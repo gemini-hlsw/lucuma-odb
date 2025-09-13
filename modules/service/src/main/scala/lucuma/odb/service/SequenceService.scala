@@ -9,13 +9,7 @@ import cats.data.EitherT
 import cats.data.OptionT
 import cats.effect.Concurrent
 import cats.effect.std.UUIDGen
-import cats.syntax.apply.*
-import cats.syntax.either.*
-import cats.syntax.eq.*
-import cats.syntax.flatMap.*
-import cats.syntax.functor.*
-import cats.syntax.option.*
-import cats.syntax.traverse.*
+import cats.syntax.all.*
 import fs2.Stream
 import grackle.Result
 import lucuma.core.enums.AtomStage
@@ -26,6 +20,7 @@ import lucuma.core.enums.SequenceType
 import lucuma.core.enums.StepStage
 import lucuma.core.enums.StepType
 import lucuma.core.model.Observation
+import lucuma.core.model.Program
 import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.AtomDigest
@@ -43,13 +38,16 @@ import lucuma.core.model.sequence.gmos.StaticConfig.GmosSouth as GmosSouthStatic
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
+import lucuma.itc.client.ItcClient
 import lucuma.odb.data.AtomExecutionState
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.data.StepExecutionState
+import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.TimeEstimateCalculator
 import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.sequence.data.StepRecord
+import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.util.Codecs.*
 import skunk.*
 import skunk.codec.numeric.int2
@@ -131,6 +129,19 @@ trait SequenceService[F[_]]:
     which: List[Observation.Id]
   )(using Transaction[F], Services.ServiceAccess): Stream[F, (Observation.Id, Short, AtomDigest)]
 
+  def updateExecutionStatesForStepEvent(
+    commitHash:    CommitHash,
+    itcClient:     ItcClient[F],
+    calculator:    TimeEstimateCalculatorImplementation.ForInstrumentMode,
+    programId:     Program.Id,
+    observationId: Observation.Id,
+    sequenceType:  SequenceType,
+    atomId:        Atom.Id,
+    stepId:        Step.Id,
+    stepStage:     StepStage,
+    time:          Timestamp
+  )(using Transaction[F], Services.ServiceAccess): F[Unit]
+
 object SequenceService:
 
   sealed trait InsertAtomResponse extends Product with Serializable
@@ -159,6 +170,24 @@ object SequenceService:
 
 
   def instantiate[F[_]: Concurrent: UUIDGen](using Services[F]): SequenceService[F] =
+    extension (s: StepStage)
+      def executionState: StepExecutionState =
+        s match
+          case StepStage.EndStep => StepExecutionState.Completed
+          case StepStage.Abort   => StepExecutionState.Aborted
+          case StepStage.Stop    => StepExecutionState.Stopped
+          case _                 => StepExecutionState.Ongoing
+
+    extension (s: StepExecutionState)
+      def isTerminal: Boolean =
+        s match
+          case StepExecutionState.NotStarted |
+               StepExecutionState.Ongoing      => false
+          case StepExecutionState.Aborted    |
+               StepExecutionState.Completed  |
+               StepExecutionState.Stopped    |
+               StepExecutionState.Abandoned    => true
+
     new SequenceService[F]:
 
       /**
@@ -234,6 +263,49 @@ object SequenceService:
           case AtomStage.EndAtom   => AtomExecutionState.Completed
         session.execute(Statements.SetAtomExecutionState)(state, atomId).void
 
+      // When a dataset event arrives, or an ongoing step event:
+      // - the step is ongoing
+      // - the associated atom is ongoing
+      // - any other ongoing steps are abandoned
+      // - any other ongoing atoms are complete
+
+      // When an end step event arrives
+      // - the step is complete
+      // - the associated atom is complete if
+      //   it has a generated atom id but the generator has no more steps for it
+
+      def updateExecutionStatesForStepEvent(
+        commitHash:    CommitHash,
+        itcClient:     ItcClient[F],
+        calculator:    TimeEstimateCalculatorImplementation.ForInstrumentMode,
+        programId:     Program.Id,
+        observationId: Observation.Id,
+        sequenceType:  SequenceType,
+        atomId:        Atom.Id,
+        stepId:        Step.Id,
+        stepStage:     StepStage,
+        time:          Timestamp
+      )(using Transaction[F], Services.ServiceAccess): F[Unit] =
+        val newAtomExecutionState: F[AtomExecutionState] =
+          if !stepStage.executionState.isTerminal then
+            AtomExecutionState.Ongoing.pure
+          else
+            services
+              .generator(commitHash, itcClient, calculator)
+              .nextAtomId(programId, observationId, sequenceType, time.some)
+              .map: e =>
+                if e.toOption.flatten.forall(_ =!= atomId) then
+                  AtomExecutionState.Completed
+                else
+                  AtomExecutionState.Ongoing
+
+        for
+          _ <- setStepExecutionState(stepId, stepStage, time)
+          s <- newAtomExecutionState
+          _ <- session.execute(Statements.SetAtomExecutionState)(s, atomId).void
+          _ <- abandonOngoingAtomsExcept(observationId, atomId)
+        yield ()
+
       override def abandonOngoingAtomsExcept(
         observationId: Observation.Id,
         atomId:        Atom.Id
@@ -248,13 +320,8 @@ object SequenceService:
         stage:  StepStage,
         time:   Timestamp
       )(using Transaction[F], Services.ServiceAccess): F[Unit] =
-        val state = stage match
-          case StepStage.EndStep => StepExecutionState.Completed
-          case StepStage.Abort   => StepExecutionState.Aborted
-          case StepStage.Stop    => StepExecutionState.Stopped
-          case _                 => StepExecutionState.Ongoing
         val completedTime = Option.when(stage === StepStage.EndStep)(time)
-        session.execute(Statements.SetStepExecutionState)(state, completedTime, stepId).void
+        session.execute(Statements.SetStepExecutionState)(stage.executionState, completedTime, stepId).void
 
       override def abandonOngoingStepsExcept(
         observationId: Observation.Id,

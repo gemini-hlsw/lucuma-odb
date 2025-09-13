@@ -514,7 +514,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
 
   private lazy val AddDatasetEvent: MutationField =
     addEvent("addDatasetEvent", AddDatasetEventInput.Binding, Predicates.datasetEvent) { input =>
-      executionEventService.insertDatasetEvent(input)
+      executionEventService.insertDatasetEvent(input, commitHash, itcClient, timeEstimateCalculator)
     }
 
   private lazy val AddSequenceEvent: MutationField =
@@ -529,7 +529,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
 
   private lazy val AddStepEvent: MutationField =
     addEvent("addStepEvent", AddStepEventInput.Binding, Predicates.stepEvent) { input =>
-      executionEventService.insertStepEvent(input)
+      executionEventService.insertStepEvent(input, commitHash, itcClient, timeEstimateCalculator)
     }
 
   private def recordAtom(

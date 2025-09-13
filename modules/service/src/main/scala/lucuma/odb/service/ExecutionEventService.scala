@@ -17,18 +17,21 @@ import grackle.syntax.*
 import lucuma.core.enums.AtomStage
 import lucuma.core.enums.DatasetStage
 import lucuma.core.enums.SequenceCommand
+import lucuma.core.enums.SequenceType
 import lucuma.core.enums.SlewStage
 import lucuma.core.enums.StepStage
 import lucuma.core.model.Client
 import lucuma.core.model.ExecutionEvent
 import lucuma.core.model.ExecutionEvent.*
 import lucuma.core.model.Observation
+import lucuma.core.model.Program
 import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.Step
 import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
+import lucuma.itc.client.ItcClient
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.input.AddAtomEventInput
@@ -36,6 +39,8 @@ import lucuma.odb.graphql.input.AddDatasetEventInput
 import lucuma.odb.graphql.input.AddSequenceEventInput
 import lucuma.odb.graphql.input.AddSlewEventInput
 import lucuma.odb.graphql.input.AddStepEventInput
+import lucuma.odb.logic.TimeEstimateCalculatorImplementation
+import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.util.Codecs.*
 import skunk.*
 import skunk.implicits.*
@@ -61,7 +66,10 @@ trait ExecutionEventService[F[_]] {
   )(using Transaction[F], Services.ServiceAccess): F[Result[ExecutionEvent]]
 
   def insertDatasetEvent(
-    input: AddDatasetEventInput
+    input:      AddDatasetEventInput,
+    commitHash: CommitHash,
+    itcClient:  ItcClient[F],
+    calculator: TimeEstimateCalculatorImplementation.ForInstrumentMode
   )(using Transaction[F], Services.ServiceAccess): F[Result[ExecutionEvent]]
 
   def insertSequenceEvent(
@@ -73,7 +81,10 @@ trait ExecutionEventService[F[_]] {
   )(using Transaction[F], Services.ServiceAccess): F[Result[ExecutionEvent]]
 
   def insertStepEvent(
-    input: AddStepEventInput
+    input:      AddStepEventInput,
+    commitHash: CommitHash,
+    itcClient:  ItcClient[F],
+    calculator: TimeEstimateCalculatorImplementation.ForInstrumentMode
   )(using Transaction[F], Services.ServiceAccess): F[Result[ExecutionEvent]]
 
   def selectSequenceEvents(
@@ -133,13 +144,16 @@ object ExecutionEventService {
         yield AtomEvent(eid, time, oid, vid, input.clientId, input.atomId, input.atomStage)).value
 
       override def insertDatasetEvent(
-        input: AddDatasetEventInput
+        input:      AddDatasetEventInput,
+        commitHash: CommitHash,
+        itcClient:  ItcClient[F],
+        calculator: TimeEstimateCalculatorImplementation.ForInstrumentMode
       )(using xa: Transaction[F], sa: Services.ServiceAccess): F[Result[ExecutionEvent]] =
 
         def invalidDataset: OdbError.InvalidDataset =
           OdbError.InvalidDataset(input.datasetId, Some(s"Dataset '${input.datasetId.show}' not found"))
 
-        val insertEvent: F[Result[(Id, Timestamp, Observation.Id, Visit.Id, Atom.Id, Step.Id)]] =
+        val insertEvent: F[Result[(Id, Timestamp, Program.Id, Observation.Id, Visit.Id, SequenceType, Atom.Id, Step.Id)]] =
           session
             .option(Statements.InsertDatasetEvent)(input)
             .map(_.toResult(invalidDataset.asProblem))
@@ -168,7 +182,22 @@ object ExecutionEventService {
 
         (for
           e <- ResultT(insertEvent)
-          (eid, time, oid, vid, aid, sid) = e
+          (eid, time, pid, oid, vid, seqType, aid, sid) = e
+          _ <- ResultT.liftF:
+            services
+              .sequenceService
+              .updateExecutionStatesForStepEvent(
+                commitHash,
+                itcClient,
+                calculator,
+                pid,
+                oid,
+                seqType,
+                aid,
+                sid,
+                StepStage.Continue,
+                time
+              )
           _ <- ResultT.liftF(setDatasetTime(time))
           _ <- ResultT.liftF(timeAccountingService.update(vid))
         yield DatasetEvent(eid, time, oid, vid, input.clientId, aid, sid, input.datasetId, input.datasetStage)).value
@@ -219,13 +248,16 @@ object ExecutionEventService {
         yield SlewEvent(eid, time, input.observationId, v, input.clientId, input.slewStage)).value
 
       override def insertStepEvent(
-        input: AddStepEventInput
+        input:      AddStepEventInput,
+        commitHash: CommitHash,
+        itcClient:  ItcClient[F],
+        calculator: TimeEstimateCalculatorImplementation.ForInstrumentMode
       )(using Transaction[F], Services.ServiceAccess): F[Result[ExecutionEvent]] =
 
         def invalidStep: OdbError.InvalidStep =
           OdbError.InvalidStep(input.stepId, Some(s"Step '${input.stepId}' not found"))
 
-        val insert: F[Result[(Id, Timestamp, Observation.Id, Visit.Id, Atom.Id)]] =
+        val insert: F[Result[(Id, Timestamp, Program.Id, Observation.Id, Visit.Id, SequenceType, Atom.Id)]] =
           session
             .option(Statements.InsertStepEvent)(input)
             .map(_.toResult(invalidStep.asProblem))
@@ -237,12 +269,28 @@ object ExecutionEventService {
 
         (for
           e <- ResultT(insert)
-          (eid, time, oid, vid, aid) = e
-          _ <- ResultT.liftF(services.sequenceService.setAtomExecutionState(aid, AtomStage.StartAtom))
-          _ <- ResultT.liftF(services.sequenceService.setStepExecutionState(input.stepId, input.stepStage, time))
-          _ <- ResultT.liftF(services.sequenceService.abandonOngoingStepsExcept(oid, aid, input.stepId))
+          (eid, time, pid, oid, vid, seqType, aid) = e
+          _ <- ResultT.liftF:
+            services
+              .sequenceService
+              .updateExecutionStatesForStepEvent(
+                commitHash,
+                itcClient,
+                calculator,
+                pid,
+                oid,
+                seqType,
+                aid,
+                input.stepId,
+                input.stepStage,
+                time
+              )
           _ <- ResultT.liftF(timeAccountingService.update(vid))
         yield StepEvent(eid, time, oid, vid, input.clientId, aid, input.stepId, input.stepStage)).value
+
+//          _ <- ResultT.liftF(services.sequenceService.setAtomExecutionState(aid, AtomStage.StartAtom))
+//          _ <- ResultT.liftF(services.sequenceService.setStepExecutionState(input.stepId, input.stepStage, time))
+//          _ <- ResultT.liftF(services.sequenceService.abandonOngoingStepsExcept(oid, aid, input.stepId))
 
       override def selectSequenceEvents(
         oid: Observation.Id
@@ -326,45 +374,62 @@ object ExecutionEventService {
       """.query(execution_event_id *: core_timestamp *: observation_id *: visit_id)
          .contramap(in => (in.atomId, in.atomStage, in.clientId, in.atomId))
 
-    val InsertDatasetEvent: Query[AddDatasetEventInput, (Id, Timestamp, Observation.Id, Visit.Id, Atom.Id, Step.Id)] =
+    val InsertDatasetEvent: Query[AddDatasetEventInput, (Id, Timestamp, Program.Id, Observation.Id, Visit.Id, SequenceType, Atom.Id, Step.Id)] =
       sql"""
-        INSERT INTO t_execution_event (
-          c_event_type,
-          c_program_id,
-          c_observation_id,
-          c_visit_id,
-          c_atom_id,
-          c_step_id,
-          c_dataset_id,
-          c_dataset_stage,
-          c_client_id
+        WITH ins AS (
+          INSERT INTO t_execution_event (
+            c_event_type,
+            c_program_id,
+            c_observation_id,
+            c_visit_id,
+            c_atom_id,
+            c_step_id,
+            c_dataset_id,
+            c_dataset_stage,
+            c_client_id
+          )
+          SELECT
+            'dataset' :: e_execution_event_type,
+            o.c_program_id,
+            d.c_observation_id,
+            d.c_visit_id,
+            s.c_atom_id,
+            d.c_step_id,
+            $dataset_id,
+            $dataset_stage,
+            ${client_id.opt}
+          FROM
+            t_dataset d
+          INNER JOIN
+            t_observation o ON o.c_observation_id = d.c_observation_id
+          INNER JOIN
+            t_step_record s ON s.c_step_id = d.c_step_id
+          INNER JOIN
+            t_atom_record a ON a.c_atom_id = s.c_atom_id
+          WHERE
+            d.c_dataset_id = $dataset_id
+          RETURNING
+            c_execution_event_id,
+            c_received,
+            c_program_id,
+            c_observation_id,
+            c_visit_id,
+            c_atom_id,
+            c_step_id
         )
         SELECT
-          'dataset' :: e_execution_event_type,
-          o.c_program_id,
-          d.c_observation_id,
-          d.c_visit_id,
-          s.c_atom_id,
-          d.c_step_id,
-          $dataset_id,
-          $dataset_stage,
-          ${client_id.opt}
-        FROM
-          t_dataset d
+          ins.c_execution_event_id,
+          ins.c_received,
+          ins.c_program_id,
+          ins.c_observation_id,
+          ins.c_visit_id,
+          a.c_sequence_type,
+          ins.c_atom_id,
+          ins.c_step_id
+        FROM ins
         INNER JOIN
-          t_observation o ON o.c_observation_id = d.c_observation_id
-        INNER JOIN
-          t_step_record s ON s.c_step_id = d.c_step_id
-        WHERE
-          d.c_dataset_id = $dataset_id
-        RETURNING
-          c_execution_event_id,
-          c_received,
-          c_observation_id,
-          c_visit_id,
-          c_atom_id,
-          c_step_id
-      """.query(execution_event_id *: core_timestamp *: observation_id *: visit_id *: atom_id *: step_id)
+          t_atom_record a ON a.c_atom_id = ins.c_atom_id
+      """.query(execution_event_id *: core_timestamp *: program_id *: observation_id *: visit_id *: sequence_type *: atom_id *: step_id)
          .contramap(in => (in.datasetId, in.datasetStage, in.clientId, in.datasetId))
 
     val InsertSequenceEvent: Query[AddSequenceEventInput, (Id, Timestamp, Observation.Id)] =
@@ -426,42 +491,56 @@ object ExecutionEventService {
       """.query(execution_event_id *: core_timestamp)
          .contramap((v, in) => (v, in.slewStage, in.clientId, v))
 
-    val InsertStepEvent: Query[AddStepEventInput, (Id,  Timestamp, Observation.Id, Visit.Id, Atom.Id)] =
+    val InsertStepEvent: Query[AddStepEventInput, (Id,  Timestamp, Program.Id, Observation.Id, Visit.Id, SequenceType, Atom.Id)] =
       sql"""
-        INSERT INTO t_execution_event (
-          c_event_type,
-          c_program_id,
-          c_observation_id,
-          c_visit_id,
-          c_atom_id,
-          c_step_id,
-          c_step_stage,
-          c_client_id
+        WITH ins AS (
+          INSERT INTO t_execution_event (
+            c_event_type,
+            c_program_id,
+            c_observation_id,
+            c_visit_id,
+            c_atom_id,
+            c_step_id,
+            c_step_stage,
+            c_client_id
+          )
+          SELECT
+            'step' :: e_execution_event_type,
+            o.c_program_id,
+            a.c_observation_id,
+            a.c_visit_id,
+            s.c_atom_id,
+            $step_id,
+            $step_stage,
+            ${client_id.opt}
+          FROM
+            t_step_record s
+          INNER JOIN
+            t_atom_record a ON a.c_atom_id = s.c_atom_id
+          INNER JOIN
+            t_observation o ON o.c_observation_id = a.c_observation_id
+          WHERE
+            s.c_step_id = $step_id
+          RETURNING
+            c_execution_event_id,
+            c_received,
+            c_program_id,
+            c_observation_id,
+            c_visit_id,
+            c_atom_id
         )
         SELECT
-          'step' :: e_execution_event_type,
-          o.c_program_id,
-          a.c_observation_id,
-          a.c_visit_id,
-          s.c_atom_id,
-          $step_id,
-          $step_stage,
-          ${client_id.opt}
-        FROM
-          t_step_record s
+          ins.c_execution_event_id,
+          ins.c_received,
+          ins.c_program_id,
+          ins.c_observation_id,
+          ins.c_visit_id,
+          a.c_sequence_type,
+          ins.c_atom_id
+        FROM ins
         INNER JOIN
-          t_atom_record a ON a.c_atom_id = s.c_atom_id
-        INNER JOIN
-          t_observation o ON o.c_observation_id = a.c_observation_id
-        WHERE
-          s.c_step_id = $step_id
-        RETURNING
-          c_execution_event_id,
-          c_received,
-          c_observation_id,
-          c_visit_id,
-          c_atom_id
-      """.query(execution_event_id *: core_timestamp *: observation_id *: visit_id *: atom_id)
+          t_atom_record a ON a.c_atom_id = ins.c_atom_id
+      """.query(execution_event_id *: core_timestamp *: program_id *: observation_id *: visit_id *: sequence_type *: atom_id)
          .contramap(in => (in.stepId, in.stepStage, in.clientId, in.stepId))
 
 
