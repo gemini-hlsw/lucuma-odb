@@ -158,17 +158,6 @@ sealed trait Generator[F[_]] {
     observationId: Observation.Id
   )(using NoTransaction[F], Services.ServiceAccess): F[ExecutionState]
 
-  /**
-   * Equivalent to executionState above, but uses provided asterism results and
-   * generator params rather than computing them.
-   */
-//  def executionState(
-//    pid:    Program.Id,
-//    oid:    Observation.Id,
-//    itcRes: ItcService.AsterismResults,
-//    params: GeneratorParams,
-//  )(using Services.ServiceAccess): F[ExecutionState]
-
   /** Equivalent to executionState above, but computes many results. */
   def executionStates(
     input: Map[Observation.Id, (Program.Id, ItcService.AsterismResults, GeneratorParams)]
@@ -600,20 +589,6 @@ object Generator {
             _.science.executionState
           ))
 
-/*
-      override def executionState(
-        pid:    Program.Id,
-        oid:    Observation.Id,
-        itcRes: ItcService.AsterismResults,
-        params: GeneratorParams,
-      )(using Services.ServiceAccess): F[ExecutionState] =
-        digestWithParamsAndHash(Context(pid, oid, Right(itcRes), params), None)
-          .map(_._1)
-          .value
-          .map:
-            case Left(_)  => ExecutionState.NotDefined
-            case Right(d) => d.science.executionState
-*/
       override def executionStates(
         input: Map[Observation.Id, (Program.Id, ItcService.AsterismResults, GeneratorParams)]
       )(using Transaction[F], Services.ServiceAccess): F[Map[Observation.Id, ExecutionState]] =

@@ -549,12 +549,6 @@ class executionDigest extends ExecutionTestSupportForGmos {
               d <- services.executionDigestService.selectOne(o, Md5Hash.Zero)(using xa)
             yield d.isEmpty
 
-/*
-        db   <- FMain.databasePoolResource[IO](databaseConfig)
-        enm  <- db.evalMap(Enums.load)
-        ptc  <- db.evalMap(TimeEstimateCalculatorImplementation.fromSession(_, enm))
- */
-
     assertIOBoolean(isEmpty, "The execution digest should be removed")
 
 

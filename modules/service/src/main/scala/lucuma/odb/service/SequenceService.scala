@@ -178,16 +178,6 @@ object SequenceService:
           case StepStage.Stop    => StepExecutionState.Stopped
           case _                 => StepExecutionState.Ongoing
 
-    extension (s: StepExecutionState)
-      def isTerminal: Boolean =
-        s match
-          case StepExecutionState.NotStarted |
-               StepExecutionState.Ongoing      => false
-          case StepExecutionState.Aborted    |
-               StepExecutionState.Completed  |
-               StepExecutionState.Stopped    |
-               StepExecutionState.Abandoned    => true
-
     new SequenceService[F]:
 
       /**

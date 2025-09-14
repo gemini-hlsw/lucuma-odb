@@ -288,10 +288,6 @@ object ExecutionEventService {
           _ <- ResultT.liftF(timeAccountingService.update(vid))
         yield StepEvent(eid, time, oid, vid, input.clientId, aid, input.stepId, input.stepStage)).value
 
-//          _ <- ResultT.liftF(services.sequenceService.setAtomExecutionState(aid, AtomStage.StartAtom))
-//          _ <- ResultT.liftF(services.sequenceService.setStepExecutionState(input.stepId, input.stepStage, time))
-//          _ <- ResultT.liftF(services.sequenceService.abandonOngoingStepsExcept(oid, aid, input.stepId))
-
       override def selectSequenceEvents(
         oid: Observation.Id
       ): Stream[F, SequenceEvent] =
