@@ -123,7 +123,7 @@ object ExecutionEventService {
               ResultT.liftF:
                 for
                   _ <- services.sequenceService.setAtomExecutionState(input.atomId, input.atomStage)
-                  _ <- services.sequenceService.abandonOngoingAtomsExcept(oid, input.atomId)
+                  _ <- services.sequenceService.abandonOngoingStepsExcept(oid, input.atomId, none)
                   _ <- timeAccountingService.update(vid)
                 yield eid
             else
@@ -166,7 +166,8 @@ object ExecutionEventService {
           .flatMap: (eid, time, vid, wasInserted) =>
             if wasInserted then
               ResultT.liftF:
-                setDatasetTime(time) *>
+                services.sequenceService.abandonOngoingStepsExcept(oid, aid, sid.some)) *>
+                setDatasetTime(time)                                                    *>
                 timeAccountingService.update(vid).as(eid)
             else
               ResultT.pure(eid)
@@ -192,7 +193,7 @@ object ExecutionEventService {
             if wasInserted then
               ResultT.liftF:
                 for
-                  _ <- services.sequenceService.abandonAtomsAndStepsForObservation(oid).whenA(input.command.isTerminal)
+                  _ <- sservices.sequenceService.abandonOngoingSteps(oid).whenA(input.command.isTerminal)
                   _ <- timeAccountingService.update(input.visitId)
                 yield eid
             else

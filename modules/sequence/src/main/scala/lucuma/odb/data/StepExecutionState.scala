@@ -36,4 +36,7 @@ enum StepExecutionState(val tag: String) derives Enumerated:
       case Aborted | Stopped | Abandoned => completedFailure
       case Completed                     => completedSuccess
 
+  def isTerminal: Boolean =
+    fold(false, true, true)
+
 end StepExecutionState

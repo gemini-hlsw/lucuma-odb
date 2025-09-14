@@ -18,8 +18,11 @@ enum AtomExecutionState(val tag: String) derives Enumerated:
   /** Atom events have arrived, but none are terminal. */
   case Ongoing     extends AtomExecutionState("ongoing")
 
-  /** The atom ended with END_ATOM. */
+  /** The atom ended and no more steps will be executed. */
   case Completed   extends AtomExecutionState("completed")
 
-  /** The atom execution was abandoned. */
+  /**
+   * The atom execution was abandoned.
+   * @deprecated("no longer used and will be removed")
+   */
   case Abandoned  extends AtomExecutionState("abandoned")
