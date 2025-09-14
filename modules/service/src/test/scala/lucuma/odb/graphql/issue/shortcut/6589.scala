@@ -22,12 +22,14 @@ import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.syntax.timespan.*
 import lucuma.itc.IntegrationTime
+import lucuma.odb.data.AtomExecutionState
+import lucuma.odb.graphql.mutation.ExecutionState
 import lucuma.odb.graphql.query.ExecutionTestSupportForGmos
 import lucuma.odb.json.gmos.given
 import lucuma.odb.json.time.transport.given
 import lucuma.odb.json.wavelength.transport.given
 
-class ShortCut_6589 extends ExecutionTestSupportForGmos:
+class ShortCut_6589 extends ExecutionTestSupportForGmos with ExecutionState:
 
   override def fakeItcSpectroscopyResult: IntegrationTime =
     IntegrationTime(
@@ -185,3 +187,17 @@ class ShortCut_6589 extends ExecutionTestSupportForGmos:
           // now we think we need a flat and the original missing science step
           _ <- assertIO(nextAtomStepTypes(setup.o), List(StepType.Gcal, StepType.Science))
         yield ()
+
+  test("After the last step in the atom finishes, the atom is marked complete."):
+    Setup
+      .init(50)
+      .flatMap: setup =>
+        assertIO(atomExecutionState(staff, setup.o), List(AtomExecutionState.Completed))
+
+//  test("... but not if you subsequently invalidate a dataset"):
+//    Setup
+//      .init(60)
+//      .flatMap: setup =>
+//        for
+//          _ <- setQaState(setup.d, DatasetQaState.Usable)
+//        assertIO(atomExecutionState(staff, setup.o), List(AtomExecutionState.Completed))
