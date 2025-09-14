@@ -68,21 +68,16 @@ trait SequenceService[F[_]]:
     stage:  AtomStage
   )(using Transaction[F], Services.ServiceAccess): F[Unit]
 
-  def abandonOngoingStepsExceptAtom(
+  def abandonOngoingStepsExcept(
     observationId: Observation.Id,
-    atomId:        Atom.Id
+    atomId:        Atom.Id,
+    stepId:        Option[Step.Id]
   )(using Transaction[F], Services.ServiceAccess): F[Unit]
 
   def setStepExecutionState(
     stepId: Step.Id,
     stage:  StepStage,
     time:   Timestamp
-  )(using Transaction[F], Services.ServiceAccess): F[Unit]
-
-  def abandonOngoingStepsExcept(
-    observationId: Observation.Id,
-    atomId:        Atom.Id,
-    stepId:        Step.Id
   )(using Transaction[F], Services.ServiceAccess): F[Unit]
 
   def insertAtomRecord(
@@ -234,23 +229,18 @@ object SequenceService:
           _ <- session.execute(Statements.AbandonAllNonTerminalStepsForObservation)(observationId)
         yield ()
 
-      override def abandonOngoingStepsExceptAtom(
-        observationId: Observation.Id,
-        atomId:        Atom.Id
-      )(using Transaction[F], Services.ServiceAccess): F[Unit] =
-        for
-          _ <- session.execute(Statements.CompleteOngoingAtomsWithoutAtomId)(observationId, atomId)
-          _ <- session.execute(Statements.AbandonOngoingStepsWithoutAtomId)(observationId, atomId)
-        yield ()
-
       override def abandonOngoingStepsExcept(
         observationId: Observation.Id,
         atomId:        Atom.Id,
-        stepId:        Step.Id
+        stepId:        Option[Step.Id]
       )(using Transaction[F], Services.ServiceAccess): F[Unit] =
+        val abandonSteps =
+          stepId.fold(session.execute(Statements.AbandonOngoingStepsWithoutAtomId)(observationId, atomId)): sid =>
+            session.execute(Statements.AbandonOngoingStepsWithoutStepId)(observationId, sid)
+
         for
           _ <- session.execute(Statements.CompleteOngoingAtomsWithoutAtomId)(observationId, atomId)
-          _ <- session.execute(Statements.AbandonOngoingStepsWithoutStepId)(observationId, stepId)
+          _ <- abandonSteps
         yield ()
 
       override def setStepExecutionState(
