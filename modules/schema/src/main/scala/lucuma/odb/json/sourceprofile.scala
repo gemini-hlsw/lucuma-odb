@@ -8,6 +8,7 @@ import cats.instances.order.*
 import cats.syntax.either.*
 import cats.syntax.traverse.*
 import coulomb.Quantity
+import coulomb.syntax.*
 import coulomb.units.si.Kelvin
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.types.numeric.PosInt
@@ -111,7 +112,7 @@ trait SourceProfileCodec {
       v.value.asJson
 
     def apply(c: HCursor): Decoder.Result[LineWidthQuantity] =
-      c.as[LineWidthValue].map { lwv => Quantity[KilometersPerSecond](lwv) }
+      c.as[LineWidthValue].map(_.withUnit[KilometersPerSecond])
   }
 
   // Measure[N] Of T
@@ -165,15 +166,15 @@ trait SourceProfileCodec {
       def decode[A: Enumerated](n: String)(f: A => UnnormalizedSED): Decoder.Result[UnnormalizedSED] =
         c.downField(n).as[A].map(f)
 
-      decode("stellarLibrary")(StellarLibrary(_))                                              orElse
-        decode("coolStar")(CoolStarModel(_))                                                   orElse
-        decode("galaxy")(Galaxy(_))                                                            orElse
-        decode("planet")(Planet(_))                                                            orElse
-        decode("quasar")(Quasar(_))                                                            orElse
-        decode("hiiRegion")(HIIRegion(_))                                                      orElse
-        decode("planetaryNebula")(PlanetaryNebula(_))                                          orElse
-        c.downField("powerLaw").as[BigDecimal].map(PowerLaw(_))                                orElse
-        c.downField("blackBodyTempK").as[PosInt].map { k => BlackBody(Quantity[Kelvin](k)) }   orElse
+      decode("stellarLibrary")(StellarLibrary(_))                                        orElse
+        decode("coolStar")(CoolStarModel(_))                                             orElse
+        decode("galaxy")(Galaxy(_))                                                      orElse
+        decode("planet")(Planet(_))                                                      orElse
+        decode("quasar")(Quasar(_))                                                      orElse
+        decode("hiiRegion")(HIIRegion(_))                                                orElse
+        decode("planetaryNebula")(PlanetaryNebula(_))                                    orElse
+        c.downField("powerLaw").as[BigDecimal].map(PowerLaw(_))                          orElse
+        c.downField("blackBodyTempK").as[PosInt].map(k => BlackBody(k.withUnit[Kelvin])) orElse
         c.downField("fluxDensities")
          .values
          .toRight(DecodingFailure("fluxDensities should hold an array of values", c.history))

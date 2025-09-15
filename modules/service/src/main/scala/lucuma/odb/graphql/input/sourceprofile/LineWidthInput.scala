@@ -6,14 +6,13 @@ package input
 package sourceprofile
 
 import coulomb.Quantity
+import coulomb.syntax.*
 import lucuma.core.math.BrightnessUnits.LineWidthQuantity
 import lucuma.core.math.LineWidthValue
 import lucuma.core.math.units.*
 import lucuma.odb.graphql.binding.*
 
 val LineWidthBinding: Matcher[LineWidthQuantity] =
-  BigDecimalBinding.emap { d =>
-    LineWidthValue.from(d).map { lwv =>
-      Quantity[KilometersPerSecond](lwv)
-    }
-  }
+  BigDecimalBinding.emap: d =>
+    LineWidthValue.from(d).map: lwv =>
+      lwv.withUnit[KilometersPerSecond]
