@@ -17,6 +17,7 @@ import lucuma.core.enums.SequenceCommand
 import lucuma.core.enums.Site
 import lucuma.core.enums.SlewStage
 import lucuma.core.model.Client
+import lucuma.core.model.ExecutionEvent
 import lucuma.core.model.Observation
 import lucuma.core.model.ObservingNight
 import lucuma.core.model.User
@@ -223,47 +224,40 @@ class addSlewEvent extends OdbSuite:
       )
 
   def addClientId(
-    oid:         Observation.Id,
-    cid:         Client.Id,
-    isDuplicate: Boolean
-  ): IO[Unit] =
-      expect(
-        service,
-        s"""
-          mutation {
-            addSlewEvent(input: {
-              observationId: "$oid",
-              slewStage: START_SLEW,
-              clientId: "$cid"
-            }) {
-              event { clientId }
+    oid: Observation.Id,
+    cid: Client.Id
+  ): IO[(ExecutionEvent.Id, Client.Id)] =
+    query(
+      service,
+      s"""
+        mutation {
+          addSlewEvent(input: {
+            observationId: "$oid",
+            slewStage: START_SLEW,
+            clientId: "$cid"
+          }) {
+            event {
+              id
+              clientId
             }
           }
-        """,
-        Either.cond(
-          !isDuplicate,
-          json"""
-            {
-              "addSlewEvent": {
-                "event": {
-                  "clientId": $cid
-                }
-              }
-            }
-          """,
-          List(s"An event with client id '$cid' has already been added.")
-        )
-      )
+        }
+      """).flatMap: js =>
+        val cur = js.hcursor.downFields("addSlewEvent", "event")
+        (for
+          e <- cur.downField("id").as[ExecutionEvent.Id]
+          d <- cur.downField("clientId").as[Client.Id]
+        yield (e, d)).leftMap(f => new RuntimeException(f.message)).liftTo[IO]
 
   test("addSlewEvent - client id"):
-    val cid  = Client.Id.parse("c-530c979f-de98-472f-9c23-a3442f2a9f7f")
+    val cid  = Client.Id.parse("c-530c979f-de98-472f-9c23-a3442f2a9f7f").get
 
     createObservation(ObservingModeType.GmosNorthLongSlit, pi).flatMap: oid =>
-      addClientId(oid, cid.get, isDuplicate = false)
+      assertIO(addClientId(oid, cid).map(_._2), cid)
 
   test("addSlewEvent - duplicate client id"):
-    val cid  = Client.Id.parse("c-b7044cd8-38b5-4592-8d99-91d2c512041d")
+    val cid  = Client.Id.parse("c-b7044cd8-38b5-4592-8d99-91d2c512041d").get
 
     createObservation(ObservingModeType.GmosNorthLongSlit, pi).flatMap: oid =>
-      addClientId(oid, cid.get, isDuplicate = false) *>
-      addClientId(oid, cid.get, isDuplicate = true)
+      addClientId(oid, cid).flatMap: (eid, _) =>
+        assertIO(addClientId(oid, cid).map(_._1), eid)
