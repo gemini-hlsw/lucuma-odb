@@ -9,8 +9,8 @@ import eu.timepit.refined.numeric.Positive
 import lucuma.core.model.ServiceUser
 import lucuma.core.model.StandardRole
 import lucuma.core.model.User
+import lucuma.core.refined.auto.*
 import lucuma.core.util.Gid
-import lucuma.refined.*
 import lucuma.sso.client.ApiKey
 import lucuma.sso.client.SsoJwtClaim
 import lucuma.sso.service.simulator.SsoSimulator
