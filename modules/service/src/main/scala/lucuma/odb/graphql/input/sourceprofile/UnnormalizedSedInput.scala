@@ -8,6 +8,8 @@ package sourceprofile
 import cats.data.NonEmptyMap
 import cats.syntax.all.*
 import coulomb.Quantity
+import coulomb.syntax.*
+import coulomb.units.si.*
 import eu.timepit.refined.types.numeric
 import grackle.Result
 import lucuma.core.enums.*
@@ -53,7 +55,7 @@ object UnnormalizedSedInput {
           case (None, None, None, None, None, None, None, None, Some(v), None, None) =>
             numeric.PosInt.from(v) match {
               case Left(err)  => Matcher.validationFailure(err)
-              case Right(pbd) => Result(UnnormalizedSED.BlackBody(Quantity(pbd)))
+              case Right(pbd) => Result(UnnormalizedSED.BlackBody(pbd.withUnit[Kelvin]))
             }
 
           case (None, None, None, None, None, None, None, None, None, Some(v), None) =>

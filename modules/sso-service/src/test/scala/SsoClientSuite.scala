@@ -8,7 +8,7 @@ import cats.syntax.all.*
 import eu.timepit.refined.numeric.Positive
 import lucuma.core.model.ServiceUser
 import lucuma.core.model.User
-import lucuma.refined.*
+import lucuma.core.refined.auto.*
 import lucuma.sso.client.ApiKey
 import lucuma.sso.client.SsoClient
 import lucuma.sso.client.SsoClient.UserInfo

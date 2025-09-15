@@ -4,7 +4,8 @@
 package lucuma.odb.graphql
 package mapping
 
-import coulomb.*
+import coulomb.Quantity
+import coulomb.syntax.*
 import grackle.Result
 import grackle.skunk.SkunkMapping
 import io.circe.Json
@@ -341,7 +342,7 @@ object GmosLongSlitMapping {
     s.split(',').toList.map(n => BigDecimal(n.trim))
 
   private def decodeWavelengthDithers(s: String): Json =
-    parseCsvBigDecimals(s).map(bd => WavelengthDither.nanometers.unsafeGet(Quantity[Nanometer](bd)).asJson).asJson
+    parseCsvBigDecimals(s).map(bd => WavelengthDither.nanometers.unsafeGet(bd.withUnit[Nanometer]).asJson).asJson
 
   private def defaultWavelengthDithersNorthJson(g: GmosNorthGrating): Json =
     Config.defaultWavelengthDithersNorth(g).map(_.asJson).asJson

@@ -24,6 +24,8 @@ import grackle.syntax.*
 import lucuma.core.enums.ChargeClass
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.math.Offset
+import lucuma.core.math.SingleSN
+import lucuma.core.math.TotalSN
 import lucuma.core.model.Observation
 import lucuma.core.model.ObservationWorkflow
 import lucuma.core.model.Program
@@ -362,7 +364,7 @@ object ObscalcService:
 
     val signal_to_noise_at: Codec[SignalToNoiseAt] =
       (wavelength_pm *: signal_to_noise *: signal_to_noise)
-        .imap((w, s, t) => SignalToNoiseAt(w, lucuma.itc.SingleSN(s), lucuma.itc.TotalSN(t)))(
+        .imap((w, s, t) => SignalToNoiseAt(w, SingleSN(s), TotalSN(t)))(
           sna => (sna.wavelength, sna.single.value, sna.total.value)
         )
 
