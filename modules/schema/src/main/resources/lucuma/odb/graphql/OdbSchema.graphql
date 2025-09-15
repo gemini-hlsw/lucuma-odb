@@ -1252,18 +1252,18 @@ input FluxDensity {
 A flux density continuum value with integrated units
 """
 input FluxDensityContinuumIntegratedInput {
-  value: PosBigDecimal!
+  value: BigDecimal!
   units: FluxDensityContinuumIntegratedUnits!
-  error: PosBigDecimal
+  error: BigDecimal
 }
 
 """
 A flux density continuum value with surface units
 """
 input FluxDensityContinuumSurfaceInput {
-  value: PosBigDecimal!
+  value: BigDecimal!
   units: FluxDensityContinuumSurfaceUnits!
-  error: PosBigDecimal
+  error: BigDecimal
 }
 
 """
