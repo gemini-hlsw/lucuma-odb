@@ -15,6 +15,7 @@ import io.circe.literal.*
 import lucuma.core.enums.DatasetStage
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.model.Client
+import lucuma.core.model.ExecutionEvent
 import lucuma.core.model.Observation
 import lucuma.core.model.User
 import lucuma.core.model.sequence.Dataset
@@ -250,50 +251,43 @@ class addDatasetEvent extends OdbSuite {
   }
 
   def addClientId(
-    did:         Dataset.Id,
-    cid:         Client.Id,
-    isDuplicate: Boolean
-  ): IO[Unit] =
-      expect(
+    did: Dataset.Id,
+    cid: Client.Id
+  ): IO[(ExecutionEvent.Id, Client.Id)] =
+      query(
         service,
         s"""
           mutation {
             addDatasetEvent(input: {
-              datasetId: "$did",
+              datasetId: "$did"
               datasetStage: START_WRITE
               clientId: "$cid"
             }) {
-              event { clientId }
-            }
-          }
-        """,
-        Either.cond(
-          !isDuplicate,
-          json"""
-            {
-              "addDatasetEvent": {
-                "event": {
-                  "clientId": $cid
-                }
+              event {
+                id
+                clientId
               }
             }
-          """,
-          List(s"An event with client id '$cid' has already been added.")
-        )
-      )
-
+          }
+        """
+      ).flatMap: js =>
+        val cur = js.hcursor.downFields("addDatasetEvent", "event")
+        (for
+          e <- cur.downField("id").as[ExecutionEvent.Id]
+          d <- cur.downField("clientId").as[Client.Id]
+        yield (e, d)).leftMap(f => new RuntimeException(f.message)).liftTo[IO]
 
   test("addDatasetEvent - client id"):
-    val cid  = Client.Id.parse("c-530c979f-de98-472f-9c23-a3442f2a9f7f")
+    val cid  = Client.Id.parse("c-530c979f-de98-472f-9c23-a3442f2a9f7f").get
 
     recordDataset(mode, service, "N18630101S0009.fits").flatMap: (_, did) =>
-      addClientId(did, cid.get, isDuplicate = false)
+      assertIO(addClientId(did, cid).map(_._2), cid)
 
   test("addDatasetEvent - duplicate client id"):
-    val cid  = Client.Id.parse("c-b7044cd8-38b5-4592-8d99-91d2c512041d")
+    val cid  = Client.Id.parse("c-b7044cd8-38b5-4592-8d99-91d2c512041d").get
 
     recordDataset(mode, service, "N18630101S0010.fits").flatMap: (_, did) =>
-      addClientId(did, cid.get, isDuplicate = false) *>
-      addClientId(did, cid.get, isDuplicate = true)
+      addClientId(did, cid).flatMap: (eid, _) =>
+        assertIO(addClientId(did, cid).map(_._1), eid)
 
 }
