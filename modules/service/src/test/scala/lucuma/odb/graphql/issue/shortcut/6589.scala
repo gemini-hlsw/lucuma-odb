@@ -9,6 +9,7 @@ import cats.syntax.either.*
 import cats.syntax.eq.*
 import cats.syntax.traverse.*
 import eu.timepit.refined.types.numeric.PosInt
+import lucuma.core.enums.AtomStage
 import lucuma.core.enums.DatasetQaState
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObserveClass
@@ -114,11 +115,19 @@ class ShortCut_6589 extends ExecutionTestSupportForGmos:
       .flatMap: s =>
         assertIOBoolean(nextAtomId(s.o).map(_ =!= s.g))
 
-  test("... but not if there was a failed step."):
+  test("... but not if there was a failed step"):
     Setup
       .init(20)
       .flatMap: s =>
         setQaState(s.d, DatasetQaState.Usable) *>
+        assertIO(nextAtomId(s.o), s.g)
+
+  test("... even if there is an end atom event"):
+    Setup
+      .init(25)
+      .flatMap: s =>
+        addAtomEventAs(serviceUser, s.a, AtomStage.EndAtom) *>
+        setQaState(s.d, DatasetQaState.Usable)              *>
         assertIO(nextAtomId(s.o), s.g)
 
   def nextAtomStepTypes(o: Observation.Id): IO[List[StepType]] =
