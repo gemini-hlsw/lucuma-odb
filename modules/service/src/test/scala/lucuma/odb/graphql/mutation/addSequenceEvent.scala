@@ -14,6 +14,7 @@ import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.SequenceCommand
 import lucuma.core.enums.StepStage
 import lucuma.core.model.Client
+import lucuma.core.model.ExecutionEvent
 import lucuma.core.model.Observation
 import lucuma.core.model.User
 import lucuma.core.model.Visit
@@ -148,11 +149,10 @@ class addSequenceEvent extends OdbSuite with ExecutionState {
   }
 
   def addClientId(
-    vid:         Visit.Id,
-    cid:         Client.Id,
-    isDuplicate: Boolean
-  ): IO[Unit] =
-    expect(
+    vid: Visit.Id,
+    cid: Client.Id
+  ): IO[(ExecutionEvent.Id, Client.Id)] =
+    query(
       service,
       s"""
         mutation {
@@ -161,36 +161,31 @@ class addSequenceEvent extends OdbSuite with ExecutionState {
             command: START,
             clientId: "$cid"
           }) {
-            event { clientId }
-          }
-        }
-      """,
-      Either.cond(
-        !isDuplicate,
-        json"""
-          {
-            "addSequenceEvent": {
-              "event": {
-                "clientId": $cid
-              }
+            event {
+              id
+              clientId
             }
           }
-        """,
-        List(s"An event with client id '$cid' has already been added.")
-      )
-    )
+        }
+      """
+    ).flatMap: js =>
+      val cur = js.hcursor.downFields("addSequenceEvent", "event")
+      (for
+        e <- cur.downField("id").as[ExecutionEvent.Id]
+        d <- cur.downField("clientId").as[Client.Id]
+      yield (e, d)).leftMap(f => new RuntimeException(f.message)).liftTo[IO]
 
   test("addSequenceEvent - client id"):
-    val cid  = Client.Id.parse("c-530c979f-de98-472f-9c23-a3442f2a9f7f")
+    val cid  = Client.Id.parse("c-530c979f-de98-472f-9c23-a3442f2a9f7f").get
 
     recordVisit(ObservingModeType.GmosNorthLongSlit, service).flatMap: (_, vid) =>
-      addClientId(vid, cid.get, isDuplicate = false)
+      assertIO(addClientId(vid, cid).map(_._2), cid)
 
   test("addSequenceEvent - duplicate client id"):
-    val cid  = Client.Id.parse("c-b7044cd8-38b5-4592-8d99-91d2c512041d")
+    val cid  = Client.Id.parse("c-b7044cd8-38b5-4592-8d99-91d2c512041d").get
 
     recordVisit(ObservingModeType.GmosNorthLongSlit, service).flatMap: (_, vid) =>
-      addClientId(vid, cid.get, isDuplicate = false) *>
-      addClientId(vid, cid.get, isDuplicate = true)
+      addClientId(vid, cid).flatMap: (eid, _) =>
+        assertIO(addClientId(vid, cid).map(_._1), eid)
 
 }
