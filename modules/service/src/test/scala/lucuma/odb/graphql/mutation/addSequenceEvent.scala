@@ -143,7 +143,7 @@ class addSequenceEvent extends OdbSuite with ExecutionState {
       resA <- atomExecutionState(user, oid)
       resS <- stepExecutionState(user, oid)
     } yield {
-      assertEquals(resA, List(AtomExecutionState.Completed, AtomExecutionState.Abandoned))
+      assertEquals(resA, List(AtomExecutionState.Completed, AtomExecutionState.Completed))
       assertEquals(resS, List(StepExecutionState.Completed, StepExecutionState.Abandoned))
     }
   }

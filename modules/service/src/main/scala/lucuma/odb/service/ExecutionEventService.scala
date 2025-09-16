@@ -9,6 +9,7 @@ import cats.syntax.applicativeError.*
 import cats.syntax.apply.*
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
+import cats.syntax.option.*
 import cats.syntax.show.*
 import fs2.Stream
 import grackle.Result
@@ -123,7 +124,7 @@ object ExecutionEventService {
               ResultT.liftF:
                 for
                   _ <- services.sequenceService.setAtomExecutionState(input.atomId, input.atomStage)
-                  _ <- services.sequenceService.abandonOngoingAtomsExcept(oid, input.atomId)
+                  _ <- services.sequenceService.abandonOngoingStepsExcept(oid, input.atomId, none)
                   _ <- timeAccountingService.update(vid)
                 yield eid
             else
@@ -137,7 +138,7 @@ object ExecutionEventService {
         def invalidDataset: OdbError.InvalidDataset =
           OdbError.InvalidDataset(input.datasetId, Some(s"Dataset '${input.datasetId.show}' not found"))
 
-        val insert: F[Result[(Id, Timestamp, Visit.Id, Boolean)]] =
+        val insert: F[Result[(Id, Timestamp, Observation.Id, Visit.Id, Atom.Id, Step.Id, Boolean)]] =
           session
             .option(Statements.InsertDatasetEvent)(input)
             .map(_.toResult(invalidDataset.asProblem))
@@ -163,10 +164,11 @@ object ExecutionEventService {
             case _                        => ().pure
 
         ResultT(insert)
-          .flatMap: (eid, time, vid, wasInserted) =>
+          .flatMap: (eid, time, oid, vid, aid, sid, wasInserted) =>
             if wasInserted then
               ResultT.liftF:
-                setDatasetTime(time) *>
+                services.sequenceService.abandonOngoingStepsExcept(oid, aid, sid.some) *>
+                setDatasetTime(time)                                                   *>
                 timeAccountingService.update(vid).as(eid)
             else
               ResultT.pure(eid)
@@ -192,7 +194,7 @@ object ExecutionEventService {
             if wasInserted then
               ResultT.liftF:
                 for
-                  _ <- services.sequenceService.abandonAtomsAndStepsForObservation(oid).whenA(input.command.isTerminal)
+                  _ <- services.sequenceService.abandonOngoingSteps(oid).whenA(input.command.isTerminal)
                   _ <- timeAccountingService.update(input.visitId)
                 yield eid
             else
@@ -236,7 +238,7 @@ object ExecutionEventService {
               for
                 _ <- ResultT.liftF(services.sequenceService.setAtomExecutionState(aid, AtomStage.StartAtom))
                 _ <- ResultT.liftF(services.sequenceService.setStepExecutionState(input.stepId, input.stepStage, time))
-                _ <- ResultT.liftF(services.sequenceService.abandonOngoingStepsExcept(oid, aid, input.stepId))
+                _ <- ResultT.liftF(services.sequenceService.abandonOngoingStepsExcept(oid, aid, input.stepId.some))
                 _ <- ResultT.liftF(timeAccountingService.update(vid))
               yield eid
             else
@@ -327,7 +329,7 @@ object ExecutionEventService {
       """.query(execution_event_id *: observation_id *: visit_id *: bool)
          .contramap(in => (in.atomId, in.atomStage, in.clientId, in.atomId))
 
-    val InsertDatasetEvent: Query[AddDatasetEventInput, (Id, Timestamp, Visit.Id, Boolean)] =
+    val InsertDatasetEvent: Query[AddDatasetEventInput, (Id, Timestamp, Observation.Id, Visit.Id, Atom.Id, Step.Id, Boolean)] =
       sql"""
         INSERT INTO t_execution_event (
           c_event_type,
@@ -363,9 +365,12 @@ object ExecutionEventService {
         RETURNING
           c_execution_event_id,
           c_received,
+          c_observation_id,
           c_visit_id,
+          c_atom_id,
+          c_step_id,
           xmax = 0 AS inserted
-      """.query(execution_event_id *: core_timestamp *: visit_id *: bool)
+      """.query(execution_event_id *: core_timestamp *: observation_id *: visit_id *: atom_id *: step_id *: bool)
          .contramap(in => (in.datasetId, in.datasetStage, in.clientId, in.datasetId))
 
     val InsertSequenceEvent: Query[AddSequenceEventInput, (Id, Observation.Id, Boolean)] =
