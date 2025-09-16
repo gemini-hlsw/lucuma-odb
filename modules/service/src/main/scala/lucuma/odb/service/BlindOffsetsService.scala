@@ -98,7 +98,7 @@ object BlindOffsetsService:
             WITH asterism_insert AS (
               INSERT INTO t_asterism_target (c_program_id, c_observation_id, c_target_id)
               VALUES ($program_id, $observation_id, $target_id)
-              ON CONFLICT (c_observation_id, c_target_id) DO NOTHING
+              ON CONFLICT (c_program_id, c_observation_id, c_target_id) DO NOTHING
               RETURNING c_target_id
             )
             UPDATE t_target

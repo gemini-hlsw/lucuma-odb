@@ -10,7 +10,6 @@ import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.enums.CalibrationRole
-import lucuma.core.enums.TargetDisposition
 import lucuma.core.model.Observation
 import lucuma.core.model.ProgramReference.Description
 import lucuma.core.model.Target
@@ -241,7 +240,7 @@ class cloneTarget extends OdbSuite {
       pid2 <- createProgramAs(pi) // regular program
       tidR <- withServices(service) { s => // clone the target into the regular program
                 s.session.transaction.use { xa =>
-                  s.targetService.cloneTargetInto(tid, pid2, TargetDisposition.Calibration)(using xa)
+                  s.targetService.cloneTargetInto(tid, pid2)(using xa)
                 }
               }
       (_, tid2) = tidR.toOption.get

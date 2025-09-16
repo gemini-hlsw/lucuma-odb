@@ -15,7 +15,6 @@ import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.Site
-import lucuma.core.enums.TargetDisposition
 import lucuma.core.math.Coordinates
 import lucuma.core.math.Declination
 import lucuma.core.math.Epoch
@@ -258,7 +257,7 @@ object CalibrationsService extends CalibrationObservations {
             // We don't want to create a target if there are no pending configurations
             if (configs.nonEmpty) {
               (for {
-                cta <- Nested(targetService.cloneTargetInto(tgtid, pid, TargetDisposition.Calibration)).map(_._2).value
+                cta <- Nested(targetService.cloneTargetInto(tgtid, pid)).map(_._2).value
                 o   <- cta.traverse(calibObservation(ct, site, pid, gid, props, configs, _))
               } yield o).orError.map(_.map((ct, _)))
             } else {
@@ -426,7 +425,7 @@ object CalibrationsService extends CalibrationObservations {
             // Update the target on the calibration
             _ <- (o.map(_._1), tgts).mapN { (oid, tgtid) =>
                     for {
-                      ct <- Nested(targetService.cloneTargetInto(tgtid, pid, TargetDisposition.Calibration)).map(_._2).value
+                      ct <- Nested(targetService.cloneTargetInto(tgtid, pid)).map(_._2).value
                       _  <- ct.traverse(ct => asterismService
                               .updateAsterism(
                                 Services.asSuperUser:
