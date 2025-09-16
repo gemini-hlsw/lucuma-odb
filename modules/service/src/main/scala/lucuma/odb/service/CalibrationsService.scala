@@ -272,7 +272,7 @@ object CalibrationsService extends CalibrationObservations {
         }.sequence.map(_.flatten)
       }
 
-      // Set the calibration role of the observations and target disposition in bulk
+      // Set the calibration role of the observations in bulk
       @annotation.nowarn("msg=unused implicit parameter")
       private def setCalibRoleAndGroup(oids: List[Observation.Id], calibrationRole: CalibrationRole)(using Transaction[F]): F[Unit] =
         session.executeCommand(Statements.setCalibRole(oids, calibrationRole)).void

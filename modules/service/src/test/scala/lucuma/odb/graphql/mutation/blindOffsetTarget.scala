@@ -49,6 +49,7 @@ class blindOffsetTarget extends OdbSuite:
     s"""
       observations {
         id
+        useBlindOffset
         $targetEnvironmentFields
       }
     """
@@ -223,11 +224,16 @@ class blindOffsetTarget extends OdbSuite:
         """
       )
     } yield {
-      val blindOffsetTarget = result.hcursor
+      val observation = result.hcursor
         .downField("updateObservations")
         .downField("observations")
         .downN(0)
+
+      val blindOffsetTarget = observation
         .downField("targetEnvironment")
         .downField("blindOffsetTarget")
       assert(blindOffsetTarget.focus.exists(_.isNull))
+
+      val useBlindOffset = observation.downField("useBlindOffset").as[Boolean]
+      assertEquals(useBlindOffset, Right(true))
     }

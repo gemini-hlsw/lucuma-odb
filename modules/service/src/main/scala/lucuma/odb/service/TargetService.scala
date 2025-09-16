@@ -504,7 +504,6 @@ object TargetService {
     }
 
     // an exact clone, except for c_target_id and c_existence (which are defaulted)
-    // targetDisposition mest be passed explicitly
     def cloneTarget(pid: Program.Id, tid: Target.Id): AppliedFragment =
       sql"""
         INSERT INTO t_target(

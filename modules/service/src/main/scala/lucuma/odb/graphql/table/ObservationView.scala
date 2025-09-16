@@ -30,7 +30,6 @@ trait ObservationView[F[_]] extends BaseMapping[F] {
       val ReferenceTime: ColumnRef       = col("c_reference_time",       core_timestamp.opt)
       val DeclaredComplete: ColumnRef    = col("c_declared_complete",    bool)
       val UseBlindOffset: ColumnRef      = col("c_use_blind_offset",     bool)
-      val BlindOffsetTargetId: ColumnRef = col("c_blind_offset_target_id", target_id.opt)
 
       object PlannedTime {
         val Pi        = col("c_pts_pi", time_span)
