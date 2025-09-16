@@ -2738,7 +2738,7 @@ class createObservation extends OdbSuite {
             createObservation(input: {
               programId: "$pid"
               SET: {
-                subtitle: "default blind offset test"
+                subtitle: "blind offset test"
               }
             }) {
               observation {
@@ -2759,7 +2759,6 @@ class createObservation extends OdbSuite {
             createObservation(input: {
               programId: "$pid"
               SET: {
-                subtitle: "explicit true test"
                 useBlindOffset: true
               }
             }) {

@@ -53,7 +53,7 @@ CREATE OR REPLACE VIEW v_observation AS
   CASE WHEN o.c_science_mode = 'spectroscopy'::d_tag THEN o.c_observation_id END AS c_spectroscopy_mode_id,
   c.c_active_start::timestamp + (c.c_active_end::timestamp - c.c_active_start::timestamp) * 0.5 AS c_reference_time,
 
-  -- Include blind offset target from asterism (derived from target_disposition)
+  -- Include blind offset target from asterism
   (SELECT a.c_target_id
     FROM t_asterism_target a
     JOIN t_target t ON a.c_target_id = t.c_target_id
@@ -69,7 +69,6 @@ CREATE OR REPLACE VIEW v_observation AS
   LEFT JOIN t_gmos_north_imaging mode_gni ON o.c_observation_id = mode_gni.c_observation_id
   LEFT JOIN t_gmos_south_imaging mode_gsi ON o.c_observation_id = mode_gsi.c_observation_id;
 
--- Recreate v_generator_params view
 CREATE OR REPLACE VIEW v_generator_params AS
 SELECT
   o.c_program_id,

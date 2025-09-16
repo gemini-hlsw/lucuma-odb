@@ -23,5 +23,4 @@ class TargetPredicates(path: Path) {
   def noCalibrationRole: Predicate =
     IsNull(path / "calibrationRole", true)
 
-  lazy val targetDisposition = LeafPredicates[lucuma.core.enums.TargetDisposition](path / "targetDisposition")
 }
