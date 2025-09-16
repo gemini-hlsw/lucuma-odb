@@ -9,6 +9,7 @@ import cats.syntax.either.*
 import cats.syntax.option.*
 import io.circe.Json
 import io.circe.literal.*
+import io.circe.syntax.*
 import lucuma.core.enums.AtomStage
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.StepStage
@@ -205,6 +206,12 @@ class addAtomEvent extends OdbSuite with ExecutionState:
             }
           }
         """,
-        List(s"An event with client id '${cid.get}' has already been added.").asLeft
+        json"""
+          {
+            "addAtomEvent": {
+              "event": { "id": ${evt.id.asJson} }
+            }
+          }
+        """.asRight
       )
     yield ()

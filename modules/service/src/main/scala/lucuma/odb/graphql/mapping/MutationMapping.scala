@@ -499,13 +499,13 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
     matcher:   Matcher[I],
     pred:      ExecutionEventPredicates
   )(
-    insert:    Services.ServiceAccess ?=> I => (Transaction[F], Services[F]) ?=> F[Result[ExecutionEvent]]
+    insert:    Services.ServiceAccess ?=> I => (Transaction[F], Services[F]) ?=> F[Result[ExecutionEvent.Id]]
   ): MutationField =
     MutationField(fieldName, matcher): (input, child) =>
       services.useTransactionally:
         requireServiceAccess:
-          insert(input).nestMap: e =>
-            Unique(Filter(pred.id.eql(e.id), child))
+          insert(input).nestMap: eid =>
+            Unique(Filter(pred.id.eql(eid), child))
 
   private lazy val AddAtomEvent: MutationField =
     addEvent("addAtomEvent", AddAtomEventInput.Binding, Predicates.atomEvent) { input =>
