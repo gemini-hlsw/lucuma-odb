@@ -34,7 +34,7 @@ val skunkVersion               = "0.6.4"
 val slf4jVersion               = "2.0.17"
 val testcontainersScalaVersion = "0.40.14" // check test output if you attempt to update this
 
-ThisBuild / tlBaseVersion      := "0.28"
+ThisBuild / tlBaseVersion      := "0.29"
 ThisBuild / scalaVersion       := "3.7.3"
 ThisBuild / crossScalaVersions := Seq("3.7.3")
 
