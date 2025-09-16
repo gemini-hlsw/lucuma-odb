@@ -8,10 +8,14 @@ import cats.data.Ior
 import cats.effect.IO
 import cats.syntax.all.*
 import io.circe.literal.*
+import lucuma.core.enums.CallForProposalsType.DemoScience
 import lucuma.core.enums.Partner
 import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.TimeAccountingCategory
 import lucuma.core.model.Observation
+import lucuma.core.model.ProgramReference
+import lucuma.core.model.ProposalReference
+import lucuma.core.model.Semester
 import lucuma.core.model.User
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
@@ -237,5 +241,108 @@ class setAllocations extends OdbSuite {
     } yield ()
 
   }
+
+  test("set allocations with a proposal reference"):
+    val ref = for
+      cid <- createCallForProposalsAs(staff, DemoScience, Semester.unsafeFromString("2025A"))
+      pid <- createProgramWithUsPi(pi)
+      _   <- addDemoScienceProposal(pi, pid, cid)
+      ref <- submitProposal(pi, pid)
+    yield ref
+
+    def query(r: ProposalReference): String =
+      s"""
+          mutation {
+            setAllocations(input: {
+              proposalReference: "${r.label}"
+              allocations: [
+                {
+                  category: US
+                  scienceBand: BAND2
+                  duration: { hours: "1.23" }
+                }
+              ]
+            }) {
+              allocations {
+                category
+                scienceBand
+                duration { hours }
+              }
+            }
+          }
+      """
+
+    ref.flatMap: r =>
+      expect(
+        user    = staff,
+        query   = query(r),
+        expected = json"""
+          {
+            "setAllocations" : {
+              "allocations" : [
+                {
+                  "category" : "US",
+                  "scienceBand" : "BAND2",
+                  "duration" : {
+                    "hours" : 1.230000
+                  }
+                }
+              ]
+            }
+          }
+        """.asRight
+      )
+
+  test("set allocations with a program reference"):
+    val ref = for
+      cid <- createCallForProposalsAs(staff, DemoScience, Semester.unsafeFromString("2025A"))
+      pid <- createProgramWithUsPi(pi)
+      _   <- addDemoScienceProposal(pi, pid, cid)
+      _   <- submitProposal(pi, pid)
+      ref <- acceptProposal(staff, pid)
+    yield ref
+
+    def query(r: ProgramReference): String =
+      s"""
+          mutation {
+            setAllocations(input: {
+              programReference: "${r.label}"
+              allocations: [
+                {
+                  category: US
+                  scienceBand: BAND2
+                  duration: { hours: "1.23" }
+                }
+              ]
+            }) {
+              allocations {
+                category
+                scienceBand
+                duration { hours }
+              }
+            }
+          }
+      """
+
+    ref.flatMap: r =>
+      expect(
+        user    = staff,
+        query   = query(r.get),
+        expected = json"""
+          {
+            "setAllocations" : {
+              "allocations" : [
+                {
+                  "category" : "US",
+                  "scienceBand" : "BAND2",
+                  "duration" : {
+                    "hours" : 1.230000
+                  }
+                }
+              ]
+            }
+          }
+        """.asRight
+      )
 
 }
