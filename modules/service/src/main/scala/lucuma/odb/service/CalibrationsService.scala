@@ -12,6 +12,7 @@ import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.string.NonEmptyString
 import grackle.Result
 import lucuma.core.enums.CalibrationRole
+import lucuma.core.enums.GmosRoi
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.Site
@@ -222,6 +223,27 @@ object CalibrationsService extends CalibrationObservations {
       ): List[CalibrationConfigSubset] =
         all.map(_.data.toConfigSubset).distinct
 
+      /**
+       * Transform configurations for specific calibration type ROI requirements
+       */
+      private def transformConfigsForCalibType(
+        configs: List[CalibrationConfigSubset],
+        calibRole: CalibrationRole
+      ): List[CalibrationConfigSubset] =
+        calibRole match
+          case CalibrationRole.SpectroPhotometric =>
+            // SpectroPhotometric always uses CentralSpectrum ROI
+            configs.map {
+              case gn: GmosNConfigs => gn.copy(roi = GmosRoi.CentralSpectrum)
+              case gs: GmosSConfigs => gs.copy(roi = GmosRoi.CentralSpectrum)
+              case other => other
+            }
+          case CalibrationRole.Twilight =>
+            // Twilight uses actual ROI from science observations
+            configs
+          case _ =>
+            configs
+
       private def calibObservation(
         calibRole: CalibrationRole,
         site:      Site,
@@ -231,16 +253,17 @@ object CalibrationsService extends CalibrationObservations {
         configs:   List[CalibrationConfigSubset],
         tid:       Target.Id
       )(using Transaction[F]): F[List[Observation.Id]] =
+        val transformedConfigs = transformConfigsForCalibType(configs, calibRole)
         calibRole match {
           case CalibrationRole.SpectroPhotometric =>
             site match {
-              case Site.GN => gmosLongSlitSpecPhotObs(pid, gid, tid, props, configs.collect { case c: GmosNConfigs => c })
-              case Site.GS => gmosLongSlitSpecPhotObs(pid, gid, tid, props, configs.collect { case c: GmosSConfigs => c })
+              case Site.GN => gmosLongSlitSpecPhotObs(pid, gid, tid, props, transformedConfigs.collect { case c: GmosNConfigs => c })
+              case Site.GS => gmosLongSlitSpecPhotObs(pid, gid, tid, props, transformedConfigs.collect { case c: GmosSConfigs => c })
             }
           case CalibrationRole.Twilight =>
             site match
-              case Site.GN => gmosLongSlitTwilightObs(pid, gid, tid, configs.collect { case c: GmosNConfigs => c })
-              case Site.GS => gmosLongSlitTwilightObs(pid, gid, tid, configs.collect { case c: GmosSConfigs => c })
+              case Site.GN => gmosLongSlitTwilightObs(pid, gid, tid, transformedConfigs.collect { case c: GmosNConfigs => c })
+              case Site.GS => gmosLongSlitTwilightObs(pid, gid, tid, transformedConfigs.collect { case c: GmosSConfigs => c })
           case _ => List.empty.pure[F]
         }
 
@@ -375,19 +398,27 @@ object CalibrationsService extends CalibrationObservations {
           // Get all the active science observations
           allSci       <- allObservations(pid, ObservationSelection.Science)
                             .map(_.filter(u => active.contains(u._1)))
-          // Unique science configurations
-          uniqueSci     = uniqueConfiguration(allSci)
           // Get all the active calibration observations
           allCalibs    <- allObservations(pid, ObservationSelection.Calibration)
-          // Unique calibration configurations
-          uniqueCalibs  = uniqueConfiguration(allCalibs)
           calibs        = toConfigForCalibration(allCalibs)
           // Average s/n wavelength at each configuration
           props         = calObsProps(toConfigForCalibration(allSci))
-          // Get all unique configurations
-          configs       = uniqueSci.diff(uniqueCalibs)
+
+          // Process SpectroPhotometric: ignore ROI differences in configurations
+          uniqueSciSpectro = allSci.map { obs =>
+                               transformConfigsForCalibType(List(obs.data.toConfigSubset), CalibrationRole.SpectroPhotometric).head
+                             }.distinct
+          uniqueCalibs = uniqueConfiguration(allCalibs)
+          configsSpectro = uniqueSciSpectro.diff(uniqueCalibs)
+
+          // Process Twilight: consider ROI differences in configurations
+          uniqueSciTwilight = allSci.map(_.data.toConfigSubset).distinct
+          configsTwilight = uniqueSciTwilight.diff(uniqueCalibs)
+
+          // Combine all configurations that need calibrations
+          configs = (configsSpectro ++ configsTwilight).distinct
           // Remove calibrations that are not needed, basically when a config is removed
-          removedOids  <- removeUnnecessaryCalibrations(uniqueSci, calibs.map {
+          removedOids  <- removeUnnecessaryCalibrations(uniqueSciSpectro, calibs.map {
                             case ObsExtract(oid, _, _, c) => (oid, c)
                           })
           // Generate new calibrations for each unique configuration
