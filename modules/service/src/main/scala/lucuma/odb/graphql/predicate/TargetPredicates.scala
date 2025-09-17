@@ -22,5 +22,5 @@ class TargetPredicates(path: Path) {
 
   def noCalibrationRole: Predicate =
     IsNull(path / "calibrationRole", true)
-}
 
+}
