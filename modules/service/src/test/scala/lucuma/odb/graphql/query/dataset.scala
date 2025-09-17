@@ -104,7 +104,7 @@ class dataset extends OdbSuite with DatasetSetupOperations {
               "start": ${inv.start.asJson},
               "end": ${inv.end.asJson},
               "duration": {
-                "seconds": ${inv.boundedTimeSpan.toSeconds.asJson}
+                "seconds": ${inv.timeSpan.toSeconds.asJson}
               }
             }
           }
