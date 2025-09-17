@@ -61,7 +61,7 @@ sealed class TimeAccountingState private (val toMap: SortedMap[TimestampInterval
    */
   def charge: CategorizedTime =
     toMap.foldLeft(CategorizedTime.Zero) { case (c, (n, x)) =>
-      c.sumCharge(x.chargeClass, n.boundedTimeSpan)
+      c.sumCharge(x.chargeClass, n.timeSpan)
     }
 
   /**
