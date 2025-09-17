@@ -898,7 +898,7 @@ object GuideService {
         Trace[F].span("getGuideAvailability"):
           (for {
             _             <- ResultT.fromResult(
-                              if (period.boundedTimeSpan <= maxAvailabilityPeriod) ().success
+                              if (period.timeSpan <= maxAvailabilityPeriod) ().success
                               else generalError(
                                 s"Period for guide availability cannot be greater than $maxAvailabilityPeriodDays days."
                               ).asFailure
@@ -909,7 +909,7 @@ object GuideService {
             currentAvail  <- ResultT.liftF(getFromCacheOrEmpty(pid, oid, newHash))
             missingPeriods = currentAvail.findMissingIntervals(period)
             // only happens if we have disjoint periods too far apart. If so, we'll just replace the existing
-            (neededPeriods, startAvail) = if (missingPeriods.exists(_.boundedTimeSpan > maxAvailabilityPeriod))
+            (neededPeriods, startAvail) = if (missingPeriods.exists(_.timeSpan > maxAvailabilityPeriod))
                               (NonEmptyList.of(period).some, ContiguousTimestampMap.empty[List[Angle]])
                             else (NonEmptyList.fromList(missingPeriods), currentAvail)
             // if we don't need anything, then we already have what we need

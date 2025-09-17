@@ -520,7 +520,7 @@ object Science:
     def remainingTimeAt(timestamp: Timestamp): TimeSpan =
       val limit = startTime.map(_.plusCalValidityPeriod).getOrElse(Timestamp.Min)
       val start = endTime.map(_ max timestamp).getOrElse(Timestamp.Max)
-      Option.when(start <= limit)(TimeSpan.between(start, limit)).flatten.getOrElse(TimeSpan.Zero)
+      Option.when(start <= limit)(TimeSpan.between(start, limit)).getOrElse(TimeSpan.Zero)
 
     /**
      * Generates the remaining steps for this block as if requested at the given

@@ -209,10 +209,7 @@ trait Codecs {
     enumerated[CloudExtinction.Preset](Type.varchar)
 
   val core_timestamp: Codec[Timestamp] =
-    timestamp.eimap(
-      ldt => Timestamp.FromLocalDateTime.getOption(ldt).toRight(s"Invalid Timestamp: $ldt"))(
-      _.toLocalDateTime
-    )
+    timestamp.imap(Timestamp.fromLocalDateTimeTruncatedAndBounded)(_.toLocalDateTime)
 
   val dataset_id: Codec[Dataset.Id] =
     gid[Dataset.Id]
