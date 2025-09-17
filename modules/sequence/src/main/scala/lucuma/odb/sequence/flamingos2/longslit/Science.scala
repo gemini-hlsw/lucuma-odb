@@ -95,7 +95,7 @@ object Science:
 
   extension (start: Timestamp)
     def timeUntil(end: Timestamp): TimeSpan =
-      if start < end then TimeSpan.between(start, end).get else TimeSpan.Zero
+      if start < end then TimeSpan.between(start, end) else TimeSpan.Zero
 
   extension [A, B](lst: List[A])
     def removeFirstBy(b: B)(f: (A, B) => Boolean): List[A] =
@@ -322,7 +322,7 @@ object Science:
 
     // Anticipated science time in all, including science we've done already
     // but for which there haven't been calibrations.
-    val scienceTime: TimeSpan = remainingScience +| pending.map(_.boundedTimeSpan).getOrElse(TimeSpan.Zero)
+    val scienceTime: TimeSpan = remainingScience +| pending.map(_.timeSpan).getOrElse(TimeSpan.Zero)
 
     // If this is over 1.5 hours we need to insert a flat roughly at:
     //   science-start + science-time / 2

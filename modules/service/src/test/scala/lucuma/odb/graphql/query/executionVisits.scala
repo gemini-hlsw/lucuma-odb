@@ -282,7 +282,7 @@ class executionVisits extends OdbSuite with ExecutionQuerySetupOperations {
               "start"    -> i.start.asJson,
               "end"      -> i.end.asJson,
               "duration" -> Json.obj(
-                "seconds" -> i.boundedTimeSpan.toSeconds.asJson
+                "seconds" -> i.timeSpan.toSeconds.asJson
               )
             )
           )
