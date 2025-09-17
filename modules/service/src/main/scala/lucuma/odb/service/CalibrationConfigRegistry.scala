@@ -20,8 +20,3 @@ object CalibrationConfigRegistry:
 
   def getSupportedCalibrationTypes(modeType: ObservingModeType): Set[CalibrationRole] =
     strategies.keys.filter(_._1 == modeType).map(_._2).toSet
-
-  def registerStrategy(modeType: ObservingModeType, calibRole: CalibrationRole, strategy: CalibrationConfigStrategy): Unit =
-    // For now, this would require modifying the strategies map
-    // In a more dynamic system, this could be a mutable map
-    throw new UnsupportedOperationException("Dynamic strategy registration not implemented")

@@ -224,6 +224,34 @@ object CalibrationsService extends CalibrationObservations {
         all.map(_.data.toConfigSubset).distinct
 
       /**
+       * Check if two configurations match ignoring ROI differences
+       */
+      private def configsMatchIgnoringRoi(c1: CalibrationConfigSubset, c2: CalibrationConfigSubset): Boolean =
+        (c1, c2) match {
+          case (gn1: GmosNConfigs, gn2: GmosNConfigs) =>
+            gn1.grating == gn2.grating &&
+            gn1.filter == gn2.filter &&
+            gn1.fpu == gn2.fpu &&
+            gn1.centralWavelength == gn2.centralWavelength &&
+            gn1.xBin == gn2.xBin &&
+            gn1.yBin == gn2.yBin &&
+            gn1.ampReadMode == gn2.ampReadMode &&
+            gn1.ampGain == gn2.ampGain
+            // Intentionally ignoring roi field
+          case (gs1: GmosSConfigs, gs2: GmosSConfigs) =>
+            gs1.grating == gs2.grating &&
+            gs1.filter == gs2.filter &&
+            gs1.fpu == gs2.fpu &&
+            gs1.centralWavelength == gs2.centralWavelength &&
+            gs1.xBin == gs2.xBin &&
+            gs1.yBin == gs2.yBin &&
+            gs1.ampReadMode == gs2.ampReadMode &&
+            gs1.ampGain == gs2.ampGain
+            // Intentionally ignoring roi field
+          case _ => false
+        }
+
+      /**
        * Transform configurations for specific calibration type ROI requirements
        */
       private def transformConfigsForCalibType(
@@ -401,17 +429,28 @@ object CalibrationsService extends CalibrationObservations {
           // Get all the active calibration observations
           allCalibs    <- allObservations(pid, ObservationSelection.Calibration)
           calibs        = toConfigForCalibration(allCalibs)
-          // Average s/n wavelength at each configuration
-          props         = calObsProps(toConfigForCalibration(allSci))
+          // Calculate props from original science observations
+          originalProps = calObsProps(toConfigForCalibration(allSci))
 
-          // Unique science configurations
-          uniqueSci     = uniqueConfiguration(allSci)
+          // Transform science configurations to match how calibrations are created (SpectroPhotometric with CentralSpectrum ROI)
+          transformedSci = allSci.map { obs =>
+                             transformConfigsForCalibType(List(obs.data.toConfigSubset), CalibrationRole.SpectroPhotometric).head
+                           }.distinct
+
+          // Map props from original configs to transformed configs
+          props = transformedSci.map { transformedConfig =>
+            // Find the original config that matches this transformed one (ignoring ROI differences)
+            val matchingOriginalProps = originalProps.find { case (originalConfig, _) =>
+              configsMatchIgnoringRoi(transformedConfig, originalConfig)
+            }.map(_._2).getOrElse(CalObsProps(None, None))
+            transformedConfig -> matchingOriginalProps
+          }.toMap
           // Unique calibration configurations
           uniqueCalibs  = uniqueConfiguration(allCalibs)
           // Get all unique configurations that need calibrations
-          configs       = uniqueSci.diff(uniqueCalibs)
+          configs       = transformedSci.diff(uniqueCalibs)
           // Remove calibrations that are not needed, basically when a config is removed
-          removedOids  <- removeUnnecessaryCalibrations(uniqueSci, calibs.map {
+          removedOids  <- removeUnnecessaryCalibrations(transformedSci, calibs.map {
                             case ObsExtract(oid, _, _, c) => (oid, c)
                           })
           // Generate new calibrations for each unique configuration
