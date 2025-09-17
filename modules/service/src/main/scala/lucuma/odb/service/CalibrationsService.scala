@@ -404,21 +404,14 @@ object CalibrationsService extends CalibrationObservations {
           // Average s/n wavelength at each configuration
           props         = calObsProps(toConfigForCalibration(allSci))
 
-          // Process SpectroPhotometric: ignore ROI differences in configurations
-          uniqueSciSpectro = allSci.map { obs =>
-                               transformConfigsForCalibType(List(obs.data.toConfigSubset), CalibrationRole.SpectroPhotometric).head
-                             }.distinct
-          uniqueCalibs = uniqueConfiguration(allCalibs)
-          configsSpectro = uniqueSciSpectro.diff(uniqueCalibs)
-
-          // Process Twilight: consider ROI differences in configurations
-          uniqueSciTwilight = allSci.map(_.data.toConfigSubset).distinct
-          configsTwilight = uniqueSciTwilight.diff(uniqueCalibs)
-
-          // Combine all configurations that need calibrations
-          configs = (configsSpectro ++ configsTwilight).distinct
+          // Unique science configurations
+          uniqueSci     = uniqueConfiguration(allSci)
+          // Unique calibration configurations
+          uniqueCalibs  = uniqueConfiguration(allCalibs)
+          // Get all unique configurations that need calibrations
+          configs       = uniqueSci.diff(uniqueCalibs)
           // Remove calibrations that are not needed, basically when a config is removed
-          removedOids  <- removeUnnecessaryCalibrations(uniqueSciSpectro, calibs.map {
+          removedOids  <- removeUnnecessaryCalibrations(uniqueSci, calibs.map {
                             case ObsExtract(oid, _, _, c) => (oid, c)
                           })
           // Generate new calibrations for each unique configuration
