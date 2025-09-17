@@ -63,6 +63,7 @@ trait StepRecordMapping[F[_]] extends StepRecordView[F]
       SqlObject("datasets"),
       SqlObject("events"),
       SqlField("generatedId",     StepRecordView.GeneratedId),
+      SqlField("idempotencyKey",  StepRecordView.IdempotencyKey),
       SqlObject("flamingos2",     Join(StepRecordView.Id, Flamingos2DynamicView.Id)),
       SqlObject("gmosNorth",      Join(StepRecordView.Id, GmosNorthDynamicTable.Id)),
       SqlObject("gmosSouth",      Join(StepRecordView.Id, GmosSouthDynamicTable.Id))

@@ -307,6 +307,8 @@ type AtomRecord {
 
   "Atom ID from the generated atom, if any, that produced this atom record."
   generatedId: AtomId
+
+  idempotencyKey: IdempotencyKey
 }
 
 "AtomRecord query results, limited to a maximum of 1000 entries."
@@ -4292,6 +4294,7 @@ input RecordAtomInput {
   instrument: Instrument!
   sequenceType: SequenceType!
   generatedId: AtomId
+  idempotencyKey: IdempotencyKey
 }
 
 "The result of recording an atom."
@@ -4313,6 +4316,8 @@ input RecordDatasetInput {
 
   "Dataset comment."
   comment: NonEmptyString
+
+  idempotencyKey: IdempotencyKey
 }
 
 "The result of recording a new dataset."
@@ -4329,6 +4334,7 @@ input RecordGmosNorthStepInput {
   telescopeConfig: TelescopeConfigInput
   observeClass: ObserveClass!
   generatedId: StepId
+  idempotencyKey: IdempotencyKey
 }
 
 """
@@ -4347,6 +4353,7 @@ Input parameters for creating a new GmosNorthVisit
 input RecordGmosNorthVisitInput {
   observationId: ObservationId!
   gmosNorth: GmosNorthStaticInput!
+  idempotencyKey: IdempotencyKey
 }
 
 """
@@ -4369,6 +4376,7 @@ input RecordGmosSouthStepInput {
   telescopeConfig: TelescopeConfigInput
   observeClass: ObserveClass!
   generatedId: StepId
+  idempotencyKey: IdempotencyKey
 }
 
 """
@@ -4387,6 +4395,7 @@ Input parameters for creating a new GmosSouthVisit
 input RecordGmosSouthVisitInput {
   observationId: ObservationId!
   gmosSouth: GmosSouthStaticInput!
+  idempotencyKey: IdempotencyKey
 }
 
 """
@@ -7378,6 +7387,7 @@ input RecordFlamingos2StepInput {
   telescopeConfig: TelescopeConfigInput
   observeClass: ObserveClass!
   generatedId: StepId
+  idempotencyKey: IdempotencyKey
 }
 
 """
@@ -7396,6 +7406,7 @@ Input parameters for creating a new Flamingos 2 Visit
 input RecordFlamingos2VisitInput {
   observationId: ObservationId!
   flamingos2:    Flamingos2StaticInput!
+  idempotencyKey: IdempotencyKey
 }
 
 """
@@ -13382,6 +13393,8 @@ type StepRecord {
   "Step ID of the generated step, if any, that produced this step record."
   generatedId: StepId
 
+  idempotencyKey: IdempotencyKey
+
   """
   Flamingos 2 instrument configuration for this step, if any.  This will be null
   unless the `instrument` discriminator is "FLAMINGOS2".
@@ -14197,6 +14210,8 @@ type Visit {
 
   "Time accounting details for this visit."
   timeChargeInvoice: TimeChargeInvoice!
+
+  idempotencyKey:  IdempotencyKey
 
   """
   Flamingos 2 static instrument configuration, for Flamingos 2 visits.  See the

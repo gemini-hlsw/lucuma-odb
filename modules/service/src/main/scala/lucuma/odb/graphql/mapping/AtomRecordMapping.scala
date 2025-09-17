@@ -40,6 +40,7 @@ trait AtomRecordMapping[F[_]] extends AtomRecordTable[F]
       EffectField("interval",    intervalHandler, List("id")),
       SqlField("sequenceType",   AtomRecordTable.SequenceType),
       SqlField("generatedId",    AtomRecordTable.GeneratedId),
+      SqlField("idempotencyKey", AtomRecordTable.IdempotencyKey),
       SqlObject("steps")
     )
 

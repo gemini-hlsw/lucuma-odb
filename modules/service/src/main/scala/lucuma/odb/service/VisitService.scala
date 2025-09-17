@@ -17,6 +17,7 @@ import lucuma.core.model.Visit
 import lucuma.core.model.sequence.flamingos2.Flamingos2StaticConfig
 import lucuma.core.model.sequence.gmos.StaticConfig.GmosNorth
 import lucuma.core.model.sequence.gmos.StaticConfig.GmosSouth
+import lucuma.core.util.IdempotencyKey
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.input.RecordVisitInput
@@ -45,7 +46,8 @@ trait VisitService[F[_]]:
   )(using Services.ServiceAccess): Stream[F, VisitRecord]
 
   def lookupOrInsert(
-    observationId: Observation.Id
+    observationId:  Observation.Id,
+    idempotencyKey: Option[IdempotencyKey]
   )(using Transaction[F], Services.ServiceAccess): F[Result[Visit.Id]]
 
   def recordFlamingos2(
@@ -104,10 +106,10 @@ object VisitService:
           session.option(Statements.SelectObsDescription)(observationId).map: od =>
             Result.fromOption(od, OdbError.InvalidObservation(observationId, s"Observation '$observationId' not found or is not associated with any instrument.".some).asProblem)
 
-
-      override def lookupOrInsert(
-        observationId: Observation.Id
-      )(using Transaction[F], Services.ServiceAccess): F[Result[Visit.Id]] =
+      private def lookupOrInsertImpl(
+        observationId:  Observation.Id,
+        idempotencyKey: Option[IdempotencyKey]
+      )(using Transaction[F], Services.ServiceAccess): F[Result[VisitRecord]] =
 
         def obsNight(site: Site): ResultT[F, ObservingNight] =
           ResultT.liftF(timeService.currentObservingNight(site))
@@ -120,22 +122,21 @@ object VisitService:
           ResultT.liftF:
             session.unique(Statements.LockCreation)(Statements.VisitCreationLockId)
 
-        def lookupVisit(desc:  ObsDescription, night: ObservingNight): ResultT[F, Option[Visit.Id]] =
+        def lookupVisit(desc:  ObsDescription, night: ObservingNight): ResultT[F, Option[VisitRecord]] =
           ResultT.liftF:
             if desc.isChargeable then
               session
                 .option(Statements.SelectChargeableVisit)(night)
                 .map: o =>
                   o.collect:
-                    case vr if vr.observationId === observationId => vr.visitId
+                    case vr if vr.observationId === observationId => vr
             else
               session
                 .option(Statements.SelectLastVisit)(night, observationId)
-                .map(_.map(_.visitId))
 
-        def insertNewVisit(desc: ObsDescription): ResultT[F, Visit.Id] =
+        def insertNewVisit(desc: ObsDescription): ResultT[F, VisitRecord] =
            ResultT.liftF:
-             session.unique(Statements.InsertVisit)(observationId, desc)
+             session.unique(Statements.InsertVisit)(observationId, desc, idempotencyKey)
 
         (for
           d  <- obsDescription(observationId)
@@ -145,29 +146,39 @@ object VisitService:
           vʹ <- v.fold(insertNewVisit(d))(ResultT.pure)
         yield vʹ).value
 
+      override def lookupOrInsert(
+        observationId:  Observation.Id,
+        idempotencyKey: Option[IdempotencyKey]
+      )(using Transaction[F], Services.ServiceAccess): F[Result[Visit.Id]] =
+        lookupOrInsertImpl(observationId, idempotencyKey).map(_.map(_.visitId))
+
       private def insertWithStaticConfig[A](
-        observationId: Observation.Id,
-        static:        A,
-        instrument:    Instrument,
-        lookupStatic:  Visit.Id                              => F[Option[A]],
-        insertStatic:  (Observation.Id, Option[Visit.Id], A) => F[Long]
+        observationId:  Observation.Id,
+        static:         A,
+        idempotencyKey: Option[IdempotencyKey],
+        instrument:     Instrument,
+        lookupStatic:   Visit.Id                              => F[Option[A]],
+        insertStatic:   (Observation.Id, Option[Visit.Id], A) => F[Long]
       )(using Transaction[F], Services.ServiceAccess): F[Result[Visit.Id]] =
 
         val insertNewVisit: ResultT[F, Visit.Id] =
           for
             d <- obsDescription(observationId)
-            v <- ResultT.liftF(session.unique(Statements.InsertVisit)(observationId, d))
-          yield v
+            v <- ResultT.liftF(session.unique(Statements.InsertVisit)(observationId, d, idempotencyKey))
+          yield v.visitId
 
         def insertStaticForVisit(v: Visit.Id): ResultT[F, Unit] =
           ResultT.liftF(insertStatic(observationId, v.some, static)).void
 
         val update = (for
-          v0 <- ResultT(lookupOrInsert(observationId))
-          os <- ResultT.liftF(lookupStatic(v0))
-          v1 <- os.fold(insertStaticForVisit(v0).as(v0)): _ =>
-                  insertNewVisit.flatMap: v =>
-                    insertStaticForVisit(v).as(v)
+          v0 <- ResultT(lookupOrInsertImpl(observationId, idempotencyKey))
+          os <- ResultT.liftF(lookupStatic(v0.visitId))
+          v1 <- os.fold(insertStaticForVisit(v0.visitId).as(v0.visitId)): _ =>
+                  if (v0.idempotencyKey, idempotencyKey).tupled.exists(_ === _) then
+                    ResultT.pure(v0.visitId)  // was previously done
+                  else
+                    insertNewVisit.flatMap: v =>
+                      insertStaticForVisit(v).as(v)
         yield v1).value
 
         update
@@ -181,6 +192,7 @@ object VisitService:
         insertWithStaticConfig(
           input.observationId,
           input.static,
+          input.idempotencyKey,
           Instrument.Flamingos2,
           flamingos2SequenceService.selectStatic,
           flamingos2SequenceService.insertStatic
@@ -192,6 +204,7 @@ object VisitService:
         insertWithStaticConfig(
           input.observationId,
           input.static,
+          input.idempotencyKey,
           Instrument.GmosNorth,
           gmosSequenceService.selectGmosNorthStatic,
           gmosSequenceService.insertGmosNorthStatic
@@ -203,6 +216,7 @@ object VisitService:
         insertWithStaticConfig(
           input.observationId,
           input.static,
+          input.idempotencyKey,
           Instrument.GmosSouth,
           gmosSequenceService.selectGmosSouthStatic,
           gmosSequenceService.insertGmosSouthStatic
@@ -214,7 +228,15 @@ object VisitService:
       (instrument *: calibration_role.opt).to[ObsDescription]
 
     private val visit_record: Codec[VisitRecord] =
-      (visit_id *: observation_id *: instrument *: core_timestamp *: lucuma.odb.util.Codecs.site *: bool).to[VisitRecord]
+      (
+        visit_id                    *:
+        observation_id              *:
+        instrument                  *:
+        core_timestamp              *:
+        lucuma.odb.util.Codecs.site *:
+        bool                        *:
+        idempotency_key.opt
+      ).to[VisitRecord]
 
     val VisitCreationLockId = 100l
 
@@ -257,7 +279,8 @@ object VisitService:
           c_instrument,
           c_created,
           c_site,
-          c_chargeable
+          c_chargeable,
+          c_idempotency_key
          FROM t_visit
         WHERE c_chargeable = true
           AND c_created >= $timestamp
@@ -281,7 +304,8 @@ object VisitService:
           c_instrument,
           c_created,
           c_site,
-          c_chargeable
+          c_chargeable,
+          c_idempotency_key
          FROM t_visit
         WHERE c_created >= $timestamp
           AND c_created  < $timestamp
@@ -305,24 +329,35 @@ object VisitService:
            AND c_instrument IS NOT NULL
       """.query(obs_description)
 
-    val InsertVisit: Query[(Observation.Id, ObsDescription), Visit.Id] =
+    val InsertVisit: Query[(Observation.Id, ObsDescription, Option[IdempotencyKey]), VisitRecord] =
       sql"""
         INSERT INTO t_visit (
           c_observation_id,
+          c_idempotency_key,
           c_instrument,
           c_site,
           c_chargeable
         )
         SELECT
           $observation_id,
+          ${idempotency_key.opt},
           $instrument,
           ${lucuma.odb.util.Codecs.site},
           $bool
+        ON CONFLICT (c_idempotency_key) DO UPDATE
+          SET c_idempotency_key = EXCLUDED.c_idempotency_key
         RETURNING
-          c_visit_id
-      """.query(visit_id).contramap: (oid, od) =>
+          c_visit_id,
+          c_observation_id,
+          c_instrument,
+          c_created,
+          c_site,
+          c_chargeable,
+          c_idempotency_key
+      """.query(visit_record).contramap: (oid, od, idm) =>
         (
           oid,
+          idm,
           od.instrument,
           od.site,
           od.isChargeable

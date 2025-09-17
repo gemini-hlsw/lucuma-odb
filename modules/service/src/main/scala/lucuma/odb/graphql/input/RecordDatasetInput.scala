@@ -8,29 +8,28 @@ import eu.timepit.refined.types.string.NonEmptyString
 import lucuma.core.enums.DatasetQaState
 import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.Step
+import lucuma.core.util.IdempotencyKey
 import lucuma.odb.graphql.binding.*
 
 case class RecordDatasetInput(
-  stepId:   Step.Id,
-  filename: Dataset.Filename,
-  qaState:  Option[DatasetQaState],
-  comment:  Option[NonEmptyString]
+  stepId:         Step.Id,
+  filename:       Dataset.Filename,
+  qaState:        Option[DatasetQaState],
+  comment:        Option[NonEmptyString],
+  idempotencyKey: Option[IdempotencyKey]
 )
 
-object RecordDatasetInput {
+object RecordDatasetInput:
 
   val Binding: Matcher[RecordDatasetInput] =
-    ObjectFieldsBinding.rmap {
+    ObjectFieldsBinding.rmap:
       case List(
         StepIdBinding("stepId", rStepId),
         DatasetFilenameBinding("filename", rFilename),
         DatasetQaStateBinding.Option("qaState", rQaState),
-        NonEmptyStringBinding.Option("comment", rComment)
+        NonEmptyStringBinding.Option("comment", rComment),
+        IdempotencyKeyBinding.Option("idempotencyKey", rIdm)
       ) =>
-        (rStepId, rFilename, rQaState, rComment).parMapN { (sid, filename, qaState, comment) =>
-          RecordDatasetInput(sid, filename, qaState, comment)
-        }
-    }
-
-}
-
+        (rStepId, rFilename, rQaState, rComment, rIdm).parMapN:
+          (sid, filename, qaState, comment, idm) =>
+            RecordDatasetInput(sid, filename, qaState, comment, idm)
