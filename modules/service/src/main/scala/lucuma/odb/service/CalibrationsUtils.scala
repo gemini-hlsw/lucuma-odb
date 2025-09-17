@@ -123,6 +123,7 @@ case class CalibrationIdealTargets(
 }
 
 trait CalibrationObservations {
+
   def gmosLongSlitSpecPhotObs[F[_]: MonadThrow: Services: Transaction, G, L, U](
     pid:     Program.Id,
     gid:     Group.Id,
@@ -131,8 +132,14 @@ trait CalibrationObservations {
     configs: List[CalibrationConfigSubset.Gmos[G, L, U]]
   ): F[List[Observation.Id]] =
     configs.traverse: c =>
-      val wavelengthAt = props.get(c).flatMap(_.wavelengthAt)
-      val band         = props.get(c).flatMap(_.band)
+      // Use strategy-based lookup since transformed configs may have different ROI than original science configs
+      val matchingProps = props.find { case (originalConfig, _) =>
+        // Check if this original config could have produced the transformed config using SpectroPhotometric strategy
+        CalibrationConfigMatcher.matcherFor(originalConfig, CalibrationRole.SpectroPhotometric)
+          .configsMatch(originalConfig, c)
+      }.map(_._2)
+      val wavelengthAt = matchingProps.flatMap(_.wavelengthAt)
+      val band         = matchingProps.flatMap(_.band)
       specPhotoObservation(pid, gid, tid, wavelengthAt, band, c.toLongSlitInput)
 
   def roleConstraints(role: CalibrationRole) =

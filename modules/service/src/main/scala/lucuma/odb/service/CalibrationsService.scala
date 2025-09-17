@@ -228,8 +228,27 @@ object CalibrationsService extends CalibrationObservations {
 
       private def uniqueConfiguration(
         all: List[ObsExtract[ObservingMode]]
+      ): List[CalibrationConfigSubset] = all.map(_.data.toConfigSubset).distinct
+
+      /**
+       * Check if a science config could have produced a calibration config
+       * considering ROI transformations for different calibration types
+       */
+      private def configsMatchForAnyCalibType(sciConfig: CalibrationConfigSubset, calibConfig: CalibrationConfigSubset): Boolean =
+        // Try matching with each available calibration strategy
+        CalibrationTypes.exists { calibRole =>
+          CalibrationConfigMatcher.matcherFor(sciConfig, calibRole).configsMatch(sciConfig, calibConfig)
+        }
+
+      /**
+       * Transform configurations for specific calibration type ROI requirements
+       */
+      private def transformConfigsForCalibType(
+        configs: List[CalibrationConfigSubset],
+        calibRole: CalibrationRole
       ): List[CalibrationConfigSubset] =
-        all.map(_.data.toConfigSubset).distinct
+        configs.map: config =>
+          CalibrationConfigMatcher.matcherFor(config, calibRole).normalize(config)
 
       private def calibObservation(
         calibRole: CalibrationRole,
@@ -240,16 +259,17 @@ object CalibrationsService extends CalibrationObservations {
         configs:   List[CalibrationConfigSubset],
         tid:       Target.Id
       )(using Transaction[F]): F[List[Observation.Id]] =
+        val transformedConfigs = transformConfigsForCalibType(configs, calibRole).distinct
         calibRole match {
           case CalibrationRole.SpectroPhotometric =>
             site match {
-              case Site.GN => gmosLongSlitSpecPhotObs(pid, gid, tid, props, configs.collect { case c: GmosNConfigs => c })
-              case Site.GS => gmosLongSlitSpecPhotObs(pid, gid, tid, props, configs.collect { case c: GmosSConfigs => c })
+              case Site.GN => gmosLongSlitSpecPhotObs(pid, gid, tid, props, transformedConfigs.collect { case c: GmosNConfigs => c })
+              case Site.GS => gmosLongSlitSpecPhotObs(pid, gid, tid, props, transformedConfigs.collect { case c: GmosSConfigs => c })
             }
           case CalibrationRole.Twilight =>
             site match
-              case Site.GN => gmosLongSlitTwilightObs(pid, gid, tid, configs.collect { case c: GmosNConfigs => c })
-              case Site.GS => gmosLongSlitTwilightObs(pid, gid, tid, configs.collect { case c: GmosSConfigs => c })
+              case Site.GN => gmosLongSlitTwilightObs(pid, gid, tid, transformedConfigs.collect { case c: GmosNConfigs => c })
+              case Site.GS => gmosLongSlitTwilightObs(pid, gid, tid, transformedConfigs.collect { case c: GmosSConfigs => c })
           case _ => List.empty.pure[F]
         }
 
@@ -314,7 +334,7 @@ object CalibrationsService extends CalibrationObservations {
       )(using Transaction[F], ServiceAccess): F[List[Observation.Id]] = {
         val oids = NonEmptyList.fromList(
           calibrations
-            .collect { case (oid, c) if !scienceConfigs.exists(_ === c) => oid }
+            .collect { case (oid, calibConfig) if !scienceConfigs.exists(configsMatchForAnyCalibType(_, calibConfig)) => oid }
             .sorted
         )
         oids.fold(List.empty.pure[F])(os => observationService.deleteCalibrationObservations(os).as(os.toList))
@@ -390,10 +410,15 @@ object CalibrationsService extends CalibrationObservations {
           allCalibs    <- allUnexecutedObservations(pid, ObservationSelection.Calibration)
           // Unique calibration configurations
           uniqueCalibs  = uniqueConfiguration(allCalibs)
+          // Get all the active calibration observations
+          allCalibs    <- allObservations(pid, ObservationSelection.Calibration)
           calibs        = toConfigForCalibration(allCalibs)
           // Average s/n wavelength at each configuration
           props         = calObsProps(toConfigForCalibration(allSci))
-          // Get all unique configurations
+          // Unique calibration configurations
+          uniqueCalibs  = uniqueConfiguration(allCalibs)
+          // Get all unique configurations that need calibrations
+          // Use ROI-aware comparison to handle transformed calibration configs
           configs       = uniqueSci.diff(uniqueCalibs)
           // Remove calibrations that are not needed, basically when a config is removed
           removedOids  <- removeUnnecessaryCalibrations(uniqueSci, calibs.map {

@@ -27,16 +27,15 @@ given Eq[ObservingMode] =
     case (a: GmosSouthImaging,    b: GmosSouthImaging)    => a === b
     case _                                                => false
 
-extension (self: ObservingMode)
-  def observingModeType: ObservingModeType =
-    self match
-      case _: Flamingos2Config    => ObservingModeType.Flamingos2LongSlit
-      case _: GmosNorthLongSlit   => ObservingModeType.GmosNorthLongSlit
-      case _: GmosSouthLongSlit   => ObservingModeType.GmosSouthLongSlit
-      case _: GmosNorthImaging    => ObservingModeType.GmosNorthImaging
-      case _: GmosSouthImaging    => ObservingModeType.GmosSouthImaging
-
 object ObservingMode:
+  extension (self: ObservingMode)
+    def observingModeType: ObservingModeType =
+      self match
+        case _: Flamingos2Config    => ObservingModeType.Flamingos2LongSlit
+        case _: GmosNorthLongSlit   => ObservingModeType.GmosNorthLongSlit
+        case _: GmosSouthLongSlit   => ObservingModeType.GmosSouthLongSlit
+        case _: GmosNorthImaging    => ObservingModeType.GmosNorthImaging
+        case _: GmosSouthImaging    => ObservingModeType.GmosSouthImaging
 
   given HashBytes[ObservingMode] =
     case f2:  Flamingos2Config    => f2.hashBytes

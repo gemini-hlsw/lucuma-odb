@@ -1005,10 +1005,11 @@ class calibrations extends OdbSuite with SubscriptionUtils with ExecutionQuerySe
       val wv = ob.collect {
         case CalibObs(_, _, Some(CalibrationRole.SpectroPhotometric), _, _, ScienceRequirements(ExposureTimeMode(SignalToNoise(wv)))) => wv
       }
-      // 510 is the average across the science observations
+      // 510 is the average across the science observations (500 + 520) / 2 = 510
       assertEquals(Wavelength.fromIntNanometers(510), wv.headOption)
     }
   }
+
   test("Don't add calibrations if science is inactive"):
     for {
       pid  <- createProgramAs(pi)
@@ -1102,4 +1103,145 @@ class calibrations extends OdbSuite with SubscriptionUtils with ExecutionQuerySe
       assert(calibIds2.contains(calibIds1.head))
       assertEquals(oids.size, 1)
     }
+
+  test("SpectroPhotometric calibrations ignore ROI differences from science observations") {
+    for {
+      pid  <- createProgramAs(pi)
+      tid1 <- createTargetAs(pi, pid, "Target1")
+      tid2 <- createTargetAs(pi, pid, "Target2")
+      oid1 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid1)
+      oid2 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid2)
+      _ <- query(
+        user = pi,
+        query = s"""
+          mutation {
+            updateObservations(input: {
+              WHERE: { id: { EQ: "$oid1" } }
+              SET: {
+                observingMode: {
+                  gmosNorthLongSlit: {
+                    grating: R831_G5302
+                    filter: R_PRIME
+                    fpu: LONG_SLIT_0_50
+                    centralWavelength: { nanometers: 500 }
+                    explicitRoi: CENTRAL_SPECTRUM
+                  }
+                }
+              }
+            }) {
+              observations { id }
+            }
+          }
+        """,
+      )
+      _ <- query(
+        user = pi,
+        query = s"""
+          mutation {
+            updateObservations(input: {
+              WHERE: { id: { EQ: "$oid2" } }
+              SET: {
+                observingMode: {
+                  gmosNorthLongSlit: {
+                    grating: R831_G5302
+                    filter: R_PRIME
+                    fpu: LONG_SLIT_0_50
+                    centralWavelength: { nanometers: 500 }
+                    explicitRoi: FULL_FRAME
+                  }
+                }
+              }
+            }) {
+              observations { id }
+            }
+          }
+        """,
+      )
+      _ <- prepareObservation(pi, oid1, tid1) *> prepareObservation(pi, oid2, tid2)
+      // Generate calibrations
+      _ <- withServices(service) { services =>
+             services.session.transaction.use { xa =>
+               services.calibrationsService(emailConfig, httpClient).recalculateCalibrations(pid, when)(using xa)
+             }
+           }
+
+      ob <- queryObservations(pid)
+    } yield {
+      val calibCount = ob.count(_.calibrationRole.contains(CalibrationRole.SpectroPhotometric))
+      // SpectroPhotometric should ignore ROI differences
+      assertEquals(calibCount, 1)
+    }
+  }
+
+  test("Twilight calibrations preserve ROI differences from science observations") {
+    for {
+      pid  <- createProgramAs(pi)
+      tid1 <- createTargetAs(pi, pid, "Target1")
+      tid2 <- createTargetAs(pi, pid, "Target2")
+      oid1 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid1)
+      oid2 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid2)
+      _ <- query(
+        user = pi,
+        query = s"""
+          mutation {
+            updateObservations(input: {
+              WHERE: { id: { EQ: "$oid1" } }
+              SET: {
+                observingMode: {
+                  gmosNorthLongSlit: {
+                    grating: R831_G5302
+                    filter: R_PRIME
+                    fpu: LONG_SLIT_0_50
+                    centralWavelength: { nanometers: 500 }
+                    explicitRoi: CENTRAL_SPECTRUM
+                  }
+                }
+              }
+            }) {
+              observations { id }
+            }
+          }
+        """
+      )
+      _ <- query(
+        user = pi,
+        query = s"""
+          mutation {
+            updateObservations(input: {
+              WHERE: { id: { EQ: "$oid2" } }
+              SET: {
+                observingMode: {
+                  gmosNorthLongSlit: {
+                    grating: R831_G5302
+                    filter: R_PRIME
+                    fpu: LONG_SLIT_0_50
+                    centralWavelength: { nanometers: 500 }
+                    explicitRoi: FULL_FRAME
+                  }
+                }
+              }
+            }) {
+              observations { id }
+            }
+          }
+        """,
+      )
+      _ <- prepareObservation(pi, oid1, tid1) *> prepareObservation(pi, oid2, tid2)
+      // Generate calibrations
+      _ <- withServices(service) { services =>
+             services.session.transaction.use { xa =>
+               services.calibrationsService(emailConfig, httpClient).recalculateCalibrations(pid, when)(using xa)
+             }
+           }
+
+      ob <- queryObservations(pid)
+    } yield {
+      val twilightCount = ob.count(_.calibrationRole.contains(CalibrationRole.Twilight))
+
+      // Twilight should preserve ROI differences - create separate calibrations for each ROI
+      // Two science observations with different ROIs should create 2 twilight calibrations
+      // Only 2 calibrations because both science observations are GMOS North (only GN site)
+      assertEquals(twilightCount, 2, "Twilight should create separate calibrations preserving ROI differences between science observations")
+    }
+  }
 }
