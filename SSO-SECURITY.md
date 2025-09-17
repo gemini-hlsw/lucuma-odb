@@ -1,5 +1,3 @@
-
-
 # Lucuma Security Overview
 
 The design goal is distributed trust/verification via token-passing, which lets us service most requests on behalf of users without having to consult a central authority.
