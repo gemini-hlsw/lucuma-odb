@@ -106,10 +106,10 @@ need most of `ObservationDB.graphql` types.
 
 Call it as:
 ```
-node schemastitcher.js modules/service/src/main/resources/graphql/ObservationDB.graphql modules/service/src/main/resources/graphql/itc_base.graphql modules/service/src/main/resources/graphql/itc.graphql
+node itc/schemastitcher.js modules/service/src/main/resources/graphql/ObservationDB.graphql itc/service/src/main/resources/graphql/itc_base.graphql itc/service/src/main/resources/graphql/itc.graphql
 ```
 
-The script fetchODBSchema.sh will get the latest schema from the odb dev server and do the stitching in one go
+The script `itcFetchODBSchema.sh` will conveniently perform this invocation.
 
 ## Benchmarking
 

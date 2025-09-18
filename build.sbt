@@ -1,3 +1,5 @@
+import NativePackagerHelper._
+
 // Please keep in alphabetical order
 val awsJavaSdkVersion          = "1.12.787"
 val boopickleVersion           = "1.5.0"
@@ -104,6 +106,7 @@ lazy val sbtDockerPublishLocal =
     List(
       "clean",
       "ssoService/docker:publishLocal",
+      "itcService/docker:publishLocal",
       "service/docker:publishLocal",
       "obscalc/docker:publishLocal",
       "calibrations/docker:publishLocal"
@@ -111,17 +114,20 @@ lazy val sbtDockerPublishLocal =
     name = Some("Build Docker images")
   )
 
-lazy val systems: List[String] = List("sso", "odb")
+lazy val systems: List[String] = List("sso", "itc", "odb")
 lazy val appNames: Map[String, String] = Map(
   "sso" -> "${{ vars.HEROKU_SSO_APP_NAME || 'lucuma-sso' }}",
+  "itc" -> "${{ vars.HEROKU_ITC_APP_NAME || 'itc' }}",
   "odb" -> "${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb' }}"
 )
 lazy val procTypes: Map[String, List[String]] = Map(
   "sso" -> List("web"),
+  "itc" -> List("web"),
   "odb" -> List("web", "obscalc", "calibration")
 )
 lazy val procTypeImageNames: Map[(String, String), String] = Map(
   ("sso", "web")           -> "lucuma-sso-service",
+  ("itc", "web")           -> "lucuma-itc-service",
   ("odb", "web")           -> "lucuma-odb-service",
   ("odb", "obscalc")       -> "obscalc-service",
   ("odb", "calibration")   -> "calibrations-service"
@@ -388,9 +394,11 @@ ThisBuild / ocsLocal       := ocsBuildInfo.value._4
 lazy val itcService = project
   .in(file("itc/service"))
   .dependsOn(itcModel.jvm)
+  .enablePlugins(BuildInfoPlugin, LucumaDockerPlugin, JavaServerAppPackaging)
   .settings(itcCommonSettings)
   .settings(
     name                  := "lucuma-itc-service",
+    description              := "ITC Server",
     scalacOptions -= "-Vtype-diffs",
     reStart / javaOptions := Seq(
       "-Dcats.effect.stackTracing=DISABLED",
@@ -436,39 +444,20 @@ lazy val itcService = project
       ocsGitBranch,
       ocsGitDescribe,
       ocsLocal
-    )
+    ),
+    // Name of the launch script
+    executableScriptName     := "itc-service",
+    dockerExposedPorts ++= Seq(6060),
+    // Add the ocslib jars to the distribution
+    Universal / mappings ++= {
+      val dir = (service / baseDirectory).value / "ocslib"
+      (dir ** AllPassFilter).pair(relativeTo(dir.getParentFile))
+    },
+    // The heap needs to be a lot smaller than the dyno size. This may be
+    // because the JVM tricks to load the 367M of old itc jar files increases the
+    // `metaspace` size by that amount. It's a nice theory, at least.
+    lucumaDockerHeapSubtract := 400
   )
-  .enablePlugins(BuildInfoPlugin)
-
-/**
- * Project for the ITC server app for development
- */
-// lazy val deploy = project
-//   .in(file("deploy"))
-//   .enablePlugins(NoPublishPlugin)
-//   .enablePlugins(LucumaDockerPlugin)
-//   .enablePlugins(JavaServerAppPackaging)
-//   .enablePlugins(GitBranchPrompt)
-//   .dependsOn(service)
-//   .settings(
-//     description              := "ITC Server",
-//     Docker / packageName     := "gpp-itc",
-//     description              := "ITC Server",
-//     // Main class for launching
-//     Compile / mainClass      := Some("lucuma.itc.service.Main"),
-//     // Name of the launch script
-//     executableScriptName     := "itc-service",
-//     dockerExposedPorts ++= Seq(6060),
-//     // Add the ocslib jars to the distribution
-//     Universal / mappings ++= {
-//       val dir = (service / baseDirectory).value / "ocslib"
-//       (dir ** AllPassFilter).pair(relativeTo(dir.getParentFile))
-//     },
-//     // The heap needs to be a lot smaller than the dyno size. This may be
-//     // because the JVM tricks to load the 367M of old itc jar files increases the
-//     // `metaspace` size by that amount. It's a nice theory, at least.
-//     lucumaDockerHeapSubtract := 400
-//   )
 
 lazy val itcClient = crossProject(JVMPlatform, JSPlatform)
   .in(file("itc/client"))
@@ -686,7 +675,6 @@ lazy val service = project
     executableScriptName            := "lucuma-odb-service",
     dockerExposedPorts ++= Seq(8082)
   )
-
 
 lazy val obscalc = project
   .in(file("modules/obscalc"))
