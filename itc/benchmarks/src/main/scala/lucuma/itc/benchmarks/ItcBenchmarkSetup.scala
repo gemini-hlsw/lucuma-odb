@@ -63,9 +63,9 @@ object ItcBenchmarkSetup:
       .map(new File(_))
       .filter(_.exists())
       .getOrElse {
-        // Fallback: detect if we're in modules/benchmarks and navigate up
+        // Fallback: detect if we're in itc/benchmarks and navigate up
         val userDir     = System.getProperty("user.dir")
-        val projectRoot = if (userDir.endsWith("modules/benchmarks")) {
+        val projectRoot = if (userDir.endsWith("itc/benchmarks")) {
           new File(userDir).getParentFile.getParentFile.getAbsolutePath
         } else {
           userDir
@@ -77,7 +77,7 @@ object ItcBenchmarkSetup:
   private def setupItc: IO[Itc[IO]] =
     findProjectRoot.flatMap: projectRoot =>
       IO {
-        val ocslibPath = new File(projectRoot, "modules/service/ocslib").getAbsolutePath
+        val ocslibPath = new File(projectRoot, "itc/service/ocslib").getAbsolutePath
         val ocslibDir  = new File(ocslibPath)
 
         if (!ocslibDir.exists())

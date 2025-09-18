@@ -74,7 +74,7 @@ trait CommonITCLegacySuite extends FunSuite:
   // Initialize the local ITC
   lazy val localItc = {
     val jarFiles =
-      new File("modules/service/ocslib")
+      new File("itc/service/ocslib")
         .getAbsoluteFile()
         .listFiles(new FileFilter() {
           override def accept(file: File): Boolean =
