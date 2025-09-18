@@ -57,6 +57,23 @@ ThisBuild / scalacOptions     ++= Seq("-Xmax-inlines", "50") // Hash derivation 
 ThisBuild / Test / fork              := false
 ThisBuild / Test / parallelExecution := false
 
+ThisBuild / watchOnTermination := { (action, cmd, times, state) =>
+  val projNames = cmd
+    .split(";")
+    .flatMap(
+      Some(_)
+        .filter(_.contains("/reStart"))
+        .flatMap(_.trim.split("/reStart") match {
+          case Array(projName) => Some(projName)
+          case _               => None
+        })
+    )
+  projNames.foldLeft(state) { (acc, projName) =>
+    val projRef = ProjectRef((ThisBuild / baseDirectory).value, projName)
+    Project.extract(state).runTask(projRef / reStop, state)._1
+  }
+}
+
 val herokuToken = "HEROKU_API_KEY" -> "${{ secrets.HEROKU_API_KEY }}"
 ThisBuild / githubWorkflowEnv += herokuToken
 
@@ -80,13 +97,28 @@ ThisBuild / githubWorkflowBuildPreamble +=
 ThisBuild / githubWorkflowBuildPreamble +=
   WorkflowStep.Use(
     UseRef.Public("kamilkisiela", "graphql-inspector", "master"),
-    name = Some("Validate GraphQL schema changes"),
+    name = Some("Validate ODB GraphQL schema changes"),
     params =
-      Map("schema"        -> "main:modules/schema/src/main/resources/lucuma/odb/graphql/OdbSchema.graphql",
-          "approve-label" -> "expected-breaking-change"
+      Map(
+        "name"          -> "Validate ODB Public API",
+        "schema"        -> "main:modules/schema/src/main/resources/lucuma/odb/graphql/OdbSchema.graphql",
+        "approve-label" -> "expected-breaking-change"
       ),
     cond = Some("github.event_name == 'pull_request' && matrix.shard == '1'")
   )
+
+ThisBuild / githubWorkflowBuildPreamble +=
+  WorkflowStep.Use(
+    UseRef.Public("kamilkisiela", "graphql-inspector", "master"),
+    name = Some("Validate ITC GraphQL schema changes"),
+    params =
+      Map(
+        "name"          -> "Validate ITC Public API",
+        "schema"        -> "main:itc/service/src/main/resources/graphql/itc.graphql",
+        "approve-label" -> "expected-breaking-change"
+      ),
+    cond = Some("github.event_name == 'pull_request' && matrix.shard == '2'")
+  )  
 
 val nTestJobShards = 8
 
@@ -100,6 +132,20 @@ ThisBuild / githubWorkflowBuild ~= (_.map(step =>
     )
   else step
 ))
+
+lazy val CheckoutFullWithLfs: WorkflowStep =
+  WorkflowStep.Use(
+    UseRef.Public("actions", "checkout", "v4"),
+    name = Some("Checkout current branch (full)"),
+    params = Map("fetch-depth" -> "0", "lfs" -> "true")
+  )
+
+ThisBuild / githubWorkflowJobSetup := {
+  List(CheckoutFullWithLfs) :::
+    WorkflowStep.SetupSbt ::
+    WorkflowStep.SetupJava(githubWorkflowJavaVersions.value.toList) :::
+    githubWorkflowGeneratedCacheSteps.value.toList
+}
 
 lazy val sbtDockerPublishLocal =
   WorkflowStep.Sbt(
