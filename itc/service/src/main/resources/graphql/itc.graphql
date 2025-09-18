@@ -2,71 +2,27 @@
 """
 This file is generated. Do not manually modify it.
 It is generated from the following source files:
-  - ObservationDB.graphql
+  - OdbSchema.graphql
   - itc_base.graphql
 """
 enum ConditionsMeasurementSource {
-  """Observer"""
-  OBSERVER
+  DUMMY
 }
 
 enum SeeingTrend {
-  """Getting Better"""
-  GETTING_BETTER
-
-  """Getting Worse"""
-  GETTING_WORSE
-
-  """Staying the Same"""
-  STAYING_THE_SAME
-
-  """Variable"""
-  VARIABLE
+  DUMMY
 }
 
 enum ConditionsExpectationType {
-  """Clear Skies"""
-  CLEAR_SKIES
-
-  """Fog"""
-  FOG
-
-  """Thick Clouds"""
-  THICK_CLOUDS
-
-  """Thin Clouds"""
-  THIN_CLOUDS
+  DUMMY
 }
 
 enum FilterType {
-  """Broad-Band Filter"""
-  BroadBand
-
-  """Combination Filter"""
-  Combination
-
-  """Engineering Filter"""
-  Engineering
-
-  """Narrow-Band Filter"""
-  NarrowBand
-
-  """Spectroscopic Filter"""
-  Spectroscopic
+  DUMMY
 }
 
 enum ProposalStatus {
-  """Not Submitted"""
-  NOT_SUBMITTED
-
-  """Submitted"""
-  SUBMITTED
-
-  """Accepted"""
-  ACCEPTED
-
-  """Not Accepted"""
-  NOT_ACCEPTED
+  DUMMY
 }
 
 """Email address, matching ^\w+@[a-zA-Z_]+?\.[a-zA-Z]{2,3}$"""
