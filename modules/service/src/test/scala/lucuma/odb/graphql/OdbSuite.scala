@@ -402,7 +402,8 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
     } yield s
 
   protected def session: Resource[IO, Session[IO]] =
-    FMain.singleSession(databaseConfig)
+    Resource.unit.flatMap: _ => // Newer versions of munit-cats-effect just don't run the tests without this line. 
+      FMain.singleSession(databaseConfig)
 
   private def transactionalClient(user: User)(svr: Server): Resource[IO, FetchClient[IO, Nothing]] =
       val uri  = svr.baseUri / "odb"
