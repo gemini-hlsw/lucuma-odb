@@ -1,42 +1,59 @@
+// Please keep in alphabetical order
 val awsJavaSdkVersion          = "1.12.787"
+val boopickleVersion           = "1.5.0"
+val bouncycastleVersion        = "1.70"
+val catsEffectVersion          = "3.6.3"
 val catsParseVersion           = "1.1.0"
+val catsScalacheckVersion      = "0.3.2"
 val catsTimeVersion            = "0.6.0"
+val catsVersion                = "2.13.0"
 val circeVersion               = "0.14.14"
 val circeRefinedVersion        = "0.15.1"
 val cirisVersion               = "3.10.0"
 val clueVersion                = "0.48.0"
 val declineVersion             = "2.5.0"
-val disciplineMunitVersion     = "1.0.9"
+// val disciplineMunitVersion     = "1.0.9"
+val dropwizardVersion          = "4.2.37"
 val flywayVersion              = "9.22.3"
 val fs2AwsVersion              = "6.2.0"
 val fs2Version                 = "3.12.0"
 val grackleVersion             = "0.25.0"
+val http4sVersion              = "0.23.30"
 val http4sBlazeVersion         = "0.23.17"
 val http4sEmberVersion         = "0.23.30"
 val http4sJdkHttpClientVersion = "0.10.0"
+val jmhVersion                 = "1.37"
 val jwtVersion                 = "10.0.4"
-val bouncycastleVersion        = "1.70"
-val weaverVersion              = "0.8.4"
+val keySemaphoreVersion        = "0.3.0-M1"
+val kittensVersion             = "3.5.0"
 val logbackVersion             = "1.5.18"
 val log4catsVersion            = "2.7.1"
-val lucumaItcVersion           = "0.48.0"
 val lucumaCoreVersion          = "0.145.0"
 val lucumaGraphQLRoutesVersion = "0.11.2"
-val munitVersion               = "0.7.29"  // check test output if you attempt to update this
-val munitCatsEffectVersion     = "1.0.7"   // check test output if you attempt to update this
+val monocleVersion             = "3.3.0"
+// val munitVersion               = "0.7.29"  // check test output if you attempt to update this
+val munitVersion               = "1.1.1"
+// val munitCatsEffectVersion     = "1.0.7"   // check test output if you attempt to update this
+val munitCatsEffectVersion     = "2.1.0"   // check test output if you attempt to update this
 val munitDisciplineVersion     = "1.0.9"   // check test output if you attempt to update this
+val munitScalacheckVersion     = "1.2.0"   // check test output if you attempt to update this
 val natchezHttp4sVersion       = "0.6.1"
 val natchezVersion             = "0.3.7"
 val paigesVersion              = "0.4.4"
 val postgresVersion            = "42.7.7"
 val pprintVersion              = "0.9.3"
+val redis4CatsVersion          = "2.0.1"
+val refinedVersion             = "0.11.3"
 val skunkVersion               = "0.6.4"
+val spireVersion               = "0.18.0"
 val slf4jVersion               = "2.0.17"
 val testcontainersScalaVersion = "0.40.14" // check test output if you attempt to update this
+val weaverVersion              = "0.8.4"
 
 ThisBuild / tlBaseVersion      := "0.29"
 ThisBuild / scalaVersion       := "3.7.3"
 ThisBuild / crossScalaVersions := Seq("3.7.3")
+ThisBuild / scalacOptions     ++= Seq("-Xmax-inlines", "50") // Hash derivation fails with default of 32
 
 ThisBuild / Test / fork              := false
 ThisBuild / Test / parallelExecution := false
@@ -219,7 +236,7 @@ lazy val ssoFrontendClient =
         "edu.gemini"    %%% "lucuma-core"         % lucumaCoreVersion,
         "edu.gemini"    %%% "lucuma-core-testkit" % lucumaCoreVersion,
         "org.scalameta" %%% "munit"               % munitVersion % Test,
-        "org.typelevel" %%% "discipline-munit"    % disciplineMunitVersion  % Test,
+        "org.typelevel" %%% "discipline-munit"    % munitDisciplineVersion  % Test,
       )
     )
 
@@ -312,7 +329,7 @@ lazy val schema =
         "io.circe"      %%% "circe-testing"              % circeVersion           % Test,
         "edu.gemini"    %%% "lucuma-core-testkit"        % lucumaCoreVersion      % Test,
         "org.scalameta" %%% "munit"                      % munitVersion           % Test,
-        "org.scalameta" %%% "munit-scalacheck"           % munitVersion           % Test,
+        "org.scalameta" %%% "munit-scalacheck"           % munitScalacheckVersion % Test,
         "org.typelevel" %%% "discipline-munit"           % munitDisciplineVersion % Test
       )
     )
@@ -332,15 +349,13 @@ lazy val binding = project
 
 lazy val sequence = project
   .in(file("modules/sequence"))
-  .dependsOn(schema.jvm)
+  .dependsOn(schema.jvm, itcClient.jvm, itcTestkit.jvm)
   .enablePlugins(NoPublishPlugin)
   .settings(
     name := "lucuma-odb-sequence",
     libraryDependencies ++= Seq(
-      "edu.gemini"    %% "lucuma-itc-client"  % lucumaItcVersion,
-      "edu.gemini"    %% "lucuma-itc-testkit" % lucumaItcVersion       % Test,
       "org.scalameta" %% "munit"              % munitVersion           % Test,
-      "org.scalameta" %% "munit-scalacheck"   % munitVersion           % Test,
+      "org.scalameta" %% "munit-scalacheck"   % munitScalacheckVersion % Test,
       "org.typelevel" %% "discipline-munit"   % munitDisciplineVersion % Test
     )
   )
@@ -357,7 +372,7 @@ lazy val smartgcal = project
       "edu.gemini"    %% "lucuma-core"         % lucumaCoreVersion,
       "edu.gemini"    %% "lucuma-core-testkit" % lucumaCoreVersion      % Test,
       "org.scalameta" %% "munit"               % munitVersion           % Test,
-      "org.scalameta" %% "munit-scalacheck"    % munitVersion           % Test,
+      "org.scalameta" %% "munit-scalacheck"    % munitScalacheckVersion % Test,
       "org.typelevel" %% "discipline-munit"    % munitDisciplineVersion % Test
     )
   )
@@ -400,14 +415,15 @@ lazy val service = project
       "com.amazonaws"             % "aws-java-sdk-core"                  % awsJavaSdkVersion          % Test,
       "edu.gemini"               %% "clue-http4s"                        % clueVersion                % Test,
       "org.scalameta"            %% "munit"                              % munitVersion               % Test,
-      "org.scalameta"            %% "munit-scalacheck"                   % munitVersion               % Test,
+      "org.scalameta"            %% "munit-scalacheck"                   % munitScalacheckVersion     % Test,
       "org.typelevel"            %% "discipline-munit"                   % munitDisciplineVersion     % Test,
       "edu.gemini"               %% "lucuma-catalog-testkit"             % lucumaCoreVersion          % Test,
       "edu.gemini"               %% "lucuma-core-testkit"                % lucumaCoreVersion          % Test,
       "org.http4s"               %% "http4s-jdk-http-client"             % http4sJdkHttpClientVersion % Test,
       "org.typelevel"            %% "cats-time"                          % catsTimeVersion,
       "org.typelevel"            %% "log4cats-slf4j"                     % log4catsVersion,
-      "org.typelevel"            %% "munit-cats-effect-3"                % munitCatsEffectVersion     % Test,
+      // "org.typelevel"            %% "munit-cats-effect-3"                % munitCatsEffectVersion     % Test,
+      "org.typelevel"            %% "munit-cats-effect"                  % munitCatsEffectVersion % Test,
       "org.typelevel"            %% "paiges-core"                        % paigesVersion,
       "com.github.vertical-blank" % "sql-formatter"                      % "2.0.5"
     ),
@@ -466,8 +482,262 @@ lazy val phase0 = project
       "edu.gemini"    %% "lucuma-core"         % lucumaCoreVersion,
       "edu.gemini"    %% "lucuma-core-testkit" % lucumaCoreVersion      % Test,
       "org.scalameta" %% "munit"               % munitVersion           % Test,
-      "org.scalameta" %% "munit-scalacheck"    % munitVersion           % Test,
-      "org.typelevel" %% "munit-cats-effect-3" % munitCatsEffectVersion % Test,
+      "org.scalameta" %% "munit-scalacheck"    % munitScalacheckVersion % Test,
+      // "org.typelevel" %% "munit-cats-effect-3" % munitCatsEffectVersion % Test,
+      "org.typelevel" %% "munit-cats-effect"   % munitCatsEffectVersion % Test,
       "org.typelevel" %% "discipline-munit"    % munitDisciplineVersion % Test
     )
+  )
+
+// START ITC
+
+lazy val itcCommonSettings = lucumaGlobalSettings ++ Seq(
+  Test / parallelExecution := false // tests run fine in parallel but output is nicer this way
+)
+
+// Basic ITC model classes
+lazy val itcModel = crossProject(JVMPlatform, JSPlatform)
+  .crossType(CrossType.Pure)
+  .in(file("itc/model"))
+  .settings(itcCommonSettings)
+  .settings(
+    name := "lucuma-itc",
+    libraryDependencies ++= Seq(
+      "io.circe"      %%% "circe-generic" % circeVersion,
+      "io.circe"      %%% "circe-refined" % circeRefinedVersion,
+      "org.typelevel" %%% "cats-core"     % catsVersion,
+      "edu.gemini"    %%% "lucuma-core"   % lucumaCoreVersion,
+      "eu.timepit"    %%% "refined"       % refinedVersion,
+      "eu.timepit"    %%% "refined-cats"  % refinedVersion,
+      "org.typelevel" %%% "kittens"       % kittensVersion
+    )
+  )
+
+lazy val ocslibHash = taskKey[String]("hash of ocslib and graphql schema")
+ThisBuild / ocslibHash / fileInputs += (itcService / baseDirectory).value.toGlob / "ocslib" / "*.jar"
+ThisBuild / ocslibHash / fileInputs += (itcService / Compile / resourceDirectory).value.toGlob / "graphql" / "*.graphql"
+ThisBuild / ocslibHash := {
+  val jarFiles      = ocslibHash.inputFiles.filter(_.toString.endsWith(".jar")).sorted.map(_.toFile)
+  val schemaFiles   =
+    ocslibHash.inputFiles.filter(_.toString.endsWith(".graphql")).sorted.map(_.toFile)
+  val allFiles      = jarFiles ++ schemaFiles
+  val hashes        = allFiles.map(Hash(_))
+  val describe      = ocsGitDescribe.value
+  val combinedInput = hashes.toArray.flatten ++ describe.getBytes("UTF-8")
+
+  Hash.toHex(Hash(combinedInput))
+}
+
+// OCS build info parsing
+lazy val ocsBuildInfo   = taskKey[(String, String, String, Boolean)]("OCS build info")
+lazy val ocsGitHash     = taskKey[String]("ocs git hash")
+lazy val ocsGitBranch   = taskKey[String]("ocs git branch")
+lazy val ocsGitDescribe = taskKey[String]("ocs git describe")
+lazy val ocsLocal       = taskKey[Boolean]("ocs local changes")
+
+ThisBuild / ocsBuildInfo := {
+  import scala.util.matching.*
+
+  val buildInfoFile = (itcService / baseDirectory).value / "ocslib" / "build-info.json"
+  val content       = IO.read(buildInfoFile)
+
+  def extractField(pattern: Regex, fieldName: String): String =
+    pattern.findFirstMatchIn(content) match {
+      case Some(m) => m.group(1)
+      case None    => throw new RuntimeException(s"$fieldName not found in build-info.json")
+    }
+
+  val gitHash     = extractField(""""ocs_git_hash":\s*"([^"]+)"""".r, "ocs_git_hash")
+  val gitBranch   = extractField(""""ocs_git_branch":\s*"([^"]+)"""".r, "ocs_git_branch")
+  val gitDescribe = extractField(""""ocs_git_describe":\s*"([^"]+)"""".r, "ocs_git_describe")
+  val local       = extractField(""""local":\s*(true|false)""".r, "local").toBoolean
+
+  (gitHash, gitBranch, gitDescribe, local)
+}
+
+ThisBuild / ocsGitHash     := ocsBuildInfo.value._1
+ThisBuild / ocsGitBranch   := ocsBuildInfo.value._2
+ThisBuild / ocsGitDescribe := ocsBuildInfo.value._3
+ThisBuild / ocsLocal       := ocsBuildInfo.value._4
+
+// Contains the grackle server
+lazy val itcService = project
+  .in(file("itc/service"))
+  .dependsOn(itcModel.jvm)
+  .settings(itcCommonSettings)
+  .settings(
+    name                  := "lucuma-itc-service",
+    scalacOptions -= "-Vtype-diffs",
+    reStart / javaOptions := Seq(
+      "-Dcats.effect.stackTracing=DISABLED",
+      "-Dcats.effect.tracing.mode=none"
+    ),
+    libraryDependencies ++= Seq(
+      "org.typelevel"        %% "grackle-core"          % grackleVersion,
+      "org.typelevel"        %% "grackle-generic"       % grackleVersion,
+      "org.typelevel"        %% "grackle-circe"         % grackleVersion,
+      "edu.gemini"           %% "lucuma-graphql-routes" % lucumaGraphQLRoutesVersion,
+      "org.tpolecat"         %% "natchez-honeycomb"     % natchezVersion,
+      "org.tpolecat"         %% "natchez-log"           % natchezVersion,
+      "org.tpolecat"         %% "natchez-http4s"        % natchezHttp4sVersion,
+      "co.fs2"               %% "fs2-core"              % fs2Version,
+      "edu.gemini"           %% "lucuma-core"           % lucumaCoreVersion,
+      "org.typelevel"        %% "cats-core"             % catsVersion,
+      "org.typelevel"        %% "cats-effect"           % catsEffectVersion,
+      "is.cir"               %% "ciris"                 % cirisVersion,
+      "org.typelevel"        %% "log4cats-slf4j"        % log4catsVersion,
+      "org.slf4j"             % "slf4j-simple"          % slf4jVersion,
+      "org.http4s"           %% "http4s-core"           % http4sVersion,
+      "org.http4s"           %% "http4s-ember-server"   % http4sVersion,
+      "org.http4s"           %% "http4s-ember-client"   % http4sVersion,
+      "eu.timepit"           %% "refined"               % refinedVersion,
+      "eu.timepit"           %% "refined-cats"          % refinedVersion,
+      "dev.profunktor"       %% "redis4cats-effects"    % redis4CatsVersion,
+      "dev.profunktor"       %% "redis4cats-log4cats"   % redis4CatsVersion,
+      "com.lihaoyi"          %% "pprint"                % pprintVersion,
+      "io.suzaku"            %% "boopickle"             % boopickleVersion,
+      "io.chrisdavenport"    %% "keysemaphore"          % keySemaphoreVersion,
+      "io.dropwizard.metrics" % "metrics-core"          % dropwizardVersion,
+      "io.dropwizard.metrics" % "metrics-jvm"           % dropwizardVersion,
+      "io.dropwizard.metrics" % "metrics-graphite"      % dropwizardVersion,
+      "org.typelevel"        %% "munit-cats-effect"     % munitCatsEffectVersion % Test
+    ),
+    buildInfoKeys         := Seq[BuildInfoKey](
+      scalaVersion,
+      sbtVersion,
+      git.gitHeadCommit,
+      "buildDateTime" -> System.currentTimeMillis(),
+      ocslibHash,
+      ocsGitHash,
+      ocsGitBranch,
+      ocsGitDescribe,
+      ocsLocal
+    )
+  )
+  .enablePlugins(BuildInfoPlugin)
+
+/**
+ * Project for the ITC server app for development
+ */
+// lazy val deploy = project
+//   .in(file("deploy"))
+//   .enablePlugins(NoPublishPlugin)
+//   .enablePlugins(LucumaDockerPlugin)
+//   .enablePlugins(JavaServerAppPackaging)
+//   .enablePlugins(GitBranchPrompt)
+//   .dependsOn(service)
+//   .settings(
+//     description              := "ITC Server",
+//     Docker / packageName     := "gpp-itc",
+//     description              := "ITC Server",
+//     // Main class for launching
+//     Compile / mainClass      := Some("lucuma.itc.service.Main"),
+//     // Name of the launch script
+//     executableScriptName     := "itc-service",
+//     dockerExposedPorts ++= Seq(6060),
+//     // Add the ocslib jars to the distribution
+//     Universal / mappings ++= {
+//       val dir = (service / baseDirectory).value / "ocslib"
+//       (dir ** AllPassFilter).pair(relativeTo(dir.getParentFile))
+//     },
+//     // The heap needs to be a lot smaller than the dyno size. This may be
+//     // because the JVM tricks to load the 367M of old itc jar files increases the
+//     // `metaspace` size by that amount. It's a nice theory, at least.
+//     lucumaDockerHeapSubtract := 400
+//   )
+
+lazy val itcClient = crossProject(JVMPlatform, JSPlatform)
+  .in(file("itc/client"))
+  .dependsOn(itcModel)
+  .settings(itcCommonSettings)
+  .settings(
+    name := "lucuma-itc-client",
+    libraryDependencies ++= Seq(
+      "edu.gemini"    %%% "lucuma-core"       % lucumaCoreVersion,
+      "org.typelevel" %%% "cats-core"         % catsVersion,
+      "org.typelevel" %%% "cats-effect"       % catsEffectVersion,
+      "org.http4s"    %%% "http4s-circe"      % http4sVersion,
+      "org.http4s"    %%% "http4s-dsl"        % http4sVersion,
+      "io.circe"      %%% "circe-literal"     % circeVersion,
+      "edu.gemini"    %%% "clue-model"        % clueVersion,
+      "edu.gemini"    %%% "clue-http4s"       % clueVersion,
+      "edu.gemini"    %%% "clue-core"         % clueVersion,
+      "io.circe"      %%% "circe-generic"     % circeVersion,
+      "org.tpolecat"  %%% "natchez-http4s"    % natchezHttp4sVersion,
+      "org.typelevel" %%% "spire"             % spireVersion,
+      "org.typelevel" %%% "spire-extras"      % spireVersion,
+      "org.typelevel" %%% "kittens"           % kittensVersion,
+      "org.typelevel" %%% "munit-cats-effect" % munitCatsEffectVersion % Test,
+      "com.lihaoyi"   %%% "pprint"            % pprintVersion          % Test
+    )
+  )
+
+lazy val itcBenchmark = project
+  .in(file("itc/benchmarks"))
+  .enablePlugins(JmhPlugin, NoPublishPlugin)
+  .dependsOn(itcService)
+  .settings(
+    libraryDependencies ++= Seq(
+      "org.openjdk.jmh" % "jmh-core"                 % jmhVersion,
+      "org.openjdk.jmh" % "jmh-generator-annprocess" % jmhVersion
+    ),
+    // Add project root system property for benchmarks
+    fork       := false,
+    Jmh / fork := false,
+    javaOptions += s"-Dproject.root=${(ThisBuild / baseDirectory).value}",
+    Jmh / javaOptions += s"-Dproject.root=${(ThisBuild / baseDirectory).value}"
+  )
+
+// val MUnitFramework = new TestFramework("munit.Framework")
+
+lazy val itcTestkit = crossProject(JVMPlatform, JSPlatform)
+  .crossType(CrossType.Pure)
+  .in(file("itc/testkit"))
+  .dependsOn(itcClient)
+  .settings(itcCommonSettings)
+  .settings(
+    name := "lucuma-itc-testkit",
+    libraryDependencies ++= Seq(
+      "edu.gemini"        %%% "lucuma-core-testkit" % lucumaCoreVersion,
+      "org.typelevel"     %%% "cats-testkit"        % catsVersion,
+      "dev.optics"        %%% "monocle-law"         % monocleVersion,
+      "org.typelevel"     %%% "spire-laws"          % spireVersion,
+      "eu.timepit"        %%% "refined-scalacheck"  % refinedVersion,
+      "io.circe"          %%% "circe-testing"       % circeVersion,
+      "io.chrisdavenport" %%% "cats-scalacheck"     % catsScalacheckVersion
+    )
+  )
+
+lazy val itcTests = project
+  .in(file("itc/tests"))
+  .enablePlugins(NoPublishPlugin)
+  .dependsOn(itcService, itcClient.jvm, itcTestkit.jvm)
+  .settings(
+    name := "lucuma-itc-tests",
+    libraryDependencies ++= Seq(
+      "org.typelevel" %%% "munit-cats-effect"      % munitCatsEffectVersion     % Test,
+      "com.lihaoyi"   %%% "pprint"                 % pprintVersion              % Test,
+      "org.http4s"     %% "http4s-jdk-http-client" % http4sJdkHttpClientVersion % Test,
+      "org.typelevel" %%% "log4cats-slf4j"         % log4catsVersion            % Test,
+      "org.scalameta" %%% "munit"                  % munitVersion               % Test,
+      "org.typelevel" %%% "discipline-munit"       % munitDisciplineVersion     % Test
+    ),
+    // testFrameworks += MUnitFramework
+  )
+
+lazy val itcLegacyTests = project
+  .in(file("itc/legacy-tests"))
+  .enablePlugins(NoPublishPlugin)
+  .dependsOn(itcService, itcClient.jvm, itcTestkit.jvm)
+  .settings(
+    name := "lucuma-itc-legacy-tests",
+    libraryDependencies ++= Seq(
+      "org.typelevel" %%% "munit-cats-effect"      % munitCatsEffectVersion     % Test,
+      "com.lihaoyi"   %%% "pprint"                 % pprintVersion              % Test,
+      "org.http4s"     %% "http4s-jdk-http-client" % http4sJdkHttpClientVersion % Test,
+      "org.typelevel" %%% "log4cats-slf4j"         % log4catsVersion            % Test,
+      "org.scalameta" %%% "munit"                  % munitVersion               % Test,
+      "org.typelevel" %%% "discipline-munit"       % munitDisciplineVersion     % Test
+    ),
+    // testFrameworks += MUnitFramework
   )
