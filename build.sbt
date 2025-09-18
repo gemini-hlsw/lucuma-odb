@@ -313,8 +313,6 @@ lazy val ssoBackendExample = project
     )
   )
 
-// END SSO
-
 // START ITC
 
 lazy val itcCommonSettings = lucumaGlobalSettings ++ Seq(
@@ -564,7 +562,7 @@ lazy val itcTests = project
 //     )
 //   )
 
-// END ITC
+// START ODB
 
 lazy val schema =
   crossProject(JVMPlatform, JSPlatform)
