@@ -480,6 +480,7 @@ lazy val itcService = project
       "io.dropwizard.metrics" % "metrics-graphite"      % dropwizardVersion,
       "org.typelevel"        %% "munit-cats-effect"     % munitCatsEffectVersion % Test
     ),
+    envVars ++= Map("ODB_BASE_URL" -> "https://lucuma-postgres-odb-dev.herokuapp.com"), // Used for local development
     buildInfoKeys         := Seq[BuildInfoKey](
       scalaVersion,
       sbtVersion,
