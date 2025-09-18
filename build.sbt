@@ -12,7 +12,6 @@ val circeRefinedVersion        = "0.15.1"
 val cirisVersion               = "3.10.0"
 val clueVersion                = "0.48.0"
 val declineVersion             = "2.5.0"
-// val disciplineMunitVersion     = "1.0.9"
 val dropwizardVersion          = "4.2.37"
 val flywayVersion              = "9.22.3"
 val fs2AwsVersion              = "6.2.0"
@@ -31,11 +30,9 @@ val log4catsVersion            = "2.7.1"
 val lucumaCoreVersion          = "0.145.0"
 val lucumaGraphQLRoutesVersion = "0.11.2"
 val monocleVersion             = "3.3.0"
-// val munitVersion               = "0.7.29"  // check test output if you attempt to update this
-val munitVersion               = "1.1.1"
-// val munitCatsEffectVersion     = "1.0.7"   // check test output if you attempt to update this
+val munitVersion               = "1.2.0"
 val munitCatsEffectVersion     = "2.1.0"   // check test output if you attempt to update this
-val munitDisciplineVersion     = "1.0.9"   // check test output if you attempt to update this
+val munitDisciplineVersion     = "2.0.0"   // check test output if you attempt to update this
 val munitScalacheckVersion     = "1.2.0"   // check test output if you attempt to update this
 val natchezHttp4sVersion       = "0.6.1"
 val natchezVersion             = "0.3.7"
@@ -47,7 +44,7 @@ val refinedVersion             = "0.11.3"
 val skunkVersion               = "0.6.4"
 val spireVersion               = "0.18.0"
 val slf4jVersion               = "2.0.17"
-val testcontainersScalaVersion = "0.40.14" // check test output if you attempt to update this
+val testcontainersScalaVersion = "0.43.0" // check test output if you attempt to update this
 val weaverVersion              = "0.8.4"
 
 ThisBuild / tlBaseVersion      := "0.29"
@@ -222,6 +219,8 @@ lazy val buildInfoSettings = Seq(
     )
 )
 
+// START SSO
+
 lazy val ssoFrontendClient =
   crossProject(JVMPlatform, JSPlatform)
     .crossType(CrossType.Pure)
@@ -314,181 +313,7 @@ lazy val ssoBackendExample = project
     )
   )
 
-lazy val schema =
-  crossProject(JVMPlatform, JSPlatform)
-    .crossType(CrossType.Pure)
-    .dependsOn(ssoFrontendClient)
-    .in(file("modules/schema"))
-    .settings(
-      name := "lucuma-odb-schema",
-      libraryDependencies ++= Seq(
-        "io.circe"      %%% "circe-parser"               % circeVersion,
-        "io.circe"      %%% "circe-literal"              % circeVersion,
-        "io.circe"      %%% "circe-refined"              % circeRefinedVersion,
-        "edu.gemini"    %%% "lucuma-core"                % lucumaCoreVersion,
-        "io.circe"      %%% "circe-testing"              % circeVersion           % Test,
-        "edu.gemini"    %%% "lucuma-core-testkit"        % lucumaCoreVersion      % Test,
-        "org.scalameta" %%% "munit"                      % munitVersion           % Test,
-        "org.scalameta" %%% "munit-scalacheck"           % munitScalacheckVersion % Test,
-        "org.typelevel" %%% "discipline-munit"           % munitDisciplineVersion % Test
-      )
-    )
-
-lazy val binding = project
-  .in(file("modules/binding"))
-  .dependsOn(schema.jvm)
-  .settings(
-    name := "lucuma-odb-binding",
-    tlVersionIntroduced := Map("3" -> "0.19.3"),
-    libraryDependencies ++= Seq(
-      "edu.gemini"    %% "lucuma-core"        % lucumaCoreVersion,
-      "org.typelevel" %% "grackle-core"       % grackleVersion,
-      "org.scalameta" %% "munit"              % munitVersion           % Test,
-    )
-  )
-
-lazy val sequence = project
-  .in(file("modules/sequence"))
-  .dependsOn(schema.jvm, itcClient.jvm, itcTestkit.jvm)
-  .enablePlugins(NoPublishPlugin)
-  .settings(
-    name := "lucuma-odb-sequence",
-    libraryDependencies ++= Seq(
-      "org.scalameta" %% "munit"              % munitVersion           % Test,
-      "org.scalameta" %% "munit-scalacheck"   % munitScalacheckVersion % Test,
-      "org.typelevel" %% "discipline-munit"   % munitDisciplineVersion % Test
-    )
-  )
-
-lazy val smartgcal = project
-  .in(file("modules/smartgcal"))
-  .enablePlugins(NoPublishPlugin)
-  .settings(
-    name := "lucuma-odb-smartgcal",
-    libraryDependencies ++= Seq(
-      "org.typelevel" %% "cats-parse"          % catsParseVersion,
-      "co.fs2"        %% "fs2-core"            % fs2Version,
-      "co.fs2"        %% "fs2-io"              % fs2Version,
-      "edu.gemini"    %% "lucuma-core"         % lucumaCoreVersion,
-      "edu.gemini"    %% "lucuma-core-testkit" % lucumaCoreVersion      % Test,
-      "org.scalameta" %% "munit"               % munitVersion           % Test,
-      "org.scalameta" %% "munit-scalacheck"    % munitScalacheckVersion % Test,
-      "org.typelevel" %% "discipline-munit"    % munitDisciplineVersion % Test
-    )
-  )
-
-lazy val service = project
-  .in(file("modules/service"))
-  .dependsOn(binding, phase0, sequence, smartgcal, ssoFrontendClient.jvm, ssoBackendClient)
-  .enablePlugins(NoPublishPlugin, LucumaDockerPlugin, JavaAppPackaging, BuildInfoPlugin)
-  .settings(buildInfoSettings)
-  .settings(
-    name                        := "lucuma-odb-service",
-    projectDependencyArtifacts  := (Compile / dependencyClasspathAsJars).value,
-    libraryDependencies ++= Seq(
-      "ch.qos.logback"            % "logback-classic"                    % logbackVersion,
-      "com.monovore"             %% "decline-effect"                     % declineVersion,
-      "com.monovore"             %% "decline"                            % declineVersion,
-      "io.laserdisc"             %% "fs2-aws-s3"                         % fs2AwsVersion,
-      "org.typelevel"            %% "grackle-skunk"                      % grackleVersion,
-      "edu.gemini"               %% "lucuma-catalog"                     % lucumaCoreVersion,
-      "edu.gemini"               %% "lucuma-ags"                         % lucumaCoreVersion,
-      "edu.gemini"               %% "lucuma-graphql-routes"              % lucumaGraphQLRoutesVersion,
-      "is.cir"                   %% "ciris"                              % cirisVersion,
-      "is.cir"                   %% "ciris-refined"                      % cirisVersion,
-      "org.flywaydb"              % "flyway-core"                        % flywayVersion,
-      "org.http4s"               %% "http4s-blaze-server"                % http4sBlazeVersion,
-      "org.http4s"               %% "http4s-ember-client"                % http4sEmberVersion,
-      "org.postgresql"            % "postgresql"                         % postgresVersion,
-      "org.tpolecat"             %% "natchez-honeycomb"                  % natchezVersion,
-      "org.tpolecat"             %% "natchez-http4s"                     % natchezHttp4sVersion,
-      "org.tpolecat"             %% "natchez-log"                        % natchezVersion,
-      "org.tpolecat"             %% "natchez-noop"                       % natchezVersion,
-      "org.tpolecat"             %% "skunk-core"                         % skunkVersion,
-      "org.tpolecat"             %% "skunk-circe"                        % skunkVersion,
-      "com.lihaoyi"              %% "pprint"                             % pprintVersion,
-      "com.dimafeng"             %% "testcontainers-scala-munit"         % testcontainersScalaVersion % Test,
-      "com.dimafeng"             %% "testcontainers-scala-localstack-v2" % testcontainersScalaVersion % Test,
-      "com.dimafeng"             %% "testcontainers-scala-postgresql"    % testcontainersScalaVersion % Test,
-      // testcontainers-scala-localstack-v2 requires both v1 and v2 of the aws sdk
-      "io.circe"                 %% "circe-testing"                      % circeVersion               % Test,
-      "com.amazonaws"             % "aws-java-sdk-core"                  % awsJavaSdkVersion          % Test,
-      "edu.gemini"               %% "clue-http4s"                        % clueVersion                % Test,
-      "org.scalameta"            %% "munit"                              % munitVersion               % Test,
-      "org.scalameta"            %% "munit-diff"                         % munitVersion               % Test,
-      "org.scalameta"            %% "munit-scalacheck"                   % munitScalacheckVersion     % Test,
-      "org.typelevel"            %% "discipline-munit"                   % munitDisciplineVersion     % Test,
-      "edu.gemini"               %% "lucuma-catalog-testkit"             % lucumaCoreVersion          % Test,
-      "edu.gemini"               %% "lucuma-core-testkit"                % lucumaCoreVersion          % Test,
-      "org.http4s"               %% "http4s-jdk-http-client"             % http4sJdkHttpClientVersion % Test,
-      "org.typelevel"            %% "cats-time"                          % catsTimeVersion,
-      "org.typelevel"            %% "log4cats-slf4j"                     % log4catsVersion,
-      // "org.typelevel"            %% "munit-cats-effect-3"                % munitCatsEffectVersion     % Test,
-      "org.typelevel"            %% "munit-cats-effect"                  % munitCatsEffectVersion % Test,
-      "org.typelevel"            %% "paiges-core"                        % paigesVersion,
-      "com.github.vertical-blank" % "sql-formatter"                      % "2.0.5"
-    ),
-    reStart / envVars += "PORT" -> "8082",
-    reStartArgs += "serve",
-    description                     := "Lucuma ODB Service",
-    // Add command line parameters
-    bashScriptExtraDefines += """set -- -Dfile.encoding=UTF-8 serve""",
-    // Name of the launch script
-    executableScriptName            := "lucuma-odb-service",
-    dockerExposedPorts ++= Seq(8082)
-  )
-
-
-lazy val obscalc = project
-  .in(file("modules/obscalc"))
-  .dependsOn(service)
-  .enablePlugins(NoPublishPlugin, LucumaDockerPlugin, JavaAppPackaging)
-  .settings(
-    name                        := "obscalc-service",
-    projectDependencyArtifacts  := (Compile / dependencyClasspathAsJars).value,
-    reStart / envVars += "PORT" -> "8082",
-    description                     := "Lucuma ODB ObsCalc Service",
-    // Add command line parameters
-    bashScriptExtraDefines += """set -- -Dfile.encoding=UTF-8""",
-    // Name of the launch script
-    executableScriptName            := "lucuma-odb-obscalc-service",
-    dockerExposedPorts ++= Seq(8082)
-  )
-
-lazy val calibrations = project
-  .in(file("modules/calibrations"))
-  .dependsOn(service)
-  .enablePlugins(NoPublishPlugin, LucumaDockerPlugin, JavaAppPackaging)
-  .settings(
-    name                        := "calibrations-service",
-    projectDependencyArtifacts  := (Compile / dependencyClasspathAsJars).value,
-    reStart / envVars += "PORT" -> "8082",
-    description                     := "Lucuma ODB Calibrations Service",
-    // Add command line parameters
-    bashScriptExtraDefines += """set -- -Dfile.encoding=UTF-8""",
-    // Name of the launch script
-    executableScriptName            := "lucuma-odb-calibrations-service",
-    dockerExposedPorts ++= Seq(8082)
-  )
-
-lazy val phase0 = project
-  .in(file("modules/phase0"))
-  .enablePlugins(NoPublishPlugin)
-  .settings(
-    name := "lucuma-odb-phase0",
-    libraryDependencies ++= Seq(
-      "org.typelevel" %% "cats-parse"          % catsParseVersion,
-      "co.fs2"        %% "fs2-core"            % fs2Version,
-      "co.fs2"        %% "fs2-io"              % fs2Version,
-      "edu.gemini"    %% "lucuma-core"         % lucumaCoreVersion,
-      "edu.gemini"    %% "lucuma-core-testkit" % lucumaCoreVersion      % Test,
-      "org.scalameta" %% "munit"               % munitVersion           % Test,
-      "org.scalameta" %% "munit-scalacheck"    % munitScalacheckVersion % Test,
-      // "org.typelevel" %% "munit-cats-effect-3" % munitCatsEffectVersion % Test,
-      "org.typelevel" %% "munit-cats-effect"   % munitCatsEffectVersion % Test,
-      "org.typelevel" %% "discipline-munit"    % munitDisciplineVersion % Test
-    )
-  )
+// END SSO
 
 // START ITC
 
@@ -689,8 +514,6 @@ lazy val itcBenchmark = project
     Jmh / javaOptions += s"-Dproject.root=${(ThisBuild / baseDirectory).value}"
   )
 
-// val MUnitFramework = new TestFramework("munit.Framework")
-
 lazy val itcTestkit = crossProject(JVMPlatform, JSPlatform)
   .crossType(CrossType.Pure)
   .in(file("itc/testkit"))
@@ -722,23 +545,198 @@ lazy val itcTests = project
       "org.typelevel" %%% "log4cats-slf4j"         % log4catsVersion            % Test,
       "org.scalameta" %%% "munit"                  % munitVersion               % Test,
       "org.typelevel" %%% "discipline-munit"       % munitDisciplineVersion     % Test
-    ),
-    // testFrameworks += MUnitFramework
+    )
   )
 
-lazy val itcLegacyTests = project
-  .in(file("itc/legacy-tests"))
-  .enablePlugins(NoPublishPlugin)
-  .dependsOn(itcService, itcClient.jvm, itcTestkit.jvm)
+// lazy val itcLegacyTests = project
+//   .in(file("itc/legacy-tests"))
+//   .enablePlugins(NoPublishPlugin)
+//   .dependsOn(itcService, itcClient.jvm, itcTestkit.jvm)
+//   .settings(
+//     name := "lucuma-itc-legacy-tests",
+//     libraryDependencies ++= Seq(
+//       "org.typelevel" %%% "munit-cats-effect"      % munitCatsEffectVersion     % Test,
+//       "com.lihaoyi"   %%% "pprint"                 % pprintVersion              % Test,
+//       "org.http4s"     %% "http4s-jdk-http-client" % http4sJdkHttpClientVersion % Test,
+//       "org.typelevel" %%% "log4cats-slf4j"         % log4catsVersion            % Test,
+//       "org.scalameta" %%% "munit"                  % munitVersion               % Test,
+//       "org.typelevel" %%% "discipline-munit"       % munitDisciplineVersion     % Test
+//     )
+//   )
+
+// END ITC
+
+lazy val schema =
+  crossProject(JVMPlatform, JSPlatform)
+    .crossType(CrossType.Pure)
+    .dependsOn(ssoFrontendClient)
+    .in(file("modules/schema"))
+    .settings(
+      name := "lucuma-odb-schema",
+      libraryDependencies ++= Seq(
+        "io.circe"      %%% "circe-parser"               % circeVersion,
+        "io.circe"      %%% "circe-literal"              % circeVersion,
+        "io.circe"      %%% "circe-refined"              % circeRefinedVersion,
+        "edu.gemini"    %%% "lucuma-core"                % lucumaCoreVersion,
+        "io.circe"      %%% "circe-testing"              % circeVersion           % Test,
+        "edu.gemini"    %%% "lucuma-core-testkit"        % lucumaCoreVersion      % Test,
+        "org.scalameta" %%% "munit"                      % munitVersion           % Test,
+        "org.scalameta" %%% "munit-scalacheck"           % munitScalacheckVersion % Test,
+        "org.typelevel" %%% "discipline-munit"           % munitDisciplineVersion % Test
+      )
+    )
+
+lazy val binding = project
+  .in(file("modules/binding"))
+  .dependsOn(schema.jvm)
   .settings(
-    name := "lucuma-itc-legacy-tests",
+    name := "lucuma-odb-binding",
+    tlVersionIntroduced := Map("3" -> "0.19.3"),
     libraryDependencies ++= Seq(
-      "org.typelevel" %%% "munit-cats-effect"      % munitCatsEffectVersion     % Test,
-      "com.lihaoyi"   %%% "pprint"                 % pprintVersion              % Test,
-      "org.http4s"     %% "http4s-jdk-http-client" % http4sJdkHttpClientVersion % Test,
-      "org.typelevel" %%% "log4cats-slf4j"         % log4catsVersion            % Test,
-      "org.scalameta" %%% "munit"                  % munitVersion               % Test,
-      "org.typelevel" %%% "discipline-munit"       % munitDisciplineVersion     % Test
+      "edu.gemini"    %% "lucuma-core"        % lucumaCoreVersion,
+      "org.typelevel" %% "grackle-core"       % grackleVersion,
+      "org.scalameta" %% "munit"              % munitVersion           % Test,
+    )
+  )
+
+lazy val sequence = project
+  .in(file("modules/sequence"))
+  .dependsOn(schema.jvm, itcClient.jvm, itcTestkit.jvm)
+  .enablePlugins(NoPublishPlugin)
+  .settings(
+    name := "lucuma-odb-sequence",
+    libraryDependencies ++= Seq(
+      "org.scalameta" %% "munit"              % munitVersion           % Test,
+      "org.scalameta" %% "munit-scalacheck"   % munitScalacheckVersion % Test,
+      "org.typelevel" %% "discipline-munit"   % munitDisciplineVersion % Test
+    )
+  )
+
+lazy val smartgcal = project
+  .in(file("modules/smartgcal"))
+  .enablePlugins(NoPublishPlugin)
+  .settings(
+    name := "lucuma-odb-smartgcal",
+    libraryDependencies ++= Seq(
+      "org.typelevel" %% "cats-parse"          % catsParseVersion,
+      "co.fs2"        %% "fs2-core"            % fs2Version,
+      "co.fs2"        %% "fs2-io"              % fs2Version,
+      "edu.gemini"    %% "lucuma-core"         % lucumaCoreVersion,
+      "edu.gemini"    %% "lucuma-core-testkit" % lucumaCoreVersion      % Test,
+      "org.scalameta" %% "munit"               % munitVersion           % Test,
+      "org.scalameta" %% "munit-scalacheck"    % munitScalacheckVersion % Test,
+      "org.typelevel" %% "discipline-munit"    % munitDisciplineVersion % Test
+    )
+  )
+
+lazy val service = project
+  .in(file("modules/service"))
+  .dependsOn(binding, phase0, sequence, smartgcal, ssoFrontendClient.jvm, ssoBackendClient)
+  .enablePlugins(NoPublishPlugin, LucumaDockerPlugin, JavaAppPackaging, BuildInfoPlugin)
+  .settings(buildInfoSettings)
+  .settings(
+    name                        := "lucuma-odb-service",
+    projectDependencyArtifacts  := (Compile / dependencyClasspathAsJars).value,
+    libraryDependencies ++= Seq(
+      "ch.qos.logback"            % "logback-classic"                    % logbackVersion,
+      "com.monovore"             %% "decline-effect"                     % declineVersion,
+      "com.monovore"             %% "decline"                            % declineVersion,
+      "io.laserdisc"             %% "fs2-aws-s3"                         % fs2AwsVersion,
+      "org.typelevel"            %% "grackle-skunk"                      % grackleVersion,
+      "edu.gemini"               %% "lucuma-catalog"                     % lucumaCoreVersion,
+      "edu.gemini"               %% "lucuma-ags"                         % lucumaCoreVersion,
+      "edu.gemini"               %% "lucuma-graphql-routes"              % lucumaGraphQLRoutesVersion,
+      "is.cir"                   %% "ciris"                              % cirisVersion,
+      "is.cir"                   %% "ciris-refined"                      % cirisVersion,
+      "org.flywaydb"              % "flyway-core"                        % flywayVersion,
+      "org.http4s"               %% "http4s-blaze-server"                % http4sBlazeVersion,
+      "org.http4s"               %% "http4s-ember-client"                % http4sEmberVersion,
+      "org.postgresql"            % "postgresql"                         % postgresVersion,
+      "org.tpolecat"             %% "natchez-honeycomb"                  % natchezVersion,
+      "org.tpolecat"             %% "natchez-http4s"                     % natchezHttp4sVersion,
+      "org.tpolecat"             %% "natchez-log"                        % natchezVersion,
+      "org.tpolecat"             %% "natchez-noop"                       % natchezVersion,
+      "org.tpolecat"             %% "skunk-core"                         % skunkVersion,
+      "org.tpolecat"             %% "skunk-circe"                        % skunkVersion,
+      "com.lihaoyi"              %% "pprint"                             % pprintVersion,
+      "com.dimafeng"             %% "testcontainers-scala-munit"         % testcontainersScalaVersion % Test,
+      "com.dimafeng"             %% "testcontainers-scala-localstack-v2" % testcontainersScalaVersion % Test,
+      "com.dimafeng"             %% "testcontainers-scala-postgresql"    % testcontainersScalaVersion % Test,
+      // testcontainers-scala-localstack-v2 requires both v1 and v2 of the aws sdk
+      "io.circe"                 %% "circe-testing"                      % circeVersion               % Test,
+      "com.amazonaws"             % "aws-java-sdk-core"                  % awsJavaSdkVersion          % Test,
+      "edu.gemini"               %% "clue-http4s"                        % clueVersion                % Test,
+      "org.scalameta"            %% "munit"                              % munitVersion               % Test,
+      "org.scalameta"            %% "munit-diff"                         % munitVersion               % Test,
+      "org.scalameta"            %% "munit-scalacheck"                   % munitScalacheckVersion     % Test,
+      "org.typelevel"            %% "discipline-munit"                   % munitDisciplineVersion     % Test,
+      "edu.gemini"               %% "lucuma-catalog-testkit"             % lucumaCoreVersion          % Test,
+      "edu.gemini"               %% "lucuma-core-testkit"                % lucumaCoreVersion          % Test,
+      "org.http4s"               %% "http4s-jdk-http-client"             % http4sJdkHttpClientVersion % Test,
+      "org.typelevel"            %% "cats-time"                          % catsTimeVersion,
+      "org.typelevel"            %% "log4cats-slf4j"                     % log4catsVersion,
+      "org.typelevel"            %% "munit-cats-effect"                  % munitCatsEffectVersion % Test,
+      "org.typelevel"            %% "paiges-core"                        % paigesVersion,
+      "com.github.vertical-blank" % "sql-formatter"                      % "2.0.5"
     ),
-    // testFrameworks += MUnitFramework
+    reStart / envVars += "PORT" -> "8082",
+    reStartArgs += "serve",
+    description                     := "Lucuma ODB Service",
+    // Add command line parameters
+    bashScriptExtraDefines += """set -- -Dfile.encoding=UTF-8 serve""",
+    // Name of the launch script
+    executableScriptName            := "lucuma-odb-service",
+    dockerExposedPorts ++= Seq(8082)
+  )
+
+
+lazy val obscalc = project
+  .in(file("modules/obscalc"))
+  .dependsOn(service)
+  .enablePlugins(NoPublishPlugin, LucumaDockerPlugin, JavaAppPackaging)
+  .settings(
+    name                        := "obscalc-service",
+    projectDependencyArtifacts  := (Compile / dependencyClasspathAsJars).value,
+    reStart / envVars += "PORT" -> "8082",
+    description                     := "Lucuma ODB ObsCalc Service",
+    // Add command line parameters
+    bashScriptExtraDefines += """set -- -Dfile.encoding=UTF-8""",
+    // Name of the launch script
+    executableScriptName            := "lucuma-odb-obscalc-service",
+    dockerExposedPorts ++= Seq(8082)
+  )
+
+lazy val calibrations = project
+  .in(file("modules/calibrations"))
+  .dependsOn(service)
+  .enablePlugins(NoPublishPlugin, LucumaDockerPlugin, JavaAppPackaging)
+  .settings(
+    name                        := "calibrations-service",
+    projectDependencyArtifacts  := (Compile / dependencyClasspathAsJars).value,
+    reStart / envVars += "PORT" -> "8082",
+    description                     := "Lucuma ODB Calibrations Service",
+    // Add command line parameters
+    bashScriptExtraDefines += """set -- -Dfile.encoding=UTF-8""",
+    // Name of the launch script
+    executableScriptName            := "lucuma-odb-calibrations-service",
+    dockerExposedPorts ++= Seq(8082)
+  )
+
+lazy val phase0 = project
+  .in(file("modules/phase0"))
+  .enablePlugins(NoPublishPlugin)
+  .settings(
+    name := "lucuma-odb-phase0",
+    libraryDependencies ++= Seq(
+      "org.typelevel" %% "cats-parse"          % catsParseVersion,
+      "co.fs2"        %% "fs2-core"            % fs2Version,
+      "co.fs2"        %% "fs2-io"              % fs2Version,
+      "edu.gemini"    %% "lucuma-core"         % lucumaCoreVersion,
+      "edu.gemini"    %% "lucuma-core-testkit" % lucumaCoreVersion      % Test,
+      "org.scalameta" %% "munit"               % munitVersion           % Test,
+      "org.scalameta" %% "munit-scalacheck"    % munitScalacheckVersion % Test,
+      // "org.typelevel" %% "munit-cats-effect-3" % munitCatsEffectVersion % Test,
+      "org.typelevel" %% "munit-cats-effect"   % munitCatsEffectVersion % Test,
+      "org.typelevel" %% "discipline-munit"    % munitDisciplineVersion % Test
+    )
   )
