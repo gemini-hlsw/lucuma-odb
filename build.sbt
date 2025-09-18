@@ -415,6 +415,7 @@ lazy val service = project
       "com.amazonaws"             % "aws-java-sdk-core"                  % awsJavaSdkVersion          % Test,
       "edu.gemini"               %% "clue-http4s"                        % clueVersion                % Test,
       "org.scalameta"            %% "munit"                              % munitVersion               % Test,
+      "org.scalameta"            %% "munit-diff"                         % munitVersion               % Test,
       "org.scalameta"            %% "munit-scalacheck"                   % munitScalacheckVersion     % Test,
       "org.typelevel"            %% "discipline-munit"                   % munitDisciplineVersion     % Test,
       "edu.gemini"               %% "lucuma-catalog-testkit"             % lucumaCoreVersion          % Test,
