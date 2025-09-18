@@ -535,21 +535,21 @@ lazy val itcTests = project
     )
   )
 
-// lazy val itcLegacyTests = project
-//   .in(file("itc/legacy-tests"))
-//   .enablePlugins(NoPublishPlugin)
-//   .dependsOn(itcService, itcClient.jvm, itcTestkit.jvm)
-//   .settings(
-//     name := "lucuma-itc-legacy-tests",
-//     libraryDependencies ++= Seq(
-//       "org.typelevel" %%% "munit-cats-effect"      % munitCatsEffectVersion     % Test,
-//       "com.lihaoyi"   %%% "pprint"                 % pprintVersion              % Test,
-//       "org.http4s"     %% "http4s-jdk-http-client" % http4sJdkHttpClientVersion % Test,
-//       "org.typelevel" %%% "log4cats-slf4j"         % log4catsVersion            % Test,
-//       "org.scalameta" %%% "munit"                  % munitVersion               % Test,
-//       "org.typelevel" %%% "discipline-munit"       % munitDisciplineVersion     % Test
-//     )
-//   )
+lazy val itcLegacyTests = project
+  .in(file("itc/legacy-tests"))
+  .enablePlugins(NoPublishPlugin)
+  .dependsOn(itcService, itcClient.jvm, itcTestkit.jvm)
+  .settings(
+    name := "lucuma-itc-legacy-tests",
+    libraryDependencies ++= Seq(
+      "org.typelevel" %%% "munit-cats-effect"      % munitCatsEffectVersion     % Test,
+      "com.lihaoyi"   %%% "pprint"                 % pprintVersion              % Test,
+      "org.http4s"     %% "http4s-jdk-http-client" % http4sJdkHttpClientVersion % Test,
+      "org.typelevel" %%% "log4cats-slf4j"         % log4catsVersion            % Test,
+      "org.scalameta" %%% "munit"                  % munitVersion               % Test,
+      "org.typelevel" %%% "discipline-munit"       % munitDisciplineVersion     % Test
+    )
+  )
 
 // START ODB
 
