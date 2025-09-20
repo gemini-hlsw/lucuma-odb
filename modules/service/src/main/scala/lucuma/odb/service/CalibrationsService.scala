@@ -12,7 +12,6 @@ import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.string.NonEmptyString
 import grackle.Result
 import lucuma.core.enums.CalibrationRole
-import lucuma.core.enums.GmosRoi
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.Site
@@ -290,37 +289,10 @@ object CalibrationsService extends CalibrationObservations {
        * considering ROI transformations for different calibration types
        */
       private def configsMatchForAnyCalibType(sciConfig: CalibrationConfigSubset, calibConfig: CalibrationConfigSubset): Boolean =
-        // Direct match (for Twilight calibrations that preserve ROI)
-        sciConfig == calibConfig ||
-        // ROI-transformed match (for SpectroPhotometric calibrations)
-        configsMatchIgnoringRoi(sciConfig, calibConfig)
-
-      /**
-       * Check if two configurations match ignoring ROI differences
-       */
-      private def configsMatchIgnoringRoi(c1: CalibrationConfigSubset, c2: CalibrationConfigSubset): Boolean =
-        (c1, c2) match {
-          case (gn1: GmosNConfigs, gn2: GmosNConfigs) =>
-            gn1.grating == gn2.grating &&
-            gn1.filter == gn2.filter &&
-            gn1.fpu == gn2.fpu &&
-            gn1.centralWavelength == gn2.centralWavelength &&
-            gn1.xBin == gn2.xBin &&
-            gn1.yBin == gn2.yBin &&
-            gn1.ampReadMode == gn2.ampReadMode &&
-            gn1.ampGain == gn2.ampGain
-            // Intentionally ignoring roi field
-          case (gs1: GmosSConfigs, gs2: GmosSConfigs) =>
-            gs1.grating == gs2.grating &&
-            gs1.filter == gs2.filter &&
-            gs1.fpu == gs2.fpu &&
-            gs1.centralWavelength == gs2.centralWavelength &&
-            gs1.xBin == gs2.xBin &&
-            gs1.yBin == gs2.yBin &&
-            gs1.ampReadMode == gs2.ampReadMode &&
-            gs1.ampGain == gs2.ampGain
-            // Intentionally ignoring roi field
-          case _ => false
+        // Try matching with each available calibration strategy
+        CalibrationTypes.exists { calibRole =>
+          CalibrationConfigStrategy.getStrategyForComparison(sciConfig, calibRole)
+            .exists(_.configsMatch(sciConfig, calibConfig))
         }
 
       /**
@@ -330,19 +302,11 @@ object CalibrationsService extends CalibrationObservations {
         configs: List[CalibrationConfigSubset],
         calibRole: CalibrationRole
       ): List[CalibrationConfigSubset] =
-        calibRole match
-          case CalibrationRole.SpectroPhotometric =>
-            // SpectroPhotometric always uses CentralSpectrum ROI
-            configs.map {
-              case gn: GmosNConfigs => gn.copy(roi = GmosRoi.CentralSpectrum)
-              case gs: GmosSConfigs => gs.copy(roi = GmosRoi.CentralSpectrum)
-              case other => other
-            }
-          case CalibrationRole.Twilight =>
-            // Twilight uses actual ROI from science observations
-            configs
-          case _ =>
-            configs
+        configs.map { config =>
+          CalibrationConfigStrategy.getStrategyForComparison(config, calibRole)
+            .map(_.normalizeForComparison(config))
+            .getOrElse(config)
+        }
 
       private def calibObservation(
         calibRole: CalibrationRole,

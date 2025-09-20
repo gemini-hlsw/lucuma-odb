@@ -40,7 +40,7 @@ class CalibrationConfigStrategySuite extends CatsEffectSuite {
     val config1 = gmosNorthConfig(GmosRoi.CentralSpectrum)
     val config2 = gmosNorthConfig(GmosRoi.FullFrame)
 
-    val strategy = SpectroPhotometricGmosLongSlitStrategy
+    val strategy = SpecphotoGmosLS
 
     val subset1 = strategy.extractConfig(config1)
     val subset2 = strategy.extractConfig(config2)
@@ -81,11 +81,11 @@ class CalibrationConfigStrategySuite extends CatsEffectSuite {
   }
 
   test("Registry returns correct strategies") {
-    val spectroStrategy = CalibrationConfigRegistry.getStrategy(
+    val spectroStrategy = CalibrationConfigStrategy.getStrategy(
       ObservingModeType.GmosNorthLongSlit,
       CalibrationRole.SpectroPhotometric
     )
-    val twilightStrategy = CalibrationConfigRegistry.getStrategy(
+    val twilightStrategy = CalibrationConfigStrategy.getStrategy(
       ObservingModeType.GmosNorthLongSlit,
       CalibrationRole.Twilight
     )
@@ -97,8 +97,50 @@ class CalibrationConfigStrategySuite extends CatsEffectSuite {
     assertEquals(twilightStrategy.get.calibrationType, CalibrationRole.Twilight)
   }
 
+  test("SpectroPhotometric strategy configsMatch ignores ROI differences") {
+    val config1 = gmosNorthConfig(GmosRoi.CentralSpectrum)
+    val config2 = gmosNorthConfig(GmosRoi.FullFrame)
+
+    val strategy = SpecphotoGmosLS
+    val subset1 = strategy.extractConfig(config1)
+    val subset2 = strategy.extractConfig(config2)
+
+    // Configs should match despite different source ROIs
+    assert(strategy.configsMatch(subset1, subset2))
+  }
+
+  test("Twilight strategy configsMatch preserves ROI differences") {
+    val config1 = gmosNorthConfig(GmosRoi.CentralSpectrum)
+    val config2 = gmosNorthConfig(GmosRoi.FullFrame)
+
+    val strategy = TwilightGmosLongSlitStrategy
+    val subset1 = strategy.extractConfig(config1)
+    val subset2 = strategy.extractConfig(config2)
+
+    // Configs should NOT match due to ROI differences
+    assert(!strategy.configsMatch(subset1, subset2))
+  }
+
+  test("Registry getStrategyForComparison works correctly") {
+    val config = SpecphotoGmosLS.extractConfig(gmosNorthConfig())
+
+    val spectroStrategy = CalibrationConfigStrategy.getStrategyForComparison(
+      config,
+      CalibrationRole.SpectroPhotometric
+    )
+    val twilightStrategy = CalibrationConfigStrategy.getStrategyForComparison(
+      config,
+      CalibrationRole.Twilight
+    )
+
+    assert(spectroStrategy.isDefined)
+    assert(twilightStrategy.isDefined)
+    assertEquals(spectroStrategy.get.calibrationType, CalibrationRole.SpectroPhotometric)
+    assertEquals(twilightStrategy.get.calibrationType, CalibrationRole.Twilight)
+  }
+
   test("Registry returns None for unsupported combinations") {
-    val strategy = CalibrationConfigRegistry.getStrategy(
+    val strategy = CalibrationConfigStrategy.getStrategy(
       ObservingModeType.GmosNorthImaging,
       CalibrationRole.SpectroPhotometric
     )
@@ -107,7 +149,7 @@ class CalibrationConfigStrategySuite extends CatsEffectSuite {
   }
 
   test("Registry lists supported calibration types") {
-    val supportedTypes = CalibrationConfigRegistry.getSupportedCalibrationTypes(
+    val supportedTypes = CalibrationConfigStrategy.getSupportedCalibrationTypes(
       ObservingModeType.GmosNorthLongSlit
     )
 
@@ -119,7 +161,7 @@ class CalibrationConfigStrategySuite extends CatsEffectSuite {
   test("Strategies produce configurations with all required fields") {
     val config = gmosNorthConfig(GmosRoi.FullFrame)
 
-    val spectroSubset = SpectroPhotometricGmosLongSlitStrategy.extractConfig(config)
+    val spectroSubset = SpecphotoGmosLS.extractConfig(config)
     val twilightSubset = TwilightGmosLongSlitStrategy.extractConfig(config)
 
     // Both should be valid GmosNConfigs with proper field values
