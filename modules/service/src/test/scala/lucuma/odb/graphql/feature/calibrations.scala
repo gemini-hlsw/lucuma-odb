@@ -232,7 +232,6 @@ class calibrations extends OdbSuite with SubscriptionUtils {
               }
             }"""
     ).flatMap { c =>
-      println(c.asJson)
       (for {
         id    <- c.hcursor.downField("observations").downField("matches").as[List[CalibObs]]
       } yield id)
@@ -263,7 +262,7 @@ class calibrations extends OdbSuite with SubscriptionUtils {
     }
   }
 
-  test("create group for calibrations".only) {
+  test("create group for calibrations") {
     for {
       pid <- createProgramAs(pi)
       tid <- createTargetAs(pi, pid, "One")
@@ -281,9 +280,8 @@ class calibrations extends OdbSuite with SubscriptionUtils {
               }.headOption
       cg   <- cgid.map(queryGroup)
                 .getOrElse(IO.raiseError(new RuntimeException("No calibration group")))
-      // ob   <- queryObservations(pid)
+      ob   <- queryObservations(pid)
     } yield {
-      pprint.pprintln(gr1)
       assertEquals(gr.size, 1)
       assert(cg._2)
       assertEquals(cg._3, CalibrationsService.CalibrationsGroupName)

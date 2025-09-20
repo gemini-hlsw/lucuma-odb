@@ -499,14 +499,14 @@ object CalibrationsService extends CalibrationObservations {
           allSci       <- allObservations(pid, ObservationSelection.Science)
                             .map(_.filter(u => active.contains(u._1)))
           // Get unique science configurations
-          uniqueSci = {val p=uniqueConfiguration(allSci);pprint.pprintln(p);println("-----");p}
+          uniqueSci = uniqueConfiguration(allSci)
           // Get all the active calibration observations
           allCalibs    <- allObservations(pid, ObservationSelection.Calibration)
           calibs        = toConfigForCalibration(allCalibs)
           // Average s/n wavelength at each configuration
           props         = calObsProps(toConfigForCalibration(allSci))
           // Unique calibration configurations
-          uniqueCalibs  = {val m=uniqueConfiguration(allCalibs);pprint.pprintln(allCalibs);println("====r");m}
+          uniqueCalibs  = uniqueConfiguration(allCalibs)
           // Get all unique configurations that need calibrations
           // Use ROI-aware comparison to handle transformed calibration configs
           configs       = uniqueSci.diff(uniqueCalibs)

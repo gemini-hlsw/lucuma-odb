@@ -123,6 +123,35 @@ case class CalibrationIdealTargets(
 }
 
 trait CalibrationObservations {
+
+  /**
+   * Check if two configurations match ignoring ROI differences
+   */
+  private def configsMatchIgnoringRoi(c1: CalibrationConfigSubset, c2: CalibrationConfigSubset): Boolean =
+    (c1, c2) match {
+      case (gn1: CalibrationConfigSubset.GmosNConfigs, gn2: CalibrationConfigSubset.GmosNConfigs) =>
+        gn1.grating == gn2.grating &&
+        gn1.filter == gn2.filter &&
+        gn1.fpu == gn2.fpu &&
+        gn1.centralWavelength == gn2.centralWavelength &&
+        gn1.xBin == gn2.xBin &&
+        gn1.yBin == gn2.yBin &&
+        gn1.ampReadMode == gn2.ampReadMode &&
+        gn1.ampGain == gn2.ampGain
+        // Intentionally ignoring roi field
+      case (gs1: CalibrationConfigSubset.GmosSConfigs, gs2: CalibrationConfigSubset.GmosSConfigs) =>
+        gs1.grating == gs2.grating &&
+        gs1.filter == gs2.filter &&
+        gs1.fpu == gs2.fpu &&
+        gs1.centralWavelength == gs2.centralWavelength &&
+        gs1.xBin == gs2.xBin &&
+        gs1.yBin == gs2.yBin &&
+        gs1.ampReadMode == gs2.ampReadMode &&
+        gs1.ampGain == gs2.ampGain
+        // Intentionally ignoring roi field
+      case _ => false
+    }
+
   def gmosLongSlitSpecPhotObs[F[_]: MonadThrow: Services: Transaction, G, L, U](
     pid:     Program.Id,
     gid:     Group.Id,
@@ -131,11 +160,13 @@ trait CalibrationObservations {
     configs: List[CalibrationConfigSubset.Gmos[G, L, U]]
   ): F[List[Observation.Id]] =
     configs.traverse: c =>
-      val wavelengthAt = props.get(c).flatMap(_.wavelengthAt)
-      val band         = props.get(c).flatMap(_.band)
-      println(props)
-      println(c)
-      println(props.get(c))
+      // Use ROI-aware lookup since transformed configs may have different ROI than original science configs
+      val matchingProps = props.find { case (originalConfig, _) =>
+        // Check if this original config could have produced the transformed config
+        configsMatchIgnoringRoi(originalConfig, c)
+      }.map(_._2)
+      val wavelengthAt = matchingProps.flatMap(_.wavelengthAt)
+      val band         = matchingProps.flatMap(_.band)
       specPhotoObservation(pid, gid, tid, wavelengthAt, band, c.toLongSlitInput)
 
   def roleConstraints(role: CalibrationRole) =
