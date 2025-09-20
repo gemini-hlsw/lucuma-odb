@@ -131,9 +131,12 @@ trait CalibrationObservations {
     configs: List[CalibrationConfigSubset.Gmos[G, L, U]]
   ): F[List[Observation.Id]] =
     configs.traverse: c =>
-      val wavelengthAt = props.get(c).flatMap(_.wavelengthAt).getOrElse(c.centralWavelength)
+      val wavelengthAt = props.get(c).flatMap(_.wavelengthAt)
       val band         = props.get(c).flatMap(_.band)
-      specPhotoObservation(pid, gid, tid, wavelengthAt.some, band, c.toLongSlitInput)
+      println(props)
+      println(c)
+      println(props.get(c))
+      specPhotoObservation(pid, gid, tid, wavelengthAt, band, c.toLongSlitInput)
 
   def roleConstraints(role: CalibrationRole) =
     role match {

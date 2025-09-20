@@ -223,6 +223,78 @@ object CalibrationsService extends CalibrationObservations {
       ): List[CalibrationConfigSubset] =
         all.map(_.data.toConfigSubset).distinct
 
+      // private def uniqueConfigurationForCalibType(
+      //   all: List[ObsExtract[ObservingMode]],
+      //   calibType: CalibrationRole
+      // ): List[CalibrationConfigSubset] = {
+      //   val configs = all.map(_.data.toConfigSubset).distinct
+      //   transformConfigsForCalibType(configs, calibType)
+      // }
+      //
+      // private def getUniqueConfigsForCalibType(
+      //   all: List[ObsExtract[ObservingMode]],
+      //   calibType: CalibrationRole
+      // ): List[CalibrationConfigSubset] = {
+      //   val allConfigs = all.map(_.data.toConfigSubset)
+      //
+      //   calibType match {
+      //     case CalibrationRole.SpectroPhotometric =>
+      //       // For SpectroPhotometric, group by everything except ROI, then transform to CentralSpectrum
+      //       val grouped = allConfigs.groupBy { config =>
+      //         config match {
+      //           case gn: GmosNConfigs => gn.copy(roi = GmosRoi.CentralSpectrum)
+      //           case gs: GmosSConfigs => gs.copy(roi = GmosRoi.CentralSpectrum)
+      //           case other => other
+      //         }
+      //       }
+      //       grouped.keys.toList
+      //
+      //     case CalibrationRole.Twilight =>
+      //       // For Twilight, preserve ROI differences
+      //       allConfigs.distinct
+      //
+      //     case _ => List.empty
+      //   }
+      // }
+      //
+      // private def getUniqueConfigurationsForCalibrations(
+      //   all: List[ObsExtract[ObservingMode]]
+      // ): List[CalibrationConfigSubset] = {
+      //   val allConfigs = all.map(_.data.toConfigSubset)
+      //
+      //   // Group by SpectroPhotometric equivalence (ignore ROI)
+      //   val spectroGroups = allConfigs.groupBy { config =>
+      //     config match {
+      //       case gn: GmosNConfigs => gn.copy(roi = GmosRoi.CentralSpectrum)
+      //       case gs: GmosSConfigs => gs.copy(roi = GmosRoi.CentralSpectrum)
+      //       case other => other
+      //     }
+      //   }
+      //
+      //   // For each SpectroPhotometric group, we need:
+      //   // 1. One SpectroPhotometric calibration (with CentralSpectrum ROI)
+      //   // 2. One Twilight calibration for each unique original ROI in the group
+      //   spectroGroups.flatMap { case (spectroConfig, originalConfigs) =>
+      //     // Add the SpectroPhotometric config (normalized to CentralSpectrum)
+      //     val spectroCalibConfig = spectroConfig
+      //
+      //     // Add Twilight configs (preserve original ROIs)
+          // val twilightCalibConfigs = originalConfigs.distinct
+          //
+          // spectroCalibConfig :: twilightCalibConfigs
+      //   }.toList.distinct
+      // }
+
+      /**
+       * Check if a science config could have produced a calibration config
+       * considering ROI transformations for different calibration types
+       */
+      private def configsMatchForAnyCalibType(sciConfig: CalibrationConfigSubset, calibConfig: CalibrationConfigSubset): Boolean =
+        // Direct match (for Twilight calibrations that preserve ROI)
+        sciConfig == calibConfig ||
+        // ROI-transformed match (for SpectroPhotometric calibrations)
+        configsMatchIgnoringRoi(sciConfig, calibConfig)
+
       /**
        * Check if two configurations match ignoring ROI differences
        */
@@ -281,7 +353,7 @@ object CalibrationsService extends CalibrationObservations {
         configs:   List[CalibrationConfigSubset],
         tid:       Target.Id
       )(using Transaction[F]): F[List[Observation.Id]] =
-        val transformedConfigs = transformConfigsForCalibType(configs, calibRole)
+        val transformedConfigs = transformConfigsForCalibType(configs, calibRole).distinct
         calibRole match {
           case CalibrationRole.SpectroPhotometric =>
             site match {
@@ -356,7 +428,7 @@ object CalibrationsService extends CalibrationObservations {
       )(using Transaction[F], ServiceAccess): F[List[Observation.Id]] = {
         val oids = NonEmptyList.fromList(
           calibrations
-            .collect { case (oid, c) if !scienceConfigs.exists(_ === c) => oid }
+            .collect { case (oid, calibConfig) if !scienceConfigs.exists(configsMatchForAnyCalibType(_, calibConfig)) => oid }
             .sorted
         )
         oids.fold(List.empty.pure[F])(os => observationService.deleteCalibrationObservations(os).as(os.toList))
@@ -426,31 +498,20 @@ object CalibrationsService extends CalibrationObservations {
           // Get all the active science observations
           allSci       <- allObservations(pid, ObservationSelection.Science)
                             .map(_.filter(u => active.contains(u._1)))
+          // Get unique science configurations
+          uniqueSci = {val p=uniqueConfiguration(allSci);pprint.pprintln(p);println("-----");p}
           // Get all the active calibration observations
           allCalibs    <- allObservations(pid, ObservationSelection.Calibration)
           calibs        = toConfigForCalibration(allCalibs)
-          // Calculate props from original science observations
-          originalProps = calObsProps(toConfigForCalibration(allSci))
-
-          // Transform science configurations to match how calibrations are created (SpectroPhotometric with CentralSpectrum ROI)
-          transformedSci = allSci.map { obs =>
-                             transformConfigsForCalibType(List(obs.data.toConfigSubset), CalibrationRole.SpectroPhotometric).head
-                           }.distinct
-
-          // Map props from original configs to transformed configs
-          props = transformedSci.map { transformedConfig =>
-            // Find the original config that matches this transformed one (ignoring ROI differences)
-            val matchingOriginalProps = originalProps.find { case (originalConfig, _) =>
-              configsMatchIgnoringRoi(transformedConfig, originalConfig)
-            }.map(_._2).getOrElse(CalObsProps(None, None))
-            transformedConfig -> matchingOriginalProps
-          }.toMap
+          // Average s/n wavelength at each configuration
+          props         = calObsProps(toConfigForCalibration(allSci))
           // Unique calibration configurations
-          uniqueCalibs  = uniqueConfiguration(allCalibs)
+          uniqueCalibs  = {val m=uniqueConfiguration(allCalibs);pprint.pprintln(allCalibs);println("====r");m}
           // Get all unique configurations that need calibrations
-          configs       = transformedSci.diff(uniqueCalibs)
+          // Use ROI-aware comparison to handle transformed calibration configs
+          configs       = uniqueSci.diff(uniqueCalibs)
           // Remove calibrations that are not needed, basically when a config is removed
-          removedOids  <- removeUnnecessaryCalibrations(transformedSci, calibs.map {
+          removedOids  <- removeUnnecessaryCalibrations(uniqueSci, calibs.map {
                             case ObsExtract(oid, _, _, c) => (oid, c)
                           })
           // Generate new calibrations for each unique configuration
