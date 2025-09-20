@@ -35,8 +35,8 @@ object CalibrationConfigStrategy:
   private val strategies: Map[(ObservingModeType, CalibrationRole), CalibrationConfigStrategy] = Map(
     (ObservingModeType.GmosNorthLongSlit, CalibrationRole.SpectroPhotometric) -> SpecphotoGmosLS,
     (ObservingModeType.GmosSouthLongSlit, CalibrationRole.SpectroPhotometric) -> SpecphotoGmosLS,
-    (ObservingModeType.GmosNorthLongSlit, CalibrationRole.Twilight) -> TwilightGmosLongSlitStrategy,
-    (ObservingModeType.GmosSouthLongSlit, CalibrationRole.Twilight) -> TwilightGmosLongSlitStrategy
+    (ObservingModeType.GmosNorthLongSlit, CalibrationRole.Twilight) -> TwilightGmosLS,
+    (ObservingModeType.GmosSouthLongSlit, CalibrationRole.Twilight) -> TwilightGmosLS
   )
 
   def getStrategy(modeType: ObservingModeType, calibRole: CalibrationRole): Option[CalibrationConfigStrategy] =
@@ -105,7 +105,7 @@ object SpecphotoGmosLS extends CalibrationConfigStrategy:
       case gs: GmosSConfigs => gs.copy(roi = GmosRoi.CentralSpectrum)
       case other => other
 
-object TwilightGmosLongSlitStrategy extends CalibrationConfigStrategy:
+object TwilightGmosLS extends CalibrationConfigStrategy:
   def extractConfig(mode: ObservingMode): CalibrationConfigSubset =
     import CalibrationConfigSubset.*
     mode match

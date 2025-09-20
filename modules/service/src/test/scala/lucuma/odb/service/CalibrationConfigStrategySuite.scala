@@ -59,7 +59,7 @@ class CalibrationConfigStrategySuite extends CatsEffectSuite {
     val config1 = gmosNorthConfig(GmosRoi.CentralSpectrum)
     val config2 = gmosNorthConfig(GmosRoi.FullFrame)
 
-    val strategy = TwilightGmosLongSlitStrategy
+    val strategy = TwilightGmosLS
 
     val subset1 = strategy.extractConfig(config1)
     val subset2 = strategy.extractConfig(config2)
@@ -113,7 +113,7 @@ class CalibrationConfigStrategySuite extends CatsEffectSuite {
     val config1 = gmosNorthConfig(GmosRoi.CentralSpectrum)
     val config2 = gmosNorthConfig(GmosRoi.FullFrame)
 
-    val strategy = TwilightGmosLongSlitStrategy
+    val strategy = TwilightGmosLS
     val subset1 = strategy.extractConfig(config1)
     val subset2 = strategy.extractConfig(config2)
 
@@ -162,7 +162,7 @@ class CalibrationConfigStrategySuite extends CatsEffectSuite {
     val config = gmosNorthConfig(GmosRoi.FullFrame)
 
     val spectroSubset = SpecphotoGmosLS.extractConfig(config)
-    val twilightSubset = TwilightGmosLongSlitStrategy.extractConfig(config)
+    val twilightSubset = TwilightGmosLS.extractConfig(config)
 
     // Both should be valid GmosNConfigs with proper field values
     spectroSubset match {
