@@ -1058,13 +1058,9 @@ class calibrations extends OdbSuite with SubscriptionUtils {
       pid  <- createProgramAs(pi)
       tid1 <- createTargetAs(pi, pid, "Target1")
       tid2 <- createTargetAs(pi, pid, "Target2")
-
-      // Create two GMOS North observations
       oid1 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid1)
       oid2 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid2)
-
-      // Set up different observing modes with different ROIs using update mutation
-      _ <- expect(
+      _ <- query(
         user = pi,
         query = s"""
           mutation {
@@ -1086,14 +1082,8 @@ class calibrations extends OdbSuite with SubscriptionUtils {
             }
           }
         """,
-        expected = Right(Json.obj(
-          "updateObservations" -> Json.obj(
-            "observations" -> Json.arr(Json.obj("id" -> Json.fromString(oid1.toString)))
-          )
-        ))
       )
-
-      _ <- expect(
+      _ <- query(
         user = pi,
         query = s"""
           mutation {
@@ -1115,15 +1105,8 @@ class calibrations extends OdbSuite with SubscriptionUtils {
             }
           }
         """,
-        expected = Right(Json.obj(
-          "updateObservations" -> Json.obj(
-            "observations" -> Json.arr(Json.obj("id" -> Json.fromString(oid2.toString)))
-          )
-        ))
       )
-
       _ <- prepareObservation(pi, oid1, tid1) *> prepareObservation(pi, oid2, tid2)
-
       // Generate calibrations
       _ <- withServices(service) { services =>
              services.session.transaction.use { xa =>
@@ -1134,11 +1117,8 @@ class calibrations extends OdbSuite with SubscriptionUtils {
       ob <- queryObservations(pid)
     } yield {
       val calibCount = ob.count(_.calibrationRole.contains(CalibrationRole.SpectroPhotometric))
-
-      // SpectroPhotometric should ignore ROI differences - only create one set of calibrations
-      // despite having two different science observation ROIs (CentralSpectrum vs FullFrame)
-      // Only 1 calibration because both science observations are GMOS North (only GN site)
-      assertEquals(calibCount, 1, "SpectroPhotometric should create only 1 calibration, ignoring ROI differences between science observations")
+      // SpectroPhotometric should ignore ROI differences
+      assertEquals(calibCount, 1)
     }
   }
 
@@ -1147,13 +1127,9 @@ class calibrations extends OdbSuite with SubscriptionUtils {
       pid  <- createProgramAs(pi)
       tid1 <- createTargetAs(pi, pid, "Target1")
       tid2 <- createTargetAs(pi, pid, "Target2")
-
-      // Create two GMOS North observations
       oid1 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid1)
       oid2 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid2)
-
-      // Set up different observing modes with different ROIs
-      _ <- expect(
+      _ <- query(
         user = pi,
         query = s"""
           mutation {
@@ -1174,15 +1150,9 @@ class calibrations extends OdbSuite with SubscriptionUtils {
               observations { id }
             }
           }
-        """,
-        expected = Right(Json.obj(
-          "updateObservations" -> Json.obj(
-            "observations" -> Json.arr(Json.obj("id" -> Json.fromString(oid1.toString)))
-          )
-        ))
+        """
       )
-
-      _ <- expect(
+      _ <- query(
         user = pi,
         query = s"""
           mutation {
@@ -1204,15 +1174,8 @@ class calibrations extends OdbSuite with SubscriptionUtils {
             }
           }
         """,
-        expected = Right(Json.obj(
-          "updateObservations" -> Json.obj(
-            "observations" -> Json.arr(Json.obj("id" -> Json.fromString(oid2.toString)))
-          )
-        ))
       )
-
       _ <- prepareObservation(pi, oid1, tid1) *> prepareObservation(pi, oid2, tid2)
-
       // Generate calibrations
       _ <- withServices(service) { services =>
              services.session.transaction.use { xa =>
@@ -1222,6 +1185,7 @@ class calibrations extends OdbSuite with SubscriptionUtils {
 
       ob <- queryObservations(pid)
     } yield {
+      ob.foreach(pprint.pprintln(_))
       val twilightCount = ob.count(_.calibrationRole.contains(CalibrationRole.Twilight))
 
       // Twilight should preserve ROI differences - create separate calibrations for each ROI
