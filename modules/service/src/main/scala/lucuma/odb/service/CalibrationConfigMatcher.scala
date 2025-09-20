@@ -4,23 +4,32 @@
 package lucuma.odb.service
 
 import cats.data.NonEmptySet
+import cats.syntax.eq.*
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.ObservingModeType
 import lucuma.odb.sequence.ObservingMode
+import lucuma.core.enums.GmosRoi
+import lucuma.odb.service.CalibrationConfigSubset.*
+import lucuma.core.enums.GmosRoi
 
 /**
   * Defines logic used to determine the config items used for a given observing mode
   * and calibration type
   */
-trait CalibrationConfigStrategy:
-  def calibrationType: CalibrationRole
+sealed trait CalibrationConfigMatcher:
+  /** Supported calibration roles */
+  def calibrationType: NonEmptySet[CalibrationRole]
+
+  /** Supported calibration modes */
   def supportedModeTypes: NonEmptySet[ObservingModeType]
 
+  /** config subset for the mode */
   def extractConfig(mode: ObservingMode): CalibrationConfigSubset
 
   /**
    * Check if two configurations match for this calibration type.
    * Different calibration types may have different matching semantics.
+   * e.g. spec photo doesn't care if roi are different.
    */
   def configsMatch(c1: CalibrationConfigSubset, c2: CalibrationConfigSubset): Boolean
 
@@ -28,39 +37,35 @@ trait CalibrationConfigStrategy:
    * Normalize a configuration for comparison purposes.
    * This allows different calibration types to apply their specific transformations.
    */
-  def normalizeForComparison(config: CalibrationConfigSubset): CalibrationConfigSubset
+  def normalize(config: CalibrationConfigSubset): CalibrationConfigSubset
 
-object CalibrationConfigStrategy:
+object CalibrationConfigMatcher:
 
-  private val strategies: Map[(ObservingModeType, CalibrationRole), CalibrationConfigStrategy] = Map(
+  private val strategies: Map[(ObservingModeType, CalibrationRole), CalibrationConfigMatcher] = Map(
     (ObservingModeType.GmosNorthLongSlit, CalibrationRole.SpectroPhotometric) -> SpecphotoGmosLS,
     (ObservingModeType.GmosSouthLongSlit, CalibrationRole.SpectroPhotometric) -> SpecphotoGmosLS,
     (ObservingModeType.GmosNorthLongSlit, CalibrationRole.Twilight) -> TwilightGmosLS,
     (ObservingModeType.GmosSouthLongSlit, CalibrationRole.Twilight) -> TwilightGmosLS
   )
 
-  def getStrategy(modeType: ObservingModeType, calibRole: CalibrationRole): Option[CalibrationConfigStrategy] =
-    strategies.get((modeType, calibRole))
-
   def getSupportedCalibrationTypes(modeType: ObservingModeType): Set[CalibrationRole] =
     strategies.keys.filter(_._1 == modeType).map(_._2).toSet
 
-  def getStrategyForComparison(config: CalibrationConfigSubset, calibRole: CalibrationRole): Option[CalibrationConfigStrategy] =
-    import CalibrationConfigSubset.*
+  def getStrategyForComparison(config: CalibrationConfigSubset, calibRole: CalibrationRole): Option[CalibrationConfigMatcher] =
     val modeType = config match
       case _: GmosNConfigs => ObservingModeType.GmosNorthLongSlit
       case _: GmosSConfigs => ObservingModeType.GmosSouthLongSlit
       case _: GmosNImagingConfigs => ObservingModeType.GmosNorthImaging
       case _: GmosSImagingConfigs => ObservingModeType.GmosSouthImaging
       case _: Flamingos2Configs => ObservingModeType.Flamingos2LongSlit
-    getStrategy(modeType, calibRole)
+    strategies.get((modeType, calibRole))
 
-object SpecphotoGmosLS extends CalibrationConfigStrategy:
+object SpecphotoGmosLS extends CalibrationConfigMatcher:
+  import lucuma.odb.sequence.gmos.longslit.Config
+
   def extractConfig(mode: ObservingMode): CalibrationConfigSubset =
-    import CalibrationConfigSubset.*
-    import lucuma.core.enums.GmosRoi
     mode match
-      case gn: lucuma.odb.sequence.gmos.longslit.Config.GmosNorth =>
+      case gn: Config.GmosNorth =>
         GmosNConfigs(
           gn.grating,
           gn.filter,
@@ -72,7 +77,7 @@ object SpecphotoGmosLS extends CalibrationConfigStrategy:
           gn.ampGain,
           GmosRoi.CentralSpectrum
         )
-      case gs: lucuma.odb.sequence.gmos.longslit.Config.GmosSouth =>
+      case gs: Config.GmosSouth =>
         GmosSConfigs(
           gs.grating,
           gs.filter,
@@ -87,29 +92,27 @@ object SpecphotoGmosLS extends CalibrationConfigStrategy:
       case _ =>
         mode.toConfigSubset
 
-  def calibrationType: CalibrationRole = CalibrationRole.SpectroPhotometric
+  def calibrationType: NonEmptySet[CalibrationRole] =
+    NonEmptySet.of(CalibrationRole.SpectroPhotometric)
 
-  def supportedModeTypes: NonEmptySet[ObservingModeType] = NonEmptySet.of(
-    ObservingModeType.GmosNorthLongSlit,
-    ObservingModeType.GmosSouthLongSlit
-  )
+  def supportedModeTypes: NonEmptySet[ObservingModeType] =
+    NonEmptySet.of(ObservingModeType.GmosNorthLongSlit, ObservingModeType.GmosSouthLongSlit)
 
   def configsMatch(c1: CalibrationConfigSubset, c2: CalibrationConfigSubset): Boolean =
-    normalizeForComparison(c1) == normalizeForComparison(c2)
+    normalize(c1) === normalize(c2)
 
-  def normalizeForComparison(config: CalibrationConfigSubset): CalibrationConfigSubset =
-    import CalibrationConfigSubset.*
-    import lucuma.core.enums.GmosRoi
+  def normalize(config: CalibrationConfigSubset): CalibrationConfigSubset =
     config match
       case gn: GmosNConfigs => gn.copy(roi = GmosRoi.CentralSpectrum)
       case gs: GmosSConfigs => gs.copy(roi = GmosRoi.CentralSpectrum)
       case other => other
 
-object TwilightGmosLS extends CalibrationConfigStrategy:
+object TwilightGmosLS extends CalibrationConfigMatcher:
+  import lucuma.odb.sequence.gmos.longslit.Config
+
   def extractConfig(mode: ObservingMode): CalibrationConfigSubset =
-    import CalibrationConfigSubset.*
     mode match
-      case gn: lucuma.odb.sequence.gmos.longslit.Config.GmosNorth =>
+      case gn: Config.GmosNorth =>
         GmosNConfigs(
           gn.grating,
           gn.filter,
@@ -121,7 +124,7 @@ object TwilightGmosLS extends CalibrationConfigStrategy:
           gn.ampGain,
           gn.roi
         )
-      case gs: lucuma.odb.sequence.gmos.longslit.Config.GmosSouth =>
+      case gs: Config.GmosSouth =>
         GmosSConfigs(
           gs.grating,
           gs.filter,
@@ -136,15 +139,13 @@ object TwilightGmosLS extends CalibrationConfigStrategy:
       case _ =>
         mode.toConfigSubset
 
-  def calibrationType: CalibrationRole = CalibrationRole.Twilight
+  def calibrationType: NonEmptySet[CalibrationRole] = NonEmptySet.of(CalibrationRole.Twilight)
 
-  def supportedModeTypes: NonEmptySet[ObservingModeType] = NonEmptySet.of(
-    ObservingModeType.GmosNorthLongSlit,
-    ObservingModeType.GmosSouthLongSlit
-  )
+  def supportedModeTypes: NonEmptySet[ObservingModeType] =
+    NonEmptySet.of(ObservingModeType.GmosNorthLongSlit, ObservingModeType.GmosSouthLongSlit)
 
   def configsMatch(c1: CalibrationConfigSubset, c2: CalibrationConfigSubset): Boolean =
-    c1 == c2
+    c1 === c2
 
-  def normalizeForComparison(config: CalibrationConfigSubset): CalibrationConfigSubset =
+  def normalize(config: CalibrationConfigSubset): CalibrationConfigSubset =
     config

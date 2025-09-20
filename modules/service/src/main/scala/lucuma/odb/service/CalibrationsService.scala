@@ -291,7 +291,7 @@ object CalibrationsService extends CalibrationObservations {
       private def configsMatchForAnyCalibType(sciConfig: CalibrationConfigSubset, calibConfig: CalibrationConfigSubset): Boolean =
         // Try matching with each available calibration strategy
         CalibrationTypes.exists { calibRole =>
-          CalibrationConfigStrategy.getStrategyForComparison(sciConfig, calibRole)
+          CalibrationConfigMatcher.getStrategyForComparison(sciConfig, calibRole)
             .exists(_.configsMatch(sciConfig, calibConfig))
         }
 
@@ -303,8 +303,8 @@ object CalibrationsService extends CalibrationObservations {
         calibRole: CalibrationRole
       ): List[CalibrationConfigSubset] =
         configs.map { config =>
-          CalibrationConfigStrategy.getStrategyForComparison(config, calibRole)
-            .map(_.normalizeForComparison(config))
+          CalibrationConfigMatcher.getStrategyForComparison(config, calibRole)
+            .map(_.normalize(config))
             .getOrElse(config)
         }
 

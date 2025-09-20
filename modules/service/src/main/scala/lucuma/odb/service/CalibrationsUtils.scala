@@ -135,7 +135,7 @@ trait CalibrationObservations {
       // Use strategy-based lookup since transformed configs may have different ROI than original science configs
       val matchingProps = props.find { case (originalConfig, _) =>
         // Check if this original config could have produced the transformed config using SpectroPhotometric strategy
-        CalibrationConfigStrategy.getStrategyForComparison(originalConfig, CalibrationRole.SpectroPhotometric)
+        CalibrationConfigMatcher.getStrategyForComparison(originalConfig, CalibrationRole.SpectroPhotometric)
           .exists(_.configsMatch(originalConfig, c))
       }.map(_._2)
       val wavelengthAt = matchingProps.flatMap(_.wavelengthAt)
