@@ -99,6 +99,7 @@ object CalibrationsService extends CalibrationObservations {
     id:   Observation.Id,
     itc:  Option[ItcInput],
     band: Option[ScienceBand],
+    role: Option[CalibrationRole],
     data: A
   ):
     def map[B](f: A => B): ObsExtract[B] =
@@ -179,8 +180,8 @@ object CalibrationsService extends CalibrationObservations {
         requiresItcInputs: Boolean
       ): PartialFunction[(Observation.Id, Either[GeneratorParamsService.Error, GeneratorParams]), ObsExtract[ObservingMode]] =
         {
-          case (oid, Right(GeneratorParams(itc, band, mode, _, _, _))) if itc.isRight || !requiresItcInputs =>
-            ObsExtract(oid, itc.toOption, band, mode)
+          case (oid, Right(GeneratorParams(itc, band, mode, calibRole, _, _))) if itc.isRight || !requiresItcInputs =>
+            ObsExtract(oid, itc.toOption, band, calibRole, mode)
         }
 
       // Find all active observations in the program
@@ -229,12 +230,16 @@ object CalibrationsService extends CalibrationObservations {
         all: List[ObsExtract[ObservingMode]]
       ): List[CalibrationConfigSubset] = all.map(_.data.toConfigSubset).distinct
 
+
       /**
-       * Check if a science config could have produced a calibration config
+       * Check if a calibration is actually needed by any science observation.
        */
-      private def doConfigsMatch(sciConfig: CalibrationConfigSubset, calibConfig: CalibrationConfigSubset): Boolean =
-        // Try matching with each supported calibration role
-        CalibrationTypes.exists: calibRole =>
+      private def isCalibrationNeeded(
+        scienceConfigs: List[CalibrationConfigSubset],
+        calibConfig: CalibrationConfigSubset,
+        calibRole: CalibrationRole
+      ): Boolean =
+        scienceConfigs.exists: sciConfig =>
           CalibrationConfigMatcher.matcherFor(sciConfig, calibRole).configsMatch(sciConfig, calibConfig)
 
       private def configForCalibrationType(
@@ -324,28 +329,37 @@ object CalibrationsService extends CalibrationObservations {
 
       private def removeUnnecessaryCalibrations(
         scienceConfigs: List[CalibrationConfigSubset],
-        calibrations:   List[(Observation.Id, CalibrationConfigSubset)]
+        calibrations:   List[ObsExtract[CalibrationConfigSubset]]
       )(using Transaction[F], ServiceAccess): F[List[Observation.Id]] = {
-        val oids = NonEmptyList.fromList(
-          calibrations
-            .collect { case (oid, calibConfig) if !scienceConfigs.exists(doConfigsMatch(_, calibConfig)) => oid }
-            .sorted
-        )
-        oids.fold(List.empty.pure[F])(os => observationService.deleteCalibrationObservations(os).as(os.toList))
+        // Determine which calibrations are unnecessary
+        val unnecessaryOids = calibrations.collect {
+          case ObsExtract(oid, _, _, Some(role), config)
+          if (!isCalibrationNeeded(scienceConfigs, config, role)) =>
+            oid
+        }
+
+        NonEmptyList.fromList(unnecessaryOids) match {
+          case Some(oids) => observationService.deleteCalibrationObservations(oids).as(oids.toList)
+          case None       => List.empty.pure[F]
+        }
       }
 
       // Update the signal to noise at wavelength for each calbiration observation depending
       // on the average wavelength of the configuration
-      private def updatePropsAt(
+      private def prepareCalibrationUpdates(
         calibrations: List[ObsExtract[CalibrationConfigSubset]],
-        removed:      List[Observation.Id],
-        props:        Map[CalibrationConfigSubset, CalObsProps],
-        role:         CalibrationRole
-      )(using Transaction[F]): F[Unit] =
+        removedOids:  List[Observation.Id],
+        props:        Map[CalibrationConfigSubset, CalObsProps]
+      ): List[(Observation.Id, CalObsProps)] =
         calibrations
-          .filterNot { o => removed.contains(o.id) }
+          .filterNot { o => removedOids.contains(o.id) }
           .map { o => (o.id, props.get(o.data)) }
           .collect { case (oid, Some(props)) if props.band.isDefined || props.wavelengthAt.isDefined => (oid, props) }
+
+      private def updatePropsAt(
+        calibrationUpdates: List[(Observation.Id, CalObsProps)]
+      )(using Transaction[F]): F[Unit] =
+        calibrationUpdates
           .traverse { (oid, props) =>
             val bandFragment = props.band.map(sql"c_science_band IS DISTINCT FROM $science_band")
             val waveFragment = props.wavelengthAt.map(sql"c_etm_signal_to_noise_at <> $wavelength_pm")
@@ -374,8 +388,8 @@ object CalibrationsService extends CalibrationObservations {
                     SELECT $observation_id
                       FROM t_observation
                     WHERE c_observation_id = $observation_id
-                      AND c_calibration_role = $calibration_role
-                      AND ("""(oid, oid, role) |+| needsUpdate |+| void")"
+                      AND c_calibration_role IS NOT NULL
+                      AND ("""(oid, oid) |+| needsUpdate |+| void")"
     //              sql"select $observation_id where c_calibration_role = $calibration_role and c_spec_signal_to_noise_at <> $wavelength_pm".apply(oid, role, w)
                 )
             )
@@ -401,23 +415,21 @@ object CalibrationsService extends CalibrationObservations {
           // Unique science configurations
           uniqueSci     = uniqueConfiguration(allSci)
           // Get all the active calibration observations (excluding those with execution events)
-          allCalibs    <- allUnexecutedObservations(pid, ObservationSelection.Calibration)
+          allCalibs    <- allUnexecutedObservations(pid, ObservationSelection.Calibration).map(_.filter(u => active.contains(u.id)))
           calibs        = toConfigForCalibration(allCalibs)
           // Average s/n wavelength at each configuration
           props         = calObsProps(toConfigForCalibration(allSci))
-          // Unique calibration configurations
-          uniqueCalibs  = uniqueConfiguration(allCalibs)
+          // Unique calibration configurations (convert to old format for compatibility)
+          uniqueCalibs  = calibs.map(c => c.data).distinct
           // Get all unique configurations that need calibrations
-          // Use ROI-aware comparison to handle transformed calibration configs
           configs       = uniqueSci.diff(uniqueCalibs)
           // Remove calibrations that are not needed, basically when a config is removed
-          removedOids  <- removeUnnecessaryCalibrations(uniqueSci, calibs.map {
-                            case ObsExtract(oid, _, _, c) => (oid, c)
-                          })
+          removedOids  <- removeUnnecessaryCalibrations(uniqueSci, calibs)
           // Generate new calibrations for each unique configuration
           addedOids    <- generateGMOSLSCalibrations(pid, props, configs, gnTgt, gsTgt)
           // Update wavelength at for each remaining calib
-          _            <- updatePropsAt(calibs, removedOids, props, CalibrationRole.SpectroPhotometric)
+          calibUpdates  = prepareCalibrationUpdates(calibs, removedOids, props)
+          _            <- updatePropsAt(calibUpdates)
           _            <- targetService.deleteOrphanCalibrationTargets(pid)
         yield (addedOids, removedOids)
 
@@ -526,6 +538,7 @@ object CalibrationsService extends CalibrationObservations {
           FROM t_observation
           WHERE c_program_id = $program_id AND c_workflow_user_state IS DISTINCT FROM 'inactive'
           """.query(observation_id)
+
 
   }
 }
