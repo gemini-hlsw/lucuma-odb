@@ -219,70 +219,7 @@ object CalibrationsService extends CalibrationObservations {
 
       private def uniqueConfiguration(
         all: List[ObsExtract[ObservingMode]]
-      ): List[CalibrationConfigSubset] =
-        all.map(_.data.toConfigSubset).distinct
-
-      // private def uniqueConfigurationForCalibType(
-      //   all: List[ObsExtract[ObservingMode]],
-      //   calibType: CalibrationRole
-      // ): List[CalibrationConfigSubset] = {
-      //   val configs = all.map(_.data.toConfigSubset).distinct
-      //   transformConfigsForCalibType(configs, calibType)
-      // }
-      //
-      // private def getUniqueConfigsForCalibType(
-      //   all: List[ObsExtract[ObservingMode]],
-      //   calibType: CalibrationRole
-      // ): List[CalibrationConfigSubset] = {
-      //   val allConfigs = all.map(_.data.toConfigSubset)
-      //
-      //   calibType match {
-      //     case CalibrationRole.SpectroPhotometric =>
-      //       // For SpectroPhotometric, group by everything except ROI, then transform to CentralSpectrum
-      //       val grouped = allConfigs.groupBy { config =>
-      //         config match {
-      //           case gn: GmosNConfigs => gn.copy(roi = GmosRoi.CentralSpectrum)
-      //           case gs: GmosSConfigs => gs.copy(roi = GmosRoi.CentralSpectrum)
-      //           case other => other
-      //         }
-      //       }
-      //       grouped.keys.toList
-      //
-      //     case CalibrationRole.Twilight =>
-      //       // For Twilight, preserve ROI differences
-      //       allConfigs.distinct
-      //
-      //     case _ => List.empty
-      //   }
-      // }
-      //
-      // private def getUniqueConfigurationsForCalibrations(
-      //   all: List[ObsExtract[ObservingMode]]
-      // ): List[CalibrationConfigSubset] = {
-      //   val allConfigs = all.map(_.data.toConfigSubset)
-      //
-      //   // Group by SpectroPhotometric equivalence (ignore ROI)
-      //   val spectroGroups = allConfigs.groupBy { config =>
-      //     config match {
-      //       case gn: GmosNConfigs => gn.copy(roi = GmosRoi.CentralSpectrum)
-      //       case gs: GmosSConfigs => gs.copy(roi = GmosRoi.CentralSpectrum)
-      //       case other => other
-      //     }
-      //   }
-      //
-      //   // For each SpectroPhotometric group, we need:
-      //   // 1. One SpectroPhotometric calibration (with CentralSpectrum ROI)
-      //   // 2. One Twilight calibration for each unique original ROI in the group
-      //   spectroGroups.flatMap { case (spectroConfig, originalConfigs) =>
-      //     // Add the SpectroPhotometric config (normalized to CentralSpectrum)
-      //     val spectroCalibConfig = spectroConfig
-      //
-      //     // Add Twilight configs (preserve original ROIs)
-          // val twilightCalibConfigs = originalConfigs.distinct
-          //
-          // spectroCalibConfig :: twilightCalibConfigs
-      //   }.toList.distinct
-      // }
+      ): List[CalibrationConfigSubset] = all.map(_.data.toConfigSubset).distinct
 
       /**
        * Check if a science config could have produced a calibration config
@@ -291,8 +228,7 @@ object CalibrationsService extends CalibrationObservations {
       private def configsMatchForAnyCalibType(sciConfig: CalibrationConfigSubset, calibConfig: CalibrationConfigSubset): Boolean =
         // Try matching with each available calibration strategy
         CalibrationTypes.exists { calibRole =>
-          CalibrationConfigMatcher.getStrategyForComparison(sciConfig, calibRole)
-            .exists(_.configsMatch(sciConfig, calibConfig))
+          CalibrationConfigMatcher.matcherFor(sciConfig, calibRole).configsMatch(sciConfig, calibConfig)
         }
 
       /**
@@ -302,11 +238,8 @@ object CalibrationsService extends CalibrationObservations {
         configs: List[CalibrationConfigSubset],
         calibRole: CalibrationRole
       ): List[CalibrationConfigSubset] =
-        configs.map { config =>
-          CalibrationConfigMatcher.getStrategyForComparison(config, calibRole)
-            .map(_.normalize(config))
-            .getOrElse(config)
-        }
+        configs.map: config =>
+          CalibrationConfigMatcher.matcherFor(config, calibRole).normalize(config)
 
       private def calibObservation(
         calibRole: CalibrationRole,

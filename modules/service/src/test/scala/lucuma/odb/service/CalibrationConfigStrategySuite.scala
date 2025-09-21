@@ -4,12 +4,12 @@
 package lucuma.odb.service
 
 import cats.syntax.all.*
+import lucuma.core.enums.*
 import lucuma.core.enums.GmosRoi
 import lucuma.core.math.Wavelength
 import lucuma.odb.sequence.gmos.longslit.Config
 import lucuma.odb.service.CalibrationConfigSubset.*
 import munit.FunSuite
-    import lucuma.core.enums.*
 
 class CalibrationConfigStrategySuite extends FunSuite:
 

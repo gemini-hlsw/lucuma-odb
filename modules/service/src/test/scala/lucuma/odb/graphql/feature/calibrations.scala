@@ -1185,7 +1185,6 @@ class calibrations extends OdbSuite with SubscriptionUtils {
 
       ob <- queryObservations(pid)
     } yield {
-      ob.foreach(pprint.pprintln(_))
       val twilightCount = ob.count(_.calibrationRole.contains(CalibrationRole.Twilight))
 
       // Twilight should preserve ROI differences - create separate calibrations for each ROI
