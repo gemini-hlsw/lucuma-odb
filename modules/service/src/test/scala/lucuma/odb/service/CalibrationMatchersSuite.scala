@@ -11,7 +11,7 @@ import lucuma.odb.sequence.gmos.longslit.Config
 import lucuma.odb.service.CalibrationConfigSubset.*
 import munit.FunSuite
 
-class CalibrationConfigStrategySuite extends FunSuite:
+class CalibrationMatchersSuite extends FunSuite:
 
   def gnConfig(roi: GmosRoi = GmosRoi.CentralSpectrum): Config.GmosNorth =
     Config.GmosNorth(
@@ -86,4 +86,3 @@ class CalibrationConfigStrategySuite extends FunSuite:
 
     val matcher = TwilightGmosLS
     assert(!matcher.configsMatch(matcher.extractConfig(config1), matcher.extractConfig(config2)))
-

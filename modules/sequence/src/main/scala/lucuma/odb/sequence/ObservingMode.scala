@@ -5,7 +5,6 @@ package lucuma.odb.sequence
 
 import cats.Eq
 import cats.syntax.eq.*
-import lucuma.core.enums.ObservingModeType
 import lucuma.odb.sequence.flamingos2.longslit.Config as Flamingos2Config
 import lucuma.odb.sequence.gmos.imaging.Config.GmosNorth as GmosNorthImaging
 import lucuma.odb.sequence.gmos.imaging.Config.GmosSouth as GmosSouthImaging
@@ -28,15 +27,6 @@ given Eq[ObservingMode] =
     case _                                                => false
 
 object ObservingMode:
-  extension (self: ObservingMode)
-    def observingModeType: ObservingModeType =
-      self match
-        case _: Flamingos2Config    => ObservingModeType.Flamingos2LongSlit
-        case _: GmosNorthLongSlit   => ObservingModeType.GmosNorthLongSlit
-        case _: GmosSouthLongSlit   => ObservingModeType.GmosSouthLongSlit
-        case _: GmosNorthImaging    => ObservingModeType.GmosNorthImaging
-        case _: GmosSouthImaging    => ObservingModeType.GmosSouthImaging
-
   given HashBytes[ObservingMode] =
     case f2:  Flamingos2Config    => f2.hashBytes
     case gnl: GmosNorthLongSlit   => gnl.hashBytes
