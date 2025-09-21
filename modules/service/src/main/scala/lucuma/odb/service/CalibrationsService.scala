@@ -184,8 +184,7 @@ object CalibrationsService extends CalibrationObservations {
         }
 
       // Find all active observations in the program
-      @annotation.nowarn("msg=unused implicit parameter")
-      private def activeObservations(pid: Program.Id)(using Transaction[F]): F[Set[Observation.Id]] =
+      private def activeObservations(pid: Program.Id): F[Set[Observation.Id]] =
         session.execute(Statements.selectActiveObservations)(pid).map(_.toSet)
 
       /**
@@ -232,18 +231,13 @@ object CalibrationsService extends CalibrationObservations {
 
       /**
        * Check if a science config could have produced a calibration config
-       * considering ROI transformations for different calibration types
        */
-      private def configsMatchForAnyCalibType(sciConfig: CalibrationConfigSubset, calibConfig: CalibrationConfigSubset): Boolean =
-        // Try matching with each available calibration strategy
-        CalibrationTypes.exists { calibRole =>
+      private def doConfigsMatch(sciConfig: CalibrationConfigSubset, calibConfig: CalibrationConfigSubset): Boolean =
+        // Try matching with each supported calibration role
+        CalibrationTypes.exists: calibRole =>
           CalibrationConfigMatcher.matcherFor(sciConfig, calibRole).configsMatch(sciConfig, calibConfig)
-        }
 
-      /**
-       * Transform configurations for specific calibration type ROI requirements
-       */
-      private def transformConfigsForCalibType(
+      private def configForCalibrationType(
         configs: List[CalibrationConfigSubset],
         calibRole: CalibrationRole
       ): List[CalibrationConfigSubset] =
@@ -259,17 +253,17 @@ object CalibrationsService extends CalibrationObservations {
         configs:   List[CalibrationConfigSubset],
         tid:       Target.Id
       )(using Transaction[F]): F[List[Observation.Id]] =
-        val transformedConfigs = transformConfigsForCalibType(configs, calibRole).distinct
+        val adjustedConfig = configForCalibrationType(configs, calibRole).distinct
         calibRole match {
           case CalibrationRole.SpectroPhotometric =>
             site match {
-              case Site.GN => gmosLongSlitSpecPhotObs(pid, gid, tid, props, transformedConfigs.collect { case c: GmosNConfigs => c })
-              case Site.GS => gmosLongSlitSpecPhotObs(pid, gid, tid, props, transformedConfigs.collect { case c: GmosSConfigs => c })
+              case Site.GN => gmosLongSlitSpecPhotObs(pid, gid, tid, props, adjustedConfig.collect { case c: GmosNConfigs => c })
+              case Site.GS => gmosLongSlitSpecPhotObs(pid, gid, tid, props, adjustedConfig.collect { case c: GmosSConfigs => c })
             }
           case CalibrationRole.Twilight =>
             site match
-              case Site.GN => gmosLongSlitTwilightObs(pid, gid, tid, transformedConfigs.collect { case c: GmosNConfigs => c })
-              case Site.GS => gmosLongSlitTwilightObs(pid, gid, tid, transformedConfigs.collect { case c: GmosSConfigs => c })
+              case Site.GN => gmosLongSlitTwilightObs(pid, gid, tid, adjustedConfig.collect { case c: GmosNConfigs => c })
+              case Site.GS => gmosLongSlitTwilightObs(pid, gid, tid, adjustedConfig.collect { case c: GmosSConfigs => c })
           case _ => List.empty.pure[F]
         }
 
@@ -334,7 +328,7 @@ object CalibrationsService extends CalibrationObservations {
       )(using Transaction[F], ServiceAccess): F[List[Observation.Id]] = {
         val oids = NonEmptyList.fromList(
           calibrations
-            .collect { case (oid, calibConfig) if !scienceConfigs.exists(configsMatchForAnyCalibType(_, calibConfig)) => oid }
+            .collect { case (oid, calibConfig) if !scienceConfigs.exists(doConfigsMatch(_, calibConfig)) => oid }
             .sorted
         )
         oids.fold(List.empty.pure[F])(os => observationService.deleteCalibrationObservations(os).as(os.toList))
@@ -408,10 +402,6 @@ object CalibrationsService extends CalibrationObservations {
           uniqueSci     = uniqueConfiguration(allSci)
           // Get all the active calibration observations (excluding those with execution events)
           allCalibs    <- allUnexecutedObservations(pid, ObservationSelection.Calibration)
-          // Unique calibration configurations
-          uniqueCalibs  = uniqueConfiguration(allCalibs)
-          // Get all the active calibration observations
-          allCalibs    <- allObservations(pid, ObservationSelection.Calibration)
           calibs        = toConfigForCalibration(allCalibs)
           // Average s/n wavelength at each configuration
           props         = calObsProps(toConfigForCalibration(allSci))

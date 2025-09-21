@@ -7,6 +7,7 @@ import cats.syntax.eq.*
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.GmosRoi
 import lucuma.core.enums.ObservingModeType
+import lucuma.core.enums.ObservingModeType.*
 import lucuma.odb.sequence.ObservingMode
 import lucuma.odb.service.CalibrationConfigSubset.*
 
@@ -44,17 +45,20 @@ object CalibrationConfigMatcher:
 
   private def matchers(om: ObservingModeType, role: CalibrationRole): CalibrationConfigMatcher =
     (om, role) match
-      case (_, CalibrationRole.SpectroPhotometric) => SpecphotoGmosLS
-      case (_, CalibrationRole.Twilight)           => TwilightGmosLS
-      case (_, _)                                  => UnknownConfig
+      case (GmosNorthLongSlit | GmosSouthLongSlit, CalibrationRole.SpectroPhotometric) =>
+        SpecphotoGmosLS
+      case (GmosNorthLongSlit | GmosSouthLongSlit, CalibrationRole.Twilight)           =>
+        TwilightGmosLS
+      case (_, _)                                                                      =>
+        UnknownConfig
 
   def matcherFor(config: CalibrationConfigSubset, calibRole: CalibrationRole): CalibrationConfigMatcher =
     val modeType = config match
-      case _: GmosNConfigs        => ObservingModeType.GmosNorthLongSlit
-      case _: GmosSConfigs        => ObservingModeType.GmosSouthLongSlit
-      case _: GmosNImagingConfigs => ObservingModeType.GmosNorthImaging
-      case _: GmosSImagingConfigs => ObservingModeType.GmosSouthImaging
-      case _: Flamingos2Configs   => ObservingModeType.Flamingos2LongSlit
+      case _: GmosNConfigs        => GmosNorthLongSlit
+      case _: GmosSConfigs        => GmosSouthLongSlit
+      case _: GmosNImagingConfigs => GmosNorthImaging
+      case _: GmosSImagingConfigs => GmosSouthImaging
+      case _: Flamingos2Configs   => Flamingos2LongSlit
     matchers(modeType, calibRole)
 
 object SpecphotoGmosLS extends CalibrationConfigMatcher:

@@ -18,6 +18,7 @@ import io.circe.syntax.*
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.GmosAmpGain
 import lucuma.core.enums.GmosAmpReadMode
+import lucuma.core.enums.GmosRoi
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.Site
@@ -167,47 +168,44 @@ class calibrations extends OdbSuite with SubscriptionUtils with ExecutionQuerySe
   case class ExposureTimeMode(signalToNoise: SignalToNoise) derives Decoder
   case class ScienceRequirements(exposureTimeMode: ExposureTimeMode) derives Decoder
   case class SignalToNoise(at: Wavelength) derives Decoder
+  case class GmosNorthLongSlit(explicitRoi: Option[GmosRoi]) derives Decoder
+  case class GmosSouthLongSlit(explicitRoi: Option[GmosRoi]) derives Decoder
+  case class ObservingMode(gmosNorthLongSlit: Option[GmosNorthLongSlit], gmosSouthLongSlit: Option[GmosSouthLongSlit]) derives Decoder
   case class CalibObs(
     id: Observation.Id,
     groupId: Option[Group.Id],
     calibrationRole: Option[CalibrationRole],
     targetEnvironment: Option[CalibTE],
     constraintSet: Option[CalibCE],
-    scienceRequirements: ScienceRequirements
+    scienceRequirements: ScienceRequirements,
+    observingMode: Option[ObservingMode]
   ) derives Decoder
 
   extension (obs: List[CalibObs])
-    def countCalibrations: Int = obs.count {
-      case CalibObs(_, _, Some(_), _, _, _) => true
+    def countCalibrations: Int = obs.count:
+      case CalibObs(_, _, Some(_), _, _, _, _) => true
       case _                               => false
-    }
 
-    def countCalibrationsWithCE(ce: CloudExtinction.Preset): Int = obs.count {
-      case CalibObs(_, _, Some(_), _, Some(CalibCE(a)), _) => a === ce
+    def countCalibrationsWithCE(ce: CloudExtinction.Preset): Int = obs.count:
+      case CalibObs(_, _, Some(_), _, Some(CalibCE(a)), _, _) => a === ce
       case _                                               => false
-    }
 
-    def countCalibrationsWithTE: Int = obs.count {
-      case CalibObs(_, _, Some(_), Some(_), _, _) => true
+    def countCalibrationsWithTE: Int = obs.count:
+      case CalibObs(_, _, Some(_), Some(_), _, _, _) => true
       case _                                     => false
-    }
 
-    def callibrationIds: List[Observation.Id] = obs.collect {
-      case CalibObs(cid, _, Some(_), _, _, _) => cid
-    }
+    def callibrationIds: List[Observation.Id] = obs.collect:
+      case CalibObs(cid, _, Some(_), _, _, _, _) => cid
 
-    def groupIds: List[Group.Id] = obs.collect {
-      case CalibObs(_, Some(gid), _, _, _, _) => gid
-    }
+    def groupIds: List[Group.Id] = obs.collect:
+      case CalibObs(_, Some(gid), _, _, _, _, _) => gid
 
   extension (elements: List[Either[Group.Id, Observation.Id]])
-    def observationIds: List[Observation.Id] = elements.collect {
+    def observationIds: List[Observation.Id] = elements.collect:
       case Right(oid) => oid
-    }
 
-    def calibrationGroupId: Option[Group.Id] = elements.collectFirst {
+    def calibrationGroupId: Option[Group.Id] = elements.collectFirst:
       case Left(gid) => gid
-    }
 
   private def queryGroup(gid: Group.Id): IO[(Group.Id, Boolean, NonEmptyString)] =
     query(
@@ -247,6 +245,14 @@ class calibrations extends OdbSuite with SubscriptionUtils with ExecutionQuerySe
                       signalToNoise {
                         at { nanometers }
                       }
+                    }
+                  }
+                  observingMode {
+                    gmosNorthLongSlit {
+                      explicitRoi
+                    }
+                    gmosSouthLongSlit {
+                      explicitRoi
                     }
                   }
                   targetEnvironment {
@@ -733,7 +739,7 @@ class calibrations extends OdbSuite with SubscriptionUtils with ExecutionQuerySe
               }
       ob   <- queryObservations(pid)
       (cid1, ct1) = ob.collect {
-        case CalibObs(cid, _, Some(_), Some(ct1), _, _) => (cid, ct1)
+        case CalibObs(cid, _, Some(_), Some(ct1), _, _, _) => (cid, ct1)
       }.head
       _    <- query(
                 user = pi,
@@ -762,7 +768,7 @@ class calibrations extends OdbSuite with SubscriptionUtils with ExecutionQuerySe
                }
       ob2   <- queryObservations(pid)
       (cid2, ct2) = ob2.collect {
-        case CalibObs(cid, _, Some(_), Some(ct2), _, _) => (cid, ct2)
+        case CalibObs(cid, _, Some(_), Some(ct2), _, _, _) => (cid, ct2)
       }.head
       // Some observation
       _     <- assertIOBoolean(IO(ob2.map(_.id) === ob.map(_.id)))
@@ -1003,7 +1009,7 @@ class calibrations extends OdbSuite with SubscriptionUtils with ExecutionQuerySe
       ob   <- queryObservations(pid)
     } yield {
       val wv = ob.collect {
-        case CalibObs(_, _, Some(CalibrationRole.SpectroPhotometric), _, _, ScienceRequirements(ExposureTimeMode(SignalToNoise(wv)))) => wv
+        case CalibObs(_, _, Some(CalibrationRole.SpectroPhotometric), _, _, ScienceRequirements(ExposureTimeMode(SignalToNoise(wv))), _) => wv
       }
       // 510 is the average across the science observations (500 + 520) / 2 = 510
       assertEquals(Wavelength.fromIntNanometers(510), wv.headOption)
@@ -1168,7 +1174,7 @@ class calibrations extends OdbSuite with SubscriptionUtils with ExecutionQuerySe
       ob <- queryObservations(pid)
     } yield {
       val calibCount = ob.count(_.calibrationRole.contains(CalibrationRole.SpectroPhotometric))
-      // SpectroPhotometric should ignore ROI differences
+      // 1 Specphoto even though we have two ROI
       assertEquals(calibCount, 1)
     }
   }
@@ -1227,7 +1233,6 @@ class calibrations extends OdbSuite with SubscriptionUtils with ExecutionQuerySe
         """,
       )
       _ <- prepareObservation(pi, oid1, tid1) *> prepareObservation(pi, oid2, tid2)
-      // Generate calibrations
       _ <- withServices(service) { services =>
              services.session.transaction.use { xa =>
                services.calibrationsService(emailConfig, httpClient).recalculateCalibrations(pid, when)(using xa)
@@ -1237,11 +1242,13 @@ class calibrations extends OdbSuite with SubscriptionUtils with ExecutionQuerySe
       ob <- queryObservations(pid)
     } yield {
       val twilightCount = ob.count(_.calibrationRole.contains(CalibrationRole.Twilight))
+      val twilightObs = ob.filter(_.calibrationRole.contains(CalibrationRole.Twilight))
+      val rois = twilightObs.flatMap(_.observingMode).flatMap(_.gmosNorthLongSlit).flatMap(_.explicitRoi)
 
-      // Twilight should preserve ROI differences - create separate calibrations for each ROI
-      // Two science observations with different ROIs should create 2 twilight calibrations
-      // Only 2 calibrations because both science observations are GMOS North (only GN site)
-      assertEquals(twilightCount, 2, "Twilight should create separate calibrations preserving ROI differences between science observations")
+      // Twilight preserve ROI differences, thus two twilight observations
+      assertEquals(twilightCount, 2)
+      assertEquals(rois.count(_ === GmosRoi.CentralSpectrum), 1)
+      assertEquals(rois.count(_ === GmosRoi.FullFrame), 1)
     }
   }
 }
