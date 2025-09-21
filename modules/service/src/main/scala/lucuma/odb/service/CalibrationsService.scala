@@ -242,12 +242,22 @@ object CalibrationsService extends CalibrationObservations {
         scienceConfigs.exists: sciConfig =>
           CalibrationConfigMatcher.matcherFor(sciConfig, calibRole).configsMatch(sciConfig, calibConfig)
 
-      private def configForCalibrationType(
-        configs: List[CalibrationConfigSubset],
-        calibRole: CalibrationRole
-      ): List[CalibrationConfigSubset] =
-        configs.map: config =>
-          CalibrationConfigMatcher.matcherFor(config, calibRole).normalize(config)
+      private def calculateConfigurationsPerRole(
+        uniqueSci: List[CalibrationConfigSubset],
+        calibs: List[ObsExtract[CalibrationConfigSubset]]
+      ): Map[CalibrationRole, List[CalibrationConfigSubset]] =
+        CalibrationTypes.map { calibType =>
+          val sciConfigs = uniqueSci.map(config =>
+            CalibrationConfigMatcher.matcherFor(config, calibType).normalize(config)
+          ).distinct
+          val calibConfigs = calibs
+            .filter(_.role.contains(calibType))
+            .map(_.data)
+            .map(config => CalibrationConfigMatcher.matcherFor(config, calibType).normalize(config))
+            .distinct
+          val newConfigs = sciConfigs.diff(calibConfigs)
+          (calibType, newConfigs)
+        }.toMap
 
       private def calibObservation(
         calibRole: CalibrationRole,
@@ -258,73 +268,67 @@ object CalibrationsService extends CalibrationObservations {
         configs:   List[CalibrationConfigSubset],
         tid:       Target.Id
       )(using Transaction[F]): F[List[Observation.Id]] =
-        val adjustedConfig = configForCalibrationType(configs, calibRole).distinct
         calibRole match {
           case CalibrationRole.SpectroPhotometric =>
             site match {
-              case Site.GN => gmosLongSlitSpecPhotObs(pid, gid, tid, props, adjustedConfig.collect { case c: GmosNConfigs => c })
-              case Site.GS => gmosLongSlitSpecPhotObs(pid, gid, tid, props, adjustedConfig.collect { case c: GmosSConfigs => c })
+              case Site.GN => gmosLongSlitSpecPhotObs(pid, gid, tid, props, configs.collect { case c: GmosNConfigs => c })
+              case Site.GS => gmosLongSlitSpecPhotObs(pid, gid, tid, props, configs.collect { case c: GmosSConfigs => c })
             }
           case CalibrationRole.Twilight =>
             site match
-              case Site.GN => gmosLongSlitTwilightObs(pid, gid, tid, adjustedConfig.collect { case c: GmosNConfigs => c })
-              case Site.GS => gmosLongSlitTwilightObs(pid, gid, tid, adjustedConfig.collect { case c: GmosSConfigs => c })
+              case Site.GN => gmosLongSlitTwilightObs(pid, gid, tid, configs.collect { case c: GmosNConfigs => c })
+              case Site.GS => gmosLongSlitTwilightObs(pid, gid, tid, configs.collect { case c: GmosSConfigs => c })
           case _ => List.empty.pure[F]
         }
 
-      private def gmosCalibrations(
-        pid:     Program.Id,
-        gid:     Group.Id,
-        props:   Map[CalibrationConfigSubset, CalObsProps],
-        configs: List[CalibrationConfigSubset],
-        gnCalc:  CalibrationIdealTargets,
-        gsCalc:  CalibrationIdealTargets
-      )(using Transaction[F], ServiceAccess): F[List[(CalibrationRole, Observation.Id)]] = {
-        def newCalibs(site: Site, ct: CalibrationRole, idealTarget: CalibrationIdealTargets): Option[F[List[(CalibrationRole, Observation.Id)]]] =
-          idealTarget.bestTarget(ct).map(tgtid =>
-            // We don't want to create a target if there are no pending configurations
+      // Set the calibration role of the observations in bulk
+      private def setCalibRoleAndGroup(oids: List[Observation.Id], calibrationRole: CalibrationRole): F[Unit] =
+        session.executeCommand(Statements.setCalibRole(oids, calibrationRole)).void
+
+      private def generateGMOSLSCalibrations(
+        pid:           Program.Id,
+        props:         Map[CalibrationConfigSubset, CalObsProps],
+        configsPerRole: Map[CalibrationRole, List[CalibrationConfigSubset]],
+        gnTgt:         CalibrationIdealTargets,
+        gsTgt:         CalibrationIdealTargets
+      )(using Transaction[F], ServiceAccess): F[List[Observation.Id]] = {
+        val allConfigs = configsPerRole.values.flatten.toList
+        for {
+          cg   <- calibrationsGroup(pid, allConfigs.size)
+          oids <- cg.map(g =>
+                    configsPerRole.toList.flatTraverse { case (calibType, configs) =>
+                      generateCalibrationsForType(pid, g, props, configs, calibType, gnTgt, gsTgt)
+                    }
+                  ).getOrElse(List.empty.pure[F])
+        } yield oids
+      }
+
+      private def generateCalibrationsForType(
+        pid:       Program.Id,
+        gid:       Group.Id,
+        props:     Map[CalibrationConfigSubset, CalObsProps],
+        configs:   List[CalibrationConfigSubset],
+        calibType: CalibrationRole,
+        gnTgt:     CalibrationIdealTargets,
+        gsTgt:     CalibrationIdealTargets
+      )(using Transaction[F], ServiceAccess): F[List[Observation.Id]] = {
+        def newCalibs(site: Site, idealTarget: CalibrationIdealTargets): Option[F[List[Observation.Id]]] =
+          idealTarget.bestTarget(calibType).map(tgtid =>
             if (configs.nonEmpty) {
               (for {
                 cta <- Nested(targetService.cloneTargetInto(tgtid, pid)).map(_._2).value
-                o   <- cta.traverse(calibObservation(ct, site, pid, gid, props, configs, _))
-              } yield o).orError.map(_.map((ct, _)))
+                o   <- cta.traverse(calibObservation(calibType, site, pid, gid, props, configs, _))
+              } yield o).orError
             } else {
               List.empty.pure[F]
             })
 
-        CalibrationTypes.map { ct =>
-          val gno = newCalibs(Site.GN, ct, gnCalc)
-          val gso = newCalibs(Site.GS, ct, gsCalc)
+        val gnoCalibs = newCalibs(Site.GN, gnTgt)
+        val gsoCalibs = newCalibs(Site.GS, gsTgt)
 
-          (gno, gso).mapN((_, _).mapN(_ ::: _)).getOrElse(List.empty.pure[F])
-        }.sequence.map(_.flatten)
-      }
-
-      // Set the calibration role of the observations in bulk
-      @annotation.nowarn("msg=unused implicit parameter")
-      private def setCalibRoleAndGroup(oids: List[Observation.Id], calibrationRole: CalibrationRole)(using Transaction[F]): F[Unit] =
-        session.executeCommand(Statements.setCalibRole(oids, calibrationRole)).void
-
-      private def generateGMOSLSCalibrations(
-        pid:     Program.Id,
-        props:   Map[CalibrationConfigSubset, CalObsProps],
-        configs: List[CalibrationConfigSubset],
-        gnTgt:   CalibrationIdealTargets,
-        gsTgt:   CalibrationIdealTargets
-      )(using Transaction[F], ServiceAccess): F[List[Observation.Id]] = {
-        if (configs.isEmpty) {
-          List.empty.pure[F]
-        } else
-          for {
-            cg   <- calibrationsGroup(pid, configs.size)
-            oids <- cg.map(g =>
-                      gmosCalibrations(pid, g, props, configs, gnTgt, gsTgt).flatTap { oids =>
-                        oids.groupBy(_._1).toList.traverse { case (role, oids) =>
-                          setCalibRoleAndGroup(oids.map(_._2), role).whenA(oids.nonEmpty)
-                        }
-                      }
-                    ).getOrElse(List.empty.pure[F])
-          } yield oids.map(_._2)
+        (gnoCalibs, gsoCalibs).mapN((_, _).mapN(_ ::: _)).getOrElse(List.empty.pure[F]).flatTap { oids =>
+          setCalibRoleAndGroup(oids, calibType).whenA(oids.nonEmpty)
+        }
       }
 
       private def removeUnnecessaryCalibrations(
@@ -390,7 +394,6 @@ object CalibrationsService extends CalibrationObservations {
                     WHERE c_observation_id = $observation_id
                       AND c_calibration_role IS NOT NULL
                       AND ("""(oid, oid) |+| needsUpdate |+| void")"
-    //              sql"select $observation_id where c_calibration_role = $calibration_role and c_spec_signal_to_noise_at <> $wavelength_pm".apply(oid, role, w)
                 )
             )
           }.void
@@ -419,14 +422,12 @@ object CalibrationsService extends CalibrationObservations {
           calibs        = toConfigForCalibration(allCalibs)
           // Average s/n wavelength at each configuration
           props         = calObsProps(toConfigForCalibration(allSci))
-          // Unique calibration configurations (convert to old format for compatibility)
-          uniqueCalibs  = calibs.map(c => c.data).distinct
-          // Get all unique configurations that need calibrations
-          configs       = uniqueSci.diff(uniqueCalibs)
+          // Per-calibration-type configuration processing
+          configsPerRole = calculateConfigurationsPerRole(uniqueSci, calibs)
           // Remove calibrations that are not needed, basically when a config is removed
           removedOids  <- removeUnnecessaryCalibrations(uniqueSci, calibs)
           // Generate new calibrations for each unique configuration
-          addedOids    <- generateGMOSLSCalibrations(pid, props, configs, gnTgt, gsTgt)
+          addedOids    <- generateGMOSLSCalibrations(pid, props, configsPerRole, gnTgt, gsTgt)
           // Update wavelength at for each remaining calib
           calibUpdates  = prepareCalibrationUpdates(calibs, removedOids, props)
           _            <- updatePropsAt(calibUpdates)
