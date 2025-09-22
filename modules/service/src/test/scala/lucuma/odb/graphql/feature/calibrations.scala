@@ -42,6 +42,7 @@ import lucuma.odb.service.CalibrationsService
 import lucuma.odb.service.Services
 import lucuma.odb.service.SpecPhotoCalibrations
 import lucuma.odb.service.TwilightCalibrations
+import lucuma.odb.graphql.query.ExecutionQuerySetupOperations
 
 import java.time.Instant
 import java.time.LocalDate
@@ -49,7 +50,7 @@ import java.time.LocalDateTime
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 
-class calibrations extends OdbSuite with SubscriptionUtils {
+class calibrations extends OdbSuite with SubscriptionUtils with ExecutionQuerySetupOperations {
   val pi       = TestUsers.Standard.pi(1, 101)
   val service  = TestUsers.service(3)
 
@@ -1026,7 +1027,7 @@ class calibrations extends OdbSuite with SubscriptionUtils {
       assertEquals(Wavelength.fromIntNanometers(510), wv.headOption)
     }
   }
-  test("Don't add calibrations if science is inactive") {
+  test("Don't add calibrations if science is inactive"):
     for {
       pid  <- createProgramAs(pi)
       tid1 <- createTargetAs(pi, pid, "One")
@@ -1051,6 +1052,85 @@ class calibrations extends OdbSuite with SubscriptionUtils {
       assertEquals(cCount, 2)
       assertEquals(oids.size, 2)
     }
-  }
-}
 
+  def updateCentralWavelength(oid: Observation.Id, centralWavelength: Wavelength): IO[Unit] =
+    query(
+      user  = pi,
+      query = s"""
+        mutation {
+          updateObservations(input: {
+            SET: {
+              observingMode: {
+                gmosNorthLongSlit: {
+                  centralWavelength: { nanometers: ${centralWavelength.toNanometers} }
+                }
+              }
+            },
+            WHERE: {
+              id: { EQ: "$oid" }
+            }
+          }) {
+            observations {
+              instrument
+            }
+          }
+        }
+      """
+    ).void
+
+  test("unnecessary calibrations are removed unless partially executed"):
+    for {
+      pid  <- createProgramAs(pi)
+      tid1 <- createTargetAs(pi, pid, "One")
+      oid1 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid1)
+      _    <- prepareObservation(pi, oid1, tid1)
+      // should produce 2 calibrations
+      _    <- withServices(service) { services =>
+                services.session.transaction.use { xa =>
+                  services.calibrationsService(emailConfig, httpClient).recalculateCalibrations(pid, when)(using xa)
+                }
+              }
+      ob1   <- queryObservations(pid)
+      calibIds1 = ob1.collect {
+        case CalibObs(cid, _, Some(_), _, _, _) => cid
+      }
+      // Add execution events to one of the calibrations (making it partially executed)
+      setup = ExecutionQuerySetupOperations.Setup(offset = 0, atomCount = 1, stepCount = 1, datasetCount = 1)
+      _     <- recordVisit(ObservingModeType.GmosNorthLongSlit, setup, service, calibIds1.head)
+      // Change the observation configuration
+      _     <- updateCentralWavelength(oid1, Wavelength.fromIntNanometers(600).get)
+      // Run calibrations again - should keep the partially executed calibration and add new ones
+      _     <- withServices(service) { services =>
+                services.session.transaction.use { xa =>
+                  services.calibrationsService(emailConfig, httpClient).recalculateCalibrations(pid, when)(using xa)
+                }
+              }
+      ob2   <- queryObservations(pid)
+      calibIds2 = ob2.collect {
+        case CalibObs(cid, _, Some(_), _, _, _) => cid
+      }
+      gr1  <- groupElementsAs(pi, pid, None)
+      // Verify that the calibration still has execution events
+      evs  <- withServices(service) { services =>
+                  services.executionEventService.selectSequenceEvents(calibIds1.head).compile.toList
+                }
+      _     <- assertIOBoolean(IO(evs.nonEmpty))
+    } yield {
+      val oids = gr1.collect { case Right(oid) => oid }
+      val count1 = ob1.count {
+        case CalibObs(_, _, Some(_), _, _, _) => true
+        case _                          => false
+      }
+      val count2 = ob2.count {
+        case CalibObs(_, _, Some(_), _, _, _) => true
+        case _                          => false
+      }
+      // initial set 2 calibs
+      assertEquals(count1, 2)
+      // After config change: 1 partially executed calibration remains + 2 new calibrations
+      assertEquals(count2, 3)
+      // The partially executed calibration should still be present
+      assert(calibIds2.contains(calibIds1.head))
+      assertEquals(oids.size, 1)
+    }
+}

@@ -200,6 +200,15 @@ object CalibrationsService extends CalibrationObservations {
           .selectAll(pid, selection = selection)
           .map(_.toList.collect(collectValid(selection === ObservationSelection.Science)))
 
+      private def allUnexecutedObservations(
+        pid:       Program.Id,
+        selection: ObservationSelection
+      )(using Transaction[F]): F[List[ObsExtract[ObservingMode]]] =
+        services
+          .generatorParamsService
+          .selectAllUnexecuted(pid, selection = selection)
+          .map(_.toList.collect(collectValid(selection === ObservationSelection.Science)))
+
       private def toConfigForCalibration(all: List[ObsExtract[ObservingMode]]): List[ObsExtract[CalibrationConfigSubset]] =
         all.map(_.map(_.toConfigSubset))
 
@@ -377,8 +386,8 @@ object CalibrationsService extends CalibrationObservations {
                             .map(_.filter(u => active.contains(u._1)))
           // Unique science configurations
           uniqueSci     = uniqueConfiguration(allSci)
-          // Get all the active calibration observations
-          allCalibs    <- allObservations(pid, ObservationSelection.Calibration)
+          // Get all the active calibration observations (excluding those with execution events)
+          allCalibs    <- allUnexecutedObservations(pid, ObservationSelection.Calibration)
           // Unique calibration configurations
           uniqueCalibs  = uniqueConfiguration(allCalibs)
           calibs        = toConfigForCalibration(allCalibs)
