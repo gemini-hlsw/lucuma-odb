@@ -7,11 +7,14 @@ package mutation
 import cats.effect.IO
 import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.NonNegShort
+import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.model.Group
 import lucuma.core.model.Observation
+import lucuma.core.model.Program
 import lucuma.core.model.User
+import lucuma.core.util.TimeSpan
 import lucuma.odb.data.Existence
 import lucuma.odb.data.OdbError
 
@@ -20,6 +23,11 @@ class updateGroups extends OdbSuite {
   val pi: User = TestUsers.Standard.pi(nextId, nextId)
   val service  = TestUsers.service(6)
   override lazy val validUsers: List[User] = List(pi, service)
+
+  val inputIntervalError =
+    "Argument 'input.SET' is invalid: Minimum interval must be less than or equal maximum interval."
+  val odbIntervalError =
+    "Minimum interval must be less than or equal maximum interval."
 
   test("simple bulk update") {
     for {
@@ -452,5 +460,247 @@ class updateGroups extends OdbSuite {
       _   <- updateGroupSystem(g1, true)
       _   <- updateGroupName(service, g1, "NewName")
     yield ()
+  }
+
+  test("can create group with any value for minimumInterval and no maximumInterval") {
+    for 
+      pid <- createProgramAs(pi)
+      _   <- createGroupAs(pi, pid, minimumInterval = TimeSpan.fromMinutes(5))
+    yield ()
+  }
+
+  test("can create group with any value for maximumInterval and no minimumInterval") {
+    for 
+      pid <- createProgramAs(pi)
+      _   <- createGroupAs(pi, pid, maximumInterval = TimeSpan.fromMinutes(5))
+    yield ()
+  }
+
+  test("can create group with minimumInterval < maximumInterval") {
+    for 
+      pid <- createProgramAs(pi)
+      _   <- createGroupAs(pi, pid, minimumInterval = TimeSpan.fromMinutes(5), maximumInterval = TimeSpan.fromMinutes(6))
+    yield ()
+  }
+
+  test("can create group with minimumInterval == maximumInterval") {
+    for 
+      pid <- createProgramAs(pi)
+      _   <- createGroupAs(pi, pid, minimumInterval = TimeSpan.fromMinutes(5), maximumInterval = TimeSpan.fromMinutes(5))
+    yield ()
+  }
+
+  test("cannot create group with minimumInterval > maximumInterval") {
+    // This error is caught by the Input
+    def createGroupError(pid: Program.Id): IO[Unit] =
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            createGroup(
+              input: {
+                programId: "$pid"
+                SET: {
+                  minimumInterval: { seconds: 5 }
+                  maximumInterval: { seconds: 4 }
+                }
+              }
+            ) {
+              group { id }
+            }
+          }
+        """,
+        expected = List(inputIntervalError).asLeft
+      )
+    
+    for {
+      pid <- createProgramAs(pi)
+      _   <- createGroupError(pid)
+    } yield ()
+  }
+
+  def updateGroupIntervals(
+    user: User,
+    gid: Group.Id,
+    minimumInterval: Option[Option[TimeSpan]],
+    maximumInterval: Option[Option[TimeSpan]],
+    error: Option[String]
+  ): IO[Unit] = 
+    extension (oots: Option[Option[TimeSpan]])
+      def toSetter(prefix: String): String =
+        oots.foldMap(ots =>
+          s"${prefix}imumInterval: ${ots.fold("null")(ts => s"{ microseconds: \"${ts.toMicroseconds.asJson.noSpaces}\" }")}"
+          )
+
+    val expectation: Either[List[String], Json] = error.fold(
+      Right(json"""
+              {
+                "updateGroups": {
+                  "groups": [
+                    {
+                      "id": $gid
+                    }
+                  ]
+                }
+              }
+            """)
+    )(s => Left(List(s)))
+
+    expect(
+      user = user,
+      query = s"""
+        mutation {
+          updateGroups(input: {
+            SET: {
+              ${minimumInterval.toSetter("min")}
+              ${maximumInterval.toSetter("max")}
+            },
+            WHERE: {
+              id: { EQ: ${gid.asJson} }
+            }
+          }) {
+            groups {
+              id
+            }
+          }
+        }
+      """,
+      expected = expectation
+    )
+
+  test("Can update minimumInterval if maximumInterval is not set") {
+    for {
+      pid <- createProgramAs(pi)
+      gid <- createGroupAs(pi, pid, minimumInterval = TimeSpan.fromSeconds(5))
+      _   <- updateGroupIntervals(
+        pi,
+        gid,
+        minimumInterval = TimeSpan.fromHours(3).some,
+        maximumInterval = None,
+        None)
+    } yield ()
+  }
+
+  test("Can update maximumInterval if minimumInterval is not set") {
+    for {
+      pid <- createProgramAs(pi)
+      gid <- createGroupAs(pi, pid, maximumInterval = TimeSpan.fromSeconds(5))
+      _   <- updateGroupIntervals(pi,
+        gid,
+        minimumInterval = None,
+        maximumInterval = TimeSpan.fromHours(3).some,
+        error = None)
+    } yield ()
+  }
+
+  test("Can update maximumInterval to same as minimumInterval") {
+    for {
+      pid <- createProgramAs(pi)
+      gid <- createGroupAs(pi, pid, minimumInterval = TimeSpan.fromHours(23))
+      _   <- updateGroupIntervals(pi,
+        gid,
+        minimumInterval = None,
+        maximumInterval = TimeSpan.fromHours(23).some,
+        error = None)
+    } yield ()
+  }
+
+  test("Can update minimumInterval to same as maximumInterval") {
+    for {
+      pid <- createProgramAs(pi)
+      gid <- createGroupAs(pi, pid, maximumInterval = TimeSpan.fromMinutes(59))
+      _   <- updateGroupIntervals(pi,
+        gid,
+        minimumInterval = TimeSpan.fromMinutes(59).some,
+        maximumInterval = None,
+        error = None)
+    } yield ()
+  }
+
+  test("Can update maximumInterval to greater than minimumInterval") {
+    for {
+      pid <- createProgramAs(pi)
+      gid <- createGroupAs(pi, pid, minimumInterval = TimeSpan.fromHours(23))
+      _   <- updateGroupIntervals(pi,
+        gid,
+        minimumInterval = None,
+        maximumInterval = TimeSpan.fromHours(24).some,
+        error = None)
+    } yield ()
+  }
+
+  test("Can update minimumInterval to less than maximumInterval") {
+    for {
+      pid <- createProgramAs(pi)
+      gid <- createGroupAs(pi, pid, minimumInterval = TimeSpan.fromHours(23))
+      _   <- updateGroupIntervals(pi,
+        gid,
+        minimumInterval = TimeSpan.fromHours(22).some,
+        maximumInterval = None,
+        error = None)
+    } yield ()
+  }
+
+  test("Cannot update maximumInterval greater than minimumInterval") {
+    // This error is caught by the database
+    for {
+      pid <- createProgramAs(pi)
+      gid <- createGroupAs(pi, pid, minimumInterval = TimeSpan.fromHours(3))
+      _   <- updateGroupIntervals(pi,
+        gid,
+        minimumInterval = None,
+        maximumInterval = TimeSpan.fromHours(2).some,
+        error = odbIntervalError.some)
+    } yield ()
+  }
+
+  test("Cannot update minimumInterval greater than maximumInterval") {
+    // This error is caught by the database
+    for {
+      pid <- createProgramAs(pi)
+      gid <- createGroupAs(pi, pid, maximumInterval = TimeSpan.fromHours(3))
+      _   <- updateGroupIntervals(pi,
+        gid,
+        minimumInterval = TimeSpan.fromHours(5).some,
+        maximumInterval = None,
+        error = odbIntervalError.some)
+    } yield ()
+  }
+
+  test("Can update both minimumInterval and maximumInterval to same") {
+    for {
+      pid <- createProgramAs(pi)
+      gid <- createGroupAs(pi, pid, maximumInterval = TimeSpan.fromHours(3))
+      _   <- updateGroupIntervals(pi,
+        gid,
+        minimumInterval = TimeSpan.fromMinutes(5).some,
+        maximumInterval = TimeSpan.fromMinutes(5).some,
+        error = None)
+    } yield ()
+  }
+
+  test("Can update both minimumInterval and maximumInterval to valid values") {
+    for {
+      pid <- createProgramAs(pi)
+      gid <- createGroupAs(pi, pid, minimumInterval = TimeSpan.fromHours(3))
+      _   <- updateGroupIntervals(pi,
+        gid,
+        minimumInterval = TimeSpan.fromHours(10).some,
+        maximumInterval = TimeSpan.fromHours(12).some,
+        error = None)
+    } yield ()
+  }
+
+  test("Cannot update both minimumInterval and maximumInterval to invalid values") {
+    // This error is caught by the Input
+    for {
+      pid <- createProgramAs(pi)
+      gid <- createGroupAs(pi, pid)
+      _   <- updateGroupIntervals(pi,
+        gid,
+        minimumInterval = TimeSpan.fromHours(10).some,
+        maximumInterval = TimeSpan.fromHours(9).some,
+        error = inputIntervalError.some)
+    } yield ()
   }
 }
