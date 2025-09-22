@@ -1,7 +1,7 @@
 import NativePackagerHelper._
 
 // Please keep in alphabetical order
-val awsJavaSdkVersion          = "1.12.787"
+val awsJavaSdkVersion          = "1.12.791"
 val boopickleVersion           = "1.5.0"
 val bouncycastleVersion        = "1.70"
 val catsEffectVersion          = "3.6.3"
