@@ -75,7 +75,7 @@ object GroupPropertiesInput {
         (rName, rDescription, rMinimumRequired, rOrdered, rMinimumInterval, rMaximumInterval, rParentGroup, rParentGroupIndex, rExistence).parTupled.flatMap {
           (name, description, minimumRequired, ordered, minimumInterval, maximumInterval, parentGroup, parentGroupIndex, existence) =>
             (minimumInterval, maximumInterval) match
-              case (Some(min), Some(max)) if max <= min => Matcher.validationFailure("Minimum interval must be less than maximum interval.")
+              case (Some(min), Some(max)) if max < min => Matcher.validationFailure("Minimum interval must be less than or equal maximum interval.")
               case _ =>
                 Result(Create(
                   name, 
@@ -107,7 +107,7 @@ object GroupPropertiesInput {
         (rName, rDescription, rMinimumRequired, rOrdered, rMinimumInterval, rMaximumInterval, rParentGroup, rParentGroupIndex, rExistence).parTupled.flatMap {
           (name, description, minimumRequired, ordered, minimumInterval, maximumInterval, parentGroup, parentGroupIndex, existence) =>
             (minimumInterval.toOption, maximumInterval.toOption) match // Scala can't typecheck it if we match Nullable.NonNull for some reason :-\
-              case (Some(min), Some(max)) if max <= min => Matcher.validationFailure("Minimum interval must be less than maximum interval.")
+              case (Some(min), Some(max)) if max < min => Matcher.validationFailure("Minimum interval must be less than or equal maximum interval.")
               case _ =>
                 Result(Edit(
                   name, 

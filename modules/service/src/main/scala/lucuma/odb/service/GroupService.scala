@@ -163,7 +163,9 @@ object GroupService {
         moveGroups(SET.parentGroupId, SET.parentGroupIndex, which, accessPredicate).flatMap { ids =>
           Statements.updateGroups(SET, which, accessPredicate).traverse { af =>
             session.prepareR(af.fragment.query(group_id)).use { pq => pq.stream(af.argument, 512).compile.toList }
-          } .map(moreIds => Result(moreIds.foldLeft(ids)((a, b) => (a ++ b).distinct)))
+          }
+          .map(moreIds => Result(moreIds.foldLeft(ids)((a, b) => (a ++ b).distinct)))
+          .recoverWith { case SqlState.CheckViolation(ex) =>  Result.failure("Minimum interval must be less than or equal maximum interval.").pure}
         }
 
       @annotation.nowarn("msg=unused implicit parameter")
