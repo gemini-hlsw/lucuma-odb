@@ -1,0 +1,636 @@
+"""
+##########
+ITC schema
+##########
+"""
+
+type Query {
+  versions: ItcVersions
+
+  """
+  Given an instrument and a spectroscopy mode,
+  return the integration time and the S/N for the given targets.
+  """
+  spectroscopy(
+    input: SpectroscopyInput!
+  ): CalculationResult!
+
+  """
+  Given an instrument and an imaging mode,
+  return the integration time and the S/N for the given targets.
+  """
+  imaging(
+    input: ImagingInput!
+  ): CalculationResult!
+
+  """
+  Given an instrument and a mode, return the graph data for the given targets.
+  Values are rounded to limit the size of the response.
+  """
+  spectroscopyGraphs(
+    input: SpectroscopyGraphsInput!
+  ): SpectroscopyGraphsResult!
+
+  """
+  Given an instrument and a mode, return the integration time,
+  estimated S/N and graph data for the given targets.
+  Graph values are rounded to limit the size of the response.
+  """
+  spectroscopyIntegrationTimeAndGraphs(
+    input: SpectroscopyIntegrationTimeAndGraphsInput!
+  ): SpectroscopyTimeAndGraphsResult!
+}
+
+type ItcVersions {
+  """id of the backend server"""
+  serverVersion: String!
+
+  """token for the itc data version, can be null"""
+  dataVersion: String
+}
+
+input GmosSSpectroscopyInput {
+  """Center of the configuration spectrum"""
+  centralWavelength: WavelengthInput!
+
+  """Gmos South disperser"""
+  grating: GmosSouthGrating!
+
+  """Gmos South Focal plane unit"""
+  fpu: GmosSouthFpuInput!
+
+  """Gmos South filter"""
+  filter: GmosSouthFilter
+
+  """ccd mode"""
+  ccdMode: GmosCcdModeInput
+
+  """Regions of interest"""
+  roi: GmosRoi
+}
+
+input GmosSImagingInput {
+  """Gmos South filter"""
+  filter: GmosSouthFilter!
+
+  """ccd mode"""
+  ccdMode: GmosCcdModeInput
+}
+
+input GmosNSpectroscopyInput {
+  """Center of the configuration spectrum"""
+  centralWavelength: WavelengthInput!
+
+  """Gmos North disperser"""
+  grating: GmosNorthGrating!
+
+  """Gmos North Focal plane unit"""
+  fpu: GmosNorthFpuInput!
+
+  """Gmos North filter"""
+  filter: GmosNorthFilter
+
+  """ccd mode"""
+  ccdMode: GmosCcdModeInput
+
+  """Regions of interest"""
+  roi: GmosRoi
+}
+
+input GmosNImagingInput {
+  """Gmos North filter"""
+  filter: GmosNorthFilter!
+
+  """ccd mode"""
+  ccdMode: GmosCcdModeInput
+}
+
+input Flamingos2SpectroscopyInput {
+  """Flamingos2 disperser"""
+  disperser: Flamingos2Disperser!
+
+  """Flamingos2 Focal plane unit"""
+  fpu: Flamingos2Fpu!
+
+  """Flamingos2 filter"""
+  filter: Flamingos2Filter!
+}
+
+input Flamingos2ImagingInput {
+  """Flamingos2 filter"""
+  filter: Flamingos2Filter!
+}
+
+type GmosSSpectroscopyParams {
+  """Wavelength in appropriate units"""
+  centralWavelength: Wavelength!
+
+  """Gmos South disperser"""
+  grating: GmosSouthGrating
+
+  """Gmos North Focal plane unit"""
+  customMask: GmosCustomMask
+
+  """Gmos South Focal plane unit"""
+  fpu: GmosSouthFpu
+
+  """Gmos South filter"""
+  filter: GmosSouthFilter
+}
+
+type GmosNSpectroscopyParams {
+  """Wavelength in appropriate units"""
+  centralWavelength: Wavelength!
+
+  """Gmos North disperser"""
+  grating: GmosNorthGrating
+
+  """Gmos North Focal plane unit"""
+  customMask: GmosCustomMask
+
+  """Gmos North Focal plane unit"""
+  fpu: GmosNorthFpu
+
+  """Gmos North filter"""
+  filter: GmosNorthFilter
+}
+
+type Flamingos2SpectroscopyParams {
+  """Flamingos2 disperser"""
+  disperser: Flamingos2Disperser
+
+  """Flamingos2 Focal plane unit"""
+  fpu: Flamingos2Fpu
+
+  """Flamingos2 filter"""
+  filter: Flamingos2Filter
+}
+
+union SpectroscopyParams = GmosNSpectroscopyParams | GmosSSpectroscopyParams | Flamingos2SpectroscopyParams
+
+type GmosSImagingParams {
+  """Gmos South filter"""
+  filter: GmosSouthFilter!
+}
+
+type GmosNImagingParams {
+  """Gmos North filter"""
+  filter: GmosNorthFilter
+}
+
+type Flamingos2ImagingParams {
+  """Flamingos2 filter"""
+  filter: Flamingos2Filter
+}
+
+union ImagingParams = GmosNImagingParams | GmosSImagingParams | Flamingos2ImagingParams
+
+"""Params for instrument modes"""
+input InstrumentModesInput {
+  """Gmos North Spectroscopy"""
+  gmosNSpectroscopy: GmosNSpectroscopyInput
+
+  """Gmos South Spectroscopy"""
+  gmosSSpectroscopy: GmosSSpectroscopyInput
+
+  """Gmos North Imaging"""
+  gmosNImaging: GmosNImagingInput
+
+  """Gmos South Imaging"""
+  gmosSImaging: GmosSImagingInput
+
+  """Flamingos2 Spectroscopy"""
+  flamingos2Spectroscopy: Flamingos2SpectroscopyInput
+
+  """Flamingos2 Imaging"""
+  flamingos2Imaging: Flamingos2ImagingInput
+}
+
+"""Image quality input - specify either preset or exact arcsec value"""
+input ImageQualityInput {
+  """Preset image quality value"""
+  preset: ImageQualityPreset
+
+  """Exact image quality in arcseconds"""
+  arcsec: BigDecimal
+}
+
+"""
+Cloud extinction input - specify either preset or exact extinction value
+"""
+input CloudExtinctionInput {
+  """Preset cloud extinction value"""
+  preset: CloudExtinctionPreset
+
+  """Exact cloud extinction in Vega magnitudes"""
+  extinction: BigDecimal
+}
+
+"""ITC-specific constraint set with flexible ImageQuality and CloudExtinction inputs"""
+input ItcConstraintsInput {
+  """Image quality - specify either preset or exact arcsec value"""
+  imageQuality: ImageQualityInput!
+
+  """Cloud extinction - specify either preset or exact extinction value"""
+  cloudExtinction: CloudExtinctionInput!
+
+  """Sky background"""
+  skyBackground: SkyBackground!
+
+  """Water vapor"""
+  waterVapor: WaterVapor!
+
+  """Elevation range"""
+  elevationRange: ElevationRangeInput!
+}
+
+"""Params for spectroscopy integration time calculation"""
+input SpectroscopyInput {
+
+  """Exposure time mode."""
+  exposureTimeMode: ExposureTimeModeInput!
+
+  """Relevant data for targets in asterism."""
+  asterism: [TargetInput!]!
+
+  """Conditions"""
+  constraints: ItcConstraintsInput!
+
+  """Instrument modes"""
+  mode: InstrumentModesInput!
+}
+
+input TargetInput {
+  """Target spatial profile PointSource/UniformSource/GaussianSource."""
+  sourceProfile: SourceProfileInput!
+
+  """Target radial velocity"""
+  radialVelocity: RadialVelocityInput!
+}
+
+"""Params for imaging integration time calculation"""
+input ImagingInput {
+
+  """Exposure time mode."""
+  exposureTimeMode: ExposureTimeModeInput!
+
+  """Relevant data for targets in asterism."""
+  asterism: [TargetInput!]!
+
+  """Conditions"""
+  constraints: ItcConstraintsInput!
+
+  """Instrument modes"""
+  mode: InstrumentModesInput!
+}
+
+"""Params for significant figures on each axis"""
+input SignificantFiguresInput {
+  """Significant figures for xAxis"""
+  xAxis: PosInt
+
+  """Significant figures for yAxis"""
+  yAxis: PosInt
+
+  """Significant figures for ccds"""
+  ccd: PosInt
+}
+
+"""Params for spectroscopy graphs calculation"""
+input SpectroscopyGraphsInput {
+  """Observing wavelength."""
+  atWavelength: WavelengthInput!
+
+  """Exposure time duration"""
+  exposureTime: TimeSpanInput!
+
+  """Exposures"""
+  exposureCount: PosInt!
+
+  """Relevant data for targets in asterism."""
+  asterism: [TargetInput!]!
+
+  """Conditions"""
+  constraints: ItcConstraintsInput!
+
+  """Instrument modes"""
+  mode: InstrumentModesInput!
+
+  """Significant figures, truncates the amount of significant value"""
+  significantFigures: SignificantFiguresInput
+}
+
+"""Parameters to retrieve graph data"""
+input SpectroscopyIntegrationTimeAndGraphsInput {
+
+  """Exposure time mode."""
+  exposureTimeMode: ExposureTimeModeInput!
+
+  """Relevant data for targets in asterism."""
+  asterism: [TargetInput!]!
+
+  """Conditions"""
+  constraints: ItcConstraintsInput!
+
+  """Instrument modes"""
+  mode: InstrumentModesInput!
+
+  """Significant figures, truncates the amount of significant value"""
+  significantFigures: SignificantFiguresInput
+}
+
+type IntegrationTime {
+  """Calculated exposure time duratio"""
+  exposureTime: TimeSpan!
+
+  """Calculate exposures count"""
+  exposureCount: PosInt!
+}
+
+type CalculationResult {
+  """server and data versions"""
+  versions: ItcVersions!
+
+  """queried mode"""
+  mode: ITCObservingMode!
+
+  """exposure time mode"""
+  exposureTimeMode: ExposureTimeMode!
+
+  """ITC results for each target"""
+  targetTimes: [TargetIntegrationTimeOutcome!]!
+
+  """Index of the brightest target, unless there are errors"""
+  brightestIndex: NonNegInt
+
+  """ITC result for brightest target, unless there are errors"""
+  brightest: TargetIntegrationTime
+}
+
+union TargetIntegrationTimeOutcome = TargetIntegrationTime | TargetError
+
+"""ITC results for a target, can be a single result or one per CCD"""
+type TargetIntegrationTime {
+  """All CCD results for the target"""
+  all: [IntegrationTime!]!
+
+  """Index of the preferred CCD result, it is mode dependent"""
+  index: NonNegInt!
+
+  selected: IntegrationTime!
+
+  """CCD performance data"""
+  ccds: [ItcCcd!]!
+
+  """The band used for the time calculation, in case of a BandNormalized SED"""
+  band: Band
+
+  """The emission line used for the time calculation, in case of an EmissionLines SED"""
+  emissionLine: Wavelength
+
+  """calculated signal to noise at a specific wavelength. Returned only if the wavelength At is valid"""
+  signalToNoiseAt: SignalToNoiseAt
+}
+
+type TargetError {
+  errorCode: String!
+  message: String!
+  wellHalfFilledSeconds: Float
+}
+
+interface ITCObservingMode {
+  """instrument"""
+  instrument: Instrument!
+}
+
+type ImagingMode implements ITCObservingMode {
+  """instrument"""
+  instrument: Instrument!
+
+  """params"""
+  params: ImagingParams!
+}
+
+type SpectroscopyMode implements ITCObservingMode {
+  """instrument"""
+  instrument: Instrument!
+
+  """params"""
+  params: SpectroscopyParams!
+}
+
+"""Graph data types"""
+enum ItcSeriesType {
+  SIGNAL_DATA
+
+  BACKGROUND_DATA
+
+  SINGLE_S2_NDATA
+
+  FINAL_S2_NDATA
+
+  PIX_SIG_DATA
+
+  PIX_BACK_DATA
+}
+
+"""Graph data types"""
+enum ItcGraphType {
+  SIGNAL_GRAPH
+
+  S2N_GRAPH
+}
+
+type GraphAxis {
+  """First value of the axis"""
+  start: Float!
+
+  """Last value of the axis"""
+  end: Float!
+
+  """Max value of the axis"""
+  max: Float!
+
+  """Min value of the axis"""
+  min: Float!
+
+  """How many values for the axis"""
+  count: PosInt!
+}
+
+type ItcSeries {
+  title: String!
+
+  """Data type: alternatives SignalData, BackgroundData, SingleS2NData, FinalS2NData, PixSigData, PixBackData"""
+  seriesType: ItcSeriesType!
+
+  """Values for the x axis"""
+  xAxis: GraphAxis
+
+  """Values for the x axis"""
+  yAxis: GraphAxis
+
+  """Data series in the form of pairs (x, y)"""
+  data: [[Float!]!]!
+
+  """Data series for the X axis"""
+  dataX: [Float!]!
+
+  """Data series for the Y axis"""
+  dataY: [Float!]!
+}
+
+type ItcGraph {
+  """Data type: alternatives SignalGraph, S2NGraph"""
+  graphType: ItcGraphType!
+
+  series: [ItcSeries!]!
+}
+
+type ItcWarning {
+  msg: String!
+}
+
+type ItcCcd {
+  """the final SN ratio for a single image"""
+  singleSNRatio: SignalToNoise!
+
+  """Wavelength where we get the max singl SN"""
+  wavelengthForMaxSingleSNRatio: Wavelength
+
+  """the max single SN ratio for this ccd"""
+  maxSingleSNRatio:  BigDecimal
+
+  """the total SN ratio for all images"""
+  totalSNRatio:  SignalToNoise!
+
+  """Wavelength where we get the max total SN"""
+  wavelengthForMaxTotalSNRatio: Wavelength
+
+  """the max final SN ratio for this ccd"""
+  maxTotalSNRatio:  BigDecimal
+
+  """the highest e- count for all pixels on the CCD"""
+  peakPixelFlux: BigDecimal!
+
+  """the well depth (max e- count per pixel) for this CCD"""
+  wellDepth:     BigDecimal!
+
+  """the amplifier gain for this CCD (used to calculate ADU)"""
+  ampGain:       BigDecimal!
+
+  """Possible warnings"""
+  warnings: [ItcWarning!]
+}
+
+type TargetGraphs {
+  """Results for each CCD"""
+  ccds: [ItcCcd!]!
+
+  """Graph data"""
+  graphData: [ItcGraph!]!
+
+  """Peak SN Ratio"""
+  peakFinalSNRatio: SignalToNoise!
+
+  """SN Ratio at the requested wavelength if passed along"""
+  atWavelengthFinalSNRatio: SignalToNoise
+
+  """Peak SN Ratio"""
+  peakSingleSNRatio: SignalToNoise!
+
+  """SN Ratio at the requested wavelength if passed along"""
+  atWavelengthSingleSNRatio: SignalToNoise
+}
+
+type TargetGraphsResult {
+  """graphs for the target"""
+  graphs: TargetGraphs!
+
+  """The band used for the graphs calculation, in case of a BandNormalized SED"""
+  band: Band
+
+  """The emission line used for the time calculation, in case of an EmissionLines SED"""
+  emissionLine: Wavelength
+}
+
+type SpectroscopyGraphsResult {
+  """server and data versions"""
+  versions: ItcVersions!
+
+  """results for each target, in same order as input"""
+  targetGraphs: [TargetGraphsOutcome!]!
+}
+
+union TargetGraphsOutcome = TargetGraphsResult | TargetError
+
+type SpectroscopyTimeAndGraphsResult {
+  """server and data versions"""
+  versions: ItcVersions!
+
+  """ITC results for each target, in case all targets succeed"""
+  targetTimesAndGraphs: [TargetTimeAndGraphsOutcome!]
+
+  """In case of errors in integration times, we short cirtuit to the results from integration times"""
+  targetTimes: [TargetIntegrationTimeOutcome!]
+
+  """Index of the brightest target"""
+  brightestIndex: NonNegInt
+
+  """ITC result for brightest target"""
+  brightest: TargetIntegrationTime
+}
+
+union TargetTimeAndGraphsOutcome = TargetTimeAndGraphs | TargetError
+
+type TargetTimeAndGraphs {
+  """Results for the integration time"""
+  integrationTime: TargetIntegrationTime!
+
+  """Results for the graphs"""
+  graphs: TargetGraphs!
+}
+
+"""Calculation result types"""
+enum SNResultType {
+  SUCCESS
+
+  NO_DATA
+
+  ABOVE_RANGE
+
+  BELOW_RANGE
+
+  CALCULATION_ERROR
+}
+
+interface SignalToNoiseResult {
+
+  """ITC result type"""
+  resultType: SNResultType!
+}
+
+type SNCalcSuccess implements SignalToNoiseResult {
+  resultType: SNResultType!
+
+  """Resulting signal to noise"""
+  signalToNoise: SignalToNoise!
+}
+
+type SNWavelengthAtBelowRange implements SignalToNoiseResult {
+  resultType: SNResultType!
+
+  signalToNoiseAt: Wavelength!
+}
+
+type SNWavelengthAtAboveRange implements SignalToNoiseResult {
+  resultType: SNResultType!
+
+  signalToNoiseAt: Wavelength!
+}
+
+type SNCalcError implements SignalToNoiseResult {
+  resultType: SNResultType!
+
+  msg: String!
+}

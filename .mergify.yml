@@ -23,6 +23,14 @@ pull_request_rules:
   - status-success=Test (ubuntu-22.04, 3, temurin@17, 7)
   actions:
     merge: {}
+- name: Label benchmarks PRs
+  conditions:
+  - files~=^itc/benchmarks/
+  actions:
+    label:
+      add:
+      - benchmarks
+      remove: []
 - name: Label binding PRs
   conditions:
   - files~=^modules/binding/
@@ -38,6 +46,30 @@ pull_request_rules:
     label:
       add:
       - calibrations
+      remove: []
+- name: Label client PRs
+  conditions:
+  - files~=^itc/client/
+  actions:
+    label:
+      add:
+      - client
+      remove: []
+- name: Label legacy-tests PRs
+  conditions:
+  - files~=^itc/legacy-tests/
+  actions:
+    label:
+      add:
+      - legacy-tests
+      remove: []
+- name: Label model PRs
+  conditions:
+  - files~=^itc/model/
+  actions:
+    label:
+      add:
+      - model
       remove: []
 - name: Label obscalc PRs
   conditions:
@@ -73,7 +105,7 @@ pull_request_rules:
       remove: []
 - name: Label service PRs
   conditions:
-  - files~=^modules/service/
+  - files~=^/
   actions:
     label:
       add:
@@ -118,4 +150,20 @@ pull_request_rules:
     label:
       add:
       - sso-service
+      remove: []
+- name: Label testkit PRs
+  conditions:
+  - files~=^itc/testkit/
+  actions:
+    label:
+      add:
+      - testkit
+      remove: []
+- name: Label tests PRs
+  conditions:
+  - files~=^itc/tests/
+  actions:
+    label:
+      add:
+      - tests
       remove: []

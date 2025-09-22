@@ -1,0 +1,8546 @@
+
+"""
+This file is generated. Do not manually modify it.
+It is generated from the following source files:
+  - OdbSchema.graphql
+  - itc_base.graphql
+"""
+enum ConditionsMeasurementSource {
+  """Observer"""
+  OBSERVER
+}
+
+enum SeeingTrend {
+  """Getting Better"""
+  GETTING_BETTER
+
+  """Getting Worse"""
+  GETTING_WORSE
+
+  """Staying the Same"""
+  STAYING_THE_SAME
+
+  """Variable"""
+  VARIABLE
+}
+
+enum ConditionsExpectationType {
+  """Clear Skies"""
+  CLEAR_SKIES
+
+  """Fog"""
+  FOG
+
+  """Thick Clouds"""
+  THICK_CLOUDS
+
+  """Thin Clouds"""
+  THIN_CLOUDS
+}
+
+enum FilterType {
+  """Broad-Band Filter"""
+  BroadBand
+
+  """Combination Filter"""
+  Combination
+
+  """Engineering Filter"""
+  Engineering
+
+  """Narrow-Band Filter"""
+  NarrowBand
+
+  """Spectroscopic Filter"""
+  Spectroscopic
+}
+
+enum ProposalStatus {
+  """Not Submitted"""
+  NOT_SUBMITTED
+
+  """Submitted"""
+  SUBMITTED
+
+  """Accepted"""
+  ACCEPTED
+
+  """Not Accepted"""
+  NOT_ACCEPTED
+}
+
+"""Email address, matching ^\w+@[a-zA-Z_]+?\.[a-zA-Z]{2,3}$"""
+scalar EmailAddress
+
+"""The result of adding a atom event."""
+type AddAtomEventResult {
+  """The new atom event that was added."""
+  event: AtomEvent!
+}
+
+"""The result of adding a dataset event."""
+type AddDatasetEventResult {
+  """The new dataset event that was added."""
+  event: DatasetEvent!
+}
+
+type AddProgramUserResult {
+  programUser: ProgramUser!
+}
+
+"""The result of adding a sequence event."""
+type AddSequenceEventResult {
+  """The new sequence event that was added."""
+  event: SequenceEvent!
+}
+
+"""The result of adding a slew event."""
+type AddSlewEventResult {
+  """The new slew event that was added."""
+  event: SlewEvent!
+}
+
+"""The result of adding a step event."""
+type AddStepEventResult {
+  """The new step event that was added."""
+  event: StepEvent!
+}
+
+"""
+The result of the 'addTimeChargeCorrection' mutation.  It contains the
+visit's updated TimeChargeInvoice after applying the correction.
+"""
+type AddTimeChargeCorrectionResult {
+  timeChargeInvoice: TimeChargeInvoice!
+}
+
+"""Air mass range creation and edit parameters"""
+input AirMassRangeInput {
+  min: PosBigDecimal
+  max: PosBigDecimal
+}
+
+"""An individual time allocation."""
+type Allocation {
+  category: TimeAccountingCategory!
+  scienceBand: ScienceBand!
+  duration: TimeSpan!
+}
+
+"""
+Create an angle from a signed value.  Choose exactly one of the available units.
+"""
+input AngleInput {
+  microarcseconds: Long
+  microseconds: BigDecimal
+  milliarcseconds: BigDecimal
+  milliseconds: BigDecimal
+  arcseconds: BigDecimal
+  seconds: BigDecimal
+  arcminutes: BigDecimal
+  minutes: BigDecimal
+  degrees: BigDecimal
+  hours: BigDecimal
+  dms: String
+  hms: String
+}
+
+"""
+Atom-level events.  The execution of a single atom will generate multiple events.
+"""
+type AtomEvent implements ExecutionEvent {
+  """Event id"""
+  id: ExecutionEventId!
+
+  """Visit associated with this event."""
+  visit: Visit!
+
+  """Observation whose execution produced this event."""
+  observation: Observation!
+
+  """Time at which this event was received"""
+  received: Timestamp!
+
+  """Event type."""
+  eventType: ExecutionEventType!
+
+  """Atom associated with this event."""
+  atom: AtomRecord!
+
+  """Atom execution stage."""
+  atomStage: AtomStage!
+
+  """Client id, if any."""
+  clientId: ClientId
+}
+
+enum AtomExecutionState {
+  """No events have been received since the atom was recorded."""
+  NOT_STARTED
+
+  """Events have been received, but no 'EndAtom'."""
+  ONGOING
+
+  """An event with an 'END_ATOM' 'AtomStage' was received."""
+  COMPLETED
+
+  """An ongoing atom was abandoned."""
+  ABANDONED
+}
+
+"""
+AtomId id formatted as `a-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}`
+"""
+scalar AtomId
+
+"""Execution stage or phase of an individual atom"""
+enum AtomStage {
+  END_ATOM
+  START_ATOM
+}
+
+"""An atom as recorded by Observe."""
+type AtomRecord {
+  """Atom ID."""
+  id: AtomId!
+
+  """The instrument associated with this atom."""
+  instrument: Instrument!
+
+  """Visit in which this atom was executed."""
+  visit: Visit!
+
+  """Created by Observe at this time."""
+  created: Timestamp!
+
+  """
+  The execution state of this atom, according to events received (if any) from
+  Observe.
+  """
+  executionState: AtomExecutionState!
+
+  """Time interval during which this atom executed."""
+  interval: TimestampInterval
+
+  """Sequence type."""
+  sequenceType: SequenceType!
+
+  """Recorded steps associated with this atom."""
+  steps(
+    """
+    Starts the result set at (or after if not existent) the given step creation
+    time.
+    """
+    OFFSET: Timestamp
+
+    """
+    Limits the result to at most this number of matches (but never more than 1000).
+    """
+    LIMIT: NonNegInt
+  ): StepRecordSelectResult!
+
+  """
+  Atom ID from the generated atom, if any, that produced this atom record.
+  """
+  generatedId: AtomId
+}
+
+"""AtomRecord query results, limited to a maximum of 1000 entries."""
+type AtomRecordSelectResult {
+  """Matching atom records up to the return size limit of 1000."""
+  matches: [AtomRecord!]!
+
+  """`true` when there were additional matches that were not returned."""
+  hasMore: Boolean!
+}
+
+"""
+CategorizedTime grouped with a ScienceBand.  A program may contain multiple
+observations in distinct bands.  Time accounting at the program level must
+distinguish time spent in observations of each of these bands.
+"""
+type BandedTime {
+  """ScienceBand associated with the time, if any."""
+  band: ScienceBand
+
+  """Time distributed across the program and non-charged categories."""
+  time: CategorizedTime!
+}
+
+"""A BandedTime that is automatically updated by a background process."""
+type CalculatedBandedTime {
+  """The current state of the background calculation."""
+  state: CalculationState!
+  value: BandedTime
+}
+
+"""
+Create or edit a band brightness value with integrated magnitude units.  When creating a new value, all fields except "error" are required.
+"""
+input BandBrightnessIntegratedInput {
+  band: Band!
+
+  """
+  The value field is required when creating a new instance of BandBrightnessIntegrated, but optional when editing
+  """
+  value: BigDecimal
+
+  """
+  The units field is required when creating a new instance of BandBrightnessIntegrated, but optional when editing
+  """
+  units: BrightnessIntegratedUnits
+
+  """Error values are optional"""
+  error: BigDecimal
+}
+
+"""
+Create or edit a band brightness value with surface magnitude units.  When creating a new value, all fields except "error" are required.
+"""
+input BandBrightnessSurfaceInput {
+  band: Band!
+
+  """
+  The value field is required when creating a new instance of BandBrightnessSurface, but optional when editing
+  """
+  value: BigDecimal
+
+  """
+  The units field is required when creating a new instance of BandBrightnessSurface, but optional when editing
+  """
+  units: BrightnessSurfaceUnits
+
+  """Error values are optional"""
+  error: BigDecimal
+}
+
+"""
+Create or edit a band normalized value with integrated magnitude units.  Specify at least "brightnesses" when creating a new BandNormalizedIntegrated.
+"""
+input BandNormalizedIntegratedInput {
+  """The sed field is optional and nullable"""
+  sed: UnnormalizedSedInput
+
+  """
+  The brightnesses field is required when creating a new instance of BandNormalizedIntegrated, but optional when editing
+  """
+  brightnesses: [BandBrightnessIntegratedInput!]
+}
+
+"""
+Create or edit a band normalized value with surface magnitude units.  Specify at least "brightnesses" when creating a new BandNormalizedSurface.
+"""
+input BandNormalizedSurfaceInput {
+  """The sed field is optional and nullable"""
+  sed: UnnormalizedSedInput
+
+  """
+  The brightnesses field is required when creating a new instance of BandNormalizedSurface, but optional when editing
+  """
+  brightnesses: [BandBrightnessSurfaceInput!]
+}
+
+"""Bias calibration step"""
+type Bias implements StepConfig {
+  """Step type"""
+  stepType: StepType!
+}
+
+"""Stopping point in a series of steps"""
+enum Breakpoint {
+  """Breakpoint Enabled"""
+  ENABLED
+
+  """Breakpoint Disabled"""
+  DISABLED
+}
+
+"""A single Call for Proposals definition."""
+type CallForProposals {
+  """The unique Call for Proposals id associated with this Call."""
+  id: CallForProposalsId!
+
+  """The title of this Call for Proposals."""
+  title: NonEmptyString!
+
+  """Describes which type of proposals are being accepted."""
+  type: CallForProposalsType!
+
+  """
+  The semester associated with the Call.  Some types may have multiple Calls
+  per semester.
+  """
+  semester: Semester!
+
+  """
+  Coordinate limits for targets that may be observed in this Call for Proposals.
+  """
+  coordinateLimits: SiteCoordinateLimits!
+
+  """
+  The active period during which accepted observations for this call may be
+  observed.
+  """
+  active: DateInterval!
+
+  """
+  The submission deadline to use for any partners without an explicit partner
+  deadline.
+  """
+  submissionDeadlineDefault: Timestamp
+
+  """Partners that may participate in this Call."""
+  partners: [CallForProposalsPartner!]!
+
+  """Whether this Call allows PIs without a partner to participate."""
+  allowsNonPartnerPi: Boolean!
+
+  """
+  The submission deadline for non-partner PIs, when allowed to participate.
+  """
+  nonPartnerDeadline: Timestamp
+
+  """
+  When specified, the observations executed in this Call will only use these
+  instruments.  When not specified, all otherwise available instruments may be
+  used.
+  """
+  instruments: [Instrument!]!
+
+  """Default proprietary period to use for propograms linked to this Call."""
+  proprietaryMonths: NonNegInt!
+
+  """Whether this Call is PRESENT or has been DELETED."""
+  existence: Existence!
+}
+
+"""Defines a unique ID for each Call for Proposals."""
+scalar CallForProposalsId
+
+"""Groups a partner with its submission deadline."""
+type CallForProposalsPartner {
+  partner: Partner!
+
+  """
+  Sets the submission deadline for this partner, overriding the
+  'submissionDeadlineDefault' for the Call for Proposals.
+  """
+  submissionDeadlineOverride: Timestamp
+
+  """
+  The submission deadline for this partner.  This will be the
+  'submissionDeadlineOverride' if specified, but otherwise the
+  'submissionDeadlineDefault' of the Call for Proposals itself.
+  """
+  submissionDeadline: Timestamp
+}
+
+type CallsForProposalsSelectResult {
+  matches: [CallForProposals!]!
+  hasMore: Boolean!
+}
+
+enum CallForProposalsType {
+  DEMO_SCIENCE
+  DIRECTORS_TIME
+  FAST_TURNAROUND
+  LARGE_PROGRAM
+  POOR_WEATHER
+  REGULAR_SEMESTER
+  SYSTEM_VERIFICATION
+}
+
+"""A time amount broken into charge class categories."""
+type CategorizedTime {
+  """Time charged to the program / PI."""
+  program: TimeSpan!
+
+  """Execution time that is not charged."""
+  nonCharged: TimeSpan!
+
+  """Total of program and uncharged times."""
+  total: TimeSpan!
+}
+
+"""
+A minimum to maximum categorized time estimate.  The actual execution time
+should vary between the two extremes, depending upon which observations and
+groups are ultimately completed.
+"""
+type CategorizedTimeRange {
+  """Minimum remaining time estimate."""
+  minimum: CategorizedTime!
+
+  """Maximum remaining time estimate."""
+  maximum: CategorizedTime!
+}
+
+"""
+A CategorizedTimeRange that is automatically updated by a background process.
+"""
+type CalculatedCategorizedTimeRange {
+  """The current state of the background calculation."""
+  state: CalculationState!
+  value: CategorizedTimeRange
+}
+
+"""
+Result of the program user role update, which is the updated program user itself.
+"""
+type ChangeProgramUserRoleResult {
+  programUser: ProgramUser!
+}
+
+scalar ClientId
+
+"""
+The result of cloning an observation, containing the original and new observations.
+"""
+type CloneObservationResult {
+  """The original unmodified observation which was cloned."""
+  originalObservation: Observation!
+
+  """The new cloned (but possibly modified) observation."""
+  newObservation: Observation!
+}
+
+"""
+The result of cloning a target, containing the original and new targets.
+"""
+type CloneTargetResult {
+  """The original unmodified target which was cloned"""
+  originalTarget: Target!
+
+  """The new cloned (but possibly modified) target"""
+  newTarget: Target!
+}
+
+scalar ChronicleId
+
+scalar TransactionId
+
+interface ChronicleEntry {
+  id: ChronicleId!
+  transactionId: TransactionId!
+  user: User
+  timestamp: Timestamp!
+}
+
+type ConditionsEntry {
+  id: ChronicleId!
+  transactionId: TransactionId!
+  user: User
+  timestamp: Timestamp!
+  measurement: ConditionsMeasurement
+  intuition: ConditionsIntuition
+}
+
+"""Non-negative floating-point value."""
+scalar Extinction
+
+type ConditionsMeasurement {
+  source: ConditionsMeasurementSource!
+  seeing: Angle
+  extinction: Extinction
+  wavelength: Wavelength
+  azimuth: Angle
+  elevation: Angle
+}
+
+type ConditionsIntuition {
+  expectation: ConditionsExpectation
+  seeingTrend: SeeingTrend
+}
+
+type ConditionsExpectation {
+  type: ConditionsExpectationType!
+  timeframe: TimeSpan!
+}
+
+type AddConditionsEntryResult {
+  conditionsEntry: ConditionsEntry!
+}
+
+"""RA/Dec limits."""
+type CoordinateLimits {
+  """
+  The start limit defines the beginning (inclusive) of an RA range in which
+  observations will be accepted.
+  """
+  raStart: RightAscension!
+
+  """
+  The end limit defines the end (inclusive) of an RA range in which observations
+  will be accepted.
+  """
+  raEnd: RightAscension!
+
+  """
+  The start limit defines the beginning (inclusive) of a declination range in
+  which observations will be accepted.
+  """
+  decStart: Declination!
+
+  """
+  The end limit defines the end (inclusive) of a declination range in which
+  observations will be accepted.
+  """
+  decEnd: Declination!
+}
+
+type CreateCallForProposalsResult {
+  callForProposals: CallForProposals!
+}
+
+"""The result of creating a new observation."""
+type CreateObservationResult {
+  """The newly created observation."""
+  observation: Observation!
+}
+
+type CreateProgramNoteResult {
+  """The newly create program note."""
+  programNote: ProgramNote!
+}
+
+"""The result of creating a new program."""
+type CreateProgramResult {
+  """The newly created program."""
+  program: Program!
+}
+
+"""The result of creating new proposal"""
+type CreateProposalResult {
+  """The newly created proposal."""
+  proposal: Proposal!
+}
+
+"""The result of creating a new target."""
+type CreateTargetResult {
+  """The newly created target."""
+  target: Target!
+}
+
+"""Dark calibration step"""
+type Dark implements StepConfig {
+  """Step type"""
+  stepType: StepType!
+}
+
+"""
+Date in ISO-8601 representation in format YYYY-MM-DD (e.g., '2024-07-31').
+"""
+scalar Date
+
+"""
+Date interval marked by a start 'Date' (inclusive) and an end 'Date' (exclusive).
+Dates are interpreted as local dates.
+"""
+type DateInterval {
+  """
+  Start date, local to the observation site, of the interval (inclusive).
+  """
+  start: Date!
+
+  """End date, local to the observation site, of the interval (exclusive)."""
+  end: Date!
+}
+
+"""The result of deleting a program user."""
+type DeleteProgramUserResult {
+  """`true` if a program user was deleted, `false` otherwise."""
+  result: Boolean!
+}
+
+"""The result of deleting a proposal."""
+type DeleteProposalResult {
+  """`true` if a proposal was deleted, `false` otherwise."""
+  result: Boolean!
+}
+
+"""Type of edit that triggered an event"""
+enum EditType {
+  """EditType Created"""
+  CREATED
+
+  """EditType Updated"""
+  UPDATED
+
+  """EditType Deleted. Used for hard deletion of calibrations"""
+  DELETED_CAL
+}
+
+"""
+Elevation range creation and edit parameters.  Choose one of airMass or hourAngle constraints.
+"""
+input ElevationRangeInput {
+  airMass: AirMassRangeInput
+  hourAngle: HourAngleRangeInput
+}
+
+type Email {
+  """Sender email address"""
+  senderEmail: EmailAddress!
+
+  """Recipient email address"""
+  recipientEmail: EmailAddress!
+
+  """Email subject"""
+  subject: NonEmptyString!
+
+  """Text format message"""
+  textMessage: NonEmptyString!
+
+  """Html format message"""
+  htmlMessage: NonEmptyString
+
+  """Original time of the email sending attempt"""
+  originalTime: Timestamp!
+
+  """The status of the email"""
+  status: EmailStatus!
+
+  """The time of the last status update"""
+  statusTime: Timestamp!
+}
+
+enum EmailStatus {
+  """Mail provider has queued the message"""
+  QUEUED
+
+  """Mail provider has rejected the message"""
+  REJECTED
+
+  """Mail provider has accepted the message"""
+  ACCEPTED
+
+  """The message has been accepted by the recipient email server"""
+  DELIVERED
+
+  """The message is not deliverable"""
+  PERMANENT_FAILURE
+
+  """The message could not be delivered, but may be deliverable later"""
+  TEMPORARY_FAILURE
+}
+
+"""
+Create or edit an emission line with integrated line flux units.  When creating a new value, all fields are required.
+"""
+input EmissionLineIntegratedInput {
+  wavelength: WavelengthInput!
+
+  """
+  The lineWidth field is required when creating a new instance of EmissionLineIntegrated, but optional when editing
+  """
+  lineWidth: PosBigDecimal
+
+  """
+  The lineFlux field is required when creating a new instance of EmissionLineIntegrated, but optional when editing
+  """
+  lineFlux: LineFluxIntegratedInput
+}
+
+"""
+Create or edit an emission line with surface line flux units.  When creating a new value, all fields are required.
+"""
+input EmissionLineSurfaceInput {
+  wavelength: WavelengthInput!
+
+  """
+  The lineWidth field is required when creating a new instance of EmissionLineSurface, but optional when editing
+  """
+  lineWidth: PosBigDecimal
+
+  """
+  The lineFlux field is required when creating a new instance of EmissionLineSurface, but optional when editing
+  """
+  lineFlux: LineFluxSurfaceInput
+}
+
+"""
+Create or edit emission lines with integrated line flux and flux density continuum units. Both "lines" and "fluxDensityContinuum" are required when creating a new EmissionLinesIntegrated.
+"""
+input EmissionLinesIntegratedInput {
+  """
+  The lines field is required when creating a new instance of EmissionLinesIntegrated, but optional when editing
+  """
+  lines: [EmissionLineIntegratedInput!]
+
+  """
+  The fluxDensityContinuum field is required when creating a new instance of EmissionLinesIntegrated, but optional when editing
+  """
+  fluxDensityContinuum: FluxDensityContinuumIntegratedInput
+}
+
+"""
+Create or edit emission lines with surface line flux and flux density continuum units. Both "lines" and "fluxDensityContinuum" are required when creating a new EmissionLinesSurface.
+"""
+input EmissionLinesSurfaceInput {
+  """
+  The lines field is required when creating a new instance of EmissionLinesSurface, but optional when editing
+  """
+  lines: [EmissionLineSurfaceInput!]
+
+  """
+  The fluxDensityContinuum field is required when creating a new instance of EmissionLinesSurface, but optional when editing
+  """
+  fluxDensityContinuum: FluxDensityContinuumSurfaceInput
+}
+
+"""Execution event types."""
+enum ExecutionEventType {
+  """Sequence-level event type."""
+  SEQUENCE
+
+  """Slew event type."""
+  SLEW
+
+  """Atom-level event type."""
+  ATOM
+
+  """Step-level event type."""
+  STEP
+
+  """Dataset-level event type."""
+  DATASET
+}
+
+"""
+Exposure time mode input.  Specify fixed or signal to noise, but not both
+"""
+input ExposureTimeModeInput {
+  """
+  The signalToNoise field must be either specified or skipped altogether.  It cannot be unset with a null value.
+  """
+  signalToNoise: SignalToNoiseExposureTimeModeInput
+
+  """
+  The timeAndCount field must be either specified or skipped altogether.  It cannot be unset with a null value.
+  """
+  timeAndCount: TimeAndCountExposureTimeModeInput
+}
+
+"""Time And Count exposure time mode parameters"""
+input TimeAndCountExposureTimeModeInput {
+  """Exposure time, which must be greater than zero."""
+  time: TimeSpanInput!
+
+  """Exposure count, which must be greater than zero."""
+  count: PosInt!
+
+  """S/N at wavelength."""
+  at: WavelengthInput!
+}
+
+"""Flux density entry"""
+input FluxDensity {
+  wavelength: WavelengthInput!
+  density: BigDecimal!
+}
+
+"""A flux density continuum value with integrated units"""
+input FluxDensityContinuumIntegratedInput {
+  value: BigDecimal!
+  units: FluxDensityContinuumIntegratedUnits!
+  error: BigDecimal
+}
+
+"""A flux density continuum value with surface units"""
+input FluxDensityContinuumSurfaceInput {
+  value: BigDecimal!
+  units: FluxDensityContinuumSurfaceUnits!
+  error: BigDecimal
+}
+
+"""
+Create or edit a gaussian source.  Specify both "fwhm" and "spectralDefinition" when creating a new Gaussian.
+"""
+input GaussianInput {
+  """
+  The fwhm field is required when creating a new instance of Gaussian, but optional when editing
+  """
+  fwhm: AngleInput
+
+  """
+  The spectralDefinition field is required when creating a new instance of Gaussian, but optional when editing
+  """
+  spectralDefinition: SpectralDefinitionIntegratedInput
+}
+
+"""GCAL calibration step (flat / arc)"""
+type Gcal implements StepConfig {
+  """GCAL continuum, present if no arcs are used"""
+  continuum: GcalContinuum
+
+  """GCAL arcs, one or more present if no continuum is used"""
+  arcs: [GcalArc!]!
+
+  """GCAL filter"""
+  filter: GcalFilter!
+
+  """GCAL diffuser"""
+  diffuser: GcalDiffuser!
+
+  """GCAL shutter"""
+  shutter: GcalShutter!
+
+  """Step type"""
+  stepType: StepType!
+}
+
+"""GCAL arc"""
+enum GcalArc {
+  """GcalArc ArArc"""
+  AR_ARC
+
+  """GcalArc ThArArc"""
+  TH_AR_ARC
+
+  """GcalArc CuArArc"""
+  CU_AR_ARC
+
+  """GcalArc XeArc"""
+  XE_ARC
+}
+
+"""GCAL continuum"""
+enum GcalContinuum {
+  """GcalContinuum IrGreyBodyLow"""
+  IR_GREY_BODY_LOW
+
+  """GcalContinuum IrGreyBodyHigh"""
+  IR_GREY_BODY_HIGH
+
+  """GcalContinuum QuartzHalogen 5W"""
+  QUARTZ_HALOGEN5
+
+  """GcalContinuum QuartzHalogen 100W"""
+  QUARTZ_HALOGEN100
+}
+
+"""GCAL diffuser"""
+enum GcalDiffuser {
+  """GcalDiffuser Ir"""
+  IR
+
+  """GcalDiffuser Visible"""
+  VISIBLE
+}
+
+"""GCAL filter"""
+enum GcalFilter {
+  """GcalFilter None"""
+  NONE
+
+  """GcalFilter Gmos"""
+  GMOS
+
+  """GcalFilter Hros"""
+  HROS
+
+  """GcalFilter Nir"""
+  NIR
+
+  """GcalFilter Nd10"""
+  ND10
+
+  """GcalFilter Nd16"""
+  ND16
+
+  """GcalFilter Nd20"""
+  ND20
+
+  """GcalFilter Nd30"""
+  ND30
+
+  """GcalFilter Nd40"""
+  ND40
+
+  """GcalFilter Nd45"""
+  ND45
+
+  """GcalFilter Nd50"""
+  ND50
+}
+
+"""GCAL shutter"""
+enum GcalShutter {
+  """GcalShutter Open"""
+  OPEN
+
+  """GcalShutter Closed"""
+  CLOSED
+}
+
+"""GMOS amp count"""
+enum GmosAmpCount {
+  """GmosAmpCount Three"""
+  THREE
+
+  """GmosAmpCount Six"""
+  SIX
+
+  """GmosAmpCount Twelve"""
+  TWELVE
+}
+
+"""CCD Readout Configuration"""
+type GmosCcdMode {
+  """GMOS X-binning"""
+  xBin: GmosBinning!
+
+  """GMOS Y-binning"""
+  yBin: GmosBinning!
+
+  """GMOS Amp Count"""
+  ampCount: GmosAmpCount!
+
+  """GMOS Amp Gain"""
+  ampGain: GmosAmpGain!
+
+  """GMOS Amp Read Mode"""
+  ampReadMode: GmosAmpReadMode!
+}
+
+"""GMOS CCD readout input parameters"""
+input GmosCcdModeInput {
+  """X Binning, defaults to 'ONE'."""
+  xBin: GmosBinning
+
+  """Y Binning, defaults to 'ONE'."""
+  yBin: GmosBinning
+
+  """Amp Count, defaults to 'TWELVE'."""
+  ampCount: GmosAmpCount
+
+  """Amp Gain, defaults to 'LOW'"""
+  ampGain: GmosAmpGain
+
+  """Amp Read Mode, defaults to 'SLOW'"""
+  ampReadMode: GmosAmpReadMode
+}
+
+"""GMOS Custom Mask"""
+type GmosCustomMask {
+  """Custom Mask Filename"""
+  filename: String!
+
+  """Custom Slit Width"""
+  slitWidth: GmosCustomSlitWidth!
+}
+
+"""GMOS custom mask input parameters"""
+input GmosCustomMaskInput {
+  """Custom mask file name"""
+  filename: String!
+
+  """Custom mask slit width"""
+  slitWidth: GmosCustomSlitWidth!
+}
+
+"""GMOS Custom Slit Width"""
+enum GmosCustomSlitWidth {
+  """GmosCustomSlitWidth CustomWidth_0_25"""
+  CUSTOM_WIDTH_0_25
+
+  """GmosCustomSlitWidth CustomWidth_0_50"""
+  CUSTOM_WIDTH_0_50
+
+  """GmosCustomSlitWidth CustomWidth_0_75"""
+  CUSTOM_WIDTH_0_75
+
+  """GmosCustomSlitWidth CustomWidth_1_00"""
+  CUSTOM_WIDTH_1_00
+
+  """GmosCustomSlitWidth CustomWidth_1_50"""
+  CUSTOM_WIDTH_1_50
+
+  """GmosCustomSlitWidth CustomWidth_2_00"""
+  CUSTOM_WIDTH_2_00
+
+  """GmosCustomSlitWidth CustomWidth_5_00"""
+  CUSTOM_WIDTH_5_00
+}
+
+"""GMOS Detector Translation X Offset"""
+enum GmosDtax {
+  """GmosDtax MinusSix"""
+  MINUS_SIX
+
+  """GmosDtax MinusFive"""
+  MINUS_FIVE
+
+  """GmosDtax MinusFour"""
+  MINUS_FOUR
+
+  """GmosDtax MinusThree"""
+  MINUS_THREE
+
+  """GmosDtax MinusTwo"""
+  MINUS_TWO
+
+  """GmosDtax MinusOne"""
+  MINUS_ONE
+
+  """GmosDtax Zero"""
+  ZERO
+
+  """GmosDtax One"""
+  ONE
+
+  """GmosDtax Two"""
+  TWO
+
+  """GmosDtax Three"""
+  THREE
+
+  """GmosDtax Four"""
+  FOUR
+
+  """GmosDtax Five"""
+  FIVE
+
+  """GmosDtax Six"""
+  SIX
+}
+
+"""Electronic offsetting"""
+enum GmosEOffsetting {
+  """GmosEOffsetting On"""
+  ON
+
+  """GmosEOffsetting Off"""
+  OFF
+}
+
+"""GMOS grating order"""
+enum GmosGratingOrder {
+  """GmosGratingOrder Zero"""
+  ZERO
+
+  """GmosGratingOrder One"""
+  ONE
+
+  """GmosGratingOrder Two"""
+  TWO
+}
+
+type GmosNodAndShuffle {
+  """Offset position A"""
+  posA: Offset!
+
+  """Offset position B"""
+  posB: Offset!
+
+  """Whether to use electronic offsetting"""
+  eOffset: GmosEOffsetting!
+
+  """Shuffle offset"""
+  shuffleOffset: Int!
+
+  """Shuffle cycles"""
+  shuffleCycles: Int!
+}
+
+"""
+GmosNorth atom, a collection of steps that should be executed in their entirety
+"""
+type GmosNorthAtom {
+  """Atom id"""
+  id: AtomId!
+
+  """Optional description of the atom."""
+  description: String
+
+  """
+  Observe class for this atom as a whole (combined observe class for each of
+  its steps).
+  """
+  observeClass: ObserveClass!
+
+  """Individual steps that comprise the atom"""
+  steps: [GmosNorthStep!]!
+}
+
+"""GmosNorth Detector type"""
+enum GmosNorthDetector {
+  E2_V
+  HAMAMATSU
+}
+
+"""GMOS North dynamic step configuration"""
+type GmosNorthDynamic {
+  """GMOS exposure time"""
+  exposure: TimeSpan!
+
+  """GMOS CCD Readout"""
+  readout: GmosCcdMode!
+
+  """GMOS detector x offset"""
+  dtax: GmosDtax!
+
+  """GMOS region of interest"""
+  roi: GmosRoi!
+
+  """GMOS North grating"""
+  gratingConfig: GmosNorthGratingConfig
+
+  """GMOS North filter"""
+  filter: GmosNorthFilter
+
+  """GMOS North FPU"""
+  fpu: GmosNorthFpu
+
+  """
+  Central wavelength, which is taken from the grating (if defined) or else
+  from the filter (if defined).
+  """
+  centralWavelength: Wavelength
+}
+
+"""GMOS North Execution Config"""
+type GmosNorthExecutionConfig {
+  """GMOS North static configuration"""
+  static: GmosNorthStatic!
+
+  """GMOS North acquisition execution sequence"""
+  acquisition: GmosNorthExecutionSequence
+
+  """GMOS North science execution"""
+  science: GmosNorthExecutionSequence
+}
+
+"""Next atom to execute and potential future atoms."""
+type GmosNorthExecutionSequence {
+  """Next atom to execute."""
+  nextAtom: GmosNorthAtom!
+
+  """(Prefix of the) remaining atoms to execute, if any."""
+  possibleFuture: [GmosNorthAtom!]!
+
+  """
+  Whether there are more anticipated atoms than those that appear in
+  'possibleFuture'.
+  """
+  hasMore: Boolean!
+}
+
+"""GMOS North FPU option, either builtin or custom mask"""
+type GmosNorthFpu {
+  """The custom mask, if in use"""
+  customMask: GmosCustomMask
+
+  """GMOS North builtin FPU, if in use"""
+  builtin: GmosNorthBuiltinFpu
+}
+
+"""GMOS North FPU input parameters (choose custom or builtin)."""
+input GmosNorthFpuInput {
+  """Custom mask FPU option"""
+  customMask: GmosCustomMaskInput
+
+  """Builtin FPU option"""
+  builtin: GmosNorthBuiltinFpu
+}
+
+"""GMOS North Grating Configuration"""
+type GmosNorthGratingConfig {
+  """GMOS North Grating"""
+  grating: GmosNorthGrating!
+
+  """GMOS grating order"""
+  order: GmosGratingOrder!
+
+  """Grating wavelength"""
+  wavelength: Wavelength!
+}
+
+"""GMOS North stage mode"""
+enum GmosNorthStageMode {
+  """GmosNorthStageMode NoFollow"""
+  NO_FOLLOW
+
+  """GmosNorthStageMode FollowXy"""
+  FOLLOW_XY
+}
+
+"""Unchanging (over the course of the sequence) configuration values"""
+type GmosNorthStatic {
+  """Stage mode"""
+  stageMode: GmosNorthStageMode!
+
+  """Detector in use (always HAMAMATSU for recent and new observations)"""
+  detector: GmosNorthDetector!
+
+  """Is MOS Pre-Imaging Observation"""
+  mosPreImaging: MosPreImaging!
+
+  """Nod-and-shuffle configuration"""
+  nodAndShuffle: GmosNodAndShuffle
+}
+
+"""GmosNorth step with potential breakpoint"""
+type GmosNorthStep {
+  """Instrument configuration for this step"""
+  instrumentConfig: GmosNorthDynamic!
+
+  """Step id"""
+  id: StepId!
+
+  """Whether to pause before the execution of this step"""
+  breakpoint: Breakpoint!
+
+  """The sequence step itself"""
+  stepConfig: StepConfig!
+
+  """The telescope configuration at this step."""
+  telescopeConfig: TelescopeConfig!
+
+  """Time estimate for this step's execution"""
+  estimate: StepEstimate!
+
+  """Observe class for this step"""
+  observeClass: ObserveClass!
+}
+
+"""
+GmosSouth atom, a collection of steps that should be executed in their entirety
+"""
+type GmosSouthAtom {
+  """Atom id"""
+  id: AtomId!
+
+  """Optional description of the atom."""
+  description: String
+
+  """
+  Observe class for this atom as a whole (combined observe class for each of
+  its steps).
+  """
+  observeClass: ObserveClass!
+
+  """Individual steps that comprise the atom"""
+  steps: [GmosSouthStep!]!
+}
+
+"""GmosSouth Detector type"""
+enum GmosSouthDetector {
+  E2_V
+  HAMAMATSU
+}
+
+"""GMOS South dynamic step configuration"""
+type GmosSouthDynamic {
+  """GMOS exposure time"""
+  exposure: TimeSpan!
+
+  """GMOS CCD Readout"""
+  readout: GmosCcdMode!
+
+  """GMOS detector x offset"""
+  dtax: GmosDtax!
+
+  """GMOS region of interest"""
+  roi: GmosRoi!
+
+  """GMOS South grating"""
+  gratingConfig: GmosSouthGratingConfig
+
+  """GMOS South filter"""
+  filter: GmosSouthFilter
+
+  """GMOS South FPU"""
+  fpu: GmosSouthFpu
+
+  """
+  Central wavelength, which is taken from the grating (if defined) or else
+  from the filter (if defined).
+  """
+  centralWavelength: Wavelength
+}
+
+"""GMOS South Execution Config"""
+type GmosSouthExecutionConfig {
+  """GMOS South static configuration"""
+  static: GmosSouthStatic!
+
+  """GMOS South acquisition execution sequence."""
+  acquisition: GmosSouthExecutionSequence
+
+  """GMOS South science execution"""
+  science: GmosSouthExecutionSequence
+}
+
+"""Next atom to execute and potential future atoms."""
+type GmosSouthExecutionSequence {
+  """Next atom to execute."""
+  nextAtom: GmosSouthAtom!
+
+  """(Prefix of the) remaining atoms to execute, if any."""
+  possibleFuture: [GmosSouthAtom!]!
+
+  """
+  Whether there are more anticipated atoms than those that appear in
+  'possibleFuture'.
+  """
+  hasMore: Boolean!
+}
+
+"""GMOS South FPU option, either builtin or custom mask"""
+type GmosSouthFpu {
+  """The custom mask, if in use"""
+  customMask: GmosCustomMask
+
+  """GMOS South builtin FPU, if in use"""
+  builtin: GmosSouthBuiltinFpu
+}
+
+"""GMOS South FPU input parameters (choose custom or builtin)."""
+input GmosSouthFpuInput {
+  """Custom mask FPU option"""
+  customMask: GmosCustomMaskInput
+
+  """Builtin FPU option"""
+  builtin: GmosSouthBuiltinFpu
+}
+
+"""GMOS South Grating Configuration"""
+type GmosSouthGratingConfig {
+  """GMOS South Grating"""
+  grating: GmosSouthGrating!
+
+  """GMOS grating order"""
+  order: GmosGratingOrder!
+
+  """Grating wavelength"""
+  wavelength: Wavelength!
+}
+
+"""GMOS South stage mode"""
+enum GmosSouthStageMode {
+  """GmosSouthStageMode NoFollow"""
+  NO_FOLLOW
+
+  """GmosSouthStageMode FollowXyz"""
+  FOLLOW_XYZ
+
+  """GmosSouthStageMode FollowZ"""
+  FOLLOW_Z
+}
+
+"""Unchanging (over the course of the sequence) configuration values"""
+type GmosSouthStatic {
+  """Stage mode"""
+  stageMode: GmosSouthStageMode!
+
+  """Detector in use (always HAMAMATSU for recent and new observations)"""
+  detector: GmosSouthDetector!
+
+  """Is MOS Pre-Imaging Observation"""
+  mosPreImaging: MosPreImaging!
+
+  """Nod-and-shuffle configuration"""
+  nodAndShuffle: GmosNodAndShuffle
+}
+
+"""GmosSouth step with potential breakpoint"""
+type GmosSouthStep {
+  """Instrument configuration for this step"""
+  instrumentConfig: GmosSouthDynamic!
+
+  """Step id"""
+  id: StepId!
+
+  """Whether to pause before the execution of this step"""
+  breakpoint: Breakpoint!
+
+  """The sequence step itself"""
+  stepConfig: StepConfig!
+
+  """The telescope configuration at this step."""
+  telescopeConfig: TelescopeConfig!
+
+  """Time estimate for this step's execution"""
+  estimate: StepEstimate!
+
+  """Observe class for this step"""
+  observeClass: ObserveClass!
+}
+
+type CloneGroupResult {
+  originalGroup: Group!
+  newGroup: Group!
+}
+
+"""Whether guiding is enabled for a particular science step."""
+enum GuideState {
+  """Guiding enabled."""
+  ENABLED
+
+  """Guiding disabled."""
+  DISABLED
+}
+
+"""Hour angle range creation parameters"""
+input HourAngleRangeInput {
+  minHours: BigDecimal
+  maxHours: BigDecimal
+}
+
+"""A line flux value with integrated units"""
+input LineFluxIntegratedInput {
+  value: PosBigDecimal!
+  units: LineFluxIntegratedUnits!
+}
+
+"""A line flux value with surface units"""
+input LineFluxSurfaceInput {
+  value: PosBigDecimal!
+  units: LineFluxSurfaceUnits!
+}
+
+scalar ProgramUserId
+
+scalar UserInvitationId
+
+scalar UserInvitationKey
+
+enum UserInvitationStatus {
+  """This invitation has not been used."""
+  PENDING
+
+  """This invitation was redeemed."""
+  REDEEMED
+
+  """This invitation was declined."""
+  DECLINED
+
+  """This invitation was revoked, and can no longer be redeemed."""
+  REVOKED
+}
+
+"""Invitation"""
+type UserInvitation {
+  """Id"""
+  id: UserInvitationId!
+
+  """Invitation status."""
+  status: UserInvitationStatus!
+
+  """User who issued the invitation."""
+  issuer: User!
+
+  """Recipient email address."""
+  recipientEmail: EmailAddress!
+
+  """The ProgramUser associated with the invitation."""
+  programUser: ProgramUser!
+
+  """The email sent for the invitation."""
+  email: Email
+}
+
+type CreateUserInvitationResult {
+  """The created invitation."""
+  invitation: UserInvitation!
+
+  """
+  Give this key to the person you wish to invite. They can later redeem the invitation.
+  """
+  key: UserInvitationKey!
+}
+
+type RedeemUserInvitationResult {
+  """The redeemed invitation."""
+  invitation: UserInvitation!
+}
+
+type RevokeUserInvitationResult {
+  """The revoked invitation."""
+  invitation: UserInvitation!
+}
+
+type LinkUserResult {
+  user: ProgramUser!
+}
+
+"""MOS pre-imaging observation"""
+enum MosPreImaging {
+  """MosPreImaging IsMosPreImaging"""
+  IS_MOS_PRE_IMAGING
+
+  """MosPreImaging IsNotMosPreImaging"""
+  IS_NOT_MOS_PRE_IMAGING
+}
+
+"""Event sent when a new object is created or updated"""
+type ObservationEdit {
+  """Type of edit"""
+  editType: EditType!
+
+  """The observationId of the edited object"""
+  observationId: ObservationId!
+
+  """Edited object, can be null if the value was deleted"""
+  value: Observation
+}
+
+"""Event sent when a configuration request is created or updated"""
+type ConfigurationRequestEdit {
+  """Type of edit"""
+  editType: EditType!
+
+  """The id of the edited configuration request"""
+  configurationRequestId: ConfigurationRequestId!
+
+  """Edited configuration request, can be null if the value was deleted"""
+  configurationRequest: ConfigurationRequest
+}
+
+type Offset {
+  """Offset in p"""
+  p: OffsetP!
+
+  """Offset in q"""
+  q: OffsetQ!
+}
+
+"""Gemini Partners"""
+enum Partner {
+  """Argentina"""
+  AR
+
+  """Brazil"""
+  BR
+
+  """Canada"""
+  CA
+
+  """Chile"""
+  CL
+
+  """Korea"""
+  KR
+
+  """University of Hawaii"""
+  UH
+
+  """United States"""
+  US
+}
+
+"""
+Partner link options (and `PartnerLink` discriminator). A user / partner
+relationship is one of (a) the user is associated with a particular partner
+(i.e., `HAS_PARTNER`), (b) the user is explicitly associated with no partner
+(i.e., `HAS_NON_PARTNER`), or (c) the link is simply not set.
+"""
+enum PartnerLinkType {
+  HAS_PARTNER
+  HAS_NON_PARTNER
+  HAS_UNSPECIFIED_PARTNER
+}
+
+"""Represents the association of a user with a `Partner`, if any."""
+interface PartnerLink {
+  """Partner link discriminator."""
+  linkType: PartnerLinkType!
+}
+
+"""
+A `PartnerLink` employed when a user is associated with a specific
+`Partner`.
+"""
+type HasPartner implements PartnerLink {
+  """Always `HAS_PARTNER`"""
+  linkType: PartnerLinkType!
+
+  """The associated partner."""
+  partner: Partner!
+}
+
+"""
+A `PartnerLink` employed when a user is explicitly associated with
+no `Partner`.
+"""
+type HasNonPartner implements PartnerLink {
+  """Always `HAS_NON_PARTNER"""
+  linkType: PartnerLinkType!
+}
+
+"""
+A `PartnerLink` employed when a user's `PartnerLink` has not
+(yet) been made.
+"""
+type HasUnspecifiedPartner implements PartnerLink {
+  """Always `HAS_UNSPECIFIED_PARTNER`"""
+  linkType: PartnerLinkType!
+}
+
+"""
+Partner splits detail how requested time for a Queue or Classical proposal
+should be distributed amongst Gemini partners.
+"""
+type PartnerSplit {
+  partner: Partner!
+
+  """
+  Percentage of requested time that should be associated with the partner.
+  """
+  percent: IntPercent!
+}
+
+"""Event sent when a new object is created or updated"""
+type ProgramEdit {
+  """Type of edit"""
+  editType: EditType!
+
+  """Edited object"""
+  value: Program!
+}
+
+"""The role a user a plays when assigned to a program."""
+enum ProgramUserRole {
+  """Primary Investigator"""
+  PI
+
+  """Co-Investigator"""
+  COI
+
+  """Co-Investigator (read-only access)"""
+  COI_RO
+
+  """External"""
+  EXTERNAL
+
+  """Staff/Partner Primary Support"""
+  SUPPORT_PRIMARY
+
+  """Staff/Partner Secondary Support"""
+  SUPPORT_SECONDARY
+}
+
+"""An assignment of a user to a program."""
+type ProgramUser {
+  id: ProgramUserId!
+  role: ProgramUserRole!
+  program: Program
+  user: User
+
+  """How the partner is associated with a partner."""
+  partnerLink: PartnerLink!
+
+  """
+  The preferred profile overrides any values that may be in the Orcid profile (user.profile).
+  """
+  preferredProfile: UserProfile!
+
+  """User educational status. PHD/Undergrad/Grad/Other."""
+  educationalStatus: EducationalStatus
+
+  """Users' reported gender."""
+  gender: Gender
+
+  """Flag indicating whether the user's proposal is part of a thesis."""
+  thesis: Boolean
+
+  """User invitations, if any, associated with this program user."""
+  invitations: [UserInvitation!]!
+
+  """Investigator affiliation."""
+  affiliation: NonEmptyString
+
+  """Has access to data."""
+  hasDataAccess: Boolean!
+
+  """
+  Name created preferentially from the fields of the preferred profile, falling back
+  to the Orcid profile if the preferred fields are not set.
+  """
+  displayName: String
+
+  """
+  The user's email address from the preferred profile, falling back to the Orcid profile
+  if the preferred email is not set.
+  """
+  email: String
+}
+
+"""
+Proposal properties that depend on the particular call for proposals associated
+with this proposal.
+"""
+interface ProposalType {
+  """The science type of this Call for Proposals."""
+  scienceSubtype: ScienceSubtype!
+}
+
+"""Proposal properties for Regular Semester (Classical) CallForProposals."""
+type Classical implements ProposalType {
+  """The science type of this Call for Proposals."""
+  scienceSubtype: ScienceSubtype!
+
+  """
+  Minimum percentage of observing time required to consider this proposal
+  successful.
+  """
+  minPercentTime: IntPercent!
+
+  """
+  Describes how time for the program will be apportioned across partners.
+  """
+  partnerSplits: [PartnerSplit!]!
+}
+
+"""Proposal properties for Demo Science CallForProposals."""
+type DemoScience implements ProposalType {
+  """The science type of this Call for Proposals."""
+  scienceSubtype: ScienceSubtype!
+
+  """
+  Whether (and how) the observations in this proposal are available for Target
+  of Opportunity triggering.
+  """
+  toOActivation: ToOActivation!
+
+  """
+  Minimum percentage of observing time required to consider this proposal
+  successful.
+  """
+  minPercentTime: IntPercent!
+}
+
+"""Proposal properties for Director's Time CallForProposals."""
+type DirectorsTime implements ProposalType {
+  """The science type of this Call for Proposals."""
+  scienceSubtype: ScienceSubtype!
+
+  """
+  Whether (and how) the observations in this proposal are available for Target
+  of Opportunity triggering.
+  """
+  toOActivation: ToOActivation!
+
+  """
+  Minimum percentage of observing time required to consider this proposal
+  successful.
+  """
+  minPercentTime: IntPercent!
+}
+
+"""Proposal properties for Fast Turnaround CallForProposals."""
+type FastTurnaround implements ProposalType {
+  """The science type of this Call for Proposals."""
+  scienceSubtype: ScienceSubtype!
+
+  """
+  Whether (and how) the observations in this proposal are available for Target
+  of Opportunity triggering.
+  """
+  toOActivation: ToOActivation!
+
+  """
+  Minimum percentage of observing time required to consider this proposal
+  successful.
+  """
+  minPercentTime: IntPercent!
+
+  """Program User that will be selected as a reviewer for this program"""
+  reviewer: ProgramUser
+
+  """
+  Program User that will be selected as a mentor for this program.
+  Required when the reviewer does not have PhD educational status.
+  """
+  mentor: ProgramUser
+}
+
+"""Proposal properties for Large Program CallForProposals."""
+type LargeProgram implements ProposalType {
+  """The science type of this Call for Proposals."""
+  scienceSubtype: ScienceSubtype!
+
+  """
+  Whether (and how) the observations in this proposal are available for Target
+  of Opportunity triggering.
+  """
+  toOActivation: ToOActivation!
+
+  """
+  Minimum percentage of observing time (first semester) required to consider this
+  proposal successful.
+  """
+  minPercentTime: IntPercent!
+
+  """
+  Minimum percentage of the total observing time (over all semesters) required
+  to consider this proposal successful.
+  """
+  minPercentTotalTime: IntPercent!
+
+  """Total time requested (over multiple all semesters) for this proposal."""
+  totalTime: TimeSpan!
+}
+
+"""
+Proposal properties for Regular Semester (Poor Weather) CallForProposals.
+"""
+type PoorWeather implements ProposalType {
+  """The science type of this Call for Proposals."""
+  scienceSubtype: ScienceSubtype!
+}
+
+"""Proposal properties for Regular Semester (Queue) CallForProposals."""
+type Queue implements ProposalType {
+  """The science type of this Call for Proposals."""
+  scienceSubtype: ScienceSubtype!
+
+  """
+  Whether (and how) the observations in this proposal are available for Target
+  of Opportunity triggering.
+  """
+  toOActivation: ToOActivation!
+
+  """
+  Minimum percentage of observing time required to consider this proposal
+  successful.
+  """
+  minPercentTime: IntPercent!
+
+  """
+  Describes how time for the program will be apportioned across partners.
+  """
+  partnerSplits: [PartnerSplit!]!
+}
+
+"""Proposal properties for System Verification CallForProposals."""
+type SystemVerification implements ProposalType {
+  """The science type of this Call for Proposals."""
+  scienceSubtype: ScienceSubtype!
+
+  """
+  Whether (and how) the observations in this proposal are available for Target
+  of Opportunity triggering.
+  """
+  toOActivation: ToOActivation!
+
+  """
+  Minimum percentage of observing time required to consider this proposal
+  successful.
+  """
+  minPercentTime: IntPercent!
+}
+
+"""Radial velocity, choose one of the available units"""
+input RadialVelocityInput {
+  centimetersPerSecond: Long
+  metersPerSecond: BigDecimal
+  kilometersPerSecond: BigDecimal
+}
+
+"""The result of recording an atom."""
+type RecordAtomResult {
+  """The newly added atom record itself."""
+  atomRecord: AtomRecord!
+}
+
+"""The result of recording a new dataset."""
+type RecordDatasetResult {
+  """The new dataset that was added."""
+  dataset: Dataset!
+}
+
+"""The result of recording a GmosNorth step."""
+type RecordGmosNorthStepResult {
+  """The newly added step record itself."""
+  stepRecord: StepRecord!
+}
+
+"""The result of recording a GmosNorth visit."""
+type RecordGmosNorthVisitResult {
+  """The newly added visit record itself."""
+  visit: Visit!
+}
+
+"""The result of recording a GmosSouth step."""
+type RecordGmosSouthStepResult {
+  """The newly added step record itself."""
+  stepRecord: StepRecord!
+}
+
+"""The result of recording a GmosSouth visit."""
+type RecordGmosSouthVisitResult {
+  """The newly added visit record itself."""
+  visit: Visit!
+}
+
+"""The result of resetting the acquisition sequence."""
+type ResetAcquisitionResult {
+  """The observation whose acquisition was reset."""
+  observation: Observation!
+}
+
+"""Science step"""
+type Science implements StepConfig {
+  """Step type is always SCIENCE."""
+  stepType: StepType!
+}
+
+"""
+Which kind of smart gcal configuration is requested in a smart gcal step.
+"""
+enum SmartGcalType {
+  ARC
+  FLAT
+  DAY_BASELINE
+  NIGHT_BASELINE
+}
+
+"""SmartGcal step configuration."""
+type SmartGcal implements StepConfig {
+  smartGcalType: SmartGcalType!
+
+  """Step type is always SMART_GCAL."""
+  stepType: StepType!
+}
+
+type SetAllocationsResult {
+  allocations: [Allocation!]!
+}
+
+type SetupTime {
+  """
+  Full setup time estimate, including slew, configuration and target acquisition
+  """
+  full: TimeSpan!
+
+  """
+  A reduced setup time contemplating reacquiring a previously acquired target
+  """
+  reacquisition: TimeSpan!
+}
+
+"""The result of setting the guide target name for an observation."""
+type SetGuideTargetNameResult {
+  observation: Observation
+}
+
+type SetProgramReferenceResult {
+  """The resulting program reference, if any."""
+  reference: ProgramReference
+}
+
+"""The result of setting the proposal status."""
+type SetProposalStatusResult {
+  """
+  The program on which the proposal status was set. Returning the program allows checking
+  the proposal reference, program reference and other values that can be affected by changing
+  the proposal status.
+  """
+  program: Program!
+}
+
+"""Signal-to-noise mode parameters"""
+input SignalToNoiseExposureTimeModeInput {
+  """s/n value"""
+  value: SignalToNoise!
+
+  """Corresponding wavelength."""
+  at: WavelengthInput!
+}
+
+"""
+Create or edit a source profile.  Exactly one of "point", "uniform" or "gaussian" is required.
+"""
+input SourceProfileInput {
+  point: SpectralDefinitionIntegratedInput
+  uniform: SpectralDefinitionSurfaceInput
+  gaussian: GaussianInput
+}
+
+"""
+Spectral definition input with integrated units.  Specify exactly one of "bandNormalized" or "emissionLines"
+"""
+input SpectralDefinitionIntegratedInput {
+  bandNormalized: BandNormalizedIntegratedInput
+  emissionLines: EmissionLinesIntegratedInput
+}
+
+"""
+Spectral definition input with surface units.  Specify exactly one of "bandNormalized" or "emissionLines"
+"""
+input SpectralDefinitionSurfaceInput {
+  bandNormalized: BandNormalizedSurfaceInput
+  emissionLines: EmissionLinesSurfaceInput
+}
+
+"""Step (bias, dark, gcal, science, etc.)"""
+interface StepConfig {
+  """Step type"""
+  stepType: StepType!
+}
+
+"""Execution state of a recorded step."""
+enum StepExecutionState {
+  """No events have been received since the step was recorded."""
+  NOT_STARTED
+
+  """
+  Events have been received, but no terminal `Abort`, `EndStep` or `Stop` events.
+  """
+  ONGOING
+
+  """An event with an 'ABORT' 'StepStage' was received."""
+  ABORTED
+
+  """An event with an 'END_STEP' 'StepStage' was received."""
+  COMPLETED
+
+  """An event with a 'STOP' 'StepStage' was received."""
+  STOPPED
+
+  """An ongoing step was abandoned."""
+  ABANDONED
+}
+
+"""Step type"""
+enum StepType {
+  """StepType Bias"""
+  BIAS
+
+  """StepType Dark"""
+  DARK
+
+  """StepType Gcal"""
+  GCAL
+
+  """StepType Science"""
+  SCIENCE
+
+  """StepType SmartGcal"""
+  SMART_GCAL
+}
+
+"""Observation background-update calculation states."""
+enum CalculationState {
+  """
+  RETRY signifies that the observation update calculation failed and will be
+  automatically attempted again even if its properties are not modified.
+  """
+  RETRY
+
+  """
+  PENDING signifies that the observation will be updated by a background worker
+  in the future.  Calculated items like the execution digest may be updated at
+  that point.
+  """
+  PENDING
+
+  """
+  CALCULATING signifies that an observation background calculation is currently
+  ongoing.
+  """
+  CALCULATING
+
+  """
+  READY signifies that there are no pending calculation updates at the moment
+  and calculated values like the execution digest will not change.
+  """
+  READY
+}
+
+"""Result type of the obscalcUpdate subscription."""
+type ObscalcUpdate {
+  """Type of edit"""
+  editType: EditType!
+
+  """Old calculation state, if any."""
+  oldState: CalculationState
+
+  """New calculation state, if any."""
+  newState: CalculationState
+
+  """Id of the observation that was updated."""
+  observationId: ObservationId!
+
+  """Updated observation, if not deleted."""
+  value: Observation
+}
+
+type ExecutionEventAdded {
+  value: ExecutionEvent!
+}
+
+type DatasetEdit {
+  """Type of edit."""
+  editType: EditType!
+
+  """The id of the edited object."""
+  datasetId: DatasetId!
+
+  """Edited dataset."""
+  value: Dataset
+}
+
+"""Event sent when a new object is created or updated"""
+type TargetEdit {
+  """Type of edit"""
+  editType: EditType!
+  targetId: TargetId!
+
+  """Edited object"""
+  value: Target
+}
+
+"""Event sent when a group is created or updated"""
+type GroupEdit {
+  """Type of edit"""
+  editType: EditType!
+
+  """Assocated program"""
+  program: Program!
+
+  """Edited group, or null if it's the top-level group."""
+  value: Group
+}
+
+type TelescopeConfig {
+  """Offset"""
+  offset: Offset!
+
+  """Guide State (whether guiding is enabled for this step)"""
+  guiding: GuideState!
+}
+
+"""
+Time Accounting Categories.  Each successful proposal is given one or more
+time allocations and each allocation has a time accounting category.
+"""
+enum TimeAccountingCategory {
+  """Argentina"""
+  AR
+
+  """Brazil"""
+  BR
+
+  """Canada"""
+  CA
+
+  """CFHT Exchange"""
+  CFHT
+
+  """Chile"""
+  CL
+
+  """Director's Time"""
+  DD
+
+  """Demo Science"""
+  DS
+
+  """Guaranteed Time"""
+  GT
+
+  """Subaru"""
+  JP
+
+  """Keck Exchange"""
+  KECK
+
+  """Republic of Korea"""
+  KR
+
+  """Large Program"""
+  LP
+
+  """Limited-term Participant"""
+  LTP
+
+  """System Verification"""
+  SV
+
+  """University of Hawaii"""
+  UH
+
+  """United States"""
+  US
+}
+
+"""Un-normalized SED input parameters.  Define one value only."""
+input UnnormalizedSedInput {
+  stellarLibrary: StellarLibrarySpectrum
+  coolStar: CoolStarTemperature
+  galaxy: GalaxySpectrum
+  planet: PlanetSpectrum
+  quasar: QuasarSpectrum
+  hiiRegion: HiiRegionSpectrum
+  planetaryNebula: PlanetaryNebulaSpectrum
+  powerLaw: BigDecimal
+  blackBodyTempK: PosInt
+  fluxDensities: [FluxDensity!]
+  fluxDensitiesAttachment: AttachmentId
+}
+
+"""
+The result of updating the selected observations, up to `LIMIT` or the maximum
+of (1000).  If `hasMore` is true, additional observations were modified and not
+included here.
+"""
+type UpdateAsterismsResult {
+  """
+  The edited observations, up to the specified LIMIT or the default maximum of 1000.
+  """
+  observations: [Observation!]!
+
+  """`true` when there were additional edits that were not returned."""
+  hasMore: Boolean!
+}
+
+"""
+The result of updating the selected attachments, up to `LIMIT` or the maximum of (1000).  If `hasMore` is true, additional attachments were modified and not included here.
+"""
+type UpdateAttachmentsResult {
+  """
+  The edited attachments, up to the specified LIMIT or the default maximum of 1000.
+  """
+  attachments: [Attachment!]!
+
+  """`true` when there were additional edits that were not returned."""
+  hasMore: Boolean!
+}
+
+"""
+The result of updating the selected calls for proposals, up to `LIMIT` or the
+maximum of 1000.  If `hasMore` is true, additional calls were modified and not
+included here.
+"""
+type UpdateCallsForProposalsResult {
+  """
+  The edited observations, up to the specified LIMIT or the default maximum of
+  1000.
+  """
+  callsForProposals: [CallForProposals!]!
+
+  """`true` when there were additional edits that were not returned."""
+  hasMore: Boolean!
+}
+
+"""
+The result of updating the selected datasets, up to `LIMIT` or the maximum of (1000).  If `hasMore` is true, additional datasets were modified and not included here.
+"""
+type UpdateDatasetsResult {
+  """
+  The edited datasets, up to the specified LIMIT or the default maximum of 1000.
+  """
+  datasets: [Dataset!]!
+
+  """`true` when there were additional edits that were not returned."""
+  hasMore: Boolean!
+}
+
+type UpdateGroupsResult {
+  """
+  The edited groups, up to the specified LIMIT or the default maximum of 1000.
+  """
+  groups: [Group!]!
+
+  """`true` when there were additional edits that were not returned."""
+  hasMore: Boolean!
+}
+
+"""
+The result of updating the selected observations, up to `LIMIT` or the maximum of (1000).  If `hasMore` is true, additional observations were modified and not included here.
+"""
+type UpdateObservationsResult {
+  """
+  The edited observations, up to the specified LIMIT or the default maximum of 1000.
+  """
+  observations: [Observation!]!
+
+  """`true` when there were additional edits that were not returned."""
+  hasMore: Boolean!
+}
+
+"""
+The result of updating the selected observations, up to `LIMIT` or the maximum of (1000).  If `hasMore` is true, additional observations were modified and not included here.
+"""
+type UpdateConfigurationRequestsResult {
+  """
+  The edited observations, up to the specified LIMIT or the default maximum of 1000.
+  """
+  requests: [ConfigurationRequest!]!
+
+  """`true` when there were additional edits that were not returned."""
+  hasMore: Boolean!
+}
+
+"""
+The result of calling 'updateProgramUsers', up to 'LIMIT' or the maximum of
+1000.  If 'hasMore' is true, additional program users were modified but not
+included in the result.
+"""
+type UpdateProgramUsersResult {
+  """
+  The first program users that were updated (up to the LIMIT specified in the
+  mutation).
+  """
+  programUsers: [ProgramUser!]!
+
+  """
+  Whether there were additional updated program users that were not returned.
+  """
+  hasMore: Boolean!
+}
+
+"""
+The result of updating the selected notes, up to `LIMIT` or the maximum of
+(1000).  If `hasMore` is true, additional notes were modified and not included
+here.
+"""
+type UpdateProgramNotesResult {
+  """
+  The edited notes, up to the specified LIMIT or the default maximum of 1000.
+  """
+  programNotes: [ProgramNote!]!
+
+  """`true` when there were additional edits that were not returned."""
+  hasMore: Boolean!
+}
+
+"""
+The result of updating the selected programs, up to `LIMIT` or the maximum of (1000).  If `hasMore` is true, additional programs were modified and not included here.
+"""
+type UpdateProgramsResult {
+  """
+  The edited programs, up to the specified LIMIT or the default maximum of 1000.
+  """
+  programs: [Program!]!
+
+  """`true` when there were additional edits that were not returned."""
+  hasMore: Boolean!
+}
+
+"""The result of updating a proposal"""
+type UpdateProposalResult {
+  """The updated proposal."""
+  proposal: Proposal!
+}
+
+"""
+The result of updating the selected targets, up to `LIMIT` or the maximum of (1000).  If `hasMore` is true, additional targets were modified and not included here.
+"""
+type UpdateTargetsResult {
+  """
+  The edited targets, up to the specified LIMIT or the default maximum of 1000.
+  """
+  targets: [Target!]!
+
+  """`true` when there were additional edits that were not returned."""
+  hasMore: Boolean!
+}
+
+"""Wavelength, choose one of the available units"""
+input WavelengthInput {
+  picometers: PosInt
+  angstroms: PosBigDecimal
+  nanometers: PosBigDecimal
+  micrometers: PosBigDecimal
+}
+
+type OffsetP {
+  """p offset in µas"""
+  microarcseconds: Long!
+
+  """p offset in mas"""
+  milliarcseconds: BigDecimal!
+
+  """p offset in arcsec"""
+  arcseconds: BigDecimal!
+}
+
+type AirMassRange {
+  """Minimum AirMass (unitless)"""
+  min: PosBigDecimal!
+
+  """Maximum AirMass (unitless)"""
+  max: PosBigDecimal!
+}
+
+type Angle {
+  """Angle in µas"""
+  microarcseconds: Long!
+
+  """Angle in µs"""
+  microseconds: BigDecimal!
+
+  """Angle in mas"""
+  milliarcseconds: BigDecimal!
+
+  """Angle in ms"""
+  milliseconds: BigDecimal!
+
+  """Angle in asec"""
+  arcseconds: BigDecimal!
+
+  """Angle in sec"""
+  seconds: BigDecimal!
+
+  """Angle in amin"""
+  arcminutes: BigDecimal!
+
+  """Angle in min"""
+  minutes: BigDecimal!
+
+  """Angle in deg"""
+  degrees: BigDecimal!
+
+  """Angle in hrs"""
+  hours: BigDecimal!
+
+  """Angle in HH:MM:SS"""
+  hms: String!
+
+  """Angle in DD:MM:SS"""
+  dms: String!
+}
+
+type AsterismGroup {
+  program: Program!
+
+  """Observations associated with the common value"""
+  observations(
+    """Set to true to include deleted values"""
+    includeDeleted: Boolean! = false
+
+    """
+    Starts the result set at (or after if not existent) the given observation id.
+    """
+    OFFSET: ObservationId
+
+    """
+    Limits the result to at most this number of matches (but never more than 1000).
+    """
+    LIMIT: NonNegInt
+  ): ObservationSelectResult!
+
+  """Commonly held value across the observations"""
+  asterism: [Target!]!
+}
+
+"""
+The matching asterismGroup results, limited to a maximum of 1000 entries.
+"""
+type AsterismGroupSelectResult {
+  """Matching asterismGroups up to the return size limit of 1000"""
+  matches: [AsterismGroup!]!
+
+  """`true` when there were additional matches that were not returned."""
+  hasMore: Boolean!
+}
+
+"""AttachmentId id formatted as `a-[1-9a-f][0-9a-f]*`"""
+scalar AttachmentId
+
+"""Attachment Types"""
+enum AttachmentType {
+  """A proposal attachment for the science case & design"""
+  SCIENCE
+
+  """A proposal attachment for team info, previous use, etc."""
+  TEAM
+
+  """An observation attachment for finder charts"""
+  FINDER
+
+  """An observation attachment for MOS masks"""
+  MOS_MASK
+
+  """An observation attachment for pre-imaging"""
+  PRE_IMAGING
+
+  """A target attachment for custom SEDs"""
+  CUSTOM_SED
+}
+
+"""Attachment"""
+type Attachment {
+  id: AttachmentId!
+  attachmentType: AttachmentType!
+  fileName: NonEmptyString!
+  description: NonEmptyString
+  checked: Boolean!
+  fileSize: Long!
+  updatedAt: Timestamp!
+  program: Program!
+}
+
+"""Brightness bands"""
+enum Band {
+  """Band SloanU"""
+  SLOAN_U
+
+  """Band SloanG"""
+  SLOAN_G
+
+  """Band SloanR"""
+  SLOAN_R
+
+  """Band SloanI"""
+  SLOAN_I
+
+  """Band SloanZ"""
+  SLOAN_Z
+
+  """Band U"""
+  U
+
+  """Band B"""
+  B
+
+  """Band V"""
+  V
+
+  """Band R"""
+  R
+
+  """Band I"""
+  I
+
+  """Band Y"""
+  Y
+
+  """Band J"""
+  J
+
+  """Band H"""
+  H
+
+  """Band K"""
+  K
+
+  """Band L"""
+  L
+
+  """Band M"""
+  M
+
+  """Band N"""
+  N
+
+  """Band Q"""
+  Q
+
+  """Band Ap"""
+  AP
+
+  """Band Gaia"""
+  GAIA
+
+  """Band GaiaBP"""
+  GAIA_BP
+
+  """Band GaiaRP"""
+  GAIA_RP
+}
+
+type BandBrightnessIntegrated {
+  """Magnitude band"""
+  band: Band!
+  value: BigDecimal!
+  units: BrightnessIntegratedUnits!
+
+  """Error, if any"""
+  error: BigDecimal
+}
+
+type BandBrightnessSurface {
+  """Magnitude band"""
+  band: Band!
+  value: BigDecimal!
+  units: BrightnessSurfaceUnits!
+
+  """Error, if any"""
+  error: BigDecimal
+}
+
+"""Band normalized common interface"""
+interface BandNormalized {
+  """Un-normalized spectral energy distribution"""
+  sed: UnnormalizedSed
+}
+
+type BandNormalizedIntegrated implements BandNormalized {
+  brightnesses: [BandBrightnessIntegrated!]!
+
+  """Un-normalized spectral energy distribution"""
+  sed: UnnormalizedSed
+}
+
+type BandNormalizedSurface implements BandNormalized {
+  brightnesses: [BandBrightnessSurface!]!
+
+  """Un-normalized spectral energy distribution"""
+  sed: UnnormalizedSed
+}
+
+"""Brightness integrated units"""
+enum BrightnessIntegratedUnits {
+  """Vega mag"""
+  VEGA_MAGNITUDE
+
+  """AB mag"""
+  AB_MAGNITUDE
+
+  """Jy"""
+  JANSKY
+
+  """W/m²/µm"""
+  W_PER_M_SQUARED_PER_UM
+
+  """erg/s/cm²/Å"""
+  ERG_PER_S_PER_CM_SQUARED_PER_A
+
+  """erg/s/cm²/Hz"""
+  ERG_PER_S_PER_CM_SQUARED_PER_HZ
+}
+
+"""Brightness surface units"""
+enum BrightnessSurfaceUnits {
+  """Vega mag/arcsec²"""
+  VEGA_MAG_PER_ARCSEC_SQUARED
+
+  """AB mag/arcsec²"""
+  AB_MAG_PER_ARCSEC_SQUARED
+
+  """Jy/arcsec²"""
+  JY_PER_ARCSEC_SQUARED
+
+  """W/m²/µm/arcsec²"""
+  W_PER_M_SQUARED_PER_UM_PER_ARCSEC_SQUARED
+
+  """erg/s/cm²/Å/arcsec²"""
+  ERG_PER_S_PER_CM_SQUARED_PER_A_PER_ARCSEC_SQUARED
+
+  """erg/s/cm²/Hz/arcsec²"""
+  ERG_PER_S_PER_CM_SQUARED_PER_HZ_PER_ARCSEC_SQUARED
+}
+
+type CatalogInfo {
+  """Catalog name option"""
+  name: CatalogName!
+
+  """Catalog id string"""
+  id: String!
+
+  """Catalog description of object morphology"""
+  objectType: String
+}
+
+"""Catalog name values"""
+enum CatalogName {
+  """CatalogName Simbad"""
+  SIMBAD
+
+  """CatalogName Import"""
+  IMPORT
+
+  """CatalogName Gaia"""
+  GAIA
+}
+
+"""Who is charged for time, if anyone."""
+enum ChargeClass {
+  """Time that is not charged."""
+  NON_CHARGED
+
+  """Time charged to the science program."""
+  PROGRAM
+}
+
+"""Cloud extinction"""
+enum CloudExtinctionPreset {
+  """CloudExtinctionPreset Zero"""
+  ZERO
+
+  """CloudExtinctionPreset PointOne"""
+  POINT_ONE
+
+  """CloudExtinctionPreset PointThree"""
+  POINT_THREE
+
+  """CloudExtinctionPreset PointFive"""
+  POINT_FIVE
+
+  """CloudExtinctionPreset OnePointZero"""
+  ONE_POINT_ZERO
+
+  """CloudExtinctionPreset TwoPointZero"""
+  TWO_POINT_ZERO
+
+  """CloudExtinctionPreset ThreePointZero"""
+  THREE_POINT_ZERO
+}
+
+"""ObservingMode"""
+enum ObservingModeType {
+  """ObservingModeType GmosNorthLongSlit"""
+  GMOS_NORTH_LONG_SLIT
+
+  """ObservingModeType GmosSouthLongSlit"""
+  GMOS_SOUTH_LONG_SLIT
+
+  """ObservingModeType Flamingos2LongSlit"""
+  FLAMINGOS_2LONG_SLIT
+
+  """ObservingModeType GmosNorthImaging"""
+  GMOS_NORTH_IMAGING
+
+  """ObservingModeType GmosSouthImaging"""
+  GMOS_SOUTH_IMAGING
+}
+
+type ConstraintSet {
+  """Image quality"""
+  imageQuality: ImageQualityPreset!
+
+  """Cloud extinction"""
+  cloudExtinction: CloudExtinctionPreset!
+
+  """Sky background"""
+  skyBackground: SkyBackground!
+
+  """Water vapor"""
+  waterVapor: WaterVapor!
+
+  """Either air mass range or elevation range"""
+  elevationRange: ElevationRange!
+}
+
+type ConstraintSetGroup {
+  """Observations associated with the common value"""
+  observations(
+    """Set to true to include deleted values"""
+    includeDeleted: Boolean! = false
+
+    """
+    Starts the result set at (or after if not existent) the given observation id.
+    """
+    OFFSET: ObservationId
+
+    """
+    Limits the result to at most this number of matches (but never more than 1000).
+    """
+    LIMIT: NonNegInt
+  ): ObservationSelectResult!
+
+  """Commonly held value across the observations"""
+  constraintSet: ConstraintSet!
+
+  """Link back to program."""
+  program: Program!
+}
+
+"""
+The matching constraintSetGroup results, limited to a maximum of 1000 entries.
+"""
+type ConstraintSetGroupSelectResult {
+  """Matching constraintSetGroups up to the return size limit of 1000"""
+  matches: [ConstraintSetGroup!]!
+
+  """`true` when there were additional matches that were not returned."""
+  hasMore: Boolean!
+}
+
+"""Cool star temperature options"""
+enum CoolStarTemperature {
+  """400 K"""
+  T400_K
+
+  """600 K"""
+  T600_K
+
+  """800 K"""
+  T800_K
+
+  """900 K"""
+  T900_K
+
+  """1000 K"""
+  T1000_K
+
+  """1200 K"""
+  T1200_K
+
+  """1400 K"""
+  T1400_K
+
+  """1600 K"""
+  T1600_K
+
+  """1800 K"""
+  T1800_K
+
+  """2000 K"""
+  T2000_K
+
+  """2200 K"""
+  T2200_K
+
+  """2400 K"""
+  T2400_K
+
+  """2600 K"""
+  T2600_K
+
+  """2800 K"""
+  T2800_K
+}
+
+type Coordinates {
+  """Right Ascension"""
+  ra: RightAscension!
+
+  """Declination"""
+  dec: Declination!
+}
+
+"""DatasetId id formatted as `d-[1-9a-f][0-9a-f]*`"""
+scalar DatasetId
+
+type Dataset {
+  """Dataset id."""
+  id: DatasetId!
+
+  """The corresponding step."""
+  step: StepRecord!
+
+  """Exposure index within the step."""
+  index: PosInt!
+
+  """
+  Dataset reference, assuming the observation has an observation reference.
+  """
+  reference: DatasetReference
+
+  """Observation associated with this dataset."""
+  observation: Observation!
+
+  """Visit associated with this dataset."""
+  visit: Visit!
+
+  """Events associated with the dataset."""
+  events(
+    """
+    Starts the result set at (or after if not existent) the given execution event id.
+    """
+    OFFSET: ExecutionEventId
+
+    """
+    Limits the result to at most this number of matches (but never more than 1000).
+    """
+    LIMIT: NonNegInt
+  ): ExecutionEventSelectResult!
+
+  """Dataset filename."""
+  filename: DatasetFilename!
+
+  """Dataset QA state, if any has been set."""
+  qaState: DatasetQaState
+
+  """Dataset comment, if any has been set."""
+  comment: NonEmptyString
+
+  """Dataset time interval, if the dataset collection has started."""
+  interval: TimestampInterval
+
+  """
+  Has the dataset been written to disk?  Note, we assume the dataset has been
+  written when an `END_WRITE` event is received from Observe.
+  """
+  isWritten: Boolean!
+}
+
+"""Database operations that provoke Chronicle table updates."""
+enum DatabaseOperation {
+  INSERT
+  UPDATE
+  DELETE
+  TRUNCATE
+}
+
+"""The Chronicle entry for dataset updates."""
+type DatasetChronicleEntry {
+  id: ChronicleId!
+  transactionId: TransactionId!
+
+  """The user who performed the insertion or update."""
+  user: User
+
+  """When the update happened."""
+  timestamp: Timestamp!
+
+  """The database operation that was performed."""
+  operation: DatabaseOperation!
+
+  """The dataset that was inserted or updated."""
+  dataset: Dataset!
+  modDatasetId: Boolean!
+  modStepId: Boolean!
+  modObservationId: Boolean!
+  modVisitId: Boolean!
+  modReference: Boolean!
+  modFilename: Boolean!
+  modQaState: Boolean!
+  modInterval: Boolean!
+  modComment: Boolean!
+  newDatasetId: DatasetId
+  newStepId: StepId
+  newObservationId: ObservationId
+  newVisitId: VisitId
+  newReference: DatasetReferenceLabel
+  newFilename: DatasetFilename
+  newQaState: DatasetQaState
+  newInterval: TimestampInterval
+  newComment: NonEmptyString
+}
+
+type DatasetChronicleEntrySelectResult {
+  """Matching entries up to the return size limit of 1000"""
+  matches: [DatasetChronicleEntry!]!
+
+  """`true` when there were additional matches that were not returned."""
+  hasMore: Boolean!
+}
+
+"""
+Dataset-level events.  A single dataset will be associated with multiple events
+as it makes its way through observe, readout and write stages.
+"""
+type DatasetEvent implements ExecutionEvent {
+  """Event id."""
+  id: ExecutionEventId!
+
+  """Visit associated with this event."""
+  visit: Visit!
+
+  """Observation whose execution produced this event."""
+  observation: Observation!
+
+  """Time at which this event was received."""
+  received: Timestamp!
+
+  """Event type."""
+  eventType: ExecutionEventType!
+
+  """Atom associated with this event."""
+  atom: AtomRecord!
+
+  """The associated step."""
+  step: StepRecord!
+
+  """Dataset execution stage."""
+  datasetStage: DatasetStage!
+
+  """The associated dataset."""
+  dataset: Dataset!
+
+  """Client id, if any."""
+  clientId: ClientId
+}
+
+"""Dataset filename in standard format."""
+scalar DatasetFilename
+
+"""Dataset QA State"""
+enum DatasetQaState {
+  """DatasetQaState Pass"""
+  PASS
+
+  """DatasetQaState Usable"""
+  USABLE
+
+  """DatasetQaState Fail"""
+  FAIL
+}
+
+"""
+Dataset reference type, broken into its constituient parts and including
+a formatted label.
+"""
+type DatasetReference {
+  """Formatted dataset reference label."""
+  label: DatasetReferenceLabel!
+
+  """The observation reference."""
+  observation: ObservationReference!
+
+  """The step index relative to its observation."""
+  stepIndex: PosInt!
+
+  """The exposure index relative to its step."""
+  exposureIndex: PosInt!
+}
+
+"""
+Dataset reference, formatted according to the observation, suffixed with
+the step and exposure indices. For example, G-2024B-1234-Q-0001-0002-0003 where
+G-2024B-1234-Q-0001 is the observation reference label, 2 is the step index and
+3 is the exposure index.
+"""
+scalar DatasetReferenceLabel
+
+"""The matching dataset results, limited to a maximum of 1000 entries."""
+type DatasetSelectResult {
+  """Matching datasets up to the return size limit of 1000"""
+  matches: [Dataset!]!
+
+  """`true` when there were additional matches that were not returned."""
+  hasMore: Boolean!
+}
+
+"""Execution stage or phase of an individual dataset."""
+enum DatasetStage {
+  END_EXPOSE
+  END_READOUT
+  END_WRITE
+  START_EXPOSE
+  START_READOUT
+  START_WRITE
+}
+
+type Declination {
+  """Declination in DD:MM:SS.SS format"""
+  dms: DmsString!
+
+  """Declination in signed degrees"""
+  degrees: BigDecimal!
+
+  """Declination in signed µas"""
+  microarcseconds: Long!
+}
+
+"""Target declination coordinate in format '[+/-]DD:MM:SS.sss'"""
+scalar DmsString
+
+"""Educational Status Phd/Grad/Undergrad/Other"""
+enum EducationalStatus {
+  """Educational Status PhD"""
+  PHD
+
+  """Educational Status Grad Student"""
+  GRAD_STUDENT
+
+  """Educational Status Undergrad Student"""
+  UNDERGRAD_STUDENT
+
+  """Educational Status Other"""
+  OTHER
+}
+
+"""Either air mass range or elevation range"""
+type ElevationRange {
+  """AirMass range if elevation range is an Airmass range"""
+  airMass: AirMassRange
+
+  """Hour angle range if elevation range is an Hour angle range"""
+  hourAngle: HourAngleRange
+}
+
+type EmissionLineIntegrated {
+  wavelength: Wavelength!
+
+  """km/s"""
+  lineWidth: PosBigDecimal!
+  lineFlux: LineFluxIntegrated!
+}
+
+type EmissionLineSurface {
+  wavelength: Wavelength!
+
+  """km/s"""
+  lineWidth: PosBigDecimal!
+  lineFlux: LineFluxSurface!
+}
+
+type EmissionLinesIntegrated {
+  lines: [EmissionLineIntegrated!]!
+  fluxDensityContinuum: FluxDensityContinuumIntegrated!
+}
+
+type EmissionLinesSurface {
+  lines: [EmissionLineSurface!]!
+  fluxDensityContinuum: FluxDensityContinuumSurface!
+}
+
+"""Ephemeris key type options"""
+enum EphemerisKeyType {
+  """EphemerisKeyType Comet"""
+  COMET
+
+  """EphemerisKeyType AsteroidNew"""
+  ASTEROID_NEW
+
+  """EphemerisKeyType AsteroidOld"""
+  ASTEROID_OLD
+
+  """EphemerisKeyType MajorBody"""
+  MAJOR_BODY
+
+  """EphemerisKeyType UserSupplied"""
+  USER_SUPPLIED
+}
+
+"""Reference observation epoch in format '[JB]YYYY.YYY'"""
+scalar EpochString
+
+type Execution {
+  """
+  Calculations dependent on the sequence, such as planned time and offsets.
+  If a sequence cannot be generated for this observation, `null` is returned
+  along with warning messages.
+  """
+  digest: CalculatedExecutionDigest
+
+  """
+  Full execution config, including acquisition and science sequences.  If a
+  sequence cannot be generated for this observation, `null` is returned along
+  with warning messages.
+  """
+  config(
+    """
+    The maximum size (number of atoms) of the `possibleFuture` in the sequences.
+    If the projected future is longer, the size will be capped at this value.
+    Use 0 if only interested in the `nextAtom`.  The maximum is 100.  Each
+    sequence has a `hasMore` field that can be used to determine whether there
+    additional atoms beyond those returned in `possibleFuture`.  The total
+    projected atom count is available in the execution digest.
+    """
+    futureLimit: NonNegInt = 25
+  ): ExecutionConfig @deprecated(reason: "moved to Query -> executionConfig")
+
+  """Determines the execution state as a whole of this observation."""
+  executionState: ExecutionState!
+
+  """
+  Executed (or at least partially executed) atom records, across all visits.
+  """
+  atomRecords(
+    """Starts the result set at the given atom creation time."""
+    OFFSET: Timestamp
+
+    """
+    Limits the result to at most this number of matches (but never more than 1000).
+    """
+    LIMIT: NonNegInt
+  ): AtomRecordSelectResult!
+
+  """Datasets associated with the observation, across all visits."""
+  datasets(
+    """
+    Starts the result set at (or after if not existent) the given dataset id.
+    """
+    OFFSET: DatasetId
+
+    """
+    Limits the result to at most this number of matches (but never more than 1000).
+    """
+    LIMIT: NonNegInt
+  ): DatasetSelectResult!
+
+  """Events associated with the observation, across all visits."""
+  events(
+    """
+    Starts the result set at (or after if not existent) the given execution event id.
+    """
+    OFFSET: ExecutionEventId
+
+    """
+    Limits the result to at most this number of matches (but never more than 1000).
+    """
+    LIMIT: NonNegInt
+  ): ExecutionEventSelectResult!
+
+  """Visits associated with the observation."""
+  visits(
+    """
+    Starts the result set at (or after if not existent) the given visit id.
+    """
+    OFFSET: VisitId
+
+    """
+    Limits the result to at most this number of matches (but never more than 1000).
+    """
+    LIMIT: NonNegInt
+  ): VisitSelectResult!
+
+  """Time accounting calculation for this observation."""
+  timeCharge: CategorizedTime!
+}
+
+"""
+Execution configuration.  All but one of the instruments will be `null`.
+"""
+type ExecutionConfig {
+  """
+  Instrument type.  This will indicate which of the instrument-specific fields
+  is defined.
+  """
+  instrument: Instrument!
+
+  """
+  Flamingos 2 execution config.  This will be null unless the `instrument` is
+  `FLAMINGOS2`.
+  """
+  flamingos2: Flamingos2ExecutionConfig
+
+  """
+  GMOS North execution config.  This will be null unless the `instrument` is
+  `GMOS_NORTH`.
+  """
+  gmosNorth: GmosNorthExecutionConfig
+
+  """
+  GMOS South execution config.  This will be null unless the `instrument` is
+  `GMOS_SOUTH`.
+  """
+  gmosSouth: GmosSouthExecutionConfig
+}
+
+"""Execution event (sequence, step, or dataset events)"""
+interface ExecutionEvent {
+  """Event id."""
+  id: ExecutionEventId!
+
+  """Visit associated with the event."""
+  visit: Visit!
+
+  """Observation whose execution produced this event."""
+  observation: Observation!
+
+  """Time at which this event was received."""
+  received: Timestamp!
+
+  """Event type."""
+  eventType: ExecutionEventType!
+
+  """Client id, if any."""
+  clientId: ClientId
+}
+
+"""ExecutionEventId id formatted as `e-[1-9a-f][0-9a-f]*`"""
+scalar ExecutionEventId
+
+"""
+The matching ExecutionEvent results, limited to a maximum of 1000 entries.
+"""
+type ExecutionEventSelectResult {
+  """Matching ExecutionEvents up to the return size limit of 1000"""
+  matches: [ExecutionEvent!]!
+
+  """`true` when there were additional matches that were not returned."""
+  hasMore: Boolean!
+}
+
+"""State of being: either Deleted or Present"""
+enum Existence {
+  """Existence Present"""
+  PRESENT
+
+  """Existence Deleted"""
+  DELETED
+}
+
+"""Summarizes the execution setup time and sequences."""
+type ExecutionDigest {
+  """Setup time calculations."""
+  setup: SetupTime!
+
+  """Acquisition sequence summary."""
+  acquisition: SequenceDigest
+
+  """Science sequence summary."""
+  science: SequenceDigest
+}
+
+"""Wraps an ExecutionDigest with the background calculation state."""
+type CalculatedExecutionDigest {
+  """Background calculation state."""
+  state: CalculationState!
+
+  """The current execution digest itself."""
+  value: ExecutionDigest
+}
+
+"""Exposure time mode, either signal to noise or fixed"""
+type ExposureTimeMode {
+  """Signal to noise exposure time mode data, if applicable."""
+  signalToNoise: SignalToNoiseExposureTimeMode
+
+  """Time and Count mode data, if applicable."""
+  timeAndCount: TimeAndCountExposureTimeMode
+}
+
+"""Flamingos 2 Execution Config"""
+type Flamingos2ExecutionConfig {
+  """Flamingos 2 static configuration"""
+  static: Flamingos2Static!
+
+  """Flamingos 2 acquisition execution sequence"""
+  acquisition: Flamingos2ExecutionSequence
+
+  """Flamingos 2 science execution"""
+  science: Flamingos2ExecutionSequence
+}
+
+"""Next atom to execute and potential future atoms."""
+type Flamingos2ExecutionSequence {
+  """Next atom to execute."""
+  nextAtom: Flamingos2Atom!
+
+  """(Prefix of the) remaining atoms to execute, if any."""
+  possibleFuture: [Flamingos2Atom!]!
+
+  """
+  Whether there are more anticipated atoms than those that appear in
+  'possibleFuture'.
+  """
+  hasMore: Boolean!
+}
+
+"""Unchanging (over the course of the sequence) configuration values"""
+type Flamingos2Static {
+  """Is MOS Pre-Imaging Observation"""
+  mosPreImaging: MosPreImaging!
+
+  """Whether to use electronic offsetting"""
+  useElectronicOffsetting: Boolean!
+}
+
+"""The result of recording a Flamingos 2 step."""
+type RecordFlamingos2StepResult {
+  """The newly added step record itself."""
+  stepRecord: StepRecord!
+}
+
+"""Result for recordFlamingos2Visit mutation."""
+type RecordFlamingos2VisitResult {
+  """The newly added visit record itself."""
+  visit: Visit!
+}
+
+"""
+Flamingos 2 atom, a collection of steps that should be executed in their entirety
+"""
+type Flamingos2Atom {
+  """Atom id"""
+  id: AtomId!
+
+  """Optional description of the atom."""
+  description: String
+
+  """
+  Observe class for this atom as a whole (combined observe class for each of
+  its steps).
+  """
+  observeClass: ObserveClass!
+
+  """Individual steps that comprise the atom"""
+  steps: [Flamingos2Step!]!
+}
+
+"""Flmaingos 2 step with potential breakpoint"""
+type Flamingos2Step {
+  """Instrument configuration for this step"""
+  instrumentConfig: Flamingos2Dynamic!
+
+  """Step id"""
+  id: StepId!
+
+  """Whether to pause before the execution of this step"""
+  breakpoint: Breakpoint!
+
+  """The sequence step itself"""
+  stepConfig: StepConfig!
+
+  """The telescope configuration at this step."""
+  telescopeConfig: TelescopeConfig!
+
+  """Time estimate for this step's execution"""
+  estimate: StepEstimate!
+
+  """Observe class for this step"""
+  observeClass: ObserveClass!
+}
+
+"""Flamingos 2 dynamic step configuration"""
+type Flamingos2Dynamic {
+  """Flamingos 2 exposure time"""
+  exposure: TimeSpan!
+
+  """Flamingos 2 disperser, if any."""
+  disperser: Flamingos2Disperser
+
+  """Flamingos 2 filter."""
+  filter: Flamingos2Filter!
+
+  """Flamingos 2 read mode."""
+  readMode: Flamingos2ReadMode!
+
+  """Flamingos 2 Lyot Wheel."""
+  lyotWheel: Flamingos2LyotWheel!
+
+  """Flamingos 2 FPU, if any."""
+  fpu: Flamingos2FpuMask
+
+  """Flamingos 2 decker."""
+  decker: Flamingos2Decker!
+
+  """Flamingos 2 readout mode."""
+  readoutMode: Flamingos2ReadoutMode!
+
+  """Flamingos 2 reads."""
+  reads: Flamingos2Reads!
+
+  """Central wavelength, which is taken from the filter wavelength."""
+  centralWavelength: Wavelength!
+}
+
+"""Flamingos 2 mask option, either builtin or custom mask"""
+type Flamingos2FpuMask {
+  """The custom mask, if in use"""
+  customMask: Flamingos2CustomMask
+
+  """Flamingos 2 builtin FPU, if in use"""
+  builtin: Flamingos2Fpu
+}
+
+"""Flamingos 2 Custom Mask"""
+type Flamingos2CustomMask {
+  """Custom Mask Filename"""
+  filename: String!
+
+  """Custom Slit Width"""
+  slitWidth: Flamingos2CustomSlitWidth!
+}
+
+"""Flamingos 2 Custom Slit Width"""
+enum Flamingos2CustomSlitWidth {
+  CUSTOM_WIDTH_1_PIX
+  CUSTOM_WIDTH_2_PIX
+  CUSTOM_WIDTH_3_PIX
+  CUSTOM_WIDTH_4_PIX
+  CUSTOM_WIDTH_6_PIX
+  CUSTOM_WIDTH_8_PIX
+  OTHER
+}
+
+"""Flamingos 2 Lyot Wheel"""
+enum Flamingos2LyotWheel {
+  F16
+  GEMS_UNDER
+  GEMS_OVER
+  HARTMANN_A
+  HARTMANN_B
+}
+
+"""Flamingos2 Disperser"""
+enum Flamingos2Disperser {
+  """Flamingos2Disperser R=1200 (J + H) grism"""
+  R1200_JH
+
+  """Flamingos2Disperser R=1200 (H + K) grism"""
+  R1200_HK
+
+  """Flamingos2Disperser R=3000 (J or H or K) grism"""
+  R3000
+}
+
+"""Flamingos2 Filter"""
+enum Flamingos2Filter {
+  """Flamingos2Filter Y (1.02 um)"""
+  Y
+
+  """Flamingos2Filter J (1.25 um)"""
+  J
+
+  """Flamingos2Filter H (1.65 um)"""
+  H
+
+  """Flamingos2Filter JH (spectroscopic)"""
+  JH
+
+  """Flamingos2Filter HK (spectroscopic)"""
+  HK
+
+  """Flamingos2Filter J-low (1.15 um)"""
+  J_LOW
+
+  """Flamingos2Filter K-long (2.20 um)"""
+  K_LONG
+
+  """Flamingos2Filter K-short (2.15 um)"""
+  K_SHORT
+
+  """Flamingos2Filter K-blue (2.06 um)"""
+  K_BLUE
+
+  """Flamingos2Filter K-red (2.31 um)"""
+  K_RED
+}
+
+"""Flamingos2 FPU"""
+enum Flamingos2Fpu {
+  """Flamingos2Fpu 2-Pixel Pinhole Grid"""
+  PINHOLE
+
+  """Flamingos2Fpu Sub-Pixel Pinhole Gr"""
+  SUB_PIX_PINHOLE
+
+  """Flamingos2Fpu 1-Pixel Long Slit"""
+  LONG_SLIT_1
+
+  """Flamingos2Fpu 2-Pixel Long Slit"""
+  LONG_SLIT_2
+
+  """Flamingos2Fpu 1-Pixel Long Slit"""
+  LONG_SLIT_3
+
+  """Flamingos2Fpu 4-Pixel Long Slit"""
+  LONG_SLIT_4
+
+  """Flamingos2Fpu 6-Pixel Long Slit"""
+  LONG_SLIT_6
+
+  """Flamingos2Fpu 8-Pixel Long Slit"""
+  LONG_SLIT_8
+}
+
+"""Flamingos2 Read Mode"""
+enum Flamingos2ReadMode {
+  """Flamingos2ReadMode Bright"""
+  BRIGHT
+
+  """Flamingos2ReadMode Medium"""
+  MEDIUM
+
+  """Flamingos2ReadMode Faint"""
+  FAINT
+}
+
+"""Flamingos2 Decker"""
+enum Flamingos2Decker {
+  """Flamingos2Decker Imaging"""
+  IMAGING
+
+  """Flamingos2Decker LongSlit"""
+  LONG_SLIT
+
+  """Flamingos2Decker MOS"""
+  MOS
+}
+
+"""Flamingos2 Readout Mode"""
+enum Flamingos2ReadoutMode {
+  """Flamingos2ReadoutMode Science"""
+  SCIENCE
+
+  """Flamingos2ReadoutMode Engineering"""
+  ENGINEERING
+}
+
+"""Flamingos2 Reads"""
+enum Flamingos2Reads {
+  """Flamingos2Reads Reads 1"""
+  READS_1
+
+  """Flamingos2Reads Reads 3"""
+  READS_3
+
+  """Flamingos2Reads Reads 4"""
+  READS_4
+
+  """Flamingos2Reads Reads 5"""
+  READS_5
+
+  """Flamingos2Reads Reads 6"""
+  READS_6
+
+  """Flamingos2Reads Reads 7"""
+  READS_7
+
+  """Flamingos2Reads Reads 8"""
+  READS_8
+
+  """Flamingos2Reads Reads 9"""
+  READS_9
+
+  """Flamingos2Reads Reads 10"""
+  READS_10
+
+  """Flamingos2Reads Reads 11"""
+  READS_11
+
+  """Flamingos2Reads Reads 12"""
+  READS_12
+
+  """Flamingos2Reads Reads 13"""
+  READS_13
+
+  """Flamingos2Reads Reads 14"""
+  READS_14
+
+  """Flamingos2Reads Reads 15"""
+  READS_15
+
+  """Flamingos2Reads Reads 16"""
+  READS_16
+}
+
+"""Flamingos2 Long Slit mode"""
+type Flamingos2LongSlit {
+  """Flamingos2 Disperser"""
+  disperser: Flamingos2Disperser!
+
+  """Flamingos2 Filter"""
+  filter: Flamingos2Filter!
+
+  """Flamingos2 FPU"""
+  fpu: Flamingos2Fpu!
+
+  """
+  Optional explicitly specified F2 ReadMode. If set it overrides the
+  default.
+  """
+  explicitReadMode: Flamingos2ReadMode
+
+  """
+  Optional explicitly specified F2 Reads. If set it overrides the
+  default.
+  """
+  explicitReads: Flamingos2Reads
+
+  """
+  The decker field is either explicitly specified in explicitDecker or else taken
+  from defaultDecker
+  """
+  decker: Flamingos2Decker!
+
+  """Default decker, calculated based on the exposure time"""
+  defaultDecker: Flamingos2Decker!
+
+  """
+  Optional explicitly specified F2 Decker. If set it overrides the
+  default.
+  """
+  explicitDecker: Flamingos2Decker
+
+  """
+  The readoutMode field is either explicitly specified in explicitReadoutMode or else taken
+  from defaultReadoutMode
+  """
+  readoutMode: Flamingos2ReadoutMode!
+
+  """Default readout mode, science"""
+  defaultReadoutMode: Flamingos2ReadoutMode!
+
+  """
+  Optional explicitly specified F2 Readout mode. If set it overrides the
+  default.
+  """
+  explicitReadoutMode: Flamingos2ReadoutMode
+
+  """
+  Offsets, either explicitly specified in explicitOffsets
+  or else taken from defaultOffsets
+  """
+  offsets: [Offset!]!
+
+  """Default offsets."""
+  defaultOffsets: [Offset!]!
+
+  """
+  Optional explicitly specified offsets. If set it overrides the
+  the default.
+  """
+  explicitOffsets: [Offset!]
+
+  """
+  The disperser as it was initially selected.  See the `disperser` field for the
+  disperser that will be used in the observation.
+  """
+  initialDisperser: Flamingos2Disperser!
+
+  """
+  The filter as it was initially selected (if any).  See the `filter` field
+  for the filter that will be used in the observation.
+  """
+  initialFilter: Flamingos2Filter!
+
+  """
+  The FPU as it was initially selected.  See the `fpu` field for the FPU that
+  will be used in the observation.
+  """
+  initialFpu: Flamingos2Fpu!
+}
+
+"""Metadata for `enum FilterType`"""
+type FilterTypeMeta {
+  tag: FilterType!
+  shortName: String!
+  longName: String!
+}
+
+"""Time and Count exposure time mode."""
+type TimeAndCountExposureTimeMode {
+  """Exposure time."""
+  time: TimeSpan!
+
+  """Exposure count."""
+  count: PosInt!
+
+  """S/N at Wavelength."""
+  at: Wavelength!
+}
+
+type FluxDensityContinuumIntegrated {
+  value: PosBigDecimal!
+  units: FluxDensityContinuumIntegratedUnits!
+  error: PosBigDecimal
+}
+
+"""Flux density continuum integrated units"""
+enum FluxDensityContinuumIntegratedUnits {
+  """W/m²/µm"""
+  W_PER_M_SQUARED_PER_UM
+
+  """erg/s/cm²/Å"""
+  ERG_PER_S_PER_CM_SQUARED_PER_A
+}
+
+type FluxDensityContinuumSurface {
+  value: PosBigDecimal!
+  units: FluxDensityContinuumSurfaceUnits!
+  error: PosBigDecimal
+}
+
+"""Flux density continuum surface units"""
+enum FluxDensityContinuumSurfaceUnits {
+  """W/m²/µm/arcsec²"""
+  W_PER_M_SQUARED_PER_UM_PER_ARCSEC_SQUARED
+
+  """erg/s/cm²/Å/arcsec²"""
+  ERG_PER_S_PER_CM_SQUARED_PER_A_PER_ARCSEC_SQUARED
+}
+
+type FluxDensityEntry {
+  wavelength: Wavelength!
+  density: BigDecimal!
+}
+
+"""Focal plane Single/Multi/IFU"""
+enum FocalPlane {
+  """FocalPlane SingleSlit"""
+  SINGLE_SLIT
+
+  """FocalPlane MultipleSlit"""
+  MULTIPLE_SLIT
+
+  """FocalPlane IFU"""
+  IFU
+}
+
+"""Galaxy spectrum"""
+enum GalaxySpectrum {
+  """GalaxySpectrum Elliptical"""
+  ELLIPTICAL
+
+  """GalaxySpectrum Spiral"""
+  SPIRAL
+}
+
+"""
+Gaussian source, one of bandNormalized and emissionLines will be defined.
+"""
+type GaussianSource {
+  """full width at half maximum"""
+  fwhm: Angle!
+
+  """Band normalized spectral definition"""
+  bandNormalized: BandNormalizedIntegrated
+
+  """Emission lines spectral definition"""
+  emissionLines: EmissionLinesIntegrated
+}
+
+"""Gender Male/Female/Other/NotSpecified"""
+enum Gender {
+  """Gender Male"""
+  MALE
+
+  """Gender Female"""
+  FEMALE
+
+  """Gender Other"""
+  OTHER
+
+  """Gender Not Specified"""
+  NOT_SPECIFIED
+}
+
+"""GMOS amp gain"""
+enum GmosAmpGain {
+  """GmosAmpGain Low"""
+  LOW
+
+  """GmosAmpGain High"""
+  HIGH
+}
+
+"""GMOS amp read mode"""
+enum GmosAmpReadMode {
+  """GmosAmpReadMode Slow"""
+  SLOW
+
+  """GmosAmpReadMode Fast"""
+  FAST
+}
+
+"""GMOS North FPU"""
+enum GmosNorthBuiltinFpu {
+  """GmosNorthBuiltinFpu Ns0"""
+  NS0
+
+  """GmosNorthBuiltinFpu Ns1"""
+  NS1
+
+  """GmosNorthBuiltinFpu Ns2"""
+  NS2
+
+  """GmosNorthBuiltinFpu Ns3"""
+  NS3
+
+  """GmosNorthBuiltinFpu Ns4"""
+  NS4
+
+  """GmosNorthBuiltinFpu Ns5"""
+  NS5
+
+  """GmosNorthBuiltinFpu LongSlit_0_25"""
+  LONG_SLIT_0_25
+
+  """GmosNorthBuiltinFpu LongSlit_0_50"""
+  LONG_SLIT_0_50
+
+  """GmosNorthBuiltinFpu LongSlit_0_75"""
+  LONG_SLIT_0_75
+
+  """GmosNorthBuiltinFpu LongSlit_1_00"""
+  LONG_SLIT_1_00
+
+  """GmosNorthBuiltinFpu LongSlit_1_50"""
+  LONG_SLIT_1_50
+
+  """GmosNorthBuiltinFpu LongSlit_2_00"""
+  LONG_SLIT_2_00
+
+  """GmosNorthBuiltinFpu LongSlit_5_00"""
+  LONG_SLIT_5_00
+
+  """GmosNorthBuiltinFpu Ifu2Slits"""
+  IFU2_SLITS
+
+  """GmosNorthBuiltinFpu IfuBlue"""
+  IFU_BLUE
+
+  """GmosNorthBuiltinFpu IfuRed"""
+  IFU_RED
+}
+
+"""GMOS North Filter"""
+enum GmosNorthFilter {
+  """GmosNorthFilter GPrime"""
+  G_PRIME
+
+  """GmosNorthFilter RPrime"""
+  R_PRIME
+
+  """GmosNorthFilter IPrime"""
+  I_PRIME
+
+  """GmosNorthFilter ZPrime"""
+  Z_PRIME
+
+  """GmosNorthFilter Z"""
+  Z
+
+  """GmosNorthFilter Y"""
+  Y
+
+  """GmosNorthFilter RI"""
+  RI
+
+  """GmosNorthFilter GG455"""
+  GG455
+
+  """GmosNorthFilter OG515"""
+  OG515
+
+  """GmosNorthFilter RG610"""
+  RG610
+
+  """GmosNorthFilter CaT"""
+  CA_T
+
+  """GmosNorthFilter Ha"""
+  HA
+
+  """GmosNorthFilter HaC"""
+  HA_C
+
+  """GmosNorthFilter DS920"""
+  DS920
+
+  """GmosNorthFilter SII"""
+  SII
+
+  """GmosNorthFilter OIII"""
+  OIII
+
+  """GmosNorthFilter OIIIC"""
+  OIIIC
+
+  """GmosNorthFilter OVI"""
+  OVI
+
+  """GmosNorthFilter OVIC"""
+  OVIC
+
+  """GmosNorthFilter HeII"""
+  HE_II
+
+  """GmosNorthFilter HeIIC"""
+  HE_IIC
+
+  """GmosNorthFilter HartmannA_RPrime"""
+  HARTMANN_A_R_PRIME
+
+  """GmosNorthFilter HartmannB_RPrime"""
+  HARTMANN_B_R_PRIME
+
+  """GmosNorthFilter GPrime_GG455"""
+  G_PRIME_GG455
+
+  """GmosNorthFilter GPrime_OG515"""
+  G_PRIME_OG515
+
+  """GmosNorthFilter RPrime_RG610"""
+  R_PRIME_RG610
+
+  """GmosNorthFilter IPrime_CaT"""
+  I_PRIME_CA_T
+
+  """GmosNorthFilter ZPrime_CaT"""
+  Z_PRIME_CA_T
+}
+
+"""GMOS North Grating"""
+enum GmosNorthGrating {
+  """GmosNorthGrating B1200_G5301"""
+  B1200_G5301
+
+  """GmosNorthGrating R831_G5302"""
+  R831_G5302
+
+  """GmosNorthGrating R600_G5304"""
+  R600_G5304
+
+  """GmosNorthGrating B480_G5309"""
+  B480_G5309
+
+  """GmosNorthGrating R400_G5310"""
+  R400_G5310
+
+  """GmosNorthGrating R150_G5308"""
+  R150_G5308
+}
+
+"""GMOS North Long Slit mode"""
+type GmosNorthLongSlit {
+  """GMOS North Grating"""
+  grating: GmosNorthGrating!
+
+  """GMOS North Filter"""
+  filter: GmosNorthFilter
+
+  """GMOS North FPU"""
+  fpu: GmosNorthBuiltinFpu!
+
+  """
+  The central wavelength, either explicitly specified in `explicitCentralWavelength`
+  or else taken from the `defaultCentralWavelength`.
+  """
+  centralWavelength: Wavelength!
+
+  """
+  GMOS X-Binning, either explicitly specified in explicitXBin or else taken
+  from the defaultXBin.
+  """
+  xBin: GmosBinning!
+
+  """
+  Default GMOS X-Binning, calculated from the effective slit size which in
+  turn is based on the selected FPU, target source profile and image quality.
+  """
+  defaultXBin: GmosBinning!
+
+  """
+  Optional explicitly specified GMOS X-Binning. If set it overrides the
+  default.
+  """
+  explicitXBin: GmosBinning
+
+  """
+  GMOS Y-Binning, either explicitly specified in explicitYBin or else taken
+  from the defaultYBin.
+  """
+  yBin: GmosBinning!
+
+  """Default GMOS Y-Binning (TWO)."""
+  defaultYBin: GmosBinning!
+
+  """
+  Optional explicitly specified GMOS Y-Binning. If set it overrides the
+  default.
+  """
+  explicitYBin: GmosBinning
+
+  """
+  GMOS amp read mode, either explicitly specified in explicitAmpReadMode or
+  else taken from the defaultAmpReadMode.
+  """
+  ampReadMode: GmosAmpReadMode!
+
+  """Default GmosAmpReadMode (SLOW)."""
+  defaultAmpReadMode: GmosAmpReadMode!
+
+  """
+  Optional explicitly specified GMOS amp read mode. If set it overrides the
+  default.
+  """
+  explicitAmpReadMode: GmosAmpReadMode
+
+  """
+  GMOS amp read gain, either explicitly specified in explicitAmpGain or else
+  taken from the defaultAmpGain.
+  """
+  ampGain: GmosAmpGain!
+
+  """Default GMOS amp gain (LOW)."""
+  defaultAmpGain: GmosAmpGain!
+
+  """
+  Optional explicitly specified GMOS amp gain.  If set it override the default.
+  """
+  explicitAmpGain: GmosAmpGain
+
+  """
+  GMOS ROI, either explicitly specified in explicitRoi or else taken from the
+  defaultRoi.
+  """
+  roi: GmosRoi!
+
+  """Default GMOS ROI (FULL_FRAME)."""
+  defaultRoi: GmosRoi!
+
+  """
+  Optional explicitly specified GMOS ROI. If set it overrides the default.
+  """
+  explicitRoi: GmosRoi
+
+  """
+  Wavelength dithers required to fill in the chip gaps. This value is either
+  explicitly specified in explicitWavelengthDithers or else taken from
+  defaultWavelengthDithers
+  """
+  wavelengthDithers: [WavelengthDither!]!
+
+  """
+  Default wavelength dithers, calculated based on the grating dispersion.
+  """
+  defaultWavelengthDithers: [WavelengthDither!]!
+
+  """
+  Optional explicitly specified wavelength dithers.  If set it overrides the
+  default.
+  """
+  explicitWavelengthDithers: [WavelengthDither!]
+
+  """
+  Q offsets, either explicitly specified in explicitOffsets
+  or else taken from defaultOffsets
+  """
+  offsets: [OffsetQ!]!
+
+  """Default offsets."""
+  defaultOffsets: [OffsetQ!]!
+
+  """
+  Optional explicitly specified q offsets. If set it overrides the
+  the default.
+  """
+  explicitOffsets: [OffsetQ!]
+
+  """
+  Spacial q offsets, either explicitly specified in explicitSpatialOffsets
+  or else taken from defaultSpatialOffsets
+  @deprecated(reason: "Use 'offsets', 'defaultOffsets', and 'explicitOffsets' instead.")
+  """
+  spatialOffsets: [OffsetQ!]!
+
+  """
+  Default spatial offsets.
+  @deprecated(reason: "Use 'defaultOffsets' instead.")
+  """
+  defaultSpatialOffsets: [OffsetQ!]!
+
+  """
+  Optional explicitly specified spatial q offsets. If set it overrides the
+  the default.
+  @deprecated(reason: "Use 'explicitOffsets' instead.")
+  """
+  explicitSpatialOffsets: [OffsetQ!]
+
+  """
+  The grating as it was initially selected.  See the `grating` field for the
+  grating that will be used in the observation.
+  """
+  initialGrating: GmosNorthGrating!
+
+  """
+  The filter as it was initially selected (if any).  See the `filter` field
+  for the filter that will be used in the observation.
+  """
+  initialFilter: GmosNorthFilter
+
+  """
+  The FPU as it was initially selected.  See the `fpu` field for the FPU that
+  will be used in the observation.
+  """
+  initialFpu: GmosNorthBuiltinFpu!
+
+  """
+  The central wavelength as initially selected.  See the `centralWavelength`
+  field for the wavelength that will be used in the observation.
+  """
+  initialCentralWavelength: Wavelength!
+}
+
+"""GMOS North Imaging mode"""
+type GmosNorthImaging {
+  """GMOS North Filters for imaging mode (multiple filters allowed)"""
+  filters: [GmosNorthFilter!]!
+
+  """
+  Initial GMOS North Filters that were used when creating the imaging mode
+  """
+  initialFilters: [GmosNorthFilter!]!
+
+  """Spatial offsets"""
+  offsets: [Offset!]!
+
+  """
+  MultipleFiltersMode, either explicitly specified in explicitMultipleFiltersMode or else taken
+  from the defaultMultipleFiltersMode.
+  """
+  multipleFiltersMode: MultipleFiltersMode!
+
+  """Default MultipleFiltersMode (GROUPED)."""
+  defaultMultipleFiltersMode: MultipleFiltersMode!
+
+  """
+  Optional explictly specified MultipleFiltersMode. If set it overrides the
+  default.
+  """
+  explicitMultipleFiltersMode: MultipleFiltersMode
+
+  """
+  GMOS Binning, either explicitly specified in explicitBin or else taken
+  from the defaultBin. XBinning == YBinning = Binning
+  """
+  bin: GmosBinning!
+
+  """Default GMOS Binning (TWO)."""
+  defaultBin: GmosBinning!
+
+  """
+  Optional explicitly specified GMOS Binning. If set it overrides the
+  default.
+  """
+  explicitBin: GmosBinning
+
+  """
+  GMOS amp read mode, either explicitly specified in explicitAmpReadMode or
+  else taken from the defaultAmpReadMode.
+  """
+  ampReadMode: GmosAmpReadMode!
+
+  """Default GmosAmpReadMode (SLOW)."""
+  defaultAmpReadMode: GmosAmpReadMode!
+
+  """
+  Optional explicitly specified GMOS amp read mode. If set it overrides the
+  default.
+  """
+  explicitAmpReadMode: GmosAmpReadMode
+
+  """
+  GMOS amp read gain, either explicitly specified in explicitAmpGain or else
+  taken from the defaultAmpGain.
+  """
+  ampGain: GmosAmpGain!
+
+  """Default GMOS amp gain (LOW)."""
+  defaultAmpGain: GmosAmpGain!
+
+  """
+  Optional explicitly specified GMOS amp gain.  If set it override the default.
+  """
+  explicitAmpGain: GmosAmpGain
+
+  """
+  GMOS ROI, either explicitly specified in explicitRoi or else taken from the
+  defaultRoi.
+  """
+  roi: GmosRoi!
+
+  """Default GMOS ROI (FULL_FRAME)."""
+  defaultRoi: GmosRoi!
+
+  """
+  Optional explicitly specified GMOS ROI.  If set it overrides the default.
+  """
+  explicitRoi: GmosRoi
+}
+
+"""GMOS Region Of Interest"""
+enum GmosRoi {
+  """GmosRoi FullFrame"""
+  FULL_FRAME
+
+  """GmosRoi Ccd2"""
+  CCD2
+
+  """GmosRoi CentralSpectrum"""
+  CENTRAL_SPECTRUM
+
+  """GmosRoi CentralStamp"""
+  CENTRAL_STAMP
+
+  """GmosRoi Custom"""
+  CUSTOM
+}
+
+"""GMOS South FPU"""
+enum GmosSouthBuiltinFpu {
+  """GmosSouthBuiltinFpu Ns1"""
+  NS1
+
+  """GmosSouthBuiltinFpu Ns2"""
+  NS2
+
+  """GmosSouthBuiltinFpu Ns3"""
+  NS3
+
+  """GmosSouthBuiltinFpu Ns4"""
+  NS4
+
+  """GmosSouthBuiltinFpu Ns5"""
+  NS5
+
+  """GmosSouthBuiltinFpu LongSlit_0_25"""
+  LONG_SLIT_0_25
+
+  """GmosSouthBuiltinFpu LongSlit_0_50"""
+  LONG_SLIT_0_50
+
+  """GmosSouthBuiltinFpu LongSlit_0_75"""
+  LONG_SLIT_0_75
+
+  """GmosSouthBuiltinFpu LongSlit_1_00"""
+  LONG_SLIT_1_00
+
+  """GmosSouthBuiltinFpu LongSlit_1_50"""
+  LONG_SLIT_1_50
+
+  """GmosSouthBuiltinFpu LongSlit_2_00"""
+  LONG_SLIT_2_00
+
+  """GmosSouthBuiltinFpu LongSlit_5_00"""
+  LONG_SLIT_5_00
+
+  """GmosSouthBuiltinFpu Ifu2Slits"""
+  IFU2_SLITS
+
+  """GmosSouthBuiltinFpu IfuBlue"""
+  IFU_BLUE
+
+  """GmosSouthBuiltinFpu IfuRed"""
+  IFU_RED
+
+  """GmosSouthBuiltinFpu IfuNS2Slits"""
+  IFU_NS2_SLITS
+
+  """GmosSouthBuiltinFpu IfuNSBlue"""
+  IFU_NS_BLUE
+
+  """GmosSouthBuiltinFpu IfuNSRed"""
+  IFU_NS_RED
+}
+
+"""GMOS South Filter"""
+enum GmosSouthFilter {
+  """GmosSouthFilter UPrime"""
+  U_PRIME
+
+  """GmosSouthFilter GPrime"""
+  G_PRIME
+
+  """GmosSouthFilter RPrime"""
+  R_PRIME
+
+  """GmosSouthFilter IPrime"""
+  I_PRIME
+
+  """GmosSouthFilter ZPrime"""
+  Z_PRIME
+
+  """GmosSouthFilter Z"""
+  Z
+
+  """GmosSouthFilter Y"""
+  Y
+
+  """GmosSouthFilter GG455"""
+  GG455
+
+  """GmosSouthFilter OG515"""
+  OG515
+
+  """GmosSouthFilter RG610"""
+  RG610
+
+  """GmosSouthFilter RG780"""
+  RG780
+
+  """GmosSouthFilter CaT"""
+  CA_T
+
+  """GmosSouthFilter HartmannA_RPrime"""
+  HARTMANN_A_R_PRIME
+
+  """GmosSouthFilter HartmannB_RPrime"""
+  HARTMANN_B_R_PRIME
+
+  """GmosSouthFilter GPrime_GG455"""
+  G_PRIME_GG455
+
+  """GmosSouthFilter GPrime_OG515"""
+  G_PRIME_OG515
+
+  """GmosSouthFilter RPrime_RG610"""
+  R_PRIME_RG610
+
+  """GmosSouthFilter IPrime_RG780"""
+  I_PRIME_RG780
+
+  """GmosSouthFilter IPrime_CaT"""
+  I_PRIME_CA_T
+
+  """GmosSouthFilter ZPrime_CaT"""
+  Z_PRIME_CA_T
+
+  """GmosSouthFilter Ha"""
+  HA
+
+  """GmosSouthFilter SII"""
+  SII
+
+  """GmosSouthFilter HaC"""
+  HA_C
+
+  """GmosSouthFilter OIII"""
+  OIII
+
+  """GmosSouthFilter OIIIC"""
+  OIIIC
+
+  """GmosSouthFilter OVI"""
+  OVI
+
+  """GmosSouthFilter OVIC"""
+  OVIC
+
+  """GmosSouthFilter HeII"""
+  HE_II
+
+  """GmosSouthFilter HeIIC"""
+  HE_IIC
+}
+
+"""GMOS South Grating"""
+enum GmosSouthGrating {
+  """GmosSouthGrating B1200_G5321"""
+  B1200_G5321
+
+  """GmosSouthGrating R831_G5322"""
+  R831_G5322
+
+  """GmosSouthGrating R600_G5324"""
+  R600_G5324
+
+  """GmosSouthGrating B480_G5327"""
+  B480_G5327
+
+  """GmosSouthGrating R400_G5325"""
+  R400_G5325
+
+  """GmosSouthGrating R150_G5326"""
+  R150_G5326
+}
+
+"""GMOS South Long Slit mode"""
+type GmosSouthLongSlit {
+  """GMOS South Grating"""
+  grating: GmosSouthGrating!
+
+  """GMOS South Filter"""
+  filter: GmosSouthFilter
+
+  """GMOS South FPU"""
+  fpu: GmosSouthBuiltinFpu!
+
+  """
+  The central wavelength, either explicitly specified in `explicitCentralWavelength`
+  or else taken from the `defaultCentralWavelength`.
+  """
+  centralWavelength: Wavelength!
+
+  """
+  GMOS X-Binning, either explicitly specified in explicitXBin or else taken
+  from the defaultXBin.
+  """
+  xBin: GmosBinning!
+
+  """
+  Default GMOS X-Binning, calculated from the effective slit size which in
+  turn is based on the selected FPU, target source profile and image quality.
+  """
+  defaultXBin: GmosBinning!
+
+  """
+  Optional explicitly specified GMOS X-Binning. If set it overrides the
+  default.
+  """
+  explicitXBin: GmosBinning
+
+  """
+  GMOS Y-Binning, either explicitly specified in explicitYBin or else taken
+  from the defaultYBin.
+  """
+  yBin: GmosBinning!
+
+  """Default GMOS Y-Binning (TWO)."""
+  defaultYBin: GmosBinning!
+
+  """
+  Optional explicitly specified GMOS Y-Binning. If set it overrides the
+  default.
+  """
+  explicitYBin: GmosBinning
+
+  """
+  GMOS amp read mode, either explicitly specified in explicitAmpReadMode or
+  else taken from the defaultAmpReadMode.
+  """
+  ampReadMode: GmosAmpReadMode!
+
+  """Default GmosAmpReadMode (SLOW)."""
+  defaultAmpReadMode: GmosAmpReadMode!
+
+  """
+  Optional explicitly specified GMOS amp read mode. If set it overrides the
+  default.
+  """
+  explicitAmpReadMode: GmosAmpReadMode
+
+  """
+  GMOS amp read gain, either explicitly specified in explicitAmpGain or else
+  taken from the defaultAmpGain.
+  """
+  ampGain: GmosAmpGain!
+
+  """Default GMOS amp gain (LOW)."""
+  defaultAmpGain: GmosAmpGain!
+
+  """
+  Optional explicitly specified GMOS amp gain.  If set it override the default.
+  """
+  explicitAmpGain: GmosAmpGain
+
+  """
+  GMOS ROI, either explicitly specified in explicitRoi or else taken from the
+  defaultRoi.
+  """
+  roi: GmosRoi!
+
+  """Default GMOS ROI (FULL_FRAME)."""
+  defaultRoi: GmosRoi!
+
+  """
+  Optional explicitly specified GMOS ROI. If set it overrides the default.
+  """
+  explicitRoi: GmosRoi
+
+  """
+  Wavelength dithers required to fill in the chip gaps. This value is either
+  explicitly specified in explicitWavelengthDithers or else taken from
+  defaultWavelengthDithers
+  """
+  wavelengthDithers: [WavelengthDither!]!
+
+  """
+  Default wavelength dithers, calculated based on the grating dispersion.
+  """
+  defaultWavelengthDithers: [WavelengthDither!]!
+
+  """
+  Optional explicitly specified wavelength dithers.  If set it overrides the
+  default.
+  """
+  explicitWavelengthDithers: [WavelengthDither!]
+
+  """
+  Q offsets, either explicitly specified in explicitOffsets
+  or else taken from defaultOffsets
+  """
+  offsets: [OffsetQ!]!
+
+  """Default offsets."""
+  defaultOffsets: [OffsetQ!]!
+
+  """
+  Optional explicitly specified q offsets. If set it overrides the
+  the default.
+  """
+  explicitOffsets: [OffsetQ!]
+
+  """
+  Spacial q offsets, either explicitly specified in explicitSpatialOffsets
+  or else taken from defaultSpatialOffsets
+  @deprecated(reason: "Use 'offsets', 'defaultOffsets', and 'explicitOffsets' instead.")
+  """
+  spatialOffsets: [OffsetQ!]!
+
+  """
+  Default spatial offsets.
+  @deprecated(reason: "Use 'defaultOffsets' instead.")
+  """
+  defaultSpatialOffsets: [OffsetQ!]!
+
+  """
+  Optional explicitly specified spatial q offsets. If set it overrides the
+  the default.
+  @deprecated(reason: "Use 'explicitOffsets' instead.")
+  """
+  explicitSpatialOffsets: [OffsetQ!]
+
+  """
+  The grating as it was initially selected.  See the `grating` field for the
+  grating that will be used in the observation.
+  """
+  initialGrating: GmosSouthGrating!
+
+  """
+  The filter as it was initially selected (if any).  See the `filter` field
+  for the filter that will be used in the observation.
+  """
+  initialFilter: GmosSouthFilter
+
+  """
+  The FPU as it was initially selected.  See the `fpu` field for the FPU that
+  will be used in the observation.
+  """
+  initialFpu: GmosSouthBuiltinFpu!
+
+  """
+  The central wavelength as initially selected.  See the `centralWavelength`
+  field for the wavelength that will be used in the observation.
+  """
+  initialCentralWavelength: Wavelength!
+}
+
+"""GMOS South Imaging mode"""
+type GmosSouthImaging {
+  """GMOS South Filters for imaging mode (multiple filters allowed)"""
+  filters: [GmosSouthFilter!]!
+
+  """
+  Initial GMOS South Filters that were used when creating the imaging mode
+  """
+  initialFilters: [GmosSouthFilter!]!
+
+  """Spatial offsets"""
+  offsets: [Offset!]!
+
+  """
+  MultipleFiltersMode, either explicitly specified in explicitMultipleFiltersMode or else taken
+  from the defaultMultipleFiltersMode.
+  """
+  multipleFiltersMode: MultipleFiltersMode!
+
+  """Default MultipleFiltersMode (GROUPED)."""
+  defaultMultipleFiltersMode: MultipleFiltersMode!
+
+  """
+  Optional explictly specified MultipleFiltersMode. If set it overrides the
+  default.
+  """
+  explicitMultipleFiltersMode: MultipleFiltersMode
+
+  """
+  GMOS Binning, either explicitly specified in explicitBin or else taken
+  from the defaultBin. XBinning == YBinning = Binning
+  """
+  bin: GmosBinning!
+
+  """Default GMOS Binning (TWO)."""
+  defaultBin: GmosBinning!
+
+  """
+  Optional explicitly specified GMOS Binning. If set it overrides the
+  default.
+  """
+  explicitBin: GmosBinning
+
+  """
+  GMOS amp read mode, either explicitly specified in explicitAmpReadMode or
+  else taken from the defaultAmpReadMode.
+  """
+  ampReadMode: GmosAmpReadMode!
+
+  """Default GmosAmpReadMode (SLOW)."""
+  defaultAmpReadMode: GmosAmpReadMode!
+
+  """
+  Optional explicitly specified GMOS amp read mode. If set it overrides the
+  default.
+  """
+  explicitAmpReadMode: GmosAmpReadMode
+
+  """
+  GMOS amp read gain, either explicitly specified in explicitAmpGain or else
+  taken from the defaultAmpGain.
+  """
+  ampGain: GmosAmpGain!
+
+  """Default GMOS amp gain (LOW)."""
+  defaultAmpGain: GmosAmpGain!
+
+  """
+  Optional explicitly specified GMOS amp gain.  If set it override the default.
+  """
+  explicitAmpGain: GmosAmpGain
+
+  """
+  GMOS ROI, either explicitly specified in explicitRoi or else taken from the
+  defaultRoi.
+  """
+  roi: GmosRoi!
+
+  """Default GMOS ROI (FULL_FRAME)."""
+  defaultRoi: GmosRoi!
+
+  """
+  Optional explicitly specified GMOS ROI.  If set it overrides the default.
+  """
+  explicitRoi: GmosRoi
+}
+
+"""GMOS Binning"""
+enum GmosBinning {
+  """GmosBinning One"""
+  ONE
+
+  """GmosBinning Two"""
+  TWO
+
+  """GmosBinning Four"""
+  FOUR
+}
+
+"""Gemini Observatory Archive properties for a particular program."""
+type GoaProperties {
+  """
+  How many months to withhold public access to the data.  This property is
+  applicable to science programs, defaults to the proprietary period associated
+  with the Call for Proposals if any; 0 months otherwise.
+  """
+  proprietaryMonths: NonNegInt!
+
+  """
+  Whether the PI wishes to be notified when new data are received. This property
+  is applicable to science programs and defaults to true.
+  """
+  shouldNotify: Boolean!
+
+  """
+  Whether the header (as well as the data itself) should remain private.  This
+  property is applicable to science programs and defaults to false.
+  """
+  privateHeader: Boolean!
+}
+
+"""A group of observations and other groups."""
+type Group {
+  id: GroupId!
+
+  """Id of this group's parent, or null if this group is at the top level."""
+  parentId: GroupId
+
+  """Position of this group in its parent group (or at the top level)."""
+  parentIndex: NonNegShort!
+
+  """The program in which this group is found."""
+  program: Program!
+
+  """Optionally, a name"""
+  name: NonEmptyString
+
+  """Optionally, a description."""
+  description: NonEmptyString
+
+  """
+  How many do we need to complete? If this is null then it means we have to complete them all
+  """
+  minimumRequired: NonNegShort
+
+  """Do they need to be completed in order?"""
+  ordered: Boolean!
+
+  """
+  Is there a minimum required and/or maximum allowed timespan between observations?
+  """
+  minimumInterval: TimeSpan
+  maximumInterval: TimeSpan
+
+  """Contained elements"""
+  elements(includeDeleted: Boolean! = false): [GroupElement!]!
+
+  """
+  Remaining execution time estimate range, assuming it can be calculated.  In
+  order for an observation to have an estimate, it must be fully defined such
+  that a sequence can be generated for it.  If a group has observations that
+  are required and which are not fully defined, the remaining time estimate
+  cannot be calculated.
+  """
+  timeEstimateRange: CalculatedCategorizedTimeRange
+
+  """
+  Prepared time by band ignoring `minimumRequired`, for observations that can be
+  calculated.  In order for an observation to have an estimate, it must be
+  fully defined such that a sequence can be generated for it.  All defined
+  observations in every band present in the group are included.
+  """
+  timeEstimateBanded: [CalculatedBandedTime!]!
+  existence: Existence!
+  system: Boolean!
+}
+
+scalar GroupId
+
+"""
+Groups contain observations and other groups. Exactly one will be defined.
+"""
+type GroupElement {
+  parentGroupId: GroupId
+  parentIndex: NonNegShort!
+  group: Group
+  observation: Observation
+  existence: Existence!
+}
+
+"""The result of creating a new group."""
+type CreateGroupResult {
+  """The newly created group."""
+  group: Group!
+}
+
+"""
+A period of time showing which position angles have guide stars available during the period.
+The position angles are tested every 10 degrees.
+"""
+type GuideAvailabilityPeriod {
+  """The start time of the availability period."""
+  start: Timestamp!
+
+  """Then end time of the availability period."""
+  end: Timestamp!
+
+  """The position angles available during this period."""
+  posAngles: [Angle!]!
+}
+
+"""The guide star(s) and related information"""
+type GuideEnvironment {
+  """The position angle"""
+  posAngle: Angle!
+
+  """
+  A list of GuideProbeTargets, which essentially provides a mapping from guide probes to targets.
+  """
+  guideTargets: [GuideTarget!]!
+}
+
+"""Enumeration for Guide Probes"""
+enum GuideProbe {
+  PWFS_1
+  PWFS_2
+  GMOS_OIWFS
+  FLAMINGOS2_OIWFS
+}
+
+"""
+Type that contains a guide probe and guide target information for use in the GuideEnvironment
+"""
+type GuideTarget {
+  """The guide probe"""
+  probe: GuideProbe!
+
+  """Target name."""
+  name: NonEmptyString!
+
+  """source profile"""
+  sourceProfile: SourceProfile!
+
+  """Sidereal tracking information, if this is a sidereal target"""
+  sidereal: Sidereal
+
+  """Nonsidereal tracking information, if this is a nonsidereal target"""
+  nonsidereal: Nonsidereal
+}
+
+"""HII Region spectrum"""
+enum HiiRegionSpectrum {
+  """HiiRegionSpectrum OrionNebula"""
+  ORION_NEBULA
+}
+
+"""Target right ascension coordinate in format 'HH:MM:SS.sss'"""
+scalar HmsString
+
+type HourAngleRange {
+  """Minimum Hour Angle (hours)"""
+  minHours: BigDecimal!
+
+  """Maximum Hour Angle (hours)"""
+  maxHours: BigDecimal!
+}
+
+"""Image quality"""
+enum ImageQualityPreset {
+  """ImageQualityPreset PointOne"""
+  POINT_ONE
+
+  """ImageQualityPreset PointTwo"""
+  POINT_TWO
+
+  """ImageQualityPreset PointThree"""
+  POINT_THREE
+
+  """ImageQualityPreset PointFour"""
+  POINT_FOUR
+
+  """ImageQualityPreset PointSix"""
+  POINT_SIX
+
+  """ImageQualityPreset PointEight"""
+  POINT_EIGHT
+
+  """ImageQualityPreset OnePointZero"""
+  ONE_POINT_ZERO
+
+  """ImageQualityPreset OnePointFive"""
+  ONE_POINT_FIVE
+
+  """ImageQualityPreset TwoPointZero"""
+  TWO_POINT_ZERO
+}
+
+"""
+Timestamp of time in ISO-8601 representation in format '2011-12-03T10:15:30Z'
+"""
+scalar Timestamp
+
+"""Instrument"""
+enum Instrument {
+  """Instrument AcqCam"""
+  ACQ_CAM
+
+  """Instrument Flamingos2"""
+  FLAMINGOS2
+
+  """Instrument Ghost"""
+  GHOST
+
+  """Instrument GmosNorth"""
+  GMOS_NORTH
+
+  """Instrument GmosSouth"""
+  GMOS_SOUTH
+
+  """Instrument Gnirs"""
+  GNIRS
+
+  """Instrument Gpi"""
+  GPI
+
+  """Instrument Gsaoi"""
+  GSAOI
+
+  """Instrument Igrins2"""
+  IGRINS2
+
+  """Instrument Niri"""
+  NIRI
+
+  """Instrument Visitor"""
+  VISITOR
+
+  """Instrument Scorpio"""
+  SCORPIO
+
+  """Instrument Alopeke"""
+  ALOPEKE
+
+  """Instrument Zorro"""
+  ZORRO
+}
+
+"""Describes an instrument configuration option for spectroscopy."""
+type SpectroscopyConfigOption {
+  name: NonEmptyString!
+  instrument: Instrument!
+  focalPlane: FocalPlane!
+  fpuLabel: NonEmptyString!
+  slitWidth: Angle!
+  slitLength: Angle!
+  disperserLabel: NonEmptyString!
+  filterLabel: NonEmptyString
+  wavelengthMin: Wavelength!
+  wavelengthMax: Wavelength!
+  wavelengthOptimal: Wavelength!
+  wavelengthCoverage: Wavelength!
+  resolution: PosInt!
+  adaptiveOptics: Boolean!
+
+  """A special capability (if any) that the configuration may have."""
+  capability: SpectroscopyCapabilities
+  site: Site!
+
+  """
+  For GMOS North options, the GMOS North configuration.  Null for other
+  instruments.
+  """
+  gmosNorth: SpectroscopyConfigOptionGmosNorth
+
+  """
+  For GMOS South options, the GMOS South configuration.  Null for other
+  instruments.
+  """
+  gmosSouth: SpectroscopyConfigOptionGmosSouth
+
+  """
+  For Flamingos2 options, the Flamingos 2configuration.  Null for other
+  instruments.
+  """
+  flamingos2: SpectroscopyConfigOptionFlamingos2
+}
+
+type SpectroscopyConfigOptionGmosNorth {
+  fpu: GmosNorthBuiltinFpu!
+  grating: GmosNorthGrating!
+  filter: GmosNorthFilter
+}
+
+type SpectroscopyConfigOptionGmosSouth {
+  fpu: GmosSouthBuiltinFpu!
+  grating: GmosSouthGrating!
+  filter: GmosSouthFilter
+}
+
+type SpectroscopyConfigOptionFlamingos2 {
+  fpu: Flamingos2Fpu!
+  disperser: Flamingos2Disperser!
+  filter: Flamingos2Filter!
+}
+
+type ImagingScienceRequirements {
+  """
+  minimumFov, which may be unset by assigning a null value, or ignored by
+  skipping it altogether.
+  """
+  minimumFov: Angle
+
+  """
+  narrowFilters, which may be unset by assigning a null value, or ignored by
+  skipping it altogether.
+  """
+  narrowFilters: Boolean
+
+  """
+  broadFilters, which may be unset by assigning a null value, or ignored by
+  skipping it altogether.
+  """
+  broadFilters: Boolean
+
+  """
+  combinedFilters, which may be unset by assigning a null value, or ignored by
+  skipping it altogether.
+  """
+  combinedFilters: Boolean
+}
+
+"""Describes an instrument configuration option for imaging."""
+type ImagingConfigOption {
+  instrument: Instrument!
+  filterLabel: NonEmptyString!
+  adaptiveOptics: Boolean!
+  site: Site!
+  fov: Angle!
+
+  """
+  For GMOS North options, the GMOS North configuration.  Null for other
+  instruments.
+  """
+  gmosNorth: ImagingConfigOptionGmosNorth
+
+  """
+  For GMOS South options, the GMOS South configuration.  Null for other
+  instruments.
+  """
+  gmosSouth: ImagingConfigOptionGmosSouth
+}
+
+type ImagingConfigOptionGmosNorth {
+  filter: GmosNorthFilter!
+}
+
+type ImagingConfigOptionGmosSouth {
+  filter: GmosSouthFilter!
+}
+
+"""An 'Int` in the range 0 to 100"""
+scalar IntPercent
+
+"""
+Contains the result of calling the ITC for a particular observation.  Since
+the observation may contain multiple targets, there may be multiple results.
+The "result" field contains the selected, representative, result for all
+targets.  If there are multiple successful results, this will be the one that
+prescribes the longest observation. If there is a mix of failures and
+successes, the overall "result" will be a failure. The "all" field contains
+results for all targets regardless.
+"""
+type ItcResultSet {
+  selected: ItcResult!
+  all: [ItcResult!]
+  index: NonNegInt!
+}
+
+"""Calculated signal to noise at a specific wavelength"""
+type SignalToNoiseAt {
+  """Single exposure signal to noise"""
+  single: SignalToNoise!
+
+  """Total exposure signal to noise"""
+  total: SignalToNoise!
+
+  """Wavelength sn was calculated at"""
+  wavelength: Wavelength!
+}
+
+"""A single ITC call result."""
+type ItcResult {
+  targetId: TargetId!
+  exposureTime: TimeSpan!
+  exposureCount: NonNegInt!
+  signalToNoiseAt: SignalToNoiseAt
+}
+
+type LineFluxIntegrated {
+  value: PosBigDecimal!
+  units: LineFluxIntegratedUnits!
+}
+
+"""Line flux integrated units"""
+enum LineFluxIntegratedUnits {
+  """W/m²"""
+  W_PER_M_SQUARED
+
+  """erg/s/cm²"""
+  ERG_PER_S_PER_CM_SQUARED
+}
+
+type LineFluxSurface {
+  value: PosBigDecimal!
+  units: LineFluxSurfaceUnits!
+}
+
+"""Line flux surface units"""
+enum LineFluxSurfaceUnits {
+  """W/m²/arcsec²"""
+  W_PER_M_SQUARED_PER_ARCSEC_SQUARED
+
+  """erg/s/cm²/arcsec²"""
+  ERG_PER_S_PER_CM_SQUARED_PER_ARCSEC_SQUARED
+}
+
+"""A String value that cannot be empty"""
+scalar NonEmptyString
+
+"""A `Short` in the range from 0 to 32767"""
+scalar NonNegShort
+
+"""An `Int` in the range from 0 to 2147483647"""
+scalar NonNegInt
+
+type Nonsidereal {
+  """
+  Human readable designation that discriminates among ephemeris keys of the same type.
+  """
+  des: String!
+
+  """Nonsidereal target lookup type."""
+  keyType: EphemerisKeyType!
+
+  """Synthesis of `keyType` and `des`"""
+  key: String!
+}
+
+"""
+Timing window inclusion options. Exclusions always take precedence over inclusions.
+"""
+enum TimingWindowInclusion {
+  """Inclusion Timing Window"""
+  INCLUDE
+
+  """Exclusion Timing Window"""
+  EXCLUDE
+}
+
+"""Timing window repetition"""
+type TimingWindowRepeat {
+  """Repeat period, counting from the start of the window."""
+  period: TimeSpan!
+
+  """Repetition times. If absent, will repeat forever."""
+  times: PosInt
+}
+
+"""Timing window end at a specified date and time."""
+type TimingWindowEndAt {
+  """Window end date and time, in UTC."""
+  atUtc: Timestamp!
+}
+
+"""Timing window end after a period of time."""
+type TimingWindowEndAfter {
+  """Window duration."""
+  after: TimeSpan!
+
+  """Window repetetion. If absent, will not repeat."""
+  repeat: TimingWindowRepeat
+}
+
+"""Timing window end."""
+union TimingWindowEnd = TimingWindowEndAt | TimingWindowEndAfter
+
+type TimingWindow {
+  """Whether this is an INCLUDE or EXCLUDE window."""
+  inclusion: TimingWindowInclusion!
+
+  """Window start time, in UTC."""
+  startUtc: Timestamp!
+
+  """Window end. If absent, the window will never end."""
+  end: TimingWindowEnd
+}
+
+type Observation {
+  """Observation ID"""
+  id: ObservationId!
+
+  """DELETED or PRESENT"""
+  existence: Existence!
+
+  """
+  Observation reference, if any (requires the existence of a reference for the
+  program itself).
+  """
+  reference: ObservationReference
+
+  """Observation index, relative to other observations in the same program."""
+  index: PosInt!
+
+  """Observation title generated from id and targets"""
+  title: NonEmptyString!
+
+  """User-supplied observation-identifying detail information"""
+  subtitle: NonEmptyString
+
+  """
+  Observations are associated with a science band once time has been allocated
+  to a program.
+  """
+  scienceBand: ScienceBand
+
+  """
+  Reference time used for execution and visualization and time-dependent calculations
+  (e.g., average parallactic angle and guide star selection)
+  """
+  observationTime: Timestamp
+
+  """
+  Used in conjunction with observationTime for time-dependentent calulations. If not
+  set, the remaining observation execution time will be used.
+  """
+  observationDuration: TimeSpan
+
+  """Position angle constraint, if any."""
+  posAngleConstraint: PosAngleConstraint!
+
+  """The program that contains this observation"""
+  program: Program!
+
+  """The observation's target(s)"""
+  targetEnvironment: TargetEnvironment!
+
+  """The constraint set for the observation"""
+  constraintSet: ConstraintSet!
+
+  """Observation timing windows"""
+  timingWindows: [TimingWindow!]!
+
+  """attachments"""
+  attachments: [Attachment!]!
+
+  """The top level science requirements"""
+  scienceRequirements: ScienceRequirements!
+
+  """The science configuration"""
+  observingMode: ObservingMode
+
+  """
+  The instrument in use for this observation, if the observing mode is set.
+  """
+  instrument: Instrument
+
+  """Execution sequence and runtime artifacts"""
+  execution: Execution!
+
+  """
+  The ITC result for this observation, assuming it has associated target(s)
+  and a selected observing mode.
+  """
+  itc: Itc!
+
+  """Enclosing group, if any."""
+  groupId: GroupId
+
+  """
+  Index in enclosing group or at the top level if ungrouped. If left unspecified on creation, observation will be added last in its enclosing group or at the top level. Cannot be set to null.
+  """
+  groupIndex: NonNegShort!
+
+  """The Calibration role of this observation"""
+  calibrationRole: CalibrationRole
+
+  """Notes for the observer"""
+  observerNotes: NonEmptyString
+
+  """Parameters relevant to approved configurations."""
+  configuration: Configuration!
+
+  """Program configuration requests applicable to this observation."""
+  configurationRequests: [ConfigurationRequest!]!
+
+  """
+  Obtains the current observation workflow state and valid transitions (and any
+  validation errors). Because this calculation is expensive, it is performed in
+  the background when something relevant changes and may be in a state of flux
+  when queried.  The calculation state in the result can be used to determine
+  whether a pending update is expected.
+  """
+  workflow: CalculatedObservationWorkflow
+}
+
+enum ExecutionState {
+  """
+  The sequence or observation isn't sufficiently defined, or there is a problem
+  that must first be resolved.
+  """
+  NOT_DEFINED
+
+  """No execution visit has been recorded."""
+  NOT_STARTED
+
+  """
+  At least one visit was made, but the sequence or observation is not yet
+  complete.
+  """
+  ONGOING
+
+  """No more data is expected."""
+  COMPLETED
+
+  """
+  User marked the observation complete regardless of any remaining steps.
+  """
+  DECLARED_COMPLETE
+}
+
+"""A configuration target will define either coordinates or a region."""
+type ConfigurationTarget {
+  coordinates: Coordinates
+  region: Region
+}
+
+type Configuration {
+  conditions: ConfigurationConditions!
+  target: ConfigurationTarget
+  observingMode: ConfigurationObservingMode
+}
+
+type ConfigurationConditions {
+  imageQuality: ImageQualityPreset!
+  cloudExtinction: CloudExtinctionPreset!
+  skyBackground: SkyBackground!
+  waterVapor: WaterVapor!
+}
+
+type ConfigurationObservingMode {
+  instrument: Instrument!
+  mode: ObservingModeType!
+  gmosNorthLongSlit: ConfigurationGmosNorthLongSlit
+  gmosSouthLongSlit: ConfigurationGmosSouthLongSlit
+  gmosNorthImaging: ConfigurationGmosNorthImaging
+  gmosSouthImaging: ConfigurationGmosSouthImaging
+  flamingos2LongSlit: ConfigurationFlamingos2LongSlit
+}
+
+type ConfigurationGmosNorthLongSlit {
+  grating: GmosNorthGrating!
+}
+
+type ConfigurationGmosSouthLongSlit {
+  grating: GmosSouthGrating!
+}
+
+type ConfigurationGmosNorthImaging {
+  filters: [GmosNorthFilter!]!
+}
+
+type ConfigurationGmosSouthImaging {
+  filters: [GmosSouthFilter!]!
+}
+
+type ConfigurationFlamingos2LongSlit {
+  disperser: Flamingos2Disperser!
+}
+
+scalar ConfigurationRequestId
+
+enum ConfigurationRequestStatus {
+  REQUESTED
+  APPROVED
+  DENIED
+  WITHDRAWN
+}
+
+type ConfigurationRequest {
+  id: ConfigurationRequestId!
+  program: Program!
+  status: ConfigurationRequestStatus!
+  justification: NonEmptyString
+  configuration: Configuration!
+  applicableObservations: [ObservationId!]!
+}
+
+type Itc {
+  """The ITC result for the science part of the sequence"""
+  science: ItcResultSet!
+
+  """The ITC result for the acquisition part of the sequence"""
+  acquisition: ItcResultSet!
+}
+
+"""ObservationId id formatted as `o-[1-9a-f][0-9a-f]*`"""
+scalar ObservationId
+
+"""
+The matching observation results, limited to a maximum of 1000 entries.
+"""
+type ObservationSelectResult {
+  """Matching observations up to the return size limit of 1000"""
+  matches: [Observation!]!
+
+  """`true` when there were additional matches that were not returned."""
+  hasMore: Boolean!
+}
+
+"""
+The matching configuration requests, limited to a maximum of 1000 entries.
+"""
+type ConfigurationRequestSelectResult {
+  """Matching configuration requests up to the return size limit of 1000"""
+  matches: [ConfigurationRequest!]!
+
+  """`true` when there were additional matches that were not returned."""
+  hasMore: Boolean!
+}
+
+"""How sequences are generated when multiple filters are specified."""
+enum MultipleFiltersMode {
+  """Grouped filters"""
+  GROUPED
+
+  """Interleaved filters"""
+  INTERLEAVED
+}
+
+"""
+Observation reference type, broken into its constituient parts and including
+a formatted label.
+"""
+type ObservationReference {
+  """Formatted observation reference label."""
+  label: ObservationReferenceLabel!
+
+  """The program reference."""
+  program: ProgramReference!
+
+  """The observation index relative to its program."""
+  index: PosInt!
+}
+
+"""
+Observation reference, formatted according to the program type, suffixed with
+observation index. For example, G-2024B-1234-Q-0001 where G-2024B-1234-Q is
+the program reference label and the observation index is 1.
+"""
+scalar ObservationReferenceLabel
+
+"""An observation validation problem"""
+type ObservationValidation {
+  """The type of validation problem"""
+  code: ObservationValidationCode!
+
+  """Particular errors for this validation type"""
+  messages: [String!]!
+}
+
+"""Types of observation validations"""
+enum ObservationValidationCode {
+  """The observation is not configured correctly and cannot be executed"""
+  CONFIGURATION_ERROR
+
+  """
+  The observation does not meet the requirements of the Call for Proposals
+  """
+  CFP_ERROR
+
+  """The observation does not have valid ITC results."""
+  ITC_ERROR
+  CONFIG_REQUEST_UNAVAILABLE
+  CONFIG_REQUEST_NOT_REQUESTED
+  CONFIG_REQUEST_DENIED
+  CONFIG_REQUEST_PENDING
+}
+
+"""
+Each step in a sequence is tagged with an observe class which identifies its
+purpose and who is ultimately charged for the time for that observe.
+"""
+enum ObserveClass {
+  """Science dataset, charged to the program."""
+  SCIENCE
+
+  """Nighttime calibration, charged to the program."""
+  NIGHT_CAL
+
+  """Acquisition, charged to the program."""
+  ACQUISITION
+
+  """Daytime calibration, charged to the observatory."""
+  DAY_CAL
+}
+
+type Parallax {
+  """Parallax in microarcseconds"""
+  microarcseconds: Long!
+
+  """Parallax in milliarcseconds"""
+  milliarcseconds: BigDecimal!
+}
+
+"""Planet spectrum"""
+enum PlanetSpectrum {
+  """PlanetSpectrum Mars"""
+  MARS
+
+  """PlanetSpectrum Jupiter"""
+  JUPITER
+
+  """PlanetSpectrum Saturn"""
+  SATURN
+
+  """PlanetSpectrum Uranus"""
+  URANUS
+
+  """PlanetSpectrum Neptune"""
+  NEPTUNE
+}
+
+"""Planetary nebula spectrum"""
+enum PlanetaryNebulaSpectrum {
+  """PlanetaryNebulaSpectrum NGC7009"""
+  NGC7009
+
+  """PlanetaryNebulaSpectrum IC5117"""
+  IC5117
+}
+
+"""Constraints (if any) on the observation's position angle."""
+type PosAngleConstraint {
+  """
+  The position angle constraint mode in use.  The value will determine whether
+  the angle is respected or ignored.
+  """
+  mode: PosAngleConstraintMode!
+
+  """
+  The fixed position angle.  This will be kept but ignored for UNBOUNDED and
+  AVERAGE_PARALLACTIC modes.
+  """
+  angle: Angle!
+}
+
+"""Position angle constraint type"""
+enum PosAngleConstraintMode {
+  """PosAngleConstraintMode Unbounded"""
+  UNBOUNDED
+
+  """PosAngleConstraintMode Fixed"""
+  FIXED
+
+  """PosAngleConstraintMode AllowFlip"""
+  ALLOW_FLIP
+
+  """PosAngleConstraintMode AverageParallactic"""
+  AVERAGE_PARALLACTIC
+
+  """PosAngleConstraintMode ParallacticOverride"""
+  PARALLACTIC_OVERRIDE
+}
+
+"""A `BigDecimal` greater than 0"""
+scalar PosBigDecimal
+
+"""An `Int` in the range from 1 to 2147483647"""
+scalar PosInt
+
+type Program {
+  """Program ID"""
+  id: ProgramId!
+
+  """DELETED or PRESENT"""
+  existence: Existence!
+
+  """Program name / title."""
+  name: NonEmptyString
+
+  """Program description / abstract."""
+  description: NonEmptyString
+
+  """Notes associated with the program, if any."""
+  notes(includeDeleted: Boolean! = false): [ProgramNote!]!
+
+  """Program type"""
+  type: ProgramType!
+
+  """Program reference, if any."""
+  reference: ProgramReference
+
+  """Program proposal"""
+  proposal: Proposal
+
+  """
+  Active period for this program.  Observations must be completed during this
+  time interval. By default, if there is an associated proposal tied to a
+  particular Call for Proposals (CfP), the active period will correspond to the
+  Cfp active period.
+  """
+  active: DateInterval!
+
+  """Proposal status of the program"""
+  proposalStatus: ProposalStatus!
+
+  """Principal Investigator"""
+  pi: ProgramUser
+
+  """Users assigned to this science program"""
+  users: [ProgramUser!]!
+
+  """All observations associated with the program."""
+  observations(
+    """Set to true to include deleted values"""
+    includeDeleted: Boolean! = false
+
+    """
+    Starts the result set at (or after if not existent) the given observation id.
+    """
+    OFFSET: ObservationId
+
+    """
+    Limits the result to at most this number of matches (but never more than 1000).
+    """
+    LIMIT: NonNegInt
+  ): ObservationSelectResult!
+
+  """All configuration requests associated with the program."""
+  configurationRequests(
+    """
+    Starts the result set at (or after if not existent) the given configuration request id.
+    """
+    OFFSET: ConfigurationRequestId
+
+    """
+    Limits the result to at most this number of matches (but never more than 1000).
+    """
+    LIMIT: NonNegInt
+  ): ConfigurationRequestSelectResult!
+
+  """Attachments assocated with the program"""
+  attachments: [Attachment!]!
+
+  """Top-level group elements (observations and sub-groups) in the program."""
+  groupElements(includeDeleted: Boolean! = false): [GroupElement!]!
+
+  """All group elements (observations and sub-groups) in the program."""
+  allGroupElements(includeDeleted: Boolean! = false): [GroupElement!]!
+
+  """
+  Remaining execution time estimate range, assuming it can be calculated.  In
+  order for an observation to have an estimate, it must be fully defined such
+  that a sequence can be generated for it.  If a program has observations that
+  are required and which are not fully defined, the remaining time estimate
+  cannot be calculated.
+  """
+  timeEstimateRange: CalculatedCategorizedTimeRange
+
+  """
+  Prepared time by band ignoring `minimumRequired` in groups, for observations
+  that can be calculated.  In order for an observation to have an estimate, it
+  must be fully defined such that a sequence can be generated for it.  All
+  defined observations in every band present in the program are included.
+  """
+  timeEstimateBanded: [CalculatedBandedTime!]!
+
+  """
+  Program-wide time charge, summing all corrected observation time charges.
+  """
+  timeCharge: [BandedTime!]!
+
+  """All user invitations associated with this program."""
+  userInvitations: [UserInvitation!]!
+
+  """All partner time allocations."""
+  allocations: [Allocation!]!
+
+  """Calibration role of the program"""
+  calibrationRole: CalibrationRole
+
+  """Observatory archive properties related to this program."""
+  goa: GoaProperties!
+}
+
+"""ProgramId id formatted as `p-[1-9a-f][0-9a-f]*`"""
+scalar ProgramId
+
+"""
+Program notes are arbitrary titled text messages associated with a particular
+program.  Notes may be private, in which case they are only visible to staff.
+"""
+type ProgramNote {
+  """This note's unique id."""
+  id: ProgramNoteId!
+
+  """The program with which this note is associated."""
+  program: Program!
+
+  """The note title."""
+  title: NonEmptyString!
+
+  """The note text, if any."""
+  text: NonEmptyString
+
+  """Whether the note is only available to Gemini staff."""
+  isPrivate: Boolean!
+
+  """DELETED or PRESENT"""
+  existence: Existence!
+}
+
+"""ProgramNoteId is formated as `n-[1-9a-f][0-9a-f]*`"""
+scalar ProgramNoteId
+
+"""
+Defines the category of program references, where specific implementations exist
+for calibration, engineering, etc.
+"""
+interface ProgramReference {
+  label: ProgramReferenceLabel!
+  type: ProgramType!
+}
+
+type CalibrationProgramReference implements ProgramReference {
+  label: ProgramReferenceLabel!
+  type: ProgramType!
+  instrument: Instrument!
+  semester: Semester!
+  semesterIndex: PosInt!
+}
+
+type CommissioningProgramReference implements ProgramReference {
+  label: ProgramReferenceLabel!
+  type: ProgramType!
+  instrument: Instrument!
+  semester: Semester!
+  semesterIndex: PosInt!
+}
+
+type EngineeringProgramReference implements ProgramReference {
+  label: ProgramReferenceLabel!
+  type: ProgramType!
+  instrument: Instrument!
+  semester: Semester!
+  semesterIndex: PosInt!
+}
+
+type ExampleProgramReference implements ProgramReference {
+  label: ProgramReferenceLabel!
+  type: ProgramType!
+  instrument: Instrument!
+}
+
+type LibraryProgramReference implements ProgramReference {
+  label: ProgramReferenceLabel!
+  type: ProgramType!
+  description: NonEmptyString!
+  instrument: Instrument!
+}
+
+type MonitoringProgramReference implements ProgramReference {
+  label: ProgramReferenceLabel!
+  type: ProgramType!
+  instrument: Instrument!
+  semester: Semester!
+  semesterIndex: PosInt!
+}
+
+type ScienceProgramReference implements ProgramReference {
+  label: ProgramReferenceLabel!
+  type: ProgramType!
+  scienceSubtype: ScienceSubtype!
+  semester: Semester!
+  semesterIndex: PosInt!
+}
+
+type SystemProgramReference implements ProgramReference {
+  label: ProgramReferenceLabel!
+  type: ProgramType!
+}
+
+"""
+Program reference, formatted according to the type.  For example, a Science
+Program has format G-YYYY[AB]-NNNN+-[CDLFSV]. For example, G-2024B-1234-Q
+where 2024B refers to the associated semester.
+"""
+scalar ProgramReferenceLabel
+
+type ProgramNoteSelectResult {
+  """Matching notes up to the return size limit of 1000."""
+  matches: [ProgramNote!]!
+
+  """`true` when there were additional matches that were not returned."""
+  hasMore: Boolean!
+}
+
+"""The matching program results, limited to a maximum of 1000 entries."""
+type ProgramSelectResult {
+  """Matching programs up to the return size limit of 1000"""
+  matches: [Program!]!
+
+  """`true` when there were additional matches that were not returned."""
+  hasMore: Boolean!
+}
+
+enum ProgramType {
+  CALIBRATION
+  ENGINEERING
+  EXAMPLE
+  LIBRARY
+  SCIENCE
+  SYSTEM
+}
+
+"""
+The matching program user results, limited to a maximum of 1000 entries.
+"""
+type ProgramUserSelectResult {
+  """Matching program users up to the return size limit of 1000"""
+  matches: [ProgramUser!]!
+
+  """`true` when there were additional matches that were not returned."""
+  hasMore: Boolean!
+}
+
+type ProperMotion {
+  """Proper motion in RA"""
+  ra: ProperMotionRA!
+
+  """Proper motion in declination"""
+  dec: ProperMotionDeclination!
+}
+
+type ProperMotionDeclination {
+  """Proper motion in properMotion μas/year"""
+  microarcsecondsPerYear: Long!
+
+  """Proper motion in properMotion mas/year"""
+  milliarcsecondsPerYear: BigDecimal!
+}
+
+type ProperMotionRA {
+  """Proper motion in properMotion μas/year"""
+  microarcsecondsPerYear: Long!
+
+  """Proper motion in properMotion mas/year"""
+  milliarcsecondsPerYear: BigDecimal!
+}
+
+type Proposal {
+  """
+  The proposal reference, assuming the proposal has been submitted and
+  assigned a semester.
+  """
+  reference: ProposalReference
+
+  """
+  The corresponding CallForProposals definition itself, if the call id has been
+  set.
+  """
+  call: CallForProposals
+
+  """Proposal TAC category"""
+  category: TacCategory
+
+  """
+  Properties of this proposal that are dependent upon the Call for Proposals
+  type.
+  """
+  type: ProposalType!
+}
+
+type ProposalReference {
+  label: ProposalReferenceLabel!
+  semester: Semester!
+  semesterIndex: PosInt!
+}
+
+"""
+Proposal reference for science programs, formatted as G-YYYY[AB]-NNNN+. For
+example, G-2024B-1234 where 2024B refers to the associated semester.
+"""
+scalar ProposalReferenceLabel
+
+"""Metadata for `enum ProposalStatus`"""
+type ProposalStatusMeta {
+  tag: ProposalStatus!
+  name: String!
+}
+
+"""Quasar spectrum"""
+enum QuasarSpectrum {
+  """QuasarSpectrum QS0"""
+  QS0
+
+  """QuasarSpectrum QS02"""
+  QS02
+}
+
+type RadialVelocity {
+  """Radial velocity in cm/s"""
+  centimetersPerSecond: Long!
+
+  """Radial velocity in m/s"""
+  metersPerSecond: BigDecimal!
+
+  """Radial velocity in km/s"""
+  kilometersPerSecond: BigDecimal!
+}
+
+type RightAscension {
+  """Right Ascension (RA) in HH:MM:SS.SSS format"""
+  hms: HmsString!
+
+  """Right Ascension (RA) in hours"""
+  hours: BigDecimal!
+
+  """Right Ascension (RA) in degrees"""
+  degrees: BigDecimal!
+
+  """Right Ascension (RA) in µs"""
+  microseconds: Long!
+}
+
+"""Base science mode"""
+type ObservingMode {
+  """Instrument"""
+  instrument: Instrument!
+
+  """Mode type"""
+  mode: ObservingModeType!
+
+  """GMOS North Long Slit mode"""
+  gmosNorthLongSlit: GmosNorthLongSlit
+
+  """GMOS South Long Slit mode"""
+  gmosSouthLongSlit: GmosSouthLongSlit
+
+  """GMOS North Imaging mode"""
+  gmosNorthImaging: GmosNorthImaging
+
+  """GMOS South Imaging mode"""
+  gmosSouthImaging: GmosSouthImaging
+
+  """Flamingos 2 Long Slit mode"""
+  flamingos2LongSlit: Flamingos2LongSlit
+}
+
+type ObservingModeGroup {
+  """Observations associated with the common value"""
+  observations(
+    """Set to true to include deleted values"""
+    includeDeleted: Boolean! = false
+
+    """
+    Starts the result set at (or after if not existent) the given observation id.
+    """
+    OFFSET: ObservationId
+
+    """
+    Limits the result to at most this number of matches (but never more than 1000).
+    """
+    LIMIT: NonNegInt
+  ): ObservationSelectResult!
+
+  """Commonly held value across the observations"""
+  observingMode: ObservingMode!
+
+  """Link back to program."""
+  program: Program!
+}
+
+"""
+The matching ObservingModeGroup results, limited to a maximum of 1000 entries.
+"""
+type ObservingModeGroupSelectResult {
+  """Matching ObservingModeGroups up to the return size limit of 1000"""
+  matches: [ObservingModeGroup!]!
+
+  """`true` when there were additional matches that were not returned."""
+  hasMore: Boolean!
+}
+
+"""Mode Spectroscopy/Imaging"""
+enum ScienceMode {
+  """ScienceMode Imaging"""
+  IMAGING
+
+  """ScienceMode Spectroscopy"""
+  SPECTROSCOPY
+}
+
+"""Science observation priorities."""
+enum ScienceBand {
+  BAND1
+  BAND2
+  BAND3
+  BAND4
+}
+
+"""
+Science program types, for science programs only (i.e., not calibration,
+engineering, library, etc.).
+"""
+enum ScienceSubtype {
+  CLASSICAL
+  DIRECTORS_TIME
+  FAST_TURNAROUND
+  LARGE_PROGRAM
+  POOR_WEATHER
+  QUEUE
+  DEMO_SCIENCE
+  SYSTEM_VERIFICATION
+}
+
+type ScienceRequirements {
+  """Science mode"""
+  mode: ScienceMode
+
+  """Requested exposure time mode."""
+  exposureTimeMode: ExposureTimeMode
+
+  """
+  Spectroscopy requirements, if mode is Spectroscopy, this mode must be set
+  """
+  spectroscopy: SpectroscopyScienceRequirements
+
+  """Imaging requirements, if mode is Imaging, this mode must be set"""
+  imaging: ImagingScienceRequirements
+}
+
+type ScienceRequirementsGroup {
+  """IDs of observations that use the same constraints"""
+  observationIds: [ObservationId!]!
+
+  """Observations associated with the common value"""
+  observations(
+    """Set to true to include deleted values"""
+    includeDeleted: Boolean! = false
+
+    """
+    Starts the result set at (or after if not existent) the given observation id.
+    """
+    OFFSET: ObservationId
+
+    """
+    Limits the result to at most this number of matches (but never more than 1000).
+    """
+    LIMIT: NonNegInt
+  ): ObservationSelectResult!
+
+  """Commonly held value across the observations"""
+  scienceRequirements: ScienceRequirements!
+}
+
+"""
+The matching scienceRequirementsGroup results, limited to a maximum of 1000 entries.
+"""
+type ScienceRequirementsGroupSelectResult {
+  """Matching scienceRequirementsGroups up to the return size limit of 1000"""
+  matches: [ScienceRequirementsGroup!]!
+
+  """`true` when there were additional matches that were not returned."""
+  hasMore: Boolean!
+}
+
+"""
+Semester string (from 2000A) in the format YYYY[AB].  An abbreviated format,
+which assumes the millennium 2000, is also permitted.  For example, 24A is read
+as 2024A.
+"""
+scalar Semester
+
+"""Sequence-level command"""
+enum SequenceCommand {
+  """SequenceCommand ABORT"""
+  ABORT
+
+  """SequenceCommand CONTINUE"""
+  CONTINUE
+
+  """SequenceCommand PAUSE"""
+  PAUSE
+
+  """SequenceCommand START"""
+  START
+
+  """SequenceCommand STOP"""
+  STOP
+}
+
+type SequenceDigest {
+  """ObserveClass of the whole sequence."""
+  observeClass: ObserveClass!
+
+  """Time estimate for the whole sequence."""
+  timeEstimate: CategorizedTime!
+
+  """Unique offsets that occur in the sequence."""
+  offsets: [Offset!]!
+
+  """
+  Total count of anticipated atoms, including the 'nextAtom', 'possibleFuture'
+  and any remaining atoms not included in 'possibleFuture'.
+  """
+  atomCount: NonNegInt!
+
+  """
+  Execution state for the sequence. Note, acquisition sequences are never
+  'COMPLETED'.  The execution state for the observation as a whole is that of
+  the science sequence.
+  """
+  executionState: ExecutionState!
+}
+
+"""
+Sequence-level events.  As commands are issued to execute a sequence, corresponding events are generated.
+"""
+type SequenceEvent implements ExecutionEvent {
+  """Event id."""
+  id: ExecutionEventId!
+
+  """Visit associated with this event."""
+  visit: Visit!
+
+  """Observation whose execution produced this event."""
+  observation: Observation!
+
+  """Time at which this event was received."""
+  received: Timestamp!
+
+  """Event type."""
+  eventType: ExecutionEventType!
+
+  """Sequence event data."""
+  command: SequenceCommand!
+
+  """Client id, if any."""
+  clientId: ClientId
+}
+
+"""Type of sequence, acquisition or science"""
+enum SequenceType {
+  """SequenceType ACQUISITION"""
+  ACQUISITION
+
+  """SequenceType SCIENCE"""
+  SCIENCE
+}
+
+type Sidereal {
+  """Right ascension at epoch"""
+  ra: RightAscension!
+
+  """Declination at epoch"""
+  dec: Declination!
+
+  """Epoch, time of base observation"""
+  epoch: EpochString!
+
+  """Proper motion per year in right ascension and declination"""
+  properMotion: ProperMotion
+
+  """Radial velocity"""
+  radialVelocity: RadialVelocity
+
+  """Parallax"""
+  parallax: Parallax
+
+  """
+  Catalog info, if any, describing from where the information in this target was obtained
+  """
+  catalogInfo: CatalogInfo
+}
+
+scalar SignalToNoise
+
+"""Signal to noise exposure time mode"""
+type SignalToNoiseExposureTimeMode {
+  """Signal/Noise value"""
+  value: SignalToNoise!
+
+  """Signal/Noise wavelength"""
+  at: Wavelength!
+}
+
+"""Telescope Sites"""
+enum Site {
+  """Gemini North"""
+  GN
+
+  """Gemini South"""
+  GS
+}
+
+"""Coordinate limits per site."""
+type SiteCoordinateLimits {
+  """Gemini North coordinate limits."""
+  north: CoordinateLimits!
+
+  """Gemini South coordinate limits."""
+  south: CoordinateLimits!
+}
+
+"""Sky background"""
+enum SkyBackground {
+  """SkyBackground Darkest"""
+  DARKEST
+
+  """SkyBackground Dark"""
+  DARK
+
+  """SkyBackground Gray"""
+  GRAY
+
+  """SkyBackground Bright"""
+  BRIGHT
+}
+
+"""Slew events."""
+type SlewEvent implements ExecutionEvent {
+  """Event id."""
+  id: ExecutionEventId!
+
+  """Visit associated with this event."""
+  visit: Visit!
+
+  """Observation whose execution produced this event."""
+  observation: Observation!
+
+  """Time at which this event was received."""
+  received: Timestamp!
+
+  """Event type."""
+  eventType: ExecutionEventType!
+
+  """Slew event data."""
+  slewStage: SlewStage!
+
+  """Client id, if any."""
+  clientId: ClientId
+}
+
+"""Slew stage"""
+enum SlewStage {
+  START_SLEW
+  END_SLEW
+}
+
+"""Source profile, exactly one of the fields will be defined"""
+type SourceProfile {
+  """point source, integrated units"""
+  point: SpectralDefinitionIntegrated
+
+  """uniform source, surface units"""
+  uniform: SpectralDefinitionSurface
+
+  """gaussian source, integrated units"""
+  gaussian: GaussianSource
+}
+
+"""
+Spectral definition integrated.  Exactly one of the fields will be defined.
+"""
+type SpectralDefinitionIntegrated {
+  """Band normalized spectral definition"""
+  bandNormalized: BandNormalizedIntegrated
+
+  """Emission lines spectral definition"""
+  emissionLines: EmissionLinesIntegrated
+}
+
+"""
+Spectral definition surface.  Exactly one of the fields will be defined.
+"""
+type SpectralDefinitionSurface {
+  """Band normalized spectral definition"""
+  bandNormalized: BandNormalizedSurface
+
+  """Emission lines spectral definition"""
+  emissionLines: EmissionLinesSurface
+}
+
+"""Spectroscopy capabilities Nod&Shuffle/Polarimetry/Corongraphy"""
+enum SpectroscopyCapabilities {
+  """SpectroscopyCapabilities NodAndShuffle"""
+  NOD_AND_SHUFFLE
+
+  """SpectroscopyCapabilities Polarimetry"""
+  POLARIMETRY
+
+  """SpectroscopyCapabilities Coronagraphy"""
+  CORONAGRAPHY
+}
+
+type SpectroscopyScienceRequirements {
+  """Requested central wavelength"""
+  wavelength: Wavelength
+
+  """Requested resolution"""
+  resolution: PosInt
+
+  """Wavelength range"""
+  wavelengthCoverage: Wavelength
+
+  """Focal plane choice"""
+  focalPlane: FocalPlane
+
+  """Focal plane angle"""
+  focalPlaneAngle: Angle
+
+  """Spectroscopy Capabilities"""
+  capability: SpectroscopyCapabilities
+}
+
+"""Stellar library spectrum"""
+enum StellarLibrarySpectrum {
+  """StellarLibrarySpectrum O5_V"""
+  O5_V
+
+  """StellarLibrarySpectrum O8_III"""
+  O8_III
+
+  """StellarLibrarySpectrum O9_V_CALSPEC"""
+  O9_V_CALSPEC
+
+  """StellarLibrarySpectrum O9_5_V_CALSPEC"""
+  O9_5_V_CALSPEC
+
+  """StellarLibrarySpectrum B0_V"""
+  B0_V
+
+  """StellarLibrarySpectrum B0_5_V_CALSPEC"""
+  B0_5_V_CALSPEC
+
+  """StellarLibrarySpectrum B3_V_CALSPEC"""
+  B3_V_CALSPEC
+
+  """StellarLibrarySpectrum B5_7_V"""
+  B5_7_V
+
+  """StellarLibrarySpectrum B5_III"""
+  B5_III
+
+  """StellarLibrarySpectrum B5_I"""
+  B5_I
+
+  """StellarLibrarySpectrum B9_III_CALSPEC"""
+  B9_III_CALSPEC
+
+  """StellarLibrarySpectrum A0_I"""
+  A0_I
+
+  """StellarLibrarySpectrum A0_III"""
+  A0_III
+
+  """StellarLibrarySpectrum A0_III_CALSPEC"""
+  A0_III_CALSPEC
+
+  """StellarLibrarySpectrum A0_V"""
+  A0_V
+
+  """StellarLibrarySpectrum A0_V_CALSPEC"""
+  A0_V_CALSPEC
+
+  """StellarLibrarySpectrum A1_V_CALSPEC"""
+  A1_V_CALSPEC
+
+  """StellarLibrarySpectrum A2_V_CALSPEC"""
+  A2_V_CALSPEC
+
+  """StellarLibrarySpectrum A3_V_CALSPEC"""
+  A3_V_CALSPEC
+
+  """StellarLibrarySpectrum A4_V_CALSPEC"""
+  A4_V_CALSPEC
+
+  """StellarLibrarySpectrum A5_III"""
+  A5_III
+
+  """StellarLibrarySpectrum A5_V"""
+  A5_V
+
+  """StellarLibrarySpectrum A5_V_CALSPEC"""
+  A5_V_CALSPEC
+
+  """StellarLibrarySpectrum A6_V_CALSPEC"""
+  A6_V_CALSPEC
+
+  """StellarLibrarySpectrum A8_III_CALSPEC"""
+  A8_III_CALSPEC
+
+  """StellarLibrarySpectrum F0_I"""
+  F0_I
+
+  """StellarLibrarySpectrum F0_I_PICKLES_IRTF"""
+  F0_I_PICKLES_IRTF
+
+  """StellarLibrarySpectrum F0_II_PICKLES_IRTF"""
+  F0_II_PICKLES_IRTF
+
+  """StellarLibrarySpectrum F0_III"""
+  F0_III
+
+  """StellarLibrarySpectrum F0_III_PICKLES_IRTF"""
+  F0_III_PICKLES_IRTF
+
+  """StellarLibrarySpectrum F0_IV_PICKLES_IRTF"""
+  F0_IV_PICKLES_IRTF
+
+  """StellarLibrarySpectrum F0_V"""
+  F0_V
+
+  """StellarLibrarySpectrum F0_V_PICKLES_IRTF"""
+  F0_V_PICKLES_IRTF
+
+  """StellarLibrarySpectrum F2_II_PICKLES_IRTF"""
+  F2_II_PICKLES_IRTF
+
+  """StellarLibrarySpectrum F2_III_PICKLES_IRTF"""
+  F2_III_PICKLES_IRTF
+
+  """StellarLibrarySpectrum F2_V_PICKLES_IRTF"""
+  F2_V_PICKLES_IRTF
+
+  """StellarLibrarySpectrum F4_V_CALSPEC"""
+  F4_V_CALSPEC
+
+  """StellarLibrarySpectrum F5_I"""
+  F5_I
+
+  """StellarLibrarySpectrum F5_I_PICKLES_IRTF"""
+  F5_I_PICKLES_IRTF
+
+  """StellarLibrarySpectrum F5_III"""
+  F5_III
+
+  """StellarLibrarySpectrum F5_III_PICKLES_IRTF"""
+  F5_III_PICKLES_IRTF
+
+  """StellarLibrarySpectrum F5_V"""
+  F5_V
+
+  """StellarLibrarySpectrum F5_V_PICKLES_IRTF"""
+  F5_V_PICKLES_IRTF
+
+  """StellarLibrarySpectrum F5_V_W"""
+  F5_V_W
+
+  """StellarLibrarySpectrum F6_V_R"""
+  F6_V_R
+
+  """StellarLibrarySpectrum F7_V_CALSPEC"""
+  F7_V_CALSPEC
+
+  """StellarLibrarySpectrum F8_I_PICKLES_IRTF"""
+  F8_I_PICKLES_IRTF
+
+  """StellarLibrarySpectrum F8_IV_CALSPEC"""
+  F8_IV_CALSPEC
+
+  """StellarLibrarySpectrum F8_V_PICKLES_IRTF"""
+  F8_V_PICKLES_IRTF
+
+  """StellarLibrarySpectrum G0_I"""
+  G0_I
+
+  """StellarLibrarySpectrum G0_I_PICKLES_IRTF"""
+  G0_I_PICKLES_IRTF
+
+  """StellarLibrarySpectrum G0_III"""
+  G0_III
+
+  """StellarLibrarySpectrum G0_V"""
+  G0_V
+
+  """StellarLibrarySpectrum G0_V_CALSPEC"""
+  G0_V_CALSPEC
+
+  """StellarLibrarySpectrum G0_V_W"""
+  G0_V_W
+
+  """StellarLibrarySpectrum G0_V_R"""
+  G0_V_R
+
+  """StellarLibrarySpectrum G1_V_CALSPEC"""
+  G1_V_CALSPEC
+
+  """StellarLibrarySpectrum G2_I_PICKLES_IRTF"""
+  G2_I_PICKLES_IRTF
+
+  """StellarLibrarySpectrum G2_IV_PICKLES_IRTF"""
+  G2_IV_PICKLES_IRTF
+
+  """StellarLibrarySpectrum G2_V"""
+  G2_V
+
+  """StellarLibrarySpectrum G2_V_CALSPEC"""
+  G2_V_CALSPEC
+
+  """StellarLibrarySpectrum G3_V_CALSPEC"""
+  G3_V_CALSPEC
+
+  """StellarLibrarySpectrum G5_I"""
+  G5_I
+
+  """StellarLibrarySpectrum G5_I_PICKLES_IRTF"""
+  G5_I_PICKLES_IRTF
+
+  """StellarLibrarySpectrum G5_III"""
+  G5_III
+
+  """StellarLibrarySpectrum G5_III_PICKLES_IRTF"""
+  G5_III_PICKLES_IRTF
+
+  """StellarLibrarySpectrum G5_III_W"""
+  G5_III_W
+
+  """StellarLibrarySpectrum G5_III_R"""
+  G5_III_R
+
+  """StellarLibrarySpectrum G5_V"""
+  G5_V
+
+  """StellarLibrarySpectrum G5_V_CALSPEC"""
+  G5_V_CALSPEC
+
+  """StellarLibrarySpectrum G5_V_W"""
+  G5_V_W
+
+  """StellarLibrarySpectrum G5_V_R"""
+  G5_V_R
+
+  """StellarLibrarySpectrum G7_III_CALSPEC"""
+  G7_III_CALSPEC
+
+  """StellarLibrarySpectrum G8_I_PICKLES_IRTF"""
+  G8_I_PICKLES_IRTF
+
+  """StellarLibrarySpectrum G8_III_PICKLES_IRTF"""
+  G8_III_PICKLES_IRTF
+
+  """StellarLibrarySpectrum G8_V_PICKLES_IRTF"""
+  G8_V_PICKLES_IRTF
+
+  """StellarLibrarySpectrum K0_III"""
+  K0_III
+
+  """StellarLibrarySpectrum K0_III_PICKLES_IRTF"""
+  K0_III_PICKLES_IRTF
+
+  """StellarLibrarySpectrum K0_III_W"""
+  K0_III_W
+
+  """StellarLibrarySpectrum K0_III_R"""
+  K0_III_R
+
+  """StellarLibrarySpectrum K0_IV_PICKLES_IRTF"""
+  K0_IV_PICKLES_IRTF
+
+  """StellarLibrarySpectrum K0_V"""
+  K0_V
+
+  """StellarLibrarySpectrum K0_V_PICKLES_IRTF"""
+  K0_V_PICKLES_IRTF
+
+  """StellarLibrarySpectrum K0_V_R"""
+  K0_V_R
+
+  """StellarLibrarySpectrum K0_5_III_CALSPEC"""
+  K0_5_III_CALSPEC
+
+  """StellarLibrarySpectrum K0_1_II"""
+  K0_1_II
+
+  """StellarLibrarySpectrum K1_5_III_CALSPEC"""
+  K1_5_III_CALSPEC
+
+  """StellarLibrarySpectrum K2_I_PICKLES_IRTF"""
+  K2_I_PICKLES_IRTF
+
+  """StellarLibrarySpectrum K2_III_PICKLES_IRTF"""
+  K2_III_PICKLES_IRTF
+
+  """StellarLibrarySpectrum K2_V_PICKLES_IRTF"""
+  K2_V_PICKLES_IRTF
+
+  """StellarLibrarySpectrum K3_II_PICKLES_IRTF"""
+  K3_II_PICKLES_IRTF
+
+  """StellarLibrarySpectrum K3_III_PICKLES_IRTF"""
+  K3_III_PICKLES_IRTF
+
+  """StellarLibrarySpectrum K3_V_PICKLES_IRTF"""
+  K3_V_PICKLES_IRTF
+
+  """StellarLibrarySpectrum K4_I"""
+  K4_I
+
+  """StellarLibrarySpectrum K4_I_PICKLES_IRTF"""
+  K4_I_PICKLES_IRTF
+
+  """StellarLibrarySpectrum K4_III"""
+  K4_III
+
+  """StellarLibrarySpectrum K4_III_PICKLES_IRTF"""
+  K4_III_PICKLES_IRTF
+
+  """StellarLibrarySpectrum K4_III_W"""
+  K4_III_W
+
+  """StellarLibrarySpectrum K4_III_R"""
+  K4_III_R
+
+  """StellarLibrarySpectrum K4_V"""
+  K4_V
+
+  """StellarLibrarySpectrum K5_III_PICKLES_IRTF"""
+  K5_III_PICKLES_IRTF
+
+  """StellarLibrarySpectrum K5_V_PICKLES_IRTF"""
+  K5_V_PICKLES_IRTF
+
+  """StellarLibrarySpectrum M0_III"""
+  M0_III
+
+  """StellarLibrarySpectrum M0_III_PICKLES_IRTF"""
+  M0_III_PICKLES_IRTF
+
+  """StellarLibrarySpectrum M0_V"""
+  M0_V
+
+  """StellarLibrarySpectrum M0_V_PICKLES_IRTF"""
+  M0_V_PICKLES_IRTF
+
+  """StellarLibrarySpectrum M1_III_PICKLES_IRTF"""
+  M1_III_PICKLES_IRTF
+
+  """StellarLibrarySpectrum M1_V_PICKLES_IRTF"""
+  M1_V_PICKLES_IRTF
+
+  """StellarLibrarySpectrum M2_I_PICKLES_IRTF"""
+  M2_I_PICKLES_IRTF
+
+  """StellarLibrarySpectrum M2_III_PICKLES_IRTF"""
+  M2_III_PICKLES_IRTF
+
+  """StellarLibrarySpectrum M2_V_PICKLES_IRTF"""
+  M2_V_PICKLES_IRTF
+
+  """StellarLibrarySpectrum M3_III"""
+  M3_III
+
+  """StellarLibrarySpectrum M3_III_PICKLES_IRTF"""
+  M3_III_PICKLES_IRTF
+
+  """StellarLibrarySpectrum M3_V"""
+  M3_V
+
+  """StellarLibrarySpectrum M3_V_PICKLES_IRTF"""
+  M3_V_PICKLES_IRTF
+
+  """StellarLibrarySpectrum M4_III_PICKLES_IRTF"""
+  M4_III_PICKLES_IRTF
+
+  """StellarLibrarySpectrum M4_V_PICKLES_IRTF"""
+  M4_V_PICKLES_IRTF
+
+  """StellarLibrarySpectrum M5_V_PICKLES_IRTF"""
+  M5_V_PICKLES_IRTF
+
+  """StellarLibrarySpectrum M6_III"""
+  M6_III
+
+  """StellarLibrarySpectrum M6_III_PICKLES_IRTF"""
+  M6_III_PICKLES_IRTF
+
+  """StellarLibrarySpectrum M6_V"""
+  M6_V
+
+  """StellarLibrarySpectrum M7_III_PICKLES_IRTF"""
+  M7_III_PICKLES_IRTF
+
+  """StellarLibrarySpectrum M8_III_PICKLES_IRTF"""
+  M8_III_PICKLES_IRTF
+
+  """StellarLibrarySpectrum M9_III"""
+  M9_III
+
+  """StellarLibrarySpectrum SD_B_CALSPEC"""
+  SD_B_CALSPEC
+
+  """StellarLibrarySpectrum SD_F8_CALSPEC"""
+  SD_F8_CALSPEC
+
+  """StellarLibrarySpectrum SD_O_CALSPEC"""
+  SD_O_CALSPEC
+
+  """StellarLibrarySpectrum DA08_CALSPEC"""
+  DA08_CALSPEC
+
+  """StellarLibrarySpectrum DA09_CALSPEC"""
+  DA09_CALSPEC
+
+  """StellarLibrarySpectrum DA12_CALSPEC"""
+  DA12_CALSPEC
+
+  """StellarLibrarySpectrum DA15_CALSPEC"""
+  DA15_CALSPEC
+
+  """StellarLibrarySpectrum DA18_CALSPEC"""
+  DA18_CALSPEC
+
+  """StellarLibrarySpectrum DA24_CALSPEC"""
+  DA24_CALSPEC
+
+  """StellarLibrarySpectrum DA28_CALSPEC"""
+  DA28_CALSPEC
+
+  """StellarLibrarySpectrum DA30_CALSPEC"""
+  DA30_CALSPEC
+
+  """StellarLibrarySpectrum DA31_CALSPEC"""
+  DA31_CALSPEC
+
+  """StellarLibrarySpectrum DA33_CALSPEC"""
+  DA33_CALSPEC
+
+  """StellarLibrarySpectrum DA36_CALSPEC"""
+  DA36_CALSPEC
+
+  """StellarLibrarySpectrum DA38_CALSPEC"""
+  DA38_CALSPEC
+
+  """StellarLibrarySpectrum DA48_CALSPEC"""
+  DA48_CALSPEC
+
+  """StellarLibrarySpectrum DA57_CALSPEC"""
+  DA57_CALSPEC
+
+  """StellarLibrarySpectrum DBQ40_CALSPEC"""
+  DBQ40_CALSPEC
+
+  """StellarLibrarySpectrum DBQA50_CALSPEC"""
+  DBQA50_CALSPEC
+
+  """StellarLibrarySpectrum DO20_CALSPEC"""
+  DO20_CALSPEC
+
+  """StellarLibrarySpectrum T2800_K"""
+  T2800_K
+
+  """StellarLibrarySpectrum T2600_K"""
+  T2600_K
+
+  """StellarLibrarySpectrum T2400_K"""
+  T2400_K
+
+  """StellarLibrarySpectrum T2200_K"""
+  T2200_K
+
+  """StellarLibrarySpectrum T2000_K"""
+  T2000_K
+
+  """StellarLibrarySpectrum T1800_K"""
+  T1800_K
+
+  """StellarLibrarySpectrum T1600_K"""
+  T1600_K
+
+  """StellarLibrarySpectrum T1400_K"""
+  T1400_K
+
+  """StellarLibrarySpectrum T1200_K"""
+  T1200_K
+
+  """StellarLibrarySpectrum T1000_K"""
+  T1000_K
+
+  """StellarLibrarySpectrum T0900_K"""
+  T0900_K
+
+  """StellarLibrarySpectrum T0800_K"""
+  T0800_K
+
+  """StellarLibrarySpectrum T0600_K"""
+  T0600_K
+
+  """StellarLibrarySpectrum T0400_K"""
+  T0400_K
+}
+
+"""
+Step-level events.  The execution of a single step will generate multiple events.
+"""
+type StepEvent implements ExecutionEvent {
+  """Event id"""
+  id: ExecutionEventId!
+
+  """Visit associated with this event."""
+  visit: Visit!
+
+  """Observation whose execution produced this event."""
+  observation: Observation!
+
+  """Time at which this event was received"""
+  received: Timestamp!
+
+  """Event type."""
+  eventType: ExecutionEventType!
+
+  """Atom associated with this event."""
+  atom: AtomRecord!
+
+  """Step associated with this event."""
+  step: StepRecord!
+
+  """Step execution stage."""
+  stepStage: StepStage!
+
+  """Client id, if any."""
+  clientId: ClientId
+}
+
+"""
+StepId id formatted as `s-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}`
+"""
+scalar StepId
+
+"""Execution stage or phase of an individual step"""
+enum StepStage {
+  ABORT
+  CONTINUE
+  END_CONFIGURE
+  END_OBSERVE
+  END_STEP
+  PAUSE
+  START_CONFIGURE
+  START_OBSERVE
+  START_STEP
+  STOP
+}
+
+"""
+An individual configuration change before a step is executed.  Multiple
+items may change simultaneously (e.g., the science fold may move while the
+Gcal filter is updated).  ConfigChangeEstimate identifies a single item that will
+be updated.
+"""
+type ConfigChangeEstimate {
+  """Name of the item that changed."""
+  name: String!
+
+  """A possibly longer description of what was updated."""
+  description: String!
+
+  """Estimated time required to effectuate the change."""
+  estimate: TimeSpan!
+}
+
+"""Time taken to update the configuration before a step is executed."""
+type AllConfigChangeEstimates {
+  """
+  The selected ConfigChangeEstimate is a maximum of all the config change
+  estimates.  In other words, one that takes the longest.
+  """
+  selected: ConfigChangeEstimate!
+
+  """
+  Index of the selected config change estimate amongst all the estimates in
+  `all`.
+  """
+  index: NonNegInt!
+
+  """
+  Complete collection of items that changed.  The selected estimate will be
+  one of the longest (there may be multiple estimates tied for the longest).
+  """
+  all: [ConfigChangeEstimate!]!
+
+  """
+  Time required for the collection of estimates in `all`.  This should
+  be the max of the individual entries because the execution happens in
+  parallel.
+  """
+  estimate: TimeSpan!
+}
+
+"""Time estimate for taking an individual dataset."""
+type DatasetEstimate {
+  """The exposure time itself"""
+  exposure: TimeSpan!
+
+  """Time required to readout the detector"""
+  readout: TimeSpan!
+
+  """Time required to write the data to the storage system"""
+  write: TimeSpan!
+
+  """Total estimate for the dataset, summing exposure, readout and write"""
+  estimate: TimeSpan!
+}
+
+"""
+Time estimate for a single detector.  Some instruments will employ multiple
+detectors per step.
+"""
+type DetectorEstimate {
+  """Indicates which detector is estimated here"""
+  name: String!
+
+  """Detector description"""
+  description: String!
+
+  """Time estimate for a single dataset produced by this detector"""
+  dataset: DatasetEstimate!
+
+  """Count of datasets to be produced by the detector"""
+  count: NonNegInt!
+
+  """
+  Total time estimate for the detector, which is the sum of the individual
+  dataset estimate multiplied by the count.
+  """
+  estimate: TimeSpan!
+}
+
+"""The collection of detector estimates involved in an individual step."""
+type AllDetectorEstimates {
+  """
+  The selected DetectorEstimate is a maximum of all the detector estimates.
+  In other words, one that takes the longest.
+  """
+  selected: DetectorEstimate!
+
+  """
+  Index of the selected detector estimate amongst all the estimates in
+  `all`.
+  """
+  index: NonNegInt!
+
+  """
+  Complete collection of detectors involved in a step.  The selected estimate
+  will be one of the longest (there may be multiple estimates tied for the
+  longest).
+  """
+  all: [DetectorEstimate!]!
+
+  """
+  Time required for the collection of estimates in `all`.  This should
+  be the max of the individual entries because the execution happens in
+  parallel.
+  """
+  estimate: TimeSpan!
+}
+
+"""
+Time estimate for an individual step, including configuration changes and
+dataset production.
+"""
+type StepEstimate {
+  """
+  Configuration changes required before the step is executed.  This will
+  obviously depend not only on the step configuration but also the previous
+  step configuration.
+  """
+  configChange: AllConfigChangeEstimates
+
+  """Time for producing the datasets for this step."""
+  detector: AllDetectorEstimates
+
+  """Total time estimate for the step."""
+  total: TimeSpan!
+}
+
+"""
+A step as recorded by Observe.  There will be one instrument configuration per
+instrument, all but one of which will be null.
+"""
+type StepRecord {
+  """Step ID."""
+  id: StepId!
+
+  """Step Index, relative to other step records in the observation."""
+  index: PosInt!
+
+  """
+  Instrument associated with the step. This will indicate which of the
+  instrument-specific dynamic fields (e.g., `gmosNorth: GmosNorthDynamic`) is
+  defined.
+  """
+  instrument: Instrument!
+
+  """The atom in which the step was executed."""
+  atom: AtomRecord!
+
+  """The step was created by Observe at this time."""
+  created: Timestamp!
+
+  """
+  The execution state of this step, according to events received (if any) from
+  Observe.
+  """
+  executionState: StepExecutionState!
+
+  """
+  Time interval during which this step executed.  This measures the range of
+  time from the first event to the last, whether or not the step ever
+  actually completed.  A 'null' result means there are no events associated
+  with this step.
+  """
+  interval: TimestampInterval
+
+  """
+  The step configuration, apart from instrument details found in the
+  instrument-specific 'StepRecord' implementation.
+  """
+  stepConfig: StepConfig!
+
+  """The telescope configuration for this step."""
+  telescopeConfig: TelescopeConfig!
+
+  """The observe class of this step."""
+  observeClass: ObserveClass!
+
+  """Original time estimate for executing this step."""
+  estimate: TimeSpan!
+
+  """
+  QA state based on a combination of dataset QA states.  The worst QA state is
+  taken as the overall step QA state.  For example, one FAIL dataset will
+  result in the step having a FAIL QA state.  Unset QA states are ignored, but
+  if none are set the result will be null.
+  """
+  qaState: DatasetQaState
+
+  """Datasets associated with this step."""
+  datasets(
+    """
+    Starts the result set at (or after if not existent) the given dataset id.
+    """
+    OFFSET: DatasetId
+
+    """
+    Limits the result to at most this number of matches (but never more than 1000).
+    """
+    LIMIT: NonNegInt
+  ): DatasetSelectResult!
+
+  """Execution events associated with this step."""
+  events(
+    """
+    Starts the result set at (or after if not existent) the given execution event id.
+    """
+    OFFSET: ExecutionEventId
+
+    """
+    Limits the result to at most this number of matches (but never more than 1000).
+    """
+    LIMIT: NonNegInt
+  ): ExecutionEventSelectResult!
+
+  """Step ID of the generated step, if any, that produced this step record."""
+  generatedId: StepId
+
+  """
+  Flamingos 2 instrument configuration for this step, if any.  This will be null
+  unless the `instrument` discriminator is "FLAMINGOS2".
+  """
+  flamingos2: Flamingos2Dynamic
+
+  """
+  GMOS North instrument configuration for this step, if any.  This will be null
+  unless the `instrument` discriminator is "GMOS_NORTH".
+  """
+  gmosNorth: GmosNorthDynamic
+
+  """
+  GMOS South instrument configuration for this step, if any.  This will be null
+  unless the `instrument` discriminator is "GMOS_SOUTH".
+  """
+  gmosSouth: GmosSouthDynamic
+}
+
+"""StepRecord query results, limited to a maximum of 1000 entries."""
+type StepRecordSelectResult {
+  """Matching step records up to the return size limit of 1000."""
+  matches: [StepRecord!]!
+
+  """`true` when there were additional matches that were not returned."""
+  hasMore: Boolean!
+}
+
+"""TAC Category"""
+enum TacCategory {
+  """TacCategory SmallBodies"""
+  SMALL_BODIES
+
+  """TacCategory PlanetaryAtmospheres"""
+  PLANETARY_ATMOSPHERES
+
+  """TacCategory PlanetarySurfaces"""
+  PLANETARY_SURFACES
+
+  """TacCategory SolarSystemOther"""
+  SOLAR_SYSTEM_OTHER
+
+  """TacCategory ExoplanetRadialVelocities"""
+  EXOPLANET_RADIAL_VELOCITIES
+
+  """TacCategory ExoplanetAtmospheresActivity"""
+  EXOPLANET_ATMOSPHERES_ACTIVITY
+
+  """TacCategory ExoplanetTransits"""
+  EXOPLANET_TRANSITS
+
+  """TacCategory ExoplanetHostStar"""
+  EXOPLANET_HOST_STAR
+
+  """TacCategory ExoplanetOther"""
+  EXOPLANET_OTHER
+
+  """TacCategory StellarAstrophysics"""
+  STELLAR_ASTROPHYSICS
+
+  """TacCategory StellarPopulations"""
+  STELLAR_POPULATIONS
+
+  """TacCategory StarFormation"""
+  STAR_FORMATION
+
+  """TacCategory GaseousAstrophysics"""
+  GASEOUS_ASTROPHYSICS
+
+  """TacCategory StellarRemnants"""
+  STELLAR_REMNANTS
+
+  """TacCategory GalacticOther"""
+  GALACTIC_OTHER
+
+  """TacCategory Cosmology"""
+  COSMOLOGY
+
+  """TacCategory ClustersOfGalaxies"""
+  CLUSTERS_OF_GALAXIES
+
+  """TacCategory HighZUniverse"""
+  HIGH_Z_UNIVERSE
+
+  """TacCategory LowZUniverse"""
+  LOW_Z_UNIVERSE
+
+  """TacCategory ActiveGalaxies"""
+  ACTIVE_GALAXIES
+
+  """TacCategory ExtragalacticOther"""
+  EXTRAGALACTIC_OTHER
+}
+
+"""
+Calibration role
+Observations/Programs/Targets can have a calibration role
+"""
+enum CalibrationRole {
+  """CalibrationRole Twilight"""
+  TWILIGHT
+
+  """CalibrationRole Photometric"""
+  PHOTOMETRIC
+
+  """CalibrationRole SpectroPhotometric"""
+  SPECTROPHOTOMETRIC
+
+  """CalibrationRole Telluric"""
+  TELLURIC
+}
+
+"""Target description"""
+type Target {
+  """Target ID"""
+  id: TargetId!
+
+  """DELETED or PRESENT"""
+  existence: Existence!
+
+  """Program that contains this target"""
+  program(
+    """Set to true to include deleted values"""
+    includeDeleted: Boolean! = false
+  ): Program!
+
+  """Target name."""
+  name: NonEmptyString!
+
+  """calibration role"""
+  calibrationRole: CalibrationRole
+
+  """source profile"""
+  sourceProfile: SourceProfile!
+
+  """Sidereal tracking information, if this is a sidereal target"""
+  sidereal: Sidereal
+
+  """Nonsidereal tracking information, if this is a nonsidereal target"""
+  nonsidereal: Nonsidereal
+
+  """Target of opportunity range information, if this a TOO target"""
+  opportunity: Opportunity
+}
+
+type Opportunity {
+  region: Region!
+}
+
+enum ArcType {
+  EMPTY
+  FULL
+  PARTIAL
+}
+
+type RightAscensionArc {
+  type: ArcType!
+  start: RightAscension
+  end: RightAscension
+}
+
+type DeclinationArc {
+  type: ArcType!
+  start: Declination
+  end: Declination
+}
+
+type Region {
+  rightAscensionArc: RightAscensionArc!
+  declinationArc: DeclinationArc!
+}
+
+type TargetEnvironment {
+  """All the observation's science targets, if any"""
+  asterism(
+    """Set to true to include deleted values"""
+    includeDeleted: Boolean! = false
+  ): [Target!]!
+
+  """First, perhaps only, science target in the asterism"""
+  firstScienceTarget(
+    """Set to true to include deleted values"""
+    includeDeleted: Boolean! = false
+  ): Target
+
+  """
+  Explicit (if defined) or computed base position at the specified time, if known.
+  """
+  basePosition(
+    """The time used for the base position calculations."""
+    observationTime: Timestamp!
+  ): Coordinates
+
+  """The guide star(s) and related information"""
+  guideEnvironments(
+    """The time used for the guide star calculations."""
+    observationTime: Timestamp!
+  ): [GuideEnvironment!]!
+
+  """
+  The guide target(s) and related information.
+  If a guide target has been set via `guideTargetName`, that target will be
+  returned. If it not found or not usable, an error will be returned.
+  If no guide target has been set, or it has been invalidated by observation/target
+  changes, Gaia will be searched for the best guide target available.
+  """
+  guideEnvironment: GuideEnvironment!
+
+  """
+  Availability of guide stars during a specified time range.
+  There can be multiple `GuideAvailabilityPeriod`s returned if availability changes over the time
+  range. In this case, the `end` of one period will be the same as the `start` of the next period.
+  """
+  guideAvailability(
+    """The starting time of the time range of interest."""
+    start: Timestamp!
+
+    """The ending time of the time range of interest."""
+    end: Timestamp!
+  ): [GuideAvailabilityPeriod!]!
+
+  """When set, overrides the default base position of the target group"""
+  explicitBase: Coordinates
+
+  """
+  The name of the guide target, if any, set by `setGuideTargetName`.
+  If the name is no longer valid or a sequence cannot be generated, null will
+  be returned.
+  """
+  guideTargetName: NonEmptyString
+}
+
+type TargetEnvironmentGroup {
+  """IDs of observations that use the same constraints"""
+  observationIds: [ObservationId!]!
+
+  """Observations associated with the common value"""
+  observations(
+    """Set to true to include deleted values"""
+    includeDeleted: Boolean! = false
+
+    """
+    Starts the result set at (or after if not existent) the given observation id.
+    """
+    OFFSET: ObservationId
+
+    """
+    Limits the result to at most this number of matches (but never more than 1000).
+    """
+    LIMIT: NonNegInt
+  ): ObservationSelectResult!
+
+  """Commonly held value across the observations"""
+  targetEnvironment: TargetEnvironment!
+}
+
+"""
+The matching targetEnvironmentGroup results, limited to a maximum of 1000 entries.
+"""
+type TargetEnvironmentGroupSelectResult {
+  """Matching targetEnvironmentGroups up to the return size limit of 1000"""
+  matches: [TargetEnvironmentGroup!]!
+
+  """`true` when there were additional matches that were not returned."""
+  hasMore: Boolean!
+}
+
+type TargetGroup {
+  """Observations associated with the common value"""
+  observations(
+    """Set to true to include deleted values"""
+    includeDeleted: Boolean! = false
+
+    """
+    Starts the result set at (or after if not existent) the given observation id.
+    """
+    OFFSET: ObservationId
+
+    """
+    Limits the result to at most this number of matches (but never more than 1000).
+    """
+    LIMIT: NonNegInt
+  ): ObservationSelectResult!
+
+  """Commonly held value across the observations"""
+  target: Target!
+
+  """Link back to program."""
+  program: Program!
+}
+
+"""
+The matching targetGroup results, limited to a maximum of 1000 entries.
+"""
+type TargetGroupSelectResult {
+  """Matching targetGroups up to the return size limit of 1000"""
+  matches: [TargetGroup!]!
+
+  """`true` when there were additional matches that were not returned."""
+  hasMore: Boolean!
+}
+
+"""TargetId id formatted as `t-[1-9a-f][0-9a-f]*`"""
+scalar TargetId
+
+"""The matching target results, limited to a maximum of 1000 entries."""
+type TargetSelectResult {
+  """Matching targets up to the return size limit of 1000"""
+  matches: [Target!]!
+
+  """`true` when there were additional matches that were not returned."""
+  hasMore: Boolean!
+}
+
+"""
+A manual correction to time accounting calculations.  Note that the
+application of a correction is bounded by a zero time span and the
+maximum time span.
+"""
+type TimeChargeCorrection {
+  """When the correction was made."""
+  created: Timestamp!
+
+  """The charge class to be corrected."""
+  chargeClass: ChargeClass!
+
+  """The operation (add or subtract) to perform."""
+  op: TimeChargeCorrectionOp!
+
+  """
+  The amount of time to add or subtract (respecting the min and max time span).
+  """
+  amount: TimeSpan!
+
+  """The user responsible for the change."""
+  user: User
+
+  """Optional justification for the correction."""
+  comment: NonEmptyString
+}
+
+"""Time accounting correction operations."""
+enum TimeChargeCorrectionOp {
+  ADD
+  SUBTRACT
+}
+
+"""
+Describes a time charge discount, broken out by charge class.  For each class,
+the associated time is subtracted and then added to uncharged.
+"""
+interface TimeChargeDiscount {
+  """The interval during which this discount applies."""
+  interval: TimestampInterval!
+
+  """Time amount to discount from the program."""
+  amount: TimeSpan!
+
+  """Additional detail."""
+  comment: String!
+}
+
+"""
+A time charge discount that is applied when part of the observation is executed
+outside of nautical twilight boundaries.  The portion that occurs during day
+time is not charged.
+"""
+type TimeChargeDaylightDiscount implements TimeChargeDiscount {
+  """The interval during which this discount applies."""
+  interval: TimestampInterval!
+
+  """Time amount to discount from the program."""
+  amount: TimeSpan!
+
+  """Additional detail."""
+  comment: String!
+
+  """The site where the observation was executed."""
+  site: Site!
+}
+
+"""
+A time charge discount that is applied when no data is collected during the
+entirety of the visit.
+"""
+type TimeChargeNoDataDiscount implements TimeChargeDiscount {
+  """The interval during which this discount applies."""
+  interval: TimestampInterval!
+
+  """Time amount to discount from the program."""
+  amount: TimeSpan!
+
+  """Additional detail."""
+  comment: String!
+}
+
+"""
+A time charge discount that is applied when part of the observation is executed
+after an overlapping chargeable observation is started.  For example, when
+writing out datasets while slewing to a new target.
+"""
+type TimeChargeOverlapDiscount implements TimeChargeDiscount {
+  """The interval during which this discount applies."""
+  interval: TimestampInterval!
+
+  """Time amount to discount from the program."""
+  amount: TimeSpan!
+
+  """Additional detail."""
+  comment: String!
+
+  """The overlapping observation."""
+  observation: Observation!
+}
+
+type TimeChargeQaDiscount implements TimeChargeDiscount {
+  """The interval during which this discount applies."""
+  interval: TimestampInterval!
+
+  """Time amount to discount from the program."""
+  amount: TimeSpan!
+
+  """Additional detail."""
+  comment: String!
+
+  """Datasets associated with the discount."""
+  datasets: [Dataset!]!
+}
+
+"""
+Detailed time accounting information for a visit, showing the raw execution
+time along with any automatically applied discounts (e.g., for bad weather)
+and manual adjustments made by staff.
+"""
+type TimeChargeInvoice {
+  """Raw execution time."""
+  executionTime: CategorizedTime!
+
+  """
+  Automatic discounts for weather loss, fault reports, and non-passing datasets.
+  """
+  discounts: [TimeChargeDiscount!]!
+
+  """Any manual corrections to the execution time."""
+  corrections: [TimeChargeCorrection!]!
+
+  """
+  Final time charge once discounts and corrections have been applied to the
+  initial 'executionTime'.
+  """
+  finalCharge: CategorizedTime!
+}
+
+"""
+Equivalent time amount in several unit options (e.g., 120 seconds or 2 minutes)
+"""
+type TimeSpan {
+  """TimeSpan in µs"""
+  microseconds: Long!
+
+  """TimeSpan in ms"""
+  milliseconds: BigDecimal!
+
+  """TimeSpan in seconds"""
+  seconds: BigDecimal!
+
+  """TimeSpan in minutes"""
+  minutes: BigDecimal!
+
+  """TimeSpan in hours"""
+  hours: BigDecimal!
+
+  """TimeSpan as an ISO-8601 string"""
+  iso: String!
+}
+
+"""
+Equivalent time amount in several unit options (exactly one must be specified)
+"""
+input TimeSpanInput {
+  """TimeSpan in µs"""
+  microseconds: Long
+
+  """TimeSpan in ms"""
+  milliseconds: BigDecimal
+
+  """TimeSpan in seconds"""
+  seconds: BigDecimal
+
+  """TimeSpan in minutes"""
+  minutes: BigDecimal
+
+  """TimeSpan in hours"""
+  hours: BigDecimal
+
+  """TimeSpan as an ISO-8601 string"""
+  iso: String
+}
+
+"""
+Time interval marked by a start 'Timestamp' (inclusive) and an end 'Timestamp'
+(exclusive).
+"""
+type TimestampInterval {
+  """Start time of the interval (inclusive)."""
+  start: Timestamp!
+
+  """End time of the interval (exclusive)."""
+  end: Timestamp!
+
+  """Duration of the interval."""
+  duration: TimeSpan!
+}
+
+"""ToO Activation"""
+enum ToOActivation {
+  """ToOActivation None"""
+  NONE
+
+  """ToOActivation Standard"""
+  STANDARD
+
+  """ToOActivation Rapid"""
+  RAPID
+}
+
+type UnlinkUserResult {
+  """Returns true if the user was unlinked, false if no such link existed."""
+  result: Boolean!
+}
+
+"""
+Un-normalized spectral energy distribution.  Exactly one of the definitions will be non-null.
+"""
+type UnnormalizedSed {
+  stellarLibrary: StellarLibrarySpectrum
+  coolStar: CoolStarTemperature
+  galaxy: GalaxySpectrum
+  planet: PlanetSpectrum
+  quasar: QuasarSpectrum
+  hiiRegion: HiiRegionSpectrum
+  planetaryNebula: PlanetaryNebulaSpectrum
+  powerLaw: BigDecimal
+  blackBodyTempK: PosInt
+  fluxDensities: [FluxDensityEntry!]
+  fluxDensitiesAttachment: AttachmentId
+}
+
+scalar UserId
+
+enum UserType {
+  GUEST
+  STANDARD
+  SERVICE
+}
+
+type User {
+  id: UserId!
+  type: UserType!
+  serviceName: String
+  orcidId: String
+  profile: UserProfile!
+}
+
+type UserProfile {
+  givenName: String
+  familyName: String
+  creditName: String
+  email: String
+}
+
+"""
+A visit is recorded whenever any part of an observation is attempted.  There
+is a specific static configuration for each instrument, only one of which is
+defined.  The same static configuration holds for the entire visit.
+"""
+type Visit {
+  """Visit id."""
+  id: VisitId!
+
+  """
+  Instrument in use for this visit.  This serves as a discriminator between the
+  various specific static instrument configuration types (e.g.,
+  `gmosNorth: GmosNorthStatic`.)
+  """
+  instrument: Instrument!
+
+  """Observation associated with this visit."""
+  observation: Observation!
+
+  """Created by Observe at time."""
+  created: Timestamp!
+
+  """Site of the visit."""
+  site: Site!
+
+  """Time interval during which this visit executed."""
+  interval: TimestampInterval
+
+  """Executed (or at least partially executed) atom records for this visit."""
+  atomRecords(
+    """Starts the result set at the given atom creation time."""
+    OFFSET: Timestamp
+
+    """
+    Limits the result to at most this number of matches (but never more than 1000).
+    """
+    LIMIT: NonNegInt
+  ): AtomRecordSelectResult!
+
+  """Datasets associated with this visit."""
+  datasets(
+    """
+    Starts the result set at (or after if not existent) the given dataset id.
+    """
+    OFFSET: DatasetId
+
+    """
+    Limits the result to at most this number of matches (but never more than 1000).
+    """
+    LIMIT: NonNegInt
+  ): DatasetSelectResult!
+
+  """Execution events associated with this visit."""
+  events(
+    """
+    Starts the result set at (or after if not existent) the given execution event id.
+    """
+    OFFSET: ExecutionEventId
+
+    """
+    Limits the result to at most this number of matches (but never more than 1000).
+    """
+    LIMIT: NonNegInt
+  ): ExecutionEventSelectResult!
+
+  """Time accounting details for this visit."""
+  timeChargeInvoice: TimeChargeInvoice!
+
+  """
+  Flamingos 2 static instrument configuration, for Flamingos 2 visits.  See the
+  `instrument` discriminator.  This will be null unless the instrument is
+  `FLAMINGOS2`.
+  """
+  flamingos2: Flamingos2Static
+
+  """
+  GmosNorth static instrument configuration, for GMOS North visits.  See the
+  `instrument` discriminator.  This will be null unless the instrument is
+  `GMOS_NORTH`.
+  """
+  gmosNorth: GmosNorthStatic
+
+  """
+  GmosSouth static instrument configuration, for GMOS South visits.  See the
+  `instrument` discriminator.  This will be null unless the instrument is
+  `GMOS_SOUTH`.
+  """
+  gmosSouth: GmosSouthStatic
+}
+
+"""Matching visit results, limited to a maximum of 1000 entries."""
+type VisitSelectResult {
+  """Matching visits up to the return size limit of 1000."""
+  matches: [Visit!]!
+
+  """`true` when there were additional matches that were not returned."""
+  hasMore: Boolean!
+}
+
+"""VisitId id formatted as `v-[1-9a-f][0-9a-f]*`"""
+scalar VisitId
+
+"""Water vapor"""
+enum WaterVapor {
+  """WaterVapor VeryDry"""
+  VERY_DRY
+
+  """WaterVapor Dry"""
+  DRY
+
+  """WaterVapor Median"""
+  MEDIAN
+
+  """WaterVapor Wet"""
+  WET
+}
+
+type Wavelength {
+  """Wavelength in pm"""
+  picometers: PosInt!
+
+  """Wavelength in Å"""
+  angstroms: PosBigDecimal!
+
+  """Wavelength in nm"""
+  nanometers: PosBigDecimal!
+
+  """Wavelength in µm"""
+  micrometers: PosBigDecimal!
+}
+
+"""
+A WavelengthDither is expressed in the same units as Wavelength but
+constrained to positive values.  It expresses an "offset" to a given
+Wavelength.
+"""
+type WavelengthDither {
+  """Wavelength dither in pm"""
+  picometers: Int!
+
+  """Wavelength dither in Å"""
+  angstroms: BigDecimal!
+
+  """Wavelength dither in nm"""
+  nanometers: BigDecimal!
+
+  """Wavelength dither in µm"""
+  micrometers: BigDecimal!
+}
+
+type OffsetQ {
+  """q offset in µas"""
+  microarcseconds: Long!
+
+  """q offset in mas"""
+  milliarcseconds: BigDecimal!
+
+  """q offset in arcsec"""
+  arcseconds: BigDecimal!
+}
+
+"""
+The `BigDecimal` scalar type represents signed fractional values with arbitrary precision.
+"""
+scalar BigDecimal
+
+"""
+The `Long` scalar type represents non-fractional signed whole numeric values. Long can represent values between -(2^63) and 2^63 - 1.
+"""
+scalar Long
+
+enum ObservationWorkflowState {
+  INACTIVE
+  UNDEFINED
+  UNAPPROVED
+  DEFINED
+  READY
+  ONGOING
+  COMPLETED
+}
+
+type ObservationWorkflow {
+  state: ObservationWorkflowState!
+  validTransitions: [ObservationWorkflowState!]!
+  validationErrors: [ObservationValidation!]!
+}
+
+type CalculatedObservationWorkflow {
+  """The current state of the background calculation."""
+  state: CalculationState!
+  value: ObservationWorkflow!
+}
+
+"""
+##########
+ITC schema
+##########
+"""
+type Query {
+  versions: ItcVersions
+
+  """
+  Given an instrument and a spectroscopy mode,
+  return the integration time and the S/N for the given targets.
+  """
+  spectroscopy(input: SpectroscopyInput!): CalculationResult!
+
+  """
+  Given an instrument and an imaging mode,
+  return the integration time and the S/N for the given targets.
+  """
+  imaging(input: ImagingInput!): CalculationResult!
+
+  """
+  Given an instrument and a mode, return the graph data for the given targets.
+  Values are rounded to limit the size of the response.
+  """
+  spectroscopyGraphs(input: SpectroscopyGraphsInput!): SpectroscopyGraphsResult!
+
+  """
+  Given an instrument and a mode, return the integration time,
+  estimated S/N and graph data for the given targets.
+  Graph values are rounded to limit the size of the response.
+  """
+  spectroscopyIntegrationTimeAndGraphs(input: SpectroscopyIntegrationTimeAndGraphsInput!): SpectroscopyTimeAndGraphsResult!
+}
+
+type ItcVersions {
+  """id of the backend server"""
+  serverVersion: String!
+
+  """token for the itc data version, can be null"""
+  dataVersion: String
+}
+
+input GmosSSpectroscopyInput {
+  """Center of the configuration spectrum"""
+  centralWavelength: WavelengthInput!
+
+  """Gmos South disperser"""
+  grating: GmosSouthGrating!
+
+  """Gmos South Focal plane unit"""
+  fpu: GmosSouthFpuInput!
+
+  """Gmos South filter"""
+  filter: GmosSouthFilter
+
+  """ccd mode"""
+  ccdMode: GmosCcdModeInput
+
+  """Regions of interest"""
+  roi: GmosRoi
+}
+
+input GmosSImagingInput {
+  """Gmos South filter"""
+  filter: GmosSouthFilter!
+
+  """ccd mode"""
+  ccdMode: GmosCcdModeInput
+}
+
+input GmosNSpectroscopyInput {
+  """Center of the configuration spectrum"""
+  centralWavelength: WavelengthInput!
+
+  """Gmos North disperser"""
+  grating: GmosNorthGrating!
+
+  """Gmos North Focal plane unit"""
+  fpu: GmosNorthFpuInput!
+
+  """Gmos North filter"""
+  filter: GmosNorthFilter
+
+  """ccd mode"""
+  ccdMode: GmosCcdModeInput
+
+  """Regions of interest"""
+  roi: GmosRoi
+}
+
+input GmosNImagingInput {
+  """Gmos North filter"""
+  filter: GmosNorthFilter!
+
+  """ccd mode"""
+  ccdMode: GmosCcdModeInput
+}
+
+input Flamingos2SpectroscopyInput {
+  """Flamingos2 disperser"""
+  disperser: Flamingos2Disperser!
+
+  """Flamingos2 Focal plane unit"""
+  fpu: Flamingos2Fpu!
+
+  """Flamingos2 filter"""
+  filter: Flamingos2Filter!
+}
+
+input Flamingos2ImagingInput {
+  """Flamingos2 filter"""
+  filter: Flamingos2Filter!
+}
+
+type GmosSSpectroscopyParams {
+  """Wavelength in appropriate units"""
+  centralWavelength: Wavelength!
+
+  """Gmos South disperser"""
+  grating: GmosSouthGrating
+
+  """Gmos North Focal plane unit"""
+  customMask: GmosCustomMask
+
+  """Gmos South Focal plane unit"""
+  fpu: GmosSouthFpu
+
+  """Gmos South filter"""
+  filter: GmosSouthFilter
+}
+
+type GmosNSpectroscopyParams {
+  """Wavelength in appropriate units"""
+  centralWavelength: Wavelength!
+
+  """Gmos North disperser"""
+  grating: GmosNorthGrating
+
+  """Gmos North Focal plane unit"""
+  customMask: GmosCustomMask
+
+  """Gmos North Focal plane unit"""
+  fpu: GmosNorthFpu
+
+  """Gmos North filter"""
+  filter: GmosNorthFilter
+}
+
+type Flamingos2SpectroscopyParams {
+  """Flamingos2 disperser"""
+  disperser: Flamingos2Disperser
+
+  """Flamingos2 Focal plane unit"""
+  fpu: Flamingos2Fpu
+
+  """Flamingos2 filter"""
+  filter: Flamingos2Filter
+}
+
+union SpectroscopyParams = GmosNSpectroscopyParams | GmosSSpectroscopyParams | Flamingos2SpectroscopyParams
+
+type GmosSImagingParams {
+  """Gmos South filter"""
+  filter: GmosSouthFilter!
+}
+
+type GmosNImagingParams {
+  """Gmos North filter"""
+  filter: GmosNorthFilter
+}
+
+type Flamingos2ImagingParams {
+  """Flamingos2 filter"""
+  filter: Flamingos2Filter
+}
+
+union ImagingParams = GmosNImagingParams | GmosSImagingParams | Flamingos2ImagingParams
+
+"""Params for instrument modes"""
+input InstrumentModesInput {
+  """Gmos North Spectroscopy"""
+  gmosNSpectroscopy: GmosNSpectroscopyInput
+
+  """Gmos South Spectroscopy"""
+  gmosSSpectroscopy: GmosSSpectroscopyInput
+
+  """Gmos North Imaging"""
+  gmosNImaging: GmosNImagingInput
+
+  """Gmos South Imaging"""
+  gmosSImaging: GmosSImagingInput
+
+  """Flamingos2 Spectroscopy"""
+  flamingos2Spectroscopy: Flamingos2SpectroscopyInput
+
+  """Flamingos2 Imaging"""
+  flamingos2Imaging: Flamingos2ImagingInput
+}
+
+"""Image quality input - specify either preset or exact arcsec value"""
+input ImageQualityInput {
+  """Preset image quality value"""
+  preset: ImageQualityPreset
+
+  """Exact image quality in arcseconds"""
+  arcsec: BigDecimal
+}
+
+"""
+Cloud extinction input - specify either preset or exact extinction value
+"""
+input CloudExtinctionInput {
+  """Preset cloud extinction value"""
+  preset: CloudExtinctionPreset
+
+  """Exact cloud extinction in Vega magnitudes"""
+  extinction: BigDecimal
+}
+
+"""
+ITC-specific constraint set with flexible ImageQuality and CloudExtinction inputs
+"""
+input ItcConstraintsInput {
+  """Image quality - specify either preset or exact arcsec value"""
+  imageQuality: ImageQualityInput!
+
+  """Cloud extinction - specify either preset or exact extinction value"""
+  cloudExtinction: CloudExtinctionInput!
+
+  """Sky background"""
+  skyBackground: SkyBackground!
+
+  """Water vapor"""
+  waterVapor: WaterVapor!
+
+  """Elevation range"""
+  elevationRange: ElevationRangeInput!
+}
+
+"""Params for spectroscopy integration time calculation"""
+input SpectroscopyInput {
+  """Exposure time mode."""
+  exposureTimeMode: ExposureTimeModeInput!
+
+  """Relevant data for targets in asterism."""
+  asterism: [TargetInput!]!
+
+  """Conditions"""
+  constraints: ItcConstraintsInput!
+
+  """Instrument modes"""
+  mode: InstrumentModesInput!
+}
+
+input TargetInput {
+  """Target spatial profile PointSource/UniformSource/GaussianSource."""
+  sourceProfile: SourceProfileInput!
+
+  """Target radial velocity"""
+  radialVelocity: RadialVelocityInput!
+}
+
+"""Params for imaging integration time calculation"""
+input ImagingInput {
+  """Exposure time mode."""
+  exposureTimeMode: ExposureTimeModeInput!
+
+  """Relevant data for targets in asterism."""
+  asterism: [TargetInput!]!
+
+  """Conditions"""
+  constraints: ItcConstraintsInput!
+
+  """Instrument modes"""
+  mode: InstrumentModesInput!
+}
+
+"""Params for significant figures on each axis"""
+input SignificantFiguresInput {
+  """Significant figures for xAxis"""
+  xAxis: PosInt
+
+  """Significant figures for yAxis"""
+  yAxis: PosInt
+
+  """Significant figures for ccds"""
+  ccd: PosInt
+}
+
+"""Params for spectroscopy graphs calculation"""
+input SpectroscopyGraphsInput {
+  """Observing wavelength."""
+  atWavelength: WavelengthInput!
+
+  """Exposure time duration"""
+  exposureTime: TimeSpanInput!
+
+  """Exposures"""
+  exposureCount: PosInt!
+
+  """Relevant data for targets in asterism."""
+  asterism: [TargetInput!]!
+
+  """Conditions"""
+  constraints: ItcConstraintsInput!
+
+  """Instrument modes"""
+  mode: InstrumentModesInput!
+
+  """Significant figures, truncates the amount of significant value"""
+  significantFigures: SignificantFiguresInput
+}
+
+"""Parameters to retrieve graph data"""
+input SpectroscopyIntegrationTimeAndGraphsInput {
+  """Exposure time mode."""
+  exposureTimeMode: ExposureTimeModeInput!
+
+  """Relevant data for targets in asterism."""
+  asterism: [TargetInput!]!
+
+  """Conditions"""
+  constraints: ItcConstraintsInput!
+
+  """Instrument modes"""
+  mode: InstrumentModesInput!
+
+  """Significant figures, truncates the amount of significant value"""
+  significantFigures: SignificantFiguresInput
+}
+
+type IntegrationTime {
+  """Calculated exposure time duratio"""
+  exposureTime: TimeSpan!
+
+  """Calculate exposures count"""
+  exposureCount: PosInt!
+}
+
+type CalculationResult {
+  """server and data versions"""
+  versions: ItcVersions!
+
+  """queried mode"""
+  mode: ITCObservingMode!
+
+  """exposure time mode"""
+  exposureTimeMode: ExposureTimeMode!
+
+  """ITC results for each target"""
+  targetTimes: [TargetIntegrationTimeOutcome!]!
+
+  """Index of the brightest target, unless there are errors"""
+  brightestIndex: NonNegInt
+
+  """ITC result for brightest target, unless there are errors"""
+  brightest: TargetIntegrationTime
+}
+
+union TargetIntegrationTimeOutcome = TargetIntegrationTime | TargetError
+
+"""ITC results for a target, can be a single result or one per CCD"""
+type TargetIntegrationTime {
+  """All CCD results for the target"""
+  all: [IntegrationTime!]!
+
+  """Index of the preferred CCD result, it is mode dependent"""
+  index: NonNegInt!
+  selected: IntegrationTime!
+
+  """CCD performance data"""
+  ccds: [ItcCcd!]!
+
+  """
+  The band used for the time calculation, in case of a BandNormalized SED
+  """
+  band: Band
+
+  """
+  The emission line used for the time calculation, in case of an EmissionLines SED
+  """
+  emissionLine: Wavelength
+
+  """
+  calculated signal to noise at a specific wavelength. Returned only if the wavelength At is valid
+  """
+  signalToNoiseAt: SignalToNoiseAt
+}
+
+type TargetError {
+  errorCode: String!
+  message: String!
+  wellHalfFilledSeconds: Float
+}
+
+interface ITCObservingMode {
+  """instrument"""
+  instrument: Instrument!
+}
+
+type ImagingMode implements ITCObservingMode {
+  """instrument"""
+  instrument: Instrument!
+
+  """params"""
+  params: ImagingParams!
+}
+
+type SpectroscopyMode implements ITCObservingMode {
+  """instrument"""
+  instrument: Instrument!
+
+  """params"""
+  params: SpectroscopyParams!
+}
+
+"""Graph data types"""
+enum ItcSeriesType {
+  SIGNAL_DATA
+  BACKGROUND_DATA
+  SINGLE_S2_NDATA
+  FINAL_S2_NDATA
+  PIX_SIG_DATA
+  PIX_BACK_DATA
+}
+
+"""Graph data types"""
+enum ItcGraphType {
+  SIGNAL_GRAPH
+  S2N_GRAPH
+}
+
+type GraphAxis {
+  """First value of the axis"""
+  start: Float!
+
+  """Last value of the axis"""
+  end: Float!
+
+  """Max value of the axis"""
+  max: Float!
+
+  """Min value of the axis"""
+  min: Float!
+
+  """How many values for the axis"""
+  count: PosInt!
+}
+
+type ItcSeries {
+  title: String!
+
+  """
+  Data type: alternatives SignalData, BackgroundData, SingleS2NData, FinalS2NData, PixSigData, PixBackData
+  """
+  seriesType: ItcSeriesType!
+
+  """Values for the x axis"""
+  xAxis: GraphAxis
+
+  """Values for the x axis"""
+  yAxis: GraphAxis
+
+  """Data series in the form of pairs (x, y)"""
+  data: [[Float!]!]!
+
+  """Data series for the X axis"""
+  dataX: [Float!]!
+
+  """Data series for the Y axis"""
+  dataY: [Float!]!
+}
+
+type ItcGraph {
+  """Data type: alternatives SignalGraph, S2NGraph"""
+  graphType: ItcGraphType!
+  series: [ItcSeries!]!
+}
+
+type ItcWarning {
+  msg: String!
+}
+
+type ItcCcd {
+  """the final SN ratio for a single image"""
+  singleSNRatio: SignalToNoise!
+
+  """Wavelength where we get the max singl SN"""
+  wavelengthForMaxSingleSNRatio: Wavelength
+
+  """the max single SN ratio for this ccd"""
+  maxSingleSNRatio: BigDecimal
+
+  """the total SN ratio for all images"""
+  totalSNRatio: SignalToNoise!
+
+  """Wavelength where we get the max total SN"""
+  wavelengthForMaxTotalSNRatio: Wavelength
+
+  """the max final SN ratio for this ccd"""
+  maxTotalSNRatio: BigDecimal
+
+  """the highest e- count for all pixels on the CCD"""
+  peakPixelFlux: BigDecimal!
+
+  """the well depth (max e- count per pixel) for this CCD"""
+  wellDepth: BigDecimal!
+
+  """the amplifier gain for this CCD (used to calculate ADU)"""
+  ampGain: BigDecimal!
+
+  """Possible warnings"""
+  warnings: [ItcWarning!]
+}
+
+type TargetGraphs {
+  """Results for each CCD"""
+  ccds: [ItcCcd!]!
+
+  """Graph data"""
+  graphData: [ItcGraph!]!
+
+  """Peak SN Ratio"""
+  peakFinalSNRatio: SignalToNoise!
+
+  """SN Ratio at the requested wavelength if passed along"""
+  atWavelengthFinalSNRatio: SignalToNoise
+
+  """Peak SN Ratio"""
+  peakSingleSNRatio: SignalToNoise!
+
+  """SN Ratio at the requested wavelength if passed along"""
+  atWavelengthSingleSNRatio: SignalToNoise
+}
+
+type TargetGraphsResult {
+  """graphs for the target"""
+  graphs: TargetGraphs!
+
+  """
+  The band used for the graphs calculation, in case of a BandNormalized SED
+  """
+  band: Band
+
+  """
+  The emission line used for the time calculation, in case of an EmissionLines SED
+  """
+  emissionLine: Wavelength
+}
+
+type SpectroscopyGraphsResult {
+  """server and data versions"""
+  versions: ItcVersions!
+
+  """results for each target, in same order as input"""
+  targetGraphs: [TargetGraphsOutcome!]!
+}
+
+union TargetGraphsOutcome = TargetGraphsResult | TargetError
+
+type SpectroscopyTimeAndGraphsResult {
+  """server and data versions"""
+  versions: ItcVersions!
+
+  """ITC results for each target, in case all targets succeed"""
+  targetTimesAndGraphs: [TargetTimeAndGraphsOutcome!]
+
+  """
+  In case of errors in integration times, we short cirtuit to the results from integration times
+  """
+  targetTimes: [TargetIntegrationTimeOutcome!]
+
+  """Index of the brightest target"""
+  brightestIndex: NonNegInt
+
+  """ITC result for brightest target"""
+  brightest: TargetIntegrationTime
+}
+
+union TargetTimeAndGraphsOutcome = TargetTimeAndGraphs | TargetError
+
+type TargetTimeAndGraphs {
+  """Results for the integration time"""
+  integrationTime: TargetIntegrationTime!
+
+  """Results for the graphs"""
+  graphs: TargetGraphs!
+}
+
+"""Calculation result types"""
+enum SNResultType {
+  SUCCESS
+  NO_DATA
+  ABOVE_RANGE
+  BELOW_RANGE
+  CALCULATION_ERROR
+}
+
+interface SignalToNoiseResult {
+  """ITC result type"""
+  resultType: SNResultType!
+}
+
+type SNCalcSuccess implements SignalToNoiseResult {
+  resultType: SNResultType!
+
+  """Resulting signal to noise"""
+  signalToNoise: SignalToNoise!
+}
+
+type SNWavelengthAtBelowRange implements SignalToNoiseResult {
+  resultType: SNResultType!
+  signalToNoiseAt: Wavelength!
+}
+
+type SNWavelengthAtAboveRange implements SignalToNoiseResult {
+  resultType: SNResultType!
+  signalToNoiseAt: Wavelength!
+}
+
+type SNCalcError implements SignalToNoiseResult {
+  resultType: SNResultType!
+  msg: String!
+}

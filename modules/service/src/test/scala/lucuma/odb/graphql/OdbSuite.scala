@@ -76,8 +76,9 @@ import lucuma.odb.service.Services
 import lucuma.odb.service.Services.ServiceAccess
 import lucuma.odb.service.Services.Syntax.*
 import lucuma.refined.*
+import munit.AnyFixture
 import munit.CatsEffectSuite
-import munit.internal.console.AnsiColors
+import munit.diff.console.AnsiColors
 import natchez.Trace
 import org.http4s.blaze.server.BlazeServerBuilder
 import org.http4s.client.Client
@@ -401,7 +402,8 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
     } yield s
 
   protected def session: Resource[IO, Session[IO]] =
-    FMain.singleSession(databaseConfig)
+    Resource.unit.flatMap: _ => // Newer versions of munit-cats-effect just don't run the tests without this line. 
+      FMain.singleSession(databaseConfig)
 
   private def transactionalClient(user: User)(svr: Server): Resource[IO, FetchClient[IO, Nothing]] =
       val uri  = svr.baseUri / "odb"
@@ -423,10 +425,10 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
 
   case class Operation(document: String) extends GraphQLOperation.Typed[Nothing, JsonObject, Json]
 
-  private lazy val serverFixture: Fixture[Server] =
+  private lazy val serverFixture: AnyFixture[Server] =
     ResourceSuiteLocalFixture("server", server)
 
-  protected lazy val sessionFixture: Fixture[Session[IO]] =
+  protected lazy val sessionFixture: AnyFixture[Session[IO]] =
     ResourceSuiteLocalFixture("session", session)
 
   override def munitFixtures = List(serverFixture, sessionFixture)
