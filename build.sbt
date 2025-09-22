@@ -49,7 +49,7 @@ val slf4jVersion               = "2.0.17"
 val testcontainersScalaVersion = "0.43.0" // check test output if you attempt to update this
 val weaverVersion              = "0.8.4"
 
-ThisBuild / tlBaseVersion      := "0.30"
+ThisBuild / tlBaseVersion      := "0.50"
 ThisBuild / scalaVersion       := "3.7.3"
 ThisBuild / crossScalaVersions := Seq("3.7.3")
 ThisBuild / scalacOptions     ++= Seq("-Xmax-inlines", "50") // Hash derivation fails with default of 32
@@ -107,18 +107,18 @@ ThisBuild / githubWorkflowBuildPreamble +=
     cond = Some("github.event_name == 'pull_request' && matrix.shard == '1'")
   )
 
-// ThisBuild / githubWorkflowBuildPreamble +=
-//   WorkflowStep.Use(
-//     UseRef.Public("kamilkisiela", "graphql-inspector", "master"),
-//     name = Some("Validate ITC GraphQL schema changes"),
-//     params =
-//       Map(
-//         "name"          -> "Validate ITC Public API",
-//         "schema"        -> "main:itc/service/src/main/resources/graphql/itc.graphql",
-//         "approve-label" -> "expected-breaking-change"
-//       ),
-//     cond = Some("github.event_name == 'pull_request' && matrix.shard == '2'")
-//   )  
+ThisBuild / githubWorkflowBuildPreamble +=
+  WorkflowStep.Use(
+    UseRef.Public("kamilkisiela", "graphql-inspector", "master"),
+    name = Some("Validate ITC GraphQL schema changes"),
+    params =
+      Map(
+        "name"          -> "Validate ITC Public API",
+        "schema"        -> "main:itc/service/src/main/resources/graphql/itc.graphql",
+        "approve-label" -> "expected-breaking-change"
+      ),
+    cond = Some("github.event_name == 'pull_request' && matrix.shard == '2'")
+  )  
 
 val nTestJobShards = 8
 
