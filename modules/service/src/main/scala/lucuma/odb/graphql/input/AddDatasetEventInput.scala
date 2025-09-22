@@ -6,14 +6,14 @@ package input
 
 import cats.syntax.parallel.*
 import lucuma.core.enums.DatasetStage
-import lucuma.core.model.Client
 import lucuma.core.model.sequence.Dataset
+import lucuma.core.util.IdempotencyKey
 import lucuma.odb.graphql.binding.*
 
 case class AddDatasetEventInput(
-  datasetId:    Dataset.Id,
-  datasetStage: DatasetStage,
-  clientId:     Option[Client.Id]
+  datasetId:      Dataset.Id,
+  datasetStage:   DatasetStage,
+  idempotencyKey: Option[IdempotencyKey]
 )
 
 object AddDatasetEventInput:
@@ -23,7 +23,8 @@ object AddDatasetEventInput:
       case List(
         DatasetIdBinding("datasetId", rDatasetId),
         DatasetStageBinding("datasetStage", rDatasetStage),
-        ClientIdBinding.Option("clientId", rCid)
+        ClientIdBinding.Option("clientId", rCid),
+        IdempotencyKeyBinding.Option("idempotencyKey", rIdm)
       ) =>
-        (rDatasetId, rDatasetStage, rCid).parMapN: (did, stage, cid) =>
-          AddDatasetEventInput(did, stage, cid)
+        (rDatasetId, rDatasetStage, rCid, rIdm).parMapN: (did, stage, cid, idm) =>
+          AddDatasetEventInput(did, stage, idm orElse cid.map(c => IdempotencyKey(c.toUuid)))

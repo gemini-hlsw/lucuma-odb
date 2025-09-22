@@ -43,6 +43,7 @@ import lucuma.core.util.CalculationState
 import lucuma.core.util.DateInterval
 import lucuma.core.util.Enumerated
 import lucuma.core.util.Gid
+import lucuma.core.util.IdempotencyKey
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
@@ -325,6 +326,9 @@ trait Codecs {
     } { h =>
       (h.minHours.toBigDecimal, h.maxHours.toBigDecimal)
     }
+
+  val idempotency_key: Codec[IdempotencyKey] =
+    codecFromPrism(IdempotencyKey.FromString, Type.uuid)
 
   val image_quality_preset: Codec[ImageQuality.Preset] =
     enumerated[ImageQuality.Preset](Type.varchar)

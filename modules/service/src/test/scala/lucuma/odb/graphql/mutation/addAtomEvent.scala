@@ -19,6 +19,7 @@ import lucuma.core.model.Observation
 import lucuma.core.model.User
 import lucuma.core.model.sequence.Atom
 import lucuma.core.syntax.string.*
+import lucuma.core.util.IdempotencyKey
 import lucuma.odb.data.AtomExecutionState
 import lucuma.odb.data.StepExecutionState
 
@@ -211,13 +212,13 @@ class addAtomEvent extends OdbSuite with ExecutionState:
       vid <- recordVisitAs(user, mode.instrument, oid)
       aid <- recordAtomAs(user, mode.instrument, vid)
       sid <- recordStepAs(user, mode.instrument, aid)
-      evt <- addAtomEventAs(user, aid, AtomStage.StartAtom, cid)
-    yield assertEquals(evt.clientId, cid)
+      evt <- addAtomEventAs(user, aid, AtomStage.StartAtom, clientId = cid)
+    yield assertEquals(evt.idempotencyKey.map(k => Client.Id.fromUuid(k.value)), cid)
 
-  test("addAtomEvent - duplicate client id"):
+  test("addAtomEvent - idempotency key"):
     val user = service
     val mode = ObservingModeType.GmosNorthLongSlit
-    val cid  = Client.Id.parse("c-b7044cd8-38b5-4592-8d99-91d2c512041d")
+    val idm  = IdempotencyKey.FromString.getOption("530c979f-de98-472f-9c23-a3442f2a9f7f")
 
     for
       pid <- createProgramAs(user)
@@ -225,14 +226,28 @@ class addAtomEvent extends OdbSuite with ExecutionState:
       vid <- recordVisitAs(user, mode.instrument, oid)
       aid <- recordAtomAs(user, mode.instrument, vid)
       sid <- recordStepAs(user, mode.instrument, aid)
-      evt <- addAtomEventAs(user, aid, AtomStage.StartAtom, cid)
+      evt <- addAtomEventAs(user, aid, AtomStage.StartAtom, idempotencyKey = idm)
+    yield assertEquals(evt.idempotencyKey, idm)
+
+  test("addAtomEvent - duplicate idempotency key"):
+    val user = service
+    val mode = ObservingModeType.GmosNorthLongSlit
+    val idm  = IdempotencyKey.FromString.getOption("b7044cd8-38b5-4592-8d99-91d2c512041d")
+
+    for
+      pid <- createProgramAs(user)
+      oid <- createObservationAs(user, pid, mode.some)
+      vid <- recordVisitAs(user, mode.instrument, oid)
+      aid <- recordAtomAs(user, mode.instrument, vid)
+      sid <- recordStepAs(user, mode.instrument, aid)
+      evt <- addAtomEventAs(user, aid, AtomStage.StartAtom, idempotencyKey = idm)
       _   <- expect(user,
         s"""
           mutation {
             addAtomEvent(input: {
               atomId: "$aid"
               atomStage: START_ATOM
-              clientId: "${cid.get}"
+              idempotencyKey: "${idm.get}"
             }) {
               event { id }
             }

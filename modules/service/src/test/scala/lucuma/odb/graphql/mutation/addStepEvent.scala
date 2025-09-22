@@ -17,6 +17,7 @@ import lucuma.core.model.ExecutionEvent
 import lucuma.core.model.Observation
 import lucuma.core.model.User
 import lucuma.core.model.sequence.Step
+import lucuma.core.util.IdempotencyKey
 import lucuma.odb.data.AtomExecutionState
 import lucuma.odb.data.StepExecutionState
 
@@ -186,21 +187,24 @@ class addStepEvent extends OdbSuite with ExecutionState {
     }
   }
 
-  def addClientId(
+  def addWithIdempotencyKey(
     sid: Step.Id,
-    cid: Client.Id
-  ): IO[(ExecutionEvent.Id, Client.Id)] =
+    idm: Option[IdempotencyKey] = None,
+    cid: Option[Client.Id]      = None
+  ): IO[(ExecutionEvent.Id, Option[IdempotencyKey], Option[Client.Id])] =
     query(
       service,
       s"""
         mutation {
           addStepEvent(input: {
-            stepId:    "$sid",
-            stepStage: START_STEP,
-            clientId:  "$cid"
+            stepId:    "$sid"
+            stepStage: START_STEP
+            ${idm.fold("")(idm => s"idempotencyKey: \"$idm\"")}
+            ${cid.fold("")(cid => s"clientId: \"$cid\"")}
           }) {
             event {
               id
+              idempotencyKey
               clientId
             }
           }
@@ -210,19 +214,26 @@ class addStepEvent extends OdbSuite with ExecutionState {
       val cur = js.hcursor.downFields("addStepEvent", "event")
       (for
         e <- cur.downField("id").as[ExecutionEvent.Id]
-        d <- cur.downField("clientId").as[Client.Id]
-      yield (e, d)).leftMap(f => new RuntimeException(f.message)).liftTo[IO]
+        n <- cur.downField("idempotencyKey").as[Option[IdempotencyKey]]
+        d <- cur.downField("clientId").as[Option[Client.Id]]
+      yield (e, n, d)).leftMap(f => new RuntimeException(f.message)).liftTo[IO]
 
   test("addStepEvent - client id"):
-    val cid  = Client.Id.parse("c-530c979f-de98-472f-9c23-a3442f2a9f7f").get
+    val cid  = Client.Id.parse("c-530c979f-de98-472f-9c23-a3442f2a9f7f")
 
     recordStep(ObservingModeType.GmosNorthLongSlit, service).flatMap: (_, sid) =>
-      assertIO(addClientId(sid, cid).map(_._2), cid)
+      assertIO(addWithIdempotencyKey(sid, cid = cid).map(_._3), cid)
 
-  test("addStepEvent - duplicate client id"):
-    val cid = Client.Id.parse("c-b7044cd8-38b5-4592-8d99-91d2c512041d").get
+  test("addSlewEvent - idempotency key"):
+    val idm = IdempotencyKey.FromString.getOption("b9bac66c-4e12-4b1d-b646-47c2c3a97792")
 
     recordStep(ObservingModeType.GmosNorthLongSlit, service).flatMap: (_, sid) =>
-      addClientId(sid, cid).flatMap: (eid, _) =>
-        assertIO(addClientId(sid, cid).map(_._1), eid)
+      assertIO(addWithIdempotencyKey(sid, idm = idm).map(_._2), idm)
+
+  test("addStepEvent - duplicate idempotency key"):
+    val idm = IdempotencyKey.FromString.getOption("b7044cd8-38b5-4592-8d99-91d2c512041d")
+
+    recordStep(ObservingModeType.GmosNorthLongSlit, service).flatMap: (_, sid) =>
+      addWithIdempotencyKey(sid, idm = idm).flatMap: (eid, _, _) =>
+        assertIO(addWithIdempotencyKey(sid, idm = idm).map(_._1), eid)
 }

@@ -26,7 +26,16 @@ scalar EmailAddress
 input AddAtomEventInput {
   atomId: AtomId!
   atomStage: AtomStage!
+  "deprecated: use idempotencyKey instead"
   clientId: ClientId
+
+
+  """
+  Idempotency key, if any.  The IdempotencyKey may be provided by clients when
+  the event is created and is used to enable problem-free retry in the case of
+  failure.
+  """
+  idempotencyKey: IdempotencyKey
 }
 
 "The result of adding a atom event."
@@ -43,7 +52,15 @@ input AddDatasetEventInput {
   "Dataset execution stage."
   datasetStage: DatasetStage!
 
+  "deprecated: use idempotencyKey instead"
   clientId: ClientId
+
+  """
+  Idempotency key, if any.  The IdempotencyKey may be provided by clients when
+  the event is created and is used to enable problem-free retry in the case of
+  failure.
+  """
+  idempotencyKey: IdempotencyKey
 }
 
 "The result of adding a dataset event."
@@ -66,7 +83,16 @@ type AddProgramUserResult {
 input AddSequenceEventInput {
   visitId: VisitId!
   command: SequenceCommand!
+
+  "deprecated: use idempotencyKey instead"
   clientId: ClientId
+
+  """
+  Idempotency key, if any.  The IdempotencyKey may be provided by clients when
+  the event is created and is used to enable problem-free retry in the case of
+  failure.
+  """
+  idempotencyKey: IdempotencyKey
 }
 
 "The result of adding a sequence event."
@@ -79,7 +105,16 @@ type AddSequenceEventResult {
 input AddSlewEventInput {
   observationId: ObservationId!
   slewStage: SlewStage!
+
+  "deprecated: use idempotencyKey instead"
   clientId: ClientId
+
+  """
+  Idempotency key, if any.  The IdempotencyKey may be provided by clients when
+  the event is created and is used to enable problem-free retry in the case of
+  failure.
+  """
+  idempotencyKey: IdempotencyKey
 }
 
 "The result of adding a slew event."
@@ -92,7 +127,16 @@ type AddSlewEventResult {
 input AddStepEventInput {
   stepId: StepId!
   stepStage: StepStage!
+
+  "deprecated: use idempotencyKey instead"
   clientId: ClientId
+
+  """
+  Idempotency key, if any.  The IdempotencyKey may be provided by clients when
+  the event is created and is used to enable problem-free retry in the case of
+  failure.
+  """
+  idempotencyKey: IdempotencyKey
 }
 
 "The result of adding a step event."
@@ -187,8 +231,14 @@ type AtomEvent implements ExecutionEvent {
   "Atom execution stage."
   atomStage: AtomStage!
 
-  "Client id, if any."
-  clientId: ClientId
+  clientId: ClientId @deprecated(reason: "Use idempotencyKey instead")
+
+  """
+  Idempotency key, if any.  The IdempotencyKey may be provided by clients when
+  the event is created and is used to enable problem-free retry in the case of
+  failure.
+  """
+  idempotencyKey: IdempotencyKey
 }
 
 enum AtomExecutionState {
@@ -694,6 +744,7 @@ type ChangeProgramUserRoleResult {
   programUser: ProgramUser!
 }
 
+"deprecated: use IdempotencyKey (UUID) instead"
 scalar ClientId
 
 """
@@ -6815,8 +6866,14 @@ type DatasetEvent implements ExecutionEvent {
   "The associated dataset."
   dataset: Dataset!
 
-  "Client id, if any."
-  clientId: ClientId
+  clientId: ClientId @deprecated(reason: "Use idempotencyKey instead")
+
+  """
+  Idempotency key, if any.  The IdempotencyKey may be provided by clients when
+  the event is created and is used to enable problem-free retry in the case of
+  failure.
+  """
+  idempotencyKey: IdempotencyKey
 
 }
 
@@ -7144,8 +7201,14 @@ interface ExecutionEvent {
   "Event type."
   eventType: ExecutionEventType!
 
-  "Client id, if any."
-  clientId: ClientId
+  clientId: ClientId @deprecated(reason: "Use idempotencyKey instead")
+
+  """
+  Idempotency key, if any.  The IdempotencyKey may be provided by clients when
+  the event is created and is used to enable problem-free retry in the case of
+  failure.
+  """
+  idempotencyKey: IdempotencyKey
 }
 
 """
@@ -9842,6 +9905,14 @@ input ImagingScienceRequirementsInput {
   combinedFilters: Boolean
 }
 
+"""
+A UUID provided by a client in order to prevent retrying a failed mutation from
+performing the action a second time when not necessary.  When a mutation is
+performed the updates are associated with the given key, if provided.  If a
+subsequent mutation is attempted using the same key then no actions are taken.
+"""
+scalar IdempotencyKey
+
 type ImagingScienceRequirements {
 
   """
@@ -11920,8 +11991,14 @@ type SequenceEvent implements ExecutionEvent {
   "Sequence event data."
   command: SequenceCommand!
 
-  "Client id, if any."
-  clientId: ClientId
+  clientId: ClientId @deprecated(reason: "Use idempotencyKey instead")
+
+  """
+  Idempotency key, if any.  The IdempotencyKey may be provided by clients when
+  the event is created and is used to enable problem-free retry in the case of
+  failure.
+  """
+  idempotencyKey: IdempotencyKey
 
 }
 
@@ -12063,8 +12140,14 @@ type SlewEvent implements ExecutionEvent {
   "Slew event data."
   slewStage: SlewStage!
 
-  "Client id, if any."
-  clientId: ClientId
+  clientId: ClientId @deprecated(reason: "Use idempotencyKey instead")
+
+  """
+  Idempotency key, if any.  The IdempotencyKey may be provided by clients when
+  the event is created and is used to enable problem-free retry in the case of
+  failure.
+  """
+  idempotencyKey: IdempotencyKey
 
 }
 
@@ -13000,8 +13083,14 @@ type StepEvent implements ExecutionEvent {
   "Step execution stage."
   stepStage: StepStage!
 
-  "Client id, if any."
-  clientId: ClientId
+  clientId: ClientId @deprecated(reason: "Use idempotencyKey instead")
+
+  """
+  Idempotency key, if any.  The IdempotencyKey may be provided by clients when
+  the event is created and is used to enable problem-free retry in the case of
+  failure.
+  """
+  idempotencyKey: IdempotencyKey
 
 }
 
