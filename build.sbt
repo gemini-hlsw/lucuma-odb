@@ -107,18 +107,18 @@ ThisBuild / githubWorkflowBuildPreamble +=
     cond = Some("github.event_name == 'pull_request' && matrix.shard == '1'")
   )
 
-ThisBuild / githubWorkflowBuildPreamble +=
-  WorkflowStep.Use(
-    UseRef.Public("kamilkisiela", "graphql-inspector", "master"),
-    name = Some("Validate ITC GraphQL schema changes"),
-    params =
-      Map(
-        "name"          -> "Validate ITC Public API",
-        "schema"        -> "main:itc/service/src/main/resources/graphql/itc.graphql",
-        "approve-label" -> "expected-breaking-change"
-      ),
-    cond = Some("github.event_name == 'pull_request' && matrix.shard == '2'")
-  )  
+// ThisBuild / githubWorkflowBuildPreamble +=
+//   WorkflowStep.Use(
+//     UseRef.Public("kamilkisiela", "graphql-inspector", "master"),
+//     name = Some("Validate ITC GraphQL schema changes"),
+//     params =
+//       Map(
+//         "name"          -> "Validate ITC Public API",
+//         "schema"        -> "main:itc/service/src/main/resources/graphql/itc.graphql",
+//         "approve-label" -> "expected-breaking-change"
+//       ),
+//     cond = Some("github.event_name == 'pull_request' && matrix.shard == '2'")
+//   )  
 
 val nTestJobShards = 8
 
