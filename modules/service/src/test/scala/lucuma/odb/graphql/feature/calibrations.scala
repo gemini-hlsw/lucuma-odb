@@ -36,13 +36,13 @@ import lucuma.core.model.User
 import lucuma.core.syntax.string.*
 import lucuma.odb.data.EditType
 import lucuma.odb.graphql.input.ProgramPropertiesInput
+import lucuma.odb.graphql.query.ExecutionQuerySetupOperations
 import lucuma.odb.graphql.subscription.SubscriptionUtils
 import lucuma.odb.json.wavelength.decoder.given
 import lucuma.odb.service.CalibrationsService
 import lucuma.odb.service.Services
 import lucuma.odb.service.SpecPhotoCalibrations
 import lucuma.odb.service.TwilightCalibrations
-import lucuma.odb.graphql.query.ExecutionQuerySetupOperations
 
 import java.time.Instant
 import java.time.LocalDate
@@ -176,6 +176,39 @@ class calibrations extends OdbSuite with SubscriptionUtils with ExecutionQuerySe
     scienceRequirements: ScienceRequirements
   ) derives Decoder
 
+  extension (obs: List[CalibObs])
+    def countCalibrations: Int = obs.count {
+      case CalibObs(_, _, Some(_), _, _, _) => true
+      case _                               => false
+    }
+
+    def countCalibrationsWithCE(ce: CloudExtinction.Preset): Int = obs.count {
+      case CalibObs(_, _, Some(_), _, Some(CalibCE(a)), _) => a === ce
+      case _                                               => false
+    }
+
+    def countCalibrationsWithTE: Int = obs.count {
+      case CalibObs(_, _, Some(_), Some(_), _, _) => true
+      case _                                     => false
+    }
+
+    def callibrationIds: List[Observation.Id] = obs.collect {
+      case CalibObs(cid, _, Some(_), _, _, _) => cid
+    }
+
+    def groupIds: List[Group.Id] = obs.collect {
+      case CalibObs(_, Some(gid), _, _, _, _) => gid
+    }
+
+  extension (elements: List[Either[Group.Id, Observation.Id]])
+    def observationIds: List[Observation.Id] = elements.collect {
+      case Right(oid) => oid
+    }
+
+    def calibrationGroupId: Option[Group.Id] = elements.collectFirst {
+      case Left(gid) => gid
+    }
+
   private def queryGroup(gid: Group.Id): IO[(Group.Id, Boolean, NonEmptyString)] =
     query(
       service,
@@ -256,9 +289,7 @@ class calibrations extends OdbSuite with SubscriptionUtils with ExecutionQuerySe
              }
       gr1  <- groupElementsAs(pi, pid, None)
     } yield {
-      val cgid = gr1.collect {
-                case Left(gid) => gid
-              }.headOption
+      val cgid = gr1.calibrationGroupId
       assert(cgid.isEmpty)
     }
   }
@@ -276,9 +307,7 @@ class calibrations extends OdbSuite with SubscriptionUtils with ExecutionQuerySe
                }
              }
       gr1  <- groupElementsAs(pi, pid, None)
-      cgid = gr1.collect {
-                case Left(gid) => gid
-              }.headOption
+      cgid = gr1.calibrationGroupId
       cg   <- cgid.map(queryGroup)
                 .getOrElse(IO.raiseError(new RuntimeException("No calibration group")))
       ob   <- queryObservations(pid)
@@ -305,16 +334,11 @@ class calibrations extends OdbSuite with SubscriptionUtils with ExecutionQuerySe
       gr1  <- groupElementsAs(pi, pid, None)
       ob   <- queryObservations(pid)
     } yield {
-      val oids = gr1.collect { case Right(oid) => oid }
-      val cgid = gr1.collect { case Left(gid) => gid }.headOption
-      val cCount = ob.count {
-        case CalibObs(_, _, Some(_), _, _, _) => true
-        case _                       => false
-      }
+      val oids = gr1.observationIds
+      val cgid = gr1.calibrationGroupId
+      val cCount = ob.countCalibrations
       // calibs belong to the calib group
-      val obsGids = ob.collect {
-        case CalibObs(_, Some(gid), _, _, _, _) => gid
-      }
+      val obsGids = ob.groupIds
       assert(obsGids.forall(g => cgid.exists(_ == g)))
       assertEquals(cCount, 4)
       assertEquals(oids.size, 2)
@@ -378,16 +402,11 @@ class calibrations extends OdbSuite with SubscriptionUtils with ExecutionQuerySe
       gr1  <- groupElementsAs(pi, pid, None)
       ob   <- queryObservations(pid)
     yield
-      val oids = gr1.collect { case Right(oid) => oid }
-      val cgid = gr1.collect { case Left(gid) => gid }.headOption
-      val cCount = ob.count {
-        case CalibObs(_, _, Some(_), _, _, _) => true
-        case _                             => false
-      }
+      val oids = gr1.observationIds
+      val cgid = gr1.calibrationGroupId
+      val cCount = ob.countCalibrations
       // calibs belong to the calib group
-      val obsGids = ob.collect {
-        case CalibObs(_, Some(gid), _, _, _, _) => gid
-      }
+      val obsGids = ob.groupIds
       assert(obsGids.forall(g => cgid.exists(_ == g)))
       assertEquals(cCount, 4)  // one group of 2 for each of (oid1, oid2) and (oid3, oid4)
       assertEquals(oids.size, 4)
@@ -407,16 +426,11 @@ class calibrations extends OdbSuite with SubscriptionUtils with ExecutionQuerySe
       gr1  <- groupElementsAs(pi, pid, None)
       ob   <- queryObservations(pid)
     } yield {
-      val oids = gr1.collect { case Right(oid) => oid }
-      val cgid = gr1.collect { case Left(gid) => gid }.headOption
-      val cCount = ob.count {
-        case CalibObs(_, _, Some(_), _, Some(CalibCE(CloudExtinction.Preset.ThreePointZero)), _) => true
-        case _                       => false
-      }
+      val oids = gr1.observationIds
+      val cgid = gr1.calibrationGroupId
+      val cCount = ob.countCalibrationsWithCE(CloudExtinction.Preset.ThreePointZero)
       // calibs belong to the calib group
-      val obsGids = ob.collect {
-        case CalibObs(_, Some(gid), _, _, _, _) => gid
-      }
+      val obsGids = ob.groupIds
       assert(obsGids.forall(g => cgid.exists(_ == g)))
       assertEquals(cCount, 1)
       assertEquals(oids.size, 1)
@@ -437,16 +451,11 @@ class calibrations extends OdbSuite with SubscriptionUtils with ExecutionQuerySe
       gr1  <- groupElementsAs(pi, pid, None)
       ob   <- queryObservations(pid)
     } yield {
-      val oids = gr1.collect { case Right(oid) => oid }
-      val cgid = gr1.collect { case Left(gid) => gid }.headOption
-      val cCount = ob.count {
-        case CalibObs(_, _, Some(_), _, Some(CalibCE(CloudExtinction.Preset.PointThree)), _) => true
-        case _                       => false
-      }
+      val oids = gr1.observationIds
+      val cgid = gr1.calibrationGroupId
+      val cCount = ob.countCalibrationsWithCE(CloudExtinction.Preset.PointThree)
       // calibs belong to the calib group
-      val obsGids = ob.collect {
-        case CalibObs(_, Some(gid), _, _, _, _) => gid
-      }
+      val obsGids = ob.groupIds
       assert(obsGids.forall(g => cgid.exists(_ == g)))
       assertEquals(cCount, 1)
       assertEquals(oids.size, 1)
@@ -470,16 +479,11 @@ class calibrations extends OdbSuite with SubscriptionUtils with ExecutionQuerySe
       gr1  <- groupElementsAs(pi, pid, None)
       ob   <- queryObservations(pid)
     } yield {
-      val oids = gr1.collect { case Right(oid) => oid }
-      val cgid = gr1.collect { case Left(gid) => gid }.headOption
-      val cCount = ob.count {
-        case CalibObs(_, _, Some(_), _, _, _) => true
-        case _                       => false
-      }
+      val oids = gr1.observationIds
+      val cgid = gr1.calibrationGroupId
+      val cCount = ob.countCalibrations
       // calibs belong to the calib group
-      val obsGids = ob.collect {
-        case CalibObs(_, Some(gid), _, _, _, _) => gid
-      }
+      val obsGids = ob.groupIds
       assert(obsGids.forall(g => cgid.exists(_ == g)))
       assertEquals(cCount, 2)
       assertEquals(oids.size, 2)
@@ -564,10 +568,7 @@ class calibrations extends OdbSuite with SubscriptionUtils with ExecutionQuerySe
               }
       ob   <- queryObservations(pid)
     } yield {
-      val cCount = ob.count {
-        case CalibObs(_, _, Some(_), Some(_), _, _) => true
-        case _                                => false
-      }
+      val cCount = ob.countCalibrationsWithTE
       assertEquals(cCount, 4)
     }
   }
@@ -589,16 +590,11 @@ class calibrations extends OdbSuite with SubscriptionUtils with ExecutionQuerySe
       gr1  <- groupElementsAs(pi, pid, None)
       ob   <- queryObservations(pid)
     } yield {
-      val oids = gr1.collect { case Right(oid) => oid }
-      val cgid = gr1.collect { case Left(gid) => gid }.headOption
-      val cCount = ob.count {
-        case CalibObs(_, _, Some(_), _, _, _) => true
-        case _                          => false
-      }
+      val oids = gr1.observationIds
+      val cgid = gr1.calibrationGroupId
+      val cCount = ob.countCalibrations
       // calibs belong to the calib group
-      val obsGids = ob.collect {
-        case CalibObs(_, Some(gid), _, _, _, _) => gid
-      }
+      val obsGids = ob.groupIds
       assert(obsGids.forall(g => cgid.exists(_ == g)))
       assertEquals(cCount, 4)
       assertEquals(oids.size, 2)
@@ -622,16 +618,11 @@ class calibrations extends OdbSuite with SubscriptionUtils with ExecutionQuerySe
       gr1  <- groupElementsAs(pi, pid, None)
       ob   <- queryObservations(pid)
     } yield {
-      val oids = gr1.collect { case Right(oid) => oid }
-      val cgid = gr1.collect { case Left(gid) => gid }.headOption
-      val cCount = ob.count {
-        case CalibObs(_, _, Some(_), _, _, _) => true
-        case _                          => false
-      }
+      val oids = gr1.observationIds
+      val cgid = gr1.calibrationGroupId
+      val cCount = ob.countCalibrations
       // calibs belong to the calib group
-      val obsGids = ob.collect {
-        case CalibObs(_, Some(gid), _, _, _, _) => gid
-      }
+      val obsGids = ob.groupIds
       assert(obsGids.forall(g => cgid.exists(_ == g)))
       assertEquals(cCount, 2)
       assertEquals(oids.size, 2)
@@ -650,9 +641,7 @@ class calibrations extends OdbSuite with SubscriptionUtils with ExecutionQuerySe
                 }
               }
       ob   <- queryObservations(pid)
-      cid = ob.collect {
-        case CalibObs(cid, _, Some(_), _, _, _) => cid
-      }
+      cid = ob.callibrationIds
       _    <- expect(
                 user = pi,
                 query = s"""
@@ -698,9 +687,7 @@ class calibrations extends OdbSuite with SubscriptionUtils with ExecutionQuerySe
                 }
               }
       ob   <- queryObservations(pid)
-      cid = ob.collect {
-        case CalibObs(cid, _, Some(_), _, _, _) => cid
-      }
+      cid = ob.callibrationIds
       _    <- expect(
                 user = pi,
                 query = s"""
@@ -796,9 +783,7 @@ class calibrations extends OdbSuite with SubscriptionUtils with ExecutionQuerySe
                 }
               }
       ob   <- queryObservations(pid)
-      cid = ob.collect {
-        case CalibObs(cid, _, Some(_), _, _, _) => cid
-      }.head
+      cid = ob.callibrationIds.head
       _    <- expect(
                 user = pi,
                 query = s"""
@@ -842,11 +827,8 @@ class calibrations extends OdbSuite with SubscriptionUtils with ExecutionQuerySe
       gr1  <- groupElementsAs(pi, pid, None)
       ob   <- queryObservations(pid)
     } yield {
-      val oids = gr1.collect { case Right(oid) => oid }
-      val cCount = ob.count {
-        case CalibObs(_, _, Some(_), _, _, _) => true
-        case _                          => false
-      }
+      val oids = gr1.observationIds
+      val cCount = ob.countCalibrations
       // Only two calibration as we removed a config
       assertEquals(cCount, 2)
       assertEquals(oids.size, 1)
@@ -1044,11 +1026,8 @@ class calibrations extends OdbSuite with SubscriptionUtils with ExecutionQuerySe
       gr1  <- groupElementsAs(pi, pid, None)
       ob   <- queryObservations(pid)
     } yield {
-      val oids = gr1.collect { case Right(oid) => oid }
-      val cCount = ob.count {
-        case CalibObs(_, _, Some(_), _, _, _) => true
-        case _                                => false
-      }
+      val oids = gr1.observationIds
+      val cCount = ob.countCalibrations
       assertEquals(cCount, 2)
       assertEquals(oids.size, 2)
     }
@@ -1091,9 +1070,7 @@ class calibrations extends OdbSuite with SubscriptionUtils with ExecutionQuerySe
                 }
               }
       ob1   <- queryObservations(pid)
-      calibIds1 = ob1.collect {
-        case CalibObs(cid, _, Some(_), _, _, _) => cid
-      }
+      calibIds1 = ob1.callibrationIds
       // Add execution events to one of the calibrations (making it partially executed)
       setup = ExecutionQuerySetupOperations.Setup(offset = 0, atomCount = 1, stepCount = 1, datasetCount = 1)
       _     <- recordVisit(ObservingModeType.GmosNorthLongSlit, setup, service, calibIds1.head)
@@ -1106,9 +1083,7 @@ class calibrations extends OdbSuite with SubscriptionUtils with ExecutionQuerySe
                 }
               }
       ob2   <- queryObservations(pid)
-      calibIds2 = ob2.collect {
-        case CalibObs(cid, _, Some(_), _, _, _) => cid
-      }
+      calibIds2 = ob2.callibrationIds
       gr1  <- groupElementsAs(pi, pid, None)
       // Verify that the calibration still has execution events
       evs  <- withServices(service) { services =>
@@ -1116,15 +1091,9 @@ class calibrations extends OdbSuite with SubscriptionUtils with ExecutionQuerySe
                 }
       _     <- assertIOBoolean(IO(evs.nonEmpty))
     } yield {
-      val oids = gr1.collect { case Right(oid) => oid }
-      val count1 = ob1.count {
-        case CalibObs(_, _, Some(_), _, _, _) => true
-        case _                          => false
-      }
-      val count2 = ob2.count {
-        case CalibObs(_, _, Some(_), _, _, _) => true
-        case _                          => false
-      }
+      val oids = gr1.observationIds
+      val count1 = ob1.countCalibrations
+      val count2 = ob2.countCalibrations
       // initial set 2 calibs
       assertEquals(count1, 2)
       // After config change: 1 partially executed calibration remains + 2 new calibrations
