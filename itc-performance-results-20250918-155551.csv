@@ -1,4 +1,0 @@
-TestName,AvgTimeMs,MinTimeMs,MaxTimeMs,Iterations,MemoryUsedMB
-Integration Time - GMOS-N,175.4,171.0,180.0,5,-394.5693817138672
-Signal-to-Noise - GMOS-N,49.6,49.0,51.0,5,416.0
-Graph Generation - GMOS-N,75.6,67.0,91.0,5,-277.6242980957031
