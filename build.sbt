@@ -497,7 +497,7 @@ lazy val itcService = project
     dockerExposedPorts ++= Seq(6060),
     // Add the ocslib jars to the distribution
     Universal / mappings ++= {
-      val dir = (service / baseDirectory).value / "ocslib"
+      val dir = (baseDirectory).value / "ocslib"
       (dir ** AllPassFilter).pair(relativeTo(dir.getParentFile))
     },
     // The heap needs to be a lot smaller than the dyno size. This may be
