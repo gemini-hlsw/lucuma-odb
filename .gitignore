@@ -68,3 +68,6 @@ odb-keys.txt
 
 # NodeJS
 node_modules/
+
+# ITC benchmarks
+itc-performance-results*.csv
