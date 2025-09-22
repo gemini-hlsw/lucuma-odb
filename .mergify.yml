@@ -55,6 +55,14 @@ pull_request_rules:
       add:
       - client
       remove: []
+- name: Label legacy-tests PRs
+  conditions:
+  - files~=^itc/legacy-tests/
+  actions:
+    label:
+      add:
+      - legacy-tests
+      remove: []
 - name: Label model PRs
   conditions:
   - files~=^itc/model/

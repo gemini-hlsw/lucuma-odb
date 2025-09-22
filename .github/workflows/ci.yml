@@ -39,6 +39,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          lfs: true
 
       - name: Setup sbt
         uses: sbt/setup-sbt@v1
@@ -71,11 +72,20 @@ jobs:
         with:
           path: modules/service/src/main/resources/db/migration/
 
-      - name: Validate GraphQL schema changes
+      - name: Validate ODB GraphQL schema changes
         if: github.event_name == 'pull_request' && matrix.shard == '1'
         uses: kamilkisiela/graphql-inspector@master
         with:
+          name: Validate ODB Public API
           schema: 'main:modules/schema/src/main/resources/lucuma/odb/graphql/OdbSchema.graphql'
+          approve-label: expected-breaking-change
+
+      - name: Validate ITC GraphQL schema changes
+        if: github.event_name == 'pull_request' && matrix.shard == '2'
+        uses: kamilkisiela/graphql-inspector@master
+        with:
+          name: Validate ITC Public API
+          schema: 'main:itc/service/src/main/resources/graphql/itc.graphql'
           approve-label: expected-breaking-change
 
       - name: Check that workflows are up to date
@@ -126,6 +136,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          lfs: true
 
       - name: Setup sbt
         uses: sbt/setup-sbt@v1
@@ -181,6 +192,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          lfs: true
 
       - name: Setup sbt
         uses: sbt/setup-sbt@v1
@@ -199,7 +211,7 @@ jobs:
         run: sbt -v -J-Xmx6g +update
 
       - name: Build Docker images
-        run: 'sbt -v -J-Xmx6g ''++ ${{ matrix.scala }}'' clean ssoService/docker:publishLocal service/docker:publishLocal obscalc/docker:publishLocal calibrations/docker:publishLocal'
+        run: 'sbt -v -J-Xmx6g ''++ ${{ matrix.scala }}'' clean ssoService/docker:publishLocal itcService/docker:publishLocal service/docker:publishLocal obscalc/docker:publishLocal calibrations/docker:publishLocal'
 
       - name: Push Docker images to Heroku
         run: |
