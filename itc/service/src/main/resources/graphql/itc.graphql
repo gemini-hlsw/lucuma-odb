@@ -6,23 +6,67 @@ It is generated from the following source files:
   - itc_base.graphql
 """
 enum ConditionsMeasurementSource {
-  DUMMY
+  """Observer"""
+  OBSERVER
 }
 
 enum SeeingTrend {
-  DUMMY
+  """Getting Better"""
+  GETTING_BETTER
+
+  """Getting Worse"""
+  GETTING_WORSE
+
+  """Staying the Same"""
+  STAYING_THE_SAME
+
+  """Variable"""
+  VARIABLE
 }
 
 enum ConditionsExpectationType {
-  DUMMY
+  """Clear Skies"""
+  CLEAR_SKIES
+
+  """Fog"""
+  FOG
+
+  """Thick Clouds"""
+  THICK_CLOUDS
+
+  """Thin Clouds"""
+  THIN_CLOUDS
 }
 
 enum FilterType {
-  DUMMY
+  """Broad-Band Filter"""
+  BroadBand
+
+  """Combination Filter"""
+  Combination
+
+  """Engineering Filter"""
+  Engineering
+
+  """Narrow-Band Filter"""
+  NarrowBand
+
+  """Spectroscopic Filter"""
+  Spectroscopic
 }
 
 enum ProposalStatus {
-  DUMMY
+  """Not Submitted"""
+  NOT_SUBMITTED
+
+  """Submitted"""
+  SUBMITTED
+
+  """Accepted"""
+  ACCEPTED
+
+  """Not Accepted"""
+  NOT_ACCEPTED
 }
 
 """Email address, matching ^\w+@[a-zA-Z_]+?\.[a-zA-Z]{2,3}$"""
