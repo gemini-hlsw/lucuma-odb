@@ -149,16 +149,24 @@ object AttachmentFileService {
     s3FileSvc: S3FileService[F]
   )(using Services[F]): AttachmentFileService[F] = {
 
+    enum AccessRequired:
+      case Read
+      case Write
+
     def checkAccess(
       user:      User,
       programId: Program.Id,
+      required: AccessRequired,
       onNoAccess: AttachmentException
     )(using Services[F], Transaction[F]): EitherT[F, AttachmentException, Unit] = user match {
       // guest users not allowed to upload files
       case GuestUser(_) => Forbidden.asLeftT
       case _            =>
-        programUserService
-          .userHasWriteAccess(programId)
+        val check: F[Boolean] = required match
+          case AccessRequired.Read => programUserService.userHasReadAccess(programId)
+          case AccessRequired.Write => programUserService.userHasWriteAccess(programId)
+        
+        check
           .map(b => if (b) ().asRight else onNoAccess.asLeft)
           .asEitherT
     }
@@ -225,11 +233,12 @@ object AttachmentFileService {
 
     def getAttachmentInfoAndCheckAccess(
       user:         User,
-      attachmentId: Attachment.Id
+      attachmentId: Attachment.Id,
+      required: AccessRequired
     )(using Services[F], Transaction[F]): EitherT[F, AttachmentException, (Program.Id, NonEmptyString)] =
       for {
         (pid, path) <- getAttachmentInfoFromDB(attachmentId).asEitherT
-        _           <- checkAccess(user, pid, FileNotFound)
+        _           <- checkAccess(user, pid, required, FileNotFound)
       } yield (pid, path)
 
     def deleteAttachmentFromDB(
@@ -300,7 +309,7 @@ object AttachmentFileService {
       )(using NoTransaction[F]): F[Either[AttachmentException, Stream[F, Byte]]] =
         (for {
           path <- services.transactionallyEitherT {
-                      getAttachmentInfoAndCheckAccess(user, attachmentId).map(_._2)
+                      getAttachmentInfoAndCheckAccess(user, attachmentId, AccessRequired.Read).map(_._2)
                   }
           res  <- Services.asSuperUser(s3FileSvc.verifyAndGet(path)).right
         } yield res).value
@@ -321,7 +330,7 @@ object AttachmentFileService {
             for {
               fn     <- FileName.fromString(fileName).liftF
               _      <- services.transactionallyEitherT {
-                          checkAccess(user, programId, Forbidden) >>
+                          checkAccess(user, programId, AccessRequired.Write, Forbidden) >>
                             validateFileExtensionByType(attachmentType, fn).liftF >>
                             checkForDuplicateType(programId, attachmentType).asEitherT >>
                             checkForDuplicateName(programId, fn, none).asEitherT
@@ -366,7 +375,7 @@ object AttachmentFileService {
             fn      <- FileName.fromString(fileName).liftF
             (pid, oldPath) <- services.transactionallyEitherT {
                 for {
-                  (pid, oldPath) <- getAttachmentInfoAndCheckAccess(user, attachmentId)
+                  (pid, oldPath) <- getAttachmentInfoAndCheckAccess(user, attachmentId, AccessRequired.Write)
                   _              <- validateFileExtensionById(attachmentId, fn).asEitherT
                   _              <- checkForDuplicateName(pid, fn, attachmentId.some).asEitherT 
                 } yield (pid, oldPath)
@@ -403,7 +412,7 @@ object AttachmentFileService {
         (for {
           path <- services.transactionallyEitherT {
               for {
-                (_, path) <- getAttachmentInfoAndCheckAccess(user, attachmentId)
+                (_, path) <- getAttachmentInfoAndCheckAccess(user, attachmentId, AccessRequired.Write)
                 _         <- deleteAttachmentFromDB(attachmentId).asEitherT
               } yield path
             }
@@ -418,7 +427,7 @@ object AttachmentFileService {
       ): F[Either[AttachmentException, String]] =
         (for {
           path <- services.transactionallyEitherT {
-                      getAttachmentInfoAndCheckAccess(user, attachmentId).map(_._2)
+                      getAttachmentInfoAndCheckAccess(user, attachmentId, AccessRequired.Read).map(_._2)
                   }
           res  <- Services.asSuperUser(s3FileSvc.presignedUrl(path)).right
         } yield res).value

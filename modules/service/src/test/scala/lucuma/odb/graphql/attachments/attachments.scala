@@ -9,6 +9,7 @@ import cats.syntax.all.*
 import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.Json
 import lucuma.core.enums.AttachmentType
+import lucuma.core.enums.ProgramUserRole
 import lucuma.core.model.Attachment
 import lucuma.core.model.Program
 import lucuma.core.model.User
@@ -523,6 +524,106 @@ class attachments extends AttachmentsSuite {
       _    <- assertAttachmentsGql(pi2, pid2, (aid2, mosMask2))
       _    <- deleteAttachment(pi, aid2).withExpectation(Status.NotFound)
       _    <- deleteAttachment(pi2, aid1).withExpectation(Status.NotFound)
+    } yield ()
+  }
+
+  test("CoI can insert attachments") {
+    for {
+      pid  <- createProgramAs(pi)
+      puid <- addProgramUserAs(pi, pid, role = ProgramUserRole.Coi)
+      _    <- linkUserAs(pi, puid, pi2.id)
+      _    <- insertAttachment(pi2, pid, preImaging).toAttachmentId
+    } yield ()
+  }
+
+  test("CoI can update attachments") {
+    for {
+      pid  <- createProgramAs(pi)
+      puid <- addProgramUserAs(pi, pid, role = ProgramUserRole.Coi)
+      _    <- linkUserAs(pi, puid, pi2.id)
+      aid  <- insertAttachment(pi, pid, mosMask1A).toAttachmentId // PI inserts
+      _    <- updateAttachment(pi2, aid, mosMask2).expectOk       // CoI updates
+    } yield ()
+  }
+
+  test("CoI can delete attachments") {
+    for {
+      pid  <- createProgramAs(pi)
+      puid <- addProgramUserAs(pi, pid, role = ProgramUserRole.Coi)
+      _    <- linkUserAs(pi, puid, pi2.id)
+      aid  <- insertAttachment(pi, pid, mosMask1A).toAttachmentId // PI inserts
+      _    <- deleteAttachment(pi2, aid).expectOk                 // CoI deletes
+    } yield ()
+  }
+
+  test("CoI can download attachments") {
+    for {
+      pid  <- createProgramAs(pi)
+      puid <- addProgramUserAs(pi, pid, role = ProgramUserRole.Coi)
+      _    <- linkUserAs(pi, puid, pi2.id)
+      aid  <- insertAttachment(pi, pid, mosMask1A).toAttachmentId   // PI inserts
+      _    <- getAttachment(pi2, aid).expectBody(mosMask1A.content) // CoI downloads
+    } yield ()
+  }
+
+  test("CoI can download attachments via presigned url") {
+    for {
+      pid  <- createProgramAs(pi)
+      puid <- addProgramUserAs(pi, pid, role = ProgramUserRole.Coi)
+      _    <- linkUserAs(pi, puid, pi2.id)
+      aid  <- insertAttachment(pi, pid, mosMask1A).toAttachmentId // PI inserts
+      url  <- getPresignedUrl(pi2, aid).toNonEmptyString          // CoI downloads
+      _    <- getViaPresignedUrl(url).expectBody(mosMask1A.content)
+    } yield ()
+  }
+
+  test("Readonly CoI cannot insert attachments") {
+    for {
+      pid  <- createProgramAs(pi)
+      puid <- addProgramUserAs(pi, pid, role = ProgramUserRole.CoiRO)
+      _    <- linkUserAs(pi, puid, pi2.id)
+      _    <- insertAttachment(pi2, pid, preImaging).withExpectation(Status.Forbidden)
+    } yield ()
+  }
+
+  test("Readonly CoI cannot update attachments") {
+    for {
+      pid  <- createProgramAs(pi)
+      puid <- addProgramUserAs(pi, pid, role = ProgramUserRole.CoiRO)
+      _    <- linkUserAs(pi, puid, pi2.id)
+      aid  <- insertAttachment(pi, pid, mosMask1A).toAttachmentId                     // PI inserts
+      _    <- updateAttachment(pi2, aid, mosMask2).withExpectation(Status.NotFound)  // CoiRO updates
+    } yield ()
+  }
+
+  test("Readonly CoI cannot delete attachments") {
+    for {
+      pid  <- createProgramAs(pi)
+      puid <- addProgramUserAs(pi, pid, role = ProgramUserRole.CoiRO)
+      _    <- linkUserAs(pi, puid, pi2.id)
+      aid  <- insertAttachment(pi, pid, mosMask1A).toAttachmentId          // PI inserts
+      _    <- deleteAttachment(pi2, aid).withExpectation(Status.NotFound)  // CoiRO deletes
+    } yield ()
+  }
+
+  test("Readonly CoI can download attachments") {
+    for {
+      pid  <- createProgramAs(pi)
+      puid <- addProgramUserAs(pi, pid, role = ProgramUserRole.CoiRO)
+      _    <- linkUserAs(pi, puid, pi2.id)
+      aid  <- insertAttachment(pi, pid, mosMask1A).toAttachmentId   // PI inserts
+      _    <- getAttachment(pi2, aid).expectBody(mosMask1A.content) // CoiRO downloads
+    } yield ()
+  }
+
+  test("Readonly CoI can download attachments via presigned url") {
+    for {
+      pid  <- createProgramAs(pi)
+      puid <- addProgramUserAs(pi, pid, role = ProgramUserRole.CoiRO)
+      _    <- linkUserAs(pi, puid, pi2.id)
+      aid  <- insertAttachment(pi, pid, mosMask1A).toAttachmentId // PI inserts
+      url  <- getPresignedUrl(pi2, aid).toNonEmptyString          // CoiRO downloads
+      _    <- getViaPresignedUrl(url).expectBody(mosMask1A.content)
     } yield ()
   }
 
