@@ -25,9 +25,10 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Create trigger to enforce the constraint
-CREATE TRIGGER trg_blind_offset_unique
-  BEFORE INSERT OR UPDATE ON t_asterism_target
+-- Create deferrable constraint trigger to enforce the constraint
+CREATE CONSTRAINT TRIGGER trg_blind_offset_unique
+  AFTER INSERT OR UPDATE ON t_asterism_target
+  DEFERRABLE INITIALLY DEFERRED
   FOR EACH ROW
   EXECUTE FUNCTION check_blind_offset_unique();
 
@@ -93,21 +94,20 @@ SELECT
   o.c_acq_reset_time,
   t.c_target_id,
   t.c_sid_rv,
-  t.c_source_profile
+  t.c_source_profile,
+  t.c_target_disposition
 FROM
   t_observation o
 LEFT JOIN LATERAL (
   SELECT t.c_target_id,
          t.c_sid_rv,
-         t.c_source_profile
+         t.c_source_profile,
+         t.c_target_disposition
     FROM t_asterism_target a
     INNER JOIN t_target t
       ON a.c_target_id = t.c_target_id
      AND t.c_existence = 'present'
    WHERE a.c_observation_id = o.c_observation_id
-     -- Don't include blind offset for sequence generation
-     AND (t.c_target_disposition = 'calibration'::e_target_disposition
-       OR t.c_target_disposition = 'science'::e_target_disposition)
 ) t ON TRUE
 ORDER BY
   o.c_observation_id,
@@ -160,3 +160,6 @@ BEGIN
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
+
+-- itc results are invalid now
+TRUNCATE t_itc_result;

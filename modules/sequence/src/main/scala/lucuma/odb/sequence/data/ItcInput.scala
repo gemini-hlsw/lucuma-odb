@@ -9,6 +9,8 @@ import cats.Order.given
 import cats.data.NonEmptyList
 import cats.data.NonEmptyVector
 import cats.derived.*
+import cats.syntax.eq.*
+import lucuma.core.enums.SequenceType
 import lucuma.core.model.Target
 import lucuma.core.util.Timestamp
 import lucuma.itc.client.ImagingInput
@@ -30,12 +32,19 @@ case class ItcInput(
   imaging:             ImagingParameters,
   spectroscopy:        SpectroscopyParameters,
   targets:             NonEmptyList[(Target.Id, TargetInput, Option[Timestamp])],
+  blindOffsetTarget:   Option[(Target.Id, TargetInput, Option[Timestamp])],
 ) derives Eq:
-  lazy val imagingInput: ImagingInput =
-    ImagingInput(imaging, targets.map(_._2))
+  def imagingInput(sequenceType: SequenceType): ImagingInput =
+    ImagingInput(imaging, targetsFor(sequenceType))
 
-  lazy val spectroscopyInput: SpectroscopyInput =
-    SpectroscopyInput(spectroscopy, targets.map(_._2))
+  def spectroscopyInput(sequenceType: SequenceType): SpectroscopyInput =
+    SpectroscopyInput(spectroscopy, targetsFor(sequenceType))
+
+  private def targetsFor(sequenceType: SequenceType): NonEmptyList[TargetInput] =
+    if (sequenceType === SequenceType.Acquisition)
+      blindOffsetTarget.fold(targets.map(_._2))(r => NonEmptyList.one(r._2))
+    else
+      targets.map(_._2)
 
   lazy val targetVector: NonEmptyVector[(Target.Id, TargetInput)] =
     targets.map(t => (t._1, t._2)).toNev
@@ -58,8 +67,19 @@ object ItcInput:
           bld.addAll(customSedTimestamp.hashBytes)
         bld.result()
 
+      def blindOffsetBytes(
+        blindOffsetTarget: Option[(Target.Id, TargetInput, Option[Timestamp])]
+      ): Array[Byte] =
+        blindOffsetTarget.fold(Array.empty[Byte]): (tid, tinput, customSedTimestamp) =>
+          Array.concat(
+            tid.hashBytes,
+            tinput.hashBytes,
+            customSedTimestamp.hashBytes
+          )
+
       Array.concat(
         a.imaging.hashBytes,
         a.spectroscopy.hashBytes,
         targetsBytes(a.targets),
+        blindOffsetBytes(a.blindOffsetTarget),
       )

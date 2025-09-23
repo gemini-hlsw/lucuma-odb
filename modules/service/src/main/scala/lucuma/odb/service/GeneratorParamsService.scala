@@ -19,11 +19,13 @@ import cats.syntax.foldable.*
 import cats.syntax.functor.*
 import cats.syntax.functorFilter.*
 import cats.syntax.option.*
+import cats.syntax.traverse.*
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosSouthFilter
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.ScienceBand
+import lucuma.core.enums.TargetDisposition
 import lucuma.core.math.RadialVelocity
 import lucuma.core.math.SignalToNoise
 import lucuma.core.math.Wavelength
@@ -170,7 +172,7 @@ object GeneratorParamsService {
       )(using Transaction[F]): F[Map[Observation.Id, Either[Error, GeneratorParams]]] =
         for
           paramsRows <- params
-          oms         = paramsRows.collect { case ParamsRow(oid, _, _, _, Some(om), _, _, _, _, _, _, _) => (oid, om) }.distinct
+          oms         = paramsRows.collect { case ParamsRow(oid, _, _, _, Some(om), _, _, _, _, _, _, _, _) => (oid, om) }.distinct
           m          <- Services.asSuperUser(observingModeServices.selectObservingMode(oms))
         yield
           NonEmptyList.fromList(paramsRows).fold(Map.empty): paramsRowsNel =>
@@ -288,9 +290,19 @@ object GeneratorParamsService {
         obsParams:  ObsParams,
         mode:       InstrumentMode,
       ): Either[MissingParamSet, ItcInput] =
+        val (blindOffsetTargets, regularTargets) =
+          obsParams.targets.toList.partition(_.targetDisposition.exists(_ === TargetDisposition.BlindOffset))
+
         (obsParams.exposureTimeMode.toValidNel(MissingParam.forObservation("exposure time mode")),
-         obsParams.targets.traverse(itcTargetParams)
-        ).mapN { case (exposureTimeMode, targets) =>
+         NonEmptyList.fromList(regularTargets).toValidNel(MissingParam.forObservation("at least one non-blind-offset target")),
+        regularTargets
+          .traverse(itcTargetParams)
+          .map(NonEmptyList.fromList)
+          .ensure(NonEmptyList.one(MissingParam.forObservation("science targets")))(_.nonEmpty)
+          .map(_.get), // Safe thanks to ensure above
+         // the db guarantees at most one BO
+         blindOffsetTargets.headOption.traverse(itcTargetParams)
+        ).mapN { case (exposureTimeMode, _, regularTargetInputs, blindOffsetTargetInput) =>
           val ici = obsParams.constraints.toInput
           ItcInput(
             ImagingParameters(
@@ -303,7 +315,8 @@ object GeneratorParamsService {
               ici,
               mode
             ),
-            targets
+            regularTargetInputs,
+            blindOffsetTargetInput
           )
         }
         .leftMap(MissingParamSet.fromParams)
@@ -352,14 +365,16 @@ object GeneratorParamsService {
     sourceProfile:      Option[SourceProfile],
     declaredComplete:   Boolean,
     acqResetTime:       Option[Timestamp],
-    customSedTimestamp: Option[Timestamp] = none
+    customSedTimestamp: Option[Timestamp] = none,
+    targetDisposition:  Option[TargetDisposition] = none
   )
 
   case class TargetParams(
     targetId:           Option[Target.Id],
     radialVelocity:     Option[RadialVelocity],
     sourceProfile:      Option[SourceProfile],
-    customSedTimestamp: Option[Timestamp]
+    customSedTimestamp: Option[Timestamp],
+    targetDisposition:  Option[TargetDisposition]
   )
 
   case class ObsParams(
@@ -385,7 +400,7 @@ object GeneratorParamsService {
           oParams.head.observingMode,
           oParams.head.scienceBand,
           oParams.map: r =>
-            TargetParams(r.targetId, r.radialVelocity, r.sourceProfile, r.customSedTimestamp),
+            TargetParams(r.targetId, r.radialVelocity, r.sourceProfile, r.customSedTimestamp, r.targetDisposition),
           oParams.head.declaredComplete,
           oParams.head.acqResetTime
         )
@@ -437,9 +452,10 @@ object GeneratorParamsService {
        radial_velocity.opt     *:
        source_profile.opt      *:
        bool                    *:
-       core_timestamp.opt
-      ).map( (oid, role, cs, etm, om, sb, tid, rv, sp, dc, art) =>
-        ParamsRow(oid, role, cs, etm, om, sb, tid, rv, sp, dc, art))
+       core_timestamp.opt      *:
+       target_disposition.opt
+      ).map( (oid, role, cs, etm, om, sb, tid, rv, sp, dc, art, disp) =>
+        ParamsRow(oid, role, cs, etm, om, sb, tid, rv, sp, dc, art, None, disp))
 
     private def ParamColumns(tab: String): String =
       s"""
@@ -464,7 +480,8 @@ object GeneratorParamsService {
         $tab.c_sid_rv,
         $tab.c_source_profile,
         $tab.c_declared_complete,
-        $tab.c_acq_reset_time
+        $tab.c_acq_reset_time,
+        $tab.c_target_disposition
       """
 
     def selectManyParams(
