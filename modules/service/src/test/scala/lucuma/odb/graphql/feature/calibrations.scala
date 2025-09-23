@@ -1552,5 +1552,4 @@ class calibrations extends OdbSuite with SubscriptionUtils with ExecutionQuerySe
     }
   }
 
-
 }

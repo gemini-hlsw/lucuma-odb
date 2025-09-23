@@ -61,7 +61,6 @@ import skunk.syntax.all.*
 
 import java.time.Instant
 
-
 trait CalibrationsService[F[_]] {
   def setCalibrationRole(
     oid:  Observation.Id,
@@ -539,7 +538,6 @@ object CalibrationsService extends CalibrationObservations {
           FROM t_observation
           WHERE c_program_id = $program_id AND c_workflow_user_state IS DISTINCT FROM 'inactive'
           """.query(observation_id)
-
 
   }
 }

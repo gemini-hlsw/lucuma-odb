@@ -123,7 +123,6 @@ case class CalibrationIdealTargets(
 }
 
 trait CalibrationObservations {
-
   def gmosLongSlitSpecPhotObs[F[_]: MonadThrow: Services: Transaction, G, L, U](
     pid:     Program.Id,
     gid:     Group.Id,
