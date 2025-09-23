@@ -68,6 +68,7 @@ import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.syntax.string.*
 import lucuma.core.util.CalculationState
 import lucuma.core.util.DateInterval
+import lucuma.core.util.IdempotencyKey
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.odb.FMain
@@ -1598,7 +1599,7 @@ trait DatabaseOperations { this: OdbSuite =>
         i <- c.downField("id").as[ExecutionEvent.Id]
         r <- c.downField("received").as[Timestamp]
         o <- c.downFields("observation", "id").as[Observation.Id]
-        n <- c.downField("clientId").as[Option[Client.Id]]
+        n <- c.downField("idempotencyKey").as[Option[IdempotencyKey]]
       yield SequenceEvent(i, r, o, vid, n, cmd)
       e.fold(f => throw new RuntimeException(f.message), identity)
   }
@@ -1623,16 +1624,15 @@ trait DatabaseOperations { this: OdbSuite =>
       }
     """
 
-    query(user = user, query = q).map { json =>
+    query(user = user, query = q).map: json =>
       val c = json.hcursor.downFields("addSlewEvent", "event")
-      val e = for {
+      val e = for
         i <- c.downField("id").as[ExecutionEvent.Id]
         r <- c.downField("received").as[Timestamp]
         v <- c.downFields("visit", "id").as[Visit.Id]
-        n <- c.downField("clientId").as[Option[Client.Id]]
-      } yield SlewEvent(i, r, oid, v, n, stg)
+        n <- c.downField("idempotencyKey").as[Option[IdempotencyKey]]
+      yield SlewEvent(i, r, oid, v, n, stg)
       e.fold(f => throw new RuntimeException(f.message), identity)
-    }
   }
 
   def recordAtomAs(user: User, instrument: Instrument, vid: Visit.Id, sequenceType: SequenceType = SequenceType.Science): IO[Atom.Id] =
@@ -1780,31 +1780,32 @@ trait DatabaseOperations { this: OdbSuite =>
       }
     """
 
-    query(user = user, query = q).map { json =>
+    query(user = user, query = q).map: json =>
       val c = json.hcursor.downFields("addStepEvent", "event")
-      val e = for {
+      val e = for
         i <- c.downField("id").as[ExecutionEvent.Id]
         r <- c.downField("received").as[Timestamp]
         o <- c.downFields("observation", "id").as[Observation.Id]
         v <- c.downFields("visit", "id").as[Visit.Id]
-        n <- c.downField("clientId").as[Option[Client.Id]]
+        n <- c.downField("idempotencyKey").as[Option[IdempotencyKey]]
         a <- c.downFields("atom", "id").as[Atom.Id]
-      } yield StepEvent(i, r, o, v, n, a, sid, stage)
+      yield StepEvent(i, r, o, v, n, a, sid, stage)
       e.fold(f => throw new RuntimeException(f.message), identity)
-    }
   }
 
   def addAtomEventAs(
-    user:     User,
-    aid:      Atom.Id,
-    stage:    AtomStage,
-    clientId: Option[Client.Id] = None
+    user:           User,
+    aid:            Atom.Id,
+    stage:          AtomStage,
+    idempotencyKey: Option[IdempotencyKey] = None,
+    clientId:       Option[Client.Id]      = None
   ): IO[AtomEvent] =
     val q = s"""
       mutation {
         addAtomEvent(input: {
           atomId:    "$aid",
           atomStage: ${stage.tag.toScreamingSnakeCase}
+          ${idempotencyKey.fold("")(idm => s"idempotencyKey: \"$idm\"")}
           ${clientId.fold("")(cid => s"clientId: \"$cid\"")}
         }) {
           event {
@@ -1812,6 +1813,7 @@ trait DatabaseOperations { this: OdbSuite =>
             received
             observation { id }
             visit { id }
+            idempotencyKey
             clientId
           }
         }
@@ -1824,8 +1826,11 @@ trait DatabaseOperations { this: OdbSuite =>
         r <- c.downField("received").as[Timestamp]
         o <- c.downFields("observation", "id").as[Observation.Id]
         v <- c.downFields("visit", "id").as[Visit.Id]
-        n <- c.downField("clientId").as[Option[Client.Id]]
-      yield AtomEvent(i, r, o, v, n, aid, stage)
+        n <- c.downField("idempotencyKey").as[Option[IdempotencyKey]]
+        x <- c.downField("clientId").as[Option[Client.Id]]
+      yield
+        assertEquals(n, x.map(c => IdempotencyKey(c.toUuid)))
+        AtomEvent(i, r, o, v, n, aid, stage)
       e.fold(f => throw new RuntimeException(f.message), identity)
 
   def recordDatasetAs(
@@ -1881,7 +1886,7 @@ trait DatabaseOperations { this: OdbSuite =>
         r <- c.downField("received").as[Timestamp]
         o <- c.downFields("observation", "id").as[Observation.Id]
         v <- c.downFields("visit", "id").as[Visit.Id]
-        n <- c.downFields("clientId").as[Option[Client.Id]]
+        n <- c.downField("idempotencyKey").as[Option[IdempotencyKey]]
         a <- c.downFields("atom", "id").as[Atom.Id]
         s <- c.downFields("step", "id").as[Step.Id]
       } yield DatasetEvent(i, r, o, v, n, a, s, did, stage)

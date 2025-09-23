@@ -11,6 +11,10 @@ import grackle.Predicate.Eql
 import grackle.Result
 import grackle.Type
 import grackle.syntax.*
+import io.circe.syntax.*
+import lucuma.core.model.Client
+
+import java.util.UUID
 
 import table.AtomRecordTable
 import table.DatasetTable
@@ -28,12 +32,17 @@ trait ExecutionEventMapping[F[_]] extends ExecutionEventTable[F]
 
   lazy val ExecutionEventMapping: ObjectMapping =
     SqlInterfaceMapping(ExecutionEventType, executionEventTypeDiscriminator)(
-      SqlField("id",           ExecutionEventTable.Id, key = true),
-      SqlObject("visit",       Join(ExecutionEventTable.VisitId,       VisitTable.Id)),
-      SqlObject("observation", Join(ExecutionEventTable.ObservationId, ObservationView.Id)),
-      SqlField("received",     ExecutionEventTable.Received),
-      SqlField("eventType",    ExecutionEventTable.EventType, discriminator = true),
-      SqlField("clientId",     ExecutionEventTable.ClientId),
+      SqlField("id",             ExecutionEventTable.Id, key = true),
+      SqlObject("visit",         Join(ExecutionEventTable.VisitId,       VisitTable.Id)),
+      SqlObject("observation",   Join(ExecutionEventTable.ObservationId, ObservationView.Id)),
+      SqlField("received",       ExecutionEventTable.Received),
+      SqlField("eventType",      ExecutionEventTable.EventType, discriminator = true),
+      CursorFieldJson(
+        "clientId",
+        cursor => cursor.fieldAs[Option[UUID]]("idempotencyKey").map(_.map(Client.Id.fromUuid).asJson),
+        List("idempotencyKey")
+      ),
+      SqlField("idempotencyKey", ExecutionEventTable.IdempotencyKey),
 
       // Hidden fields used in the WhereExecutionEvent predicate.  There
       // appears to be no good way to create a predicate that matches on a
