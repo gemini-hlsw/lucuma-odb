@@ -51,6 +51,7 @@ import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.util.Codecs.*
 import lucuma.refined.*
 import org.http4s.client.Client
+import org.typelevel.log4cats.Logger
 import skunk.AppliedFragment
 import skunk.Command
 import skunk.Query
@@ -130,7 +131,7 @@ object CalibrationsService extends CalibrationObservations {
       case (tid, name, role, Some(st)) => (tid, name, role, st)
     }
 
-  def instantiate[F[_]: MonadCancelThrow](emailConfig: Config.Email, httpClient: Client[F])(using Services[F]): CalibrationsService[F] =
+  def instantiate[F[_]: {MonadCancelThrow, Services, Logger as L}](emailConfig: Config.Email, httpClient: Client[F]): CalibrationsService[F] =
     new CalibrationsService[F] {
 
       override def setCalibrationRole(
@@ -403,7 +404,8 @@ object CalibrationsService extends CalibrationObservations {
             .map(targetCoordinates(referenceInstant))
 
       def recalculateCalibrations(pid: Program.Id, referenceInstant: Instant)(using Transaction[F], ServiceAccess): F[(List[Observation.Id], List[Observation.Id])] =
-        for
+        for {
+          _            <- L.info(s"Recalculating calibrations for $pid, reference instant  $referenceInstant")
           // Read calibration targets
           tgts         <- calibrationTargets(CalibrationTypes, referenceInstant)
           // Actual target for GN and GS
@@ -411,13 +413,17 @@ object CalibrationsService extends CalibrationObservations {
           gnTgt         = CalibrationIdealTargets(Site.GN, referenceInstant, tgts)
           // List of the program's active observations
           active       <- activeObservations(pid)
+          _            <- L.debug(s"Program $pid has ${active.size} active observations: $active").whenA(active.nonEmpty)
           // Get all the active science observations
           allSci       <- allObservations(pid, ObservationSelection.Science)
                             .map(_.filter(u => active.contains(u._1)))
+          _            <- L.debug(s"Program $pid has ${allSci.length} science observations: ${allSci.map(_.id)}").whenA(allSci.nonEmpty)
           // Unique science configurations
           uniqueSci     = uniqueConfiguration(allSci)
+          _            <- L.debug(s"Program $pid has ${uniqueSci.length} science configurations")
           // Get all the active calibration observations (excluding those with execution events)
           allCalibs    <- allUnexecutedObservations(pid, ObservationSelection.Calibration).map(_.filter(u => active.contains(u.id)))
+          _            <- L.debug(s"Program $pid has ${allCalibs.length} active calibration observations: ${allCalibs.map(_.id)}").whenA(allCalibs.nonEmpty)
           calibs        = toConfigForCalibration(allCalibs)
           // Average s/n wavelength at each configuration
           props         = calObsProps(toConfigForCalibration(allSci))
@@ -425,13 +431,15 @@ object CalibrationsService extends CalibrationObservations {
           configsPerRole = calculateConfigurationsPerRole(uniqueSci, calibs)
           // Remove calibrations that are not needed, basically when a config is removed
           removedOids  <- removeUnnecessaryCalibrations(uniqueSci, calibs)
+          _            <- L.debug(s"Program $pid will remove unnecessary calibrations $removedOids").whenA(removedOids.nonEmpty)
           // Generate new calibrations for each unique configuration
           addedOids    <- generateGMOSLSCalibrations(pid, props, configsPerRole, gnTgt, gsTgt)
+          _            <- L.debug(s"Program $pid added calibrations $addedOids").whenA(addedOids.nonEmpty)
           // Update wavelength at for each remaining calib
           calibUpdates  = prepareCalibrationUpdates(calibs, removedOids, props)
           _            <- updatePropsAt(calibUpdates)
           _            <- targetService.deleteOrphanCalibrationTargets(pid)
-        yield (addedOids, removedOids)
+        } yield (addedOids, removedOids)
 
       // Recalcula the target of a calibration observation
       def recalculateCalibrationTarget(
@@ -439,6 +447,7 @@ object CalibrationsService extends CalibrationObservations {
         oid: Observation.Id,
       )(using Transaction[F], ServiceAccess): F[Unit] = {
         for {
+          _    <- L.info(s"Recalculating calibration targets for $pid, oid $oid")
           o    <- session.execute(Statements.selectCalibrationTimeAndConf)(oid).map(_.headOption)
           // Find the original target
           otgs <- o.map(_._1).map { oid =>
