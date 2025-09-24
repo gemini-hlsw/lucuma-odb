@@ -1086,7 +1086,7 @@ class recordStep extends OdbSuite {
   test("recordStep - idempotencyKey"):
     val idm = IdempotencyKey.FromString.getOption("7304956b-45ab-45b6-8db1-ae6f743b519c").get
 
-    def recordStep(aid: Atom.Id): IO[Step.Id] =
+    def recordStep(aid: Atom.Id): IO[(Step.Id, IdempotencyKey)] =
       query(
         user  = service,
         query = s"""
@@ -1102,20 +1102,25 @@ class recordStep extends OdbSuite {
               observeClass: ${ObserveClass.Science.tag.toScreamingSnakeCase}
               idempotencyKey: "${IdempotencyKey.FromString.reverseGet(idm)}"
             }) {
-              stepRecord { id }
+              stepRecord {
+                id
+                idempotencyKey
+              }
             }
           }
         """
       ).map: js =>
-        js.hcursor
-          .downFields("recordGmosNorthStep", "stepRecord", "id")
-          .require[Step.Id]
+        val s = js.hcursor.downFields("recordGmosNorthStep", "stepRecord")
+        (
+          s.downField("id").require[Step.Id],
+          s.downField("idempotencyKey").require[IdempotencyKey]
+        )
 
     assertIOBoolean:
       for
         (_, _, _, a) <- recordVisitAndAtom(ObservingModeType.GmosNorthLongSlit, service)
-        s0           <- recordStep(a)
-        s1           <- recordStep(a)
-      yield s0 === s1
+        (s0, k0)     <- recordStep(a)
+        (s1, k1)     <- recordStep(a)
+      yield (s0 === s1) && (k0 === idm) && (k1 === idm)
 
 }

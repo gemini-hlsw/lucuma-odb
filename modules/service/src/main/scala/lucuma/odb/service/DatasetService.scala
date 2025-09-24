@@ -151,20 +151,25 @@ object DatasetService {
           c_file_date,
           c_file_index,
           c_qa_state,
-          c_comment
+          c_comment,
+          c_idempotency_key
         )
         SELECT
           $step_id,
           $dataset_filename,
           ${dataset_qa_state.opt},
-          ${text_nonempty.opt}
+          ${text_nonempty.opt},
+          ${idempotency_key.opt}
+        ON CONFLICT (c_idempotency_key) DO UPDATE
+          SET c_idempotency_key = EXCLUDED.c_idempotency_key
         RETURNING
           c_dataset_id
       """.query(dataset_id).contramap { input => (
         input.stepId,
         input.filename,
         input.qaState,
-        input.comment
+        input.comment,
+        input.idempotencyKey
       )}
 
     def UpdateDatasets(

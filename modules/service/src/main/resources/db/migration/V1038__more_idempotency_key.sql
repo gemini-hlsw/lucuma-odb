@@ -1,3 +1,7 @@
+ALTER TABLE t_visit
+  ADD COLUMN c_idempotency_key uuid,
+  ADD CONSTRAINT t_visit_unique_idempotency_key UNIQUE (c_idempotency_key);
+
 ALTER TABLE t_atom_record
   ADD COLUMN c_idempotency_key uuid,
   ADD CONSTRAINT t_atom_record_unique_idempotency_key UNIQUE (c_idempotency_key);
@@ -6,9 +10,9 @@ ALTER TABLE t_step_record
   ADD COLUMN c_idempotency_key uuid,
   ADD CONSTRAINT t_step_record_unique_idempotency_key UNIQUE (c_idempotency_key);
 
-ALTER TABLE t_visit
+ALTER TABLE t_dataset
   ADD COLUMN c_idempotency_key uuid,
-  ADD CONSTRAINT t_visit_unique_idempotency_key UNIQUE (c_idempotency_key);
+  ADD CONSTRAINT t_dataset_unique_idempotency_key UNIQUE (c_idempotency_key);
 
 -- update v_step_record
 DROP VIEW v_step_record;

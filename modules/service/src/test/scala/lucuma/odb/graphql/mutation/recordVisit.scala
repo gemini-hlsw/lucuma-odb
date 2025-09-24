@@ -85,7 +85,7 @@ class recordVisit extends OdbSuite:
         oid <- createObservationAs(service, pid, ObservingModeType.GmosNorthLongSlit.some)
       yield oid
 
-    def recordVisit(oid: Observation.Id): IO[Visit.Id] =
+    def recordVisit(oid: Observation.Id): IO[(Visit.Id, IdempotencyKey)] =
       query(
         user  = service,
         query = s"""
@@ -97,21 +97,26 @@ class recordVisit extends OdbSuite:
               }
               idempotencyKey: "${IdempotencyKey.FromString.reverseGet(idm)}"
             }) {
-              visit { id }
+              visit {
+                id
+                idempotencyKey
+              }
             }
           }
         """
       ).map: js =>
-        js.hcursor
-          .downFields("recordGmosNorthVisit", "visit", "id")
-          .require[Visit.Id]
+        val v = js.hcursor.downFields("recordGmosNorthVisit", "visit")
+        (
+          v.downField("id").require[Visit.Id],
+          v.downField("idempotencyKey").require[IdempotencyKey]
+        )
 
     assertIOBoolean:
       for
-        o  <- setup
-        v0 <- recordVisit(o)
-        v1 <- recordVisit(o)
-      yield v0 === v1
+        o        <- setup
+        (v0, k0) <- recordVisit(o)
+        (v1, k1) <- recordVisit(o)
+      yield (v0 === v1) && (k0 === idm) && (k1 === idm)
 
   test("recordGmosNorthVisit - idempotencyKey (slew)"):
     val idm0  = IdempotencyKey.FromString.getOption("100fbce7-73eb-4c82-8a1e-e987a087b89d").get

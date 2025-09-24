@@ -193,7 +193,7 @@ class recordAtom extends OdbSuite {
   test("recordAtom - idempotencyKey"):
     val idm = IdempotencyKey.FromString.getOption("7304956b-45ab-45b6-8db1-ae6f743b519c").get
 
-    def recordAtom(vid: Visit.Id): IO[Atom.Id] =
+    def recordAtom(vid: Visit.Id): IO[(Atom.Id, IdempotencyKey)] =
       query(
         user  = service,
         query = s"""
@@ -204,20 +204,25 @@ class recordAtom extends OdbSuite {
               sequenceType: SCIENCE
               idempotencyKey: "${IdempotencyKey.FromString.reverseGet(idm)}"
             }) {
-              atomRecord { id }
+              atomRecord {
+                id
+                idempotencyKey
+              }
             }
           }
         """
       ).map: js =>
-        js.hcursor
-          .downFields("recordAtom", "atomRecord", "id")
-          .require[Atom.Id]
+        val a = js.hcursor.downFields("recordAtom", "atomRecord")
+        (
+          a.downField("id").require[Atom.Id],
+          a.downField("idempotencyKey").require[IdempotencyKey]
+        )
 
     assertIOBoolean:
       for
         (_, _, v) <- recordVisit(ObservingModeType.GmosNorthLongSlit, service)
-        a0        <- recordAtom(v)
-        a1        <- recordAtom(v)
-      yield a0 === a1
+        (a0, k0)  <- recordAtom(v)
+        (a1, k1)  <- recordAtom(v)
+      yield (a0 === a1) && (k0 === idm) && (k1 === idm)
 
 }
