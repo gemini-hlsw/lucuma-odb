@@ -174,7 +174,8 @@ object VisitService:
           v0 <- ResultT(lookupOrInsertImpl(observationId, idempotencyKey))
           os <- ResultT.liftF(lookupStatic(v0.visitId))
           v1 <- os.fold(insertStaticForVisit(v0.visitId).as(v0.visitId)): _ =>
-                  if (v0.idempotencyKey, idempotencyKey).tupled.exists(_ === _) then
+                  val sameKey = (v0.idempotencyKey, idempotencyKey).tupled.exists(_ === _)
+                  if sameKey then
                     ResultT.pure(v0.visitId)  // was previously done
                   else
                     insertNewVisit.flatMap: v =>
