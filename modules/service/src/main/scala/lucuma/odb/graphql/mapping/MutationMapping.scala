@@ -563,7 +563,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
       services.useTransactionally:
         requireServiceAccess:
           recordStep(
-            sequenceService.insertFlamingos2StepRecord(input.atomId, input.instrument, input.stepConfig, input.telescopeConfig, input.observeClass, input.generatedId, timeEstimateCalculator.flamingos2),
+            sequenceService.insertFlamingos2StepRecord(input.atomId, input.instrument, input.stepConfig, input.telescopeConfig, input.observeClass, input.generatedId, input.idempotencyKey, timeEstimateCalculator.flamingos2),
             Predicates.flamingos2Step.id,
             child
           )
@@ -573,7 +573,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
       services.useTransactionally:
         requireServiceAccess:
           recordStep(
-            sequenceService.insertGmosNorthStepRecord(input.atomId, input.instrument, input.stepConfig, input.telescopeConfig, input.observeClass, input.generatedId, timeEstimateCalculator.gmosNorth),
+            sequenceService.insertGmosNorthStepRecord(input.atomId, input.instrument, input.stepConfig, input.telescopeConfig, input.observeClass, input.generatedId, input.idempotencyKey, timeEstimateCalculator.gmosNorth),
             Predicates.gmosNorthStep.id,
             child
           )
@@ -583,7 +583,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
       services.useTransactionally:
         requireServiceAccess:
           recordStep(
-            sequenceService.insertGmosSouthStepRecord(input.atomId, input.instrument, input.stepConfig, input.telescopeConfig, input.observeClass, input.generatedId, timeEstimateCalculator.gmosSouth),
+            sequenceService.insertGmosSouthStepRecord(input.atomId, input.instrument, input.stepConfig, input.telescopeConfig, input.observeClass, input.generatedId, input.idempotencyKey, timeEstimateCalculator.gmosSouth),
             Predicates.gmosSouthStep.id,
             child
           )

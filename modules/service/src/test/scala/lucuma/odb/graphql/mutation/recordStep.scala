@@ -6,6 +6,7 @@ package mutation
 
 import cats.effect.IO
 import cats.syntax.either.*
+import cats.syntax.eq.*
 import cats.syntax.option.*
 import io.circe.Json
 import io.circe.literal.*
@@ -18,6 +19,7 @@ import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.Step
 import lucuma.core.syntax.string.toScreamingSnakeCase
+import lucuma.core.util.IdempotencyKey
 import org.scalacheck.Arbitrary.arbitrary
 
 class recordStep extends OdbSuite {
@@ -1080,5 +1082,40 @@ class recordStep extends OdbSuite {
       """.asRight
     )
   }
+
+  test("recordStep - idempotencyKey"):
+    val idm = IdempotencyKey.FromString.getOption("7304956b-45ab-45b6-8db1-ae6f743b519c").get
+
+    def recordStep(aid: Atom.Id): IO[Step.Id] =
+      query(
+        user  = service,
+        query = s"""
+          mutation {
+            recordGmosNorthStep(input: {
+              atomId: "$aid"
+              ${dynamicConfig(Instrument.GmosNorth)}
+              stepConfig: {
+                smartGcal: {
+                  smartGcalType: FLAT
+                }
+              }
+              observeClass: ${ObserveClass.Science.tag.toScreamingSnakeCase}
+              idempotencyKey: "${IdempotencyKey.FromString.reverseGet(idm)}"
+            }) {
+              stepRecord { id }
+            }
+          }
+        """
+      ).map: js =>
+        js.hcursor
+          .downFields("recordGmosNorthStep", "stepRecord", "id")
+          .require[Step.Id]
+
+    assertIOBoolean:
+      for
+        (_, _, _, a) <- recordVisitAndAtom(ObservingModeType.GmosNorthLongSlit, service)
+        s0           <- recordStep(a)
+        s1           <- recordStep(a)
+      yield s0 === s1
 
 }
