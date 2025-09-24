@@ -39,8 +39,8 @@ class executionTwilight extends ExecutionTestSupportForGmos {
     twilight: Observation.Id
   )
 
-  // Picks the expected twilight observation out of the program's observations
-  def twilight(pid: Program.Id): IO[Calibrations] =
+  // Picks the expected calibration observations out of the program's observations
+  def calibrations(pid: Program.Id): IO[Calibrations] =
     query(
       pi,
       s"""
@@ -86,7 +86,7 @@ class executionTwilight extends ExecutionTestSupportForGmos {
             .recalculateCalibrations(p, when)(using xa)
             .map(_._1)
       }
-      c <- twilight(p)
+      c <- calibrations(p)
     yield (p, o, c)
 
   def query(sequenceType: String, oid: Observation.Id): String =
@@ -358,5 +358,41 @@ class executionTwilight extends ExecutionTestSupportForGmos {
       t1          <- programTimeEstimate(p1)
       cSpecPhot   <- obsTimeEstimate(c.specPhot)
     yield (t0.programTime +| cSpecPhot.programTime) === t1.programTime)
+
+  test("twilight - has no target"):
+    val genTwilight =
+      for
+        (p, _, c) <- setup
+        _         <- runObscalcUpdate(p, c.twilight)
+      yield c.twilight
+
+    genTwilight.flatMap: oid =>
+      expect(
+        user  = pi,
+        query =
+          s"""
+             query {
+               observation(observationId: "$oid") {
+                 calibrationRole
+                 targetEnvironment {
+                   asterism {
+                     id
+                   }
+                 }
+               }
+             }
+           """,
+        expected =
+          json"""
+            {
+              "observation": {
+                "calibrationRole": "TWILIGHT",
+                "targetEnvironment": {
+                  "asterism": []
+                }
+              }
+            }
+          """.asRight
+      )
 
 }
