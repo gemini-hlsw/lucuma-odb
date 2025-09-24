@@ -33,8 +33,8 @@ class ItcInputSuite extends FunSuite:
     )
 
   test("acquisition sequence uses blind offset target when available"):
-    val regularTarget = (Target.Id.fromLong(1L).get, arbitrary[TargetInput].sample.get, Option.empty[Timestamp])
-    val blindOffsetTarget = (Target.Id.fromLong(2L).get, arbitrary[TargetInput].sample.get, Option.empty[Timestamp])
+    val regularTarget = (Target.Id.fromLong(1L).get, arbitrary[TargetInput].sample.get, None)
+    val blindOffsetTarget = (Target.Id.fromLong(2L).get, arbitrary[TargetInput].sample.get, None)
 
     val itcInput = createItcInput(
       NonEmptyList.one(regularTarget),
@@ -54,8 +54,8 @@ class ItcInputSuite extends FunSuite:
 
   test("both sequences use regular targets when no blind offset exists"):
     val regularTargets = NonEmptyList.of(
-      (Target.Id.fromLong(1L).get, arbitrary[TargetInput].sample.get, Option.empty[Timestamp]),
-      (Target.Id.fromLong(2L).get, arbitrary[TargetInput].sample.get, Option.empty[Timestamp])
+      (Target.Id.fromLong(1L).get, arbitrary[TargetInput].sample.get, None),
+      (Target.Id.fromLong(2L).get, arbitrary[TargetInput].sample.get, None)
     )
 
     val itcInput = createItcInput(regularTargets, None)
@@ -69,8 +69,8 @@ class ItcInputSuite extends FunSuite:
     assertEquals(acquisitionInput.asterism, scienceInput.asterism)
 
   test("science sequence ignores blind offset target"):
-    val regularTarget = (Target.Id.fromLong(1L).get, arbitrary[TargetInput].sample.get, Option.empty[Timestamp])
-    val blindOffsetTarget = (Target.Id.fromLong(2L).get, arbitrary[TargetInput].sample.get, Option.empty[Timestamp])
+    val regularTarget = (Target.Id.fromLong(1L).get, arbitrary[TargetInput].sample.get, None)
+    val blindOffsetTarget = (Target.Id.fromLong(2L).get, arbitrary[TargetInput].sample.get, None)
 
     val itcInput = createItcInput(
       NonEmptyList.one(regularTarget),
