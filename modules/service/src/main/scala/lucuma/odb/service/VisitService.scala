@@ -254,7 +254,8 @@ object VisitService:
           c_instrument,
           c_created,
           c_site,
-          c_chargeable
+          c_chargeable,
+          c_idempotency_key
         FROM t_visit
         WHERE c_visit_id = $visit_id
       """.query(visit_record)
@@ -267,7 +268,8 @@ object VisitService:
           c_instrument,
           c_created,
           c_site,
-          c_chargeable
+          c_chargeable,
+          c_idempotency_key
         FROM t_visit
         WHERE c_observation_id = $observation_id
       """.query(visit_record)

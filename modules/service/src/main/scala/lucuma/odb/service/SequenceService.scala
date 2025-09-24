@@ -40,6 +40,7 @@ import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosSouth
 import lucuma.core.model.sequence.gmos.StaticConfig.GmosNorth as GmosNorthStatic
 import lucuma.core.model.sequence.gmos.StaticConfig.GmosSouth as GmosSouthStatic
+import lucuma.core.util.IdempotencyKey
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
@@ -81,10 +82,11 @@ trait SequenceService[F[_]]:
   )(using Transaction[F], Services.ServiceAccess): F[Unit]
 
   def insertAtomRecord(
-    visitId:      Visit.Id,
-    instrument:   Instrument,
-    sequenceType: SequenceType,
-    generatedId:  Option[Atom.Id]
+    visitId:        Visit.Id,
+    instrument:     Instrument,
+    sequenceType:   SequenceType,
+    generatedId:    Option[Atom.Id],
+    idempotencyKey: Option[IdempotencyKey]
   )(using Transaction[F], Services.ServiceAccess): F[Result[Atom.Id]]
 
   def insertFlamingos2StepRecord(
@@ -258,25 +260,27 @@ object SequenceService:
 
       @annotation.nowarn("msg=unused implicit parameter")
       def insertAtomRecordImpl(
-        visitId:      Visit.Id,
-        instrument:   Instrument,
-        sequenceType: SequenceType,
-        generatedId:  Option[Atom.Id]
+        visitId:        Visit.Id,
+        instrument:     Instrument,
+        sequenceType:   SequenceType,
+        generatedId:    Option[Atom.Id],
+        idempotencyKey: Option[IdempotencyKey]
       )(using Transaction[F], Services.ServiceAccess): F[InsertAtomResponse] =
         val v = visitService.select(visitId).map(_.filter(_.instrument === instrument))
         (for
-          inv <- EitherT.fromOptionF(v, InsertAtomResponse.VisitNotFound(visitId, instrument))
-          aid <- EitherT.right[InsertAtomResponse](UUIDGen[F].randomUUID.map(Atom.Id.fromUuid))
-          _   <- EitherT.right[InsertAtomResponse](session.execute(Statements.InsertAtom)(aid, inv.observationId, visitId, instrument, sequenceType, generatedId))
-        yield InsertAtomResponse.Success(aid)).merge
+          inv  <- EitherT.fromOptionF(v, InsertAtomResponse.VisitNotFound(visitId, instrument))
+          aid  <- EitherT.right[InsertAtomResponse](UUIDGen[F].randomUUID.map(Atom.Id.fromUuid))
+          aidʹ <- EitherT.right[InsertAtomResponse](session.unique(Statements.InsertAtom)(aid, inv.observationId, visitId, instrument, sequenceType, generatedId, idempotencyKey))
+        yield InsertAtomResponse.Success(aidʹ)).merge
 
       override def insertAtomRecord(
-        visitId:      Visit.Id,
-        instrument:   Instrument,
-        sequenceType: SequenceType,
-        generatedId:  Option[Atom.Id]
+        visitId:        Visit.Id,
+        instrument:     Instrument,
+        sequenceType:   SequenceType,
+        generatedId:    Option[Atom.Id],
+        idempotencyKey: Option[IdempotencyKey]
       )(using Transaction[F], Services.ServiceAccess): F[Result[Atom.Id]] =
-        insertAtomRecordImpl(visitId, instrument, sequenceType, generatedId).map:
+        insertAtomRecordImpl(visitId, instrument, sequenceType, generatedId, idempotencyKey).map:
           case InsertAtomResponse.VisitNotFound(id, instrument) => OdbError.InvalidVisit(id, Some(s"Visit '$id' not found or is not a ${instrument.longName} visit")).asFailure
           case InsertAtomResponse.Success(aid)                  => Result.success(aid)
 
@@ -415,14 +419,15 @@ object SequenceService:
          WHERE c_atom_id = $atom_id AND c_instrument = $instrument
       """.query(observation_id)
 
-    val InsertAtom: Command[(
+    val InsertAtom: Query[(
       Atom.Id,
       Observation.Id,
       Visit.Id,
       Instrument,
       SequenceType,
-      Option[Atom.Id]
-    )] =
+      Option[Atom.Id],
+      Option[IdempotencyKey]
+    ), Atom.Id] =
       sql"""
         INSERT INTO t_atom_record (
           c_atom_id,
@@ -430,15 +435,21 @@ object SequenceService:
           c_visit_id,
           c_instrument,
           c_sequence_type,
-          c_generated_id
+          c_generated_id,
+          c_idempotency_key
         ) SELECT
           $atom_id,
           $observation_id,
           $visit_id,
           $instrument,
           $sequence_type,
-          ${atom_id.opt}
-      """.command
+          ${atom_id.opt},
+          ${idempotency_key.opt}
+        ON CONFLICT (c_idempotency_key) DO UPDATE
+          SET c_idempotency_key = EXCLUDED.c_idempotency_key
+        RETURNING
+          c_atom_id
+      """.query(atom_id)
 
     val InsertStep: Command[(
       Step.Id,

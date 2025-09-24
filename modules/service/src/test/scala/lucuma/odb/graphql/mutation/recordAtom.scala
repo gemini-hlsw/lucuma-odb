@@ -6,6 +6,7 @@ package mutation
 
 import cats.effect.IO
 import cats.syntax.either.*
+import cats.syntax.eq.*
 import cats.syntax.option.*
 import io.circe.Json
 import io.circe.literal.*
@@ -16,6 +17,7 @@ import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Atom
+import lucuma.core.util.IdempotencyKey
 import org.scalacheck.Arbitrary.arbitrary
 
 class recordAtom extends OdbSuite {
@@ -187,4 +189,35 @@ class recordAtom extends OdbSuite {
       """.asRight
     )
   }
+
+  test("recordAtom - idempotencyKey"):
+    val idm = IdempotencyKey.FromString.getOption("7304956b-45ab-45b6-8db1-ae6f743b519c").get
+
+    def recordAtom(vid: Visit.Id): IO[Atom.Id] =
+      query(
+        user  = service,
+        query = s"""
+          mutation {
+            recordAtom(input: {
+              visitId: "$vid"
+              instrument: GMOS_NORTH
+              sequenceType: SCIENCE
+              idempotencyKey: "${IdempotencyKey.FromString.reverseGet(idm)}"
+            }) {
+              atomRecord { id }
+            }
+          }
+        """
+      ).map: js =>
+        js.hcursor
+          .downFields("recordAtom", "atomRecord", "id")
+          .require[Atom.Id]
+
+    assertIOBoolean:
+      for
+        (_, _, v) <- recordVisit(ObservingModeType.GmosNorthLongSlit, service)
+        a0        <- recordAtom(v)
+        a1        <- recordAtom(v)
+      yield a0 === a1
+
 }
