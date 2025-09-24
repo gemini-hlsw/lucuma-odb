@@ -118,7 +118,7 @@ ThisBuild / githubWorkflowBuildPreamble +=
         "approve-label" -> "expected-breaking-change"
       ),
     cond = Some("github.event_name == 'pull_request' && matrix.shard == '2'")
-  )  
+  )
 
 val nTestJobShards = 8
 
@@ -439,7 +439,7 @@ ThisBuild / ocsLocal       := ocsBuildInfo.value._4
 // Contains the grackle server
 lazy val itcService = project
   .in(file("itc/service"))
-  .dependsOn(itcModel.jvm)
+  .dependsOn(itcModel.jvm, binding)
   .enablePlugins(BuildInfoPlugin, LucumaDockerPlugin, JavaServerAppPackaging)
   .settings(itcCommonSettings)
   .settings(
