@@ -359,7 +359,7 @@ class executionTwilight extends ExecutionTestSupportForGmos {
       cSpecPhot   <- obsTimeEstimate(c.specPhot)
     yield (t0.programTime +| cSpecPhot.programTime) === t1.programTime)
 
-  test("twilight - has no target"):
+  test("twilight - works when executed in isolation"):
     val genTwilight =
       for
         (p, _, c) <- setup
@@ -373,10 +373,18 @@ class executionTwilight extends ExecutionTestSupportForGmos {
           s"""
              query {
                observation(observationId: "$oid") {
-                 calibrationRole
-                 targetEnvironment {
-                   asterism {
-                     id
+                 execution {
+                   config {
+                     instrument
+                     gmosNorth {
+                       science {
+                         nextAtom {
+                           steps {
+                             observeClass
+                           }
+                         }
+                       }
+                     }
                    }
                  }
                }
@@ -386,13 +394,65 @@ class executionTwilight extends ExecutionTestSupportForGmos {
           json"""
             {
               "observation": {
-                "calibrationRole": "TWILIGHT",
-                "targetEnvironment": {
-                  "asterism": []
+                "execution": {
+                  "config": {
+                    "instrument": "GMOS_NORTH",
+                    "gmosNorth" : {
+                      "science" : {
+                        "nextAtom" : {
+                          "steps" : [
+                            {
+                              "observeClass" : "DAY_CAL"
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  }
                 }
               }
             }
           """.asRight
       )
 
+  test("twilight - fails when coupled with itc"):
+    val genTwilight =
+      for
+        (p, _, c) <- setup
+        _         <- runObscalcUpdate(p, c.twilight)
+      yield c.twilight
+
+    genTwilight.flatMap: oid =>
+      expect(
+        user  = pi,
+        query =
+          s"""
+             query {
+               observation(observationId: "$oid") {
+                 itc {
+                   science {
+                     selected {
+                       targetId
+                     }
+                   }
+                 }
+                 execution {
+                   config {
+                     instrument
+                     gmosNorth {
+                       science {
+                         nextAtom {
+                           steps {
+                             observeClass
+                           }
+                         }
+                       }
+                     }
+                   }
+                 }
+               }
+             }
+           """,
+        expected = List("ITC cannot be queried until the following parameters are defined: SED, brightness measure").asLeft
+      )
 }
