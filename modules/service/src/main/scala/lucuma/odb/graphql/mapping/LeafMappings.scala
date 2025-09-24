@@ -45,6 +45,7 @@ import lucuma.core.model.sequence.DatasetReference
 import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.TimeChargeCorrection
 import lucuma.core.util.CalculationState
+import lucuma.core.util.IdempotencyKey
 import lucuma.core.util.Timestamp
 import lucuma.odb.data.AtomExecutionState
 import lucuma.odb.data.DatabaseOperation
@@ -145,6 +146,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[Group.Id](GroupIdType),
       LeafMapping[GuideProbe](GuideProbeType),
       LeafMapping[StepGuideState](GuideStateType),
+      LeafMapping[IdempotencyKey](IdempotencyKeyType),
       LeafMapping[ImageQuality.Preset](ImageQualityPresetType),
       LeafMapping[Instrument](InstrumentType),
       LeafMapping[IntPercent](IntPercentType),

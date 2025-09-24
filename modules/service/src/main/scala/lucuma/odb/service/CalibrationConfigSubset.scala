@@ -44,6 +44,7 @@ object CalibrationConfigSubset:
     def yBin:              GmosYBinning
     def ampReadMode:       GmosAmpReadMode
     def ampGain:           GmosAmpGain
+    def roi:               GmosRoi
 
     def longSlitCommonInput: GmosLongSlitInput.Create.Common =
       GmosLongSlitInput.Create.Common(
@@ -52,7 +53,7 @@ object CalibrationConfigSubset:
         explicitYBin           = yBin.some,
         explicitAmpReadMode    = ampReadMode.some,
         explicitAmpGain        = ampGain.some,
-        explicitRoi            = GmosRoi.CentralSpectrum.some,
+        explicitRoi            = roi.some,
         explicitλDithers       = none,
         explicitOffsets        = none
       )
@@ -67,7 +68,8 @@ object CalibrationConfigSubset:
     xBin:              GmosXBinning,
     yBin:              GmosYBinning,
     ampReadMode:       GmosAmpReadMode,
-    ampGain:           GmosAmpGain
+    ampGain:           GmosAmpGain,
+    roi:               GmosRoi
   ) extends Gmos[GmosNorthGrating, GmosNorthFilter, GmosNorthFpu] derives Eq:
 
     def toLongSlitInput: ObservingModeInput.Create =
@@ -87,7 +89,8 @@ object CalibrationConfigSubset:
     xBin:              GmosXBinning,
     yBin:              GmosYBinning,
     ampReadMode:       GmosAmpReadMode,
-    ampGain:           GmosAmpGain
+    ampGain:           GmosAmpGain,
+    roi:               GmosRoi
   ) extends Gmos[GmosSouthGrating, GmosSouthFilter, GmosSouthFpu] derives Eq:
 
     def toLongSlitInput: ObservingModeInput.Create =
@@ -189,7 +192,8 @@ object CalibrationConfigSubset:
             gn.xBin,
             gn.yBin,
             gn.ampReadMode,
-            gn.ampGain
+            gn.ampGain,
+            gn.roi
           )
         case gs: Config.GmosSouth =>
           GmosSConfigs(
@@ -200,7 +204,8 @@ object CalibrationConfigSubset:
             gs.xBin,
             gs.yBin,
             gs.ampReadMode,
-            gs.ampGain
+            gs.ampGain,
+            gs.roi
           )
         case gni: ImagingConfig.GmosNorth =>
           GmosNImagingConfigs(

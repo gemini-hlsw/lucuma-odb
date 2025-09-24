@@ -303,7 +303,7 @@ object ExecutionEventService {
           c_visit_id,
           c_atom_id,
           c_atom_stage,
-          c_client_id
+          c_idempotency_key
         )
         SELECT
           'atom' :: e_execution_event_type,
@@ -312,22 +312,22 @@ object ExecutionEventService {
           a.c_visit_id,
           $atom_id,
           $atom_stage,
-          ${client_id.opt}
+          ${idempotency_key.opt}
         FROM
           t_atom_record a
         INNER JOIN
           t_observation o ON o.c_observation_id = a.c_observation_id
         WHERE
           a.c_atom_id = $atom_id
-        ON CONFLICT (c_client_id) DO UPDATE
-          SET c_client_id = EXCLUDED.c_client_id
+        ON CONFLICT (c_idempotency_key) DO UPDATE
+          SET c_idempotency_key = EXCLUDED.c_idempotency_key
         RETURNING
           c_execution_event_id,
           c_observation_id,
           c_visit_id,
           xmax = 0 AS inserted
       """.query(execution_event_id *: observation_id *: visit_id *: bool)
-         .contramap(in => (in.atomId, in.atomStage, in.clientId, in.atomId))
+         .contramap(in => (in.atomId, in.atomStage, in.idempotencyKey, in.atomId))
 
     val InsertDatasetEvent: Query[AddDatasetEventInput, (Id, Timestamp, Observation.Id, Visit.Id, Atom.Id, Step.Id, Boolean)] =
       sql"""
@@ -340,7 +340,7 @@ object ExecutionEventService {
           c_step_id,
           c_dataset_id,
           c_dataset_stage,
-          c_client_id
+          c_idempotency_key
         )
         SELECT
           'dataset' :: e_execution_event_type,
@@ -351,7 +351,7 @@ object ExecutionEventService {
           d.c_step_id,
           $dataset_id,
           $dataset_stage,
-          ${client_id.opt}
+          ${idempotency_key.opt}
         FROM
           t_dataset d
         INNER JOIN
@@ -360,8 +360,8 @@ object ExecutionEventService {
           t_step_record s ON s.c_step_id = d.c_step_id
         WHERE
           d.c_dataset_id = $dataset_id
-        ON CONFLICT (c_client_id) DO UPDATE
-          SET c_client_id = EXCLUDED.c_client_id
+        ON CONFLICT (c_idempotency_key) DO UPDATE
+          SET c_idempotency_key = EXCLUDED.c_idempotency_key
         RETURNING
           c_execution_event_id,
           c_received,
@@ -371,7 +371,7 @@ object ExecutionEventService {
           c_step_id,
           xmax = 0 AS inserted
       """.query(execution_event_id *: core_timestamp *: observation_id *: visit_id *: atom_id *: step_id *: bool)
-         .contramap(in => (in.datasetId, in.datasetStage, in.clientId, in.datasetId))
+         .contramap(in => (in.datasetId, in.datasetStage, in.idempotencyKey, in.datasetId))
 
     val InsertSequenceEvent: Query[AddSequenceEventInput, (Id, Observation.Id, Boolean)] =
       sql"""
@@ -381,7 +381,7 @@ object ExecutionEventService {
           c_observation_id,
           c_visit_id,
           c_sequence_command,
-          c_client_id
+          c_idempotency_key
         )
         SELECT
           'sequence' :: e_execution_event_type,
@@ -389,21 +389,21 @@ object ExecutionEventService {
           v.c_observation_id,
           $visit_id,
           $sequence_command,
-          ${client_id.opt}
+          ${idempotency_key.opt}
         FROM
           t_visit v
         INNER JOIN
           t_observation o ON o.c_observation_id = v.c_observation_id
         WHERE
           v.c_visit_id = $visit_id
-        ON CONFLICT (c_client_id) DO UPDATE
-          SET c_client_id = EXCLUDED.c_client_id
+        ON CONFLICT (c_idempotency_key) DO UPDATE
+          SET c_idempotency_key = EXCLUDED.c_idempotency_key
         RETURNING
           c_execution_event_id,
           c_observation_id,
           xmax = 0 AS inserted
       """.query(execution_event_id *: observation_id *: bool)
-         .contramap(in => (in.visitId, in.command, in.clientId, in.visitId))
+         .contramap(in => (in.visitId, in.command, in.idempotencyKey, in.visitId))
 
     val InsertSlewEvent: Query[(Visit.Id, AddSlewEventInput), (Id, Boolean)] =
       sql"""
@@ -413,7 +413,7 @@ object ExecutionEventService {
           c_observation_id,
           c_visit_id,
           c_slew_stage,
-          c_client_id
+          c_idempotency_key
         )
         SELECT
           'slew' :: e_execution_event_type,
@@ -421,20 +421,20 @@ object ExecutionEventService {
           v.c_observation_id,
           $visit_id,
           $slew_stage,
-          ${client_id.opt}
+          ${idempotency_key.opt}
         FROM
           t_visit v
         INNER JOIN
           t_observation o ON o.c_observation_id = v.c_observation_id
         WHERE
           v.c_visit_id = $visit_id
-        ON CONFLICT (c_client_id) DO UPDATE
-          SET c_client_id = EXCLUDED.c_client_id
+        ON CONFLICT (c_idempotency_key) DO UPDATE
+          SET c_idempotency_key = EXCLUDED.c_idempotency_key
         RETURNING
           c_execution_event_id,
           xmax = 0 AS inserted
       """.query(execution_event_id *: bool)
-         .contramap((v, in) => (v, in.slewStage, in.clientId, v))
+         .contramap((v, in) => (v, in.slewStage, in.idempotencyKey, v))
 
     val InsertStepEvent: Query[AddStepEventInput, (Id,  Timestamp, Observation.Id, Visit.Id, Atom.Id, Boolean)] =
       sql"""
@@ -446,7 +446,7 @@ object ExecutionEventService {
           c_atom_id,
           c_step_id,
           c_step_stage,
-          c_client_id
+          c_idempotency_key
         )
         SELECT
           'step' :: e_execution_event_type,
@@ -456,7 +456,7 @@ object ExecutionEventService {
           s.c_atom_id,
           $step_id,
           $step_stage,
-          ${client_id.opt}
+          ${idempotency_key.opt}
         FROM
           t_step_record s
         INNER JOIN
@@ -465,8 +465,8 @@ object ExecutionEventService {
           t_observation o ON o.c_observation_id = a.c_observation_id
         WHERE
           s.c_step_id = $step_id
-        ON CONFLICT (c_client_id) DO UPDATE
-          SET c_client_id = EXCLUDED.c_client_id
+        ON CONFLICT (c_idempotency_key) DO UPDATE
+          SET c_idempotency_key = EXCLUDED.c_idempotency_key
         RETURNING
           c_execution_event_id,
           c_received,
@@ -475,7 +475,7 @@ object ExecutionEventService {
           c_atom_id,
           xmax = 0 AS inserted
       """.query(execution_event_id *: core_timestamp *: observation_id *: visit_id *: atom_id *: bool)
-         .contramap(in => (in.stepId, in.stepStage, in.clientId, in.stepId))
+         .contramap(in => (in.stepId, in.stepStage, in.idempotencyKey, in.stepId))
 
     val SelectSequenceEvents: Query[Observation.Id, ExecutionEvent.SequenceEvent] =
       sql"""
@@ -484,7 +484,7 @@ object ExecutionEventService {
           c_received,
           c_observation_id,
           c_visit_id,
-          c_client_id,
+          c_idempotency_key,
           c_sequence_command
         FROM
           t_execution_event
@@ -494,11 +494,11 @@ object ExecutionEventService {
         ORDER BY
           c_received
       """.query((
-        execution_event_id *:
-        core_timestamp     *:
-        observation_id     *:
-        visit_id           *:
-        client_id.opt      *:
+        execution_event_id  *:
+        core_timestamp      *:
+        observation_id      *:
+        visit_id            *:
+        idempotency_key.opt *:
         sequence_command
       ).to[ExecutionEvent.SequenceEvent])
 

@@ -182,7 +182,7 @@ class executionTwilight extends ExecutionTestSupportForGmos {
                                   "ampReadMode": "SLOW"
                                 },
                                 "dtax": "ZERO",
-                                "roi": "CENTRAL_SPECTRUM",
+                                "roi": "FULL_FRAME",
                                 "gratingConfig": {
                                   "grating": "R831_G5302",
                                   "order": "ONE",
@@ -277,8 +277,8 @@ class executionTwilight extends ExecutionTestSupportForGmos {
                       "observeClass": "DAY_CAL",
                       "timeEstimate": {
                         "program": { "seconds":  0.000000 },
-                        "nonCharged": { "seconds":  50.700000 },
-                        "total": { "seconds":  50.700000 }
+                        "nonCharged": { "seconds":  81.100000 },
+                        "total": { "seconds":  81.100000 }
                       }
                     }
                   }

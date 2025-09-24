@@ -6,14 +6,14 @@ package input
 
 import cats.syntax.parallel.*
 import lucuma.core.enums.StepStage
-import lucuma.core.model.Client
 import lucuma.core.model.sequence.Step
+import lucuma.core.util.IdempotencyKey
 import lucuma.odb.graphql.binding.*
 
 case class AddStepEventInput(
-  stepId:    Step.Id,
-  stepStage: StepStage,
-  clientId:  Option[Client.Id]
+  stepId:         Step.Id,
+  stepStage:      StepStage,
+  idempotencyKey: Option[IdempotencyKey]
 )
 
 object AddStepEventInput:
@@ -23,7 +23,9 @@ object AddStepEventInput:
       case List(
         StepIdBinding("stepId", rStepId),
         StepStageBinding("stepStage", rStepStage),
-        ClientIdBinding.Option("clientId", rCid)
+        ClientIdBinding.Option("clientId", rCid),
+        IdempotencyKeyBinding.Option("idempotencyKey", rIdm)
       ) =>
-        (rStepId, rStepStage, rCid).parMapN: (sid, stage, cid) =>
-          AddStepEventInput(sid, stage, cid)
+        (rStepId, rStepStage, rCid, rIdm).parMapN: (sid, stage, cid, idm) =>
+
+          AddStepEventInput(sid, stage, idm orElse cid.map(c => IdempotencyKey(c.toUuid)))

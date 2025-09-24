@@ -12,6 +12,7 @@ import lucuma.odb.util.Codecs.dataset_id
 import lucuma.odb.util.Codecs.dataset_stage
 import lucuma.odb.util.Codecs.execution_event_id
 import lucuma.odb.util.Codecs.execution_event_type
+import lucuma.odb.util.Codecs.idempotency_key
 import lucuma.odb.util.Codecs.observation_id
 import lucuma.odb.util.Codecs.sequence_command
 import lucuma.odb.util.Codecs.slew_stage
@@ -39,3 +40,4 @@ trait ExecutionEventTable[F[_]] extends BaseMapping[F]:
     val DatasetStage: ColumnRef    = col("c_dataset_stage",      dataset_stage)
 
     val ClientId: ColumnRef        = col("c_client_id",         client_id.opt)
+    val IdempotencyKey: ColumnRef  = col("c_idempotency_key",   idempotency_key.opt)

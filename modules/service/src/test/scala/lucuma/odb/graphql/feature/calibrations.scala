@@ -18,6 +18,7 @@ import io.circe.syntax.*
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.GmosAmpGain
 import lucuma.core.enums.GmosAmpReadMode
+import lucuma.core.enums.GmosRoi
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.Site
@@ -36,6 +37,7 @@ import lucuma.core.model.User
 import lucuma.core.syntax.string.*
 import lucuma.odb.data.EditType
 import lucuma.odb.graphql.input.ProgramPropertiesInput
+import lucuma.odb.graphql.query.ExecutionQuerySetupOperations
 import lucuma.odb.graphql.subscription.SubscriptionUtils
 import lucuma.odb.json.wavelength.decoder.given
 import lucuma.odb.service.CalibrationsService
@@ -49,7 +51,7 @@ import java.time.LocalDateTime
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 
-class calibrations extends OdbSuite with SubscriptionUtils {
+class calibrations extends OdbSuite with SubscriptionUtils with ExecutionQuerySetupOperations {
   val pi       = TestUsers.Standard.pi(1, 101)
   val service  = TestUsers.service(3)
 
@@ -166,14 +168,44 @@ class calibrations extends OdbSuite with SubscriptionUtils {
   case class ExposureTimeMode(signalToNoise: SignalToNoise) derives Decoder
   case class ScienceRequirements(exposureTimeMode: ExposureTimeMode) derives Decoder
   case class SignalToNoise(at: Wavelength) derives Decoder
+  case class GmosNorthLongSlit(explicitRoi: Option[GmosRoi]) derives Decoder
+  case class GmosSouthLongSlit(explicitRoi: Option[GmosRoi]) derives Decoder
+  case class ObservingMode(gmosNorthLongSlit: Option[GmosNorthLongSlit], gmosSouthLongSlit: Option[GmosSouthLongSlit]) derives Decoder
   case class CalibObs(
     id: Observation.Id,
     groupId: Option[Group.Id],
     calibrationRole: Option[CalibrationRole],
     targetEnvironment: Option[CalibTE],
     constraintSet: Option[CalibCE],
-    scienceRequirements: ScienceRequirements
+    scienceRequirements: ScienceRequirements,
+    observingMode: Option[ObservingMode]
   ) derives Decoder
+
+  extension (obs: List[CalibObs])
+    def countCalibrations: Int = obs.count:
+      case CalibObs(_, _, Some(_), _, _, _, _) => true
+      case _                               => false
+
+    def countCalibrationsWithCE(ce: CloudExtinction.Preset): Int = obs.count:
+      case CalibObs(_, _, Some(_), _, Some(CalibCE(a)), _, _) => a === ce
+      case _                                               => false
+
+    def countCalibrationsWithTE: Int = obs.count:
+      case CalibObs(_, _, Some(_), Some(_), _, _, _) => true
+      case _                                     => false
+
+    def callibrationIds: List[Observation.Id] = obs.collect:
+      case CalibObs(cid, _, Some(_), _, _, _, _) => cid
+
+    def groupIds: List[Group.Id] = obs.collect:
+      case CalibObs(_, Some(gid), _, _, _, _, _) => gid
+
+  extension (elements: List[Either[Group.Id, Observation.Id]])
+    def observationIds: List[Observation.Id] = elements.collect:
+      case Right(oid) => oid
+
+    def calibrationGroupId: Option[Group.Id] = elements.collectFirst:
+      case Left(gid) => gid
 
   private def queryGroup(gid: Group.Id): IO[(Group.Id, Boolean, NonEmptyString)] =
     query(
@@ -213,6 +245,14 @@ class calibrations extends OdbSuite with SubscriptionUtils {
                       signalToNoise {
                         at { nanometers }
                       }
+                    }
+                  }
+                  observingMode {
+                    gmosNorthLongSlit {
+                      explicitRoi
+                    }
+                    gmosSouthLongSlit {
+                      explicitRoi
                     }
                   }
                   targetEnvironment {
@@ -255,9 +295,7 @@ class calibrations extends OdbSuite with SubscriptionUtils {
              }
       gr1  <- groupElementsAs(pi, pid, None)
     } yield {
-      val cgid = gr1.collect {
-                case Left(gid) => gid
-              }.headOption
+      val cgid = gr1.calibrationGroupId
       assert(cgid.isEmpty)
     }
   }
@@ -275,9 +313,7 @@ class calibrations extends OdbSuite with SubscriptionUtils {
                }
              }
       gr1  <- groupElementsAs(pi, pid, None)
-      cgid = gr1.collect {
-                case Left(gid) => gid
-              }.headOption
+      cgid = gr1.calibrationGroupId
       cg   <- cgid.map(queryGroup)
                 .getOrElse(IO.raiseError(new RuntimeException("No calibration group")))
       ob   <- queryObservations(pid)
@@ -304,16 +340,11 @@ class calibrations extends OdbSuite with SubscriptionUtils {
       gr1  <- groupElementsAs(pi, pid, None)
       ob   <- queryObservations(pid)
     } yield {
-      val oids = gr1.collect { case Right(oid) => oid }
-      val cgid = gr1.collect { case Left(gid) => gid }.headOption
-      val cCount = ob.count {
-        case CalibObs(_, _, Some(_), _, _, _) => true
-        case _                       => false
-      }
+      val oids = gr1.observationIds
+      val cgid = gr1.calibrationGroupId
+      val cCount = ob.countCalibrations
       // calibs belong to the calib group
-      val obsGids = ob.collect {
-        case CalibObs(_, Some(gid), _, _, _, _) => gid
-      }
+      val obsGids = ob.groupIds
       assert(obsGids.forall(g => cgid.exists(_ == g)))
       assertEquals(cCount, 4)
       assertEquals(oids.size, 2)
@@ -377,16 +408,11 @@ class calibrations extends OdbSuite with SubscriptionUtils {
       gr1  <- groupElementsAs(pi, pid, None)
       ob   <- queryObservations(pid)
     yield
-      val oids = gr1.collect { case Right(oid) => oid }
-      val cgid = gr1.collect { case Left(gid) => gid }.headOption
-      val cCount = ob.count {
-        case CalibObs(_, _, Some(_), _, _, _) => true
-        case _                             => false
-      }
+      val oids = gr1.observationIds
+      val cgid = gr1.calibrationGroupId
+      val cCount = ob.countCalibrations
       // calibs belong to the calib group
-      val obsGids = ob.collect {
-        case CalibObs(_, Some(gid), _, _, _, _) => gid
-      }
+      val obsGids = ob.groupIds
       assert(obsGids.forall(g => cgid.exists(_ == g)))
       assertEquals(cCount, 4)  // one group of 2 for each of (oid1, oid2) and (oid3, oid4)
       assertEquals(oids.size, 4)
@@ -406,16 +432,11 @@ class calibrations extends OdbSuite with SubscriptionUtils {
       gr1  <- groupElementsAs(pi, pid, None)
       ob   <- queryObservations(pid)
     } yield {
-      val oids = gr1.collect { case Right(oid) => oid }
-      val cgid = gr1.collect { case Left(gid) => gid }.headOption
-      val cCount = ob.count {
-        case CalibObs(_, _, Some(_), _, Some(CalibCE(CloudExtinction.Preset.ThreePointZero)), _) => true
-        case _                       => false
-      }
+      val oids = gr1.observationIds
+      val cgid = gr1.calibrationGroupId
+      val cCount = ob.countCalibrationsWithCE(CloudExtinction.Preset.ThreePointZero)
       // calibs belong to the calib group
-      val obsGids = ob.collect {
-        case CalibObs(_, Some(gid), _, _, _, _) => gid
-      }
+      val obsGids = ob.groupIds
       assert(obsGids.forall(g => cgid.exists(_ == g)))
       assertEquals(cCount, 1)
       assertEquals(oids.size, 1)
@@ -436,16 +457,11 @@ class calibrations extends OdbSuite with SubscriptionUtils {
       gr1  <- groupElementsAs(pi, pid, None)
       ob   <- queryObservations(pid)
     } yield {
-      val oids = gr1.collect { case Right(oid) => oid }
-      val cgid = gr1.collect { case Left(gid) => gid }.headOption
-      val cCount = ob.count {
-        case CalibObs(_, _, Some(_), _, Some(CalibCE(CloudExtinction.Preset.PointThree)), _) => true
-        case _                       => false
-      }
+      val oids = gr1.observationIds
+      val cgid = gr1.calibrationGroupId
+      val cCount = ob.countCalibrationsWithCE(CloudExtinction.Preset.PointThree)
       // calibs belong to the calib group
-      val obsGids = ob.collect {
-        case CalibObs(_, Some(gid), _, _, _, _) => gid
-      }
+      val obsGids = ob.groupIds
       assert(obsGids.forall(g => cgid.exists(_ == g)))
       assertEquals(cCount, 1)
       assertEquals(oids.size, 1)
@@ -469,16 +485,11 @@ class calibrations extends OdbSuite with SubscriptionUtils {
       gr1  <- groupElementsAs(pi, pid, None)
       ob   <- queryObservations(pid)
     } yield {
-      val oids = gr1.collect { case Right(oid) => oid }
-      val cgid = gr1.collect { case Left(gid) => gid }.headOption
-      val cCount = ob.count {
-        case CalibObs(_, _, Some(_), _, _, _) => true
-        case _                       => false
-      }
+      val oids = gr1.observationIds
+      val cgid = gr1.calibrationGroupId
+      val cCount = ob.countCalibrations
       // calibs belong to the calib group
-      val obsGids = ob.collect {
-        case CalibObs(_, Some(gid), _, _, _, _) => gid
-      }
+      val obsGids = ob.groupIds
       assert(obsGids.forall(g => cgid.exists(_ == g)))
       assertEquals(cCount, 2)
       assertEquals(oids.size, 2)
@@ -563,10 +574,7 @@ class calibrations extends OdbSuite with SubscriptionUtils {
               }
       ob   <- queryObservations(pid)
     } yield {
-      val cCount = ob.count {
-        case CalibObs(_, _, Some(_), Some(_), _, _) => true
-        case _                                => false
-      }
+      val cCount = ob.countCalibrationsWithTE
       assertEquals(cCount, 4)
     }
   }
@@ -588,16 +596,11 @@ class calibrations extends OdbSuite with SubscriptionUtils {
       gr1  <- groupElementsAs(pi, pid, None)
       ob   <- queryObservations(pid)
     } yield {
-      val oids = gr1.collect { case Right(oid) => oid }
-      val cgid = gr1.collect { case Left(gid) => gid }.headOption
-      val cCount = ob.count {
-        case CalibObs(_, _, Some(_), _, _, _) => true
-        case _                          => false
-      }
+      val oids = gr1.observationIds
+      val cgid = gr1.calibrationGroupId
+      val cCount = ob.countCalibrations
       // calibs belong to the calib group
-      val obsGids = ob.collect {
-        case CalibObs(_, Some(gid), _, _, _, _) => gid
-      }
+      val obsGids = ob.groupIds
       assert(obsGids.forall(g => cgid.exists(_ == g)))
       assertEquals(cCount, 4)
       assertEquals(oids.size, 2)
@@ -621,16 +624,11 @@ class calibrations extends OdbSuite with SubscriptionUtils {
       gr1  <- groupElementsAs(pi, pid, None)
       ob   <- queryObservations(pid)
     } yield {
-      val oids = gr1.collect { case Right(oid) => oid }
-      val cgid = gr1.collect { case Left(gid) => gid }.headOption
-      val cCount = ob.count {
-        case CalibObs(_, _, Some(_), _, _, _) => true
-        case _                          => false
-      }
+      val oids = gr1.observationIds
+      val cgid = gr1.calibrationGroupId
+      val cCount = ob.countCalibrations
       // calibs belong to the calib group
-      val obsGids = ob.collect {
-        case CalibObs(_, Some(gid), _, _, _, _) => gid
-      }
+      val obsGids = ob.groupIds
       assert(obsGids.forall(g => cgid.exists(_ == g)))
       assertEquals(cCount, 2)
       assertEquals(oids.size, 2)
@@ -649,9 +647,7 @@ class calibrations extends OdbSuite with SubscriptionUtils {
                 }
               }
       ob   <- queryObservations(pid)
-      cid = ob.collect {
-        case CalibObs(cid, _, Some(_), _, _, _) => cid
-      }
+      cid = ob.callibrationIds
       _    <- expect(
                 user = pi,
                 query = s"""
@@ -697,9 +693,7 @@ class calibrations extends OdbSuite with SubscriptionUtils {
                 }
               }
       ob   <- queryObservations(pid)
-      cid = ob.collect {
-        case CalibObs(cid, _, Some(_), _, _, _) => cid
-      }
+      cid = ob.callibrationIds
       _    <- expect(
                 user = pi,
                 query = s"""
@@ -745,7 +739,7 @@ class calibrations extends OdbSuite with SubscriptionUtils {
               }
       ob   <- queryObservations(pid)
       (cid1, ct1) = ob.collect {
-        case CalibObs(cid, _, Some(_), Some(ct1), _, _) => (cid, ct1)
+        case CalibObs(cid, _, Some(_), Some(ct1), _, _, _) => (cid, ct1)
       }.head
       _    <- query(
                 user = pi,
@@ -774,7 +768,7 @@ class calibrations extends OdbSuite with SubscriptionUtils {
                }
       ob2   <- queryObservations(pid)
       (cid2, ct2) = ob2.collect {
-        case CalibObs(cid, _, Some(_), Some(ct2), _, _) => (cid, ct2)
+        case CalibObs(cid, _, Some(_), Some(ct2), _, _, _) => (cid, ct2)
       }.head
       // Some observation
       _     <- assertIOBoolean(IO(ob2.map(_.id) === ob.map(_.id)))
@@ -795,9 +789,7 @@ class calibrations extends OdbSuite with SubscriptionUtils {
                 }
               }
       ob   <- queryObservations(pid)
-      cid = ob.collect {
-        case CalibObs(cid, _, Some(_), _, _, _) => cid
-      }.head
+      cid = ob.callibrationIds.head
       _    <- expect(
                 user = pi,
                 query = s"""
@@ -841,11 +833,8 @@ class calibrations extends OdbSuite with SubscriptionUtils {
       gr1  <- groupElementsAs(pi, pid, None)
       ob   <- queryObservations(pid)
     } yield {
-      val oids = gr1.collect { case Right(oid) => oid }
-      val cCount = ob.count {
-        case CalibObs(_, _, Some(_), _, _, _) => true
-        case _                          => false
-      }
+      val oids = gr1.observationIds
+      val cCount = ob.countCalibrations
       // Only two calibration as we removed a config
       assertEquals(cCount, 2)
       assertEquals(oids.size, 1)
@@ -1020,13 +1009,14 @@ class calibrations extends OdbSuite with SubscriptionUtils {
       ob   <- queryObservations(pid)
     } yield {
       val wv = ob.collect {
-        case CalibObs(_, _, Some(CalibrationRole.SpectroPhotometric), _, _, ScienceRequirements(ExposureTimeMode(SignalToNoise(wv)))) => wv
+        case CalibObs(_, _, Some(CalibrationRole.SpectroPhotometric), _, _, ScienceRequirements(ExposureTimeMode(SignalToNoise(wv))), _) => wv
       }
-      // 510 is the average across the science observations
+      // 510 is the average across the science observations (500 + 520) / 2 = 510
       assertEquals(Wavelength.fromIntNanometers(510), wv.headOption)
     }
   }
-  test("Don't add calibrations if science is inactive") {
+
+  test("Don't add calibrations if science is inactive"):
     for {
       pid  <- createProgramAs(pi)
       tid1 <- createTargetAs(pi, pid, "One")
@@ -1043,14 +1033,523 @@ class calibrations extends OdbSuite with SubscriptionUtils {
       gr1  <- groupElementsAs(pi, pid, None)
       ob   <- queryObservations(pid)
     } yield {
-      val oids = gr1.collect { case Right(oid) => oid }
-      val cCount = ob.count {
-        case CalibObs(_, _, Some(_), _, _, _) => true
-        case _                                => false
-      }
+      val oids = gr1.observationIds
+      val cCount = ob.countCalibrations
       assertEquals(cCount, 2)
       assertEquals(oids.size, 2)
     }
-  }
-}
 
+  def updateCentralWavelength(oid: Observation.Id, centralWavelength: Wavelength): IO[Unit] =
+    query(
+      user  = pi,
+      query = s"""
+        mutation {
+          updateObservations(input: {
+            SET: {
+              observingMode: {
+                gmosNorthLongSlit: {
+                  centralWavelength: { nanometers: ${centralWavelength.toNanometers} }
+                }
+              }
+            },
+            WHERE: {
+              id: { EQ: "$oid" }
+            }
+          }) {
+            observations {
+              instrument
+            }
+          }
+        }
+      """
+    ).void
+
+  test("unnecessary calibrations are removed unless partially executed"):
+    for {
+      pid  <- createProgramAs(pi)
+      tid1 <- createTargetAs(pi, pid, "One")
+      oid1 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid1)
+      _    <- prepareObservation(pi, oid1, tid1)
+      // should produce 2 calibrations
+      _    <- withServices(service) { services =>
+                services.session.transaction.use { xa =>
+                  services.calibrationsService(emailConfig, httpClient).recalculateCalibrations(pid, when)(using xa)
+                }
+              }
+      ob1   <- queryObservations(pid)
+      calibIds1 = ob1.callibrationIds
+      // Add execution events to one of the calibrations (making it partially executed)
+      setup = ExecutionQuerySetupOperations.Setup(offset = 0, atomCount = 1, stepCount = 1, datasetCount = 1)
+      _     <- recordVisit(ObservingModeType.GmosNorthLongSlit, setup, service, calibIds1.head)
+      // Change the observation configuration
+      _     <- updateCentralWavelength(oid1, Wavelength.fromIntNanometers(600).get)
+      // Run calibrations again - should keep the partially executed calibration and add new ones
+      _     <- withServices(service) { services =>
+                services.session.transaction.use { xa =>
+                  services.calibrationsService(emailConfig, httpClient).recalculateCalibrations(pid, when)(using xa)
+                }
+              }
+      ob2   <- queryObservations(pid)
+      calibIds2 = ob2.callibrationIds
+      gr1  <- groupElementsAs(pi, pid, None)
+      // Verify that the calibration still has execution events
+      evs  <- withServices(service) { services =>
+                  services.executionEventService.selectSequenceEvents(calibIds1.head).compile.toList
+                }
+      _     <- assertIOBoolean(IO(evs.nonEmpty))
+    } yield {
+      val oids = gr1.observationIds
+      val count1 = ob1.countCalibrations
+      val count2 = ob2.countCalibrations
+      // initial set 2 calibs
+      assertEquals(count1, 2)
+      // After config change: 1 partially executed calibration remains + 2 new calibrations
+      assertEquals(count2, 3)
+      // The partially executed calibration should still be present
+      assert(calibIds2.contains(calibIds1.head))
+      assertEquals(oids.size, 1)
+    }
+
+  test("SpectroPhotometric calibrations ignore ROI differences from science observations") {
+    for {
+      pid  <- createProgramAs(pi)
+      tid1 <- createTargetAs(pi, pid, "Target1")
+      tid2 <- createTargetAs(pi, pid, "Target2")
+      oid1 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid1)
+      oid2 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid2)
+      _ <- query(
+        user = pi,
+        query = s"""
+          mutation {
+            updateObservations(input: {
+              WHERE: { id: { EQ: "$oid1" } }
+              SET: {
+                observingMode: {
+                  gmosNorthLongSlit: {
+                    grating: R831_G5302
+                    filter: R_PRIME
+                    fpu: LONG_SLIT_0_50
+                    centralWavelength: { nanometers: 500 }
+                    explicitRoi: CENTRAL_SPECTRUM
+                  }
+                }
+              }
+            }) {
+              observations { id }
+            }
+          }
+        """,
+      )
+      _ <- query(
+        user = pi,
+        query = s"""
+          mutation {
+            updateObservations(input: {
+              WHERE: { id: { EQ: "$oid2" } }
+              SET: {
+                observingMode: {
+                  gmosNorthLongSlit: {
+                    grating: R831_G5302
+                    filter: R_PRIME
+                    fpu: LONG_SLIT_0_50
+                    centralWavelength: { nanometers: 500 }
+                    explicitRoi: FULL_FRAME
+                  }
+                }
+              }
+            }) {
+              observations { id }
+            }
+          }
+        """,
+      )
+      _ <- prepareObservation(pi, oid1, tid1) *> prepareObservation(pi, oid2, tid2)
+      // Generate calibrations
+      _ <- withServices(service) { services =>
+             services.session.transaction.use { xa =>
+               services.calibrationsService(emailConfig, httpClient).recalculateCalibrations(pid, when)(using xa)
+             }
+           }
+
+      ob <- queryObservations(pid)
+    } yield {
+      val calibCount = ob.count(_.calibrationRole.contains(CalibrationRole.SpectroPhotometric))
+      // 1 Specphoto even though we have two ROI
+      assertEquals(calibCount, 1)
+    }
+  }
+
+  test("Twilight calibrations preserve ROI differences from science observations") {
+    for {
+      pid  <- createProgramAs(pi)
+      tid1 <- createTargetAs(pi, pid, "Target1")
+      tid2 <- createTargetAs(pi, pid, "Target2")
+      oid1 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid1)
+      oid2 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid2)
+      _ <- query(
+        user = pi,
+        query = s"""
+          mutation {
+            updateObservations(input: {
+              WHERE: { id: { EQ: "$oid1" } }
+              SET: {
+                observingMode: {
+                  gmosNorthLongSlit: {
+                    grating: R831_G5302
+                    filter: R_PRIME
+                    fpu: LONG_SLIT_0_50
+                    centralWavelength: { nanometers: 500 }
+                    explicitRoi: CENTRAL_SPECTRUM
+                  }
+                }
+              }
+            }) {
+              observations { id }
+            }
+          }
+        """
+      )
+      _ <- query(
+        user = pi,
+        query = s"""
+          mutation {
+            updateObservations(input: {
+              WHERE: { id: { EQ: "$oid2" } }
+              SET: {
+                observingMode: {
+                  gmosNorthLongSlit: {
+                    grating: R831_G5302
+                    filter: R_PRIME
+                    fpu: LONG_SLIT_0_50
+                    centralWavelength: { nanometers: 500 }
+                    explicitRoi: FULL_FRAME
+                  }
+                }
+              }
+            }) {
+              observations { id }
+            }
+          }
+        """,
+      )
+      _ <- prepareObservation(pi, oid1, tid1) *> prepareObservation(pi, oid2, tid2)
+      _ <- withServices(service) { services =>
+             services.session.transaction.use { xa =>
+               services.calibrationsService(emailConfig, httpClient).recalculateCalibrations(pid, when)(using xa)
+             }
+           }
+
+      ob <- queryObservations(pid)
+    } yield {
+      val twilightCount = ob.count(_.calibrationRole.contains(CalibrationRole.Twilight))
+      val twilightObs = ob.filter(_.calibrationRole.contains(CalibrationRole.Twilight))
+      val rois = twilightObs.flatMap(_.observingMode).flatMap(_.gmosNorthLongSlit).flatMap(_.explicitRoi)
+
+      // Twilight preserve ROI differences, thus two twilight observations
+      assertEquals(twilightCount, 2)
+      assertEquals(rois.count(_ === GmosRoi.CentralSpectrum), 1)
+      assertEquals(rois.count(_ === GmosRoi.FullFrame), 1)
+    }
+  }
+
+  test("twilight calibrations are properly removed when science observation is deleted") {
+    for {
+      pid  <- createProgramAs(pi)
+      tid1 <- createTargetAs(pi, pid, "Target1")
+      tid2 <- createTargetAs(pi, pid, "Target2")
+      oid1 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid1)
+      oid2 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid2)
+      // Set different ROIs for the two observations
+      _ <- query(
+        user = pi,
+        query = s"""
+          mutation {
+            updateObservations(input: {
+              WHERE: { id: { EQ: "$oid1" } }
+              SET: {
+                observingMode: {
+                  gmosNorthLongSlit: {
+                    grating: R831_G5302
+                    filter: R_PRIME
+                    fpu: LONG_SLIT_0_50
+                    centralWavelength: { nanometers: 500 }
+                    explicitRoi: CENTRAL_SPECTRUM
+                  }
+                }
+              }
+            }) {
+              observations { id }
+            }
+          }
+        """
+      )
+      _ <- query(
+        user = pi,
+        query = s"""
+          mutation {
+            updateObservations(input: {
+              WHERE: { id: { EQ: "$oid2" } }
+              SET: {
+                observingMode: {
+                  gmosNorthLongSlit: {
+                    grating: R831_G5302
+                    filter: R_PRIME
+                    fpu: LONG_SLIT_0_50
+                    centralWavelength: { nanometers: 500 }
+                    explicitRoi: FULL_FRAME
+                  }
+                }
+              }
+            }) {
+              observations { id }
+            }
+          }
+        """
+      )
+      _    <- prepareObservation(pi, oid1, tid1) *> prepareObservation(pi, oid2, tid2)
+      _    <- withServices(service) { services =>
+                services.session.transaction.use { xa =>
+                  services.calibrationsService(emailConfig, httpClient).recalculateCalibrations(pid, when)(using xa)
+                }
+              }
+      obsBefore <- queryObservations(pid)
+      _    <- deleteObservation(pi, oid2)  // Delete full frame
+      _    <- withServices(service) { services =>
+                services.session.transaction.use { xa =>
+                  services.calibrationsService(emailConfig, httpClient).recalculateCalibrations(pid, when)(using xa)
+                }
+              }
+      gr1  <- groupElementsAs(pi, pid, None)
+      obsAfter   <- queryObservations(pid)
+    } yield {
+      // Before deletion: should have 1 specphoto + 2 twilights (one for each ROI)
+      val specphotoBefore = obsBefore.count(_.calibrationRole.exists(_ === CalibrationRole.SpectroPhotometric))
+      val twilightBefore = obsBefore.count(_.calibrationRole.exists(_ === CalibrationRole.Twilight))
+      assertEquals(specphotoBefore, 1)
+      assertEquals(twilightBefore, 2)
+
+      // After deletion: one each type
+      val specphotoAfter = obsAfter.count(_.calibrationRole.exists(_ === CalibrationRole.SpectroPhotometric))
+      val twilightAfter = obsAfter.count(_.calibrationRole.exists(_ === CalibrationRole.Twilight))
+
+      assertEquals(specphotoAfter, 1)
+      assertEquals(twilightAfter, 1)
+
+      // Verify only the needed ROI remains in twilight calibrations
+      val remainingTwilightRois = obsAfter
+        .filter(_.calibrationRole.contains(CalibrationRole.Twilight))
+        .flatMap(_.observingMode)
+        .flatMap(_.gmosNorthLongSlit)
+        .flatMap(_.explicitRoi)
+      assertEquals(remainingTwilightRois, List(GmosRoi.CentralSpectrum))
+    }
+  }
+
+  test("twilight calibrations are properly removed when science observation ROI is converted") {
+    for {
+      pid  <- createProgramAs(pi)
+      tid1 <- createTargetAs(pi, pid, "Target1")
+      tid2 <- createTargetAs(pi, pid, "Target2")
+      oid1 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid1)
+      oid2 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid2)
+      // Set different ROIs for the two observations
+      _ <- query(
+        user = pi,
+        query = s"""
+          mutation {
+            updateObservations(input: {
+              WHERE: { id: { EQ: "$oid1" } }
+              SET: {
+                observingMode: {
+                  gmosNorthLongSlit: {
+                    grating: R831_G5302
+                    filter: R_PRIME
+                    fpu: LONG_SLIT_0_50
+                    centralWavelength: { nanometers: 500 }
+                    explicitRoi: CENTRAL_SPECTRUM
+                  }
+                }
+              }
+            }) {
+              observations { id }
+            }
+          }
+        """
+      )
+      _ <- query(
+        user = pi,
+        query = s"""
+          mutation {
+            updateObservations(input: {
+              WHERE: { id: { EQ: "$oid2" } }
+              SET: {
+                observingMode: {
+                  gmosNorthLongSlit: {
+                    grating: R831_G5302
+                    filter: R_PRIME
+                    fpu: LONG_SLIT_0_50
+                    centralWavelength: { nanometers: 500 }
+                    explicitRoi: FULL_FRAME
+                  }
+                }
+              }
+            }) {
+              observations { id }
+            }
+          }
+        """
+      )
+      _    <- prepareObservation(pi, oid1, tid1) *> prepareObservation(pi, oid2, tid2)
+      _    <- withServices(service) { services =>
+                services.session.transaction.use { xa =>
+                  services.calibrationsService(emailConfig, httpClient).recalculateCalibrations(pid, when)(using xa)
+                }
+              }
+      obsBefore <- queryObservations(pid)
+      // Convert full observation to central
+      _ <- query(
+        user = pi,
+        query = s"""
+          mutation {
+            updateObservations(input: {
+              WHERE: { id: { EQ: "$oid2" } }
+              SET: {
+                observingMode: {
+                  gmosNorthLongSlit: {
+                    grating: R831_G5302
+                    filter: R_PRIME
+                    fpu: LONG_SLIT_0_50
+                    centralWavelength: { nanometers: 500 }
+                    explicitRoi: CENTRAL_SPECTRUM
+                  }
+                }
+              }
+            }) {
+              observations { id }
+            }
+          }
+        """
+      )
+      _    <- withServices(service) { services =>
+                services.session.transaction.use { xa =>
+                  services.calibrationsService(emailConfig, httpClient).recalculateCalibrations(pid, when)(using xa)
+                }
+              }
+      gr1  <- groupElementsAs(pi, pid, None)
+      obsAfter   <- queryObservations(pid)
+    } yield {
+      // Before conversion: 1 specphoto + 2 twilights
+      val specphotoBefore = obsBefore.count(_.calibrationRole.exists(_ === CalibrationRole.SpectroPhotometric))
+      val twilightBefore = obsBefore.count(_.calibrationRole.exists(_ === CalibrationRole.Twilight))
+
+      assertEquals(specphotoBefore, 1)
+      assertEquals(twilightBefore, 2)
+
+      // After conversion: calibrations remain available even when no longer strictly needed
+      val specphotoAfter = obsAfter.count(_.calibrationRole.contains(CalibrationRole.SpectroPhotometric))
+      val twilightAfter = obsAfter.count(_.calibrationRole.contains(CalibrationRole.Twilight))
+      val twilightRoisAfter = obsAfter
+        .filter(_.calibrationRole.contains(CalibrationRole.Twilight))
+        .flatMap(_.observingMode)
+        .flatMap(_.gmosNorthLongSlit)
+        .flatMap(_.explicitRoi)
+
+      assertEquals(specphotoAfter, 1)
+      assertEquals(twilightAfter, 1)
+      assertEquals(twilightRoisAfter, List(GmosRoi.CentralSpectrum))
+    }
+  }
+
+  test("Adding observation with different ROI creates new twilight calibration") {
+    for {
+      pid  <- createProgramAs(pi)
+      tid1 <- createTargetAs(pi, pid, "Target1")
+      tid2 <- createTargetAs(pi, pid, "Target2")
+      oid1 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid1)
+      // Set up first observation with FULL_FRAME
+      _ <- query(
+        user = pi,
+        query = s"""
+          mutation {
+            updateObservations(input: {
+              WHERE: { id: { EQ: "$oid1" } }
+              SET: {
+                observingMode: {
+                  gmosNorthLongSlit: {
+                    grating: R831_G5302
+                    filter: R_PRIME
+                    fpu: LONG_SLIT_0_50
+                    centralWavelength: { nanometers: 500 }
+                    explicitRoi: FULL_FRAME
+                  }
+                }
+              }
+            }) {
+              observations { id }
+            }
+          }
+        """,
+      )
+      _ <- prepareObservation(pi, oid1, tid1)
+      // Generate calibrations for first observation
+      _ <- withServices(service): services =>
+             services.session.transaction.use: xa =>
+               services.calibrationsService(emailConfig, httpClient).recalculateCalibrations(pid, when)(using xa)
+      obsAfterFirst <- queryObservations(pid)
+      // Now add second observation with same config but different ROI
+      oid2 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid2)
+      _ <- query(
+        user = pi,
+        query = s"""
+          mutation {
+            updateObservations(input: {
+              WHERE: { id: { EQ: "$oid2" } }
+              SET: {
+                observingMode: {
+                  gmosNorthLongSlit: {
+                    grating: R831_G5302
+                    filter: R_PRIME
+                    fpu: LONG_SLIT_0_50
+                    centralWavelength: { nanometers: 500 }
+                    explicitRoi: CENTRAL_SPECTRUM
+                  }
+                }
+              }
+            }) {
+              observations { id }
+            }
+          }
+        """,
+      )
+      _ <- prepareObservation(pi, oid2, tid2)
+      // Recalculate calibrations after adding second observation
+      _ <- withServices(service) { services =>
+             services.session.transaction.use { xa =>
+               services.calibrationsService(emailConfig, httpClient).recalculateCalibrations(pid, when)(using xa)
+             }
+           }
+      obsAfterSecond <- queryObservations(pid)
+    } yield {
+      // After first observation: 1 specphote + 1 Twilight
+      val specphotoAfterFirst = obsAfterFirst.count(_.calibrationRole.exists(_ === CalibrationRole.SpectroPhotometric))
+      val twilightAfterFirst = obsAfterFirst.count(_.calibrationRole.exists(_ === CalibrationRole.Twilight))
+
+      assertEquals(specphotoAfterFirst, 1)
+      assertEquals(twilightAfterFirst, 1)
+
+      // After second observation: should have 1 specphote + 2 Twilight
+      val specphotoAfterSecond = obsAfterSecond.count(_.calibrationRole.exists(_ === CalibrationRole.SpectroPhotometric))
+      val twilightAfterSecond = obsAfterSecond.count(_.calibrationRole.exists(_ === CalibrationRole.Twilight))
+      val twilightObs = obsAfterSecond.filter(_.calibrationRole.contains(CalibrationRole.Twilight))
+      val rois = twilightObs.flatMap(_.observingMode).flatMap(_.gmosNorthLongSlit).flatMap(_.explicitRoi)
+
+      // SpectroPhotometric calibrations ignore ROI, so still only 1
+      assertEquals(specphotoAfterSecond, 1)
+      // Twilight calibrations preserve ROI, so now 2 (one for each ROI)
+      assertEquals(twilightAfterSecond, 2)
+      assertEquals(rois.count(_ === GmosRoi.FullFrame), 1)
+      assertEquals(rois.count(_ === GmosRoi.CentralSpectrum), 1)
+    }
+  }
+
+}
