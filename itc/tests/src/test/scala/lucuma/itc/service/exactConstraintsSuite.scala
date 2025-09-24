@@ -600,6 +600,7 @@ class exactConstraintsSuite extends GraphQLSuite:
         }
       """
     )
+
   test("exactconditions: cloudExtinction boundary minimum value"):
     query(
       """
@@ -1002,7 +1003,16 @@ class exactConstraintsSuite extends GraphQLSuite:
         {
           "errors": [
             {
-              "message": "Argument 'input.constraints.imageQuality' is invalid: Expected exactly one of preset, arcsec"
+              "message": "Argument 'input.constraints.imageQuality' is invalid: Expected exactly one of preset, arcsec",
+              "extensions": {
+                "odb_error" : {
+                  "odb_error.tag" : "invalid_argument",
+                  "odb_error.detail" : "Argument 'input.constraints.imageQuality' is invalid: Expected exactly one of preset, arcsec",
+                  "odb_error.data" : {
+
+                  }
+                }
+              }
             }
           ]
         }
@@ -1083,7 +1093,16 @@ class exactConstraintsSuite extends GraphQLSuite:
         {
           "errors": [
             {
-              "message": "Argument 'input.constraints.cloudExtinction' is invalid: Expected exactly one of preset, extinction"
+              "message": "Argument 'input.constraints.cloudExtinction' is invalid: Expected exactly one of preset, extinction",
+              "extensions": {
+                "odb_error" : {
+                  "odb_error.tag" : "invalid_argument",
+                  "odb_error.detail" : "Argument 'input.constraints.cloudExtinction' is invalid: Expected exactly one of preset, extinction",
+                  "odb_error.data" : {
+
+                  }
+                }
+              }
             }
           ]
         }
@@ -1323,7 +1342,16 @@ class exactConstraintsSuite extends GraphQLSuite:
         {
           "errors": [
             {
-              "message": "Argument 'input.constraints.imageQuality' is invalid: Expected exactly one of preset, arcsec"
+              "message": "Argument 'input.constraints.imageQuality' is invalid: Expected exactly one of preset, arcsec",
+              "extensions": {
+                "odb_error" : {
+                  "odb_error.tag" : "invalid_argument",
+                  "odb_error.detail" : "Argument 'input.constraints.imageQuality' is invalid: Expected exactly one of preset, arcsec",
+                  "odb_error.data" : {
+
+                  }
+                }
+              }
             }
           ]
         }
@@ -1401,7 +1429,16 @@ class exactConstraintsSuite extends GraphQLSuite:
         {
           "errors": [
             {
-              "message": "Argument 'input.constraints.cloudExtinction' is invalid: Expected exactly one of preset, extinction"
+              "message": "Argument 'input.constraints.cloudExtinction' is invalid: Expected exactly one of preset, extinction",
+              "extensions": {
+                "odb_error" : {
+                  "odb_error.tag" : "invalid_argument",
+                  "odb_error.detail" : "Argument 'input.constraints.cloudExtinction' is invalid: Expected exactly one of preset, extinction",
+                  "odb_error.data" : {
+
+                  }
+                }
+              }
             }
           ]
         }
