@@ -224,6 +224,13 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
   def fakeItcSpectroscopyResult: IntegrationTime =
     FakeItcResult
 
+  // Input-dependent ITC result hooks - override these for target-specific responses
+  def fakeItcImagingResultFor(input: ImagingInput): Option[IntegrationTime] =
+    None
+
+  def fakeItcSpectroscopyResultFor(input: SpectroscopyInput): Option[IntegrationTime] =
+    None
+
   def fakeSignalToNoiseAt(w: Wavelength): SignalToNoiseAt =
     SignalToNoiseAt(
       w,
@@ -235,13 +242,14 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
     new ItcClient[IO] {
 
       override def imaging(input: ImagingInput, useCache: Boolean): IO[ClientCalculationResult] =
+        val result = fakeItcImagingResultFor(input).getOrElse(fakeItcImagingResult)
         ClientCalculationResult(
           FakeItcVersions,
           AsterismIntegrationTimeOutcomes(
             NonEmptyChain.fromSeq(
               List.fill(input.asterism.length)(
                 TargetIntegrationTimeOutcome(
-                  TargetIntegrationTime(Zipper.one(fakeItcImagingResult), FakeBandOrLine, None, Nil).asRight
+                  TargetIntegrationTime(Zipper.one(result), FakeBandOrLine, None, Nil).asRight
                 )
               )
             ).get
@@ -261,7 +269,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
           val result =
             input.exposureTimeMode match
               case ExposureTimeMode.SignalToNoiseMode(_, _)   =>
-                fakeItcSpectroscopyResult
+                fakeItcSpectroscopyResultFor(input).getOrElse(fakeItcSpectroscopyResult)
               case ExposureTimeMode.TimeAndCountMode(t, c, _) =>
                 IntegrationTime(t, PosInt.unsafeFrom(c.value))
 
@@ -402,7 +410,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
     } yield s
 
   protected def session: Resource[IO, Session[IO]] =
-    Resource.unit.flatMap: _ => // Newer versions of munit-cats-effect just don't run the tests without this line. 
+    Resource.unit.flatMap: _ => // Newer versions of munit-cats-effect just don't run the tests without this line.
       FMain.singleSession(databaseConfig)
 
   private def transactionalClient(user: User)(svr: Server): Resource[IO, FetchClient[IO, Nothing]] =
