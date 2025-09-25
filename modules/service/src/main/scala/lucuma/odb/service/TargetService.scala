@@ -173,14 +173,14 @@ object TargetService {
               session.prepareR(s2.fragment.command).use(_.execute(s2.argument))
             }
 
-          clone(input.targetId, pid).flatMap: tid =>
+          clone(input.targetId, pid).flatMap { tid =>
             update(tid).flatMap {
               case Some(err: UpdateTargetsError) => transaction.rollback.as(UpdateFailed(err))
               case _ => replaceIn(tid) as Success(input.targetId, tid)
             }.map(cloneResultTranslation)
+          }
 
-      @annotation.nowarn("msg=unused implicit parameter")
-      private def cloneTargetIntoImpl(targetId: Target.Id, programId: Program.Id)(using Transaction[F]): F[CloneTargetResponse] = {
+      private def cloneTargetIntoImpl(targetId: Target.Id, programId: Program.Id): F[CloneTargetResponse] = {
         import CloneTargetResponse.*
 
         // Ensure the destination program exists

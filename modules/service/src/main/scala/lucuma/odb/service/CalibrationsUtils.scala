@@ -162,7 +162,8 @@ trait CalibrationObservations {
               scienceBand = band,
               targetEnvironment = TargetEnvironmentInput.Create(
                 none,
-                List(tid).some
+                List(tid).some,
+                none
               ).some,
               constraintSet = roleConstraints(CalibrationRole.SpectroPhotometric).some,
               group = gid.some,
@@ -201,7 +202,8 @@ trait CalibrationObservations {
             ObservationPropertiesInput.Create.Default.copy(
               targetEnvironment = TargetEnvironmentInput.Create(
                 none,
-                List(tid).some
+                List(tid).some,
+                none
               ).some,
               constraintSet = roleConstraints(CalibrationRole.Twilight).some,
               group = gid.some,

@@ -74,6 +74,33 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos:
           ).asRight
       )
 
+  test("simple generation with blind offset target uses regular targets for science sequence"):
+    val setup: IO[Observation.Id] =
+      for
+        p <- createProgram
+        t <- createTargetWithProfileAs(pi, p)
+        bt <- createTargetWithProfileAs(pi, p)
+        o <- createObservationWithBlindOffset(pi, p, List(t))
+      yield o
+
+    setup.flatMap: oid =>
+      expect(
+        user     = pi,
+        query    = gmosNorthScienceQuery(oid, 1.some),
+        expected =
+          Json.obj(
+            "executionConfig" -> Json.obj(
+              "gmosNorth" -> Json.obj(
+                "science" -> Json.obj(
+                  "nextAtom" -> gmosNorthExpectedScienceAtom(ditherNm = 0, 0, 15, -15),
+                  "possibleFuture" -> List(gmosNorthExpectedScienceAtom(ditherNm = 5, 0, 15, -15)).asJson,
+                  "hasMore" -> true.asJson
+                )
+              )
+            )
+          ).asRight
+      )
+
   test("simple generation - unlimited future"):
     val setup: IO[Observation.Id] =
       for

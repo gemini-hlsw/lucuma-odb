@@ -33,6 +33,9 @@ import lucuma.core.enums.StepGuideState
 import lucuma.core.math.BoundedInterval
 import lucuma.core.math.Wavelength
 import lucuma.core.model.Observation
+import lucuma.core.model.Program
+import lucuma.core.model.Target
+import lucuma.core.model.User
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.StepConfig.Gcal
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth
@@ -338,3 +341,98 @@ trait ExecutionTestSupportForGmos extends ExecutionTestSupport:
       gmosNorthExpectedArc(ditherNm, 0, q0), gmosNorthExpectedFlat(ditherNm, 0, q0)
     ) ++ (q0 :: qs.toList).map(q => gmosNorthExpectedScience(ditherNm, 0, q))
     gmosNorthExpectedScienceAtom(ditherNm, steps)
+
+  // This is a bit hackish, we are passing an RV of 999 to identify which one is BlindOffset
+  def createObservationWithBlindOffset(
+    user: User,
+    pid: Program.Id,
+    tids: List[Target.Id]
+  ): IO[Observation.Id] =
+    query(
+      user = user,
+      query = s"""
+        mutation {
+          createObservation(input: {
+            programId: ${pid.asJson},
+            SET: {
+              constraintSet: {
+                cloudExtinction: POINT_ONE,
+                imageQuality: ONE_POINT_ZERO,
+                skyBackground: DARKEST
+              },
+              targetEnvironment: {
+                asterism: ${tids.asJson},
+                blindOffsetTarget: {
+                  name: "Blind Offset Star",
+                  sidereal: {
+                    ra: { degrees: "12.345" },
+                    dec: { degrees: "45.678" },
+                    epoch: "J2000.000",
+                    radialVelocity: {
+                      kilometersPerSecond: 999.0
+                    }
+                  },
+                  sourceProfile: {
+                    point: {
+                      bandNormalized: {
+                        sed: {
+                          stellarLibrary: B5_III
+                        },
+                        brightnesses: [{
+                          band: R,
+                          value: 3.0,
+                          units: VEGA_MAGNITUDE
+                        }]
+                      }
+                    }
+                  }
+                }
+              },
+              scienceRequirements: {
+                exposureTimeMode: {
+                  signalToNoise: {
+                    value: 50,
+                    at: {
+                      nanometers: 500
+                    }
+                  }
+                },
+                spectroscopy: {
+                  wavelength: {
+                    nanometers: 500
+                  },
+                  resolution: 1000,
+                  wavelengthCoverage: {
+                    nanometers: 50
+                  },
+                  focalPlane: SINGLE_SLIT,
+                  focalPlaneAngle: {
+                    microarcseconds: 0
+                  }
+                }
+              },
+              observingMode: {
+                gmosNorthLongSlit: {
+                  grating: R831_G5302,
+                  filter: R_PRIME,
+                  fpu: LONG_SLIT_0_50,
+                  centralWavelength: {
+                    nanometers: 500
+                  },
+                  explicitYBin: TWO
+                }
+              }
+            }
+          }) {
+            observation {
+              id
+            }
+          }
+        }
+      """
+    ).map { json =>
+      json.hcursor
+        .downFields("createObservation", "observation", "id")
+        .as[Observation.Id]
+        .getOrElse(sys.error("Could not create observation"))
+    }

@@ -35,6 +35,7 @@ import io.circe.syntax.*
 import lucuma.core.data.Zipper
 import lucuma.core.data.ZipperCodec.given
 import lucuma.core.enums.Band
+import lucuma.core.enums.SequenceType
 import lucuma.core.math.SignalToNoise
 import lucuma.core.math.SingleSN
 import lucuma.core.math.TotalSN
@@ -340,7 +341,7 @@ object ItcService {
       private def safeAcquisitionCall(targets: ItcInput): F[Either[OdbError, AsterismIntegrationTimes]] =
         def go(min: TimeSpan, max: TimeSpan): F[Either[OdbError, AsterismIntegrationTimes]] =
           client
-            .imaging(targets.imagingInput, useCache = false)
+            .imaging(targets.imagingInput(SequenceType.Acquisition), useCache = false)
             .map:
               _.targetTimes.modifyValue:
                 _.map:
@@ -375,7 +376,7 @@ object ItcService {
       private def callRemoteItc(
         targets: ItcInput
       )(using NoTransaction[F]): F[Either[OdbError, AsterismResults]] =
-        (safeAcquisitionCall(targets), client.spectroscopy(targets.spectroscopyInput, useCache = false)).parMapN {
+        (safeAcquisitionCall(targets), client.spectroscopy(targets.spectroscopyInput(SequenceType.Science), useCache = false)).parMapN {
           case (imgResult, ClientCalculationResult(_, specOutcomes)) =>
             val specResult = specOutcomes.partitionErrors.leftMap(convertErrors(targets))
 

@@ -314,6 +314,15 @@ object ObservationService {
                     Services.asSuperUser:
                       asterismService.insertAsterism(pid, NonEmptyList.one(oid), a)
                 .as(oid)
+            .flatMap: oid =>
+              SET
+                .targetEnvironment
+                .flatMap(_.blindOffsetTarget)
+                .traverse: targetInput =>
+                  ResultT:
+                    Services.asSuperUser:
+                      blindOffsetsService.createBlindOffset(pid, oid, targetInput)
+                .as(oid)
             .value
             .flatTap: r =>
               transaction.rollback.unlessA(r.hasValue)
@@ -402,7 +411,7 @@ object ObservationService {
         Trace[F].span("updateObservation") {
           update.fold(Result(Map.empty).pure[F]): (SET, which) =>
             def validateBand(pids: => List[Program.Id]): ResultT[F, Unit] =
-              SET.scienceBand.toOption.fold(ResultT.unit): band => 
+              SET.scienceBand.toOption.fold(ResultT.unit): band =>
                 ResultT:
                   Services.asSuperUser:
                     allocationService.validateBand(band, pids)
@@ -422,6 +431,9 @@ object ObservationService {
                 _ <- ResultT(g.toList.traverse { case (pid, oids) =>
                       obsAttachmentAssignmentService.setAssignments(pid, oids, SET.attachments)
                     }.map(_.sequence))
+                _ <- ResultT(Services.asSuperUser(g.toList.flatTraverse { case (pid, oids) =>
+                      oids.traverse(oid => blindOffsetsService.updateBlindOffset(pid, oid, SET.targetEnvironment))
+                    }.map(_.sequence)))
             } yield g
 
             for {
@@ -584,6 +596,7 @@ object ObservationService {
           SET.observingMode.flatMap(_.observingModeType),
           SET.observingMode.flatMap(_.observingModeType).map(_.instrument),
           SET.observerNotes,
+          SET.useBlindOffset.getOrElse(false)
         )
       }
 
@@ -602,6 +615,7 @@ object ObservationService {
       modeType:            Option[ObservingModeType],
       instrument:          Option[Instrument],
       observerNotes:       Option[NonEmptyString],
+      useBlindOffset:      Boolean,
     ): AppliedFragment = {
 
       val insert: AppliedFragment = {
@@ -660,6 +674,7 @@ object ObservationService {
            modeType                                                                                                                ,
            instrument                                                                                                              ,
            observerNotes                                                                                                           ,
+           useBlindOffset                                                                                                          ,
         )
       }
 
@@ -708,6 +723,7 @@ object ObservationService {
       Option[ObservingModeType]        ,
       Option[Instrument]               ,
       Option[NonEmptyString]           ,
+      Boolean                          ,
     )] =
       sql"""
         INSERT INTO t_observation (
@@ -746,7 +762,8 @@ object ObservationService {
           c_img_combined_filters,
           c_observing_mode_type,
           c_instrument,
-          c_observer_notes
+          c_observer_notes,
+          c_use_blind_offset
         )
         SELECT
           $program_id,
@@ -784,7 +801,8 @@ object ObservationService {
           ${bool.opt},
           ${observing_mode_type.opt},
           ${instrument.opt},
-          ${text_nonempty.opt}
+          ${text_nonempty.opt},
+          $bool
       """
 
     def selectObservingModes(
@@ -952,6 +970,7 @@ object ObservationService {
       val upSubtitle          = sql"c_subtitle = ${text_nonempty.opt}"
       val upScienceBand       = sql"c_science_band = ${science_band.opt}"
       val upObserverNotes     = sql"c_observer_notes = ${text_nonempty.opt}"
+      val upUseBlindOffset    = sql"c_use_blind_offset = $bool"
 
       val ups: List[AppliedFragment] =
         List(
@@ -959,6 +978,7 @@ object ObservationService {
           SET.subtitle.foldPresent(upSubtitle),
           SET.scienceBand.foldPresent(upScienceBand),
           SET.observerNotes.foldPresent(upObserverNotes),
+          SET.useBlindOffset.map(upUseBlindOffset)
         ).flatten
 
       val posAngleConstraint: List[AppliedFragment] =

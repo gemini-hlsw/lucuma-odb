@@ -60,6 +60,13 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
       Join(AsterismTargetTable.TargetId, TargetView.TargetId)
     )
 
+  private def blindOffsetTargetObject(name: String): SqlObject =
+    SqlObject(
+      name,
+      Join(ObservationView.Id, AsterismTargetTable.ObservationId),
+      Join(AsterismTargetTable.TargetId, TargetView.TargetId)
+    )
+
   lazy val TargetEnvironmentMapping: ObjectMapping =
     ObjectMapping(TargetEnvironmentType)(
       SqlField("programId", ObservationView.ProgramId, hidden = true),
@@ -67,6 +74,7 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
       asterismObject("asterism"),
       asterismObject("firstScienceTarget"),
       SqlObject("explicitBase"),
+      blindOffsetTargetObject("blindOffsetTarget"),
       EffectField("basePosition", basePositionQueryHandler, List("id", "programId")),
       EffectField("guideEnvironments", guideEnvironmentsQueryHandler, List("id", "programId")),
       EffectField("guideEnvironment", guideEnvironmentQueryHandler, List("id", "programId")),
@@ -80,6 +88,15 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
       oss    = List(OrderSelection[Target.Id](TargetType / "id")).some,
       offset = none,
       limit  = Option.when(firstOnly)(1),
+      child  = child
+    )
+
+  private def blindOffsetTargetQuery(child: Query): Query =
+    FilterOrderByOffsetLimit(
+      pred   = none, // Blind offset targets are handled via database joins, not GraphQL predicates
+      oss    = none,
+      offset = none,
+      limit  = 1.some,
       child  = child
     )
 
@@ -116,6 +133,11 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
       end   <- Elab.liftR(rEnd)
       env   <- Elab.env(AvailabilityStartParam -> start, AvailabilityEndParam -> end)
     } yield env
+
+    case (TargetEnvironmentType, "blindOffsetTarget", Nil) =>
+      Elab.transformChild { child =>
+        Unique(blindOffsetTargetQuery(child))
+      }
   }
 
   def basePositionQueryHandler: EffectHandler[F] = {
@@ -195,4 +217,3 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
     effectHandler(readEnv, calculate)
   }
 }
-
