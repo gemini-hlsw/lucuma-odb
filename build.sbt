@@ -49,7 +49,7 @@ val slf4jVersion               = "2.0.17"
 val testcontainersScalaVersion = "0.43.0" // check test output if you attempt to update this
 val weaverVersion              = "0.8.4"
 
-ThisBuild / tlBaseVersion      := "0.50"
+ThisBuild / tlBaseVersion      := "0.51"
 ThisBuild / scalaVersion       := "3.7.3"
 ThisBuild / crossScalaVersions := Seq("3.7.3")
 ThisBuild / scalacOptions     ++= Seq("-Xmax-inlines", "50") // Hash derivation fails with default of 32
@@ -118,7 +118,7 @@ ThisBuild / githubWorkflowBuildPreamble +=
         "approve-label" -> "expected-breaking-change"
       ),
     cond = Some("github.event_name == 'pull_request' && matrix.shard == '2'")
-  )  
+  )
 
 val nTestJobShards = 8
 
@@ -439,7 +439,7 @@ ThisBuild / ocsLocal       := ocsBuildInfo.value._4
 // Contains the grackle server
 lazy val itcService = project
   .in(file("itc/service"))
-  .dependsOn(itcModel.jvm)
+  .dependsOn(itcModel.jvm, binding)
   .enablePlugins(BuildInfoPlugin, LucumaDockerPlugin, JavaServerAppPackaging)
   .settings(itcCommonSettings)
   .settings(

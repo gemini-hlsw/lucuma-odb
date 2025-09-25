@@ -10,8 +10,7 @@ object TimeSpanBinding {
 
   val Microseconds: Matcher[TimeSpan] =
     LongBinding.emap { µs =>
-      TimeSpan
-        .FromMicroseconds
+      TimeSpan.FromMicroseconds
         .getOption(µs)
         .toRight(s"$µs is outside of the range for TimeSpan in µs")
     }
@@ -40,8 +39,7 @@ object TimeSpanBinding {
 
   val Iso: Matcher[TimeSpan] =
     StringBinding.emap { s =>
-      TimeSpan
-        .FromString
+      TimeSpan.FromString
         .getOption(s)
         .toRight(s"`$s` cannot be parsed as a valid ISO 8601 time string in TimeSpan range.")
     }
