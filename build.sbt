@@ -137,7 +137,7 @@ lazy val CheckoutFullWithLfs: WorkflowStep =
   WorkflowStep.Use(
     UseRef.Public("actions", "checkout", "v4"),
     name = Some("Checkout current branch (full)"),
-    params = Map("fetch-depth" -> "0")
+    params = Map("fetch-depth" -> "0", "lfs" -> "true")
   )
 
 ThisBuild / githubWorkflowJobSetup := {
