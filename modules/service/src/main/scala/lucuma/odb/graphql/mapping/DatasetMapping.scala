@@ -37,19 +37,20 @@ trait DatasetMapping[F[_]] extends DatasetTable[F]
 
   lazy val DatasetMapping: ObjectMapping =
     ObjectMapping(DatasetType)(
-      SqlField("id",           DatasetTable.Id,   key = true),
-      SqlObject("step",        Join(DatasetTable.StepId, StepRecordView.Id)),
-      SqlField("index",        DatasetTable.ExposureIndex),
-      SqlObject("reference",   Join(DatasetTable.Id, DatasetReferenceView.Id)),
-      SqlObject("observation", Join(DatasetTable.ObservationId, ObservationView.Id)),
-      SqlObject("visit",       Join(DatasetTable.StepId, StepRecordView.Id), Join(StepRecordView.AtomId, AtomRecordTable.Id), Join(AtomRecordTable.VisitId, VisitTable.Id)),
+      SqlField("id",             DatasetTable.Id,   key = true),
+      SqlObject("step",          Join(DatasetTable.StepId, StepRecordView.Id)),
+      SqlField("index",          DatasetTable.ExposureIndex),
+      SqlObject("reference",     Join(DatasetTable.Id, DatasetReferenceView.Id)),
+      SqlObject("observation",   Join(DatasetTable.ObservationId, ObservationView.Id)),
+      SqlObject("visit",         Join(DatasetTable.StepId, StepRecordView.Id), Join(StepRecordView.AtomId, AtomRecordTable.Id), Join(AtomRecordTable.VisitId, VisitTable.Id)),
       SqlObject("events"),
-      SqlField("filename",     DatasetTable.File.Name),
-      SqlField("qaState",      DatasetTable.QaState),
-      SqlField("comment",      DatasetTable.Comment),
+      SqlField("filename",       DatasetTable.File.Name),
+      SqlField("qaState",        DatasetTable.QaState),
+      SqlField("comment",        DatasetTable.Comment),
+      SqlField("idempotencyKey", DatasetTable.IdempotencyKey),
 
-      SqlField("start",        DatasetTable.Time.Start, hidden = true),
-      SqlField("end",          DatasetTable.Time.End, hidden = true),
+      SqlField("start",          DatasetTable.Time.Start, hidden = true),
+      SqlField("end",            DatasetTable.Time.End, hidden = true),
 
       CursorFieldJson("interval",
           cursor =>

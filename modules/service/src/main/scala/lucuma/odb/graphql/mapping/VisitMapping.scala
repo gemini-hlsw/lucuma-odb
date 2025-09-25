@@ -50,6 +50,7 @@ trait VisitMapping[F[_]] extends VisitTable[F]
       SqlObject("datasets"),
       SqlObject("events"),
       SqlObject("timeChargeInvoice"),
+      SqlField("idempotencyKey", VisitTable.IdempotencyKey),
       SqlObject("flamingos2", Join(VisitTable.Id, Flamingos2StaticTable.VisitId)),
       SqlObject("gmosNorth",  Join(VisitTable.Id, GmosNorthStaticTable.VisitId)),
       SqlObject("gmosSouth",  Join(VisitTable.Id, GmosSouthStaticTable.VisitId))

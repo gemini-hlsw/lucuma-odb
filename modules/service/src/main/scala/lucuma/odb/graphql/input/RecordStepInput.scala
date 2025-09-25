@@ -13,6 +13,7 @@ import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosSouth
+import lucuma.core.util.IdempotencyKey
 import lucuma.odb.graphql.binding.*
 
 case class RecordStepInput[A](
@@ -21,7 +22,8 @@ case class RecordStepInput[A](
   stepConfig:      StepConfig,
   telescopeConfig: TelescopeConfig,
   observeClass:    ObserveClass,
-  generatedId:     Option[Step.Id]
+  generatedId:     Option[Step.Id],
+  idempotencyKey:  Option[IdempotencyKey]
 )
 
 object RecordStepInput:
@@ -30,19 +32,18 @@ object RecordStepInput:
     instrumentName:    String,
     instrumentMatcher: Matcher[A]
   ): Matcher[RecordStepInput[A]] =
-    ObjectFieldsBinding.rmap {
+    ObjectFieldsBinding.rmap:
       case List(
         AtomIdBinding("atomId", rAtomId),
         instrumentMatcher(`instrumentName`, rInstrument),
         StepConfigInput.Binding("stepConfig", rStepConfig),
         TelescopeConfigInput.Binding.Option("telescopeConfig", rTelescopeConfig),
         ObserveClassBinding("observeClass", rObserveClass),
-        StepIdBinding.Option("generatedId", rGenerated)
-      ) => (rAtomId, rInstrument, rStepConfig, rTelescopeConfig, rObserveClass, rGenerated).parMapN {
-        (atomId, instrument, step, telescope, oclass, generated) =>
-        RecordStepInput(atomId, instrument, step, telescope.getOrElse(TelescopeConfig.Default), oclass, generated)
-      }
-    }
+        StepIdBinding.Option("generatedId", rGenerated),
+        IdempotencyKeyBinding.Option("idempotencyKey", rIdm)
+      ) => (rAtomId, rInstrument, rStepConfig, rTelescopeConfig, rObserveClass, rGenerated, rIdm).parMapN:
+        (atomId, instrument, step, telescope, oclass, generated, idm) =>
+          RecordStepInput(atomId, instrument, step, telescope.getOrElse(TelescopeConfig.Default), oclass, generated, idm)
 
   val Flamingos2Binding: Matcher[RecordStepInput[Flamingos2DynamicConfig]] =
     binding("flamingos2", Flamingos2DynamicInput.Binding)

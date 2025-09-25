@@ -40,6 +40,7 @@ import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosSouth
 import lucuma.core.model.sequence.gmos.StaticConfig.GmosNorth as GmosNorthStatic
 import lucuma.core.model.sequence.gmos.StaticConfig.GmosSouth as GmosSouthStatic
+import lucuma.core.util.IdempotencyKey
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
@@ -81,10 +82,11 @@ trait SequenceService[F[_]]:
   )(using Transaction[F], Services.ServiceAccess): F[Unit]
 
   def insertAtomRecord(
-    visitId:      Visit.Id,
-    instrument:   Instrument,
-    sequenceType: SequenceType,
-    generatedId:  Option[Atom.Id]
+    visitId:        Visit.Id,
+    instrument:     Instrument,
+    sequenceType:   SequenceType,
+    generatedId:    Option[Atom.Id],
+    idempotencyKey: Option[IdempotencyKey]
   )(using Transaction[F], Services.ServiceAccess): F[Result[Atom.Id]]
 
   def insertFlamingos2StepRecord(
@@ -94,6 +96,7 @@ trait SequenceService[F[_]]:
     telescope:      TelescopeConfig,
     observeClass:   ObserveClass,
     generatedId:    Option[Step.Id],
+    idempotencyKey: Option[IdempotencyKey],
     timeCalculator: TimeEstimateCalculator[Flamingos2StaticConfig, Flamingos2DynamicConfig]
   )(using Transaction[F], Services.ServiceAccess): F[Result[Step.Id]]
 
@@ -104,6 +107,7 @@ trait SequenceService[F[_]]:
     telescope:      TelescopeConfig,
     observeClass:   ObserveClass,
     generatedId:    Option[Step.Id],
+    idempotencyKey: Option[IdempotencyKey],
     timeCalculator: TimeEstimateCalculator[GmosNorthStatic, GmosNorth]
   )(using Transaction[F], Services.ServiceAccess): F[Result[Step.Id]]
 
@@ -114,6 +118,7 @@ trait SequenceService[F[_]]:
     telescope:      TelescopeConfig,
     observeClass:   ObserveClass,
     generatedId:    Option[Step.Id],
+    idempotencyKey: Option[IdempotencyKey],
     timeCalculator: TimeEstimateCalculator[GmosSouthStatic, GmosSouth]
   )(using Transaction[F], Services.ServiceAccess): F[Result[Step.Id]]
 
@@ -258,25 +263,27 @@ object SequenceService:
 
       @annotation.nowarn("msg=unused implicit parameter")
       def insertAtomRecordImpl(
-        visitId:      Visit.Id,
-        instrument:   Instrument,
-        sequenceType: SequenceType,
-        generatedId:  Option[Atom.Id]
+        visitId:        Visit.Id,
+        instrument:     Instrument,
+        sequenceType:   SequenceType,
+        generatedId:    Option[Atom.Id],
+        idempotencyKey: Option[IdempotencyKey]
       )(using Transaction[F], Services.ServiceAccess): F[InsertAtomResponse] =
         val v = visitService.select(visitId).map(_.filter(_.instrument === instrument))
         (for
-          inv <- EitherT.fromOptionF(v, InsertAtomResponse.VisitNotFound(visitId, instrument))
-          aid <- EitherT.right[InsertAtomResponse](UUIDGen[F].randomUUID.map(Atom.Id.fromUuid))
-          _   <- EitherT.right[InsertAtomResponse](session.execute(Statements.InsertAtom)(aid, inv.observationId, visitId, instrument, sequenceType, generatedId))
-        yield InsertAtomResponse.Success(aid)).merge
+          inv  <- EitherT.fromOptionF(v, InsertAtomResponse.VisitNotFound(visitId, instrument))
+          aid  <- EitherT.right[InsertAtomResponse](UUIDGen[F].randomUUID.map(Atom.Id.fromUuid))
+          aidʹ <- EitherT.right[InsertAtomResponse](session.unique(Statements.InsertAtom)(aid, inv.observationId, visitId, instrument, sequenceType, generatedId, idempotencyKey))
+        yield InsertAtomResponse.Success(aidʹ)).merge
 
       override def insertAtomRecord(
-        visitId:      Visit.Id,
-        instrument:   Instrument,
-        sequenceType: SequenceType,
-        generatedId:  Option[Atom.Id]
+        visitId:        Visit.Id,
+        instrument:     Instrument,
+        sequenceType:   SequenceType,
+        generatedId:    Option[Atom.Id],
+        idempotencyKey: Option[IdempotencyKey]
       )(using Transaction[F], Services.ServiceAccess): F[Result[Atom.Id]] =
-        insertAtomRecordImpl(visitId, instrument, sequenceType, generatedId).map:
+        insertAtomRecordImpl(visitId, instrument, sequenceType, generatedId, idempotencyKey).map:
           case InsertAtomResponse.VisitNotFound(id, instrument) => OdbError.InvalidVisit(id, Some(s"Visit '$id' not found or is not a ${instrument.longName} visit")).asFailure
           case InsertAtomResponse.Success(aid)                  => Result.success(aid)
 
@@ -300,6 +307,7 @@ object SequenceService:
         telescopeConfig:     TelescopeConfig,
         observeClass:        ObserveClass,
         generatedId:         Option[Step.Id],
+        idempotencyKey:      Option[IdempotencyKey],
         timeEstimate:        (S, TimeEstimateCalculator.Last[D]) => StepEstimate,
         estimatorState:      Observation.Id => F[Option[(S, TimeEstimateCalculator.Last[D])]],
         insertDynamicConfig: Step.Id => F[Unit]
@@ -307,14 +315,16 @@ object SequenceService:
         val foo = session.option(Statements.SelectObservationId)((atomId, instrument))
         val fos = OptionT(foo).flatMap(o => OptionT(estimatorState(o))).value
         (for {
-          sid <- EitherT.right(UUIDGen[F].randomUUID.map(Step.Id.fromUuid))
-          es  <- EitherT.fromOptionF(fos, AtomNotFound(atomId, instrument))
-          _   <- EitherT.right(session.execute(Statements.InsertStep)(
-                   sid, atomId, instrument, stepConfig.stepType, telescopeConfig, observeClass, generatedId, timeEstimate.tupled(es).total
-                 )).void
-          _   <- EitherT.right(insertStepConfig(sid, stepConfig))
-          _   <- EitherT.right(insertDynamicConfig(sid))
-        } yield Success(sid)).merge.map:
+          sid  <- EitherT.right(UUIDGen[F].randomUUID.map(Step.Id.fromUuid))
+          es   <- EitherT.fromOptionF(fos, AtomNotFound(atomId, instrument))
+          sidʹ <- EitherT.right(session.unique(Statements.InsertStep)(
+                    sid, atomId, instrument, stepConfig.stepType, telescopeConfig, observeClass, generatedId, idempotencyKey, timeEstimate.tupled(es).total
+                  ))
+                  // If the insertion uses the given random step id, it must be new.  Otherwise, we are
+                  // returning an existing one.
+          _    <- if sid === sidʹ then EitherT.right(insertStepConfig(sidʹ, stepConfig)) else EitherT.pure(())
+          _    <- if sid === sidʹ then EitherT.right(insertDynamicConfig(sidʹ)) else EitherT.pure(())
+        } yield Success(sidʹ)).merge.map:
           case AtomNotFound(id, instrument)  => OdbError.InvalidAtom(id, Some(s"Atom '$id' not found or is not a ${instrument.longName} atom")).asFailure
           case Success(sid)                  => Result(sid)
 
@@ -325,6 +335,7 @@ object SequenceService:
         telescopeConfig: TelescopeConfig,
         observeClass:    ObserveClass,
         generatedId:     Option[Step.Id],
+        idempotencyKey:  Option[IdempotencyKey],
         timeCalculator:  TimeEstimateCalculator[Flamingos2StaticConfig, Flamingos2DynamicConfig]
       )(using Transaction[F], Services.ServiceAccess): F[Result[Step.Id]] =
         insertStepRecord(
@@ -334,6 +345,7 @@ object SequenceService:
           telescopeConfig,
           observeClass,
           generatedId,
+          idempotencyKey,
           timeCalculator.estimateStep(_, _, ProtoStep(dynamicConfig, stepConfig, telescopeConfig, observeClass)),
           selectFlamingos2EstimatorState,
           sid => flamingos2SequenceService.insertDynamic(sid, dynamicConfig)
@@ -346,6 +358,7 @@ object SequenceService:
         telescopeConfig: TelescopeConfig,
         observeClass:    ObserveClass,
         generatedId:     Option[Step.Id],
+        idempotencyKey:  Option[IdempotencyKey],
         timeCalculator:  TimeEstimateCalculator[GmosNorthStatic, GmosNorth]
       )(using Transaction[F], Services.ServiceAccess): F[Result[Step.Id]] =
         insertStepRecord(
@@ -355,6 +368,7 @@ object SequenceService:
           telescopeConfig,
           observeClass,
           generatedId,
+          idempotencyKey,
           timeCalculator.estimateStep(_, _, ProtoStep(dynamicConfig, stepConfig, telescopeConfig, observeClass)),
           selectGmosNorthEstimatorState,
           sid => gmosSequenceService.insertGmosNorthDynamic(sid, dynamicConfig)
@@ -367,6 +381,7 @@ object SequenceService:
         telescopeConfig: TelescopeConfig,
         observeClass:    ObserveClass,
         generatedId:     Option[Step.Id],
+        idempotencyKey:  Option[IdempotencyKey],
         timeCalculator:  TimeEstimateCalculator[GmosSouthStatic, GmosSouth]
       )(using Transaction[F], Services.ServiceAccess): F[Result[Step.Id]] =
         insertStepRecord(
@@ -376,6 +391,7 @@ object SequenceService:
           telescopeConfig,
           observeClass,
           generatedId,
+          idempotencyKey,
           timeCalculator.estimateStep(_, _, ProtoStep(dynamicConfig, stepConfig, telescopeConfig, observeClass)),
           selectGmosSouthEstimatorState,
           sid => gmosSequenceService.insertGmosSouthDynamic(sid, dynamicConfig)
@@ -415,14 +431,15 @@ object SequenceService:
          WHERE c_atom_id = $atom_id AND c_instrument = $instrument
       """.query(observation_id)
 
-    val InsertAtom: Command[(
+    val InsertAtom: Query[(
       Atom.Id,
       Observation.Id,
       Visit.Id,
       Instrument,
       SequenceType,
-      Option[Atom.Id]
-    )] =
+      Option[Atom.Id],
+      Option[IdempotencyKey]
+    ), Atom.Id] =
       sql"""
         INSERT INTO t_atom_record (
           c_atom_id,
@@ -430,17 +447,23 @@ object SequenceService:
           c_visit_id,
           c_instrument,
           c_sequence_type,
-          c_generated_id
+          c_generated_id,
+          c_idempotency_key
         ) SELECT
           $atom_id,
           $observation_id,
           $visit_id,
           $instrument,
           $sequence_type,
-          ${atom_id.opt}
-      """.command
+          ${atom_id.opt},
+          ${idempotency_key.opt}
+        ON CONFLICT (c_idempotency_key) DO UPDATE
+          SET c_idempotency_key = EXCLUDED.c_idempotency_key
+        RETURNING
+          c_atom_id
+      """.query(atom_id)
 
-    val InsertStep: Command[(
+    val InsertStep: Query[(
       Step.Id,
       Atom.Id,
       Instrument,
@@ -448,8 +471,9 @@ object SequenceService:
       TelescopeConfig,
       ObserveClass,
       Option[Step.Id],
+      Option[IdempotencyKey],
       TimeSpan,
-    )] =
+    ), Step.Id] =
       sql"""
         INSERT INTO t_step_record (
           c_step_id,
@@ -462,6 +486,7 @@ object SequenceService:
           c_guide_state,
           c_observe_class,
           c_generated_id,
+          c_idempotency_key,
           c_time_estimate
         ) SELECT
           $step_id,
@@ -479,8 +504,13 @@ object SequenceService:
           $telescope_config,
           $obs_class,
           ${step_id.opt},
+          ${idempotency_key.opt},
           $time_span
-      """.command.contramap { (s, a, i, st, tc, oc, g, d) => (s, a, a, i, st, tc, oc, g, d) }
+        ON CONFLICT (c_idempotency_key) DO UPDATE
+          SET c_idempotency_key = EXCLUDED.c_idempotency_key
+        RETURNING
+          c_step_id
+      """.query(step_id).contramap { (s, a, i, st, tc, oc, g, idm, d) => (s, a, a, i, st, tc, oc, g, idm, d) }
 
     private def insertStepConfigFragment(table: String, columns: List[String]): Fragment[Void] =
       sql"""

@@ -29,7 +29,6 @@ input AddAtomEventInput {
   "deprecated: use idempotencyKey instead"
   clientId: ClientId
 
-
   """
   Idempotency key, if any.  The IdempotencyKey may be provided by clients when
   the event is created and is used to enable problem-free retry in the case of
@@ -307,6 +306,13 @@ type AtomRecord {
 
   "Atom ID from the generated atom, if any, that produced this atom record."
   generatedId: AtomId
+
+  """
+  Idempotency key, if any.  The IdempotencyKey may be provided by clients when
+  the atom is created and is used to enable problem-free retry in the case of
+  failure.
+  """
+  idempotencyKey: IdempotencyKey
 }
 
 "AtomRecord query results, limited to a maximum of 1000 entries."
@@ -4292,6 +4298,13 @@ input RecordAtomInput {
   instrument: Instrument!
   sequenceType: SequenceType!
   generatedId: AtomId
+
+  """
+  Idempotency key, if any.  The IdempotencyKey may be provided by clients when
+  the atom is created and is used to enable problem-free retry in the case of
+  failure.
+  """
+  idempotencyKey: IdempotencyKey
 }
 
 "The result of recording an atom."
@@ -4313,6 +4326,13 @@ input RecordDatasetInput {
 
   "Dataset comment."
   comment: NonEmptyString
+
+  """
+  Idempotency key, if any.  The IdempotencyKey may be provided by clients when
+  the dataset is created and is used to enable problem-free retry in the case of
+  failure.
+  """
+  idempotencyKey: IdempotencyKey
 }
 
 "The result of recording a new dataset."
@@ -4329,6 +4349,13 @@ input RecordGmosNorthStepInput {
   telescopeConfig: TelescopeConfigInput
   observeClass: ObserveClass!
   generatedId: StepId
+
+  """
+  Idempotency key, if any.  The IdempotencyKey may be provided by clients when
+  the step is created and is used to enable problem-free retry in the case of
+  failure.
+  """
+  idempotencyKey: IdempotencyKey
 }
 
 """
@@ -4347,6 +4374,13 @@ Input parameters for creating a new GmosNorthVisit
 input RecordGmosNorthVisitInput {
   observationId: ObservationId!
   gmosNorth: GmosNorthStaticInput!
+
+  """
+  Idempotency key, if any.  The IdempotencyKey may be provided by clients when
+  the visit is created and is used to enable problem-free retry in the case of
+  failure.
+  """
+  idempotencyKey: IdempotencyKey
 }
 
 """
@@ -4369,6 +4403,13 @@ input RecordGmosSouthStepInput {
   telescopeConfig: TelescopeConfigInput
   observeClass: ObserveClass!
   generatedId: StepId
+
+  """
+  Idempotency key, if any.  The IdempotencyKey may be provided by clients when
+  the step is created and is used to enable problem-free retry in the case of
+  failure.
+  """
+  idempotencyKey: IdempotencyKey
 }
 
 """
@@ -4387,6 +4428,13 @@ Input parameters for creating a new GmosSouthVisit
 input RecordGmosSouthVisitInput {
   observationId: ObservationId!
   gmosSouth: GmosSouthStaticInput!
+
+  """
+  Idempotency key, if any.  The IdempotencyKey may be provided by clients when
+  the visit is created and is used to enable problem-free retry in the case of
+  failure.
+  """
+  idempotencyKey: IdempotencyKey
 }
 
 """
@@ -6682,6 +6730,13 @@ type Dataset {
   "Dataset comment, if any has been set."
   comment: NonEmptyString
 
+  """
+  Idempotency key, if any.  The IdempotencyKey may be provided by clients when
+  the dataset is created and is used to enable problem-free retry in the case of
+  failure.
+  """
+  idempotencyKey: IdempotencyKey
+
   "Dataset time interval, if the dataset collection has started."
   interval: TimestampInterval
 
@@ -7378,6 +7433,13 @@ input RecordFlamingos2StepInput {
   telescopeConfig: TelescopeConfigInput
   observeClass: ObserveClass!
   generatedId: StepId
+
+  """
+  Idempotency key, if any.  The IdempotencyKey may be provided by clients when
+  the step is created and is used to enable problem-free retry in the case of
+  failure.
+  """
+  idempotencyKey: IdempotencyKey
 }
 
 """
@@ -7396,6 +7458,13 @@ Input parameters for creating a new Flamingos 2 Visit
 input RecordFlamingos2VisitInput {
   observationId: ObservationId!
   flamingos2:    Flamingos2StaticInput!
+
+  """
+  Idempotency key, if any.  The IdempotencyKey may be provided by clients when
+  the visit is created and is used to enable problem-free retry in the case of
+  failure.
+  """
+  idempotencyKey: IdempotencyKey
 }
 
 """
@@ -13383,6 +13452,13 @@ type StepRecord {
   generatedId: StepId
 
   """
+  Idempotency key, if any.  The IdempotencyKey may be provided by clients when
+  the step is created and is used to enable problem-free retry in the case of
+  failure.
+  """
+  idempotencyKey: IdempotencyKey
+
+  """
   Flamingos 2 instrument configuration for this step, if any.  This will be null
   unless the `instrument` discriminator is "FLAMINGOS2".
   """
@@ -14197,6 +14273,13 @@ type Visit {
 
   "Time accounting details for this visit."
   timeChargeInvoice: TimeChargeInvoice!
+
+  """
+  Idempotency key, if any.  The IdempotencyKey may be provided by clients when
+  the visit is created and is used to enable problem-free retry in the case of
+  failure.
+  """
+  idempotencyKey: IdempotencyKey
 
   """
   Flamingos 2 static instrument configuration, for Flamingos 2 visits.  See the

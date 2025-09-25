@@ -7,6 +7,7 @@ import lucuma.odb.graphql.BaseMapping
 import lucuma.odb.util.Codecs.core_timestamp
 import lucuma.odb.util.Codecs.dataset_id
 import lucuma.odb.util.Codecs.dataset_qa_state
+import lucuma.odb.util.Codecs.idempotency_key
 import lucuma.odb.util.Codecs.int4_pos
 import lucuma.odb.util.Codecs.observation_id
 import lucuma.odb.util.Codecs.observation_reference
@@ -37,8 +38,9 @@ trait DatasetTable[F[_]] extends BaseMapping[F] {
       val Name: ColumnRef  = col("c_filename",   varchar_nonempty)
     }
 
-    val QaState: ColumnRef     = col("c_qa_state", dataset_qa_state.opt)
-    val Comment: ColumnRef     = col("c_comment",  text_nonempty.opt)
+    val QaState: ColumnRef        = col("c_qa_state",        dataset_qa_state.opt)
+    val Comment: ColumnRef        = col("c_comment",         text_nonempty.opt)
+    val IdempotencyKey: ColumnRef = col("c_idempotency_key", idempotency_key.opt)
 
     object Time {
       val Start: ColumnRef     = col("c_start_time", core_timestamp.opt)

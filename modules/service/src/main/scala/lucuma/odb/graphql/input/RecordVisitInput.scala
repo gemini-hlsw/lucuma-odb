@@ -9,26 +9,28 @@ import lucuma.core.model.Observation
 import lucuma.core.model.sequence.flamingos2.Flamingos2StaticConfig
 import lucuma.core.model.sequence.gmos.StaticConfig.GmosNorth
 import lucuma.core.model.sequence.gmos.StaticConfig.GmosSouth
+import lucuma.core.util.IdempotencyKey
 import lucuma.odb.graphql.binding.*
 
 case class RecordVisitInput[A](
-  observationId: Observation.Id,
-  static:        A
+  observationId:  Observation.Id,
+  static:         A,
+  idempotencyKey: Option[IdempotencyKey]
 )
 
-object RecordVisitInput {
+object RecordVisitInput:
 
   private def binding[A](
     instrumentName: String,
     staticMatcher:  Matcher[A]
   ): Matcher[RecordVisitInput[A]] =
-    ObjectFieldsBinding.rmap {
+    ObjectFieldsBinding.rmap:
       case List(
         ObservationIdBinding("observationId", rObservationId),
-        staticMatcher(`instrumentName`, rStatic)
+        staticMatcher(`instrumentName`, rStatic),
+        IdempotencyKeyBinding.Option("idempotencyKey", rIdm)
       ) =>
-        (rObservationId, rStatic).parMapN(RecordVisitInput(_, _))
-    }
+        (rObservationId, rStatic, rIdm).parMapN(RecordVisitInput(_, _, _))
 
   val Flamingos2Binding: Matcher[RecordVisitInput[Flamingos2StaticConfig]] =
     binding("flamingos2", Flamingos2StaticInput.Binding)
@@ -38,5 +40,3 @@ object RecordVisitInput {
 
   val GmosSouthBinding: Matcher[RecordVisitInput[GmosSouth]] =
     binding("gmosSouth", GmosSouthStaticInput.Binding)
-
-}

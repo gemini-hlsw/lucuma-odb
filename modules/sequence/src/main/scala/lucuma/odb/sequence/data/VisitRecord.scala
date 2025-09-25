@@ -7,13 +7,15 @@ import lucuma.core.enums.Instrument
 import lucuma.core.enums.Site
 import lucuma.core.model.Observation
 import lucuma.core.model.Visit
+import lucuma.core.util.IdempotencyKey
 import lucuma.core.util.Timestamp
 
 case class VisitRecord(
-  visitId:       Visit.Id,
-  observationId: Observation.Id,
-  instrument:    Instrument,
-  created:       Timestamp,
-  site:          Site,
-  chargeable:    Boolean
+  visitId:        Visit.Id,
+  observationId:  Observation.Id,
+  instrument:     Instrument,
+  created:        Timestamp,
+  site:           Site,
+  chargeable:     Boolean,
+  idempotencyKey: Option[IdempotencyKey]
 )

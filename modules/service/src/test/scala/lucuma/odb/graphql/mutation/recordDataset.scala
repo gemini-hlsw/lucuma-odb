@@ -6,6 +6,7 @@ package mutation
 
 import cats.effect.IO
 import cats.syntax.either.*
+import cats.syntax.eq.*
 import cats.syntax.option.*
 import io.circe.Json
 import io.circe.literal.*
@@ -16,7 +17,9 @@ import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Atom
+import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.Step
+import lucuma.core.util.IdempotencyKey
 
 class recordDataset extends OdbSuite {
 
@@ -279,5 +282,39 @@ class recordDataset extends OdbSuite {
             }
           """
         ))
+
+  test("recordDataset - idempotencyKey"):
+    val idm = IdempotencyKey.FromString.getOption("7304956b-45ab-45b6-8db1-ae6f743b519c").get
+
+    def recordDataset(sid: Step.Id): IO[(Dataset.Id, IdempotencyKey)] =
+      query(
+        user  = service,
+        query = s"""
+          mutation {
+            recordDataset(input: {
+              stepId: "$sid"
+              filename: "N18630101S0006.fits"
+              idempotencyKey: "${IdempotencyKey.FromString.reverseGet(idm)}"
+            }) {
+              dataset {
+                id
+                idempotencyKey
+              }
+            }
+          }
+        """
+      ).map: js =>
+        val d = js.hcursor.downFields("recordDataset", "dataset")
+        (
+          d.downField("id").require[Dataset.Id],
+          d.downField("idempotencyKey").require[IdempotencyKey]
+        )
+
+    assertIOBoolean:
+      for
+        (_, _, _, _, s) <- setup(ObservingModeType.GmosNorthLongSlit, service)
+        (d0, k0)        <- recordDataset(s)
+        (d1, k1)        <- recordDataset(s)
+      yield (d0 === d1) && (k0 === idm) && (k1 === idm)
 
 }

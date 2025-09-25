@@ -13,6 +13,7 @@ import lucuma.odb.util.Codecs.gcal_diffuser
 import lucuma.odb.util.Codecs.gcal_filter
 import lucuma.odb.util.Codecs.gcal_shutter
 import lucuma.odb.util.Codecs.guide_state
+import lucuma.odb.util.Codecs.idempotency_key
 import lucuma.odb.util.Codecs.instrument
 import lucuma.odb.util.Codecs.int4_pos
 import lucuma.odb.util.Codecs.obs_class
@@ -37,6 +38,7 @@ trait StepRecordView[F[_]] extends BaseMapping[F]:
     val Completed: ColumnRef      = col("c_completed",       core_timestamp.opt)
     val ExecutionState: ColumnRef = col("c_execution_state", step_execution_state)
     val GeneratedId: ColumnRef    = col("c_generated_id",    step_id.opt)
+    val IdempotencyKey: ColumnRef = col("c_idempotency_key", idempotency_key.opt)
     val QaState: ColumnRef        = col("c_qa_state",        dataset_qa_state.opt)
 
     val FirstEvent: ColumnRef     = col("c_first_event_time", core_timestamp.opt)
