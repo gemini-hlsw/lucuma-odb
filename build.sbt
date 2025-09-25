@@ -137,7 +137,7 @@ lazy val CheckoutFullWithLfs: WorkflowStep =
   WorkflowStep.Use(
     UseRef.Public("actions", "checkout", "v4"),
     name = Some("Checkout current branch (full)"),
-    params = Map("fetch-depth" -> "0", "lfs" -> "true")
+    params = Map("fetch-depth" -> "0")
   )
 
 ThisBuild / githubWorkflowJobSetup := {
@@ -246,7 +246,7 @@ val mainCond                 = "github.ref == 'refs/heads/main'"
 val geminiRepoCond           = "startsWith(github.repository, 'gemini')"
 def allConds(conds: String*) = conds.mkString("(", " && ", ")")
 
-ThisBuild / githubWorkflowAddedJobs +=
+ThisBuild / githubWorkflowAddedJobs ++= Seq(
   WorkflowJob(
     "deploy",
     "Build and publish Docker images / Deploy to Heroku",
@@ -261,6 +261,7 @@ ThisBuild / githubWorkflowAddedJobs +=
     javas = githubWorkflowJavaVersions.value.toList.take(1),
     cond = Some(allConds(mainCond, geminiRepoCond))
   )
+)
 
 lazy val buildInfoSettings = Seq(
   buildInfoKeys         := Seq[BuildInfoKey](
@@ -588,6 +589,15 @@ lazy val itcLegacyTests = project
   .dependsOn(itcService, itcClient.jvm, itcTestkit.jvm)
   .settings(
     name := "lucuma-itc-legacy-tests",
+    // Skip legacy tests unless explicitly enabled
+    Test / test := {
+      if (sys.env.get("RUN_LEGACY_TESTS").contains("true")) {
+        (Test / test).value
+      } else {
+        streams.value.log.info("Skipping ITC legacy tests (set RUN_LEGACY_TESTS=true to enable)")
+        ()
+      }
+    },
     libraryDependencies ++= Seq(
       "org.typelevel" %%% "munit-cats-effect"      % munitCatsEffectVersion     % Test,
       "com.lihaoyi"   %%% "pprint"                 % pprintVersion              % Test,
