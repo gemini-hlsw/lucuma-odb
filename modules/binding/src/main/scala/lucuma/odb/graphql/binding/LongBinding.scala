@@ -9,15 +9,15 @@ import grackle.Value
 import scala.util.control.NonFatal
 
 val LongBinding: Matcher[Long] = {
-  case Value.IntValue(v)     => v.toLong.asRight
-  case v@Value.FloatValue(double) =>
+  case Value.IntValue(v)            => v.toLong.asRight
+  case v @ Value.FloatValue(double) =>
     lazy val long = double.toLong
     if double.isWhole && long.toDouble == double then long.asRight
     else s"Expected Long, got $v".asLeft
-  case Value.StringValue(v)  =>
+  case Value.StringValue(v)         =>
     try v.toLong.asRight
     catch { case NonFatal(e) => s"Invalid Long: $v: ${e.getMessage}".asLeft }
-  case Value.NullValue       => s"cannot be null".asLeft
-  case Value.AbsentValue     => s"cannot be absent".asLeft
-  case other                 => s"Expected Long, got $other".asLeft
+  case Value.NullValue              => s"cannot be null".asLeft
+  case Value.AbsentValue            => s"cannot be absent".asLeft
+  case other                        => s"Expected Long, got $other".asLeft
 }

@@ -7,9 +7,9 @@ import lucuma.core.math.SignalToNoise
 
 val SignalToNoiseBinding: Matcher[SignalToNoise] =
   BigDecimalBinding.emap { bd =>
-    SignalToNoise
-      .FromBigDecimalExact
+    SignalToNoise.FromBigDecimalExact
       .getOption(bd)
-      .toRight(s"Signal-to-noise out of range [${SignalToNoise.Min.toBigDecimal}, ${SignalToNoise.Max.toBigDecimal}] with scale 3: $bd")
+      .toRight(
+        s"Signal-to-noise out of range [${SignalToNoise.Min.toBigDecimal}, ${SignalToNoise.Max.toBigDecimal}] with scale 3: $bd"
+      )
   }
-
