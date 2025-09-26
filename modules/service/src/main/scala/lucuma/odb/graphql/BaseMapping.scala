@@ -169,6 +169,7 @@ trait BaseMapping[F[_]]
   lazy val GmosCustomSlitWidthType                 = schema.ref("GmosCustomSlitWidth")
   lazy val GmosDtaxType                            = schema.ref("GmosDtax")
   lazy val GmosGratingOrderType                    = schema.ref("GmosGratingOrder")
+  lazy val GmosImagingTypeType                     = schema.ref("GmosImagingType")
   lazy val GmosNorthAtomType                       = schema.ref("GmosNorthAtom")
   lazy val GmosNorthBuiltinFpuType                 = schema.ref("GmosNorthBuiltinFpu")
   lazy val GmosNorthDetectorType                   = schema.ref("GmosNorthDetector")
@@ -232,6 +233,7 @@ trait BaseMapping[F[_]]
   lazy val NonNegShortType                         = schema.ref("NonNegShort")
   lazy val NonsiderealType                         = schema.ref("Nonsidereal")
   lazy val ObscalcUpdateType                       = schema.ref("ObscalcUpdate")
+  lazy val OffsetGeneratorTypeType                 = schema.ref("OffsetGeneratorType")
   lazy val OffsetPType                             = schema.ref("OffsetP")
   lazy val OffsetQType                             = schema.ref("OffsetQ")
   lazy val OffsetType                              = schema.ref("Offset")
@@ -395,6 +397,7 @@ trait BaseMapping[F[_]]
   lazy val VisitIdType                             = schema.ref("VisitId")
   lazy val VisitSelectResultType                   = schema.ref("VisitSelectResult")
   lazy val WaterVaporType                          = schema.ref("WaterVapor")
+  lazy val WavelengthOrderType                     = schema.ref("WavelengthOrder")
   lazy val WavelengthType                          = schema.ref("Wavelength")
 
 }

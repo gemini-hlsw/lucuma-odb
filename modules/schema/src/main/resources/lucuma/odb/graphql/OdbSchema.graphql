@@ -1768,6 +1768,28 @@ enum GmosGratingOrder {
   TWO
 }
 
+"""
+GMOS imaging observation variations.
+"""
+enum GmosImagingType {
+  """
+  Datasets for each filter are grouped so that they are executed together in a
+  block.
+  """
+  GROUPED_FILTERS
+
+  """
+  Datasets for each filter are interleaved so that they are executed one after
+  another in repeating blocks.
+  """
+  INTERLEAVED_FILTERS
+
+  """
+  Imaging for the purpose of preparing a MOS mask.
+  """
+  MOS_PRE_IMAGING
+}
+
 type GmosNodAndShuffle {
   """
   Offset position A
@@ -3509,6 +3531,13 @@ input OffsetComponentInput {
   Angle in arcsec
   """
   arcseconds: BigDecimal
+}
+
+enum OffsetGeneratorType {
+  NONE
+  GRID
+  RANDOM
+  SPIRAL
 }
 
 """
@@ -14390,6 +14419,11 @@ type WavelengthDither {
   Wavelength dither in µm
   """
   micrometers: BigDecimal!
+}
+
+enum WavelengthOrder {
+  INCREASING
+  DECREASING
 }
 
 input WhereAngle {

@@ -39,6 +39,7 @@ import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.model.sequence.TimeChargeCorrection
+import lucuma.core.optics.Format
 import lucuma.core.util.CalculationState
 import lucuma.core.util.DateInterval
 import lucuma.core.util.Enumerated
@@ -92,9 +93,12 @@ trait Codecs {
       .imap[List[A]](_.flattenTo(List))(Arr.fromFoldable)
 
   private def codecFromPrism[A](prism: Prism[String, A], tpe: Type): Codec[A] =
+    codecFromFormat(Format.fromPrism(prism), tpe)
+
+  private def codecFromFormat[A](format: Format[String, A], tpe: Type): Codec[A] =
     Codec.simple(
-      prism.reverseGet,
-      s => prism.getOption(s).toRight(s"Invalid: $s"),
+      format.reverseGet,
+      s => format.getOption(s).toRight(s"Invalid: $s"),
       tpe
     )
 
@@ -328,7 +332,7 @@ trait Codecs {
     }
 
   val idempotency_key: Codec[IdempotencyKey] =
-    codecFromPrism(IdempotencyKey.FromString, Type.uuid)
+    codecFromFormat(IdempotencyKey.FromString, Type.uuid)
 
   val image_quality_preset: Codec[ImageQuality.Preset] =
     enumerated[ImageQuality.Preset](Type.varchar)

@@ -131,6 +131,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[GmosCustomSlitWidth](GmosCustomSlitWidthType),
       LeafMapping[GmosDtax](GmosDtaxType),
       LeafMapping[GmosGratingOrder](GmosGratingOrderType),
+      LeafMapping[GmosImagingType](GmosImagingTypeType),
       LeafMapping[GmosNorthFpu](GmosNorthBuiltinFpuType),
       LeafMapping[GmosNorthDetector](GmosNorthDetectorType),
       LeafMapping[GmosNorthFilter](GmosNorthFilterType),
@@ -162,6 +163,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[ObservationReference](ObservationReferenceLabelType),
       LeafMapping[ObservationWorkflowState](ObservationWorkflowStateType),
       LeafMapping[ObserveClass](ObserveClassType),
+      LeafMapping[OffsetGeneratorType](OffsetGeneratorTypeType),
       LeafMapping[Partner](PartnerType),
       LeafMapping[PartnerLinkType](PartnerLinkTypeType),
       LeafMapping[PosAngleConstraintMode](PosAngleConstraintModeType),
@@ -209,6 +211,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[UserType](UserTypeType),
       LeafMapping[Visit.Id](VisitIdType),
       LeafMapping[WaterVapor](WaterVaporType),
+      LeafMapping[WavelengthOrder](WavelengthOrderType)
     )
 
 }
