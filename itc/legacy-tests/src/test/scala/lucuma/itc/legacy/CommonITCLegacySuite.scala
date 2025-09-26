@@ -4,6 +4,7 @@
 package lucuma.itc.legacy
 
 import cats.data.NonEmptyMap
+import cats.effect.IO
 import cats.implicits.*
 import coulomb.Quantity
 import coulomb.syntax.*
@@ -31,22 +32,20 @@ import lucuma.itc.service.ItcObservingConditions
 import lucuma.itc.service.Main.ReverseClassLoader
 import lucuma.itc.service.ObservingMode
 import lucuma.itc.service.TargetData
-import munit.FunSuite
 import munit.Tag
 
 import java.io.File
 import java.io.FileFilter
 import scala.collection.immutable.SortedMap
-import scala.concurrent.duration.*
 
 object LegacyITCTest extends Tag("LegacyItcTest")
+
+import munit.CatsEffectSuite
 
 /**
  * This is a common trait for tests of the legacy ITC code
  */
-trait CommonITCLegacySuite extends FunSuite:
-  // Default timeout for all legacy ITC tests
-  override def munitTimeout: Duration = 5.minute
+trait CommonITCLegacySuite extends CatsEffectSuite:
 
   // Common validation functions
   def containsValidResults(r: IntegrationTimeRemoteResult): Boolean =
@@ -80,7 +79,7 @@ trait CommonITCLegacySuite extends FunSuite:
           override def accept(file: File): Boolean =
             file.getName().endsWith(".jar")
         })
-    LocalItc(
+    LocalItc[IO](
       new ReverseClassLoader(jarFiles.map(_.toURI.toURL), ClassLoader.getSystemClassLoader())
     )
   }
@@ -337,7 +336,7 @@ trait CommonITCLegacySuite extends FunSuite:
               .asJson
               .noSpaces
           )
-        assert(result.fold(allowedErrors, containsValidResults))
+        assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))
 
     test(s"$name - cloud extinction".tag(LegacyITCTest)):
       Enumerated[CloudExtinction.Preset].all.foreach: ce =>
@@ -348,7 +347,7 @@ trait CommonITCLegacySuite extends FunSuite:
               .asJson
               .noSpaces
           )
-        assert(result.fold(allowedErrors, containsValidResults))
+        assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))
 
     test(s"$name - water vapor".tag(LegacyITCTest)):
       Enumerated[WaterVapor].all.foreach: wv =>
@@ -356,7 +355,7 @@ trait CommonITCLegacySuite extends FunSuite:
           .calculateIntegrationTime(
             params.copy(conditions = params.conditions.copy(wv = wv)).asJson.noSpaces
           )
-        assert(result.fold(allowedErrors, containsValidResults))
+        assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))
 
     test(s"$name - sky background".tag(LegacyITCTest)):
       Enumerated[SkyBackground].all.foreach: sb =>
@@ -364,7 +363,7 @@ trait CommonITCLegacySuite extends FunSuite:
           .calculateIntegrationTime(
             params.copy(conditions = params.conditions.copy(sb = sb)).asJson.noSpaces
           )
-        assert(result.fold(allowedErrors, containsValidResults))
+        assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))
 
   def testSEDs(
     name:        String,
@@ -385,7 +384,7 @@ trait CommonITCLegacySuite extends FunSuite:
               UnnormalizedSED.StellarLibrary(f)
             ).asJson.noSpaces
           )
-        assert(result.fold(allowedErrors, containsValidResults))
+        assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))
 
     test(s"$name - cool star".tag(LegacyITCTest)):
       assume(runCoolStar, "Skip cool star test")
@@ -400,7 +399,7 @@ trait CommonITCLegacySuite extends FunSuite:
               UnnormalizedSED.CoolStarModel(f)
             ).asJson.noSpaces
           )
-        assert(result.fold(allowedErrors, containsValidResults))
+        assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))
 
     test(s"$name - galaxy spectrum".tag(LegacyITCTest)):
       Enumerated[GalaxySpectrum].all.foreach: f =>
@@ -414,7 +413,7 @@ trait CommonITCLegacySuite extends FunSuite:
               UnnormalizedSED.Galaxy(f)
             ).asJson.noSpaces
           )
-        assert(result.fold(allowedErrors, containsValidResults))
+        assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))
 
     test(s"$name - planet spectrum".tag(LegacyITCTest)):
       Enumerated[PlanetSpectrum].all.foreach: f =>
@@ -428,7 +427,7 @@ trait CommonITCLegacySuite extends FunSuite:
               UnnormalizedSED.Planet(f)
             ).asJson.noSpaces
           )
-        assert(result.fold(allowedErrors, containsValidResults))
+        assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))
 
     test(s"$name - quasar spectrum".tag(LegacyITCTest)):
       Enumerated[QuasarSpectrum].all.foreach: f =>
@@ -442,7 +441,7 @@ trait CommonITCLegacySuite extends FunSuite:
               UnnormalizedSED.Quasar(f)
             ).asJson.noSpaces
           )
-        assert(result.fold(allowedErrors, containsValidResults))
+        assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))
 
     test(s"$name - hii region spectrum".tag(LegacyITCTest)):
       Enumerated[HIIRegionSpectrum].all.foreach: f =>
@@ -456,7 +455,7 @@ trait CommonITCLegacySuite extends FunSuite:
               UnnormalizedSED.HIIRegion(f)
             ).asJson.noSpaces
           )
-        assert(result.fold(allowedErrors, containsValidResults))
+        assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))
 
     test(s"$name - planetary nebula spectrum".tag(LegacyITCTest)):
       Enumerated[PlanetaryNebulaSpectrum].all.foreach: f =>
@@ -470,7 +469,7 @@ trait CommonITCLegacySuite extends FunSuite:
               UnnormalizedSED.PlanetaryNebula(f)
             ).asJson.noSpaces
           )
-        assert(result.fold(allowedErrors, containsValidResults))
+        assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))
 
   def testUserDefinedSED(name: String, baseParams: ItcParameters): Unit =
     test(s"$name - user defined SED".tag(LegacyITCTest)):
@@ -492,7 +491,7 @@ trait CommonITCLegacySuite extends FunSuite:
           ).asJson.noSpaces
         )
 
-      assert(result.fold(allowedErrors, containsValidResults))
+      assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))
 
   def testBrightnessUnits(
     name:       String,
@@ -511,7 +510,7 @@ trait CommonITCLegacySuite extends FunSuite:
               f.withValueTagged(BrightnessValue.unsafeFrom(5))
             ).asJson.noSpaces
           )
-        assert(result.fold(errorCheck, containsValidResults))
+        assertIOBoolean(result.map(_.fold(errorCheck, containsValidResults)))
 
     test(s"$name - surface units".tag(LegacyITCTest)):
       Brightness.Surface.all.toList.foreach: f =>
@@ -525,7 +524,7 @@ trait CommonITCLegacySuite extends FunSuite:
               f.withValueTagged(BrightnessValue.unsafeFrom(5))
             ).asJson.noSpaces
           )
-        assert(result.fold(errorCheck, containsValidResults))
+        assertIOBoolean(result.map(_.fold(errorCheck, containsValidResults)))
 
     test(s"$name - gaussian units".tag(LegacyITCTest)):
       Brightness.Integrated.all.toList.foreach: f =>
@@ -539,7 +538,7 @@ trait CommonITCLegacySuite extends FunSuite:
               f.withValueTagged(BrightnessValue.unsafeFrom(5))
             ).asJson.noSpaces
           )
-        assert(result.fold(errorCheck, containsValidResults))
+        assertIOBoolean(result.map(_.fold(errorCheck, containsValidResults)))
 
   def testPowerAndBlackbody(name: String, baseParams: ItcParameters): Unit =
     test(s"$name - power law".tag(LegacyITCTest)):
@@ -554,4 +553,4 @@ trait CommonITCLegacySuite extends FunSuite:
               f
             ).asJson.noSpaces
           )
-        assert(result.fold(allowedErrors, containsValidResults))
+        assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))

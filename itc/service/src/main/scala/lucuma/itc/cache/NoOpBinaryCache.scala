@@ -7,14 +7,13 @@ import cats.Applicative
 import cats.effect.Async
 import cats.syntax.all.*
 import io.chrisdavenport.keysemaphore.KeySemaphore
-import natchez.Trace
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration.FiniteDuration
 
 object NoOpBinaryCache:
 
-  def apply[F[_]: Async: Trace: Logger]: F[BinaryEffectfulCache[F]] =
+  def apply[F[_]: Async: Logger]: F[BinaryEffectfulCache[F]] =
     KeySemaphore
       .of[F, Array[Byte]](_ => 1)
       .map: sem =>

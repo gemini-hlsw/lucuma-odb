@@ -109,13 +109,18 @@ object Main extends IOApp with ItcCacheOrRemote {
    * is defined, otherwise a log endpoint.
    */
   def entryPointResource[F[_]: Sync: Logger](
-    config: Option[HoneycombConfig]
+    config:      Option[HoneycombConfig],
+    environment: ExecutionEnvironment
   ): Resource[F, EntryPoint[F]] =
     config.fold(
       Log.entryPoint(ServiceName).pure[Resource[F, *]]
     ): cfg =>
       Honeycomb.entryPoint(ServiceName): cb =>
         Sync[F].blocking:
+          val existingFields = cb.getGlobalFields
+          val newFields      = new java.util.HashMap[String, Object](existingFields)
+          newFields.put("service.version", version(environment).value)
+          cb.setGlobalFields(newFields)
           cb.setWriteKey(cfg.writeKey)
           cb.setDataset(cfg.dataset)
           cb.build()
@@ -154,11 +159,11 @@ object Main extends IOApp with ItcCacheOrRemote {
         Resource.eval(NoOpBinaryCache[F])
 
   def routes[F[_]: Async: Logger: Parallel: Trace: Compression: Network](
-    cfg: Config,
-    itc: LocalItc
+    cfg: Config
   ): Resource[F, WebSocketBuilder2[F] => HttpRoutes[F]] =
     for
-      itc                        <- Resource.eval(ItcImpl.build(FLocalItc[F](itc)).pure[F])
+      localItc                   <- Resource.eval(legacyItcLoader[F])
+      itc                        <- Resource.eval(ItcImpl.build(FLocalItc[F](localItc)).pure[F])
       cache                      <- createCache[F](cfg.redisUrl)
       _                          <- Resource.eval(checkVersionToPurge[F](cache))
       customSedResolver          <- CustomSedOdbAttachmentResolver[F](cfg.odbBaseUrl, cfg.odbServiceToken)
@@ -190,7 +195,7 @@ object Main extends IOApp with ItcCacheOrRemote {
   // Build a custom class loader to read and call the legacy ocs2 libs
   // without affecting the current classes. This is mostly because ocs2 uses scala 2.11
   // and it will conflict with the current scala 3 classes
-  def legacyItcLoader[F[_]: Sync]: F[LocalItc] =
+  def legacyItcLoader[F[_]: Sync]: F[LocalItc[F]] =
     Sync[F]
       .blocking:
         val jarFiles: Array[File] =
@@ -198,7 +203,7 @@ object Main extends IOApp with ItcCacheOrRemote {
             override def accept(file: File): Boolean =
               file.getName().endsWith(".jar");
           })
-        LocalItc:
+        LocalItc[F]:
           new ReverseClassLoader(jarFiles.map(_.toURI.toURL), ClassLoader.getSystemClassLoader())
 
   /**
@@ -209,9 +214,8 @@ object Main extends IOApp with ItcCacheOrRemote {
     for
       _  <- Resource.eval(banner[IO](cfg))
       _  <- MetricsService.resource[IO](cfg.metrics)
-      cl <- Resource.eval(legacyItcLoader[IO])
-      ep <- entryPointResource[IO](cfg.honeycomb)
-      ap <- ep.wsLiftR(routes(cfg, cl)).map(_.map(_.orNotFound))
+      ep <- entryPointResource[IO](cfg.honeycomb, cfg.environment)
+      ap <- ep.wsLiftR(routes(cfg)).map(_.map(_.orNotFound))
       _  <- serverResource(ap, cfg)
     yield ExitCode.Success
 

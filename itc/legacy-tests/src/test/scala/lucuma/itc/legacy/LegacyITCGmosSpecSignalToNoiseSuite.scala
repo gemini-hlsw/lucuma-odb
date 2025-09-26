@@ -15,17 +15,13 @@ import lucuma.itc.service.GmosNorthFpuParam
 import lucuma.itc.service.GmosSouthFpuParam
 import lucuma.itc.service.ItcObservationDetails
 import lucuma.itc.service.ObservingMode
-import munit.FunSuite
-
-import scala.concurrent.duration.*
 
 /**
  * This is a unit test mostly to ensure all possible combination of params can be parsed by the
  * legacy ITC (Note that the ITC may still return an error but we want to ensure it can parse the
  * values
  */
-class LegacyITCGmosSpecSignalToNoiseSuite extends FunSuite with CommonITCLegacySuite:
-  override def munitTimeout: Duration = 5.minute
+class LegacyITCGmosSpecSignalToNoiseSuite extends CommonITCLegacySuite:
 
   override val obs = ItcObservationDetails(
     calculationMethod =
@@ -79,7 +75,7 @@ class LegacyITCGmosSpecSignalToNoiseSuite extends FunSuite with CommonITCLegacyS
         .calculateIntegrationTime(
           bodyConf(sourceDefinition, obs, gnConf.copy(disperser = d)).asJson.noSpaces
         )
-      assert(result.fold(allowedErrors, containsValidResults))
+      assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))
 
   test("gmos north filter".tag(LegacyITCTest)):
     Enumerated[GmosNorthFilter].all.foreach: f =>
@@ -87,7 +83,7 @@ class LegacyITCGmosSpecSignalToNoiseSuite extends FunSuite with CommonITCLegacyS
         .calculateIntegrationTime(
           bodyConf(sourceDefinition, obs, gnConf.copy(filter = f.some)).asJson.noSpaces
         )
-      assert(result.fold(allowedErrors, containsValidResults))
+      assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))
 
   test("gmos north fpu".tag(LegacyITCTest)):
     Enumerated[GmosNorthFpu].all.foreach: f =>
@@ -99,7 +95,7 @@ class LegacyITCGmosSpecSignalToNoiseSuite extends FunSuite with CommonITCLegacyS
                    analysis = if (f.isIFU) ifuAnalysisMethod else lsAnalysisMethod
           ).asJson.noSpaces
         )
-      assert(result.fold(allowedErrors, containsValidResults))
+      assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))
 
   val gsConf = ObservingMode.SpectroscopyMode.GmosSouth(
     Wavelength.decimalNanometers.getOption(600).get,
@@ -121,7 +117,7 @@ class LegacyITCGmosSpecSignalToNoiseSuite extends FunSuite with CommonITCLegacyS
         .calculateIntegrationTime(
           bodyConf(sourceDefinition, obs, gsConf.copy(disperser = d)).asJson.noSpaces
         )
-      assert(result.fold(allowedErrors, containsValidResults))
+      assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))
 
   test("gmos south filter".tag(LegacyITCTest)):
     Enumerated[GmosSouthFilter].all.foreach: f =>
@@ -129,7 +125,7 @@ class LegacyITCGmosSpecSignalToNoiseSuite extends FunSuite with CommonITCLegacyS
         .calculateIntegrationTime(
           bodyConf(sourceDefinition, obs, gsConf.copy(filter = f.some)).asJson.noSpaces
         )
-      assert(result.fold(allowedErrors, containsValidResults))
+      assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))
 
   test("gmos south fpu".tag(LegacyITCTest)):
     Enumerated[GmosSouthFpu].all.foreach: f =>
@@ -141,7 +137,7 @@ class LegacyITCGmosSpecSignalToNoiseSuite extends FunSuite with CommonITCLegacyS
                    analysis = if (f.isIFU) ifuAnalysisMethod else lsAnalysisMethod
           ).asJson.noSpaces
         )
-      assert(result.fold(allowedErrors, containsValidResults))
+      assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))
 
   // Testing various SEDs
   testSEDs("GMOS spectroscopy S/N", baseParams)

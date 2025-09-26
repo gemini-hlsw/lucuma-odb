@@ -32,7 +32,7 @@ import lucuma.itc.service.Itc
 import lucuma.itc.service.ItcObservingConditions
 import lucuma.itc.service.ObservingMode
 import lucuma.itc.service.TargetData
-import natchez.Trace.Implicits.noop
+import natchez.Trace
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 
@@ -91,7 +91,8 @@ object ItcBenchmarkSetup:
           .toArray[URL]
 
         val classLoader = new URLClassLoader(jarUrls, null)
-        val localItc    = LocalItc(classLoader)
+        given Trace[IO] = Trace.Implicits.noop[IO]
+        val localItc    = LocalItc[IO](classLoader)
         val fLocalItc   = FLocalItc[IO](localItc)
 
         ItcImpl.build[IO](fLocalItc)

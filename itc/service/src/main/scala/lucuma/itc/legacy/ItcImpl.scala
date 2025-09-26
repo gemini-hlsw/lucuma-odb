@@ -3,13 +3,9 @@
 
 package lucuma.itc.legacy
 
-import algebra.instances.all.given
 import cats.*
 import cats.syntax.all.*
 import coulomb.Quantity
-import coulomb.syntax.*
-import coulomb.units.si.*
-import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.numeric.PosInt
 import io.circe.Json
 import io.circe.syntax.*
@@ -23,7 +19,6 @@ import lucuma.core.util.TimeSpan
 import lucuma.itc.CalculationError
 import lucuma.itc.IntegrationTime
 import lucuma.itc.ItcCcd
-import lucuma.itc.Millisecond
 import lucuma.itc.SignalToNoiseAt
 import lucuma.itc.TargetGraphsCalcResult
 import lucuma.itc.TargetIntegrationTime
@@ -76,7 +71,7 @@ object ItcImpl {
         constraints:   ItcObservingConditions,
         signalToNoise: SignalToNoise
       ): F[TargetIntegrationTime] =
-        T.span("calculate-integration-time"):
+        T.span("calculate integration_time"):
           observingMode match
             case s @ (SpectroscopyMode.GmosNorth(_, _, _, _, _, _) |
                 SpectroscopyMode.GmosSouth(_, _, _, _, _, _) |
@@ -97,54 +92,52 @@ object ItcImpl {
         exposureTime:  TimeSpan,
         exposureCount: PosInt
       ): F[TargetGraphsCalcResult] =
-        observingMode match
-          case s @ (SpectroscopyMode.GmosNorth(_, _, _, _, _, _) |
-              SpectroscopyMode.GmosSouth(_, _, _, _, _, _) |
-              SpectroscopyMode.Flamingos2(_, _, _)) =>
-            spectroscopyGraphs(
-              target,
-              atWavelength,
-              s,
-              constraints,
-              exposureTime.toMilliseconds.withUnit[Millisecond].toUnit[Second],
-              exposureCount.value
-            )
-          case ImagingMode.GmosNorth(_, _) | ImagingMode.GmosSouth(_, _) |
-              ImagingMode.Flamingos2(_) =>
-            MonadThrow[F].raiseError:
-              new IllegalArgumentException("Imaging mode not supported for graph calculation")
+        T.span("calculate graphs"):
+          observingMode match
+            case s @ (SpectroscopyMode.GmosNorth(_, _, _, _, _, _) |
+                SpectroscopyMode.GmosSouth(_, _, _, _, _, _) |
+                SpectroscopyMode.Flamingos2(_, _, _)) =>
+              spectroscopyGraphs(
+                target,
+                atWavelength,
+                s,
+                constraints,
+                exposureTime,
+                exposureCount
+              )
+            case ImagingMode.GmosNorth(_, _) | ImagingMode.GmosSouth(_, _) |
+                ImagingMode.Flamingos2(_) =>
+              MonadThrow[F].raiseError:
+                new IllegalArgumentException("Imaging mode not supported for graph calculation")
 
       private def spectroscopyGraphs(
-        target:           TargetData,
-        atWavelength:     Wavelength,
-        observingMode:    ObservingMode,
-        constraints:      ItcObservingConditions,
-        exposureDuration: Quantity[BigDecimal, Second],
-        exposureCount:    Int,
-        level:            Option[NonNegInt] = none
+        target:        TargetData,
+        atWavelength:  Wavelength,
+        observingMode: ObservingMode,
+        constraints:   ItcObservingConditions,
+        exposureTime:  TimeSpan,
+        exposureCount: PosInt
       ): F[TargetGraphsCalcResult] =
         import lucuma.itc.legacy.*
 
-        T.span("legacy-itc-query"):
-          val (request, bandOrLine): (Json, Either[Band, Wavelength]) =
-            spectroscopyGraphParams(
-              target,
-              atWavelength,
-              observingMode,
-              exposureDuration.value.toDouble.seconds,
-              constraints,
-              exposureCount
-            ).leftMap(_.asJson)
+        val (request, bandOrLine): (Json, Either[Band, Wavelength]) =
+          spectroscopyGraphParams(
+            target,
+            atWavelength,
+            observingMode,
+            exposureTime.toMilliseconds.toDouble.milliseconds,
+            constraints,
+            exposureCount.value
+          ).leftMap(_.asJson)
 
-          for
-            _ <- T.put("itc.query" -> request.spaces2)
-            _ <- T.put("itc.exposureDuration" -> exposureDuration.value.toInt)
-            _ <- T.put("itc.exposures" -> exposureCount)
-            _ <- T.put("itc.level" -> level.map(_.value).orEmpty)
-            _ <- L.info("spectroscopy graph request:")
-            _ <- L.info(request.noSpaces) // Request to the legacy itc
-            r <- itcLocal.calculateGraphs(request.noSpaces)
-          yield TargetGraphsCalcResult.fromLegacy(r.ccds, r.groups, atWavelength, bandOrLine)
+        for
+          _ <- T.put("params.exposure_time" -> exposureTime.toMilliseconds.toInt)
+          _ <- T.put("params.exposure_count" -> exposureCount.value)
+          _ <- T.put("params.science_mode" -> "spectroscopy")
+          _ <- L.info("spectroscopy graph request:")
+          _ <- L.info(request.noSpaces) // Request to the legacy itc
+          r <- itcLocal.calculateGraphs(request.noSpaces)
+        yield TargetGraphsCalcResult.fromLegacy(r.ccds, r.groups, atWavelength, bandOrLine)
 
       /**
        * Compute the exposure time and number of exposures required to achieve the desired
@@ -169,18 +162,16 @@ object ItcImpl {
           ).leftMap(_.asJson)
 
         for
-          _ <- L.info(s"Desired S/N $signalToNoise")
-          _ <- L.info(s"Target $target at wavelength $atWavelength")
-          r <- T.span("itc.calctime.spectroscopy-integration-time"):
-                 for
-                   _      <- T.put("itc.query" -> request.spaces2)
-                   _      <- T.put("itc.sigma" -> signalToNoise.toBigDecimal.toDouble)
-                   _      <- L.info(request.noSpaces) // Request to the legacy itc
-                   _      <- L.info("spectroscopy time request:")
-                   a      <- itcLocal.calculateIntegrationTime(request.noSpaces)
-                   result <- convertIntegrationTimeRemoteResult(a, bandOrLine)
-                 yield result
-        yield r
+          _      <- L.info(s"Desired S/N $signalToNoise")
+          _      <- L.info(s"Target $target at wavelength $atWavelength")
+          _      <- T.put("params.signal_to_noise" -> signalToNoise.toBigDecimal.toDouble)
+          _      <- T.put("params.at" -> atWavelength.nm.value.value.toDouble)
+          _      <- T.put("params.science_mode" -> "spectroscopy")
+          _      <- L.info(request.noSpaces) // Request to the legacy itc
+          _      <- L.info("spectroscopy time request:")
+          a      <- itcLocal.calculateIntegrationTime(request.noSpaces)
+          result <- convertIntegrationTimeRemoteResult(a, bandOrLine)
+        yield result
 
       private def convertIntegrationTimeRemoteResult(
         r:          IntegrationTimeRemoteResult,
@@ -237,20 +228,19 @@ object ItcImpl {
         for
           _ <- L.info(s"Calculate S/N for exp time $exposureTime and count $exposureCount")
           _ <- L.info(s"Target $target at wavelength $atWavelength")
-          r <- T.span("itc.calctime.spectroscopy-signal-to-noise"):
-                 for
-                   _ <- T.put("itc.query" -> request.spaces2)
-                   _ <- L.info(
-                          s"Spectroscopy: Signal to noise mode ${request.noSpaces}"
-                        ) // Request to the legacy itc
-                   a <- itcLocal.calculateSignalToNoise(request.noSpaces)
-                 yield TargetIntegrationTime(
-                   Zipper.one(IntegrationTime(exposureTime, exposureCount)),
-                   bandOrLine,
-                   a.signalToNoiseAt.map(fromLegacy),
-                   a.ccds.toList.flatMap(fromLegacyCcd)
-                 )
-        yield r
+          _ <- T.put("params.science_mode" -> "spectroscopy")
+          _ <- T.put("params.exposure_time" -> exposureTime.toMilliseconds.toInt)
+          _ <- T.put("params.exposure_count" -> exposureCount.value)
+          _ <- L.info(
+                 s"Spectroscopy: Signal to noise mode ${request.noSpaces}"
+               ) // Request to the legacy itc
+          a <- itcLocal.calculateSignalToNoise(request.noSpaces)
+        yield TargetIntegrationTime(
+          Zipper.one(IntegrationTime(exposureTime, exposureCount)),
+          bandOrLine,
+          a.signalToNoiseAt.map(fromLegacy),
+          a.ccds.toList.flatMap(fromLegacyCcd)
+        )
 
       def calculateSignalToNoise(
         target:        TargetData,
@@ -260,7 +250,7 @@ object ItcImpl {
         exposureTime:  TimeSpan,
         exposureCount: PosInt
       ): F[TargetIntegrationTime] =
-        T.span("calculate-signal-to-noise"):
+        T.span("calculate signal_to_noise"):
           observingMode match
             case s @ (ObservingMode.SpectroscopyMode.GmosNorth(_, _, _, _, _, _) |
                 ObservingMode.SpectroscopyMode.GmosSouth(_, _, _, _, _, _) |
@@ -307,18 +297,16 @@ object ItcImpl {
           )
 
         for
-          _ <- L.info(s"Desired S/N $signalToNoise")
-          _ <- L.info(s"Target $target  at wavelength $atWavelength")
-          r <- T.span("itc.calctime.spectroscopy-exp-time-at"):
-                 for
-                   _            <- T.put("itc.query" -> request.spaces2)
-                   _            <- T.put("itc.sigma" -> signalToNoise.toBigDecimal.toDouble)
-                   // Request to the legacy itc
-                   _            <- L.info(s"Imaging: Signal to noise mode ${request.noSpaces}")
-                   remoteResult <- itcLocal.calculateIntegrationTime(request.noSpaces)
-                   result       <- convertIntegrationTimeRemoteResult(remoteResult, bandOrLine)
-                 yield result
-        yield r
+          _            <- L.info(s"Desired S/N $signalToNoise")
+          _            <- L.info(s"Target $target  at wavelength $atWavelength")
+          _            <- T.put("params.signal_to_noise" -> signalToNoise.toBigDecimal.toDouble)
+          _            <- T.put("params.at" -> atWavelength.nm.value.value.toDouble)
+          _            <- T.put("params.science_mode" -> "imaging")
+          // Request to the legacy itc
+          _            <- L.info(s"Imaging: Signal to noise mode ${request.noSpaces}")
+          remoteResult <- itcLocal.calculateIntegrationTime(request.noSpaces)
+          result       <- convertIntegrationTimeRemoteResult(remoteResult, bandOrLine)
+        yield result
 
       /**
        * Compute the exposure time and number of exposures required to achieve the desired
@@ -345,17 +333,16 @@ object ItcImpl {
           ).leftMap(_.asJson)
 
         for {
-          _ <- L.info(s"Calculate S/N for exp time $exposureTime and count $exposureCount")
-          _ <- L.info(s"Target $target  at wavelength $atWavelength")
-          r <- T.span("itc.calctime.imaging-exp-time-at"):
-                 for
-                   _            <- T.put("itc.query" -> request.spaces2)
-                   // Request to the legacy itc
-                   _            <- L.info(s"Imaging: time and count mode ${request.noSpaces}")
-                   remoteResult <- itcLocal.calculateIntegrationTime(request.noSpaces)
-                   result       <- convertIntegrationTimeRemoteResult(remoteResult, bandOrLine)
-                 yield result
-        } yield r
+          _            <- L.info(s"Calculate S/N for exp time $exposureTime and count $exposureCount")
+          _            <- L.info(s"Target $target  at wavelength $atWavelength")
+          _            <- T.put("params.science_mode" -> "imaging")
+          _            <- T.put("params.exposure_time" -> exposureTime.toMilliseconds.toInt)
+          _            <- T.put("params.exposure_count" -> exposureCount.value)
+          // Request to the legacy itc
+          _            <- L.info(s"Imaging: time and count mode ${request.noSpaces}")
+          remoteResult <- itcLocal.calculateIntegrationTime(request.noSpaces)
+          result       <- convertIntegrationTimeRemoteResult(remoteResult, bandOrLine)
+        } yield result
     }
 
 }
