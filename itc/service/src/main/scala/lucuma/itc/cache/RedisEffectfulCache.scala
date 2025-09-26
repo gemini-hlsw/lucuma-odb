@@ -19,7 +19,7 @@ trait RedisEffectfulCache[F[_]: Async: Trace](
 ) extends BinaryEffectfulCache[F]:
 
   override protected def read(key: Array[Byte]): F[Option[Array[Byte]]] =
-    Trace[F].span("read cache"):
+    Trace[F].span("redis_read"):
       Trace[F].put("cache.operation" -> "read", "cache.backend" -> "redis") *>
         redis
           .get(key)
@@ -30,7 +30,7 @@ trait RedisEffectfulCache[F[_]: Async: Trace](
     key:     Array[Byte],
     context: String = ""
   ): F[Option[Array[Byte]]] =
-    Trace[F].span("read cache"):
+    Trace[F].span("redis_read_with_context"):
       Trace[F].put("cache.operation"  -> "read",
                    "cache.backend"    -> "redis",
                    "cache.key_prefix" -> context
@@ -45,7 +45,7 @@ trait RedisEffectfulCache[F[_]: Async: Trace](
     value: Array[Byte],
     ttl:   Option[FiniteDuration]
   ): F[Unit] =
-    Trace[F].span("write cache"):
+    Trace[F].span("redis_write"):
       Trace[F].put("cache.operation" -> "write",
                    "cache.backend"   -> "redis",
                    "cache.has_ttl"   -> ttl.isDefined.toString
@@ -53,7 +53,7 @@ trait RedisEffectfulCache[F[_]: Async: Trace](
         ttl.fold(redis.set(key, value))(redis.setEx(key, value, _))
 
   override protected def delete(key: Array[Byte]): F[Unit] =
-    Trace[F].span("delete cache"):
+    Trace[F].span("redis_delete"):
       Trace[F].put("cache.operation" -> "delete", "cache.backend" -> "redis") *>
         redis.unsafe(_.del(key)).void
 

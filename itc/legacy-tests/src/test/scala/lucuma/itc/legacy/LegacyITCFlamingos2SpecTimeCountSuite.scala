@@ -6,9 +6,9 @@ package lucuma.itc.legacy
 import lucuma.core.enums.*
 import lucuma.core.math.Angle
 import lucuma.core.math.Wavelength
-
 import lucuma.itc.service.ItcObservationDetails
 import lucuma.itc.service.ObservingMode
+
 import scala.concurrent.duration.*
 
 /**

@@ -131,13 +131,17 @@ object ItcImpl {
           ).leftMap(_.asJson)
 
         for
-          _ <- T.put("params.exposure_time" -> exposureTime.toMilliseconds.toInt)
-          _ <- T.put("params.exposure_count" -> exposureCount.value)
-          _ <- T.put("params.science_mode" -> "spectroscopy")
-          _ <- L.info("spectroscopy graph request:")
-          _ <- L.info(request.noSpaces) // Request to the legacy itc
-          r <- itcLocal.calculateGraphs(request.noSpaces)
-        yield TargetGraphsCalcResult.fromLegacy(r.ccds, r.groups, atWavelength, bandOrLine)
+          _      <- T.put("params.exposure_time" -> exposureTime.toMilliseconds.toInt)
+          _      <- T.put("params.exposure_count" -> exposureCount.value)
+          _      <- T.put("params.science_mode" -> "spectroscopy")
+          _      <- L.info("spectroscopy graph request:")
+          _      <- L.info(request.noSpaces) // Request to the legacy itc
+          r      <- itcLocal.calculateGraphs(request.noSpaces)
+          result <- T.span("convert graphs_result"):
+                      TargetGraphsCalcResult
+                        .fromLegacy(r.ccds, r.groups, atWavelength, bandOrLine)
+                        .pure[F]
+        yield result
 
       /**
        * Compute the exposure time and number of exposures required to achieve the desired
@@ -170,7 +174,8 @@ object ItcImpl {
           _      <- L.info(request.noSpaces) // Request to the legacy itc
           _      <- L.info("spectroscopy time request:")
           a      <- itcLocal.calculateIntegrationTime(request.noSpaces)
-          result <- convertIntegrationTimeRemoteResult(a, bandOrLine)
+          result <- T.span("convert integration_time_result"):
+                      convertIntegrationTimeRemoteResult(a, bandOrLine)
         yield result
 
       private def convertIntegrationTimeRemoteResult(
@@ -305,7 +310,8 @@ object ItcImpl {
           // Request to the legacy itc
           _            <- L.info(s"Imaging: Signal to noise mode ${request.noSpaces}")
           remoteResult <- itcLocal.calculateIntegrationTime(request.noSpaces)
-          result       <- convertIntegrationTimeRemoteResult(remoteResult, bandOrLine)
+          result       <- T.span("convert integration_time_result"):
+                            convertIntegrationTimeRemoteResult(remoteResult, bandOrLine)
         yield result
 
       /**
@@ -341,7 +347,8 @@ object ItcImpl {
           // Request to the legacy itc
           _            <- L.info(s"Imaging: time and count mode ${request.noSpaces}")
           remoteResult <- itcLocal.calculateIntegrationTime(request.noSpaces)
-          result       <- convertIntegrationTimeRemoteResult(remoteResult, bandOrLine)
+          result       <- T.span("convert integration_time_result"):
+                            convertIntegrationTimeRemoteResult(remoteResult, bandOrLine)
         } yield result
     }
 
