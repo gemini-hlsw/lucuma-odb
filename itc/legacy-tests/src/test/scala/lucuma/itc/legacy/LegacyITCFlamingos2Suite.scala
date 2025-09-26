@@ -9,14 +9,13 @@ import lucuma.core.util.Enumerated
 import lucuma.itc.legacy.codecs.given
 import lucuma.itc.service.ItcObservationDetails.AnalysisMethod
 import lucuma.itc.service.ObservingMode
-import munit.FunSuite
 
 /**
  * This is a unit test for Flamingos2 imaging mode in the legacy ITC, ensuring all possible
  * combinations of parameters can be parsed. The ITC may still return an error but we want to ensure
  * it can parse the values.
  */
-trait LegacyITCFlamingos2Suite extends FunSuite with CommonITCLegacySuite:
+trait LegacyITCFlamingos2Suite extends CommonITCLegacySuite:
 
   def analysisMethod: AnalysisMethod
 
@@ -36,7 +35,7 @@ trait LegacyITCFlamingos2Suite extends FunSuite with CommonITCLegacySuite:
                    analysisMethod
           ).asJson.noSpaces
         )
-      assert(result.fold(allowedErrors, containsValidResults))
+      assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))
 
   test(s"$title - Flamingos2 fpu".tag(LegacyITCTest)):
     Enumerated[Flamingos2Fpu].all.foreach: f =>
@@ -44,7 +43,7 @@ trait LegacyITCFlamingos2Suite extends FunSuite with CommonITCLegacySuite:
         .calculateIntegrationTime(
           bodyConf(sourceDefinition, obs, observingModeWithFpu(f)).asJson.noSpaces
         )
-      assert(result.fold(allowedErrors, containsValidResults))
+      assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))
 
   // Testing observing conditions
   testConditions(title, baseParams)

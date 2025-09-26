@@ -67,7 +67,7 @@ class LegacyITCGmosImgSignalToNoiseSuite extends CommonITCLegacySuite:
         .calculateIntegrationTime(
           bodyConf(sourceDefinition, obs, gmosNConf.copy(filter = f)).asJson.noSpaces
         )
-      assert(result.fold(allowedErrors, containsValidResults))
+      assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))
 
   // GMOS South filter testing
   val gmosSConf = ObservingMode.ImagingMode.GmosSouth(
@@ -87,7 +87,7 @@ class LegacyITCGmosImgSignalToNoiseSuite extends CommonITCLegacySuite:
         .calculateIntegrationTime(
           bodyConf(sourceDefinition, obs, gmosSConf.copy(filter = f)).asJson.noSpaces
         )
-      assert(result.fold(allowedErrors, containsValidResults))
+      assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))
 
   // Testing various SEDs
   testSEDs("GMOS imaging TxC S/N", baseParams, false, false)

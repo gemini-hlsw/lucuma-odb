@@ -8,7 +8,6 @@ import lucuma.core.math.Angle
 import lucuma.core.math.Wavelength
 import lucuma.itc.service.ItcObservationDetails
 import lucuma.itc.service.ObservingMode
-import munit.FunSuite
 
 import scala.concurrent.duration.*
 

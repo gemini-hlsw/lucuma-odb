@@ -7,7 +7,6 @@ import lucuma.core.enums.*
 import lucuma.core.math.Angle
 import lucuma.itc.service.ItcObservationDetails
 import lucuma.itc.service.ObservingMode
-import munit.FunSuite
 
 /**
  * This is a unit test for Flamingos2 imaging mode in the legacy ITC, ensuring all possible

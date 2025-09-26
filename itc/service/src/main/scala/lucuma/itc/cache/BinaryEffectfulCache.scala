@@ -34,7 +34,7 @@ trait BinaryEffectfulCache[F[_]: MonadCancelThrow: Logger]
     Either.catchNonFatal(Unpickle[V1].fromBytes(ByteBuffer.wrap(bytes))).liftTo[F]
 
   def readBinary[K1: Hash, V1: Pickler](key: K1, keyPrefix: String = ""): F[Option[V1]] =
-    read(keyToBinary(key, keyPrefix)).flatMap(_.traverse(valueFromBinary))
+    readWithContext(keyToBinary(key, keyPrefix), keyPrefix).flatMap(_.traverse(valueFromBinary))
 
   def writeBinary[K1: Hash, V1: Pickler](
     key:       K1,
@@ -75,7 +75,7 @@ trait BinaryEffectfulCache[F[_]: MonadCancelThrow: Logger]
       for
         _          <- Logger[F].debug(s"Reading from cache with key [$bk]")
         cacheValue <-
-          read(bk)
+          readWithContext(bk, keyPrefix)
             .handleErrorWith: e =>
               Logger[F].error(e)(s"Error reading from cache with key [$bk]").as(none)
         r          <- cacheValue.fold(writeValue)(safeValueFromBinary)

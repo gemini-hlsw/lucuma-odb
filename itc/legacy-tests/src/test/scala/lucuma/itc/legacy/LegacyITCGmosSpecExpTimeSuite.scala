@@ -85,7 +85,7 @@ class LegacyITCGmosSpecExpTimeSuite extends CommonITCLegacySuite:
             gnConf.copy(disperser = d)
           ).asJson.noSpaces
         )
-      assert(result.fold(allowedErrors, containsValidResults))
+      assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))
 
   test("gmos north filter".tag(LegacyITCTest)):
     Enumerated[GmosNorthFilter].all.foreach: f =>
@@ -97,7 +97,7 @@ class LegacyITCGmosSpecExpTimeSuite extends CommonITCLegacySuite:
             gnConf.copy(filter = f.some)
           ).asJson.noSpaces
         )
-      assert(result.fold(allowedErrors, containsValidResults))
+      assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))
 
   test("gmos north fpu".tag(LegacyITCTest)):
     Enumerated[GmosNorthFpu].all.foreach: f =>
@@ -110,7 +110,7 @@ class LegacyITCGmosSpecExpTimeSuite extends CommonITCLegacySuite:
             if (f.isIFU) ifuAnalysisMethod else lsAnalysisMethod
           ).asJson.noSpaces
         )
-      assert(result.fold(allowedErrors, containsValidResults))
+      assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))
 
   // GMOS South grating configuration testing
   val gsConf = ObservingMode.SpectroscopyMode.GmosSouth(
@@ -138,7 +138,7 @@ class LegacyITCGmosSpecExpTimeSuite extends CommonITCLegacySuite:
             gsConf.copy(disperser = d)
           ).asJson.noSpaces
         )
-      assert(result.fold(allowedErrors, containsValidResults))
+      assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))
 
   test("gmos south filter".tag(LegacyITCTest)):
     Enumerated[GmosSouthFilter].all.foreach: f =>
@@ -150,7 +150,7 @@ class LegacyITCGmosSpecExpTimeSuite extends CommonITCLegacySuite:
             gsConf.copy(filter = f.some)
           ).asJson.noSpaces
         )
-      assert(result.fold(allowedErrors, containsValidResults))
+      assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))
 
   test("gmos south fpu".tag(LegacyITCTest)):
     Enumerated[GmosSouthFpu].all.foreach: f =>
@@ -163,7 +163,7 @@ class LegacyITCGmosSpecExpTimeSuite extends CommonITCLegacySuite:
             if (f.isIFU) ifuAnalysisMethod else lsAnalysisMethod
           ).asJson.noSpaces
         )
-      assert(result.fold(allowedErrors, containsValidResults))
+      assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))
 
   // Testing various SEDs
   testSEDs("GMOS spectroscopy TxC", baseParams)

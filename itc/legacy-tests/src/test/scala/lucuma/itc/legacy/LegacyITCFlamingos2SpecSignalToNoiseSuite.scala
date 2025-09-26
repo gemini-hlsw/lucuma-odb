@@ -8,7 +8,6 @@ import lucuma.core.math.Angle
 import lucuma.core.math.Wavelength
 import lucuma.itc.service.ItcObservationDetails
 import lucuma.itc.service.ObservingMode
-import munit.FunSuite
 
 /**
  * This is a unit test mostly to ensure all possible combination of params can be parsed by the
