@@ -56,6 +56,7 @@ import lucuma.odb.data.EditType
 import lucuma.odb.data.EmailId
 import lucuma.odb.data.ExecutionEventType
 import lucuma.odb.data.Existence
+import lucuma.odb.data.ExposureTimeModeId
 import lucuma.odb.data.ExposureTimeModeType
 import lucuma.odb.data.Extinction
 import lucuma.odb.data.Md5Hash
@@ -284,6 +285,9 @@ trait Codecs {
 
   val existence: Codec[Existence] =
     enumerated(Type("e_existence"))
+
+  val exposure_time_mode_id: Codec[ExposureTimeModeId] =
+    int4.imap(ExposureTimeModeId.apply)(_.value)
 
   val exposure_time_mode_type: Codec[ExposureTimeModeType] =
     enumerated(Type("e_exp_time_mode"))
@@ -530,7 +534,7 @@ trait Codecs {
     enumerated[SpectroscopyCapabilities](Type.varchar)
 
   val signal_to_noise: Codec[SignalToNoise] =
-    numeric(10,3).eimap(
+    numeric(11,3).eimap(
      bd => SignalToNoise.FromBigDecimalExact.getOption(bd).toRight(s"Invalid signal-to-noise value: $bd")
     )(_.toBigDecimal)
 

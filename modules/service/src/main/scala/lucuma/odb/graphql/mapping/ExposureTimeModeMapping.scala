@@ -3,16 +3,14 @@
 
 package lucuma.odb.graphql.mapping
 
-import lucuma.odb.graphql.table.ObservationView
+import lucuma.odb.graphql.table.ExposureTimeModeView
 
 
-trait ExposureTimeModeMapping[F[_]] extends ObservationView[F]:
-
-  import ObservationView.ScienceRequirements.Spectroscopy.ExposureTimeMode
+trait ExposureTimeModeMapping[F[_]] extends ExposureTimeModeView[F]:
 
   lazy val ExposureTimeModeMapping: ObjectMapping =
     ObjectMapping(ExposureTimeModeType)(
-      SqlField("id", ExposureTimeMode.SyntheticId, key = true, hidden = true),
+      SqlField("id", ExposureTimeModeView.Id, key = true, hidden = true),
       SqlObject("signalToNoise"),
       SqlObject("timeAndCount")
     )

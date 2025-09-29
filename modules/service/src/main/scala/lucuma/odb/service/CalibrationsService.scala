@@ -361,9 +361,18 @@ object CalibrationsService extends CalibrationObservations {
       )(using Transaction[F]): F[Unit] =
         calibrationUpdates
           .traverse { (oid, props) =>
-            val bandFragment = props.band.map(sql"c_science_band IS DISTINCT FROM $science_band")
-            val waveFragment = props.wavelengthAt.map(sql"c_etm_signal_to_noise_at <> $wavelength_pm")
+            val bandFragment = props.band.map(sql"o.c_science_band IS DISTINCT FROM $science_band")
+            val waveFragment = props.wavelengthAt.map(sql"e.c_signal_to_noise_at <> $wavelength_pm")
             val needsUpdate  = List(bandFragment, waveFragment).flatten.intercalate(void" OR ")
+
+            val etmJoin: AppliedFragment =
+              if props.wavelengthAt.isDefined then
+                void"""
+                  LEFT JOIN t_exposure_time_mode_link k USING (c_observation_id)
+                  LEFT JOIN t_exposure_time_mode e ON e.c_exposure_time_mode_id = r.c_exposure_time_mode_id
+                """
+              else
+                void""
 
             services.observationService.updateObservations(
               Services.asSuperUser:
@@ -384,12 +393,14 @@ object CalibrationsService extends CalibrationObservations {
                   ),
                   // Important: Only update the obs that need it or it will produce a cascade of infinite updates
                   // TODO: This could be slightly optimized by grouping obs per configuration and updating in batches
-                  sql"""
-                    SELECT $observation_id
-                      FROM t_observation
-                    WHERE c_observation_id = $observation_id
-                      AND c_calibration_role IS NOT NULL
-                      AND ("""(oid, oid) |+| needsUpdate |+| void")"
+                  void"""
+                    SELECT c_observation_id
+                      FROM t_observation o
+                  """ |+| etmJoin |+| sql"""
+                    WHERE o.c_observation_id = $observation_id
+                      AND o.c_calibration_role IS NOT NULL
+                      AND (
+                  """.apply(oid) |+| needsUpdate |+| void")"
                 )
             )
           }.void
