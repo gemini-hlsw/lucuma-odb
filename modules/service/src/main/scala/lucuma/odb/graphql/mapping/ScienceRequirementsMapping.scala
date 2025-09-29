@@ -4,20 +4,20 @@
 package lucuma.odb.graphql
 package mapping
 
-import grackle.skunk.SkunkMapping
+import lucuma.odb.graphql.table.ExposureTimeModeView
 import lucuma.odb.graphql.table.ObservationView
 
-trait ScienceRequirementsMapping[F[_]] extends ObservationView[F] {
-
-  import ObservationView.ScienceRequirements
+trait ScienceRequirementsMapping[F[_]] extends ObservationView[F] with ExposureTimeModeView[F]:
 
   lazy val ScienceRequirementsMapping: ObjectMapping =
     ObjectMapping(ScienceRequirementsType)(
       SqlField("id", ObservationView.Id, key = true, hidden = true),
-      SqlField("mode", ScienceRequirements.Mode),
-      SqlObject("exposureTimeMode"),
+      SqlField("mode", ObservationView.ScienceRequirements.Mode),
+      SqlObject(
+        "exposureTimeMode",
+         Join(ObservationView.Id, ExposureTimeModeLink.ObservationId),
+         Join(ExposureTimeModeLink.ExposureTimeModeId, ExposureTimeModeView.Id)
+      ),
       SqlObject("spectroscopy"),
       SqlObject("imaging")
     )
-
-}

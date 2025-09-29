@@ -9,9 +9,9 @@ import lucuma.odb.util.GmosCodecs.*
 import skunk.circe.codec.json.*
 import skunk.codec.all.*
 
-trait GmosLongSlitTable[F[_]] extends BaseMapping[F] {
+trait GmosLongSlitTable[F[_]] extends BaseMapping[F]:
 
-  class CommonColumns(implicit val tableName: TableName) {
+  class CommonColumns(implicit val tableName: TableName):
 
     val ObservationId: ColumnRef            = col("c_observation_id", observation_id)
 
@@ -32,9 +32,8 @@ trait GmosLongSlitTable[F[_]] extends BaseMapping[F] {
 
     val ImageQuality: ColumnRef             = col("c_image_quality", image_quality_preset)
     val SourceProfile: ColumnRef            = col("c_source_profile", jsonb.opt)
-  }
 
-  object GmosNorthLongSlitTable extends TableDef("t_gmos_north_long_slit") {
+  object GmosNorthLongSlitTable extends TableDef("t_gmos_north_long_slit"):
 
     val Grating: ColumnRef        = col("c_grating", gmos_north_grating)
     val Filter: ColumnRef         = col("c_filter", gmos_north_filter.opt)
@@ -46,9 +45,7 @@ trait GmosLongSlitTable[F[_]] extends BaseMapping[F] {
 
     val Common: CommonColumns     = new CommonColumns()
 
-  }
-
-  object GmosSouthLongSlitTable extends TableDef("t_gmos_south_long_slit") {
+  object GmosSouthLongSlitTable extends TableDef("t_gmos_south_long_slit"):
 
     val Grating: ColumnRef        = col("c_grating", gmos_south_grating)
     val Filter: ColumnRef         = col("c_filter", gmos_south_filter.opt)
@@ -59,6 +56,3 @@ trait GmosLongSlitTable[F[_]] extends BaseMapping[F] {
     val InitialFpu: ColumnRef     = col("c_initial_fpu", gmos_south_fpu)
 
     val Common: CommonColumns     = new CommonColumns()
-
-  }
-}

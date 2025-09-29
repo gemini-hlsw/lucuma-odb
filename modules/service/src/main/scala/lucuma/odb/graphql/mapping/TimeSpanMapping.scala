@@ -8,6 +8,7 @@ import lucuma.core.optics.Format
 import lucuma.core.util.TimeSpan
 import lucuma.odb.graphql.table.AllocationTable
 import lucuma.odb.graphql.table.ChronConditionsEntryView
+import lucuma.odb.graphql.table.ExposureTimeModeView
 import lucuma.odb.graphql.table.Flamingos2DynamicView
 import lucuma.odb.graphql.table.GmosDynamicTables
 import lucuma.odb.graphql.table.GroupView
@@ -21,6 +22,7 @@ import lucuma.odb.graphql.table.TimingWindowView
 import lucuma.odb.graphql.table.VisitTable
 
 trait TimeSpanMapping[F[_]] extends AllocationTable[F]
+                               with ExposureTimeModeView[F]
                                with Flamingos2DynamicView[F]
                                with GmosDynamicTables[F]
                                with ProgramTable[F]
@@ -34,7 +36,7 @@ trait TimeSpanMapping[F[_]] extends AllocationTable[F]
                                with VisitTable[F]
                                with ChronConditionsEntryView[F] {
 
-  import ObservationView.ScienceRequirements.Spectroscopy.ExposureTimeMode
+  import ExposureTimeModeView.TimeAndCount
 
   lazy val TimeSpanMappings: List[TypeMapping] =
     List(
@@ -47,7 +49,7 @@ trait TimeSpanMapping[F[_]] extends AllocationTable[F]
       timeSpanMappingAtPath(StepRecordType / "flamingos2" / "exposure", Flamingos2DynamicView.ExposureTime)(Flamingos2DynamicView.Id),
       timeSpanMappingAtPath(StepRecordType / "gmosNorth" / "exposure", GmosNorthDynamicTable.ExposureTime)(GmosNorthDynamicTable.Id),
       timeSpanMappingAtPath(StepRecordType / "gmosSouth" / "exposure", GmosSouthDynamicTable.ExposureTime)(GmosSouthDynamicTable.Id),
-      timeSpanMappingAtPath(TimeAndCountExposureTimeModeType / "time", ExposureTimeMode.TimeAndCount.Time)(ExposureTimeMode.SyntheticId),
+      timeSpanMappingAtPath(TimeAndCountExposureTimeModeType / "time", TimeAndCount.Time)(TimeAndCount.SyntheticId),
       timeSpanMappingAtPath(TimeChargeCorrectionType / "amount", TimeChargeCorrectionTable.Amount)(TimeChargeCorrectionTable.Id),
       timeSpanMappingAtPath(TimeChargeDiscountType / "amount", TimeChargeDiscountTable.Amount)(TimeChargeDiscountTable.VisitId),
       timeSpanMappingAtPath(TimeChargeDaylightDiscountType / "amount", TimeChargeDiscountTable.Amount)(TimeChargeDiscountTable.VisitId),
