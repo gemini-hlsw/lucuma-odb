@@ -63,8 +63,7 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
   private def blindOffsetTargetObject(name: String): SqlObject =
     SqlObject(
       name,
-      Join(ObservationView.Id, AsterismTargetTable.ObservationId),
-      Join(AsterismTargetTable.TargetId, TargetView.TargetId)
+      Join(ObservationView.BlindOffsetTargetId, TargetView.TargetId)
     )
 
   lazy val TargetEnvironmentMapping: ObjectMapping =

@@ -6,10 +6,11 @@ package subscription
 
 import cats.effect.IO
 import cats.effect.kernel.Ref
-import cats.syntax.show.*
+import cats.syntax.all.*
 import io.circe.Json
 import io.circe.literal.*
 import lucuma.core.enums.CalibrationRole
+import lucuma.core.enums.TargetDisposition
 import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.User
@@ -240,10 +241,9 @@ class targetEdit extends OdbSuite {
         mutations =
           Right(
             createProgramAs(pi)
-              .flatTap(
-                createTarget(pi, _, "t")
+              .flatTap(pid =>
+              (createTargetViaServiceAs(pi, pid, TargetDisposition.Calibration, CalibrationRole.Twilight.some) <* pause)
                   .flatTap(i => ref.set(List(i)))
-                  .flatMap(setTargetCalibrationRole(_, CalibrationRole.Twilight))
               )
               .flatMap(pid => withServices(service) {services =>
                 services.session.transaction.use { xa =>
@@ -256,15 +256,6 @@ class targetEdit extends OdbSuite {
                 json"""{
                     "targetEdit": {
                       "editType":"CREATED",
-                      "targetId":${i.head.show},
-                      "value": {
-                        "id":${i.head.show}
-                      }
-                    }
-                  }""",
-                json"""{
-                    "targetEdit": {
-                      "editType":"UPDATED",
                       "targetId":${i.head.show},
                       "value": {
                         "id":${i.head.show}

@@ -683,9 +683,10 @@ trait DatabaseOperations { this: OdbSuite =>
       .liftTo[IO]
     }
 
-  def deleteObservation(
+  def setObservationExistence(
     user: User,
-    oid:  Observation.Id
+    oid:  Observation.Id,
+    existence: Existence
   ): IO[Unit] =
     expect(
       user = user,
@@ -699,26 +700,40 @@ trait DatabaseOperations { this: OdbSuite =>
                 }
               }
               SET: {
-                existence: DELETED
+                existence: ${existence.tag.toUpperCase}
               }
+              includeDeleted: true
             }
           ) {
             observations {
-             id
+              id
+              existence
             }
           }
         }
       """,
-      expected = Right(
-        Json.obj(
-          "updateObservations" -> Json.obj(
-            "observations" -> Json.arr(
-              Json.obj("id" -> oid.asJson)
-            )
-          )
-        )
-      )
+      expected = json"""
+        {
+          "updateObservations": {
+            "observations": [
+              { "id": $oid, "existence": ${existence.tag.toUpperCase} }
+            ]
+          }
+        }
+      """.asRight
     )
+
+  def deleteObservation(
+    user: User,
+    oid:  Observation.Id
+  ): IO[Unit] =
+    setObservationExistence(user, oid, Existence.Deleted)
+
+  def restoreObservation(
+    user: User,
+    oid:  Observation.Id
+  ): IO[Unit] =
+    setObservationExistence(user, oid, Existence.Present)
 
   def setScienceBandAs(user: User, oid: Observation.Id, band: Option[ScienceBand]): IO[Unit] =
     query(
@@ -1364,6 +1379,43 @@ trait DatabaseOperations { this: OdbSuite =>
 
   def undeleteTargetAs(user: User, tid: Target.Id): IO[Unit] =
     updateTargetExistencetAs(user, tid, Existence.Present)
+
+  def expectTargetExistenceAs(user: User, tid: Target.Id, shouldBePresent: Boolean): IO[Unit] =
+    val existence = if (shouldBePresent) Existence.Present else Existence.Deleted
+    expect(
+      user = user,
+      query = s"""
+        query {
+          target(targetId: "$tid") {
+            existence
+          }
+        }
+      """,
+      expected = json"""
+        {
+          "target": {
+            "existence": ${existence.tag.toUpperCase().asJson}
+          }
+        }
+      """.asRight
+    )
+
+  def expectTargetNotFoundAs(user: User, tid: Target.Id): IO[Unit] =
+    expect(
+      user = user,
+      query = s"""
+        query {
+          target(targetId: "$tid") {
+            id
+          }
+        }
+      """,
+      expected = json"""
+        {
+          "target": null
+        }
+      """.asRight
+    )
 
   def createGroupAs(
     user: User,
@@ -2246,12 +2298,6 @@ trait DatabaseOperations { this: OdbSuite =>
     val command = sql"update t_group set c_system = $bool where c_group_id = $group_id".command
     FMain.databasePoolResource[IO](databaseConfig).flatten
       .use(_.prepareR(command).use(_.execute(system, id).void))
-  }
-
-  def setTargetCalibrationRole(tid: Target.Id, role: CalibrationRole): IO[Unit] = {
-    val command = sql"update t_target set c_calibration_role = $calibration_role, c_target_disposition = 'calibration' where c_target_id = $target_id".command
-    FMain.databasePoolResource[IO](databaseConfig).flatten
-      .use(_.prepareR(command).use(_.execute(role, tid).void))
   }
 
   def setObservationCalibratioRole(oid: Observation.Id, role: Option[CalibrationRole]): IO[Unit] = {
