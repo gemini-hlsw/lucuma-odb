@@ -148,6 +148,9 @@ class ShortCut_6589 extends ExecutionTestSupportForGmos:
           // comparing it to what it was at the beginning of the "Setup" before
           // anything was executed.  Now they are the same again.
           _ <- assertIO(nextAtomId(s.o), s.g)
+
+          // Record the previous atom again and verify the recorded atom is is the same as before.
+          _ <- assertIO(recordAtomAs(serviceUser, Instrument.GmosNorth, s.v, SequenceType.Science), s.a)
         yield ()
 
   def nextAtomStepTypes(o: Observation.Id): IO[List[StepType]] =
