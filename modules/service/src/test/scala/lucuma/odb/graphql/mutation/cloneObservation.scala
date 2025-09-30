@@ -27,6 +27,7 @@ class cloneObservation extends OdbSuite {
       subtitle
       program { id }
       observerNotes
+      useBlindOffset
       constraintSet {
         cloudExtinction
         imageQuality
@@ -730,49 +731,62 @@ class cloneObservation extends OdbSuite {
     }
   }
 
-  test("clone observation should preserve observer notes") {
-    createProgramAs(pi).flatMap { pid =>
-      query(
-        user = pi,
-        query = s"""
-          mutation {
-            createObservation(input: {
-              programId: "$pid"
-              SET: {
-                observerNotes: "Important observation notes"
-              }
-            }) {
-              observation {
-                id
-              }
-            }
-          }
-        """
-      ).flatMap { json =>
-        val oid = json.hcursor.downFields("createObservation", "observation", "id").require[Observation.Id]
-        query(
-          user = pi,
-          query = s"""
-            mutation {
-              cloneObservation(input: {
-                observationId: ${oid.asJson}
-              }) {
-                originalObservation {
-                  observerNotes
-                }
-                newObservation {
-                  observerNotes
-                }
-              }
-            }
-          """
-        ).map { json =>
-          val originalNotes = json.hcursor.downFields("cloneObservation", "originalObservation", "observerNotes").require[String]
-          val clonedNotes = json.hcursor.downFields("cloneObservation", "newObservation", "observerNotes").require[String]
-          assertEquals(originalNotes, "Important observation notes")
-          assertEquals(clonedNotes, "Important observation notes")
-        }
-      }
-    }
-  }
+  test("clone observation should preserve observer notes"):
+    for {
+      pid    <- createProgramAs(pi)
+      idjson <- query(
+                  user = pi,
+                  query = s"""
+                    mutation {
+                      createObservation(input: {
+                        programId: "$pid"
+                        SET: {
+                          observerNotes: "Observation notes"
+                          useBlindOffset: true
+                        }
+                      }) {
+                        observation {
+                          id
+                        }
+                      }
+                    }
+                  """
+                )
+      oid   = idjson.hcursor.downFields("createObservation", "observation", "id").require[Observation.Id]
+      _     <- expect(
+                user = pi,
+                query = s"""
+                  mutation {
+                    cloneObservation(input: {
+                      observationId: ${oid.asJson}
+                    }) {
+                      originalObservation {
+                        observerNotes
+                        useBlindOffset
+                      }
+                      newObservation {
+                        observerNotes
+                        useBlindOffset
+                      }
+                    }
+                  }
+                """,
+                expected = Right(
+                  json"""
+                    {
+                      "cloneObservation": {
+                        "originalObservation": {
+                          "observerNotes": "Observation notes",
+                          "useBlindOffset": true
+                        },
+                        "newObservation": {
+                          "observerNotes": "Observation notes",
+                          "useBlindOffset": true
+                        }
+                      }
+                    }
+                  """
+                )
+              )
+    } yield ()
 }

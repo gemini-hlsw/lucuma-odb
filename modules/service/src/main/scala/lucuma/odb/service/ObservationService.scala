@@ -1105,7 +1105,8 @@ object ObservationService {
           c_img_narrow_filters,
           c_img_broad_filters,
           c_img_combined_filters,
-          c_observer_notes
+          c_observer_notes,
+          c_use_blind_offset
         )
         SELECT
           c_program_id,
@@ -1147,7 +1148,8 @@ object ObservationService {
           c_img_narrow_filters,
           c_img_broad_filters,
           c_img_combined_filters,
-          c_observer_notes
+          c_observer_notes,
+          c_use_blind_offset
       FROM t_observation
       WHERE c_observation_id = $observation_id
       RETURNING c_observation_id
