@@ -1104,7 +1104,8 @@ object ObservationService {
           c_img_minimum_fov,
           c_img_narrow_filters,
           c_img_broad_filters,
-          c_img_combined_filters
+          c_img_combined_filters,
+          c_observer_notes
         )
         SELECT
           c_program_id,
@@ -1145,7 +1146,8 @@ object ObservationService {
           c_img_minimum_fov,
           c_img_narrow_filters,
           c_img_broad_filters,
-          c_img_combined_filters
+          c_img_combined_filters,
+          c_observer_notes
       FROM t_observation
       WHERE c_observation_id = $observation_id
       RETURNING c_observation_id

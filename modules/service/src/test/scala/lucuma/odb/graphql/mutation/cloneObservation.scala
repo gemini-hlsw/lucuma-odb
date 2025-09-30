@@ -26,6 +26,7 @@ class cloneObservation extends OdbSuite {
       title
       subtitle
       program { id }
+      observerNotes
       constraintSet {
         cloudExtinction
         imageQuality
@@ -724,6 +725,52 @@ class cloneObservation extends OdbSuite {
               """
             )
           )
+        }
+      }
+    }
+  }
+
+  test("clone observation should preserve observer notes") {
+    createProgramAs(pi).flatMap { pid =>
+      query(
+        user = pi,
+        query = s"""
+          mutation {
+            createObservation(input: {
+              programId: "$pid"
+              SET: {
+                observerNotes: "Important observation notes"
+              }
+            }) {
+              observation {
+                id
+              }
+            }
+          }
+        """
+      ).flatMap { json =>
+        val oid = json.hcursor.downFields("createObservation", "observation", "id").require[Observation.Id]
+        query(
+          user = pi,
+          query = s"""
+            mutation {
+              cloneObservation(input: {
+                observationId: ${oid.asJson}
+              }) {
+                originalObservation {
+                  observerNotes
+                }
+                newObservation {
+                  observerNotes
+                }
+              }
+            }
+          """
+        ).map { json =>
+          val originalNotes = json.hcursor.downFields("cloneObservation", "originalObservation", "observerNotes").require[String]
+          val clonedNotes = json.hcursor.downFields("cloneObservation", "newObservation", "observerNotes").require[String]
+          assertEquals(originalNotes, "Important observation notes")
+          assertEquals(clonedNotes, "Important observation notes")
         }
       }
     }
