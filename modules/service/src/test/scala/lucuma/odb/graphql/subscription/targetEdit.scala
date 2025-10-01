@@ -6,10 +6,13 @@ package subscription
 
 import cats.effect.IO
 import cats.effect.kernel.Ref
-import cats.syntax.show.*
+import cats.syntax.all.*
 import io.circe.Json
 import io.circe.literal.*
+import io.circe.syntax.*
 import lucuma.core.enums.CalibrationRole
+import lucuma.core.enums.TargetDisposition
+import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.User
@@ -222,7 +225,7 @@ class targetEdit extends OdbSuite {
     )
   }
 
-  test("event for target deletion") {
+  test("event for calibration target deletion") {
     Ref.of[IO, List[Target.Id]](List.empty[Target.Id]).flatMap { ref =>
       subscriptionExpectF(
         user      = pi,
@@ -240,10 +243,9 @@ class targetEdit extends OdbSuite {
         mutations =
           Right(
             createProgramAs(pi)
-              .flatTap(
-                createTarget(pi, _, "t")
+              .flatTap(pid =>
+              (createTargetViaServiceAs(pi, pid, TargetDisposition.Calibration, CalibrationRole.Twilight.some) <* pause)
                   .flatTap(i => ref.set(List(i)))
-                  .flatMap(setTargetCalibrationRole(_, CalibrationRole.Twilight))
               )
               .flatMap(pid => withServices(service) {services =>
                 services.session.transaction.use { xa =>
@@ -264,15 +266,6 @@ class targetEdit extends OdbSuite {
                   }""",
                 json"""{
                     "targetEdit": {
-                      "editType":"UPDATED",
-                      "targetId":${i.head.show},
-                      "value": {
-                        "id":${i.head.show}
-                      }
-                    }
-                  }""",
-                json"""{
-                    "targetEdit": {
                       "editType":"DELETED_CAL",
                       "targetId":${i.head.show},
                       "value": null
@@ -280,6 +273,57 @@ class targetEdit extends OdbSuite {
                   }"""
              )
             )
+      )
+    }
+  }
+
+  test("event for blind offset target deletion") {
+    Ref.of[IO, List[(Observation.Id, Target.Id)]](List.empty[(Observation.Id, Target.Id)]).flatMap { ref =>
+      subscriptionExpectF(
+        user      = pi,
+        query     = s"""
+          subscription {
+            targetEdit {
+              editType
+              targetId
+              value {
+                id
+              }
+            }
+          }
+        """,
+        mutations =
+          Right(
+            createProgramAs(pi)
+              .flatMap(pid =>
+                (createObservationWithBlindOffsetAs(pi, pid, "Blinding") <* pause)
+                  .flatTap(tup => ref.set(List(tup)))
+              .flatMap((oid, tid) =>
+                updateAsterisms(pi, List(oid), List.empty, List(tid), List((oid, List.empty)))
+              )
+            )
+          ),
+        expectedF = ref.get.map(l =>
+          val tid   = l.head._2
+          List(
+            json"""{
+                "targetEdit": {
+                  "editType": "CREATED",
+                  "targetId": ${tid.asJson},
+                  "value": {
+                    "id":${tid.asJson}
+                  }
+                }
+              }""",
+            json"""{
+                "targetEdit": {
+                  "editType":"DELETED_CAL",
+                  "targetId":${tid.asJson},
+                  "value": null
+                }
+              }"""
+          )
+        )
       )
     }
   }
