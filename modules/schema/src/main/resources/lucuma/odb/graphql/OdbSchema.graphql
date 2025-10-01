@@ -13597,6 +13597,32 @@ enum TacCategory {
 }
 
 """
+Target disposition
+"""
+enum TargetDisposition {
+  """
+  TargetDisposition Science
+  Science targets are associated with science observations.
+  """
+  SCIENCE
+
+  """
+  TargetDisposition Calibration
+  Calibration targets are associated with calibration observations.
+  """
+  CALIBRATION
+
+  """
+  TargetDisposition BlindOffset
+  Blind offset targets do not exist independently from an observation. If a blind offset target is
+  removed from the asterism of an observation, or the useBlindOffset flag is unset, the blind offset target
+  is deleted.
+  """
+  BLIND_OFFSET
+
+}
+
+"""
 Calibration role
 Observations/Programs/Targets can have a calibration role
 """
@@ -13650,6 +13676,11 @@ type Target {
   Target name.
   """
   name: NonEmptyString!
+
+  """
+  Target disposition. See TargetDisposition for more information.
+  """
+  disposition: TargetDisposition!
 
   """
   calibration role
@@ -15389,7 +15420,6 @@ input WhereEqFocalPlane {
 Filters on equality (or not) of the instrument and the supplied criteria.
 All supplied criteria must match, but usually only one is selected.  E.g.
 'EQ = "GMOS_SOUTH"' will match when the property value is "GMOS_SOUTH".
-Defining, `EQ`, `NEQ` etc. implies `IS_NULL` is `false`.
 """
 input WhereEqInstrument {
   """
@@ -15411,6 +15441,33 @@ input WhereEqInstrument {
   Matches if the instrument is none of the supplied values.
   """
   NIN: [Instrument!]
+}
+
+"""
+Filters on equality (or not) of the target disposition and the supplied criteria.
+All supplied criteria must match, but usually only one is selected.  E.g.
+'EQ = "SCIENCE"' will match when the property value is "SCIENCE".
+"""
+input WhereEqTargetDisposition {
+  """
+  Matches if the target disposition is exactly the supplied value.
+  """
+  EQ: TargetDisposition
+
+  """
+  Matches if the target disposition is not the supplied value.
+  """
+  NEQ: TargetDisposition
+
+  """
+  Matches if the target disposition is any of the supplied options.
+  """
+  IN: [TargetDisposition!]
+
+  """
+  Matches if the target disposition is none of the supplied values.
+  """
+  NIN: [TargetDisposition!]
 }
 
 """
@@ -17292,6 +17349,11 @@ input WhereTarget {
   Matches the target name.
   """
   name: WhereString
+
+  """
+  Matches the target disposition.
+  """
+  disposition: WhereEqTargetDisposition
 
   """
   Matches the calibration role.
