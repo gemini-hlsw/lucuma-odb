@@ -10,6 +10,7 @@ import cats.effect.std.SecureRandom
 import cats.effect.std.UUIDGen
 import cats.implicits.*
 import fs2.compression.Compression
+import lucuma.catalog.clients.GaiaClient
 import lucuma.core.model.Access
 import lucuma.core.model.AccessControlException
 import lucuma.core.model.Observation
@@ -35,12 +36,13 @@ object SchedulerRoutes:
 
   // the normal constructor
   def apply[F[_]: Async: Logger: Parallel: Trace: SecureRandom](
-    pool:      Resource[F, Session[F]],
-    ssoClient: SsoClient[F, User],
-    enums:     Enums
+    pool:       Resource[F, Session[F]],
+    ssoClient:  SsoClient[F, User],
+    enums:      Enums,
+    gaiaClient: GaiaClient[F]
   ): HttpRoutes[F] =
     apply(
-      [A] => (u: User) => (fa: Services[F] => F[A]) => pool.map(Services.forUser(u, enums, None)).use(fa),
+      [A] => (u: User) => (fa: Services[F] => F[A]) => pool.map(Services.forUser(u, enums, gaiaClient, None)).use(fa),
       ssoClient
     )
 

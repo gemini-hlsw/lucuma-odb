@@ -24,6 +24,7 @@ import lucuma.core.model.User
 import lucuma.core.util.CalculationState
 import lucuma.itc.client.ItcClient
 import lucuma.odb.Config
+import lucuma.odb.data.BlindOffset
 import lucuma.odb.data.Obscalc
 import lucuma.odb.graphql.OdbMapping
 import lucuma.odb.graphql.enums.Enums
@@ -197,21 +198,43 @@ object CalcMain extends MainParams:
           Logger[F].debug(s"Stored obscalc result for ${pc.observationId}. Current status: $meta.")
         .void
 
+    val blindOffsetPollStream: Stream[F, BlindOffset.PendingCalc] =
+      Stream
+        .awakeEvery(pollPeriod)
+        .evalMap: _ =>
+          services.useTransactionally:
+            requireServiceAccessOrThrow:
+              obscalc.loadBlindOffsetCalcs(connectionsLimit / 2)
+        .flatMap(Stream.emits)
+
+    val blindOffsetCalcStream: Stream[F, Unit] =
+      blindOffsetPollStream
+        .parEvalMapUnordered(connectionsLimit / 2): pc =>
+          services.useNonTransactionally:
+            requireServiceAccessOrThrow:
+              obscalc.calculateAndUpdateBlindOffset(pc)
+        .evalTap: _ =>
+          Logger[F].debug(s"Completed blind offset calculation")
+        .void
+
+    val combinedStream = calcAndUpdateStream.merge(blindOffsetCalcStream)
+
     for
-      _ <- Resource.eval(Logger[F].info("Processing PendingCalc"))
+      _ <- Resource.eval(Logger[F].info("Processing PendingCalc and BlindOffset calculations"))
       _ <- Resource.eval:
              services.useTransactionally:
                requireServiceAccessOrThrow:
                  obscalc.reset
-      o <- calcAndUpdateStream.compile.drain.background
+      o <- combinedStream.compile.drain.background
     yield o
 
   def services[F[_]: Concurrent: Parallel: UUIDGen: Trace: Logger](
-    user:    User,
-    enums:   Enums,
-    mapping: Session[F] => Mapping[F]
+    user:       User,
+    enums:      Enums,
+    gaiaClient: GaiaClient[F],
+    mapping:    Session[F] => Mapping[F]
   )(session: Session[F]): F[Services[F]] =
-    Services.forUser(user, enums, mapping.some)(session).pure[F].flatTap: _ =>
+    Services.forUser(user, enums, gaiaClient, mapping.some)(session).pure[F].flatTap: _ =>
       val us = UserService.fromSession(session)
       Services.asSuperUser(us.canonicalizeUser(user))
 
@@ -236,7 +259,7 @@ object CalcMain extends MainParams:
       t     <- topic(pool)
       user  <- Resource.eval(serviceUser[F](c))
       mapping = (s: Session[F]) => OdbMapping.forObscalc(Resource.pure(s), SkunkMonitor.noopMonitor[F], user, c.goaUsers, gaiaClient, itc, c.commitHash, enums, ptc, http, c.email)
-      o     <- runObscalcDaemon(c.database.maxObscalcConnections, c.commitHash, c.obscalcPoll, itc, ptc, t, pool.evalMap(services(user, enums, mapping)))
+      o     <- runObscalcDaemon(c.database.maxObscalcConnections, c.commitHash, c.obscalcPoll, itc, ptc, t, pool.evalMap(services(user, enums, gaiaClient, mapping)))
     yield o
 
   /** Our logical entry point. */

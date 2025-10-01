@@ -20,7 +20,6 @@ import io.circe.refined.given
 import io.circe.syntax.*
 import lucuma.ags
 import lucuma.ags.*
-import lucuma.catalog.clients.GaiaClient
 import lucuma.catalog.votable.*
 import lucuma.core.enums.Flamingos2LyotWheel
 import lucuma.core.enums.GuideProbe
@@ -91,11 +90,11 @@ trait GuideService[F[_]] {
 
   def getObjectTracking(pid: Program.Id, oid: Observation.Id)(using
     NoTransaction[F], SuperUserAccess
-  ): F[Result[Option[ObjectTracking]]] 
+  ): F[Result[Option[ObjectTracking]]]
 
   def getObjectTrackingOrRegion(pid: Program.Id, oid: Observation.Id)(using
     NoTransaction[F], SuperUserAccess
-  ): F[Result[Either[ObjectTracking, Region]]] 
+  ): F[Result[Either[ObjectTracking, Region]]]
 
   def getGuideEnvironments(pid: Program.Id, oid: Observation.Id, obsTime: Timestamp)(using
     NoTransaction[F], SuperUserAccess
@@ -300,11 +299,11 @@ object GuideService {
   }
 
   def instantiate[F[_]: Concurrent: Trace](
-    gaiaClient:             GaiaClient[F],
     itcClient:              ItcClient[F],
     commitHash:             CommitHash,
     timeEstimateCalculator: TimeEstimateCalculatorImplementation.ForInstrumentMode
   )(using Services[F]): GuideService[F] =
+    val gaiaClient = summon[Services[F]].gaiaClient
     new GuideService[F] {
 
       def getAsterism(pid: Program.Id, oid: Observation.Id)(using
@@ -746,7 +745,7 @@ object GuideService {
         (for {
           obsInfo       <- ResultT(getObservationInfo(oid))
           asterism      <- ResultT(getAsterism(pid, oid))
-          baseTracking   = 
+          baseTracking   =
             obsInfo.explicitBase match
               case Some(eb) => Left(ObjectTracking.constant(eb))
               case None     => ObjectTracking.orRegionFromAsterism(asterism)
@@ -773,7 +772,7 @@ object GuideService {
                               .map(ObjectTracking.constant)
                               .orElse(ObjectTracking.fromAsterism(asterism))
                               .fold(Result.failure(s"No tracking available for $oid")): t =>
-                                Result.success(t)                             
+                                Result.success(t)
 
           visitEnd      <- ResultT.fromResult(
                              obsTime

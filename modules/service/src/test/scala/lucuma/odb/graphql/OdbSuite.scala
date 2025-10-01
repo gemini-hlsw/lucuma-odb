@@ -362,7 +362,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
   protected def goaUsers: Set[User.Id] =
     Set.empty
 
-  private val gaiaAdapters: NonEmptyChain[CatalogAdapter.Gaia] =
+  protected val gaiaAdapters: NonEmptyChain[CatalogAdapter.Gaia] =
     NonEmptyChain.one(CatalogAdapter.Gaia3LiteEsa)
 
   private def httpApp(using Trace[IO]): Resource[IO, WebSocketBuilder2[IO] => HttpApp[IO]] =
@@ -678,9 +678,10 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
   def withServices[A](u: User)(f: Services[IO] => IO[A]): IO[A] =
     import Trace.Implicits.noop
     Resource.eval(IO(sessionFixture())).use { s =>
-      Enums.load(s).flatMap(e =>
-        f(Services.forUser(u, e, None)(s))
-      )
+      Enums.load(s).flatMap { e =>
+        val gaia = GaiaClient.build(httpClient, adapters = gaiaAdapters)
+        f(Services.forUser(u, e, gaia, None)(s))
+      }
     }
 
   extension [A](r: Result[A]) def get: IO[A] =
@@ -696,7 +697,8 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
     import Trace.Implicits.noop
     Resource.eval(IO(sessionFixture())).use: s =>
       Enums.load(s).flatMap: e =>
-        given services: Services[IO] = Services.forUser(u, e, None)(s)
+        val gaia = GaiaClient.build(httpClient, adapters = gaiaAdapters)
+        given services: Services[IO] = Services.forUser(u, e, gaia, None)(s)
         requireServiceAccess:
           f(services).map(Result.success)
         .flatMap(_.get)
@@ -709,7 +711,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
 
     val res =
       for
-        http <- JdkHttpClient.simple[IO]
+        http <- httpClient.pure[Resource[IO, *]]
         db   <- FMain.databasePoolResource[IO](databaseConfig)
         enm  <- db.evalMap(Enums.load)
         ptc  <- db.evalMap(TimeEstimateCalculatorImplementation.fromSession(_, enm))
@@ -730,7 +732,8 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
         emailConfig
       )
       db.use: s =>
-        given services: Services[IO] = Services.forUser(u, enm, mapping.some)(s)
+        val gaia = GaiaClient.build[IO](http, adapters = gaiaAdapters)
+        given services: Services[IO] = Services.forUser(u, enm, gaia, mapping.some)(s)
         requireServiceAccess:
           f(services).map(Result.success)
         .flatMap(_.get)

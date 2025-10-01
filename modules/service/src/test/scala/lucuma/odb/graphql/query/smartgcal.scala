@@ -13,6 +13,7 @@ import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.numeric.PosLong
 import io.circe.Json
 import io.circe.literal.*
+import lucuma.catalog.clients.GaiaClient
 import lucuma.core.enums.Flamingos2Disperser
 import lucuma.core.enums.Flamingos2Filter
 import lucuma.core.enums.Flamingos2Fpu
@@ -72,7 +73,8 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
 
   override def dbInitialization: Option[Session[IO] => IO[Unit]] = Some { s =>
     Enums.load(s).flatMap { e =>
-      val services = Services.forUser(pi /* doesn't matter*/, e, None)(s)
+      val gaia = GaiaClient.build(httpClient, adapters = gaiaAdapters)
+      val services = Services.forUser(pi /* doesn't matter*/, e, gaia, None)(s)
       services.transactionally {
 
         val flat =

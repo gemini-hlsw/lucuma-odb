@@ -9,6 +9,7 @@ import cats.effect.std.SecureRandom
 import cats.effect.std.UUIDGen
 import cats.implicits.*
 import eu.timepit.refined.types.string.NonEmptyString
+import lucuma.catalog.clients.GaiaClient
 import lucuma.core.enums.AttachmentType
 import lucuma.core.model.Attachment
 import lucuma.core.model.Program
@@ -38,10 +39,11 @@ object AttachmentRoutes {
     s3:                    S3FileService[F],
     ssoClient:             SsoClient[F, User],
     enums:                 Enums,
+    gaiaClient:            GaiaClient[F],
     maxUploadMb:           Int,
   ): HttpRoutes[F] =
     apply(
-      [A] => (u: User) => (fa: AttachmentFileService[F] => F[A]) => pool.map(Services.forUser(u, enums, None)).map(_.attachmentFileService(s3)).use(fa),
+      [A] => (u: User) => (fa: AttachmentFileService[F] => F[A]) => pool.map(Services.forUser(u, enums, gaiaClient, None)).map(_.attachmentFileService(s3)).use(fa),
       ssoClient,
       maxUploadMb
     )
@@ -110,7 +112,7 @@ object AttachmentRoutes {
       case req @ POST -> Root / "attachment"
           :? ProgramIdMatcher(programId)
           +& FileNameMatcher(fileName)
-          +& AttachmentTypeMatcher(attachmentType) 
+          +& AttachmentTypeMatcher(attachmentType)
           +& DescriptionMatcher(optDesc) =>
         ssoClient.require(req) { user =>
           service(user) { s =>

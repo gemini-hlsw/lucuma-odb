@@ -255,10 +255,10 @@ object FMain extends MainParams {
       metadataService    = GraphQLService(OdbMapping.forMetadata(pool, SkunkMonitor.noopMonitor[F], enums))
       webhookService    <- pool.map(EmailWebhookService.fromSession(_))
     } yield { wsb =>
-      val attachmentRoutes   = AttachmentRoutes.apply[F](pool, s3FileService, ssoClient, enums, awsConfig.fileUploadMaxMb)
+      val attachmentRoutes   = AttachmentRoutes.apply[F](pool, s3FileService, ssoClient, enums, gaiaClient, awsConfig.fileUploadMaxMb)
       val metadataRoutes     = GraphQLRoutes.enumMetadata(metadataService)
       val emailWebhookRoutes = EmailWebhookRoutes(webhookService, emailConfig)
-      val schedulerRoutes    = SchedulerRoutes.apply[F](pool, ssoClient, enums)
+      val schedulerRoutes    = SchedulerRoutes.apply[F](pool, ssoClient, enums, gaiaClient)
       middleware(graphQLRoutes(wsb) <+> attachmentRoutes <+>  metadataRoutes <+> emailWebhookRoutes <+> schedulerRoutes)
     }
 

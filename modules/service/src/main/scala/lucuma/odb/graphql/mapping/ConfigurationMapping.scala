@@ -81,15 +81,15 @@ trait ConfigurationMapping[F[_]]
       def calculate(pid: Program.Id, oid: Observation.Id, oRefTime: Option[Timestamp]): F[Result[Option[Either[Coordinates, Region]]]] =
         services.use { implicit s =>
           Services.asSuperUser:
-            s.guideService(gaiaClient, itcClient, commitHash, timeEstimateCalculator)
+            s.guideService(itcClient, commitHash, timeEstimateCalculator)
               .getObjectTrackingOrRegion(pid, oid)
               .map:
-                case Failure(problems) => Warning(problems, None) // turn failure into a warning                
-                case other => 
+                case Failure(problems) => Warning(problems, None) // turn failure into a warning
+                case other =>
                   other.map:
                     case Right(r) => Some(Right(r))
                     case Left(cs) =>
-                      oRefTime.flatMap: refTime =>                        
+                      oRefTime.flatMap: refTime =>
                         cs.at(refTime.toInstant).map: aliased =>
                           Left(aliased.value)
         }
@@ -118,8 +118,8 @@ trait ConfigurationMapping[F[_]]
                         Json.obj(
                           "coordinates" -> result.flatMap(_.left.toOption).asJson,
                           "region"      -> result.flatMap(_.toOption).asJson,
-                        ), 
-                        Some(parentCursor), 
+                        ),
+                        Some(parentCursor),
                         parentCursor.fullEnv
                       )
                      }

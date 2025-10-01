@@ -11,6 +11,7 @@ import eu.timepit.refined.types.numeric.PosLong
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
+import lucuma.catalog.clients.GaiaClient
 import lucuma.core.enums.Breakpoint
 import lucuma.core.enums.GcalArc
 import lucuma.core.enums.GcalBaselineType
@@ -139,7 +140,8 @@ trait ExecutionTestSupportForGmos extends ExecutionTestSupport:
       )
 
     Enums.load(s).flatMap: e =>
-      val services = Services.forUser(pi /* doesn't matter*/, e, None)(s)
+      val gaia = GaiaClient.build(httpClient, adapters = gaiaAdapters)
+      val services = Services.forUser(pi /* doesn't matter*/, e, gaia, None)(s)
       services.transactionally:
         rows.zipWithIndex.traverse_ : (r, i) =>
           Services.asSuperUser:

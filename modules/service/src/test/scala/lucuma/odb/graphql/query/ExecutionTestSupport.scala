@@ -9,6 +9,7 @@ import cats.effect.IO
 import cats.syntax.all.*
 import io.circe.Json
 import io.circe.literal.*
+import lucuma.catalog.clients.GaiaClient
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.DatasetQaState
 import lucuma.core.enums.DatasetStage
@@ -255,7 +256,8 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
         future <- limit.traverse(lim => IO.fromOption(Generator.FutureLimit.from(lim).toOption)(new IllegalArgumentException("Specify a future limit from 0 to 100")))
         enums  <- Enums.load(session)
         tec    <- TimeEstimateCalculatorImplementation.fromSession(session, enums)
-        srv     = Services.forUser(serviceUser, enums, None)(session)
+        gaia    = GaiaClient.build(httpClient, adapters = gaiaAdapters)
+        srv     = Services.forUser(serviceUser, enums, gaia, None)(session)
         gen     = srv.generator(CommitHash.Zero, itcClient, tec)
         res    <- Services.asSuperUser(gen.generate(pid, oid, future.getOrElse(Generator.FutureLimit.Default), when))
       yield res

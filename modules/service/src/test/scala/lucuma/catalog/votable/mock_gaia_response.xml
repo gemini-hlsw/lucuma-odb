@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<VOTABLE version="1.4" xmlns="http://www.ivoa.net/xml/VOTable/v1.3">
+  <RESOURCE type="results">
+    <TABLE>
+      <FIELD ID="source_id" datatype="long" name="source_id"/>
+      <FIELD ID="ra" datatype="double" name="ra" unit="deg"/>
+      <FIELD ID="pmra" datatype="double" name="pmra" unit="mas/yr"/>
+      <FIELD ID="dec" datatype="double" name="dec" unit="deg"/>
+      <FIELD ID="pmdec" datatype="double" name="pmdec" unit="mas/yr"/>
+      <FIELD ID="parallax" datatype="double" name="parallax" unit="mas"/>
+      <FIELD ID="radial_velocity" datatype="double" name="radial_velocity" unit="km/s"/>
+      <FIELD ID="phot_g_mean_mag" datatype="float" name="phot_g_mean_mag" unit="mag"/>
+      <FIELD ID="phot_rp_mean_mag" datatype="float" name="phot_rp_mean_mag" unit="mag"/>
+      <DATA>
+        <TABLEDATA>
+          <TR>
+            <TD>3403796049196297600</TD>
+            <TD>83.82208</TD>
+            <TD>5.5</TD>
+            <TD>22.01444</TD>
+            <TD>-2.1</TD>
+            <TD>1.2</TD>
+            <TD>10.5</TD>
+            <TD>14.5</TD>
+            <TD>13.8</TD>
+          </TR>
+          <TR>
+            <TD>3403795976178260736</TD>
+            <TD>83.82240</TD>
+            <TD>4.2</TD>
+            <TD>22.01500</TD>
+            <TD>-1.8</TD>
+            <TD>0.9</TD>
+            <TD>12.3</TD>
+            <TD>15.1</TD>
+            <TD>14.3</TD>
+          </TR>
+        </TABLEDATA>
+      </DATA>
+    </TABLE>
+  </RESOURCE>
+</VOTABLE>

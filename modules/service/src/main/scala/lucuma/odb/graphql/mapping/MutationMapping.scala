@@ -338,9 +338,9 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
       services.useTransactionally:
         selectForClone(input).flatMap: res =>
           res.flatTraverse: checked =>
-            if checked.isEmpty then 
+            if checked.isEmpty then
               OdbError.NotAuthorized(user.id).asFailureF
-            else 
+            else
               observationService.cloneObservation(checked).nestMap: ids =>
                 Filter(And(
                   Predicates.cloneObservationResult.originalObservation.id.eql(ids.originalId),
@@ -588,7 +588,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
             child
           )
 
-  
+
   @annotation.nowarn("msg=unused implicit parameter")
   private def recordVisit(
     response:  F[Result[Visit.Id]],
@@ -651,7 +651,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
           q <- ResultT.fromResult(allocationResultSubquery(p, child))
         yield q).value
 
-  private lazy val SetGuideTargetName = 
+  private lazy val SetGuideTargetName =
     MutationField("setGuideTargetName", SetGuideTargetNameInput.Binding): (input, child) =>
       services.useNonTransactionally:
         selectForUpdate(input, false /* ignore cals */).flatMap: r =>
@@ -660,7 +660,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
             case r @ Warning(problems, AccessControl.Checked.Empty) => Failure(problems).pure[F]
             case other =>
               other.flatTraverse: checked =>
-                guideService(gaiaClient, itcClient, commitHash, timeEstimateCalculator)
+                guideService(itcClient, commitHash, timeEstimateCalculator)
                   .setGuideTargetName(checked)
                   .nestMap: oid =>
                     Unique(Filter(Predicates.setGuideTargetNameResult.observationId.eql(oid), child))
@@ -804,7 +804,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
           services.useTransactionally:
             approval.flatTraverse: edit =>
                 updateObservations(edit)
-                  .flatMap: 
+                  .flatMap:
                     case (map, query) =>
                       Services.asSuperUser:
                         setAsterisms(map)
@@ -846,7 +846,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
               )
 
   private lazy val UpdatePrograms =
-    MutationField("updatePrograms", UpdateProgramsInput.binding(Path.from(ProgramType))): (input, child) =>      
+    MutationField("updatePrograms", UpdateProgramsInput.binding(Path.from(ProgramType))): (input, child) =>
       services.useTransactionally:
         (for
           checked <- ResultT(selectForUpdate(input))
@@ -880,7 +880,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
             ResultT(services.useTransactionally(targetService.updateTargets(checked)))
               .flatMap: selected =>
                 ResultT(targetResultSubquery(selected, input.LIMIT, child).pure[F])
-              .value  
+              .value
 
   def groupResultSubquery(pids: List[Group.Id], limit: Option[NonNegInt], child: Query): Result[Query] =
     mutationResultSubquery(

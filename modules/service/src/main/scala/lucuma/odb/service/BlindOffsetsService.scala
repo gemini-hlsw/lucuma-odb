@@ -5,12 +5,22 @@ package lucuma.odb.service
 
 import cats.effect.Concurrent
 import cats.syntax.all.*
+import eu.timepit.refined.types.string.NonEmptyString
 import grackle.Result
+import lucuma.core.enums.Band
+import lucuma.core.enums.StellarLibrarySpectrum
+import lucuma.core.math.BrightnessUnits.*
+import lucuma.core.math.Coordinates
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
+import lucuma.core.model.SourceProfile
+import lucuma.core.model.SpectralDefinition
 import lucuma.core.model.Target
+import lucuma.core.model.UnnormalizedSED
+import lucuma.odb.data.Existence
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.Nullable.NonNull
+import lucuma.odb.graphql.input.SiderealInput
 import lucuma.odb.graphql.input.TargetEnvironmentInput
 import lucuma.odb.graphql.input.TargetPropertiesInput
 import lucuma.odb.graphql.mapping.AccessControl
@@ -19,6 +29,8 @@ import lucuma.odb.util.Codecs.*
 import skunk.*
 import skunk.codec.boolean.bool
 import skunk.implicits.*
+
+import scala.collection.immutable.SortedMap
 
 sealed trait BlindOffsetsService[F[_]]:
 
@@ -42,6 +54,12 @@ sealed trait BlindOffsetsService[F[_]]:
     targetEnvironment: Option[TargetEnvironmentInput.Edit]
   )(using Transaction[F], ServiceAccess): F[Result[Unit]]
 
+  def createOrUpdateBlindOffsetFromCoordinates(
+    programId: Program.Id,
+    observationId: Observation.Id,
+    coordinates: Coordinates
+  )(using Transaction[F], ServiceAccess): F[Result[Unit]]
+
 object BlindOffsetsService:
 
   def instantiate[F[_]: Concurrent](using Services[F]): BlindOffsetsService[F] =
@@ -61,12 +79,16 @@ object BlindOffsetsService:
                 for {
                   _ <- session.execute(Statements.addBlindOffset)(programId, observationId, targetId, targetId)
                   _ <- session.execute(Statements.updateBlindOffsetFlag)(true, observationId)
+                  _ <- session.execute(Statements.setManualOverride)(true, observationId)
                 } yield targetId
 
       override def removeBlindOffset(
         observationId: Observation.Id
       )(using Transaction[F], ServiceAccess): F[Unit] =
-        session.execute(Statements.removeBlindOffset)(observationId).void
+        for {
+          _ <- session.execute(Statements.removeBlindOffset)(observationId)
+          _ <- session.execute(Statements.setManualOverride)(false, observationId)
+        } yield ()
 
       override def getBlindOffset(
         observationId: Observation.Id
@@ -80,16 +102,43 @@ object BlindOffsetsService:
       )(using Transaction[F], ServiceAccess): F[Result[Unit]] =
         targetEnvironment.fold(Result.unit.pure[F]): te =>
           te.blindOffsetTarget match
-            case Nullable.Absent => Result.unit.pure[F] // No change
+            case Nullable.Absent => Result.unit.pure[F]
             case Nullable.Null =>
               removeBlindOffset(observationId).as(Result.unit)
             case NonNull(targetInput: TargetPropertiesInput.Create) =>
               for {
-                // Remove existi
                 _          <- removeBlindOffset(observationId)
-                // Then create the new one
                 result     <- createBlindOffset(programId, observationId, targetInput)
               } yield result.void
+
+      override def createOrUpdateBlindOffsetFromCoordinates(
+        programId: Program.Id,
+        observationId: Observation.Id,
+        coordinates: Coordinates
+      )(using Transaction[F], ServiceAccess): F[Result[Unit]] =
+        val targetInput = TargetPropertiesInput.Create(
+          name = NonEmptyString.unsafeFrom("Blind Offset"),
+          subtypeInfo = SiderealInput.Create(
+            ra = coordinates.ra,
+            dec = coordinates.dec,
+            epoch = lucuma.core.math.Epoch.J2000,
+            properMotion = None,
+            radialVelocity = None,
+            parallax = None,
+            catalogInfo = None
+          ),
+          sourceProfile = SourceProfile.Point(
+            SpectralDefinition.BandNormalized(
+              Some(UnnormalizedSED.StellarLibrary(StellarLibrarySpectrum.G2V)),
+              SortedMap.empty[Band, BrightnessMeasure[Integrated]]
+            )
+          ),
+          existence = Existence.Present
+        )
+        for {
+          _      <- removeBlindOffset(observationId)
+          result <- createBlindOffset(programId, observationId, targetInput)
+        } yield result.void
 
       private object Statements:
 
@@ -129,5 +178,12 @@ object BlindOffsetsService:
           sql"""
             UPDATE t_observation
             SET c_use_blind_offset = ${bool}
+            WHERE c_observation_id = $observation_id
+          """.command
+
+        val setManualOverride: Command[Boolean *: Observation.Id *: EmptyTuple] =
+          sql"""
+            UPDATE t_obscalc
+            SET c_blind_offset_manual_override = $bool
             WHERE c_observation_id = $observation_id
           """.command

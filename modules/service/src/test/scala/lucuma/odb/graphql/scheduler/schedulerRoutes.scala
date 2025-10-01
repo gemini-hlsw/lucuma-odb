@@ -7,6 +7,7 @@ package scheduler
 import cats.effect.IO
 import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.PosInt
+import lucuma.catalog.clients.GaiaClient
 import lucuma.core.enums.ChargeClass
 import lucuma.core.enums.GcalLampType
 import lucuma.core.enums.ObserveClass
@@ -39,7 +40,8 @@ class schedulerRoutes extends SchedulerRoutesSuite with ExecutionTestSupportForG
   def withRoutes[A](user: User, request: Request[IO]): IO[Response[IO]] =
     withSession: s =>
       Enums.load(s).flatMap: enums =>
-        val srv = Services.forUser(user, enums, None)(s)
+        val gaia = GaiaClient.build(httpClient, adapters = gaiaAdapters)
+        val srv = Services.forUser(user, enums, gaia, None)(s)
         SchedulerRoutes(srv, ssoClient).orNotFound.run(request)
 
   test("not service user"):

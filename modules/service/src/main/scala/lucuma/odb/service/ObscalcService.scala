@@ -3,6 +3,7 @@
 
 package lucuma.odb.service
 
+import cats.MonadThrow
 import cats.Order.catsKernelOrderingForOrder
 import cats.data.EitherT
 import cats.data.NonEmptyList
@@ -21,11 +22,21 @@ import fs2.Pure
 import fs2.Stream
 import grackle.Result
 import grackle.syntax.*
+import lucuma.catalog.BlindOffsetCandidate
+import lucuma.catalog.clients.GaiaClient
+import lucuma.catalog.votable.ADQLInterpreter
+import lucuma.catalog.votable.QueryByADQL
 import lucuma.core.enums.ChargeClass
 import lucuma.core.enums.ObservationWorkflowState
+import lucuma.core.geom.ShapeExpression
+import lucuma.core.geom.ShapeInterpreter
+import lucuma.core.math.Coordinates
+import lucuma.core.math.Declination
 import lucuma.core.math.Offset
+import lucuma.core.math.RightAscension
 import lucuma.core.math.SingleSN
 import lucuma.core.math.TotalSN
+import lucuma.core.model.ObjectTracking
 import lucuma.core.model.Observation
 import lucuma.core.model.ObservationWorkflow
 import lucuma.core.model.Program
@@ -40,6 +51,7 @@ import lucuma.core.util.Timestamp
 import lucuma.itc.IntegrationTime
 import lucuma.itc.SignalToNoiseAt
 import lucuma.itc.client.ItcClient
+import lucuma.odb.data.BlindOffset
 import lucuma.odb.data.Obscalc
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
@@ -56,6 +68,7 @@ import skunk.codec.numeric.int4
 import skunk.data.Arr
 import skunk.implicits.*
 
+import java.time.Instant
 import scala.collection.immutable.SortedSet
 
 sealed trait ObscalcService[F[_]]:
@@ -152,6 +165,12 @@ sealed trait ObscalcService[F[_]]:
     pending: Obscalc.PendingCalc
   )(using ServiceAccess, NoTransaction[F]): F[Obscalc.Result]
 
+  def loadBlindOffsetCalcs(max: Int)(using ServiceAccess, Transaction[F]): F[List[BlindOffset.PendingCalc]]
+
+  def calculateAndUpdateBlindOffset(
+    pending: BlindOffset.PendingCalc
+  )(using ServiceAccess, NoTransaction[F]): F[Unit]
+
 object ObscalcService:
 
   /**
@@ -168,6 +187,8 @@ object ObscalcService:
     itcClient:  ItcClient[F],
     calculator: ForInstrumentMode
   )(using Services[F]): ObscalcService[F] =
+
+    val gaiaClient = summon[Services[F]].gaiaClient
 
     new ObscalcService[F]:
       override def selectOne(
@@ -344,6 +365,117 @@ object ObscalcService:
             val result = Obscalc.Result.Error(OdbError.UpdateFailed(Option(e.getMessage)), UndefinedWorkflow)
             services.transactionally:
               storeResult(pending, result, CalculationState.Retry)
+
+      override def loadBlindOffsetCalcs(
+        max: Int
+      )(using ServiceAccess, Transaction[F]): F[List[BlindOffset.PendingCalc]] =
+        session.execute(Statements.LoadPendingBlindOffsetCalc)(max)
+
+      override def calculateAndUpdateBlindOffset(
+        pending: BlindOffset.PendingCalc
+      )(using ServiceAccess, NoTransaction[F]): F[Unit] =
+        for {
+          result <- services.transactionally(performBlindOffsetCalculation(pending))
+          _      <- services.transactionally(updateBlindOffsetState(pending, result))
+        } yield ()
+
+      private def performBlindOffsetCalculation(
+        pending: BlindOffset.PendingCalc
+      )(using ServiceAccess): F[Option[Coordinates]] =
+        (pending.observationTime, pending.explicitBase) match
+          case (Some(time), Some(base)) =>
+            calculateBlindOffsetFromBase(base, time).map(_.some)
+          case (Some(time), None) =>
+            for {
+              asterismResult <- Services.asSuperUser:
+                                  asterismService.getAsterism(pending.programId, pending.observationId)
+              coords         <- asterismResult match
+                                  case targets if targets.nonEmpty =>
+                                    val asterismTargets = NonEmptyList.fromListUnsafe(targets.map(_._2))
+                                    ObjectTracking.orRegionFromAsterism(asterismTargets) match
+                                      case Left(tracking) =>
+                                        calculateBlindOffsetFromTracking(tracking, time).map(_.some)
+                                      case Right(region) =>
+                                        Logger[F].warn(s"Asterism for ${pending.observationId} is a region, not a tracking").as(none)
+                                  case _ =>
+                                    Logger[F].warn(s"No asterism targets for ${pending.observationId}").as(none)
+            } yield coords
+          case _ =>
+            Logger[F].warn(s"No observation time for ${pending.observationId}").as(none)
+
+      private def calculateBlindOffsetFromBase(
+        base: Coordinates,
+        time: Timestamp
+      ): F[Coordinates] =
+        val tracking = ObjectTracking.constant(base)
+        calculateBlindOffsetFromTracking(tracking, time)
+
+      private def calculateBlindOffsetFromTracking(
+        tracking: ObjectTracking,
+        time: Timestamp
+      ): F[Coordinates] =
+        import lucuma.catalog.BlindOffsets
+        import lucuma.core.math.syntax.int.*
+        import lucuma.core.geom.jts.interpreter.given
+        import lucuma.core.geom.syntax.all.*
+
+        def runBlindOffsetAnalysis[F[_]: Concurrent](
+          gaiaClient:      GaiaClient[F],
+          baseTracking:    ObjectTracking,
+          observationTime: Instant
+        )(using ShapeInterpreter): F[List[BlindOffsetCandidate]] =
+          baseTracking
+            .at(observationTime)
+            .map: baseCoords =>
+              val baseCoordinates = baseCoords.value
+              val searchRadius    = 300.arcseconds
+
+              val adqlQuery = QueryByADQL(
+                base = baseCoordinates,
+                shapeConstraint = ShapeExpression.centeredEllipse(searchRadius * 2, searchRadius * 2),
+                brightnessConstraints = None
+              )
+
+              val interpreter = ADQLInterpreter.blindOffsetCandidates
+
+              gaiaClient
+                .query(adqlQuery)(using interpreter)
+                .flatTap(r => {println(r);Concurrent[F].unit})
+                .map(_.collect { case Right(target) => target })
+                .map(BlindOffsets.analysis(_, baseTracking, observationTime))
+            .getOrElse(List.empty.pure[F])
+
+
+        runBlindOffsetAnalysis(gaiaClient, tracking, time.toInstant)
+          .flatMap: candidates =>
+            println(candidates)
+            candidates.headOption match
+              case Some(candidate) =>
+                candidate.candidateCoords.value.pure[F]
+              case None =>
+                MonadThrow[F].raiseError(
+                  new RuntimeException(s"No blind offset candidates found near base position at $time")
+                )
+
+      private def updateBlindOffsetState(
+        pending: BlindOffset.PendingCalc,
+        result: Option[Coordinates]
+      )(using ServiceAccess, Transaction[F]): F[Unit] =
+        result match
+          case Some(coords) =>
+            for {
+              _ <- blindOffsetsService.createOrUpdateBlindOffsetFromCoordinates(
+                     pending.programId,
+                     pending.observationId,
+                     coords
+                   ).void
+              _ <- session.execute(Statements.UpdateBlindOffsetState)(
+                     pending.lastInvalidation,
+                     pending.observationId
+                   )
+            } yield ()
+          case None =>
+            session.execute(Statements.MarkBlindOffsetRetry)(pending.observationId).void
 
   object Statements:
     val pending_obscalc: Codec[Obscalc.PendingCalc] =
@@ -715,3 +847,72 @@ object ObscalcService:
         void"SET " |+| updates.intercalate(void", ") |+| void" " |+|
         sql"WHERE c_observation_id = $observation_id"(pending.observationId) |+| void" " |+|
         void"RETURNING c_program_id, c_observation_id, c_obscalc_state, c_last_invalidation, c_last_update, c_retry_at, c_failure_count"
+
+    val LoadPendingBlindOffsetCalc: Query[Int, BlindOffset.PendingCalc] =
+      sql"""
+        WITH tasks AS (
+          SELECT
+            o.c_program_id,
+            o.c_observation_id,
+            c.c_last_invalidation,
+            o.c_explicit_ra,
+            o.c_explicit_dec,
+            o.c_observation_time
+          FROM t_obscalc c
+          JOIN t_observation o USING (c_observation_id)
+          WHERE o.c_use_blind_offset = true
+            AND c.c_blind_offset_state = 'pending'
+            AND c.c_blind_offset_manual_override = false
+            AND c.c_obscalc_state = 'ready'
+          ORDER BY c.c_last_invalidation
+          LIMIT $int4
+          FOR UPDATE SKIP LOCKED
+        )
+        UPDATE t_obscalc c
+        SET c_blind_offset_state = 'calculating'
+        FROM tasks
+        WHERE c.c_observation_id = tasks.c_observation_id
+        RETURNING
+          tasks.c_program_id,
+          tasks.c_observation_id,
+          tasks.c_last_invalidation,
+          tasks.c_explicit_ra,
+          tasks.c_explicit_dec,
+          tasks.c_observation_time
+      """.query(
+        program_id *: observation_id *: core_timestamp *:
+        angle_µas.opt *: angle_µas.opt *: core_timestamp.opt
+      ).map { case (pid, oid, invalidation, ra, dec, time) =>
+        BlindOffset.PendingCalc(
+          pid, oid, invalidation,
+          (ra, dec).mapN((r, d) =>
+            (RightAscension.fromAngleExact.getOption(r), Declination.fromAngle.getOption(d)).mapN(Coordinates.apply)
+          ).flatten,
+          time
+        )
+      }
+
+    val UpdateBlindOffsetState: Command[Timestamp *: Observation.Id *: EmptyTuple] =
+      sql"""
+        UPDATE t_obscalc
+        SET c_blind_offset_state = CASE
+          WHEN c_last_invalidation = $core_timestamp THEN 'ready'::e_calculation_state
+          ELSE 'pending'::e_calculation_state
+        END
+        WHERE c_observation_id = $observation_id
+      """.command
+
+    val MarkBlindOffsetRetry: Command[Observation.Id] =
+      sql"""
+        UPDATE t_obscalc
+        SET c_blind_offset_state = 'retry'::e_calculation_state,
+            c_retry_at = NOW() + INTERVAL '5 minutes'
+        WHERE c_observation_id = $observation_id
+      """.command
+
+    val setManualOverride: Command[Boolean *: Observation.Id *: EmptyTuple] =
+      sql"""
+        UPDATE t_obscalc
+        SET c_blind_offset_manual_override = ${skunk.codec.boolean.bool}
+        WHERE c_observation_id = $observation_id
+      """.command

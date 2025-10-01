@@ -6,6 +6,7 @@ package lucuma.odb.data
 import cats.syntax.option.*
 import eu.timepit.refined.types.numeric.NonNegInt
 import lucuma.core.data.Zipper
+import lucuma.core.math.Coordinates
 import lucuma.core.model.Observation
 import lucuma.core.model.ObservationWorkflow
 import lucuma.core.model.Program
@@ -106,4 +107,13 @@ object Obscalc:
   final case class Entry(
     meta:   Obscalc.Meta,
     result: Option[Obscalc.Result]
+  )
+
+object BlindOffset:
+  case class PendingCalc(
+    programId: Program.Id,
+    observationId: Observation.Id,
+    lastInvalidation: Timestamp,
+    explicitBase: Option[Coordinates],
+    observationTime: Option[Timestamp]
   )
