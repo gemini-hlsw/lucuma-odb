@@ -680,7 +680,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
     Resource.eval(IO(sessionFixture())).use { s =>
       Enums.load(s).flatMap { e =>
         val gaia = GaiaClient.build(httpClient, adapters = gaiaAdapters)
-        f(Services.forUser(u, e, gaia, None)(s))
+        f(Services.forUser(u, e, Some(gaia), None)(s))
       }
     }
 
@@ -698,7 +698,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
     Resource.eval(IO(sessionFixture())).use: s =>
       Enums.load(s).flatMap: e =>
         val gaia = GaiaClient.build(httpClient, adapters = gaiaAdapters)
-        given services: Services[IO] = Services.forUser(u, e, gaia, None)(s)
+        given services: Services[IO] = Services.forUser(u, e, Some(gaia), None)(s)
         requireServiceAccess:
           f(services).map(Result.success)
         .flatMap(_.get)
@@ -733,7 +733,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       )
       db.use: s =>
         val gaia = GaiaClient.build[IO](http, adapters = gaiaAdapters)
-        given services: Services[IO] = Services.forUser(u, enm, gaia, mapping.some)(s)
+        given services: Services[IO] = Services.forUser(u, enm, Some(gaia), mapping.some)(s)
         requireServiceAccess:
           f(services).map(Result.success)
         .flatMap(_.get)

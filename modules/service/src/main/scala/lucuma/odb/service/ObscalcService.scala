@@ -414,48 +414,52 @@ object ObscalcService:
         tracking: ObjectTracking,
         time: Timestamp
       ): F[Coordinates] =
-        import lucuma.catalog.BlindOffsets
-        import lucuma.core.math.syntax.int.*
-        import lucuma.core.geom.jts.interpreter.given
-        import lucuma.core.geom.syntax.all.*
+        gaiaClient match
+          case None =>
+            MonadThrow[F].raiseError(new RuntimeException("Gaia client not available for blind offset calculation"))
+          case Some(gc) =>
+            import lucuma.catalog.BlindOffsets
+            import lucuma.core.math.syntax.int.*
+            import lucuma.core.geom.jts.interpreter.given
+            import lucuma.core.geom.syntax.all.*
 
-        def runBlindOffsetAnalysis[F[_]: Concurrent](
-          gaiaClient:      GaiaClient[F],
-          baseTracking:    ObjectTracking,
-          observationTime: Instant
-        )(using ShapeInterpreter): F[List[BlindOffsetCandidate]] =
-          baseTracking
-            .at(observationTime)
-            .map: baseCoords =>
-              val baseCoordinates = baseCoords.value
-              val searchRadius    = 300.arcseconds
+            def runBlindOffsetAnalysis[F[_]: Concurrent](
+              gaiaClient:      GaiaClient[F],
+              baseTracking:    ObjectTracking,
+              observationTime: Instant
+            )(using ShapeInterpreter): F[List[BlindOffsetCandidate]] =
+              baseTracking
+                .at(observationTime)
+                .map: baseCoords =>
+                  val baseCoordinates = baseCoords.value
+                  val searchRadius    = 300.arcseconds
 
-              val adqlQuery = QueryByADQL(
-                base = baseCoordinates,
-                shapeConstraint = ShapeExpression.centeredEllipse(searchRadius * 2, searchRadius * 2),
-                brightnessConstraints = None
-              )
+                  val adqlQuery = QueryByADQL(
+                    base = baseCoordinates,
+                    shapeConstraint = ShapeExpression.centeredEllipse(searchRadius * 2, searchRadius * 2),
+                    brightnessConstraints = None
+                  )
 
-              val interpreter = ADQLInterpreter.blindOffsetCandidates
+                  val interpreter = ADQLInterpreter.blindOffsetCandidates
 
-              gaiaClient
-                .query(adqlQuery)(using interpreter)
-                .flatTap(r => {println(r);Concurrent[F].unit})
-                .map(_.collect { case Right(target) => target })
-                .map(BlindOffsets.analysis(_, baseTracking, observationTime))
-            .getOrElse(List.empty.pure[F])
+                  gaiaClient
+                    .query(adqlQuery)(using interpreter)
+                    .flatTap(r => {println(r);Concurrent[F].unit})
+                    .map(_.collect { case Right(target) => target })
+                    .map(BlindOffsets.analysis(_, baseTracking, observationTime))
+                .getOrElse(List.empty.pure[F])
 
 
-        runBlindOffsetAnalysis(gaiaClient, tracking, time.toInstant)
-          .flatMap: candidates =>
-            println(candidates)
-            candidates.headOption match
-              case Some(candidate) =>
-                candidate.candidateCoords.value.pure[F]
-              case None =>
-                MonadThrow[F].raiseError(
-                  new RuntimeException(s"No blind offset candidates found near base position at $time")
-                )
+            runBlindOffsetAnalysis(gc, tracking, time.toInstant)
+              .flatMap: candidates =>
+                println(candidates)
+                candidates.headOption match
+                  case Some(candidate) =>
+                    candidate.candidateCoords.value.pure[F]
+                  case None =>
+                    MonadThrow[F].raiseError(
+                      new RuntimeException(s"No blind offset candidates found near base position at $time")
+                    )
 
       private def updateBlindOffsetState(
         pending: BlindOffset.PendingCalc,

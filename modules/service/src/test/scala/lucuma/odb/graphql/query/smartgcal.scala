@@ -74,7 +74,7 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
   override def dbInitialization: Option[Session[IO] => IO[Unit]] = Some { s =>
     Enums.load(s).flatMap { e =>
       val gaia = GaiaClient.build(httpClient, adapters = gaiaAdapters)
-      val services = Services.forUser(pi /* doesn't matter*/, e, gaia, None)(s)
+      val services = Services.forUser(pi /* doesn't matter*/, e, Some(gaia), None)(s)
       services.transactionally {
 
         val flat =

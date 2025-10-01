@@ -41,7 +41,7 @@ class schedulerRoutes extends SchedulerRoutesSuite with ExecutionTestSupportForG
     withSession: s =>
       Enums.load(s).flatMap: enums =>
         val gaia = GaiaClient.build(httpClient, adapters = gaiaAdapters)
-        val srv = Services.forUser(user, enums, gaia, None)(s)
+        val srv = Services.forUser(user, enums, Some(gaia), None)(s)
         SchedulerRoutes(srv, ssoClient).orNotFound.run(request)
 
   test("not service user"):

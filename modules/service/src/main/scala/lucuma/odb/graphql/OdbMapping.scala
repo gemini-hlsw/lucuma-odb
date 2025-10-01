@@ -307,7 +307,7 @@ object OdbMapping {
               Services.forUser(
                 user,
                 enums,
-                gaiaClient0,
+                Some(gaiaClient0),
                 Option.when(allowSub): (s: Session[F]) =>
                   apply(
                     Resource.pure(s),     // Always use the provided session

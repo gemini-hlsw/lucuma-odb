@@ -61,7 +61,7 @@ trait ObscalcServiceSuiteSupport extends ExecutionTestSupportForGmos:
   def select(o: Observation.Id): IO[Option[Obscalc.Entry]] =
     withObscalcServiceTransactionally(_.selectOne(o))
 
-  val load: IO[List[Obscalc.PendingCalc]] =
+  def load: IO[List[Obscalc.PendingCalc]] =
     withObscalcServiceTransactionally(_.load(10))
 
   def calculateAndUpdate(p: Obscalc.PendingCalc): IO[Option[Obscalc.Meta]] =
@@ -70,7 +70,7 @@ trait ObscalcServiceSuiteSupport extends ExecutionTestSupportForGmos:
   def calculateOnly(pc: Obscalc.PendingCalc): IO[Obscalc.Result] =
     withObscalcService(_.calculateOnly(pc))
 
-  val reset: IO[Unit] =
+  def reset: IO[Unit] =
     withObscalcServiceTransactionally(_.reset)
 
   def insert(pc: Obscalc.PendingCalc): IO[Unit] =
@@ -111,7 +111,7 @@ trait ObscalcServiceSuiteSupport extends ExecutionTestSupportForGmos:
       """.query(calculation_state)
       session.unique(query)(o)
 
-  val selectStates: IO[Map[Observation.Id, CalculationState]] =
+  def selectStates: IO[Map[Observation.Id, CalculationState]] =
     withSession: session =>
       val states: Query[Void, (Observation.Id, CalculationState)] = sql"""
         SELECT
@@ -123,7 +123,7 @@ trait ObscalcServiceSuiteSupport extends ExecutionTestSupportForGmos:
 
       session.execute(states).map(_.toMap)
 
-  val cleanup: IO[Unit] =
+  def cleanup: IO[Unit] =
     withSession: session =>
       val truncate = sql"""
         TRUNCATE t_obscalc

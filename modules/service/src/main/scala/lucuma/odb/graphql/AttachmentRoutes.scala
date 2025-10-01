@@ -43,7 +43,7 @@ object AttachmentRoutes {
     maxUploadMb:           Int,
   ): HttpRoutes[F] =
     apply(
-      [A] => (u: User) => (fa: AttachmentFileService[F] => F[A]) => pool.map(Services.forUser(u, enums, gaiaClient, None)).map(_.attachmentFileService(s3)).use(fa),
+      [A] => (u: User) => (fa: AttachmentFileService[F] => F[A]) => pool.map(Services.forUser(u, enums, Some(gaiaClient), None)).map(_.attachmentFileService(s3)).use(fa),
       ssoClient,
       maxUploadMb
     )

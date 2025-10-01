@@ -257,7 +257,7 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
         enums  <- Enums.load(session)
         tec    <- TimeEstimateCalculatorImplementation.fromSession(session, enums)
         gaia    = GaiaClient.build(httpClient, adapters = gaiaAdapters)
-        srv     = Services.forUser(serviceUser, enums, gaia, None)(session)
+        srv     = Services.forUser(serviceUser, enums, Some(gaia), None)(session)
         gen     = srv.generator(CommitHash.Zero, itcClient, tec)
         res    <- Services.asSuperUser(gen.generate(pid, oid, future.getOrElse(Generator.FutureLimit.Default), when))
       yield res

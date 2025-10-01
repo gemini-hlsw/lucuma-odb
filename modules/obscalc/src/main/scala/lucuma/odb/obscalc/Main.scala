@@ -234,7 +234,7 @@ object CalcMain extends MainParams:
     gaiaClient: GaiaClient[F],
     mapping:    Session[F] => Mapping[F]
   )(session: Session[F]): F[Services[F]] =
-    Services.forUser(user, enums, gaiaClient, mapping.some)(session).pure[F].flatTap: _ =>
+    Services.forUser(user, enums, Some(gaiaClient), mapping.some)(session).pure[F].flatTap: _ =>
       val us = UserService.fromSession(session)
       Services.asSuperUser(us.canonicalizeUser(user))
 

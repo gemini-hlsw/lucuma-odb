@@ -444,15 +444,19 @@ object GuideService {
       def callGaia(
         query: ADQLQuery
       ): F[Result[List[GuideStarCandidate]]] =
-        Trace[F].span("callGaia"):
-          val MaxTargets                     = 100
-          given ADQLInterpreter          = ADQLInterpreter.nTarget(MaxTargets)
-          gaiaClient.query(query)
-          .map:
-            _.collect { case Right(s) => GuideStarCandidate.siderealTarget.get(s)}
-              .success
-            // Should we have access to a logger in Services so we can log this instead of passing details on to the user?
-          .handleError(e => gaiaError(e.getMessage()).asFailure)
+        gaiaClient match
+          case None =>
+            gaiaError("Gaia client not available").asFailure.pure[F]
+          case Some(gc) =>
+            Trace[F].span("callGaia"):
+              val MaxTargets                     = 100
+              given ADQLInterpreter          = ADQLInterpreter.nTarget(MaxTargets)
+              gc.query(query)
+              .map:
+                _.collect { case Right(s) => GuideStarCandidate.siderealTarget.get(s)}
+                  .success
+                // Should we have access to a logger in Services so we can log this instead of passing details on to the user?
+              .handleError(e => gaiaError(e.getMessage()).asFailure)
 
       def getAllCandidates(
         oid:         Observation.Id,
@@ -486,17 +490,21 @@ object GuideService {
         } yield nel).value
 
       def getGuideStarFromGaia(name: GuideStarName): F[Result[GuideStarCandidate]] =
-        ResultT.fromResult(guideStarIdFromName(name)).flatMap { id =>
-          ResultT(
-            gaiaClient.queryById(id)
-              .map:
-                _.toOption
-                  .map(GuideStarCandidate.siderealTarget.get)
-                  .toResult(gaiaError(s"Star with id $id not found on Gaia.").asProblem)
-              // Should we have access to a logger in Services so we can log this instead of passing details on to the user?
-              .handleError(e => gaiaError(e.getMessage()).asFailure)
-          )
-        }.value
+        gaiaClient match
+          case None =>
+            gaiaError("Gaia client not available").asFailure.pure[F]
+          case Some(gc) =>
+            ResultT.fromResult(guideStarIdFromName(name)).flatMap { id =>
+              ResultT(
+                gc.queryById(id)
+                  .map:
+                    _.toOption
+                      .map(GuideStarCandidate.siderealTarget.get)
+                      .toResult(gaiaError(s"Star with id $id not found on Gaia.").asProblem)
+                  // Should we have access to a logger in Services so we can log this instead of passing details on to the user?
+                  .handleError(e => gaiaError(e.getMessage()).asFailure)
+              )
+            }.value
 
       extension (target: Target)
         def invalidDate(startDate: Timestamp): Timestamp =

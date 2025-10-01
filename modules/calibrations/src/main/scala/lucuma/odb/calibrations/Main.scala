@@ -164,7 +164,7 @@ object CMain extends MainParams {
   )(pool: Session[F]): F[Services[F]] =
     user match {
       case Some(u) if u.role.access === Access.Service =>
-        Services.forUser(u, enums, None)(pool).pure[F].flatTap { _ =>
+        Services.forUser(u, enums, None, None)(pool).pure[F].flatTap { _ =>
           val us = UserService.fromSession(pool)
           Services.asSuperUser(us.canonicalizeUser(u))
         }

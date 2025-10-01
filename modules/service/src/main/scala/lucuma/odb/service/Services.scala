@@ -63,7 +63,7 @@ trait Services[F[_]]:
   val enums: Enums
 
   /** The Gaia catalog client. */
-  def gaiaClient: GaiaClient[F]
+  def gaiaClient: Option[GaiaClient[F]]
 
   /**
    * Define an interaction with the database that will execute a block `fa` within a transaction,
@@ -236,7 +236,7 @@ object Services:
    * Construct a `Services` for the given `User` and `Session`. Service instances are constructed
    * lazily.
    */
-  def forUser[F[_]](u: User, e: Enums, gc: GaiaClient[F], m: Option[Session[F] => Mapping[F]])(s: Session[F])(
+  def forUser[F[_]](u: User, e: Enums, gc: Option[GaiaClient[F]], m: Option[Session[F] => Mapping[F]])(s: Session[F])(
     using tf: Trace[F], uf: UUIDGen[F], cf: Concurrent[F], par: Parallel[F], log: Logger[F]
   ): Services[F] =
     new Services[F]:

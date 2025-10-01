@@ -42,7 +42,7 @@ object SchedulerRoutes:
     gaiaClient: GaiaClient[F]
   ): HttpRoutes[F] =
     apply(
-      [A] => (u: User) => (fa: Services[F] => F[A]) => pool.map(Services.forUser(u, enums, gaiaClient, None)).use(fa),
+      [A] => (u: User) => (fa: Services[F] => F[A]) => pool.map(Services.forUser(u, enums, Some(gaiaClient), None)).use(fa),
       ssoClient
     )
 
