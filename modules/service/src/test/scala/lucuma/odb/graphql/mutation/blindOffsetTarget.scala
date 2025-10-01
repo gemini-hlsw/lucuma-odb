@@ -157,7 +157,7 @@ class blindOffsetTarget extends OdbSuite:
     for {
       pid <- createProgramAs(pi)
       tid <- createTargetAs(pi, pid, "Regular Target")
-      result <- expect(
+      _ <- expect(
         user = pi,
         query = s"""
           mutation {
@@ -433,3 +433,86 @@ class blindOffsetTarget extends OdbSuite:
       _    <- restoreObservation(pi, oid)
       _    <- expectTargetExistenceAs(pi, btid, shouldBePresent = true)
     } yield () 
+
+  test("removing blind offset from asterism deletes target"):
+    for {
+      pid <- createProgramAs(pi)
+      tid <- createTargetAs(pi, pid, "Regular Target")
+      oid <- createObservationAs(pi, pid, tid)
+      _ <- expect(
+        user = pi,
+        query = s"""
+          mutation {
+            updateObservations(input: {
+              SET: {
+                targetEnvironment: {
+                  ${blindOffsetTargetInput(blindOffsetInput("Blind Offset Star", "12.345", "45.678"))}
+                }
+              }
+              WHERE: {
+                id: { EQ: ${oid.asJson} }
+              }
+            }) {
+              $observationsFields
+            }
+          }
+        """,
+        expected = expectedListResults("updateObservations", "observations", "Regular Target", true, "Blind Offset Star".some)
+      )
+      btid <- getBlindOffsetId(pi, oid)
+      _    <- expectTargetExistenceAs(pi, btid, shouldBePresent = true)
+      _    <- updateAsterisms(pi, List(oid), List.empty, List(btid), List((oid, List(tid))))
+      _    <- expectTargetNotFoundAs(pi, btid)
+    } yield () 
+
+  test("add blind offset to an observation via the asterism service is an error"):
+    for {
+      pid <- createProgramAs(pi)
+      tid <- createTargetAs(pi, pid, "Regular Target")
+      oid <- createObservationAs(pi, pid, tid)
+      _ <- expect(
+        user = pi,
+        query = s"""
+          mutation {
+            updateObservations(input: {
+              SET: {
+                targetEnvironment: {
+                  ${blindOffsetTargetInput(blindOffsetInput("Blind Offset Star", "12.345", "45.678"))}
+                }
+              }
+              WHERE: {
+                id: { EQ: ${oid.asJson} }
+              }
+            }) {
+              $observationsFields
+            }
+          }
+        """,
+        expected = expectedListResults("updateObservations", "observations", "Regular Target", true, "Blind Offset Star".some)
+      )
+      btid <- getBlindOffsetId(pi, oid)
+      oid2 <- createObservationAs(pi, pid)
+      _    <- expect(
+        user = pi,
+        query = s"""
+          mutation {
+            updateAsterisms(input: {
+              SET: { ADD: [${btid.asJson}] }
+              WHERE: { id: { EQ: ${oid2.asJson} } }
+            }) {
+              observations { id }
+            }
+          }
+        """,
+        expected = List("Blind offset targets cannot be added to an asterism.").asLeft
+      )
+    } yield () 
+
+  // This does cause an exception to thrown via skunk, but I don't know how to catch it because it is
+  // a deferred constraint. Since we don't allow creating non-science targets via the API, this should
+  // never happen in practice.
+  // test("creating blind offset without obs is error"):
+  //   for
+  //     pid <- createProgramAs(pi)
+  //     tid <- createTargetViaServiceAs(pi, pid, TargetDisposition.BlindOffset, none)
+  //   yield ()

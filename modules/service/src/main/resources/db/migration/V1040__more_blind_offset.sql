@@ -107,7 +107,31 @@ CREATE CONSTRAINT TRIGGER trg_blind_offset_not_shared
   EXECUTE FUNCTION check_blind_offset_not_shared();
 
 --------------------------------------------------------
--- Prevent a blind offset from existing without being assigned to an observation
+-- Ensure that a blind offset target is assigned to an observation by the end of the transaction.
+--------------------------------------------------------
+CREATE OR REPLACE FUNCTION ensure_blind_offset_is_assigned()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF NEW.c_target_disposition = 'blind_offset' THEN
+    IF NOT EXISTS (
+      SELECT 1 FROM t_asterism_target a
+      WHERE a.c_target_id = NEW.c_target_id
+    ) THEN
+      RAISE EXCEPTION 'Blind offset targets must be assigned to an observation';
+    END IF;
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE CONSTRAINT TRIGGER trg_ensure_blind_offset_is_assigned
+  AFTER INSERT OR UPDATE ON t_target
+  DEFERRABLE INITIALLY DEFERRED
+  FOR EACH ROW
+  EXECUTE FUNCTION ensure_blind_offset_is_assigned();
+
+--------------------------------------------------------
+-- Delete a blind offset target when it is removed from an asterism
 --------------------------------------------------------
 CREATE OR REPLACE FUNCTION delete_blind_offset_when_removed_from_asterism()
 RETURNS TRIGGER AS $$

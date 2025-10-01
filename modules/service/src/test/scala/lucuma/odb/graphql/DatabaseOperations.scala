@@ -929,6 +929,57 @@ trait DatabaseOperations { this: OdbSuite =>
       json.hcursor.downFields("createObservation", "observation", "id").require[Observation.Id]
     }
 
+  def createObservationWithBlindOffsetAs(user: User, pid: Program.Id, blindOffsetName: String, tids: Target.Id*): IO[(Observation.Id, Target.Id)] =
+    query(
+      user = user,
+      query =
+        s"""
+          mutation {
+            createObservation(input: {
+            programId: ${pid.asJson},
+              SET: {
+                targetEnvironment: {
+                  asterism: ${tids.asJson}
+                  blindOffsetTarget: {
+                    name: ${blindOffsetName.asJson}
+                    sidereal: {
+                      ra: { degrees: "12.345" }
+                      dec: { degrees: "45.678" }
+                      epoch: "J2000.000"
+                    }
+                    sourceProfile: {
+                      point: {
+                        bandNormalized: {
+                          sed: {
+                            stellarLibrary: B5_III
+                          }
+                          brightnesses: []
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }) {
+              observation {
+                id
+                targetEnvironment {
+                  blindOffsetTarget {
+                    id
+                  }
+                }
+              }
+            }
+          }
+        """
+    ).map { json =>
+      val obs = json.hcursor.downFields("createObservation", "observation")
+      val obsId = obs.downField("id").require[Observation.Id]
+      val targetId = obs.downField("targetEnvironment").downField("blindOffsetTarget").downField("id").require[Target.Id]
+      (obsId, targetId)
+      
+    }
+
   def resetAcquisitionAs(user: User, oid: Observation.Id): IO[Unit] =
     query(
       user  = user,

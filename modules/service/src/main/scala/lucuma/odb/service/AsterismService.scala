@@ -111,20 +111,29 @@ object AsterismService {
         }
       }
 
+      private def containsBlindOffset(
+        targetIds: NonEmptyList[Target.Id]
+      ): F[Boolean] = 
+        val enc = target_id.nel(targetIds)
+        session.unique(Statements.containsBlindOffset(enc))(targetIds)
+      
+
       override def insertAsterism(
         programId:      Program.Id,
         observationIds: NonEmptyList[Observation.Id],
         targetIds:      NonEmptyList[Target.Id]
       )(using Transaction[F], SuperUserAccess): F[Result[Unit]] = {
-        val af = Statements.insertLinks(programId, observationIds, targetIds)
-        session.prepareR(af.fragment.command).use { p =>
-          p.execute(af.argument)
-            .as(Result.unit)
-            .recoverWith {
-              case SqlState.ForeignKeyViolation(_) =>
-                OdbError.InvalidTargetList(programId, targetIds).asFailureF
-            }
-        }
+        containsBlindOffset(targetIds).flatMap: hasBlindOffset =>
+          if (hasBlindOffset)
+            OdbError.InvalidArgument("Blind offset targets cannot be added to an asterism.".some).asFailureF
+          else
+            val af = Statements.insertLinks(programId, observationIds, targetIds)
+            session.prepareR(af.fragment.command).use: p =>
+              p.execute(af.argument)
+                .as(Result.unit)
+                .recoverWith:
+                  case SqlState.ForeignKeyViolation(_) =>
+                    OdbError.InvalidTargetList(programId, targetIds).asFailureF
       }
 
       @annotation.nowarn("msg=unused implicit parameter")
@@ -357,6 +366,13 @@ object AsterismService {
         where t.c_existence = 'present'
       """.query(observation_id ~ Decoders.targetDecoder)
 
+    def containsBlindOffset[A <: NonEmptyList[Target.Id]](enc: Encoder[A]): Query[A, Boolean] =
+      sql"""
+        select count(1)
+        from t_target
+        where c_target_id in ($enc)
+          and c_target_disposition = 'blind_offset'
+      """.query(int8).map(_ > 0)
   }
 
   object Decoders {
