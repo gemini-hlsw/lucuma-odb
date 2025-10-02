@@ -7,12 +7,16 @@ import grackle.Path
 import grackle.Predicate
 import grackle.Predicate.*
 import lucuma.core.enums.CalibrationRole
+import lucuma.core.enums.TargetDisposition
 import lucuma.core.model.Target
 
 class TargetPredicates(path: Path) {
   lazy val existence = ExistencePredicates(path / "existence")
   lazy val id = LeafPredicates[Target.Id](path / "id")
   lazy val program = ProgramPredicates(path / "program")
+
+  def hasDisposition(disposition: TargetDisposition): Predicate =
+    Eql(path / "disposition", Const[TargetDisposition](disposition))
 
   def hasCalibrationRole(role: CalibrationRole): Predicate =
     Eql(path / "calibrationRole", Const[CalibrationRole](role))
