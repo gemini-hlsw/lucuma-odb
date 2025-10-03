@@ -592,6 +592,7 @@ object OdbMapping {
                 ProgramElaborator,
                 ProgramUserElaborator,
                 ProposalTypeElaborator,
+                ScienceRequirementsElaborator,
                 StepRecordElaborator,
                 SubscriptionElaborator,
                 TargetEnvironmentElaborator,

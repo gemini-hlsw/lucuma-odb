@@ -33,6 +33,7 @@ trait Predicates[F[_]] extends BaseMapping[F] {
     val datasetEvent                  = ExecutionEventPredicates(Path.from(DatasetEventType))
     val executionEvent                = ExecutionEventPredicates(Path.from(ExecutionEventType))
     val executionEventAdded           = ExecutionEventAddedPredicates(Path.from(ExecutionEventAddedType))
+    val exposureTimeMode              = ExposureTimeModePredicates(Path.from(ExposureTimeModeType))
     val flamingos2Step                = StepPredicates(Path.from(Flamingos2StepType))
     val gmosNorthStep                 = StepPredicates(Path.from(GmosNorthStepType))
     val gmosSouthStep                 = StepPredicates(Path.from(GmosSouthStepType))
