@@ -260,7 +260,7 @@ object ObservationService {
                   .traverse_ { (oid, etm) =>
                     services
                       .exposureTimeModeService
-                      .insertExposureTimeModeLink(oid, etm, ExposureTimeModeRole.Requirement)
+                      .insertExposureTimeMode(oid, ExposureTimeModeRole.Requirement, etm)
                   }
 
               }.flatTap { rOid =>
@@ -443,9 +443,9 @@ object ObservationService {
                 _ <- ResultT.liftF:
                        u.fold(().pure[F]): u =>
                          e.fold(
-                           services.exposureTimeModeService.deleteExposureTimeModeLinks(u, ExposureTimeModeRole.Requirement),
+                           services.exposureTimeModeService.deleteExposureTimeModes(u, ExposureTimeModeRole.Requirement.some),
                            ().pure[F],
-                           e => services.exposureTimeModeService.updateExposureTimeModeLinks(u, e, ExposureTimeModeRole.Requirement)
+                           e => services.exposureTimeModeService.updateExposureTimeModes(u, ExposureTimeModeRole.Requirement, e)
                          )
 
                 _ <- validateBand(g.keys.toList)
@@ -524,7 +524,7 @@ object ObservationService {
                 val cloneRelatedItems =
                   Services.asSuperUser:
                     asterismService.cloneAsterism(observationId, oid2) >>
-                    exposureTimeModeService.cloneExposureTimeModeLinks(observationId, oid2) >>
+                    exposureTimeModeService.cloneExposureTimeModes(observationId, oid2) >>
                     observingMode.traverse(observingModeServices.cloneFunction(_)(observationId, oid2)) >>
                     timingWindowService.cloneTimingWindows(observationId, oid2) >>
                     obsAttachmentAssignmentService.cloneAssignments(observationId, oid2)

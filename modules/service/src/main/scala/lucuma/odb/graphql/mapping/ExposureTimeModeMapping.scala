@@ -11,6 +11,7 @@ trait ExposureTimeModeMapping[F[_]] extends ExposureTimeModeView[F]:
   lazy val ExposureTimeModeMapping: ObjectMapping =
     ObjectMapping(ExposureTimeModeType)(
       SqlField("id", ExposureTimeModeView.Id, key = true, hidden = true),
+      SqlField("role", ExposureTimeModeView.Role, hidden = true),
       SqlObject("signalToNoise"),
       SqlObject("timeAndCount")
     )

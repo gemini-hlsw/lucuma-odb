@@ -364,15 +364,12 @@ object CalibrationsService extends CalibrationObservations {
           .traverse { (oid, props) =>
             val etmJoin: AppliedFragment =
               if props.wavelengthAt.isDefined then
-                void"""
-                  LEFT JOIN t_exposure_time_mode_link k USING (c_observation_id)
-                  LEFT JOIN t_exposure_time_mode e ON e.c_exposure_time_mode_id = k.c_exposure_time_mode_id
-                """
+                void"""LEFT JOIN t_exposure_time_mode e USING (c_observation_id)"""
               else
                 void""
 
             val bandFragment = props.band.map(sql"o.c_science_band IS DISTINCT FROM $science_band")
-            val waveFragment = props.wavelengthAt.map(w => sql"(e.c_signal_to_noise_at <> $wavelength_pm AND k.c_role = $exposure_time_mode_role)".apply(w, ExposureTimeModeRole.Requirement))
+            val waveFragment = props.wavelengthAt.map(w => sql"(e.c_signal_to_noise_at <> $wavelength_pm AND e.c_role = $exposure_time_mode_role)".apply(w, ExposureTimeModeRole.Requirement))
             val needsUpdate  = List(bandFragment, waveFragment).flatten.intercalate(void" OR ")
 
             services.observationService.updateObservations(

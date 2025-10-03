@@ -6,7 +6,6 @@ package lucuma.odb.service
 import cats.data.NonEmptyList
 import cats.effect.MonadCancelThrow
 import cats.syntax.flatMap.*
-import cats.syntax.foldable.*
 import cats.syntax.functor.*
 import eu.timepit.refined.types.numeric.PosInt
 import lucuma.core.math.SignalToNoise
@@ -24,32 +23,28 @@ import skunk.implicits.*
 sealed trait ExposureTimeModeService[F[_]]:
 
   def insertExposureTimeMode(
-    etm: ExposureTimeMode
+    oid:  Observation.Id,
+    role: ExposureTimeModeRole,
+    etm:  ExposureTimeMode
   )(using Transaction[F]): F[ExposureTimeModeId]
+
+  def deleteExposureTimeModes(
+    oids: NonEmptyList[Observation.Id],
+    role: Option[ExposureTimeModeRole]
+  )(using Transaction[F]): F[Unit]
 
   def updateExposureTimeMode(
     eid:    ExposureTimeModeId,
     update: ExposureTimeMode
   )(using Transaction[F]): F[Unit]
 
-  def insertExposureTimeModeLink(
-    oid:  Observation.Id,
-    etm:  ExposureTimeMode,
-    role: ExposureTimeModeRole
+  def updateExposureTimeModes(
+    oids:   NonEmptyList[Observation.Id],
+    role:   ExposureTimeModeRole,
+    update: ExposureTimeMode
   )(using Transaction[F]): F[Unit]
 
-  def deleteExposureTimeModeLinks(
-    oids: NonEmptyList[Observation.Id],
-    role: ExposureTimeModeRole
-  )(using Transaction[F]): F[Unit]
-
-  def updateExposureTimeModeLinks(
-    oids: NonEmptyList[Observation.Id],
-    etm:  ExposureTimeMode,
-    role: ExposureTimeModeRole
-  )(using Transaction[F]): F[Unit]
-
-  def cloneExposureTimeModeLinks(
+  def cloneExposureTimeModes(
     originalId: Observation.Id,
     newId:      Observation.Id
   )(using Transaction[F]): F[Unit]
@@ -60,76 +55,41 @@ object ExposureTimeModeService:
     new ExposureTimeModeService[F]:
 
       override def insertExposureTimeMode(
-        etm: ExposureTimeMode
+        oid:  Observation.Id,
+        role: ExposureTimeModeRole,
+        etm:  ExposureTimeMode
       )(using Transaction[F]): F[ExposureTimeModeId] =
-        session.unique(Statements.InsertExposureTimeMode)(etm)
+        session.unique(Statements.Insert)(oid, role, etm)
+
+      override def deleteExposureTimeModes(
+        oids: NonEmptyList[Observation.Id],
+        role: Option[ExposureTimeModeRole]
+      )(using Transaction[F]): F[Unit] =
+        session.exec(Statements.delete(oids, role))
 
       override def updateExposureTimeMode(
-        eid: ExposureTimeModeId,
-        etm: ExposureTimeMode
+        eid:    ExposureTimeModeId,
+        update: ExposureTimeMode
       )(using Transaction[F]): F[Unit] =
-        session.execute(Statements.UpdateExposureTimeMode)(eid, etm).void
+        session.execute(Statements.UpdateExposureTimeMode)(eid, update).void
 
-      override def insertExposureTimeModeLink(
-        oid:  Observation.Id,
-        etm:  ExposureTimeMode,
-        role: ExposureTimeModeRole
-      )(using Transaction[F]): F[Unit] =
-        for
-          e <- insertExposureTimeMode(etm)
-          _ <- session.execute(Statements.InsertExposureTimeModeLink)(oid, e, role).void
-        yield ()
-
-      override def deleteExposureTimeModeLinks(
-        oids: NonEmptyList[Observation.Id],
-        role: ExposureTimeModeRole
-      )(using Transaction[F]): F[Unit] =
-        session.exec(Statements.deleteLinks(oids, role))
-
-      override def updateExposureTimeModeLinks(
-        oids: NonEmptyList[Observation.Id],
-        etm:  ExposureTimeMode,
-        role: ExposureTimeModeRole
+      override def updateExposureTimeModes(
+        oids:   NonEmptyList[Observation.Id],
+        role:   ExposureTimeModeRole,
+        update: ExposureTimeMode
       )(using Transaction[F]): F[Unit] =
         for
-          _ <- session.exec(Statements.updateLinksWherePresent(oids, etm, role))
-          _ <- session.exec(Statements.insertLinksWhereNotPresent(oids, etm, role))
+          _ <- session.exec(Statements.updateWherePresent(oids, role, update))
+          _ <- session.exec(Statements.insertWhereNotPresent(oids, role, update))
         yield ()
 
-      override def cloneExposureTimeModeLinks(
+      override def cloneExposureTimeModes(
         originalOid: Observation.Id,
         newOid:      Observation.Id
       )(using Transaction[F]): F[Unit] =
-        for
-          ls <- session.execute(Statements.SelectLinks)(originalOid)
-          _  <- ls.traverse_ { (originalEid, role) =>
-                  session.unique(Statements.CloneExposureTimeMode)(originalEid).flatMap: newEid =>
-                    session.execute(Statements.InsertExposureTimeModeLink)(newOid, newEid, role)
-                }
-        yield ()
+        session.execute(Statements.Clone)(originalOid, newOid).void
 
   object Statements:
-
-/*
-    private val signal_to_noise_mode: Codec[ExposureTimeMode.SignalToNoiseMode] =
-      (signal_to_noise *: wavelength_pm).to[ExposureTimeMode.SignalToNoiseMode]
-
-    private val time_and_count_mode: Codec[ExposureTimeMode.TimeAndCountMode] =
-      (time_span *: int4_pos *: wavelength_pm).to[ExposureTimeMode.TimeAndCountMode]
-
-    private val exposure_time_mode: Codec[ExposureTimeMode] =
-      (signal_to_noise_mode.opt *: time_and_count_mode.opt)
-        .eimap {
-          case (Some(_),  Some(_))  |
-               (None,     None)     => "Exactly one of signal-to-noise or time-and-count mode must be specified.".asLeft
-          case (Some(sn), None)     => sn.asRight.widen[ExposureTimeMode]
-          case (None,     Some(tc)) => tc.asRight.widen[ExposureTimeMode]
-        } { etm => (
-            ExposureTimeMode.signalToNoise.getOption(etm),
-            ExposureTimeMode.timeAndCount.getOption(etm)
-          )
-        }
-*/
 
     extension (etm: ExposureTimeMode)
       def modeType: ExposureTimeModeType =
@@ -155,9 +115,11 @@ object ExposureTimeModeService:
           .andThen(ExposureTimeMode.TimeAndCountMode.count)
           .getOption(etm)
 
-    val InsertExposureTimeMode: Query[ExposureTimeMode, ExposureTimeModeId] =
+    val Insert: Query[(Observation.Id, ExposureTimeModeRole, ExposureTimeMode), ExposureTimeModeId] =
       sql"""
         INSERT INTO t_exposure_time_mode (
+          c_observation_id,
+          c_role,
           c_exposure_time_mode,
           c_signal_to_noise,
           c_signal_to_noise_at,
@@ -165,6 +127,8 @@ object ExposureTimeModeService:
           c_exposure_count
         )
         SELECT
+          $observation_id,
+          $exposure_time_mode_role,
           $exposure_time_mode_type,
           ${signal_to_noise.opt},
           $wavelength_pm,
@@ -173,14 +137,30 @@ object ExposureTimeModeService:
         RETURNING
           c_exposure_time_mode_id
       """.query(exposure_time_mode_id)
-         .contramap: etm =>
+         .contramap: (oid, role, etm) =>
            (
+             oid,
+             role,
              etm.modeType,
              etm.signalToNoise,
              etm.at,
              etm.exposureTime,
              etm.exposureCount
            )
+
+    def delete(
+      oids: NonEmptyList[Observation.Id],
+      role: Option[ExposureTimeModeRole]
+    ): AppliedFragment =
+      sql"""
+        DELETE FROM t_exposure_time_mode
+              WHERE c_observation_id IN ${observation_id.list(oids.length).values}
+      """.apply(oids.toList) |+|
+      role.fold(void"")(
+        sql"""
+          AND c_role = $exposure_time_mode_role
+        """
+      )
 
     val UpdateExposureTimeMode: Command[(ExposureTimeModeId, ExposureTimeMode)] =
       sql"""
@@ -204,120 +184,50 @@ object ExposureTimeModeService:
             id
           )
 
-
-    val InsertExposureTimeModeLink: Command[(Observation.Id, ExposureTimeModeId, ExposureTimeModeRole)] =
-      sql"""
-        INSERT INTO t_exposure_time_mode_link (
-          c_observation_id,
-          c_exposure_time_mode_id,
-          c_role
-        )
-        SELECT
-          $observation_id,
-          $exposure_time_mode_id,
-          $exposure_time_mode_role
-      """.command
-
-    def updateLinksWherePresent(
-      oids: NonEmptyList[Observation.Id],
-      etm:  ExposureTimeMode,
-      role: ExposureTimeModeRole
+    def updateWherePresent(
+      oids:   NonEmptyList[Observation.Id],
+      role:   ExposureTimeModeRole,
+      update: ExposureTimeMode
     ): AppliedFragment =
       sql"""
-        UPDATE t_exposure_time_mode m
+        UPDATE t_exposure_time_mode
         SET c_exposure_time_mode = $exposure_time_mode_type,
             c_signal_to_noise    = ${signal_to_noise.opt},
             c_signal_to_noise_at = $wavelength_pm,
             c_exposure_time      = ${time_span.opt},
             c_exposure_count     = ${int4_pos.opt}
-        FROM t_exposure_time_mode_link k
-        WHERE k.c_observation_id IN ${observation_id.list(oids.length).values}
-          AND m.c_exposure_time_mode_id = k.c_exposure_time_mode_id
-          AND k.c_role = $exposure_time_mode_role
+        WHERE c_observation_id IN ${observation_id.list(oids.length).values}
+          AND c_role = $exposure_time_mode_role
       """.apply(
-        etm.modeType,
-        etm.signalToNoise,
-        etm.at,
-        etm.exposureTime,
-        etm.exposureCount,
+        update.modeType,
+        update.signalToNoise,
+        update.at,
+        update.exposureTime,
+        update.exposureCount,
         oids.toList,
         role
       )
 
-    def insertLinksWhereNotPresent(
-      oids: NonEmptyList[Observation.Id],
-      etm:  ExposureTimeMode,
-      role: ExposureTimeModeRole
+    def insertWhereNotPresent(
+      oids:   NonEmptyList[Observation.Id],
+      role:   ExposureTimeModeRole,
+      update: ExposureTimeMode
     ): AppliedFragment =
       sql"""
         WITH obs_ids AS (
           SELECT
-            c_observation_id,
-            ROW_NUMBER() OVER () AS rn
-          FROM unnest(ARRAY[${observation_id.list(oids.length)}]) WITH ORDINALITY AS t(c_observation_id)
+            c_observation_id
+          FROM unnest(ARRAY[${observation_id.list(oids.length)}]) AS t(c_observation_id)
           WHERE NOT EXISTS (
             SELECT 1
-            FROM t_exposure_time_mode_link k
-            WHERE k.c_observation_id = t.c_observation_id
+            FROM t_exposure_time_mode e
+            WHERE e.c_observation_id = t.c_observation_id
+              AND e.c_role = $exposure_time_mode_role
           )
-        ),
-        exposure_time_mode_ids AS (
-          INSERT INTO t_exposure_time_mode (
-            c_exposure_time_mode,
-            c_signal_to_noise,
-            c_signal_to_noise_at,
-            c_exposure_time,
-            c_exposure_count
-          )
-          SELECT
-            $exposure_time_mode_type,
-            ${signal_to_noise.opt},
-            $wavelength_pm,
-            ${time_span.opt},
-            ${int4_pos.opt}
-          FROM obs_ids
-          RETURNING c_exposure_time_mode_id
-        ),
-        numbered_exposure_time_mode_ids AS (
-          SELECT
-            c_exposure_time_mode_id,
-            ROW_NUMBER() OVER () AS rn
-          FROM exposure_time_mode_ids
         )
-        INSERT INTO t_exposure_time_mode_link (
-          c_observation_id,
-          c_exposure_time_mode_id,
-          c_role
-        )
-        SELECT
-          o.c_observation_id,
-          i.c_exposure_time_mode_id,
-          $exposure_time_mode_role
-        FROM obs_ids o
-        JOIN numbered_exposure_time_mode_ids i USING (rn);
-      """.apply(
-        oids.toList,
-        etm.modeType,
-        etm.signalToNoise,
-        etm.at,
-        etm.exposureTime,
-        etm.exposureCount,
-        role
-      )
-
-    def deleteLinks(
-      oids: NonEmptyList[Observation.Id],
-      role: ExposureTimeModeRole
-    ): AppliedFragment =
-      sql"""
-        DELETE FROM t_exposure_time_mode_link
-              WHERE c_observation_id IN ${observation_id.list(oids.length).values}
-                AND c_role = $exposure_time_mode_role
-      """.apply(oids.toList, role)
-
-    val CloneExposureTimeMode: Query[ExposureTimeModeId, ExposureTimeModeId] =
-      sql"""
         INSERT INTO t_exposure_time_mode (
+          c_observation_id,
+          c_role,
           c_exposure_time_mode,
           c_signal_to_noise,
           c_signal_to_noise_at,
@@ -325,15 +235,51 @@ object ExposureTimeModeService:
           c_exposure_count
         )
         SELECT
+          c_observation_id,
+          $exposure_time_mode_role,
+          $exposure_time_mode_type,
+          ${signal_to_noise.opt},
+          $wavelength_pm,
+          ${time_span.opt},
+          ${int4_pos.opt}
+        FROM
+          obs_ids
+      """.apply(
+        oids.toList,
+        role,
+        role,
+        update.modeType,
+        update.signalToNoise,
+        update.at,
+        update.exposureTime,
+        update.exposureCount
+      )
+
+    // (Original, New)
+    val Clone: Command[(Observation.Id, Observation.Id)] =
+      sql"""
+        INSERT INTO t_exposure_time_mode (
+          c_observation_id,
+          c_role,
+          c_exposure_time_mode,
+          c_signal_to_noise,
+          c_signal_to_noise_at,
+          c_exposure_time,
+          c_exposure_count
+        )
+        SELECT
+          $observation_id,
+          c_role,
           c_exposure_time_mode,
           c_signal_to_noise,
           c_signal_to_noise_at,
           c_exposure_time,
           c_exposure_count
         FROM t_exposure_time_mode
-        WHERE c_exposure_time_mode_id = $exposure_time_mode_id
-        RETURNING c_exposure_time_mode_id
-      """.query(exposure_time_mode_id)
+        WHERE c_observation_id = $observation_id
+      """.command
+         .contramap: (origOid, newOid) =>
+           (newOid, origOid)
 
     val SelectLinks: Query[Observation.Id, (ExposureTimeModeId, ExposureTimeModeRole)] =
       sql"""

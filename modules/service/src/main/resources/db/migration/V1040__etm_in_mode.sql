@@ -1,7 +1,22 @@
 
+-- Exposure time modes will be pulled into their own table.  There are n
+-- exposure time modes per observation.  One from the science requirements, one
+-- (potentially) for the acquisition, and n science exposure time modes (e.g.,
+-- one per filter for imaging).  This enumeration identifies the possible roles
+-- of an exposure time mode.
+CREATE TYPE e_exposure_time_mode_role AS ENUM(
+  'acquisition',
+  'requirement',
+  'science'
+);
+
+
 -- Exposure Time Mode gets its own table.
 CREATE TABLE t_exposure_time_mode (
-  c_exposure_time_mode_id SERIAL           PRIMARY KEY,
+  c_exposure_time_mode_id SERIAL                    PRIMARY KEY,
+  c_observation_id        d_observation_id          NOT NULL REFERENCES t_observation(c_observation_id) ON DELETE CASCADE,
+  c_role                  e_exposure_time_mode_role NOT NULL,
+
   c_exposure_time_mode    e_exp_time_mode  NOT NULL,
   c_signal_to_noise       numeric(11, 3)   CHECK (c_signal_to_noise > 0::numeric),
   c_signal_to_noise_at    d_wavelength_pm,
@@ -13,58 +28,29 @@ CREATE TABLE t_exposure_time_mode (
       WHEN 'time_and_count'::e_exp_time_mode  THEN num_nulls(c_signal_to_noise_at, c_exposure_time, c_exposure_count) = 0
       ELSE true
     END
-  ),
-  c_observation_id d_observation_id NOT NULL -- temporary for migration
-);
-
--- Exposure time modes are linked to observations.  Each link carries its own
--- role.
- CREATE TYPE e_exposure_time_mode_role AS ENUM(
-  'acquisition',
-  'requirement',
-  'science'
-);
-
--- Create a requirements ETM link table to track exposure time mode in the
--- requirements.
-CREATE TABLE t_exposure_time_mode_link (
-  c_observation_id        d_observation_id          PRIMARY KEY REFERENCES     t_observation(c_observation_id) ON DELETE CASCADE,
-  c_exposure_time_mode_id integer                   UNIQUE NOT NULL REFERENCES t_exposure_time_mode(c_exposure_time_mode_id) ON DELETE CASCADE,
-  c_role                  e_exposure_time_mode_role NOT NULL
+  )
 );
 
 -- Populate the ETMs from the existing requirements in t_observation
 INSERT INTO t_exposure_time_mode (
+  c_observation_id,
+  c_role,
   c_exposure_time_mode,
   c_signal_to_noise,
   c_signal_to_noise_at,
   c_exposure_time,
-  c_exposure_count,
-  c_observation_id
+  c_exposure_count
 )
 SELECT
+  c_observation_id,
+  'requirement'::e_exposure_time_mode_role,
   c_exp_time_mode,
   c_etm_signal_to_noise,
   c_etm_signal_to_noise_at,
   c_etm_exp_time,
-  c_etm_exp_count,
-  c_observation_id
+  c_etm_exp_count
 FROM t_observation
 WHERE c_exp_time_mode IS NOT NULL;
-
-INSERT INTO t_exposure_time_mode_link (
-  c_observation_id,
-  c_exposure_time_mode_id,
-  c_role
-)
-SELECT
-  c_observation_id,
-  c_exposure_time_mode_id,
-  'requirement'
-FROM t_exposure_time_mode;
-
-ALTER TABLE t_exposure_time_mode
-  DROP COLUMN c_observation_id;
 
 DROP VIEW IF EXISTS v_observation;
 DROP VIEW IF EXISTS v_generator_params;
@@ -76,25 +62,6 @@ ALTER TABLE t_observation
   DROP COLUMN c_etm_signal_to_noise_at,
   DROP COLUMN c_etm_exp_time,
   DROP COLUMN c_etm_exp_count;
-
--- Add a trigger to clean up orphaned ETM rows (e.g., when an observation is
--- deleted the link table row deletion is cascaded but nothing removes the ETM
--- entry).
-
-CREATE OR REPLACE FUNCTION delete_exposure_time_mode()
-RETURNS TRIGGER
-LANGUAGE plpgsql AS $$
-BEGIN
-  DELETE FROM t_exposure_time_mode
-  WHERE c_exposure_time_mode_id = OLD.c_exposure_time_mode_id;
-  RETURN NULL;
-END;
-$$;
-
-CREATE TRIGGER delete_exposure_time_mode_trigger
-AFTER DELETE ON t_exposure_time_mode_link
-FOR EACH ROW
-EXECUTE FUNCTION delete_exposure_time_mode();
 
 -- We need a view on the exposure time mode for the embedded s/n, t&c.
 CREATE VIEW v_exposure_time_mode AS
@@ -175,9 +142,8 @@ LEFT JOIN LATERAL (
      AND t.c_existence = 'present'
    WHERE a.c_observation_id = o.c_observation_id
 ) t ON TRUE
-LEFT JOIN t_exposure_time_mode_link k USING (c_observation_id)
-LEFT JOIN t_exposure_time_mode      e ON k.c_exposure_time_mode_id = e.c_exposure_time_mode_id
-WHERE k.c_role = 'requirement'
+LEFT JOIN t_exposure_time_mode e USING (c_observation_id)
+WHERE e.c_role = 'requirement'
 ORDER BY
   o.c_observation_id,
   t.c_target_id;
