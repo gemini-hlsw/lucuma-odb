@@ -17,11 +17,20 @@ CREATE TABLE t_exposure_time_mode (
   c_observation_id d_observation_id NOT NULL -- temporary for migration
 );
 
+-- Exposure time modes are linked to observations.  Each link carries its own
+-- role.
+ CREATE TYPE e_exposure_time_mode_role AS ENUM(
+  'acquisition',
+  'requirement',
+  'science'
+);
+
 -- Create a requirements ETM link table to track exposure time mode in the
 -- requirements.
 CREATE TABLE t_exposure_time_mode_link (
-  c_observation_id        d_observation_id PRIMARY KEY REFERENCES     t_observation(c_observation_id) ON DELETE CASCADE,
-  c_exposure_time_mode_id integer          UNIQUE NOT NULL REFERENCES t_exposure_time_mode(c_exposure_time_mode_id) ON DELETE CASCADE
+  c_observation_id        d_observation_id          PRIMARY KEY REFERENCES     t_observation(c_observation_id) ON DELETE CASCADE,
+  c_exposure_time_mode_id integer                   UNIQUE NOT NULL REFERENCES t_exposure_time_mode(c_exposure_time_mode_id) ON DELETE CASCADE,
+  c_role                  e_exposure_time_mode_role NOT NULL
 );
 
 -- Populate the ETMs from the existing requirements in t_observation
@@ -45,11 +54,13 @@ WHERE c_exp_time_mode IS NOT NULL;
 
 INSERT INTO t_exposure_time_mode_link (
   c_observation_id,
-  c_exposure_time_mode_id
+  c_exposure_time_mode_id,
+  c_role
 )
 SELECT
   c_observation_id,
-  c_exposure_time_mode_id
+  c_exposure_time_mode_id,
+  'requirement'
 FROM t_exposure_time_mode;
 
 ALTER TABLE t_exposure_time_mode
@@ -166,6 +177,7 @@ LEFT JOIN LATERAL (
 ) t ON TRUE
 LEFT JOIN t_exposure_time_mode_link k USING (c_observation_id)
 LEFT JOIN t_exposure_time_mode      e ON k.c_exposure_time_mode_id = e.c_exposure_time_mode_id
+WHERE k.c_role = 'requirement'
 ORDER BY
   o.c_observation_id,
   t.c_target_id;

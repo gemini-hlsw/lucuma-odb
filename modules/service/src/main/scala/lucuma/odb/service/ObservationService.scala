@@ -42,6 +42,7 @@ import lucuma.core.model.StandardRole.*
 import lucuma.core.model.Target
 import lucuma.core.syntax.string.*
 import lucuma.odb.data.Existence
+import lucuma.odb.data.ExposureTimeModeRole
 import lucuma.odb.data.ExposureTimeModeType
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.Nullable.NonNull
@@ -259,7 +260,7 @@ object ObservationService {
                   .traverse_ { (oid, etm) =>
                     services
                       .exposureTimeModeService
-                      .insertExposureTimeModeRequirement(oid, etm)
+                      .insertExposureTimeModeLink(oid, etm, ExposureTimeModeRole.Requirement)
                   }
 
               }.flatTap { rOid =>
@@ -442,9 +443,9 @@ object ObservationService {
                 _ <- ResultT.liftF:
                        u.fold(().pure[F]): u =>
                          e.fold(
-                           services.exposureTimeModeService.deleteExposureTimeModeRequirement(u),
+                           services.exposureTimeModeService.deleteExposureTimeModeLinks(u, ExposureTimeModeRole.Requirement),
                            ().pure[F],
-                           e => services.exposureTimeModeService.updateExposureTimeModeRequirement(u, e)
+                           e => services.exposureTimeModeService.updateExposureTimeModeLinks(u, e, ExposureTimeModeRole.Requirement)
                          )
 
                 _ <- validateBand(g.keys.toList)
@@ -523,7 +524,7 @@ object ObservationService {
                 val cloneRelatedItems =
                   Services.asSuperUser:
                     asterismService.cloneAsterism(observationId, oid2) >>
-                    exposureTimeModeService.cloneExposureTimeModeRequirement(observationId, oid2) >>
+                    exposureTimeModeService.cloneExposureTimeModeLinks(observationId, oid2) >>
                     observingMode.traverse(observingModeServices.cloneFunction(_)(observationId, oid2)) >>
                     timingWindowService.cloneTimingWindows(observationId, oid2) >>
                     obsAttachmentAssignmentService.cloneAssignments(observationId, oid2)
