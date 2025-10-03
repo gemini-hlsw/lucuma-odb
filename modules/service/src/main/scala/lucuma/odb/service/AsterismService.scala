@@ -117,6 +117,19 @@ object AsterismService {
         val enc = target_id.nel(targetIds)
         session.unique(Statements.containsBlindOffset(enc))(targetIds)
       
+      private def deleteLinks(
+        programId:      Program.Id,
+        observationIds: NonEmptyList[Observation.Id],
+        targetIds:      NonEmptyList[Target.Id]
+      ): F[Result[Unit]] =
+        containsBlindOffset(targetIds).flatMap: hasBlindOffset =>
+          if (hasBlindOffset)
+            OdbError.InvalidArgument("Blind offset targets cannot be removed from an asterism.".some).asFailureF
+          else
+            val af = Statements.deleteLinks(programId, observationIds, targetIds)
+            session.prepareR(af.fragment.command).use { p =>
+              p.execute(af.argument).as(Result.unit)
+            }
 
       override def insertAsterism(
         programId:      Program.Id,
@@ -172,10 +185,7 @@ object AsterismService {
           ResultT(selectProgramId(observationIds)).flatMap { pid =>
             ResultT(ADD.fold(Result.unit.pure[F])(Services.asSuperUser(insertAsterism(pid, observationIds, _)))) *>
               ResultT(DELETE.fold(Result.unit.pure[F]) { tids =>
-                val af = Statements.deleteLinks(pid, observationIds, tids)
-                session.prepareR(af.fragment.command).use { p =>
-                  p.execute(af.argument).as(Result.unit)
-                }
+                deleteLinks(pid, observationIds, tids)
               })
           }.value
 
@@ -254,15 +264,17 @@ object AsterismService {
         void""" ON CONFLICT DO NOTHING"""  // the key consists of all the columns anyway
     }
 
+    // assumes table alias of 'a'
     private def programIdEqual(
       programId: Program.Id
     ): AppliedFragment =
-      sql"c_program_id = $program_id"(programId)
+      sql"a.c_program_id = $program_id"(programId)
 
+    // assumes table alias of 'a'
     private def targetIdIn(
       targetIds: NonEmptyList[Target.Id]
     ): AppliedFragment =
-      void"c_target_id IN (" |+|
+      void"a.c_target_id IN (" |+|
         targetIds.map(sql"$target_id").intercalate(void", ") |+|
       void")"
 
@@ -271,18 +283,24 @@ object AsterismService {
       observationIds: NonEmptyList[Observation.Id],
       targetIds:      NonEmptyList[Target.Id]
     ): AppliedFragment =
-       void"DELETE FROM ONLY t_asterism_target "        |+|
-         void"WHERE " |+| programIdEqual(programId)     |+|
-         void" AND " |+| observationIdIn(observationIds) |+|
-         void" AND " |+| targetIdIn(targetIds)
+      void"DELETE FROM ONLY t_asterism_target a "                        |+|
+        void"USING t_target t "                                          |+|
+        void"WHERE " |+| programIdEqual(programId)                       |+|
+        void" AND " |+| observationIdIn(observationIds)                  |+|
+        void" AND " |+| targetIdIn(targetIds)                            |+|
+        void" AND a.c_target_id = t.c_target_id "                        |+|
+        void" AND t.c_target_disposition != 'blind_offset' "  
 
     def deleteAllLinks(
       programId:      Program.Id,
       observationIds: NonEmptyList[Observation.Id]
     ): AppliedFragment =
-      void"DELETE FROM ONLY t_asterism_target "         |+|
-        void"WHERE " |+| programIdEqual(programId)      |+|
-        void" AND "  |+| observationIdIn(observationIds)
+      void"DELETE FROM ONLY t_asterism_target a "                        |+|
+        void"USING t_target t "                                          |+|
+        void"WHERE " |+| programIdEqual(programId)                       |+|
+        void" AND "  |+| observationIdIn(observationIds)                 |+|
+        void" AND a.c_target_id = t.c_target_id "                        |+|
+        void" AND t.c_target_disposition != 'blind_offset' "  
 
     // programs that aren't visible.
     def clone(originalOid: Observation.Id, newOid: Observation.Id): AppliedFragment =
@@ -299,7 +317,7 @@ object AsterismService {
         FROM t_asterism_target
         JOIN t_target ON t_target.c_target_id = t_asterism_target.c_target_id
         WHERE c_observation_id = $observation_id
-        AND t_target.c_existence = 'present' -- don't clone references to deleted targets
+        AND t_target.c_existence = 'present' -- don't clone references to deleted targets, but do clone blind offsets
       """.apply(newOid, originalOid)
 
     def getAsterism(pid: Program.Id, oid: Observation.Id): AppliedFragment =
@@ -332,6 +350,7 @@ object AsterismService {
           and a.c_program_id = $program_id
           and a.c_observation_id = $observation_id
         where t.c_existence = 'present'
+          and t.c_target_disposition != 'blind_offset'
       """.apply(pid, oid)
 
     def getAsterisms[A <: NonEmptyList[Observation.Id]](enc: Encoder[A]): Query[A, (Observation.Id, (Target.Id, Target))] =
@@ -364,6 +383,7 @@ object AsterismService {
         on t.c_target_id = a.c_target_id
           and a.c_observation_id in ($enc)
         where t.c_existence = 'present'
+          and t.c_target_disposition != 'blind_offset'
       """.query(observation_id ~ Decoders.targetDecoder)
 
     def containsBlindOffset[A <: NonEmptyList[Target.Id]](enc: Encoder[A]): Query[A, Boolean] =
