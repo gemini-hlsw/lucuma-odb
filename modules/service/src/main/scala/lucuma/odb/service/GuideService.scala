@@ -91,11 +91,11 @@ trait GuideService[F[_]] {
 
   def getObjectTracking(pid: Program.Id, oid: Observation.Id)(using
     NoTransaction[F], SuperUserAccess
-  ): F[Result[Option[ObjectTracking]]] 
+  ): F[Result[Option[ObjectTracking]]]
 
   def getObjectTrackingOrRegion(pid: Program.Id, oid: Observation.Id)(using
     NoTransaction[F], SuperUserAccess
-  ): F[Result[Either[ObjectTracking, Region]]] 
+  ): F[Result[Either[ObjectTracking, Region]]]
 
   def getGuideEnvironments(pid: Program.Id, oid: Observation.Id, obsTime: Timestamp)(using
     NoTransaction[F], SuperUserAccess
@@ -448,7 +448,7 @@ object GuideService {
         Trace[F].span("callGaia"):
           val MaxTargets                     = 100
           given ADQLInterpreter          = ADQLInterpreter.nTarget(MaxTargets)
-          gaiaClient.query(query)
+          gaiaClient.queryGuideStars(query)
           .map:
             _.collect { case Right(s) => GuideStarCandidate.siderealTarget.get(s)}
               .success
@@ -489,7 +489,7 @@ object GuideService {
       def getGuideStarFromGaia(name: GuideStarName): F[Result[GuideStarCandidate]] =
         ResultT.fromResult(guideStarIdFromName(name)).flatMap { id =>
           ResultT(
-            gaiaClient.queryById(id)
+            gaiaClient.queryByIdGuideStar(id)
               .map:
                 _.toOption
                   .map(GuideStarCandidate.siderealTarget.get)
@@ -746,7 +746,7 @@ object GuideService {
         (for {
           obsInfo       <- ResultT(getObservationInfo(oid))
           asterism      <- ResultT(getAsterism(pid, oid))
-          baseTracking   = 
+          baseTracking   =
             obsInfo.explicitBase match
               case Some(eb) => Left(ObjectTracking.constant(eb))
               case None     => ObjectTracking.orRegionFromAsterism(asterism)
@@ -773,7 +773,7 @@ object GuideService {
                               .map(ObjectTracking.constant)
                               .orElse(ObjectTracking.fromAsterism(asterism))
                               .fold(Result.failure(s"No tracking available for $oid")): t =>
-                                Result.success(t)                             
+                                Result.success(t)
 
           visitEnd      <- ResultT.fromResult(
                              obsTime
