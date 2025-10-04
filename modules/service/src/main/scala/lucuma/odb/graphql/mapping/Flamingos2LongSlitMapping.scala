@@ -74,19 +74,4 @@ trait Flamingos2LongSlitMapping[F[_]]
 
     )
 
-  // TelluricType mapping
-  // The JSONB is encoded as {"Hot": {}} or {"Manual": {"starTypes": [...]}}
-  lazy val TelluricTypeMapping: ObjectMapping =
-    ObjectMapping(TelluricTypeType)(
-      CursorFieldJson("tag", c => c.as[Json].flatMap { json =>
-        json.asObject.flatMap(_.keys.headOption) match {
-          case Some(tag) => Result(Json.fromString(tag.toUpperCase)) // Hot -> HOT, Manual -> MANUAL
-          case None => Result.internalError(s"No variant key in telluricType JSON: $json")
-        }
-      }, Nil),
-      CursorFieldJson("starTypes", c => c.as[Json].map { json =>
-        json.hcursor.downField("Manual").downField("starTypes").focus.getOrElse(Json.Null)
-      }, Nil)
-    )
-
 }

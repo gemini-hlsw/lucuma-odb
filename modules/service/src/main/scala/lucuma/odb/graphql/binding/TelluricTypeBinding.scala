@@ -18,15 +18,17 @@ object TelluricTypeBinding extends Matcher[TelluricType] {
         fieldMap.get("tag") match {
           case Some(Value.EnumValue(tag)) =>
             tag.toUpperCase match {
-              case "HOT" => Right(TelluricType.Hot)
-              case "A0V" => Right(TelluricType.A0V)
-              case "SOLAR" => Right(TelluricType.Solar)
+              case "HOT"    => Right(TelluricType.Hot)
+              case "A0V"    => Right(TelluricType.A0V)
+              case "SOLAR"  => Right(TelluricType.Solar)
               case "MANUAL" =>
                 fieldMap.get("starTypes") match {
                   case Some(Value.ListValue(types)) =>
                     types.traverse {
-                      case Value.StringValue(str) => Right(str)
-                      case _ => Left("Expected string in starTypes")
+                      case Value.StringValue(str) =>
+                        Right(str)
+                      case _                      =>
+                        Left("Expected string in starTypes")
                     }.flatMap { typesList =>
                       NonEmptyList.fromList(typesList) match {
                         case Some(nel) => Right(TelluricType.Manual(nel))
@@ -34,12 +36,12 @@ object TelluricTypeBinding extends Matcher[TelluricType] {
                       }
                     }
                   case None => Left("starTypes is required when tag is MANUAL")
-                  case _ => Left("starTypes must be a list")
+                  case _    => Left("starTypes must be a list")
                 }
               case other => Left(s"Unknown telluric type tag: $other")
             }
           case Some(_) => Left("tag must be an enum value")
-          case None => Left("tag field is required in telluricType")
+          case None    => Left("tag field is required in telluricType")
         }
       case _ => Left("Expected object for telluricType")
     }

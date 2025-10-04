@@ -403,7 +403,6 @@ object OdbMapping {
                 FilterTypeMetaMapping,
                 Flamingos2DynamicMapping,
                 Flamingos2LongSlitMapping,
-                TelluricTypeMapping,
                 Flamingos2StaticMapping,
                 GmosNorthImagingMapping,
                 GmosNorthLongSlitMapping,

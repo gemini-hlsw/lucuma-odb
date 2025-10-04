@@ -6,8 +6,6 @@ package lucuma.odb.service
 import cats.data.NonEmptyList
 import cats.effect.Concurrent
 import cats.syntax.all.*
-import io.circe.Decoder as CirceDecoder
-import io.circe.Encoder as CirceEncoder
 import io.circe.Json
 import io.circe.syntax.*
 import lucuma.core.enums.Flamingos2Decker
@@ -20,6 +18,7 @@ import lucuma.core.enums.Flamingos2Reads
 import lucuma.core.model.Observation
 import lucuma.core.model.TelluricType
 import lucuma.odb.format.spatialOffsets.*
+import lucuma.odb.json.TelluricTypeCodecs.given
 import lucuma.odb.graphql.input.Flamingos2LongSlitInput
 import lucuma.odb.sequence.flamingos2.longslit.Config
 import lucuma.odb.util.Codecs.*
@@ -49,31 +48,6 @@ trait Flamingos2LongSlitService[F[_]]:
   def clone(originalId: Observation.Id, newId: Observation.Id): F[Unit]
 
 object Flamingos2LongSlitService:
-
-  // Explicit Circe encoder/decoder matching the derived encoding format
-  // Encodes as: {"Hot": {}}, {"A0V": {}}, {"Solar": {}}, {"Manual": {"starTypes": [...]}}
-  given CirceEncoder[TelluricType] = CirceEncoder.instance {
-    case TelluricType.Hot         => Json.obj("Hot" -> Json.obj())
-    case TelluricType.A0V         => Json.obj("A0V" -> Json.obj())
-    case TelluricType.Solar       => Json.obj("Solar" -> Json.obj())
-    case TelluricType.Manual(starTypes) => Json.obj("Manual" -> Json.obj("starTypes" -> starTypes.toList.asJson))
-  }
-
-  given CirceDecoder[TelluricType] = CirceDecoder.instance { cursor =>
-    cursor.keys.flatMap(_.headOption) match {
-      case Some("Hot")   => Right(TelluricType.Hot)
-      case Some("A0V")   => Right(TelluricType.A0V)
-      case Some("Solar") => Right(TelluricType.Solar)
-      case Some("Manual") =>
-        cursor.downField("Manual").downField("starTypes").as[List[String]].flatMap { types =>
-          cats.data.NonEmptyList.fromList(types) match {
-            case Some(nel) => Right(TelluricType.Manual(nel))
-            case None => Left(io.circe.DecodingFailure("starTypes must be non-empty", cursor.history))
-          }
-        }
-      case other => Left(io.circe.DecodingFailure(s"Unknown TelluricType variant: $other", cursor.history))
-    }
-  }
 
   def instantiate[F[_]: {Concurrent as F, Services}]: Flamingos2LongSlitService[F] =
 
