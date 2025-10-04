@@ -307,7 +307,7 @@ object OdbMapping {
               Services.forUser(
                 user,
                 enums,
-                Option.when(allowSub): (s: Session[F]) => 
+                Option.when(allowSub): (s: Session[F]) =>
                   apply(
                     Resource.pure(s),     // Always use the provided session
                     monitor0,             // Same args as the outer mapping
@@ -403,6 +403,7 @@ object OdbMapping {
                 FilterTypeMetaMapping,
                 Flamingos2DynamicMapping,
                 Flamingos2LongSlitMapping,
+                TelluricTypeMapping,
                 Flamingos2StaticMapping,
                 GmosNorthImagingMapping,
                 GmosNorthLongSlitMapping,

@@ -7981,6 +7981,29 @@ enum Flamingos2Reads {
 }
 
 """
+Telluric calibration tag
+"""
+enum TelluricTag {
+  HOT
+  A0V
+  SOLAR
+  MANUAL
+}
+
+"""
+Telluric calibration type
+"""
+type TelluricType {
+  tag: TelluricTag!
+  starTypes: [String!] # when tag is MANUAL
+}
+
+input TelluricTypeInput {
+  tag: TelluricTag!
+  starTypes: [String!] # when tag is MANUAL
+}
+
+"""
 Flamingos2 Long Slit mode
 """
 type Flamingos2LongSlit {
@@ -8064,6 +8087,11 @@ type Flamingos2LongSlit {
   explicitOffsets: [Offset!]
 
   """
+  Telluric type configuration for this observation.
+  """
+  telluricType: TelluricType!
+
+  """
   The disperser as it was initially selected.  See the `disperser` field for the
   disperser that will be used in the observation.
   """
@@ -8126,6 +8154,11 @@ input Flamingos2LongSlitInput {
   The explicitOffsets field may be unset by assigning a null value, or ignored by skipping it altogether
   """
   explicitOffsets: [OffsetInput!]
+
+  """
+  The telluricType field must be either specified or skipped altogether. It cannot be unset with a null value.
+  """
+  telluricType: TelluricTypeInput = { tag: HOT }
 
 }
 

@@ -14,6 +14,7 @@ import lucuma.core.enums.Flamingos2ReadMode
 import lucuma.core.enums.Flamingos2ReadoutMode
 import lucuma.core.enums.Flamingos2Reads
 import lucuma.core.math.Offset
+import lucuma.core.model.TelluricType
 import lucuma.core.syntax.all.*
 import lucuma.odb.sequence.syntax.all.*
 
@@ -34,7 +35,8 @@ case class Config private[longslit](
   explicitDecker: Option[Flamingos2Decker],
   defaultReadoutMode: Flamingos2ReadoutMode,
   explicitReadoutMode: Option[Flamingos2ReadoutMode],
-  explicitSpatialOffsets: Option[List[Offset]]
+  explicitSpatialOffsets: Option[List[Offset]],
+  telluricType: TelluricType
 ) derives Eq {
 
   def decker: Flamingos2Decker =
@@ -59,6 +61,8 @@ case class Config private[longslit](
     out.writeChars(readoutMode.tag)
     val off: Array[Byte] = explicitSpatialOffsets.foldMap(_.map(_.hashBytes)).flatten.toArray
     out.write(off, 0, off.length)
+    val tt: Array[Byte] = telluricType.hashBytes
+    out.write(tt, 0, tt.length)
 
     out.close()
     bao.toByteArray
@@ -84,7 +88,8 @@ object Config:
     explicitReads: Option[Flamingos2Reads] = None,
     explicitDecker: Option[Flamingos2Decker] = None,
     explicitReadoutMode: Option[Flamingos2ReadoutMode] = None,
-    explicitSpatialOffsets: Option[List[Offset]] = None
+    explicitSpatialOffsets: Option[List[Offset]] = None,
+    telluricType: TelluricType = TelluricType.Hot
   ): Config =
     new Config(
       disperser,
@@ -96,5 +101,6 @@ object Config:
       explicitDecker,
       DefaultFlamingos2ReadoutMode,
       explicitReadoutMode,
-      explicitSpatialOffsets
+      explicitSpatialOffsets,
+      telluricType
     )

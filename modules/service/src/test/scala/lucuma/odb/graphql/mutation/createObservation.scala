@@ -1130,6 +1130,10 @@ class createObservation extends OdbSuite {
                 readoutMode
                 defaultReadoutMode
                 explicitReadoutMode
+                telluricType {
+                  tag
+                  starTypes
+                }
                 initialDisperser
                 initialFilter
                 initialFpu
@@ -1176,6 +1180,10 @@ class createObservation extends OdbSuite {
            Some(Flamingos2Filter.Y),
            Flamingos2Fpu.LongSlit2
           )
+        ) *>
+        assertIO(
+          longSlit.downField("telluricType").downIO[String]("tag"),
+          "HOT"
         )
 
       }
