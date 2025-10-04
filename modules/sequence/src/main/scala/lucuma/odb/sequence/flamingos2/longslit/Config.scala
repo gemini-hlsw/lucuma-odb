@@ -62,7 +62,7 @@ case class Config private[longslit](
     val off: Array[Byte] = explicitSpatialOffsets.foldMap(_.map(_.hashBytes)).flatten.toArray
     out.write(off, 0, off.length)
     val tt: Array[Byte] = telluricType.hashBytes
-    out.writeChars(telluricType.tag)
+    out.write(tt, 0, tt.length)
 
     out.close()
     bao.toByteArray

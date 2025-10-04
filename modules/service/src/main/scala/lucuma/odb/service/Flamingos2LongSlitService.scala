@@ -18,8 +18,8 @@ import lucuma.core.enums.Flamingos2Reads
 import lucuma.core.model.Observation
 import lucuma.core.model.TelluricType
 import lucuma.odb.format.spatialOffsets.*
-import lucuma.odb.json.TelluricTypeCodecs.given
 import lucuma.odb.graphql.input.Flamingos2LongSlitInput
+import lucuma.odb.json.TelluricTypeCodecs.given
 import lucuma.odb.sequence.flamingos2.longslit.Config
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.Flamingos2Codecs.*

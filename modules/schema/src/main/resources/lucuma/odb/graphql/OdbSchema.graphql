@@ -7981,7 +7981,7 @@ enum Flamingos2Reads {
 }
 
 """
-Telluric calibration tag
+Telluric calibration type
 """
 enum TelluricTag {
   HOT

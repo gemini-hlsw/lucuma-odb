@@ -8,6 +8,7 @@ import io.circe.testing.CodecTests
 import lucuma.core.model.TelluricType
 import lucuma.core.model.arb.ArbTelluricType.given
 import munit.DisciplineSuite
+
 import TelluricTypeCodecs.given
 
 class TelluricTypeCodecSuite extends DisciplineSuite with ArbitraryInstances:
