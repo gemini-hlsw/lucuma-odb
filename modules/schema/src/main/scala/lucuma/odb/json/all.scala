@@ -30,6 +30,7 @@ object all {
        with parallax.QueryCodec
        with target.QueryCodec
        with configurationrequest.QueryCodec
+       with tellurictype.QueryCodec
        with UniversalCodecs
 
   object transport
@@ -43,6 +44,7 @@ object all {
        with radialvelocity.TransportCodec
        with parallax.TransportCodec
        with target.TransportCodec
+       with tellurictype.TransportCodec
        with UniversalCodecs
 
 }

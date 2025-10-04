@@ -8,8 +8,13 @@ import io.circe.testing.CodecTests
 import lucuma.core.model.TelluricType
 import lucuma.core.model.arb.ArbTelluricType.given
 import munit.DisciplineSuite
-import TelluricTypeCodecs.given
 
-class TelluricTypeCodecSuite extends DisciplineSuite with ArbitraryInstances:
+class TelluricTypeQueryCodecSuite extends DisciplineSuite with ArbitraryInstances:
+  import tellurictype.query.given
 
-  checkAll("Codec", CodecTests[TelluricType].unserializableCodec)
+  checkAll("QueryCodec", CodecTests[TelluricType].unserializableCodec)
+
+class TelluricTypeTransportCodecSuite extends DisciplineSuite with ArbitraryInstances:
+  import tellurictype.transport.given
+
+  checkAll("TransportCodec", CodecTests[TelluricType].unserializableCodec)

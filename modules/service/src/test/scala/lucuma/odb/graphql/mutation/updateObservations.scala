@@ -3943,6 +3943,114 @@ class updateObservations extends OdbSuite
       """.asRight)
     } yield ()
 
+  test("[flamingos2] updateObservations with telluricType"):
+    for {
+      pid <- createProgramAs(pi)
+      oid <- createObservationAs(pi, pid)
+      _   <- expect(
+                user = pi,
+                query = s"""
+                  mutation {
+                    updateObservations(input: {
+                      SET: {
+                        observingMode: {
+                          flamingos2LongSlit: {
+                            disperser: R1200_HK
+                            filter: Y
+                            fpu: LONG_SLIT_2
+                            telluricType: {
+                              tag: MANUAL
+                              starTypes: ["A5V", "G2V", "K0III"]
+                            }
+                          }
+                        }
+                      }
+                      WHERE: {
+                        id: { EQ: ${oid.asJson} }
+                      }
+                    }) {
+                      observations {
+                        observingMode {
+                          flamingos2LongSlit {
+                            telluricType {
+                              tag
+                              starTypes
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                """,
+                expected = json"""
+                  {
+                    "updateObservations": {
+                      "observations": [
+                        {
+                          "observingMode": {
+                            "flamingos2LongSlit": {
+                              "telluricType": {
+                                "tag": "MANUAL",
+                                "starTypes": ["A5V", "G2V", "K0III"]
+                              }
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                """.asRight)
+      _   <- expect(
+                user = pi,
+                query =s"""
+                  mutation {
+                    updateObservations(input: {
+                      SET: {
+                        observingMode: {
+                          flamingos2LongSlit: {
+                            telluricType: {
+                              tag: SOLAR
+                            }
+                          }
+                        }
+                      }
+                      WHERE: {
+                        id: { EQ: ${oid.asJson} }
+                      }
+                    }) {
+                      observations {
+                        observingMode {
+                          flamingos2LongSlit {
+                            telluricType {
+                              tag
+                              starTypes
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                """,
+                expected = json"""
+                  {
+                    "updateObservations": {
+                      "observations": [
+                        {
+                          "observingMode": {
+                            "flamingos2LongSlit": {
+                              "telluricType": {
+                                "tag": "SOLAR",
+                                "starTypes": null
+                              }
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                """.asRight)
+    } yield ()
+
   test("field precedence: new offset fields take priority over deprecated ones"):
 
     val update = """

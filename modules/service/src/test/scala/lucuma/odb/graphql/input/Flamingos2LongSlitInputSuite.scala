@@ -9,6 +9,7 @@ import lucuma.core.enums.Flamingos2Filter
 import lucuma.core.enums.Flamingos2Fpu
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.math.Offset
+import lucuma.core.model.TelluricType
 import lucuma.core.syntax.all.*
 import lucuma.core.util.arb.ArbEnumerated.given
 import lucuma.odb.graphql.input.arb.ArbFlamingos2LongSlitInput.given
@@ -76,7 +77,7 @@ class Flamingos2LongSlitInputSuite extends DisciplineSuite with ArbitraryInstanc
       explicitDecker = lucuma.odb.data.Nullable.Null,
       explicitReadoutMode = lucuma.odb.data.Nullable.Null,
       explicitOffsets = lucuma.odb.data.Nullable.NonNull(offsets),
-      telluricType = None
+      telluricType = Some(TelluricType.Hot)
     )
 
     assertEquals(edit.formattedOffsets, lucuma.odb.data.Nullable.NonNull("0.000000,5.000000,0.000000,10.000000"))

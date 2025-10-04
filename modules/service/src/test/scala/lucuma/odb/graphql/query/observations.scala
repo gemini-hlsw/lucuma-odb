@@ -784,4 +784,148 @@ class observations extends OdbSuite {
       )
     } yield ()
 
+  test("query Flamingos2 long slit observations with telluricType"):
+    for {
+      pid <- createProgramAs(pi)
+      tid <- createTargetAs(pi, pid)
+      oid <- createFlamingos2LongSlitObservationAs(pi, pid, tid)
+      _   <- expect(
+                user = pi,
+                query = s"""
+                  query {
+                    observations(WHERE: {
+                      instrument: { EQ: FLAMINGOS2 }
+                    }) {
+                      matches {
+                        id
+                        observingMode {
+                          flamingos2LongSlit {
+                            disperser
+                            filter
+                            fpu
+                            telluricType {
+                              tag
+                              starTypes
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                """,
+                expected = Right(
+                  json"""
+                    {
+                      "observations": {
+                        "matches": [
+                          {
+                            "id": $oid,
+                            "observingMode": {
+                              "flamingos2LongSlit": {
+                                "disperser": "R1200_HK",
+                                "filter": "Y",
+                                "fpu": "LONG_SLIT_2",
+                                "telluricType": {
+                                  "tag": "HOT",
+                                  "starTypes": null
+                                }
+                              }
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  """
+                )
+              )
+    } yield ()
+
+  test("query Flamingos2 long slit observations with Manual telluricType"):
+    for {
+      pid <- createProgramAs(pi)
+      tid <- createTargetAs(pi, pid)
+      oid <- createObservationAs(pi, pid)
+      _   <- expect(
+               user = pi,
+               query = s"""
+                  mutation {
+                    updateObservations(input: {
+                      SET: {
+                        observingMode: {
+                          flamingos2LongSlit: {
+                            disperser: R1200_HK
+                            filter: Y
+                            fpu: LONG_SLIT_2
+                            telluricType: {
+                              tag: MANUAL
+                              starTypes: ["A5V", "G2V", "K0III"]
+                            }
+                          }
+                        }
+                      }
+                      WHERE: {
+                        id: { EQ: ${oid.asJson} }
+                      }
+                    }) {
+                      observations {
+                        id
+                      }
+                    }
+                  }""",
+                  expected =json"""
+                    {
+                      "updateObservations": {
+                        "observations": [
+                          {
+                            "id": $oid
+                          }
+                        ]
+                      }
+                    }
+                  """.asRight)
+      _   <- expect(
+                user = pi,
+                query = s"""
+                  query {
+                    observations(WHERE: {
+                      id: { EQ: ${oid.asJson} }
+                    }) {
+                      matches {
+                        id
+                        observingMode {
+                          flamingos2LongSlit {
+                            telluricType {
+                              tag
+                              starTypes
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                """,
+                expected = Right(
+                  json"""
+                    {
+                      "observations": {
+                        "matches": [
+                          {
+                            "id": $oid,
+                            "observingMode": {
+                              "flamingos2LongSlit": {
+                                "telluricType": {
+                                  "tag": "MANUAL",
+                                  "starTypes": ["A5V", "G2V", "K0III"]
+                                }
+                              }
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  """
+                )
+              )
+    } yield ()
+
 }

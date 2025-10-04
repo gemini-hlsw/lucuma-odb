@@ -31,11 +31,11 @@ trait Flamingos2LongSlitView[F[_]] extends BaseMapping[F]:
 
     val Offsets: ColumnRef            = col("c_offsets", text.opt)
 
-    val TelluricType: ColumnRef       = col("c_telluric_type", jsonb)
-
     val ImageQuality: ColumnRef       = col("c_image_quality", image_quality_preset)
     val SourceProfile: ColumnRef      = col("c_source_profile", jsonb.opt)
 
     val InitialDisperser: ColumnRef   = col("c_initial_disperser", flamingos_2_disperser)
     val InitialFilter: ColumnRef      = col("c_initial_filter", flamingos_2_filter)
     val InitialFpu: ColumnRef         = col("c_initial_fpu", flamingos_2_fpu)
+
+    val TelluricType: ColumnRef       = col("c_telluric_type", jsonb)
