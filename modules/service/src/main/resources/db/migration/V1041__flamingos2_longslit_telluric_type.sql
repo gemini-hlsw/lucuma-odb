@@ -1,8 +1,7 @@
 
 ALTER TABLE t_flamingos_2_long_slit
-ADD COLUMN c_telluric_type jsonb NOT NULL DEFAULT '{"Hot":{}}'::jsonb;
+ADD COLUMN c_telluric_type jsonb NOT NULL DEFAULT '{"tag":"HOT","starTypes":null}'::jsonb;
 
--- Recreate the view to include the new column
 CREATE OR REPLACE VIEW v_flamingos_2_long_slit AS
 SELECT
   m.*
