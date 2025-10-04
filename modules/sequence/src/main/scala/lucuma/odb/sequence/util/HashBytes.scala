@@ -8,6 +8,7 @@ import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.numeric.PosLong
 import io.circe.Encoder
 import lucuma.core.math.Offset
+import lucuma.core.model.TelluricType
 import lucuma.core.util.Enumerated
 import lucuma.core.util.Gid
 import lucuma.core.util.TimeSpan
@@ -72,6 +73,8 @@ object HashBytes {
       toByteArray(BigInt(a), 2)
   }
 
+  given HashBytes[String] = _.getBytes
+
   given HashBytes[Boolean] with
     def hashBytes(a: Boolean): Array[Byte] =
       HashBytes[Int].hashBytes(a.hashCode)
@@ -103,6 +106,15 @@ object HashBytes {
     def hashBytes(a: Offset.Q): Array[Byte] =
       HashBytes[Long].hashBytes(a.toAngle.toMicroarcseconds)
   }
+
+  given HashBytes[TelluricType] =
+    case t @ TelluricType.Manual(starTypes) =>
+      Array.concat(
+        HashBytes[String].hashBytes(t.tag),
+        starTypes.toList.map(HashBytes[String].hashBytes).flatten.toArray
+      )
+    case t                                  =>
+      HashBytes[String].hashBytes(t.tag)
 
   given HashBytes[Offset] with {
     def hashBytes(a: Offset): Array[Byte] =

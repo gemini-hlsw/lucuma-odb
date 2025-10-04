@@ -75,7 +75,8 @@ class Flamingos2LongSlitInputSuite extends DisciplineSuite with ArbitraryInstanc
       explicitReads = lucuma.odb.data.Nullable.Null,
       explicitDecker = lucuma.odb.data.Nullable.Null,
       explicitReadoutMode = lucuma.odb.data.Nullable.Null,
-      explicitOffsets = lucuma.odb.data.Nullable.NonNull(offsets)
+      explicitOffsets = lucuma.odb.data.Nullable.NonNull(offsets),
+      telluricType = None
     )
 
     assertEquals(edit.formattedOffsets, lucuma.odb.data.Nullable.NonNull("0.000000,5.000000,0.000000,10.000000"))

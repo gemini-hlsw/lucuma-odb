@@ -15,6 +15,7 @@ import lucuma.core.enums.Flamingos2ReadoutMode
 import lucuma.core.enums.Flamingos2Reads
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.math.Offset
+import lucuma.core.model.TelluricType
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.Nullable.NonNull
 import lucuma.odb.format.spatialOffsets.*
@@ -36,7 +37,8 @@ object Flamingos2LongSlitInput {
     explicitReads: Option[Flamingos2Reads]             = None,
     explicitDecker: Option[Flamingos2Decker]           = None,
     explicitReadoutMode: Option[Flamingos2ReadoutMode] = None,
-    explicitOffsets: Option[List[Offset]]              = None
+    explicitOffsets: Option[List[Offset]]              = None,
+    telluricType: TelluricType                         = TelluricType.Hot
   ) {
     def observingModeType: ObservingModeType =
       ObservingModeType.Flamingos2LongSlit
@@ -54,7 +56,8 @@ object Flamingos2LongSlitInput {
       Option[Flamingos2Decker],
       Option[Flamingos2ReadoutMode],
       Option[Flamingos2Reads],
-      Option[List[Offset]]
+      Option[List[Offset]],
+      Option[TelluricType]
     )] =
       ObjectFieldsBinding.rmap {
         case List(
@@ -65,7 +68,8 @@ object Flamingos2LongSlitInput {
           Flamingos2ReadsBinding.Option("explicitReads", rReads),
           Flamingos2DeckerBinding.Option("explicitDecker", rDecker),
           Flamingos2ReadoutModeBinding.Option("explicitReadoutMode", rReadoutMode),
-          OffsetInput.Binding.List.Option("explicitOffsets", rOffsets)
+          OffsetInput.Binding.List.Option("explicitOffsets", rOffsets),
+          TelluricTypeBinding.Option("telluricType", rTelluricType)
         ) => (
           rDisperser,
           rFilter,
@@ -74,7 +78,8 @@ object Flamingos2LongSlitInput {
           rDecker,
           rReadoutMode,
           rReads,
-          rOffsets
+          rOffsets,
+          rTelluricType
         ).parTupled
       }
 
@@ -88,7 +93,8 @@ object Flamingos2LongSlitInput {
           explicitDecker,
           explicitReadoutMode,
           explicitReads,
-          explicitOffsets
+          explicitOffsets,
+          telluricType
       ) =>
         explicitOffsets match {
           case Some(offsets) =>
@@ -101,7 +107,8 @@ object Flamingos2LongSlitInput {
                 explicitReads,
                 explicitDecker,
                 explicitReadoutMode,
-                explicitOffsets
+                explicitOffsets,
+                telluricType.getOrElse(TelluricType.Hot)
               )
             )
           case None =>
@@ -113,7 +120,8 @@ object Flamingos2LongSlitInput {
               explicitReads,
               explicitDecker,
               explicitReadoutMode,
-              explicitOffsets
+              explicitOffsets,
+              telluricType.getOrElse(TelluricType.Hot)
             ))
         }
       }
@@ -128,7 +136,8 @@ object Flamingos2LongSlitInput {
     explicitReads: Nullable[Flamingos2Reads],
     explicitDecker: Nullable[Flamingos2Decker],
     explicitReadoutMode: Nullable[Flamingos2ReadoutMode],
-    explicitOffsets: Nullable[List[Offset]]
+    explicitOffsets: Nullable[List[Offset]],
+    telluricType: Option[TelluricType]
   ) {
 
     val observingModeType: ObservingModeType =
@@ -156,7 +165,8 @@ object Flamingos2LongSlitInput {
         explicitReads.toOption,
         explicitDecker.toOption,
         explicitReadoutMode.toOption,
-        explicitOffsets.toOption
+        explicitOffsets.toOption,
+        telluricType.getOrElse(TelluricType.Hot)
       )
   }
 
@@ -170,7 +180,8 @@ object Flamingos2LongSlitInput {
       Nullable[Flamingos2Reads],
       Nullable[Flamingos2Decker],
       Nullable[Flamingos2ReadoutMode],
-      Nullable[List[Offset]]
+      Nullable[List[Offset]],
+      Option[TelluricType]
     )] =
       ObjectFieldsBinding.rmap {
         case List(
@@ -181,7 +192,8 @@ object Flamingos2LongSlitInput {
           Flamingos2ReadsBinding.Nullable("explicitReads", rReads),
           Flamingos2DeckerBinding.Nullable("explicitDecker", rDecker),
           Flamingos2ReadoutModeBinding.Nullable("explicitReadoutMode", rReadoutMode),
-          OffsetInput.Binding.List.Nullable("explicitOffsets", rOffsets)
+          OffsetInput.Binding.List.Nullable("explicitOffsets", rOffsets),
+          TelluricTypeBinding.Option("telluricType", rTelluricType)
         ) => (
           rDisperser,
           rFilter,
@@ -190,7 +202,8 @@ object Flamingos2LongSlitInput {
           rReads,
           rDecker,
           rReadoutMode,
-          rOffsets
+          rOffsets,
+          rTelluricType
         ).parTupled
       }
 
@@ -204,7 +217,8 @@ object Flamingos2LongSlitInput {
           explicitReads,
           explicitDecker,
           explicitReadoutMode,
-          explicitOffsets
+          explicitOffsets,
+          telluricType
           ) =>
           explicitOffsets match {
             case NonNull(offsets) =>
@@ -217,7 +231,8 @@ object Flamingos2LongSlitInput {
                   explicitReads,
                   explicitDecker,
                   explicitReadoutMode,
-                  explicitOffsets
+                  explicitOffsets,
+                  telluricType
                 )
               )
             case _ =>
@@ -229,7 +244,8 @@ object Flamingos2LongSlitInput {
                 explicitReads,
                 explicitDecker,
                 explicitReadoutMode,
-                explicitOffsets
+                explicitOffsets,
+                telluricType
               ))
           }
       }

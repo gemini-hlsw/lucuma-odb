@@ -102,13 +102,6 @@ trait Codecs {
       tpe
     )
 
-  private def codecFromFormat[A](format: Format[String, A], tpe: Type): Codec[A] =
-    Codec.simple(
-      format.reverseGet,
-      s => format.getOption(s).toRight(s"Invalid: $s"),
-      tpe
-    )
-
   def gid[A](implicit ev: Gid[A]): Codec[A] =
     codecFromPrism(ev.fromString, Type.varchar)
 

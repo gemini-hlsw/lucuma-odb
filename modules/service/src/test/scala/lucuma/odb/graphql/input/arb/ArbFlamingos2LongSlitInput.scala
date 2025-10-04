@@ -4,6 +4,7 @@
 package lucuma.odb.graphql.input
 package arb
 
+import cats.data.NonEmptyList
 import lucuma.core.enums.Flamingos2Decker
 import lucuma.core.enums.Flamingos2Disperser
 import lucuma.core.enums.Flamingos2Filter
@@ -13,6 +14,7 @@ import lucuma.core.enums.Flamingos2ReadoutMode
 import lucuma.core.enums.Flamingos2Reads
 import lucuma.core.math.Offset
 import lucuma.core.math.arb.ArbOffset.given
+import lucuma.core.model.TelluricType
 import lucuma.core.util.arb.ArbEnumerated.given
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.arb.ArbNullable.given
@@ -20,6 +22,18 @@ import org.scalacheck.*
 import org.scalacheck.Arbitrary.arbitrary
 
 trait ArbFlamingos2LongSlitInput:
+
+  given Arbitrary[TelluricType] =
+    Arbitrary {
+      Gen.oneOf(
+        Gen.const(TelluricType.Hot),
+        Gen.const(TelluricType.A0V),
+        Gen.const(TelluricType.Solar),
+        for {
+          starTypes <- Gen.nonEmptyListOf(Gen.oneOf("A5V", "G2V", "K0III", "M0V"))
+        } yield TelluricType.Manual(NonEmptyList.fromListUnsafe(starTypes))
+      )
+    }
 
   given Arbitrary[Flamingos2LongSlitInput.Create] =
     Arbitrary {
@@ -32,7 +46,8 @@ trait ArbFlamingos2LongSlitInput:
         d <- arbitrary[Option[Flamingos2Decker]]
         o <- arbitrary[Option[Flamingos2ReadoutMode]]
         so <- arbitrary[Option[List[Offset]]]
-      } yield Flamingos2LongSlitInput.Create(g, f, u, r, s, d, o, so)
+        tt <- arbitrary[TelluricType]
+      } yield Flamingos2LongSlitInput.Create(g, f, u, r, s, d, o, so, tt)
     }
 
   given Arbitrary[Flamingos2LongSlitInput.Edit] =
@@ -45,7 +60,9 @@ trait ArbFlamingos2LongSlitInput:
         s <- arbitrary[Nullable[Flamingos2Reads]]
         d <- arbitrary[Nullable[Flamingos2Decker]]
         o <- arbitrary[Nullable[Flamingos2ReadoutMode]]
-        so <- arbitrary[Nullable[List[Offset]]] } yield Flamingos2LongSlitInput.Edit(g, f, u, r, s, d, o, so)
+        so <- arbitrary[Nullable[List[Offset]]]
+        tt <- arbitrary[Option[TelluricType]]
+      } yield Flamingos2LongSlitInput.Edit(g, f, u, r, s, d, o, so, tt)
     }
 
 

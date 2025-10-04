@@ -109,6 +109,10 @@ class cloneObservation extends OdbSuite {
           disperser
           filter
           fpu
+          telluricType {
+            tag
+            starTypes
+          }
         }
       }
       targetEnvironment {

@@ -289,7 +289,7 @@ object GeneratorParamsService {
             )
             GeneratorParams(itcObsParams(obsParams, mode), obsParams.scienceBand, gs, obsParams.calibrationRole, obsParams.declaredComplete, obsParams.acqResetTime)
 
-          case f2 @ flamingos2.longslit.Config(disperser, filter, fpu, _, _, _, _, _, _, _) =>
+          case f2 @ flamingos2.longslit.Config(disperser = disperser, filter = filter, fpu = fpu) =>
             val mode = InstrumentMode.Flamingos2Spectroscopy(disperser, filter, fpu)
             GeneratorParams(itcObsParams(obsParams, mode), obsParams.scienceBand, f2, obsParams.calibrationRole, obsParams.declaredComplete, obsParams.acqResetTime)
 
