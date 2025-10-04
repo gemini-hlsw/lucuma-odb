@@ -33,7 +33,7 @@ sealed trait CalibrationConfigMatcher:
   def normalize(config: CalibrationConfigSubset): CalibrationConfigSubset
 
 object CalibrationConfigMatcher:
-  private val UnknownConfig: CalibrationConfigMatcher =
+  val UnknownConfig: CalibrationConfigMatcher =
     new CalibrationConfigMatcher {
       def extractConfig(mode: ObservingMode): CalibrationConfigSubset =
         mode.toConfigSubset
@@ -49,6 +49,8 @@ object CalibrationConfigMatcher:
         SpecphotoGmosLS
       case (GmosNorthLongSlit | GmosSouthLongSlit, CalibrationRole.Twilight)           =>
         TwilightGmosLS
+      case (Flamingos2LongSlit, CalibrationRole.Telluric)                              =>
+        Flamingos2LS
       case (_, _)                                                                      =>
         UnknownConfig
 
@@ -75,6 +77,16 @@ object SpecphotoGmosLS extends CalibrationConfigMatcher:
       case other => other
 
 object TwilightGmosLS extends CalibrationConfigMatcher:
+  def extractConfig(mode: ObservingMode): CalibrationConfigSubset =
+    mode.toConfigSubset
+
+  def configsMatch(c1: CalibrationConfigSubset, c2: CalibrationConfigSubset): Boolean =
+    c1 === c2
+
+  def normalize(config: CalibrationConfigSubset): CalibrationConfigSubset =
+    config
+
+object Flamingos2LS extends CalibrationConfigMatcher:
   def extractConfig(mode: ObservingMode): CalibrationConfigSubset =
     mode.toConfigSubset
 
