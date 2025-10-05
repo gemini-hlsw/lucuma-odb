@@ -80,7 +80,7 @@ object GmosFpu {
     Json.obj(
       e.fold(
         m => "customMask" -> m.asJson,
-        b => "builtin" -> b.asScreamingJson
+        b => "builtin"    -> b.asScreamingJson
       )
     )
 

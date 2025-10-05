@@ -78,6 +78,7 @@ import lucuma.odb.service.Services.Syntax.*
 import lucuma.refined.*
 import munit.AnyFixture
 import munit.CatsEffectSuite
+import munit.Location
 import munit.diff.console.AnsiColors
 import natchez.Trace
 import org.http4s.blaze.server.BlazeServerBuilder
@@ -122,7 +123,7 @@ object OdbSuite:
  * Mixin that allows execution of GraphQL operations on a per-suite instance of the Odb, shared
  * among all tests.
  */
-abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with TestContainerForAll with DatabaseOperations with TestSsoClient with ChronicleOperations {
+abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with TestContainerForAll with DatabaseOperations with ServiceOperations with TestSsoClient with ChronicleOperations {
   override implicit def munitIoRuntime: IORuntime = OdbSuite.runtime
 
   /** Ensure that exactly the specified errors are reported, in order. */
@@ -506,7 +507,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
     expected:  Either[List[String], Json],
     variables: Option[JsonObject] = None,
     client:    ClientOption = ClientOption.Default
-  ): IO[Unit] = {
+  )(using Location): IO[Unit] = {
     val op = this.query(user, query, variables, client)
     expected.fold(errors => {
       op
@@ -527,7 +528,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
     expected:  Json,
     variables: Option[JsonObject] = None,
     client:    ClientOption = ClientOption.Default
-  ): IO[Unit] =
+  )(using Location): IO[Unit] =
     this.query(user, query, variables, client)
       .map(_.spaces2)
       .assertEquals(expected.spaces2) // by comparing strings we get more useful errors
@@ -539,7 +540,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
     expected:  PartialFunction[OdbError, Unit],
     variables: Option[JsonObject] = None,
     client:    ClientOption = ClientOption.Default
-  ): IO[Unit] =
+  )(using Location): IO[Unit] =
     this.query(user, query, variables, client)
       .intercept[ResponseException[Any]]
       .map: er =>
@@ -559,7 +560,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
     expected:  Set[OdbError],
     variables: Option[JsonObject] = None,
     client:    ClientOption = ClientOption.Default
-  ): IO[Unit] =
+  )(using Location): IO[Unit] =
     this.query(user, query, variables, client)
       .intercept[ResponseException[Any]]
       .map: e =>
@@ -571,7 +572,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
     expected:  Either[PartialFunction[OdbError, Unit], Json],
     variables: Option[JsonObject] = None,
     client:    ClientOption = ClientOption.Default
-  ): IO[Unit] =
+  )(using Location): IO[Unit] =
     expected.fold(
       expectOdbError(user, query, _, variables, client),
       expectSuccess(user, query, _, variables, client)
@@ -583,7 +584,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
     expected:  Ior[List[String], Json],
     variables: Option[JsonObject] = None,
     client:    ClientOption = ClientOption.Default
-  ): IO[Unit] =
+  )(using Location): IO[Unit] =
     queryIor(user, query, variables, client).map: ior =>
       assertEquals(ior.leftMap(_.toList.map(_.message)), expected)
 
@@ -653,19 +654,19 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
         }
     }
 
-  def subscriptionExpect(user: User, query: String, mutations: Either[List[(String, Option[JsonObject])], IO[Any]], expected: List[Json], variables: Option[JsonObject] = None) =
+  def subscriptionExpect(user: User, query: String, mutations: Either[List[(String, Option[JsonObject])], IO[Any]], expected: List[Json], variables: Option[JsonObject] = None)(using Location) =
     subscription(user, query, mutations, variables).map { obt =>
       assertEquals(obt.map(_.spaces2), expected.map(_.spaces2))  // by comparing strings we get more useful errors
     }
 
-  def subscriptionExpectF(user: User, query: String, mutations: Either[List[(String, Option[JsonObject])], IO[Any]], expectedF: IO[List[Json]], variables: Option[JsonObject] = None) =
+  def subscriptionExpectF(user: User, query: String, mutations: Either[List[(String, Option[JsonObject])], IO[Any]], expectedF: IO[List[Json]], variables: Option[JsonObject] = None)(using Location) =
     subscription(user, query, mutations, variables).flatMap { obt =>
       expectedF.map { expected =>
         assertEquals(obt.map(_.spaces2), expected.map(_.spaces2))  // by comparing strings we get more useful errors
       }
     }
 
-  def subscriptionExpectFT(user: User, query: String, mutations: Either[List[(String, Option[JsonObject])], IO[Any]], expectedF: IO[List[Json]], variables: Option[JsonObject] = None, transform: List[Json] => List[Json]) =
+  def subscriptionExpectFT(user: User, query: String, mutations: Either[List[(String, Option[JsonObject])], IO[Any]], expectedF: IO[List[Json]], variables: Option[JsonObject] = None, transform: List[Json] => List[Json])(using Location) =
     subscription(user, query, mutations, variables).flatMap { obt =>
       expectedF.map { expected =>
         assertEquals(transform(obt).map(_.spaces2), transform(expected).map(_.spaces2))  // by comparing strings we get more useful errors

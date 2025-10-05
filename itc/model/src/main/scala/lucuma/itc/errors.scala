@@ -35,8 +35,7 @@ object Error:
       )
       .deepMerge(e match
         case SourceTooBright(hw) => Json.obj("wellHalfFilledSeconds" -> hw.asJson)
-        case _                   => Json.obj("wellHalfFilledSeconds" -> Json.Null)
-      )
+        case _                   => Json.obj("wellHalfFilledSeconds" -> Json.Null))
 
   given Decoder[Error] = c =>
     c.downField("errorCode")

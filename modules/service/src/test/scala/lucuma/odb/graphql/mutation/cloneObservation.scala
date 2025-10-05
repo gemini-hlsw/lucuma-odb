@@ -26,6 +26,8 @@ class cloneObservation extends OdbSuite {
       title
       subtitle
       program { id }
+      observerNotes
+      useBlindOffset
       constraintSet {
         cloudExtinction
         imageQuality
@@ -728,4 +730,63 @@ class cloneObservation extends OdbSuite {
       }
     }
   }
+
+  test("clone observation should preserve observer notes"):
+    for {
+      pid    <- createProgramAs(pi)
+      idjson <- query(
+                  user = pi,
+                  query = s"""
+                    mutation {
+                      createObservation(input: {
+                        programId: "$pid"
+                        SET: {
+                          observerNotes: "Observation notes"
+                          useBlindOffset: true
+                        }
+                      }) {
+                        observation {
+                          id
+                        }
+                      }
+                    }
+                  """
+                )
+      oid   = idjson.hcursor.downFields("createObservation", "observation", "id").require[Observation.Id]
+      _     <- expect(
+                user = pi,
+                query = s"""
+                  mutation {
+                    cloneObservation(input: {
+                      observationId: ${oid.asJson}
+                    }) {
+                      originalObservation {
+                        observerNotes
+                        useBlindOffset
+                      }
+                      newObservation {
+                        observerNotes
+                        useBlindOffset
+                      }
+                    }
+                  }
+                """,
+                expected = Right(
+                  json"""
+                    {
+                      "cloneObservation": {
+                        "originalObservation": {
+                          "observerNotes": "Observation notes",
+                          "useBlindOffset": true
+                        },
+                        "newObservation": {
+                          "observerNotes": "Observation notes",
+                          "useBlindOffset": true
+                        }
+                      }
+                    }
+                  """
+                )
+              )
+    } yield ()
 }

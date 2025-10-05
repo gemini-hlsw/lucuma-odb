@@ -8,6 +8,7 @@ import cats.syntax.all.*
 import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.enums.CalibrationRole
+import lucuma.core.enums.TargetDisposition
 import lucuma.core.model.ProgramReference.Description
 import lucuma.core.model.User
 import lucuma.odb.graphql.input.ProgramPropertiesInput
@@ -184,8 +185,7 @@ class updateTargets extends OdbSuite {
   test("delete orphan calibration targets") {
     for {
       pid  <-  createProgramAs(pi)
-      tid  <- createTargetAs(pi, pid)
-      _    <- setTargetCalibrationRole(tid, CalibrationRole.Photometric)
+      tid  <- createTargetViaServiceAs(pi, pid, TargetDisposition.Calibration, CalibrationRole.Photometric.some)
       _    <- withServices(service) { s =>
                 s.session.transaction.use { xa =>
                   s.targetService.deleteOrphanCalibrationTargets(pid)(using xa)

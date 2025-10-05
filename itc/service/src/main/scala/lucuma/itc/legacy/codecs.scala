@@ -523,9 +523,8 @@ private[legacy] object codecs:
           .downField("exposures")
           .as[Int]
           .flatMap:
-            refineV[NonNegative](_).leftMap(e =>
-              DecodingFailure(e, c.downField("exposures").history)
-            )
+            refineV[NonNegative](_)
+              .leftMap(e => DecodingFailure(e, c.downField("exposures").history))
     yield Exposures(time, count)
 
   given Decoder[AllExposureCalculations] = (c: HCursor) =>

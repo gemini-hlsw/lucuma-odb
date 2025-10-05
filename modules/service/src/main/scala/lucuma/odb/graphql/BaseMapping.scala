@@ -341,6 +341,7 @@ trait BaseMapping[F[_]]
   lazy val SystemProgramReferenceType              = schema.ref("SystemProgramReference")
   lazy val SystemVerificationType                  = schema.ref("SystemVerification")
   lazy val TacCategoryType                         = schema.ref("TacCategory")
+  lazy val TargetDispositionType                  = schema.ref("TargetDisposition")
   lazy val TargetEditType                          = schema.ref("TargetEdit")
   lazy val TargetEnvironmentType                   = schema.ref("TargetEnvironment")
   lazy val TargetGroupSelectResultType             = schema.ref("TargetGroupSelectResult")

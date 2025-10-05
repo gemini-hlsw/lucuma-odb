@@ -196,6 +196,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[String](HmsStringType),
       LeafMapping[Tag](TacCategoryType),
       LeafMapping[Target.Id](TargetIdType),
+      LeafMapping[TargetDisposition](TargetDispositionType),
       LeafMapping[TimeAccountingCategory](TimeAccountingCategoryType),
       LeafMapping[TimeChargeCorrection.Op](TimeChargeCorrectionOpType),
       LeafMapping[Timestamp](TimestampType),

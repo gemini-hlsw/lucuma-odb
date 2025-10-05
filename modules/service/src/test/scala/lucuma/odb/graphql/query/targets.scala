@@ -4,12 +4,17 @@
 package lucuma.odb.graphql
 package query
 
+import cats.effect.IO
 import cats.syntax.all.*
 import io.circe.Json
+import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.enums.CalibrationRole
+import lucuma.core.enums.TargetDisposition
+import lucuma.core.model.Program
 import lucuma.core.model.ProgramReference.Description
 import lucuma.core.model.Target
+import lucuma.core.model.User
 import lucuma.odb.graphql.input.ProgramPropertiesInput
 import lucuma.odb.service.Services
 
@@ -331,4 +336,88 @@ class targets extends OdbSuite {
           )
     } yield ()
   }
+
+  test("target selection with target disposition") {
+    for {
+      pid  <- createProgramAs(pi)
+      tids <- createTargetAs(service, pid).replicateA(5)
+      ctid <- createTargetViaServiceAs(pi, pid, TargetDisposition.Calibration, CalibrationRole.Twilight.some)
+      (oid, btid) <- createObservationWithBlindOffsetAs(pi, pid, "Blind offset")
+      _ <- expectWithDisposition(
+            user = pi,
+            pid,
+            whereDisposition = """EQ: SCIENCE""",
+            targets = tids.map(t => (t, "SCIENCE"))
+          )
+      _ <- expectWithDisposition(
+            user = pi,
+            pid,
+            whereDisposition = """EQ: BLIND_OFFSET""",
+            targets = List((btid, "BLIND_OFFSET"))
+          )
+      _ <- expectWithDisposition(
+            user = pi,
+            pid,
+            whereDisposition = """IN: [BLIND_OFFSET, CALIBRATION]""",
+            targets = List((ctid, "CALIBRATION"), (btid, "BLIND_OFFSET"))
+          )
+      _ <- expectWithDisposition(
+            user = pi,
+            pid,
+            whereDisposition = """NIN: [SCIENCE]""",
+            targets = List((ctid, "CALIBRATION"), (btid, "BLIND_OFFSET"))
+          )
+      _ <- expectWithDisposition(
+            user = pi,
+            pid,
+            whereDisposition = """NEQ: CALIBRATION""",
+            targets = tids.map(t => (t, "SCIENCE")) ++ List((btid, "BLIND_OFFSET"))
+          )
+    } yield ()
+  }
+
+  private def expectWithDisposition(
+    user: User,
+    pid: Program.Id,
+    whereDisposition: String,
+    targets: List[(Target.Id, String)]
+  ): IO[Unit] =
+    val targetsJson: Json = targets.map(t => 
+      json"""
+        {
+          "id" : ${t._1.asJson},
+          "disposition" : ${t._2.asJson}
+        }
+      """
+    ).asJson
+    val expected = json"""
+      {
+        "targets" : {
+          "matches" : $targetsJson
+        }
+      }
+    """
+    expect(
+      user = user,
+      query = s"""
+        query {
+          targets(
+            WHERE: {
+              disposition: {
+                $whereDisposition
+              }
+              program: {
+                id: { EQ: "$pid" }
+              }
+            }
+          ) {
+            matches {
+              id
+              disposition
+            }
+          }
+        }
+      """,
+      expected = expected.asRight
+    )
 }
