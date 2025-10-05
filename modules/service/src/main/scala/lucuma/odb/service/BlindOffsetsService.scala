@@ -6,6 +6,7 @@ package lucuma.odb.service
 import cats.effect.Concurrent
 import cats.syntax.all.*
 import grackle.Result
+import lucuma.core.enums.TargetDisposition
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
@@ -55,17 +56,21 @@ object BlindOffsetsService:
         input: TargetPropertiesInput.Create
       )(using Transaction[F], ServiceAccess): F[Result[Target.Id]] =
         Services.asSuperUser:
-          targetService.createTarget(AccessControl.unchecked(input, programId, program_id))
-            .flatMap: rTargetId =>
-              rTargetId.traverse: targetId =>
-                for {
-                  _ <- session.execute(Statements.addBlindOffset)(programId, observationId, targetId, targetId)
-                  _ <- session.execute(Statements.updateBlindOffsetFlag)(true, observationId)
-                } yield targetId
+          targetService.createTarget(
+            AccessControl.unchecked(input, programId, program_id),
+            TargetDisposition.BlindOffset
+          ).flatMap: rTargetId =>
+            rTargetId.traverse: targetId =>
+              for {
+                _ <- session.execute(Statements.addBlindOffset)(programId, observationId, targetId)
+                _ <- session.execute(Statements.updateBlindOffsetFlag)(true, observationId)
+              } yield targetId
 
       override def removeBlindOffset(
         observationId: Observation.Id
       )(using Transaction[F], ServiceAccess): F[Unit] =
+        // This removes any existing blind offset target from the t_asterism_target table,
+        // a database trigger permanently deletes the blind offset target from t_target
         session.execute(Statements.removeBlindOffset)(observationId).void
 
       override def getBlindOffset(
@@ -93,17 +98,11 @@ object BlindOffsetsService:
 
       private object Statements:
 
-        val addBlindOffset: Command[Program.Id *: Observation.Id *: Target.Id *: Target.Id *: EmptyTuple] =
+        val addBlindOffset: Command[Program.Id *: Observation.Id *: Target.Id *: EmptyTuple] =
           sql"""
-            WITH asterism_insert AS (
-              INSERT INTO t_asterism_target (c_program_id, c_observation_id, c_target_id)
-              VALUES ($program_id, $observation_id, $target_id)
-              ON CONFLICT (c_program_id, c_observation_id, c_target_id) DO NOTHING
-              RETURNING c_target_id
-            )
-            UPDATE t_target
-            SET c_target_disposition = 'blind_offset'
-            WHERE c_target_id = $target_id
+            INSERT INTO t_asterism_target (c_program_id, c_observation_id, c_target_id)
+            VALUES ($program_id, $observation_id, $target_id)
+            ON CONFLICT (c_program_id, c_observation_id, c_target_id) DO NOTHING
           """.command
 
         val removeBlindOffset: Command[Observation.Id] =

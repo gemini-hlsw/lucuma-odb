@@ -14,6 +14,8 @@ import grackle.Result
 import io.circe.Json
 import io.circe.syntax.*
 import lucuma.core.enums.ArcType
+import lucuma.core.enums.CalibrationRole
+import lucuma.core.enums.TargetDisposition
 import lucuma.core.math.Angular
 import lucuma.core.math.Arc
 import lucuma.core.math.Arc.Empty
@@ -59,7 +61,11 @@ import skunk.implicits.*
 import Services.Syntax.*
 
 trait TargetService[F[_]] {
-  def createTarget(input: CheckedWithId[TargetPropertiesInput.Create, Program.Id])(using Transaction[F]): F[Result[Target.Id]]
+  def createTarget(
+    input: CheckedWithId[TargetPropertiesInput.Create, Program.Id],
+    disposition: TargetDisposition = TargetDisposition.Science,
+    role: Option[CalibrationRole] = None
+  )(using Transaction[F]): F[Result[Target.Id]]
   def updateTargets(checked: AccessControl.Checked[TargetPropertiesInput.Edit])(using Transaction[F]): F[Result[List[Target.Id]]]
   def cloneTarget(input: AccessControl.CheckedWithId[CloneTargetInput, Program.Id])(using Transaction[F]): F[Result[(Target.Id, Target.Id)]]
   def cloneTargetInto(targetId: Target.Id, programId: Program.Id)(using Transaction[F], ServiceAccess): F[Result[(Target.Id, Target.Id)]]
@@ -92,12 +98,16 @@ object TargetService {
   def instantiate[F[_]: Concurrent](using Services[F]): TargetService[F] =
     new TargetService[F] {
 
-      override def createTarget(input: CheckedWithId[TargetPropertiesInput.Create, Program.Id])(using Transaction[F]): F[Result[Target.Id]] =
+      override def createTarget(
+        input: CheckedWithId[TargetPropertiesInput.Create, Program.Id],
+        disposition: TargetDisposition = TargetDisposition.Science,
+        role: Option[CalibrationRole] = None
+      )(using Transaction[F]): F[Result[Target.Id]] =
         input.foldWithId(OdbError.NotAuthorized(user.id).asFailureF): (input, pid) =>
           val af = input.subtypeInfo match
-            case s: SiderealInput.Create  => Statements.insertSiderealFragment(pid, input.name, s, input.sourceProfile.asJson)
-            case n: EphemerisKey => Statements.insertNonsiderealFragment(pid, input.name, n, input.sourceProfile.asJson)
-            case o: OpportunityInput.Create => Statements.insertOpportunityFragment(pid, input.name, o.region, input.sourceProfile.asJson)
+            case s: SiderealInput.Create  => Statements.insertSiderealFragment(pid, input.name, s, input.sourceProfile.asJson, disposition, role)
+            case n: EphemerisKey => Statements.insertNonsiderealFragment(pid, input.name, n, input.sourceProfile.asJson, disposition, role)
+            case OpportunityInput.Create(r) => Statements.insertOpportunityFragment(pid, input.name, r, input.sourceProfile.asJson, disposition, role)
           session.prepareR(af.fragment.query(target_id)).use: ps =>
             ps.unique(af.argument).map(Result.success)
 
@@ -223,7 +233,9 @@ object TargetService {
       pid:           Program.Id,
       name:          NonEmptyString,
       si:            SiderealInput.Create,
-      sourceProfile: Json
+      sourceProfile: Json,
+      disposition:   TargetDisposition,
+      role:          Option[CalibrationRole]
     ): AppliedFragment = {
       sql"""
         insert into t_target (
@@ -241,7 +253,8 @@ object TargetService {
           c_sid_catalog_id,
           c_sid_catalog_object_type,
           c_source_profile,
-          c_target_disposition
+          c_target_disposition,
+          c_calibration_role
         )
         select
           $program_id,
@@ -258,7 +271,8 @@ object TargetService {
           ${text_nonempty.opt},
           ${text_nonempty.opt},
           $json,
-          'science'
+          $target_disposition,
+          ${calibration_role.opt}
         returning c_target_id
       """.apply(
         pid,
@@ -274,6 +288,8 @@ object TargetService {
         si.catalogInfo.flatMap(_.id),
         si.catalogInfo.flatMap(_.objectType),
         sourceProfile,
+        disposition,
+        role
       )
     }
 
@@ -281,7 +297,9 @@ object TargetService {
       pid:           Program.Id,
       name:          NonEmptyString,
       ek:            EphemerisKey,
-      sourceProfile: Json
+      sourceProfile: Json,
+      disposition:   TargetDisposition, 
+      role:          Option[CalibrationRole]
     ): AppliedFragment = {
       sql"""
         insert into t_target (
@@ -292,7 +310,8 @@ object TargetService {
           c_nsid_key_type,
           c_nsid_key,
           c_source_profile,
-          c_target_disposition
+          c_target_disposition,
+          c_calibration_role
         )
         select
           $program_id,
@@ -302,7 +321,8 @@ object TargetService {
           ${ephemeris_key_type},
           ${text_nonempty},
           $json,
-          'science'
+          $target_disposition,
+          ${calibration_role.opt}
         returning c_target_id
       """.apply(
         pid,
@@ -311,6 +331,8 @@ object TargetService {
         ek.keyType,
         NonEmptyString.from(EphemerisKey.fromString.reverseGet(ek)).toOption.get, // we know this is never empty
         sourceProfile,
+        disposition,
+        role
       )
     }
 
@@ -331,7 +353,9 @@ object TargetService {
       pid:           Program.Id,
       name:          NonEmptyString,
       region:        RegionInput.Create,
-      sourceProfile: Json
+      sourceProfile: Json,
+      disposition:   TargetDisposition,
+      role:          Option[CalibrationRole]
     ): AppliedFragment = {
       sql"""
         insert into t_target (
@@ -345,7 +369,8 @@ object TargetService {
           c_opp_dec_arc_start,
           c_opp_dec_arc_end,
           c_source_profile,
-          c_target_disposition
+          c_target_disposition,
+          c_calibration_role
         )
         select
           $program_id,
@@ -354,7 +379,8 @@ object TargetService {
           ${arc(right_ascension)},
           ${arc(declination)},
           $json,
-          'science'
+          $target_disposition,
+          ${calibration_role.opt}
         returning c_target_id
       """.apply(
         pid,
@@ -362,6 +388,8 @@ object TargetService {
         region.raArc,
         region.decArc,
         sourceProfile,
+        disposition,
+        role
       )
     }
 
