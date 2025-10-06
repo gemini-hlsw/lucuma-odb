@@ -17,7 +17,7 @@ import lucuma.odb.json.offset.query.given
 import lucuma.odb.sequence.flamingos2.longslit.Config
 
 trait Flamingos2LongSlitMapping[F[_]]
-  extends Flamingos2LongSlitView[F] with OptionalFieldMapping[F] { this: SkunkMapping[F] =>
+  extends Flamingos2LongSlitView[F] with OptionalFieldMapping[F] with BaseMapping[F] { this: SkunkMapping[F] =>
 
   private def decodeOffsets(s: String): Json =
     OffsetsFormat.getOption(s).map(_.asJson).getOrElse(List.empty[Offset].asJson)
@@ -65,6 +65,8 @@ trait Flamingos2LongSlitMapping[F[_]]
       ),
 
       CursorFieldJson("defaultOffsets", _ => Result(defaultOffsetsJson), Nil),
+
+      SqlJson("telluricType", Flamingos2LongSlitView.TelluricType),
 
       SqlField("initialDisperser", Flamingos2LongSlitView.InitialDisperser),
       SqlField("initialFilter",    Flamingos2LongSlitView.InitialFilter),

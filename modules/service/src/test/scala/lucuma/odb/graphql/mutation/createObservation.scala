@@ -4,6 +4,7 @@
 package lucuma.odb.graphql
 package mutation
 
+import cats.data.NonEmptyList
 import cats.effect.IO
 import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.NonNegShort
@@ -23,11 +24,13 @@ import lucuma.core.model.Semester
 import lucuma.core.model.ServiceUser
 import lucuma.core.model.StandardUser
 import lucuma.core.model.Target
+import lucuma.core.model.TelluricType
 import lucuma.core.model.User
 import lucuma.core.syntax.string.*
 import lucuma.core.syntax.timespan.*
 import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.graphql.input.AllocationInput
+import lucuma.odb.json.tellurictype.query.given
 
 class createObservation extends OdbSuite {
 
@@ -1130,6 +1133,10 @@ class createObservation extends OdbSuite {
                 readoutMode
                 defaultReadoutMode
                 explicitReadoutMode
+                telluricType {
+                  tag
+                  starTypes
+                }
                 initialDisperser
                 initialFilter
                 initialFpu
@@ -1159,7 +1166,8 @@ class createObservation extends OdbSuite {
            longSlit.downIO[Option[Flamingos2ReadoutMode]]("explicitReadoutMode"),
            longSlit.downIO[Flamingos2Disperser]("initialDisperser"),
            longSlit.downIO[Option[Flamingos2Filter]]("initialFilter"),
-           longSlit.downIO[Flamingos2Fpu]("initialFpu")
+           longSlit.downIO[Flamingos2Fpu]("initialFpu"),
+           longSlit.downIO[TelluricType]("telluricType")
           ).tupled,
           (Flamingos2Disperser.R1200HK,
            Some(Flamingos2Filter.Y),
@@ -1174,10 +1182,10 @@ class createObservation extends OdbSuite {
            None,
            Flamingos2Disperser.R1200HK,
            Some(Flamingos2Filter.Y),
-           Flamingos2Fpu.LongSlit2
+           Flamingos2Fpu.LongSlit2,
+           TelluricType.Hot
           )
         )
-
       }
     }
   }
@@ -1189,8 +1197,18 @@ class createObservation extends OdbSuite {
     explicitReadMode:    Option[Flamingos2ReadMode],
     explicitDecker:      Option[Flamingos2Decker],
     explicitReadoutMode: Option[Flamingos2ReadoutMode],
-    explicitReads:       Option[Flamingos2Reads]
+    explicitReads:       Option[Flamingos2Reads],
+    telluricType:        TelluricType
   ): String =
+    def telluricTypeToGraphQL(tt: TelluricType): String = tt match {
+      case TelluricType.Hot   => "{ tag: HOT }"
+      case TelluricType.A0V   => "{ tag: A0V }"
+      case TelluricType.Solar => "{ tag: SOLAR }"
+      case TelluricType.Manual(starTypes) =>
+        val types = starTypes.toList.map(s => s""""$s"""").mkString("[", ", ", "]")
+        s"{ tag: MANUAL, starTypes: $types }"
+    }
+
     s"""
       mutation {
         createObservation(input: {
@@ -1205,6 +1223,7 @@ class createObservation extends OdbSuite {
                 explicitDecker: ${explicitDecker.map(_.tag.toScreamingSnakeCase).getOrElse("null")}
                 explicitReadoutMode: ${explicitReadoutMode.map(_.tag.toScreamingSnakeCase).getOrElse("null")}
                 explicitReads: ${explicitReads.map(_.tag.toScreamingSnakeCase).getOrElse("null")}
+                telluricType: ${telluricTypeToGraphQL(telluricType)}
               }
             }
           }
@@ -1223,6 +1242,10 @@ class createObservation extends OdbSuite {
                 readoutMode
                 defaultReadoutMode
                 explicitReadoutMode
+                telluricType {
+                  tag
+                  starTypes
+                }
               }
             }
           }
@@ -1240,7 +1263,8 @@ class createObservation extends OdbSuite {
           explicitReadMode = Some(Flamingos2ReadMode.Bright),
           explicitReads = None,
           explicitDecker = Some(Flamingos2Decker.MOS),
-          explicitReadoutMode = Some(Flamingos2ReadoutMode.Engineering)
+          explicitReadoutMode = Some(Flamingos2ReadoutMode.Engineering),
+          telluricType = TelluricType.Solar
         )).flatMap { js =>
           val longSlit = js.hcursor.downPath("createObservation", "observation", "observingMode", "flamingos2LongSlit")
 
@@ -1255,22 +1279,23 @@ class createObservation extends OdbSuite {
             longSlit.downIO[Option[Flamingos2Decker]]("explicitDecker"),
             longSlit.downIO[Flamingos2ReadoutMode]("readoutMode"),
             longSlit.downIO[Flamingos2ReadoutMode]("defaultReadoutMode"),
-            longSlit.downIO[Option[Flamingos2ReadoutMode]]("explicitReadoutMode")
+            longSlit.downIO[Option[Flamingos2ReadoutMode]]("explicitReadoutMode"),
+            longSlit.downIO[TelluricType]("telluricType")
           ).tupled, (
             Flamingos2Disperser.R1200HK,
             Some(Flamingos2Filter.Y),
             Flamingos2Fpu.LongSlit2,
-            Some(Flamingos2ReadMode.Bright),        // Explicitly set read mode
-            None,                           // Explicit reads is Empty
-            Flamingos2Decker.MOS,                   // Explicitly set
-            Flamingos2Decker.LongSlit,              // default to long slit
-            Some(Flamingos2Decker.MOS),             // Explicitly set
-            Flamingos2ReadoutMode.Engineering,      // Explicitly set
-            Flamingos2ReadoutMode.Science,          // Science bf default
-            Some(Flamingos2ReadoutMode.Engineering) // Explicitly set
+            Some(Flamingos2ReadMode.Bright),         // Explicitly set read mode
+            None,                                    // Explicit reads is Empty
+            Flamingos2Decker.MOS,                    // Explicitly set
+            Flamingos2Decker.LongSlit,               // default to long slit
+            Some(Flamingos2Decker.MOS),              // Explicitly set
+            Flamingos2ReadoutMode.Engineering,       // Explicitly set
+            Flamingos2ReadoutMode.Science,           // Science bf default
+            Some(Flamingos2ReadoutMode.Engineering), // Explicitly set
+            TelluricType.Solar
           )
         )
-
       }
     }
   }
@@ -1285,7 +1310,8 @@ class createObservation extends OdbSuite {
           explicitReadMode = None,
           explicitReads = Some(Flamingos2Reads.Reads_4),
           explicitDecker = None,
-          explicitReadoutMode = None
+          explicitReadoutMode = None,
+          telluricType = TelluricType.A0V
         )).flatMap { js =>
           val longSlit = js.hcursor.downPath("createObservation", "observation", "observingMode", "flamingos2LongSlit")
 
@@ -1296,7 +1322,8 @@ class createObservation extends OdbSuite {
             longSlit.downIO[Option[Flamingos2ReadMode]]("explicitReadMode"),
             longSlit.downIO[Option[Flamingos2Reads]]("explicitReads"),
             longSlit.downIO[Flamingos2Decker]("decker"),
-            longSlit.downIO[Flamingos2ReadoutMode]("readoutMode")
+            longSlit.downIO[Flamingos2ReadoutMode]("readoutMode"),
+            longSlit.downIO[TelluricType]("telluricType")
           ).tupled, (
             Flamingos2Disperser.R1200HK,
             Some(Flamingos2Filter.Y),
@@ -1304,7 +1331,8 @@ class createObservation extends OdbSuite {
             None,
             Some(Flamingos2Reads.Reads_4),          // Explicit reads set to 4
             Flamingos2Decker.LongSlit,              // default to long slit
-            Flamingos2ReadoutMode.Science           // Science bf default
+            Flamingos2ReadoutMode.Science,          // Science bf default
+            TelluricType.A0V
           )
         )
 
@@ -1322,7 +1350,8 @@ class createObservation extends OdbSuite {
           explicitReadMode = Some(Flamingos2ReadMode.Medium),
           explicitReads = Some(Flamingos2Reads.Reads_16),
           explicitDecker = None,
-          explicitReadoutMode = None
+          explicitReadoutMode = None,
+          telluricType = TelluricType.Manual(NonEmptyList.of("A1", "A2"))
         )).flatMap { js =>
           val longSlit = js.hcursor.downPath("createObservation", "observation", "observingMode", "flamingos2LongSlit")
 
@@ -1333,7 +1362,8 @@ class createObservation extends OdbSuite {
             longSlit.downIO[Option[Flamingos2ReadMode]]("explicitReadMode"),
             longSlit.downIO[Option[Flamingos2Reads]]("explicitReads"),
             longSlit.downIO[Flamingos2Decker]("decker"),
-            longSlit.downIO[Flamingos2ReadoutMode]("readoutMode")
+            longSlit.downIO[Flamingos2ReadoutMode]("readoutMode"),
+            longSlit.downIO[TelluricType]("telluricType")
           ).tupled, (
             Flamingos2Disperser.R1200HK,
             Some(Flamingos2Filter.Y),
@@ -1341,7 +1371,8 @@ class createObservation extends OdbSuite {
             Some(Flamingos2ReadMode.Medium), // Explicitly set read mode
             Some(Flamingos2Reads.Reads_16),  // Explicit reads is 16
             Flamingos2Decker.LongSlit,       // default to long slit
-            Flamingos2ReadoutMode.Science    // Science bf default
+            Flamingos2ReadoutMode.Science,   // Science bf default
+            TelluricType.Manual(NonEmptyList.of("A1", "A2"))
           )
         )
 

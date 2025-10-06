@@ -37,3 +37,5 @@ trait Flamingos2LongSlitView[F[_]] extends BaseMapping[F]:
     val InitialDisperser: ColumnRef   = col("c_initial_disperser", flamingos_2_disperser)
     val InitialFilter: ColumnRef      = col("c_initial_filter", flamingos_2_filter)
     val InitialFpu: ColumnRef         = col("c_initial_fpu", flamingos_2_fpu)
+
+    val TelluricType: ColumnRef       = col("c_telluric_type", jsonb)

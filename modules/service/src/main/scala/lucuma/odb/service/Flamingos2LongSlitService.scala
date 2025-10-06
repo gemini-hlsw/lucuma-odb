@@ -6,6 +6,8 @@ package lucuma.odb.service
 import cats.data.NonEmptyList
 import cats.effect.Concurrent
 import cats.syntax.all.*
+import io.circe.Json
+import io.circe.syntax.*
 import lucuma.core.enums.Flamingos2Decker
 import lucuma.core.enums.Flamingos2Disperser
 import lucuma.core.enums.Flamingos2Filter
@@ -14,12 +16,15 @@ import lucuma.core.enums.Flamingos2ReadMode
 import lucuma.core.enums.Flamingos2ReadoutMode
 import lucuma.core.enums.Flamingos2Reads
 import lucuma.core.model.Observation
+import lucuma.core.model.TelluricType
 import lucuma.odb.format.spatialOffsets.*
 import lucuma.odb.graphql.input.Flamingos2LongSlitInput
+import lucuma.odb.json.all.query.given
 import lucuma.odb.sequence.flamingos2.longslit.Config
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.Flamingos2Codecs.*
 import skunk.*
+import skunk.circe.codec.json.*
 import skunk.codec.text.text
 import skunk.implicits.*
 
@@ -56,13 +61,14 @@ object Flamingos2LongSlitService:
          flamingos_2_reads.opt        *:
          flamingos_2_decker.opt       *:
          flamingos_2_readout_mode.opt *:
-         text.opt
-        ).emap { case (disperser, filter, fpu, readMode, reads, decker, readoutMode, offsetsText) =>
-          offsetsText
-            .traverse: so =>
-              OffsetsFormat.getOption(so).toRight(s"Could not parse '$so' as an offsets list.")
-            .map: offsets =>
-              Config(disperser, filter, fpu, readMode, reads, decker, readoutMode, offsets)
+         text.opt                     *:
+         jsonb
+        ).emap { case (disperser, filter, fpu, readMode, reads, decker, readoutMode, offsetsText, telluricTypeJson) =>
+          (offsetsText.traverse: so =>
+            OffsetsFormat.getOption(so).toRight(s"Could not parse '$so' as an offsets list."),
+            telluricTypeJson.as[TelluricType].leftMap(_.getMessage)).mapN { (offsets, telluricType) =>
+              Config(disperser, filter, fpu, readMode, reads, decker, readoutMode, offsets, telluricType)
+          }
         }
 
       override def select(
@@ -105,7 +111,8 @@ object Flamingos2LongSlitService:
           ls.c_reads,
           ls.c_decker,
           ls.c_readout_mode,
-          ls.c_offsets
+          ls.c_offsets,
+          ls.c_telluric_type
         FROM
           t_flamingos_2_long_slit ls
         INNER JOIN t_observation ob ON ls.c_observation_id = ob.c_observation_id
@@ -126,6 +133,7 @@ object Flamingos2LongSlitService:
       Option[Flamingos2Decker]     ,
       Option[Flamingos2ReadoutMode],
       Option[String]               ,
+      TelluricType                 ,
       Flamingos2Disperser          ,
       Flamingos2Filter             ,
       Flamingos2Fpu
@@ -142,6 +150,7 @@ object Flamingos2LongSlitService:
           c_decker,
           c_readout_mode,
           c_offsets,
+          c_telluric_type,
           c_initial_disperser,
           c_initial_filter,
           c_initial_fpu
@@ -157,12 +166,13 @@ object Flamingos2LongSlitService:
           ${flamingos_2_decker.opt},
           ${flamingos_2_readout_mode.opt},
           ${text.opt},
+          $jsonb,
           $flamingos_2_disperser,
           $flamingos_2_filter,
           $flamingos_2_fpu
         FROM t_observation
         WHERE c_observation_id = $observation_id
-       """.contramap { (o, d, f, u, r, e, m, a, s, id, ii, iu) => (o, d, f, u, r, e, m, a, s, id, ii, iu, o)}
+       """.contramap { (o, d, f, u, r, e, m, a, s, t, id, ii, iu) => (o, d, f, u, r, e, m, a, s, t.asJson, id, ii, iu, o)}
 
     def insertF2LongSlit(
       observationId: Observation.Id,
@@ -177,7 +187,8 @@ object Flamingos2LongSlitService:
         input.explicitReads          ,
         input.explicitDecker         ,
         input.explicitReadoutMode    ,
-        input.formattedOffsets,
+        input.formattedOffsets       ,
+        input.telluricType           ,
         input.disperser              ,
         input.filter                 ,
         input.fpu                    ,
@@ -198,7 +209,8 @@ object Flamingos2LongSlitService:
       val upReads          = sql"c_reads           = ${flamingos_2_reads.opt}"
       val upDecker         = sql"c_decker          = ${flamingos_2_decker.opt}"
       val upReadoutMode    = sql"c_readout_mode    = ${flamingos_2_readout_mode.opt}"
-      val upOffsets        = sql"c_offsets = ${text.opt}"
+      val upOffsets        = sql"c_offsets         = ${text.opt}"
+      val upTelluricType   = sql"c_telluric_type   = ${jsonb.opt}"
 
       val ups: List[AppliedFragment] =
         List(
@@ -209,7 +221,8 @@ object Flamingos2LongSlitService:
           input.explicitReads.toOptionOption.map(upReads),
           input.explicitDecker.toOptionOption.map(upDecker),
           input.explicitReadoutMode.toOptionOption.map(upReadoutMode),
-          input.formattedOffsets.toOptionOption.map(upOffsets)
+          input.formattedOffsets.toOptionOption.map(upOffsets),
+          input.telluricType.map(tt => upTelluricType(Some(tt.asJson)))
         ).flatten
 
       NonEmptyList.fromList(ups)
@@ -243,6 +256,7 @@ object Flamingos2LongSlitService:
         c_readout_mode,
         c_readout_mode_default,
         c_offsets,
+        c_telluric_type,
         c_initial_disperser,
         c_initial_filter,
         c_initial_fpu
@@ -261,6 +275,7 @@ object Flamingos2LongSlitService:
         c_readout_mode,
         c_readout_mode_default,
         c_offsets,
+        c_telluric_type,
         c_initial_disperser,
         c_initial_filter,
         c_initial_fpu

@@ -109,6 +109,10 @@ class cloneObservation extends OdbSuite {
           disperser
           filter
           fpu
+          telluricType {
+            tag
+            starTypes
+          }
         }
       }
       targetEnvironment {
@@ -645,91 +649,131 @@ class cloneObservation extends OdbSuite {
     }
   }
 
-  test("clone Flamingos2 long slit observation preserves spatial offsets") {
-    createProgramAs(pi).flatMap { pid =>
-      createTargetAs(pi, pid).flatMap { tid =>
-        // Create a Flamingos2 long slit observation with spatial offsets
-        createFlamingos2LongSlitObservationAs(pi, pid, ImageQuality.Preset.PointEight, Some("""[
-          { p: { arcseconds: 0.0 }, q: { arcseconds: 1.5 } },
-          { p: { arcseconds: 0.0 }, q: { arcseconds: 0.5 } },
-          { p: { arcseconds: 0.0 }, q: { arcseconds: 2.25 } },
-          { p: { arcseconds: 0.0 }, q: { arcseconds: -1.0 } }
-        ]"""), tid).flatMap { oid =>
-          expect(
-            user = pi,
-            query = s"""
-              mutation {
-                cloneObservation(input: {
-                  observationId: "$oid"
-                }) {
-                  originalObservation {
-                    observingMode {
-                      flamingos2LongSlit {
-                        offsets {
-                          p {
-                            arcseconds
+  test("clone Flamingos2 long slit observation preserves spatial offsets"):
+    for {
+      pid <- createProgramAs(pi)
+      tid <- createTargetAs(pi, pid)
+      // Create a Flamingos2 long slit observation with spatial offsets
+      oid <- createFlamingos2LongSlitObservationAs(pi, pid, ImageQuality.Preset.PointEight, Some("""[
+                { p: { arcseconds: 0.0 }, q: { arcseconds: 1.5 } },
+                { p: { arcseconds: 0.0 }, q: { arcseconds: 0.5 } },
+                { p: { arcseconds: 0.0 }, q: { arcseconds: 2.25 } },
+                { p: { arcseconds: 0.0 }, q: { arcseconds: -1.0 } }
+              ]"""), tid)
+      // Update observation to set telluric type with star types
+      _   <- query(
+                user = pi,
+                query = s"""
+                          mutation {
+                            updateObservations(input: {
+                              SET: {
+                                observingMode: {
+                                  flamingos2LongSlit: {
+                                    telluricType: {
+                                      tag: MANUAL
+                                      starTypes: ["A1", "A2"]
+                                    }
+                                  }
+                                }
+                              }
+                              WHERE: {
+                                id: { EQ: ${oid.asJson} }
+                              }
+                            }) {
+                              observations {
+                                id
+                              }
+                            }
                           }
-                          q {
-                            arcseconds
+                        """)
+      _   <- expect(
+              user = pi,
+              query = s"""
+                mutation {
+                  cloneObservation(input: {
+                    observationId: "$oid"
+                  }) {
+                    originalObservation {
+                      observingMode {
+                        flamingos2LongSlit {
+                          offsets {
+                            p {
+                              arcseconds
+                            }
+                            q {
+                              arcseconds
+                            }
+                          }
+                          telluricType {
+                            tag
+                            starTypes
                           }
                         }
                       }
                     }
-                  }
-                  newObservation {
-                    observingMode {
-                      flamingos2LongSlit {
-                        offsets {
-                          p {
-                            arcseconds
+                    newObservation {
+                      observingMode {
+                        flamingos2LongSlit {
+                          offsets {
+                            p {
+                              arcseconds
+                            }
+                            q {
+                              arcseconds
+                            }
                           }
-                          q {
-                            arcseconds
+                          telluricType {
+                            tag
+                            starTypes
                           }
                         }
                       }
                     }
                   }
                 }
-              }
-            """,
-            expected = Right(
-              json"""
-                {
-                  "cloneObservation": {
-                    "originalObservation": {
-                      "observingMode": {
-                        "flamingos2LongSlit": {
-                          "offsets": [
-                            { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 1.500000 } },
-                            { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 0.500000 } },
-                            { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 2.250000 } },
-                            { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -1.000000 } }
-                          ]
+              """,
+              expected = Right(
+                json"""
+                  {
+                    "cloneObservation": {
+                      "originalObservation": {
+                        "observingMode": {
+                          "flamingos2LongSlit": {
+                            "offsets": [
+                              { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 1.500000 } },
+                              { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 0.500000 } },
+                              { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 2.250000 } },
+                              { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -1.000000 } }
+                            ],
+                            "telluricType": {
+                              "tag": "MANUAL",
+                              "starTypes": ["A1", "A2"]
+                            }
+                          }
                         }
-                      }
-                    },
-                    "newObservation": {
-                      "observingMode": {
-                        "flamingos2LongSlit": {
-                          "offsets": [
-                            { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 1.500000 } },
-                            { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 0.500000 } },
-                            { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 2.250000 } },
-                            { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -1.000000 } }
-                          ]
+                      },
+                      "newObservation": {
+                        "observingMode": {
+                          "flamingos2LongSlit": {
+                            "offsets": [
+                              { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 1.500000 } },
+                              { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 0.500000 } },
+                              { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 2.250000 } },
+                              { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -1.000000 } }
+                            ],
+                            "telluricType": {
+                              "tag": "MANUAL",
+                              "starTypes": ["A1", "A2"]
+                            }
+                          }
                         }
                       }
                     }
                   }
-                }
-              """
+                """
+              )
             )
-          )
-        }
-      }
-    }
-  }
+      } yield ()
 
   test("clone observation should preserve observer notes"):
     for {
