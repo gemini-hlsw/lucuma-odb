@@ -142,8 +142,9 @@ LEFT JOIN LATERAL (
      AND t.c_existence = 'present'
    WHERE a.c_observation_id = o.c_observation_id
 ) t ON TRUE
-LEFT JOIN t_exposure_time_mode e USING (c_observation_id)
-WHERE e.c_role = 'requirement'
+LEFT JOIN t_exposure_time_mode e
+  ON e.c_observation_id = o.c_observation_id
+ AND e.c_role = 'requirement'
 ORDER BY
   o.c_observation_id,
   t.c_target_id;
