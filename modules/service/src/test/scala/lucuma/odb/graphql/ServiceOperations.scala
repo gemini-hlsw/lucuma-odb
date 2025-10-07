@@ -13,6 +13,7 @@ import lucuma.core.enums.TargetDisposition
 import lucuma.core.math.Declination
 import lucuma.core.math.Epoch
 import lucuma.core.math.RightAscension
+import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.SourceProfile
 import lucuma.core.model.SpectralDefinition
@@ -20,7 +21,9 @@ import lucuma.core.model.Target
 import lucuma.core.model.UnnormalizedSED
 import lucuma.core.model.User
 import lucuma.odb.data.Existence
+import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.input.SiderealInput
+import lucuma.odb.graphql.input.TargetEnvironmentInput
 import lucuma.odb.graphql.input.TargetPropertiesInput
 import lucuma.odb.graphql.mapping.AccessControl
 import lucuma.odb.service.Services
@@ -49,7 +52,14 @@ trait ServiceOperations { this: OdbSuite =>
         )
       ),
       existence    = Existence.Present
-    ) 
+    )
+
+  val DefaultTargetEnvironmentInput4UpdateBlindoffset: TargetEnvironmentInput.Edit =
+    TargetEnvironmentInput.Edit(
+      explicitBase = Nullable.Absent,
+      asterism = Nullable.Absent,
+      blindOffsetTarget = Nullable.NonNull(DefaultCreateTargetInput)
+    )
 
   def createTargetViaServiceAs(
     user: User,
@@ -66,4 +76,19 @@ trait ServiceOperations { this: OdbSuite =>
           .flatMap:
             case Result.Success(tid) => tid.pure
             case _ => IO.raiseError[Target.Id](new Exception("createTargetViaServiceAs failed"))
+  
+  def updateBlindOffsetViaServiceAs(
+    user: User,
+    programId: Program.Id,
+    observationId: Observation.Id,
+    input: TargetEnvironmentInput.Edit = DefaultTargetEnvironmentInput4UpdateBlindoffset,
+    isExplicit: Boolean = false
+  ): IO[Unit] =
+    withServices(user): services =>
+      Services.asSuperUser:
+        services.session.transaction.use: xa =>
+          (services.blindOffsetsService.updateBlindOffset(programId, observationId, input.some, isExplicit)(using xa))
+            .flatMap:
+              case Result.Success(_) => ().pure
+              case _ => IO.raiseError(new Exception("updateBlindOffsetViaServiceAs failed"))
 }

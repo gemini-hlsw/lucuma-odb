@@ -505,6 +505,11 @@ object ObservationService {
                     timingWindowService.cloneTimingWindows(observationId, oid2) >>
                     obsAttachmentAssignmentService.cloneAssignments(observationId, oid2)
 
+                val cloneBlindOffset = // only clone if it won't be overwritten by the updateObservations
+                  if SET.flatMap(_.targetEnvironment).fold(true)(_.asterism.isAbsent) then
+                    blindOffsetsService.cloneBlindOffset(pid, observationId, oid2)
+                  else Result.unit.pure 
+
                 val doUpdate =
                   SET match
                     case None    => Result((pid, oid2)).pure[F] // nothing to do
@@ -519,9 +524,13 @@ object ObservationService {
                         .flatTap {
                           r => transaction.rollback.unlessA(r.hasValue)
                         }
-
-                cloneRelatedItems >> doUpdate
-
+                (
+                  for
+                    _ <- ResultT.liftF(cloneRelatedItems)
+                    _ <- ResultT(cloneBlindOffset)
+                    r <- ResultT(doUpdate)
+                  yield r
+                ).value
             }
         }
       }
@@ -1106,7 +1115,8 @@ object ObservationService {
           c_img_broad_filters,
           c_img_combined_filters,
           c_observer_notes,
-          c_use_blind_offset
+          c_use_blind_offset,
+          c_explicit_blind_offset
         )
         SELECT
           c_program_id,
@@ -1149,7 +1159,8 @@ object ObservationService {
           c_img_broad_filters,
           c_img_combined_filters,
           c_observer_notes,
-          c_use_blind_offset
+          c_use_blind_offset,
+          c_explicit_blind_offset
       FROM t_observation
       WHERE c_observation_id = $observation_id
       RETURNING c_observation_id

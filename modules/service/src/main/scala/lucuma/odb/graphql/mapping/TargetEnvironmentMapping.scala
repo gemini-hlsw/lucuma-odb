@@ -10,8 +10,6 @@ import cats.effect.Temporal
 import cats.syntax.all.*
 import eu.timepit.refined.types.string.NonEmptyString
 import grackle.Env
-import grackle.Predicate.And
-import grackle.Predicate.Not
 import grackle.Query
 import grackle.Query.*
 import grackle.QueryCompiler.Elab
@@ -21,7 +19,6 @@ import grackle.skunk.SkunkMapping
 import grackle.syntax.*
 import io.circe.refined.given
 import lucuma.catalog.clients.GaiaClient
-import lucuma.core.enums.TargetDisposition
 import lucuma.core.math.Coordinates
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
@@ -77,6 +74,7 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
       asterismObject("firstScienceTarget"),
       SqlObject("explicitBase"),
       blindOffsetTargetObject("blindOffsetTarget"),
+      SqlField("explicitBlindOffset", ObservationView.ExplicitBlindOffset),
       EffectField("basePosition", basePositionQueryHandler, List("id", "programId")),
       EffectField("guideEnvironments", guideEnvironmentsQueryHandler, List("id", "programId")),
       EffectField("guideEnvironment", guideEnvironmentQueryHandler, List("id", "programId")),
@@ -86,7 +84,7 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
 
   private def asterismQuery(includeDeleted: Boolean, firstOnly: Boolean, child: Query): Query =
     FilterOrderByOffsetLimit(
-      pred   = Some(And(Predicates.target.existence.includeDeleted(includeDeleted), Not(Predicates.target.hasDisposition(TargetDisposition.BlindOffset)))),
+      pred   = Some(Predicates.target.existence.includeDeleted(includeDeleted)),
       oss    = List(OrderSelection[Target.Id](TargetType / "id")).some,
       offset = none,
       limit  = Option.when(firstOnly)(1),

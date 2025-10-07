@@ -115,10 +115,15 @@ class cloneObservation extends OdbSuite {
           }
         }
       }
+      useBlindOffset
       targetEnvironment {
         asterism {
           id
         }
+        blindOffsetTarget {
+          id
+        }
+        explicitBlindOffset
       }
       $TimingWindowsGraph
     }

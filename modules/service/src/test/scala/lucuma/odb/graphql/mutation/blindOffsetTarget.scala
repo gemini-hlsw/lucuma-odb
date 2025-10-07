@@ -10,9 +10,13 @@ import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.model.Observation
+import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.User
+import lucuma.odb.util.Codecs.*
 import munit.Location
+import skunk.SqlState
+import skunk.syntax.all.*
 
 class blindOffsetTarget extends OdbSuite:
 
@@ -49,6 +53,7 @@ class blindOffsetTarget extends OdbSuite:
         blindOffsetTarget {
           name
         }
+        explicitBlindOffset
       }
     """
 
@@ -73,7 +78,7 @@ class blindOffsetTarget extends OdbSuite:
       }
     """
 
-  private def expectedInnerResults(obsTitle: String, useBlindOffset: Boolean, blindOffsetName: Option[String]) =
+  private def expectedInnerResults(obsTitle: String, useBlindOffset: Boolean, blindOffsetName: Option[String], isExplicit: Boolean) =
     val blindOffset: Json =
       blindOffsetName.fold(Json.Null) { name =>
         Json.obj(
@@ -85,7 +90,8 @@ class blindOffsetTarget extends OdbSuite:
         "title": ${obsTitle.asJson},
         "useBlindOffset": $useBlindOffset,
         "targetEnvironment": {
-          "blindOffsetTarget": $blindOffset
+          "blindOffsetTarget": $blindOffset,
+          "explicitBlindOffset": $isExplicit
         }
       }
     """
@@ -95,51 +101,57 @@ class blindOffsetTarget extends OdbSuite:
     innerObj: String,
     obsTitle: String,
     useBlindOffset: Boolean,
-    blindOffsetName: Option[String]
+    blindOffsetName: Option[String],
+    isExplicit: Boolean
   ) =
-    Json.obj(outterObj -> Json.obj(innerObj -> expectedInnerResults(obsTitle, useBlindOffset, blindOffsetName))).asRight
+    Json.obj(outterObj -> Json.obj(innerObj -> expectedInnerResults(obsTitle, useBlindOffset, blindOffsetName, isExplicit))).asRight
 
   private def expectedListResults(
     outterObj: String,
     innerObj: String,
     obsTitle: String,
     useBlindOffset: Boolean,
-    blindOffsetName: Option[String]
+    blindOffsetName: Option[String],
+    isExplicit: Boolean
   ) =
-    Json.obj(outterObj -> Json.obj(innerObj -> Json.arr(expectedInnerResults(obsTitle, useBlindOffset, blindOffsetName)))).asRight
+    Json.obj(outterObj -> Json.obj(innerObj -> Json.arr(expectedInnerResults(obsTitle, useBlindOffset, blindOffsetName, isExplicit)))).asRight
 
-  private def queryBlindOffsetId(user: User, oid: Observation.Id): IO[Option[Target.Id]] =
+  private def queryBlindOffsetFields(user: User, oid: Observation.Id): IO[(Boolean, Option[Target.Id], Boolean)] =
     query(
       user = user,
       query = s"""
         query {
           observation(observationId: ${oid.asJson}) {
+            useBlindOffset
             targetEnvironment {
               blindOffsetTarget {
                 id
               }
+              explicitBlindOffset
             }
           }
         }
       """
-    ).map:
-      _.hcursor
-        .downField("observation")
-        .downField("targetEnvironment")
-        .downField("blindOffsetTarget")
-        .downField("id").as[Target.Id]
-        .toOption
+    ).map: json =>
+      val obs = json.hcursor.downField("observation")
+      val useBlindOffset = obs.downField("useBlindOffset").require[Boolean]
+      val te = obs.downField("targetEnvironment")
+      val btid = te.downField("blindOffsetTarget").downField("id").as[Target.Id].toOption
+      val isExplicit = te.downField("explicitBlindOffset").require[Boolean]
+      (useBlindOffset, btid, isExplicit)
   
   private def getBlindOffsetId(user: User, oid: Observation.Id)(using Location): IO[Target.Id] = 
-    queryBlindOffsetId(user, oid).map:
-      _.getOrElse(fail("Expected blind offset target"))
+    queryBlindOffsetFields(user, oid).map:
+      _._2.getOrElse(fail("Expected blind offset target"))
 
-  private def expectNoBlindOffset(user: User, oid: Observation.Id)(using Location): IO[Unit] =
-    queryBlindOffsetId(user, oid).map:
-      _.fold(())(_ => fail("Expected no blind offset target"))
-
-  private def expectBlindOffsetId(user: User, oid: Observation.Id, expected: Target.Id)(using Location): IO[Unit] =
-    assertIO(getBlindOffsetId(user, oid), expected)
+  private def expectBlindOffsetFields(
+    user: User,
+    oid: Observation.Id,
+    useBlindOffset: Boolean,
+    btid: Option[Target.Id],
+    isExplicit: Boolean
+  )(using Location): IO[Unit] = 
+    assertIO(queryBlindOffsetFields(user, oid), (useBlindOffset, btid, isExplicit), "Unexpected blind offset fields")
 
   private def expectAsterismTargetsAs(user: User, oid: Observation.Id, expected: Target.Id*)(using Location): IO[Unit] =
     expect(
@@ -174,6 +186,25 @@ class blindOffsetTarget extends OdbSuite:
       """.asRight
     )
 
+  // tests the database trigger
+  private def insertIntoAstersimViaSqlAndExpectError(pid: Program.Id, oid: Observation.Id, blindtid: Target.Id)(using Location): IO[Unit] =
+    val gotExpected = withSession:
+      _.execute(
+        sql"""
+          INSERT INTO t_asterism_target
+          VALUES ($program_id, $observation_id, $target_id)
+        """.command
+      )(pid, oid, blindtid)
+      .map(_ => false)
+      .recover:
+        case SqlState.RaiseException(m)
+          if m.getMessage.contains("An asterism can only contain science and calibration targets.") => true 
+    assertIOBoolean(gotExpected)
+
+  private def hardDeleteTarget(tid: Target.Id): IO[Unit] =
+    withSession:
+      _.execute(sql"""DELETE FROM t_target WHERE c_target_id = $target_id""".command)(tid).void
+
   test("create observation with blind offset target"):
     for {
       pid <- createProgramAs(pi)
@@ -193,7 +224,7 @@ class blindOffsetTarget extends OdbSuite:
             }
           }
         """,
-        expected = expectedResults("createObservation", "observation", NoTargetTitle, true, "Blind Offset Star".some)
+        expected = expectedResults("createObservation", "observation", NoTargetTitle, true, "Blind Offset Star".some, true)
       )
     } yield () 
 
@@ -218,7 +249,7 @@ class blindOffsetTarget extends OdbSuite:
             }
           }
         """,
-        expected = expectedResults("createObservation", "observation", "Regular Target", true, "Blind Offset Star".some)
+        expected = expectedResults("createObservation", "observation", "Regular Target", true, "Blind Offset Star".some, true)
       )
     } yield () 
 
@@ -239,14 +270,15 @@ class blindOffsetTarget extends OdbSuite:
               "title": ${NoTargetTitle.asJson},
               "useBlindOffset": false,
               "targetEnvironment": {
-                "blindOffsetTarget": null
+                "blindOffsetTarget": null,
+                "explicitBlindOffset": false
               }
             }
           }
         """.asRight
       )
       _ <- expectAsterismTargetsAs(pi, oid) // blind offset targets are not in the asterism
-      _ <- expectNoBlindOffset(pi, oid)
+      _ <- expectBlindOffsetFields(pi, oid, false, none, false)
     } yield ()
 
   test("create observation with non-blind offset target"):
@@ -267,13 +299,14 @@ class blindOffsetTarget extends OdbSuite:
               "title": ${"Regular Target".asJson},
               "useBlindOffset": false,
               "targetEnvironment": {
-                "blindOffsetTarget": null
+                "blindOffsetTarget": null,
+                "explicitBlindOffset": false
               }
             }
           }
         """.asRight
       )
-      _ <- expectNoBlindOffset(pi, oid)
+      _ <- expectBlindOffsetFields(pi, oid, false, none, false)
     } yield ()
 
   test("blind offsets are not in the observation asterism"):
@@ -308,7 +341,7 @@ class blindOffsetTarget extends OdbSuite:
             }
           }
         """,
-        expected = expectedListResults("updateObservations", "observations", NoTargetTitle, true, "New Blind Offset Target".some)
+        expected = expectedListResults("updateObservations", "observations", NoTargetTitle, true, "New Blind Offset Target".some, true)
       )
       _ <- getBlindOffsetId(pi, oid)
       _ <- expectAsterismTargetsAs(pi, oid) // blind offset targets are not in the asterism
@@ -336,7 +369,7 @@ class blindOffsetTarget extends OdbSuite:
             }
           }
         """,
-        expected = expectedListResults("updateObservations", "observations", NoTargetTitle, true, "Original Target".some)
+        expected = expectedListResults("updateObservations", "observations", NoTargetTitle, true, "Original Target".some, true)
       )
       tid <- getBlindOffsetId(pi, oid)
       _   <- expectTargetExistenceAs(pi, tid, shouldBePresent = true)
@@ -358,7 +391,7 @@ class blindOffsetTarget extends OdbSuite:
             }
           }
         """,
-        expected = expectedListResults("updateObservations", "observations", NoTargetTitle, true, "Replacement Target".some)
+        expected = expectedListResults("updateObservations", "observations", NoTargetTitle, true, "Replacement Target".some, true)
       )
       _ <- expectTargetNotFoundAs(pi, tid)
       _ <- getBlindOffsetId(pi, oid)
@@ -387,7 +420,7 @@ class blindOffsetTarget extends OdbSuite:
             }
           }
         """,
-        expected = expectedListResults("updateObservations", "observations", "Regular Target", true, "Target to Remove".some)
+        expected = expectedListResults("updateObservations", "observations", "Regular Target", true, "Target to Remove".some, true)
       )
       btid <- getBlindOffsetId(pi, oid)
       _    <- expectTargetExistenceAs(pi, btid, shouldBePresent = true)
@@ -410,11 +443,11 @@ class blindOffsetTarget extends OdbSuite:
             }
           }
         """,
-        expected = expectedListResults("updateObservations", "observations", "Regular Target", true, none)
+        expected = expectedListResults("updateObservations", "observations", "Regular Target", true, none, false)
       )
       _   <- expectTargetNotFoundAs(pi, btid)
       _   <- expectAsterismTargetsAs(pi, oid, tid) 
-      _   <- expectNoBlindOffset(pi, oid)
+      _   <- expectBlindOffsetFields(pi, oid, true, none, false) // useOffset should still be true
     } yield ()
 
   test("create observation with blind offset target and non-blind offset target, set useBlindOffset to false"):
@@ -440,7 +473,7 @@ class blindOffsetTarget extends OdbSuite:
             }
           }
         """,
-        expected = expectedListResults("updateObservations", "observations", "Regular Target", true, "Blind Offset Star".some)
+        expected = expectedListResults("updateObservations", "observations", "Regular Target", true, "Blind Offset Star".some, true)
       )
       btid <- getBlindOffsetId(pi, oid)
       _    <- expectTargetExistenceAs(pi, btid, shouldBePresent = true)
@@ -461,11 +494,11 @@ class blindOffsetTarget extends OdbSuite:
             }
           }
         """,
-        expected = expectedListResults("updateObservations", "observations", "Regular Target", false, none)
+        expected = expectedListResults("updateObservations", "observations", "Regular Target", false, none, false)
       )
       _    <- expectTargetNotFoundAs(pi, btid)
       _    <- expectAsterismTargetsAs(pi, oid, tid) 
-      _    <- expectNoBlindOffset(pi, oid)
+      _    <- expectBlindOffsetFields(pi, oid, false, none, false)
     } yield () 
 
   test("create observation with blind offset target and non-blind offset target, delete and restore"):
@@ -491,7 +524,7 @@ class blindOffsetTarget extends OdbSuite:
             }
           }
         """,
-        expected = expectedListResults("updateObservations", "observations", "Regular Target", true, "Blind Offset Star".some)
+        expected = expectedListResults("updateObservations", "observations", "Regular Target", true, "Blind Offset Star".some, true)
       )
       btid <- getBlindOffsetId(pi, oid)
       _    <- expectTargetExistenceAs(pi, btid, shouldBePresent = true)
@@ -501,7 +534,7 @@ class blindOffsetTarget extends OdbSuite:
       _    <- expectTargetExistenceAs(pi, btid, shouldBePresent = true)
     } yield () 
 
-  test("removing blind offset from an observation via the asterism service is an error"):
+  test("removing blind offset from an observation via the asterism service does nothing"):
     for {
       pid <- createProgramAs(pi)
       tid <- createTargetAs(pi, pid, "Regular Target")
@@ -524,28 +557,14 @@ class blindOffsetTarget extends OdbSuite:
             }
           }
         """,
-        expected = expectedListResults("updateObservations", "observations", "Regular Target", true, "Blind Offset Star".some)
+        expected = expectedListResults("updateObservations", "observations", "Regular Target", true, "Blind Offset Star".some, true)
       )
       btid <- getBlindOffsetId(pi, oid)
       _    <- expectTargetExistenceAs(pi, btid, shouldBePresent = true)
       _    <- expectAsterismTargetsAs(pi, oid, tid)
-      _    <- expect(
-        user = pi,
-        query = s"""
-          mutation {
-            updateAsterisms(input: {
-              SET: { DELETE: [${btid.asJson}] }
-              WHERE: { id: { EQ: ${oid.asJson} } }
-            }) {
-              observations { id }
-            }
-          }
-        """,
-        expected = List("Blind offset targets cannot be removed from an asterism.").asLeft
-      )
+      _    <- updateAsterisms(pi, List(oid), List.empty, List(btid), List((oid, List(tid))))
       _ <- expectTargetExistenceAs(pi, btid, shouldBePresent = true)
-      _ <- expectBlindOffsetId(pi, oid, btid)
-      _ <- expectAsterismTargetsAs(pi, oid, tid)
+      _ <- expectBlindOffsetFields(pi, oid, true, btid.some, true)
     } yield () 
 
   test("adding blind offset to an observation via the asterism service is an error"):
@@ -571,7 +590,7 @@ class blindOffsetTarget extends OdbSuite:
             }
           }
         """,
-        expected = expectedListResults("updateObservations", "observations", "Regular Target", true, "Blind Offset Star".some)
+        expected = expectedListResults("updateObservations", "observations", "Regular Target", true, "Blind Offset Star".some, true)
       )
       btid <- getBlindOffsetId(pi, oid)
       oid2 <- createObservationAs(pi, pid)
@@ -589,15 +608,162 @@ class blindOffsetTarget extends OdbSuite:
         """,
         expected = List("Blind offset targets cannot be added to an asterism.").asLeft
       )
-      _ <- expectBlindOffsetId(pi, oid, btid)
-      _ <- expectNoBlindOffset(pi, oid2)
+      _ <- expectBlindOffsetFields(pi, oid, true, btid.some, true)
+      _ <- expectBlindOffsetFields(pi, oid2, false, none, false)
     } yield () 
 
-  // This does cause an exception to thrown via skunk, but I don't know how to catch it because it is
+  test("adding blind offset to an observation asterism via SQL is an error"):
+    for {
+      pid <- createProgramAs(pi)
+      tid <- createTargetAs(pi, pid, "Regular Target")
+      oid <- createObservationAs(pi, pid, tid)
+      _ <- expect(
+        user = pi,
+        query = s"""
+          mutation {
+            updateObservations(input: {
+              SET: {
+                targetEnvironment: {
+                  ${blindOffsetTargetInput(blindOffsetInput("Blind Offset Star", "12.345", "45.678"))}
+                }
+              }
+              WHERE: {
+                id: { EQ: ${oid.asJson} }
+              }
+            }) {
+              $observationsFields
+            }
+          }
+        """,
+        expected = expectedListResults("updateObservations", "observations", "Regular Target", true, "Blind Offset Star".some, true)
+      )
+      btid <- getBlindOffsetId(pi, oid)
+      oid2 <- createObservationAs(pi, pid)
+      _    <- insertIntoAstersimViaSqlAndExpectError(pid, oid2, btid)
+      _    <- expectBlindOffsetFields(pi, oid, true, btid.some, true)
+      _    <- expectBlindOffsetFields(pi, oid2, false, none, false)
+    } yield () 
+
+  test("hard delete of blind offset target resets observation values"):
+    for {
+      pid  <- createProgramAs(pi)
+      tid1 <- createTargetAs(pi, pid, "Regular Target 1")
+      tid2 <- createTargetAs(pi, pid, "Regular Target 2")
+      (oid, btid)  <- createObservationWithBlindOffsetAs(pi, pid, "Blind Offset", tid1, tid2)
+      _    <- expectTargetExistenceAs(pi, btid, shouldBePresent = true)
+      _    <- hardDeleteTarget(btid)
+      _    <- expectTargetNotFoundAs(pi, btid)
+      _    <- expectAsterismTargetsAs(pi, oid, tid1, tid2) // asterism unchanged
+      _    <- expectBlindOffsetFields(pi, oid, true, none, false) // useBlindOffset should still be true
+    } yield ()
+
+  test("setting blind offset target id to null deletes any assigned target"): // testing the trigger
+    for {
+      pid         <- createProgramAs(pi)
+      (oid, btid) <- createObservationWithBlindOffsetAs(pi, pid, "Blinded by the light") 
+      _           <- withSession(
+        _.execute(sql"""
+          UPDATE t_observation
+          SET c_blind_offset_target_id = null
+          WHERE c_observation_id = $observation_id
+        """.command)(oid)
+      )
+      _           <- expectBlindOffsetFields(pi, oid, true, none, true)
+      _           <- expectTargetNotFoundAs(pi, btid)
+    } yield ()
+
+  test("cloning observation clones blind offset - explicit blind offset"):
+    for {
+      pid         <- createProgramAs(pi)
+      tid         <- createTargetAs(pi, pid, "Regular")
+      (oid, btid) <- createObservationWithBlindOffsetAs(pi, pid, "Like a runner in the night", tid)
+      clone       <- cloneObservationAs(pi, oid)
+      _           <- expectAsterismTargetsAs(pi, oid, tid)
+      _           <- expectAsterismTargetsAs(pi, clone, tid)
+      btidClone   <- getBlindOffsetId(pi, clone) 
+      _            = assertNotEquals(btid, btidClone)
+      _           <- expectBlindOffsetFields(pi, oid, true, btid.some, true)
+      _           <- expectBlindOffsetFields(pi, clone, true, btidClone.some, true)
+    } yield ()
+
+  test("cloning observation clones blind offset - automatic blind offset"):
+    for {
+      pid         <- createProgramAs(pi)
+      tid         <- createTargetAs(pi, pid, "Regular")
+      oid         <- createObservationAs(pi, pid, tid)
+      _           <- updateBlindOffsetViaServiceAs(pi, pid, oid, isExplicit = false)
+      btid        <- getBlindOffsetId(pi, oid)
+      clone       <- cloneObservationAs(pi, oid)
+      _           <- expectAsterismTargetsAs(pi, oid, tid)
+      _           <- expectAsterismTargetsAs(pi, clone, tid)
+      btidClone   <- getBlindOffsetId(pi, clone) 
+      _            = assertNotEquals(btid, btidClone)
+      _           <- expectBlindOffsetFields(pi, oid, true, btid.some, false)
+      _           <- expectBlindOffsetFields(pi, clone, true, btidClone.some, false)
+    } yield ()
+
+  // This does cause an exception to be thrown via skunk, but I don't know how to catch it because it is
   // a deferred constraint. Since we don't allow creating non-science targets via the API, this should
   // never happen in practice.
   // test("creating blind offset without obs is error"):
   //   for
   //     pid <- createProgramAs(pi)
-  //     tid <- createTargetViaServiceAs(pi, pid, TargetDisposition.BlindOffset, none)
+  //     tid <- createTargetViaServiceAs(pi, pid, lucuma.core.enums.TargetDisposition.BlindOffset, none)
   //   yield ()
+
+class blindOffsetTargetNotSharedTrigger extends OdbSuite:
+
+  val pi: User = TestUsers.Standard.pi(nextId, nextId)
+  val pi2: User = TestUsers.Standard.pi(nextId, nextId)
+
+  override lazy val validUsers: List[User] = List(pi, pi2)
+
+  // Running this test by itself works, but I think it borks skunk so following tests fail.
+  // So, I put it in a test class by itself.
+  test("blind offset targets cannot be shared"): // testing the trigger
+    val gotExpected = for {
+      pid         <- createProgramAs(pi)
+      (oid, btid) <- createObservationWithBlindOffsetAs(pi, pid, "Blinding")
+      oid2        <- createObservationAs(pi, pid)
+      r           <- withSession(
+        _.execute(sql"""
+          UPDATE t_observation
+          SET c_blind_offset_target_id = $target_id
+          WHERE c_observation_id = $observation_id
+        """.command)(btid, oid2).void
+      )
+      .as(false)
+      .recover:
+        case e if e.getMessage.contains("Blind offset targets cannot be shared") => true
+        case _ => false
+    } yield r
+    assertIOBoolean(gotExpected, "Expected error while attempting to share")
+
+class blindOffsetTargetMustBeBlindOffsetTrigger extends OdbSuite:
+
+  val pi: User = TestUsers.Standard.pi(nextId, nextId)
+  val pi2: User = TestUsers.Standard.pi(nextId, nextId)
+
+  override lazy val validUsers: List[User] = List(pi, pi2)
+
+  // Running this test by itself works, but I think it borks skunk so following tests fail.
+  // So, I put it in a test class by itself.
+  test("assigned blind offset targets must actually be blind offsets"): // testing the trigger
+    val gotExpected = for {
+      pid         <- createProgramAs(pi)
+      (oid, btid) <- createObservationWithBlindOffsetAs(pi, pid, "Blinding")
+      tid         <- createTargetAs(pi, pid, "Science!!!")
+      r           <- withSession(
+        _.execute(sql"""
+          UPDATE t_observation
+          SET c_blind_offset_target_id = $target_id
+          WHERE c_observation_id = $observation_id
+        """.command)(tid, oid).void
+      )
+      .as(false)
+      .recover:
+        case e if e.getMessage.contains("Blind offset targets must have a disposition of blind_offset") => true
+        case _ => false
+    } yield r
+    assertIOBoolean(gotExpected, "Expected error while attempting to assign science as blind offset")
+

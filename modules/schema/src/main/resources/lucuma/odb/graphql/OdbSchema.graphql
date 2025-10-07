@@ -13846,6 +13846,11 @@ type TargetEnvironment {
   The target used for blind offset acquisition, if any
   """
   blindOffsetTarget: Target
+
+  """
+  When true, indicates that the default blind offset target has been replaced by an explicit target
+  """
+  explicitBlindOffset: Boolean!
 }
 
 type TargetEnvironmentGroup {
