@@ -163,7 +163,8 @@ trait CalibrationObservations {
               targetEnvironment = TargetEnvironmentInput.Create(
                 none,
                 List(tid).some,
-                none
+                none,
+                true
               ).some,
               constraintSet = roleConstraints(CalibrationRole.SpectroPhotometric).some,
               group = gid.some,
@@ -203,7 +204,8 @@ trait CalibrationObservations {
               targetEnvironment = TargetEnvironmentInput.Create(
                 none,
                 List(tid).some,
-                none
+                none,
+                true
               ).some,
               constraintSet = roleConstraints(CalibrationRole.Twilight).some,
               group = gid.some,

@@ -14,9 +14,10 @@ sealed trait TargetEnvironmentInput
 object TargetEnvironmentInput:
 
   final case class Create(
-    explicitBase:      Option[CoordinatesInput.Create],
-    asterism:          Option[List[Target.Id]],
-    blindOffsetTarget: Option[TargetPropertiesInput.Create]
+    explicitBase:        Option[CoordinatesInput.Create],
+    asterism:            Option[List[Target.Id]],
+    blindOffsetTarget:   Option[TargetPropertiesInput.Create],
+    explicitBlindOffset: Boolean
   ) extends TargetEnvironmentInput
   object Create:
     val Binding: Matcher[Create] =
@@ -24,15 +25,17 @@ object TargetEnvironmentInput:
         case List(
           CoordinatesInput.Create.Binding.Option("explicitBase", rBase),
           TargetIdBinding.List.Option("asterism", rAsterism),
-          TargetPropertiesInput.Binding.Option("blindOffsetTarget", rBlindOffsetTarget)
-        ) => (rBase, rAsterism, rBlindOffsetTarget).parMapN(Create(_, _, _))
+          TargetPropertiesInput.Binding.Option("blindOffsetTarget", rBlindOffsetTarget),
+          BooleanBinding("explicitBlindOffset", rExplicit)
+        ) => (rBase, rAsterism, rBlindOffsetTarget, rExplicit).parMapN(Create(_, _, _, _))
       }
 
 
   final case class Edit(
-    explicitBase:      Nullable[CoordinatesInput.Edit],
-    asterism:          Nullable[List[Target.Id]],
-    blindOffsetTarget: Nullable[TargetPropertiesInput.Create]
+    explicitBase:        Nullable[CoordinatesInput.Edit],
+    asterism:            Nullable[List[Target.Id]],
+    blindOffsetTarget:   Nullable[TargetPropertiesInput.Create],
+    explicitBlindOffset: Boolean
   ) extends TargetEnvironmentInput
 
   object Edit:
@@ -41,6 +44,7 @@ object TargetEnvironmentInput:
         case List(
           CoordinatesInput.Edit.Binding.Nullable("explicitBase", rBase),
           TargetIdBinding.List.Nullable("asterism", rAsterism),
-          TargetPropertiesInput.Binding.Nullable("blindOffsetTarget", rBlindOffsetTarget)
-        ) => (rBase, rAsterism, rBlindOffsetTarget).parMapN(Edit(_, _, _))
+          TargetPropertiesInput.Binding.Nullable("blindOffsetTarget", rBlindOffsetTarget),
+          BooleanBinding("explicitBlindOffset", rExplicit)
+        ) => (rBase, rAsterism, rBlindOffsetTarget, rExplicit).parMapN(Edit(_, _, _, _))
       }

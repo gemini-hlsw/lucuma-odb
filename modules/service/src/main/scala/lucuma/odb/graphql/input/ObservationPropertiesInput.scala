@@ -28,8 +28,8 @@ object ObservationPropertiesInput {
     def asterism: Nullable[NonEmptyList[Target.Id]] =
       Nullable.orAbsent(targetEnvironment).flatMap: t =>
         t match
-          case TargetEnvironmentInput.Create(_, asterism, _) => Nullable.orAbsent(asterism.flatMap(NonEmptyList.fromList))
-          case TargetEnvironmentInput.Edit(_, asterism, _)   => asterism.flatMap(tids => Nullable.orAbsent(NonEmptyList.fromList(tids)))
+          case TargetEnvironmentInput.Create(_, asterism, _, _) => Nullable.orAbsent(asterism.flatMap(NonEmptyList.fromList))
+          case TargetEnvironmentInput.Edit(_, asterism, _, _)   => asterism.flatMap(tids => Nullable.orAbsent(NonEmptyList.fromList(tids)))
 
   }
 

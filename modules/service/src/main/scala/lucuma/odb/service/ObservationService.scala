@@ -317,11 +317,11 @@ object ObservationService {
             .flatMap: oid =>
               SET
                 .targetEnvironment
-                .flatMap(_.blindOffsetTarget)
-                .traverse: targetInput =>
+                .flatMap(te => te.blindOffsetTarget.map((_, te.explicitBlindOffset)))
+                .traverse: (targetInput, isExplicit) =>
                   ResultT:
                     Services.asSuperUser:
-                      blindOffsetsService.createBlindOffset(pid, oid, targetInput)
+                      blindOffsetsService.createBlindOffset(pid, oid, targetInput, isExplicit)
                 .as(oid)
             .value
             .flatTap: r =>

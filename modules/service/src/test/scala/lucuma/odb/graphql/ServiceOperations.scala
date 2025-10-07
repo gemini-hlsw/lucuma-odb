@@ -58,7 +58,8 @@ trait ServiceOperations { this: OdbSuite =>
     TargetEnvironmentInput.Edit(
       explicitBase = Nullable.Absent,
       asterism = Nullable.Absent,
-      blindOffsetTarget = Nullable.NonNull(DefaultCreateTargetInput)
+      blindOffsetTarget = Nullable.NonNull(DefaultCreateTargetInput),
+      explicitBlindOffset = false
     )
 
   def createTargetViaServiceAs(
@@ -81,13 +82,12 @@ trait ServiceOperations { this: OdbSuite =>
     user: User,
     programId: Program.Id,
     observationId: Observation.Id,
-    input: TargetEnvironmentInput.Edit = DefaultTargetEnvironmentInput4UpdateBlindoffset,
-    isExplicit: Boolean = false
+    input: TargetEnvironmentInput.Edit = DefaultTargetEnvironmentInput4UpdateBlindoffset
   ): IO[Unit] =
     withServices(user): services =>
       Services.asSuperUser:
         services.session.transaction.use: xa =>
-          (services.blindOffsetsService.updateBlindOffset(programId, observationId, input.some, isExplicit)(using xa))
+          (services.blindOffsetsService.updateBlindOffset(programId, observationId, input.some)(using xa))
             .flatMap:
               case Result.Success(_) => ().pure
               case _ => IO.raiseError(new Exception("updateBlindOffsetViaServiceAs failed"))

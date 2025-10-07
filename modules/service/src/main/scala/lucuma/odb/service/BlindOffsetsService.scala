@@ -29,7 +29,7 @@ sealed trait BlindOffsetsService[F[_]]:
     programId: Program.Id,
     observationId: Observation.Id,
     input: TargetPropertiesInput.Create,
-    isExplicit: Boolean = true // If set via the API it is explicit. If set internally, might not be.
+    isExplicit: Boolean = true
   )(using Transaction[F], ServiceAccess): F[Result[Target.Id]]
 
   def removeBlindOffset(
@@ -43,8 +43,7 @@ sealed trait BlindOffsetsService[F[_]]:
   def updateBlindOffset(
     programId: Program.Id,
     observationId: Observation.Id,
-    targetEnvironment: Option[TargetEnvironmentInput.Edit],
-    isExplicit: Boolean = true // If set via the API it is explicit. If set internally, might not be.
+    targetEnvironment: Option[TargetEnvironmentInput.Edit]
   )(using Transaction[F], ServiceAccess): F[Result[Unit]]
 
   def cloneBlindOffset(
@@ -79,7 +78,7 @@ object BlindOffsetsService:
       override def removeBlindOffset(
         observationId: Observation.Id
       )(using Transaction[F], ServiceAccess): F[Unit] =
-        // This permanently any existing blind offset target from the t_target table,
+        // This permanently deletes any existing blind offset target from the t_target table,
         // database triggers set c_blind_offset_target_id to null and c_explicit_blind_offset to false
         session.execute(Statements.removeBlindOffset)(observationId).void
 
@@ -91,8 +90,7 @@ object BlindOffsetsService:
       override def updateBlindOffset(
         programId: Program.Id,
         observationId: Observation.Id,
-        targetEnvironment: Option[TargetEnvironmentInput.Edit],
-        isExplicit: Boolean = true
+        targetEnvironment: Option[TargetEnvironmentInput.Edit]
       )(using Transaction[F], ServiceAccess): F[Result[Unit]] =
         targetEnvironment.fold(Result.unit.pure[F]): te =>
           te.blindOffsetTarget match
@@ -104,7 +102,7 @@ object BlindOffsetsService:
                 // Remove existi
                 _          <- removeBlindOffset(observationId)
                 // Then create the new one.
-                result     <- createBlindOffset(programId, observationId, targetInput, isExplicit)
+                result     <- createBlindOffset(programId, observationId, targetInput, te.explicitBlindOffset)
               } yield result.void
 
       override def cloneBlindOffset(

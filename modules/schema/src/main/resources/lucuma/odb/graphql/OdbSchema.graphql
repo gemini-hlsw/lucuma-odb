@@ -5325,6 +5325,13 @@ input TargetEnvironmentInput {
   The target used for acquisition if a blind offset is needed.
   """
   blindOffsetTarget: TargetPropertiesInput
+
+  """
+  When true, indicates that the default blind offset target has been replaced by an explicit target.
+  If it is false, the blind offset may be updated when the observation changes.
+  This property only has an affect if a `blindOffsetTarget` is provided.
+  """
+  explicitBlindOffset: Boolean = true
 }
 
 """
@@ -13848,7 +13855,8 @@ type TargetEnvironment {
   blindOffsetTarget: Target
 
   """
-  When true, indicates that the default blind offset target has been replaced by an explicit target
+  When true, indicates that the default blind offset target has been replaced by an explicit target.
+  If it is false, the blind offset may be updated when the observation changes.
   """
   explicitBlindOffset: Boolean!
 }
