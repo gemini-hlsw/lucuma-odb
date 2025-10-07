@@ -6,7 +6,6 @@ package lucuma.odb.graphql
 package query
 
 import cats.effect.IO
-import cats.effect.Resource
 import cats.syntax.all.*
 import io.circe.Json
 import io.circe.literal.*
@@ -15,11 +14,11 @@ import lucuma.ags.GuideStarName
 import lucuma.core.model.Observation
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
-import org.http4s.Request
-import org.http4s.Response
+import org.http4s.HttpApp
+import org.http4s.client.Client
 
 class guideTargetName extends ExecutionTestSupportForGmos {
-  
+
   val targetName1: String = GuideStarName.gaiaSourceId.reverseGet(1L).value.value
 
   val ObsTime: Timestamp = Timestamp.FromString.getOption("2024-08-25T00:00:00Z").get
@@ -50,8 +49,10 @@ class guideTargetName extends ExecutionTestSupportForGmos {
     """.asRight
 
   // This just ensures that Gaia is never called
-  override def httpRequestHandler: Request[IO] => Resource[IO, Response[IO]] =
-    _ => Resource.eval(IO.raiseError(Exception("Test failure, unexpected call to Gaia!!!")))
+  override def httpClient: Client[IO] =
+    Client.fromHttpApp[IO](HttpApp[IO](_ =>
+      IO.raiseError(Exception("Test failure, unexpected call to Gaia!!!"))
+    ))
 
   test("no configuration returns null") {
     val setup: IO[Observation.Id] =

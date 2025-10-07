@@ -5,15 +5,11 @@ package lucuma.odb.graphql
 package query
 
 import cats.effect.IO
-import cats.effect.Resource
 import cats.syntax.all.*
-import fs2.Stream
-import fs2.text.utf8
 import io.circe.Json
 import io.circe.literal.*
 import lucuma.core.model.Observation
-import org.http4s.Request
-import org.http4s.Response
+import org.http4s.client.Client
 
 class guideEnvironments extends ExecutionTestSupportForGmos {
 
@@ -25,14 +21,14 @@ class guideEnvironments extends ExecutionTestSupportForGmos {
   |<VOTABLE version="1.4" xmlns="http://www.ivoa.net/xml/VOTable/v1.3" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.ivoa.net/xml/VOTable/v1.3 http://www.ivoa.net/xml/VOTable/v1.3">
   |    <RESOURCE type="results">
   |        <INFO name="QUERY_STATUS" value="OK" />
-  |        <INFO name="QUERY" value="SELECT TOP 100 source_id,ra,pmra,dec,pmdec,parallax,radial_velocity,phot_g_mean_mag,phot_rp_mean_mag 
+  |        <INFO name="QUERY" value="SELECT TOP 100 source_id,ra,pmra,dec,pmdec,parallax,radial_velocity,phot_g_mean_mag,phot_rp_mean_mag
   |     FROM gaiadr3.gaia_source_lite
   |     WHERE CONTAINS(POINT(&#039;ICRS&#039;,ra,dec),CIRCLE(&#039;ICRS&#039;, 86.55474, -0.10137, 0.08167))=1
   |     and ((phot_rp_mean_mag &lt; 17.228) or (phot_g_mean_mag &lt; 17.228))
   |     and (ruwe &lt; 1.4)
   |     ORDER BY phot_g_mean_mag
   |      ">
-  |            <![CDATA[SELECT TOP 100 source_id,ra,pmra,dec,pmdec,parallax,radial_velocity,phot_g_mean_mag,phot_rp_mean_mag 
+  |            <![CDATA[SELECT TOP 100 source_id,ra,pmra,dec,pmdec,parallax,radial_velocity,phot_g_mean_mag,phot_rp_mean_mag
   |     FROM gaiadr3.gaia_source_lite
   |     WHERE CONTAINS(POINT('ICRS',ra,dec),CIRCLE('ICRS', 86.55474, -0.10137, 0.08167))=1
   |     and ((phot_rp_mean_mag < 17.228) or (phot_g_mean_mag < 17.228))
@@ -119,78 +115,6 @@ class guideEnvironments extends ExecutionTestSupportForGmos {
   |                        <TD>15.209204</TD>
   |                        <TD>13.883842</TD>
   |                    </TR>
-  |                </TABLEDATA>
-  |            </DATA>
-  |        </TABLE>
-  |    </RESOURCE>
-  |</VOTABLE>""".stripMargin
-
-  val gaiaEmptyReponseString = 
-  """<?xml version="1.0" encoding="UTF-8"?>
-  |<VOTABLE version="1.4" xmlns="http://www.ivoa.net/xml/VOTable/v1.3" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.ivoa.net/xml/VOTable/v1.3 http://www.ivoa.net/xml/VOTable/v1.3">
-  |    <RESOURCE type="results">
-  |        <INFO name="QUERY_STATUS" value="OK" />
-  |        <INFO name="QUERY" value="SELECT TOP 100 source_id,ra,pmra,dec,pmdec,parallax,radial_velocity,phot_g_mean_mag,phot_rp_mean_mag 
-  |     FROM gaiadr3.gaia_source_lite
-  |     WHERE CONTAINS(POINT(&#039;ICRS&#039;,ra,dec),CIRCLE(&#039;ICRS&#039;, 86.55474, -0.10137, 0.08167))=1
-  |     and ((phot_rp_mean_mag &lt; 17.228) or (phot_g_mean_mag &lt; 17.228))
-  |     and (ruwe &lt; 1.4)
-  |     ORDER BY phot_g_mean_mag
-  |      ">
-  |            <![CDATA[SELECT TOP 100 source_id,ra,pmra,dec,pmdec,parallax,radial_velocity,phot_g_mean_mag,phot_rp_mean_mag 
-  |     FROM gaiadr3.gaia_source_lite
-  |     WHERE CONTAINS(POINT('ICRS',ra,dec),CIRCLE('ICRS', 86.55474, -0.10137, 0.08167))=1
-  |     and ((phot_rp_mean_mag < 17.228) or (phot_g_mean_mag < 17.228))
-  |     and (ruwe < 1.4)
-  |     ORDER BY phot_g_mean_mag
-  |      ]]>
-  |        </INFO>
-  |        <INFO name="CAPTION" value="How to cite and acknowledge Gaia: https://gea.esac.esa.int/archive/documentation/credits.html">
-  |            <![CDATA[How to cite and acknowledge Gaia: https://gea.esac.esa.int/archive/documentation/credits.html]]>
-  |        </INFO>
-  |        <INFO name="CITATION" value="How to cite and acknowledge Gaia: https://gea.esac.esa.int/archive/documentation/credits.html" ucd="meta.bib">
-  |            <![CDATA[How to cite and acknowledge Gaia: https://gea.esac.esa.int/archive/documentation/credits.html]]>
-  |        </INFO>
-  |        <INFO name="PAGE" value="" />
-  |        <INFO name="PAGE_SIZE" value="" />
-  |        <INFO name="JOBID" value="1693412462905O">
-  |            <![CDATA[1693412462905O]]>
-  |        </INFO>
-  |        <INFO name="JOBNAME" value="" />
-  |        <COOSYS ID="GAIADR3" epoch="J2016.0" system="ICRS" />
-  |        <RESOURCE>
-  |            <COOSYS ID="t14806478-coosys-1" epoch="J2016.0" system="ICRS"/>
-  |        </RESOURCE>
-  |        <TABLE>
-  |            <FIELD datatype="long" name="source_id" ucd="meta.id">
-  |                <DESCRIPTION>Unique source identifier (unique within a particular Data Release)</DESCRIPTION>
-  |            </FIELD>
-  |            <FIELD datatype="double" name="ra" ref="t14806478-coosys-1" ucd="pos.eq.ra;meta.main" unit="deg" utype="Char.SpatialAxis.Coverage.Location.Coord.Position2D.Value2.C1">
-  |                <DESCRIPTION>Right ascension</DESCRIPTION>
-  |            </FIELD>
-  |            <FIELD datatype="double" name="pmra" ucd="pos.pm;pos.eq.ra" unit="mas.yr**-1">
-  |                <DESCRIPTION>Proper motion in right ascension direction</DESCRIPTION>
-  |            </FIELD>
-  |            <FIELD datatype="double" name="dec" ref="t14806478-coosys-1" ucd="pos.eq.dec;meta.main" unit="deg" utype="Char.SpatialAxis.Coverage.Location.Coord.Position2D.Value2.C2">
-  |                <DESCRIPTION>Declination</DESCRIPTION>
-  |            </FIELD>
-  |            <FIELD datatype="double" name="pmdec" ucd="pos.pm;pos.eq.dec" unit="mas.yr**-1">
-  |                <DESCRIPTION>Proper motion in declination direction</DESCRIPTION>
-  |            </FIELD>
-  |            <FIELD datatype="double" name="parallax" ucd="pos.parallax.trig" unit="mas">
-  |                <DESCRIPTION>Parallax</DESCRIPTION>
-  |            </FIELD>
-  |            <FIELD datatype="float" name="radial_velocity" ucd="spect.dopplerVeloc.opt;em.opt.I" unit="km.s**-1">
-  |                <DESCRIPTION>Radial velocity</DESCRIPTION>
-  |            </FIELD>
-  |            <FIELD datatype="float" name="phot_g_mean_mag" ucd="phot.mag;em.opt" unit="mag">
-  |                <DESCRIPTION>G-band mean magnitude</DESCRIPTION>
-  |            </FIELD>
-  |            <FIELD datatype="float" name="phot_rp_mean_mag" ucd="phot.mag;em.opt.R" unit="mag">
-  |                <DESCRIPTION>Integrated RP mean magnitude</DESCRIPTION>
-  |            </FIELD>
-  |            <DATA>
-  |                <TABLEDATA>
   |                </TABLEDATA>
   |            </DATA>
   |        </TABLE>
@@ -476,12 +400,8 @@ class guideEnvironments extends ExecutionTestSupportForGmos {
     }
     """
 
-  override def httpRequestHandler: Request[IO] => Resource[IO, Response[IO]] =
-    req => {
-      val respStr =
-        if (req.uri.renderString.contains("20-0.10137")) gaiaReponseString else gaiaEmptyReponseString
-      Resource.eval(IO.pure(Response(body = Stream(respStr).through(utf8.encode))))
-    }
+  override def httpClient: Client[IO] =
+    GaiaTestFixtures.mockGaiaHttpClient[IO](gaiaReponseString)
 
   test("successfully obtain guide environment") {
     val setup: IO[Observation.Id] =
