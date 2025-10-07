@@ -27,6 +27,7 @@ import lucuma.core.math.Wavelength
 import lucuma.core.math.WavelengthDelta
 import lucuma.core.math.WavelengthDither
 import lucuma.core.math.units.Pixels
+import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.sequence.gmos.GmosCcdMode
 import lucuma.core.model.sequence.gmos.longslit.*
 import lucuma.core.util.Enumerated
@@ -46,6 +47,10 @@ sealed trait Config[G: Enumerated, L: Enumerated, U: Enumerated] extends Product
   def grating: G
 
   def coverage: WavelengthDelta
+
+  def acqExposureTimeMode: ExposureTimeMode
+
+  def sciExposureTimeMode: ExposureTimeMode
 
   def filter: Option[L]
 
@@ -141,12 +146,21 @@ sealed trait Config[G: Enumerated, L: Enumerated, U: Enumerated] extends Product
       out.writeLong(o.toAngle.toMicroarcseconds)
 
     out.close()
-    bao.toByteArray
+
+    import lucuma.odb.sequence.util.HashBytes.*
+
+    Array.concat(
+      acqExposureTimeMode.hashBytes,
+      sciExposureTimeMode.hashBytes,
+      bao.toByteArray
+    )
 
 object Config:
 
   final case class Common(
     centralWavelength:         Wavelength,
+    acqExposureTimeMode:       ExposureTimeMode,
+    sciExposureTimeMode:       ExposureTimeMode,
     defaultXBin:               GmosXBinning,
     explicitXBin:              Option[GmosXBinning],
     defaultYBin:               GmosYBinning,
@@ -164,6 +178,8 @@ object Config:
       Eq.by: a =>
         (
           a.centralWavelength,
+          a.acqExposureTimeMode,
+          a.sciExposureTimeMode,
           a.defaultXBin,
           a.explicitXBin,
           a.defaultYBin,
@@ -187,6 +203,12 @@ object Config:
 
     override def centralWavelength: Wavelength =
       common.centralWavelength
+
+    override def acqExposureTimeMode: ExposureTimeMode =
+      common.acqExposureTimeMode
+
+    override def sciExposureTimeMode: ExposureTimeMode =
+      common.sciExposureTimeMode
 
     override def defaultXBin: GmosXBinning =
       common.defaultXBin
@@ -241,6 +263,12 @@ object Config:
 
     override def centralWavelength: Wavelength =
       common.centralWavelength
+
+    override def acqExposureTimeMode: ExposureTimeMode =
+      common.acqExposureTimeMode
+
+    override def sciExposureTimeMode: ExposureTimeMode =
+      common.sciExposureTimeMode
 
     override def defaultXBin: GmosXBinning =
       common.defaultXBin

@@ -7,15 +7,13 @@ import cats.data.NonEmptyList
 import cats.effect.MonadCancelThrow
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
-import eu.timepit.refined.types.numeric.PosInt
-import lucuma.core.math.SignalToNoise
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.Observation
-import lucuma.core.util.TimeSpan
 import lucuma.odb.data.ExposureTimeModeId
 import lucuma.odb.data.ExposureTimeModeRole
 import lucuma.odb.data.ExposureTimeModeType
 import lucuma.odb.service.Services.Syntax.*
+import lucuma.odb.syntax.exposureTimeMode.*
 import lucuma.odb.util.Codecs.*
 import skunk.*
 import skunk.implicits.*
@@ -90,30 +88,6 @@ object ExposureTimeModeService:
         session.execute(Statements.Clone)(originalOid, newOid).void
 
   object Statements:
-
-    extension (etm: ExposureTimeMode)
-      def modeType: ExposureTimeModeType =
-        etm match
-          case ExposureTimeMode.SignalToNoiseMode(_, _)   => ExposureTimeModeType.SignalToNoiseMode
-          case ExposureTimeMode.TimeAndCountMode(_, _, _) => ExposureTimeModeType.TimeAndCountMode
-
-      def signalToNoise: Option[SignalToNoise] =
-        ExposureTimeMode
-          .signalToNoise
-          .andThen(ExposureTimeMode.SignalToNoiseMode.value)
-          .getOption(etm)
-
-      def exposureTime: Option[TimeSpan] =
-        ExposureTimeMode
-          .timeAndCount
-          .andThen(ExposureTimeMode.TimeAndCountMode.time)
-          .getOption(etm)
-
-      def exposureCount: Option[PosInt] =
-        ExposureTimeMode
-          .timeAndCount
-          .andThen(ExposureTimeMode.TimeAndCountMode.count)
-          .getOption(etm)
 
     val Insert: Query[(Observation.Id, ExposureTimeModeRole, ExposureTimeMode), ExposureTimeModeId] =
       sql"""

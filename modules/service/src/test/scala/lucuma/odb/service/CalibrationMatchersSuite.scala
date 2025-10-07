@@ -4,9 +4,12 @@
 package lucuma.odb.service
 
 import cats.syntax.all.*
+import eu.timepit.refined.types.numeric.PosInt
 import lucuma.core.enums.*
 import lucuma.core.enums.GmosRoi
 import lucuma.core.math.Wavelength
+import lucuma.core.model.ExposureTimeMode
+import lucuma.core.syntax.timespan.*
 import lucuma.core.util.arb.ArbEnumerated.given
 import lucuma.odb.sequence.gmos.longslit.Config
 import lucuma.odb.service.CalibrationConfigMatcher.UnknownConfig
@@ -20,12 +23,16 @@ import org.scalacheck.Prop.propBoolean
 class CalibrationMatchersSuite extends ScalaCheckSuite:
 
   def gnConfig(roi: GmosRoi = GmosRoi.CentralSpectrum): Config.GmosNorth =
+    val w = Wavelength.fromIntNanometers(500).get
+    val e = ExposureTimeMode.TimeAndCountMode(10.secondTimeSpan, PosInt.unsafeFrom(1), w)
     Config.GmosNorth(
       grating = GmosNorthGrating.B1200_G5301,
       filter = GmosNorthFilter.GPrime.some,
       fpu = GmosNorthFpu.LongSlit_1_00,
       common = Config.Common(
-        centralWavelength = Wavelength.fromIntNanometers(500).get,
+        centralWavelength   = w,
+        acqExposureTimeMode = e,
+        sciExposureTimeMode = e,
         defaultXBin = GmosXBinning.One,
         explicitXBin = None,
         defaultYBin = GmosYBinning.One,

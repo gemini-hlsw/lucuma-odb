@@ -26,7 +26,6 @@ import lucuma.core.enums.GmosSouthFilter
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.ScienceBand
 import lucuma.core.math.RadialVelocity
-import lucuma.core.math.SignalToNoise
 import lucuma.core.math.Wavelength
 import lucuma.core.model.ConstraintSet
 import lucuma.core.model.ExposureTimeMode
@@ -49,7 +48,6 @@ import lucuma.itc.client.InstrumentMode.GmosSouthSpectroscopy
 import lucuma.itc.client.ItcConstraintsInput.*
 import lucuma.itc.client.SpectroscopyParameters
 import lucuma.itc.client.TargetInput
-import lucuma.odb.data.ExposureTimeModeType
 import lucuma.odb.json.sourceprofile.given
 import lucuma.odb.sequence.ObservingMode
 import lucuma.odb.sequence.data.GeneratorParams
@@ -430,34 +428,11 @@ object GeneratorParamsService {
         sp.as[SourceProfile].leftMap(f => s"Could not decode SourceProfile: ${f.message}")
       }
 
-    val exposure_time_mode: Decoder[Option[ExposureTimeMode]] =
-      (
-        exposure_time_mode_type.opt  *:
-        wavelength_pm.opt            *:
-        signal_to_noise.opt          *:
-        time_span.opt                *:
-        int4_pos.opt
-      ).emap: (tpe, at, s2n, time, count) =>
-        tpe.fold(none[ExposureTimeMode].asRight[String]) {
-          case ExposureTimeModeType.SignalToNoiseMode =>
-            (s2n, at)
-              .mapN(ExposureTimeMode.SignalToNoiseMode.apply)
-              .toRight("Both c_etm_signal_to_noise and c_etm_signal_to_noise_at must be defined for the SignalToNoise exposure time mode.")
-              .map(_.some)
-
-          case ExposureTimeModeType.TimeAndCountMode  =>
-            (time, count, at)
-              .mapN(ExposureTimeMode.TimeAndCountMode.apply)
-              .toRight("c_etm_exp_time, c_etm_exp_count and c_etm_signal_to_noise_at must be defined for the TimeAndCount exposure time mode.")
-              .map(_.some)
-        }
-
-
     val params: Decoder[ParamsRow] =
       (observation_id          *:
        calibration_role.opt    *:
        constraint_set          *:
-       exposure_time_mode      *:
+       exposure_time_mode.opt  *:
        observing_mode_type.opt *:
        science_band.opt        *:
        target_id.opt           *:

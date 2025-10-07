@@ -69,6 +69,7 @@ import lucuma.odb.data.TimeCharge.DiscountDiscriminator
 import lucuma.odb.data.TimingWindowEndTypeEnum
 import lucuma.odb.data.UserType
 import lucuma.odb.service.ObservationWorkflowService
+import lucuma.odb.syntax.exposureTimeMode.*
 import monocle.Prism
 import skunk.*
 import skunk.circe.codec.json.*
@@ -794,6 +795,34 @@ trait Codecs {
 
   val user_invitation_status: Codec[InvitationStatus] =
     enumerated(Type("e_invitation_status"))
+
+  val exposure_time_mode: Codec[ExposureTimeMode] =
+      (
+        exposure_time_mode_type  *:
+        wavelength_pm            *:
+        signal_to_noise.opt      *:
+        time_span.opt            *:
+        int4_pos.opt
+      ).eimap((tpe, at, s2n, time, count) =>
+        tpe match
+          case ExposureTimeModeType.SignalToNoiseMode =>
+            s2n
+              .map(s => ExposureTimeMode.SignalToNoiseMode(s, at))
+              .toRight("Both signal-to-noise value must be defined for the SignalToNoise exposure time mode.")
+
+          case ExposureTimeModeType.TimeAndCountMode  =>
+            (time, count)
+              .mapN((t, c) => ExposureTimeMode.TimeAndCountMode(t, c, at))
+              .toRight("Both exposure time and count must be defined for the TimeAndCount exposure time mode.")
+      )(
+        etm => (
+          etm.modeType,
+          etm.at,
+          etm.signalToNoise,
+          etm.exposureTime,
+          etm.exposureCount
+        )
+      )
 
   val observation_workflow_state: Codec[ObservationWorkflowState] =
     enumerated(Type("e_workflow_state"))

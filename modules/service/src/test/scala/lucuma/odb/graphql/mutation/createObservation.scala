@@ -38,6 +38,9 @@ class createObservation extends OdbSuite {
     def downPath(p: String*): ACursor =
       p.foldLeft(ac) { (aCursor, field) => aCursor.downField(field) }
 
+    def isNullIO(p: String*): IO[Boolean] =
+      IO(downPath(p*).focus.exists(_.isNull))
+
     def liftIO[A: Decoder]: IO[A] =
       ac.as[A].leftMap(f => new RuntimeException(f.message)).liftTo[IO]
 
@@ -893,7 +896,10 @@ class createObservation extends OdbSuite {
     grating:  String,
     fpu:      String = "LONG_SLIT_0_25",
     iq:       ImageQuality.Preset = ImageQuality.Preset.TwoPointZero,
-    asterism: List[Target.Id] = Nil
+    reqSn:    Option[Int]         = None,
+    acqSn:    Option[Int]         = None,
+    sciSn:    Option[Int]         = None,
+    asterism: List[Target.Id]     = Nil
   ): String =
     s"""
       mutation {
@@ -903,6 +909,19 @@ class createObservation extends OdbSuite {
             constraintSet: {
               imageQuality: ${iq.tag.toUpperCase}
             }
+            ${reqSn.map { sn =>
+                s"""
+                  scienceRequirements: {
+                    exposureTimeMode: {
+                      signalToNoise: {
+                        value: $sn
+                        at: { nanometers: 234.56 }
+                      }
+                    }
+                  }
+                """
+              }.getOrElse("")
+            }
             observingMode: {
               gmos${siteName(site)}LongSlit: {
                 grating: $grating
@@ -910,7 +929,29 @@ class createObservation extends OdbSuite {
                 fpu: $fpu
                 centralWavelength: {
                   nanometers: 234.56
-                },
+                }
+                ${acqSn.map { sn =>
+                    s"""
+                      acquisitionExposureTimeMode: {
+                        signalToNoise: {
+                          value: $sn
+                          at: { nanometers: 234.56 }
+                        }
+                      }
+                    """
+                  }.getOrElse("")
+                }
+                ${sciSn.map { sn =>
+                    s"""
+                      scienceExposureTimeMode: {
+                        signalToNoise: {
+                          value: $sn
+                          at: { nanometers: 234.56 }
+                        }
+                      }
+                    """.stripMargin
+                  }.getOrElse("")
+                }
                 explicitYBin: TWO
               }
             }
@@ -928,10 +969,22 @@ class createObservation extends OdbSuite {
                 centralWavelength {
                   nanometers
                 }
-                xBin,
-                explicitXBin,
-                defaultXBin,
-                yBin,
+                acquisitionExposureTimeMode {
+                  signalToNoise {
+                    value
+                    at { nanometers }
+                  }
+                }
+                scienceExposureTimeMode {
+                  signalToNoise {
+                    value
+                    at { nanometers }
+                  }
+                }
+                xBin
+                explicitXBin
+                defaultXBin
+                yBin
                 explicitYBin
                 defaultYBin
                 initialGrating
@@ -947,9 +1000,9 @@ class createObservation extends OdbSuite {
       }
     """
 
-  test("[general] specify gmos north long slit observing mode at observation creation") {
-    createProgramAs(pi).flatMap { pid =>
-      query(pi, createObsWithGmosObservingMode(pid, Site.GN, "B1200_G5301")).flatMap { js =>
+  test("[general] specify gmos north long slit observing mode at observation creation"):
+    createProgramAs(pi).flatMap: pid =>
+      query(pi, createObsWithGmosObservingMode(pid, Site.GN, "B1200_G5301")).flatMap: js =>
         val longSlit = js.hcursor.downPath("createObservation", "observation", "observingMode", "gmosNorthLongSlit")
 
         assertIO(
@@ -957,6 +1010,8 @@ class createObservation extends OdbSuite {
            longSlit.downIO[Option[GmosNorthFilter]]("filter"),
            longSlit.downIO[GmosNorthFpu]("fpu"),
            longSlit.downIO[Double]("centralWavelength", "nanometers"),
+           longSlit.isNullIO("acquisitionExposureTimeMode"),
+           longSlit.isNullIO("scienceExposureTimeMode"),
            longSlit.downIO[GmosXBinning]("xBin"),
            longSlit.downIO[Option[GmosXBinning]]("explicitXBin"),
            longSlit.downIO[GmosXBinning]("defaultXBin"),
@@ -972,6 +1027,8 @@ class createObservation extends OdbSuite {
            Some(GmosNorthFilter.GPrime),
            GmosNorthFpu.LongSlit_0_25,
            234.56,
+           true,
+           true,
            GmosXBinning.One,
            None,
            GmosXBinning.One,
@@ -985,9 +1042,51 @@ class createObservation extends OdbSuite {
           )
         )
 
-      }
-    }
-  }
+  test("[general] specify gmos north long slit with requirement ETM"):
+    createProgramAs(pi).flatMap: pid =>
+      query(pi, createObsWithGmosObservingMode(pid, Site.GN, "B1200_G5301", reqSn = 20.some)).flatMap: js =>
+        val longSlit = js.hcursor.downPath("createObservation", "observation", "observingMode", "gmosNorthLongSlit")
+
+        assertIO(
+          (
+           longSlit.downIO[Int]("acquisitionExposureTimeMode", "signalToNoise", "value"),
+           longSlit.downIO[Int]("scienceExposureTimeMode", "signalToNoise", "value")
+          ).tupled,
+          (
+           10,
+           20,
+          )
+        )
+
+  test("[general] specify gmos north long slit with science ETM"):
+    createProgramAs(pi).flatMap: pid =>
+      query(pi, createObsWithGmosObservingMode(pid, Site.GN, "B1200_G5301", sciSn = 20.some)).flatMap: js =>
+        val longSlit = js.hcursor.downPath("createObservation", "observation", "observingMode", "gmosNorthLongSlit")
+        assertIO(
+          (
+           longSlit.downIO[Int]("acquisitionExposureTimeMode", "signalToNoise", "value"),
+           longSlit.downIO[Int]("scienceExposureTimeMode", "signalToNoise", "value")
+          ).tupled,
+          (
+           10,
+           20,
+          )
+        )
+
+  test("[general] specify gmos north long slit with all ETMs"):
+    createProgramAs(pi).flatMap: pid =>
+      query(pi, createObsWithGmosObservingMode(pid, Site.GN, "B1200_G5301", reqSn = 20.some, acqSn = 5.some, sciSn = 30.some)).flatMap: js =>
+        val longSlit = js.hcursor.downPath("createObservation", "observation", "observingMode", "gmosNorthLongSlit")
+        assertIO(
+          (
+           longSlit.downIO[Int]("acquisitionExposureTimeMode", "signalToNoise", "value"),
+           longSlit.downIO[Int]("scienceExposureTimeMode", "signalToNoise", "value")
+          ).tupled,
+          (
+            5,
+           30,
+          )
+        )
 
   test("[general] specify gmos north long slit with calculated xbin") {
     createProgramAs(pi).flatMap { pid =>
