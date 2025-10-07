@@ -9,6 +9,7 @@ import cats.syntax.functorFilter.*
 import cats.syntax.traverse.*
 import grackle.Result
 import lucuma.core.enums.ObservingModeType
+import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.Observation
 import lucuma.odb.graphql.input.ObservingModeInput
 import lucuma.odb.sequence.ObservingMode
@@ -24,7 +25,8 @@ sealed trait ObservingModeServices[F[_]] {
   )(using Transaction[F], SuperUserAccess): F[Map[Observation.Id, ObservingMode]]
 
   def createFunction(
-    input: ObservingModeInput.Create
+    input: ObservingModeInput.Create,
+    etm:   Option[ExposureTimeMode]
   )(using Transaction[F], SuperUserAccess): Result[List[Observation.Id] => F[Unit]]
 
   def deleteFunction(
@@ -84,11 +86,12 @@ object ObservingModeServices {
         }.map(_.fold(Map.empty[Observation.Id, ObservingMode])(_ ++ _))
 
       override def createFunction(
-        input: ObservingModeInput.Create
+        input: ObservingModeInput.Create,
+        etm:   Option[ExposureTimeMode]
       )(using Transaction[F], SuperUserAccess): Result[List[Observation.Id] => F[Unit]] =
         List(
-          input.gmosNorthLongSlit.map(gmosLongSlitService.insertNorth),
-          input.gmosSouthLongSlit.map(gmosLongSlitService.insertSouth),
+          input.gmosNorthLongSlit.map(g => gmosLongSlitService.insertNorth(g.withDefaultExposureTimeMode(etm))),
+          input.gmosSouthLongSlit.map(g => gmosLongSlitService.insertSouth(g.withDefaultExposureTimeMode(etm))),
           input.flamingos2LongSlit.map(flamingos2LongSlitService.insert),
           input.gmosNorthImaging.map(gmosImagingService.insertNorth),
           input.gmosSouthImaging.map(gmosImagingService.insertSouth)

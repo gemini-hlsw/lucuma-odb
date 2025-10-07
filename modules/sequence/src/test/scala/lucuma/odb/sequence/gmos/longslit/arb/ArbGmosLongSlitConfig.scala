@@ -23,6 +23,8 @@ import lucuma.core.math.WavelengthDither
 import lucuma.core.math.arb.ArbOffset
 import lucuma.core.math.arb.ArbWavelength
 import lucuma.core.math.arb.ArbWavelengthDither
+import lucuma.core.model.ExposureTimeMode
+import lucuma.core.model.arb.ArbExposureTimeMode
 import lucuma.core.util.arb.ArbEnumerated
 import org.scalacheck.*
 import org.scalacheck.Arbitrary.arbitrary
@@ -30,6 +32,7 @@ import org.scalacheck.Arbitrary.arbitrary
 object ArbGmosLongSlitConfig:
 
   import ArbEnumerated.given
+  import ArbExposureTimeMode.given
   import ArbOffset.given
   import ArbWavelength.given
   import ArbWavelengthDither.given
@@ -37,18 +40,22 @@ object ArbGmosLongSlitConfig:
   given Arbitrary[Config.Common] =
     Arbitrary:
       for
-        w <- arbitrary[Wavelength]
+        w  <- arbitrary[Wavelength]
+        ac <- arbitrary[ExposureTimeMode]
+        sc <- arbitrary[ExposureTimeMode]
         dx <- arbitrary[GmosXBinning]
-        x <- arbitrary[Option[GmosXBinning]]
+        x  <- arbitrary[Option[GmosXBinning]]
         dy <- arbitrary[GmosYBinning]
-        y <- arbitrary[Option[GmosYBinning]]
-        m <- arbitrary[Option[GmosAmpReadMode]]
-        n <- arbitrary[Option[GmosAmpGain]]
-        r <- arbitrary[Option[GmosRoi]]
-        d <- arbitrary[Option[List[WavelengthDither]]]
-        s <- arbitrary[Option[List[Q]]]
+        y  <- arbitrary[Option[GmosYBinning]]
+        m  <- arbitrary[Option[GmosAmpReadMode]]
+        n  <- arbitrary[Option[GmosAmpGain]]
+        r  <- arbitrary[Option[GmosRoi]]
+        d  <- arbitrary[Option[List[WavelengthDither]]]
+        s  <- arbitrary[Option[List[Q]]]
       yield Config.Common(
         w,
+        ac,
+        sc,
         dx,
         x,
         dy,

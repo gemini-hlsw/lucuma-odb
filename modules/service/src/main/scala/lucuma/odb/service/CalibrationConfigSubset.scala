@@ -49,6 +49,8 @@ object CalibrationConfigSubset:
     def longSlitCommonInput: GmosLongSlitInput.Create.Common =
       GmosLongSlitInput.Create.Common(
         centralWavelength      = centralWavelength,
+        acqExposureTimeMode    = none,
+        sciExposureTimeMode    = none,
         explicitXBin           = xBin.some,
         explicitYBin           = yBin.some,
         explicitAmpReadMode    = ampReadMode.some,

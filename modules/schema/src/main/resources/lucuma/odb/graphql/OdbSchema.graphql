@@ -2082,6 +2082,18 @@ input GmosNorthLongSlitInput {
   centralWavelength: WavelengthInput
 
   """
+  Exposure time mode for the acquisition sequence.  If not specified, a default
+  exposure time mode is used.
+  """
+  acquisitionExposureTimeMode: ExposureTimeModeInput
+
+  """
+  Exposure time mode for the science sequence.  If not specified, the exposure
+  time mode of the observation's science requirements are used.
+  """
+  scienceExposureTimeMode: ExposureTimeModeInput
+
+  """
   The explicitXBin field may be unset by assigning a null value, or ignored by skipping it altogether
   """
   explicitXBin: GmosBinning
@@ -2522,6 +2534,18 @@ input GmosSouthLongSlitInput {
   The centralWavelength field must be either specified or skipped altogether.  It cannot be unset with a null value.
   """
   centralWavelength: WavelengthInput
+
+  """
+  Exposure time mode for the acquisition sequence.  If not specified, a default
+  exposure time mode is used.
+  """
+  acquisitionExposureTimeMode: ExposureTimeModeInput
+
+  """
+  Exposure time mode for the science sequence.  If not specified, the exposure
+  time mode of the observation's science requirements are used.
+  """
+  scienceExposureTimeMode: ExposureTimeModeInput
 
   """
   The explicitXBin field may be unset by assigning a null value, or ignored by skipping it altogether
@@ -8599,6 +8623,10 @@ type GmosNorthLongSlit {
   """
   centralWavelength: Wavelength!
 
+  acquisitionExposureTimeMode: ExposureTimeMode
+
+  scienceExposureTimeMode: ExposureTimeMode
+
   """
   GMOS X-Binning, either explicitly specified in explicitXBin or else taken
   from the defaultXBin.
@@ -9201,6 +9229,10 @@ type GmosSouthLongSlit {
   or else taken from the `defaultCentralWavelength`.
   """
   centralWavelength: Wavelength!
+
+  acquisitionExposureTimeMode: ExposureTimeMode
+
+  scienceExposureTimeMode: ExposureTimeMode
 
   """
   GMOS X-Binning, either explicitly specified in explicitXBin or else taken

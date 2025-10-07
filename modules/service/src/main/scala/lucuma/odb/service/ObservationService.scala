@@ -236,25 +236,23 @@ object ObservationService {
         Trace[F].span("createObservation") {
           session.execute(sql"set constraints all deferred".command) >>
           session.prepareR(GroupService.Statements.OpenHole).use(_.unique(programId, SET.group, SET.groupIndex)).flatMap { ix =>
+            val oEtm = SET
+              .scienceRequirements
+              .flatMap(_.exposureTimeMode.toOption)
+
             Statements
               .insertObservation(programId, SET, ix)
               .flatTraverse { af =>
                 session.prepareR(af.fragment.query(observation_id)).use { pq =>
                   pq.unique(af.argument).map(Result.success)
                 }.flatMap { rOid =>
-
-                  val rOptF = SET.observingMode.traverse(observingModeServices.createFunction)
+                  val rOptF = SET.observingMode.traverse(m => observingModeServices.createFunction(m, oEtm))
                   (rOid, rOptF).parMapN { (oid, optF) =>
                     optF.fold(oid.pure[F]) { f => f(List(oid)).as(oid) }
                   }.sequence
 
                 }
               }.flatTap { rOid =>
-
-                val oEtm = SET
-                  .scienceRequirements
-                  .flatMap(_.exposureTimeMode.toOption)
-
                 (rOid.toOption, oEtm)
                   .tupled
                   .traverse_ { (oid, etm) =>
@@ -262,7 +260,6 @@ object ObservationService {
                       .exposureTimeModeService
                       .insertExposureTimeMode(oid, ExposureTimeModeRole.Requirement, etm)
                   }
-
               }.flatTap { rOid =>
                 rOid.flatTraverse { oid => Services.asSuperUser(setTimingWindows(List(oid), SET.timingWindows)) }
               }.flatMap { rOid =>

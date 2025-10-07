@@ -15,6 +15,7 @@ CREATE TYPE e_exposure_time_mode_role AS ENUM(
 CREATE TABLE t_exposure_time_mode (
   c_exposure_time_mode_id SERIAL                    PRIMARY KEY,
   c_observation_id        d_observation_id          NOT NULL REFERENCES t_observation(c_observation_id) ON DELETE CASCADE,
+  --c_observing_mode_type   e_observing_mode_type,
   c_role                  e_exposure_time_mode_role NOT NULL,
 
   c_exposure_time_mode    e_exp_time_mode  NOT NULL,
@@ -22,6 +23,7 @@ CREATE TABLE t_exposure_time_mode (
   c_signal_to_noise_at    d_wavelength_pm,
   c_exposure_time         interval         CHECK (c_exposure_time  >= '0'::interval),
   c_exposure_count        integer          CHECK (c_exposure_count >= 0),
+
   CONSTRAINT t_exposure_time_mode_check CHECK (
     CASE c_exposure_time_mode
       WHEN 'signal_to_noise'::e_exp_time_mode THEN num_nulls(c_signal_to_noise, c_signal_to_noise_at) = 0
@@ -30,6 +32,13 @@ CREATE TABLE t_exposure_time_mode (
     END
   )
 );
+
+CREATE UNIQUE INDEX exposure_time_mode_role_constraint
+  ON t_exposure_time_mode (c_observation_id, c_role)
+  WHERE c_role IN (
+    'requirement'::e_exposure_time_mode_role,
+    'acquisition'::e_exposure_time_mode_role
+  );
 
 -- Populate the ETMs from the existing requirements in t_observation
 INSERT INTO t_exposure_time_mode (
