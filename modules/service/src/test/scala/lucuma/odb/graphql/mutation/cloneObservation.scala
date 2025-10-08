@@ -27,7 +27,6 @@ class cloneObservation extends OdbSuite {
       subtitle
       program { id }
       observerNotes
-      useBlindOffset
       constraintSet {
         cloudExtinction
         imageQuality
@@ -115,8 +114,8 @@ class cloneObservation extends OdbSuite {
           }
         }
       }
-      useBlindOffset
       targetEnvironment {
+        useBlindOffset
         asterism {
           id
         }
@@ -791,7 +790,9 @@ class cloneObservation extends OdbSuite {
                         programId: "$pid"
                         SET: {
                           observerNotes: "Observation notes"
-                          useBlindOffset: true
+                          targetEnvironment: {
+                            useBlindOffset: true
+                          }
                         }
                       }) {
                         observation {
@@ -811,11 +812,15 @@ class cloneObservation extends OdbSuite {
                     }) {
                       originalObservation {
                         observerNotes
-                        useBlindOffset
+                        targetEnvironment {
+                          useBlindOffset
+                        }
                       }
                       newObservation {
                         observerNotes
-                        useBlindOffset
+                        targetEnvironment {
+                          useBlindOffset
+                        }
                       }
                     }
                   }
@@ -826,11 +831,15 @@ class cloneObservation extends OdbSuite {
                       "cloneObservation": {
                         "originalObservation": {
                           "observerNotes": "Observation notes",
-                          "useBlindOffset": true
+                          "targetEnvironment": {
+                            "useBlindOffset": true
+                          }
                         },
                         "newObservation": {
                           "observerNotes": "Observation notes",
-                          "useBlindOffset": true
+                          "targetEnvironment": {
+                            "useBlindOffset": true
+                          }
                         }
                       }
                     }

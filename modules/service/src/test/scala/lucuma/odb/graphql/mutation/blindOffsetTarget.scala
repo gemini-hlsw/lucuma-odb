@@ -50,6 +50,7 @@ class blindOffsetTarget extends OdbSuite:
   private val targetEnvironmentFields =
     """
       targetEnvironment {
+        useBlindOffset
         blindOffsetTarget {
           name
         }
@@ -61,7 +62,6 @@ class blindOffsetTarget extends OdbSuite:
     s"""
       {
         title
-        useBlindOffset
         $targetEnvironmentFields
       }
     """
@@ -88,8 +88,8 @@ class blindOffsetTarget extends OdbSuite:
     json"""
       {
         "title": ${obsTitle.asJson},
-        "useBlindOffset": $useBlindOffset,
         "targetEnvironment": {
+          "useBlindOffset": $useBlindOffset,
           "blindOffsetTarget": $blindOffset,
           "explicitBlindOffset": $isExplicit
         }
@@ -122,8 +122,8 @@ class blindOffsetTarget extends OdbSuite:
       query = s"""
         query {
           observation(observationId: ${oid.asJson}) {
-            useBlindOffset
             targetEnvironment {
+              useBlindOffset
               blindOffsetTarget {
                 id
                 name
@@ -135,8 +135,8 @@ class blindOffsetTarget extends OdbSuite:
       """
     ).map: json =>
       val obs = json.hcursor.downField("observation")
-      val useBlindOffset = obs.downField("useBlindOffset").require[Boolean]
       val te = obs.downField("targetEnvironment")
+      val useBlindOffset = te.downField("useBlindOffset").require[Boolean]
       val btid = te.downField("blindOffsetTarget").downField("id").as[Target.Id].toOption
       val name = te.downField("blindOffsetTarget").downField("name").as[String].toOption
       val isExplicit = te.downField("explicitBlindOffset").require[Boolean]
@@ -312,8 +312,8 @@ class blindOffsetTarget extends OdbSuite:
           {
             "observation": {
               "title": ${NoTargetTitle.asJson},
-              "useBlindOffset": false,
               "targetEnvironment": {
+                "useBlindOffset": false,
                 "blindOffsetTarget": null,
                 "explicitBlindOffset": false
               }
@@ -341,8 +341,8 @@ class blindOffsetTarget extends OdbSuite:
           {
             "observation": {
               "title": ${"Regular Target".asJson},
-              "useBlindOffset": false,
               "targetEnvironment": {
+                "useBlindOffset": false,
                 "blindOffsetTarget": null,
                 "explicitBlindOffset": false
               }
@@ -558,7 +558,9 @@ class blindOffsetTarget extends OdbSuite:
           mutation {
             updateObservations(input: {
               SET: {
-                useBlindOffset: false
+                targetEnvironment: {
+                  useBlindOffset: false
+                }
               }
               WHERE: {
                 id: { EQ: ${oid.asJson} }

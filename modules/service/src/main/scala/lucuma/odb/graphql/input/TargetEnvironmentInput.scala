@@ -16,6 +16,7 @@ object TargetEnvironmentInput:
   final case class Create(
     explicitBase:        Option[CoordinatesInput.Create],
     asterism:            Option[List[Target.Id]],
+    useBlindOffset:      Option[Boolean],
     blindOffsetTarget:   Option[TargetPropertiesInput.Create],
     explicitBlindOffset: Boolean
   ) extends TargetEnvironmentInput
@@ -25,15 +26,17 @@ object TargetEnvironmentInput:
         case List(
           CoordinatesInput.Create.Binding.Option("explicitBase", rBase),
           TargetIdBinding.List.Option("asterism", rAsterism),
+          BooleanBinding.Option("useBlindOffset", rUseBlindOffset),
           TargetPropertiesInput.Binding.Option("blindOffsetTarget", rBlindOffsetTarget),
           BooleanBinding("explicitBlindOffset", rExplicit)
-        ) => (rBase, rAsterism, rBlindOffsetTarget, rExplicit).parMapN(Create(_, _, _, _))
+        ) => (rBase, rAsterism, rUseBlindOffset, rBlindOffsetTarget, rExplicit).parMapN(Create(_, _, _, _, _))
       }
 
 
   final case class Edit(
     explicitBase:        Nullable[CoordinatesInput.Edit],
     asterism:            Nullable[List[Target.Id]],
+    useBlindOffset:      Option[Boolean],
     blindOffsetTarget:   Nullable[TargetPropertiesInput.Create],
     explicitBlindOffset: Boolean
   ) extends TargetEnvironmentInput
@@ -44,7 +47,8 @@ object TargetEnvironmentInput:
         case List(
           CoordinatesInput.Edit.Binding.Nullable("explicitBase", rBase),
           TargetIdBinding.List.Nullable("asterism", rAsterism),
+          BooleanBinding.Option("useBlindOffset", rUseBlindOffset),
           TargetPropertiesInput.Binding.Nullable("blindOffsetTarget", rBlindOffsetTarget),
           BooleanBinding("explicitBlindOffset", rExplicit)
-        ) => (rBase, rAsterism, rBlindOffsetTarget, rExplicit).parMapN(Edit(_, _, _, _))
+        ) => (rBase, rAsterism, rUseBlindOffset, rBlindOffsetTarget, rExplicit).parMapN(Edit(_, _, _, _, _))
       }

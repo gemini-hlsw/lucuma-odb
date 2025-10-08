@@ -73,6 +73,7 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
       asterismObject("asterism"),
       asterismObject("firstScienceTarget"),
       SqlObject("explicitBase"),
+      SqlField("useBlindOffset", ObservationView.UseBlindOffset),
       blindOffsetTargetObject("blindOffsetTarget"),
       SqlField("explicitBlindOffset", ObservationView.ExplicitBlindOffset),
       EffectField("basePosition", basePositionQueryHandler, List("id", "programId")),

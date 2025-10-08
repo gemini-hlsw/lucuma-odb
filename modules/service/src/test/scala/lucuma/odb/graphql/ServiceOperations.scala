@@ -58,6 +58,7 @@ trait ServiceOperations { this: OdbSuite =>
     TargetEnvironmentInput.Edit(
       explicitBase = Nullable.Absent,
       asterism = Nullable.Absent,
+      none,
       blindOffsetTarget = Nullable.NonNull(defaultCreateTargetInput(name)),
       explicitBlindOffset = false
     )

@@ -2773,13 +2773,15 @@ class createObservation extends OdbSuite {
               }
             }) {
               observation {
-                useBlindOffset
+                targetEnvironment {
+                  useBlindOffset
+                }
               }
             }
           }
           """).flatMap { js =>
         val useBlindOffset = js.hcursor
-          .downField("createObservation").downField("observation").downField("useBlindOffset")
+          .downFields("createObservation", "observation", "targetEnvironment", "useBlindOffset")
           .as[Boolean]
           .liftTo[IO]
         assertIO(useBlindOffset, false)
@@ -2790,17 +2792,21 @@ class createObservation extends OdbSuite {
             createObservation(input: {
               programId: "$pid"
               SET: {
-                useBlindOffset: true
+                targetEnvironment: {
+                  useBlindOffset: true
+                }
               }
             }) {
               observation {
-                useBlindOffset
+                targetEnvironment {
+                  useBlindOffset
+                }
               }
             }
           }
           """).flatMap { js =>
         val useBlindOffset = js.hcursor
-          .downField("createObservation").downField("observation").downField("useBlindOffset")
+          .downFields("createObservation", "observation", "targetEnvironment", "useBlindOffset")
           .as[Boolean]
           .liftTo[IO]
         assertIO(useBlindOffset, true)

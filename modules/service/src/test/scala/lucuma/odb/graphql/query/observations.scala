@@ -42,7 +42,9 @@ class observations extends OdbSuite {
                   id
                   calibrationRole
                   observerNotes
-                  useBlindOffset
+                  targetEnvironment {
+                    useBlindOffset
+                  }
                 }
               }
             }
@@ -57,7 +59,9 @@ class observations extends OdbSuite {
                         "id"              -> id.asJson,
                         "calibrationRole" -> Json.Null,
                         "observerNotes"   -> Json.Null,
-                        "useBlindOffset"  -> Json.False
+                        "targetEnvironment" -> Json.obj(
+                          "useBlindOffset"  -> Json.False
+                        )  
                       )
                     }
                 )
@@ -80,7 +84,9 @@ class observations extends OdbSuite {
                 hasMore
                 matches {
                   id
-                  useBlindOffset
+                  targetEnvironment {
+                    useBlindOffset
+                  }
                 }
               }
             }
@@ -93,7 +99,9 @@ class observations extends OdbSuite {
                     oids.take(3).map { id =>
                       Json.obj(
                         "id" -> id.asJson,
-                        "useBlindOffset" -> Json.False
+                        "targetEnvironment" -> Json.obj(
+                          "useBlindOffset" -> Json.False
+                        )
                       )
                     }
                 )
@@ -116,7 +124,9 @@ class observations extends OdbSuite {
                 hasMore
                 matches {
                   id
-                  useBlindOffset
+                  targetEnvironment {
+                    useBlindOffset 
+                  }
                 }
               }
             }
@@ -130,7 +140,9 @@ class observations extends OdbSuite {
                   "matches" : [
                     {
                       "id" : $oid,
-                      "useBlindOffset" : false
+                      "targetEnvironment": {
+                        "useBlindOffset" : false
+                      }
                     }
                   ]
                 }
@@ -373,7 +385,6 @@ class observations extends OdbSuite {
                     id
                     groupId
                     groupIndex
-                    useBlindOffset
                   }
                 }
               }""",
@@ -385,8 +396,7 @@ class observations extends OdbSuite {
                               {
                                 "id" : $oid,
                                 "groupId" : null,
-                                "groupIndex" : 0,
-                                "useBlindOffset" : false
+                                "groupIndex" : 0
                               }
                             ]
                           }
@@ -410,7 +420,6 @@ class observations extends OdbSuite {
                     id
                     groupId
                     groupIndex
-                    useBlindOffset
                   }
                 }
               }""",
@@ -422,8 +431,7 @@ class observations extends OdbSuite {
                               {
                                 "id" : $oid,
                                 "groupId" : $gid,
-                                "groupIndex" : 0,
-                                "useBlindOffset" : false
+                                "groupIndex" : 0
                               }
                             ]
                           }
@@ -496,7 +504,9 @@ class observations extends OdbSuite {
                     }) {
                       matches {
                         id
-                        useBlindOffset
+                        targetEnvironment {
+                          useBlindOffset
+                        }
                         observingMode {
                           gmosNorthImaging {
                             filters
@@ -518,7 +528,9 @@ class observations extends OdbSuite {
                         "matches": [
                           {
                             "id": $oid,
-                            "useBlindOffset": false,
+                            "targetEnvironment": {
+                              "useBlindOffset": false
+                            },
                             "observingMode": {
                               "gmosNorthImaging": {
                                 "filters": ["G_PRIME", "R_PRIME"],
@@ -552,7 +564,6 @@ class observations extends OdbSuite {
                     }) {
                       matches {
                         id
-                        useBlindOffset
                         observingMode {
                           gmosSouthImaging {
                             filters
@@ -574,7 +585,6 @@ class observations extends OdbSuite {
                         "matches": [
                           {
                             "id": $oid,
-                            "useBlindOffset": false,
                             "observingMode": {
                               "gmosSouthImaging": {
                                 "filters": ["G_PRIME", "R_PRIME"],
@@ -631,7 +641,6 @@ class observations extends OdbSuite {
                     matches {
                       id
                       instrument
-                      useBlindOffset
                       observingMode {
                         mode
                         gmosNorthImaging {
@@ -663,7 +672,6 @@ class observations extends OdbSuite {
                         {
                           "id": $oidNorth,
                           "instrument": "GMOS_NORTH",
-                          "useBlindOffset": false,
                           "observingMode": {
                             "mode": "GMOS_NORTH_IMAGING",
                             "gmosNorthImaging": {
@@ -680,7 +688,6 @@ class observations extends OdbSuite {
                         {
                           "id": $oidSouth,
                           "instrument": "GMOS_SOUTH",
-                          "useBlindOffset": false,
                           "observingMode": {
                             "mode": "GMOS_SOUTH_IMAGING",
                             "gmosNorthImaging": null,

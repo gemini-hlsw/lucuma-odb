@@ -120,7 +120,7 @@ ORDER BY
   t.c_target_id;
 
 --------------------------------------------------------
--- Update asterism_update - only science targets can be added to the asterism.
+-- Update asterism_update - only science and calibration targets can be added to the asterism.
 -- Modified from V1038 to what it was in V0916, but also only allow science and calibration targets in
 -- the asterism
 --------------------------------------------------------

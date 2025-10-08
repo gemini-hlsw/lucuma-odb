@@ -605,7 +605,7 @@ object ObservationService {
           SET.observingMode.flatMap(_.observingModeType),
           SET.observingMode.flatMap(_.observingModeType).map(_.instrument),
           SET.observerNotes,
-          SET.useBlindOffset.getOrElse(false)
+          SET.targetEnvironment.flatMap(_.useBlindOffset).getOrElse(false)
         )
       }
 
@@ -987,7 +987,7 @@ object ObservationService {
           SET.subtitle.foldPresent(upSubtitle),
           SET.scienceBand.foldPresent(upScienceBand),
           SET.observerNotes.foldPresent(upObserverNotes),
-          SET.useBlindOffset.map(upUseBlindOffset)
+          SET.targetEnvironment.flatMap(_.useBlindOffset).map(upUseBlindOffset)
         ).flatten
 
       val posAngleConstraint: List[AppliedFragment] =
