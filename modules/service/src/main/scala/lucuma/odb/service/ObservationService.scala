@@ -506,7 +506,7 @@ object ObservationService {
                     obsAttachmentAssignmentService.cloneAssignments(observationId, oid2)
 
                 val cloneBlindOffset = // only clone if it won't be overwritten by the updateObservations
-                  if SET.flatMap(_.targetEnvironment).fold(true)(_.asterism.isAbsent) then
+                  if SET.flatMap(_.targetEnvironment).fold(true)(_.blindOffsetTarget.isAbsent) then
                     blindOffsetsService.cloneBlindOffset(pid, observationId, oid2)
                   else Result.unit.pure 
 

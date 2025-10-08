@@ -33,9 +33,9 @@ import scala.collection.immutable.SortedMap
 
 // Methods, etc. for making calls to the services via `withServices`
 trait ServiceOperations { this: OdbSuite =>
-  val DefaultCreateTargetInput: TargetPropertiesInput.Create =
+  def defaultCreateTargetInput(name: String): TargetPropertiesInput.Create =
     TargetPropertiesInput.Create(
-      name         = NonEmptyString.unsafeFrom("My Target"),
+      name         = NonEmptyString.unsafeFrom(name),
       subtypeInfo  = SiderealInput.Create(
         ra    = RightAscension.Zero,
         dec   = Declination.Zero,
@@ -54,11 +54,11 @@ trait ServiceOperations { this: OdbSuite =>
       existence    = Existence.Present
     )
 
-  val DefaultTargetEnvironmentInput4UpdateBlindoffset: TargetEnvironmentInput.Edit =
+  def defaultTargetEnvironmentInput4UpdateBlindoffset(name: String): TargetEnvironmentInput.Edit =
     TargetEnvironmentInput.Edit(
       explicitBase = Nullable.Absent,
       asterism = Nullable.Absent,
-      blindOffsetTarget = Nullable.NonNull(DefaultCreateTargetInput),
+      blindOffsetTarget = Nullable.NonNull(defaultCreateTargetInput(name)),
       explicitBlindOffset = false
     )
 
@@ -67,7 +67,7 @@ trait ServiceOperations { this: OdbSuite =>
     programId: Program.Id,
     disposition: TargetDisposition,
     role: Option[CalibrationRole] = None,
-    input: TargetPropertiesInput.Create = DefaultCreateTargetInput
+    input: TargetPropertiesInput.Create = defaultCreateTargetInput("My Target")
   ): IO[Target.Id] = 
     val checkedInput = Services.asSuperUser(AccessControl.unchecked(input, programId, program_id))
 
@@ -82,8 +82,9 @@ trait ServiceOperations { this: OdbSuite =>
     user: User,
     programId: Program.Id,
     observationId: Observation.Id,
-    input: TargetEnvironmentInput.Edit = DefaultTargetEnvironmentInput4UpdateBlindoffset
+    name: String // must be non-empty
   ): IO[Unit] =
+    val input = defaultTargetEnvironmentInput4UpdateBlindoffset(name)
     withServices(user): services =>
       Services.asSuperUser:
         services.session.transaction.use: xa =>
