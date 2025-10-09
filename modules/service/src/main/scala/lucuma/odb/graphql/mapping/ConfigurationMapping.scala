@@ -76,15 +76,15 @@ trait ConfigurationMapping[F[_]]
     // the cursor, and we don't need the environment at all. Would be nice to abstract something out.
     new EffectHandler[F] {
 
-      def calculate(pid: Program.Id, oid: Observation.Id, oRefTime: Option[Timestamp]): F[Result[Option[Either[Coordinates, Region]]]] =
+      def calculate(oid: Observation.Id, oRefTime: Option[Timestamp]): F[Result[Option[Either[Coordinates, Region]]]] =
         oRefTime
           .traverse: at =>
             services.use { implicit s =>
               Services.asSuperUser:
                 s .trackingService
-                  .getCoordinatesSnapshotOrRegion(pid, oid, at)
+                  .getCoordinatesSnapshotOrRegion(oid, at)
                   .map: res =>
-                    res.map(_.leftMap(_.base))
+                    res.map(_.bimap(_.base, _._1))
               }
           .map(_.sequence)          
 
@@ -100,7 +100,7 @@ trait ConfigurationMapping[F[_]]
         (for {
           ctx <- ResultT(queryContext(queries).pure[F])
           obs <- ctx.distinct.traverse { case (pid, oid, ldt) =>
-                   ResultT(calculate(pid, oid, ldt)).map((oid, _))
+                   ResultT(calculate(oid, ldt)).map((oid, _))
                  }
           res <- ResultT(ctx
                    .flatMap { case (pid, oid, ldt) => obs.find(r => r._1 === oid).map(_._2).toList }

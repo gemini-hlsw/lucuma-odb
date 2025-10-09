@@ -85,7 +85,7 @@ class createConfigurationRequest extends OdbSuite with ObservingModeSetupOperati
                             "hms" : "05:46:13.138550"
                           },
                           "dec" : {
-                            "dms" : "-00:06:04.916777"
+                            "dms" : "-00:06:04.916776"
                           }
                         }
                       },
@@ -125,7 +125,7 @@ class createConfigurationRequest extends OdbSuite with ObservingModeSetupOperati
               }
             """,
             expected = {
-              case OdbError.GuideEnvironmentError(_) => // expected
+              case OdbError.InvalidObservation(_, _) => // expected
               case OdbError.InvalidConfiguration(_)  => // expected
             }
           )
@@ -150,7 +150,7 @@ class createConfigurationRequest extends OdbSuite with ObservingModeSetupOperati
                 }
               """,
               expected = {
-                case OdbError.GuideEnvironmentError(_) => // expected
+                case OdbError.InvalidObservation(_, _) => // expected
                 case OdbError.InvalidConfiguration(_)  => // expected
               }
             )
