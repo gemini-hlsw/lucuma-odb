@@ -232,4 +232,50 @@ trait CalibrationObservations {
               Codecs.program_id
             )
       ).orError
+
+  def flamingos2TelluricObs[F[_]: MonadThrow: Services: Transaction](
+    pid: Program.Id,
+    gid: Group.Id,
+    tid: Target.Id,
+    config: CalibrationConfigSubset.Flamingos2Configs
+  ): F[Observation.Id] =
+    telluricObservation(pid, gid, tid, config.toLongSlitInput)
+
+  private def telluricObservation[F[_]: Services: MonadThrow: Transaction](
+    pid: Program.Id,
+    gid: Group.Id,
+    tid: Target.Id,
+    obsMode: ObservingModeInput.Create
+  ): F[Observation.Id] =
+    observationService.createObservation(
+      Services.asSuperUser:
+        AccessControl.unchecked(
+          ObservationPropertiesInput.Create.Default.copy(
+            targetEnvironment = TargetEnvironmentInput.Create(
+              none,
+              List(tid).some,
+              none
+            ).some,
+            constraintSet = roleConstraints(CalibrationRole.Telluric).some,
+            group = gid.some,
+            posAngleConstraint = PosAngleConstraintInput(
+              mode = PosAngleConstraintMode.AverageParallactic.some, none
+            ).some,
+            observingMode = obsMode.some,
+            scienceRequirements =
+              ScienceRequirementsInput(
+                exposureTimeMode = Nullable.NonNull(
+                  ExposureTimeMode.SignalToNoiseMode(
+                    SignalToNoise.unsafeFromBigDecimalExact(100.0),
+                    Wavelength.fromIntNanometers(2000).get
+                  )
+                ),
+                spectroscopy = SpectroscopyScienceRequirementsInput.Default.some,
+                imaging = none
+              ).some
+            ),
+            pid,
+            Codecs.program_id
+          )
+    ).orError
 }

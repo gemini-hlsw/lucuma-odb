@@ -15,6 +15,13 @@ import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.Site
+import lucuma.core.enums.StellarLibrarySpectrum
+import lucuma.core.enums.TargetDisposition
+import lucuma.core.model.SourceProfile
+import lucuma.core.model.SpectralDefinition
+import lucuma.core.model.UnnormalizedSED
+
+import scala.collection.immutable.SortedMap
 import lucuma.core.math.Coordinates
 import lucuma.core.math.Declination
 import lucuma.core.math.Epoch
@@ -40,7 +47,9 @@ import lucuma.odb.graphql.input.EditAsterismsPatchInput
 import lucuma.odb.graphql.input.GroupPropertiesInput
 import lucuma.odb.graphql.input.ObservationPropertiesInput
 import lucuma.odb.graphql.input.ScienceRequirementsInput
+import lucuma.odb.graphql.input.SiderealInput
 import lucuma.odb.graphql.input.SpectroscopyScienceRequirementsInput
+import lucuma.odb.graphql.input.TargetPropertiesInput
 import lucuma.odb.graphql.mapping.AccessControl
 import lucuma.odb.sequence.ObservingMode
 import lucuma.odb.sequence.data.GeneratorParams
@@ -186,6 +195,137 @@ object CalibrationsService extends CalibrationObservations {
       // Find all active observations in the program
       private def activeObservations(pid: Program.Id): F[Set[Observation.Id]] =
         session.execute(Statements.selectActiveObservations)(pid).map(_.toSet)
+
+      private def telluricGroupName(scienceObsId: Observation.Id): NonEmptyString =
+        NonEmptyString.unsafeFrom(s"F2 Telluric for ${scienceObsId.show}")
+
+      private def findTelluricGroupForScience(
+        pid: Program.Id,
+        scienceObsId: Observation.Id
+      )(using Transaction[F]): F[Option[Group.Id]] =
+        val groupName = telluricGroupName(scienceObsId)
+        groupService(emailConfig, httpClient).selectGroups(pid).map {
+          case GroupTree.Root(_, children) =>
+            children.collectFirst {
+              case GroupTree.Branch(gid, _, _, _, Some(name), _, _, _, true) if name == groupName => gid
+            }
+          case _ => none
+        }
+
+      private def getOrCreateTelluricTarget(
+        pid: Program.Id
+      )(using Transaction[F], ServiceAccess): F[Target.Id] =
+        Services.asSuperUser:
+          targetService.createTarget(
+            AccessControl.unchecked(
+              TargetPropertiesInput.Create(
+                name = NonEmptyString.unsafeFrom("Telluric Standard"),
+                subtypeInfo = SiderealInput.Create(
+                  ra = RightAscension.Zero,
+                  dec = Declination.Zero,
+                  epoch = Epoch.J2000,
+                  properMotion = none,
+                  radialVelocity = none,
+                  parallax = none,
+                  catalogInfo = none
+                ),
+                sourceProfile = SourceProfile.Point(
+                  SpectralDefinition.BandNormalized(
+                    sed = UnnormalizedSED.StellarLibrary(StellarLibrarySpectrum.A0V).some,
+                    brightnesses = SortedMap.empty
+                  )
+                ),
+                existence = Existence.Present
+              ),
+              pid,
+              program_id
+            ),
+            TargetDisposition.Calibration,
+            CalibrationRole.Telluric.some
+          ).orError
+
+      private def getTelluricObservationsInGroup(
+        gid: Group.Id
+      )(using Transaction[F]): F[List[Observation.Id]] =
+        session.execute(sql"""
+          SELECT c_observation_id
+          FROM t_observation
+          WHERE c_group_id = $group_id
+            AND c_calibration_role = $calibration_role
+        """.query(observation_id))((gid, CalibrationRole.Telluric))
+
+      private def ensureTelluricForScience(
+        pid: Program.Id,
+        scienceObs: ObsExtract[CalibrationConfigSubset],
+        telluricTarget: Target.Id
+      )(using Transaction[F], ServiceAccess): F[Option[Observation.Id]] =
+        scienceObs.data match
+          case f2Config: Flamingos2Configs =>
+            findTelluricGroupForScience(pid, scienceObs.id).flatMap { existingGroup =>
+              existingGroup match
+                case Some(gid) =>
+                  getTelluricObservationsInGroup(gid).flatMap { tellurics =>
+                    tellurics match
+                      case telluricOid :: _ =>
+                        session.prepareR(sql"""
+                          SELECT c_observation_id
+                          FROM t_observation
+                          WHERE c_observation_id = $observation_id
+                        """.query(observation_id)).use { pq =>
+                          pq.option(telluricOid)
+                        }.flatMap {
+                          case Some(_) => none.pure[F]
+                          case None =>
+                            flamingos2TelluricObs(pid, gid, telluricTarget, f2Config)
+                              .flatTap(oid => setCalibRoleAndGroup(List(oid), CalibrationRole.Telluric))
+                              .map(_.some)
+                        }
+                      case Nil =>
+                        flamingos2TelluricObs(pid, gid, telluricTarget, f2Config)
+                          .flatTap(oid => setCalibRoleAndGroup(List(oid), CalibrationRole.Telluric))
+                          .map(_.some)
+                  }
+                case None =>
+                  val groupName = telluricGroupName(scienceObs.id)
+                  groupService(emailConfig, httpClient).createGroup(
+                    input = CreateGroupInput(
+                      programId = pid.some,
+                      proposalReference = none,
+                      programReference = none,
+                      SET = GroupPropertiesInput.Create(
+                        name = groupName.some,
+                        description = none,
+                        minimumRequired = none,
+                        ordered = false,
+                        minimumInterval = none,
+                        maximumInterval = none,
+                        parentGroupId = none,
+                        parentGroupIndex = none,
+                        existence = Existence.Present
+                      ),
+                      Nil
+                    ),
+                    system = true
+                  ).flatMap {
+                    case Result.Success(gid) =>
+                      flamingos2TelluricObs(pid, gid, telluricTarget, f2Config)
+                        .flatTap(oid => setCalibRoleAndGroup(List(oid), CalibrationRole.Telluric))
+                        .map(_.some)
+                    case _ => none.pure[F]
+                  }
+            }
+          case _ => none.pure[F]
+
+      private def generateF2TelluricCalibrations(
+        pid: Program.Id,
+        f2ScienceObs: List[ObsExtract[CalibrationConfigSubset]]
+      )(using Transaction[F], ServiceAccess): F[List[Observation.Id]] =
+        for
+          telluricTarget <- getOrCreateTelluricTarget(pid)
+          addedOids      <- f2ScienceObs.traverse(scienceObs =>
+                              ensureTelluricForScience(pid, scienceObs, telluricTarget)
+                            ).map(_.flatten)
+        yield addedOids
 
       /**
        * Requests configuration params for a program id and selection (either science or calibration)
@@ -414,24 +554,36 @@ object CalibrationsService extends CalibrationObservations {
           // Get all the active science observations
           allSci       <- allObservations(pid, ObservationSelection.Science)
                             .map(_.filter(u => active.contains(u._1)))
-          // Unique science configurations
-          uniqueSci     = uniqueConfiguration(allSci)
+
+          // Separate F2 science observations from GMOS
+          f2Sci         = allSci.filter(_.data.toConfigSubset.isInstanceOf[Flamingos2Configs])
+          gmosSci       = allSci.filterNot(_.data.toConfigSubset.isInstanceOf[Flamingos2Configs])
+          f2ScienceObs  = toConfigForCalibration(f2Sci)
+
+          // GMOS calibrations (existing config-based logic)
+          uniqueGmosSci = uniqueConfiguration(gmosSci)
           // Get all the active calibration observations (excluding those with execution events)
           allCalibs    <- allUnexecutedObservations(pid, ObservationSelection.Calibration).map(_.filter(u => active.contains(u.id)))
           calibs        = toConfigForCalibration(allCalibs)
+          gmosCalibs    = calibs.filterNot(_.data.isInstanceOf[Flamingos2Configs])
           // Average s/n wavelength at each configuration
           props         = calObsProps(toConfigForCalibration(allSci))
-          // Per-calibration-type configuration processing
-          configsPerRole = calculateConfigurationsPerRole(uniqueSci, calibs)
-          // Remove calibrations that are not needed, basically when a config is removed
-          removedOids  <- removeUnnecessaryCalibrations(uniqueSci, calibs)
-          // Generate new calibrations for each unique configuration
-          addedOids    <- generateGMOSLSCalibrations(pid, props, configsPerRole, gnTgt, gsTgt)
-          // Update wavelength at for each remaining calib
-          calibUpdates  = prepareCalibrationUpdates(calibs, removedOids, props)
-          _            <- updatePropsAt(calibUpdates)
+          // Per-calibration-type configuration processing (GMOS only)
+          gmosConfigsPerRole = calculateConfigurationsPerRole(uniqueGmosSci, gmosCalibs)
+          // Remove unnecessary GMOS calibrations
+          removedGmosOids <- removeUnnecessaryCalibrations(uniqueGmosSci, gmosCalibs)
+          // Generate new GMOS calibrations
+          addedGmosOids <- generateGMOSLSCalibrations(pid, props, gmosConfigsPerRole, gnTgt, gsTgt)
+          // Update wavelength at for each remaining GMOS calib
+          gmosCalibUpdates = prepareCalibrationUpdates(gmosCalibs, removedGmosOids, props)
+          _            <- updatePropsAt(gmosCalibUpdates)
+
+          // F2 telluric calibrations (new observation-based logic)
+          addedF2Oids  <- generateF2TelluricCalibrations(pid, f2ScienceObs)
+
+          // Cleanup
           _            <- targetService.deleteOrphanCalibrationTargets(pid)
-        yield (addedOids, removedOids)
+        yield (addedGmosOids ::: addedF2Oids, removedGmosOids)
 
       // Recalcula the target of a calibration observation
       def recalculateCalibrationTarget(

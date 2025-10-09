@@ -47,3 +47,40 @@ class CalibrationsServiceSuite extends OdbSuite:
               )
               after  <- services.calibrationsService(emailConfig, httpClient).calibrationTargets(roles, when)
             yield before.tail === after
+
+  test("F2 tellurics: one telluric per science observation"):
+    createProgramAs(serviceUser).flatMap: pid =>
+      createTargetAs(serviceUser, pid).flatMap: tid =>
+        createFlamingos2LongSlitObservationAs(serviceUser, pid, tid).flatMap: obs1 =>
+          createFlamingos2LongSlitObservationAs(serviceUser, pid, tid).flatMap: obs2 =>
+            createFlamingos2LongSlitObservationAs(serviceUser, pid, tid).flatMap: obs3 =>
+              withServices(serviceUser): services =>
+                assertIOBoolean:
+                  Services.asSuperUser:
+                    services.transactionally:
+                      services.calibrationsService(emailConfig, httpClient)
+                        .recalculateCalibrations(pid, when)
+                        .map: (added, removed) =>
+                          added.size == 3 && removed.isEmpty
+
+  test("F2 tellurics: each in separate group"):
+    createProgramAs(serviceUser).flatMap: pid =>
+      createTargetAs(serviceUser, pid).flatMap: tid =>
+        createFlamingos2LongSlitObservationAs(serviceUser, pid, tid).flatMap: obs1 =>
+          createFlamingos2LongSlitObservationAs(serviceUser, pid, tid).flatMap: obs2 =>
+            withServices(serviceUser): services =>
+              assertIOBoolean:
+                Services.asSuperUser:
+                  services.transactionally:
+                    for
+                      result <- services.calibrationsService(emailConfig, httpClient)
+                                  .recalculateCalibrations(pid, when)
+                      groups <- services.groupService(emailConfig, httpClient).selectGroups(pid)
+                    yield
+                      import lucuma.odb.data.GroupTree
+                      val groupNames = groups match
+                        case GroupTree.Root(_, children) =>
+                          children.collect:
+                            case GroupTree.Branch(_, _, _, _, Some(name), _, _, _, true) => name.value
+                        case _ => List.empty
+                      groupNames.count(_.contains("F2 Telluric for")) == 2
