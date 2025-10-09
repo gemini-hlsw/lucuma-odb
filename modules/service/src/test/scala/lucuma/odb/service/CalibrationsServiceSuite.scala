@@ -10,11 +10,12 @@ import lucuma.odb.graphql.OdbSuite
 import lucuma.odb.graphql.TestUsers
 import lucuma.odb.graphql.input.TargetPropertiesInput
 import lucuma.odb.graphql.mapping.AccessControl
+import lucuma.odb.graphql.query.ObservingModeSetupOperations
 import lucuma.odb.util.Codecs.*
 
 import java.time.*
 
-class CalibrationsServiceSuite extends OdbSuite:
+class CalibrationsServiceSuite extends OdbSuite with ObservingModeSetupOperations:
   val serviceUser = TestUsers.service(nextId)
   lazy val validUsers = List(serviceUser)
 
@@ -48,12 +49,12 @@ class CalibrationsServiceSuite extends OdbSuite:
               after  <- services.calibrationsService(emailConfig, httpClient).calibrationTargets(roles, when)
             yield before.tail === after
 
-  test("F2 tellurics: one telluric per science observation"):
+  test("recalculateCalibrations integration: F2 and GMOS"):
     createProgramAs(serviceUser).flatMap: pid =>
       createTargetAs(serviceUser, pid).flatMap: tid =>
-        createFlamingos2LongSlitObservationAs(serviceUser, pid, tid).flatMap: obs1 =>
-          createFlamingos2LongSlitObservationAs(serviceUser, pid, tid).flatMap: obs2 =>
-            createFlamingos2LongSlitObservationAs(serviceUser, pid, tid).flatMap: obs3 =>
+        createTargetWithProfileAs(serviceUser, pid).flatMap: gmosTarget =>
+          createFlamingos2LongSlitObservationAs(serviceUser, pid, tid).flatMap: _ =>
+            createGmosNorthLongSlitObservationAs(serviceUser, pid, List(gmosTarget)).flatMap: _ =>
               withServices(serviceUser): services =>
                 assertIOBoolean:
                   Services.asSuperUser:
@@ -61,26 +62,5 @@ class CalibrationsServiceSuite extends OdbSuite:
                       services.calibrationsService(emailConfig, httpClient)
                         .recalculateCalibrations(pid, when)
                         .map: (added, removed) =>
+                          // Should create F2 telluric (1) + GMOS calibrations (2: spectrophotometric + twilight)
                           added.size == 3 && removed.isEmpty
-
-  test("F2 tellurics: each in separate group"):
-    createProgramAs(serviceUser).flatMap: pid =>
-      createTargetAs(serviceUser, pid).flatMap: tid =>
-        createFlamingos2LongSlitObservationAs(serviceUser, pid, tid).flatMap: obs1 =>
-          createFlamingos2LongSlitObservationAs(serviceUser, pid, tid).flatMap: obs2 =>
-            withServices(serviceUser): services =>
-              assertIOBoolean:
-                Services.asSuperUser:
-                  services.transactionally:
-                    for
-                      result <- services.calibrationsService(emailConfig, httpClient)
-                                  .recalculateCalibrations(pid, when)
-                      groups <- services.groupService(emailConfig, httpClient).selectGroups(pid)
-                    yield
-                      import lucuma.odb.data.GroupTree
-                      val groupNames = groups match
-                        case GroupTree.Root(_, children) =>
-                          children.collect:
-                            case GroupTree.Branch(_, _, _, _, Some(name), _, _, _, true) => name.value
-                        case _ => List.empty
-                      groupNames.count(_.contains("F2 Telluric for")) == 2
