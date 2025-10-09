@@ -95,7 +95,6 @@ class observation extends OdbSuite {
           s"""
             query {
               observation(observationId: "$oid") {
-                useBlindOffset
                 observingMode {
                   gmosNorthLongSlit {
                     defaultXBin
@@ -105,6 +104,7 @@ class observation extends OdbSuite {
                   asterism {
                     id
                   }
+                  useBlindOffset
                 }
               }
             }
@@ -113,7 +113,6 @@ class observation extends OdbSuite {
           json"""
             {
               "observation" : {
-                "useBlindOffset" : false,
                 "observingMode" : {
                   "gmosNorthLongSlit" : {
                     "defaultXBin" : "ONE"
@@ -127,7 +126,8 @@ class observation extends OdbSuite {
                     {
                       "id" : "t-195"
                     }
-                  ]
+                  ],
+                  "useBlindOffset" : false
                 }
               }
             }
