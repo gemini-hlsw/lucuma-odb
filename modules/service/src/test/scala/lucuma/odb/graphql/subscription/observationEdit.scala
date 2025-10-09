@@ -440,6 +440,24 @@ class observationEdit extends OdbSuite with SubscriptionUtils {
     } yield ()
   }
 
+  test("triggers for changing target epoch in blind offset") {
+    import Group1.pi
+
+    for {
+      pid  <- createProgram(pi, "foo")
+      tid0 <- createTargetAs(pi, pid, "Zero")
+      tid1 <- createTargetAs(pi, pid, "One")
+      (oid, btid) <- createObservationWithBlindOffsetAs(pi, pid, "Blind offset", tid0, tid1)
+      _    <- subscriptionExpect(
+        user      = pi,
+        query     = titleSubscription,
+        mutations =
+          Right(updateTargetEpoch(pi, btid, Epoch.B1950)),
+        expected  = List(titleUpdated(oid, "Zero, One"))
+      )
+    } yield ()
+  }
+
   test("triggers for deleting a calibration observation") {
     import Group1.{ pi, service }
     def deleteCalibrationObservation(oid: Observation.Id) =

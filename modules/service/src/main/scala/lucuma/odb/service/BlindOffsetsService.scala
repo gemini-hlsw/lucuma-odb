@@ -3,6 +3,7 @@
 
 package lucuma.odb.service
 
+import cats.data.NonEmptyList
 import cats.effect.Concurrent
 import cats.syntax.all.*
 import grackle.Result
@@ -10,8 +11,10 @@ import lucuma.core.enums.TargetDisposition
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
+import lucuma.odb.data.BlindOffsetType
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.Nullable.NonNull
+import lucuma.odb.graphql.input.CloneTargetInput
 import lucuma.odb.graphql.input.TargetEnvironmentInput
 import lucuma.odb.graphql.input.TargetPropertiesInput
 import lucuma.odb.graphql.mapping.AccessControl
@@ -26,7 +29,8 @@ sealed trait BlindOffsetsService[F[_]]:
   def createBlindOffset(
     programId: Program.Id,
     observationId: Observation.Id,
-    input: TargetPropertiesInput.Create
+    input: TargetPropertiesInput.Create,
+    blindOffsetType: BlindOffsetType = BlindOffsetType.Manual
   )(using Transaction[F], ServiceAccess): F[Result[Target.Id]]
 
   def removeBlindOffset(
@@ -43,6 +47,12 @@ sealed trait BlindOffsetsService[F[_]]:
     targetEnvironment: Option[TargetEnvironmentInput.Edit]
   )(using Transaction[F], ServiceAccess): F[Result[Unit]]
 
+  def cloneBlindOffset(
+    programId: Program.Id,
+    oldObservationId: Observation.Id,
+    newObservationId: Observation.Id
+  )(using Transaction[F]): F[Result[Unit]]
+
 object BlindOffsetsService:
 
   def instantiate[F[_]: Concurrent](using Services[F]): BlindOffsetsService[F] =
@@ -53,7 +63,8 @@ object BlindOffsetsService:
       override def createBlindOffset(
         programId: Program.Id,
         observationId: Observation.Id,
-        input: TargetPropertiesInput.Create
+        input: TargetPropertiesInput.Create,
+        blindOffsetType: BlindOffsetType = BlindOffsetType.Manual
       )(using Transaction[F], ServiceAccess): F[Result[Target.Id]] =
         Services.asSuperUser:
           targetService.createTarget(
@@ -62,21 +73,20 @@ object BlindOffsetsService:
           ).flatMap: rTargetId =>
             rTargetId.traverse: targetId =>
               for {
-                _ <- session.execute(Statements.addBlindOffset)(programId, observationId, targetId)
-                _ <- session.execute(Statements.updateBlindOffsetFlag)(true, observationId)
+                _ <- session.execute(Statements.updateBlindOffsetFields)(targetId, true, blindOffsetType, observationId)
               } yield targetId
 
       override def removeBlindOffset(
         observationId: Observation.Id
       )(using Transaction[F], ServiceAccess): F[Unit] =
-        // This removes any existing blind offset target from the t_asterism_target table,
-        // a database trigger permanently deletes the blind offset target from t_target
+        // This permanently deletes any existing blind offset target from the t_target table,
+        // database triggers set c_blind_offset_target_id to null and c_blind_offset_type to MANUAL
         session.execute(Statements.removeBlindOffset)(observationId).void
 
       override def getBlindOffset(
         observationId: Observation.Id
       )(using Transaction[F]): F[Option[Target.Id]] =
-        session.option(Statements.selectBlindOffset)(observationId)
+        session.option(Statements.selectBlindOffset)(observationId).map(_.flatten)
 
       override def updateBlindOffset(
         programId: Program.Id,
@@ -92,41 +102,56 @@ object BlindOffsetsService:
               for {
                 // Remove existi
                 _          <- removeBlindOffset(observationId)
-                // Then create the new one
-                result     <- createBlindOffset(programId, observationId, targetInput)
+                // Then create the new one.
+                result     <- createBlindOffset(programId, observationId, targetInput, te.blindOffsetType)
               } yield result.void
+
+      override def cloneBlindOffset(
+        programId: Program.Id,
+        oldObservationId: Observation.Id,
+        newObservationId: Observation.Id
+      )(using Transaction[F]): F[Result[Unit]] = 
+        getBlindOffset(oldObservationId).flatMap:
+          _.fold(Result.unit.pure): tid =>
+            val input = CloneTargetInput(tid, SET = None, REPLACE_IN = NonEmptyList.one(newObservationId).some)
+            Services.asSuperUser:
+              targetService.cloneTarget(
+                AccessControl.unchecked(input, programId, program_id)
+              ).flatMap:
+                _.traverse((_, tid) =>
+                  session.execute(Statements.updateBlindOffsetTargetId)(tid, newObservationId).void
+                )
 
       private object Statements:
 
-        val addBlindOffset: Command[Program.Id *: Observation.Id *: Target.Id *: EmptyTuple] =
-          sql"""
-            INSERT INTO t_asterism_target (c_program_id, c_observation_id, c_target_id)
-            VALUES ($program_id, $observation_id, $target_id)
-            ON CONFLICT (c_program_id, c_observation_id, c_target_id) DO NOTHING
-          """.command
-
         val removeBlindOffset: Command[Observation.Id] =
           sql"""
-            DELETE FROM t_asterism_target
-            WHERE c_observation_id = $observation_id
-            AND c_target_id IN (
-              SELECT c_target_id FROM t_target
-              WHERE c_target_disposition = 'blind_offset'
-            )
+            DELETE FROM t_target t
+            USING t_observation o
+            WHERE o.c_observation_id = $observation_id
+              AND t.c_target_id = o.c_blind_offset_target_id
           """.command
 
-        val selectBlindOffset: Query[Observation.Id, Target.Id] =
+        val selectBlindOffset: Query[Observation.Id, Option[Target.Id]] =
           sql"""
-            SELECT a.c_target_id
-            FROM t_asterism_target a
-            JOIN t_target t ON a.c_target_id = t.c_target_id
-            WHERE a.c_observation_id = $observation_id
-            AND t.c_target_disposition = 'blind_offset'
-          """.query(target_id)
+            SELECT c_blind_offset_target_id
+            FROM t_observation
+            WHERE c_observation_id = $observation_id
+          """.query(target_id.opt)
 
-        val updateBlindOffsetFlag: Command[Boolean *: Observation.Id *: EmptyTuple] =
+        val updateBlindOffsetFields: Command[(Target.Id, Boolean, BlindOffsetType, Observation.Id)] =
           sql"""
             UPDATE t_observation
-            SET c_use_blind_offset = ${bool}
+            SET c_blind_offset_target_id = $target_id,
+                c_use_blind_offset = ${bool},
+                c_blind_offset_type = ${blind_offset_type}
             WHERE c_observation_id = $observation_id
           """.command
+
+        val updateBlindOffsetTargetId: Command[(Target.Id, Observation.Id)] =
+          sql"""
+            UPDATE t_observation
+            SET c_blind_offset_target_id = $target_id
+            WHERE c_observation_id = $observation_id
+          """.command
+            

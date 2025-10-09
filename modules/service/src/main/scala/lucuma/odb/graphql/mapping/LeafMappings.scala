@@ -48,6 +48,7 @@ import lucuma.core.util.CalculationState
 import lucuma.core.util.IdempotencyKey
 import lucuma.core.util.Timestamp
 import lucuma.odb.data.AtomExecutionState
+import lucuma.odb.data.BlindOffsetType
 import lucuma.odb.data.DatabaseOperation
 import lucuma.odb.data.EditType
 import lucuma.odb.data.ExecutionEventType
@@ -78,6 +79,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[Attachment.Id](AttachmentIdType),
       LeafMapping[AttachmentType](AttachmentTypeType),
       LeafMapping[BigDecimal](BigDecimalType),
+      LeafMapping[BlindOffsetType](BlindOffsetTypeType),
       LeafMapping[CalibrationRole](CalibrationRoleType),
       LeafMapping[CallForProposals.Id](CallForProposalsIdType),
       LeafMapping[CallForProposalsType](CallForProposalsTypeType),

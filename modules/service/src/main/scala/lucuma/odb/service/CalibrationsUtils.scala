@@ -21,6 +21,7 @@ import lucuma.core.model.Group
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
+import lucuma.odb.data.BlindOffsetType
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.graphql.input.ConstraintSetInput
@@ -163,7 +164,9 @@ trait CalibrationObservations {
               targetEnvironment = TargetEnvironmentInput.Create(
                 none,
                 List(tid).some,
-                none
+                none,
+                none,
+                BlindOffsetType.Manual
               ).some,
               constraintSet = roleConstraints(CalibrationRole.SpectroPhotometric).some,
               group = gid.some,
@@ -203,7 +206,9 @@ trait CalibrationObservations {
               targetEnvironment = TargetEnvironmentInput.Create(
                 none,
                 List(tid).some,
-                none
+                none,
+                none,
+                BlindOffsetType.Manual
               ).some,
               constraintSet = roleConstraints(CalibrationRole.Twilight).some,
               group = gid.some,

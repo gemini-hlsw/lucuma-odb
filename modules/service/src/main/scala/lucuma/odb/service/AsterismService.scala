@@ -117,7 +117,6 @@ object AsterismService {
         val enc = target_id.nel(targetIds)
         session.unique(Statements.containsBlindOffset(enc))(targetIds)
       
-
       override def insertAsterism(
         programId:      Program.Id,
         observationIds: NonEmptyList[Observation.Id],
@@ -271,17 +270,17 @@ object AsterismService {
       observationIds: NonEmptyList[Observation.Id],
       targetIds:      NonEmptyList[Target.Id]
     ): AppliedFragment =
-       void"DELETE FROM ONLY t_asterism_target "        |+|
-         void"WHERE " |+| programIdEqual(programId)     |+|
-         void" AND " |+| observationIdIn(observationIds) |+|
-         void" AND " |+| targetIdIn(targetIds)
+      void"DELETE FROM ONLY t_asterism_target a "       |+|
+        void"WHERE " |+| programIdEqual(programId)      |+|
+        void" AND " |+| observationIdIn(observationIds) |+|
+        void" AND " |+| targetIdIn(targetIds)
 
     def deleteAllLinks(
       programId:      Program.Id,
       observationIds: NonEmptyList[Observation.Id]
     ): AppliedFragment =
-      void"DELETE FROM ONLY t_asterism_target "         |+|
-        void"WHERE " |+| programIdEqual(programId)      |+|
+      void"DELETE FROM ONLY t_asterism_target a "        |+|
+        void"WHERE " |+| programIdEqual(programId)       |+|
         void" AND "  |+| observationIdIn(observationIds)
 
     // programs that aren't visible.
