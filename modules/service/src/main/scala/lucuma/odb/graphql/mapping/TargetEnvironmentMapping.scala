@@ -143,12 +143,12 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
     val readEnv: Env => Result[Timestamp] = _.getR[Timestamp](ObsTimeParam)
 
     val calculate: (Program.Id, Observation.Id, Timestamp) => F[Result[Option[Coordinates]]] =
-      (pid, oid, obsTime) =>
+      (_, oid, obsTime) =>
         services.use { implicit services =>
           Services.asSuperUser:
             services
               .trackingService
-              .getCoordinatesSnapshotOrRegion(pid, oid, obsTime)
+              .getCoordinatesSnapshotOrRegion(oid, obsTime)
               .map: res =>
                 res.map(_.left.toOption.map(_.base)) // treat region as None
         }

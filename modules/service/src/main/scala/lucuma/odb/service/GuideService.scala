@@ -322,7 +322,7 @@ object GuideService {
             af.fragment.query(Decoders.obsInfoDecoder)
           )
           .use(
-            _.option(af.argument).map(_.toResult(OdbError.InvalidObservation(oid).asProblem))
+            _.option(af.argument).map(_.toResult(OdbError.InvalidObservation(oid, Some(s"Could not compute observation info for $oid.")).asProblem))
           )
       }
 
@@ -382,7 +382,7 @@ object GuideService {
         session
           .prepareR(af.fragment.query(observation_id))
           .use(_.option(af.argument))
-          .map(_.fold(OdbError.InvalidObservation(oid).asFailure)(_.success))
+          .map(_.fold(OdbError.InvalidObservation(oid, Some(s"Failed to update guide target name for $oid.")).asFailure)(_.success))
 
       def getFromCacheOrEmpty(pid: Program.Id, oid: Observation.Id, newHash: Md5Hash)(
         using NoTransaction[F]
@@ -626,7 +626,7 @@ object GuideService {
       )(using SuperUserAccess): F[Result[ContiguousTimestampMap[List[Angle]]]] =
         val interval = TimestampInterval.between(neededPeriods.minimumBy(_.start).start, neededPeriods.maximumBy(_.end).end)
         (for {
-          tracking     <- ResultT(trackingService.getTrackingSnapshot(pid, obsInfo.id, interval).map(_.redeemFailure)) // treat failure as None
+          tracking     <- ResultT(trackingService.getTrackingSnapshot(obsInfo.id, interval).map(_.redeemFailure)) // treat failure as None
           candPeriod    = neededPeriods.tail.fold(neededPeriods.head)((a, b) => a.span(b))
           candidates   <- ResultT:
                            tracking match
@@ -762,7 +762,6 @@ object GuideService {
         name.toGaiaSourceId.toResult(generalError(s"Invalid guide star name `$name`").asProblem)
 
       def lookupGuideStar(
-        pid: Program.Id,
         oid: Observation.Id,
         oGuideStarName: Option[GuideStarName],
         obsInfo: ObservationInfo,
@@ -783,7 +782,7 @@ object GuideService {
                                .toResult(generalError("Visit end time out of range").asProblem)
                            )
 
-          tracking      <- ResultT(trackingService.getTrackingSnapshot(pid, oid, TimestampInterval.empty(obsTime) ))
+          tracking      <- ResultT(trackingService.getTrackingSnapshot(oid, TimestampInterval.empty(obsTime)))
           baseTracking     = tracking.base
           asterismTracking = tracking.asterism.map(_._2) // discard the target ids
 
@@ -841,7 +840,7 @@ object GuideService {
             scienceDuration <- ResultT.fromResult(genInfo.getScienceDuration(obsDuration, oid))
             scienceStart     = genInfo.getScienceStartTime(obsTime)
             oGSName          = obsInfo.validGuideStarName(genInfo.hash)
-            result          <- ResultT(lookupGuideStar(pid, oid, oGSName, obsInfo, genInfo, obsTime, obsDuration, scienceStart, scienceDuration))
+            result          <- ResultT(lookupGuideStar(oid, oGSName, obsInfo, genInfo, obsTime, obsDuration, scienceStart, scienceDuration))
           } yield result).value
 
       override def getGuideTargetName(pid: Program.Id, oid: Observation.Id)(
@@ -865,7 +864,7 @@ object GuideService {
           obsInfo       <- ResultT(getObservationInfo(oid))
           genInfo       <- ResultT(getGeneratorInfo(pid, oid))
 
-          tracking      <- ResultT(trackingService.getTrackingSnapshot(pid, oid, TimestampInterval.empty(obsTime)))
+          tracking      <- ResultT(trackingService.getTrackingSnapshot(oid, TimestampInterval.empty(obsTime)))
           baseTracking     = tracking.base // use explicit base if defined
           asterismTracking = tracking.asterism.map(_._2) // discard the target ids
 

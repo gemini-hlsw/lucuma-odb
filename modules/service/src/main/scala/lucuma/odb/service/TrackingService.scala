@@ -10,7 +10,6 @@ import cats.Monad
 import cats.syntax.all.*
 import lucuma.core.util.TimestampInterval
 import lucuma.core.util.Timestamp
-import lucuma.core.model.Program
 import lucuma.core.model.Observation
 import grackle.Result
 import lucuma.core.math.Coordinates
@@ -27,70 +26,65 @@ import lucuma.core.model.Target.Sidereal
 import lucuma.core.model.Target.Nonsidereal
 import cats.data.EitherT
 import lucuma.core.model.CompositeTracking
+import skunk.Query
+import skunk.syntax.all.*
+import lucuma.odb.util.Codecs.*
+import lucuma.odb.service.Services.Syntax.session
+import cats.effect.Concurrent
+import lucuma.core.model.ConstantTracking
 
 trait TrackingService[F[_]]:
   import TrackingService.Snapshot
 
   /**
-   * This is the batch version of `getTrackingSnapshotOrRegion`. Each passed key is guaranteed to
-   * exist in the yielded map.
+   * Yield a mapping from each value in `keys` to a result containig either a tracking snapshot
+   * or a pair containing the region and explicit base (if any) for observations containing opportunity
+   * targets; or a failure if tracking information is not available. Any returned snapshot is 
+   * guaranteed to be defined at all points on `interval`.
+   * 
+   * This is the most general method; all other methods on this interface are defined in terms of
+   * this operation.
    */
   def getTrackingSnapshotOrRegion(
-    keys: List[(Program.Id, Observation.Id)],
+    keys: List[Observation.Id],
     interval: TimestampInterval
-  ): F[Map[(Program.Id, Observation.Id), Result[Either[Snapshot[Tracking], Region]]]]
+  ): F[Map[Observation.Id, Result[Either[Snapshot[Tracking], (Region, Option[Coordinates])]]]]
 
   /**
-   * This is the batch version of `getCoordinatesSnapshotOrRegion`. Each passed key is guaranteed to
-   * exist in the yielded map.
+   * Convenience method that calls `getTrackingSnapshotOrRegion` over an interval around `t` and
+   * evaluates any computed tracking functions at that point.
    */
   def getCoordinatesSnapshotOrRegion(
-    keys: List[(Program.Id, Observation.Id)],
+    keys: List[Observation.Id],
     t: Timestamp
-  ): F[Map[(Program.Id, Observation.Id), Result[Either[Snapshot[Coordinates], Region]]]]
+  ): F[Map[Observation.Id, Result[Either[Snapshot[Coordinates], (Region, Option[Coordinates])]]]]
 
-  /**
-   * Yield the asterism's base tracking (an explicit base position, if defined, otherwise the centroid
-   * of the component targets), as well as the component tracking for each science targett;
-   * or the region if the asterism contains any opportunity targets. The returned ephemerides are 
-   * guaranteed to be defined over `interval` but may not be defined outside it. All other methods on
-   * this interface are defined in terms of this operation.
-   * 
-   * For nonsidereal targets that require ephemeris information from HORIZONS we always select at
-   * least one point outside `interval` on each end to guarantee that coordinates are known at 
-   * `interval`'s endpoints. For intervals shorter than 24h we select one point per hour, and for
-   * larger intervals we select one point per 12h. These points are aligned to UTC on the hour to
-   * facilitate caching.
-   * 
-   * This method will yield a failed result if the asterism is empty, if there are nonsidereal targets 
-   * and the site can't be determined, if an ephemeris can't be fetched due to a service error, or 
-   * if a user-defined ephemeris isn't defined for the specified interval.
-   */
+  /** Single-target version of `getCoordinatesSnapshotOrRegion`. */
   def getTrackingSnapshotOrRegion(
-    pid: Program.Id, 
     oid: Observation.Id, 
     interval: TimestampInterval
-  ): F[Result[Either[Snapshot[Tracking], Region]]] 
+  ): F[Result[Either[Snapshot[Tracking], (Region, Option[Coordinates])]]] 
 
+  /** 
+   * Convenience method that calls `getTrackingSnapshotOrRegion` that discards any resulting
+   * region and turns it into a failure.
+   */
   def getTrackingSnapshot(
-    pid: Program.Id, 
     oid: Observation.Id, 
     interval: TimestampInterval
   ): F[Result[Snapshot[Tracking]]] 
 
-
-  /**
-   * Equivalent to `getTrackingSnapshotOrRegion` when computed for an interval around `t` and evaluated
-   * at `t`.
-   */
+  /** Single-target version of `getCoordinatesSnapshotOrRegion`. */
   def getCoordinatesSnapshotOrRegion(
-    pid: Program.Id, 
     oid: Observation.Id, 
     t: Timestamp
-  ): F[Result[Either[Snapshot[Coordinates], Region]]] 
+  ): F[Result[Either[Snapshot[Coordinates], (Region, Option[Coordinates])]]] 
 
+  /** 
+   * Convenience method that calls `getCoordinatesSnapshotOrRegion` that discards any resulting
+   * region and turns it into a failure.
+   */
   def getCoordinatesSnapshot(
-    pid: Program.Id, 
     oid: Observation.Id, 
     t: Timestamp
   ): F[Result[Snapshot[Coordinates]]] 
@@ -101,7 +95,7 @@ trait TrackingService[F[_]]:
 object TrackingService:
 
   /** A snapshot of information (typically `Tracking` or `Coordinates`) for an observation's base position and asterism. */
-  case class Snapshot[+A](pid: Program.Id, oid: Observation.Id, base: A, asterism: NonEmptyList[(Target.Id, A)]):
+  case class Snapshot[+A](oid: Observation.Id, base: A, asterism: NonEmptyList[(Target.Id, A)]):
 
     /** If this is a tracking snapshot, evaluate it at a given time. */
     def at(t: Timestamp)(using A <:< Tracking): Result[Snapshot[Coordinates]] =
@@ -122,13 +116,13 @@ object TrackingService:
       override def foldRight[A, B](fa: Snapshot[A], lb: cats.Eval[B])(f: (A, Eval[B]) => Eval[B]): Eval[B] = (fa.base :: fa.asterism.map(_._2)).foldRight(lb)(f)
       override def traverse[G[_]: Applicative, A, B](fa: Snapshot[A])(f: A => G[B]): G[Snapshot[B]] = fa.traverse(f)
       
-  def instantiate[F[_]: Monad: Services]: TrackingService[F] =
+  def instantiate[F[_]: Monad: Concurrent: Services]: TrackingService[F] =
     new TrackingService:
         
       def getCoordinatesSnapshotOrRegion(
-        keys: List[(Program.Id, Observation.Id)],
+        keys: List[Observation.Id],
         t: Timestamp
-      ): F[Map[(Program.Id, Observation.Id), Result[Either[Snapshot[Coordinates], Region]]]] =
+      ): F[Map[Observation.Id, Result[Either[Snapshot[Coordinates], (Region, Option[Coordinates])]]]] =
         getTrackingSnapshotOrRegion(keys, TimestampInterval.empty(t))
           .map: resultMap =>
             resultMap
@@ -140,66 +134,73 @@ object TrackingService:
               .toMap
 
       def getTrackingSnapshotOrRegion(
-        pid: Program.Id, 
         oid: Observation.Id, 
         interval: TimestampInterval
-      ): F[Result[Either[Snapshot[Tracking], Region]]] =
-        val key = (pid, oid)
-        getTrackingSnapshotOrRegion(List(key), interval).map(_(key))
+      ): F[Result[Either[Snapshot[Tracking], (Region, Option[Coordinates])]]] =
+        getTrackingSnapshotOrRegion(List(oid), interval).map(_(oid))
       
       def getTrackingSnapshot(
-        pid: Program.Id, 
         oid: Observation.Id, 
         interval: TimestampInterval
       ): F[Result[Snapshot[Tracking]]] =
-        getTrackingSnapshotOrRegion(pid, oid, interval)
+        getTrackingSnapshotOrRegion(oid, interval)
           .map: res =>
             res.flatMap:
               case Left(t)  => Result.success(t)
               case Right(r) => OdbError.InvalidObservation(oid, Some(s"Tracking unavailable for $oid due to opportunity targets.")).asFailure
 
       def getCoordinatesSnapshotOrRegion(
-        pid: Program.Id, 
         oid: Observation.Id, 
         t: Timestamp
-      ): F[Result[Either[Snapshot[Coordinates], Region]]] =
-        val key = (pid, oid)
-        getCoordinatesSnapshotOrRegion(List(key), t).map(_(key))
+      ): F[Result[Either[Snapshot[Coordinates], (Region, Option[Coordinates])]]] =
+        getCoordinatesSnapshotOrRegion(List(oid), t).map(_(oid))
 
 
       def getCoordinatesSnapshot(
-        pid: Program.Id, 
         oid: Observation.Id, 
         t: Timestamp
       ): F[Result[Snapshot[Coordinates]]]  =
-        getCoordinatesSnapshotOrRegion(pid, oid, t)
+        getCoordinatesSnapshotOrRegion(oid, t)
           .map: res =>
             res.flatMap:
               case Left(t)  => Result.success(t)
               case Right(r) => OdbError.InvalidObservation(oid, Some(s"Tracking unavailable for $oid due to opportunity targets.")).asFailure
 
       def getTrackingSnapshotOrRegion(
-        keys: List[(Program.Id, Observation.Id)],
+        keys: List[Observation.Id],
         interval: TimestampInterval
-      ): F[Map[(Program.Id, Observation.Id), Result[Either[Snapshot[Tracking], Region]]]] =
-        asSuperUser: // hm
-          asterismService
-            .getAsterisms(keys.map(_._2)) // TODO: even though this is a bulk fetch it's still inefficient; we don't need all this information
-            .flatMap: asterismMap =>
-              keys
-                .traverse: 
-                  case key @ (pid, oid) => 
-                    asterismMap
-                      .get(oid)
-                      .fold(OdbError.InvalidObservation(oid).asFailureF): ts =>
-                        NonEmptyList.fromList(ts) match
-                          case None      => OdbError.InvalidObservation(oid, Some(s"No targets are defined for $oid.")).asFailureF
-                          case Some(nel) => mkTracking(pid, oid, nel)
-                      .map(key -> _)
-                .map(_.toMap)
+      ): F[Map[Observation.Id, Result[Either[Snapshot[Tracking], (Region, Option[Coordinates])]]]] =
+        getExplicitBaseCoordinates(keys).flatMap: explicitBases =>
+          asSuperUser: // hm
+            asterismService
+              .getAsterisms(keys) // TODO: even though this is a bulk fetch it's still inefficient; we don't need all this information
+              .flatMap: asterismMap =>
+                keys
+                  .traverse: 
+                    case oid => 
+                      asterismMap
+                        .get(oid)
+                        .fold(OdbError.InvalidObservation(oid, Some(s"No targets are defined for $oid.")).asFailureF): ts =>
+                          NonEmptyList.fromList(ts) match
+                            case None      => OdbError.InvalidObservation(oid, Some(s"No targets are defined for $oid.")).asFailureF
+                            case Some(nel) => mkTracking(oid, explicitBases.get(oid), nel)
+                        .map(oid -> _)
+                  .map(_.toMap)
+
+      private def getExplicitBaseCoordinates(oids: List[Observation.Id]): F[Map[Observation.Id, Coordinates]] =
+        NonEmptyList.fromList(oids.distinct) match
+          case None => Map.empty.pure[F]
+          case Some(nel) =>
+            session
+              .prepareR(Statements.selectExplicitBaseCoordinates(nel))
+              .use: pq =>
+                pq.stream(nel, 1024)
+                  .compile
+                  .toList
+                  .map(_.toMap)
 
       // Temporary, until we have ephimerides plumbed in
-      private def mkTracking(pid: Program.Id, oid: Observation.Id, asterism: NonEmptyList[(Target.Id, Target)]): F[Result[Either[Snapshot[Tracking], Region]]] =
+      private def mkTracking(oid: Observation.Id, explicitBase: Option[Coordinates], asterism: NonEmptyList[(Target.Id, Target)]): F[Result[Either[Snapshot[Tracking], (Region, Option[Coordinates])]]] =
         asterism
           .traverse: (tid, target) =>
             target match
@@ -208,7 +209,23 @@ object TrackingService:
               case Opportunity(_, region, _)   => EitherT(Result(Left(region)))
           .value
           .map:
-            case Left(r)   => Right(r)
-            case Right(ts) => Left(Snapshot(pid, oid, CompositeTracking(ts.map(_._2)), ts))
+            case Left(r)   => Right((r, explicitBase))
+            case Right(ts) => 
+              val base = explicitBase.fold(CompositeTracking(ts.map(_._2)))(ConstantTracking.apply)
+              Left(Snapshot(oid, base, ts))
           .pure[F]
 
+  object Statements:
+
+      def selectExplicitBaseCoordinates(oids: NonEmptyList[Observation.Id]): Query[oids.type, (Observation.Id, Coordinates)] =
+        sql"""
+          SELECT c_observation_id, c_explicit_ra, c_explicit_dec
+          FROM t_observation
+          WHERE c_observation_id IN (${observation_id.nel(oids)})
+          AND c_explicit_ra IS NOT NULL
+          AND c_explicit_dec IS NOT NULL
+        """
+          .query(observation_id *: right_ascension *: declination)
+          .map:
+            case (oid, ra, dec) => 
+              (oid, Coordinates(ra, dec))

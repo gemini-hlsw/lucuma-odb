@@ -131,7 +131,7 @@ case class ObservationValidationInfo(
   tpe:                ProgramType,
   oid:                Observation.Id,
   instrument:         Option[Instrument],
-  coordinates:        Option[Coordinates],  // coordinates at CFP midpoint, if any
+  coordinates:        Option[Coordinates],  // explicit base, or coordinates at CFP midpoint, if any
   explicitBase:       Option[Coordinates],
   role:               Option[CalibrationRole],
   userState:          Option[ObservationWorkflowService.UserState],
@@ -310,8 +310,8 @@ object ObservationWorkflowService {
             .values
             .groupBy(_.cfpMidpoint)
             .collect:
-              case (Some(k), v) => k -> v.toList.map(i => (i.pid, i.oid))
-            .toList // we now have a list of (Timestamp, List[(pid, oid)]) batches
+              case (Some(k), v) => k -> v.toList.map(_.oid)
+            .toList // we now have a list of (Timestamp, List[oid]) batches
             .foldLeftM(input): // fold over this list with `input` as the starting point, updating when we can find coordinates
               case (accum, (when, batch)) =>
                 trackingService
@@ -319,7 +319,8 @@ object ObservationWorkflowService {
                   .map: batchResults =>
                     batchResults
                       .collect:                        
-                        case ((pid, oid), Result.Success(Left(snap))) => oid -> snap.base // we only care about results where coordinates are known
+                        case (oid, Result.Success(Left(snap))) => oid -> snap.base // we only care about results where coordinates are known
+                        case (oid, Result.Success(Right(_, Some(eb)))) => oid -> eb
                       .foldLeft(accum): 
                         case (accum2, (oid, coords)) =>
                           accum2.updatedWith(oid): op =>
@@ -596,7 +597,7 @@ object ObservationWorkflowService {
           result.flatMap: map =>
             map.get(oid) match
               case Some(wf) => Result(wf)
-              case None     => OdbError.InvalidObservation(oid).asFailure
+              case None     => OdbError.InvalidObservation(oid, Some(s"Could not compute workflow for $oid.")).asFailure
 
       override def getCalculatedWorkflow(
         oid:  Observation.Id,
