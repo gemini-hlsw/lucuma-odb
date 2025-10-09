@@ -10,8 +10,6 @@ import grackle.Cursor
 import grackle.Query
 import grackle.Query.EffectHandler
 import grackle.Result
-import grackle.Result.Failure
-import grackle.Result.Warning
 import grackle.ResultT
 import io.circe.Json
 import io.circe.syntax.*
@@ -79,20 +77,16 @@ trait ConfigurationMapping[F[_]]
     new EffectHandler[F] {
 
       def calculate(pid: Program.Id, oid: Observation.Id, oRefTime: Option[Timestamp]): F[Result[Option[Either[Coordinates, Region]]]] =
-        services.use { implicit s =>
-          Services.asSuperUser:
-            s.guideService(gaiaClient, itcClient, commitHash, timeEstimateCalculator)
-              .getObjectTrackingOrRegion(pid, oid)
-              .map:
-                case Failure(problems) => Warning(problems, None) // turn failure into a warning                
-                case other => 
-                  other.map:
-                    case Right(r) => Some(Right(r))
-                    case Left(cs) =>
-                      oRefTime.flatMap: refTime =>                        
-                        cs.at(refTime.toInstant).map: aliased =>
-                          Left(aliased.value)
-        }
+        oRefTime
+          .traverse: at =>
+            services.use { implicit s =>
+              Services.asSuperUser:
+                s .trackingService
+                  .getCoordinatesSnapshotOrRegion(pid, oid, at)
+                  .map: res =>
+                    res.map(_.leftMap(_.base))
+              }
+          .map(_.sequence)          
 
       private def queryContext(queries: List[(Query, Cursor)]): Result[List[(Program.Id, Observation.Id, Option[Timestamp])]] =
         queries.parTraverse: (_, cursor) =>

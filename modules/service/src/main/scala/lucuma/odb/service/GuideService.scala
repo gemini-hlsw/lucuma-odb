@@ -33,18 +33,17 @@ import lucuma.core.geom.jts.interpreter.given
 import lucuma.core.math.Angle
 import lucuma.core.math.Coordinates
 import lucuma.core.math.Offset
-import lucuma.core.math.Region
 import lucuma.core.math.Wavelength
 import lucuma.core.model.AirMassBound
 import lucuma.core.model.ConstraintSet
 import lucuma.core.model.ElevationRange
 import lucuma.core.model.HourAngleBound
-import lucuma.core.model.ObjectTracking
 import lucuma.core.model.Observation
 import lucuma.core.model.PosAngleConstraint
 import lucuma.core.model.Program
 import lucuma.core.model.SiderealTracking
 import lucuma.core.model.Target
+import lucuma.core.model.Tracking
 import lucuma.core.model.User
 import lucuma.core.model.sequence.ExecutionDigest
 import lucuma.core.model.sequence.flamingos2.Flamingos2FpuMask
@@ -77,6 +76,7 @@ import natchez.Trace
 import skunk.*
 import skunk.data.Arr
 import skunk.implicits.*
+import lucuma.odb.syntax.result.*
 
 import java.security.MessageDigest
 import java.time.Duration
@@ -84,18 +84,11 @@ import java.time.temporal.ChronoUnit
 import scala.collection.immutable.SortedMap
 
 import Services.Syntax.*
+import scala.annotation.tailrec
 
 trait GuideService[F[_]] {
   import GuideService.AvailabilityPeriod
   import GuideService.GuideEnvironment
-
-  def getObjectTracking(pid: Program.Id, oid: Observation.Id)(using
-    NoTransaction[F], SuperUserAccess
-  ): F[Result[Option[ObjectTracking]]]
-
-  def getObjectTrackingOrRegion(pid: Program.Id, oid: Observation.Id)(using
-    NoTransaction[F], SuperUserAccess
-  ): F[Result[Either[ObjectTracking, Region]]]
 
   def getGuideEnvironments(pid: Program.Id, oid: Observation.Id, obsTime: Timestamp)(using
     NoTransaction[F], SuperUserAccess
@@ -124,7 +117,7 @@ trait GuideService[F[_]] {
 object GuideService {
   // if any science target or guide star candidate moves more than this many milliarcseconds,
   // we consider it to potentially invalidate the availability.
-  val invalidThreshold = 100.0
+  val invalidThreshold = Angle.milliarcseconds.reverseGet(100)
 
   // The longest availability period we will calculate.
   val maxAvailabilityPeriodDays = 200L
@@ -421,19 +414,19 @@ object GuideService {
         oid:             Observation.Id,
         start:           Timestamp,
         end:             Timestamp,
-        tracking:        ObjectTracking,
+        tracking:        Tracking,
         shapeConstraint: ShapeExpression,
         wavelength:      Wavelength,
         constraints:     ConstraintSet
       ): Result[ADQLQuery] =
-        (tracking.at(start.toInstant), tracking.at(end.toInstant))
+        (tracking(start.toInstant), tracking(end.toInstant))
           .mapN { (a, b) =>
             // If caching is implemented for the guide star results, `ags.widestConstraints` should be
             // used for the brightness constraints.
             val brightnessConstraints = gaiaBrightnessConstraints(constraints, GuideSpeed.Slow, wavelength)
             // Make a query based on two coordinates of the base of an asterism over a year
             CoordinatesRangeQueryByADQL(
-              NonEmptyList.of(a.value, b.value),
+              NonEmptyList.of(a, b),
               shapeConstraint,
               brightnessConstraints.some
             )
@@ -459,7 +452,7 @@ object GuideService {
         oid:         Observation.Id,
         start:       Timestamp,
         end:         Timestamp,
-        tracking:    ObjectTracking,
+        tracking:    Tracking,
         wavelength:  Wavelength,
         constraints: ConstraintSet
       ): F[Result[List[GuideStarCandidate]]] =
@@ -474,7 +467,7 @@ object GuideService {
         oid:         Observation.Id,
         start:       Timestamp,
         end:         Timestamp,
-        tracking:    ObjectTracking,
+        tracking:    Tracking,
         wavelength:  Wavelength,
         constraints: ConstraintSet
       ): F[Result[NonEmptyList[GuideStarCandidate]]] =
@@ -499,28 +492,60 @@ object GuideService {
           )
         }.value
 
-      extension (target: Target)
-        def invalidDate(startDate: Timestamp): Timestamp =
-          Target.siderealTracking.getOption(target).map(_.invalidDate(startDate)).getOrElse(Timestamp.Max)
+
+      extension (ts: Timestamp) def plusDaysTruncatedAndBounded(n: Int): Timestamp =
+        Timestamp.fromInstantTruncatedAndBounded(ts.toInstant.plus(n, ChronoUnit.DAYS))
+
+      /** 
+       * Find the first timestamp in `interval` for which the coordinates stray more than `invalidThreshold`
+       * from the origin (i.e., coordinates at `interval.start`), or `Timestamp.Max` if the target never
+       * exits the valid region. We only check once per day.
+       */
+      def findInvalidDate(tracking: Tracking, interval: TimestampInterval): Either[OdbError, Timestamp] = {
+
+        // Get the coords and handle failure in the expected form
+        def coordsAt(ts: Timestamp): Either[OdbError, Coordinates] =
+          tracking(ts.toInstant)
+            .toRight(generalError(s"Coordinates unavailable at ${interval.start.toInstant}."))
+
+        // Get the origin, if we can
+        coordsAt(interval.start).flatMap: origin =>
+
+          // Start at `ts` and see how far the target has moved, looping back if we need to keep checking.
+          @tailrec def go(ts: Timestamp): Either[OdbError, Timestamp] =
+            if ts >= interval.end then Right(Timestamp.Max)
+            else
+              // N.B. patten-match here to retain tailrec
+              coordsAt(ts) match
+                case Left(err) => Left(err)
+                case Right(coords) =>
+                  if origin.angularDistance(coords) > invalidThreshold then Right(ts)
+                  else 
+                    go(ts.plusDaysTruncatedAndBounded(1))
+          
+          // Start at the beginning
+          go(interval.start)
+
+      }        
 
       extension (sidereal: SiderealTracking)
         def masy: Double =
           sidereal.properMotion
             .map(pm => (pm.ra.masy.value.pow(2) + pm.dec.masy.value.pow(2)).toReal.sqrt.toDouble)
             .getOrElse(0.0)
+        /** Optimized version of `findInvalidDate` for sidereal tracking, which always succeeds. */
         def invalidDate(startDate: Timestamp): Timestamp = {
           val speed = masy
           if (speed === 0.0) Timestamp.Max
           else {
             // This is approximate, but so is the invalidThreshold...
             // These should always be big values (until nonsidereal), but if it is 0, we'd go infinite loop.
-            val daysTilInvalid = scala.math.max((invalidThreshold / speed * 365).intValue, 1)
-            Timestamp.fromInstantTruncated(startDate.toInstant.plus(daysTilInvalid, ChronoUnit.DAYS))
-              .getOrElse(Timestamp.Max)
+            val daysTilInvalid = scala.math.max((Angle.milliarcseconds.get(invalidThreshold).toDouble / speed * 365).intValue, 1)
+            startDate.plusDaysTruncatedAndBounded(daysTilInvalid)
           }
         }
 
-      // TODO: Can go away after `guideEnvironments` is removed???
+      // TODO: Can go away after `guideEnvironments` is removed
       extension (usables: List[AgsAnalysis.Usable])
         def toGuideEnvironments: List[GuideEnvironment] = usables.map(_.toGuideEnvironment)
 
@@ -549,7 +574,7 @@ object GuideService {
           off <- offsets.getOrElse(NonEmptyList.of(Offset.Zero))
         } yield AgsPosition(pa, off)
 
-      // TODO: Can go away after `guideEnvironments` is removed???
+      // TODO: Can go away after `guideEnvironments` is removed
       def processCandidates(
         obsInfo:       ObservationInfo,
         wavelength:    Wavelength,
@@ -599,20 +624,21 @@ object GuideService {
         currentAvail:    ContiguousTimestampMap[List[Angle]],
         newHash:         Md5Hash
       )(using SuperUserAccess): F[Result[ContiguousTimestampMap[List[Angle]]]] =
+        val interval = TimestampInterval.between(neededPeriods.minimumBy(_.start).start, neededPeriods.maximumBy(_.end).end)
         (for {
-          asterism     <- ResultT(getAsterism(pid, obsInfo.id))
-          tracking      = ObjectTracking.fromAsterism(asterism)
+          tracking     <- ResultT(trackingService.getTrackingSnapshot(pid, obsInfo.id, interval).map(_.redeemFailure)) // treat failure as None
           candPeriod    = neededPeriods.tail.fold(neededPeriods.head)((a, b) => a.span(b))
           candidates   <- ResultT:
                            tracking match
                               case None    => Result.success(Nil).pure[F]
-                              case Some(t) => getAllCandidates(obsInfo.id, candPeriod.start, candPeriod.end, t, genInfo.centralWavelength, obsInfo.constraints)
+                              case Some(t) => getAllCandidates(obsInfo.id, candPeriod.start, candPeriod.end, t.base, genInfo.centralWavelength, obsInfo.constraints)
           positions     = getPositions(obsInfo.availabilityAngles, genInfo.offsets)
           neededLists  <- ResultT.fromResult:
                             neededPeriods.traverse: p =>
                               tracking match
                                 case None => Result.success(ContiguousTimestampMap.empty[List[Angle]])
-                                case Some(t) => buildAvailabilityList(p, obsInfo, genInfo, genInfo.centralWavelength, asterism, t, candidates, positions)
+                                case Some(t) => 
+                                  buildAvailabilityList(p, obsInfo, genInfo, genInfo.centralWavelength, t.asterism.map(_._2), t.base, candidates, positions)
           availability <- ResultT.fromResult(
                             neededLists.foldLeft(currentAvail.some)((acc, ele) => acc.flatMap(_.union(ele)))
                               .toResult(generalError("Error creating guide availability").asProblem)
@@ -625,15 +651,15 @@ object GuideService {
         obsInfo:    ObservationInfo,
         genInfo:    GeneratorInfo,
         wavelength: Wavelength,
-        asterism:   NonEmptyList[Target],
-        tracking:   ObjectTracking,
+        asterismTracking:   NonEmptyList[Tracking],
+        baseTracking:   Tracking,
         candidates: List[GuideStarCandidate],
         positions:  NonEmptyList[AgsPosition]
       ): Result[ContiguousTimestampMap[List[Angle]]] = {
         @scala.annotation.tailrec
         def go(startTime: Timestamp, accum: ContiguousTimestampMap[List[Angle]]): Either[OdbError, ContiguousTimestampMap[List[Angle]]] = {
           val eap =
-            buildAvailabilityPeriod(startTime, period.end, obsInfo, genInfo, wavelength, asterism, tracking, candidates, positions)
+            buildAvailabilityPeriod(startTime, period.end, obsInfo, genInfo, wavelength, asterismTracking, baseTracking, candidates, positions)
           eap match
                       case Left(error)                      => error.asLeft
                       case Right(ap) if ap.period.end < period.end => go(ap.period.end, accum.unsafeAdd(ap.period, ap.posAngles))
@@ -652,27 +678,27 @@ object GuideService {
         obsInfo:    ObservationInfo,
         genInfo:    GeneratorInfo,
         wavelength: Wavelength,
-        asterism:   NonEmptyList[Target],
-        tracking:   ObjectTracking,
+        asterismTracking:   NonEmptyList[Tracking],
+        baseTracking:   Tracking,
         candidates: List[GuideStarCandidate],
         positions:  NonEmptyList[AgsPosition],
       ): Either[OdbError, AvailabilityPeriod] =
         for {
           baseCoords      <- obsInfo.explicitBase
-                               .orElse(
-                                 tracking
-                                   .at(start.toInstant)
-                                   .map(_.value)
-                               )
+                               .orElse(baseTracking(start.toInstant))
                                .toRight(
                                  generalError(s"Unable to get coordinates for asterism in observation ${obsInfo.id}")
                                )
-          scienceCoords   <- asterism.toList
-                               .traverse(t => ObjectTracking.fromTarget(t).flatMap(_.at(start.toInstant)).map(_.value))
+          scienceCoords   <- asterismTracking
+                               .traverse(_(start.toInstant))
                                .toRight(
-                                 generalError(s"Unable to get coordinates for science targets in observation ${obsInfo.id}")
+                                 generalError(s"Unable to get coordinates for all science targets in observation ${obsInfo.id}")
                                )
-          scienceCutoff    = asterism.map(_.invalidDate(start)).toList.min
+
+          scienceCutoff   <- asterismTracking
+                              .traverse(findInvalidDate(_, TimestampInterval.between(start, end)))
+                              .map(_.minimum)
+                              
           // we can stop testing candidates when all angles being tested have invalid dates that are farther
           // in the future than either the end time passed in, or a science candidate will be invalid
           endCutoff        = scienceCutoff.min(end)
@@ -684,7 +710,7 @@ object GuideService {
                                obsInfo.constraints,
                                wavelength,
                                baseCoords,
-                               scienceCoords,
+                               scienceCoords.toList,
                                obsInfo.availabilityAngles,
                                positions,
                                genInfo.agsParams
@@ -735,23 +761,6 @@ object GuideService {
       def guideStarIdFromName(name: GuideStarName): Result[Long] =
         name.toGaiaSourceId.toResult(generalError(s"Invalid guide star name `$name`").asProblem)
 
-      override def getObjectTracking(pid: Program.Id, oid: Observation.Id)(using
-        NoTransaction[F], SuperUserAccess
-      ): F[Result[Option[ObjectTracking]]] =
-        getObjectTrackingOrRegion(pid, oid).map(_.map(_.left.toOption))
-
-      override def getObjectTrackingOrRegion(pid: Program.Id, oid: Observation.Id)(using
-        NoTransaction[F], SuperUserAccess
-      ): F[Result[Either[ObjectTracking, Region]]] =
-        (for {
-          obsInfo       <- ResultT(getObservationInfo(oid))
-          asterism      <- ResultT(getAsterism(pid, oid))
-          baseTracking   =
-            obsInfo.explicitBase match
-              case Some(eb) => Left(ObjectTracking.constant(eb))
-              case None     => ObjectTracking.orRegionFromAsterism(asterism)
-        } yield baseTracking).value
-
       def lookupGuideStar(
         pid: Program.Id,
         oid: Observation.Id,
@@ -767,41 +776,39 @@ object GuideService {
         // than name), or the name wasn't set or wasn't valid and we need to find all the candidates and
         // select the best.
         (for {
-          asterism      <- ResultT(getAsterism(pid, oid))
-          baseTracking  <- ResultT.fromResult:
-                            obsInfo.explicitBase
-                              .map(ObjectTracking.constant)
-                              .orElse(ObjectTracking.fromAsterism(asterism))
-                              .fold(Result.failure(s"No tracking available for $oid")): t =>
-                                Result.success(t)
 
           visitEnd      <- ResultT.fromResult(
                              obsTime
                                .plusMicrosOption(obsDuration.toMicroseconds)
                                .toResult(generalError("Visit end time out of range").asProblem)
                            )
+
+          tracking      <- ResultT(trackingService.getTrackingSnapshot(pid, oid, TimestampInterval.empty(obsTime) ))
+          baseTracking     = tracking.base
+          asterismTracking = tracking.asterism.map(_._2) // discard the target ids
+
           candidates    <- ResultT(
                              oGuideStarName.fold(
                               getAllCandidatesNonEmpty(oid, obsTime, visitEnd, baseTracking, genInfo.centralWavelength, obsInfo.constraints)
                              )(gsn => getGuideStarFromGaia(gsn).map(_.map(NonEmptyList.one)))
                            ).map(_.map(_.at(obsTime.toInstant)))
           baseCoords    <- ResultT.fromResult(
-                             baseTracking.at(obsTime.toInstant).map(_.value)
+                             baseTracking(obsTime.toInstant)
                                .toResult(
                                  generalError(
                                    s"Unable to get coordinates for asterism in observation $oid"
                                  ).asProblem
                                )
                            )
-          scienceCoords <- ResultT.fromResult(
-                             asterism.toList
-                               .traverse(t => ObjectTracking.fromTarget(t).flatMap(_.at(obsTime.toInstant)).map(_.value))
+          scienceCoords <- ResultT.fromResult:
+                             asterismTracking.toList
+                               .traverse(_(obsTime.toInstant))
                                .toResult(
                                  generalError(
                                    s"Unable to get coordinates for science targets in observation $oid"
                                  ).asProblem
                                )
-                           )
+                           
           angles        <- ResultT.fromResult(
                              obsInfo.posAngleConstraint
                               .anglesToTestAt(genInfo.site, baseTracking, scienceTime.toInstant, scienceDuration.toDuration)
@@ -856,36 +863,37 @@ object GuideService {
       ): F[Result[List[GuideEnvironment]]] =
         (for {
           obsInfo       <- ResultT(getObservationInfo(oid))
-          asterism      <- ResultT(getAsterism(pid, oid))
           genInfo       <- ResultT(getGeneratorInfo(pid, oid))
-          baseTracking   = obsInfo.explicitBase.map(ObjectTracking.constant).orElse(ObjectTracking.fromAsterism(asterism))
+
+          tracking      <- ResultT(trackingService.getTrackingSnapshot(pid, oid, TimestampInterval.empty(obsTime)))
+          baseTracking     = tracking.base // use explicit base if defined
+          asterismTracking = tracking.asterism.map(_._2) // discard the target ids
+
           visitEnd      <- ResultT.fromResult(
                              obsTime
                                .plusMicrosOption(genInfo.timeEstimate.toMicroseconds)
                                .toResult(generalError("Visit end time out of range").asProblem)
                            )
-          candidates    <- ResultT(
-                            baseTracking match
-                              case None => Nil.success.pure[F]
-                              case Some(t) => getAllCandidates(oid, obsTime, visitEnd, t, genInfo.centralWavelength, obsInfo.constraints)
-                          ).map(_.map(_.at(obsTime.toInstant)))
+          candidates    <- ResultT(getAllCandidates(oid, obsTime, visitEnd, baseTracking, genInfo.centralWavelength, obsInfo.constraints))
+                            .map(_.map(_.at(obsTime.toInstant)))
           baseCoords    <- ResultT.fromResult(
-                             baseTracking.flatMap(_.at(obsTime.toInstant)).map(_.value)
+                             baseTracking(obsTime.toInstant)
                                .toResult(
                                  generalError(s"Unable to get coordinates for asterism in observation $oid").asProblem
                                )
                            )
           scienceCoords <- ResultT.fromResult(
-                             asterism.toList
-                               .traverse(t => ObjectTracking.fromTarget(t).flatMap(_.at(obsTime.toInstant)).map(_.value))
-                               .toResult(
-                                 generalError(s"Unable to get coordinates for science targets in observation $oid").asProblem
-                               )
+                            asterismTracking
+                              .toList
+                              .traverse(_(obsTime.toInstant))
+                              .toResult(
+                                generalError(s"Unable to get coordinates for science targets in observation $oid").asProblem
+                              )
                            )
           angles        <- ResultT.fromResult(
-                             baseTracking
-                              .flatMap: t =>
-                                obsInfo.posAngleConstraint.anglesToTestAt(genInfo.site, t, obsTime.toInstant, genInfo.timeEstimate.toDuration)
+                            obsInfo
+                              .posAngleConstraint
+                              .anglesToTestAt(genInfo.site, baseTracking, obsTime.toInstant, genInfo.timeEstimate.toDuration)
                               .toResult(generalError(s"No angles to test for guide target candidates for observation $oid.").asProblem)
                            )
           positions      = getPositions(angles, genInfo.offsets)
