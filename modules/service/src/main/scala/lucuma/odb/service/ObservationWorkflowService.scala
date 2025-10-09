@@ -51,6 +51,7 @@ import lucuma.odb.util.Codecs.*
 import skunk.*
 import skunk.codec.boolean.*
 import skunk.implicits.*
+import lucuma.core.util.Timestamp
 
 import java.time.Instant
 
@@ -131,8 +132,8 @@ case class ObservationValidationInfo(
   tpe:                ProgramType,
   oid:                Observation.Id,
   instrument:         Option[Instrument],
-  ra:                 Option[RightAscension],
-  dec:                Option[Declination],
+  coordinates:        Option[Coordinates],  // coordinates at CFP midpoint, if any
+  explicitBase:       Option[Coordinates],
   role:               Option[CalibrationRole],
   userState:          Option[ObservationWorkflowService.UserState],
   declaredComplete:   Boolean,
@@ -152,24 +153,20 @@ case class ObservationValidationInfo(
       s"Unexpected enum value for ProposalStatus: ${proposalStatus.value}"
     )
 
-  def explicitBase: Option[Coordinates] =
-    (ra, dec).mapN(Coordinates.apply)
-
-  def site: Set[Site] =
-    instrument.foldMap(_.site)
-
-  def coordinatesAt(when: Instant): Option[Coordinates] =
-    explicitBase.orElse:
-      for
-        ast <- NonEmptyList.fromList(asterism)
-        tracking  = Tracking.fromAsterism(ast)
-        coordsAt <- tracking.flatMap(_.at(when))
-      yield coordsAt
+  def site: Option[Site] =
+    instrument.flatMap(_.site.headOption) // TODO: fix this so there's never more than one instrument
 
   def isOpportunity: Boolean =
     asterism.exists:
       case t: Target.Opportunity => true
       case _ => false
+
+  lazy val cfpMidpoint: Option[Timestamp] =
+    for
+      s  <- site
+      c  <- cfpInfo
+      ts <- Timestamp.fromInstant(c.midpoint(s))
+    yield ts
 
 }
 
@@ -185,6 +182,7 @@ case class CfpInfo(
 
   def addInstrument(insts: Option[Instrument]): CfpInfo =
     insts.fold(this)(inst => copy(instruments = inst :: instruments))
+
 }
 
 
@@ -308,6 +306,26 @@ object ObservationWorkflowService {
                   input.map: (oid, info) =>
                     oid -> info.copy(programAllocations = result.get(info.pid))
 
+        def addCoordinates(input: Map[Observation.Id, ObservationValidationInfo]): F[Map[Observation.Id, ObservationValidationInfo]] =
+          input
+            .values
+            .groupBy(_.cfpMidpoint)
+            .collect:
+              case (Some(k), v) => k -> v.toList.map(i => (i.pid, i.oid))
+            .toList // we now have a list of (Timestamp, List[(pid, oid)]) batches
+            .foldLeftM(input): // fold over this list with `input` as the starting point, updating when we can find coordinates
+              case (accum, (when, batch)) =>
+                trackingService
+                  .getCoordinatesSnapshotOrRegion(batch, when)
+                  .map: batchResults =>
+                    batchResults
+                      .collect:                        
+                        case ((pid, oid), Result.Success(Left(snap))) => oid -> snap.base // we only care about results where coordinates are known
+                      .foldLeft(accum): 
+                        case (accum2, (oid, coords)) =>
+                          accum2.updatedWith(oid): op =>
+                            op.map(_.copy(coordinates = Some(coords)))
+
         NonEmptyList.fromList(oids) match
           case None      =>
             Map.empty.pure
@@ -317,6 +335,7 @@ object ObservationWorkflowService {
               .flatMap(addGeneratorParams)
               .flatMap(addCfpInfos)
               .flatMap(addProgramAllocations)
+              .flatMap(addCoordinates)
       }
 
       private def lookupCachedItcResults(
@@ -462,8 +481,8 @@ object ObservationWorkflowService {
 
         val cfpRaDecValidator: Validator = info =>
           info.cfpInfo.foldMap: cfp =>
-            info.site.headOption.foldMap: site =>
-              info.coordinatesAt(cfp.midpoint(site)).foldMap: coords =>
+            info.site.foldMap: site =>
+              info.coordinates.foldMap: coords =>
                 val ok = cfp.limits.siteLimits(site).inLimits(coords)
                 if ok then ObservationValidationMap.empty
                 else ObservationValidationMap.singleton(ObservationValidation.callForProposals(Messages.CoordinatesOutOfRange))
@@ -732,7 +751,7 @@ object ObservationWorkflowService {
       .query(program_id *: program_type *: observation_id *: instrument.opt *: right_ascension.opt *: declination.opt *: calibration_role.opt *: user_state.opt *: bool *: tag *: cfp_id.opt *: science_band.opt)
       .map:
         case (pid, tpe, oid, inst, ra, dec, cal, state, dc, tag, cfp, sci) =>
-          ObservationValidationInfo(pid, tpe, oid, inst, ra, dec, cal, state, dc, tag, cfp, sci, Nil)
+          ObservationValidationInfo(pid, tpe, oid, inst, None, (ra, dec).mapN(Coordinates.apply), cal, state, dc, tag, cfp, sci, Nil)
 
     def ProgramAllocations[A <: NonEmptyList[Program.Id]](enc: Encoder[A]): Query[A, (Program.Id, ScienceBand)] =
       sql"""
