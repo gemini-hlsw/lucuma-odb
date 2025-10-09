@@ -1,5 +1,8 @@
 -- Remove the CREATE OR REPLACE FUNCTION blindblind offsets from the t_asterism_target table and into the t_observation table
 
+CREATE TYPE e_blind_offset_type
+  AS ENUM('automatic', 'manual');
+
 --------------------------------------------------------
 -- Drop unnecessary triggers and functions
 --------------------------------------------------------
@@ -15,7 +18,7 @@ DROP FUNCTION IF EXISTS delete_move_blind_offset_when_use_flag_cleared() CASCADE
 -- Add columns to t_observation for blind offset target and populate from t_asterism_target.
 --------------------------------------------------------
 ALTER TABLE t_observation
-  ADD COLUMN c_explicit_blind_offset BOOLEAN NOT NULL DEFAULT FALSE,
+  ADD COLUMN c_blind_offset_type e_blind_offset_type NOT NULL DEFAULT 'manual' :: e_blind_offset_type,
   ADD COLUMN c_blind_offset_target_id d_target_id NULL,
   ADD FOREIGN KEY (c_blind_offset_target_id)
     REFERENCES t_target(c_target_id)
@@ -314,7 +317,7 @@ $$ LANGUAGE plpgsql;
 
 --------------------------------------------------------
 -- When a blind offset target is modified, invalidate obscalc and update the 
--- c_explicit_blind_offset flag on the observation
+-- c_blind_offset_type on the observation
 --------------------------------------------------------
 CREATE OR REPLACE FUNCTION blind_offset_target_update()
   RETURNS trigger AS $$
@@ -328,9 +331,9 @@ BEGIN
   IF FOUND THEN
     CALL invalidate_obscalc(obsid);
 
-    -- The blind offset is only edited by the user, which changes it to explicit
+    -- The blind offset is only edited by the user, which changes it to manual
     UPDATE t_observation
-    SET c_explicit_blind_offset = TRUE
+    SET c_blind_offset_type = 'manual' :: e_blind_offset_type
     WHERE c_observation_id = obsid;
 
     -- Notify the change
@@ -348,13 +351,13 @@ CREATE CONSTRAINT TRIGGER trg_blind_offset_target_update
 
 --------------------------------------------------------
 -- When a blind offset target is deleted, the FK constraint on t_observation will set the observation's
--- c_blind_offset_target_id to NULL. We also want to set c_explicit_blind_offset to FALSE
+-- c_blind_offset_target_id to NULL. We also want to set c_blind_offset_type to MANUAL
 --------------------------------------------------------
 CREATE OR REPLACE FUNCTION blind_offset_target_delete()
   RETURNS trigger AS $$
 BEGIN
   UPDATE t_observation
-    SET c_explicit_blind_offset = FALSE
+    SET c_blind_offset_type = 'manual' :: e_blind_offset_type
     WHERE c_blind_offset_target_id = OLD.c_target_id;
   RETURN OLD;
 END;

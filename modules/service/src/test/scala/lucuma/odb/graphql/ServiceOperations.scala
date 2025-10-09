@@ -20,6 +20,7 @@ import lucuma.core.model.SpectralDefinition
 import lucuma.core.model.Target
 import lucuma.core.model.UnnormalizedSED
 import lucuma.core.model.User
+import lucuma.odb.data.BlindOffsetType
 import lucuma.odb.data.Existence
 import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.input.SiderealInput
@@ -54,13 +55,13 @@ trait ServiceOperations { this: OdbSuite =>
       existence    = Existence.Present
     )
 
-  def defaultTargetEnvironmentInput4UpdateBlindoffset(name: String): TargetEnvironmentInput.Edit =
+  def defaultTargetEnvironmentInput4UpdateBlindoffset(name: String, blindOffsetType: BlindOffsetType): TargetEnvironmentInput.Edit =
     TargetEnvironmentInput.Edit(
       explicitBase = Nullable.Absent,
       asterism = Nullable.Absent,
       none,
       blindOffsetTarget = Nullable.NonNull(defaultCreateTargetInput(name)),
-      explicitBlindOffset = false
+      blindOffsetType = blindOffsetType
     )
 
   def createTargetViaServiceAs(
@@ -83,9 +84,10 @@ trait ServiceOperations { this: OdbSuite =>
     user: User,
     programId: Program.Id,
     observationId: Observation.Id,
-    name: String // must be non-empty
+    name: String, // must be non-empty
+    blindOffsetType: BlindOffsetType
   ): IO[Unit] =
-    val input = defaultTargetEnvironmentInput4UpdateBlindoffset(name)
+    val input = defaultTargetEnvironmentInput4UpdateBlindoffset(name, blindOffsetType)
     withServices(user): services =>
       Services.asSuperUser:
         services.session.transaction.use: xa =>

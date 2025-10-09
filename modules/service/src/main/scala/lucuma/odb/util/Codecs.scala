@@ -50,6 +50,7 @@ import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
 import lucuma.core.util.Uid
 import lucuma.odb.data.AtomExecutionState
+import lucuma.odb.data.BlindOffsetType
 import lucuma.odb.data.DatabaseOperation
 import lucuma.odb.data.EditType
 import lucuma.odb.data.EmailId
@@ -194,6 +195,9 @@ trait Codecs {
 
   val attachment_type: Codec[AttachmentType] =
     enumerated(Type("e_attachment_type"))
+
+  val blind_offset_type: Codec[BlindOffsetType] =
+    enumerated(Type("e_blind_offset_type"))
 
   val catalog_name: Codec[CatalogName] =
     enumerated(Type("e_catalog_name"))

@@ -431,6 +431,21 @@ type Bias implements StepConfig {
 }
 
 """
+Whether the blind offset target will be automatically calculated or not.
+"""
+enum BlindOffsetType {
+  """
+  The blind offset target will be automatically calculated.
+  """
+  AUTOMATIC
+
+  """
+  A blind offset has been explictly selected, or an automatically selected one was edited.
+  """
+  MANUAL
+}
+
+"""
 Stopping point in a series of steps
 """
 enum Breakpoint {
@@ -5327,11 +5342,10 @@ input TargetEnvironmentInput {
   blindOffsetTarget: TargetPropertiesInput
 
   """
-  When true, indicates that the default blind offset target has been replaced by an explicit target.
-  If it is false, the blind offset may be updated when the observation changes.
-  This property only has an affect if a `blindOffsetTarget` is provided.
+  The type of blind offset (automatic or manual) if a blind offset exists.
+  Default = Manual
   """
-  explicitBlindOffset: Boolean = true
+  blindOffsetType: BlindOffsetType
 }
 
 """
@@ -13855,10 +13869,9 @@ type TargetEnvironment {
   blindOffsetTarget: Target
 
   """
-  When true, indicates that the default blind offset target has been replaced by an explicit target.
-  If it is false, the blind offset may be updated when the observation changes.
+  The type of blind offset (automatic or manual) if a blind offset exists.
   """
-  explicitBlindOffset: Boolean!
+  blindOffsetType: BlindOffsetType!
 }
 
 type TargetEnvironmentGroup {

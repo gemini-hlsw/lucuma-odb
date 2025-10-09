@@ -75,7 +75,7 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
       SqlObject("explicitBase"),
       SqlField("useBlindOffset", ObservationView.UseBlindOffset),
       blindOffsetTargetObject("blindOffsetTarget"),
-      SqlField("explicitBlindOffset", ObservationView.ExplicitBlindOffset),
+      SqlField("blindOffsetType", ObservationView.BlindOffsetType),
       EffectField("basePosition", basePositionQueryHandler, List("id", "programId")),
       EffectField("guideEnvironments", guideEnvironmentsQueryHandler, List("id", "programId")),
       EffectField("guideEnvironment", guideEnvironmentQueryHandler, List("id", "programId")),

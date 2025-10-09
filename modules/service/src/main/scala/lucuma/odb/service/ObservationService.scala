@@ -317,11 +317,11 @@ object ObservationService {
             .flatMap: oid =>
               SET
                 .targetEnvironment
-                .flatMap(te => te.blindOffsetTarget.map((_, te.explicitBlindOffset)))
-                .traverse: (targetInput, isExplicit) =>
+                .flatMap(te => te.blindOffsetTarget.map((_, te.blindOffsetType)))
+                .traverse: (targetInput, blindOffsetType) =>
                   ResultT:
                     Services.asSuperUser:
-                      blindOffsetsService.createBlindOffset(pid, oid, targetInput, isExplicit)
+                      blindOffsetsService.createBlindOffset(pid, oid, targetInput, blindOffsetType)
                 .as(oid)
             .value
             .flatTap: r =>
@@ -1116,7 +1116,7 @@ object ObservationService {
           c_img_combined_filters,
           c_observer_notes,
           c_use_blind_offset,
-          c_explicit_blind_offset
+          c_blind_offset_type
         )
         SELECT
           c_program_id,
@@ -1160,7 +1160,7 @@ object ObservationService {
           c_img_combined_filters,
           c_observer_notes,
           c_use_blind_offset,
-          c_explicit_blind_offset
+          c_blind_offset_type
       FROM t_observation
       WHERE c_observation_id = $observation_id
       RETURNING c_observation_id

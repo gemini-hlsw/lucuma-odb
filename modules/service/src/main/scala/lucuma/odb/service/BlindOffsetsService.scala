@@ -11,6 +11,7 @@ import lucuma.core.enums.TargetDisposition
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
+import lucuma.odb.data.BlindOffsetType
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.Nullable.NonNull
 import lucuma.odb.graphql.input.CloneTargetInput
@@ -29,7 +30,7 @@ sealed trait BlindOffsetsService[F[_]]:
     programId: Program.Id,
     observationId: Observation.Id,
     input: TargetPropertiesInput.Create,
-    isExplicit: Boolean = true
+    blindOffsetType: BlindOffsetType = BlindOffsetType.Manual
   )(using Transaction[F], ServiceAccess): F[Result[Target.Id]]
 
   def removeBlindOffset(
@@ -63,7 +64,7 @@ object BlindOffsetsService:
         programId: Program.Id,
         observationId: Observation.Id,
         input: TargetPropertiesInput.Create,
-        isExplicit: Boolean = true
+        blindOffsetType: BlindOffsetType = BlindOffsetType.Manual
       )(using Transaction[F], ServiceAccess): F[Result[Target.Id]] =
         Services.asSuperUser:
           targetService.createTarget(
@@ -72,14 +73,14 @@ object BlindOffsetsService:
           ).flatMap: rTargetId =>
             rTargetId.traverse: targetId =>
               for {
-                _ <- session.execute(Statements.updateBlindOffsetFields)(targetId, true, isExplicit, observationId)
+                _ <- session.execute(Statements.updateBlindOffsetFields)(targetId, true, blindOffsetType, observationId)
               } yield targetId
 
       override def removeBlindOffset(
         observationId: Observation.Id
       )(using Transaction[F], ServiceAccess): F[Unit] =
         // This permanently deletes any existing blind offset target from the t_target table,
-        // database triggers set c_blind_offset_target_id to null and c_explicit_blind_offset to false
+        // database triggers set c_blind_offset_target_id to null and c_blind_offset_type to MANUAL
         session.execute(Statements.removeBlindOffset)(observationId).void
 
       override def getBlindOffset(
@@ -102,7 +103,7 @@ object BlindOffsetsService:
                 // Remove existi
                 _          <- removeBlindOffset(observationId)
                 // Then create the new one.
-                result     <- createBlindOffset(programId, observationId, targetInput, te.explicitBlindOffset)
+                result     <- createBlindOffset(programId, observationId, targetInput, te.blindOffsetType)
               } yield result.void
 
       override def cloneBlindOffset(
@@ -138,12 +139,12 @@ object BlindOffsetsService:
             WHERE c_observation_id = $observation_id
           """.query(target_id.opt)
 
-        val updateBlindOffsetFields: Command[(Target.Id, Boolean, Boolean, Observation.Id)] =
+        val updateBlindOffsetFields: Command[(Target.Id, Boolean, BlindOffsetType, Observation.Id)] =
           sql"""
             UPDATE t_observation
             SET c_blind_offset_target_id = $target_id,
                 c_use_blind_offset = ${bool},
-                c_explicit_blind_offset = ${bool}
+                c_blind_offset_type = ${blind_offset_type}
             WHERE c_observation_id = $observation_id
           """.command
 

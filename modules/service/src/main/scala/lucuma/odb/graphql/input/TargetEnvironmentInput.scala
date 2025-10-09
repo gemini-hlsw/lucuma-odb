@@ -6,6 +6,7 @@ package input
 
 import cats.syntax.parallel.*
 import lucuma.core.model.Target
+import lucuma.odb.data.BlindOffsetType
 import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.binding.*
 
@@ -18,7 +19,7 @@ object TargetEnvironmentInput:
     asterism:            Option[List[Target.Id]],
     useBlindOffset:      Option[Boolean],
     blindOffsetTarget:   Option[TargetPropertiesInput.Create],
-    explicitBlindOffset: Boolean
+    blindOffsetType:     BlindOffsetType
   ) extends TargetEnvironmentInput
   object Create:
     val Binding: Matcher[Create] =
@@ -28,8 +29,9 @@ object TargetEnvironmentInput:
           TargetIdBinding.List.Option("asterism", rAsterism),
           BooleanBinding.Option("useBlindOffset", rUseBlindOffset),
           TargetPropertiesInput.Binding.Option("blindOffsetTarget", rBlindOffsetTarget),
-          BooleanBinding("explicitBlindOffset", rExplicit)
-        ) => (rBase, rAsterism, rUseBlindOffset, rBlindOffsetTarget, rExplicit).parMapN(Create(_, _, _, _, _))
+          BlindOffsetTypeBinding.Option("blindOffsetType", rBlindOffsetType)
+        ) => (rBase, rAsterism, rUseBlindOffset, rBlindOffsetTarget, rBlindOffsetType)
+          .parMapN((b, a, u, t, o) => Create(b, a, u, t, o.getOrElse(BlindOffsetType.Manual)))
       }
 
 
@@ -38,7 +40,7 @@ object TargetEnvironmentInput:
     asterism:            Nullable[List[Target.Id]],
     useBlindOffset:      Option[Boolean],
     blindOffsetTarget:   Nullable[TargetPropertiesInput.Create],
-    explicitBlindOffset: Boolean
+    blindOffsetType:     BlindOffsetType
   ) extends TargetEnvironmentInput
 
   object Edit:
@@ -49,6 +51,7 @@ object TargetEnvironmentInput:
           TargetIdBinding.List.Nullable("asterism", rAsterism),
           BooleanBinding.Option("useBlindOffset", rUseBlindOffset),
           TargetPropertiesInput.Binding.Nullable("blindOffsetTarget", rBlindOffsetTarget),
-          BooleanBinding("explicitBlindOffset", rExplicit)
-        ) => (rBase, rAsterism, rUseBlindOffset, rBlindOffsetTarget, rExplicit).parMapN(Edit(_, _, _, _, _))
+          BlindOffsetTypeBinding.Option("blindOffsetType", rBlindOffsetType)
+        ) => (rBase, rAsterism, rUseBlindOffset, rBlindOffsetTarget, rBlindOffsetType)
+          .parMapN((b, a, u, t, o) => Edit(b, a, u, t, o.getOrElse(BlindOffsetType.Manual)))
       }

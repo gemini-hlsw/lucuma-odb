@@ -122,7 +122,7 @@ class cloneObservation extends OdbSuite {
         blindOffsetTarget {
           id
         }
-        explicitBlindOffset
+        blindOffsetType
       }
       $TimingWindowsGraph
     }
