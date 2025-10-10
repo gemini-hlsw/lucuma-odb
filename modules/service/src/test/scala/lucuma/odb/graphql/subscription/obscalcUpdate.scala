@@ -275,7 +275,7 @@ class obscalcUpdate extends ObscalcServiceSuiteSupport:
             "observationId" -> oid.asJson,
             "oldState" -> CalculationState.Pending.asJson,
             "newState" -> Json.Null,
-            "editType" -> EditType.DeletedCal.tag.toUpperCase.asJson,
+            "editType" -> EditType.HardDelete.tag.toUpperCase.asJson,
             "value" -> Json.Null
           )
         )

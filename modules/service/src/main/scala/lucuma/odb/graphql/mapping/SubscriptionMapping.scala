@@ -165,7 +165,7 @@ trait SubscriptionMapping[F[_]] extends Predicates[F] {
                     Select("value", a,
                       // This predicate needs to be down here
                       Filter(
-                        if e.editType === EditType.DeletedCal
+                        if e.editType === EditType.HardDelete
                         then Predicates.observation.id.isNull(true)
                         else Predicates.observation.id.eql(e.observationId),
                         c
@@ -200,7 +200,7 @@ trait SubscriptionMapping[F[_]] extends Predicates[F] {
                     Select("value", a,
                       // This predicate needs to be down here
                       Filter(
-                        if e.editType === EditType.DeletedCal
+                        if e.editType === EditType.HardDelete
                         then Predicates.observation.id.isNull(true) // always false; Predicate.False doesn't work
                         else Predicates.observation.id.eql(e.observationId),
                         c
@@ -236,7 +236,7 @@ trait SubscriptionMapping[F[_]] extends Predicates[F] {
                     Select("configurationRequest", a,
                       // This predicate needs to be down here
                       Filter(
-                        if e.editType === EditType.DeletedCal
+                        if e.editType === EditType.HardDelete
                         then Predicates.configurationRequest.id.isNull(true) // always false; Predicate.False doesn't work
                         else Predicates.configurationRequest.id.eql(e.configurationRequestId),
                         c
@@ -272,7 +272,7 @@ trait SubscriptionMapping[F[_]] extends Predicates[F] {
                     Select("value", a,
                       // This predicate needs to be down here
                       Filter(
-                        if e.editType === EditType.DeletedCal
+                        if e.editType === EditType.HardDelete
                         then Predicates.target.id.isNull(true) // always false; Predicate.False doesn't work
                         else Predicates.target.id.eql(e.targetId),
                         c

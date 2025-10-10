@@ -11,10 +11,10 @@ object EditType {
 
   case object Created    extends EditType("created")
   case object Updated    extends EditType("updated")
-  case object DeletedCal extends EditType("deleted_cal")
+  case object HardDelete extends EditType("hard_delete")
 
   implicit val EnumeratedUserType: Enumerated[EditType] =
-    Enumerated.from(Created, Updated, DeletedCal).withTag(_.tag)
+    Enumerated.from(Created, Updated, HardDelete).withTag(_.tag)
 
   /**
    * Map `TG_OP` to `EditType`.
@@ -24,7 +24,7 @@ object EditType {
     s match {
       case "INSERT" => Some(Created)
       case "UPDATE" => Some(Updated)
-      case "DELETE" => Some(DeletedCal)
+      case "DELETE" => Some(HardDelete)
       case _        => None
     }
 

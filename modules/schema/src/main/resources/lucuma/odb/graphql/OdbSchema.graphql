@@ -1142,9 +1142,9 @@ enum EditType {
   UPDATED
 
   """
-  EditType Deleted. Used for hard deletion of calibrations
+  EditType Deleted. Used for hard deletion of calibrations and blind offset targets
   """
-  DELETED_CAL
+  HARD_DELETE
 }
 
 """

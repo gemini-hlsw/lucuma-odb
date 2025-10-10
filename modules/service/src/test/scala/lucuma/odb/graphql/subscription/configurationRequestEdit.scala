@@ -181,7 +181,7 @@ class configurationRequestEdit extends OdbSuite with SubscriptionUtils with Obse
         json"""
           {
             "configurationRequestEdit" : {
-              "editType" : "DELETED_CAL",
+              "editType" : "HARD_DELETE",
               "configurationRequest" : null
             }
           }
