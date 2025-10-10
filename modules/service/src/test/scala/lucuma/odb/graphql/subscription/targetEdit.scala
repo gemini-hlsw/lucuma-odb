@@ -306,7 +306,7 @@ class targetEdit extends OdbSuite {
                   }""",
                 json"""{
                     "targetEdit": {
-                      "editType":"DELETED_CAL",
+                      "editType":"HARD_DELETE",
                       "targetId":${i.head.show},
                       "value": null
                     }
@@ -355,7 +355,7 @@ class targetEdit extends OdbSuite {
               }""",
             json"""{
                 "targetEdit": {
-                  "editType":"DELETED_CAL",
+                  "editType":"HARD_DELETE",
                   "targetId":${tid.asJson},
                   "value": null
                 }
