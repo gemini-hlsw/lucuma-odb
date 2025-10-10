@@ -13822,7 +13822,7 @@ type TargetEnvironment {
     The time used for the guide star calculations.
     """
     observationTime: Timestamp!
-  ): [GuideEnvironment!]!
+  ): [GuideEnvironment!]! @deprecated(reason: "use guideEnvironment instead")
 
   """
   The guide target(s) and related information.

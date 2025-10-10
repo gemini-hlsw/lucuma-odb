@@ -97,6 +97,7 @@ trait GuideService[F[_]] {
     NoTransaction[F], SuperUserAccess
   ): F[Result[Either[ObjectTracking, Region]]]
 
+  // deprecated - use getGuideEnvironment istead
   def getGuideEnvironments(pid: Program.Id, oid: Observation.Id, obsTime: Timestamp)(using
     NoTransaction[F], SuperUserAccess
   ): F[Result[List[GuideEnvironment]]]
@@ -108,9 +109,6 @@ trait GuideService[F[_]] {
   def getGuideAvailability(pid: Program.Id, oid: Observation.Id, period: TimestampInterval)(using
     NoTransaction[F], SuperUserAccess
   ): F[Result[List[AvailabilityPeriod]]]
-
-  // def setGuideTargetName(input: SetGuideTargetNameInput)(
-  //   using NoTransaction[F]): F[Result[Observation.Id]]
 
   def setGuideTargetName(
     checked: AccessControl.CheckedWithId[SetGuideTargetNameInput, Observation.Id]
@@ -850,7 +848,7 @@ object GuideService {
                         )
         } yield oGSName.map(_.toNonEmptyString)).value
 
-      // TODO: This can go away when Navigate is ready.
+      // deprecated - use getGuideEnvironment istead
       override def getGuideEnvironments(pid: Program.Id, oid: Observation.Id, obsTime: Timestamp)(
         using NoTransaction[F], SuperUserAccess
       ): F[Result[List[GuideEnvironment]]] =
