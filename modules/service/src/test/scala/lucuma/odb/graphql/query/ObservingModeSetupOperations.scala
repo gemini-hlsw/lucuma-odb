@@ -309,7 +309,7 @@ trait ObservingModeSetupOperations extends DatabaseOperations { this: OdbSuite =
       val prefix = s"[$tt]".padTo(13, ' ')
       val ops = name match
         case s: String => TestOptions(s"$prefix $name")
-        case o: TestOptions => o.withName(s"$prefix ${o.name}")          
+        case o: TestOptions => o.withName(s"$prefix ${o.name}")
       test(ops)(body(tt, fun))
 
   def createTargetWithProfileAs(
