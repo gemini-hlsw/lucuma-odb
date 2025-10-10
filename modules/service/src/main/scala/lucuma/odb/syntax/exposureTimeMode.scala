@@ -3,12 +3,20 @@
 
 package lucuma.odb.syntax
 
+import cats.Order.catsKernelOrderingForOrder
+import cats.syntax.functor.*
+import cats.syntax.option.*
 import eu.timepit.refined.types.numeric.PosInt
+import grackle.Problem
+import grackle.Result
 import lucuma.core.math.SignalToNoise
 import lucuma.core.math.Wavelength
 import lucuma.core.model.ExposureTimeMode
+import lucuma.core.model.Observation
 import lucuma.core.util.TimeSpan
 import lucuma.odb.data.ExposureTimeModeType
+import lucuma.odb.data.OdbError
+import lucuma.odb.data.OdbErrorExtensions.*
 
 trait ToExposureTimeModeOps:
 
@@ -42,5 +50,34 @@ trait ToExposureTimeModeOps:
         SignalToNoise.FromBigDecimalExact.getOption(10).get,
         at
       )
+
+    def forSingleScienceObservingModes(
+      observingModeName:   String,
+      explicitAcquisition: Option[ExposureTimeMode],
+      explicitScience:     Option[ExposureTimeMode],
+      newRequirement:      Option[ExposureTimeMode],
+      curRequirements:     Map[Observation.Id, ExposureTimeMode],
+      which:               List[Observation.Id]
+    ): Result[Map[Observation.Id, (ExposureTimeMode, ExposureTimeMode)]] =
+      val sci =
+        which
+          .fproduct: oid =>
+            explicitScience orElse newRequirement orElse curRequirements.get(oid)
+          .collect:
+            case (oid, Some(etm)) => oid -> etm
+          .toMap
+
+      val missing = which.toSet -- sci.keySet
+
+      def success: Map[Observation.Id, (ExposureTimeMode, ExposureTimeMode)] =
+        sci.fproductLeft: etm =>
+          explicitAcquisition.getOrElse(forAcquisition(etm.at))
+
+      def error: Problem =
+        val oids = missing.toList.sorted.mkString(", ")
+        val msg  = s"${observingModeName} requires a science exposure time mode.  Missing in observations: $oids"
+        OdbError.InvalidArgument(msg.some).asProblem
+
+      Result.fromOption(Option.when(missing.isEmpty)(success), error)
 
 object exposureTimeMode extends ToExposureTimeModeOps

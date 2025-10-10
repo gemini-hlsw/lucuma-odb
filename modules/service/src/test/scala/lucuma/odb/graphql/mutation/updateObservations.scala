@@ -1444,6 +1444,12 @@ class updateObservations extends OdbSuite
           centralWavelength: {
             nanometers: 234.56
           }
+          scienceExposureTimeMode: {
+            signalToNoise: {
+              value: 20.0
+              at: { nanometers: 234.56 }
+            }
+          }
         }
       }
     """
@@ -1573,6 +1579,12 @@ class updateObservations extends OdbSuite
           fpu: LONG_SLIT_0_25
           centralWavelength: {
             nanometers: 234.56
+          }
+          scienceExposureTimeMode: {
+            signalToNoise: {
+              value: 20.0
+              at: { nanometers: 234.56 }
+            }
           }
         }
       }
@@ -1731,6 +1743,12 @@ class updateObservations extends OdbSuite
           fpu: LONG_SLIT_0_25
           centralWavelength: {
             nanometers: 234.56
+          }
+          scienceExposureTimeMode: {
+            signalToNoise: {
+              value: 20.0
+              at: { nanometers: 234.56 }
+            }
           }
         }
       }
@@ -2104,6 +2122,12 @@ class updateObservations extends OdbSuite
           centralWavelength: {
             nanometers: 234.56
           }
+          scienceExposureTimeMode: {
+            signalToNoise: {
+              value: 20.0
+              at: { nanometers: 234.56 }
+            }
+          }
           explicitXBin: FOUR
           explicitYBin: FOUR
           explicitAmpReadMode: FAST
@@ -2318,6 +2342,12 @@ class updateObservations extends OdbSuite
           centralWavelength: {
             nanometers: 234.56
           }
+          scienceExposureTimeMode: {
+            signalToNoise: {
+              value: 20.0
+              at: { nanometers: 234.56 }
+            }
+          }
         }
       }
     """
@@ -2361,6 +2391,12 @@ class updateObservations extends OdbSuite
           fpu: LONG_SLIT_0_25
           centralWavelength: {
             nanometers: 234.56
+          }
+          scienceExposureTimeMode: {
+            signalToNoise: {
+              value: 20.0
+              at: { nanometers: 234.56 }
+            }
           }
         }
       }
@@ -2411,6 +2447,12 @@ class updateObservations extends OdbSuite
           centralWavelength: {
             nanometers: 234.56
           }
+          scienceExposureTimeMode: {
+            signalToNoise: {
+              value: 20.0
+              at: { nanometers: 234.56 }
+            }
+          }
         }
       }
     """
@@ -2450,6 +2492,12 @@ class updateObservations extends OdbSuite
           grating: R831_G5322
           filter: G_PRIME
           fpu: LONG_SLIT_0_25
+          scienceExposureTimeMode: {
+            signalToNoise: {
+              value: 20.0
+              at: { nanometers: 234.56 }
+            }
+          }
         }
       }
     """
@@ -2550,6 +2598,12 @@ class updateObservations extends OdbSuite
           fpu: LONG_SLIT_0_25
           centralWavelength: {
             nanometers: 234.56
+          }
+          scienceExposureTimeMode: {
+            signalToNoise: {
+              value: 20.0
+              at: { nanometers: 234.56 }
+            }
           }
         }
       }
@@ -3306,6 +3360,12 @@ class updateObservations extends OdbSuite
           fpu: LONG_SLIT_0_25
           centralWavelength: {
             nanometers: 500
+          }
+          scienceExposureTimeMode: {
+            signalToNoise: {
+              value: 20.0
+              at: { nanometers: 500.0 }
+            }
           }
         }
       }

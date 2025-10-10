@@ -50,7 +50,6 @@ import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.data.Tag
-import lucuma.odb.graphql.given
 import lucuma.odb.graphql.input.ConstraintSetInput
 import lucuma.odb.graphql.input.ElevationRangeInput
 import lucuma.odb.graphql.input.ImagingScienceRequirementsInput
@@ -236,45 +235,45 @@ object ObservationService {
         Trace[F].span("createObservation") {
           session.execute(sql"set constraints all deferred".command) >>
           session.prepareR(GroupService.Statements.OpenHole).use(_.unique(programId, SET.group, SET.groupIndex)).flatMap { ix =>
-            val oEtm = SET
-              .scienceRequirements
-              .flatMap(_.exposureTimeMode.toOption)
+            val oEtm = SET.scienceRequirements.flatMap(_.exposureTimeMode.toOption)
 
             Statements
               .insertObservation(programId, SET, ix)
-              .flatTraverse { af =>
-                session.prepareR(af.fragment.query(observation_id)).use { pq =>
-                  pq.unique(af.argument).map(Result.success)
-                }.flatMap { rOid =>
-                  val rOptF = SET.observingMode.traverse(m => observingModeServices.createFunction(m, oEtm))
-                  (rOid, rOptF).parMapN { (oid, optF) =>
-                    optF.fold(oid.pure[F]) { f => f(List(oid)).as(oid) }
-                  }.sequence
 
-                }
-              }.flatTap { rOid =>
+              .flatTraverse: af =>
+                session.prepareR(af.fragment.query(observation_id)).use: pq =>
+                  pq.unique(af.argument).map(Result.success)
+
+              .flatMap: rOid =>
+                rOid
+                  .flatTraverse: oid =>
+                    SET.observingMode.fold(oid.success.pure[F]): m =>
+                      observingModeServices
+                        .create(m, oEtm, List(oid))
+                        .map(_.as(oid))
+
+              .flatTap: rOid =>
                 (rOid.toOption, oEtm)
                   .tupled
-                  .traverse_ { (oid, etm) =>
+                  .traverse_ : (oid, etm) =>
                     services
                       .exposureTimeModeService
-                      .insertExposureTimeMode(oid, ExposureTimeModeRole.Requirement, etm)
-                  }
-              }.flatTap { rOid =>
-                rOid.flatTraverse { oid => Services.asSuperUser(setTimingWindows(List(oid), SET.timingWindows)) }
-              }.flatMap { rOid =>
-                SET.attachments.fold(rOid.pure[F]) { aids =>
-                  rOid.flatTraverse { oid =>
+                      .insertOne(oid, ExposureTimeModeRole.Requirement, etm)
+
+              .flatTap: rOid =>
+                rOid.flatTraverse: oid =>
+                  Services.asSuperUser(setTimingWindows(List(oid), SET.timingWindows))
+
+              .flatMap: rOid =>
+                SET.attachments.fold(rOid.pure[F]): aids =>
+                  rOid.flatTraverse: oid =>
                     obsAttachmentAssignmentService
                       .insertAssignments(programId, List(oid), aids)
                       .map(_.map(_ => oid))
-                  }
-                }
-              }
-          }.recoverWith {
+
+          }.recoverWith:
              case SqlState.CheckViolation(ex) =>
                OdbError.InvalidArgument(Some(constraintViolationMessage(ex))).asFailureF
-          }
         }
 
       // This will fully delete a calibration observation
@@ -361,6 +360,7 @@ object ObservationService {
       private def updateObservingModes(
         nEdit: Nullable[ObservingModeInput.Edit],
         oids:  NonEmptyList[Observation.Id],
+        etm:   Option[ExposureTimeMode]
       )(using Transaction[F], SuperUserAccess): F[Result[Unit]] =
 
         nEdit.toOptionOption.fold(Result.unit.pure[F]) { oEdit =>
@@ -368,6 +368,7 @@ object ObservationService {
             m <- selectObservingModes(oids.toList)
             _ <- updateObservingModeType(oEdit.flatMap(_.observingModeType), oids)
             r <- m.toList.traverse { case (existingMode, matchingOids) =>
+
               (existingMode, oEdit) match {
                 case (Some(ex), Some(edit)) if edit.observingModeType.contains(ex) =>
                   // update existing
@@ -379,12 +380,12 @@ object ObservationService {
                     _ <- observingModeServices.deleteFunction(ex)(matchingOids)
 
                     // create new
-                    r <- observingModeServices.createViaUpdateFunction(edit).traverse(_(matchingOids))
+                    r <- observingModeServices.createViaUpdate(edit, etm, matchingOids)
                   } yield r
 
                 case (None,    Some(edit)) =>
                   // create new
-                  observingModeServices.createViaUpdateFunction(edit).traverse(_(matchingOids))
+                  observingModeServices.createViaUpdate(edit, etm, matchingOids)
 
                 case (Some(ex), None) =>
                   // delete existing
@@ -432,21 +433,18 @@ object ObservationService {
                 g  = r.groupMap(_._1)(_._2)                                        // grouped:   Map[Program.Id, List[Observation.Id]]
                 u  = g.values.reduceOption(_ ++ _).flatMap(NonEmptyList.fromList)  // ungrouped: NonEmptyList[Observation.Id]
 
-                e  = SET
-                       .scienceRequirements
-                       .map(_.exposureTimeMode)
-                       .getOrElse(Nullable.Absent)
+                e  = SET.scienceRequirements.map(_.exposureTimeMode).getOrElse(Nullable.Absent)
 
                 _ <- ResultT.liftF:
                        u.fold(().pure[F]): u =>
                          e.fold(
-                           services.exposureTimeModeService.deleteExposureTimeModes(u, ExposureTimeModeRole.Requirement.some),
+                           services.exposureTimeModeService.delete(u, ExposureTimeModeRole.Requirement.some),
                            ().pure[F],
-                           e => services.exposureTimeModeService.updateExposureTimeModes(u, ExposureTimeModeRole.Requirement, e)
+                           e => services.exposureTimeModeService.updateMany(u, ExposureTimeModeRole.Requirement, e)
                          )
 
                 _ <- validateBand(g.keys.toList)
-                _ <- ResultT(u.map(u => Services.asSuperUser(updateObservingModes(SET.observingMode, u))).getOrElse(Result.unit.pure[F]))
+                _ <- ResultT(u.map(u => Services.asSuperUser(updateObservingModes(SET.observingMode, u, e.toOption))).getOrElse(Result.unit.pure[F]))
                 _ <- ResultT(Services.asSuperUser(setTimingWindows(u.foldMap(_.toList), SET.timingWindows.foldPresent(_.orEmpty))))
                 _ <- ResultT(g.toList.traverse { case (pid, oids) =>
                       obsAttachmentAssignmentService.setAssignments(pid, oids, SET.attachments)
@@ -521,7 +519,7 @@ object ObservationService {
                 val cloneRelatedItems =
                   Services.asSuperUser:
                     asterismService.cloneAsterism(observationId, oid2) >>
-                    exposureTimeModeService.cloneExposureTimeModes(observationId, oid2) >>
+                    exposureTimeModeService.clone(observationId, oid2) >>
                     observingMode.traverse(observingModeServices.cloneFunction(_)(observationId, oid2)) >>
                     timingWindowService.cloneTimingWindows(observationId, oid2) >>
                     obsAttachmentAssignmentService.cloneAssignments(observationId, oid2)

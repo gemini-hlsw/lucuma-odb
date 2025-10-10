@@ -7,6 +7,8 @@ import cats.Applicative
 import cats.data.NonEmptyList
 import cats.effect.Concurrent
 import cats.syntax.all.*
+import grackle.Result
+import grackle.ResultT
 import lucuma.core.enums.GmosAmpGain
 import lucuma.core.enums.GmosAmpReadMode
 import lucuma.core.enums.GmosNorthFilter
@@ -22,12 +24,10 @@ import lucuma.core.math.Wavelength
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.Observation
 import lucuma.odb.data.ExposureTimeModeRole
-import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.input.GmosLongSlitInput
 import lucuma.odb.sequence.gmos.longslit.Config.Common
 import lucuma.odb.sequence.gmos.longslit.Config.GmosNorth
 import lucuma.odb.sequence.gmos.longslit.Config.GmosSouth
-import lucuma.odb.syntax.exposureTimeMode.*
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.GmosCodecs.*
 import skunk.*
@@ -47,12 +47,16 @@ trait GmosLongSlitService[F[_]] {
   ): F[Map[Observation.Id, GmosSouth]]
 
   def insertNorth(
-    input: GmosLongSlitInput.Create.North
-  )(which: List[Observation.Id])(using Transaction[F]): F[Unit]
+    input:  GmosLongSlitInput.Create.North,
+    reqEtm: Option[ExposureTimeMode],
+    which:  List[Observation.Id]
+  )(using Transaction[F]): F[Result[Unit]]
 
   def insertSouth(
-    input: GmosLongSlitInput.Create.South
-  )(which: List[Observation.Id])(using Transaction[F]): F[Unit]
+    input:  GmosLongSlitInput.Create.South,
+    reqEtm: Option[ExposureTimeMode],
+    which:  List[Observation.Id]
+  )(using Transaction[F]): F[Result[Unit]]
 
   def deleteNorth(which: List[Observation.Id])(using Transaction[F]): F[Unit]
 
@@ -153,38 +157,38 @@ object GmosLongSlitService {
         select(which, Statements.selectGmosSouthLongSlit, south).map(_.toMap)
 
       private def insertExposureTimeModes(
+        name:   String,
         common: GmosLongSlitInput.Create.Common,
+        req:    Option[ExposureTimeMode],
         which:  List[Observation.Id]
-      )(using Transaction[F]): F[Unit] =
-
-        val sci = common.sciExposureTimeMode
-        val acq = common.acqExposureTimeMode.orElse(sci.map(etm => ExposureTimeMode.forAcquisition(etm.at)))
-
-        def insert(etm: Option[ExposureTimeMode], role: ExposureTimeModeRole): F[Unit] =
-          etm.traverse_ : etm =>
-            which.traverse_ : oid =>
-              services.exposureTimeModeService.insertExposureTimeMode(oid, role, etm)
-
-        for
-          _ <- insert(acq, ExposureTimeModeRole.Acquisition)
-          _ <- insert(sci, ExposureTimeModeRole.Science)
-        yield ()
+      )(using Transaction[F]): F[Result[Unit]] =
+        exposureTimeModeService.insertForSingleScienceEtm(
+          name,
+          common.acqExposureTimeMode,
+          common.sciExposureTimeMode,
+          req,
+          which
+        )
 
       override def insertNorth(
         input: GmosLongSlitInput.Create.North,
-      )(which: List[Observation.Id])(using Transaction[F]): F[Unit] =
-        for
-          _ <- insertExposureTimeModes(input.common, which)
-          _ <- which.traverse { oid => session.exec(Statements.insertGmosNorthLongSlit(oid, input)) }.void
-        yield ()
+        req:   Option[ExposureTimeMode],
+        which: List[Observation.Id]
+      )(using Transaction[F]): F[Result[Unit]] =
+        (for
+          _ <- ResultT(insertExposureTimeModes("GMOS North Long Slit", input.common, req, which))
+          _ <- ResultT.liftF(which.traverse { oid => session.exec(Statements.insertGmosNorthLongSlit(oid, input)) }.void)
+        yield ()).value
 
       override def insertSouth(
         input: GmosLongSlitInput.Create.South,
-      )(which: List[Observation.Id])(using Transaction[F]): F[Unit] =
-        for
-          _ <- insertExposureTimeModes(input.common, which)
-          _ <- which.traverse { oid => session.exec(Statements.insertGmosSouthLongSlit(oid, input)) }.void
-        yield ()
+        req:   Option[ExposureTimeMode],
+        which: List[Observation.Id]
+      )(using Transaction[F]): F[Result[Unit]] =
+        (for
+          _ <- ResultT(insertExposureTimeModes("GMOS South Long Slit", input.common, req, which))
+          _ <- ResultT.liftF(which.traverse { oid => session.exec(Statements.insertGmosSouthLongSlit(oid, input)) }.void)
+        yield ()).value
 
       private def deleteExposureTimeModes(
         which: List[Observation.Id]
@@ -194,7 +198,7 @@ object GmosLongSlitService {
           .traverse_ : nel =>
             List(ExposureTimeModeRole.Acquisition, ExposureTimeModeRole.Science)
               .traverse_ : role =>
-                services.exposureTimeModeService.deleteExposureTimeModes(nel, role.some)
+                services.exposureTimeModeService.delete(nel, role.some)
 
       override def deleteNorth(which: List[Observation.Id])(using Transaction[F]): F[Unit] =
         for
@@ -213,13 +217,10 @@ object GmosLongSlitService {
         which:  List[Observation.Id]
       )(using Transaction[F]): F[Unit] =
 
-        def update(etm: Nullable[ExposureTimeMode], role: ExposureTimeModeRole): F[Unit] =
+        def update(etm: Option[ExposureTimeMode], role: ExposureTimeModeRole): F[Unit] =
           NonEmptyList.fromList(which).traverse_ : nel =>
-            etm.fold(
-              services.exposureTimeModeService.deleteExposureTimeModes(nel, role.some),
-              ().pure[F],
-              e => services.exposureTimeModeService.updateExposureTimeModes(nel, role, e)
-            )
+            etm.fold(().pure[F]): e =>
+              services.exposureTimeModeService.updateMany(nel, role, e)
 
         for
           _ <- update(common.acqExposureTimeMode, ExposureTimeModeRole.Acquisition)

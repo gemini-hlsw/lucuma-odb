@@ -8,8 +8,11 @@ import cats.data.NonEmptyList
 import cats.effect.Concurrent
 import cats.effect.MonadCancelThrow
 import cats.syntax.all.*
+import grackle.Result
+import grackle.syntax.*
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosSouthFilter
+import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.Observation
 import lucuma.odb.format.spatialOffsets.*
 import lucuma.odb.graphql.input.GmosImagingInput
@@ -33,12 +36,16 @@ sealed trait GmosImagingService[F[_]] {
   ): F[Map[Observation.Id, Config.GmosSouth]]
 
   def insertNorth(
-    input: GmosImagingInput.Create.North
-  )(which: List[Observation.Id])(using Transaction[F]): F[Unit]
+    input:  GmosImagingInput.Create.North,
+    reqEtm: Option[ExposureTimeMode],
+    which:  List[Observation.Id]
+  )(using Transaction[F]): F[Result[Unit]]
 
   def insertSouth(
-    input: GmosImagingInput.Create.South
-  )(which: List[Observation.Id])(using Transaction[F]): F[Unit]
+    input:  GmosImagingInput.Create.South,
+    reqEtm: Option[ExposureTimeMode],
+    which:  List[Observation.Id]
+  )(using Transaction[F]): F[Result[Unit]]
 
   def deleteNorth(
     which: List[Observation.Id]
@@ -129,14 +136,22 @@ object GmosImagingService {
         select(which, Statements.selectGmosSouthImaging, south).map(_.toMap)
 
       override def insertNorth(
-        input: GmosImagingInput.Create.North
-      )(which: List[Observation.Id])(using Transaction[F]): F[Unit] =
-        session.exec(Statements.insertGmosNorthImaging(which, input))
+        input:  GmosImagingInput.Create.North,
+        reqEtm: Option[ExposureTimeMode],
+        which:  List[Observation.Id]
+      )(using Transaction[F]): F[Result[Unit]] =
+        session
+          .exec(Statements.insertGmosNorthImaging(which, input))
+          .map(_.success)
 
       override def insertSouth(
-        input: GmosImagingInput.Create.South
-      )(which: List[Observation.Id])(using Transaction[F]): F[Unit] =
-        session.exec(Statements.insertGmosSouthImaging(which, input))
+        input:  GmosImagingInput.Create.South,
+        reqEtm: Option[ExposureTimeMode],
+        which:  List[Observation.Id]
+      )(using Transaction[F]): F[Result[Unit]] =
+        session
+          .exec(Statements.insertGmosSouthImaging(which, input))
+          .map(_.success)
 
       override def deleteNorth(
         which: List[Observation.Id]

@@ -6,6 +6,8 @@ package lucuma.odb.service
 import cats.data.NonEmptyList
 import cats.effect.Concurrent
 import cats.syntax.all.*
+import grackle.Result
+import grackle.syntax.*
 import io.circe.Json
 import io.circe.syntax.*
 import lucuma.core.enums.Flamingos2Decker
@@ -15,6 +17,7 @@ import lucuma.core.enums.Flamingos2Fpu
 import lucuma.core.enums.Flamingos2ReadMode
 import lucuma.core.enums.Flamingos2ReadoutMode
 import lucuma.core.enums.Flamingos2Reads
+import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.Observation
 import lucuma.core.model.TelluricType
 import lucuma.odb.format.spatialOffsets.*
@@ -35,9 +38,11 @@ trait Flamingos2LongSlitService[F[_]]:
     which: List[Observation.Id]
   ): F[Map[Observation.Id, Config]]
 
-  def insert(input: Flamingos2LongSlitInput.Create)(
-    which: List[Observation.Id]
-  )(using Transaction[F]): F[Unit]
+  def insert(
+    input:  Flamingos2LongSlitInput.Create,
+    reqEtm: Option[ExposureTimeMode],
+    which:  List[Observation.Id]
+  )(using Transaction[F]): F[Result[Unit]]
 
   def delete(which: List[Observation.Id])(using Transaction[F]): F[Unit]
 
@@ -83,9 +88,16 @@ object Flamingos2LongSlitService:
           .map(_.toMap)
 
       override def insert(
-        input: Flamingos2LongSlitInput.Create,
-      )(which: List[Observation.Id])(using Transaction[F]): F[Unit] =
-        which.traverse { oid => session.exec(Statements.insertF2LongSlit(oid, input)) }.void
+        input:  Flamingos2LongSlitInput.Create,
+        reqEtm: Option[ExposureTimeMode],
+        which:  List[Observation.Id]
+      )(using Transaction[F]): F[Result[Unit]] =
+        which
+          .traverse: oid =>
+            session.exec(Statements.insertF2LongSlit(oid, input))
+          .void
+          .map(_.success)
+
 
       def delete(which: List[Observation.Id] )(using Transaction[F]): F[Unit] =
         Statements.deleteF2(which).fold(F.unit)(session.exec)

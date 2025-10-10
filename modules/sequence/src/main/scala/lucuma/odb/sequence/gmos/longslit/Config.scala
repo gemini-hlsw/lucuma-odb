@@ -48,15 +48,16 @@ sealed trait Config[G: Enumerated, L: Enumerated, U: Enumerated] extends Product
 
   def coverage: WavelengthDelta
 
-  def acqExposureTimeMode: ExposureTimeMode
-
-  def sciExposureTimeMode: ExposureTimeMode
-
   def filter: Option[L]
 
   def fpu: U
 
   def centralWavelength: Wavelength
+
+
+  def acquisitionExposureTimeMode: ExposureTimeMode
+
+  def scienceExposureTimeMode: ExposureTimeMode
 
 
   def xBin: GmosXBinning =
@@ -150,26 +151,26 @@ sealed trait Config[G: Enumerated, L: Enumerated, U: Enumerated] extends Product
     import lucuma.odb.sequence.util.HashBytes.*
 
     Array.concat(
-      acqExposureTimeMode.hashBytes,
-      sciExposureTimeMode.hashBytes,
+      acquisitionExposureTimeMode.hashBytes,
+      scienceExposureTimeMode.hashBytes,
       bao.toByteArray
     )
 
 object Config:
 
   final case class Common(
-    centralWavelength:         Wavelength,
-    acqExposureTimeMode:       ExposureTimeMode,
-    sciExposureTimeMode:       ExposureTimeMode,
-    defaultXBin:               GmosXBinning,
-    explicitXBin:              Option[GmosXBinning],
-    defaultYBin:               GmosYBinning,
-    explicitYBin:              Option[GmosYBinning],
-    explicitAmpReadMode:       Option[GmosAmpReadMode],
-    explicitAmpGain:           Option[GmosAmpGain],
-    explicitRoi:               Option[GmosRoi],
-    explicitWavelengthDithers: Option[List[WavelengthDither]],
-    explicitSpatialOffsets:    Option[List[Q]]
+    centralWavelength:           Wavelength,
+    acquisitionExposureTimeMode: ExposureTimeMode,
+    scienceExposureTimeMode:     ExposureTimeMode,
+    defaultXBin:                 GmosXBinning,
+    explicitXBin:                Option[GmosXBinning],
+    defaultYBin:                 GmosYBinning,
+    explicitYBin:                Option[GmosYBinning],
+    explicitAmpReadMode:         Option[GmosAmpReadMode],
+    explicitAmpGain:             Option[GmosAmpGain],
+    explicitRoi:                 Option[GmosRoi],
+    explicitWavelengthDithers:   Option[List[WavelengthDither]],
+    explicitSpatialOffsets:      Option[List[Q]]
   )
 
   object Common:
@@ -178,8 +179,8 @@ object Config:
       Eq.by: a =>
         (
           a.centralWavelength,
-          a.acqExposureTimeMode,
-          a.sciExposureTimeMode,
+          a.acquisitionExposureTimeMode,
+          a.scienceExposureTimeMode,
           a.defaultXBin,
           a.explicitXBin,
           a.defaultYBin,
@@ -204,11 +205,11 @@ object Config:
     override def centralWavelength: Wavelength =
       common.centralWavelength
 
-    override def acqExposureTimeMode: ExposureTimeMode =
-      common.acqExposureTimeMode
+    override def acquisitionExposureTimeMode: ExposureTimeMode =
+      common.acquisitionExposureTimeMode
 
-    override def sciExposureTimeMode: ExposureTimeMode =
-      common.sciExposureTimeMode
+    override def scienceExposureTimeMode: ExposureTimeMode =
+      common.scienceExposureTimeMode
 
     override def defaultXBin: GmosXBinning =
       common.defaultXBin
@@ -264,11 +265,11 @@ object Config:
     override def centralWavelength: Wavelength =
       common.centralWavelength
 
-    override def acqExposureTimeMode: ExposureTimeMode =
-      common.acqExposureTimeMode
+    override def acquisitionExposureTimeMode: ExposureTimeMode =
+      common.acquisitionExposureTimeMode
 
-    override def sciExposureTimeMode: ExposureTimeMode =
-      common.sciExposureTimeMode
+    override def scienceExposureTimeMode: ExposureTimeMode =
+      common.scienceExposureTimeMode
 
     override def defaultXBin: GmosXBinning =
       common.defaultXBin

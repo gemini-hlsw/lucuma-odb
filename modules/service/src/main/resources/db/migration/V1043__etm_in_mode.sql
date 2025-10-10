@@ -72,6 +72,96 @@ ALTER TABLE t_observation
   DROP COLUMN c_etm_exp_time,
   DROP COLUMN c_etm_exp_count;
 
+-- Migrate the existing long slit observing mode tables to have acquisition and
+-- science ETMs based on a default (for acq) and the requirement ETM (for sci).
+DO $$
+DECLARE
+  mode TEXT[];
+  modes CONSTANT TEXT[][] := ARRAY[
+    ['Flamingos2 Long Slit',
+     't_flamingos_2_long_slit',
+     'f.c_wavelength',
+     'LEFT JOIN t_f2_filter f ON f.c_tag = m.c_filter'
+    ],
+    ['GMOS North Long Slit',
+     't_gmos_north_long_slit',
+     'm.c_central_wavelength',
+     ''
+    ],
+    ['GMOS South Long Slit',
+     't_gmos_south_long_slit',
+     'm.c_central_wavelength',
+     ''
+    ]
+  ];
+BEGIN
+  FOREACH mode SLICE 1 IN ARRAY modes
+  LOOP
+    RAISE NOTICE 'Converting mode %', mode[1];
+
+    -- Copy requirement ETM into science ETM for every observation with this
+    -- observing mode.
+    EXECUTE format($sql$
+      INSERT INTO t_exposure_time_mode (
+        c_observation_id,
+        c_role,
+        c_exposure_time_mode,
+        c_signal_to_noise,
+        c_signal_to_noise_at,
+        c_exposure_time,
+        c_exposure_count
+      )
+      SELECT
+        m.c_observation_id,
+        'science'::e_exposure_time_mode_role,
+        e.c_exposure_time_mode,
+        e.c_signal_to_noise,
+        e.c_signal_to_noise_at,
+        e.c_exposure_time,
+        e.c_exposure_count
+      FROM %I m
+      LEFT JOIN t_exposure_time_mode e
+        ON e.c_observation_id = m.c_observation_id
+       AND e.c_role = 'requirement';
+    $sql$, mode[2]);
+
+    -- Remove entries without a corresponding science ETM.  A science ETM is
+    -- going to be assumed/required.
+    EXECUTE format($sql$
+      DELETE FROM %I m
+      WHERE NOT EXISTS (
+        SELECT 1
+        FROM t_exposure_time_mode e
+        WHERE e.c_observation_id = m.c_observation_id
+        AND e.c_role = 'science'
+      );
+    $sql$, mode[2]);
+
+    -- Add an acquisition ETM for every remaining mode
+    EXECUTE format($sql$
+      INSERT INTO t_exposure_time_mode (
+        c_observation_id,
+        c_role,
+        c_exposure_time_mode,
+        c_signal_to_noise,
+        c_signal_to_noise_at,
+        c_exposure_time,
+        c_exposure_count
+      )
+      SELECT
+        c_observation_id,
+        'acquisition'::e_exposure_time_mode_role,
+        'signal_to_noise'::e_exp_time_mode,
+        10::numeric(11,3),
+        %s,
+        NULL,
+        NULL
+      FROM %I m
+      %s;
+    $sql$, mode[3], mode[2], mode[4]);
+  END LOOP;
+END $$;
+
 -- We need a view on the exposure time mode for the embedded s/n, t&c.
 CREATE VIEW v_exposure_time_mode AS
   SELECT e.*,
@@ -94,16 +184,7 @@ CREATE VIEW v_observation AS
   CASE WHEN o.c_observation_duration     IS NOT NULL THEN o.c_observation_id END AS c_observation_duration_id,
   CASE WHEN o.c_science_mode = 'imaging'::d_tag      THEN o.c_observation_id END AS c_imaging_mode_id,
   CASE WHEN o.c_science_mode = 'spectroscopy'::d_tag THEN o.c_observation_id END AS c_spectroscopy_mode_id,
-  c.c_active_start::timestamp + (c.c_active_end::timestamp - c.c_active_start::timestamp) * 0.5 AS c_reference_time,
-
-  -- Include blind offset target from asterism
-  (SELECT a.c_target_id
-    FROM t_asterism_target a
-    JOIN t_target t ON a.c_target_id = t.c_target_id
-    WHERE a.c_observation_id = o.c_observation_id
-    AND t.c_target_disposition = 'blind_offset'
-    LIMIT 1) AS c_blind_offset_target_id
-
+  c.c_active_start::timestamp + (c.c_active_end::timestamp - c.c_active_start::timestamp) * 0.5 AS c_reference_time
   FROM t_observation o
   LEFT JOIN t_proposal p on p.c_program_id = o.c_program_id
   LEFT JOIN t_cfp c on p.c_cfp_id = c.c_cfp_id
@@ -134,17 +215,19 @@ SELECT
   o.c_science_band,
   o.c_declared_complete,
   o.c_acq_reset_time,
+  o.c_blind_offset_target_id,
+  b.c_sid_rv AS c_blind_rv,
+  b.c_source_profile AS c_blind_source_profile,
   t.c_target_id,
   t.c_sid_rv,
-  t.c_source_profile,
-  t.c_target_disposition
+  t.c_source_profile
 FROM
   t_observation o
+LEFT JOIN t_target b ON c_target_id = o.c_blind_offset_target_id
 LEFT JOIN LATERAL (
   SELECT t.c_target_id,
          t.c_sid_rv,
-         t.c_source_profile,
-         t.c_target_disposition
+         t.c_source_profile
     FROM t_asterism_target a
     INNER JOIN t_target t
       ON a.c_target_id = t.c_target_id
@@ -157,7 +240,6 @@ LEFT JOIN t_exposure_time_mode e
 ORDER BY
   o.c_observation_id,
   t.c_target_id;
-
 
 -- Update the signal-to-noise type to match the exposure time mode
 ALTER TABLE t_obscalc

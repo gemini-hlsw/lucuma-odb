@@ -30,9 +30,9 @@ class CalibrationMatchersSuite extends ScalaCheckSuite:
       filter = GmosNorthFilter.GPrime.some,
       fpu = GmosNorthFpu.LongSlit_1_00,
       common = Config.Common(
-        centralWavelength   = w,
-        acqExposureTimeMode = e,
-        sciExposureTimeMode = e,
+        centralWavelength = w,
+        acquisitionExposureTimeMode = e,
+        scienceExposureTimeMode = e,
         defaultXBin = GmosXBinning.One,
         explicitXBin = None,
         defaultYBin = GmosYBinning.One,

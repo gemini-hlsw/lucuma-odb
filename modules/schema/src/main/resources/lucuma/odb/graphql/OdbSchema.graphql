@@ -8677,9 +8677,15 @@ type GmosNorthLongSlit {
   """
   centralWavelength: Wavelength!
 
-  acquisitionExposureTimeMode: ExposureTimeMode
+  """
+  The exposure time mode used for ITC lookup for the acquisition sequence.
+  """
+  acquisitionExposureTimeMode: ExposureTimeMode!
 
-  scienceExposureTimeMode: ExposureTimeMode
+  """
+  The exposure time mode used for ITC lookup for the science sequence.
+  """
+  scienceExposureTimeMode: ExposureTimeMode!
 
   """
   GMOS X-Binning, either explicitly specified in explicitXBin or else taken
@@ -9281,9 +9287,15 @@ type GmosSouthLongSlit {
   """
   centralWavelength: Wavelength!
 
-  acquisitionExposureTimeMode: ExposureTimeMode
+  """
+  The exposure time mode used for ITC lookup for the acquisition sequence.
+  """
+  acquisitionExposureTimeMode: ExposureTimeMode!
 
-  scienceExposureTimeMode: ExposureTimeMode
+  """
+  The exposure time mode used for ITC lookup for the science sequence.
+  """
+  scienceExposureTimeMode: ExposureTimeMode!
 
   """
   GMOS X-Binning, either explicitly specified in explicitXBin or else taken
