@@ -11711,27 +11711,6 @@ type Query {
     targetId: TargetId!
   ): Target
 
-  # Target environment for the given observation (or environment id)
-  # targetEnvironment(
-  #   # Observation ID
-  #   observationId: ObservationId!
-  # ): TargetEnvironment
-
-  # Observations grouped by common target environment
-  # targetEnvironmentGroup(
-  #   # Program ID
-  #   programId: ProgramId!
-
-  #   # Filters the selection of observations.
-  #   WHERE: WhereObservation
-
-  #   # Limits the result to at most this number of matches (but never more than 1000).
-  #   LIMIT: NonNegInt
-
-  #   # Set to true to include deleted values
-  #   includeDeleted: Boolean! = false
-  # ): TargetEnvironmentGroupSelectResult!
-
   """
   Observations grouped by commonly held targets. Identify the program by
   specifying only one of programId, programReference, or proposalReference. If
@@ -13872,53 +13851,6 @@ type TargetEnvironment {
   The type of blind offset (automatic or manual) if a blind offset exists.
   """
   blindOffsetType: BlindOffsetType!
-}
-
-type TargetEnvironmentGroup {
-  """
-  IDs of observations that use the same constraints
-  """
-  observationIds: [ObservationId!]!
-
-  """
-  Observations associated with the common value
-  """
-  observations(
-    """
-    Set to true to include deleted values
-    """
-    includeDeleted: Boolean! = false
-
-    """
-    Starts the result set at (or after if not existent) the given observation id.
-    """
-    OFFSET: ObservationId
-
-    """
-    Limits the result to at most this number of matches (but never more than 1000).
-    """
-    LIMIT: NonNegInt
-  ): ObservationSelectResult!
-
-  """
-  Commonly held value across the observations
-  """
-  targetEnvironment: TargetEnvironment!
-}
-
-"""
-The matching targetEnvironmentGroup results, limited to a maximum of 1000 entries.
-"""
-type TargetEnvironmentGroupSelectResult {
-  """
-  Matching targetEnvironmentGroups up to the return size limit of 1000
-  """
-  matches: [TargetEnvironmentGroup!]!
-
-  """
-  `true` when there were additional matches that were not returned.
-  """
-  hasMore: Boolean!
 }
 
 type TargetGroup {
