@@ -82,7 +82,6 @@ import lucuma.odb.json.offset.transport.given
 import lucuma.odb.json.stepconfig.given
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.util.CommitHash
-import lucuma.odb.service.CalibrationsService
 import lucuma.odb.service.EmailService
 import lucuma.odb.service.Services
 import lucuma.odb.service.Services.Syntax.*
@@ -977,7 +976,7 @@ trait DatabaseOperations { this: OdbSuite =>
       val obsId = obs.downField("id").require[Observation.Id]
       val targetId = obs.downField("targetEnvironment").downField("blindOffsetTarget").downField("id").require[Target.Id]
       (obsId, targetId)
-      
+
     }
 
   def resetAcquisitionAs(user: User, oid: Observation.Id): IO[Unit] =
@@ -2351,10 +2350,14 @@ trait DatabaseOperations { this: OdbSuite =>
       .use(_.prepareR(command).use(_.execute(system, id).void))
   }
 
-  def setObservationCalibratioRole(oid: Observation.Id, role: Option[CalibrationRole]): IO[Unit] = {
+  def setObservationCalibrationRole(oids: List[Observation.Id], role: CalibrationRole): IO[Unit] =
+    val af = void"UPDATE t_observation " |+|
+      sql"SET c_calibration_role = $calibration_role "(role) |+|
+      void"WHERE c_observation_id IN (" |+|
+        oids.map(sql"$observation_id").intercalate(void", ") |+| void")"
+
     FMain.databasePoolResource[IO](databaseConfig).flatten
-      .use(_.prepareR(CalibrationsService.Statements.SetCalibrationRole).use(_.execute(oid, role).void))
-  }
+      .use(_.prepareR(af.fragment.command).use(_.execute(af.argument).void))
 
   def cloneGroupAs(user: User, gid: Group.Id): IO[Group.Id] =
     query(

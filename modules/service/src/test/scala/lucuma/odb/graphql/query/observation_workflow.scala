@@ -322,7 +322,7 @@ class observation_workflow
           )
         ).asRight
       )
-  }    
+  }
 
   test("missing target info, invalid instrument"):
     val setup: IO[Observation.Id] =
@@ -789,7 +789,7 @@ class observation_workflow
       for
         pid <- createProgramAs(pi)
         oid <- createObservationAs(pi, pid) // is missing target
-        _   <- setObservationCalibratioRole(oid, CalibrationRole.SpectroPhotometric.some)
+        _   <- setObservationCalibrationRole(List(oid), CalibrationRole.SpectroPhotometric)
         _   <- runObscalcUpdateAs(serviceUser, pid, oid)
       yield oid
 
@@ -869,19 +869,19 @@ class observation_workflow
         expected = workflowQueryResult(
           CalculatedValue(
             CalculationState.Ready,
-            ObservationWorkflow(          
+            ObservationWorkflow(
               ObservationWorkflowState.Defined,
               tt match
                 case TargetType.Sidereal    => List(ObservationWorkflowState.Inactive, ObservationWorkflowState.Ready)
                 case TargetType.Nonsidereal => ???
-                case TargetType.Opportunity => List(ObservationWorkflowState.Inactive)             
+                case TargetType.Opportunity => List(ObservationWorkflowState.Inactive)
               ,
               Nil
             )
           ),
           CalculatedValue(
             CalculationState.Ready,
-            ObservationWorkflow(          
+            ObservationWorkflow(
               ObservationWorkflowState.Undefined,
               List(ObservationWorkflowState.Inactive),
               List(
@@ -894,7 +894,7 @@ class observation_workflow
           )
         ).asRight
       )
-  
+
   }
 
 
@@ -926,7 +926,7 @@ class observation_workflow
               tt match
                 case TargetType.Sidereal    => List(ObservationWorkflowState.Inactive, ObservationWorkflowState.Ready)
                 case TargetType.Nonsidereal => ???
-                case TargetType.Opportunity => List(ObservationWorkflowState.Inactive)             
+                case TargetType.Opportunity => List(ObservationWorkflowState.Inactive)
               ,
               Nil
             )

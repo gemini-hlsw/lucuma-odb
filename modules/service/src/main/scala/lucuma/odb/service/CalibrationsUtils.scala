@@ -254,7 +254,9 @@ trait CalibrationObservations {
             targetEnvironment = TargetEnvironmentInput.Create(
               none,
               List(tid).some,
-              none
+              none,
+              none,
+              BlindOffsetType.Automatic,
             ).some,
             constraintSet = roleConstraints(CalibrationRole.Telluric).some,
             group = gid.some,

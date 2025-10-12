@@ -51,7 +51,7 @@ import java.time.LocalDateTime
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 
-class calibrations extends OdbSuite with SubscriptionUtils with ExecutionQuerySetupOperations {
+class perConfigCalibrations extends OdbSuite with SubscriptionUtils with ExecutionQuerySetupOperations {
   val pi       = TestUsers.Standard.pi(1, 101)
   val service  = TestUsers.service(3)
 

@@ -3,12 +3,10 @@
 
 package lucuma.odb.service
 
-import cats.Order.catsKernelOrderingForOrder
 import cats.data.Nested
 import cats.data.NonEmptyList
 import cats.effect.MonadCancelThrow
 import cats.syntax.all.*
-import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.string.NonEmptyString
 import grackle.Result
 import lucuma.core.enums.CalibrationRole
@@ -40,8 +38,6 @@ import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.util.Codecs.*
 import lucuma.refined.*
 import org.http4s.client.Client
-import skunk.AppliedFragment
-import skunk.Command
 import skunk.Query
 import skunk.Transaction
 import skunk.codec.numeric.int8
@@ -51,11 +47,6 @@ import skunk.syntax.all.*
 import java.time.Instant
 
 trait CalibrationsService[F[_]] {
-  def setCalibrationRole(
-    oid:  Observation.Id,
-    role: Option[CalibrationRole]
-  )(using Transaction[F], ServiceAccess): F[Unit]
-
   /**
     * Recalculates the calibrations for a program
     *
@@ -122,12 +113,6 @@ object CalibrationsService extends CalibrationObservations {
   def instantiate[F[_]: MonadCancelThrow](emailConfig: Config.Email, httpClient: Client[F])(using Services[F]): CalibrationsService[F] =
     new CalibrationsService[F] {
 
-      override def setCalibrationRole(
-        oid:  Observation.Id,
-        role: Option[CalibrationRole]
-      )(using Transaction[F], ServiceAccess): F[Unit] =
-        session.execute(Statements.SetCalibrationRole)(oid, role).void
-
       private def collectValid(
         requiresItcInputs: Boolean
       ): PartialFunction[(Observation.Id, Either[GeneratorParamsService.Error, GeneratorParams]), ObsExtract[ObservingMode]] =
@@ -170,7 +155,7 @@ object CalibrationsService extends CalibrationObservations {
             .map(targetCoordinates(referenceInstant))
 
       def recalculateCalibrations(pid: Program.Id, referenceInstant: Instant)(using Transaction[F], ServiceAccess): F[(List[Observation.Id], List[Observation.Id])] =
-        val sharedService = SharedCalibrationsService.instantiate(emailConfig, httpClient)
+        val sharedService = PerConfigCalibrationsService.instantiate(emailConfig, httpClient)
         val perObsService = PerObsCalibrationsService.instantiate(emailConfig, httpClient)
 
         for
@@ -249,19 +234,6 @@ object CalibrationsService extends CalibrationObservations {
     }
 
   object Statements {
-
-    val SetCalibrationRole: Command[(Observation.Id, Option[CalibrationRole])] =
-      sql"""
-        UPDATE t_observation
-        SET c_calibration_role = ${calibration_role.opt}
-        WHERE c_observation_id = $observation_id
-      """.command.contramap((a, b) => (b, a))
-
-    def setCalibRole(oids: List[Observation.Id], role: CalibrationRole): AppliedFragment =
-      void"UPDATE t_observation " |+|
-        sql"SET c_calibration_role = $calibration_role "(role) |+|
-        void"WHERE c_observation_id IN (" |+|
-          oids.map(sql"$observation_id").intercalate(void", ") |+| void")"
 
     def selectCalibrationTargets(roles: List[CalibrationRole]): Query[List[CalibrationRole], (Target.Id, String, CalibrationRole, RightAscension, Declination, Epoch, Option[Long], Option[Long], Option[RadialVelocity], Option[Parallax])] =
       sql"""SELECT

@@ -8,10 +8,12 @@ import cats.data.Nested
 import cats.data.NonEmptyList
 import cats.effect.MonadCancelThrow
 import cats.syntax.all.*
+import eu.timepit.refined.types.numeric.PosInt
 import grackle.Result
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.Site
+import lucuma.core.math.Coordinates
 import lucuma.core.math.Wavelength
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.Group
@@ -37,9 +39,6 @@ import lucuma.odb.service.CalibrationsService.ObsExtract
 import lucuma.odb.service.Services.ServiceAccess
 import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.util.Codecs.*
-import lucuma.core.math.Coordinates
-import lucuma.core.util.Timestamp
-import eu.timepit.refined.types.numeric.PosInt
 import org.http4s.client.Client
 import skunk.AppliedFragment
 import skunk.Transaction
@@ -47,7 +46,7 @@ import skunk.syntax.all.*
 
 import java.time.Instant
 
-trait SharedCalibrationsService[F[_]]:
+trait PerConfigCalibrationsService[F[_]]:
   def generateSharedCalibrations(
     pid: Program.Id,
     allSci: List[ObsExtract[ObservingMode]],
@@ -56,9 +55,9 @@ trait SharedCalibrationsService[F[_]]:
     when: Instant
   )(using Transaction[F], ServiceAccess): F[(List[Observation.Id], List[Observation.Id])]
 
-object SharedCalibrationsService:
-  def instantiate[F[_]: MonadCancelThrow](emailConfig: Config.Email, httpClient: Client[F])(using Services[F]): SharedCalibrationsService[F] =
-    new SharedCalibrationsService[F] with CalibrationObservations:
+object PerConfigCalibrationsService:
+  def instantiate[F[_]: MonadCancelThrow](emailConfig: Config.Email, httpClient: Client[F])(using Services[F]): PerConfigCalibrationsService[F] =
+    new PerConfigCalibrationsService[F] with CalibrationObservations:
       private def toConfigForCalibration(all: List[ObsExtract[ObservingMode]]): List[ObsExtract[CalibrationConfigSubset]] =
         all.map(_.map(_.toConfigSubset))
 

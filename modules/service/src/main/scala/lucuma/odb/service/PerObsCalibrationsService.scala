@@ -49,7 +49,7 @@ object PerObsCalibrationsService:
   def instantiate[F[_]: MonadCancelThrow](emailConfig: Config.Email, httpClient: Client[F])(using Services[F]): PerObsCalibrationsService[F] =
     new PerObsCalibrationsService[F] with CalibrationObservations:
       private def telluricGroupName(scienceObsId: Observation.Id): NonEmptyString =
-        NonEmptyString.unsafeFrom(s"F2 Scienc and Telluric Standard")
+        NonEmptyString.unsafeFrom(s"F2 Science and Telluric Standard per $scienceObsId")
 
       private def findTelluricGroupForScience(
         pid: Program.Id,

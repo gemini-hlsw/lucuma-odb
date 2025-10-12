@@ -49,18 +49,20 @@ class CalibrationsServiceSuite extends OdbSuite with ObservingModeSetupOperation
               after  <- services.calibrationsService(emailConfig, httpClient).calibrationTargets(roles, when)
             yield before.tail === after
 
-  test("recalculateCalibrations integration: F2 and GMOS"):
-    createProgramAs(serviceUser).flatMap: pid =>
-      createTargetAs(serviceUser, pid).flatMap: tid =>
-        createTargetWithProfileAs(serviceUser, pid).flatMap: gmosTarget =>
-          createFlamingos2LongSlitObservationAs(serviceUser, pid, tid).flatMap: _ =>
-            createGmosNorthLongSlitObservationAs(serviceUser, pid, List(gmosTarget)).flatMap: _ =>
-              withServices(serviceUser): services =>
-                assertIOBoolean:
-                  Services.asSuperUser:
-                    services.transactionally:
-                      services.calibrationsService(emailConfig, httpClient)
-                        .recalculateCalibrations(pid, when)
-                        .map: (added, removed) =>
-                          // Should create F2 telluric (1) + GMOS calibrations (2: spectrophotometric + twilight)
-                          added.size == 3 && removed.isEmpty
+  test("recalculateCalibrations high level test, runs F2 and GMOS"):
+    for {
+      pid <- createProgramAs(serviceUser)
+      tid <- createTargetAs(serviceUser, pid)
+      gmt <- createTargetWithProfileAs(serviceUser, pid)
+      f2  <- createFlamingos2LongSlitObservationAs(serviceUser, pid, tid)
+      _   <- createGmosNorthLongSlitObservationAs(serviceUser, pid, List(gmt))
+      _   <- withServices(serviceUser): services =>
+               assertIOBoolean:
+                 Services.asSuperUser:
+                   services.transactionally:
+                     services.calibrationsService(emailConfig, httpClient)
+                       .recalculateCalibrations(pid, when)
+                       .map: (added, removed) =>
+                         // Should create 1 F2 telluric + 2 GMOS calibrations (specphoto + twilight)
+                         added.size == 3 && removed.isEmpty
+    } yield ()
