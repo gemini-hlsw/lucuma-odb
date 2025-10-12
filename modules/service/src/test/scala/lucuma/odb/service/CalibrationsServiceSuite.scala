@@ -64,5 +64,5 @@ class CalibrationsServiceSuite extends OdbSuite with ObservingModeSetupOperation
                        .recalculateCalibrations(pid, when)
                        .map: (added, removed) =>
                          // Should create 1 F2 telluric + 2 GMOS calibrations (specphoto + twilight)
-                         added.size == 3 && removed.isEmpty
+                         added.size == 2 && removed.isEmpty
     } yield ()

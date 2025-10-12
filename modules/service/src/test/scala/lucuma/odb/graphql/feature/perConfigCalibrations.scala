@@ -1,8 +1,7 @@
 // Copyright (c) 2016-2025 Association of Universities for Research in Astronomy, Inc. (AURA)
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
-package lucuma.odb.graphql
-package feature
+package lucuma.odb.feature
 
 import cats.Eq
 import cats.derived.*
@@ -36,11 +35,14 @@ import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.core.syntax.string.*
 import lucuma.odb.data.EditType
+import lucuma.odb.graphql.OdbSuite
+import lucuma.odb.graphql.TestUsers
 import lucuma.odb.graphql.input.ProgramPropertiesInput
 import lucuma.odb.graphql.query.ExecutionQuerySetupOperations
 import lucuma.odb.graphql.subscription.SubscriptionUtils
 import lucuma.odb.json.wavelength.decoder.given
 import lucuma.odb.service.CalibrationsService
+import lucuma.odb.service.PerConfigCalibrationsService
 import lucuma.odb.service.Services
 import lucuma.odb.service.SpecPhotoCalibrations
 import lucuma.odb.service.TwilightCalibrations
@@ -320,7 +322,7 @@ class perConfigCalibrations extends OdbSuite with SubscriptionUtils with Executi
     } yield {
       assertEquals(gr.size, 1)
       assert(cg._2)
-      assertEquals(cg._3, CalibrationsService.CalibrationsGroupName)
+      assertEquals(cg._3, PerConfigCalibrationsService.CalibrationsGroupName)
     }
   }
 

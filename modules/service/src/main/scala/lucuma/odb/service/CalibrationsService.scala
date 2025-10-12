@@ -7,7 +7,6 @@ import cats.data.Nested
 import cats.data.NonEmptyList
 import cats.effect.MonadCancelThrow
 import cats.syntax.all.*
-import eu.timepit.refined.types.string.NonEmptyString
 import grackle.Result
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.ObservingModeType
@@ -32,11 +31,9 @@ import lucuma.odb.graphql.mapping.AccessControl
 import lucuma.odb.sequence.ObservingMode
 import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.sequence.data.ItcInput
-import lucuma.odb.service.CalibrationConfigSubset.*
 import lucuma.odb.service.Services.ServiceAccess
 import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.util.Codecs.*
-import lucuma.refined.*
 import org.http4s.client.Client
 import skunk.Query
 import skunk.Transaction
@@ -71,8 +68,7 @@ trait CalibrationsService[F[_]] {
 }
 
 object CalibrationsService extends CalibrationObservations {
-  val CalibrationsGroupName: NonEmptyString = "Calibrations".refined
-  val CalibrationTypes = List(CalibrationRole.SpectroPhotometric, CalibrationRole.Twilight)
+  val SharedCalibrationTypes = List(CalibrationRole.SpectroPhotometric, CalibrationRole.Twilight)
 
   case class ObsExtract[A](
     id:   Observation.Id,
@@ -146,9 +142,6 @@ object CalibrationsService extends CalibrationObservations {
           .selectAllUnexecuted(pid, selection = selection)
           .map(_.toList.collect(collectValid(selection === ObservationSelection.Science)))
 
-      private def toConfigForCalibration(all: List[ObsExtract[ObservingMode]]): List[ObsExtract[CalibrationConfigSubset]] =
-        all.map(_.map(_.toConfigSubset))
-
       override def calibrationTargets(roles: List[CalibrationRole], referenceInstant: Instant)
         : F[List[(Target.Id, String, CalibrationRole, Coordinates)]] =
           session.execute(Statements.selectCalibrationTargets(roles))(roles)
@@ -156,11 +149,11 @@ object CalibrationsService extends CalibrationObservations {
 
       def recalculateCalibrations(pid: Program.Id, referenceInstant: Instant)(using Transaction[F], ServiceAccess): F[(List[Observation.Id], List[Observation.Id])] =
         val sharedService = PerConfigCalibrationsService.instantiate(emailConfig, httpClient)
-        val perObsService = PerObsCalibrationsService.instantiate(emailConfig, httpClient)
+        //val perObsService = PerObsCalibrationsService.instantiate(emailConfig, httpClient)
 
         for
           // Read calibration targets (shared resource)
-          calibTargets <- calibrationTargets(CalibrationTypes, referenceInstant)
+          calibTargets <- calibrationTargets(SharedCalibrationTypes, referenceInstant)
 
           // List of the program's active observations
           active       <- activeObservations(pid)
@@ -172,16 +165,10 @@ object CalibrationsService extends CalibrationObservations {
                             .map(_.filter(u => active.contains(u.id)))
 
           // Delegate to shared calibrations service (handles GMOS)
-          sharedResult <- sharedService.generateSharedCalibrations(pid, allSci, allCalibs, calibTargets, referenceInstant)
-          (addedShared, removedShared) = sharedResult
-
-          // Delegate to per-observation calibrations service (handles F2 tellurics)
-          f2ScienceObs  = toConfigForCalibration(allSci.filter(_.data.toConfigSubset.isInstanceOf[Flamingos2Configs]))
-          addedPerObs  <- perObsService.generatePerObsCalibrations(pid, f2ScienceObs)
-
+          (addedShared, removedShared) <- sharedService.generateSharedCalibrations(pid, allSci, allCalibs, calibTargets, referenceInstant)
           // Cleanup
           _            <- targetService.deleteOrphanCalibrationTargets(pid)
-        yield (addedShared ::: addedPerObs, removedShared)
+        yield (addedShared, removedShared)
 
       // Recalcula the target of a calibration observation
       def recalculateCalibrationTarget(
@@ -199,11 +186,11 @@ object CalibrationsService extends CalibrationObservations {
           tgts <- o match {
                   case Some(oid, cr, Some(ot), Some(ObservingModeType.GmosNorthLongSlit)) =>
                     session
-                      .execute(Statements.selectCalibrationTargets(CalibrationTypes))(CalibrationTypes)
+                      .execute(Statements.selectCalibrationTargets(SharedCalibrationTypes))(SharedCalibrationTypes)
                       .map(targetCoordinates(ot.toInstant).map(CalibrationIdealTargets(Site.GN, ot.toInstant, _)).map(_.bestTarget(cr)))
                   case Some(oid, cr, Some(ot), Some(ObservingModeType.GmosSouthLongSlit)) =>
                     session
-                      .execute(Statements.selectCalibrationTargets(CalibrationTypes))(CalibrationTypes)
+                      .execute(Statements.selectCalibrationTargets(SharedCalibrationTypes))(SharedCalibrationTypes)
                       .map(targetCoordinates(ot.toInstant).map(CalibrationIdealTargets(Site.GS, ot.toInstant, _)).map(_.bestTarget(cr)))
                   case _ =>
                     none.pure[F]

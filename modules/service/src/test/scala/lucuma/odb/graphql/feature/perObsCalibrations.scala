@@ -1,19 +1,16 @@
 // Copyright (c) 2016-2025 Association of Universities for Research in Astronomy, Inc. (AURA)
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
-package lucuma.odb.graphql
-package feature
+package lucuma.odb.feature
 
 import cats.Eq
 import cats.derived.*
 import cats.effect.IO
 import cats.effect.kernel.Ref
 import cats.syntax.all.*
-import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.Decoder
 import io.circe.Json
 import io.circe.literal.*
-import io.circe.refined.*
 import io.circe.syntax.*
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.GmosAmpGain
@@ -36,6 +33,8 @@ import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.core.syntax.string.*
 import lucuma.odb.data.EditType
+import lucuma.odb.graphql.OdbSuite
+import lucuma.odb.graphql.TestUsers
 import lucuma.odb.graphql.input.ProgramPropertiesInput
 import lucuma.odb.graphql.query.ExecutionQuerySetupOperations
 import lucuma.odb.graphql.subscription.SubscriptionUtils
@@ -207,20 +206,6 @@ class perObsCalibrations extends OdbSuite with SubscriptionUtils with ExecutionQ
     def calibrationGroupId: Option[Group.Id] = elements.collectFirst:
       case Left(gid) => gid
 
-  private def queryGroup(gid: Group.Id): IO[(Group.Id, Boolean, NonEmptyString)] =
-    query(
-      service,
-      s"""query { group(groupId: "$gid") { id system name} }"""
-    ).flatMap { c =>
-      (for {
-        id    <- c.hcursor.downField("group").downField("id").as[Group.Id]
-        sys   <- c.hcursor.downField("group").downField("system").as[Boolean]
-        name  <- c.hcursor.downField("group").downField("name").as[NonEmptyString]
-      } yield (id, sys, name))
-        .leftMap(f => new RuntimeException(f.message))
-        .liftTo[IO]
-     }
-
   private def queryObservations(pid: Program.Id): IO[List[CalibObs]] =
     query(
       service,
@@ -282,46 +267,6 @@ class perObsCalibrations extends OdbSuite with SubscriptionUtils with ExecutionQ
   def formatLD(ld: LocalDate): String = {
     val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSX")
     ld.atStartOfDay().atOffset(ZoneOffset.UTC).format(formatter)
-  }
-
-  test("no calibrations group if not needed") {
-    for {
-      pid <- createProgramAs(pi)
-      oid <- createObservationAs(pi, pid, None)
-      _   <- withServices(service) { services =>
-               services.session.transaction.use { xa =>
-                 services.calibrationsService(emailConfig, httpClient).recalculateCalibrations(pid, when)(using xa)
-               }
-             }
-      gr1  <- groupElementsAs(pi, pid, None)
-    } yield {
-      val cgid = gr1.calibrationGroupId
-      assert(cgid.isEmpty)
-    }
-  }
-
-  test("create group for calibrations") {
-    for {
-      pid <- createProgramAs(pi)
-      tid <- createTargetAs(pi, pid, "One")
-      oid <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid)
-      _   <- prepareObservation(pi, oid, tid)
-      gr  <- groupElementsAs(pi, pid, None)
-      _   <- withServices(service) { services =>
-               services.session.transaction.use { xa =>
-                 services.calibrationsService(emailConfig, httpClient).recalculateCalibrations(pid, when)(using xa)
-               }
-             }
-      gr1  <- groupElementsAs(pi, pid, None)
-      cgid = gr1.calibrationGroupId
-      cg   <- cgid.map(queryGroup)
-                .getOrElse(IO.raiseError(new RuntimeException("No calibration group")))
-      ob   <- queryObservations(pid)
-    } yield {
-      assertEquals(gr.size, 1)
-      assert(cg._2)
-      assertEquals(cg._3, CalibrationsService.CalibrationsGroupName)
-    }
   }
 
   test("add calibrations for each LongSlit mode") {

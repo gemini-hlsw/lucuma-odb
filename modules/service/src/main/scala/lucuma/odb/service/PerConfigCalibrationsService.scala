@@ -9,6 +9,7 @@ import cats.data.NonEmptyList
 import cats.effect.MonadCancelThrow
 import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.PosInt
+import eu.timepit.refined.types.string.NonEmptyString
 import grackle.Result
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.ScienceBand
@@ -33,12 +34,12 @@ import lucuma.odb.graphql.mapping.AccessControl
 import lucuma.odb.sequence.ObservingMode
 import lucuma.odb.service.CalibrationConfigSubset.*
 import lucuma.odb.service.CalibrationsService.CalObsProps
-import lucuma.odb.service.CalibrationsService.CalibrationTypes
-import lucuma.odb.service.CalibrationsService.CalibrationsGroupName
 import lucuma.odb.service.CalibrationsService.ObsExtract
+import lucuma.odb.service.CalibrationsService.SharedCalibrationTypes
 import lucuma.odb.service.Services.ServiceAccess
 import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.util.Codecs.*
+import lucuma.refined.*
 import org.http4s.client.Client
 import skunk.AppliedFragment
 import skunk.Transaction
@@ -56,11 +57,10 @@ trait PerConfigCalibrationsService[F[_]]:
   )(using Transaction[F], ServiceAccess): F[(List[Observation.Id], List[Observation.Id])]
 
 object PerConfigCalibrationsService:
+  val CalibrationsGroupName: NonEmptyString = "Calibrations".refined
+
   def instantiate[F[_]: MonadCancelThrow](emailConfig: Config.Email, httpClient: Client[F])(using Services[F]): PerConfigCalibrationsService[F] =
     new PerConfigCalibrationsService[F] with CalibrationObservations:
-      private def toConfigForCalibration(all: List[ObsExtract[ObservingMode]]): List[ObsExtract[CalibrationConfigSubset]] =
-        all.map(_.map(_.toConfigSubset))
-
       private def calObsProps(
         calibConfigs: List[ObsExtract[CalibrationConfigSubset]]
       ): Map[CalibrationConfigSubset, CalObsProps] =
@@ -132,7 +132,7 @@ object PerConfigCalibrationsService:
         uniqueSci: List[CalibrationConfigSubset],
         calibs: List[ObsExtract[CalibrationConfigSubset]]
       ): Map[CalibrationRole, List[CalibrationConfigSubset]] =
-        CalibrationTypes.map { calibType =>
+        SharedCalibrationTypes.map { calibType =>
           val sciConfigs = uniqueSci.map(config =>
             CalibrationConfigMatcher.matcherFor(config, calibType).normalize(config)
           ).distinct

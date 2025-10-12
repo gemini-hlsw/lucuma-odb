@@ -32,6 +32,9 @@ import lucuma.odb.graphql.input.ScienceRequirementsInput
 import lucuma.odb.graphql.input.SpectroscopyScienceRequirementsInput
 import lucuma.odb.graphql.input.TargetEnvironmentInput
 import lucuma.odb.graphql.mapping.AccessControl
+import lucuma.odb.sequence.ObservingMode
+import lucuma.odb.service.CalibrationConfigSubset.*
+import lucuma.odb.service.CalibrationsService.ObsExtract
 import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.util.Codecs
 import skunk.Transaction
@@ -124,6 +127,9 @@ case class CalibrationIdealTargets(
 }
 
 trait CalibrationObservations {
+  def toConfigForCalibration(all: List[ObsExtract[ObservingMode]]): List[ObsExtract[CalibrationConfigSubset]] =
+    all.map(_.map(_.toConfigSubset))
+
   def gmosLongSlitSpecPhotObs[F[_]: MonadThrow: Services: Transaction, G, L, U](
     pid:     Program.Id,
     gid:     Group.Id,
