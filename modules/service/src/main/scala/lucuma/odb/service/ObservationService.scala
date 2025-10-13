@@ -278,7 +278,7 @@ object ObservationService {
           group     = Nullable.Null
         )
 
-        // delete asterisms and observations (don't delete targets - they may be shared)
+        // delete asterisms and observations
         for {
           _    <- oids.traverse { o =>
                     // set the existence to deleted, so it gets removed from groups too

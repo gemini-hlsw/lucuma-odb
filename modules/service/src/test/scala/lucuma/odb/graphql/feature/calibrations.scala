@@ -358,16 +358,16 @@ class calibrations extends OdbSuite with SubscriptionUtils with ExecutionQuerySe
       tid2 <- createTargetAs(pi, pid, "Two")
 
       oid1 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid1)
-      _    <- updateReadModeAndGain(oid1, GmosAmpReadMode.Fast, GmosAmpGain.High)
+      _    <- updateConf(oid1, GmosAmpReadMode.Fast, GmosAmpGain.High)
 
       oid2 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid1)
-      _    <- updateReadModeAndGain(oid2, GmosAmpReadMode.Fast, GmosAmpGain.High)
+      _    <- updateConf(oid2, GmosAmpReadMode.Fast, GmosAmpGain.High)
 
       oid3 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid2)
-      _    <- updateReadModeAndGain(oid3, GmosAmpReadMode.Slow, GmosAmpGain.Low)
+      _    <- updateConf(oid3, GmosAmpReadMode.Slow, GmosAmpGain.Low)
 
       oid4 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid2)
-      _    <- updateReadModeAndGain(oid4, GmosAmpReadMode.Slow, GmosAmpGain.Low)
+      _    <- updateConf(oid4, GmosAmpReadMode.Slow, GmosAmpGain.Low)
 
       _    <- prepareObservation(pi, oid1, tid1) *>
               prepareObservation(pi, oid2, tid1) *>
@@ -1038,7 +1038,7 @@ class calibrations extends OdbSuite with SubscriptionUtils with ExecutionQuerySe
       """
     ).void
 
-  def updateReadModeAndGain(oid: Observation.Id, readMode: GmosAmpReadMode, gain: GmosAmpGain): IO[Unit] =
+  def updateConf(oid: Observation.Id, readMode: GmosAmpReadMode, gain: GmosAmpGain): IO[Unit] =
     query(
       user  = pi,
       query = s"""
@@ -1559,9 +1559,9 @@ class calibrations extends OdbSuite with SubscriptionUtils with ExecutionQuerySe
       tid2 <- createTargetAs(pi, pid, "Two")
       // two observations with different configs
       oid1 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid1)
-      _    <- updateReadModeAndGain(oid1, GmosAmpReadMode.Fast, GmosAmpGain.High)
+      _    <- updateConf(oid1, GmosAmpReadMode.Fast, GmosAmpGain.High)
       oid2 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid2)
-      _    <- updateReadModeAndGain(oid2, GmosAmpReadMode.Slow, GmosAmpGain.Low)
+      _    <- updateConf(oid2, GmosAmpReadMode.Slow, GmosAmpGain.Low)
       _    <- prepareObservation(pi, oid1, tid1) *> prepareObservation(pi, oid2, tid2)
       // run calibrations
       _    <- recalculateCalibrations(pid)
