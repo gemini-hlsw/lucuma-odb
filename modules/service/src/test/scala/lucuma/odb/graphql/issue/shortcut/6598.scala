@@ -228,10 +228,11 @@ class ShortCut_6598 extends ExecutionTestSupportForGmos:
       _   <- countCalibrations(pid).assertEquals(CalibrationCounts(2, 2, 0, 0))
 
       // Step 6: Change the status of one science observation to "Inactive"
-      _   <- IO.println("-----------    Step 6: Setting first observation inactive...")
+      _   <- IO.println("Step 6: Setting first observation inactive...")
       _   <- setObservationWorkflowState(pi, o1, ObservationWorkflowState.Inactive)
       _   <- recalculateCalibrations(pid, when)
       // Calibs restored, given only one science config it should have 1 specphoto + 1 twilight
-      // The bug is fixed: no untargeted calibrations are created
+      // With the bug we would unteragetd calibratoins observations as a shared target was deleted 
+      // on the inactivated observation
       _   <- countCalibrations(pid).assertEquals(CalibrationCounts(1, 1, 0, 0))
     } yield ()

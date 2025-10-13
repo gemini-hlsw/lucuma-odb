@@ -268,7 +268,7 @@ object ObservationService {
 
       // This will fully delete a calibration observation
       // It assumes the simple case where the observation has no extra timing windows or attachments
-      // Note: targets are NOT deleted here because they may be shared with other observations
+      // targets are not deleted here because they may be shared with other observations
       // Orphaned targets should be cleaned up separately via deleteOrphanCalibrationTargets
       def deleteCalibrationObservations(
         oids: NonEmptyList[Observation.Id]
@@ -278,7 +278,7 @@ object ObservationService {
           group     = Nullable.Null
         )
 
-        // delete asterisms and observations (but NOT targets - they may be shared)
+        // delete asterisms and observations (don't delete targets - they may be shared)
         for {
           _    <- oids.traverse { o =>
                     // set the existence to deleted, so it gets removed from groups too
