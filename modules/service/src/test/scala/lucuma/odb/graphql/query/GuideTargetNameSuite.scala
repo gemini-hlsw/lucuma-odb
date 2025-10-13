@@ -2,7 +2,6 @@
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
 package lucuma.odb.graphql
-
 package query
 
 import cats.effect.IO
@@ -13,13 +12,16 @@ import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.ags.GuideStarName
 import lucuma.core.model.Observation
+import lucuma.core.model.Program
+import lucuma.core.model.Target
+import lucuma.core.model.User
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import org.http4s.Request
 import org.http4s.Response
 
-class guideTargetName extends ExecutionTestSupportForGmos {
-  
+trait GuideTargetNameSuite extends ExecutionTestSupport {
+
   val targetName1: String = GuideStarName.gaiaSourceId.reverseGet(1L).value.value
 
   val ObsTime: Timestamp = Timestamp.FromString.getOption("2024-08-25T00:00:00Z").get
@@ -53,6 +55,9 @@ class guideTargetName extends ExecutionTestSupportForGmos {
   override def httpRequestHandler: Request[IO] => Resource[IO, Response[IO]] =
     _ => Resource.eval(IO.raiseError(Exception("Test failure, unexpected call to Gaia!!!")))
 
+  // Abstract method to be implemented by concrete test suites
+  def createObservationAs(user: User, pid: Program.Id, tids: List[Target.Id]): IO[Observation.Id]
+
   test("no configuration returns null") {
     val setup: IO[Observation.Id] =
       for {
@@ -72,7 +77,7 @@ class guideTargetName extends ExecutionTestSupportForGmos {
       for {
         p <- createProgramAs(pi)
         t <- createTargetWithProfileAs(pi, p)
-        o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+        o <- createObservationAs(pi, p, List(t))
         _ <- setObservationTimeAndDuration(pi, o, none, ObsDuration.some)
       } yield o
     setup.flatMap { oid =>
@@ -87,7 +92,7 @@ class guideTargetName extends ExecutionTestSupportForGmos {
     val setup: IO[Observation.Id] =
       for {
         p <- createProgramAs(pi)
-        o <- createGmosNorthLongSlitObservationAs(pi, p, List.empty)
+        o <- createObservationAs(pi, p, List.empty)
         _ <- setObservationTimeAndDuration(pi, o, ObsTime.some, none)
       } yield o
     setup.flatMap { oid =>
@@ -103,7 +108,7 @@ class guideTargetName extends ExecutionTestSupportForGmos {
       for {
         p <- createProgramAs(pi)
         t <- createTargetWithProfileAs(pi, p)
-        o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+        o <- createObservationAs(pi, p, List(t))
         _ <- setObservationTimeAndDuration(pi, o, ObsTime.some, none)
       } yield o
     setup.flatMap { oid =>
@@ -119,7 +124,7 @@ class guideTargetName extends ExecutionTestSupportForGmos {
       for {
         p <- createProgramAs(pi)
         t <- createTargetWithProfileAs(pi, p)
-        o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+        o <- createObservationAs(pi, p, List(t))
         _ <- setObservationTimeAndDuration(pi, o, ObsTime.some, none)
         _ <- setGuideTargetName(pi, o, targetName1.some)
       } yield o
@@ -130,12 +135,13 @@ class guideTargetName extends ExecutionTestSupportForGmos {
         expected = guideTargetNameResult(targetName1.some))
     }
   }
+
   test("removing targets invalidates name") {
     val setup: IO[Observation.Id] =
       for {
         p <- createProgramAs(pi)
         t <- createTargetWithProfileAs(pi, p)
-        o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+        o <- createObservationAs(pi, p, List(t))
         _ <- setObservationTimeAndDuration(pi, o, ObsTime.some, none)
         _ <- setGuideTargetName(pi, o, targetName1.some)
         _ <- updateAsterisms(pi, List(o), add = List.empty, del = List(t), exp = List((o -> List.empty)))
@@ -153,7 +159,7 @@ class guideTargetName extends ExecutionTestSupportForGmos {
       for {
         p <- createProgramAs(pi)
         t <- createTargetWithProfileAs(pi, p)
-        o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+        o <- createObservationAs(pi, p, List(t))
         _ <- setObservationTimeAndDuration(pi, o, ObsTime.some, none)
         _ <- setGuideTargetName(pi, o, targetName1.some)
         _ <- setGuideTargetName(pi, o, none)
@@ -171,7 +177,7 @@ class guideTargetName extends ExecutionTestSupportForGmos {
       for {
         p <- createProgramAs(pi)
         t <- createTargetWithProfileAs(pi, p)
-        o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+        o <- createObservationAs(pi, p, List(t))
         _ <- setObservationTimeAndDuration(pi, o, ObsTime.some, none)
         _ <- setGuideTargetName(pi, o, targetName1.some)
         _ <- setObservationTimeAndDuration(pi, o, none, none)
@@ -189,7 +195,7 @@ class guideTargetName extends ExecutionTestSupportForGmos {
       for {
         p <- createProgramAs(pi)
         t <- createTargetWithProfileAs(pi, p)
-        o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+        o <- createObservationAs(pi, p, List(t))
         _ <- setObservationTimeAndDuration(pi, o, ObsTime.some, none)
         _ <- setGuideTargetName(pi, o, targetName1.some)
         _ <- setObservationTimeAndDuration(pi, o, Later.some, none)
@@ -207,7 +213,7 @@ class guideTargetName extends ExecutionTestSupportForGmos {
       for {
         p <- createProgramAs(pi)
         t <- createTargetWithProfileAs(pi, p)
-        o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+        o <- createObservationAs(pi, p, List(t))
         _ <- setObservationTimeAndDuration(pi, o, ObsTime.some, none)
         _ <- setGuideTargetName(pi, o, targetName1.some)
         _ <- setObservationTimeAndDuration(pi, o, ObsTime.some, ObsDuration.some)
