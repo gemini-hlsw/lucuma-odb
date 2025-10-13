@@ -267,7 +267,9 @@ object ObservationService {
         }
 
       // This will fully delete a calibration observation
-      // It assumes the imple case where the observation has no extra timing windows or attachments
+      // It assumes the simple case where the observation has no extra timing windows or attachments
+      // Note: targets are NOT deleted here because they may be shared with other observations
+      // Orphaned targets should be cleaned up separately via deleteOrphanCalibrationTargets
       def deleteCalibrationObservations(
         oids: NonEmptyList[Observation.Id]
       )(using Transaction[F], ServiceAccess): F[Result[Unit]] = {
@@ -276,7 +278,7 @@ object ObservationService {
           group     = Nullable.Null
         )
 
-        // delete targets, asterisms and observations
+        // delete asterisms and observations (but NOT targets - they may be shared)
         for {
           _    <- oids.traverse { o =>
                     // set the existence to deleted, so it gets removed from groups too
@@ -284,16 +286,9 @@ object ObservationService {
                       Services.asSuperUser:
                         AccessControl.unchecked(existenceOff, List(o), observation_id)
                   }
-                  // Look for the linked targets
-          tids <- session.execute(Statements.linkedTargets(oids))(oids.toList)
-                  // Delete asterisms and targets
-          _    <- NonEmptyList
-                    .fromList(tids)
-                    .traverse(tids => session.executeCommand(Statements.deleteLinkedAsterisms(tids)).void)
-          _    <- NonEmptyList
-                    .fromList(tids)
-                    .traverse(tids => session.executeCommand(Statements.deleteTargets(tids)).void)
-                  // Actually delete the observations
+                  // Delete asterism_target entries for these observations
+          _    <- session.executeCommand(Statements.deleteAsterismsForObservations(oids))
+                  // Delete the observations themselves
           _    <- session.executeCommand(Statements.deleteCalibrationObservations(oids))
         } yield Result.unit
 
@@ -508,7 +503,7 @@ object ObservationService {
                 val cloneBlindOffset = // only clone if it won't be overwritten by the updateObservations
                   if SET.flatMap(_.targetEnvironment).fold(true)(_.blindOffsetTarget.isAbsent) then
                     blindOffsetsService.cloneBlindOffset(pid, observationId, oid2)
-                  else Result.unit.pure 
+                  else Result.unit.pure
 
                 val doUpdate =
                   SET match
@@ -1186,6 +1181,11 @@ object ObservationService {
       void"DELETE FROM t_asterism_target " |+|
         void"WHERE c_target_id IN (" |+|
           tids.map(sql"$target_id").intercalate(void", ") |+| void")"
+
+    def deleteAsterismsForObservations(oids: NonEmptyList[Observation.Id]): AppliedFragment =
+      void"DELETE FROM t_asterism_target " |+|
+        void"WHERE c_observation_id IN (" |+|
+          oids.map(sql"$observation_id").intercalate(void", ") |+| void")"
 
     def deleteTargets(tids: NonEmptyList[Target.Id]): AppliedFragment =
       void"DELETE FROM t_target " |+|
