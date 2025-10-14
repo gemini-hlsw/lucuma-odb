@@ -18,11 +18,11 @@ CREATE TABLE t_exposure_time_mode (
   --c_observing_mode_type   e_observing_mode_type,
   c_role                  e_exposure_time_mode_role NOT NULL,
 
-  c_exposure_time_mode    e_exp_time_mode  NOT NULL,
-  c_signal_to_noise       numeric(11, 3)   CHECK (c_signal_to_noise > 0::numeric),
+  c_exposure_time_mode    e_exp_time_mode           NOT NULL,
+  c_signal_to_noise       numeric(11, 3)            CHECK (c_signal_to_noise > 0::numeric),
   c_signal_to_noise_at    d_wavelength_pm,
-  c_exposure_time         interval         CHECK (c_exposure_time  >= '0'::interval),
-  c_exposure_count        integer          CHECK (c_exposure_count >= 0),
+  c_exposure_time         interval                  CHECK (c_exposure_time  >= '0'::interval),
+  c_exposure_count        integer                   CHECK (c_exposure_count >= 0),
 
   CONSTRAINT t_exposure_time_mode_check CHECK (
     CASE c_exposure_time_mode

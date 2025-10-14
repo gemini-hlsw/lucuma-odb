@@ -58,6 +58,8 @@ case class Config private[longslit](
     out.writeChars(disperser.tag)
     out.writeChars(filter.tag)
     out.writeChars(fpu.tag)
+    out.write(acquisitionExposureTimeMode.hashBytes)
+    out.write(scienceExposureTimeMode.hashBytes)
     out.writeChars(explicitReadMode.foldMap(_.tag))
     out.writeChars(explicitReads.foldMap(_.tag))
     out.writeChars(decker.tag)
@@ -68,12 +70,8 @@ case class Config private[longslit](
     out.write(tt, 0, tt.length)
 
     out.close()
+    bao.toByteArray
 
-    Array.concat(
-      acquisitionExposureTimeMode.hashBytes,
-      scienceExposureTimeMode.hashBytes,
-      bao.toByteArray
-    )
 
 object Config:
 

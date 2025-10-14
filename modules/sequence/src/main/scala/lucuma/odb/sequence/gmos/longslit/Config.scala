@@ -137,6 +137,8 @@ sealed trait Config[G: Enumerated, L: Enumerated, U: Enumerated] extends Product
     filter.foreach(f => out.writeChars(Enumerated[L].tag(f)))
     out.writeChars(Enumerated[U].tag(fpu))
     out.writeInt(centralWavelength.toPicometers.value.value)
+    out.write(acquisitionExposureTimeMode.hashBytes)
+    out.write(scienceExposureTimeMode.hashBytes)
     out.writeChars(xBin.tag)
     out.writeChars(yBin.tag)
     out.writeChars(ampGain.tag)
@@ -148,12 +150,7 @@ sealed trait Config[G: Enumerated, L: Enumerated, U: Enumerated] extends Product
       out.writeLong(o.toAngle.toMicroarcseconds)
 
     out.close()
-
-    Array.concat(
-      acquisitionExposureTimeMode.hashBytes,
-      scienceExposureTimeMode.hashBytes,
-      bao.toByteArray
-    )
+    bao.toByteArray
 
 object Config:
 
