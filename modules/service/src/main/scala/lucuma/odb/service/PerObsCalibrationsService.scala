@@ -34,6 +34,7 @@ import lucuma.odb.service.Services.ServiceAccess
 import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.util.Codecs.*
 import org.http4s.client.Client
+import skunk.AppliedFragment
 import skunk.Transaction
 import skunk.syntax.all.*
 
@@ -183,3 +184,4 @@ object PerObsCalibrationsService:
                               ensureTelluricForScience(pid, scienceObs, telluricTarget)
                             ).map(_.flatten)
         yield addedOids
+

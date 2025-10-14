@@ -4,13 +4,11 @@
 package lucuma.odb.service
 
 import cats.Order.catsKernelOrderingForOrder
-import cats.data.Nested
 import cats.data.NonEmptyList
 import cats.effect.MonadCancelThrow
 import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.string.NonEmptyString
-import grackle.Result
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.Site
@@ -41,6 +39,8 @@ import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.util.Codecs.*
 import lucuma.refined.*
 import org.http4s.client.Client
+import org.typelevel.log4cats.Logger
+import org.typelevel.log4cats.syntax.*
 import skunk.AppliedFragment
 import skunk.Transaction
 import skunk.syntax.all.*
@@ -59,7 +59,7 @@ trait PerConfigCalibrationsService[F[_]]:
 object PerConfigCalibrationsService:
   val CalibrationsGroupName: NonEmptyString = "Calibrations".refined
 
-  def instantiate[F[_]: MonadCancelThrow](emailConfig: Config.Email, httpClient: Client[F])(using Services[F]): PerConfigCalibrationsService[F] =
+  def instantiate[F[_]: {MonadCancelThrow, Services, Logger}](emailConfig: Config.Email, httpClient: Client[F]): PerConfigCalibrationsService[F] =
     new PerConfigCalibrationsService[F] with CalibrationObservations:
       private def calObsProps(
         calibConfigs: List[ObsExtract[CalibrationConfigSubset]]
@@ -113,13 +113,13 @@ object PerConfigCalibrationsService:
           }
         } else none.pure[F]
 
+      // Set the calibration role of the observations in bulk
       private def setCalibRoleAndGroup(oids: List[Observation.Id], calibrationRole: CalibrationRole): F[Unit] =
-        val cmd = void"UPDATE t_observation " |+|
-          sql"SET c_calibration_role = $calibration_role "(calibrationRole) |+|
-          void"WHERE c_observation_id IN (" |+|
-            oids.map(sql"$observation_id").intercalate(void", ") |+| void")"
-        session.executeCommand(cmd).void
+        session.executeCommand(Statements.setCalibRole(oids, calibrationRole)).void
 
+      /**
+       * Check if a calibration is actually needed by any science observation.
+       */
       private def isCalibrationNeeded(
         scienceConfigs: List[CalibrationConfigSubset],
         calibConfig: CalibrationConfigSubset,
@@ -151,21 +151,20 @@ object PerConfigCalibrationsService:
         pid:       Program.Id,
         gid:       Group.Id,
         props:     Map[CalibrationConfigSubset, CalObsProps],
-        configs:   List[CalibrationConfigSubset],
+        config:    CalibrationConfigSubset,
         tid:       Target.Id
-      )(using Transaction[F]): F[List[Observation.Id]] =
-        calibRole match {
-          case CalibrationRole.SpectroPhotometric =>
-            site match {
-              case Site.GN => gmosLongSlitSpecPhotObs(pid, gid, tid, props, configs.collect { case c: GmosNConfigs => c })
-              case Site.GS => gmosLongSlitSpecPhotObs(pid, gid, tid, props, configs.collect { case c: GmosSConfigs => c })
-            }
-          case CalibrationRole.Twilight =>
-            site match
-              case Site.GN => gmosLongSlitTwilightObs(pid, gid, tid, configs.collect { case c: GmosNConfigs => c })
-              case Site.GS => gmosLongSlitTwilightObs(pid, gid, tid, configs.collect { case c: GmosSConfigs => c })
-          case _ => List.empty.pure[F]
-        }
+      )(using Transaction[F], MonadCancelThrow[F]): Option[F[Observation.Id]] =
+        (site, calibRole, config) match
+          case (Site.GN, CalibrationRole.SpectroPhotometric, c: GmosNConfigs) =>
+            gmosLongSlitSpecPhotObs(pid, gid, tid, props, c).some
+          case (Site.GS, CalibrationRole.SpectroPhotometric, c: GmosSConfigs) =>
+            gmosLongSlitSpecPhotObs(pid, gid, tid, props, c).some
+          case (Site.GN, CalibrationRole.Twilight, c: GmosNConfigs)           =>
+            gmosLongSlitTwilightObs(pid, gid, tid, c).some
+          case (Site.GS, CalibrationRole.Twilight, c: GmosSConfigs)           =>
+            gmosLongSlitTwilightObs(pid, gid, tid, c).some
+          case _                                                              =>
+            none
 
       private def generateGMOSLSCalibrations(
         pid:           Program.Id,
@@ -194,19 +193,16 @@ object PerConfigCalibrationsService:
         gnTgt:     CalibrationIdealTargets,
         gsTgt:     CalibrationIdealTargets
       )(using Transaction[F], ServiceAccess): F[List[Observation.Id]] = {
-        def newCalibs(site: Site, idealTarget: CalibrationIdealTargets): Option[F[List[Observation.Id]]] =
-          idealTarget.bestTarget(calibType).map(tgtid =>
-            if (configs.nonEmpty) {
-              (for {
-                cta <- Nested(targetService.cloneTargetInto(tgtid, pid)).map(_._2).value
-                o   <- cta.traverse(calibObservation(calibType, site, pid, gid, props, configs, _))
-              } yield o).orError
-            } else {
-              List.empty.pure[F]
-            })
+        def newCalibs(site: Site, idealTarget: CalibrationIdealTargets, siteConfigs: List[CalibrationConfigSubset]): Option[F[List[Observation.Id]]] =
+          idealTarget.bestTarget(calibType).map: tgtid =>
+            siteConfigs.flatTraverse: config =>
+              for {
+                (_, tid) <- targetService.cloneTargetInto(tgtid, pid).orError
+                oid      <- calibObservation(calibType, site, pid, gid, props, config, tid).sequence
+              } yield oid.toList
 
-        val gnoCalibs = newCalibs(Site.GN, gnTgt)
-        val gsoCalibs = newCalibs(Site.GS, gsTgt)
+        val gnoCalibs = newCalibs(Site.GN, gnTgt, configs.collect { case g: GmosNConfigs => g })
+        val gsoCalibs = newCalibs(Site.GS, gsTgt, configs.collect { case g: GmosSConfigs => g })
 
         (gnoCalibs, gsoCalibs).mapN((_, _).mapN(_ ::: _)).getOrElse(List.empty.pure[F]).flatTap { oids =>
           setCalibRoleAndGroup(oids, calibType).whenA(oids.nonEmpty)
@@ -228,6 +224,8 @@ object PerConfigCalibrationsService:
         }
       }
 
+      // Update the signal to noise at wavelength for each calbiration observation depending
+      // on the average wavelength of the configuration
       private def prepareCalibrationUpdates(
         calibrations: List[ObsExtract[CalibrationConfigSubset]],
         removedOids:  List[Observation.Id],
@@ -285,7 +283,7 @@ object PerConfigCalibrationsService:
         val gmosSci = allSci.filterNot(_.data.toConfigSubset.isInstanceOf[Flamingos2Configs])
         val gmosCalibs = toConfigForCalibration(allCalibs).filterNot(_.data.isInstanceOf[Flamingos2Configs])
 
-        // Get unique GMOS configurations
+        // unique GMOS configurations
         val uniqueSci = uniqueConfiguration(gmosSci)
 
         // Extract props from all science observations
@@ -295,10 +293,24 @@ object PerConfigCalibrationsService:
         val gnTgt = CalibrationIdealTargets(Site.GN, when, calibTargets)
         val gsTgt = CalibrationIdealTargets(Site.GS, when, calibTargets)
 
+        val configsPerRole = calculateConfigurationsPerRole(uniqueSci, gmosCalibs)
+
         for
-          configsPerRole <- calculateConfigurationsPerRole(uniqueSci, gmosCalibs).pure[F]
+          _              <- info"Recalculating shared calibrations for $pid, instant $when"
+          _              <- debug"Program $pid has ${uniqueSci.length} science configurations"
+          // Remove calibrations that are not needed, basically when a config is removed
           removedOids    <- removeUnnecessaryCalibrations(uniqueSci, gmosCalibs)
+          _              <- (debug"Program $pid will remove unnecessary calibrations $removedOids").whenA(removedOids.nonEmpty)
+          // Generate new calibrations for each unique configuration
           addedOids      <- generateGMOSLSCalibrations(pid, props, configsPerRole, gnTgt, gsTgt)
+          _              <- (debug"Program $pid added calibrations $addedOids").whenA(addedOids.nonEmpty)
           calibUpdates    = prepareCalibrationUpdates(gmosCalibs, removedOids, props)
           _              <- updatePropsAt(calibUpdates)
         yield (addedOids, removedOids)
+
+      object Statements:
+        def setCalibRole(oids: List[Observation.Id], role: CalibrationRole): AppliedFragment =
+          void"UPDATE t_observation " |+|
+            sql"SET c_calibration_role = $calibration_role "(role) |+|
+            void"WHERE c_observation_id IN (" |+|
+              oids.map(sql"$observation_id").intercalate(void", ") |+| void")"

@@ -35,6 +35,8 @@ import lucuma.odb.service.Services.ServiceAccess
 import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.util.Codecs.*
 import org.http4s.client.Client
+import org.typelevel.log4cats.Logger
+import org.typelevel.log4cats.syntax.*
 import skunk.Query
 import skunk.Transaction
 import skunk.codec.numeric.int8
@@ -106,7 +108,7 @@ object CalibrationsService extends CalibrationObservations {
       case (tid, name, role, Some(st)) => (tid, name, role, st)
     }
 
-  def instantiate[F[_]: MonadCancelThrow](emailConfig: Config.Email, httpClient: Client[F])(using Services[F]): CalibrationsService[F] =
+  def instantiate[F[_]: {MonadCancelThrow, Services, Logger}](emailConfig: Config.Email, httpClient: Client[F]): CalibrationsService[F] =
     new CalibrationsService[F] {
 
       private def collectValid(
@@ -152,17 +154,20 @@ object CalibrationsService extends CalibrationObservations {
         //val perObsService = PerObsCalibrationsService.instantiate(emailConfig, httpClient)
 
         for
+          _            <- info"Recalculating calibrations for $pid, reference instant  $referenceInstant"
           // Read calibration targets (shared resource)
           calibTargets <- calibrationTargets(SharedCalibrationTypes, referenceInstant)
-
           // List of the program's active observations
           active       <- activeObservations(pid)
-
+          _            <- (debug"Program $pid has ${active.size} active observations: $active").whenA(active.nonEmpty)
           // Get all active science and calibration observations
           allSci       <- allObservations(pid, ObservationSelection.Science)
                             .map(_.filter(u => active.contains(u._1)))
+          _            <- (debug"Program $pid has ${allSci.length} science observations: ${allSci.map(_.id)}").whenA(allSci.nonEmpty)
+          // Get all the active calibration observations (excluding those with execution events)
           allCalibs    <- allUnexecutedObservations(pid, ObservationSelection.Calibration)
                             .map(_.filter(u => active.contains(u.id)))
+          _            <- (debug"Program $pid has ${allCalibs.length} active calibration observations: ${allCalibs.map(_.id)}").whenA(allCalibs.nonEmpty)
 
           // Delegate to shared calibrations service (handles GMOS)
           (addedShared, removedShared) <- sharedService.generateSharedCalibrations(pid, allSci, allCalibs, calibTargets, referenceInstant)
@@ -176,6 +181,7 @@ object CalibrationsService extends CalibrationObservations {
         oid: Observation.Id,
       )(using Transaction[F], ServiceAccess): F[Unit] = {
         for {
+          _    <- info"Recalculating calibration targets for $pid, oid $oid"
           o    <- session.execute(Statements.selectCalibrationTimeAndConf)(oid).map(_.headOption)
           // Find the original target
           otgs <- o.map(_._1).map { oid =>

@@ -354,48 +354,22 @@ class perConfigCalibrations extends OdbSuite with SubscriptionUtils with Executi
   }
 
   test("distinguish read mode") {
-    def update(oid: Observation.Id, readMode: GmosAmpReadMode, gain: GmosAmpGain): IO[Unit] =
-      query(
-        user  = pi,
-        query = s"""
-          mutation {
-            updateObservations(input: {
-              SET: {
-                observingMode: {
-                  gmosNorthLongSlit: {
-                    explicitAmpReadMode: ${readMode.tag.toScreamingSnakeCase}
-                    explicitAmpGain: ${gain.tag.toScreamingSnakeCase}
-                  }
-                }
-              },
-              WHERE: {
-                id: { EQ: "$oid" }
-              }
-            }) {
-              observations {
-                instrument
-              }
-            }
-          }
-        """
-      ).void
-
     for
       pid  <- createProgramAs(pi)
       tid1 <- createTargetAs(pi, pid, "One")
       tid2 <- createTargetAs(pi, pid, "Two")
 
       oid1 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid1)
-      _    <- update(oid1, GmosAmpReadMode.Fast, GmosAmpGain.High)
+      _    <- updateConf(oid1, GmosAmpReadMode.Fast, GmosAmpGain.High)
 
       oid2 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid1)
-      _    <- update(oid2, GmosAmpReadMode.Fast, GmosAmpGain.High)
+      _    <- updateConf(oid2, GmosAmpReadMode.Fast, GmosAmpGain.High)
 
       oid3 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid2)
-      _    <- update(oid3, GmosAmpReadMode.Slow, GmosAmpGain.Low)
+      _    <- updateConf(oid3, GmosAmpReadMode.Slow, GmosAmpGain.Low)
 
       oid4 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid2)
-      _    <- update(oid4, GmosAmpReadMode.Slow, GmosAmpGain.Low)
+      _    <- updateConf(oid4, GmosAmpReadMode.Slow, GmosAmpGain.Low)
 
       _    <- prepareObservation(pi, oid1, tid1) *>
               prepareObservation(pi, oid2, tid1) *>
@@ -1066,6 +1040,32 @@ class perConfigCalibrations extends OdbSuite with SubscriptionUtils with Executi
       """
     ).void
 
+  def updateConf(oid: Observation.Id, readMode: GmosAmpReadMode, gain: GmosAmpGain): IO[Unit] =
+    query(
+      user  = pi,
+      query = s"""
+        mutation {
+          updateObservations(input: {
+            SET: {
+              observingMode: {
+                gmosNorthLongSlit: {
+                  explicitAmpReadMode: ${readMode.tag.toScreamingSnakeCase}
+                  explicitAmpGain: ${gain.tag.toScreamingSnakeCase}
+                }
+              }
+            },
+            WHERE: {
+              id: { EQ: "$oid" }
+            }
+          }) {
+            observations {
+              instrument
+            }
+          }
+        }
+      """
+    ).void
+
   test("unnecessary calibrations are removed unless partially executed"):
     for {
       pid  <- createProgramAs(pi)
@@ -1551,6 +1551,30 @@ class perConfigCalibrations extends OdbSuite with SubscriptionUtils with Executi
       assertEquals(twilightAfterSecond, 2)
       assertEquals(rois.count(_ === GmosRoi.FullFrame), 1)
       assertEquals(rois.count(_ === GmosRoi.CentralSpectrum), 1)
+    }
+  }
+
+  test("each calibration observation gets its own unique target") {
+    for {
+      pid  <- createProgramAs(pi)
+      tid1 <- createTargetAs(pi, pid, "One")
+      tid2 <- createTargetAs(pi, pid, "Two")
+      // two observations with different configs
+      oid1 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid1)
+      _    <- updateConf(oid1, GmosAmpReadMode.Fast, GmosAmpGain.High)
+      oid2 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid2)
+      _    <- updateConf(oid2, GmosAmpReadMode.Slow, GmosAmpGain.Low)
+      _    <- prepareObservation(pi, oid1, tid1) *> prepareObservation(pi, oid2, tid2)
+      // run calibrations
+      _    <- recalculateCalibrations(pid)
+      ob   <- queryObservations(pid)
+    } yield {
+      val calibTargetIds = ob.collect:
+        case CalibObs(_, _, Some(_), Some(CalibTE(Some(CalibTarget(targetId)))), _, _, _) =>
+          targetId
+
+      // Verify all calibration targets are unique
+      assertEquals(calibTargetIds.size, calibTargetIds.distinct.size)
     }
   }
 

@@ -788,7 +788,8 @@ class observation_workflow
     val setup: IO[Observation.Id] =
       for
         pid <- createProgramAs(pi)
-        oid <- createObservationAs(pi, pid) // is missing target
+        tid <- createTargetWithProfileAs(pi, pid)
+        oid <- createObservationAs(pi, pid, tid)
         _   <- setObservationCalibrationRole(List(oid), CalibrationRole.SpectroPhotometric)
         _   <- runObscalcUpdateAs(serviceUser, pid, oid)
       yield oid
