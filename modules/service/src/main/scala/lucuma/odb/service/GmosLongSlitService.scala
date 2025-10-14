@@ -63,12 +63,14 @@ trait GmosLongSlitService[F[_]] {
   def deleteSouth(which: List[Observation.Id])(using Transaction[F]): F[Unit]
 
   def updateNorth(
-    SET:   GmosLongSlitInput.Edit.North
-  )(which: List[Observation.Id])(using Transaction[F]): F[Unit]
+    SET:   GmosLongSlitInput.Edit.North,
+    which: List[Observation.Id]
+  )(using Transaction[F]): F[Unit]
 
   def updateSouth(
-    SET: GmosLongSlitInput.Edit.South
-  )(which: List[Observation.Id])(using Transaction[F]): F[Unit]
+    SET: GmosLongSlitInput.Edit.South,
+    which: List[Observation.Id]
+  )(using Transaction[F]): F[Unit]
 
   def cloneNorth(
     originalId: Observation.Id,
@@ -190,25 +192,11 @@ object GmosLongSlitService {
           _ <- ResultT.liftF(which.traverse { oid => session.exec(Statements.insertGmosSouthLongSlit(oid, input)) }.void)
         yield ()).value
 
-      private def deleteExposureTimeModes(
-        which: List[Observation.Id]
-      )(using Transaction[F]): F[Unit] =
-        NonEmptyList
-          .fromList(which)
-          .traverse_ : nel =>
-            services.exposureTimeModeService.delete(nel, ExposureTimeModeRole.Acquisition, ExposureTimeModeRole.Science)
-
       override def deleteNorth(which: List[Observation.Id])(using Transaction[F]): F[Unit] =
-        for
-          _ <- Statements.deleteGmosNorthLongSlit(which).fold(Applicative[F].unit)(session.exec)
-          _ <- deleteExposureTimeModes(which)
-        yield ()
+        Statements.deleteGmosNorthLongSlit(which).fold(Applicative[F].unit)(session.exec)
 
       override def deleteSouth(which: List[Observation.Id])(using Transaction[F]): F[Unit] =
-        for
-          _ <- Statements.deleteGmosSouthLongSlit(which).fold(Applicative[F].unit)(session.exec)
-          _ <- deleteExposureTimeModes(which)
-        yield ()
+        Statements.deleteGmosSouthLongSlit(which).fold(Applicative[F].unit)(session.exec)
 
       private def updateExposureTimeModes(
         common: GmosLongSlitInput.Edit.Common,
@@ -226,16 +214,18 @@ object GmosLongSlitService {
         yield ()
 
       override def updateNorth(
-        SET:   GmosLongSlitInput.Edit.North
-      )(which: List[Observation.Id])(using Transaction[F]): F[Unit] =
+        SET:   GmosLongSlitInput.Edit.North,
+        which: List[Observation.Id]
+      )(using Transaction[F]): F[Unit] =
         for
           _ <- updateExposureTimeModes(SET.common, which)
           _ <- Statements.updateGmosNorthLongSlit(SET, which).fold(Applicative[F].unit)(session.exec)
         yield ()
 
       override def updateSouth(
-        SET: GmosLongSlitInput.Edit.South
-      )(which: List[Observation.Id])(using Transaction[F]): F[Unit] =
+        SET: GmosLongSlitInput.Edit.South,
+        which: List[Observation.Id]
+      )(using Transaction[F]): F[Unit] =
         for
           _ <- updateExposureTimeModes(SET.common, which)
           _ <- Statements.updateGmosSouthLongSlit(SET, which).fold(Applicative[F].unit)(session.exec)

@@ -47,7 +47,8 @@ trait Flamingos2LongSlitService[F[_]]:
 
   def delete(which: List[Observation.Id])(using Transaction[F]): F[Unit]
 
-  def update(SET: Flamingos2LongSlitInput.Edit)(
+  def update(
+    SET:   Flamingos2LongSlitInput.Edit,
     which: List[Observation.Id]
   )(using Transaction[F]): F[Unit]
 
@@ -114,19 +115,8 @@ object Flamingos2LongSlitService:
           _ <- ResultT.liftF(which.traverse { oid => session.exec(Statements.insertF2LongSlit(oid, input)) }.void)
         yield ()).value
 
-      private def deleteExposureTimeModes(
-        which: List[Observation.Id]
-      )(using Transaction[F]): F[Unit] =
-        NonEmptyList
-          .fromList(which)
-          .traverse_ : nel =>
-            services.exposureTimeModeService.delete(nel, ExposureTimeModeRole.Acquisition, ExposureTimeModeRole.Science)
-
-      def delete(which: List[Observation.Id] )(using Transaction[F]): F[Unit] =
-        for
-          _ <- Statements.deleteF2(which).fold(F.unit)(session.exec)
-          _ <- deleteExposureTimeModes(which)
-        yield ()
+      def delete(which: List[Observation.Id])(using Transaction[F]): F[Unit] =
+        Statements.deleteF2(which).fold(F.unit)(session.exec)
 
       private def updateExposureTimeModes(
         input: Flamingos2LongSlitInput.Edit,
@@ -144,8 +134,9 @@ object Flamingos2LongSlitService:
         yield ()
 
       override def update(
-        SET: Flamingos2LongSlitInput.Edit
-      )(which: List[Observation.Id])(using Transaction[F]): F[Unit] =
+        SET: Flamingos2LongSlitInput.Edit,
+        which: List[Observation.Id]
+      )(using Transaction[F]): F[Unit] =
         for
           _ <- updateExposureTimeModes(SET, which)
           _ <- Statements.updateF2LongSlit(SET, which).fold(F.unit)(session.exec)
@@ -157,7 +148,6 @@ object Flamingos2LongSlitService:
 
   object Statements {
 
-//        INNER JOIN t_observation ob ON ls.c_observation_id = ob.c_observation_id
     def selectFlamingos2LongSlit(observationIds: NonEmptyList[Observation.Id]): AppliedFragment =
       sql"""
         SELECT

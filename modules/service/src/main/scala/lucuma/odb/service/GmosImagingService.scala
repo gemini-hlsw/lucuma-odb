@@ -56,12 +56,15 @@ sealed trait GmosImagingService[F[_]] {
   )(using Transaction[F]): F[Unit]
 
   def updateNorth(
-    SET: GmosImagingInput.Edit.North
-  )(which: List[Observation.Id])(using Transaction[F]): F[Unit]
+    SET: GmosImagingInput.Edit.North,
+    which: List[Observation.Id]
+  )(using Transaction[F]): F[Unit]
 
   def updateSouth(
-    SET: GmosImagingInput.Edit.South
-  )(which: List[Observation.Id])(using Transaction[F]): F[Unit]
+    SET: GmosImagingInput.Edit.South,
+    which: List[Observation.Id]
+  )(using Transaction[F]): F[Unit]
+
   def cloneNorth(
     observationId: Observation.Id,
     newObservationId: Observation.Id
@@ -164,8 +167,9 @@ object GmosImagingService {
         Statements.deleteGmosImaging("t_gmos_south_imaging", "t_gmos_south_imaging_filter", "t_gmos_south_imaging_initial_filter", which)
 
       override def updateNorth(
-        SET: GmosImagingInput.Edit.North
-      )(which: List[Observation.Id])(using Transaction[F]): F[Unit] =
+        SET: GmosImagingInput.Edit.North,
+        which: List[Observation.Id]
+      )(using Transaction[F]): F[Unit] =
         Statements.updateGmosImaging(
           "t_gmos_north_imaging",
           "t_gmos_north_imaging_filter",
@@ -176,8 +180,9 @@ object GmosImagingService {
         )
 
       override def updateSouth(
-        SET: GmosImagingInput.Edit.South
-      )(which: List[Observation.Id])(using Transaction[F]): F[Unit] =
+        SET: GmosImagingInput.Edit.South,
+        which: List[Observation.Id]
+      )(using Transaction[F]): F[Unit] =
         Statements.updateGmosImaging(
           "t_gmos_south_imaging",
           "t_gmos_south_imaging_filter",

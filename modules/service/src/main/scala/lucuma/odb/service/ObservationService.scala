@@ -372,12 +372,12 @@ object ObservationService {
               (existingMode, oEdit) match {
                 case (Some(ex), Some(edit)) if edit.observingModeType.contains(ex) =>
                   // update existing
-                  observingModeServices.updateFunction(edit).traverse(_(matchingOids))
+                  observingModeServices.update(edit, matchingOids)
 
                 case (Some(ex), Some(edit)) =>
                   for {
                     // delete existing
-                    _ <- observingModeServices.deleteFunction(ex)(matchingOids)
+                    _ <- observingModeServices.delete(ex, matchingOids)
 
                     // create new
                     r <- observingModeServices.createViaUpdate(edit, etm, matchingOids)
@@ -389,7 +389,7 @@ object ObservationService {
 
                 case (Some(ex), None) =>
                   // delete existing
-                  observingModeServices.deleteFunction(ex)(matchingOids).as(Result.unit)
+                  observingModeServices.delete(ex, matchingOids).as(Result.unit)
 
                 case _  =>
                   // do nothing
@@ -519,8 +519,7 @@ object ObservationService {
                 val cloneRelatedItems =
                   Services.asSuperUser:
                     asterismService.cloneAsterism(observationId, oid2) >>
-                    exposureTimeModeService.clone(observationId, oid2) >>
-                    observingMode.traverse(observingModeServices.cloneFunction(_)(observationId, oid2)) >>
+                    observingMode.traverse(m => observingModeServices.clone(m, observationId, oid2)) >>
                     timingWindowService.cloneTimingWindows(observationId, oid2) >>
                     obsAttachmentAssignmentService.cloneAssignments(observationId, oid2)
 
