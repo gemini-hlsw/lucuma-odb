@@ -179,7 +179,7 @@ object CalibrationConfigSubset:
         none,
         none,
         none,
-        Flamingos2LongSlitInput.Create(disperser, filter, fpu, none, none, none, none).some
+        Flamingos2LongSlitInput.Create(disperser, filter, fpu, none, none, none, none, none, none).some
       )
 
   extension (mode: ObservingMode)

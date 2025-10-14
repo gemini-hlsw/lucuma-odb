@@ -1212,6 +1212,14 @@ class createObservation extends OdbSuite {
             constraintSet: {
               imageQuality: ${iq.tag.toUpperCase}
             }
+            scienceRequirements: {
+              exposureTimeMode: {
+                signalToNoise: {
+                  value: 100.0
+                  at: { nanometers: 234.56 }
+                }
+              }
+            }
             observingMode: {
               flamingos2LongSlit: {
                 disperser: $grating
@@ -1230,6 +1238,18 @@ class createObservation extends OdbSuite {
                 disperser
                 filter
                 fpu
+                acquisitionExposureTimeMode {
+                  signalToNoise {
+                    value
+                    at { nanometers }
+                  }
+                }
+                scienceExposureTimeMode {
+                  signalToNoise {
+                    value
+                    at { nanometers }
+                  }
+                }
                 explicitReadMode
                 explicitReads
                 decker
@@ -1261,6 +1281,10 @@ class createObservation extends OdbSuite {
           (longSlit.downIO[Flamingos2Disperser]("disperser"),
            longSlit.downIO[Option[Flamingos2Filter]]("filter"),
            longSlit.downIO[Flamingos2Fpu]("fpu"),
+           longSlit.downIO[Double]("acquisitionExposureTimeMode", "signalToNoise", "value"),
+           longSlit.downIO[Double]("acquisitionExposureTimeMode", "signalToNoise", "at", "nanometers"),
+           longSlit.downIO[Double]("scienceExposureTimeMode", "signalToNoise", "value"),
+           longSlit.downIO[Double]("scienceExposureTimeMode", "signalToNoise", "at", "nanometers"),
            longSlit.downIO[Option[Flamingos2ReadMode]]("explicitReadMode"),
            longSlit.downIO[Option[Flamingos2Reads]]("explicitReads"),
            longSlit.downIO[Flamingos2Decker]("decker"),
@@ -1277,6 +1301,10 @@ class createObservation extends OdbSuite {
           (Flamingos2Disperser.R1200HK,
            Some(Flamingos2Filter.Y),
            Flamingos2Fpu.LongSlit2,
+           10.0,
+           234.56,
+           100.0,
+           234.56,
            None,
            None,
            Flamingos2Decker.LongSlit,
@@ -1319,6 +1347,14 @@ class createObservation extends OdbSuite {
         createObservation(input: {
           programId: ${pid.asJson}
           SET: {
+            scienceRequirements: {
+              exposureTimeMode: {
+                signalToNoise: {
+                  value: 100.0
+                  at: { nanometers: 234.56 }
+                }
+              }
+            }
             observingMode: {
               flamingos2LongSlit: {
                 disperser: ${disperser.tag.toScreamingSnakeCase}
@@ -1491,6 +1527,14 @@ class createObservation extends OdbSuite {
         createObservation(input: {
           programId: ${pid.asJson}
           SET: {
+            scienceRequirements: {
+              exposureTimeMode: {
+                signalToNoise: {
+                  value: 100.0
+                  at: { nanometers: 234.56 }
+                }
+              }
+            }
             observingMode: {
               flamingos2LongSlit: {
                 disperser: R1200_HK
@@ -2717,6 +2761,14 @@ class createObservation extends OdbSuite {
           createObservation(input: {
             programId: ${pid.asJson}
             SET: {
+              scienceRequirements: {
+                exposureTimeMode: {
+                  signalToNoise: {
+                    value: 100.0
+                    at: { nanometers: 234.56 }
+                  }
+                }
+              }
               observingMode: {
                 flamingos2LongSlit: {
                   disperser: R1200_HK

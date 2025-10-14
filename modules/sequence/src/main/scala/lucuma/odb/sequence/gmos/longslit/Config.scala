@@ -31,6 +31,7 @@ import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.sequence.gmos.GmosCcdMode
 import lucuma.core.model.sequence.gmos.longslit.*
 import lucuma.core.util.Enumerated
+import lucuma.odb.sequence.syntax.hash.*
 import monocle.Lens
 
 import java.io.ByteArrayOutputStream
@@ -147,8 +148,6 @@ sealed trait Config[G: Enumerated, L: Enumerated, U: Enumerated] extends Product
       out.writeLong(o.toAngle.toMicroarcseconds)
 
     out.close()
-
-    import lucuma.odb.sequence.util.HashBytes.*
 
     Array.concat(
       acquisitionExposureTimeMode.hashBytes,

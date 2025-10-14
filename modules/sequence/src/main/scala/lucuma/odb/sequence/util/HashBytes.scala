@@ -35,9 +35,10 @@ object HashBytes:
 
   def apply[A](using ev: HashBytes[A]): ev.type = ev
 
-  extension [A: HashBytes](a: A)
-    def hashBytes: Array[Byte] =
-      HashBytes[A].hashBytes(a)
+  import lucuma.odb.sequence.syntax.hash.*
+//  extension [A: HashBytes](a: A)
+//    def hashBytes: Array[Byte] =
+//      HashBytes[A].hashBytes(a)
 
   def by[A, B: HashBytes](f: A => B): HashBytes[A] =
     new HashBytes[A]:

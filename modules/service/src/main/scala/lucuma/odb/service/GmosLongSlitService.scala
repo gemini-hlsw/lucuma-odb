@@ -196,9 +196,7 @@ object GmosLongSlitService {
         NonEmptyList
           .fromList(which)
           .traverse_ : nel =>
-            List(ExposureTimeModeRole.Acquisition, ExposureTimeModeRole.Science)
-              .traverse_ : role =>
-                services.exposureTimeModeService.delete(nel, role.some)
+            services.exposureTimeModeService.delete(nel, ExposureTimeModeRole.Acquisition, ExposureTimeModeRole.Science)
 
       override def deleteNorth(which: List[Observation.Id])(using Transaction[F]): F[Unit] =
         for

@@ -585,6 +585,7 @@ object OdbMapping {
                 ConstraintSetGroupElaborator,
                 DatasetElaborator,
                 ExecutionElaborator,
+                Flamingos2LongSlitElaborator,
                 GmosNorthLongSlitElaborator,
                 GmosSouthLongSlitElaborator,
                 GroupElaborator,

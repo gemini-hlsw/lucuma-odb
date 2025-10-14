@@ -438,7 +438,7 @@ object ObservationService {
                 _ <- ResultT.liftF:
                        u.fold(().pure[F]): u =>
                          e.fold(
-                           services.exposureTimeModeService.delete(u, ExposureTimeModeRole.Requirement.some),
+                           services.exposureTimeModeService.delete(u, ExposureTimeModeRole.Requirement),
                            ().pure[F],
                            e => services.exposureTimeModeService.updateMany(u, ExposureTimeModeRole.Requirement, e)
                          )
@@ -627,42 +627,6 @@ object ObservationService {
           SET.targetEnvironment.flatMap(_.useBlindOffset).getOrElse(false)
         )
       }
-
-//        val exposureTimeMode: Option[ExposureTimeMode] =
-//          scienceRequirements.flatMap(_.exposureTimeMode.toOption)
-//
-//        val exposureTimeModeType: Option[ExposureTimeModeType] =
-//          exposureTimeMode.map(_.tpe)
-//
-//        val signalToNoiseExposureTimeMode: Option[ExposureTimeMode.SignalToNoiseMode] =
-//          exposureTimeMode.flatMap(ExposureTimeMode.signalToNoise.getOption)
-//
-//        val timeAndCountExposureTimeMode: Option[ExposureTimeMode.TimeAndCountMode] =
-//          exposureTimeMode.flatMap(ExposureTimeMode.timeAndCount.getOption)
-
-//           exposureTimeModeType                                                                                                    ,
-//           exposureTimeMode.map(_.at)                                                                                              ,
-//           signalToNoiseExposureTimeMode.map(_.value)                                                                              ,
-//           timeAndCountExposureTimeMode.map(_.time)                                                                                ,
-//           timeAndCountExposureTimeMode.map(_.count)                                                                               ,
-
-//      Option[ExposureTimeModeType]     ,
-//      Option[Wavelength]               ,
-//      Option[SignalToNoise]            ,
-//      Option[TimeSpan]                 ,
-//      Option[PosInt]                   ,
-
-//          c_exp_time_mode,
-//          c_etm_signal_to_noise_at,
-//          c_etm_signal_to_noise,
-//          c_etm_exp_time,
-//          c_etm_exp_count,
-
-//          ${exposure_time_mode_type.opt},
-//          ${wavelength_pm.opt},
-//          ${signal_to_noise.opt},
-//          ${time_span.opt},
-//          ${int4_pos.opt},
 
     private def insertObservation(
       programId:           Program.Id,

@@ -51,7 +51,7 @@ sealed trait ExposureTimeModeService[F[_]]:
 
   def delete(
     oids: NonEmptyList[Observation.Id],
-    role: Option[ExposureTimeModeRole]
+    role: ExposureTimeModeRole*
   )(using Transaction[F]): F[Unit]
 
   def updateOne(
@@ -124,10 +124,10 @@ object ExposureTimeModeService:
             .map(_.toMap)
 
       override def delete(
-        oids: NonEmptyList[Observation.Id],
-        role: Option[ExposureTimeModeRole]
+        oids:  NonEmptyList[Observation.Id],
+        roles: ExposureTimeModeRole*
       )(using Transaction[F]): F[Unit] =
-        session.exec(Statements.delete(oids, role))
+        session.exec(Statements.delete(oids, roles.toList))
 
       override def updateOne(
         eid:    ExposureTimeModeId,
@@ -293,17 +293,15 @@ object ExposureTimeModeService:
           )
 
     def delete(
-      oids: NonEmptyList[Observation.Id],
-      role: Option[ExposureTimeModeRole]
+      oids:  NonEmptyList[Observation.Id],
+      roles: List[ExposureTimeModeRole]
     ): AppliedFragment =
       sql"""
         DELETE FROM t_exposure_time_mode
               WHERE c_observation_id IN ${observation_id.list(oids.length).values}
-      """.apply(oids.toList) |+|
-      role.fold(void"")(
-        sql"""
-          AND c_role = $exposure_time_mode_role
-        """
+      """.apply(oids.toList) |+| (
+        if roles.isEmpty then void""
+        else sql"AND c_role IN ${exposure_time_mode_role.list(roles.length).values}".apply(roles)
       )
 
     val UpdateExposureTimeMode: Command[(ExposureTimeModeId, ExposureTimeMode)] =

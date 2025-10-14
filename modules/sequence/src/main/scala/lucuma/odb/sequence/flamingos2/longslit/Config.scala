@@ -14,6 +14,7 @@ import lucuma.core.enums.Flamingos2ReadMode
 import lucuma.core.enums.Flamingos2ReadoutMode
 import lucuma.core.enums.Flamingos2Reads
 import lucuma.core.math.Offset
+import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.TelluricType
 import lucuma.core.syntax.all.*
 import lucuma.odb.sequence.syntax.all.*
@@ -29,6 +30,8 @@ case class Config private[longslit](
   disperser: Flamingos2Disperser,
   filter: Flamingos2Filter,
   fpu: Flamingos2Fpu,
+  acquisitionExposureTimeMode: ExposureTimeMode,
+  scienceExposureTimeMode: ExposureTimeMode,
   explicitReadMode: Option[Flamingos2ReadMode],
   explicitReads: Option[Flamingos2Reads],
   defaultDecker: Flamingos2Decker,
@@ -37,7 +40,7 @@ case class Config private[longslit](
   explicitReadoutMode: Option[Flamingos2ReadoutMode],
   explicitSpatialOffsets: Option[List[Offset]],
   telluricType: TelluricType
-) derives Eq {
+) derives Eq:
 
   def decker: Flamingos2Decker =
     explicitDecker.getOrElse(defaultDecker)
@@ -48,7 +51,7 @@ case class Config private[longslit](
   def offsets: List[Offset] =
     explicitSpatialOffsets.getOrElse(Config.DefaultSpatialOffsets)
 
-  def hashBytes: Array[Byte] = {
+  def hashBytes: Array[Byte] =
     val bao: ByteArrayOutputStream = new ByteArrayOutputStream(256)
     val out: DataOutputStream      = new DataOutputStream(bao)
 
@@ -65,10 +68,12 @@ case class Config private[longslit](
     out.write(tt, 0, tt.length)
 
     out.close()
-    bao.toByteArray
-  }
 
-}
+    Array.concat(
+      acquisitionExposureTimeMode.hashBytes,
+      scienceExposureTimeMode.hashBytes,
+      bao.toByteArray
+    )
 
 object Config:
 
@@ -84,6 +89,8 @@ object Config:
     disperser: Flamingos2Disperser,
     filter: Flamingos2Filter,
     fpu: Flamingos2Fpu,
+    acquisitionExposureTimeMode: ExposureTimeMode,
+    scienceExposureTimeMode: ExposureTimeMode,
     explicitReadMode: Option[Flamingos2ReadMode] = None,
     explicitReads: Option[Flamingos2Reads] = None,
     explicitDecker: Option[Flamingos2Decker] = None,
@@ -95,6 +102,8 @@ object Config:
       disperser,
       filter,
       fpu,
+      acquisitionExposureTimeMode,
+      scienceExposureTimeMode,
       explicitReadMode,
       explicitReads,
       Flamingos2Decker.LongSlit,
