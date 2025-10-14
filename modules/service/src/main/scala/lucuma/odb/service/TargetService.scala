@@ -48,6 +48,7 @@ import lucuma.odb.service.Services.ServiceAccess
 import lucuma.odb.service.TargetService.UpdateTargetsResponse.SourceProfileUpdatesFailed
 import lucuma.odb.service.TargetService.UpdateTargetsResponse.TrackingSwitchFailed
 import lucuma.odb.util.Codecs.*
+import org.typelevel.log4cats.Logger
 import skunk.AppliedFragment
 import skunk.Codec
 import skunk.Encoder
@@ -95,7 +96,7 @@ object TargetService {
     case NoSuchProgram(programId: Program.Id)
     case UpdateFailed(problem: UpdateTargetsError)
 
-  def instantiate[F[_]: Concurrent](using Services[F]): TargetService[F] =
+  def instantiate[F[_]: {Concurrent, Services, Logger as L}]: TargetService[F] =
     new TargetService[F] {
 
       override def createTarget(
@@ -221,9 +222,12 @@ object TargetService {
 
       override def deleteOrphanCalibrationTargets(pid: Program.Id)(using Transaction[F], ServiceAccess): F[Result[Unit]] = {
         val s = Statements.deleteOrphanCalibrationTargets(pid)
-        session
-          .prepareR(s.fragment.command)
-          .use(_.execute(s.argument)).as(Result.unit)
+        L.info(s"Delete orphan calibration targets for $pid") *>
+          session
+            .prepareR(s.fragment.command)
+            .use(_.execute(s.argument))
+            .flatTap(r => L.debug(s"Orphan target deletion result: $r"))
+            .as(Result.unit)
       }
     }
 
@@ -298,7 +302,7 @@ object TargetService {
       name:          NonEmptyString,
       ek:            EphemerisKey,
       sourceProfile: Json,
-      disposition:   TargetDisposition, 
+      disposition:   TargetDisposition,
       role:          Option[CalibrationRole]
     ): AppliedFragment = {
       sql"""

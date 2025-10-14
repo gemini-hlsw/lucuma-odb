@@ -315,7 +315,7 @@ object ObscalcService:
 
         Logger[F].info(s"${pending.observationId}: *** start calculating") *>
         result.flatTap: r =>
-          Logger[F].info(s"${pending.observationId}: *** end caculating: $r")
+          Logger[F].info(s"${pending.observationId}: *** end calculating: $r")
 
       @annotation.nowarn("msg=unused implicit parameter")
       private def storeResult(

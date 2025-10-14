@@ -614,7 +614,7 @@ class setProposalStatus extends OdbSuite
       _   <- computeItcResultAs(pi, oid)
       ina <- createObservationAs(pi, pid) // inactive, should be ignored
       _   <- setObservationWorkflowState(pi, ina, ObservationWorkflowState.Inactive)
-      cal <- createObservationAs(pi, pid) // calibration, should be ignored
+      cal <- createObservationAs(pi, pid, tid) // calibration, should be ignored
       _   <- setObservationCalibratioRole(cal, Some(CalibrationRole.Photometric))
       _   <-
         expect(
@@ -726,7 +726,7 @@ class setProposalStatus extends OdbSuite
   test("✓ A partner of 'HasNonPartner' counts as a US partner for validation"):
     createCallForProposalsAs(
       staff,
-      CallForProposalsType.RegularSemester, 
+      CallForProposalsType.RegularSemester,
       partners = List((Partner.US, none), (Partner.CA, none))
     ).flatMap: cid =>
       createProgramWithCaPi(pi).flatMap: pid =>
@@ -766,7 +766,7 @@ class setProposalStatus extends OdbSuite
   test("Cannot submit past deadline: PI HasNonPartner with US deadline override"):
     createCallForProposalsAs(
       staff,
-      CallForProposalsType.RegularSemester, 
+      CallForProposalsType.RegularSemester,
       deadline = yesterday.some,
       partners = List((Partner.US, none), (Partner.CA, none))
     ).flatMap: cid =>
@@ -797,7 +797,7 @@ class setProposalStatus extends OdbSuite
   test("Cannot submit past deadline: PI HasNonPartner with default US deadline"):
     createCallForProposalsAs(
       staff,
-      CallForProposalsType.RegularSemester, 
+      CallForProposalsType.RegularSemester,
       partners = List((Partner.US, yesterday.some), (Partner.CA, none))
     ).flatMap: cid =>
       createProgramWithNonPartnerPi(pi).flatMap: pid =>
@@ -827,7 +827,7 @@ class setProposalStatus extends OdbSuite
   test("Cannot submit past deadline: PI HasPartner with default deadline"):
     createCallForProposalsAs(
       staff,
-      CallForProposalsType.RegularSemester, 
+      CallForProposalsType.RegularSemester,
       deadline = yesterday.some,
       partners = List((Partner.US, none), (Partner.CA, none))
     ).flatMap: cid =>
@@ -858,7 +858,7 @@ class setProposalStatus extends OdbSuite
   test("Cannot submit past deadline: PI HasPartner with deadline override"):
     createCallForProposalsAs(
       staff,
-      CallForProposalsType.RegularSemester, 
+      CallForProposalsType.RegularSemester,
       partners = List((Partner.US, none), (Partner.CA, yesterday.some))
     ).flatMap: cid =>
       createProgramWithCaPi(pi).flatMap: pid =>
