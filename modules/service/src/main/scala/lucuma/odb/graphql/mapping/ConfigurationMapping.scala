@@ -68,8 +68,6 @@ trait ConfigurationMapping[F[_]]
       SqlObject("observingMode"),
     )
 
-  // Use GuideService.getObjectTrackikng to compute thet location of this observation's asterism at the middle
-  // of the CFP's active period (if we can).
   def targetQueryHandler: EffectHandler[F] =
 
     // N.B. we can't use ObservationEffectHandler here because it doesn't gather all the infomation we need from
@@ -84,9 +82,14 @@ trait ConfigurationMapping[F[_]]
                 s .trackingService
                   .getCoordinatesSnapshotOrRegion(oid, at)
                   .map: res =>
-                    res.map(_.bimap(_.base, _._1))
+                    if res.isFailure then Result(None) // important, don't fail here
+                    else res
+                      .map:
+                        case Left(a)             => Left(a.base).some // non-opportunity
+                        case Right((_, Some(c))) => Left(c).some      // opportunity with explicit base
+                        case Right((r, None))    => Right(r).some     // opportunity without explicit base
               }
-          .map(_.sequence)          
+          .map(_.sequence.map(_.flatten))
 
       private def queryContext(queries: List[(Query, Cursor)]): Result[List[(Program.Id, Observation.Id, Option[Timestamp])]] =
         queries.parTraverse: (_, cursor) =>
