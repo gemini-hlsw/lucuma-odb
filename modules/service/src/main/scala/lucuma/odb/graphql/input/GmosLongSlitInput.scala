@@ -57,16 +57,16 @@ object GmosLongSlitInput:
   object Create:
 
     final case class Common(
-      centralWavelength:   Wavelength,
-      acqExposureTimeMode: Option[ExposureTimeMode],
-      sciExposureTimeMode: Option[ExposureTimeMode],
-      explicitXBin:        Option[GmosXBinning],
-      explicitYBin:        Option[GmosYBinning],
-      explicitAmpReadMode: Option[GmosAmpReadMode],
-      explicitAmpGain:     Option[GmosAmpGain],
-      explicitRoi:         Option[GmosRoi],
-      explicitλDithers:    Option[List[WavelengthDither]],
-      explicitOffsets:     Option[List[Q]]
+      centralWavelength:           Wavelength,
+      acquisitionExposureTimeMode: Option[ExposureTimeMode],
+      scienceExposureTimeMode:     Option[ExposureTimeMode],
+      explicitXBin:                Option[GmosXBinning],
+      explicitYBin:                Option[GmosYBinning],
+      explicitAmpReadMode:         Option[GmosAmpReadMode],
+      explicitAmpGain:             Option[GmosAmpGain],
+      explicitRoi:                 Option[GmosRoi],
+      explicitλDithers:            Option[List[WavelengthDither]],
+      explicitOffsets:             Option[List[Q]]
     ):
 
       // Formatted to store in a text column in the database with a regex constraint
@@ -84,11 +84,6 @@ object GmosLongSlitInput:
     ) extends Create[GmosNorthGrating, GmosNorthFilter, GmosNorthFpu]:
       def observingModeType: ObservingModeType =
         ObservingModeType.GmosNorthLongSlit
-
-      def withDefaultExposureTimeMode(m: Option[ExposureTimeMode]): North =
-        common.sciExposureTimeMode match
-          case None => copy(common = common.copy(sciExposureTimeMode = m))
-          case _    => this
 
     object North:
 
@@ -138,11 +133,6 @@ object GmosLongSlitInput:
       def observingModeType: ObservingModeType =
         ObservingModeType.GmosSouthLongSlit
 
-      def withDefaultExposureTimeMode(m: Option[ExposureTimeMode]): South =
-        common.sciExposureTimeMode match
-          case None => copy(common = common.copy(sciExposureTimeMode = m))
-          case _    => this
-
     object South:
 
       val Binding: Matcher[South] =
@@ -186,24 +176,24 @@ object GmosLongSlitInput:
   object Edit:
 
     final case class Common(
-      centralWavelength:   Option[Wavelength],
-      acqExposureTimeMode: Option[ExposureTimeMode],
-      sciExposureTimeMode: Option[ExposureTimeMode],
-      explicitXBin:        Nullable[GmosXBinning],
-      explicitYBin:        Nullable[GmosYBinning],
-      explicitAmpReadMode: Nullable[GmosAmpReadMode],
-      explicitAmpGain:     Nullable[GmosAmpGain],
-      explicitRoi:         Nullable[GmosRoi],
-      explicitλDithers:    Nullable[List[WavelengthDither]],
-      explicitOffsets:     Nullable[List[Q]]
+      centralWavelength:           Option[Wavelength],
+      acquisitionExposureTimeMode: Option[ExposureTimeMode],
+      scienceExposureTimeMode:     Option[ExposureTimeMode],
+      explicitXBin:                Nullable[GmosXBinning],
+      explicitYBin:                Nullable[GmosYBinning],
+      explicitAmpReadMode:         Nullable[GmosAmpReadMode],
+      explicitAmpGain:             Nullable[GmosAmpGain],
+      explicitRoi:                 Nullable[GmosRoi],
+      explicitλDithers:            Nullable[List[WavelengthDither]],
+      explicitOffsets:             Nullable[List[Q]]
     ):
 
       def toCreate(site: Site): Result[Create.Common] =
         required(site, centralWavelength, "centralWavelength").map: w =>
           Create.Common(
             w,
-            acqExposureTimeMode,
-            sciExposureTimeMode,
+            acquisitionExposureTimeMode,
+            scienceExposureTimeMode,
             explicitXBin.toOption,
             explicitYBin.toOption,
             explicitAmpReadMode.toOption,

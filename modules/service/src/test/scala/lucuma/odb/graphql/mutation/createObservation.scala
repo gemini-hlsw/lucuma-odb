@@ -38,9 +38,6 @@ class createObservation extends OdbSuite {
     def downPath(p: String*): ACursor =
       p.foldLeft(ac) { (aCursor, field) => aCursor.downField(field) }
 
-    def isNullIO(p: String*): IO[Boolean] =
-      IO(downPath(p*).focus.exists(_.isNull))
-
     def liftIO[A: Decoder]: IO[A] =
       ac.as[A].leftMap(f => new RuntimeException(f.message)).liftTo[IO]
 

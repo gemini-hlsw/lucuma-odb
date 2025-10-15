@@ -51,6 +51,14 @@ trait ToExposureTimeModeOps:
         at
       )
 
+    /**
+     * Computes the acquisition and science exposure time modes for an
+     * observing mode with a single science exposure time mode.  It uses the
+     * explicit acquisition or science mode if provided.  If not but there is
+     * a new science requirement ETM, it uses that.  If not but there is an
+     * existing science requirement ETM, it uses that.  Failing that, an
+     * error result.
+     */
     def forSingleScienceObservingModes(
       observingModeName:   String,
       explicitAcquisition: Option[ExposureTimeMode],

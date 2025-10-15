@@ -369,7 +369,7 @@ object CalibrationsService extends CalibrationObservations {
                 void""
 
             val bandFragment = props.band.map(sql"o.c_science_band IS DISTINCT FROM $science_band")
-            val waveFragment = props.wavelengthAt.map(w => sql"(e.c_signal_to_noise_at <> $wavelength_pm AND e.c_role = $exposure_time_mode_role)".apply(w, ExposureTimeModeRole.Requirement))
+            val waveFragment = props.wavelengthAt.map(w => sql"(e.c_signal_to_noise_at <> $wavelength_pm AND e.c_role = $exposure_time_mode_role)".apply(w, ExposureTimeModeRole.Science))
             val needsUpdate  = List(bandFragment, waveFragment).flatten.intercalate(void" OR ")
 
             services.observationService.updateObservations(

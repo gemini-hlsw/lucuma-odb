@@ -166,8 +166,8 @@ object GmosLongSlitService {
       )(using Transaction[F]): F[Result[Unit]] =
         exposureTimeModeService.insertForSingleScienceEtm(
           name,
-          common.acqExposureTimeMode,
-          common.sciExposureTimeMode,
+          common.acquisitionExposureTimeMode,
+          common.scienceExposureTimeMode,
           req,
           which
         )
@@ -209,8 +209,8 @@ object GmosLongSlitService {
               services.exposureTimeModeService.updateMany(nel, role, e)
 
         for
-          _ <- update(common.acqExposureTimeMode, ExposureTimeModeRole.Acquisition)
-          _ <- update(common.sciExposureTimeMode, ExposureTimeModeRole.Science)
+          _ <- update(common.acquisitionExposureTimeMode, ExposureTimeModeRole.Acquisition)
+          _ <- update(common.scienceExposureTimeMode, ExposureTimeModeRole.Science)
         yield ()
 
       override def updateNorth(
