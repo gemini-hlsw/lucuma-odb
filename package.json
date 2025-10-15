@@ -1,19 +1,19 @@
 {
-  "name": "lucuma-itc",
+  "name": "lucuma-odb",
   "version": "0.0.0",
-  "description": " lucuma ITC",
+  "description": " lucuma ODB scripts",
   "directories": {
     "test": "tests"
   },
   "scripts": {
-    "start": "./fetchODBSchema.mjs"
+    "start": "./itcStitchOdbSchema.sh"
   },
   "license": "BSD-3-Clause",
   "devDependencies": {
-    "graphql": "^16.9.0"
+    "graphql": "^16.11.0"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/gemini-hlsw/lucuma-itc.git"
+    "url": "git+https://github.com/gemini-hlsw/lucuma-odb.git"
   }
 }
