@@ -169,9 +169,14 @@ type AtomEvent implements ExecutionEvent {
 
   """Atom execution stage."""
   atomStage: AtomStage!
+  clientId: ClientId @deprecated(reason: "Use idempotencyKey instead")
 
-  """Client id, if any."""
-  clientId: ClientId
+  """
+  Idempotency key, if any.  The IdempotencyKey may be provided by clients when
+  the event is created and is used to enable problem-free retry in the case of
+  failure.
+  """
+  idempotencyKey: IdempotencyKey
 }
 
 enum AtomExecutionState {
@@ -243,6 +248,13 @@ type AtomRecord {
   Atom ID from the generated atom, if any, that produced this atom record.
   """
   generatedId: AtomId
+
+  """
+  Idempotency key, if any.  The IdempotencyKey may be provided by clients when
+  the atom is created and is used to enable problem-free retry in the case of
+  failure.
+  """
+  idempotencyKey: IdempotencyKey
 }
 
 """AtomRecord query results, limited to a maximum of 1000 entries."""
@@ -344,6 +356,19 @@ input BandNormalizedSurfaceInput {
 type Bias implements StepConfig {
   """Step type"""
   stepType: StepType!
+}
+
+"""
+Whether the blind offset target will be automatically calculated or not.
+"""
+enum BlindOffsetType {
+  """The blind offset target will be automatically calculated."""
+  AUTOMATIC
+
+  """
+  A blind offset has been explictly selected, or an automatically selected one was edited.
+  """
+  MANUAL
 }
 
 """Stopping point in a series of steps"""
@@ -491,6 +516,7 @@ type ChangeProgramUserRoleResult {
   programUser: ProgramUser!
 }
 
+"""@deprecated: use IdempotencyKey (UUID) instead"""
 scalar ClientId
 
 """
@@ -666,8 +692,10 @@ enum EditType {
   """EditType Updated"""
   UPDATED
 
-  """EditType Deleted. Used for hard deletion of calibrations"""
-  DELETED_CAL
+  """
+  EditType Deleted. Used for hard deletion of calibrations and blind offset targets
+  """
+  HARD_DELETE
 }
 
 """
@@ -2951,6 +2979,13 @@ type Dataset {
   """Dataset comment, if any has been set."""
   comment: NonEmptyString
 
+  """
+  Idempotency key, if any.  The IdempotencyKey may be provided by clients when
+  the dataset is created and is used to enable problem-free retry in the case of
+  failure.
+  """
+  idempotencyKey: IdempotencyKey
+
   """Dataset time interval, if the dataset collection has started."""
   interval: TimestampInterval
 
@@ -3044,9 +3079,14 @@ type DatasetEvent implements ExecutionEvent {
 
   """The associated dataset."""
   dataset: Dataset!
+  clientId: ClientId @deprecated(reason: "Use idempotencyKey instead")
 
-  """Client id, if any."""
-  clientId: ClientId
+  """
+  Idempotency key, if any.  The IdempotencyKey may be provided by clients when
+  the event is created and is used to enable problem-free retry in the case of
+  failure.
+  """
+  idempotencyKey: IdempotencyKey
 }
 
 """Dataset filename in standard format."""
@@ -3323,9 +3363,14 @@ interface ExecutionEvent {
 
   """Event type."""
   eventType: ExecutionEventType!
+  clientId: ClientId @deprecated(reason: "Use idempotencyKey instead")
 
-  """Client id, if any."""
-  clientId: ClientId
+  """
+  Idempotency key, if any.  The IdempotencyKey may be provided by clients when
+  the event is created and is used to enable problem-free retry in the case of
+  failure.
+  """
+  idempotencyKey: IdempotencyKey
 }
 
 """ExecutionEventId id formatted as `e-[1-9a-f][0-9a-f]*`"""
@@ -3697,6 +3742,20 @@ enum Flamingos2Reads {
   READS_16
 }
 
+"""Telluric calibration type"""
+enum TelluricTag {
+  HOT
+  A0V
+  SOLAR
+  MANUAL
+}
+
+"""Telluric calibration type"""
+type TelluricType {
+  tag: TelluricTag!
+  starTypes: [String!]
+}
+
 """Flamingos2 Long Slit mode"""
 type Flamingos2LongSlit {
   """Flamingos2 Disperser"""
@@ -3764,6 +3823,9 @@ type Flamingos2LongSlit {
   the default.
   """
   explicitOffsets: [Offset!]
+
+  """Telluric type configuration for this observation."""
+  telluricType: TelluricType!
 
   """
   The disperser as it was initially selected.  See the `disperser` field for the
@@ -4197,9 +4259,7 @@ type GmosNorthLongSlit {
   """
   spatialOffsets: [OffsetQ!]! @deprecated(reason: "Use 'offsets', 'defaultOffsets', and 'explicitOffsets' instead.")
 
-  """
-  Default spatial offsets.
-  """
+  """Default spatial offsets."""
   defaultSpatialOffsets: [OffsetQ!]! @deprecated(reason: "Use 'defaultOffsets' instead.")
 
   """
@@ -4638,9 +4698,7 @@ type GmosSouthLongSlit {
   """
   spatialOffsets: [OffsetQ!]! @deprecated(reason: "Use 'offsets', 'defaultOffsets', and 'explicitOffsets' instead.")
 
-  """
-  Default spatial offsets.
-  """
+  """Default spatial offsets."""
   defaultSpatialOffsets: [OffsetQ!]! @deprecated(reason: "Use 'defaultOffsets' instead.")
 
   """
@@ -5078,6 +5136,14 @@ type SpectroscopyConfigOptionFlamingos2 {
   disperser: Flamingos2Disperser!
   filter: Flamingos2Filter!
 }
+
+"""
+A UUID provided by a client in order to prevent retrying a failed mutation from
+performing the action a second time when not necessary.  When a mutation is
+performed the updates are associated with the given key, if provided.  If a
+subsequent mutation is attempted using the same key then no actions are taken.
+"""
+scalar IdempotencyKey
 
 type ImagingScienceRequirements {
   """
@@ -6221,9 +6287,14 @@ type SequenceEvent implements ExecutionEvent {
 
   """Sequence event data."""
   command: SequenceCommand!
+  clientId: ClientId @deprecated(reason: "Use idempotencyKey instead")
 
-  """Client id, if any."""
-  clientId: ClientId
+  """
+  Idempotency key, if any.  The IdempotencyKey may be provided by clients when
+  the event is created and is used to enable problem-free retry in the case of
+  failure.
+  """
+  idempotencyKey: IdempotencyKey
 }
 
 """Type of sequence, acquisition or science"""
@@ -6323,9 +6394,14 @@ type SlewEvent implements ExecutionEvent {
 
   """Slew event data."""
   slewStage: SlewStage!
+  clientId: ClientId @deprecated(reason: "Use idempotencyKey instead")
 
-  """Client id, if any."""
-  clientId: ClientId
+  """
+  Idempotency key, if any.  The IdempotencyKey may be provided by clients when
+  the event is created and is used to enable problem-free retry in the case of
+  failure.
+  """
+  idempotencyKey: IdempotencyKey
 }
 
 """Slew stage"""
@@ -6904,9 +6980,14 @@ type StepEvent implements ExecutionEvent {
 
   """Step execution stage."""
   stepStage: StepStage!
+  clientId: ClientId @deprecated(reason: "Use idempotencyKey instead")
 
-  """Client id, if any."""
-  clientId: ClientId
+  """
+  Idempotency key, if any.  The IdempotencyKey may be provided by clients when
+  the event is created and is used to enable problem-free retry in the case of
+  failure.
+  """
+  idempotencyKey: IdempotencyKey
 }
 
 """
@@ -7151,6 +7232,13 @@ type StepRecord {
   generatedId: StepId
 
   """
+  Idempotency key, if any.  The IdempotencyKey may be provided by clients when
+  the step is created and is used to enable problem-free retry in the case of
+  failure.
+  """
+  idempotencyKey: IdempotencyKey
+
+  """
   Flamingos 2 instrument configuration for this step, if any.  This will be null
   unless the `instrument` discriminator is "FLAMINGOS2".
   """
@@ -7244,6 +7332,29 @@ enum TacCategory {
   EXTRAGALACTIC_OTHER
 }
 
+"""Target disposition"""
+enum TargetDisposition {
+  """
+  TargetDisposition Science
+  Science targets are associated with science observations.
+  """
+  SCIENCE
+
+  """
+  TargetDisposition Calibration
+  Calibration targets are associated with calibration observations.
+  """
+  CALIBRATION
+
+  """
+  TargetDisposition BlindOffset
+  Blind offset targets do not exist independently from an observation. If a blind offset target is
+  removed from the asterism of an observation, or the useBlindOffset flag is unset, the blind offset target
+  is deleted.
+  """
+  BLIND_OFFSET
+}
+
 """
 Calibration role
 Observations/Programs/Targets can have a calibration role
@@ -7278,6 +7389,9 @@ type Target {
 
   """Target name."""
   name: NonEmptyString!
+
+  """Target disposition. See TargetDisposition for more information."""
+  disposition: TargetDisposition!
 
   """calibration role"""
   calibrationRole: CalibrationRole
@@ -7347,7 +7461,7 @@ type TargetEnvironment {
   guideEnvironments(
     """The time used for the guide star calculations."""
     observationTime: Timestamp!
-  ): [GuideEnvironment!]!
+  ): [GuideEnvironment!]! @deprecated(reason: "use guideEnvironment instead")
 
   """
   The guide target(s) and related information.
@@ -7380,41 +7494,17 @@ type TargetEnvironment {
   be returned.
   """
   guideTargetName: NonEmptyString
-}
 
-type TargetEnvironmentGroup {
-  """IDs of observations that use the same constraints"""
-  observationIds: [ObservationId!]!
+  """Whether blind offset is enabled for this observation"""
+  useBlindOffset: Boolean!
 
-  """Observations associated with the common value"""
-  observations(
-    """Set to true to include deleted values"""
-    includeDeleted: Boolean! = false
-
-    """
-    Starts the result set at (or after if not existent) the given observation id.
-    """
-    OFFSET: ObservationId
-
-    """
-    Limits the result to at most this number of matches (but never more than 1000).
-    """
-    LIMIT: NonNegInt
-  ): ObservationSelectResult!
-
-  """Commonly held value across the observations"""
-  targetEnvironment: TargetEnvironment!
-}
+  """The target used for blind offset acquisition, if any"""
+  blindOffsetTarget: Target
 
 """
-The matching targetEnvironmentGroup results, limited to a maximum of 1000 entries.
-"""
-type TargetEnvironmentGroupSelectResult {
-  """Matching targetEnvironmentGroups up to the return size limit of 1000"""
-  matches: [TargetEnvironmentGroup!]!
-
-  """`true` when there were additional matches that were not returned."""
-  hasMore: Boolean!
+  The type of blind offset (automatic or manual) if a blind offset exists.
+  """
+  blindOffsetType: BlindOffsetType!
 }
 
 type TargetGroup {
@@ -7788,6 +7878,13 @@ type Visit {
 
   """Time accounting details for this visit."""
   timeChargeInvoice: TimeChargeInvoice!
+
+  """
+  Idempotency key, if any.  The IdempotencyKey may be provided by clients when
+  the visit is created and is used to enable problem-free retry in the case of
+  failure.
+  """
+  idempotencyKey: IdempotencyKey
 
   """
   Flamingos 2 static instrument configuration, for Flamingos 2 visits.  See the
