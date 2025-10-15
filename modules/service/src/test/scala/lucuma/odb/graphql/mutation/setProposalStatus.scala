@@ -614,7 +614,7 @@ class setProposalStatus extends OdbSuite
       _   <- computeItcResultAs(pi, oid)
       ina <- createObservationAs(pi, pid) // inactive, should be ignored
       _   <- setObservationWorkflowState(pi, ina, ObservationWorkflowState.Inactive)
-      cal <- createObservationAs(pi, pid) // calibration, should be ignored
+      cal <- createObservationAs(pi, pid, tid) // calibration, should be ignored
       _   <- setObservationCalibrationRole(List(cal), CalibrationRole.Photometric)
       _   <-
         expect(

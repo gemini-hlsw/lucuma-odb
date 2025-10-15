@@ -8,8 +8,7 @@ ALTER TABLE t_group DISABLE TRIGGER group_trigger_groups;
 UPDATE t_observation
 SET c_group_id = NULL,
     c_group_index = -1
-WHERE c_calibration_role IN ('twilight', 'spectrophotometric', 'telluric')
-  AND c_existence = 'present'
+WHERE c_calibration_role IN ('twilight', 'spectrophotometric', 'telluric', 'photometric')
   AND NOT EXISTS (
     SELECT 1
     FROM t_asterism_target at
@@ -18,8 +17,7 @@ WHERE c_calibration_role IN ('twilight', 'spectrophotometric', 'telluric')
   );
 
 DELETE FROM t_observation
-WHERE c_calibration_role IN ('twilight', 'spectrophotometric', 'telluric')
-  AND c_existence = 'present'
+WHERE c_calibration_role IN ('twilight', 'spectrophotometric', 'telluric', 'photometric')
   AND NOT EXISTS (
     SELECT 1
     FROM t_asterism_target at
@@ -50,7 +48,7 @@ BEGIN
   END IF;
 
   -- Only check for twilight, spectrophotometric, and telluric calibrations
-  IF current_calib_role IN ('twilight', 'spectrophotometric', 'telluric') THEN
+  IF current_calib_role IN ('twilight', 'spectrophotometric', 'telluric', 'photometric') THEN
 
     SELECT COUNT(*) INTO target_count
     FROM t_asterism_target
