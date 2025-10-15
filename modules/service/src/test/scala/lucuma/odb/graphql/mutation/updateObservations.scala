@@ -912,7 +912,7 @@ class updateObservations extends OdbSuite
 
   }
 
-  test("spectroscopy science requirements: update") {
+  test("science requirements: update") {
     oneUpdateTest(
       pi,
       spectroscopyScienceRequirements.update,
@@ -920,6 +920,45 @@ class updateObservations extends OdbSuite
       spectroscopyScienceRequirements.expected.asRight
     )
   }
+
+  test("science requirements: delete exposure time mode"):
+    for
+      pid <- createProgramAs(pi)
+      oid <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some)
+      _   <- updateObservation(
+        user     = pi,
+        oid      = oid,
+        update   = """
+          scienceRequirements: {
+            exposureTimeMode: null
+          }
+        """,
+        query    = """
+          observations {
+            scienceRequirements {
+              exposureTimeMode {
+                signalToNoise {
+                  value
+                }
+              }
+            }
+          }
+        """,
+        expected = json"""
+          {
+            "updateObservations": {
+              "observations": [
+                {
+                  "scienceRequirements": {
+                    "exposureTimeMode": null
+                  }
+                }
+              ]
+            }
+          }
+        """.asRight
+      )
+    yield ()
 
   test("science requirements: delete spectroscopy focal plane") {
     for {
@@ -2134,10 +2173,16 @@ class updateObservations extends OdbSuite
           centralWavelength: {
             nanometers: 234.56
           }
+          acquisitionExposureTimeMode: {
+            signalToNoise: {
+              value: 9.9
+              at: { nanometers: 123.45 }
+            }
+          }
           scienceExposureTimeMode: {
             signalToNoise: {
               value: 20.0
-              at: { nanometers: 234.56 }
+              at: { nanometers: 543.21 }
             }
           }
           explicitXBin: FOUR
@@ -2171,6 +2216,18 @@ class updateObservations extends OdbSuite
             fpu
             centralWavelength {
               nanometers
+            }
+            acquisitionExposureTimeMode {
+              signalToNoise {
+                value
+                at { nanometers }
+              }
+            }
+            scienceExposureTimeMode {
+              signalToNoise {
+                value
+                at { nanometers }
+              }
             }
             explicitXBin
             explicitYBin
@@ -2211,6 +2268,18 @@ class updateObservations extends OdbSuite
                   "fpu": "LONG_SLIT_0_25",
                   "centralWavelength": {
                     "nanometers": 234.560
+                  },
+                  "acquisitionExposureTimeMode": {
+                    "signalToNoise": {
+                      "value": 9.900,
+                      "at": { "nanometers": 123.450 }
+                    }
+                  },
+                  "scienceExposureTimeMode": {
+                    "signalToNoise": {
+                      "value": 20.000,
+                      "at": { "nanometers": 543.210 }
+                    }
                   },
                   "explicitXBin": "FOUR",
                   "explicitYBin": "FOUR",
@@ -2265,6 +2334,18 @@ class updateObservations extends OdbSuite
           centralWavelength: {
             nanometers: 654.321
           }
+          acquisitionExposureTimeMode: {
+            signalToNoise: {
+              value: 99.9
+              at: { nanometers: 234.56 }
+            }
+          }
+          scienceExposureTimeMode: {
+            signalToNoise: {
+              value: 220.0
+              at: { nanometers: 654.32 }
+            }
+          }
           explicitXBin: ONE
           explicitYBin: ONE
           explicitAmpReadMode: SLOW
@@ -2297,6 +2378,18 @@ class updateObservations extends OdbSuite
                   "fpu": "LONG_SLIT_0_50",
                   "centralWavelength": {
                     "nanometers": 654.321
+                  },
+                  "acquisitionExposureTimeMode": {
+                    "signalToNoise": {
+                      "value": 99.900,
+                      "at": { "nanometers": 234.560 }
+                    }
+                  },
+                  "scienceExposureTimeMode": {
+                    "signalToNoise": {
+                      "value": 220.000,
+                      "at": { "nanometers": 654.320 }
+                    }
                   },
                   "explicitXBin": "ONE",
                   "explicitYBin": "ONE",
@@ -2346,6 +2439,14 @@ class updateObservations extends OdbSuite
 
     val update0 =
       """
+      scienceRequirements: {
+        exposureTimeMode: {
+          signalToNoise: {
+            value: 100.0
+            at: { nanometers: 1210.0 }
+          }
+        }
+      }
       observingMode: {
         gmosNorthLongSlit: {
           grating: B1200_G5301
@@ -2353,6 +2454,12 @@ class updateObservations extends OdbSuite
           fpu: LONG_SLIT_0_25
           centralWavelength: {
             nanometers: 234.56
+          }
+          acquisitionExposureTimeMode: {
+            signalToNoise: {
+              value: 1.0
+              at: { nanometers: 123.45 }
+            }
           }
           scienceExposureTimeMode: {
             signalToNoise: {
@@ -2368,6 +2475,14 @@ class updateObservations extends OdbSuite
       """
       observations {
         instrument
+        scienceRequirements {
+          exposureTimeMode {
+            signalToNoise {
+              value
+              at { nanometers }
+            }
+          }
+        }
         observingMode {
           gmosNorthLongSlit {
             grating
@@ -2383,6 +2498,14 @@ class updateObservations extends OdbSuite
           "observations": [
             {
               "instrument": "GMOS_NORTH",
+              "scienceRequirements": {
+                "exposureTimeMode": {
+                  "signalToNoise": {
+                    "value": 100.000,
+                    "at": { "nanometers":  1210.000 }
+                  }
+                }
+              },
               "observingMode": {
                 "gmosNorthLongSlit": {
                   "grating": "B1200_G5301"
@@ -2404,12 +2527,6 @@ class updateObservations extends OdbSuite
           centralWavelength: {
             nanometers: 234.56
           }
-          scienceExposureTimeMode: {
-            signalToNoise: {
-              value: 20.0
-              at: { nanometers: 234.56 }
-            }
-          }
         }
       }
     """
@@ -2421,11 +2538,24 @@ class updateObservations extends OdbSuite
         observingMode {
           gmosSouthLongSlit {
             grating
+            acquisitionExposureTimeMode {
+              signalToNoise {
+                value
+                at { nanometers }
+              }
+            }
+            scienceExposureTimeMode {
+              signalToNoise {
+                value
+                at { nanometers }
+              }
+            }
           }
         }
       }
     """
 
+    // ETMs inherited from requirements (with acq value fixed at 10.0)
     val expected1 =
       json"""
       {
@@ -2435,7 +2565,19 @@ class updateObservations extends OdbSuite
               "instrument": "GMOS_SOUTH",
               "observingMode": {
                 "gmosSouthLongSlit": {
-                  "grating": "R831_G5322"
+                  "grating": "R831_G5322",
+                  "acquisitionExposureTimeMode": {
+                    "signalToNoise": {
+                      "value": 10.000,
+                      "at": { "nanometers": 1210.000 }
+                    }
+                  },
+                  "scienceExposureTimeMode": {
+                    "signalToNoise": {
+                      "value": 100.000,
+                      "at": { "nanometers": 1210.000 }
+                    }
+                  }
                 }
               }
             }
