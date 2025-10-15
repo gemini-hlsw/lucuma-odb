@@ -565,6 +565,9 @@ trait Codecs {
   val calibration_role: Codec[CalibrationRole] =
     enumerated(Type("e_calibration_role"))
 
+  val _calibration_role: Codec[List[CalibrationRole]] =
+    _enumerated[CalibrationRole](Type("_e_calibration_role", List(Type("e_calibration_role"))))
+
   val target_disposition: Codec[TargetDisposition] =
     enumerated(Type("e_target_disposition"))
 

@@ -83,7 +83,7 @@ object PerConfigCalibrationsService:
           groupService(emailConfig, httpClient).selectGroups(pid).flatMap {
             case GroupTree.Root(_, c) =>
               val existing = c.collectFirst {
-                case GroupTree.Branch(gid, _, _, _, Some(CalibrationsGroupName), _, _, _, true) => gid
+                case GroupTree.Branch(gid, _, _, _, Some(CalibrationsGroupName), _, _, _, true, _) => gid
               }
               existing match {
                 case Some(gid) => gid.some.pure[F]

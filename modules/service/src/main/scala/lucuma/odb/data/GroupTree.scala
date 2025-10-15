@@ -7,6 +7,7 @@ import cats.syntax.eq.*
 import cats.syntax.option.*
 import eu.timepit.refined.types.numeric.NonNegShort
 import eu.timepit.refined.types.string.NonEmptyString
+import lucuma.core.enums.CalibrationRole
 import lucuma.core.model.Group
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
@@ -24,7 +25,7 @@ sealed trait GroupTree extends Product with Serializable {
         case Nil => None
         case GroupTree.Leaf(_) :: tail => go(tail)
         case GroupTree.Root(_, c) :: tail => go(c ::: tail)
-        case (b @ GroupTree.Branch(g, _, _, c, _, _, _, _, _)) :: tail =>
+        case (b @ GroupTree.Branch(g, _, _, c, _, _, _, _, _, _)) :: tail =>
           if (g === groupId) b.some else go(c ::: tail)
       }
     go(List(this))
@@ -66,15 +67,16 @@ object GroupTree {
    * or other groups.
    */
   case class Branch(
-    groupId:     Group.Id,
-    minRequired: Option[NonNegShort],
-    ordered:     Boolean,
-    children:    List[Child],
-    name:        Option[NonEmptyString],
-    description: Option[NonEmptyString],
-    minInterval: Option[TimeSpan],
-    maxInterval: Option[TimeSpan],
-    system:      Boolean
+    groupId:          Group.Id,
+    minRequired:      Option[NonNegShort],
+    ordered:          Boolean,
+    children:         List[Child],
+    name:             Option[NonEmptyString],
+    description:      Option[NonEmptyString],
+    minInterval:      Option[TimeSpan],
+    maxInterval:      Option[TimeSpan],
+    system:           Boolean,
+    calibrationRoles: List[CalibrationRole]
   ) extends Parent with Child
 
   /**

@@ -5,7 +5,7 @@ package lucuma.odb.service
 
 import cats.data.Nested
 import cats.data.NonEmptyList
-import cats.effect.MonadCancelThrow
+import cats.effect.Concurrent
 import cats.syntax.all.*
 import grackle.Result
 import lucuma.core.enums.CalibrationRole
@@ -31,6 +31,7 @@ import lucuma.odb.graphql.mapping.AccessControl
 import lucuma.odb.sequence.ObservingMode
 import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.sequence.data.ItcInput
+import lucuma.odb.service.CalibrationConfigSubset.toConfigSubset
 import lucuma.odb.service.Services.ServiceAccess
 import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.util.Codecs.*
@@ -108,7 +109,7 @@ object CalibrationsService extends CalibrationObservations {
       case (tid, name, role, Some(st)) => (tid, name, role, st)
     }
 
-  def instantiate[F[_]: {MonadCancelThrow, Services, Logger}](emailConfig: Config.Email, httpClient: Client[F]): CalibrationsService[F] =
+  def instantiate[F[_]: {Concurrent, Services, Logger}](emailConfig: Config.Email, httpClient: Client[F]): CalibrationsService[F] =
     new CalibrationsService[F] {
 
       private def collectValid(
@@ -151,7 +152,7 @@ object CalibrationsService extends CalibrationObservations {
 
       def recalculateCalibrations(pid: Program.Id, referenceInstant: Instant)(using Transaction[F], ServiceAccess): F[(List[Observation.Id], List[Observation.Id])] =
         val sharedService = PerConfigCalibrationsService.instantiate(emailConfig, httpClient)
-        //val perObsService = PerObsCalibrationsService.instantiate(emailConfig, httpClient)
+        val perObsService = PerObsCalibrationsService.instantiate(emailConfig, httpClient)
 
         for
           _            <- info"Recalculating calibrations for $pid, reference instant  $referenceInstant"
@@ -169,8 +170,18 @@ object CalibrationsService extends CalibrationObservations {
                             .map(_.filter(u => active.contains(u.id)))
           _            <- (debug"Program $pid has ${allCalibs.length} active calibration observations: ${allCalibs.map(_.id)}").whenA(allCalibs.nonEmpty)
 
+          // Separate F2 from GMOS observations
+          f2ScienceObs  = allSci.filter(_.data.toConfigSubset.isInstanceOf[CalibrationConfigSubset.Flamingos2Configs]).map(_.map(_.toConfigSubset))
+          gmosScienceObs = allSci.filterNot(_.data.toConfigSubset.isInstanceOf[CalibrationConfigSubset.Flamingos2Configs])
+
+          _            <- (debug"Program $pid has ${f2ScienceObs.length} F2 science observations: ${f2ScienceObs.map(_.id)}").whenA(f2ScienceObs.nonEmpty)
+          _            <- (debug"Program $pid has ${gmosScienceObs.length} GMOS science observations: ${gmosScienceObs.map(_.id)}").whenA(gmosScienceObs.nonEmpty)
+
+          // Handle F2 per-observation grouping
+          _ <- perObsService.generatePerObsCalibrations(pid, f2ScienceObs)
+
           // Delegate to shared calibrations service (handles GMOS)
-          (addedShared, removedShared) <- sharedService.generateSharedCalibrations(pid, allSci, allCalibs, calibTargets, referenceInstant)
+          (addedShared, removedShared) <- sharedService.generateSharedCalibrations(pid, gmosScienceObs, allCalibs, calibTargets, referenceInstant)
           // Cleanup
           _            <- targetService.deleteOrphanCalibrationTargets(pid)
         yield (addedShared, removedShared)

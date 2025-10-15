@@ -9643,6 +9643,13 @@ type Group {
   existence: Existence!
 
   system: Boolean!
+
+  """
+  Calibration roles supported by this group (system groups only).
+  Empty array for non-calibration groups.
+  This field is system-managed and not user-editable.
+  """
+  calibrationRoles: [CalibrationRole!]!
 }
 
 scalar GroupId
