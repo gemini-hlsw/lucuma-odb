@@ -7,6 +7,8 @@ package input
 
 import cats.syntax.functor.*
 import cats.syntax.parallel.*
+import cats.syntax.traverse.*
+import grackle.Result
 import lucuma.core.enums.ObservingModeType
 import lucuma.odb.graphql.binding.*
 
@@ -69,6 +71,14 @@ object ObservingModeInput {
         .orElse(gmosNorthImaging.map(_.observingModeType))
         .orElse(gmosSouthImaging.map(_.observingModeType))
         .orElse(flamingos2LongSlit.map(_.observingModeType))
+
+    def toCreate: Result[Create] =
+      (gmosNorthLongSlit.traverse(_.toCreate),
+       gmosSouthLongSlit.traverse(_.toCreate),
+       gmosNorthImaging.traverse(_.toCreate),
+       gmosSouthImaging.traverse(_.toCreate),
+       flamingos2LongSlit.traverse(_.toCreate)
+      ).parMapN(Create.apply)
 
   }
 

@@ -438,7 +438,7 @@ object ObservationService {
                 _ <- ResultT.liftF:
                        u.fold(().pure[F]): u =>
                          e.fold(
-                           services.exposureTimeModeService.delete(u, ExposureTimeModeRole.Requirement),
+                           services.exposureTimeModeService.deleteMany(u, ExposureTimeModeRole.Requirement),
                            ().pure[F],
                            e => services.exposureTimeModeService.updateMany(u, ExposureTimeModeRole.Requirement, e)
                          )

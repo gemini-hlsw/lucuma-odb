@@ -49,7 +49,7 @@ sealed trait ExposureTimeModeService[F[_]]:
     etm:  ExposureTimeMode
   )(using Transaction[F]): F[Map[Observation.Id, ExposureTimeModeId]]
 
-  def delete(
+  def deleteMany(
     oids: NonEmptyList[Observation.Id],
     role: ExposureTimeModeRole*
   )(using Transaction[F]): F[Unit]
@@ -123,7 +123,7 @@ object ExposureTimeModeService:
             .toList
             .map(_.toMap)
 
-      override def delete(
+      override def deleteMany(
         oids:  NonEmptyList[Observation.Id],
         roles: ExposureTimeModeRole*
       )(using Transaction[F]): F[Unit] =

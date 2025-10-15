@@ -111,10 +111,10 @@ object ObservingModeServices:
       )(using Transaction[F], SuperUserAccess): F[Result[Unit]] =
         List(
           input.flamingos2LongSlit.map(m => flamingos2LongSlitService.insert(m, etm, which)),
-          input.gmosNorthImaging.map(m => gmosImagingService.insertNorth(m, etm, which)),
-          input.gmosNorthLongSlit.map(m => gmosLongSlitService.insertNorth(m, etm, which)),
-          input.gmosSouthImaging.map(m => gmosImagingService.insertSouth(m, etm, which)),
-          input.gmosSouthLongSlit.map(m => gmosLongSlitService.insertSouth(m, etm, which))
+          input.gmosNorthImaging.map(m =>   gmosImagingService.insertNorth(m, etm, which)),
+          input.gmosNorthLongSlit.map(m =>  gmosLongSlitService.insertNorth(m, etm, which)),
+          input.gmosSouthImaging.map(m =>   gmosImagingService.insertSouth(m, etm, which)),
+          input.gmosSouthLongSlit.map(m =>  gmosLongSlitService.insertSouth(m, etm, which))
         ).flattenOption match
           case List(r) => r
           case Nil     => OdbError.InvalidArgument("No observing mode creation parameters were provided.".some).asFailureF
@@ -129,7 +129,7 @@ object ObservingModeServices:
           NonEmptyList
             .fromList(which)
             .traverse_ : nel =>
-              services.exposureTimeModeService.delete(nel, ExposureTimeModeRole.Acquisition, ExposureTimeModeRole.Science)
+              services.exposureTimeModeService.deleteMany(nel, ExposureTimeModeRole.Acquisition, ExposureTimeModeRole.Science)
 
         val deleteObservingMode: F[Unit] =
           mode match
@@ -161,16 +161,7 @@ object ObservingModeServices:
         etm:   Option[ExposureTimeMode],
         which: List[Observation.Id]
       )(using Transaction[F], SuperUserAccess): F[Result[Unit]] =
-        List(
-          input.flamingos2LongSlit.map(m => m.toCreate.flatTraverse(c => flamingos2LongSlitService.insert(c, etm, which))),
-          input.gmosNorthImaging.map(m => m.toCreate.flatTraverse(c => gmosImagingService.insertNorth(c, etm, which))),
-          input.gmosNorthLongSlit.map(m => m.toCreate.flatTraverse(c => gmosLongSlitService.insertNorth(c, etm, which))),
-          input.gmosSouthLongSlit.map(m => m.toCreate.flatTraverse(c => gmosLongSlitService.insertSouth(c, etm, which))),
-          input.gmosSouthImaging.map(m => m.toCreate.flatTraverse(c => gmosImagingService.insertSouth(c, etm, which)))
-        ).flattenOption match
-          case List(r) => r
-          case Nil     => OdbError.InvalidArgument("No observing mode creation parameters were provided.".some).asFailureF
-          case _       => OdbError.InvalidArgument("Only one observing mode's creation parameters may be provided.".some).asFailureF
+        input.toCreate.flatTraverse(c => create(c, etm, which))
 
       override def clone(
         mode:    ObservingModeType,

@@ -15,7 +15,6 @@ CREATE TYPE e_exposure_time_mode_role AS ENUM(
 CREATE TABLE t_exposure_time_mode (
   c_exposure_time_mode_id SERIAL                    PRIMARY KEY,
   c_observation_id        d_observation_id          NOT NULL REFERENCES t_observation(c_observation_id) ON DELETE CASCADE,
-  --c_observing_mode_type   e_observing_mode_type,
   c_role                  e_exposure_time_mode_role NOT NULL,
 
   c_exposure_time_mode    e_exp_time_mode           NOT NULL,
