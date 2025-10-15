@@ -161,6 +161,80 @@ BEGIN
   END LOOP;
 END $$;
 
+-- We'd like to add c_observing_mode_type and make a compound FK to
+-- t_observation(c_observing_id, c_observing_mode_type) but unfortunately the
+-- observing mode type is nullable.  We'll make sure the ETM is consistent with
+-- the mode in a trigger function.
+
+CREATE FUNCTION check_etm_consistent()
+RETURNS TRIGGER AS $$
+DECLARE
+  obs_id   d_observation_id;
+  obs_mode e_observing_mode_type;
+  acq_count INTEGER;
+  sci_count INTEGER;
+BEGIN
+
+  -- Use OLD for DELETE, NEW otherwise
+  obs_id := COALESCE(NEW.c_observation_id, OLD.c_observation_id);
+
+  -- Lookup the observing mode
+  SELECT c_observing_mode_type INTO obs_mode
+    FROM t_observation
+   WHERE c_observation_id = obs_id;
+
+  -- How many of each type do we have?
+  SELECT
+    COUNT(*) FILTER (WHERE c_role = 'acquisition'),
+    COUNT(*) FILTER (WHERE c_role = 'science')
+  INTO acq_count, sci_count
+  FROM t_exposure_time_mode
+  WHERE c_observation_id = obs_id;
+
+  IF obs_mode IS NULL THEN
+
+    -- When there is no observing mode, there should be no acquisition or science ETMs.
+    IF acq_count <> 0 OR sci_count <> 0 THEN
+      RAISE EXCEPTION 'Observation % with mode % should not have acquisition nor science exposure time modes', obs_id, obs_mode;
+    END IF;
+
+  ELSE
+
+    -- Mode specific checks
+    CASE
+      WHEN obs_mode IN ('flamingos_2_long_slit', 'gmos_north_long_slit', 'gmos_south_long_slit') THEN
+        IF acq_count <> 1 THEN
+          RAISE EXCEPTION 'Observation % with mode % must have an acquisition exposure time mode', obs_id, obs_mode;
+        END IF;
+
+        IF sci_count <> 1 THEN
+          RAISE EXCEPTION 'Observation % with mode % must have exactly one science exposure time mode', obs_id, obs_mode;
+        END IF;
+
+      WHEN obs_mode IN ('gmos_north_imaging', 'gmos_south_imaging') THEN
+        NULL;  -- placeholder
+
+      ELSE
+        RAISE EXCEPTION 'Unknown observing mode % for observation %', obs_mode, obs_id;
+    END CASE;
+  END IF;
+
+  RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE CONSTRAINT TRIGGER check_etm_consistent__t_exposure_time_mode_trigger
+AFTER INSERT OR DELETE OR UPDATE OF c_role ON t_exposure_time_mode
+DEFERRABLE INITIALLY DEFERRED
+FOR EACH ROW
+EXECUTE FUNCTION check_etm_consistent();
+
+CREATE CONSTRAINT TRIGGER check_etm_consistent__t_observation_trigger
+AFTER INSERT OR DELETE OR UPDATE OF c_observing_mode_type ON t_observation
+DEFERRABLE INITIALLY DEFERRED
+FOR EACH ROW
+EXECUTE FUNCTION check_etm_consistent();
+
 -- We need a view on the exposure time mode for the embedded s/n, t&c.
 CREATE VIEW v_exposure_time_mode AS
   SELECT e.*,
@@ -242,3 +316,24 @@ ALTER TABLE t_obscalc
   ALTER COLUMN c_img_total_sn   SET DATA TYPE numeric(11,3),
   ALTER COLUMN c_spec_single_sn SET DATA TYPE numeric(11,3),
   ALTER COLUMN c_spec_total_sn  SET DATA TYPE numeric(11,3);
+
+-- We need to trigger an obscalc update whenever an exposure time mode changes.
+CREATE FUNCTION etm_obscalc_invalidate()
+RETURNS TRIGGER AS $$
+DECLARE
+  obs_id d_observation_id;
+BEGIN
+  obs_id := COALESCE(NEW.c_observation_id, OLD.c_observation_id);
+
+  IF ROW(NEW.*) IS DISTINCT FROM ROW(OLD.*) THEN
+    CALL invalidate_obscalc(obs_id);
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE CONSTRAINT TRIGGER etm_obscalc_invalidate_trigger
+AFTER INSERT OR UPDATE OR DELETE ON t_exposure_time_mode
+DEFERRABLE INITIALLY DEFERRED
+FOR EACH ROW
+EXECUTE FUNCTION etm_obscalc_invalidate();
