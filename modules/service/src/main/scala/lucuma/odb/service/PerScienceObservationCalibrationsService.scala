@@ -16,20 +16,20 @@ import lucuma.odb.data.Existence
 import lucuma.odb.data.GroupTree
 import lucuma.odb.graphql.input.CreateGroupInput
 import lucuma.odb.graphql.input.GroupPropertiesInput
-import lucuma.odb.service.CalibrationsService.ObsExtract
 import lucuma.odb.service.Services.ServiceAccess
 import org.http4s.client.Client
 import skunk.Transaction
 
-trait PerObsCalibrationsService[F[_]]:
-  def generatePerObsCalibrations(
+trait PerScienceObservationCalibrationsService[F[_]]:
+
+  def generateCalibrations(
     pid: Program.Id,
     f2ScienceObs: List[ObsExtract[CalibrationConfigSubset]]
   )(using Transaction[F], ServiceAccess): F[List[Observation.Id]]
 
-object PerObsCalibrationsService:
-  def instantiate[F[_]: Concurrent](emailConfig: Config.Email, httpClient: Client[F])(using Services[F]): PerObsCalibrationsService[F] =
-    new PerObsCalibrationsService[F] with CalibrationObservations:
+object PerScienceObservationCalibrationsService:
+  def instantiate[F[_]: Concurrent](emailConfig: Config.Email, httpClient: Client[F])(using Services[F]): PerScienceObservationCalibrationsService[F] =
+    new PerScienceObservationCalibrationsService[F] with CalibrationObservations:
 
       private def groupNameForObservation(oid: Observation.Id): NonEmptyString =
         NonEmptyString.unsafeFrom(s"F2 Science and Telluric Standard for ${oid.show}")
@@ -104,7 +104,7 @@ object PerObsCalibrationsService:
           case _ =>
             new RuntimeException(s"Failed to create F2 group").raiseError[F, Group.Id]
 
-      override def generatePerObsCalibrations(
+      override def generateCalibrations(
         pid: Program.Id,
         f2ScienceObs: List[ObsExtract[CalibrationConfigSubset]]
       )(using Transaction[F], ServiceAccess): F[List[Observation.Id]] =

@@ -10,7 +10,6 @@ import cats.syntax.all.*
 import grackle.Result
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.ObservingModeType
-import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.Site
 import lucuma.core.math.Coordinates
 import lucuma.core.math.Declination
@@ -19,7 +18,6 @@ import lucuma.core.math.Parallax
 import lucuma.core.math.ProperMotion
 import lucuma.core.math.RadialVelocity
 import lucuma.core.math.RightAscension
-import lucuma.core.math.Wavelength
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.SiderealTracking
@@ -30,7 +28,6 @@ import lucuma.odb.graphql.input.EditAsterismsPatchInput
 import lucuma.odb.graphql.mapping.AccessControl
 import lucuma.odb.sequence.ObservingMode
 import lucuma.odb.sequence.data.GeneratorParams
-import lucuma.odb.sequence.data.ItcInput
 import lucuma.odb.service.CalibrationConfigSubset.toConfigSubset
 import lucuma.odb.service.Services.ServiceAccess
 import lucuma.odb.service.Services.Syntax.*
@@ -38,6 +35,8 @@ import lucuma.odb.util.Codecs.*
 import org.http4s.client.Client
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.syntax.*
+import skunk.AppliedFragment
+import skunk.Command
 import skunk.Query
 import skunk.Transaction
 import skunk.codec.numeric.int8
@@ -47,6 +46,7 @@ import skunk.syntax.all.*
 import java.time.Instant
 
 trait CalibrationsService[F[_]] {
+
   /**
     * Recalculates the calibrations for a program
     *
@@ -71,23 +71,7 @@ trait CalibrationsService[F[_]] {
 }
 
 object CalibrationsService extends CalibrationObservations {
-  val SharedCalibrationTypes = List(CalibrationRole.SpectroPhotometric, CalibrationRole.Twilight)
-
-  case class ObsExtract[A](
-    id:   Observation.Id,
-    itc:  Option[ItcInput],
-    band: Option[ScienceBand],
-    role: Option[CalibrationRole],
-    data: A
-  ):
-    def map[B](f: A => B): ObsExtract[B] =
-      copy(data = f(data))
-
-  case class CalObsProps(
-    wavelengthAt: Option[Wavelength],
-    band:         Option[ScienceBand]
-  )
-
+  val PerProgramPerConfigCalibrationTypes = List(CalibrationRole.SpectroPhotometric, CalibrationRole.Twilight)
   private def targetCoordinates(when: Instant)(
     rows: List[(Target.Id, String, CalibrationRole, RightAscension, Declination, Epoch, Option[Long], Option[Long], Option[RadialVelocity], Option[Parallax])]
   ): List[(Target.Id, String, CalibrationRole, Coordinates)] =
@@ -151,13 +135,13 @@ object CalibrationsService extends CalibrationObservations {
             .map(targetCoordinates(referenceInstant))
 
       def recalculateCalibrations(pid: Program.Id, referenceInstant: Instant)(using Transaction[F], ServiceAccess): F[(List[Observation.Id], List[Observation.Id])] =
-        val sharedService = PerConfigCalibrationsService.instantiate(emailConfig, httpClient)
-        val perObsService = PerObsCalibrationsService.instantiate(emailConfig, httpClient)
+        val sharedService = PerProgramPerConfigCalibrationsService.instantiate(emailConfig, httpClient)
+        val perObsService = PerScienceObservationCalibrationsService.instantiate(emailConfig, httpClient)
 
-        for
+        for {
           _            <- info"Recalculating calibrations for $pid, reference instant  $referenceInstant"
           // Read calibration targets (shared resource)
-          calibTargets <- calibrationTargets(SharedCalibrationTypes, referenceInstant)
+          calibTargets <- calibrationTargets(PerProgramPerConfigCalibrationTypes, referenceInstant)
           // List of the program's active observations
           active       <- activeObservations(pid)
           _            <- (debug"Program $pid has ${active.size} active observations: $active").whenA(active.nonEmpty)
@@ -177,14 +161,13 @@ object CalibrationsService extends CalibrationObservations {
           _            <- (debug"Program $pid has ${f2ScienceObs.length} F2 science observations: ${f2ScienceObs.map(_.id)}").whenA(f2ScienceObs.nonEmpty)
           _            <- (debug"Program $pid has ${gmosScienceObs.length} GMOS science observations: ${gmosScienceObs.map(_.id)}").whenA(gmosScienceObs.nonEmpty)
 
-          // Handle F2 per-observation grouping
-          _ <- perObsService.generatePerObsCalibrations(pid, f2ScienceObs)
-
-          // Delegate to shared calibrations service (handles GMOS)
-          (addedShared, removedShared) <- sharedService.generateSharedCalibrations(pid, gmosScienceObs, allCalibs, calibTargets, referenceInstant)
+          // Handle per-science-observation calibs
+          _            <- perObsService.generateCalibrations(pid, f2ScienceObs)
+          // Handle per-config calib
+          (addedShared, removedShared) <- sharedService.generateCalibrations(pid, gmosScienceObs, allCalibs, calibTargets, referenceInstant)
           // Cleanup
           _            <- targetService.deleteOrphanCalibrationTargets(pid)
-        yield (addedShared, removedShared)
+        } yield (addedShared, removedShared)
 
       // Recalcula the target of a calibration observation
       def recalculateCalibrationTarget(
@@ -203,11 +186,11 @@ object CalibrationsService extends CalibrationObservations {
           tgts <- o match {
                   case Some(oid, cr, Some(ot), Some(ObservingModeType.GmosNorthLongSlit)) =>
                     session
-                      .execute(Statements.selectCalibrationTargets(SharedCalibrationTypes))(SharedCalibrationTypes)
+                      .execute(Statements.selectCalibrationTargets(PerProgramPerConfigCalibrationTypes))(PerProgramPerConfigCalibrationTypes)
                       .map(targetCoordinates(ot.toInstant).map(CalibrationIdealTargets(Site.GN, ot.toInstant, _)).map(_.bestTarget(cr)))
                   case Some(oid, cr, Some(ot), Some(ObservingModeType.GmosSouthLongSlit)) =>
                     session
-                      .execute(Statements.selectCalibrationTargets(SharedCalibrationTypes))(SharedCalibrationTypes)
+                      .execute(Statements.selectCalibrationTargets(PerProgramPerConfigCalibrationTypes))(PerProgramPerConfigCalibrationTypes)
                       .map(targetCoordinates(ot.toInstant).map(CalibrationIdealTargets(Site.GS, ot.toInstant, _)).map(_.bestTarget(cr)))
                   case _ =>
                     none.pure[F]
@@ -238,6 +221,19 @@ object CalibrationsService extends CalibrationObservations {
     }
 
   object Statements {
+
+    val SetCalibrationRole: Command[(Observation.Id, Option[CalibrationRole])] =
+      sql"""
+        UPDATE t_observation
+        SET c_calibration_role = ${calibration_role.opt}
+        WHERE c_observation_id = $observation_id
+      """.command.contramap((a, b) => (b, a))
+
+    def setCalibRole(oids: List[Observation.Id], role: CalibrationRole): AppliedFragment =
+      void"UPDATE t_observation " |+|
+        sql"SET c_calibration_role = $calibration_role "(role) |+|
+        void"WHERE c_observation_id IN (" |+|
+          oids.map(sql"$observation_id").intercalate(void", ") |+| void")"
 
     def selectCalibrationTargets(roles: List[CalibrationRole]): Query[List[CalibrationRole], (Target.Id, String, CalibrationRole, RightAscension, Declination, Epoch, Option[Long], Option[Long], Option[RadialVelocity], Option[Parallax])] =
       sql"""SELECT

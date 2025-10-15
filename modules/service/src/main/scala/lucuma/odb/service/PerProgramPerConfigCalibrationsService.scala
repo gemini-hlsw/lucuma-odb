@@ -31,9 +31,7 @@ import lucuma.odb.graphql.input.SpectroscopyScienceRequirementsInput
 import lucuma.odb.graphql.mapping.AccessControl
 import lucuma.odb.sequence.ObservingMode
 import lucuma.odb.service.CalibrationConfigSubset.*
-import lucuma.odb.service.CalibrationsService.CalObsProps
-import lucuma.odb.service.CalibrationsService.ObsExtract
-import lucuma.odb.service.CalibrationsService.SharedCalibrationTypes
+import lucuma.odb.service.CalibrationsService.PerProgramPerConfigCalibrationTypes
 import lucuma.odb.service.Services.ServiceAccess
 import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.util.Codecs.*
@@ -47,8 +45,8 @@ import skunk.syntax.all.*
 
 import java.time.Instant
 
-trait PerConfigCalibrationsService[F[_]]:
-  def generateSharedCalibrations(
+trait PerProgramPerConfigCalibrationsService[F[_]]:
+  def generateCalibrations(
     pid: Program.Id,
     allSci: List[ObsExtract[ObservingMode]],
     allCalibs: List[ObsExtract[ObservingMode]],
@@ -56,11 +54,11 @@ trait PerConfigCalibrationsService[F[_]]:
     when: Instant
   )(using Transaction[F], ServiceAccess): F[(List[Observation.Id], List[Observation.Id])]
 
-object PerConfigCalibrationsService:
+object PerProgramPerConfigCalibrationsService:
   val CalibrationsGroupName: NonEmptyString = "Calibrations".refined
 
-  def instantiate[F[_]: {MonadCancelThrow, Services, Logger}](emailConfig: Config.Email, httpClient: Client[F]): PerConfigCalibrationsService[F] =
-    new PerConfigCalibrationsService[F] with CalibrationObservations:
+  def instantiate[F[_]: {MonadCancelThrow, Services, Logger}](emailConfig: Config.Email, httpClient: Client[F]): PerProgramPerConfigCalibrationsService[F] =
+    new PerProgramPerConfigCalibrationsService[F] with CalibrationObservations:
       private def calObsProps(
         calibConfigs: List[ObsExtract[CalibrationConfigSubset]]
       ): Map[CalibrationConfigSubset, CalObsProps] =
@@ -115,7 +113,7 @@ object PerConfigCalibrationsService:
 
       // Set the calibration role of the observations in bulk
       private def setCalibRoleAndGroup(oids: List[Observation.Id], calibrationRole: CalibrationRole): F[Unit] =
-        session.executeCommand(Statements.setCalibRole(oids, calibrationRole)).void
+        session.executeCommand(CalibrationsService.Statements.setCalibRole(oids, calibrationRole)).void
 
       /**
        * Check if a calibration is actually needed by any science observation.
@@ -132,7 +130,7 @@ object PerConfigCalibrationsService:
         uniqueSci: List[CalibrationConfigSubset],
         calibs: List[ObsExtract[CalibrationConfigSubset]]
       ): Map[CalibrationRole, List[CalibrationConfigSubset]] =
-        SharedCalibrationTypes.map { calibType =>
+        PerProgramPerConfigCalibrationTypes.map { calibType =>
           val sciConfigs = uniqueSci.map(config =>
             CalibrationConfigMatcher.matcherFor(config, calibType).normalize(config)
           ).distinct
@@ -272,7 +270,7 @@ object PerConfigCalibrationsService:
             )
           }.void
 
-      override def generateSharedCalibrations(
+      override def generateCalibrations(
         pid: Program.Id,
         allSci: List[ObsExtract[ObservingMode]],
         allCalibs: List[ObsExtract[ObservingMode]],
@@ -307,10 +305,3 @@ object PerConfigCalibrationsService:
           calibUpdates    = prepareCalibrationUpdates(gmosCalibs, removedOids, props)
           _              <- updatePropsAt(calibUpdates)
         yield (addedOids, removedOids)
-
-      object Statements:
-        def setCalibRole(oids: List[Observation.Id], role: CalibrationRole): AppliedFragment =
-          void"UPDATE t_observation " |+|
-            sql"SET c_calibration_role = $calibration_role "(role) |+|
-            void"WHERE c_observation_id IN (" |+|
-              oids.map(sql"$observation_id").intercalate(void", ") |+| void")"

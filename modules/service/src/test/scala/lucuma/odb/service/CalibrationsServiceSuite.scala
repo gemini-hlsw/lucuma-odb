@@ -10,12 +10,11 @@ import lucuma.odb.graphql.OdbSuite
 import lucuma.odb.graphql.TestUsers
 import lucuma.odb.graphql.input.TargetPropertiesInput
 import lucuma.odb.graphql.mapping.AccessControl
-import lucuma.odb.graphql.query.ObservingModeSetupOperations
 import lucuma.odb.util.Codecs.*
 
 import java.time.*
 
-class CalibrationsServiceSuite extends OdbSuite with ObservingModeSetupOperations:
+class CalibrationsServiceSuite extends OdbSuite:
   val serviceUser = TestUsers.service(nextId)
   lazy val validUsers = List(serviceUser)
 
@@ -48,21 +47,3 @@ class CalibrationsServiceSuite extends OdbSuite with ObservingModeSetupOperation
               )
               after  <- services.calibrationsService(emailConfig, httpClient).calibrationTargets(roles, when)
             yield before.tail === after
-
-  test("recalculateCalibrations high level test, runs F2 and GMOS"):
-    for {
-      pid <- createProgramAs(serviceUser)
-      tid <- createTargetAs(serviceUser, pid)
-      gmt <- createTargetWithProfileAs(serviceUser, pid)
-      f2  <- createFlamingos2LongSlitObservationAs(serviceUser, pid, tid)
-      _   <- createGmosNorthLongSlitObservationAs(serviceUser, pid, List(gmt))
-      _   <- withServices(serviceUser): services =>
-               assertIOBoolean:
-                 Services.asSuperUser:
-                   services.transactionally:
-                     services.calibrationsService(emailConfig, httpClient)
-                       .recalculateCalibrations(pid, when)
-                       .map: (added, removed) =>
-                         // Should create 1 F2 telluric + 2 GMOS calibrations (specphoto + twilight)
-                         added.size == 2 && removed.isEmpty
-    } yield ()

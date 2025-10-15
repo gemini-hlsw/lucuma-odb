@@ -42,7 +42,7 @@ import lucuma.odb.graphql.query.ExecutionQuerySetupOperations
 import lucuma.odb.graphql.subscription.SubscriptionUtils
 import lucuma.odb.json.wavelength.decoder.given
 import lucuma.odb.service.CalibrationsService
-import lucuma.odb.service.PerConfigCalibrationsService
+import lucuma.odb.service.PerProgramPerConfigCalibrationsService
 import lucuma.odb.service.Services
 import lucuma.odb.service.SpecPhotoCalibrations
 import lucuma.odb.service.TwilightCalibrations
@@ -53,7 +53,7 @@ import java.time.LocalDateTime
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 
-class perConfigCalibrations extends OdbSuite with SubscriptionUtils with ExecutionQuerySetupOperations {
+class perProgramPerConfigCalibrations extends OdbSuite with SubscriptionUtils with ExecutionQuerySetupOperations {
   val pi       = TestUsers.Standard.pi(1, 101)
   val service  = TestUsers.service(3)
 
@@ -322,7 +322,7 @@ class perConfigCalibrations extends OdbSuite with SubscriptionUtils with Executi
     } yield {
       assertEquals(gr.size, 1)
       assert(cg._2)
-      assertEquals(cg._3, PerConfigCalibrationsService.CalibrationsGroupName)
+      assertEquals(cg._3, PerProgramPerConfigCalibrationsService.CalibrationsGroupName)
     }
   }
 

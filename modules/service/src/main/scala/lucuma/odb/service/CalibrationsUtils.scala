@@ -33,8 +33,8 @@ import lucuma.odb.graphql.input.SpectroscopyScienceRequirementsInput
 import lucuma.odb.graphql.input.TargetEnvironmentInput
 import lucuma.odb.graphql.mapping.AccessControl
 import lucuma.odb.sequence.ObservingMode
+import lucuma.odb.sequence.data.ItcInput
 import lucuma.odb.service.CalibrationConfigSubset.*
-import lucuma.odb.service.CalibrationsService.ObsExtract
 import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.util.Codecs
 import skunk.Transaction
@@ -42,6 +42,21 @@ import skunk.Transaction
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.LocalTime
+
+case class ObsExtract[A](
+  id:   Observation.Id,
+  itc:  Option[ItcInput],
+  band: Option[ScienceBand],
+  role: Option[CalibrationRole],
+  data: A
+):
+  def map[B](f: A => B): ObsExtract[B] =
+    copy(data = f(data))
+
+case class CalObsProps(
+  wavelengthAt: Option[Wavelength],
+  band:         Option[ScienceBand]
+)
 
 trait CalibrationTargetLocator {
   def bestTargetInList(ref: Coordinates, tgts: List[(Target.Id, String, CalibrationRole, Coordinates)]): Option[(CalibrationRole, Target.Id)] =
@@ -134,7 +149,7 @@ trait CalibrationObservations {
     pid:    Program.Id,
     gid:    Group.Id,
     tid:    Target.Id,
-    props:  Map[CalibrationConfigSubset, CalibrationsService.CalObsProps],
+    props:  Map[CalibrationConfigSubset, CalObsProps],
     config: CalibrationConfigSubset.Gmos[G, L, U]
   ): F[Observation.Id] =
     val matchingProps = props.find { case (originalConfig, _) =>
@@ -238,51 +253,4 @@ trait CalibrationObservations {
             )
       ).orError
 
-  def flamingos2TelluricObs[F[_]: MonadThrow: Services: Transaction](
-    pid: Program.Id,
-    gid: Group.Id,
-    tid: Target.Id,
-    config: CalibrationConfigSubset.Flamingos2Configs
-  ): F[Observation.Id] =
-    telluricObservation(pid, gid, tid, config.toLongSlitInput)
-
-  private def telluricObservation[F[_]: Services: MonadThrow: Transaction](
-    pid: Program.Id,
-    gid: Group.Id,
-    tid: Target.Id,
-    obsMode: ObservingModeInput.Create
-  ): F[Observation.Id] =
-    observationService.createObservation(
-      Services.asSuperUser:
-        AccessControl.unchecked(
-          ObservationPropertiesInput.Create.Default.copy(
-            targetEnvironment = TargetEnvironmentInput.Create(
-              none,
-              List(tid).some,
-              none,
-              none,
-              BlindOffsetType.Automatic,
-            ).some,
-            constraintSet = roleConstraints(CalibrationRole.Telluric).some,
-            group = gid.some,
-            posAngleConstraint = PosAngleConstraintInput(
-              mode = PosAngleConstraintMode.AverageParallactic.some, none
-            ).some,
-            observingMode = obsMode.some,
-            scienceRequirements =
-              ScienceRequirementsInput(
-                exposureTimeMode = Nullable.NonNull(
-                  ExposureTimeMode.SignalToNoiseMode(
-                    SignalToNoise.unsafeFromBigDecimalExact(100.0),
-                    Wavelength.fromIntNanometers(2000).get
-                  )
-                ),
-                spectroscopy = SpectroscopyScienceRequirementsInput.Default.some,
-                imaging = none
-              ).some
-            ),
-            pid,
-            Codecs.program_id
-          )
-    ).orError
 }
