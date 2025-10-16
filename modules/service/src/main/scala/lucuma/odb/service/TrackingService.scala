@@ -227,6 +227,10 @@ object TrackingService:
               Left(Snapshot(oid, base, ts))
           .pure[F]
 
+        // We want to normalize requests so samples always fall on the hour; and for now we will request one every 4 hours,
+        // aligned to midnight UTC.
+
+
   object Statements:
 
       def selectExplicitBaseCoordinates(oids: NonEmptyList[Observation.Id]): Query[oids.type, (Observation.Id, Coordinates)] =

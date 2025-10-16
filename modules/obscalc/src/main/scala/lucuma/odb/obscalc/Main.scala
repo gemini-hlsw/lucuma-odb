@@ -37,6 +37,7 @@ import lucuma.odb.service.UserService
 import lucuma.odb.util.LucumaEntryPoint
 import natchez.Trace
 import org.http4s.Credentials
+import org.http4s.client.Client
 import org.http4s.headers.Authorization
 import org.typelevel.ci.CIString
 import org.typelevel.log4cats.Logger
@@ -45,7 +46,6 @@ import skunk.{Command as _, *}
 
 import scala.concurrent.duration.*
 import scala.util.NotGiven
-import org.http4s.client.Client
 
 sealed trait MainParams:
   val ServiceName: String =
