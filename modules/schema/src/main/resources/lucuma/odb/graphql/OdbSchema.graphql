@@ -26,7 +26,7 @@ scalar EmailAddress
 input AddAtomEventInput {
   atomId: AtomId!
   atomStage: AtomStage!
-  "deprecated: use idempotencyKey instead"
+  "@deprecated: use idempotencyKey instead"
   clientId: ClientId
 
   """
@@ -51,7 +51,7 @@ input AddDatasetEventInput {
   "Dataset execution stage."
   datasetStage: DatasetStage!
 
-  "deprecated: use idempotencyKey instead"
+  "@deprecated: use idempotencyKey instead"
   clientId: ClientId
 
   """
@@ -83,7 +83,7 @@ input AddSequenceEventInput {
   visitId: VisitId!
   command: SequenceCommand!
 
-  "deprecated: use idempotencyKey instead"
+  "@deprecated: use idempotencyKey instead"
   clientId: ClientId
 
   """
@@ -105,7 +105,7 @@ input AddSlewEventInput {
   observationId: ObservationId!
   slewStage: SlewStage!
 
-  "deprecated: use idempotencyKey instead"
+  "@deprecated: use idempotencyKey instead"
   clientId: ClientId
 
   """
@@ -127,7 +127,7 @@ input AddStepEventInput {
   stepId: StepId!
   stepStage: StepStage!
 
-  "deprecated: use idempotencyKey instead"
+  "@deprecated: use idempotencyKey instead"
   clientId: ClientId
 
   """
@@ -765,7 +765,7 @@ type ChangeProgramUserRoleResult {
   programUser: ProgramUser!
 }
 
-"deprecated: use IdempotencyKey (UUID) instead"
+"@deprecated: use IdempotencyKey (UUID) instead"
 scalar ClientId
 
 """
@@ -8775,22 +8775,19 @@ type GmosNorthLongSlit {
   """
   Spacial q offsets, either explicitly specified in explicitSpatialOffsets
   or else taken from defaultSpatialOffsets
-  @deprecated(reason: "Use 'offsets', 'defaultOffsets', and 'explicitOffsets' instead.")
   """
-  spatialOffsets: [OffsetQ!]!
+  spatialOffsets: [OffsetQ!]! @deprecated(reason: "Use 'offsets', 'defaultOffsets', and 'explicitOffsets' instead.")
 
   """
   Default spatial offsets.
-  @deprecated(reason: "Use 'defaultOffsets' instead.")
   """
-  defaultSpatialOffsets: [OffsetQ!]!
+  defaultSpatialOffsets: [OffsetQ!]! @deprecated(reason: "Use 'defaultOffsets' instead.")
 
   """
   Optional explicitly specified spatial q offsets. If set it overrides the
   the default.
-  @deprecated(reason: "Use 'explicitOffsets' instead.")
   """
-  explicitSpatialOffsets: [OffsetQ!]
+  explicitSpatialOffsets: [OffsetQ!] @deprecated(reason: "Use 'explicitOffsets' instead.")
 
   """
   The grating as it was initially selected.  See the `grating` field for the
@@ -9378,22 +9375,19 @@ type GmosSouthLongSlit {
   """
   Spacial q offsets, either explicitly specified in explicitSpatialOffsets
   or else taken from defaultSpatialOffsets
-  @deprecated(reason: "Use 'offsets', 'defaultOffsets', and 'explicitOffsets' instead.")
   """
-  spatialOffsets: [OffsetQ!]!
+  spatialOffsets: [OffsetQ!]! @deprecated(reason: "Use 'offsets', 'defaultOffsets', and 'explicitOffsets' instead.")
 
   """
   Default spatial offsets.
-  @deprecated(reason: "Use 'defaultOffsets' instead.")
   """
-  defaultSpatialOffsets: [OffsetQ!]!
+  defaultSpatialOffsets: [OffsetQ!]! @deprecated(reason: "Use 'defaultOffsets' instead.")
 
   """
   Optional explicitly specified spatial q offsets. If set it overrides the
   the default.
-  @deprecated(reason: "Use 'explicitOffsets' instead.")
   """
-  explicitSpatialOffsets: [OffsetQ!]
+  explicitSpatialOffsets: [OffsetQ!] @deprecated(reason: "Use 'explicitOffsets' instead.")
 
   """
   The grating as it was initially selected.  See the `grating` field for the
