@@ -9636,11 +9636,13 @@ type Group {
 
   existence: Existence!
 
+  """
+  This group is managed by the system and not user-editable
+  """
   system: Boolean!
 
   """
   Calibration roles supported by this group (system groups only).
-  Empty array for non-calibration groups.
   This field is system-managed and not user-editable.
   """
   calibrationRoles: [CalibrationRole!]!

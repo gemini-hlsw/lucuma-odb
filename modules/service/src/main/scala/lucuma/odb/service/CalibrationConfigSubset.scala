@@ -32,7 +32,8 @@ import lucuma.odb.sequence.flamingos2.longslit.Config as Flamingos2Config
 import lucuma.odb.sequence.gmos.imaging.Config as ImagingConfig
 import lucuma.odb.sequence.gmos.longslit.Config
 
-sealed trait CalibrationConfigSubset derives Eq
+sealed trait CalibrationConfigSubset derives Eq:
+  def modeTypeTag: String
 
 object CalibrationConfigSubset:
   sealed trait Gmos[G, L, U] extends CalibrationConfigSubset:
@@ -72,6 +73,8 @@ object CalibrationConfigSubset:
     roi:               GmosRoi
   ) extends Gmos[GmosNorthGrating, GmosNorthFilter, GmosNorthFpu] derives Eq:
 
+    def modeTypeTag: String = "gmos_north_long_slit"
+
     def toLongSlitInput: ObservingModeInput.Create =
       ObservingModeInput.Create(
         GmosLongSlitInput.Create.North(grating, filter, fpu, longSlitCommonInput).some,
@@ -92,6 +95,8 @@ object CalibrationConfigSubset:
     ampGain:           GmosAmpGain,
     roi:               GmosRoi
   ) extends Gmos[GmosSouthGrating, GmosSouthFilter, GmosSouthFpu] derives Eq:
+
+    def modeTypeTag: String = "gmos_south_long_slit"
 
     def toLongSlitInput: ObservingModeInput.Create =
       ObservingModeInput.Create(
@@ -118,6 +123,8 @@ object CalibrationConfigSubset:
     ampGain:     GmosAmpGain,
     roi:         GmosRoi
   ) extends GmosImaging[GmosNorthFilter] derives Eq:
+
+    def modeTypeTag: String = "gmos_north_imaging"
 
     def toImagingInput: ObservingModeInput.Create =
       ObservingModeInput.Create(
@@ -146,6 +153,8 @@ object CalibrationConfigSubset:
     roi:         GmosRoi
   ) extends GmosImaging[GmosSouthFilter] derives Eq:
 
+    def modeTypeTag: String = "gmos_south_imaging"
+
     def toImagingInput: ObservingModeInput.Create =
       ObservingModeInput.Create(
         none,
@@ -170,6 +179,8 @@ object CalibrationConfigSubset:
     filter:    Flamingos2Filter,
     fpu:       Flamingos2Fpu
   ) extends CalibrationConfigSubset derives Eq:
+
+    def modeTypeTag: String = "flamingos_2_long_slit"
 
     def toLongSlitInput: ObservingModeInput.Create =
       ObservingModeInput.Create(

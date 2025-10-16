@@ -36,8 +36,12 @@ object PerScienceObservationCalibrationsService:
   def instantiate[F[_]: {Concurrent, Services as S, Trace}](emailConfig: Config.Email, httpClient: Client[F]): PerScienceObservationCalibrationsService[F] =
     new PerScienceObservationCalibrationsService[F] with CalibrationObservations:
 
-      private def groupNameForObservation(oid: Observation.Id): NonEmptyString =
-        NonEmptyString.unsafeFrom(s"F2 Science and Telluric Standard for ${oid.show}")
+      private def groupNameForObservation(
+        config: CalibrationConfigSubset,
+        calibrationRole: CalibrationRole,
+        oid: Observation.Id
+      ): NonEmptyString =
+        NonEmptyString.unsafeFrom(s"${config.modeTypeTag}/${calibrationRole.tag}/${oid.show}")
 
       private def findSystemGroupForObservation(
         tree: GroupTree,
@@ -56,6 +60,7 @@ object PerScienceObservationCalibrationsService:
 
       private def createF2TelluricGroup(
         pid: Program.Id,
+        config: CalibrationConfigSubset,
         oid: Observation.Id,
         parentGroupId: Option[Group.Id]
       )(using Transaction[F]): F[Group.Id] =
@@ -65,8 +70,8 @@ object PerScienceObservationCalibrationsService:
             proposalReference = none,
             programReference = none,
             SET = GroupPropertiesInput.Create(
-              name = groupNameForObservation(oid).some,
-              description = NonEmptyString.unsafeFrom("System group for F2 observation and its telluric calibration").some,
+              name = groupNameForObservation(config, CalibrationRole.Telluric, oid).some,
+              description = none,
               minimumRequired = none,
               ordered = false,
               minimumInterval = none,
@@ -134,5 +139,5 @@ object PerScienceObservationCalibrationsService:
               case None =>
                 // Need to create system group
                 val parentGroup = findParentGroupForObservation(tree, obs.id)
-                createF2TelluricGroup(pid, obs.id, parentGroup).void
+                createF2TelluricGroup(pid, obs.data, obs.id, parentGroup).void
         yield List.empty

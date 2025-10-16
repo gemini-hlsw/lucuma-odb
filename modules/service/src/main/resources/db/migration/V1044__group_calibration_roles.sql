@@ -1,12 +1,12 @@
 -- Add calibration roles support to groups
--- This allows system groups to indicate which types of calibrations they manage
 
--- Add the calibration roles column
 ALTER TABLE t_group
 ADD COLUMN c_calibration_roles e_calibration_role[] NOT NULL DEFAULT '{}'::e_calibration_role[];
 
-COMMENT ON COLUMN t_group.c_calibration_roles IS
-'Calibration roles supported by this group (system groups only). Empty array for non-calibration groups. Used to indicate which types of calibrations this group manages (e.g., Telluric, SpectroPhotometric). Only settable by system code, not user-editable.';
+-- Only system groups can have calibration roles
+ALTER TABLE t_group
+ADD CONSTRAINT group_calibration_roles_system_only_check
+CHECK (c_system = true OR c_calibration_roles = '{}');
 
 -- Recreate the v_group view to include the new column
 DROP VIEW v_group;
@@ -17,8 +17,7 @@ CREATE VIEW v_group AS
   CASE WHEN c_max_interval IS NOT NULL THEN c_group_id END AS c_max_interval_id
   FROM t_group;
 
--- Migrate existing F2 long slit science observations into system groups
--- This ensures all F2 observations are properly grouped for telluric calibration generation
+-- Add existing F2 long slit science observations into system groups
 DO $$
 DECLARE
   obs_rec RECORD;
@@ -26,20 +25,19 @@ DECLARE
   parent_group_id d_group_id;
   next_parent_index INT;
 BEGIN
-  -- Temporarily disable ALL triggers to avoid constraint issues during migration
+  -- Disable triggers temoporarily
   ALTER TABLE t_observation DISABLE TRIGGER ALL;
   ALTER TABLE t_group DISABLE TRIGGER ALL;
 
-  -- Process each F2 long slit science observation
+  -- Get each F2 science
   FOR obs_rec IN
     SELECT o.c_observation_id, o.c_program_id, o.c_group_id, o.c_group_index
     FROM t_observation o
     INNER JOIN t_flamingos_2_long_slit f2
       ON o.c_observation_id = f2.c_observation_id
     WHERE
-      -- Only science observations (not calibrations)
       o.c_calibration_role IS NULL
-      -- Not already in a system group with telluric role
+      -- Not already in a system group
       AND NOT EXISTS (
         SELECT 1 FROM t_group g
         WHERE g.c_group_id = o.c_group_id
@@ -47,17 +45,16 @@ BEGIN
           AND 'telluric' = ANY(g.c_calibration_roles)
       )
   LOOP
-    -- Determine parent group (preserve current group as parent if exists)
+    -- preserve current group as parent if exists0
     parent_group_id := obs_rec.c_group_id;
 
-    -- Calculate next available index in parent group
+    -- next available index in parent group
     IF parent_group_id IS NOT NULL THEN
       SELECT COALESCE(MAX(c_parent_index) + 1, 0)
       INTO next_parent_index
       FROM t_group
       WHERE c_parent_id = parent_group_id;
     ELSE
-      -- If no parent, this will be a top-level group
       SELECT COALESCE(MAX(c_parent_index) + 1, 0)
       INTO next_parent_index
       FROM t_group
@@ -83,8 +80,9 @@ BEGIN
       obs_rec.c_program_id,
       parent_group_id,
       next_parent_index,
-      'F2 Science and Telluric Standard for ' || obs_rec.c_observation_id,
-      'System group for F2 observation and its telluric calibration',
+      -- Match naming convention in the code
+      f2.c_observing_mode_type::text || '/' || 'telluric' || '/' || obs_rec.c_observation_id,
+      NULL,
       NULL,
       false,
       NULL,
@@ -94,7 +92,6 @@ BEGIN
       '{telluric}'::e_calibration_role[]
     ) RETURNING c_group_id INTO new_group_id;
 
-    -- Move observation to the new system group
     UPDATE t_observation
     SET c_group_id = new_group_id,
         c_group_index = 0
@@ -102,7 +99,7 @@ BEGIN
 
   END LOOP;
 
-  -- Re-enable ALL triggers
+  -- Re-enable triggers
   ALTER TABLE t_observation ENABLE TRIGGER ALL;
   ALTER TABLE t_group ENABLE TRIGGER ALL;
 END $$;

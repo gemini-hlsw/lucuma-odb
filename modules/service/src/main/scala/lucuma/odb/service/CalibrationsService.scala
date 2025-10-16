@@ -140,35 +140,32 @@ object CalibrationsService extends CalibrationObservations {
         val perObsService = PerScienceObservationCalibrationsService.instantiate(emailConfig, httpClient)
 
         for {
-          _            <- info"Recalculating calibrations for $pid, reference instant  $referenceInstant"
+          _                <- info"Recalculating calibrations for $pid, reference instant  $referenceInstant"
           // Read calibration targets (shared resource)
-          calibTargets <- calibrationTargets(PerProgramPerConfigCalibrationTypes, referenceInstant)
+          calibTargets     <- calibrationTargets(PerProgramPerConfigCalibrationTypes, referenceInstant)
           // List of the program's active observations
-          active       <- activeObservations(pid)
-          _            <- (debug"Program $pid has ${active.size} active observations: $active").whenA(active.nonEmpty)
+          active           <- activeObservations(pid)
+          _                <- (debug"Program $pid has ${active.size} active observations: $active").whenA(active.nonEmpty)
           // Get all active science and calibration observations
-          allSci       <- allObservations(pid, ObservationSelection.Science)
-                            .map(_.filter(u => active.contains(u._1)))
-          _            <- (debug"Program $pid has ${allSci.length} science observations: ${allSci.map(_.id)}").whenA(allSci.nonEmpty)
+          allSci           <- allObservations(pid, ObservationSelection.Science)
+                                .map(_.filter(u => active.contains(u._1)))
+          _                <- (debug"Program $pid has ${allSci.length} science observations: ${allSci.map(_.id)}").whenA(allSci.nonEmpty)
           // Get all the active calibration observations (excluding those with execution events)
-          allCalibs    <- allUnexecutedObservations(pid, ObservationSelection.Calibration)
-                            .map(_.filter(u => active.contains(u.id)))
-          _            <- (debug"Program $pid has ${allCalibs.length} active calibration observations: ${allCalibs.map(_.id)}").whenA(allCalibs.nonEmpty)
-
-          // Separate F2 from GMOS observations
-          f2ScienceObs  = allSci.filter(_.data.toConfigSubset.isInstanceOf[CalibrationConfigSubset.Flamingos2Configs]).map(_.map(_.toConfigSubset))
-          gmosScienceObs = allSci.filterNot(_.data.toConfigSubset.isInstanceOf[CalibrationConfigSubset.Flamingos2Configs])
-
-          _            <- (debug"Program $pid has ${f2ScienceObs.length} F2 science observations: ${f2ScienceObs.map(_.id)}").whenA(f2ScienceObs.nonEmpty)
-          _            <- (debug"Program $pid has ${gmosScienceObs.length} GMOS science observations: ${gmosScienceObs.map(_.id)}").whenA(gmosScienceObs.nonEmpty)
-
+          allCalibs        <- allUnexecutedObservations(pid, ObservationSelection.Calibration)
+                                .map(_.filter(u => active.contains(u.id)))
+          _                <- (debug"Program $pid has ${allCalibs.length} active calibration observations: ${allCalibs.map(_.id)}").whenA(allCalibs.nonEmpty)
+          // F2 and GMOS observations
+          f2ScienceObs     = allSci.filter(_.data.toConfigSubset.isInstanceOf[CalibrationConfigSubset.Flamingos2Configs]).map(_.map(_.toConfigSubset))
+          gmosScienceObs   = allSci.filterNot(_.data.toConfigSubset.isInstanceOf[CalibrationConfigSubset.Flamingos2Configs])
+          _                <- (debug"Program $pid has ${f2ScienceObs.length} F2 science observations: ${f2ScienceObs.map(_.id)}").whenA(f2ScienceObs.nonEmpty)
+          _                <- (debug"Program $pid has ${gmosScienceObs.length} GMOS science observations: ${gmosScienceObs.map(_.id)}").whenA(gmosScienceObs.nonEmpty)
           // Handle per-science-observation calibs
-          _            <- perObsService.generateCalibrations(pid, f2ScienceObs)
-          // Handle per-config calib
-          (addedShared, removedShared) <- sharedService.generateCalibrations(pid, gmosScienceObs, allCalibs, calibTargets, referenceInstant)
-          // Cleanup
-          _            <- targetService.deleteOrphanCalibrationTargets(pid)
-        } yield (addedShared, removedShared)
+          _                <- perObsService.generateCalibrations(pid, f2ScienceObs)
+          // Handle per--config calib
+          (added, removed) <- sharedService.generateCalibrations(pid, gmosScienceObs, allCalibs, calibTargets, referenceInstant)
+          // Clean orphaned targets
+          _                <- targetService.deleteOrphanCalibrationTargets(pid)
+        } yield (added, removed)
 
       // Recalcula the target of a calibration observation
       def recalculateCalibrationTarget(

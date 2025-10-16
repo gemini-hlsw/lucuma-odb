@@ -23,14 +23,62 @@ sealed trait GroupTree extends Product with Serializable {
     def go(remaining: List[GroupTree]): Option[GroupTree] =
       remaining match {
         case Nil => None
-        case GroupTree.Leaf(_) :: tail => go(tail)
-        case GroupTree.Root(_, c) :: tail => go(c ::: tail)
+        case GroupTree.Leaf(_) :: tail                                 =>
+          go(tail)
+        case GroupTree.Root(_, c) :: tail                              =>
+          go(c ::: tail)
         case (b @ GroupTree.Branch(groupId = g, children = c)) :: tail =>
           if (g === groupId) b.some else go(c ::: tail)
       }
     go(List(this))
   }
 
+  def findGroupsWithObservations(
+    predicate: GroupTree.Branch => Boolean
+  ): List[(Group.Id, List[Observation.Id])] = {
+    @scala.annotation.tailrec
+    def go(
+      remaining: List[GroupTree],
+      acc: List[(Group.Id, List[Observation.Id])]
+    ): List[(Group.Id, List[Observation.Id])] =
+      remaining match
+        case Nil => acc.reverse
+        case GroupTree.Leaf(_) :: tail =>
+          go(tail, acc)
+        case GroupTree.Root(_, children) :: tail =>
+          go(children ::: tail, acc)
+        case (b @ GroupTree.Branch(groupId = gid, children = children)) :: tail =>
+          val observations = children.collect:
+            case GroupTree.Leaf(obsId) => obsId
+          val newAcc =
+            if predicate(b) then (gid, observations) :: acc
+            else acc
+          go(children ::: tail, newAcc)
+    go(List(this), Nil)
+  }
+
+  def findGroupContaining(
+    oid: Observation.Id,
+    predicate: GroupTree.Branch => Boolean
+  ): Option[Group.Id] = {
+    @scala.annotation.tailrec
+    def go(remaining: List[GroupTree]): Option[Group.Id] =
+      remaining match
+        case Nil => None
+        case GroupTree.Leaf(_) :: tail =>
+          go(tail)
+        case GroupTree.Root(_, children) :: tail =>
+          go(children ::: tail)
+        case (b @ GroupTree.Branch(groupId = gid, children = children)) :: tail =>
+          val hasObs = children.exists:
+            case GroupTree.Leaf(obsId) => obsId === oid
+            case _           => false
+          if predicate(b) && hasObs then
+            Some(gid)
+          else
+            go(children ::: tail)
+    go(List(this))
+  }
 }
 
 object GroupTree {
@@ -85,61 +133,5 @@ object GroupTree {
   case class Leaf(
     observationId: Observation.Id
   ) extends Child
-
-  extension (tree: GroupTree) {
-
-    /**
-     * Finds all groups that match a predicate, along with their direct observation children.
-     */
-    def findGroupsWithObservations(
-      predicate: Branch => Boolean
-    ): List[(Group.Id, List[Observation.Id])] = {
-      @scala.annotation.tailrec
-      def go(
-        remaining: List[GroupTree],
-        acc: List[(Group.Id, List[Observation.Id])]
-      ): List[(Group.Id, List[Observation.Id])] =
-        remaining match
-          case Nil => acc.reverse
-          case Leaf(_) :: tail =>
-            go(tail, acc)
-          case Root(_, children) :: tail =>
-            go(children ::: tail, acc)
-          case (b @ Branch(groupId = gid, children = children)) :: tail =>
-            val observations = children.collect:
-              case Leaf(obsId) => obsId
-            val newAcc =
-              if predicate(b) then (gid, observations) :: acc
-              else acc
-            go(children ::: tail, newAcc)
-      go(List(tree), Nil)
-    }
-
-    /**
-     * Finds the first group containing an observation that matches a predicate.
-     */
-    def findGroupContaining(
-      oid: Observation.Id,
-      predicate: Branch => Boolean
-    ): Option[Group.Id] = {
-      @scala.annotation.tailrec
-      def go(remaining: List[GroupTree]): Option[Group.Id] =
-        remaining match
-          case Nil => None
-          case Leaf(_) :: tail =>
-            go(tail)
-          case Root(_, children) :: tail =>
-            go(children ::: tail)
-          case (b @ Branch(groupId = gid, children = children)) :: tail =>
-            val hasObs = children.exists:
-              case Leaf(obsId) => obsId === oid
-              case _           => false
-            if predicate(b) && hasObs then
-              Some(gid)
-            else
-              go(children ::: tail)
-      go(List(tree))
-    }
-  }
 
 }
