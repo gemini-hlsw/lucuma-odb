@@ -32,6 +32,7 @@ import lucuma.odb.service.CalibrationConfigSubset.toConfigSubset
 import lucuma.odb.service.Services.ServiceAccess
 import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.util.Codecs.*
+import natchez.Trace
 import org.http4s.client.Client
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.syntax.*
@@ -93,7 +94,7 @@ object CalibrationsService extends CalibrationObservations {
       case (tid, name, role, Some(st)) => (tid, name, role, st)
     }
 
-  def instantiate[F[_]: {Concurrent, Services, Logger}](emailConfig: Config.Email, httpClient: Client[F]): CalibrationsService[F] =
+  def instantiate[F[_]: {Concurrent, Services, Logger, Trace}](emailConfig: Config.Email, httpClient: Client[F]): CalibrationsService[F] =
     new CalibrationsService[F] {
 
       private def collectValid(

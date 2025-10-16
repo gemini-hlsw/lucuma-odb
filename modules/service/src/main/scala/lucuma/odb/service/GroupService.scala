@@ -39,6 +39,8 @@ trait GroupService[F[_]] {
   def selectGroups(programId: Program.Id)(using Transaction[F]): F[GroupTree]
   def selectPid(groupId: Group.Id)(using Transaction[F]): F[Option[Program.Id]]
   def cloneGroup(input: CloneGroupInput)(using Transaction[F]): F[Result[Group.Id]]
+  def selectAllObservationsInGroup(groupId: Group.Id)(using Transaction[F]): F[List[Observation.Id]]
+  def deleteSystemGroup(groupId: Group.Id)(using Transaction[F]): F[Unit]
 }
 
 object GroupService {
@@ -199,6 +201,18 @@ object GroupService {
       def selectPid(groupId: Group.Id)(using Transaction[F]): F[Option[Program.Id]] =
         session.option(Statements.SelectPid)(groupId)
 
+      def selectAllObservationsInGroup(groupId: Group.Id)(using Transaction[F]): F[List[Observation.Id]] =
+        session.execute(Statements.SelectAllObservationsInGroup)(groupId)
+
+      def deleteSystemGroup(groupId: Group.Id)(using Transaction[F]): F[Unit] =
+        for
+          info <- session.option(Statements.SelectGroupInfo)(groupId)
+          _    <- info.traverse: (pid, parentId, parentIndex) =>
+                    session.execute(sql"SET CONSTRAINTS ALL DEFERRED".command) >>
+                    session.execute(Statements.DeleteSystemGroup)(groupId) >>
+                    session.execute(Statements.CloseHole)(pid, parentId, parentIndex)
+        yield ()
+
     }
 
   object Statements {
@@ -336,6 +350,13 @@ object GroupService {
            c_group_id = $group_id
        """.query(program_id)
 
+      val SelectAllObservationsInGroup: Query[Group.Id, Observation.Id] =
+        sql"""
+          SELECT c_observation_id
+          FROM t_observation
+          WHERE c_group_id = $group_id
+        """.query(observation_id)
+
       /** Select group elements in a group, in order. */
       val SelectGroupElements: Query[Group.Id, GroupElement.Id] =
         sql"""
@@ -409,6 +430,23 @@ object GroupService {
                 initialContents = Nil
               ), sys, roles)
 
+    val SelectGroupInfo: Query[Group.Id, (Program.Id, Option[Group.Id], NonNegShort)] =
+      sql"""
+        SELECT c_program_id, c_parent_id, c_parent_index
+        FROM t_group
+        WHERE c_group_id = $group_id
+      """.query(program_id *: group_id.opt *: int2_nonneg)
+
+    val DeleteSystemGroup: Command[Group.Id] =
+      sql"""
+        DELETE FROM t_group
+        WHERE c_group_id = $group_id AND c_system = true
+      """.command
+
+    val CloseHole: Command[(Program.Id, Option[Group.Id], NonNegShort)] =
+      sql"""
+        CALL group_close_hole($program_id, ${group_id.opt}, $int2_nonneg)
+      """.command
 
   }
 

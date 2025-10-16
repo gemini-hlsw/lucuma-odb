@@ -86,4 +86,60 @@ object GroupTree {
     observationId: Observation.Id
   ) extends Child
 
+  extension (tree: GroupTree) {
+
+    /**
+     * Finds all groups that match a predicate, along with their direct observation children.
+     */
+    def findGroupsWithObservations(
+      predicate: Branch => Boolean
+    ): List[(Group.Id, List[Observation.Id])] = {
+      @scala.annotation.tailrec
+      def go(
+        remaining: List[GroupTree],
+        acc: List[(Group.Id, List[Observation.Id])]
+      ): List[(Group.Id, List[Observation.Id])] =
+        remaining match
+          case Nil => acc.reverse
+          case Leaf(_) :: tail =>
+            go(tail, acc)
+          case Root(_, children) :: tail =>
+            go(children ::: tail, acc)
+          case (b @ Branch(groupId = gid, children = children)) :: tail =>
+            val observations = children.collect:
+              case Leaf(obsId) => obsId
+            val newAcc =
+              if predicate(b) then (gid, observations) :: acc
+              else acc
+            go(children ::: tail, newAcc)
+      go(List(tree), Nil)
+    }
+
+    /**
+     * Finds the first group containing an observation that matches a predicate.
+     */
+    def findGroupContaining(
+      oid: Observation.Id,
+      predicate: Branch => Boolean
+    ): Option[Group.Id] = {
+      @scala.annotation.tailrec
+      def go(remaining: List[GroupTree]): Option[Group.Id] =
+        remaining match
+          case Nil => None
+          case Leaf(_) :: tail =>
+            go(tail)
+          case Root(_, children) :: tail =>
+            go(children ::: tail)
+          case (b @ Branch(groupId = gid, children = children)) :: tail =>
+            val hasObs = children.exists:
+              case Leaf(obsId) => obsId === oid
+              case _           => false
+            if predicate(b) && hasObs then
+              Some(gid)
+            else
+              go(children ::: tail)
+      go(List(tree))
+    }
+  }
+
 }

@@ -14,9 +14,14 @@ import lucuma.core.model.Program
 import lucuma.odb.Config
 import lucuma.odb.data.Existence
 import lucuma.odb.data.GroupTree
+import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.input.CreateGroupInput
 import lucuma.odb.graphql.input.GroupPropertiesInput
+import lucuma.odb.graphql.input.ObservationPropertiesInput
+import lucuma.odb.graphql.mapping.AccessControl
 import lucuma.odb.service.Services.ServiceAccess
+import lucuma.odb.util.Codecs.*
+import natchez.Trace
 import org.http4s.client.Client
 import skunk.Transaction
 
@@ -24,11 +29,11 @@ trait PerScienceObservationCalibrationsService[F[_]]:
 
   def generateCalibrations(
     pid: Program.Id,
-    f2ScienceObs: List[ObsExtract[CalibrationConfigSubset]]
+    scienceObs: List[ObsExtract[CalibrationConfigSubset]]
   )(using Transaction[F], ServiceAccess): F[List[Observation.Id]]
 
 object PerScienceObservationCalibrationsService:
-  def instantiate[F[_]: Concurrent](emailConfig: Config.Email, httpClient: Client[F])(using Services[F]): PerScienceObservationCalibrationsService[F] =
+  def instantiate[F[_]: {Concurrent, Services as S, Trace}](emailConfig: Config.Email, httpClient: Client[F]): PerScienceObservationCalibrationsService[F] =
     new PerScienceObservationCalibrationsService[F] with CalibrationObservations:
 
       private def groupNameForObservation(oid: Observation.Id): NonEmptyString =
@@ -38,41 +43,16 @@ object PerScienceObservationCalibrationsService:
         tree: GroupTree,
         oid: Observation.Id
       ): Option[Group.Id] =
-        def searchTree(node: GroupTree): Option[Group.Id] =
-          node match
-            case GroupTree.Root(_, children) =>
-              children.flatMap(searchTree).headOption
-            case GroupTree.Branch(gid, _, _, children, _, _, _, _, system, calibrationRoles) =>
-              val hasObs = children.exists:
-                case GroupTree.Leaf(obsId) => obsId == oid
-                case _                     => false
-              if system && calibrationRoles.contains(CalibrationRole.Telluric) && hasObs then
-                Some(gid)
-              else
-                children.flatMap(searchTree).headOption
-            case GroupTree.Leaf(_) =>
-              None
-        searchTree(tree)
+        tree.findGroupContaining(
+          oid,
+          b => b.system && b.calibrationRoles.exists(_ == CalibrationRole.Telluric)
+        )
 
       private def findParentGroupForObservation(
         tree: GroupTree,
         oid: Observation.Id
       ): Option[Group.Id] =
-        def searchTree(node: GroupTree): Option[Group.Id] =
-          node match
-            case GroupTree.Root(_, children) =>
-              children.flatMap(searchTree).headOption
-            case GroupTree.Branch(gid, _, _, children, _, _, _, _, system, _) =>
-              val hasObsDirectly = children.exists:
-                case GroupTree.Leaf(obsId) => obsId == oid
-                case _                     => false
-              if hasObsDirectly && !system then
-                Some(gid)
-              else
-                children.flatMap(searchTree).headOption
-            case GroupTree.Leaf(_) =>
-              None
-        searchTree(tree)
+        tree.findGroupContaining(oid, b => !b.system)
 
       private def createF2TelluricGroup(
         pid: Program.Id,
@@ -104,13 +84,48 @@ object PerScienceObservationCalibrationsService:
           case _ =>
             new RuntimeException(s"Failed to create F2 group").raiseError[F, Group.Id]
 
+      private def telluricGroups(tree: GroupTree): List[(Group.Id, List[Observation.Id])] =
+        tree.findGroupsWithObservations(b => b.system && b.calibrationRoles.contains(CalibrationRole.Telluric))
+
       override def generateCalibrations(
         pid: Program.Id,
-        f2ScienceObs: List[ObsExtract[CalibrationConfigSubset]]
+        scienceObs: List[ObsExtract[CalibrationConfigSubset]]
       )(using Transaction[F], ServiceAccess): F[List[Observation.Id]] =
+        val groupService = S.groupService(emailConfig, httpClient)
+        val observationService = ObservationService.instantiate[F]
+
         for
-          tree <- GroupService.instantiate(emailConfig, httpClient).selectGroups(pid)
-          _ <- f2ScienceObs.traverse: obs =>
+          tree              <- groupService.selectGroups(pid)
+          existingGroups    = telluricGroups(tree)
+          currentObsIds     = scienceObs.map(_.id).toSet
+          // find observations that need cleanup (including DELETED observations not in the tree)
+          _                 <- existingGroups.traverse: (groupId, _) =>
+                                 // Get ALL observations in this group from the database (including DELETED ones)
+                                 groupService.selectAllObservationsInGroup(groupId).flatMap: allGroupObs =>
+                                   val obsoleteObs = allGroupObs.filterNot(currentObsIds.contains)
+                                   if obsoleteObs.nonEmpty then
+                                     // Remove observations from this system group and move them to parent or null
+                                     obsoleteObs.traverse: oid =>
+                                       observationService.updateObservations:
+                                         Services.asSuperUser:
+                                           AccessControl.unchecked(
+                                             ObservationPropertiesInput.Edit.Empty.copy(group = Nullable.Null),
+                                             List(oid),
+                                             observation_id
+                                           )
+                                     .void
+                                   else
+                                     ().pure[F]
+          // Clean up empty system groups
+          _ <- existingGroups.traverse: (groupId, groupObsIds) =>
+            val remainingObs = groupObsIds.filter(currentObsIds.contains)
+            if remainingObs.isEmpty then
+              groupService.deleteSystemGroup(groupId)
+            else
+              ().pure[F]
+
+          // Create or verify system groups for current F2 observations
+          _ <- scienceObs.traverse: obs =>
             val existingSystemGroup = findSystemGroupForObservation(tree, obs.id)
             existingSystemGroup match
               case Some(_) =>
