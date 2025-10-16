@@ -33,6 +33,7 @@ import lucuma.core.model.Tracking
 import lucuma.core.syntax.string.*
 import lucuma.core.util.DateInterval
 import lucuma.core.util.Enumerated
+import lucuma.core.util.Timestamp
 import lucuma.itc.client.ItcClient
 import lucuma.odb.data.ObservationValidationMap
 import lucuma.odb.data.OdbError
@@ -51,7 +52,6 @@ import lucuma.odb.util.Codecs.*
 import skunk.*
 import skunk.codec.boolean.*
 import skunk.implicits.*
-import lucuma.core.util.Timestamp
 
 import java.time.Instant
 
