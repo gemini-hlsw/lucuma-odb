@@ -121,7 +121,7 @@ BEGIN
         e.c_exposure_time,
         e.c_exposure_count
       FROM %I m
-      LEFT JOIN t_exposure_time_mode e
+      INNER JOIN t_exposure_time_mode e
         ON e.c_observation_id = m.c_observation_id
        AND e.c_role = 'requirement';
     $sql$, mode[2]);
