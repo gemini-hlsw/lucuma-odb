@@ -71,20 +71,20 @@ import lucuma.odb.sequence.syntax.hash.*
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.sequence.util.HashBytes
 import lucuma.odb.service.Services.SuperUserAccess
+import lucuma.odb.syntax.result.*
 import lucuma.odb.util.Codecs.*
 import natchez.Trace
 import skunk.*
 import skunk.data.Arr
 import skunk.implicits.*
-import lucuma.odb.syntax.result.*
 
 import java.security.MessageDigest
 import java.time.Duration
 import java.time.temporal.ChronoUnit
+import scala.annotation.tailrec
 import scala.collection.immutable.SortedMap
 
 import Services.Syntax.*
-import scala.annotation.tailrec
 
 trait GuideService[F[_]] {
   import GuideService.AvailabilityPeriod
