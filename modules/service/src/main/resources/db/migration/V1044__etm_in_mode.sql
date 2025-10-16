@@ -32,6 +32,8 @@ CREATE TABLE t_exposure_time_mode (
   )
 );
 
+-- There may be only one requirement and one acquisition ETM per observations.
+-- Some observing modes, however, will have multiple science ETMs
 CREATE UNIQUE INDEX exposure_time_mode_role_constraint
   ON t_exposure_time_mode (c_observation_id, c_role)
   WHERE c_role IN (
@@ -39,7 +41,7 @@ CREATE UNIQUE INDEX exposure_time_mode_role_constraint
     'acquisition'::e_exposure_time_mode_role
   );
 
--- Populate the ETMs from the existing requirements in t_observation
+-- Populate the requirement ETMs from the existing requirements in t_observation
 INSERT INTO t_exposure_time_mode (
   c_observation_id,
   c_role,
@@ -124,8 +126,10 @@ BEGIN
        AND e.c_role = 'requirement';
     $sql$, mode[2]);
 
-    -- Remove entries without a corresponding science ETM.  A science ETM is
-    -- going to be assumed/required.
+    -- Remove observing mode entries without a corresponding science ETM.  That
+    -- is, those that never had a requirement exposure time mode.  In order to
+    -- actually execute an observation, a requirement exposure time mode must
+    -- have been present. A science ETM is now going to be required.
     EXECUTE format($sql$
       DELETE FROM %I m
       WHERE NOT EXISTS (
@@ -136,7 +140,7 @@ BEGIN
       );
     $sql$, mode[2]);
 
-    -- Add an acquisition ETM for every remaining mode
+    -- Add an acquisition ETM for every remaining observing mode
     EXECUTE format($sql$
       INSERT INTO t_exposure_time_mode (
         c_observation_id,

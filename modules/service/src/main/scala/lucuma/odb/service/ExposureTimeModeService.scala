@@ -26,6 +26,9 @@ import lucuma.odb.util.Codecs.*
 import skunk.*
 import skunk.implicits.*
 
+/**
+ * A service that facilitates working with the t_exposure_time_mode table.
+ */
 sealed trait ExposureTimeModeService[F[_]]:
 
   def select(
@@ -70,6 +73,14 @@ sealed trait ExposureTimeModeService[F[_]]:
     newId:      Observation.Id
   )(using Transaction[F]): F[Unit]
 
+  /**
+   * Computes and inserts the acquisition and science exposure time mode entries
+   * for modes which have a single science exposure time mode.  Explicit values
+   * may be provided.  If not, then if a new requirement ETM is being added or
+   * updated, we base the science / acquisition ETMs on that.  If not, then we
+   * base them on the existing requirement ETM (if any).  Otherwise, an error
+   * result.
+   */
   def insertForSingleScienceEtm(
     observingModeName:   String,
     explicitAcquisition: Option[ExposureTimeMode],
@@ -422,12 +433,3 @@ object ExposureTimeModeService:
       """.command
          .contramap: (origOid, newOid) =>
            (newOid, origOid)
-
-    val SelectLinks: Query[Observation.Id, (ExposureTimeModeId, ExposureTimeModeRole)] =
-      sql"""
-        SELECT
-          c_exposure_time_mode_id,
-          c_role
-        FROM t_exposure_time_mode_link
-        WHERE c_observation_id = $observation_id
-      """.query(exposure_time_mode_id *: exposure_time_mode_role)
