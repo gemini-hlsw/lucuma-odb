@@ -252,5 +252,4 @@ trait CalibrationObservations {
               Codecs.program_id
             )
       ).orError
-
 }

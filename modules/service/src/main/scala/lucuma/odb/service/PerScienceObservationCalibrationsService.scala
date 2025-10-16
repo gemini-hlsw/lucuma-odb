@@ -58,7 +58,7 @@ object PerScienceObservationCalibrationsService:
       ): Option[Group.Id] =
         tree.findGroupContaining(oid, b => !b.system)
 
-      private def createF2TelluricGroup(
+      private def f2TelluricGroup(
         pid: Program.Id,
         config: CalibrationConfigSubset,
         oid: Observation.Id,
@@ -103,41 +103,33 @@ object PerScienceObservationCalibrationsService:
           tree              <- groupService.selectGroups(pid)
           existingGroups    = telluricGroups(tree)
           currentObsIds     = scienceObs.map(_.id).toSet
-          // find observations that need cleanup (including DELETED observations not in the tree)
-          _                 <- existingGroups.traverse: (groupId, _) =>
-                                 // Get ALL observations in this group from the database (including DELETED ones)
-                                 groupService.selectAllObservationsInGroup(groupId).flatMap: allGroupObs =>
-                                   val obsoleteObs = allGroupObs.filterNot(currentObsIds.contains)
-                                   if obsoleteObs.nonEmpty then
-                                     // Remove observations from this system group and move them to parent or null
-                                     obsoleteObs.traverse: oid =>
-                                       observationService.updateObservations:
-                                         Services.asSuperUser:
+          // find observations that need cleanup
+          _                 <- existingGroups.traverse_ : (gid, _) =>
+                                 // Get all observations in this group from the database
+                                 groupService.selectAllObservationsInGroup(gid).flatMap: allObsIds =>
+                                   allObsIds
+                                     .filterNot(currentObsIds.contains)
+                                     .traverse_ : oid =>
+                                       observationService.updateObservations(
+                                         Services.asSuperUser(
                                            AccessControl.unchecked(
                                              ObservationPropertiesInput.Edit.Empty.copy(group = Nullable.Null),
                                              List(oid),
                                              observation_id
                                            )
-                                     .void
-                                   else
-                                     ().pure[F]
+                                         )
+                                       )
           // Clean up empty system groups
-          _ <- existingGroups.traverse: (groupId, groupObsIds) =>
-            val remainingObs = groupObsIds.filter(currentObsIds.contains)
-            if remainingObs.isEmpty then
-              groupService.deleteSystemGroup(groupId)
-            else
-              ().pure[F]
-
+          _                 <- existingGroups.traverse_ : (gid, groupObsIds) =>
+                                 groupObsIds
+                                   .filter(currentObsIds.contains)
+                                   .headOption
+                                   .fold(groupService.deleteSystemGroup(gid).void)(_ => ().pure[F])
           // Create or verify system groups for current F2 observations
-          _ <- scienceObs.traverse: obs =>
-            val existingSystemGroup = findSystemGroupForObservation(tree, obs.id)
-            existingSystemGroup match
-              case Some(_) =>
-                // Observation already in correct system group
-                ().pure[F]
-              case None =>
-                // Need to create system group
-                val parentGroup = findParentGroupForObservation(tree, obs.id)
-                createF2TelluricGroup(pid, obs.data, obs.id, parentGroup).void
-        yield List.empty
+          _                 <- scienceObs.traverse_ { obs =>
+                                 findSystemGroupForObservation(tree, obs.id)
+                                   .fold(
+                                     f2TelluricGroup(pid, obs.data, obs.id, findParentGroupForObservation(tree, obs.id)).void
+                                   )(_ => ().pure[F])
+                               }
+        yield List.empty // no calibs yet

@@ -104,7 +104,8 @@ object PerProgramPerConfigCalibrationsService:
                         ),
                         Nil
                       ),
-                    system = true
+                    system = true,
+                    calibrationRoles = List(CalibrationRole.Twilight, CalibrationRole.SpectroPhotometric)
                   ).map(_.toOption)
               }
             case _ => none.pure[F]

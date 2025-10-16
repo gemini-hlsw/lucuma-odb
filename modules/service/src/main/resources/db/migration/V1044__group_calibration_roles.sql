@@ -31,7 +31,7 @@ BEGIN
 
   -- Get each F2 science
   FOR obs_rec IN
-    SELECT o.c_observation_id, o.c_program_id, o.c_group_id, o.c_group_index
+    SELECT o.c_observation_id, o.c_program_id, o.c_group_id, o.c_group_index, f2.c_observing_mode_type
     FROM t_observation o
     INNER JOIN t_flamingos_2_long_slit f2
       ON o.c_observation_id = f2.c_observation_id
@@ -81,7 +81,7 @@ BEGIN
       parent_group_id,
       next_parent_index,
       -- Match naming convention in the code
-      f2.c_observing_mode_type::text || '/' || 'telluric' || '/' || obs_rec.c_observation_id,
+      obs_rec.c_observing_mode_type::text || '/' || 'telluric' || '/' || obs_rec.c_observation_id,
       NULL,
       NULL,
       false,
@@ -103,3 +103,11 @@ BEGIN
   ALTER TABLE t_observation ENABLE TRIGGER ALL;
   ALTER TABLE t_group ENABLE TRIGGER ALL;
 END $$;
+
+-- Update existing "Calibrations" groups to have twilight and spectrophotometric roles
+
+UPDATE t_group
+SET c_calibration_roles = '{twilight,spectrophotometric}'::e_calibration_role[]
+WHERE c_name = 'Calibrations'
+  AND c_system = true
+  AND c_calibration_roles = '{}'::e_calibration_role[];
