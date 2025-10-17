@@ -9,7 +9,7 @@ import cats.Monad
 import cats.Traverse
 import cats.data.EitherT
 import cats.data.NonEmptyList
-import cats.effect.Concurrent
+import cats.effect.*
 import cats.syntax.all.*
 import grackle.Result
 import lucuma.core.math.Coordinates
@@ -24,14 +24,20 @@ import lucuma.core.model.Target.Sidereal
 import lucuma.core.model.Tracking
 import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
+import lucuma.horizons.HorizonsClient
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.service.Services.Syntax.asterismService
 import lucuma.odb.service.Services.Syntax.session
 import lucuma.odb.service.Services.asSuperUser
 import lucuma.odb.util.Codecs.*
+import org.http4s.client.Client
+import org.typelevel.log4cats.Logger
 import skunk.Query
 import skunk.syntax.all.*
+
+import scala.annotation.nowarn
+import scala.concurrent.duration.*
 
 trait TrackingService[F[_]]:
   import TrackingService.Snapshot
@@ -116,9 +122,15 @@ object TrackingService:
       override def foldRight[A, B](fa: Snapshot[A], lb: cats.Eval[B])(f: (A, Eval[B]) => Eval[B]): Eval[B] = (fa.base :: fa.asterism.map(_._2)).foldRight(lb)(f)
       override def traverse[G[_]: Applicative, A, B](fa: Snapshot[A])(f: A => G[B]): G[Snapshot[B]] = fa.traverse(f)
       
-  def instantiate[F[_]: Monad: Concurrent: Services]: TrackingService[F] =
+  def instantiate[F[_]: Monad: Temporal: Services: Logger](
+    client: Client[F]
+  ): TrackingService[F] =
     new TrackingService:
-        
+      
+      @nowarn // unused for now
+      lazy val horizonsClient: HorizonsClient[F] =
+        HorizonsClient(client, 5, 1.second)
+
       def getCoordinatesSnapshotOrRegion(
         keys: List[Observation.Id],
         t: Timestamp

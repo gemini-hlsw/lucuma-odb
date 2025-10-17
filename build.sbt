@@ -688,6 +688,7 @@ lazy val service = project
       "io.laserdisc"             %% "fs2-aws-s3"                         % fs2AwsVersion,
       "org.typelevel"            %% "grackle-skunk"                      % grackleVersion,
       "edu.gemini"               %% "lucuma-catalog"                     % lucumaCoreVersion,
+      "edu.gemini"               %% "lucuma-horizons"                    % lucumaCoreVersion,
       "edu.gemini"               %% "lucuma-ags"                         % lucumaCoreVersion,
       "edu.gemini"               %% "lucuma-graphql-routes"              % lucumaGraphQLRoutesVersion,
       "is.cir"                   %% "ciris"                              % cirisVersion,

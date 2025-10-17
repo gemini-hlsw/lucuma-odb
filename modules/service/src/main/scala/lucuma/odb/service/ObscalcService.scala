@@ -49,6 +49,7 @@ import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.Services.ServiceAccess
 import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.util.Codecs.*
+import org.http4s.client.Client
 import org.typelevel.log4cats.Logger
 import skunk.*
 import skunk.codec.numeric._int8
@@ -166,6 +167,7 @@ object ObscalcService:
   def instantiate[F[_]: Concurrent: Logger](
     commitHash: CommitHash,
     itcClient:  ItcClient[F],
+    httpClient: Client[F],
     calculator: ForInstrumentMode
   )(using Services[F]): ObscalcService[F] =
 
@@ -280,7 +282,7 @@ object ObscalcService:
           Logger[F].info(s"${pending.observationId}: calculating workflow") *>
           services
             .transactionally:
-              observationWorkflowService.getCalculatedWorkflow(pending.observationId, itc, dig.map(_.science.executionState))
+              observationWorkflowService(httpClient).getCalculatedWorkflow(pending.observationId, itc, dig.map(_.science.executionState))
             .flatMap: r =>
               r.toOption.fold(Logger[F].warn(s"${pending.observationId}: failure calculating workflow: $r").as(UndefinedWorkflow))(_.pure[F])
             .flatTap: r =>

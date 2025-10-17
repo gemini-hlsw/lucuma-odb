@@ -78,12 +78,12 @@ object TimeEstimateService:
   def instantiate[F[_]: Concurrent](
     commitHash:   CommitHash,
     itcClient:    ItcClient[F],
+    httpClient:   Client[F],
     calculator:   TimeEstimateCalculatorImplementation.ForInstrumentMode,
     emailConfig:  Config.Email,
-    httpClient:   Client[F]
   )(using Services[F], Logger[F]): TimeEstimateService[F] =
     lazy val obscalcService: ObscalcService[F] =
-      services.obscalcService(commitHash, itcClient, calculator)
+      services.obscalcService(commitHash, itcClient, httpClient, calculator)
 
     new TimeEstimateService[F]:
 
