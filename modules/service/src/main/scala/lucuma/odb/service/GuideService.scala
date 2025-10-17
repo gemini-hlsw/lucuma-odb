@@ -542,7 +542,7 @@ object GuideService {
           }
         }
 
-      // TODO: Can go away after `guideEnvironments` is removed
+      // TODO: Can go away after `guideEnvironments` is removed???
       extension (usables: List[AgsAnalysis.Usable])
         def toGuideEnvironments: List[GuideEnvironment] = usables.map(_.toGuideEnvironment)
 
@@ -571,7 +571,7 @@ object GuideService {
           off <- offsets.getOrElse(NonEmptyList.of(Offset.Zero))
         } yield AgsPosition(pa, off)
 
-      // TODO: Can go away after `guideEnvironments` is removed
+      // TODO: Can go away after `guideEnvironments` is removed???
       def processCandidates(
         obsInfo:       ObservationInfo,
         wavelength:    Wavelength,
