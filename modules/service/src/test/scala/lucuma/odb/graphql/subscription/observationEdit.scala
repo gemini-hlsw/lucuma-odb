@@ -171,7 +171,7 @@ class observationEdit extends OdbSuite with SubscriptionUtils {
     Json.obj(
       "observationEdit" -> Json.obj(
         "observationId" -> oid.asJson,
-        "editType" -> Json.fromString(EditType.DeletedCal.tag.toUpperCase),
+        "editType" -> Json.fromString(EditType.HardDelete.tag.toUpperCase),
         "meta"     -> Json.Null,
         "value"    -> Json.Null
       )
@@ -436,6 +436,24 @@ class observationEdit extends OdbSuite with SubscriptionUtils {
         mutations =
           Right(updateTargetEpoch(pi, tid0, Epoch.B1950)),
         expected  = List(titleUpdated(oid0, "Zero, One"), titleUpdated(oid1, "Zero"))
+      )
+    } yield ()
+  }
+
+  test("triggers for changing target epoch in blind offset") {
+    import Group1.pi
+
+    for {
+      pid  <- createProgram(pi, "foo")
+      tid0 <- createTargetAs(pi, pid, "Zero")
+      tid1 <- createTargetAs(pi, pid, "One")
+      (oid, btid) <- createObservationWithBlindOffsetAs(pi, pid, "Blind offset", tid0, tid1)
+      _    <- subscriptionExpect(
+        user      = pi,
+        query     = titleSubscription,
+        mutations =
+          Right(updateTargetEpoch(pi, btid, Epoch.B1950)),
+        expected  = List(titleUpdated(oid, "Zero, One"))
       )
     } yield ()
   }

@@ -112,6 +112,46 @@ class targetEdit extends OdbSuite {
   def updated(name: String, tid: Target.Id): Json =
     targetEdit(EditType.Updated, name, tid)
 
+  def removeBlindOffset(user: User, oid: Observation.Id): IO[Unit] =
+    expect(
+      user = user,
+      query = s"""
+        mutation {
+          updateObservations(input: {
+            SET: {
+              targetEnvironment: {
+                blindOffsetTarget: null
+              }
+            }
+            WHERE: {
+              id: { EQ: ${oid.asJson} }
+            }
+          }) {
+            observations {
+              targetEnvironment {
+                blindOffsetTarget {
+                  id
+                }
+              }
+            }
+          }
+        }
+      """,
+      expected = json"""
+        {
+          "updateObservations": {
+            "observations": [
+              {
+                "targetEnvironment": {
+                  "blindOffsetTarget": null
+                }
+              }
+            ]
+          }
+        }
+      """.asRight
+    )
+
   test("trigger for a new target in any program") {
     Ref.of[IO, List[Target.Id]](List.empty[Target.Id]).flatMap { ref =>
       subscriptionExpectF(
@@ -266,7 +306,7 @@ class targetEdit extends OdbSuite {
                   }""",
                 json"""{
                     "targetEdit": {
-                      "editType":"DELETED_CAL",
+                      "editType":"HARD_DELETE",
                       "targetId":${i.head.show},
                       "value": null
                     }
@@ -298,9 +338,7 @@ class targetEdit extends OdbSuite {
               .flatMap(pid =>
                 (createObservationWithBlindOffsetAs(pi, pid, "Blinding") <* pause)
                   .flatTap(tup => ref.set(List(tup)))
-              .flatMap((oid, tid) =>
-                updateAsterisms(pi, List(oid), List.empty, List(tid), List((oid, List.empty)))
-              )
+              .flatMap((oid, _) => removeBlindOffset(pi, oid))
             )
           ),
         expectedF = ref.get.map(l =>
@@ -317,7 +355,7 @@ class targetEdit extends OdbSuite {
               }""",
             json"""{
                 "targetEdit": {
-                  "editType":"DELETED_CAL",
+                  "editType":"HARD_DELETE",
                   "targetId":${tid.asJson},
                   "value": null
                 }

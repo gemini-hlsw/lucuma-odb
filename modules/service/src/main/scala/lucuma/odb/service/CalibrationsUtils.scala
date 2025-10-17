@@ -21,6 +21,7 @@ import lucuma.core.model.Group
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
+import lucuma.odb.data.BlindOffsetType
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.graphql.input.ConstraintSetInput
@@ -124,22 +125,21 @@ case class CalibrationIdealTargets(
 
 trait CalibrationObservations {
   def gmosLongSlitSpecPhotObs[F[_]: MonadThrow: Services: Transaction, G, L, U](
-    pid:     Program.Id,
-    gid:     Group.Id,
-    tid:     Target.Id,
-    props:   Map[CalibrationConfigSubset, CalibrationsService.CalObsProps],
-    configs: List[CalibrationConfigSubset.Gmos[G, L, U]]
-  ): F[List[Observation.Id]] =
-    configs.traverse: c =>
-      val matchingProps = props.find { case (originalConfig, _) =>
-        // Check if this original config could have produced the transformed config using SpectroPhotometric strategy
-        CalibrationConfigMatcher
-          .matcherFor(originalConfig, CalibrationRole.SpectroPhotometric)
-          .configsMatch(originalConfig, c)
-      }.map(_._2)
-      val wavelengthAt = matchingProps.flatMap(_.wavelengthAt)
-      val band         = matchingProps.flatMap(_.band)
-      specPhotoObservation(pid, gid, tid, wavelengthAt, band, c.toLongSlitInput)
+    pid:    Program.Id,
+    gid:    Group.Id,
+    tid:    Target.Id,
+    props:  Map[CalibrationConfigSubset, CalibrationsService.CalObsProps],
+    config: CalibrationConfigSubset.Gmos[G, L, U]
+  ): F[Observation.Id] =
+    val matchingProps = props.find { case (originalConfig, _) =>
+      // Check if this original config could have produced the transformed config using SpectroPhotometric strategy
+      CalibrationConfigMatcher
+        .matcherFor(originalConfig, CalibrationRole.SpectroPhotometric)
+        .configsMatch(originalConfig, config)
+    }.map(_._2)
+    val wavelengthAt = matchingProps.flatMap(_.wavelengthAt)
+    val band         = matchingProps.flatMap(_.band)
+    specPhotoObservation(pid, gid, tid, wavelengthAt, band, config.toLongSlitInput)
 
   def roleConstraints(role: CalibrationRole) =
     role match
@@ -163,7 +163,9 @@ trait CalibrationObservations {
               targetEnvironment = TargetEnvironmentInput.Create(
                 none,
                 List(tid).some,
-                none
+                none,
+                none,
+                BlindOffsetType.Manual
               ).some,
               constraintSet = roleConstraints(CalibrationRole.SpectroPhotometric).some,
               group = gid.some,
@@ -188,12 +190,12 @@ trait CalibrationObservations {
       ).orError
 
   def gmosLongSlitTwilightObs[F[_]: MonadThrow: Services: Transaction, G, L, U](
-    pid:     Program.Id,
-    gid:     Group.Id,
-    tid:     Target.Id,
-    configs: List[CalibrationConfigSubset.Gmos[G, L, U]]
-  ): F[List[Observation.Id]] =
-    configs.traverse(c => twilightObservation(pid, gid, tid, c.centralWavelength, c.toLongSlitInput))
+    pid:    Program.Id,
+    gid:    Group.Id,
+    tid:    Target.Id,
+    config: CalibrationConfigSubset.Gmos[G, L, U]
+  ): F[Observation.Id] =
+    twilightObservation(pid, gid, tid, config.centralWavelength, config.toLongSlitInput)
 
   private def twilightObservation[F[_]: Services: MonadThrow: Transaction](pid: Program.Id, gid: Group.Id, tid: Target.Id, cw: Wavelength, obsMode: ObservingModeInput.Create): F[Observation.Id] =
       observationService.createObservation(
@@ -203,7 +205,9 @@ trait CalibrationObservations {
               targetEnvironment = TargetEnvironmentInput.Create(
                 none,
                 List(tid).some,
-                none
+                none,
+                none,
+                BlindOffsetType.Manual
               ).some,
               constraintSet = roleConstraints(CalibrationRole.Twilight).some,
               group = gid.some,

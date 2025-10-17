@@ -40,6 +40,7 @@ trait BaseMapping[F[_]]
   lazy val AttachmentTypeType                      = schema.ref("AttachmentType")
   lazy val BiasType                                = schema.ref("Bias")
   lazy val BigDecimalType                          = schema.ref("BigDecimal")
+  lazy val BlindOffsetTypeType                     = schema.ref("BlindOffsetType")
   lazy val CalculatedAtomDigestsType               = schema.ref("CalculatedAtomDigests")
   lazy val CalculatedObservationWorkflowType       = schema.ref("CalculatedObservationWorkflow")
   lazy val CalculationStateType                    = schema.ref("CalculationState")

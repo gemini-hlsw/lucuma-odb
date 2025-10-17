@@ -4134,14 +4134,16 @@ class updateObservations extends OdbSuite
         _   <- updateObservation(
           user = user,
           oid = oid,
-          update = s"useBlindOffset: $value",
-          query = "observations { useBlindOffset }",
+          update = s"targetEnvironment: { useBlindOffset: $value }",
+          query = "observations { targetEnvironment { useBlindOffset }}",
           expected = Right(json"""
             {
               "updateObservations": {
                 "observations": [
                   {
-                    "useBlindOffset": $value
+                    "targetEnvironment": {
+                      "useBlindOffset": $value
+                    }
                   }
                 ]
               }

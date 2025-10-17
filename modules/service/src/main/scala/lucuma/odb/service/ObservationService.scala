@@ -267,7 +267,9 @@ object ObservationService {
         }
 
       // This will fully delete a calibration observation
-      // It assumes the imple case where the observation has no extra timing windows or attachments
+      // It assumes the simple case where the observation has no extra timing windows or attachments
+      // targets are not deleted here because they may be shared with other observations
+      // Orphaned targets should be cleaned up separately via deleteOrphanCalibrationTargets
       def deleteCalibrationObservations(
         oids: NonEmptyList[Observation.Id]
       )(using Transaction[F], ServiceAccess): F[Result[Unit]] = {
@@ -276,7 +278,7 @@ object ObservationService {
           group     = Nullable.Null
         )
 
-        // delete targets, asterisms and observations
+        // delete asterisms and observations
         for {
           _    <- oids.traverse { o =>
                     // set the existence to deleted, so it gets removed from groups too
@@ -284,16 +286,9 @@ object ObservationService {
                       Services.asSuperUser:
                         AccessControl.unchecked(existenceOff, List(o), observation_id)
                   }
-                  // Look for the linked targets
-          tids <- session.execute(Statements.linkedTargets(oids))(oids.toList)
-                  // Delete asterisms and targets
-          _    <- NonEmptyList
-                    .fromList(tids)
-                    .traverse(tids => session.executeCommand(Statements.deleteLinkedAsterisms(tids)).void)
-          _    <- NonEmptyList
-                    .fromList(tids)
-                    .traverse(tids => session.executeCommand(Statements.deleteTargets(tids)).void)
-                  // Actually delete the observations
+                  // Delete asterism_target entries for these observations
+          _    <- session.executeCommand(Statements.deleteAsterismsForObservations(oids))
+                  // Delete the observations themselves
           _    <- session.executeCommand(Statements.deleteCalibrationObservations(oids))
         } yield Result.unit
 
@@ -317,11 +312,11 @@ object ObservationService {
             .flatMap: oid =>
               SET
                 .targetEnvironment
-                .flatMap(_.blindOffsetTarget)
-                .traverse: targetInput =>
+                .flatMap(te => te.blindOffsetTarget.map((_, te.blindOffsetType)))
+                .traverse: (targetInput, blindOffsetType) =>
                   ResultT:
                     Services.asSuperUser:
-                      blindOffsetsService.createBlindOffset(pid, oid, targetInput)
+                      blindOffsetsService.createBlindOffset(pid, oid, targetInput, blindOffsetType)
                 .as(oid)
             .value
             .flatTap: r =>
@@ -505,6 +500,11 @@ object ObservationService {
                     timingWindowService.cloneTimingWindows(observationId, oid2) >>
                     obsAttachmentAssignmentService.cloneAssignments(observationId, oid2)
 
+                val cloneBlindOffset = // only clone if it won't be overwritten by the updateObservations
+                  if SET.flatMap(_.targetEnvironment).fold(true)(_.blindOffsetTarget.isAbsent) then
+                    blindOffsetsService.cloneBlindOffset(pid, observationId, oid2)
+                  else Result.unit.pure
+
                 val doUpdate =
                   SET match
                     case None    => Result((pid, oid2)).pure[F] // nothing to do
@@ -519,9 +519,13 @@ object ObservationService {
                         .flatTap {
                           r => transaction.rollback.unlessA(r.hasValue)
                         }
-
-                cloneRelatedItems >> doUpdate
-
+                (
+                  for
+                    _ <- ResultT.liftF(cloneRelatedItems)
+                    _ <- ResultT(cloneBlindOffset)
+                    r <- ResultT(doUpdate)
+                  yield r
+                ).value
             }
         }
       }
@@ -596,7 +600,7 @@ object ObservationService {
           SET.observingMode.flatMap(_.observingModeType),
           SET.observingMode.flatMap(_.observingModeType).map(_.instrument),
           SET.observerNotes,
-          SET.useBlindOffset.getOrElse(false)
+          SET.targetEnvironment.flatMap(_.useBlindOffset).getOrElse(false)
         )
       }
 
@@ -978,7 +982,7 @@ object ObservationService {
           SET.subtitle.foldPresent(upSubtitle),
           SET.scienceBand.foldPresent(upScienceBand),
           SET.observerNotes.foldPresent(upObserverNotes),
-          SET.useBlindOffset.map(upUseBlindOffset)
+          SET.targetEnvironment.flatMap(_.useBlindOffset).map(upUseBlindOffset)
         ).flatten
 
       val posAngleConstraint: List[AppliedFragment] =
@@ -1106,7 +1110,8 @@ object ObservationService {
           c_img_broad_filters,
           c_img_combined_filters,
           c_observer_notes,
-          c_use_blind_offset
+          c_use_blind_offset,
+          c_blind_offset_type
         )
         SELECT
           c_program_id,
@@ -1149,7 +1154,8 @@ object ObservationService {
           c_img_broad_filters,
           c_img_combined_filters,
           c_observer_notes,
-          c_use_blind_offset
+          c_use_blind_offset,
+          c_blind_offset_type
       FROM t_observation
       WHERE c_observation_id = $observation_id
       RETURNING c_observation_id
@@ -1175,6 +1181,11 @@ object ObservationService {
       void"DELETE FROM t_asterism_target " |+|
         void"WHERE c_target_id IN (" |+|
           tids.map(sql"$target_id").intercalate(void", ") |+| void")"
+
+    def deleteAsterismsForObservations(oids: NonEmptyList[Observation.Id]): AppliedFragment =
+      void"DELETE FROM t_asterism_target " |+|
+        void"WHERE c_observation_id IN (" |+|
+          oids.map(sql"$observation_id").intercalate(void", ") |+| void")"
 
     def deleteTargets(tids: NonEmptyList[Target.Id]): AppliedFragment =
       void"DELETE FROM t_target " |+|

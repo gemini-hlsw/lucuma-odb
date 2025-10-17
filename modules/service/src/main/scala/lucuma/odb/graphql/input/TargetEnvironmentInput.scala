@@ -6,6 +6,7 @@ package input
 
 import cats.syntax.parallel.*
 import lucuma.core.model.Target
+import lucuma.odb.data.BlindOffsetType
 import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.binding.*
 
@@ -14,9 +15,11 @@ sealed trait TargetEnvironmentInput
 object TargetEnvironmentInput:
 
   final case class Create(
-    explicitBase:      Option[CoordinatesInput.Create],
-    asterism:          Option[List[Target.Id]],
-    blindOffsetTarget: Option[TargetPropertiesInput.Create]
+    explicitBase:        Option[CoordinatesInput.Create],
+    asterism:            Option[List[Target.Id]],
+    useBlindOffset:      Option[Boolean],
+    blindOffsetTarget:   Option[TargetPropertiesInput.Create],
+    blindOffsetType:     BlindOffsetType
   ) extends TargetEnvironmentInput
   object Create:
     val Binding: Matcher[Create] =
@@ -24,15 +27,20 @@ object TargetEnvironmentInput:
         case List(
           CoordinatesInput.Create.Binding.Option("explicitBase", rBase),
           TargetIdBinding.List.Option("asterism", rAsterism),
-          TargetPropertiesInput.Binding.Option("blindOffsetTarget", rBlindOffsetTarget)
-        ) => (rBase, rAsterism, rBlindOffsetTarget).parMapN(Create(_, _, _))
+          BooleanBinding.Option("useBlindOffset", rUseBlindOffset),
+          TargetPropertiesInput.Binding.Option("blindOffsetTarget", rBlindOffsetTarget),
+          BlindOffsetTypeBinding.Option("blindOffsetType", rBlindOffsetType)
+        ) => (rBase, rAsterism, rUseBlindOffset, rBlindOffsetTarget, rBlindOffsetType)
+          .parMapN((b, a, u, t, o) => Create(b, a, u, t, o.getOrElse(BlindOffsetType.Manual)))
       }
 
 
   final case class Edit(
-    explicitBase:      Nullable[CoordinatesInput.Edit],
-    asterism:          Nullable[List[Target.Id]],
-    blindOffsetTarget: Nullable[TargetPropertiesInput.Create]
+    explicitBase:        Nullable[CoordinatesInput.Edit],
+    asterism:            Nullable[List[Target.Id]],
+    useBlindOffset:      Option[Boolean],
+    blindOffsetTarget:   Nullable[TargetPropertiesInput.Create],
+    blindOffsetType:     BlindOffsetType
   ) extends TargetEnvironmentInput
 
   object Edit:
@@ -41,6 +49,9 @@ object TargetEnvironmentInput:
         case List(
           CoordinatesInput.Edit.Binding.Nullable("explicitBase", rBase),
           TargetIdBinding.List.Nullable("asterism", rAsterism),
-          TargetPropertiesInput.Binding.Nullable("blindOffsetTarget", rBlindOffsetTarget)
-        ) => (rBase, rAsterism, rBlindOffsetTarget).parMapN(Edit(_, _, _))
+          BooleanBinding.Option("useBlindOffset", rUseBlindOffset),
+          TargetPropertiesInput.Binding.Nullable("blindOffsetTarget", rBlindOffsetTarget),
+          BlindOffsetTypeBinding.Option("blindOffsetType", rBlindOffsetType)
+        ) => (rBase, rAsterism, rUseBlindOffset, rBlindOffsetTarget, rBlindOffsetType)
+          .parMapN((b, a, u, t, o) => Edit(b, a, u, t, o.getOrElse(BlindOffsetType.Manual)))
       }
