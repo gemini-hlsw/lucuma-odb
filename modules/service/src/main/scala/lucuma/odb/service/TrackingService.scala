@@ -38,6 +38,9 @@ import skunk.syntax.all.*
 
 import scala.annotation.nowarn
 import scala.concurrent.duration.*
+import lucuma.core.enums.ObservingModeType
+import lucuma.core.model.Program
+import lucuma.core.enums.Site
 
 trait TrackingService[F[_]]:
   import TrackingService.Snapshot
@@ -122,14 +125,36 @@ object TrackingService:
       override def foldRight[A, B](fa: Snapshot[A], lb: cats.Eval[B])(f: (A, Eval[B]) => Eval[B]): Eval[B] = (fa.base :: fa.asterism.map(_._2)).foldRight(lb)(f)
       override def traverse[G[_]: Applicative, A, B](fa: Snapshot[A])(f: A => G[B]): G[Snapshot[B]] = fa.traverse(f)
       
+  private case class ObsInfo(
+    pid: Program.Id, 
+    oid: Observation.Id, 
+    mode: Option[ObservingModeType], 
+    explicitBase: Option[Coordinates]
+  ):
+    // TODO: We need to use the instrument rather than the mode, and we need to consult Resource for
+    // this information. We also need to fix some deficiencies in the Instrument enum, which allows
+    // the same instrument to show up at both sites.
+    def site: Result[Site] =
+      Result.fromOption(
+        mode.map:
+          case ObservingModeType.GmosNorthLongSlit  => Site.GN
+          case ObservingModeType.GmosSouthLongSlit  => Site.GS
+          case ObservingModeType.Flamingos2LongSlit => Site.GS
+          case ObservingModeType.GmosNorthImaging   => Site.GN
+          case ObservingModeType.GmosSouthImaging   => Site.GN,
+        s"Could not determine site for $oid."
+      )
+    
   def instantiate[F[_]: Monad: Temporal: Services: Logger](
-    client: Client[F]
+    client: Client[F],
+    horizonsRetries: Int = 5,
+    horizonsInitialRetryInterval: FiniteDuration = 1.second
   ): TrackingService[F] =
     new TrackingService:
       
       @nowarn // unused for now
       lazy val horizonsClient: HorizonsClient[F] =
-        HorizonsClient(client, 5, 1.second)
+        HorizonsClient(client, horizonsRetries, horizonsInitialRetryInterval)
 
       def getCoordinatesSnapshotOrRegion(
         keys: List[Observation.Id],
@@ -182,7 +207,7 @@ object TrackingService:
         keys: List[Observation.Id],
         interval: TimestampInterval
       ): F[Map[Observation.Id, Result[Either[Snapshot[Tracking], (Region, Option[Coordinates])]]]] =
-        getExplicitBaseCoordinates(keys).flatMap: explicitBases =>
+        getObsInfo(keys).flatMap: infos =>
           asSuperUser: // hm
             asterismService
               .getAsterisms(keys) // TODO: even though this is a bulk fetch it's still inefficient; we don't need all this information
@@ -195,23 +220,23 @@ object TrackingService:
                         .fold(OdbError.InvalidObservation(oid, Some(s"No targets are defined for $oid.")).asFailureF): ts =>
                           NonEmptyList.fromList(ts) match
                             case None      => OdbError.InvalidObservation(oid, Some(s"No targets are defined for $oid.")).asFailureF
-                            case Some(nel) => mkTracking(oid, explicitBases.get(oid), nel)
+                            case Some(nel) => mkTracking(oid, infos.get(oid).flatMap(_.explicitBase), nel)
                         .map(oid -> _)
                   .map(_.toMap)
 
-      private def getExplicitBaseCoordinates(oids: List[Observation.Id]): F[Map[Observation.Id, Coordinates]] =
+      private def getObsInfo(oids: List[Observation.Id]): F[Map[Observation.Id, ObsInfo]] =
         NonEmptyList.fromList(oids.distinct) match
           case None => Map.empty.pure[F]
           case Some(nel) =>
             session
-              .prepareR(Statements.selectExplicitBaseCoordinates(nel))
+              .prepareR(Statements.selectObsInfo(nel))
               .use: pq =>
                 pq.stream(nel, 1024)
                   .compile
                   .toList
                   .map(_.toMap)
 
-      // Temporary, until we have ephimerides plumbed in
+      // Temporary, until we have ephemerides plumbed in
       private def mkTracking(oid: Observation.Id, explicitBase: Option[Coordinates], asterism: NonEmptyList[(Target.Id, Target)]): F[Result[Either[Snapshot[Tracking], (Region, Option[Coordinates])]]] =
         asterism
           .traverse: (tid, target) =>
@@ -231,17 +256,17 @@ object TrackingService:
         // aligned to midnight UTC.
 
 
-  object Statements:
+  private object Statements:
 
-      def selectExplicitBaseCoordinates(oids: NonEmptyList[Observation.Id]): Query[oids.type, (Observation.Id, Coordinates)] =
+      def selectObsInfo(oids: NonEmptyList[Observation.Id]): Query[oids.type, (Observation.Id, ObsInfo)] =
         sql"""
-          SELECT c_observation_id, c_explicit_ra, c_explicit_dec
+          SELECT c_program_id, c_observation_id, c_observing_mode_type, c_explicit_ra, c_explicit_dec
           FROM t_observation
           WHERE c_observation_id IN (${observation_id.nel(oids)})
           AND c_explicit_ra IS NOT NULL
           AND c_explicit_dec IS NOT NULL
         """
-          .query(observation_id *: right_ascension *: declination)
+          .query(program_id *: observation_id *: observing_mode_type.opt *: right_ascension.opt *: declination.opt)
           .map:
-            case (oid, ra, dec) => 
-              (oid, Coordinates(ra, dec))
+            case (pid, oid, mode, ra, dec) => 
+              oid -> ObsInfo(pid, oid, mode, (ra, dec).mapN(Coordinates.apply))
