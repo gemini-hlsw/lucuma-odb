@@ -17,6 +17,13 @@ CREATE VIEW v_group AS
   CASE WHEN c_max_interval IS NOT NULL THEN c_group_id END AS c_max_interval_id
   FROM t_group;
 
+-- Update existing "Calibrations" groups to have twilight and spectrophotometric roles
+UPDATE t_group
+SET c_calibration_roles = '{twilight,spectrophotometric}'::e_calibration_role[]
+WHERE c_name = 'Calibrations'
+  AND c_system = true
+  AND c_calibration_roles = '{}'::e_calibration_role[];
+
 -- Add existing F2 long slit science observations into system groups
 DO $$
 DECLARE
@@ -103,11 +110,3 @@ BEGIN
   ALTER TABLE t_observation ENABLE TRIGGER ALL;
   ALTER TABLE t_group ENABLE TRIGGER ALL;
 END $$;
-
--- Update existing "Calibrations" groups to have twilight and spectrophotometric roles
-
-UPDATE t_group
-SET c_calibration_roles = '{twilight,spectrophotometric}'::e_calibration_role[]
-WHERE c_name = 'Calibrations'
-  AND c_system = true
-  AND c_calibration_roles = '{}'::e_calibration_role[];
