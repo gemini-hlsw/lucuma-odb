@@ -4,12 +4,12 @@
 package lucuma.odb.graphql.mapping
 
 import grackle.skunk.SkunkMapping
-import lucuma.odb.graphql.table.ObservationView
+import lucuma.odb.graphql.table.ExposureTimeModeView
 
 
-trait SignalToNoiseExposureTimeModeMapping[F[_]] extends ObservationView[F]:
+trait SignalToNoiseExposureTimeModeMapping[F[_]] extends ExposureTimeModeView[F]:
 
-  import ObservationView.ScienceRequirements.Spectroscopy.ExposureTimeMode.SignalToNoise
+  import ExposureTimeModeView.SignalToNoise
 
   lazy val SignalToNoiseExposureTimeModeMapping: ObjectMapping =
     ObjectMapping(SignalToNoiseExposureTimeModeType)(

@@ -6,6 +6,8 @@ package lucuma.odb.service
 import cats.data.NonEmptyList
 import cats.effect.Concurrent
 import cats.syntax.all.*
+import grackle.Result
+import grackle.ResultT
 import io.circe.Json
 import io.circe.syntax.*
 import lucuma.core.enums.Flamingos2Decker
@@ -15,8 +17,10 @@ import lucuma.core.enums.Flamingos2Fpu
 import lucuma.core.enums.Flamingos2ReadMode
 import lucuma.core.enums.Flamingos2ReadoutMode
 import lucuma.core.enums.Flamingos2Reads
+import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.Observation
 import lucuma.core.model.TelluricType
+import lucuma.odb.data.ExposureTimeModeRole
 import lucuma.odb.format.spatialOffsets.*
 import lucuma.odb.graphql.input.Flamingos2LongSlitInput
 import lucuma.odb.json.all.query.given
@@ -35,13 +39,16 @@ trait Flamingos2LongSlitService[F[_]]:
     which: List[Observation.Id]
   ): F[Map[Observation.Id, Config]]
 
-  def insert(input: Flamingos2LongSlitInput.Create)(
-    which: List[Observation.Id]
-  )(using Transaction[F]): F[Unit]
+  def insert(
+    input:  Flamingos2LongSlitInput.Create,
+    reqEtm: Option[ExposureTimeMode],
+    which:  List[Observation.Id]
+  )(using Transaction[F]): F[Result[Unit]]
 
   def delete(which: List[Observation.Id])(using Transaction[F]): F[Unit]
 
-  def update(SET: Flamingos2LongSlitInput.Edit)(
+  def update(
+    SET:   Flamingos2LongSlitInput.Edit,
     which: List[Observation.Id]
   )(using Transaction[F]): F[Unit]
 
@@ -57,17 +64,19 @@ object Flamingos2LongSlitService:
         (flamingos_2_disperser        *:
          flamingos_2_filter           *:
          flamingos_2_fpu              *:
+         exposure_time_mode           *:
+         exposure_time_mode           *:
          flamingos_2_read_mode.opt    *:
          flamingos_2_reads.opt        *:
          flamingos_2_decker.opt       *:
          flamingos_2_readout_mode.opt *:
          text.opt                     *:
          jsonb
-        ).emap { case (disperser, filter, fpu, readMode, reads, decker, readoutMode, offsetsText, telluricTypeJson) =>
+        ).emap { case (disperser, filter, fpu, acq, sci, readMode, reads, decker, readoutMode, offsetsText, telluricTypeJson) =>
           (offsetsText.traverse: so =>
             OffsetsFormat.getOption(so).toRight(s"Could not parse '$so' as an offsets list."),
             telluricTypeJson.as[TelluricType].leftMap(_.getMessage)).mapN { (offsets, telluricType) =>
-              Config(disperser, filter, fpu, readMode, reads, decker, readoutMode, offsets, telluricType)
+              Config(disperser, filter, fpu, acq, sci, readMode, reads, decker, readoutMode, offsets, telluricType)
           }
         }
 
@@ -82,17 +91,56 @@ object Flamingos2LongSlitService:
               pq.stream(af.argument, chunkSize = 1024).compile.toList
           .map(_.toMap)
 
+      private def insertExposureTimeModes(
+        name:  String,
+        input: Flamingos2LongSlitInput.Create,
+        req:   Option[ExposureTimeMode],
+        which: List[Observation.Id]
+      )(using Transaction[F]): F[Result[Unit]] =
+        exposureTimeModeService.insertForSingleScienceEtm(
+          name,
+          input.acquisitionExposureTimeMode,
+          input.scienceExposureTimeMode,
+          req,
+          which
+        )
+
       override def insert(
         input: Flamingos2LongSlitInput.Create,
-      )(which: List[Observation.Id])(using Transaction[F]): F[Unit] =
-        which.traverse { oid => session.exec(Statements.insertF2LongSlit(oid, input)) }.void
+        req:   Option[ExposureTimeMode],
+        which: List[Observation.Id]
+      )(using Transaction[F]): F[Result[Unit]] =
+        (for
+          _ <- ResultT(insertExposureTimeModes("Flamingos 2 Long Slit", input, req, which))
+          _ <- ResultT.liftF(which.traverse { oid => session.exec(Statements.insertF2LongSlit(oid, input)) }.void)
+        yield ()).value
 
-      def delete(which: List[Observation.Id] )(using Transaction[F]): F[Unit] =
+      def delete(which: List[Observation.Id])(using Transaction[F]): F[Unit] =
         Statements.deleteF2(which).fold(F.unit)(session.exec)
 
-      def update(SET: Flamingos2LongSlitInput.Edit)(
-        which: List[Observation.Id])(using Transaction[F]): F[Unit] =
-        Statements.updateF2LongSlit(SET, which).fold(F.unit)(session.exec)
+      private def updateExposureTimeModes(
+        input: Flamingos2LongSlitInput.Edit,
+        which: List[Observation.Id]
+      )(using Transaction[F]): F[Unit] =
+
+        def update(etm: Option[ExposureTimeMode], role: ExposureTimeModeRole): F[Unit] =
+          NonEmptyList.fromList(which).traverse_ : nel =>
+            etm.fold(().pure[F]): e =>
+              services.exposureTimeModeService.updateMany(nel, role, e)
+
+        for
+          _ <- update(input.acquisitionExposureTimeMode, ExposureTimeModeRole.Acquisition)
+          _ <- update(input.scienceExposureTimeMode, ExposureTimeModeRole.Science)
+        yield ()
+
+      override def update(
+        SET: Flamingos2LongSlitInput.Edit,
+        which: List[Observation.Id]
+      )(using Transaction[F]): F[Unit] =
+        for
+          _ <- updateExposureTimeModes(SET, which)
+          _ <- Statements.updateF2LongSlit(SET, which).fold(F.unit)(session.exec)
+        yield ()
 
       def clone(originalId: Observation.Id, newId: Observation.Id): F[Unit] =
         session.exec(Statements.cloneF2(originalId, newId))
@@ -107,6 +155,16 @@ object Flamingos2LongSlitService:
           ls.c_disperser,
           ls.c_filter,
           ls.c_fpu,
+          acq.c_exposure_time_mode,
+          acq.c_signal_to_noise_at,
+          acq.c_signal_to_noise,
+          acq.c_exposure_time,
+          acq.c_exposure_count,
+          sci.c_exposure_time_mode,
+          sci.c_signal_to_noise_at,
+          sci.c_signal_to_noise,
+          sci.c_exposure_time,
+          sci.c_exposure_count,
           ls.c_read_mode,
           ls.c_reads,
           ls.c_decker,
@@ -115,7 +173,12 @@ object Flamingos2LongSlitService:
           ls.c_telluric_type
         FROM
           t_flamingos_2_long_slit ls
-        INNER JOIN t_observation ob ON ls.c_observation_id = ob.c_observation_id
+        LEFT JOIN t_exposure_time_mode acq
+           ON acq.c_observation_id = ls.c_observation_id
+          AND acq.c_role = 'acquisition'
+        LEFT JOIN t_exposure_time_mode sci
+           ON sci.c_observation_id = ls.c_observation_id
+          AND sci.c_role = 'science'
       """(Void) |+|
       void"""
         WHERE

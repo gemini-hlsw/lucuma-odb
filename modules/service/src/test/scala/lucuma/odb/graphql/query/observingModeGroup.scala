@@ -53,6 +53,14 @@ class observingModeGroup extends OdbSuite:
               constraintSet: {
                 imageQuality: ${iq.tag.toUpperCase}
               }
+              scienceRequirements: {
+                exposureTimeMode: {
+                  signalToNoise: {
+                    value: 10.0
+                    at: { nanometers: 234.56 }
+                  }
+                }
+              }
               observingMode: {
                 gmos${siteName(site)}LongSlit: {
                   grating: $grating

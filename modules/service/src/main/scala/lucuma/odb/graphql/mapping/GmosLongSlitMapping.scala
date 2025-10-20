@@ -6,7 +6,12 @@ package mapping
 
 import coulomb.Quantity
 import coulomb.syntax.*
+import grackle.Query.Binding
+import grackle.Query.Filter
+import grackle.Query.Unique
+import grackle.QueryCompiler.Elab
 import grackle.Result
+import grackle.TypeRef
 import grackle.skunk.SkunkMapping
 import io.circe.Json
 import io.circe.syntax.*
@@ -21,6 +26,8 @@ import lucuma.core.math.Offset.Q
 import lucuma.core.math.WavelengthDither
 import lucuma.core.math.units.Nanometer
 import lucuma.core.model.sequence.gmos.longslit.*
+import lucuma.odb.data.ExposureTimeModeRole
+import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.graphql.table.*
 import lucuma.odb.json.offset.query.given
 import lucuma.odb.json.wavelength.query.given
@@ -29,9 +36,12 @@ import lucuma.odb.sequence.gmos.longslit.Config
 import scala.reflect.ClassTag
 
 trait GmosLongSlitMapping[F[_]]
-  extends GmosLongSlitTable[F] with OptionalFieldMapping[F] { this: SkunkMapping[F] =>
+  extends GmosLongSlitTable[F]
+     with ExposureTimeModeMapping[F]
+     with OptionalFieldMapping[F]
+     with Predicates[F] { this: SkunkMapping[F] =>
 
-  private class CommonFieldMappings(cc: CommonColumns) {
+  private class CommonFieldMappings(cc: CommonColumns):
 
     import GmosLongSlitMapping._
 
@@ -127,9 +137,8 @@ trait GmosLongSlitMapping[F[_]]
     val sourceProfile: FieldMapping =
       SqlField("sourceProfile", cc.SourceProfile, hidden = true)
 
-  }
 
-  lazy val GmosNorthLongSlitMapping: ObjectMapping = {
+  lazy val GmosNorthLongSlitMapping: ObjectMapping =
 
     import GmosLongSlitMapping._
 
@@ -142,7 +151,10 @@ trait GmosLongSlitMapping[F[_]]
       SqlField("grating", GmosNorthLongSlitTable.Grating),
       SqlField("filter",  GmosNorthLongSlitTable.Filter),
       SqlField("fpu",     GmosNorthLongSlitTable.Fpu),
+
       SqlObject("centralWavelength"),
+      SqlObject("acquisitionExposureTimeMode", Join(GmosNorthLongSlitTable.Common.ObservationId, ExposureTimeModeView.ObservationId)),
+      SqlObject("scienceExposureTimeMode",     Join(GmosNorthLongSlitTable.Common.ObservationId, ExposureTimeModeView.ObservationId)),
 
       // ---------------------
       // xBin
@@ -230,9 +242,26 @@ trait GmosLongSlitMapping[F[_]]
       SqlObject("initialCentralWavelength")
     )
 
-  }
+  lazy val GmosNorthLongSlitElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
+      case (GmosNorthLongSlitType, "acquisitionExposureTimeMode", Nil) =>
+        Elab.transformChild: child =>
+          Unique(
+            Filter(
+              Predicates.exposureTimeMode.role.eql(ExposureTimeModeRole.Acquisition),
+              child
+            )
+          )
 
-  lazy val GmosSouthLongSlitMapping: ObjectMapping = {
+      case (GmosNorthLongSlitType, "scienceExposureTimeMode", Nil) =>
+        Elab.transformChild: child =>
+          Unique(
+            Filter(
+              Predicates.exposureTimeMode.role.eql(ExposureTimeModeRole.Science),
+              child
+            )
+          )
+
+  lazy val GmosSouthLongSlitMapping: ObjectMapping =
 
     import GmosLongSlitMapping._
 
@@ -245,7 +274,10 @@ trait GmosLongSlitMapping[F[_]]
       SqlField("grating", GmosSouthLongSlitTable.Grating),
       SqlField("filter",  GmosSouthLongSlitTable.Filter),
       SqlField("fpu",     GmosSouthLongSlitTable.Fpu),
+
       SqlObject("centralWavelength"),
+      SqlObject("acquisitionExposureTimeMode", Join(GmosSouthLongSlitTable.Common.ObservationId, ExposureTimeModeView.ObservationId)),
+      SqlObject("scienceExposureTimeMode",     Join(GmosSouthLongSlitTable.Common.ObservationId, ExposureTimeModeView.ObservationId)),
 
       // ---------------------
       // xBin
@@ -333,10 +365,27 @@ trait GmosLongSlitMapping[F[_]]
       SqlObject("initialCentralWavelength")
     )
 
-  }
+  lazy val GmosSouthLongSlitElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
+      case (GmosSouthLongSlitType, "acquisitionExposureTimeMode", Nil) =>
+        Elab.transformChild: child =>
+          Unique(
+            Filter(
+              Predicates.exposureTimeMode.role.eql(ExposureTimeModeRole.Acquisition),
+              child
+            )
+          )
+
+      case (GmosSouthLongSlitType, "scienceExposureTimeMode", Nil) =>
+        Elab.transformChild: child =>
+          Unique(
+            Filter(
+              Predicates.exposureTimeMode.role.eql(ExposureTimeModeRole.Science),
+              child
+            )
+          )
 }
 
-object GmosLongSlitMapping {
+object GmosLongSlitMapping:
 
   private def parseCsvBigDecimals(s: String): List[BigDecimal] =
     s.split(',').toList.map(n => BigDecimal(n.trim))
@@ -355,5 +404,3 @@ object GmosLongSlitMapping {
 
   private val defaultSpatialOffsetsJson: Json =
     Config.DefaultSpatialOffsets.map(_.asJson).asJson
-
-}

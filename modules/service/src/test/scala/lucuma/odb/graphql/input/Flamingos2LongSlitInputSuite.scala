@@ -57,6 +57,8 @@ class Flamingos2LongSlitInputSuite extends DisciplineSuite with ArbitraryInstanc
       disperser = Flamingos2Disperser.R1200JH,
       filter = Flamingos2Filter.JH,
       fpu = Flamingos2Fpu.LongSlit2,
+      acquisitionExposureTimeMode = None,
+      scienceExposureTimeMode = None,
       explicitOffsets = Some(offsets)
     )
 
@@ -72,6 +74,8 @@ class Flamingos2LongSlitInputSuite extends DisciplineSuite with ArbitraryInstanc
       disperser = None,
       filter = None,
       fpu = None,
+      acquisitionExposureTimeMode = None,
+      scienceExposureTimeMode = None,
       explicitReadMode = lucuma.odb.data.Nullable.Null,
       explicitReads = lucuma.odb.data.Nullable.Null,
       explicitDecker = lucuma.odb.data.Nullable.Null,

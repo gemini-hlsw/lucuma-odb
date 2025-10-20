@@ -26,7 +26,6 @@ import lucuma.core.enums.GmosSouthFilter
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.ScienceBand
 import lucuma.core.math.RadialVelocity
-import lucuma.core.math.SignalToNoise
 import lucuma.core.math.Wavelength
 import lucuma.core.model.ConstraintSet
 import lucuma.core.model.ExposureTimeMode
@@ -49,7 +48,6 @@ import lucuma.itc.client.InstrumentMode.GmosSouthSpectroscopy
 import lucuma.itc.client.ItcConstraintsInput.*
 import lucuma.itc.client.SpectroscopyParameters
 import lucuma.itc.client.TargetInput
-import lucuma.odb.data.ExposureTimeModeType
 import lucuma.odb.json.sourceprofile.given
 import lucuma.odb.sequence.ObservingMode
 import lucuma.odb.sequence.data.GeneratorParams
@@ -58,6 +56,7 @@ import lucuma.odb.sequence.data.MissingParam
 import lucuma.odb.sequence.data.MissingParamSet
 import lucuma.odb.sequence.flamingos2
 import lucuma.odb.sequence.gmos.longslit.Acquisition
+import lucuma.odb.syntax.exposureTimeMode.*
 import lucuma.odb.util.Codecs.*
 import skunk.*
 import skunk.circe.codec.json.*
@@ -265,6 +264,20 @@ object GeneratorParamsService {
         obsParams: ObsParams,
         config:    Option[ObservingMode]
       ): Either[Error, GeneratorParams] =
+
+        // Placeholder until we straighten out GMOS imaging
+        def itcObsParamsWithRequirementEtm(
+          mode: InstrumentMode
+        ): Either[MissingParamSet, ItcInput] =
+          obsParams
+            .exposureTimeMode
+            .toRight:
+              MissingParamSet.fromParams(NonEmptyList.one(MissingParam.forObservation("exposure time mode")))
+            .flatMap: etm =>
+              val sci = etm
+              val acq = ExposureTimeMode.forAcquisition(etm.at)
+              itcObsParams(acq, sci, obsParams, mode)
+
         observingMode(obsParams.targets, config).map:
           case gn @ gmos.longslit.Config.GmosNorth(g, f, u, c) =>
             val mode = InstrumentMode.GmosNorthSpectroscopy(
@@ -275,7 +288,7 @@ object GeneratorParamsService {
               gn.ccdMode.some,
               gn.roi.some
             )
-            GeneratorParams(itcObsParams(obsParams, mode), obsParams.scienceBand, gn, obsParams.calibrationRole, obsParams.declaredComplete, obsParams.acqResetTime)
+            GeneratorParams(itcObsParams(c.acquisitionExposureTimeMode, c.scienceExposureTimeMode, obsParams, mode), obsParams.scienceBand, gn, obsParams.calibrationRole, obsParams.declaredComplete, obsParams.acqResetTime)
 
           case gs @ gmos.longslit.Config.GmosSouth(g, f, u, c) =>
             val mode = InstrumentMode.GmosSouthSpectroscopy(
@@ -286,41 +299,48 @@ object GeneratorParamsService {
               gs.ccdMode.some,
               gs.roi.some
             )
-            GeneratorParams(itcObsParams(obsParams, mode), obsParams.scienceBand, gs, obsParams.calibrationRole, obsParams.declaredComplete, obsParams.acqResetTime)
+            GeneratorParams(itcObsParams(c.acquisitionExposureTimeMode, c.scienceExposureTimeMode, obsParams, mode), obsParams.scienceBand, gs, obsParams.calibrationRole, obsParams.declaredComplete, obsParams.acqResetTime)
 
-          case f2 @ flamingos2.longslit.Config(disperser = disperser, filter = filter, fpu = fpu) =>
+          case f2 @ flamingos2.longslit.Config(disperser = disperser, filter = filter, fpu = fpu, acquisitionExposureTimeMode = acq, scienceExposureTimeMode = sci) =>
             val mode = InstrumentMode.Flamingos2Spectroscopy(disperser, filter, fpu)
-            GeneratorParams(itcObsParams(obsParams, mode), obsParams.scienceBand, f2, obsParams.calibrationRole, obsParams.declaredComplete, obsParams.acqResetTime)
+            GeneratorParams(itcObsParams(acq, sci, obsParams, mode), obsParams.scienceBand, f2, obsParams.calibrationRole, obsParams.declaredComplete, obsParams.acqResetTime)
 
           case gn @ gmos.imaging.Config.GmosNorth(filters = filters) =>
             // FIXME: This is not right we have n filters
             val mode = InstrumentMode.GmosNorthImaging(filters.head, gn.ccdMode.some)
-            GeneratorParams(itcObsParams(obsParams, mode), obsParams.scienceBand, gn, obsParams.calibrationRole, obsParams.declaredComplete, obsParams.acqResetTime)
+            GeneratorParams(itcObsParamsWithRequirementEtm(mode), obsParams.scienceBand, gn, obsParams.calibrationRole, obsParams.declaredComplete, obsParams.acqResetTime)
 
           case gs @ gmos.imaging.Config.GmosSouth(filters = filters) =>
             // FIXME: This is not right we have n filters
             val mode = InstrumentMode.GmosSouthImaging(filters.head, gs.ccdMode.some)
-            GeneratorParams(itcObsParams(obsParams, mode), obsParams.scienceBand, gs, obsParams.calibrationRole, obsParams.declaredComplete, obsParams.acqResetTime)
+            GeneratorParams(itcObsParamsWithRequirementEtm(mode), obsParams.scienceBand, gs, obsParams.calibrationRole, obsParams.declaredComplete, obsParams.acqResetTime)
 
       private def itcObsParams(
-        obsParams:  ObsParams,
-        mode:       InstrumentMode,
+        acqEtm:    ExposureTimeMode,
+        sciEtm:    ExposureTimeMode,
+        obsParams: ObsParams,
+        mode:      InstrumentMode
       ): Either[MissingParamSet, ItcInput] =
 
-        (obsParams.exposureTimeMode.toValidNel(MissingParam.forObservation("exposure time mode")),
-        obsParams.targets.traverse(itcTargetParams),
+        // TODO: We have a mismatch here between the ITC and the ODB that we'll
+        // need to sort out in order to do imaging.  The ITC takes imaging
+        // parameters and spectroscopy parameters.  We're using the imaging
+        // parameters for acquisition always.  Also, we need to handle the case
+        // where we have multiple filters each with its own ETM.
+
+        (obsParams.targets.traverse(itcTargetParams),
          // the db guarantees at most one BO
          obsParams.blindOffset.traverse(itcTargetParams)
-        ).mapN { case (exposureTimeMode, regularTargetInputs, blindOffsetTargetInput) =>
+        ).mapN { case (regularTargetInputs, blindOffsetTargetInput) =>
           val ici = obsParams.constraints.toInput
           ItcInput(
             ImagingParameters(
-              ExposureTimeMode.SignalToNoiseMode(Acquisition.AcquisitionSN, exposureTimeMode.at),
+              acqEtm,
               ici,
-              mode.asImaging(exposureTimeMode.at)
+              mode.asImaging(acqEtm.at)
             ),
             SpectroscopyParameters(
-              exposureTimeMode,
+              sciEtm,
               ici,
               mode
             ),
@@ -430,34 +450,11 @@ object GeneratorParamsService {
         sp.as[SourceProfile].leftMap(f => s"Could not decode SourceProfile: ${f.message}")
       }
 
-    val exposure_time_mode: Decoder[Option[ExposureTimeMode]] =
-      (
-        exposure_time_mode_type.opt  *:
-        wavelength_pm.opt            *:
-        signal_to_noise.opt          *:
-        time_span.opt                *:
-        int4_pos.opt
-      ).emap: (tpe, at, s2n, time, count) =>
-        tpe.fold(none[ExposureTimeMode].asRight[String]) {
-          case ExposureTimeModeType.SignalToNoiseMode =>
-            (s2n, at)
-              .mapN(ExposureTimeMode.SignalToNoiseMode.apply)
-              .toRight("Both c_etm_signal_to_noise and c_etm_signal_to_noise_at must be defined for the SignalToNoise exposure time mode.")
-              .map(_.some)
-
-          case ExposureTimeModeType.TimeAndCountMode  =>
-            (time, count, at)
-              .mapN(ExposureTimeMode.TimeAndCountMode.apply)
-              .toRight("c_etm_exp_time, c_etm_exp_count and c_etm_signal_to_noise_at must be defined for the TimeAndCount exposure time mode.")
-              .map(_.some)
-        }
-
-
     val params: Decoder[ParamsRow] =
       (observation_id          *:
        calibration_role.opt    *:
        constraint_set          *:
-       exposure_time_mode      *:
+       exposure_time_mode.opt  *:
        observing_mode_type.opt *:
        science_band.opt        *:
        target_id.opt           *:
@@ -483,11 +480,11 @@ object GeneratorParamsService {
         $tab.c_air_mass_max,
         $tab.c_hour_angle_min,
         $tab.c_hour_angle_max,
-        $tab.c_exp_time_mode,
-        $tab.c_etm_signal_to_noise_at,
-        $tab.c_etm_signal_to_noise,
-        $tab.c_etm_exp_time,
-        $tab.c_etm_exp_count,
+        $tab.c_exposure_time_mode,
+        $tab.c_signal_to_noise_at,
+        $tab.c_signal_to_noise,
+        $tab.c_exposure_time,
+        $tab.c_exposure_count,
         $tab.c_observing_mode_type,
         $tab.c_science_band,
         $tab.c_blind_offset_target_id,

@@ -15,13 +15,21 @@ import lucuma.core.enums.DatasetQaState
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SequenceType
+import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.StepConfig
+import lucuma.itc.IntegrationTime
+import lucuma.itc.client.ImagingInput
 import lucuma.odb.json.all.transport.given
 
 class executionAcqGmosNorth extends ExecutionTestSupportForGmos:
+
+  override def fakeItcImagingResultFor(input: ImagingInput): Option[IntegrationTime] =
+    input.exposureTimeMode match
+      case ExposureTimeMode.TimeAndCountMode(t, c, _) => IntegrationTime(t, c).some
+      case _ => none
 
   val InitialAcquisition: Json =
     json"""
@@ -448,3 +456,79 @@ class executionAcqGmosNorth extends ExecutionTestSupportForGmos:
         ).asLeft
       )
     yield ()
+
+  test("override exposure time"):
+    val setup: IO[Observation.Id] =
+      for
+        p <- createProgram
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createObservationWithModeAs(pi, p, List(t), s"""
+               gmosNorthLongSlit: {
+                 grating: R831_G5302
+                 filter: R_PRIME
+                 fpu: LONG_SLIT_0_50
+                 centralWavelength: {
+                   nanometers: 500
+                 }
+                 acquisitionExposureTimeMode: {
+                   timeAndCount: {
+                     time: { seconds: 16 }
+                     count: 1
+                     at: { nanometers: 500 }
+                   }
+                 }
+                 explicitYBin: TWO
+              }
+             """)
+      yield o
+
+    setup.flatMap: oid =>
+      expect(
+        user     = pi,
+        query    = s"""
+          query {
+            executionConfig(observationId: "$oid") {
+              gmosNorth {
+                acquisition {
+                  nextAtom {
+                    steps {
+                      instrumentConfig {
+                        exposure { seconds }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        """,
+        expected = json"""
+          {
+            "executionConfig": {
+              "gmosNorth": {
+                "acquisition": {
+                  "nextAtom": {
+                    "steps": [
+                      {
+                        "instrumentConfig": {
+                          "exposure": { "seconds": 16.000000 }
+                        }
+                      },
+                      {
+                        "instrumentConfig": {
+                          "exposure": { "seconds": 20.000000 }
+                        }
+                      },
+                      {
+                        "instrumentConfig": {
+                          "exposure": { "seconds": 48.000000 }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        """.asRight
+      )

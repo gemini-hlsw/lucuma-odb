@@ -27,9 +27,11 @@ import lucuma.core.math.Wavelength
 import lucuma.core.math.WavelengthDelta
 import lucuma.core.math.WavelengthDither
 import lucuma.core.math.units.Pixels
+import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.sequence.gmos.GmosCcdMode
 import lucuma.core.model.sequence.gmos.longslit.*
 import lucuma.core.util.Enumerated
+import lucuma.odb.sequence.syntax.hash.*
 import monocle.Lens
 
 import java.io.ByteArrayOutputStream
@@ -52,6 +54,11 @@ sealed trait Config[G: Enumerated, L: Enumerated, U: Enumerated] extends Product
   def fpu: U
 
   def centralWavelength: Wavelength
+
+
+  def acquisitionExposureTimeMode: ExposureTimeMode
+
+  def scienceExposureTimeMode: ExposureTimeMode
 
 
   def xBin: GmosXBinning =
@@ -130,6 +137,8 @@ sealed trait Config[G: Enumerated, L: Enumerated, U: Enumerated] extends Product
     filter.foreach(f => out.writeChars(Enumerated[L].tag(f)))
     out.writeChars(Enumerated[U].tag(fpu))
     out.writeInt(centralWavelength.toPicometers.value.value)
+    out.write(acquisitionExposureTimeMode.hashBytes)
+    out.write(scienceExposureTimeMode.hashBytes)
     out.writeChars(xBin.tag)
     out.writeChars(yBin.tag)
     out.writeChars(ampGain.tag)
@@ -146,16 +155,18 @@ sealed trait Config[G: Enumerated, L: Enumerated, U: Enumerated] extends Product
 object Config:
 
   final case class Common(
-    centralWavelength:         Wavelength,
-    defaultXBin:               GmosXBinning,
-    explicitXBin:              Option[GmosXBinning],
-    defaultYBin:               GmosYBinning,
-    explicitYBin:              Option[GmosYBinning],
-    explicitAmpReadMode:       Option[GmosAmpReadMode],
-    explicitAmpGain:           Option[GmosAmpGain],
-    explicitRoi:               Option[GmosRoi],
-    explicitWavelengthDithers: Option[List[WavelengthDither]],
-    explicitSpatialOffsets:    Option[List[Q]]
+    centralWavelength:           Wavelength,
+    acquisitionExposureTimeMode: ExposureTimeMode,
+    scienceExposureTimeMode:     ExposureTimeMode,
+    defaultXBin:                 GmosXBinning,
+    explicitXBin:                Option[GmosXBinning],
+    defaultYBin:                 GmosYBinning,
+    explicitYBin:                Option[GmosYBinning],
+    explicitAmpReadMode:         Option[GmosAmpReadMode],
+    explicitAmpGain:             Option[GmosAmpGain],
+    explicitRoi:                 Option[GmosRoi],
+    explicitWavelengthDithers:   Option[List[WavelengthDither]],
+    explicitSpatialOffsets:      Option[List[Q]]
   )
 
   object Common:
@@ -164,6 +175,8 @@ object Config:
       Eq.by: a =>
         (
           a.centralWavelength,
+          a.acquisitionExposureTimeMode,
+          a.scienceExposureTimeMode,
           a.defaultXBin,
           a.explicitXBin,
           a.defaultYBin,
@@ -187,6 +200,12 @@ object Config:
 
     override def centralWavelength: Wavelength =
       common.centralWavelength
+
+    override def acquisitionExposureTimeMode: ExposureTimeMode =
+      common.acquisitionExposureTimeMode
+
+    override def scienceExposureTimeMode: ExposureTimeMode =
+      common.scienceExposureTimeMode
 
     override def defaultXBin: GmosXBinning =
       common.defaultXBin
@@ -241,6 +260,12 @@ object Config:
 
     override def centralWavelength: Wavelength =
       common.centralWavelength
+
+    override def acquisitionExposureTimeMode: ExposureTimeMode =
+      common.acquisitionExposureTimeMode
+
+    override def scienceExposureTimeMode: ExposureTimeMode =
+      common.scienceExposureTimeMode
 
     override def defaultXBin: GmosXBinning =
       common.defaultXBin

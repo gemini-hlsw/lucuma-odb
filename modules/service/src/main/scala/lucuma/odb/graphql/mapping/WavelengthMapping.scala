@@ -8,6 +8,7 @@ import grackle.Path
 import grackle.skunk.SkunkMapping
 import lucuma.core.math.Wavelength
 import lucuma.odb.graphql.table.ChronConditionsEntryView
+import lucuma.odb.graphql.table.ExposureTimeModeView
 import lucuma.odb.graphql.table.Flamingos2DynamicView
 import lucuma.odb.graphql.table.GmosDynamicTables
 import lucuma.odb.graphql.table.GmosLongSlitTable
@@ -17,6 +18,7 @@ import lucuma.odb.graphql.table.SpectroscopyConfigOptionTable
 trait WavelengthMapping[F[_]]
   extends GmosLongSlitTable[F]
      with ChronConditionsEntryView[F]
+     with ExposureTimeModeView[F]
      with Flamingos2DynamicView[F]
      with GmosDynamicTables[F]
      with ObservationView[F]
@@ -55,7 +57,7 @@ trait WavelengthMapping[F[_]]
       wavelengthMappingAtPath(GmosNorthLongSlitType / "initialCentralWavelength", GmosNorthLongSlitTable.Common.InitialCentralWavelength, GmosNorthLongSlitTable.Common.ObservationId),
       wavelengthMappingAtPath(GmosSouthLongSlitType / "centralWavelength", GmosSouthLongSlitTable.Common.CentralWavelength, GmosSouthLongSlitTable.Common.ObservationId),
       wavelengthMappingAtPath(GmosSouthLongSlitType / "initialCentralWavelength", GmosSouthLongSlitTable.Common.InitialCentralWavelength, GmosSouthLongSlitTable.Common.ObservationId),
-      wavelengthMappingAtPath(SignalToNoiseExposureTimeModeType / "at", Spectroscopy.ExposureTimeMode.SignalToNoise.At, Spectroscopy.ExposureTimeMode.SignalToNoise.SyntheticId),
+      wavelengthMappingAtPath(SignalToNoiseExposureTimeModeType / "at", ExposureTimeModeView.SignalToNoise.At, ExposureTimeModeView.SignalToNoise.SyntheticId),
       wavelengthMappingAtPath(SpectroscopyConfigOptionType / "wavelengthMin", SpectroscopyConfigOptionTable.WavelengthMin, SpectroscopyConfigOptionTable.Instrument, SpectroscopyConfigOptionTable.Index),
       wavelengthMappingAtPath(SpectroscopyConfigOptionType / "wavelengthMax", SpectroscopyConfigOptionTable.WavelengthMax, SpectroscopyConfigOptionTable.Instrument, SpectroscopyConfigOptionTable.Index),
       wavelengthMappingAtPath(SpectroscopyConfigOptionType / "wavelengthOptimal", SpectroscopyConfigOptionTable.WavelengthOptimal, SpectroscopyConfigOptionTable.Instrument, SpectroscopyConfigOptionTable.Index),
@@ -67,5 +69,5 @@ trait WavelengthMapping[F[_]]
       wavelengthMappingAtPath(StepRecordType / "gmosSouth" / "centralWavelength", GmosSouthDynamicTable.CentralWavelength.Value, GmosSouthDynamicTable.CentralWavelength.SyntheticId),
       wavelengthMappingAtPath(StepRecordType / "gmosNorth" / "gratingConfig" / "wavelength", GmosNorthDynamicTable.Grating.Wavelength, GmosNorthDynamicTable.Id),
       wavelengthMappingAtPath(StepRecordType / "gmosSouth" / "gratingConfig" / "wavelength", GmosSouthDynamicTable.Grating.Wavelength, GmosSouthDynamicTable.Id),
-      wavelengthMappingAtPath(TimeAndCountExposureTimeModeType / "at", Spectroscopy.ExposureTimeMode.TimeAndCount.At, Spectroscopy.ExposureTimeMode.TimeAndCount.SyntheticId)
+      wavelengthMappingAtPath(TimeAndCountExposureTimeModeType / "at", ExposureTimeModeView.TimeAndCount.At, ExposureTimeModeView.TimeAndCount.SyntheticId)
     )
