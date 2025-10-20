@@ -39,12 +39,12 @@ import lucuma.core.model.AirMassBound
 import lucuma.core.model.ConstraintSet
 import lucuma.core.model.ElevationRange
 import lucuma.core.model.HourAngleBound
-import lucuma.core.model.ObjectTracking
 import lucuma.core.model.Observation
 import lucuma.core.model.PosAngleConstraint
 import lucuma.core.model.Program
 import lucuma.core.model.SiderealTracking
 import lucuma.core.model.Target
+import lucuma.core.model.Tracking
 import lucuma.core.model.User
 import lucuma.core.model.sequence.ExecutionDigest
 import lucuma.core.model.sequence.flamingos2.Flamingos2FpuMask
@@ -91,11 +91,11 @@ trait GuideService[F[_]] {
 
   def getObjectTracking(pid: Program.Id, oid: Observation.Id)(using
     NoTransaction[F], SuperUserAccess
-  ): F[Result[Option[ObjectTracking]]]
+  ): F[Result[Option[Tracking]]]
 
   def getObjectTrackingOrRegion(pid: Program.Id, oid: Observation.Id)(using
     NoTransaction[F], SuperUserAccess
-  ): F[Result[Either[ObjectTracking, Region]]]
+  ): F[Result[Either[Tracking, Region]]]
 
   // deprecated - use getGuideEnvironment istead
   def getGuideEnvironments(pid: Program.Id, oid: Observation.Id, obsTime: Timestamp)(using
@@ -419,7 +419,7 @@ object GuideService {
         oid:             Observation.Id,
         start:           Timestamp,
         end:             Timestamp,
-        tracking:        ObjectTracking,
+        tracking:        Tracking,
         shapeConstraint: ShapeExpression,
         wavelength:      Wavelength,
         constraints:     ConstraintSet
@@ -431,7 +431,7 @@ object GuideService {
             val brightnessConstraints = gaiaBrightnessConstraints(constraints, GuideSpeed.Slow, wavelength)
             // Make a query based on two coordinates of the base of an asterism over a year
             CoordinatesRangeQueryByADQL(
-              NonEmptyList.of(a.value, b.value),
+              NonEmptyList.of(a, b),
               shapeConstraint,
               brightnessConstraints.some
             )
@@ -457,7 +457,7 @@ object GuideService {
         oid:         Observation.Id,
         start:       Timestamp,
         end:         Timestamp,
-        tracking:    ObjectTracking,
+        tracking:    Tracking,
         wavelength:  Wavelength,
         constraints: ConstraintSet
       ): F[Result[List[GuideStarCandidate]]] =
@@ -472,7 +472,7 @@ object GuideService {
         oid:         Observation.Id,
         start:       Timestamp,
         end:         Timestamp,
-        tracking:    ObjectTracking,
+        tracking:    Tracking,
         wavelength:  Wavelength,
         constraints: ConstraintSet
       ): F[Result[NonEmptyList[GuideStarCandidate]]] =
@@ -599,7 +599,7 @@ object GuideService {
       )(using SuperUserAccess): F[Result[ContiguousTimestampMap[List[Angle]]]] =
         (for {
           asterism     <- ResultT(getAsterism(pid, obsInfo.id))
-          tracking      = ObjectTracking.fromAsterism(asterism)
+          tracking      = Tracking.fromAsterism(asterism)
           candPeriod    = neededPeriods.tail.fold(neededPeriods.head)((a, b) => a.span(b))
           candidates   <- ResultT:
                            tracking match
@@ -624,7 +624,7 @@ object GuideService {
         genInfo:    GeneratorInfo,
         wavelength: Wavelength,
         asterism:   NonEmptyList[Target],
-        tracking:   ObjectTracking,
+        tracking:   Tracking,
         candidates: List[GuideStarCandidate],
         positions:  NonEmptyList[AgsPosition]
       ): Result[ContiguousTimestampMap[List[Angle]]] = {
@@ -651,22 +651,18 @@ object GuideService {
         genInfo:    GeneratorInfo,
         wavelength: Wavelength,
         asterism:   NonEmptyList[Target],
-        tracking:   ObjectTracking,
+        tracking:   Tracking,
         candidates: List[GuideStarCandidate],
         positions:  NonEmptyList[AgsPosition],
       ): Either[OdbError, AvailabilityPeriod] =
         for {
           baseCoords      <- obsInfo.explicitBase
-                               .orElse(
-                                 tracking
-                                   .at(start.toInstant)
-                                   .map(_.value)
-                               )
+                               .orElse(tracking.at(start.toInstant))
                                .toRight(
                                  generalError(s"Unable to get coordinates for asterism in observation ${obsInfo.id}")
                                )
           scienceCoords   <- asterism.toList
-                               .traverse(t => ObjectTracking.fromTarget(t).flatMap(_.at(start.toInstant)).map(_.value))
+                               .traverse(t => Tracking.fromTarget(t).flatMap(_.at(start.toInstant)))
                                .toRight(
                                  generalError(s"Unable to get coordinates for science targets in observation ${obsInfo.id}")
                                )
@@ -735,19 +731,19 @@ object GuideService {
 
       override def getObjectTracking(pid: Program.Id, oid: Observation.Id)(using
         NoTransaction[F], SuperUserAccess
-      ): F[Result[Option[ObjectTracking]]] =
+      ): F[Result[Option[Tracking]]] =
         getObjectTrackingOrRegion(pid, oid).map(_.map(_.left.toOption))
 
       override def getObjectTrackingOrRegion(pid: Program.Id, oid: Observation.Id)(using
         NoTransaction[F], SuperUserAccess
-      ): F[Result[Either[ObjectTracking, Region]]] =
+      ): F[Result[Either[Tracking, Region]]] =
         (for {
           obsInfo       <- ResultT(getObservationInfo(oid))
           asterism      <- ResultT(getAsterism(pid, oid))
           baseTracking   =
             obsInfo.explicitBase match
-              case Some(eb) => Left(ObjectTracking.constant(eb))
-              case None     => ObjectTracking.orRegionFromAsterism(asterism)
+              case Some(eb) => Left(Tracking.constant(eb))
+              case None     => Tracking.orRegionFromAsterism(asterism)
         } yield baseTracking).value
 
       def lookupGuideStar(
@@ -768,8 +764,8 @@ object GuideService {
           asterism      <- ResultT(getAsterism(pid, oid))
           baseTracking  <- ResultT.fromResult:
                             obsInfo.explicitBase
-                              .map(ObjectTracking.constant)
-                              .orElse(ObjectTracking.fromAsterism(asterism))
+                              .map(Tracking.constant)
+                              .orElse(Tracking.fromAsterism(asterism))
                               .fold(Result.failure(s"No tracking available for $oid")): t =>
                                 Result.success(t)
 
@@ -784,7 +780,7 @@ object GuideService {
                              )(gsn => getGuideStarFromGaia(gsn).map(_.map(NonEmptyList.one)))
                            ).map(_.map(_.at(obsTime.toInstant)))
           baseCoords    <- ResultT.fromResult(
-                             baseTracking.at(obsTime.toInstant).map(_.value)
+                             baseTracking.at(obsTime.toInstant)
                                .toResult(
                                  generalError(
                                    s"Unable to get coordinates for asterism in observation $oid"
@@ -793,7 +789,7 @@ object GuideService {
                            )
           scienceCoords <- ResultT.fromResult(
                              asterism.toList
-                               .traverse(t => ObjectTracking.fromTarget(t).flatMap(_.at(obsTime.toInstant)).map(_.value))
+                               .traverse(t => Tracking.fromTarget(t).flatMap(_.at(obsTime.toInstant)))
                                .toResult(
                                  generalError(
                                    s"Unable to get coordinates for science targets in observation $oid"
@@ -856,7 +852,7 @@ object GuideService {
           obsInfo       <- ResultT(getObservationInfo(oid))
           asterism      <- ResultT(getAsterism(pid, oid))
           genInfo       <- ResultT(getGeneratorInfo(pid, oid))
-          baseTracking   = obsInfo.explicitBase.map(ObjectTracking.constant).orElse(ObjectTracking.fromAsterism(asterism))
+          baseTracking   = obsInfo.explicitBase.map(Tracking.constant).orElse(Tracking.fromAsterism(asterism))
           visitEnd      <- ResultT.fromResult(
                              obsTime
                                .plusMicrosOption(genInfo.timeEstimate.toMicroseconds)
@@ -868,14 +864,14 @@ object GuideService {
                               case Some(t) => getAllCandidates(oid, obsTime, visitEnd, t, genInfo.centralWavelength, obsInfo.constraints)
                           ).map(_.map(_.at(obsTime.toInstant)))
           baseCoords    <- ResultT.fromResult(
-                             baseTracking.flatMap(_.at(obsTime.toInstant)).map(_.value)
+                             baseTracking.flatMap(_.at(obsTime.toInstant))
                                .toResult(
                                  generalError(s"Unable to get coordinates for asterism in observation $oid").asProblem
                                )
                            )
           scienceCoords <- ResultT.fromResult(
                              asterism.toList
-                               .traverse(t => ObjectTracking.fromTarget(t).flatMap(_.at(obsTime.toInstant)).map(_.value))
+                               .traverse(t => Tracking.fromTarget(t).flatMap(_.at(obsTime.toInstant)))
                                .toResult(
                                  generalError(s"Unable to get coordinates for science targets in observation $oid").asProblem
                                )
