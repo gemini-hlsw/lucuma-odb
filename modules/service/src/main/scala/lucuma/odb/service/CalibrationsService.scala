@@ -126,7 +126,7 @@ object CalibrationsService extends CalibrationObservations {
           },
           rv,
           parallax
-        ).apply(when)
+        ).at(when)
       )
     }.collect {
       case (tid, name, role, Some(st)) => (tid, name, role, st)

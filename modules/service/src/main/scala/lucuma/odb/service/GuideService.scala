@@ -416,7 +416,7 @@ object GuideService {
         wavelength:      Wavelength,
         constraints:     ConstraintSet
       ): Result[ADQLQuery] =
-        (tracking(start.toInstant), tracking(end.toInstant))
+        (tracking.at(start.toInstant), tracking.at(end.toInstant))
           .mapN { (a, b) =>
             // If caching is implemented for the guide star results, `ags.widestConstraints` should be
             // used for the brightness constraints.
@@ -502,7 +502,7 @@ object GuideService {
 
         // Get the coords and handle failure in the expected form
         def coordsAt(ts: Timestamp): Either[OdbError, Coordinates] =
-          tracking(ts.toInstant)
+          tracking.at(ts.toInstant)
             .toRight(generalError(s"Coordinates unavailable at ${interval.start.toInstant}."))
 
         // Get the origin, if we can
@@ -682,7 +682,7 @@ object GuideService {
       ): Either[OdbError, AvailabilityPeriod] =
         for {
           baseCoords      <- obsInfo.explicitBase
-                               .orElse(baseTracking(start.toInstant))
+                               .orElse(baseTracking.at(start.toInstant))
                                .toRight(
                                  generalError(s"Unable to get coordinates for asterism in observation ${obsInfo.id}")
                                )
@@ -873,7 +873,7 @@ object GuideService {
           candidates    <- ResultT(getAllCandidates(oid, obsTime, visitEnd, baseTracking, genInfo.centralWavelength, obsInfo.constraints))
                             .map(_.map(_.at(obsTime.toInstant)))
           baseCoords    <- ResultT.fromResult(
-                             baseTracking(obsTime.toInstant)
+                             baseTracking.at(obsTime.toInstant)
                                .toResult(
                                  generalError(s"Unable to get coordinates for asterism in observation $oid").asProblem
                                )

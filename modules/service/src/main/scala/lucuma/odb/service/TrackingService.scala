@@ -99,7 +99,7 @@ object TrackingService:
 
     /** If this is a tracking snapshot, evaluate it at a given time. */
     def at(t: Timestamp)(using A <:< Tracking): Result[Snapshot[Coordinates]] =
-      Result.fromOption(traverse(_(t.toInstant)), "Tracking not defined over expected region.")
+      Result.fromOption(traverse(_.at(t.toInstant)), "Tracking not defined over expected region.")
 
     def map[B](f: A => B): Snapshot[B] =
       copy(base = f(base), asterism = asterism.map(_.map(f)))

@@ -29,7 +29,6 @@ import lucuma.core.model.Program
 import lucuma.core.model.SiteCoordinatesLimits
 import lucuma.core.model.StandardRole.*
 import lucuma.core.model.Target
-import lucuma.core.model.Tracking
 import lucuma.core.syntax.string.*
 import lucuma.core.util.DateInterval
 import lucuma.core.util.Enumerated
