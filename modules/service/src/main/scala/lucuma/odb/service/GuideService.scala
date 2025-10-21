@@ -490,8 +490,11 @@ object GuideService {
         }.value
 
 
-      extension (ts: Timestamp) def plusDaysTruncatedAndBounded(n: Int): Timestamp =
-        Timestamp.fromInstantTruncatedAndBounded(ts.toInstant.plus(n, ChronoUnit.DAYS))
+      extension (ts: Timestamp) 
+        def plusDays(n: Int): Option[Timestamp] =
+          Timestamp.fromInstant(ts.toInstant.plus(n, ChronoUnit.DAYS))
+        def plusDaysTruncatedAndBounded(n: Int): Timestamp =
+          Timestamp.fromInstantTruncatedAndBounded(ts.toInstant.plus(n, ChronoUnit.DAYS))
 
       /** 
        * Find the first timestamp in `interval` for which the coordinates stray more than `invalidThreshold`
@@ -518,7 +521,11 @@ object GuideService {
                 case Right(coords) =>
                   if origin.angularDistance(coords) > invalidThreshold then Right(ts)
                   else 
-                    go(ts.plusDaysTruncatedAndBounded(1))
+                    ts.plusDays(1) match
+                      case Some(ts) => go(ts)
+                      case None     => Left(OdbError.InvalidArgument(Some(s"Interval out of range: $interval")))
+                    
+                    // go(ts.plusDaysTruncatedAndBounded(1))
           
           // Start at the beginning
           go(interval.start)
