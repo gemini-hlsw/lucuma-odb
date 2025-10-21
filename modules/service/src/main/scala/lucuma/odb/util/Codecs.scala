@@ -56,6 +56,8 @@ import lucuma.odb.data.EditType
 import lucuma.odb.data.EmailId
 import lucuma.odb.data.ExecutionEventType
 import lucuma.odb.data.Existence
+import lucuma.odb.data.ExposureTimeModeId
+import lucuma.odb.data.ExposureTimeModeRole
 import lucuma.odb.data.ExposureTimeModeType
 import lucuma.odb.data.Extinction
 import lucuma.odb.data.Md5Hash
@@ -67,6 +69,7 @@ import lucuma.odb.data.TimeCharge.DiscountDiscriminator
 import lucuma.odb.data.TimingWindowEndTypeEnum
 import lucuma.odb.data.UserType
 import lucuma.odb.service.ObservationWorkflowService
+import lucuma.odb.syntax.exposureTimeMode.*
 import monocle.Prism
 import skunk.*
 import skunk.circe.codec.json.*
@@ -284,6 +287,12 @@ trait Codecs {
 
   val existence: Codec[Existence] =
     enumerated(Type("e_existence"))
+
+  val exposure_time_mode_id: Codec[ExposureTimeModeId] =
+    int4.imap(ExposureTimeModeId.apply)(_.value)
+
+  val exposure_time_mode_role: Codec[ExposureTimeModeRole] =
+    enumerated(Type("e_exposure_time_mode_role"))
 
   val exposure_time_mode_type: Codec[ExposureTimeModeType] =
     enumerated(Type("e_exp_time_mode"))
@@ -530,7 +539,7 @@ trait Codecs {
     enumerated[SpectroscopyCapabilities](Type.varchar)
 
   val signal_to_noise: Codec[SignalToNoise] =
-    numeric(10,3).eimap(
+    numeric(11,3).eimap(
      bd => SignalToNoise.FromBigDecimalExact.getOption(bd).toRight(s"Invalid signal-to-noise value: $bd")
     )(_.toBigDecimal)
 
@@ -786,6 +795,34 @@ trait Codecs {
 
   val user_invitation_status: Codec[InvitationStatus] =
     enumerated(Type("e_invitation_status"))
+
+  val exposure_time_mode: Codec[ExposureTimeMode] =
+      (
+        exposure_time_mode_type  *:
+        wavelength_pm            *:
+        signal_to_noise.opt      *:
+        time_span.opt            *:
+        int4_pos.opt
+      ).eimap((tpe, at, s2n, time, count) =>
+        tpe match
+          case ExposureTimeModeType.SignalToNoiseMode =>
+            s2n
+              .map(s => ExposureTimeMode.SignalToNoiseMode(s, at))
+              .toRight("Both signal-to-noise value must be defined for the SignalToNoise exposure time mode.")
+
+          case ExposureTimeModeType.TimeAndCountMode  =>
+            (time, count)
+              .mapN((t, c) => ExposureTimeMode.TimeAndCountMode(t, c, at))
+              .toRight("Both exposure time and count must be defined for the TimeAndCount exposure time mode.")
+      )(
+        etm => (
+          etm.modeType,
+          etm.at,
+          etm.signalToNoise,
+          etm.exposureTime,
+          etm.exposureCount
+        )
+      )
 
   val observation_workflow_state: Codec[ObservationWorkflowState] =
     enumerated(Type("e_workflow_state"))

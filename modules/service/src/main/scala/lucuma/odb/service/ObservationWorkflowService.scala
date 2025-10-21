@@ -22,7 +22,6 @@ import lucuma.core.math.Declination
 import lucuma.core.math.RightAscension
 import lucuma.core.model.CallCoordinatesLimits
 import lucuma.core.model.CallForProposals
-import lucuma.core.model.ObjectTracking
 import lucuma.core.model.Observation
 import lucuma.core.model.ObservationValidation
 import lucuma.core.model.ObservationWorkflow
@@ -30,6 +29,7 @@ import lucuma.core.model.Program
 import lucuma.core.model.SiteCoordinatesLimits
 import lucuma.core.model.StandardRole.*
 import lucuma.core.model.Target
+import lucuma.core.model.Tracking
 import lucuma.core.syntax.string.*
 import lucuma.core.util.DateInterval
 import lucuma.core.util.Enumerated
@@ -162,9 +162,9 @@ case class ObservationValidationInfo(
     explicitBase.orElse:
       for
         ast <- NonEmptyList.fromList(asterism)
-        tracking  = ObjectTracking.fromAsterism(ast)
+        tracking  = Tracking.fromAsterism(ast)
         coordsAt <- tracking.flatMap(_.at(when))
-      yield coordsAt.value
+      yield coordsAt
 
   def isOpportunity: Boolean =
     asterism.exists:

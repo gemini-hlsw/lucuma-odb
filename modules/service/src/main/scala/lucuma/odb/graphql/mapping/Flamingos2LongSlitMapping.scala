@@ -4,20 +4,30 @@
 package lucuma.odb.graphql
 package mapping
 
+import grackle.Query.Binding
+import grackle.Query.Filter
+import grackle.Query.Unique
+import grackle.QueryCompiler.Elab
 import grackle.Result
+import grackle.TypeRef
 import grackle.skunk.SkunkMapping
 import io.circe.Json
 import io.circe.syntax.*
 import lucuma.core.enums.Flamingos2Decker
 import lucuma.core.enums.Flamingos2ReadoutMode
 import lucuma.core.math.Offset
+import lucuma.odb.data.ExposureTimeModeRole
 import lucuma.odb.format.spatialOffsets.*
+import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.graphql.table.*
 import lucuma.odb.json.offset.query.given
 import lucuma.odb.sequence.flamingos2.longslit.Config
 
 trait Flamingos2LongSlitMapping[F[_]]
-  extends Flamingos2LongSlitView[F] with OptionalFieldMapping[F] with BaseMapping[F] { this: SkunkMapping[F] =>
+  extends Flamingos2LongSlitView[F]
+     with ExposureTimeModeMapping[F]
+     with OptionalFieldMapping[F]
+     with Predicates[F] { this: SkunkMapping[F] =>
 
   private def decodeOffsets(s: String): Json =
     OffsetsFormat.getOption(s).map(_.asJson).getOrElse(List.empty[Offset].asJson)
@@ -33,6 +43,9 @@ trait Flamingos2LongSlitMapping[F[_]]
       SqlField("disperser", Flamingos2LongSlitView.Disperser),
       SqlField("filter",    Flamingos2LongSlitView.Filter),
       SqlField("fpu",       Flamingos2LongSlitView.Fpu),
+
+      SqlObject("acquisitionExposureTimeMode", Join(Flamingos2LongSlitView.ObservationId, ExposureTimeModeView.ObservationId)),
+      SqlObject("scienceExposureTimeMode", Join(Flamingos2LongSlitView.ObservationId, ExposureTimeModeView.ObservationId)),
 
       SqlField("explicitReadMode", Flamingos2LongSlitView.ReadMode),
       SqlField("explicitReads", Flamingos2LongSlitView.Reads),
@@ -73,5 +86,24 @@ trait Flamingos2LongSlitMapping[F[_]]
       SqlField("initialFpu",       Flamingos2LongSlitView.InitialFpu),
 
     )
+
+  lazy val Flamingos2LongSlitElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
+    case (Flamingos2LongSlitType, "acquisitionExposureTimeMode", Nil) =>
+      Elab.transformChild: child =>
+        Unique(
+          Filter(
+            Predicates.exposureTimeMode.role.eql(ExposureTimeModeRole.Acquisition),
+            child
+          )
+        )
+
+    case (Flamingos2LongSlitType, "scienceExposureTimeMode", Nil) =>
+      Elab.transformChild: child =>
+        Unique(
+          Filter(
+            Predicates.exposureTimeMode.role.eql(ExposureTimeModeRole.Science),
+            child
+          )
+        )
 
 }

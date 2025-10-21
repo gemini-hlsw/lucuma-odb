@@ -36,6 +36,8 @@ import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.Services
 import natchez.Trace.Implicits.noop
 
+import java.time.Instant
+
 trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
 
   val pi: User          = TestUsers.Standard.pi(1, 30)
@@ -309,4 +311,13 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
     generateAfter(pid, oid, time).flatMap: res =>
       IO.fromEither(res.leftMap(e => new RuntimeException(s"Failed to generate the sequence: ${e.message}")))
 
+  /**
+   * @return list of added and removed calibration observations
+   */
+  def recalculateCalibrations(pid: Program.Id, when: Instant): IO[(List[Observation.Id], List[Observation.Id])] =
+    withServices(serviceUser): services =>
+      services.session.transaction.use: xa =>
+        services
+          .calibrationsService(emailConfig, httpClient)
+          .recalculateCalibrations(pid, when)(using xa)
 }

@@ -33,6 +33,7 @@ import lucuma.core.model.Target
 import lucuma.core.util.Timestamp
 import lucuma.odb.Config
 import lucuma.odb.data.Existence
+import lucuma.odb.data.ExposureTimeModeRole
 import lucuma.odb.data.GroupTree
 import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.input.CreateGroupInput
@@ -51,6 +52,7 @@ import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.util.Codecs.*
 import lucuma.refined.*
 import org.http4s.client.Client
+import org.typelevel.log4cats.Logger
 import skunk.AppliedFragment
 import skunk.Command
 import skunk.Query
@@ -130,7 +132,7 @@ object CalibrationsService extends CalibrationObservations {
       case (tid, name, role, Some(st)) => (tid, name, role, st)
     }
 
-  def instantiate[F[_]: MonadCancelThrow](emailConfig: Config.Email, httpClient: Client[F])(using Services[F]): CalibrationsService[F] =
+  def instantiate[F[_]: {MonadCancelThrow, Services, Logger as L}](emailConfig: Config.Email, httpClient: Client[F]): CalibrationsService[F] =
     new CalibrationsService[F] {
 
       override def setCalibrationRole(
@@ -264,21 +266,20 @@ object CalibrationsService extends CalibrationObservations {
         pid:       Program.Id,
         gid:       Group.Id,
         props:     Map[CalibrationConfigSubset, CalObsProps],
-        configs:   List[CalibrationConfigSubset],
+        config:    CalibrationConfigSubset,
         tid:       Target.Id
-      )(using Transaction[F]): F[List[Observation.Id]] =
-        calibRole match {
-          case CalibrationRole.SpectroPhotometric =>
-            site match {
-              case Site.GN => gmosLongSlitSpecPhotObs(pid, gid, tid, props, configs.collect { case c: GmosNConfigs => c })
-              case Site.GS => gmosLongSlitSpecPhotObs(pid, gid, tid, props, configs.collect { case c: GmosSConfigs => c })
-            }
-          case CalibrationRole.Twilight =>
-            site match
-              case Site.GN => gmosLongSlitTwilightObs(pid, gid, tid, configs.collect { case c: GmosNConfigs => c })
-              case Site.GS => gmosLongSlitTwilightObs(pid, gid, tid, configs.collect { case c: GmosSConfigs => c })
-          case _ => List.empty.pure[F]
-        }
+      )(using Transaction[F], MonadCancelThrow[F]): Option[F[Observation.Id]] =
+        (site, calibRole, config) match
+          case (Site.GN, CalibrationRole.SpectroPhotometric, c: GmosNConfigs) =>
+            gmosLongSlitSpecPhotObs(pid, gid, tid, props, c).some
+          case (Site.GS, CalibrationRole.SpectroPhotometric, c: GmosSConfigs) =>
+            gmosLongSlitSpecPhotObs(pid, gid, tid, props, c).some
+          case (Site.GN, CalibrationRole.Twilight, c: GmosNConfigs)           =>
+            gmosLongSlitTwilightObs(pid, gid, tid, c).some
+          case (Site.GS, CalibrationRole.Twilight, c: GmosSConfigs)           =>
+            gmosLongSlitTwilightObs(pid, gid, tid, c).some
+          case _                                                              =>
+            none
 
       // Set the calibration role of the observations in bulk
       private def setCalibRoleAndGroup(oids: List[Observation.Id], calibrationRole: CalibrationRole): F[Unit] =
@@ -311,19 +312,16 @@ object CalibrationsService extends CalibrationObservations {
         gnTgt:     CalibrationIdealTargets,
         gsTgt:     CalibrationIdealTargets
       )(using Transaction[F], ServiceAccess): F[List[Observation.Id]] = {
-        def newCalibs(site: Site, idealTarget: CalibrationIdealTargets): Option[F[List[Observation.Id]]] =
-          idealTarget.bestTarget(calibType).map(tgtid =>
-            if (configs.nonEmpty) {
-              (for {
-                cta <- Nested(targetService.cloneTargetInto(tgtid, pid)).map(_._2).value
-                o   <- cta.traverse(calibObservation(calibType, site, pid, gid, props, configs, _))
-              } yield o).orError
-            } else {
-              List.empty.pure[F]
-            })
+        def newCalibs(site: Site, idealTarget: CalibrationIdealTargets, siteConfigs: List[CalibrationConfigSubset]): Option[F[List[Observation.Id]]] =
+          idealTarget.bestTarget(calibType).map: tgtid =>
+            siteConfigs.flatTraverse: config =>
+              for {
+                (_, tid) <- targetService.cloneTargetInto(tgtid, pid).orError
+                oid      <- calibObservation(calibType, site, pid, gid, props, config, tid).sequence
+              } yield oid.toList
 
-        val gnoCalibs = newCalibs(Site.GN, gnTgt)
-        val gsoCalibs = newCalibs(Site.GS, gsTgt)
+        val gnoCalibs = newCalibs(Site.GN, gnTgt, configs.collect { case g: GmosNConfigs => g })
+        val gsoCalibs = newCalibs(Site.GS, gsTgt, configs.collect { case g: GmosSConfigs => g })
 
         (gnoCalibs, gsoCalibs).mapN((_, _).mapN(_ ::: _)).getOrElse(List.empty.pure[F]).flatTap { oids =>
           setCalibRoleAndGroup(oids, calibType).whenA(oids.nonEmpty)
@@ -364,8 +362,14 @@ object CalibrationsService extends CalibrationObservations {
       )(using Transaction[F]): F[Unit] =
         calibrationUpdates
           .traverse { (oid, props) =>
-            val bandFragment = props.band.map(sql"c_science_band IS DISTINCT FROM $science_band")
-            val waveFragment = props.wavelengthAt.map(sql"c_etm_signal_to_noise_at <> $wavelength_pm")
+            val etmJoin: AppliedFragment =
+              if props.wavelengthAt.isDefined then
+                void"""LEFT JOIN t_exposure_time_mode e USING (c_observation_id)"""
+              else
+                void""
+
+            val bandFragment = props.band.map(sql"o.c_science_band IS DISTINCT FROM $science_band")
+            val waveFragment = props.wavelengthAt.map(w => sql"(e.c_signal_to_noise_at <> $wavelength_pm AND e.c_role = $exposure_time_mode_role)".apply(w, ExposureTimeModeRole.Science))
             val needsUpdate  = List(bandFragment, waveFragment).flatten.intercalate(void" OR ")
 
             services.observationService.updateObservations(
@@ -387,12 +391,14 @@ object CalibrationsService extends CalibrationObservations {
                   ),
                   // Important: Only update the obs that need it or it will produce a cascade of infinite updates
                   // TODO: This could be slightly optimized by grouping obs per configuration and updating in batches
-                  sql"""
-                    SELECT $observation_id
-                      FROM t_observation
-                    WHERE c_observation_id = $observation_id
-                      AND c_calibration_role IS NOT NULL
-                      AND ("""(oid, oid) |+| needsUpdate |+| void")"
+                  void"""
+                    SELECT DISTINCT c_observation_id
+                      FROM t_observation o
+                  """ |+| etmJoin |+| sql"""
+                    WHERE o.c_observation_id = $observation_id
+                      AND o.c_calibration_role IS NOT NULL
+                      AND (
+                  """.apply(oid) |+| needsUpdate |+| void")"
                 )
             )
           }.void
@@ -403,7 +409,8 @@ object CalibrationsService extends CalibrationObservations {
             .map(targetCoordinates(referenceInstant))
 
       def recalculateCalibrations(pid: Program.Id, referenceInstant: Instant)(using Transaction[F], ServiceAccess): F[(List[Observation.Id], List[Observation.Id])] =
-        for
+        for {
+          _            <- L.info(s"Recalculating calibrations for $pid, reference instant  $referenceInstant")
           // Read calibration targets
           tgts         <- calibrationTargets(CalibrationTypes, referenceInstant)
           // Actual target for GN and GS
@@ -411,13 +418,17 @@ object CalibrationsService extends CalibrationObservations {
           gnTgt         = CalibrationIdealTargets(Site.GN, referenceInstant, tgts)
           // List of the program's active observations
           active       <- activeObservations(pid)
+          _            <- L.debug(s"Program $pid has ${active.size} active observations: $active").whenA(active.nonEmpty)
           // Get all the active science observations
           allSci       <- allObservations(pid, ObservationSelection.Science)
                             .map(_.filter(u => active.contains(u._1)))
+          _            <- L.debug(s"Program $pid has ${allSci.length} science observations: ${allSci.map(_.id)}").whenA(allSci.nonEmpty)
           // Unique science configurations
           uniqueSci     = uniqueConfiguration(allSci)
+          _            <- L.debug(s"Program $pid has ${uniqueSci.length} science configurations")
           // Get all the active calibration observations (excluding those with execution events)
           allCalibs    <- allUnexecutedObservations(pid, ObservationSelection.Calibration).map(_.filter(u => active.contains(u.id)))
+          _            <- L.debug(s"Program $pid has ${allCalibs.length} active calibration observations: ${allCalibs.map(_.id)}").whenA(allCalibs.nonEmpty)
           calibs        = toConfigForCalibration(allCalibs)
           // Average s/n wavelength at each configuration
           props         = calObsProps(toConfigForCalibration(allSci))
@@ -425,13 +436,15 @@ object CalibrationsService extends CalibrationObservations {
           configsPerRole = calculateConfigurationsPerRole(uniqueSci, calibs)
           // Remove calibrations that are not needed, basically when a config is removed
           removedOids  <- removeUnnecessaryCalibrations(uniqueSci, calibs)
+          _            <- L.debug(s"Program $pid will remove unnecessary calibrations $removedOids").whenA(removedOids.nonEmpty)
           // Generate new calibrations for each unique configuration
           addedOids    <- generateGMOSLSCalibrations(pid, props, configsPerRole, gnTgt, gsTgt)
+          _            <- L.debug(s"Program $pid added calibrations $addedOids").whenA(addedOids.nonEmpty)
           // Update wavelength at for each remaining calib
           calibUpdates  = prepareCalibrationUpdates(calibs, removedOids, props)
           _            <- updatePropsAt(calibUpdates)
           _            <- targetService.deleteOrphanCalibrationTargets(pid)
-        yield (addedOids, removedOids)
+        } yield (addedOids, removedOids)
 
       // Recalcula the target of a calibration observation
       def recalculateCalibrationTarget(
@@ -439,6 +452,7 @@ object CalibrationsService extends CalibrationObservations {
         oid: Observation.Id,
       )(using Transaction[F], ServiceAccess): F[Unit] = {
         for {
+          _    <- L.info(s"Recalculating calibration targets for $pid, oid $oid")
           o    <- session.execute(Statements.selectCalibrationTimeAndConf)(oid).map(_.headOption)
           // Find the original target
           otgs <- o.map(_._1).map { oid =>

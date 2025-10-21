@@ -1,24 +1,6 @@
-const fs = require('fs');
-const path = require('path');
-const { 
-  buildSchema, 
-  printSchema, 
-  GraphQLSchema,
-  GraphQLInputObjectType,
-  parse,
-  visit,
-  Kind,
-  buildASTSchema,
-  print,
-  isInputObjectType,
-  isObjectType,
-  isInterfaceType,
-  isUnionType,
-  isEnumType,
-  isScalarType,
-  getNullableType,
-  getNamedType,
-} = require('graphql');
+import { readFile, writeFile } from 'fs/promises';
+import { GraphQLSchema, buildASTSchema, getNamedType, isEnumType, isInputObjectType, isInterfaceType, isObjectType, isScalarType, isUnionType, parse, print, printSchema, visit } from 'graphql';
+import { basename, resolve } from 'path';
 
 // Parse command line arguments
 function parseArguments() {
@@ -38,10 +20,13 @@ function parseArguments() {
 const args = parseArguments();
 const DEBUG = args.debug;
 
-// Function to read schema files
+/**
+ * Function to read schema files
+ * @param {string} filePath 
+ */
 function readSchema(filePath) {
   try {
-    return fs.readFileSync(path.resolve(filePath), 'utf8');
+    return readFile(resolve(filePath), 'utf8');
   } catch (error) {
     console.error(`Error reading file ${filePath}:`, error.message);
     process.exit(1);
@@ -50,8 +35,8 @@ function readSchema(filePath) {
 
 // 1. Read both schema files
 console.log(`Reading schema files: ${args.schema1Path} and ${args.schema2Path}`);
-const schema1Raw = readSchema(args.schema1Path);
-const schema2Raw = readSchema(args.schema2Path);
+const schema1Raw = await readSchema(args.schema1Path);
+const schema2Raw = await readSchema(args.schema2Path);
 
 // 2. First, merge the schemas as-is to preserve all type references
 console.log('First merging schemas to preserve all type references...');
@@ -111,7 +96,10 @@ if (entryPoints.length === 0) {
 
 console.log(`Found operation types: ${entryPoints.map(t => t.name).join(', ')}`);
 
-// 4. Build dependency graph and identify reachable types with improved input handling
+/**
+ * 4. Build dependency graph and identify reachable types with improved input handling
+ * @param {import('graphql').GraphQLSchema} schema
+ */
 function buildDependencyGraph(schema) {
   const graph = {};
   const typeMap = schema.getTypeMap();
@@ -216,7 +204,7 @@ console.log('Building dependency graph with improved input type handling...');
 const dependencyGraph = buildDependencyGraph(mergedSchema);
 
 if (DEBUG) {
-  fs.writeFileSync('dependency-graph.json', JSON.stringify(dependencyGraph, null, 2));
+  await writeFile('dependency-graph.json', JSON.stringify(dependencyGraph, null, 2));
   console.log('Wrote dependency graph to dependency-graph.json for debugging');
 }
 
@@ -349,14 +337,14 @@ outputSDL = `
 """
 This file is generated. Do not manually modify it.
 It is generated from the following source files:
-  - ${path.basename(args.schema1Path)}
-  - ${path.basename(args.schema2Path)}
+  - ${basename(args.schema1Path)}
+  - ${basename(args.schema2Path)}
 """
 ${outputSDL}
 `;
 
 try {
-  fs.writeFileSync(args.outputPath, outputSDL);
+  await writeFile(args.outputPath, outputSDL);
   console.log(`Success! Pruned and merged schema has been written to ${args.outputPath}`);
   
   // Report detailed statistics
@@ -394,7 +382,7 @@ try {
   }
   
   if (DEBUG && removedTypeNames.length > 0) {
-    fs.writeFileSync('removed-types.json', JSON.stringify({
+    await writeFile('removed-types.json', JSON.stringify({
       removed: removedTypeNames.sort(),
       kept: keptTypeNames.sort()
     }, null, 2));

@@ -26,7 +26,7 @@ scalar EmailAddress
 input AddAtomEventInput {
   atomId: AtomId!
   atomStage: AtomStage!
-  "deprecated: use idempotencyKey instead"
+  "@deprecated: use idempotencyKey instead"
   clientId: ClientId
 
   """
@@ -51,7 +51,7 @@ input AddDatasetEventInput {
   "Dataset execution stage."
   datasetStage: DatasetStage!
 
-  "deprecated: use idempotencyKey instead"
+  "@deprecated: use idempotencyKey instead"
   clientId: ClientId
 
   """
@@ -83,7 +83,7 @@ input AddSequenceEventInput {
   visitId: VisitId!
   command: SequenceCommand!
 
-  "deprecated: use idempotencyKey instead"
+  "@deprecated: use idempotencyKey instead"
   clientId: ClientId
 
   """
@@ -105,7 +105,7 @@ input AddSlewEventInput {
   observationId: ObservationId!
   slewStage: SlewStage!
 
-  "deprecated: use idempotencyKey instead"
+  "@deprecated: use idempotencyKey instead"
   clientId: ClientId
 
   """
@@ -127,7 +127,7 @@ input AddStepEventInput {
   stepId: StepId!
   stepStage: StepStage!
 
-  "deprecated: use idempotencyKey instead"
+  "@deprecated: use idempotencyKey instead"
   clientId: ClientId
 
   """
@@ -765,7 +765,7 @@ type ChangeProgramUserRoleResult {
   programUser: ProgramUser!
 }
 
-"deprecated: use IdempotencyKey (UUID) instead"
+"@deprecated: use IdempotencyKey (UUID) instead"
 scalar ClientId
 
 """
@@ -2097,6 +2097,18 @@ input GmosNorthLongSlitInput {
   centralWavelength: WavelengthInput
 
   """
+  Exposure time mode for the acquisition sequence.  If not specified, a default
+  exposure time mode is used.
+  """
+  acquisitionExposureTimeMode: ExposureTimeModeInput
+
+  """
+  Exposure time mode for the science sequence.  If not specified, the exposure
+  time mode of the observation's science requirements are used.
+  """
+  scienceExposureTimeMode: ExposureTimeModeInput
+
+  """
   The explicitXBin field may be unset by assigning a null value, or ignored by skipping it altogether
   """
   explicitXBin: GmosBinning
@@ -2537,6 +2549,18 @@ input GmosSouthLongSlitInput {
   The centralWavelength field must be either specified or skipped altogether.  It cannot be unset with a null value.
   """
   centralWavelength: WavelengthInput
+
+  """
+  Exposure time mode for the acquisition sequence.  If not specified, a default
+  exposure time mode is used.
+  """
+  acquisitionExposureTimeMode: ExposureTimeModeInput
+
+  """
+  Exposure time mode for the science sequence.  If not specified, the exposure
+  time mode of the observation's science requirements are used.
+  """
+  scienceExposureTimeMode: ExposureTimeModeInput
 
   """
   The explicitXBin field may be unset by assigning a null value, or ignored by skipping it altogether
@@ -8045,6 +8069,16 @@ type Flamingos2LongSlit {
   fpu: Flamingos2Fpu!
 
   """
+  The exposure time mode used for ITC lookup for the acquisition sequence.
+  """
+  acquisitionExposureTimeMode: ExposureTimeMode!
+
+  """
+  The exposure time mode used for ITC lookup for the science sequence.
+  """
+  scienceExposureTimeMode: ExposureTimeMode!
+
+  """
   Optional explicitly specified F2 ReadMode. If set it overrides the
   default.
   """
@@ -8150,6 +8184,18 @@ input Flamingos2LongSlitInput {
   The fpu field must be specified.  It cannot be unset with a null value.
   """
   fpu: Flamingos2Fpu
+
+  """
+  Exposure time mode for the acquisition sequence.  If not specified, a default
+  exposure time mode is used.
+  """
+  acquisitionExposureTimeMode: ExposureTimeModeInput
+
+  """
+  Exposure time mode for the science sequence.  If not specified, the exposure
+  time mode of the observation's science requirements are used.
+  """
+  scienceExposureTimeMode: ExposureTimeModeInput
 
   """
   The read mode field may be unset by assigning a null value, or ignored by skipping it altogether
@@ -8654,6 +8700,16 @@ type GmosNorthLongSlit {
   centralWavelength: Wavelength!
 
   """
+  The exposure time mode used for ITC lookup for the acquisition sequence.
+  """
+  acquisitionExposureTimeMode: ExposureTimeMode!
+
+  """
+  The exposure time mode used for ITC lookup for the science sequence.
+  """
+  scienceExposureTimeMode: ExposureTimeMode!
+
+  """
   GMOS X-Binning, either explicitly specified in explicitXBin or else taken
   from the defaultXBin.
   """
@@ -8775,22 +8831,19 @@ type GmosNorthLongSlit {
   """
   Spacial q offsets, either explicitly specified in explicitSpatialOffsets
   or else taken from defaultSpatialOffsets
-  @deprecated(reason: "Use 'offsets', 'defaultOffsets', and 'explicitOffsets' instead.")
   """
-  spatialOffsets: [OffsetQ!]!
+  spatialOffsets: [OffsetQ!]! @deprecated(reason: "Use 'offsets', 'defaultOffsets', and 'explicitOffsets' instead.")
 
   """
   Default spatial offsets.
-  @deprecated(reason: "Use 'defaultOffsets' instead.")
   """
-  defaultSpatialOffsets: [OffsetQ!]!
+  defaultSpatialOffsets: [OffsetQ!]! @deprecated(reason: "Use 'defaultOffsets' instead.")
 
   """
   Optional explicitly specified spatial q offsets. If set it overrides the
   the default.
-  @deprecated(reason: "Use 'explicitOffsets' instead.")
   """
-  explicitSpatialOffsets: [OffsetQ!]
+  explicitSpatialOffsets: [OffsetQ!] @deprecated(reason: "Use 'explicitOffsets' instead.")
 
   """
   The grating as it was initially selected.  See the `grating` field for the
@@ -9257,6 +9310,16 @@ type GmosSouthLongSlit {
   centralWavelength: Wavelength!
 
   """
+  The exposure time mode used for ITC lookup for the acquisition sequence.
+  """
+  acquisitionExposureTimeMode: ExposureTimeMode!
+
+  """
+  The exposure time mode used for ITC lookup for the science sequence.
+  """
+  scienceExposureTimeMode: ExposureTimeMode!
+
+  """
   GMOS X-Binning, either explicitly specified in explicitXBin or else taken
   from the defaultXBin.
   """
@@ -9378,22 +9441,19 @@ type GmosSouthLongSlit {
   """
   Spacial q offsets, either explicitly specified in explicitSpatialOffsets
   or else taken from defaultSpatialOffsets
-  @deprecated(reason: "Use 'offsets', 'defaultOffsets', and 'explicitOffsets' instead.")
   """
-  spatialOffsets: [OffsetQ!]!
+  spatialOffsets: [OffsetQ!]! @deprecated(reason: "Use 'offsets', 'defaultOffsets', and 'explicitOffsets' instead.")
 
   """
   Default spatial offsets.
-  @deprecated(reason: "Use 'defaultOffsets' instead.")
   """
-  defaultSpatialOffsets: [OffsetQ!]!
+  defaultSpatialOffsets: [OffsetQ!]! @deprecated(reason: "Use 'defaultOffsets' instead.")
 
   """
   Optional explicitly specified spatial q offsets. If set it overrides the
   the default.
-  @deprecated(reason: "Use 'explicitOffsets' instead.")
   """
-  explicitSpatialOffsets: [OffsetQ!]
+  explicitSpatialOffsets: [OffsetQ!] @deprecated(reason: "Use 'explicitOffsets' instead.")
 
   """
   The grating as it was initially selected.  See the `grating` field for the

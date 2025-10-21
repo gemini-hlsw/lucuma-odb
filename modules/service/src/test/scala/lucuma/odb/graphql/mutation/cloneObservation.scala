@@ -15,8 +15,9 @@ import lucuma.core.model.ImageQuality
 import lucuma.core.model.Observation
 import lucuma.core.model.ObservationReference
 import lucuma.core.model.Target
+import lucuma.odb.graphql.query.ObservingModeSetupOperations
 
-class cloneObservation extends OdbSuite {
+class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
   val pi, pi2 = TestUsers.Standard.pi(nextId, nextId)
   val staff   = TestUsers.Standard.staff(nextId, nextId)
   lazy val validUsers = List(pi, pi2, staff)
@@ -37,6 +38,12 @@ class cloneObservation extends OdbSuite {
         exposureTimeMode {
           signalToNoise {
             value
+            at { nanometers }
+          }
+          timeAndCount {
+            time { seconds }
+            count
+            at { nanometers }
           }
         }
         spectroscopy {
@@ -59,6 +66,28 @@ class cloneObservation extends OdbSuite {
           filter
           fpu
           centralWavelength { nanometers }
+          acquisitionExposureTimeMode {
+            signalToNoise {
+              value
+              at { nanometers }
+            }
+            timeAndCount {
+              time { seconds }
+              count
+              at { nanometers }
+            }
+          }
+          scienceExposureTimeMode {
+            signalToNoise {
+              value
+              at { nanometers }
+            }
+            timeAndCount {
+              time { seconds }
+              count
+              at { nanometers }
+            }
+          }
           offsets { arcseconds }
           explicitOffsets { arcseconds }
           defaultOffsets { arcseconds }
@@ -71,6 +100,28 @@ class cloneObservation extends OdbSuite {
           filter
           fpu
           centralWavelength { nanometers }
+          acquisitionExposureTimeMode {
+            signalToNoise {
+              value
+              at { nanometers }
+            }
+            timeAndCount {
+              time { seconds }
+              count
+              at { nanometers }
+            }
+          }
+          scienceExposureTimeMode {
+            signalToNoise {
+              value
+              at { nanometers }
+            }
+            timeAndCount {
+              time { seconds }
+              count
+              at { nanometers }
+            }
+          }
           offsets { arcseconds }
           explicitOffsets { arcseconds }
           defaultOffsets { arcseconds }
@@ -108,6 +159,28 @@ class cloneObservation extends OdbSuite {
           disperser
           filter
           fpu
+          acquisitionExposureTimeMode {
+            signalToNoise {
+              value
+              at { nanometers }
+            }
+            timeAndCount {
+              time { seconds }
+              count
+              at { nanometers }
+            }
+          }
+          scienceExposureTimeMode {
+            signalToNoise {
+              value
+              at { nanometers }
+            }
+            timeAndCount {
+              time { seconds }
+              count
+              at { nanometers }
+            }
+          }
           telluricType {
             tag
             starTypes
@@ -847,4 +920,54 @@ class cloneObservation extends OdbSuite {
                 )
               )
     } yield ()
+
+  test("clone preserves exposure time modes"):
+    createProgramAs(pi).flatMap: pid =>
+      val t = createTargetAs(pi, pid)
+      (t, t).tupled.flatMap: (tid1, tid2) =>
+        createObservationWithModeAs(
+          pi,
+          pid,
+          List(tid1, tid2),
+          s"""
+            gmosNorthLongSlit: {
+              grating: R831_G5302
+              filter: R_PRIME
+              fpu: LONG_SLIT_0_50
+              centralWavelength: {
+                nanometers: 500
+              }
+              acquisitionExposureTimeMode: {
+                signalToNoise: {
+                  value: 99.9
+                  at: { nanometers: 123.45 }
+                }
+              }
+              scienceExposureTimeMode: {
+                signalToNoise: {
+                  value: 100.0
+                  at: { nanometers: 543.21 }
+                }
+              }
+              explicitYBin: TWO
+            }
+          """
+        ).flatMap: oid =>
+          query(
+            user = pi,
+            query = s"""
+              mutation {
+                cloneObservation(input: {
+                  observationId: "$oid"
+                }) {
+                  originalObservation $ObservationGraph
+                  newObservation $ObservationGraph
+                }
+              }
+            """
+          ).map: json =>
+            val a = json.hcursor.downFields("cloneObservation", "originalObservation").require[Json]
+            val b = json.hcursor.downFields("cloneObservation", "newObservation").require[Json]
+            assertEquals(a, b)
+
 }

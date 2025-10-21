@@ -49,6 +49,8 @@ object CalibrationConfigSubset:
     def longSlitCommonInput: GmosLongSlitInput.Create.Common =
       GmosLongSlitInput.Create.Common(
         centralWavelength      = centralWavelength,
+        acquisitionExposureTimeMode    = none,
+        scienceExposureTimeMode    = none,
         explicitXBin           = xBin.some,
         explicitYBin           = yBin.some,
         explicitAmpReadMode    = ampReadMode.some,
@@ -177,7 +179,7 @@ object CalibrationConfigSubset:
         none,
         none,
         none,
-        Flamingos2LongSlitInput.Create(disperser, filter, fpu, none, none, none, none).some
+        Flamingos2LongSlitInput.Create(disperser, filter, fpu, none, none, none, none, none, none).some
       )
 
   extension (mode: ObservingMode)

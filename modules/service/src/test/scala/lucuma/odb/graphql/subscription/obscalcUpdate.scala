@@ -308,3 +308,61 @@ class obscalcUpdate extends ObscalcServiceSuiteSupport:
         )
       )
     )
+
+  test("trigger for exposure time mode update"):
+    def updateEtm(o: Observation.Id): IO[Json] =
+      query(
+        user  = pi,
+        query = s"""
+          mutation {
+            updateObservations(input: {
+              SET: {
+                observingMode: {
+                  gmosSouthLongSlit: {
+                    scienceExposureTimeMode: {
+                      signalToNoise: {
+                        value: 99.99
+                        at: { nanometers: 12 }
+                      }
+                    }
+                  }
+                }
+              }
+              WHERE: { id: { EQ: "$o" } }
+            }) {
+              observations {
+                id
+              }
+            }
+          }
+        """
+      )
+
+    setup.flatMap: (_, oid) =>
+      subscriptionExpect(
+        user      = pi,
+        query     = s"""
+          subscription {
+            obscalcUpdate {
+              oldState
+              newState
+              editType
+              value { id }
+            }
+          }
+        """,
+        mutations = updateEtm(oid).asRight,
+        expected  = List(
+          Json.obj(
+            "obscalcUpdate" -> Json.obj(
+              "oldState" -> CalculationState.Pending.asJson,
+              "newState" -> CalculationState.Pending.asJson,
+              "editType" -> EditType.Updated.tag.toUpperCase.asJson,
+              "value" -> Json.obj(
+                "id" -> oid.asJson
+              )
+            )
+          )
+        )
+      )
+
