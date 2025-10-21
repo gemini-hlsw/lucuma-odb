@@ -41,8 +41,8 @@ import lucuma.core.model.Program
 import lucuma.core.model.StandardRole.*
 import lucuma.core.model.Target
 import lucuma.core.syntax.string.*
-import lucuma.core.util.TimeSpan
 import lucuma.odb.data.Existence
+import lucuma.odb.data.ExposureTimeModeRole
 import lucuma.odb.data.ExposureTimeModeType
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.Nullable.NonNull
@@ -50,7 +50,6 @@ import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.data.Tag
-import lucuma.odb.graphql.given
 import lucuma.odb.graphql.input.ConstraintSetInput
 import lucuma.odb.graphql.input.ElevationRangeInput
 import lucuma.odb.graphql.input.ImagingScienceRequirementsInput
@@ -236,34 +235,45 @@ object ObservationService {
         Trace[F].span("createObservation") {
           session.execute(sql"set constraints all deferred".command) >>
           session.prepareR(GroupService.Statements.OpenHole).use(_.unique(programId, SET.group, SET.groupIndex)).flatMap { ix =>
+            val oEtm = SET.scienceRequirements.flatMap(_.exposureTimeMode.toOption)
+
             Statements
               .insertObservation(programId, SET, ix)
-              .flatTraverse { af =>
-                session.prepareR(af.fragment.query(observation_id)).use { pq =>
+
+              .flatTraverse: af =>
+                session.prepareR(af.fragment.query(observation_id)).use: pq =>
                   pq.unique(af.argument).map(Result.success)
-                }.flatMap { rOid =>
 
-                  val rOptF = SET.observingMode.traverse(observingModeServices.createFunction)
-                  (rOid, rOptF).parMapN { (oid, optF) =>
-                    optF.fold(oid.pure[F]) { f => f(List(oid)).as(oid) }
-                  }.sequence
+              .flatMap: rOid =>
+                rOid
+                  .flatTraverse: oid =>
+                    SET.observingMode.fold(oid.success.pure[F]): m =>
+                      observingModeServices
+                        .create(m, oEtm, List(oid))
+                        .map(_.as(oid))
 
-                }
-              }.flatTap { rOid =>
-                rOid.flatTraverse { oid => Services.asSuperUser(setTimingWindows(List(oid), SET.timingWindows)) }
-              }.flatMap { rOid =>
-                SET.attachments.fold(rOid.pure[F]) { aids =>
-                  rOid.flatTraverse { oid =>
+              .flatTap: rOid =>
+                (rOid.toOption, oEtm)
+                  .tupled
+                  .traverse_ : (oid, etm) =>
+                    services
+                      .exposureTimeModeService
+                      .insertOne(oid, ExposureTimeModeRole.Requirement, etm)
+
+              .flatTap: rOid =>
+                rOid.flatTraverse: oid =>
+                  Services.asSuperUser(setTimingWindows(List(oid), SET.timingWindows))
+
+              .flatMap: rOid =>
+                SET.attachments.fold(rOid.pure[F]): aids =>
+                  rOid.flatTraverse: oid =>
                     obsAttachmentAssignmentService
                       .insertAssignments(programId, List(oid), aids)
                       .map(_.map(_ => oid))
-                  }
-                }
-              }
-          }.recoverWith {
+
+          }.recoverWith:
              case SqlState.CheckViolation(ex) =>
                OdbError.InvalidArgument(Some(constraintViolationMessage(ex))).asFailureF
-          }
         }
 
       // This will fully delete a calibration observation
@@ -350,6 +360,7 @@ object ObservationService {
       private def updateObservingModes(
         nEdit: Nullable[ObservingModeInput.Edit],
         oids:  NonEmptyList[Observation.Id],
+        etm:   Option[ExposureTimeMode]
       )(using Transaction[F], SuperUserAccess): F[Result[Unit]] =
 
         nEdit.toOptionOption.fold(Result.unit.pure[F]) { oEdit =>
@@ -357,27 +368,28 @@ object ObservationService {
             m <- selectObservingModes(oids.toList)
             _ <- updateObservingModeType(oEdit.flatMap(_.observingModeType), oids)
             r <- m.toList.traverse { case (existingMode, matchingOids) =>
+
               (existingMode, oEdit) match {
                 case (Some(ex), Some(edit)) if edit.observingModeType.contains(ex) =>
                   // update existing
-                  observingModeServices.updateFunction(edit).traverse(_(matchingOids))
+                  observingModeServices.update(edit, matchingOids)
 
                 case (Some(ex), Some(edit)) =>
                   for {
                     // delete existing
-                    _ <- observingModeServices.deleteFunction(ex)(matchingOids)
+                    _ <- observingModeServices.delete(ex, matchingOids)
 
                     // create new
-                    r <- observingModeServices.createViaUpdateFunction(edit).traverse(_(matchingOids))
+                    r <- observingModeServices.createViaUpdate(edit, etm, matchingOids)
                   } yield r
 
                 case (None,    Some(edit)) =>
                   // create new
-                  observingModeServices.createViaUpdateFunction(edit).traverse(_(matchingOids))
+                  observingModeServices.createViaUpdate(edit, etm, matchingOids)
 
                 case (Some(ex), None) =>
                   // delete existing
-                  observingModeServices.deleteFunction(ex)(matchingOids).as(Result.unit)
+                  observingModeServices.delete(ex, matchingOids).as(Result.unit)
 
                 case _  =>
                   // do nothing
@@ -420,8 +432,19 @@ object ObservationService {
                     })
                 g  = r.groupMap(_._1)(_._2)                                        // grouped:   Map[Program.Id, List[Observation.Id]]
                 u  = g.values.reduceOption(_ ++ _).flatMap(NonEmptyList.fromList)  // ungrouped: NonEmptyList[Observation.Id]
+
+                e  = SET.scienceRequirements.map(_.exposureTimeMode).getOrElse(Nullable.Absent)
+
+                _ <- ResultT.liftF:
+                       u.fold(().pure[F]): u =>
+                         e.fold(
+                           services.exposureTimeModeService.deleteMany(u, ExposureTimeModeRole.Requirement),
+                           ().pure[F],
+                           e => services.exposureTimeModeService.updateMany(u, ExposureTimeModeRole.Requirement, e)
+                         )
+
                 _ <- validateBand(g.keys.toList)
-                _ <- ResultT(u.map(u => Services.asSuperUser(updateObservingModes(SET.observingMode, u))).getOrElse(Result.unit.pure[F]))
+                _ <- ResultT(u.map(u => Services.asSuperUser(updateObservingModes(SET.observingMode, u, e.toOption))).getOrElse(Result.unit.pure[F]))
                 _ <- ResultT(Services.asSuperUser(setTimingWindows(u.foldMap(_.toList), SET.timingWindows.foldPresent(_.orEmpty))))
                 _ <- ResultT(g.toList.traverse { case (pid, oids) =>
                       obsAttachmentAssignmentService.setAssignments(pid, oids, SET.attachments)
@@ -496,7 +519,7 @@ object ObservationService {
                 val cloneRelatedItems =
                   Services.asSuperUser:
                     asterismService.cloneAsterism(observationId, oid2) >>
-                    observingMode.traverse(observingModeServices.cloneFunction(_)(observationId, oid2)) >>
+                    observingMode.traverse(m => observingModeServices.clone(m, observationId, oid2)) >>
                     timingWindowService.cloneTimingWindows(observationId, oid2) >>
                     obsAttachmentAssignmentService.cloneAssignments(observationId, oid2)
 
@@ -629,18 +652,6 @@ object ObservationService {
         val imaging: Option[ImagingScienceRequirementsInput] =
           scienceRequirements.flatMap(_.imaging)
 
-        val exposureTimeMode: Option[ExposureTimeMode] =
-          scienceRequirements.flatMap(_.exposureTimeMode.toOption)
-
-        val exposureTimeModeType: Option[ExposureTimeModeType] =
-          exposureTimeMode.map(_.tpe)
-
-        val signalToNoiseExposureTimeMode: Option[ExposureTimeMode.SignalToNoiseMode] =
-          exposureTimeMode.flatMap(ExposureTimeMode.signalToNoise.getOption)
-
-        val timeAndCountExposureTimeMode: Option[ExposureTimeMode.TimeAndCountMode] =
-          exposureTimeMode.flatMap(ExposureTimeMode.timeAndCount.getOption)
-
         InsertObservation.apply(
           programId                                                                                                                ,
            groupId                                                                                                                 ,
@@ -662,11 +673,6 @@ object ObservationService {
            ElevationRange.hourAngle.getOption(constraintSet.elevationRange).map(_.maxHours.toBigDecimal)                           ,
            spectroscopy.flatMap(_.wavelength.toOption)                                                                             ,
            spectroscopy.flatMap(_.resolution.toOption)                                                                             ,
-           exposureTimeModeType                                                                                                    ,
-           exposureTimeMode.map(_.at)                                                                                              ,
-           signalToNoiseExposureTimeMode.map(_.value)                                                                              ,
-           timeAndCountExposureTimeMode.map(_.time)                                                                                ,
-           timeAndCountExposureTimeMode.map(_.count)                                                                               ,
            spectroscopy.flatMap(_.wavelengthCoverage.toOption)                                                                     ,
            spectroscopy.flatMap(_.focalPlane.toOption)                                                                             ,
            spectroscopy.flatMap(_.focalPlaneAngle.toOption)                                                                        ,
@@ -711,11 +717,6 @@ object ObservationService {
       Option[BigDecimal]               ,
       Option[Wavelength]               ,
       Option[PosInt]                   ,
-      Option[ExposureTimeModeType]     ,
-      Option[Wavelength]               ,
-      Option[SignalToNoise]            ,
-      Option[TimeSpan]                 ,
-      Option[PosInt]                   ,
       Option[Wavelength]               ,
       Option[FocalPlane]               ,
       Option[Angle]                    ,
@@ -751,11 +752,6 @@ object ObservationService {
           c_hour_angle_max,
           c_spec_wavelength,
           c_spec_resolution,
-          c_exp_time_mode,
-          c_etm_signal_to_noise_at,
-          c_etm_signal_to_noise,
-          c_etm_exp_time,
-          c_etm_exp_count,
           c_spec_wavelength_coverage,
           c_spec_focal_plane,
           c_spec_focal_plane_angle,
@@ -789,11 +785,6 @@ object ObservationService {
           ${hour_angle_range_value.opt},
           ${hour_angle_range_value.opt},
           ${wavelength_pm.opt},
-          ${int4_pos.opt},
-          ${exposure_time_mode_type.opt},
-          ${wavelength_pm.opt},
-          ${signal_to_noise.opt},
-          ${time_span.opt},
           ${int4_pos.opt},
           ${wavelength_pm.opt},
           ${focal_plane.opt},
@@ -922,24 +913,7 @@ object ObservationService {
       ).flattenOption
     }
 
-    def scienceRequirementsUpdates(in: ScienceRequirementsInput): List[AppliedFragment] = {
-      val upExpTimeModeType    = sql"c_exp_time_mode = ${exposure_time_mode_type.opt}"
-      val upSignalToNoiseAt    = sql"c_etm_signal_to_noise_at = ${wavelength_pm.opt}"
-      val upSignalToNoise      = sql"c_etm_signal_to_noise = ${signal_to_noise.opt}"
-      val upExpTime            = sql"c_etm_exp_time = ${time_span.opt}"
-      val upExpCount           = sql"c_etm_exp_count = ${int4_pos.opt}"
-
-      val expTimeModeType   = in.exposureTimeMode.map(_.tpe)
-      val signalToNoiseMode = in.exposureTimeMode.flatMap(etm => ExposureTimeMode.signalToNoise.getOption(etm).fold(Nullable.Absent)(Nullable.NonNull.apply))
-      val timeAndCountMode  = in.exposureTimeMode.flatMap(etm => ExposureTimeMode.timeAndCount.getOption(etm).fold(Nullable.Absent)(Nullable.NonNull.apply))
-
-      val fields = List(
-        expTimeModeType.foldPresent(upExpTimeModeType),
-        in.exposureTimeMode.map(_.at).foldPresent(upSignalToNoiseAt),
-        signalToNoiseMode.map(_.value).foldPresent(upSignalToNoise),
-        timeAndCountMode.map(_.time).foldPresent(upExpTime),
-        timeAndCountMode.map(_.count).foldPresent(upExpCount),
-      ).flattenOption
+    def scienceRequirementsUpdates(in: ScienceRequirementsInput): List[AppliedFragment] =
 
       // we clear fields based on the science mode that's being set
       val clearSpectroscopy = in.imaging.isDefined && in.spectroscopy.isEmpty
@@ -963,11 +937,9 @@ object ObservationService {
           void"c_img_combined_filters = NULL"
         )).orEmpty
 
-      fields ++ spectroscopyClear ++ imagingClear ++
+      spectroscopyClear ++ imagingClear ++
         in.spectroscopy.toList.flatMap(spectroscopyRequirementsUpdates) ++
         in.imaging.toList.flatMap(imagingRequirementsUpdates)
-
-    }
 
     def updates(SET: ObservationPropertiesInput.Edit): Result[Option[NonEmptyList[AppliedFragment]]] = {
       val upExistence         = sql"c_existence = $existence"
@@ -1095,11 +1067,6 @@ object ObservationService {
           c_hour_angle_max,
           c_spec_wavelength,
           c_spec_resolution,
-          c_exp_time_mode,
-          c_etm_signal_to_noise_at,
-          c_etm_signal_to_noise,
-          c_etm_exp_time,
-          c_etm_exp_count,
           c_spec_wavelength_coverage,
           c_spec_focal_plane,
           c_spec_focal_plane_angle,
@@ -1139,11 +1106,6 @@ object ObservationService {
           c_hour_angle_max,
           c_spec_wavelength,
           c_spec_resolution,
-          c_exp_time_mode,
-          c_etm_signal_to_noise_at,
-          c_etm_signal_to_noise,
-          c_etm_exp_time,
-          c_etm_exp_count,
           c_spec_wavelength_coverage,
           c_spec_focal_plane,
           c_spec_focal_plane_angle,

@@ -3,13 +3,22 @@
 
 package lucuma.odb.service
 
+import cats.data.NonEmptyList
 import cats.effect.MonadCancelThrow
+import cats.syntax.apply.*
+import cats.syntax.foldable.*
 import cats.syntax.functor.*
 import cats.syntax.functorFilter.*
+import cats.syntax.option.*
 import cats.syntax.traverse.*
 import grackle.Result
+import grackle.syntax.*
 import lucuma.core.enums.ObservingModeType
+import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.Observation
+import lucuma.odb.data.ExposureTimeModeRole
+import lucuma.odb.data.OdbError
+import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.input.ObservingModeInput
 import lucuma.odb.sequence.ObservingMode
 import lucuma.odb.service.Services.SuperUserAccess
@@ -17,38 +26,50 @@ import skunk.Transaction
 
 import Services.Syntax.*
 
-sealed trait ObservingModeServices[F[_]] {
+// N.B., observing modes come with an acquisition exposure time mode and one or
+// more science exposure time modes.  This class directly handles ETM updates
+// for delete and clone, but create, update, and createViaUpdate implementations
+// do their own ETM management.  This is because the rules will differ depending
+// on the observing mode.
+
+sealed trait ObservingModeServices[F[_]]:
 
   def selectObservingMode(
     which: List[(Observation.Id, ObservingModeType)]
   )(using Transaction[F], SuperUserAccess): F[Map[Observation.Id, ObservingMode]]
 
-  def createFunction(
-    input: ObservingModeInput.Create
-  )(using Transaction[F], SuperUserAccess): Result[List[Observation.Id] => F[Unit]]
+  def create(
+    input: ObservingModeInput.Create,
+    etm:   Option[ExposureTimeMode],
+    which: List[Observation.Id]
+  )(using Transaction[F], SuperUserAccess): F[Result[Unit]]
 
-  def deleteFunction(
-    mode: ObservingModeType
-  )(using Transaction[F], SuperUserAccess): List[Observation.Id] => F[Unit]
+  def delete(
+    mode:  ObservingModeType,
+    which: List[Observation.Id]
+  )(using Transaction[F], SuperUserAccess): F[Unit]
 
-  def updateFunction(
-    input: ObservingModeInput.Edit
-  )(using Transaction[F], SuperUserAccess): Result[List[Observation.Id] => F[Unit]]
+  def update(
+    input: ObservingModeInput.Edit,
+    which: List[Observation.Id]
+  )(using Transaction[F], SuperUserAccess): F[Result[Unit]]
 
-  def createViaUpdateFunction(
-    input: ObservingModeInput.Edit
-  )(using Transaction[F], SuperUserAccess): Result[List[Observation.Id] => F[Unit]]
+  def createViaUpdate(
+    input: ObservingModeInput.Edit,
+    etm:   Option[ExposureTimeMode],
+    which: List[Observation.Id]
+  )(using Transaction[F], SuperUserAccess): F[Result[Unit]]
 
-  def cloneFunction(
-    mode: ObservingModeType
-  )(using Transaction[F], SuperUserAccess): (Observation.Id, Observation.Id) => F[Unit]
+  def clone(
+    mode:    ObservingModeType,
+    origOid: Observation.Id,
+    newOid:  Observation.Id
+  )(using Transaction[F], SuperUserAccess): F[Unit]
 
-}
-
-object ObservingModeServices {
+object ObservingModeServices:
 
   def instantiate[F[_]: {MonadCancelThrow, Services}]: ObservingModeServices[F] =
-    new ObservingModeServices[F] {
+    new ObservingModeServices[F]:
 
       override def selectObservingMode(
         which: List[(Observation.Id, ObservingModeType)]
@@ -83,68 +104,80 @@ object ObservingModeServices {
 
         }.map(_.fold(Map.empty[Observation.Id, ObservingMode])(_ ++ _))
 
-      override def createFunction(
-        input: ObservingModeInput.Create
-      )(using Transaction[F], SuperUserAccess): Result[List[Observation.Id] => F[Unit]] =
+      override def create(
+        input: ObservingModeInput.Create,
+        etm:   Option[ExposureTimeMode],
+        which: List[Observation.Id]
+      )(using Transaction[F], SuperUserAccess): F[Result[Unit]] =
         List(
-          input.gmosNorthLongSlit.map(gmosLongSlitService.insertNorth),
-          input.gmosSouthLongSlit.map(gmosLongSlitService.insertSouth),
-          input.flamingos2LongSlit.map(flamingos2LongSlitService.insert),
-          input.gmosNorthImaging.map(gmosImagingService.insertNorth),
-          input.gmosSouthImaging.map(gmosImagingService.insertSouth)
+          input.flamingos2LongSlit.map(m => flamingos2LongSlitService.insert(m, etm, which)),
+          input.gmosNorthImaging.map(m =>   gmosImagingService.insertNorth(m, etm, which)),
+          input.gmosNorthLongSlit.map(m =>  gmosLongSlitService.insertNorth(m, etm, which)),
+          input.gmosSouthImaging.map(m =>   gmosImagingService.insertSouth(m, etm, which)),
+          input.gmosSouthLongSlit.map(m =>  gmosLongSlitService.insertSouth(m, etm, which))
         ).flattenOption match
-          case List(f) => Result(f)
-          case Nil     => Result.failure("No observing mode creation parameters were provided.")
-          case _       => Result.failure("Only one observing mode's creation parameters may be provided.")
+          case List(r) => r
+          case Nil     => OdbError.InvalidArgument("No observing mode creation parameters were provided.".some).asFailureF
+          case _       => OdbError.InvalidArgument("Only one observing mode's creation parameters may be provided.".some).asFailureF
 
-      override def deleteFunction(
-        mode: ObservingModeType
-      )(using Transaction[F], SuperUserAccess): List[Observation.Id] => F[Unit] =
-        mode match
-          case ObservingModeType.Flamingos2LongSlit => flamingos2LongSlitService.delete
-          case ObservingModeType.GmosNorthLongSlit  => gmosLongSlitService.deleteNorth
-          case ObservingModeType.GmosNorthImaging   => gmosImagingService.deleteNorth
-          case ObservingModeType.GmosSouthLongSlit  => gmosLongSlitService.deleteSouth
-          case ObservingModeType.GmosSouthImaging   => gmosImagingService.deleteSouth
+      override def delete(
+        mode:  ObservingModeType,
+        which: List[Observation.Id]
+      )(using Transaction[F], SuperUserAccess): F[Unit] =
 
-      override def updateFunction(
-        input: ObservingModeInput.Edit
-      )(using Transaction[F], SuperUserAccess): Result[List[Observation.Id] => F[Unit]] =
+        val deleteExposureTimeModes: F[Unit] =
+          NonEmptyList
+            .fromList(which)
+            .traverse_ : nel =>
+              services.exposureTimeModeService.deleteMany(nel, ExposureTimeModeRole.Acquisition, ExposureTimeModeRole.Science)
+
+        val deleteObservingMode: F[Unit] =
+          mode match
+            case ObservingModeType.Flamingos2LongSlit => flamingos2LongSlitService.delete(which)
+            case ObservingModeType.GmosNorthImaging   => gmosImagingService.deleteNorth(which)
+            case ObservingModeType.GmosNorthLongSlit  => gmosLongSlitService.deleteNorth(which)
+            case ObservingModeType.GmosSouthImaging   => gmosImagingService.deleteSouth(which)
+            case ObservingModeType.GmosSouthLongSlit  => gmosLongSlitService.deleteSouth(which)
+
+        deleteExposureTimeModes *> deleteObservingMode
+
+      def update(
+        input: ObservingModeInput.Edit,
+        which: List[Observation.Id]
+      )(using Transaction[F], SuperUserAccess): F[Result[Unit]] =
         List(
-          input.flamingos2LongSlit.map(flamingos2LongSlitService.update),
-          input.gmosNorthLongSlit.map(gmosLongSlitService.updateNorth),
-          input.gmosSouthLongSlit.map(gmosLongSlitService.updateSouth),
-          input.gmosNorthImaging.map(gmosImagingService.updateNorth),
-          input.gmosSouthImaging.map(gmosImagingService.updateSouth)
+          input.flamingos2LongSlit.map(m => flamingos2LongSlitService.update(m, which)),
+          input.gmosNorthImaging.map(m => gmosImagingService.updateNorth(m, which)),
+          input.gmosNorthLongSlit.map(m => gmosLongSlitService.updateNorth(m, which)),
+          input.gmosSouthImaging.map(m => gmosImagingService.updateSouth(m, which)),
+          input.gmosSouthLongSlit.map(m => gmosLongSlitService.updateSouth(m, which))
         ).flattenOption match
-          case List(f) => Result(f)
-          case Nil     => Result.failure("No observing mode edit parameters were provided.")
-          case _       => Result.failure("Only one observing mode's edit parameters may be provided.")
+          case List(f) => f.map(_.success)
+          case Nil     => OdbError.InvalidArgument("No observing mode edit parameters were provided.".some).asFailureF
+          case _       => OdbError.InvalidArgument("Only one observing mode's edit parameters may be provided.".some).asFailureF
 
-      override def createViaUpdateFunction(
-        input: ObservingModeInput.Edit
-      )(using Transaction[F], SuperUserAccess): Result[List[Observation.Id] => F[Unit]] =
-        List(
-          input.flamingos2LongSlit.map(m => m.toCreate.map(flamingos2LongSlitService.insert)),
-          input.gmosNorthLongSlit.map(m => m.toCreate.map(gmosLongSlitService.insertNorth)),
-          input.gmosSouthLongSlit.map(m => m.toCreate.map(gmosLongSlitService.insertSouth)),
-          input.gmosNorthImaging.map(m => m.toCreate.map(gmosImagingService.insertNorth)),
-          input.gmosSouthImaging.map(m => m.toCreate.map(gmosImagingService.insertSouth))
-        ).flattenOption match
-          case List(f) => f
-          case Nil     => Result.failure("No observing mode edit parameters were provided.")
-          case _       => Result.failure("Only one observing mode's edit parameters may be provided.")
+      override def createViaUpdate(
+        input: ObservingModeInput.Edit,
+        etm:   Option[ExposureTimeMode],
+        which: List[Observation.Id]
+      )(using Transaction[F], SuperUserAccess): F[Result[Unit]] =
+        input.toCreate.flatTraverse(c => create(c, etm, which))
 
-      override def cloneFunction(
-        mode: ObservingModeType
-      )(using Transaction[F], SuperUserAccess): (Observation.Id, Observation.Id) => F[Unit] =
-        mode match
-          case ObservingModeType.Flamingos2LongSlit => flamingos2LongSlitService.clone
-          case ObservingModeType.GmosNorthLongSlit  => gmosLongSlitService.cloneNorth
-          case ObservingModeType.GmosNorthImaging   => gmosImagingService.cloneNorth
-          case ObservingModeType.GmosSouthLongSlit  => gmosLongSlitService.cloneSouth
-          case ObservingModeType.GmosSouthImaging   => gmosImagingService.cloneSouth
+      override def clone(
+        mode:    ObservingModeType,
+        origOid: Observation.Id,
+        newOid:  Observation.Id
+      )(using Transaction[F], SuperUserAccess): F[Unit] =
 
-    }
+        val cloneExposureTimeModes: F[Unit] =
+          exposureTimeModeService.clone(origOid, newOid)
 
-}
+        val cloneObservingMode: F[Unit] =
+          mode match
+            case ObservingModeType.Flamingos2LongSlit => flamingos2LongSlitService.clone(origOid, newOid)
+            case ObservingModeType.GmosNorthLongSlit  => gmosLongSlitService.cloneNorth(origOid, newOid)
+            case ObservingModeType.GmosNorthImaging   => gmosImagingService.cloneNorth(origOid, newOid)
+            case ObservingModeType.GmosSouthLongSlit  => gmosLongSlitService.cloneSouth(origOid, newOid)
+            case ObservingModeType.GmosSouthImaging   => gmosImagingService.cloneSouth(origOid, newOid)
+
+        cloneExposureTimeModes *> cloneObservingMode

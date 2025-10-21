@@ -21,6 +21,8 @@ import lucuma.core.math.WavelengthDither
 import lucuma.core.math.arb.ArbOffset
 import lucuma.core.math.arb.ArbWavelength
 import lucuma.core.math.arb.ArbWavelengthDither
+import lucuma.core.model.ExposureTimeMode
+import lucuma.core.model.arb.ArbExposureTimeMode
 import lucuma.core.util.arb.ArbEnumerated
 import org.scalacheck.*
 import org.scalacheck.Arbitrary.arbitrary
@@ -29,6 +31,7 @@ trait ArbGmosLongSlitInput {
 
   import ArbEnumerated.given
   import ArbOffset.given
+  import ArbExposureTimeMode.given
   import ArbWavelength.given
   import ArbWavelengthDither.given
 
@@ -36,6 +39,8 @@ trait ArbGmosLongSlitInput {
     Arbitrary {
       for {
         w <- arbitrary[Wavelength]
+        a <- arbitrary[Option[ExposureTimeMode]]
+        c <- arbitrary[Option[ExposureTimeMode]]
         x <- arbitrary[Option[GmosXBinning]]
         y <- arbitrary[Option[GmosYBinning]]
         m <- arbitrary[Option[GmosAmpReadMode]]
@@ -45,6 +50,8 @@ trait ArbGmosLongSlitInput {
         s <- arbitrary[Option[List[Q]]]
       } yield GmosLongSlitInput.Create.Common(
         w,
+        a,
+        c,
         x,
         y,
         m,

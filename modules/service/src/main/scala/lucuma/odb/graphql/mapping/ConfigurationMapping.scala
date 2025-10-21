@@ -91,7 +91,7 @@ trait ConfigurationMapping[F[_]]
                     case Left(cs) =>
                       oRefTime.flatMap: refTime =>                        
                         cs.at(refTime.toInstant).map: aliased =>
-                          Left(aliased.value)
+                          Left(aliased)
         }
 
       private def queryContext(queries: List[(Query, Cursor)]): Result[List[(Program.Id, Observation.Id, Option[Timestamp])]] =

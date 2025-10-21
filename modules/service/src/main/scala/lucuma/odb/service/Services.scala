@@ -124,6 +124,9 @@ trait Services[F[_]]:
   /** The `ExecutionEventService`. */
   def executionEventService: ExecutionEventService[F]
 
+  /** The `ExposureTimeModeService`. */
+  def exposureTimeModeService: ExposureTimeModeService[F]
+
   /** The `GeneratorParamsService`. */
   def generatorParamsService: GeneratorParamsService[F]
 
@@ -288,6 +291,7 @@ object Services:
       lazy val datasetService = DatasetService.instantiate
       lazy val executionDigestService = ExecutionDigestService.instantiate
       lazy val executionEventService = ExecutionEventService.instantiate
+      lazy val exposureTimeModeService = ExposureTimeModeService.instantiate
       lazy val generatorParamsService = GeneratorParamsService.instantiate
       lazy val flamingos2LongSlitService = Flamingos2LongSlitService.instantiate
       lazy val flamingos2SequenceService = Flamingos2SequenceService.instantiate
@@ -347,6 +351,7 @@ object Services:
     def datasetService[F[_]](using Services[F]): DatasetService[F] = summon[Services[F]].datasetService
     def executionDigestService[F[_]](using Services[F]): ExecutionDigestService[F] = summon[Services[F]].executionDigestService
     def executionEventService[F[_]](using Services[F]): ExecutionEventService[F] = summon[Services[F]].executionEventService
+    def exposureTimeModeService[F[_]](using Services[F]): ExposureTimeModeService[F] = summon[Services[F]].exposureTimeModeService
     def generatorParamsService[F[_]](using Services[F]): GeneratorParamsService[F] = summon[Services[F]].generatorParamsService
     def gmosLongSlitService[F[_]](using Services[F]): GmosLongSlitService[F] = summon[Services[F]].gmosLongSlitService
     def gmosImagingService[F[_]](using Services[F]): GmosImagingService[F] = summon[Services[F]].gmosImagingService

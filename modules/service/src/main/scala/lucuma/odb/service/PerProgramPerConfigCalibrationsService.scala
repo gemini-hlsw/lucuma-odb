@@ -21,6 +21,7 @@ import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.odb.Config
 import lucuma.odb.data.Existence
+import lucuma.odb.data.ExposureTimeModeRole
 import lucuma.odb.data.GroupTree
 import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.input.CreateGroupInput
@@ -240,8 +241,14 @@ object PerProgramPerConfigCalibrationsService:
       )(using Transaction[F]): F[Unit] =
         calibrationUpdates
           .traverse { (oid, props) =>
-            val bandFragment = props.band.map(sql"c_science_band IS DISTINCT FROM $science_band")
-            val waveFragment = props.wavelengthAt.map(sql"c_etm_signal_to_noise_at <> $wavelength_pm")
+            val etmJoin: AppliedFragment =
+              if props.wavelengthAt.isDefined then
+                void"""LEFT JOIN t_exposure_time_mode e USING (c_observation_id)"""
+              else
+                void""
+
+            val bandFragment = props.band.map(sql"o.c_science_band IS DISTINCT FROM $science_band")
+            val waveFragment = props.wavelengthAt.map(w => sql"(e.c_signal_to_noise_at <> $wavelength_pm AND e.c_role = $exposure_time_mode_role)".apply(w, ExposureTimeModeRole.Science))
             val needsUpdate  = List(bandFragment, waveFragment).flatten.intercalate(void" OR ")
 
             services.observationService.updateObservations(
@@ -261,12 +268,14 @@ object PerProgramPerConfigCalibrationsService:
                         imaging      = None
                       )
                   ),
-                  sql"""
-                    SELECT $observation_id
-                      FROM t_observation
-                    WHERE c_observation_id = $observation_id
-                      AND c_calibration_role IS NOT NULL
-                      AND ("""(oid, oid) |+| needsUpdate |+| void")"
+                  void"""
+                    SELECT DISTINCT c_observation_id
+                      FROM t_observation o
+                  """ |+| etmJoin |+| sql"""
+                    WHERE o.c_observation_id = $observation_id
+                      AND o.c_calibration_role IS NOT NULL
+                      AND (
+                  """.apply(oid) |+| needsUpdate |+| void")"
                 )
             )
           }.void
