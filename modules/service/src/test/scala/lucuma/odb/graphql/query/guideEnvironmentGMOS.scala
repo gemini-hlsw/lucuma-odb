@@ -11,6 +11,7 @@ import fs2.Stream
 import fs2.text.utf8
 import io.circe.Json
 import io.circe.literal.*
+import io.circe.syntax.*
 import lucuma.ags.GuideStarName
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
@@ -395,5 +396,60 @@ class guideEnvironmentGMOS extends ExecutionTestSupportForGmos with GuideEnviron
       expect(pi, guideEnvironmentQuery(oid), expected = otherGuideEnvironmentResults)
     }
   }
+
+  test("with blind offset target - successfully obtain guide environment") {
+    val setup: IO[Observation.Id] =
+      for {
+        p <- createProgramAs(pi)
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createObservationAs(pi, p, List(t))
+        _ <- setBlindOffsetViaGraphQL(pi, o, "Blind Offset Target")
+        _ <- setObservationTimeAndDuration(pi, o, gaiaSuccess.some, fullTimeEstimate.some)
+      } yield o
+    setup.flatMap { oid =>
+      expect(pi, guideEnvironmentQuery(oid), expected = defaultGuideEnvironmentResults)
+    }
+  }
+
+  def setBlindOffsetViaGraphQL(user: User, oid: Observation.Id, blindOffsetName: String): IO[Unit] =
+    query(
+      user = user,
+      query =
+        s"""
+          mutation {
+            updateObservations(input: {
+              WHERE: { id: { EQ: "$oid" } }
+              SET: {
+                targetEnvironment: {
+                  blindOffsetTarget: {
+                    name: ${blindOffsetName.asJson}
+                    sidereal: {
+                      ra: { degrees: "12.345" }
+                      dec: { degrees: "45.678" }
+                      epoch: "J2000.000"
+                    }
+                    sourceProfile: {
+                      point: {
+                        bandNormalized: {
+                          sed: { stellarLibrary: B5_III }
+                          brightnesses: [
+                            {
+                              band: R
+                              value: 15.0
+                              units: VEGA_MAGNITUDE
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }) {
+              observations { id }
+            }
+          }
+        """
+    ).void
 
 }
