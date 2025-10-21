@@ -124,14 +124,18 @@ object GmosLongSlitService {
 
       val north: Decoder[GmosNorth] =
         (gmos_north_grating     *:
-         gmos_north_filter.opt  *:
+         gmos_north_filter.opt  *: // science filter (if any)
+         gmos_north_filter      *: // default acquisition filter
+         gmos_north_filter.opt  *: // explicit acquisition filter (if any)
          gmos_north_fpu         *:
          common
         ).to[GmosNorth]
 
       val south: Decoder[GmosSouth] =
         (gmos_south_grating     *:
-         gmos_south_filter.opt  *:
+         gmos_south_filter.opt  *: // science filter (if any)
+         gmos_south_filter      *: // default acquisition filter
+         gmos_south_filter.opt  *: // explicit acquisition filter (if any)
          gmos_south_fpu         *:
          common
         ).to[GmosSouth]
@@ -256,6 +260,8 @@ object GmosLongSlitService {
           ls.c_observation_id,
           ls.c_grating,
           ls.c_filter,
+          ls.c_acquisition_filter_default,
+          ls.c_acquisition_filter,
           ls.c_fpu,
           ls.c_central_wavelength,
           acq.c_exposure_time_mode,
@@ -295,16 +301,17 @@ object GmosLongSlitService {
     def selectGmosNorthLongSlit(
       observationIds: NonEmptyList[Observation.Id]
     ): AppliedFragment =
-      selectGmosLongSlit("t_gmos_north_long_slit", observationIds)
+      selectGmosLongSlit("v_gmos_north_long_slit", observationIds)
 
     def selectGmosSouthLongSlit(
       observationIds: NonEmptyList[Observation.Id]
     ): AppliedFragment =
-      selectGmosLongSlit("t_gmos_south_long_slit", observationIds)
+      selectGmosLongSlit("v_gmos_south_long_slit", observationIds)
 
     val InsertGmosNorthLongSlit: Fragment[(
       Observation.Id          ,
       GmosNorthGrating        ,
+      Option[GmosNorthFilter] ,
       Option[GmosNorthFilter] ,
       GmosNorthFpu            ,
       Wavelength              ,
@@ -326,6 +333,7 @@ object GmosLongSlitService {
           c_program_id,
           c_grating,
           c_filter,
+          c_acquisition_filter,
           c_fpu,
           c_central_wavelength,
           c_xbin,
@@ -345,6 +353,7 @@ object GmosLongSlitService {
           c_program_id,
           $gmos_north_grating,
           ${gmos_north_filter.opt},
+          ${gmos_north_filter.opt},
           $gmos_north_fpu,
           $wavelength_pm,
           ${gmos_binning.opt},
@@ -360,8 +369,8 @@ object GmosLongSlitService {
           $wavelength_pm
         FROM t_observation
         WHERE c_observation_id = $observation_id
-       """.contramap { (o, g, l, u, w, x, y, r, n, i, wd, so, ig, il, iu, iw) => (
-         o, g, l, u, w, x.map(_.value), y.map(_.value), r, n, i, wd, so, ig, il, iu, iw, o
+       """.contramap { (o, g, l, af, u, w, x, y, r, n, i, wd, so, ig, il, iu, iw) => (
+         o, g, l, af, u, w, x.map(_.value), y.map(_.value), r, n, i, wd, so, ig, il, iu, iw, o
        )}
 
     def insertGmosNorthLongSlit(
@@ -372,6 +381,7 @@ object GmosLongSlitService {
         observationId                        ,
         input.grating                        ,
         input.filter                         ,
+        input.acquisitionFilter              ,
         input.fpu                            ,
         input.common.centralWavelength       ,
         input.common.explicitXBin            ,
@@ -390,6 +400,7 @@ object GmosLongSlitService {
     val InsertGmosSouthLongSlit: Fragment[(
       Observation.Id          ,
       GmosSouthGrating        ,
+      Option[GmosSouthFilter] ,
       Option[GmosSouthFilter] ,
       GmosSouthFpu            ,
       Wavelength              ,
@@ -411,6 +422,7 @@ object GmosLongSlitService {
           c_program_id,
           c_grating,
           c_filter,
+          c_acquisition_filter,
           c_fpu,
           c_central_wavelength,
           c_xbin,
@@ -430,6 +442,7 @@ object GmosLongSlitService {
           c_program_id,
           $gmos_south_grating,
           ${gmos_south_filter.opt},
+          ${gmos_south_filter.opt},
           $gmos_south_fpu,
           $wavelength_pm,
           ${gmos_binning.opt},
@@ -445,8 +458,8 @@ object GmosLongSlitService {
           $wavelength_pm
         FROM t_observation
         WHERE c_observation_id = $observation_id
-       """.contramap { (o, g, l, u, w, x, y, r, n, i, wd, so, ig, il, iu, iw) => (
-         o, g, l, u, w, x.map(_.value), y.map(_.value), r, n, i, wd, so, ig, il, iu, iw, o
+       """.contramap { (o, g, l, af, u, w, x, y, r, n, i, wd, so, ig, il, iu, iw) => (
+         o, g, l, af, u, w, x.map(_.value), y.map(_.value), r, n, i, wd, so, ig, il, iu, iw, o
        )}
 
     def insertGmosSouthLongSlit(
@@ -457,6 +470,7 @@ object GmosLongSlitService {
         observationId                          ,
           input.grating                        ,
           input.filter                         ,
+          input.acquisitionFilter              ,
           input.fpu                            ,
           input.common.centralWavelength       ,
           input.common.explicitXBin            ,
@@ -516,14 +530,16 @@ object GmosLongSlitService {
       input: GmosLongSlitInput.Edit.North
     ): Option[NonEmptyList[AppliedFragment]] = {
 
-      val upGrating     = sql"c_grating = $gmos_north_grating"
-      val upFilter      = sql"c_filter  = ${gmos_north_filter.opt}"
-      val upFpu         = sql"c_fpu     = $gmos_north_fpu"
+      val upGrating     = sql"c_grating            = $gmos_north_grating"
+      val upFilter      = sql"c_filter             = ${gmos_north_filter.opt}"
+      val upAcqFilter   = sql"c_acquisition_filter = ${gmos_north_filter.opt}"
+      val upFpu         = sql"c_fpu                = $gmos_north_fpu"
 
       val ups: List[AppliedFragment] =
         List(
           input.grating.map(upGrating),
           input.filter.toOptionOption.map(upFilter),
+          input.acquisitionFilter.toOptionOption.map(upAcqFilter),
           input.fpu.map(upFpu),
         ).flatten ++ commonUpdates(input.common)
 
@@ -547,14 +563,16 @@ object GmosLongSlitService {
       input: GmosLongSlitInput.Edit.South
     ): Option[NonEmptyList[AppliedFragment]] = {
 
-      val upGrating     = sql"c_grating = $gmos_south_grating"
-      val upFilter      = sql"c_filter  = ${gmos_south_filter.opt}"
-      val upFpu         = sql"c_fpu     = $gmos_south_fpu"
+      val upGrating     = sql"c_grating            = $gmos_south_grating"
+      val upFilter      = sql"c_filter             = ${gmos_south_filter.opt}"
+      val upAcqFilter   = sql"c_acquisition_filter = ${gmos_south_filter.opt}"
+      val upFpu         = sql"c_fpu                = $gmos_south_fpu"
 
       val ups: List[AppliedFragment] =
         List(
           input.grating.map(upGrating),
           input.filter.toOptionOption.map(upFilter),
+          input.filter.toOptionOption.map(upAcqFilter),
           input.fpu.map(upFpu),
         ).flatten ++ commonUpdates(input.common)
 
@@ -586,6 +604,7 @@ object GmosLongSlitService {
         c_observing_mode_type,
         c_grating,
         c_filter,
+        c_acquisition_filter,
         c_fpu,
         c_central_wavelength,
         c_xbin,
@@ -606,6 +625,7 @@ object GmosLongSlitService {
         c_observing_mode_type,
         c_grating,
         c_filter,
+        c_acquisition_filter,
         c_fpu,
         c_central_wavelength,
         c_xbin,

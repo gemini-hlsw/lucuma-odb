@@ -65,13 +65,15 @@ trait ArbGmosLongSlitInput {
   given Arbitrary[GmosLongSlitInput.Create.North] =
     Arbitrary {
       for {
-        g <- arbitrary[GmosNorthGrating]
-        f <- arbitrary[Option[GmosNorthFilter]]
-        u <- arbitrary[GmosNorthFpu]
-        c <- arbitrary[GmosLongSlitInput.Create.Common]
+        g   <- arbitrary[GmosNorthGrating]
+        f   <- arbitrary[Option[GmosNorthFilter]]
+        eaf <- arbitrary[Option[GmosNorthFilter]]
+        u   <- arbitrary[GmosNorthFpu]
+        c   <- arbitrary[GmosLongSlitInput.Create.Common]
       } yield GmosLongSlitInput.Create.North(
         g,
         f,
+        eaf,
         u,
         c
       )
@@ -80,13 +82,15 @@ trait ArbGmosLongSlitInput {
   given Arbitrary[GmosLongSlitInput.Create.South] =
     Arbitrary {
       for {
-        g <- arbitrary[GmosSouthGrating]
-        f <- arbitrary[Option[GmosSouthFilter]]
-        u <- arbitrary[GmosSouthFpu]
-        c <- arbitrary[GmosLongSlitInput.Create.Common]
+        g   <- arbitrary[GmosSouthGrating]
+        f   <- arbitrary[Option[GmosSouthFilter]]
+        eaf <- arbitrary[Option[GmosSouthFilter]]
+        u   <- arbitrary[GmosSouthFpu]
+        c   <- arbitrary[GmosLongSlitInput.Create.Common]
       } yield GmosLongSlitInput.Create.South(
         g,
         f,
+        eaf,
         u,
         c
       )

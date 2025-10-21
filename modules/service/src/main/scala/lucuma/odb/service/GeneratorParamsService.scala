@@ -279,7 +279,7 @@ object GeneratorParamsService {
               itcObsParams(acq, sci, obsParams, mode)
 
         observingMode(obsParams.targets, config).map:
-          case gn @ gmos.longslit.Config.GmosNorth(g, f, u, c) =>
+          case gn @ gmos.longslit.Config.GmosNorth(g, f, _, _, u, c) =>
             val mode = InstrumentMode.GmosNorthSpectroscopy(
               c.centralWavelength,
               g,
@@ -290,7 +290,7 @@ object GeneratorParamsService {
             )
             GeneratorParams(itcObsParams(c.acquisitionExposureTimeMode, c.scienceExposureTimeMode, obsParams, mode), obsParams.scienceBand, gn, obsParams.calibrationRole, obsParams.declaredComplete, obsParams.acqResetTime)
 
-          case gs @ gmos.longslit.Config.GmosSouth(g, f, u, c) =>
+          case gs @ gmos.longslit.Config.GmosSouth(g, f, _, _, u, c) =>
             val mode = InstrumentMode.GmosSouthSpectroscopy(
               c.centralWavelength,
               g,

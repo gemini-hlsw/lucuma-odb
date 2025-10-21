@@ -2087,6 +2087,14 @@ input GmosNorthLongSlitInput {
   filter: GmosNorthFilter
 
   """
+  An explicit acquisition filter to use instead of the default.  The `explicitAcquisitionFilter`
+  may be unset by assigning a null value, or ignored by skipping it altogether.  If not provided,
+  the filter that will be used for the acquisition sequence is the broadband filter closest to
+  the central wavelength.
+  """
+  explicitAcquisitionFilter: GmosNorthFilter
+
+  """
   The fpu field must be either specified or skipped altogether.  It cannot be unset with a null value.
   """
   fpu: GmosNorthBuiltinFpu
@@ -2539,6 +2547,14 @@ input GmosSouthLongSlitInput {
   The filter field may be unset by assigning a null value, or ignored by skipping it altogether
   """
   filter: GmosSouthFilter
+
+  """
+  An explicit acquisition filter to use instead of the default.  The `explicitAcquisitionFilter`
+  may be unset by assigning a null value, or ignored by skipping it altogether.  If not provided,
+  the filter that will be used for the acquisition sequence is the broadband filter closest to
+  the central wavelength.
+  """
+  explicitAcquisitionFilter: GmosSouthFilter
 
   """
   The fpu field must be either specified or skipped altogether.  It cannot be unset with a null value.
@@ -8689,6 +8705,25 @@ type GmosNorthLongSlit {
   filter: GmosNorthFilter
 
   """
+  The GMOS North filter that will be used in the acquisition sequence.  This will
+  be the `explicitAcquisitionFilter` if specified, but otherwise the
+  `defaultAcquisitionFilter`.
+  """
+  acquisitionFilter: GmosNorthFilter!
+
+  """
+  The GMOS Nouth filter that will be used by default, if an explicit acquisition
+  filter was not specified.  The default is calculated as the broadband filter
+  closest in wavelength to the observation's `centralWavelength`.
+  """
+  defaultAcquisitionFilter: GmosNorthFilter!
+
+  """
+  An explicitly specified GMOS North filter to use in acquisition (if any).
+  """
+  explicitAcquisitionFilter: GmosNorthFilter
+
+  """
   GMOS North FPU
   """
   fpu: GmosNorthBuiltinFpu!
@@ -9297,6 +9332,25 @@ type GmosSouthLongSlit {
   GMOS South Filter
   """
   filter: GmosSouthFilter
+
+  """
+  The GMOS South filter that will be used in the acquisition sequence.  This will
+  be the `explicitAcquisitionFilter` if specified, but otherwise the
+  `defaultAcquisitionFilter`.
+  """
+  acquisitionFilter: GmosSouthFilter!
+
+  """
+  The GMOS South filter that will be used by default, if an explicit acquisition
+  filter was not specified.  The default is calculated as the broadband filter
+  closest in wavelength to the observation's `centralWavelength`.
+  """
+  defaultAcquisitionFilter: GmosSouthFilter!
+
+  """
+  An explicitly specified GMOS South filter to use in acquisition (if any).
+  """
+  explicitAcquisitionFilter: GmosSouthFilter
 
   """
   GMOS South FPU

@@ -61,6 +61,14 @@ sealed trait Config[G: Enumerated, L: Enumerated, U: Enumerated] extends Product
   def scienceExposureTimeMode: ExposureTimeMode
 
 
+  def acquisitionFilter: L =
+    explicitAcquisitionFilter.getOrElse(defaultAcquisitionFilter)
+
+  def defaultAcquisitionFilter: L
+
+  def explicitAcquisitionFilter: Option[L]
+
+
   def xBin: GmosXBinning =
     explicitXBin.getOrElse(defaultXBin)
 
@@ -189,10 +197,12 @@ object Config:
         )
 
   final case class GmosNorth(
-    grating: GmosNorthGrating,
-    filter:  Option[GmosNorthFilter],
-    fpu:     GmosNorthFpu,
-    common:  Common
+    grating:                   GmosNorthGrating,
+    filter:                    Option[GmosNorthFilter],
+    defaultAcquisitionFilter:  GmosNorthFilter,
+    explicitAcquisitionFilter: Option[GmosNorthFilter],
+    fpu:                       GmosNorthFpu,
+    common:                    Common
   ) extends Config[GmosNorthGrating, GmosNorthFilter, GmosNorthFpu]:
 
     override def coverage: WavelengthDelta =
@@ -249,10 +259,12 @@ object Config:
         )
 
   final case class GmosSouth(
-    grating: GmosSouthGrating,
-    filter:  Option[GmosSouthFilter],
-    fpu:     GmosSouthFpu,
-    common:  Common
+    grating:                   GmosSouthGrating,
+    filter:                    Option[GmosSouthFilter],
+    defaultAcquisitionFilter:  GmosSouthFilter,
+    explicitAcquisitionFilter: Option[GmosSouthFilter],
+    fpu:                       GmosSouthFpu,
+    common:                    Common
   ) extends Config[GmosSouthGrating, GmosSouthFilter, GmosSouthFpu]:
 
     override def coverage: WavelengthDelta =

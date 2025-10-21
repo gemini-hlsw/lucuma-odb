@@ -1614,7 +1614,7 @@ class updateObservations extends OdbSuite
     oneUpdateTest(pi, update, query, expected)
   }
 
-  test("observing mode: update existing") {
+  test("observing mode: update existing changing mode") {
 
     val update0 = """
       observingMode: {
@@ -1811,6 +1811,9 @@ class updateObservations extends OdbSuite
         observingMode {
           gmosNorthLongSlit {
             grating
+            acquisitionFilter
+            defaultAcquisitionFilter
+            explicitAcquisitionFilter
           }
         }
       }
@@ -1825,7 +1828,10 @@ class updateObservations extends OdbSuite
               "instrument": "GMOS_NORTH",
               "observingMode": {
                 "gmosNorthLongSlit": {
-                  "grating": "B1200_G5301"
+                  "grating": "B1200_G5301",
+                  "acquisitionFilter": "G_PRIME",
+                  "defaultAcquisitionFilter": "G_PRIME",
+                  "explicitAcquisitionFilter": null
                 }
               }
             }
@@ -1838,6 +1844,7 @@ class updateObservations extends OdbSuite
       observingMode: {
         gmosNorthLongSlit: {
           grating: R831_G5302
+          explicitAcquisitionFilter: I_PRIME
         }
       }
     """
@@ -1851,7 +1858,96 @@ class updateObservations extends OdbSuite
               "instrument": "GMOS_NORTH",
               "observingMode": {
                 "gmosNorthLongSlit": {
-                  "grating": "R831_G5302"
+                  "grating": "R831_G5302",
+                  "acquisitionFilter": "I_PRIME",
+                  "defaultAcquisitionFilter": "G_PRIME",
+                  "explicitAcquisitionFilter": "I_PRIME"
+                }
+              }
+            }
+          ]
+        }
+      }
+    """.asRight
+
+    multiUpdateTest(pi, List((update0, query, expected0), (update1, query, expected1)))
+  }
+
+  test("observing mode: update existing deleting explicit acquisition filter") {
+
+    val update0 = """
+      observingMode: {
+        gmosNorthLongSlit: {
+          grating: B1200_G5301
+          filter: G_PRIME
+          explicitAcquisitionFilter: I_PRIME
+          fpu: LONG_SLIT_0_25
+          centralWavelength: {
+            nanometers: 234.56
+          }
+          scienceExposureTimeMode: {
+            signalToNoise: {
+              value: 20.0
+              at: { nanometers: 234.56 }
+            }
+          }
+        }
+      }
+    """
+
+    val query = """
+      observations {
+        instrument
+        observingMode {
+          gmosNorthLongSlit {
+            acquisitionFilter
+            defaultAcquisitionFilter
+            explicitAcquisitionFilter
+          }
+        }
+      }
+    """
+
+    val expected0 =
+      json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "instrument": "GMOS_NORTH",
+              "observingMode": {
+                "gmosNorthLongSlit": {
+                  "acquisitionFilter": "I_PRIME",
+                  "defaultAcquisitionFilter": "G_PRIME",
+                  "explicitAcquisitionFilter": "I_PRIME"
+                }
+              }
+            }
+          ]
+        }
+      }
+    """.asRight
+
+    val update1 = """
+      observingMode: {
+        gmosNorthLongSlit: {
+          explicitAcquisitionFilter: null
+        }
+      }
+    """
+
+    val expected1 =
+      json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "instrument": "GMOS_NORTH",
+              "observingMode": {
+                "gmosNorthLongSlit": {
+                  "acquisitionFilter": "G_PRIME",
+                  "defaultAcquisitionFilter": "G_PRIME",
+                  "explicitAcquisitionFilter": null
                 }
               }
             }

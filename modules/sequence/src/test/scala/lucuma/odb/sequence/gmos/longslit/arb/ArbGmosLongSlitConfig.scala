@@ -70,17 +70,21 @@ object ArbGmosLongSlitConfig:
   given Arbitrary[Config.GmosNorth] =
     Arbitrary:
       for
-        g <- arbitrary[GmosNorthGrating]
-        f <- arbitrary[Option[GmosNorthFilter]]
-        u <- arbitrary[GmosNorthFpu]
-        c <- arbitrary[Config.Common]
-      yield Config.GmosNorth(g, f, u, c)
+        g   <- arbitrary[GmosNorthGrating]
+        f   <- arbitrary[Option[GmosNorthFilter]]
+        daf <- arbitrary[GmosNorthFilter]
+        eaf <- arbitrary[Option[GmosNorthFilter]]
+        u   <- arbitrary[GmosNorthFpu]
+        c   <- arbitrary[Config.Common]
+      yield Config.GmosNorth(g, f, daf, eaf, u, c)
 
   given Arbitrary[Config.GmosSouth] =
     Arbitrary:
       for
-        g <- arbitrary[GmosSouthGrating]
-        f <- arbitrary[Option[GmosSouthFilter]]
-        u <- arbitrary[GmosSouthFpu]
-        c <- arbitrary[Config.Common]
-      yield Config.GmosSouth(g, f, u, c)
+        g   <- arbitrary[GmosSouthGrating]
+        f   <- arbitrary[Option[GmosSouthFilter]]
+        daf <- arbitrary[GmosSouthFilter]
+        eaf <- arbitrary[Option[GmosSouthFilter]]
+        u   <- arbitrary[GmosSouthFpu]
+        c   <- arbitrary[Config.Common]
+      yield Config.GmosSouth(g, f, daf, eaf, u, c)

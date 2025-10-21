@@ -76,7 +76,7 @@ object CalibrationConfigSubset:
 
     def toLongSlitInput: ObservingModeInput.Create =
       ObservingModeInput.Create(
-        GmosLongSlitInput.Create.North(grating, filter, fpu, longSlitCommonInput).some,
+        GmosLongSlitInput.Create.North(grating, filter, none, fpu, longSlitCommonInput).some,
         none,
         none,
         none,
@@ -98,7 +98,7 @@ object CalibrationConfigSubset:
     def toLongSlitInput: ObservingModeInput.Create =
       ObservingModeInput.Create(
         none,
-        GmosLongSlitInput.Create.South(grating, filter, fpu, longSlitCommonInput).some,
+        GmosLongSlitInput.Create.South(grating, filter, none, fpu, longSlitCommonInput).some,
         none,
         none,
         none

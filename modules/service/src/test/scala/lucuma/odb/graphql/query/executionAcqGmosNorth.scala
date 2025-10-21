@@ -532,3 +532,126 @@ class executionAcqGmosNorth extends ExecutionTestSupportForGmos:
           }
         """.asRight
       )
+
+  test("invalid GMOS North acquisition filter"):
+    for
+      p <- createProgram
+      t <- createTargetWithProfileAs(pi, p)
+      _ <- expect(
+             user  = pi,
+             query = createObservationWithModeQuery(p, List(t), s"""
+               gmosNorthLongSlit: {
+                 grating: R831_G5302
+                 filter: R_PRIME
+                 explicitAcquisitionFilter: GG455
+                 fpu: LONG_SLIT_0_50
+                 centralWavelength: {
+                   nanometers: 500
+                 }
+                 explicitYBin: TWO
+               }
+             """),
+             expected = List(
+               "Argument 'input.SET.observingMode.gmosNorthLongSlit' is invalid: 'explicitAcquisitionFilter' must contain one of: G_PRIME, R_PRIME, I_PRIME, Z_PRIME"
+             ).asLeft
+           )
+    yield ()
+
+  test("override acquisition filter"):
+    val setup: IO[Observation.Id] =
+      for
+        p <- createProgram
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createObservationWithModeAs(pi, p, List(t), s"""
+               gmosNorthLongSlit: {
+                 grating: R831_G5302
+                 filter: R_PRIME
+                 explicitAcquisitionFilter: Z_PRIME
+                 fpu: LONG_SLIT_0_50
+                 centralWavelength: {
+                   nanometers: 500
+                 }
+                 explicitYBin: TWO
+              }
+             """)
+        _ <- expect(
+          user  = pi,
+          query = s"""
+            query {
+              observation(observationId: "$o") {
+                observingMode {
+                  gmosNorthLongSlit {
+                    acquisitionFilter
+                    defaultAcquisitionFilter
+                    explicitAcquisitionFilter
+                  }
+                }
+              }
+            }
+          """,
+          expected = json"""
+            {
+              "observation": {
+                "observingMode": {
+                  "gmosNorthLongSlit": {
+                    "acquisitionFilter": "Z_PRIME",
+                    "defaultAcquisitionFilter": "G_PRIME",
+                    "explicitAcquisitionFilter": "Z_PRIME"
+                  }
+                }
+              }
+            }
+          """.asRight
+        )
+      yield o
+
+    setup.flatMap: oid =>
+      expect(
+        user     = pi,
+        query    = s"""
+          query {
+            executionConfig(observationId: "$oid") {
+              gmosNorth {
+                acquisition {
+                  nextAtom {
+                    steps {
+                      instrumentConfig {
+                        filter
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        """,
+        expected = json"""
+          {
+            "executionConfig": {
+              "gmosNorth": {
+                "acquisition": {
+                  "nextAtom": {
+                    "steps": [
+                      {
+                        "instrumentConfig": {
+                          "filter": "Z_PRIME"
+                        }
+                      },
+                      {
+                        "instrumentConfig": {
+                          "filter": "Z_PRIME"
+                        }
+                      },
+                      {
+                        "instrumentConfig": {
+                          "filter": "Z_PRIME"
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        """.asRight
+      )

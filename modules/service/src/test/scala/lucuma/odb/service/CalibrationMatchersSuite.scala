@@ -28,6 +28,8 @@ class CalibrationMatchersSuite extends ScalaCheckSuite:
     Config.GmosNorth(
       grating = GmosNorthGrating.B1200_G5301,
       filter = GmosNorthFilter.GPrime.some,
+      defaultAcquisitionFilter = GmosNorthFilter.GPrime,
+      explicitAcquisitionFilter = none,
       fpu = GmosNorthFpu.LongSlit_1_00,
       common = Config.Common(
         centralWavelength = w,
