@@ -490,11 +490,8 @@ object GuideService {
         }.value
 
 
-      extension (ts: Timestamp) 
-        def plusDays(n: Int): Option[Timestamp] =
-          Timestamp.fromInstant(ts.toInstant.plus(n, ChronoUnit.DAYS))
-        def plusDaysTruncatedAndBounded(n: Int): Timestamp =
-          Timestamp.fromInstantTruncatedAndBounded(ts.toInstant.plus(n, ChronoUnit.DAYS))
+      extension (ts: Timestamp) def plusDaysTruncatedAndBounded(n: Int): Timestamp =
+        Timestamp.fromInstantTruncatedAndBounded(ts.toInstant.plus(n, ChronoUnit.DAYS))
 
       /** 
        * Find the first timestamp in `interval` for which the coordinates stray more than `invalidThreshold`
@@ -511,21 +508,23 @@ object GuideService {
         // Get the origin, if we can
         coordsAt(interval.start).flatMap: origin =>
 
+          def withinBoundsAt(ts: Timestamp): Either[OdbError, Boolean] =
+            coordsAt(ts).map: coords =>
+              origin.angularDistance(coords) > invalidThreshold          
+
           // Start at `ts` and see how far the target has moved, looping back if we need to keep checking.
           @tailrec def go(ts: Timestamp): Either[OdbError, Timestamp] =
-            if ts >= interval.end then Right(Timestamp.Max)
+            if ts >= interval.end then 
+              // one last check at the endpoint
+              withinBoundsAt(interval.end).map:
+                case true  => Timestamp.Max // never exits
+                case false => interval.end  // exits during the last day of the interval
             else
               // N.B. patten-match here to retain tailrec
-              coordsAt(ts) match
-                case Left(err) => Left(err)
-                case Right(coords) =>
-                  if origin.angularDistance(coords) > invalidThreshold then Right(ts)
-                  else 
-                    ts.plusDays(1) match
-                      case Some(ts) => go(ts)
-                      case None     => Left(OdbError.InvalidArgument(Some(s"Interval out of range: $interval")))
-                    
-                    // go(ts.plusDaysTruncatedAndBounded(1))
+              withinBoundsAt(ts) match
+                case Left(err)    => Left(err)
+                case Right(true)  => Right(ts)
+                case Right(false) => go(ts.plusDaysTruncatedAndBounded(1))
           
           // Start at the beginning
           go(interval.start)
