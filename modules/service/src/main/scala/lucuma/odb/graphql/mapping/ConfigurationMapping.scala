@@ -10,8 +10,6 @@ import grackle.Cursor
 import grackle.Query
 import grackle.Query.EffectHandler
 import grackle.Result
-import grackle.Result.Failure
-import grackle.Result.Warning
 import grackle.ResultT
 import io.circe.Json
 import io.circe.syntax.*
@@ -70,29 +68,28 @@ trait ConfigurationMapping[F[_]]
       SqlObject("observingMode"),
     )
 
-  // Use GuideService.getObjectTrackikng to compute thet location of this observation's asterism at the middle
-  // of the CFP's active period (if we can).
   def targetQueryHandler: EffectHandler[F] =
 
     // N.B. we can't use ObservationEffectHandler here because it doesn't gather all the infomation we need from
     // the cursor, and we don't need the environment at all. Would be nice to abstract something out.
     new EffectHandler[F] {
 
-      def calculate(pid: Program.Id, oid: Observation.Id, oRefTime: Option[Timestamp]): F[Result[Option[Either[Coordinates, Region]]]] =
-        services.use { implicit s =>
-          Services.asSuperUser:
-            s.guideService(gaiaClient, itcClient, commitHash, timeEstimateCalculator)
-              .getObjectTrackingOrRegion(pid, oid)
-              .map:
-                case Failure(problems) => Warning(problems, None) // turn failure into a warning                
-                case other => 
-                  other.map:
-                    case Right(r) => Some(Right(r))
-                    case Left(cs) =>
-                      oRefTime.flatMap: refTime =>                        
-                        cs.at(refTime.toInstant).map: aliased =>
-                          Left(aliased)
-        }
+      def calculate(oid: Observation.Id, oRefTime: Option[Timestamp]): F[Result[Option[Either[Coordinates, Region]]]] =
+        oRefTime
+          .traverse: at =>
+            services.use { implicit s =>
+              Services.asSuperUser:
+                s .trackingService
+                  .getCoordinatesSnapshotOrRegion(oid, at)
+                  .map: res =>
+                    if res.isFailure then Result(None) // important, don't fail here
+                    else res
+                      .map:
+                        case Left(a)             => Left(a.base).some // non-opportunity
+                        case Right((_, Some(c))) => Left(c).some      // opportunity with explicit base
+                        case Right((r, None))    => Right(r).some     // opportunity without explicit base
+              }
+          .map(_.sequence.map(_.flatten))
 
       private def queryContext(queries: List[(Query, Cursor)]): Result[List[(Program.Id, Observation.Id, Option[Timestamp])]] =
         queries.parTraverse: (_, cursor) =>
@@ -106,7 +103,7 @@ trait ConfigurationMapping[F[_]]
         (for {
           ctx <- ResultT(queryContext(queries).pure[F])
           obs <- ctx.distinct.traverse { case (pid, oid, ldt) =>
-                   ResultT(calculate(pid, oid, ldt)).map((oid, _))
+                   ResultT(calculate(oid, ldt)).map((oid, _))
                  }
           res <- ResultT(ctx
                    .flatMap { case (pid, oid, ldt) => obs.find(r => r._1 === oid).map(_._2).toList }

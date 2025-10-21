@@ -207,6 +207,8 @@ trait Services[F[_]]:
   /** Construct a `TimeEstimateService`, given a `CommitHash` and an `ItcClient`.*/
   def timeEstimateService(commitHash: CommitHash, itcClient: ItcClient[F], ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode, emailConfig: Config.Email, httpClient: Client[F]): TimeEstimateService[F]
 
+  def trackingService: TrackingService[F]
+
   /** Construct a `guideService`, given an http4s `Client`, an `ItcClient`, a `CommitHash` and a `TimeEstimateCalculator`. */
   def guideService(gaiaClient: GaiaClient[F], itcClient: ItcClient[F], commitHash: CommitHash, ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode): GuideService[F]
 
@@ -311,6 +313,7 @@ object Services:
       lazy val timeAccountingService = TimeAccountingService.instantiate
       lazy val timeService = TimeService.instantiate
       lazy val timingWindowService = TimingWindowService.instantiate
+      lazy val trackingService = TrackingService.instantiate
       lazy val visitService = VisitService.instantiate
 
       // A few services require additional arguments for instantiation that may not always be
@@ -371,6 +374,7 @@ object Services:
     def smartGcalService[F[_]](using Services[F]): SmartGcalService[F] = summon[Services[F]].smartGcalService
     def sequenceService[F[_]](using Services[F]): SequenceService[F] = summon[Services[F]].sequenceService
     def targetService[F[_]](using Services[F]): TargetService[F] = summon[Services[F]].targetService
+    def trackingService[F[_]](using Services[F]): TrackingService[F] = summon[Services[F]].trackingService
     def timeAccountingService[F[_]](using Services[F]): TimeAccountingService[F] = summon[Services[F]].timeAccountingService
     def timeService[F[_]](using Services[F]): TimeService[F] = summon[Services[F]].timeService
     def timingWindowService[F[_]](using Services[F]): TimingWindowService[F] = summon[Services[F]].timingWindowService
