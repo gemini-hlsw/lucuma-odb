@@ -84,6 +84,12 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
           explicitSpatialOffsets { arcseconds }
           defaultSpatialOffsets { arcseconds }
           acquisition {
+            filter
+            defaultFilter
+            explicitFilter
+            roi
+            defaultRoi
+            explicitRoi
             exposureTimeMode {
               signalToNoise {
                 value
@@ -120,6 +126,12 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
           explicitSpatialOffsets { arcseconds }
           defaultSpatialOffsets { arcseconds }
           acquisition {
+            filter
+            defaultFilter
+            explicitFilter
+            roi
+            defaultRoi
+            explicitRoi
             exposureTimeMode {
               signalToNoise {
                 value

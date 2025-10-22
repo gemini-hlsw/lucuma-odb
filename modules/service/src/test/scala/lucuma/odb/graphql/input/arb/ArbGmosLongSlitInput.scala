@@ -6,6 +6,7 @@ package arb
 
 import lucuma.core.enums.GmosAmpGain
 import lucuma.core.enums.GmosAmpReadMode
+import lucuma.core.enums.GmosLongSlitAcquisitionRoi
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosNorthFpu
 import lucuma.core.enums.GmosNorthGrating
@@ -65,8 +66,9 @@ trait ArbGmosLongSlitInput:
     Arbitrary:
       for
         f <- arbitrary[Nullable[GmosNorthFilter]]
+        r <- arbitrary[Nullable[GmosLongSlitAcquisitionRoi]]
         a <- arbitrary[Option[ExposureTimeMode]]
-      yield GmosLongSlitInput.NorthAcquisition(f, a)
+      yield GmosLongSlitInput.NorthAcquisition(f, r, a)
 
   given Arbitrary[GmosLongSlitInput.Create.North] =
     Arbitrary:
@@ -88,8 +90,9 @@ trait ArbGmosLongSlitInput:
     Arbitrary:
       for
         f <- arbitrary[Nullable[GmosSouthFilter]]
+        r <- arbitrary[Nullable[GmosLongSlitAcquisitionRoi]]
         a <- arbitrary[Option[ExposureTimeMode]]
-      yield GmosLongSlitInput.SouthAcquisition(f, a)
+      yield GmosLongSlitInput.SouthAcquisition(f, r, a)
 
   given Arbitrary[GmosLongSlitInput.Create.South] =
     Arbitrary:

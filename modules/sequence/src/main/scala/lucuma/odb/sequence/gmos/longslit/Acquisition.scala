@@ -21,7 +21,6 @@ import lucuma.core.enums.GmosGratingOrder
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosNorthFpu
 import lucuma.core.enums.GmosNorthGrating
-import lucuma.core.enums.GmosRoi
 import lucuma.core.enums.GmosSouthFilter
 import lucuma.core.enums.GmosSouthFpu
 import lucuma.core.enums.GmosSouthGrating
@@ -100,14 +99,14 @@ object Acquisition:
           _  <- optics.grating       := none[(G, GmosGratingOrder, Wavelength)]
           _  <- optics.xBin          := GmosXBinning.Two
           _  <- optics.yBin          := GmosYBinning.Two
-          _  <- optics.roi           := GmosRoi.Ccd2
+          _  <- optics.roi           := acqConfig.roi.imagingRoi
           s0 <- scienceStep(0.arcsec, 0.arcsec, ObserveClass.Acquisition)
 
           _  <- optics.exposure      := 20.secondTimeSpan
           _  <- optics.fpu           := GmosFpuMask.Builtin(fpu).some
           _  <- optics.xBin          := GmosXBinning.One
           _  <- optics.yBin          := GmosYBinning.One
-          _  <- optics.roi           := GmosRoi.CentralStamp
+          _  <- optics.roi           := acqConfig.roi.slitRoi
           s1 <- scienceStep(10.arcsec, 0.arcsec, ObserveClass.Acquisition)
 
           _  <- optics.exposure      := lastExpTime(exposureTime)

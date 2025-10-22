@@ -23,6 +23,7 @@ import lucuma.core.enums.GmosAmpGain
 import lucuma.core.enums.GmosAmpReadMode
 import lucuma.core.enums.GmosDtax
 import lucuma.core.enums.GmosGratingOrder
+import lucuma.core.enums.GmosLongSlitAcquisitionRoi
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosNorthFpu
 import lucuma.core.enums.GmosNorthGrating
@@ -208,34 +209,34 @@ trait ExecutionTestSupportForGmos extends ExecutionTestSupport:
   def gmosNorthFlat(ditherNm: Int): GmosNorth =
     gmosNorthScience(ditherNm).copy(exposure = gn_flat.instrumentConfig.exposureTime)
 
-  val GmosNorthAcq0: GmosNorth =
+  def gmosNorthAcq0(roi: GmosLongSlitAcquisitionRoi): GmosNorth =
     gmosNorthScience(0).copy(
       exposure      = fakeItcImagingResult.exposureTime,
       readout       = GmosCcdMode(GmosXBinning.Two, GmosYBinning.Two, GmosAmpCount.Twelve, GmosAmpGain.Low, GmosAmpReadMode.Fast),
-      roi           = GmosRoi.Ccd2,
+      roi           = roi.imagingRoi,
       gratingConfig = none,
       filter        = GmosNorthFilter.GPrime.some,
       fpu           = none
     )
 
-  val GmosNorthAcq1: GmosNorth =
-    GmosNorthAcq0.copy(
-      exposure = GmosNorthAcq0.exposure *| 2,
+  def gmosNorthAcq1(roi: GmosLongSlitAcquisitionRoi): GmosNorth =
+    gmosNorthAcq0(roi).copy(
+      exposure = gmosNorthAcq0(roi).exposure *| 2,
       readout  = GmosCcdMode(GmosXBinning.One, GmosYBinning.One, GmosAmpCount.Twelve, GmosAmpGain.Low, GmosAmpReadMode.Fast),
-      roi      = GmosRoi.CentralStamp,
+      roi      = roi.slitRoi,
       fpu      = gmosNorthScience(0).fpu
     )
 
-  val GmosNorthAcq2: GmosNorth =
-    GmosNorthAcq1.copy(
-      exposure = GmosNorthAcq0.exposure *| 3
+  def gmosNorthAcq2(roi: GmosLongSlitAcquisitionRoi): GmosNorth =
+    gmosNorthAcq1(roi).copy(
+      exposure = gmosNorthAcq0(roi).exposure *| 3
     )
 
-  def gmosNorthAcq(step: Int): GmosNorth =
+  def gmosNorthAcq(step: Int, roi: GmosLongSlitAcquisitionRoi = GmosLongSlitAcquisitionRoi.Ccd2): GmosNorth =
     step match
-      case 0 => GmosNorthAcq0
-      case 1 => GmosNorthAcq1
-      case 2 => GmosNorthAcq2
+      case 0 => gmosNorthAcq0(roi)
+      case 1 => gmosNorthAcq1(roi)
+      case 2 => gmosNorthAcq2(roi)
       case _ => sys.error("Only 3 steps in a GMOS North Acq")
 
   val FlatStep: StepConfig.Gcal =
@@ -318,10 +319,15 @@ trait ExecutionTestSupportForGmos extends ExecutionTestSupport:
       }
     """
 
-  protected def gmosNorthExpectedAcq(step: Int, p: Int, breakpoint: Breakpoint = Breakpoint.Disabled): Json =
+  protected def gmosNorthExpectedAcq(
+    step:       Int,
+    p:          Int,
+    roi:        GmosLongSlitAcquisitionRoi = GmosLongSlitAcquisitionRoi.Ccd2,
+    breakpoint: Breakpoint                 = Breakpoint.Disabled
+  ): Json =
     json"""
       {
-        "instrumentConfig" : ${gmosNorthExpectedInstrumentConfig(gmosNorthAcq(step))},
+        "instrumentConfig" : ${gmosNorthExpectedInstrumentConfig(gmosNorthAcq(step, roi))},
         "stepConfig" : { "stepType":  "SCIENCE" },
         "telescopeConfig": ${expectedTelescopeConfig(p, 0, StepGuideState.Enabled)},
         "observeClass" : "ACQUISITION",

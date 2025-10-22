@@ -8,6 +8,7 @@ package arb
 
 import lucuma.core.enums.GmosAmpGain
 import lucuma.core.enums.GmosAmpReadMode
+import lucuma.core.enums.GmosLongSlitAcquisitionRoi
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosNorthFpu
 import lucuma.core.enums.GmosNorthGrating
@@ -40,18 +41,22 @@ object ArbGmosLongSlitConfig:
   given given_Arbitrary_AcquisitionConfig_GmosNorth: Arbitrary[AcquisitionConfig.GmosNorth] =
     Arbitrary:
       for
-        e   <- arbitrary[ExposureTimeMode]
-        daf <- arbitrary[GmosNorthFilter]
-        eaf <- arbitrary[Option[GmosNorthFilter]]
-      yield AcquisitionConfig.GmosNorth(e, daf, eaf)
+        e  <- arbitrary[ExposureTimeMode]
+        df <- arbitrary[GmosNorthFilter]
+        ef <- arbitrary[Option[GmosNorthFilter]]
+        dr <- arbitrary[GmosLongSlitAcquisitionRoi]
+        er <- arbitrary[Option[GmosLongSlitAcquisitionRoi]]
+      yield AcquisitionConfig.GmosNorth(e, df, ef, dr, er)
 
   given given_Arbitrary_AcquisitionConfig_GmosSouth: Arbitrary[AcquisitionConfig.GmosSouth] =
     Arbitrary:
       for
-        e   <- arbitrary[ExposureTimeMode]
-        daf <- arbitrary[GmosSouthFilter]
-        eaf <- arbitrary[Option[GmosSouthFilter]]
-      yield AcquisitionConfig.GmosSouth(e, daf, eaf)
+        e  <- arbitrary[ExposureTimeMode]
+        df <- arbitrary[GmosSouthFilter]
+        ef <- arbitrary[Option[GmosSouthFilter]]
+        dr <- arbitrary[GmosLongSlitAcquisitionRoi]
+        er <- arbitrary[Option[GmosLongSlitAcquisitionRoi]]
+      yield AcquisitionConfig.GmosSouth(e, df, ef, dr, er)
 
   given Arbitrary[Config.Common] =
     Arbitrary:

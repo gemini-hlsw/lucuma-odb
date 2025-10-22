@@ -45,8 +45,10 @@ class CalibrationMatchersSuite extends ScalaCheckSuite:
       ),
       acquisition = AcquisitionConfig.GmosNorth(
         exposureTimeMode = e,
-        defaultFilter = GmosNorthFilter.GPrime,
-        explicitFilter = none
+        defaultFilter  = GmosNorthFilter.GPrime,
+        explicitFilter = none,
+        defaultRoi     = GmosLongSlitAcquisitionRoi.Ccd2,
+        explicitRoi    = none
       )
     )
 
