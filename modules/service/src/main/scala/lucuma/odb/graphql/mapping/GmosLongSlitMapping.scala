@@ -139,6 +139,16 @@ trait GmosLongSlitMapping[F[_]]
     val sourceProfile: FieldMapping =
       SqlField("sourceProfile", cc.SourceProfile, hidden = true)
 
+  lazy val GmosNorthLongSlitAcquisitionMapping: ObjectMapping =
+    ObjectMapping(GmosNorthLongSlitAcquisitionType)(
+      SqlField("observationId", GmosNorthLongSlitView.Common.ObservationId, key = true, hidden = true),
+
+      explicitOrElseDefault[GmosNorthFilter]("filter", "explicitFilter", "defaultFilter"),
+      SqlField("defaultFilter",  GmosNorthLongSlitView.AcquisitionFilterDefault),
+      SqlField("explicitFilter", GmosNorthLongSlitView.AcquisitionFilter),
+
+      SqlObject("exposureTimeMode", Join(GmosNorthLongSlitView.Common.ObservationId, ExposureTimeModeView.ObservationId))
+    )
 
   lazy val GmosNorthLongSlitMapping: ObjectMapping =
 
@@ -153,15 +163,10 @@ trait GmosLongSlitMapping[F[_]]
       SqlField("grating", GmosNorthLongSlitView.Grating),
       SqlField("filter",  GmosNorthLongSlitView.Filter),
 
-      explicitOrElseDefault[GmosNorthFilter]("acquisitionFilter", "explicitAcquisitionFilter", "defaultAcquisitionFilter"),
-      SqlField("defaultAcquisitionFilter",  GmosNorthLongSlitView.AcquisitionFilterDefault),
-      SqlField("explicitAcquisitionFilter", GmosNorthLongSlitView.AcquisitionFilter),
-
       SqlField("fpu",     GmosNorthLongSlitView.Fpu),
 
       SqlObject("centralWavelength"),
-      SqlObject("acquisitionExposureTimeMode", Join(GmosNorthLongSlitView.Common.ObservationId, ExposureTimeModeView.ObservationId)),
-      SqlObject("scienceExposureTimeMode",     Join(GmosNorthLongSlitView.Common.ObservationId, ExposureTimeModeView.ObservationId)),
+      SqlObject("exposureTimeMode", Join(GmosNorthLongSlitView.Common.ObservationId, ExposureTimeModeView.ObservationId)),
 
       // ---------------------
       // xBin
@@ -237,6 +242,8 @@ trait GmosLongSlitMapping[F[_]]
       common.imageQuality,
       common.sourceProfile,
 
+      SqlObject("acquisition"),
+
       // ---------------------
       // initialValues
       // ---------------------
@@ -250,7 +257,7 @@ trait GmosLongSlitMapping[F[_]]
     )
 
   lazy val GmosNorthLongSlitElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
-      case (GmosNorthLongSlitType, "acquisitionExposureTimeMode", Nil) =>
+      case (GmosNorthLongSlitAcquisitionType, "exposureTimeMode", Nil) =>
         Elab.transformChild: child =>
           Unique(
             Filter(
@@ -259,7 +266,7 @@ trait GmosLongSlitMapping[F[_]]
             )
           )
 
-      case (GmosNorthLongSlitType, "scienceExposureTimeMode", Nil) =>
+      case (GmosNorthLongSlitType, "exposureTimeMode", Nil) =>
         Elab.transformChild: child =>
           Unique(
             Filter(
@@ -267,6 +274,17 @@ trait GmosLongSlitMapping[F[_]]
               child
             )
           )
+
+  lazy val GmosSouthLongSlitAcquisitionMapping: ObjectMapping =
+    ObjectMapping(GmosSouthLongSlitAcquisitionType)(
+      SqlField("observationId", GmosSouthLongSlitView.Common.ObservationId, key = true, hidden = true),
+
+      explicitOrElseDefault[GmosSouthFilter]("filter", "explicitFilter", "defaultFilter"),
+      SqlField("defaultFilter",  GmosSouthLongSlitView.AcquisitionFilterDefault),
+      SqlField("explicitFilter", GmosSouthLongSlitView.AcquisitionFilter),
+
+      SqlObject("exposureTimeMode", Join(GmosSouthLongSlitView.Common.ObservationId, ExposureTimeModeView.ObservationId))
+    )
 
   lazy val GmosSouthLongSlitMapping: ObjectMapping =
 
@@ -281,15 +299,10 @@ trait GmosLongSlitMapping[F[_]]
       SqlField("grating", GmosSouthLongSlitView.Grating),
       SqlField("filter",  GmosSouthLongSlitView.Filter),
 
-      explicitOrElseDefault[GmosSouthFilter]("acquisitionFilter", "explicitAcquisitionFilter", "defaultAcquisitionFilter"),
-      SqlField("defaultAcquisitionFilter", GmosSouthLongSlitView.AcquisitionFilterDefault),
-      SqlField("explicitAcquisitionFilter", GmosSouthLongSlitView.AcquisitionFilter),
-
       SqlField("fpu",     GmosSouthLongSlitView.Fpu),
 
       SqlObject("centralWavelength"),
-      SqlObject("acquisitionExposureTimeMode", Join(GmosSouthLongSlitView.Common.ObservationId, ExposureTimeModeView.ObservationId)),
-      SqlObject("scienceExposureTimeMode",     Join(GmosSouthLongSlitView.Common.ObservationId, ExposureTimeModeView.ObservationId)),
+      SqlObject("exposureTimeMode", Join(GmosSouthLongSlitView.Common.ObservationId, ExposureTimeModeView.ObservationId)),
 
       // ---------------------
       // xBin
@@ -365,6 +378,8 @@ trait GmosLongSlitMapping[F[_]]
       common.imageQuality,
       common.sourceProfile,
 
+      SqlObject("acquisition"),
+
       // ---------------------
       // initialValues
       // ---------------------
@@ -378,7 +393,7 @@ trait GmosLongSlitMapping[F[_]]
     )
 
   lazy val GmosSouthLongSlitElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
-      case (GmosSouthLongSlitType, "acquisitionExposureTimeMode", Nil) =>
+      case (GmosSouthLongSlitAcquisitionType, "exposureTimeMode", Nil) =>
         Elab.transformChild: child =>
           Unique(
             Filter(
@@ -387,7 +402,7 @@ trait GmosLongSlitMapping[F[_]]
             )
           )
 
-      case (GmosSouthLongSlitType, "scienceExposureTimeMode", Nil) =>
+      case (GmosSouthLongSlitType, "exposureTimeMode", Nil) =>
         Elab.transformChild: child =>
           Unique(
             Filter(

@@ -470,14 +470,16 @@ class executionAcqGmosNorth extends ExecutionTestSupportForGmos:
                  centralWavelength: {
                    nanometers: 500
                  }
-                 acquisitionExposureTimeMode: {
-                   timeAndCount: {
-                     time: { seconds: 16 }
-                     count: 1
-                     at: { nanometers: 500 }
+                 explicitYBin: TWO
+                 acquisition: {
+                   exposureTimeMode: {
+                     timeAndCount: {
+                       time: { seconds: 16 }
+                       count: 1
+                       at: { nanometers: 500 }
+                     }
                    }
                  }
-                 explicitYBin: TWO
               }
              """)
       yield o
@@ -543,16 +545,18 @@ class executionAcqGmosNorth extends ExecutionTestSupportForGmos:
                gmosNorthLongSlit: {
                  grating: R831_G5302
                  filter: R_PRIME
-                 explicitAcquisitionFilter: GG455
                  fpu: LONG_SLIT_0_50
                  centralWavelength: {
                    nanometers: 500
                  }
                  explicitYBin: TWO
+                 acquisition: {
+                   explicitFilter: GG455
+                 }
                }
              """),
              expected = List(
-               "Argument 'input.SET.observingMode.gmosNorthLongSlit' is invalid: 'explicitAcquisitionFilter' must contain one of: G_PRIME, R_PRIME, I_PRIME, Z_PRIME"
+               "Argument 'input.SET.observingMode.gmosNorthLongSlit.acquisition' is invalid: 'explicitFilter' must contain one of: G_PRIME, R_PRIME, I_PRIME, Z_PRIME"
              ).asLeft
            )
     yield ()
@@ -566,12 +570,14 @@ class executionAcqGmosNorth extends ExecutionTestSupportForGmos:
                gmosNorthLongSlit: {
                  grating: R831_G5302
                  filter: R_PRIME
-                 explicitAcquisitionFilter: Z_PRIME
                  fpu: LONG_SLIT_0_50
                  centralWavelength: {
                    nanometers: 500
                  }
                  explicitYBin: TWO
+                 acquisition: {
+                   explicitFilter: Z_PRIME
+                 }
               }
              """)
         _ <- expect(
@@ -581,9 +587,11 @@ class executionAcqGmosNorth extends ExecutionTestSupportForGmos:
               observation(observationId: "$o") {
                 observingMode {
                   gmosNorthLongSlit {
-                    acquisitionFilter
-                    defaultAcquisitionFilter
-                    explicitAcquisitionFilter
+                    acquisition {
+                      filter
+                      defaultFilter
+                      explicitFilter
+                    }
                   }
                 }
               }
@@ -594,9 +602,11 @@ class executionAcqGmosNorth extends ExecutionTestSupportForGmos:
               "observation": {
                 "observingMode": {
                   "gmosNorthLongSlit": {
-                    "acquisitionFilter": "Z_PRIME",
-                    "defaultAcquisitionFilter": "G_PRIME",
-                    "explicitAcquisitionFilter": "Z_PRIME"
+                    "acquisition": {
+                      "filter": "Z_PRIME",
+                      "defaultFilter": "G_PRIME",
+                      "explicitFilter": "Z_PRIME"
+                    }
                   }
                 }
               }

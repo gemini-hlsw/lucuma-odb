@@ -319,7 +319,7 @@ class obscalcUpdate extends ObscalcServiceSuiteSupport:
               SET: {
                 observingMode: {
                   gmosSouthLongSlit: {
-                    scienceExposureTimeMode: {
+                    exposureTimeMode: {
                       signalToNoise: {
                         value: 99.99
                         at: { nanometers: 12 }

@@ -164,17 +164,12 @@ object GmosLongSlitService {
 
       private def insertExposureTimeModes(
         name:   String,
-        common: GmosLongSlitInput.Create.Common,
+        acq:    Option[ExposureTimeMode],
+        sci:    Option[ExposureTimeMode],
         req:    Option[ExposureTimeMode],
         which:  List[Observation.Id]
       )(using Transaction[F]): F[Result[Unit]] =
-        exposureTimeModeService.insertForSingleScienceEtm(
-          name,
-          common.acquisitionExposureTimeMode,
-          common.scienceExposureTimeMode,
-          req,
-          which
-        )
+        exposureTimeModeService.insertForSingleScienceEtm(name, acq, sci, req, which)
 
       override def insertNorth(
         input: GmosLongSlitInput.Create.North,
@@ -182,7 +177,7 @@ object GmosLongSlitService {
         which: List[Observation.Id]
       )(using Transaction[F]): F[Result[Unit]] =
         (for
-          _ <- ResultT(insertExposureTimeModes("GMOS North Long Slit", input.common, req, which))
+          _ <- ResultT(insertExposureTimeModes("GMOS North Long Slit", input.acquisition.flatMap(_.exposureTimeMode), input.common.exposureTimeMode, req, which))
           _ <- ResultT.liftF(which.traverse { oid => session.exec(Statements.insertGmosNorthLongSlit(oid, input)) }.void)
         yield ()).value
 
@@ -192,7 +187,7 @@ object GmosLongSlitService {
         which: List[Observation.Id]
       )(using Transaction[F]): F[Result[Unit]] =
         (for
-          _ <- ResultT(insertExposureTimeModes("GMOS South Long Slit", input.common, req, which))
+          _ <- ResultT(insertExposureTimeModes("GMOS South Long Slit", input.acquisition.flatMap(_.exposureTimeMode), input.common.exposureTimeMode, req, which))
           _ <- ResultT.liftF(which.traverse { oid => session.exec(Statements.insertGmosSouthLongSlit(oid, input)) }.void)
         yield ()).value
 
@@ -203,8 +198,9 @@ object GmosLongSlitService {
         Statements.deleteGmosSouthLongSlit(which).fold(Applicative[F].unit)(session.exec)
 
       private def updateExposureTimeModes(
-        common: GmosLongSlitInput.Edit.Common,
-        which:  List[Observation.Id]
+        acq:   Option[ExposureTimeMode],
+        sci:   Option[ExposureTimeMode],
+        which: List[Observation.Id]
       )(using Transaction[F]): F[Unit] =
 
         def update(etm: Option[ExposureTimeMode], role: ExposureTimeModeRole): F[Unit] =
@@ -213,8 +209,8 @@ object GmosLongSlitService {
               services.exposureTimeModeService.updateMany(nel, role, e)
 
         for
-          _ <- update(common.acquisitionExposureTimeMode, ExposureTimeModeRole.Acquisition)
-          _ <- update(common.scienceExposureTimeMode, ExposureTimeModeRole.Science)
+          _ <- update(acq, ExposureTimeModeRole.Acquisition)
+          _ <- update(sci, ExposureTimeModeRole.Science)
         yield ()
 
       override def updateNorth(
@@ -222,7 +218,7 @@ object GmosLongSlitService {
         which: List[Observation.Id]
       )(using Transaction[F]): F[Unit] =
         for
-          _ <- updateExposureTimeModes(SET.common, which)
+          _ <- updateExposureTimeModes(SET.acquisition.flatMap(_.exposureTimeMode), SET.common.exposureTimeMode, which)
           _ <- Statements.updateGmosNorthLongSlit(SET, which).fold(Applicative[F].unit)(session.exec)
         yield ()
 
@@ -231,7 +227,7 @@ object GmosLongSlitService {
         which: List[Observation.Id]
       )(using Transaction[F]): F[Unit] =
         for
-          _ <- updateExposureTimeModes(SET.common, which)
+          _ <- updateExposureTimeModes(SET.acquisition.flatMap(_.exposureTimeMode), SET.common.exposureTimeMode, which)
           _ <- Statements.updateGmosSouthLongSlit(SET, which).fold(Applicative[F].unit)(session.exec)
         yield ()
 
@@ -378,22 +374,22 @@ object GmosLongSlitService {
       input:         GmosLongSlitInput.Create.North
     ): AppliedFragment =
       InsertGmosNorthLongSlit.apply(
-        observationId                        ,
-        input.grating                        ,
-        input.filter                         ,
-        input.acquisitionFilter              ,
-        input.fpu                            ,
-        input.common.centralWavelength       ,
-        input.common.explicitXBin            ,
-        input.common.explicitYBin            ,
-        input.common.explicitAmpReadMode     ,
-        input.common.explicitAmpGain         ,
-        input.common.explicitRoi             ,
-        input.common.formattedλDithers       ,
-        input.common.formattedOffsets        ,
-        input.grating                        ,
-        input.filter                         ,
-        input.fpu                            ,
+        observationId,
+        input.grating,
+        input.filter,
+        input.acquisition.flatMap(_.filter.toOption),
+        input.fpu,
+        input.common.centralWavelength,
+        input.common.explicitXBin,
+        input.common.explicitYBin,
+        input.common.explicitAmpReadMode,
+        input.common.explicitAmpGain,
+        input.common.explicitRoi,
+        input.common.formattedλDithers,
+        input.common.formattedOffsets,
+        input.grating,
+        input.filter,
+        input.fpu,
         input.common.centralWavelength
       )
 
@@ -467,23 +463,23 @@ object GmosLongSlitService {
       input:         GmosLongSlitInput.Create.South
     ): AppliedFragment =
       InsertGmosSouthLongSlit.apply(
-        observationId                          ,
-          input.grating                        ,
-          input.filter                         ,
-          input.acquisitionFilter              ,
-          input.fpu                            ,
-          input.common.centralWavelength       ,
-          input.common.explicitXBin            ,
-          input.common.explicitYBin            ,
-          input.common.explicitAmpReadMode     ,
-          input.common.explicitAmpGain         ,
-          input.common.explicitRoi             ,
-          input.common.formattedλDithers       ,
-          input.common.formattedOffsets ,
-          input.grating                        ,
-          input.filter                         ,
-          input.fpu                            ,
-          input.common.centralWavelength
+        observationId,
+        input.grating,
+        input.filter,
+        input.acquisition.flatMap(_.filter.toOption),
+        input.fpu,
+        input.common.centralWavelength,
+        input.common.explicitXBin,
+        input.common.explicitYBin,
+        input.common.explicitAmpReadMode,
+        input.common.explicitAmpGain,
+        input.common.explicitRoi,
+        input.common.formattedλDithers,
+        input.common.formattedOffsets,
+        input.grating,
+        input.filter,
+        input.fpu,
+        input.common.centralWavelength
       )
 
     def deleteGmosNorthLongSlit(
@@ -539,7 +535,7 @@ object GmosLongSlitService {
         List(
           input.grating.map(upGrating),
           input.filter.toOptionOption.map(upFilter),
-          input.acquisitionFilter.toOptionOption.map(upAcqFilter),
+          input.acquisition.flatMap(_.filter.toOptionOption).map(upAcqFilter),
           input.fpu.map(upFpu),
         ).flatten ++ commonUpdates(input.common)
 

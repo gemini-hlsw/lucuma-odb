@@ -24,22 +24,23 @@ import lucuma.core.math.arb.ArbWavelengthDither
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.arb.ArbExposureTimeMode
 import lucuma.core.util.arb.ArbEnumerated
+import lucuma.odb.data.Nullable
+import lucuma.odb.data.arb.ArbNullable
 import org.scalacheck.*
 import org.scalacheck.Arbitrary.arbitrary
 
-trait ArbGmosLongSlitInput {
-
+trait ArbGmosLongSlitInput:
   import ArbEnumerated.given
+  import ArbNullable.given
   import ArbOffset.given
   import ArbExposureTimeMode.given
   import ArbWavelength.given
   import ArbWavelengthDither.given
 
   given Arbitrary[GmosLongSlitInput.Create.Common] =
-    Arbitrary {
-      for {
+    Arbitrary:
+      for
         w <- arbitrary[Wavelength]
-        a <- arbitrary[Option[ExposureTimeMode]]
         c <- arbitrary[Option[ExposureTimeMode]]
         x <- arbitrary[Option[GmosXBinning]]
         y <- arbitrary[Option[GmosYBinning]]
@@ -48,9 +49,8 @@ trait ArbGmosLongSlitInput {
         r <- arbitrary[Option[GmosRoi]]
         d <- arbitrary[Option[List[WavelengthDither]]]
         s <- arbitrary[Option[List[Q]]]
-      } yield GmosLongSlitInput.Create.Common(
+      yield GmosLongSlitInput.Create.Common(
         w,
-        a,
         c,
         x,
         y,
@@ -60,42 +60,51 @@ trait ArbGmosLongSlitInput {
         d,
         s
       )
-    }
+
+  given Arbitrary[GmosLongSlitInput.NorthAcquisition] =
+    Arbitrary:
+      for
+        f <- arbitrary[Nullable[GmosNorthFilter]]
+        a <- arbitrary[Option[ExposureTimeMode]]
+      yield GmosLongSlitInput.NorthAcquisition(f, a)
 
   given Arbitrary[GmosLongSlitInput.Create.North] =
-    Arbitrary {
-      for {
-        g   <- arbitrary[GmosNorthGrating]
-        f   <- arbitrary[Option[GmosNorthFilter]]
-        eaf <- arbitrary[Option[GmosNorthFilter]]
-        u   <- arbitrary[GmosNorthFpu]
-        c   <- arbitrary[GmosLongSlitInput.Create.Common]
-      } yield GmosLongSlitInput.Create.North(
+    Arbitrary:
+      for
+        g <- arbitrary[GmosNorthGrating]
+        f <- arbitrary[Option[GmosNorthFilter]]
+        u <- arbitrary[GmosNorthFpu]
+        c <- arbitrary[GmosLongSlitInput.Create.Common]
+        a <- arbitrary[Option[GmosLongSlitInput.NorthAcquisition]]
+      yield GmosLongSlitInput.Create.North(
         g,
         f,
-        eaf,
         u,
-        c
+        c,
+        a
       )
-    }
+
+  given Arbitrary[GmosLongSlitInput.SouthAcquisition] =
+    Arbitrary:
+      for
+        f <- arbitrary[Nullable[GmosSouthFilter]]
+        a <- arbitrary[Option[ExposureTimeMode]]
+      yield GmosLongSlitInput.SouthAcquisition(f, a)
 
   given Arbitrary[GmosLongSlitInput.Create.South] =
-    Arbitrary {
-      for {
-        g   <- arbitrary[GmosSouthGrating]
-        f   <- arbitrary[Option[GmosSouthFilter]]
-        eaf <- arbitrary[Option[GmosSouthFilter]]
-        u   <- arbitrary[GmosSouthFpu]
-        c   <- arbitrary[GmosLongSlitInput.Create.Common]
-      } yield GmosLongSlitInput.Create.South(
+    Arbitrary:
+      for
+        g <- arbitrary[GmosSouthGrating]
+        f <- arbitrary[Option[GmosSouthFilter]]
+        u <- arbitrary[GmosSouthFpu]
+        c <- arbitrary[GmosLongSlitInput.Create.Common]
+        a <- arbitrary[Option[GmosLongSlitInput.SouthAcquisition]]
+      yield GmosLongSlitInput.Create.South(
         g,
         f,
-        eaf,
         u,
-        c
+        c,
+        a
       )
-    }
-
-}
 
 object ArbGmosLongSlitInput extends ArbGmosLongSlitInput

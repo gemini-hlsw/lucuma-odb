@@ -48,16 +48,15 @@ object CalibrationConfigSubset:
 
     def longSlitCommonInput: GmosLongSlitInput.Create.Common =
       GmosLongSlitInput.Create.Common(
-        centralWavelength      = centralWavelength,
-        acquisitionExposureTimeMode    = none,
-        scienceExposureTimeMode    = none,
-        explicitXBin           = xBin.some,
-        explicitYBin           = yBin.some,
-        explicitAmpReadMode    = ampReadMode.some,
-        explicitAmpGain        = ampGain.some,
-        explicitRoi            = roi.some,
-        explicitλDithers       = none,
-        explicitOffsets        = none
+        centralWavelength   = centralWavelength,
+        exposureTimeMode    = none,
+        explicitXBin        = xBin.some,
+        explicitYBin        = yBin.some,
+        explicitAmpReadMode = ampReadMode.some,
+        explicitAmpGain     = ampGain.some,
+        explicitRoi         = roi.some,
+        explicitλDithers    = none,
+        explicitOffsets     = none
       )
 
     def toLongSlitInput: ObservingModeInput.Create
@@ -76,7 +75,7 @@ object CalibrationConfigSubset:
 
     def toLongSlitInput: ObservingModeInput.Create =
       ObservingModeInput.Create(
-        GmosLongSlitInput.Create.North(grating, filter, none, fpu, longSlitCommonInput).some,
+        GmosLongSlitInput.Create.North(grating, filter, fpu, longSlitCommonInput, none).some,
         none,
         none,
         none,
@@ -98,7 +97,7 @@ object CalibrationConfigSubset:
     def toLongSlitInput: ObservingModeInput.Create =
       ObservingModeInput.Create(
         none,
-        GmosLongSlitInput.Create.South(grating, filter, none, fpu, longSlitCommonInput).some,
+        GmosLongSlitInput.Create.South(grating, filter, fpu, longSlitCommonInput, none).some,
         none,
         none,
         none
