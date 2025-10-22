@@ -81,7 +81,7 @@ object Acquisition:
   private sealed trait StepComputer[D, G, L, U] extends GmosSequenceState[D, G, L, U]:
 
     def compute(
-      filter:       L,
+      acqConfig:    AcquisitionConfig[L],
       fpu:          U,
       exposureTime: TimeSpan
     ): Acquisition.Steps[D] =
@@ -95,7 +95,7 @@ object Acquisition:
       eval:
         for
           _  <- optics.exposure      := exposureTime
-          _  <- optics.filter        := filter.some
+          _  <- optics.filter        := acqConfig.filter.some
           _  <- optics.fpu           := none[GmosFpuMask[U]]
           _  <- optics.grating       := none[(G, GmosGratingOrder, Wavelength)]
           _  <- optics.xBin          := GmosXBinning.Two
@@ -264,7 +264,7 @@ object Acquisition:
                lastReset,
                IndexTracker.Zero,
                atomBuilder,
-               stepComp.compute(config.acquisitionFilter, config.fpu, t.exposureTime)
+               stepComp.compute(config.acquisition, config.fpu, t.exposureTime)
              )
 
   def gmosNorth(

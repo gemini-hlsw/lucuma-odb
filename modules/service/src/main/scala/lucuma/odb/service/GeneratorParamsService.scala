@@ -279,7 +279,7 @@ object GeneratorParamsService {
               itcObsParams(acq, sci, obsParams, mode)
 
         observingMode(obsParams.targets, config).map:
-          case gn @ gmos.longslit.Config.GmosNorth(g, f, _, _, u, c) =>
+          case gn @ gmos.longslit.Config.GmosNorth(g, f, u, c, a) =>
             val mode = InstrumentMode.GmosNorthSpectroscopy(
               c.centralWavelength,
               g,
@@ -288,9 +288,9 @@ object GeneratorParamsService {
               gn.ccdMode.some,
               gn.roi.some
             )
-            GeneratorParams(itcObsParams(c.acquisitionExposureTimeMode, c.scienceExposureTimeMode, obsParams, mode), obsParams.scienceBand, gn, obsParams.calibrationRole, obsParams.declaredComplete, obsParams.acqResetTime)
+            GeneratorParams(itcObsParams(a.exposureTimeMode, c.exposureTimeMode, obsParams, mode), obsParams.scienceBand, gn, obsParams.calibrationRole, obsParams.declaredComplete, obsParams.acqResetTime)
 
-          case gs @ gmos.longslit.Config.GmosSouth(g, f, _, _, u, c) =>
+          case gs @ gmos.longslit.Config.GmosSouth(g, f, u, c, a) =>
             val mode = InstrumentMode.GmosSouthSpectroscopy(
               c.centralWavelength,
               g,
@@ -299,7 +299,7 @@ object GeneratorParamsService {
               gs.ccdMode.some,
               gs.roi.some
             )
-            GeneratorParams(itcObsParams(c.acquisitionExposureTimeMode, c.scienceExposureTimeMode, obsParams, mode), obsParams.scienceBand, gs, obsParams.calibrationRole, obsParams.declaredComplete, obsParams.acqResetTime)
+            GeneratorParams(itcObsParams(a.exposureTimeMode, c.exposureTimeMode, obsParams, mode), obsParams.scienceBand, gs, obsParams.calibrationRole, obsParams.declaredComplete, obsParams.acqResetTime)
 
           case f2 @ flamingos2.longslit.Config(disperser = disperser, filter = filter, fpu = fpu, acquisitionExposureTimeMode = acq, scienceExposureTimeMode = sci) =>
             val mode = InstrumentMode.Flamingos2Spectroscopy(disperser, filter, fpu)

@@ -25,6 +25,7 @@ import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.Observation
 import lucuma.odb.data.ExposureTimeModeRole
 import lucuma.odb.graphql.input.GmosLongSlitInput
+import lucuma.odb.sequence.gmos.longslit.AcquisitionConfig
 import lucuma.odb.sequence.gmos.longslit.Config.Common
 import lucuma.odb.sequence.gmos.longslit.Config.GmosNorth
 import lucuma.odb.sequence.gmos.longslit.Config.GmosSouth
@@ -92,7 +93,6 @@ object GmosLongSlitService {
 
       val common: Decoder[Common] =
         (wavelength_pm          *:   // centralWavelength
-         exposure_time_mode     *:   // acquisition exposure time mode
          exposure_time_mode     *:   // science exposure time mode
          gmos_binning           *:   // defaultXBin
          gmos_binning.opt       *:   // explicitXBin
@@ -103,14 +103,13 @@ object GmosLongSlitService {
          gmos_roi.opt           *:   // explicitRoi
          text.opt               *:   // explicitWavelengthDithers
          text.opt                    // explicitOffsets
-        ).emap: (w, acq, sci, defaultX, x, defaultY, y, arm, ag, roi, owd, oso) =>
+        ).emap: (w, exp, defaultX, x, defaultY, y, arm, ag, roi, owd, oso) =>
           for
             wavelengthDithers <- owd.traverse(wd => GmosLongSlitInput.WavelengthDithersFormat.getOption(wd).toRight(s"Could not parse '$wd' as a wavelength dithers list."))
             offsets           <- oso.traverse(sd => GmosLongSlitInput.SpatialOffsetsFormat.getOption(sd).toRight(s"Could not parse '$sd' as as offsets list."))
           yield Common(
             w,
-            acq,
-            sci,
+            exp,
             GmosXBinning(defaultX),
             x.map(GmosXBinning(_)),
             GmosYBinning(defaultY),
@@ -122,22 +121,32 @@ object GmosLongSlitService {
             offsets
           )
 
+      val north_acquisition: Decoder[AcquisitionConfig.GmosNorth] =
+        (exposure_time_mode     *: // acquisition exposure time mode
+         gmos_north_filter      *: // default acquisition filter
+         gmos_north_filter.opt     // explicit acquisition filter (if any)
+        ).to[AcquisitionConfig.GmosNorth]
+
+      val south_acquisition: Decoder[AcquisitionConfig.GmosSouth] =
+        (exposure_time_mode     *: // acquisition exposure time mode
+         gmos_south_filter      *: // default acquisition filter
+         gmos_south_filter.opt     // explicit acquisition filter (if any)
+        ).to[AcquisitionConfig.GmosSouth]
+
       val north: Decoder[GmosNorth] =
         (gmos_north_grating     *:
          gmos_north_filter.opt  *: // science filter (if any)
-         gmos_north_filter      *: // default acquisition filter
-         gmos_north_filter.opt  *: // explicit acquisition filter (if any)
          gmos_north_fpu         *:
-         common
+         common                 *:
+         north_acquisition
         ).to[GmosNorth]
 
       val south: Decoder[GmosSouth] =
         (gmos_south_grating     *:
          gmos_south_filter.opt  *: // science filter (if any)
-         gmos_south_filter      *: // default acquisition filter
-         gmos_south_filter.opt  *: // explicit acquisition filter (if any)
          gmos_south_fpu         *:
-         common
+         common                 *:
+         south_acquisition
         ).to[GmosSouth]
 
       private def select[A](
@@ -256,15 +265,8 @@ object GmosLongSlitService {
           ls.c_observation_id,
           ls.c_grating,
           ls.c_filter,
-          ls.c_acquisition_filter_default,
-          ls.c_acquisition_filter,
           ls.c_fpu,
           ls.c_central_wavelength,
-          acq.c_exposure_time_mode,
-          acq.c_signal_to_noise_at,
-          acq.c_signal_to_noise,
-          acq.c_exposure_time,
-          acq.c_exposure_count,
           sci.c_exposure_time_mode,
           sci.c_signal_to_noise_at,
           sci.c_signal_to_noise,
@@ -278,7 +280,14 @@ object GmosLongSlitService {
           ls.c_amp_gain,
           ls.c_roi,
           ls.c_wavelength_dithers,
-          ls.c_offsets
+          ls.c_offsets,
+          acq.c_exposure_time_mode,
+          acq.c_signal_to_noise_at,
+          acq.c_signal_to_noise,
+          acq.c_exposure_time,
+          acq.c_exposure_count,
+          ls.c_acquisition_filter_default,
+          ls.c_acquisition_filter
         FROM
           #$table ls
         LEFT JOIN t_exposure_time_mode acq
