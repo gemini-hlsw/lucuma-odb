@@ -163,18 +163,7 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
           disperser
           filter
           fpu
-          acquisitionExposureTimeMode {
-            signalToNoise {
-              value
-              at { nanometers }
-            }
-            timeAndCount {
-              time { seconds }
-              count
-              at { nanometers }
-            }
-          }
-          scienceExposureTimeMode {
+          exposureTimeMode {
             signalToNoise {
               value
               at { nanometers }
@@ -188,6 +177,19 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
           telluricType {
             tag
             starTypes
+          }
+          acquisition {
+            exposureTimeMode {
+              signalToNoise {
+                value
+                at { nanometers }
+              }
+              timeAndCount {
+                time { seconds }
+                count
+                at { nanometers }
+              }
+            }
           }
         }
       }

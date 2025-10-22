@@ -1544,7 +1544,7 @@ class updateObservations extends OdbSuite
           disperser: R1200_JH
           filter: Y
           fpu: LONG_SLIT_2
-          scienceExposureTimeMode: {
+          exposureTimeMode: {
             signalToNoise: {
               value: 20.0
               at: { nanometers: 234.56 }
@@ -1706,7 +1706,7 @@ class updateObservations extends OdbSuite
           disperser: R1200_JH
           filter: Y
           fpu: LONG_SLIT_2
-          scienceExposureTimeMode: {
+          exposureTimeMode: {
             signalToNoise: {
               value: 30.0
               at: { nanometers: 345.67 }
@@ -2952,7 +2952,7 @@ class updateObservations extends OdbSuite
           disperser: R1200_JH
           filter: Y
           fpu: LONG_SLIT_2
-          scienceExposureTimeMode: {
+          exposureTimeMode: {
             signalToNoise: {
               value: 30.0
               at: { nanometers: 345.67 }
@@ -4165,7 +4165,7 @@ class updateObservations extends OdbSuite
                   disperser: R1200_HK
                   filter: Y
                   fpu: LONG_SLIT_2
-                  scienceExposureTimeMode: {
+                  exposureTimeMode: {
                     signalToNoise: {
                       value: 30.0
                       at: { nanometers: 345.67 }
@@ -4230,7 +4230,7 @@ class updateObservations extends OdbSuite
                   disperser: R1200_HK
                   filter: Y
                   fpu: LONG_SLIT_2
-                  scienceExposureTimeMode: {
+                  exposureTimeMode: {
                     signalToNoise: {
                       value: 30.0
                       at: { nanometers: 345.67 }
@@ -4320,7 +4320,7 @@ class updateObservations extends OdbSuite
                             disperser: R1200_HK
                             filter: Y
                             fpu: LONG_SLIT_2
-                            scienceExposureTimeMode: {
+                            exposureTimeMode: {
                               signalToNoise: {
                                 value: 30.0
                                 at: { nanometers: 345.67 }

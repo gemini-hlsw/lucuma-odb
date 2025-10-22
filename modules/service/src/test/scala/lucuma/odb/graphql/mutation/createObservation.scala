@@ -1239,13 +1239,7 @@ class createObservation extends OdbSuite {
                 disperser
                 filter
                 fpu
-                acquisitionExposureTimeMode {
-                  signalToNoise {
-                    value
-                    at { nanometers }
-                  }
-                }
-                scienceExposureTimeMode {
+                exposureTimeMode {
                   signalToNoise {
                     value
                     at { nanometers }
@@ -1262,6 +1256,14 @@ class createObservation extends OdbSuite {
                 telluricType {
                   tag
                   starTypes
+                }
+                acquisition {
+                  exposureTimeMode {
+                    signalToNoise {
+                      value
+                      at { nanometers }
+                    }
+                  }
                 }
                 initialDisperser
                 initialFilter
@@ -1282,10 +1284,10 @@ class createObservation extends OdbSuite {
           (longSlit.downIO[Flamingos2Disperser]("disperser"),
            longSlit.downIO[Option[Flamingos2Filter]]("filter"),
            longSlit.downIO[Flamingos2Fpu]("fpu"),
-           longSlit.downIO[Double]("acquisitionExposureTimeMode", "signalToNoise", "value"),
-           longSlit.downIO[Double]("acquisitionExposureTimeMode", "signalToNoise", "at", "nanometers"),
-           longSlit.downIO[Double]("scienceExposureTimeMode", "signalToNoise", "value"),
-           longSlit.downIO[Double]("scienceExposureTimeMode", "signalToNoise", "at", "nanometers"),
+           longSlit.downIO[Double]("acquisition", "exposureTimeMode", "signalToNoise", "value"),
+           longSlit.downIO[Double]("acquisition", "exposureTimeMode", "signalToNoise", "at", "nanometers"),
+           longSlit.downIO[Double]("exposureTimeMode", "signalToNoise", "value"),
+           longSlit.downIO[Double]("exposureTimeMode", "signalToNoise", "at", "nanometers"),
            longSlit.downIO[Option[Flamingos2ReadMode]]("explicitReadMode"),
            longSlit.downIO[Option[Flamingos2Reads]]("explicitReads"),
            longSlit.downIO[Flamingos2Decker]("decker"),

@@ -99,8 +99,8 @@ object Flamingos2LongSlitService:
       )(using Transaction[F]): F[Result[Unit]] =
         exposureTimeModeService.insertForSingleScienceEtm(
           name,
-          input.acquisitionExposureTimeMode,
-          input.scienceExposureTimeMode,
+          input.acquisition.flatMap(_.exposureTimeMode),
+          input.exposureTimeMode,
           req,
           which
         )
@@ -129,8 +129,8 @@ object Flamingos2LongSlitService:
               services.exposureTimeModeService.updateMany(nel, role, e)
 
         for
-          _ <- update(input.acquisitionExposureTimeMode, ExposureTimeModeRole.Acquisition)
-          _ <- update(input.scienceExposureTimeMode, ExposureTimeModeRole.Science)
+          _ <- update(input.acquisition.flatMap(_.exposureTimeMode), ExposureTimeModeRole.Acquisition)
+          _ <- update(input.exposureTimeMode, ExposureTimeModeRole.Science)
         yield ()
 
       override def update(

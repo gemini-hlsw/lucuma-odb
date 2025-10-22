@@ -57,9 +57,9 @@ class Flamingos2LongSlitInputSuite extends DisciplineSuite with ArbitraryInstanc
       disperser = Flamingos2Disperser.R1200JH,
       filter = Flamingos2Filter.JH,
       fpu = Flamingos2Fpu.LongSlit2,
-      acquisitionExposureTimeMode = None,
-      scienceExposureTimeMode = None,
-      explicitOffsets = Some(offsets)
+      exposureTimeMode = None,
+      explicitOffsets = Some(offsets),
+      acquisition = None
     )
 
     assertEquals(create.formattedOffsets, Some("0.000000,5.000000,0.000000,10.000000"))
@@ -74,14 +74,14 @@ class Flamingos2LongSlitInputSuite extends DisciplineSuite with ArbitraryInstanc
       disperser = None,
       filter = None,
       fpu = None,
-      acquisitionExposureTimeMode = None,
-      scienceExposureTimeMode = None,
+      exposureTimeMode = None,
       explicitReadMode = lucuma.odb.data.Nullable.Null,
       explicitReads = lucuma.odb.data.Nullable.Null,
       explicitDecker = lucuma.odb.data.Nullable.Null,
       explicitReadoutMode = lucuma.odb.data.Nullable.Null,
       explicitOffsets = lucuma.odb.data.Nullable.NonNull(offsets),
-      telluricType = Some(TelluricType.Hot)
+      telluricType = Some(TelluricType.Hot),
+      acquisition = None
     )
 
     assertEquals(edit.formattedOffsets, lucuma.odb.data.Nullable.NonNull("0.000000,5.000000,0.000000,10.000000"))

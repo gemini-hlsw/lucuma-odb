@@ -8093,6 +8093,18 @@ input TelluricTypeInput {
 }
 
 """
+Flamingos2 Long Slit acquisition settings.
+"""
+type Flamingos2LongSlitAcquisition {
+
+  """
+  The exposure time mode used for ITC lookup for the acquisition sequence.
+  """
+  exposureTimeMode: ExposureTimeMode!
+
+}
+
+"""
 Flamingos2 Long Slit mode
 """
 type Flamingos2LongSlit {
@@ -8113,14 +8125,9 @@ type Flamingos2LongSlit {
   fpu: Flamingos2Fpu!
 
   """
-  The exposure time mode used for ITC lookup for the acquisition sequence.
-  """
-  acquisitionExposureTimeMode: ExposureTimeMode!
-
-  """
   The exposure time mode used for ITC lookup for the science sequence.
   """
-  scienceExposureTimeMode: ExposureTimeMode!
+  exposureTimeMode: ExposureTimeMode!
 
   """
   Optional explicitly specified F2 ReadMode. If set it overrides the
@@ -8191,6 +8198,11 @@ type Flamingos2LongSlit {
   telluricType: TelluricType!
 
   """
+  Acquisition properties.
+  """
+  acquisition: Flamingos2LongSlitAcquisition!
+
+  """
   The disperser as it was initially selected.  See the `disperser` field for the
   disperser that will be used in the observation.
   """
@@ -8207,6 +8219,20 @@ type Flamingos2LongSlit {
   will be used in the observation.
   """
   initialFpu: Flamingos2Fpu!
+
+}
+
+"""
+Flamingos2 Long Slit acquisition input parameters.  When specified, these override
+default values.
+"""
+input Flamingos2LongSlitAcquisitionInput {
+
+  """
+  Exposure time mode for the acquisition sequence.  If not specified, a default
+  exposure time mode is used.
+  """
+  exposureTimeMode: ExposureTimeModeInput
 
 }
 
@@ -8230,16 +8256,10 @@ input Flamingos2LongSlitInput {
   fpu: Flamingos2Fpu
 
   """
-  Exposure time mode for the acquisition sequence.  If not specified, a default
-  exposure time mode is used.
-  """
-  acquisitionExposureTimeMode: ExposureTimeModeInput
-
-  """
   Exposure time mode for the science sequence.  If not specified, the exposure
   time mode of the observation's science requirements are used.
   """
-  scienceExposureTimeMode: ExposureTimeModeInput
+  exposureTimeMode: ExposureTimeModeInput
 
   """
   The read mode field may be unset by assigning a null value, or ignored by skipping it altogether
@@ -8271,6 +8291,10 @@ input Flamingos2LongSlitInput {
   """
   telluricType: TelluricTypeInput = { tag: HOT }
 
+  """
+  Acquisition properties that, when set, override default values.
+  """
+  acquisition: Flamingos2LongSlitInput
 }
 
 """

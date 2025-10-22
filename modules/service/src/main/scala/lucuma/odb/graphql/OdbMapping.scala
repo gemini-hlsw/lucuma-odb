@@ -402,6 +402,7 @@ object OdbMapping {
                 FastTurnaroundMapping,
                 FilterTypeMetaMapping,
                 Flamingos2DynamicMapping,
+                Flamingos2LongSlitAcquisitionMapping,
                 Flamingos2LongSlitMapping,
                 Flamingos2StaticMapping,
                 GmosNorthImagingMapping,
