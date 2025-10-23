@@ -25,21 +25,26 @@ import org.scalacheck.Arbitrary.arbitrary
 
 trait ArbFlamingos2LongSlitInput:
 
+  given Arbitrary[Flamingos2LongSlitInput.Acquisition] =
+    Arbitrary:
+      arbitrary[Option[ExposureTimeMode]].map: e =>
+        Flamingos2LongSlitInput.Acquisition(e)
+
   given Arbitrary[Flamingos2LongSlitInput.Create] =
     Arbitrary:
       for
         g  <- arbitrary[Flamingos2Disperser]
         f  <- arbitrary[Flamingos2Filter]
         u  <- arbitrary[Flamingos2Fpu]
-        ac <- arbitrary[Option[ExposureTimeMode]]
-        sc <- arbitrary[Option[ExposureTimeMode]]
+        e  <- arbitrary[Option[ExposureTimeMode]]
         r  <- arbitrary[Option[Flamingos2ReadMode]]
         s  <- arbitrary[Option[Flamingos2Reads]]
         d  <- arbitrary[Option[Flamingos2Decker]]
         o  <- arbitrary[Option[Flamingos2ReadoutMode]]
         so <- arbitrary[Option[List[Offset]]]
         tt <- arbitrary[TelluricType]
-      yield Flamingos2LongSlitInput.Create(g, f, u, ac, sc, r, s, d, o, so, tt)
+        a  <- arbitrary[Option[Flamingos2LongSlitInput.Acquisition]]
+      yield Flamingos2LongSlitInput.Create(g, f, u, e, r, s, d, o, so, tt, a)
 
   given Arbitrary[Flamingos2LongSlitInput.Edit] =
     Arbitrary:
@@ -47,14 +52,14 @@ trait ArbFlamingos2LongSlitInput:
         g  <- arbitrary[Option[Flamingos2Disperser]]
         f  <- arbitrary[Option[Flamingos2Filter]]
         u  <- arbitrary[Option[Flamingos2Fpu]]
-        ac <- arbitrary[Option[ExposureTimeMode]]
-        sc <- arbitrary[Option[ExposureTimeMode]]
+        e  <- arbitrary[Option[ExposureTimeMode]]
         r  <- arbitrary[Nullable[Flamingos2ReadMode]]
         s  <- arbitrary[Nullable[Flamingos2Reads]]
         d  <- arbitrary[Nullable[Flamingos2Decker]]
         o  <- arbitrary[Nullable[Flamingos2ReadoutMode]]
         so <- arbitrary[Nullable[List[Offset]]]
         tt <- arbitrary[Option[TelluricType]]
-      yield Flamingos2LongSlitInput.Edit(g, f, u, ac, sc, r, s, d, o, so, tt)
+        a  <- arbitrary[Option[Flamingos2LongSlitInput.Acquisition]]
+      yield Flamingos2LongSlitInput.Edit(g, f, u, e, r, s, d, o, so, tt, a)
 
 object ArbFlamingos2LongSlitInput extends ArbFlamingos2LongSlitInput

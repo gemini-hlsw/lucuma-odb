@@ -863,7 +863,7 @@ class observations extends OdbSuite {
                             disperser: R1200_HK
                             filter: Y
                             fpu: LONG_SLIT_2
-                            scienceExposureTimeMode: {
+                            exposureTimeMode: {
                               signalToNoise: {
                                 value: 10.0
                                 at: { nanometers: 123.45 }

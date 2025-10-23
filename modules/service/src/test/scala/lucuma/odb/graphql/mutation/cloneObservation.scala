@@ -66,18 +66,7 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
           filter
           fpu
           centralWavelength { nanometers }
-          acquisitionExposureTimeMode {
-            signalToNoise {
-              value
-              at { nanometers }
-            }
-            timeAndCount {
-              time { seconds }
-              count
-              at { nanometers }
-            }
-          }
-          scienceExposureTimeMode {
+          exposureTimeMode {
             signalToNoise {
               value
               at { nanometers }
@@ -94,24 +83,26 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
           spatialOffsets { arcseconds }
           explicitSpatialOffsets { arcseconds }
           defaultSpatialOffsets { arcseconds }
+          acquisition {
+            exposureTimeMode {
+              signalToNoise {
+                value
+                at { nanometers }
+              }
+              timeAndCount {
+                time { seconds }
+                count
+                at { nanometers }
+              }
+            }
+          }
         }
         gmosSouthLongSlit {
           grating
           filter
           fpu
           centralWavelength { nanometers }
-          acquisitionExposureTimeMode {
-            signalToNoise {
-              value
-              at { nanometers }
-            }
-            timeAndCount {
-              time { seconds }
-              count
-              at { nanometers }
-            }
-          }
-          scienceExposureTimeMode {
+          exposureTimeMode {
             signalToNoise {
               value
               at { nanometers }
@@ -128,6 +119,19 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
           spatialOffsets { arcseconds }
           explicitSpatialOffsets { arcseconds }
           defaultSpatialOffsets { arcseconds }
+          acquisition {
+            exposureTimeMode {
+              signalToNoise {
+                value
+                at { nanometers }
+              }
+              timeAndCount {
+                time { seconds }
+                count
+                at { nanometers }
+              }
+            }
+          }
         }
         gmosNorthImaging {
           filters
@@ -159,18 +163,7 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
           disperser
           filter
           fpu
-          acquisitionExposureTimeMode {
-            signalToNoise {
-              value
-              at { nanometers }
-            }
-            timeAndCount {
-              time { seconds }
-              count
-              at { nanometers }
-            }
-          }
-          scienceExposureTimeMode {
+          exposureTimeMode {
             signalToNoise {
               value
               at { nanometers }
@@ -184,6 +177,19 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
           telluricType {
             tag
             starTypes
+          }
+          acquisition {
+            exposureTimeMode {
+              signalToNoise {
+                value
+                at { nanometers }
+              }
+              timeAndCount {
+                time { seconds }
+                count
+                at { nanometers }
+              }
+            }
           }
         }
       }
@@ -937,19 +943,21 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
               centralWavelength: {
                 nanometers: 500
               }
-              acquisitionExposureTimeMode: {
-                signalToNoise: {
-                  value: 99.9
-                  at: { nanometers: 123.45 }
-                }
-              }
-              scienceExposureTimeMode: {
+              exposureTimeMode: {
                 signalToNoise: {
                   value: 100.0
                   at: { nanometers: 543.21 }
                 }
               }
               explicitYBin: TWO
+              acquisition: {
+                exposureTimeMode: {
+                  signalToNoise: {
+                    value: 99.9
+                    at: { nanometers: 123.45 }
+                  }
+                }
+              }
             }
           """
         ).flatMap: oid =>

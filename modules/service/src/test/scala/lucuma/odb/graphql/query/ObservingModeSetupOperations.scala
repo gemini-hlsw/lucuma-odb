@@ -84,6 +84,33 @@ trait ObservingModeSetupOperations extends DatabaseOperations { this: OdbSuite =
       """
     )
 
+  def createObservationWithModeQuery(
+    pid:  Program.Id,
+    tids: List[Target.Id],
+    mode: String
+  ): String =
+    s"""
+      mutation {
+        createObservation(input: {
+          programId: ${pid.asJson},
+          SET: {
+            $ConstraintSet,
+            targetEnvironment: {
+              asterism: ${tids.asJson}
+            },
+            $SpectroscopyScienceRequirements,
+            observingMode: {
+              $mode
+            }
+          }
+        }) {
+          observation {
+            id
+          }
+        }
+      }
+    """
+
   def createObservationWithModeAs(
     user:         User,
     pid:          Program.Id,
@@ -92,28 +119,7 @@ trait ObservingModeSetupOperations extends DatabaseOperations { this: OdbSuite =
   ): IO[Observation.Id] =
     query(
       user  = user,
-      query =
-      s"""
-        mutation {
-          createObservation(input: {
-            programId: ${pid.asJson},
-            SET: {
-              $ConstraintSet,
-              targetEnvironment: {
-                asterism: ${tids.asJson}
-              },
-              $SpectroscopyScienceRequirements,
-              observingMode: {
-                $mode
-              }
-            }
-          }) {
-            observation {
-              id
-            }
-          }
-        }
-      """
+      query = createObservationWithModeQuery(pid, tids, mode),
     ).map { json =>
       json.hcursor.downFields("createObservation", "observation", "id").require[Observation.Id]
     }

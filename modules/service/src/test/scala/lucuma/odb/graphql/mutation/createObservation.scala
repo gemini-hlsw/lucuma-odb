@@ -927,20 +927,9 @@ class createObservation extends OdbSuite {
                 centralWavelength: {
                   nanometers: 234.56
                 }
-                ${acqSn.map { sn =>
-                    s"""
-                      acquisitionExposureTimeMode: {
-                        signalToNoise: {
-                          value: $sn
-                          at: { nanometers: 234.56 }
-                        }
-                      }
-                    """
-                  }.getOrElse("")
-                }
                 ${sciSn.map { sn =>
                     s"""
-                      scienceExposureTimeMode: {
+                      exposureTimeMode: {
                         signalToNoise: {
                           value: $sn
                           at: { nanometers: 234.56 }
@@ -950,6 +939,19 @@ class createObservation extends OdbSuite {
                   }.getOrElse("")
                 }
                 explicitYBin: TWO
+                ${acqSn.map { sn =>
+                    s"""
+                      acquisition: {
+                        exposureTimeMode: {
+                          signalToNoise: {
+                            value: $sn
+                            at: { nanometers: 234.56 }
+                          }
+                        }
+                      }
+                    """
+                  }.getOrElse("")
+                }
               }
             }
             targetEnvironment: {
@@ -966,13 +968,7 @@ class createObservation extends OdbSuite {
                 centralWavelength {
                   nanometers
                 }
-                acquisitionExposureTimeMode {
-                  signalToNoise {
-                    value
-                    at { nanometers }
-                  }
-                }
-                scienceExposureTimeMode {
+                exposureTimeMode {
                   signalToNoise {
                     value
                     at { nanometers }
@@ -984,6 +980,14 @@ class createObservation extends OdbSuite {
                 yBin
                 explicitYBin
                 defaultYBin
+                acquisition {
+                  exposureTimeMode {
+                    signalToNoise {
+                      value
+                      at { nanometers }
+                    }
+                  }
+                }
                 initialGrating
                 initialFilter
                 initialFpu
@@ -1007,10 +1011,10 @@ class createObservation extends OdbSuite {
            longSlit.downIO[Option[GmosNorthFilter]]("filter"),
            longSlit.downIO[GmosNorthFpu]("fpu"),
            longSlit.downIO[Double]("centralWavelength", "nanometers"),
-           longSlit.downIO[Double]("acquisitionExposureTimeMode", "signalToNoise", "value"),
-           longSlit.downIO[Double]("acquisitionExposureTimeMode", "signalToNoise", "at", "nanometers"),
-           longSlit.downIO[Double]("scienceExposureTimeMode", "signalToNoise", "value"),
-           longSlit.downIO[Double]("scienceExposureTimeMode", "signalToNoise", "at", "nanometers"),
+           longSlit.downIO[Double]("acquisition", "exposureTimeMode", "signalToNoise", "value"),
+           longSlit.downIO[Double]("acquisition", "exposureTimeMode", "signalToNoise", "at", "nanometers"),
+           longSlit.downIO[Double]("exposureTimeMode", "signalToNoise", "value"),
+           longSlit.downIO[Double]("exposureTimeMode", "signalToNoise", "at", "nanometers"),
            longSlit.downIO[GmosXBinning]("xBin"),
            longSlit.downIO[Option[GmosXBinning]]("explicitXBin"),
            longSlit.downIO[GmosXBinning]("defaultXBin"),
@@ -1059,8 +1063,8 @@ class createObservation extends OdbSuite {
         val longSlit = js.hcursor.downPath("createObservation", "observation", "observingMode", "gmosNorthLongSlit")
         assertIO(
           (
-           longSlit.downIO[Int]("acquisitionExposureTimeMode", "signalToNoise", "value"),
-           longSlit.downIO[Int]("scienceExposureTimeMode", "signalToNoise", "value")
+           longSlit.downIO[Int]("acquisition", "exposureTimeMode", "signalToNoise", "value"),
+           longSlit.downIO[Int]("exposureTimeMode", "signalToNoise", "value")
           ).tupled,
           (
            10,
@@ -1074,8 +1078,8 @@ class createObservation extends OdbSuite {
         val longSlit = js.hcursor.downPath("createObservation", "observation", "observingMode", "gmosNorthLongSlit")
         assertIO(
           (
-           longSlit.downIO[Int]("acquisitionExposureTimeMode", "signalToNoise", "value"),
-           longSlit.downIO[Int]("scienceExposureTimeMode", "signalToNoise", "value")
+           longSlit.downIO[Int]("acquisition", "exposureTimeMode", "signalToNoise", "value"),
+           longSlit.downIO[Int]("exposureTimeMode", "signalToNoise", "value")
           ).tupled,
           (
             5,
@@ -1154,10 +1158,10 @@ class createObservation extends OdbSuite {
            longSlit.downIO[Option[GmosSouthFilter]]("filter"),
            longSlit.downIO[GmosSouthFpu]("fpu"),
            longSlit.downIO[Double]("centralWavelength", "nanometers"),
-           longSlit.downIO[Double]("acquisitionExposureTimeMode", "signalToNoise", "value"),
-           longSlit.downIO[Double]("acquisitionExposureTimeMode", "signalToNoise", "at", "nanometers"),
-           longSlit.downIO[Double]("scienceExposureTimeMode", "signalToNoise", "value"),
-           longSlit.downIO[Double]("scienceExposureTimeMode", "signalToNoise", "at", "nanometers"),
+           longSlit.downIO[Double]("acquisition", "exposureTimeMode", "signalToNoise", "value"),
+           longSlit.downIO[Double]("acquisition", "exposureTimeMode", "signalToNoise", "at", "nanometers"),
+           longSlit.downIO[Double]("exposureTimeMode", "signalToNoise", "value"),
+           longSlit.downIO[Double]("exposureTimeMode", "signalToNoise", "at", "nanometers"),
            longSlit.downIO[GmosXBinning]("xBin"),
            longSlit.downIO[Option[GmosXBinning]]("explicitXBin"),
            longSlit.downIO[GmosXBinning]("defaultXBin"),
@@ -1235,13 +1239,7 @@ class createObservation extends OdbSuite {
                 disperser
                 filter
                 fpu
-                acquisitionExposureTimeMode {
-                  signalToNoise {
-                    value
-                    at { nanometers }
-                  }
-                }
-                scienceExposureTimeMode {
+                exposureTimeMode {
                   signalToNoise {
                     value
                     at { nanometers }
@@ -1258,6 +1256,14 @@ class createObservation extends OdbSuite {
                 telluricType {
                   tag
                   starTypes
+                }
+                acquisition {
+                  exposureTimeMode {
+                    signalToNoise {
+                      value
+                      at { nanometers }
+                    }
+                  }
                 }
                 initialDisperser
                 initialFilter
@@ -1278,10 +1284,10 @@ class createObservation extends OdbSuite {
           (longSlit.downIO[Flamingos2Disperser]("disperser"),
            longSlit.downIO[Option[Flamingos2Filter]]("filter"),
            longSlit.downIO[Flamingos2Fpu]("fpu"),
-           longSlit.downIO[Double]("acquisitionExposureTimeMode", "signalToNoise", "value"),
-           longSlit.downIO[Double]("acquisitionExposureTimeMode", "signalToNoise", "at", "nanometers"),
-           longSlit.downIO[Double]("scienceExposureTimeMode", "signalToNoise", "value"),
-           longSlit.downIO[Double]("scienceExposureTimeMode", "signalToNoise", "at", "nanometers"),
+           longSlit.downIO[Double]("acquisition", "exposureTimeMode", "signalToNoise", "value"),
+           longSlit.downIO[Double]("acquisition", "exposureTimeMode", "signalToNoise", "at", "nanometers"),
+           longSlit.downIO[Double]("exposureTimeMode", "signalToNoise", "value"),
+           longSlit.downIO[Double]("exposureTimeMode", "signalToNoise", "at", "nanometers"),
            longSlit.downIO[Option[Flamingos2ReadMode]]("explicitReadMode"),
            longSlit.downIO[Option[Flamingos2Reads]]("explicitReads"),
            longSlit.downIO[Flamingos2Decker]("decker"),
@@ -1672,7 +1678,7 @@ class createObservation extends OdbSuite {
                 centralWavelength: {
                   nanometers: 234.56
                 }
-                scienceExposureTimeMode: {
+                exposureTimeMode: {
                   signalToNoise: {
                     value: 20.0
                     at: { nanometers: 234.56 }
