@@ -88,7 +88,8 @@ sealed trait ObservationService[F[_]] {
   )(using Transaction[F]): F[Result[Program.Id]]
 
   def createObservation(
-    input: AccessControl.CheckedWithId[ObservationPropertiesInput.Create, Program.Id]
+    input: AccessControl.CheckedWithId[ObservationPropertiesInput.Create, Program.Id],
+    calibrationRole: Option[CalibrationRole] = None
   )(using Transaction[F]): F[Result[Observation.Id]]
 
   def updateObservations(
@@ -230,7 +231,8 @@ object ObservationService {
       /** Create the observation itself, with no asterism. */
       private def createObservationImpl(
         programId: Program.Id,
-        SET:       ObservationPropertiesInput.Create
+        SET:       ObservationPropertiesInput.Create,
+        calibrationRole: Option[CalibrationRole]
       )(using Transaction[F], SuperUserAccess): F[Result[Observation.Id]] =
         Trace[F].span("createObservation") {
           session.execute(sql"set constraints all deferred".command) >>
@@ -238,7 +240,7 @@ object ObservationService {
             val oEtm = SET.scienceRequirements.flatMap(_.exposureTimeMode.toOption)
 
             Statements
-              .insertObservation(programId, SET, ix)
+              .insertObservation(programId, SET, ix, calibrationRole)
 
               .flatTraverse: af =>
                 session.prepareR(af.fragment.query(observation_id)).use: pq =>
@@ -305,12 +307,13 @@ object ObservationService {
       }
 
       override def createObservation(
-        input: AccessControl.CheckedWithId[ObservationPropertiesInput.Create, Program.Id]
+        input: AccessControl.CheckedWithId[ObservationPropertiesInput.Create, Program.Id],
+        calibrationRole: Option[CalibrationRole] = None
       )(using Transaction[F]): F[Result[Observation.Id]] =
         input.foldWithId(
           OdbError.InvalidArgument().asFailureF // typically handled by caller
         ): (SET, pid) =>
-          ResultT(Services.asSuperUser(createObservationImpl(pid, SET)))
+          ResultT(Services.asSuperUser(createObservationImpl(pid, SET, calibrationRole)))
             .flatMap: oid =>
               SET
                 .asterism
@@ -606,6 +609,7 @@ object ObservationService {
       programId: Program.Id,
       SET:       ObservationPropertiesInput.Create,
       groupIndex: NonNegShort,
+      calibrationRole: Option[CalibrationRole]
     ): Result[AppliedFragment] =
       SET.constraintSet.traverse(_.create).map { cs =>
         insertObservation(
@@ -623,7 +627,8 @@ object ObservationService {
           SET.observingMode.flatMap(_.observingModeType),
           SET.observingMode.flatMap(_.observingModeType).map(_.instrument),
           SET.observerNotes,
-          SET.targetEnvironment.flatMap(_.useBlindOffset).getOrElse(false)
+          SET.targetEnvironment.flatMap(_.useBlindOffset).getOrElse(false),
+          calibrationRole
         )
       }
 
@@ -643,6 +648,7 @@ object ObservationService {
       instrument:          Option[Instrument],
       observerNotes:       Option[NonEmptyString],
       useBlindOffset:      Boolean,
+      calibrationRole:     Option[CalibrationRole]
     ): AppliedFragment = {
 
       val insert: AppliedFragment = {
@@ -653,38 +659,39 @@ object ObservationService {
           scienceRequirements.flatMap(_.imaging)
 
         InsertObservation.apply(
-          programId                                                                                                                ,
-           groupId                                                                                                                 ,
-           groupIndex                                                                                                              ,
-           subtitle                                                                                                                ,
-           existence                                                                                                               ,
-           scienceBand                                                                                                             ,
-           posAngleConsMode                                                                                                        ,
-           posAngle                                                                                                                ,
-           explicitBase.map(_.ra)                                                                                                  ,
-           explicitBase.map(_.dec)                                                                                                 ,
-           constraintSet.cloudExtinction                                                                                           ,
-           constraintSet.imageQuality                                                                                              ,
-           constraintSet.skyBackground                                                                                             ,
-           constraintSet.waterVapor                                                                                                ,
-           ElevationRange.airMass.getOption(constraintSet.elevationRange).map(am => PosBigDecimal.unsafeFrom(am.min.toBigDecimal)) , // TODO: fix in core
-           ElevationRange.airMass.getOption(constraintSet.elevationRange).map(am => PosBigDecimal.unsafeFrom(am.max.toBigDecimal)) ,
-           ElevationRange.hourAngle.getOption(constraintSet.elevationRange).map(_.minHours.toBigDecimal)                           ,
-           ElevationRange.hourAngle.getOption(constraintSet.elevationRange).map(_.maxHours.toBigDecimal)                           ,
-           spectroscopy.flatMap(_.wavelength.toOption)                                                                             ,
-           spectroscopy.flatMap(_.resolution.toOption)                                                                             ,
-           spectroscopy.flatMap(_.wavelengthCoverage.toOption)                                                                     ,
-           spectroscopy.flatMap(_.focalPlane.toOption)                                                                             ,
-           spectroscopy.flatMap(_.focalPlaneAngle.toOption)                                                                        ,
-           spectroscopy.flatMap(_.capability.toOption)                                                                             ,
-           imaging.flatMap(_.minimumFov.toOption)                                                                                  ,
-           imaging.flatMap(_.narrowFilters.toOption)                                                                               ,
-           imaging.flatMap(_.broadFilters.toOption)                                                                                ,
-           imaging.flatMap(_.combinedFilters.toOption)                                                                             ,
-           modeType                                                                                                                ,
-           instrument                                                                                                              ,
-           observerNotes                                                                                                           ,
-           useBlindOffset                                                                                                          ,
+          programId                                                                                                               ,
+           groupId                                                                                                                ,
+           groupIndex                                                                                                             ,
+           subtitle                                                                                                               ,
+           existence                                                                                                              ,
+           scienceBand                                                                                                            ,
+           posAngleConsMode                                                                                                       ,
+           posAngle                                                                                                               ,
+           explicitBase.map(_.ra)                                                                                                 ,
+           explicitBase.map(_.dec)                                                                                                ,
+           constraintSet.cloudExtinction                                                                                          ,
+           constraintSet.imageQuality                                                                                             ,
+           constraintSet.skyBackground                                                                                            ,
+           constraintSet.waterVapor                                                                                               ,
+           ElevationRange.airMass.getOption(constraintSet.elevationRange).map(am => PosBigDecimal.unsafeFrom(am.min.toBigDecimal)), // TODO: fix in core
+           ElevationRange.airMass.getOption(constraintSet.elevationRange).map(am => PosBigDecimal.unsafeFrom(am.max.toBigDecimal)),
+           ElevationRange.hourAngle.getOption(constraintSet.elevationRange).map(_.minHours.toBigDecimal)                          ,
+           ElevationRange.hourAngle.getOption(constraintSet.elevationRange).map(_.maxHours.toBigDecimal)                          ,
+           spectroscopy.flatMap(_.wavelength.toOption)                                                                            ,
+           spectroscopy.flatMap(_.resolution.toOption)                                                                            ,
+           spectroscopy.flatMap(_.wavelengthCoverage.toOption)                                                                    ,
+           spectroscopy.flatMap(_.focalPlane.toOption)                                                                            ,
+           spectroscopy.flatMap(_.focalPlaneAngle.toOption)                                                                       ,
+           spectroscopy.flatMap(_.capability.toOption)                                                                            ,
+           imaging.flatMap(_.minimumFov.toOption)                                                                                 ,
+           imaging.flatMap(_.narrowFilters.toOption)                                                                              ,
+           imaging.flatMap(_.broadFilters.toOption)                                                                               ,
+           imaging.flatMap(_.combinedFilters.toOption)                                                                            ,
+           modeType                                                                                                               ,
+           instrument                                                                                                             ,
+           observerNotes                                                                                                          ,
+           useBlindOffset                                                                                                         ,
+           calibrationRole                                                                                                        ,
         )
       }
 
@@ -729,6 +736,7 @@ object ObservationService {
       Option[Instrument]               ,
       Option[NonEmptyString]           ,
       Boolean                          ,
+      Option[CalibrationRole]          ,
     )] =
       sql"""
         INSERT INTO t_observation (
@@ -763,7 +771,8 @@ object ObservationService {
           c_observing_mode_type,
           c_instrument,
           c_observer_notes,
-          c_use_blind_offset
+          c_use_blind_offset,
+          c_calibration_role
         )
         SELECT
           $program_id,
@@ -797,7 +806,8 @@ object ObservationService {
           ${observing_mode_type.opt},
           ${instrument.opt},
           ${text_nonempty.opt},
-          $bool
+          $bool,
+          ${calibration_role.opt}
       """
 
     def selectObservingModes(
@@ -1168,6 +1178,7 @@ object ObservationService {
         FROM t_observation
         WHERE c_program_id = $program_id AND c_existence = 'present'
       """.query(observation_id *: science_band.opt)
+
   }
 
 }

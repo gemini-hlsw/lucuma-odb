@@ -29,10 +29,9 @@ import lucuma.odb.graphql.mapping.AccessControl
 import lucuma.odb.sequence.ObservingMode
 import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.service.CalibrationConfigSubset.toConfigSubset
-import lucuma.odb.service.Services.ServiceAccess
+import lucuma.odb.service.Services.SuperUserAccess
 import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.util.Codecs.*
-import natchez.Trace
 import org.http4s.client.Client
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.syntax.*
@@ -58,7 +57,7 @@ trait CalibrationsService[F[_]] {
   def recalculateCalibrations(
     pid: Program.Id,
     referenceInstant: Instant
-  )(using Transaction[F], ServiceAccess): F[(List[Observation.Id], List[Observation.Id])]
+  )(using Transaction[F], SuperUserAccess): F[(List[Observation.Id], List[Observation.Id])]
 
   /**
     * Returns the calibration targets for a given role adjusted to a reference instant
@@ -68,7 +67,7 @@ trait CalibrationsService[F[_]] {
   def recalculateCalibrationTarget(
     pid: Program.Id,
     oid: Observation.Id,
-  )(using Transaction[F], ServiceAccess): F[Unit]
+  )(using Transaction[F], SuperUserAccess): F[Unit]
 }
 
 object CalibrationsService extends CalibrationObservations {
@@ -94,7 +93,7 @@ object CalibrationsService extends CalibrationObservations {
       case (tid, name, role, Some(st)) => (tid, name, role, st)
     }
 
-  def instantiate[F[_]: {Concurrent, Services, Logger, Trace}](emailConfig: Config.Email, httpClient: Client[F]): CalibrationsService[F] =
+  def instantiate[F[_]: {Concurrent, Services, Logger}](emailConfig: Config.Email, httpClient: Client[F]): CalibrationsService[F] =
     new CalibrationsService[F] {
 
       private def collectValid(
@@ -135,7 +134,7 @@ object CalibrationsService extends CalibrationObservations {
           session.execute(Statements.selectCalibrationTargets(roles))(roles)
             .map(targetCoordinates(referenceInstant))
 
-      def recalculateCalibrations(pid: Program.Id, referenceInstant: Instant)(using Transaction[F], ServiceAccess): F[(List[Observation.Id], List[Observation.Id])] =
+      def recalculateCalibrations(pid: Program.Id, referenceInstant: Instant)(using Transaction[F], SuperUserAccess): F[(List[Observation.Id], List[Observation.Id])] =
         val sharedService = PerProgramPerConfigCalibrationsService.instantiate(emailConfig, httpClient)
         val perObsService = PerScienceObservationCalibrationsService.instantiate(emailConfig, httpClient)
 
@@ -160,25 +159,24 @@ object CalibrationsService extends CalibrationObservations {
           _                <- (debug"Program $pid has ${f2ScienceObs.length} F2 science observations: ${f2ScienceObs.map(_.id)}").whenA(f2ScienceObs.nonEmpty)
           _                <- (debug"Program $pid has ${gmosScienceObs.length} GMOS science observations: ${gmosScienceObs.map(_.id)}").whenA(gmosScienceObs.nonEmpty)
           // Handle per-science-observation calibs
-          _                <- perObsService.generateCalibrations(pid, f2ScienceObs)
+          (f2Added, f2Removed)     <- perObsService.generateCalibrations(pid, f2ScienceObs)
           // Handle per--config calib
-          (added, removed) <- sharedService.generateCalibrations(pid, gmosScienceObs, allCalibs, calibTargets, referenceInstant)
+          (gmosAdded, gmosRemoved) <- sharedService.generateCalibrations(pid, gmosScienceObs, allCalibs, calibTargets, referenceInstant)
           // Clean orphaned targets
-          _                <- targetService.deleteOrphanCalibrationTargets(pid)
-        } yield (added, removed)
+          _                        <- targetService.deleteOrphanCalibrationTargets(pid)
+        } yield (f2Added ++ gmosAdded, f2Removed ++ gmosRemoved)
 
       // Recalcula the target of a calibration observation
       def recalculateCalibrationTarget(
         pid: Program.Id,
         oid: Observation.Id,
-      )(using Transaction[F], ServiceAccess): F[Unit] = {
+      )(using Transaction[F], SuperUserAccess): F[Unit] = {
         for {
           _    <- info"Recalculating calibration targets for $pid, oid $oid"
           o    <- session.execute(Statements.selectCalibrationTimeAndConf)(oid).map(_.headOption)
           // Find the original target
           otgs <- o.map(_._1).map { oid =>
-                    Services.asSuperUser:
-                      asterismService.getAsterism(pid, oid).map(_.map(_._1))
+                    asterismService.getAsterism(pid, oid).map(_.map(_._1))
                   }.getOrElse(List.empty.pure[F])
           // Select a new target
           tgts <- o match {
@@ -199,15 +197,14 @@ object CalibrationsService extends CalibrationObservations {
                       ct <- Nested(targetService.cloneTargetInto(tgtid, pid)).map(_._2).value
                       _  <- ct.traverse(ct => asterismService
                               .updateAsterism(
-                                Services.asSuperUser:
-                                  AccessControl.unchecked(
-                                    EditAsterismsPatchInput(
-                                      Some(List(ct)),
-                                      NonEmptyList.fromList(otgs).map(_.toList)
-                                    ),
-                                    List(oid),
-                                    observation_id
-                                  )
+                                AccessControl.unchecked(
+                                  EditAsterismsPatchInput(
+                                    Some(List(ct)),
+                                    NonEmptyList.fromList(otgs).map(_.toList)
+                                  ),
+                                  List(oid),
+                                  observation_id
+                                )
                               )
                             )
                     } yield ()
