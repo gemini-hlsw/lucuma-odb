@@ -37,12 +37,27 @@ object ArbGmosLongSlitConfig:
   import ArbWavelength.given
   import ArbWavelengthDither.given
 
+  given given_Arbitrary_AcquisitionConfig_GmosNorth: Arbitrary[AcquisitionConfig.GmosNorth] =
+    Arbitrary:
+      for
+        e   <- arbitrary[ExposureTimeMode]
+        daf <- arbitrary[GmosNorthFilter]
+        eaf <- arbitrary[Option[GmosNorthFilter]]
+      yield AcquisitionConfig.GmosNorth(e, daf, eaf)
+
+  given given_Arbitrary_AcquisitionConfig_GmosSouth: Arbitrary[AcquisitionConfig.GmosSouth] =
+    Arbitrary:
+      for
+        e   <- arbitrary[ExposureTimeMode]
+        daf <- arbitrary[GmosSouthFilter]
+        eaf <- arbitrary[Option[GmosSouthFilter]]
+      yield AcquisitionConfig.GmosSouth(e, daf, eaf)
+
   given Arbitrary[Config.Common] =
     Arbitrary:
       for
         w  <- arbitrary[Wavelength]
-        ac <- arbitrary[ExposureTimeMode]
-        sc <- arbitrary[ExposureTimeMode]
+        e  <- arbitrary[ExposureTimeMode]
         dx <- arbitrary[GmosXBinning]
         x  <- arbitrary[Option[GmosXBinning]]
         dy <- arbitrary[GmosYBinning]
@@ -54,8 +69,7 @@ object ArbGmosLongSlitConfig:
         s  <- arbitrary[Option[List[Q]]]
       yield Config.Common(
         w,
-        ac,
-        sc,
+        e,
         dx,
         x,
         dy,
@@ -74,7 +88,8 @@ object ArbGmosLongSlitConfig:
         f <- arbitrary[Option[GmosNorthFilter]]
         u <- arbitrary[GmosNorthFpu]
         c <- arbitrary[Config.Common]
-      yield Config.GmosNorth(g, f, u, c)
+        a <- arbitrary[AcquisitionConfig.GmosNorth]
+      yield Config.GmosNorth(g, f, u, c, a)
 
   given Arbitrary[Config.GmosSouth] =
     Arbitrary:
@@ -83,4 +98,5 @@ object ArbGmosLongSlitConfig:
         f <- arbitrary[Option[GmosSouthFilter]]
         u <- arbitrary[GmosSouthFpu]
         c <- arbitrary[Config.Common]
-      yield Config.GmosSouth(g, f, u, c)
+        a <- arbitrary[AcquisitionConfig.GmosSouth]
+      yield Config.GmosSouth(g, f, u, c, a)

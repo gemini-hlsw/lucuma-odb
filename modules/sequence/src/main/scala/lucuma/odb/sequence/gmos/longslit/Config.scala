@@ -55,11 +55,7 @@ sealed trait Config[G: Enumerated, L: Enumerated, U: Enumerated] extends Product
 
   def centralWavelength: Wavelength
 
-
-  def acquisitionExposureTimeMode: ExposureTimeMode
-
-  def scienceExposureTimeMode: ExposureTimeMode
-
+  def exposureTimeMode: ExposureTimeMode
 
   def xBin: GmosXBinning =
     explicitXBin.getOrElse(defaultXBin)
@@ -129,6 +125,8 @@ sealed trait Config[G: Enumerated, L: Enumerated, U: Enumerated] extends Product
       ampReadMode
     )
 
+  def acquisition: AcquisitionConfig[L]
+
   def hashBytes: Array[Byte] =
     val bao: ByteArrayOutputStream = new ByteArrayOutputStream(256)
     val out: DataOutputStream      = new DataOutputStream(bao)
@@ -137,8 +135,7 @@ sealed trait Config[G: Enumerated, L: Enumerated, U: Enumerated] extends Product
     filter.foreach(f => out.writeChars(Enumerated[L].tag(f)))
     out.writeChars(Enumerated[U].tag(fpu))
     out.writeInt(centralWavelength.toPicometers.value.value)
-    out.write(acquisitionExposureTimeMode.hashBytes)
-    out.write(scienceExposureTimeMode.hashBytes)
+    out.write(exposureTimeMode.hashBytes)
     out.writeChars(xBin.tag)
     out.writeChars(yBin.tag)
     out.writeChars(ampGain.tag)
@@ -148,6 +145,7 @@ sealed trait Config[G: Enumerated, L: Enumerated, U: Enumerated] extends Product
       out.writeInt(d.toPicometers.value)
     spatialOffsets.foreach: o =>
       out.writeLong(o.toAngle.toMicroarcseconds)
+    out.write(acquisition.hashBytes)
 
     out.close()
     bao.toByteArray
@@ -156,8 +154,7 @@ object Config:
 
   final case class Common(
     centralWavelength:           Wavelength,
-    acquisitionExposureTimeMode: ExposureTimeMode,
-    scienceExposureTimeMode:     ExposureTimeMode,
+    exposureTimeMode:            ExposureTimeMode,
     defaultXBin:                 GmosXBinning,
     explicitXBin:                Option[GmosXBinning],
     defaultYBin:                 GmosYBinning,
@@ -175,8 +172,7 @@ object Config:
       Eq.by: a =>
         (
           a.centralWavelength,
-          a.acquisitionExposureTimeMode,
-          a.scienceExposureTimeMode,
+          a.exposureTimeMode,
           a.defaultXBin,
           a.explicitXBin,
           a.defaultYBin,
@@ -189,10 +185,11 @@ object Config:
         )
 
   final case class GmosNorth(
-    grating: GmosNorthGrating,
-    filter:  Option[GmosNorthFilter],
-    fpu:     GmosNorthFpu,
-    common:  Common
+    grating:     GmosNorthGrating,
+    filter:      Option[GmosNorthFilter],
+    fpu:         GmosNorthFpu,
+    common:      Common,
+    acquisition: AcquisitionConfig.GmosNorth
   ) extends Config[GmosNorthGrating, GmosNorthFilter, GmosNorthFpu]:
 
     override def coverage: WavelengthDelta =
@@ -201,11 +198,8 @@ object Config:
     override def centralWavelength: Wavelength =
       common.centralWavelength
 
-    override def acquisitionExposureTimeMode: ExposureTimeMode =
-      common.acquisitionExposureTimeMode
-
-    override def scienceExposureTimeMode: ExposureTimeMode =
-      common.scienceExposureTimeMode
+    override def exposureTimeMode: ExposureTimeMode =
+      common.exposureTimeMode
 
     override def defaultXBin: GmosXBinning =
       common.defaultXBin
@@ -245,14 +239,16 @@ object Config:
           a.grating,
           a.filter,
           a.fpu,
-          a.common
+          a.common,
+          a.acquisition
         )
 
   final case class GmosSouth(
-    grating: GmosSouthGrating,
-    filter:  Option[GmosSouthFilter],
-    fpu:     GmosSouthFpu,
-    common:  Common
+    grating:     GmosSouthGrating,
+    filter:      Option[GmosSouthFilter],
+    fpu:         GmosSouthFpu,
+    common:      Common,
+    acquisition: AcquisitionConfig.GmosSouth
   ) extends Config[GmosSouthGrating, GmosSouthFilter, GmosSouthFpu]:
 
     override def coverage: WavelengthDelta =
@@ -261,11 +257,8 @@ object Config:
     override def centralWavelength: Wavelength =
       common.centralWavelength
 
-    override def acquisitionExposureTimeMode: ExposureTimeMode =
-      common.acquisitionExposureTimeMode
-
-    override def scienceExposureTimeMode: ExposureTimeMode =
-      common.scienceExposureTimeMode
+    override def exposureTimeMode: ExposureTimeMode =
+      common.exposureTimeMode
 
     override def defaultXBin: GmosXBinning =
       common.defaultXBin
@@ -305,7 +298,8 @@ object Config:
           a.grating,
           a.filter,
           a.fpu,
-          a.common
+          a.common,
+          a.acquisition
         )
 
   def explicitWavelengthDithers[G, L, U]: Lens[Config[G, L, U], Option[List[WavelengthDither]]] =

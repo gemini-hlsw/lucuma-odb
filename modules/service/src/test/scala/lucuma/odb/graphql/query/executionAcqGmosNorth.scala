@@ -470,14 +470,16 @@ class executionAcqGmosNorth extends ExecutionTestSupportForGmos:
                  centralWavelength: {
                    nanometers: 500
                  }
-                 acquisitionExposureTimeMode: {
-                   timeAndCount: {
-                     time: { seconds: 16 }
-                     count: 1
-                     at: { nanometers: 500 }
+                 explicitYBin: TWO
+                 acquisition: {
+                   exposureTimeMode: {
+                     timeAndCount: {
+                       time: { seconds: 16 }
+                       count: 1
+                       at: { nanometers: 500 }
+                     }
                    }
                  }
-                 explicitYBin: TWO
               }
              """)
       yield o
@@ -522,6 +524,137 @@ class executionAcqGmosNorth extends ExecutionTestSupportForGmos:
                       {
                         "instrumentConfig": {
                           "exposure": { "seconds": 48.000000 }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        """.asRight
+      )
+
+  test("invalid GMOS North acquisition filter"):
+    for
+      p <- createProgram
+      t <- createTargetWithProfileAs(pi, p)
+      _ <- expect(
+             user  = pi,
+             query = createObservationWithModeQuery(p, List(t), s"""
+               gmosNorthLongSlit: {
+                 grating: R831_G5302
+                 filter: R_PRIME
+                 fpu: LONG_SLIT_0_50
+                 centralWavelength: {
+                   nanometers: 500
+                 }
+                 explicitYBin: TWO
+                 acquisition: {
+                   explicitFilter: GG455
+                 }
+               }
+             """),
+             expected = List(
+               "Argument 'input.SET.observingMode.gmosNorthLongSlit.acquisition' is invalid: 'explicitFilter' must contain one of: G_PRIME, R_PRIME, I_PRIME, Z_PRIME"
+             ).asLeft
+           )
+    yield ()
+
+  test("override acquisition filter"):
+    val setup: IO[Observation.Id] =
+      for
+        p <- createProgram
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createObservationWithModeAs(pi, p, List(t), s"""
+               gmosNorthLongSlit: {
+                 grating: R831_G5302
+                 filter: R_PRIME
+                 fpu: LONG_SLIT_0_50
+                 centralWavelength: {
+                   nanometers: 500
+                 }
+                 explicitYBin: TWO
+                 acquisition: {
+                   explicitFilter: Z_PRIME
+                 }
+              }
+             """)
+        _ <- expect(
+          user  = pi,
+          query = s"""
+            query {
+              observation(observationId: "$o") {
+                observingMode {
+                  gmosNorthLongSlit {
+                    acquisition {
+                      filter
+                      defaultFilter
+                      explicitFilter
+                    }
+                  }
+                }
+              }
+            }
+          """,
+          expected = json"""
+            {
+              "observation": {
+                "observingMode": {
+                  "gmosNorthLongSlit": {
+                    "acquisition": {
+                      "filter": "Z_PRIME",
+                      "defaultFilter": "G_PRIME",
+                      "explicitFilter": "Z_PRIME"
+                    }
+                  }
+                }
+              }
+            }
+          """.asRight
+        )
+      yield o
+
+    setup.flatMap: oid =>
+      expect(
+        user     = pi,
+        query    = s"""
+          query {
+            executionConfig(observationId: "$oid") {
+              gmosNorth {
+                acquisition {
+                  nextAtom {
+                    steps {
+                      instrumentConfig {
+                        filter
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        """,
+        expected = json"""
+          {
+            "executionConfig": {
+              "gmosNorth": {
+                "acquisition": {
+                  "nextAtom": {
+                    "steps": [
+                      {
+                        "instrumentConfig": {
+                          "filter": "Z_PRIME"
+                        }
+                      },
+                      {
+                        "instrumentConfig": {
+                          "filter": "Z_PRIME"
+                        }
+                      },
+                      {
+                        "instrumentConfig": {
+                          "filter": "Z_PRIME"
                         }
                       }
                     ]

@@ -80,16 +80,11 @@ object Acquisition:
 
   private sealed trait StepComputer[D, G, L, U] extends GmosSequenceState[D, G, L, U]:
 
-    def wavelength(filter: L): Wavelength
-
     def compute(
-      acqFilters:   NonEmptyList[L],
+      acqConfig:    AcquisitionConfig[L],
       fpu:          U,
-      exposureTime: TimeSpan,
-      λ:            Wavelength
+      exposureTime: TimeSpan
     ): Acquisition.Steps[D] =
-
-      val filter: L = Acquisition.filter(acqFilters, λ, wavelength)
 
       // Last step, max 360s
       // https://app.shortcut.com/lucuma/story/1999/determine-exposure-time-for-acquisition-images#activity-2516
@@ -100,7 +95,7 @@ object Acquisition:
       eval:
         for
           _  <- optics.exposure      := exposureTime
-          _  <- optics.filter        := filter.some
+          _  <- optics.filter        := acqConfig.filter.some
           _  <- optics.fpu           := none[GmosFpuMask[U]]
           _  <- optics.grating       := none[(G, GmosGratingOrder, Wavelength)]
           _  <- optics.xBin          := GmosXBinning.Two
@@ -125,20 +120,10 @@ object Acquisition:
   private object StepComputer:
 
     object North extends GmosNorthSequenceState
-                    with StepComputer[GmosNorth, GmosNorthGrating, GmosNorthFilter, GmosNorthFpu]:
-
-      override def wavelength(f: GmosNorthFilter): Wavelength =
-        f.wavelength
-
-    end North
+                    with StepComputer[GmosNorth, GmosNorthGrating, GmosNorthFilter, GmosNorthFpu]
 
     object South extends GmosSouthSequenceState
-                    with StepComputer[GmosSouth, GmosSouthGrating, GmosSouthFilter, GmosSouthFpu]:
-
-      override def wavelength(f: GmosSouthFilter): Wavelength =
-        f.wavelength
-
-    end South
+                    with StepComputer[GmosSouth, GmosSouthGrating, GmosSouthFilter, GmosSouthFpu]
 
   end StepComputer
 
@@ -264,9 +249,7 @@ object Acquisition:
     time:        Either[OdbError, IntegrationTime],
     calRole:     Option[CalibrationRole],
     atomBuilder: AtomBuilder[D],
-    acqFilters:  NonEmptyList[L],
-    fpu:         U,
-    λ:           Wavelength,
+    config:      Config[G, L, U],
     lastReset:   Option[Timestamp]
   ): Either[OdbError, SequenceGenerator[D]] =
     calRole match
@@ -277,7 +260,12 @@ object Acquisition:
         time
           .filterOrElse(_.exposureTime.toNonNegMicroseconds.value > 0, OdbError.SequenceUnavailable(oid, s"Could not generate a sequence for $oid: GMOS Long Slit acquisition requires a positive exposure time.".some))
           .map: t =>
-             AcquisitionState.Init(lastReset, IndexTracker.Zero, atomBuilder, stepComp.compute(acqFilters, fpu, t.exposureTime, λ))
+             AcquisitionState.Init(
+               lastReset,
+               IndexTracker.Zero,
+               atomBuilder,
+               stepComp.compute(config.acquisition, config.fpu, t.exposureTime)
+             )
 
   def gmosNorth(
     observationId: Observation.Id,
@@ -295,9 +283,7 @@ object Acquisition:
       time,
       calRole,
       AtomBuilder.instantiate(estimator, static, namespace, SequenceType.Acquisition),
-      GmosNorthFilter.acquisition,
-      config.fpu,
-      config.centralWavelength,
+      config,
       lastReset
     )
 
@@ -317,9 +303,7 @@ object Acquisition:
       time,
       calRole,
       AtomBuilder.instantiate(estimator, static, namespace, SequenceType.Acquisition),
-      GmosSouthFilter.acquisition,
-      config.fpu,
-      config.centralWavelength,
+      config,
       lastReset
     )
 

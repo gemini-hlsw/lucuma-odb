@@ -35,6 +35,12 @@ trait Flamingos2LongSlitMapping[F[_]]
   private val defaultOffsetsJson: Json =
     Config.DefaultSpatialOffsets.map(_.asJson).asJson
 
+  lazy val Flamingos2LongSlitAcquisitionMapping: ObjectMapping =
+    ObjectMapping(Flamingos2LongSlitAcquisitionType)(
+      SqlField("observationId", Flamingos2LongSlitView.ObservationId, key = true, hidden = true),
+      SqlObject("exposureTimeMode", Join(Flamingos2LongSlitView.ObservationId, ExposureTimeModeView.ObservationId))
+    )
+
   lazy val Flamingos2LongSlitMapping: ObjectMapping =
     ObjectMapping(Flamingos2LongSlitType)(
 
@@ -44,8 +50,7 @@ trait Flamingos2LongSlitMapping[F[_]]
       SqlField("filter",    Flamingos2LongSlitView.Filter),
       SqlField("fpu",       Flamingos2LongSlitView.Fpu),
 
-      SqlObject("acquisitionExposureTimeMode", Join(Flamingos2LongSlitView.ObservationId, ExposureTimeModeView.ObservationId)),
-      SqlObject("scienceExposureTimeMode", Join(Flamingos2LongSlitView.ObservationId, ExposureTimeModeView.ObservationId)),
+      SqlObject("exposureTimeMode", Join(Flamingos2LongSlitView.ObservationId, ExposureTimeModeView.ObservationId)),
 
       SqlField("explicitReadMode", Flamingos2LongSlitView.ReadMode),
       SqlField("explicitReads", Flamingos2LongSlitView.Reads),
@@ -81,6 +86,8 @@ trait Flamingos2LongSlitMapping[F[_]]
 
       SqlJson("telluricType", Flamingos2LongSlitView.TelluricType),
 
+      SqlObject("acquisition"),
+
       SqlField("initialDisperser", Flamingos2LongSlitView.InitialDisperser),
       SqlField("initialFilter",    Flamingos2LongSlitView.InitialFilter),
       SqlField("initialFpu",       Flamingos2LongSlitView.InitialFpu),
@@ -88,7 +95,7 @@ trait Flamingos2LongSlitMapping[F[_]]
     )
 
   lazy val Flamingos2LongSlitElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
-    case (Flamingos2LongSlitType, "acquisitionExposureTimeMode", Nil) =>
+    case (Flamingos2LongSlitAcquisitionType, "exposureTimeMode", Nil) =>
       Elab.transformChild: child =>
         Unique(
           Filter(
@@ -97,7 +104,7 @@ trait Flamingos2LongSlitMapping[F[_]]
           )
         )
 
-    case (Flamingos2LongSlitType, "scienceExposureTimeMode", Nil) =>
+    case (Flamingos2LongSlitType, "exposureTimeMode", Nil) =>
       Elab.transformChild: child =>
         Unique(
           Filter(
