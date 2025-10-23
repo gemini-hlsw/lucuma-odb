@@ -137,7 +137,7 @@ object CMain extends MainParams {
       _  <- Resource.eval(Logger[F].info("Start listening for program changes"))
       _  <- Resource.eval(obsTopic.subscribe(100).evalMap { elem =>
               services.useTransactionally{
-                requireServiceAccess:
+                Services.asSuperUser:
                   for {
                     t <- Sync[F].delay(LocalDate.now(ZoneOffset.UTC))
                     _ <- calibrationsService(emailConfig, httpClient)
@@ -151,7 +151,7 @@ object CMain extends MainParams {
       _  <- Resource.eval(Logger[F].info("Start listening for calibration time changes"))
       _  <- Resource.eval(calibTopic.subscribe(100).evalMap { elem =>
               services.useTransactionally {
-                requireServiceAccess:
+                Services.asSuperUser:
                   calibrationsService(emailConfig, httpClient).recalculateCalibrationTarget(elem.programId, elem.observationId)
                     .map(Result.success)
               }
