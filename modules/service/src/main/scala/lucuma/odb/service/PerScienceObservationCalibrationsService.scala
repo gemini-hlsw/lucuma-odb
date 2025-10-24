@@ -312,21 +312,23 @@ object PerScienceObservationCalibrationsService:
         def syncTelluricObservation(
           obs: ObsExtract[CalibrationConfigSubset],
           gid: Group.Id
-        ): F[Result[Observation.Id]] =
+        ): F[Result[Option[Observation.Id]]] =
           findTelluricObservation(gid).flatMap:
             case Some(telluricId) =>
-              syncConfiguration(obs.id, telluricId).as(Result(telluricId))
+              syncConfiguration(obs.id, telluricId).as(Result(none[Observation.Id]))
             case _                =>
               createTelluricObservation(pid, obs.id, gid).flatMap:
                 case Result.Warning(problems, oid) =>
-                  (info"Created telluric observation with warnings: $problems").as(Result(oid))
-                case telluricId                    =>
-                  telluricId.pure[F]
+                  (info"Created telluric observation with warnings: $problems").as(Result(oid.some))
+                case Result.Success(oid)           =>
+                  Result(oid.some).pure[F]
+                case other                         =>
+                  other.map(_.some).pure[F]
 
         def generateTelluricForScience(
           tree: GroupTree,
           obs: ObsExtract[CalibrationConfigSubset]
-        ): F[Result[Observation.Id]] =
+        ): F[Result[Option[Observation.Id]]] =
           (for
             gid <- ResultT(readTelluricGroup(tree, obs))
             tid <- ResultT(syncTelluricObservation(obs, gid))
@@ -334,22 +336,26 @@ object PerScienceObservationCalibrationsService:
 
         (for
           // Read program's group tree
+          _               <- ResultT.liftF(info"Recalculating per science calibrations for $pid, instant")
           tree            <- ResultT.liftF(groupService.selectGroups(pid))
           // Find existing telluric groups
           existingGroups  = telluricGroups(tree)
           // Track current science observations
           currentObsIds   = scienceObs.map(_.id).toSet
+          _               <- ResultT.liftF(debug"Program $pid has ${currentObsIds.size} science configurations")
           // Remove stale science obs from groups
           _               <- ResultT.liftF:
                                existingGroups.traverse_ : (gid, _) =>
                                  removeOrphanedScienceObservations(gid, currentObsIds)
           // Delete groups with no current science obs
-          deletedTelluric <- ResultT.liftF:
+          deleted         <- ResultT.liftF:
                                existingGroups.flatTraverse: (gid, obsIds) =>
                                  deleteEmptyGroups(gid, obsIds, currentObsIds)
           // Create/sync telluric for each science obs
-          telluricIds     <- scienceObs.traverse(obs => ResultT(generateTelluricForScience(tree, obs)))
-        yield (telluricIds, deletedTelluric)).value.orError
+          added           <- scienceObs.traverse(obs => ResultT(generateTelluricForScience(tree, obs)))
+          _               <- ResultT.liftF:
+                               debug"Program $pid add ${added} and removed $deleted calibrations"
+        yield (added.flatten, deleted)).value.orError
 
       private object Statements:
 
