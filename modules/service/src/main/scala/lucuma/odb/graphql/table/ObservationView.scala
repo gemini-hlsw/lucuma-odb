@@ -33,12 +33,6 @@ trait ObservationView[F[_]] extends BaseMapping[F] {
       val BlindOffsetTargetId: ColumnRef = col("c_blind_offset_target_id", target_id.opt)
       val BlindOffsetType: ColumnRef     = col("c_blind_offset_type",      blind_offset_type)
 
-      object PlannedTime {
-        val Pi        = col("c_pts_pi", time_span)
-        val Uncharged = col("c_pts_uncharged", time_span)
-        val Execution = col("c_pts_execution", time_span)
-      }
-
       object PosAngleConstraint {
         val Mode: ColumnRef  = col("c_pac_mode",  pac_mode.embedded)
         val Angle: ColumnRef = col("c_pac_angle", angle_µas.embedded)
