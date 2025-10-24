@@ -1815,6 +1815,9 @@ class updateObservations extends OdbSuite
               filter
               defaultFilter
               explicitFilter
+              roi
+              defaultRoi
+              explicitRoi
             }
           }
         }
@@ -1834,7 +1837,10 @@ class updateObservations extends OdbSuite
                   "acquisition": {
                     "filter": "G_PRIME",
                     "defaultFilter": "G_PRIME",
-                    "explicitFilter": null
+                    "explicitFilter": null,
+                    "roi": "CCD2",
+                    "defaultRoi": "CCD2",
+                    "explicitRoi": null
                   }
                 }
               }
@@ -1850,6 +1856,7 @@ class updateObservations extends OdbSuite
           grating: R831_G5302
           acquisition: {
             explicitFilter: I_PRIME
+            explicitRoi: FULL_CCD2
           }
         }
       }
@@ -1868,7 +1875,10 @@ class updateObservations extends OdbSuite
                   "acquisition": {
                     "filter": "I_PRIME",
                     "defaultFilter": "G_PRIME",
-                    "explicitFilter": "I_PRIME"
+                    "explicitFilter": "I_PRIME",
+                    "roi": "FULL_CCD2",
+                    "defaultRoi": "CCD2",
+                    "explicitRoi": "FULL_CCD2"
                   }
                 }
               }
@@ -1881,7 +1891,7 @@ class updateObservations extends OdbSuite
     multiUpdateTest(pi, List((update0, query, expected0), (update1, query, expected1)))
   }
 
-  test("observing mode: update existing deleting explicit acquisition filter") {
+  test("observing mode: update existing deleting explicit acquisition filter and ROI") {
 
     val update0 = """
       observingMode: {
@@ -1900,6 +1910,7 @@ class updateObservations extends OdbSuite
           }
           acquisition: {
             explicitFilter: I_PRIME
+            explicitRoi: FULL_CCD2
           }
         }
       }
@@ -1914,6 +1925,9 @@ class updateObservations extends OdbSuite
               filter
               defaultFilter
               explicitFilter
+              roi
+              defaultRoi
+              explicitRoi
             }
           }
         }
@@ -1932,7 +1946,10 @@ class updateObservations extends OdbSuite
                   "acquisition": {
                     "filter": "I_PRIME",
                     "defaultFilter": "G_PRIME",
-                    "explicitFilter": "I_PRIME"
+                    "explicitFilter": "I_PRIME",
+                    "roi": "FULL_CCD2",
+                    "defaultRoi": "CCD2",
+                    "explicitRoi": "FULL_CCD2"
                   }
                 }
               }
@@ -1947,6 +1964,7 @@ class updateObservations extends OdbSuite
         gmosNorthLongSlit: {
           acquisition: {
             explicitFilter: null
+            explicitRoi: null
           }
         }
       }
@@ -1964,7 +1982,10 @@ class updateObservations extends OdbSuite
                   "acquisition": {
                     "filter": "G_PRIME",
                     "defaultFilter": "G_PRIME",
-                    "explicitFilter": null
+                    "explicitFilter": null,
+                    "roi": "CCD2",
+                    "defaultRoi": "CCD2",
+                    "explicitRoi": null
                   }
                 }
               }

@@ -2087,6 +2087,13 @@ input GmosNorthLongSlitAcquisitionInput {
   explicitFilter: GmosNorthFilter
 
   """
+  An explicit acquisition ROI mode to use instead of the default.  The `explicitRoi`
+  may be unset by assigning a null value, or ignored by skipping it altogether.  If not provided,
+  the ROI(s) that will be used for the acquisition sequence will depend on the science ROI.
+  """
+  explicitRoi: GmosLongSlitAcquisitionRoi
+
+  """
   Exposure time mode for the acquisition sequence.  If not specified, a default
   exposure time mode is used.
   """
@@ -2561,6 +2568,13 @@ input GmosSouthLongSlitAcquisitionInput {
   the central wavelength.
   """
   explicitFilter: GmosSouthFilter
+
+  """
+  An explicit acquisition ROI mode to use instead of the default.  The `explicitRoi`
+  may be unset by assigning a null value, or ignored by skipping it altogether.  If not provided,
+  the ROI(s) that will be used for the acquisition sequence will depend on the science ROI.
+  """
+  explicitRoi: GmosLongSlitAcquisitionRoi
 
   """
   Exposure time mode for the acquisition sequence.  If not specified, a default
@@ -8478,6 +8492,33 @@ enum GmosAmpReadMode {
 }
 
 """
+GMOS Long Slit Acquisition ROI options.
+"""
+enum GmosLongSlitAcquisitionRoi {
+
+  """
+  Imaging step uses CCD2, slit steps use Central Stamp.
+  """
+  CCD2_STAMP
+
+  """
+  Both imaging and slit use CCD2.
+  """
+  CCD2
+
+  """
+  Both imaging and slit use Ceentral Stamp.
+  """
+  STAMP
+
+  """
+  Imaging uses Full frame, slit steps use CCD2.
+  """
+  FULL_CCD2
+
+}
+
+"""
 GMOS North FPU
 """
 enum GmosNorthBuiltinFpu {
@@ -8764,6 +8805,24 @@ type GmosNorthLongSlitAcquisition {
   An explicitly specified GMOS North filter to use in acquisition (if any).
   """
   explicitFilter: GmosNorthFilter
+
+  """
+  The ROI(s) that will be used for the acquisition sequence.  In the case of a
+  compound ROI such as `CCD2_STAMP`, the first will be used for the imaging step
+  and the second for the remainder of the steps.
+  """
+  roi: GmosLongSlitAcquisitionRoi!
+
+  """
+  The acquisition ROI(s) that will be used by default, if an explicit ROI was
+  not specified.
+  """
+  defaultRoi: GmosLongSlitAcquisitionRoi!
+
+  """
+  An explicitly specified ROI to use in acquisition (if any).
+  """
+  explicitRoi: GmosLongSlitAcquisitionRoi
 
   """
   The exposure time mode used for ITC lookup for the acquisition sequence.
@@ -9405,6 +9464,24 @@ type GmosSouthLongSlitAcquisition {
   An explicitly specified GMOS South filter to use in acquisition (if any).
   """
   explicitFilter: GmosSouthFilter
+
+  """
+  The ROI(s) that will be used for the acquisition sequence.  In the case of a
+  compound ROI such as `CCD2_STAMP`, the first will be used for the imaging step
+  and the second for the remainder of the steps.
+  """
+  roi: GmosLongSlitAcquisitionRoi!
+
+  """
+  The acquisition ROI(s) that will be used by default, if an explicit ROI was
+  not specified.
+  """
+  defaultRoi: GmosLongSlitAcquisitionRoi!
+
+  """
+  An explicitly specified ROI to use in acquisition (if any).
+  """
+  explicitRoi: GmosLongSlitAcquisitionRoi
 
   """
   The exposure time mode used for ITC lookup for the acquisition sequence.

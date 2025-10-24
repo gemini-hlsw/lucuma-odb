@@ -133,6 +133,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[GmosCustomSlitWidth](GmosCustomSlitWidthType),
       LeafMapping[GmosDtax](GmosDtaxType),
       LeafMapping[GmosGratingOrder](GmosGratingOrderType),
+      LeafMapping[GmosLongSlitAcquisitionRoi](GmosLongSlitAcquisitionRoiType),
       LeafMapping[GmosNorthFpu](GmosNorthBuiltinFpuType),
       LeafMapping[GmosNorthDetector](GmosNorthDetectorType),
       LeafMapping[GmosNorthFilter](GmosNorthFilterType),

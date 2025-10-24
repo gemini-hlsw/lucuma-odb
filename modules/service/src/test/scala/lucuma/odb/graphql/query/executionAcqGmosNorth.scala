@@ -12,6 +12,8 @@ import io.circe.Json
 import io.circe.literal.*
 import lucuma.core.enums.Breakpoint
 import lucuma.core.enums.DatasetQaState
+import lucuma.core.enums.GmosLongSlitAcquisitionRoi
+import lucuma.core.enums.GmosLongSlitAcquisitionRoi.*
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SequenceType
@@ -31,7 +33,9 @@ class executionAcqGmosNorth extends ExecutionTestSupportForGmos:
       case ExposureTimeMode.TimeAndCountMode(t, c, _) => IntegrationTime(t, c).some
       case _ => none
 
-  val InitialAcquisition: Json =
+  def initialAcquisition(
+    roi: GmosLongSlitAcquisitionRoi = Ccd2
+  ): Json =
     json"""
       {
         "executionConfig": {
@@ -41,9 +45,9 @@ class executionAcqGmosNorth extends ExecutionTestSupportForGmos:
                 "description": "Initial Acquisition",
                 "observeClass": "ACQUISITION",
                 "steps": [
-                  ${gmosNorthExpectedAcq(0,  0)},
-                  ${gmosNorthExpectedAcq(1, 10)},
-                  ${gmosNorthExpectedAcq(2,  0, Breakpoint.Enabled)}
+                  ${gmosNorthExpectedAcq(0,  0, roi = roi)},
+                  ${gmosNorthExpectedAcq(1, 10, roi = roi)},
+                  ${gmosNorthExpectedAcq(2,  0, roi = roi, Breakpoint.Enabled)}
                 ]
               },
               "possibleFuture": [
@@ -51,7 +55,7 @@ class executionAcqGmosNorth extends ExecutionTestSupportForGmos:
                   "description": "Fine Adjustments",
                   "observeClass": "ACQUISITION",
                   "steps": [
-                    ${gmosNorthExpectedAcq(2, 0)}
+                    ${gmosNorthExpectedAcq(2, 0, roi = roi)}
                   ]
                 }
               ],
@@ -62,7 +66,9 @@ class executionAcqGmosNorth extends ExecutionTestSupportForGmos:
       }
     """
 
-  val FineAdjustments: Json =
+  def fineAdjustments(
+    roi: GmosLongSlitAcquisitionRoi = Ccd2
+  ): Json =
     json"""
       {
         "executionConfig": {
@@ -72,7 +78,7 @@ class executionAcqGmosNorth extends ExecutionTestSupportForGmos:
                 "description": "Fine Adjustments",
                 "observeClass": "ACQUISITION",
                 "steps": [
-                  ${gmosNorthExpectedAcq(2, 0, Breakpoint.Disabled)}
+                  ${gmosNorthExpectedAcq(2, 0, roi = roi, Breakpoint.Disabled)}
                 ]
               },
               "possibleFuture": [
@@ -80,7 +86,7 @@ class executionAcqGmosNorth extends ExecutionTestSupportForGmos:
                   "description": "Fine Adjustments",
                   "observeClass": "ACQUISITION",
                   "steps": [
-                    ${gmosNorthExpectedAcq(2, 0, Breakpoint.Disabled)}
+                    ${gmosNorthExpectedAcq(2, 0, roi = roi, Breakpoint.Disabled)}
                   ]
                 }
               ],
@@ -103,7 +109,7 @@ class executionAcqGmosNorth extends ExecutionTestSupportForGmos:
       expect(
         user     = pi,
         query    = gmosNorthAcquisitionQuery(oid),
-        expected = InitialAcquisition.asRight
+        expected = initialAcquisition(Ccd2).asRight
       )
 
   test("execute first step only, reset"):
@@ -125,7 +131,7 @@ class executionAcqGmosNorth extends ExecutionTestSupportForGmos:
       expect(
         user     = pi,
         query    = gmosNorthAcquisitionQuery(oid),
-        expected = InitialAcquisition.asRight
+        expected = initialAcquisition(Ccd2).asRight
       )
 
   test("execute first atom - repeat of last acq step"):
@@ -152,7 +158,7 @@ class executionAcqGmosNorth extends ExecutionTestSupportForGmos:
       expect(
         user     = pi,
         query    = gmosNorthAcquisitionQuery(oid),
-        expected = FineAdjustments.asRight
+        expected = fineAdjustments(Ccd2).asRight
       )
 
   test("execute first step only"):
@@ -183,8 +189,8 @@ class executionAcqGmosNorth extends ExecutionTestSupportForGmos:
                       "description": "Initial Acquisition",
                       "observeClass": "ACQUISITION",
                       "steps": [
-                        ${gmosNorthExpectedAcq(1, 10)},
-                        ${gmosNorthExpectedAcq(2,  0, Breakpoint.Enabled)}
+                        ${gmosNorthExpectedAcq(1, 10, roi = Ccd2)},
+                        ${gmosNorthExpectedAcq(2,  0, roi = Ccd2, breakpoint = Breakpoint.Enabled)}
                       ]
                     },
                     "possibleFuture": [
@@ -192,7 +198,7 @@ class executionAcqGmosNorth extends ExecutionTestSupportForGmos:
                         "description": "Fine Adjustments",
                         "observeClass": "ACQUISITION",
                         "steps": [
-                          ${gmosNorthExpectedAcq(2, 0, Breakpoint.Disabled)}
+                          ${gmosNorthExpectedAcq(2, 0, roi = Ccd2, breakpoint = Breakpoint.Disabled)}
                         ]
                       }
                     ],
@@ -233,7 +239,7 @@ class executionAcqGmosNorth extends ExecutionTestSupportForGmos:
       expect(
         user     = pi,
         query    = gmosNorthAcquisitionQuery(oid),
-        expected = FineAdjustments.asRight
+        expected = fineAdjustments(Ccd2).asRight
       )
 
   test("execute acquisition, switch to science, back to acquisition"):
@@ -269,7 +275,7 @@ class executionAcqGmosNorth extends ExecutionTestSupportForGmos:
       expect(
         user     = pi,
         query    = gmosNorthAcquisitionQuery(oid),
-        expected = InitialAcquisition.asRight
+        expected = initialAcquisition(Ccd2).asRight
       )
 
   test("execute acquisition, make a new visit, back to acquisition"):
@@ -303,7 +309,7 @@ class executionAcqGmosNorth extends ExecutionTestSupportForGmos:
       expect(
         user     = pi,
         query    = gmosNorthAcquisitionQuery(oid),
-        expected = InitialAcquisition.asRight
+        expected = initialAcquisition(Ccd2).asRight
       )
 
   test("execute first step, second step, fail second step only"):
@@ -342,8 +348,8 @@ class executionAcqGmosNorth extends ExecutionTestSupportForGmos:
                       "description": "Initial Acquisition",
                       "observeClass": "ACQUISITION",
                       "steps": [
-                        ${gmosNorthExpectedAcq(1, 10)},
-                        ${gmosNorthExpectedAcq(2,  0, Breakpoint.Enabled)}
+                        ${gmosNorthExpectedAcq(1, 10, Ccd2)},
+                        ${gmosNorthExpectedAcq(2,  0, Ccd2, Breakpoint.Enabled)}
                       ]
                     },
                     "possibleFuture": [
@@ -351,7 +357,7 @@ class executionAcqGmosNorth extends ExecutionTestSupportForGmos:
                         "description": "Fine Adjustments",
                         "observeClass": "ACQUISITION",
                         "steps": [
-                          ${gmosNorthExpectedAcq(2, 0)}
+                          ${gmosNorthExpectedAcq(2, 0, Ccd2)}
                         ]
                       }
                     ],
@@ -664,4 +670,32 @@ class executionAcqGmosNorth extends ExecutionTestSupportForGmos:
             }
           }
         """.asRight
+      )
+
+  test("override roi"):
+    val setup: IO[Observation.Id] =
+      for
+        p <- createProgram
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createObservationWithModeAs(pi, p, List(t), s"""
+               gmosNorthLongSlit: {
+                 grating: R831_G5302
+                 filter: R_PRIME
+                 fpu: LONG_SLIT_0_50
+                 centralWavelength: {
+                   nanometers: 500
+                 }
+                 explicitYBin: TWO
+                 acquisition: {
+                   explicitRoi: FULL_CCD2
+                 }
+              }
+             """)
+      yield o
+
+    setup.flatMap: oid =>
+      expect(
+        user     = pi,
+        query    = gmosNorthAcquisitionQuery(oid),
+        expected = initialAcquisition(FullCcd2).asRight
       )

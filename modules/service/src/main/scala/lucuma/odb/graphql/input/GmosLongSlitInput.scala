@@ -13,6 +13,7 @@ import grackle.Result
 import grackle.syntax.*
 import lucuma.core.enums.GmosAmpGain
 import lucuma.core.enums.GmosAmpReadMode
+import lucuma.core.enums.GmosLongSlitAcquisitionRoi
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosNorthFpu
 import lucuma.core.enums.GmosNorthGrating
@@ -54,6 +55,7 @@ object GmosLongSlitInput:
 
   final case class NorthAcquisition(
     filter:           Nullable[GmosNorthFilter],
+    roi:              Nullable[GmosLongSlitAcquisitionRoi],
     exposureTimeMode: Option[ExposureTimeMode]
   )
 
@@ -62,6 +64,7 @@ object GmosLongSlitInput:
       ObjectFieldsBinding.rmap {
         case List(
           GmosNorthFilterBinding.Nullable("explicitFilter", rFilter),
+          GmosLongSlitAcquisitionRoiBinding.Nullable("explicitRoi", rRoi),
           ExposureTimeModeInput.Binding.Option("exposureTimeMode", rExposureTimeMode)
         ) => (
           rFilter.flatMap: n =>
@@ -69,12 +72,14 @@ object GmosLongSlitInput:
               if GmosNorthFilter.acquisition.toList.contains(f) then f.success
               else OdbError.InvalidArgument(s"'explicitFilter' must contain one of: ${GmosNorthFilter.acquisition.map(_.tag.toScreamingSnakeCase).mkString_(", ")}".some).asFailure
           ,
+          rRoi,
           rExposureTimeMode
         ).parMapN(apply)
       }
 
   final case class SouthAcquisition(
     filter:           Nullable[GmosSouthFilter],
+    roi:              Nullable[GmosLongSlitAcquisitionRoi],
     exposureTimeMode: Option[ExposureTimeMode]
   )
 
@@ -83,6 +88,7 @@ object GmosLongSlitInput:
       ObjectFieldsBinding.rmap {
         case List(
           GmosSouthFilterBinding.Nullable("explicitFilter", rFilter),
+          GmosLongSlitAcquisitionRoiBinding.Nullable("explicitRoi", rRoi),
           ExposureTimeModeInput.Binding.Option("exposureTimeMode", rExposureTimeMode)
         ) => (
           rFilter.flatMap: n =>
@@ -90,6 +96,7 @@ object GmosLongSlitInput:
               if GmosSouthFilter.acquisition.toList.contains(f) then f.success
               else OdbError.InvalidArgument(s"'explicitFilter' must contain one of: ${GmosSouthFilter.acquisition.map(_.tag.toScreamingSnakeCase).mkString_(", ")}".some).asFailure
           ,
+          rRoi,
           rExposureTimeMode
         ).parMapN(apply)
       }

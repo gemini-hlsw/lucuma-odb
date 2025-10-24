@@ -4,6 +4,7 @@
 package lucuma.odb.sequence.gmos.longslit
 
 import cats.Eq
+import lucuma.core.enums.GmosLongSlitAcquisitionRoi
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosSouthFilter
 import lucuma.core.model.ExposureTimeMode
@@ -29,11 +30,20 @@ sealed trait AcquisitionConfig[L: Enumerated] extends Product with Serializable:
 
   def explicitFilter: Option[L]
 
+  def roi: GmosLongSlitAcquisitionRoi =
+    explicitRoi.getOrElse(defaultRoi)
+
+  def defaultRoi: GmosLongSlitAcquisitionRoi
+
+  def explicitRoi: Option[GmosLongSlitAcquisitionRoi]
+
+
   def hashBytes: Array[Byte] =
     val bao: ByteArrayOutputStream = new ByteArrayOutputStream(256)
     val out: DataOutputStream      = new DataOutputStream(bao)
 
     out.writeChars(Enumerated[L].tag(filter))
+    out.writeChars(roi.tag)
     out.write(exposureTimeMode.hashBytes)
 
     out.close()
@@ -44,7 +54,9 @@ object AcquisitionConfig:
   final case class GmosNorth(
     exposureTimeMode: ExposureTimeMode,
     defaultFilter:    GmosNorthFilter,
-    explicitFilter:    Option[GmosNorthFilter]
+    explicitFilter:   Option[GmosNorthFilter],
+    defaultRoi:       GmosLongSlitAcquisitionRoi,
+    explicitRoi:      Option[GmosLongSlitAcquisitionRoi]
   ) extends AcquisitionConfig[GmosNorthFilter]
 
   object GmosNorth:
@@ -54,13 +66,17 @@ object AcquisitionConfig:
         (
           a.exposureTimeMode,
           a.defaultFilter,
-          a.explicitFilter
+          a.explicitFilter,
+          a.defaultRoi,
+          a.explicitRoi
         )
 
   final case class GmosSouth(
     exposureTimeMode: ExposureTimeMode,
     defaultFilter:    GmosSouthFilter,
-    explicitFilter:    Option[GmosSouthFilter]
+    explicitFilter:   Option[GmosSouthFilter],
+    defaultRoi:       GmosLongSlitAcquisitionRoi,
+    explicitRoi:      Option[GmosLongSlitAcquisitionRoi]
   ) extends AcquisitionConfig[GmosSouthFilter]
 
   object GmosSouth:
@@ -70,5 +86,7 @@ object AcquisitionConfig:
         (
           a.exposureTimeMode,
           a.defaultFilter,
-          a.explicitFilter
+          a.explicitFilter,
+          a.defaultRoi,
+          a.explicitRoi
         )

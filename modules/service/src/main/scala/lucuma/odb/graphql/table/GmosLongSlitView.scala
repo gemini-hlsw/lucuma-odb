@@ -24,6 +24,8 @@ trait GmosLongSlitView[F[_]] extends BaseMapping[F]:
     val AmpReadMode: ColumnRef              = col("c_amp_read_mode", gmos_amp_read_mode.opt)
     val AmpGain: ColumnRef                  = col("c_amp_gain", gmos_amp_gain.opt)
     val Roi: ColumnRef                      = col("c_roi", gmos_roi.opt)
+    val AcquisitionRoi: ColumnRef           = col("c_acquisition_roi", gmos_long_slit_acquisition_roi.opt)
+    val AcquisitionRoiDefault: ColumnRef    = col("c_acquisition_roi_default", gmos_long_slit_acquisition_roi)
 
     val WavelengthDithers: ColumnRef        = col("c_wavelength_dithers", text.opt)
     val Offsets: ColumnRef                  = col("c_offsets", text.opt)
