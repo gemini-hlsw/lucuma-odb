@@ -22,6 +22,7 @@ import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.SourceProfile
 import lucuma.core.model.SpectralDefinition
+import lucuma.core.model.Target
 import lucuma.odb.Config
 import lucuma.odb.data.BlindOffsetType
 import lucuma.odb.data.Existence
@@ -40,14 +41,13 @@ import lucuma.odb.graphql.mapping.AccessControl
 import lucuma.odb.service.Services.SuperUserAccess
 import lucuma.odb.util.Codecs.*
 import org.http4s.client.Client
+import org.typelevel.log4cats.Logger
+import org.typelevel.log4cats.syntax.*
 import skunk.*
 import skunk.Transaction
 import skunk.implicits.*
 
 import scala.collection.immutable.SortedMap
-import lucuma.core.model.Target
-import org.typelevel.log4cats.Logger
-import org.typelevel.log4cats.syntax.*
 
 trait PerScienceObservationCalibrationsService[F[_]]:
 
@@ -59,20 +59,20 @@ trait PerScienceObservationCalibrationsService[F[_]]:
 object PerScienceObservationCalibrationsService:
   def instantiate[F[_]: {Concurrent as F, Logger, Services as S}](
     emailConfig: Config.Email,
-    httpClient: Client[F]
+    httpClient:  Client[F]
   ): PerScienceObservationCalibrationsService[F] =
     new PerScienceObservationCalibrationsService[F] with CalibrationObservations:
 
       private def groupNameForObservation(
-        config: CalibrationConfigSubset,
+        config:          CalibrationConfigSubset,
         calibrationRole: CalibrationRole,
-        oid: Observation.Id
+        oid:             Observation.Id
       ): NonEmptyString =
         NonEmptyString.unsafeFrom(s"${config.modeTypeTag}/${calibrationRole.tag}/${oid.show}")
 
       private def findSystemGroupForObservation(
         tree: GroupTree,
-        oid: Observation.Id
+        oid:  Observation.Id
       ): Option[Group.Id] =
         tree.findGroupContaining(
           oid,
@@ -81,14 +81,14 @@ object PerScienceObservationCalibrationsService:
 
       private def findParentGroupForObservation(
         tree: GroupTree,
-        oid: Observation.Id
+        oid:  Observation.Id
       ): Option[Group.Id] =
         tree.findGroupContaining(oid, b => !b.system)
 
       private def f2TelluricGroup(
-        pid: Program.Id,
-        config: CalibrationConfigSubset,
-        oid: Observation.Id,
+        pid:           Program.Id,
+        config:        CalibrationConfigSubset,
+        oid:           Observation.Id,
         parentGroupId: Option[Group.Id]
       )(using Transaction[F]): F[Result[Group.Id]] =
         GroupService.instantiate(emailConfig, httpClient).createGroup(
@@ -122,8 +122,8 @@ object PerScienceObservationCalibrationsService:
           .use(_.option((gid, CalibrationRole.Telluric)))
 
       private def createTelluricObservation(
-        pid: Program.Id,
-        scienceOid: Observation.Id,
+        pid:             Program.Id,
+        scienceOid:      Observation.Id,
         telluricGroupId: Group.Id
       )(using Transaction[F], SuperUserAccess): F[Result[Observation.Id]] =
         def obsGroupIndex(scienceOid: Observation.Id): F[NonNegShort] =
@@ -132,12 +132,13 @@ object PerScienceObservationCalibrationsService:
             .use(_.unique(scienceOid))
 
         def insertTelluricObservation(
-          pid: Program.Id,
-          targetId: Target.Id,
+          pid:             Program.Id,
+          targetId:        Target.Id,
           telluricGroupId: Group.Id,
-          telluricIndex: NonNegShort
+          telluricIndex:   NonNegShort
         )(using Transaction[F], SuperUserAccess): F[Result[Observation.Id]] =
           // Minimal input to create the telluric obs
+          // TODO create a proper telluric target
           val targetEnvironment = TargetEnvironmentInput.Create(
             explicitBase = none,
             asterism = List(targetId).some,
@@ -200,7 +201,7 @@ object PerScienceObservationCalibrationsService:
           scienceIndex  <- ResultT.liftF(obsGroupIndex(scienceOid))
           telluricIndex = NonNegShort.unsafeFrom((scienceIndex.value + 1).toShort)
           targetId      <- ResultT(telluricTargetPlaceholder(pid))
-          telluricId   <- ResultT(insertTelluricObservation(pid, targetId, telluricGroupId, telluricIndex))
+          telluricId    <- ResultT(insertTelluricObservation(pid, targetId, telluricGroupId, telluricIndex))
           _             <- ResultT(syncConfiguration(scienceOid, telluricId))
         yield telluricId).value
 

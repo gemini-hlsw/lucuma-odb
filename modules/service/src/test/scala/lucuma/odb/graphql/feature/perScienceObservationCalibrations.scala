@@ -10,6 +10,7 @@ import lucuma.core.enums.CalibrationRole
 import lucuma.core.math.Wavelength
 import lucuma.core.model.Group
 import lucuma.core.model.Observation
+import lucuma.core.model.Target
 import lucuma.odb.graphql.OdbSuite
 import lucuma.odb.graphql.TestUsers
 import lucuma.odb.graphql.query.ExecutionTestSupport
@@ -34,15 +35,14 @@ class perScienceObservationCalibrations
 
   val when = LocalDateTime.of(2024, 1, 1, 12, 0, 0).toInstant(ZoneOffset.UTC)
 
-  case class GroupInfo(id: Group.Id, system: Boolean, name: String, calibrationRoles: List[CalibrationRole]) derives Decoder
+  case class GroupInfo(id: Group.Id, system: Boolean, name: String, calibrationRoles: List[CalibrationRole])
+      derives Decoder
   case class ObsInfo(id: Observation.Id, groupId: Option[Group.Id]) derives Decoder
-  case class ObservationWithRole(
-    id: Observation.Id,
-    calibrationRole: Option[CalibrationRole]
-  ) derives Decoder
+  case class ObservationWithRole(id: Observation.Id, calibrationRole: Option[CalibrationRole])
+    derives Decoder
   case class ObsWithTarget(
     id: Observation.Id,
-    targetId: Option[lucuma.core.model.Target.Id],
+    targetId: Option[Target.Id],
     targetName: Option[String],
     targetRa: Option[String],
     targetDec: Option[String]
@@ -61,8 +61,8 @@ class perScienceObservationCalibrations
               }
             }
           }"""
-    ).flatMap { c =>
-      val elements = c.hcursor
+    ).map: c =>
+      c.hcursor
         .downField("group")
         .downField("elements")
         .values
@@ -70,8 +70,6 @@ class perScienceObservationCalibrations
         .flatten
         .flatMap(_.hcursor.downField("observation").as[Option[ObservationWithRole]].toOption)
         .flatten
-      elements.pure[IO]
-    }
 
   private def queryObservationWithTarget(oid: Observation.Id): IO[ObsWithTarget] =
     query(
@@ -91,7 +89,7 @@ class perScienceObservationCalibrations
               }
             }
           }"""
-    ).flatMap { c =>
+    ).flatMap: c =>
       val cursor = c.hcursor.downField("observation")
       val asterismCursor = cursor
         .downField("targetEnvironment")
@@ -99,15 +97,14 @@ class perScienceObservationCalibrations
         .downArray
 
       val result = for
-        id <- cursor.downField("id").as[Observation.Id]
-        targetId <- asterismCursor.downField("id").as[Option[lucuma.core.model.Target.Id]]
+        id         <- cursor.downField("id").as[Observation.Id]
+        targetId   <- asterismCursor.downField("id").as[Option[Target.Id]]
         targetName <- asterismCursor.downField("name").as[Option[String]]
-        targetRa <- asterismCursor.downField("sidereal").downField("ra").downField("hms").as[Option[String]]
-        targetDec <- asterismCursor.downField("sidereal").downField("dec").downField("dms").as[Option[String]]
+        targetRa   <- asterismCursor.downField("sidereal").downField("ra").downField("hms").as[Option[String]]
+        targetDec  <- asterismCursor.downField("sidereal").downField("dec").downField("dms").as[Option[String]]
       yield ObsWithTarget(id, targetId, targetName, targetRa, targetDec)
 
       result.leftMap(f => new RuntimeException(f.message)).liftTo[IO]
-    }
 
   private def queryObservationExists(oid: Observation.Id): IO[Boolean] =
     query(
@@ -117,9 +114,8 @@ class perScienceObservationCalibrations
               id
             }
           }"""
-    ).map { c =>
+    ).map: c =>
       c.hcursor.downField("observation").as[ObsInfo].isRight
-    }
 
   private def queryTargetExists(tid: lucuma.core.model.Target.Id): IO[Boolean] =
     query(
@@ -129,9 +125,8 @@ class perScienceObservationCalibrations
               id
             }
           }"""
-    ).map { c =>
+    ).map: c =>
       c.hcursor.downField("target").focus.exists(!_.isNull)
-    }
 
   private def queryGroup(gid: Group.Id): IO[GroupInfo] =
     query(
@@ -144,11 +139,10 @@ class perScienceObservationCalibrations
               calibrationRoles
             }
           }"""
-    ).flatMap { c =>
+    ).flatMap: c =>
       c.hcursor.downField("group").as[GroupInfo]
         .leftMap(f => new RuntimeException(f.message))
         .liftTo[IO]
-    }
 
   private def queryObservation(oid: Observation.Id): IO[ObsInfo] =
     query(
@@ -159,11 +153,10 @@ class perScienceObservationCalibrations
               groupId
             }
           }"""
-    ).flatMap { c =>
+    ).flatMap: c =>
       c.hcursor.downField("observation").as[ObsInfo]
         .leftMap(f => new RuntimeException(f.message))
         .liftTo[IO]
-    }
 
   private def queryGroupExists(gid: Group.Id): IO[Boolean] =
     query(
@@ -173,9 +166,8 @@ class perScienceObservationCalibrations
               id
             }
           }"""
-    ).map { c =>
+    ).map: c =>
       c.hcursor.downField("group").as[GroupInfo].isRight
-    }
 
   private def updateObservationMode(oid: Observation.Id, mode: String): IO[Unit] =
     query(
@@ -220,6 +212,49 @@ class perScienceObservationCalibrations
         }
       }"""
     ).void
+
+  private def updateFlamingos2Fpu(oid: Observation.Id, fpu: String): IO[Unit] =
+    query(
+      pi,
+      s"""mutation {
+        updateObservations(input: {
+          WHERE: { id: { EQ: "$oid" } }
+          SET: {
+            observingMode: {
+              flamingos2LongSlit: {
+                fpu: $fpu
+              }
+            }
+          }
+        }) {
+          observations {
+            id
+          }
+        }
+      }"""
+    ).void
+
+  private def queryObservationFpu(oid: Observation.Id): IO[Option[String]] =
+    query(
+      service,
+      s"""query {
+            observation(observationId: "$oid") {
+              id
+              observingMode {
+                flamingos2LongSlit {
+                  fpu
+                }
+              }
+            }
+          }"""
+    ).map: c =>
+      c.hcursor
+        .downField("observation")
+        .downField("observingMode")
+        .downField("flamingos2LongSlit")
+        .downField("fpu")
+        .as[String]
+        .toOption
 
   test("F2 observation is automatically placed in a group with telluric role"):
     for {
@@ -439,4 +474,27 @@ class perScienceObservationCalibrations
       assertEquals(added2.size, 0)
       assertEquals(removed2.size, 1)
       assertEquals(removed2.headOption, Some(telluricOid))
+    }
+
+  test("changing F2 FPU syncs to telluric observation"):
+    for {
+      pid          <- createProgramAs(pi)
+      tid          <- createTargetWithProfileAs(pi, pid)
+      oid          <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+      _            <- recalculateCalibrations(pid, when)
+      obs1         <- queryObservation(oid)
+      groupId      =  obs1.groupId.get
+      obsInGroup1  <- queryObservationsInGroup(groupId)
+      telluricOid  =  obsInGroup1.find(_.calibrationRole.contains(CalibrationRole.Telluric)).get.id
+      scienceFpu1  <- queryObservationFpu(oid)
+      telluricFpu1 <- queryObservationFpu(telluricOid)
+      _            <- updateFlamingos2Fpu(oid, "LONG_SLIT_2")
+      _            <- recalculateCalibrations(pid, when)
+      scienceFpu2  <- queryObservationFpu(oid)
+      telluricFpu2 <- queryObservationFpu(telluricOid)
+    } yield {
+      assertEquals(scienceFpu1, Some("LONG_SLIT_1"))
+      assertEquals(telluricFpu1, Some("LONG_SLIT_1"))
+      assertEquals(scienceFpu2, Some("LONG_SLIT_2"), "Science observation should have LONG_SLIT_2 after update")
+      assertEquals(telluricFpu2, Some("LONG_SLIT_2"), "Telluric observation should sync to LONG_SLIT_2")
     }
