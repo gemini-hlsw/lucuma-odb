@@ -8308,7 +8308,7 @@ input Flamingos2LongSlitInput {
   """
   Acquisition properties that, when set, override default values.
   """
-  acquisition: Flamingos2LongSlitInput
+  acquisition: Flamingos2LongSlitAcquisitionInput
 }
 
 """
