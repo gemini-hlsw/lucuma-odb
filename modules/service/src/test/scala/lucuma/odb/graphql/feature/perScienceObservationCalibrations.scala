@@ -10,6 +10,7 @@ import lucuma.core.enums.CalibrationRole
 import lucuma.core.math.Wavelength
 import lucuma.core.model.Group
 import lucuma.core.model.Observation
+import lucuma.core.model.Target
 import lucuma.odb.graphql.OdbSuite
 import lucuma.odb.graphql.TestUsers
 import lucuma.odb.graphql.query.ExecutionTestSupport
@@ -34,8 +35,98 @@ class perScienceObservationCalibrations
 
   val when = LocalDateTime.of(2024, 1, 1, 12, 0, 0).toInstant(ZoneOffset.UTC)
 
-  case class GroupInfo(id: Group.Id, system: Boolean, name: String, calibrationRoles: List[CalibrationRole]) derives Decoder
+  case class GroupInfo(id: Group.Id, system: Boolean, name: String, calibrationRoles: List[CalibrationRole])
+      derives Decoder
   case class ObsInfo(id: Observation.Id, groupId: Option[Group.Id]) derives Decoder
+  case class ObservationWithRole(id: Observation.Id, calibrationRole: Option[CalibrationRole])
+    derives Decoder
+  case class ObsWithTarget(
+    id: Observation.Id,
+    targetId: Option[Target.Id],
+    targetName: Option[String],
+    targetRa: Option[String],
+    targetDec: Option[String]
+  ) derives Decoder
+
+  private def queryObservationsInGroup(gid: Group.Id): IO[List[ObservationWithRole]] =
+    query(
+      service,
+      s"""query {
+            group(groupId: "$gid") {
+              elements {
+                observation {
+                  id
+                  calibrationRole
+                }
+              }
+            }
+          }"""
+    ).map: c =>
+      c.hcursor
+        .downField("group")
+        .downField("elements")
+        .values
+        .toList
+        .flatten
+        .flatMap(_.hcursor.downField("observation").as[Option[ObservationWithRole]].toOption)
+        .flatten
+
+  private def queryObservationWithTarget(oid: Observation.Id): IO[ObsWithTarget] =
+    query(
+      service,
+      s"""query {
+            observation(observationId: "$oid") {
+              id
+              targetEnvironment {
+                asterism {
+                  id
+                  name
+                  sidereal {
+                    ra { hms }
+                    dec { dms }
+                  }
+                }
+              }
+            }
+          }"""
+    ).flatMap: c =>
+      val cursor = c.hcursor.downField("observation")
+      val asterismCursor = cursor
+        .downField("targetEnvironment")
+        .downField("asterism")
+        .downArray
+
+      val result = for
+        id         <- cursor.downField("id").as[Observation.Id]
+        targetId   <- asterismCursor.downField("id").as[Option[Target.Id]]
+        targetName <- asterismCursor.downField("name").as[Option[String]]
+        targetRa   <- asterismCursor.downField("sidereal").downField("ra").downField("hms").as[Option[String]]
+        targetDec  <- asterismCursor.downField("sidereal").downField("dec").downField("dms").as[Option[String]]
+      yield ObsWithTarget(id, targetId, targetName, targetRa, targetDec)
+
+      result.leftMap(f => new RuntimeException(f.message)).liftTo[IO]
+
+  private def queryObservationExists(oid: Observation.Id): IO[Boolean] =
+    query(
+      service,
+      s"""query {
+            observation(observationId: "$oid") {
+              id
+            }
+          }"""
+    ).map: c =>
+      c.hcursor.downField("observation").as[ObsInfo].isRight
+
+  private def queryTargetExists(tid: lucuma.core.model.Target.Id): IO[Boolean] =
+    query(
+      service,
+      s"""query {
+            target(targetId: "$tid") {
+              id
+            }
+          }"""
+    ).map: c =>
+      c.hcursor.downField("target").focus.exists(!_.isNull)
 
   private def queryGroup(gid: Group.Id): IO[GroupInfo] =
     query(
@@ -48,11 +139,10 @@ class perScienceObservationCalibrations
               calibrationRoles
             }
           }"""
-    ).flatMap { c =>
+    ).flatMap: c =>
       c.hcursor.downField("group").as[GroupInfo]
         .leftMap(f => new RuntimeException(f.message))
         .liftTo[IO]
-    }
 
   private def queryObservation(oid: Observation.Id): IO[ObsInfo] =
     query(
@@ -63,11 +153,10 @@ class perScienceObservationCalibrations
               groupId
             }
           }"""
-    ).flatMap { c =>
+    ).flatMap: c =>
       c.hcursor.downField("observation").as[ObsInfo]
         .leftMap(f => new RuntimeException(f.message))
         .liftTo[IO]
-    }
 
   private def queryGroupExists(gid: Group.Id): IO[Boolean] =
     query(
@@ -77,9 +166,8 @@ class perScienceObservationCalibrations
               id
             }
           }"""
-    ).map { c =>
+    ).map: c =>
       c.hcursor.downField("group").as[GroupInfo].isRight
-    }
 
   private def updateObservationMode(oid: Observation.Id, mode: String): IO[Unit] =
     query(
@@ -124,6 +212,49 @@ class perScienceObservationCalibrations
         }
       }"""
     ).void
+
+  private def updateFlamingos2Fpu(oid: Observation.Id, fpu: String): IO[Unit] =
+    query(
+      pi,
+      s"""mutation {
+        updateObservations(input: {
+          WHERE: { id: { EQ: "$oid" } }
+          SET: {
+            observingMode: {
+              flamingos2LongSlit: {
+                fpu: $fpu
+              }
+            }
+          }
+        }) {
+          observations {
+            id
+          }
+        }
+      }"""
+    ).void
+
+  private def queryObservationFpu(oid: Observation.Id): IO[Option[String]] =
+    query(
+      service,
+      s"""query {
+            observation(observationId: "$oid") {
+              id
+              observingMode {
+                flamingos2LongSlit {
+                  fpu
+                }
+              }
+            }
+          }"""
+    ).map: c =>
+      c.hcursor
+        .downField("observation")
+        .downField("observingMode")
+        .downField("flamingos2LongSlit")
+        .downField("fpu")
+        .as[String]
+        .toOption
 
   test("F2 observation is automatically placed in a group with telluric role"):
     for {
@@ -191,4 +322,179 @@ class perScienceObservationCalibrations
     } yield {
       assert(obsBefore.groupId.isDefined)
       assert(!groupExists)
+    }
+
+  test("F2 observation gets a telluric calibration observation"):
+    for {
+      pid                <- createProgramAs(pi)
+      tid                <- createTargetWithProfileAs(pi, pid)
+      oid                <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+      (added, removed)   <- recalculateCalibrations(pid, when)
+      obs                <- queryObservation(oid)
+      groupId            =  obs.groupId.get
+      obsInGroup         <- queryObservationsInGroup(groupId)
+      telluricObs        =  obsInGroup.filter(_.calibrationRole.contains(CalibrationRole.Telluric))
+    } yield {
+      assertEquals(telluricObs.size, 1)
+      assertEquals(obsInGroup.size, 2)
+      assertEquals(added.size, 1)
+      assertEquals(removed.size, 0)
+      assert(telluricObs.headOption.exists(t => added.contains(t.id)))
+    }
+
+  test("telluric observation has a placeholder target"):
+    for {
+      pid         <- createProgramAs(pi)
+      tid         <- createTargetWithProfileAs(pi, pid)
+      oid         <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+      _           <- recalculateCalibrations(pid, when)
+      obs         <- queryObservation(oid)
+      groupId     =  obs.groupId.get
+      obsInGroup  <- queryObservationsInGroup(groupId)
+      telluricOid =  obsInGroup.find(_.calibrationRole.contains(CalibrationRole.Telluric)).get.id
+      telluricObs <- queryObservationWithTarget(telluricOid)
+    } yield {
+      assertEquals(telluricObs.targetName, Some("Telluric Target (TBD)"))
+      assertEquals(telluricObs.targetRa, Some("00:00:00.000000"))
+      assertEquals(telluricObs.targetDec, Some("+00:00:00.000000"))
+    }
+
+  test("each F2 observation gets its own unique telluric observation and target"):
+    for {
+      pid                <- createProgramAs(pi)
+      tid1               <- createTargetWithProfileAs(pi, pid)
+      tid2               <- createTargetWithProfileAs(pi, pid)
+      oid1               <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid1))
+      oid2               <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid2))
+      (added, removed)   <- recalculateCalibrations(pid, when)
+      obs1               <- queryObservation(oid1)
+      obs2               <- queryObservation(oid2)
+      obsInGroup1        <- queryObservationsInGroup(obs1.groupId.get)
+      obsInGroup2        <- queryObservationsInGroup(obs2.groupId.get)
+      telluric1Oid       =  obsInGroup1.find(_.calibrationRole.contains(CalibrationRole.Telluric)).get.id
+      telluric2Oid       =  obsInGroup2.find(_.calibrationRole.contains(CalibrationRole.Telluric)).get.id
+      telluric1          <- queryObservationWithTarget(telluric1Oid)
+      telluric2          <- queryObservationWithTarget(telluric2Oid)
+    } yield {
+      assertNotEquals(telluric1Oid, telluric2Oid)
+      assertNotEquals(telluric1.targetId, telluric2.targetId)
+      assertEquals(added.size, 2)
+      assertEquals(removed.size, 0)
+      assert(added.contains(telluric1Oid))
+      assert(added.contains(telluric2Oid))
+    }
+
+  test("calling recalculateCalibrations multiple times is idempotent"):
+    for {
+      pid                  <- createProgramAs(pi)
+      tid                  <- createTargetWithProfileAs(pi, pid)
+      oid                  <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+      (added1, removed1)   <- recalculateCalibrations(pid, when)
+      obs                  <- queryObservation(oid)
+      groupId              =  obs.groupId.get
+      obsInGroup1          <- queryObservationsInGroup(groupId)
+      telluric1Oid         =  obsInGroup1.find(_.calibrationRole.contains(CalibrationRole.Telluric)).get.id
+      (added2, removed2)   <- recalculateCalibrations(pid, when)
+      obsInGroup2          <- queryObservationsInGroup(groupId)
+      telluric2Oid         =  obsInGroup2.find(_.calibrationRole.contains(CalibrationRole.Telluric)).get.id
+    } yield {
+      assertEquals(obsInGroup2.size, 2)
+      assertEquals(telluric1Oid, telluric2Oid)
+      assertEquals(added1.size, 1)
+      assertEquals(removed1.size, 0)
+      assertEquals(added2.size, 0)
+      assertEquals(removed2.size, 0)
+    }
+
+  test("recalculation syncs telluric observation configuration"):
+    for {
+      pid          <- createProgramAs(pi)
+      tid          <- createTargetWithProfileAs(pi, pid)
+      oid          <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+      _            <- recalculateCalibrations(pid, when)
+      obs1         <- queryObservation(oid)
+      groupId      =  obs1.groupId.get
+      obsInGroup1  <- queryObservationsInGroup(groupId)
+      telluric1Oid =  obsInGroup1.find(_.calibrationRole.contains(CalibrationRole.Telluric)).get.id
+      _            <- recalculateCalibrations(pid, when)
+      obsInGroup2  <- queryObservationsInGroup(groupId)
+      telluric2Oid =  obsInGroup2.find(_.calibrationRole.contains(CalibrationRole.Telluric)).get.id
+    } yield {
+      assertEquals(obsInGroup2.size, 2)
+      assertEquals(telluric1Oid, telluric2Oid)
+    }
+
+  test("changing F2 to GMOS deletes telluric observation"):
+    for {
+      pid                  <- createProgramAs(pi)
+      tid                  <- createTargetWithProfileAs(pi, pid)
+      oid                  <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+      (added1, removed1)   <- recalculateCalibrations(pid, when)
+      obs1                 <- queryObservation(oid)
+      groupId              =  obs1.groupId.get
+      obsInGroup1          <- queryObservationsInGroup(groupId)
+      telluricOid          =  obsInGroup1.find(_.calibrationRole.contains(CalibrationRole.Telluric)).get.id
+      _                    <- updateObservationMode(oid, "gmosNorthLongSlit")
+      (added2, removed2)   <- recalculateCalibrations(pid, when)
+      obsExists            <- queryObservationExists(telluricOid)
+      groupExists          <- queryGroupExists(groupId)
+    } yield {
+      assert(!obsExists)
+      assert(!groupExists)
+      assertEquals(added1.size, 1)
+      assertEquals(removed1.size, 0)
+      assertEquals(added2.size, 2)
+      assertEquals(removed2.size, 1)
+      assertEquals(removed2.headOption, Some(telluricOid))
+    }
+
+  test("deleting F2 science observation deletes telluric observation"):
+    for {
+      pid                  <- createProgramAs(pi)
+      tid                  <- createTargetWithProfileAs(pi, pid)
+      oid                  <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+      (added1, removed1)   <- recalculateCalibrations(pid, when)
+      obs1                 <- queryObservation(oid)
+      groupId              =  obs1.groupId.get
+      obsInGroup1          <- queryObservationsInGroup(groupId)
+      telluricOid          =  obsInGroup1.find(_.calibrationRole.contains(CalibrationRole.Telluric)).get.id
+      telluricTgt          <- queryObservationWithTarget(telluricOid)
+      telluricTid          =  telluricTgt.targetId.get
+      _                    <- setObservationInactive(oid)
+      (added2, removed2)   <- recalculateCalibrations(pid, when)
+      telluricExists       <- queryObservationExists(telluricOid)
+      groupExists          <- queryGroupExists(groupId)
+      targetExists         <- queryTargetExists(telluricTid)
+    } yield {
+      assert(!telluricExists)
+      assert(!groupExists)
+      assert(!targetExists)
+      assertEquals(added1.size, 1)
+      assertEquals(removed1.size, 0)
+      assertEquals(added2.size, 0)
+      assertEquals(removed2.size, 1)
+      assertEquals(removed2.headOption, Some(telluricOid))
+    }
+
+  test("changing F2 FPU syncs to telluric observation"):
+    for {
+      pid          <- createProgramAs(pi)
+      tid          <- createTargetWithProfileAs(pi, pid)
+      oid          <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+      _            <- recalculateCalibrations(pid, when)
+      obs1         <- queryObservation(oid)
+      groupId      =  obs1.groupId.get
+      obsInGroup1  <- queryObservationsInGroup(groupId)
+      telluricOid  =  obsInGroup1.find(_.calibrationRole.contains(CalibrationRole.Telluric)).get.id
+      scienceFpu1  <- queryObservationFpu(oid)
+      telluricFpu1 <- queryObservationFpu(telluricOid)
+      _            <- updateFlamingos2Fpu(oid, "LONG_SLIT_2")
+      _            <- recalculateCalibrations(pid, when)
+      scienceFpu2  <- queryObservationFpu(oid)
+      telluricFpu2 <- queryObservationFpu(telluricOid)
+    } yield {
+      assertEquals(scienceFpu1, Some("LONG_SLIT_1"))
+      assertEquals(telluricFpu1, Some("LONG_SLIT_1"))
+      assertEquals(scienceFpu2, Some("LONG_SLIT_2"), "Science observation should have LONG_SLIT_2 after update")
+      assertEquals(telluricFpu2, Some("LONG_SLIT_2"), "Telluric observation should sync to LONG_SLIT_2")
     }
