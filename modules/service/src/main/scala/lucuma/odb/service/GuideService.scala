@@ -70,6 +70,7 @@ import lucuma.odb.sequence.gmos
 import lucuma.odb.sequence.syntax.hash.*
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.sequence.util.HashBytes
+import lucuma.odb.service.AsterismService
 import lucuma.odb.service.Services.SuperUserAccess
 import lucuma.odb.syntax.result.*
 import lucuma.odb.util.Codecs.*
@@ -80,11 +81,13 @@ import skunk.implicits.*
 
 import java.security.MessageDigest
 import java.time.Duration
+import java.time.Instant
 import java.time.temporal.ChronoUnit
 import scala.annotation.tailrec
 import scala.collection.immutable.SortedMap
 
 import Services.Syntax.*
+import lucuma.core.math.Region
 
 trait GuideService[F[_]] {
   import GuideService.AvailabilityPeriod
@@ -185,7 +188,8 @@ object GuideService {
     optObsTime:         Option[Timestamp],
     optObsDuration:     Option[TimeSpan],
     guideStarName:      Option[GuideStarName],
-    guideStarHash:      Option[Md5Hash]
+    guideStarHash:      Option[Md5Hash],
+    blindOffsetTargetId: Option[Target.Id]
   ) {
     def obsTime: Result[Timestamp] =
       optObsTime.toResult(generalError(s"Observation time not set for observation $id.").asProblem)
@@ -228,6 +232,9 @@ object GuideService {
 
       given Encoder[Coordinates] = deriveEncoder
       md5.update(HashBytes.forJsonEncoder[Option[Coordinates]].hashBytes(explicitBase))
+
+      given Encoder[Target.Id] = deriveEncoder
+      md5.update(HashBytes.forJsonEncoder[Option[Target.Id]].hashBytes(blindOffsetTargetId))
 
       Md5Hash.unsafeFromByteArray(md5.digest())
     }
@@ -322,6 +329,8 @@ object GuideService {
             _.option(af.argument).map(_.toResult(OdbError.InvalidObservation(oid, Some(s"Could not compute observation info for $oid.")).asProblem))
           )
       }
+
+
 
       def getAvailabilityHash(pid: Program.Id, oid: Observation.Id)(using
         NoTransaction[F]
@@ -493,7 +502,7 @@ object GuideService {
       extension (ts: Timestamp) def plusDaysTruncatedAndBounded(n: Int): Timestamp =
         Timestamp.fromInstantTruncatedAndBounded(ts.toInstant.plus(n, ChronoUnit.DAYS))
 
-      /** 
+      /**
        * Find the first timestamp in `interval` for which the coordinates stray more than `invalidThreshold`
        * from the origin (i.e., coordinates at `interval.start`), or `Timestamp.Max` if the target never
        * exits the valid region. We only check once per day.
@@ -510,11 +519,11 @@ object GuideService {
 
           def withinBoundsAt(ts: Timestamp): Either[OdbError, Boolean] =
             coordsAt(ts).map: coords =>
-              origin.angularDistance(coords) > invalidThreshold          
+              origin.angularDistance(coords) > invalidThreshold
 
           // Start at `ts` and see how far the target has moved, looping back if we need to keep checking.
           @tailrec def go(ts: Timestamp): Either[OdbError, Timestamp] =
-            if ts >= interval.end then 
+            if ts >= interval.end then
               // one last check at the endpoint
               withinBoundsAt(interval.end).map:
                 case true  => Timestamp.Max // never exits
@@ -525,11 +534,11 @@ object GuideService {
                 case Left(err)    => Left(err)
                 case Right(true)  => Right(ts)
                 case Right(false) => go(ts.plusDaysTruncatedAndBounded(1))
-          
+
           // Start at the beginning
           go(interval.start)
 
-      }        
+      }
 
       extension (sidereal: SiderealTracking)
         def masy: Double =
@@ -640,7 +649,7 @@ object GuideService {
                             neededPeriods.traverse: p =>
                               tracking match
                                 case None => Result.success(ContiguousTimestampMap.empty[List[Angle]])
-                                case Some(t) => 
+                                case Some(t) =>
                                   buildAvailabilityList(p, obsInfo, genInfo, genInfo.centralWavelength, t.asterism.map(_._2), t.base, candidates, positions)
           availability <- ResultT.fromResult(
                             neededLists.foldLeft(currentAvail.some)((acc, ele) => acc.flatMap(_.union(ele)))
@@ -701,7 +710,7 @@ object GuideService {
           scienceCutoff   <- asterismTracking
                               .traverse(findInvalidDate(_, TimestampInterval.between(start, end)))
                               .map(_.minimum)
-                              
+
           // we can stop testing candidates when all angles being tested have invalid dates that are farther
           // in the future than either the end time passed in, or a science candidate will be invalid
           endCutoff        = scienceCutoff.min(end)
@@ -764,6 +773,51 @@ object GuideService {
       def guideStarIdFromName(name: GuideStarName): Result[Long] =
         name.toGaiaSourceId.toResult(generalError(s"Invalid guide star name `$name`").asProblem)
 
+      def getTracking(pid: Program.Id, oid: Observation.Id)(using
+        NoTransaction[F], SuperUserAccess
+      ): F[Result[Option[Tracking]]] =
+        getTrackingOrRegion(pid, oid).map(_.map(_.left.toOption))
+
+      def getTrackingOrRegion(pid: Program.Id, oid: Observation.Id)(using
+        NoTransaction[F], SuperUserAccess
+      ): F[Result[Either[Tracking, Region]]] =
+        (for {
+          obsInfo       <- ResultT(getObservationInfo(oid))
+          asterism      <- ResultT(getAsterism(pid, oid))
+          baseTracking   =
+            obsInfo.explicitBase match
+              case Some(eb) => Left(Tracking.constant(eb))
+              case None     => Tracking.orRegionFromAsterism(asterism)
+        } yield baseTracking).value
+
+      def getBlindOffset(
+        oid: Observation.Id,
+        baseCoords: Coordinates,
+        instant: Instant
+      )(using SuperUserAccess): F[Option[Offset]] =
+        Services.asSuperUser:
+          Trace[F].span("getBlindOffset") {
+            for {
+              blindOffsetTargetIdOpt <- session.prepareR(
+                sql"SELECT c_blind_offset_target_id FROM t_observation WHERE c_observation_id = $observation_id".query(target_id.opt)
+              ).use(_.unique(oid))
+              offsetOpt <- blindOffsetTargetIdOpt.traverse { blindOffsetTargetId =>
+                session.prepareR(
+                  sql"""SELECT c_target_id, c_name, c_sid_ra, c_sid_dec, c_sid_epoch, c_sid_pm_ra, c_sid_pm_dec, c_sid_rv, c_parallax, c_source_profile
+                        FROM t_target WHERE c_target_id = $target_id AND c_existence = 'present'""".query(AsterismService.Decoders.targetDecoder)
+                ).use(_.option(blindOffsetTargetId)).map { targetOpt =>
+                  targetOpt.flatMap { case (_, target) =>
+                    Tracking.fromTarget(target)
+                      .flatMap(_.at(instant))
+                      .map(blindCoords => baseCoords.diff(blindCoords).offset)
+                  }
+                }
+              }
+            } yield offsetOpt.flatten
+          }.handleErrorWith { _ =>
+            None.pure[F]
+          }
+
       def lookupGuideStar(
         oid: Observation.Id,
         oGuideStarName: Option[GuideStarName],
@@ -810,13 +864,20 @@ object GuideService {
                                    s"Unable to get coordinates for science targets in observation $oid"
                                  ).asProblem
                                )
-                           
+
           angles        <- ResultT.fromResult(
                              obsInfo.posAngleConstraint
                               .anglesToTestAt(genInfo.site, baseTracking, scienceTime.toInstant, scienceDuration.toDuration)
                               .toResult(generalError(s"No angles to test for guide target candidates for observation $oid.").asProblem)
                            )
-          positions      = getPositions(angles, genInfo.offsets)
+          blindOffsetOpt <- ResultT.liftF(getBlindOffset(oid, baseCoords, obsTime.toInstant))
+          combinedOffsets = blindOffsetOpt match
+                              case Some(offset) =>
+                                genInfo.offsets match
+                                  case Some(offsets) => Some(offsets.append(offset))
+                                  case None => Some(NonEmptyList.one(offset))
+                              case None => genInfo.offsets
+          positions      = getPositions(angles, combinedOffsets)
           optUsable      = chooseBestGuideStar(obsInfo, genInfo.centralWavelength, genInfo, baseCoords, scienceCoords, positions, candidates)
           env           <- ResultT.fromResult(
                              optUsable
@@ -898,7 +959,14 @@ object GuideService {
                               .anglesToTestAt(genInfo.site, baseTracking, obsTime.toInstant, genInfo.timeEstimate.toDuration)
                               .toResult(generalError(s"No angles to test for guide target candidates for observation $oid.").asProblem)
                            )
-          positions      = getPositions(angles, genInfo.offsets)
+          blindOffsetOpt <- ResultT.liftF(getBlindOffset(oid, baseCoords, obsTime.toInstant))
+          combinedOffsets = blindOffsetOpt match
+                              case Some(offset) =>
+                                genInfo.offsets match
+                                  case Some(offsets) => Some(offsets.append(offset))
+                                  case None => Some(NonEmptyList.one(offset))
+                              case None => genInfo.offsets
+          positions      = getPositions(angles, combinedOffsets)
           usable         = processCandidates(obsInfo, genInfo.centralWavelength, genInfo, baseCoords, scienceCoords, positions, candidates)
         } yield usable.toGuideEnvironments.toList).value
 
@@ -979,10 +1047,12 @@ object GuideService {
           c_observation_time,
           c_observation_duration,
           c_guide_target_name,
-          c_guide_target_hash
+          c_guide_target_hash,
+          c_blind_offset_target_id
         from t_observation
         where c_observation_id = $observation_id
       """.apply(oid)
+
 
     def getGuideAvailabilityHash(user: User, pid: Program.Id, oid: Observation.Id): AppliedFragment =
       sql"""
@@ -1097,8 +1167,9 @@ object GuideService {
         core_timestamp.opt         *:
         time_span.opt              *:
         guide_target_name.opt      *:
-        md5_hash.opt).emap {
-        case (id, pid, cloud, image, sky, water, amMin, amMax, haMin, haMax, mode, angle, ra, dec, time, duration, guidestarName, guidestarHash) =>
+        md5_hash.opt               *:
+        target_id.opt).emap {
+        case (id, pid, cloud, image, sky, water, amMin, amMax, haMin, haMax, mode, angle, ra, dec, time, duration, guidestarName, guidestarHash, blindOffsetTargetId) =>
           val paConstraint: PosAngleConstraint = mode match
             case PosAngleConstraintMode.Unbounded           => PosAngleConstraint.Unbounded
             case PosAngleConstraintMode.Fixed               => PosAngleConstraint.Fixed(angle)
@@ -1130,7 +1201,7 @@ object GuideService {
             (ra, dec).mapN(Coordinates(_, _))
 
           elevRange.map(elev =>
-            ObservationInfo(id, pid, ConstraintSet(image, cloud, sky, water, elev), paConstraint, explicitBase, time, duration, guidestarName, guidestarHash)
+            ObservationInfo(id, pid, ConstraintSet(image, cloud, sky, water, elev), paConstraint, explicitBase, time, duration, guidestarName, guidestarHash, blindOffsetTargetId)
           )
       }
 
@@ -1141,5 +1212,7 @@ object GuideService {
       (timestamp_interval *: angle_µas_list).imap((period, angles) =>
         AvailabilityPeriod(period, angles)
       )(ap => (ap.period, ap.posAngles))
+
+
   }
 }
