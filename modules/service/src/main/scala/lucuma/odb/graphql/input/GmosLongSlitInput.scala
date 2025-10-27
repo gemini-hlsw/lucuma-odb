@@ -5,12 +5,15 @@ package lucuma.odb.graphql
 package input
 
 import cats.syntax.foldable.*
+import cats.syntax.option.*
 import cats.syntax.parallel.*
 import cats.syntax.traverse.*
 import coulomb.Quantity
 import grackle.Result
+import grackle.syntax.*
 import lucuma.core.enums.GmosAmpGain
 import lucuma.core.enums.GmosAmpReadMode
+import lucuma.core.enums.GmosLongSlitAcquisitionRoi
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosNorthFpu
 import lucuma.core.enums.GmosNorthGrating
@@ -27,7 +30,10 @@ import lucuma.core.math.Wavelength
 import lucuma.core.math.WavelengthDither
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.optics.Format
+import lucuma.core.syntax.string.*
 import lucuma.odb.data.Nullable
+import lucuma.odb.data.OdbError
+import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.format.spatialOffsets.*
 import lucuma.odb.graphql.binding.*
 
@@ -47,26 +53,72 @@ object GmosLongSlitInput:
 
   val SpatialOffsetsFormat: Format[String, List[Q]] = OffsetsQFormat
 
-  sealed trait Create[G, F, U] {
+  final case class NorthAcquisition(
+    filter:           Nullable[GmosNorthFilter],
+    roi:              Nullable[GmosLongSlitAcquisitionRoi],
+    exposureTimeMode: Option[ExposureTimeMode]
+  )
+
+  object NorthAcquisition:
+    val Binding: Matcher[NorthAcquisition] =
+      ObjectFieldsBinding.rmap {
+        case List(
+          GmosNorthFilterBinding.Nullable("explicitFilter", rFilter),
+          GmosLongSlitAcquisitionRoiBinding.Nullable("explicitRoi", rRoi),
+          ExposureTimeModeInput.Binding.Option("exposureTimeMode", rExposureTimeMode)
+        ) => (
+          rFilter.flatMap: n =>
+            n.traverse: f =>
+              if GmosNorthFilter.acquisition.toList.contains(f) then f.success
+              else OdbError.InvalidArgument(s"'explicitFilter' must contain one of: ${GmosNorthFilter.acquisition.map(_.tag.toScreamingSnakeCase).mkString_(", ")}".some).asFailure
+          ,
+          rRoi,
+          rExposureTimeMode
+        ).parMapN(apply)
+      }
+
+  final case class SouthAcquisition(
+    filter:           Nullable[GmosSouthFilter],
+    roi:              Nullable[GmosLongSlitAcquisitionRoi],
+    exposureTimeMode: Option[ExposureTimeMode]
+  )
+
+  object SouthAcquisition:
+    val Binding: Matcher[SouthAcquisition] =
+      ObjectFieldsBinding.rmap {
+        case List(
+          GmosSouthFilterBinding.Nullable("explicitFilter", rFilter),
+          GmosLongSlitAcquisitionRoiBinding.Nullable("explicitRoi", rRoi),
+          ExposureTimeModeInput.Binding.Option("exposureTimeMode", rExposureTimeMode)
+        ) => (
+          rFilter.flatMap: n =>
+            n.traverse: f =>
+              if GmosSouthFilter.acquisition.toList.contains(f) then f.success
+              else OdbError.InvalidArgument(s"'explicitFilter' must contain one of: ${GmosSouthFilter.acquisition.map(_.tag.toScreamingSnakeCase).mkString_(", ")}".some).asFailure
+          ,
+          rRoi,
+          rExposureTimeMode
+        ).parMapN(apply)
+      }
+
+  sealed trait Create[G, F, U]:
     def grating: G
     def filter:  Option[F]
     def fpu:     U
     def common:  Create.Common
-  }
 
   object Create:
 
     final case class Common(
-      centralWavelength:           Wavelength,
-      acquisitionExposureTimeMode: Option[ExposureTimeMode],
-      scienceExposureTimeMode:     Option[ExposureTimeMode],
-      explicitXBin:                Option[GmosXBinning],
-      explicitYBin:                Option[GmosYBinning],
-      explicitAmpReadMode:         Option[GmosAmpReadMode],
-      explicitAmpGain:             Option[GmosAmpGain],
-      explicitRoi:                 Option[GmosRoi],
-      explicitλDithers:            Option[List[WavelengthDither]],
-      explicitOffsets:             Option[List[Q]]
+      centralWavelength:   Wavelength,
+      exposureTimeMode:    Option[ExposureTimeMode],
+      explicitXBin:        Option[GmosXBinning],
+      explicitYBin:        Option[GmosYBinning],
+      explicitAmpReadMode: Option[GmosAmpReadMode],
+      explicitAmpGain:     Option[GmosAmpGain],
+      explicitRoi:         Option[GmosRoi],
+      explicitλDithers:    Option[List[WavelengthDither]],
+      explicitOffsets:     Option[List[Q]]
     ):
 
       // Formatted to store in a text column in the database with a regex constraint
@@ -77,10 +129,11 @@ object GmosLongSlitInput:
         explicitOffsets.map(SpatialOffsetsFormat.reverseGet)
 
     final case class North(
-      grating: GmosNorthGrating,
-      filter:  Option[GmosNorthFilter],
-      fpu:     GmosNorthFpu,
-      common:  Common
+      grating:     GmosNorthGrating,
+      filter:      Option[GmosNorthFilter],
+      fpu:         GmosNorthFpu,
+      common:      Common,
+      acquisition: Option[NorthAcquisition]
     ) extends Create[GmosNorthGrating, GmosNorthFilter, GmosNorthFpu]:
       def observingModeType: ObservingModeType =
         ObservingModeType.GmosNorthLongSlit
@@ -94,15 +147,15 @@ object GmosLongSlitInput:
             filter,
             Some(fpu),
             Some(centralWavelength),
-            acqExposureTimeMode,
-            sciExposureTimeMode,
+            exposureTimeMode,
             exXBin,
             exYBin,
             exAmpReadMode,
             exAmpGain,
             exRoi,
             exWavelengthDithers,
-            exOffsets
+            exOffsets,
+            acquisition
           ) =>
             Result(North(
               grating,
@@ -110,8 +163,7 @@ object GmosLongSlitInput:
               fpu,
               Common(
                 centralWavelength,
-                acqExposureTimeMode,
-                sciExposureTimeMode,
+                exposureTimeMode,
                 exXBin.toOption,
                 exYBin.toOption,
                 exAmpReadMode.toOption,
@@ -119,16 +171,18 @@ object GmosLongSlitInput:
                 exRoi.toOption,
                 exWavelengthDithers.toOption,
                 exOffsets.toOption
-              )
+              ),
+              acquisition
             ))
           case _ =>
             Matcher.validationFailure("grating, fpu, and centralWavelength are required when creating the GMOS North Long Slit observing mode.")
 
     final case class South(
-      grating: GmosSouthGrating,
-      filter:  Option[GmosSouthFilter],
-      fpu:     GmosSouthFpu,
-      common:  Common
+      grating:     GmosSouthGrating,
+      filter:      Option[GmosSouthFilter],
+      fpu:         GmosSouthFpu,
+      common:      Common,
+      acquisition: Option[SouthAcquisition]
     ) extends Create[GmosSouthGrating, GmosSouthFilter, GmosSouthFpu]:
       def observingModeType: ObservingModeType =
         ObservingModeType.GmosSouthLongSlit
@@ -142,24 +196,23 @@ object GmosLongSlitInput:
             filter,
             Some(fpu),
             Some(centralWavelength),
-            acqExposureTimeMode,
-            sciExposureTimeMode,
+            exposureTimeMode,
             exXBin,
             exYBin,
             exAmpReadMode,
             exAmpGain,
             exRoi,
             exWavelengthDithers,
-            exOffsets
-            ) =>
+            exOffsets,
+            acquisition
+          ) =>
             Result(South(
               grating,
               filter.toOption,
               fpu,
               Common(
                 centralWavelength,
-                acqExposureTimeMode,
-                sciExposureTimeMode,
+                exposureTimeMode,
                 exXBin.toOption,
                 exYBin.toOption,
                 exAmpReadMode.toOption,
@@ -167,7 +220,8 @@ object GmosLongSlitInput:
                 exRoi.toOption,
                 exWavelengthDithers.toOption,
                 exOffsets.toOption
-              )
+              ),
+              acquisition
             ))
           case _ =>
             Matcher.validationFailure("grating, fpu, and centralWavelength are required when creating the GMOS South Long Slit observing mode.")
@@ -176,24 +230,22 @@ object GmosLongSlitInput:
   object Edit:
 
     final case class Common(
-      centralWavelength:           Option[Wavelength],
-      acquisitionExposureTimeMode: Option[ExposureTimeMode],
-      scienceExposureTimeMode:     Option[ExposureTimeMode],
-      explicitXBin:                Nullable[GmosXBinning],
-      explicitYBin:                Nullable[GmosYBinning],
-      explicitAmpReadMode:         Nullable[GmosAmpReadMode],
-      explicitAmpGain:             Nullable[GmosAmpGain],
-      explicitRoi:                 Nullable[GmosRoi],
-      explicitλDithers:            Nullable[List[WavelengthDither]],
-      explicitOffsets:             Nullable[List[Q]]
+      centralWavelength:    Option[Wavelength],
+      exposureTimeMode:     Option[ExposureTimeMode],
+      explicitXBin:         Nullable[GmosXBinning],
+      explicitYBin:         Nullable[GmosYBinning],
+      explicitAmpReadMode:  Nullable[GmosAmpReadMode],
+      explicitAmpGain:      Nullable[GmosAmpGain],
+      explicitRoi:          Nullable[GmosRoi],
+      explicitλDithers:     Nullable[List[WavelengthDither]],
+      explicitOffsets:      Nullable[List[Q]]
     ):
 
       def toCreate(site: Site): Result[Create.Common] =
         required(site, centralWavelength, "centralWavelength").map: w =>
           Create.Common(
             w,
-            acquisitionExposureTimeMode,
-            scienceExposureTimeMode,
+            exposureTimeMode,
             explicitXBin.toOption,
             explicitYBin.toOption,
             explicitAmpReadMode.toOption,
@@ -218,10 +270,11 @@ object GmosLongSlitInput:
       Result.fromOption(oa, Matcher.validationProblem(s"A $itemName is required in order to create a GMOS ${siteName} Long Slit observing mode."))
 
     final case class North(
-      grating: Option[GmosNorthGrating],
-      filter:  Nullable[GmosNorthFilter],
-      fpu:     Option[GmosNorthFpu],
-      common:  Edit.Common
+      grating:     Option[GmosNorthGrating],
+      filter:      Nullable[GmosNorthFilter],
+      fpu:         Option[GmosNorthFpu],
+      common:      Edit.Common,
+      acquisition: Option[NorthAcquisition]
     ):
 
       val observingModeType: ObservingModeType =
@@ -232,7 +285,7 @@ object GmosLongSlitInput:
           g <- required(Site.GN, grating, "grating")
           u <- required(Site.GN, fpu, "fpu")
           c <- common.toCreate(Site.GN)
-        yield Create.North(g, filter.toOption, u, c)
+        yield Create.North(g, filter.toOption, u, c, acquisition)
 
     object North:
 
@@ -243,15 +296,15 @@ object GmosLongSlitInput:
             filter,
             fpu,
             centralWavelength,
-            acqExposureTimeMode,
-            sciExposureTimeMode,
+            exposureTimeMode,
             exXBin,
             exYBin,
             exAmpReadMode,
             exAmpGain,
             exRoi,
             exWavelengthDithers,
-            exOffsets
+            exOffsets,
+            acquisition
           ) =>
             Result(North(
               grating,
@@ -259,8 +312,7 @@ object GmosLongSlitInput:
               fpu,
               Common(
                 centralWavelength,
-                acqExposureTimeMode,
-                sciExposureTimeMode,
+                exposureTimeMode,
                 exXBin,
                 exYBin,
                 exAmpReadMode,
@@ -268,14 +320,16 @@ object GmosLongSlitInput:
                 exRoi,
                 exWavelengthDithers,
                 exOffsets
-              )
+              ),
+              acquisition
             ))
 
     final case class South(
-      grating: Option[GmosSouthGrating],
-      filter:  Nullable[GmosSouthFilter],
-      fpu:     Option[GmosSouthFpu],
-      common:  Edit.Common
+      grating:     Option[GmosSouthGrating],
+      filter:      Nullable[GmosSouthFilter],
+      fpu:         Option[GmosSouthFpu],
+      common:      Edit.Common,
+      acquisition: Option[SouthAcquisition]
     ):
 
       val observingModeType: ObservingModeType =
@@ -286,7 +340,7 @@ object GmosLongSlitInput:
           g <- required(Site.GS, grating, "grating")
           u <- required(Site.GS, fpu, "fpu")
           c <- common.toCreate(Site.GS)
-        yield Create.South(g, filter.toOption, u, c)
+        yield Create.South(g, filter.toOption, u, c, acquisition)
 
     object South:
 
@@ -297,24 +351,23 @@ object GmosLongSlitInput:
             filter,
             fpu,
             centralWavelength,
-            acqExposureTimeMode,
-            sciExposureTimeMode,
+            exposureTimeMode,
             exXBin,
             exYBin,
             exAmpReadMode,
             exAmpGain,
             exRoi,
             exWavelengthDithers,
-            exOffsets
-            ) =>
+            exOffsets,
+            acquisition
+          ) =>
             Result(South(
               grating,
               filter,
               fpu,
               Common(
                 centralWavelength,
-                acqExposureTimeMode,
-                sciExposureTimeMode,
+                exposureTimeMode,
                 exXBin,
                 exYBin,
                 exAmpReadMode,
@@ -322,7 +375,8 @@ object GmosLongSlitInput:
                 exRoi,
                 exWavelengthDithers,
                 exOffsets
-              )
+              ),
+              acquisition
             ))
 
 
@@ -332,14 +386,14 @@ object GmosLongSlitInput:
     Option[GmosNorthFpu],
     Option[Wavelength],
     Option[ExposureTimeMode],
-    Option[ExposureTimeMode],
     Nullable[GmosXBinning],
     Nullable[GmosYBinning],
     Nullable[GmosAmpReadMode],
     Nullable[GmosAmpGain],
     Nullable[GmosRoi],
     Nullable[List[WavelengthDither]],
-    Nullable[List[Q]]
+    Nullable[List[Q]],
+    Option[NorthAcquisition]
   )] =
     ObjectFieldsBinding.rmap:
       case List(
@@ -347,8 +401,7 @@ object GmosLongSlitInput:
         GmosNorthFilterBinding.Nullable("filter", rFilter),
         GmosNorthFpuBinding.Option("fpu", rFpu),
         WavelengthInput.Binding.Option("centralWavelength", rCentralWavelength),
-        ExposureTimeModeInput.Binding.Option("acquisitionExposureTimeMode", rAcqExposureTimeMode),
-        ExposureTimeModeInput.Binding.Option("scienceExposureTimeMode", rSciExposureTimeMode),
+        ExposureTimeModeInput.Binding.Option("exposureTimeMode", rExposureTimeMode),
         GmosBinningBinding.Nullable("explicitXBin", rExplicitXBin),
         GmosBinningBinding.Nullable("explicitYBin", rExplicitYBin),
         GmosAmpReadModeBinding.Nullable("explicitAmpReadMode", rExplicitAmpReadMode),
@@ -356,14 +409,14 @@ object GmosLongSlitInput:
         GmosRoiBinding.Nullable("explicitRoi", rExplicitRoi),
         WavelengthDitherInput.Binding.List.Nullable("explicitWavelengthDithers", rWavelengthDithers),
         OffsetComponentInput.BindingQ.List.Nullable("explicitOffsets", rOffsets),
-        OffsetComponentInput.BindingQ.List.Nullable("explicitSpatialOffsets", rSpatialOffsets)
+        OffsetComponentInput.BindingQ.List.Nullable("explicitSpatialOffsets", rSpatialOffsets),
+        NorthAcquisition.Binding.Option("acquisition", rAcquisition)
       ) => (
         rGrating,
         rFilter,
         rFpu,
         rCentralWavelength,
-        rAcqExposureTimeMode,
-        rSciExposureTimeMode,
+        rExposureTimeMode,
         rExplicitXBin.map(_.map(GmosXBinning(_))),
         rExplicitYBin.map(_.map(GmosYBinning(_))),
         rExplicitAmpReadMode,
@@ -372,7 +425,8 @@ object GmosLongSlitInput:
         rWavelengthDithers,
         (rOffsets, rSpatialOffsets).parMapN { (offsets, spatialOffsets) =>
           offsets.orElse(spatialOffsets)
-        }
+        },
+        rAcquisition
       ).parTupled
 
   private val SouthData: Matcher[(
@@ -381,14 +435,14 @@ object GmosLongSlitInput:
     Option[GmosSouthFpu],
     Option[Wavelength],
     Option[ExposureTimeMode],
-    Option[ExposureTimeMode],
     Nullable[GmosXBinning],
     Nullable[GmosYBinning],
     Nullable[GmosAmpReadMode],
     Nullable[GmosAmpGain],
     Nullable[GmosRoi],
     Nullable[List[WavelengthDither]],
-    Nullable[List[Q]]
+    Nullable[List[Q]],
+    Option[SouthAcquisition]
   )] =
     ObjectFieldsBinding.rmap:
       case List(
@@ -396,8 +450,7 @@ object GmosLongSlitInput:
         GmosSouthFilterBinding.Nullable("filter", rFilter),
         GmosSouthFpuBinding.Option("fpu", rFpu),
         WavelengthInput.Binding.Option("centralWavelength", rCentralWavelength),
-        ExposureTimeModeInput.Binding.Option("acquisitionExposureTimeMode", rAcqExposureTimeMode),
-        ExposureTimeModeInput.Binding.Option("scienceExposureTimeMode", rSciExposureTimeMode),
+        ExposureTimeModeInput.Binding.Option("exposureTimeMode", rExposureTimeMode),
         GmosBinningBinding.Nullable("explicitXBin", rExplicitXBin),
         GmosBinningBinding.Nullable("explicitYBin", rExplicitYBin),
         GmosAmpReadModeBinding.Nullable("explicitAmpReadMode", rExplicitAmpReadMode),
@@ -405,14 +458,14 @@ object GmosLongSlitInput:
         GmosRoiBinding.Nullable("explicitRoi", rExplicitRoi),
         WavelengthDitherInput.Binding.List.Nullable("explicitWavelengthDithers", rWavelengthDithers),
         OffsetComponentInput.BindingQ.List.Nullable("explicitOffsets", rOffsets),
-        OffsetComponentInput.BindingQ.List.Nullable("explicitSpatialOffsets", rSpatialOffsets)
+        OffsetComponentInput.BindingQ.List.Nullable("explicitSpatialOffsets", rSpatialOffsets),
+        SouthAcquisition.Binding.Option("acquisition", rAcquisition)
       ) => (
         rGrating,
         rFilter,
         rFpu,
         rCentralWavelength,
-        rAcqExposureTimeMode,
-        rSciExposureTimeMode,
+        rExposureTimeMode,
         rExplicitXBin.map(_.map(GmosXBinning(_))),
         rExplicitYBin.map(_.map(GmosYBinning(_))),
         rExplicitAmpReadMode,
@@ -421,5 +474,6 @@ object GmosLongSlitInput:
         rWavelengthDithers,
         (rOffsets, rSpatialOffsets).parMapN { (offsets, spatialOffsets) =>
           offsets.orElse(spatialOffsets)
-        }
+        },
+        rAcquisition
       ).parTupled

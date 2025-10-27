@@ -36,6 +36,29 @@ class executionPlannedTime extends ExecutionTestSupportForGmos {
         p <- createProgram
         t <- createTargetWithProfileAs(pi, p)
         o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+        // Set the acquisition ROI to CCD2_STAMP to match the previous default.
+        _ <- query(
+          user  = pi,
+          query = s"""
+            mutation {
+              updateObservations(input: {
+                SET: {
+                  observingMode: {
+                    gmosNorthLongSlit: {
+                      acquisition: {
+                        explicitRoi: CCD2_STAMP
+                      }
+                    }
+                  }
+                }
+              }) {
+                observations {
+                  id
+                }
+              }
+            }
+          """
+        )
       } yield o
 
     def instrumentConfig(x: GmosXBinning, y: GmosYBinning, r: GmosRoi): Json =

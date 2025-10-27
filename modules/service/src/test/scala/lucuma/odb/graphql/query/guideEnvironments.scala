@@ -503,7 +503,7 @@ class guideEnvironments extends ExecutionTestSupportForGmos {
       } yield o
     setup.flatMap { oid =>
       expect(pi, guideEnvironmentQuery(oid, aug2023),
-      expected = List(s"No targets have been defined for observation $oid.").asLeft)
+      expected = List(s"Could not generate a sequence for $oid: observation is missing target").asLeft)
     }
   }
 

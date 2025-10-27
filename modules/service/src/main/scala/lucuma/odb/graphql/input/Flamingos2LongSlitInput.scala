@@ -31,18 +31,32 @@ object Flamingos2LongSlitInput:
     else
       Result(offsets)
 
+  case class Acquisition(
+    exposureTimeMode: Option[ExposureTimeMode]
+  )
+
+  object Acquisition:
+
+    val Binding: Matcher[Acquisition] =
+      ObjectFieldsBinding.rmap {
+        case List(
+          ExposureTimeModeInput.Binding.Option("exposureTimeMode", rExposureTime)
+        ) => rExposureTime.map(apply)
+      }
+
+
   case class Create(
     disperser: Flamingos2Disperser,
     filter: Flamingos2Filter,
     fpu: Flamingos2Fpu,
-    acquisitionExposureTimeMode: Option[ExposureTimeMode],
-    scienceExposureTimeMode: Option[ExposureTimeMode],
+    exposureTimeMode: Option[ExposureTimeMode],
     explicitReadMode: Option[Flamingos2ReadMode]       = None,
     explicitReads: Option[Flamingos2Reads]             = None,
     explicitDecker: Option[Flamingos2Decker]           = None,
     explicitReadoutMode: Option[Flamingos2ReadoutMode] = None,
     explicitOffsets: Option[List[Offset]]              = None,
-    telluricType: TelluricType                         = TelluricType.Hot
+    telluricType: TelluricType                         = TelluricType.Hot,
+    acquisition: Option[Acquisition]                   = None
   ):
     def observingModeType: ObservingModeType =
       ObservingModeType.Flamingos2LongSlit
@@ -57,39 +71,39 @@ object Flamingos2LongSlitInput:
       Flamingos2Filter,
       Flamingos2Fpu,
       Option[ExposureTimeMode],
-      Option[ExposureTimeMode],
       Option[Flamingos2ReadMode],
+      Option[Flamingos2Reads],
       Option[Flamingos2Decker],
       Option[Flamingos2ReadoutMode],
-      Option[Flamingos2Reads],
       Option[List[Offset]],
-      Option[TelluricType]
+      Option[TelluricType],
+      Option[Acquisition]
     )] =
       ObjectFieldsBinding.rmap {
         case List(
           Flamingos2DisperserBinding("disperser", rDisperser),
           Flamingos2FilterBinding("filter", rFilter),
           Flamingos2FpuBinding("fpu", rFpu),
-          ExposureTimeModeInput.Binding.Option("acquisitionExposureTimeMode", rAcqExposureTimeMode),
-          ExposureTimeModeInput.Binding.Option("scienceExposureTimeMode", rSciExposureTimeMode),
+          ExposureTimeModeInput.Binding.Option("exposureTimeMode", rExposureTimeMode),
           Flamingos2ReadModeBinding.Option("explicitReadMode", rReadMode),
           Flamingos2ReadsBinding.Option("explicitReads", rReads),
           Flamingos2DeckerBinding.Option("explicitDecker", rDecker),
           Flamingos2ReadoutModeBinding.Option("explicitReadoutMode", rReadoutMode),
           OffsetInput.Binding.List.Option("explicitOffsets", rOffsets),
-          TelluricTypeBinding.Option("telluricType", rTelluricType)
+          TelluricTypeBinding.Option("telluricType", rTelluricType),
+          Acquisition.Binding.Option("acquisition", rAcquisition)
         ) => (
           rDisperser,
           rFilter,
           rFpu,
-          rAcqExposureTimeMode,
-          rSciExposureTimeMode,
+          rExposureTimeMode,
           rReadMode,
+          rReads,
           rDecker,
           rReadoutMode,
-          rReads,
           rOffsets,
-          rTelluricType
+          rTelluricType,
+          rAcquisition
         ).parTupled
       }
 
@@ -99,45 +113,45 @@ object Flamingos2LongSlitInput:
           disperser,
           filter,
           fpu,
-          acqExposureTimeMode,
-          sciExposureTimeMode,
+          exposureTimeMode,
           explicitReadMode,
+          explicitReads,
           explicitDecker,
           explicitReadoutMode,
-          explicitReads,
           explicitOffsets,
-          telluricType
-      ) =>
-        explicitOffsets match
-          case Some(offsets) =>
-            validateOffsets(offsets).as:
-              Create(
+          telluricType,
+          acquisition
+        ) =>
+          explicitOffsets match
+            case Some(offsets) =>
+              validateOffsets(offsets).as:
+                Create(
+                  disperser,
+                  filter,
+                  fpu,
+                  exposureTimeMode,
+                  explicitReadMode,
+                  explicitReads,
+                  explicitDecker,
+                  explicitReadoutMode,
+                  explicitOffsets,
+                  telluricType.getOrElse(TelluricType.Hot),
+                  acquisition
+                )
+            case None =>
+              Result(Create(
                 disperser,
                 filter,
                 fpu,
-                acqExposureTimeMode,
-                sciExposureTimeMode,
+                exposureTimeMode,
                 explicitReadMode,
                 explicitReads,
                 explicitDecker,
                 explicitReadoutMode,
                 explicitOffsets,
-                telluricType.getOrElse(TelluricType.Hot)
-              )
-          case None =>
-            Result(Create(
-              disperser,
-              filter,
-              fpu,
-              acqExposureTimeMode,
-              sciExposureTimeMode,
-              explicitReadMode,
-              explicitReads,
-              explicitDecker,
-              explicitReadoutMode,
-              explicitOffsets,
-              telluricType.getOrElse(TelluricType.Hot)
-            ))
+                telluricType.getOrElse(TelluricType.Hot),
+                acquisition
+              ))
       }
 
 
@@ -145,14 +159,14 @@ object Flamingos2LongSlitInput:
     disperser: Option[Flamingos2Disperser],
     filter: Option[Flamingos2Filter],
     fpu: Option[Flamingos2Fpu],
-    acquisitionExposureTimeMode: Option[ExposureTimeMode],
-    scienceExposureTimeMode: Option[ExposureTimeMode],
+    exposureTimeMode: Option[ExposureTimeMode],
     explicitReadMode: Nullable[Flamingos2ReadMode],
     explicitReads: Nullable[Flamingos2Reads],
     explicitDecker: Nullable[Flamingos2Decker],
     explicitReadoutMode: Nullable[Flamingos2ReadoutMode],
     explicitOffsets: Nullable[List[Offset]],
-    telluricType: Option[TelluricType]
+    telluricType: Option[TelluricType],
+    acquisition: Option[Acquisition]
   ):
 
     val observingModeType: ObservingModeType =
@@ -168,22 +182,22 @@ object Flamingos2LongSlitInput:
       )
 
     val toCreate: Result[Create] =
-      for {
+      for
         g <- required(disperser, "disperser")
         f <- required(filter, "filter")
         u <- required(fpu, "fpu")
-      } yield Create(
+      yield Create(
         g,
         f,
         u,
-        acquisitionExposureTimeMode,
-        scienceExposureTimeMode,
+        exposureTimeMode,
         explicitReadMode.toOption,
         explicitReads.toOption,
         explicitDecker.toOption,
         explicitReadoutMode.toOption,
         explicitOffsets.toOption,
-        telluricType.getOrElse(TelluricType.Hot)
+        telluricType.getOrElse(TelluricType.Hot),
+        acquisition
       )
 
   object Edit:
@@ -193,39 +207,39 @@ object Flamingos2LongSlitInput:
       Option[Flamingos2Filter],
       Option[Flamingos2Fpu],
       Option[ExposureTimeMode],
-      Option[ExposureTimeMode],
       Nullable[Flamingos2ReadMode],
       Nullable[Flamingos2Reads],
       Nullable[Flamingos2Decker],
       Nullable[Flamingos2ReadoutMode],
       Nullable[List[Offset]],
-      Option[TelluricType]
+      Option[TelluricType],
+      Option[Acquisition]
     )] =
       ObjectFieldsBinding.rmap {
         case List(
           Flamingos2DisperserBinding.Option("disperser", rDisperser),
           Flamingos2FilterBinding.Option("filter", rFilter),
           Flamingos2FpuBinding.Option("fpu", rFpu),
-          ExposureTimeModeInput.Binding.Option("acquisitionExposureTimeMode", rAcqExposureTimeMode),
-          ExposureTimeModeInput.Binding.Option("scienceExposureTimeMode", rSciExposureTimeMode),
+          ExposureTimeModeInput.Binding.Option("exposureTimeMode", rExposureTimeMode),
           Flamingos2ReadModeBinding.Nullable("explicitReadMode", rReadMode),
           Flamingos2ReadsBinding.Nullable("explicitReads", rReads),
           Flamingos2DeckerBinding.Nullable("explicitDecker", rDecker),
           Flamingos2ReadoutModeBinding.Nullable("explicitReadoutMode", rReadoutMode),
           OffsetInput.Binding.List.Nullable("explicitOffsets", rOffsets),
-          TelluricTypeBinding.Option("telluricType", rTelluricType)
+          TelluricTypeBinding.Option("telluricType", rTelluricType),
+          Acquisition.Binding.Option("acquisition", rAcquisition)
         ) => (
           rDisperser,
           rFilter,
           rFpu,
-          rAcqExposureTimeMode,
-          rSciExposureTimeMode,
+          rExposureTimeMode,
           rReadMode,
           rReads,
           rDecker,
           rReadoutMode,
           rOffsets,
-          rTelluricType
+          rTelluricType,
+          rAcquisition
         ).parTupled
       }
 
@@ -235,15 +249,15 @@ object Flamingos2LongSlitInput:
           grating,
           filter,
           fpu,
-          acqExposureTimeMode,
-          sciExposureTimeMode,
+          exposureTimeMode,
           explicitReadMode,
           explicitReads,
           explicitDecker,
           explicitReadoutMode,
           explicitOffsets,
-          telluricType
-          ) =>
+          telluricType,
+          acquisition
+        ) =>
           explicitOffsets match
             case NonNull(offsets) =>
               validateOffsets(offsets).as:
@@ -251,27 +265,27 @@ object Flamingos2LongSlitInput:
                   grating,
                   filter,
                   fpu,
-                  acqExposureTimeMode,
-                  sciExposureTimeMode,
+                  exposureTimeMode,
                   explicitReadMode,
                   explicitReads,
                   explicitDecker,
                   explicitReadoutMode,
                   explicitOffsets,
-                  telluricType
+                  telluricType,
+                  acquisition
                 )
             case _ =>
               Result(Edit(
                 grating,
                 filter,
                 fpu,
-                acqExposureTimeMode,
-                sciExposureTimeMode,
+                exposureTimeMode,
                 explicitReadMode,
                 explicitReads,
                 explicitDecker,
                 explicitReadoutMode,
                 explicitOffsets,
-                telluricType
+                telluricType,
+                acquisition
               ))
       }

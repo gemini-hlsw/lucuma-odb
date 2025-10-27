@@ -162,6 +162,29 @@ class ObscalcServiceSuite extends ObscalcServiceSuiteSupport:
       p <- createProgram
       t <- createTargetWithProfileAs(pi, p)
       o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+      // Set the acquisition ROI to CCD2_STAMP to match the previous default.
+      _ <- query(
+        user  = pi,
+        query = s"""
+          mutation {
+            updateObservations(input: {
+              SET: {
+                observingMode: {
+                  gmosNorthLongSlit: {
+                    acquisition: {
+                      explicitRoi: CCD2_STAMP
+                    }
+                  }
+                }
+              }
+            }) {
+              observations {
+                id
+              }
+            }
+          }
+        """
+      )
     yield (p, t, o)
 
   def fakeWithTargetResult(tid: Target.Id): Obscalc.Result =
@@ -193,7 +216,6 @@ class ObscalcServiceSuite extends ObscalcServiceSuiteSupport:
           SequenceDigest(
             ObserveClass.Science,
             CategorizedTime(ChargeClass.Program -> TimeSpan.FromSeconds.getOption(ScienceSequence).get),
-//            CategorizedTime(ChargeClass.Program -> TimeSpan.unsafeFromMicroseconds(784200000L)),
             SortedSet(Offset.microarcseconds.reverseGet(0L, 1295985000000L), Offset.Zero, Offset.microarcseconds.reverseGet(0L, 15000000L)),
             NonNegInt.unsafeFrom(3),
             ExecutionState.NotStarted
@@ -260,7 +282,7 @@ class ObscalcServiceSuite extends ObscalcServiceSuiteSupport:
     yield ()
 
   test("update then load"):
-    setup.flatTap: (p, _, o) =>
+    (setup <* cleanup).flatTap: (p, _, o) =>
       val pc = Obscalc.PendingCalc(p, o, randomTime)
       assertIO(insert(pc) *> calculateAndUpdate(pc) *> load, Nil)
 
@@ -300,7 +322,7 @@ class ObscalcServiceSuite extends ObscalcServiceSuiteSupport:
         """.command
         session.execute(cmd)(o).void
 
-    val res = setup.flatMap: (_, _, o) =>
+    val res = (setup <* cleanup).flatMap: (_, _, o) =>
       setWavelengthToMagicValue(o) *>
       load.flatMap: lst =>
         calculateAndUpdate(lst.head) *> selectStates

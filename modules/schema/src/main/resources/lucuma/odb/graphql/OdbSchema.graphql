@@ -2073,6 +2073,35 @@ input GmosNorthGratingConfigInput {
 }
 
 """
+Parameters that override acquisition defaults.  These are optional and may be specified to change
+the default behavior of the acquisition sequence.
+"""
+input GmosNorthLongSlitAcquisitionInput {
+
+  """
+  An explicit acquisition filter to use instead of the default.  The `explicitFilter`
+  may be unset by assigning a null value, or ignored by skipping it altogether.  If not provided,
+  the filter that will be used for the acquisition sequence is the broadband filter closest to
+  the central wavelength.
+  """
+  explicitFilter: GmosNorthFilter
+
+  """
+  An explicit acquisition ROI mode to use instead of the default.  The `explicitRoi`
+  may be unset by assigning a null value, or ignored by skipping it altogether.  If not provided,
+  the ROI(s) that will be used for the acquisition sequence will depend on the science ROI.
+  """
+  explicitRoi: GmosLongSlitAcquisitionRoi
+
+  """
+  Exposure time mode for the acquisition sequence.  If not specified, a default
+  exposure time mode is used.
+  """
+  exposureTimeMode: ExposureTimeModeInput
+
+}
+
+"""
 Edit or create GMOS North Long Slit advanced configuration
 """
 input GmosNorthLongSlitInput {
@@ -2097,16 +2126,10 @@ input GmosNorthLongSlitInput {
   centralWavelength: WavelengthInput
 
   """
-  Exposure time mode for the acquisition sequence.  If not specified, a default
-  exposure time mode is used.
-  """
-  acquisitionExposureTimeMode: ExposureTimeModeInput
-
-  """
   Exposure time mode for the science sequence.  If not specified, the exposure
   time mode of the observation's science requirements are used.
   """
-  scienceExposureTimeMode: ExposureTimeModeInput
+  exposureTimeMode: ExposureTimeModeInput
 
   """
   The explicitXBin field may be unset by assigning a null value, or ignored by skipping it altogether
@@ -2148,6 +2171,12 @@ input GmosNorthLongSlitInput {
   @deprecated(reason: "Use 'explicitOffsets' instead.")
   """
   explicitSpatialOffsets: [OffsetComponentInput!]
+
+  """
+  Parameters that override acquisition defaults.
+  """
+  acquisition: GmosNorthLongSlitAcquisitionInput
+
 }
 
 """
@@ -2527,6 +2556,35 @@ input GmosSouthGratingConfigInput {
 }
 
 """
+Parameters that override acquisition defaults.  These are optional and may be specified to change
+the default behavior of the acquisition sequence.
+"""
+input GmosSouthLongSlitAcquisitionInput {
+
+  """
+  An explicit acquisition filter to use instead of the default.  The `explicitFilter`
+  may be unset by assigning a null value, or ignored by skipping it altogether.  If not provided,
+  the filter that will be used for the acquisition sequence is the broadband filter closest to
+  the central wavelength.
+  """
+  explicitFilter: GmosSouthFilter
+
+  """
+  An explicit acquisition ROI mode to use instead of the default.  The `explicitRoi`
+  may be unset by assigning a null value, or ignored by skipping it altogether.  If not provided,
+  the ROI(s) that will be used for the acquisition sequence will depend on the science ROI.
+  """
+  explicitRoi: GmosLongSlitAcquisitionRoi
+
+  """
+  Exposure time mode for the acquisition sequence.  If not specified, a default
+  exposure time mode is used.
+  """
+  exposureTimeMode: ExposureTimeModeInput
+
+}
+
+"""
 Edit or create GMOS South Long Slit advanced configuration
 """
 input GmosSouthLongSlitInput {
@@ -2551,16 +2609,10 @@ input GmosSouthLongSlitInput {
   centralWavelength: WavelengthInput
 
   """
-  Exposure time mode for the acquisition sequence.  If not specified, a default
-  exposure time mode is used.
-  """
-  acquisitionExposureTimeMode: ExposureTimeModeInput
-
-  """
   Exposure time mode for the science sequence.  If not specified, the exposure
   time mode of the observation's science requirements are used.
   """
-  scienceExposureTimeMode: ExposureTimeModeInput
+  exposureTimeMode: ExposureTimeModeInput
 
   """
   The explicitXBin field may be unset by assigning a null value, or ignored by skipping it altogether
@@ -2602,6 +2654,12 @@ input GmosSouthLongSlitInput {
   @deprecated(reason: "Use 'explicitOffsets' instead.")
   """
   explicitSpatialOffsets: [OffsetComponentInput!]
+
+  """
+  Parameters that override acquisition defaults.
+  """
+  acquisition: GmosSouthLongSlitAcquisitionInput
+
 }
 
 """
@@ -8049,6 +8107,18 @@ input TelluricTypeInput {
 }
 
 """
+Flamingos2 Long Slit acquisition settings.
+"""
+type Flamingos2LongSlitAcquisition {
+
+  """
+  The exposure time mode used for ITC lookup for the acquisition sequence.
+  """
+  exposureTimeMode: ExposureTimeMode!
+
+}
+
+"""
 Flamingos2 Long Slit mode
 """
 type Flamingos2LongSlit {
@@ -8069,14 +8139,9 @@ type Flamingos2LongSlit {
   fpu: Flamingos2Fpu!
 
   """
-  The exposure time mode used for ITC lookup for the acquisition sequence.
-  """
-  acquisitionExposureTimeMode: ExposureTimeMode!
-
-  """
   The exposure time mode used for ITC lookup for the science sequence.
   """
-  scienceExposureTimeMode: ExposureTimeMode!
+  exposureTimeMode: ExposureTimeMode!
 
   """
   Optional explicitly specified F2 ReadMode. If set it overrides the
@@ -8147,6 +8212,11 @@ type Flamingos2LongSlit {
   telluricType: TelluricType!
 
   """
+  Acquisition properties.
+  """
+  acquisition: Flamingos2LongSlitAcquisition!
+
+  """
   The disperser as it was initially selected.  See the `disperser` field for the
   disperser that will be used in the observation.
   """
@@ -8163,6 +8233,20 @@ type Flamingos2LongSlit {
   will be used in the observation.
   """
   initialFpu: Flamingos2Fpu!
+
+}
+
+"""
+Flamingos2 Long Slit acquisition input parameters.  When specified, these override
+default values.
+"""
+input Flamingos2LongSlitAcquisitionInput {
+
+  """
+  Exposure time mode for the acquisition sequence.  If not specified, a default
+  exposure time mode is used.
+  """
+  exposureTimeMode: ExposureTimeModeInput
 
 }
 
@@ -8186,16 +8270,10 @@ input Flamingos2LongSlitInput {
   fpu: Flamingos2Fpu
 
   """
-  Exposure time mode for the acquisition sequence.  If not specified, a default
-  exposure time mode is used.
-  """
-  acquisitionExposureTimeMode: ExposureTimeModeInput
-
-  """
   Exposure time mode for the science sequence.  If not specified, the exposure
   time mode of the observation's science requirements are used.
   """
-  scienceExposureTimeMode: ExposureTimeModeInput
+  exposureTimeMode: ExposureTimeModeInput
 
   """
   The read mode field may be unset by assigning a null value, or ignored by skipping it altogether
@@ -8227,6 +8305,10 @@ input Flamingos2LongSlitInput {
   """
   telluricType: TelluricTypeInput = { tag: HOT }
 
+  """
+  Acquisition properties that, when set, override default values.
+  """
+  acquisition: Flamingos2LongSlitInput
 }
 
 """
@@ -8407,6 +8489,33 @@ enum GmosAmpReadMode {
   GmosAmpReadMode Fast
   """
   FAST
+}
+
+"""
+GMOS Long Slit Acquisition ROI options.
+"""
+enum GmosLongSlitAcquisitionRoi {
+
+  """
+  Imaging step uses CCD2, slit steps use Central Stamp.
+  """
+  CCD2_STAMP
+
+  """
+  Both imaging and slit use CCD2.
+  """
+  CCD2
+
+  """
+  Both imaging and slit use Ceentral Stamp.
+  """
+  STAMP
+
+  """
+  Imaging uses Full frame, slit steps use CCD2.
+  """
+  FULL_CCD2
+
 }
 
 """
@@ -8675,9 +8784,58 @@ enum GmosNorthGrating {
 }
 
 """
+Acquisition settings for GMOS North long slit acquisition.
+"""
+type GmosNorthLongSlitAcquisition {
+
+  """
+  The GMOS North filter that will be used in the acquisition sequence.  This will
+  be the `explicitFilter` if specified, but otherwise the `defaultFilter`.
+  """
+  filter: GmosNorthFilter!
+
+  """
+  The GMOS Nouth filter that will be used by default, if an explicit acquisition
+  filter was not specified.  The default is calculated as the broadband filter
+  closest in wavelength to the observation's `centralWavelength`.
+  """
+  defaultFilter: GmosNorthFilter!
+
+  """
+  An explicitly specified GMOS North filter to use in acquisition (if any).
+  """
+  explicitFilter: GmosNorthFilter
+
+  """
+  The ROI(s) that will be used for the acquisition sequence.  In the case of a
+  compound ROI such as `CCD2_STAMP`, the first will be used for the imaging step
+  and the second for the remainder of the steps.
+  """
+  roi: GmosLongSlitAcquisitionRoi!
+
+  """
+  The acquisition ROI(s) that will be used by default, if an explicit ROI was
+  not specified.
+  """
+  defaultRoi: GmosLongSlitAcquisitionRoi!
+
+  """
+  An explicitly specified ROI to use in acquisition (if any).
+  """
+  explicitRoi: GmosLongSlitAcquisitionRoi
+
+  """
+  The exposure time mode used for ITC lookup for the acquisition sequence.
+  """
+  exposureTimeMode: ExposureTimeMode!
+
+}
+
+"""
 GMOS North Long Slit mode
 """
 type GmosNorthLongSlit {
+
   """
   GMOS North Grating
   """
@@ -8700,14 +8858,9 @@ type GmosNorthLongSlit {
   centralWavelength: Wavelength!
 
   """
-  The exposure time mode used for ITC lookup for the acquisition sequence.
-  """
-  acquisitionExposureTimeMode: ExposureTimeMode!
-
-  """
   The exposure time mode used for ITC lookup for the science sequence.
   """
-  scienceExposureTimeMode: ExposureTimeMode!
+  exposureTimeMode: ExposureTimeMode!
 
   """
   GMOS X-Binning, either explicitly specified in explicitXBin or else taken
@@ -8844,6 +8997,11 @@ type GmosNorthLongSlit {
   the default.
   """
   explicitSpatialOffsets: [OffsetQ!] @deprecated(reason: "Use 'explicitOffsets' instead.")
+
+  """
+  Settings that apply to the acquisition sequence.
+  """
+  acquisition: GmosNorthLongSlitAcquisition!
 
   """
   The grating as it was initially selected.  See the `grating` field for the
@@ -9285,9 +9443,58 @@ enum GmosSouthGrating {
 }
 
 """
+Acquisition settings for GMOS South long slit acquisition.
+"""
+type GmosSouthLongSlitAcquisition {
+
+  """
+  The GMOS South filter that will be used in the acquisition sequence.  This will
+  be the `explicitFilter` if specified, but otherwise the `defaultFilter`.
+  """
+  filter: GmosSouthFilter!
+
+  """
+  The GMOS South filter that will be used by default, if an explicit acquisition
+  filter was not specified.  The default is calculated as the broadband filter
+  closest in wavelength to the observation's `centralWavelength`.
+  """
+  defaultFilter: GmosSouthFilter!
+
+  """
+  An explicitly specified GMOS South filter to use in acquisition (if any).
+  """
+  explicitFilter: GmosSouthFilter
+
+  """
+  The ROI(s) that will be used for the acquisition sequence.  In the case of a
+  compound ROI such as `CCD2_STAMP`, the first will be used for the imaging step
+  and the second for the remainder of the steps.
+  """
+  roi: GmosLongSlitAcquisitionRoi!
+
+  """
+  The acquisition ROI(s) that will be used by default, if an explicit ROI was
+  not specified.
+  """
+  defaultRoi: GmosLongSlitAcquisitionRoi!
+
+  """
+  An explicitly specified ROI to use in acquisition (if any).
+  """
+  explicitRoi: GmosLongSlitAcquisitionRoi
+
+  """
+  The exposure time mode used for ITC lookup for the acquisition sequence.
+  """
+  exposureTimeMode: ExposureTimeMode!
+
+}
+
+"""
 GMOS South Long Slit mode
 """
 type GmosSouthLongSlit {
+
   """
   GMOS South Grating
   """
@@ -9310,14 +9517,9 @@ type GmosSouthLongSlit {
   centralWavelength: Wavelength!
 
   """
-  The exposure time mode used for ITC lookup for the acquisition sequence.
-  """
-  acquisitionExposureTimeMode: ExposureTimeMode!
-
-  """
   The exposure time mode used for ITC lookup for the science sequence.
   """
-  scienceExposureTimeMode: ExposureTimeMode!
+  exposureTimeMode: ExposureTimeMode!
 
   """
   GMOS X-Binning, either explicitly specified in explicitXBin or else taken
@@ -9454,6 +9656,11 @@ type GmosSouthLongSlit {
   the default.
   """
   explicitSpatialOffsets: [OffsetQ!] @deprecated(reason: "Use 'explicitOffsets' instead.")
+
+  """
+  Settings that apply to the acquisition sequence.
+  """
+  acquisition: GmosSouthLongSlitAcquisition!
 
   """
   The grating as it was initially selected.  See the `grating` field for the

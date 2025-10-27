@@ -13,7 +13,7 @@ import lucuma.core.enums.Breakpoint
 import lucuma.core.enums.GmosAmpCount
 import lucuma.core.enums.GmosAmpGain
 import lucuma.core.enums.GmosAmpReadMode
-import lucuma.core.enums.GmosRoi
+import lucuma.core.enums.GmosLongSlitAcquisitionRoi
 import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
 import lucuma.core.math.RadialVelocity
@@ -37,16 +37,16 @@ class executionGmosNorthWithBlindOffset extends ExecutionTestSupportForGmos:
     )
 
   // Override static acquisition configs to match flat timing from runtime ITC mock
-  override val GmosNorthAcq1: GmosNorth =
-    GmosNorthAcq0.copy(
+  override def gmosNorthAcq1(roi: GmosLongSlitAcquisitionRoi): GmosNorth =
+    gmosNorthAcq0(roi).copy(
       exposure = 20.secTimeSpan, // Same as Acq0, not multiplied
       readout  = GmosCcdMode(GmosXBinning.One, GmosYBinning.One, GmosAmpCount.Twelve, GmosAmpGain.Low, GmosAmpReadMode.Fast),
-      roi      = GmosRoi.CentralStamp,
+      roi      = roi.slitRoi,
       fpu      = gmosNorthScience(0).fpu
     )
 
-  override val GmosNorthAcq2: GmosNorth =
-    GmosNorthAcq1.copy(
+  override def gmosNorthAcq2(roi: GmosLongSlitAcquisitionRoi): GmosNorth =
+    gmosNorthAcq1(roi).copy(
       exposure = 60.secTimeSpan // Match what runtime produces (20s * 3)
     )
 
@@ -75,7 +75,7 @@ class executionGmosNorthWithBlindOffset extends ExecutionTestSupportForGmos:
                 "steps": [
                   ${gmosNorthExpectedAcq(0,  0)},
                   ${gmosNorthExpectedAcq(1, 10)},
-                  ${gmosNorthExpectedAcq(2,  0, Breakpoint.Enabled)}
+                  ${gmosNorthExpectedAcq(2,  0, breakpoint = Breakpoint.Enabled)}
                 ]
               },
               "possibleFuture": [
@@ -125,7 +125,7 @@ class executionGmosNorthWithoutBlindOffset extends ExecutionTestSupportForGmos:
                 "steps": [
                   ${gmosNorthExpectedAcq(0, 0)},
                   ${gmosNorthExpectedAcq(1, 10)},
-                  ${gmosNorthExpectedAcq(2, 0, Breakpoint.Enabled)}
+                  ${gmosNorthExpectedAcq(2, 0, breakpoint = Breakpoint.Enabled)}
                 ]
               },
               "possibleFuture": [

@@ -9,7 +9,7 @@ import lucuma.odb.util.GmosCodecs.*
 import skunk.circe.codec.json.*
 import skunk.codec.all.*
 
-trait GmosLongSlitTable[F[_]] extends BaseMapping[F]:
+trait GmosLongSlitView[F[_]] extends BaseMapping[F]:
 
   class CommonColumns(implicit val tableName: TableName):
 
@@ -24,6 +24,8 @@ trait GmosLongSlitTable[F[_]] extends BaseMapping[F]:
     val AmpReadMode: ColumnRef              = col("c_amp_read_mode", gmos_amp_read_mode.opt)
     val AmpGain: ColumnRef                  = col("c_amp_gain", gmos_amp_gain.opt)
     val Roi: ColumnRef                      = col("c_roi", gmos_roi.opt)
+    val AcquisitionRoi: ColumnRef           = col("c_acquisition_roi", gmos_long_slit_acquisition_roi.opt)
+    val AcquisitionRoiDefault: ColumnRef    = col("c_acquisition_roi_default", gmos_long_slit_acquisition_roi)
 
     val WavelengthDithers: ColumnRef        = col("c_wavelength_dithers", text.opt)
     val Offsets: ColumnRef                  = col("c_offsets", text.opt)
@@ -33,10 +35,12 @@ trait GmosLongSlitTable[F[_]] extends BaseMapping[F]:
     val ImageQuality: ColumnRef             = col("c_image_quality", image_quality_preset)
     val SourceProfile: ColumnRef            = col("c_source_profile", jsonb.opt)
 
-  object GmosNorthLongSlitTable extends TableDef("t_gmos_north_long_slit"):
+  object GmosNorthLongSlitView extends TableDef("v_gmos_north_long_slit"):
 
     val Grating: ColumnRef        = col("c_grating", gmos_north_grating)
     val Filter: ColumnRef         = col("c_filter", gmos_north_filter.opt)
+    val AcquisitionFilter         = col("c_acquisition_filter", gmos_north_filter.opt)
+    val AcquisitionFilterDefault  = col("c_acquisition_filter_default", gmos_north_filter)
     val Fpu: ColumnRef            = col("c_fpu", gmos_north_fpu)
 
     val InitialGrating: ColumnRef = col("c_initial_grating", gmos_north_grating)
@@ -45,10 +49,12 @@ trait GmosLongSlitTable[F[_]] extends BaseMapping[F]:
 
     val Common: CommonColumns     = new CommonColumns()
 
-  object GmosSouthLongSlitTable extends TableDef("t_gmos_south_long_slit"):
+  object GmosSouthLongSlitView extends TableDef("v_gmos_south_long_slit"):
 
     val Grating: ColumnRef        = col("c_grating", gmos_south_grating)
     val Filter: ColumnRef         = col("c_filter", gmos_south_filter.opt)
+    val AcquisitionFilter         = col("c_acquisition_filter", gmos_south_filter.opt)
+    val AcquisitionFilterDefault  = col("c_acquisition_filter_default", gmos_south_filter)
     val Fpu: ColumnRef            = col("c_fpu", gmos_south_fpu)
 
     val InitialGrating: ColumnRef = col("c_initial_grating", gmos_south_grating)

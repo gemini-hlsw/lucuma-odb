@@ -1483,7 +1483,7 @@ class updateObservations extends OdbSuite
           centralWavelength: {
             nanometers: 234.56
           }
-          scienceExposureTimeMode: {
+          exposureTimeMode: {
             signalToNoise: {
               value: 20.0
               at: { nanometers: 234.56 }
@@ -1544,7 +1544,7 @@ class updateObservations extends OdbSuite
           disperser: R1200_JH
           filter: Y
           fpu: LONG_SLIT_2
-          scienceExposureTimeMode: {
+          exposureTimeMode: {
             signalToNoise: {
               value: 20.0
               at: { nanometers: 234.56 }
@@ -1614,7 +1614,7 @@ class updateObservations extends OdbSuite
     oneUpdateTest(pi, update, query, expected)
   }
 
-  test("observing mode: update existing") {
+  test("observing mode: update existing changing mode") {
 
     val update0 = """
       observingMode: {
@@ -1625,7 +1625,7 @@ class updateObservations extends OdbSuite
           centralWavelength: {
             nanometers: 234.56
           }
-          scienceExposureTimeMode: {
+          exposureTimeMode: {
             signalToNoise: {
               value: 20.0
               at: { nanometers: 234.56 }
@@ -1706,7 +1706,7 @@ class updateObservations extends OdbSuite
           disperser: R1200_JH
           filter: Y
           fpu: LONG_SLIT_2
-          scienceExposureTimeMode: {
+          exposureTimeMode: {
             signalToNoise: {
               value: 30.0
               at: { nanometers: 345.67 }
@@ -1795,7 +1795,7 @@ class updateObservations extends OdbSuite
           centralWavelength: {
             nanometers: 234.56
           }
-          scienceExposureTimeMode: {
+          exposureTimeMode: {
             signalToNoise: {
               value: 20.0
               at: { nanometers: 234.56 }
@@ -1811,6 +1811,14 @@ class updateObservations extends OdbSuite
         observingMode {
           gmosNorthLongSlit {
             grating
+            acquisition {
+              filter
+              defaultFilter
+              explicitFilter
+              roi
+              defaultRoi
+              explicitRoi
+            }
           }
         }
       }
@@ -1825,7 +1833,15 @@ class updateObservations extends OdbSuite
               "instrument": "GMOS_NORTH",
               "observingMode": {
                 "gmosNorthLongSlit": {
-                  "grating": "B1200_G5301"
+                  "grating": "B1200_G5301",
+                  "acquisition": {
+                    "filter": "G_PRIME",
+                    "defaultFilter": "G_PRIME",
+                    "explicitFilter": null,
+                    "roi": "CCD2",
+                    "defaultRoi": "CCD2",
+                    "explicitRoi": null
+                  }
                 }
               }
             }
@@ -1838,6 +1854,10 @@ class updateObservations extends OdbSuite
       observingMode: {
         gmosNorthLongSlit: {
           grating: R831_G5302
+          acquisition: {
+            explicitFilter: I_PRIME
+            explicitRoi: FULL_CCD2
+          }
         }
       }
     """
@@ -1851,7 +1871,122 @@ class updateObservations extends OdbSuite
               "instrument": "GMOS_NORTH",
               "observingMode": {
                 "gmosNorthLongSlit": {
-                  "grating": "R831_G5302"
+                  "grating": "R831_G5302",
+                  "acquisition": {
+                    "filter": "I_PRIME",
+                    "defaultFilter": "G_PRIME",
+                    "explicitFilter": "I_PRIME",
+                    "roi": "FULL_CCD2",
+                    "defaultRoi": "CCD2",
+                    "explicitRoi": "FULL_CCD2"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    """.asRight
+
+    multiUpdateTest(pi, List((update0, query, expected0), (update1, query, expected1)))
+  }
+
+  test("observing mode: update existing deleting explicit acquisition filter and ROI") {
+
+    val update0 = """
+      observingMode: {
+        gmosNorthLongSlit: {
+          grating: B1200_G5301
+          filter: G_PRIME
+          fpu: LONG_SLIT_0_25
+          centralWavelength: {
+            nanometers: 234.56
+          }
+          exposureTimeMode: {
+            signalToNoise: {
+              value: 20.0
+              at: { nanometers: 234.56 }
+            }
+          }
+          acquisition: {
+            explicitFilter: I_PRIME
+            explicitRoi: FULL_CCD2
+          }
+        }
+      }
+    """
+
+    val query = """
+      observations {
+        instrument
+        observingMode {
+          gmosNorthLongSlit {
+            acquisition {
+              filter
+              defaultFilter
+              explicitFilter
+              roi
+              defaultRoi
+              explicitRoi
+            }
+          }
+        }
+      }
+    """
+
+    val expected0 =
+      json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "instrument": "GMOS_NORTH",
+              "observingMode": {
+                "gmosNorthLongSlit": {
+                  "acquisition": {
+                    "filter": "I_PRIME",
+                    "defaultFilter": "G_PRIME",
+                    "explicitFilter": "I_PRIME",
+                    "roi": "FULL_CCD2",
+                    "defaultRoi": "CCD2",
+                    "explicitRoi": "FULL_CCD2"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    """.asRight
+
+    val update1 = """
+      observingMode: {
+        gmosNorthLongSlit: {
+          acquisition: {
+            explicitFilter: null
+            explicitRoi: null
+          }
+        }
+      }
+    """
+
+    val expected1 =
+      json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "instrument": "GMOS_NORTH",
+              "observingMode": {
+                "gmosNorthLongSlit": {
+                  "acquisition": {
+                    "filter": "G_PRIME",
+                    "defaultFilter": "G_PRIME",
+                    "explicitFilter": null,
+                    "roi": "CCD2",
+                    "defaultRoi": "CCD2",
+                    "explicitRoi": null
+                  }
                 }
               }
             }
@@ -2173,13 +2308,7 @@ class updateObservations extends OdbSuite
           centralWavelength: {
             nanometers: 234.56
           }
-          acquisitionExposureTimeMode: {
-            signalToNoise: {
-              value: 9.9
-              at: { nanometers: 123.45 }
-            }
-          }
-          scienceExposureTimeMode: {
+          exposureTimeMode: {
             signalToNoise: {
               value: 20.0
               at: { nanometers: 543.21 }
@@ -2201,7 +2330,15 @@ class updateObservations extends OdbSuite
             { arcseconds:  10.0 },
             { arcseconds:  10.0 },
             { arcseconds: -10.0 }
-          ]
+          ],
+          acquisition: {
+            exposureTimeMode: {
+              signalToNoise: {
+                value: 9.9
+                at: { nanometers: 123.45 }
+              }
+            }
+          }
         }
       }
     """
@@ -2217,13 +2354,7 @@ class updateObservations extends OdbSuite
             centralWavelength {
               nanometers
             }
-            acquisitionExposureTimeMode {
-              signalToNoise {
-                value
-                at { nanometers }
-              }
-            }
-            scienceExposureTimeMode {
+            exposureTimeMode {
               signalToNoise {
                 value
                 at { nanometers }
@@ -2249,6 +2380,14 @@ class updateObservations extends OdbSuite
             spatialOffsets {
               arcseconds
             }
+            acquisition {
+              exposureTimeMode {
+                signalToNoise {
+                  value
+                  at { nanometers }
+                }
+              }
+            }
           }
         }
       }
@@ -2269,13 +2408,7 @@ class updateObservations extends OdbSuite
                   "centralWavelength": {
                     "nanometers": 234.560
                   },
-                  "acquisitionExposureTimeMode": {
-                    "signalToNoise": {
-                      "value": 9.900,
-                      "at": { "nanometers": 123.450 }
-                    }
-                  },
-                  "scienceExposureTimeMode": {
+                  "exposureTimeMode": {
                     "signalToNoise": {
                       "value": 20.000,
                       "at": { "nanometers": 543.210 }
@@ -2315,7 +2448,15 @@ class updateObservations extends OdbSuite
                     { "arcseconds":  10.000000 },
                     { "arcseconds":  10.000000 },
                     { "arcseconds": -10.000000 }
-                  ]
+                  ],
+                  "acquisition": {
+                    "exposureTimeMode": {
+                      "signalToNoise": {
+                        "value": 9.900,
+                        "at": { "nanometers": 123.450 }
+                      }
+                    }
+                  }
                 }
               }
             }
@@ -2334,13 +2475,7 @@ class updateObservations extends OdbSuite
           centralWavelength: {
             nanometers: 654.321
           }
-          acquisitionExposureTimeMode: {
-            signalToNoise: {
-              value: 99.9
-              at: { nanometers: 234.56 }
-            }
-          }
-          scienceExposureTimeMode: {
+          exposureTimeMode: {
             signalToNoise: {
               value: 220.0
               at: { nanometers: 654.32 }
@@ -2360,7 +2495,15 @@ class updateObservations extends OdbSuite
             { arcseconds:  2.0 },
             { arcseconds:  2.0 },
             { arcseconds: -2.0 }
-          ]
+          ],
+          acquisition: {
+            exposureTimeMode: {
+              signalToNoise: {
+                value: 99.9
+                at: { nanometers: 234.56 }
+              }
+            }
+          }
         }
       }
     """
@@ -2379,13 +2522,7 @@ class updateObservations extends OdbSuite
                   "centralWavelength": {
                     "nanometers": 654.321
                   },
-                  "acquisitionExposureTimeMode": {
-                    "signalToNoise": {
-                      "value": 99.900,
-                      "at": { "nanometers": 234.560 }
-                    }
-                  },
-                  "scienceExposureTimeMode": {
+                  "exposureTimeMode": {
                     "signalToNoise": {
                       "value": 220.000,
                       "at": { "nanometers": 654.320 }
@@ -2423,7 +2560,15 @@ class updateObservations extends OdbSuite
                     { "arcseconds":  2.000000 },
                     { "arcseconds":  2.000000 },
                     { "arcseconds": -2.000000 }
-                  ]
+                  ],
+                  "acquisition": {
+                    "exposureTimeMode": {
+                      "signalToNoise": {
+                        "value": 99.900,
+                        "at": { "nanometers": 234.560 }
+                      }
+                    }
+                  }
                 }
               }
             }
@@ -2455,16 +2600,18 @@ class updateObservations extends OdbSuite
           centralWavelength: {
             nanometers: 234.56
           }
-          acquisitionExposureTimeMode: {
-            signalToNoise: {
-              value: 1.0
-              at: { nanometers: 123.45 }
-            }
-          }
-          scienceExposureTimeMode: {
+          exposureTimeMode: {
             signalToNoise: {
               value: 20.0
               at: { nanometers: 234.56 }
+            }
+          }
+          acquisition: {
+            exposureTimeMode: {
+              signalToNoise: {
+                value: 1.0
+                at: { nanometers: 123.45 }
+              }
             }
           }
         }
@@ -2538,16 +2685,18 @@ class updateObservations extends OdbSuite
         observingMode {
           gmosSouthLongSlit {
             grating
-            acquisitionExposureTimeMode {
+            exposureTimeMode {
               signalToNoise {
                 value
                 at { nanometers }
               }
             }
-            scienceExposureTimeMode {
-              signalToNoise {
-                value
-                at { nanometers }
+            acquisition {
+              exposureTimeMode {
+                signalToNoise {
+                  value
+                  at { nanometers }
+                }
               }
             }
           }
@@ -2566,16 +2715,18 @@ class updateObservations extends OdbSuite
               "observingMode": {
                 "gmosSouthLongSlit": {
                   "grating": "R831_G5322",
-                  "acquisitionExposureTimeMode": {
-                    "signalToNoise": {
-                      "value": 10.000,
-                      "at": { "nanometers": 1210.000 }
-                    }
-                  },
-                  "scienceExposureTimeMode": {
+                  "exposureTimeMode": {
                     "signalToNoise": {
                       "value": 100.000,
                       "at": { "nanometers": 1210.000 }
+                    }
+                  },
+                  "acquisition": {
+                    "exposureTimeMode": {
+                      "signalToNoise": {
+                        "value": 10.000,
+                        "at": { "nanometers": 1210.000 }
+                      }
                     }
                   }
                 }
@@ -2601,7 +2752,7 @@ class updateObservations extends OdbSuite
           centralWavelength: {
             nanometers: 234.56
           }
-          scienceExposureTimeMode: {
+          exposureTimeMode: {
             signalToNoise: {
               value: 20.0
               at: { nanometers: 234.56 }
@@ -2646,7 +2797,7 @@ class updateObservations extends OdbSuite
           grating: R831_G5322
           filter: G_PRIME
           fpu: LONG_SLIT_0_25
-          scienceExposureTimeMode: {
+          exposureTimeMode: {
             signalToNoise: {
               value: 20.0
               at: { nanometers: 234.56 }
@@ -2753,7 +2904,7 @@ class updateObservations extends OdbSuite
           centralWavelength: {
             nanometers: 234.56
           }
-          scienceExposureTimeMode: {
+          exposureTimeMode: {
             signalToNoise: {
               value: 20.0
               at: { nanometers: 234.56 }
@@ -2822,7 +2973,7 @@ class updateObservations extends OdbSuite
           disperser: R1200_JH
           filter: Y
           fpu: LONG_SLIT_2
-          scienceExposureTimeMode: {
+          exposureTimeMode: {
             signalToNoise: {
               value: 30.0
               at: { nanometers: 345.67 }
@@ -3521,7 +3672,7 @@ class updateObservations extends OdbSuite
           centralWavelength: {
             nanometers: 500
           }
-          scienceExposureTimeMode: {
+          exposureTimeMode: {
             signalToNoise: {
               value: 20.0
               at: { nanometers: 500.0 }
@@ -4035,7 +4186,7 @@ class updateObservations extends OdbSuite
                   disperser: R1200_HK
                   filter: Y
                   fpu: LONG_SLIT_2
-                  scienceExposureTimeMode: {
+                  exposureTimeMode: {
                     signalToNoise: {
                       value: 30.0
                       at: { nanometers: 345.67 }
@@ -4100,7 +4251,7 @@ class updateObservations extends OdbSuite
                   disperser: R1200_HK
                   filter: Y
                   fpu: LONG_SLIT_2
-                  scienceExposureTimeMode: {
+                  exposureTimeMode: {
                     signalToNoise: {
                       value: 30.0
                       at: { nanometers: 345.67 }
@@ -4190,7 +4341,7 @@ class updateObservations extends OdbSuite
                             disperser: R1200_HK
                             filter: Y
                             fpu: LONG_SLIT_2
-                            scienceExposureTimeMode: {
+                            exposureTimeMode: {
                               signalToNoise: {
                                 value: 30.0
                                 at: { nanometers: 345.67 }

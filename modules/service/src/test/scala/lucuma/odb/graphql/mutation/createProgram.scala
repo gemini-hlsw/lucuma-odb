@@ -556,17 +556,11 @@ class createProgram extends OdbSuite {
             "c_mod_name"            : true,
             "c_new_name"            : "Foo",
             "c_operation"           : "INSERT",
-            "c_mod_pts_pi"          : true,
-            "c_new_pts_pi"          : "PT0S",
             "c_program_id"          : ${pid},
             "c_mod_existence"       : true,
             "c_new_existence"       : "present",
             "c_mod_program_id"      : true,
             "c_new_program_id"      : ${pid},
-            "c_mod_pts_execution"   : true,
-            "c_mod_pts_uncharged"   : true,
-            "c_new_pts_execution"   : "PT0S",
-            "c_new_pts_uncharged"   : "PT0S",
             "c_mod_proposal_status" : true,
             "c_new_proposal_status" : "not_submitted"
           }
