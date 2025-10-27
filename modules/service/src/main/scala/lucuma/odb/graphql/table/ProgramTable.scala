@@ -27,11 +27,6 @@ trait ProgramTable[F[_]] extends BaseMapping[F]:
       val ShouldNotify  = col("c_goa_should_notify", bool)
       val PrivateHeader = col("c_goa_private_header", bool)
 
-    object PlannedTime:
-      val Pi        = col("c_pts_pi", time_span)
-      val Uncharged = col("c_pts_uncharged", time_span)
-      val Execution = col("c_pts_execution", time_span)
-
     val ProgramType    = col("c_program_type", program_type)
 
     object Reference:
