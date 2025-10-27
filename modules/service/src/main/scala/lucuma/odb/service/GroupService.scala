@@ -3,6 +3,8 @@
 
 package lucuma.odb.service
 
+import cats.Applicative
+import cats.Monad
 import cats.data.NonEmptyList
 import cats.effect.Concurrent
 import cats.syntax.all.*
@@ -16,6 +18,9 @@ import lucuma.core.model.Program
 import lucuma.odb.Config
 import lucuma.odb.data.Existence
 import lucuma.odb.data.GroupTree
+import lucuma.odb.data.GroupTree.Branch
+import lucuma.odb.data.GroupTree.Leaf
+import lucuma.odb.data.GroupTree.Root
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
@@ -24,6 +29,7 @@ import lucuma.odb.graphql.input.CreateGroupInput
 import lucuma.odb.graphql.input.GroupPropertiesInput
 import lucuma.odb.graphql.input.ObservationPropertiesInput
 import lucuma.odb.graphql.mapping.AccessControl
+import lucuma.odb.service.Services.ServiceAccess
 import lucuma.odb.util.Codecs.*
 import org.http4s.client.Client
 import skunk.*
@@ -38,6 +44,9 @@ trait GroupService[F[_]] {
   def selectGroups(programId: Program.Id)(using Transaction[F]): F[GroupTree]
   def selectPid(groupId: Group.Id)(using Transaction[F]): F[Option[Program.Id]]
   def cloneGroup(input: CloneGroupInput)(using Transaction[F]): F[Result[Group.Id]]
+
+  def deleteSystemGroup(pid: Program.Id, groupId: Group.Id)(using Transaction[F], ServiceAccess): F[Result[Unit]]
+  
 }
 
 object GroupService {
@@ -76,6 +85,55 @@ object GroupService {
       override def createGroup(input: CreateGroupInput, system: Boolean)(using Transaction[F]): F[Result[Group.Id]] =
         programService(emailConfig, httpClient).resolvePid(input.programId, input.proposalReference, input.programReference).flatMap: r =>
           r.traverse(createGroupImpl(_, input.SET, input.initialContents, system))
+      
+      // This saves a bit of annoyance below
+      extension [A](self: List[A]) private def traverseNel_[F[_]: Applicative, B](f: NonEmptyList[A] => F[B]): F[Unit] =
+        NonEmptyList.fromList(self).traverse(f).void
+
+      // I don't know why this isn't defined already
+      extension [F[_]: Monad, A](self: ResultT[F,A]) def >>[B](fb: ResultT[F, B]): ResultT[F, B] =
+        self.flatMap(_ => fb)
+
+      override def deleteSystemGroup(pid: Program.Id, groupId: Group.Id)(using Transaction[F], ServiceAccess): F[Result[Unit]] =
+        session.execute(sql"set constraints all deferred".command) *>
+        selectGroups(pid).flatMap: root =>
+          root.findGroup(groupId) match
+            case None    => OdbError.InvalidArgument(s"No such group $groupId in $pid.".some).asFailureF
+            case Some(g) => 
+              ResultT.fromResult(toDelete(g))
+                .flatMap: (gs, os) =>                  
+                  os.traverseNel_(nel => ResultT(observationService.deleteCalibrationObservations(nel))) >>
+                  gs.traverseNel_(nel => deleteEmptySystemGroups(nel))
+                .value
+                .flatTap: r =>
+                  transaction.rollback.whenA(r.isFailure)
+
+      private def deleteEmptySystemGroups(gs: NonEmptyList[Group.Id]): ResultT[F, Unit] =
+        ResultT:
+          val enc: Encoder[gs.type] = group_id.nel(gs)
+          moveGroups(Nullable.Null, None, sql"$enc"(gs), AppliedFragment.empty) *>
+          session.prepareR(Statements.deleteSystemGroups(enc)).use: pq =>
+            pq.stream(gs, 1024)
+              .compile
+              .toList
+              .flatMap: deleted =>
+                if deleted.toSet == gs.toList.toSet then Result.unit.pure[F]
+                else OdbError.InvalidArgument(s"Cannot delete non-system groups.".some).asFailureF
+
+      private def toDelete(tree: GroupTree): Result[(List[Group.Id], List[Observation.Id])] =
+        tree match
+          case Root(programId, children) => 
+            OdbError.InvalidArgument(s"Cannot delete root group of $programId.".some).asFailure
+          case Branch(groupId, _, _, children, _, _, _, _, false) =>
+              OdbError.InvalidArgument(s"Cannot delete non-sytem group $groupId.".some).asFailure
+          case Leaf(observationId) => 
+            Result((Nil, List(observationId))) // calibration-ness is checked by the obs service    
+          case Branch(groupId, _, _, children, _, _, _, _, true) =>
+              children
+                .traverse(toDelete)
+                .map(_.combineAll)
+                .map: (gs, os) => 
+                  (groupId :: gs, os)            
 
       // Clone `oid` into `dest`, at the end.
       private def cloneObservationInto(oid: Observation.Id, dest: Option[Group.Id])(using Transaction[F]): ResultT[F, Observation.Id] =
@@ -402,6 +460,13 @@ object GroupService {
                 initialContents = Nil
               ), sys)
 
+      def deleteSystemGroups[A <: NonEmptyList[Group.Id]](enc: Encoder[A]): Query[A, Group.Id] =
+        sql"""
+          DELETE FROM t_group
+          WHERE c_group_id in ($enc)
+          AND c_system = true
+          RETURNING c_group_id
+        """.query(group_id)
 
   }
 

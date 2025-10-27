@@ -288,6 +288,17 @@ object ObservationService {
           group     = Nullable.Null
         )
 
+        def doDelete: F[Result[Unit]] =
+          val enc = observation_id.nel(oids)          
+          session
+            .prepareR(Statements.deleteCalibrationObservations(enc))
+            .use: pq =>
+              pq.stream(oids, 1024).compile.toList.flatMap: deleted =>
+                if oids.toList.sorted === deleted.sorted then Result.unit.pure[F]
+                else 
+                  transaction.rollback >>
+                  OdbError.InvalidObservationList(oids, s"One or more specified observations are not calibrations.".some).asFailureF
+
         // delete asterisms and observations
         for {
           _    <- oids.traverse { o =>
@@ -299,8 +310,8 @@ object ObservationService {
                   // Delete asterism_target entries for these observations
           _    <- session.executeCommand(Statements.deleteAsterismsForObservations(oids))
                   // Delete the observations themselves
-          _    <- session.executeCommand(Statements.deleteCalibrationObservations(oids))
-        } yield Result.unit
+          r    <- doDelete
+        } yield r
 
       }
 
@@ -1154,10 +1165,13 @@ object ObservationService {
         void"WHERE c_target_id IN (" |+|
           tids.map(sql"$target_id").intercalate(void", ") |+| void")"
 
-    def deleteCalibrationObservations(oids: NonEmptyList[Observation.Id]): AppliedFragment =
-      void"DELETE FROM t_observation " |+|
-        void"WHERE c_observation_id IN (" |+|
-          oids.map(sql"$observation_id").intercalate(void", ") |+| void")"
+    def deleteCalibrationObservations[A <: NonEmptyList[Observation.Id]](enc: Encoder[A]): Query[A, Observation.Id] =
+      sql"""
+        DELETE FROM t_observation
+        WHERE c_calibration_role IS NOT NULL
+        AND c_observation_id IN ($enc)
+        RETURNING c_observation_id
+      """.query(observation_id)
 
     val ResetAcquisition: Command[Observation.Id] =
       sql"""
