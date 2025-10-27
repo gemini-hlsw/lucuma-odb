@@ -46,7 +46,7 @@ val refinedVersion             = "0.11.3"
 val skunkVersion               = "0.6.4"
 val spireVersion               = "0.18.0"
 val slf4jVersion               = "2.0.17"
-val testcontainersScalaVersion = "0.43.0" // check test output if you attempt to update this
+val testcontainersScalaVersion = "0.43.6" // check test output if you attempt to update this
 val weaverVersion              = "0.8.4"
 
 ThisBuild / tlBaseVersion      := "0.51"
