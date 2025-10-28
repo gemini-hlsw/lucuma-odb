@@ -3,14 +3,14 @@
 
 package lucuma.odb.graphql
 package issue.shortcut
+import cats.effect.Deferred
 import cats.effect.IO
 import grackle.Result
+import io.circe.literal.*
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.model.Group
 import lucuma.core.model.Program
 import lucuma.odb.service.Services.Syntax.*
-import cats.effect.Deferred
-import io.circe.literal.*
 
 class ShortCut_7118 extends OdbSuite with DatabaseOperations:
 
