@@ -33,6 +33,7 @@ import lucuma.core.geom.jts.interpreter.given
 import lucuma.core.math.Angle
 import lucuma.core.math.Coordinates
 import lucuma.core.math.Offset
+import lucuma.core.math.ProperMotion
 import lucuma.core.math.Wavelength
 import lucuma.core.model.AirMassBound
 import lucuma.core.model.ConstraintSet
@@ -70,13 +71,11 @@ import lucuma.odb.sequence.gmos
 import lucuma.odb.sequence.syntax.hash.*
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.sequence.util.HashBytes
-import lucuma.odb.service.AsterismService
 import lucuma.odb.service.Services.SuperUserAccess
 import lucuma.odb.syntax.result.*
 import lucuma.odb.util.Codecs.*
 import natchez.Trace
 import skunk.*
-import skunk.data.Arr
 import skunk.implicits.*
 
 import java.security.MessageDigest
@@ -87,7 +86,6 @@ import scala.annotation.tailrec
 import scala.collection.immutable.SortedMap
 
 import Services.Syntax.*
-import lucuma.core.math.Region
 
 trait GuideService[F[_]] {
   import GuideService.AvailabilityPeriod
@@ -329,8 +327,6 @@ object GuideService {
             _.option(af.argument).map(_.toResult(OdbError.InvalidObservation(oid, Some(s"Could not compute observation info for $oid.")).asProblem))
           )
       }
-
-
 
       def getAvailabilityHash(pid: Program.Id, oid: Observation.Id)(using
         NoTransaction[F]
@@ -773,60 +769,29 @@ object GuideService {
       def guideStarIdFromName(name: GuideStarName): Result[Long] =
         name.toGaiaSourceId.toResult(generalError(s"Invalid guide star name `$name`").asProblem)
 
-      def getTracking(pid: Program.Id, oid: Observation.Id)(using
-        NoTransaction[F], SuperUserAccess
-      ): F[Result[Option[Tracking]]] =
-        getTrackingOrRegion(pid, oid).map(_.map(_.left.toOption))
-
-      def getTrackingOrRegion(pid: Program.Id, oid: Observation.Id)(using
-        NoTransaction[F], SuperUserAccess
-      ): F[Result[Either[Tracking, Region]]] =
-        (for {
-          obsInfo       <- ResultT(getObservationInfo(oid))
-          asterism      <- ResultT(getAsterism(pid, oid))
-          baseTracking   =
-            obsInfo.explicitBase match
-              case Some(eb) => Left(Tracking.constant(eb))
-              case None     => Tracking.orRegionFromAsterism(asterism)
-        } yield baseTracking).value
-
       def getBlindOffset(
-        oid: Observation.Id,
+        oid:        Observation.Id,
         baseCoords: Coordinates,
-        instant: Instant
-      )(using SuperUserAccess): F[Option[Offset]] =
-        Services.asSuperUser:
-          Trace[F].span("getBlindOffset") {
-            for {
-              blindOffsetTargetIdOpt <- session.prepareR(
-                sql"SELECT c_blind_offset_target_id FROM t_observation WHERE c_observation_id = $observation_id".query(target_id.opt)
-              ).use(_.unique(oid))
-              offsetOpt <- blindOffsetTargetIdOpt.traverse { blindOffsetTargetId =>
-                session.prepareR(
-                  sql"""SELECT c_target_id, c_name, c_sid_ra, c_sid_dec, c_sid_epoch, c_sid_pm_ra, c_sid_pm_dec, c_sid_rv, c_parallax, c_source_profile
-                        FROM t_target WHERE c_target_id = $target_id AND c_existence = 'present'""".query(AsterismService.Decoders.targetDecoder)
-                ).use(_.option(blindOffsetTargetId)).map { targetOpt =>
-                  targetOpt.flatMap { case (_, target) =>
-                    Tracking.fromTarget(target)
-                      .flatMap(_.at(instant))
-                      .map(blindCoords => baseCoords.diff(blindCoords).offset)
-                  }
-                }
-              }
-            } yield offsetOpt.flatten
-          }.handleErrorWith { _ =>
-            None.pure[F]
-          }
+        instant:    Instant
+      ): F[Option[Offset]] =
+          Trace[F].span("getBlindOffset"):
+            val trackingStmt = Statements.getBlindOffsetTracking(oid)
+            session.prepareR(
+              trackingStmt.fragment.query(siderealTrackingDecoder)
+            ).use(_.option(trackingStmt.argument)).map: tracking =>
+              tracking.flatMap:
+                _.at(instant)
+                  .map(_.diff(baseCoords).offset)
 
       def lookupGuideStar(
-        oid: Observation.Id,
-        oGuideStarName: Option[GuideStarName],
-        obsInfo: ObservationInfo,
-        genInfo: GeneratorInfo,
-        obsTime: Timestamp,
-        obsDuration: TimeSpan,
-        scienceTime: Timestamp,
-        scienceDuration: TimeSpan
+        oid:                    Observation.Id,
+        oGuideStarName:         Option[GuideStarName],
+        obsInfo:                ObservationInfo,
+        genInfo:                GeneratorInfo,
+        obsTime:                Timestamp,
+        obsDuration:            TimeSpan,
+        scienceTime:            Timestamp,
+        scienceDuration:        TimeSpan
       )(using SuperUserAccess): F[Result[GuideEnvironment]] =
         // If we got here, we either have the name but need to get all the details (they queried for more
         // than name), or the name wasn't set or wasn't valid and we need to find all the candidates and
@@ -1053,6 +1018,15 @@ object GuideService {
         where c_observation_id = $observation_id
       """.apply(oid)
 
+    def getBlindOffsetTracking(oid: Observation.Id): AppliedFragment =
+      sql"""
+        SELECT t.c_sid_ra, t.c_sid_dec, t.c_sid_epoch, t.c_sid_pm_ra, t.c_sid_pm_dec, t.c_sid_rv, t.c_sid_parallax
+        FROM t_observation o
+        INNER JOIN t_target t ON o.c_blind_offset_target_id = t.c_target_id
+        WHERE o.c_observation_id = $observation_id
+          AND t.c_existence = 'present'
+          AND t.c_target_disposition = 'blind_offset'
+      """.apply(oid)
 
     def getGuideAvailabilityHash(user: User, pid: Program.Id, oid: Observation.Id): AppliedFragment =
       sql"""
@@ -1112,7 +1086,7 @@ object GuideService {
           observation_id *:
           core_timestamp *:
           core_timestamp *:
-          Decoders.angle_µas_list
+          angle_µas_list
         ).values.list(periods.length)}
       """
       .apply(
@@ -1205,14 +1179,10 @@ object GuideService {
           )
       }
 
-    val angle_µas_list: Codec[List[Angle]] =
-      _angle_µas.imap(_.toList)(l => Arr.fromFoldable(l))
-
     val availability_period: Codec[AvailabilityPeriod] =
       (timestamp_interval *: angle_µas_list).imap((period, angles) =>
         AvailabilityPeriod(period, angles)
       )(ap => (ap.period, ap.posAngles))
-
 
   }
 }

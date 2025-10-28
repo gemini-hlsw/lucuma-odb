@@ -24,10 +24,10 @@ import org.http4s.Response
 class guideEnvironmentBlindOffsetAGS extends ExecutionTestSupportForGmos with GuideEnvironmentSuite {
 
   override val gaiaSuccess: Timestamp = Timestamp.FromString.getOption("2023-08-30T00:00:00Z").get
-  
+
   // Use the same Gaia response data as the existing tests for consistency
   override val defaultTargetId: Long = 3219118090462918016L
-  
+
   // Gaia response with guide stars for normal coordinates (around science target)
   override val gaiaResponseString: String =
   """<?xml version="1.0" encoding="UTF-8"?>
@@ -341,13 +341,13 @@ class guideEnvironmentBlindOffsetAGS extends ExecutionTestSupportForGmos with Gu
         o <- createObservationAs(pi, p, List(t))
         _ <- setObservationTimeAndDuration(pi, o, gaiaSuccess.some, fullTimeEstimate.some)
       } yield o
-    
+
     setup.flatMap { oid =>
       expect(pi, guideEnvironmentQuery(oid), expected = successGuideEnvironmentResults)
     }
   }
 
-  test("AGS calculation with blind offset 1 degree away - should find no guide stars") {
+  test("AGS calculation with blind offset 1 degree away - should find no usable guide stars") {
     val setup: IO[Observation.Id] =
       for {
         p <- createProgramAs(pi)
@@ -355,25 +355,63 @@ class guideEnvironmentBlindOffsetAGS extends ExecutionTestSupportForGmos with Gu
         o <- createObservationAs(pi, p, List(t))
         _ <- setObservationTimeAndDuration(pi, o, gaiaSuccess.some, fullTimeEstimate.some)
         // Set blind offset 1 degree away from science target coordinates
+        // Guide stars will be found at base position but won't be usable at the blind offset position
         _ <- setBlindOffsetViaGraphQL(pi, o, "87.55474", "-0.10137")
       } yield o
-    
+
     setup.flatMap { oid =>
-      expect(pi, guideEnvironmentQuery(oid), expected = List("No potential guidestars found on Gaia.").asLeft)
+      expect(pi, guideEnvironmentQuery(oid), expected = List("No usable guidestars are available.").asLeft)
     }
   }
 
-  test("AGS calculation with nearby blind offset - should still find guide stars") {
+  test("AGS calculation with blind offset at same position as science - should find same guide stars") {
     val setup: IO[Observation.Id] =
       for {
         p <- createProgramAs(pi)
         t <- createTargetWithProfileAs(pi, p)
         o <- createObservationAs(pi, p, List(t))
         _ <- setObservationTimeAndDuration(pi, o, gaiaSuccess.some, fullTimeEstimate.some)
-        // Set blind offset close to science target (within same AGS search area)
-        _ <- setBlindOffsetViaGraphQL(pi, o, "86.60000", "-0.10000")
+        // Set blind offset at exact same coordinates as science target WITH proper motion
+        // The science target has PM: RA=0.918 mas/yr, Dec=-1.057 mas/yr
+        // Setting the blind offset with the same coordinates and PM creates a zero offset
+        _ <- query(
+               user = pi,
+               query = s"""
+                 mutation {
+                   updateObservations(input: {
+                     WHERE: { id: { EQ: "$o" } }
+                     SET: {
+                       targetEnvironment: {
+                         blindOffsetTarget: {
+                           name: "Blind Offset Target"
+                           sidereal: {
+                             ra: { hms: "05:46:13.137" }
+                             dec: { dms: "-00:06:04.89" }
+                             epoch: "J2000.0"
+                             properMotion: {
+                               ra: { milliarcsecondsPerYear: 0.918 }
+                               dec: { milliarcsecondsPerYear: -1.057 }
+                             }
+                           }
+                           sourceProfile: {
+                             point: {
+                               bandNormalized: {
+                                 sed: { stellarLibrary: B5_III }
+                                 brightnesses: [{ band: R, value: 15.0, units: VEGA_MAGNITUDE }]
+                               }
+                             }
+                           }
+                         }
+                       }
+                     }
+                   }) {
+                     observations { id }
+                   }
+                 }
+               """
+             ).void
       } yield o
-    
+
     setup.flatMap { oid =>
       expect(pi, guideEnvironmentQuery(oid), expected = successGuideEnvironmentResults)
     }
