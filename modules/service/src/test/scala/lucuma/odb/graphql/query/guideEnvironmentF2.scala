@@ -21,7 +21,7 @@ import org.http4s.Response
 class guideEnvironmentF2 extends ExecutionTestSupportForFlamingos2
                               with GuideEnvironmentSuite:
 
-  val fullTimeEstimate: TimeSpan = TimeSpan.fromMinutes(40).get
+  override val fullTimeEstimate: TimeSpan = TimeSpan.fromMinutes(40).get
 
   override def httpRequestHandler: Request[IO] => Resource[IO, Response[IO]] =
     _ => Resource.eval(IO.pure(Response(body = Stream(gaiaResponseString).through(utf8.encode))))

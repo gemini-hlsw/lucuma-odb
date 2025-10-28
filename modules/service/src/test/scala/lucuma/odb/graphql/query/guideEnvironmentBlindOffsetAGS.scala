@@ -9,14 +9,10 @@ import cats.effect.Resource
 import cats.syntax.all.*
 import fs2.Stream
 import fs2.text.utf8
-import io.circe.Json
-import io.circe.literal.*
-import io.circe.syntax.*
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.User
-import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import org.http4s.Request
 import org.http4s.Response
@@ -185,99 +181,19 @@ class guideEnvironmentBlindOffsetAGS extends ExecutionTestSupportForGmos with Gu
   |    </RESOURCE>
   |</VOTABLE>""".stripMargin
 
-  val setupTime: TimeSpan = TimeSpan.fromMinutes(16).get
-  val fullTimeEstimate: TimeSpan = TimeSpan.parse("PT36M1.8S").toOption.get
-
-  // Expected result when guide stars are found (same as existing tests)
-  val successGuideEnvironmentResults =
-    json"""
-    {
-      "observation": {
-        "title": "V1647 Orionis",
-        "targetEnvironment": {
-          "guideEnvironment": {
-            "posAngle": {
-              "degrees": 180.000000
-            },
-            "guideTargets": [
-              {
-                "name": "Gaia DR3 3219118090462918016",
-                "probe": "GMOS_OIWFS",
-                "sourceProfile": {
-                  "point": {
-                    "bandNormalized": {
-                      "brightnesses": [
-                        {
-                          "band": "GAIA_RP"
-                        }
-                      ]
-                    }
-                  }
-                },
-                "sidereal": {
-                  "catalogInfo": {
-                    "name": "GAIA",
-                    "id": "3219118090462918016",
-                    "objectType": null
-                  },
-                  "epoch": "J2023.660",
-                  "ra": {
-                    "microseconds": 20782434012,
-                    "hms": "05:46:22.434012",
-                    "hours": 5.772898336666666666666666666666667,
-                    "degrees": 86.59347505
-                  },
-                  "dec": {
-                    "dms": "-00:08:52.651136",
-                    "degrees": 359.8520413511111,
-                    "microarcseconds": 1295467348864
-                  },
-                  "radialVelocity": {
-                    "metersPerSecond": 0,
-                    "centimetersPerSecond": 0,
-                    "kilometersPerSecond": 0
-                  },
-                  "properMotion": {
-                    "ra": {
-                      "microarcsecondsPerYear": 438,
-                      "milliarcsecondsPerYear": 0.438
-                    },
-                    "dec": {
-                      "microarcsecondsPerYear": -741,
-                      "milliarcsecondsPerYear": -0.741
-                    }
-                  },
-                  "parallax": {
-                    "microarcseconds": 2432,
-                    "milliarcseconds": 2.432
-                  }
-                },
-                "nonsidereal": null
-              }
-            ]
-          }
-        }
-      }
-    }
-    """.asRight
-
   // Mock Gaia handler that returns different responses based on coordinates
   override def httpRequestHandler: Request[IO] => Resource[IO, Response[IO]] =
     req => {
       val renderStr = req.uri.renderString
-      println(s"DEBUG: Gaia request URI: $renderStr")
       val respStr =
         if (renderStr.contains("87.55474")) {
           // Blind offset coordinates (1 degree away) - return empty response
-          println("DEBUG: Returning empty response for blind offset coordinates")
           gaiaEmptyReponseString
         } else if (renderStr.contains("86.55474")) {
           // Normal science target coordinates - return guide stars
-          println("DEBUG: Returning guide stars for normal coordinates")
           gaiaResponseString
         } else {
           // Any other coordinates - return empty response
-          println(s"DEBUG: Returning empty response for other coordinates: $renderStr")
           gaiaEmptyReponseString
         }
       Resource.eval(IO.pure(Response(body = Stream(respStr).through(utf8.encode))))
@@ -290,49 +206,6 @@ class guideEnvironmentBlindOffsetAGS extends ExecutionTestSupportForGmos with Gu
   ): IO[Observation.Id] =
     createGmosNorthLongSlitObservationAs(user, pid, tids, offsetArcsec = List(0, 15).some)
 
-  def setBlindOffsetViaGraphQL(user: User, oid: Observation.Id, ra: String, dec: String): IO[Unit] =
-    query(
-      user = user,
-      query =
-        s"""
-          mutation {
-            updateObservations(input: {
-              WHERE: { id: { EQ: "$oid" } }
-              SET: {
-                targetEnvironment: {
-                  blindOffsetTarget: {
-                    name: ${"Blind Offset Target".asJson}
-                    sidereal: {
-                      ra: { degrees: $ra }
-                      dec: { degrees: $dec }
-                      epoch: "J2000.000"
-                    }
-                    sourceProfile: {
-                      point: {
-                        bandNormalized: {
-                          sed: { stellarLibrary: B5_III }
-                          brightnesses: [
-                            {
-                              band: R
-                              value: 15.0
-                              units: VEGA_MAGNITUDE
-                            }
-                          ]
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }) {
-              observations {
-                id
-              }
-            }
-          }
-        """
-    ).void
-
   test("AGS calculation without blind offset - should find guide stars") {
     val setup: IO[Observation.Id] =
       for {
@@ -343,7 +216,7 @@ class guideEnvironmentBlindOffsetAGS extends ExecutionTestSupportForGmos with Gu
       } yield o
 
     setup.flatMap { oid =>
-      expect(pi, guideEnvironmentQuery(oid), expected = successGuideEnvironmentResults)
+      expect(pi, guideEnvironmentQuery(oid), expected = successfulGuideEnvironmentResult)
     }
   }
 
@@ -356,7 +229,7 @@ class guideEnvironmentBlindOffsetAGS extends ExecutionTestSupportForGmos with Gu
         _ <- setObservationTimeAndDuration(pi, o, gaiaSuccess.some, fullTimeEstimate.some)
         // Set blind offset 1 degree away from science target coordinates
         // Guide stars will be found at base position but won't be usable at the blind offset position
-        _ <- setBlindOffsetViaGraphQL(pi, o, "87.55474", "-0.10137")
+        _ <- setBlindOffsetViaGraphQL(pi, o, "Blind Offset Target", "87.55474", "-0.10137")
       } yield o
 
     setup.flatMap { oid =>
@@ -413,7 +286,7 @@ class guideEnvironmentBlindOffsetAGS extends ExecutionTestSupportForGmos with Gu
       } yield o
 
     setup.flatMap { oid =>
-      expect(pi, guideEnvironmentQuery(oid), expected = successGuideEnvironmentResults)
+      expect(pi, guideEnvironmentQuery(oid), expected = successfulGuideEnvironmentResult)
     }
   }
 

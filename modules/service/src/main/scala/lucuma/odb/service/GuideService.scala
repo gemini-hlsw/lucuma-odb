@@ -177,15 +177,15 @@ object GuideService {
 
 
   case class ObservationInfo(
-    id:                 Observation.Id,
-    programId:          Program.Id,
-    constraints:        ConstraintSet,
-    posAngleConstraint: PosAngleConstraint,
-    explicitBase:       Option[Coordinates],
-    optObsTime:         Option[Timestamp],
-    optObsDuration:     Option[TimeSpan],
-    guideStarName:      Option[GuideStarName],
-    guideStarHash:      Option[Md5Hash],
+    id:                  Observation.Id,
+    programId:           Program.Id,
+    constraints:         ConstraintSet,
+    posAngleConstraint:  PosAngleConstraint,
+    explicitBase:        Option[Coordinates],
+    optObsTime:          Option[Timestamp],
+    optObsDuration:      Option[TimeSpan],
+    guideStarName:       Option[GuideStarName],
+    guideStarHash:       Option[Md5Hash],
     blindOffsetTargetId: Option[Target.Id]
   ) {
     def obsTime: Result[Timestamp] =

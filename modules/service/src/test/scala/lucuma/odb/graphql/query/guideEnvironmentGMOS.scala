@@ -11,7 +11,6 @@ import fs2.Stream
 import fs2.text.utf8
 import io.circe.Json
 import io.circe.literal.*
-import io.circe.syntax.*
 import lucuma.ags.GuideStarName
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
@@ -27,8 +26,6 @@ class guideEnvironmentGMOS extends ExecutionTestSupportForGmos with GuideEnviron
   val gaiaEmpty: Timestamp = Timestamp.FromString.getOption("3000-01-30T04:00:00Z").get
   val gaiaError: Timestamp = Timestamp.FromString.getOption("4000-12-30T20:00:00Z").get
 
-  val setupTime: TimeSpan = TimeSpan.fromMinutes(16).get
-  val fullTimeEstimate: TimeSpan = TimeSpan.parse("PT36M1.8S").toOption.get
   val durationTooShort: TimeSpan = setupTime -| TimeSpan.fromMicroseconds(1).get
   val durationTooLong: TimeSpan = fullTimeEstimate +| TimeSpan.fromMicroseconds(1).get
   val durationNotValidated: TimeSpan = TimeSpan.Zero
@@ -44,78 +41,6 @@ class guideEnvironmentGMOS extends ExecutionTestSupportForGmos with GuideEnviron
         "title": "V1647 Orionis",
         "targetEnvironment": {
           "guideEnvironments": null
-        }
-      }
-    }
-    """.asRight
-
-  val defaultGuideEnvironmentResults =
-    json"""
-    {
-      "observation": {
-        "title": "V1647 Orionis",
-        "targetEnvironment": {
-          "guideEnvironment": {
-            "posAngle": {
-              "degrees": 180.000000
-            },
-            "guideTargets": [
-              {
-                "name": "Gaia DR3 3219118090462918016",
-                "probe": "GMOS_OIWFS",
-                "sourceProfile": {
-                  "point": {
-                    "bandNormalized": {
-                      "brightnesses": [
-                        {
-                          "band": "GAIA_RP"
-                        }
-                      ]
-                    }
-                  }
-                },
-                "sidereal": {
-                  "catalogInfo": {
-                    "name": "GAIA",
-                    "id": "3219118090462918016",
-                    "objectType": null
-                  },
-                  "epoch": "J2023.660",
-                  "ra": {
-                    "microseconds": 20782434012,
-                    "hms": "05:46:22.434012",
-                    "hours": 5.772898336666666666666666666666667,
-                    "degrees": 86.59347505
-                  },
-                  "dec": {
-                    "dms": "-00:08:52.651136",
-                    "degrees": 359.8520413511111,
-                    "microarcseconds": 1295467348864
-                  },
-                  "radialVelocity": {
-                    "metersPerSecond": 0,
-                    "centimetersPerSecond": 0,
-                    "kilometersPerSecond": 0
-                  },
-                  "properMotion": {
-                    "ra": {
-                      "microarcsecondsPerYear": 438,
-                      "milliarcsecondsPerYear": 0.438
-                    },
-                    "dec": {
-                      "microarcsecondsPerYear": -741,
-                      "milliarcsecondsPerYear": -0.741
-                    }
-                  },
-                  "parallax": {
-                    "microarcseconds": 2432,
-                    "milliarcseconds": 2.432
-                  }
-                },
-                "nonsidereal": null
-              }
-            ]
-          }
         }
       }
     }
@@ -352,7 +277,7 @@ class guideEnvironmentGMOS extends ExecutionTestSupportForGmos with GuideEnviron
         _ <- setObservationTimeAndDuration(pi, o, gaiaSuccess.some, fullTimeEstimate.some)
       } yield o
     setup.flatMap { oid =>
-      expect(pi, guideEnvironmentQuery(oid), expected = defaultGuideEnvironmentResults)
+      expect(pi, guideEnvironmentQuery(oid), expected = successfulGuideEnvironmentResult)
     }
   }
 
@@ -365,7 +290,7 @@ class guideEnvironmentGMOS extends ExecutionTestSupportForGmos with GuideEnviron
         _ <- setObservationTimeAndDuration(pi, o, gaiaSuccess.some, fullTimeEstimate.some)
       } yield o
     setup.flatMap { oid =>
-      expect(pi, guideEnvironmentQuery(oid), expected = defaultGuideEnvironmentResults)
+      expect(pi, guideEnvironmentQuery(oid), expected = successfulGuideEnvironmentResult)
     }
   }
 
@@ -379,7 +304,7 @@ class guideEnvironmentGMOS extends ExecutionTestSupportForGmos with GuideEnviron
         _ <- setGuideTargetName(pi, o, defaultTargetName.some)
       } yield o
     setup.flatMap { oid =>
-      expect(pi, guideEnvironmentQuery(oid), expected = defaultGuideEnvironmentResults)
+      expect(pi, guideEnvironmentQuery(oid), expected = successfulGuideEnvironmentResult)
     }
   }
 
@@ -396,60 +321,5 @@ class guideEnvironmentGMOS extends ExecutionTestSupportForGmos with GuideEnviron
       expect(pi, guideEnvironmentQuery(oid), expected = otherGuideEnvironmentResults)
     }
   }
-
-  test("with blind offset target - successfully obtain guide environment") {
-    val setup: IO[Observation.Id] =
-      for {
-        p <- createProgramAs(pi)
-        t <- createTargetWithProfileAs(pi, p)
-        o <- createObservationAs(pi, p, List(t))
-        _ <- setBlindOffsetViaGraphQL(pi, o, "Blind Offset Target")
-        _ <- setObservationTimeAndDuration(pi, o, gaiaSuccess.some, fullTimeEstimate.some)
-      } yield o
-    setup.flatMap { oid =>
-      expect(pi, guideEnvironmentQuery(oid), expected = defaultGuideEnvironmentResults)
-    }
-  }
-
-  def setBlindOffsetViaGraphQL(user: User, oid: Observation.Id, blindOffsetName: String): IO[Unit] =
-    query(
-      user = user,
-      query =
-        s"""
-          mutation {
-            updateObservations(input: {
-              WHERE: { id: { EQ: "$oid" } }
-              SET: {
-                targetEnvironment: {
-                  blindOffsetTarget: {
-                    name: ${blindOffsetName.asJson}
-                    sidereal: {
-                      ra: { degrees: "12.345" }
-                      dec: { degrees: "45.678" }
-                      epoch: "J2000.000"
-                    }
-                    sourceProfile: {
-                      point: {
-                        bandNormalized: {
-                          sed: { stellarLibrary: B5_III }
-                          brightnesses: [
-                            {
-                              band: R
-                              value: 15.0
-                              units: VEGA_MAGNITUDE
-                            }
-                          ]
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }) {
-              observations { id }
-            }
-          }
-        """
-    ).void
 
 }
