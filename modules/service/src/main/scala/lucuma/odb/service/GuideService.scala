@@ -268,7 +268,9 @@ object GuideService {
   ) {
     val timeEstimate                         = digest.fullTimeEstimate.sum
     val setupTime                            = digest.setup.full
-    val offsets                              = NonEmptyList.fromFoldable(digest.science.offsets.union(digest.acquisition.offsets))
+    val acqOffsets                           = NonEmptyList.fromFoldable(digest.acquisition.offsets)
+    val sciOffsets                           = NonEmptyList.fromFoldable(digest.science.offsets)
+
     val (site, agsParams, centralWavelength): (Site, AgsParams, Wavelength) = params.observingMode match
       case mode: gmos.longslit.Config.GmosNorth =>
         (Site.GN, AgsParams.GmosAgsParams(mode.fpu.asLeft.some, PortDisposition.Side), mode.centralWavelength)
@@ -573,15 +575,6 @@ object GuideService {
               case Right((d, p, h)) => GeneratorInfo(d, p, h).success
               case Left(ge)         => generatorError(ge).asFailure
 
-      def getPositions(
-        angles:             NonEmptyList[Angle],
-        offsets:            Option[NonEmptyList[Offset]],
-      ): NonEmptyList[AgsPosition] =
-        for {
-          pa  <- angles
-          off <- offsets.getOrElse(NonEmptyList.of(Offset.Zero))
-        } yield AgsPosition(pa, off)
-
       // TODO: Can go away after `guideEnvironments` is removed???
       def processCandidates(
         obsInfo:       ObservationInfo,
@@ -589,15 +582,18 @@ object GuideService {
         genInfo:       GeneratorInfo,
         baseCoords:    Coordinates,
         scienceCoords: List[Coordinates],
-        positions:     NonEmptyList[AgsPosition],
-        candidates:    List[GuideStarCandidate]
+        angles:        NonEmptyList[Angle],
+        candidates:    List[GuideStarCandidate],
       ): List[AgsAnalysis.Usable] =
         Ags
           .agsAnalysis(obsInfo.constraints,
                        wavelength,
                        baseCoords,
                        scienceCoords,
-                       positions,
+                       none,
+                       angles,
+                       genInfo.acqOffsets,
+                       genInfo.sciOffsets,
                        genInfo.agsParams,
                        candidates
           )
@@ -609,7 +605,7 @@ object GuideService {
         genInfo:       GeneratorInfo,
         baseCoords:    Coordinates,
         scienceCoords: List[Coordinates],
-        positions:     NonEmptyList[AgsPosition],
+        angles:        NonEmptyList[Angle],
         candidates:    NonEmptyList[GuideStarCandidate]
       ): Option[AgsAnalysis.Usable] =
         Ags
@@ -617,7 +613,10 @@ object GuideService {
                        wavelength,
                        baseCoords,
                        scienceCoords,
-                       positions,
+                       none,
+                       angles,
+                       genInfo.acqOffsets,
+                       genInfo.sciOffsets,
                        genInfo.agsParams,
                        candidates.toList
           )
@@ -639,14 +638,28 @@ object GuideService {
           candidates   <- ResultT:
                            tracking match
                               case None    => Result.success(Nil).pure[F]
-                              case Some(t) => getAllCandidates(obsInfo.id, candPeriod.start, candPeriod.end, t.base, genInfo.centralWavelength, obsInfo.constraints)
-          positions     = getPositions(obsInfo.availabilityAngles, genInfo.offsets)
+                              case Some(t) =>
+                                getAllCandidates(
+                                  obsInfo.id,
+                                  candPeriod.start,
+                                  candPeriod.end, t.base,
+                                  genInfo.centralWavelength,
+                                  obsInfo.constraints
+                                )
           neededLists  <- ResultT.fromResult:
                             neededPeriods.traverse: p =>
                               tracking match
                                 case None => Result.success(ContiguousTimestampMap.empty[List[Angle]])
                                 case Some(t) =>
-                                  buildAvailabilityList(p, obsInfo, genInfo, genInfo.centralWavelength, t.asterism.map(_._2), t.base, candidates, positions)
+                                  buildAvailabilityList(
+                                    p,
+                                    obsInfo,
+                                    genInfo,
+                                    genInfo.centralWavelength,
+                                    t.asterism.map(_._2),
+                                    t.base,
+                                    candidates
+                                  )
           availability <- ResultT.fromResult(
                             neededLists.foldLeft(currentAvail.some)((acc, ele) => acc.flatMap(_.union(ele)))
                               .toResult(generalError("Error creating guide availability").asProblem)
@@ -661,13 +674,21 @@ object GuideService {
         wavelength:       Wavelength,
         asterismTracking: NonEmptyList[Tracking],
         baseTracking:     Tracking,
-        candidates:       List[GuideStarCandidate],
-        positions:        NonEmptyList[AgsPosition]
+        candidates:       List[GuideStarCandidate]
       ): Result[ContiguousTimestampMap[List[Angle]]] = {
         @scala.annotation.tailrec
         def go(startTime: Timestamp, accum: ContiguousTimestampMap[List[Angle]]): Either[OdbError, ContiguousTimestampMap[List[Angle]]] = {
           val eap =
-            buildAvailabilityPeriod(startTime, period.end, obsInfo, genInfo, wavelength, asterismTracking, baseTracking, candidates, positions)
+            buildAvailabilityPeriod(
+              startTime,
+              period.end,
+              obsInfo,
+              genInfo,
+              wavelength,
+              asterismTracking,
+              baseTracking,
+              candidates
+            )
           eap match
                       case Left(error)                      => error.asLeft
                       case Right(ap) if ap.period.end < period.end => go(ap.period.end, accum.unsafeAdd(ap.period, ap.posAngles))
@@ -681,15 +702,14 @@ object GuideService {
       }
 
       def buildAvailabilityPeriod(
-        start:      Timestamp,
-        end:        Timestamp,
-        obsInfo:    ObservationInfo,
-        genInfo:    GeneratorInfo,
-        wavelength: Wavelength,
-        asterismTracking:   NonEmptyList[Tracking],
-        baseTracking:   Tracking,
-        candidates: List[GuideStarCandidate],
-        positions:  NonEmptyList[AgsPosition],
+        start:            Timestamp,
+        end:              Timestamp,
+        obsInfo:          ObservationInfo,
+        genInfo:          GeneratorInfo,
+        wavelength:       Wavelength,
+        asterismTracking: NonEmptyList[Tracking],
+        baseTracking:     Tracking,
+        candidates:       List[GuideStarCandidate]
       ): Either[OdbError, AvailabilityPeriod] =
         for {
           baseCoords      <- obsInfo.explicitBase
@@ -720,7 +740,8 @@ object GuideService {
                                baseCoords,
                                scienceCoords.toList,
                                obsInfo.availabilityAngles,
-                               positions,
+                               genInfo.acqOffsets,
+                               genInfo.sciOffsets,
                                genInfo.agsParams
                              )
           candidateCutoff  = angleMap.values.minOption.getOrElse(Timestamp.Max)
@@ -728,7 +749,7 @@ object GuideService {
         } yield AvailabilityPeriod(start, finalEnd, angleMap.keys.toList)
 
       def getAvailabilityMap(
-        candidates: List[GuideStarCandidate],
+        candidates:    List[GuideStarCandidate],
         start:         Timestamp,
         endCutoff:     Timestamp, // The oldest time we need to satisfy to allow short cutting
         constraints:   ConstraintSet,
@@ -736,7 +757,8 @@ object GuideService {
         baseCoords:    Coordinates,
         scienceCoords: List[Coordinates],
         angles:        NonEmptyList[Angle],
-        positions:     NonEmptyList[AgsPosition],
+        acqOffsets:    Option[NonEmptyList[Offset]],
+        sciOffsets:    Option[NonEmptyList[Offset]],
         params:        AgsParams
       ): SortedMap[Angle, Timestamp] = {
         Stream.emits(candidates)
@@ -746,7 +768,10 @@ object GuideService {
               wavelength,
               baseCoords,
               scienceCoords,
-              positions,
+              none,
+              angles,
+              acqOffsets,
+              sciOffsets,
               params
             )
           )
@@ -836,14 +861,7 @@ object GuideService {
                               .toResult(generalError(s"No angles to test for guide target candidates for observation $oid.").asProblem)
                            )
           blindOffsetOpt <- ResultT.liftF(getBlindOffset(oid, baseCoords, obsTime.toInstant))
-          combinedOffsets = blindOffsetOpt match
-                              case Some(offset) =>
-                                genInfo.offsets match
-                                  case Some(offsets) => Some(offsets.append(offset))
-                                  case None => Some(NonEmptyList.one(offset))
-                              case None => genInfo.offsets
-          positions      = getPositions(angles, combinedOffsets)
-          optUsable      = chooseBestGuideStar(obsInfo, genInfo.centralWavelength, genInfo, baseCoords, scienceCoords, positions, candidates)
+          optUsable      = chooseBestGuideStar(obsInfo, genInfo.centralWavelength, genInfo, baseCoords, scienceCoords, angles, candidates)
           env           <- ResultT.fromResult(
                              optUsable
                               .map(_.toGuideEnvironment)
@@ -925,14 +943,7 @@ object GuideService {
                               .toResult(generalError(s"No angles to test for guide target candidates for observation $oid.").asProblem)
                            )
           blindOffsetOpt <- ResultT.liftF(getBlindOffset(oid, baseCoords, obsTime.toInstant))
-          combinedOffsets = blindOffsetOpt match
-                              case Some(offset) =>
-                                genInfo.offsets match
-                                  case Some(offsets) => Some(offsets.append(offset))
-                                  case None => Some(NonEmptyList.one(offset))
-                              case None => genInfo.offsets
-          positions      = getPositions(angles, combinedOffsets)
-          usable         = processCandidates(obsInfo, genInfo.centralWavelength, genInfo, baseCoords, scienceCoords, positions, candidates)
+          usable         = processCandidates(obsInfo, genInfo.centralWavelength, genInfo, baseCoords, scienceCoords, angles, candidates)
         } yield usable.toGuideEnvironments.toList).value
 
       override def getGuideAvailability(pid: Program.Id, oid: Observation.Id, period: TimestampInterval)(
