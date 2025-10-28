@@ -9,6 +9,8 @@ import lucuma.core.enums.CalibrationRole
 import lucuma.core.model.Group
 import lucuma.core.model.Program
 import lucuma.odb.service.Services.Syntax.*
+import cats.effect.Deferred
+import io.circe.literal.*
 
 class ShortCut_7118 extends OdbSuite with DatabaseOperations:
 
@@ -117,3 +119,48 @@ class ShortCut_7118 extends OdbSuite with DatabaseOperations:
       r   <- deleteSystemGroup(pid, gid)
     yield assertFailure(r, s"Cannot delete non-sytem group $g2.")
 
+  test("event (should trigger on hard delete)"):
+    Deferred[IO, (Program.Id, Group.Id)].flatMap: d =>
+      subscriptionExpectF(
+        user = pi,
+        query     = s"""
+          subscription {
+            groupEdit {
+              editType
+            }
+          }
+        """,
+        mutations =
+          Right:
+            for
+              pid <- createProgramAs(pi)
+              gid <- createGroupAs(pi, pid) // make sure group is in the middle
+              _   <- d.complete((pid, gid))
+              _   <- updateGroupSystem(gid, true)
+              _   <- deleteSystemGroup(pid, gid)
+            yield (),
+        expectedF =
+          d.get.map: (_, _) =>
+            List(
+              json"""{
+                "groupEdit" : {
+                  "editType" : "CREATED"
+                }
+              }""",
+              json"""{
+                "groupEdit" : {
+                  "editType" : "UPDATED"
+                }
+              }""",
+              json"""{
+                "groupEdit" : {
+                  "editType" : "UPDATED"
+                }
+              }""",
+              json"""{
+                "groupEdit" : {
+                  "editType" : "HARD_DELETE"
+                }
+              }"""
+          )
+      )
