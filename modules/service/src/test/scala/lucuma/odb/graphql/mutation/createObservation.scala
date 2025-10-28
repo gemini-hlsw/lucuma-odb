@@ -692,7 +692,7 @@ class createObservation extends OdbSuite {
           .as[ImageQuality.Preset]
           .leftMap(f => new RuntimeException(f.message))
           .liftTo[IO]
-        assertIO(get, ImageQuality.Preset.PointEight)
+        assertIO(get, ImageQuality.Preset.OnePointZero)
       }
     }
   }
