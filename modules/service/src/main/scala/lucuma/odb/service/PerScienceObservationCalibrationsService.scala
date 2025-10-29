@@ -124,7 +124,7 @@ object PerScienceObservationCalibrationsService:
                                  groupObsIds
                                    .filter(currentObsIds.contains)
                                    .headOption
-                                   .fold(groupService.deleteSystemGroup(gid).void)(_ => ().pure[F])
+                                   .fold(groupService.deleteSystemGroup(pid, gid).void)(_ => ().pure[F])
           // Create or verify system groups for current F2 observations
           _                 <- scienceObs.traverse_ { obs =>
                                  findSystemGroupForObservation(tree, obs.id)

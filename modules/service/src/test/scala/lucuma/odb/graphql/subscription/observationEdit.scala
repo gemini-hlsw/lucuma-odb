@@ -12,6 +12,7 @@ import cats.syntax.traverse.*
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
+import lucuma.core.enums.CalibrationRole
 import lucuma.core.math.Epoch
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
@@ -472,6 +473,7 @@ class observationEdit extends OdbSuite with SubscriptionUtils {
       tid0 <- createTargetAs(pi, pid, "Zero")
       // An observation with a single target is essentially a calib observation
       oid  <- createObservationAs(pi, pid, None, tid0)
+      _    <- setObservationCalibrationRole(List(oid), CalibrationRole.Telluric)
       _    <- subscriptionExpect(
         user      = pi,
         query     = deletedSubscription(pid),

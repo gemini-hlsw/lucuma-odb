@@ -9,6 +9,7 @@ import cats.effect.IO
 import cats.syntax.all.*
 import io.circe.Json
 import io.circe.syntax.*
+import lucuma.core.enums.CalibrationRole
 import lucuma.core.model.Observation
 import lucuma.core.model.Semester
 import lucuma.core.util.CalculationState
@@ -242,6 +243,7 @@ class obscalcUpdate extends ObscalcServiceSuiteSupport:
 
   test("trigger for hard delete"):
     setup.flatMap: (_, oid) =>
+      setObservationCalibrationRole(List(oid), CalibrationRole.Telluric) >>
       subscriptionExpect(
       user      = pi,
       query     = s"""

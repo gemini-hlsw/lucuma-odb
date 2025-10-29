@@ -43,7 +43,7 @@ object ConstraintSetInput {
   val NominalConstraints: ConstraintSet =
     ConstraintSet(
       cloudExtinction = CloudExtinction.Preset.PointThree,
-      imageQuality    = ImageQuality.Preset.PointEight,
+      imageQuality    = ImageQuality.Preset.OnePointZero,
       skyBackground   = SkyBackground.Bright,
       waterVapor      = WaterVapor.Wet,
       elevationRange  = ElevationRange.ByAirMass.Default
