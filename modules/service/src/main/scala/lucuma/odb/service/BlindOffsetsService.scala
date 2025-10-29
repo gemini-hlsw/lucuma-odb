@@ -110,7 +110,7 @@ object BlindOffsetsService:
         programId: Program.Id,
         oldObservationId: Observation.Id,
         newObservationId: Observation.Id
-      )(using Transaction[F]): F[Result[Unit]] = 
+      )(using Transaction[F]): F[Result[Unit]] =
         getBlindOffset(oldObservationId).flatMap:
           _.fold(Result.unit.pure): tid =>
             val input = CloneTargetInput(tid, SET = None, REPLACE_IN = NonEmptyList.one(newObservationId).some)
@@ -154,4 +154,3 @@ object BlindOffsetsService:
             SET c_blind_offset_target_id = $target_id
             WHERE c_observation_id = $observation_id
           """.command
-            

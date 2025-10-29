@@ -1,0 +1,293 @@
+// Copyright (c) 2016-2025 Association of Universities for Research in Astronomy, Inc. (AURA)
+// For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
+
+package lucuma.odb.graphql
+package query
+
+import cats.effect.IO
+import cats.effect.Resource
+import cats.syntax.all.*
+import fs2.Stream
+import fs2.text.utf8
+import lucuma.core.model.Observation
+import lucuma.core.model.Program
+import lucuma.core.model.Target
+import lucuma.core.model.User
+import lucuma.core.util.Timestamp
+import org.http4s.Request
+import org.http4s.Response
+
+class guideEnvironmentBlindOffsetAGS extends ExecutionTestSupportForGmos with GuideEnvironmentSuite {
+
+  override val gaiaSuccess: Timestamp = Timestamp.FromString.getOption("2023-08-30T00:00:00Z").get
+
+  // Use the same Gaia response data as the existing tests for consistency
+  override val defaultTargetId: Long = 3219118090462918016L
+
+  // Gaia response with guide stars for normal coordinates (around science target)
+  override val gaiaResponseString: String =
+  """<?xml version="1.0" encoding="UTF-8"?>
+  |<VOTABLE version="1.4" xmlns="http://www.ivoa.net/xml/VOTable/v1.3" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.ivoa.net/xml/VOTable/v1.3 http://www.ivoa.net/xml/VOTable/v1.3">
+  |    <RESOURCE type="results">
+  |        <INFO name="QUERY_STATUS" value="OK" />
+  |        <INFO name="QUERY" value="SELECT TOP 100 source_id,ra,pmra,dec,pmdec,parallax,radial_velocity,phot_g_mean_mag,phot_rp_mean_mag
+  |     FROM gaiadr3.gaia_source_lite
+  |     WHERE CONTAINS(POINT(&#039;ICRS&#039;,ra,dec),CIRCLE(&#039;ICRS&#039;, 86.55474, -0.10137, 0.08167))=1
+  |     and ((phot_rp_mean_mag &lt; 17.228) or (phot_g_mean_mag &lt; 17.228))
+  |     and (ruwe &lt; 1.4)
+  |     ORDER BY phot_g_mean_mag
+  |      ">
+  |            <![CDATA[SELECT TOP 100 source_id,ra,pmra,dec,pmdec,parallax,radial_velocity,phot_g_mean_mag,phot_rp_mean_mag
+  |     FROM gaiadr3.gaia_source_lite
+  |     WHERE CONTAINS(POINT('ICRS',ra,dec),CIRCLE('ICRS', 86.55474, -0.10137, 0.08167))=1
+  |     and ((phot_rp_mean_mag < 17.228) or (phot_g_mean_mag < 17.228))
+  |     and (ruwe < 1.4)
+  |     ORDER BY phot_g_mean_mag
+  |      ]]>
+  |        </INFO>
+  |        <INFO name="CAPTION" value="How to cite and acknowledge Gaia: https://gea.esac.esa.int/archive/documentation/credits.html">
+  |            <![CDATA[How to cite and acknowledge Gaia: https://gea.esac.esa.int/archive/documentation/credits.html]]>
+  |        </INFO>
+  |        <INFO name="CITATION" value="How to cite and acknowledge Gaia: https://gea.esac.esa.int/archive/documentation/credits.html" ucd="meta.bib">
+  |            <![CDATA[How to cite and acknowledge Gaia: https://gea.esac.esa.int/archive/documentation/credits.html]]>
+  |        </INFO>
+  |        <INFO name="PAGE" value="" />
+  |        <INFO name="PAGE_SIZE" value="" />
+  |        <INFO name="JOBID" value="1693412462905O">
+  |            <![CDATA[1693412462905O]]>
+  |        </INFO>
+  |        <INFO name="JOBNAME" value="" />
+  |        <COOSYS ID="GAIADR3" epoch="J2016.0" system="ICRS" />
+  |        <RESOURCE>
+  |            <COOSYS ID="t14806478-coosys-1" epoch="J2016.0" system="ICRS"/>
+  |        </RESOURCE>
+  |        <TABLE>
+  |            <FIELD datatype="long" name="source_id" ucd="meta.id">
+  |                <DESCRIPTION>Unique source identifier (unique within a particular Data Release)</DESCRIPTION>
+  |            </FIELD>
+  |            <FIELD datatype="double" name="ra" ref="t14806478-coosys-1" ucd="pos.eq.ra;meta.main" unit="deg" utype="Char.SpatialAxis.Coverage.Location.Coord.Position2D.Value2.C1">
+  |                <DESCRIPTION>Right ascension</DESCRIPTION>
+  |            </FIELD>
+  |            <FIELD datatype="double" name="pmra" ucd="pos.pm;pos.eq.ra" unit="mas.yr**-1">
+  |                <DESCRIPTION>Proper motion in right ascension direction</DESCRIPTION>
+  |            </FIELD>
+  |            <FIELD datatype="double" name="dec" ref="t14806478-coosys-1" ucd="pos.eq.dec;meta.main" unit="deg" utype="Char.SpatialAxis.Coverage.Location.Coord.Position2D.Value2.C2">
+  |                <DESCRIPTION>Declination</DESCRIPTION>
+  |            </FIELD>
+  |            <FIELD datatype="double" name="pmdec" ucd="pos.pm;pos.eq.dec" unit="mas.yr**-1">
+  |                <DESCRIPTION>Proper motion in declination direction</DESCRIPTION>
+  |            </FIELD>
+  |            <FIELD datatype="double" name="parallax" ucd="pos.parallax.trig" unit="mas">
+  |                <DESCRIPTION>Parallax</DESCRIPTION>
+  |            </FIELD>
+  |            <FIELD datatype="float" name="radial_velocity" ucd="spect.dopplerVeloc.opt;em.opt.I" unit="km.s**-1">
+  |                <DESCRIPTION>Radial velocity</DESCRIPTION>
+  |            </FIELD>
+  |            <FIELD datatype="float" name="phot_g_mean_mag" ucd="phot.mag;em.opt" unit="mag">
+  |                <DESCRIPTION>G-band mean magnitude</DESCRIPTION>
+  |            </FIELD>
+  |            <FIELD datatype="float" name="phot_rp_mean_mag" ucd="phot.mag;em.opt.R" unit="mag">
+  |                <DESCRIPTION>Integrated RP mean magnitude</DESCRIPTION>
+  |            </FIELD>
+  |            <DATA>
+  |                <TABLEDATA>
+  |                    <TR>
+  |                        <TD>3219118090462918016</TD>
+  |                        <TD>86.5934741222927</TD>
+  |                        <TD>0.43862335651876644</TD>
+  |                        <TD>-0.14795707230703778</TD>
+  |                        <TD>-0.7414519014405084</TD>
+  |                        <TD>2.4315367202517466</TD>
+  |                        <TD>10.090042</TD>
+  |                        <TD>14.204175</TD>
+  |                        <TD>13.172072</TD>
+  |                    </TR>
+  |                </TABLEDATA>
+  |            </DATA>
+  |        </TABLE>
+  |    </RESOURCE>
+  |</VOTABLE>""".stripMargin
+
+  // Empty Gaia response for coordinates around blind offset (1 degree away)
+  override val gaiaEmptyReponseString =
+  """<?xml version="1.0" encoding="UTF-8"?>
+  |<VOTABLE version="1.4" xmlns="http://www.ivoa.net/xml/VOTable/v1.3" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.ivoa.net/xml/VOTable/v1.3 http://www.ivoa.net/xml/VOTable/v1.3">
+  |    <RESOURCE type="results">
+  |        <INFO name="QUERY_STATUS" value="OK" />
+  |        <INFO name="QUERY" value="SELECT TOP 100 source_id,ra,pmra,dec,pmdec,parallax,radial_velocity,phot_g_mean_mag,phot_rp_mean_mag
+  |     FROM gaiadr3.gaia_source_lite
+  |     WHERE CONTAINS(POINT(&#039;ICRS&#039;,ra,dec),CIRCLE(&#039;ICRS&#039;, 87.55474, -0.10137, 0.08167))=1
+  |     and ((phot_rp_mean_mag &lt; 17.228) or (phot_g_mean_mag &lt; 17.228))
+  |     and (ruwe &lt; 1.4)
+  |     ORDER BY phot_g_mean_mag
+  |      ">
+  |            <![CDATA[SELECT TOP 100 source_id,ra,pmra,dec,pmdec,parallax,radial_velocity,phot_g_mean_mag,phot_rp_mean_mag
+  |     FROM gaiadr3.gaia_source_lite
+  |     WHERE CONTAINS(POINT('ICRS',ra,dec),CIRCLE('ICRS', 87.55474, -0.10137, 0.08167))=1
+  |     and ((phot_rp_mean_mag < 17.228) or (phot_g_mean_mag < 17.228))
+  |     and (ruwe < 1.4)
+  |     ORDER BY phot_g_mean_mag
+  |      ]]>
+  |        </INFO>
+  |        <INFO name="CAPTION" value="How to cite and acknowledge Gaia: https://gea.esac.esa.int/archive/documentation/credits.html">
+  |            <![CDATA[How to cite and acknowledge Gaia: https://gea.esac.esa.int/archive/documentation/credits.html]]>
+  |        </INFO>
+  |        <INFO name="CITATION" value="How to cite and acknowledge Gaia: https://gea.esac.esa.int/archive/documentation/credits.html" ucd="meta.bib">
+  |            <![CDATA[How to cite and acknowledge Gaia: https://gea.esac.esa.int/archive/documentation/credits.html]]>
+  |        </INFO>
+  |        <INFO name="PAGE" value="" />
+  |        <INFO name="PAGE_SIZE" value="" />
+  |        <INFO name="JOBID" value="1693412462905O">
+  |            <![CDATA[1693412462905O]]>
+  |        </INFO>
+  |        <INFO name="JOBNAME" value="" />
+  |        <COOSYS ID="GAIADR3" epoch="J2016.0" system="ICRS" />
+  |        <RESOURCE>
+  |            <COOSYS ID="t14806478-coosys-1" epoch="J2016.0" system="ICRS"/>
+  |        </RESOURCE>
+  |        <TABLE>
+  |            <FIELD datatype="long" name="source_id" ucd="meta.id">
+  |                <DESCRIPTION>Unique source identifier (unique within a particular Data Release)</DESCRIPTION>
+  |            </FIELD>
+  |            <FIELD datatype="double" name="ra" ref="t14806478-coosys-1" ucd="pos.eq.ra;meta.main" unit="deg" utype="Char.SpatialAxis.Coverage.Location.Coord.Position2D.Value2.C1">
+  |                <DESCRIPTION>Right ascension</DESCRIPTION>
+  |            </FIELD>
+  |            <FIELD datatype="double" name="pmra" ucd="pos.pm;pos.eq.ra" unit="mas.yr**-1">
+  |                <DESCRIPTION>Proper motion in right ascension direction</DESCRIPTION>
+  |            </FIELD>
+  |            <FIELD datatype="double" name="dec" ref="t14806478-coosys-1" ucd="pos.eq.dec;meta.main" unit="deg" utype="Char.SpatialAxis.Coverage.Location.Coord.Position2D.Value2.C2">
+  |                <DESCRIPTION>Declination</DESCRIPTION>
+  |            </FIELD>
+  |            <FIELD datatype="double" name="pmdec" ucd="pos.pm;pos.eq.dec" unit="mas.yr**-1">
+  |                <DESCRIPTION>Proper motion in declination direction</DESCRIPTION>
+  |            </FIELD>
+  |            <FIELD datatype="double" name="parallax" ucd="pos.parallax.trig" unit="mas">
+  |                <DESCRIPTION>Parallax</DESCRIPTION>
+  |            </FIELD>
+  |            <FIELD datatype="float" name="radial_velocity" ucd="spect.dopplerVeloc.opt;em.opt.I" unit="km.s**-1">
+  |                <DESCRIPTION>Radial velocity</DESCRIPTION>
+  |            </FIELD>
+  |            <FIELD datatype="float" name="phot_g_mean_mag" ucd="phot.mag;em.opt" unit="mag">
+  |                <DESCRIPTION>G-band mean magnitude</DESCRIPTION>
+  |            </FIELD>
+  |            <FIELD datatype="float" name="phot_rp_mean_mag" ucd="phot.mag;em.opt.R" unit="mag">
+  |                <DESCRIPTION>Integrated RP mean magnitude</DESCRIPTION>
+  |            </FIELD>
+  |            <DATA>
+  |                <TABLEDATA>
+  |                </TABLEDATA>
+  |            </DATA>
+  |        </TABLE>
+  |    </RESOURCE>
+  |</VOTABLE>""".stripMargin
+
+  // Mock Gaia handler that returns different responses based on coordinates
+  override def httpRequestHandler: Request[IO] => Resource[IO, Response[IO]] =
+    req => {
+      val renderStr = req.uri.renderString
+      val respStr =
+        if (renderStr.contains("87.55474")) {
+          // Blind offset coordinates (1 degree away) - return empty response
+          gaiaEmptyReponseString
+        } else if (renderStr.contains("86.55474")) {
+          // Normal science target coordinates - return guide stars
+          gaiaResponseString
+        } else {
+          // Any other coordinates - return empty response
+          gaiaEmptyReponseString
+        }
+      Resource.eval(IO.pure(Response(body = Stream(respStr).through(utf8.encode))))
+    }
+
+  override def createObservationAs(
+    user: User,
+    pid: Program.Id,
+    tids: List[Target.Id]
+  ): IO[Observation.Id] =
+    createGmosNorthLongSlitObservationAs(user, pid, tids, offsetArcsec = List(0, 15).some)
+
+  test("AGS calculation without blind offset - should find guide stars") {
+    val setup: IO[Observation.Id] =
+      for {
+        p <- createProgramAs(pi)
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createObservationAs(pi, p, List(t))
+        _ <- setObservationTimeAndDuration(pi, o, gaiaSuccess.some, fullTimeEstimate.some)
+      } yield o
+
+    setup.flatMap { oid =>
+      expect(pi, guideEnvironmentQuery(oid), expected = successfulGuideEnvironmentResult)
+    }
+  }
+
+  test("AGS calculation with blind offset 1 degree away - should find no usable guide stars") {
+    val setup: IO[Observation.Id] =
+      for {
+        p <- createProgramAs(pi)
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createObservationAs(pi, p, List(t))
+        _ <- setObservationTimeAndDuration(pi, o, gaiaSuccess.some, fullTimeEstimate.some)
+        // Set blind offset 1 degree away from science target coordinates
+        // Guide stars will be found at base position but won't be usable at the blind offset position
+        _ <- setBlindOffsetViaGraphQL(pi, o, "Blind Offset Target", "87.55474", "-0.10137")
+      } yield o
+
+    setup.flatMap { oid =>
+      expect(pi, guideEnvironmentQuery(oid), expected = List("No usable guidestars are available.").asLeft)
+    }
+  }
+
+  test("AGS calculation with blind offset at same position as science - should find same guide stars") {
+    val setup: IO[Observation.Id] =
+      for {
+        p <- createProgramAs(pi)
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createObservationAs(pi, p, List(t))
+        _ <- setObservationTimeAndDuration(pi, o, gaiaSuccess.some, fullTimeEstimate.some)
+        // Set blind offset at exact same coordinates as science target WITH proper motion
+        // The science target has PM: RA=0.918 mas/yr, Dec=-1.057 mas/yr
+        // Setting the blind offset with the same coordinates and PM creates a zero offset
+        _ <- query(
+               user = pi,
+               query = s"""
+                 mutation {
+                   updateObservations(input: {
+                     WHERE: { id: { EQ: "$o" } }
+                     SET: {
+                       targetEnvironment: {
+                         blindOffsetTarget: {
+                           name: "Blind Offset Target"
+                           sidereal: {
+                             ra: { hms: "05:46:13.137" }
+                             dec: { dms: "-00:06:04.89" }
+                             epoch: "J2000.0"
+                             properMotion: {
+                               ra: { milliarcsecondsPerYear: 0.918 }
+                               dec: { milliarcsecondsPerYear: -1.057 }
+                             }
+                           }
+                           sourceProfile: {
+                             point: {
+                               bandNormalized: {
+                                 sed: { stellarLibrary: B5_III }
+                                 brightnesses: [{ band: R, value: 15.0, units: VEGA_MAGNITUDE }]
+                               }
+                             }
+                           }
+                         }
+                       }
+                     }
+                   }) {
+                     observations { id }
+                   }
+                 }
+               """
+             ).void
+      } yield o
+
+    setup.flatMap { oid =>
+      expect(pi, guideEnvironmentQuery(oid), expected = successfulGuideEnvironmentResult)
+    }
+  }
+
+}

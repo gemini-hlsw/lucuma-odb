@@ -12,27 +12,30 @@ import fs2.text.utf8
 import io.circe.Json
 import io.circe.literal.*
 import lucuma.core.model.Observation
+import lucuma.core.model.Program
+import lucuma.core.model.Target
+import lucuma.core.model.User
 import org.http4s.Request
 import org.http4s.Response
 
-class guideEnvironments extends ExecutionTestSupportForGmos {
+class guideEnvironments extends ExecutionTestSupportForGmos with GuideEnvironmentSuite {
 
   val aug2023 = "2023-08-30T00:00:00Z"
   val aug3000 = "3000-08-30T00:00:00Z"
 
-  val gaiaReponseString =
+  override val gaiaResponseString =
   """<?xml version="1.0" encoding="UTF-8"?>
   |<VOTABLE version="1.4" xmlns="http://www.ivoa.net/xml/VOTable/v1.3" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.ivoa.net/xml/VOTable/v1.3 http://www.ivoa.net/xml/VOTable/v1.3">
   |    <RESOURCE type="results">
   |        <INFO name="QUERY_STATUS" value="OK" />
-  |        <INFO name="QUERY" value="SELECT TOP 100 source_id,ra,pmra,dec,pmdec,parallax,radial_velocity,phot_g_mean_mag,phot_rp_mean_mag 
+  |        <INFO name="QUERY" value="SELECT TOP 100 source_id,ra,pmra,dec,pmdec,parallax,radial_velocity,phot_g_mean_mag,phot_rp_mean_mag
   |     FROM gaiadr3.gaia_source_lite
   |     WHERE CONTAINS(POINT(&#039;ICRS&#039;,ra,dec),CIRCLE(&#039;ICRS&#039;, 86.55474, -0.10137, 0.08167))=1
   |     and ((phot_rp_mean_mag &lt; 17.228) or (phot_g_mean_mag &lt; 17.228))
   |     and (ruwe &lt; 1.4)
   |     ORDER BY phot_g_mean_mag
   |      ">
-  |            <![CDATA[SELECT TOP 100 source_id,ra,pmra,dec,pmdec,parallax,radial_velocity,phot_g_mean_mag,phot_rp_mean_mag 
+  |            <![CDATA[SELECT TOP 100 source_id,ra,pmra,dec,pmdec,parallax,radial_velocity,phot_g_mean_mag,phot_rp_mean_mag
   |     FROM gaiadr3.gaia_source_lite
   |     WHERE CONTAINS(POINT('ICRS',ra,dec),CIRCLE('ICRS', 86.55474, -0.10137, 0.08167))=1
   |     and ((phot_rp_mean_mag < 17.228) or (phot_g_mean_mag < 17.228))
@@ -125,19 +128,19 @@ class guideEnvironments extends ExecutionTestSupportForGmos {
   |    </RESOURCE>
   |</VOTABLE>""".stripMargin
 
-  val gaiaEmptyReponseString = 
+  override val gaiaEmptyReponseString =
   """<?xml version="1.0" encoding="UTF-8"?>
   |<VOTABLE version="1.4" xmlns="http://www.ivoa.net/xml/VOTable/v1.3" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.ivoa.net/xml/VOTable/v1.3 http://www.ivoa.net/xml/VOTable/v1.3">
   |    <RESOURCE type="results">
   |        <INFO name="QUERY_STATUS" value="OK" />
-  |        <INFO name="QUERY" value="SELECT TOP 100 source_id,ra,pmra,dec,pmdec,parallax,radial_velocity,phot_g_mean_mag,phot_rp_mean_mag 
+  |        <INFO name="QUERY" value="SELECT TOP 100 source_id,ra,pmra,dec,pmdec,parallax,radial_velocity,phot_g_mean_mag,phot_rp_mean_mag
   |     FROM gaiadr3.gaia_source_lite
   |     WHERE CONTAINS(POINT(&#039;ICRS&#039;,ra,dec),CIRCLE(&#039;ICRS&#039;, 86.55474, -0.10137, 0.08167))=1
   |     and ((phot_rp_mean_mag &lt; 17.228) or (phot_g_mean_mag &lt; 17.228))
   |     and (ruwe &lt; 1.4)
   |     ORDER BY phot_g_mean_mag
   |      ">
-  |            <![CDATA[SELECT TOP 100 source_id,ra,pmra,dec,pmdec,parallax,radial_velocity,phot_g_mean_mag,phot_rp_mean_mag 
+  |            <![CDATA[SELECT TOP 100 source_id,ra,pmra,dec,pmdec,parallax,radial_velocity,phot_g_mean_mag,phot_rp_mean_mag
   |     FROM gaiadr3.gaia_source_lite
   |     WHERE CONTAINS(POINT('ICRS',ra,dec),CIRCLE('ICRS', 86.55474, -0.10137, 0.08167))=1
   |     and ((phot_rp_mean_mag < 17.228) or (phot_g_mean_mag < 17.228))
@@ -479,9 +482,16 @@ class guideEnvironments extends ExecutionTestSupportForGmos {
   override def httpRequestHandler: Request[IO] => Resource[IO, Response[IO]] =
     req => {
       val respStr =
-        if (req.uri.renderString.contains("20-0.10137")) gaiaReponseString else gaiaEmptyReponseString
+        if (req.uri.renderString.contains("20-0.10137")) gaiaResponseString else gaiaEmptyReponseString
       Resource.eval(IO.pure(Response(body = Stream(respStr).through(utf8.encode))))
     }
+
+  override def createObservationAs(
+    user: User,
+    pid: Program.Id,
+    tids: List[Target.Id]
+  ): IO[Observation.Id] =
+    createGmosNorthLongSlitObservationAs(user, pid, tids, offsetArcsec = List(0, 15).some)
 
   test("successfully obtain guide environment") {
     val setup: IO[Observation.Id] =

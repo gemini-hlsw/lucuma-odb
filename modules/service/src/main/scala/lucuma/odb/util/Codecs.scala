@@ -6,6 +6,7 @@ package lucuma.odb.util
 import cats.data.NonEmptyList
 import cats.syntax.apply.*
 import cats.syntax.either.*
+import cats.syntax.foldable.*
 import cats.syntax.option.*
 import eu.timepit.refined.types.numeric.NonNegBigDecimal
 import eu.timepit.refined.types.numeric.NonNegInt
@@ -22,10 +23,12 @@ import lucuma.core.data.EmailAddress
 import lucuma.core.enums.*
 import lucuma.core.math.Angle
 import lucuma.core.math.BoundedInterval
+import lucuma.core.math.Coordinates
 import lucuma.core.math.Declination
 import lucuma.core.math.Epoch
 import lucuma.core.math.Offset
 import lucuma.core.math.Parallax
+import lucuma.core.math.ProperMotion
 import lucuma.core.math.RadialVelocity
 import lucuma.core.math.RightAscension
 import lucuma.core.math.SignalToNoise
@@ -180,6 +183,9 @@ trait Codecs {
       safe(s => Angle.microarcseconds.reverseGet(s.toLong)),
       Type("_d_angle_µas", List(Type("d_angle_µas")))
     )
+
+  val angle_µas_list: Codec[List[Angle]] =
+    _angle_µas.imap(_.toList)(l => Arr.fromFoldable(l))
 
   val arc_type: Codec[ArcType] =
     enumerated[ArcType](Type("e_arc_type"))
@@ -421,6 +427,12 @@ trait Codecs {
       p => Angle.fromMicroarcseconds(p.μas.value.value)
     )
 
+  val proper_motion_ra: Codec[ProperMotion.RA] =
+    int8.imap(ProperMotion.μasyRA)(_.μasy.value)
+
+  val proper_motion_dec: Codec[ProperMotion.Dec] =
+    int8.imap(ProperMotion.μasyDec)(_.μasy.value)
+
   val partner: Codec[Partner] =
     enumerated(Type.varchar)
 
@@ -498,6 +510,15 @@ trait Codecs {
       a => RightAscension.fromAngleExact.getOption(a).toRight(s"Invalid right ascension: $a"))(
       RightAscension.fromAngleExact.reverseGet
     )
+
+  val siderealTrackingDecoder: Decoder[SiderealTracking] =
+    (right_ascension *: declination *: epoch *: proper_motion_ra.opt *: proper_motion_dec.opt *: radial_velocity.opt *: parallax.opt).emap {
+      case (ra, dec, ep, pmRa, pmDec, rv, par) =>
+        val coords = Coordinates(ra, dec)
+        val pm = (pmRa, pmDec).mapN(ProperMotion.apply)
+        val tracking = SiderealTracking(coords, ep, pm, rv, par)
+        Right(tracking)
+    }
 
   val science_band: Codec[ScienceBand] =
     enumerated(Type("e_science_band"))
