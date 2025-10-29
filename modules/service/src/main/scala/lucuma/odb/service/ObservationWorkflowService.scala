@@ -55,6 +55,7 @@ import skunk.implicits.*
 import java.time.Instant
 
 import Services.Syntax.*
+import org.http4s.client.Client
 
 sealed trait ObservationWorkflowService[F[_]] {
 
@@ -236,7 +237,7 @@ object ObservationWorkflowService {
       case _                             => ObservationValidation.configuration(ge.format)
 
   /* Construct an instance. */
-  def instantiate[F[_]: Concurrent](using Services[F]): ObservationWorkflowService[F] =
+  def instantiate[F[_]: Concurrent](httpClient: Client[F])(using Services[F]): ObservationWorkflowService[F] =
     new ObservationWorkflowService[F] {
 
       // Make the enums available in a stable and implicit way
@@ -314,7 +315,7 @@ object ObservationWorkflowService {
             .toList // we now have a list of (Timestamp, List[oid]) batches
             .foldLeftM(input): // fold over this list with `input` as the starting point, updating when we can find coordinates
               case (accum, (when, batch)) =>
-                trackingService
+                trackingService(httpClient)
                   .getCoordinatesSnapshotOrRegion(batch, when)
                   .map: batchResults =>
                     batchResults

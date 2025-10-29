@@ -29,7 +29,7 @@ val keySemaphoreVersion        = "0.3.0-M1"
 val kittensVersion             = "3.5.0"
 val logbackVersion             = "1.5.19"
 val log4catsVersion            = "2.7.1"
-val lucumaCoreVersion          = "0.151.0"
+val lucumaCoreVersion          = "0.151.0-6-69641c8-20251028T232126Z-SNAPSHOT"// "0.151.0"
 val lucumaGraphQLRoutesVersion = "0.11.3"
 val monocleVersion             = "3.3.0"
 val munitVersion               = "1.2.0"
@@ -688,6 +688,7 @@ lazy val service = project
       "io.laserdisc"             %% "fs2-aws-s3"                         % fs2AwsVersion,
       "org.typelevel"            %% "grackle-skunk"                      % grackleVersion,
       "edu.gemini"               %% "lucuma-catalog"                     % lucumaCoreVersion,
+      "edu.gemini"               %% "lucuma-horizons"                    % lucumaCoreVersion,
       "edu.gemini"               %% "lucuma-ags"                         % lucumaCoreVersion,
       "edu.gemini"               %% "lucuma-graphql-routes"              % lucumaGraphQLRoutesVersion,
       "is.cir"                   %% "ciris"                              % cirisVersion,

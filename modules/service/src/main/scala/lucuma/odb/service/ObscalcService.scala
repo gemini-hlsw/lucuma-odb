@@ -57,6 +57,7 @@ import skunk.data.Arr
 import skunk.implicits.*
 
 import scala.collection.immutable.SortedSet
+import org.http4s.client.Client
 
 sealed trait ObscalcService[F[_]]:
 
@@ -166,7 +167,8 @@ object ObscalcService:
   def instantiate[F[_]: Concurrent: Logger](
     commitHash: CommitHash,
     itcClient:  ItcClient[F],
-    calculator: ForInstrumentMode
+    calculator: ForInstrumentMode,
+    httpClient: Client[F]
   )(using Services[F]): ObscalcService[F] =
 
     new ObscalcService[F]:
@@ -280,7 +282,7 @@ object ObscalcService:
           Logger[F].info(s"${pending.observationId}: calculating workflow") *>
           services
             .transactionally:
-              observationWorkflowService.getCalculatedWorkflow(pending.observationId, itc, dig.map(_.science.executionState))
+              observationWorkflowService(httpClient).getCalculatedWorkflow(pending.observationId, itc, dig.map(_.science.executionState))
             .flatMap: r =>
               r.toOption.fold(Logger[F].warn(s"${pending.observationId}: failure calculating workflow: $r").as(UndefinedWorkflow))(_.pure[F])
             .flatTap: r =>

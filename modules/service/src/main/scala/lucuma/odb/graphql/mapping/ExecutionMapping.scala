@@ -44,6 +44,7 @@ import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.Services
 import lucuma.odb.service.Services.Syntax.*
 import org.typelevel.log4cats.Logger
+import org.http4s.client.Client
 
 trait ExecutionMapping[F[_]: Logger] extends ObservationEffectHandler[F]
                                 with ObscalcTable[F]
@@ -55,6 +56,7 @@ trait ExecutionMapping[F[_]: Logger] extends ObservationEffectHandler[F]
 
   def user: User
   def itcClient: ItcClient[F]
+  def httpClient: Client[F]
   def services: Resource[F, Services[F]]
   def commitHash: CommitHash
   def timeEstimateCalculator: TimeEstimateCalculatorImplementation.ForInstrumentMode
@@ -160,7 +162,7 @@ trait ExecutionMapping[F[_]: Logger] extends ObservationEffectHandler[F]
     val calculate: (Program.Id, Observation.Id, Unit) => F[Result[Json]] =
       (_, oid, _) =>
         services.useTransactionally:
-          obscalcService(commitHash, itcClient, timeEstimateCalculator)
+          obscalcService(commitHash, itcClient, timeEstimateCalculator, httpClient)
            .selectExecutionDigest(oid)
            .map:
              _.fold(OdbError.SequenceUnavailable(oid).asWarning(Json.Null)): cv =>

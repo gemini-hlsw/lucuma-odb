@@ -85,6 +85,7 @@ import scala.annotation.tailrec
 import scala.collection.immutable.SortedMap
 
 import Services.Syntax.*
+import org.http4s.client.Client
 
 trait GuideService[F[_]] {
   import GuideService.AvailabilityPeriod
@@ -293,7 +294,8 @@ object GuideService {
     gaiaClient:             GaiaClient[F],
     itcClient:              ItcClient[F],
     commitHash:             CommitHash,
-    timeEstimateCalculator: TimeEstimateCalculatorImplementation.ForInstrumentMode
+    timeEstimateCalculator: TimeEstimateCalculatorImplementation.ForInstrumentMode,
+    httpClient:             Client[F]
   )(using Services[F]): GuideService[F] =
     new GuideService[F] {
 
@@ -629,7 +631,7 @@ object GuideService {
       )(using SuperUserAccess): F[Result[ContiguousTimestampMap[List[Angle]]]] =
         val interval = TimestampInterval.between(neededPeriods.minimumBy(_.start).start, neededPeriods.maximumBy(_.end).end)
         (for {
-          tracking     <- ResultT(trackingService.getTrackingSnapshot(obsInfo.id, interval).map(_.redeemFailure)) // treat failure as None
+          tracking     <- ResultT(trackingService(httpClient).getTrackingSnapshot(obsInfo.id, interval).map(_.redeemFailure)) // treat failure as None
           candPeriod    = neededPeriods.tail.fold(neededPeriods.head)((a, b) => a.span(b))
           candidates   <- ResultT:
                            tracking match
@@ -785,7 +787,7 @@ object GuideService {
                                .toResult(generalError("Visit end time out of range").asProblem)
                            )
 
-          tracking      <- ResultT(trackingService.getTrackingSnapshot(oid, TimestampInterval.empty(obsTime)))
+          tracking      <- ResultT(trackingService(httpClient).getTrackingSnapshot(oid, TimestampInterval.empty(obsTime)))
           baseTracking     = tracking.base
           asterismTracking = tracking.asterism.map(_._2) // discard the target ids
 
@@ -867,7 +869,7 @@ object GuideService {
           obsInfo       <- ResultT(getObservationInfo(oid))
           genInfo       <- ResultT(getGeneratorInfo(pid, oid))
 
-          tracking      <- ResultT(trackingService.getTrackingSnapshot(oid, TimestampInterval.empty(obsTime)))
+          tracking      <- ResultT(trackingService(httpClient).getTrackingSnapshot(oid, TimestampInterval.empty(obsTime)))
           baseTracking     = tracking.base // use explicit base if defined
           asterismTracking = tracking.asterism.map(_._2) // discard the target ids
 
