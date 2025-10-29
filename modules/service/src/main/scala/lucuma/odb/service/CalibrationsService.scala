@@ -57,7 +57,6 @@ import skunk.AppliedFragment
 import skunk.Command
 import skunk.Query
 import skunk.Transaction
-import skunk.codec.numeric.int8
 import skunk.codec.text.text
 import skunk.syntax.all.*
 
@@ -112,7 +111,7 @@ object CalibrationsService extends CalibrationObservations {
   )
 
   private def targetCoordinates(when: Instant)(
-    rows: List[(Target.Id, String, CalibrationRole, RightAscension, Declination, Epoch, Option[Long], Option[Long], Option[RadialVelocity], Option[Parallax])]
+    rows: List[(Target.Id, String, CalibrationRole, RightAscension, Declination, Epoch, Option[ProperMotion.RA], Option[ProperMotion.Dec], Option[RadialVelocity], Option[Parallax])]
   ): List[(Target.Id, String, CalibrationRole, Coordinates)] =
     rows.map { case (tid, name, role, ra, dec, epoch, pmra, pmdec, rv, parallax) =>
       (tid,
@@ -121,9 +120,7 @@ object CalibrationsService extends CalibrationObservations {
         SiderealTracking(
           Coordinates(ra, dec),
           epoch,
-          (pmra, pmdec).mapN{ case (r, d) =>
-            ProperMotion(ProperMotion.μasyRA(r), ProperMotion.μasyDec(d))
-          },
+          (pmra, pmdec).mapN(ProperMotion.apply),
           rv,
           parallax
         ).at(when)
@@ -512,7 +509,7 @@ object CalibrationsService extends CalibrationObservations {
         void"WHERE c_observation_id IN (" |+|
           oids.map(sql"$observation_id").intercalate(void", ") |+| void")"
 
-    def selectCalibrationTargets(roles: List[CalibrationRole]): Query[List[CalibrationRole], (Target.Id, String, CalibrationRole, RightAscension, Declination, Epoch, Option[Long], Option[Long], Option[RadialVelocity], Option[Parallax])] =
+    def selectCalibrationTargets(roles: List[CalibrationRole]): Query[List[CalibrationRole], (Target.Id, String, CalibrationRole, RightAscension, Declination, Epoch, Option[ProperMotion.RA], Option[ProperMotion.Dec], Option[RadialVelocity], Option[Parallax])] =
       sql"""SELECT
               c_target_id,
               t_target.c_name,
@@ -532,7 +529,7 @@ object CalibrationsService extends CalibrationObservations {
               AND t_target.c_existence='present'
               AND t_target.c_target_disposition = 'calibration'
             ORDER BY c_target_id
-          """.query(target_id *: text *: calibration_role *: right_ascension *: declination *: epoch *: int8.opt *: int8.opt *: radial_velocity.opt *: parallax.opt)
+          """.query(target_id *: text *: calibration_role *: right_ascension *: declination *: epoch *: proper_motion_ra.opt *: proper_motion_dec.opt *: radial_velocity.opt *: parallax.opt)
 
     val selectCalibrationTimeAndConf: Query[Observation.Id, (Observation.Id, CalibrationRole, Option[Timestamp], Option[ObservingModeType])] =
       sql"""

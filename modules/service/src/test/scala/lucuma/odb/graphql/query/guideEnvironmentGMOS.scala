@@ -26,8 +26,6 @@ class guideEnvironmentGMOS extends ExecutionTestSupportForGmos with GuideEnviron
   val gaiaEmpty: Timestamp = Timestamp.FromString.getOption("3000-01-30T04:00:00Z").get
   val gaiaError: Timestamp = Timestamp.FromString.getOption("4000-12-30T20:00:00Z").get
 
-  val setupTime: TimeSpan = TimeSpan.fromMinutes(16).get
-  val fullTimeEstimate: TimeSpan = TimeSpan.parse("PT36M1.8S").toOption.get
   val durationTooShort: TimeSpan = setupTime -| TimeSpan.fromMicroseconds(1).get
   val durationTooLong: TimeSpan = fullTimeEstimate +| TimeSpan.fromMicroseconds(1).get
   val durationNotValidated: TimeSpan = TimeSpan.Zero
@@ -43,78 +41,6 @@ class guideEnvironmentGMOS extends ExecutionTestSupportForGmos with GuideEnviron
         "title": "V1647 Orionis",
         "targetEnvironment": {
           "guideEnvironments": null
-        }
-      }
-    }
-    """.asRight
-
-  val defaultGuideEnvironmentResults =
-    json"""
-    {
-      "observation": {
-        "title": "V1647 Orionis",
-        "targetEnvironment": {
-          "guideEnvironment": {
-            "posAngle": {
-              "degrees": 180.000000
-            },
-            "guideTargets": [
-              {
-                "name": "Gaia DR3 3219118090462918016",
-                "probe": "GMOS_OIWFS",
-                "sourceProfile": {
-                  "point": {
-                    "bandNormalized": {
-                      "brightnesses": [
-                        {
-                          "band": "GAIA_RP"
-                        }
-                      ]
-                    }
-                  }
-                },
-                "sidereal": {
-                  "catalogInfo": {
-                    "name": "GAIA",
-                    "id": "3219118090462918016",
-                    "objectType": null
-                  },
-                  "epoch": "J2023.660",
-                  "ra": {
-                    "microseconds": 20782434012,
-                    "hms": "05:46:22.434012",
-                    "hours": 5.772898336666666666666666666666667,
-                    "degrees": 86.59347505
-                  },
-                  "dec": {
-                    "dms": "-00:08:52.651136",
-                    "degrees": 359.8520413511111,
-                    "microarcseconds": 1295467348864
-                  },
-                  "radialVelocity": {
-                    "metersPerSecond": 0,
-                    "centimetersPerSecond": 0,
-                    "kilometersPerSecond": 0
-                  },
-                  "properMotion": {
-                    "ra": {
-                      "microarcsecondsPerYear": 438,
-                      "milliarcsecondsPerYear": 0.438
-                    },
-                    "dec": {
-                      "microarcsecondsPerYear": -741,
-                      "milliarcsecondsPerYear": -0.741
-                    }
-                  },
-                  "parallax": {
-                    "microarcseconds": 2432,
-                    "milliarcseconds": 2.432
-                  }
-                },
-                "nonsidereal": null
-              }
-            ]
-          }
         }
       }
     }
@@ -351,7 +277,7 @@ class guideEnvironmentGMOS extends ExecutionTestSupportForGmos with GuideEnviron
         _ <- setObservationTimeAndDuration(pi, o, gaiaSuccess.some, fullTimeEstimate.some)
       } yield o
     setup.flatMap { oid =>
-      expect(pi, guideEnvironmentQuery(oid), expected = defaultGuideEnvironmentResults)
+      expect(pi, guideEnvironmentQuery(oid), expected = successfulGuideEnvironmentResult)
     }
   }
 
@@ -364,7 +290,7 @@ class guideEnvironmentGMOS extends ExecutionTestSupportForGmos with GuideEnviron
         _ <- setObservationTimeAndDuration(pi, o, gaiaSuccess.some, fullTimeEstimate.some)
       } yield o
     setup.flatMap { oid =>
-      expect(pi, guideEnvironmentQuery(oid), expected = defaultGuideEnvironmentResults)
+      expect(pi, guideEnvironmentQuery(oid), expected = successfulGuideEnvironmentResult)
     }
   }
 
@@ -378,7 +304,7 @@ class guideEnvironmentGMOS extends ExecutionTestSupportForGmos with GuideEnviron
         _ <- setGuideTargetName(pi, o, defaultTargetName.some)
       } yield o
     setup.flatMap { oid =>
-      expect(pi, guideEnvironmentQuery(oid), expected = defaultGuideEnvironmentResults)
+      expect(pi, guideEnvironmentQuery(oid), expected = successfulGuideEnvironmentResult)
     }
   }
 

@@ -32,7 +32,7 @@ import lucuma.core.geom.gmos.candidatesArea
 import lucuma.core.geom.jts.interpreter.given
 import lucuma.core.math.Angle
 import lucuma.core.math.Coordinates
-import lucuma.core.math.Offset
+import lucuma.core.math.ProperMotion
 import lucuma.core.math.Wavelength
 import lucuma.core.model.AirMassBound
 import lucuma.core.model.ConstraintSet
@@ -76,11 +76,11 @@ import lucuma.odb.util.Codecs.*
 import natchez.Trace
 import org.http4s.client.Client
 import skunk.*
-import skunk.data.Arr
 import skunk.implicits.*
 
 import java.security.MessageDigest
 import java.time.Duration
+import java.time.Instant
 import java.time.temporal.ChronoUnit
 import scala.annotation.tailrec
 import scala.collection.immutable.SortedMap
@@ -178,15 +178,16 @@ object GuideService {
 
 
   case class ObservationInfo(
-    id:                 Observation.Id,
-    programId:          Program.Id,
-    constraints:        ConstraintSet,
-    posAngleConstraint: PosAngleConstraint,
-    explicitBase:       Option[Coordinates],
-    optObsTime:         Option[Timestamp],
-    optObsDuration:     Option[TimeSpan],
-    guideStarName:      Option[GuideStarName],
-    guideStarHash:      Option[Md5Hash]
+    id:                  Observation.Id,
+    programId:           Program.Id,
+    constraints:         ConstraintSet,
+    posAngleConstraint:  PosAngleConstraint,
+    explicitBase:        Option[Coordinates],
+    optObsTime:          Option[Timestamp],
+    optObsDuration:      Option[TimeSpan],
+    guideStarName:       Option[GuideStarName],
+    guideStarHash:       Option[Md5Hash],
+    blindOffsetTargetId: Option[Target.Id]
   ) {
     def obsTime: Result[Timestamp] =
       optObsTime.toResult(generalError(s"Observation time not set for observation $id.").asProblem)
@@ -230,6 +231,9 @@ object GuideService {
       given Encoder[Coordinates] = deriveEncoder
       md5.update(HashBytes.forJsonEncoder[Option[Coordinates]].hashBytes(explicitBase))
 
+      given Encoder[Target.Id] = deriveEncoder
+      md5.update(HashBytes.forJsonEncoder[Option[Target.Id]].hashBytes(blindOffsetTargetId))
+
       Md5Hash.unsafeFromByteArray(md5.digest())
     }
 
@@ -262,9 +266,11 @@ object GuideService {
     params: GeneratorParams,
     hash:   Md5Hash
   ) {
-    val timeEstimate                         = digest.fullTimeEstimate.sum
-    val setupTime                            = digest.setup.full
-    val offsets                              = NonEmptyList.fromFoldable(digest.science.offsets.union(digest.acquisition.offsets))
+    val timeEstimate = digest.fullTimeEstimate.sum
+    val setupTime    = digest.setup.full
+    val acqOffsets   = NonEmptyList.fromFoldable(digest.acquisition.offsets).map(AcquisitionOffsets.apply)
+    val sciOffsets   = NonEmptyList.fromFoldable(digest.science.offsets).map(ScienceOffsets.apply)
+
     val (site, agsParams, centralWavelength): (Site, AgsParams, Wavelength) = params.observingMode match
       case mode: gmos.longslit.Config.GmosNorth =>
         (Site.GN, AgsParams.GmosAgsParams(mode.fpu.asLeft.some, PortDisposition.Side), mode.centralWavelength)
@@ -495,7 +501,7 @@ object GuideService {
       extension (ts: Timestamp) def plusDaysTruncatedAndBounded(n: Int): Timestamp =
         Timestamp.fromInstantTruncatedAndBounded(ts.toInstant.plus(n, ChronoUnit.DAYS))
 
-      /** 
+      /**
        * Find the first timestamp in `interval` for which the coordinates stray more than `invalidThreshold`
        * from the origin (i.e., coordinates at `interval.start`), or `Timestamp.Max` if the target never
        * exits the valid region. We only check once per day.
@@ -512,11 +518,11 @@ object GuideService {
 
           def withinBoundsAt(ts: Timestamp): Either[OdbError, Boolean] =
             coordsAt(ts).map: coords =>
-              origin.angularDistance(coords) > invalidThreshold          
+              origin.angularDistance(coords) > invalidThreshold
 
           // Start at `ts` and see how far the target has moved, looping back if we need to keep checking.
           @tailrec def go(ts: Timestamp): Either[OdbError, Timestamp] =
-            if ts >= interval.end then 
+            if ts >= interval.end then
               // one last check at the endpoint
               withinBoundsAt(interval.end).map:
                 case true  => Timestamp.Max // never exits
@@ -527,11 +533,11 @@ object GuideService {
                 case Left(err)    => Left(err)
                 case Right(true)  => Right(ts)
                 case Right(false) => go(ts.plusDaysTruncatedAndBounded(1))
-          
+
           // Start at the beginning
           go(interval.start)
 
-      }        
+      }
 
       extension (sidereal: SiderealTracking)
         def masy: Double =
@@ -570,15 +576,6 @@ object GuideService {
               case Right((d, p, h)) => GeneratorInfo(d, p, h).success
               case Left(ge)         => generatorError(ge).asFailure
 
-      def getPositions(
-        angles:             NonEmptyList[Angle],
-        offsets:            Option[NonEmptyList[Offset]],
-      ): NonEmptyList[AgsPosition] =
-        for {
-          pa  <- angles
-          off <- offsets.getOrElse(NonEmptyList.of(Offset.Zero))
-        } yield AgsPosition(pa, off)
-
       // TODO: Can go away after `guideEnvironments` is removed???
       def processCandidates(
         obsInfo:       ObservationInfo,
@@ -586,15 +583,19 @@ object GuideService {
         genInfo:       GeneratorInfo,
         baseCoords:    Coordinates,
         scienceCoords: List[Coordinates],
-        positions:     NonEmptyList[AgsPosition],
-        candidates:    List[GuideStarCandidate]
+        blindOffset:   Option[Coordinates],
+        angles:        NonEmptyList[Angle],
+        candidates:    List[GuideStarCandidate],
       ): List[AgsAnalysis.Usable] =
         Ags
           .agsAnalysis(obsInfo.constraints,
                        wavelength,
                        baseCoords,
                        scienceCoords,
-                       positions,
+                       blindOffset,
+                       angles,
+                       genInfo.acqOffsets,
+                       genInfo.sciOffsets,
                        genInfo.agsParams,
                        candidates
           )
@@ -606,7 +607,8 @@ object GuideService {
         genInfo:       GeneratorInfo,
         baseCoords:    Coordinates,
         scienceCoords: List[Coordinates],
-        positions:     NonEmptyList[AgsPosition],
+        blindOffset:   Option[Coordinates],
+        angles:        NonEmptyList[Angle],
         candidates:    NonEmptyList[GuideStarCandidate]
       ): Option[AgsAnalysis.Usable] =
         Ags
@@ -614,7 +616,10 @@ object GuideService {
                        wavelength,
                        baseCoords,
                        scienceCoords,
-                       positions,
+                       blindOffset,
+                       angles,
+                       genInfo.acqOffsets,
+                       genInfo.sciOffsets,
                        genInfo.agsParams,
                        candidates.toList
           )
@@ -627,6 +632,7 @@ object GuideService {
         obsInfo:         ObservationInfo,
         genInfo:         GeneratorInfo,
         currentAvail:    ContiguousTimestampMap[List[Angle]],
+        blindOffset:     Option[Coordinates],
         newHash:         Md5Hash
       )(using SuperUserAccess): F[Result[ContiguousTimestampMap[List[Angle]]]] =
         val interval = TimestampInterval.between(neededPeriods.minimumBy(_.start).start, neededPeriods.maximumBy(_.end).end)
@@ -636,14 +642,29 @@ object GuideService {
           candidates   <- ResultT:
                            tracking match
                               case None    => Result.success(Nil).pure[F]
-                              case Some(t) => getAllCandidates(obsInfo.id, candPeriod.start, candPeriod.end, t.base, genInfo.centralWavelength, obsInfo.constraints)
-          positions     = getPositions(obsInfo.availabilityAngles, genInfo.offsets)
+                              case Some(t) =>
+                                getAllCandidates(
+                                  obsInfo.id,
+                                  candPeriod.start,
+                                  candPeriod.end, t.base,
+                                  genInfo.centralWavelength,
+                                  obsInfo.constraints
+                                )
           neededLists  <- ResultT.fromResult:
                             neededPeriods.traverse: p =>
                               tracking match
                                 case None => Result.success(ContiguousTimestampMap.empty[List[Angle]])
-                                case Some(t) => 
-                                  buildAvailabilityList(p, obsInfo, genInfo, genInfo.centralWavelength, t.asterism.map(_._2), t.base, candidates, positions)
+                                case Some(t) =>
+                                  buildAvailabilityList(
+                                    p,
+                                    obsInfo,
+                                    genInfo,
+                                    genInfo.centralWavelength,
+                                    t.asterism.map(_._2),
+                                    t.base,
+                                    blindOffset,
+                                    candidates
+                                  )
           availability <- ResultT.fromResult(
                             neededLists.foldLeft(currentAvail.some)((acc, ele) => acc.flatMap(_.union(ele)))
                               .toResult(generalError("Error creating guide availability").asProblem)
@@ -658,13 +679,23 @@ object GuideService {
         wavelength:       Wavelength,
         asterismTracking: NonEmptyList[Tracking],
         baseTracking:     Tracking,
-        candidates:       List[GuideStarCandidate],
-        positions:        NonEmptyList[AgsPosition]
+        blindOffset:      Option[Coordinates],
+        candidates:       List[GuideStarCandidate]
       ): Result[ContiguousTimestampMap[List[Angle]]] = {
         @scala.annotation.tailrec
         def go(startTime: Timestamp, accum: ContiguousTimestampMap[List[Angle]]): Either[OdbError, ContiguousTimestampMap[List[Angle]]] = {
           val eap =
-            buildAvailabilityPeriod(startTime, period.end, obsInfo, genInfo, wavelength, asterismTracking, baseTracking, candidates, positions)
+            buildAvailabilityPeriod(
+              startTime,
+              period.end,
+              obsInfo,
+              genInfo,
+              wavelength,
+              asterismTracking,
+              baseTracking,
+              blindOffset,
+              candidates
+            )
           eap match
                       case Left(error)                      => error.asLeft
                       case Right(ap) if ap.period.end < period.end => go(ap.period.end, accum.unsafeAdd(ap.period, ap.posAngles))
@@ -678,15 +709,15 @@ object GuideService {
       }
 
       def buildAvailabilityPeriod(
-        start:      Timestamp,
-        end:        Timestamp,
-        obsInfo:    ObservationInfo,
-        genInfo:    GeneratorInfo,
-        wavelength: Wavelength,
-        asterismTracking:   NonEmptyList[Tracking],
-        baseTracking:   Tracking,
-        candidates: List[GuideStarCandidate],
-        positions:  NonEmptyList[AgsPosition],
+        start:            Timestamp,
+        end:              Timestamp,
+        obsInfo:          ObservationInfo,
+        genInfo:          GeneratorInfo,
+        wavelength:       Wavelength,
+        asterismTracking: NonEmptyList[Tracking],
+        baseTracking:     Tracking,
+        blindOffset:      Option[Coordinates],
+        candidates:       List[GuideStarCandidate]
       ): Either[OdbError, AvailabilityPeriod] =
         for {
           baseCoords      <- obsInfo.explicitBase
@@ -703,7 +734,7 @@ object GuideService {
           scienceCutoff   <- asterismTracking
                               .traverse(findInvalidDate(_, TimestampInterval.between(start, end)))
                               .map(_.minimum)
-                              
+
           // we can stop testing candidates when all angles being tested have invalid dates that are farther
           // in the future than either the end time passed in, or a science candidate will be invalid
           endCutoff        = scienceCutoff.min(end)
@@ -716,8 +747,10 @@ object GuideService {
                                wavelength,
                                baseCoords,
                                scienceCoords.toList,
+                               blindOffset,
                                obsInfo.availabilityAngles,
-                               positions,
+                               genInfo.acqOffsets,
+                               genInfo.sciOffsets,
                                genInfo.agsParams
                              )
           candidateCutoff  = angleMap.values.minOption.getOrElse(Timestamp.Max)
@@ -725,15 +758,17 @@ object GuideService {
         } yield AvailabilityPeriod(start, finalEnd, angleMap.keys.toList)
 
       def getAvailabilityMap(
-        candidates: List[GuideStarCandidate],
+        candidates:    List[GuideStarCandidate],
         start:         Timestamp,
         endCutoff:     Timestamp, // The oldest time we need to satisfy to allow short cutting
         constraints:   ConstraintSet,
         wavelength:    Wavelength,
         baseCoords:    Coordinates,
         scienceCoords: List[Coordinates],
+        blindOffset:   Option[Coordinates],
         angles:        NonEmptyList[Angle],
-        positions:     NonEmptyList[AgsPosition],
+        acqOffsets:    Option[AcquisitionOffsets],
+        sciOffsets:    Option[ScienceOffsets],
         params:        AgsParams
       ): SortedMap[Angle, Timestamp] = {
         Stream.emits(candidates)
@@ -743,7 +778,10 @@ object GuideService {
               wavelength,
               baseCoords,
               scienceCoords,
-              positions,
+              blindOffset,
+              angles,
+              acqOffsets,
+              sciOffsets,
               params
             )
           )
@@ -766,15 +804,26 @@ object GuideService {
       def guideStarIdFromName(name: GuideStarName): Result[Long] =
         name.toGaiaSourceId.toResult(generalError(s"Invalid guide star name `$name`").asProblem)
 
+      def getBlindOffsetCoordinates(
+        oid:     Observation.Id,
+        instant: Instant
+      ): F[Option[Coordinates]] =
+          Trace[F].span("getBlindOffsetCoordinates"):
+            val trackingStmt = Statements.getBlindOffsetTracking(oid)
+            session.prepareR(
+              trackingStmt.fragment.query(siderealTrackingDecoder)
+            ).use(_.option(trackingStmt.argument)).map: tracking =>
+              tracking.flatMap(_.at(instant))
+
       def lookupGuideStar(
-        oid: Observation.Id,
-        oGuideStarName: Option[GuideStarName],
-        obsInfo: ObservationInfo,
-        genInfo: GeneratorInfo,
-        obsTime: Timestamp,
-        obsDuration: TimeSpan,
-        scienceTime: Timestamp,
-        scienceDuration: TimeSpan
+        oid:                    Observation.Id,
+        oGuideStarName:         Option[GuideStarName],
+        obsInfo:                ObservationInfo,
+        genInfo:                GeneratorInfo,
+        obsTime:                Timestamp,
+        obsDuration:            TimeSpan,
+        scienceTime:            Timestamp,
+        scienceDuration:        TimeSpan
       )(using SuperUserAccess): F[Result[GuideEnvironment]] =
         // If we got here, we either have the name but need to get all the details (they queried for more
         // than name), or the name wasn't set or wasn't valid and we need to find all the candidates and
@@ -812,14 +861,14 @@ object GuideService {
                                    s"Unable to get coordinates for science targets in observation $oid"
                                  ).asProblem
                                )
-                           
+
           angles        <- ResultT.fromResult(
                              obsInfo.posAngleConstraint
                               .anglesToTestAt(genInfo.site, baseTracking, scienceTime.toInstant, scienceDuration.toDuration)
                               .toResult(generalError(s"No angles to test for guide target candidates for observation $oid.").asProblem)
                            )
-          positions      = getPositions(angles, genInfo.offsets)
-          optUsable      = chooseBestGuideStar(obsInfo, genInfo.centralWavelength, genInfo, baseCoords, scienceCoords, positions, candidates)
+          blindOffsetOpt <- ResultT.liftF(getBlindOffsetCoordinates(oid, obsTime.toInstant))
+          optUsable      = chooseBestGuideStar(obsInfo, genInfo.centralWavelength, genInfo, baseCoords, scienceCoords, blindOffsetOpt, angles, candidates)
           env           <- ResultT.fromResult(
                              optUsable
                               .map(_.toGuideEnvironment)
@@ -900,8 +949,8 @@ object GuideService {
                               .anglesToTestAt(genInfo.site, baseTracking, obsTime.toInstant, genInfo.timeEstimate.toDuration)
                               .toResult(generalError(s"No angles to test for guide target candidates for observation $oid.").asProblem)
                            )
-          positions      = getPositions(angles, genInfo.offsets)
-          usable         = processCandidates(obsInfo, genInfo.centralWavelength, genInfo, baseCoords, scienceCoords, positions, candidates)
+          blindOffsetOpt <- ResultT.liftF(getBlindOffsetCoordinates(oid, obsTime.toInstant))
+          usable         = processCandidates(obsInfo, genInfo.centralWavelength, genInfo, baseCoords, scienceCoords, blindOffsetOpt, angles, candidates)
         } yield usable.toGuideEnvironments.toList).value
 
       override def getGuideAvailability(pid: Program.Id, oid: Observation.Id, period: TimestampInterval)(
@@ -917,6 +966,7 @@ object GuideService {
                             )
             obsInfo       <- ResultT(getObservationInfo(oid))
             genInfo       <- ResultT(getGeneratorInfo(pid, oid))
+            blindOffset   <- ResultT.liftF(getBlindOffsetCoordinates(oid, period.start.toInstant))
             newHash        = obsInfo.availabilityHash(genInfo.hash)
             currentAvail  <- ResultT.liftF(getFromCacheOrEmpty(pid, oid, newHash))
             missingPeriods = currentAvail.findMissingIntervals(period)
@@ -926,7 +976,7 @@ object GuideService {
                             else (NonEmptyList.fromList(missingPeriods), currentAvail)
             // if we don't need anything, then we already have what we need
             fullAvail     <- neededPeriods.fold(ResultT.pure(startAvail))(nel =>
-                              ResultT(buildAvailabilityAndCache(pid, nel, obsInfo, genInfo, startAvail, newHash))
+                              ResultT(buildAvailabilityAndCache(pid, nel, obsInfo, genInfo, startAvail, blindOffset, newHash))
                             )
             availability   = fullAvail.slice(period).intervals.toList.map(AvailabilityPeriod.fromTuple)
           } yield availability).value
@@ -981,9 +1031,20 @@ object GuideService {
           c_observation_time,
           c_observation_duration,
           c_guide_target_name,
-          c_guide_target_hash
+          c_guide_target_hash,
+          c_blind_offset_target_id
         from t_observation
         where c_observation_id = $observation_id
+      """.apply(oid)
+
+    def getBlindOffsetTracking(oid: Observation.Id): AppliedFragment =
+      sql"""
+        SELECT t.c_sid_ra, t.c_sid_dec, t.c_sid_epoch, t.c_sid_pm_ra, t.c_sid_pm_dec, t.c_sid_rv, t.c_sid_parallax
+        FROM t_observation o
+        INNER JOIN t_target t ON o.c_blind_offset_target_id = t.c_target_id
+        WHERE o.c_observation_id = $observation_id
+          AND t.c_existence = 'present'
+          AND t.c_target_disposition = 'blind_offset'
       """.apply(oid)
 
     def getGuideAvailabilityHash(user: User, pid: Program.Id, oid: Observation.Id): AppliedFragment =
@@ -1044,7 +1105,7 @@ object GuideService {
           observation_id *:
           core_timestamp *:
           core_timestamp *:
-          Decoders.angle_µas_list
+          angle_µas_list
         ).values.list(periods.length)}
       """
       .apply(
@@ -1099,8 +1160,9 @@ object GuideService {
         core_timestamp.opt         *:
         time_span.opt              *:
         guide_target_name.opt      *:
-        md5_hash.opt).emap {
-        case (id, pid, cloud, image, sky, water, amMin, amMax, haMin, haMax, mode, angle, ra, dec, time, duration, guidestarName, guidestarHash) =>
+        md5_hash.opt               *:
+        target_id.opt).emap {
+        case (id, pid, cloud, image, sky, water, amMin, amMax, haMin, haMax, mode, angle, ra, dec, time, duration, guidestarName, guidestarHash, blindOffsetTargetId) =>
           val paConstraint: PosAngleConstraint = mode match
             case PosAngleConstraintMode.Unbounded           => PosAngleConstraint.Unbounded
             case PosAngleConstraintMode.Fixed               => PosAngleConstraint.Fixed(angle)
@@ -1132,16 +1194,14 @@ object GuideService {
             (ra, dec).mapN(Coordinates(_, _))
 
           elevRange.map(elev =>
-            ObservationInfo(id, pid, ConstraintSet(image, cloud, sky, water, elev), paConstraint, explicitBase, time, duration, guidestarName, guidestarHash)
+            ObservationInfo(id, pid, ConstraintSet(image, cloud, sky, water, elev), paConstraint, explicitBase, time, duration, guidestarName, guidestarHash, blindOffsetTargetId)
           )
       }
-
-    val angle_µas_list: Codec[List[Angle]] =
-      _angle_µas.imap(_.toList)(l => Arr.fromFoldable(l))
 
     val availability_period: Codec[AvailabilityPeriod] =
       (timestamp_interval *: angle_µas_list).imap((period, angles) =>
         AvailabilityPeriod(period, angles)
       )(ap => (ap.period, ap.posAngles))
+
   }
 }

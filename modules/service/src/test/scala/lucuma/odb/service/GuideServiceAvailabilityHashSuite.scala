@@ -12,6 +12,7 @@ import lucuma.core.model.ConstraintSet
 import lucuma.core.model.Observation
 import lucuma.core.model.PosAngleConstraint
 import lucuma.core.model.Program
+import lucuma.core.model.Target
 import lucuma.core.model.arb.*
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
@@ -46,9 +47,9 @@ class GuideServiceAvailabilityHashSuite  extends ScalaCheckSuite {
       gsHash:  Option[Md5Hash],
       genHash: Md5Hash
     ) =>
-      val obsInfo1 = ObservationInfo(obsId1, pid, cs, pac, oc, ot, od, gs, gsHash)
-      val obsInfo2 = ObservationInfo(obsId2, pid, cs, pac, oc, ot, od, gs, gsHash)
-      assertEquals(obsInfo1.availabilityHash(genHash), obsInfo2.availabilityHash(genHash))
+      val obsInfo1 = ObservationInfo(obsId1, pid, cs, pac, oc, ot, od, gs, gsHash, None)
+      val obsInfo2 = ObservationInfo(obsId2, pid, cs, pac, oc, ot, od, gs, gsHash, None)
+      assertEquals(obsInfo1.availabilityHash(genHash), obsInfo2.availabilityHash(genHash), "hashes should be equal")
     }
   }
 
@@ -66,8 +67,8 @@ class GuideServiceAvailabilityHashSuite  extends ScalaCheckSuite {
       genHash1: Md5Hash,
       genHash2: Md5Hash
     ) =>
-      val hash1 = ObservationInfo(obsId, pid, cs, pac, oc, ot, od, gs, gsHash).availabilityHash(genHash1)
-      val hash2 = ObservationInfo(obsId, pid, cs, pac, oc, ot, od, gs, gsHash).availabilityHash(genHash2)
+      val hash1 = ObservationInfo(obsId, pid, cs, pac, oc, ot, od, gs, gsHash, None).availabilityHash(genHash1)
+      val hash2 = ObservationInfo(obsId, pid, cs, pac, oc, ot, od, gs, gsHash, None).availabilityHash(genHash2)
 
       if (genHash1 === genHash2)
         assertEquals(hash1, hash2)
@@ -90,8 +91,8 @@ class GuideServiceAvailabilityHashSuite  extends ScalaCheckSuite {
       gsHash:  Option[Md5Hash],
       genHash: Md5Hash
     ) =>
-      val hash1 = ObservationInfo(obsId, pid, cs1, pac, oc, ot, od, gs, gsHash).availabilityHash(genHash)
-      val hash2 = ObservationInfo(obsId, pid, cs2, pac, oc, ot, od, gs, gsHash).availabilityHash(genHash)
+      val hash1 = ObservationInfo(obsId, pid, cs1, pac, oc, ot, od, gs, gsHash, None).availabilityHash(genHash)
+      val hash2 = ObservationInfo(obsId, pid, cs2, pac, oc, ot, od, gs, gsHash, None).availabilityHash(genHash)
 
       if (cs1 === cs2)
         assertEquals(hash1, hash2)
@@ -114,8 +115,8 @@ class GuideServiceAvailabilityHashSuite  extends ScalaCheckSuite {
       gsHash:  Option[Md5Hash],
       genHash: Md5Hash
     ) =>
-      val obsInfo1 = ObservationInfo(obsId, pid, cs, pac1, oc, ot, od, gs, gsHash)
-      val obsInfo2 = ObservationInfo(obsId, pid, cs, pac2, oc, ot, od, gs, gsHash)
+      val obsInfo1 = ObservationInfo(obsId, pid, cs, pac1, oc, ot, od, gs, gsHash, None)
+      val obsInfo2 = ObservationInfo(obsId, pid, cs, pac2, oc, ot, od, gs, gsHash, None)
 
       val hash1 = obsInfo1.availabilityHash(genHash)
       val hash2 = obsInfo2.availabilityHash(genHash)
@@ -143,10 +144,35 @@ class GuideServiceAvailabilityHashSuite  extends ScalaCheckSuite {
       gsHash:  Option[Md5Hash],
       genHash: Md5Hash
     ) =>
-      val hash1 = ObservationInfo(obsId, pid, cs, pac, oc1, ot, od, gs, gsHash).availabilityHash(genHash)
-      val hash2 = ObservationInfo(obsId, pid, cs, pac, oc2, ot, od, gs, gsHash).availabilityHash(genHash)
+      val hash1 = ObservationInfo(obsId, pid, cs, pac, oc1, ot, od, gs, gsHash, None).availabilityHash(genHash)
+      val hash2 = ObservationInfo(obsId, pid, cs, pac, oc2, ot, od, gs, gsHash, None).availabilityHash(genHash)
 
       if (oc1 === oc2)
+        assertEquals(hash1, hash2)
+      else
+        assertNotEquals(hash1, hash2)
+    }
+  }
+
+  test("hashes different for different blind offset target IDs") {
+    forAll { (
+      obsId:   Observation.Id,
+      pid:     Program.Id,
+      cs:      ConstraintSet,
+      pac:     PosAngleConstraint,
+      oc:      Option[Coordinates],
+      ot:      Option[Timestamp],
+      od:      Option[TimeSpan],
+      gs:      Option[GuideStarName],
+      gsHash:  Option[Md5Hash],
+      boId1:   Option[Target.Id],
+      boId2:   Option[Target.Id],
+      genHash: Md5Hash
+    ) =>
+      val hash1 = ObservationInfo(obsId, pid, cs, pac, oc, ot, od, gs, gsHash, boId1).availabilityHash(genHash)
+      val hash2 = ObservationInfo(obsId, pid, cs, pac, oc, ot, od, gs, gsHash, boId2).availabilityHash(genHash)
+
+      if (boId1 === boId2)
         assertEquals(hash1, hash2)
       else
         assertNotEquals(hash1, hash2)
@@ -169,10 +195,11 @@ class GuideServiceAvailabilityHashSuite  extends ScalaCheckSuite {
       gs2:     Option[GuideStarName],
       gsHash1: Option[Md5Hash],
       gsHash2: Option[Md5Hash],
+      boId:    Option[Target.Id],
       genHash: Md5Hash
     ) =>
-      val obsInfo1 = ObservationInfo(obsId, pid1, cs, pac, oc, ot1, od1, gs1, gsHash1)
-      val obsInfo2 = ObservationInfo(obsId, pid2, cs, pac, oc, ot2, od2, gs2, gsHash2)
+      val obsInfo1 = ObservationInfo(obsId, pid1, cs, pac, oc, ot1, od1, gs1, gsHash1, boId)
+      val obsInfo2 = ObservationInfo(obsId, pid2, cs, pac, oc, ot2, od2, gs2, gsHash2, boId)
       assertEquals(obsInfo1.availabilityHash(genHash), obsInfo2.availabilityHash(genHash))
     }
   }

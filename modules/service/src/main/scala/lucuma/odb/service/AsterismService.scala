@@ -113,10 +113,10 @@ object AsterismService {
 
       private def containsBlindOffset(
         targetIds: NonEmptyList[Target.Id]
-      ): F[Boolean] = 
+      ): F[Boolean] =
         val enc = target_id.nel(targetIds)
         session.unique(Statements.containsBlindOffset(enc))(targetIds)
-      
+
       override def insertAsterism(
         programId:      Program.Id,
         observationIds: NonEmptyList[Observation.Id],
@@ -383,8 +383,8 @@ object AsterismService {
         right_ascension.opt *:
         declination.opt *:
         epoch.opt *:
-        int8.opt *:               // proper motion ra
-        int8.opt *:               // proper motion dec
+        proper_motion_ra.opt *:   // proper motion ra
+        proper_motion_dec.opt *:  // proper motion dec
         radial_velocity.opt *:
         parallax.opt *:
         catalog_name.opt *:
@@ -397,7 +397,7 @@ object AsterismService {
         right_ascension.opt *:
         arc_type.opt *:
         declination.opt *:
-        declination.opt *:          
+        declination.opt *:
         jsonb                     // source profile
       ).emap {
         case (id,
@@ -426,9 +426,7 @@ object AsterismService {
           (oRa, oDec, oEpoch, oSourceProfile)
             .mapN { (ra, dec, epoch, sourceProfile) =>
               val baseCoords   = Coordinates(ra, dec)
-              val properMotion = (oPmRa, oPmDec).mapN((pmRa, pmDec) =>
-                ProperMotion(ProperMotion.μasyRA(pmRa), ProperMotion.μasyDec(pmDec))
-              )
+              val properMotion = (oPmRa, oPmDec).mapN(ProperMotion.apply)
               val catalogInfo  = (oCatName, oCatId.flatMap(toNonEmpty)).mapN { (name, id) =>
                 CatalogInfo(name, id, oCatType.flatMap(toNonEmpty))
               }
@@ -460,7 +458,7 @@ object AsterismService {
                     case (ArcType.Full, None, None) => Arc.Full[Declination]().some
                     case (ArcType.Partial, Some(s), Some(e)) => Arc.Partial(s, e).some
                     case _ => None
-                  
+
                 (oRaArc, oDecArc).mapN: (raArc, decArc) =>
                   (id, Target.Opportunity(name, Region(raArc, decArc), sourceProfile))
 

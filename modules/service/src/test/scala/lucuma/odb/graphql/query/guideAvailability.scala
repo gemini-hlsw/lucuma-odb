@@ -24,7 +24,7 @@ import lucuma.odb.service.GuideService.AvailabilityPeriod
 import org.http4s.Request
 import org.http4s.Response
 
-class guideAvailability extends ExecutionTestSupportForGmos {
+class guideAvailability extends ExecutionTestSupportForGmos with GuideEnvironmentSuite {
 
   val oct15_2023 = "2023-10-15T00:00:00Z"
   val oct25_2023 = "2023-10-25T00:00:00Z"
@@ -42,19 +42,19 @@ class guideAvailability extends ExecutionTestSupportForGmos {
   val laterAngles = earlyAngles.filter(_ =!= 250)
 
   // increased the proper motion of the second candidate so we could get multiple availabilities.
-  val gaiaResponseString = 
+  override val gaiaResponseString =
   """<?xml version="1.0" encoding="UTF-8"?>
   |<VOTABLE version="1.4" xmlns="http://www.ivoa.net/xml/VOTable/v1.3" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.ivoa.net/xml/VOTable/v1.3 http://www.ivoa.net/xml/VOTable/v1.3">
   |    <RESOURCE type="results">
   |        <INFO name="QUERY_STATUS" value="OK" />
-  |        <INFO name="QUERY" value="SELECT TOP 100 source_id,ra,pmra,dec,pmdec,parallax,radial_velocity,phot_g_mean_mag,phot_rp_mean_mag 
+  |        <INFO name="QUERY" value="SELECT TOP 100 source_id,ra,pmra,dec,pmdec,parallax,radial_velocity,phot_g_mean_mag,phot_rp_mean_mag
   |     FROM gaiadr3.gaia_source_lite
   |     WHERE CONTAINS(POINT(&#039;ICRS&#039;,ra,dec),CIRCLE(&#039;ICRS&#039;, 86.55474, -0.10137, 0.08167))=1
   |     and ((phot_rp_mean_mag &lt; 17.228) or (phot_g_mean_mag &lt; 17.228))
   |     and (ruwe &lt; 1.4)
   |     ORDER BY phot_g_mean_mag
   |      ">
-  |            <![CDATA[SELECT TOP 100 source_id,ra,pmra,dec,pmdec,parallax,radial_velocity,phot_g_mean_mag,phot_rp_mean_mag 
+  |            <![CDATA[SELECT TOP 100 source_id,ra,pmra,dec,pmdec,parallax,radial_velocity,phot_g_mean_mag,phot_rp_mean_mag
   |     FROM gaiadr3.gaia_source_lite
   |     WHERE CONTAINS(POINT('ICRS',ra,dec),CIRCLE('ICRS', 86.55474, -0.10137, 0.08167))=1
   |     and ((phot_rp_mean_mag < 17.228) or (phot_g_mean_mag < 17.228))
@@ -136,19 +136,19 @@ class guideAvailability extends ExecutionTestSupportForGmos {
   |    </RESOURCE>
   |</VOTABLE>""".stripMargin
 
-  val gaiaEmptyResponseString = 
+  override val gaiaEmptyReponseString =
   """<?xml version="1.0" encoding="UTF-8"?>
   |<VOTABLE version="1.4" xmlns="http://www.ivoa.net/xml/VOTable/v1.3" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.ivoa.net/xml/VOTable/v1.3 http://www.ivoa.net/xml/VOTable/v1.3">
   |    <RESOURCE type="results">
   |        <INFO name="QUERY_STATUS" value="OK" />
-  |        <INFO name="QUERY" value="SELECT TOP 100 source_id,ra,pmra,dec,pmdec,parallax,radial_velocity,phot_g_mean_mag,phot_rp_mean_mag 
+  |        <INFO name="QUERY" value="SELECT TOP 100 source_id,ra,pmra,dec,pmdec,parallax,radial_velocity,phot_g_mean_mag,phot_rp_mean_mag
   |     FROM gaiadr3.gaia_source_lite
   |     WHERE CONTAINS(POINT(&#039;ICRS&#039;,ra,dec),CIRCLE(&#039;ICRS&#039;, 86.55474, -0.10137, 0.08167))=1
   |     and ((phot_rp_mean_mag &lt; 17.228) or (phot_g_mean_mag &lt; 17.228))
   |     and (ruwe &lt; 1.4)
   |     ORDER BY phot_g_mean_mag
   |      ">
-  |            <![CDATA[SELECT TOP 100 source_id,ra,pmra,dec,pmdec,parallax,radial_velocity,phot_g_mean_mag,phot_rp_mean_mag 
+  |            <![CDATA[SELECT TOP 100 source_id,ra,pmra,dec,pmdec,parallax,radial_velocity,phot_g_mean_mag,phot_rp_mean_mag
   |     FROM gaiadr3.gaia_source_lite
   |     WHERE CONTAINS(POINT('ICRS',ra,dec),CIRCLE('ICRS', 86.55474, -0.10137, 0.08167))=1
   |     and ((phot_rp_mean_mag < 17.228) or (phot_g_mean_mag  17.228))
@@ -267,12 +267,12 @@ class guideAvailability extends ExecutionTestSupportForGmos {
   override def httpRequestHandler: Request[IO] => Resource[IO, Response[IO]] =
     req => {
       val respStr =
-        if (req.uri.renderString.contains("20-0.10166")) gaiaEmptyResponseString
+        if (req.uri.renderString.contains("20-0.10166")) gaiaEmptyReponseString
         else gaiaResponseString
       Resource.eval(IO.pure(Response(body = Stream(respStr).through(utf8.encode))))
     }
 
-  private def createObservationAs(user: User, pid: Program.Id, tids: List[Target.Id]): IO[Observation.Id] =
+  override def createObservationAs(user: User, pid: Program.Id, tids: List[Target.Id]): IO[Observation.Id] =
     createGmosNorthLongSlitObservationAs(user, pid, tids, offsetArcsec = List(0, 15).some)
 
   test("successfully obtain guide availability") {
@@ -372,7 +372,7 @@ class guideAvailability extends ExecutionTestSupportForGmos {
       val expected2 = availabilityResult("V1647 Orionis", periods2).asRight
       val two = expect(pi, guideAvailabilityQuery(oid, oct25_2023, mar05_2024), expected = expected2)
 
-      one >> two 
+      one >> two
     }
   }
 
@@ -397,7 +397,7 @@ class guideAvailability extends ExecutionTestSupportForGmos {
       val expected2 = availabilityResult("V1647 Orionis", periods2).asRight
       val two = expect(pi, guideAvailabilityQuery(oid, nov30_2023, feb01_2024), expected = expected2)
 
-      one >> two 
+      one >> two
     }
   }
 
@@ -422,7 +422,7 @@ class guideAvailability extends ExecutionTestSupportForGmos {
       val expected2 = availabilityResult("V1647 Orionis", periods2).asRight
       val two = expect(pi, guideAvailabilityQuery(oid, oct15_2023, oct25_2023), expected = expected2)
 
-      one >> two 
+      one >> two
     }
   }
 
@@ -447,7 +447,7 @@ class guideAvailability extends ExecutionTestSupportForGmos {
       val expected2 = availabilityResult("V1647 Orionis", periods2).asRight
       val two = expect(pi, guideAvailabilityQuery(oid, oct15_2023, oct31_2023), expected = expected2)
 
-      one >> two 
+      one >> two
     }
   }
 
@@ -472,7 +472,7 @@ class guideAvailability extends ExecutionTestSupportForGmos {
       val expected2 = availabilityResult("V1647 Orionis", periods2).asRight
       val two = expect(pi, guideAvailabilityQuery(oid, oct15_2023, nov30_2023), expected = expected2)
 
-      one >> two 
+      one >> two
     }
   }
 
@@ -497,7 +497,7 @@ class guideAvailability extends ExecutionTestSupportForGmos {
       val expected2 = availabilityResult("V1647 Orionis", periods2).asRight
       val two = expect(pi, guideAvailabilityQuery(oid, mar05_2024, mar10_2024), expected = expected2)
 
-      one >> two 
+      one >> two
     }
   }
 
@@ -522,7 +522,7 @@ class guideAvailability extends ExecutionTestSupportForGmos {
       val expected2 = availabilityResult("V1647 Orionis", periods2).asRight
       val two = expect(pi, guideAvailabilityQuery(oid, feb28_2024, mar10_2024), expected = expected2)
 
-      one >> two 
+      one >> two
     }
   }
 
@@ -548,7 +548,7 @@ class guideAvailability extends ExecutionTestSupportForGmos {
       val expected2 = availabilityResult("V1647 Orionis", periods2).asRight
       val two = expect(pi, guideAvailabilityQuery(oid, nov30_2023, mar05_2024), expected = expected2)
 
-      one >> two 
+      one >> two
     }
   }
 
@@ -573,7 +573,7 @@ class guideAvailability extends ExecutionTestSupportForGmos {
       val expected2 = availabilityResult("V1647 Orionis", periods2).asRight
       val two = expect(pi, guideAvailabilityQuery(oid, emptyStart, emptyEnd), expected = expected2)
 
-      one >> two 
+      one >> two
     }
   }
 
