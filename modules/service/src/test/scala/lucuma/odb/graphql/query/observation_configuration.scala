@@ -762,9 +762,6 @@ class observation_configuration extends OdbSuite with ObservingModeSetupOperatio
                           ra { 
                             hms 
                           }
-                          dec { 
-                            dms 
-                          }
                         }
                         region {
                           rightAscensionArc {
@@ -816,9 +813,6 @@ class observation_configuration extends OdbSuite with ObservingModeSetupOperatio
                         "coordinates" : {
                           "ra" : {
                             "hms" : "08:09:46.797666"
-                          },
-                          "dec" : {
-                            "dms" : "+03:21:19.542048"
                           }
                         },
                         "region" : null
