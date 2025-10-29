@@ -4,8 +4,12 @@
 package lucuma.odb.graphql
 package mapping
 
+import grackle.Query.Binding
+import grackle.Query.Filter
 import grackle.Result
+import grackle.QueryCompiler.Elab
 import grackle.skunk.SkunkMapping
+import grackle.TypeRef
 import io.circe.*
 import io.circe.syntax.*
 import lucuma.core.enums.GmosAmpGain
@@ -14,12 +18,16 @@ import lucuma.core.enums.GmosBinning
 import lucuma.core.enums.GmosRoi
 import lucuma.core.enums.MultipleFiltersMode
 import lucuma.core.math.Offset
+import lucuma.odb.data.ObservingModeRowVersion
 import lucuma.odb.format.spatialOffsets.*
+import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.graphql.table.*
 import lucuma.odb.json.offset.query.given
 
-trait GmosImagingMapping[F[_]]
-  extends GmosImagingView[F] with OptionalFieldMapping[F] { this: SkunkMapping[F] =>
+trait GmosImagingMapping[F[_]] extends GmosImagingView[F]
+                                  with GmosImagingFilterTable[F]
+                                  with OptionalFieldMapping[F]
+                                  with Predicates[F] { this: SkunkMapping[F] =>
 
   import GmosImagingMapping.*
 
@@ -51,9 +59,9 @@ trait GmosImagingMapping[F[_]]
   lazy val GmosNorthImagingMapping: ObjectMapping =
     ObjectMapping(GmosNorthImagingType)(
 
-      SqlField("observationId", GmosNorthImagingView.ObservationId, key = true, hidden = true),
-      SqlField("filters", GmosNorthImagingView.Filters),
-      SqlField("initialFilters", GmosNorthImagingView.InitialFilters),
+      SqlField("observationId",   GmosNorthImagingView.ObservationId, key = true, hidden = true),
+      SqlObject("filters",        Join(GmosNorthImagingView.ObservationId, GmosNorthImagingFilterTable.ObservationId)),
+      SqlObject("initialFilters", Join(GmosNorthImagingView.ObservationId, GmosNorthImagingFilterTable.ObservationId)),
 
       SqlField("offsetsString", GmosNorthImagingView.Offsets, hidden = true),
       CommonImagingFields.offsets,
@@ -79,12 +87,27 @@ trait GmosImagingMapping[F[_]]
       CommonImagingFields.defaultRoi,
     )
 
+  lazy val GmosNorthImagingElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
+    case (GmosNorthImagingType, "filters", Nil) =>
+      Elab.transformChild: child =>
+        Filter(
+          Predicates.gmosNorthImagingFilter.version.eql(ObservingModeRowVersion.Current),
+          child
+        )
+
+    case (GmosNorthImagingType, "initialFilters", Nil) =>
+      Elab.transformChild: child =>
+        Filter(
+          Predicates.gmosNorthImagingFilter.version.eql(ObservingModeRowVersion.Initial),
+          child
+        )
+
   lazy val GmosSouthImagingMapping: ObjectMapping =
     ObjectMapping(GmosSouthImagingType)(
 
-      SqlField("observationId", GmosSouthImagingView.ObservationId, key = true, hidden = true),
-      SqlField("filters", GmosSouthImagingView.Filters),
-      SqlField("initialFilters", GmosSouthImagingView.InitialFilters),
+      SqlField("observationId",   GmosSouthImagingView.ObservationId, key = true, hidden = true),
+      SqlObject("filters",        Join(GmosSouthImagingView.ObservationId, GmosSouthImagingFilterTable.ObservationId)),
+      SqlObject("initialFilters", Join(GmosSouthImagingView.ObservationId, GmosSouthImagingFilterTable.ObservationId)),
 
       SqlField("offsetsString", GmosSouthImagingView.Offsets, hidden = true),
       CommonImagingFields.offsets,
@@ -109,6 +132,21 @@ trait GmosImagingMapping[F[_]]
       SqlField("explicitRoi", GmosSouthImagingView.ExplicitRoi),
       CommonImagingFields.defaultRoi,
     )
+
+  lazy val GmosSouthImagingElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
+    case (GmosSouthImagingType, "filters", Nil) =>
+      Elab.transformChild: child =>
+        Filter(
+          Predicates.gmosSouthImagingFilter.version.eql(ObservingModeRowVersion.Current),
+          child
+        )
+
+    case (GmosSouthImagingType, "initialFilters", Nil) =>
+      Elab.transformChild: child =>
+        Filter(
+          Predicates.gmosSouthImagingFilter.version.eql(ObservingModeRowVersion.Initial),
+          child
+        )
 }
 
 object GmosImagingMapping:

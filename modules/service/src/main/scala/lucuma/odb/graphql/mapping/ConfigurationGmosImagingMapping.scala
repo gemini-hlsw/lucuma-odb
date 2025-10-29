@@ -7,9 +7,8 @@ package mapping
 import lucuma.odb.graphql.table.ConfigurationRequestView
 import lucuma.odb.graphql.table.GmosImagingView
 
-trait ConfigurationGmosImagingMappings[F[_]]
-  extends GmosImagingView[F]
-     with ConfigurationRequestView[F] {
+trait ConfigurationGmosImagingMappings[F[_]] extends GmosImagingView[F]
+                                                with ConfigurationRequestView[F]:
 
   // North
 
@@ -48,5 +47,3 @@ trait ConfigurationGmosImagingMappings[F[_]]
       SqlField("id", ConfigurationRequestView.GmosSouthImaging.Id, key = true, hidden = true),
       SqlField("filters", ConfigurationRequestView.GmosSouthImaging.Filters),
     )
-
-}

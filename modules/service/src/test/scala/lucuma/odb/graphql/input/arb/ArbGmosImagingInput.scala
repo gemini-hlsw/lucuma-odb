@@ -43,7 +43,7 @@ trait ArbGmosImagingInput:
         f1 <- arbitrary[GmosNorthFilter]
         fs <- arbitrary[List[GmosNorthFilter]]
         c <- arbitrary[GmosImagingInput.Create.Common]
-      } yield GmosImagingInput.Create.North(NonEmptyList(f1, fs), c)
+      } yield GmosImagingInput.Create.NorthBinding(NonEmptyList(f1, fs), c)
     }
 
   given Arbitrary[GmosImagingInput.Create.South] =
@@ -52,7 +52,7 @@ trait ArbGmosImagingInput:
         f1 <- arbitrary[GmosSouthFilter]
         fs <- arbitrary[List[GmosSouthFilter]]
         c <- arbitrary[GmosImagingInput.Create.Common]
-      } yield GmosImagingInput.Create.South(NonEmptyList(f1, fs), c)
+      } yield GmosImagingInput.Create.SouthBinding(NonEmptyList(f1, fs), c)
     }
 
   given arbEditCommon: Arbitrary[GmosImagingInput.Edit.Common] =

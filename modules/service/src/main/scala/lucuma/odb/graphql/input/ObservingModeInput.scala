@@ -23,10 +23,11 @@ object ObservingModeInput {
   ) {
 
     def observingModeType: Option[ObservingModeType] =
-      gmosNorthLongSlit.map(_.observingModeType)
+      gmosNorthLongSlit
+        .map(_.observingModeType)
         .orElse(gmosSouthLongSlit.map(_.observingModeType))
-        .orElse(gmosNorthImaging.map(_.observingModeType))
-        .orElse(gmosSouthImaging.map(_.observingModeType))
+        .orElse(gmosNorthImaging.as(ObservingModeType.GmosNorthImaging))
+        .orElse(gmosSouthImaging.as(ObservingModeType.GmosSouthImaging))
         .orElse(flamingos2LongSlit.map(_.observingModeType))
 
   }
@@ -38,8 +39,8 @@ object ObservingModeInput {
         case List(
           GmosLongSlitInput.Create.North.Binding.Option("gmosNorthLongSlit", rGmosNorthLongSlit),
           GmosLongSlitInput.Create.South.Binding.Option("gmosSouthLongSlit", rGmosSouthLongSlit),
-          GmosImagingInput.Create.North.Binding.Option("gmosNorthImaging", rGmosNorthImaging),
-          GmosImagingInput.Create.South.Binding.Option("gmosSouthImaging", rGmosSouthImaging),
+          GmosImagingInput.Create.NorthBinding.Option("gmosNorthImaging", rGmosNorthImaging),
+          GmosImagingInput.Create.SouthBinding.Option("gmosSouthImaging", rGmosSouthImaging),
           Flamingos2LongSlitInput.Create.Binding.Option("flamingos2LongSlit", rFlamingos2LongSlit)
         ) =>
           (rGmosNorthLongSlit, rGmosSouthLongSlit, rGmosNorthImaging, rGmosSouthImaging, rFlamingos2LongSlit).parTupled.flatMap {
@@ -68,8 +69,8 @@ object ObservingModeInput {
     def observingModeType: Option[ObservingModeType] =
       gmosNorthLongSlit.map(_.observingModeType)
         .orElse(gmosSouthLongSlit.map(_.observingModeType))
-        .orElse(gmosNorthImaging.map(_.observingModeType))
-        .orElse(gmosSouthImaging.map(_.observingModeType))
+        .orElse(gmosNorthImaging.as(ObservingModeType.GmosNorthImaging))
+        .orElse(gmosSouthImaging.as(ObservingModeType.GmosSouthImaging))
         .orElse(flamingos2LongSlit.map(_.observingModeType))
 
     def toCreate: Result[Create] =
@@ -89,8 +90,8 @@ object ObservingModeInput {
         case List(
           GmosLongSlitInput.Edit.North.Binding.Option("gmosNorthLongSlit", rGmosNorthLongSlit),
           GmosLongSlitInput.Edit.South.Binding.Option("gmosSouthLongSlit", rGmosSouthLongSlit),
-          GmosImagingInput.Edit.North.Binding.Option("gmosNorthImaging", rGmosNorthImaging),
-          GmosImagingInput.Edit.South.Binding.Option("gmosSouthImaging", rGmosSouthImaging),
+          GmosImagingInput.Edit.NorthBinding.Option("gmosNorthImaging", rGmosNorthImaging),
+          GmosImagingInput.Edit.SouthBinding.Option("gmosSouthImaging", rGmosSouthImaging),
           Flamingos2LongSlitInput.Edit.Binding.Option("flamingos2LongSlit", rFlamingos2LongSlit)
         ) =>
           (rGmosNorthLongSlit, rGmosSouthLongSlit, rGmosNorthImaging, rGmosSouthImaging, rFlamingos2LongSlit).parTupled.flatMap {

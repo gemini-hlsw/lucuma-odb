@@ -181,6 +181,7 @@ object OdbMapping {
           with GmosDynamicMapping[F]
           with GmosFpuMapping[F]
           with GmosGratingConfigMapping[F]
+          with GmosImagingFilterMapping[F]
           with GmosImagingMapping[F]
           with GmosLongSlitMapping[F]
           with GmosNorthStaticMapping[F]
@@ -405,10 +406,12 @@ object OdbMapping {
                 Flamingos2LongSlitAcquisitionMapping,
                 Flamingos2LongSlitMapping,
                 Flamingos2StaticMapping,
+                GmosNorthImagingFilterMapping,
                 GmosNorthImagingMapping,
                 GmosNorthLongSlitAcquisitionMapping,
                 GmosNorthLongSlitMapping,
                 GmosNorthStaticMapping,
+                GmosSouthImagingFilterMapping,
                 GmosSouthImagingMapping,
                 GmosSouthLongSlitAcquisitionMapping,
                 GmosSouthLongSlitMapping,
@@ -589,7 +592,9 @@ object OdbMapping {
                 DatasetElaborator,
                 ExecutionElaborator,
                 Flamingos2LongSlitElaborator,
+                GmosNorthImagingElaborator,
                 GmosNorthLongSlitElaborator,
+                GmosSouthImagingElaborator,
                 GmosSouthLongSlitElaborator,
                 GroupElaborator,
                 MutationElaborator,
