@@ -720,24 +720,23 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
 
     val res =
       for
-        http <- JdkHttpClient.simple[IO]
         db   <- FMain.databasePoolResource[IO](databaseConfig)
         enm  <- db.evalMap(Enums.load)
         ptc  <- db.evalMap(TimeEstimateCalculatorImplementation.fromSession(_, enm))
-      yield (http, db, enm, ptc)
+      yield (db, enm, ptc)
 
-    res.use: (http, db, enm, ptc) =>
+    res.use: (db, enm, ptc) =>
       val mapping = (s: Session[IO]) => OdbMapping.forObscalc(
         Resource.pure(s),
         SkunkMonitor.noopMonitor[IO],
         u,
         goaUsers,
-        GaiaClient.build[IO](http, adapters = gaiaAdapters),
+        GaiaClient.build[IO](httpClient, adapters = gaiaAdapters),
         itcClient,
         CommitHash.Zero,
         enm,
         ptc,
-        http,
+        httpClient,
         emailConfig
       )
       db.use: s =>

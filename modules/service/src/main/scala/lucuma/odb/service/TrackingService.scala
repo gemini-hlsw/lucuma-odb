@@ -41,6 +41,7 @@ import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.core.enums.ObservingModeType
 import org.http4s.client.Client
 import org.typelevel.log4cats.Logger
+import scala.annotation.nowarn
 
 trait TrackingService[F[_]]:
   import TrackingService.Snapshot
@@ -273,9 +274,11 @@ object TrackingService:
             .alignedEphemeris(key, site, interval.start.toInstant, interval.days, interval.cadence)
             .map(Result.fromEither)
           
+      @nowarn("msg=unused")
       private def cacheHorizonsEphemeris(eph: HorizonsEphemeris): ResultT[F, Unit] =
         ResultT.unit // TODO
 
+      @nowarn("msg=unused")
       private def loadHorizonsEphemeris(key: EphemerisKey.Horizons, site: Site, interval: TimestampInterval): ResultT[F, Option[HorizonsEphemeris]] =
         ResultT.success(None) // TODO
 

@@ -874,7 +874,7 @@ class observation_workflow
               ObservationWorkflowState.Defined,
               tt match
                 case TargetType.Sidereal    => List(ObservationWorkflowState.Inactive, ObservationWorkflowState.Ready)
-                case TargetType.Nonsidereal => ???
+                case TargetType.Nonsidereal => List(ObservationWorkflowState.Inactive, ObservationWorkflowState.Ready)
                 case TargetType.Opportunity => List(ObservationWorkflowState.Inactive)
               ,
               Nil
@@ -926,7 +926,7 @@ class observation_workflow
               ObservationWorkflowState.Defined,
               tt match
                 case TargetType.Sidereal    => List(ObservationWorkflowState.Inactive, ObservationWorkflowState.Ready)
-                case TargetType.Nonsidereal => ???
+                case TargetType.Nonsidereal => List(ObservationWorkflowState.Inactive, ObservationWorkflowState.Ready)
                 case TargetType.Opportunity => List(ObservationWorkflowState.Inactive)
               ,
               Nil
