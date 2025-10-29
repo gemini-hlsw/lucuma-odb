@@ -19,6 +19,7 @@ trait ConditionsSyntax:
         case ImageQuality.Preset.PointSix     => "PERCENT_70"
         case ImageQuality.Preset.PointEight   => "PERCENT_70"
         case ImageQuality.Preset.OnePointZero => "PERCENT_85"
+        case ImageQuality.Preset.OnePointTwo  => "PERCENT_85"
         case ImageQuality.Preset.OnePointFive => "ANY"
         case ImageQuality.Preset.TwoPointZero => "ANY"
 
