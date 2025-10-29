@@ -11,6 +11,7 @@ import lucuma.core.enums.CalibrationRole
 import lucuma.core.model.Group
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
+import lucuma.core.util.TimeSpan
 import lucuma.odb.Config
 import lucuma.odb.data.Existence
 import lucuma.odb.data.GroupTree
@@ -73,9 +74,9 @@ object PerScienceObservationCalibrationsService:
               name = groupNameForObservation(config, CalibrationRole.Telluric, oid).some,
               description = none,
               minimumRequired = none,
-              ordered = false,
+              ordered = true,
               minimumInterval = none,
-              maximumInterval = none,
+              maximumInterval = TimeSpan.Zero.some,
               parentGroupId = parentGroupId,
               parentGroupIndex = none,
               existence = Existence.Present

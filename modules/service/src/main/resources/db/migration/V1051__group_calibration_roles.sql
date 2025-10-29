@@ -91,9 +91,9 @@ BEGIN
       obs_rec.c_observing_mode_type::text || '/' || 'telluric' || '/' || obs_rec.c_observation_id,
       NULL,
       NULL,
-      false,
+      true,
       NULL,
-      NULL,
+      0,
       'present',
       true,
       '{telluric}'::e_calibration_role[]

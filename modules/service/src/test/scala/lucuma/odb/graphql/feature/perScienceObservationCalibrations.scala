@@ -10,11 +10,13 @@ import lucuma.core.enums.CalibrationRole
 import lucuma.core.math.Wavelength
 import lucuma.core.model.Group
 import lucuma.core.model.Observation
+import lucuma.core.util.TimeSpan
 import lucuma.odb.graphql.OdbSuite
 import lucuma.odb.graphql.TestUsers
 import lucuma.odb.graphql.query.ExecutionTestSupport
 import lucuma.odb.graphql.query.ObservingModeSetupOperations
 import lucuma.odb.graphql.subscription.SubscriptionUtils
+import lucuma.odb.json.time.transport.given
 
 import java.time.LocalDateTime
 import java.time.ZoneOffset
@@ -34,7 +36,15 @@ class perScienceObservationCalibrations
 
   val when = LocalDateTime.of(2024, 1, 1, 12, 0, 0).toInstant(ZoneOffset.UTC)
 
-  case class GroupInfo(id: Group.Id, system: Boolean, name: String, calibrationRoles: List[CalibrationRole]) derives Decoder
+  case class GroupInfo(
+    id: Group.Id,
+    system: Boolean,
+    name: String,
+    ordered: Boolean,
+    minimumRequired: Option[Int],
+    maximumInterval: Option[TimeSpan],
+    calibrationRoles: List[CalibrationRole]
+  ) derives Decoder
   case class ObsInfo(id: Observation.Id, groupId: Option[Group.Id]) derives Decoder
 
   private def queryGroup(gid: Group.Id): IO[GroupInfo] =
@@ -45,7 +55,12 @@ class perScienceObservationCalibrations
               id
               system
               name
+              ordered
               calibrationRoles
+              minimumRequired
+              maximumInterval {
+                microseconds
+              }
             }
           }"""
     ).flatMap { c =>
@@ -191,4 +206,19 @@ class perScienceObservationCalibrations
     } yield {
       assert(obsBefore.groupId.isDefined)
       assert(!groupExists)
+    }
+
+  test("telluric group has immediate execution properties"):
+    for {
+      pid       <- createProgramAs(pi)
+      tid       <- createTargetWithProfileAs(pi, pid)
+      oid       <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+      _         <- recalculateCalibrations(pid, when)
+      obs       <- queryObservation(oid)
+      groupId   =  obs.groupId.get
+      groupInfo <- queryGroup(groupId)
+    } yield {
+      assertEquals(groupInfo.ordered, true)
+      assertEquals(groupInfo.minimumRequired, None) // all observations
+      assertEquals(groupInfo.maximumInterval, TimeSpan.Zero.some)
     }
