@@ -27,6 +27,7 @@ import com.dimafeng.testcontainers.PostgreSQLContainer
 import com.dimafeng.testcontainers.munit.TestContainerForAll
 import eu.timepit.refined.types.numeric.PosInt
 import fs2.Stream
+import fs2.io.net.tls.TLSContext
 import fs2.text.utf8
 import grackle.Mapping
 import grackle.Result
@@ -83,6 +84,7 @@ import munit.diff.console.AnsiColors
 import natchez.Trace
 import org.http4s.blaze.server.BlazeServerBuilder
 import org.http4s.client.Client
+import org.http4s.ember.client.EmberClientBuilder
 import org.http4s.headers.Authorization
 import org.http4s.jdkhttpclient.JdkHttpClient
 import org.http4s.jdkhttpclient.JdkWSClient
@@ -103,8 +105,6 @@ import java.net.SocketException
 import java.nio.file.Paths
 import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
-import org.http4s.ember.client.EmberClientBuilder
-import fs2.io.net.tls.TLSContext
 
 object OdbSuite:
   def reportFailure: Throwable => Unit =

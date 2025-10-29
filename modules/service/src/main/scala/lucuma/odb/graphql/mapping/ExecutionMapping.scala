@@ -43,8 +43,8 @@ import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.Services
 import lucuma.odb.service.Services.Syntax.*
-import org.typelevel.log4cats.Logger
 import org.http4s.client.Client
+import org.typelevel.log4cats.Logger
 
 trait ExecutionMapping[F[_]: Logger] extends ObservationEffectHandler[F]
                                 with ObscalcTable[F]

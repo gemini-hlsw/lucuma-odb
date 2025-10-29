@@ -74,6 +74,7 @@ import lucuma.odb.service.Services.SuperUserAccess
 import lucuma.odb.syntax.result.*
 import lucuma.odb.util.Codecs.*
 import natchez.Trace
+import org.http4s.client.Client
 import skunk.*
 import skunk.data.Arr
 import skunk.implicits.*
@@ -85,7 +86,6 @@ import scala.annotation.tailrec
 import scala.collection.immutable.SortedMap
 
 import Services.Syntax.*
-import org.http4s.client.Client
 
 trait GuideService[F[_]] {
   import GuideService.AvailabilityPeriod

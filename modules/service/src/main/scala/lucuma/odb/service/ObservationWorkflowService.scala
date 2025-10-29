@@ -48,6 +48,7 @@ import lucuma.odb.service.GeneratorParamsService.Error as GenParamsError
 import lucuma.odb.service.Services.SuperUserAccess
 import lucuma.odb.syntax.instrument.*
 import lucuma.odb.util.Codecs.*
+import org.http4s.client.Client
 import skunk.*
 import skunk.codec.boolean.*
 import skunk.implicits.*
@@ -55,7 +56,6 @@ import skunk.implicits.*
 import java.time.Instant
 
 import Services.Syntax.*
-import org.http4s.client.Client
 
 sealed trait ObservationWorkflowService[F[_]] {
 

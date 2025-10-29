@@ -32,10 +32,10 @@ import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.GuideService
 import lucuma.odb.service.Services
+import org.http4s.client.Client
 
 import binding.*
 import table.*
-import org.http4s.client.Client
 
 trait TargetEnvironmentMapping[F[_]: Temporal]
   extends ObservationEffectHandler[F]

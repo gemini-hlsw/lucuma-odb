@@ -7,9 +7,9 @@ import cats.Applicative
 import cats.ApplicativeError
 import cats.MonadError
 import cats.Parallel
-import cats.effect.Temporal
 import cats.effect.MonadCancelThrow
 import cats.effect.Resource
+import cats.effect.Temporal
 import cats.effect.std.UUIDGen
 import cats.syntax.all.*
 import grackle.Mapping

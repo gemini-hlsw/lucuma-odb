@@ -49,6 +49,7 @@ import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.Services.ServiceAccess
 import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.util.Codecs.*
+import org.http4s.client.Client
 import org.typelevel.log4cats.Logger
 import skunk.*
 import skunk.codec.numeric._int8
@@ -57,7 +58,6 @@ import skunk.data.Arr
 import skunk.implicits.*
 
 import scala.collection.immutable.SortedSet
-import org.http4s.client.Client
 
 sealed trait ObscalcService[F[_]]:
 
