@@ -1156,7 +1156,7 @@ trait DatabaseOperations { this: OdbSuite =>
                 name: "$name"
                 nonsidereal: {
                   keyType: COMET
-                  des: "foo"
+                  des: "1P"
                 }
                 $sourceProfile
               }

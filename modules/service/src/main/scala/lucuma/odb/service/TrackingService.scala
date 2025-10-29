@@ -105,7 +105,7 @@ object TrackingService:
 
 
   extension (interval: TimestampInterval) 
-    private def days: Int = interval.duration.toDays.toInt
+    private def days: Int = interval.duration.toDays.toInt max 1 // always at least one day
     private def cadence: HorizonsClient.ElementsPerDay =
       import interval.duration
       if      duration <=  1.day then 24
@@ -124,7 +124,7 @@ object TrackingService:
 
     /** If this is a tracking snapshot, evaluate it at a given time. */
     def at(t: Timestamp)(using A <:< Tracking): Result[Snapshot[Coordinates]] =
-      Result.fromOption(traverse(_.at(t.toInstant)), "Tracking not defined over expected region.")
+      Result.fromOption(traverse(_.at(t.toInstant)), s"Tracking not defined over expected region.")
 
     def map[B](f: A => B): Snapshot[B] =
       copy(base = f(base), asterism = asterism.map(_.map(f)))

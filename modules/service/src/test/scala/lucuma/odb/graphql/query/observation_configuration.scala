@@ -739,4 +739,110 @@ class observation_configuration extends OdbSuite with ObservingModeSetupOperatio
   }
 
 
+  test("select configuration for fully-configured observation with nonsidereal target (gmos-n longslit)") {
+    createCallForProposalsAs(admin).flatMap { cfpid =>
+      createProgramAs(pi, "Foo").flatMap { pid =>
+        addProposal(pi, pid, Some(cfpid), None) >>
+        createNonsiderealTargetAs(pi, pid).flatMap { tid =>
+          createGmosNorthLongSlitObservationAs(pi, pid, List(tid)).flatMap { oid =>
+            expect(
+              user = pi,
+              query = s"""
+                query {
+                  observation(observationId: "$oid") {
+                    configuration {
+                      conditions {
+                        imageQuality
+                        cloudExtinction
+                        skyBackground
+                        waterVapor
+                      }
+                      target {
+                        coordinates {
+                          ra { 
+                            hms 
+                          }
+                          dec { 
+                            dms 
+                          }
+                        }
+                        region {
+                          rightAscensionArc {
+                            type
+                            start { degrees }
+                            end { degrees }
+                          }
+                          declinationArc {
+                            type
+                            start { degrees }
+                            end { degrees }
+                          }
+                        }
+                      }
+                      observingMode {
+                        instrument
+                        mode
+                        gmosNorthLongSlit {
+                          grating
+                        }
+                        gmosSouthLongSlit {
+                          grating
+                        }
+                        gmosNorthImaging {
+                          filters
+                        }
+                        gmosSouthImaging {
+                          filters
+                        }
+                        flamingos2LongSlit {
+                          disperser
+                        }
+                      }
+                    }
+                  }
+                }
+              """,
+              expected = Right(json"""
+                {
+                  "observation" : {
+                    "configuration" : {
+                      "conditions" : {
+                        "imageQuality" : "POINT_ONE",
+                        "cloudExtinction" : "POINT_ONE",
+                        "skyBackground" : "DARKEST",
+                        "waterVapor" : "WET"
+                      },
+                      "target" : {
+                        "coordinates" : {
+                          "ra" : {
+                            "hms" : "08:09:46.797666"
+                          },
+                          "dec" : {
+                            "dms" : "+03:21:19.542048"
+                          }
+                        },
+                        "region" : null
+                      },
+                      "observingMode" : {
+                        "instrument" : "GMOS_NORTH",
+                        "mode" : "GMOS_NORTH_LONG_SLIT",
+                        "gmosNorthLongSlit" : {
+                          "grating" : "R831_G5302"
+                        },
+                        "gmosSouthLongSlit" : null,
+                        "gmosNorthImaging" : null,
+                        "gmosSouthImaging" : null,
+                        "flamingos2LongSlit" : null                      
+                      }
+                    }
+                  }
+                }
+              """)
+            )
+          }
+        }
+      }
+    }
+  }
+
 }
