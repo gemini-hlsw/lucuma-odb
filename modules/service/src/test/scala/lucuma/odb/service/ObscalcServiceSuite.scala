@@ -61,7 +61,7 @@ trait ObscalcServiceSuiteSupport extends ExecutionTestSupportForGmos:
   def select(o: Observation.Id): IO[Option[Obscalc.Entry]] =
     withObscalcServiceTransactionally(_.selectOne(o))
 
-  val load: IO[List[Obscalc.PendingCalc]] =
+  def load: IO[List[Obscalc.PendingCalc]] =
     withObscalcServiceTransactionally(_.load(10))
 
   def calculateAndUpdate(p: Obscalc.PendingCalc): IO[Option[Obscalc.Meta]] =
@@ -70,7 +70,7 @@ trait ObscalcServiceSuiteSupport extends ExecutionTestSupportForGmos:
   def calculateOnly(pc: Obscalc.PendingCalc): IO[Obscalc.Result] =
     withObscalcService(_.calculateOnly(pc))
 
-  val reset: IO[Unit] =
+  def reset: IO[Unit] =
     withObscalcServiceTransactionally(_.reset)
 
   def insert(pc: Obscalc.PendingCalc): IO[Unit] =
