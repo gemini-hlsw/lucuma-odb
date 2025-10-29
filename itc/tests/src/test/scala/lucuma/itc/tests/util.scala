@@ -5,6 +5,8 @@ package lucuma.itc.tests
 
 import cats.effect.IO
 import cats.syntax.option.*
+import fs2.io.file.Files
+import fs2.io.file.Path
 import lucuma.core.model.Attachment
 import lucuma.graphql.routes.GraphQLService
 import lucuma.graphql.routes.Routes
@@ -23,6 +25,7 @@ import org.http4s.Uri
 import org.http4s.server.websocket.WebSocketBuilder2
 import org.typelevel.log4cats.Logger
 
+import java.nio.file.Paths as JPaths
 import scala.concurrent.duration.*
 
 def app(
@@ -40,14 +43,8 @@ given CustomSed.Resolver[IO] = new CustomSedDatResolver[IO] {
     IO:
       id match
         case DummyId   =>
-          fs2.Stream.emits:
-            List(
-              "# Should skip comments and empty lines",
-              "500.0 1.0",
-              "600.0 2.0 ignore this",
-              "",
-              "700.0 3.0"
-            )
+          val fs2Path = Path.fromNioPath(JPaths.get(getClass.getResource("/sed.dat").toURI))
+          Files[IO].readUtf8Lines(fs2Path)
         case InvalidId =>
           fs2.Stream.emit("someText someOtherText")
         case _         =>
