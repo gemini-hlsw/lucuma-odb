@@ -15,16 +15,13 @@ import lucuma.core.util.TimeSpan
 import lucuma.odb.Config
 import lucuma.odb.data.Existence
 import lucuma.odb.data.GroupTree
-import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.input.CreateGroupInput
 import lucuma.odb.graphql.input.GroupPropertiesInput
-import lucuma.odb.graphql.input.ObservationPropertiesInput
-import lucuma.odb.graphql.mapping.AccessControl
 import lucuma.odb.service.Services.ServiceAccess
 import lucuma.odb.util.Codecs.*
-import natchez.Trace
 import org.http4s.client.Client
 import skunk.Transaction
+import skunk.syntax.all.*
 
 trait PerScienceObservationCalibrationsService[F[_]]:
 
@@ -34,19 +31,19 @@ trait PerScienceObservationCalibrationsService[F[_]]:
   )(using Transaction[F], ServiceAccess): F[List[Observation.Id]]
 
 object PerScienceObservationCalibrationsService:
-  def instantiate[F[_]: {Concurrent, Services as S, Trace}](emailConfig: Config.Email, httpClient: Client[F]): PerScienceObservationCalibrationsService[F] =
+  def instantiate[F[_]: {Concurrent, Services as S}](emailConfig: Config.Email, httpClient: Client[F]): PerScienceObservationCalibrationsService[F] =
     new PerScienceObservationCalibrationsService[F] with CalibrationObservations:
 
       private def groupNameForObservation(
-        config: CalibrationConfigSubset,
+        config:          CalibrationConfigSubset,
         calibrationRole: CalibrationRole,
-        oid: Observation.Id
+        oid:             Observation.Id
       ): NonEmptyString =
         NonEmptyString.unsafeFrom(s"${config.modeType.dbTag}/${calibrationRole.tag}/${oid.show}")
 
       private def findSystemGroupForObservation(
         tree: GroupTree,
-        oid: Observation.Id
+        oid:  Observation.Id
       ): Option[Group.Id] =
         tree.findGroupContaining(
           oid,
@@ -55,17 +52,17 @@ object PerScienceObservationCalibrationsService:
 
       private def findParentGroupForObservation(
         tree: GroupTree,
-        oid: Observation.Id
+        oid:  Observation.Id
       ): Option[Group.Id] =
         tree.findGroupContaining(oid, b => !b.system)
 
       private def f2TelluricGroup(
-        pid: Program.Id,
-        config: CalibrationConfigSubset,
-        oid: Observation.Id,
+        pid:           Program.Id,
+        config:        CalibrationConfigSubset,
+        oid:           Observation.Id,
         parentGroupId: Option[Group.Id]
-      )(using Transaction[F]): F[Group.Id] =
-        GroupService.instantiate(emailConfig, httpClient).createGroup(
+      )(using Transaction[F]): F[Result[Group.Id]] =
+        S.groupService(emailConfig, httpClient).createGroup(
           CreateGroupInput(
             programId = pid.some,
             proposalReference = none,
@@ -85,52 +82,80 @@ object PerScienceObservationCalibrationsService:
           ),
           system = true,
           calibrationRoles = List(CalibrationRole.Telluric)
-        ).flatMap:
-          case Result.Success(gid) => gid.pure[F]
-          case _ =>
-            new RuntimeException(s"Failed to create F2 group").raiseError[F, Group.Id]
+        )
 
       private def telluricGroups(tree: GroupTree): List[(Group.Id, List[Observation.Id])] =
         tree.findGroupsWithObservations(b => b.system && b.calibrationRoles.contains(CalibrationRole.Telluric))
 
       override def generateCalibrations(
-        pid: Program.Id,
+        pid:        Program.Id,
         scienceObs: List[ObsExtract[CalibrationConfigSubset]]
       )(using Transaction[F], ServiceAccess): F[List[Observation.Id]] =
-        val groupService = S.groupService(emailConfig, httpClient)
-        val observationService = ObservationService.instantiate[F]
+        val groupService  = S.groupService(emailConfig, httpClient)
+        val currentObsIds = scienceObs.map(_.id).toSet
 
         for
-          tree              <- groupService.selectGroups(pid)
-          existingGroups    = telluricGroups(tree)
-          currentObsIds     = scienceObs.map(_.id).toSet
-          // find observations that need cleanup
-          _                 <- existingGroups.traverse_ : (gid, _) =>
-                                 // Get all observations in this group from the database
-                                 groupService.selectAllObservationsInGroup(gid).flatMap: allObsIds =>
-                                   allObsIds
-                                     .filterNot(currentObsIds.contains)
-                                     .traverse_ : oid =>
-                                       observationService.updateObservations(
-                                         Services.asSuperUser(
-                                           AccessControl.unchecked(
-                                             ObservationPropertiesInput.Edit.Empty.copy(group = Nullable.Null),
-                                             List(oid),
-                                             observation_id
-                                           )
-                                         )
-                                       )
-          // Clean up empty system groups
-          _                 <- existingGroups.traverse_ : (gid, groupObsIds) =>
-                                 groupObsIds
-                                   .filter(currentObsIds.contains)
-                                   .headOption
-                                   .fold(groupService.deleteSystemGroup(pid, gid).void)(_ => ().pure[F])
+          _                 <- S.session.execute(sql"set constraints all deferred".command)
+          // All telluric program groups
+          initialTelluricGroups <- groupService.selectGroups(pid).map(telluricGroups)
+          // Query database directly for ALL observations in ALL telluric groups in a single query
+          // This is necessary because the tree only includes observations with c_existence = 'present'
+          allObsInGroups    <- initialTelluricGroups.map(_._1) match
+                                 case Nil => Map.empty[Group.Id, List[Observation.Id]].pure[F]
+                                 case gids =>
+                                   val enc = group_id.list(gids.length)
+                                   S.session.prepareR(
+                                     sql"""
+                                       SELECT c_group_id, c_observation_id
+                                       FROM t_observation
+                                       WHERE c_group_id IN ($enc)
+                                     """.query(group_id *: observation_id)
+                                   ).use { ps =>
+                                     ps.stream(gids, 1024)
+                                       .compile
+                                       .toList
+                                       .map(_.groupMap(_._1)(t => t._2))
+                                   }
+          // Collect all observations that need unlinking (not in current science set)
+          obsToUnlink       = allObsInGroups.values.flatten.filterNot(currentObsIds.contains).toList
+          // Batch unlink all observations using group_move_observation
+          _                 <- obsToUnlink.traverse_ { oid =>
+                                 S.session.prepareR(sql"SELECT group_move_observation($observation_id, ${group_id.opt}, ${int2_nonneg.opt})".query(void)).use { ps =>
+                                   ps.unique((oid, None, None))
+                                 }
+                               }
+          // Reload tree to see which groups are now empty after unlinking
+          treeAfterUnlink   <- groupService.selectGroups(pid)
+          existingAfter     = telluricGroups(treeAfterUnlink)
+          // Delete empty system groups
+          // Note: We must use deleteSystemGroup to properly manage parent group indices
+          _                 <- existingAfter
+                                 .filter(_._2.isEmpty)
+                                 .traverse_ { (gid, _) =>
+                                   groupService.deleteSystemGroup(pid, gid).void
+                                 }
           // Create or verify system groups for current F2 observations
           _                 <- scienceObs.traverse_ { obs =>
-                                 findSystemGroupForObservation(tree, obs.id)
+                                 findSystemGroupForObservation(treeAfterUnlink, obs.id)
                                    .fold(
-                                     f2TelluricGroup(pid, obs.data, obs.id, findParentGroupForObservation(tree, obs.id)).void
+                                     f2TelluricGroup(pid, obs.data, obs.id, findParentGroupForObservation(treeAfterUnlink, obs.id)).void
                                    )(_ => ().pure[F])
                                }
         yield List.empty // no calibs yet
+
+      object Statements:
+        val m = 1
+        // val GroupObs: Query[(Program.Id, Create), ProgramNote.Id] = ???
+                                   // val enc = group_id.list(gids.length)
+                                   // S.session.prepareR(
+                                   //   sql"""
+                                   //     SELECT c_group_id, c_observation_id
+                                   //     FROM t_observation
+                                   //     WHERE c_group_id IN ($enc)
+                                   //   """.query(group_id *: observation_id)
+                                   // ).use { ps =>
+                                   //   ps.stream(gids, 1024)
+                                   //     .compile
+                                   //     .toList
+                                   //     .map(_.groupMap(_._1)(t => t._2))
+                                   // }

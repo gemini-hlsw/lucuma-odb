@@ -29,10 +29,12 @@ import lucuma.odb.graphql.mapping.AccessControl
 import lucuma.odb.sequence.ObservingMode
 import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.service.CalibrationConfigSubset.toConfigSubset
+import lucuma.odb.sequence.flamingos2.longslit.Config as Flamingos2Config
+import lucuma.odb.sequence.gmos.longslit.Config.GmosNorth as GmosNorthLongSlit
+import lucuma.odb.sequence.gmos.longslit.Config.GmosSouth as GmosSouthLongSlit
 import lucuma.odb.service.Services.ServiceAccess
 import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.util.Codecs.*
-import natchez.Trace
 import org.http4s.client.Client
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.syntax.*
@@ -94,7 +96,7 @@ object CalibrationsService extends CalibrationObservations {
       case (tid, name, role, Some(st)) => (tid, name, role, st)
     }
 
-  def instantiate[F[_]: {Concurrent, Services, Logger, Trace}](emailConfig: Config.Email, httpClient: Client[F]): CalibrationsService[F] =
+  def instantiate[F[_]: {Concurrent, Services, Logger}](emailConfig: Config.Email, httpClient: Client[F]): CalibrationsService[F] =
     new CalibrationsService[F] {
 
       private def collectValid(
@@ -135,6 +137,13 @@ object CalibrationsService extends CalibrationObservations {
           session.execute(Statements.selectCalibrationTargets(roles))(roles)
             .map(targetCoordinates(referenceInstant))
 
+      def perObsFilter: PartialFunction[ObsExtract[ObservingMode], ObsExtract[ObservingMode]] =
+        case d @ ObsExtract(data = _: Flamingos2Config) => d
+
+      def perProgramFilter: PartialFunction[ObsExtract[ObservingMode], ObsExtract[ObservingMode]] =
+        case d @ ObsExtract(data = _: GmosNorthLongSlit) => d
+        case d @ ObsExtract(data = _: GmosSouthLongSlit) => d
+
       def recalculateCalibrations(pid: Program.Id, referenceInstant: Instant)(using Transaction[F], ServiceAccess): F[(List[Observation.Id], List[Observation.Id])] =
         val sharedService = PerProgramPerConfigCalibrationsService.instantiate(emailConfig, httpClient)
         val perObsService = PerScienceObservationCalibrationsService.instantiate(emailConfig, httpClient)
@@ -154,15 +163,14 @@ object CalibrationsService extends CalibrationObservations {
           allCalibs        <- allUnexecutedObservations(pid, ObservationSelection.Calibration)
                                 .map(_.filter(u => active.contains(u.id)))
           _                <- (debug"Program $pid has ${allCalibs.length} active calibration observations: ${allCalibs.map(_.id)}").whenA(allCalibs.nonEmpty)
-          // F2 and GMOS observations
-          f2ScienceObs     = allSci.filter(_.data.toConfigSubset.isInstanceOf[CalibrationConfigSubset.Flamingos2Configs]).map(_.map(_.toConfigSubset))
-          gmosScienceObs   = allSci.filterNot(_.data.toConfigSubset.isInstanceOf[CalibrationConfigSubset.Flamingos2Configs])
-          _                <- (debug"Program $pid has ${f2ScienceObs.length} F2 science observations: ${f2ScienceObs.map(_.id)}").whenA(f2ScienceObs.nonEmpty)
-          _                <- (debug"Program $pid has ${gmosScienceObs.length} GMOS science observations: ${gmosScienceObs.map(_.id)}").whenA(gmosScienceObs.nonEmpty)
+          perObs           = allSci.collect(perObsFilter).map(_.map(_.toConfigSubset))
+          perProgram       = allSci.collect(perProgramFilter)
+          _                <- (debug"Program $pid has ${perObs.length} science observations with per obs calibrations: ${perObs.map(_.id)}").whenA(perObs.nonEmpty)
+          _                <- (debug"Program $pid has ${perProgram.length} science observations for per program calibrations: ${perProgram.map(_.id)}").whenA(perProgram.nonEmpty)
           // Handle per-science-observation calibs
-          _                <- perObsService.generateCalibrations(pid, f2ScienceObs)
+          _                <- perObsService.generateCalibrations(pid, perObs)
           // Handle per--config calib
-          (added, removed) <- sharedService.generateCalibrations(pid, gmosScienceObs, allCalibs, calibTargets, referenceInstant)
+          (added, removed) <- sharedService.generateCalibrations(pid, perProgram, allCalibs, calibTargets, referenceInstant)
           // Clean orphaned targets
           _                <- targetService.deleteOrphanCalibrationTargets(pid)
         } yield (added, removed)

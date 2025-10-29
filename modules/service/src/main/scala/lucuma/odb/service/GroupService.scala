@@ -45,9 +45,8 @@ trait GroupService[F[_]] {
   def selectGroups(programId: Program.Id)(using Transaction[F]): F[GroupTree]
   def selectPid(groupId: Group.Id)(using Transaction[F]): F[Option[Program.Id]]
   def cloneGroup(input: CloneGroupInput)(using Transaction[F]): F[Result[Group.Id]]
-  def selectAllObservationsInGroup(groupId: Group.Id)(using Transaction[F]): F[List[Observation.Id]]
+  def selectAllObservations(groupId: Group.Id)(using Transaction[F]): F[List[Observation.Id]]
   def deleteSystemGroup(pid: Program.Id, groupId: Group.Id)(using Transaction[F], ServiceAccess): F[Result[Unit]]
-
 }
 
 object GroupService {
@@ -257,7 +256,7 @@ object GroupService {
       def selectPid(groupId: Group.Id)(using Transaction[F]): F[Option[Program.Id]] =
         session.option(Statements.SelectPid)(groupId)
 
-      def selectAllObservationsInGroup(groupId: Group.Id)(using Transaction[F]): F[List[Observation.Id]] =
+      def selectAllObservations(groupId: Group.Id)(using Transaction[F]): F[List[Observation.Id]] =
         session.execute(Statements.SelectAllObservationsInGroup)(groupId)
 
     }
@@ -387,113 +386,95 @@ object GroupService {
       """.query(group_id.opt *: int2_nonneg *: observation_id)
          .map { case (gid, index, oid) => (gid, index, GroupTree.Leaf(oid)) }
 
-     val SelectPid: Query[Group.Id, Program.Id] =
-       sql"""
-         SELECT
-           c_program_id
-         FROM
-           t_group
-         WHERE
-           c_group_id = $group_id
-       """.query(program_id)
-
-      val SelectAllObservationsInGroup: Query[Group.Id, Observation.Id] =
-        sql"""
-          SELECT c_observation_id
-          FROM t_observation
-          WHERE c_group_id = $group_id
-        """.query(observation_id)
-
-      /** Select group elements in a group, in order. */
-      val SelectGroupElements: Query[Group.Id, GroupElement.Id] =
-        sql"""
-          SELECT c_group_id, c_observation_id
-          FROM (
-            SELECT null c_group_id, c_observation_id, c_group_index
-            FROM t_observation WHERE c_group_id = $group_id
-            UNION
-            SELECT c_group_id, null, c_parent_index
-            FROM t_group WHERE c_parent_id = $group_id
-          ) sub ORDER BY c_group_index
-        """
-          .contramap[Group.Id](a => (a, a))
-          .query(
-            (group_id.opt ~ observation_id.opt).emap:
-              case (None, Some(oid)) => Right(Right(oid))
-              case (Some(gid), None) => Right(Left(gid))
-              case (a, b)            => Left("SelectGroupElements: unpossible row: $a, $b")
-          )
-
-      /** Select a `CreateGroupInput` for a given `Group.Id` that can be used to create an empty clone. */
-      val SelectGroupAsInput: Query[Group.Id, (CreateGroupInput, Boolean, List[CalibrationRole])] =
-        sql"""
-          SELECT
-            c_program_id,
-            c_parent_id,
-            c_parent_index,
-            c_name,
-            c_description,
-            c_min_required,
-            c_ordered,
-            c_min_interval,
-            c_max_interval,
-            c_existence,
-            c_system,
-            c_calibration_roles
-          FROM
-            t_group
-          WHERE
-            c_group_id = $group_id
-        """.query(
-            program_id ~
-            group_id.opt ~
-            int2_nonneg ~
-            text_nonempty.opt ~
-            text_nonempty.opt ~
-            int2_nonneg.opt ~
-            bool ~
-            time_span.opt ~
-            time_span.opt ~
-            existence ~
-            bool ~
-            _calibration_role
-          ).map:
-            case pid ~ gid ~ gix ~ nam ~ des ~ mre ~ ord ~ min ~ max ~ exi ~ sys ~ roles =>
-              (CreateGroupInput(
-                programId = Some(pid),
-                proposalReference = None,
-                programReference = None,
-                SET = GroupPropertiesInput.Create(
-                  name = nam,
-                  description = des,
-                  minimumRequired = mre,
-                  ordered = ord,
-                  minimumInterval = min,
-                  maximumInterval = max,
-                  parentGroupId = gid,
-                  parentGroupIndex = Some(gix),
-                  existence = exi,
-                ),
-                initialContents = Nil
-              ), sys, roles)
-
-    val SelectGroupInfo: Query[Group.Id, (Program.Id, Option[Group.Id], NonNegShort)] =
+    val SelectPid: Query[Group.Id, Program.Id] =
       sql"""
-        SELECT c_program_id, c_parent_id, c_parent_index
-        FROM t_group
+        SELECT
+          c_program_id
+        FROM
+          t_group
+        WHERE
+          c_group_id = $group_id
+      """.query(program_id)
+
+    val SelectAllObservationsInGroup: Query[Group.Id, Observation.Id] =
+      sql"""
+        SELECT c_observation_id
+        FROM t_observation
         WHERE c_group_id = $group_id
-      """.query(program_id *: group_id.opt *: int2_nonneg)
+      """.query(observation_id)
 
-    val DeleteSystemGroup: Command[Group.Id] =
+    /** Select group elements in a group, in order. */
+    val SelectGroupElements: Query[Group.Id, GroupElement.Id] =
       sql"""
-        DELETE FROM t_group
-        WHERE c_group_id = $group_id AND c_system = true
-      """.command
+        SELECT c_group_id, c_observation_id
+        FROM (
+          SELECT null c_group_id, c_observation_id, c_group_index
+          FROM t_observation WHERE c_group_id = $group_id
+          UNION
+          SELECT c_group_id, null, c_parent_index
+          FROM t_group WHERE c_parent_id = $group_id
+        ) sub ORDER BY c_group_index
+      """
+        .contramap[Group.Id](a => (a, a))
+        .query(
+          (group_id.opt ~ observation_id.opt).emap:
+            case (None, Some(oid)) => Right(Right(oid))
+            case (Some(gid), None) => Right(Left(gid))
+            case (a, b)            => Left("SelectGroupElements: unpossible row: $a, $b")
+        )
 
-    val CloseHole: Command[(Program.Id, Option[Group.Id], NonNegShort)] =
+    /** Select a `CreateGroupInput` for a given `Group.Id` that can be used to create an empty clone. */
+    val SelectGroupAsInput: Query[Group.Id, (CreateGroupInput, Boolean, List[CalibrationRole])] =
       sql"""
-        CALL group_close_hole($program_id, ${group_id.opt}, $int2_nonneg)
-      """.command
+        SELECT
+          c_program_id,
+          c_parent_id,
+          c_parent_index,
+          c_name,
+          c_description,
+          c_min_required,
+          c_ordered,
+          c_min_interval,
+          c_max_interval,
+          c_existence,
+          c_system,
+          c_calibration_roles
+        FROM
+          t_group
+        WHERE
+          c_group_id = $group_id
+      """.query(
+          program_id ~
+          group_id.opt ~
+          int2_nonneg ~
+          text_nonempty.opt ~
+          text_nonempty.opt ~
+          int2_nonneg.opt ~
+          bool ~
+          time_span.opt ~
+          time_span.opt ~
+          existence ~
+          bool ~
+          _calibration_role
+        ).map:
+          case pid ~ gid ~ gix ~ nam ~ des ~ mre ~ ord ~ min ~ max ~ exi ~ sys ~ roles =>
+            (CreateGroupInput(
+              programId = Some(pid),
+              proposalReference = None,
+              programReference = None,
+              SET = GroupPropertiesInput.Create(
+                name = nam,
+                description = des,
+                minimumRequired = mre,
+                ordered = ord,
+                minimumInterval = min,
+                maximumInterval = max,
+                parentGroupId = gid,
+                parentGroupIndex = Some(gix),
+                existence = exi,
+              ),
+              initialContents = Nil
+            ), sys, roles)
 
     def deleteSystemGroups[A <: NonEmptyList[Group.Id]](enc: Encoder[A]): Query[A, Group.Id] =
       sql"""

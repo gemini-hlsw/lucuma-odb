@@ -48,11 +48,11 @@ import java.time.Instant
 
 trait PerProgramPerConfigCalibrationsService[F[_]]:
   def generateCalibrations(
-    pid: Program.Id,
-    allSci: List[ObsExtract[ObservingMode]],
-    allCalibs: List[ObsExtract[ObservingMode]],
+    pid:          Program.Id,
+    allSci:       List[ObsExtract[ObservingMode]],
+    allCalibs:    List[ObsExtract[ObservingMode]],
     calibTargets: List[(Target.Id, String, CalibrationRole, Coordinates)],
-    when: Instant
+    when:         Instant
   )(using Transaction[F], ServiceAccess): F[(List[Observation.Id], List[Observation.Id])]
 
 object PerProgramPerConfigCalibrationsService:

@@ -222,3 +222,95 @@ class perScienceObservationCalibrations
       assertEquals(groupInfo.minimumRequired, None) // all observations
       assertEquals(groupInfo.maximumInterval, TimeSpan.Zero.some)
     }
+
+  test("Multiple recalculations don't create duplicate groups"):
+    for {
+      pid         <- createProgramAs(pi)
+      tid         <- createTargetWithProfileAs(pi, pid)
+      oid         <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+      _           <- recalculateCalibrations(pid, when)
+      obsAfter1   <- queryObservation(oid)
+      groupId1    =  obsAfter1.groupId.get
+      _           <- recalculateCalibrations(pid, when)
+      obsAfter2   <- queryObservation(oid)
+      groupId2    =  obsAfter2.groupId.get
+      _           <- recalculateCalibrations(pid, when)
+      obsAfter3   <- queryObservation(oid)
+      groupId3    =  obsAfter3.groupId.get
+    } yield {
+      assertEquals(groupId1, groupId2)
+      assertEquals(groupId2, groupId3)
+    }
+
+  test("Mixed add/delete in single recalculation"):
+    for {
+      pid         <- createProgramAs(pi)
+      tid1        <- createTargetWithProfileAs(pi, pid)
+      tid2        <- createTargetWithProfileAs(pi, pid)
+      tid3        <- createTargetWithProfileAs(pi, pid)
+      oid1        <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid1))
+      oid2        <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid2))
+      _           <- recalculateCalibrations(pid, when)
+      obs1Before  <- queryObservation(oid1)
+      obs2Before  <- queryObservation(oid2)
+      group1Id    =  obs1Before.groupId.get
+      // Delete obs1, keep obs2, add obs3
+      _           <- setObservationInactive(oid1)
+      oid3        <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid3))
+      _           <- recalculateCalibrations(pid, when)
+      group1Exists <- queryGroupExists(group1Id)
+      obs2After   <- queryObservation(oid2)
+      obs3After   <- queryObservation(oid3)
+    } yield {
+      assert(!group1Exists, "deleted observation's group should be removed")
+      assert(obs2After.groupId.isDefined, "obs2 should still have a group")
+      assert(obs3After.groupId.isDefined, "obs3 should have a group")
+      assert(obs2After.groupId != obs3After.groupId, "obs2 and obs3 should have different groups")
+    }
+
+  test("New F2 observation creates group even with inactive F2 observation present"):
+    for {
+      pid         <- createProgramAs(pi)
+      tid1        <- createTargetWithProfileAs(pi, pid)
+      tid2        <- createTargetWithProfileAs(pi, pid)
+      oid1        <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid1))
+      _           <- recalculateCalibrations(pid, when)
+      obs1Before  <- queryObservation(oid1)
+      group1Id    =  obs1Before.groupId.get
+      // Set observation1 inactive
+      _           <- setObservationInactive(oid1)
+      // Create new F2 observation
+      oid2        <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid2))
+      _           <- recalculateCalibrations(pid, when)
+      group1Exists <- queryGroupExists(group1Id)
+      obs2After   <- queryObservation(oid2)
+    } yield {
+      assert(!group1Exists, "observation1 group should be deleted")
+      assert(obs2After.groupId.isDefined, "observation2 should have a group")
+      assert(obs2After.groupId != Some(group1Id), "observation2 should have a new group")
+    }
+
+  test("System telluric group is marked as system"):
+    for {
+      pid       <- createProgramAs(pi)
+      tid       <- createTargetWithProfileAs(pi, pid)
+      oid       <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+      _         <- recalculateCalibrations(pid, when)
+      obs       <- queryObservation(oid)
+      groupId   =  obs.groupId.get
+      groupInfo <- queryGroup(groupId)
+    } yield {
+      assert(groupInfo.system, "telluric group should be marked as system")
+      assert(groupInfo.calibrationRoles.contains(CalibrationRole.Telluric))
+    }
+
+  test("Recalculation handles GMOS observation correctly"):
+    for {
+      pid         <- createProgramAs(pi)
+      tid         <- createTargetWithProfileAs(pi, pid)
+      oid         <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
+      _           <- recalculateCalibrations(pid, when)
+      obs         <- queryObservation(oid)
+    } yield {
+      assertEquals(obs.groupId, None, "GMOS observation should have no telluric group")
+    }
