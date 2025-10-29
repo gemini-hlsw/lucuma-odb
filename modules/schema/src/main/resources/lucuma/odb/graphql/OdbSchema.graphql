@@ -2183,10 +2183,11 @@ input GmosNorthLongSlitInput {
 Edit or create GMOS North Imaging advanced configuration
 """
 input GmosNorthImagingInput {
+
   """
   The filters field must be specified with at least one filter. It cannot be unset with a null value.
   """
-  filters: [GmosNorthFilter!]
+  filters: [GmosNorthImagingFilterInput!]
 
   """
   The offsets field may be unset by assigning a null value, or ignored by skipping it altogether
@@ -2663,13 +2664,38 @@ input GmosSouthLongSlitInput {
 }
 
 """
+Imaging filters combine an actual filter with an exposure time mode.
+"""
+type GmosSouthImagingFilter {
+
+  filter: GmosSouthFilter!
+
+  exposureTimeMode: ExposureTimeMode!
+
+}
+
+"""
+Defines the GMOS South filter to use along with its exposure time mode.  If the
+exposure time mode is not specified, it is taken from the observation's
+requirements.
+"""
+input GmosSouthImagingFilterInput {
+
+  filter: GmosSouthFilter!
+
+  exposureTimeMode: ExposureTimeModeInput
+
+}
+
+"""
 Edit or create GMOS South Imaging advanced configuration
 """
 input GmosSouthImagingInput {
+
   """
   The filters field must be specified with at least one filter. It cannot be unset with a null value.
   """
-  filters: [GmosSouthFilter!]
+  filters: [GmosSouthImagingFilterInput!]
 
   """
   The offsets field may be unset by assigning a null value, or ignored by skipping it altogether
@@ -9029,18 +9055,43 @@ type GmosNorthLongSlit {
 }
 
 """
+Imaging filters combine an actual filter with an exposure time mode.
+"""
+type GmosNorthImagingFilter {
+
+  filter: GmosNorthFilter!
+
+  exposureTimeMode: ExposureTimeMode!
+
+}
+
+"""
+Defines the GMOS North filter to use along with its exposure time mode.  If the
+exposure time mode is not specified, it is taken from the observation's
+requirements.
+"""
+input GmosNorthImagingFilterInput {
+
+  filter: GmosNorthFilter!
+
+  exposureTimeMode: ExposureTimeModeInput
+
+}
+
+"""
 GMOS North Imaging mode
 """
 type GmosNorthImaging {
+
   """
   GMOS North Filters for imaging mode (multiple filters allowed)
   """
-  filters: [GmosNorthFilter!]!
+  filters: [GmosNorthImagingFilter!]!
 
   """
   Initial GMOS North Filters that were used when creating the imaging mode
   """
-  initialFilters: [GmosNorthFilter!]!
+  initialFilters: [GmosNorthImagingFilter!]!
 
   """
   Spatial offsets
@@ -9691,15 +9742,16 @@ type GmosSouthLongSlit {
 GMOS South Imaging mode
 """
 type GmosSouthImaging {
+
   """
   GMOS South Filters for imaging mode (multiple filters allowed)
   """
-  filters: [GmosSouthFilter!]!
+  filters: [GmosSouthImagingFilter!]!
 
   """
   Initial GMOS South Filters that were used when creating the imaging mode
   """
-  initialFilters: [GmosSouthFilter!]!
+  initialFilters: [GmosSouthImagingFilter!]!
 
   """
   Spatial offsets

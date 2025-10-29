@@ -4,22 +4,37 @@
 package lucuma.odb.graphql
 package mapping
 
+import cats.Order
+import grackle.Query.Binding
+import grackle.Query.Filter
+import grackle.Query.OrderBy
+import grackle.Query.OrderSelection
+import grackle.Query.OrderSelections
+import grackle.QueryCompiler.Elab
 import grackle.Result
+import grackle.TypeRef
 import grackle.skunk.SkunkMapping
 import io.circe.*
 import io.circe.syntax.*
 import lucuma.core.enums.GmosAmpGain
 import lucuma.core.enums.GmosAmpReadMode
 import lucuma.core.enums.GmosBinning
+import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosRoi
+import lucuma.core.enums.GmosSouthFilter
 import lucuma.core.enums.MultipleFiltersMode
 import lucuma.core.math.Offset
+import lucuma.odb.data.ObservingModeRowVersion
 import lucuma.odb.format.spatialOffsets.*
+import lucuma.odb.graphql.predicate.LeafPredicates
+import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.graphql.table.*
 import lucuma.odb.json.offset.query.given
 
-trait GmosImagingMapping[F[_]]
-  extends GmosImagingView[F] with OptionalFieldMapping[F] { this: SkunkMapping[F] =>
+trait GmosImagingMapping[F[_]] extends GmosImagingView[F]
+                                  with GmosImagingFilterTable[F]
+                                  with OptionalFieldMapping[F]
+                                  with Predicates[F] { this: SkunkMapping[F] =>
 
   import GmosImagingMapping.*
 
@@ -51,9 +66,9 @@ trait GmosImagingMapping[F[_]]
   lazy val GmosNorthImagingMapping: ObjectMapping =
     ObjectMapping(GmosNorthImagingType)(
 
-      SqlField("observationId", GmosNorthImagingView.ObservationId, key = true, hidden = true),
-      SqlField("filters", GmosNorthImagingView.Filters),
-      SqlField("initialFilters", GmosNorthImagingView.InitialFilters),
+      SqlField("observationId",   GmosNorthImagingView.ObservationId, key = true, hidden = true),
+      SqlObject("filters",        Join(GmosNorthImagingView.ObservationId, GmosNorthImagingFilterTable.ObservationId)),
+      SqlObject("initialFilters", Join(GmosNorthImagingView.ObservationId, GmosNorthImagingFilterTable.ObservationId)),
 
       SqlField("offsetsString", GmosNorthImagingView.Offsets, hidden = true),
       CommonImagingFields.offsets,
@@ -79,12 +94,40 @@ trait GmosImagingMapping[F[_]]
       CommonImagingFields.defaultRoi,
     )
 
+  // We need an elaborator in order to order the filters predictably and to
+  // limit the results to either "current" or "initial".
+  private def filterElaborator[L: Order](
+    t: TypeRef,
+    p: LeafPredicates[ObservingModeRowVersion],
+    v: ObservingModeRowVersion
+  ): Elab[Unit] =
+    Elab.transformChild: child =>
+        OrderBy(
+          OrderSelections(List(OrderSelection[L](t / "filter"))),
+          Filter(p.eql(v), child)
+        )
+
+  lazy val GmosNorthImagingElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
+    case (GmosNorthImagingType, "filters", Nil) =>
+      filterElaborator[GmosNorthFilter](
+        GmosNorthImagingType,
+        Predicates.gmosNorthImagingFilter.version,
+        ObservingModeRowVersion.Current
+      )
+
+    case (GmosNorthImagingType, "initialFilters", Nil) =>
+      filterElaborator[GmosNorthFilter](
+        GmosNorthImagingType,
+        Predicates.gmosNorthImagingFilter.version,
+        ObservingModeRowVersion.Initial
+      )
+
   lazy val GmosSouthImagingMapping: ObjectMapping =
     ObjectMapping(GmosSouthImagingType)(
 
-      SqlField("observationId", GmosSouthImagingView.ObservationId, key = true, hidden = true),
-      SqlField("filters", GmosSouthImagingView.Filters),
-      SqlField("initialFilters", GmosSouthImagingView.InitialFilters),
+      SqlField("observationId",   GmosSouthImagingView.ObservationId, key = true, hidden = true),
+      SqlObject("filters",        Join(GmosSouthImagingView.ObservationId, GmosSouthImagingFilterTable.ObservationId)),
+      SqlObject("initialFilters", Join(GmosSouthImagingView.ObservationId, GmosSouthImagingFilterTable.ObservationId)),
 
       SqlField("offsetsString", GmosSouthImagingView.Offsets, hidden = true),
       CommonImagingFields.offsets,
@@ -109,6 +152,22 @@ trait GmosImagingMapping[F[_]]
       SqlField("explicitRoi", GmosSouthImagingView.ExplicitRoi),
       CommonImagingFields.defaultRoi,
     )
+
+  lazy val GmosSouthImagingElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
+    case (GmosSouthImagingType, "filters", Nil) =>
+      filterElaborator[GmosSouthFilter](
+        GmosSouthImagingType,
+        Predicates.gmosSouthImagingFilter.version,
+        ObservingModeRowVersion.Current
+      )
+
+    case (GmosSouthImagingType, "initialFilters", Nil) =>
+      filterElaborator[GmosSouthFilter](
+        GmosSouthImagingType,
+        Predicates.gmosSouthImagingFilter.version,
+        ObservingModeRowVersion.Initial
+      )
+
 }
 
 object GmosImagingMapping:

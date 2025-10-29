@@ -97,13 +97,13 @@ object Flamingos2LongSlitService:
         req:   Option[ExposureTimeMode],
         which: List[Observation.Id]
       )(using Transaction[F]): F[Result[Unit]] =
-        exposureTimeModeService.insertForSingleScienceEtm(
+        exposureTimeModeService.insertOneWithDefaults(
           name,
           input.acquisition.flatMap(_.exposureTimeMode),
           input.exposureTimeMode,
           req,
           which
-        )
+        ).map(_.void)
 
       override def insert(
         input: Flamingos2LongSlitInput.Create,
@@ -124,9 +124,8 @@ object Flamingos2LongSlitService:
       )(using Transaction[F]): F[Unit] =
 
         def update(etm: Option[ExposureTimeMode], role: ExposureTimeModeRole): F[Unit] =
-          NonEmptyList.fromList(which).traverse_ : nel =>
-            etm.fold(().pure[F]): e =>
-              services.exposureTimeModeService.updateMany(nel, role, e)
+          etm.fold(().pure[F]): e =>
+            services.exposureTimeModeService.updateMany(which, role, e)
 
         for
           _ <- update(input.acquisition.flatMap(_.exposureTimeMode), ExposureTimeModeRole.Acquisition)

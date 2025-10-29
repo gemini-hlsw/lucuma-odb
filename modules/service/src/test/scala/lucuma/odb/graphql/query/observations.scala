@@ -509,8 +509,8 @@ class observations extends OdbSuite {
                         }
                         observingMode {
                           gmosNorthImaging {
-                            filters
-                            initialFilters
+                            filters { filter }
+                            initialFilters { filter }
                             bin
                             ampReadMode
                             ampGain
@@ -533,8 +533,14 @@ class observations extends OdbSuite {
                             },
                             "observingMode": {
                               "gmosNorthImaging": {
-                                "filters": ["G_PRIME", "R_PRIME"],
-                                "initialFilters": ["G_PRIME", "R_PRIME"],
+                                "filters": [
+                                  { "filter": "G_PRIME" },
+                                  { "filter": "R_PRIME" }
+                                ],
+                                "initialFilters": [
+                                  { "filter": "G_PRIME" },
+                                  { "filter": "R_PRIME" }
+                                ],
                                 "bin": "TWO",
                                 "ampReadMode": "SLOW",
                                 "ampGain": "LOW",
@@ -566,8 +572,8 @@ class observations extends OdbSuite {
                         id
                         observingMode {
                           gmosSouthImaging {
-                            filters
-                            initialFilters
+                            filters { filter }
+                            initialFilters { filter }
                             bin
                             ampReadMode
                             ampGain
@@ -587,8 +593,14 @@ class observations extends OdbSuite {
                             "id": $oid,
                             "observingMode": {
                               "gmosSouthImaging": {
-                                "filters": ["G_PRIME", "R_PRIME"],
-                                "initialFilters": ["G_PRIME", "R_PRIME"],
+                                "filters": [
+                                  { "filter": "G_PRIME" },
+                                  { "filter": "R_PRIME" }
+                                ],
+                                "initialFilters": [
+                                  { "filter": "G_PRIME" },
+                                  { "filter": "R_PRIME" }
+                                ],
                                 "bin": "TWO",
                                 "ampReadMode": "SLOW",
                                 "ampGain": "LOW",
@@ -644,16 +656,16 @@ class observations extends OdbSuite {
                       observingMode {
                         mode
                         gmosNorthImaging {
-                          filters
-                          initialFilters
+                          filters { filter }
+                          initialFilters { filter }
                           bin
                           ampReadMode
                           ampGain
                           roi
                         }
                         gmosSouthImaging {
-                          filters
-                          initialFilters
+                          filters { filter }
+                          initialFilters { filter }
                           bin
                           ampReadMode
                           ampGain
@@ -675,8 +687,14 @@ class observations extends OdbSuite {
                           "observingMode": {
                             "mode": "GMOS_NORTH_IMAGING",
                             "gmosNorthImaging": {
-                              "filters": ["G_PRIME", "R_PRIME"],
-                              "initialFilters": ["G_PRIME", "R_PRIME"],
+                              "filters": [
+                                { "filter": "G_PRIME" },
+                                { "filter": "R_PRIME" }
+                              ],
+                              "initialFilters": [
+                                { "filter": "G_PRIME" },
+                                { "filter": "R_PRIME" }
+                              ],
                               "bin": "TWO",
                               "ampReadMode": "SLOW",
                               "ampGain": "LOW",
@@ -692,8 +710,14 @@ class observations extends OdbSuite {
                             "mode": "GMOS_SOUTH_IMAGING",
                             "gmosNorthImaging": null,
                             "gmosSouthImaging": {
-                              "filters": ["G_PRIME", "R_PRIME"],
-                              "initialFilters": ["G_PRIME", "R_PRIME"],
+                              "filters": [
+                                { "filter": "G_PRIME" },
+                                { "filter": "R_PRIME" }
+                              ],
+                              "initialFilters": [
+                                { "filter": "G_PRIME" },
+                                { "filter": "R_PRIME" }
+                              ],
                               "bin": "TWO",
                               "ampReadMode": "SLOW",
                               "ampGain": "LOW",
@@ -721,8 +745,8 @@ class observations extends OdbSuite {
             observation(observationId: "$oid") {
               observingMode {
                 gmosNorthImaging {
-                  filters
-                  initialFilters
+                  filters { filter }
+                  initialFilters { filter }
                 }
               }
             }
@@ -734,8 +758,14 @@ class observations extends OdbSuite {
               "observation": {
                 "observingMode": {
                   "gmosNorthImaging": {
-                    "filters": ["G_PRIME", "R_PRIME"],
-                    "initialFilters": ["G_PRIME", "R_PRIME"]
+                    "filters": [
+                      { "filter": "G_PRIME" },
+                      { "filter": "R_PRIME" }
+                    ],
+                    "initialFilters": [
+                      { "filter": "G_PRIME" },
+                      { "filter": "R_PRIME" }
+                    ]
                   }
                 }
               }
@@ -752,7 +782,10 @@ class observations extends OdbSuite {
               SET: {
                 observingMode: {
                   gmosNorthImaging: {
-                    filters: [I_PRIME, Z_PRIME]
+                    filters: [
+                      { filter: I_PRIME },
+                      { filter: Z_PRIME }
+                    ]
                   }
                 }
               }
@@ -761,8 +794,8 @@ class observations extends OdbSuite {
                 id
                 observingMode {
                   gmosNorthImaging {
-                    filters
-                    initialFilters
+                    filters { filter }
+                    initialFilters { filter }
                   }
                 }
               }
@@ -778,8 +811,14 @@ class observations extends OdbSuite {
                     "id": $oid,
                     "observingMode": {
                       "gmosNorthImaging": {
-                        "filters": ["I_PRIME", "Z_PRIME"],
-                        "initialFilters": ["G_PRIME", "R_PRIME"]
+                        "filters": [
+                          { "filter": "I_PRIME" },
+                          { "filter": "Z_PRIME" }
+                        ],
+                        "initialFilters": [
+                          { "filter": "G_PRIME" },
+                          { "filter": "R_PRIME" }
+                        ]
                       }
                     }
                   }

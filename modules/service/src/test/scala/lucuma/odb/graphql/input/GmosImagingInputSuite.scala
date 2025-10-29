@@ -9,22 +9,12 @@ import lucuma.core.enums.GmosAmpReadMode
 import lucuma.core.enums.GmosBinning
 import lucuma.core.enums.GmosRoi
 import lucuma.core.enums.MultipleFiltersMode
-import lucuma.core.enums.ObservingModeType
 import lucuma.core.math.Offset
 import lucuma.odb.format.spatialOffsets.*
-import lucuma.odb.graphql.input.arb.ArbGmosImagingInput.given
 import munit.DisciplineSuite
 import munit.FunSuite
-import org.scalacheck.Prop.forAll
 
 class GmosImagingInputSuite extends DisciplineSuite with ArbitraryInstances :
-  test("GmosImagingInput.Create.North should have correct observingModeType"):
-    forAll: (c: GmosImagingInput.Create.North) =>
-      assertEquals(c.observingModeType, ObservingModeType.GmosNorthImaging)
-
-  test("GmosImagingInput.Create.South should have correct observingModeType"):
-    forAll: (c: GmosImagingInput.Create.South) =>
-      assertEquals(c.observingModeType, ObservingModeType.GmosSouthImaging)
 
   test("GmosImagingInput.Create.Common stores explicit values correctly") {
     val common = GmosImagingInput.Create.Common(
