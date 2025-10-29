@@ -220,6 +220,132 @@ class observationEdit extends OdbSuite with SubscriptionUtils {
         """
       ).void
 
+  def requirementsExposureTimeModeObservationEdit(etm: Json): Json =
+    json"""
+      {
+        "observationEdit": {
+          "editType": "UPDATED",
+          "value": {
+            "scienceRequirements": {
+              "exposureTimeMode": $etm
+            }
+          }
+        }
+      }
+    """
+
+  val signalToNoiseObservationEdit: Json =
+    val sn = json"""
+      {
+        "signalToNoise": {
+          "value": 100.000,
+          "at": {
+            "picometers": 650000
+          }
+        },
+        "timeAndCount": null
+      }
+    """
+    requirementsExposureTimeModeObservationEdit(sn)
+
+  val timeAndCountObservationEdit: Json =
+    val tc = json"""
+      {
+        "signalToNoise": null,
+        "timeAndCount": {
+          "time": {
+            "microseconds": 600000000
+          },
+          "count": 3,
+          "at": {
+            "picometers": 650000
+          }
+        }
+      }
+    """
+    requirementsExposureTimeModeObservationEdit(tc)
+
+  def updateRequirementsExposureTimeMode(user: User, oid: Observation.Id, etm: String): IO[Unit] =
+    sleep >>
+      query(
+        user = user,
+        query = s"""
+          mutation {
+            updateObservations(input: {
+              SET: {
+                scienceRequirements: {
+                  exposureTimeMode: $etm
+                }
+              },
+              WHERE: { id: { EQ: "$oid" } }
+            }) {
+              observations {
+                id
+              }
+            }
+          }
+        """
+      ).void
+  
+  def signalToNoiseUpdate(user: User, obsId: Observation.Id): IO[Unit] =
+    val sn = s"""
+      {
+        signalToNoise: {
+          value: 100,
+          at: {
+            picometers: 650000
+          }
+        }
+      }
+    """
+    updateRequirementsExposureTimeMode(user, obsId, sn)
+
+  def timeAndCountUpdate(user: User, obsId: Observation.Id): IO[Unit] =
+    val tc = s"""
+      {
+        timeAndCount: {
+          time: {
+            microseconds: 600000000
+          },
+          count: 3,
+          at: {
+            picometers: 650000
+          }
+        }
+      }
+    """
+    updateRequirementsExposureTimeMode(user, obsId, tc)
+  
+  val requirementsExposureTimeModeSubscription =
+    s"""
+      subscription {
+        observationEdit {
+          editType
+          value {
+            scienceRequirements {
+              exposureTimeMode {
+                signalToNoise {
+                  value
+                  at {
+                    picometers
+                  }
+                }
+                timeAndCount {
+                  time {
+                    microseconds
+                  }
+                  count
+                  at {
+                    picometers
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    """
+
   test("trigger for my own new observations") {
     import Group1._
     List(pi, guest, service).traverse { user =>
@@ -492,6 +618,26 @@ class observationEdit extends OdbSuite with SubscriptionUtils {
           """,
           calibrationDeleted(oid)
         )
+      )
+    } yield ()
+  }
+
+  test("triggers for adding/editing/deleting science requirements exposure time mode") {
+    import Group1.pi
+    for {
+      pid <- createProgram(pi, "foo")
+      oid <- createObservationAs(pi, pid)
+      _   <- subscriptionExpect(
+        user      = pi,
+        query     = requirementsExposureTimeModeSubscription,
+        mutations = Right(
+          signalToNoiseUpdate(pi, oid) >>
+          timeAndCountUpdate(pi, oid) >>
+          updateRequirementsExposureTimeMode(pi, oid, "null")),
+        expected  = List(
+          signalToNoiseObservationEdit,
+          timeAndCountObservationEdit,
+          requirementsExposureTimeModeObservationEdit(Json.Null))
       )
     } yield ()
   }
