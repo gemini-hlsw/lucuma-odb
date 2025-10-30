@@ -69,6 +69,7 @@ trait GroupMapping[F[_]] extends GroupView[F] with ProgramTable[F] with GroupEle
 
       SqlField("existence", GroupView.Existence),
       SqlField("system", GroupView.System),
+      SqlField("calibrationRoles", GroupView.CalibrationRoles),
     )
 
   lazy val GroupElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
