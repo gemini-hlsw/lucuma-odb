@@ -28,7 +28,7 @@ trait CustomSedDatResolver[F[_]: Concurrent] extends CustomSed.Resolver[F]:
   private val Comment    = "\\s*#.*"
 
   private def parseLine(line: String): Either[String, (Wavelength, BigDecimal)] =
-    line.split(Delimiters).take(2) match
+    line.trim.split(Delimiters).take(2) match
       case Array(wavelength, density) =>
         val w: Either[String, Wavelength] =
           wavelength.toDoubleOption

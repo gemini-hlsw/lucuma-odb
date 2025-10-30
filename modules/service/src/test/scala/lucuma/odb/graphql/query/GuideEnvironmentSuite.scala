@@ -5,16 +5,25 @@ package lucuma.odb.graphql
 package query
 
 import cats.effect.IO
+import cats.syntax.all.*
+import io.circe.Json
+import io.circe.literal.*
+import io.circe.syntax.*
 import lucuma.ags.GuideStarName
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.User
+import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 
 trait GuideEnvironmentSuite extends ExecutionTestSupport:
 
   val gaiaSuccess: Timestamp = Timestamp.FromString.getOption("2023-08-30T00:00:00Z").get
+
+  // Common time and duration constants for guide environment validation
+  val setupTime: TimeSpan = TimeSpan.fromMinutes(16).get
+  val fullTimeEstimate: TimeSpan = TimeSpan.parse("PT36M1.8S").toOption.get
 
   val defaultTargetId: Long = 3219118090462918016L
   val otherTargetId: Long = 3219142829474535424L
@@ -437,5 +446,126 @@ trait GuideEnvironmentSuite extends ExecutionTestSupport:
         }
       }
     """
+
+  // Helper method to set blind offset target via GraphQL mutation
+  def setBlindOffsetViaGraphQL(
+    user: User,
+    oid: Observation.Id,
+    name: String,
+    ra: String,
+    dec: String
+  ): IO[Unit] =
+    query(
+      user = user,
+      query =
+        s"""
+          mutation {
+            updateObservations(input: {
+              WHERE: { id: { EQ: "$oid" } }
+              SET: {
+                targetEnvironment: {
+                  blindOffsetTarget: {
+                    name: ${name.asJson}
+                    sidereal: {
+                      ra: { degrees: $ra }
+                      dec: { degrees: $dec }
+                      epoch: "J2000.000"
+                    }
+                    sourceProfile: {
+                      point: {
+                        bandNormalized: {
+                          sed: { stellarLibrary: B5_III }
+                          brightnesses: [
+                            {
+                              band: R
+                              value: 15.0
+                              units: VEGA_MAGNITUDE
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }) {
+              observations { id }
+            }
+          }
+        """
+    ).void
+
+  // Common expected JSON result for successful guide environment query
+  val successfulGuideEnvironmentResult: Either[List[String], Json] =
+    json"""
+    {
+      "observation": {
+        "title": "V1647 Orionis",
+        "targetEnvironment": {
+          "guideEnvironment": {
+            "posAngle": {
+              "degrees": 180.000000
+            },
+            "guideTargets": [
+              {
+                "name": "Gaia DR3 3219118090462918016",
+                "probe": "GMOS_OIWFS",
+                "sourceProfile": {
+                  "point": {
+                    "bandNormalized": {
+                      "brightnesses": [
+                        {
+                          "band": "GAIA_RP"
+                        }
+                      ]
+                    }
+                  }
+                },
+                "sidereal": {
+                  "catalogInfo": {
+                    "name": "GAIA",
+                    "id": "3219118090462918016",
+                    "objectType": null
+                  },
+                  "epoch": "J2023.660",
+                  "ra": {
+                    "microseconds": 20782434012,
+                    "hms": "05:46:22.434012",
+                    "hours": 5.772898336666666666666666666666667,
+                    "degrees": 86.59347505
+                  },
+                  "dec": {
+                    "dms": "-00:08:52.651136",
+                    "degrees": 359.8520413511111,
+                    "microarcseconds": 1295467348864
+                  },
+                  "radialVelocity": {
+                    "metersPerSecond": 0,
+                    "centimetersPerSecond": 0,
+                    "kilometersPerSecond": 0
+                  },
+                  "properMotion": {
+                    "ra": {
+                      "microarcsecondsPerYear": 438,
+                      "milliarcsecondsPerYear": 0.438
+                    },
+                    "dec": {
+                      "microarcsecondsPerYear": -741,
+                      "milliarcsecondsPerYear": -0.741
+                    }
+                  },
+                  "parallax": {
+                    "microarcseconds": 2432,
+                    "milliarcseconds": 2.432
+                  }
+                },
+                "nonsidereal": null
+              }
+            ]
+          }
+        }
+      }
+    }
+    """.asRight
 
   def createObservationAs(user: User, pid: Program.Id, tids: List[Target.Id]): IO[Observation.Id]
