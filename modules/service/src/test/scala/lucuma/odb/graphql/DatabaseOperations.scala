@@ -1475,7 +1475,8 @@ trait DatabaseOperations { this: OdbSuite =>
     minRequired: Option[NonNegShort] = None,
     minimumInterval: Option[TimeSpan] = None,
     maximumInterval: Option[TimeSpan] = None,
-    initialContents: Option[List[Either[Group.Id, Observation.Id]]] = None
+    initialContents: Option[List[Either[Group.Id, Observation.Id]]] = None,
+    name: Option[String] = None
   ): IO[Group.Id] =
     query(
       user = user,
@@ -1490,6 +1491,7 @@ trait DatabaseOperations { this: OdbSuite =>
                 minimumRequired: ${minRequired.map(_.value).asJson.spaces2}
                 ${minimumInterval.foldMap(ts => s"minimumInterval: { microseconds: \"${ts.toMicroseconds}\" }")}
                 ${maximumInterval.foldMap(ts => s"maximumInterval: { microseconds: \"${ts.toMicroseconds}\" }")}
+                ${name.foldMap(n => s"name: ${n.asJson.spaces2}")}
               }
               ${
                 initialContents.foldMap: es =>

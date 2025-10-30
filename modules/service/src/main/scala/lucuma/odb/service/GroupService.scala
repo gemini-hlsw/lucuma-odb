@@ -42,7 +42,11 @@ import Services.Syntax.*
 trait GroupService[F[_]] {
   def createGroup(input: CreateGroupInput, system: Boolean = false, calibrationRoles: List[CalibrationRole] = Nil)(using Transaction[F]): F[Result[Group.Id]]
   def updateGroups(SET: GroupPropertiesInput.Edit, which: AppliedFragment)(using Transaction[F]): F[Result[List[Group.Id]]]
-  def selectGroups(programId: Program.Id)(using Transaction[F]): F[GroupTree]
+  def selectGroups(
+    programId: Program.Id,
+    groupFilter: AppliedFragment = void"",
+    obsFilter: AppliedFragment = sql"c_existence = $existence"(Existence.Present)
+  )(using Transaction[F]): F[GroupTree]
   def selectPid(groupId: Group.Id)(using Transaction[F]): F[Option[Program.Id]]
   def cloneGroup(input: CloneGroupInput)(using Transaction[F]): F[Result[Group.Id]]
   def selectAllObservations(groupId: Group.Id)(using Transaction[F]): F[List[Observation.Id]]
@@ -230,7 +234,11 @@ object GroupService {
       def openHole(pid: Program.Id, gid: Option[Group.Id], index: Option[NonNegShort])(using Transaction[F]): F[NonNegShort] =
         session.prepareR(Statements.OpenHole).use(_.unique(pid, gid, index))
 
-      def selectGroups(programId: Program.Id)(using Transaction[F]): F[GroupTree] = {
+      def selectGroups(
+        programId: Program.Id,
+        groupFilter: AppliedFragment = void"",
+        obsFilter: AppliedFragment = sql"c_existence = $existence"(Existence.Present)
+      )(using Transaction[F]): F[GroupTree] = {
 
         def mkTree(m: Map[Option[Group.Id], List[GroupTree.Child]]): GroupTree = {
 
@@ -246,9 +254,22 @@ object GroupService {
           GroupTree.Root(programId, mapChildren(m.get(none[Group.Id]).toList.flatten))
         }
 
+        val groupsQuery = Statements.SelectGroups(programId, groupFilter)
+        val obsQuery = Statements.SelectObservations(programId, obsFilter)
+
+        val groupDecoder = (group_id.opt *: int2_nonneg *: Statements.branch).map {
+          case (gid, index, branch) => (gid, index, branch)
+        }
+        val obsDecoder = (group_id.opt *: int2_nonneg *: observation_id)
+          .map { case (gid, index, oid) => (gid, index, GroupTree.Leaf(oid)) }
+
         for {
-          gs <- session.execute(Statements.SelectGroups)(programId)
-          os <- session.execute(Statements.SelectObservations)(programId)
+          gs <- session.prepareR(groupsQuery.fragment.query(groupDecoder)).use { ps =>
+                  ps.stream(groupsQuery.argument, 1024).compile.toList
+                }
+          os <- session.prepareR(obsQuery.fragment.query(obsDecoder)).use { ps =>
+                  ps.stream(obsQuery.argument, 1024).compile.toList
+                }
         } yield mkTree((gs ++ os).groupBy(_._1).view.mapValues(_.sortBy(_._2.value).map(_._3)).toMap)
 
       }
@@ -353,7 +374,7 @@ object GroupService {
           GroupTree.Branch(gid, minRequired, ordered, Nil, name, description, minInterval, maxInterval, system, calibrationRoles)
       }
 
-    val SelectGroups: Query[Program.Id, (Option[Group.Id], NonNegShort, GroupTree.Branch)] =
+    def SelectGroups(pid: Program.Id, filter: AppliedFragment): AppliedFragment =
       sql"""
         SELECT
           c_parent_id,
@@ -371,9 +392,10 @@ object GroupService {
           t_group
         WHERE
           c_program_id = $program_id
-      """.query(group_id.opt *: int2_nonneg *: branch)
+      """.apply(pid) |+|
+      (if filter.fragment.sql.isEmpty then void"" else void" AND " |+| filter)
 
-    val SelectObservations: Query[Program.Id, (Option[Group.Id], NonNegShort, GroupTree.Leaf)] =
+    def SelectObservations(pid: Program.Id, filter: AppliedFragment): AppliedFragment =
       sql"""
         SELECT
           c_group_id,
@@ -382,9 +404,9 @@ object GroupService {
         FROM
           t_observation
         WHERE
-          c_program_id = $program_id AND c_existence = 'present'
-      """.query(group_id.opt *: int2_nonneg *: observation_id)
-         .map { case (gid, index, oid) => (gid, index, GroupTree.Leaf(oid)) }
+          c_program_id = $program_id
+      """.apply(pid) |+|
+      (if filter.fragment.sql.isEmpty then void"" else void" AND " |+| filter)
 
     val SelectPid: Query[Group.Id, Program.Id] =
       sql"""

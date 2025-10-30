@@ -45,7 +45,7 @@ object PerScienceObservationCalibrationsService:
         tree: GroupTree,
         oid:  Observation.Id
       ): Option[Group.Id] =
-        tree.findGroupContaining(
+        tree.collectGroups(
           oid,
           b => b.system && b.calibrationRoles.exists(_ == CalibrationRole.Telluric)
         )
@@ -54,7 +54,7 @@ object PerScienceObservationCalibrationsService:
         tree: GroupTree,
         oid:  Observation.Id
       ): Option[Group.Id] =
-        tree.findGroupContaining(oid, b => !b.system)
+        tree.collectGroups(oid, b => !b.system)
 
       private def f2TelluricGroup(
         pid:           Program.Id,
@@ -85,7 +85,7 @@ object PerScienceObservationCalibrationsService:
         )
 
       private def telluricGroups(tree: GroupTree): List[(Group.Id, List[Observation.Id])] =
-        tree.findGroupsWithObservations(b => b.system && b.calibrationRoles.contains(CalibrationRole.Telluric))
+        tree.collectObservations(b => b.system && b.calibrationRoles.contains(CalibrationRole.Telluric))
 
       override def generateCalibrations(
         pid:        Program.Id,
@@ -97,25 +97,14 @@ object PerScienceObservationCalibrationsService:
         for
           _                 <- S.session.execute(sql"set constraints all deferred".command)
           // All telluric program groups
-          initialTelluricGroups <- groupService.selectGroups(pid).map(telluricGroups)
-          // Query database directly for ALL observations in ALL telluric groups in a single query
-          // This is necessary because the tree only includes observations with c_existence = 'present'
-          allObsInGroups    <- initialTelluricGroups.map(_._1) match
-                                 case Nil => Map.empty[Group.Id, List[Observation.Id]].pure[F]
-                                 case gids =>
-                                   val enc = group_id.list(gids.length)
-                                   S.session.prepareR(
-                                     sql"""
-                                       SELECT c_group_id, c_observation_id
-                                       FROM t_observation
-                                       WHERE c_group_id IN ($enc)
-                                     """.query(group_id *: observation_id)
-                                   ).use { ps =>
-                                     ps.stream(gids, 1024)
-                                       .compile
-                                       .toList
-                                       .map(_.groupMap(_._1)(t => t._2))
-                                   }
+          initialTelluricGroups <- groupService.selectGroups(
+                           pid,
+                           obsFilter = void""
+                         ).map(telluricGroups)
+          // Extract all observations from the tree (now includes deleted observations)
+          allObsInGroups    = initialTelluricGroups.map { case (gid, obsIds) =>
+                              (gid, obsIds.toList)
+                            }.toMap
           // Collect all observations that need unlinking (not in current science set)
           obsToUnlink       = allObsInGroups.values.flatten.filterNot(currentObsIds.contains).toList
           // Batch unlink all observations using group_move_observation
@@ -142,20 +131,3 @@ object PerScienceObservationCalibrationsService:
                                    )(_ => ().pure[F])
                                }
         yield List.empty // no calibs yet
-
-      object Statements:
-        val m = 1
-        // val GroupObs: Query[(Program.Id, Create), ProgramNote.Id] = ???
-                                   // val enc = group_id.list(gids.length)
-                                   // S.session.prepareR(
-                                   //   sql"""
-                                   //     SELECT c_group_id, c_observation_id
-                                   //     FROM t_observation
-                                   //     WHERE c_group_id IN ($enc)
-                                   //   """.query(group_id *: observation_id)
-                                   // ).use { ps =>
-                                   //   ps.stream(gids, 1024)
-                                   //     .compile
-                                   //     .toList
-                                   //     .map(_.groupMap(_._1)(t => t._2))
-                                   // }

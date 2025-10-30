@@ -33,7 +33,7 @@ sealed trait GroupTree extends Product with Serializable {
     go(List(this))
   }
 
-  def findGroupsWithObservations(
+  def collectObservations(
     predicate: GroupTree.Branch => Boolean
   ): List[(Group.Id, List[Observation.Id])] = {
     @scala.annotation.tailrec
@@ -57,7 +57,7 @@ sealed trait GroupTree extends Product with Serializable {
     go(List(this), Nil)
   }
 
-  def findGroupContaining(
+  def collectGroups(
     oid: Observation.Id,
     predicate: GroupTree.Branch => Boolean
   ): Option[Group.Id] = {
