@@ -43,9 +43,9 @@ sealed trait GroupTree extends Product with Serializable {
     ): List[(Group.Id, List[Observation.Id])] =
       remaining match
         case Nil => acc.reverse
-        case GroupTree.Leaf(_) :: tail =>
+        case GroupTree.Leaf(_) :: tail                                          =>
           go(tail, acc)
-        case GroupTree.Root(_, children) :: tail =>
+        case GroupTree.Root(_, children) :: tail                                =>
           go(children ::: tail, acc)
         case (b @ GroupTree.Branch(groupId = gid, children = children)) :: tail =>
           val observations = children.collect:
@@ -65,9 +65,9 @@ sealed trait GroupTree extends Product with Serializable {
     def go(remaining: List[GroupTree]): Option[Group.Id] =
       remaining match
         case Nil => None
-        case GroupTree.Leaf(_) :: tail =>
+        case GroupTree.Leaf(_) :: tail                                          =>
           go(tail)
-        case GroupTree.Root(_, children) :: tail =>
+        case GroupTree.Root(_, children) :: tail                                =>
           go(children ::: tail)
         case (b @ GroupTree.Branch(groupId = gid, children = children)) :: tail =>
           val hasObs = children.exists:

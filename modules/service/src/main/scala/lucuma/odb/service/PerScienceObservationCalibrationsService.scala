@@ -20,6 +20,7 @@ import lucuma.odb.graphql.input.GroupPropertiesInput
 import lucuma.odb.service.Services.ServiceAccess
 import lucuma.odb.util.Codecs.*
 import org.http4s.client.Client
+import skunk.AppliedFragment
 import skunk.Transaction
 import skunk.syntax.all.*
 
@@ -56,7 +57,7 @@ object PerScienceObservationCalibrationsService:
       ): Option[Group.Id] =
         tree.collectGroups(oid, b => !b.system)
 
-      private def f2TelluricGroup(
+      private def newTelluricGroup(
         pid:           Program.Id,
         config:        CalibrationConfigSubset,
         oid:           Observation.Id,
@@ -87,6 +88,11 @@ object PerScienceObservationCalibrationsService:
       private def telluricGroups(tree: GroupTree): List[(Group.Id, List[Observation.Id])] =
         tree.collectObservations(b => b.system && b.calibrationRoles.contains(CalibrationRole.Telluric))
 
+      def moveObservationOut(oid: Observation.Id) =
+        S.session
+          .prepareR(Statements.groupMove)
+          .use(_.unique((oid, None, None)))
+
       override def generateCalibrations(
         pid:        Program.Id,
         scienceObs: List[ObsExtract[CalibrationConfigSubset]]
@@ -96,38 +102,44 @@ object PerScienceObservationCalibrationsService:
 
         for
           _                 <- S.session.execute(sql"set constraints all deferred".command)
-          // All telluric program groups
-          initialTelluricGroups <- groupService.selectGroups(
-                           pid,
-                           obsFilter = void""
-                         ).map(telluricGroups)
-          // Extract all observations from the tree (now includes deleted observations)
-          allObsInGroups    = initialTelluricGroups.map { case (gid, obsIds) =>
-                              (gid, obsIds.toList)
-                            }.toMap
-          // Collect all observations that need unlinking (not in current science set)
-          obsToUnlink       = allObsInGroups.values.flatten.filterNot(currentObsIds.contains).toList
-          // Batch unlink all observations using group_move_observation
-          _                 <- obsToUnlink.traverse_ { oid =>
-                                 S.session.prepareR(sql"SELECT group_move_observation($observation_id, ${group_id.opt}, ${int2_nonneg.opt})".query(void)).use { ps =>
-                                   ps.unique((oid, None, None))
-                                 }
-                               }
-          // Reload tree to see which groups are now empty after unlinking
-          treeAfterUnlink   <- groupService.selectGroups(pid)
-          existingAfter     = telluricGroups(treeAfterUnlink)
-          // Delete empty system groups
-          // Note: We must use deleteSystemGroup to properly manage parent group indices
-          _                 <- existingAfter
-                                 .filter(_._2.isEmpty)
-                                 .traverse_ { (gid, _) =>
-                                   groupService.deleteSystemGroup(pid, gid).void
-                                 }
+          // Telluric groups with all observations
+          telluricGroups    <- groupService.selectGroups(
+                                    pid,
+                                    groupFilter = Statements.telluricGroup,
+                                    obsFilter = void""
+                                  ).map(telluricGroups)
+          allObsInGroups    = telluricGroups.toMap
+          // Obervations to remove (not telluric nymore)
+          obsToUnlink       = allObsInGroups.values.flatten.filterNot(a => currentObsIds.exists(_ === a))
+          // remove observations from the groups using group_move_observation
+          _                 <- obsToUnlink.toList.traverse_ : oid =>
+                                 moveObservationOut(oid)
+          // Compute which groups are now empty
+          emptyGroupIds     = allObsInGroups.collect:
+                                case (gid, obsIds) if obsIds.forall(o => obsToUnlink.toSet.exists(_ === o)) =>
+                                  gid
+          // Delete empty system groups using deleteSystemGroup
+          _                 <- emptyGroupIds.toList.traverse_ : gid =>
+                                 groupService.deleteSystemGroup(pid, gid)
+          // Reload tree once for group creation step
+          currentGroups  <- groupService.selectGroups(pid)
           // Create or verify system groups for current F2 observations
-          _                 <- scienceObs.traverse_ { obs =>
-                                 findSystemGroupForObservation(treeAfterUnlink, obs.id)
+          _                 <- scienceObs.traverse_ : obs =>
+                                 findSystemGroupForObservation(currentGroups, obs.id)
                                    .fold(
-                                     f2TelluricGroup(pid, obs.data, obs.id, findParentGroupForObservation(treeAfterUnlink, obs.id)).void
+                                     newTelluricGroup(
+                                       pid,
+                                       obs.data,
+                                       obs.id,
+                                       findParentGroupForObservation(currentGroups, obs.id)
+                                     ).void
                                    )(_ => ().pure[F])
-                               }
         yield List.empty // no calibs yet
+
+      object Statements:
+        // Filter to fetch only telluric system groups
+        val telluricGroup: AppliedFragment =
+          void"c_system = true AND c_calibration_roles = ARRAY['telluric']::e_calibration_role[]"
+
+        val groupMove =
+          sql"select group_move_observation($observation_id, ${group_id.opt}, ${int2_nonneg.opt})".query(void)

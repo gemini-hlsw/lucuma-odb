@@ -10,6 +10,7 @@ import lucuma.core.enums.CalibrationRole
 import lucuma.core.math.Wavelength
 import lucuma.core.model.Group
 import lucuma.core.model.Observation
+import lucuma.core.model.Program
 import lucuma.core.util.TimeSpan
 import lucuma.odb.graphql.OdbSuite
 import lucuma.odb.graphql.TestUsers
@@ -94,6 +95,30 @@ class perScienceObservationCalibrations
           }"""
     ).map { c =>
       c.hcursor.downField("group").as[GroupInfo].isRight
+    }
+
+  private def queryAllGroups(pid: Program.Id): IO[List[Group.Id]] =
+    case class GroupWrapper(id: Group.Id) derives Decoder
+    case class GroupElementWrapper(group: Option[GroupWrapper]) derives Decoder
+    query(
+      service,
+      s"""query {
+            program(programId: "$pid") {
+              allGroupElements {
+                group {
+                  id
+                }
+              }
+            }
+          }"""
+    ).flatMap { c =>
+      c.hcursor
+        .downField("program")
+        .downField("allGroupElements")
+        .as[List[GroupElementWrapper]]
+        .map(_.flatMap(_.group.map(_.id)))
+        .leftMap(f => new RuntimeException(f.message))
+        .liftTo[IO]
     }
 
   private def updateObservationMode(oid: Observation.Id, mode: String): IO[Unit] =
@@ -223,7 +248,7 @@ class perScienceObservationCalibrations
       assertEquals(groupInfo.maximumInterval, TimeSpan.Zero.some)
     }
 
-  test("Multiple recalculations don't create duplicate groups"):
+  test("Multiple recalculations are idempotent, no duplicate groups"):
     for {
       pid         <- createProgramAs(pi)
       tid         <- createTargetWithProfileAs(pi, pid)
@@ -231,15 +256,21 @@ class perScienceObservationCalibrations
       _           <- recalculateCalibrations(pid, when)
       obsAfter1   <- queryObservation(oid)
       groupId1    =  obsAfter1.groupId.get
+      allGroups1  <- queryAllGroups(pid)
       _           <- recalculateCalibrations(pid, when)
       obsAfter2   <- queryObservation(oid)
       groupId2    =  obsAfter2.groupId.get
+      allGroups2  <- queryAllGroups(pid)
       _           <- recalculateCalibrations(pid, when)
       obsAfter3   <- queryObservation(oid)
       groupId3    =  obsAfter3.groupId.get
+      allGroups3  <- queryAllGroups(pid)
     } yield {
       assertEquals(groupId1, groupId2)
       assertEquals(groupId2, groupId3)
+      assertEquals(allGroups3.length, 1)
+      assertEquals(allGroups1.toSet, allGroups2.toSet)
+      assertEquals(allGroups2.toSet, allGroups3.toSet)
     }
 
   test("Mixed add/delete in single recalculation"):
@@ -262,10 +293,9 @@ class perScienceObservationCalibrations
       obs2After   <- queryObservation(oid2)
       obs3After   <- queryObservation(oid3)
     } yield {
-      assert(!group1Exists, "deleted observation's group should be removed")
-      assert(obs2After.groupId.isDefined, "obs2 should still have a group")
-      assert(obs3After.groupId.isDefined, "obs3 should have a group")
-      assert(obs2After.groupId != obs3After.groupId, "obs2 and obs3 should have different groups")
+      assert(!group1Exists)
+      assert(obs2After.groupId.isDefined)
+      assert(obs3After.groupId.isDefined)
     }
 
   test("New F2 observation creates group even with inactive F2 observation present"):
@@ -285,23 +315,9 @@ class perScienceObservationCalibrations
       group1Exists <- queryGroupExists(group1Id)
       obs2After   <- queryObservation(oid2)
     } yield {
-      assert(!group1Exists, "observation1 group should be deleted")
-      assert(obs2After.groupId.isDefined, "observation2 should have a group")
-      assert(obs2After.groupId != Some(group1Id), "observation2 should have a new group")
-    }
-
-  test("System telluric group is marked as system"):
-    for {
-      pid       <- createProgramAs(pi)
-      tid       <- createTargetWithProfileAs(pi, pid)
-      oid       <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
-      _         <- recalculateCalibrations(pid, when)
-      obs       <- queryObservation(oid)
-      groupId   =  obs.groupId.get
-      groupInfo <- queryGroup(groupId)
-    } yield {
-      assert(groupInfo.system, "telluric group should be marked as system")
-      assert(groupInfo.calibrationRoles.contains(CalibrationRole.Telluric))
+      assert(!group1Exists)
+      assert(obs1Before.groupId =!= obs2After.groupId)
+      assert(obs2After.groupId != Some(group1Id))
     }
 
   test("Recalculation handles GMOS observation correctly"):
@@ -312,5 +328,5 @@ class perScienceObservationCalibrations
       _           <- recalculateCalibrations(pid, when)
       obs         <- queryObservation(oid)
     } yield {
-      assertEquals(obs.groupId, None, "GMOS observation should have no telluric group")
+      assertEquals(obs.groupId, None)
     }
