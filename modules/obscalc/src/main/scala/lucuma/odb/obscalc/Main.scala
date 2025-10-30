@@ -37,6 +37,7 @@ import lucuma.odb.service.UserService
 import lucuma.odb.util.LucumaEntryPoint
 import natchez.Trace
 import org.http4s.Credentials
+import org.http4s.client.Client
 import org.http4s.headers.Authorization
 import org.typelevel.ci.CIString
 import org.typelevel.log4cats.Logger
@@ -141,13 +142,14 @@ object CalcMain extends MainParams:
     commitHash:       CommitHash,
     pollPeriod:       FiniteDuration,
     itcClient:        ItcClient[F],
+    httpClient:       Client[F],
     timeEstimate:     TimeEstimateCalculatorImplementation.ForInstrumentMode,
     topic:            Topic[F, ObscalcTopic.Element],
     services:         Resource[F, Services[F]]
   ): Resource[F, F[Outcome[F, Throwable, Unit]]] =
 
     val obscalc: Services[F] ?=> ObscalcService[F] =
-      obscalcService(commitHash, itcClient, timeEstimate)
+      obscalcService(commitHash, itcClient, timeEstimate, httpClient)
 
     // Stream of pending calc produced by watching for updates to t_obscalc.
     // We filter out anything but transitions to Pending.  Entries in the Retry
@@ -206,7 +208,7 @@ object CalcMain extends MainParams:
       o <- calcAndUpdateStream.compile.drain.background
     yield o
 
-  def services[F[_]: Concurrent: Parallel: UUIDGen: Trace: Logger](
+  def services[F[_]: Temporal: Parallel: UUIDGen: Trace: Logger](
     user:    User,
     enums:   Enums,
     mapping: Session[F] => Mapping[F]
@@ -236,7 +238,7 @@ object CalcMain extends MainParams:
       t     <- topic(pool)
       user  <- Resource.eval(serviceUser[F](c))
       mapping = (s: Session[F]) => OdbMapping.forObscalc(Resource.pure(s), SkunkMonitor.noopMonitor[F], user, c.goaUsers, gaiaClient, itc, c.commitHash, enums, ptc, http, c.email)
-      o     <- runObscalcDaemon(c.database.maxObscalcConnections, c.commitHash, c.obscalcPoll, itc, ptc, t, pool.evalMap(services(user, enums, mapping)))
+      o     <- runObscalcDaemon(c.database.maxObscalcConnections, c.commitHash, c.obscalcPoll, itc, http, ptc, t, pool.evalMap(services(user, enums, mapping)))
     yield o
 
   /** Our logical entry point. */

@@ -83,7 +83,7 @@ object TimeEstimateService:
     httpClient:   Client[F]
   )(using Services[F], Logger[F]): TimeEstimateService[F] =
     lazy val obscalcService: ObscalcService[F] =
-      services.obscalcService(commitHash, itcClient, calculator)
+      services.obscalcService(commitHash, itcClient, calculator, httpClient)
 
     new TimeEstimateService[F]:
 

@@ -194,7 +194,7 @@ trait AccessControl[F[_]] extends Predicates[F] {
     Services.asSuperUser:
       writableOids(includeDeleted, WHERE, includeCalibrations)
         .flatTraverse: which =>
-          observationWorkflowService.filterState(
+          observationWorkflowService(httpClient).filterState(
             which, 
             allowedStates,
             commitHash,
@@ -299,7 +299,7 @@ trait AccessControl[F[_]] extends Predicates[F] {
           WHERE.getOrElse(True)
         ))
       ).flatTraverse: which =>
-        observationWorkflowService.filterTargets(
+        observationWorkflowService(httpClient).filterTargets(
           which,
           allowedStates,
           commitHash,
@@ -718,7 +718,7 @@ trait AccessControl[F[_]] extends Predicates[F] {
   def selectForUpdate(input: SetObservationWorkflowStateInput)(using Services[F], NoTransaction[F]): F[Result[CheckedWithId[(ObservationWorkflow, ObservationWorkflowState), Observation.Id]]] =
     verifyWritable(input.observationId) >>
     Services.asSuperUser:
-      observationWorkflowService.getWorkflows(List(input.observationId), commitHash, itcClient, timeEstimateCalculator)
+      observationWorkflowService(httpClient).getWorkflows(List(input.observationId), commitHash, itcClient, timeEstimateCalculator)
         .map: res =>
           res.map(_(input.observationId)).flatMap: w =>
             if w.state === input.state || w.validTransitions.contains(input.state)

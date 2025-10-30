@@ -660,7 +660,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
             case r @ Warning(problems, AccessControl.Checked.Empty) => Failure(problems).pure[F]
             case other =>
               other.flatTraverse: checked =>
-                guideService(gaiaClient, itcClient, commitHash, timeEstimateCalculator)
+                guideService(gaiaClient, itcClient, commitHash, timeEstimateCalculator, httpClient)
                   .setGuideTargetName(checked)
                   .nestMap: oid =>
                     Unique(Filter(Predicates.setGuideTargetNameResult.observationId.eql(oid), child))
@@ -670,7 +670,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
       services.useNonTransactionally:
         selectForUpdate(input).flatMap: res =>
           res.flatTraverse: checked =>
-            observationWorkflowService.setWorkflowState(checked, commitHash, itcClient, timeEstimateCalculator)
+            observationWorkflowService(httpClient).setWorkflowState(checked, commitHash, itcClient, timeEstimateCalculator)
 
   private lazy val SetProgramReference =
     MutationField("setProgramReference", SetProgramReferenceInput.Binding): (input, child) =>

@@ -109,7 +109,7 @@ trait DatabaseOperations { this: OdbSuite =>
         .flatMap: tec =>
           given Services[IO] = services
           requireServiceAccessOrThrow:
-            val srv  = obscalcService(CommitHash.Zero, itcClient, tec)
+            val srv  = obscalcService(CommitHash.Zero, itcClient, tec, httpClient)
             val when =
               services.transactionally:
                 srv
@@ -1156,7 +1156,7 @@ trait DatabaseOperations { this: OdbSuite =>
                 name: "$name"
                 nonsidereal: {
                   keyType: COMET
-                  des: "foo"
+                  des: "1P"
                 }
                 $sourceProfile
               }

@@ -309,6 +309,7 @@ trait ObservingModeSetupOperations extends DatabaseOperations { this: OdbSuite =
       Map(
         TargetType.Sidereal    -> ((u, p) => createTargetWithProfileAs(u, p)),
         TargetType.Opportunity -> ((u, p) => createOpportunityTargetAs(u, p)),
+        TargetType.Nonsidereal -> ((u, p) => createNonsiderealTargetAs(u, p)),
       )
   )(body: (TargetType, (User, Program.Id) => IO[Target.Id]) => Any) =
     ctors.foreach: (tt, fun) =>
