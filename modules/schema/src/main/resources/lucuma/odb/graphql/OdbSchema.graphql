@@ -10119,6 +10119,11 @@ enum ImageQualityPreset {
   ONE_POINT_ZERO
 
   """
+  ImageQualityPreset OnePointZero
+  """
+  ONE_POINT_TWO
+
+  """
   ImageQualityPreset OnePointFive
   """
   ONE_POINT_FIVE
