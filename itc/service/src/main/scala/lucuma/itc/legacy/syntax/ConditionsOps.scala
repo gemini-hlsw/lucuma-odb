@@ -6,22 +6,8 @@ package lucuma.itc.legacy.syntax
 import lucuma.core.enums.SkyBackground
 import lucuma.core.enums.WaterVapor
 import lucuma.core.model.CloudExtinction
-import lucuma.core.model.ImageQuality
 
 trait ConditionsSyntax:
-  extension (self: ImageQuality.Preset)
-    def ocs2Tag: String =
-      self match
-        case ImageQuality.Preset.PointOne     => "PERCENT_20"
-        case ImageQuality.Preset.PointTwo     => "PERCENT_20"
-        case ImageQuality.Preset.PointThree   => "PERCENT_20"
-        case ImageQuality.Preset.PointFour    => "PERCENT_20"
-        case ImageQuality.Preset.PointSix     => "PERCENT_70"
-        case ImageQuality.Preset.PointEight   => "PERCENT_70"
-        case ImageQuality.Preset.OnePointZero => "PERCENT_85"
-        case ImageQuality.Preset.OnePointTwo  => "PERCENT_85"
-        case ImageQuality.Preset.OnePointFive => "ANY"
-        case ImageQuality.Preset.TwoPointZero => "ANY"
 
   extension (self: CloudExtinction.Preset)
     def ocs2Tag: String =
