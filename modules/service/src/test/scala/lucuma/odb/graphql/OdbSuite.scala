@@ -442,6 +442,13 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
         _   <- Resource.make(sc.connect(ps.pure[IO]))(_ => sc.disconnect())
       } yield sc
 
+  private def unauthenticatedClient(svr: Server): Resource[IO, FetchClient[IO, Nothing]] =
+    val uri = svr.baseUri / "odb"
+    for {
+      xbe <- JdkHttpClient.simple[IO].map(Http4sHttpBackend[IO](_))
+      xc  <- Resource.eval(Http4sHttpClient.of[IO, Nothing](uri)(using Async[IO], xbe, Logger[IO]))
+    } yield xc
+
   case class Operation(document: String) extends GraphQLOperation.Typed[Nothing, JsonObject, Json]
 
   private lazy val serverFixture: AnyFixture[Server] =
@@ -618,6 +625,23 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
                 case None => IO.println(s"🐙 Not an OdbError: $e")
           case _ => IO.unit
       }
+
+  def unauthenticatedQuery(
+    query:     String,
+    variables: Option[JsonObject] = None
+  ): IO[Json] =
+    Resource.eval(IO(serverFixture()))
+      .flatMap(unauthenticatedClient)
+      .use: conn =>
+        val req = conn.request(Operation(query))
+        val op  = variables.fold(req.apply)(req.withInput).raiseGraphQLErrors
+        op.onError:
+          case ResponseException(es, _) =>
+            es.traverse_ : e =>
+              OdbError.fromGraphQLError(e) match
+                case Some(_) => IO.unit
+                case None    => IO.println(s"Not an OdbError: $e")
+          case _             => IO.unit
 
   def queryIor(
     user:      User,
