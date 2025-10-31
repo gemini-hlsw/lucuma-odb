@@ -3,8 +3,10 @@
 
 package lucuma.odb.service
 
+import cats.data.NonEmptyList
 import cats.effect.Concurrent
 import cats.syntax.all.*
+import eu.timepit.refined.types.numeric.NonNegShort
 import eu.timepit.refined.types.string.NonEmptyString
 import grackle.Result
 import lucuma.core.enums.CalibrationRole
@@ -21,6 +23,7 @@ import lucuma.odb.service.Services.ServiceAccess
 import lucuma.odb.util.Codecs.*
 import org.http4s.client.Client
 import skunk.AppliedFragment
+import skunk.Query
 import skunk.Transaction
 import skunk.syntax.all.*
 
@@ -88,10 +91,18 @@ object PerScienceObservationCalibrationsService:
       private def telluricGroups(tree: GroupTree): List[(Group.Id, List[Observation.Id])] =
         tree.collectObservations(b => b.system && b.calibrationRoles.contains(CalibrationRole.Telluric))
 
-      def moveObservationOut(oid: Observation.Id) =
-        S.session
-          .prepareR(Statements.groupMove)
-          .use(_.unique((oid, None, None)))
+      private def observationsToMove(
+        allObsInGroups: Map[Group.Id, List[Observation.Id]],
+        toUnlink:       Set[Observation.Id],
+        groupLocations: Map[Group.Id, (Option[Group.Id], NonNegShort)]
+      ): List[(Observation.Id, Option[Group.Id], Option[NonNegShort])] =
+        allObsInGroups.toList.flatMap: (gid, obsIds) =>
+          val toMove = obsIds.filter(o => toUnlink.exists(o === _))
+          val (parentGroupId, parentIndex) =
+            groupLocations.get(gid)
+              .map { case (pid, idx) => (pid, idx.some) }
+              .getOrElse((none, none))
+          toMove.map(oid => (oid, parentGroupId, parentIndex))
 
       override def generateCalibrations(
         pid:        Program.Id,
@@ -103,22 +114,20 @@ object PerScienceObservationCalibrationsService:
         for
           _                 <- S.session.execute(sql"set constraints all deferred".command)
           // Telluric groups with all observations
-          telluricGroups    <- groupService.selectGroups(
-                                    pid,
-                                    groupFilter = Statements.telluricGroup,
-                                    obsFilter = void""
-                                  ).map(telluricGroups)
-          allObsInGroups    = telluricGroups.toMap
-          // Obervations to remove (not telluric nymore)
-          obsToUnlink       = allObsInGroups.values.flatten.filterNot(a => currentObsIds.exists(_ === a))
-          // remove observations from the groups using group_move_observation
-          _                 <- obsToUnlink.toList.traverse_ : oid =>
-                                 moveObservationOut(oid)
+          telluricGroupList <- groupService.selectGroups(pid, obsFilter = void"true").map(telluricGroups)
+          allObsInGroups    = telluricGroupList.toMap
+          // Obervations to remove from telluric groups
+          toUnlink          = allObsInGroups.values.flatten.filterNot(a => currentObsIds.exists(_ === a)).toSet
+          // Query group locations
+          groupLocations    <- Statements.queryGroupLocations(allObsInGroups.keys.toList)
+          // Collect all observations to move with their target locations
+          toMove            = observationsToMove(allObsInGroups, toUnlink, groupLocations)
+          // Move all observations in a single database call
+          _                 <- Statements.moveObservations(toMove)
           // Compute which groups are now empty
           emptyGroupIds     = allObsInGroups.collect:
-                                case (gid, obsIds) if obsIds.forall(o => obsToUnlink.toSet.exists(_ === o)) =>
-                                  gid
-          // Delete empty system groups using deleteSystemGroup
+                                case (gid, obsIds) if obsIds.forall(o => toUnlink.exists(_ === o)) => gid
+          // Delete empty telluric groups using deleteSystemGroup
           _                 <- emptyGroupIds.toList.traverse_ : gid =>
                                  groupService.deleteSystemGroup(pid, gid)
           // Reload tree once for group creation step
@@ -137,9 +146,41 @@ object PerScienceObservationCalibrationsService:
         yield List.empty // no calibs yet
 
       object Statements:
-        // Filter to fetch only telluric system groups
-        val telluricGroup: AppliedFragment =
-          void"c_system = true AND c_calibration_roles = ARRAY['telluric']::e_calibration_role[]"
 
-        val groupMove =
-          sql"select group_move_observation($observation_id, ${group_id.opt}, ${int2_nonneg.opt})".query(void)
+        def groupLocations(gids: List[Group.Id]): Query[gids.type, (Group.Id, Option[Group.Id], NonNegShort)] =
+          sql"""
+            select c_group_id, c_parent_id, c_parent_index
+            from t_group
+            where c_group_id in (${group_id.list(gids)})
+          """.query(group_id *: group_id.opt *: int2_nonneg).contramap(_ => gids)
+
+        // For each gruop return the parent groupid and the location on that gorup
+        def queryGroupLocations(gids: List[Group.Id]): F[Map[Group.Id, (Option[Group.Id], NonNegShort)]] =
+          gids match
+            case Nil => Map.empty[Group.Id, (Option[Group.Id], NonNegShort)].pure[F]
+            case _ =>
+              S.session.prepareR(groupLocations(gids))
+                .use(_.stream(gids, 1024).compile.toList)
+                .map(_.map { case (gid, parentId, parentIndex) =>
+                  gid -> ((parentId, parentIndex))
+                }.toMap)
+
+        def moveObservations(
+          moves: List[(Observation.Id, Option[Group.Id], Option[NonNegShort])]
+        ): F[Unit] =
+          NonEmptyList.fromList(moves) match
+            case None => ().pure[F]
+            case Some(nel) =>
+              val values = nel.map { case (oid, pgid, pidx) =>
+                sql"(${observation_id}, ${group_id.opt}, ${int2_nonneg.opt})".apply(oid, pgid, pidx)
+              }
+              val valuesFragment = values.intercalate(void", ")
+              val query =
+                void"""
+                  select group_move_observation(obs_id, parent_id, parent_idx)
+                  from (values """ |+|
+                  valuesFragment |+|
+                  void""") as moves(obs_id, parent_id, parent_idx)
+                """
+              S.session.prepareR(query.fragment.query(void))
+                .use(_.stream(query.argument, 1024).compile.drain)

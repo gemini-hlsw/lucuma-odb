@@ -93,7 +93,7 @@ BEGIN
       NULL,
       true,
       NULL,
-      0,
+      '0 seconds'::interval,
       'present',
       true,
       '{telluric}'::e_calibration_role[]

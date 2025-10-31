@@ -44,9 +44,15 @@ class perScienceObservationCalibrations
     ordered: Boolean,
     minimumRequired: Option[Int],
     maximumInterval: Option[TimeSpan],
-    calibrationRoles: List[CalibrationRole]
+    calibrationRoles: List[CalibrationRole],
+    parentId: Option[Group.Id],
+    parentIndex: Int
   ) derives Decoder
-  case class ObsInfo(id: Observation.Id, groupId: Option[Group.Id]) derives Decoder
+  case class ObsInfo(
+    id: Observation.Id,
+    groupId: Option[Group.Id],
+    groupIndex: Option[Int]
+  ) derives Decoder
 
   private def queryGroup(gid: Group.Id): IO[GroupInfo] =
     query(
@@ -62,6 +68,8 @@ class perScienceObservationCalibrations
               maximumInterval {
                 microseconds
               }
+              parentId
+              parentIndex
             }
           }"""
     ).flatMap { c =>
@@ -77,6 +85,7 @@ class perScienceObservationCalibrations
             observation(observationId: "$oid") {
               id
               groupId
+              groupIndex
             }
           }"""
     ).flatMap { c =>
@@ -330,3 +339,48 @@ class perScienceObservationCalibrations
     } yield {
       assertEquals(obs.groupId, None)
     }
+
+  test("Observation takes telluric group's position when group is deleted"):
+    for {
+      pid  <- createProgramAs(pi)
+      tid  <- createTargetWithProfileAs(pi, pid)
+      oid  <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+      _    <- recalculateCalibrations(pid, when)
+      obs  <- queryObservation(oid)
+      telluricGroupId = obs.groupId.get
+      telluricGroup <- queryGroup(telluricGroupId)
+      // Change to GMOS
+      _    <- updateObservationMode(oid, "gmosNorthLongSlit")
+      _    <- recalculateCalibrations(pid, when)
+      obsAfter <- queryObservation(oid)
+    } yield {
+      assertEquals(obsAfter.groupId, telluricGroup.parentId)
+      assertEquals(obsAfter.groupIndex, Some(telluricGroup.parentIndex))
+    }
+
+  test("Observation preserves parent group position when nested telluric group is deleted"):
+    for {
+      pid              <- createProgramAs(pi)
+      parentGroupId    <- createGroupAs(pi, pid, name = "parent".some)
+      tid              <- createTargetWithProfileAs(pi, pid)
+      // Create F2 observation directly in the parent group
+      oid              <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+      _                <- moveObservationAs(pi, oid, parentGroupId.some)  // Move to parent group
+      _                <- recalculateCalibrations(pid, when)
+      obs              <- queryObservation(oid)
+      telluricGroupId  =  obs.groupId.get
+      telluricGroup    <- queryGroup(telluricGroupId)
+      _                <- updateObservationMode(oid, "gmosNorthLongSlit")
+      _                <- recalculateCalibrations(pid, when)
+      obsAfter         <- queryObservation(oid)
+      groupAfter       <- queryGroupExists(telluricGroupId)
+    } yield {
+      assertEquals(telluricGroup.parentId, Some(parentGroupId))
+      assert(telluricGroup.system)
+      assert(telluricGroup.calibrationRoles.contains(CalibrationRole.Telluric))
+      // Verify observation moved back to parent group at telluric group's position
+      assertEquals(obsAfter.groupId, Some(parentGroupId))
+      assertEquals(obsAfter.groupIndex, Some(telluricGroup.parentIndex))
+      assert(!groupAfter)
+    }
+
