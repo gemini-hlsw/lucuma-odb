@@ -3,8 +3,10 @@
 
 package lucuma.odb.service
 
+import cats.data.NonEmptyList
 import cats.effect.Concurrent
 import cats.syntax.all.*
+import eu.timepit.refined.types.numeric.NonNegShort
 import eu.timepit.refined.types.string.NonEmptyString
 import grackle.Result
 import lucuma.core.enums.CalibrationRole
@@ -21,6 +23,7 @@ import lucuma.odb.service.Services.ServiceAccess
 import lucuma.odb.util.Codecs.*
 import org.http4s.client.Client
 import skunk.AppliedFragment
+import skunk.Query
 import skunk.Transaction
 import skunk.syntax.all.*
 
@@ -88,11 +91,6 @@ object PerScienceObservationCalibrationsService:
       private def telluricGroups(tree: GroupTree): List[(Group.Id, List[Observation.Id])] =
         tree.collectObservations(b => b.system && b.calibrationRoles.contains(CalibrationRole.Telluric))
 
-      def moveObservationOut(oid: Observation.Id) =
-        S.session
-          .prepareR(Statements.groupMove)
-          .use(_.unique((oid, None, None)))
-
       override def generateCalibrations(
         pid:        Program.Id,
         scienceObs: List[ObsExtract[CalibrationConfigSubset]]
@@ -103,21 +101,36 @@ object PerScienceObservationCalibrationsService:
         for
           _                 <- S.session.execute(sql"set constraints all deferred".command)
           // Telluric groups with all observations
-          telluricGroups    <- groupService.selectGroups(
-                                    pid,
-                                    groupFilter = Statements.telluricGroup,
-                                    obsFilter = void""
-                                  ).map(telluricGroups)
-          allObsInGroups    = telluricGroups.toMap
-          // Obervations to remove (not telluric nymore)
-          obsToUnlink       = allObsInGroups.values.flatten.filterNot(a => currentObsIds.exists(_ === a))
-          // remove observations from the groups using group_move_observation
-          _                 <- obsToUnlink.toList.traverse_ : oid =>
-                                 moveObservationOut(oid)
+          telluricGroupList <- groupService.selectGroups(pid, obsFilter = void"true").map(telluricGroups)
+          allObsInGroups    = telluricGroupList.toMap
+          // Obervations to remove (not telluric anymore)
+          toUngroup         = allObsInGroups.values.flatten.filterNot(a => currentObsIds.exists(_ === a))
+          // Query group locations (batch query)
+          groupLocations    <- allObsInGroups.keys.toList match
+                                 case Nil => Map.empty[Group.Id, (Option[Group.Id], NonNegShort)].pure[F]
+                                 case gids =>
+                                   S.session.prepareR(Statements.groupLocations(gids))
+                                     .use(_.stream(gids, 1024).compile.toList)
+                                     .map(_.map { case (gid, parentId, parentIndex) =>
+                                       gid -> ((parentId, parentIndex))
+                                     }.toMap)
+          obsToUnlinkSet    = toUngroup.toSet
+          // Move observations to their group's parent location (batch by group)
+          _                 <- allObsInGroups.toList.traverse_ { case (gid, obsIds) =>
+                                 val toMove = obsIds.filter(obsToUnlinkSet.contains)
+                                 NonEmptyList.fromList(toMove).traverse_ { nel =>
+                                   val (parentGroupId, parentIndex) =
+                                     groupLocations.get(gid)
+                                       .map { case (pid, idx) => (pid, idx.some) }
+                                       .getOrElse((none, none))
+                                   val af = Statements.moveObservationsBatch(nel.toList, parentGroupId, parentIndex)
+                                   S.session.prepareR(af.fragment.query(void))
+                                     .use(_.stream(af.argument, 1024).compile.drain)
+                                 }
+                               }
           // Compute which groups are now empty
           emptyGroupIds     = allObsInGroups.collect:
-                                case (gid, obsIds) if obsIds.forall(o => obsToUnlink.toSet.exists(_ === o)) =>
-                                  gid
+                                case (gid, obsIds) if obsIds.forall(o => obsToUnlinkSet.exists(_ === o)) => gid
           // Delete empty system groups using deleteSystemGroup
           _                 <- emptyGroupIds.toList.traverse_ : gid =>
                                  groupService.deleteSystemGroup(pid, gid)
@@ -141,5 +154,20 @@ object PerScienceObservationCalibrationsService:
         val telluricGroup: AppliedFragment =
           void"c_system = true AND c_calibration_roles = ARRAY['telluric']::e_calibration_role[]"
 
-        val groupMove =
-          sql"select group_move_observation($observation_id, ${group_id.opt}, ${int2_nonneg.opt})".query(void)
+        def groupLocations(gids: List[Group.Id]): Query[gids.type, (Group.Id, Option[Group.Id], NonNegShort)] =
+          sql"""
+            select c_group_id, c_parent_id, c_parent_index
+            from t_group
+            where c_group_id in (${group_id.list(gids)})
+          """.query(group_id *: group_id.opt *: int2_nonneg).contramap(_ => gids)
+
+        def moveObservationsBatch(
+          oids: List[Observation.Id],
+          parentGroupId: Option[Group.Id],
+          parentIndex: Option[NonNegShort]
+        ): AppliedFragment =
+          sql"""
+            select group_move_observation(c_observation_id, ${group_id.opt}, ${int2_nonneg.opt})
+            from t_observation
+            where c_observation_id in (${observation_id.list(oids)})
+          """.apply(parentGroupId, parentIndex, oids)
