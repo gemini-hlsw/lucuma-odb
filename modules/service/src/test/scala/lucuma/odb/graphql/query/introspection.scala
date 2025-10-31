@@ -10,7 +10,7 @@ class introspection extends OdbSuite:
   val pi         = TestUsers.Standard.pi(1, 30)
   val validUsers = List(pi)
 
-  test("foo"):    
+  test("introspection query"):
     query(
       user = pi,
       // N.B. this is the query https://github.com/graphql/graphiql uses
@@ -113,8 +113,23 @@ class introspection extends OdbSuite:
               }
             }
           }
-        }      
+        }
       """
     ).onError { case t =>
       fail("\n🐞🐞🐞\n🐞🐞🐞 Schema introspection failed!\n🐞🐞🐞\n", t)
+    }
+
+  test("introspection query works without authentication"):
+    unauthenticatedQuery(
+      query = """
+        query IntrospectionQuery {
+          __schema {
+            queryType {
+              name
+            }
+          }
+        }
+      """
+    ).onError { case t =>
+      fail("Unauthenticated schema introspection failed!", t)
     }
