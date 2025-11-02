@@ -167,17 +167,24 @@ object Science:
          b1Off:  Offset,
          a1Off:  Offset
       ): PreDef =
+
+        val readMode =
+          config
+            .explicitReadMode
+            .getOrElse:
+              Flamingos2ReadMode.forExposureTime(time.exposureTime)
+
         eval:
           for
             _  <- F2.exposure    := time.exposureTime
             _  <- F2.disperser   := config.disperser.some
             _  <- F2.filter      := config.filter
-            _  <- F2.readMode    := Flamingos2ReadMode.forExposureTime(time.exposureTime)
+            _  <- F2.readMode    := readMode
             _  <- F2.lyotWheel   := Flamingos2LyotWheel.F16
             _  <- F2.fpu         := Flamingos2FpuMask.builtin(config.fpu)
             _  <- F2.decker      := config.decker
             _  <- F2.readoutMode := config.readoutMode
-            _  <- F2.reads       := config.explicitReads.getOrElse(Flamingos2ReadMode.forExposureTime(time.exposureTime).readCount)
+            _  <- F2.reads       := config.explicitReads.getOrElse(readMode.readCount)
             a0 <- f2ScienceStep(a0Off)
             b0 <- f2ScienceStep(b0Off)
             b1 <- f2ScienceStep(b1Off)
