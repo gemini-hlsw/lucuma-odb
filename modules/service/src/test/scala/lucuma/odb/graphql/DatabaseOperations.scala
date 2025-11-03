@@ -82,6 +82,7 @@ import lucuma.odb.json.offset.transport.given
 import lucuma.odb.json.stepconfig.given
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.util.CommitHash
+import lucuma.odb.service.CalibrationsService
 import lucuma.odb.service.EmailService
 import lucuma.odb.service.Services
 import lucuma.odb.service.Services.Syntax.*
@@ -976,7 +977,7 @@ trait DatabaseOperations { this: OdbSuite =>
       val obsId = obs.downField("id").require[Observation.Id]
       val targetId = obs.downField("targetEnvironment").downField("blindOffsetTarget").downField("id").require[Target.Id]
       (obsId, targetId)
-
+      
     }
 
   def resetAcquisitionAs(user: User, oid: Observation.Id): IO[Unit] =
@@ -1475,8 +1476,7 @@ trait DatabaseOperations { this: OdbSuite =>
     minRequired: Option[NonNegShort] = None,
     minimumInterval: Option[TimeSpan] = None,
     maximumInterval: Option[TimeSpan] = None,
-    initialContents: Option[List[Either[Group.Id, Observation.Id]]] = None,
-    name: Option[String] = None
+    initialContents: Option[List[Either[Group.Id, Observation.Id]]] = None
   ): IO[Group.Id] =
     query(
       user = user,
@@ -1491,7 +1491,6 @@ trait DatabaseOperations { this: OdbSuite =>
                 minimumRequired: ${minRequired.map(_.value).asJson.spaces2}
                 ${minimumInterval.foldMap(ts => s"minimumInterval: { microseconds: \"${ts.toMicroseconds}\" }")}
                 ${maximumInterval.foldMap(ts => s"maximumInterval: { microseconds: \"${ts.toMicroseconds}\" }")}
-                ${name.foldMap(n => s"name: ${n.asJson.spaces2}")}
               }
               ${
                 initialContents.foldMap: es =>
@@ -2352,14 +2351,10 @@ trait DatabaseOperations { this: OdbSuite =>
       .use(_.prepareR(command).use(_.execute(system, id).void))
   }
 
-  def setObservationCalibrationRole(oids: List[Observation.Id], role: CalibrationRole): IO[Unit] =
-    val af = void"UPDATE t_observation " |+|
-      sql"SET c_calibration_role = $calibration_role "(role) |+|
-      void"WHERE c_observation_id IN (" |+|
-        oids.map(sql"$observation_id").intercalate(void", ") |+| void")"
-
+  def setObservationCalibratioRole(oid: Observation.Id, role: Option[CalibrationRole]): IO[Unit] = {
     FMain.databasePoolResource[IO](databaseConfig).flatten
-      .use(_.prepareR(af.fragment.command).use(_.execute(af.argument).void))
+      .use(_.prepareR(CalibrationsService.Statements.SetCalibrationRole).use(_.execute(oid, role).void))
+  }
 
   def cloneGroupAs(user: User, gid: Group.Id): IO[Group.Id] =
     query(

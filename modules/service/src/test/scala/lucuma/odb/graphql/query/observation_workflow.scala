@@ -790,7 +790,7 @@ class observation_workflow
         pid <- createProgramAs(pi)
         tid <- createTargetWithProfileAs(pi, pid)
         oid <- createObservationAs(pi, pid, tid)
-        _   <- setObservationCalibrationRole(List(oid), CalibrationRole.SpectroPhotometric)
+        _   <- setObservationCalibratioRole(oid, CalibrationRole.SpectroPhotometric.some)
         _   <- runObscalcUpdateAs(serviceUser, pid, oid)
       yield oid
 

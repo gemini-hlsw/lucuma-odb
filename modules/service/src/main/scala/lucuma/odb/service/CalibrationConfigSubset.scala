@@ -22,7 +22,6 @@ import lucuma.core.enums.GmosSouthFpu
 import lucuma.core.enums.GmosSouthGrating
 import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
-import lucuma.core.enums.ObservingModeType
 import lucuma.core.math.Wavelength
 import lucuma.odb.graphql.input.Flamingos2LongSlitInput
 import lucuma.odb.graphql.input.GmosImagingInput
@@ -33,8 +32,7 @@ import lucuma.odb.sequence.flamingos2.longslit.Config as Flamingos2Config
 import lucuma.odb.sequence.gmos.imaging.Config as ImagingConfig
 import lucuma.odb.sequence.gmos.longslit.Config
 
-sealed trait CalibrationConfigSubset derives Eq:
-  def modeType: ObservingModeType
+sealed trait CalibrationConfigSubset derives Eq
 
 object CalibrationConfigSubset:
   sealed trait Gmos[G, L, U] extends CalibrationConfigSubset:
@@ -47,7 +45,6 @@ object CalibrationConfigSubset:
     def ampReadMode:       GmosAmpReadMode
     def ampGain:           GmosAmpGain
     def roi:               GmosRoi
-    def modeType:          ObservingModeType
 
     def longSlitCommonInput: GmosLongSlitInput.Create.Common =
       GmosLongSlitInput.Create.Common(
@@ -76,8 +73,6 @@ object CalibrationConfigSubset:
     roi:               GmosRoi
   ) extends Gmos[GmosNorthGrating, GmosNorthFilter, GmosNorthFpu] derives Eq:
 
-    def modeType: ObservingModeType = ObservingModeType.GmosNorthLongSlit
-
     def toLongSlitInput: ObservingModeInput.Create =
       ObservingModeInput.Create(
         GmosLongSlitInput.Create.North(grating, filter, fpu, longSlitCommonInput, none).some,
@@ -98,8 +93,6 @@ object CalibrationConfigSubset:
     ampGain:           GmosAmpGain,
     roi:               GmosRoi
   ) extends Gmos[GmosSouthGrating, GmosSouthFilter, GmosSouthFpu] derives Eq:
-
-    def modeType: ObservingModeType = ObservingModeType.GmosSouthLongSlit
 
     def toLongSlitInput: ObservingModeInput.Create =
       ObservingModeInput.Create(
@@ -126,8 +119,6 @@ object CalibrationConfigSubset:
     ampGain:     GmosAmpGain,
     roi:         GmosRoi
   ) extends GmosImaging[GmosNorthFilter] derives Eq:
-
-    def modeType: ObservingModeType = ObservingModeType.GmosNorthImaging
 
     def toImagingInput: ObservingModeInput.Create =
       ObservingModeInput.Create(
@@ -156,8 +147,6 @@ object CalibrationConfigSubset:
     roi:         GmosRoi
   ) extends GmosImaging[GmosSouthFilter] derives Eq:
 
-    def modeType: ObservingModeType = ObservingModeType.GmosSouthImaging
-
     def toImagingInput: ObservingModeInput.Create =
       ObservingModeInput.Create(
         none,
@@ -182,8 +171,6 @@ object CalibrationConfigSubset:
     filter:    Flamingos2Filter,
     fpu:       Flamingos2Fpu
   ) extends CalibrationConfigSubset derives Eq:
-
-    def modeType: ObservingModeType = ObservingModeType.Flamingos2LongSlit
 
     def toLongSlitInput: ObservingModeInput.Create =
       ObservingModeInput.Create(

@@ -243,7 +243,7 @@ class obscalcUpdate extends ObscalcServiceSuiteSupport:
 
   test("trigger for hard delete"):
     setup.flatMap: (_, oid) =>
-      setObservationCalibrationRole(List(oid), CalibrationRole.Telluric) >>
+      setObservationCalibratioRole(oid, Some(CalibrationRole.Telluric)) >>
       subscriptionExpect(
       user      = pi,
       query     = s"""
