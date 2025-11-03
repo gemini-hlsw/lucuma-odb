@@ -158,7 +158,7 @@ object CMain extends MainParams {
             }.compile.drain.start.void)
     } yield ()
 
-  def services[F[_]: Concurrent: Parallel: UUIDGen: Trace: Logger](
+  def services[F[_]: Temporal: Parallel: UUIDGen: Trace: Logger](
     user: Option[User],
     enums: Enums
   )(pool: Session[F]): F[Services[F]] =

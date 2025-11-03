@@ -27,6 +27,7 @@ import com.dimafeng.testcontainers.PostgreSQLContainer
 import com.dimafeng.testcontainers.munit.TestContainerForAll
 import eu.timepit.refined.types.numeric.PosInt
 import fs2.Stream
+import fs2.io.net.tls.TLSContext
 import fs2.text.utf8
 import grackle.Mapping
 import grackle.Result
@@ -83,6 +84,7 @@ import munit.diff.console.AnsiColors
 import natchez.Trace
 import org.http4s.blaze.server.BlazeServerBuilder
 import org.http4s.client.Client
+import org.http4s.ember.client.EmberClientBuilder
 import org.http4s.headers.Authorization
 import org.http4s.jdkhttpclient.JdkHttpClient
 import org.http4s.jdkhttpclient.JdkWSClient
@@ -305,8 +307,16 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
         FakeItcVersions.pure[IO]
     }
 
-  // override in tests that need an http client
-  protected def httpRequestHandler: Request[IO] => Resource[IO, Response[IO]] = _ => Resource.eval(IO.pure(Response.notFound[IO]))
+  protected val httpClientResource: Resource[IO, Client[IO]] =
+    for 
+      tctx <- TLSContext.Builder.forAsync[IO].insecureResource
+      http <- EmberClientBuilder.default[IO].withTLSContext(tctx).withTimeout(5.seconds).build
+    yield http
+
+  // Override in tests that need an non-default http client.
+  // This isn't an ideal way to do it but it should be ok and it prevents a lot of rejiggering.
+  protected def httpRequestHandler: Request[IO] => Resource[IO, Response[IO]] = req => 
+    httpClientResource.flatMap(_.run(req))
 
   // tests that require successfully sending invitations can assign this to httpRequestHandler
   protected val invitationEmailRequestHandler: Request[IO] => Resource[IO, Response[IO]] =
@@ -710,24 +720,23 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
 
     val res =
       for
-        http <- JdkHttpClient.simple[IO]
         db   <- FMain.databasePoolResource[IO](databaseConfig)
         enm  <- db.evalMap(Enums.load)
         ptc  <- db.evalMap(TimeEstimateCalculatorImplementation.fromSession(_, enm))
-      yield (http, db, enm, ptc)
+      yield (db, enm, ptc)
 
-    res.use: (http, db, enm, ptc) =>
+    res.use: (db, enm, ptc) =>
       val mapping = (s: Session[IO]) => OdbMapping.forObscalc(
         Resource.pure(s),
         SkunkMonitor.noopMonitor[IO],
         u,
         goaUsers,
-        GaiaClient.build[IO](http, adapters = gaiaAdapters),
+        GaiaClient.build[IO](httpClient, adapters = gaiaAdapters),
         itcClient,
         CommitHash.Zero,
         enm,
         ptc,
-        http,
+        httpClient,
         emailConfig
       )
       db.use: s =>

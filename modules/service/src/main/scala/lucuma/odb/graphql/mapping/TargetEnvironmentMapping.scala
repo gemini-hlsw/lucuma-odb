@@ -32,6 +32,7 @@ import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.GuideService
 import lucuma.odb.service.Services
+import org.http4s.client.Client
 
 import binding.*
 import table.*
@@ -44,6 +45,7 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
      with TargetView[F] { this: SkunkMapping[F] & TargetMapping[F] =>
 
   def itcClient: ItcClient[F]
+  def httpClient: Client[F]
   def gaiaClient: GaiaClient[F]
   def services: Resource[F, Services[F]]
   def commitHash: CommitHash
@@ -149,7 +151,7 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
         services.use { implicit services =>
           Services.asSuperUser:
             services
-              .trackingService
+              .trackingService(httpClient)
               .getCoordinatesSnapshotOrRegion(oid, obsTime)
               .map: res =>
                 res.map(_.left.toOption.map(_.base)) // treat region as None
@@ -165,7 +167,7 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
       (pid, oid, obsTime) =>
         services.use { implicit s =>
           Services.asSuperUser:
-            s.guideService(gaiaClient, itcClient, commitHash, timeEstimateCalculator)
+            s.guideService(gaiaClient, itcClient, commitHash, timeEstimateCalculator, httpClient)
               .getGuideEnvironments(pid, oid, obsTime)
         }
 
@@ -179,7 +181,7 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
       (pid, oid, _) =>
         services.use { implicit s =>
           Services.asSuperUser:
-            s.guideService(gaiaClient, itcClient, commitHash, timeEstimateCalculator)
+            s.guideService(gaiaClient, itcClient, commitHash, timeEstimateCalculator, httpClient)
               .getGuideEnvironment(pid, oid)
         }
 
@@ -199,7 +201,7 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
       (pid, oid, period) =>
         services.use { implicit s =>
           Services.asSuperUser:
-            s.guideService(gaiaClient, itcClient, commitHash, timeEstimateCalculator)
+            s.guideService(gaiaClient, itcClient, commitHash, timeEstimateCalculator, httpClient)
               .getGuideAvailability(pid, oid, period)
         }
 
@@ -213,7 +215,7 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
       (pid, oid, _) =>
         services.use { implicit s =>
           Services.asSuperUser:
-            s.guideService(gaiaClient, itcClient, commitHash, timeEstimateCalculator)
+            s.guideService(gaiaClient, itcClient, commitHash, timeEstimateCalculator, httpClient)
               .getGuideTargetName(pid, oid)
         }
 
