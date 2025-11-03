@@ -2,24 +2,34 @@
 
 set -e
 
-if [ -z $1 ]; then
+if [ -z "$1" ]; then
   echo "🔥 Usage: `basename $0` <path to itc distribution bundle directory>"
+  echo "   Example: `basename $0` /path/to/ocs/app/itc/target/itc/2026A-test.1.1.1/Test/itc/bundle"
   exit 1
 fi
 
-if [ -d $1 ]; then
-  BUNDLE=$(readlink -f "$1")
-  LIB="$(dirname "$(readlink -f "$0")")/modules/service/ocslib"
-  mkdir -p "$LIB"
-  echo "🔸 Reading from $BUNDLE"
-  echo "🔸 Writing to   $LIB"
-else
+if [ ! -d "$1" ]; then
   echo "🔸 Directory not found: $1"
   exit 1
 fi
 
+BUNDLE=$(cd "$1" && pwd)
+LIB="$(dirname "$(readlink -f "$0")")/service/ocslib"
+mkdir -p "$LIB"
+echo "🔸 Reading from $BUNDLE"
+echo "🔸 Writing to   $LIB"
+
+# Find the git repository root from the bundle directory
 echo "🔸 Capturing OCS build information"
-OCS_REPO_PATH="$1"
+cd "$BUNDLE"
+OCS_REPO_PATH=$(git rev-parse --show-toplevel 2>/dev/null || echo "")
+
+if [ -z "$OCS_REPO_PATH" ]; then
+  echo "🔥 Error: Could not find git repository root from $BUNDLE"
+  exit 1
+fi
+
+echo "🔸 Found OCS repository at $OCS_REPO_PATH"
 cd "$OCS_REPO_PATH"
 
 # Capture git information
