@@ -384,3 +384,36 @@ class perScienceObservationCalibrations
       assert(!groupAfter)
     }
 
+  test("Telluric group uses obs position in the group"):
+    for {
+      pid              <- createProgramAs(pi)
+      parentGroupId    <- createGroupAs(pi, pid, name = "parent".some)
+      tid1             <- createTargetWithProfileAs(pi, pid)
+      tid2             <- createTargetWithProfileAs(pi, pid)
+      f2Oid            <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid1))
+      _                <- moveObservationAs(pi, f2Oid, parentGroupId.some)
+      // Add gmos after f2
+      gmosOid          <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid2))
+      _                <- moveObservationAs(pi, gmosOid, parentGroupId.some)
+      f2Before         <- queryObservation(f2Oid)
+      gmosBefore       <- queryObservation(gmosOid)
+      originalGroupId  =  f2Before.groupId
+      originalIndex    =  f2Before.groupIndex
+      _                <- recalculateCalibrations(pid, when)
+      // check it is idempotent
+      _                <- recalculateCalibrations(pid, when)
+      f2After          <- queryObservation(f2Oid)
+      gmosAfter        <- queryObservation(gmosOid)
+      telluricGroupId  =  f2After.groupId.get
+      telluricGroup    <- queryGroup(telluricGroupId)
+    } yield {
+      // F2 was originally at index 0, GMOS at index 1
+      assertEquals(f2Before.groupIndex, 0.some)
+      assertEquals(gmosBefore.groupIndex, 1.some)
+      // Verify telluric group took the F2 observation's original position
+      assertEquals(telluricGroup.parentId, originalGroupId)
+      assertEquals(telluricGroup.parentIndex.some, originalIndex)
+      // GMOS observation stays at index 1
+      assertEquals(gmosAfter.groupId, parentGroupId.some)
+      assertEquals(gmosAfter.groupIndex, 1.some)
+    }

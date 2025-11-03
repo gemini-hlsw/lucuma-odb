@@ -64,7 +64,8 @@ object PerScienceObservationCalibrationsService:
         pid:           Program.Id,
         config:        CalibrationConfigSubset,
         oid:           Observation.Id,
-        parentGroupId: Option[Group.Id]
+        parentGroupId: Option[Group.Id],
+        parentIndex:   Option[NonNegShort]
       )(using Transaction[F]): F[Result[Group.Id]] =
         S.groupService(emailConfig, httpClient).createGroup(
           CreateGroupInput(
@@ -79,7 +80,7 @@ object PerScienceObservationCalibrationsService:
               minimumInterval = none,
               maximumInterval = TimeSpan.Zero.some,
               parentGroupId = parentGroupId,
-              parentGroupIndex = none,
+              parentGroupIndex = parentIndex,
               existence = Existence.Present
             ),
             initialContents = List(Right(oid))
@@ -88,21 +89,21 @@ object PerScienceObservationCalibrationsService:
           calibrationRoles = List(CalibrationRole.Telluric)
         )
 
-      private def telluricGroups(tree: GroupTree): List[(Group.Id, List[Observation.Id])] =
+      private def telluricGroups(tree: GroupTree): List[(Group.Id, List[(Observation.Id, NonNegShort)])] =
         tree.collectObservations(b => b.system && b.calibrationRoles.contains(CalibrationRole.Telluric))
 
       private def observationsToMove(
-        allObsInGroups: Map[Group.Id, List[Observation.Id]],
+        allObsInGroups: Map[Group.Id, List[(Observation.Id, NonNegShort)]],
         toUnlink:       Set[Observation.Id],
         groupLocations: Map[Group.Id, (Option[Group.Id], NonNegShort)]
       ): List[(Observation.Id, Option[Group.Id], Option[NonNegShort])] =
-        allObsInGroups.toList.flatMap: (gid, obsIds) =>
-          val toMove = obsIds.filter(o => toUnlink.exists(o === _))
+        allObsInGroups.toList.flatMap: (gid, obsWithIndices) =>
+          val toMove = obsWithIndices.filter((o, _) => toUnlink.exists(o === _))
           val (parentGroupId, parentIndex) =
             groupLocations.get(gid)
               .map { case (pid, idx) => (pid, idx.some) }
               .getOrElse((none, none))
-          toMove.map(oid => (oid, parentGroupId, parentIndex))
+          toMove.map((oid, _) => (oid, parentGroupId, parentIndex))
 
       override def generateCalibrations(
         pid:        Program.Id,
@@ -117,7 +118,7 @@ object PerScienceObservationCalibrationsService:
           telluricGroupList <- groupService.selectGroups(pid, obsFilter = void"true").map(telluricGroups)
           allObsInGroups    = telluricGroupList.toMap
           // Obervations to remove from telluric groups
-          toUnlink          = allObsInGroups.values.flatten.filterNot(a => currentObsIds.exists(_ === a)).toSet
+          toUnlink          = allObsInGroups.values.flatten.map(_._1).filterNot(a => currentObsIds.exists(_ === a)).toSet
           // Query group locations
           groupLocations    <- Statements.queryGroupLocations(allObsInGroups.keys.toList)
           // Collect all observations to move with their target locations
@@ -126,12 +127,15 @@ object PerScienceObservationCalibrationsService:
           _                 <- Statements.moveObservations(toMove)
           // Compute which groups are now empty
           emptyGroupIds     = allObsInGroups.collect:
-                                case (gid, obsIds) if obsIds.forall(o => toUnlink.exists(_ === o)) => gid
+                                case (gid, obsWithIndices) if obsWithIndices.forall((o, _) => toUnlink.exists(_ === o)) => gid
           // Delete empty telluric groups using deleteSystemGroup
           _                 <- emptyGroupIds.toList.traverse_ : gid =>
                                  groupService.deleteSystemGroup(pid, gid)
           // Reload tree once for group creation step
           currentGroups  <- groupService.selectGroups(pid)
+          // Build observation index map from all parent groups (not just system groups)
+          allObsWithIndices = currentGroups.collectObservations(_ => true)
+          obsIndexMap       = allObsWithIndices.flatMap((_, obs) => obs).toMap
           // Create or verify system groups for current F2 observations
           _                 <- scienceObs.traverse_ : obs =>
                                  findSystemGroupForObservation(currentGroups, obs.id)
@@ -140,7 +144,8 @@ object PerScienceObservationCalibrationsService:
                                        pid,
                                        obs.data,
                                        obs.id,
-                                       findParentGroupForObservation(currentGroups, obs.id)
+                                       findParentGroupForObservation(currentGroups, obs.id),
+                                       obsIndexMap.get(obs.id)
                                      ).void
                                    )(_ => ().pure[F])
         yield List.empty // no calibs yet

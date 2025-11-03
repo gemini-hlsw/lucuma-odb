@@ -35,12 +35,12 @@ sealed trait GroupTree extends Product with Serializable {
 
   def collectObservations(
     predicate: GroupTree.Branch => Boolean
-  ): List[(Group.Id, List[Observation.Id])] = {
+  ): List[(Group.Id, List[(Observation.Id, NonNegShort)])] = {
     @scala.annotation.tailrec
     def go(
       remaining: List[GroupTree],
-      acc: List[(Group.Id, List[Observation.Id])]
-    ): List[(Group.Id, List[Observation.Id])] =
+      acc: List[(Group.Id, List[(Observation.Id, NonNegShort)])]
+    ): List[(Group.Id, List[(Observation.Id, NonNegShort)])] =
       remaining match
         case Nil => acc.reverse
         case GroupTree.Leaf(_) :: tail                                          =>
@@ -48,8 +48,13 @@ sealed trait GroupTree extends Product with Serializable {
         case GroupTree.Root(_, children) :: tail                                =>
           go(children ::: tail, acc)
         case (b @ GroupTree.Branch(groupId = gid, children = children)) :: tail =>
-          val observations = children.collect:
-            case GroupTree.Leaf(obsId) => obsId
+          val observations =
+            children
+              .zipWithIndex
+              .map:
+                case (l, i) => (l, NonNegShort.from(i.toShort))
+              .collect:
+                case (GroupTree.Leaf(obsId), Right(idx)) => (obsId, idx)
           val newAcc =
             if predicate(b) then (gid, observations) :: acc
             else acc
