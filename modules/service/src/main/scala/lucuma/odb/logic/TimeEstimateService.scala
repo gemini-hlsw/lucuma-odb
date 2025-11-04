@@ -138,9 +138,9 @@ object TimeEstimateService:
         m:    Map[Observation.Id, CalculatedValue[CategorizedTime]]
       ): Option[CalculatedValue[CategorizedTimeRange]] =
         root match
-          case GroupTree.Leaf(oid)                                  => leafRange(oid, m)
-          case GroupTree.Branch(_, min, _, children, _, _, _, _, _) => parentRange(pid, min, children, m)
-          case GroupTree.Root(_, children)                          => parentRange(pid, None, children, m)
+          case GroupTree.Leaf(oid)                                      => leafRange(oid, m)
+          case GroupTree.Branch(minRequired = min, children = children) => parentRange(pid, min, children, m)
+          case GroupTree.Root(_, children)                              => parentRange(pid, None, children, m)
 
       private def load(
         pid: Program.Id
@@ -180,9 +180,9 @@ object TimeEstimateService:
       )(using Transaction[F]): F[Map[Option[ScienceBand], CalculatedValue[CategorizedTime]]] =
         def containedObs(root: GroupTree): Set[Observation.Id] =
           root match
-            case GroupTree.Leaf(oid)                                => Set(oid)
-            case GroupTree.Branch(_, _, _, children, _, _, _, _, _) => children.map(containedObs).combineAll
-            case GroupTree.Root(_, children)                        => children.map(containedObs).combineAll
+            case GroupTree.Leaf(oid)                   => Set(oid)
+            case GroupTree.Branch(children = children) => children.map(containedObs).combineAll
+            case GroupTree.Root(_, children)           => children.map(containedObs).combineAll
 
         val res = (for
           p <- OptionT(groupService(emailConfig, httpClient).selectPid(gid))

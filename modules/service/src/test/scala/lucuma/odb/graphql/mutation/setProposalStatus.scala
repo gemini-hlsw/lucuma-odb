@@ -603,7 +603,7 @@ class setProposalStatus extends OdbSuite
       ina <- createObservationAs(pi, pid) // inactive, should be ignored
       _   <- setObservationWorkflowState(pi, ina, ObservationWorkflowState.Inactive)
       cal <- createObservationAs(pi, pid, tid) // calibration, should be ignored
-      _   <- setObservationCalibratioRole(cal, Some(CalibrationRole.Photometric))
+      _   <- setObservationCalibrationRole(List(cal), CalibrationRole.Photometric)
       _   <-
         expect(
           user = pi,
