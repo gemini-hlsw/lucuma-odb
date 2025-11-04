@@ -69,31 +69,29 @@ loaded dynamically by the application and be called via reflection with a custom
 classloader
 
 In case the code in ocs2 changes we need to update the jar files using the
-`update.sh` script.  The jar files are fairly large (they contain the data files
+`itc/update_itc_jars.sh` script.  The jar files are fairly large (they contain the data files
 used to calculate the itc results). Given github limitations these need to be
 stored in `git lfs`.
 
 [Install `git lfs`](https://git-lfs.com) to get the necessary jar files.
 
-## Long term
+When the OCS ITC code changes, update the JAR files by running:
 
-Ideally we'd port the old ITC codebase and integrate it here. This is no small task but an initial
-attempt was started on the `legacy-port` branch
-
-## Buildpacks
-
-This project needs the following buildpacks to be used in heroku (order is important)
-
-```
-=== itc-master Buildpack URLs
-1. https://github.com/radian-software/heroku-buildpack-git-lfs
-2. heroku/scala
-3. https://github.com/opencounter/heroku-buildpack-post-build-clean.git
+```bash
+./itc/update_itc_jars.sh <path-to-ocs-bundle-directory>
 ```
 
-First we need git lfs to get the files stored in github lfs
-Then scala to build the app
-And finally post-build-clean to reduce the slug size
+For example:
+```bash
+./itc/update_itc_jars.sh ../ocs/app/itc/target/itc/2026A-test.1.1.1/Test/itc/bundle
+```
+
+The script will:
+- Find the OCS git repository from the bundle directory
+- Capture git metadata (commit hash, branch, etc.)
+  - ocs git repo bust be clean
+- Copy legacy JAR files to `itc/service/ocslib/`
+- Create `build-info.json` with OCS version information
 
 ## Schema stitching
 
@@ -122,4 +120,3 @@ sbt "benchmark/runMain lucuma.itc.benchmarks.ItcPerformanceHarness"
 ```
 benchmark/Jmh/run lucuma.itc.benchmarks.ItcCoreBenchmark
 ```
-
