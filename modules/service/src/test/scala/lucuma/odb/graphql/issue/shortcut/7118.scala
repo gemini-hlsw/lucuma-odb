@@ -28,18 +28,18 @@ class ShortCut_7118 extends OdbSuite with DatabaseOperations:
     a match
       case Result.Failure(ps) => assertEquals(ps.head.message, msg)
       case _ => fail(s"Expected failure ($msg), found $a")
-    
+
   test("can't delete non-system group"):
-    for 
+    for
       pid <- createProgramAs(pi)
       _   <- createObservationAs(pi, pid)
       gid <- createGroupAs(pi, pid) // make sure group is in the middle
       _   <- createObservationAs(pi, pid)
-      res <- deleteSystemGroup(pid, gid)      
+      res <- deleteSystemGroup(pid, gid)
     yield assertFailure(res, s"Cannot delete non-sytem group $gid.")
 
   test("delete empty system group at top level"):
-    for 
+    for
       pid <- createProgramAs(pi)
       _   <- createObservationAs(pi, pid)
       gid <- createGroupAs(pi, pid) // make sure group is in the middle
@@ -49,7 +49,7 @@ class ShortCut_7118 extends OdbSuite with DatabaseOperations:
     yield (pid, gid)
 
   test("delete empty system group at non-top level"):
-    for 
+    for
       pid <- createProgramAs(pi)
       pg  <- createGroupAs(pi, pid) // parent group
       _   <- createObservationInGroupAs(pi, pid, Some(pg), None)
@@ -60,7 +60,7 @@ class ShortCut_7118 extends OdbSuite with DatabaseOperations:
     yield (pid, gid)
 
   test("delete non-empty system group at top level"):
-    for 
+    for
       _   <- createUsers(svc) // make sure service user is in the database
       pid <- createProgramAs(pi)
       _   <- createObservationAs(pi, pid)
@@ -70,14 +70,14 @@ class ShortCut_7118 extends OdbSuite with DatabaseOperations:
       tid <- createTargetAs(pi, pid)
       oid <- createObservationAs(pi, pid, tid)
       _   <- moveObservationAs(pi, oid, Some(gid))
-      _   <- setObservationCalibratioRole(oid, Some(CalibrationRole.Telluric))
+      _   <- setObservationCalibrationRole(List(oid), CalibrationRole.Telluric)
       g2  <- createGroupAs(pi, pid, Some(gid))
       _   <- updateGroupSystem(g2, true)
       _   <- assertIO(deleteSystemGroup(pid, gid), Result.unit)
     yield ()
 
   test("delete non-empty system group at non-top level"):
-    for 
+    for
       _   <- createUsers(svc) // make sure service user is in the database
       pid <- createProgramAs(pi)
       _   <- createObservationAs(pi, pid)
@@ -86,14 +86,14 @@ class ShortCut_7118 extends OdbSuite with DatabaseOperations:
       tid <- createTargetAs(pi, pid)
       oid <- createObservationAs(pi, pid, tid)
       _   <- moveObservationAs(pi, oid, Some(gid))
-      _   <- setObservationCalibratioRole(oid, Some(CalibrationRole.Telluric))
+      _   <- setObservationCalibrationRole(List(oid), CalibrationRole.Telluric)
       g2  <- createGroupAs(pi, pid, Some(gid))
       _   <- updateGroupSystem(g2, true)
       _   <- assertIO(deleteSystemGroup(pid, g2), Result.unit)
     yield ()
 
   test("can't delete system group that contains a non-calibration observation"):
-    for 
+    for
       pid <- createProgramAs(pi)
       _   <- createObservationAs(pi, pid)
       gid <- createGroupAs(pi, pid) // make sure group is in the middle
@@ -104,7 +104,7 @@ class ShortCut_7118 extends OdbSuite with DatabaseOperations:
     yield assertFailure(res, "One or more specified observations are not calibrations.")
 
   test("can't delete system group that contains a non-system group"):
-    for 
+    for
       _   <- createUsers(svc) // make sure service user is in the database
       pid <- createProgramAs(pi)
       _   <- createObservationAs(pi, pid)
@@ -114,7 +114,7 @@ class ShortCut_7118 extends OdbSuite with DatabaseOperations:
       tid <- createTargetAs(pi, pid)
       oid <- createObservationAs(pi, pid, tid)
       _   <- moveObservationAs(pi, oid, Some(gid))
-      _   <- setObservationCalibratioRole(oid, Some(CalibrationRole.Telluric))
+      _   <- setObservationCalibrationRole(List(oid), CalibrationRole.Telluric)
       g2  <- createGroupAs(pi, pid, Some(gid)) // not a system group
       r   <- deleteSystemGroup(pid, gid)
     yield assertFailure(r, s"Cannot delete non-sytem group $g2.")
