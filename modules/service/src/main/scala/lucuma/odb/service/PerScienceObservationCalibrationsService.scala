@@ -229,13 +229,14 @@ object PerScienceObservationCalibrationsService:
 
       private def deleteTelluricObservationsFromGroups(
         groupIds: List[Group.Id]
-      )(using Transaction[F], SuperUserAccess): F[Unit] =
-        groupIds.traverse_( gid =>
+      )(using Transaction[F], SuperUserAccess): F[List[Observation.Id]] =
+        groupIds.flatTraverse( gid =>
           findTelluricObservation(gid).flatMap:
             case Some(telluricOid) =>
               observationService.deleteCalibrationObservations(NonEmptyList.one(telluricOid))
+                .as(List(telluricOid))
             case None =>
-              Result.unit.pure[F]
+              List.empty[Observation.Id].pure[F]
         )
 
       private def telluricGroup(
@@ -348,7 +349,7 @@ object PerScienceObservationCalibrationsService:
           emptyGroupIds     = allObsInGroups.collect:
                                 case (gid, obsWithIndices) if obsWithIndices.forall((o, _) => toUnlink.exists(_ === o)) => gid
           // Delete telluric calibration observations from empty groups
-          _                 <- ResultT.liftF(deleteTelluricObservationsFromGroups(emptyGroupIds.toList))
+          removedTellurics  <- ResultT.liftF(deleteTelluricObservationsFromGroups(emptyGroupIds.toList))
           // Delete empty telluric groups using deleteSystemGroup
           _                 <- ResultT.liftF(emptyGroupIds.toList.traverse_(gid => groupService.deleteSystemGroup(pid, gid)))
           // Reload tree once for group creation step
@@ -363,7 +364,7 @@ object PerScienceObservationCalibrationsService:
           updatedGroups    <- ResultT.liftF(groupService.selectGroups(pid))
           // Create/sync telluric for each science obs
           telluricIds      <- scienceObs.traverse(obs => ResultT(telluricObservation(pid, obs, updatedGroups)))
-        yield (telluricIds, Nil)).value.map(_.toOption.getOrElse((Nil, Nil)))
+        yield (telluricIds, removedTellurics)).value.map(_.toOption.getOrElse((Nil, Nil)))
 
       object Statements:
 

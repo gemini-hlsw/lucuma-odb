@@ -528,8 +528,8 @@ class perScienceObservationCalibrations
       obsInGroup  <- queryObservationsInGroup(groupId)
       telluricObs =  obsInGroup.filter(_.calibrationRole.contains(CalibrationRole.Telluric))
     } yield {
-      assertEquals(telluricObs.size, 1, "Should have exactly one telluric observation")
-      assertEquals(obsInGroup.size, 2, "Group should contain science obs + telluric obs")
+      assertEquals(telluricObs.size, 1)
+      assertEquals(obsInGroup.size, 2)
     }
 
   test("telluric observation has placeholder target with correct properties"):
@@ -566,8 +566,8 @@ class perScienceObservationCalibrations
       telluric1    <- queryObservationWithTarget(telluric1Oid)
       telluric2    <- queryObservationWithTarget(telluric2Oid)
     } yield {
-      assertNotEquals(telluric1Oid, telluric2Oid, "Should have different telluric observations")
-      assertNotEquals(telluric1.targetId, telluric2.targetId, "Should have different targets")
+      assertNotEquals(telluric1Oid, telluric2Oid)
+      assertNotEquals(telluric1.targetId, telluric2.targetId)
     }
 
   test("calling recalculateCalibrations multiple times is idempotent"):
@@ -584,8 +584,8 @@ class perScienceObservationCalibrations
       obsInGroup2  <- queryObservationsInGroup(groupId)
       telluric2Oid =  obsInGroup2.find(_.calibrationRole.contains(CalibrationRole.Telluric)).get.id
     } yield {
-      assertEquals(obsInGroup2.size, 2, "Should still have exactly 2 observations")
-      assertEquals(telluric1Oid, telluric2Oid, "Telluric obs ID should be preserved (synced, not recreated)")
+      assertEquals(obsInGroup2.size, 2)
+      assertEquals(telluric1Oid, telluric2Oid)
     }
 
   test("recalculation syncs telluric observation configuration"):
@@ -602,8 +602,8 @@ class perScienceObservationCalibrations
       obsInGroup2  <- queryObservationsInGroup(groupId)
       telluric2Oid =  obsInGroup2.find(_.calibrationRole.contains(CalibrationRole.Telluric)).get.id
     } yield {
-      assertEquals(obsInGroup2.size, 2, "Should still have exactly 2 observations")
-      assertEquals(telluric1Oid, telluric2Oid, "Telluric obs should maintain same ID when synced")
+      assertEquals(obsInGroup2.size, 2)
+      assertEquals(telluric1Oid, telluric2Oid)
     }
 
   test("changing F2 to GMOS deletes telluric observation"):
@@ -621,8 +621,8 @@ class perScienceObservationCalibrations
       obsExists    <- queryObservationExists(telluricOid)
       groupExists  <- queryGroupExists(groupId)
     } yield {
-      assert(!obsExists, "Telluric observation should be deleted")
-      assert(!groupExists, "System group should be deleted")
+      assert(!obsExists)
+      assert(!groupExists)
     }
 
   test("deleting F2 science observation deletes telluric observation"):
@@ -639,11 +639,41 @@ class perScienceObservationCalibrations
       telluricTid  =  telluricTgt.targetId.get
       _            <- setObservationInactive(oid)
       _            <- recalculateCalibrations(pid, when)
-      telluricExists <- queryObservationExists(telluricOid)
-      groupExists    <- queryGroupExists(groupId)
-      targetExists   <- queryTargetExists(telluricTid)
+      tellExists   <- queryObservationExists(telluricOid)
+      groupExists  <- queryGroupExists(groupId)
+      targetExists <- queryTargetExists(telluricTid)
     } yield {
-      assert(!telluricExists, "Telluric observation should be deleted")
-      assert(!groupExists, "System group should be deleted")
-      assert(!targetExists, "Orphaned telluric target should be cleaned up")
+      assert(!tellExists)
+      assert(!groupExists)
+      assert(!targetExists)
+    }
+
+  test("recalculateCalibrations returns correct added and removed observation IDs"):
+    for {
+      pid                <- createProgramAs(pi)
+      tid                <- createTargetWithProfileAs(pi, pid)
+      oid                <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+      // add 1 telluric
+      (added1, removed1) <- recalculateCalibrations(pid, when)
+      obs1               <- queryObservation(oid)
+      groupId            =  obs1.groupId.get
+      obsInGroup1        <- queryObservationsInGroup(groupId)
+      telluricOid        =  obsInGroup1.find(_.calibrationRole.contains(CalibrationRole.Telluric)).get.id
+      // re-sync the same observation (idempotent)
+      (added2, removed2) <- recalculateCalibrations(pid, when)
+      // removed F2 observation should remove the telluric
+      _                  <- setObservationInactive(oid)
+      (added3, removed3) <- recalculateCalibrations(pid, when)
+    } yield {
+      // First recalculation added the telluric observation
+      assertEquals(added1.size, 1)
+      assertEquals(added1.headOption, telluricOid.some)
+      assertEquals(removed1.size, 0)
+      assertEquals(added2.size, 1)
+      assertEquals(added2.headOption, telluricOid.some)
+      assertEquals(removed2.size, 0)
+      // Third recalculation removed the telluric observation after deleting science obs
+      assertEquals(added3.size, 0)
+      assertEquals(removed3.size, 1)
+      assertEquals(removed3.headOption, telluricOid.some)
     }
