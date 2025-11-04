@@ -32,9 +32,8 @@ DECLARE
   parent_group_id d_group_id;
   next_parent_index INT;
 BEGIN
-  -- Disable triggers temoporarily
-  ALTER TABLE t_observation DISABLE TRIGGER ALL;
-  ALTER TABLE t_group DISABLE TRIGGER ALL;
+  -- Defer constraint triggers to allow temporary index discontinuities
+  SET CONSTRAINTS ALL DEFERRED;
 
   -- Get each F2 science
   FOR obs_rec IN
@@ -44,7 +43,15 @@ BEGIN
       ON o.c_observation_id = f2.c_observation_id
     WHERE
       o.c_calibration_role IS NULL
-      -- Not already in a system group
+      -- Only process non-deleted observations
+      AND o.c_existence = 'present'
+      -- Not in a deleted group
+      AND (o.c_group_id IS NULL OR EXISTS (
+        SELECT 1 FROM t_group g
+        WHERE g.c_group_id = o.c_group_id
+          AND g.c_existence = 'present'
+      ))
+      -- Not already in a telluric system group
       AND NOT EXISTS (
         SELECT 1 FROM t_group g
         WHERE g.c_group_id = o.c_group_id
@@ -52,22 +59,12 @@ BEGIN
           AND 'telluric' = ANY(g.c_calibration_roles)
       )
   LOOP
-    -- preserve current group as parent if exists0
+    -- preserve current group as parent if exists
     parent_group_id := obs_rec.c_group_id;
 
-    -- next available index in parent group
-    IF parent_group_id IS NOT NULL THEN
-      SELECT COALESCE(MAX(c_parent_index) + 1, 0)
-      INTO next_parent_index
-      FROM t_group
-      WHERE c_parent_id = parent_group_id;
-    ELSE
-      SELECT COALESCE(MAX(c_parent_index) + 1, 0)
-      INTO next_parent_index
-      FROM t_group
-      WHERE c_program_id = obs_rec.c_program_id
-        AND c_parent_id IS NULL;
-    END IF;
+    -- Use the observation's current index so the telluric group takes its place
+    -- Open a hole at this position (shifts everything forward)
+    next_parent_index := group_open_hole(obs_rec.c_program_id, parent_group_id, obs_rec.c_group_index);
 
     -- Create new system group for this observation
     INSERT INTO t_group (
@@ -99,14 +96,8 @@ BEGIN
       '{telluric}'::e_calibration_role[]
     ) RETURNING c_group_id INTO new_group_id;
 
-    UPDATE t_observation
-    SET c_group_id = new_group_id,
-        c_group_index = 0
-    WHERE c_observation_id = obs_rec.c_observation_id;
+    -- Use group_move_observation to properly close the hole and move the observation
+    PERFORM group_move_observation(obs_rec.c_observation_id, new_group_id, 0::int2);
 
   END LOOP;
-
-  -- Re-enable triggers
-  ALTER TABLE t_observation ENABLE TRIGGER ALL;
-  ALTER TABLE t_group ENABLE TRIGGER ALL;
 END $$;
