@@ -6,6 +6,7 @@ package query
 
 import cats.effect.IO
 import cats.syntax.either.*
+import cats.syntax.option.*
 import eu.timepit.refined.types.numeric.PosInt
 import io.circe.Json
 import io.circe.literal.*
@@ -28,7 +29,11 @@ class executionSpecPhot extends ExecutionTestSupportForGmos {
         p <- createProgram
         t <- createTargetWithProfileAs(pi, p)
         o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
-        _ <- setObservationCalibrationRole(List(o), CalibrationRole.SpectroPhotometric)
+        _ <- withServices(serviceUser) { services =>
+               services.session.transaction.use { xa =>
+                 services.calibrationsService(emailConfig, httpClient).setCalibrationRole(o, CalibrationRole.SpectroPhotometric.some)(using xa)
+               }
+             }
       } yield o
 
     setup.flatMap { oid =>
@@ -230,7 +235,11 @@ class executionSpecPhot extends ExecutionTestSupportForGmos {
                  }
                """
              )
-        _ <- setObservationCalibrationRole(List(o), CalibrationRole.SpectroPhotometric)
+        _ <- withServices(serviceUser) { services =>
+               services.session.transaction.use { xa =>
+                 services.calibrationsService(emailConfig, httpClient).setCalibrationRole(o, CalibrationRole.SpectroPhotometric.some)(using xa)
+               }
+             }
       } yield o
 
     setup.flatMap { oid =>
@@ -347,7 +356,11 @@ class executionSpecPhot extends ExecutionTestSupportForGmos {
                  }
                """
              )
-        _ <- setObservationCalibrationRole(List(o), CalibrationRole.SpectroPhotometric)
+        _ <- withServices(serviceUser) { services =>
+               services.session.transaction.use { xa =>
+                 services.calibrationsService(emailConfig, httpClient).setCalibrationRole(o, CalibrationRole.SpectroPhotometric.some)(using xa)
+               }
+             }
       } yield o
 
     setup.flatMap { oid =>

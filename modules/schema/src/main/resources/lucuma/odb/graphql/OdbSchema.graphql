@@ -9909,16 +9909,7 @@ type Group {
 
   existence: Existence!
 
-  """
-  This group is managed by the system and not user-editable
-  """
   system: Boolean!
-
-  """
-  Calibration roles supported by this group (system groups only).
-  This field is system-managed and not user-editable.
-  """
-  calibrationRoles: [CalibrationRole!]!
 }
 
 scalar GroupId

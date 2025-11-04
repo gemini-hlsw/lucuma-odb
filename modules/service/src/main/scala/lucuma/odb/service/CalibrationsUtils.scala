@@ -32,9 +32,6 @@ import lucuma.odb.graphql.input.ScienceRequirementsInput
 import lucuma.odb.graphql.input.SpectroscopyScienceRequirementsInput
 import lucuma.odb.graphql.input.TargetEnvironmentInput
 import lucuma.odb.graphql.mapping.AccessControl
-import lucuma.odb.sequence.ObservingMode
-import lucuma.odb.sequence.data.ItcInput
-import lucuma.odb.service.CalibrationConfigSubset.*
 import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.util.Codecs
 import skunk.Transaction
@@ -42,21 +39,6 @@ import skunk.Transaction
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.LocalTime
-
-case class ObsExtract[A](
-  id:   Observation.Id,
-  itc:  Option[ItcInput],
-  band: Option[ScienceBand],
-  role: Option[CalibrationRole],
-  data: A
-):
-  def map[B](f: A => B): ObsExtract[B] =
-    copy(data = f(data))
-
-case class CalObsProps(
-  wavelengthAt: Option[Wavelength],
-  band:         Option[ScienceBand]
-)
 
 trait CalibrationTargetLocator {
   def bestTargetInList(ref: Coordinates, tgts: List[(Target.Id, String, CalibrationRole, Coordinates)]): Option[(CalibrationRole, Target.Id)] =
@@ -142,14 +124,11 @@ case class CalibrationIdealTargets(
 }
 
 trait CalibrationObservations {
-  def toConfigForCalibration(all: List[ObsExtract[ObservingMode]]): List[ObsExtract[CalibrationConfigSubset]] =
-    all.map(_.map(_.toConfigSubset))
-
   def gmosLongSlitSpecPhotObs[F[_]: MonadThrow: Services: Transaction, G, L, U](
     pid:    Program.Id,
     gid:    Group.Id,
     tid:    Target.Id,
-    props:  Map[CalibrationConfigSubset, CalObsProps],
+    props:  Map[CalibrationConfigSubset, CalibrationsService.CalObsProps],
     config: CalibrationConfigSubset.Gmos[G, L, U]
   ): F[Observation.Id] =
     val matchingProps = props.find { case (originalConfig, _) =>

@@ -7,7 +7,6 @@ import cats.syntax.eq.*
 import cats.syntax.option.*
 import eu.timepit.refined.types.numeric.NonNegShort
 import eu.timepit.refined.types.string.NonEmptyString
-import lucuma.core.enums.CalibrationRole
 import lucuma.core.model.Group
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
@@ -23,67 +22,14 @@ sealed trait GroupTree extends Product with Serializable {
     def go(remaining: List[GroupTree]): Option[GroupTree] =
       remaining match {
         case Nil => None
-        case GroupTree.Leaf(_) :: tail                                 =>
-          go(tail)
-        case GroupTree.Root(_, c) :: tail                              =>
-          go(c ::: tail)
-        case (b @ GroupTree.Branch(groupId = g, children = c)) :: tail =>
+        case GroupTree.Leaf(_) :: tail => go(tail)
+        case GroupTree.Root(_, c) :: tail => go(c ::: tail)
+        case (b @ GroupTree.Branch(g, _, _, c, _, _, _, _, _)) :: tail =>
           if (g === groupId) b.some else go(c ::: tail)
       }
     go(List(this))
   }
 
-  def collectObservations(
-    predicate: GroupTree.Branch => Boolean
-  ): List[(Group.Id, List[(Observation.Id, NonNegShort)])] = {
-    @scala.annotation.tailrec
-    def go(
-      remaining: List[GroupTree],
-      acc: List[(Group.Id, List[(Observation.Id, NonNegShort)])]
-    ): List[(Group.Id, List[(Observation.Id, NonNegShort)])] =
-      remaining match
-        case Nil => acc.reverse
-        case GroupTree.Leaf(_) :: tail                                          =>
-          go(tail, acc)
-        case GroupTree.Root(_, children) :: tail                                =>
-          go(children ::: tail, acc)
-        case (b @ GroupTree.Branch(groupId = gid, children = children)) :: tail =>
-          val observations =
-            children
-              .zipWithIndex
-              .map:
-                case (l, i) => (l, NonNegShort.from(i.toShort))
-              .collect:
-                case (GroupTree.Leaf(obsId), Right(idx)) => (obsId, idx)
-          val newAcc =
-            if predicate(b) then (gid, observations) :: acc
-            else acc
-          go(children ::: tail, newAcc)
-    go(List(this), Nil)
-  }
-
-  def collectGroups(
-    oid: Observation.Id,
-    predicate: GroupTree.Branch => Boolean
-  ): Option[Group.Id] = {
-    @scala.annotation.tailrec
-    def go(remaining: List[GroupTree]): Option[Group.Id] =
-      remaining match
-        case Nil => None
-        case GroupTree.Leaf(_) :: tail                                          =>
-          go(tail)
-        case GroupTree.Root(_, children) :: tail                                =>
-          go(children ::: tail)
-        case (b @ GroupTree.Branch(groupId = gid, children = children)) :: tail =>
-          val hasObs = children.exists:
-            case GroupTree.Leaf(obsId) => obsId === oid
-            case _           => false
-          if predicate(b) && hasObs then
-            Some(gid)
-          else
-            go(children ::: tail)
-    go(List(this))
-  }
 }
 
 object GroupTree {
@@ -120,16 +66,15 @@ object GroupTree {
    * or other groups.
    */
   case class Branch(
-    groupId:          Group.Id,
-    minRequired:      Option[NonNegShort],
-    ordered:          Boolean,
-    children:         List[Child],
-    name:             Option[NonEmptyString],
-    description:      Option[NonEmptyString],
-    minInterval:      Option[TimeSpan],
-    maxInterval:      Option[TimeSpan],
-    system:           Boolean,
-    calibrationRoles: List[CalibrationRole]
+    groupId:     Group.Id,
+    minRequired: Option[NonNegShort],
+    ordered:     Boolean,
+    children:    List[Child],
+    name:        Option[NonEmptyString],
+    description: Option[NonEmptyString],
+    minInterval: Option[TimeSpan],
+    maxInterval: Option[TimeSpan],
+    system:      Boolean
   ) extends Parent with Child
 
   /**

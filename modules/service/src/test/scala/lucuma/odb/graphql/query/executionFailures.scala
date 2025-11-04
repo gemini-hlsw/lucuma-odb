@@ -6,6 +6,7 @@ package query
 
 import cats.effect.IO
 import cats.syntax.either.*
+import cats.syntax.option.*
 import io.circe.Json
 import io.circe.literal.*
 import lucuma.core.enums.CalibrationRole
@@ -237,7 +238,11 @@ class executionFailures extends ExecutionTestSupportForGmos {
         p <- createProgram
         t <- createTargetWithProfileAs(pi, p)
         o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
-        _ <- setObservationCalibrationRole(List(o), CalibrationRole.Photometric)
+        _ <- withServices(serviceUser) { services =>
+               services.session.transaction.use { xa =>
+                 services.calibrationsService(emailConfig, httpClient).setCalibrationRole(o, CalibrationRole.Photometric.some)(using xa)
+               }
+             }
       } yield o
 
     setup.flatMap { oid =>

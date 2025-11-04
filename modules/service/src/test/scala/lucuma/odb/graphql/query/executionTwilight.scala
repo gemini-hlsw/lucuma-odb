@@ -79,7 +79,13 @@ class executionTwilight extends ExecutionTestSupportForGmos {
   val setup: IO[(Program.Id, Observation.Id, Calibrations)] =
     for
       (p, o) <- setupScienceObs
-      _ <- recalculateCalibrations(p, when).map(_._1)
+      _ <- withServices(serviceUser) { services =>
+        services.session.transaction.use: xa =>
+          services
+            .calibrationsService(emailConfig, httpClient)
+            .recalculateCalibrations(p, when)(using xa)
+            .map(_._1)
+      }
       c <- twilight(p)
     yield (p, o, c)
 
