@@ -1,53 +1,57 @@
-name: Legacy Tests
+# GitHub Actions workflow for running expensive legacy ITC tests
+# Triggers when:
+# - PR modifies itc/service/ocslib/ (OCS JAR files or build-info.json)
+# - PR modifies itc/legacy-tests/ (test suite itself)
+# - PR is labeled with 'legacy-tests' (manual override)
+# - Scheduled daily at 2 AM UTC
+# - Manually triggered via workflow_dispatch
+
+name: Legacy ITC Tests
 
 on:
-  schedule:
-    - cron: '0 2 * * *'  # Daily at 2 AM UTC
-  workflow_dispatch:
   pull_request:
-    types: [labeled]
-
-env:
-  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    types: [labeled, opened, synchronize, reopened]
+    paths:
+      - 'itc/service/ocslib/**'
+      - 'itc/legacy-tests/**'
+  schedule:
+    - cron: '0 2 * * *'
+  workflow_dispatch:
 
 jobs:
   legacy-tests:
-    name: ITC Legacy Tests
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || contains(github.event.pull_request.labels.*.name, 'itc-legacy-tests')
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        java: ['17']
-        scala: ['3.7.3']
+    name: Legacy ITC Tests
+    # Run on schedule, manual trigger, path changes, or legacy-tests label
+    if: |
+      github.event_name == 'schedule' ||
+      github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'pull_request'
+    runs-on: ubuntu-22.04
     steps:
-      - name: Checkout current branch (full)
+      - name: Checkout code with LFS
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
           lfs: true
 
-      - name: Setup sbt
-        uses: sbt/setup-sbt@v1
-
-      - name: Setup Java ${{ matrix.java }}
+      - name: Setup Java
         uses: actions/setup-java@v4
         with:
-          distribution: temurin
-          java-version: ${{ matrix.java }}
+          distribution: 'temurin'
+          java-version: '17'
 
-      - name: Cache sbt
+      - name: Cache SBT
         uses: actions/cache@v4
         with:
           path: |
             ~/.sbt
             ~/.ivy2/cache
-            ~/.coursier/cache/v1
-            ~/.cache/coursier/v1
-            ~/AppData/Local/Coursier/Cache/v1
-            ~/Library/Caches/Coursier/v1
-          key: ${{ runner.os }}-sbt-cache-v2-${{ hashFiles('**/*.sbt') }}-${{ hashFiles('project/build.properties') }}
+            ~/.coursier
+          key: ${{ runner.os }}-sbt-${{ hashFiles('**/build.sbt', '**/project/build.properties', '**/project/plugins.sbt') }}
+          restore-keys: |
+            ${{ runner.os }}-sbt-
 
-      - name: Run ITC Legacy Tests
-        run: sbt -v -J-Xmx6g itcLegacyTests/test
+      - name: Run Legacy ITC Tests
         env:
-          RUN_LEGACY_TESTS: 'true'
+          RUN_LEGACY_TESTS: true
+        run: sbt -v -J-Xmx6g itcLegacyTests/test
