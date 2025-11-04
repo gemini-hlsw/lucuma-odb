@@ -48,6 +48,8 @@ import skunk.syntax.all.*
 
 import scala.collection.immutable.SortedMap
 import lucuma.core.model.Target
+import org.typelevel.log4cats.Logger
+import org.typelevel.log4cats.syntax.*
 
 trait PerScienceObservationCalibrationsService[F[_]]:
 
@@ -57,7 +59,7 @@ trait PerScienceObservationCalibrationsService[F[_]]:
   )(using Transaction[F], SuperUserAccess): F[(List[Observation.Id], List[Observation.Id])]
 
 object PerScienceObservationCalibrationsService:
-  def instantiate[F[_]: {Concurrent as F, Services as S}](
+  def instantiate[F[_]: {Concurrent as F, Logger, Services as S}](
     emailConfig: Config.Email,
     httpClient: Client[F]
   ): PerScienceObservationCalibrationsService[F] =
@@ -239,36 +241,49 @@ object PerScienceObservationCalibrationsService:
               List.empty[Observation.Id].pure[F]
         )
 
-      private def telluricGroup(
-        pid:           Program.Id,
-        obs:           ObsExtract[CalibrationConfigSubset],
-        currentGroups: GroupTree,
-        obsIndexMap:   Map[Observation.Id, NonNegShort]
-      )(using Transaction[F]): F[Unit] =
-        findSystemGroupForObservation(currentGroups, obs.id)
+      private def readTelluricGroup(
+        pid:  Program.Id,
+        tree: GroupTree,
+        obs:  ObsExtract[CalibrationConfigSubset]
+      )(using Transaction[F]): F[Result[Group.Id]] =
+        val obsIndexMap = tree.collectObservations(_ => true).flatMap((_, obs) => obs).toMap
+        findSystemGroupForObservation(tree, obs.id)
           .fold(
             newTelluricGroup(
               pid,
               obs.data,
               obs.id,
-              findParentGroupForObservation(currentGroups, obs.id),
+              findParentGroupForObservation(tree, obs.id),
               obsIndexMap.get(obs.id)
-            ).void
-          )(_ => ().pure[F])
+            )
+          )(gid => Result(gid).pure[F])
 
-      private def telluricObservation(
-        pid:           Program.Id,
-        scienceObs:    ObsExtract[CalibrationConfigSubset],
-        updatedGroups: GroupTree
-      )(using Transaction[F], SuperUserAccess): F[Result[Observation.Id]] =
-        findSystemGroupForObservation(updatedGroups, scienceObs.id).fold(
-          Result.failure[Observation.Id](s"No telluric group found for ${scienceObs.id}").pure[F]
-        ): gid =>
-          findTelluricObservation(gid).flatMap:
-            case Some(telluricId) =>
-              syncConfiguration(scienceObs.id, telluricId).as(Result(telluricId))
-            case None             =>
-              createTelluricObservation(pid, scienceObs.id, gid)
+      private def syncTelluricObservation(
+        pid: Program.Id,
+        obs: ObsExtract[CalibrationConfigSubset],
+        gid: Group.Id
+      )(using Transaction[F], SuperUserAccess): F[Result[Option[Observation.Id]]] =
+        findTelluricObservation(gid).flatMap:
+          case Some(telluricId) =>
+            syncConfiguration(obs.id, telluricId).map(_.as(none[Observation.Id]))
+          case None             =>
+            createTelluricObservation(pid, obs.id, gid).flatMap:
+              case Result.Warning(problems, oid) =>
+                (info"Created telluric observation with warnings: $problems").as(Result(oid.some))
+              case Result.Success(oid)           =>
+                Result(oid.some).pure[F]
+              case other                         =>
+                other.map(_.some).pure[F]
+
+      private def generateTelluricForScience(
+        pid:  Program.Id,
+        tree: GroupTree,
+        obs:  ObsExtract[CalibrationConfigSubset]
+      )(using Transaction[F], SuperUserAccess): F[Result[Option[Observation.Id]]] =
+        (for
+          gid <- ResultT(readTelluricGroup(pid, tree, obs))
+          tid <- ResultT(syncTelluricObservation(pid, obs, gid))
+        yield tid).value
 
       private def syncConfiguration(
         sourceOid: Observation.Id,
@@ -286,6 +301,8 @@ object PerScienceObservationCalibrationsService:
         ): Result[(Option[ObservingModeType], Option[ObservingModeType])] =
           modes match
             case (sid, sourceMode) :: (tid, targetMode) :: Nil if (sid === sourceOid && tid === targetOid) =>
+              Result((sourceMode, targetMode))
+            case (tid, targetMode) :: (sid, sourceMode) :: Nil if (sid === sourceOid && tid === targetOid) =>
               Result((sourceMode, targetMode))
             case _ =>
               Result.failure("Cannot read obs modes for source and target")
@@ -329,6 +346,8 @@ object PerScienceObservationCalibrationsService:
         val currentObsIds = scienceObs.map(_.id).toSet
 
         (for
+          _                 <- ResultT.liftF(info"Recalculating per science calibrations for $pid")
+          _                 <- ResultT.liftF(debug"Program $pid has ${currentObsIds.size} science configurations")
           _                 <- ResultT.liftF(S.session.execute(sql"set constraints all deferred".command))
           // Telluric groups with all observations
           allObsInGroups    <- ResultT.liftF(groupService.selectGroups(pid, obsFilter = void"true").map(telluricGroups).map(_.toMap))
@@ -349,22 +368,15 @@ object PerScienceObservationCalibrationsService:
           emptyGroupIds     = allObsInGroups.collect:
                                 case (gid, obsWithIndices) if obsWithIndices.forall((o, _) => toUnlink.exists(_ === o)) => gid
           // Delete telluric calibration observations from empty groups
-          removedTellurics  <- ResultT.liftF(deleteTelluricObservationsFromGroups(emptyGroupIds.toList))
+          deleted           <- ResultT.liftF(deleteTelluricObservationsFromGroups(emptyGroupIds.toList))
           // Delete empty telluric groups using deleteSystemGroup
           _                 <- ResultT.liftF(emptyGroupIds.toList.traverse_(gid => groupService.deleteSystemGroup(pid, gid)))
-          // Reload tree once for group creation step
-          currentGroups     <- ResultT.liftF(groupService.selectGroups(pid))
-          // Build observation index map from all parent groups (not just system groups)
-          allObsWithIndices = currentGroups.collectObservations(_ => true)
-          obsIndexMap       = allObsWithIndices.flatMap((_, obs) => obs).toMap
-          // Create or verify system groups for current F2 observations
-          _                 <- ResultT.liftF:
-                                 scienceObs.traverse_(telluricGroup(pid, _, currentGroups, obsIndexMap))
-          // Reload groups to get updated system groups
-          updatedGroups    <- ResultT.liftF(groupService.selectGroups(pid))
+          // Reload tree for group creation/lookup
+          tree              <- ResultT.liftF(groupService.selectGroups(pid))
           // Create/sync telluric for each science obs
-          telluricIds      <- scienceObs.traverse(obs => ResultT(telluricObservation(pid, obs, updatedGroups)))
-        yield (telluricIds, removedTellurics)).value.map(_.toOption.getOrElse((Nil, Nil)))
+          added             <- scienceObs.traverse(obs => ResultT(generateTelluricForScience(pid, tree, obs)))
+          _                 <- ResultT.liftF(debug"Program $pid add ${added.flatten} and removed $deleted calibrations")
+        yield (added.flatten, deleted)).value.orError
 
       object Statements:
 
