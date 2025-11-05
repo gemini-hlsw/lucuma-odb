@@ -20,16 +20,15 @@ import lucuma.core.math.RightAscension
 import lucuma.core.model.Group
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
-import lucuma.core.util.TimeSpan
 import lucuma.core.model.SourceProfile
 import lucuma.core.model.SpectralDefinition
+import lucuma.core.model.Target
+import lucuma.core.util.TimeSpan
 import lucuma.odb.Config
 import lucuma.odb.data.BlindOffsetType
 import lucuma.odb.data.Existence
 import lucuma.odb.data.ExposureTimeModeRole
 import lucuma.odb.data.GroupTree
-import skunk.AppliedFragment
-import skunk.Query
 import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.graphql.input.CreateGroupInput
 import lucuma.odb.graphql.input.GroupPropertiesInput
@@ -42,14 +41,15 @@ import lucuma.odb.graphql.mapping.AccessControl
 import lucuma.odb.service.Services.SuperUserAccess
 import lucuma.odb.util.Codecs.*
 import org.http4s.client.Client
+import org.typelevel.log4cats.Logger
+import org.typelevel.log4cats.syntax.*
 import skunk.*
+import skunk.AppliedFragment
+import skunk.Query
 import skunk.Transaction
 import skunk.syntax.all.*
 
 import scala.collection.immutable.SortedMap
-import lucuma.core.model.Target
-import org.typelevel.log4cats.Logger
-import org.typelevel.log4cats.syntax.*
 
 trait PerScienceObservationCalibrationsService[F[_]]:
 
