@@ -33,8 +33,8 @@ import org.http4s.client.Client
 import org.http4s.headers.Authorization
 import org.typelevel.ci.CIString
 import org.typelevel.log4cats.Logger
-import org.typelevel.log4cats.syntax.*
 import org.typelevel.log4cats.slf4j.Slf4jLogger
+import org.typelevel.log4cats.syntax.*
 import skunk.{Command as _, *}
 
 import java.time.LocalDate
