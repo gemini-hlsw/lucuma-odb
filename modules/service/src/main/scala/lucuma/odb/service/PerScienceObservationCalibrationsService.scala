@@ -375,7 +375,6 @@ object PerScienceObservationCalibrationsService:
           tree              <- ResultT.liftF(groupService.selectGroups(pid))
           // Create/sync telluric for each science obs
           added             <- scienceObs.traverse(obs => ResultT(generateTelluricForScience(pid, tree, obs)))
-          _                 <- ResultT.liftF(debug"Program $pid add ${added.flatten} and removed $deleted calibrations")
         yield (added.flatten, deleted)).value.orError
 
       object Statements:

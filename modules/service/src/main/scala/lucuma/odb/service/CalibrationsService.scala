@@ -42,6 +42,7 @@ import skunk.AppliedFragment
 import skunk.Command
 import skunk.Query
 import skunk.Transaction
+import skunk.codec.boolean.bool
 import skunk.codec.text.text
 import skunk.syntax.all.*
 
@@ -70,6 +71,8 @@ trait CalibrationsService[F[_]] {
     pid: Program.Id,
     oid: Observation.Id,
   )(using Transaction[F], SuperUserAccess): F[Unit]
+
+  def isCalibration(obsId: Observation.Id): F[Boolean]
 }
 
 object CalibrationsService extends CalibrationObservations {
@@ -219,6 +222,9 @@ object CalibrationsService extends CalibrationObservations {
             _  <- targetService.deleteOrphanCalibrationTargets(pid)
         } yield ()
       }
+
+      override def isCalibration(obsId: Observation.Id): F[Boolean] =
+        session.execute(Statements.isCalibration)(obsId).map(_.headOption.getOrElse(false))
     }
 
   object Statements {
@@ -276,6 +282,13 @@ object CalibrationsService extends CalibrationObservations {
           FROM t_observation
           WHERE c_program_id = $program_id AND c_workflow_user_state IS DISTINCT FROM 'inactive'
           """.query(observation_id)
+
+    val isCalibration: Query[Observation.Id, Boolean] =
+      sql"""
+        SELECT c_calibration_role IS NOT NULL
+        FROM t_observation
+        WHERE c_observation_id = $observation_id
+      """.query(bool)
 
   }
 }
