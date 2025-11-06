@@ -10,7 +10,7 @@ import cats.effect.std.SecureRandom
 import cats.effect.std.Supervisor
 import cats.effect.std.UUIDGen
 import cats.effect.syntax.all.*
-import cats.implicits.*
+import cats.syntax.all.*
 import com.monovore.decline.*
 import com.monovore.decline.effect.CommandIOApp
 import fs2.concurrent.Topic
@@ -34,6 +34,7 @@ import org.http4s.headers.Authorization
 import org.typelevel.ci.CIString
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
+import org.typelevel.log4cats.syntax.*
 import skunk.{Command as _, *}
 
 import java.time.LocalDate
@@ -126,35 +127,37 @@ object CMain extends MainParams {
       top <- Resource.eval(ObservationTopic(ses, 1024, sup))
     } yield (top, ctt)
 
-  def runCalibrationsDaemon[F[_]: Async: Logger](
+  def runCalibrationsDaemon[F[_]: {Async, Logger, Clock as C}](
     emailConfig: Config.Email,
     httpClient: Client[F],
     obsTopic: Topic[F, ObservationTopic.Element],
     calibTopic: Topic[F, CalibTimeTopic.Element],
     services: Resource[F, Services[F]]
   ): Resource[F, Unit] =
+    summon[Monad[F]]
     for {
-      _  <- Resource.eval(Logger[F].info("Start listening for program changes"))
+      _  <- Resource.eval(info"Start listening for program changes")
       _  <- Resource.eval(obsTopic.subscribe(100).evalMap { elem =>
-              services.useTransactionally{
-                requireServiceAccess:
-                  for {
-                    t <- Sync[F].delay(LocalDate.now(ZoneOffset.UTC))
-                    _ <- calibrationsService(emailConfig, httpClient)
-                          .recalculateCalibrations(
-                            elem.programId,
-                            LocalDateTime.of(t, LocalTime.MIDNIGHT).toInstant(ZoneOffset.UTC)
-                          )
-                  } yield Result.unit
-              }
+              services.use: svc =>
+                services.useTransactionally:
+                  Services.asSuperUser:
+                    for {
+                      i <- svc.calibrationsService(emailConfig, httpClient).isCalibration(elem.observationId)
+                      _ <- info"Observation channel: Element(${elem.observationId},${elem.programId},${elem.editType},${elem.users}), calibration: $i"
+                      t <- C.realTimeInstant.map(i => LocalDate.ofInstant(i, ZoneOffset.UTC))
+                      _ <- calibrationsService(emailConfig, httpClient)
+                            .recalculateCalibrations(
+                              elem.programId,
+                              LocalDateTime.of(t, LocalTime.MIDNIGHT).toInstant(ZoneOffset.UTC)
+                            ).unlessA(i) // Don't execute for changes from calibration events
+                    } yield Result.unit
             }.compile.drain.start.void)
-      _  <- Resource.eval(Logger[F].info("Start listening for calibration time changes"))
+      _  <- Resource.eval(info"Start listening for calibration time changes")
       _  <- Resource.eval(calibTopic.subscribe(100).evalMap { elem =>
-              services.useTransactionally {
-                requireServiceAccess:
+              services.useTransactionally:
+                Services.asSuperUser:
                   calibrationsService(emailConfig, httpClient).recalculateCalibrationTarget(elem.programId, elem.observationId)
                     .map(Result.success)
-              }
             }.compile.drain.start.void)
     } yield ()
 

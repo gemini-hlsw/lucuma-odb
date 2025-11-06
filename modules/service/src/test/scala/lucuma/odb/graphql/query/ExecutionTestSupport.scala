@@ -317,7 +317,8 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
   def recalculateCalibrations(pid: Program.Id, when: Instant): IO[(List[Observation.Id], List[Observation.Id])] =
     withServices(serviceUser): services =>
       services.session.transaction.use: xa =>
-        services
-          .calibrationsService(emailConfig, httpClient)
-          .recalculateCalibrations(pid, when)(using xa)
+        Services.asSuperUser:
+          services
+            .calibrationsService(emailConfig, httpClient)
+            .recalculateCalibrations(pid, when)(using xa)
 }

@@ -692,7 +692,8 @@ class perProgramPerConfigCalibrations
       // In reality this is done listening to events but we can explicitly call the function here
       _     <- withServices(service) { services =>
                  services.session.transaction.use { xa =>
-                   services.calibrationsService(emailConfig, httpClient).recalculateCalibrationTarget(pid, cid1)(using xa)
+                   Services.asSuperUser:
+                     services.calibrationsService(emailConfig, httpClient).recalculateCalibrationTarget(pid, cid1)(using xa)
                  }
                }
       ob2   <- queryObservations(pid)
