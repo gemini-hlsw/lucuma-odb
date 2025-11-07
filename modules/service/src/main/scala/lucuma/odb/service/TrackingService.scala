@@ -48,8 +48,11 @@ import skunk.Query
 import skunk.codec.all.*
 import skunk.syntax.all.*
 
-import scala.annotation.nowarn
 import scala.concurrent.duration.*
+import lucuma.core.enums.EphemerisKeyType
+import lucuma.horizons.HorizonsEphemerisEntry
+import java.time.ZonedDateTime
+import java.time.ZoneOffset
 
 trait TrackingService[F[_]]:
   import TrackingService.Snapshot
@@ -124,6 +127,28 @@ object TrackingService:
       else if duration <= 12.day then 2
       else 1
 
+    // TODO: move to core
+    def alignedZonedDateTime =
+      ZonedDateTime
+        .ofInstant(interval.start.toInstant, ZoneOffset.UTC)
+        .withHour(0)
+        .withMinute(0)
+        .withSecond(0)   
+
+    def alignedStart: Timestamp =
+      Timestamp.fromInstantTruncatedAndBounded:
+        alignedZonedDateTime.toInstant()
+
+    def alignedEnd: Timestamp =
+      Timestamp.fromInstantTruncatedAndBounded:
+        alignedZonedDateTime.plusDays(days).toInstant()
+
+    def expectedAlignedElements = 
+      days * cadence
+
+    // ephemeris(key, site, aligned.toInstant, aligned.plusDays(days).toInstant, days * cadence)
+
+
   extension [F[_]: Monad, A](rt: ResultT[F, A]) def flatTap(f: A => ResultT[F, Unit]): ResultT[F, A] =
     rt.flatMap(a => f(a).as(a))
 
@@ -194,7 +219,6 @@ object TrackingService:
         t: Timestamp
       ): F[Result[Either[Snapshot[Coordinates], (Region, Option[Coordinates])]]] =
         getCoordinatesSnapshotOrRegion(List(oid), t).map(_(oid))
-
 
       def getCoordinatesSnapshot(
         oid: Observation.Id, 
@@ -291,10 +315,17 @@ object TrackingService:
                 ps.execute(es)
             .void
 
-      @nowarn("msg=unused")
       private def loadHorizonsEphemeris(key: EphemerisKey.Horizons, site: Site, interval: TimestampInterval): ResultT[F, Option[HorizonsEphemeris]] =
-        ResultT.success(None) // TODO
-
+        ResultT.liftF:
+          session.prepareR(Statements.SelectHorisonEphemerisEntries).use: pq =>
+            pq.stream((key, site, interval), 1024)
+              .compile
+              .toList
+              .map: es =>
+                println(s"loadHorizonsEphemeris: Got ${es.length} elements, need ${interval.expectedAlignedElements}.")
+                Option.when(es.length >= interval.expectedAlignedElements):
+                  HorizonsEphemeris(key, site, interval.start.toInstant, interval.end.toInstant, es)
+              
   private object Statements:
 
     /* This flattens a `HorizonsEphemeris` and constrains its `when` values to a storable range. */
@@ -344,7 +375,7 @@ object TrackingService:
                   case ObservingModeType.GmosSouthImaging   => Site.GS                  
             (oid, osite, (ora, odec).mapN(Coordinates.apply))
 
-    def insertOrUpdateHorizonsEphemeris[A <: NonEmptyList[StorableHorizonsEphemerisEntry]](entries: A): Command[entries.type] =
+    def insertOrUpdateHorizonsEphemeris[A <: NonEmptyList[StorableHorizonsEphemerisEntry]](entries: A): Command[entries.type] = {
 
       val enc: Encoder[StorableHorizonsEphemerisEntry] =
         ( 
@@ -399,3 +430,39 @@ object TrackingService:
           c_vmag       = EXCLUDED.c_vmag,      
           c_sb         = EXCLUDED.c_sb        
       """.command
+    }
+
+    val SelectHorisonEphemerisEntries: Query[(EphemerisKey.Horizons, Site, TimestampInterval), HorizonsEphemerisEntry] =
+      sql"""
+      SELECT
+        c_when,      
+        c_ra,        
+        c_dec,       
+        c_dra,       
+        c_ddec,      
+        c_airmass,   
+        c_extinction,
+        c_vmag,      
+        c_sb
+      FROM  t_ephemeris
+      WHERE c_key_type = $ephemeris_key_type
+      AND   c_des = $varchar
+      AND   c_site = $site
+      AND   c_when >= $core_timestamp
+      AND   c_when <= $core_timestamp
+      """
+        .contramap[(EphemerisKey.Horizons, Site, TimestampInterval)]: (key, site, interval) =>
+          (key.keyType, key.des, site, interval.alignedStart, interval.alignedEnd)
+        .query(
+          core_timestamp      *: 
+          right_ascension     *: 
+          declination         *: 
+          offset              *: 
+          air_mass.opt        *: 
+          core_extinction.opt *: 
+          numeric             *: 
+          numeric.opt
+      ).map: (ts, ra, dec, v, am, e, vm, sb) =>
+        HorizonsEphemerisEntry(
+          ts.toInstant, Coordinates(ra, dec), v, am, e, vm.toDouble, sb.map(_.toDouble)
+        )

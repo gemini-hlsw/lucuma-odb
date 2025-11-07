@@ -19,7 +19,7 @@ CREATE TABLE t_ephemeris (
 
   -- Other information that we're not using yet, but let's hang onto it
   c_airmass     d_air_mass            NULL, 
-  c_extinction  numeric(2,1)          NULL CHECK(c_extinction > 0.0 and c_extinction <= 3.0),
+  c_extinction  int2                  NULL, -- check?
   c_vmag        numeric               NULL, -- TODO: check constraint
   c_sb          numeric               NULL  -- TODO: check constraint
   
