@@ -39,7 +39,6 @@ import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.syntax.scienceSubtype.*
 import lucuma.odb.util.Codecs.*
 import org.http4s.Uri
-import org.http4s.client.Client
 import skunk.*
 import skunk.codec.all.*
 import skunk.data.Completion.Delete

@@ -3,14 +3,14 @@
 
 package lucuma.odb.service
 
-import java.util.UUID
-
 import cats.effect.kernel.Concurrent
 import eu.timepit.refined.types.string.NonEmptyString
 import fs2.Stream
 import lucuma.core.model.Program
 import lucuma.odb.service.Services.SuperUserAccess
 import software.amazon.awssdk.services.s3.model.HeadObjectResponse
+
+import java.util.UUID
 
 /**
  * Provides noop implementations of external service clients for contexts where

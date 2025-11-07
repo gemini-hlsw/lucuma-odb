@@ -34,6 +34,7 @@ import lucuma.odb.graphql.topic.TargetTopic
 import lucuma.odb.graphql.util.*
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.util.CommitHash
+import lucuma.odb.service.NoopClients
 import lucuma.odb.service.Services
 import lucuma.odb.util.Codecs.DomainCodec
 import natchez.Trace
@@ -329,7 +330,7 @@ object OdbMapping {
                 httpClient0,
                 itcClient0,
                 gaiaClient0,
-                throw new RuntimeException("s3FileService not available in sub-mappings")
+                NoopClients.noopS3FileService[F]
               )(session)
 
           override val timeEstimateCalculator: TimeEstimateCalculatorImplementation.ForInstrumentMode = tec

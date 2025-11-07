@@ -19,6 +19,7 @@ import grackle.Result
 import lucuma.catalog.clients.GaiaClient
 import lucuma.core.model.Access
 import lucuma.core.model.User
+import lucuma.itc.client.ItcClient
 import lucuma.odb.Config
 import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.graphql.topic.CalibTimeTopic
@@ -44,7 +45,6 @@ import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.ZoneOffset
 import scala.concurrent.duration.*
-import lucuma.itc.client.ItcClient
 
 sealed trait MainParams {
   val ServiceName: String =

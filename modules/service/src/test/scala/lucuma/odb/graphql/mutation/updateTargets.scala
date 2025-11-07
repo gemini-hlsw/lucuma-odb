@@ -137,7 +137,7 @@ class updateTargets extends OdbSuite {
       pid  <- withServices(service) { s =>
                 Services.asSuperUser:
                   s.session.transaction.use { xa =>
-                    s.programService(emailConfig, httpClient)
+                    s.programService
                       .insertCalibrationProgram(
                         ProgramPropertiesInput.Create.Default.some,
                         CalibrationRole.Photometric,
@@ -510,7 +510,7 @@ class updateTargets extends OdbSuite {
                           degrees: 50
                         }
                       }
-                    }                      
+                    }
                   }
                 }
                 WHERE: {
@@ -564,7 +564,7 @@ class updateTargets extends OdbSuite {
                           degrees: 50
                         }
                       }
-                    }                      
+                    }
                   }
                 }
                 WHERE: {
@@ -726,7 +726,7 @@ class updateTargets extends OdbSuite {
                       declinationArc: {
                         type: EMPTY
                       }
-                    }                      
+                    }
                   }
                 }
                 WHERE: {
@@ -747,7 +747,7 @@ class updateTargets extends OdbSuite {
                         start { degrees }
                         end { degrees }
                       }
-                    }                      
+                    }
                   }
                 }
               }
@@ -773,7 +773,7 @@ class updateTargets extends OdbSuite {
                             "end" : null
                           }
                         }
-                      }                      
+                      }
                     }
                   ]
                 }
@@ -802,7 +802,7 @@ class updateTargets extends OdbSuite {
                       declinationArc: {
                         type: FULL
                       }
-                    }                      
+                    }
                   }
                 }
                 WHERE: {
@@ -823,7 +823,7 @@ class updateTargets extends OdbSuite {
                         start { degrees }
                         end { degrees }
                       }
-                    }                      
+                    }
                   }
                 }
               }
@@ -849,7 +849,7 @@ class updateTargets extends OdbSuite {
                             "end" : null
                           }
                         }
-                      }                      
+                      }
                     }
                   ]
                 }
@@ -882,7 +882,7 @@ class updateTargets extends OdbSuite {
                         start: { degrees: 10 }
                         end: { degrees: 20 }
                       }
-                    }                      
+                    }
                   }
                 }
                 WHERE: {
@@ -903,7 +903,7 @@ class updateTargets extends OdbSuite {
                         start { degrees }
                         end { degrees }
                       }
-                    }                      
+                    }
                   }
                 }
               }
@@ -929,7 +929,7 @@ class updateTargets extends OdbSuite {
                             "end" : { "degrees": 20.0 }
                           }
                         }
-                      }                      
+                      }
                     }
                   ]
                 }
@@ -1314,7 +1314,7 @@ class updateTargets extends OdbSuite {
               }
             """,
             expected = Left(List("Not a gaussian source.  To change profile type, please provide a full definition."))
-          ) 
+          )
         }
       }
     }

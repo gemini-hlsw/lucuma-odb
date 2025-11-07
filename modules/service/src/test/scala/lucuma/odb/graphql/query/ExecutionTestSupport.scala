@@ -34,7 +34,6 @@ import lucuma.odb.logic.Generator
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.Services
-import natchez.Trace.Implicits.noop
 
 import java.time.Instant
 
@@ -257,8 +256,8 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
         future <- limit.traverse(lim => IO.fromOption(Generator.FutureLimit.from(lim).toOption)(new IllegalArgumentException("Specify a future limit from 0 to 100")))
         enums  <- Enums.load(session)
         tec    <- TimeEstimateCalculatorImplementation.fromSession(session, enums)
-        srv     = Services.forUser(serviceUser, enums, None)(session)
-        gen     = srv.generator(CommitHash.Zero, itcClient, tec)
+        srv     = servicesFor(serviceUser, enums)(session)
+        gen     = srv.generator(CommitHash.Zero, tec)
         res    <- Services.asSuperUser(gen.generate(pid, oid, future.getOrElse(Generator.FutureLimit.Default), when))
       yield res
 
@@ -319,6 +318,6 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
       services.session.transaction.use: xa =>
         Services.asSuperUser:
           services
-            .calibrationsService(emailConfig, httpClient)
+            .calibrationsService
             .recalculateCalibrations(pid, when)(using xa)
 }

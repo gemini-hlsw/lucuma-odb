@@ -50,7 +50,6 @@ import lucuma.odb.service.Services
 import lucuma.odb.smartgcal.data.Gmos
 import lucuma.odb.smartgcal.data.SmartGcalValue
 import lucuma.odb.smartgcal.data.SmartGcalValue.LegacyInstrumentConfig
-import natchez.Trace.Implicits.noop
 import skunk.Session
 
 trait ExecutionTestSupportForGmos extends ExecutionTestSupport:
@@ -140,7 +139,7 @@ trait ExecutionTestSupportForGmos extends ExecutionTestSupport:
       )
 
     Enums.load(s).flatMap: e =>
-      val services = Services.forUser(pi /* doesn't matter*/, e, None)(s)
+      val services = servicesFor(pi /* doesn't matter*/, e)(s)
       services.transactionally:
         rows.zipWithIndex.traverse_ : (r, i) =>
           Services.asSuperUser:
