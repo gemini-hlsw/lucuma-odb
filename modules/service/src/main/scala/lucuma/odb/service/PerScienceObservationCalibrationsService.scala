@@ -22,7 +22,6 @@ import lucuma.core.model.SourceProfile
 import lucuma.core.model.SpectralDefinition
 import lucuma.core.model.Target
 import lucuma.core.util.TimeSpan
-import lucuma.odb.Config
 import lucuma.odb.data.BlindOffsetType
 import lucuma.odb.data.Existence
 import lucuma.odb.data.ExposureTimeModeRole
@@ -38,7 +37,6 @@ import lucuma.odb.graphql.input.TargetPropertiesInput
 import lucuma.odb.graphql.mapping.AccessControl
 import lucuma.odb.service.Services.SuperUserAccess
 import lucuma.odb.util.Codecs.*
-import org.http4s.client.Client
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.syntax.*
 import skunk.*
@@ -57,13 +55,10 @@ trait PerScienceObservationCalibrationsService[F[_]]:
   )(using Transaction[F], SuperUserAccess): F[(List[Observation.Id], List[Observation.Id])]
 
 object PerScienceObservationCalibrationsService:
-  def instantiate[F[_]: {Concurrent as F, Logger, Services as S}](
-    emailConfig: Config.Email,
-    httpClient: Client[F]
-  ): PerScienceObservationCalibrationsService[F] =
+  def instantiate[F[_]: {Concurrent as F, Logger, Services as S}]: PerScienceObservationCalibrationsService[F] =
     new PerScienceObservationCalibrationsService[F] with CalibrationObservations:
 
-      val groupService  = S.groupService(emailConfig, httpClient)
+      val groupService  = S.groupService
       val observationService = S.observationService
       val obsModeService = S.observingModeServices
 

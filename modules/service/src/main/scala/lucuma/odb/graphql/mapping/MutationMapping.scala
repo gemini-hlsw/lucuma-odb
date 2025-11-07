@@ -326,7 +326,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
   private lazy val CloneGroup: MutationField =
     MutationField("cloneGroup", CloneGroupInput.Binding): (input, child) =>
       services.useTransactionally:
-        groupService(emailConfig, httpClient).cloneGroup(input).nestMap: id =>
+        groupService.cloneGroup(input).nestMap: id =>
           Filter(
             And(
               Predicates.cloneGroupResult.originalGroup.id.eql(input.groupId),
@@ -338,9 +338,9 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
       services.useTransactionally:
         selectForClone(input).flatMap: res =>
           res.flatTraverse: checked =>
-            if checked.isEmpty then 
+            if checked.isEmpty then
               OdbError.NotAuthorized(user.id).asFailureF
-            else 
+            else
               observationService.cloneObservation(checked).nestMap: ids =>
                 Filter(And(
                   Predicates.cloneObservationResult.originalObservation.id.eql(ids.originalId),
@@ -393,7 +393,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
   private lazy val CreateGroup: MutationField =
     MutationField("createGroup", CreateGroupInput.Binding): (input, child) =>
       services.useTransactionally:
-        groupService(emailConfig, httpClient).createGroup(input).nestMap: gid =>
+        groupService.createGroup(input).nestMap: gid =>
             Unique(Filter(Predicates.group.id.eql(gid), child))
 
   private lazy val CreateObservation: MutationField =
@@ -412,7 +412,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
       services.useTransactionally {
         selectForUpdate(input).flatMap: r =>
           r.flatTraverse: checked =>
-            programService(emailConfig, httpClient).insertProgram(checked).nestMap: id =>
+            programService.insertProgram(checked).nestMap: id =>
               Unique(Filter(Predicates.program.id.eql(id), child))
       }
     }
@@ -432,7 +432,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
     MutationField("createProposal", CreateProposalInput.Binding): (input, child) =>
       services.useTransactionally:
         requirePiAccess:
-          proposalService(emailConfig, httpClient).createProposal(input).nestMap: pid =>
+          proposalService.createProposal(input).nestMap: pid =>
             Unique(Filter(Predicates.createProposalResult.programId.eql(pid), child))
 
   private lazy val CreateTarget =
@@ -446,7 +446,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
   private lazy val CreateUserInvitation =
     MutationField("createUserInvitation", CreateUserInvitationInput.Binding): (input, child) =>
       services.useTransactionally:
-        userInvitationService(emailConfig, httpClient).createUserInvitation(input).map: rInv =>
+        userInvitationService.createUserInvitation(input).map: rInv =>
           rInv.map: inv =>
             Environment(
               Env("inv" -> inv),
@@ -463,7 +463,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
     MutationField.json("deleteProposal", DeleteProposalInput.Binding): input =>
       services.useTransactionally:
         requireStaffAccess:
-          proposalService(emailConfig, httpClient).deleteProposal(input).nestMap: b =>
+          proposalService.deleteProposal(input).nestMap: b =>
             Json.obj("result" -> b.asJson)
 
   private lazy val LinkUser =
@@ -588,7 +588,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
             child
           )
 
-  
+
   @annotation.nowarn("msg=unused implicit parameter")
   private def recordVisit(
     response:  F[Result[Visit.Id]],
@@ -631,14 +631,14 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
   private lazy val RedeemUserInvitation =
     MutationField("redeemUserInvitation", RedeemUserInvitationInput.Binding): (input, child) =>
       services.useTransactionally:
-        userInvitationService(emailConfig, httpClient).redeemUserInvitation(input).map: rId =>
+        userInvitationService.redeemUserInvitation(input).map: rId =>
           rId.map: id =>
             Unique(Filter(Predicates.userInvitation.id.eql(id), child))
 
   private lazy val RevokeUserInvitation =
     MutationField("revokeUserInvitation", RevokeUserInvitationInput.Binding): (input, child) =>
       services.useTransactionally:
-        userInvitationService(emailConfig, httpClient).revokeUserInvitation(input).map: rId =>
+        userInvitationService.revokeUserInvitation(input).map: rId =>
           rId.map: id =>
             Unique(Filter(Predicates.userInvitation.id.eql(id), child))
 
@@ -651,7 +651,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
           q <- ResultT.fromResult(allocationResultSubquery(p, child))
         yield q).value
 
-  private lazy val SetGuideTargetName = 
+  private lazy val SetGuideTargetName =
     MutationField("setGuideTargetName", SetGuideTargetNameInput.Binding): (input, child) =>
       services.useNonTransactionally:
         selectForUpdate(input, false /* ignore cals */).flatMap: r =>
@@ -660,7 +660,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
             case r @ Warning(problems, AccessControl.Checked.Empty) => Failure(problems).pure[F]
             case other =>
               other.flatTraverse: checked =>
-                guideService(gaiaClient, itcClient, commitHash, timeEstimateCalculator, httpClient)
+                guideService(commitHash, timeEstimateCalculator)
                   .setGuideTargetName(checked)
                   .nestMap: oid =>
                     Unique(Filter(Predicates.setGuideTargetNameResult.observationId.eql(oid), child))
@@ -670,21 +670,21 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
       services.useNonTransactionally:
         selectForUpdate(input).flatMap: res =>
           res.flatTraverse: checked =>
-            observationWorkflowService(httpClient).setWorkflowState(checked, commitHash, itcClient, timeEstimateCalculator)
+            observationWorkflowService.setWorkflowState(checked, commitHash, itcClient, timeEstimateCalculator)
 
   private lazy val SetProgramReference =
     MutationField("setProgramReference", SetProgramReferenceInput.Binding): (input, child) =>
       services.useTransactionally:
         selectForUpdate(input).flatMap: r =>
           r.flatTraverse: checked =>
-            programService(emailConfig, httpClient).setProgramReference(checked).nestMap: (pid, _) =>
+            programService.setProgramReference(checked).nestMap: (pid, _) =>
               Unique(Filter(Predicates.setProgramReferenceResult.programId.eql(pid), child))
 
   private lazy val SetProposalStatus =
     MutationField("setProposalStatus", SetProposalStatusInput.Binding): (input, child) =>
       services.useNonTransactionally:
         requirePiAccess:
-          proposalService(emailConfig, httpClient).setProposalStatus(input, commitHash, itcClient, timeEstimateCalculator).nestMap: pid =>
+          proposalService.setProposalStatus(input, commitHash, itcClient, timeEstimateCalculator).nestMap: pid =>
             Unique(Filter(Predicates.setProposalStatusResult.programId.eql(pid), child))
 
   private lazy val UpdateAsterisms: MutationField =
@@ -804,7 +804,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
           services.useTransactionally:
             approval.flatTraverse: edit =>
                 updateObservations(edit)
-                  .flatMap: 
+                  .flatMap:
                     case (map, query) =>
                       Services.asSuperUser:
                         setAsterisms(map)
@@ -846,11 +846,11 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
               )
 
   private lazy val UpdatePrograms =
-    MutationField("updatePrograms", UpdateProgramsInput.binding(Path.from(ProgramType))): (input, child) =>      
+    MutationField("updatePrograms", UpdateProgramsInput.binding(Path.from(ProgramType))): (input, child) =>
       services.useTransactionally:
         (for
           checked <- ResultT(selectForUpdate(input))
-          pids    <- ResultT(programService(emailConfig, httpClient).updatePrograms(checked))
+          pids    <- ResultT(programService.updatePrograms(checked))
           query   <- ResultT.fromResult(programResultSubquery(pids, input.LIMIT, child))
         yield query).value
 
@@ -858,7 +858,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
     MutationField("updateProposal", UpdateProposalInput.Binding) { (input, child) =>
       services.useTransactionally:
         requirePiAccess:
-          proposalService(emailConfig, httpClient).updateProposal(input).nestMap: pid =>
+          proposalService.updateProposal(input).nestMap: pid =>
             Unique(Filter(Predicates.updateProposalResult.programId.eql(pid), child))
   }
 
@@ -880,7 +880,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
             ResultT(services.useTransactionally(targetService.updateTargets(checked)))
               .flatMap: selected =>
                 ResultT(targetResultSubquery(selected, input.LIMIT, child).pure[F])
-              .value  
+              .value
 
   def groupResultSubquery(pids: List[Group.Id], limit: Option[NonNegInt], child: Query): Result[Query] =
     mutationResultSubquery(
@@ -902,7 +902,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
               input.WHERE.getOrElse(True)
             ))
           ).flatTraverse: which =>
-            groupService(emailConfig, httpClient).updateGroups(input.SET, which).map: r =>
+            groupService.updateGroups(input.SET, which).map: r =>
               r.flatMap: selected =>
                 groupResultSubquery(selected, input.LIMIT, child)
         .recover: // need to recover here due to deferred constraints; nothing bad happens until we commit

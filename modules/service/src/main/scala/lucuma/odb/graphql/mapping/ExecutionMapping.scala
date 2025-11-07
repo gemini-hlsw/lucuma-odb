@@ -44,9 +44,8 @@ import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.Services
 import lucuma.odb.service.Services.Syntax.*
 import org.http4s.client.Client
-import org.typelevel.log4cats.Logger
 
-trait ExecutionMapping[F[_]: Logger] extends ObservationEffectHandler[F]
+trait ExecutionMapping[F[_]] extends ObservationEffectHandler[F]
                                 with ObscalcTable[F]
                                 with Predicates[F]
                                 with SelectSubquery {
@@ -131,7 +130,7 @@ trait ExecutionMapping[F[_]: Logger] extends ObservationEffectHandler[F]
       (pid, oid, futureLimit) =>
         services.use: s =>
           Services.asSuperUser:
-            s.generator(commitHash, itcClient, timeEstimateCalculator)
+            s.generator(commitHash, timeEstimateCalculator)
              .generate(pid, oid, futureLimit)
              .map(_.bimap(_.asWarning(Json.Null), _.asJson.success).merge)
 
@@ -151,7 +150,7 @@ trait ExecutionMapping[F[_]: Logger] extends ObservationEffectHandler[F]
       (pid, oid, _) => {
         services.use: s =>
           Services.asSuperUser:
-            s.generator(commitHash, itcClient, timeEstimateCalculator)
+            s.generator(commitHash, timeEstimateCalculator)
              .executionState(pid, oid)
              .map(_.asJson.success)
       }
@@ -162,7 +161,7 @@ trait ExecutionMapping[F[_]: Logger] extends ObservationEffectHandler[F]
     val calculate: (Program.Id, Observation.Id, Unit) => F[Result[Json]] =
       (_, oid, _) =>
         services.useTransactionally:
-          obscalcService(commitHash, itcClient, timeEstimateCalculator, httpClient)
+          obscalcService(commitHash, timeEstimateCalculator)
            .selectExecutionDigest(oid)
            .map:
              _.fold(OdbError.SequenceUnavailable(oid).asWarning(Json.Null)): cv =>

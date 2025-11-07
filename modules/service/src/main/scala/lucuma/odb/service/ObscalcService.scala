@@ -39,7 +39,6 @@ import lucuma.core.util.CalculationState
 import lucuma.core.util.Timestamp
 import lucuma.itc.IntegrationTime
 import lucuma.itc.SignalToNoiseAt
-import lucuma.itc.client.ItcClient
 import lucuma.odb.data.Obscalc
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
@@ -49,7 +48,6 @@ import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.Services.ServiceAccess
 import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.util.Codecs.*
-import org.http4s.client.Client
 import org.typelevel.log4cats.Logger
 import skunk.*
 import skunk.codec.numeric._int8
@@ -166,9 +164,7 @@ object ObscalcService:
 
   def instantiate[F[_]: Concurrent: Logger](
     commitHash: CommitHash,
-    itcClient:  ItcClient[F],
     calculator: ForInstrumentMode,
-    httpClient: Client[F]
   )(using Services[F]): ObscalcService[F] =
 
     new ObscalcService[F]:
@@ -282,13 +278,13 @@ object ObscalcService:
           Logger[F].info(s"${pending.observationId}: calculating workflow") *>
           services
             .transactionally:
-              observationWorkflowService(httpClient).getCalculatedWorkflow(pending.observationId, itc, dig.map(_.science.executionState))
+              observationWorkflowService.getCalculatedWorkflow(pending.observationId, itc, dig.map(_.science.executionState))
             .flatMap: r =>
               r.toOption.fold(Logger[F].warn(s"${pending.observationId}: failure calculating workflow: $r").as(UndefinedWorkflow))(_.pure[F])
             .flatTap: r =>
               Logger[F].info(s"${pending.observationId}: finished calculating workflow: $r")
 
-        val gen = generator(commitHash, itcClient, calculator)
+        val gen = generator(commitHash, calculator)
 
         def digest(itcResult: Either[OdbError, ItcService.AsterismResults]): F[Either[OdbError, (ExecutionDigest, Stream[Pure, AtomDigest])]] =
           Logger[F].info(s"${pending.observationId}: calculating digest") *>
@@ -300,7 +296,7 @@ object ObscalcService:
             Logger[F].info(s"${pending.observationId}: finished calculting digest: $da")
 
         val result = for
-          r <- itcService(itcClient).lookup(pending.programId, pending.observationId)
+          r <- itcService.lookup(pending.programId, pending.observationId)
           _ <- Logger[F].info(s"${pending.observationId}: itc lookup: $r")
           d <- digest(r)
           w <- workflow(r.toOption, d.toOption.map(_._1))

@@ -108,7 +108,7 @@ trait DatabaseOperations { this: OdbSuite =>
         .flatMap: tec =>
           given Services[IO] = services
           requireServiceAccessOrThrow:
-            val srv  = obscalcService(CommitHash.Zero, itcClient, tec, httpClient)
+            val srv  = obscalcService(CommitHash.Zero, tec)
             val when =
               services.transactionally:
                 srv

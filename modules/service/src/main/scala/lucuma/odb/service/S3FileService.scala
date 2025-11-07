@@ -3,6 +3,7 @@
 
 package lucuma.odb.service
 
+import cats.Applicative
 import cats.effect.Async
 import cats.effect.Ref
 import cats.effect.Resource
@@ -73,6 +74,33 @@ trait S3FileService[F[_]] {
 
 object S3FileService {
   val partSize: PartSizeMB = 5.refined
+
+  def noop[F[_]: Applicative]: S3FileService[F] =
+    new S3FileService[F] {
+      def get(filePath: NonEmptyString)(using SuperUserAccess): Stream[F, Byte] =
+        Stream.empty
+
+      def getMetadata(filePath: NonEmptyString)(using SuperUserAccess): F[HeadObjectResponse] =
+        HeadObjectResponse.builder().build().pure[F]
+
+      def verifyFileAcess(filePath: NonEmptyString)(using SuperUserAccess): F[Unit] =
+        Applicative[F].unit
+
+      def verifyAndGet(filePath: NonEmptyString)(using SuperUserAccess): F[Stream[F, Byte]] =
+        Stream.empty.pure[F]
+
+      def upload(filePath: NonEmptyString, data: Stream[F, Byte])(using SuperUserAccess): F[Long] =
+        0L.pure[F]
+
+      def delete(filePath: NonEmptyString)(using SuperUserAccess): F[Unit] =
+        Applicative[F].unit
+
+      def presignedUrl(filePath: NonEmptyString)(using SuperUserAccess): F[String] =
+        "".pure[F]
+
+      def filePath(programId: Program.Id, uuid: UUID, fileName: NonEmptyString)(using SuperUserAccess): NonEmptyString =
+        fileName
+    }
 
   def fromS3ConfigAndClient[F[_]: Async: Trace](
     awsConfig: Config.Aws,

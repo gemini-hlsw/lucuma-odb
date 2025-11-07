@@ -34,6 +34,7 @@ import lucuma.odb.graphql.topic.TargetTopic
 import lucuma.odb.graphql.util.*
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.util.CommitHash
+import lucuma.odb.service.S3FileService
 import lucuma.odb.service.Services
 import lucuma.odb.util.Codecs.DomainCodec
 import natchez.Trace
@@ -307,7 +308,7 @@ object OdbMapping {
               Services.forUser(
                 user,
                 enums,
-                Option.when(allowSub): (s: Session[F]) => 
+                Option.when(allowSub): (s: Session[F]) =>
                   apply(
                     Resource.pure(s),     // Always use the provided session
                     monitor0,             // Same args as the outer mapping
@@ -324,7 +325,12 @@ object OdbMapping {
                     false,                  // don't allow further sub-mappings; only one level of recursion is allowed
                     Some(schema),           // don't re-parse the schema
                     shouldValidate = false  // already validated
-                  )
+                  ),
+                emailConfig0,
+                httpClient0,
+                itcClient0,
+                gaiaClient0,
+                S3FileService.noop[F]
               )(session)
 
           override val timeEstimateCalculator: TimeEstimateCalculatorImplementation.ForInstrumentMode = tec

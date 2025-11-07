@@ -308,14 +308,14 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
     }
 
   protected val httpClientResource: Resource[IO, Client[IO]] =
-    for 
+    for
       tctx <- TLSContext.Builder.forAsync[IO].insecureResource
       http <- EmberClientBuilder.default[IO].withTLSContext(tctx).withTimeout(5.seconds).build
     yield http
 
   // Override in tests that need an non-default http client.
   // This isn't an ideal way to do it but it should be ok and it prevents a lot of rejiggering.
-  protected def httpRequestHandler: Request[IO] => Resource[IO, Response[IO]] = req => 
+  protected def httpRequestHandler: Request[IO] => Resource[IO, Response[IO]] = req =>
     httpClientResource.flatMap(_.run(req))
 
   // tests that require successfully sending invitations can assign this to httpRequestHandler
@@ -376,12 +376,16 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
   private val gaiaAdapters: NonEmptyChain[CatalogAdapter.Gaia] =
     NonEmptyChain.one(CatalogAdapter.Gaia3LiteEsa)
 
+  private def gaiaClient: GaiaClient[IO] =
+    GaiaClient.build[IO](httpClient, adapters = gaiaAdapters)
+
   private def httpApp(using Trace[IO]): Resource[IO, WebSocketBuilder2[IO] => HttpApp[IO]] =
     FMain.routesResource[IO](
       databaseConfig,
       awsConfig,
       emailConfig,
       itcClient.pure[Resource[IO, *]],
+      gaiaClient.pure[Resource[IO, *]],
       CommitHash.Zero,
       goaUsers,
       ssoClient.pure[Resource[IO, *]],
@@ -390,7 +394,6 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       s3ClientOpsResource,
       s3PresignerResource,
       httpClient.pure[Resource[IO, *]],
-      gaiaAdapters
     ).map(_.map(_.orNotFound))
 
   /** Resource yielding an instantiated OdbMapping, which we can use for some whitebox testing. */
@@ -400,11 +403,10 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       mon  = SkunkMonitor.noopMonitor[IO]
       usr  = TestUsers.Standard.pi(11, 110)
       top <- OdbMapping.Topics(db)
-      gaia = GaiaClient.build(httpClient, adapters = gaiaAdapters)
       itc  = itcClient
       enm <- db.evalMap(Enums.load)
       ptc <- db.evalMap(TimeEstimateCalculatorImplementation.fromSession(_, enm))
-      map  = OdbMapping(db, mon, usr, top, gaia, itc, CommitHash.Zero, goaUsers, enm, ptc, httpClient, emailConfig)
+      map  = OdbMapping(db, mon, usr, top, gaiaClient, itc, CommitHash.Zero, goaUsers, enm, ptc, httpClient, emailConfig)
     } yield map
 
   protected def trace: Resource[IO, Trace[IO]] =
@@ -683,14 +685,17 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       }
     }
 
+  def servicesFor(u: User, e: Enums) =
+    import Trace.Implicits.noop
+    Services.forUser(u, e, None, emailConfig, httpClient, itcClient, gaiaClient, S3FileService.noop[IO])
+
   def withSession[A](f: Session[IO] => IO[A]): IO[A] =
     Resource.eval(IO(sessionFixture())).use(f)
 
   def withServices[A](u: User)(f: Services[IO] => IO[A]): IO[A] =
-    import Trace.Implicits.noop
     Resource.eval(IO(sessionFixture())).use { s =>
       Enums.load(s).flatMap(e =>
-        f(Services.forUser(u, e, None)(s))
+        f(servicesFor(u, e)(s))
       )
     }
 
@@ -704,10 +709,9 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
   // RCN: We had a lot of calls in the calibrations tests that now require ServiceAcces, so
   // instead of changing all the callsites I added this overload.
   def withServices[A](u: ServiceUser)(f: ServiceAccess ?=> Services[IO] => IO[A]): IO[A] =
-    import Trace.Implicits.noop
     Resource.eval(IO(sessionFixture())).use: s =>
       Enums.load(s).flatMap: e =>
-        given services: Services[IO] = Services.forUser(u, e, None)(s)
+        given services: Services[IO] = servicesFor(u, e)(s)
         requireServiceAccess:
           f(services).map(Result.success)
         .flatMap(_.get)
@@ -731,7 +735,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
         SkunkMonitor.noopMonitor[IO],
         u,
         goaUsers,
-        GaiaClient.build[IO](httpClient, adapters = gaiaAdapters),
+        gaiaClient,
         itcClient,
         CommitHash.Zero,
         enm,
@@ -740,7 +744,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
         emailConfig
       )
       db.use: s =>
-        given services: Services[IO] = Services.forUser(u, enm, mapping.some)(s)
+        given services: Services[IO] = Services.forUser(u, enm, mapping.some, emailConfig, httpClient, itcClient, gaiaClient, S3FileService.noop[IO])(s)
         requireServiceAccess:
           f(services).map(Result.success)
         .flatMap(_.get)

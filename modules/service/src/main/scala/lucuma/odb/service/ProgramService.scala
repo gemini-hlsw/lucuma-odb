@@ -22,7 +22,6 @@ import lucuma.core.model.ProgramReference.Description
 import lucuma.core.model.ProposalReference
 import lucuma.core.model.Semester
 import lucuma.core.model.ServiceUser
-import lucuma.odb.Config
 import lucuma.odb.data.*
 import lucuma.odb.graphql.input.GoaPropertiesInput
 import lucuma.odb.graphql.input.ProgramPropertiesInput
@@ -31,7 +30,6 @@ import lucuma.odb.graphql.mapping.AccessControl
 import lucuma.odb.service.Services.SuperUserAccess
 import lucuma.odb.util.Codecs.*
 import natchez.Trace
-import org.http4s.client.Client
 import skunk.*
 import skunk.codec.all.*
 import skunk.syntax.all.*
@@ -101,7 +99,7 @@ object ProgramService {
    * Construct a `ProgramService` using the specified `Session`, for the specified `User`. All
    * operations will be performed on behalf of `user`.
    */
-  def instantiate[F[_]: Concurrent: Trace](emailConfig: Config.Email, httpClient: Client[F])(using Services[F]): ProgramService[F] =
+  def instantiate[F[_]: Concurrent: Trace](using Services[F]): ProgramService[F] =
     new ProgramService[F] {
 
       def selectPid(ref: Ior[ProposalReference, ProgramReference]): F[Option[Program.Id]] = {
@@ -167,10 +165,10 @@ object ProgramService {
                 .failure
           }
 
-      override def setProgramReference(input: AccessControl.CheckedWithId[ProgramReferencePropertiesInput, Program.Id])(using Transaction[F]): F[Result[(Program.Id, Option[ProgramReference])]] = 
+      override def setProgramReference(input: AccessControl.CheckedWithId[ProgramReferencePropertiesInput, Program.Id])(using Transaction[F]): F[Result[(Program.Id, Option[ProgramReference])]] =
         input.foldWithId(OdbError.InvalidArgument().asFailureF): (props, pid) =>
           def validateProposal(pid: Program.Id): F[Result[Unit]] =
-            proposalService(emailConfig, httpClient).hasProposal(pid).map { hasProposal =>
+            proposalService.hasProposal(pid).map { hasProposal =>
               OdbError
                 .InvalidProgram(pid, s"Cannot set the program reference for $pid to ${props.programType.abbreviation} until its proposal is removed.".some)
                 .asFailure
@@ -228,7 +226,7 @@ object ProgramService {
               val edit = ProgramPropertiesInput.Edit.Default.copy(active = a.some)
               updatePrograms(
                 Services.asSuperUser:
-                  // Irritating, we need to reign in the bare AppliedFragments because there's no 
+                  // Irritating, we need to reign in the bare AppliedFragments because there's no
                   // way to know what form they should take. Sometimes it's IN (frag), other
                   // times (as below) it's FROM (frag) and you need a SELECT in there.
                   AccessControl.unchecked(edit, sql"select $program_id".apply(p))

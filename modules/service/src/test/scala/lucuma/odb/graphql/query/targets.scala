@@ -187,7 +187,7 @@ class targets extends OdbSuite {
       pid <- withServices(service) { s =>
               Services.asSuperUser:
                 s.session.transaction.use { xa =>
-                  s.programService(emailConfig, httpClient)
+                  s.programService
                     .insertCalibrationProgram(
                       ProgramPropertiesInput.Create.Default.some,
                       CalibrationRole.Telluric,
@@ -238,7 +238,7 @@ class targets extends OdbSuite {
       pid <- withServices(service) { s =>
               Services.asSuperUser:
                 s.session.transaction.use { xa =>
-                  s.programService(emailConfig, httpClient)
+                  s.programService
                     .insertCalibrationProgram(
                       ProgramPropertiesInput.Create.Default.some,
                       CalibrationRole.Photometric,
@@ -290,7 +290,7 @@ class targets extends OdbSuite {
       pid  <- withServices(service) { s =>
                 Services.asSuperUser:
                   s.session.transaction.use { xa =>
-                    s.programService(emailConfig, httpClient)
+                    s.programService
                       .insertCalibrationProgram(
                         ProgramPropertiesInput.Create.Default.some,
                         CalibrationRole.Telluric,
@@ -382,7 +382,7 @@ class targets extends OdbSuite {
     whereDisposition: String,
     targets: List[(Target.Id, String)]
   ): IO[Unit] =
-    val targetsJson: Json = targets.map(t => 
+    val targetsJson: Json = targets.map(t =>
       json"""
         {
           "id" : ${t._1.asJson},
