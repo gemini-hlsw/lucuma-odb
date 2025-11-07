@@ -42,6 +42,7 @@ import io.circe.JsonObject
 import io.circe.syntax.*
 import io.laserdisc.pure.s3.tagless.S3AsyncClientOp
 import lucuma.catalog.clients.GaiaClient
+import lucuma.catalog.telluric.TelluricClient
 import lucuma.catalog.votable.CatalogAdapter
 import lucuma.core.data.EmailAddress
 import lucuma.core.data.Zipper
@@ -362,6 +363,14 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       invitationFrom    = EmailAddress.unsafeFrom("explore@gpp.com"),
       exploreUrl = Http4sUri.fromString("https://nonsense.kom").toOption.get
     )
+
+  protected def telluricConfig: Config.Telluric =
+    Config.Telluric(
+      root = Http4sUri.fromString("https://telluric-targets.gpp.gemini.edu/").toOption.get
+    )
+
+  protected def telluricClient: IO[TelluricClient[IO]] =
+    TelluricClient.create[IO](telluricConfig.root, httpClient)
 
   // These are overriden in OdbSuiteWithS3 for tests that need it.
   protected def s3ClientOpsResource: Resource[IO, S3AsyncClientOp[IO]] =

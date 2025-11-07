@@ -4,21 +4,31 @@
 package lucuma.odb.feature
 
 import cats.effect.IO
+import cats.effect.Resource
 import cats.syntax.all.*
 import io.circe.Decoder
+import lucuma.catalog.telluric.TelluricStar
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.Flamingos2Fpu
+import lucuma.core.enums.TelluricCalibrationOrder
+import lucuma.core.math.Coordinates
+import lucuma.core.math.Declination
+import lucuma.core.math.RightAscension
 import lucuma.core.math.Wavelength
 import lucuma.core.model.Group
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.util.TimeSpan
+import lucuma.odb.Config
 import lucuma.odb.graphql.OdbSuite
 import lucuma.odb.graphql.TestUsers
 import lucuma.odb.graphql.query.ExecutionTestSupport
 import lucuma.odb.graphql.query.ObservingModeSetupOperations
 import lucuma.odb.graphql.subscription.SubscriptionUtils
 import lucuma.odb.json.time.transport.given
+import org.http4s.Uri
+import org.http4s.circe.jsonEncoder
+import org.http4s.syntax.literals.*
 
 import java.time.LocalDateTime
 import java.time.ZoneOffset
@@ -37,6 +47,49 @@ class perScienceObservationCalibrations
   override val validUsers = List(pi, service)
 
   val when = LocalDateTime.of(2024, 1, 1, 12, 0, 0).toInstant(ZoneOffset.UTC)
+
+  // Test telluric star returned by the mock
+  val testTelluricStar = TelluricStar(
+    hip = 12345,
+    spType = "A0V",
+    coordinates = Coordinates(
+      RightAscension.fromDoubleDegrees(123.456),
+      Declination.fromDoubleDegrees(45.678).getOrElse(Declination.Zero)
+    ),
+    distance = 100.5,
+    hmag = 7.5,
+    score = 0.95,
+    order = TelluricCalibrationOrder.Before
+  )
+
+  // Override telluricConfig to use mock client
+  override protected def telluricConfig: Config.Telluric =
+    Config.Telluric(uri"http://mock-telluric-service")
+
+  // Override httpRequestHandler to intercept telluric service requests
+  override protected def httpRequestHandler: org.http4s.Request[IO] => Resource[IO, org.http4s.Response[IO]] = req =>
+    if (req.uri.toString.contains("mock-telluric-service")) {
+      // Return mock telluric response
+      val mockResponse = io.circe.Json.obj(
+        "data" -> io.circe.Json.obj(
+          "search" -> io.circe.Json.arr(
+            io.circe.Json.obj(
+              "HIP" -> io.circe.Json.fromInt(testTelluricStar.hip),
+              "spType" -> io.circe.Json.fromString(testTelluricStar.spType),
+              "RA" -> io.circe.Json.fromDoubleOrNull(testTelluricStar.coordinates.ra.toAngle.toDoubleDegrees),
+              "Dec" -> io.circe.Json.fromDoubleOrNull(testTelluricStar.coordinates.dec.toAngle.toSignedDoubleDegrees),
+              "Distance" -> io.circe.Json.fromDoubleOrNull(testTelluricStar.distance),
+              "Hmag" -> io.circe.Json.fromDoubleOrNull(testTelluricStar.hmag),
+              "Score" -> io.circe.Json.fromDoubleOrNull(testTelluricStar.score),
+              "Order" -> io.circe.Json.fromString(testTelluricStar.order.tag)
+            )
+          )
+        )
+      )
+      Resource.pure(org.http4s.Response[IO](org.http4s.Status.Ok).withEntity(mockResponse))
+    } else {
+      super.httpRequestHandler(req)
+    }
 
   case class GroupInfo(
     id:               Group.Id,
@@ -587,7 +640,7 @@ class perScienceObservationCalibrations
       assertEquals(removed.size, 0)
     }
 
-  test("telluric observation has placeholder target with correct properties"):
+  test("telluric observation has real telluric star target"):
     for {
       pid         <- createProgramAs(pi)
       tid         <- createTargetWithProfileAs(pi, pid)
@@ -599,9 +652,10 @@ class perScienceObservationCalibrations
       telluricOid =  obsInGroup.find(_.calibrationRole.contains(CalibrationRole.Telluric)).get.id
       telluricObs <- queryObservationWithTarget(telluricOid)
     } yield {
-      assertEquals(telluricObs.targetName, Some("Telluric Target (TBD)"))
-      assertEquals(telluricObs.targetRa, Some("00:00:00.000000"))
-      assertEquals(telluricObs.targetDec, Some("+00:00:00.000000"))
+      // Verify we got a real telluric star from the mock, not a placeholder
+      assertEquals(telluricObs.targetName, Some("HIP 12345"))
+      assertEquals(telluricObs.targetRa, Some("08:13:49.440000"))
+      assertEquals(telluricObs.targetDec, Some("+45:40:40.800000"))
     }
 
   test("each F2 observation gets its own unique telluric observation and target"):

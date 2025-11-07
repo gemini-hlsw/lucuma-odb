@@ -17,6 +17,7 @@ import fs2.concurrent.Topic
 import fs2.io.net.Network
 import grackle.Result
 import lucuma.catalog.clients.GaiaClient
+import lucuma.catalog.telluric.TelluricClient
 import lucuma.core.model.Access
 import lucuma.core.model.User
 import lucuma.itc.client.ItcClient
@@ -135,18 +136,19 @@ object CMain extends MainParams {
     calibTopic: Topic[F, CalibTimeTopic.Element],
     services: Resource[F, Services[F]]
   ): Resource[F, Unit] =
-    summon[Monad[F]]
     for {
+      telluricClient <- Resource.eval(TelluricClient.create[F](telluricConfig.root, httpClient)(using A, L))
       _  <- Resource.eval(info"Start listening for program changes")
       _  <- Resource.eval(obsTopic.subscribe(100).evalMap { elem =>
               services.use: svc =>
+                val calSvc = svc.calibrationsService(emailConfig, telluricClient, httpClient)
                 services.useTransactionally:
                   Services.asSuperUser:
                     for {
-                      i <- svc.calibrationsService.isCalibration(elem.observationId)
+                      i <- calSvc.isCalibration(elem.observationId)
                       _ <- info"Observation channel: Element(${elem.observationId},${elem.programId},${elem.editType},${elem.users}), calibration: $i"
                       t <- C.realTimeInstant.map(i => LocalDate.ofInstant(i, ZoneOffset.UTC))
-                      _ <- calibrationsService
+                      _ <- calSvc
                             .recalculateCalibrations(
                               elem.programId,
                               LocalDateTime.of(t, LocalTime.MIDNIGHT).toInstant(ZoneOffset.UTC)
@@ -207,12 +209,7 @@ object CMain extends MainParams {
       (obsT, ctT) <- topics(pool)
       user        <- Resource.eval(serviceUser[F](c))
       httpClient  <- c.httpClientResource
-      itcClient   <- c.itcClient
-      gaiaClient  <- c.gaiaClient
-      _           <- runCalibrationsDaemon(
-                       obsT,
-                       ctT,
-                       pool.evalMap(services(user, enums, c.email, httpClient, itcClient, gaiaClient)))
+      _           <- runCalibrationsDaemon(c.email, c.telluric, httpClient, obsT, ctT, pool.evalMap(services(user, enums)))
     } yield ExitCode.Success
 
   /** Our logical entry point. */

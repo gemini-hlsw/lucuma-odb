@@ -18,6 +18,7 @@ import grackle.ResultT
 import io.circe.Json
 import io.circe.JsonObject
 import lucuma.catalog.clients.GaiaClient
+import lucuma.catalog.telluric.TelluricClient
 import lucuma.core.model.Access
 import lucuma.core.model.User
 import lucuma.core.util.Gid

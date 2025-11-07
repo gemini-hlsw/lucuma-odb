@@ -43,6 +43,7 @@ case class Config(
   port:          Port,                      // Our port, nothing fancy.
   itc:           Config.Itc,                // ITC config
   sso:           Config.Sso,                // SSO config
+  telluric:      Config.Telluric,           // Telluric service config
   serviceJwt:    String,                    // Only service users can exchange API keys, so we need a service user JWT.
   honeycomb:     Option[Config.Honeycomb],  // Honeycomb config
   database:      Config.Database,           // Database config
@@ -113,6 +114,15 @@ object Config:
       envOrProp("ODB_SSO_ROOT").as[Uri],
       envOrProp("ODB_SSO_PUBLIC_KEY").as[PublicKey]
     ).parMapN(Sso.apply)
+
+  // Root URI for the telluric service
+  case class Telluric(root: Uri)
+
+  object Telluric:
+    lazy val fromCiris: ConfigValue[Effect, Telluric] =
+      envOrProp("ODB_TELLURIC_ROOT").as[Uri]
+        .default(uri"https://telluric-targets.gpp.gemini.edu/")
+        .map(Telluric.apply)
 
   case class Honeycomb(
     writeKey: String,
@@ -308,6 +318,7 @@ object Config:
     envOrProp("PORT").as[Int].as[Port], // passed by Heroku
     Itc.fromCiris,
     Sso.fromCiris,
+    Telluric.fromCiris,
     envOrProp("ODB_SERVICE_JWT"),
     Honeycomb.fromCiris,
     Database.fromCiris,
