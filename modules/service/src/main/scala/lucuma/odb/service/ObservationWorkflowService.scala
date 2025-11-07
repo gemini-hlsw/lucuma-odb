@@ -100,7 +100,7 @@ sealed trait ObservationWorkflowService[F[_]] {
   )(using NoTransaction[F]): F[Result[ObservationWorkflow]]
 
   def filterState(
-    oids: List[Observation.Id], 
+    oids: List[Observation.Id],
     states: Set[ObservationWorkflowState],
     commitHash: CommitHash,
     itcClient: ItcClient[F],
@@ -318,10 +318,10 @@ object ObservationWorkflowService {
                   .getCoordinatesSnapshotOrRegion(batch, when)
                   .map: batchResults =>
                     batchResults
-                      .collect:                        
+                      .collect:
                         case (oid, Result.Success(Left(snap))) => oid -> snap.base // we only care about results where coordinates are known
                         case (oid, Result.Success(Right(_, Some(eb)))) => oid -> eb
-                      .foldLeft(accum): 
+                      .foldLeft(accum):
                         case (accum2, (oid, coords)) =>
                           accum2.updatedWith(oid): op =>
                             op.map(_.copy(coordinates = Some(coords)))
@@ -340,9 +340,8 @@ object ObservationWorkflowService {
 
       private def lookupCachedItcResults(
         input:      Map[Observation.Id, ObservationValidationInfo],
-        itcClient:  ItcClient[F]
       )(using Transaction[F], SuperUserAccess): F[Map[Observation.Id, ItcService.AsterismResults]] =
-        itcService(itcClient)
+        itcService
           .selectAll:
             input
               .view
@@ -372,10 +371,9 @@ object ObservationWorkflowService {
         infos:      Map[Observation.Id, ObservationValidationInfo],
         itcResults: Map[Observation.Id, ItcService.AsterismResults],
         commitHash: CommitHash,
-        itcClient:  ItcClient[F],
         ptc:        TimeEstimateCalculatorImplementation.ForInstrumentMode
       )(using NoTransaction[F], SuperUserAccess): F[Map[Observation.Id, ExecutionState]] =
-        generator(commitHash, itcClient, ptc)
+        generator(commitHash, ptc)
           .executionStates:
             infos
               .toList
@@ -575,7 +573,7 @@ object ObservationWorkflowService {
             (
               for
                 infos  <- ResultT.liftF(lookupObsDefinitions(oids))               // Map[Observation.Id, ObsDefinition]
-                itcRes <- ResultT.liftF(lookupCachedItcResults(infos, itcClient)) // Map[Observation.Id, ItcService.AsterismResults]
+                itcRes <- ResultT.liftF(lookupCachedItcResults(infos)) // Map[Observation.Id, ItcService.AsterismResults]
                 errs   <- validateObsDefinition(infos, itcRes.keySet.apply)       // Map[Observation.Id, ObservationValidationMap]
               yield (infos, errs, itcRes)
             ).value
@@ -583,7 +581,7 @@ object ObservationWorkflowService {
         (for
           (infos, errs, itcRes) <- ResultT(select)
           errorFree              = infos.view.filterKeys(oid => errs.get(oid).forall(_.isEmpty)).toMap
-          execs                 <- ResultT.liftF(executionStates(errorFree, itcRes, commitHash, itcClient, ptc))
+          execs                 <- ResultT.liftF(executionStates(errorFree, itcRes, commitHash, ptc))
           workflows             <- ResultT.fromResult(computeWorkflows(infos, errs, execs))
         yield workflows).value
 
@@ -631,10 +629,10 @@ object ObservationWorkflowService {
         itcClient: ItcClient[F],
         ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode
       )(using NoTransaction[F]): F[Result[ObservationWorkflow]] =
-        input.foldWithId(OdbError.InvalidArgument().asFailureF): 
+        input.foldWithId(OdbError.InvalidArgument().asFailureF):
           case ((w, state), oid) =>
             if w.state === state then ResultT.success(w)
-            else ResultT: 
+            else ResultT:
               // If we're transitioning to or from a UserState, just update that column
               if w.state.isUserState || state.isUserState then
                 services.transactionally:
@@ -644,14 +642,14 @@ object ObservationWorkflowService {
               else // we must be declaring completion (or revoking that declaration)
                 import ObservationWorkflowState.*
                 (w.state, state) match
-                  case (Ongoing, Completed) | (Completed, Ongoing) => 
+                  case (Ongoing, Completed) | (Completed, Ongoing) =>
                     services.transactionally:
                       session.prepareR(Statements.UpdateDeclaredCompletion).use: pc =>
                         pc.execute(state === Completed, oid)
                           .as(Result(w.copy(state = state)))
-                  case _ => 
+                  case _ =>
                     // This should never happen but I want to check for it anyway.
-                    Result.internalError(s"Transition from ${w.state} to $state was not expected.").pure[F]                
+                    Result.internalError(s"Transition from ${w.state} to $state was not expected.").pure[F]
           .value
 
       extension (wf: ObservationWorkflow) def isCompatibleWith(states: Set[ObservationWorkflowState]): Boolean =
@@ -660,7 +658,7 @@ object ObservationWorkflowService {
         (wf.state :: wf.validTransitions.filterNot(_ === ObservationWorkflowState.Completed)).forall(states.contains)
 
       override def filterState(
-        oids: List[Observation.Id], 
+        oids: List[Observation.Id],
         states: Set[ObservationWorkflowState],
         commitHash: CommitHash,
         itcClient: ItcClient[F],
@@ -713,7 +711,7 @@ object ObservationWorkflowService {
             getWorkflows(map.values.toList.flatten, commitHash, itcClient, ptc)
               .map: res =>
                 res.flatMap: wfs =>
-                  map.toList.foldLeft(Result(Nil)): 
+                  map.toList.foldLeft(Result(Nil)):
                     case (accum, (tid, oids)) =>
                       oids.traverse(wfs.get) match
                         case None => Result.internalError("Unpossible: query returned one or more bogus oids")
@@ -723,7 +721,7 @@ object ObservationWorkflowService {
                             val msg = s"Target $tid is not eligible for this operation due to the workflow state of one or more associated observations."
                             OdbError.InvalidTarget(tid, msg.some)
                               .asProblemNec
-    
+
   }
 
   object Statements {

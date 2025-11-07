@@ -23,15 +23,11 @@ import lucuma.core.model.sequence.CategorizedTime
 import lucuma.core.model.sequence.CategorizedTimeRange
 import lucuma.core.util.CalculatedValue
 import lucuma.core.util.CalculationState
-import lucuma.itc.client.ItcClient
-import lucuma.odb.Config
 import lucuma.odb.data.GroupTree
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.ObscalcService
 import lucuma.odb.service.Services
 import lucuma.odb.service.Services.Syntax.*
-import org.http4s.client.Client
-import org.typelevel.log4cats.Logger
 import skunk.Transaction
 
 /**
@@ -75,15 +71,12 @@ sealed trait TimeEstimateService[F[_]]:
 
 object TimeEstimateService:
 
-  def instantiate[F[_]: Concurrent](
+  def instantiate[F[_]: Concurrent: Services](
     commitHash:   CommitHash,
-    itcClient:    ItcClient[F],
     calculator:   TimeEstimateCalculatorImplementation.ForInstrumentMode,
-    emailConfig:  Config.Email,
-    httpClient:   Client[F]
-  )(using Services[F], Logger[F]): TimeEstimateService[F] =
+  ): TimeEstimateService[F] =
     lazy val obscalcService: ObscalcService[F] =
-      services.obscalcService(commitHash, itcClient, calculator)
+      services.obscalcService(commitHash, calculator)
 
     new TimeEstimateService[F]:
 
@@ -138,14 +131,14 @@ object TimeEstimateService:
         m:    Map[Observation.Id, CalculatedValue[CategorizedTime]]
       ): Option[CalculatedValue[CategorizedTimeRange]] =
         root match
-          case GroupTree.Leaf(oid)                                  => leafRange(oid, m)
-          case GroupTree.Branch(_, min, _, children, _, _, _, _, _) => parentRange(pid, min, children, m)
-          case GroupTree.Root(_, children)                          => parentRange(pid, None, children, m)
+          case GroupTree.Leaf(oid)                                      => leafRange(oid, m)
+          case GroupTree.Branch(minRequired = min, children = children) => parentRange(pid, min, children, m)
+          case GroupTree.Root(_, children)                              => parentRange(pid, None, children, m)
 
       private def load(
         pid: Program.Id
       )(using Transaction[F]): F[(GroupTree, Map[Observation.Id, CalculatedValue[CategorizedTime]])] =
-        (groupService(emailConfig, httpClient).selectGroups(pid), obscalcService.selectProgramCategorizedTime(pid)).tupled
+        (groupService.selectGroups(pid), obscalcService.selectProgramCategorizedTime(pid)).tupled
 
       override def estimateProgramRange(
         pid: Program.Id
@@ -157,7 +150,7 @@ object TimeEstimateService:
         gid: Group.Id
       )(using Transaction[F]): F[Option[CalculatedValue[CategorizedTimeRange]]] =
         (for
-          p <- OptionT(groupService(emailConfig, httpClient).selectPid(gid))
+          p <- OptionT(groupService.selectPid(gid))
           d <- OptionT.liftF(load(p))
           (tree, valueMap) = d
           t <- OptionT.fromOption(tree.findGroup(gid))
@@ -180,13 +173,13 @@ object TimeEstimateService:
       )(using Transaction[F]): F[Map[Option[ScienceBand], CalculatedValue[CategorizedTime]]] =
         def containedObs(root: GroupTree): Set[Observation.Id] =
           root match
-            case GroupTree.Leaf(oid)                                => Set(oid)
-            case GroupTree.Branch(_, _, _, children, _, _, _, _, _) => children.map(containedObs).combineAll
-            case GroupTree.Root(_, children)                        => children.map(containedObs).combineAll
+            case GroupTree.Leaf(oid)                   => Set(oid)
+            case GroupTree.Branch(children = children) => children.map(containedObs).combineAll
+            case GroupTree.Root(_, children)           => children.map(containedObs).combineAll
 
         val res = (for
-          p <- OptionT(groupService(emailConfig, httpClient).selectPid(gid))
-          t <- OptionT.liftF(groupService(emailConfig, httpClient).selectGroups(p))
+          p <- OptionT(groupService.selectPid(gid))
+          t <- OptionT.liftF(groupService.selectGroups(p))
           os = t.findGroup(gid).map(containedObs).combineAll
           b <- OptionT.liftF(observationService.selectBands(p))
           c <- OptionT.liftF(obscalcService.selectProgramCategorizedTime(p))

@@ -50,7 +50,6 @@ import lucuma.core.model.sequence.flamingos2.Flamingos2FpuMask
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
-import lucuma.itc.client.ItcClient
 import lucuma.itc.client.ItcConstraintsInput
 import lucuma.itc.client.ItcConstraintsInput.*
 import lucuma.odb.data.ContiguousTimestampMap
@@ -297,9 +296,8 @@ object GuideService {
 
   def instantiate[F[_]: Concurrent: Trace](
     gaiaClient:             GaiaClient[F],
-    itcClient:              ItcClient[F],
     commitHash:             CommitHash,
-    timeEstimateCalculator: TimeEstimateCalculatorImplementation.ForInstrumentMode
+    timeEstimateCalculator: TimeEstimateCalculatorImplementation.ForInstrumentMode,
   )(using Services[F]): GuideService[F] =
     new GuideService[F] {
 
@@ -568,7 +566,7 @@ object GuideService {
         oid: Observation.Id
       ): F[Result[GeneratorInfo]] =
         Services.asSuperUser:
-          generator(commitHash, itcClient, timeEstimateCalculator)
+          generator(commitHash, timeEstimateCalculator)
             .digestWithParamsAndHash(pid, oid)
             .map:
               case Right((d, p, h)) => GeneratorInfo(d, p, h).success

@@ -7650,6 +7650,9 @@ enum ImageQualityPreset {
   """ImageQualityPreset OnePointZero"""
   ONE_POINT_ZERO
 
+  """ImageQualityPreset OnePointTw"""
+  ONE_POINT_TWO
+
   """ImageQualityPreset OnePointTwo"""
   ONE_POINT_TWO
 

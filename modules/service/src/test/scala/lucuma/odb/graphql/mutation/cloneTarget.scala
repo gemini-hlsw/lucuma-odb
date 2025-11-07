@@ -188,7 +188,7 @@ class cloneTarget extends OdbSuite {
       pid <- withServices(service) { s =>
               Services.asSuperUser:
                 s.session.transaction.use { xa =>
-                  s.programService(emailConfig, httpClient)
+                  s.programService
                     .insertCalibrationProgram(
                       ProgramPropertiesInput.Create.Default.some,
                       CalibrationRole.Photometric,
@@ -229,7 +229,7 @@ class cloneTarget extends OdbSuite {
       pid  <- withServices(service) { s => // calibration prograam
                 Services.asSuperUser:
                   s.session.transaction.use { xa =>
-                    s.programService(emailConfig, httpClient)
+                    s.programService
                       .insertCalibrationProgram(
                         ProgramPropertiesInput.Create.Default.some,
                         CalibrationRole.Telluric,

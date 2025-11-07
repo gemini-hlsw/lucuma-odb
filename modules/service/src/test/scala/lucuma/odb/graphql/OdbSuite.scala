@@ -27,6 +27,7 @@ import com.dimafeng.testcontainers.PostgreSQLContainer
 import com.dimafeng.testcontainers.munit.TestContainerForAll
 import eu.timepit.refined.types.numeric.PosInt
 import fs2.Stream
+import fs2.io.net.tls.TLSContext
 import fs2.text.utf8
 import grackle.Mapping
 import grackle.Result
@@ -83,6 +84,7 @@ import munit.diff.console.AnsiColors
 import natchez.Trace
 import org.http4s.blaze.server.BlazeServerBuilder
 import org.http4s.client.Client
+import org.http4s.ember.client.EmberClientBuilder
 import org.http4s.headers.Authorization
 import org.http4s.jdkhttpclient.JdkHttpClient
 import org.http4s.jdkhttpclient.JdkWSClient
@@ -305,8 +307,16 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
         FakeItcVersions.pure[IO]
     }
 
-  // override in tests that need an http client
-  protected def httpRequestHandler: Request[IO] => Resource[IO, Response[IO]] = _ => Resource.eval(IO.pure(Response.notFound[IO]))
+  protected val httpClientResource: Resource[IO, Client[IO]] =
+    for
+      tctx <- TLSContext.Builder.forAsync[IO].insecureResource
+      http <- EmberClientBuilder.default[IO].withTLSContext(tctx).withTimeout(5.seconds).build
+    yield http
+
+  // Override in tests that need an non-default http client.
+  // This isn't an ideal way to do it but it should be ok and it prevents a lot of rejiggering.
+  protected def httpRequestHandler: Request[IO] => Resource[IO, Response[IO]] = req =>
+    httpClientResource.flatMap(_.run(req))
 
   // tests that require successfully sending invitations can assign this to httpRequestHandler
   protected val invitationEmailRequestHandler: Request[IO] => Resource[IO, Response[IO]] =
@@ -366,12 +376,16 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
   private val gaiaAdapters: NonEmptyChain[CatalogAdapter.Gaia] =
     NonEmptyChain.one(CatalogAdapter.Gaia3LiteEsa)
 
+  private def gaiaClient: GaiaClient[IO] =
+    GaiaClient.build[IO](httpClient, adapters = gaiaAdapters)
+
   private def httpApp(using Trace[IO]): Resource[IO, WebSocketBuilder2[IO] => HttpApp[IO]] =
     FMain.routesResource[IO](
       databaseConfig,
       awsConfig,
       emailConfig,
       itcClient.pure[Resource[IO, *]],
+      gaiaClient.pure[Resource[IO, *]],
       CommitHash.Zero,
       goaUsers,
       ssoClient.pure[Resource[IO, *]],
@@ -380,7 +394,6 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       s3ClientOpsResource,
       s3PresignerResource,
       httpClient.pure[Resource[IO, *]],
-      gaiaAdapters
     ).map(_.map(_.orNotFound))
 
   /** Resource yielding an instantiated OdbMapping, which we can use for some whitebox testing. */
@@ -390,11 +403,10 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       mon  = SkunkMonitor.noopMonitor[IO]
       usr  = TestUsers.Standard.pi(11, 110)
       top <- OdbMapping.Topics(db)
-      gaia = GaiaClient.build(httpClient, adapters = gaiaAdapters)
       itc  = itcClient
       enm <- db.evalMap(Enums.load)
       ptc <- db.evalMap(TimeEstimateCalculatorImplementation.fromSession(_, enm))
-      map  = OdbMapping(db, mon, usr, top, gaia, itc, CommitHash.Zero, goaUsers, enm, ptc, httpClient, emailConfig)
+      map  = OdbMapping(db, mon, usr, top, gaiaClient, itc, CommitHash.Zero, goaUsers, enm, ptc, httpClient, emailConfig)
     } yield map
 
   protected def trace: Resource[IO, Trace[IO]] =
@@ -673,14 +685,17 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       }
     }
 
+  def servicesFor(u: User, e: Enums) =
+    import Trace.Implicits.noop
+    Services.forUser(u, e, None, emailConfig, httpClient, itcClient, gaiaClient, S3FileService.noop[IO])
+
   def withSession[A](f: Session[IO] => IO[A]): IO[A] =
     Resource.eval(IO(sessionFixture())).use(f)
 
   def withServices[A](u: User)(f: Services[IO] => IO[A]): IO[A] =
-    import Trace.Implicits.noop
     Resource.eval(IO(sessionFixture())).use { s =>
       Enums.load(s).flatMap(e =>
-        f(Services.forUser(u, e, None)(s))
+        f(servicesFor(u, e)(s))
       )
     }
 
@@ -694,10 +709,9 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
   // RCN: We had a lot of calls in the calibrations tests that now require ServiceAcces, so
   // instead of changing all the callsites I added this overload.
   def withServices[A](u: ServiceUser)(f: ServiceAccess ?=> Services[IO] => IO[A]): IO[A] =
-    import Trace.Implicits.noop
     Resource.eval(IO(sessionFixture())).use: s =>
       Enums.load(s).flatMap: e =>
-        given services: Services[IO] = Services.forUser(u, e, None)(s)
+        given services: Services[IO] = servicesFor(u, e)(s)
         requireServiceAccess:
           f(services).map(Result.success)
         .flatMap(_.get)
@@ -710,28 +724,27 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
 
     val res =
       for
-        http <- JdkHttpClient.simple[IO]
         db   <- FMain.databasePoolResource[IO](databaseConfig)
         enm  <- db.evalMap(Enums.load)
         ptc  <- db.evalMap(TimeEstimateCalculatorImplementation.fromSession(_, enm))
-      yield (http, db, enm, ptc)
+      yield (db, enm, ptc)
 
-    res.use: (http, db, enm, ptc) =>
+    res.use: (db, enm, ptc) =>
       val mapping = (s: Session[IO]) => OdbMapping.forObscalc(
         Resource.pure(s),
         SkunkMonitor.noopMonitor[IO],
         u,
         goaUsers,
-        GaiaClient.build[IO](http, adapters = gaiaAdapters),
+        gaiaClient,
         itcClient,
         CommitHash.Zero,
         enm,
         ptc,
-        http,
+        httpClient,
         emailConfig
       )
       db.use: s =>
-        given services: Services[IO] = Services.forUser(u, enm, mapping.some)(s)
+        given services: Services[IO] = Services.forUser(u, enm, mapping.some, emailConfig, httpClient, itcClient, gaiaClient, S3FileService.noop[IO])(s)
         requireServiceAccess:
           f(services).map(Result.success)
         .flatMap(_.get)

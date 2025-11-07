@@ -232,13 +232,13 @@ trait ProgramMapping[F[_]]
   private lazy val estimateRangeHandler: EffectHandler[F] =
     keyValueEffectHandler[Program.Id, Option[CalculatedValue[CategorizedTimeRange]]]("id"): pid =>
       services.useTransactionally:
-        timeEstimateService(commitHash, itcClient, timeEstimateCalculator, emailConfig, httpClient)
+        timeEstimateService(commitHash, timeEstimateCalculator)
           .estimateProgramRange(pid)
 
   private lazy val estimateBandedHandler: EffectHandler[F] =
     keyValueEffectHandler[Program.Id, List[CalculatedValue[BandedTime]]]("id"): gid =>
       services.useTransactionally:
-        timeEstimateService(commitHash, itcClient, timeEstimateCalculator, emailConfig, httpClient)
+        timeEstimateService(commitHash, timeEstimateCalculator)
           .estimateProgramBanded(gid)
           .map(_.toList.sortBy(_._1).map((b, cv) => Monad[CalculatedValue].map(cv)(t => BandedTime(b, t))))
 

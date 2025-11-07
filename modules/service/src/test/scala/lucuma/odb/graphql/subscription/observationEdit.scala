@@ -13,6 +13,9 @@ import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.enums.CalibrationRole
+import lucuma.core.enums.Flamingos2Disperser
+import lucuma.core.enums.GmosNorthGrating
+import lucuma.core.enums.ObservingModeType
 import lucuma.core.math.Epoch
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
@@ -286,7 +289,7 @@ class observationEdit extends OdbSuite with SubscriptionUtils {
           }
         """
       ).void
-  
+
   def signalToNoiseUpdate(user: User, obsId: Observation.Id): IO[Unit] =
     val sn = s"""
       {
@@ -315,7 +318,7 @@ class observationEdit extends OdbSuite with SubscriptionUtils {
       }
     """
     updateRequirementsExposureTimeMode(user, obsId, tc)
-  
+
   val requirementsExposureTimeModeSubscription =
     s"""
       subscription {
@@ -599,7 +602,7 @@ class observationEdit extends OdbSuite with SubscriptionUtils {
       tid0 <- createTargetAs(pi, pid, "Zero")
       // An observation with a single target is essentially a calib observation
       oid  <- createObservationAs(pi, pid, None, tid0)
-      _    <- setObservationCalibratioRole(oid, Some(CalibrationRole.Telluric))
+      _    <- setObservationCalibrationRole(List(oid), CalibrationRole.Telluric)
       _    <- subscriptionExpect(
         user      = pi,
         query     = deletedSubscription(pid),
@@ -641,4 +644,150 @@ class observationEdit extends OdbSuite with SubscriptionUtils {
       )
     } yield ()
   }
+
+  val f2ConfigSubscription: String =
+    s"""
+      subscription {
+        observationEdit {
+          editType
+          value {
+            observingMode {
+              flamingos2LongSlit {
+                disperser
+                filter
+                fpu
+              }
+            }
+          }
+        }
+      }
+    """
+
+  def f2DisperserObservationEdit(disperser: Flamingos2Disperser): Json =
+    json"""
+      {
+        "observationEdit": {
+          "editType": "UPDATED",
+          "value": {
+            "observingMode": {
+              "flamingos2LongSlit": {
+                "disperser": ${disperser.tag},
+                "filter": "Y",
+                "fpu": "LONG_SLIT_2"
+              }
+            }
+          }
+        }
+      }
+    """
+
+  def updateFlamingos2Disperser(user: User, oid: Observation.Id, disperser: Flamingos2Disperser): IO[Unit] =
+    query(
+      user = user,
+      query = s"""
+        mutation {
+          updateObservations(input: {
+            SET: {
+              observingMode: {
+                flamingos2LongSlit: {
+                  disperser: ${disperser.tag}
+                }
+              }
+            },
+            WHERE: { id: { EQ: "$oid" } }
+          }) {
+            observations {
+              id
+            }
+          }
+        }
+      """
+    ).void
+
+  test("triggers for changing flamingos2 long slit configuration"):
+    import Group1.pi
+    for {
+      pid <- createProgram(pi, "foo")
+      tid <- createTargetAs(pi, pid, "Target")
+      oid <- createFlamingos2LongSlitObservationAs(pi, pid, tid)
+      _   <- subscriptionExpect(
+        user      = pi,
+        query     = f2ConfigSubscription,
+        mutations = Right(updateFlamingos2Disperser(pi, oid, Flamingos2Disperser.R3000)),
+        expected  = List(f2DisperserObservationEdit(Flamingos2Disperser.R3000))
+      )
+    } yield ()
+
+  val gmosConfigSubscription: String =
+    s"""
+      subscription {
+        observationEdit {
+          editType
+          value {
+            observingMode {
+              gmosNorthLongSlit {
+                grating
+                filter
+                fpu
+              }
+            }
+          }
+        }
+      }
+    """
+
+  def gmosGratingObservationEdit(grating: GmosNorthGrating): Json =
+    json"""
+      {
+        "observationEdit": {
+          "editType": "UPDATED",
+          "value": {
+            "observingMode": {
+              "gmosNorthLongSlit": {
+                "grating": ${grating.tag},
+                "filter": "R_PRIME",
+                "fpu": "LONG_SLIT_0_50"
+              }
+            }
+          }
+        }
+      }
+    """
+
+  def updateGmosNorthGrating(user: User, oid: Observation.Id, grating: GmosNorthGrating): IO[Unit] =
+    query(
+      user = user,
+      query = s"""
+        mutation {
+          updateObservations(input: {
+            SET: {
+              observingMode: {
+                gmosNorthLongSlit: {
+                  grating: ${grating.tag}
+                }
+              }
+            },
+            WHERE: { id: { EQ: "$oid" } }
+          }) {
+            observations {
+              id
+            }
+          }
+        }
+      """
+    ).void
+
+  test("triggers for changing gmos north long slit configuration"):
+    import Group1.pi
+    for {
+      pid <- createProgram(pi, "name")
+      tid <- createTargetAs(pi, pid)
+      oid <- createObservationAs(pi, pid, Some(ObservingModeType.GmosNorthLongSlit))
+      _   <- subscriptionExpect(
+        user      = pi,
+        query     = gmosConfigSubscription,
+        mutations = Right(updateGmosNorthGrating(pi, oid, GmosNorthGrating.B1200_G5301)),
+        expected  = List(gmosGratingObservationEdit(GmosNorthGrating.B1200_G5301))
+      )
+    } yield ()
 }

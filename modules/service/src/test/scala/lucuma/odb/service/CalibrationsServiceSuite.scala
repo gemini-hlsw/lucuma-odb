@@ -25,7 +25,7 @@ class CalibrationsServiceSuite extends OdbSuite:
     withServices(serviceUser): services =>
       assertIOBoolean(
         services
-          .calibrationsService(emailConfig, httpClient)
+          .calibrationsService
           .calibrationTargets(List(CalibrationRole.SpectroPhotometric), when)
           .map(_.sizeIs > 0)
       )
@@ -37,7 +37,7 @@ class CalibrationsServiceSuite extends OdbSuite:
         Services.asSuperUser:
           services.transactionally:
             for
-              before <- services.calibrationsService(emailConfig, httpClient).calibrationTargets(roles, when)
+              before <- services.calibrationsService.calibrationTargets(roles, when)
               _      <- services.targetService.updateTargets(
                  AccessControl.unchecked(
                    TargetPropertiesInput.Edit(none, none, none, Existence.Deleted.some),
@@ -45,5 +45,5 @@ class CalibrationsServiceSuite extends OdbSuite:
                    target_id
                  )
               )
-              after  <- services.calibrationsService(emailConfig, httpClient).calibrationTargets(roles, when)
+              after  <- services.calibrationsService.calibrationTargets(roles, when)
             yield before.tail === after

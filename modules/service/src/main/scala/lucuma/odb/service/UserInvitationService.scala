@@ -30,7 +30,6 @@ import lucuma.odb.graphql.input.CreateUserInvitationInput
 import lucuma.odb.graphql.input.RedeemUserInvitationInput
 import lucuma.odb.graphql.input.RevokeUserInvitationInput
 import lucuma.odb.util.Codecs.*
-import org.http4s.client.Client
 import skunk.Query
 import skunk.SqlState
 import skunk.Transaction
@@ -52,7 +51,7 @@ trait UserInvitationService[F[_]]:
 
 object UserInvitationService:
 
-  def instantiate[F[_]: MonadCancelThrow](emailConfig: Config.Email, httpClient: Client[F])(using Services[F]): UserInvitationService[F] =
+  def instantiate[F[_]: MonadCancelThrow](emailConfig: Config.Email)(using Services[F]): UserInvitationService[F] =
     new UserInvitationService[F]:
 
       def sendInvitation(
@@ -80,7 +79,7 @@ object UserInvitationService:
 
         // A different message could be sent for html clients
         Services.asSuperUser:
-          emailService(emailConfig, httpClient)
+          emailService
             .send(pid, emailConfig.invitationFrom, input.recipientEmail, subject, textMessage, none)
       }
 

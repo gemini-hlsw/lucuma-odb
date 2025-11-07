@@ -39,7 +39,6 @@ import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.syntax.scienceSubtype.*
 import lucuma.odb.util.Codecs.*
 import org.http4s.Uri
-import org.http4s.client.Client
 import skunk.*
 import skunk.codec.all.*
 import skunk.data.Completion.Delete
@@ -169,7 +168,7 @@ object ProposalService {
   }
 
   /** Construct a `ProposalService` using the specified `Session`. */
-  def instantiate[F[_]: Concurrent](emailConfig: Config.Email, httpClient: Client[F])(using Services[F]): ProposalService[F] =
+  def instantiate[F[_]: Concurrent](emailConfig: Config.Email)(using Services[F]): ProposalService[F] =
     new ProposalService[F] {
 
       import error.*
@@ -229,7 +228,7 @@ object ProposalService {
           piEmailStr.fold(missingPiEmailAddress(pid).asFailure)(emailStr =>
             piEmailAddress.fold(invalidPiEmailAddress(emailStr.value, pid).asFailure)(_ => Result.unit)
           )
-          
+
         def validateSubmission(
           pid: Program.Id,
           newStatus: enumsVal.ProposalStatus
@@ -300,9 +299,9 @@ object ProposalService {
 
         private val timeFormatter = DateTimeFormatter.ofPattern("HH:mm")
         private def formatTime(t: Timestamp): String = timeFormatter.format(t.toLocalDateTime)
-        
+
         private def programUrl(newReference: ProposalReference): Uri = emailConfig.exploreUrl / newReference.label
-        
+
         private def textSubmissionEmail(newReference: ProposalReference): NonEmptyString = NonEmptyString.unsafeFrom(
           s"""Hello,
           |
@@ -322,7 +321,7 @@ object ProposalService {
           |Gemini Observatory
           """.stripMargin
         )
-        
+
         private def htmlSubmissionEmail(newReference: ProposalReference): NonEmptyString = NonEmptyString.unsafeFrom(
           s"""Hello,<br/>
           <br/>
@@ -360,7 +359,7 @@ object ProposalService {
           html: Option[NonEmptyString]
         )(using Transaction[F]): F[Result[Unit]] =
           Services.asSuperUser:
-            emailService(emailConfig, httpClient)
+            emailService
               .send(pid, emailConfig.invitationFrom, recipient, subject, text, html)
               .map(_ => Result.unit)
 
@@ -503,7 +502,7 @@ object ProposalService {
           ).sequence.void)
 
         (for {
-          pid    <- ResultT(programService(emailConfig, httpClient).resolvePid(input.programId, input.proposalReference, input.programReference))
+          pid    <- ResultT(programService.resolvePid(input.programId, input.proposalReference, input.programReference))
           before <- ResultT(ProposalContext.lookup(pid))
           after  <- ResultT(before.edit(input.SET))
           _      <- checkCfpCompatibility(after)
@@ -557,7 +556,7 @@ object ProposalService {
           val af = Statements.updateProposalStatus(user, pid, tag)
           session.prepareR(af.fragment.command).use(_.execute(af.argument)).void
 
-        ResultT(programService(emailConfig, httpClient).resolvePid(input.programId, input.proposalReference, input.programReference))
+        ResultT(programService.resolvePid(input.programId, input.proposalReference, input.programReference))
           .flatMap: pid =>
             ResultT(Services.asSuperUser(observationWorkflowService.getWorkflows(pid, commitHash, itcClient, ptc))).flatMap: wfs =>
               val states = wfs.values.map(_.state).toSet

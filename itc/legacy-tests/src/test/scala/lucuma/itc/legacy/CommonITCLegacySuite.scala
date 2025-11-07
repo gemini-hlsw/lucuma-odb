@@ -476,8 +476,8 @@ trait CommonITCLegacySuite extends CatsEffectSuite:
       val userDefinedFluxDensities = NonEmptyMap.of(
         Wavelength.decimalNanometers.getOption(300).get -> BigDecimal(0.5),
         Wavelength.decimalNanometers.getOption(500).get -> BigDecimal(1.0),
-        Wavelength.decimalNanometers.getOption(600).get -> BigDecimal(0.0),
-        Wavelength.decimalNanometers.getOption(700).get -> BigDecimal(-0.1)
+        Wavelength.decimalNanometers.getOption(600).get -> BigDecimal(0.2),
+        Wavelength.decimalNanometers.getOption(700).get -> BigDecimal(0.3)
       )
 
       val result = localItc
@@ -490,7 +490,6 @@ trait CommonITCLegacySuite extends CatsEffectSuite:
             UnnormalizedSED.UserDefined(userDefinedFluxDensities)
           ).asJson.noSpaces
         )
-
       assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))
 
   def testBrightnessUnits(

@@ -39,7 +39,6 @@ import lucuma.core.model.sequence.gmos.StaticConfig.GmosNorth as GmosNorthStatic
 import lucuma.core.model.sequence.gmos.StaticConfig.GmosSouth as GmosSouthStatic
 import lucuma.core.util.Timestamp
 import lucuma.itc.IntegrationTime
-import lucuma.itc.client.ItcClient
 import lucuma.odb.data.Md5Hash
 import lucuma.odb.data.OdbError
 import lucuma.odb.sequence.ExecutionConfigGenerator
@@ -202,7 +201,6 @@ object Generator {
 
   def instantiate[F[_]: Concurrent](
     commitHash:   CommitHash,
-    itcClient:    ItcClient[F],
     calculator:   TimeEstimateCalculatorImplementation.ForInstrumentMode
   )(using Services[F]): Generator[F] =
     new Generator[F] {
@@ -260,7 +258,7 @@ object Generator {
           pid: Program.Id,
           oid: Observation.Id
         )(using NoTransaction[F]): EitherT[F, OdbError, Context] = {
-          val itc = itcService(itcClient)
+          val itc = itcService
 
           val opc: F[Either[OdbError, (GeneratorParams, Option[ItcService.AsterismResults])]] =
             services.transactionally:

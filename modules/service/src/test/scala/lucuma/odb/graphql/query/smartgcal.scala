@@ -49,7 +49,6 @@ import lucuma.odb.smartgcal.data.Gmos
 import lucuma.odb.smartgcal.data.Gmos.GratingConfigKey
 import lucuma.odb.smartgcal.data.SmartGcalValue
 import lucuma.odb.smartgcal.data.SmartGcalValue.LegacyInstrumentConfig
-import natchez.Trace.Implicits.noop
 import skunk.Session
 
 class smartgcal extends OdbSuite with ObservingModeSetupOperations {
@@ -72,7 +71,7 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
 
   override def dbInitialization: Option[Session[IO] => IO[Unit]] = Some { s =>
     Enums.load(s).flatMap { e =>
-      val services = Services.forUser(pi /* doesn't matter*/, e, None)(s)
+      val services = servicesFor(pi /* doesn't matter*/, e)(s)
       services.transactionally {
 
         val flat =

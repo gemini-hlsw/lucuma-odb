@@ -27,12 +27,14 @@ import lucuma.odb.json.region.query.given
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.Services
+import org.http4s.client.Client
 
 trait ConfigurationMapping[F[_]]
   extends ObservationView[F] with ConfigurationRequestView[F] {
 
   def services: Resource[F, Services[F]]
   def itcClient: ItcClient[F]
+  def httpClient: Client[F]
   def gaiaClient: GaiaClient[F]
   def commitHash: CommitHash
   def timeEstimateCalculator: TimeEstimateCalculatorImplementation.ForInstrumentMode
@@ -79,7 +81,7 @@ trait ConfigurationMapping[F[_]]
           .traverse: at =>
             services.use { implicit s =>
               Services.asSuperUser:
-                s .trackingService
+                s.trackingService
                   .getCoordinatesSnapshotOrRegion(oid, at)
                   .map: res =>
                     if res.isFailure then Result(None) // important, don't fail here
@@ -115,8 +117,8 @@ trait ConfigurationMapping[F[_]]
                         Json.obj(
                           "coordinates" -> result.flatMap(_.left.toOption).asJson,
                           "region"      -> result.flatMap(_.toOption).asJson,
-                        ), 
-                        Some(parentCursor), 
+                        ),
+                        Some(parentCursor),
                         parentCursor.fullEnv
                       )
                      }

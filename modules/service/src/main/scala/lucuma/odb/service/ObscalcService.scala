@@ -39,7 +39,6 @@ import lucuma.core.util.CalculationState
 import lucuma.core.util.Timestamp
 import lucuma.itc.IntegrationTime
 import lucuma.itc.SignalToNoiseAt
-import lucuma.itc.client.ItcClient
 import lucuma.odb.data.Obscalc
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
@@ -165,8 +164,7 @@ object ObscalcService:
 
   def instantiate[F[_]: Concurrent: Logger](
     commitHash: CommitHash,
-    itcClient:  ItcClient[F],
-    calculator: ForInstrumentMode
+    calculator: ForInstrumentMode,
   )(using Services[F]): ObscalcService[F] =
 
     new ObscalcService[F]:
@@ -286,7 +284,7 @@ object ObscalcService:
             .flatTap: r =>
               Logger[F].info(s"${pending.observationId}: finished calculating workflow: $r")
 
-        val gen = generator(commitHash, itcClient, calculator)
+        val gen = generator(commitHash, calculator)
 
         def digest(itcResult: Either[OdbError, ItcService.AsterismResults]): F[Either[OdbError, (ExecutionDigest, Stream[Pure, AtomDigest])]] =
           Logger[F].info(s"${pending.observationId}: calculating digest") *>
@@ -298,7 +296,7 @@ object ObscalcService:
             Logger[F].info(s"${pending.observationId}: finished calculting digest: $da")
 
         val result = for
-          r <- itcService(itcClient).lookup(pending.programId, pending.observationId)
+          r <- itcService.lookup(pending.programId, pending.observationId)
           _ <- Logger[F].info(s"${pending.observationId}: itc lookup: $r")
           d <- digest(r)
           w <- workflow(r.toOption, d.toOption.map(_._1))

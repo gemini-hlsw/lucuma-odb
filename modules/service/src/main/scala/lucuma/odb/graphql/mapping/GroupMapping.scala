@@ -69,6 +69,7 @@ trait GroupMapping[F[_]] extends GroupView[F] with ProgramTable[F] with GroupEle
 
       SqlField("existence", GroupView.Existence),
       SqlField("system", GroupView.System),
+      SqlField("calibrationRoles", GroupView.CalibrationRoles),
     )
 
   lazy val GroupElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
@@ -89,12 +90,12 @@ trait GroupMapping[F[_]] extends GroupView[F] with ProgramTable[F] with GroupEle
   private lazy val estimateRangeHandler: EffectHandler[F] =
     keyValueEffectHandler[Group.Id, Option[CalculatedValue[CategorizedTimeRange]]]("id"): gid =>
       services.useTransactionally:
-        timeEstimateService(commitHash, itcClient, timeEstimateCalculator, emailConfig, httpClient)
+        timeEstimateService(commitHash, timeEstimateCalculator)
           .estimateGroupRange(gid)
 
   private lazy val estimateBandedHandler: EffectHandler[F] =
     keyValueEffectHandler[Group.Id, List[CalculatedValue[BandedTime]]]("id"): gid =>
       services.useTransactionally:
-        timeEstimateService(commitHash, itcClient, timeEstimateCalculator, emailConfig, httpClient)
+        timeEstimateService(commitHash, timeEstimateCalculator)
           .estimateGroupBanded(gid)
           .map(_.toList.sortBy(_._1).map((b, cv) => Monad[CalculatedValue].map(cv)(t => BandedTime(b, t))))
