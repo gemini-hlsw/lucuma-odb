@@ -44,9 +44,8 @@ import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.Services
 import lucuma.odb.service.Services.Syntax.*
 import org.http4s.client.Client
-import org.typelevel.log4cats.Logger
 
-trait ExecutionMapping[F[_]: Logger] extends ObservationEffectHandler[F]
+trait ExecutionMapping[F[_]] extends ObservationEffectHandler[F]
                                 with ObscalcTable[F]
                                 with Predicates[F]
                                 with SelectSubquery {
