@@ -31,6 +31,7 @@ import lucuma.odb.graphql.topic.ObscalcTopic
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.ObscalcService
+import lucuma.odb.service.S3FileService
 import lucuma.odb.service.Services
 import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.service.UserService
@@ -223,7 +224,7 @@ object CalcMain extends MainParams:
       httpClient,
       itcClient,
       gaiaClient,
-      throw new RuntimeException("s3FileService not available in obscalc service")
+      S3FileService.noop[F]
     )(session).pure[F].flatTap: _ =>
       val us = UserService.fromSession(session)
       Services.asSuperUser(us.canonicalizeUser(user))

@@ -72,7 +72,6 @@ import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.AttachmentFileService.AttachmentException
-import lucuma.odb.service.NoopClients
 import lucuma.odb.service.S3FileService
 import lucuma.odb.service.Services
 import lucuma.odb.service.Services.ServiceAccess
@@ -364,7 +363,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       exploreUrl = Http4sUri.fromString("https://nonsense.kom").toOption.get
     )
 
-  // adThese are overriden in OdbSuiteWithS3 for tests that need it.
+  // These are overriden in OdbSuiteWithS3 for tests that need it.
   protected def s3ClientOpsResource: Resource[IO, S3AsyncClientOp[IO]] =
     S3FileService.s3AsyncClientOpsResource[IO](awsConfig)
 
@@ -688,7 +687,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
 
   def servicesFor(u: User, e: Enums) =
     import Trace.Implicits.noop
-    Services.forUser(u, e, None, emailConfig, httpClient, itcClient, gaiaClient, NoopClients.noopS3FileService[IO])
+    Services.forUser(u, e, None, emailConfig, httpClient, itcClient, gaiaClient, S3FileService.noop[IO])
 
   def withSession[A](f: Session[IO] => IO[A]): IO[A] =
     Resource.eval(IO(sessionFixture())).use(f)
@@ -745,7 +744,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
         emailConfig
       )
       db.use: s =>
-        given services: Services[IO] = Services.forUser(u, enm, mapping.some, emailConfig, httpClient, itcClient, gaiaClient, NoopClients.noopS3FileService[IO])(s)
+        given services: Services[IO] = Services.forUser(u, enm, mapping.some, emailConfig, httpClient, itcClient, gaiaClient, S3FileService.noop[IO])(s)
         requireServiceAccess:
           f(services).map(Result.success)
         .flatMap(_.get)

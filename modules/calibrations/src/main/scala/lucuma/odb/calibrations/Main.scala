@@ -25,7 +25,7 @@ import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.graphql.topic.CalibTimeTopic
 import lucuma.odb.graphql.topic.ObservationTopic
 import lucuma.odb.sequence.util.CommitHash
-import lucuma.odb.service.NoopClients
+import lucuma.odb.service.S3FileService
 import lucuma.odb.service.Services
 import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.service.UserService
@@ -180,7 +180,7 @@ object CMain extends MainParams {
           httpClient,
           itcClient,
           gaiaClient,
-          NoopClients.noopS3FileService[F]
+          S3FileService.noop[F]
         )(pool).pure[F].flatTap { _ =>
           val us = UserService.fromSession(pool)
           Services.asSuperUser(us.canonicalizeUser(u))
