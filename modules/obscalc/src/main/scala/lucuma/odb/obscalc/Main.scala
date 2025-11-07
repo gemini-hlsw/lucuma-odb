@@ -141,15 +141,13 @@ object CalcMain extends MainParams:
     connectionsLimit: Int,
     commitHash:       CommitHash,
     pollPeriod:       FiniteDuration,
-    itcClient:        ItcClient[F],
-    httpClient:       Client[F],
     timeEstimate:     TimeEstimateCalculatorImplementation.ForInstrumentMode,
     topic:            Topic[F, ObscalcTopic.Element],
     services:         Resource[F, Services[F]]
   ): Resource[F, F[Outcome[F, Throwable, Unit]]] =
 
     val obscalc: Services[F] ?=> ObscalcService[F] =
-      obscalcService(commitHash, itcClient, timeEstimate, httpClient)
+      obscalcService(commitHash, timeEstimate)
 
     // Stream of pending calc produced by watching for updates to t_obscalc.
     // We filter out anything but transitions to Pending.  Entries in the Retry
@@ -209,11 +207,24 @@ object CalcMain extends MainParams:
     yield o
 
   def services[F[_]: Temporal: Parallel: UUIDGen: Trace: Logger](
-    user:    User,
-    enums:   Enums,
-    mapping: Session[F] => Mapping[F]
+    user:        User,
+    enums:       Enums,
+    mapping:     Session[F] => Mapping[F],
+    emailConfig: Config.Email,
+    httpClient:  Client[F],
+    itcClient:   ItcClient[F],
+    gaiaClient:  GaiaClient[F]
   )(session: Session[F]): F[Services[F]] =
-    Services.forUser(user, enums, mapping.some)(session).pure[F].flatTap: _ =>
+    Services.forUser(
+      user,
+      enums,
+      mapping.some,
+      emailConfig,
+      httpClient,
+      itcClient,
+      gaiaClient,
+      throw new RuntimeException("s3FileService not available in obscalc service")
+    )(session).pure[F].flatTap: _ =>
       val us = UserService.fromSession(session)
       Services.asSuperUser(us.canonicalizeUser(user))
 
@@ -223,22 +234,20 @@ object CalcMain extends MainParams:
    */
   def server[F[_]: Async: Parallel: Logger: Trace: Console: Network: SecureRandom]: Resource[F, F[Outcome[F, Throwable, Unit]]] =
     for
-      c     <- Resource.eval(Config.fromCiris.load[F])
-      _     <- Resource.eval(banner[F](c))
-      ep    <- LucumaEntryPoint.entryPointResource(ServiceName, c)
-      pool  <- databasePoolResource[F](c.database)
-      enums <- Resource.eval(pool.use(Enums.load))
-
-      http  <- c.httpClientResource
-      gaiaClient =  GaiaClient.build[F](http, adapters = GaiaClient.DefaultAdapters)
-
-      itc   <- c.itcClient
-      ptc   <- Resource.eval(pool.use(TimeEstimateCalculatorImplementation.fromSession(_, enums)))
-
-      t     <- topic(pool)
-      user  <- Resource.eval(serviceUser[F](c))
-      mapping = (s: Session[F]) => OdbMapping.forObscalc(Resource.pure(s), SkunkMonitor.noopMonitor[F], user, c.goaUsers, gaiaClient, itc, c.commitHash, enums, ptc, http, c.email)
-      o     <- runObscalcDaemon(c.database.maxObscalcConnections, c.commitHash, c.obscalcPoll, itc, http, ptc, t, pool.evalMap(services(user, enums, mapping)))
+      c          <- Resource.eval(Config.fromCiris.load[F])
+      _          <- Resource.eval(banner[F](c))
+      ep         <- LucumaEntryPoint.entryPointResource(ServiceName, c)
+      pool       <- databasePoolResource[F](c.database)
+      enums      <- Resource.eval(pool.use(Enums.load))
+      http       <- c.httpClientResource
+      gaiaClient <- c.gaiaClient
+      itc        <- c.itcClient
+      ptc        <- Resource.eval(pool.use(TimeEstimateCalculatorImplementation.fromSession(_, enums)))
+      t          <- topic(pool)
+      user       <- Resource.eval(serviceUser[F](c))
+      mapping     = (s: Session[F]) =>
+                      OdbMapping.forObscalc(Resource.pure(s), SkunkMonitor.noopMonitor[F], user, c.goaUsers, gaiaClient, itc, c.commitHash, enums, ptc, http, c.email)
+      o          <- runObscalcDaemon(c.database.maxObscalcConnections, c.commitHash, c.obscalcPoll, ptc, t, pool.evalMap(services(user, enums, mapping, c.email, http, itc, gaiaClient)))
     yield o
 
   /** Our logical entry point. */

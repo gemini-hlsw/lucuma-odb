@@ -23,14 +23,11 @@ import lucuma.core.model.sequence.CategorizedTime
 import lucuma.core.model.sequence.CategorizedTimeRange
 import lucuma.core.util.CalculatedValue
 import lucuma.core.util.CalculationState
-import lucuma.itc.client.ItcClient
-import lucuma.odb.Config
 import lucuma.odb.data.GroupTree
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.ObscalcService
 import lucuma.odb.service.Services
 import lucuma.odb.service.Services.Syntax.*
-import org.http4s.client.Client
 import org.typelevel.log4cats.Logger
 import skunk.Transaction
 
@@ -77,13 +74,10 @@ object TimeEstimateService:
 
   def instantiate[F[_]: Concurrent](
     commitHash:   CommitHash,
-    itcClient:    ItcClient[F],
     calculator:   TimeEstimateCalculatorImplementation.ForInstrumentMode,
-    emailConfig:  Config.Email,
-    httpClient:   Client[F]
   )(using Services[F], Logger[F]): TimeEstimateService[F] =
     lazy val obscalcService: ObscalcService[F] =
-      services.obscalcService(commitHash, itcClient, calculator, httpClient)
+      services.obscalcService(commitHash, calculator)
 
     new TimeEstimateService[F]:
 
@@ -145,7 +139,7 @@ object TimeEstimateService:
       private def load(
         pid: Program.Id
       )(using Transaction[F]): F[(GroupTree, Map[Observation.Id, CalculatedValue[CategorizedTime]])] =
-        (groupService(emailConfig, httpClient).selectGroups(pid), obscalcService.selectProgramCategorizedTime(pid)).tupled
+        (groupService.selectGroups(pid), obscalcService.selectProgramCategorizedTime(pid)).tupled
 
       override def estimateProgramRange(
         pid: Program.Id
@@ -157,7 +151,7 @@ object TimeEstimateService:
         gid: Group.Id
       )(using Transaction[F]): F[Option[CalculatedValue[CategorizedTimeRange]]] =
         (for
-          p <- OptionT(groupService(emailConfig, httpClient).selectPid(gid))
+          p <- OptionT(groupService.selectPid(gid))
           d <- OptionT.liftF(load(p))
           (tree, valueMap) = d
           t <- OptionT.fromOption(tree.findGroup(gid))
@@ -185,8 +179,8 @@ object TimeEstimateService:
             case GroupTree.Root(_, children)           => children.map(containedObs).combineAll
 
         val res = (for
-          p <- OptionT(groupService(emailConfig, httpClient).selectPid(gid))
-          t <- OptionT.liftF(groupService(emailConfig, httpClient).selectGroups(p))
+          p <- OptionT(groupService.selectPid(gid))
+          t <- OptionT.liftF(groupService.selectGroups(p))
           os = t.findGroup(gid).map(containedObs).combineAll
           b <- OptionT.liftF(observationService.selectBands(p))
           c <- OptionT.liftF(obscalcService.selectProgramCategorizedTime(p))

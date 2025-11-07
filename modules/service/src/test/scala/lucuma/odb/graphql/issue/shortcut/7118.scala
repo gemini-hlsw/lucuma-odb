@@ -22,7 +22,7 @@ class ShortCut_7118 extends OdbSuite with DatabaseOperations:
   def deleteSystemGroup(pid: Program.Id, gid: Group.Id): IO[Result[Unit]] =
     withServices(svc): ss =>
       ss.transactionally:
-        groupService(null, null).deleteSystemGroup(pid, gid)
+        groupService.deleteSystemGroup(pid, gid)
 
   def assertFailure(a: Result[Any], msg: String): Unit =
     a match

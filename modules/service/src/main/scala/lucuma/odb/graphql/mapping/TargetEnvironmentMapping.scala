@@ -151,7 +151,7 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
         services.use { implicit services =>
           Services.asSuperUser:
             services
-              .trackingService(httpClient)
+              .trackingService
               .getCoordinatesSnapshotOrRegion(oid, obsTime)
               .map: res =>
                 res.map(_.left.toOption.map(_.base)) // treat region as None
@@ -167,7 +167,7 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
       (pid, oid, obsTime) =>
         services.use { implicit s =>
           Services.asSuperUser:
-            s.guideService(gaiaClient, itcClient, commitHash, timeEstimateCalculator, httpClient)
+            s.guideService(commitHash, timeEstimateCalculator)
               .getGuideEnvironments(pid, oid, obsTime)
         }
 
@@ -181,7 +181,7 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
       (pid, oid, _) =>
         services.use { implicit s =>
           Services.asSuperUser:
-            s.guideService(gaiaClient, itcClient, commitHash, timeEstimateCalculator, httpClient)
+            s.guideService(commitHash, timeEstimateCalculator)
               .getGuideEnvironment(pid, oid)
         }
 
@@ -201,7 +201,7 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
       (pid, oid, period) =>
         services.use { implicit s =>
           Services.asSuperUser:
-            s.guideService(gaiaClient, itcClient, commitHash, timeEstimateCalculator, httpClient)
+            s.guideService(commitHash, timeEstimateCalculator)
               .getGuideAvailability(pid, oid, period)
         }
 
@@ -215,7 +215,7 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
       (pid, oid, _) =>
         services.use { implicit s =>
           Services.asSuperUser:
-            s.guideService(gaiaClient, itcClient, commitHash, timeEstimateCalculator, httpClient)
+            s.guideService(commitHash, timeEstimateCalculator)
               .getGuideTargetName(pid, oid)
         }
 

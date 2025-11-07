@@ -14,6 +14,7 @@ import eu.timepit.refined.types.string.NonEmptyString
 import fs2.aws.s3.models.Models.BucketName
 import fs2.aws.s3.models.Models.FileKey
 import fs2.io.net.Network
+import lucuma.catalog.clients.GaiaClient
 import lucuma.core.data.EmailAddress
 import lucuma.core.model.Program
 import lucuma.core.model.User
@@ -72,6 +73,11 @@ case class Config(
   def itcClient[F[_]: Async: Logger: Network]: Resource[F, ItcClient[F]] =
     httpClientResource[F].evalMap: httpClient =>
       ItcClient.create(itc.root, httpClient)
+
+  // Gaia client resource
+  def gaiaClient[F[_]: Async: Network]: Resource[F, GaiaClient[F]] =
+    httpClientResource[F].map: httpClient =>
+      GaiaClient.build[F](httpClient, adapters = GaiaClient.DefaultAdapters)
 
   // SSO Client resource (has to be a resource because it owns an HTTP client).
   def ssoClient[F[_]: Async: Trace: Network: Logger]: Resource[F, SsoClient[F, User]] =

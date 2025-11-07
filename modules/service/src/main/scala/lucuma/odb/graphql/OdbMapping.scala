@@ -307,7 +307,7 @@ object OdbMapping {
               Services.forUser(
                 user,
                 enums,
-                Option.when(allowSub): (s: Session[F]) => 
+                Option.when(allowSub): (s: Session[F]) =>
                   apply(
                     Resource.pure(s),     // Always use the provided session
                     monitor0,             // Same args as the outer mapping
@@ -324,7 +324,12 @@ object OdbMapping {
                     false,                  // don't allow further sub-mappings; only one level of recursion is allowed
                     Some(schema),           // don't re-parse the schema
                     shouldValidate = false  // already validated
-                  )
+                  ),
+                emailConfig0,
+                httpClient0,
+                itcClient0,
+                gaiaClient0,
+                throw new RuntimeException("s3FileService not available in sub-mappings")
               )(session)
 
           override val timeEstimateCalculator: TimeEstimateCalculatorImplementation.ForInstrumentMode = tec

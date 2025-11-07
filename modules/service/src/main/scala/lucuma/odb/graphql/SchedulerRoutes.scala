@@ -19,12 +19,15 @@ import lucuma.core.model.sequence.AtomDigest
 import lucuma.core.syntax.string.*
 import lucuma.core.util.Gid
 import lucuma.core.util.Uid
+import lucuma.itc.client.ItcClient
+import lucuma.odb.Config
 import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.service.Services
 import lucuma.odb.service.Services.Syntax.*
 import lucuma.sso.client.SsoClient
 import natchez.Trace
 import org.http4s.*
+import org.http4s.client.Client
 import org.http4s.dsl.Http4sDsl
 import org.http4s.headers.`Accept-Encoding`
 import org.typelevel.ci.*
@@ -35,12 +38,16 @@ object SchedulerRoutes:
 
   // the normal constructor
   def apply[F[_]: Async: Logger: Parallel: Trace: SecureRandom](
-    pool:      Resource[F, Session[F]],
-    ssoClient: SsoClient[F, User],
-    enums:     Enums
+    pool:        Resource[F, Session[F]],
+    ssoClient:   SsoClient[F, User],
+    enums:       Enums,
+    emailConfig: Config.Email,
+    httpClient:  Client[F],
+    itcClient:   ItcClient[F],
+    gaiaClient:  lucuma.catalog.clients.GaiaClient[F]
   ): HttpRoutes[F] =
     apply(
-      [A] => (u: User) => (fa: Services[F] => F[A]) => pool.map(Services.forUser(u, enums, None)).use(fa),
+      [A] => (u: User) => (fa: Services[F] => F[A]) => pool.map(Services.forUser(u, enums, None, emailConfig, httpClient, itcClient, gaiaClient, throw new RuntimeException("s3FileService not available in SchedulerRoutes"))).use(fa),
       ssoClient
     )
 

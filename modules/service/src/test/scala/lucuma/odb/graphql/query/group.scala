@@ -83,7 +83,7 @@ class group extends OdbSuite with DatabaseOperations {
           _    <- setObservationExistence(pi0, oid2, Existence.Deleted) *>
                     setObservationExistence(pi0, oid3, Existence.Deleted)
           tree <- services
-                    .groupService(emailConfig, httpClient)
+                    .groupService
                     .selectGroups(
                       pid,
                       obsFilter = sql"c_existence = $existence"(Existence.Deleted)
@@ -102,7 +102,7 @@ class group extends OdbSuite with DatabaseOperations {
           gid1 <- createGroupAs(pi0, pid)
           gid2 <- createGroupAs(pi0, pid, name = "group".some)
           tree <- services
-                    .groupService(emailConfig, httpClient)
+                    .groupService
                     .selectGroups(
                       pid,
                       groupFilter = sql"c_name = $varchar".apply("group")
@@ -124,7 +124,7 @@ class group extends OdbSuite with DatabaseOperations {
           _          <- setObservationExistence(pi0, deletedObs, Existence.Deleted)
           // selectGroups with both filters: group 2 + deleted observations
           tree <-    services
-                        .groupService(emailConfig, httpClient)
+                        .groupService
                         .selectGroups(
                           pid,
                           groupFilter = sql"c_name = $varchar".apply("group2"),

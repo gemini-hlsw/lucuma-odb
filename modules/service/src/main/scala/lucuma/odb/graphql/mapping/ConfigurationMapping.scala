@@ -81,7 +81,7 @@ trait ConfigurationMapping[F[_]]
           .traverse: at =>
             services.use { implicit s =>
               Services.asSuperUser:
-                s .trackingService(httpClient)
+                s.trackingService
                   .getCoordinatesSnapshotOrRegion(oid, at)
                   .map: res =>
                     if res.isFailure then Result(None) // important, don't fail here
@@ -117,8 +117,8 @@ trait ConfigurationMapping[F[_]]
                         Json.obj(
                           "coordinates" -> result.flatMap(_.left.toOption).asJson,
                           "region"      -> result.flatMap(_.toOption).asJson,
-                        ), 
-                        Some(parentCursor), 
+                        ),
+                        Some(parentCursor),
                         parentCursor.fullEnv
                       )
                      }

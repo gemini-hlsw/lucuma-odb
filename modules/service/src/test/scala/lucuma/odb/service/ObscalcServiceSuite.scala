@@ -47,7 +47,7 @@ trait ObscalcServiceSuiteSupport extends ExecutionTestSupportForGmos:
       TimeEstimateCalculatorImplementation
         .fromSession(services.session, services.enums)
         .map: tec =>
-          services.obscalcService(CommitHash.Zero, itcClient, tec, httpClient)
+          services.obscalcService(CommitHash.Zero, tec)
 
   def withObscalcService[A](f: ServiceAccess ?=> ObscalcService[IO] => IO[A]): IO[A] =
     withServicesForObscalc(serviceUser): services =>

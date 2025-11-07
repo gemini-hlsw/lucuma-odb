@@ -23,7 +23,6 @@ import lucuma.core.model.Program
 import lucuma.core.model.SiderealTracking
 import lucuma.core.model.Target
 import lucuma.core.util.Timestamp
-import lucuma.odb.Config
 import lucuma.odb.graphql.input.EditAsterismsPatchInput
 import lucuma.odb.graphql.mapping.AccessControl
 import lucuma.odb.sequence.ObservingMode
@@ -35,7 +34,6 @@ import lucuma.odb.service.CalibrationConfigSubset.toConfigSubset
 import lucuma.odb.service.Services.SuperUserAccess
 import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.util.Codecs.*
-import org.http4s.client.Client
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.syntax.*
 import skunk.AppliedFragment
@@ -96,7 +94,7 @@ object CalibrationsService extends CalibrationObservations {
       case (tid, name, role, Some(st)) => (tid, name, role, st)
     }
 
-  def instantiate[F[_]: {Concurrent, Services, Logger}](emailConfig: Config.Email, httpClient: Client[F]): CalibrationsService[F] =
+  def instantiate[F[_]: {Concurrent, Services, Logger}]: CalibrationsService[F] =
     new CalibrationsService[F] {
 
       private def collectValid(
@@ -145,8 +143,8 @@ object CalibrationsService extends CalibrationObservations {
         case d @ ObsExtract(data = _: GmosSouthLongSlit) => d
 
       def recalculateCalibrations(pid: Program.Id, referenceInstant: Instant)(using Transaction[F], SuperUserAccess): F[(List[Observation.Id], List[Observation.Id])] =
-        val sharedService = PerProgramPerConfigCalibrationsService.instantiate(emailConfig, httpClient)
-        val perObsService = PerScienceObservationCalibrationsService.instantiate(emailConfig, httpClient)
+        val sharedService = PerProgramPerConfigCalibrationsService.instantiate
+        val perObsService = PerScienceObservationCalibrationsService.instantiate
 
         for {
           _                <- info"Recalculating calibrations for $pid, reference instant  $referenceInstant"

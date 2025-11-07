@@ -173,7 +173,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
     def generate(pid: Program.Id, oid: Observation.Id, limit: FutureLimit): F[Result[Json]] =
       services.useNonTransactionally:
         Services.asSuperUser:
-          generator(commitHash, itcClient, timeEstimateCalculator)
+          generator(commitHash, timeEstimateCalculator)
             .generate(pid, oid, limit)
             .map(_.bimap(_.asWarning(Json.Null), _.asJson.success).merge)
 
