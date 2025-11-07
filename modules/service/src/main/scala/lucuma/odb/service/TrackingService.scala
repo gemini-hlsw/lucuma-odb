@@ -15,11 +15,15 @@ import grackle.ResultT
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.Site
 import lucuma.core.math.Coordinates
+import lucuma.core.math.Offset
 import lucuma.core.math.Region
+import lucuma.core.model.AirMass
+import lucuma.core.model.AirMassBound
 import lucuma.core.model.CompositeTracking
 import lucuma.core.model.ConstantTracking
 import lucuma.core.model.EphemerisKey
 import lucuma.core.model.EphemerisTracking
+import lucuma.core.model.Extinction
 import lucuma.core.model.Observation
 import lucuma.core.model.Target
 import lucuma.core.model.Target.Nonsidereal
@@ -38,7 +42,10 @@ import lucuma.odb.service.Services.asSuperUser
 import lucuma.odb.util.Codecs.*
 import org.http4s.client.Client
 import org.typelevel.log4cats.Logger
+import skunk.Command
+import skunk.Encoder
 import skunk.Query
+import skunk.codec.all.*
 import skunk.syntax.all.*
 
 import scala.annotation.nowarn
@@ -104,7 +111,6 @@ trait TrackingService[F[_]]:
 
 
 object TrackingService:
-
 
   extension (interval: TimestampInterval) 
     private def days: Int = interval.duration.toDays.toInt max 1 // always at least one day
@@ -275,30 +281,121 @@ object TrackingService:
             .alignedEphemeris(key, site, interval.start.toInstant, interval.days, interval.cadence)
             .map(Result.fromEither)
           
-      @nowarn("msg=unused")
       private def cacheHorizonsEphemeris(eph: HorizonsEphemeris): ResultT[F, Unit] =
-        ResultT.unit // TODO
+        ResultT.liftF:
+          Statements.StorableHorizonsEphemerisEntry
+            .flatten(eph)
+            .traverse: es =>
+              val stmt = Statements.insertOrUpdateHorizonsEphemeris(es)
+              session.prepareR(stmt).use: ps =>
+                ps.execute(es)
+            .void
 
       @nowarn("msg=unused")
       private def loadHorizonsEphemeris(key: EphemerisKey.Horizons, site: Site, interval: TimestampInterval): ResultT[F, Option[HorizonsEphemeris]] =
         ResultT.success(None) // TODO
 
-  object Statements:
+  private object Statements:
 
-      def selectSiteAndExplicitBaseCoordinates(oids: NonEmptyList[Observation.Id]): Query[oids.type, (Observation.Id, Option[Site], Option[Coordinates])] =
-        sql"""
-          SELECT c_observation_id, c_observing_mode_type, c_explicit_ra, c_explicit_dec
-          FROM t_observation
-          WHERE c_observation_id IN (${observation_id.nel(oids)})
-        """
-          .query(observation_id *: observing_mode_type.opt *: right_ascension.opt *: declination.opt)
-          .map:
-            case (oid, omode, ora, odec) => 
-              val osite: Option[Site] =
-                omode.map:
-                    case ObservingModeType.GmosNorthLongSlit  => Site.GN
-                    case ObservingModeType.GmosSouthLongSlit  => Site.GS
-                    case ObservingModeType.Flamingos2LongSlit => Site.GS
-                    case ObservingModeType.GmosNorthImaging   => Site.GN
-                    case ObservingModeType.GmosSouthImaging   => Site.GS                  
-              (oid, osite, (ora, odec).mapN(Coordinates.apply))
+    /* This flattens a `HorizonsEphemeris` and constrains its `when` values to a storable range. */
+    case class StorableHorizonsEphemerisEntry(
+      key: EphemerisKey.Horizons,
+      site: Site,
+      when: Timestamp,
+      coordinates: Coordinates,
+      velocity: Offset,
+      airmass: Option[AirMass],
+      extinction: Option[Extinction],
+      visualMagnitude: Double,
+      surfaceBrightness: Option[Double],
+    )
+    object StorableHorizonsEphemerisEntry:
+      def flatten(ephemeris: HorizonsEphemeris): Option[NonEmptyList[StorableHorizonsEphemerisEntry]] =
+        NonEmptyList.fromList:
+          ephemeris.entries.flatMap: entry =>
+            Timestamp.fromInstant(entry.when).map: when =>
+              StorableHorizonsEphemerisEntry(
+                ephemeris.key,
+                ephemeris.site,
+                when,
+                entry.coordinates,
+                entry.velocity,
+                entry.airmass.filterNot(_.value.value > AirMassBound.Max.value.value.value.value), // Horizons returns airmasses > 3
+                entry.extinction.filterNot(Extinction.FromMilliVegaMagnitude.reverseGet(_) >= 1), // also extinctions > 1
+                entry.visualMagnitude,
+                entry.surfaceBrightness,
+              )
+
+    def selectSiteAndExplicitBaseCoordinates(oids: NonEmptyList[Observation.Id]): Query[oids.type, (Observation.Id, Option[Site], Option[Coordinates])] =
+      sql"""
+        SELECT c_observation_id, c_observing_mode_type, c_explicit_ra, c_explicit_dec
+        FROM t_observation
+        WHERE c_observation_id IN (${observation_id.nel(oids)})
+      """
+        .query(observation_id *: observing_mode_type.opt *: right_ascension.opt *: declination.opt)
+        .map:
+          case (oid, omode, ora, odec) => 
+            val osite: Option[Site] =
+              omode.map:
+                  case ObservingModeType.GmosNorthLongSlit  => Site.GN
+                  case ObservingModeType.GmosSouthLongSlit  => Site.GS
+                  case ObservingModeType.Flamingos2LongSlit => Site.GS
+                  case ObservingModeType.GmosNorthImaging   => Site.GN
+                  case ObservingModeType.GmosSouthImaging   => Site.GS                  
+            (oid, osite, (ora, odec).mapN(Coordinates.apply))
+
+    def insertOrUpdateHorizonsEphemeris[A <: NonEmptyList[StorableHorizonsEphemerisEntry]](entries: A): Command[entries.type] =
+
+      val enc: Encoder[StorableHorizonsEphemerisEntry] =
+        ( 
+          ephemeris_key_type  *:
+          varchar             *:
+          site                *:
+          core_timestamp      *: 
+          right_ascension     *: 
+          declination         *: 
+          offset              *: 
+          air_mass.opt        *: 
+          core_extinction.opt *: 
+          numeric             *: 
+          numeric.opt
+        ).contramap: e =>
+          (
+            e.key.keyType,
+            e.key.des,
+            e.site,
+            e.when,
+            e.coordinates.ra,
+            e.coordinates.dec,
+            e.velocity,
+            e.airmass,
+            e.extinction,
+            e.visualMagnitude,
+            e.surfaceBrightness.map(a => a: BigDecimal),
+          )
+
+      sql"""
+        INSERT INTO t_ephemeris (
+          c_key_type,  
+          c_des,       
+          c_site,      
+          c_when,      
+          c_ra,        
+          c_dec,       
+          c_dra,       
+          c_ddec,      
+          c_airmass,   
+          c_extinction,
+          c_vmag,      
+          c_sb        
+        ) VALUES ${enc.values.nel(entries)}
+        ON CONFLICT (c_key_type, c_des, c_site, c_when) DO UPDATE SET
+          c_ra         = EXCLUDED.c_ra,        
+          c_dec        = EXCLUDED.c_dec,       
+          c_dra        = EXCLUDED.c_dra,       
+          c_ddec       = EXCLUDED.c_ddec,      
+          c_airmass    = EXCLUDED.c_airmass,   
+          c_extinction = EXCLUDED.c_extinction,
+          c_vmag       = EXCLUDED.c_vmag,      
+          c_sb         = EXCLUDED.c_sb        
+      """.command

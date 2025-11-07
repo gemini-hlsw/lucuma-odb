@@ -174,6 +174,9 @@ trait Codecs {
       (PosBigDecimal.unsafeFrom(a.min.toBigDecimal), PosBigDecimal.unsafeFrom(a.max.toBigDecimal))
     }
 
+  val air_mass: Codec[AirMass] =
+    numeric(3, 2).eimap(AirMass.from)(AirMass.From.reverseGet)
+
   val angle_µas: Codec[Angle] =
     int8.imap(Angle.microarcseconds.reverseGet)(Angle.microarcseconds.get)
 
@@ -802,6 +805,9 @@ trait Codecs {
 
   val extinction: Codec[Extinction] =
     int2_nonneg.imap(Extinction.apply)(_.underlying)
+
+  val core_extinction: Codec[lucuma.core.model.Extinction] =
+    int2_nonneg.imap(lucuma.core.model.Extinction.FromRefined.get)(lucuma.core.model.Extinction.FromRefined.reverseGet)
 
   val user_invitation: Codec[UserInvitation] =
     import UserInvitation.fromString
