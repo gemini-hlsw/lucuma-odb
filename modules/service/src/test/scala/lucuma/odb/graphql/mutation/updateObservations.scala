@@ -62,7 +62,6 @@ class updateObservations extends OdbSuite
       }
     yield ()
 
-
   test("general: update that selects nothing") {
     def emptyUpdate(user: User): IO[Unit] =
       expect(
@@ -3463,9 +3462,20 @@ class updateObservations extends OdbSuite
   test("observing mode: create GMOS imaging in an existing observation"):
 
     val update = """
+      scienceRequirements: {
+        exposureTimeMode: {
+          signalToNoise: {
+            value: 100.0
+            at: { nanometers: 500.0 }
+          }
+        }
+      }
       observingMode: {
         gmosNorthImaging: {
-          filters: [G_PRIME, R_PRIME]
+          filters: [
+            { filter: G_PRIME },
+            { filter: R_PRIME }
+          ]
           explicitMultipleFiltersMode: INTERLEAVED
           explicitBin: TWO
           explicitAmpReadMode: FAST
@@ -3480,8 +3490,12 @@ class updateObservations extends OdbSuite
         instrument
         observingMode {
           gmosNorthImaging {
-            filters
-            initialFilters
+            filters {
+              filter
+            }
+            initialFilters {
+              filter
+            }
             multipleFiltersMode
             bin
             ampReadMode
@@ -3489,8 +3503,12 @@ class updateObservations extends OdbSuite
             roi
           }
           gmosSouthImaging {
-            filters
-            initialFilters
+            filters {
+              filter
+            }
+            initialFilters {
+              filter
+            }
             multipleFiltersMode
             bin
             ampReadMode
@@ -3510,8 +3528,14 @@ class updateObservations extends OdbSuite
               "instrument": "GMOS_NORTH",
               "observingMode": {
                 "gmosNorthImaging": {
-                  "filters": ["G_PRIME", "R_PRIME"],
-                  "initialFilters": ["G_PRIME", "R_PRIME"],
+                  "filters": [
+                    { "filter": "G_PRIME" },
+                    { "filter": "R_PRIME" }
+                  ],
+                  "initialFilters": [
+                    { "filter": "G_PRIME" },
+                    { "filter": "R_PRIME" }
+                  ],
                   "multipleFiltersMode": "INTERLEAVED",
                   "bin": "TWO",
                   "ampReadMode": "FAST",
@@ -3531,9 +3555,20 @@ class updateObservations extends OdbSuite
   test("observing mode: update existing GMOS imaging"):
 
     val update0 = """
+      scienceRequirements: {
+        exposureTimeMode: {
+          signalToNoise: {
+            value: 100.0
+            at: { nanometers: 500.0 }
+          }
+        }
+      }
       observingMode: {
         gmosNorthImaging: {
-          filters: [G_PRIME, R_PRIME]
+          filters: [
+            { filter: G_PRIME },
+            { filter: R_PRIME }
+          ]
           explicitBin: ONE
           explicitAmpReadMode: SLOW
           explicitAmpGain: LOW
@@ -3547,7 +3582,9 @@ class updateObservations extends OdbSuite
         instrument
         observingMode {
           gmosNorthImaging {
-            filters
+            filters {
+              filter
+            }
             multipleFiltersMode
             bin
             ampReadMode
@@ -3567,7 +3604,10 @@ class updateObservations extends OdbSuite
               "instrument": "GMOS_NORTH",
               "observingMode": {
                 "gmosNorthImaging": {
-                  "filters": ["G_PRIME", "R_PRIME"],
+                  "filters": [
+                    { "filter": "G_PRIME" },
+                    { "filter": "R_PRIME" }
+                  ],
                   "multipleFiltersMode": "GROUPED",
                   "bin": "ONE",
                   "ampReadMode": "SLOW",
@@ -3584,7 +3624,10 @@ class updateObservations extends OdbSuite
     val update1 = """
       observingMode: {
         gmosNorthImaging: {
-          filters: [I_PRIME, Z_PRIME]
+          filters: [
+            { filter: I_PRIME },
+            { filter: Z_PRIME }
+          ]
           explicitMultipleFiltersMode: INTERLEAVED
           explicitBin: FOUR
           explicitAmpReadMode: FAST
@@ -3603,7 +3646,10 @@ class updateObservations extends OdbSuite
               "instrument": "GMOS_NORTH",
               "observingMode": {
                 "gmosNorthImaging": {
-                  "filters": ["I_PRIME", "Z_PRIME"],
+                  "filters": [
+                    { "filter": "I_PRIME" },
+                    { "filter": "Z_PRIME" }
+                  ],
                   "multipleFiltersMode": "INTERLEAVED",
                   "bin": "FOUR",
                   "ampReadMode": "FAST",
@@ -3627,9 +3673,20 @@ class updateObservations extends OdbSuite
   test("observing mode: switch from GMOS imaging to long slit"):
 
     val update0 = """
+      scienceRequirements: {
+        exposureTimeMode: {
+          signalToNoise: {
+            value: 100.0
+            at: { nanometers: 500.0 }
+          }
+        }
+      }
       observingMode: {
         gmosNorthImaging: {
-          filters: [G_PRIME, R_PRIME]
+          filters: [
+            { filter: G_PRIME },
+            { filter: R_PRIME }
+          ]
         }
       }
     """
@@ -3639,7 +3696,9 @@ class updateObservations extends OdbSuite
         instrument
         observingMode {
           gmosNorthImaging {
-            filters
+            filters {
+              filter
+            }
           }
         }
       }
@@ -3654,7 +3713,10 @@ class updateObservations extends OdbSuite
               "instrument": "GMOS_NORTH",
               "observingMode": {
                 "gmosNorthImaging": {
-                  "filters": ["G_PRIME", "R_PRIME"]
+                  "filters": [
+                    { "filter": "G_PRIME" },
+                    { "filter": "R_PRIME" }
+                  ]
                 }
               }
             }
@@ -3687,7 +3749,9 @@ class updateObservations extends OdbSuite
         instrument
         observingMode {
           gmosNorthImaging {
-            filters
+            filters {
+              filter
+            }
           }
           gmosNorthLongSlit {
             grating
@@ -3720,9 +3784,20 @@ class updateObservations extends OdbSuite
   test("observing mode: delete GMOS imaging"):
 
     val update0 = """
+      scienceRequirements: {
+        exposureTimeMode: {
+          signalToNoise: {
+            value: 100.0
+            at: { nanometers: 500.0 }
+          }
+        }
+      }
       observingMode: {
         gmosNorthImaging: {
-          filters: [G_PRIME, R_PRIME]
+          filters: [
+            { filter: G_PRIME },
+            { filter: R_PRIME }
+          ]
         }
       }
     """
@@ -3733,7 +3808,9 @@ class updateObservations extends OdbSuite
         observingMode {
           mode
           gmosNorthImaging {
-            filters
+            filters {
+              filter
+            }
           }
         }
       }
@@ -3749,7 +3826,10 @@ class updateObservations extends OdbSuite
               "observingMode": {
                 "mode": "GMOS_NORTH_IMAGING",
                 "gmosNorthImaging": {
-                  "filters": ["G_PRIME", "R_PRIME"]
+                  "filters": [
+                    { "filter": "G_PRIME" },
+                    { "filter": "R_PRIME" }
+                  ]
                 }
               }
             }
@@ -3797,7 +3877,9 @@ class updateObservations extends OdbSuite
       observations {
         observingMode {
           gmosSouthImaging {
-            filters
+            filters {
+              filter
+            }
             explicitBin
           }
         }
@@ -3812,7 +3894,10 @@ class updateObservations extends OdbSuite
               {
                 "observingMode": {
                   "gmosSouthImaging": {
-                    "filters": ["G_PRIME", "R_PRIME"],
+                    "filters": [
+                      { "filter": "G_PRIME" },
+                      { "filter": "R_PRIME" }
+                    ],
                     "explicitBin": "FOUR"
                   }
                 }
@@ -3914,7 +3999,9 @@ class updateObservations extends OdbSuite
       observations {
         observingMode {
           gmosNorthImaging {
-            filters
+            filters {
+              filter
+            }
           }
         }
       }
@@ -3929,7 +4016,10 @@ class updateObservations extends OdbSuite
         val initialUpdate = """
           observingMode: {
             gmosNorthImaging: {
-              filters: [G_PRIME, R_PRIME],
+              filters: [
+                { filter: G_PRIME },
+                { filter: R_PRIME }
+              ],
               explicitBin: TWO,
               explicitAmpGain: LOW
             }
@@ -3950,7 +4040,9 @@ class updateObservations extends OdbSuite
           observations {
             observingMode {
               gmosNorthImaging {
-                filters
+                filters {
+                  filter
+                }
                 bin
                 ampGain
               }
@@ -3969,7 +4061,10 @@ class updateObservations extends OdbSuite
                     {
                       "observingMode": {
                         "gmosNorthImaging": {
-                          "filters": ["G_PRIME", "R_PRIME"],
+                          "filters": [
+                            { "filter": "G_PRIME" },
+                            { "filter": "R_PRIME" }
+                          ],
                           "bin": "TWO",
                           "ampGain": "LOW"
                         }
@@ -3993,8 +4088,8 @@ class updateObservations extends OdbSuite
                 observation(observationId: "$oid") {
                   observingMode {
                     gmosNorthImaging {
-                      filters
-                      initialFilters
+                      filters { filter }
+                      initialFilters { filter }
                       bin
                       ampGain
                     }
@@ -4007,8 +4102,14 @@ class updateObservations extends OdbSuite
                 "observation": {
                   "observingMode": {
                     "gmosNorthImaging": {
-                      "filters": ["G_PRIME", "R_PRIME"],
-                      "initialFilters": ["G_PRIME", "R_PRIME"],
+                      "filters": [
+                        { "filter": "G_PRIME" },
+                        { "filter": "R_PRIME" }
+                      ],
+                      "initialFilters": [
+                        { "filter": "G_PRIME" },
+                        { "filter": "R_PRIME" }
+                      ],
                       "bin": "TWO",
                       "ampGain": "LOW"
                     }
@@ -4023,9 +4124,21 @@ class updateObservations extends OdbSuite
 
   test("observing mode: set GMOS North imaging in existing observation") {
     val update = """
+      scienceRequirements: {
+        exposureTimeMode: {
+          signalToNoise: {
+            value: 100.0
+            at: { nanometers: 500.0 }
+          }
+        }
+      }
       observingMode: {
         gmosNorthImaging: {
-          filters: [G_PRIME, R_PRIME, I_PRIME]
+          filters: [
+            { filter: G_PRIME },
+            { filter: R_PRIME },
+            { filter: I_PRIME }
+          ]
           explicitMultipleFiltersMode: INTERLEAVED
           explicitBin: TWO
           explicitAmpReadMode: SLOW
@@ -4040,7 +4153,7 @@ class updateObservations extends OdbSuite
         instrument
         observingMode {
           gmosNorthImaging {
-            filters
+            filters { filter }
             multipleFiltersMode
             bin
             ampReadMode
@@ -4059,7 +4172,11 @@ class updateObservations extends OdbSuite
               "instrument": "GMOS_NORTH",
               "observingMode": {
                 "gmosNorthImaging": {
-                  "filters": ["G_PRIME", "I_PRIME", "R_PRIME"],
+                  "filters": [
+                    { "filter": "G_PRIME" },
+                    { "filter": "R_PRIME" },
+                    { "filter": "I_PRIME" }
+                  ],
                   "multipleFiltersMode": "INTERLEAVED",
                   "bin": "TWO",
                   "ampReadMode": "SLOW",
@@ -4078,9 +4195,21 @@ class updateObservations extends OdbSuite
 
   test("observing mode: set GMOS South imaging in existing observation") {
     val update = """
+      scienceRequirements: {
+        exposureTimeMode: {
+          signalToNoise: {
+            value: 100.0
+            at: { nanometers: 500.0 }
+          }
+        }
+      }
       observingMode: {
         gmosSouthImaging: {
-          filters: [G_PRIME, R_PRIME]
+          filters: [
+            { filter: G_PRIME },
+            { filter: R_PRIME },
+            { filter: I_PRIME }
+          ]
           explicitMultipleFiltersMode: INTERLEAVED
           explicitBin: FOUR
           explicitAmpReadMode: FAST
@@ -4095,7 +4224,7 @@ class updateObservations extends OdbSuite
         instrument
         observingMode {
           gmosSouthImaging {
-            filters
+            filters { filter }
             multipleFiltersMode
             bin
             ampReadMode
@@ -4114,7 +4243,11 @@ class updateObservations extends OdbSuite
               "instrument": "GMOS_SOUTH",
               "observingMode": {
                 "gmosSouthImaging": {
-                  "filters": ["G_PRIME", "R_PRIME"],
+                  "filters":  [
+                    { "filter": "G_PRIME" },
+                    { "filter": "R_PRIME" },
+                    { "filter": "I_PRIME" }
+                  ],
                   "multipleFiltersMode": "INTERLEAVED",
                   "bin": "FOUR",
                   "ampReadMode": "FAST",
@@ -4543,6 +4676,7 @@ class updateObservations extends OdbSuite
 
     updateBlindOffsetTest(pi, true) *>
       updateBlindOffsetTest(pi, false)
+
 }
 
 trait UpdateConstraintSetOps { this: OdbSuite =>

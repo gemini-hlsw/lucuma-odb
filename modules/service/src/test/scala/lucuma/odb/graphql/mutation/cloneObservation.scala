@@ -10,11 +10,15 @@ import eu.timepit.refined.types.numeric.PosInt
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
+import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.model.ImageQuality
 import lucuma.core.model.Observation
 import lucuma.core.model.ObservationReference
 import lucuma.core.model.Target
+import lucuma.core.syntax.string.*
+import lucuma.core.util.Enumerated
+import lucuma.core.util.Gid
 import lucuma.odb.graphql.query.ObservingModeSetupOperations
 
 class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
@@ -146,8 +150,8 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
           }
         }
         gmosNorthImaging {
-          filters
-          initialFilters
+          filters { filter }
+          initialFilters { filter }
           multipleFiltersMode
           bin
           ampReadMode
@@ -159,8 +163,8 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
           }
         }
         gmosSouthImaging {
-          filters
-          initialFilters
+          filters { filter }
+          initialFilters { filter }
           multipleFiltersMode
           bin
           ampReadMode
@@ -515,10 +519,35 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
     } yield ()
   }
 
-  test("clone GMOS North imaging observation preserves filters and configuration") {
-    createProgramAs(pi).flatMap { pid =>
-      createTargetAs(pi, pid).flatMap { tid =>
-        createGmosNorthImagingObservationAs(pi, pid, tid).flatMap { oid =>
+  def filtersQuery(n: String): String =
+    s"""$n {
+      filter
+      exposureTimeMode {
+        signalToNoise {
+          value
+          at { nanometers }
+        }
+      }
+    }
+    """
+
+  def filterJson[L: Enumerated](filter: L, value: Int, nm: Int): Json =
+    json"""
+      {
+        "filter": ${Enumerated[L].tag(filter).toScreamingSnakeCase.asJson},
+        "exposureTimeMode": {
+          "signalToNoise": {
+            "value": ${BigDecimal((value * 1000).toLong, 3).asJson},
+            "at": { "nanometers": ${BigDecimal((nm * 1000).toLong, 3).asJson} }
+          }
+        }
+      }
+    """
+
+  test("clone GMOS North imaging observation preserves filters and configuration"):
+    createProgramAs(pi).flatMap: pid =>
+      createTargetAs(pi, pid).flatMap: tid =>
+        createGmosNorthImagingObservationAs(pi, pid, tid).flatMap: oid =>
           expect(
             user = pi,
             query = s"""
@@ -529,8 +558,8 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
                   originalObservation {
                     observingMode {
                       gmosNorthImaging {
-                        filters
-                        initialFilters
+                        ${filtersQuery("filters")}
+                        ${filtersQuery("initialFilters")}
                         multipleFiltersMode
                         bin
                         ampReadMode
@@ -542,8 +571,8 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
                   newObservation {
                     observingMode {
                       gmosNorthImaging {
-                        filters
-                        initialFilters
+                        ${filtersQuery("filters")}
+                        ${filtersQuery("initialFilters")}
                         multipleFiltersMode
                         bin
                         ampReadMode
@@ -562,8 +591,14 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
                     "originalObservation": {
                       "observingMode": {
                         "gmosNorthImaging": {
-                          "filters": ["G_PRIME", "R_PRIME"],
-                          "initialFilters": ["G_PRIME", "R_PRIME"],
+                          "filters": [
+                            ${filterJson(GmosNorthFilter.GPrime, 100, 1210)},
+                            ${filterJson(GmosNorthFilter.RPrime, 100, 1210)}
+                          ],
+                          "initialFilters": [
+                            ${filterJson(GmosNorthFilter.GPrime, 100, 1210)},
+                            ${filterJson(GmosNorthFilter.RPrime, 100, 1210)}
+                          ],
                           "multipleFiltersMode": "GROUPED",
                           "bin": "TWO",
                           "ampReadMode": "SLOW",
@@ -575,8 +610,14 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
                     "newObservation": {
                       "observingMode": {
                         "gmosNorthImaging": {
-                          "filters": ["G_PRIME", "R_PRIME"],
-                          "initialFilters": ["G_PRIME", "R_PRIME"],
+                          "filters": [
+                            ${filterJson(GmosNorthFilter.GPrime, 100, 1210)},
+                            ${filterJson(GmosNorthFilter.RPrime, 100, 1210)}
+                          ],
+                          "initialFilters": [
+                            ${filterJson(GmosNorthFilter.GPrime, 100, 1210)},
+                            ${filterJson(GmosNorthFilter.RPrime, 100, 1210)}
+                          ],
                           "multipleFiltersMode": "GROUPED",
                           "bin": "TWO",
                           "ampReadMode": "SLOW",
@@ -590,10 +631,286 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
               """
             )
           )
-        }
-      }
-    }
-  }
+
+  test("clone GMOS North imaging observation makes independent filters"):
+    createProgramAs(pi).flatMap: pid =>
+      createTargetAs(pi, pid).flatMap: tid =>
+        createGmosNorthImagingObservationAs(pi, pid, tid).flatMap: oid =>
+          expect( // provide filters with distinct ETMs
+            user     = pi,
+            query    = s"""
+              mutation {
+                updateObservations(input: {
+                  SET: {
+                    observingMode: {
+                      gmosNorthImaging: {
+                        filters: [
+                          {
+                            filter: G_PRIME,
+                            exposureTimeMode: {
+                              signalToNoise: {
+                                value: 101.0
+                                at: { nanometers: 501.0 }
+                              }
+                            }
+                          },
+                          {
+                            filter: R_PRIME,
+                            exposureTimeMode: {
+                              signalToNoise: {
+                                value: 102.0
+                                at: { nanometers: 502.0 }
+                              }
+                            }
+                          },
+                          {
+                            filter: I_PRIME,
+                            exposureTimeMode: {
+                              signalToNoise: {
+                                value: 103.0
+                                at: { nanometers: 503.0 }
+                              }
+                            }
+                          },
+                          {
+                            filter: Z_PRIME,
+                            exposureTimeMode: {
+                              signalToNoise: {
+                                value: 104.0
+                                at: { nanometers: 504.0 }
+                              }
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  }
+                  WHERE: {
+                    id: { EQ: ${oid.asJson} }
+                  }
+                }) {
+                  observations {
+                    observingMode {
+                      gmosNorthImaging {
+                        ${filtersQuery("filters")}
+                        ${filtersQuery("initialFilters")}
+                      }
+                    }
+                  }
+                }
+              }
+            """,
+            expected = json"""
+              {
+                "updateObservations": {
+                  "observations": [
+                    {
+                      "observingMode": {
+                        "gmosNorthImaging": {
+                          "filters": [
+                            ${filterJson(GmosNorthFilter.GPrime, 101, 501)},
+                            ${filterJson(GmosNorthFilter.RPrime, 102, 502)},
+                            ${filterJson(GmosNorthFilter.IPrime, 103, 503)},
+                            ${filterJson(GmosNorthFilter.ZPrime, 104, 504)}
+                          ],
+                          "initialFilters": [
+                            ${filterJson(GmosNorthFilter.GPrime, 100, 1210)},
+                            ${filterJson(GmosNorthFilter.RPrime, 100, 1210)}
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            """.asRight
+          ) *> expect(   // Clone
+            user = pi,
+            query = s"""
+              mutation {
+                cloneObservation(input: {
+                  observationId: "$oid"
+                }) {
+                  originalObservation {
+                    observingMode {
+                      gmosNorthImaging {
+                        ${filtersQuery("filters")}
+                        ${filtersQuery("initialFilters")}
+                      }
+                    }
+                  }
+                  newObservation {
+                    observingMode {
+                      gmosNorthImaging {
+                        ${filtersQuery("filters")}
+                        ${filtersQuery("initialFilters")}
+                      }
+                    }
+                  }
+                }
+              }
+            """,
+            expected = json"""
+              {
+                "cloneObservation": {
+                  "originalObservation": {
+                    "observingMode": {
+                      "gmosNorthImaging": {
+                        "filters": [
+                          ${filterJson(GmosNorthFilter.GPrime, 101, 501)},
+                          ${filterJson(GmosNorthFilter.RPrime, 102, 502)},
+                          ${filterJson(GmosNorthFilter.IPrime, 103, 503)},
+                          ${filterJson(GmosNorthFilter.ZPrime, 104, 504)}
+                        ],
+                        "initialFilters": [
+                          ${filterJson(GmosNorthFilter.GPrime, 100, 1210)},
+                          ${filterJson(GmosNorthFilter.RPrime, 100, 1210)}
+                        ]
+                      }
+                    }
+                  },
+                  "newObservation": {
+                    "observingMode": {
+                      "gmosNorthImaging": {
+                        "filters": [
+                          ${filterJson(GmosNorthFilter.GPrime, 101, 501)},
+                          ${filterJson(GmosNorthFilter.RPrime, 102, 502)},
+                          ${filterJson(GmosNorthFilter.IPrime, 103, 503)},
+                          ${filterJson(GmosNorthFilter.ZPrime, 104, 504)}
+                        ],
+                        "initialFilters": [
+                          ${filterJson(GmosNorthFilter.GPrime, 100, 1210)},
+                          ${filterJson(GmosNorthFilter.RPrime, 100, 1210)}
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            """.asRight
+          ) *> expect(  // mutate cloned observation
+            user     = pi,
+            query    = s"""
+              mutation {
+                updateObservations(input: {
+                  SET: {
+                    observingMode: {
+                      gmosNorthImaging: {
+                        filters: [
+                          {
+                            filter: G_PRIME,
+                            exposureTimeMode: {
+                              signalToNoise: {
+                                value: 105.0
+                                at: { nanometers: 505.0 }
+                              }
+                            }
+                          },
+                          {
+                            filter: R_PRIME,
+                            exposureTimeMode: {
+                              signalToNoise: {
+                                value: 106.0
+                                at: { nanometers: 506.0 }
+                              }
+                            }
+                          },
+                          {
+                            filter: I_PRIME,
+                            exposureTimeMode: {
+                              signalToNoise: {
+                                value: 107.0
+                                at: { nanometers: 507.0 }
+                              }
+                            }
+                          },
+                          {
+                            filter: Z_PRIME,
+                            exposureTimeMode: {
+                              signalToNoise: {
+                                value: 108.0
+                                at: { nanometers: 508.0 }
+                              }
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  }
+                  WHERE: {
+                    id: { EQ: ${Gid[Observation.Id].partialNext(oid).get.asJson} }
+                  }
+                }) {
+                  observations {
+                    observingMode {
+                      gmosNorthImaging {
+                        ${filtersQuery("filters")}
+                        ${filtersQuery("initialFilters")}
+                      }
+                    }
+                  }
+                }
+              }
+            """,
+            expected = json"""
+              {
+                "updateObservations": {
+                  "observations": [
+                    {
+                      "observingMode": {
+                        "gmosNorthImaging": {
+                          "filters": [
+                            ${filterJson(GmosNorthFilter.GPrime, 105, 505)},
+                            ${filterJson(GmosNorthFilter.RPrime, 106, 506)},
+                            ${filterJson(GmosNorthFilter.IPrime, 107, 507)},
+                            ${filterJson(GmosNorthFilter.ZPrime, 108, 508)}
+                          ],
+                          "initialFilters": [
+                            ${filterJson(GmosNorthFilter.GPrime, 100, 1210)},
+                            ${filterJson(GmosNorthFilter.RPrime, 100, 1210)}
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            """.asRight
+          ) *> expect(  // original observation unmodified
+            user     = pi,
+            query    = s"""
+              query {
+                observation(observationId: "$oid") {
+                  observingMode {
+                    gmosNorthImaging {
+                      ${filtersQuery("filters")}
+                      ${filtersQuery("initialFilters")}
+                    }
+                  }
+                }
+              }
+            """,
+            expected = json"""
+              {
+                "observation": {
+                  "observingMode": {
+                    "gmosNorthImaging": {
+                      "filters": [
+                        ${filterJson(GmosNorthFilter.GPrime, 101, 501)},
+                        ${filterJson(GmosNorthFilter.RPrime, 102, 502)},
+                        ${filterJson(GmosNorthFilter.IPrime, 103, 503)},
+                        ${filterJson(GmosNorthFilter.ZPrime, 104, 504)}
+                      ],
+                      "initialFilters": [
+                        ${filterJson(GmosNorthFilter.GPrime, 100, 1210)},
+                        ${filterJson(GmosNorthFilter.RPrime, 100, 1210)}
+                      ]
+                    }
+                  }
+                }
+              }
+            """.asRight
+          )
 
   test("clone GMOS South imaging observation preserves filters and configuration") {
     createProgramAs(pi).flatMap { pid =>
@@ -609,7 +926,7 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
                   originalObservation {
                     observingMode {
                       gmosSouthImaging {
-                        filters
+                        filters { filter }
                         multipleFiltersMode
                         bin
                         ampReadMode
@@ -621,7 +938,7 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
                   newObservation {
                     observingMode {
                       gmosSouthImaging {
-                        filters
+                        filters { filter }
                         multipleFiltersMode
                         bin
                         ampReadMode
@@ -640,7 +957,10 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
                     "originalObservation": {
                       "observingMode": {
                         "gmosSouthImaging": {
-                          "filters": ["G_PRIME", "R_PRIME"],
+                          "filters": [
+                            { "filter": "G_PRIME" },
+                            { "filter": "R_PRIME" }
+                          ],
                           "multipleFiltersMode": "GROUPED",
                           "bin": "TWO",
                           "ampReadMode": "SLOW",
@@ -652,7 +972,10 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
                     "newObservation": {
                       "observingMode": {
                         "gmosSouthImaging": {
-                          "filters": ["G_PRIME", "R_PRIME"],
+                          "filters": [
+                            { "filter": "G_PRIME" },
+                            { "filter": "R_PRIME" }
+                          ],
                           "multipleFiltersMode": "GROUPED",
                           "bin": "TWO",
                           "ampReadMode": "SLOW",

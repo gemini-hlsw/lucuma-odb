@@ -300,7 +300,7 @@ object PerScienceObservationCalibrationsService:
 
         def deleteAllExposureTimeModes(sm: Option[ObservingModeType]): F[Unit] =
           sm.traverse(_ => S.exposureTimeModeService.deleteMany(
-            NonEmptyList.one(targetOid),
+            List(targetOid),
             ExposureTimeModeRole.Requirement,
             ExposureTimeModeRole.Acquisition,
             ExposureTimeModeRole.Science
