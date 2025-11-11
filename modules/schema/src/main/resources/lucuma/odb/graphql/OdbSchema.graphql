@@ -2194,6 +2194,12 @@ input GmosNorthImagingInput {
   """
   offsets: [OffsetInput!]
 
+  "Temporary, WIP -- will be moved."
+  objectOffsetGenerator: OffsetGeneratorInput
+
+  "Temporary, WIP -- will be moved."
+  skyOffsetGenerator: OffsetGeneratorInput
+
   """
   How sequences are generated when multiple filters are specified.
   Defaults to GROUPED.
@@ -2701,6 +2707,12 @@ input GmosSouthImagingInput {
   The offsets field may be unset by assigning a null value, or ignored by skipping it altogether
   """
   offsets: [OffsetInput!]
+
+  "Temporary, WIP -- will be moved."
+  objectOffsetGenerator: OffsetGeneratorInput
+
+  "Temporary, WIP -- will be moved."
+  skyOffsetGenerator: OffsetGeneratorInput
 
   """
   How sequences are generated when multiple filters are specified.
@@ -3642,6 +3654,85 @@ input OffsetInput {
   Offset in q
   """
   q: OffsetComponentInput!
+}
+
+type OffsetGenerator {
+  generatorType: OffsetGeneratorType!
+
+  enumerated: EnumeratedOffsetGenerator
+  grid:       GridOffsetGenerator
+  random:     RandomOffsetGenerator
+  spiral:     SpiralOffsetGenerator
+}
+
+input OffsetGeneratorInput {
+  enumerated: EnumeratedOffsetGeneratorInput
+  grid:       GridOffsetGeneratorInput
+  random:     RandomOffsetGeneratorInput
+  spiral:     SpiralOffsetGeneratorInput
+}
+
+enum OffsetGeneratorType {
+  NONE,
+  ENUMERATED,
+  GRID,
+  RANDOM,
+  SPIRAL
+}
+
+# In the `ENUMERATED` option offsets are explicitly specified instead of calculated.
+type EnumeratedOffsetGenerator {
+  # Explicit offset (and guiding values).  If the list is empty then this
+  # is essentially the same as `NONE`.  If the ITC prescribes _n_ steps for
+  # an observation, but only _m_ < _n_ are provided, the sequence repeats.
+  values: [TelescopeConfig!]!
+}
+
+input EnumeratedOffsetGeneratorInput {
+  # TelescopeConfigInput groups an offset position with a guide state (guided or not guided).
+  # Not-guided offsets are intended for sky positions.
+  values: [TelescopeConfigInput!]!
+}
+
+# Defines a region of the sky using two corners.  Exposures are
+# then distributed across this region as evenly as possible.
+type GridOffsetGenerator {
+  cornerA: Offset!
+  cornerB: Offset!
+}
+
+input GridOffsetGeneratorInput {
+  cornerA: OffsetInput!
+  cornerB: OffsetInput!
+}
+
+# The random offset pattern is defined by the limiting `size` and
+# the `center` point.  The offsets are random, but non-repeating.
+type RandomOffsetGenerator {
+  size: Angle!
+  center: Offset!
+}
+
+input RandomOffsetGeneratorInput {
+  # Radius defining the circular area in which all offsets will be placed.
+  size: AngleInput!
+
+  # Defaults to (0, 0).
+  center: OffsetInput
+}
+
+# A Fermat spiral pattern limited by the given size.
+type SpiralOffsetGenerator {
+  size: Angle!
+  center: Offset!
+}
+
+input SpiralOffsetGeneratorInput {
+  # Radius defining the circular area in which all offsets will be placed.
+  size: AngleInput!
+
+  # Defaults to (0, 0).
+  center: OffsetInput
 }
 
 """
@@ -9098,6 +9189,12 @@ type GmosNorthImaging {
   """
   offsets: [Offset!]!
 
+  "Temporary, WIP -- will be moved."
+  objectOffsetGenerator: OffsetGenerator
+
+  "Temporary, WIP -- will be moved."
+  skyOffsetGenerator: OffsetGenerator
+
   """
   MultipleFiltersMode, either explicitly specified in explicitMultipleFiltersMode or else taken
   from the defaultMultipleFiltersMode.
@@ -9757,6 +9854,12 @@ type GmosSouthImaging {
   Spatial offsets
   """
   offsets: [Offset!]!
+
+  "Temporary, WIP -- will be moved."
+  objectOffsetGenerator: OffsetGenerator
+
+  "Temporary, WIP -- will be moved."
+  skyOffsetGenerator: OffsetGenerator
 
   """
   MultipleFiltersMode, either explicitly specified in explicitMultipleFiltersMode or else taken

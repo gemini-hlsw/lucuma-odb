@@ -18,6 +18,8 @@ class GmosImagingInputSuite extends DisciplineSuite with ArbitraryInstances :
 
   test("GmosImagingInput.Create.Common stores explicit values correctly") {
     val common = GmosImagingInput.Create.Common(
+      objectOffsetGenerator = None,
+      skyOffsetGenerator = None,
       explicitMultipleFiltersMode = Some(MultipleFiltersMode.Interleaved),
       explicitBin = Some(GmosBinning.Two),
       explicitAmpReadMode = Some(GmosAmpReadMode.Slow),
@@ -37,6 +39,8 @@ class GmosImagingInputSuite extends DisciplineSuite with ArbitraryInstances :
     import lucuma.odb.data.Nullable
 
     val editCommon = GmosImagingInput.Edit.Common(
+      objectOffsetGenerator = Nullable.Absent,
+      skyOffsetGenerator    = Nullable.Absent,
       explicitMultipleFiltersMode = Nullable.NonNull(MultipleFiltersMode.Interleaved),
       explicitBin = Nullable.NonNull(GmosBinning.Two),
       explicitAmpReadMode = Nullable.NonNull(GmosAmpReadMode.Slow),
@@ -81,6 +85,8 @@ class GmosImagingInputSuite extends DisciplineSuite with ArbitraryInstances :
     )
 
     val common = GmosImagingInput.Create.Common(
+      objectOffsetGenerator = None,
+      skyOffsetGenerator = None,
       explicitMultipleFiltersMode = None,
       explicitBin = None,
       explicitAmpReadMode = None,
