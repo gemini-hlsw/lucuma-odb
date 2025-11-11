@@ -10,17 +10,21 @@ import cats.syntax.all.*
 import grackle.Result
 import grackle.ResultT
 import grackle.syntax.*
+import lucuma.core.enums.GmosNorthFilter
+import lucuma.core.enums.GmosSouthFilter
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.Observation
 import lucuma.odb.data.ExposureTimeModeId
 import lucuma.odb.data.ExposureTimeModeRole
 import lucuma.odb.data.ObservingModeRowVersion
+import lucuma.odb.data.OffsetGeneratorRole
 import lucuma.odb.format.spatialOffsets.*
 import lucuma.odb.graphql.input.GmosImagingInput
 import lucuma.odb.sequence.gmos.imaging.Config
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.GmosCodecs.*
 import skunk.*
+import skunk.codec.numeric.int8
 import skunk.codec.text.text
 import skunk.implicits.*
 
@@ -35,6 +39,14 @@ sealed trait GmosImagingService[F[_]]:
   def selectSouth(
     which: List[Observation.Id]
   ): F[Map[Observation.Id, Config.GmosSouth]]
+
+  def selectNorthSeeds(
+    oid: Observation.Id
+  ): F[Map[GmosNorthFilter, Long]]
+
+  def selectSouthSeeds(
+    ooid: Observation.Id
+  ): F[Map[GmosSouthFilter, Long]]
 
   def insertNorth(
     input:  GmosImagingInput.Create.North,
@@ -106,6 +118,29 @@ object GmosImagingService:
               pq.stream(af.argument, chunkSize = 1024).compile.toList
           .map(_.toMap)
 
+      override def selectNorthSeeds(
+        oid: Observation.Id
+      ): F[Map[GmosNorthFilter, Long]] =
+        selectSeeds[GmosNorthFilter]("t_gmos_north_imaging_filter", oid, gmos_north_filter)
+
+      override def selectSouthSeeds(
+        oid: Observation.Id
+      ): F[Map[GmosSouthFilter, Long]] =
+        selectSeeds[GmosSouthFilter]("t_gmos_south_imaging_filter", oid, gmos_south_filter)
+
+      private def selectSeeds[A](
+        table:   String,
+        oid:     Observation.Id,
+        decoder: Decoder[A]
+      ): F[Map[A, Long]] =
+        val af = Statements.selectSeeds(table, oid)
+        session.prepareR(af.fragment.query(decoder *: int8)).use: pq =>
+          pq.stream(af.argument, chunkSize=64)
+            .compile
+            .toList
+            .map(_.toMap)
+
+
       override def insertNorth(
         input:  GmosImagingInput.Create.North,
         reqEtm: Option[ExposureTimeMode],
@@ -162,6 +197,24 @@ object GmosImagingService:
               // Insert the science filters (current / mutable version)
               cur <- ResultT.liftF(services.exposureTimeModeService.insertResolvedScienceOnly(stripAcquisition(r)))
               _   <- ResultT.liftF(insertFilters(cur, filterTable, filterCodec, ObservingModeRowVersion.Current))
+
+              // Insert the offset generators
+              _  <- ResultT.liftF:
+                      input.common.objectOffsetGenerator.traverse_ : og =>
+                        services.offsetGeneratorService.insert(which, og, OffsetGeneratorRole.Object)
+
+              _  <- ResultT.liftF:
+                      input.common.skyOffsetGenerator.traverse_ : og =>
+                        services.offsetGeneratorService.insert(which, og, OffsetGeneratorRole.Sky)
+
+//              _   <- ResultT.liftF:
+//                       oids.traverse: oid =>
+//                         input.common.objectOffsetGenerator.traverse_(
+//                           services.offsetGeneratorService.insert(oid, _)
+//                         ) *>
+//                         input.common.skyOffsetGenerator.traverse_(
+//                           services.offsetGeneratorService.insert(oid, _)
+//                         )
             yield ()
           .value
 
@@ -348,6 +401,18 @@ object GmosImagingService:
         FROM #$viewName
         WHERE
       """(Void) |+| observationIdIn(oids)
+
+    def selectSeeds(
+      tableName: String,
+      oid:       Observation.Id
+    ): AppliedFragment =
+      sql"""
+        SELECT
+          c_filter,
+          c_seed
+        FROM #$tableName
+        WHERE c_observation_id = $observation_id
+      """.apply(oid)
 
     def insert(
       modeTable: String,

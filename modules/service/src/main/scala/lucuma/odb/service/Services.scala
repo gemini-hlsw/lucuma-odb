@@ -7,6 +7,7 @@ import cats.Applicative
 import cats.ApplicativeError
 import cats.MonadError
 import cats.Parallel
+import cats.effect.Async
 import cats.effect.MonadCancelThrow
 import cats.effect.Resource
 import cats.effect.Temporal
@@ -166,6 +167,9 @@ trait Services[F[_]]:
   /** The `ObservingModeServices`. */
   def observingModeServices: ObservingModeServices[F]
 
+  /** The `OffsetGeneratorService`. */
+  def offsetGeneratorService: OffsetGeneratorService[F]
+
   /** The `PartnerSplitsService`. */
   def partnerSplitsService: PartnerSplitsService[F]
 
@@ -257,7 +261,7 @@ object Services:
     s3FileService0: S3FileService[F],
     horizonsClient: HorizonsClient[F],
   )(s: Session[F])(
-    using tf: Trace[F], uf: UUIDGen[F], cf: Temporal[F], par: Parallel[F], log: Logger[F], lf: LoggerFactory[F]
+    using tf: Trace[F], uf: UUIDGen[F], cf: Temporal[F], par: Parallel[F], log: Logger[F], lf: LoggerFactory[F], as: Async[F]
   ): Services[F[_]] =
     new Services[F]:
 
@@ -328,6 +332,7 @@ object Services:
       lazy val obsAttachmentAssignmentService = ObsAttachmentAssignmentService.instantiate
       lazy val observationService = ObservationService.instantiate
       lazy val observingModeServices = ObservingModeServices.instantiate
+      lazy val offsetGeneratorService = OffsetGeneratorService.instantiate
       lazy val partnerSplitsService = PartnerSplitsService.instantiate
       lazy val programNoteService = ProgramNoteService.instantiate
       lazy val programUserService = ProgramUserService.instantiate
@@ -390,6 +395,7 @@ object Services:
     def observationService[F[_]](using Services[F]): ObservationService[F] = summon[Services[F]].observationService
     def observationWorkflowService[F[_]](using Services[F]): ObservationWorkflowService[F] = summon[Services[F]].observationWorkflowService
     def observingModeServices[F[_]](using Services[F]): ObservingModeServices[F] = summon[Services[F]].observingModeServices
+    def offsetGeneratorService[F[_]](using Services[F]): OffsetGeneratorService[F] = summon[Services[F]].offsetGeneratorService
     def partnerSplitsService[F[_]](using Services[F]): PartnerSplitsService[F] = summon[Services[F]].partnerSplitsService
     def programNoteService[F[_]](using Services[F]): ProgramNoteService[F] = summon[Services[F]].programNoteService
     def programService[F[_]](using Services[F]): ProgramService[F] = summon[Services[F]].programService

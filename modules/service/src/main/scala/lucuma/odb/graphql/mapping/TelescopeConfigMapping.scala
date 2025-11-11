@@ -4,13 +4,41 @@
 package lucuma.odb.graphql
 package mapping
 
+import grackle.Path
+
+import table.EnumeratedOffsetView
 import table.StepRecordView
 
-trait TelescopeConfigMapping[F[_]] extends StepRecordView[F]:
+trait TelescopeConfigMapping[F[_]] extends EnumeratedOffsetView[F] with StepRecordView[F]:
 
-  lazy val TelescopeConfigMapping: ObjectMapping =
-    ObjectMapping(StepRecordType / "telescopeConfig")(
-      SqlField("synthetic_id", StepRecordView.Id, key = true, hidden = true),
+  private def telescopeConfigMappingAtPath(
+    path:          Path,
+    guidingColumn: ColumnRef,
+    idColumns:     ColumnRef*
+  ): ObjectMapping =
+    ObjectMapping(path)(
+      (
+        idColumns.toList.map: ref =>
+          SqlField(ref.column, ref, key = true, hidden = true)
+      ) ++ List(
+        SqlObject("offset"),
+        SqlField("guiding", guidingColumn)
+      )*
+    )
+
+  private def enumeratedTelescopeConfigMapping: ObjectMapping =
+    ObjectMapping(TelescopeConfigType)(
+      SqlField("observationId", EnumeratedOffsetView.ObservationId, key = true, hidden = true),
+      SqlField("role",          EnumeratedOffsetView.OffsetGeneratorRole, key = true, hidden = true),
+      SqlField("index",         EnumeratedOffsetView.Index, key = true, hidden = true),
       SqlObject("offset"),
-      SqlField("guiding", StepRecordView.GuideState)
+      SqlField("guiding",       EnumeratedOffsetView.GuideState)
+    )
+
+
+  lazy val TelescopeConfigMappings: List[ObjectMapping] =
+    List(
+//      telescopeConfigMappingAtPath(EnumeratedOffsetGeneratorType / "values", EnumeratedOffsetTable.GuideState, EnumeratedOffsetTable.ObservationId, EnumeratedOffsetTable.OffsetGeneratorRole, EnumeratedOffsetTable.Index),
+      enumeratedTelescopeConfigMapping,
+      telescopeConfigMappingAtPath(StepRecordType / "telescopeConfig", StepRecordView.GuideState, StepRecordView.Id)
     )

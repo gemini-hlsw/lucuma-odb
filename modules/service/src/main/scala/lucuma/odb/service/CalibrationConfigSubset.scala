@@ -137,6 +137,8 @@ object CalibrationConfigSubset:
         GmosImagingInput.Create(
           filters.map(f => GmosImagingFilterInput(f, none)),
           GmosImagingInput.Create.Common(
+            none,
+            none,
             none, // Do we need multipleFiltersMode here?
             binning.some,
             ampReadMode.some,
@@ -167,6 +169,8 @@ object CalibrationConfigSubset:
         GmosImagingInput.Create(
           filters.map(f => GmosImagingFilterInput(f, none)),
           GmosImagingInput.Create.Common(
+            none,
+            none,
             none, // Do we need multipleFiltersMode here?
             binning.some,
             ampReadMode.some,

@@ -171,7 +171,7 @@ object CMain extends MainParams {
             }.compile.drain.start.void)
     } yield ()
 
-  def services[F[_]: Temporal: Parallel: UUIDGen: Trace: Logger: LoggerFactory](
+  def services[F[_]: Temporal: Async: Parallel: UUIDGen: Trace: Logger: LoggerFactory](
     user: Option[User],
     enums: Enums,
     emailConfig: Config.Email,
