@@ -202,6 +202,9 @@ trait Services[F[_]]:
 
   def obscalcService(commitHash: CommitHash, ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode): ObscalcService[F]
 
+  /** Construct a `TelluricResolutionService`, given a `TelluricClient`. */
+  def telluricResolutionService(telluricClient: TelluricClient[F]): TelluricResolutionService[F]
+
   /** The `TimeAccounting` service. */
   def timeAccountingService: TimeAccountingService[F]
 

@@ -61,6 +61,16 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+-- Index for efficient polling queries
+CREATE INDEX idx_telluric_resolution_pending
+  ON t_telluric_resolution(c_program_id, c_state)
+  WHERE c_state IN ('pending', 'retry');
+
+-- Index for startup batch processing
+CREATE INDEX idx_telluric_resolution_retry_at
+  ON t_telluric_resolution(c_retry_at)
+  WHERE c_state = 'retry' AND c_retry_at IS NOT NULL;
+
 -- Trigger on t_telluric_resolution
 CREATE TRIGGER ch_telluric_resolution_trigger
   AFTER INSERT OR UPDATE ON t_telluric_resolution

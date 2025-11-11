@@ -7,8 +7,9 @@ import cats.data.Nested
 import cats.data.NonEmptyList
 import cats.effect.Concurrent
 import cats.syntax.all.*
-import grackle.Result
 import lucuma.catalog.telluric.TelluricClient
+import grackle.Result
+
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.Site
@@ -96,7 +97,6 @@ object CalibrationsService extends CalibrationObservations {
     }
 
   def instantiate[F[_]: {Concurrent, Services, Logger}]: CalibrationsService[F] =
-
     new CalibrationsService[F] {
 
       private def collectValid(
