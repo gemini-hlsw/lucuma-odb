@@ -72,6 +72,7 @@ import lucuma.odb.data.Tag
 import lucuma.odb.data.TimeCharge.DiscountDiscriminator
 import lucuma.odb.data.TimingWindowEndTypeEnum
 import lucuma.odb.data.UserType
+import lucuma.odb.sequence.data.OffsetGeneratorType
 import lucuma.odb.service.ObservationWorkflowService
 import lucuma.odb.syntax.exposureTimeMode.*
 import monocle.Prism
@@ -402,6 +403,9 @@ trait Codecs {
 
   val observation_id: Codec[Observation.Id] =
     gid[Observation.Id]
+
+  val offset_generator_type: Codec[OffsetGeneratorType] =
+    enumerated(Type("e_offset_generator_type"))
 
   val configuration_request_id: Codec[ConfigurationRequest.Id] =
     gid[ConfigurationRequest.Id]
