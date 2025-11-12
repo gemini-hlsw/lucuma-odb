@@ -1445,6 +1445,12 @@ type GmosSouthGratingConfig {
   wavelength: Wavelength!
 }
 
+"""Imaging filters combine an actual filter with an exposure time mode."""
+type GmosSouthImagingFilter {
+  filter: GmosSouthFilter!
+  exposureTimeMode: ExposureTimeMode!
+}
+
 """GMOS South stage mode"""
 enum GmosSouthStageMode {
   """GmosSouthStageMode NoFollow"""
@@ -3756,6 +3762,14 @@ type TelluricType {
   starTypes: [String!]
 }
 
+"""Flamingos2 Long Slit acquisition settings."""
+type Flamingos2LongSlitAcquisition {
+  """
+  The exposure time mode used for ITC lookup for the acquisition sequence.
+  """
+  exposureTimeMode: ExposureTimeMode!
+}
+
 """Flamingos2 Long Slit mode"""
 type Flamingos2LongSlit {
   """Flamingos2 Disperser"""
@@ -3766,6 +3780,9 @@ type Flamingos2LongSlit {
 
   """Flamingos2 FPU"""
   fpu: Flamingos2Fpu!
+
+  """The exposure time mode used for ITC lookup for the science sequence."""
+  exposureTimeMode: ExposureTimeMode!
 
   """
   Optional explicitly specified F2 ReadMode. If set it overrides the
@@ -3826,6 +3843,9 @@ type Flamingos2LongSlit {
 
   """Telluric type configuration for this observation."""
   telluricType: TelluricType!
+
+  """Acquisition properties."""
+  acquisition: Flamingos2LongSlitAcquisition!
 
   """
   The disperser as it was initially selected.  See the `disperser` field for the
@@ -3966,6 +3986,21 @@ enum GmosAmpReadMode {
 
   """GmosAmpReadMode Fast"""
   FAST
+}
+
+"""GMOS Long Slit Acquisition ROI options."""
+enum GmosLongSlitAcquisitionRoi {
+  """Imaging step uses CCD2, slit steps use Central Stamp."""
+  CCD2_STAMP
+
+  """Both imaging and slit use CCD2."""
+  CCD2
+
+  """Both imaging and slit use Ceentral Stamp."""
+  STAMP
+
+  """Imaging uses Full frame, slit steps use CCD2."""
+  FULL_CCD2
 }
 
 """GMOS North FPU"""
@@ -4127,6 +4162,48 @@ enum GmosNorthGrating {
   R150_G5308
 }
 
+"""Acquisition settings for GMOS North long slit acquisition."""
+type GmosNorthLongSlitAcquisition {
+  """
+  The GMOS North filter that will be used in the acquisition sequence.  This will
+  be the `explicitFilter` if specified, but otherwise the `defaultFilter`.
+  """
+  filter: GmosNorthFilter!
+
+  """
+  The GMOS Nouth filter that will be used by default, if an explicit acquisition
+  filter was not specified.  The default is calculated as the broadband filter
+  closest in wavelength to the observation's `centralWavelength`.
+  """
+  defaultFilter: GmosNorthFilter!
+
+  """
+  An explicitly specified GMOS North filter to use in acquisition (if any).
+  """
+  explicitFilter: GmosNorthFilter
+
+  """
+  The ROI(s) that will be used for the acquisition sequence.  In the case of a
+  compound ROI such as `CCD2_STAMP`, the first will be used for the imaging step
+  and the second for the remainder of the steps.
+  """
+  roi: GmosLongSlitAcquisitionRoi!
+
+  """
+  The acquisition ROI(s) that will be used by default, if an explicit ROI was
+  not specified.
+  """
+  defaultRoi: GmosLongSlitAcquisitionRoi!
+
+  """An explicitly specified ROI to use in acquisition (if any)."""
+  explicitRoi: GmosLongSlitAcquisitionRoi
+
+  """
+  The exposure time mode used for ITC lookup for the acquisition sequence.
+  """
+  exposureTimeMode: ExposureTimeMode!
+}
+
 """GMOS North Long Slit mode"""
 type GmosNorthLongSlit {
   """GMOS North Grating"""
@@ -4143,6 +4220,9 @@ type GmosNorthLongSlit {
   or else taken from the `defaultCentralWavelength`.
   """
   centralWavelength: Wavelength!
+
+  """The exposure time mode used for ITC lookup for the science sequence."""
+  exposureTimeMode: ExposureTimeMode!
 
   """
   GMOS X-Binning, either explicitly specified in explicitXBin or else taken
@@ -4268,6 +4348,9 @@ type GmosNorthLongSlit {
   """
   explicitSpatialOffsets: [OffsetQ!] @deprecated(reason: "Use 'explicitOffsets' instead.")
 
+  """Settings that apply to the acquisition sequence."""
+  acquisition: GmosNorthLongSlitAcquisition!
+
   """
   The grating as it was initially selected.  See the `grating` field for the
   grating that will be used in the observation.
@@ -4293,15 +4376,21 @@ type GmosNorthLongSlit {
   initialCentralWavelength: Wavelength!
 }
 
+"""Imaging filters combine an actual filter with an exposure time mode."""
+type GmosNorthImagingFilter {
+  filter: GmosNorthFilter!
+  exposureTimeMode: ExposureTimeMode!
+}
+
 """GMOS North Imaging mode"""
 type GmosNorthImaging {
   """GMOS North Filters for imaging mode (multiple filters allowed)"""
-  filters: [GmosNorthFilter!]!
+  filters: [GmosNorthImagingFilter!]!
 
   """
   Initial GMOS North Filters that were used when creating the imaging mode
   """
-  initialFilters: [GmosNorthFilter!]!
+  initialFilters: [GmosNorthImagingFilter!]!
 
   """Spatial offsets"""
   offsets: [Offset!]!
@@ -4566,6 +4655,48 @@ enum GmosSouthGrating {
   R150_G5326
 }
 
+"""Acquisition settings for GMOS South long slit acquisition."""
+type GmosSouthLongSlitAcquisition {
+  """
+  The GMOS South filter that will be used in the acquisition sequence.  This will
+  be the `explicitFilter` if specified, but otherwise the `defaultFilter`.
+  """
+  filter: GmosSouthFilter!
+
+  """
+  The GMOS South filter that will be used by default, if an explicit acquisition
+  filter was not specified.  The default is calculated as the broadband filter
+  closest in wavelength to the observation's `centralWavelength`.
+  """
+  defaultFilter: GmosSouthFilter!
+
+  """
+  An explicitly specified GMOS South filter to use in acquisition (if any).
+  """
+  explicitFilter: GmosSouthFilter
+
+  """
+  The ROI(s) that will be used for the acquisition sequence.  In the case of a
+  compound ROI such as `CCD2_STAMP`, the first will be used for the imaging step
+  and the second for the remainder of the steps.
+  """
+  roi: GmosLongSlitAcquisitionRoi!
+
+  """
+  The acquisition ROI(s) that will be used by default, if an explicit ROI was
+  not specified.
+  """
+  defaultRoi: GmosLongSlitAcquisitionRoi!
+
+  """An explicitly specified ROI to use in acquisition (if any)."""
+  explicitRoi: GmosLongSlitAcquisitionRoi
+
+  """
+  The exposure time mode used for ITC lookup for the acquisition sequence.
+  """
+  exposureTimeMode: ExposureTimeMode!
+}
+
 """GMOS South Long Slit mode"""
 type GmosSouthLongSlit {
   """GMOS South Grating"""
@@ -4582,6 +4713,9 @@ type GmosSouthLongSlit {
   or else taken from the `defaultCentralWavelength`.
   """
   centralWavelength: Wavelength!
+
+  """The exposure time mode used for ITC lookup for the science sequence."""
+  exposureTimeMode: ExposureTimeMode!
 
   """
   GMOS X-Binning, either explicitly specified in explicitXBin or else taken
@@ -4707,6 +4841,9 @@ type GmosSouthLongSlit {
   """
   explicitSpatialOffsets: [OffsetQ!] @deprecated(reason: "Use 'explicitOffsets' instead.")
 
+  """Settings that apply to the acquisition sequence."""
+  acquisition: GmosSouthLongSlitAcquisition!
+
   """
   The grating as it was initially selected.  See the `grating` field for the
   grating that will be used in the observation.
@@ -4735,12 +4872,12 @@ type GmosSouthLongSlit {
 """GMOS South Imaging mode"""
 type GmosSouthImaging {
   """GMOS South Filters for imaging mode (multiple filters allowed)"""
-  filters: [GmosSouthFilter!]!
+  filters: [GmosSouthImagingFilter!]!
 
   """
   Initial GMOS South Filters that were used when creating the imaging mode
   """
-  initialFilters: [GmosSouthFilter!]!
+  initialFilters: [GmosSouthImagingFilter!]!
 
   """Spatial offsets"""
   offsets: [Offset!]!
@@ -4906,7 +5043,15 @@ type Group {
   """
   timeEstimateBanded: [CalculatedBandedTime!]!
   existence: Existence!
+
+  """This group is managed by the system and not user-editable"""
   system: Boolean!
+
+  """
+  Calibration roles supported by this group (system groups only).
+  This field is system-managed and not user-editable.
+  """
+  calibrationRoles: [CalibrationRole!]!
 }
 
 scalar GroupId
@@ -4956,8 +5101,8 @@ type GuideEnvironment {
 
 """Enumeration for Guide Probes"""
 enum GuideProbe {
-  PWFS_1
-  PWFS_2
+  PWFS1
+  PWFS2
   GMOS_OIWFS
   FLAMINGOS2_OIWFS
 }
@@ -7504,7 +7649,7 @@ type TargetEnvironment {
   """The target used for blind offset acquisition, if any"""
   blindOffsetTarget: Target
 
-"""
+  """
   The type of blind offset (automatic or manual) if a blind offset exists.
   """
   blindOffsetType: BlindOffsetType!

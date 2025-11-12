@@ -10074,9 +10074,9 @@ type GuideEnvironment {
 Enumeration for Guide Probes
 """
 enum GuideProbe {
-  PWFS_1
+  PWFS1
 
-  PWFS_2
+  PWFS2
 
   GMOS_OIWFS
 
