@@ -331,7 +331,7 @@ object OdbMapping {
                 httpClient0,
                 itcClient0,
                 gaiaClient0,
-                S3FileService.noop[F]
+                S3FileService.noop[F],null
               )(session)
 
           override val timeEstimateCalculator: TimeEstimateCalculatorImplementation.ForInstrumentMode = tec

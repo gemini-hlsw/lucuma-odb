@@ -10,6 +10,8 @@ import cats.effect.std.SecureRandom
 import cats.effect.std.UUIDGen
 import cats.implicits.*
 import fs2.compression.Compression
+import lucuma.catalog.clients.GaiaClient
+import lucuma.catalog.telluric.TelluricClient
 import lucuma.core.model.Access
 import lucuma.core.model.AccessControlException
 import lucuma.core.model.Observation
@@ -44,10 +46,11 @@ object SchedulerRoutes:
     emailConfig: Config.Email,
     httpClient:  Client[F],
     itcClient:   ItcClient[F],
-    gaiaClient:  lucuma.catalog.clients.GaiaClient[F]
+    gaiaClient:  GaiaClient[F],
+    telluricClient: TelluricClient[F]
   ): HttpRoutes[F] =
     apply(
-      [A] => (u: User) => (fa: Services[F] => F[A]) => pool.map(Services.forUser(u, enums, None, emailConfig, httpClient, itcClient, gaiaClient, throw new RuntimeException("s3FileService not available in SchedulerRoutes"))).use(fa),
+      [A] => (u: User) => (fa: Services[F] => F[A]) => pool.map(Services.forUser(u, enums, None, emailConfig, httpClient, itcClient, gaiaClient, throw new RuntimeException("s3FileService not available in SchedulerRoutes"), telluricClient)).use(fa),
       ssoClient
     )
 

@@ -6,31 +6,39 @@ package lucuma.odb.service
 import cats.effect.Temporal
 import cats.syntax.all.*
 import eu.timepit.refined.types.string.NonEmptyString
-import lucuma.catalog.telluric.{TelluricClient, TelluricSearchInput}
+import lucuma.catalog.telluric.TelluricClient
+import lucuma.catalog.telluric.TelluricSearchInput
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.TargetDisposition
-import lucuma.core.math.{Coordinates, Epoch}
-import lucuma.core.model.{Observation, Target}
+import lucuma.core.math.Coordinates
+import lucuma.core.math.Epoch
+import lucuma.core.model.Observation
 import lucuma.core.model.SourceProfile
 import lucuma.core.model.SpectralDefinition
-import lucuma.core.util.{TimeSpan, Timestamp}
-import lucuma.odb.data.{Existence,  TelluricResolution}
-import lucuma.odb.graphql.input.{SiderealInput, TargetPropertiesInput}
+import lucuma.core.model.Target
+import lucuma.core.util.TimeSpan
+import lucuma.core.util.Timestamp
+import lucuma.odb.data.Existence
+import lucuma.odb.data.TelluricResolution
+import lucuma.odb.graphql.input.SiderealInput
+import lucuma.odb.graphql.input.TargetPropertiesInput
 import lucuma.odb.graphql.mapping.AccessControl
 import lucuma.odb.json.tellurictype.transport.given
 import lucuma.odb.service.Services.ServiceAccess
+import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.util.Codecs.*
+import lucuma.odb.util.Codecs.calculation_state
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.syntax.*
 import skunk.*
 import skunk.circe.codec.json.*
-import skunk.codec.all.{int4, text, timestamp as tsTimestamp, *}
+import skunk.codec.all.int4
+import skunk.codec.all.text
+import skunk.codec.all.{timestamp as tsTimestamp, *}
 import skunk.implicits.*
-import lucuma.odb.util.Codecs.{calculation_state}
 
 import scala.collection.immutable.SortedMap
 import scala.concurrent.duration.*
-import lucuma.odb.service.Services.Syntax.*
 
 trait TelluricResolutionService[F[_]]:
 

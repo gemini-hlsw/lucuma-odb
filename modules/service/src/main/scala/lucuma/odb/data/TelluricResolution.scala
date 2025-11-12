@@ -3,8 +3,11 @@
 
 package lucuma.odb.data
 
-import lucuma.core.model.{Observation, Program, Target}
-import lucuma.core.util.{CalculationState, Timestamp}
+import lucuma.core.model.Observation
+import lucuma.core.model.Program
+import lucuma.core.model.Target
+import lucuma.core.util.CalculationState
+import lucuma.core.util.Timestamp
 
 object TelluricResolution:
   case class Meta(

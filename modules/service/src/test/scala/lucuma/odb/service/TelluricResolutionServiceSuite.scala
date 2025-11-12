@@ -6,23 +6,27 @@ package lucuma.odb.service
 import cats.effect.IO
 import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.PosLong
-import lucuma.catalog.telluric.{TelluricClient, TelluricSearchInput, TelluricStar}
+import lucuma.catalog.telluric.TelluricClient
+import lucuma.catalog.telluric.TelluricSearchInput
+import lucuma.catalog.telluric.TelluricSearchInput.*
+import lucuma.catalog.telluric.TelluricStar
 import lucuma.core.enums.TelluricCalibrationOrder
-import lucuma.core.model.{Observation, Program, Target}
+import lucuma.core.model.Observation
+import lucuma.core.model.Program
+import lucuma.core.model.Target
 import lucuma.core.util.CalculationState
 import lucuma.core.util.Timestamp
 import lucuma.odb.data.TelluricResolution
-import lucuma.catalog.telluric.TelluricSearchInput.*
 import lucuma.odb.graphql.OdbSuite
 import lucuma.odb.graphql.TestUsers
 import lucuma.odb.graphql.query.ExecutionTestSupportForGmos
 import lucuma.odb.util.Codecs.*
+import skunk.*
+import skunk.codec.all.*
+import skunk.implicits.*
 
 import java.time.LocalDateTime
 import scala.concurrent.duration.*
-import skunk.*
-import skunk.implicits.*
-import skunk.codec.all.*
 
 class TelluricResolutionServiceSuite extends ExecutionTestSupportForGmos {
 

@@ -203,7 +203,7 @@ trait Services[F[_]]:
   def obscalcService(commitHash: CommitHash, ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode): ObscalcService[F]
 
   /** Construct a `TelluricResolutionService`, given a `TelluricClient`. */
-  def telluricResolutionService(telluricClient: TelluricClient[F]): TelluricResolutionService[F]
+  def telluricResolutionService: TelluricResolutionService[F]
 
   /** The `TimeAccounting` service. */
   def timeAccountingService: TimeAccountingService[F]
@@ -250,7 +250,8 @@ object Services:
     httpClient0: Client[F],
     itcClient0: ItcClient[F],
     gaiaClient0: GaiaClient[F],
-    s3FileService0: S3FileService[F]
+    s3FileService0: S3FileService[F],
+    telluricClient: TelluricClient[F]
   )(s: Session[F])(
     using tf: Trace[F], uf: UUIDGen[F], cf: Temporal[F], par: Parallel[F], log: Logger[F]
   ): Services[F[_]] =
@@ -349,6 +350,7 @@ object Services:
       lazy val userInvitationService = UserInvitationService.instantiate(emailConfig)
       lazy val trackingService = TrackingService.instantiate(httpClient)
       lazy val observationWorkflowService = ObservationWorkflowService.instantiate
+      lazy val telluricResolutionService = TelluricResolutionService.instantiate(telluricClient)
 
 
   /**

@@ -224,7 +224,8 @@ object CalcMain extends MainParams:
       httpClient,
       itcClient,
       gaiaClient,
-      S3FileService.noop[F]
+      S3FileService.noop[F],
+      null
     )(session).pure[F].flatTap: _ =>
       val us = UserService.fromSession(session)
       Services.asSuperUser(us.canonicalizeUser(user))

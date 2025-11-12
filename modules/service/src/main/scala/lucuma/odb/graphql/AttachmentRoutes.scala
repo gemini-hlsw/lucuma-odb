@@ -9,6 +9,8 @@ import cats.effect.std.SecureRandom
 import cats.effect.std.UUIDGen
 import cats.implicits.*
 import eu.timepit.refined.types.string.NonEmptyString
+import lucuma.catalog.clients.GaiaClient
+import lucuma.catalog.telluric.TelluricClient
 import lucuma.core.enums.AttachmentType
 import lucuma.core.model.Attachment
 import lucuma.core.model.Program
@@ -45,10 +47,11 @@ object AttachmentRoutes {
     emailConfig:           Config.Email,
     httpClient:            Client[F],
     itcClient:             ItcClient[F],
-    gaiaClient:            lucuma.catalog.clients.GaiaClient[F]
+    gaiaClient:            GaiaClient[F],
+    telluricClient:        TelluricClient[F]
   ): HttpRoutes[F] =
     apply(
-      [A] => (u: User) => (fa: AttachmentFileService[F] => F[A]) => pool.map(Services.forUser(u, enums, None, emailConfig, httpClient, itcClient, gaiaClient, s3)).map(_.attachmentFileService).use(fa),
+      [A] => (u: User) => (fa: AttachmentFileService[F] => F[A]) => pool.map(Services.forUser(u, enums, None, emailConfig, httpClient, itcClient, gaiaClient, s3, telluricClient)).map(_.attachmentFileService).use(fa),
       ssoClient,
       maxUploadMb
     )

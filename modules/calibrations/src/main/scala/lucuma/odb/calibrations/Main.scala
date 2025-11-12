@@ -137,11 +137,10 @@ object CMain extends MainParams {
     services: Resource[F, Services[F]]
   ): Resource[F, Unit] =
     for {
-      telluricClient <- Resource.eval(TelluricClient.create[F](telluricConfig.root, httpClient)(using A, L))
       _  <- Resource.eval(info"Start listening for program changes")
       _  <- Resource.eval(obsTopic.subscribe(100).evalMap { elem =>
               services.use: svc =>
-                val calSvc = svc.calibrationsService(emailConfig, telluricClient, httpClient)
+                val calSvc = svc.calibrationsService
                 services.useTransactionally:
                   Services.asSuperUser:
                     for {
@@ -170,7 +169,8 @@ object CMain extends MainParams {
     emailConfig: Config.Email,
     httpClient: Client[F],
     itcClient: ItcClient[F],
-    gaiaClient: GaiaClient[F]
+    gaiaClient: GaiaClient[F],
+    telluricClient: TelluricClient[F]
   )(pool: Session[F]): F[Services[F]] =
     user match {
       case Some(u) if u.role.access === Access.Service =>
@@ -182,7 +182,8 @@ object CMain extends MainParams {
           httpClient,
           itcClient,
           gaiaClient,
-          S3FileService.noop[F]
+          S3FileService.noop[F],
+          telluricClient
         )(pool).pure[F].flatTap { _ =>
           val us = UserService.fromSession(pool)
           Services.asSuperUser(us.canonicalizeUser(u))
@@ -209,7 +210,9 @@ object CMain extends MainParams {
       (obsT, ctT) <- topics(pool)
       user        <- Resource.eval(serviceUser[F](c))
       httpClient  <- c.httpClientResource
-      _           <- runCalibrationsDaemon(c.email, c.telluric, httpClient, obsT, ctT, pool.evalMap(services(user, enums)))
+      gaiaClient  <- c.gaiaClient
+      itcClient   <- c.itcClient
+      _           <- runCalibrationsDaemon(obsT, ctT, pool.evalMap(services(user, enums, c.email, httpClient, itcClient, gaiaClient, null)))
     } yield ExitCode.Success
 
   /** Our logical entry point. */

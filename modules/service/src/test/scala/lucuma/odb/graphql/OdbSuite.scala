@@ -395,6 +395,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       emailConfig,
       itcClient.pure[Resource[IO, *]],
       gaiaClient.pure[Resource[IO, *]],
+      null,
       CommitHash.Zero,
       goaUsers,
       ssoClient.pure[Resource[IO, *]],
@@ -696,7 +697,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
 
   def servicesFor(u: User, e: Enums) =
     import Trace.Implicits.noop
-    Services.forUser(u, e, None, emailConfig, httpClient, itcClient, gaiaClient, S3FileService.noop[IO])
+    Services.forUser(u, e, None, emailConfig, httpClient, itcClient, gaiaClient, S3FileService.noop[IO], null)
 
   def withSession[A](f: Session[IO] => IO[A]): IO[A] =
     Resource.eval(IO(sessionFixture())).use(f)
@@ -753,7 +754,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
         emailConfig
       )
       db.use: s =>
-        given services: Services[IO] = Services.forUser(u, enm, mapping.some, emailConfig, httpClient, itcClient, gaiaClient, S3FileService.noop[IO])(s)
+        given services: Services[IO] = Services.forUser(u, enm, mapping.some, emailConfig, httpClient, itcClient, gaiaClient, S3FileService.noop[IO], null)(s)
         requireServiceAccess:
           f(services).map(Result.success)
         .flatMap(_.get)

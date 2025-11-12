@@ -7,9 +7,7 @@ import cats.data.Nested
 import cats.data.NonEmptyList
 import cats.effect.Concurrent
 import cats.syntax.all.*
-import lucuma.catalog.telluric.TelluricClient
 import grackle.Result
-
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.Site

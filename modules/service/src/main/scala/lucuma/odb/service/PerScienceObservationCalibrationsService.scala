@@ -8,12 +8,10 @@ import cats.effect.Concurrent
 import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.NonNegShort
 import eu.timepit.refined.types.string.NonEmptyString
-
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.TargetDisposition
-import lucuma.core.math.Coordinates
 import lucuma.core.math.Declination
 import lucuma.core.math.Epoch
 import lucuma.core.math.RightAscension
@@ -23,7 +21,6 @@ import lucuma.core.model.Program
 import lucuma.core.model.SourceProfile
 import lucuma.core.model.SpectralDefinition
 import lucuma.core.model.Target
-import lucuma.core.model.TelluricType
 import lucuma.core.util.TimeSpan
 import lucuma.odb.data.BlindOffsetType
 import lucuma.odb.data.Existence
@@ -38,7 +35,6 @@ import lucuma.odb.graphql.input.SiderealInput
 import lucuma.odb.graphql.input.TargetEnvironmentInput
 import lucuma.odb.graphql.input.TargetPropertiesInput
 import lucuma.odb.graphql.mapping.AccessControl
-import lucuma.odb.json.tellurictype.transport.given
 import lucuma.odb.service.Services.SuperUserAccess
 import lucuma.odb.util.Codecs.*
 import org.typelevel.log4cats.Logger
@@ -47,8 +43,6 @@ import skunk.*
 import skunk.AppliedFragment
 import skunk.Query
 import skunk.Transaction
-import skunk.circe.codec.json.*
-import skunk.codec.all.int8
 import skunk.syntax.all.*
 
 import scala.collection.immutable.SortedMap
@@ -61,13 +55,6 @@ trait PerScienceObservationCalibrationsService[F[_]]:
   )(using Transaction[F], SuperUserAccess): F[(List[Observation.Id], List[Observation.Id])]
 
 object PerScienceObservationCalibrationsService:
-  private def telluricTypeToSpectralType(tt: TelluricType): String =
-    tt match
-      case TelluricType.Hot                => "hot"
-      case TelluricType.A0V                => "A0V"
-      case TelluricType.Solar              => "Solar"
-      case TelluricType.Manual(starTypes)  => starTypes.head
-
   def instantiate[F[_]: {Concurrent as F, Logger, Services as S}]: PerScienceObservationCalibrationsService[F] =
     new PerScienceObservationCalibrationsService[F] with CalibrationObservations:
 
@@ -201,7 +188,7 @@ object PerScienceObservationCalibrationsService:
               calibrationRole = CalibrationRole.Telluric.some
             ).orError
 
-        def createPlaceholderTelluricTarget(pid: Program.Id): F[Target.Id] =
+        def telluricTargetPlaceholder(pid: Program.Id): F[Target.Id] =
           val targetInput = TargetPropertiesInput.Create(
             name = NonEmptyString.unsafeFrom("Telluric Target (TBD)"),
             subtypeInfo = SiderealInput.Create(
@@ -225,225 +212,18 @@ object PerScienceObservationCalibrationsService:
             role = CalibrationRole.Telluric.some
           ).orError
 
-        def recordTelluricResolutionRequest(
-          pid:        Program.Id,
-          telluricId: Observation.Id,
-          scienceId:  Observation.Id
-        ): F[Unit] =
-          S.session.execute(Statements.insertTelluricResolutionRequest)(
-            (telluricId, pid, scienceId)
-          ).void
-
         for
           scienceIndex  <- obsGroupIndex(scienceOid)
           telluricIndex = NonNegShort.unsafeFrom((scienceIndex.value + 1).toShort)
-          targetId      <- createPlaceholderTelluricTarget(pid)  // Always placeholder
+          targetId      <- telluricTargetPlaceholder(pid)
           telluricId    <- insertTelluricObservation(pid, targetId, telluricGroupId, telluricIndex)
-          _             <- recordTelluricResolutionRequest(pid, telluricId, scienceOid)  // NEW
           _             <- syncConfiguration(scienceOid, telluricId)
         yield telluricId
-
-        private def findTelluricObservation(gid: Group.Id): F[Option[Observation.Id]] =
-          S.session
-            .prepareR(Statements.selectTelluricObservation)
-            .use(_.option((gid, CalibrationRole.Telluric)))
-
-        private def createTelluricObservation(
-          pid:             Program.Id,
-          scienceOid:      Observation.Id,
-          telluricGroupId: Group.Id
-        )(using Transaction[F], SuperUserAccess): F[Observation.Id] =
-          def obsGroupIndex(scienceOid: Observation.Id): F[NonNegShort] =
-            S.session
-              .prepareR(Statements.selectScienceObservationIndex)
-              .use(_.unique(scienceOid))
-
-          def insertTelluricObservation(
-            pid:             Program.Id,
-            targetId:        Target.Id,
-            telluricGroupId: Group.Id,
-            telluricIndex:   NonNegShort
-          ): F[Observation.Id] =
-            // Minimal input to create the telluric obs
-            val targetEnvironment = TargetEnvironmentInput.Create(
-              explicitBase = none,
-              asterism = List(targetId).some,
-              useBlindOffset = false.some,
-              blindOffsetTarget = none,
-              blindOffsetType = BlindOffsetType.Manual
-            )
-
-            val obsInput = ObservationPropertiesInput.Create(
-              subtitle = none,
-              scienceBand = none,
-              posAngleConstraint = PosAngleConstraintInput(
-                mode = PosAngleConstraintMode.AverageParallactic.some,
-                angle = none
-              ).some,
-              targetEnvironment = targetEnvironment.some,
-              constraintSet = none,
-              timingWindows = none,
-              attachments = none,
-              scienceRequirements = none,
-              observingMode = none,
-              existence = Existence.Present.some,
-              group = telluricGroupId.some,
-              groupIndex = telluricIndex.some,
-              observerNotes = none
-            )
-            observationService
-              .createObservation(
-                AccessControl.unchecked(obsInput, pid, program_id),
-                calibrationRole = CalibrationRole.Telluric.some
-              ).orError
-
-        def deleteAllExposureTimeModes(sm: Option[ObservingModeType]): F[Unit] =
-          sm.traverse(_ => S.exposureTimeModeService.deleteMany(
-            List(targetOid),
-            ExposureTimeModeRole.Requirement,
-            ExposureTimeModeRole.Acquisition,
-            ExposureTimeModeRole.Science
-          )).void
-
-          def createPlaceholderTelluricTarget(pid: Program.Id): F[Target.Id] =
-            val targetInput = TargetPropertiesInput.Create(
-              name = NonEmptyString.unsafeFrom("Telluric Target (TBD)"),
-              subtypeInfo = SiderealInput.Create(
-                ra = RightAscension.Zero,
-                dec = Declination.Zero,
-                epoch = Epoch.J2000,
-                properMotion = None,
-                radialVelocity = None,
-                parallax = None,
-                catalogInfo = None
-              ),
-              sourceProfile = SourceProfile.Point(
-                SpectralDefinition.BandNormalized(None, SortedMap.empty)
-              ),
-              existence = Existence.Present
-            )
-
-            S.targetService.createTarget(
-              AccessControl.unchecked(targetInput, pid, program_id),
-              disposition = TargetDisposition.Calibration,
-              role = CalibrationRole.Telluric.some
-            ).orError
-
-          def createTelluricTargetFromStar(
-            pid: Program.Id,
-            star: lucuma.catalog.telluric.TelluricStar
-          ): F[Target.Id] =
-            val targetInput = TargetPropertiesInput.Create(
-              name = NonEmptyString.unsafeFrom(s"HIP ${star.hip}"),
-              subtypeInfo = SiderealInput.Create(
-                ra = star.coordinates.ra,
-                dec = star.coordinates.dec,
-                epoch = Epoch.J2000,
-                properMotion = None,
-                radialVelocity = None,
-                parallax = None,
-                catalogInfo = None
-              ),
-              sourceProfile = SourceProfile.Point(
-                SpectralDefinition.BandNormalized(None, SortedMap.empty)
-              ),
-              existence = Existence.Present
-            )
-
-            S.targetService.createTarget(
-              AccessControl.unchecked(targetInput, pid, program_id),
-              disposition = TargetDisposition.Calibration,
-              role = CalibrationRole.Telluric.some
-            ).orError
-
-          def searchTelluricTarget(
-            pid: Program.Id,
-            scienceOid: Observation.Id
-          ): F[Target.Id] =
-            (for {
-              asterism <- S.asterismService.getAsterism(pid, scienceOid)
-              scienceTargetId = asterism.headOption.map(_._1)
-              scienceCoords <- scienceTargetId.flatTraverse: tid =>
-                S.session.prepareR(Statements.selectTargetCoordinates).use(_.option(tid))
-              f2ConfigOpt <- S.session.prepareR(Statements.selectF2Config).use(_.option(scienceOid))
-              result <- (scienceCoords, f2ConfigOpt) match
-                case (Some(coords), Some((telluricType, durationMicros))) =>
-                  TimeSpan.fromMicroseconds(durationMicros) match
-                    case Some(duration) =>
-                      val spType = telluricTypeToSpectralType(telluricType)
-                      val searchInput = TelluricSearchInput(
-                        coordinates = coords,
-                        duration = duration,
-                        brightest = BigDecimal(8.0),
-                        spType = spType
-                      )
-                      telluricClient.search(searchInput).flatMap: stars =>
-                        stars.headOption match
-                          case Some(star) =>
-                            info"Found telluric star HIP ${star.hip} for observation $scienceOid" *>
-                            createTelluricTargetFromStar(pid, star)
-                          case None =>
-                            info"No telluric stars found for observation $scienceOid, using placeholder" *>
-                            createPlaceholderTelluricTarget(pid)
-                      .handleErrorWith: err =>
-                        warn"Error searching for telluric star for observation $scienceOid: ${err.getMessage}, using placeholder" *>
-                        createPlaceholderTelluricTarget(pid)
-                    case None =>
-                      info"Invalid duration for observation $scienceOid, using placeholder" *>
-                      createPlaceholderTelluricTarget(pid)
-                case _ =>
-                  info"Missing coordinates or F2 config for observation $scienceOid, using placeholder" *>
-                  createPlaceholderTelluricTarget(pid)
-            } yield result)
-
-          for
-            scienceIndex  <- obsGroupIndex(scienceOid)
-            telluricIndex = NonNegShort.unsafeFrom((scienceIndex.value + 1).toShort)
-            targetId      <- searchTelluricTarget(pid, scienceOid)
-            telluricId    <- insertTelluricObservation(pid, targetId, telluricGroupId, telluricIndex)
-            _             <- syncConfiguration(scienceOid, telluricId)
-          yield telluricId
-
-        private def deleteTelluricObservationsFromGroups(
-          groupIds: List[Group.Id]
-        )(using Transaction[F], SuperUserAccess): F[List[Observation.Id]] =
-          groupIds.flatTraverse( gid =>
-            findTelluricObservation(gid).flatMap:
-              case Some(telluricOid) =>
-                observationService.deleteCalibrationObservations(NonEmptyList.one(telluricOid))
-                  .as(List(telluricOid))
-              case None =>
-                List.empty[Observation.Id].pure[F]
-          )
-
-        private def readTelluricGroup(
-          pid:  Program.Id,
-          tree: GroupTree,
-          obs:  ObsExtract[CalibrationConfigSubset]
-        )(using Transaction[F]): F[Group.Id] =
-          val obsIndexMap = tree.collectObservations(_ => true).flatMap((_, obs) => obs).toMap
-          findSystemGroupForObservation(tree, obs.id)
-            .fold(
-              newTelluricGroup(
-                pid,
-                obs.data,
-                obs.id,
-                findParentGroupForObservation(tree, obs.id),
-                obsIndexMap.get(obs.id)
-              )
-            )(gid => gid.pure[F])
-
-        private def syncTelluricObservation(
-          pid: Program.Id,
-          obs: ObsExtract[CalibrationConfigSubset],
-          gid: Group.Id
-        )(using Transaction[F], SuperUserAccess): F[Option[Observation.Id]] =
 
       private def deleteTelluricObservationsFromGroups(
         groupIds: List[Group.Id]
       )(using Transaction[F], SuperUserAccess): F[List[Observation.Id]] =
         groupIds.flatTraverse( gid =>
-
           findTelluricObservation(gid).flatMap:
             case Some(telluricOid) =>
               observationService.deleteCalibrationObservations(NonEmptyList.one(telluricOid))
@@ -520,7 +300,7 @@ object PerScienceObservationCalibrationsService:
 
         def deleteAllExposureTimeModes(sm: Option[ObservingModeType]): F[Unit] =
           sm.traverse(_ => S.exposureTimeModeService.deleteMany(
-            NonEmptyList.one(targetOid),
+            List(targetOid),
             ExposureTimeModeRole.Requirement,
             ExposureTimeModeRole.Acquisition,
             ExposureTimeModeRole.Science
@@ -588,22 +368,6 @@ object PerScienceObservationCalibrationsService:
 
       object Statements:
 
-        val selectTargetCoordinates: Query[Target.Id, Coordinates] =
-          sql"""
-            SELECT c_ra, c_dec
-            FROM   t_target
-            WHERE  c_target_id = $target_id
-              AND  c_sid_ra IS NOT NULL
-              AND  c_sid_dec IS NOT NULL
-          """.query(right_ascension *: declination).map(Coordinates.apply)
-
-        val selectF2Config: Query[Observation.Id, (TelluricType, Long)] =
-          sql"""
-            SELECT c_telluric_type, c_time_estimate
-            FROM   t_flamingos2_long_slit
-            WHERE  c_observation_id = $observation_id
-          """.query(jsonb.emap(_.as[TelluricType].leftMap(_.getMessage)) *: int8)
-
         val selectTelluricObservation: Query[(Group.Id, CalibrationRole), Observation.Id] =
           sql"""
             SELECT c_observation_id
@@ -636,24 +400,6 @@ object PerScienceObservationCalibrationsService:
             FROM   t_observation
             WHERE  c_observation_id = $observation_id
           """.query(int2_nonneg)
-
-        val insertTelluricResolutionRequest: Command[(Observation.Id, Program.Id, Observation.Id)] =
-          sql"""
-            INSERT INTO t_telluric_resolution (
-              c_observation_id,
-              c_program_id,
-              c_science_observation_id,
-              c_state,
-              c_last_invalidation
-            ) VALUES (
-              $observation_id,
-              $program_id,
-              $observation_id,
-              'pending',
-              now()
-            )
-            ON CONFLICT (c_observation_id) DO NOTHING
-          """.command
 
         def syncObservationConfiguration(
           sourceOid: Observation.Id,
@@ -721,4 +467,4 @@ object PerScienceObservationCalibrationsService:
                   void""") as moves(obs_id, parent_id, parent_idx)
                 """
               S.session.prepareR(query.fragment.query(void))
-              .use(_.stream(query.argument, 1024).compile.drain)
+                .use(_.stream(query.argument, 1024).compile.drain)
