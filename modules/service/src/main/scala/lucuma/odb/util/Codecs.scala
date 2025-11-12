@@ -64,6 +64,7 @@ import lucuma.odb.data.ExposureTimeModeRole
 import lucuma.odb.data.ExposureTimeModeType
 import lucuma.odb.data.Extinction
 import lucuma.odb.data.Md5Hash
+import lucuma.odb.data.ObservingModeRowVersion
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.data.StepExecutionState
@@ -410,6 +411,9 @@ trait Codecs {
 
   val observing_mode_type: Codec[ObservingModeType] =
     enumerated(Type("e_observing_mode_type"))
+
+  val observing_mode_row_version: Codec[ObservingModeRowVersion] =
+    enumerated(Type("e_observing_mode_row_version"))
 
   val orcid_id: Codec[OrcidId] =
     Codec.simple[OrcidId](

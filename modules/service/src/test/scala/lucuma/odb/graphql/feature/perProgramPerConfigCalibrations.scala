@@ -451,7 +451,7 @@ class perProgramPerConfigCalibrations
 
   def calibrationTargets(role: CalibrationRole, referenceInstant: Instant) =
     withServices(pi) { services =>
-      services.calibrationsService(emailConfig, httpClient).calibrationTargets(List(role), referenceInstant)
+      services.calibrationsService.calibrationTargets(List(role), referenceInstant)
     }
 
   test("calculate best target for specphoto") {
@@ -503,7 +503,7 @@ class perProgramPerConfigCalibrations
       tpid <- withServices(service) { s =>
                 Services.asSuperUser:
                   s.session.transaction.use { xa =>
-                      s.programService(emailConfig, httpClient)
+                      s.programService
                         .insertCalibrationProgram(
                           ProgramPropertiesInput.Create.Default.some,
                           CalibrationRole.SpectroPhotometric,
@@ -692,7 +692,8 @@ class perProgramPerConfigCalibrations
       // In reality this is done listening to events but we can explicitly call the function here
       _     <- withServices(service) { services =>
                  services.session.transaction.use { xa =>
-                   services.calibrationsService(emailConfig, httpClient).recalculateCalibrationTarget(pid, cid1)(using xa)
+                   Services.asSuperUser:
+                     services.calibrationsService.recalculateCalibrationTarget(pid, cid1)(using xa)
                  }
                }
       ob2   <- queryObservations(pid)

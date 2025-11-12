@@ -2378,7 +2378,9 @@ class createObservation extends OdbSuite {
               observation(observationId: "$oid") {
                 observingMode {
                   gmosNorthImaging {
-                    filters
+                    filters {
+                      filter
+                    }
                     bin
                     ampReadMode
                     ampGain
@@ -2392,7 +2394,14 @@ class createObservation extends OdbSuite {
               "observation": {
                 "observingMode": {
                   "gmosNorthImaging": {
-                    "filters": ["G_PRIME", "R_PRIME"],
+                    "filters": [
+                      {
+                        "filter": "G_PRIME"
+                      },
+                      {
+                        "filter": "R_PRIME"
+                      }
+                    ],
                     "bin": "TWO",
                     "ampReadMode": "SLOW",
                     "ampGain": "LOW",
@@ -2437,7 +2446,9 @@ class createObservation extends OdbSuite {
               observation(observationId: "$oid") {
                 observingMode {
                   gmosNorthImaging {
-                    filters
+                    filters {
+                      filter
+                    }
                     bin
                     ampReadMode
                     ampGain
@@ -2451,7 +2462,14 @@ class createObservation extends OdbSuite {
               "observation": {
                 "observingMode": {
                   "gmosNorthImaging": {
-                    "filters": ["G_PRIME", "R_PRIME"],
+                    "filters": [
+                      {
+                        "filter": "G_PRIME"
+                      },
+                      {
+                        "filter": "R_PRIME"
+                      }
+                    ],
                     "bin": "ONE",
                     "ampReadMode": "SLOW",
                     "ampGain": "LOW",
@@ -2474,7 +2492,9 @@ class createObservation extends OdbSuite {
               observation(observationId: "$oid") {
                 observingMode {
                   gmosSouthImaging {
-                    filters
+                    filters {
+                      filter
+                    }
                     bin
                     ampReadMode
                     ampGain
@@ -2488,7 +2508,14 @@ class createObservation extends OdbSuite {
               "observation": {
                 "observingMode": {
                   "gmosSouthImaging": {
-                    "filters": ["G_PRIME", "R_PRIME"],
+                    "filters": [
+                      {
+                        "filter": "G_PRIME"
+                      },
+                      {
+                        "filter": "R_PRIME"
+                      }
+                    ],
                     "bin": "TWO",
                     "ampReadMode": "SLOW",
                     "ampGain": "LOW",
@@ -2572,7 +2599,9 @@ class createObservation extends OdbSuite {
               observation {
                 observingMode {
                   gmosNorthImaging {
-                    filters
+                    filters {
+                      filter
+                    }
                   }
                 }
               }
@@ -2611,7 +2640,9 @@ class createObservation extends OdbSuite {
               observation {
                 observingMode {
                   gmosSouthImaging {
-                    filters
+                    filters {
+                      filter
+                    }
                   }
                 }
               }
@@ -2620,6 +2651,194 @@ class createObservation extends OdbSuite {
         """, List("Argument 'input.SET.observingMode.gmosSouthImaging' is invalid: At least one filter must be specified for GMOS imaging observations.").asLeft)
       }
     }
+
+  private def gmosImagingFilterTest(
+    reqEtm:    Option[Int],
+    gEtm:      Option[Int],
+    rEtm:      Option[Int],
+    gExpected: Json,
+    rExpected: Json
+  ) =
+    def etmInput(etm: Option[Int]): String =
+      etm.fold(""): sn =>
+        s"""
+          exposureTimeMode: {
+            signalToNoise: {
+              value: $sn
+              at: { nanometers: 500.0 }
+            }
+          }
+        """
+
+    createProgramAs(pi).flatMap: pid =>
+      createTargetAs(pi, pid).flatMap: tid =>
+        expect(pi, s"""
+          mutation {
+            createObservation(input: {
+              programId: ${pid.asJson}
+              SET: {
+                targetEnvironment: {
+                  asterism: [${tid.asJson}]
+                }
+                scienceRequirements: {
+                  ${etmInput(reqEtm)}
+                  imaging: {
+                    minimumFov: { arcseconds: 100 }
+                    narrowFilters: false
+                    broadFilters: false
+                    combinedFilters: true
+                  }
+                }
+                observingMode: {
+                  gmosNorthImaging: {
+                    filters: [
+                      {
+                        filter: G_PRIME
+                        ${etmInput(gEtm)}
+                      },
+                      {
+                        filter: R_PRIME
+                        ${etmInput(rEtm)}
+                      }
+                    ]
+                  }
+                }
+              }
+            }) {
+              observation {
+                observingMode {
+                  gmosNorthImaging {
+                    filters {
+                      filter
+                      exposureTimeMode {
+                        signalToNoise {
+                          value
+                          at { nanometers }
+                        }
+                      }
+                    }
+                    initialFilters {
+                      filter
+                      exposureTimeMode {
+                        signalToNoise {
+                          value
+                          at { nanometers }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        """, json"""
+          {
+            "createObservation": {
+              "observation": {
+                "observingMode": {
+                  "gmosNorthImaging": {
+                    "filters": [
+                      ${gExpected},
+                      ${rExpected}
+                    ],
+                    "initialFilters": [
+                      ${gExpected},
+                      ${rExpected}
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        """.asRight
+      )
+
+  test("[gmos imaging] can create GMOS North imaging observation with differing explicit exposure time modes"):
+    gmosImagingFilterTest(
+      none,
+      10.some,
+      11.some,
+      json"""
+        {
+          "filter": "G_PRIME",
+          "exposureTimeMode": {
+            "signalToNoise": {
+              "value": 10.000,
+              "at": { "nanometers":  500.000 }
+            }
+          }
+        }
+      """,
+      json"""
+        {
+          "filter": "R_PRIME",
+          "exposureTimeMode": {
+            "signalToNoise": {
+              "value": 11.000,
+              "at": { "nanometers":  500.000 }
+            }
+          }
+        }
+      """
+    )
+
+  test("[gmos imaging] can create GMOS North imaging observation with same explicit exposure time modes"):
+    gmosImagingFilterTest(
+      none,
+      10.some,
+      10.some,
+      json"""
+        {
+          "filter": "G_PRIME",
+          "exposureTimeMode": {
+            "signalToNoise": {
+              "value": 10.000,
+              "at": { "nanometers":  500.000 }
+            }
+          }
+        }
+      """,
+      json"""
+        {
+          "filter": "R_PRIME",
+          "exposureTimeMode": {
+            "signalToNoise": {
+              "value": 10.000,
+              "at": { "nanometers":  500.000 }
+            }
+          }
+        }
+      """
+    )
+
+  test("[gmos imaging] can create GMOS North imaging observation with default + explicit exposure time modes"):
+    gmosImagingFilterTest(
+      11.some,
+      none,
+      10.some,
+      json"""
+        {
+          "filter": "G_PRIME",
+          "exposureTimeMode": {
+            "signalToNoise": {
+              "value": 11.000,
+              "at": { "nanometers":  500.000 }
+            }
+          }
+        }
+      """,
+      json"""
+        {
+          "filter": "R_PRIME",
+          "exposureTimeMode": {
+            "signalToNoise": {
+              "value": 10.000,
+              "at": { "nanometers":  500.000 }
+            }
+          }
+        }
+      """
+    )
 
   test("[gmos imaging] can create GMOS North imaging observation with spatial offsets"):
     createProgramAs(pi).flatMap { pid =>
@@ -2633,6 +2852,12 @@ class createObservation extends OdbSuite {
                   asterism: [${tid.asJson}]
                 }
                 scienceRequirements: {
+                  exposureTimeMode: {
+                    signalToNoise: {
+                      value: 10.0
+                      at: { nanometers: 500.0 }
+                    }
+                  }
                   imaging: {
                     minimumFov: { arcseconds: 100 }
                     narrowFilters: false
@@ -2642,7 +2867,10 @@ class createObservation extends OdbSuite {
                 }
                 observingMode: {
                   gmosNorthImaging: {
-                    filters: [G_PRIME, R_PRIME]
+                    filters: [
+                      { filter: G_PRIME },
+                      { filter: R_PRIME }
+                    ]
                     offsets: [
                       { p: { arcseconds: "1.5" }, q: { arcseconds: "2.0" } },
                       { p: { arcseconds: "-0.5" }, q: { arcseconds: "1.0" } }
@@ -2654,7 +2882,9 @@ class createObservation extends OdbSuite {
               observation {
                 observingMode {
                   gmosNorthImaging {
-                    filters
+                    filters {
+                      filter
+                    }
                     offsets {
                       p { arcseconds }
                       q { arcseconds }
@@ -2670,7 +2900,10 @@ class createObservation extends OdbSuite {
               "observation": {
                 "observingMode": {
                   "gmosNorthImaging": {
-                    "filters": ["G_PRIME", "R_PRIME"],
+                    "filters": [
+                      { "filter": "G_PRIME" },
+                      { "filter": "R_PRIME" }
+                    ],
                     "offsets": [
                       { "p": { "arcseconds": 1.500000 }, "q": { "arcseconds": 2.000000 } },
                       { "p": { "arcseconds": -0.500000 }, "q": { "arcseconds": 1.000000 } }
@@ -2696,6 +2929,12 @@ class createObservation extends OdbSuite {
                   asterism: [${tid.asJson}]
                 }
                 scienceRequirements: {
+                  exposureTimeMode: {
+                    signalToNoise: {
+                      value: 10.0
+                      at: { nanometers: 500.0 }
+                    }
+                  }
                   imaging: {
                     minimumFov: { arcseconds: 100 }
                     narrowFilters: false
@@ -2705,7 +2944,10 @@ class createObservation extends OdbSuite {
                 }
                 observingMode: {
                   gmosSouthImaging: {
-                    filters: [G_PRIME, R_PRIME]
+                    filters: [
+                      { filter: G_PRIME },
+                      { filter: R_PRIME }
+                    ]
                     offsets: [
                       { p: { arcseconds: "2.5" }, q: { arcseconds: "-1.5" } }
                     ]
@@ -2716,7 +2958,9 @@ class createObservation extends OdbSuite {
               observation {
                 observingMode {
                   gmosSouthImaging {
-                    filters
+                    filters {
+                      filter
+                    }
                     offsets {
                       p { arcseconds }
                       q { arcseconds }
@@ -2732,7 +2976,10 @@ class createObservation extends OdbSuite {
               "observation": {
                 "observingMode": {
                   "gmosSouthImaging": {
-                    "filters": ["G_PRIME", "R_PRIME"],
+                    "filters": [
+                      { "filter": "G_PRIME" },
+                      { "filter": "R_PRIME" }
+                    ],
                     "offsets": [
                       { "p": { "arcseconds": 2.500000 }, "q": { "arcseconds": -1.500000 } }
                     ]
@@ -2757,6 +3004,12 @@ class createObservation extends OdbSuite {
                   asterism: [${tid.asJson}]
                 }
                 scienceRequirements: {
+                  exposureTimeMode: {
+                    signalToNoise: {
+                      value: 10.0
+                      at: { nanometers: 500.0 }
+                    }
+                  }
                   imaging: {
                     minimumFov: { arcseconds: 100 }
                     narrowFilters: false
@@ -2766,7 +3019,14 @@ class createObservation extends OdbSuite {
                 }
                 observingMode: {
                   gmosNorthImaging: {
-                    filters: [G_PRIME, R_PRIME]
+                    filters: [
+                      {
+                        filter: G_PRIME
+                      },
+                      {
+                        filter: R_PRIME
+                      }
+                    ]
                   }
                 }
               }

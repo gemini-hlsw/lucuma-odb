@@ -19,7 +19,6 @@ import lucuma.core.model.Group
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
-import lucuma.odb.Config
 import lucuma.odb.data.Existence
 import lucuma.odb.data.ExposureTimeModeRole
 import lucuma.odb.data.GroupTree
@@ -37,7 +36,6 @@ import lucuma.odb.service.Services.ServiceAccess
 import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.util.Codecs.*
 import lucuma.refined.*
-import org.http4s.client.Client
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.syntax.*
 import skunk.AppliedFragment
@@ -58,7 +56,7 @@ trait PerProgramPerConfigCalibrationsService[F[_]]:
 object PerProgramPerConfigCalibrationsService:
   val CalibrationsGroupName: NonEmptyString = "Calibrations".refined
 
-  def instantiate[F[_]: {MonadCancelThrow, Services, Logger}](emailConfig: Config.Email, httpClient: Client[F]): PerProgramPerConfigCalibrationsService[F] =
+  def instantiate[F[_]: {MonadCancelThrow, Services, Logger}]: PerProgramPerConfigCalibrationsService[F] =
     new PerProgramPerConfigCalibrationsService[F] with CalibrationObservations:
       private def calObsProps(
         calibConfigs: List[ObsExtract[CalibrationConfigSubset]]
@@ -79,7 +77,7 @@ object PerProgramPerConfigCalibrationsService:
 
       private def calibrationsGroup(pid: Program.Id, size: Int)(using Transaction[F]): F[Option[Group.Id]] =
         if (size > 0) {
-          groupService(emailConfig, httpClient).selectGroups(pid).flatMap {
+          groupService.selectGroups(pid).flatMap {
             case GroupTree.Root(_, c) =>
               val existing = c.collectFirst {
                 case GroupTree.Branch(gid, _, _, _, Some(CalibrationsGroupName), _, _, _, true, _) => gid
@@ -87,7 +85,7 @@ object PerProgramPerConfigCalibrationsService:
               existing match {
                 case Some(gid) => gid.some.pure[F]
                 case None      =>
-                  groupService(emailConfig, httpClient).createGroup(
+                  groupService.createGroup(
                       input = CreateGroupInput(
                         programId = pid.some,
                         proposalReference = none,

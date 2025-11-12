@@ -10,19 +10,22 @@ import cats.effect.std.SecureRandom
 import cats.effect.std.Supervisor
 import cats.effect.std.UUIDGen
 import cats.effect.syntax.all.*
-import cats.implicits.*
+import cats.syntax.all.*
 import com.monovore.decline.*
 import com.monovore.decline.effect.CommandIOApp
 import fs2.concurrent.Topic
 import fs2.io.net.Network
 import grackle.Result
+import lucuma.catalog.clients.GaiaClient
 import lucuma.core.model.Access
 import lucuma.core.model.User
+import lucuma.itc.client.ItcClient
 import lucuma.odb.Config
 import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.graphql.topic.CalibTimeTopic
 import lucuma.odb.graphql.topic.ObservationTopic
 import lucuma.odb.sequence.util.CommitHash
+import lucuma.odb.service.S3FileService
 import lucuma.odb.service.Services
 import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.service.UserService
@@ -34,6 +37,7 @@ import org.http4s.headers.Authorization
 import org.typelevel.ci.CIString
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
+import org.typelevel.log4cats.syntax.*
 import skunk.{Command as _, *}
 
 import java.time.LocalDate
@@ -126,45 +130,58 @@ object CMain extends MainParams {
       top <- Resource.eval(ObservationTopic(ses, 1024, sup))
     } yield (top, ctt)
 
-  def runCalibrationsDaemon[F[_]: Async: Logger](
-    emailConfig: Config.Email,
-    httpClient: Client[F],
+  def runCalibrationsDaemon[F[_]: {Async, Logger, Clock as C}](
     obsTopic: Topic[F, ObservationTopic.Element],
     calibTopic: Topic[F, CalibTimeTopic.Element],
     services: Resource[F, Services[F]]
   ): Resource[F, Unit] =
+    summon[Monad[F]]
     for {
-      _  <- Resource.eval(Logger[F].info("Start listening for program changes"))
+      _  <- Resource.eval(info"Start listening for program changes")
       _  <- Resource.eval(obsTopic.subscribe(100).evalMap { elem =>
-              services.useTransactionally{
-                requireServiceAccess:
-                  for {
-                    t <- Sync[F].delay(LocalDate.now(ZoneOffset.UTC))
-                    _ <- calibrationsService(emailConfig, httpClient)
-                          .recalculateCalibrations(
-                            elem.programId,
-                            LocalDateTime.of(t, LocalTime.MIDNIGHT).toInstant(ZoneOffset.UTC)
-                          )
-                  } yield Result.unit
-              }
+              services.use: svc =>
+                services.useTransactionally:
+                  Services.asSuperUser:
+                    for {
+                      i <- svc.calibrationsService.isCalibration(elem.observationId)
+                      _ <- info"Observation channel: Element(${elem.observationId},${elem.programId},${elem.editType},${elem.users}), calibration: $i"
+                      t <- C.realTimeInstant.map(i => LocalDate.ofInstant(i, ZoneOffset.UTC))
+                      _ <- calibrationsService
+                            .recalculateCalibrations(
+                              elem.programId,
+                              LocalDateTime.of(t, LocalTime.MIDNIGHT).toInstant(ZoneOffset.UTC)
+                            ).unlessA(i) // Don't execute for changes from calibration events
+                    } yield Result.unit
             }.compile.drain.start.void)
-      _  <- Resource.eval(Logger[F].info("Start listening for calibration time changes"))
+      _  <- Resource.eval(info"Start listening for calibration time changes")
       _  <- Resource.eval(calibTopic.subscribe(100).evalMap { elem =>
-              services.useTransactionally {
-                requireServiceAccess:
-                  calibrationsService(emailConfig, httpClient).recalculateCalibrationTarget(elem.programId, elem.observationId)
+              services.useTransactionally:
+                Services.asSuperUser:
+                  calibrationsService.recalculateCalibrationTarget(elem.programId, elem.observationId)
                     .map(Result.success)
-              }
             }.compile.drain.start.void)
     } yield ()
 
   def services[F[_]: Temporal: Parallel: UUIDGen: Trace: Logger](
     user: Option[User],
-    enums: Enums
+    enums: Enums,
+    emailConfig: Config.Email,
+    httpClient: Client[F],
+    itcClient: ItcClient[F],
+    gaiaClient: GaiaClient[F]
   )(pool: Session[F]): F[Services[F]] =
     user match {
       case Some(u) if u.role.access === Access.Service =>
-        Services.forUser(u, enums, None)(pool).pure[F].flatTap { _ =>
+        Services.forUser(
+          u,
+          enums,
+          None,
+          emailConfig,
+          httpClient,
+          itcClient,
+          gaiaClient,
+          S3FileService.noop[F]
+        )(pool).pure[F].flatTap { _ =>
           val us = UserService.fromSession(pool)
           Services.asSuperUser(us.canonicalizeUser(u))
         }
@@ -190,7 +207,12 @@ object CMain extends MainParams {
       (obsT, ctT) <- topics(pool)
       user        <- Resource.eval(serviceUser[F](c))
       httpClient  <- c.httpClientResource
-      _           <- runCalibrationsDaemon(c.email, httpClient, obsT, ctT, pool.evalMap(services(user, enums)))
+      itcClient   <- c.itcClient
+      gaiaClient  <- c.gaiaClient
+      _           <- runCalibrationsDaemon(
+                       obsT,
+                       ctT,
+                       pool.evalMap(services(user, enums, c.email, httpClient, itcClient, gaiaClient)))
     } yield ExitCode.Success
 
   /** Our logical entry point. */

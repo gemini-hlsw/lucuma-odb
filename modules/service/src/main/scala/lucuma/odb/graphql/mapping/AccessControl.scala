@@ -84,7 +84,7 @@ object AccessControl:
    * beforehand (see `CheckedWithIds`).
    */
   sealed trait Checked[+A]:
-    
+
     def isEmpty: Boolean =
       fold(true)((_, _) => false)
 
@@ -120,13 +120,13 @@ object AccessControl:
 
   object Checked {
 
-    /** An approved operation defined over ids returned by `IN` expression `which`. */    
+    /** An approved operation defined over ids returned by `IN` expression `which`. */
     sealed abstract case class NonEmpty[A](SET: A, which: AppliedFragment) extends Checked[A]
 
-    /** An approved operation defined over `ids`, encodable via `enc`. */    
+    /** An approved operation defined over `ids`, encodable via `enc`. */
     sealed abstract case class NonEmptyWithIds[A,B](SET: A, ids: NonEmptyList[B], enc: Encoder[B]) extends CheckedWithIds[A,B]
 
-    /** An approved operation defined over `id`, encodable via `enc`. */    
+    /** An approved operation defined over `id`, encodable via `enc`. */
     sealed abstract case class NonEmptyWithId[A,B](SET: A, id: B, enc: Encoder[B]) extends CheckedWithId[A,B]
 
     /** An approved operation that is known to have no effect. */
@@ -194,8 +194,8 @@ trait AccessControl[F[_]] extends Predicates[F] {
     Services.asSuperUser:
       writableOids(includeDeleted, WHERE, includeCalibrations)
         .flatTraverse: which =>
-          observationWorkflowService(httpClient).filterState(
-            which, 
+          observationWorkflowService.filterState(
+            which,
             allowedStates,
             commitHash,
             itcClient,
@@ -277,7 +277,7 @@ trait AccessControl[F[_]] extends Predicates[F] {
     pids:           List[Program.Id]
   )(using Services[F], NoTransaction[F]): F[Result[List[Program.Id]]] =
     selectForProgramUpdateImpl(
-      includeDeleted, 
+      includeDeleted,
       Some(Predicates.program.id.in(pids))
     )
 
@@ -299,7 +299,7 @@ trait AccessControl[F[_]] extends Predicates[F] {
           WHERE.getOrElse(True)
         ))
       ).flatTraverse: which =>
-        observationWorkflowService(httpClient).filterTargets(
+        observationWorkflowService.filterTargets(
           which,
           allowedStates,
           commitHash,
@@ -317,7 +317,7 @@ trait AccessControl[F[_]] extends Predicates[F] {
     selectForTargetUpdateImpl(
       input.includeDeleted,
       input.WHERE,
-      ObservationWorkflowState.preExecutionSet,      
+      ObservationWorkflowState.preExecutionSet,
     ).nestMap: tids =>
       Services.asSuperUser:
         AccessControl.unchecked(input.SET, tids, target_id)
@@ -328,7 +328,7 @@ trait AccessControl[F[_]] extends Predicates[F] {
     oids:                List[Observation.Id],
     includeCalibrations: Boolean,
     allowedStates:       Set[ObservationWorkflowState]
-  )(using Services[F], NoTransaction[F]): F[Result[List[Observation.Id]]] = 
+  )(using Services[F], NoTransaction[F]): F[Result[List[Observation.Id]]] =
     selectForObservationUpdateImpl(
       includeDeleted,
       Some(Predicates.observation.id.in(oids)),
@@ -341,9 +341,9 @@ trait AccessControl[F[_]] extends Predicates[F] {
    * set based on access control policies and return a checked edit that is valid for execution.
    */
   def selectForUpdate(
-    input: UpdateObservationsInput, 
+    input: UpdateObservationsInput,
     includeCalibrations: Boolean
-  )(using Services[F], 
+  )(using Services[F],
           NoTransaction[F]
   ): F[Result[AccessControl.CheckedWithIds[ObservationPropertiesInput.Edit, Observation.Id]]] =
     {
@@ -367,16 +367,16 @@ trait AccessControl[F[_]] extends Predicates[F] {
         else ObservationWorkflowState.fullSet         // always ok
 
       selectForObservationUpdateImpl(
-        input.includeDeleted, 
-        input.WHERE, 
-        includeCalibrations, 
+        input.includeDeleted,
+        input.WHERE,
+        includeCalibrations,
         allowedStates
       ).nestMap: oids =>
         Services.asSuperUser:
           AccessControl.unchecked(input.SET, oids, observation_id)
 
     }
-      
+
   /**
    * Given an operation that defines a set of observations and a proposed edit, select and filter this
    * set based on access control policies and return a checked edit that is valid for execution.
@@ -384,13 +384,13 @@ trait AccessControl[F[_]] extends Predicates[F] {
   def selectForUpdate(
     input: UpdateAsterismsInput,
     includeCalibrations: Boolean
-  )(using Services[F], 
+  )(using Services[F],
           NoTransaction[F]
   ): F[Result[AccessControl.CheckedWithIds[EditAsterismsPatchInput, Observation.Id]]] =
     selectForObservationUpdateImpl(
-      input.includeDeleted, 
-      input.WHERE, 
-      includeCalibrations, 
+      input.includeDeleted,
+      input.WHERE,
+      includeCalibrations,
       ObservationWorkflowState.preExecutionSet // not allowed once we start executing
     ).nestMap: oids =>
       Services.asSuperUser:
@@ -403,13 +403,13 @@ trait AccessControl[F[_]] extends Predicates[F] {
   def selectForUpdate(
     input: UpdateObservationsTimesInput,
     includeCalibrations: Boolean
-  )(using Services[F], 
+  )(using Services[F],
           NoTransaction[F]
   ): F[Result[AccessControl.CheckedWithIds[ObservationTimesInput, Observation.Id]]]  =
     selectForObservationUpdateImpl(
-      input.includeDeleted, 
-      input.WHERE, 
-      includeCalibrations, 
+      input.includeDeleted,
+      input.WHERE,
+      includeCalibrations,
       ObservationWorkflowState.allButComplete // allowed unless we're complete
     ).nestMap: oids =>
       Services.asSuperUser:
@@ -432,7 +432,7 @@ trait AccessControl[F[_]] extends Predicates[F] {
             None,
             List(oid),
             includeCalibrations,
-            if user.role.access <= Access.Pi 
+            if user.role.access <= Access.Pi
               then ObservationWorkflowState.preExecutionSet
               else ObservationWorkflowState.allButComplete
           ).map: r =>
@@ -447,7 +447,7 @@ trait AccessControl[F[_]] extends Predicates[F] {
     prop: Option[ProposalReference],
     prog: Option[ProgramReference]
   )(using Services[F]): F[Result[Option[Program.Id]]] =
-    programService(emailConfig, httpClient)
+    programService
       .resolvePid(pid, prop, prog)
       .flatMap: r =>
         r.flatTraverse: pid =>
@@ -488,7 +488,7 @@ trait AccessControl[F[_]] extends Predicates[F] {
                 AccessControl.unchecked(props, pid, program_id)
       .value
 
-  } 
+  }
 
   def selectForUpdate(
     input: CreateTargetInput,
@@ -501,7 +501,7 @@ trait AccessControl[F[_]] extends Predicates[F] {
             AccessControl.unchecked(input.SET, pid, program_id)
       .value
 
-  } 
+  }
 
   def selectForClone(
     input: CloneObservationInput
@@ -560,7 +560,7 @@ trait AccessControl[F[_]] extends Predicates[F] {
   def selectForUpdate(
     input: SetProgramReferenceInput
   )(using Services[F], Transaction[F]): F[Result[AccessControl.CheckedWithId[ProgramReferencePropertiesInput, Program.Id]]] =
-    programService(emailConfig, httpClient)
+    programService
       .resolvePid(input.programId, input.proposalReference, input.programReference)
       .flatMap: r =>
         r.flatTraverse: pid =>
@@ -594,7 +594,7 @@ trait AccessControl[F[_]] extends Predicates[F] {
     input: SetAllocationsInput
   )(using Services[F]): F[Result[AccessControl.CheckedWithId[List[AllocationInput], Program.Id]]] =
     requireStaffAccess:
-      ResultT(programService(emailConfig, httpClient).resolvePid(input.programId, input.proposalReference, input.programReference))
+      ResultT(programService.resolvePid(input.programId, input.proposalReference, input.programReference))
         .map: pid =>
           Services.asSuperUser:
             AccessControl.unchecked(input.allocations, pid, program_id)
@@ -704,7 +704,7 @@ trait AccessControl[F[_]] extends Predicates[F] {
             ),
             includeCalibrations = false,
             allowedStates = ObservationWorkflowState.preExecutionSet
-          ) 
+          )
 
     editableProgram
       .flatMap: (tid, pid) =>
@@ -718,7 +718,7 @@ trait AccessControl[F[_]] extends Predicates[F] {
   def selectForUpdate(input: SetObservationWorkflowStateInput)(using Services[F], NoTransaction[F]): F[Result[CheckedWithId[(ObservationWorkflow, ObservationWorkflowState), Observation.Id]]] =
     verifyWritable(input.observationId) >>
     Services.asSuperUser:
-      observationWorkflowService(httpClient).getWorkflows(List(input.observationId), commitHash, itcClient, timeEstimateCalculator)
+      observationWorkflowService.getWorkflows(List(input.observationId), commitHash, itcClient, timeEstimateCalculator)
         .map: res =>
           res.map(_(input.observationId)).flatMap: w =>
             if w.state === input.state || w.validTransitions.contains(input.state)

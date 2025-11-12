@@ -14,6 +14,8 @@ import lucuma.core.model.Attachment
 import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.core.util.Enumerated
+import lucuma.itc.client.ItcClient
+import lucuma.odb.Config
 import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.service.AttachmentFileService
 import lucuma.odb.service.AttachmentFileService.AttachmentException
@@ -22,6 +24,7 @@ import lucuma.odb.service.Services
 import lucuma.sso.client.SsoClient
 import natchez.Trace
 import org.http4s.*
+import org.http4s.client.Client
 import org.http4s.dsl.Http4sDsl
 import org.http4s.server.middleware.EntityLimiter
 import org.typelevel.log4cats.Logger
@@ -39,9 +42,13 @@ object AttachmentRoutes {
     ssoClient:             SsoClient[F, User],
     enums:                 Enums,
     maxUploadMb:           Int,
+    emailConfig:           Config.Email,
+    httpClient:            Client[F],
+    itcClient:             ItcClient[F],
+    gaiaClient:            lucuma.catalog.clients.GaiaClient[F]
   ): HttpRoutes[F] =
     apply(
-      [A] => (u: User) => (fa: AttachmentFileService[F] => F[A]) => pool.map(Services.forUser(u, enums, None)).map(_.attachmentFileService(s3)).use(fa),
+      [A] => (u: User) => (fa: AttachmentFileService[F] => F[A]) => pool.map(Services.forUser(u, enums, None, emailConfig, httpClient, itcClient, gaiaClient, s3)).map(_.attachmentFileService).use(fa),
       ssoClient,
       maxUploadMb
     )
@@ -110,7 +117,7 @@ object AttachmentRoutes {
       case req @ POST -> Root / "attachment"
           :? ProgramIdMatcher(programId)
           +& FileNameMatcher(fileName)
-          +& AttachmentTypeMatcher(attachmentType) 
+          +& AttachmentTypeMatcher(attachmentType)
           +& DescriptionMatcher(optDesc) =>
         ssoClient.require(req) { user =>
           service(user) { s =>

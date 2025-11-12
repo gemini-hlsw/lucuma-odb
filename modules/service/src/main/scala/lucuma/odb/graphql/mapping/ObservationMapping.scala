@@ -121,7 +121,7 @@ trait ObservationMapping[F[_]]
     val calculate: (Program.Id, Observation.Id, Unit) => F[Result[ItcService.AsterismResults]] =
       (pid, oid, _) =>
         services.use { implicit s =>
-          itcService(itcClient)
+          itcService
             .lookup(pid, oid)
             .map(_.bimap(_.asFailure, _.success).merge)
         }

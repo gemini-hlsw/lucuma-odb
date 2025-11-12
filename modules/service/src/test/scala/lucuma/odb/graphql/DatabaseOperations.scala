@@ -108,7 +108,7 @@ trait DatabaseOperations { this: OdbSuite =>
         .flatMap: tec =>
           given Services[IO] = services
           requireServiceAccessOrThrow:
-            val srv  = obscalcService(CommitHash.Zero, itcClient, tec, httpClient)
+            val srv  = obscalcService(CommitHash.Zero, tec)
             val when =
               services.transactionally:
                 srv
@@ -840,13 +840,19 @@ trait DatabaseOperations { this: OdbSuite =>
       case ObservingModeType.GmosNorthImaging =>
         """{
           gmosNorthImaging: {
-            filters: [R_PRIME, G_PRIME]
+            filters: [
+              { filter: R_PRIME },
+              { filter: G_PRIME }
+            ]
           }
         }"""
       case ObservingModeType.GmosSouthImaging =>
         """{
           gmosSouthImaging: {
-            filters: [R_PRIME, G_PRIME]
+            filters: [
+              { filter: R_PRIME },
+              { filter: G_PRIME }
+            ]
           }
         }"""
       case ObservingModeType.GmosNorthLongSlit =>
@@ -874,7 +880,14 @@ trait DatabaseOperations { this: OdbSuite =>
         val offsetsField = offsets.fold("")(offsets => s", offsets: $offsets")
         s"""{
           gmosNorthImaging: {
-            filters: [R_PRIME, G_PRIME]
+            filters: [
+              {
+                filter: R_PRIME
+              },
+              {
+                filter: G_PRIME
+              }
+            ]
             $offsetsField
           }
         }"""
@@ -882,7 +895,14 @@ trait DatabaseOperations { this: OdbSuite =>
         val offsetsField = offsets.fold("")(offsets => s", offsets: $offsets")
         s"""{
           gmosSouthImaging: {
-            filters: [R_PRIME, G_PRIME]
+            filters: [
+              {
+                filter: R_PRIME
+              },
+              {
+                filter: G_PRIME
+              }
+            ]
             $offsetsField
           }
         }"""
