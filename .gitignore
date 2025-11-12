@@ -71,3 +71,6 @@ node_modules/
 
 # ITC benchmarks
 itc-performance-results*.csv
+
+# Temporary ODB schema
+itc/service/src/main/resources/graphql/ObservationDB.graphql

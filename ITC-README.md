@@ -97,17 +97,38 @@ The script will:
 
 The itc schema uses many types defined on the odb schema. The `schemastitcher.js` script can be used
 to generate a single schema file that includes all the types needed by the itc schema. It uses as a
-base `itc_base.graphql` and stitches it with `ObservationDB.graphql`.
+base `itc_base.graphql` and stitches it with the ODB schema fetched from a locally running server.
 
 It starts with the queries defined on `itc_base.graphql` and prunes the unused types, as itc doesn't
-need most of `ObservationDB.graphql` types.
+need most of the ODB schema types.
 
-Call it as:
-```
-node itc/schemastitcher.js modules/service/src/main/resources/graphql/ObservationDB.graphql itc/service/src/main/resources/graphql/itc_base.graphql itc/service/src/main/resources/graphql/itc.graphql
-```
+### Local ITC schema generation
 
-The script `itcFetchODBSchema.sh` will conveniently perform this invocation.
+To stitch the ITC schema with a local ODB server:
+
+1. Start the ODB server:
+   ```bash
+   sbt service/reStart
+   ```
+
+2. Run the stitching script from the `itc/` directory:
+   ```bash
+   cd itc
+   ./stitchSchemaFromLocal.sh
+   ```
+
+The script will:
+- Check if ODB server is running on localhost:8082
+- Fetch the schema via GraphQL introspection
+- Stitch it with `itc_base.graphql` to create `itc.graphql`
+
+You can also stitch manually:
+```bash
+node itc/schemastitcher.mjs \
+  <path-to-odb-schema> \
+  itc/service/src/main/resources/graphql/itc_base.graphql \
+  itc/service/src/main/resources/graphql/itc.graphql
+```
 
 ## Benchmarking
 

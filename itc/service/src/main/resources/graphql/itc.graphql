@@ -2,7 +2,7 @@
 """
 This file is generated. Do not manually modify it.
 It is generated from the following source files:
-  - OdbSchema.graphql
+  - ObservationDB.graphql
   - itc_base.graphql
 """
 enum ConditionsMeasurementSource {
