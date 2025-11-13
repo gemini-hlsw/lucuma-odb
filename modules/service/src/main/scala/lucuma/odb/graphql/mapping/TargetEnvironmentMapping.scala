@@ -152,7 +152,7 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
           Services.asSuperUser:
             services
               .trackingService
-              .getCoordinatesSnapshotOrRegion(oid, obsTime)
+              .getCoordinatesSnapshotOrRegion(oid, obsTime, false)
               .map: res =>
                 res.map(_.left.toOption.map(_.base)) // treat region as None
         }

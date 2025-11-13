@@ -315,7 +315,7 @@ object ObservationWorkflowService {
             .foldLeftM(input): // fold over this list with `input` as the starting point, updating when we can find coordinates
               case (accum, (when, batch)) =>
                 trackingService
-                  .getCoordinatesSnapshotOrRegion(batch, when)
+                  .getCoordinatesSnapshotOrRegion(batch, when, false)
                   .map: batchResults =>
                     batchResults
                       .collect:
