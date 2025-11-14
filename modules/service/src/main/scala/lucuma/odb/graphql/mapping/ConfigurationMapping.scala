@@ -82,7 +82,7 @@ trait ConfigurationMapping[F[_]]
             services.use { implicit s =>
               Services.asSuperUser:
                 s.trackingService
-                  .getCoordinatesSnapshotOrRegion(oid, at)
+                  .getCoordinatesSnapshotOrRegion(oid, at, false)
                   .map: res =>
                     if res.isFailure then Result(None) // important, don't fail here
                     else res
