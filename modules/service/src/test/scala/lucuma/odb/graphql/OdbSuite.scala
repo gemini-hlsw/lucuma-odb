@@ -132,16 +132,16 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
   override implicit def munitIoRuntime: IORuntime = OdbSuite.runtime
 
   /** Ensure that exactly the specified errors are reported, in order. */
-  def interceptGraphQL(messages: String*)(fa: IO[Any]): IO[Unit] =
+  def interceptGraphQL(messages: String*)(fa: IO[Any])(using Location): IO[Unit] =
     fa.attempt.flatMap {
       case Left(ResponseException(errors, _)) =>
-        assertEquals(messages.toList, errors.toList.map(_.message)).pure[IO]
+        assertEquals(errors.toList.map(_.message), messages.toList).pure[IO]
       case Left(other) => IO.raiseError(other)
       case Right(a) => fail(s"Expected failure, got $a")
     }
 
   /** Intercept a single OdbError */
-  def interceptOdbError(fa: IO[Any])(f: PartialFunction[OdbError, Unit]): IO[Unit] =
+  def interceptOdbError(fa: IO[Any])(f: PartialFunction[OdbError, Unit])(using Location): IO[Unit] =
     fa.attempt.flatMap {
       case Left(e @ ResponseException(errors, _)) =>
         errors.toList.flatMap(OdbError.fromGraphQLError) match

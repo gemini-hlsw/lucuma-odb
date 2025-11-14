@@ -384,7 +384,7 @@ class reference extends OdbSuite {
             }
           }
         """,
-        List("Argument 'input.SET' is invalid: Exactly one of 'calibration', 'commissioning', 'engineering', 'example', 'library', 'monitoring', 'science' or 'system' expected.").asLeft
+        List("Exactly one key must be specified for oneOf input object ProgramReferencePropertiesInput in field 'setProgramReference' of type 'Mutation', but found 'calibration', 'engineering'").asLeft
       )
     }
   }
