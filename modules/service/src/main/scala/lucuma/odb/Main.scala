@@ -45,7 +45,8 @@ import org.http4s.implicits.*
 import org.http4s.server.*
 import org.http4s.server.websocket.WebSocketBuilder2
 import org.typelevel.log4cats.Logger
-import org.typelevel.log4cats.slf4j.Slf4jLogger
+import org.typelevel.log4cats.LoggerFactory
+import org.typelevel.log4cats.slf4j.Slf4jFactory
 import skunk.{Command as _, *}
 import software.amazon.awssdk.services.s3.presigner.S3Presigner
 
@@ -120,7 +121,8 @@ object Main extends CommandIOApp(
       name    = "serve",
       header  = "Run the ODB service.",
     )((ResetDatabase.opt, SkipMigration.opt).tupled.map { case (reset, skipMigration) =>
-      given Logger[IO] = Slf4jLogger.getLoggerFromName[IO]("lucuma-odb")
+      given LF: LoggerFactory[IO] = Slf4jFactory.create[IO]
+      given Logger[IO] = LF.getLoggerFromName("lucuma-odb")
 
       for {
         _ <- IO.whenA(reset.isRequested)(IO.println("Resetting database."))
@@ -201,7 +203,7 @@ object FMain extends MainParams {
       .resource
 
   /** A resource that yields our HttpRoutes, wrapped in accessory middleware. */
-  def routesResource[F[_]: Async: Parallel: Trace: Logger: Network: Console: SecureRandom](
+  def routesResource[F[_]: Async: Parallel: Trace: Logger: LoggerFactory: Network: Console: SecureRandom](
     config: Config
   ): Resource[F, WebSocketBuilder2[F] => HttpRoutes[F]] =
     routesResource(
@@ -221,7 +223,7 @@ object FMain extends MainParams {
     )
 
   /** A resource that yields our HttpRoutes, wrapped in accessory middleware. */
-  def routesResource[F[_]: Async: Parallel: Trace: Logger: Network: Console: SecureRandom](
+  def routesResource[F[_]: Async: Parallel: Trace: Logger: LoggerFactory: Network: Console: SecureRandom](
     databaseConfig:       Config.Database,
     awsConfig:            Config.Aws,
     emailConfig:          Config.Email,
@@ -316,7 +318,7 @@ object FMain extends MainParams {
    * Our main server, as a resource that starts up our server on acquire and shuts it all down
    * in cleanup, yielding an `ExitCode`. Users will `use` this resource and hold it forever.
    */
-  def server[F[_]: Async: Parallel: Logger: Console: Network: SecureRandom](
+  def server[F[_]: Async: Parallel: Logger: LoggerFactory: Console: Network: SecureRandom](
     reset:         ResetDatabase,
     skipMigration: SkipMigration,
     mkTrace:       EntryPoint[F] => F[Trace[F]]
@@ -334,7 +336,7 @@ object FMain extends MainParams {
     } yield ExitCode.Success
 
   /** Our logical entry point. */
-  def runF[F[_]: Async: Parallel: Logger: Console: Network: SecureRandom](
+  def runF[F[_]: Async: Parallel: Logger: LoggerFactory: Console: Network: SecureRandom](
     reset:         ResetDatabase,
     skipMigration: SkipMigration,
     mkTrace:       EntryPoint[F] => F[Trace[F]]

@@ -32,12 +32,13 @@ import org.http4s.dsl.Http4sDsl
 import org.http4s.headers.`Accept-Encoding`
 import org.typelevel.ci.*
 import org.typelevel.log4cats.Logger
+import org.typelevel.log4cats.LoggerFactory
 import skunk.Session
 
 object SchedulerRoutes:
 
   // the normal constructor
-  def apply[F[_]: Async: Logger: Parallel: Trace: SecureRandom](
+  def apply[F[_]: Async: Logger: LoggerFactory: Parallel: Trace: SecureRandom](
     pool:        Resource[F, Session[F]],
     ssoClient:   SsoClient[F, User],
     enums:       Enums,

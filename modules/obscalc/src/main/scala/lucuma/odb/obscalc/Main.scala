@@ -42,7 +42,8 @@ import org.http4s.client.Client
 import org.http4s.headers.Authorization
 import org.typelevel.ci.CIString
 import org.typelevel.log4cats.Logger
-import org.typelevel.log4cats.slf4j.Slf4jLogger
+import org.typelevel.log4cats.LoggerFactory
+import org.typelevel.log4cats.slf4j.Slf4jFactory
 import skunk.{Command as _, *}
 
 import scala.concurrent.duration.*
@@ -74,7 +75,8 @@ object ObscalcMain extends CommandIOApp(
     Opts(serve)
 
   lazy val serve: IO[ExitCode] =
-    given Logger[IO] = Slf4jLogger.getLoggerFromName[IO]("obscalc-service")
+    given LF: LoggerFactory[IO] = Slf4jFactory.create[IO]
+    given Logger[IO] = LF.getLoggerFromName("obscalc-service")
 
     import natchez.Trace.Implicits.noop
 
@@ -207,7 +209,7 @@ object CalcMain extends MainParams:
       o <- calcAndUpdateStream.compile.drain.background
     yield o
 
-  def services[F[_]: Temporal: Parallel: UUIDGen: Trace: Logger](
+  def services[F[_]: Temporal: Parallel: UUIDGen: Trace: Logger: LoggerFactory](
     user:        User,
     enums:       Enums,
     mapping:     Session[F] => Mapping[F],
@@ -233,7 +235,7 @@ object CalcMain extends MainParams:
    * Our main server, as a resource that starts up our server on acquire and shuts it all down
    * in cleanup, yielding an `ExitCode`. Users will `use` this resource and hold it forever.
    */
-  def server[F[_]: Async: Parallel: Logger: Trace: Console: Network: SecureRandom]: Resource[F, F[Outcome[F, Throwable, Unit]]] =
+  def server[F[_]: Async: Parallel: Logger: LoggerFactory: Trace: Console: Network: SecureRandom]: Resource[F, F[Outcome[F, Throwable, Unit]]] =
     for
       c          <- Resource.eval(Config.fromCiris.load[F])
       _          <- Resource.eval(banner[F](c))
@@ -252,7 +254,7 @@ object CalcMain extends MainParams:
     yield o
 
   /** Our logical entry point. */
-  def runF[F[_]:   Async: Parallel: Logger: Trace: Network: Console: SecureRandom]: F[ExitCode] =
+  def runF[F[_]:   Async: Parallel: Logger: LoggerFactory: Trace: Network: Console: SecureRandom]: F[ExitCode] =
     server.use: o =>
       o.flatMap:
         case Outcome.Succeeded(_) => Logger[F].info("Obscalc completed.")  >> ExitCode.Success.pure[F]

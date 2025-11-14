@@ -35,6 +35,7 @@ import lucuma.odb.sequence.util.CommitHash
 import natchez.Trace
 import org.http4s.client.Client
 import org.typelevel.log4cats.Logger
+import org.typelevel.log4cats.LoggerFactory
 import skunk.Session
 import skunk.Transaction
 import skunk.codec.all.*
@@ -252,7 +253,7 @@ object Services:
     gaiaClient0: GaiaClient[F],
     s3FileService0: S3FileService[F]
   )(s: Session[F])(
-    using tf: Trace[F], uf: UUIDGen[F], cf: Temporal[F], par: Parallel[F], log: Logger[F]
+    using tf: Trace[F], uf: UUIDGen[F], cf: Temporal[F], par: Parallel[F], log: Logger[F], lf: LoggerFactory[F]
   ): Services[F[_]] =
     new Services[F]:
 

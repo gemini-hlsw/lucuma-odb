@@ -43,6 +43,7 @@ import skunk.Transaction
 import skunk.syntax.all.*
 
 import java.time.Instant
+import org.typelevel.log4cats.LoggerFactory
 
 trait PerProgramPerConfigCalibrationsService[F[_]]:
   def generateCalibrations(
@@ -56,8 +57,10 @@ trait PerProgramPerConfigCalibrationsService[F[_]]:
 object PerProgramPerConfigCalibrationsService:
   val CalibrationsGroupName: NonEmptyString = "Calibrations".refined
 
-  def instantiate[F[_]: {MonadCancelThrow, Services, Logger}]: PerProgramPerConfigCalibrationsService[F] =
+  def instantiate[F[_]: {MonadCancelThrow, Services, LoggerFactory as LF}]: PerProgramPerConfigCalibrationsService[F] =
     new PerProgramPerConfigCalibrationsService[F] with CalibrationObservations:
+      given Logger[F] = LF.getLoggerFromName("per-program-calibrations")
+
       private def calObsProps(
         calibConfigs: List[ObsExtract[CalibrationConfigSubset]]
       ): Map[CalibrationConfigSubset, CalObsProps] =

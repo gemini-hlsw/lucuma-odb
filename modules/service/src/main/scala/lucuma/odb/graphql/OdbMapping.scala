@@ -41,6 +41,7 @@ import natchez.Trace
 import org.http4s.client.Client
 import org.tpolecat.sourcepos.SourcePos
 import org.typelevel.log4cats.Logger
+import org.typelevel.log4cats.LoggerFactory
 
 import scala.io.AnsiColor
 import scala.io.Source
@@ -85,7 +86,7 @@ object OdbMapping {
   private implicit def monoidPartialFunction[A, B]: Monoid[PartialFunction[A, B]] =
     Monoid.instance(PartialFunction.empty, _ orElse _)
 
-  def apply[F[_]: Async: Parallel: Trace: Logger: SecureRandom](
+  def apply[F[_]: Async: Parallel: Trace: Logger: LoggerFactory: SecureRandom](
     database:      Resource[F, Session[F]],
     monitor0:      SkunkMonitor[F],
     user0:         User,
@@ -698,7 +699,7 @@ object OdbMapping {
    * a `Services` instance that has a mapping.  This mapping ignores
    * subscriptions.
    */
-  def forObscalc[F[_]: Async: Parallel: Trace: Logger: SecureRandom](
+  def forObscalc[F[_]: Async: Parallel: Trace: Logger: LoggerFactory: SecureRandom](
     database:    Resource[F, Session[F]],
     monitor:     SkunkMonitor[F],
     user:        User,

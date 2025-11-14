@@ -43,6 +43,7 @@ import skunk.Transaction
 import skunk.codec.boolean.bool
 import skunk.codec.text.text
 import skunk.syntax.all.*
+import org.typelevel.log4cats.LoggerFactory
 
 import java.time.Instant
 
@@ -94,8 +95,9 @@ object CalibrationsService extends CalibrationObservations {
       case (tid, name, role, Some(st)) => (tid, name, role, st)
     }
 
-  def instantiate[F[_]: {Concurrent, Services, Logger}]: CalibrationsService[F] =
+  def instantiate[F[_]: {Concurrent, Services, LoggerFactory as LF}]: CalibrationsService[F] =
     new CalibrationsService[F] {
+      given Logger[F] = LF.getLoggerFromName("calibrations-service")
 
       private def collectValid(
         requiresItcInputs: Boolean
