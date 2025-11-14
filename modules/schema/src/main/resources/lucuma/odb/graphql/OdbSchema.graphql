@@ -17,9 +17,6 @@ enum ProposalStatus {
   DUMMY
 }
 
-"Indicates exactly one field must be supplied and this field must not be `null`."
-directive @oneOf on INPUT_OBJECT
-
 """
 Email address, matching ^\w+@[a-zA-Z_]+?\.[a-zA-Z]{2,3}$
 """
