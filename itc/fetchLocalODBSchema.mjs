@@ -31,9 +31,14 @@ if (!response.ok) {
 
 console.log('Fetched ODB schema from local server.');
 
-const data = (await response.json()).data;
+const json = await response.json();
 
-const schema = printSchema(buildClientSchema(data));
+if (json.errors) {
+  console.error('Errors in introspection query response:', json.errors);
+  throw new Error('Introspection query returned errors');
+}
+
+const schema = printSchema(buildClientSchema(json.data));
 
 await writeFile(
   'service/src/main/resources/graphql/ObservationDB.graphql',
