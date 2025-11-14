@@ -315,7 +315,7 @@ class guideEnvironments extends ExecutionTestSupportForGmos with GuideEnvironmen
                       "id": "3219118090462918016",
                       "objectType": null
                     },
-                    "epoch": "J2023.660",
+                    "epoch": "J2023.659",
                     "ra": {
                       "microseconds": 20782434012,
                       "hms": "05:46:22.434012",
@@ -323,9 +323,9 @@ class guideEnvironments extends ExecutionTestSupportForGmos with GuideEnvironmen
                       "degrees": 86.59347505
                     },
                     "dec": {
-                      "dms": "-00:08:52.651136",
-                      "degrees": 359.8520413511111,
-                      "microarcseconds": 1295467348864
+                      "dms": "-00:08:52.651135",
+                      "degrees": 359.8520413513889,
+                      "microarcseconds": 1295467348865
                     },
                     "radialVelocity": {
                       "metersPerSecond": 0,
@@ -376,7 +376,7 @@ class guideEnvironments extends ExecutionTestSupportForGmos with GuideEnvironmen
                       "id": "3219118640218737920",
                       "objectType": null
                     },
-                    "epoch": "J2023.660",
+                    "epoch": "J2023.659",
                     "ra": {
                       "microseconds": 20760248368,
                       "hms": "05:46:00.248368",
@@ -384,9 +384,9 @@ class guideEnvironments extends ExecutionTestSupportForGmos with GuideEnvironmen
                       "degrees": 86.50103486666666666666666666666667
                     },
                     "dec": {
-                      "dms": "-00:08:26.299165",
-                      "degrees": 359.8593613430556,
-                      "microarcseconds": 1295493700835
+                      "dms": "-00:08:26.299164",
+                      "degrees": 359.8593613433333,
+                      "microarcseconds": 1295493700836
                     },
                     "radialVelocity": {
                       "metersPerSecond": 0,
@@ -437,17 +437,17 @@ class guideEnvironments extends ExecutionTestSupportForGmos with GuideEnvironmen
                       "id": "3219142829474535424",
                       "objectType": null
                     },
-                    "epoch": "J2023.660",
+                    "epoch": "J2023.659",
                     "ra": {
-                      "microseconds": 20782383800,
-                      "hms": "05:46:22.383800",
-                      "hours": 5.772884388888888888888888888888889,
-                      "degrees": 86.59326583333333333333333333333333
+                      "microseconds": 20782383801,
+                      "hms": "05:46:22.383801",
+                      "hours": 5.772884389166666666666666666666667,
+                      "degrees": 86.5932658375
                     },
                     "dec": {
-                      "dms": "-00:03:38.949911",
-                      "degrees": 359.93918058027776,
-                      "microarcseconds": 1295781050089
+                      "dms": "-00:03:38.949866",
+                      "degrees": 359.9391805927778,
+                      "microarcseconds": 1295781050134
                     },
                     "radialVelocity": {
                       "metersPerSecond": 0,
