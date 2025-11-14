@@ -72,17 +72,17 @@ class guideEnvironmentF2 extends ExecutionTestSupportForFlamingos2
                           "id": "3219142829474535424",
                           "objectType": null
                         },
-                        "epoch": "J2023.660",
+                        "epoch": "J2023.659",
                         "ra": {
-                          "microseconds": 20782383800,
-                          "hms": "05:46:22.383800",
-                          "hours": 5.772884388888888888888888888888889,
-                          "degrees": 86.59326583333333333333333333333333
+                          "microseconds": 20782383801,
+                          "hms": "05:46:22.383801",
+                          "hours": 5.772884389166666666666666666666667,
+                          "degrees": 86.5932658375
                         },
                         "dec": {
-                          "dms": "-00:03:38.949911",
-                          "degrees": 359.93918058027776,
-                          "microarcseconds": 1295781050089
+                          "dms": "-00:03:38.949866",
+                          "degrees": 359.9391805927778,
+                          "microarcseconds": 1295781050134
                         },
                         "radialVelocity": {
                           "metersPerSecond": 0,
