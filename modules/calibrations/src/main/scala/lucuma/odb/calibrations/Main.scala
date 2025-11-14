@@ -36,7 +36,8 @@ import org.http4s.client.Client
 import org.http4s.headers.Authorization
 import org.typelevel.ci.CIString
 import org.typelevel.log4cats.Logger
-import org.typelevel.log4cats.slf4j.Slf4jLogger
+import org.typelevel.log4cats.LoggerFactory
+import org.typelevel.log4cats.slf4j.Slf4jFactory
 import org.typelevel.log4cats.syntax.*
 import skunk.{Command as _, *}
 
@@ -74,7 +75,8 @@ object CalibrationsMain extends CommandIOApp(
     Opts(serve)
 
   lazy val serve: IO[ExitCode] = {
-    given Logger[IO] = Slf4jLogger.getLoggerFromName[IO]("calibrations-service")
+    given LF: LoggerFactory[IO] = Slf4jFactory.create[IO]
+    given Logger[IO] = LF.getLoggerFromName("calibrations-service")
 
     import natchez.Trace.Implicits.noop
 
@@ -115,7 +117,6 @@ object CMain extends MainParams {
       // debug    = true,
     )
   }
-
 
   def serviceUser[F[_]: Async: Trace: Network: Logger](c: Config): F[Option[User]] =
     c.ssoClient.use: sso =>
@@ -162,7 +163,7 @@ object CMain extends MainParams {
             }.compile.drain.start.void)
     } yield ()
 
-  def services[F[_]: Temporal: Parallel: UUIDGen: Trace: Logger](
+  def services[F[_]: Temporal: Parallel: UUIDGen: Trace: Logger: LoggerFactory](
     user: Option[User],
     enums: Enums,
     emailConfig: Config.Email,
@@ -197,7 +198,7 @@ object CMain extends MainParams {
    * Our main server, as a resource that starts up our server on acquire and shuts it all down
    * in cleanup, yielding an `ExitCode`. Users will `use` this resource and hold it forever.
    */
-  def server[F[_]: Async: Parallel: Logger: Trace: Console: Network: SecureRandom]: Resource[F, ExitCode] =
+  def server[F[_]: Async: Parallel: Logger: LoggerFactory: Trace: Console: Network: SecureRandom]: Resource[F, ExitCode] =
     for {
       c           <- Resource.eval(Config.fromCiris.load[F])
       _           <- Resource.eval(banner[F](c))
@@ -216,7 +217,7 @@ object CMain extends MainParams {
     } yield ExitCode.Success
 
   /** Our logical entry point. */
-  def runF[F[_]:   Async: Parallel: Logger: Trace: Network: Console: SecureRandom]: F[ExitCode] =
+  def runF[F[_]:   Async: Parallel: Logger: LoggerFactory: Trace: Network: Console: SecureRandom]: F[ExitCode] =
     server.use(_ => Concurrent[F].never[ExitCode])
 
 }
