@@ -20,7 +20,14 @@ const response = await fetch(new URL(url), {
     'Content-Type': 'application/json',
   },
   method: 'POST',
-  body: JSON.stringify({ query: getIntrospectionQuery() }),
+  body: JSON.stringify({
+    query: getIntrospectionQuery({
+      specifiedByUrl: true,
+      oneOf: true,
+      inputValueDeprecation: true,
+      directiveIsRepeatable: true,
+    }),
+  }),
 });
 
 if (!response.ok) {
