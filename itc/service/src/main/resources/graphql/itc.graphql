@@ -130,7 +130,7 @@ type Allocation {
 """
 Create an angle from a signed value.  Choose exactly one of the available units.
 """
-input AngleInput {
+input AngleInput @oneOf {
   microarcseconds: Long
   microseconds: BigDecimal
   milliarcseconds: BigDecimal
@@ -1967,7 +1967,7 @@ type SystemVerification implements ProposalType {
 }
 
 """Radial velocity, choose one of the available units"""
-input RadialVelocityInput {
+input RadialVelocityInput @oneOf {
   centimetersPerSecond: Long
   metersPerSecond: BigDecimal
   kilometersPerSecond: BigDecimal
@@ -2087,7 +2087,7 @@ input SignalToNoiseExposureTimeModeInput {
 """
 Create or edit a source profile.  Exactly one of "point", "uniform" or "gaussian" is required.
 """
-input SourceProfileInput {
+input SourceProfileInput @oneOf {
   point: SpectralDefinitionIntegratedInput
   uniform: SpectralDefinitionSurfaceInput
   gaussian: GaussianInput
@@ -2475,7 +2475,7 @@ type UpdateTargetsResult {
 }
 
 """Wavelength, choose one of the available units"""
-input WavelengthInput {
+input WavelengthInput @oneOf {
   picometers: PosInt
   angstroms: PosBigDecimal
   nanometers: PosBigDecimal

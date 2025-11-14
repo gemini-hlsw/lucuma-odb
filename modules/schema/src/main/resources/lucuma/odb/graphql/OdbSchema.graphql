@@ -190,7 +190,7 @@ input AllocationInput {
 """
 Create an angle from a signed value.  Choose exactly one of the available units.
 """
-input AngleInput {
+input AngleInput @oneOf {
   microarcseconds: Long
   microseconds: BigDecimal
   milliarcseconds: BigDecimal
@@ -1091,7 +1091,7 @@ type DateInterval {
 """
 Declination, choose one of the available units
 """
-input DeclinationInput {
+input DeclinationInput @oneOf {
   microarcseconds: Long
   degrees: BigDecimal
   dms: DmsString
@@ -3647,7 +3647,7 @@ input OffsetInput {
 """
 Parallax, choose one of the available units
 """
-input ParallaxInput {
+input ParallaxInput @oneOf {
   microarcseconds: Long
   milliarcseconds: BigDecimal
 }
@@ -3977,7 +3977,7 @@ type ProgramUser {
 """
 Proper motion component, choose one of the available units
 """
-input ProperMotionComponentInput {
+input ProperMotionComponentInput @oneOf {
   microarcsecondsPerYear: Long
   milliarcsecondsPerYear: BigDecimal
 }
@@ -4402,7 +4402,7 @@ input ProposalPropertiesInput {
 """
 Radial velocity, choose one of the available units
 """
-input RadialVelocityInput {
+input RadialVelocityInput @oneOf {
   centimetersPerSecond: Long
   metersPerSecond: BigDecimal
   kilometersPerSecond: BigDecimal
@@ -4588,7 +4588,7 @@ type ResetAcquisitionResult {
 """
 Right Ascension, choose one of the available units
 """
-input RightAscensionInput {
+input RightAscensionInput @oneOf {
   microseconds: Long
   degrees: BigDecimal
   hours: BigDecimal
@@ -4748,7 +4748,7 @@ input SetProgramReferenceInput {
 Properties for the chosen program reference type.  Supply the value for exactly
 one of the inputs.
 """
-input ProgramReferencePropertiesInput {
+input ProgramReferencePropertiesInput @oneOf {
   calibration: ProgramReferencePropertiesCalibrationInput
   commissioning: ProgramReferencePropertiesCommissioningInput
   engineering: ProgramReferencePropertiesEngineeringInput
@@ -4927,7 +4927,7 @@ input SignalToNoiseExposureTimeModeInput {
 """
 Create or edit a source profile.  Exactly one of "point", "uniform" or "gaussian" is required.
 """
-input SourceProfileInput {
+input SourceProfileInput @oneOf {
   point: SpectralDefinitionIntegratedInput
   uniform: SpectralDefinitionSurfaceInput
   gaussian: GaussianInput
@@ -6077,7 +6077,7 @@ type UpdateTargetsResult {
 """
 Wavelength, choose one of the available units
 """
-input WavelengthInput {
+input WavelengthInput @oneOf {
   picometers: PosInt
   angstroms: PosBigDecimal
   nanometers: PosBigDecimal
@@ -6087,7 +6087,7 @@ input WavelengthInput {
 """
 WavelengthDither, choose one of the available units
 """
-input WavelengthDitherInput {
+input WavelengthDitherInput @oneOf {
   picometers: Int
   angstroms: BigDecimal
   nanometers: BigDecimal
@@ -9985,7 +9985,7 @@ type GroupElement {
 }
 
 "A group element identifier. Exactly one of groupId and observationId must be provided."
-input GroupElementInput {
+input GroupElementInput @oneOf {
   groupId: GroupId
   observationId: ObservationId
 }
