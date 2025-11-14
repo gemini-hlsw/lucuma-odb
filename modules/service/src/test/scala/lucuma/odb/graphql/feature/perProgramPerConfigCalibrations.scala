@@ -50,6 +50,7 @@ import lucuma.odb.service.TwilightCalibrations
 import skunk.data.Notification
 import skunk.implicits.*
 
+import skunk.implicits.*
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime

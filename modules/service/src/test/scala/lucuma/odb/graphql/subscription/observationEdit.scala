@@ -790,4 +790,38 @@ class observationEdit extends OdbSuite with SubscriptionUtils {
         expected  = List(gmosGratingObservationEdit(GmosNorthGrating.B1200_G5301))
       )
     } yield ()
+
+  test("triggers for hard delete sends valid notification payload"):
+    import Group1.{ pi, service }
+    def deleteCalibrationObservation(oid: Observation.Id) =
+      withServices(service) { services =>
+        services.session.transaction.use { xa =>
+          services.observationService.deleteCalibrationObservations(NonEmptyList.one(oid))(using xa)
+        }
+      }
+
+    for {
+      pid  <- createProgram(pi, "foo")
+      tid  <- createTargetAs(pi, pid, "Target")
+      oid  <- createObservationAs(pi, pid, None, tid)
+      _    <- setObservationCalibrationRole(List(oid), CalibrationRole.SpectroPhotometric)
+      _    <- subscriptionExpect(
+        user      = pi,
+        query     = deletedSubscription(pid),
+        mutations = Right(deleteCalibrationObservation(oid)),
+        expected  = List(
+          json"""
+            {
+              "observationEdit" : {
+                "observationId" : $oid,
+                "editType" : "UPDATED",
+                "meta" : null,
+                "value" : null
+              }
+            }
+          """,
+          calibrationDeleted(oid)
+        )
+      )
+    } yield ()
 }
