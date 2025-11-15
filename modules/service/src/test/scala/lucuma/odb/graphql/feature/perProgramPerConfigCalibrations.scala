@@ -47,12 +47,15 @@ import lucuma.odb.service.PerProgramPerConfigCalibrationsService
 import lucuma.odb.service.Services
 import lucuma.odb.service.SpecPhotoCalibrations
 import lucuma.odb.service.TwilightCalibrations
+import skunk.data.Notification
+import skunk.implicits.*
 
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
+import scala.concurrent.duration.*
 
 class perProgramPerConfigCalibrations
     extends OdbSuite
@@ -1470,4 +1473,33 @@ class perProgramPerConfigCalibrations
     }
   }
 
+  test("events for deleting a calibration observation don't emit bogus notification") {
+    for {
+      pid  <- createProgram(pi, "foo")
+      tid1 <- createTargetAs(pi, pid, "One")
+      tid2 <- createTargetAs(pi, pid, "Two")
+      oid1 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid1)
+      oid2 <- createObservationAs(pi, pid, ObservingModeType.GmosSouthLongSlit.some, tid2)
+      _    <- prepareObservation(pi, oid1, tid1) *> prepareObservation(pi, oid2, tid2)
+      _    <- recalculateCalibrations(pid, when)
+      ev   <- Ref.of[IO, List[Notification[String]]](Nil)
+      fib  <- withServices(service): services =>
+                // listen to the raw notifications channel, ObsTopic filters bogus
+                // event out
+                services.session.channel(id"ch_observation_edit").listen(10)
+                  .interruptAfter(10.seconds)
+                  .compile.toList.flatTap(ev.set).start
+      _    <- deleteObservation(pi, oid2)
+      _    <- recalculateCalibrations(pid, when)
+      _    <- fib.join
+      _    <- ev.get.map: not =>
+                // Bogus notifiactions carry no value
+                val invalidNotifications = not.filter(_.value.isEmpty)
+
+                // Without migration 1060 this produces a bogus notification without
+                // a value, it only shwos on the logs butstill
+                invalidNotifications.isEmpty
+              .assert
+    } yield ()
+  }
 }
