@@ -298,7 +298,7 @@ object PerProgramPerConfigCalibrationsService:
         val activeGmosSci = gmosSci.filter: obs =>
           obs.started || obs.state.exists(_ === ObservationWorkflowState.Ready)
 
-        // unique GMOS configurations (from active science observations only)
+        // unique GMOS configurations
         val uniqueSci = uniqueConfiguration(activeGmosSci)
 
         // Extract props from all science observations
