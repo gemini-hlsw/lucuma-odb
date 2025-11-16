@@ -41,6 +41,7 @@ import org.typelevel.log4cats.syntax.*
 import skunk.AppliedFragment
 import skunk.Transaction
 import skunk.syntax.all.*
+import lucuma.core.enums.ObservationWorkflowState
 
 import java.time.Instant
 import org.typelevel.log4cats.LoggerFactory
@@ -215,7 +216,7 @@ object PerProgramPerConfigCalibrationsService:
         calibrations:   List[ObsExtract[CalibrationConfigSubset]]
       )(using Transaction[F], ServiceAccess): F[List[Observation.Id]] = {
         val unnecessaryOids = calibrations.collect {
-          case ObsExtract(oid, _, _, Some(role), config)
+          case ObsExtract(oid, _, _, Some(role), config, _, _)
             if !isCalibrationNeeded(scienceConfigs, config, role) => oid
         }
 
@@ -288,12 +289,17 @@ object PerProgramPerConfigCalibrationsService:
         calibTargets: List[(Target.Id, String, CalibrationRole, Coordinates)],
         when: Instant
       )(using Transaction[F], ServiceAccess): F[(List[Observation.Id], List[Observation.Id])] =
-        // Filter for GMOS observations (exclude F2)
-        val gmosSci = allSci.filterNot(_.data.toConfigSubset.isInstanceOf[Flamingos2Configs])
-        val gmosCalibs = toConfigForCalibration(allCalibs).filterNot(_.data.isInstanceOf[Flamingos2Configs])
 
-        // unique GMOS configurations
-        val uniqueSci = uniqueConfiguration(gmosSci)
+        // Filter for GMOS observations (exclude F2)
+        val gmosSci = allSci.collect(ObsExtract.perProgramFilter)
+        val gmosCalibs = toConfigForCalibration(allCalibs).collect(ObsExtract.perProgramCalibrationFilter)
+
+        // Filter to only 'ready' OR executed observations before extracting unique configs
+        val activeGmosSci = gmosSci.filter: obs =>
+          obs.started || obs.state.exists(_ === ObservationWorkflowState.Ready)
+
+        // unique GMOS configurations (from active science observations only)
+        val uniqueSci = uniqueConfiguration(activeGmosSci)
 
         // Extract props from all science observations
         val props = calObsProps(toConfigForCalibration(allSci))
@@ -305,14 +311,14 @@ object PerProgramPerConfigCalibrationsService:
         val configsPerRole = calculateConfigurationsPerRole(uniqueSci, gmosCalibs)
 
         for
-          _              <- info"Recalculating shared calibrations for $pid, instant $when"
-          _              <- debug"Program $pid has ${uniqueSci.length} science configurations"
+          _              <- info"===== Recalculating shared calibrations for program ID: $pid, instant $when ====="
+          _              <- info"Program $pid has ${uniqueSci.length} science configurations"
           // Remove calibrations that are not needed, basically when a config is removed
           removedOids    <- removeUnnecessaryCalibrations(uniqueSci, gmosCalibs)
-          _              <- (debug"Program $pid will remove unnecessary calibrations $removedOids").whenA(removedOids.nonEmpty)
+          _              <- (info"Program $pid will remove unnecessary calibrations $removedOids").whenA(removedOids.nonEmpty)
           // Generate new calibrations for each unique configuration
           addedOids      <- generateGMOSLSCalibrations(pid, props, configsPerRole, gnTgt, gsTgt)
-          _              <- (debug"Program $pid added calibrations $addedOids").whenA(addedOids.nonEmpty)
+          _              <- (info"Program $pid added calibrations $addedOids").whenA(addedOids.nonEmpty)
           calibUpdates    = prepareCalibrationUpdates(gmosCalibs, removedOids, props)
           _              <- updatePropsAt(calibUpdates)
         yield (addedOids, removedOids)

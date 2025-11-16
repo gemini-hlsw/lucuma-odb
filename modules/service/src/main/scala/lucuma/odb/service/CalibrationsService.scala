@@ -9,6 +9,7 @@ import cats.effect.Concurrent
 import cats.syntax.all.*
 import grackle.Result
 import lucuma.core.enums.CalibrationRole
+import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.Site
 import lucuma.core.math.Coordinates
@@ -27,10 +28,6 @@ import lucuma.odb.graphql.input.EditAsterismsPatchInput
 import lucuma.odb.graphql.mapping.AccessControl
 import lucuma.odb.sequence.ObservingMode
 import lucuma.odb.sequence.data.GeneratorParams
-import lucuma.odb.sequence.flamingos2.longslit.Config as Flamingos2Config
-import lucuma.odb.sequence.gmos.longslit.Config.GmosNorth as GmosNorthLongSlit
-import lucuma.odb.sequence.gmos.longslit.Config.GmosSouth as GmosSouthLongSlit
-import lucuma.odb.service.CalibrationConfigSubset.toConfigSubset
 import lucuma.odb.service.Services.SuperUserAccess
 import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.util.Codecs.*
@@ -76,6 +73,7 @@ trait CalibrationsService[F[_]] {
 
 object CalibrationsService extends CalibrationObservations {
   val PerProgramPerConfigCalibrationTypes = List(CalibrationRole.SpectroPhotometric, CalibrationRole.Twilight)
+
   private def targetCoordinates(when: Instant)(
     rows: List[(Target.Id, String, CalibrationRole, RightAscension, Declination, Epoch, Option[ProperMotion.RA], Option[ProperMotion.Dec], Option[RadialVelocity], Option[Parallax])]
   ): List[(Target.Id, String, CalibrationRole, Coordinates)] =
@@ -101,15 +99,13 @@ object CalibrationsService extends CalibrationObservations {
 
       private def collectValid(
         requiresItcInputs: Boolean
-      ): PartialFunction[(Observation.Id, Either[GeneratorParamsService.Error, GeneratorParams]), ObsExtract[ObservingMode]] =
+      ): PartialFunction[(Observation.Id, (Either[GeneratorParamsService.Error, GeneratorParams], Option[ObservationWorkflowState], Boolean)), ObsExtract[ObservingMode]] =
         {
-          case (oid, Right(GeneratorParams(itc, band, mode, calibRole, _, _))) if itc.isRight || !requiresItcInputs =>
-            ObsExtract(oid, itc.toOption, band, calibRole, mode)
+          case (oid, (Right(GeneratorParams(itc, band, mode, calibRole, _, _)), wfs, hee)) if itc.isRight || !requiresItcInputs =>
+            // Default to Ready if workflow state is NULL (for compatibility with existing tests)
+            val workflowState = wfs.orElse(ObservationWorkflowState.Ready.some)
+            ObsExtract(oid, itc.toOption, band, calibRole, mode, workflowState, hee)
         }
-
-      // Find all active observations in the program
-      private def activeObservations(pid: Program.Id): F[Set[Observation.Id]] =
-        session.execute(Statements.selectActiveObservations)(pid).map(_.toSet)
 
       /**
        * Requests configuration params for a program id and selection (either science or calibration)
@@ -118,62 +114,47 @@ object CalibrationsService extends CalibrationObservations {
         pid:       Program.Id,
         selection: ObservationSelection
       )(using Transaction[F]): F[List[ObsExtract[ObservingMode]]] =
-        services
-          .generatorParamsService
-          .selectAll(pid, selection = selection)
-          .map(_.toList.collect(collectValid(selection === ObservationSelection.Science)))
+        services.generatorParamsService.selectAll(pid, selection = selection).map { paramsMap =>
+          paramsMap.toList.collect(collectValid(selection === ObservationSelection.Science))
+        }
 
       private def allUnexecutedObservations(
         pid:       Program.Id,
         selection: ObservationSelection
       )(using Transaction[F]): F[List[ObsExtract[ObservingMode]]] =
-        services
-          .generatorParamsService
-          .selectAllUnexecuted(pid, selection = selection)
-          .map(_.toList.collect(collectValid(selection === ObservationSelection.Science)))
+        services.generatorParamsService.selectAllUnexecuted(pid, selection = selection).map { paramsMap =>
+          paramsMap.toList.collect(collectValid(selection === ObservationSelection.Science))
+        }
 
       override def calibrationTargets(roles: List[CalibrationRole], referenceInstant: Instant)
         : F[List[(Target.Id, String, CalibrationRole, Coordinates)]] =
           session.execute(Statements.selectCalibrationTargets(roles))(roles)
             .map(targetCoordinates(referenceInstant))
 
-      def perObsFilter: PartialFunction[ObsExtract[ObservingMode], ObsExtract[ObservingMode]] =
-        case d @ ObsExtract(data = _: Flamingos2Config) => d
-
-      def perProgramFilter: PartialFunction[ObsExtract[ObservingMode], ObsExtract[ObservingMode]] =
-        case d @ ObsExtract(data = _: GmosNorthLongSlit) => d
-        case d @ ObsExtract(data = _: GmosSouthLongSlit) => d
-
       def recalculateCalibrations(pid: Program.Id, referenceInstant: Instant)(using Transaction[F], SuperUserAccess): F[(List[Observation.Id], List[Observation.Id])] =
         val sharedService = PerProgramPerConfigCalibrationsService.instantiate
-        val perObsService = PerScienceObservationCalibrationsService.instantiate
 
         for {
-          _                <- info"Recalculating calibrations for $pid, reference instant  $referenceInstant"
+          _                <- info"=== Recalculating calibrations for program ID: $pid, reference instant $referenceInstant ==="
           // Read calibration targets (shared resource)
           calibTargets     <- calibrationTargets(PerProgramPerConfigCalibrationTypes, referenceInstant)
-          // List of the program's active observations
-          active           <- activeObservations(pid)
-          _                <- (debug"Program $pid has ${active.size} active observations: $active").whenA(active.nonEmpty)
-          // Get all active science and calibration observations
+          // Get all science and calibration observations (regardless of workflow state)
           allSci           <- allObservations(pid, ObservationSelection.Science)
-                                .map(_.filter(u => active.contains(u._1)))
-          _                <- (debug"Program $pid has ${allSci.length} science observations: ${allSci.map(_.id)}").whenA(allSci.nonEmpty)
-          // Get all the active calibration observations (excluding those with execution events)
+          _                <- (info"Program ID: $pid has ${allSci.length} science observations: ${allSci.map(_.id)}").whenA(allSci.nonEmpty)
+          // Get all calibration observations (excluding those with execution events, but ignoring workflow state)
           allCalibs        <- allUnexecutedObservations(pid, ObservationSelection.Calibration)
-                                .map(_.filter(u => active.contains(u.id)))
-          _                <- (debug"Program $pid has ${allCalibs.length} active calibration observations: ${allCalibs.map(_.id)}").whenA(allCalibs.nonEmpty)
-          perObs           = allSci.collect(perObsFilter).map(_.map(_.toConfigSubset))
-          perProgram       = allSci.collect(perProgramFilter)
-          _                <- (debug"Program $pid has ${perObs.length} science observations with per obs calibrations: ${perObs.map(_.id)}").whenA(perObs.nonEmpty)
-          // Handle per-science-observation calibs
-          (f2Added, f2Removed)     <- perObsService.generateCalibrations(pid, perObs)
-          _                <- (debug"Program $pid has ${perProgram.length} science observations for per program calibrations: ${perProgram.map(_.id)}").whenA(perProgram.nonEmpty)
-          // Handle per--config calib
+          _                <- (info"Program ID: $pid has ${allCalibs.length} calibration observations: ${allCalibs.map(_.id)}").whenA(allCalibs.nonEmpty)
+          // perObs           = allSci.collect(perObsFilter).map(_.map(_.toConfigSubset))
+          perProgram       = allSci.collect(ObsExtract.perProgramFilter)
+          // _                <- (debug"Program $pid has ${perObs.length} science observations with per obs calibrations: ${perObs.map(_.id)}").whenA(perObs.nonEmpty)
+          // // Handle per-science-observation calibs
+          // (f2Added, f2Removed)     <- perObsService.generateCalibrations(pid, perObs)
+          _                <- (info"Program ID: $pid has ${perProgram.length} science observations for per program calibrations: ${perProgram.map(_.id)}").whenA(perProgram.nonEmpty)
+          // // Handle per--config calib
           (gmosAdded, gmosRemoved) <- sharedService.generateCalibrations(pid, perProgram, allCalibs, calibTargets, referenceInstant)
-          // Clean orphaned targets
+          // // Clean orphaned targets
           _                        <- targetService.deleteOrphanCalibrationTargets(pid)
-        } yield (f2Added ++ gmosAdded, f2Removed ++ gmosRemoved)
+        } yield (gmosAdded, gmosRemoved) //(f2Added ++ gmosAdded, f2Removed ++ gmosRemoved)
 
       // Recalcula the target of a calibration observation
       def recalculateCalibrationTarget(
@@ -280,7 +261,9 @@ object CalibrationsService extends CalibrationObservations {
         SELECT
             c_observation_id
           FROM t_observation
-          WHERE c_program_id = $program_id AND c_workflow_user_state IS DISTINCT FROM 'inactive'
+          WHERE c_program_id = $program_id
+            AND c_workflow_user_state = 'ready'
+            AND c_existence = 'present'
           """.query(observation_id)
 
     val isCalibration: Query[Observation.Id, Boolean] =
@@ -289,6 +272,18 @@ object CalibrationsService extends CalibrationObservations {
         FROM t_observation
         WHERE c_observation_id = $observation_id
       """.query(bool)
+
+    def selectWorkflowStates(oids: List[Observation.Id]): Query[List[Observation.Id], (Observation.Id, Option[ObservationWorkflowState], Boolean)] =
+      sql"""
+        SELECT
+          ob.c_observation_id,
+          ob.c_workflow_user_state,
+          CASE WHEN COUNT(ee.c_observation_id) > 0 THEN true ELSE false END as has_execution_events
+        FROM t_observation ob
+        LEFT JOIN t_execution_event ee ON ob.c_observation_id = ee.c_observation_id
+        WHERE ob.c_observation_id IN (${observation_id.list(oids.length)})
+        GROUP BY ob.c_observation_id, ob.c_workflow_user_state
+      """.query(observation_id *: observation_workflow_user_state.opt *: bool)
 
   }
 }

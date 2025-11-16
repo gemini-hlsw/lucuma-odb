@@ -136,8 +136,8 @@ object CMain extends MainParams {
     calibTopic: Topic[F, CalibTimeTopic.Element],
     services: Resource[F, Services[F]]
   ): Resource[F, Unit] =
-    summon[Monad[F]]
     for {
+      _  <- Resource.eval(debug"Calibrations Service starting")
       _  <- Resource.eval(info"Start listening for program changes")
       _  <- Resource.eval(obsTopic.subscribe(100).evalMap { elem =>
               services.use: svc =>
