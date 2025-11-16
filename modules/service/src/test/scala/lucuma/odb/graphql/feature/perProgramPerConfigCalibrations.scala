@@ -47,7 +47,6 @@ import lucuma.odb.service.PerProgramPerConfigCalibrationsService
 import lucuma.odb.service.Services
 import lucuma.odb.service.SpecPhotoCalibrations
 import lucuma.odb.service.TwilightCalibrations
-import lucuma.odb.util.Codecs.*
 import skunk.data.Notification
 import skunk.implicits.*
 
@@ -156,13 +155,6 @@ class perProgramPerConfigCalibrations
       """
     )
 
-  def setWorkflow(oid: Observation.Id, state: ObservationWorkflowState): IO[Unit] =
-    session.use(_.execute(sql"""
-      UPDATE t_observation
-      SET c_workflow_user_state = ${observation_workflow_user_state}
-      WHERE c_observation_id = ${observation_id}
-    """.command)(state, oid)).void
-
   def prepareObservation(pi: User, oid: Observation.Id, tid: Target.Id, snAt: Wavelength = DefaultSnAt): IO[Unit] =
     for {
       _ <- updateTargetProperties(
@@ -173,7 +165,7 @@ class perProgramPerConfigCalibrations
              0.0
            )
       _ <- scienceRequirements(pi, oid, snAt)
-      _ <- setWorkflow(oid, ObservationWorkflowState.Ready)
+      _ <- setWorkflowStateDirectly(oid, ObservationWorkflowState.Ready)
     } yield ()
 
 
