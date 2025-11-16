@@ -156,7 +156,7 @@ class perProgramPerConfigCalibrations
       """
     )
 
-  def setWorkflowStateDirectly(oid: Observation.Id, state: ObservationWorkflowState): IO[Unit] =
+  def setWorkflow(oid: Observation.Id, state: ObservationWorkflowState): IO[Unit] =
     session.use(_.execute(sql"""
       UPDATE t_observation
       SET c_workflow_user_state = ${observation_workflow_user_state}
@@ -173,7 +173,7 @@ class perProgramPerConfigCalibrations
              0.0
            )
       _ <- scienceRequirements(pi, oid, snAt)
-      _ <- setWorkflowStateDirectly(oid, ObservationWorkflowState.Ready)
+      _ <- setWorkflow(oid, ObservationWorkflowState.Ready)
     } yield ()
 
 
