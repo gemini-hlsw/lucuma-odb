@@ -10,6 +10,7 @@ import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.string.NonEmptyString
 import lucuma.core.enums.CalibrationRole
+import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.Site
 import lucuma.core.math.Coordinates
@@ -37,14 +38,13 @@ import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.util.Codecs.*
 import lucuma.refined.*
 import org.typelevel.log4cats.Logger
+import org.typelevel.log4cats.LoggerFactory
 import org.typelevel.log4cats.syntax.*
 import skunk.AppliedFragment
 import skunk.Transaction
 import skunk.syntax.all.*
-import lucuma.core.enums.ObservationWorkflowState
 
 import java.time.Instant
-import org.typelevel.log4cats.LoggerFactory
 
 trait PerProgramPerConfigCalibrationsService[F[_]]:
   def generateCalibrations(

@@ -35,6 +35,9 @@ import lucuma.odb.graphql.input.TargetEnvironmentInput
 import lucuma.odb.graphql.mapping.AccessControl
 import lucuma.odb.sequence.ObservingMode
 import lucuma.odb.sequence.data.ItcInput
+import lucuma.odb.sequence.flamingos2.longslit.Config as Flamingos2Config
+import lucuma.odb.sequence.gmos.longslit.Config.GmosNorth as GmosNorthLongSlit
+import lucuma.odb.sequence.gmos.longslit.Config.GmosSouth as GmosSouthLongSlit
 import lucuma.odb.service.CalibrationConfigSubset.*
 import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.util.Codecs
@@ -43,9 +46,6 @@ import skunk.Transaction
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.LocalTime
-import lucuma.odb.sequence.flamingos2.longslit.Config as Flamingos2Config
-import lucuma.odb.sequence.gmos.longslit.Config.GmosNorth as GmosNorthLongSlit
-import lucuma.odb.sequence.gmos.longslit.Config.GmosSouth as GmosSouthLongSlit
 
 case class ObsExtract[A](
   id:      Observation.Id,

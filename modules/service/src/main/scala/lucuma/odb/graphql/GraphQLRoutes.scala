@@ -38,8 +38,8 @@ import org.http4s.dsl.Http4sDsl
 import org.http4s.headers.Authorization
 import org.http4s.headers.`Content-Type`
 import org.http4s.server.websocket.WebSocketBuilder2
-import org.typelevel.log4cats.LoggerFactory
 import org.typelevel.log4cats.Logger
+import org.typelevel.log4cats.LoggerFactory
 import skunk.Session
 import skunk.SqlState
 
