@@ -182,6 +182,7 @@ class ShortCut_6598 extends ExecutionTestSupportForGmos:
       pid <- createProgram
       tid <- createTargetAs(pi, pid, "Science Target")
       o1  <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
+      _   <- setWorkflowStateDirectly(o1, ObservationWorkflowState.Ready)
 
       // Step 1: Create a single obs and calculate calibrations
       _   <- IO.println("Step 1: Setup observation...")
@@ -195,6 +196,7 @@ class ShortCut_6598 extends ExecutionTestSupportForGmos:
       // Step 2: Duplicate the science observation (clone it)
       _   <- IO.println("Step 2: Cloning observation...")
       o2  <- cloneObservationAs(pi, o1)
+      _   <- setWorkflowStateDirectly(o2, ObservationWorkflowState.Ready)
       // Run workflow
       _   <- runObscalcUpdate(pid, o2)
       _   <- recalculateCalibrations(pid, when).flatMap(_._1.traverse(runObscalcUpdate(pid, _)))
@@ -232,7 +234,7 @@ class ShortCut_6598 extends ExecutionTestSupportForGmos:
       _   <- setObservationWorkflowState(pi, o1, ObservationWorkflowState.Inactive)
       _   <- recalculateCalibrations(pid, when)
       // Calibs restored, given only one science config it should have 1 specphoto + 1 twilight
-      // With the bug we would unteragetd calibratoins observations as a shared target was deleted 
+      // With the bug we would unteragetd calibratoins observations as a shared target was deleted
       // on the inactivated observation
       _   <- countCalibrations(pid).assertEquals(CalibrationCounts(1, 1, 0, 0))
     } yield ()
