@@ -47,8 +47,6 @@ import lucuma.odb.service.PerProgramPerConfigCalibrationsService
 import lucuma.odb.service.Services
 import lucuma.odb.service.SpecPhotoCalibrations
 import lucuma.odb.service.TwilightCalibrations
-import skunk.data.Notification
-import skunk.implicits.*
 
 import skunk.implicits.*
 import java.time.Instant
@@ -1503,4 +1501,100 @@ class perProgramPerConfigCalibrations
               .assert
     } yield ()
   }
+
+  test("Don't generate calibrations when all GMOS science observations are not ready"):
+    for {
+      pid  <- createProgramAs(pi)
+      tid1 <- createTargetAs(pi, pid, "One")
+      tid2 <- createTargetAs(pi, pid, "Two")
+      oid1 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid1)
+      oid2 <- createObservationAs(pi, pid, ObservingModeType.GmosSouthLongSlit.some, tid2)
+      _    <- prepareObservation(pi, oid1, tid1) *> prepareObservation(pi, oid2, tid2)
+      _    <- setObservationWorkflowState(pi, oid1, ObservationWorkflowState.Inactive)
+      _    <- setObservationWorkflowState(pi, oid2, ObservationWorkflowState.Inactive)
+      _    <- recalculateCalibrations(pid, when)
+      gr1  <- groupElementsAs(pi, pid, None)
+      ob   <- queryObservations(pid)
+    } yield {
+      val cgid = gr1.calibrationGroupId
+      val cCount = ob.countCalibrations
+      // No calibrations
+      assertEquals(cCount, 0)
+      assert(cgid.isEmpty)
+    }
+
+  test("Generate calibrations for active observation when mixed with inactive"):
+    for {
+      pid  <- createProgramAs(pi)
+      tid1 <- createTargetAs(pi, pid, "One")
+      tid2 <- createTargetAs(pi, pid, "Two")
+      oid1 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid1)
+      oid2 <- createObservationAs(pi, pid, ObservingModeType.GmosSouthLongSlit.some, tid2)
+      _    <- prepareObservation(pi, oid1, tid1) *> prepareObservation(pi, oid2, tid2)
+      _    <- setObservationWorkflowState(pi, oid2, ObservationWorkflowState.Inactive)
+      _    <- recalculateCalibrations(pid, when)
+      gr1  <- groupElementsAs(pi, pid, None)
+      ob   <- queryObservations(pid)
+    } yield {
+      val cgid = gr1.calibrationGroupId
+      val cCount = ob.countCalibrations
+      // 2 Calibrations for the only active obs
+      assertEquals(cCount, 2)
+      assert(cgid.isDefined)
+    }
+
+  test("Remove calibrations when science observation becomes inactive"):
+    for {
+      pid  <- createProgramAs(pi)
+      tid1 <- createTargetAs(pi, pid, "One")
+      oid1 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid1)
+      _    <- prepareObservation(pi, oid1, tid1)
+      _    <- recalculateCalibrations(pid, when)
+      ob1  <- queryObservations(pid)
+      gr1  <- groupElementsAs(pi, pid, None)
+      // make the observation inactive
+      _    <- setObservationWorkflowState(pi, oid1, ObservationWorkflowState.Inactive)
+      _    <- recalculateCalibrations(pid, when)
+      ob2  <- queryObservations(pid)
+      gr2  <- groupElementsAs(pi, pid, None)
+    } yield {
+      val cCountBefore = ob1.countCalibrations
+      val cgidBefore = gr1.calibrationGroupId
+      val cCountAfter = ob2.countCalibrations
+      val cgidAfter = gr2.calibrationGroupId
+      // Before: 2 calibrations and group exists
+      assertEquals(cCountBefore, 2)
+      assert(cgidBefore.isDefined)
+      // After: calibrations removed but group persists (empty)
+      assertEquals(cCountAfter, 0)
+      assert(cgidAfter.isDefined)
+      assertEquals(cgidBefore, cgidAfter)
+    }
+
+  test("Remove calibrations when science observation is deleted"):
+    for {
+      pid  <- createProgramAs(pi)
+      tid1 <- createTargetAs(pi, pid, "One")
+      oid1 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid1)
+      _    <- prepareObservation(pi, oid1, tid1)
+      _    <- recalculateCalibrations(pid, when)
+      ob1  <- queryObservations(pid)
+      gr1  <- groupElementsAs(pi, pid, None)
+      // set existence to 'not present'
+      _    <- deleteObservation(pi, oid1)
+      _    <- recalculateCalibrations(pid, when)
+      ob2  <- queryObservations(pid)
+      gr2  <- groupElementsAs(pi, pid, None)
+    } yield {
+      val cCountBefore = ob1.countCalibrations
+      val cgidBefore = gr1.calibrationGroupId
+      val cCountAfter = ob2.countCalibrations
+      val cgidAfter = gr2.calibrationGroupId
+      assertEquals(cCountBefore, 2)
+      assert(cgidBefore.isDefined)
+      // calibrations removed when science observation is deleted
+      assertEquals(cCountAfter, 0)
+      assert(cgidAfter.isDefined)
+    }
+
 }

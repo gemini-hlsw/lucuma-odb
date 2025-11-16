@@ -7,6 +7,7 @@ import cats.MonadThrow
 import cats.syntax.all.*
 import grackle.Result
 import lucuma.core.enums.CalibrationRole
+import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.Site
 import lucuma.core.math.Angle
@@ -42,16 +43,34 @@ import skunk.Transaction
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.LocalTime
+import lucuma.odb.sequence.flamingos2.longslit.Config as Flamingos2Config
+import lucuma.odb.sequence.gmos.longslit.Config.GmosNorth as GmosNorthLongSlit
+import lucuma.odb.sequence.gmos.longslit.Config.GmosSouth as GmosSouthLongSlit
 
 case class ObsExtract[A](
-  id:   Observation.Id,
-  itc:  Option[ItcInput],
-  band: Option[ScienceBand],
-  role: Option[CalibrationRole],
-  data: A
+  id:      Observation.Id,
+  itc:     Option[ItcInput],
+  band:    Option[ScienceBand],
+  role:    Option[CalibrationRole],
+  data:    A,
+  state:   Option[ObservationWorkflowState],
+  started: Boolean
 ):
   def map[B](f: A => B): ObsExtract[B] =
     copy(data = f(data))
+
+object ObsExtract:
+  val PerProgramPerConfigCalibrationTypes = List(CalibrationRole.SpectroPhotometric, CalibrationRole.Twilight)
+
+  def perObsFilter: PartialFunction[ObsExtract[ObservingMode], ObsExtract[ObservingMode]] =
+    case d @ ObsExtract(data = _: Flamingos2Config) => d
+
+  def perProgramFilter: PartialFunction[ObsExtract[ObservingMode], ObsExtract[ObservingMode]] =
+    case d @ ObsExtract(data = _: GmosNorthLongSlit) => d
+    case d @ ObsExtract(data = _: GmosSouthLongSlit) => d
+
+  def perProgramCalibrationFilter: PartialFunction[ObsExtract[CalibrationConfigSubset], ObsExtract[CalibrationConfigSubset]] =
+    case d @ ObsExtract(role = Some(r)) if PerProgramPerConfigCalibrationTypes.exists(_ === r) => d
 
 case class CalObsProps(
   wavelengthAt: Option[Wavelength],
