@@ -32,6 +32,7 @@ import lucuma.odb.service.Services.SuperUserAccess
 import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.util.Codecs.*
 import org.typelevel.log4cats.Logger
+import org.typelevel.log4cats.LoggerFactory
 import org.typelevel.log4cats.syntax.*
 import skunk.AppliedFragment
 import skunk.Command
@@ -40,7 +41,6 @@ import skunk.Transaction
 import skunk.codec.boolean.bool
 import skunk.codec.text.text
 import skunk.syntax.all.*
-import org.typelevel.log4cats.LoggerFactory
 
 import java.time.Instant
 
@@ -102,9 +102,7 @@ object CalibrationsService extends CalibrationObservations {
       ): PartialFunction[(Observation.Id, (Either[GeneratorParamsService.Error, GeneratorParams], Option[ObservationWorkflowState], Boolean)), ObsExtract[ObservingMode]] =
         {
           case (oid, (Right(GeneratorParams(itc, band, mode, calibRole, _, _)), wfs, hee)) if itc.isRight || !requiresItcInputs =>
-            // Default to Ready if workflow state is NULL (for compatibility with existing tests)
-            val workflowState = wfs.orElse(ObservationWorkflowState.Ready.some)
-            ObsExtract(oid, itc.toOption, band, calibRole, mode, workflowState, hee)
+            ObsExtract(oid, itc.toOption, band, calibRole, mode, wfs, hee)
         }
 
       /**

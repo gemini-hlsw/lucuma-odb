@@ -137,7 +137,7 @@ object CMain extends MainParams {
     services: Resource[F, Services[F]]
   ): Resource[F, Unit] =
     for {
-      _  <- Resource.eval(debug"Calibrations Service starting")
+      _  <- Resource.eval(info"Calibrations Service starting")
       _  <- Resource.eval(info"Start listening for program changes")
       _  <- Resource.eval(obsTopic.subscribe(100).evalMap { elem =>
               services.use: svc =>

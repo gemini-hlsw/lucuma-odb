@@ -28,8 +28,8 @@ import org.http4s.client.Client
 import org.http4s.dsl.Http4sDsl
 import org.http4s.server.middleware.EntityLimiter
 import org.typelevel.log4cats.Logger
-import skunk.Session
 import org.typelevel.log4cats.LoggerFactory
+import skunk.Session
 
 object AttachmentRoutes {
   object AttachmentId {
