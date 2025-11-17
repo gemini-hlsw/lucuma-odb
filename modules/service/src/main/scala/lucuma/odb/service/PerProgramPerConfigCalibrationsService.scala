@@ -3,6 +3,7 @@
 
 package lucuma.odb.service
 
+import cats.Applicative
 import cats.Order.catsKernelOrderingForOrder
 import cats.data.NonEmptyList
 import cats.effect.MonadCancelThrow
@@ -282,6 +283,16 @@ object PerProgramPerConfigCalibrationsService:
             )
           }.void
 
+      private def deleteEmptyCalibrationGroup(pid: Program.Id)(using Transaction[F], ServiceAccess): F[Unit] =
+        groupService.selectGroups(pid).flatMap:
+          case GroupTree.Root(_, children) =>
+            children.collectFirst {
+              case GroupTree.Branch(gid, _, _, obs, Some(CalibrationsGroupName), _, _, _, true, _)
+                if obs.isEmpty => gid
+            }.traverse_(groupService.deleteSystemGroup(pid, _))
+          case _                           =>
+            Applicative[F].unit
+
       override def generateCalibrations(
         pid: Program.Id,
         allSci: List[ObsExtract[ObservingMode]],
@@ -321,4 +332,6 @@ object PerProgramPerConfigCalibrationsService:
           _              <- (info"Program $pid added calibrations $addedOids").whenA(addedOids.nonEmpty)
           calibUpdates    = prepareCalibrationUpdates(gmosCalibs, removedOids, props)
           _              <- updatePropsAt(calibUpdates)
+          // Delete the calibration group if empty
+          _              <- deleteEmptyCalibrationGroup(pid)
         yield (addedOids, removedOids)
