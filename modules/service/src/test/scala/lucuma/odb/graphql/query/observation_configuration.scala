@@ -93,7 +93,7 @@ class observation_configuration extends OdbSuite with ObservingModeSetupOperatio
                             "hms" : "05:46:13.138550"
                           },
                           "dec" : {
-                            "dms" : "-00:06:04.916776"
+                            "dms" : "-00:06:04.916774"
                           }
                         },
                         "region" : null
@@ -199,7 +199,7 @@ class observation_configuration extends OdbSuite with ObservingModeSetupOperatio
                             "hms" : "05:46:13.138550"
                           },
                           "dec" : {
-                            "dms" : "-00:06:04.916776"
+                            "dms" : "-00:06:04.916774"
                           }
                         },
                         "region" : null
@@ -305,7 +305,7 @@ class observation_configuration extends OdbSuite with ObservingModeSetupOperatio
                             "hms" : "05:46:13.138550"
                           },
                           "dec" : {
-                            "dms" : "-00:06:04.916776"
+                            "dms" : "-00:06:04.916774"
                           }
                         },
                         "region" : null
@@ -414,7 +414,7 @@ class observation_configuration extends OdbSuite with ObservingModeSetupOperatio
                             "hms" : "05:46:13.138550"
                           },
                           "dec" : {
-                            "dms" : "-00:06:04.916776"
+                            "dms" : "-00:06:04.916774"
                           }
                         },
                         "region" : null
@@ -523,7 +523,7 @@ class observation_configuration extends OdbSuite with ObservingModeSetupOperatio
                             "hms" : "05:46:13.138550"
                           },
                           "dec" : {
-                            "dms" : "-00:06:04.916776"
+                            "dms" : "-00:06:04.916774"
                           }
                         },
                         "region" : null

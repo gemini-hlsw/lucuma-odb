@@ -54,25 +54,28 @@ class observation_configurationRequests
           }
         """
 
+    private def gmosImagingObservingMode[L: Enumerated](
+      site:    String,
+      filters: List[L]
+    ): String =
+      val fs = filters.map: f =>
+        s"{ filter: ${Enumerated[L].tag(f).toScreamingSnakeCase} }"
+
+      s"""
+        observingMode: {
+          gmos${site}Imaging: {
+            filters: ${fs.mkString("[", ",\n", "]")}
+          }
+        }
+      """
+
     def forGmosNorthImaging(user: User, oid: Observation.Id, filters: List[GmosNorthFilter]): IO[Unit] =
       updateObservationAs(user, oid):
-        s"""
-          observingMode: {
-            gmosNorthImaging: {
-              filters: ${filters.map(_.tag.toScreamingSnakeCase).mkString("[", " ", "]")}
-            }
-          }
-        """
+        gmosImagingObservingMode("North", filters)
 
     def forGmosSouthImaging(user: User, oid: Observation.Id, filters: List[GmosSouthFilter]): IO[Unit] =
       updateObservationAs(user, oid):
-        s"""
-          observingMode: {
-            gmosSouthImaging: {
-              filters:  ${filters.map(_.tag.toScreamingSnakeCase).mkString("[", " ", "]")}
-            }
-          }
-        """
+        gmosImagingObservingMode("South", filters)
 
     def forFlamingos2LongSlit(user: User, oid: Observation.Id, disperser: Flamingos2Disperser): IO[Unit] =
       updateObservationAs(user, oid):

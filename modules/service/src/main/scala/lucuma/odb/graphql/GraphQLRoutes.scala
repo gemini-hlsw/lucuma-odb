@@ -54,19 +54,20 @@ object GraphQLRoutes {
    * based on the `Authorization` header and discarded when `ttl` expires.
    */
   def apply[F[_]: Async: Parallel: Trace: Logger: SecureRandom](
-    gaiaClient:   GaiaClient[F],
-    itcClient:    ItcClient[F],
-    commitHash:   CommitHash,
-    goaUsers:     Set[User.Id],
-    ssoClient:    SsoClient[F, User],
-    pool:         Resource[F, Session[F]],
-    monitor:      SkunkMonitor[F],
-    ttl:          FiniteDuration,
-    userSvc:      UserService[F],
-    enums:        Enums,
-    ptc:          TimeEstimateCalculatorImplementation.ForInstrumentMode,
-    httpClient:   Client[F],
-    emailConfig:  Config.Email
+    gaiaClient:      GaiaClient[F],
+    itcClient:       ItcClient[F],
+    commitHash:      CommitHash,
+    goaUsers:        Set[User.Id],
+    ssoClient:       SsoClient[F, User],
+    pool:            Resource[F, Session[F]],
+    monitor:         SkunkMonitor[F],
+    ttl:             FiniteDuration,
+    userSvc:         UserService[F],
+    enums:           Enums,
+    ptc:             TimeEstimateCalculatorImplementation.ForInstrumentMode,
+    httpClient:      Client[F],
+    emailConfig:     Config.Email,
+    metadataService: GraphQLService[F]
   ): Resource[F, WebSocketBuilder2[F] => HttpRoutes[F]] =
     OdbMapping.Topics(pool).flatMap { topics =>
 
@@ -90,7 +91,7 @@ object GraphQLRoutes {
       Cache.timed[F, Authorization, Option[GraphQLService[F]]](ttl).map { cache => wsb =>
         LucumaGraphQLRoutes.forService[F](
           {
-            case None    => none.pure[F]  // No auth, no service (for now)
+            case None    => metadataService.some.pure[F]  // No auth, use metadata service for introspection
             case Some(a) =>
               cache.get(a).flatMap {
                 case Some(opt) =>
@@ -102,7 +103,7 @@ object GraphQLRoutes {
                       for {
                         user <- OptionT(ssoClient.get(a))
                         props = List[(String, TraceValue)](
-                          "lucuma.user.id"          -> user.id.toString, 
+                          "lucuma.user.id"          -> user.id.toString,
                           "lucuma.user.displayName" -> user.displayName
                         )
 
@@ -133,7 +134,7 @@ object GraphQLRoutes {
       }
     }
 
-  /** 
+  /**
    * An endpoint that listens on `/export/<name>` and returns an application/javascript response
    * of the form `export const <name> = '<query result>'`.
    */
@@ -148,7 +149,7 @@ object GraphQLRoutes {
       override def toResponse(result: Result[Json]): F[Response[F]] =
         result.toEither match {
           case Left(err)   => super.toResponse(result)
-          case Right(json) => 
+          case Right(json) =>
             Ok(s"export const $name ='${json.noSpaces}'")
             .map(_.withContentType(`Content-Type`(MediaType.application.javascript)))
         }
@@ -177,5 +178,3 @@ object GraphQLRoutes {
     """)
 
 }
-
-

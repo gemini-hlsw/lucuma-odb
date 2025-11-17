@@ -183,7 +183,9 @@ object GmosLongSlitService {
         req:    Option[ExposureTimeMode],
         which:  List[Observation.Id]
       )(using Transaction[F]): F[Result[Unit]] =
-        exposureTimeModeService.insertForSingleScienceEtm(name, acq, sci, req, which)
+        exposureTimeModeService
+          .insertOneWithDefaults(name, acq, sci, req, which)
+          .map(_.void)
 
       override def insertNorth(
         input: GmosLongSlitInput.Create.North,
@@ -218,9 +220,8 @@ object GmosLongSlitService {
       )(using Transaction[F]): F[Unit] =
 
         def update(etm: Option[ExposureTimeMode], role: ExposureTimeModeRole): F[Unit] =
-          NonEmptyList.fromList(which).traverse_ : nel =>
-            etm.fold(().pure[F]): e =>
-              services.exposureTimeModeService.updateMany(nel, role, e)
+          etm.fold(().pure[F]): e =>
+            services.exposureTimeModeService.updateMany(which, role, e)
 
         for
           _ <- update(acq, ExposureTimeModeRole.Acquisition)

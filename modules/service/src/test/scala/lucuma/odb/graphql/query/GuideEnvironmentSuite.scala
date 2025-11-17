@@ -527,7 +527,7 @@ trait GuideEnvironmentSuite extends ExecutionTestSupport:
                     "id": "3219118090462918016",
                     "objectType": null
                   },
-                  "epoch": "J2023.660",
+                  "epoch": "J2023.659",
                   "ra": {
                     "microseconds": 20782434012,
                     "hms": "05:46:22.434012",
@@ -535,9 +535,9 @@ trait GuideEnvironmentSuite extends ExecutionTestSupport:
                     "degrees": 86.59347505
                   },
                   "dec": {
-                    "dms": "-00:08:52.651136",
-                    "degrees": 359.8520413511111,
-                    "microarcseconds": 1295467348864
+                    "dms": "-00:08:52.651135",
+                    "degrees": 359.8520413513889,
+                    "microarcseconds": 1295467348865
                   },
                   "radialVelocity": {
                     "metersPerSecond": 0,

@@ -451,10 +451,11 @@ object ObservationService {
 
                 _ <- ResultT.liftF:
                        u.fold(().pure[F]): u =>
+                         val lst = u.toList
                          e.fold(
-                           services.exposureTimeModeService.deleteMany(u, ExposureTimeModeRole.Requirement),
+                           services.exposureTimeModeService.deleteMany(lst, ExposureTimeModeRole.Requirement),
                            ().pure[F],
-                           e => services.exposureTimeModeService.updateMany(u, ExposureTimeModeRole.Requirement, e)
+                           e => services.exposureTimeModeService.updateMany(lst, ExposureTimeModeRole.Requirement, e)
                          )
 
                 _ <- validateBand(g.keys.toList)

@@ -3,10 +3,9 @@
 
 package lucuma.odb.service
 
-import cats.data.NonEmptyList
 import cats.effect.MonadCancelThrow
 import cats.syntax.apply.*
-import cats.syntax.foldable.*
+import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import cats.syntax.functorFilter.*
 import cats.syntax.option.*
@@ -16,6 +15,7 @@ import grackle.syntax.*
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.Observation
+import lucuma.odb.data.ExposureTimeModeId
 import lucuma.odb.data.ExposureTimeModeRole
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
@@ -126,10 +126,7 @@ object ObservingModeServices:
       )(using Transaction[F], SuperUserAccess): F[Unit] =
 
         val deleteExposureTimeModes: F[Unit] =
-          NonEmptyList
-            .fromList(which)
-            .traverse_ : nel =>
-              services.exposureTimeModeService.deleteMany(nel, ExposureTimeModeRole.Acquisition, ExposureTimeModeRole.Science)
+          services.exposureTimeModeService.deleteMany(which, ExposureTimeModeRole.Acquisition, ExposureTimeModeRole.Science)
 
         val deleteObservingMode: F[Unit] =
           mode match
@@ -146,13 +143,13 @@ object ObservingModeServices:
         which: List[Observation.Id]
       )(using Transaction[F], SuperUserAccess): F[Result[Unit]] =
         List(
-          input.flamingos2LongSlit.map(m => flamingos2LongSlitService.update(m, which)),
+          input.flamingos2LongSlit.map(m => flamingos2LongSlitService.update(m, which).map(_.success)),
           input.gmosNorthImaging.map(m => gmosImagingService.updateNorth(m, which)),
-          input.gmosNorthLongSlit.map(m => gmosLongSlitService.updateNorth(m, which)),
+          input.gmosNorthLongSlit.map(m => gmosLongSlitService.updateNorth(m, which).map(_.success)),
           input.gmosSouthImaging.map(m => gmosImagingService.updateSouth(m, which)),
-          input.gmosSouthLongSlit.map(m => gmosLongSlitService.updateSouth(m, which))
+          input.gmosSouthLongSlit.map(m => gmosLongSlitService.updateSouth(m, which).map(_.success))
         ).flattenOption match
-          case List(f) => f.map(_.success)
+          case List(r) => r
           case Nil     => OdbError.InvalidArgument("No observing mode edit parameters were provided.".some).asFailureF
           case _       => OdbError.InvalidArgument("Only one observing mode's edit parameters may be provided.".some).asFailureF
 
@@ -169,15 +166,14 @@ object ObservingModeServices:
         newOid:  Observation.Id
       )(using Transaction[F], SuperUserAccess): F[Unit] =
 
-        val cloneExposureTimeModes: F[Unit] =
-          exposureTimeModeService.clone(origOid, newOid)
-
-        val cloneObservingMode: F[Unit] =
+        def cloneObservingMode(etms: List[(ExposureTimeModeId, ExposureTimeModeId)]): F[Unit] =
           mode match
             case ObservingModeType.Flamingos2LongSlit => flamingos2LongSlitService.clone(origOid, newOid)
             case ObservingModeType.GmosNorthLongSlit  => gmosLongSlitService.cloneNorth(origOid, newOid)
-            case ObservingModeType.GmosNorthImaging   => gmosImagingService.cloneNorth(origOid, newOid)
+            case ObservingModeType.GmosNorthImaging   => gmosImagingService.cloneNorth(origOid, newOid, etms)
             case ObservingModeType.GmosSouthLongSlit  => gmosLongSlitService.cloneSouth(origOid, newOid)
-            case ObservingModeType.GmosSouthImaging   => gmosImagingService.cloneSouth(origOid, newOid)
+            case ObservingModeType.GmosSouthImaging   => gmosImagingService.cloneSouth(origOid, newOid, etms)
 
-        cloneExposureTimeModes *> cloneObservingMode
+        exposureTimeModeService
+          .clone(origOid, newOid)
+          .flatMap(cloneObservingMode)

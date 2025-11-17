@@ -14,6 +14,8 @@ import lucuma.core.enums.GmosSouthFilter
 import lucuma.core.enums.MultipleFiltersMode
 import lucuma.core.math.Offset
 import lucuma.core.math.arb.ArbOffset
+import lucuma.core.model.ExposureTimeMode
+import lucuma.core.model.arb.ArbExposureTimeMode
 import lucuma.core.util.arb.ArbEnumerated
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.arb.ArbNullable.given
@@ -23,7 +25,15 @@ import org.scalacheck.Arbitrary.arbitrary
 trait ArbGmosImagingInput:
 
   import ArbEnumerated.given
+  import ArbExposureTimeMode.given
   import ArbOffset.given
+
+  given [L: Arbitrary]: Arbitrary[GmosImagingFilterInput[L]] =
+    Arbitrary:
+      for
+        f <- arbitrary[L]
+        e <- arbitrary[Option[ExposureTimeMode]]
+      yield GmosImagingFilterInput(f, e)
 
   given Arbitrary[GmosImagingInput.Create.Common] =
     Arbitrary {
@@ -40,19 +50,19 @@ trait ArbGmosImagingInput:
   given Arbitrary[GmosImagingInput.Create.North] =
     Arbitrary {
       for {
-        f1 <- arbitrary[GmosNorthFilter]
-        fs <- arbitrary[List[GmosNorthFilter]]
+        f1 <- arbitrary[GmosImagingFilterInput[GmosNorthFilter]]
+        fs <- arbitrary[List[GmosImagingFilterInput[GmosNorthFilter]]]
         c <- arbitrary[GmosImagingInput.Create.Common]
-      } yield GmosImagingInput.Create.North(NonEmptyList(f1, fs), c)
+      } yield GmosImagingInput.Create(NonEmptyList(f1, fs), c)
     }
 
   given Arbitrary[GmosImagingInput.Create.South] =
     Arbitrary {
       for {
-        f1 <- arbitrary[GmosSouthFilter]
-        fs <- arbitrary[List[GmosSouthFilter]]
+        f1 <- arbitrary[GmosImagingFilterInput[GmosSouthFilter]]
+        fs <- arbitrary[List[GmosImagingFilterInput[GmosSouthFilter]]]
         c <- arbitrary[GmosImagingInput.Create.Common]
-      } yield GmosImagingInput.Create.South(NonEmptyList(f1, fs), c)
+      } yield GmosImagingInput.Create(NonEmptyList(f1, fs), c)
     }
 
   given arbEditCommon: Arbitrary[GmosImagingInput.Edit.Common] =
@@ -70,18 +80,18 @@ trait ArbGmosImagingInput:
     Arbitrary {
       for {
         s <- Gen.choose(1, 4)
-        f <- Gen.option(Gen.listOfN(s, arbitrary[GmosNorthFilter]).map(NonEmptyList.fromListUnsafe))
+        f <- Gen.option(Gen.listOfN(s, arbitrary[GmosImagingFilterInput[GmosNorthFilter]]).map(NonEmptyList.fromListUnsafe))
         c <- arbitrary[GmosImagingInput.Edit.Common]
-      } yield GmosImagingInput.Edit.North(f, c)
+      } yield GmosImagingInput.Edit(f, c)
     }
 
   given arbEditCommonS: Arbitrary[GmosImagingInput.Edit.South] =
     Arbitrary {
       for {
         s <- Gen.choose(1, 4)
-        f <- Gen.option(Gen.listOfN(s, arbitrary[GmosSouthFilter]).map(NonEmptyList.fromListUnsafe))
+        f <- Gen.option(Gen.listOfN(s, arbitrary[GmosImagingFilterInput[GmosSouthFilter]]).map(NonEmptyList.fromListUnsafe))
         c <- arbitrary[GmosImagingInput.Edit.Common]
-      } yield GmosImagingInput.Edit.South(f, c)
+      } yield GmosImagingInput.Edit(f, c)
     }
 
 object ArbGmosImagingInput extends ArbGmosImagingInput

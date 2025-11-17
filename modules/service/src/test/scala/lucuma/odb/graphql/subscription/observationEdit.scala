@@ -564,7 +564,7 @@ class observationEdit extends OdbSuite with SubscriptionUtils {
         user      = pi,
         query     = titleSubscription,
         mutations =
-          Right(updateTargetEpoch(pi, tid0, Epoch.B1950)),
+          Right(updateTargetEpoch(pi, tid0, Epoch.fromString.getOption("J2020.0").get)),
         expected  = List(titleUpdated(oid0, "Zero, One"), titleUpdated(oid1, "Zero"))
       )
     } yield ()
@@ -582,7 +582,7 @@ class observationEdit extends OdbSuite with SubscriptionUtils {
         user      = pi,
         query     = titleSubscription,
         mutations =
-          Right(updateTargetEpoch(pi, btid, Epoch.B1950)),
+          Right(updateTargetEpoch(pi, btid, Epoch.fromString.getOption("J2020.0").get)),
         expected  = List(titleUpdated(oid, "Zero, One"))
       )
     } yield ()

@@ -29,7 +29,7 @@ val keySemaphoreVersion        = "0.3.0-M1"
 val kittensVersion             = "3.5.0"
 val logbackVersion             = "1.5.19"
 val log4catsVersion            = "2.7.1"
-val lucumaCoreVersion          = "0.153.0"
+val lucumaCoreVersion          = "0.154.0"
 val lucumaGraphQLRoutesVersion = "0.11.3"
 val monocleVersion             = "3.3.0"
 val munitVersion               = "1.2.0"
@@ -49,7 +49,7 @@ val slf4jVersion               = "2.0.17"
 val testcontainersScalaVersion = "0.43.0" // check test output if you attempt to update this
 val weaverVersion              = "0.8.4"
 
-ThisBuild / tlBaseVersion      := "0.52"
+ThisBuild / tlBaseVersion      := "0.54"
 ThisBuild / scalaVersion       := "3.7.3"
 ThisBuild / crossScalaVersions := Seq("3.7.3")
 ThisBuild / scalacOptions     ++= Seq("-Xmax-inlines", "50") // Hash derivation fails with default of 32

@@ -35,8 +35,8 @@ class guideAvailability extends ExecutionTestSupportForGmos with GuideEnvironmen
   val mar05_2024 = "2024-03-05T00:00:00Z"
   val mar10_2024 = "2024-03-10T00:00:00Z"
 
-  val emptyStart   = "3025-10-31T00:00:00Z"
-  val emptyEnd     = "3025-12-31T01:00:00Z"
+  val emptyStart   = "2995-10-31T00:00:00Z"
+  val emptyEnd     = "2995-12-31T01:00:00Z" 
 
   val earlyAngles = List(160, 170, 180, 190, 200, 250, 260, 270, 280, 290, 300, 310)
   val laterAngles = earlyAngles.filter(_ =!= 250)
@@ -267,7 +267,7 @@ class guideAvailability extends ExecutionTestSupportForGmos with GuideEnvironmen
   override def httpRequestHandler: Request[IO] => Resource[IO, Response[IO]] =
     req => {
       val respStr =
-        if (req.uri.renderString.contains("20-0.10166")) gaiaEmptyReponseString
+        if (req.uri.renderString.contains("-0.10165")) gaiaEmptyReponseString
         else gaiaResponseString
       Resource.eval(IO.pure(Response(body = Stream(respStr).through(utf8.encode))))
     }
@@ -311,6 +311,9 @@ class guideAvailability extends ExecutionTestSupportForGmos with GuideEnvironmen
         t <- createTargetWithProfileAs(pi, p)
         o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
       } yield o
+
+    
+
     val periods = List(
       makeAvailabilityPeriod(emptyStart, emptyEnd, List.empty)
     )
