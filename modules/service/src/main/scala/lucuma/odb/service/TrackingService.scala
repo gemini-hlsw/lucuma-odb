@@ -129,7 +129,10 @@ object TrackingService:
 
 
   extension (interval: TimestampInterval) 
-    private def days: Int = interval.duration.toDays.toInt max 1 // always at least one day
+
+    private def days: Int = 
+      interval.duration.toDays.toInt max 1 // always at least one day
+
     private def cadence: HorizonsClient.ElementsPerDay =
       import interval.duration
       if      duration <=  1.day then 24
@@ -140,7 +143,6 @@ object TrackingService:
       else if duration <= 12.day then 2
       else 1
 
-    // TODO: move to core
     def alignedZonedDateTime =
       ZonedDateTime
         .ofInstant(interval.start.toInstant, ZoneOffset.UTC)
@@ -162,9 +164,6 @@ object TrackingService:
     def expectedInstants: List[Instant] =
       (0 to expectedAlignedElements).toList.map: n =>
           alignedZonedDateTime.plusHours(n * 24 / cadence).toInstant()
-
-    // ephemeris(key, site, aligned.toInstant, aligned.plusDays(days).toInstant, days * cadence)
-
 
   extension [F[_]: Monad, A](rt: ResultT[F, A]) def flatTap(f: A => ResultT[F, Unit]): ResultT[F, A] =
     rt.flatMap(a => f(a).as(a))
