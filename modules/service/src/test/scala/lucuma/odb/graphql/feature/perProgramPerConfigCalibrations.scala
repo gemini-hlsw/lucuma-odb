@@ -165,7 +165,7 @@ class perProgramPerConfigCalibrations
              0.0
            )
       _ <- scienceRequirements(pi, oid, snAt)
-      _ <- setWorkflowStateDirectly(oid, ObservationWorkflowState.Ready)
+      _ <- setWorkflowState(oid, ObservationWorkflowState.Ready)
     } yield ()
 
 
@@ -1567,7 +1567,7 @@ class perProgramPerConfigCalibrations
       // Before: 2 calibrations and group exists
       assertEquals(cCountBefore, 2)
       assert(cgidBefore.isDefined)
-      // After: calibrations removed but group persists (empty)
+      // After: calibrations removed
       assertEquals(cCountAfter, 0)
       assert(cgidAfter.isDefined)
       assertEquals(cgidBefore, cgidAfter)

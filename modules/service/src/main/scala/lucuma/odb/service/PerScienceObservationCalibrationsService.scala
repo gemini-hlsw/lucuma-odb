@@ -10,6 +10,7 @@ import eu.timepit.refined.types.numeric.NonNegShort
 import eu.timepit.refined.types.string.NonEmptyString
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.Instrument
+import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.TargetDisposition
 import lucuma.core.math.Declination
@@ -328,7 +329,11 @@ object PerScienceObservationCalibrationsService:
         pid:        Program.Id,
         scienceObs: List[ObsExtract[CalibrationConfigSubset]]
       )(using Transaction[F], SuperUserAccess): F[(List[Observation.Id], List[Observation.Id])] =
-        val currentObsIds = scienceObs.map(_.id).toSet
+        // Filter to only include observations that are Ready or have been started
+        val activeScienceObs = scienceObs.filter: obs =>
+          obs.started || obs.state.exists(_ === ObservationWorkflowState.Ready)
+
+        val currentObsIds = activeScienceObs.map(_.id).toSet
 
         for
           _                 <- info"Recalculating per science calibrations for $pid"
@@ -362,7 +367,7 @@ object PerScienceObservationCalibrationsService:
           // Reload tree for group creation/lookup
           tree              <- groupService.selectGroups(pid)
           // Create/sync telluric for each science obs
-          added             <- scienceObs.traverse(obs => generateTelluricForScience(pid, tree, obs))
+          added             <- activeScienceObs.traverse(obs => generateTelluricForScience(pid, tree, obs))
           _                 <- (info"Added ${added.size} telluric observation on program $pid: $added").whenA(toMove.nonEmpty)
         yield (added.flatten, deleted)
 
