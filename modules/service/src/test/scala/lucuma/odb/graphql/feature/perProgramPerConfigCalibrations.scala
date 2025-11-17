@@ -1567,10 +1567,9 @@ class perProgramPerConfigCalibrations
       // Before: 2 calibrations and group exists
       assertEquals(cCountBefore, 2)
       assert(cgidBefore.isDefined)
-      // After: calibrations removed
+      // After: calibrations removed and group deleted
       assertEquals(cCountAfter, 0)
-      assert(cgidAfter.isDefined)
-      assertEquals(cgidBefore, cgidAfter)
+      assert(cgidAfter.isEmpty)
     }
 
   test("Remove calibrations when science observation is deleted"):
@@ -1594,9 +1593,9 @@ class perProgramPerConfigCalibrations
       val cgidAfter = gr2.calibrationGroupId
       assertEquals(cCountBefore, 2)
       assert(cgidBefore.isDefined)
-      // calibrations removed when science observation is deleted
+      // calibrations removed and group deleted when science observation is deleted
       assertEquals(cCountAfter, 0)
-      assert(cgidAfter.isDefined)
+      assert(cgidAfter.isEmpty)
     }
 
 }
