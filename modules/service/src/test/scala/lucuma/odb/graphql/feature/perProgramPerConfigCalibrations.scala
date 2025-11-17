@@ -155,7 +155,7 @@ class perProgramPerConfigCalibrations
       """
     )
 
-  def prepareObservation(pi: User, oid: Observation.Id, tid: Target.Id, snAt: Wavelength = DefaultSnAt): IO[Unit] =
+  def prepareObservation(pi: User, pid: Program.Id, oid: Observation.Id, tid: Target.Id, snAt: Wavelength = DefaultSnAt): IO[Unit] =
     for {
       _ <- updateTargetProperties(
              pi,
@@ -166,6 +166,7 @@ class perProgramPerConfigCalibrations
            )
       _ <- scienceRequirements(pi, oid, snAt)
       _ <- setWorkflowState(oid, ObservationWorkflowState.Ready)
+      _ <- runObscalcUpdate(pid, oid)
     } yield ()
 
 
@@ -312,7 +313,7 @@ class perProgramPerConfigCalibrations
       pid <- createProgramAs(pi)
       tid <- createTargetAs(pi, pid, "One")
       oid <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid)
-      _   <- prepareObservation(pi, oid, tid)
+      _   <- prepareObservation(pi, pid, oid, tid)
       gr  <- groupElementsAs(pi, pid, None)
       _   <- recalculateCalibrations(pid, when)
       gr1  <- groupElementsAs(pi, pid, None)
@@ -334,7 +335,7 @@ class perProgramPerConfigCalibrations
       tid2 <- createTargetAs(pi, pid, "Two")
       oid1 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid1)
       oid2 <- createObservationAs(pi, pid, ObservingModeType.GmosSouthLongSlit.some, tid2)
-      _    <- prepareObservation(pi, oid1, tid1) *> prepareObservation(pi, oid2, tid2)
+      _    <- prepareObservation(pi, pid, oid1, tid1) *> prepareObservation(pi, pid, oid2, tid2)
       _    <- recalculateCalibrations(pid, when)
       gr1  <- groupElementsAs(pi, pid, None)
       ob   <- queryObservations(pid)
@@ -368,10 +369,10 @@ class perProgramPerConfigCalibrations
       oid4 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid2)
       _    <- updateConf(oid4, GmosAmpReadMode.Slow, GmosAmpGain.Low)
 
-      _    <- prepareObservation(pi, oid1, tid1) *>
-              prepareObservation(pi, oid2, tid1) *>
-              prepareObservation(pi, oid3, tid2) *>
-              prepareObservation(pi, oid4, tid2)
+      _    <- prepareObservation(pi, pid, oid1, tid1) *>
+              prepareObservation(pi, pid, oid2, tid1) *>
+              prepareObservation(pi, pid, oid3, tid2) *>
+              prepareObservation(pi, pid, oid4, tid2)
 
       _    <- recalculateCalibrations(pid, when)
       gr1  <- groupElementsAs(pi, pid, None)
@@ -392,7 +393,7 @@ class perProgramPerConfigCalibrations
       pid  <- createProgramAs(pi)
       tid1 <- createTargetAs(pi, pid, "One")
       oid1 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid1)
-      _    <- prepareObservation(pi, oid1, tid1)
+      _    <- prepareObservation(pi, pid, oid1, tid1)
       _    <- recalculateCalibrations(pid, when)
       gr1  <- groupElementsAs(pi, pid, None)
       ob   <- queryObservations(pid)
@@ -413,7 +414,7 @@ class perProgramPerConfigCalibrations
       pid  <- createProgramAs(pi)
       tid1 <- createTargetAs(pi, pid, "One")
       oid1 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid1)
-      _    <- prepareObservation(pi, oid1, tid1)
+      _    <- prepareObservation(pi, pid, oid1, tid1)
       _    <- recalculateCalibrations(pid, when)
       gr1  <- groupElementsAs(pi, pid, None)
       ob   <- queryObservations(pid)
@@ -437,7 +438,7 @@ class perProgramPerConfigCalibrations
       oid1 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid1)
       oid2 <- createObservationAs(pi, pid, ObservingModeType.GmosSouthLongSlit.some, tid2)
               // No target for oid2 -> no conf
-      _    <- prepareObservation(pi, oid1, tid1) *> scienceRequirements(pi, oid2)
+      _    <- prepareObservation(pi, pid, oid1, tid1) *> scienceRequirements(pi, oid2)
       _    <- recalculateCalibrations(pid, when)
       gr1  <- groupElementsAs(pi, pid, None)
       ob   <- queryObservations(pid)
@@ -519,10 +520,10 @@ class perProgramPerConfigCalibrations
       tid1 <- createTargetAs(pi, pid, "One")
       tid2 <- createTargetAs(pi, pid, "Two")
       _    <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid1).flatTap { oid =>
-                prepareObservation(pi, oid, tid1)
+                prepareObservation(pi, pid, oid, tid1)
               }
       _    <- createObservationAs(pi, pid, ObservingModeType.GmosSouthLongSlit.some, tid2).flatTap { oid =>
-                prepareObservation(pi, oid, tid2)
+                prepareObservation(pi, pid, oid, tid2)
               }
       _    <- recalculateCalibrations(pid, when)
       ob   <- queryObservations(pid)
@@ -539,7 +540,7 @@ class perProgramPerConfigCalibrations
       tid2 <- createTargetAs(pi, pid, "Two")
       oid1 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid1)
       oid2 <- createObservationAs(pi, pid, ObservingModeType.GmosSouthLongSlit.some, tid2)
-      _    <- prepareObservation(pi, oid1, tid1) *> prepareObservation(pi, oid2, tid2)
+      _    <- prepareObservation(pi, pid, oid1, tid1) *> prepareObservation(pi, pid, oid2, tid2)
       _    <- recalculateCalibrations(pid, when)
       _    <- recalculateCalibrations(pid, when)
       gr1  <- groupElementsAs(pi, pid, None)
@@ -563,7 +564,7 @@ class perProgramPerConfigCalibrations
       tid2 <- createIncompleteTargetAs(pi, pid, "Two")
       oid1 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid1)
       oid2 <- createObservationAs(pi, pid, ObservingModeType.GmosSouthLongSlit.some, tid2)
-      _    <- prepareObservation(pi, oid1, tid1) *> scienceRequirements(pi, oid2)
+      _    <- prepareObservation(pi, pid, oid1, tid1) *> scienceRequirements(pi, oid2)
       _    <- recalculateCalibrations(pid, when)
       _    <- recalculateCalibrations(pid, when)
       gr1  <- groupElementsAs(pi, pid, None)
@@ -585,7 +586,7 @@ class perProgramPerConfigCalibrations
       pid  <- createProgramAs(pi)
       tid1 <- createTargetAs(pi, pid, "One")
       oid1 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid1)
-      _    <- prepareObservation(pi, oid1, tid1)
+      _    <- prepareObservation(pi, pid, oid1, tid1)
       _    <- recalculateCalibrations(pid, when)
       ob   <- queryObservations(pid)
       cid = ob.callibrationIds
@@ -627,7 +628,7 @@ class perProgramPerConfigCalibrations
       pid  <- createProgramAs(pi)
       tid1 <- createTargetAs(pi, pid, "One")
       oid1 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid1)
-      _    <- prepareObservation(pi, oid1, tid1)
+      _    <- prepareObservation(pi, pid, oid1, tid1)
       _    <- recalculateCalibrations(pid, when)
       ob   <- queryObservations(pid)
       cid = ob.callibrationIds
@@ -668,7 +669,7 @@ class perProgramPerConfigCalibrations
       pid  <- createProgramAs(pi)
       tid1 <- createTargetAs(pi, pid, "One")
       oid1 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid1)
-      _    <- prepareObservation(pi, oid1, tid1)
+      _    <- prepareObservation(pi, pid, oid1, tid1)
       _    <- recalculateCalibrations(pid, when)
       ob   <- queryObservations(pid)
       (cid1, ct1) = ob.collect {
@@ -716,7 +717,7 @@ class perProgramPerConfigCalibrations
       pid  <- createProgramAs(pi)
       tid1 <- createTargetAs(pi, pid, "One")
       oid1 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid1)
-      _    <- prepareObservation(pi, oid1, tid1)
+      _    <- prepareObservation(pi, pid, oid1, tid1)
       _    <- recalculateCalibrations(pid, when)
       ob   <- queryObservations(pid)
       cid = ob.callibrationIds.head
@@ -748,7 +749,7 @@ class perProgramPerConfigCalibrations
       tid2 <- createTargetAs(pi, pid, "Two")
       oid1 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid1)
       oid2 <- createObservationAs(pi, pid, ObservingModeType.GmosSouthLongSlit.some, tid2)
-      _    <- prepareObservation(pi, oid1, tid1) *> prepareObservation(pi, oid2, tid2)
+      _    <- prepareObservation(pi, pid, oid1, tid1) *> prepareObservation(pi, pid, oid2, tid2)
       _    <- recalculateCalibrations(pid, when)
       _    <- deleteObservation(pi, oid2)
       _    <- recalculateCalibrations(pid, when)
@@ -794,7 +795,7 @@ class perProgramPerConfigCalibrations
       tid0 <- createTargetAs(pi, pid, "Zero")
       // An observation with a single target is essentially a calib observation
       oid  <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid0)
-      _    <- prepareObservation(pi, oid, tid0)
+      _    <- prepareObservation(pi, pid, oid, tid0)
       a    <- Ref.of[IO, List[Observation.Id]](Nil) // Added observation
       _    <- subscriptionExpectFT(
                 user      = pi,
@@ -849,7 +850,7 @@ class perProgramPerConfigCalibrations
       tid2 <- createTargetAs(pi, pid, "Two")
       oid1 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid1)
       oid2 <- createObservationAs(pi, pid, ObservingModeType.GmosSouthLongSlit.some, tid2)
-      _    <- prepareObservation(pi, oid1, tid1) *> prepareObservation(pi, oid2, tid2)
+      _    <- prepareObservation(pi, pid, oid1, tid1) *> prepareObservation(pi, pid, oid2, tid2)
               // This will add four calibrations
       (ad, _) <- recalculateCalibrations(pid, when)
               // This should delete two
@@ -917,8 +918,8 @@ class perProgramPerConfigCalibrations
       tid2 <- createTargetAs(pi, pid, "Two")
       oid1 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid1)
       oid2 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid2)
-      _    <- prepareObservation(pi, oid1, tid1, Wavelength.fromIntNanometers(500).get) *>
-                prepareObservation(pi, oid2, tid2, Wavelength.fromIntNanometers(520).get)
+      _    <- prepareObservation(pi, pid, oid1, tid1, Wavelength.fromIntNanometers(500).get) *>
+                prepareObservation(pi, pid, oid2, tid2, Wavelength.fromIntNanometers(520).get)
               // This will add four calibrations
       (ad, _) <- recalculateCalibrations(pid, when)
       ob   <- queryObservations(pid)
@@ -938,7 +939,7 @@ class perProgramPerConfigCalibrations
       tid2 <- createTargetAs(pi, pid, "Two")
       oid1 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid1)
       oid2 <- createObservationAs(pi, pid, ObservingModeType.GmosSouthLongSlit.some, tid2)
-      _    <- prepareObservation(pi, oid1, tid1) *> prepareObservation(pi, oid2, tid2)
+      _    <- prepareObservation(pi, pid, oid1, tid1) *> prepareObservation(pi, pid, oid2, tid2)
       _    <- setObservationWorkflowState(pi, oid1, ObservationWorkflowState.Inactive)
       _    <- recalculateCalibrations(pid, when)
       gr1  <- groupElementsAs(pi, pid, None)
@@ -1006,7 +1007,7 @@ class perProgramPerConfigCalibrations
       pid  <- createProgramAs(pi)
       tid1 <- createTargetAs(pi, pid, "One")
       oid1 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid1)
-      _    <- prepareObservation(pi, oid1, tid1)
+      _    <- prepareObservation(pi, pid, oid1, tid1)
       // should produce 2 calibrations
       _    <- recalculateCalibrations(pid, when)
       ob1   <- queryObservations(pid)
@@ -1092,7 +1093,7 @@ class perProgramPerConfigCalibrations
           }
         """,
       )
-      _ <- prepareObservation(pi, oid1, tid1) *> prepareObservation(pi, oid2, tid2)
+      _ <- prepareObservation(pi, pid, oid1, tid1) *> prepareObservation(pi, pid, oid2, tid2)
       // Generate calibrations
       _ <- recalculateCalibrations(pid, when)
       ob <- queryObservations(pid)
@@ -1156,7 +1157,7 @@ class perProgramPerConfigCalibrations
           }
         """,
       )
-      _ <- prepareObservation(pi, oid1, tid1) *> prepareObservation(pi, oid2, tid2)
+      _ <- prepareObservation(pi, pid, oid1, tid1) *> prepareObservation(pi, pid, oid2, tid2)
       _ <- recalculateCalibrations(pid, when)
 
       ob <- queryObservations(pid)
@@ -1226,7 +1227,7 @@ class perProgramPerConfigCalibrations
           }
         """
       )
-      _    <- prepareObservation(pi, oid1, tid1) *> prepareObservation(pi, oid2, tid2)
+      _    <- prepareObservation(pi, pid, oid1, tid1) *> prepareObservation(pi, pid, oid2, tid2)
       _    <- recalculateCalibrations(pid, when)
       obsBefore <- queryObservations(pid)
       _    <- deleteObservation(pi, oid2)  // Delete full frame
@@ -1311,7 +1312,7 @@ class perProgramPerConfigCalibrations
           }
         """
       )
-      _    <- prepareObservation(pi, oid1, tid1) *> prepareObservation(pi, oid2, tid2)
+      _    <- prepareObservation(pi, pid, oid1, tid1) *> prepareObservation(pi, pid, oid2, tid2)
       _    <- recalculateCalibrations(pid, when)
       obsBefore <- queryObservations(pid)
       // Convert full observation to central
@@ -1394,7 +1395,7 @@ class perProgramPerConfigCalibrations
           }
         """,
       )
-      _ <- prepareObservation(pi, oid1, tid1)
+      _ <- prepareObservation(pi, pid, oid1, tid1)
       // Generate calibrations for first observation
       _ <- recalculateCalibrations(pid, when)
       obsAfterFirst <- queryObservations(pid)
@@ -1423,7 +1424,7 @@ class perProgramPerConfigCalibrations
           }
         """,
       )
-      _ <- prepareObservation(pi, oid2, tid2)
+      _ <- prepareObservation(pi, pid, oid2, tid2)
       // Recalculate calibrations after adding second observation
       _ <- recalculateCalibrations(pid, when)
       obsAfterSecond <- queryObservations(pid)
@@ -1460,7 +1461,7 @@ class perProgramPerConfigCalibrations
       _    <- updateConf(oid1, GmosAmpReadMode.Fast, GmosAmpGain.High)
       oid2 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid2)
       _    <- updateConf(oid2, GmosAmpReadMode.Slow, GmosAmpGain.Low)
-      _    <- prepareObservation(pi, oid1, tid1) *> prepareObservation(pi, oid2, tid2)
+      _    <- prepareObservation(pi, pid, oid1, tid1) *> prepareObservation(pi, pid, oid2, tid2)
       // run calibrations
       _    <- recalculateCalibrations(pid, when)
       ob   <- queryObservations(pid)
@@ -1481,7 +1482,7 @@ class perProgramPerConfigCalibrations
       tid2 <- createTargetAs(pi, pid, "Two")
       oid1 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid1)
       oid2 <- createObservationAs(pi, pid, ObservingModeType.GmosSouthLongSlit.some, tid2)
-      _    <- prepareObservation(pi, oid1, tid1) *> prepareObservation(pi, oid2, tid2)
+      _    <- prepareObservation(pi, pid, oid1, tid1) *> prepareObservation(pi, pid, oid2, tid2)
       _    <- recalculateCalibrations(pid, when)
       ev   <- Ref.of[IO, List[Notification[String]]](Nil)
       fib  <- withServices(service): services =>
@@ -1511,7 +1512,7 @@ class perProgramPerConfigCalibrations
       tid2 <- createTargetAs(pi, pid, "Two")
       oid1 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid1)
       oid2 <- createObservationAs(pi, pid, ObservingModeType.GmosSouthLongSlit.some, tid2)
-      _    <- prepareObservation(pi, oid1, tid1) *> prepareObservation(pi, oid2, tid2)
+      _    <- prepareObservation(pi, pid, oid1, tid1) *> prepareObservation(pi, pid, oid2, tid2)
       _    <- setObservationWorkflowState(pi, oid1, ObservationWorkflowState.Inactive)
       _    <- setObservationWorkflowState(pi, oid2, ObservationWorkflowState.Inactive)
       _    <- recalculateCalibrations(pid, when)
@@ -1532,7 +1533,7 @@ class perProgramPerConfigCalibrations
       tid2 <- createTargetAs(pi, pid, "Two")
       oid1 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid1)
       oid2 <- createObservationAs(pi, pid, ObservingModeType.GmosSouthLongSlit.some, tid2)
-      _    <- prepareObservation(pi, oid1, tid1) *> prepareObservation(pi, oid2, tid2)
+      _    <- prepareObservation(pi, pid, oid1, tid1) *> prepareObservation(pi, pid, oid2, tid2)
       _    <- setObservationWorkflowState(pi, oid2, ObservationWorkflowState.Inactive)
       _    <- recalculateCalibrations(pid, when)
       gr1  <- groupElementsAs(pi, pid, None)
@@ -1550,7 +1551,7 @@ class perProgramPerConfigCalibrations
       pid  <- createProgramAs(pi)
       tid1 <- createTargetAs(pi, pid, "One")
       oid1 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid1)
-      _    <- prepareObservation(pi, oid1, tid1)
+      _    <- prepareObservation(pi, pid, oid1, tid1)
       _    <- recalculateCalibrations(pid, when)
       ob1  <- queryObservations(pid)
       gr1  <- groupElementsAs(pi, pid, None)
@@ -1577,7 +1578,7 @@ class perProgramPerConfigCalibrations
       pid  <- createProgramAs(pi)
       tid1 <- createTargetAs(pi, pid, "One")
       oid1 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid1)
-      _    <- prepareObservation(pi, oid1, tid1)
+      _    <- prepareObservation(pi, pid, oid1, tid1)
       _    <- recalculateCalibrations(pid, when)
       ob1  <- queryObservations(pid)
       gr1  <- groupElementsAs(pi, pid, None)
