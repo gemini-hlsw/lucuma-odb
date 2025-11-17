@@ -182,7 +182,7 @@ class ShortCut_6598 extends ExecutionTestSupportForGmos:
       pid <- createProgram
       tid <- createTargetAs(pi, pid, "Science Target")
       o1  <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
-      _   <- setWorkflowStateDirectly(o1, ObservationWorkflowState.Ready)
+      _   <- setWorkflowState(o1, ObservationWorkflowState.Ready)
 
       // Step 1: Create a single obs and calculate calibrations
       _   <- IO.println("Step 1: Setup observation...")
@@ -196,7 +196,7 @@ class ShortCut_6598 extends ExecutionTestSupportForGmos:
       // Step 2: Duplicate the science observation (clone it)
       _   <- IO.println("Step 2: Cloning observation...")
       o2  <- cloneObservationAs(pi, o1)
-      _   <- setWorkflowStateDirectly(o2, ObservationWorkflowState.Ready)
+      _   <- setWorkflowState(o2, ObservationWorkflowState.Ready)
       // Run workflow
       _   <- runObscalcUpdate(pid, o2)
       _   <- recalculateCalibrations(pid, when).flatMap(_._1.traverse(runObscalcUpdate(pid, _)))
