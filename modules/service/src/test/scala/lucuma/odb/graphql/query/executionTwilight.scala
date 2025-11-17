@@ -10,6 +10,7 @@ import eu.timepit.refined.types.numeric.PosInt
 import io.circe.Json
 import io.circe.literal.*
 import lucuma.core.enums.CalibrationRole
+import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.ObserveClass
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
@@ -74,6 +75,7 @@ class executionTwilight extends ExecutionTestSupportForGmos {
       p <- createProgram
       t <- createTargetAs(pi, p, "real target")
       o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+      _ <- setWorkflowStateDirectly(o, ObservationWorkflowState.Ready)
     yield (p, o)
 
   val setup: IO[(Program.Id, Observation.Id, Calibrations)] =
