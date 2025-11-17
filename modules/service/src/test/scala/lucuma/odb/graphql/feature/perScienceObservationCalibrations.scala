@@ -332,6 +332,7 @@ class perScienceObservationCalibrations
       tid  <- createTargetWithProfileAs(pi, pid)
       oid  <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
       _    <- setWorkflowState(oid, ObservationWorkflowState.Ready)
+      _    <- runObscalcUpdate(pid, oid)
       _    <- recalculateCalibrations(pid, when)
       obs  <- queryObservation(oid)
       grp  <- obs.groupId.traverse(queryGroup)
@@ -348,8 +349,10 @@ class perScienceObservationCalibrations
       tid2  <- createTargetWithProfileAs(pi, pid)
       oid1  <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid1))
       _     <- setWorkflowState(oid1, ObservationWorkflowState.Ready)
+      _     <- runObscalcUpdate(pid, oid1)
       oid2  <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid2))
       _     <- setWorkflowState(oid2, ObservationWorkflowState.Ready)
+      _     <- runObscalcUpdate(pid, oid2)
       _     <- recalculateCalibrations(pid, when)
       obs1  <- queryObservation(oid1)
       obs2  <- queryObservation(oid2)
@@ -365,6 +368,7 @@ class perScienceObservationCalibrations
       tid         <- createTargetWithProfileAs(pi, pid)
       oid         <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
       _           <- setWorkflowState(oid, ObservationWorkflowState.Ready)
+      _           <- runObscalcUpdate(pid, oid)
       _           <- recalculateCalibrations(pid, when)
       obsBefore   <- queryObservation(oid)
       groupId     =  obsBefore.groupId.get
@@ -386,6 +390,7 @@ class perScienceObservationCalibrations
       tid         <- createTargetWithProfileAs(pi, pid)
       oid         <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
       _           <- setWorkflowState(oid, ObservationWorkflowState.Ready)
+      _           <- runObscalcUpdate(pid, oid)
       _           <- recalculateCalibrations(pid, when)
       obsBefore   <- queryObservation(oid)
       groupId     =  obsBefore.groupId.get
@@ -405,6 +410,7 @@ class perScienceObservationCalibrations
       tid       <- createTargetWithProfileAs(pi, pid)
       oid       <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
       _         <- setWorkflowState(oid, ObservationWorkflowState.Ready)
+      _         <- runObscalcUpdate(pid, oid)
       _         <- recalculateCalibrations(pid, when)
       obs       <- queryObservation(oid)
       groupId   =  obs.groupId.get
@@ -421,6 +427,7 @@ class perScienceObservationCalibrations
       tid         <- createTargetWithProfileAs(pi, pid)
       oid         <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
       _           <- setWorkflowState(oid, ObservationWorkflowState.Ready)
+      _           <- runObscalcUpdate(pid, oid)
       _           <- recalculateCalibrations(pid, when)
       obsAfter1   <- queryObservation(oid)
       groupId1    =  obsAfter1.groupId.get
@@ -449,8 +456,10 @@ class perScienceObservationCalibrations
       tid3        <- createTargetWithProfileAs(pi, pid)
       oid1        <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid1))
       _           <- setWorkflowState(oid1, ObservationWorkflowState.Ready)
+      _           <- runObscalcUpdate(pid, oid1)
       oid2        <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid2))
       _           <- setWorkflowState(oid2, ObservationWorkflowState.Ready)
+      _           <- runObscalcUpdate(pid, oid2)
       _           <- recalculateCalibrations(pid, when)
       obs1Before  <- queryObservation(oid1)
       obs2Before  <- queryObservation(oid2)
@@ -459,6 +468,7 @@ class perScienceObservationCalibrations
       _           <- setObservationInactive(oid1)
       oid3        <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid3))
       _           <- setWorkflowState(oid3, ObservationWorkflowState.Ready)
+      _           <- runObscalcUpdate(pid, oid3)
       _           <- recalculateCalibrations(pid, when)
       group1Exists <- queryGroupExists(group1Id)
       obs2After   <- queryObservation(oid2)
@@ -476,6 +486,7 @@ class perScienceObservationCalibrations
       tid2        <- createTargetWithProfileAs(pi, pid)
       oid1        <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid1))
       _           <- setWorkflowState(oid1, ObservationWorkflowState.Ready)
+      _           <- runObscalcUpdate(pid, oid1)
       _           <- recalculateCalibrations(pid, when)
       obs1Before  <- queryObservation(oid1)
       group1Id    =  obs1Before.groupId.get
@@ -484,6 +495,7 @@ class perScienceObservationCalibrations
       // Create new F2 observation
       oid2        <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid2))
       _           <- setWorkflowState(oid2, ObservationWorkflowState.Ready)
+      _           <- runObscalcUpdate(pid, oid2)
       _           <- recalculateCalibrations(pid, when)
       group1Exists <- queryGroupExists(group1Id)
       obs2After   <- queryObservation(oid2)
@@ -510,6 +522,7 @@ class perScienceObservationCalibrations
       tid  <- createTargetWithProfileAs(pi, pid)
       oid  <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
       _    <- setWorkflowState(oid, ObservationWorkflowState.Ready)
+      _    <- runObscalcUpdate(pid, oid)
       _    <- recalculateCalibrations(pid, when)
       obs  <- queryObservation(oid)
       telluricGroupId = obs.groupId.get
@@ -531,6 +544,7 @@ class perScienceObservationCalibrations
       // Create F2 observation directly in the parent group
       oid              <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
       _                <- setWorkflowState(oid, ObservationWorkflowState.Ready)
+      _                <- runObscalcUpdate(pid, oid)
       _                <- moveObservationAs(pi, oid, parentGroupId.some)  // Move to parent group
       _                <- recalculateCalibrations(pid, when)
       obs              <- queryObservation(oid)
@@ -558,6 +572,7 @@ class perScienceObservationCalibrations
       tid2             <- createTargetWithProfileAs(pi, pid)
       f2Oid            <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid1))
       _                <- setWorkflowState(f2Oid, ObservationWorkflowState.Ready)
+      _                <- runObscalcUpdate(pid, f2Oid)
       _                <- moveObservationAs(pi, f2Oid, parentGroupId.some)
       // Add gmos after f2
       gmosOid          <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid2))
@@ -591,6 +606,7 @@ class perScienceObservationCalibrations
       tid                <- createTargetWithProfileAs(pi, pid)
       oid                <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
       _                  <- setWorkflowState(oid, ObservationWorkflowState.Ready)
+      _                  <- runObscalcUpdate(pid, oid)
       (added, removed)   <- recalculateCalibrations(pid, when)
       obs                <- queryObservation(oid)
       groupId            =  obs.groupId.get
@@ -610,6 +626,7 @@ class perScienceObservationCalibrations
       tid         <- createTargetWithProfileAs(pi, pid)
       oid         <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
       _           <- setWorkflowState(oid, ObservationWorkflowState.Ready)
+      _           <- runObscalcUpdate(pid, oid)
       _           <- recalculateCalibrations(pid, when)
       obs         <- queryObservation(oid)
       groupId     =  obs.groupId.get
@@ -629,8 +646,10 @@ class perScienceObservationCalibrations
       tid2               <- createTargetWithProfileAs(pi, pid)
       oid1               <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid1))
       _                  <- setWorkflowState(oid1, ObservationWorkflowState.Ready)
+      _                  <- runObscalcUpdate(pid, oid1)
       oid2               <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid2))
       _                  <- setWorkflowState(oid2, ObservationWorkflowState.Ready)
+      _                  <- runObscalcUpdate(pid, oid2)
       (added, removed)   <- recalculateCalibrations(pid, when)
       obs1               <- queryObservation(oid1)
       obs2               <- queryObservation(oid2)
@@ -655,6 +674,7 @@ class perScienceObservationCalibrations
       tid                  <- createTargetWithProfileAs(pi, pid)
       oid                  <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
       _                    <- setWorkflowState(oid, ObservationWorkflowState.Ready)
+      _                    <- runObscalcUpdate(pid, oid)
       (added1, removed1)   <- recalculateCalibrations(pid, when)
       obs                  <- queryObservation(oid)
       groupId              =  obs.groupId.get
@@ -678,6 +698,7 @@ class perScienceObservationCalibrations
       tid          <- createTargetWithProfileAs(pi, pid)
       oid          <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
       _            <- setWorkflowState(oid, ObservationWorkflowState.Ready)
+      _            <- runObscalcUpdate(pid, oid)
       _            <- recalculateCalibrations(pid, when)
       obs1         <- queryObservation(oid)
       groupId      =  obs1.groupId.get
@@ -697,6 +718,7 @@ class perScienceObservationCalibrations
       tid                  <- createTargetWithProfileAs(pi, pid)
       oid                  <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
       _                    <- setWorkflowState(oid, ObservationWorkflowState.Ready)
+      _                    <- runObscalcUpdate(pid, oid)
       (added1, removed1)   <- recalculateCalibrations(pid, when)
       obs1                 <- queryObservation(oid)
       groupId              =  obs1.groupId.get
@@ -721,6 +743,7 @@ class perScienceObservationCalibrations
       tid                  <- createTargetWithProfileAs(pi, pid)
       oid                  <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
       _                    <- setWorkflowState(oid, ObservationWorkflowState.Ready)
+      _                    <- runObscalcUpdate(pid, oid)
       (added1, removed1)   <- recalculateCalibrations(pid, when)
       obs1                 <- queryObservation(oid)
       groupId              =  obs1.groupId.get
@@ -750,6 +773,7 @@ class perScienceObservationCalibrations
       tid                <- createTargetWithProfileAs(pi, pid)
       oid                <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
       _                  <- setWorkflowState(oid, ObservationWorkflowState.Ready)
+      _                  <- runObscalcUpdate(pid, oid)
       // add 1 telluric
       (added1, removed1) <- recalculateCalibrations(pid, when)
       obs1               <- queryObservation(oid)
@@ -781,6 +805,7 @@ class perScienceObservationCalibrations
       tid          <- createTargetWithProfileAs(pi, pid)
       oid          <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
       _            <- setWorkflowState(oid, ObservationWorkflowState.Ready)
+      _            <- runObscalcUpdate(pid, oid)
       _            <- recalculateCalibrations(pid, when)
       obs1         <- queryObservation(oid)
       groupId      =  obs1.groupId.get
@@ -823,6 +848,7 @@ class perScienceObservationCalibrations
       tid2        <- createTargetWithProfileAs(pi, pid)
       oid1        <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid1))
       _           <- setWorkflowState(oid1, ObservationWorkflowState.Ready)
+      _           <- runObscalcUpdate(pid, oid1)
       oid2        <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid2))
       _           <- setWorkflowState(oid2, ObservationWorkflowState.Ready)
       _           <- setObservationWorkflowState(pi, oid2, ObservationWorkflowState.Inactive)
@@ -844,6 +870,7 @@ class perScienceObservationCalibrations
       tid         <- createTargetWithProfileAs(pi, pid)
       oid         <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
       _           <- setWorkflowState(oid, ObservationWorkflowState.Ready)
+      _           <- runObscalcUpdate(pid, oid)
       _           <- recalculateCalibrations(pid, when)
       obsBefore   <- queryObservation(oid)
       groupId     =  obsBefore.groupId.get
@@ -865,6 +892,7 @@ class perScienceObservationCalibrations
       tid         <- createTargetWithProfileAs(pi, pid)
       oid         <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
       _           <- setWorkflowState(oid, ObservationWorkflowState.Ready)
+      _           <- runObscalcUpdate(pid, oid)
       _           <- recalculateCalibrations(pid, when)
       obsBefore   <- queryObservation(oid)
       groupId     =  obsBefore.groupId.get

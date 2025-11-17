@@ -185,7 +185,7 @@ object GeneratorParamsService {
           oms         = paramsRows.collect { case RowForCalibration(observationId = oid, observingMode = Some(om)) => (oid, om) }.distinct
           m          <- Services.asSuperUser(observingModeServices.selectObservingMode(oms))
         yield
-          val workflowStates = paramsRows.map(r => r.observationId -> (r.workflowUserState, r.hasExecutionEvents)).toMap
+          val workflowStates = paramsRows.map(r => r.observationId -> (r.workflowState, r.hasExecutionEvents)).toMap
           NonEmptyList.fromList(paramsRows).fold(Map.empty): paramsRowsNel =>
             ObsParams.fromForCalibsRow(paramsRowsNel).map: (obsId, obsParams) =>
               val (wfs, hee) = workflowStates.getOrElse(obsId, (none, false))
@@ -428,7 +428,7 @@ object GeneratorParamsService {
     sourceProfile:       Option[SourceProfile],
     declaredComplete:    Boolean,
     acqResetTime:        Option[Timestamp],
-    workflowUserState:   Option[ObservationWorkflowState],
+    workflowState:       Option[ObservationWorkflowState],
     hasExecutionEvents:  Boolean,
     customSedTimestamp:  Option[Timestamp] = none
   )
@@ -519,21 +519,21 @@ object GeneratorParamsService {
       }
 
     val paramsForCalibrations: Decoder[RowForCalibration] =
-      (observation_id                      *:
-       calibration_role.opt                *:
-       constraint_set                      *:
-       exposure_time_mode.opt              *:
-       observing_mode_type.opt             *:
-       science_band.opt                    *:
-       target_id.opt                       *:
-       radial_velocity.opt                 *:
-       source_profile.opt                  *:
-       target_id.opt                       *:
-       radial_velocity.opt                 *:
-       source_profile.opt                  *:
-       bool                                *:
-       core_timestamp.opt                  *:
-       observation_workflow_user_state.opt *:
+      (observation_id                   *:
+       calibration_role.opt             *:
+       constraint_set                   *:
+       exposure_time_mode.opt           *:
+       observing_mode_type.opt          *:
+       science_band.opt                 *:
+       target_id.opt                    *:
+       radial_velocity.opt              *:
+       source_profile.opt               *:
+       target_id.opt                    *:
+       radial_velocity.opt              *:
+       source_profile.opt               *:
+       bool                             *:
+       core_timestamp.opt               *:
+       observation_workflow_state.opt   *:
        bool
       ).map( (oid, role, cs, etm, om, sb, btid, brv, bsp, tid, rv, sp, dc, art, wfs, hee) =>
         RowForCalibration(oid, role, cs, etm, om, sb, btid, brv, bsp, tid, rv, sp, dc, art, wfs, hee, None))
@@ -627,10 +627,14 @@ object GeneratorParamsService {
       sql"""
         SELECT
           #${ParamColumns("gp")},
-          ob.c_workflow_user_state,
+          CASE WHEN ob.c_workflow_user_state = 'inactive' THEN 'inactive'::e_workflow_state
+               WHEN oc.c_workflow_state IS NOT NULL AND oc.c_workflow_state <> 'undefined' THEN oc.c_workflow_state
+               ELSE NULL
+          END as c_workflow_state,
           CASE WHEN COUNT(ee.c_observation_id) OVER (PARTITION BY gp.c_observation_id) > 0 THEN true ELSE false END as has_execution_events
         FROM v_generator_params gp
         INNER JOIN t_observation ob ON gp.c_observation_id = ob.c_observation_id
+        LEFT JOIN t_obscalc oc ON ob.c_observation_id = oc.c_observation_id
         LEFT JOIN t_execution_event ee ON ob.c_observation_id = ee.c_observation_id
         WHERE
       """(Void) |+|
@@ -653,10 +657,14 @@ object GeneratorParamsService {
       sql"""
         SELECT
           #${ParamColumns("gp")},
-          ob.c_workflow_user_state,
+          CASE WHEN ob.c_workflow_user_state = 'inactive' THEN 'inactive'::e_workflow_state
+               WHEN oc.c_workflow_state IS NOT NULL AND oc.c_workflow_state <> 'undefined' THEN oc.c_workflow_state
+               ELSE NULL
+          END as c_workflow_state,
           CASE WHEN COUNT(ee.c_observation_id) OVER (PARTITION BY gp.c_observation_id) > 0 THEN true ELSE false END as has_execution_events
         FROM v_generator_params gp
         INNER JOIN t_observation ob ON gp.c_observation_id = ob.c_observation_id
+        LEFT JOIN t_obscalc oc ON ob.c_observation_id = oc.c_observation_id
         LEFT JOIN t_execution_event ee ON ob.c_observation_id = ee.c_observation_id
         WHERE
       """(Void) |+|
