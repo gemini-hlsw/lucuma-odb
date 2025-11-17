@@ -18,6 +18,7 @@ import grackle.ResultT
 import io.circe.Json
 import io.circe.JsonObject
 import lucuma.catalog.clients.GaiaClient
+import lucuma.core.data.Metadata
 import lucuma.core.model.Access
 import lucuma.core.model.User
 import lucuma.core.util.Gid
@@ -61,6 +62,9 @@ trait Services[F[_]]:
 
   /** The dynamic enums loaded from the DB. */
   val enums: Enums
+
+  /** Availability metadata (hardcoded for now). */
+  def metadata: Metadata = Metadata.placeholder
 
   /**
    * Define an interaction with the database that will execute a block `fa` within a transaction,
@@ -400,6 +404,7 @@ object Services:
     def guideService[F[_]](commitHash: CommitHash, ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode)(using Services[F]): GuideService[F] = summon[Services[F]].guideService(commitHash, ptc)
     def userInvitationService[F[_]](using Services[F]): UserInvitationService[F] = summon[Services[F]].userInvitationService
     def emailService[F[_]](using Services[F]) = summon[Services[F]].emailService
+    def metadata[F[_]](using Services[F]) = summon[Services[F]].metadata
 
     def requirePiAccess[F[_], A](fa: Services.PiAccess ?=> F[Result[A]])(using Services[F], Applicative[F]): F[Result[A]] =
       if user.role.access >= Access.Pi then fa(using ())

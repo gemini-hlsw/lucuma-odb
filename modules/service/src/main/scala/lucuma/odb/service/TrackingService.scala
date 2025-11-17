@@ -12,8 +12,8 @@ import cats.effect.Temporal
 import cats.syntax.all.*
 import grackle.Result
 import grackle.ResultT
+import lucuma.core.data.Metadata
 import lucuma.core.enums.EphemerisKeyType
-import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.Site
 import lucuma.core.math.Coordinates
 import lucuma.core.math.Offset
@@ -38,8 +38,7 @@ import lucuma.horizons.HorizonsEphemeris
 import lucuma.horizons.HorizonsEphemerisEntry
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
-import lucuma.odb.service.Services.Syntax.asterismService
-import lucuma.odb.service.Services.Syntax.session
+import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.service.Services.asSuperUser
 import lucuma.odb.util.Codecs.*
 import org.http4s.client.Client
@@ -290,7 +289,7 @@ object TrackingService:
         interval: TimestampInterval,
         force: Boolean
       ): F[Map[Observation.Id, Result[Either[Snapshot[(Tracking, Int)], (Region, Option[Coordinates])]]]] =
-        getSiteAndExplicitBaseCoordinates(keys).flatMap: (explicitBases, sites) =>
+        getSiteAndExplicitBaseCoordinates(keys, interval).flatMap: (explicitBases, sites) =>
           asSuperUser: // hm
             asterismService
               .getAsterisms(keys) // TODO: even though this is a bulk fetch it's still inefficient; we don't need all this information
@@ -307,12 +306,12 @@ object TrackingService:
                         .map(oid -> _)
                   .map(_.toMap)
 
-      private def getSiteAndExplicitBaseCoordinates(oids: List[Observation.Id]): F[(Map[Observation.Id, Coordinates], Map[Observation.Id, Site])] =
+      private def getSiteAndExplicitBaseCoordinates(oids: List[Observation.Id], when: TimestampInterval): F[(Map[Observation.Id, Coordinates], Map[Observation.Id, Site])] =
         NonEmptyList.fromList(oids.distinct) match
           case None => (Map.empty, Map.empty).pure[F]
           case Some(nel) =>
             session
-              .prepareR(Statements.selectSiteAndExplicitBaseCoordinates(nel))
+              .prepareR(Statements.selectSiteAndExplicitBaseCoordinates(nel, when, metadata))
               .use: pq =>
                 pq.stream(nel, 1024)
                   .compile
@@ -384,7 +383,7 @@ object TrackingService:
               pc.execute(key, site).as(Left(interval.expectedAlignedElements))
         else
           ResultT.liftF:
-            session.prepareR(Statements.SelectHorisonEphemerisEntries).use: pq =>
+            session.prepareR(Statements.SelectHorizonsEphemerisEntries).use: pq =>
               pq.stream((key, site, interval), 1024)
                 .compile
                 .toList
@@ -427,22 +426,22 @@ object TrackingService:
                 entry.surfaceBrightness,
               )
 
-    def selectSiteAndExplicitBaseCoordinates(oids: NonEmptyList[Observation.Id]): Query[oids.type, (Observation.Id, Option[Site], Option[Coordinates])] =
+    def selectSiteAndExplicitBaseCoordinates(oids: NonEmptyList[Observation.Id], when: TimestampInterval, metadata: Metadata): Query[oids.type, (Observation.Id, Option[Site], Option[Coordinates])] =
       sql"""
-        SELECT c_observation_id, c_observing_mode_type, c_explicit_ra, c_explicit_dec
+        SELECT c_observation_id, c_instrument, c_explicit_ra, c_explicit_dec
         FROM t_observation
         WHERE c_observation_id IN (${observation_id.nel(oids)})
       """
-        .query(observation_id *: observing_mode_type.opt *: right_ascension.opt *: declination.opt)
+        .query(observation_id *: instrument.opt *: right_ascension.opt *: declination.opt)
         .map:
-          case (oid, omode, ora, odec) => 
+          case (oid, oinst, ora, odec) => 
+
             val osite: Option[Site] =
-              omode.map:
-                  case ObservingModeType.GmosNorthLongSlit  => Site.GN
-                  case ObservingModeType.GmosSouthLongSlit  => Site.GS
-                  case ObservingModeType.Flamingos2LongSlit => Site.GS
-                  case ObservingModeType.GmosNorthImaging   => Site.GN
-                  case ObservingModeType.GmosSouthImaging   => Site.GS                  
+              oinst.flatMap: inst =>
+                metadata
+                  .availability(inst)
+                  .siteForRange(cats.collections.Range(when.start.toInstant, when.end.toInstant))
+            
             (oid, osite, (ora, odec).mapN(Coordinates.apply))
 
     def insertOrUpdateHorizonsEphemeris[A <: NonEmptyList[StorableHorizonsEphemerisEntry]](entries: A): Command[entries.type] = {
@@ -502,7 +501,7 @@ object TrackingService:
       """.command
     }
 
-    val SelectHorisonEphemerisEntries: Query[(EphemerisKey.Horizons, Site, TimestampInterval), HorizonsEphemerisEntry] =
+    val SelectHorizonsEphemerisEntries: Query[(EphemerisKey.Horizons, Site, TimestampInterval), HorizonsEphemerisEntry] =
       sql"""
         SELECT
           c_when,      
