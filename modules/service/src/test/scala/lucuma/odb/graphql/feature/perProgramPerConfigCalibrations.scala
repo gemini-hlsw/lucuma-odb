@@ -165,7 +165,6 @@ class perProgramPerConfigCalibrations
              0.0
            )
       _ <- scienceRequirements(pi, oid, snAt)
-      _ <- setWorkflowState(oid, ObservationWorkflowState.Ready)
       _ <- runObscalcUpdate(pid, oid)
     } yield ()
 
@@ -1002,7 +1001,7 @@ class perProgramPerConfigCalibrations
       """
     ).void
 
-  test("unnecessary calibrations are removed unless partially executed"):
+  test("unnecessary calibrations are removed unless Ongoing or Completed"):
     for {
       pid  <- createProgramAs(pi)
       tid1 <- createTargetAs(pi, pid, "One")
@@ -1012,12 +1011,13 @@ class perProgramPerConfigCalibrations
       _    <- recalculateCalibrations(pid, when)
       ob1   <- queryObservations(pid)
       calibIds1 = ob1.callibrationIds
-      // Add execution events to one of the calibrations (making it partially executed)
+      // Add execution events to one of the calibrations (making it Ongoing)
       setup = ExecutionQuerySetupOperations.Setup(offset = 0, atomCount = 1, stepCount = 1, datasetCount = 1)
       _     <- recordVisit(ObservingModeType.GmosNorthLongSlit, setup, service, calibIds1.head)
+      _     <- runObscalcUpdate(pid, calibIds1.head)
       // Change the observation configuration
       _     <- updateCentralWavelength(oid1, Wavelength.fromIntNanometers(600).get)
-      // Run calibrations again - should keep the partially executed calibration and add new ones
+      // Run calibrations again - should keep the Ongoing calibration and add new ones
       _     <- recalculateCalibrations(pid, when)
       ob2   <- queryObservations(pid)
       calibIds2 = ob2.callibrationIds
@@ -1033,9 +1033,9 @@ class perProgramPerConfigCalibrations
       val count2 = ob2.countCalibrations
       // initial set 2 calibs
       assertEquals(count1, 2)
-      // After config change: 1 partially executed calibration remains + 2 new calibrations
+      // After config change: 1 Ongoing calibration remains + 2 new calibrations
       assertEquals(count2, 3)
-      // The partially executed calibration should still be present
+      // The Ongoing calibration should still be present
       assert(calibIds2.contains(calibIds1.head))
       assertEquals(oids.size, 1)
     }
@@ -1597,6 +1597,64 @@ class perProgramPerConfigCalibrations
       // calibrations removed and group deleted when science observation is deleted
       assertEquals(cCountAfter, 0)
       assert(cgidAfter.isEmpty)
+    }
+
+  test("Generate calibrations for Defined state observations"):
+    for {
+      pid  <- createProgramAs(pi)
+      tid  <- createTargetAs(pi, pid, "Target-Defined")
+      oid  <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid)
+      _    <- updateTargetProperties(pi, tid, RightAscension.Zero.toAngle.toMicroarcseconds, Declination.Zero.toAngle.toMicroarcseconds, 0.0)
+      _    <- scienceRequirements(pi, oid, DefaultSnAt)
+      _    <- runObscalcUpdate(pid, oid)
+      _    <- recalculateCalibrations(pid, when)
+      ob   <- queryObservations(pid)
+      gr   <- groupElementsAs(pi, pid, None)
+    } yield {
+      // Defined observations should generate calibrations
+      assertEquals(ob.countCalibrations, 2)
+      assert(gr.calibrationGroupId.isDefined)
+    }
+
+  test("Protect Ongoing calibrations from deletion"):
+    for {
+      pid  <- createProgramAs(pi)
+      tid  <- createTargetAs(pi, pid, "Target-Ongoing")
+      oid  <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid)
+      _    <- prepareObservation(pi, pid, oid, tid)
+      _    <- recalculateCalibrations(pid, when)
+      ob1  <- queryObservations(pid)
+      calibIds = ob1.callibrationIds
+      // One calibration is ongoing
+      _    <- setCalculatedWorkflowState(calibIds.head, ObservationWorkflowState.Ongoing)
+      // Change science configuration
+      _    <- updateCentralWavelength(oid, Wavelength.fromIntNanometers(600).get)
+      _    <- recalculateCalibrations(pid, when)
+      ob2  <- queryObservations(pid)
+    } yield {
+      // Ongoing calibration preserved + 2 new calibrations
+      assertEquals(ob2.countCalibrations, 3)
+      assert(ob2.callibrationIds.contains(calibIds.head))
+    }
+
+  test("Protect Completed calibrations from deletion"):
+    for {
+      pid  <- createProgramAs(pi)
+      tid  <- createTargetAs(pi, pid, "Target-Completed")
+      oid  <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid)
+      _    <- prepareObservation(pi, pid, oid, tid)
+      _    <- recalculateCalibrations(pid, when)
+      ob1  <- queryObservations(pid)
+      calibIds = ob1.callibrationIds
+      // Set one calibration as Completed
+      _    <- setCalculatedWorkflowState(calibIds.head, ObservationWorkflowState.Completed)
+      _    <- updateCentralWavelength(oid, Wavelength.fromIntNanometers(600).get)
+      _    <- recalculateCalibrations(pid, when)
+      ob2  <- queryObservations(pid)
+    } yield {
+      // Completed calibration should be preserved + 2 new calibrations
+      assertEquals(ob2.countCalibrations, 3)
+      assert(ob2.callibrationIds.contains(calibIds.head))
     }
 
 }

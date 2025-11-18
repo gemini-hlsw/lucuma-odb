@@ -224,14 +224,32 @@ object PerScienceObservationCalibrationsService:
       private def deleteTelluricObservationsFromGroups(
         groupIds: List[Group.Id]
       )(using Transaction[F], SuperUserAccess): F[List[Observation.Id]] =
-        groupIds.flatTraverse( gid =>
+        def resolveWorkflowState(
+          userState: Option[ObservationWorkflowState],
+          calculatedState: Option[ObservationWorkflowState]
+        ): Option[ObservationWorkflowState] =
+          userState match
+            case Some(ObservationWorkflowState.Inactive) => ObservationWorkflowState.Inactive.some
+            case _ =>
+              calculatedState.filter(_ =!= ObservationWorkflowState.Undefined)
+
+        groupIds.flatTraverse: gid =>
           findTelluricObservation(gid).flatMap:
             case Some(telluricOid) =>
-              observationService.deleteCalibrationObservations(NonEmptyList.one(telluricOid))
-                .as(List(telluricOid))
+              for
+                userState       <- Statements.selectUserWorkflowState(telluricOid)
+                calculatedState <- Statements.selectObscalcWorkflowState(telluricOid)
+                resolvedState   = resolveWorkflowState(userState, calculatedState)
+                result          <- resolvedState match
+                  // Don't delete calibrations for Ongoing or Completed
+                  case Some(state) if state === ObservationWorkflowState.Ongoing || state === ObservationWorkflowState.Completed =>
+                    List.empty.pure[F]
+                  case _ =>
+                    observationService.deleteCalibrationObservations(NonEmptyList.one(telluricOid))
+                      .as(List(telluricOid))
+              yield result
             case None =>
-              List.empty[Observation.Id].pure[F]
-        )
+              List.empty.pure[F]
 
       private def readTelluricGroup(
         pid:  Program.Id,
@@ -329,9 +347,9 @@ object PerScienceObservationCalibrationsService:
         pid:        Program.Id,
         scienceObs: List[ObsExtract[CalibrationConfigSubset]]
       )(using Transaction[F], SuperUserAccess): F[(List[Observation.Id], List[Observation.Id])] =
-        // Filter to only include observations that are Ready or have been started
+        // only include observations that are Defined or Ready
         val activeScienceObs = scienceObs.filter: obs =>
-          obs.started || obs.state.exists(_ === ObservationWorkflowState.Ready)
+          obs.state.exists(s => s === ObservationWorkflowState.Defined || s === ObservationWorkflowState.Ready)
 
         val currentObsIds = activeScienceObs.map(_.id).toSet
 
@@ -372,6 +390,24 @@ object PerScienceObservationCalibrationsService:
         yield (added.flatten, deleted)
 
       object Statements:
+
+        def selectUserWorkflowState(oid: Observation.Id): F[Option[ObservationWorkflowState]] =
+          S.session.option(
+            sql"""
+              SELECT c_workflow_user_state
+              FROM t_observation
+              WHERE c_observation_id = $observation_id
+            """.query(observation_workflow_user_state.opt)
+          )(oid).map(_.flatten)
+
+        def selectObscalcWorkflowState(oid: Observation.Id): F[Option[ObservationWorkflowState]] =
+          S.session.option(
+            sql"""
+              SELECT c_workflow_state
+              FROM t_obscalc
+              WHERE c_observation_id = $observation_id
+            """.query(observation_workflow_state.opt)
+          )(oid).map(_.flatten)
 
         val selectTelluricObservation: Query[(Group.Id, CalibrationRole), Observation.Id] =
           sql"""
