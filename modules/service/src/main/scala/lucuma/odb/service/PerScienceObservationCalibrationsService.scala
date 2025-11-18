@@ -221,18 +221,19 @@ object PerScienceObservationCalibrationsService:
           _             <- syncConfiguration(scienceOid, telluricId)
         yield telluricId
 
+      // Helper to resolve workflow state from separate table queries
+      private def resolveWorkflowState(
+        userState: Option[ObservationWorkflowState],
+        calculatedState: Option[ObservationWorkflowState]
+      ): Option[ObservationWorkflowState] =
+        userState match
+          case Some(ObservationWorkflowState.Inactive) => ObservationWorkflowState.Inactive.some
+          case _ =>
+            calculatedState.filter(_ =!= ObservationWorkflowState.Undefined)
+
       private def deleteTelluricObservationsFromGroups(
         groupIds: List[Group.Id]
       )(using Transaction[F], SuperUserAccess): F[List[Observation.Id]] =
-        def resolveWorkflowState(
-          userState: Option[ObservationWorkflowState],
-          calculatedState: Option[ObservationWorkflowState]
-        ): Option[ObservationWorkflowState] =
-          userState match
-            case Some(ObservationWorkflowState.Inactive) => ObservationWorkflowState.Inactive.some
-            case _ =>
-              calculatedState.filter(_ =!= ObservationWorkflowState.Undefined)
-
         groupIds.flatTraverse: gid =>
           findTelluricObservation(gid).flatMap:
             case Some(telluricOid) =>
@@ -347,13 +348,16 @@ object PerScienceObservationCalibrationsService:
         pid:        Program.Id,
         scienceObs: List[ObsExtract[CalibrationConfigSubset]]
       )(using Transaction[F], SuperUserAccess): F[(List[Observation.Id], List[Observation.Id])] =
-        // only include observations that are Defined or Ready
-        val activeScienceObs = scienceObs.filter: obs =>
-          obs.state.exists(s => s === ObservationWorkflowState.Defined || s === ObservationWorkflowState.Ready)
-
-        val currentObsIds = activeScienceObs.map(_.id).toSet
-
         for
+          // only include observations that are Defined or Ready
+          activeScienceObs <- scienceObs.filterA: obs =>
+                                for
+                                  userState       <- Statements.selectUserWorkflowState(obs.id)
+                                  calculatedState <- Statements.selectObscalcWorkflowState(obs.id)
+                                  resolvedState   = resolveWorkflowState(userState, calculatedState)
+                                yield resolvedState.exists(s => s === ObservationWorkflowState.Defined || s === ObservationWorkflowState.Ready)
+
+          currentObsIds     = activeScienceObs.map(_.id).toSet
           _                 <- info"Recalculating per science calibrations for $pid"
           _                 <- debug"Program $pid has ${currentObsIds.size} science configurations"
           _                 <- S.session.execute(sql"set constraints all deferred".command)

@@ -9,7 +9,6 @@ import cats.effect.Concurrent
 import cats.syntax.all.*
 import grackle.Result
 import lucuma.core.enums.CalibrationRole
-import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.Site
 import lucuma.core.math.Coordinates
@@ -100,10 +99,10 @@ object CalibrationsService extends CalibrationObservations {
 
       private def collectValid(
         requiresItcInputs: Boolean
-      ): PartialFunction[(Observation.Id, (Either[GeneratorParamsService.Error, GeneratorParams], Option[ObservationWorkflowState], Boolean)), ObsExtract[ObservingMode]] =
+      ): PartialFunction[(Observation.Id, Either[GeneratorParamsService.Error, GeneratorParams]), ObsExtract[ObservingMode]] =
         {
-          case (oid, (Right(GeneratorParams(itc, band, mode, calibRole, _, _)), wfs, hee)) if itc.isRight || !requiresItcInputs =>
-            ObsExtract(oid, itc.toOption, band, calibRole, mode, wfs, hee)
+          case (oid, Right(GeneratorParams(itc, band, mode, calibRole, _, _))) if itc.isRight || !requiresItcInputs =>
+            ObsExtract(oid, itc.toOption, band, calibRole, mode)
         }
 
       /**

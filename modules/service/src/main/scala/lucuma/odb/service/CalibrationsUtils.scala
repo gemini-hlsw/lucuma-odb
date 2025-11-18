@@ -7,7 +7,6 @@ import cats.MonadThrow
 import cats.syntax.all.*
 import grackle.Result
 import lucuma.core.enums.CalibrationRole
-import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.Site
 import lucuma.core.math.Angle
@@ -52,9 +51,7 @@ case class ObsExtract[A](
   itc:     Option[ItcInput],
   band:    Option[ScienceBand],
   role:    Option[CalibrationRole],
-  data:    A,
-  state:   Option[ObservationWorkflowState],
-  started: Boolean
+  data:    A
 ):
   def map[B](f: A => B): ObsExtract[B] =
     copy(data = f(data))

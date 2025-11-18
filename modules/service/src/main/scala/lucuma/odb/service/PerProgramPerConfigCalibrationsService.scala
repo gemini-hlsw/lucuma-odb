@@ -212,20 +212,36 @@ object PerProgramPerConfigCalibrationsService:
         }
       }
 
+      // Helper to resolve workflow state from separate table queries
+      private def resolveWorkflowState(
+        userState: Option[ObservationWorkflowState],
+        calculatedState: Option[ObservationWorkflowState]
+      ): Option[ObservationWorkflowState] =
+        userState match
+          case Some(ObservationWorkflowState.Inactive) => ObservationWorkflowState.Inactive.some
+          case _ =>
+            calculatedState.filter(_ =!= ObservationWorkflowState.Undefined)
+
       private def removeUnnecessaryCalibrations(
         scienceConfigs: List[CalibrationConfigSubset],
         calibrations:   List[ObsExtract[CalibrationConfigSubset]]
       )(using Transaction[F], ServiceAccess): F[List[Observation.Id]] = {
-        val unnecessaryOids = calibrations.collect {
-          case ObsExtract(oid, _, _, Some(role), config, state, _)
-            if !isCalibrationNeeded(scienceConfigs, config, role) &&
-               !state.exists(s => s === ObservationWorkflowState.Ongoing || s === ObservationWorkflowState.Completed) => oid
+        val candidates = calibrations.collect {
+          case ObsExtract(oid, _, _, Some(role), config)
+            if !isCalibrationNeeded(scienceConfigs, config, role) => oid
         }
 
-        NonEmptyList.fromList(unnecessaryOids) match {
-          case Some(oids) => observationService.deleteCalibrationObservations(oids).as(oids.toList)
-          case None       => List.empty.pure[F]
-        }
+        candidates.filterA: oid =>
+          for
+            userState       <- Statements.selectUserWorkflowState(oid)
+            calculatedState <- Statements.selectObscalcWorkflowState(oid)
+            resolvedState   = resolveWorkflowState(userState, calculatedState)
+          yield !resolvedState.exists(s => s === ObservationWorkflowState.Ongoing || s === ObservationWorkflowState.Completed)
+        .flatMap: unnecessaryOids =>
+          NonEmptyList.fromList(unnecessaryOids) match {
+            case Some(oids) => observationService.deleteCalibrationObservations(oids).as(oids.toList)
+            case None       => List.empty.pure[F]
+          }
       }
 
       // Update the signal to noise at wavelength for each calbiration observation depending
@@ -306,23 +322,27 @@ object PerProgramPerConfigCalibrationsService:
         val gmosSci = allSci.collect(ObsExtract.perProgramFilter)
         val gmosCalibs = toConfigForCalibration(allCalibs).collect(ObsExtract.perProgramCalibrationFilter)
 
-        // only 'defined' or 'ready' observations
-        val activeGmosSci = gmosSci.filter: obs =>
-          obs.state.exists(s => s === ObservationWorkflowState.Defined || s === ObservationWorkflowState.Ready)
-
-        // unique GMOS configurations
-        val uniqueSci = uniqueConfiguration(activeGmosSci)
-
-        // Extract props from all science observations
-        val props = calObsProps(toConfigForCalibration(allSci))
-
-        // Create ideal targets for each site
-        val gnTgt = CalibrationIdealTargets(Site.GN, when, calibTargets)
-        val gsTgt = CalibrationIdealTargets(Site.GS, when, calibTargets)
-
-        val configsPerRole = calculateConfigurationsPerRole(uniqueSci, gmosCalibs)
-
         for
+          // Filter for only 'defined' or 'ready' observations by checking workflow state
+          activeGmosSci  <- gmosSci.filterA: obs =>
+                              for
+                                userState       <- Statements.selectUserWorkflowState(obs.id)
+                                calculatedState <- Statements.selectObscalcWorkflowState(obs.id)
+                                resolvedState   = resolveWorkflowState(userState, calculatedState)
+                              yield resolvedState.exists(s => s === ObservationWorkflowState.Defined || s === ObservationWorkflowState.Ready)
+
+          // unique GMOS configurations
+          uniqueSci       = uniqueConfiguration(activeGmosSci)
+
+          // Extract props from all science observations
+          props           = calObsProps(toConfigForCalibration(allSci))
+
+          // Create ideal targets for each site
+          gnTgt           = CalibrationIdealTargets(Site.GN, when, calibTargets)
+          gsTgt           = CalibrationIdealTargets(Site.GS, when, calibTargets)
+
+          configsPerRole  = calculateConfigurationsPerRole(uniqueSci, gmosCalibs)
+
           _              <- info"===== Recalculating shared calibrations for program ID: $pid, instant $when ====="
           _              <- info"Program $pid has ${uniqueSci.length} science configurations"
           // Remove calibrations that are not needed, basically when a config is removed
@@ -336,3 +356,23 @@ object PerProgramPerConfigCalibrationsService:
           // Delete the calibration group if empty
           _              <- deleteEmptyCalibrationGroup(pid)
         yield (addedOids, removedOids)
+
+      object Statements:
+
+        def selectUserWorkflowState(oid: Observation.Id): F[Option[ObservationWorkflowState]] =
+          session.option(
+            sql"""
+              SELECT c_workflow_user_state
+              FROM t_observation
+              WHERE c_observation_id = $observation_id
+            """.query(observation_workflow_user_state.opt)
+          )(oid).map(_.flatten)
+
+        def selectObscalcWorkflowState(oid: Observation.Id): F[Option[ObservationWorkflowState]] =
+          session.option(
+            sql"""
+              SELECT c_workflow_state
+              FROM t_obscalc
+              WHERE c_observation_id = $observation_id
+            """.query(observation_workflow_state.opt)
+          )(oid).map(_.flatten)
