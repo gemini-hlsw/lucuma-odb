@@ -19,11 +19,13 @@ import grackle.Result
 import lucuma.catalog.clients.GaiaClient
 import lucuma.core.model.Access
 import lucuma.core.model.User
+import lucuma.core.util.CalculationState
 import lucuma.itc.client.ItcClient
 import lucuma.odb.Config
+import lucuma.odb.data.EditType
 import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.graphql.topic.CalibTimeTopic
-import lucuma.odb.graphql.topic.ObservationTopic
+import lucuma.odb.graphql.topic.ObscalcTopic
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.S3FileService
 import lucuma.odb.service.Services
@@ -123,35 +125,38 @@ object CMain extends MainParams {
       sso.get(Authorization(Credentials.Token(CIString("Bearer"), c.serviceJwt)))
 
   def topics[F[_]: Concurrent: Logger: Trace](pool: Resource[F, Session[F]]):
-   Resource[F, (Topic[F, ObservationTopic.Element], Topic[F, CalibTimeTopic.Element])] =
+   Resource[F, (Topic[F, ObscalcTopic.Element], Topic[F, CalibTimeTopic.Element])] =
     for {
       sup <- Supervisor[F]
       ses <- pool
       ctt <- Resource.eval(CalibTimeTopic(ses, 1024, sup))
-      top <- Resource.eval(ObservationTopic(ses, 1024, sup))
+      top <- Resource.eval(ObscalcTopic(ses, 1024, sup))
     } yield (top, ctt)
 
   def runCalibrationsDaemon[F[_]: {Async, Logger, Clock as C}](
-    obsTopic: Topic[F, ObservationTopic.Element],
+    obscalcTopic: Topic[F, ObscalcTopic.Element],
     calibTopic: Topic[F, CalibTimeTopic.Element],
     services: Resource[F, Services[F]]
   ): Resource[F, Unit] =
     for {
       _  <- Resource.eval(info"Calibrations Service starting")
-      _  <- Resource.eval(info"Start listening for program changes")
-      _  <- Resource.eval(obsTopic.subscribe(100).evalMap { elem =>
+      _  <- Resource.eval(info"Start listening for obscalc changes")
+      _  <- Resource.eval(obscalcTopic.subscribe(100).evalMap { elem =>
               services.use: svc =>
                 services.useTransactionally:
                   Services.asSuperUser:
                     for {
                       i <- svc.calibrationsService.isCalibration(elem.observationId)
-                      _ <- info"Observation channel: Element(${elem.observationId},${elem.programId},${elem.editType},${elem.users}), calibration: $i"
-                      t <- C.realTimeInstant.map(i => LocalDate.ofInstant(i, ZoneOffset.UTC))
+                      _ <- (info"Calibrations Service Obscalc channel: Element(${elem.observationId},${elem.programId},${elem.editType},oldState=${elem.oldState},newState=${elem.newState},${elem.users}), is calibration: $i").whenA(i)
+                      t <- C.realTimeInstant.map(LocalDate.ofInstant(_, ZoneOffset.UTC))
                       _ <- calibrationsService
                             .recalculateCalibrations(
                               elem.programId,
                               LocalDateTime.of(t, LocalTime.MIDNIGHT).toInstant(ZoneOffset.UTC)
-                            ).unlessA(i) // Don't execute for changes from calibration events
+                            ).whenA(!i &&
+                                    elem.newState.exists(_ === CalculationState.Ready) &&
+                                    (elem.editType === EditType.Created ||
+                                     elem.editType === EditType.Updated))
                     } yield Result.unit
             }.compile.drain.start.void)
       _  <- Resource.eval(info"Start listening for calibration time changes")
