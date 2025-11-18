@@ -23,7 +23,6 @@ import cats.syntax.traverse.*
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosSouthFilter
-import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.ScienceBand
 import lucuma.core.math.RadialVelocity
@@ -56,6 +55,7 @@ import lucuma.odb.sequence.data.ItcInput
 import lucuma.odb.sequence.data.MissingParam
 import lucuma.odb.sequence.data.MissingParamSet
 import lucuma.odb.sequence.flamingos2
+import lucuma.odb.sequence.flamingos2.longslit.Acquisition as F2Acquisition
 import lucuma.odb.sequence.gmos.longslit.Acquisition
 import lucuma.odb.syntax.exposureTimeMode.*
 import lucuma.odb.util.Codecs.*
@@ -91,12 +91,12 @@ trait GeneratorParamsService[F[_]] {
   def selectAll(
     programId: Program.Id,
     selection: ObservationSelection = ObservationSelection.All
-  )(using Transaction[F]): F[Map[Observation.Id, (Either[Error, GeneratorParams], Option[ObservationWorkflowState], Boolean)]]
+  )(using Transaction[F]): F[Map[Observation.Id, Either[Error, GeneratorParams]]]
 
   def selectAllUnexecuted(
     programId: Program.Id,
     selection: ObservationSelection = ObservationSelection.All
-  )(using Transaction[F]): F[Map[Observation.Id, (Either[Error, GeneratorParams], Option[ObservationWorkflowState], Boolean)]]
+  )(using Transaction[F]): F[Map[Observation.Id, Either[Error, GeneratorParams]]]
 
 }
 
@@ -131,7 +131,7 @@ object GeneratorParamsService {
         case Flamingos2Imaging(_)                    =>
           mode
         case Flamingos2Spectroscopy(_, f, _)         =>
-          InstrumentMode.Flamingos2Imaging(lucuma.odb.sequence.flamingos2.longslit.Acquisition.toAcquisitionFilter(f))
+          InstrumentMode.Flamingos2Imaging(F2Acquisition.toAcquisitionFilter(f))
         case GmosNorthImaging(_, _)                  =>
           mode
         case GmosNorthSpectroscopy(_, _, _, _, _, _) =>
@@ -168,39 +168,25 @@ object GeneratorParamsService {
       override def selectAll(
         pid:       Program.Id,
         selection: ObservationSelection
-      )(using Transaction[F]): F[Map[Observation.Id, (Either[Error, GeneratorParams], Option[ObservationWorkflowState], Boolean)]] =
-        doSelectForCalibrations(selectAllParams(pid, selection))
+      )(using Transaction[F]): F[Map[Observation.Id, Either[Error, GeneratorParams]]] =
+        doSelect(selectAllParams(pid, selection))
 
       override def selectAllUnexecuted(
         pid:       Program.Id,
         selection: ObservationSelection
-      )(using Transaction[F]): F[Map[Observation.Id, (Either[Error, GeneratorParams], Option[ObservationWorkflowState], Boolean)]] =
-        doSelectForCalibrations(selectAllParamsUnexecuted(pid, selection))
-
-      private def doSelectForCalibrations(
-        params: F[List[RowForCalibration]]
-      )(using Transaction[F]): F[Map[Observation.Id, (Either[Error, GeneratorParams], Option[ObservationWorkflowState], Boolean)]] =
-        for
-          paramsRows <- params
-          oms         = paramsRows.collect { case RowForCalibration(observationId = oid, observingMode = Some(om)) => (oid, om) }.distinct
-          m          <- Services.asSuperUser(observingModeServices.selectObservingMode(oms))
-        yield
-          val workflowStates = paramsRows.map(r => r.observationId -> (r.workflowState, r.hasExecutionEvents)).toMap
-          NonEmptyList.fromList(paramsRows).fold(Map.empty): paramsRowsNel =>
-            ObsParams.fromForCalibsRow(paramsRowsNel).map: (obsId, obsParams) =>
-              val (wfs, hee) = workflowStates.getOrElse(obsId, (none, false))
-              obsId -> (toObsGeneratorParams(obsParams, m.get(obsId)), wfs, hee)
+      )(using Transaction[F]): F[Map[Observation.Id, Either[Error, GeneratorParams]]] =
+        doSelect(selectAllParamsUnexecuted(pid, selection))
 
       private def doSelect(
         params: F[List[ParamsRow]]
       )(using Transaction[F]): F[Map[Observation.Id, Either[Error, GeneratorParams]]] =
         for
           paramsRows <- params
-          oms         = paramsRows.collect { case ParamsRow(observationId = oid, observingMode = Some(om)) => (oid, om) }.distinct
+          oms         = paramsRows.collect { case ParamsRow(oid, _, _, _, Some(om), _, _, _, _, _, _, _, _, _, _) => (oid, om) }.distinct
           m          <- Services.asSuperUser(observingModeServices.selectObservingMode(oms))
         yield
           NonEmptyList.fromList(paramsRows).fold(Map.empty): paramsRowsNel =>
-            ObsParams.fromParamsRow(paramsRowsNel).map: (obsId, obsParams) =>
+            ObsParams.fromParamsRows(paramsRowsNel).map: (obsId, obsParams) =>
               obsId -> toObsGeneratorParams(obsParams, m.get(obsId))
 
       private def selectManyParams(
@@ -222,53 +208,37 @@ object GeneratorParamsService {
             executeSelect(Statements.selectManyParams(oids))
           }
 
+      private def selectAllParams(
+        pid:       Program.Id,
+        selection: ObservationSelection
+      ): F[List[ParamsRow]] =
+        executeSelect(Statements.selectAllParams(user, pid, /*minStatus,*/ selection))
+
+      private def selectAllParamsUnexecuted(
+        pid:       Program.Id,
+        selection: ObservationSelection
+      ): F[List[ParamsRow]] =
+        executeSelect(Statements.selectAllParamsUnexecuted(user, pid, selection))
+
       private def executeSelect(af: AppliedFragment): F[List[ParamsRow]] =
         session
           .prepareR(af.fragment.query(Statements.params))
           .use(_.stream(af.argument, chunkSize = 64).compile.to(List))
           .flatMap(addCustomSedTimestamps)
 
-      private def selectAllParams(
-        pid:       Program.Id,
-        selection: ObservationSelection
-      ): F[List[RowForCalibration]] =
-        executeSelectFC(Statements.selectAllParams(user, pid, /*minStatus,*/ selection))
-
-      private def selectAllParamsUnexecuted(
-        pid:       Program.Id,
-        selection: ObservationSelection
-      ): F[List[RowForCalibration]] =
-        executeSelectFC(Statements.selectAllParamsUnexecuted(user, pid, selection))
-
-      private def executeSelectFC(af: AppliedFragment): F[List[RowForCalibration]] =
-        session
-          .prepareR(af.fragment.query(Statements.paramsForCalibrations))
-          .use(_.stream(af.argument, chunkSize = 64).compile.to(List))
-          .flatMap(addCustomSedTimestampsFC)
-
       // If the user uploads a new custom sed in place of an existing one, that needs to
       // invalidate the cache. So, we include the timestamp of the attachment (if any) in
       // the hash.
-      private def withSedTimestamps[A](
-        params: List[A],
-        getSourceProfile: A => Option[SourceProfile],
-        updateTimestamp: (A, Option[Timestamp]) => A
-      ): F[List[A]] =
-        NonEmptyList.fromList(params.map(p => getSourceProfile(p).flatMap(customSedIdOptional.getOption)).flattenOption)
+      private def addCustomSedTimestamps(params: List[ParamsRow]): F[List[ParamsRow]] =
+        NonEmptyList.fromList(params.map(p => p.sourceProfile.flatMap(customSedIdOptional.getOption)).flattenOption)
           .fold(params.pure)(attIds =>
             Services.asSuperUser(attachmentMetadataService.getUpdatedAt(attIds)).map(map =>
               params.map(p =>
-                val aid = getSourceProfile(p).flatMap(customSedIdOptional.getOption)
-                aid.fold(p)(id => updateTimestamp(p, map.get(id)))
+                val aid = p.sourceProfile.flatMap(customSedIdOptional.getOption)
+                aid.fold(p)(id => p.copy(customSedTimestamp = map.get(id)))
               )
             )
           )
-
-      private def addCustomSedTimestampsFC(params: List[RowForCalibration]): F[List[RowForCalibration]] =
-        withSedTimestamps(params, _.sourceProfile, (r, ts) => r.copy(customSedTimestamp = ts))
-
-      private def addCustomSedTimestamps(params: List[ParamsRow]): F[List[ParamsRow]] =
-        withSedTimestamps(params, _.sourceProfile, (r, ts) => r.copy(customSedTimestamp = ts))
 
       private def observingMode(
         params: NonEmptyList[TargetParams],
@@ -413,26 +383,6 @@ object GeneratorParamsService {
 
     }
 
-  case class RowForCalibration(
-    observationId:       Observation.Id,
-    calibrationRole:     Option[CalibrationRole],
-    constraints:         ConstraintSet,
-    exposureTimeMode:    Option[ExposureTimeMode],
-    observingMode:       Option[ObservingModeType],
-    scienceBand:         Option[ScienceBand],
-    blindTargetId:       Option[Target.Id],
-    blindRadialVelocity: Option[RadialVelocity],
-    blindSourceProfile:  Option[SourceProfile],
-    targetId:            Option[Target.Id],
-    radialVelocity:      Option[RadialVelocity],
-    sourceProfile:       Option[SourceProfile],
-    declaredComplete:    Boolean,
-    acqResetTime:        Option[Timestamp],
-    workflowState:       Option[ObservationWorkflowState],
-    hasExecutionEvents:  Boolean,
-    customSedTimestamp:  Option[Timestamp] = none
-  )
-
   case class ParamsRow(
     observationId:       Observation.Id,
     calibrationRole:     Option[CalibrationRole],
@@ -472,24 +422,7 @@ object GeneratorParamsService {
   )
 
   object ObsParams {
-    def fromForCalibsRow(ps: NonEmptyList[RowForCalibration]): Map[Observation.Id, ObsParams] =
-      ps.groupBy(_.observationId).view.mapValues: oParams =>
-        ObsParams(
-          oParams.head.observationId,
-          oParams.head.calibrationRole,
-          oParams.head.constraints,
-          oParams.head.exposureTimeMode,
-          oParams.head.observingMode,
-          oParams.head.scienceBand,
-          oParams.head.blindTargetId.map(btid => TargetParams(btid.some, oParams.head.blindRadialVelocity, oParams.head.blindSourceProfile, None)),
-          oParams.map: r =>
-            TargetParams(r.targetId, r.radialVelocity, r.sourceProfile, r.customSedTimestamp),
-          oParams.head.declaredComplete,
-          oParams.head.acqResetTime
-        )
-      .toMap
-
-    def fromParamsRow(ps: NonEmptyList[ParamsRow]): Map[Observation.Id, ObsParams] =
+    def fromParamsRows(ps: NonEmptyList[ParamsRow]): Map[Observation.Id, ObsParams] =
       ps.groupBy(_.observationId).view.mapValues: oParams =>
         ObsParams(
           oParams.head.observationId,
@@ -517,26 +450,6 @@ object GeneratorParamsService {
       jsonb.emap { sp =>
         sp.as[SourceProfile].leftMap(f => s"Could not decode SourceProfile: ${f.message}")
       }
-
-    val paramsForCalibrations: Decoder[RowForCalibration] =
-      (observation_id                   *:
-       calibration_role.opt             *:
-       constraint_set                   *:
-       exposure_time_mode.opt           *:
-       observing_mode_type.opt          *:
-       science_band.opt                 *:
-       target_id.opt                    *:
-       radial_velocity.opt              *:
-       source_profile.opt               *:
-       target_id.opt                    *:
-       radial_velocity.opt              *:
-       source_profile.opt               *:
-       bool                             *:
-       core_timestamp.opt               *:
-       observation_workflow_state.opt   *:
-       bool
-      ).map( (oid, role, cs, etm, om, sb, btid, brv, bsp, tid, rv, sp, dc, art, wfs, hee) =>
-        RowForCalibration(oid, role, cs, etm, om, sb, btid, brv, bsp, tid, rv, sp, dc, art, wfs, hee, None))
 
     val params: Decoder[ParamsRow] =
       (observation_id          *:
@@ -591,7 +504,8 @@ object GeneratorParamsService {
       which:     NonEmptyList[Observation.Id]
     ): AppliedFragment =
       sql"""
-        SELECT #${ParamColumns("gp")}
+        SELECT
+          #${ParamColumns("gp")}
         FROM v_generator_params gp
         WHERE
       """(Void) |+|
@@ -605,7 +519,8 @@ object GeneratorParamsService {
       which: NonEmptyList[Observation.Id]
     ): AppliedFragment =
       sql"""
-        SELECT #${ParamColumns("gp")}
+        SELECT
+          #${ParamColumns("gp")}
         FROM v_generator_params gp
         WHERE
       """(Void) |+|
@@ -626,21 +541,17 @@ object GeneratorParamsService {
 
       sql"""
         SELECT
-          #${ParamColumns("gp")},
-          CASE WHEN ob.c_workflow_user_state = 'inactive' THEN 'inactive'::e_workflow_state
-               WHEN oc.c_workflow_state IS NOT NULL AND oc.c_workflow_state <> 'undefined' THEN oc.c_workflow_state
-               ELSE NULL
-          END as c_workflow_state,
-          CASE WHEN COUNT(ee.c_observation_id) OVER (PARTITION BY gp.c_observation_id) > 0 THEN true ELSE false END as has_execution_events
+          #${ParamColumns("gp")}
         FROM v_generator_params gp
         INNER JOIN t_observation ob ON gp.c_observation_id = ob.c_observation_id
-        LEFT JOIN t_obscalc oc ON ob.c_observation_id = oc.c_observation_id
-        LEFT JOIN t_execution_event ee ON ob.c_observation_id = ee.c_observation_id
         WHERE
       """(Void) |+|
-        sql"""gp.c_program_id = $program_id""".apply(programId) |+|
-        void""" AND ob.c_existence = 'present' """              |+|
-        selector                                                |+|
+        sql"""gp.c_program_id = $program_id""".apply(programId)              |+|
+        void""" AND ob.c_existence = 'present' """                           |+|
+        void""" AND ob.c_workflow_user_state is distinct from 'inactive' """ |+|
+        // sql""" AND ob.c_status >= $obs_status """.apply(minStatus) |+|
+        // void""" AND ob.c_active_status = 'active' """              |+|
+        selector                                                             |+|
         existsUserReadAccess(user, programId).fold(AppliedFragment.empty) { af => void""" AND """ |+| af }
     }
 
@@ -656,22 +567,17 @@ object GeneratorParamsService {
 
       sql"""
         SELECT
-          #${ParamColumns("gp")},
-          CASE WHEN ob.c_workflow_user_state = 'inactive' THEN 'inactive'::e_workflow_state
-               WHEN oc.c_workflow_state IS NOT NULL AND oc.c_workflow_state <> 'undefined' THEN oc.c_workflow_state
-               ELSE NULL
-          END as c_workflow_state,
-          CASE WHEN COUNT(ee.c_observation_id) OVER (PARTITION BY gp.c_observation_id) > 0 THEN true ELSE false END as has_execution_events
+          #${ParamColumns("gp")}
         FROM v_generator_params gp
         INNER JOIN t_observation ob ON gp.c_observation_id = ob.c_observation_id
-        LEFT JOIN t_obscalc oc ON ob.c_observation_id = oc.c_observation_id
         LEFT JOIN t_execution_event ee ON ob.c_observation_id = ee.c_observation_id
         WHERE
       """(Void) |+|
-        sql"""gp.c_program_id = $program_id""".apply(programId) |+|
-        void""" AND ob.c_existence = 'present' """              |+|
-        void""" AND ee.c_observation_id IS NULL """             |+|
-        selector                                                |+|
+        sql"""gp.c_program_id = $program_id""".apply(programId)              |+|
+        void""" AND ob.c_existence = 'present' """                           |+|
+        void""" AND ob.c_workflow_user_state is distinct from 'inactive' """ |+|
+        void""" AND ee.c_observation_id IS NULL """                          |+|
+        selector                                                             |+|
         existsUserReadAccess(user, programId).fold(AppliedFragment.empty) { af => void""" AND """ |+| af }
     }
   }
