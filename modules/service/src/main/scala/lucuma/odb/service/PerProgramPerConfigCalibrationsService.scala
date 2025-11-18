@@ -217,8 +217,9 @@ object PerProgramPerConfigCalibrationsService:
         calibrations:   List[ObsExtract[CalibrationConfigSubset]]
       )(using Transaction[F], ServiceAccess): F[List[Observation.Id]] = {
         val unnecessaryOids = calibrations.collect {
-          case ObsExtract(oid, _, _, Some(role), config, _, _)
-            if !isCalibrationNeeded(scienceConfigs, config, role) => oid
+          case ObsExtract(oid, _, _, Some(role), config, state, _)
+            if !isCalibrationNeeded(scienceConfigs, config, role) &&
+               !state.exists(s => s === ObservationWorkflowState.Ongoing || s === ObservationWorkflowState.Completed) => oid
         }
 
         NonEmptyList.fromList(unnecessaryOids) match {
@@ -305,9 +306,9 @@ object PerProgramPerConfigCalibrationsService:
         val gmosSci = allSci.collect(ObsExtract.perProgramFilter)
         val gmosCalibs = toConfigForCalibration(allCalibs).collect(ObsExtract.perProgramCalibrationFilter)
 
-        // Filter to only 'ready' OR executed observations before extracting unique configs
+        // only 'defined' or 'ready' observations
         val activeGmosSci = gmosSci.filter: obs =>
-          obs.started || obs.state.exists(_ === ObservationWorkflowState.Ready)
+          obs.state.exists(s => s === ObservationWorkflowState.Defined || s === ObservationWorkflowState.Ready)
 
         // unique GMOS configurations
         val uniqueSci = uniqueConfiguration(activeGmosSci)
