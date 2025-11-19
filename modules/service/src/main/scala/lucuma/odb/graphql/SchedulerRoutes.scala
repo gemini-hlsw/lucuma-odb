@@ -10,6 +10,7 @@ import cats.effect.std.SecureRandom
 import cats.effect.std.UUIDGen
 import cats.implicits.*
 import fs2.compression.Compression
+import lucuma.catalog.clients.GaiaClient
 import lucuma.core.model.Access
 import lucuma.core.model.AccessControlException
 import lucuma.core.model.Observation
@@ -22,6 +23,7 @@ import lucuma.core.util.Uid
 import lucuma.itc.client.ItcClient
 import lucuma.odb.Config
 import lucuma.odb.graphql.enums.Enums
+import lucuma.odb.service.S3FileService
 import lucuma.odb.service.Services
 import lucuma.odb.service.Services.Syntax.*
 import lucuma.sso.client.SsoClient
@@ -44,10 +46,20 @@ object SchedulerRoutes:
     emailConfig: Config.Email,
     httpClient:  Client[F],
     itcClient:   ItcClient[F],
-    gaiaClient:  lucuma.catalog.clients.GaiaClient[F]
+    gaiaClient:  GaiaClient[F]
   ): HttpRoutes[F] =
     apply(
-      [A] => (u: User) => (fa: Services[F] => F[A]) => pool.map(Services.forUser(u, enums, None, emailConfig, httpClient, itcClient, gaiaClient, throw new RuntimeException("s3FileService not available in SchedulerRoutes"))).use(fa),
+      [A] => (u: User) => (fa: Services[F] => F[A]) => pool.map(
+        Services.forUser(
+          u,
+          enums,
+          None,
+          emailConfig,
+          httpClient,
+          itcClient,
+          gaiaClient,
+          S3FileService.noop[F]
+        )).use(fa),
       ssoClient
     )
 
