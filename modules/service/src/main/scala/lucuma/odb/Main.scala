@@ -306,6 +306,10 @@ object FMain extends MainParams {
     }
   }
 
+  def runStartupDiagnostics[F[_]: Async : Console : Network: Logger](config: Config.Database, fatal: Boolean): F[Unit] =
+    singleSession(config).map(StartupDiagnostics.apply(_)).use: sd =>
+      sd.runAllDiagnostics(fatal)
+
   implicit def kleisliLogger[F[_]: Logger, A]: Logger[Kleisli[F, A, *]] =
     Logger[F].mapK(Kleisli.liftK)
 
@@ -326,6 +330,7 @@ object FMain extends MainParams {
       _  <- Resource.eval(banner[F](c))
       _  <- Applicative[Resource[F, *]].whenA(reset.isRequested)(Resource.eval(resetDatabase[F](c.database)))
       _  <- Applicative[Resource[F, *]].unlessA(skipMigration.isRequested)(Resource.eval(migrateDatabase[F](c.database)))
+      _  <- Resource.eval(runStartupDiagnostics(c.database, true))
       ep <- LucumaEntryPoint.entryPointResource(ServiceName, c)
       t  <- Resource.eval(mkTrace(ep))
       ap <- { given Trace[F] = t; routesResource(c).map(_.map(_.orNotFound)) }

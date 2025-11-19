@@ -55,7 +55,6 @@ import lucuma.core.util.Uid
 import lucuma.odb.data.AtomExecutionState
 import lucuma.odb.data.BlindOffsetType
 import lucuma.odb.data.DatabaseOperation
-import lucuma.odb.data.EditType
 import lucuma.odb.data.EmailId
 import lucuma.odb.data.ExecutionEventType
 import lucuma.odb.data.Existence
@@ -259,9 +258,6 @@ trait Codecs {
       Declination.fromAngle.reverseGet
     )
 
-  val edit_type: Codec[EditType] =
-    enumerated(Type("e_edit_type"))
-
   val educational_status: Codec[EducationalStatus] =
     enumerated(Type("e_educational_status"))
 
@@ -309,9 +305,6 @@ trait Codecs {
 
   val focal_plane: Codec[FocalPlane] =
     enumerated[FocalPlane](Type.varchar)
-
-  val gcal_arc: Codec[GcalArc] =
-    enumerated[GcalArc](Type.varchar)
 
   val gcal_baseline: Codec[GcalBaselineType] =
     enumerated(Type("e_gcal_baseline_type"))
