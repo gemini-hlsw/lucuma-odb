@@ -83,6 +83,7 @@ import lucuma.odb.json.stepconfig.given
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.EmailService
+import lucuma.odb.service.ObservationWorkflowService
 import lucuma.odb.service.Services
 import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.syntax.instrument.*
@@ -2510,12 +2511,14 @@ trait DatabaseOperations { this: OdbSuite =>
     """.command)(state, oid)).void
 
   // write workflow state directly without going through obscalc
-  def setWorkflowState(oid: Observation.Id, state: ObservationWorkflowState): IO[Unit] =
+  def setWorkflowUserState(oid: Observation.Id, state: ObservationWorkflowService.UserState): IO[Unit] =
+    import skunk.codec.text.text
+    val stateStr = (state: ObservationWorkflowState).tag
     session.use(_.execute(sql"""
       UPDATE t_observation
-      SET c_workflow_user_state = ${observation_workflow_user_state}
-      WHERE c_observation_id = ${observation_id}
-    """.command)(state, oid)).void
+      SET c_workflow_user_state = $text::e_workflow_user_state
+      WHERE c_observation_id = $observation_id
+    """.command)(stateStr, oid)).void
 
   private def itcQuery(oids: Observation.Id*) =
     s"""

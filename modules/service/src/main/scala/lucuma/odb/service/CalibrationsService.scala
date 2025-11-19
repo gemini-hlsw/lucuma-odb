@@ -9,6 +9,7 @@ import cats.effect.Concurrent
 import cats.syntax.all.*
 import grackle.Result
 import lucuma.core.enums.CalibrationRole
+import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.Site
 import lucuma.core.math.Coordinates
@@ -94,7 +95,7 @@ object CalibrationsService extends CalibrationObservations {
     }
 
   def instantiate[F[_]: {Concurrent, Services, LoggerFactory as LF}]: CalibrationsService[F] =
-    new CalibrationsService[F] {
+    new CalibrationsService[F] with WorkflowStateQueries[F] {
       given Logger[F] = LF.getLoggerFromName("calibrations-service")
 
       private def collectValid(
@@ -116,14 +117,6 @@ object CalibrationsService extends CalibrationObservations {
           paramsMap.toList.collect(collectValid(selection === ObservationSelection.Science))
         }
 
-      private def allUnexecutedObservations(
-        pid:       Program.Id,
-        selection: ObservationSelection
-      )(using Transaction[F]): F[List[ObsExtract[ObservingMode]]] =
-        services.generatorParamsService.selectAllUnexecuted(pid, selection = selection).map { paramsMap =>
-          paramsMap.toList.collect(collectValid(selection === ObservationSelection.Science))
-        }
-
       override def calibrationTargets(roles: List[CalibrationRole], referenceInstant: Instant)
         : F[List[(Target.Id, String, CalibrationRole, Coordinates)]] =
           session.execute(Statements.selectCalibrationTargets(roles))(roles)
@@ -140,9 +133,12 @@ object CalibrationsService extends CalibrationObservations {
           // Get all science and calibration observations (regardless of workflow state)
           allSci           <- allObservations(pid, ObservationSelection.Science)
           _                <- (info"Program ID: $pid has ${allSci.length} science observations: ${allSci.map(_.id)}").whenA(allSci.nonEmpty)
-          // Get all calibration observations (excluding those with execution events, but ignoring workflow state)
-          allCalibs        <- allUnexecutedObservations(pid, ObservationSelection.Calibration)
-          _                <- (info"Program ID: $pid has ${allCalibs.length} calibration observations: ${allCalibs.map(_.id)}").whenA(allCalibs.nonEmpty)
+          // Get all calibration observations
+          allCalibsRaw     <- allObservations(pid, ObservationSelection.Calibration)
+          // Filter out calibrations that are Ongoing or Completed
+          allCalibs        <- filterWorkflowStateNotIn(allCalibsRaw, _.id,
+                                List(ObservationWorkflowState.Ongoing, ObservationWorkflowState.Completed))
+          _                <- (info"Program ID: $pid has ${allCalibs.length} unexecuted calibration observations: ${allCalibs.map(_.id)}").whenA(allCalibs.nonEmpty)
           perObs           = allSci.collect(ObsExtract.perObsFilter).map(_.map(_.toConfigSubset))
           perProgram       = allSci.collect(ObsExtract.perProgramFilter)
           _                <- (debug"Program $pid has ${perObs.length} science observations with per obs calibrations: ${perObs.map(_.id)}").whenA(perObs.nonEmpty)
@@ -205,6 +201,7 @@ object CalibrationsService extends CalibrationObservations {
 
       override def isCalibration(obsId: Observation.Id): F[Boolean] =
         session.execute(Statements.isCalibration)(obsId).map(_.headOption.getOrElse(false))
+
     }
 
   object Statements {

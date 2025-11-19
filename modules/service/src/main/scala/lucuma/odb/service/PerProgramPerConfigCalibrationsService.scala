@@ -60,7 +60,7 @@ object PerProgramPerConfigCalibrationsService:
   val CalibrationsGroupName: NonEmptyString = "Calibrations".refined
 
   def instantiate[F[_]: {MonadCancelThrow, Services, LoggerFactory as LF}]: PerProgramPerConfigCalibrationsService[F] =
-    new PerProgramPerConfigCalibrationsService[F] with CalibrationObservations:
+    new PerProgramPerConfigCalibrationsService[F] with CalibrationObservations with WorkflowStateQueries[F]:
       given Logger[F] = LF.getLoggerFromName("per-program-calibrations")
 
       private def calObsProps(
@@ -212,16 +212,6 @@ object PerProgramPerConfigCalibrationsService:
         }
       }
 
-      // Helper to resolve workflow state from separate table queries
-      private def resolveWorkflowState(
-        userState: Option[ObservationWorkflowState],
-        calculatedState: Option[ObservationWorkflowState]
-      ): Option[ObservationWorkflowState] =
-        userState match
-          case Some(ObservationWorkflowState.Inactive) => ObservationWorkflowState.Inactive.some
-          case _ =>
-            calculatedState.filter(_ =!= ObservationWorkflowState.Undefined)
-
       private def removeUnnecessaryCalibrations(
         scienceConfigs: List[CalibrationConfigSubset],
         calibrations:   List[ObsExtract[CalibrationConfigSubset]]
@@ -231,12 +221,10 @@ object PerProgramPerConfigCalibrationsService:
             if !isCalibrationNeeded(scienceConfigs, config, role) => oid
         }
 
-        candidates.filterA: oid =>
-          for
-            userState       <- Statements.selectUserWorkflowState(oid)
-            calculatedState <- Statements.selectObscalcWorkflowState(oid)
-            resolvedState   = resolveWorkflowState(userState, calculatedState)
-          yield !resolvedState.exists(s => s === ObservationWorkflowState.Ongoing || s === ObservationWorkflowState.Completed)
+        filterWorkflowStateNotIn(
+          candidates,
+          identity,
+          List(ObservationWorkflowState.Ongoing, ObservationWorkflowState.Completed))
         .flatMap: unnecessaryOids =>
           NonEmptyList.fromList(unnecessaryOids) match {
             case Some(oids) => observationService.deleteCalibrationObservations(oids).as(oids.toList)
@@ -324,13 +312,8 @@ object PerProgramPerConfigCalibrationsService:
 
         for
           // Filter for only 'defined' or 'ready' observations by checking workflow state
-          activeGmosSci  <- gmosSci.filterA: obs =>
-                              for
-                                userState       <- Statements.selectUserWorkflowState(obs.id)
-                                calculatedState <- Statements.selectObscalcWorkflowState(obs.id)
-                                resolvedState   = resolveWorkflowState(userState, calculatedState)
-                              yield resolvedState.exists(s => s === ObservationWorkflowState.Defined || s === ObservationWorkflowState.Ready)
-
+          activeGmosSci   <- filterWorkflowStateIn(gmosSci, _.id,
+                                List(ObservationWorkflowState.Defined, ObservationWorkflowState.Ready))
           // unique GMOS configurations
           uniqueSci       = uniqueConfiguration(activeGmosSci)
 
@@ -356,23 +339,3 @@ object PerProgramPerConfigCalibrationsService:
           // Delete the calibration group if empty
           _              <- deleteEmptyCalibrationGroup(pid)
         yield (addedOids, removedOids)
-
-      object Statements:
-
-        def selectUserWorkflowState(oid: Observation.Id): F[Option[ObservationWorkflowState]] =
-          session.option(
-            sql"""
-              SELECT c_workflow_user_state
-              FROM t_observation
-              WHERE c_observation_id = $observation_id
-            """.query(observation_workflow_user_state.opt)
-          )(oid).map(_.flatten)
-
-        def selectObscalcWorkflowState(oid: Observation.Id): F[Option[ObservationWorkflowState]] =
-          session.option(
-            sql"""
-              SELECT c_workflow_state
-              FROM t_obscalc
-              WHERE c_observation_id = $observation_id
-            """.query(observation_workflow_state.opt)
-          )(oid).map(_.flatten)

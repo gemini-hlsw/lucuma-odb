@@ -57,7 +57,7 @@ trait PerScienceObservationCalibrationsService[F[_]]:
 
 object PerScienceObservationCalibrationsService:
   def instantiate[F[_]: {Concurrent as F, Logger, Services as S}]: PerScienceObservationCalibrationsService[F] =
-    new PerScienceObservationCalibrationsService[F] with CalibrationObservations:
+    new PerScienceObservationCalibrationsService[F] with CalibrationObservations with WorkflowStateQueries[F]:
 
       val groupService  = S.groupService
       val observationService = S.observationService
@@ -221,16 +221,6 @@ object PerScienceObservationCalibrationsService:
           _             <- syncConfiguration(scienceOid, telluricId)
         yield telluricId
 
-      // Helper to resolve workflow state from separate table queries
-      private def resolveWorkflowState(
-        userState: Option[ObservationWorkflowState],
-        calculatedState: Option[ObservationWorkflowState]
-      ): Option[ObservationWorkflowState] =
-        userState match
-          case Some(ObservationWorkflowState.Inactive) => ObservationWorkflowState.Inactive.some
-          case _ =>
-            calculatedState.filter(_ =!= ObservationWorkflowState.Undefined)
-
       private def deleteTelluricObservationsFromGroups(
         groupIds: List[Group.Id]
       )(using Transaction[F], SuperUserAccess): F[List[Observation.Id]] =
@@ -238,8 +228,8 @@ object PerScienceObservationCalibrationsService:
           findTelluricObservation(gid).flatMap:
             case Some(telluricOid) =>
               for
-                userState       <- Statements.selectUserWorkflowState(telluricOid)
-                calculatedState <- Statements.selectObscalcWorkflowState(telluricOid)
+                userState       <- selectUserWorkflowState(telluricOid)
+                calculatedState <- selectObscalcWorkflowState(telluricOid)
                 resolvedState   = resolveWorkflowState(userState, calculatedState)
                 result          <- resolvedState match
                   // Don't delete calibrations for Ongoing or Completed
@@ -350,13 +340,8 @@ object PerScienceObservationCalibrationsService:
       )(using Transaction[F], SuperUserAccess): F[(List[Observation.Id], List[Observation.Id])] =
         for
           // only include observations that are Defined or Ready
-          activeScienceObs <- scienceObs.filterA: obs =>
-                                for
-                                  userState       <- Statements.selectUserWorkflowState(obs.id)
-                                  calculatedState <- Statements.selectObscalcWorkflowState(obs.id)
-                                  resolvedState   = resolveWorkflowState(userState, calculatedState)
-                                yield resolvedState.exists(s => s === ObservationWorkflowState.Defined || s === ObservationWorkflowState.Ready)
-
+          activeScienceObs <- filterWorkflowStateIn(scienceObs, _.id,
+                                List(ObservationWorkflowState.Defined, ObservationWorkflowState.Ready))
           currentObsIds     = activeScienceObs.map(_.id).toSet
           _                 <- info"Recalculating per science calibrations for $pid"
           _                 <- debug"Program $pid has ${currentObsIds.size} science configurations"
@@ -394,24 +379,6 @@ object PerScienceObservationCalibrationsService:
         yield (added.flatten, deleted)
 
       object Statements:
-
-        def selectUserWorkflowState(oid: Observation.Id): F[Option[ObservationWorkflowState]] =
-          S.session.option(
-            sql"""
-              SELECT c_workflow_user_state
-              FROM t_observation
-              WHERE c_observation_id = $observation_id
-            """.query(observation_workflow_user_state.opt)
-          )(oid).map(_.flatten)
-
-        def selectObscalcWorkflowState(oid: Observation.Id): F[Option[ObservationWorkflowState]] =
-          S.session.option(
-            sql"""
-              SELECT c_workflow_state
-              FROM t_obscalc
-              WHERE c_observation_id = $observation_id
-            """.query(observation_workflow_state.opt)
-          )(oid).map(_.flatten)
 
         val selectTelluricObservation: Query[(Group.Id, CalibrationRole), Observation.Id] =
           sql"""

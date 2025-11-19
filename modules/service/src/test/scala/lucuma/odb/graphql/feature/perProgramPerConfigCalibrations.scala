@@ -1002,31 +1002,35 @@ class perProgramPerConfigCalibrations
     ).void
 
   test("unnecessary calibrations are removed unless Ongoing or Completed"):
+    val setupEvent =
+      ExecutionQuerySetupOperations
+        .Setup(offset = 0, atomCount = 1, stepCount = 1, datasetCount = 1)
+
     for {
-      pid  <- createProgramAs(pi)
-      tid1 <- createTargetAs(pi, pid, "One")
-      oid1 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid1)
-      _    <- prepareObservation(pi, pid, oid1, tid1)
+      pid       <- createProgramAs(pi)
+      tid1      <- createTargetAs(pi, pid, "One")
+      oid1      <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid1)
+      _         <- prepareObservation(pi, pid, oid1, tid1)
       // should produce 2 calibrations
-      _    <- recalculateCalibrations(pid, when)
-      ob1   <- queryObservations(pid)
+      _         <- recalculateCalibrations(pid, when)
+      ob1       <- queryObservations(pid)
       calibIds1 = ob1.callibrationIds
       // Add execution events to one of the calibrations (making it Ongoing)
-      setup = ExecutionQuerySetupOperations.Setup(offset = 0, atomCount = 1, stepCount = 1, datasetCount = 1)
-      _     <- recordVisit(ObservingModeType.GmosNorthLongSlit, setup, service, calibIds1.head)
-      _     <- runObscalcUpdate(pid, calibIds1.head)
+      visit     <- recordVisit(ObservingModeType.GmosNorthLongSlit, setupEvent, service, calibIds1.head)
+      _         <- runObscalcUpdate(pid, calibIds1.head)
+      // I expected the workflow to automatically switch to ongoing but it doesn't
+      _         <- setCalculatedWorkflowState(calibIds1.head, ObservationWorkflowState.Ongoing)
       // Change the observation configuration
-      _     <- updateCentralWavelength(oid1, Wavelength.fromIntNanometers(600).get)
+      _         <- updateCentralWavelength(oid1, Wavelength.fromIntNanometers(600).get)
       // Run calibrations again - should keep the Ongoing calibration and add new ones
-      _     <- recalculateCalibrations(pid, when)
-      ob2   <- queryObservations(pid)
+      _         <- recalculateCalibrations(pid, when)
+      ob2       <- queryObservations(pid)
       calibIds2 = ob2.callibrationIds
-      gr1  <- groupElementsAs(pi, pid, None)
+      gr1       <- groupElementsAs(pi, pid, None)
       // Verify that the calibration still has execution events
-      evs  <- withServices(service) { services =>
-                  services.executionEventService.selectSequenceEvents(calibIds1.head).compile.toList
-                }
-      _     <- assertIOBoolean(IO(evs.nonEmpty))
+      evs       <- withServices(service):
+                  _.executionEventService.selectSequenceEvents(calibIds1.head).compile.toList
+      _         <- assertIOBoolean(IO(evs.nonEmpty))
     } yield {
       val oids = gr1.observationIds
       val count1 = ob1.countCalibrations
