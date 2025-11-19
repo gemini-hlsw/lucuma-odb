@@ -10,7 +10,6 @@ import eu.timepit.refined.types.numeric.NonNegShort
 import eu.timepit.refined.types.string.NonEmptyString
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.Instrument
-import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.TargetDisposition
 import lucuma.core.math.Declination
@@ -224,23 +223,14 @@ object PerScienceObservationCalibrationsService:
       private def deleteTelluricObservationsFromGroups(
         groupIds: List[Group.Id]
       )(using Transaction[F], SuperUserAccess): F[List[Observation.Id]] =
-        groupIds.flatTraverse: gid =>
-          findTelluricObservation(gid).flatMap:
-            case Some(telluricOid) =>
-              for
-                userState       <- selectUserWorkflowState(telluricOid)
-                calculatedState <- selectObscalcWorkflowState(telluricOid)
-                resolvedState   = resolveWorkflowState(userState, calculatedState)
-                result          <- resolvedState match
-                  // Don't delete calibrations for Ongoing or Completed
-                  case Some(state) if state === ObservationWorkflowState.Ongoing || state === ObservationWorkflowState.Completed =>
-                    List.empty.pure[F]
-                  case _ =>
-                    observationService.deleteCalibrationObservations(NonEmptyList.one(telluricOid))
-                      .as(List(telluricOid))
-              yield result
-            case None =>
-              List.empty.pure[F]
+        for
+          allTelluricOids <- groupIds.flatTraverse(gid => findTelluricObservation(gid).map(_.toList))
+          // Filter ongoing and completed
+          toDelete        <- excludeOngoingAndCompleted(allTelluricOids, identity)
+          deleted         <- NonEmptyList.fromList(toDelete) match
+                               case Some(nel) => observationService.deleteCalibrationObservations(nel).as(toDelete)
+                               case None      => List.empty.pure[F]
+        yield deleted
 
       private def readTelluricGroup(
         pid:  Program.Id,
@@ -340,8 +330,7 @@ object PerScienceObservationCalibrationsService:
       )(using Transaction[F], SuperUserAccess): F[(List[Observation.Id], List[Observation.Id])] =
         for
           // only include observations that are Defined or Ready
-          activeScienceObs <- filterWorkflowStateIn(scienceObs, _.id,
-                                List(ObservationWorkflowState.Defined, ObservationWorkflowState.Ready))
+          activeScienceObs <- onlyDefinedAndReady(scienceObs, _.id)
           currentObsIds     = activeScienceObs.map(_.id).toSet
           _                 <- info"Recalculating per science calibrations for $pid"
           _                 <- debug"Program $pid has ${currentObsIds.size} science configurations"

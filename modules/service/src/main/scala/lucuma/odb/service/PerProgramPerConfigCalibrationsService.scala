@@ -11,7 +11,6 @@ import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.string.NonEmptyString
 import lucuma.core.enums.CalibrationRole
-import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.Site
 import lucuma.core.math.Coordinates
@@ -221,10 +220,7 @@ object PerProgramPerConfigCalibrationsService:
             if !isCalibrationNeeded(scienceConfigs, config, role) => oid
         }
 
-        filterWorkflowStateNotIn(
-          candidates,
-          identity,
-          List(ObservationWorkflowState.Ongoing, ObservationWorkflowState.Completed))
+        excludeOngoingAndCompleted(candidates, identity)
         .flatMap: unnecessaryOids =>
           NonEmptyList.fromList(unnecessaryOids) match {
             case Some(oids) => observationService.deleteCalibrationObservations(oids).as(oids.toList)
@@ -310,22 +306,17 @@ object PerProgramPerConfigCalibrationsService:
         val gmosSci = allSci.collect(ObsExtract.perProgramFilter)
         val gmosCalibs = toConfigForCalibration(allCalibs).collect(ObsExtract.perProgramCalibrationFilter)
 
-        for
+        for {
           // Filter for only 'defined' or 'ready' observations by checking workflow state
-          activeGmosSci   <- filterWorkflowStateIn(gmosSci, _.id,
-                                List(ObservationWorkflowState.Defined, ObservationWorkflowState.Ready))
+          activeGmosSci   <- onlyDefinedAndReady(gmosSci, _.id)
           // unique GMOS configurations
           uniqueSci       = uniqueConfiguration(activeGmosSci)
-
           // Extract props from all science observations
           props           = calObsProps(toConfigForCalibration(allSci))
-
           // Create ideal targets for each site
           gnTgt           = CalibrationIdealTargets(Site.GN, when, calibTargets)
           gsTgt           = CalibrationIdealTargets(Site.GS, when, calibTargets)
-
           configsPerRole  = calculateConfigurationsPerRole(uniqueSci, gmosCalibs)
-
           _              <- info"===== Recalculating shared calibrations for program ID: $pid, instant $when ====="
           _              <- info"Program $pid has ${uniqueSci.length} science configurations"
           // Remove calibrations that are not needed, basically when a config is removed
@@ -338,4 +329,4 @@ object PerProgramPerConfigCalibrationsService:
           _              <- updatePropsAt(calibUpdates)
           // Delete the calibration group if empty
           _              <- deleteEmptyCalibrationGroup(pid)
-        yield (addedOids, removedOids)
+        } yield (addedOids, removedOids)

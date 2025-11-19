@@ -9,7 +9,6 @@ import cats.effect.Concurrent
 import cats.syntax.all.*
 import grackle.Result
 import lucuma.core.enums.CalibrationRole
-import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.Site
 import lucuma.core.math.Coordinates
@@ -135,13 +134,12 @@ object CalibrationsService extends CalibrationObservations {
           _                <- (info"Program ID: $pid has ${allSci.length} science observations: ${allSci.map(_.id)}").whenA(allSci.nonEmpty)
           // Get all calibration observations
           allCalibsRaw     <- allObservations(pid, ObservationSelection.Calibration)
-          // Filter out calibrations that are Ongoing or Completed
-          allCalibs        <- filterWorkflowStateNotIn(allCalibsRaw, _.id,
-                                List(ObservationWorkflowState.Ongoing, ObservationWorkflowState.Completed))
+          // Filter out calibrations that are ongoing or completed
+          allCalibs        <- excludeOngoingAndCompleted(allCalibsRaw, _.id)
           _                <- (info"Program ID: $pid has ${allCalibs.length} unexecuted calibration observations: ${allCalibs.map(_.id)}").whenA(allCalibs.nonEmpty)
           perObs           = allSci.collect(ObsExtract.perObsFilter).map(_.map(_.toConfigSubset))
           perProgram       = allSci.collect(ObsExtract.perProgramFilter)
-          _                <- (debug"Program $pid has ${perObs.length} science observations with per obs calibrations: ${perObs.map(_.id)}").whenA(perObs.nonEmpty)
+          _                <- (info"Program $pid has ${perObs.length} science observations with per obs calibrations: ${perObs.map(_.id)}").whenA(perObs.nonEmpty)
           // Handle per-science-observation calibs
           (f2Added, f2Removed)     <- perObsService.generateCalibrations(pid, perObs)
           _                <- (info"Program ID: $pid has ${perProgram.length} science observations for per program calibrations: ${perProgram.map(_.id)}").whenA(perProgram.nonEmpty)

@@ -387,45 +387,29 @@ class perProgramPerConfigCalibrations
       assertEquals(oids.size, 4)
   }
 
-  test("specphoto cloud extinction") {
-    for {
-      pid  <- createProgramAs(pi)
-      tid1 <- createTargetAs(pi, pid, "One")
-      oid1 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid1)
-      _    <- prepareObservation(pi, pid, oid1, tid1)
-      _    <- recalculateCalibrations(pid, when)
-      gr1  <- groupElementsAs(pi, pid, None)
-      ob   <- queryObservations(pid)
-    } yield {
-      val oids = gr1.observationIds
-      val cgid = gr1.calibrationGroupId
-      val cCount = ob.countCalibrationsWithCE(CloudExtinction.Preset.ThreePointZero)
-      // calibs belong to the calib group
-      val obsGids = ob.groupIds
-      assert(obsGids.forall(g => cgid.exists(_ == g)))
-      assertEquals(cCount, 1)
-      assertEquals(oids.size, 1)
-    }
-  }
-
-  test("twilight cloud extinction") {
-    for {
-      pid  <- createProgramAs(pi)
-      tid1 <- createTargetAs(pi, pid, "One")
-      oid1 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid1)
-      _    <- prepareObservation(pi, pid, oid1, tid1)
-      _    <- recalculateCalibrations(pid, when)
-      gr1  <- groupElementsAs(pi, pid, None)
-      ob   <- queryObservations(pid)
-    } yield {
-      val oids = gr1.observationIds
-      val cgid = gr1.calibrationGroupId
-      val cCount = ob.countCalibrationsWithCE(CloudExtinction.Preset.PointThree)
-      // calibs belong to the calib group
-      val obsGids = ob.groupIds
-      assert(obsGids.forall(g => cgid.exists(_ == g)))
-      assertEquals(cCount, 1)
-      assertEquals(oids.size, 1)
+  test("calibration cloud extinction for specphoto and twilight") {
+    List(
+      ("specphoto", CloudExtinction.Preset.ThreePointZero),
+      ("twilight", CloudExtinction.Preset.PointThree)
+    ).traverse_ { case (role, cloudExtinction) =>
+      for {
+        pid  <- createProgramAs(pi)
+        tid1 <- createTargetAs(pi, pid, "One")
+        oid1 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid1)
+        _    <- prepareObservation(pi, pid, oid1, tid1)
+        _    <- recalculateCalibrations(pid, when)
+        gr1  <- groupElementsAs(pi, pid, None)
+        ob   <- queryObservations(pid)
+      } yield {
+        val oids = gr1.observationIds
+        val cgid = gr1.calibrationGroupId
+        val cCount = ob.countCalibrationsWithCE(cloudExtinction)
+        // calibs belong to the calib group
+        val obsGids = ob.groupIds
+        assert(obsGids.forall(g => cgid.exists(_ == g)))
+        assertEquals(cCount, 1)
+        assertEquals(oids.size, 1)
+      }
     }
   }
 
@@ -1530,7 +1514,7 @@ class perProgramPerConfigCalibrations
       assert(cgid.isEmpty)
     }
 
-  test("Generate calibrations for active observation when mixed with inactive"):
+  test("Generate calibrations for active mixed with inactive"):
     for {
       pid  <- createProgramAs(pi)
       tid1 <- createTargetAs(pi, pid, "One")
@@ -1550,115 +1534,72 @@ class perProgramPerConfigCalibrations
       assert(cgid.isDefined)
     }
 
-  test("Remove calibrations when science observation becomes inactive"):
-    for {
-      pid  <- createProgramAs(pi)
-      tid1 <- createTargetAs(pi, pid, "One")
-      oid1 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid1)
-      _    <- prepareObservation(pi, pid, oid1, tid1)
-      _    <- recalculateCalibrations(pid, when)
-      ob1  <- queryObservations(pid)
-      gr1  <- groupElementsAs(pi, pid, None)
-      // make the observation inactive
-      _    <- setObservationWorkflowState(pi, oid1, ObservationWorkflowState.Inactive)
-      _    <- recalculateCalibrations(pid, when)
-      ob2  <- queryObservations(pid)
-      gr2  <- groupElementsAs(pi, pid, None)
-    } yield {
-      val cCountBefore = ob1.countCalibrations
-      val cgidBefore = gr1.calibrationGroupId
-      val cCountAfter = ob2.countCalibrations
-      val cgidAfter = gr2.calibrationGroupId
-      // Before: 2 calibrations and group exists
-      assertEquals(cCountBefore, 2)
-      assert(cgidBefore.isDefined)
-      // After: calibrations removed and group deleted
-      assertEquals(cCountAfter, 0)
-      assert(cgidAfter.isEmpty)
-    }
+  test("Remove calibrations when observation becomes inactive or deleted"):
+    List(
+      (oid: Observation.Id) => setObservationWorkflowState(pi, oid, ObservationWorkflowState.Inactive),
+      (oid: Observation.Id) => deleteObservation(pi, oid)
+    ).traverse_ : set =>
+      for {
+        pid  <- createProgramAs(pi)
+        tid1 <- createTargetAs(pi, pid, "One")
+        oid1 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid1)
+        _    <- prepareObservation(pi, pid, oid1, tid1)
+        _    <- recalculateCalibrations(pid, when)
+        ob1  <- queryObservations(pid)
+        gr1  <- groupElementsAs(pi, pid, None)
+        _    <- set(oid1)
+        _    <- recalculateCalibrations(pid, when)
+        ob2  <- queryObservations(pid)
+        gr2  <- groupElementsAs(pi, pid, None)
+      } yield {
+        val cCountBefore = ob1.countCalibrations
+        val cgidBefore = gr1.calibrationGroupId
+        val cCountAfter = ob2.countCalibrations
+        val cgidAfter = gr2.calibrationGroupId
+        // Before: 2 calibrations and group exists
+        assertEquals(cCountBefore, 2)
+        assert(cgidBefore.isDefined)
+        // After: calibrations removed and group deleted
+        assertEquals(cCountAfter, 0)
+        assert(cgidAfter.isEmpty)
+      }
 
-  test("Remove calibrations when science observation is deleted"):
-    for {
-      pid  <- createProgramAs(pi)
-      tid1 <- createTargetAs(pi, pid, "One")
-      oid1 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid1)
-      _    <- prepareObservation(pi, pid, oid1, tid1)
-      _    <- recalculateCalibrations(pid, when)
-      ob1  <- queryObservations(pid)
-      gr1  <- groupElementsAs(pi, pid, None)
-      // set existence to 'not present'
-      _    <- deleteObservation(pi, oid1)
-      _    <- recalculateCalibrations(pid, when)
-      ob2  <- queryObservations(pid)
-      gr2  <- groupElementsAs(pi, pid, None)
-    } yield {
-      val cCountBefore = ob1.countCalibrations
-      val cgidBefore = gr1.calibrationGroupId
-      val cCountAfter = ob2.countCalibrations
-      val cgidAfter = gr2.calibrationGroupId
-      assertEquals(cCountBefore, 2)
-      assert(cgidBefore.isDefined)
-      // calibrations removed and group deleted when science observation is deleted
-      assertEquals(cCountAfter, 0)
-      assert(cgidAfter.isEmpty)
-    }
+  test("Generate for defined and ready observations"):
+    List(ObservationWorkflowState.Defined, ObservationWorkflowState.Ready).traverse_ : state =>
+      for {
+        pid  <- createProgramAs(pi)
+        tid  <- createTargetAs(pi, pid, "Target-Defined")
+        oid  <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid)
+        _    <- updateTargetProperties(pi, tid, RightAscension.Zero.toAngle.toMicroarcseconds, Declination.Zero.toAngle.toMicroarcseconds, 0.0)
+        _    <- scienceRequirements(pi, oid, DefaultSnAt)
+        _    <- setCalculatedWorkflowState(oid, state)
+        _    <- runObscalcUpdate(pid, oid)
+        _    <- recalculateCalibrations(pid, when)
+        ob   <- queryObservations(pid)
+        gr   <- groupElementsAs(pi, pid, None)
+      } yield {
+        assertEquals(ob.countCalibrations, 2)
+        assert(gr.calibrationGroupId.isDefined)
+      }
 
-  test("Generate calibrations for Defined state observations"):
-    for {
-      pid  <- createProgramAs(pi)
-      tid  <- createTargetAs(pi, pid, "Target-Defined")
-      oid  <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid)
-      _    <- updateTargetProperties(pi, tid, RightAscension.Zero.toAngle.toMicroarcseconds, Declination.Zero.toAngle.toMicroarcseconds, 0.0)
-      _    <- scienceRequirements(pi, oid, DefaultSnAt)
-      _    <- runObscalcUpdate(pid, oid)
-      _    <- recalculateCalibrations(pid, when)
-      ob   <- queryObservations(pid)
-      gr   <- groupElementsAs(pi, pid, None)
-    } yield {
-      // Defined observations should generate calibrations
-      assertEquals(ob.countCalibrations, 2)
-      assert(gr.calibrationGroupId.isDefined)
-    }
-
-  test("Protect Ongoing calibrations from deletion"):
-    for {
-      pid  <- createProgramAs(pi)
-      tid  <- createTargetAs(pi, pid, "Target-Ongoing")
-      oid  <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid)
-      _    <- prepareObservation(pi, pid, oid, tid)
-      _    <- recalculateCalibrations(pid, when)
-      ob1  <- queryObservations(pid)
-      calibIds = ob1.callibrationIds
-      // One calibration is ongoing
-      _    <- setCalculatedWorkflowState(calibIds.head, ObservationWorkflowState.Ongoing)
-      // Change science configuration
-      _    <- updateCentralWavelength(oid, Wavelength.fromIntNanometers(600).get)
-      _    <- recalculateCalibrations(pid, when)
-      ob2  <- queryObservations(pid)
-    } yield {
-      // Ongoing calibration preserved + 2 new calibrations
-      assertEquals(ob2.countCalibrations, 3)
-      assert(ob2.callibrationIds.contains(calibIds.head))
-    }
-
-  test("Protect Completed calibrations from deletion"):
-    for {
-      pid  <- createProgramAs(pi)
-      tid  <- createTargetAs(pi, pid, "Target-Completed")
-      oid  <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid)
-      _    <- prepareObservation(pi, pid, oid, tid)
-      _    <- recalculateCalibrations(pid, when)
-      ob1  <- queryObservations(pid)
-      calibIds = ob1.callibrationIds
-      // Set one calibration as Completed
-      _    <- setCalculatedWorkflowState(calibIds.head, ObservationWorkflowState.Completed)
-      _    <- updateCentralWavelength(oid, Wavelength.fromIntNanometers(600).get)
-      _    <- recalculateCalibrations(pid, when)
-      ob2  <- queryObservations(pid)
-    } yield {
-      // Completed calibration should be preserved + 2 new calibrations
-      assertEquals(ob2.countCalibrations, 3)
-      assert(ob2.callibrationIds.contains(calibIds.head))
-    }
+  test("don't delete ongoing and completed calibrations"):
+    List(ObservationWorkflowState.Ongoing, ObservationWorkflowState.Completed).traverse_ : state =>
+      for {
+        pid  <- createProgramAs(pi)
+        tid  <- createTargetAs(pi, pid, "Target")
+        oid  <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid)
+        _    <- prepareObservation(pi, pid, oid, tid)
+        _    <- recalculateCalibrations(pid, when)
+        ob1  <- queryObservations(pid)
+        calibIds = ob1.callibrationIds
+        _    <- setCalculatedWorkflowState(calibIds.head, state)
+        _    <- updateCentralWavelength(oid, Wavelength.fromIntNanometers(600).get)
+        _    <- recalculateCalibrations(pid, when)
+        ob2  <- queryObservations(pid)
+      } yield {
+        // Calibration preserved + 2 new calibrations
+        assertEquals(ob2.countCalibrations, 3)
+        assert(ob2.callibrationIds.contains(calibIds.head))
+      }
 
 }

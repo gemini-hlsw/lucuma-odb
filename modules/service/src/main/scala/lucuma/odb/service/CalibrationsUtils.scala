@@ -51,11 +51,11 @@ import java.time.LocalDateTime
 import java.time.LocalTime
 
 case class ObsExtract[A](
-  id:      Observation.Id,
-  itc:     Option[ItcInput],
-  band:    Option[ScienceBand],
-  role:    Option[CalibrationRole],
-  data:    A
+  id:   Observation.Id,
+  itc:  Option[ItcInput],
+  band: Option[ScienceBand],
+  role: Option[CalibrationRole],
+  data: A
 ):
   def map[B](f: A => B): ObsExtract[B] =
     copy(data = f(data))
@@ -121,6 +121,12 @@ trait WorkflowStateQueries[F[_]: Monad] {
 
   def filterWorkflowStateIn[A](obs: List[A], oid: A => Observation.Id, states: List[ObservationWorkflowState])(using Services[F]) =
     filterWorkflow(obs, oid, states, identity)
+
+  def excludeOngoingAndCompleted[A](obs: List[A], oid: A => Observation.Id)(using Services[F]): F[List[A]] =
+    filterWorkflowStateNotIn(obs, oid, List(ObservationWorkflowState.Ongoing, ObservationWorkflowState.Completed))
+
+  def onlyDefinedAndReady[A](obs: List[A], oid: A => Observation.Id)(using Services[F]): F[List[A]] =
+    filterWorkflowStateIn(obs, oid, List(ObservationWorkflowState.Defined, ObservationWorkflowState.Ready))
 
   def selectUserWorkflowState(oid: Observation.Id)(using Services[F]): F[Option[ObservationWorkflowService.UserState]] =
     session.option(

@@ -155,6 +155,7 @@ object CMain extends MainParams {
                               LocalDateTime.of(t, LocalTime.MIDNIGHT).toInstant(ZoneOffset.UTC)
                             ).whenA(!i &&
                                     elem.newState.exists(_ === CalculationState.Ready) &&
+                                    elem.oldState =!= elem.newState &&
                                     (elem.editType === EditType.Created ||
                                      elem.editType === EditType.Updated))
                     } yield Result.unit
