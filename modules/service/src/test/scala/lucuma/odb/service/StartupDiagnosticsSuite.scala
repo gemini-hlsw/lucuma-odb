@@ -3,8 +3,8 @@
 
 package lucuma.odb.service
 
-import lucuma.odb.graphql.OdbSuite
 import lucuma.odb.StartupDiagnostics
+import lucuma.odb.graphql.OdbSuite
 
 class StartupDiagnosticsSuite extends OdbSuite:
 

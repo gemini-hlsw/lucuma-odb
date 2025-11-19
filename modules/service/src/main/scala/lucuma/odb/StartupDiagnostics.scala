@@ -3,18 +3,19 @@
 
 package lucuma.odb
 
+import cats.Applicative
+import cats.effect.Concurrent
+import cats.kernel.Semigroup
+import cats.syntax.all.*
 import lucuma.core.util.Enumerated
+import lucuma.odb.util.Codecs.*
+import org.tpolecat.typename.TypeName
+import org.typelevel.log4cats.Logger
 import skunk.Decoder
 import skunk.Session
-import skunk.syntax.all.*
-import cats.effect.Concurrent
-import cats.syntax.all.*
-import org.tpolecat.typename.TypeName
-import lucuma.odb.util.Codecs.*
-import cats.kernel.Semigroup
-import cats.Applicative
-import org.typelevel.log4cats.Logger
 import skunk.codec.text.varchar
+import skunk.syntax.all.*
+
 import scala.annotation.nowarn
 
 trait StartupDiagnostics[F[_]]:
