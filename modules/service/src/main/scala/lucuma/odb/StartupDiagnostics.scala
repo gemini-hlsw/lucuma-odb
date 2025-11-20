@@ -31,11 +31,9 @@ object StartupDiagnostics:
     types: List[Type],
     errors: List[String]
   ):
-    def updated(newTypes: List[Type], newErrors: List[String]): DiagState = DiagState(types ++ newTypes, errors ++ newErrors)
-    def updated(newErrors: List[String]): DiagState = DiagState(types, errors ++ newErrors)
-    def updated(newType: Type): DiagState = DiagState(newType :: types, errors)
-  object DiagState:
-    val Initial = DiagState(Nil, Nil)
+    def updated(newTypes: List[Type], newErrors: List[String]) = DiagState(types ++ newTypes, errors ++ newErrors)
+    def updated(newErrors: List[String]) = DiagState(types, errors ++ newErrors)
+    def updated(newType: Type) = DiagState(newType :: types, errors)
 
   def apply[F[_]: Concurrent: Logger](db: Session[F]): StartupDiagnostics[F] =
 
@@ -123,17 +121,17 @@ object StartupDiagnostics:
           checkPostgresLookupTable(gmos_binning, "t_gmos_binning"),
           checkPostgresLookupTable(gmos_custom_slit_width, "t_gmos_custom_slit_width"),
           checkPostgresLookupTable(gmos_dtax, "t_gmos_dtax"),
-          // checkPostgresLookupTable(gmos_grating_order, "t_gmos_grating_order"),
+          checkPostgresLookupTable(gmos_grating_order, "t_gmos_disperser_order"),
           checkPostgresLookupTable(gmos_north_detector, "t_gmos_north_detector"),
           checkPostgresLookupTable(gmos_north_filter, "t_gmos_north_filter"),
           checkPostgresLookupTable(gmos_north_fpu, "t_gmos_north_fpu"),
-          // checkPostgresLookupTable(gmos_north_grating, "t_gmos_north_grating"),
+          checkPostgresLookupTable(gmos_north_grating, "t_gmos_north_disperser"),
           checkPostgresLookupTable(gmos_north_stage_mode, "t_gmos_north_stage_mode"),
           checkPostgresLookupTable(gmos_roi, "t_gmos_roi"),
           checkPostgresLookupTable(gmos_south_detector, "t_gmos_south_detector"),
           checkPostgresLookupTable(gmos_south_filter, "t_gmos_south_filter"),
           checkPostgresLookupTable(gmos_south_fpu, "t_gmos_south_fpu"),
-          // checkPostgresLookupTable(gmos_south_grating, "t_gmos_south_grating"),
+          checkPostgresLookupTable(gmos_south_grating, "t_gmos_south_disperser"),
           checkPostgresLookupTable(gmos_south_stage_mode, "t_gmos_south_stage_mode"),
           checkPostgresLookupTable(image_quality_preset, "t_image_quality"),
           checkPostgresLookupTable(instrument, "t_instrument"),
@@ -145,13 +143,14 @@ object StartupDiagnostics:
           assertUnusedPostgresEnum(Type("e_target_type")),
           assertUnusedPostgresEnum(Type("e_source_profile_type")),
 
-          checkEnumCoverage, // This should come last
+          // This should come last
+          checkEnumCoverage, 
 
         )
 
       def runAllDiagnostics(fatal: Boolean): F[Unit] =        
         Logger[F].info("Running startup diagnostics.") >>
-        allDiagnostics.sequence.runS(DiagState.Initial).map(_.errors).flatMap: errors =>
+        allDiagnostics.sequence.runS(DiagState(Nil, Nil)).map(_.errors).flatMap: errors =>
           errors.traverse_(Logger[F].error(_)) >>
             Logger[F].info("Startup diagnostics passed.").whenA(errors.isEmpty) >>
             Logger[F].error("Startup diagnostics failed.").whenA(errors.nonEmpty) >>
