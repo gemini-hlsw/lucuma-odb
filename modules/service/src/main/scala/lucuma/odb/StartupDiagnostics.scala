@@ -7,8 +7,14 @@ import cats.data.NonEmptyList
 import cats.data.StateT
 import cats.effect.Concurrent
 import cats.syntax.all.*
-import lucuma.core.enums.ObservationWorkflowState
+import grackle.EnumType
+import grackle.Schema
+import grackle.Type as GrackleType
+import lucuma.core.enums.*
+import lucuma.core.model.*
+import lucuma.core.syntax.string.*
 import lucuma.core.util.Enumerated
+import lucuma.odb.data.*
 import lucuma.odb.service.ObservationWorkflowService
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.GmosCodecs.*
@@ -17,8 +23,9 @@ import org.typelevel.log4cats.Logger
 import skunk.Codec
 import skunk.Session
 import skunk.codec.text.varchar
-import skunk.data.Type
+import skunk.data.Type as PgType
 import skunk.syntax.all.*
+import lucuma.odb.graphql.enums.* 
 
 trait StartupDiagnostics[F[_]]:
 
@@ -28,21 +35,27 @@ trait StartupDiagnostics[F[_]]:
 object StartupDiagnostics:
 
   case class DiagState(
-    types: List[Type],
+    pgTypes: List[PgType],
+    grackleTypes: List[GrackleType],
     errors: List[String]
   ):
-    def updated(newTypes: List[Type], newErrors: List[String]) = DiagState(types ++ newTypes, errors ++ newErrors)
-    def updated(newErrors: List[String]) = DiagState(types, errors ++ newErrors)
-    def updated(newType: Type) = DiagState(newType :: types, errors)
+    def +(t: PgType) = copy(pgTypes = t :: pgTypes)
+    def ++(ts: List[PgType]) = ts.foldLeft(this)(_ + _)
+    def +(t: GrackleType) = copy(grackleTypes = t :: grackleTypes)
+    def +(s: String) = copy(errors = s :: errors)
+    def ++(ss: List[String])(using DummyImplicit) = ss.foldLeft(this)(_ + _)
 
-  def apply[F[_]: Concurrent: Logger](db: Session[F]): StartupDiagnostics[F] =
+  object DiagState:
+    val Initial = DiagState(Nil, Nil, Nil)
 
+  def apply[F[_]: Concurrent: Logger](db: Session[F], schema: Schema, enums: Enums): StartupDiagnostics[F] =
     new StartupDiagnostics[F]:
+      import enums.{ schema => _, * }
 
       val allDiagnostics: List[StateT[F, DiagState, Unit]] =
         List(
 
-          // Postgres Enums
+          // Postgres enums that have corresponding Scala enums, mediated through codecs
           checkPostgresEnum(arc_type),
           checkPostgresEnum(atom_stage),
           checkPostgresEnum(attachment_type),
@@ -107,7 +120,7 @@ object StartupDiagnostics:
           },
           checkPostgresEnum(user_type),
 
-          // Postgres Lookup Tables
+          // Postgres lookup tables that have corresponding Scala enums, mediated through codecs
           checkPostgresLookupTable(atom_execution_state, "t_atom_execution_state"),
           checkPostgresLookupTable(cloud_extinction_preset, "t_cloud_extinction"),
           checkPostgresLookupTable(focal_plane, "t_focal_plane"),
@@ -139,41 +152,165 @@ object StartupDiagnostics:
           checkPostgresLookupTable(step_execution_state, "t_step_execution_state"),
           checkPostgresLookupTable(water_vapor, "t_water_vapor"),
 
-          // Enumerated types that are used in the database schema but don't exist in the model
-          assertUnusedPostgresEnum(Type("e_target_type")),
-          assertUnusedPostgresEnum(Type("e_source_profile_type")),
+          // Postgres enums that have no corresponding Scala enum
+          assertUnmappedPostgresEnum(PgType("e_target_type")),
+          assertUnmappedPostgresEnum(PgType("e_source_profile_type")),
 
-          // This should come last
+          // GraphQL enums that have corresponding Scala enums          
+          checkSchemaEnum[ArcType]("ArcType"),
+          checkSchemaEnum[AtomExecutionState]("AtomExecutionState"),
+          checkSchemaEnum[AtomStage]("AtomStage"),
+          checkSchemaEnum[AttachmentType]("AttachmentType"),
+          checkSchemaEnum[Band]("Band"),
+          checkSchemaEnum[BlindOffsetType]("BlindOffsetType"),
+          checkSchemaEnum[Breakpoint]("Breakpoint"),
+          // checkSchemaEnum[BrightnessIntegratedUnits]("BrightnessIntegratedUnits"),
+          // checkSchemaEnum[BrightnessSurfaceUnits]("BrightnessSurfaceUnits"),
+          // checkSchemaEnum[CalculationState]("CalculationState"),
+          checkSchemaEnum[CalibrationRole]("CalibrationRole"),
+          checkSchemaEnum[CallForProposalsType]("CallForProposalsType"),
+          checkSchemaEnum[CatalogName]("CatalogName"),
+          checkSchemaEnum[ChargeClass]("ChargeClass"),
+          checkSchemaEnum[CloudExtinction.Preset]("CloudExtinctionPreset"),
+          checkSchemaEnum[ConfigurationRequestStatus]("ConfigurationRequestStatus"),
+          checkSchemaEnum[CoolStarTemperature]("CoolStarTemperature"),
+          checkSchemaEnum[DatabaseOperation]("DatabaseOperation"),
+          checkSchemaEnum[DatasetQaState]("DatasetQaState"),
+          checkSchemaEnum[DatasetStage]("DatasetStage"),
+          checkSchemaEnum[EditType]("EditType"),
+          checkSchemaEnum[EducationalStatus]("EducationalStatus"),
+          checkSchemaEnum[EmailStatus]("EmailStatus"),
+          checkSchemaEnum[EphemerisKeyType]("EphemerisKeyType"),
+          checkSchemaEnum[ExecutionEventType]("ExecutionEventType"),
+          checkSchemaEnum[ExecutionState]("ExecutionState"),
+          checkSchemaEnum[Existence]("Existence"),
+          checkSchemaEnum[FilterType]("FilterType", false),
+          checkSchemaEnum[Flamingos2CustomSlitWidth]("Flamingos2CustomSlitWidth"),
+          checkSchemaEnum[Flamingos2Decker]("Flamingos2Decker"),
+          checkSchemaEnum[Flamingos2Disperser]("Flamingos2Disperser"),
+          checkSchemaEnum[Flamingos2Filter]("Flamingos2Filter"),
+          checkSchemaEnum[Flamingos2Fpu]("Flamingos2Fpu"),
+          checkSchemaEnum[Flamingos2LyotWheel]("Flamingos2LyotWheel"),
+          checkSchemaEnum[Flamingos2ReadMode]("Flamingos2ReadMode"),
+          checkSchemaEnum[Flamingos2ReadoutMode]("Flamingos2ReadoutMode"),
+          checkSchemaEnum[Flamingos2Reads]("Flamingos2Reads"),
+          // checkSchemaEnum[FluxDensityContinuumIntegratedUnits]("FluxDensityContinuumIntegratedUnits"),
+          // checkSchemaEnum[FluxDensityContinuumSurfaceUnits]("FluxDensityContinuumSurfaceUnits"),
+          checkSchemaEnum[FocalPlane]("FocalPlane"),
+          checkSchemaEnum[GalaxySpectrum]("GalaxySpectrum"),
+          checkSchemaEnum[GcalArc]("GcalArc"),
+          checkSchemaEnum[GcalContinuum]("GcalContinuum"),
+          checkSchemaEnum[GcalDiffuser]("GcalDiffuser"),
+          checkSchemaEnum[GcalFilter]("GcalFilter"),
+          checkSchemaEnum[GcalShutter]("GcalShutter"),
+          checkSchemaEnum[Gender]("Gender"),
+          checkSchemaEnum[GmosAmpCount]("GmosAmpCount"),
+          checkSchemaEnum[GmosAmpGain]("GmosAmpGain"),
+          checkSchemaEnum[GmosAmpReadMode]("GmosAmpReadMode"),
+          checkSchemaEnum[GmosBinning]("GmosBinning"),
+          checkSchemaEnum[GmosCustomSlitWidth]("GmosCustomSlitWidth"),
+          checkSchemaEnum[GmosDtax]("GmosDtax"),
+          checkSchemaEnum[GmosEOffsetting]("GmosEOffsetting"),
+          checkSchemaEnum[GmosGratingOrder]("GmosGratingOrder"),
+          checkSchemaEnum[GmosLongSlitAcquisitionRoi]("GmosLongSlitAcquisitionRoi"),
+          checkSchemaEnum[GmosNorthFpu]("GmosNorthBuiltinFpu"),
+          checkSchemaEnum[GmosNorthDetector]("GmosNorthDetector"),
+          checkSchemaEnum[GmosNorthFilter]("GmosNorthFilter"),
+          checkSchemaEnum[GmosNorthGrating]("GmosNorthGrating"),
+          checkSchemaEnum[GmosNorthStageMode]("GmosNorthStageMode"),
+          checkSchemaEnum[GmosRoi]("GmosRoi"),
+          checkSchemaEnum[GmosSouthFpu]("GmosSouthBuiltinFpu"),
+          checkSchemaEnum[GmosSouthDetector]("GmosSouthDetector"),
+          checkSchemaEnum[GmosSouthFilter]("GmosSouthFilter"),
+          checkSchemaEnum[GmosSouthGrating]("GmosSouthGrating"),
+          checkSchemaEnum[GmosSouthStageMode]("GmosSouthStageMode"),
+          checkSchemaEnum[GuideProbe]("GuideProbe"),
+          // checkSchemaEnum[GuideState]("GuideState"),
+          // checkSchemaEnum[HiiRegionSpectrum]("HiiRegionSpectrum"),
+          checkSchemaEnum[ImageQuality.Preset]("ImageQualityPreset"),
+          checkSchemaEnum[Instrument]("Instrument"),
+          // checkSchemaEnum[LineFluxIntegratedUnits]("LineFluxIntegratedUnits"),
+          // checkSchemaEnum[LineFluxSurfaceUnits]("LineFluxSurfaceUnits"),
+          checkSchemaEnum[MosPreImaging]("MosPreImaging"),
+          checkSchemaEnum[MultipleFiltersMode]("MultipleFiltersMode"),
+          checkSchemaEnum[ObsActiveStatus]("ObsActiveStatus"),
+          checkSchemaEnum[ObsStatus]("ObsStatus"),
+          checkSchemaEnum[ObservationValidationCode]("ObservationValidationCode"),
+          checkSchemaEnum[ObservationWorkflowState]("ObservationWorkflowState"),
+          checkSchemaEnum[ObserveClass]("ObserveClass"),
+          checkSchemaEnum[ObservingModeType]("ObservingModeType"),
+          checkSchemaEnum[Partner]("Partner"),
+          checkSchemaEnum[PartnerLinkType]("PartnerLinkType"),
+          checkSchemaEnum[PlanetSpectrum]("PlanetSpectrum"),
+          checkSchemaEnum[PlanetaryNebulaSpectrum]("PlanetaryNebulaSpectrum"),
+          checkSchemaEnum[PosAngleConstraintMode]("PosAngleConstraintMode"),
+          checkSchemaEnum[ProgramType]("ProgramType"),
+          checkSchemaEnum[ProgramUserRole]("ProgramUserRole"),
+          checkSchemaEnum[ProposalStatus]("ProposalStatus"),
+          checkSchemaEnum[QuasarSpectrum]("QuasarSpectrum"),
+          checkSchemaEnum[ScienceBand]("ScienceBand"),
+          checkSchemaEnum[ScienceMode]("ScienceMode"),
+          checkSchemaEnum[ScienceSubtype]("ScienceSubtype"),
+          checkSchemaEnum[SequenceCommand]("SequenceCommand"),
+          checkSchemaEnum[SequenceType]("SequenceType"),
+          checkSchemaEnum[Site]("Site"),
+          checkSchemaEnum[SkyBackground]("SkyBackground"),
+          checkSchemaEnum[SlewStage]("SlewStage"),
+          checkSchemaEnum[SmartGcalType]("SmartGcalType"),
+          checkSchemaEnum[SpectroscopyCapabilities]("SpectroscopyCapabilities"),
+          checkSchemaEnum[StellarLibrarySpectrum]("StellarLibrarySpectrum"),
+          checkSchemaEnum[StepExecutionState]("StepExecutionState"),
+          checkSchemaEnum[StepStage]("StepStage"),
+          checkSchemaEnum[StepType]("StepType"),
+          checkSchemaEnum[TacCategory]("TacCategory"),
+          checkSchemaEnum[TargetDisposition]("TargetDisposition"),
+          // checkSchemaEnum[TelluricTag]("TelluricTag"),
+          checkSchemaEnum[TimeAccountingCategory]("TimeAccountingCategory"),
+          // checkSchemaEnum[TimeChargeCorrectionOp]("TimeChargeCorrectionOp"),
+          checkSchemaEnum[TimingWindowInclusion]("TimingWindowInclusion"),
+          checkSchemaEnum[ToOActivation]("ToOActivation"),
+          checkSchemaEnum[InvitationStatus]("UserInvitationStatus"),
+          checkSchemaEnum[UserType]("UserType"),
+          checkSchemaEnum[WaterVapor]("WaterVapor"),
+
+          // GraphQL enums that have no corresponding Scala enum
+          assertUnmappedSchemaEnum("SeeingTrend"),
+          assertUnmappedSchemaEnum("Ignore"),
+          assertUnmappedSchemaEnum("ConditionsExpectationType"),
+          assertUnmappedSchemaEnum("ConditionsMeasurementSource"),
+
+          // These should come last, to see what we missed above.
           checkEnumCoverage, 
+          checkSchemaCoverage,
 
         )
 
       def runAllDiagnostics(fatal: Boolean): F[Unit] =        
         Logger[F].info("Running startup diagnostics.") >>
-        allDiagnostics.sequence.runS(DiagState(Nil, Nil)).map(_.errors).flatMap: errors =>
+        allDiagnostics.sequence.runS(DiagState.Initial).map(_.errors).flatMap: errors =>
           errors.traverse_(Logger[F].error(_)) >>
             Logger[F].info("Startup diagnostics passed.").whenA(errors.isEmpty) >>
             Logger[F].error("Startup diagnostics failed.").whenA(errors.nonEmpty) >>
             Concurrent[F].raiseError(new Error(s"Startup diagnostics failed. Exiting.")).whenA(fatal && errors.nonEmpty)
 
-      def assertUnusedPostgresEnum(tpe: Type): StateT[F, DiagState, Unit] =
-        StateT.modify(_.updated(tpe))
+      def assertUnmappedPostgresEnum(tpe: PgType): StateT[F, DiagState, Unit] =
+        StateT.modify(_ + tpe)
 
       def checkPostgresEnum[E: Enumerated](codec: Codec[E]): StateT[F, DiagState, Unit] =
         StateT.modifyF: ds =>
           db.stream(sql"SELECT unnest(enum_range(NULL::#${codec.types.head.name})::_varchar) as value".query(varchar))(skunk.Void, 104)
             .compile
             .toList
-            .map(align(codec, "the database schema"))
-            .map(ds.updated(codec.types, _))
+            .map(alignCodec(codec, "the database schema"))
+            .map(ss => ds ++ codec.types ++ ss)
 
       def checkPostgresLookupTable[E: Enumerated: TypeName](codec: Codec[E], tableName: String): StateT[F, DiagState, Unit] =
         StateT.modifyF: ds =>
           db.stream(sql"SELECT c_tag FROM #$tableName".query(varchar))(skunk.Void, 104)
             .compile
             .toList
-            .map(align(codec, s"lookup table $tableName"))
-            .map(ds.updated(codec.types, _))
+            .map(alignCodec(codec, s"lookup table $tableName"))
+            .map(ss => ds ++ codec.types ++ ss)
 
       def checkEnumCoverage: StateT[F, DiagState, Unit] =
         StateT.modifyF: ds =>
@@ -181,9 +318,29 @@ object StartupDiagnostics:
             .compile
             .toList
             .map: es =>
-              val seen = ds.types.map(_.name).toSet
-              val errors = es.filterNot(seen).map(s => s"Postgres enum $s has not been checked.")
-              ds.updated(errors)
+              val seen = ds.pgTypes.map(_.name).toSet
+              val errors = es.filterNot(seen).map(s => s"Postgres enum $s has not been checked for consistency with a Scala enum.")
+              ds ++ errors
+
+      def checkSchemaEnum[A: Enumerated: TypeName](name: String, screaming: Boolean = true): StateT[F, DiagState, Unit] =
+        StateT.modify: ds =>          
+          schema.types.collectFirst { case t @ EnumType(`name`, _, _, _) => t } match
+            case None => ds + s"GraphQL enum $name was not found in the Schema."
+            case Some(et) => ds + et ++ alignSchema(s"GraphQL enum $name", screaming)(et.enumValues.map(_.name))
+
+      def assertUnmappedSchemaEnum(name: String): StateT[F, DiagState, Unit] =
+        StateT.modify: ds =>          
+          schema.types.collectFirst { case t @ EnumType(`name`, _, _, _) => t } match
+            case None => ds + s"GraphQL enum $name was not found in the Schema."
+            case Some(et) => ds + et
+
+      def checkSchemaCoverage: StateT[F, DiagState, Unit] =
+        StateT.modify: ds =>          
+          schema
+            .types
+            .filter(tpe => tpe.isEnum && !ds.grackleTypes.contains(tpe))
+            .map(tpe => s"GraphQL enum ${tpe.name} has not been checked for consistency with a Scala enum.")
+            .foldLeft(ds)(_ + _)
 
       /**
        * In the case of `Site` and maybe other places the Scala side tag isn't the same as the database side tag, and this
@@ -193,8 +350,8 @@ object StartupDiagnostics:
       def databaseTag[A](codec: Codec[A])(tag: String)(using e: Enumerated[A]): String =
         e.fromTag(tag).flatMap(codec.encode(_).headOption.flatten).getOrElse(tag)
 
-      def align[A](codec: Codec[A], where: String)(found: List[String])(using e: Enumerated[A], tn: TypeName[A]): List[String] =
-        val expected = e.all.map(e.tag).map(databaseTag(codec)).toSet
+      def align[A](where: String, transform: String => String)(found: List[String])(using e: Enumerated[A], tn: TypeName[A]): List[String] =
+        val expected = e.all.map(e.tag).map(transform).toSet
         val actual   = found.toSet
         (expected ++ actual)
           .toList
@@ -204,3 +361,9 @@ object StartupDiagnostics:
               case (true, false)  => List(s"${tn.value}: expected tag \"$tag\" was not found in $where.")
               case (false, true)  => List(s"${tn.value}: unexpected tag \"$tag\" was found in $where.")
               case _ => Nil
+
+      def alignCodec[A](codec: Codec[A], where: String)(found: List[String])(using e: Enumerated[A], tn: TypeName[A]): List[String] =
+        align(where, databaseTag(codec))(found)
+
+      def alignSchema[A](where: String, screaming: Boolean)(found: List[String])(using e: Enumerated[A], tn: TypeName[A]): List[String] =
+        align(where, s => if screaming then s.toScreamingSnakeCase else s)(found)

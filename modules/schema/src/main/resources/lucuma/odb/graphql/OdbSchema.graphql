@@ -1467,10 +1467,10 @@ enum GcalFilter {
   """
   GMOS
 
-  """
-  GcalFilter Hros
-  """
-  HROS
+  # """
+  # GcalFilter Hros
+  # """
+  # HROS
 
   """
   GcalFilter Nir
@@ -1482,10 +1482,10 @@ enum GcalFilter {
   """
   ND10
 
-  """
-  GcalFilter Nd16
-  """
-  ND16
+  # """
+  # GcalFilter Nd16
+  # """
+  # ND16
 
   """
   GcalFilter Nd20
@@ -1507,10 +1507,10 @@ enum GcalFilter {
   """
   ND45
 
-  """
-  GcalFilter Nd50
-  """
-  ND50
+  # """
+  # GcalFilter Nd50
+  # """
+  # ND50
 }
 
 """
@@ -3915,15 +3915,15 @@ enum ProgramUserRole {
   SUPPORT_SECONDARY
 }
 
-"""
-The type of support role.
-"""
-enum ProgramUserSupportRoleType {
-  "Staff support"
-  STAFF
-  "Partner support"
-  PARTNER
-}
+# """
+# The type of support role.
+# """
+# enum ProgramUserSupportRoleType {
+#   "Staff support"
+#   STAFF
+#   "Partner support"
+#   PARTNER
+# }
 
 """
 An assignment of a user to a program.
@@ -6645,7 +6645,7 @@ enum ObservingModeType {
   """
   ObservingModeType Flamingos2LongSlit
   """
-  FLAMINGOS_2LONG_SLIT
+  FLAMINGOS_2_LONG_SLIT
 
   """
   ObservingModeType GmosNorthImaging
@@ -11497,6 +11497,8 @@ enum ProgramType {
   LIBRARY
   SCIENCE
   SYSTEM
+  MONITORING
+  COMMISSIONING
 }
 
 """

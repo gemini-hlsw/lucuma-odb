@@ -309,8 +309,13 @@ object FMain extends MainParams {
   }
 
   def runStartupDiagnostics[F[_]: Async : Console : Network: Logger](config: Config.Database, fatal: Boolean): F[Unit] =
-    singleSession(config).map(StartupDiagnostics.apply(_)).use: sd =>
-      sd.runAllDiagnostics(fatal)
+    import lucuma.odb.graphql.util.SchemaSemigroup.*    
+    singleSession(config).use: db =>
+      for
+        es <- Enums.load(db)
+        s   = OdbMapping.unsafeLoadOdbSchema |+| es.schema
+        _  <- StartupDiagnostics(db, s, es).runAllDiagnostics(fatal)
+      yield ()
 
   implicit def kleisliLogger[F[_]: Logger, A]: Logger[Kleisli[F, A, *]] =
     Logger[F].mapK(Kleisli.liftK)
