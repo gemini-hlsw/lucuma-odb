@@ -199,6 +199,7 @@ object OdbMapping {
           with MutationMapping[F]
           with NonsiderealMapping[F]
           with AttachmentMapping[F]
+          with OffsetGeneratorMapping[F]
           with ObscalcUpdateMapping[F]
           with ObservationEditMapping[F]
           with ObservationMapping[F]
@@ -511,7 +512,6 @@ object OdbMapping {
                 TargetGroupSelectResultMapping,
                 TargetMapping,
                 TargetSelectResultMapping,
-                TelescopeConfigMapping,
                 TimeAndCountExposureTimeModeMapping,
                 TimeChargeCorrectionMapping,
                 TimeChargeDaylightDiscountMapping,
@@ -574,12 +574,12 @@ object OdbMapping {
                 GmosSouthGratingConfigMappings,
                 LeafMappings,
                 ObservationSelectResultMappings,
+                OffsetGeneratorMappings,
                 OffsetMappings,
-                OffsetPMappings,
-                OffsetQMappings,
                 RegionMappings,
                 RightAscensionMappings,
                 SiteCoordinateLimitsMappings,
+                TelescopeConfigMappings,
                 TimeSpanMappings,
                 UserProfileMappings,
                 WavelengthMappings
@@ -596,6 +596,7 @@ object OdbMapping {
                 CallForProposalsElaborator,
                 ConstraintSetGroupElaborator,
                 DatasetElaborator,
+                EnumeratedOffsetElaborator,
                 ExecutionElaborator,
                 Flamingos2LongSlitElaborator,
                 GmosNorthImagingElaborator,

@@ -65,12 +65,14 @@ import lucuma.odb.data.Extinction
 import lucuma.odb.data.Md5Hash
 import lucuma.odb.data.ObservingModeRowVersion
 import lucuma.odb.data.OdbError
+import lucuma.odb.data.OffsetGeneratorRole
 import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.data.StepExecutionState
 import lucuma.odb.data.Tag
 import lucuma.odb.data.TimeCharge.DiscountDiscriminator
 import lucuma.odb.data.TimingWindowEndTypeEnum
 import lucuma.odb.data.UserType
+import lucuma.odb.sequence.data.OffsetGeneratorType
 import lucuma.odb.service.ObservationWorkflowService
 import lucuma.odb.syntax.exposureTimeMode.*
 import monocle.Prism
@@ -398,6 +400,12 @@ trait Codecs {
 
   val observation_id: Codec[Observation.Id] =
     gid[Observation.Id]
+
+  val offset_generator_role: Codec[OffsetGeneratorRole] =
+    enumerated(Type("e_offset_generator_role"))
+
+  val offset_generator_type: Codec[OffsetGeneratorType] =
+    enumerated(Type("e_offset_generator_type"))
 
   val configuration_request_id: Codec[ConfigurationRequest.Id] =
     gid[ConfigurationRequest.Id]

@@ -33,6 +33,7 @@ import lucuma.odb.json.offset.query.given
 
 trait GmosImagingMapping[F[_]] extends GmosImagingView[F]
                                   with GmosImagingFilterTable[F]
+                                  with OffsetGeneratorView[F]
                                   with OptionalFieldMapping[F]
                                   with Predicates[F] { this: SkunkMapping[F] =>
 
@@ -72,6 +73,9 @@ trait GmosImagingMapping[F[_]] extends GmosImagingView[F]
 
       SqlField("offsetsString", GmosNorthImagingView.Offsets, hidden = true),
       CommonImagingFields.offsets,
+
+      SqlObject("objectOffsetGenerator", Join(GmosNorthImagingView.ObservationId, OffsetGeneratorView.ObjectObservationId)),
+      SqlObject("skyOffsetGenerator",    Join(GmosNorthImagingView.ObservationId, OffsetGeneratorView.SkyObservationId)),
 
       CommonImagingFields.multipleFiltersMode,
       SqlField("explicitMultipleFiltersMode", GmosNorthImagingView.ExplicitMultipleFiltersMode),
@@ -131,6 +135,9 @@ trait GmosImagingMapping[F[_]] extends GmosImagingView[F]
 
       SqlField("offsetsString", GmosSouthImagingView.Offsets, hidden = true),
       CommonImagingFields.offsets,
+
+      SqlObject("objectOffsetGenerator", Join(GmosSouthImagingView.ObservationId, OffsetGeneratorView.ObjectObservationId)),
+      SqlObject("skyOffsetGenerator",    Join(GmosSouthImagingView.ObservationId, OffsetGeneratorView.SkyObservationId)),
 
       CommonImagingFields.multipleFiltersMode,
       SqlField("explicitMultipleFiltersMode", GmosSouthImagingView.ExplicitMultipleFiltersMode),
