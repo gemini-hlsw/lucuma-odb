@@ -70,7 +70,7 @@ enum ProposalStatus {
 }
 
 """Email address, matching ^\w+@[a-zA-Z_]+?\.[a-zA-Z]{2,3}$"""
-scalar EmailAddress
+scalar EmailAddress @specifiedBy(url: "https://html.spec.whatwg.org/multipage/input.html#valid-e-mail-address")
 
 """The result of adding a atom event."""
 type AddAtomEventResult {
@@ -130,7 +130,7 @@ type Allocation {
 """
 Create an angle from a signed value.  Choose exactly one of the available units.
 """
-input AngleInput {
+input AngleInput @oneOf {
   microarcseconds: Long
   microseconds: BigDecimal
   milliarcseconds: BigDecimal
@@ -837,7 +837,7 @@ enum ExecutionEventType {
 """
 Exposure time mode input.  Specify fixed or signal to noise, but not both
 """
-input ExposureTimeModeInput {
+input ExposureTimeModeInput @oneOf {
   """
   The signalToNoise field must be either specified or skipped altogether.  It cannot be unset with a null value.
   """
@@ -1264,7 +1264,7 @@ type GmosNorthFpu {
 }
 
 """GMOS North FPU input parameters (choose custom or builtin)."""
-input GmosNorthFpuInput {
+input GmosNorthFpuInput @oneOf {
   """Custom mask FPU option"""
   customMask: GmosCustomMaskInput
 
@@ -1425,7 +1425,7 @@ type GmosSouthFpu {
 }
 
 """GMOS South FPU input parameters (choose custom or builtin)."""
-input GmosSouthFpuInput {
+input GmosSouthFpuInput @oneOf {
   """Custom mask FPU option"""
   customMask: GmosCustomMaskInput
 
@@ -1967,7 +1967,7 @@ type SystemVerification implements ProposalType {
 }
 
 """Radial velocity, choose one of the available units"""
-input RadialVelocityInput {
+input RadialVelocityInput @oneOf {
   centimetersPerSecond: Long
   metersPerSecond: BigDecimal
   kilometersPerSecond: BigDecimal
@@ -2087,7 +2087,7 @@ input SignalToNoiseExposureTimeModeInput {
 """
 Create or edit a source profile.  Exactly one of "point", "uniform" or "gaussian" is required.
 """
-input SourceProfileInput {
+input SourceProfileInput @oneOf {
   point: SpectralDefinitionIntegratedInput
   uniform: SpectralDefinitionSurfaceInput
   gaussian: GaussianInput
@@ -2096,7 +2096,7 @@ input SourceProfileInput {
 """
 Spectral definition input with integrated units.  Specify exactly one of "bandNormalized" or "emissionLines"
 """
-input SpectralDefinitionIntegratedInput {
+input SpectralDefinitionIntegratedInput @oneOf {
   bandNormalized: BandNormalizedIntegratedInput
   emissionLines: EmissionLinesIntegratedInput
 }
@@ -2104,7 +2104,7 @@ input SpectralDefinitionIntegratedInput {
 """
 Spectral definition input with surface units.  Specify exactly one of "bandNormalized" or "emissionLines"
 """
-input SpectralDefinitionSurfaceInput {
+input SpectralDefinitionSurfaceInput @oneOf {
   bandNormalized: BandNormalizedSurfaceInput
   emissionLines: EmissionLinesSurfaceInput
 }
@@ -2475,7 +2475,7 @@ type UpdateTargetsResult {
 }
 
 """Wavelength, choose one of the available units"""
-input WavelengthInput {
+input WavelengthInput @oneOf {
   picometers: PosInt
   angstroms: PosBigDecimal
   nanometers: PosBigDecimal
@@ -7867,7 +7867,7 @@ type TimeSpan {
 """
 Equivalent time amount in several unit options (exactly one must be specified)
 """
-input TimeSpanInput {
+input TimeSpanInput @oneOf {
   """TimeSpan in µs"""
   microseconds: Long
 
@@ -8338,7 +8338,7 @@ type Flamingos2ImagingParams {
 union ImagingParams = GmosNImagingParams | GmosSImagingParams | Flamingos2ImagingParams
 
 """Params for instrument modes"""
-input InstrumentModesInput {
+input InstrumentModesInput @oneOf {
   """Gmos North Spectroscopy"""
   gmosNSpectroscopy: GmosNSpectroscopyInput
 
@@ -8381,7 +8381,7 @@ input CloudExtinctionInput {
 """
 ITC-specific constraint set with flexible ImageQuality and CloudExtinction inputs
 """
-input ItcConstraintsInput {
+input ItcConstraintsInput @oneOf {
   """Image quality - specify either preset or exact arcsec value"""
   imageQuality: ImageQualityInput!
 
