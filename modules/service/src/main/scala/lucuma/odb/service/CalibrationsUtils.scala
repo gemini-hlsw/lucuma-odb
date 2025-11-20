@@ -99,22 +99,10 @@ extension[F[_], A](r: F[Result[A]])
 
 trait WorkflowStateQueries[F[_]: Monad] {
 
-  def resolveWorkflowState(
-    userState: Option[ObservationWorkflowState],
-    calculatedState: Option[ObservationWorkflowState]
-  ): Option[ObservationWorkflowState] =
-    userState match
-      case Some(ObservationWorkflowState.Inactive) => ObservationWorkflowState.Inactive.some
-      case _ =>
-        calculatedState.filter(_ =!= ObservationWorkflowState.Undefined)
-
   private def filterWorkflow[A](obs: List[A], oid: A => Observation.Id, states: List[ObservationWorkflowState], f: Boolean => Boolean)(using Services[F]) =
     obs.filterA: obs =>
-      for
-        userState       <- selectUserWorkflowState(oid(obs))
-        calculatedState <- selectObscalcWorkflowState(oid(obs))
-        resolvedState   = resolveWorkflowState(userState, calculatedState)
-      yield f(resolvedState.exists(s => states.exists(_ === s)))
+      selectObscalcWorkflowState(oid(obs)).map: calculatedState =>
+        f(calculatedState.exists(s => states.exists(_ === s)))
 
   def filterWorkflowStateNotIn[A](obs: List[A], oid: A => Observation.Id, states: List[ObservationWorkflowState])(using Services[F]) =
     filterWorkflow(obs, oid, states, a => !a)
@@ -127,15 +115,6 @@ trait WorkflowStateQueries[F[_]: Monad] {
 
   def onlyDefinedAndReady[A](obs: List[A], oid: A => Observation.Id)(using Services[F]): F[List[A]] =
     filterWorkflowStateIn(obs, oid, List(ObservationWorkflowState.Defined, ObservationWorkflowState.Ready))
-
-  def selectUserWorkflowState(oid: Observation.Id)(using Services[F]): F[Option[ObservationWorkflowService.UserState]] =
-    session.option(
-      sql"""
-        SELECT c_workflow_user_state
-        FROM t_observation
-        WHERE c_observation_id = $observation_id
-      """.query(user_state.opt)
-    )(oid).map(_.flatten)
 
   def selectObscalcWorkflowState(oid: Observation.Id)(using Services[F]): F[Option[ObservationWorkflowState]] =
     session.option(
