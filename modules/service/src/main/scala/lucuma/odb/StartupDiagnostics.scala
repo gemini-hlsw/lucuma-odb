@@ -3,11 +3,15 @@
 
 package lucuma.odb
 
+import cats.data.NonEmptyList
 import cats.data.StateT
 import cats.effect.Concurrent
 import cats.syntax.all.*
+import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.util.Enumerated
+import lucuma.odb.service.ObservationWorkflowService
 import lucuma.odb.util.Codecs.*
+import lucuma.odb.util.GmosCodecs.*
 import org.tpolecat.typename.TypeName
 import org.typelevel.log4cats.Logger
 import skunk.Codec
@@ -15,10 +19,6 @@ import skunk.Session
 import skunk.codec.text.varchar
 import skunk.data.Type
 import skunk.syntax.all.*
-import lucuma.core.enums.ObservationWorkflowState
-import lucuma.odb.service.ObservationWorkflowService
-import cats.data.NonEmptyList
-import lucuma.odb.util.GmosCodecs.*
 
 trait StartupDiagnostics[F[_]]:
 
