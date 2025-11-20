@@ -3,10 +3,12 @@
 
 package lucuma.odb.service
 
+import cats.Monad
 import cats.MonadThrow
 import cats.syntax.all.*
 import grackle.Result
 import lucuma.core.enums.CalibrationRole
+import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.Site
 import lucuma.core.math.Angle
@@ -34,10 +36,15 @@ import lucuma.odb.graphql.input.TargetEnvironmentInput
 import lucuma.odb.graphql.mapping.AccessControl
 import lucuma.odb.sequence.ObservingMode
 import lucuma.odb.sequence.data.ItcInput
+import lucuma.odb.sequence.flamingos2.longslit.Config as Flamingos2Config
+import lucuma.odb.sequence.gmos.longslit.Config.GmosNorth as GmosNorthLongSlit
+import lucuma.odb.sequence.gmos.longslit.Config.GmosSouth as GmosSouthLongSlit
 import lucuma.odb.service.CalibrationConfigSubset.*
 import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.util.Codecs
+import lucuma.odb.util.Codecs.*
 import skunk.Transaction
+import skunk.syntax.all.*
 
 import java.time.Instant
 import java.time.LocalDateTime
@@ -52,6 +59,19 @@ case class ObsExtract[A](
 ):
   def map[B](f: A => B): ObsExtract[B] =
     copy(data = f(data))
+
+object ObsExtract:
+  val PerProgramPerConfigCalibrationTypes = List(CalibrationRole.SpectroPhotometric, CalibrationRole.Twilight)
+
+  def perObsFilter: PartialFunction[ObsExtract[ObservingMode], ObsExtract[ObservingMode]] =
+    case d @ ObsExtract(data = _: Flamingos2Config) => d
+
+  def perProgramFilter: PartialFunction[ObsExtract[ObservingMode], ObsExtract[ObservingMode]] =
+    case d @ ObsExtract(data = _: GmosNorthLongSlit) => d
+    case d @ ObsExtract(data = _: GmosSouthLongSlit) => d
+
+  def perProgramCalibrationFilter: PartialFunction[ObsExtract[CalibrationConfigSubset], ObsExtract[CalibrationConfigSubset]] =
+    case d @ ObsExtract(role = Some(r)) if PerProgramPerConfigCalibrationTypes.exists(_ === r) => d
 
 case class CalObsProps(
   wavelengthAt: Option[Wavelength],
@@ -76,6 +96,35 @@ extension[F[_], A](r: F[Result[A]])
       case Result.Failure(a)       => F.raiseError(new RuntimeException(a.map(_.message).toList.mkString(", ")))
       case Result.InternalError(a) => F.raiseError(a)
     }
+
+trait WorkflowStateQueries[F[_]: Monad] {
+
+  private def filterWorkflow[A](obs: List[A], oid: A => Observation.Id, states: List[ObservationWorkflowState], f: Boolean => Boolean)(using Services[F]) =
+    obs.filterA: obs =>
+      selectObscalcWorkflowState(oid(obs)).map: calculatedState =>
+        f(calculatedState.exists(s => states.exists(_ === s)))
+
+  def filterWorkflowStateNotIn[A](obs: List[A], oid: A => Observation.Id, states: List[ObservationWorkflowState])(using Services[F]) =
+    filterWorkflow(obs, oid, states, a => !a)
+
+  def filterWorkflowStateIn[A](obs: List[A], oid: A => Observation.Id, states: List[ObservationWorkflowState])(using Services[F]) =
+    filterWorkflow(obs, oid, states, identity)
+
+  def excludeOngoingAndCompleted[A](obs: List[A], oid: A => Observation.Id)(using Services[F]): F[List[A]] =
+    filterWorkflowStateNotIn(obs, oid, List(ObservationWorkflowState.Ongoing, ObservationWorkflowState.Completed))
+
+  def onlyDefinedAndReady[A](obs: List[A], oid: A => Observation.Id)(using Services[F]): F[List[A]] =
+    filterWorkflowStateIn(obs, oid, List(ObservationWorkflowState.Defined, ObservationWorkflowState.Ready))
+
+  def selectObscalcWorkflowState(oid: Observation.Id)(using Services[F]): F[Option[ObservationWorkflowState]] =
+    session.option(
+      sql"""
+        SELECT c_workflow_state
+        FROM t_obscalc
+        WHERE c_observation_id = $observation_id
+      """.query(observation_workflow_state.opt)
+    )(oid).map(_.flatten)
+}
 
 trait SpecPhotoCalibrations extends CalibrationTargetLocator {
   def idealLocation(site: Site, referenceInstant: Instant): Coordinates = {

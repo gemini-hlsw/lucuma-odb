@@ -55,6 +55,7 @@ import lucuma.odb.sequence.data.ItcInput
 import lucuma.odb.sequence.data.MissingParam
 import lucuma.odb.sequence.data.MissingParamSet
 import lucuma.odb.sequence.flamingos2
+import lucuma.odb.sequence.flamingos2.longslit.Acquisition as F2Acquisition
 import lucuma.odb.sequence.gmos.longslit.Acquisition
 import lucuma.odb.syntax.exposureTimeMode.*
 import lucuma.odb.util.Codecs.*
@@ -92,11 +93,6 @@ trait GeneratorParamsService[F[_]] {
     selection: ObservationSelection = ObservationSelection.All
   )(using Transaction[F]): F[Map[Observation.Id, Either[Error, GeneratorParams]]]
 
-  def selectAllUnexecuted(
-    programId: Program.Id,
-    selection: ObservationSelection = ObservationSelection.All
-  )(using Transaction[F]): F[Map[Observation.Id, Either[Error, GeneratorParams]]]
-
 }
 
 object GeneratorParamsService {
@@ -130,7 +126,7 @@ object GeneratorParamsService {
         case Flamingos2Imaging(_)                    =>
           mode
         case Flamingos2Spectroscopy(_, f, _)         =>
-          InstrumentMode.Flamingos2Imaging(lucuma.odb.sequence.flamingos2.longslit.Acquisition.toAcquisitionFilter(f))
+          InstrumentMode.Flamingos2Imaging(F2Acquisition.toAcquisitionFilter(f))
         case GmosNorthImaging(_, _)                  =>
           mode
         case GmosNorthSpectroscopy(_, _, _, _, _, _) =>
@@ -170,12 +166,6 @@ object GeneratorParamsService {
       )(using Transaction[F]): F[Map[Observation.Id, Either[Error, GeneratorParams]]] =
         doSelect(selectAllParams(pid, selection))
 
-      override def selectAllUnexecuted(
-        pid:       Program.Id,
-        selection: ObservationSelection
-      )(using Transaction[F]): F[Map[Observation.Id, Either[Error, GeneratorParams]]] =
-        doSelect(selectAllParamsUnexecuted(pid, selection))
-
       private def doSelect(
         params: F[List[ParamsRow]]
       )(using Transaction[F]): F[Map[Observation.Id, Either[Error, GeneratorParams]]] =
@@ -212,12 +202,6 @@ object GeneratorParamsService {
         selection: ObservationSelection
       ): F[List[ParamsRow]] =
         executeSelect(Statements.selectAllParams(user, pid, /*minStatus,*/ selection))
-
-      private def selectAllParamsUnexecuted(
-        pid:       Program.Id,
-        selection: ObservationSelection
-      ): F[List[ParamsRow]] =
-        executeSelect(Statements.selectAllParamsUnexecuted(user, pid, selection))
 
       private def executeSelect(af: AppliedFragment): F[List[ParamsRow]] =
         session
@@ -553,31 +537,6 @@ object GeneratorParamsService {
         selector                                                             |+|
         existsUserReadAccess(user, programId).fold(AppliedFragment.empty) { af => void""" AND """ |+| af }
     }
-
-    def selectAllParamsUnexecuted(
-      user:      User,
-      programId: Program.Id,
-      selection: ObservationSelection
-    ): AppliedFragment = {
-      val selector = selection match
-        case ObservationSelection.All         => void""
-        case ObservationSelection.Science     => void" AND ob.c_calibration_role is null "
-        case ObservationSelection.Calibration => void" AND ob.c_calibration_role is not null "
-
-      sql"""
-        SELECT
-          #${ParamColumns("gp")}
-        FROM v_generator_params gp
-        INNER JOIN t_observation ob ON gp.c_observation_id = ob.c_observation_id
-        LEFT JOIN t_execution_event ee ON ob.c_observation_id = ee.c_observation_id
-        WHERE
-      """(Void) |+|
-        sql"""gp.c_program_id = $program_id""".apply(programId)              |+|
-        void""" AND ob.c_existence = 'present' """                           |+|
-        void""" AND ob.c_workflow_user_state is distinct from 'inactive' """ |+|
-        void""" AND ee.c_observation_id IS NULL """                          |+|
-        selector                                                             |+|
-        existsUserReadAccess(user, programId).fold(AppliedFragment.empty) { af => void""" AND """ |+| af }
-    }
   }
+
 }

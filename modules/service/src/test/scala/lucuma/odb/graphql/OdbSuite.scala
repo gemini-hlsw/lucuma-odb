@@ -96,6 +96,8 @@ import org.testcontainers.containers.PostgreSQLContainer.POSTGRESQL_PORT
 import org.testcontainers.containers.wait.strategy.Wait
 import org.testcontainers.images.builder.ImageFromDockerfile
 import org.typelevel.log4cats.Logger
+import org.typelevel.log4cats.LoggerFactory
+import org.typelevel.log4cats.slf4j.Slf4jFactory
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 import skunk.Session
 import software.amazon.awssdk.services.s3.model.S3Exception
@@ -204,6 +206,9 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       }: Unit
     }
     new GenericContainer.Def(dbContainer) {}
+
+  given LoggerFactory[IO] =
+    Slf4jFactory.create[IO]
 
   implicit val log: Logger[IO] =
     Slf4jLogger.getLoggerFromName("lucuma-odb-test")

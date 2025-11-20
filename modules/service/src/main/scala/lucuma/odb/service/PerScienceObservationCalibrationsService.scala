@@ -56,7 +56,7 @@ trait PerScienceObservationCalibrationsService[F[_]]:
 
 object PerScienceObservationCalibrationsService:
   def instantiate[F[_]: {Concurrent as F, Logger, Services as S}]: PerScienceObservationCalibrationsService[F] =
-    new PerScienceObservationCalibrationsService[F] with CalibrationObservations:
+    new PerScienceObservationCalibrationsService[F] with CalibrationObservations with WorkflowStateQueries[F]:
 
       val groupService  = S.groupService
       val observationService = S.observationService
@@ -223,14 +223,14 @@ object PerScienceObservationCalibrationsService:
       private def deleteTelluricObservationsFromGroups(
         groupIds: List[Group.Id]
       )(using Transaction[F], SuperUserAccess): F[List[Observation.Id]] =
-        groupIds.flatTraverse( gid =>
-          findTelluricObservation(gid).flatMap:
-            case Some(telluricOid) =>
-              observationService.deleteCalibrationObservations(NonEmptyList.one(telluricOid))
-                .as(List(telluricOid))
-            case None =>
-              List.empty[Observation.Id].pure[F]
-        )
+        for
+          allTelluricOids <- groupIds.flatTraverse(gid => findTelluricObservation(gid).map(_.toList))
+          // Filter ongoing and completed
+          toDelete        <- excludeOngoingAndCompleted(allTelluricOids, identity)
+          deleted         <- NonEmptyList.fromList(toDelete) match
+                               case Some(nel) => observationService.deleteCalibrationObservations(nel).as(toDelete)
+                               case None      => List.empty.pure[F]
+        yield deleted
 
       private def readTelluricGroup(
         pid:  Program.Id,
@@ -328,9 +328,10 @@ object PerScienceObservationCalibrationsService:
         pid:        Program.Id,
         scienceObs: List[ObsExtract[CalibrationConfigSubset]]
       )(using Transaction[F], SuperUserAccess): F[(List[Observation.Id], List[Observation.Id])] =
-        val currentObsIds = scienceObs.map(_.id).toSet
-
         for
+          // only include observations that are Defined or Ready
+          activeScienceObs <- onlyDefinedAndReady(scienceObs, _.id)
+          currentObsIds     = activeScienceObs.map(_.id).toSet
           _                 <- info"Recalculating per science calibrations for $pid"
           _                 <- debug"Program $pid has ${currentObsIds.size} science configurations"
           _                 <- S.session.execute(sql"set constraints all deferred".command)
@@ -362,7 +363,7 @@ object PerScienceObservationCalibrationsService:
           // Reload tree for group creation/lookup
           tree              <- groupService.selectGroups(pid)
           // Create/sync telluric for each science obs
-          added             <- scienceObs.traverse(obs => generateTelluricForScience(pid, tree, obs))
+          added             <- activeScienceObs.traverse(obs => generateTelluricForScience(pid, tree, obs))
           _                 <- (info"Added ${added.size} telluric observation on program $pid: $added").whenA(toMove.nonEmpty)
         yield (added.flatten, deleted)
 

@@ -74,6 +74,7 @@ class executionTwilight extends ExecutionTestSupportForGmos {
       p <- createProgram
       t <- createTargetAs(pi, p, "real target")
       o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+      _ <- runObscalcUpdate(p, o)
     yield (p, o)
 
   val setup: IO[(Program.Id, Observation.Id, Calibrations)] =

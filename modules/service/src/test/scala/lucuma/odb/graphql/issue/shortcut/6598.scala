@@ -232,7 +232,7 @@ class ShortCut_6598 extends ExecutionTestSupportForGmos:
       _   <- setObservationWorkflowState(pi, o1, ObservationWorkflowState.Inactive)
       _   <- recalculateCalibrations(pid, when)
       // Calibs restored, given only one science config it should have 1 specphoto + 1 twilight
-      // With the bug we would unteragetd calibratoins observations as a shared target was deleted 
+      // With the bug we would unteragetd calibratoins observations as a shared target was deleted
       // on the inactivated observation
       _   <- countCalibrations(pid).assertEquals(CalibrationCounts(1, 1, 0, 0))
     } yield ()

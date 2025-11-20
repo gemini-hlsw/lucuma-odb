@@ -19,11 +19,13 @@ import grackle.Result
 import lucuma.catalog.clients.GaiaClient
 import lucuma.core.model.Access
 import lucuma.core.model.User
+import lucuma.core.util.CalculationState
 import lucuma.itc.client.ItcClient
 import lucuma.odb.Config
+import lucuma.odb.data.EditType
 import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.graphql.topic.CalibTimeTopic
-import lucuma.odb.graphql.topic.ObservationTopic
+import lucuma.odb.graphql.topic.ObscalcTopic
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.S3FileService
 import lucuma.odb.service.Services
@@ -36,7 +38,8 @@ import org.http4s.client.Client
 import org.http4s.headers.Authorization
 import org.typelevel.ci.CIString
 import org.typelevel.log4cats.Logger
-import org.typelevel.log4cats.slf4j.Slf4jLogger
+import org.typelevel.log4cats.LoggerFactory
+import org.typelevel.log4cats.slf4j.Slf4jFactory
 import org.typelevel.log4cats.syntax.*
 import skunk.{Command as _, *}
 
@@ -74,7 +77,8 @@ object CalibrationsMain extends CommandIOApp(
     Opts(serve)
 
   lazy val serve: IO[ExitCode] = {
-    given Logger[IO] = Slf4jLogger.getLoggerFromName[IO]("calibrations-service")
+    given LF: LoggerFactory[IO] = Slf4jFactory.create[IO]
+    given Logger[IO] = LF.getLoggerFromName("calibrations-service")
 
     import natchez.Trace.Implicits.noop
 
@@ -116,41 +120,44 @@ object CMain extends MainParams {
     )
   }
 
-
   def serviceUser[F[_]: Async: Trace: Network: Logger](c: Config): F[Option[User]] =
     c.ssoClient.use: sso =>
       sso.get(Authorization(Credentials.Token(CIString("Bearer"), c.serviceJwt)))
 
   def topics[F[_]: Concurrent: Logger: Trace](pool: Resource[F, Session[F]]):
-   Resource[F, (Topic[F, ObservationTopic.Element], Topic[F, CalibTimeTopic.Element])] =
+   Resource[F, (Topic[F, ObscalcTopic.Element], Topic[F, CalibTimeTopic.Element])] =
     for {
       sup <- Supervisor[F]
       ses <- pool
       ctt <- Resource.eval(CalibTimeTopic(ses, 1024, sup))
-      top <- Resource.eval(ObservationTopic(ses, 1024, sup))
+      top <- Resource.eval(ObscalcTopic(ses, 1024, sup))
     } yield (top, ctt)
 
   def runCalibrationsDaemon[F[_]: {Async, Logger, Clock as C}](
-    obsTopic: Topic[F, ObservationTopic.Element],
+    obscalcTopic: Topic[F, ObscalcTopic.Element],
     calibTopic: Topic[F, CalibTimeTopic.Element],
     services: Resource[F, Services[F]]
   ): Resource[F, Unit] =
-    summon[Monad[F]]
     for {
-      _  <- Resource.eval(info"Start listening for program changes")
-      _  <- Resource.eval(obsTopic.subscribe(100).evalMap { elem =>
+      _  <- Resource.eval(info"Calibrations Service starting")
+      _  <- Resource.eval(info"Start listening for obscalc changes")
+      _  <- Resource.eval(obscalcTopic.subscribe(100).evalMap { elem =>
               services.use: svc =>
                 services.useTransactionally:
                   Services.asSuperUser:
                     for {
                       i <- svc.calibrationsService.isCalibration(elem.observationId)
-                      _ <- info"Observation channel: Element(${elem.observationId},${elem.programId},${elem.editType},${elem.users}), calibration: $i"
-                      t <- C.realTimeInstant.map(i => LocalDate.ofInstant(i, ZoneOffset.UTC))
+                      _ <- (info"Calibrations Service Obscalc channel: Element(${elem.observationId},${elem.programId},${elem.editType},oldState=${elem.oldState},newState=${elem.newState},${elem.users}), is calibration: $i").whenA(i)
+                      t <- C.realTimeInstant.map(LocalDate.ofInstant(_, ZoneOffset.UTC))
                       _ <- calibrationsService
                             .recalculateCalibrations(
                               elem.programId,
                               LocalDateTime.of(t, LocalTime.MIDNIGHT).toInstant(ZoneOffset.UTC)
-                            ).unlessA(i) // Don't execute for changes from calibration events
+                            ).whenA(!i &&
+                                    elem.newState.exists(_ === CalculationState.Ready) &&
+                                    elem.oldState =!= elem.newState &&
+                                    (elem.editType === EditType.Created ||
+                                     elem.editType === EditType.Updated))
                     } yield Result.unit
             }.compile.drain.start.void)
       _  <- Resource.eval(info"Start listening for calibration time changes")
@@ -162,7 +169,7 @@ object CMain extends MainParams {
             }.compile.drain.start.void)
     } yield ()
 
-  def services[F[_]: Temporal: Parallel: UUIDGen: Trace: Logger](
+  def services[F[_]: Temporal: Parallel: UUIDGen: Trace: Logger: LoggerFactory](
     user: Option[User],
     enums: Enums,
     emailConfig: Config.Email,
@@ -197,7 +204,7 @@ object CMain extends MainParams {
    * Our main server, as a resource that starts up our server on acquire and shuts it all down
    * in cleanup, yielding an `ExitCode`. Users will `use` this resource and hold it forever.
    */
-  def server[F[_]: Async: Parallel: Logger: Trace: Console: Network: SecureRandom]: Resource[F, ExitCode] =
+  def server[F[_]: Async: Parallel: Logger: LoggerFactory: Trace: Console: Network: SecureRandom]: Resource[F, ExitCode] =
     for {
       c           <- Resource.eval(Config.fromCiris.load[F])
       _           <- Resource.eval(banner[F](c))
@@ -216,7 +223,7 @@ object CMain extends MainParams {
     } yield ExitCode.Success
 
   /** Our logical entry point. */
-  def runF[F[_]:   Async: Parallel: Logger: Trace: Network: Console: SecureRandom]: F[ExitCode] =
+  def runF[F[_]:   Async: Parallel: Logger: LoggerFactory: Trace: Network: Console: SecureRandom]: F[ExitCode] =
     server.use(_ => Concurrent[F].never[ExitCode])
 
 }

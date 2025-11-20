@@ -3,6 +3,7 @@
 
 package lucuma.odb.service
 
+import cats.Applicative
 import cats.Order.catsKernelOrderingForOrder
 import cats.data.NonEmptyList
 import cats.effect.MonadCancelThrow
@@ -37,6 +38,7 @@ import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.util.Codecs.*
 import lucuma.refined.*
 import org.typelevel.log4cats.Logger
+import org.typelevel.log4cats.LoggerFactory
 import org.typelevel.log4cats.syntax.*
 import skunk.AppliedFragment
 import skunk.Transaction
@@ -56,8 +58,10 @@ trait PerProgramPerConfigCalibrationsService[F[_]]:
 object PerProgramPerConfigCalibrationsService:
   val CalibrationsGroupName: NonEmptyString = "Calibrations".refined
 
-  def instantiate[F[_]: {MonadCancelThrow, Services, Logger}]: PerProgramPerConfigCalibrationsService[F] =
-    new PerProgramPerConfigCalibrationsService[F] with CalibrationObservations:
+  def instantiate[F[_]: {MonadCancelThrow, Services, LoggerFactory as LF}]: PerProgramPerConfigCalibrationsService[F] =
+    new PerProgramPerConfigCalibrationsService[F] with CalibrationObservations with WorkflowStateQueries[F]:
+      given Logger[F] = LF.getLoggerFromName("per-program-calibrations")
+
       private def calObsProps(
         calibConfigs: List[ObsExtract[CalibrationConfigSubset]]
       ): Map[CalibrationConfigSubset, CalObsProps] =
@@ -211,15 +215,17 @@ object PerProgramPerConfigCalibrationsService:
         scienceConfigs: List[CalibrationConfigSubset],
         calibrations:   List[ObsExtract[CalibrationConfigSubset]]
       )(using Transaction[F], ServiceAccess): F[List[Observation.Id]] = {
-        val unnecessaryOids = calibrations.collect {
+        val candidates = calibrations.collect {
           case ObsExtract(oid, _, _, Some(role), config)
             if !isCalibrationNeeded(scienceConfigs, config, role) => oid
         }
 
-        NonEmptyList.fromList(unnecessaryOids) match {
-          case Some(oids) => observationService.deleteCalibrationObservations(oids).as(oids.toList)
-          case None       => List.empty.pure[F]
-        }
+        excludeOngoingAndCompleted(candidates, identity)
+        .flatMap: unnecessaryOids =>
+          NonEmptyList.fromList(unnecessaryOids) match {
+            case Some(oids) => observationService.deleteCalibrationObservations(oids).as(oids.toList)
+            case None       => List.empty.pure[F]
+          }
       }
 
       // Update the signal to noise at wavelength for each calbiration observation depending
@@ -278,6 +284,16 @@ object PerProgramPerConfigCalibrationsService:
             )
           }.void
 
+      private def deleteEmptyCalibrationGroup(pid: Program.Id)(using Transaction[F], ServiceAccess): F[Unit] =
+        groupService.selectGroups(pid).flatMap:
+          case GroupTree.Root(_, children) =>
+            children.collectFirst {
+              case GroupTree.Branch(gid, _, _, obs, Some(CalibrationsGroupName), _, _, _, true, _)
+                if obs.isEmpty => gid
+            }.traverse_(groupService.deleteSystemGroup(pid, _))
+          case _                           =>
+            Applicative[F].unit
+
       override def generateCalibrations(
         pid: Program.Id,
         allSci: List[ObsExtract[ObservingMode]],
@@ -285,31 +301,32 @@ object PerProgramPerConfigCalibrationsService:
         calibTargets: List[(Target.Id, String, CalibrationRole, Coordinates)],
         when: Instant
       )(using Transaction[F], ServiceAccess): F[(List[Observation.Id], List[Observation.Id])] =
+
         // Filter for GMOS observations (exclude F2)
-        val gmosSci = allSci.filterNot(_.data.toConfigSubset.isInstanceOf[Flamingos2Configs])
-        val gmosCalibs = toConfigForCalibration(allCalibs).filterNot(_.data.isInstanceOf[Flamingos2Configs])
+        val gmosSci = allSci.collect(ObsExtract.perProgramFilter)
+        val gmosCalibs = toConfigForCalibration(allCalibs).collect(ObsExtract.perProgramCalibrationFilter)
 
-        // unique GMOS configurations
-        val uniqueSci = uniqueConfiguration(gmosSci)
-
-        // Extract props from all science observations
-        val props = calObsProps(toConfigForCalibration(allSci))
-
-        // Create ideal targets for each site
-        val gnTgt = CalibrationIdealTargets(Site.GN, when, calibTargets)
-        val gsTgt = CalibrationIdealTargets(Site.GS, when, calibTargets)
-
-        val configsPerRole = calculateConfigurationsPerRole(uniqueSci, gmosCalibs)
-
-        for
-          _              <- info"Recalculating shared calibrations for $pid, instant $when"
-          _              <- debug"Program $pid has ${uniqueSci.length} science configurations"
+        for {
+          // Filter for only 'defined' or 'ready' observations by checking workflow state
+          activeGmosSci   <- onlyDefinedAndReady(gmosSci, _.id)
+          // unique GMOS configurations
+          uniqueSci       = uniqueConfiguration(activeGmosSci)
+          // Extract props from all science observations
+          props           = calObsProps(toConfigForCalibration(allSci))
+          // Create ideal targets for each site
+          gnTgt           = CalibrationIdealTargets(Site.GN, when, calibTargets)
+          gsTgt           = CalibrationIdealTargets(Site.GS, when, calibTargets)
+          configsPerRole  = calculateConfigurationsPerRole(uniqueSci, gmosCalibs)
+          _              <- info"===== Recalculating shared calibrations for program ID: $pid, instant $when ====="
+          _              <- info"Program $pid has ${uniqueSci.length} science configurations"
           // Remove calibrations that are not needed, basically when a config is removed
           removedOids    <- removeUnnecessaryCalibrations(uniqueSci, gmosCalibs)
-          _              <- (debug"Program $pid will remove unnecessary calibrations $removedOids").whenA(removedOids.nonEmpty)
+          _              <- (info"Program $pid will remove unnecessary calibrations $removedOids").whenA(removedOids.nonEmpty)
           // Generate new calibrations for each unique configuration
           addedOids      <- generateGMOSLSCalibrations(pid, props, configsPerRole, gnTgt, gsTgt)
-          _              <- (debug"Program $pid added calibrations $addedOids").whenA(addedOids.nonEmpty)
+          _              <- (info"Program $pid added calibrations $addedOids").whenA(addedOids.nonEmpty)
           calibUpdates    = prepareCalibrationUpdates(gmosCalibs, removedOids, props)
           _              <- updatePropsAt(calibUpdates)
-        yield (addedOids, removedOids)
+          // Delete the calibration group if empty
+          _              <- deleteEmptyCalibrationGroup(pid)
+        } yield (addedOids, removedOids)
