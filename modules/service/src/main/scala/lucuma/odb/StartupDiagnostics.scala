@@ -159,21 +159,21 @@ object StartupDiagnostics:
       def assertUnusedPostgresEnum(tpe: Type): StateT[F, DiagState, Unit] =
         StateT.modify(_.updated(tpe))
 
-      def checkPostgresEnum[E: Enumerated](decoder: Codec[E]): StateT[F, DiagState, Unit] =
+      def checkPostgresEnum[E: Enumerated](codec: Codec[E]): StateT[F, DiagState, Unit] =
         StateT.modifyF: ds =>
-          db.stream(sql"SELECT unnest(enum_range(NULL::#${decoder.types.head.name})::_varchar) as value".query(varchar))(skunk.Void, 104)
+          db.stream(sql"SELECT unnest(enum_range(NULL::#${codec.types.head.name})::_varchar) as value".query(varchar))(skunk.Void, 104)
             .compile
             .toList
-            .map(align(decoder, "the database schema"))
-            .map(ds.updated(decoder.types, _))
+            .map(align(codec, "the database schema"))
+            .map(ds.updated(codec.types, _))
 
-      def checkPostgresLookupTable[E: Enumerated: TypeName](decoder: Codec[E], tableName: String): StateT[F, DiagState, Unit] =
+      def checkPostgresLookupTable[E: Enumerated: TypeName](codec: Codec[E], tableName: String): StateT[F, DiagState, Unit] =
         StateT.modifyF: ds =>
           db.stream(sql"SELECT c_tag FROM #$tableName".query(varchar))(skunk.Void, 104)
             .compile
             .toList
-            .map(align(decoder, s"lookup table $tableName"))
-            .map(ds.updated(decoder.types, _))
+            .map(align(codec, s"lookup table $tableName"))
+            .map(ds.updated(codec.types, _))
 
       def checkEnumCoverage: StateT[F, DiagState, Unit] =
         StateT.modifyF: ds =>
