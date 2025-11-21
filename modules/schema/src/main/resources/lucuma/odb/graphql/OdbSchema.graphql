@@ -1467,11 +1467,6 @@ enum GcalFilter {
   """
   GMOS
 
-  # """
-  # GcalFilter Hros
-  # """
-  # HROS
-
   """
   GcalFilter Nir
   """
@@ -1481,11 +1476,6 @@ enum GcalFilter {
   GcalFilter Nd10
   """
   ND10
-
-  # """
-  # GcalFilter Nd16
-  # """
-  # ND16
 
   """
   GcalFilter Nd20
@@ -1507,10 +1497,6 @@ enum GcalFilter {
   """
   ND45
 
-  # """
-  # GcalFilter Nd50
-  # """
-  # ND50
 }
 
 """
@@ -3915,15 +3901,6 @@ enum ProgramUserRole {
   SUPPORT_SECONDARY
 }
 
-# """
-# The type of support role.
-# """
-# enum ProgramUserSupportRoleType {
-#   "Staff support"
-#   STAFF
-#   "Partner support"
-#   PARTNER
-# }
 
 """
 An assignment of a user to a program.
