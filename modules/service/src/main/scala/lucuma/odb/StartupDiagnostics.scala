@@ -11,10 +11,16 @@ import grackle.EnumType
 import grackle.Schema
 import grackle.Type as GrackleType
 import lucuma.core.enums.*
+import lucuma.core.enums.Band
+import lucuma.core.math.BrightnessUnits.*
+import lucuma.core.math.dimensional.*
 import lucuma.core.model.*
+import lucuma.core.model.sequence.TimeChargeCorrection
 import lucuma.core.syntax.string.*
+import lucuma.core.util.*
 import lucuma.core.util.Enumerated
 import lucuma.odb.data.*
+import lucuma.odb.graphql.enums.*
 import lucuma.odb.service.ObservationWorkflowService
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.GmosCodecs.*
@@ -25,7 +31,6 @@ import skunk.Session
 import skunk.codec.text.varchar
 import skunk.data.Type as PgType
 import skunk.syntax.all.*
-import lucuma.odb.graphql.enums.* 
 
 trait StartupDiagnostics[F[_]]:
 
@@ -164,9 +169,9 @@ object StartupDiagnostics:
           checkSchemaEnum[Band]("Band"),
           checkSchemaEnum[BlindOffsetType]("BlindOffsetType"),
           checkSchemaEnum[Breakpoint]("Breakpoint"),
-          // checkSchemaEnum[BrightnessIntegratedUnits]("BrightnessIntegratedUnits"),
-          // checkSchemaEnum[BrightnessSurfaceUnits]("BrightnessSurfaceUnits"),
-          // checkSchemaEnum[CalculationState]("CalculationState"),
+          checkSchemaEnum[Units Of Brightness[Integrated]]("BrightnessIntegratedUnits"),
+          checkSchemaEnum[Units Of Brightness[Surface]]("BrightnessSurfaceUnits"),
+          checkSchemaEnum[CalculationState]("CalculationState"),
           checkSchemaEnum[CalibrationRole]("CalibrationRole"),
           checkSchemaEnum[CallForProposalsType]("CallForProposalsType"),
           checkSchemaEnum[CatalogName]("CatalogName"),
@@ -194,8 +199,8 @@ object StartupDiagnostics:
           checkSchemaEnum[Flamingos2ReadMode]("Flamingos2ReadMode"),
           checkSchemaEnum[Flamingos2ReadoutMode]("Flamingos2ReadoutMode"),
           checkSchemaEnum[Flamingos2Reads]("Flamingos2Reads"),
-          // checkSchemaEnum[FluxDensityContinuumIntegratedUnits]("FluxDensityContinuumIntegratedUnits"),
-          // checkSchemaEnum[FluxDensityContinuumSurfaceUnits]("FluxDensityContinuumSurfaceUnits"),
+          checkSchemaEnum[Units Of FluxDensityContinuum[Integrated]]("FluxDensityContinuumIntegratedUnits"),
+          checkSchemaEnum[Units Of FluxDensityContinuum[Surface]]("FluxDensityContinuumSurfaceUnits"),
           checkSchemaEnum[FocalPlane]("FocalPlane"),
           checkSchemaEnum[GalaxySpectrum]("GalaxySpectrum"),
           checkSchemaEnum[GcalArc]("GcalArc"),
@@ -225,12 +230,9 @@ object StartupDiagnostics:
           checkSchemaEnum[GmosSouthGrating]("GmosSouthGrating"),
           checkSchemaEnum[GmosSouthStageMode]("GmosSouthStageMode"),
           checkSchemaEnum[GuideProbe]("GuideProbe"),
-          // checkSchemaEnum[GuideState]("GuideState"),
-          // checkSchemaEnum[HiiRegionSpectrum]("HiiRegionSpectrum"),
+          checkSchemaEnum[StepGuideState]("GuideState"),
           checkSchemaEnum[ImageQuality.Preset]("ImageQualityPreset"),
           checkSchemaEnum[Instrument]("Instrument"),
-          // checkSchemaEnum[LineFluxIntegratedUnits]("LineFluxIntegratedUnits"),
-          // checkSchemaEnum[LineFluxSurfaceUnits]("LineFluxSurfaceUnits"),
           checkSchemaEnum[MosPreImaging]("MosPreImaging"),
           checkSchemaEnum[MultipleFiltersMode]("MultipleFiltersMode"),
           checkSchemaEnum[ObsActiveStatus]("ObsActiveStatus"),
@@ -264,9 +266,8 @@ object StartupDiagnostics:
           checkSchemaEnum[StepType]("StepType"),
           checkSchemaEnum[TacCategory]("TacCategory"),
           checkSchemaEnum[TargetDisposition]("TargetDisposition"),
-          // checkSchemaEnum[TelluricTag]("TelluricTag"),
           checkSchemaEnum[TimeAccountingCategory]("TimeAccountingCategory"),
-          // checkSchemaEnum[TimeChargeCorrectionOp]("TimeChargeCorrectionOp"),
+          checkSchemaEnum[TimeChargeCorrection.Op]("TimeChargeCorrectionOp"),
           checkSchemaEnum[TimingWindowInclusion]("TimingWindowInclusion"),
           checkSchemaEnum[ToOActivation]("ToOActivation"),
           checkSchemaEnum[InvitationStatus]("UserInvitationStatus"),
@@ -278,6 +279,10 @@ object StartupDiagnostics:
           assertUnmappedSchemaEnum("Ignore"),
           assertUnmappedSchemaEnum("ConditionsExpectationType"),
           assertUnmappedSchemaEnum("ConditionsMeasurementSource"),
+          assertUnmappedSchemaEnum("LineFluxIntegratedUnits"), // Probably should an enum for this
+          assertUnmappedSchemaEnum("LineFluxSurfaceUnits"),    // Probably should an enum for this
+          assertUnmappedSchemaEnum("TelluricTag"),
+          assertUnmappedSchemaEnum("HiiRegionSpectrum"),       // Probably should an enum for this
 
           // These should come last, to see what we missed above.
           checkEnumCoverage, 
