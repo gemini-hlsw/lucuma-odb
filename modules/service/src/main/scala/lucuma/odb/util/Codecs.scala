@@ -854,12 +854,11 @@ trait Codecs {
   val observation_workflow_state: Codec[ObservationWorkflowState] =
     enumerated(Type("e_workflow_state"))
 
-  val observation_workflow_user_state: Codec[ObservationWorkflowState] =
-    enumerated(Type("e_workflow_user_state"))
-
   val user_state: Codec[ObservationWorkflowService.UserState] =
     import ObservationWorkflowService.UserState
     import ObservationWorkflowState.*
+    val observation_workflow_user_state: Codec[ObservationWorkflowState] =
+      enumerated(Type("e_workflow_user_state"))
     observation_workflow_user_state.eimap[UserState] {
       case Inactive   => Right(Inactive)
       case Ready      => Right(Ready)

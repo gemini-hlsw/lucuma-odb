@@ -2501,6 +2501,14 @@ trait DatabaseOperations { this: OdbSuite =>
     ).map: json =>
       json.hcursor.downFields("setObservationWorkflowState", "state").require[ObservationWorkflowState]
 
+  // write workflow state directly without going through obscalc
+  def setCalculatedWorkflowState(oid: Observation.Id, state: ObservationWorkflowState): IO[Unit] =
+    session.use(_.execute(sql"""
+      UPDATE t_obscalc
+      SET c_workflow_state = ${observation_workflow_state}
+      WHERE c_observation_id = ${observation_id}
+    """.command)(state, oid)).void
+
   private def itcQuery(oids: Observation.Id*) =
     s"""
       query {

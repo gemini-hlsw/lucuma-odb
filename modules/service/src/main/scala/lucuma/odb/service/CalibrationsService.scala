@@ -27,14 +27,12 @@ import lucuma.odb.graphql.input.EditAsterismsPatchInput
 import lucuma.odb.graphql.mapping.AccessControl
 import lucuma.odb.sequence.ObservingMode
 import lucuma.odb.sequence.data.GeneratorParams
-import lucuma.odb.sequence.flamingos2.longslit.Config as Flamingos2Config
-import lucuma.odb.sequence.gmos.longslit.Config.GmosNorth as GmosNorthLongSlit
-import lucuma.odb.sequence.gmos.longslit.Config.GmosSouth as GmosSouthLongSlit
-import lucuma.odb.service.CalibrationConfigSubset.toConfigSubset
+import lucuma.odb.service.CalibrationConfigSubset.*
 import lucuma.odb.service.Services.SuperUserAccess
 import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.util.Codecs.*
 import org.typelevel.log4cats.Logger
+import org.typelevel.log4cats.LoggerFactory
 import org.typelevel.log4cats.syntax.*
 import skunk.AppliedFragment
 import skunk.Command
@@ -75,6 +73,7 @@ trait CalibrationsService[F[_]] {
 
 object CalibrationsService extends CalibrationObservations {
   val PerProgramPerConfigCalibrationTypes = List(CalibrationRole.SpectroPhotometric, CalibrationRole.Twilight)
+
   private def targetCoordinates(when: Instant)(
     rows: List[(Target.Id, String, CalibrationRole, RightAscension, Declination, Epoch, Option[ProperMotion.RA], Option[ProperMotion.Dec], Option[RadialVelocity], Option[Parallax])]
   ): List[(Target.Id, String, CalibrationRole, Coordinates)] =
@@ -94,8 +93,9 @@ object CalibrationsService extends CalibrationObservations {
       case (tid, name, role, Some(st)) => (tid, name, role, st)
     }
 
-  def instantiate[F[_]: {Concurrent, Services, Logger}]: CalibrationsService[F] =
-    new CalibrationsService[F] {
+  def instantiate[F[_]: {Concurrent, Services, LoggerFactory as LF}]: CalibrationsService[F] =
+    new CalibrationsService[F] with WorkflowStateQueries[F] {
+      given Logger[F] = LF.getLoggerFromName("calibrations-service")
 
       private def collectValid(
         requiresItcInputs: Boolean
@@ -105,10 +105,6 @@ object CalibrationsService extends CalibrationObservations {
             ObsExtract(oid, itc.toOption, band, calibRole, mode)
         }
 
-      // Find all active observations in the program
-      private def activeObservations(pid: Program.Id): F[Set[Observation.Id]] =
-        session.execute(Statements.selectActiveObservations)(pid).map(_.toSet)
-
       /**
        * Requests configuration params for a program id and selection (either science or calibration)
        */
@@ -116,57 +112,37 @@ object CalibrationsService extends CalibrationObservations {
         pid:       Program.Id,
         selection: ObservationSelection
       )(using Transaction[F]): F[List[ObsExtract[ObservingMode]]] =
-        services
-          .generatorParamsService
-          .selectAll(pid, selection = selection)
-          .map(_.toList.collect(collectValid(selection === ObservationSelection.Science)))
-
-      private def allUnexecutedObservations(
-        pid:       Program.Id,
-        selection: ObservationSelection
-      )(using Transaction[F]): F[List[ObsExtract[ObservingMode]]] =
-        services
-          .generatorParamsService
-          .selectAllUnexecuted(pid, selection = selection)
-          .map(_.toList.collect(collectValid(selection === ObservationSelection.Science)))
+        services.generatorParamsService.selectAll(pid, selection = selection).map { paramsMap =>
+          paramsMap.toList.collect(collectValid(selection === ObservationSelection.Science))
+        }
 
       override def calibrationTargets(roles: List[CalibrationRole], referenceInstant: Instant)
         : F[List[(Target.Id, String, CalibrationRole, Coordinates)]] =
           session.execute(Statements.selectCalibrationTargets(roles))(roles)
             .map(targetCoordinates(referenceInstant))
 
-      def perObsFilter: PartialFunction[ObsExtract[ObservingMode], ObsExtract[ObservingMode]] =
-        case d @ ObsExtract(data = _: Flamingos2Config) => d
-
-      def perProgramFilter: PartialFunction[ObsExtract[ObservingMode], ObsExtract[ObservingMode]] =
-        case d @ ObsExtract(data = _: GmosNorthLongSlit) => d
-        case d @ ObsExtract(data = _: GmosSouthLongSlit) => d
-
       def recalculateCalibrations(pid: Program.Id, referenceInstant: Instant)(using Transaction[F], SuperUserAccess): F[(List[Observation.Id], List[Observation.Id])] =
-        val sharedService = PerProgramPerConfigCalibrationsService.instantiate
         val perObsService = PerScienceObservationCalibrationsService.instantiate
+        val sharedService = PerProgramPerConfigCalibrationsService.instantiate
 
         for {
-          _                <- info"Recalculating calibrations for $pid, reference instant  $referenceInstant"
+          _                <- info"=== Recalculating calibrations for program ID: $pid, reference instant $referenceInstant ==="
           // Read calibration targets (shared resource)
           calibTargets     <- calibrationTargets(PerProgramPerConfigCalibrationTypes, referenceInstant)
-          // List of the program's active observations
-          active           <- activeObservations(pid)
-          _                <- (debug"Program $pid has ${active.size} active observations: $active").whenA(active.nonEmpty)
-          // Get all active science and calibration observations
+          // Get all science and calibration observations (regardless of workflow state)
           allSci           <- allObservations(pid, ObservationSelection.Science)
-                                .map(_.filter(u => active.contains(u._1)))
-          _                <- (debug"Program $pid has ${allSci.length} science observations: ${allSci.map(_.id)}").whenA(allSci.nonEmpty)
-          // Get all the active calibration observations (excluding those with execution events)
-          allCalibs        <- allUnexecutedObservations(pid, ObservationSelection.Calibration)
-                                .map(_.filter(u => active.contains(u.id)))
-          _                <- (debug"Program $pid has ${allCalibs.length} active calibration observations: ${allCalibs.map(_.id)}").whenA(allCalibs.nonEmpty)
-          perObs           = allSci.collect(perObsFilter).map(_.map(_.toConfigSubset))
-          perProgram       = allSci.collect(perProgramFilter)
-          _                <- (debug"Program $pid has ${perObs.length} science observations with per obs calibrations: ${perObs.map(_.id)}").whenA(perObs.nonEmpty)
+          _                <- (info"Program ID: $pid has ${allSci.length} science observations: ${allSci.map(_.id)}").whenA(allSci.nonEmpty)
+          // Get all calibration observations
+          allCalibsRaw     <- allObservations(pid, ObservationSelection.Calibration)
+          // Filter out calibrations that are ongoing or completed
+          allCalibs        <- excludeOngoingAndCompleted(allCalibsRaw, _.id)
+          _                <- (info"Program ID: $pid has ${allCalibs.length} unexecuted calibration observations: ${allCalibs.map(_.id)}").whenA(allCalibs.nonEmpty)
+          perObs           = allSci.collect(ObsExtract.perObsFilter).map(_.map(_.toConfigSubset))
+          perProgram       = allSci.collect(ObsExtract.perProgramFilter)
+          _                <- (info"Program $pid has ${perObs.length} science observations with per obs calibrations: ${perObs.map(_.id)}").whenA(perObs.nonEmpty)
           // Handle per-science-observation calibs
           (f2Added, f2Removed)     <- perObsService.generateCalibrations(pid, perObs)
-          _                <- (debug"Program $pid has ${perProgram.length} science observations for per program calibrations: ${perProgram.map(_.id)}").whenA(perProgram.nonEmpty)
+          _                <- (info"Program ID: $pid has ${perProgram.length} science observations for per program calibrations: ${perProgram.map(_.id)}").whenA(perProgram.nonEmpty)
           // Handle per--config calib
           (gmosAdded, gmosRemoved) <- sharedService.generateCalibrations(pid, perProgram, allCalibs, calibTargets, referenceInstant)
           // Clean orphaned targets
@@ -223,6 +199,7 @@ object CalibrationsService extends CalibrationObservations {
 
       override def isCalibration(obsId: Observation.Id): F[Boolean] =
         session.execute(Statements.isCalibration)(obsId).map(_.headOption.getOrElse(false))
+
     }
 
   object Statements {
@@ -272,14 +249,6 @@ object CalibrationsService extends CalibrationObservations {
           FROM t_observation
           WHERE c_observation_id = $observation_id AND c_calibration_role IS NOT NULL
           """.query(observation_id *: calibration_role *: core_timestamp.opt *: observing_mode_type.opt)
-
-    val selectActiveObservations: Query[Program.Id, Observation.Id] =
-      sql"""
-        SELECT
-            c_observation_id
-          FROM t_observation
-          WHERE c_program_id = $program_id AND c_workflow_user_state IS DISTINCT FROM 'inactive'
-          """.query(observation_id)
 
     val isCalibration: Query[Observation.Id, Boolean] =
       sql"""
