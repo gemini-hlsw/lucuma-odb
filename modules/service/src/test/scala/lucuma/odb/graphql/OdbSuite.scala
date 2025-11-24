@@ -54,6 +54,7 @@ import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.ServiceUser
 import lucuma.core.model.User
 import lucuma.core.syntax.timespan.*
+import lucuma.horizons.HorizonsClient
 import lucuma.itc.AsterismIntegrationTimeOutcomes
 import lucuma.itc.IntegrationTime
 import lucuma.itc.ItcVersions
@@ -107,7 +108,6 @@ import java.net.SocketException
 import java.nio.file.Paths
 import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
-import lucuma.horizons.HorizonsClient
 
 object OdbSuite:
   def reportFailure: Throwable => Unit =
