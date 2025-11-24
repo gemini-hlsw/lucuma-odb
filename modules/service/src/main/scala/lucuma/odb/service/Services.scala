@@ -203,20 +203,20 @@ trait Services[F[_]]:
   def itcService: ItcService[F]
 
   /** Construct a `Generator`, given a `CommitHash`.*/
-  def generator(commitHash: CommitHash, ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode): Generator[F]
+  def generator: Generator[F]
 
-  def obscalcService(commitHash: CommitHash, ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode): ObscalcService[F]
+  def obscalcService: ObscalcService[F]
 
   /** The `TimeAccounting` service. */
   def timeAccountingService: TimeAccountingService[F]
 
   /** Construct a `TimeEstimateService`, given a `CommitHash`.*/
-  def timeEstimateService(commitHash: CommitHash, ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode): TimeEstimateService[F]
+  def timeEstimateService: TimeEstimateService[F]
 
   def trackingService: TrackingService[F]
 
   /** Construct a `guideService`, given a `CommitHash` and a `TimeEstimateCalculator`. */
-  def guideService(commitHash: CommitHash, ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode): GuideService[F]
+  def guideService: GuideService[F]
 
   /** The `UserInvitationService` */
   def userInvitationService: UserInvitationService[F]
@@ -249,6 +249,8 @@ object Services:
     enums0: Enums,
     mapping0: Option[Session[F] => Mapping[F]],
     emailConfig0: Config.Email,
+    commitHash0: CommitHash,
+    tc0: TimeEstimateCalculatorImplementation.ForInstrumentMode,
     httpClient0: Client[F],
     itcClient0: ItcClient[F],
     gaiaClient0: GaiaClient[F],
@@ -267,6 +269,8 @@ object Services:
       val itcClient = itcClient0
       val gaiaClient = gaiaClient0
       val s3FileService = s3FileService0
+      val commitHash = commitHash0
+      val tc = tc0
 
       given Services[F] = this // need is for `instantiate` calls below
 
@@ -340,10 +344,10 @@ object Services:
       // `Services` instance.
       lazy val attachmentFileService = AttachmentFileService.instantiate(s3FileService)
       lazy val itcService = ItcService.instantiate(itcClient)
-      def generator(commitHash: CommitHash, ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode) = Generator.instantiate(commitHash, ptc)
-      def obscalcService(commitHash: CommitHash, ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode) = ObscalcService.instantiate(commitHash, ptc)
-      def timeEstimateService(commitHash: CommitHash, ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode) = TimeEstimateService.instantiate(commitHash, ptc)
-      def guideService(commitHash: CommitHash, ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode) = GuideService.instantiate(gaiaClient, commitHash, ptc)
+      lazy val generator = Generator.instantiate(commitHash, tc)
+      lazy val obscalcService = ObscalcService.instantiate
+      lazy val timeEstimateService = TimeEstimateService.instantiate
+      def guideService = GuideService.instantiate(gaiaClient)
       lazy val calibrationsService = CalibrationsService.instantiate
       lazy val emailService = EmailService.fromConfigAndClient(emailConfig, httpClient)
       lazy val groupService = GroupService.instantiate
@@ -401,10 +405,10 @@ object Services:
     def timingWindowService[F[_]](using Services[F]): TimingWindowService[F] = summon[Services[F]].timingWindowService
     def visitService[F[_]](using Services[F]): VisitService[F] = summon[Services[F]].visitService
     def itcService[F[_]](using Services[F]): ItcService[F] = summon[Services[F]].itcService
-    def generator[F[_]](commitHash: CommitHash, ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode)(using Services[F]): Generator[F] = summon[Services[F]].generator(commitHash, ptc)
-    def obscalcService[F[_]](commitHash: CommitHash, ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode)(using Services[F]): ObscalcService[F] = summon[Services[F]].obscalcService(commitHash, ptc)
-    def timeEstimateService[F[_]](commitHash: CommitHash, ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode)(using Services[F]): TimeEstimateService[F] = summon[Services[F]].timeEstimateService(commitHash, ptc)
-    def guideService[F[_]](commitHash: CommitHash, ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode)(using Services[F]): GuideService[F] = summon[Services[F]].guideService(commitHash, ptc)
+    def generator[F[_]](using Services[F]): Generator[F] = summon[Services[F]].generator
+    def obscalcService[F[_]](using Services[F]): ObscalcService[F] = summon[Services[F]].obscalcService
+    def timeEstimateService[F[_]](using Services[F]): TimeEstimateService[F] = summon[Services[F]].timeEstimateService
+    def guideService[F[_]](using Services[F]): GuideService[F] = summon[Services[F]].guideService
     def userInvitationService[F[_]](using Services[F]): UserInvitationService[F] = summon[Services[F]].userInvitationService
     def emailService[F[_]](using Services[F]) = summon[Services[F]].emailService
     def metadata[F[_]](using Services[F]) = summon[Services[F]].metadata

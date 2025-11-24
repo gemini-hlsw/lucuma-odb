@@ -143,15 +143,13 @@ object CalcMain extends MainParams:
 
   def runObscalcDaemon[F[_]: Async: Logger](
     connectionsLimit: Int,
-    commitHash:       CommitHash,
     pollPeriod:       FiniteDuration,
-    timeEstimate:     TimeEstimateCalculatorImplementation.ForInstrumentMode,
     topic:            Topic[F, ObscalcTopic.Element],
     services:         Resource[F, Services[F]]
   ): Resource[F, F[Outcome[F, Throwable, Unit]]] =
 
-    val obscalc: Services[F] ?=> ObscalcService[F] =
-      obscalcService(commitHash, timeEstimate)
+    def obscalc: Services[F] ?=> ObscalcService[F] =
+      obscalcService
 
     // Stream of pending calc produced by watching for updates to t_obscalc.
     // We filter out anything but transitions to Pending.  Entries in the Retry
@@ -215,6 +213,8 @@ object CalcMain extends MainParams:
     enums:       Enums,
     mapping:     Session[F] => Mapping[F],
     emailConfig: Config.Email,
+    commitHash:  CommitHash,
+    calculator:  TimeEstimateCalculatorImplementation.ForInstrumentMode,
     httpClient:  Client[F],
     itcClient:   ItcClient[F],
     gaiaClient:  GaiaClient[F],
@@ -225,6 +225,8 @@ object CalcMain extends MainParams:
       enums,
       mapping.some,
       emailConfig,
+      commitHash,
+      calculator,
       httpClient,
       itcClient,
       gaiaClient,

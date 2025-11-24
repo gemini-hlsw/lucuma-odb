@@ -67,8 +67,6 @@ import lucuma.odb.json.time.query.given
 import lucuma.odb.json.wavelength.query.given
 import lucuma.odb.logic.Generator
 import lucuma.odb.logic.Generator.FutureLimit
-import lucuma.odb.logic.TimeEstimateCalculatorImplementation
-import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.Services
 import skunk.Transaction
 
@@ -82,9 +80,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
   // Resources defined in the final cake.
   def user: model.User
   def services: Resource[F, Services[F]]
-  def timeEstimateCalculator: TimeEstimateCalculatorImplementation.ForInstrumentMode
   def itcClient: ItcClient[F]
-  def commitHash: CommitHash
   def goaUsers: Set[User.Id]
 
   lazy val QueryMapping: ObjectMapping =
@@ -173,7 +169,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
     def generate(pid: Program.Id, oid: Observation.Id, limit: FutureLimit): F[Result[Json]] =
       services.useNonTransactionally:
         Services.asSuperUser:
-          generator(commitHash, timeEstimateCalculator)
+          generator
             .generate(pid, oid, limit)
             .map(_.bimap(_.asWarning(Json.Null), _.asJson.success).merge)
 

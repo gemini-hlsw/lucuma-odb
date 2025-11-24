@@ -55,8 +55,6 @@ import lucuma.odb.graphql.predicate.DatasetPredicates
 import lucuma.odb.graphql.predicate.ExecutionEventPredicates
 import lucuma.odb.graphql.predicate.LeafPredicates
 import lucuma.odb.instances.given
-import lucuma.odb.logic.TimeEstimateCalculatorImplementation
-import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.NoTransaction
 import lucuma.odb.service.Services
 import lucuma.odb.service.Services.SuperUserAccess
@@ -137,12 +135,10 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
   // Resources defined in the final cake.
   def services: Resource[F, Services[F]]
   def user: User
-  def timeEstimateCalculator: TimeEstimateCalculatorImplementation.ForInstrumentMode
   def httpClient: Client[F]
   def gaiaClient: GaiaClient[F]
   def itcClient: ItcClient[F]
   def emailConfig: Config.Email
-  def commitHash: CommitHash
 
   // Convenience for constructing a SqlRoot and corresponding 1-arg elaborator.
   private trait MutationField {
@@ -660,7 +656,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
             case r @ Warning(problems, AccessControl.Checked.Empty) => Failure(problems).pure[F]
             case other =>
               other.flatTraverse: checked =>
-                guideService(commitHash, timeEstimateCalculator)
+                guideService
                   .setGuideTargetName(checked)
                   .nestMap: oid =>
                     Unique(Filter(Predicates.setGuideTargetNameResult.observationId.eql(oid), child))

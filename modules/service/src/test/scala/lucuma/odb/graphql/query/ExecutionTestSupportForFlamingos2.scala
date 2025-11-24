@@ -34,7 +34,6 @@ import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig
 import lucuma.core.model.sequence.flamingos2.Flamingos2FpuMask
 import lucuma.core.syntax.string.*
 import lucuma.core.util.TimeSpan
-import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.service.Services
 import lucuma.odb.smartgcal.data.Flamingos2
 import lucuma.odb.smartgcal.data.SmartGcalValue
@@ -87,8 +86,7 @@ trait ExecutionTestSupportForFlamingos2 extends ExecutionTestSupport:
         Flamingos2.TableRow(PosLong.unsafeFrom(1), f2_key_JH1, f2_arc_JH1)
       )
 
-    Enums.load(s).flatMap: e =>
-      val services = servicesFor(pi /* doesn't matter*/, e)(s)
+    servicesFor(pi /* doesn't matter*/).map(_(s)).use: services =>
       services.transactionally:
         rows.zipWithIndex.traverse_ : (r, i) =>
           Services.asSuperUser:

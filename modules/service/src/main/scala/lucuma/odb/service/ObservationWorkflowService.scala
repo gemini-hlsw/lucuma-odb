@@ -40,6 +40,7 @@ import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.data.Tag
 import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.graphql.mapping.AccessControl
+import lucuma.odb.logic.Generator
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.sequence.data.MissingParamSet
@@ -373,7 +374,7 @@ object ObservationWorkflowService {
         commitHash: CommitHash,
         ptc:        TimeEstimateCalculatorImplementation.ForInstrumentMode
       )(using NoTransaction[F], SuperUserAccess): F[Map[Observation.Id, ExecutionState]] =
-        generator(commitHash, ptc)
+        Generator.instantiate(commitHash, ptc)
           .executionStates:
             infos
               .toList

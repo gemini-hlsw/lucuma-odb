@@ -62,12 +62,10 @@ import lucuma.odb.graphql.mapping.AccessControl
 import lucuma.odb.json.all.query.given
 import lucuma.odb.json.target
 import lucuma.odb.logic.Generator
-import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.sequence.flamingos2
 import lucuma.odb.sequence.gmos
 import lucuma.odb.sequence.syntax.hash.*
-import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.sequence.util.HashBytes
 import lucuma.odb.service.Services.SuperUserAccess
 import lucuma.odb.syntax.result.*
@@ -294,11 +292,9 @@ object GuideService {
           .toResult(generalError(s"Observation duration of ${obsDuration.format} is less than the setup time of ${setupTime.format} for observation $obsId.").asProblem)
   }
 
-  def instantiate[F[_]: Concurrent: Trace](
+  def instantiate[F[_]: Concurrent: Services: Trace](
     gaiaClient:             GaiaClient[F],
-    commitHash:             CommitHash,
-    timeEstimateCalculator: TimeEstimateCalculatorImplementation.ForInstrumentMode,
-  )(using Services[F]): GuideService[F] =
+  ): GuideService[F] =
     new GuideService[F] {
 
       def getAsterism(pid: Program.Id, oid: Observation.Id)(using
@@ -566,7 +562,7 @@ object GuideService {
         oid: Observation.Id
       ): F[Result[GeneratorInfo]] =
         Services.asSuperUser:
-          generator(commitHash, timeEstimateCalculator)
+          generator
             .digestWithParamsAndHash(pid, oid)
             .map:
               case Right((d, p, h)) => GeneratorInfo(d, p, h).success

@@ -45,7 +45,6 @@ import lucuma.core.model.sequence.gmos.GmosFpuMask
 import lucuma.core.model.sequence.gmos.GmosGratingConfig
 import lucuma.core.syntax.string.*
 import lucuma.core.util.TimeSpan
-import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.service.Services
 import lucuma.odb.smartgcal.data.Gmos
 import lucuma.odb.smartgcal.data.SmartGcalValue
@@ -138,8 +137,7 @@ trait ExecutionTestSupportForGmos extends ExecutionTestSupport:
         Gmos.TableRow(PosLong.unsafeFrom(1), gn_key_5_00, gn_arc)
       )
 
-    Enums.load(s).flatMap: e =>
-      val services = servicesFor(pi /* doesn't matter*/, e)(s)
+    servicesFor(pi /* doesn't matter*/).map(_(s)).use: services =>
       services.transactionally:
         rows.zipWithIndex.traverse_ : (r, i) =>
           Services.asSuperUser:

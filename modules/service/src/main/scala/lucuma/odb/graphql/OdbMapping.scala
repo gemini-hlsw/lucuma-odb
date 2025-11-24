@@ -306,6 +306,9 @@ object OdbMapping {
           override val itcClient = itcClient0
           override val user: User = user0
           override val topics: Topics[F] = topics0
+          override val timeEstimateCalculator: TimeEstimateCalculatorImplementation.ForInstrumentMode = tec
+          override val httpClient: Client[F] = httpClient0
+          override val emailConfig: Config.Email = emailConfig0
 
           override val services: Resource[F, Services[F]] =
             pool.map: session =>
@@ -332,16 +335,14 @@ object OdbMapping {
                     shouldValidate = false  // already validated
                   ),
                 emailConfig0,
+                commitHash,
+                timeEstimateCalculator,
                 httpClient0,
                 itcClient0,
                 gaiaClient0,
                 S3FileService.noop[F],
                 horizonsClient0
               )(session)
-
-          override val timeEstimateCalculator: TimeEstimateCalculatorImplementation.ForInstrumentMode = tec
-          override val httpClient: Client[F] = httpClient0
-          override val emailConfig: Config.Email = emailConfig0
 
           def mkTypeMappings(ms: List[TypeMapping]): TypeMappings =
             if shouldValidate then TypeMappings(ms)
@@ -673,9 +674,7 @@ object OdbMapping {
       // These are unused for enum metadata queries.
       def user = sys.error("OdbMapping.forMetadata: no user available")
       def services = sys.error("OdbMapping.forMetadata: no services available")
-      def timeEstimateCalculator = sys.error("OdbMapping.forMetadata: no timeEstimateCalculator available")
       def itcClient = sys.error("OdbMapping.forMetadata: no itcClient available")
-      def commitHash = sys.error("OdbMapping.forMetadata: no commitHash available")
       def goaUsers = sys.error("OdbMapping.forMetadata: no goaUsers available")
 
       // Our schema

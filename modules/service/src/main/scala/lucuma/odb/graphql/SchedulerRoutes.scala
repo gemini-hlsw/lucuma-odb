@@ -24,6 +24,8 @@ import lucuma.horizons.HorizonsClient
 import lucuma.itc.client.ItcClient
 import lucuma.odb.Config
 import lucuma.odb.graphql.enums.Enums
+import lucuma.odb.logic.TimeEstimateCalculatorImplementation
+import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.S3FileService
 import lucuma.odb.service.Services
 import lucuma.odb.service.Services.Syntax.*
@@ -46,6 +48,8 @@ object SchedulerRoutes:
     ssoClient:   SsoClient[F, User],
     enums:       Enums,
     emailConfig: Config.Email,
+    commitHash:  CommitHash,
+    tc:          TimeEstimateCalculatorImplementation.ForInstrumentMode,
     httpClient:  Client[F],
     horizonsClient: HorizonsClient[F],
     itcClient:   ItcClient[F],
@@ -58,6 +62,8 @@ object SchedulerRoutes:
           enums,
           None,
           emailConfig,
+          commitHash,
+          tc,
           httpClient,
           itcClient,
           gaiaClient,
