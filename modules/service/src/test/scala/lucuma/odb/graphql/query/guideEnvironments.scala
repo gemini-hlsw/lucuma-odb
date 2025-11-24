@@ -303,6 +303,9 @@ class guideEnvironments extends ExecutionTestSupportForGmos with GuideEnvironmen
                       "bandNormalized": {
                         "brightnesses": [
                           {
+                            "band": "GAIA"
+                          },
+                          {
                             "band": "GAIA_RP"
                           }
                         ]
@@ -315,17 +318,17 @@ class guideEnvironments extends ExecutionTestSupportForGmos with GuideEnvironmen
                       "id": "3219118090462918016",
                       "objectType": null
                     },
-                    "epoch": "J2023.659",
+                    "epoch": "J2016.000",
                     "ra": {
-                      "microseconds": 20782434012,
-                      "hms": "05:46:22.434012",
-                      "hours": 5.772898336666666666666666666666667,
-                      "degrees": 86.59347505
+                      "microseconds": 20782433789,
+                      "hms": "05:46:22.433789",
+                      "hours": 5.772898274722222222222222222222222,
+                      "degrees": 86.59347412083333333333333333333333
                     },
                     "dec": {
-                      "dms": "-00:08:52.651135",
-                      "degrees": 359.8520413513889,
-                      "microarcseconds": 1295467348865
+                      "dms": "-00:08:52.645460",
+                      "degrees": 359.8520429277778,
+                      "microarcseconds": 1295467354540
                     },
                     "radialVelocity": {
                       "metersPerSecond": 0,
@@ -364,6 +367,9 @@ class guideEnvironments extends ExecutionTestSupportForGmos with GuideEnvironmen
                       "bandNormalized": {
                         "brightnesses": [
                           {
+                            "band": "GAIA"
+                          },
+                          {
                             "band": "GAIA_RP"
                           }
                         ]
@@ -376,17 +382,17 @@ class guideEnvironments extends ExecutionTestSupportForGmos with GuideEnvironmen
                       "id": "3219118640218737920",
                       "objectType": null
                     },
-                    "epoch": "J2023.659",
+                    "epoch": "J2016.000",
                     "ra": {
-                      "microseconds": 20760248368,
-                      "hms": "05:46:00.248368",
-                      "hours": 5.766735657777777777777777777777778,
-                      "degrees": 86.50103486666666666666666666666667
+                      "microseconds": 20760247957,
+                      "hms": "05:46:00.247957",
+                      "hours": 5.766735543611111111111111111111111,
+                      "degrees": 86.50103315416666666666666666666667
                     },
                     "dec": {
-                      "dms": "-00:08:26.299164",
-                      "degrees": 359.8593613433333,
-                      "microarcseconds": 1295493700836
+                      "dms": "-00:08:26.290793",
+                      "degrees": 359.85936366861114,
+                      "microarcseconds": 1295493709207
                     },
                     "radialVelocity": {
                       "metersPerSecond": 0,
@@ -425,6 +431,9 @@ class guideEnvironments extends ExecutionTestSupportForGmos with GuideEnvironmen
                       "bandNormalized": {
                         "brightnesses": [
                           {
+                            "band": "GAIA"
+                          },
+                          {
                             "band": "GAIA_RP"
                           }
                         ]
@@ -437,17 +446,17 @@ class guideEnvironments extends ExecutionTestSupportForGmos with GuideEnvironmen
                       "id": "3219142829474535424",
                       "objectType": null
                     },
-                    "epoch": "J2023.659",
+                    "epoch": "J2016.000",
                     "ra": {
-                      "microseconds": 20782383801,
-                      "hms": "05:46:22.383801",
-                      "hours": 5.772884389166666666666666666666667,
-                      "degrees": 86.5932658375
+                      "microseconds": 20782389077,
+                      "hms": "05:46:22.389077",
+                      "hours": 5.772885854722222222222222222222222,
+                      "degrees": 86.59328782083333333333333333333333
                     },
                     "dec": {
-                      "dms": "-00:03:38.949866",
-                      "degrees": 359.9391805927778,
-                      "microarcseconds": 1295781050134
+                      "dms": "-00:03:38.722655",
+                      "degrees": 359.93924370694447,
+                      "microarcseconds": 1295781277345
                     },
                     "radialVelocity": {
                       "metersPerSecond": 0,

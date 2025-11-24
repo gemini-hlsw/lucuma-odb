@@ -70,6 +70,8 @@ import lucuma.odb.sequence.util.HashBytes
 import lucuma.odb.service.Services.SuperUserAccess
 import lucuma.odb.syntax.result.*
 import lucuma.odb.util.Codecs.*
+import monocle.Focus
+import monocle.Lens
 import natchez.Trace
 import skunk.*
 import skunk.implicits.*
@@ -139,6 +141,12 @@ object GuideService {
 
   object GuideEnvironment {
     given Encoder[GuideEnvironment] = deriveEncoder
+
+    val posAngle: Lens[GuideEnvironment, Angle] =
+      Focus[GuideEnvironment](_.posAngle)
+
+    val guideTargets: Lens[GuideEnvironment, List[GuideTarget]] =
+      Focus[GuideEnvironment](_.guideTargets)
   }
 
   case class AvailabilityPeriod(
@@ -434,16 +442,17 @@ object GuideService {
 
       def callGaia(
         query: ADQLQuery
-      ): F[Result[List[GuideStarCandidate]]] =
+      ): F[Result[List[(Target.Sidereal, GuideStarCandidate)]]] =
         Trace[F].span("callGaia"):
           val MaxTargets                     = 100
           given ADQLInterpreter          = ADQLInterpreter.nTarget(MaxTargets)
-          gaiaClient.queryGuideStars(query)
-          .map:
-            _.collect { case Right(s) => GuideStarCandidate.siderealTarget.get(s)}
-              .success
-            // Should we have access to a logger in Services so we can log this instead of passing details on to the user?
-          .handleError(e => gaiaError(e.getMessage()).asFailure)
+          gaiaClient
+            .query(query)
+            .map:
+              _.collect { case Right(s) => (s.target, GuideStarCandidate.siderealTarget.get(s.target))}
+                .success
+              // Should we have access to a logger in Services so we can log this instead of passing details on to the user?
+            .handleError(e => gaiaError(e.getMessage()).asFailure)
 
       def getAllCandidates(
         oid:         Observation.Id,
@@ -452,7 +461,7 @@ object GuideService {
         tracking:    Tracking,
         wavelength:  Wavelength,
         constraints: ConstraintSet
-      ): F[Result[List[GuideStarCandidate]]] =
+      ): F[Result[List[(Target.Sidereal, GuideStarCandidate)]]] =
         (for {
           query      <- ResultT.fromResult(
                           getGaiaQuery(oid, start, end, tracking, candidatesArea.candidatesArea, wavelength, constraints)
@@ -467,7 +476,7 @@ object GuideService {
         tracking:    Tracking,
         wavelength:  Wavelength,
         constraints: ConstraintSet
-      ): F[Result[NonEmptyList[GuideStarCandidate]]] =
+      ): F[Result[NonEmptyList[(Target.Sidereal, GuideStarCandidate)]]] =
         (for {
           candidates <- ResultT(getAllCandidates(oid, start, end, tracking, wavelength, constraints))
           nel        <- ResultT.fromResult(
@@ -476,13 +485,13 @@ object GuideService {
                         )
         } yield nel).value
 
-      def getGuideStarFromGaia(name: GuideStarName): F[Result[GuideStarCandidate]] =
+      def getGuideStarFromGaia(name: GuideStarName): F[Result[(Target.Sidereal, GuideStarCandidate)]] =
         ResultT.fromResult(guideStarIdFromName(name)).flatMap { id =>
           ResultT(
-            gaiaClient.queryByIdGuideStar(id)
+            gaiaClient.queryById(id)
               .map:
                 _.toOption
-                  .map(GuideStarCandidate.siderealTarget.get)
+                  .map(s => (s.target, GuideStarCandidate.siderealTarget.get(s.target)))
                   .toResult(gaiaError(s"Star with id $id not found on Gaia.").asProblem)
               // Should we have access to a logger in Services so we can log this instead of passing details on to the user?
               .handleError(e => gaiaError(e.getMessage()).asFailure)
@@ -550,12 +559,13 @@ object GuideService {
 
       // TODO: Can go away after `guideEnvironments` is removed???
       extension (usables: List[AgsAnalysis.Usable])
-        def toGuideEnvironments: List[GuideEnvironment] = usables.map(_.toGuideEnvironment)
+        def toGuideEnvironments(originals: Map[Long, Target.Sidereal]): List[GuideEnvironment] =
+          usables.map(_.toGuideEnvironment(originals)).flattenOption
 
       extension (usable: AgsAnalysis.Usable)
-        def toGuideEnvironment: GuideEnvironment =
-          val target = GuideStarCandidate.siderealTarget.reverseGet(usable.target)
-          GuideEnvironment(usable.posAngle, List(GuideTarget(usable.guideProbe, target)))
+        def toGuideEnvironment(originals: Map[Long, Target.Sidereal]): Option[GuideEnvironment] =
+          originals.get(usable.target.id).map: target =>
+            GuideEnvironment(usable.posAngle, List(GuideTarget(usable.guideProbe, target)))
 
       def getGeneratorInfo(
         pid: Program.Id,
@@ -655,7 +665,7 @@ object GuideService {
                                     t.asterism.map(_._2),
                                     t.base,
                                     blindOffset,
-                                    candidates
+                                    candidates.map(_._2)
                                   )
           availability <- ResultT.fromResult(
                             neededLists.foldLeft(currentAvail.some)((acc, ele) => acc.flatMap(_.union(ele)))
@@ -832,11 +842,12 @@ object GuideService {
           baseTracking     = tracking.base
           asterismTracking = tracking.asterism.map(_._2) // discard the target ids
 
-          candidates    <- ResultT(
+          original      <- ResultT(
                              oGuideStarName.fold(
                               getAllCandidatesNonEmpty(oid, obsTime, visitEnd, baseTracking, genInfo.centralWavelength, obsInfo.constraints)
                              )(gsn => getGuideStarFromGaia(gsn).map(_.map(NonEmptyList.one)))
-                           ).map(_.map(_.at(obsTime.toInstant)))
+                           )
+          candidates     = original.map(_._2.at(obsTime.toInstant)) // PM corrected
           baseCoords    <- ResultT.fromResult(
                              baseTracking.at(obsTime.toInstant)
                                .toResult(
@@ -861,9 +872,10 @@ object GuideService {
                            )
           blindOffsetOpt <- ResultT.liftF(getBlindOffsetCoordinates(oid, obsTime.toInstant))
           optUsable      = chooseBestGuideStar(obsInfo, genInfo.centralWavelength, genInfo, baseCoords, scienceCoords, blindOffsetOpt, angles, candidates)
-          env           <- ResultT.fromResult(
+          tgts           = original.map(x => (x._2.id, x._1)).toList.toMap
+          env            <- ResultT.fromResult(
                              optUsable
-                              .map(_.toGuideEnvironment)
+                              .flatMap(_.toGuideEnvironment(tgts))
                               .toResult (
                                 generalError(
                                   oGuideStarName.fold("No usable guidestars are available.")(name =>
@@ -919,8 +931,9 @@ object GuideService {
                                .plusMicrosOption(genInfo.timeEstimate.toMicroseconds)
                                .toResult(generalError("Visit end time out of range").asProblem)
                            )
-          candidates    <- ResultT(getAllCandidates(oid, obsTime, visitEnd, baseTracking, genInfo.centralWavelength, obsInfo.constraints))
-                            .map(_.map(_.at(obsTime.toInstant)))
+          original <- ResultT(getAllCandidates(oid, obsTime, visitEnd, baseTracking, genInfo.centralWavelength, obsInfo.constraints))
+          originals      = original.map(c => c._2.id -> c._1).toMap
+          candidates     = original.map(_._2.at(obsTime.toInstant))
           baseCoords    <- ResultT.fromResult(
                              baseTracking.at(obsTime.toInstant)
                                .toResult(
@@ -943,7 +956,7 @@ object GuideService {
                            )
           blindOffsetOpt <- ResultT.liftF(getBlindOffsetCoordinates(oid, obsTime.toInstant))
           usable         = processCandidates(obsInfo, genInfo.centralWavelength, genInfo, baseCoords, scienceCoords, blindOffsetOpt, angles, candidates)
-        } yield usable.toGuideEnvironments.toList).value
+        } yield usable.toGuideEnvironments(originals).toList).value
 
       override def getGuideAvailability(pid: Program.Id, oid: Observation.Id, period: TimestampInterval)(
         using NoTransaction[F], SuperUserAccess

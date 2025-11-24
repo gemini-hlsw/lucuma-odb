@@ -496,6 +496,7 @@ trait GuideEnvironmentSuite extends ExecutionTestSupport:
     ).void
 
   // Common expected JSON result for successful guide environment query
+  // Uses original Gaia results
   val successfulGuideEnvironmentResult: Either[List[String], Json] =
     json"""
     {
@@ -515,6 +516,9 @@ trait GuideEnvironmentSuite extends ExecutionTestSupport:
                     "bandNormalized": {
                       "brightnesses": [
                         {
+                          "band": "GAIA"
+                        },
+                        {
                           "band": "GAIA_RP"
                         }
                       ]
@@ -527,17 +531,17 @@ trait GuideEnvironmentSuite extends ExecutionTestSupport:
                     "id": "3219118090462918016",
                     "objectType": null
                   },
-                  "epoch": "J2023.659",
+                  "epoch": "J2016.000",
                   "ra": {
-                    "microseconds": 20782434012,
-                    "hms": "05:46:22.434012",
-                    "hours": 5.772898336666666666666666666666667,
-                    "degrees": 86.59347505
+                    "microseconds": 20782433789,
+                    "hms": "05:46:22.433789",
+                    "hours": 5.772898274722222222222222222222222,
+                    "degrees": 86.59347412083333333333333333333333
                   },
                   "dec": {
-                    "dms": "-00:08:52.651135",
-                    "degrees": 359.8520413513889,
-                    "microarcseconds": 1295467348865
+                    "dms": "-00:08:52.645460",
+                    "degrees": 359.8520429277778,
+                    "microarcseconds": 1295467354540
                   },
                   "radialVelocity": {
                     "metersPerSecond": 0,
