@@ -22,6 +22,7 @@ import lucuma.catalog.clients.GaiaClient
 import lucuma.core.model.Access
 import lucuma.core.model.User
 import lucuma.core.util.CalculationState
+import lucuma.horizons.HorizonsClient
 import lucuma.itc.client.ItcClient
 import lucuma.odb.Config
 import lucuma.odb.data.Obscalc
@@ -48,7 +49,6 @@ import skunk.{Command as _, *}
 
 import scala.concurrent.duration.*
 import scala.util.NotGiven
-import lucuma.horizons.HorizonsClient
 
 sealed trait MainParams:
   val ServiceName: String =

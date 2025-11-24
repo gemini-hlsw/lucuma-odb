@@ -19,6 +19,7 @@ import io.laserdisc.pure.s3.tagless.S3AsyncClientOp
 import lucuma.catalog.clients.GaiaClient
 import lucuma.core.model.User
 import lucuma.graphql.routes.GraphQLService
+import lucuma.horizons.HorizonsClient
 import lucuma.itc.client.ItcClient
 import lucuma.odb.graphql.AttachmentRoutes
 import lucuma.odb.graphql.EmailWebhookRoutes
@@ -51,7 +52,6 @@ import skunk.{Command as _, *}
 import software.amazon.awssdk.services.s3.presigner.S3Presigner
 
 import scala.concurrent.duration.*
-import lucuma.horizons.HorizonsClient
 
 object MainArgs {
   opaque type ResetDatabase = Boolean

@@ -19,6 +19,7 @@ import grackle.skunk.SkunkMapping
 import grackle.skunk.SkunkMonitor
 import lucuma.catalog.clients.GaiaClient
 import lucuma.core.model.User
+import lucuma.horizons.HorizonsClient
 import lucuma.itc.client.ItcClient
 import lucuma.odb.Config
 import lucuma.odb.graphql.enums.Enums
@@ -45,7 +46,6 @@ import org.typelevel.log4cats.LoggerFactory
 
 import scala.io.AnsiColor
 import scala.io.Source
-import lucuma.horizons.HorizonsClient
 
 object OdbMapping {
 
