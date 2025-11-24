@@ -18,6 +18,7 @@ import lucuma.core.model.User
 import lucuma.graphql.routes.GraphQLService
 import lucuma.graphql.routes.HttpRouteHandler
 import lucuma.graphql.routes.Routes as LucumaGraphQLRoutes
+import lucuma.horizons.HorizonsClient
 import lucuma.itc.client.ItcClient
 import lucuma.odb.Config
 import lucuma.odb.graphql.enums.Enums
@@ -67,6 +68,7 @@ object GraphQLRoutes {
     enums:           Enums,
     ptc:             TimeEstimateCalculatorImplementation.ForInstrumentMode,
     httpClient:      Client[F],
+    horizonsClient:  HorizonsClient[F],
     emailConfig:     Config.Email,
     metadataService: GraphQLService[F]
   ): Resource[F, WebSocketBuilder2[F] => HttpRoutes[F]] =
@@ -113,7 +115,7 @@ object GraphQLRoutes {
                         _    <- OptionT.liftF(Services.asSuperUser(userSvc.canonicalizeUser(user).retryOnInvalidCursorName))
 
                         _    <- OptionT.liftF(info(user, s"New service instance."))
-                        map   = OdbMapping(pool, monitor, user, topics, gaiaClient, itcClient, commitHash, goaUsers, enums, ptc, httpClient, emailConfig)
+                        map   = OdbMapping(pool, monitor, user, topics, gaiaClient, itcClient, commitHash, goaUsers, enums, ptc, httpClient, horizonsClient, emailConfig)
                         svc   = new GraphQLService(map, props*) {
                           override def query(request: Operation): F[Result[Json]] =
                             super.query(request).retryOnInvalidCursorName

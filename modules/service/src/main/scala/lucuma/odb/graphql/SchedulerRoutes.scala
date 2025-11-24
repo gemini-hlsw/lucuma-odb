@@ -20,6 +20,7 @@ import lucuma.core.model.sequence.AtomDigest
 import lucuma.core.syntax.string.*
 import lucuma.core.util.Gid
 import lucuma.core.util.Uid
+import lucuma.horizons.HorizonsClient
 import lucuma.itc.client.ItcClient
 import lucuma.odb.Config
 import lucuma.odb.graphql.enums.Enums
@@ -46,6 +47,7 @@ object SchedulerRoutes:
     enums:       Enums,
     emailConfig: Config.Email,
     httpClient:  Client[F],
+    horizonsClient: HorizonsClient[F],
     itcClient:   ItcClient[F],
     gaiaClient:  GaiaClient[F]
   ): HttpRoutes[F] =
@@ -59,7 +61,8 @@ object SchedulerRoutes:
           httpClient,
           itcClient,
           gaiaClient,
-          S3FileService.noop[F]
+          S3FileService.noop[F],
+          horizonsClient,
         )).use(fa),
       ssoClient
     )

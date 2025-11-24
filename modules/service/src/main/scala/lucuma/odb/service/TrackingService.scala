@@ -41,8 +41,6 @@ import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.service.Services.asSuperUser
 import lucuma.odb.util.Codecs.*
-import org.http4s.client.Client
-import org.typelevel.log4cats.Logger
 import skunk.Command
 import skunk.Encoder
 import skunk.Query
@@ -192,15 +190,8 @@ object TrackingService:
       override def foldRight[A, B](fa: Snapshot[A], lb: cats.Eval[B])(f: (A, Eval[B]) => Eval[B]): Eval[B] = (fa.base :: fa.asterism.map(_._2)).foldRight(lb)(f)
       override def traverse[G[_]: Applicative, A, B](fa: Snapshot[A])(f: A => G[B]): G[Snapshot[B]] = fa.traverse(f)
       
-  def instantiate[F[_]: Monad: Temporal: Services: Logger](httpClient: Client[F]): TrackingService[F] =
-    new Whitebox:
-      
-      val horizonsClient: HorizonsClient[F] =
-        HorizonsClient(
-          httpClient,
-          5,        // max retries
-          1.second  // initial retry interval
-        )
+  def instantiate[F[_]: Monad: Temporal: Services](horizonsClient: HorizonsClient[F]): TrackingService[F] =
+    new Whitebox:      
 
       def getCoordinatesSnapshotOrRegion(
         keys: List[Observation.Id],

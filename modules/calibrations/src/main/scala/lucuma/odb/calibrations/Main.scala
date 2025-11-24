@@ -20,6 +20,7 @@ import lucuma.catalog.clients.GaiaClient
 import lucuma.core.model.Access
 import lucuma.core.model.User
 import lucuma.core.util.CalculationState
+import lucuma.horizons.HorizonsClient
 import lucuma.itc.client.ItcClient
 import lucuma.odb.Config
 import lucuma.odb.data.EditType
@@ -175,7 +176,8 @@ object CMain extends MainParams {
     emailConfig: Config.Email,
     httpClient: Client[F],
     itcClient: ItcClient[F],
-    gaiaClient: GaiaClient[F]
+    gaiaClient: GaiaClient[F],
+    horizonsClient: HorizonsClient[F]
   )(pool: Session[F]): F[Services[F]] =
     user match {
       case Some(u) if u.role.access === Access.Service =>
@@ -187,7 +189,8 @@ object CMain extends MainParams {
           httpClient,
           itcClient,
           gaiaClient,
-          S3FileService.noop[F]
+          S3FileService.noop[F],
+          horizonsClient,
         )(pool).pure[F].flatTap { _ =>
           val us = UserService.fromSession(pool)
           Services.asSuperUser(us.canonicalizeUser(u))
@@ -214,12 +217,13 @@ object CMain extends MainParams {
       (obsT, ctT) <- topics(pool)
       user        <- Resource.eval(serviceUser[F](c))
       httpClient  <- c.httpClientResource
+      horizonsClient <- c.horizonsClientResource
       itcClient   <- c.itcClient
       gaiaClient  <- c.gaiaClient
       _           <- runCalibrationsDaemon(
                        obsT,
                        ctT,
-                       pool.evalMap(services(user, enums, c.email, httpClient, itcClient, gaiaClient)))
+                       pool.evalMap(services(user, enums, c.email, httpClient, itcClient, gaiaClient, horizonsClient)))
     } yield ExitCode.Success
 
   /** Our logical entry point. */

@@ -48,6 +48,7 @@ import skunk.{Command as _, *}
 
 import scala.concurrent.duration.*
 import scala.util.NotGiven
+import lucuma.horizons.HorizonsClient
 
 sealed trait MainParams:
   val ServiceName: String =
@@ -216,7 +217,8 @@ object CalcMain extends MainParams:
     emailConfig: Config.Email,
     httpClient:  Client[F],
     itcClient:   ItcClient[F],
-    gaiaClient:  GaiaClient[F]
+    gaiaClient:  GaiaClient[F],
+    horizonsClient: HorizonsClient[F],
   )(session: Session[F]): F[Services[F]] =
     Services.forUser(
       user,
@@ -226,7 +228,8 @@ object CalcMain extends MainParams:
       httpClient,
       itcClient,
       gaiaClient,
-      S3FileService.noop[F]
+      S3FileService.noop[F],
+      horizonsClient
     )(session).pure[F].flatTap: _ =>
       val us = UserService.fromSession(session)
       Services.asSuperUser(us.canonicalizeUser(user))
@@ -245,12 +248,13 @@ object CalcMain extends MainParams:
       http       <- c.httpClientResource
       gaiaClient <- c.gaiaClient
       itc        <- c.itcClient
+      horizonsClient <- c.horizonsClientResource
       ptc        <- Resource.eval(pool.use(TimeEstimateCalculatorImplementation.fromSession(_, enums)))
       t          <- topic(pool)
       user       <- Resource.eval(serviceUser[F](c))
       mapping     = (s: Session[F]) =>
-                      OdbMapping.forObscalc(Resource.pure(s), SkunkMonitor.noopMonitor[F], user, c.goaUsers, gaiaClient, itc, c.commitHash, enums, ptc, http, c.email)
-      o          <- runObscalcDaemon(c.database.maxObscalcConnections, c.commitHash, c.obscalcPoll, ptc, t, pool.evalMap(services(user, enums, mapping, c.email, http, itc, gaiaClient)))
+                      OdbMapping.forObscalc(Resource.pure(s), SkunkMonitor.noopMonitor[F], user, c.goaUsers, gaiaClient, itc, c.commitHash, enums, ptc, http, horizonsClient, c.email)
+      o          <- runObscalcDaemon(c.database.maxObscalcConnections, c.commitHash, c.obscalcPoll, ptc, t, pool.evalMap(services(user, enums, mapping, c.email, http, itc, gaiaClient, horizonsClient)))
     yield o
 
   /** Our logical entry point. */

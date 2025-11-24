@@ -812,7 +812,7 @@ class observation_configuration extends OdbSuite with ObservingModeSetupOperatio
                       "target" : {
                         "coordinates" : {
                           "ra" : {
-                            "hms" : "08:09:46.797666"
+                            "hms" : "08:09:46.797665"
                           }
                         },
                         "region" : null

@@ -14,6 +14,7 @@ import lucuma.core.model.Attachment
 import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.core.util.Enumerated
+import lucuma.horizons.HorizonsClient
 import lucuma.itc.client.ItcClient
 import lucuma.odb.Config
 import lucuma.odb.graphql.enums.Enums
@@ -46,10 +47,11 @@ object AttachmentRoutes {
     emailConfig:           Config.Email,
     httpClient:            Client[F],
     itcClient:             ItcClient[F],
-    gaiaClient:            lucuma.catalog.clients.GaiaClient[F]
+    gaiaClient:            lucuma.catalog.clients.GaiaClient[F],
+    horizonsClient:        HorizonsClient[F]
   ): HttpRoutes[F] =
     apply(
-      [A] => (u: User) => (fa: AttachmentFileService[F] => F[A]) => pool.map(Services.forUser(u, enums, None, emailConfig, httpClient, itcClient, gaiaClient, s3)).map(_.attachmentFileService).use(fa),
+      [A] => (u: User) => (fa: AttachmentFileService[F] => F[A]) => pool.map(Services.forUser(u, enums, None, emailConfig, httpClient, itcClient, gaiaClient, s3, horizonsClient)).map(_.attachmentFileService).use(fa),
       ssoClient,
       maxUploadMb
     )
