@@ -34,11 +34,11 @@ class observation_configuration extends OdbSuite with ObservingModeSetupOperatio
                       }
                       target {
                         coordinates {
-                          ra { 
-                            hms 
+                          ra {
+                            hms
                           }
-                          dec { 
-                            dms 
+                          dec {
+                            dms
                           }
                         }
                         region {
@@ -107,7 +107,7 @@ class observation_configuration extends OdbSuite with ObservingModeSetupOperatio
                         "gmosSouthLongSlit" : null,
                         "gmosNorthImaging" : null,
                         "gmosSouthImaging" : null,
-                        "flamingos2LongSlit" : null                      
+                        "flamingos2LongSlit" : null
                       }
                     }
                   }
@@ -140,11 +140,11 @@ class observation_configuration extends OdbSuite with ObservingModeSetupOperatio
                       }
                       target {
                         coordinates {
-                          ra { 
-                            hms 
+                          ra {
+                            hms
                           }
-                          dec { 
-                            dms 
+                          dec {
+                            dms
                           }
                         }
                         region {
@@ -246,11 +246,11 @@ class observation_configuration extends OdbSuite with ObservingModeSetupOperatio
                       }
                       target {
                         coordinates {
-                          ra { 
-                            hms 
+                          ra {
+                            hms
                           }
-                          dec { 
-                            dms 
+                          dec {
+                            dms
                           }
                         }
                         region {
@@ -355,11 +355,11 @@ class observation_configuration extends OdbSuite with ObservingModeSetupOperatio
                       }
                       target {
                         coordinates {
-                          ra { 
-                            hms 
+                          ra {
+                            hms
                           }
-                          dec { 
-                            dms 
+                          dec {
+                            dms
                           }
                         }
                         region {
@@ -464,11 +464,11 @@ class observation_configuration extends OdbSuite with ObservingModeSetupOperatio
                       }
                       target {
                         coordinates {
-                          ra { 
-                            hms 
+                          ra {
+                            hms
                           }
-                          dec { 
-                            dms 
+                          dec {
+                            dms
                           }
                         }
                         region {
@@ -569,11 +569,11 @@ class observation_configuration extends OdbSuite with ObservingModeSetupOperatio
                       }
                       target {
                         coordinates {
-                          ra { 
-                            hms 
+                          ra {
+                            hms
                           }
-                          dec { 
-                            dms 
+                          dec {
+                            dms
                           }
                         }
                         region {
@@ -656,11 +656,11 @@ class observation_configuration extends OdbSuite with ObservingModeSetupOperatio
                       }
                       target {
                         coordinates {
-                          ra { 
-                            hms 
+                          ra {
+                            hms
                           }
-                          dec { 
-                            dms 
+                          dec {
+                            dms
                           }
                         }
                         region {
@@ -759,8 +759,8 @@ class observation_configuration extends OdbSuite with ObservingModeSetupOperatio
                       }
                       target {
                         coordinates {
-                          ra { 
-                            hms 
+                          ra {
+                            hms
                           }
                         }
                         region {
@@ -826,7 +826,7 @@ class observation_configuration extends OdbSuite with ObservingModeSetupOperatio
                         "gmosSouthLongSlit" : null,
                         "gmosNorthImaging" : null,
                         "gmosSouthImaging" : null,
-                        "flamingos2LongSlit" : null                      
+                        "flamingos2LongSlit" : null
                       }
                     }
                   }
