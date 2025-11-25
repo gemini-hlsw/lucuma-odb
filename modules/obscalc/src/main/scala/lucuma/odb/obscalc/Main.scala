@@ -31,7 +31,6 @@ import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.graphql.topic.ObscalcTopic
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.util.CommitHash
-import lucuma.odb.service.ObscalcService
 import lucuma.odb.service.S3FileService
 import lucuma.odb.service.Services
 import lucuma.odb.service.Services.Syntax.*
@@ -148,9 +147,6 @@ object CalcMain extends MainParams:
     services:         Resource[F, Services[F]]
   ): Resource[F, F[Outcome[F, Throwable, Unit]]] =
 
-    def obscalc: Services[F] ?=> ObscalcService[F] =
-      obscalcService
-
     // Stream of pending calc produced by watching for updates to t_obscalc.
     // We filter out anything but transitions to Pending.  Entries in the Retry
     // state are picked up via polling (see pollStream below).  By responding
@@ -168,7 +164,7 @@ object CalcMain extends MainParams:
           .flatTraverse: oid =>
             services.useTransactionally:
               requireServiceAccessOrThrow:
-                obscalc.loadObs(oid)
+                obscalcService.loadObs(oid)
 
     // Stream of pending calc produced by periodic polling.  This will pick up
     // up to connectionsLimit entries including those that are in a 'Retry'
@@ -179,7 +175,7 @@ object CalcMain extends MainParams:
         .evalMap: _ =>
           services.useTransactionally:
             requireServiceAccessOrThrow:
-              obscalc.load(1024)
+              obscalcService.load(1024)
         .flatMap(Stream.emits)
 
     // Combine the eventStream and the pollStream (after startup), process each
@@ -192,7 +188,7 @@ object CalcMain extends MainParams:
         .parEvalMapUnordered(connectionsLimit): pc =>
           services.useNonTransactionally:
             requireServiceAccessOrThrow:
-              obscalc
+              obscalcService
                 .calculateAndUpdate(pc)
                 .tupleLeft(pc)
         .evalTap: (pc, meta) =>
@@ -204,7 +200,7 @@ object CalcMain extends MainParams:
       _ <- Resource.eval:
              services.useTransactionally:
                requireServiceAccessOrThrow:
-                 obscalc.reset
+                 obscalcService.reset
       o <- calcAndUpdateStream.compile.drain.background
     yield o
 

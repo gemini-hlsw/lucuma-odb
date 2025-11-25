@@ -338,6 +338,12 @@ object Services:
       lazy val timeService = TimeService.instantiate
       lazy val timingWindowService = TimingWindowService.instantiate
       lazy val visitService = VisitService.instantiate
+      lazy val obscalcService = ObscalcService.instantiate
+      lazy val timeEstimateService = TimeEstimateService.instantiate
+      lazy val calibrationsService = CalibrationsService.instantiate
+      lazy val groupService = GroupService.instantiate
+      lazy val programService = ProgramService.instantiate
+      lazy val observationWorkflowService = ObservationWorkflowService.instantiate
 
       // A few services require additional arguments for instantiation that may not always be
       // available, so we require them here instead of demanding them before constructing a
@@ -345,18 +351,11 @@ object Services:
       lazy val attachmentFileService = AttachmentFileService.instantiate(s3FileService)
       lazy val itcService = ItcService.instantiate(itcClient)
       lazy val generator = Generator.instantiate(commitHash, tc)
-      lazy val obscalcService = ObscalcService.instantiate
-      lazy val timeEstimateService = TimeEstimateService.instantiate
-      def guideService = GuideService.instantiate(gaiaClient)
-      lazy val calibrationsService = CalibrationsService.instantiate
+      lazy val guideService = GuideService.instantiate(gaiaClient)
       lazy val emailService = EmailService.fromConfigAndClient(emailConfig, httpClient)
-      lazy val groupService = GroupService.instantiate
-      lazy val programService = ProgramService.instantiate
       lazy val proposalService = ProposalService.instantiate(emailConfig)
       lazy val userInvitationService = UserInvitationService.instantiate(emailConfig)
       lazy val trackingService = TrackingService.instantiate(horizonsClient)
-      lazy val observationWorkflowService = ObservationWorkflowService.instantiate
-
 
   /**
    * This adds syntax to access the members of `Services` and the current `Transaction` when they
