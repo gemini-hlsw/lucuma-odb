@@ -9,6 +9,7 @@ import cats.effect.std.SecureRandom
 import cats.effect.std.UUIDGen
 import cats.implicits.*
 import eu.timepit.refined.types.string.NonEmptyString
+import lucuma.catalog.clients.GaiaClient
 import lucuma.core.enums.AttachmentType
 import lucuma.core.model.Attachment
 import lucuma.core.model.Program
@@ -18,6 +19,8 @@ import lucuma.horizons.HorizonsClient
 import lucuma.itc.client.ItcClient
 import lucuma.odb.Config
 import lucuma.odb.graphql.enums.Enums
+import lucuma.odb.logic.TimeEstimateCalculatorImplementation
+import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.AttachmentFileService
 import lucuma.odb.service.AttachmentFileService.AttachmentException
 import lucuma.odb.service.S3FileService
@@ -39,19 +42,35 @@ object AttachmentRoutes {
 
   // the normal constructor
   def apply[F[_]: Async: Logger: LoggerFactory: Parallel: Trace: SecureRandom](
-    pool:                  Resource[F, Session[F]],
-    s3:                    S3FileService[F],
-    ssoClient:             SsoClient[F, User],
-    enums:                 Enums,
-    maxUploadMb:           Int,
-    emailConfig:           Config.Email,
-    httpClient:            Client[F],
-    itcClient:             ItcClient[F],
-    gaiaClient:            lucuma.catalog.clients.GaiaClient[F],
-    horizonsClient:        HorizonsClient[F]
+    pool:           Resource[F, Session[F]],
+    s3:             S3FileService[F],
+    ssoClient:      SsoClient[F, User],
+    enums:          Enums,
+    maxUploadMb:    Int,
+    emailConfig:    Config.Email,
+    commitHash:     CommitHash,
+    calculator:     TimeEstimateCalculatorImplementation.ForInstrumentMode,
+    httpClient:     Client[F],
+    itcClient:      ItcClient[F],
+    gaiaClient:     GaiaClient[F],
+    horizonsClient: HorizonsClient[F]
   ): HttpRoutes[F] =
     apply(
-      [A] => (u: User) => (fa: AttachmentFileService[F] => F[A]) => pool.map(Services.forUser(u, enums, None, emailConfig, httpClient, itcClient, gaiaClient, s3, horizonsClient)).map(_.attachmentFileService).use(fa),
+      [A] => (u: User) => (fa: AttachmentFileService[F] => F[A]) =>
+        pool.map(
+          Services.forUser(
+            u,
+            enums,
+            None,
+            emailConfig,
+            commitHash,
+            calculator,
+            httpClient,
+            itcClient,
+            gaiaClient,
+            s3,
+            horizonsClient
+          )).map(_.attachmentFileService).use(fa),
       ssoClient,
       maxUploadMb
     )

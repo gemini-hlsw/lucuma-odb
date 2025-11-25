@@ -42,9 +42,7 @@ import lucuma.itc.SignalToNoiseAt
 import lucuma.odb.data.Obscalc
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
-import lucuma.odb.logic.TimeEstimateCalculatorImplementation.ForInstrumentMode
 import lucuma.odb.sequence.data.GeneratorParams
-import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.Services.ServiceAccess
 import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.util.Codecs.*
@@ -162,10 +160,7 @@ object ObscalcService:
     Nil
   )
 
-  def instantiate[F[_]: Concurrent: Logger](
-    commitHash: CommitHash,
-    calculator: ForInstrumentMode,
-  )(using Services[F]): ObscalcService[F] =
+  def instantiate[F[_]: Concurrent: Logger: Services]: ObscalcService[F] =
 
     new ObscalcService[F]:
       override def selectOne(
@@ -284,7 +279,7 @@ object ObscalcService:
             .flatTap: r =>
               Logger[F].info(s"${pending.observationId}: finished calculating workflow: $r")
 
-        val gen = generator(commitHash, calculator)
+        val gen = generator
 
         def digest(itcResult: Either[OdbError, ItcService.AsterismResults]): F[Either[OdbError, (ExecutionDigest, Stream[Pure, AtomDigest])]] =
           Logger[F].info(s"${pending.observationId}: calculating digest") *>

@@ -80,9 +80,8 @@ import lucuma.odb.graphql.input.AllocationInput
 import lucuma.odb.graphql.input.TimeChargeCorrectionInput
 import lucuma.odb.json.offset.transport.given
 import lucuma.odb.json.stepconfig.given
-import lucuma.odb.logic.TimeEstimateCalculatorImplementation
-import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.EmailService
+import lucuma.odb.service.ObscalcService
 import lucuma.odb.service.Services
 import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.syntax.instrument.*
@@ -103,21 +102,18 @@ trait DatabaseOperations { this: OdbSuite =>
   // trigger an update on demand.
   def runObscalcUpdateAs(user: ServiceUser, pid: Program.Id, oid: Observation.Id): IO[Unit] =
     withServicesForObscalc(user): services =>
-      TimeEstimateCalculatorImplementation
-        .fromSession(services.session, services.enums)
-        .flatMap: tec =>
-          given Services[IO] = services
-          requireServiceAccessOrThrow:
-            val srv  = obscalcService(CommitHash.Zero, tec)
-            val when =
-              services.transactionally:
-                srv
-                  .selectOne(oid)
-                  .map(_.map(_.meta.lastInvalidation).getOrElse(Timestamp.Min))
+      given Services[IO] = services
+      requireServiceAccessOrThrow:
+        val srv  = ObscalcService.instantiate[IO]
+        val when =
+          services.transactionally:
+            srv
+              .selectOne(oid)
+              .map(_.map(_.meta.lastInvalidation).getOrElse(Timestamp.Min))
 
-            when.flatMap: t =>
-              srv.calculateAndUpdate(Obscalc.PendingCalc(pid, oid, t))
-      .void
+        when.flatMap: t =>
+          srv.calculateAndUpdate(Obscalc.PendingCalc(pid, oid, t))
+    .void
 
   def selectCalculationStates: IO[Map[Observation.Id, CalculationState]] =
     withSession: session =>

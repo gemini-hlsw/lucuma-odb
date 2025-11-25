@@ -27,6 +27,7 @@ import lucuma.odb.data.EditType
 import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.graphql.topic.CalibTimeTopic
 import lucuma.odb.graphql.topic.ObscalcTopic
+import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.S3FileService
 import lucuma.odb.service.Services
@@ -174,6 +175,8 @@ object CMain extends MainParams {
     user: Option[User],
     enums: Enums,
     emailConfig: Config.Email,
+    commitHash: CommitHash,
+    calculator: TimeEstimateCalculatorImplementation.ForInstrumentMode,
     httpClient: Client[F],
     itcClient: ItcClient[F],
     gaiaClient: GaiaClient[F],
@@ -186,6 +189,8 @@ object CMain extends MainParams {
           enums,
           None,
           emailConfig,
+          commitHash,
+          calculator,
           httpClient,
           itcClient,
           gaiaClient,
@@ -220,10 +225,22 @@ object CMain extends MainParams {
       horizonsClient <- c.horizonsClientResource
       itcClient   <- c.itcClient
       gaiaClient  <- c.gaiaClient
+      ptc         <- Resource.eval(pool.use(TimeEstimateCalculatorImplementation.fromSession(_, enums)))
       _           <- runCalibrationsDaemon(
                        obsT,
                        ctT,
-                       pool.evalMap(services(user, enums, c.email, httpClient, itcClient, gaiaClient, horizonsClient)))
+                       pool.evalMap(
+                         services(
+                           user,
+                           enums,
+                           c.email,
+                           c.commitHash,
+                           ptc,
+                           httpClient,
+                           itcClient,
+                           gaiaClient,
+                           horizonsClient
+                     )))
     } yield ExitCode.Success
 
   /** Our logical entry point. */

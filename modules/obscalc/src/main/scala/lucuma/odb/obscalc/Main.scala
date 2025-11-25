@@ -31,7 +31,6 @@ import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.graphql.topic.ObscalcTopic
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.util.CommitHash
-import lucuma.odb.service.ObscalcService
 import lucuma.odb.service.S3FileService
 import lucuma.odb.service.Services
 import lucuma.odb.service.Services.Syntax.*
@@ -143,15 +142,10 @@ object CalcMain extends MainParams:
 
   def runObscalcDaemon[F[_]: Async: Logger](
     connectionsLimit: Int,
-    commitHash:       CommitHash,
     pollPeriod:       FiniteDuration,
-    timeEstimate:     TimeEstimateCalculatorImplementation.ForInstrumentMode,
     topic:            Topic[F, ObscalcTopic.Element],
     services:         Resource[F, Services[F]]
   ): Resource[F, F[Outcome[F, Throwable, Unit]]] =
-
-    val obscalc: Services[F] ?=> ObscalcService[F] =
-      obscalcService(commitHash, timeEstimate)
 
     // Stream of pending calc produced by watching for updates to t_obscalc.
     // We filter out anything but transitions to Pending.  Entries in the Retry
@@ -170,7 +164,7 @@ object CalcMain extends MainParams:
           .flatTraverse: oid =>
             services.useTransactionally:
               requireServiceAccessOrThrow:
-                obscalc.loadObs(oid)
+                obscalcService.loadObs(oid)
 
     // Stream of pending calc produced by periodic polling.  This will pick up
     // up to connectionsLimit entries including those that are in a 'Retry'
@@ -181,7 +175,7 @@ object CalcMain extends MainParams:
         .evalMap: _ =>
           services.useTransactionally:
             requireServiceAccessOrThrow:
-              obscalc.load(1024)
+              obscalcService.load(1024)
         .flatMap(Stream.emits)
 
     // Combine the eventStream and the pollStream (after startup), process each
@@ -194,7 +188,7 @@ object CalcMain extends MainParams:
         .parEvalMapUnordered(connectionsLimit): pc =>
           services.useNonTransactionally:
             requireServiceAccessOrThrow:
-              obscalc
+              obscalcService
                 .calculateAndUpdate(pc)
                 .tupleLeft(pc)
         .evalTap: (pc, meta) =>
@@ -206,7 +200,7 @@ object CalcMain extends MainParams:
       _ <- Resource.eval:
              services.useTransactionally:
                requireServiceAccessOrThrow:
-                 obscalc.reset
+                 obscalcService.reset
       o <- calcAndUpdateStream.compile.drain.background
     yield o
 
@@ -215,6 +209,8 @@ object CalcMain extends MainParams:
     enums:       Enums,
     mapping:     Session[F] => Mapping[F],
     emailConfig: Config.Email,
+    commitHash:  CommitHash,
+    calculator:  TimeEstimateCalculatorImplementation.ForInstrumentMode,
     httpClient:  Client[F],
     itcClient:   ItcClient[F],
     gaiaClient:  GaiaClient[F],
@@ -225,6 +221,8 @@ object CalcMain extends MainParams:
       enums,
       mapping.some,
       emailConfig,
+      commitHash,
+      calculator,
       httpClient,
       itcClient,
       gaiaClient,
@@ -254,7 +252,7 @@ object CalcMain extends MainParams:
       user       <- Resource.eval(serviceUser[F](c))
       mapping     = (s: Session[F]) =>
                       OdbMapping.forObscalc(Resource.pure(s), SkunkMonitor.noopMonitor[F], user, c.goaUsers, gaiaClient, itc, c.commitHash, enums, ptc, http, horizonsClient, c.email)
-      o          <- runObscalcDaemon(c.database.maxObscalcConnections, c.commitHash, c.obscalcPoll, ptc, t, pool.evalMap(services(user, enums, mapping, c.email, http, itc, gaiaClient, horizonsClient)))
+      o          <- runObscalcDaemon(c.database.maxObscalcConnections, c.obscalcPoll, t, pool.evalMap(services(user, enums, mapping, c.email, c.commitHash, ptc, http, itc, gaiaClient, horizonsClient)))
     yield o
 
   /** Our logical entry point. */

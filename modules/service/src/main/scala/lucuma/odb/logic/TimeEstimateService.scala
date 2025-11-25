@@ -24,7 +24,6 @@ import lucuma.core.model.sequence.CategorizedTimeRange
 import lucuma.core.util.CalculatedValue
 import lucuma.core.util.CalculationState
 import lucuma.odb.data.GroupTree
-import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.ObscalcService
 import lucuma.odb.service.Services
 import lucuma.odb.service.Services.Syntax.*
@@ -71,12 +70,9 @@ sealed trait TimeEstimateService[F[_]]:
 
 object TimeEstimateService:
 
-  def instantiate[F[_]: Concurrent: Services](
-    commitHash:   CommitHash,
-    calculator:   TimeEstimateCalculatorImplementation.ForInstrumentMode,
-  ): TimeEstimateService[F] =
+  def instantiate[F[_]: Concurrent: Services]: TimeEstimateService[F] =
     lazy val obscalcService: ObscalcService[F] =
-      services.obscalcService(commitHash, calculator)
+      services.obscalcService
 
     new TimeEstimateService[F]:
 

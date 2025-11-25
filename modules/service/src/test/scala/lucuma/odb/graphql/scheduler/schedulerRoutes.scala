@@ -19,7 +19,6 @@ import lucuma.core.model.sequence.CategorizedTime
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
 import lucuma.itc.IntegrationTime
-import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.graphql.query.ExecutionTestSupportForGmos
 import org.http4s.*
 import org.http4s.implicits.*
@@ -36,9 +35,8 @@ class schedulerRoutes extends SchedulerRoutesSuite with ExecutionTestSupportForG
 
   def withRoutes[A](user: User, request: Request[IO]): IO[Response[IO]] =
     withSession: s =>
-      Enums.load(s).flatMap: enums =>
-        val srv = servicesFor(user, enums)(s)
-        SchedulerRoutes(srv, ssoClient).orNotFound.run(request)
+      servicesFor(user).use: srv =>
+        SchedulerRoutes(srv(s), ssoClient).orNotFound.run(request)
 
   test("not service user"):
     atomsRequest(pi).flatMap: request =>

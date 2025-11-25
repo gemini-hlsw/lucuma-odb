@@ -199,10 +199,10 @@ object Generator {
     def sequenceTooLong(oid: Observation.Id): OdbError =
       sequenceUnavailable(oid, s"The generated sequence is too long (more than $SequenceAtomLimit atoms).")
 
-  def instantiate[F[_]: Concurrent](
+  def instantiate[F[_]: Concurrent: Services](
     commitHash:   CommitHash,
     calculator:   TimeEstimateCalculatorImplementation.ForInstrumentMode
-  )(using Services[F]): Generator[F] =
+  ): Generator[F] =
     new Generator[F] {
 
       private val exp = SmartGcalImplementation.fromService(smartGcalService)

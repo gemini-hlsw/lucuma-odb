@@ -719,19 +719,23 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       }
     }
 
-  def servicesFor(u: User, e: Enums) =
+  def servicesFor(u: User): Resource[IO, Session[IO] => Services[IO]] =
     import Trace.Implicits.noop
-    Services.forUser(u, e, None, emailConfig, httpClient, itcClient, gaiaClient, S3FileService.noop[IO], horizonsClient)
+
+    for
+      db   <- FMain.databasePoolResource[IO](databaseConfig)
+      enm  <- db.evalMap(Enums.load)
+      ptc  <- db.evalMap(TimeEstimateCalculatorImplementation.fromSession(_, enm))
+    yield Services.forUser(u, enm, None, emailConfig, CommitHash.Zero, ptc, httpClient, itcClient, gaiaClient, S3FileService.noop[IO], horizonsClient)
 
   def withSession[A](f: Session[IO] => IO[A]): IO[A] =
     Resource.eval(IO(sessionFixture())).use(f)
 
   def withServices[A](u: User)(f: Services[IO] => IO[A]): IO[A] =
-    Resource.eval(IO(sessionFixture())).use { s =>
-      Enums.load(s).flatMap(e =>
-        f(servicesFor(u, e)(s))
-      )
-    }
+    (for {
+      s <- Resource.eval(IO(sessionFixture()))
+      p <- servicesFor(u)
+    } yield p(s)).use(f)
 
   extension [A](r: Result[A]) def get: IO[A] =
     r match
@@ -743,12 +747,14 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
   // RCN: We had a lot of calls in the calibrations tests that now require ServiceAcces, so
   // instead of changing all the callsites I added this overload.
   def withServices[A](u: ServiceUser)(f: ServiceAccess ?=> Services[IO] => IO[A]): IO[A] =
-    Resource.eval(IO(sessionFixture())).use: s =>
-      Enums.load(s).flatMap: e =>
-        given services: Services[IO] = servicesFor(u, e)(s)
-        requireServiceAccess:
-          f(services).map(Result.success)
-        .flatMap(_.get)
+    (for {
+      s <- Resource.eval(IO(sessionFixture()))
+      p <- servicesFor(u)
+    } yield p(s)).use: s =>
+      given Services[IO] = s
+      requireServiceAccess:
+        f(s).map(Result.success)
+      .flatMap(_.get)
 
   // Provides a `Services` instance for testing that includes enough of a GraphQL mapping
   // to perform the observation workflow calculation (which uses the configuration service
@@ -779,7 +785,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
         emailConfig
       )
       db.use: s =>
-        given services: Services[IO] = Services.forUser(u, enm, mapping.some, emailConfig, httpClient, itcClient, gaiaClient, S3FileService.noop[IO], horizonsClient)(s)
+        given services: Services[IO] = Services.forUser(u, enm, mapping.some, emailConfig, CommitHash.Zero, ptc, httpClient, itcClient, gaiaClient, S3FileService.noop[IO], horizonsClient)(s)
         requireServiceAccess:
           f(services).map(Result.success)
         .flatMap(_.get)

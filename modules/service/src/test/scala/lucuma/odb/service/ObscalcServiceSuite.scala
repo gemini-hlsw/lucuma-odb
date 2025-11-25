@@ -29,8 +29,6 @@ import lucuma.core.util.Timestamp
 import lucuma.odb.data.Obscalc
 import lucuma.odb.data.OdbError
 import lucuma.odb.graphql.query.ExecutionTestSupportForGmos
-import lucuma.odb.logic.TimeEstimateCalculatorImplementation
-import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.Services.ServiceAccess
 import lucuma.odb.util.Codecs.calculation_state
 import lucuma.odb.util.Codecs.core_timestamp
@@ -43,20 +41,15 @@ import scala.collection.immutable.SortedSet
 
 trait ObscalcServiceSuiteSupport extends ExecutionTestSupportForGmos:
 
-  def instantiate(services: Services[IO]): IO[ObscalcService[IO]] =
-      TimeEstimateCalculatorImplementation
-        .fromSession(services.session, services.enums)
-        .map: tec =>
-          services.obscalcService(CommitHash.Zero, tec)
-
   def withObscalcService[A](f: ServiceAccess ?=> ObscalcService[IO] => IO[A]): IO[A] =
     withServicesForObscalc(serviceUser): services =>
-      instantiate(services).flatMap(f)
+      given Services[IO] = services
+      f(ObscalcService.instantiate[IO])
 
   def withObscalcServiceTransactionally[A](f: (ServiceAccess, Transaction[IO]) ?=> ObscalcService[IO] => IO[A]): IO[A] =
     withServicesForObscalc(serviceUser): services =>
       services.transactionally:
-        instantiate(services).flatMap(f)
+        f(ObscalcService.instantiate[IO])
 
   def select(o: Observation.Id): IO[Option[Obscalc.Entry]] =
     withObscalcServiceTransactionally(_.selectOne(o))

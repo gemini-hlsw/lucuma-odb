@@ -41,7 +41,6 @@ import lucuma.core.model.sequence.StepConfig.Gcal
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
 import lucuma.itc.IntegrationTime
-import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.service.Services
 import lucuma.odb.service.SmartGcalService
 import lucuma.odb.smartgcal.data.Flamingos2
@@ -70,8 +69,7 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
     )
 
   override def dbInitialization: Option[Session[IO] => IO[Unit]] = Some { s =>
-    Enums.load(s).flatMap { e =>
-      val services = servicesFor(pi /* doesn't matter*/, e)(s)
+    servicesFor(pi /* doesn't matter*/).map(_(s)).use: services =>
       services.transactionally {
 
         val flat =
@@ -273,7 +271,6 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
 
         } yield ()
       }
-    }
   }
 
   val AtomQuery: String =

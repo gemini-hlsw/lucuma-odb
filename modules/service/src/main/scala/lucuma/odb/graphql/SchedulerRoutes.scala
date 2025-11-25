@@ -24,6 +24,8 @@ import lucuma.horizons.HorizonsClient
 import lucuma.itc.client.ItcClient
 import lucuma.odb.Config
 import lucuma.odb.graphql.enums.Enums
+import lucuma.odb.logic.TimeEstimateCalculatorImplementation
+import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.S3FileService
 import lucuma.odb.service.Services
 import lucuma.odb.service.Services.Syntax.*
@@ -42,14 +44,16 @@ object SchedulerRoutes:
 
   // the normal constructor
   def apply[F[_]: Async: Logger: LoggerFactory: Parallel: Trace: SecureRandom](
-    pool:        Resource[F, Session[F]],
-    ssoClient:   SsoClient[F, User],
-    enums:       Enums,
-    emailConfig: Config.Email,
-    httpClient:  Client[F],
-    horizonsClient: HorizonsClient[F],
-    itcClient:   ItcClient[F],
-    gaiaClient:  GaiaClient[F]
+    pool:           Resource[F, Session[F]],
+    ssoClient:      SsoClient[F, User],
+    enums:          Enums,
+    emailConfig:    Config.Email,
+    commitHash:     CommitHash,
+    tc:             TimeEstimateCalculatorImplementation.ForInstrumentMode,
+    httpClient:     Client[F],
+    itcClient:      ItcClient[F],
+    gaiaClient:     GaiaClient[F],
+    horizonsClient: HorizonsClient[F]
   ): HttpRoutes[F] =
     apply(
       [A] => (u: User) => (fa: Services[F] => F[A]) => pool.map(
@@ -58,6 +62,8 @@ object SchedulerRoutes:
           enums,
           None,
           emailConfig,
+          commitHash,
+          tc,
           httpClient,
           itcClient,
           gaiaClient,

@@ -28,8 +28,6 @@ import lucuma.core.util.TimestampInterval
 import lucuma.itc.client.ItcClient
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.json.coordinates.query.given
-import lucuma.odb.logic.TimeEstimateCalculatorImplementation
-import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.GuideService
 import lucuma.odb.service.Services
 import org.http4s.client.Client
@@ -48,8 +46,6 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
   def httpClient: Client[F]
   def gaiaClient: GaiaClient[F]
   def services: Resource[F, Services[F]]
-  def commitHash: CommitHash
-  def timeEstimateCalculator: TimeEstimateCalculatorImplementation.ForInstrumentMode
 
   private val ObsTimeParam           = "observationTime"
   private val AvailabilityStartParam = "start"
@@ -167,7 +163,7 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
       (pid, oid, obsTime) =>
         services.use { implicit s =>
           Services.asSuperUser:
-            s.guideService(commitHash, timeEstimateCalculator)
+            s.guideService
               .getGuideEnvironments(pid, oid, obsTime)
         }
 
@@ -181,7 +177,7 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
       (pid, oid, _) =>
         services.use { implicit s =>
           Services.asSuperUser:
-            s.guideService(commitHash, timeEstimateCalculator)
+            s.guideService
               .getGuideEnvironment(pid, oid)
         }
 
@@ -201,7 +197,7 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
       (pid, oid, period) =>
         services.use { implicit s =>
           Services.asSuperUser:
-            s.guideService(commitHash, timeEstimateCalculator)
+            s.guideService
               .getGuideAvailability(pid, oid, period)
         }
 
@@ -215,7 +211,7 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
       (pid, oid, _) =>
         services.use { implicit s =>
           Services.asSuperUser:
-            s.guideService(commitHash, timeEstimateCalculator)
+            s.guideService
               .getGuideTargetName(pid, oid)
         }
 
