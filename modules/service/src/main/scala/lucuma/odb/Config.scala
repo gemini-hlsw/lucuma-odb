@@ -19,6 +19,7 @@ import lucuma.core.data.EmailAddress
 import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.core.util.Gid
+import lucuma.horizons.HorizonsClient
 import lucuma.itc.client.ItcClient
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.sso.client.SsoClient
@@ -68,6 +69,9 @@ case class Config(
       .withTimeout(httpClient.timeout)
       .withIdleConnectionTime(httpClient.effectiveIdleConnectionTime)
       .build
+
+  def horizonsClientResource[F[_]: Async: Network: Logger]: Resource[F, HorizonsClient[F]] =
+    httpClientResource.map(HorizonsClient.apply(_, 5, 1.second))
 
   // ITC client resource
   def itcClient[F[_]: Async: Logger: Network]: Resource[F, ItcClient[F]] =

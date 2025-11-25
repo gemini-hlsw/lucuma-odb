@@ -54,6 +54,7 @@ import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.ServiceUser
 import lucuma.core.model.User
 import lucuma.core.syntax.timespan.*
+import lucuma.horizons.HorizonsClient
 import lucuma.itc.AsterismIntegrationTimeOutcomes
 import lucuma.itc.IntegrationTime
 import lucuma.itc.ItcVersions
@@ -384,6 +385,9 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
   private def gaiaClient: GaiaClient[IO] =
     GaiaClient.build[IO](httpClient, adapters = gaiaAdapters)
 
+  private val horizonsClient: HorizonsClient[IO] =
+    HorizonsClient.forTesting(horizonsFixture)
+
   private def httpApp(using Trace[IO]): Resource[IO, WebSocketBuilder2[IO] => HttpApp[IO]] =
     FMain.routesResource[IO](
       databaseConfig,
@@ -399,6 +403,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       s3ClientOpsResource,
       s3PresignerResource,
       httpClient.pure[Resource[IO, *]],
+      horizonsClient.pure[Resource[IO, *]]
     ).map(_.map(_.orNotFound))
 
   /** Resource yielding an instantiated OdbMapping, which we can use for some whitebox testing. */
@@ -411,7 +416,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       itc  = itcClient
       enm <- db.evalMap(Enums.load)
       ptc <- db.evalMap(TimeEstimateCalculatorImplementation.fromSession(_, enm))
-      map  = OdbMapping(db, mon, usr, top, gaiaClient, itc, CommitHash.Zero, goaUsers, enm, ptc, httpClient, emailConfig)
+      map  = OdbMapping(db, mon, usr, top, gaiaClient, itc, CommitHash.Zero, goaUsers, enm, ptc, httpClient, horizonsClient, emailConfig)
     } yield map
 
   protected def trace: Resource[IO, Trace[IO]] =
@@ -716,7 +721,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
 
   def servicesFor(u: User, e: Enums) =
     import Trace.Implicits.noop
-    Services.forUser(u, e, None, emailConfig, httpClient, itcClient, gaiaClient, S3FileService.noop[IO])
+    Services.forUser(u, e, None, emailConfig, httpClient, itcClient, gaiaClient, S3FileService.noop[IO], horizonsClient)
 
   def withSession[A](f: Session[IO] => IO[A]): IO[A] =
     Resource.eval(IO(sessionFixture())).use(f)
@@ -770,10 +775,11 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
         enm,
         ptc,
         httpClient,
+        horizonsClient,
         emailConfig
       )
       db.use: s =>
-        given services: Services[IO] = Services.forUser(u, enm, mapping.some, emailConfig, httpClient, itcClient, gaiaClient, S3FileService.noop[IO])(s)
+        given services: Services[IO] = Services.forUser(u, enm, mapping.some, emailConfig, httpClient, itcClient, gaiaClient, S3FileService.noop[IO], horizonsClient)(s)
         requireServiceAccess:
           f(services).map(Result.success)
         .flatMap(_.get)

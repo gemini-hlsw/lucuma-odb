@@ -19,6 +19,7 @@ import io.laserdisc.pure.s3.tagless.S3AsyncClientOp
 import lucuma.catalog.clients.GaiaClient
 import lucuma.core.model.User
 import lucuma.graphql.routes.GraphQLService
+import lucuma.horizons.HorizonsClient
 import lucuma.itc.client.ItcClient
 import lucuma.odb.graphql.AttachmentRoutes
 import lucuma.odb.graphql.EmailWebhookRoutes
@@ -219,7 +220,8 @@ object FMain extends MainParams {
       config.domain,
       S3FileService.s3AsyncClientOpsResource(config.aws),
       S3FileService.s3PresignerResource(config.aws),
-      config.httpClientResource
+      config.httpClientResource,
+      config.horizonsClientResource
     )
 
   /** A resource that yields our HttpRoutes, wrapped in accessory middleware. */
@@ -236,7 +238,8 @@ object FMain extends MainParams {
     domain:               List[String],
     s3OpsResource:        Resource[F, S3AsyncClientOp[F]],
     s3PresignerResource:  Resource[F, S3Presigner],
-    httpClientResource:   Resource[F, Client[F]]
+    httpClientResource:   Resource[F, Client[F]],
+    horizonsClientResource: Resource[F, HorizonsClient[F]],
   ): Resource[F, WebSocketBuilder2[F] => HttpRoutes[F]] =
     for {
       pool              <- databasePoolResource[F](databaseConfig)
@@ -244,21 +247,22 @@ object FMain extends MainParams {
       gaiaClient        <- gaiaClientResource
       ssoClient         <- ssoClientResource
       httpClient        <- httpClientResource
+      horizonsClient    <- horizonsClientResource
       userSvc           <- pool.map(UserService.fromSession(_))
       middleware        <- Resource.eval(ServerMiddleware(corsOverHttps, domain, ssoClient, userSvc))
       enums             <- Resource.eval(pool.use(Enums.load))
       ptc               <- Resource.eval(pool.use(TimeEstimateCalculatorImplementation.fromSession(_, enums)))
       metadataService    = GraphQLService(OdbMapping.forMetadata(pool, SkunkMonitor.noopMonitor[F], enums))
-      graphQLRoutes     <- GraphQLRoutes(gaiaClient, itcClient, commitHash, goaUsers, ssoClient, pool, SkunkMonitor.noopMonitor[F], GraphQLServiceTTL, userSvc, enums, ptc, httpClient, emailConfig, metadataService)
+      graphQLRoutes     <- GraphQLRoutes(gaiaClient, itcClient, commitHash, goaUsers, ssoClient, pool, SkunkMonitor.noopMonitor[F], GraphQLServiceTTL, userSvc, enums, ptc, httpClient, horizonsClient, emailConfig, metadataService)
       s3ClientOps       <- s3OpsResource
       s3Presigner       <- s3PresignerResource
       s3FileService      = S3FileService.fromS3ConfigAndClient(awsConfig, s3ClientOps, s3Presigner)
       webhookService    <- pool.map(EmailWebhookService.fromSession(_))
     } yield { wsb =>
-      val attachmentRoutes   = AttachmentRoutes.apply[F](pool, s3FileService, ssoClient, enums, awsConfig.fileUploadMaxMb, emailConfig, httpClient, itcClient, gaiaClient)
+      val attachmentRoutes   = AttachmentRoutes.apply[F](pool, s3FileService, ssoClient, enums, awsConfig.fileUploadMaxMb, emailConfig, httpClient, itcClient, gaiaClient, horizonsClient)
       val metadataRoutes     = GraphQLRoutes.enumMetadata(metadataService)
       val emailWebhookRoutes = EmailWebhookRoutes(webhookService, emailConfig)
-      val schedulerRoutes    = SchedulerRoutes.apply[F](pool, ssoClient, enums, emailConfig, httpClient, itcClient, gaiaClient)
+      val schedulerRoutes    = SchedulerRoutes.apply[F](pool, ssoClient, enums, emailConfig, httpClient, horizonsClient, itcClient, gaiaClient)
       middleware(graphQLRoutes(wsb) <+> attachmentRoutes <+>  metadataRoutes <+> emailWebhookRoutes <+> schedulerRoutes)
     }
 

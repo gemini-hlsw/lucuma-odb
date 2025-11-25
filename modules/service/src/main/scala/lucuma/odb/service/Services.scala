@@ -23,6 +23,7 @@ import lucuma.core.model.Access
 import lucuma.core.model.User
 import lucuma.core.util.Gid
 import lucuma.graphql.routes.GraphQLService
+import lucuma.horizons.HorizonsClient
 import lucuma.itc.client.ItcClient
 import lucuma.odb.Config
 import lucuma.odb.data.OdbError
@@ -251,7 +252,8 @@ object Services:
     httpClient0: Client[F],
     itcClient0: ItcClient[F],
     gaiaClient0: GaiaClient[F],
-    s3FileService0: S3FileService[F]
+    s3FileService0: S3FileService[F],
+    horizonsClient: HorizonsClient[F],
   )(s: Session[F])(
     using tf: Trace[F], uf: UUIDGen[F], cf: Temporal[F], par: Parallel[F], log: Logger[F], lf: LoggerFactory[F]
   ): Services[F[_]] =
@@ -348,7 +350,7 @@ object Services:
       lazy val programService = ProgramService.instantiate
       lazy val proposalService = ProposalService.instantiate(emailConfig)
       lazy val userInvitationService = UserInvitationService.instantiate(emailConfig)
-      lazy val trackingService = TrackingService.instantiate(httpClient)
+      lazy val trackingService = TrackingService.instantiate(horizonsClient)
       lazy val observationWorkflowService = ObservationWorkflowService.instantiate
 
 

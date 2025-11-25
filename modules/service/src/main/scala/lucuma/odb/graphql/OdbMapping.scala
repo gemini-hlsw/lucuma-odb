@@ -19,6 +19,7 @@ import grackle.skunk.SkunkMapping
 import grackle.skunk.SkunkMonitor
 import lucuma.catalog.clients.GaiaClient
 import lucuma.core.model.User
+import lucuma.horizons.HorizonsClient
 import lucuma.itc.client.ItcClient
 import lucuma.odb.Config
 import lucuma.odb.graphql.enums.Enums
@@ -98,6 +99,7 @@ object OdbMapping {
     enums:         Enums,
     tec:           TimeEstimateCalculatorImplementation.ForInstrumentMode,
     httpClient0:   Client[F],
+    horizonsClient0: HorizonsClient[F],
     emailConfig0:  Config.Email,
     allowSub:      Boolean = true,        // Are submappings (recursive calls) allowed?
     schema0:       Option[Schema] = None, // If we happen to have a schema we can pass it and avoid more parsing
@@ -323,6 +325,7 @@ object OdbMapping {
                     enums,
                     tec,
                     httpClient0,
+                    horizonsClient0,
                     emailConfig0,
                     false,                  // don't allow further sub-mappings; only one level of recursion is allowed
                     Some(schema),           // don't re-parse the schema
@@ -332,7 +335,8 @@ object OdbMapping {
                 httpClient0,
                 itcClient0,
                 gaiaClient0,
-                S3FileService.noop[F]
+                S3FileService.noop[F],
+                horizonsClient0
               )(session)
 
           override val timeEstimateCalculator: TimeEstimateCalculatorImplementation.ForInstrumentMode = tec
@@ -710,6 +714,7 @@ object OdbMapping {
     enums:       Enums,
     tec:         TimeEstimateCalculatorImplementation.ForInstrumentMode,
     httpClient:  Client[F],
+    horizonsClient: HorizonsClient[F],
     emailConfig: Config.Email,
     schema:      Option[Schema] = None // If we happen to have a schema we can pass it and avoid more parsing
   ): Mapping[F] =
@@ -726,6 +731,7 @@ object OdbMapping {
       enums,
       tec,
       httpClient,
+      horizonsClient,
       emailConfig,
       allowSub = false,
       schema,
