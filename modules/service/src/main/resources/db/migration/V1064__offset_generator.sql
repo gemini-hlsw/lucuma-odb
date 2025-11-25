@@ -38,6 +38,7 @@ RETURNS TRIGGER AS $$
 BEGIN
   DELETE FROM t_offset_generator
   WHERE c_observation_id = OLD.c_observation_id;
+  RETURN NULL;
 END;
 $$ LANGUAGE plpgsql;
 
