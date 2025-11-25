@@ -16,10 +16,12 @@ import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.Observation
 import lucuma.odb.data.ExposureTimeModeId
 import lucuma.odb.data.ExposureTimeModeRole
+import lucuma.odb.data.Nullable
 import lucuma.odb.data.ObservingModeRowVersion
 import lucuma.odb.data.OffsetGeneratorRole
 import lucuma.odb.format.spatialOffsets.*
 import lucuma.odb.graphql.input.GmosImagingInput
+import lucuma.odb.graphql.input.OffsetGeneratorInput
 import lucuma.odb.sequence.gmos.imaging.Config
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.GmosCodecs.*
@@ -201,11 +203,11 @@ object GmosImagingService:
               // Insert the offset generators
               _  <- ResultT.liftF:
                       input.common.objectOffsetGenerator.traverse_ : og =>
-                        services.offsetGeneratorService.insert(which, og, OffsetGeneratorRole.Object)
+                        services.offsetGeneratorService.insert(oids, og, OffsetGeneratorRole.Object)
 
               _  <- ResultT.liftF:
                       input.common.skyOffsetGenerator.traverse_ : og =>
-                        services.offsetGeneratorService.insert(which, og, OffsetGeneratorRole.Sky)
+                        services.offsetGeneratorService.insert(oids, og, OffsetGeneratorRole.Sky)
 
             yield ()
           .value
@@ -312,7 +314,22 @@ object GmosImagingService:
                 _   <- ResultT.liftF(insertFilters(cur, filterTable, filterCodec, ObservingModeRowVersion.Current))
               yield ()
 
-          modeUpdates *> filterUpdates.value
+          def updateOffsetForRole(
+            input: Nullable[OffsetGeneratorInput],
+            role:  OffsetGeneratorRole
+          ): F[Unit] =
+            input.toOptionOption.fold(Concurrent[F].unit): in =>
+              services.offsetGeneratorService.replace(oids, in, role)
+
+          val offsetUpdates =
+            updateOffsetForRole(edit.common.objectOffsetGenerator, OffsetGeneratorRole.Object) *>
+            updateOffsetForRole(edit.common.skyOffsetGenerator, OffsetGeneratorRole.Sky)
+
+          (for
+            _ <- ResultT.liftF(modeUpdates)
+            _ <- filterUpdates
+            _ <- ResultT.liftF(offsetUpdates)
+          yield ()).value
 
       override def cloneNorth(
         observationId:    Observation.Id,

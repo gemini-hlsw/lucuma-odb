@@ -42,9 +42,20 @@ import Services.Syntax.*
 sealed trait OffsetGeneratorService[F[_]]:
 
   def insert(
-    oids:  List[Observation.Id],
+    oids:  NonEmptyList[Observation.Id],
     input: OffsetGeneratorInput,
     role:  OffsetGeneratorRole,
+  ): F[Unit]
+
+  def delete(
+    oids: NonEmptyList[Observation.Id],
+    role: OffsetGeneratorRole
+  ): F[Unit]
+
+  def replace(
+    oids:  NonEmptyList[Observation.Id],
+    input: Option[OffsetGeneratorInput],
+    role:  OffsetGeneratorRole
   ): F[Unit]
 
   def clone(
@@ -80,27 +91,36 @@ object OffsetGeneratorService:
     new OffsetGeneratorService[F]:
 
       override def insert(
-        oids:  List[Observation.Id],
+        oids:  NonEmptyList[Observation.Id],
         input: OffsetGeneratorInput,
         role:  OffsetGeneratorRole,
       ): F[Unit] =
         val unit = Concurrent[F].unit
 
-        def insertOffsetsIfEnumerated(
-          which: NonEmptyList[Observation.Id]
-        ): F[Unit] =
+        val insertOffsetsIfEnumerated: F[Unit] =
           input match
             case OffsetGeneratorInput.Enumerated(values) =>
               NonEmptyList.fromList(values).fold(unit): offs =>
-                session.exec(Statements.insertEnumeratedOffsets(which, offs, role))
+                session.exec(Statements.insertEnumeratedOffsets(oids, offs, role))
             case _                                       =>
               unit
 
-        NonEmptyList
-          .fromList(oids)
-          .fold(unit): which =>
-            session.exec(Statements.insert(which, input, role)) *>
-              insertOffsetsIfEnumerated(which)
+        session.exec(Statements.insert(oids, input, role)) *> insertOffsetsIfEnumerated
+
+      override def delete(
+        oids: NonEmptyList[Observation.Id],
+        role: OffsetGeneratorRole
+      ): F[Unit] =
+        session.exec(Statements.deleteOffsetGenerator(oids, role)) // cascades to enumerated offsets
+
+      override def replace(
+        oids:  NonEmptyList[Observation.Id],
+        input: Option[OffsetGeneratorInput],
+        role:  OffsetGeneratorRole
+      ): F[Unit] =
+        delete(oids, role) *>
+        input.fold(Concurrent[F].unit): in =>
+          insert(oids, in, role)
 
       override def clone(
         originalId: Observation.Id,
@@ -379,6 +399,17 @@ object OffsetGeneratorService:
           c_guide_state
         ) VALUES
       """ |+| values.intercalate(void", ")
+
+    def deleteOffsetGenerator(
+      which: NonEmptyList[Observation.Id],
+      role:  OffsetGeneratorRole
+    ): AppliedFragment =
+      sql"""
+        DELETE FROM t_offset_generator
+        WHERE
+          c_role = $offset_generator_role AND
+          c_observation_id IN ${observation_id.list(which.length).values}
+      """.apply(role, which.toList)
 
     val CloneOffsetGenerator: Command[(Observation.Id, Observation.Id)] =
       sql"""
