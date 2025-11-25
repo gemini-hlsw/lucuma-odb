@@ -60,6 +60,9 @@ class guideEnvironmentF2 extends ExecutionTestSupportForFlamingos2
                           "bandNormalized": {
                             "brightnesses": [
                               {
+                                "band": "GAIA"
+                              },
+                              {
                                 "band": "GAIA_RP"
                               }
                             ]
@@ -72,17 +75,17 @@ class guideEnvironmentF2 extends ExecutionTestSupportForFlamingos2
                           "id": "3219142829474535424",
                           "objectType": null
                         },
-                        "epoch": "J2023.659",
+                        "epoch": "J2016.000",
                         "ra": {
-                          "microseconds": 20782383801,
-                          "hms": "05:46:22.383801",
-                          "hours": 5.772884389166666666666666666666667,
-                          "degrees": 86.5932658375
+                          "microseconds": 20782389077,
+                          "hms": "05:46:22.389077",
+                          "hours": 5.772885854722222222222222222222222,
+                          "degrees": 86.59328782083333333333333333333333
                         },
                         "dec": {
-                          "dms": "-00:03:38.949866",
-                          "degrees": 359.9391805927778,
-                          "microarcseconds": 1295781050134
+                          "dms": "-00:03:38.722655",
+                          "degrees": 359.93924370694447,
+                          "microarcseconds": 1295781277345
                         },
                         "radialVelocity": {
                           "metersPerSecond": 0,
