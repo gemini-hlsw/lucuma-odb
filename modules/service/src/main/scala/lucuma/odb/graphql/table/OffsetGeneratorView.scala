@@ -14,8 +14,8 @@ trait OffsetGeneratorView[F[_]] extends BaseMapping[F]:
   object OffsetGeneratorView extends TableDef("v_offset_generator"):
 
     val ObservationId: ColumnRef       = col("c_observation_id", observation_id)
-    val ObjectObservationId: ColumnRef = col("c_object_observation_id", observation_id.opt)
-    val SkyObservationId: ColumnRef    = col("c_sky_observation_id", observation_id.opt)
+    val ObjectObservationId: ColumnRef = col("c_object_observation_id", observation_id.embedded)
+    val SkyObservationId: ColumnRef    = col("c_sky_observation_id", observation_id.embedded)
 
     val OffsetGeneratorRole: ColumnRef = col("c_role", offset_generator_role)
 

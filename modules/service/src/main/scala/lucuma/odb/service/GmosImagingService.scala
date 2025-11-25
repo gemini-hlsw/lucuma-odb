@@ -335,8 +335,9 @@ object GmosImagingService:
         newObservationId: Observation.Id,
         etms:             List[(ExposureTimeModeId, ExposureTimeModeId)]
       )(using Services[F]): F[Unit] =
-        session.exec(Statements.clone(modeTableName, observationId, newObservationId)) *>
-          session.exec(Statements.cloneFiltersAndEtms(filterTableName, observationId, newObservationId, etms))
+        session.exec(Statements.clone(modeTableName, observationId, newObservationId))                       *>
+        session.exec(Statements.cloneFiltersAndEtms(filterTableName, observationId, newObservationId, etms)) *>
+        services.offsetGeneratorService.clone(observationId, newObservationId)
 
   object Statements:
 

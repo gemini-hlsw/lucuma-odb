@@ -15,6 +15,7 @@ import lucuma.core.enums.ObservingModeType
 import lucuma.core.model.ImageQuality
 import lucuma.core.model.Observation
 import lucuma.core.model.ObservationReference
+import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.syntax.string.*
 import lucuma.core.util.Enumerated
@@ -993,6 +994,285 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
       }
     }
   }
+
+  test("close GMOS imaging observation preserves offset generator"):
+    val inputsAndResults = List(
+      s"""
+        {
+          enumerated: {
+            values: [
+              {
+                offset: {
+                  p: { arcseconds: 10.0 }
+                  q: { arcseconds: 11.0 }
+                }
+                guiding: ENABLED
+              },
+              {
+                offset: {
+                  p: { arcseconds: 12.0 }
+                  q: { arcseconds: 13.0 }
+                }
+                guiding: ENABLED
+              }
+            ]
+          }
+        }
+      """ -> json"""
+        {
+          "enumerated": {
+            "values": [
+              {
+                "offset": {
+                  "p": { "arcseconds": 10 },
+                  "q": { "arcseconds": 11 }
+                },
+                "guiding": "ENABLED"
+              },
+              {
+                "offset": {
+                  "p": { "arcseconds": 12 },
+                  "q": { "arcseconds": 13 }
+                },
+                "guiding": "ENABLED"
+              }
+            ]
+          },
+          "grid": null,
+          "random": null,
+          "spiral": null
+        }
+      """,
+      s"""
+        {
+          grid: {
+            cornerA: {
+              p: { arcseconds: 14.0 }
+              q: { arcseconds: 15.0 }
+            }
+            cornerB: {
+              p: { arcseconds: 16.0 }
+              q: { arcseconds: 17.0 }
+            }
+          }
+        }
+      """ -> json"""
+        {
+          "enumerated": null,
+          "grid": {
+            "cornerA": {
+              "p": { "arcseconds":  14 },
+              "q": { "arcseconds":  15 }
+            },
+            "cornerB": {
+              "p": { "arcseconds":  16 },
+              "q": { "arcseconds":  17 }
+            }
+          },
+          "random": null,
+          "spiral": null
+        }
+      """,
+      s"""
+        {
+          random: {
+            size: { arcseconds: 18.0 }
+            center: {
+              p: { arcseconds: 19.0 }
+              q: { arcseconds: 20.0 }
+            }
+          }
+        }
+      """ -> json"""
+        {
+          "enumerated": null,
+          "grid": null,
+          "random": {
+            "size": { "arcseconds": 18 },
+            "center": {
+              "p": { "arcseconds": 19 },
+              "q": { "arcseconds": 20 }
+            }
+          },
+          "spiral": null
+        }
+      """,
+      s"""
+        {
+          spiral: {
+            size: { arcseconds: 21.0 }
+            center: {
+              p: { arcseconds: 22.0 }
+              q: { arcseconds: 23.0 }
+            }
+          }
+        }
+      """ -> json"""
+        {
+          "enumerated": null,
+          "grid": null,
+          "random": null,
+          "spiral": {
+            "size": { "arcseconds": 21 },
+            "center": {
+              "p": { "arcseconds": 22 },
+              "q": { "arcseconds": 23 }
+            }
+          }
+        }
+      """
+    )
+
+    def createObservation(
+      pid: Program.Id,
+      tid: Target.Id,
+      obj: String,
+      sky: String
+    ): IO[Observation.Id] =
+      query(
+        user  = pi,
+        query =
+          s"""
+            mutation {
+              createObservation(input: {
+              programId: "$pid",
+                SET: {
+                  targetEnvironment: {
+                    asterism: ["$tid"]
+                  }
+                  scienceRequirements: ${scienceRequirementsObject(ObservingModeType.GmosNorthImaging)}
+                  observingMode: {
+                    gmosNorthImaging: {
+                      filters: [
+                        {
+                          filter: R_PRIME
+                        },
+                        {
+                          filter: G_PRIME
+                        }
+                      ]
+                      objectOffsetGenerator: $obj
+                      skyOffsetGenerator: $sky
+                    }
+                  }
+                  constraintSet: {
+                    imageQuality: ${ImageQuality.Preset.PointEight.tag.toScreamingSnakeCase}
+                  }
+                }
+              }) {
+                observation { id }
+              }
+            }
+          """
+        ).map: json =>
+          json.hcursor.downFields("createObservation", "observation", "id").require[Observation.Id]
+
+    inputsAndResults.zip(inputsAndResults.tail).traverse:
+      case ((objIn, objRes), (skyIn, skyRes)) =>
+        createProgramAs(pi).flatMap: pid =>
+          createTargetAs(pi, pid).flatMap: tid =>
+            createObservation(pid, tid, objIn, skyIn).flatMap: oid =>
+              expect(
+                user  = pi,
+                query = s"""
+                  mutation {
+                    cloneObservation(input: {
+                      observationId: "$oid"
+                    }) {
+                      newObservation {
+                        observingMode {
+                          gmosNorthImaging {
+                            objectOffsetGenerator {
+                              enumerated {
+                                values {
+                                  offset {
+                                    p { arcseconds }
+                                    q { arcseconds }
+                                  }
+                                  guiding
+                                }
+                              }
+                              grid {
+                                cornerA {
+                                  p { arcseconds }
+                                  q { arcseconds }
+                                }
+                                cornerB {
+                                  p { arcseconds }
+                                  q { arcseconds }
+                                }
+                              }
+                              random {
+                                size { arcseconds }
+                                center {
+                                  p { arcseconds }
+                                  q { arcseconds }
+                                }
+                              }
+                              spiral {
+                                size { arcseconds }
+                                center {
+                                  p { arcseconds }
+                                  q { arcseconds }
+                                }
+                              }
+                            }
+                            skyOffsetGenerator {
+                              enumerated {
+                                values {
+                                  offset {
+                                    p { arcseconds }
+                                    q { arcseconds }
+                                  }
+                                  guiding
+                                }
+                              }
+                              grid {
+                                cornerA {
+                                  p { arcseconds }
+                                  q { arcseconds }
+                                }
+                                cornerB {
+                                  p { arcseconds }
+                                  q { arcseconds }
+                                }
+                              }
+                              random {
+                                size { arcseconds }
+                                center {
+                                  p { arcseconds }
+                                  q { arcseconds }
+                                }
+                              }
+                              spiral {
+                                size { arcseconds }
+                                center {
+                                  p { arcseconds }
+                                  q { arcseconds }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                """,
+                expected = json"""
+                  {
+                    "cloneObservation": {
+                      "newObservation": {
+                        "observingMode": {
+                          "gmosNorthImaging": {
+                            "objectOffsetGenerator": $objRes,
+                            "skyOffsetGenerator": $skyRes
+                          }
+                        }
+                      }
+                    }
+                  }
+                """.asRight
+              )
 
   test("clone GMOS imaging observation preserves spatial offsets") {
     createProgramAs(pi).flatMap { pid =>

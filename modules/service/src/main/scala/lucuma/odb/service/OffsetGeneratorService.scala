@@ -47,6 +47,11 @@ sealed trait OffsetGeneratorService[F[_]]:
     role:  OffsetGeneratorRole,
   ): F[Unit]
 
+  def clone(
+    originalId: Observation.Id,
+    newId:      Observation.Id
+  ): F[Unit]
+
   def generateGmosNorthImagingObject(
     oid:          Observation.Id,
     filterCounts: Map[GmosNorthFilter, (Int, Long)]
@@ -96,6 +101,13 @@ object OffsetGeneratorService:
           .fold(unit): which =>
             session.exec(Statements.insert(which, input, role)) *>
               insertOffsetsIfEnumerated(which)
+
+      override def clone(
+        originalId: Observation.Id,
+        newId:      Observation.Id
+      ): F[Unit] =
+        session.execute(Statements.CloneOffsetGenerator)(newId, originalId) *>
+        session.execute(Statements.CloneEnumeratedOffsets)(newId, originalId).void
 
       override def generateGmosNorthImagingObject(
         o:  Observation.Id,
@@ -367,12 +379,54 @@ object OffsetGeneratorService:
           c_guide_state
         ) VALUES
       """ |+| values.intercalate(void", ")
-/*
-    def cloneEnumeratedOffsets(
-      originalId: Observation.Id,
-      newId:      Observation.Id
-    ) =
-      void"""
-        INSERT INTO t_enumerated_offset
-      """
-*/
+
+    val CloneOffsetGenerator: Command[(Observation.Id, Observation.Id)] =
+      sql"""
+        INSERT INTO t_offset_generator (
+          c_observation_id,
+          c_role,
+          c_type,
+          c_grid_corner_a_p,
+          c_grid_corner_a_q,
+          c_grid_corner_b_p,
+          c_grid_corner_b_q,
+          c_size,
+          c_center_offset_p,
+          c_center_offset_q
+        )
+        SELECT
+          $observation_id,
+          c_role,
+          c_type,
+          c_grid_corner_a_p,
+          c_grid_corner_a_q,
+          c_grid_corner_b_p,
+          c_grid_corner_b_q,
+          c_size,
+          c_center_offset_p,
+          c_center_offset_q
+        FROM t_offset_generator
+        WHERE c_observation_id = $observation_id
+      """.command
+
+    // New, Old
+    val CloneEnumeratedOffsets: Command[(Observation.Id, Observation.Id)] =
+      sql"""
+        INSERT INTO t_enumerated_offset (
+          c_observation_id,
+          c_role,
+          c_index,
+          c_offset_p,
+          c_offset_q,
+          c_guide_state
+        )
+        SELECT
+          $observation_id,
+          c_role,
+          c_index,
+          c_offset_p,
+          c_offset_q,
+          c_guide_state
+        FROM t_enumerated_offset
+        WHERE c_observation_id = $observation_id
+      """.command

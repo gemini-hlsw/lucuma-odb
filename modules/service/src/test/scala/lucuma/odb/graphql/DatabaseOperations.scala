@@ -753,7 +753,7 @@ trait DatabaseOperations { this: OdbSuite =>
       """
     ).void
 
-  private def scienceRequirementsObject(observingMode: ObservingModeType): String =
+  protected def scienceRequirementsObject(observingMode: ObservingModeType): String =
     observingMode match
       case ObservingModeType.Flamingos2LongSlit =>
         """{

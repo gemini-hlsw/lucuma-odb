@@ -66,18 +66,30 @@ trait OffsetGeneratorMapping[F[_]] extends OffsetGeneratorView[F] with Enumerate
 
       SqlField("generatorType", OffsetGeneratorView.OffsetGeneratorType),
 
-      SqlObject("enumerated", Join(OffsetGeneratorView.ObservationId, OffsetGeneratorView.Enumerated.ObservationId)),
-      SqlObject("grid",       Join(OffsetGeneratorView.ObservationId, OffsetGeneratorView.Grid.ObservationId)),
-      SqlObject("random",     Join(OffsetGeneratorView.ObservationId, OffsetGeneratorView.Random.ObservationId)),
-      SqlObject("spiral",     Join(OffsetGeneratorView.ObservationId, OffsetGeneratorView.Spiral.ObservationId))
+      SqlObject("enumerated", Join(List(
+        OffsetGeneratorView.ObservationId       -> OffsetGeneratorView.Enumerated.ObservationId,
+        OffsetGeneratorView.OffsetGeneratorRole -> OffsetGeneratorView.Enumerated.OffsetGeneratorRole
+      ))),
+      SqlObject("grid",       Join(List(
+        OffsetGeneratorView.ObservationId       -> OffsetGeneratorView.Grid.ObservationId,
+        OffsetGeneratorView.OffsetGeneratorRole -> OffsetGeneratorView.Grid.OffsetGeneratorRole
+      ))),
+      SqlObject("random",     Join(List(
+        OffsetGeneratorView.ObservationId       -> OffsetGeneratorView.Random.ObservationId,
+        OffsetGeneratorView.OffsetGeneratorRole -> OffsetGeneratorView.Random.OffsetGeneratorRole
+      ))),
+      SqlObject("spiral",     Join(List(
+        OffsetGeneratorView.ObservationId       -> OffsetGeneratorView.Spiral.ObservationId,
+        OffsetGeneratorView.OffsetGeneratorRole -> OffsetGeneratorView.Spiral.OffsetGeneratorRole
+      )))
     )
 
   lazy val OffsetGeneratorMappings: List[TypeMapping] =
     List(
       enumeratedOffsetGeneratorMapping(GmosNorthImagingType / "objectOffsetGenerator" / "enumerated", OffsetGeneratorView.Enumerated.ObservationId, EnumeratedOffsetView.ObjectObservationId),
-      enumeratedOffsetGeneratorMapping(GmosNorthImagingType / "skyOffsetGenerator" / "enumerated", OffsetGeneratorView.Enumerated.ObservationId, EnumeratedOffsetView.SkyObservationId),
+      enumeratedOffsetGeneratorMapping(GmosNorthImagingType / "skyOffsetGenerator"    / "enumerated", OffsetGeneratorView.Enumerated.ObservationId, EnumeratedOffsetView.SkyObservationId),
       enumeratedOffsetGeneratorMapping(GmosSouthImagingType / "objectOffsetGenerator" / "enumerated", OffsetGeneratorView.Enumerated.ObservationId, EnumeratedOffsetView.ObjectObservationId),
-      enumeratedOffsetGeneratorMapping(GmosSouthImagingType / "skyOffsetGenerator" / "enumerated", OffsetGeneratorView.Enumerated.ObservationId, EnumeratedOffsetView.SkyObservationId),
+      enumeratedOffsetGeneratorMapping(GmosSouthImagingType / "skyOffsetGenerator"    / "enumerated", OffsetGeneratorView.Enumerated.ObservationId, EnumeratedOffsetView.SkyObservationId),
       GridOffsetGeneratorMapping,
       OffsetGeneratorMapping,
       RandomOffsetGeneratorMapping,
