@@ -229,7 +229,18 @@ object CMain extends MainParams {
       _           <- runCalibrationsDaemon(
                        obsT,
                        ctT,
-                       pool.evalMap(services(user, enums, c.email, c.commitHash, ptc, httpClient, itcClient, gaiaClient)))
+                       pool.evalMap(
+                         services(
+                           user,
+                           enums,
+                           c.email,
+                           c.commitHash,
+                           ptc,
+                           httpClient,
+                           itcClient,
+                           gaiaClient,
+                           horizonsClient
+                     )))
     } yield ExitCode.Success
 
   /** Our logical entry point. */

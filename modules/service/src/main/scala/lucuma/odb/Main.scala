@@ -260,7 +260,7 @@ object FMain extends MainParams {
       webhookService    <- pool.map(EmailWebhookService.fromSession(_))
     } yield { wsb =>
       val attachmentRoutes   = AttachmentRoutes.apply[F](pool, s3FileService, ssoClient, enums, awsConfig.fileUploadMaxMb, emailConfig, commitHash, ptc, httpClient, itcClient, gaiaClient, horizonsClient)
-      val schedulerRoutes    = SchedulerRoutes.apply[F](pool, ssoClient, enums, emailConfig, httpClient, horizonsClient, itcClient, gaiaClient, horizonsClient)
+      val schedulerRoutes    = SchedulerRoutes.apply[F](pool, ssoClient, enums, emailConfig, commitHash, ptc, httpClient, itcClient, gaiaClient, horizonsClient)
       val metadataRoutes     = GraphQLRoutes.enumMetadata(metadataService)
       val emailWebhookRoutes = EmailWebhookRoutes(webhookService, emailConfig)
       middleware(graphQLRoutes(wsb) <+> attachmentRoutes <+>  metadataRoutes <+> emailWebhookRoutes <+> schedulerRoutes)

@@ -252,7 +252,7 @@ object CalcMain extends MainParams:
       user       <- Resource.eval(serviceUser[F](c))
       mapping     = (s: Session[F]) =>
                       OdbMapping.forObscalc(Resource.pure(s), SkunkMonitor.noopMonitor[F], user, c.goaUsers, gaiaClient, itc, c.commitHash, enums, ptc, http, horizonsClient, c.email)
-      o          <- runObscalcDaemon(c.database.maxObscalcConnections, c.commitHash, c.obscalcPoll, ptc, t, pool.evalMap(services(user, enums, mapping, c.email, http, itc, gaiaClient, horizonsClient)))
+      o          <- runObscalcDaemon(c.database.maxObscalcConnections, c.obscalcPoll, t, pool.evalMap(services(user, enums, mapping, c.email, c.commitHash, ptc, http, itc, gaiaClient, horizonsClient)))
     yield o
 
   /** Our logical entry point. */

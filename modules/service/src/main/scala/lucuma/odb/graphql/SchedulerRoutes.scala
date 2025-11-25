@@ -44,16 +44,16 @@ object SchedulerRoutes:
 
   // the normal constructor
   def apply[F[_]: Async: Logger: LoggerFactory: Parallel: Trace: SecureRandom](
-    pool:        Resource[F, Session[F]],
-    ssoClient:   SsoClient[F, User],
-    enums:       Enums,
-    emailConfig: Config.Email,
-    commitHash:  CommitHash,
-    tc:          TimeEstimateCalculatorImplementation.ForInstrumentMode,
-    httpClient:  Client[F],
-    horizonsClient: HorizonsClient[F],
-    itcClient:   ItcClient[F],
-    gaiaClient:  GaiaClient[F]
+    pool:           Resource[F, Session[F]],
+    ssoClient:      SsoClient[F, User],
+    enums:          Enums,
+    emailConfig:    Config.Email,
+    commitHash:     CommitHash,
+    tc:             TimeEstimateCalculatorImplementation.ForInstrumentMode,
+    httpClient:     Client[F],
+    itcClient:      ItcClient[F],
+    gaiaClient:     GaiaClient[F],
+    horizonsClient: HorizonsClient[F]
   ): HttpRoutes[F] =
     apply(
       [A] => (u: User) => (fa: Services[F] => F[A]) => pool.map(
