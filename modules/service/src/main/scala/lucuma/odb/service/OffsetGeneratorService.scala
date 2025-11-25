@@ -367,3 +367,12 @@ object OffsetGeneratorService:
           c_guide_state
         ) VALUES
       """ |+| values.intercalate(void", ")
+/*
+    def cloneEnumeratedOffsets(
+      originalId: Observation.Id,
+      newId:      Observation.Id
+    ) =
+      void"""
+        INSERT INTO t_enumerated_offset
+      """
+*/

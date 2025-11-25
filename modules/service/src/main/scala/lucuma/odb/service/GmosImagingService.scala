@@ -207,14 +207,6 @@ object GmosImagingService:
                       input.common.skyOffsetGenerator.traverse_ : og =>
                         services.offsetGeneratorService.insert(which, og, OffsetGeneratorRole.Sky)
 
-//              _   <- ResultT.liftF:
-//                       oids.traverse: oid =>
-//                         input.common.objectOffsetGenerator.traverse_(
-//                           services.offsetGeneratorService.insert(oid, _)
-//                         ) *>
-//                         input.common.skyOffsetGenerator.traverse_(
-//                           services.offsetGeneratorService.insert(oid, _)
-//                         )
             yield ()
           .value
 
