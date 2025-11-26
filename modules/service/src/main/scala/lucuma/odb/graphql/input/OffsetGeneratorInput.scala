@@ -102,17 +102,17 @@ object OffsetGeneratorInput:
     ObjectFieldsBinding.rmap:
       case List(
         AngleInput.Binding("size", rSize),
-        OffsetInput.Binding("center", rCenter)
+        OffsetInput.Binding.Option("center", rCenter)
       ) => (rSize, rCenter).parMapN: (size, center) =>
-        Random(size, center)
+        Random(size, center.getOrElse(Offset.Zero))
 
   private val SpiralBinding: Matcher[Spiral] =
     ObjectFieldsBinding.rmap:
       case List(
         AngleInput.Binding("size", rSize),
-        OffsetInput.Binding("center", rCenter)
+        OffsetInput.Binding.Option("center", rCenter)
       ) => (rSize, rCenter).parMapN: (size, center) =>
-        Spiral(size, center)
+        Spiral(size, center.getOrElse(Offset.Zero))
 
   val Binding: Matcher[OffsetGeneratorInput] =
     ObjectFieldsBinding.rmap:

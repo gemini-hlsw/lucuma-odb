@@ -133,32 +133,20 @@ object OffsetGeneratorService:
         o:  Observation.Id,
         fs: Map[GmosNorthFilter, (Int, Long)]
       ): F[Map[GmosNorthFilter, List[TelescopeConfig]]] =
-        generateGmosImagingObject(
-          o,
-          fs,
-          "t_gmos_north_imaging",
-          "c_object_offset_generator_id"
-        )
+        generateGmosImagingObject(o, fs)
 
       override def generateGmosSouthImagingObject(
         o:  Observation.Id,
         fs: Map[GmosSouthFilter, (Int, Long)]
       ): F[Map[GmosSouthFilter, List[TelescopeConfig]]] =
-        generateGmosImagingObject(
-          o,
-          fs,
-          "t_gmos_south_imaging",
-          "c_object_offset_generator_id"
-        )
+        generateGmosImagingObject(o, fs)
 
       private def generateGmosImagingObject[A](
-        o:           Observation.Id,
-        counts:      Map[A, (Int, Long)],
-        modeTable:   String,
-        inputColumn: String
+        oid:    Observation.Id,
+        counts: Map[A, (Int, Long)]
       ): F[Map[A, List[TelescopeConfig]]] =
         for
-          in <- selectInput(o, modeTable, inputColumn)
+          in <- selectInput(oid, OffsetGeneratorRole.Object)
           os <- in.fold(List.empty.pure[F]): in =>
                   counts.toList.traverse:
                     case (a, (count, seed)) => generate(count, seed, in, StepGuideState.Enabled).tupleLeft(a)
@@ -169,52 +157,36 @@ object OffsetGeneratorService:
         count: Int,
         seed:  Long
       ): F[List[TelescopeConfig]] =
-        generateGmosImagingSky(
-          oid,
-          count,
-          seed,
-          "t_gmos_north_imaging",
-          "c_sky_offset_generator_id"
-        )
+        generateGmosImagingSky(oid, count, seed)
 
       override def generateGmosSouthImagingSky(
         oid:   Observation.Id,
         count: Int,
         seed:  Long
       ): F[List[TelescopeConfig]] =
-        generateGmosImagingSky(
-          oid,
-          count,
-          seed,
-          "t_gmos_south_imaging",
-          "c_sky_offset_generator_id"
-        )
+        generateGmosImagingSky(oid, count, seed)
 
       private def generateGmosImagingSky[A](
-        o:           Observation.Id,
-        count:       Int,
-        seed:        Long,
-        modeTable:   String,
-        inputColumn: String
+        oid:   Observation.Id,
+        count: Int,
+        seed:  Long
       ): F[List[TelescopeConfig]] =
         for
-          in <- selectInput(o, modeTable, inputColumn)
+          in <- selectInput(oid, OffsetGeneratorRole.Sky)
           os <- in.fold(List.empty.pure[F]): in =>
                   generate(count, seed, in, StepGuideState.Disabled)
         yield os
 
-
       private def selectInput(
-        oid:       Observation.Id,
-        modeTable: String,
-        column:    String
+        oid:  Observation.Id,
+        role: OffsetGeneratorRole
       ): F[Option[OffsetGeneratorInput]] =
         for
-          ps <- session.option(Statements.selectInput(modeTable, column))(oid)
+          ps <- session.option(Statements.SelectInput)(oid, role)
           r  <- ps.traverse: (gen, a, b, s, c) =>
                   gen match
                     case OffsetGeneratorType.NoGenerator => OffsetGeneratorInput.NoGenerator.pure[F]
-                    case OffsetGeneratorType.Enumerated  => selectEnumeratedOffsets(oid).map(OffsetGeneratorInput.Enumerated.apply)
+                    case OffsetGeneratorType.Enumerated  => selectEnumeratedOffsets(oid, role).map(OffsetGeneratorInput.Enumerated.apply)
                     case OffsetGeneratorType.Grid        => OffsetGeneratorInput.Grid(a, b).pure[F]
                     case OffsetGeneratorType.Random      => OffsetGeneratorInput.Random(s, c).pure[F]
                     case OffsetGeneratorType.Spiral      => OffsetGeneratorInput.Spiral(s, c).pure[F]
@@ -232,7 +204,7 @@ object OffsetGeneratorService:
               List.empty[TelescopeConfig].pure[F]
 
             case OffsetGeneratorInput.Enumerated(lst)      =>
-              lst.pure[F]
+              LazyList.continually(lst).flatten.take(count).toList.pure[F]
 
             case OffsetGeneratorInput.Grid(a, b)           =>
               val w = (a.p.toSignedDecimalArcseconds - b.p.toSignedDecimalArcseconds).abs
@@ -251,9 +223,9 @@ object OffsetGeneratorService:
               val o  = Offset.signedDecimalArcseconds.reverseGet((p0, q0))
 
               val offsets =
-                (0 until cols).toList.flatMap: c =>
-                  (0 until rows).toList.map: r =>
-                    o + Offset.signedDecimalArcseconds.reverseGet((stepP * c, stepQ * r))
+                (0 until rows).toList.flatMap: r =>
+                  (0 until cols).toList.map: c =>
+                    o + Offset.signedDecimalArcseconds.reverseGet((stepP * c, - (stepQ * r)))
 
               offsets.take(count).map(o => TelescopeConfig(o, guideState)).pure[F]
 
@@ -265,17 +237,19 @@ object OffsetGeneratorService:
               withSeededRandom:
                 OffsetGenerator.spiral(posN, size, center)
 
-      private def selectEnumeratedOffsets(o: Observation.Id): F[List[TelescopeConfig]] =
-        session.execute(Statements.SelectEnumeratedOffsets)(o)
-
+      private def selectEnumeratedOffsets(
+        oid:  Observation.Id,
+        role: OffsetGeneratorRole
+      ): F[List[TelescopeConfig]] =
+        session.execute(Statements.SelectEnumeratedOffsets)(oid, role)
 
   object Statements:
 
-    def selectInput(
-      table:  String,
-      column: String
-    ): Query[
-      Observation.Id,
+    val SelectInput: Query[
+      (
+        Observation.Id,
+        OffsetGeneratorRole
+      ),
       (
         OffsetGeneratorType,
         Offset,
@@ -286,7 +260,7 @@ object OffsetGeneratorService:
     ] =
       sql"""
         SELECT
-          c_offset_generator_type,
+          c_type,
           c_grid_corner_a_p,
           c_grid_corner_a_q,
           c_grid_corner_b_p,
@@ -294,9 +268,9 @@ object OffsetGeneratorService:
           c_size,
           c_center_offset_p,
           c_center_offset_q
-        FROM t_offset_generator g
-        INNER JOIN #$table m ON m.#$column = g.c_offset_generator_id
-        WHERE m.c_observation_id = $observation_id
+        FROM t_offset_generator
+        WHERE c_observation_id = $observation_id
+          AND c_role           = $offset_generator_role
       """.query(
         offset_generator_type *:
         offset                *:
@@ -305,16 +279,16 @@ object OffsetGeneratorService:
         offset
       )
 
-    val SelectEnumeratedOffsets: Query[Observation.Id, TelescopeConfig] =
+    val SelectEnumeratedOffsets: Query[(Observation.Id, OffsetGeneratorRole), TelescopeConfig] =
       sql"""
         SELECT
           c_offset_p,
           c_offset_q,
           c_guide_state
-        FROM t_enumerated_offset o
-        INNER JOIN t_offset_generator g ON g.c_offset_generator_id = o.c_offset_generator_id
-        WHERE g.c_observation_id = $observation_id
-        ORDER BY g.c_index
+        FROM t_enumerated_offset
+        WHERE c_observation_id = $observation_id
+          AND c_role           = $offset_generator_role
+        ORDER BY c_index
       """.query(telescope_config)
 
     def insert(
