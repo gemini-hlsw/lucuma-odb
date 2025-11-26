@@ -3656,6 +3656,13 @@ input OffsetInput {
   q: OffsetComponentInput!
 }
 
+"""
+An offset generator produces a series of offsets according to generator-specific
+parameters.  Only (at most) one of `enumerated`, `grid`, `random` or `spiral`
+will be defined.  All others will be `null`.  The `generatorType` corresponds to
+the entry (if any) that is defined.  If the generator type of `NONE`, then none
+of the entries will be defined.
+"""
 type OffsetGenerator {
   generatorType: OffsetGeneratorType!
 
@@ -3665,6 +3672,11 @@ type OffsetGenerator {
   spiral:     SpiralOffsetGenerator
 }
 
+"""
+An offset generator is specified by defining one of the `enumerated`, `grid`,
+`random` or `spiral` options.  If none are defined, the generator type will be
+`NONE`.
+"""
 input OffsetGeneratorInput {
   enumerated: EnumeratedOffsetGeneratorInput
   grid:       GridOffsetGeneratorInput
@@ -3701,6 +3713,10 @@ type GridOffsetGenerator {
   cornerB: Offset!
 }
 
+"""
+Defines the region over which the grid pattern of offsets will be distributed.
+The number of points is determined by integration time calculator results.
+"""
 input GridOffsetGeneratorInput {
   cornerA: OffsetInput!
   cornerB: OffsetInput!

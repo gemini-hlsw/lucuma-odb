@@ -14,31 +14,31 @@ trait TelescopeConfigMapping[F[_]] extends EnumeratedOffsetView[F] with StepReco
   private def telescopeConfigMappingAtPath(
     path:          Path,
     guidingColumn: ColumnRef,
-    idColumns:     ColumnRef*
+    idColumns:     (String, ColumnRef)*
   ): ObjectMapping =
     ObjectMapping(path)(
       (
-        idColumns.toList.map: ref =>
-          SqlField(ref.column, ref, key = true, hidden = true)
+        idColumns.toList.map: (name, ref) =>
+          SqlField(name, ref, key = true, hidden = true)
       ) ++ List(
         SqlObject("offset"),
         SqlField("guiding", guidingColumn)
       )*
     )
 
-  private def enumeratedTelescopeConfigMapping: ObjectMapping =
-    ObjectMapping(TelescopeConfigType)(
-      SqlField("observationId", EnumeratedOffsetView.ObservationId, key = true, hidden = true),
-      SqlField("role",          EnumeratedOffsetView.OffsetGeneratorRole, key = true, hidden = true),
-      SqlField("index",         EnumeratedOffsetView.Index, key = true, hidden = true),
-      SqlObject("offset"),
-      SqlField("guiding",       EnumeratedOffsetView.GuideState)
-    )
-
-
   lazy val TelescopeConfigMappings: List[ObjectMapping] =
     List(
-//      telescopeConfigMappingAtPath(EnumeratedOffsetGeneratorType / "values", EnumeratedOffsetTable.GuideState, EnumeratedOffsetTable.ObservationId, EnumeratedOffsetTable.OffsetGeneratorRole, EnumeratedOffsetTable.Index),
-      enumeratedTelescopeConfigMapping,
-      telescopeConfigMappingAtPath(StepRecordType / "telescopeConfig", StepRecordView.GuideState, StepRecordView.Id)
+      telescopeConfigMappingAtPath(
+        EnumeratedOffsetGeneratorType / "values",
+        EnumeratedOffsetView.GuideState,
+        "observationId" -> EnumeratedOffsetView.ObservationId,
+        "role"          -> EnumeratedOffsetView.OffsetGeneratorRole,
+        "index"         -> EnumeratedOffsetView.Index
+      ),
+
+      telescopeConfigMappingAtPath(
+        StepRecordType / "telescopeConfig",
+        StepRecordView.GuideState,
+        "id" -> StepRecordView.Id
+      )
     )
