@@ -17,8 +17,8 @@ import lucuma.odb.graphql.*
 import org.scalacheck.Arbitrary
 import org.scalacheck.Arbitrary.arbitrary
 import org.scalacheck.Gen
-import org.scalacheck.Prop
-import org.scalacheck.Prop.*
+import org.scalacheck.effect.PropF
+import org.scalacheck.effect.PropF.forAllF
 
 class OffsetGeneratorServiceSuite extends OdbSuite with munit.ScalaCheckSuite:
 
@@ -214,38 +214,32 @@ class OffsetGeneratorServiceSuite extends OdbSuite with munit.ScalaCheckSuite:
   private def randomGeneratorTest(
     input:               String,
     sizeMicroarcseconds: Int
-  ): Prop =
-    forAll: (g: CountAndSeed, r: CountAndSeed) =>
-      val propResult =
-        IO.blocking:
-          val counts = Map(
-            GmosNorthFilter.GPrime -> (g.count -> g.seed),
-            GmosNorthFilter.RPrime -> (r.count -> r.seed)
-          )
+  ): PropF[IO] =
+    forAllF: (g: CountAndSeed, r: CountAndSeed) =>
+      val counts = Map(
+        GmosNorthFilter.GPrime -> (g.count -> g.seed),
+        GmosNorthFilter.RPrime -> (r.count -> r.seed)
+      )
 
-          val result = calcObjectOffsets(input, counts).unsafeRunSync()
+      calcObjectOffsets(input, counts).map: r =>
+        val sizeCorrect =
+          r.forall: (f, os) =>
+            os.sizeIs == counts(f)._1
 
-          assert:
-            val sizeCorrect =
-              result.forall: (f, os) =>
-                os.sizeIs == counts(f)._1
+        val withinSizeLimit =
+          r.values
+           .flatten
+           .map(_.offset.distance(Offset.Zero).toMicroarcseconds)
+           .forall(_ > sizeMicroarcseconds)
 
-            val withinSizeLimit =
-              result
-                .values
-                .flatten
-                .map(_.offset.distance(Offset.Zero).toMicroarcseconds)
-                .forall(_ <= sizeMicroarcseconds)
+        val notRepeating =
+          r.values.forall: os =>
+            os == os.distinct
 
-            val notRepeating =
-              result.values.forall: os =>
-                os == os.distinct
+        assert:
+          sizeCorrect && withinSizeLimit && notRepeating
 
-            sizeCorrect && withinSizeLimit && notRepeating
-
-      propResult.unsafeRunSync()
-
-  property("random"):
+  test("random"):
     randomGeneratorTest(
       s"""
         random: {
@@ -255,7 +249,7 @@ class OffsetGeneratorServiceSuite extends OdbSuite with munit.ScalaCheckSuite:
       20_000_000
     )
 
-  property("spiral"):
+  test("spiral"):
     randomGeneratorTest(
       s"""
         spiral: {
