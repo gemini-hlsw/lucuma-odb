@@ -157,7 +157,7 @@ class OffsetGeneratorServiceSuite extends OdbSuite with munit.ScalaCheckEffectSu
 
     assertIO(result, expected)
 
-  test("grid"):
+  test("uniform"):
     val counts = Map(
       GmosNorthFilter.GPrime -> ( 8, 0L), // sqrt( 8 * 2) = 4 columns at 2:1 aspect ratio
       GmosNorthFilter.RPrime -> (18, 0L)  // sqrt(18 * 2) = 6 columns at 2:1 aspect ratio
@@ -166,7 +166,7 @@ class OffsetGeneratorServiceSuite extends OdbSuite with munit.ScalaCheckEffectSu
     // 2:1 aspect ratio
     val result = calcObjectOffsets(
       s"""
-        grid: {
+        uniform: {
           cornerA: {
             p: { arcseconds: 10.0 }
             q: { arcseconds: 10.0 }
@@ -182,13 +182,13 @@ class OffsetGeneratorServiceSuite extends OdbSuite with munit.ScalaCheckEffectSu
 
     val expected = Map(
       GmosNorthFilter.GPrime -> ( // 4 x 2
-        row(20_000_000)(10_000_000, 16_666_666, 23_333_333, 30_000_000) ++
-        row(10_000_000)(10_000_000, 16_666_666, 23_333_333, 30_000_000)
+        row(20_000_000)(30_000_000, 23_333_334, 16_666_667, 10_000_000) ++
+        row(10_000_000)(30_000_000, 23_333_334, 16_666_667, 10_000_000)
       ),
       GmosNorthFilter.RPrime -> ( // 6 x 3
-        row(20_000_000)(10_000_000, 14_000_000, 18_000_000, 22_000_000, 26_000_000, 30_000_000) ++
-        row(15_000_000)(10_000_000, 14_000_000, 18_000_000, 22_000_000, 26_000_000, 30_000_000) ++
-        row(10_000_000)(10_000_000, 14_000_000, 18_000_000, 22_000_000, 26_000_000, 30_000_000)
+        row(20_000_000)(30_000_000, 26_000_000, 22_000_000, 18_000_000, 14_000_000, 10_000_000) ++
+        row(15_000_000)(30_000_000, 26_000_000, 22_000_000, 18_000_000, 14_000_000, 10_000_000) ++
+        row(10_000_000)(30_000_000, 26_000_000, 22_000_000, 18_000_000, 14_000_000, 10_000_000)
       )
     )
 

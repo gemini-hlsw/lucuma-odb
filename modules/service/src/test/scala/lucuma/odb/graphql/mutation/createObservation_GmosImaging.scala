@@ -715,7 +715,7 @@ class createObservation_GmosImaging extends OdbSuite:
           }
         """.asRight)
 
-  test("can create with grid object and random sky offset generators"):
+  test("can create with uniform object and random sky offset generators"):
     createProgramAs(pi).flatMap: pid =>
       createTargetAs(pi, pid).flatMap: tid =>
         expect(pi, s"""
@@ -747,7 +747,7 @@ class createObservation_GmosImaging extends OdbSuite:
                       { filter: R_PRIME }
                     ]
                     objectOffsetGenerator: {
-                      grid: {
+                      uniform: {
                         cornerA: {
                           p: { arcseconds: 10.0 }
                           q: { arcseconds: 11.0 }
@@ -785,7 +785,7 @@ class createObservation_GmosImaging extends OdbSuite:
                           guiding
                         }
                       }
-                      grid {
+                      uniform {
                         cornerA {
                           p { arcseconds }
                           q { arcseconds }
@@ -825,9 +825,9 @@ class createObservation_GmosImaging extends OdbSuite:
                 "observingMode": {
                   "gmosSouthImaging": {
                     "objectOffsetGenerator": {
-                      "generatorType": "GRID",
+                      "generatorType": "UNIFORM",
                       "enumerated": null,
-                      "grid": {
+                      "uniform": {
                         "cornerA": {
                           "p": { "arcseconds": 10 },
                           "q": { "arcseconds": 11 }

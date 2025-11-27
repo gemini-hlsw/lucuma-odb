@@ -3658,7 +3658,7 @@ input OffsetInput {
 
 """
 An offset generator produces a series of offsets according to generator-specific
-parameters.  Only (at most) one of `enumerated`, `grid`, `random` or `spiral`
+parameters.  Only (at most) one of `enumerated`, `random`, `spiral` or `uniform`
 will be defined.  All others will be `null`.  The `generatorType` corresponds to
 the entry (if any) that is defined.  If the generator type of `NONE`, then none
 of the entries will be defined.
@@ -3667,32 +3667,34 @@ type OffsetGenerator {
   generatorType: OffsetGeneratorType!
 
   enumerated: EnumeratedOffsetGenerator
-  grid:       GridOffsetGenerator
   random:     RandomOffsetGenerator
   spiral:     SpiralOffsetGenerator
+  uniform:    UniformOffsetGenerator
 }
 
 """
-An offset generator is specified by defining one of the `enumerated`, `grid`,
-`random` or `spiral` options.  If none are defined, the generator type will be
+An offset generator is specified by defining one of the `enumerated`, `random`,
+`spiral` or `uniform` options.  If none are defined, the generator type will be
 `NONE`.
 """
 input OffsetGeneratorInput {
   enumerated: EnumeratedOffsetGeneratorInput
-  grid:       GridOffsetGeneratorInput
   random:     RandomOffsetGeneratorInput
   spiral:     SpiralOffsetGeneratorInput
+  uniform:    UniformOffsetGeneratorInput
 }
 
 enum OffsetGeneratorType {
   NONE,
   ENUMERATED,
-  GRID,
   RANDOM,
-  SPIRAL
+  SPIRAL,
+  UNIFORM
 }
 
-# In the `ENUMERATED` option offsets are explicitly specified instead of calculated.
+"""
+In the `ENUMERATED` option offsets are explicitly specified instead of calculated.
+"""
 type EnumeratedOffsetGenerator {
   # Explicit offset (and guiding values).  If the list is empty then this
   # is essentially the same as `NONE`.  If the ITC prescribes _n_ steps for
@@ -3704,22 +3706,6 @@ input EnumeratedOffsetGeneratorInput {
   # TelescopeConfigInput groups an offset position with a guide state (guided or not guided).
   # Not-guided offsets are intended for sky positions.
   values: [TelescopeConfigInput!]!
-}
-
-# Defines a region of the sky using two corners.  Exposures are
-# then distributed across this region as evenly as possible.
-type GridOffsetGenerator {
-  cornerA: Offset!
-  cornerB: Offset!
-}
-
-"""
-Defines the region over which the grid pattern of offsets will be distributed.
-The number of points is determined by integration time calculator results.
-"""
-input GridOffsetGeneratorInput {
-  cornerA: OffsetInput!
-  cornerB: OffsetInput!
 }
 
 # The random offset pattern is defined by the limiting `size` and
@@ -3749,6 +3735,24 @@ input SpiralOffsetGeneratorInput {
 
   # Defaults to (0, 0).
   center: OffsetInput
+}
+
+"""
+Defines a region of the sky using two corners.  Exposures are
+then distributed across this region as evenly as possible.
+"""
+type UniformOffsetGenerator {
+  cornerA: Offset!
+  cornerB: Offset!
+}
+
+"""
+Defines the region over which the pattern of offsets will be distributed.
+The number of points is determined by integration time calculator results.
+"""
+input UniformOffsetGeneratorInput {
+  cornerA: OffsetInput!
+  cornerB: OffsetInput!
 }
 
 """

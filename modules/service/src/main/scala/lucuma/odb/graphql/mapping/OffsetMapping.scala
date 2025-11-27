@@ -37,8 +37,8 @@ trait OffsetMapping[F[_]] extends EnumeratedOffsetView[F]
       SqlField(s"id$idx", ref, key = true, hidden = true)
     ObjectMapping(path)((idFields ++ List(SqlObject("p"), SqlObject("q")))*)
 
-  private lazy val CornerAPath:    Path = GridOffsetGeneratorType / "cornerA"
-  private lazy val CornerBPath:    Path = GridOffsetGeneratorType / "cornerB"
+  private lazy val CornerAPath:    Path = UniformOffsetGeneratorType / "cornerA"
+  private lazy val CornerBPath:    Path = UniformOffsetGeneratorType / "cornerB"
   private lazy val EnumeratedPath: Path = EnumeratedOffsetGeneratorType / "values" / "offset"
   private lazy val RandomPath:     Path = RandomOffsetGeneratorType / "center"
   private lazy val SpiralPath:     Path = SpiralOffsetGeneratorType / "center"
@@ -50,13 +50,13 @@ trait OffsetMapping[F[_]] extends EnumeratedOffsetView[F]
       offsetComponentMappingAtPath(EnumeratedPath / "p", EnumeratedOffsetView.OffsetP, EnumeratedOffsetView.ObservationId, EnumeratedOffsetView.OffsetGeneratorRole, EnumeratedOffsetView.Index),
       offsetComponentMappingAtPath(EnumeratedPath / "q", EnumeratedOffsetView.OffsetQ, EnumeratedOffsetView.ObservationId, EnumeratedOffsetView.OffsetGeneratorRole, EnumeratedOffsetView.Index),
 
-      offsetMappingAtPath(CornerAPath, OffsetGeneratorView.Grid.ObservationId, OffsetGeneratorView.Grid.OffsetGeneratorRole),
-      offsetComponentMappingAtPath(CornerAPath / "p", OffsetGeneratorView.GridCornerAP, OffsetGeneratorView.Grid.ObservationId, OffsetGeneratorView.Grid.OffsetGeneratorRole),
-      offsetComponentMappingAtPath(CornerAPath / "q", OffsetGeneratorView.GridCornerAQ, OffsetGeneratorView.Grid.ObservationId, OffsetGeneratorView.Grid.OffsetGeneratorRole),
+      offsetMappingAtPath(CornerAPath, OffsetGeneratorView.Uniform.ObservationId, OffsetGeneratorView.Uniform.OffsetGeneratorRole),
+      offsetComponentMappingAtPath(CornerAPath / "p", OffsetGeneratorView.UniformCornerAP, OffsetGeneratorView.Uniform.ObservationId, OffsetGeneratorView.Uniform.OffsetGeneratorRole),
+      offsetComponentMappingAtPath(CornerAPath / "q", OffsetGeneratorView.UniformCornerAQ, OffsetGeneratorView.Uniform.ObservationId, OffsetGeneratorView.Uniform.OffsetGeneratorRole),
 
-      offsetMappingAtPath(CornerBPath, OffsetGeneratorView.Grid.ObservationId, OffsetGeneratorView.Grid.OffsetGeneratorRole),
-      offsetComponentMappingAtPath(CornerBPath / "p", OffsetGeneratorView.GridCornerBP, OffsetGeneratorView.Grid.ObservationId, OffsetGeneratorView.Grid.OffsetGeneratorRole),
-      offsetComponentMappingAtPath(CornerBPath / "q", OffsetGeneratorView.GridCornerBQ, OffsetGeneratorView.Grid.ObservationId, OffsetGeneratorView.Grid.OffsetGeneratorRole),
+      offsetMappingAtPath(CornerBPath, OffsetGeneratorView.Uniform.ObservationId, OffsetGeneratorView.Uniform.OffsetGeneratorRole),
+      offsetComponentMappingAtPath(CornerBPath / "p", OffsetGeneratorView.UniformCornerBP, OffsetGeneratorView.Uniform.ObservationId, OffsetGeneratorView.Uniform.OffsetGeneratorRole),
+      offsetComponentMappingAtPath(CornerBPath / "q", OffsetGeneratorView.UniformCornerBQ, OffsetGeneratorView.Uniform.ObservationId, OffsetGeneratorView.Uniform.OffsetGeneratorRole),
 
       offsetMappingAtPath(RandomPath, OffsetGeneratorView.Random.ObservationId, OffsetGeneratorView.Random.OffsetGeneratorRole),
       offsetComponentMappingAtPath(RandomPath / "p", OffsetGeneratorView.CenterOffsetP, OffsetGeneratorView.Random.ObservationId, OffsetGeneratorView.Random.OffsetGeneratorRole),

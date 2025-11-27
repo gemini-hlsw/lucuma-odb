@@ -27,9 +27,9 @@ sealed trait OffsetGeneratorInput:
     this match
       case OffsetGeneratorInput.NoGenerator   => OffsetGeneratorType.NoGenerator
       case OffsetGeneratorInput.Enumerated(_) => OffsetGeneratorType.Enumerated
-      case OffsetGeneratorInput.Grid(_, _)    => OffsetGeneratorType.Grid
       case OffsetGeneratorInput.Random(_, _)  => OffsetGeneratorType.Random
       case OffsetGeneratorInput.Spiral(_, _)  => OffsetGeneratorType.Spiral
+      case OffsetGeneratorInput.Uniform(_, _) => OffsetGeneratorType.Uniform
 
 object OffsetGeneratorInput:
 
@@ -38,15 +38,6 @@ object OffsetGeneratorInput:
   case class Enumerated(
     values: NonEmptyList[TelescopeConfig]
   ) extends OffsetGeneratorInput
-
-  case class Grid(
-    cornerA: Offset,
-    cornerB: Offset
-  ) extends OffsetGeneratorInput
-
-  object Grid:
-    val cornerA: Lens[Grid, Offset] = GenLens[Grid](_.cornerA)
-    val cornerB: Lens[Grid, Offset] = GenLens[Grid](_.cornerB)
 
   case class Random(
     size:   Angle,
@@ -58,9 +49,18 @@ object OffsetGeneratorInput:
     center: Offset
   ) extends OffsetGeneratorInput
 
-  private def grid: Prism[OffsetGeneratorInput, Grid] = GenPrism[OffsetGeneratorInput, Grid]
-  val cornerA: Optional[OffsetGeneratorInput, Offset] = grid.andThen(Grid.cornerA)
-  val cornerB: Optional[OffsetGeneratorInput, Offset] = grid.andThen(Grid.cornerB)
+  case class Uniform(
+    cornerA: Offset,
+    cornerB: Offset
+  ) extends OffsetGeneratorInput
+
+  object Uniform:
+    val cornerA: Lens[Uniform, Offset] = GenLens[Uniform](_.cornerA)
+    val cornerB: Lens[Uniform, Offset] = GenLens[Uniform](_.cornerB)
+
+  private def uniform: Prism[OffsetGeneratorInput, Uniform] = GenPrism[OffsetGeneratorInput, Uniform]
+  val cornerA: Optional[OffsetGeneratorInput, Offset] = uniform.andThen(Uniform.cornerA)
+  val cornerB: Optional[OffsetGeneratorInput, Offset] = uniform.andThen(Uniform.cornerB)
 
   val size: Optional[OffsetGeneratorInput, Angle] =
     Optional.apply[OffsetGeneratorInput, Angle] {
@@ -96,15 +96,6 @@ object OffsetGeneratorInput:
           .fold(OdbError.InvalidArgument("'enumerated' offsets must have at least one offset position".some).asFailure): nel =>
             Enumerated(nel).success
 
-
-  private val GridBinding: Matcher[Grid] =
-    ObjectFieldsBinding.rmap:
-      case List(
-        OffsetInput.Binding("cornerA", rCornerA),
-        OffsetInput.Binding("cornerB", rCornerB)
-      ) => (rCornerA, rCornerB).parMapN: (a, b) =>
-        Grid(a, b)
-
   private val RandomBinding: Matcher[Random] =
     ObjectFieldsBinding.rmap:
       case List(
@@ -121,17 +112,25 @@ object OffsetGeneratorInput:
       ) => (rSize, rCenter).parMapN: (size, center) =>
         Spiral(size, center.getOrElse(Offset.Zero))
 
+  private val UniformBinding: Matcher[Uniform] =
+    ObjectFieldsBinding.rmap:
+      case List(
+        OffsetInput.Binding("cornerA", rCornerA),
+        OffsetInput.Binding("cornerB", rCornerB)
+      ) => (rCornerA, rCornerB).parMapN: (a, b) =>
+        Uniform(a, b)
+
   val Binding: Matcher[OffsetGeneratorInput] =
     ObjectFieldsBinding.rmap:
       case List(
         EnumeratedBinding.Option("enumerated", rEnumerated),
-        GridBinding.Option("grid", rGrid),
         RandomBinding.Option("random", rRandom),
-        SpiralBinding.Option("spiral", rSpiral)
-      ) => (rEnumerated, rGrid, rRandom, rSpiral).parTupled.flatMap:
+        SpiralBinding.Option("spiral", rSpiral),
+        UniformBinding.Option("uniform", rUniform)
+      ) => (rEnumerated, rRandom, rSpiral, rUniform).parTupled.flatMap:
         case (None,    None,    None,    None   ) => NoGenerator.success
         case (Some(e), None,    None,    None   ) => e.success
-        case (None,    Some(g), None,    None   ) => g.success
-        case (None,    None,    Some(r), None   ) => r.success
-        case (None,    None,    None,    Some(s)) => s.success
+        case (None,    Some(r), None,    None   ) => r.success
+        case (None,    None,    Some(s), None   ) => s.success
+        case (None,    None,    None,    Some(u)) => u.success
         case _                                    => Matcher.validationFailure("At most one offset generator may be specified.")

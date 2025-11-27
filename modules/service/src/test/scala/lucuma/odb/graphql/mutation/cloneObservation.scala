@@ -1038,14 +1038,14 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
               }
             ]
           },
-          "grid": null,
+          "uniform": null,
           "random": null,
           "spiral": null
         }
       """,
       s"""
         {
-          grid: {
+          uniform: {
             cornerA: {
               p: { arcseconds: 14.0 }
               q: { arcseconds: 15.0 }
@@ -1059,7 +1059,7 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
       """ -> json"""
         {
           "enumerated": null,
-          "grid": {
+          "uniform": {
             "cornerA": {
               "p": { "arcseconds":  14 },
               "q": { "arcseconds":  15 }
@@ -1086,7 +1086,7 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
       """ -> json"""
         {
           "enumerated": null,
-          "grid": null,
+          "uniform": null,
           "random": {
             "size": { "arcseconds": 18 },
             "center": {
@@ -1110,7 +1110,7 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
       """ -> json"""
         {
           "enumerated": null,
-          "grid": null,
+          "uniform": null,
           "random": null,
           "spiral": {
             "size": { "arcseconds": 21 },
@@ -1192,7 +1192,7 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
                                   guiding
                                 }
                               }
-                              grid {
+                              uniform {
                                 cornerA {
                                   p { arcseconds }
                                   q { arcseconds }
@@ -1227,7 +1227,7 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
                                   guiding
                                 }
                               }
-                              grid {
+                              uniform {
                                 cornerA {
                                   p { arcseconds }
                                   q { arcseconds }

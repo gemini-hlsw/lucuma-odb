@@ -35,14 +35,6 @@ trait OffsetGeneratorMapping[F[_]] extends OffsetGeneratorView[F] with Enumerate
           child
         )
 
-  lazy val GridOffsetGeneratorMapping: ObjectMapping =
-    ObjectMapping(GridOffsetGeneratorType)(
-      SqlField("observationId", OffsetGeneratorView.Grid.ObservationId, key = true, hidden = true),
-      SqlField("role",          OffsetGeneratorView.Grid.OffsetGeneratorRole, key = true, hidden = true),
-      SqlObject("cornerA"),
-      SqlObject("cornerB")
-    )
-
   lazy val RandomOffsetGeneratorMapping: ObjectMapping =
     ObjectMapping(RandomOffsetGeneratorType)(
       SqlField("observationId", OffsetGeneratorView.Random.ObservationId, key = true, hidden = true),
@@ -59,6 +51,14 @@ trait OffsetGeneratorMapping[F[_]] extends OffsetGeneratorView[F] with Enumerate
       SqlObject("center")
     )
 
+  lazy val UniformOffsetGeneratorMapping: ObjectMapping =
+    ObjectMapping(UniformOffsetGeneratorType)(
+      SqlField("observationId", OffsetGeneratorView.Uniform.ObservationId, key = true, hidden = true),
+      SqlField("role",          OffsetGeneratorView.Uniform.OffsetGeneratorRole, key = true, hidden = true),
+      SqlObject("cornerA"),
+      SqlObject("cornerB")
+    )
+
   lazy val OffsetGeneratorMapping: ObjectMapping =
     ObjectMapping(OffsetGeneratorType)(
       SqlField("observationId", OffsetGeneratorView.ObservationId, key = true, hidden = true),
@@ -70,10 +70,6 @@ trait OffsetGeneratorMapping[F[_]] extends OffsetGeneratorView[F] with Enumerate
         OffsetGeneratorView.ObservationId       -> OffsetGeneratorView.Enumerated.ObservationId,
         OffsetGeneratorView.OffsetGeneratorRole -> OffsetGeneratorView.Enumerated.OffsetGeneratorRole
       ))),
-      SqlObject("grid",       Join(List(
-        OffsetGeneratorView.ObservationId       -> OffsetGeneratorView.Grid.ObservationId,
-        OffsetGeneratorView.OffsetGeneratorRole -> OffsetGeneratorView.Grid.OffsetGeneratorRole
-      ))),
       SqlObject("random",     Join(List(
         OffsetGeneratorView.ObservationId       -> OffsetGeneratorView.Random.ObservationId,
         OffsetGeneratorView.OffsetGeneratorRole -> OffsetGeneratorView.Random.OffsetGeneratorRole
@@ -81,6 +77,10 @@ trait OffsetGeneratorMapping[F[_]] extends OffsetGeneratorView[F] with Enumerate
       SqlObject("spiral",     Join(List(
         OffsetGeneratorView.ObservationId       -> OffsetGeneratorView.Spiral.ObservationId,
         OffsetGeneratorView.OffsetGeneratorRole -> OffsetGeneratorView.Spiral.OffsetGeneratorRole
+      ))),
+      SqlObject("uniform",    Join(List(
+        OffsetGeneratorView.ObservationId       -> OffsetGeneratorView.Uniform.ObservationId,
+        OffsetGeneratorView.OffsetGeneratorRole -> OffsetGeneratorView.Uniform.OffsetGeneratorRole
       )))
     )
 
@@ -90,8 +90,8 @@ trait OffsetGeneratorMapping[F[_]] extends OffsetGeneratorView[F] with Enumerate
       enumeratedOffsetGeneratorMapping(GmosNorthImagingType / "skyOffsetGenerator"    / "enumerated", OffsetGeneratorView.Enumerated.ObservationId, EnumeratedOffsetView.SkyObservationId),
       enumeratedOffsetGeneratorMapping(GmosSouthImagingType / "objectOffsetGenerator" / "enumerated", OffsetGeneratorView.Enumerated.ObservationId, EnumeratedOffsetView.ObjectObservationId),
       enumeratedOffsetGeneratorMapping(GmosSouthImagingType / "skyOffsetGenerator"    / "enumerated", OffsetGeneratorView.Enumerated.ObservationId, EnumeratedOffsetView.SkyObservationId),
-      GridOffsetGeneratorMapping,
       OffsetGeneratorMapping,
       RandomOffsetGeneratorMapping,
-      SpiralOffsetGeneratorMapping
+      SpiralOffsetGeneratorMapping,
+      UniformOffsetGeneratorMapping
     )

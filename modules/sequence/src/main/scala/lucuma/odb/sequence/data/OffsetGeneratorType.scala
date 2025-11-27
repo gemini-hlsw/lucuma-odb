@@ -8,6 +8,6 @@ import lucuma.core.util.Enumerated
 enum OffsetGeneratorType(val tag: String) derives Enumerated:
   case NoGenerator extends OffsetGeneratorType("none")
   case Enumerated  extends OffsetGeneratorType("enumerated")
-  case Grid        extends OffsetGeneratorType("grid")
   case Random      extends OffsetGeneratorType("random")
   case Spiral      extends OffsetGeneratorType("spiral")
+  case Uniform     extends OffsetGeneratorType("uniform")

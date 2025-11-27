@@ -1,9 +1,9 @@
 CREATE TYPE e_offset_generator_type AS ENUM(
   'none',
   'enumerated',
-  'grid',
   'random',
-  'spiral'
+  'spiral',
+  'uniform'
 );
 
 CREATE TYPE e_offset_generator_role AS ENUM(
@@ -13,20 +13,20 @@ CREATE TYPE e_offset_generator_role AS ENUM(
 
 CREATE TABLE t_offset_generator (
 
-  c_observation_id   d_observation_id        NOT NULL REFERENCES t_observation(c_observation_id) ON DELETE CASCADE,
-  c_role             e_offset_generator_role NOT NULL,
+  c_observation_id     d_observation_id        NOT NULL REFERENCES t_observation(c_observation_id) ON DELETE CASCADE,
+  c_role               e_offset_generator_role NOT NULL,
   PRIMARY KEY (c_observation_id, c_role),
 
-  c_type             e_offset_generator_type NOT NULL,
+  c_type               e_offset_generator_type NOT NULL,
 
-  c_grid_corner_a_p  d_angle_µas             NOT NULL DEFAULT 0,
-  c_grid_corner_a_q  d_angle_µas             NOT NULL DEFAULT 0,
-  c_grid_corner_b_p  d_angle_µas             NOT NULL DEFAULT 0,
-  c_grid_corner_b_q  d_angle_µas             NOT NULL DEFAULT 0,
+  c_uniform_corner_a_p d_angle_µas             NOT NULL DEFAULT 0,
+  c_uniform_corner_a_q d_angle_µas             NOT NULL DEFAULT 0,
+  c_uniform_corner_b_p d_angle_µas             NOT NULL DEFAULT 0,
+  c_uniform_corner_b_q d_angle_µas             NOT NULL DEFAULT 0,
 
-  c_size             d_angle_µas             NOT NULL DEFAULT 0,
-  c_center_offset_p  d_angle_µas             NOT NULL DEFAULT 0,
-  c_center_offset_q  d_angle_µas             NOT NULL DEFAULT 0
+  c_size               d_angle_µas             NOT NULL DEFAULT 0,
+  c_center_offset_p    d_angle_µas             NOT NULL DEFAULT 0,
+  c_center_offset_q    d_angle_µas             NOT NULL DEFAULT 0
 
 );
 
@@ -59,12 +59,12 @@ CREATE VIEW v_offset_generator AS
   CASE WHEN o.c_role = 'sky'        THEN o.c_observation_id END AS c_sky_observation_id,
   CASE WHEN o.c_type = 'enumerated' THEN o.c_observation_id END AS c_enumerated_observation_id,
   CASE WHEN o.c_type = 'enumerated' THEN o.c_role           END AS c_enumerated_role,
-  CASE WHEN o.c_type = 'grid'       THEN o.c_observation_id END AS c_grid_observation_id,
-  CASE WHEN o.c_type = 'grid'       THEN o.c_role           END AS c_grid_role,
   CASE WHEN o.c_type = 'random'     THEN o.c_observation_id END AS c_random_observation_id,
   CASE WHEN o.c_type = 'random'     THEN o.c_role           END AS c_random_role,
   CASE WHEN o.c_type = 'spiral'     THEN o.c_observation_id END AS c_spiral_observation_id,
-  CASE WHEN o.c_type = 'spiral'     THEN o.c_role           END AS c_spiral_role
+  CASE WHEN o.c_type = 'spiral'     THEN o.c_role           END AS c_spiral_role,
+  CASE WHEN o.c_type = 'uniform'    THEN o.c_observation_id END AS c_uniform_observation_id,
+  CASE WHEN o.c_type = 'uniform'    THEN o.c_role           END AS c_uniform_role
   FROM t_offset_generator o;
 
 

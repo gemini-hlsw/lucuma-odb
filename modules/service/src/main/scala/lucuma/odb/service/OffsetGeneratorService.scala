@@ -187,7 +187,7 @@ object OffsetGeneratorService:
                   gen match
                     case OffsetGeneratorType.NoGenerator => OffsetGeneratorInput.NoGenerator.pure[F]
                     case OffsetGeneratorType.Enumerated  => selectEnumeratedOffsets(oid, role).map(OffsetGeneratorInput.Enumerated.apply)
-                    case OffsetGeneratorType.Grid        => OffsetGeneratorInput.Grid(a, b).pure[F]
+                    case OffsetGeneratorType.Uniform        => OffsetGeneratorInput.Uniform(a, b).pure[F]
                     case OffsetGeneratorType.Random      => OffsetGeneratorInput.Random(s, c).pure[F]
                     case OffsetGeneratorType.Spiral      => OffsetGeneratorInput.Spiral(s, c).pure[F]
         yield r
@@ -213,26 +213,32 @@ object OffsetGeneratorService:
               // default is ignored.
               LazyList.continually(lst.toList).flatten.take(count).toList.pure[F]
 
-            case OffsetGeneratorInput.Grid(a, b)           =>
+            case OffsetGeneratorInput.Uniform(a, b)           =>
               val w = (a.p.toSignedDecimalArcseconds - b.p.toSignedDecimalArcseconds).abs
               val h = (a.q.toSignedDecimalArcseconds - b.q.toSignedDecimalArcseconds).abs
-              val aspectRatio = w / h
 
-              val cols0 = 1 max Math.sqrt(posN.value * aspectRatio.doubleValue).round.toInt
-              val rows  = 1 max (posN.value.toDouble / cols0).ceil.toInt
-              val cols  = (posN.value.toDouble / rows).ceil.toInt
+              val (rows, cols) =
+                if h <= 0.000001 then
+                  (1, posN.value)
+                else
+                  val aspectRatio = w / h
+
+                  val cols0 = 1 max Math.sqrt(posN.value * aspectRatio.doubleValue).round.toInt
+                  val rows  = 1 max (posN.value.toDouble / cols0).ceil.toInt
+                  val cols  = (posN.value.toDouble / rows).ceil.toInt
+                  (rows, cols)
 
               val stepP = if cols <= 2 then w else w / (cols - 1) // arcseconds
               val stepQ = if rows <= 2 then h else h / (rows - 1) // arcseconds
 
-              val p0 = a.p.toSignedDecimalArcseconds min b.p.toSignedDecimalArcseconds
+              val p0 = a.p.toSignedDecimalArcseconds max b.p.toSignedDecimalArcseconds
               val q0 = a.q.toSignedDecimalArcseconds max b.q.toSignedDecimalArcseconds
               val o  = Offset.signedDecimalArcseconds.reverseGet((p0, q0))
 
               val offsets =
                 (0 until rows).toList.flatMap: r =>
                   (0 until cols).toList.map: c =>
-                    o + Offset.signedDecimalArcseconds.reverseGet((stepP * c, - (stepQ * r)))
+                    o + Offset.signedDecimalArcseconds.reverseGet(-stepP * c, -stepQ * r)
 
               offsets.take(count).map(o => TelescopeConfig(o, defaultGuideState)).pure[F]
 
@@ -275,10 +281,10 @@ object OffsetGeneratorService:
       sql"""
         SELECT
           c_type,
-          c_grid_corner_a_p,
-          c_grid_corner_a_q,
-          c_grid_corner_b_p,
-          c_grid_corner_b_q,
+          c_uniform_corner_a_p,
+          c_uniform_corner_a_q,
+          c_uniform_corner_b_p,
+          c_uniform_corner_b_q,
           c_size,
           c_center_offset_p,
           c_center_offset_q
@@ -343,10 +349,10 @@ object OffsetGeneratorService:
           c_observation_id,
           c_role,
           c_type,
-          c_grid_corner_a_p,
-          c_grid_corner_a_q,
-          c_grid_corner_b_p,
-          c_grid_corner_b_q,
+          c_uniform_corner_a_p,
+          c_uniform_corner_a_q,
+          c_uniform_corner_b_p,
+          c_uniform_corner_b_q,
           c_size,
           c_center_offset_p,
           c_center_offset_q
@@ -405,10 +411,10 @@ object OffsetGeneratorService:
           c_observation_id,
           c_role,
           c_type,
-          c_grid_corner_a_p,
-          c_grid_corner_a_q,
-          c_grid_corner_b_p,
-          c_grid_corner_b_q,
+          c_uniform_corner_a_p,
+          c_uniform_corner_a_q,
+          c_uniform_corner_b_p,
+          c_uniform_corner_b_q,
           c_size,
           c_center_offset_p,
           c_center_offset_q
@@ -417,10 +423,10 @@ object OffsetGeneratorService:
           $observation_id,
           c_role,
           c_type,
-          c_grid_corner_a_p,
-          c_grid_corner_a_q,
-          c_grid_corner_b_p,
-          c_grid_corner_b_q,
+          c_uniform_corner_a_p,
+          c_uniform_corner_a_q,
+          c_uniform_corner_b_p,
+          c_uniform_corner_b_q,
           c_size,
           c_center_offset_p,
           c_center_offset_q
