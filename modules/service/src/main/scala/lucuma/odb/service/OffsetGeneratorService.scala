@@ -3,6 +3,7 @@
 
 package lucuma.odb.service
 
+import cats.ApplicativeError
 import cats.Monad
 import cats.data.NonEmptyList
 import cats.effect.Async
@@ -99,10 +100,9 @@ object OffsetGeneratorService:
 
         val insertOffsetsIfEnumerated: F[Unit] =
           input match
-            case OffsetGeneratorInput.Enumerated(values) =>
-              NonEmptyList.fromList(values).fold(unit): offs =>
-                session.exec(Statements.insertEnumeratedOffsets(oids, offs, role))
-            case _                                       =>
+            case OffsetGeneratorInput.Enumerated(offs) =>
+              session.exec(Statements.insertEnumeratedOffsets(oids, offs, role))
+            case _                                     =>
               unit
 
         session.exec(Statements.insert(oids, input, role)) *> insertOffsetsIfEnumerated
@@ -211,7 +211,7 @@ object OffsetGeneratorService:
             case OffsetGeneratorInput.Enumerated(lst)      =>
               // Enumerated positions come with an explicit guide state so the
               // default is ignored.
-              LazyList.continually(lst).flatten.take(count).toList.pure[F]
+              LazyList.continually(lst.toList).flatten.take(count).toList.pure[F]
 
             case OffsetGeneratorInput.Grid(a, b)           =>
               val w = (a.p.toSignedDecimalArcseconds - b.p.toSignedDecimalArcseconds).abs
@@ -247,8 +247,15 @@ object OffsetGeneratorService:
       private def selectEnumeratedOffsets(
         oid:  Observation.Id,
         role: OffsetGeneratorRole
-      ): F[List[TelescopeConfig]] =
-        session.execute(Statements.SelectEnumeratedOffsets)(oid, role)
+      ): F[NonEmptyList[TelescopeConfig]] =
+        session
+          .execute(Statements.SelectEnumeratedOffsets)(oid, role)
+          .flatMap: lst =>
+            ApplicativeError
+              .liftFromOption[F](
+                NonEmptyList.fromList(lst),
+                new RuntimeException("Expected at least one enumerated offset.")
+              )
 
   object Statements:
 

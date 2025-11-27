@@ -4,12 +4,15 @@
 package lucuma.odb.graphql
 package input
 
+import cats.data.NonEmptyList
 import cats.syntax.option.*
 import cats.syntax.parallel.*
 import grackle.syntax.*
 import lucuma.core.math.Angle
 import lucuma.core.math.Offset
 import lucuma.core.model.sequence.TelescopeConfig
+import lucuma.odb.data.OdbError
+import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.binding.*
 import lucuma.odb.sequence.data.OffsetGeneratorType
 import monocle.Lens
@@ -33,7 +36,7 @@ object OffsetGeneratorInput:
   case object NoGenerator extends OffsetGeneratorInput
 
   case class Enumerated(
-    values: List[TelescopeConfig]
+    values: NonEmptyList[TelescopeConfig]
   ) extends OffsetGeneratorInput
 
   case class Grid(
@@ -87,7 +90,11 @@ object OffsetGeneratorInput:
     ObjectFieldsBinding.rmap:
       case List(
         TelescopeConfigInput.Binding.List("values", rValues)
-      ) => rValues.map(Enumerated.apply)
+      ) => rValues.flatMap: lst =>
+        NonEmptyList
+          .fromList(lst)
+          .fold(OdbError.InvalidArgument("'enumerated' offsets must have at least one offset position".some).asFailure): nel =>
+            Enumerated(nel).success
 
 
   private val GridBinding: Matcher[Grid] =
