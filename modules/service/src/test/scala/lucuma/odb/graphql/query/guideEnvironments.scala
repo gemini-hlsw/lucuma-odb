@@ -331,9 +331,9 @@ class guideEnvironments extends ExecutionTestSupportForGmos with GuideEnvironmen
                       "microarcseconds": 1295467354540
                     },
                     "radialVelocity": {
-                      "metersPerSecond": 0,
-                      "centimetersPerSecond": 0,
-                      "kilometersPerSecond": 0
+                      "metersPerSecond": 10090.042000,
+                      "centimetersPerSecond": 1009004,
+                      "kilometersPerSecond": 10.090042
                     },
                     "properMotion": {
                       "ra": {
