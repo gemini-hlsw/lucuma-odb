@@ -62,7 +62,7 @@ trait OffsetMapping[F[_]] extends EnumeratedOffsetView[F]
       offsetComponentMappingAtPath(RandomPath / "p", OffsetGeneratorView.CenterOffsetP, OffsetGeneratorView.Random.ObservationId, OffsetGeneratorView.Random.OffsetGeneratorRole),
       offsetComponentMappingAtPath(RandomPath / "q", OffsetGeneratorView.CenterOffsetQ, OffsetGeneratorView.Random.ObservationId, OffsetGeneratorView.Random.OffsetGeneratorRole),
 
-      offsetMappingAtPath(SpiralPath, OffsetGeneratorView.ObservationId, OffsetGeneratorView.Spiral.ObservationId, OffsetGeneratorView.Spiral.OffsetGeneratorRole),
+      offsetMappingAtPath(SpiralPath, OffsetGeneratorView.Spiral.ObservationId, OffsetGeneratorView.Spiral.OffsetGeneratorRole),
       offsetComponentMappingAtPath(SpiralPath / "p", OffsetGeneratorView.CenterOffsetP, OffsetGeneratorView.Spiral.ObservationId, OffsetGeneratorView.Spiral.OffsetGeneratorRole),
       offsetComponentMappingAtPath(SpiralPath / "q", OffsetGeneratorView.CenterOffsetQ, OffsetGeneratorView.Spiral.ObservationId, OffsetGeneratorView.Spiral.OffsetGeneratorRole),
 

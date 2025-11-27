@@ -1008,3 +1008,85 @@ class createObservation_GmosImaging extends OdbSuite:
             }
           """.asRight
         )
+
+  test("can create with spiral generator"):
+    createProgramAs(pi).flatMap: pid =>
+      createTargetAs(pi, pid).flatMap: tid =>
+        expect(pi, s"""
+          mutation {
+            createObservation(input: {
+              programId: ${pid.asJson}
+              SET: {
+                targetEnvironment: {
+                  asterism: [${tid.asJson}]
+                }
+                scienceRequirements: {
+                  exposureTimeMode: {
+                    signalToNoise: {
+                      value: 10.0
+                      at: { nanometers: 500.0 }
+                    }
+                  }
+                  imaging: {
+                    minimumFov: { arcseconds: 100 }
+                    narrowFilters: false
+                    broadFilters: false
+                    combinedFilters: true
+                  }
+                }
+                observingMode: {
+                  gmosSouthImaging: {
+                    filters: [
+                      { filter: G_PRIME },
+                      { filter: R_PRIME }
+                    ]
+                    objectOffsetGenerator: {
+                      spiral: {
+                        size: { arcseconds: 14.0 }
+                      }
+                    }
+                  }
+                }
+              }
+            }) {
+              observation {
+                observingMode {
+                  gmosSouthImaging {
+                    objectOffsetGenerator {
+                      generatorType
+                      spiral {
+                        size { arcseconds }
+                        center {
+                          p { arcseconds }
+                          q { arcseconds }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        """, json"""
+          {
+            "createObservation": {
+              "observation": {
+                "observingMode": {
+                  "gmosSouthImaging": {
+                    "objectOffsetGenerator": {
+                      "generatorType": "SPIRAL",
+                      "spiral": {
+                        "size": { "arcseconds":  14 },
+                        "center": {
+                          "p": { "arcseconds": 0 },
+                          "q": { "arcseconds": 0 }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        """.asRight
+      )

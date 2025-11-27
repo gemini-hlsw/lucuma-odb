@@ -192,11 +192,16 @@ object OffsetGeneratorService:
                     case OffsetGeneratorType.Spiral      => OffsetGeneratorInput.Spiral(s, c).pure[F]
         yield r
 
-      private def generate(count: Int, seed: Long, input: OffsetGeneratorInput, guideState: StepGuideState): F[List[TelescopeConfig]] =
+      private def generate(
+        count:             Int,
+        seed:              Long,
+        input:             OffsetGeneratorInput,
+        defaultGuideState: StepGuideState
+      ): F[List[TelescopeConfig]] =
         def withSeededRandom(fa: (Monad[F], Random[F]) ?=> F[NonEmptyList[Offset]]): F[List[TelescopeConfig]] =
           Random.scalaUtilRandomSeedLong(seed).flatMap: r =>
             given Random[F] = r
-            fa.map(_.toList.map(o => TelescopeConfig(o, guideState)))
+            fa.map(_.toList.map(o => TelescopeConfig(o, defaultGuideState)))
 
         PosInt.unapply(count).fold(List.empty[TelescopeConfig].pure[F]): posN =>
           input match
@@ -204,6 +209,8 @@ object OffsetGeneratorService:
               List.empty[TelescopeConfig].pure[F]
 
             case OffsetGeneratorInput.Enumerated(lst)      =>
+              // Enumerated positions come with an explicit guide state so the
+              // default is ignored.
               LazyList.continually(lst).flatten.take(count).toList.pure[F]
 
             case OffsetGeneratorInput.Grid(a, b)           =>
@@ -227,7 +234,7 @@ object OffsetGeneratorService:
                   (0 until cols).toList.map: c =>
                     o + Offset.signedDecimalArcseconds.reverseGet((stepP * c, - (stepQ * r)))
 
-              offsets.take(count).map(o => TelescopeConfig(o, guideState)).pure[F]
+              offsets.take(count).map(o => TelescopeConfig(o, defaultGuideState)).pure[F]
 
             case OffsetGeneratorInput.Random(size, center) =>
               withSeededRandom:

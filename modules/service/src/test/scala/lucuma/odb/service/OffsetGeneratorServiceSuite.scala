@@ -20,7 +20,7 @@ import org.scalacheck.Gen
 import org.scalacheck.effect.PropF
 import org.scalacheck.effect.PropF.forAllF
 
-class OffsetGeneratorServiceSuite extends OdbSuite with munit.ScalaCheckSuite:
+class OffsetGeneratorServiceSuite extends OdbSuite with munit.ScalaCheckEffectSuite:
 
   val pi: StandardUser     = TestUsers.Standard.pi(nextId, nextId)
   val service: ServiceUser = TestUsers.service(nextId)
@@ -230,7 +230,7 @@ class OffsetGeneratorServiceSuite extends OdbSuite with munit.ScalaCheckSuite:
           r.values
            .flatten
            .map(_.offset.distance(Offset.Zero).toMicroarcseconds)
-           .forall(_ > sizeMicroarcseconds)
+           .forall(_ < sizeMicroarcseconds)
 
         val notRepeating =
           r.values.forall: os =>

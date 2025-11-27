@@ -995,7 +995,7 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
     }
   }
 
-  test("close GMOS imaging observation preserves offset generator"):
+  test("clone GMOS imaging observation preserves offset generator"):
     val inputsAndResults = List(
       s"""
         {
