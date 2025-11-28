@@ -19,6 +19,7 @@ import fs2.io.net.Network
 import grackle.Mapping
 import grackle.skunk.SkunkMonitor
 import lucuma.catalog.clients.GaiaClient
+import lucuma.catalog.telluric.TelluricTargetsClient
 import lucuma.core.model.Access
 import lucuma.core.model.User
 import lucuma.core.util.CalculationState
@@ -215,6 +216,7 @@ object CalcMain extends MainParams:
     itcClient:   ItcClient[F],
     gaiaClient:  GaiaClient[F],
     horizonsClient: HorizonsClient[F],
+    telClient:   TelluricTargetsClient[F]
   )(session: Session[F]): F[Services[F]] =
     Services.forUser(
       user,
@@ -227,7 +229,8 @@ object CalcMain extends MainParams:
       itcClient,
       gaiaClient,
       S3FileService.noop[F],
-      horizonsClient
+      horizonsClient,
+      telClient
     )(session).pure[F].flatTap: _ =>
       val us = UserService.fromSession(session)
       Services.asSuperUser(us.canonicalizeUser(user))
@@ -247,12 +250,43 @@ object CalcMain extends MainParams:
       gaiaClient <- c.gaiaClient
       itc        <- c.itcClient
       horizonsClient <- c.horizonsClientResource
+      telClient  <- c.telluricClient
       ptc        <- Resource.eval(pool.use(TimeEstimateCalculatorImplementation.fromSession(_, enums)))
       t          <- topic(pool)
       user       <- Resource.eval(serviceUser[F](c))
       mapping     = (s: Session[F]) =>
-                      OdbMapping.forObscalc(Resource.pure(s), SkunkMonitor.noopMonitor[F], user, c.goaUsers, gaiaClient, itc, c.commitHash, enums, ptc, http, horizonsClient, c.email)
-      o          <- runObscalcDaemon(c.database.maxObscalcConnections, c.obscalcPoll, t, pool.evalMap(services(user, enums, mapping, c.email, c.commitHash, ptc, http, itc, gaiaClient, horizonsClient)))
+                      OdbMapping.forObscalc(
+                        Resource.pure(s),
+                        SkunkMonitor.noopMonitor[F],
+                        user,
+                        c.goaUsers,
+                        gaiaClient,
+                        itc,
+                        c.commitHash,
+                        enums,
+                        ptc,
+                        http,
+                        horizonsClient,
+                        c.email
+                      )
+      o          <- runObscalcDaemon(
+                      c.database.maxObscalcConnections,
+                      c.obscalcPoll,
+                      t,
+                      pool.evalMap(
+                        services(
+                          user,
+                          enums,
+                          mapping,
+                          c.email,
+                          c.commitHash,
+                          ptc,
+                          http,
+                          itc,
+                          gaiaClient,
+                          horizonsClient,
+                          telClient
+                      )))
     yield o
 
   /** Our logical entry point. */

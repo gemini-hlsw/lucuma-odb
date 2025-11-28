@@ -18,6 +18,7 @@ import grackle.QueryCompiler.SelectElaborator
 import grackle.skunk.SkunkMapping
 import grackle.skunk.SkunkMonitor
 import lucuma.catalog.clients.GaiaClient
+import lucuma.catalog.telluric.TelluricTargetsClient
 import lucuma.core.model.User
 import lucuma.horizons.HorizonsClient
 import lucuma.itc.client.ItcClient
@@ -342,7 +343,8 @@ object OdbMapping {
                 itcClient0,
                 gaiaClient0,
                 S3FileService.noop[F],
-                horizonsClient0
+                horizonsClient0,
+                TelluricTargetsClient.noop[F]
               )(session)
 
           def mkTypeMappings(ms: List[TypeMapping]): TypeMappings =

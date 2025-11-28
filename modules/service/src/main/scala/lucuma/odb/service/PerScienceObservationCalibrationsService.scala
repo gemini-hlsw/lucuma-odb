@@ -11,16 +11,9 @@ import eu.timepit.refined.types.string.NonEmptyString
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObservingModeType
-import lucuma.core.enums.TargetDisposition
-import lucuma.core.math.Declination
-import lucuma.core.math.Epoch
-import lucuma.core.math.RightAscension
 import lucuma.core.model.Group
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
-import lucuma.core.model.SourceProfile
-import lucuma.core.model.SpectralDefinition
-import lucuma.core.model.Target
 import lucuma.core.util.TimeSpan
 import lucuma.odb.data.BlindOffsetType
 import lucuma.odb.data.Existence
@@ -31,9 +24,7 @@ import lucuma.odb.graphql.input.CreateGroupInput
 import lucuma.odb.graphql.input.GroupPropertiesInput
 import lucuma.odb.graphql.input.ObservationPropertiesInput
 import lucuma.odb.graphql.input.PosAngleConstraintInput
-import lucuma.odb.graphql.input.SiderealInput
 import lucuma.odb.graphql.input.TargetEnvironmentInput
-import lucuma.odb.graphql.input.TargetPropertiesInput
 import lucuma.odb.graphql.mapping.AccessControl
 import lucuma.odb.service.Services.SuperUserAccess
 import lucuma.odb.util.Codecs.*
@@ -44,8 +35,6 @@ import skunk.AppliedFragment
 import skunk.Query
 import skunk.Transaction
 import skunk.syntax.all.*
-
-import scala.collection.immutable.SortedMap
 
 trait PerScienceObservationCalibrationsService[F[_]]:
 
@@ -61,6 +50,7 @@ object PerScienceObservationCalibrationsService:
       val groupService  = S.groupService
       val observationService = S.observationService
       val obsModeService = S.observingModeServices
+      val telluricResolutionService = S.telluricResolutionService
 
       private def groupNameForObservation(
         config:          CalibrationConfigSubset,
@@ -151,14 +141,13 @@ object PerScienceObservationCalibrationsService:
 
         def insertTelluricObservation(
           pid:             Program.Id,
-          targetId:        Target.Id,
           telluricGroupId: Group.Id,
           telluricIndex:   NonNegShort
         ): F[Observation.Id] =
-          // Minimal input to create the telluric obs
+          // Minimal input to create the telluric obs with empty asterism
           val targetEnvironment = TargetEnvironmentInput.Create(
             explicitBase = none,
-            asterism = List(targetId).some,
+            asterism = none,
             useBlindOffset = false.some,
             blindOffsetTarget = none,
             blindOffsetType = BlindOffsetType.Manual
@@ -188,35 +177,11 @@ object PerScienceObservationCalibrationsService:
               calibrationRole = CalibrationRole.Telluric.some
             ).orError
 
-        def telluricTargetPlaceholder(pid: Program.Id): F[Target.Id] =
-          val targetInput = TargetPropertiesInput.Create(
-            name = NonEmptyString.unsafeFrom("Telluric Target (TBD)"),
-            subtypeInfo = SiderealInput.Create(
-              ra = RightAscension.Zero,
-              dec = Declination.Zero,
-              epoch = Epoch.J2000,
-              properMotion = None,
-              radialVelocity = None,
-              parallax = None,
-              catalogInfo = None
-            ),
-            sourceProfile = SourceProfile.Point(
-              SpectralDefinition.BandNormalized(None, SortedMap.empty)
-            ),
-            existence = Existence.Present
-          )
-
-          S.targetService.createTarget(
-            AccessControl.unchecked(targetInput, pid, program_id),
-            disposition = TargetDisposition.Calibration,
-            role = CalibrationRole.Telluric.some
-          ).orError
-
         for
           scienceIndex  <- obsGroupIndex(scienceOid)
           telluricIndex = NonNegShort.unsafeFrom((scienceIndex.value + 1).toShort)
-          targetId      <- telluricTargetPlaceholder(pid)
-          telluricId    <- insertTelluricObservation(pid, targetId, telluricGroupId, telluricIndex)
+          telluricId    <- insertTelluricObservation(pid, telluricGroupId, telluricIndex)
+          _             <- telluricResolutionService.recordResolutionRequest(pid, telluricId, scienceOid)
           _             <- syncConfiguration(scienceOid, telluricId)
         yield telluricId
 
@@ -346,19 +311,19 @@ object PerScienceObservationCalibrationsService:
           // Query group locations
           groupLocations    <- Statements.queryGroupLocations(allObsInGroups.keys.toList)
           // Collect all observations to move with their target locations (only science obs, not calibrations)
-          _                 <- (debug"Remove ${toUnlink.size} observations from their telluric groups on program $pid: $toUnlink").whenA(toUnlink.nonEmpty)
+          _                 <- (info"Remove ${toUnlink.size} observations from their telluric groups on program $pid: $toUnlink").whenA(toUnlink.nonEmpty)
           toMove            = observationsToMove(allObsInGroups, toUnlink, groupLocations, telluricObsSet)
           // Move all observations in a single database call
-          _                 <- (debug"Move ${toMove.size} observations to telluric groups on program $pid: ${toMove.map(_._1)}").whenA(toMove.nonEmpty)
+          _                 <- (info"Move ${toMove.size} observations to telluric groups on program $pid: ${toMove.map(_._1)}").whenA(toMove.nonEmpty)
           _                 <- Statements.moveObservations(toMove)
           // Compute which groups are now empty (all observations are being unlinked)
           emptyGroupIds     = allObsInGroups.collect:
                                 case (gid, obsWithIndices) if obsWithIndices.forall((o, _) => toUnlink.exists(_ === o)) => gid
           // Delete telluric calibration observations from empty groups
           deleted           <- deleteTelluricObservationsFromGroups(emptyGroupIds.toList)
-          _                 <- (debug"Deleted ${toMove.size} observations to telluric groups on program $pid: $deleted").whenA(toMove.nonEmpty)
+          _                 <- (info"Deleted ${toMove.size} observations to telluric groups on program $pid: $deleted").whenA(toMove.nonEmpty)
           // Delete empty telluric groups using deleteSystemGroup
-          _                 <- (debug"Remove ${emptyGroupIds.size} empty telluric groups on program $pid: $emptyGroupIds").whenA(toMove.nonEmpty)
+          _                 <- (info"Remove ${emptyGroupIds.size} empty telluric groups on program $pid: $emptyGroupIds").whenA(toMove.nonEmpty)
           _                 <- emptyGroupIds.toList.traverse_(gid => groupService.deleteSystemGroup(pid, gid))
           // Reload tree for group creation/lookup
           tree              <- groupService.selectGroups(pid)
