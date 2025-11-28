@@ -19,6 +19,7 @@ import grackle.ResultT
 import io.circe.Json
 import io.circe.JsonObject
 import lucuma.catalog.clients.GaiaClient
+import lucuma.catalog.telluric.TelluricTargetsClient
 import lucuma.core.data.Metadata
 import lucuma.core.model.Access
 import lucuma.core.model.User
@@ -211,6 +212,9 @@ trait Services[F[_]]:
 
   def obscalcService: ObscalcService[F]
 
+  /** Construct a `TelluricResolutionService`, given a `TelluricTargetsClient`. */
+  def telluricResolutionService: TelluricResolutionService[F]
+
   /** The `TimeAccounting` service. */
   def timeAccountingService: TimeAccountingService[F]
 
@@ -248,7 +252,7 @@ object Services:
    * Construct a `Services` for the given `User` and `Session`. Service instances are constructed
    * lazily.
    */
-  def forUser[F[_]](
+  def forUser[F[_]: Async](
     user0: User,
     enums0: Enums,
     mapping0: Option[Session[F] => Mapping[F]],
@@ -260,8 +264,9 @@ object Services:
     gaiaClient0: GaiaClient[F],
     s3FileService0: S3FileService[F],
     horizonsClient: HorizonsClient[F],
+    telluricClient: TelluricTargetsClient[F]
   )(s: Session[F])(
-    using tf: Trace[F], uf: UUIDGen[F], cf: Temporal[F], par: Parallel[F], log: Logger[F], lf: LoggerFactory[F], as: Async[F]
+    using tf: Trace[F], uf: UUIDGen[F], cf: Temporal[F], par: Parallel[F], log: Logger[F], lf: LoggerFactory[F]
   ): Services[F[_]] =
     new Services[F]:
 
@@ -361,6 +366,7 @@ object Services:
       lazy val proposalService = ProposalService.instantiate(emailConfig)
       lazy val userInvitationService = UserInvitationService.instantiate(emailConfig)
       lazy val trackingService = TrackingService.instantiate(horizonsClient)
+      lazy val telluricResolutionService: TelluricResolutionService[F] = TelluricResolutionService.instantiate(telluricClient)
 
   /**
    * This adds syntax to access the members of `Services` and the current `Transaction` when they
@@ -416,6 +422,7 @@ object Services:
     def guideService[F[_]](using Services[F]): GuideService[F] = summon[Services[F]].guideService
     def userInvitationService[F[_]](using Services[F]): UserInvitationService[F] = summon[Services[F]].userInvitationService
     def emailService[F[_]](using Services[F]) = summon[Services[F]].emailService
+    def telluricResolutionService[F[_]](using Services[F]): TelluricResolutionService[F] = summon[Services[F]].telluricResolutionService
     def metadata[F[_]](using Services[F]) = summon[Services[F]].metadata
 
     def requirePiAccess[F[_], A](fa: Services.PiAccess ?=> F[Result[A]])(using Services[F], Applicative[F]): F[Result[A]] =

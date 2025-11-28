@@ -791,3 +791,7 @@ lazy val phase0 = project
       "org.typelevel" %% "discipline-munit"    % munitDisciplineVersion % Test
     )
   )
+
+// Command aliases for starting/stopping all services
+addCommandAlias("allStart", ";service/reStart;obscalc/reStart;calibrations/reStart")
+addCommandAlias("allStop", ";service/reStop;obscalc/reStop;calibrations/reStop")

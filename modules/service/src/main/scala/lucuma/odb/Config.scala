@@ -15,6 +15,8 @@ import fs2.aws.s3.models.Models.BucketName
 import fs2.aws.s3.models.Models.FileKey
 import fs2.io.net.Network
 import lucuma.catalog.clients.GaiaClient
+import lucuma.catalog.clients.SimbadClient
+import lucuma.catalog.telluric.TelluricTargetsClient
 import lucuma.core.data.EmailAddress
 import lucuma.core.model.Program
 import lucuma.core.model.User
@@ -44,6 +46,7 @@ case class Config(
   port:          Port,                      // Our port, nothing fancy.
   itc:           Config.Itc,                // ITC config
   sso:           Config.Sso,                // SSO config
+  telluric:      Config.Telluric,           // Telluric service config
   serviceJwt:    String,                    // Only service users can exchange API keys, so we need a service user JWT.
   honeycomb:     Option[Config.Honeycomb],  // Honeycomb config
   database:      Config.Database,           // Database config
@@ -83,6 +86,12 @@ case class Config(
     httpClientResource[F].map: httpClient =>
       GaiaClient.build[F](httpClient, adapters = GaiaClient.DefaultAdapters)
 
+  // Telluric client resource
+  def telluricClient[F[_]: Async: Network: Logger]: Resource[F, TelluricTargetsClient[F]] =
+    httpClientResource[F].evalMap: httpClient =>
+      val simbadClient = SimbadClient.build(httpClient)
+      TelluricTargetsClient.build(telluric.root, httpClient, simbadClient)
+
   // SSO Client resource (has to be a resource because it owns an HTTP client).
   def ssoClient[F[_]: Async: Trace: Network: Logger]: Resource[F, SsoClient[F, User]] =
     httpClientResource[F].evalMap: httpClient =>
@@ -117,6 +126,15 @@ object Config:
       envOrProp("ODB_SSO_ROOT").as[Uri],
       envOrProp("ODB_SSO_PUBLIC_KEY").as[PublicKey]
     ).parMapN(Sso.apply)
+
+  // Root URI for the telluric service
+  case class Telluric(root: Uri)
+
+  object Telluric:
+    lazy val fromCiris: ConfigValue[Effect, Telluric] =
+      envOrProp("ODB_TELLURIC_ROOT").as[Uri]
+        .default(uri"https://telluric-targets.gpp.gemini.edu/")
+        .map(Telluric.apply)
 
   case class Honeycomb(
     writeKey: String,
@@ -312,6 +330,7 @@ object Config:
     envOrProp("PORT").as[Int].as[Port], // passed by Heroku
     Itc.fromCiris,
     Sso.fromCiris,
+    Telluric.fromCiris,
     envOrProp("ODB_SERVICE_JWT"),
     Honeycomb.fromCiris,
     Database.fromCiris,

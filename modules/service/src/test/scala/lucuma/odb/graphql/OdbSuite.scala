@@ -42,6 +42,8 @@ import io.circe.JsonObject
 import io.circe.syntax.*
 import io.laserdisc.pure.s3.tagless.S3AsyncClientOp
 import lucuma.catalog.clients.GaiaClient
+import lucuma.catalog.clients.SimbadClient
+import lucuma.catalog.telluric.TelluricTargetsClient
 import lucuma.catalog.votable.CatalogAdapter
 import lucuma.core.data.EmailAddress
 import lucuma.core.data.Zipper
@@ -91,6 +93,7 @@ import org.http4s.jdkhttpclient.JdkHttpClient
 import org.http4s.jdkhttpclient.JdkWSClient
 import org.http4s.server.Server
 import org.http4s.server.websocket.WebSocketBuilder2
+import org.http4s.syntax.literals.*
 import org.http4s.{Uri as Http4sUri, *}
 import org.slf4j
 import org.testcontainers.containers.PostgreSQLContainer.POSTGRESQL_PORT
@@ -366,8 +369,14 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       domain            = "gpp.com".refined,
       webhookSigningKey = "webhookKey".refined,
       invitationFrom    = EmailAddress.unsafeFrom("explore@gpp.com"),
-      exploreUrl = Http4sUri.fromString("https://nonsense.kom").toOption.get
+      exploreUrl        = uri"https://explore.gemini.edu/"
     )
+
+  val simbadClient: SimbadClient[IO] =
+    SimbadClient.build[IO](httpClient)
+
+  protected def telluricClient: IO[TelluricTargetsClient[IO]] =
+    TelluricTargetsClient.build[IO](uri"https://telluric-targets.gpp.gemini.edu/", httpClient, simbadClient)
 
   // These are overriden in OdbSuiteWithS3 for tests that need it.
   protected def s3ClientOpsResource: Resource[IO, S3AsyncClientOp[IO]] =
@@ -395,6 +404,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       emailConfig,
       itcClient.pure[Resource[IO, *]],
       gaiaClient.pure[Resource[IO, *]],
+      Resource.pure(TelluricTargetsClient.noop[IO]),
       CommitHash.Zero,
       goaUsers,
       ssoClient.pure[Resource[IO, *]],
@@ -726,7 +736,8 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       db   <- FMain.databasePoolResource[IO](databaseConfig)
       enm  <- db.evalMap(Enums.load)
       ptc  <- db.evalMap(TimeEstimateCalculatorImplementation.fromSession(_, enm))
-    yield Services.forUser(u, enm, None, emailConfig, CommitHash.Zero, ptc, httpClient, itcClient, gaiaClient, S3FileService.noop[IO], horizonsClient)
+      tc   <- Resource.eval(telluricClient)
+    yield Services.forUser(u, enm, None, emailConfig, CommitHash.Zero, ptc, httpClient, itcClient, gaiaClient, S3FileService.noop[IO], horizonsClient, tc)
 
   def withSession[A](f: Session[IO] => IO[A]): IO[A] =
     Resource.eval(IO(sessionFixture())).use(f)
@@ -785,7 +796,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
         emailConfig
       )
       db.use: s =>
-        given services: Services[IO] = Services.forUser(u, enm, mapping.some, emailConfig, CommitHash.Zero, ptc, httpClient, itcClient, gaiaClient, S3FileService.noop[IO], horizonsClient)(s)
+        given services: Services[IO] = Services.forUser(u, enm, mapping.some, emailConfig, CommitHash.Zero, ptc, httpClient, itcClient, gaiaClient, S3FileService.noop[IO], horizonsClient, TelluricTargetsClient.noop[IO])(s)
         requireServiceAccess:
           f(services).map(Result.success)
         .flatMap(_.get)
