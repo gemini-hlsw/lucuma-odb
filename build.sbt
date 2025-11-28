@@ -3,7 +3,7 @@ import NativePackagerHelper._
 // Please keep in alphabetical order
 val awsJavaSdkVersion          = "1.12.792"
 val boopickleVersion           = "1.5.0"
-val bouncycastleVersion        = "1.70"
+val bouncycastleVersion        = "1.83"
 val catsEffectVersion          = "3.6.3"
 val catsParseVersion           = "1.1.0"
 val catsScalacheckVersion      = "0.3.2"
@@ -300,8 +300,8 @@ lazy val ssoBackendClient = project
     name := "lucuma-sso-backend-client",
     libraryDependencies ++= Seq(
       "com.github.jwt-scala" %% "jwt-circe"          % jwtVersion,
-      "org.bouncycastle"      % "bcpkix-jdk15on"     % bouncycastleVersion,
-      "org.bouncycastle"      % "bcpg-jdk15on"       % bouncycastleVersion,
+      "org.bouncycastle"      % "bcpkix-jdk18on"     % bouncycastleVersion,
+      "org.bouncycastle"      % "bcpg-jdk18on"       % bouncycastleVersion,
       "org.http4s"           %% "http4s-core"        % http4sEmberVersion,
       "org.http4s"           %% "http4s-client"      % http4sEmberVersion,
       "org.http4s"           %% "http4s-dsl"         % http4sEmberVersion,
