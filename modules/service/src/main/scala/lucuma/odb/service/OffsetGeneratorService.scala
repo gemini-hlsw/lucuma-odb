@@ -1,0 +1,457 @@
+// Copyright (c) 2016-2025 Association of Universities for Research in Astronomy, Inc. (AURA)
+// For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
+
+package lucuma.odb.service
+
+import cats.ApplicativeError
+import cats.Monad
+import cats.data.NonEmptyList
+import cats.effect.Async
+import cats.effect.Concurrent
+import cats.effect.std.Random
+import cats.syntax.applicative.*
+import cats.syntax.apply.*
+import cats.syntax.flatMap.*
+import cats.syntax.foldable.*
+import cats.syntax.functor.*
+import cats.syntax.traverse.*
+import eu.timepit.refined.types.numeric.PosInt
+import lucuma.core.enums.GmosNorthFilter
+import lucuma.core.enums.GmosSouthFilter
+import lucuma.core.enums.StepGuideState
+import lucuma.core.geom.OffsetGenerator
+import lucuma.core.math.Angle
+import lucuma.core.math.Offset
+import lucuma.core.model.Observation
+import lucuma.core.model.sequence.TelescopeConfig
+import lucuma.odb.data.OffsetGeneratorRole
+import lucuma.odb.graphql.input.OffsetGeneratorInput
+import lucuma.odb.sequence.data.OffsetGeneratorType
+import lucuma.odb.util.Codecs.angle_µas
+import lucuma.odb.util.Codecs.guide_state
+import lucuma.odb.util.Codecs.observation_id
+import lucuma.odb.util.Codecs.offset
+import lucuma.odb.util.Codecs.offset_generator_role
+import lucuma.odb.util.Codecs.offset_generator_type
+import lucuma.odb.util.Codecs.telescope_config
+import skunk.*
+import skunk.codec.numeric.int4
+import skunk.implicits.*
+
+import Services.Syntax.*
+
+sealed trait OffsetGeneratorService[F[_]]:
+
+  def insert(
+    oids:  NonEmptyList[Observation.Id],
+    input: OffsetGeneratorInput,
+    role:  OffsetGeneratorRole,
+  ): F[Unit]
+
+  def delete(
+    oids: NonEmptyList[Observation.Id],
+    role: OffsetGeneratorRole
+  ): F[Unit]
+
+  def replace(
+    oids:  NonEmptyList[Observation.Id],
+    input: Option[OffsetGeneratorInput],
+    role:  OffsetGeneratorRole
+  ): F[Unit]
+
+  def clone(
+    originalId: Observation.Id,
+    newId:      Observation.Id
+  ): F[Unit]
+
+  def generateGmosNorthImagingObject(
+    oid:          Observation.Id,
+    filterCounts: Map[GmosNorthFilter, (Int, Long)]
+  ): F[Map[GmosNorthFilter, List[TelescopeConfig]]]
+
+  def generateGmosNorthImagingSky(
+    oid:   Observation.Id,
+    count: Int,
+    seed:  Long
+  ): F[List[TelescopeConfig]]
+
+  def generateGmosSouthImagingObject(
+    oid:          Observation.Id,
+    filterCounts: Map[GmosSouthFilter, (Int, Long)]
+  ): F[Map[GmosSouthFilter, List[TelescopeConfig]]]
+
+  def generateGmosSouthImagingSky(
+    oid:   Observation.Id,
+    count: Int,
+    seed:  Long
+  ): F[List[TelescopeConfig]]
+
+object OffsetGeneratorService:
+
+  def instantiate[F[_]: Async: Concurrent](using Services[F]): OffsetGeneratorService[F] =
+    new OffsetGeneratorService[F]:
+
+      override def insert(
+        oids:  NonEmptyList[Observation.Id],
+        input: OffsetGeneratorInput,
+        role:  OffsetGeneratorRole,
+      ): F[Unit] =
+        val unit = Concurrent[F].unit
+
+        val insertOffsetsIfEnumerated: F[Unit] =
+          input match
+            case OffsetGeneratorInput.Enumerated(offs) =>
+              session.exec(Statements.insertEnumeratedOffsets(oids, offs, role))
+            case _                                     =>
+              unit
+
+        session.exec(Statements.insert(oids, input, role)) *> insertOffsetsIfEnumerated
+
+      override def delete(
+        oids: NonEmptyList[Observation.Id],
+        role: OffsetGeneratorRole
+      ): F[Unit] =
+        session.exec(Statements.deleteOffsetGenerator(oids, role)) // cascades to enumerated offsets
+
+      override def replace(
+        oids:  NonEmptyList[Observation.Id],
+        input: Option[OffsetGeneratorInput],
+        role:  OffsetGeneratorRole
+      ): F[Unit] =
+        delete(oids, role) *>
+        input.fold(Concurrent[F].unit): in =>
+          insert(oids, in, role)
+
+      override def clone(
+        originalId: Observation.Id,
+        newId:      Observation.Id
+      ): F[Unit] =
+        session.execute(Statements.CloneOffsetGenerator)(newId, originalId) *>
+        session.execute(Statements.CloneEnumeratedOffsets)(newId, originalId).void
+
+      override def generateGmosNorthImagingObject(
+        o:  Observation.Id,
+        fs: Map[GmosNorthFilter, (Int, Long)]
+      ): F[Map[GmosNorthFilter, List[TelescopeConfig]]] =
+        generateGmosImagingObject(o, fs)
+
+      override def generateGmosSouthImagingObject(
+        o:  Observation.Id,
+        fs: Map[GmosSouthFilter, (Int, Long)]
+      ): F[Map[GmosSouthFilter, List[TelescopeConfig]]] =
+        generateGmosImagingObject(o, fs)
+
+      private def generateGmosImagingObject[A](
+        oid:    Observation.Id,
+        counts: Map[A, (Int, Long)]
+      ): F[Map[A, List[TelescopeConfig]]] =
+        for
+          in <- selectInput(oid, OffsetGeneratorRole.Object)
+          os <- in.fold(List.empty.pure[F]): in =>
+                  counts.toList.traverse:
+                    case (a, (count, seed)) => generate(count, seed, in, StepGuideState.Enabled).tupleLeft(a)
+        yield os.toMap
+
+      override def generateGmosNorthImagingSky(
+        oid:   Observation.Id,
+        count: Int,
+        seed:  Long
+      ): F[List[TelescopeConfig]] =
+        generateGmosImagingSky(oid, count, seed)
+
+      override def generateGmosSouthImagingSky(
+        oid:   Observation.Id,
+        count: Int,
+        seed:  Long
+      ): F[List[TelescopeConfig]] =
+        generateGmosImagingSky(oid, count, seed)
+
+      private def generateGmosImagingSky[A](
+        oid:   Observation.Id,
+        count: Int,
+        seed:  Long
+      ): F[List[TelescopeConfig]] =
+        for
+          in <- selectInput(oid, OffsetGeneratorRole.Sky)
+          os <- in.fold(List.empty.pure[F]): in =>
+                  generate(count, seed, in, StepGuideState.Disabled)
+        yield os
+
+      private def selectInput(
+        oid:  Observation.Id,
+        role: OffsetGeneratorRole
+      ): F[Option[OffsetGeneratorInput]] =
+        for
+          ps <- session.option(Statements.SelectInput)(oid, role)
+          r  <- ps.traverse: (gen, a, b, s, c) =>
+                  gen match
+                    case OffsetGeneratorType.NoGenerator => OffsetGeneratorInput.NoGenerator.pure[F]
+                    case OffsetGeneratorType.Enumerated  => selectEnumeratedOffsets(oid, role).map(OffsetGeneratorInput.Enumerated.apply)
+                    case OffsetGeneratorType.Uniform        => OffsetGeneratorInput.Uniform(a, b).pure[F]
+                    case OffsetGeneratorType.Random      => OffsetGeneratorInput.Random(s, c).pure[F]
+                    case OffsetGeneratorType.Spiral      => OffsetGeneratorInput.Spiral(s, c).pure[F]
+        yield r
+
+      private def generate(
+        count:             Int,
+        seed:              Long,
+        input:             OffsetGeneratorInput,
+        defaultGuideState: StepGuideState
+      ): F[List[TelescopeConfig]] =
+        def withSeededRandom(fa: (Monad[F], Random[F]) ?=> F[NonEmptyList[Offset]]): F[List[TelescopeConfig]] =
+          Random.scalaUtilRandomSeedLong(seed).flatMap: r =>
+            given Random[F] = r
+            fa.map(_.toList.map(o => TelescopeConfig(o, defaultGuideState)))
+
+        PosInt.unapply(count).fold(List.empty[TelescopeConfig].pure[F]): posN =>
+          input match
+            case OffsetGeneratorInput.NoGenerator          =>
+              List.empty[TelescopeConfig].pure[F]
+
+            case OffsetGeneratorInput.Enumerated(lst)      =>
+              // Enumerated positions come with an explicit guide state so the
+              // default is ignored.
+              LazyList.continually(lst.toList).flatten.take(count).toList.pure[F]
+
+            case OffsetGeneratorInput.Uniform(a, b)           =>
+              val w = (a.p.toSignedDecimalArcseconds - b.p.toSignedDecimalArcseconds).abs
+              val h = (a.q.toSignedDecimalArcseconds - b.q.toSignedDecimalArcseconds).abs
+
+              val (rows, cols) =
+                if h <= 0.000001 then
+                  (1, posN.value)
+                else
+                  val aspectRatio = w / h
+
+                  val cols0 = 1 max Math.sqrt(posN.value * aspectRatio.doubleValue).round.toInt
+                  val rows  = 1 max (posN.value.toDouble / cols0).ceil.toInt
+                  val cols  = (posN.value.toDouble / rows).ceil.toInt
+                  (rows, cols)
+
+              val stepP = if cols <= 2 then w else w / (cols - 1) // arcseconds
+              val stepQ = if rows <= 2 then h else h / (rows - 1) // arcseconds
+
+              val p0 = a.p.toSignedDecimalArcseconds max b.p.toSignedDecimalArcseconds
+              val q0 = a.q.toSignedDecimalArcseconds max b.q.toSignedDecimalArcseconds
+              val o  = Offset.signedDecimalArcseconds.reverseGet((p0, q0))
+
+              val offsets =
+                (0 until rows).toList.flatMap: r =>
+                  (0 until cols).toList.map: c =>
+                    o + Offset.signedDecimalArcseconds.reverseGet(-stepP * c, -stepQ * r)
+
+              offsets.take(count).map(o => TelescopeConfig(o, defaultGuideState)).pure[F]
+
+            case OffsetGeneratorInput.Random(size, center) =>
+              withSeededRandom:
+                OffsetGenerator.random(posN, size, center)
+
+            case OffsetGeneratorInput.Spiral(size, center) =>
+              withSeededRandom:
+                OffsetGenerator.spiral(posN, size, center)
+
+      private def selectEnumeratedOffsets(
+        oid:  Observation.Id,
+        role: OffsetGeneratorRole
+      ): F[NonEmptyList[TelescopeConfig]] =
+        session
+          .execute(Statements.SelectEnumeratedOffsets)(oid, role)
+          .flatMap: lst =>
+            ApplicativeError
+              .liftFromOption[F](
+                NonEmptyList.fromList(lst),
+                new RuntimeException("Expected at least one enumerated offset.")
+              )
+
+  object Statements:
+
+    val SelectInput: Query[
+      (
+        Observation.Id,
+        OffsetGeneratorRole
+      ),
+      (
+        OffsetGeneratorType,
+        Offset,
+        Offset,
+        Angle,
+        Offset
+      )
+    ] =
+      sql"""
+        SELECT
+          c_type,
+          c_uniform_corner_a_p,
+          c_uniform_corner_a_q,
+          c_uniform_corner_b_p,
+          c_uniform_corner_b_q,
+          c_size,
+          c_center_offset_p,
+          c_center_offset_q
+        FROM t_offset_generator
+        WHERE c_observation_id = $observation_id
+          AND c_role           = $offset_generator_role
+      """.query(
+        offset_generator_type *:
+        offset                *:
+        offset                *:
+        angle_µas             *:
+        offset
+      )
+
+    val SelectEnumeratedOffsets: Query[(Observation.Id, OffsetGeneratorRole), TelescopeConfig] =
+      sql"""
+        SELECT
+          c_offset_p,
+          c_offset_q,
+          c_guide_state
+        FROM t_enumerated_offset
+        WHERE c_observation_id = $observation_id
+          AND c_role           = $offset_generator_role
+        ORDER BY c_index
+      """.query(telescope_config)
+
+    def insert(
+      which: NonEmptyList[Observation.Id],
+      ogi:   OffsetGeneratorInput,
+      role:  OffsetGeneratorRole
+    ): AppliedFragment =
+      def orZero(a: Option[Angle]): Angle = a.getOrElse(Angle.Angle0)
+
+      val values =
+        which.map: oid =>
+          sql"""(
+            $observation_id,
+            $offset_generator_role,
+            $offset_generator_type,
+            $angle_µas,
+            $angle_µas,
+            $angle_µas,
+            $angle_µas,
+            $angle_µas,
+            $angle_µas,
+            $angle_µas
+          )"""(
+            oid,
+            role,
+            ogi.offsetGeneratorType,
+            orZero(OffsetGeneratorInput.cornerA.getOption(ogi).map(_.p.toAngle)),
+            orZero(OffsetGeneratorInput.cornerA.getOption(ogi).map(_.q.toAngle)),
+            orZero(OffsetGeneratorInput.cornerB.getOption(ogi).map(_.p.toAngle)),
+            orZero(OffsetGeneratorInput.cornerB.getOption(ogi).map(_.q.toAngle)),
+            orZero(OffsetGeneratorInput.size.getOption(ogi)),
+            orZero(OffsetGeneratorInput.center.getOption(ogi).map(_.p.toAngle)),
+            orZero(OffsetGeneratorInput.center.getOption(ogi).map(_.q.toAngle))
+          )
+
+      void"""
+        INSERT INTO t_offset_generator (
+          c_observation_id,
+          c_role,
+          c_type,
+          c_uniform_corner_a_p,
+          c_uniform_corner_a_q,
+          c_uniform_corner_b_p,
+          c_uniform_corner_b_q,
+          c_size,
+          c_center_offset_p,
+          c_center_offset_q
+        ) VALUES
+      """ |+| values.intercalate(void", ")
+
+    def insertEnumeratedOffsets(
+      which: NonEmptyList[Observation.Id],
+      offs:  NonEmptyList[TelescopeConfig],
+      role:  OffsetGeneratorRole
+    ): AppliedFragment =
+      val values =
+        which.flatMap: oid =>
+          offs.zipWithIndex.map: (off, idx) =>
+            sql"""(
+              $observation_id,
+              $offset_generator_role,
+              $int4,
+              $angle_µas,
+              $angle_µas,
+              $guide_state
+            )"""(
+              oid,
+              role,
+              idx,
+              off.offset.p.toAngle,
+              off.offset.q.toAngle,
+              off.guiding
+            )
+
+      void"""
+        INSERT INTO t_enumerated_offset (
+          c_observation_id,
+          c_role,
+          c_index,
+          c_offset_p,
+          c_offset_q,
+          c_guide_state
+        ) VALUES
+      """ |+| values.intercalate(void", ")
+
+    def deleteOffsetGenerator(
+      which: NonEmptyList[Observation.Id],
+      role:  OffsetGeneratorRole
+    ): AppliedFragment =
+      sql"""
+        DELETE FROM t_offset_generator
+        WHERE
+          c_role = $offset_generator_role AND
+          c_observation_id IN ${observation_id.list(which.length).values}
+      """.apply(role, which.toList)
+
+    val CloneOffsetGenerator: Command[(Observation.Id, Observation.Id)] =
+      sql"""
+        INSERT INTO t_offset_generator (
+          c_observation_id,
+          c_role,
+          c_type,
+          c_uniform_corner_a_p,
+          c_uniform_corner_a_q,
+          c_uniform_corner_b_p,
+          c_uniform_corner_b_q,
+          c_size,
+          c_center_offset_p,
+          c_center_offset_q
+        )
+        SELECT
+          $observation_id,
+          c_role,
+          c_type,
+          c_uniform_corner_a_p,
+          c_uniform_corner_a_q,
+          c_uniform_corner_b_p,
+          c_uniform_corner_b_q,
+          c_size,
+          c_center_offset_p,
+          c_center_offset_q
+        FROM t_offset_generator
+        WHERE c_observation_id = $observation_id
+      """.command
+
+    // New, Old
+    val CloneEnumeratedOffsets: Command[(Observation.Id, Observation.Id)] =
+      sql"""
+        INSERT INTO t_enumerated_offset (
+          c_observation_id,
+          c_role,
+          c_index,
+          c_offset_p,
+          c_offset_q,
+          c_guide_state
+        )
+        SELECT
+          $observation_id,
+          c_role,
+          c_index,
+          c_offset_p,
+          c_offset_q,
+          c_guide_state
+        FROM t_enumerated_offset
+        WHERE c_observation_id = $observation_id
+      """.command

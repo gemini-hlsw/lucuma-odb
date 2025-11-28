@@ -36,6 +36,7 @@ val munitVersion               = "1.2.1"
 val munitCatsEffectVersion     = "2.1.0"   // check test output if you attempt to update this
 val munitDisciplineVersion     = "2.0.0"   // check test output if you attempt to update this
 val munitScalacheckVersion     = "1.2.0"   // check test output if you attempt to update this
+val scalacheckEffectMunitVersion = "1.0.4"
 val natchezHttp4sVersion       = "0.6.1"
 val natchezVersion             = "0.3.7"
 val paigesVersion              = "0.4.4"
@@ -708,16 +709,17 @@ lazy val service = project
       "com.dimafeng"             %% "testcontainers-scala-localstack-v2" % testcontainersScalaVersion % Test,
       "com.dimafeng"             %% "testcontainers-scala-postgresql"    % testcontainersScalaVersion % Test,
       // testcontainers-scala-localstack-v2 requires both v1 and v2 of the aws sdk
-      "io.circe"                 %% "circe-testing"                      % circeVersion               % Test,
-      "com.amazonaws"             % "aws-java-sdk-core"                  % awsJavaSdkVersion          % Test,
-      "edu.gemini"               %% "clue-http4s"                        % clueVersion                % Test,
-      "org.scalameta"            %% "munit"                              % munitVersion               % Test,
-      "org.scalameta"            %% "munit-diff"                         % munitVersion               % Test,
-      "org.scalameta"            %% "munit-scalacheck"                   % munitScalacheckVersion     % Test,
-      "org.typelevel"            %% "discipline-munit"                   % munitDisciplineVersion     % Test,
-      "edu.gemini"               %% "lucuma-catalog-testkit"             % lucumaCoreVersion          % Test,
-      "edu.gemini"               %% "lucuma-core-testkit"                % lucumaCoreVersion          % Test,
-      "org.http4s"               %% "http4s-jdk-http-client"             % http4sJdkHttpClientVersion % Test,
+      "io.circe"                 %% "circe-testing"                      % circeVersion                 % Test,
+      "com.amazonaws"             % "aws-java-sdk-core"                  % awsJavaSdkVersion            % Test,
+      "edu.gemini"               %% "clue-http4s"                        % clueVersion                  % Test,
+      "org.scalameta"            %% "munit"                              % munitVersion                 % Test,
+      "org.scalameta"            %% "munit-diff"                         % munitVersion                 % Test,
+      "org.scalameta"            %% "munit-scalacheck"                   % munitScalacheckVersion       % Test,
+      "org.typelevel"            %% "scalacheck-effect-munit"            % scalacheckEffectMunitVersion % Test,
+      "org.typelevel"            %% "discipline-munit"                   % munitDisciplineVersion       % Test,
+      "edu.gemini"               %% "lucuma-catalog-testkit"             % lucumaCoreVersion            % Test,
+      "edu.gemini"               %% "lucuma-core-testkit"                % lucumaCoreVersion            % Test,
+      "org.http4s"               %% "http4s-jdk-http-client"             % http4sJdkHttpClientVersion   % Test,
       "org.typelevel"            %% "cats-time"                          % catsTimeVersion,
       "org.typelevel"            %% "log4cats-slf4j"                     % log4catsVersion,
       "org.typelevel"            %% "munit-cats-effect"                  % munitCatsEffectVersion % Test,

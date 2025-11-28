@@ -4,13 +4,41 @@
 package lucuma.odb.graphql
 package mapping
 
+import grackle.Path
+
+import table.EnumeratedOffsetView
 import table.StepRecordView
 
-trait TelescopeConfigMapping[F[_]] extends StepRecordView[F]:
+trait TelescopeConfigMapping[F[_]] extends EnumeratedOffsetView[F] with StepRecordView[F]:
 
-  lazy val TelescopeConfigMapping: ObjectMapping =
-    ObjectMapping(StepRecordType / "telescopeConfig")(
-      SqlField("synthetic_id", StepRecordView.Id, key = true, hidden = true),
-      SqlObject("offset"),
-      SqlField("guiding", StepRecordView.GuideState)
+  private def telescopeConfigMappingAtPath(
+    path:          Path,
+    guidingColumn: ColumnRef,
+    idColumns:     (String, ColumnRef)*
+  ): ObjectMapping =
+    ObjectMapping(path)(
+      (
+        idColumns.toList.map: (name, ref) =>
+          SqlField(name, ref, key = true, hidden = true)
+      ) ++ List(
+        SqlObject("offset"),
+        SqlField("guiding", guidingColumn)
+      )*
+    )
+
+  lazy val TelescopeConfigMappings: List[ObjectMapping] =
+    List(
+      telescopeConfigMappingAtPath(
+        EnumeratedOffsetGeneratorType / "values",
+        EnumeratedOffsetView.GuideState,
+        "observationId" -> EnumeratedOffsetView.ObservationId,
+        "role"          -> EnumeratedOffsetView.OffsetGeneratorRole,
+        "index"         -> EnumeratedOffsetView.Index
+      ),
+
+      telescopeConfigMappingAtPath(
+        StepRecordType / "telescopeConfig",
+        StepRecordView.GuideState,
+        "id" -> StepRecordView.Id
+      )
     )
