@@ -27,6 +27,7 @@ import lucuma.core.enums.GuideProbe
 import lucuma.core.enums.GuideSpeed
 import lucuma.core.enums.PortDisposition
 import lucuma.core.enums.Site
+import lucuma.core.enums.StepGuideState
 import lucuma.core.geom.ShapeExpression
 import lucuma.core.geom.gmos.candidatesArea
 import lucuma.core.geom.jts.interpreter.given
@@ -272,8 +273,12 @@ object GuideService {
   ) {
     val timeEstimate = digest.fullTimeEstimate.sum
     val setupTime    = digest.setup.full
-    val acqOffsets   = NonEmptyList.fromFoldable(digest.acquisition.offsets).map(AcquisitionOffsets.apply)
-    val sciOffsets   = NonEmptyList.fromFoldable(digest.science.offsets).map(ScienceOffsets.apply)
+    val acqOffsets   = NonEmptyList.fromFoldable(
+      digest.acquisition.offsets.collect { case (StepGuideState.Enabled, o) => GuidedOffset(o) }
+    ).map(AcquisitionOffsets.apply)
+    val sciOffsets   = NonEmptyList.fromFoldable(
+      digest.science.offsets.collect { case (StepGuideState.Enabled, o) => GuidedOffset(o) }
+    ).map(ScienceOffsets.apply)
 
     val (site, agsParams, centralWavelength): (Site, AgsParams, Wavelength) = params.observingMode match
       case mode: gmos.longslit.Config.GmosNorth =>
