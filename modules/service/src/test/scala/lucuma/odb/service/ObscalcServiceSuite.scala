@@ -12,6 +12,7 @@ import lucuma.core.enums.ChargeClass
 import lucuma.core.enums.ExecutionState
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.ObserveClass
+import lucuma.core.enums.StepGuideState
 import lucuma.core.math.Offset
 import lucuma.core.math.Wavelength
 import lucuma.core.model.Observation
@@ -202,14 +203,23 @@ class ObscalcServiceSuite extends ObscalcServiceSuiteSupport:
           SequenceDigest(
             ObserveClass.Acquisition,
             CategorizedTime(ChargeClass.Program -> TimeSpan.unsafeFromMicroseconds(219362500L)),
-            SortedSet(Offset.Zero, Offset.microarcseconds.reverseGet(10000000L, 0L)),
+            SortedSet(
+              (StepGuideState.Enabled, Offset.Zero),
+              (StepGuideState.Enabled, Offset.microarcseconds.reverseGet(10000000L, 0L))
+            ),
             NonNegInt.unsafeFrom(2),
             ExecutionState.NotStarted
           ),
           SequenceDigest(
             ObserveClass.Science,
             CategorizedTime(ChargeClass.Program -> TimeSpan.FromSeconds.getOption(ScienceSequence).get),
-            SortedSet(Offset.microarcseconds.reverseGet(0L, 1295985000000L), Offset.Zero, Offset.microarcseconds.reverseGet(0L, 15000000L)),
+            SortedSet(
+              (StepGuideState.Disabled, Offset.Zero),
+              (StepGuideState.Disabled, Offset.microarcseconds.reverseGet(0L, 15000000L)),
+              (StepGuideState.Enabled, Offset.microarcseconds.reverseGet(0L, 1295985000000L)),
+              (StepGuideState.Enabled, Offset.Zero),
+              (StepGuideState.Enabled, Offset.microarcseconds.reverseGet(0L, 15000000L))
+            ),
             NonNegInt.unsafeFrom(3),
             ExecutionState.NotStarted
           )

@@ -4,10 +4,13 @@
 package lucuma.odb.util
 
 import cats.data.NonEmptyList
+import cats.implicits.catsKernelOrderingForOrder
 import cats.syntax.apply.*
 import cats.syntax.either.*
+import cats.syntax.eq.*
 import cats.syntax.foldable.*
 import cats.syntax.option.*
+import cats.syntax.traverse.*
 import eu.timepit.refined.types.numeric.NonNegBigDecimal
 import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.numeric.NonNegLong
@@ -38,6 +41,9 @@ import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.CategorizedTime
 import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.DatasetReference
+import lucuma.core.model.sequence.ExecutionDigest
+import lucuma.core.model.sequence.SequenceDigest
+import lucuma.core.model.sequence.SetupTime
 import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.TelescopeConfig
@@ -85,6 +91,7 @@ import spire.math.interval.Closed
 import spire.math.interval.Open
 import spire.math.interval.ValueBound
 
+import scala.collection.immutable.SortedSet
 import scala.util.control.Exception
 import scala.util.matching.Regex
 
@@ -583,6 +590,53 @@ trait Codecs {
 
   val _step_type: Codec[List[StepType]] =
     _enumerated[StepType](Type("_e_step_type", List(Type("e_step_type"))))
+
+  val _guide_state: Codec[List[StepGuideState]] =
+    _enumerated[StepGuideState](Type("_e_guide_state", List(Type("e_guide_state"))))
+
+  lazy val setup_time: Codec[SetupTime] =
+    (time_span *: time_span).to[SetupTime]
+
+  lazy val offset_array: Codec[List[Offset]] =
+    _int8.eimap { arr =>
+      val len = arr.size / 2
+      if (arr.size % 2 =!= 0) "Expected an even number of offset coordinates".asLeft
+      else arr.reshape(len, 2).fold("Quite unexpectedly, cannot reshape offsets to an Nx2 array".asLeft[List[Offset]]) { arr =>
+        Either.fromOption(
+          (0 until len).toList.traverse { index =>
+            (arr.get(index, 0), arr.get(index, 1)).mapN { (p, q) =>
+              Offset.signedMicroarcseconds.reverseGet((p, q))
+            }
+          },
+          "Invalid offset array"
+        )
+      }
+    } { offsets =>
+      Arr
+        .fromFoldable(offsets.flatMap(o => Offset.signedMicroarcseconds.get(o).toList))
+        .reshape(offsets.size, 2)
+        .get
+    }
+
+  lazy val sequence_digest: Codec[SequenceDigest] =
+    (obs_class *: categorized_time *: offset_array *: _guide_state *: int4_nonneg *: execution_state).imap {
+      case (oClass, pTime, offsets, guideStates, aCount, execState) =>
+        val guidedOffsets = offsets.zip(guideStates).map { case (o, g) => (g, o) }
+        SequenceDigest(oClass, pTime, SortedSet.from(guidedOffsets), aCount, execState)
+    } { sd =>
+      val offsetsList = sd.offsets.toList
+      (
+        sd.observeClass,
+        sd.timeEstimate,
+        offsetsList.map(_._2),
+        offsetsList.map(_._1),
+        sd.atomCount,
+        sd.executionState
+      )
+    }
+
+  lazy val execution_digest: Codec[ExecutionDigest] =
+    (setup_time *: sequence_digest *: sequence_digest).to[ExecutionDigest]
 
   val step_type: Codec[StepType] =
     enumerated(Type("e_step_type"))
