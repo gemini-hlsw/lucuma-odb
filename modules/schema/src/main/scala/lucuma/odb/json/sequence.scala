@@ -18,6 +18,7 @@ import lucuma.core.enums.Breakpoint
 import lucuma.core.enums.ExecutionState
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObserveClass
+import lucuma.core.enums.StepGuideState
 import lucuma.core.math.Offset
 import lucuma.core.math.Wavelength
 import lucuma.core.model.sequence.Atom
@@ -97,12 +98,25 @@ trait SequenceCodec {
       )
     }
 
+  private given Decoder[(StepGuideState, Offset)] =
+    Decoder.instance: c =>
+      for
+        g <- c.downField("guideState").as[StepGuideState]
+        o <- c.downField("offset").as[Offset]
+      yield (g, o)
+
   given Decoder[SequenceDigest] =
     Decoder.instance: c =>
       for
         o <- c.downField("observeClass").as[ObserveClass]
         t <- c.downField("timeEstimate").as[CategorizedTime]
-        f <- c.downField("offsets").as[List[Offset]].map(SortedSet.from)
+        f <- c.downField("guidedOffsets").as[List[(StepGuideState, Offset)]]
+              .map(SortedSet.from)
+              .orElse(
+                c.downField("offsets").as[List[Offset]]
+                  .map(_.map(off => (StepGuideState.Enabled, off)))
+                  .map(SortedSet.from)
+              )
         n <- c.downField("atomCount").as[NonNegInt]
         e <- c.downField("executionState").as[ExecutionState]
       yield SequenceDigest(o, t, f, n, e)
@@ -112,7 +126,10 @@ trait SequenceCodec {
       Json.obj(
         "observeClass"   -> a.observeClass.asJson,
         "timeEstimate"   -> a.timeEstimate.asJson,
-        "offsets"        -> a.offsets.toList.asJson,
+        "offsets"        -> a.offsets.toList.map(_._2).distinct.asJson,
+        "guidedOffsets"  -> a.offsets.toList.map { case (g, o) =>
+                             Json.obj("guideState" -> g.asJson, "offset" -> o.asJson)
+                           }.asJson,
         "atomCount"      -> a.atomCount.asJson,
         "executionState" -> a.executionState.asJson
       )
