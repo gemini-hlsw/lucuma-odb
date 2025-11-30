@@ -280,23 +280,23 @@ object ExecutionDigestService {
           $int4_nonneg,
           $execution_state
         ON CONFLICT ON CONSTRAINT t_execution_digest_pkey DO UPDATE
-          SET c_hash                       = $md5_hash,
-              c_full_setup_time            = $time_span,
-              c_reacq_setup_time           = $time_span,
-              c_acq_obs_class              = $obs_class,
-              c_acq_non_charged_time       = $time_span,
-              c_acq_program_time           = $time_span,
-              c_acq_offsets                = $offset_array,
-              c_acq_offset_guide_states    = $_guide_state,
-              c_acq_atom_count             = $int4_nonneg,
-              c_acq_execution_state        = $execution_state,
-              c_sci_obs_class              = $obs_class,
-              c_sci_non_charged_time       = $time_span,
-              c_sci_program_time           = $time_span,
-              c_sci_offsets                = $offset_array,
-              c_sci_offset_guide_states    = $_guide_state,
-              c_sci_atom_count             = $int4_nonneg,
-              c_sci_execution_state        = $execution_state
+          SET c_hash                    = $md5_hash,
+              c_full_setup_time         = $time_span,
+              c_reacq_setup_time        = $time_span,
+              c_acq_obs_class           = $obs_class,
+              c_acq_non_charged_time    = $time_span,
+              c_acq_program_time        = $time_span,
+              c_acq_offsets             = $offset_array,
+              c_acq_offset_guide_states = $_guide_state,
+              c_acq_atom_count          = $int4_nonneg,
+              c_acq_execution_state     = $execution_state,
+              c_sci_obs_class           = $obs_class,
+              c_sci_non_charged_time    = $time_span,
+              c_sci_program_time        = $time_span,
+              c_sci_offsets             = $offset_array,
+              c_sci_offset_guide_states = $_guide_state,
+              c_sci_atom_count          = $int4_nonneg,
+              c_sci_execution_state     = $execution_state
       """.command
 
   }

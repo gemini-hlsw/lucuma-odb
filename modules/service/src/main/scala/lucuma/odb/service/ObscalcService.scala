@@ -617,22 +617,22 @@ object ObscalcService:
         sql"c_reacq_setup_time     = ${time_span.opt}"(r.digest.map(_.setup.reacquisition)),
 
         // Acquisition Digest
-        sql"c_acq_obs_class              = ${obs_class.opt}"(r.digest.map(_.acquisition.observeClass)),
-        sql"c_acq_non_charged_time       = ${time_span.opt}"(r.digest.map(_.acquisition.timeEstimate(ChargeClass.NonCharged))),
-        sql"c_acq_program_time           = ${time_span.opt}"(r.digest.map(_.acquisition.timeEstimate(ChargeClass.Program))),
-        sql"c_acq_offsets                = ${offset_array.opt}"(r.digest.map(_.acquisition.offsets.toList.map(_._1))),
-        sql"c_acq_offset_guide_states    = ${_guide_state.opt}"(r.digest.map(_.acquisition.offsets.toList.map(_._2))),
-        sql"c_acq_atom_count             = ${int4_nonneg.opt}"(r.digest.map(_.acquisition.atomCount)),
-        sql"c_acq_execution_state        = ${execution_state.opt}"(r.digest.map(_.acquisition.executionState)),
+        sql"c_acq_obs_class           = ${obs_class.opt}"(r.digest.map(_.acquisition.observeClass)),
+        sql"c_acq_non_charged_time    = ${time_span.opt}"(r.digest.map(_.acquisition.timeEstimate(ChargeClass.NonCharged))),
+        sql"c_acq_program_time        = ${time_span.opt}"(r.digest.map(_.acquisition.timeEstimate(ChargeClass.Program))),
+        sql"c_acq_offsets             = ${offset_array.opt}"(r.digest.map(_.acquisition.offsets.toList.map(_._1))),
+        sql"c_acq_offset_guide_states = ${_guide_state.opt}"(r.digest.map(_.acquisition.offsets.toList.map(_._2))),
+        sql"c_acq_atom_count          = ${int4_nonneg.opt}"(r.digest.map(_.acquisition.atomCount)),
+        sql"c_acq_execution_state     = ${execution_state.opt}"(r.digest.map(_.acquisition.executionState)),
 
         // Science Digest
-        sql"c_sci_obs_class              = ${obs_class.opt}"(r.digest.map(_.science.observeClass)),
-        sql"c_sci_non_charged_time       = ${time_span.opt}"(r.digest.map(_.science.timeEstimate(ChargeClass.NonCharged))),
-        sql"c_sci_program_time           = ${time_span.opt}"(r.digest.map(_.science.timeEstimate(ChargeClass.Program))),
-        sql"c_sci_offsets                = ${offset_array.opt}"(r.digest.map(_.science.offsets.toList.map(_._1))),
-        sql"c_sci_offset_guide_states    = ${_guide_state.opt}"(r.digest.map(_.science.offsets.toList.map(_._2))),
-        sql"c_sci_atom_count             = ${int4_nonneg.opt}"(r.digest.map(_.science.atomCount)),
-        sql"c_sci_execution_state        = ${execution_state.opt}"(r.digest.map(_.science.executionState)),
+        sql"c_sci_obs_class           = ${obs_class.opt}"(r.digest.map(_.science.observeClass)),
+        sql"c_sci_non_charged_time    = ${time_span.opt}"(r.digest.map(_.science.timeEstimate(ChargeClass.NonCharged))),
+        sql"c_sci_program_time        = ${time_span.opt}"(r.digest.map(_.science.timeEstimate(ChargeClass.Program))),
+        sql"c_sci_offsets             = ${offset_array.opt}"(r.digest.map(_.science.offsets.toList.map(_._1))),
+        sql"c_sci_offset_guide_states = ${_guide_state.opt}"(r.digest.map(_.science.offsets.toList.map(_._2))),
+        sql"c_sci_atom_count          = ${int4_nonneg.opt}"(r.digest.map(_.science.atomCount)),
+        sql"c_sci_execution_state     = ${execution_state.opt}"(r.digest.map(_.science.executionState)),
 
         // Workflow
         sql"c_workflow_state       = ${observation_workflow_state}"(r.workflow.state),
