@@ -35,11 +35,10 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     steps:
-      - name: Checkout current branch (full)
-        uses: actions/checkout@v4
+      - name: Checkout current branch
+        uses: nschloe/action-cached-lfs-checkout@v1
         with:
           fetch-depth: 0
-          lfs: true
 
       - name: Setup sbt
         uses: sbt/setup-sbt@v1
@@ -132,11 +131,10 @@ jobs:
         java: [temurin@17]
     runs-on: ${{ matrix.os }}
     steps:
-      - name: Checkout current branch (full)
-        uses: actions/checkout@v4
+      - name: Checkout current branch
+        uses: nschloe/action-cached-lfs-checkout@v1
         with:
           fetch-depth: 0
-          lfs: true
 
       - name: Setup sbt
         uses: sbt/setup-sbt@v1
@@ -184,15 +182,14 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-22.04]
-        scala: [3.7.3]
+        scala: [3.7.4]
         java: [temurin@17]
     runs-on: ${{ matrix.os }}
     steps:
-      - name: Checkout current branch (full)
-        uses: actions/checkout@v4
+      - name: Checkout current branch
+        uses: nschloe/action-cached-lfs-checkout@v1
         with:
           fetch-depth: 0
-          lfs: true
 
       - name: Setup sbt
         uses: sbt/setup-sbt@v1
