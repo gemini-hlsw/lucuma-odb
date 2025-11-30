@@ -70,7 +70,7 @@ enum ProposalStatus {
 }
 
 """Email address, matching ^\w+@[a-zA-Z_]+?\.[a-zA-Z]{2,3}$"""
-scalar EmailAddress
+scalar EmailAddress @specifiedBy(url: "https://html.spec.whatwg.org/multipage/input.html#valid-e-mail-address")
 
 """The result of adding a atom event."""
 type AddAtomEventResult {
@@ -130,7 +130,7 @@ type Allocation {
 """
 Create an angle from a signed value.  Choose exactly one of the available units.
 """
-input AngleInput {
+input AngleInput @oneOf {
   microarcseconds: Long
   microseconds: BigDecimal
   milliarcseconds: BigDecimal
@@ -837,7 +837,7 @@ enum ExecutionEventType {
 """
 Exposure time mode input.  Specify fixed or signal to noise, but not both
 """
-input ExposureTimeModeInput {
+input ExposureTimeModeInput @oneOf {
   """
   The signalToNoise field must be either specified or skipped altogether.  It cannot be unset with a null value.
   """
@@ -1640,6 +1640,55 @@ type Offset {
   q: OffsetQ!
 }
 
+"""
+An offset generator produces a series of offsets according to generator-specific
+parameters.  Only (at most) one of `enumerated`, `random`, `spiral` or `uniform`
+will be defined.  All others will be `null`.  The `generatorType` corresponds to
+the entry (if any) that is defined.  If the generator type of `NONE`, then none
+of the entries will be defined.
+"""
+type OffsetGenerator {
+  generatorType: OffsetGeneratorType!
+  enumerated: EnumeratedOffsetGenerator
+  random: RandomOffsetGenerator
+  spiral: SpiralOffsetGenerator
+  uniform: UniformOffsetGenerator
+}
+
+enum OffsetGeneratorType {
+  NONE
+  ENUMERATED
+  RANDOM
+  SPIRAL
+  UNIFORM
+}
+
+"""
+In the `ENUMERATED` option offsets are explicitly specified instead of calculated.
+"""
+type EnumeratedOffsetGenerator {
+  values: [TelescopeConfig!]!
+}
+
+type RandomOffsetGenerator {
+  size: Angle!
+  center: Offset!
+}
+
+type SpiralOffsetGenerator {
+  size: Angle!
+  center: Offset!
+}
+
+"""
+Defines a region of the sky using two corners.  Exposures are
+then distributed across this region as evenly as possible.
+"""
+type UniformOffsetGenerator {
+  cornerA: Offset!
+  cornerB: Offset!
+}
+
 """Gemini Partners"""
 enum Partner {
   """Argentina"""
@@ -1967,7 +2016,7 @@ type SystemVerification implements ProposalType {
 }
 
 """Radial velocity, choose one of the available units"""
-input RadialVelocityInput {
+input RadialVelocityInput @oneOf {
   centimetersPerSecond: Long
   metersPerSecond: BigDecimal
   kilometersPerSecond: BigDecimal
@@ -2087,7 +2136,7 @@ input SignalToNoiseExposureTimeModeInput {
 """
 Create or edit a source profile.  Exactly one of "point", "uniform" or "gaussian" is required.
 """
-input SourceProfileInput {
+input SourceProfileInput @oneOf {
   point: SpectralDefinitionIntegratedInput
   uniform: SpectralDefinitionSurfaceInput
   gaussian: GaussianInput
@@ -2096,7 +2145,7 @@ input SourceProfileInput {
 """
 Spectral definition input with integrated units.  Specify exactly one of "bandNormalized" or "emissionLines"
 """
-input SpectralDefinitionIntegratedInput {
+input SpectralDefinitionIntegratedInput @oneOf {
   bandNormalized: BandNormalizedIntegratedInput
   emissionLines: EmissionLinesIntegratedInput
 }
@@ -2104,7 +2153,7 @@ input SpectralDefinitionIntegratedInput {
 """
 Spectral definition input with surface units.  Specify exactly one of "bandNormalized" or "emissionLines"
 """
-input SpectralDefinitionSurfaceInput {
+input SpectralDefinitionSurfaceInput @oneOf {
   bandNormalized: BandNormalizedSurfaceInput
   emissionLines: EmissionLinesSurfaceInput
 }
@@ -2475,7 +2524,7 @@ type UpdateTargetsResult {
 }
 
 """Wavelength, choose one of the available units"""
-input WavelengthInput {
+input WavelengthInput @oneOf {
   picometers: PosInt
   angstroms: PosBigDecimal
   nanometers: PosBigDecimal
@@ -4395,6 +4444,12 @@ type GmosNorthImaging {
   """Spatial offsets"""
   offsets: [Offset!]!
 
+  """Temporary, WIP -- will be moved."""
+  objectOffsetGenerator: OffsetGenerator
+
+  """Temporary, WIP -- will be moved."""
+  skyOffsetGenerator: OffsetGenerator
+
   """
   MultipleFiltersMode, either explicitly specified in explicitMultipleFiltersMode or else taken
   from the defaultMultipleFiltersMode.
@@ -4881,6 +4936,12 @@ type GmosSouthImaging {
 
   """Spatial offsets"""
   offsets: [Offset!]!
+
+  """Temporary, WIP -- will be moved."""
+  objectOffsetGenerator: OffsetGenerator
+
+  """Temporary, WIP -- will be moved."""
+  skyOffsetGenerator: OffsetGenerator
 
   """
   MultipleFiltersMode, either explicitly specified in explicitMultipleFiltersMode or else taken
@@ -7867,7 +7928,7 @@ type TimeSpan {
 """
 Equivalent time amount in several unit options (exactly one must be specified)
 """
-input TimeSpanInput {
+input TimeSpanInput @oneOf {
   """TimeSpan in µs"""
   microseconds: Long
 
@@ -8338,7 +8399,7 @@ type Flamingos2ImagingParams {
 union ImagingParams = GmosNImagingParams | GmosSImagingParams | Flamingos2ImagingParams
 
 """Params for instrument modes"""
-input InstrumentModesInput {
+input InstrumentModesInput @oneOf {
   """Gmos North Spectroscopy"""
   gmosNSpectroscopy: GmosNSpectroscopyInput
 
@@ -8359,7 +8420,7 @@ input InstrumentModesInput {
 }
 
 """Image quality input - specify either preset or exact arcsec value"""
-input ImageQualityInput {
+input ImageQualityInput @oneOf {
   """Preset image quality value"""
   preset: ImageQualityPreset
 
@@ -8370,7 +8431,7 @@ input ImageQualityInput {
 """
 Cloud extinction input - specify either preset or exact extinction value
 """
-input CloudExtinctionInput {
+input CloudExtinctionInput @oneOf {
   """Preset cloud extinction value"""
   preset: CloudExtinctionPreset
 

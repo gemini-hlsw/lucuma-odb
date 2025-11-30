@@ -1918,7 +1918,7 @@ class createObservation extends OdbSuite {
 
   test("[general] can't create an observation with two observing modes") {
     createProgramAs(pi).flatMap { pid =>
-      interceptGraphQL(s"Argument 'input.SET.observingMode' is invalid: Expected exactly one of gmosNorthLongSlit, gmosSouthLongSlit, gmosNorthImaging, gmosSouthImaging, flamingos2LongSlit") {
+      interceptGraphQL("Exactly one key must be specified for oneOf input object ObservingModeInput in field 'createObservation' of type 'Mutation', but found 'gmosNorthLongSlit', 'gmosSouthLongSlit'") {
         query(pi,
           s"""
           mutation {

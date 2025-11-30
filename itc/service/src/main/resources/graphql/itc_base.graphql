@@ -186,7 +186,7 @@ type Flamingos2ImagingParams {
 union ImagingParams = GmosNImagingParams | GmosSImagingParams | Flamingos2ImagingParams
 
 """Params for instrument modes"""
-input InstrumentModesInput {
+input InstrumentModesInput @oneOf {
   """Gmos North Spectroscopy"""
   gmosNSpectroscopy: GmosNSpectroscopyInput
 
@@ -207,7 +207,7 @@ input InstrumentModesInput {
 }
 
 """Image quality input - specify either preset or exact arcsec value"""
-input ImageQualityInput {
+input ImageQualityInput @oneOf {
   """Preset image quality value"""
   preset: ImageQualityPreset
 
@@ -218,7 +218,7 @@ input ImageQualityInput {
 """
 Cloud extinction input - specify either preset or exact extinction value
 """
-input CloudExtinctionInput {
+input CloudExtinctionInput @oneOf {
   """Preset cloud extinction value"""
   preset: CloudExtinctionPreset
 

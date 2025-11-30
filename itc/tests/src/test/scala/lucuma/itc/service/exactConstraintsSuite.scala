@@ -1003,16 +1003,7 @@ class exactConstraintsSuite extends GraphQLSuite:
         {
           "errors": [
             {
-              "message": "Argument 'input.constraints.imageQuality' is invalid: Expected exactly one of preset, arcsec",
-              "extensions": {
-                "odb_error" : {
-                  "odb_error.tag" : "invalid_argument",
-                  "odb_error.detail" : "Argument 'input.constraints.imageQuality' is invalid: Expected exactly one of preset, arcsec",
-                  "odb_error.data" : {
-
-                  }
-                }
-              }
+              "message" : "Exactly one key must be specified for oneOf input object ImageQualityInput in field 'spectroscopy' of type 'Query', but found 'preset', 'arcsec'"
             }
           ]
         }
@@ -1093,16 +1084,7 @@ class exactConstraintsSuite extends GraphQLSuite:
         {
           "errors": [
             {
-              "message": "Argument 'input.constraints.cloudExtinction' is invalid: Expected exactly one of preset, extinction",
-              "extensions": {
-                "odb_error" : {
-                  "odb_error.tag" : "invalid_argument",
-                  "odb_error.detail" : "Argument 'input.constraints.cloudExtinction' is invalid: Expected exactly one of preset, extinction",
-                  "odb_error.data" : {
-
-                  }
-                }
-              }
+              "message" : "Exactly one key must be specified for oneOf input object CloudExtinctionInput in field 'spectroscopy' of type 'Query', but found 'preset', 'extinction'"
             }
           ]
         }
@@ -1342,16 +1324,7 @@ class exactConstraintsSuite extends GraphQLSuite:
         {
           "errors": [
             {
-              "message": "Argument 'input.constraints.imageQuality' is invalid: Expected exactly one of preset, arcsec",
-              "extensions": {
-                "odb_error" : {
-                  "odb_error.tag" : "invalid_argument",
-                  "odb_error.detail" : "Argument 'input.constraints.imageQuality' is invalid: Expected exactly one of preset, arcsec",
-                  "odb_error.data" : {
-
-                  }
-                }
-              }
+              "message" : "Exactly one key must be specified for oneOf input object ImageQualityInput in field 'spectroscopy' of type 'Query'"
             }
           ]
         }
@@ -1429,16 +1402,7 @@ class exactConstraintsSuite extends GraphQLSuite:
         {
           "errors": [
             {
-              "message": "Argument 'input.constraints.cloudExtinction' is invalid: Expected exactly one of preset, extinction",
-              "extensions": {
-                "odb_error" : {
-                  "odb_error.tag" : "invalid_argument",
-                  "odb_error.detail" : "Argument 'input.constraints.cloudExtinction' is invalid: Expected exactly one of preset, extinction",
-                  "odb_error.data" : {
-
-                  }
-                }
-              }
+              "message" : "Exactly one key must be specified for oneOf input object CloudExtinctionInput in field 'spectroscopy' of type 'Query'"
             }
           ]
         }

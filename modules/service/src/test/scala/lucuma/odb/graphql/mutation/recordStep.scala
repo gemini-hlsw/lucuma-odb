@@ -44,7 +44,7 @@ class recordStep extends OdbSuite {
     user:     User,
     query:    Atom.Id => String,
     expected: Atom.Id => Either[String, Json]
-  ): IO[Unit] =
+  )(using munit.Location): IO[Unit] =
     for {
       ids <- recordVisitAndAtom(mode, user)
       (_, _, _, aid) = ids

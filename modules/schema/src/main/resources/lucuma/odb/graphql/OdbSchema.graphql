@@ -20,14 +20,13 @@ enum ProposalStatus {
 """
 Email address, matching ^\w+@[a-zA-Z_]+?\.[a-zA-Z]{2,3}$
 """
-scalar EmailAddress
+scalar EmailAddress @specifiedBy(url: "https://html.spec.whatwg.org/multipage/input.html#valid-e-mail-address")
 
 "AtomEvent creation parameters."
 input AddAtomEventInput {
   atomId: AtomId!
   atomStage: AtomStage!
-  "@deprecated: use idempotencyKey instead"
-  clientId: ClientId
+  clientId: ClientId @deprecated(reason: "Use idempotencyKey instead")
 
   """
   Idempotency key, if any.  The IdempotencyKey may be provided by clients when
@@ -51,8 +50,7 @@ input AddDatasetEventInput {
   "Dataset execution stage."
   datasetStage: DatasetStage!
 
-  "@deprecated: use idempotencyKey instead"
-  clientId: ClientId
+  clientId: ClientId @deprecated(reason: "Use idempotencyKey instead")
 
   """
   Idempotency key, if any.  The IdempotencyKey may be provided by clients when
@@ -83,8 +81,7 @@ input AddSequenceEventInput {
   visitId: VisitId!
   command: SequenceCommand!
 
-  "@deprecated: use idempotencyKey instead"
-  clientId: ClientId
+  clientId: ClientId @deprecated(reason: "Use idempotencyKey instead")
 
   """
   Idempotency key, if any.  The IdempotencyKey may be provided by clients when
@@ -105,8 +102,7 @@ input AddSlewEventInput {
   observationId: ObservationId!
   slewStage: SlewStage!
 
-  "@deprecated: use idempotencyKey instead"
-  clientId: ClientId
+  clientId: ClientId @deprecated(reason: "Use idempotencyKey instead")
 
   """
   Idempotency key, if any.  The IdempotencyKey may be provided by clients when
@@ -127,8 +123,7 @@ input AddStepEventInput {
   stepId: StepId!
   stepStage: StepStage!
 
-  "@deprecated: use idempotencyKey instead"
-  clientId: ClientId
+  clientId: ClientId @deprecated(reason: "Use idempotencyKey instead")
 
   """
   Idempotency key, if any.  The IdempotencyKey may be provided by clients when
@@ -190,7 +185,7 @@ input AllocationInput {
 """
 Create an angle from a signed value.  Choose exactly one of the available units.
 """
-input AngleInput {
+input AngleInput @oneOf {
   microarcseconds: Long
   microseconds: BigDecimal
   milliarcseconds: BigDecimal
@@ -1091,7 +1086,7 @@ type DateInterval {
 """
 Declination, choose one of the available units
 """
-input DeclinationInput {
+input DeclinationInput @oneOf {
   microarcseconds: Long
   degrees: BigDecimal
   dms: DmsString
@@ -1286,7 +1281,7 @@ enum ExecutionEventType {
 """
 Exposure time mode input.  Specify fixed or signal to noise, but not both
 """
-input ExposureTimeModeInput {
+input ExposureTimeModeInput @oneOf {
   """
   The signalToNoise field must be either specified or skipped altogether.  It cannot be unset with a null value.
   """
@@ -2168,9 +2163,8 @@ input GmosNorthLongSlitInput {
 
   """
   The explicitSpatialOffsets field may be unset by assigning a null value, or ignored by skipping it altogether
-  @deprecated(reason: "Use 'explicitOffsets' instead.")
   """
-  explicitSpatialOffsets: [OffsetComponentInput!]
+  explicitSpatialOffsets: [OffsetComponentInput!] @deprecated(reason: "Use 'explicitOffsets' instead.")
 
   """
   Parameters that override acquisition defaults.
@@ -2658,9 +2652,8 @@ input GmosSouthLongSlitInput {
 
   """
   The explicitSpatialOffsets field may be unset by assigning a null value, or ignored by skipping it altogether
-  @deprecated(reason: "Use 'explicitOffsets' instead.")
   """
-  explicitSpatialOffsets: [OffsetComponentInput!]
+  explicitSpatialOffsets: [OffsetComponentInput!] @deprecated(reason: "Use 'explicitOffsets' instead.")
 
   """
   Parameters that override acquisition defaults.
@@ -3758,7 +3751,7 @@ input UniformOffsetGeneratorInput {
 """
 Parallax, choose one of the available units
 """
-input ParallaxInput {
+input ParallaxInput @oneOf {
   microarcseconds: Long
   milliarcseconds: BigDecimal
 }
@@ -4088,7 +4081,7 @@ type ProgramUser {
 """
 Proper motion component, choose one of the available units
 """
-input ProperMotionComponentInput {
+input ProperMotionComponentInput @oneOf {
   microarcsecondsPerYear: Long
   milliarcsecondsPerYear: BigDecimal
 }
@@ -4299,7 +4292,7 @@ type SystemVerification implements ProposalType {
 Properties associated with particular proposal types.  Exactly one of
 these should be set upon creation or editing.
 """
-input ProposalTypeInput {
+input ProposalTypeInput @oneOf {
   classical: ClassicalInput
 
   demoScience: DemoScienceInput
@@ -4513,7 +4506,7 @@ input ProposalPropertiesInput {
 """
 Radial velocity, choose one of the available units
 """
-input RadialVelocityInput {
+input RadialVelocityInput @oneOf {
   centimetersPerSecond: Long
   metersPerSecond: BigDecimal
   kilometersPerSecond: BigDecimal
@@ -4699,7 +4692,7 @@ type ResetAcquisitionResult {
 """
 Right Ascension, choose one of the available units
 """
-input RightAscensionInput {
+input RightAscensionInput @oneOf {
   microseconds: Long
   degrees: BigDecimal
   hours: BigDecimal
@@ -4741,7 +4734,7 @@ type SmartGcal implements StepConfig {
 """
 Edit or create an observation's observing mode
 """
-input ObservingModeInput {
+input ObservingModeInput @oneOf {
   """
   The gmosNorthLongSlit field must be either specified or skipped altogether.  It cannot be unset with a null value.
   """
@@ -4859,7 +4852,7 @@ input SetProgramReferenceInput {
 Properties for the chosen program reference type.  Supply the value for exactly
 one of the inputs.
 """
-input ProgramReferencePropertiesInput {
+input ProgramReferencePropertiesInput @oneOf {
   calibration: ProgramReferencePropertiesCalibrationInput
   commissioning: ProgramReferencePropertiesCommissioningInput
   engineering: ProgramReferencePropertiesEngineeringInput
@@ -5038,7 +5031,7 @@ input SignalToNoiseExposureTimeModeInput {
 """
 Create or edit a source profile.  Exactly one of "point", "uniform" or "gaussian" is required.
 """
-input SourceProfileInput {
+input SourceProfileInput @oneOf {
   point: SpectralDefinitionIntegratedInput
   uniform: SpectralDefinitionSurfaceInput
   gaussian: GaussianInput
@@ -5047,7 +5040,7 @@ input SourceProfileInput {
 """
 Spectral definition input with integrated units.  Specify exactly one of "bandNormalized" or "emissionLines"
 """
-input SpectralDefinitionIntegratedInput {
+input SpectralDefinitionIntegratedInput @oneOf {
   bandNormalized: BandNormalizedIntegratedInput
   emissionLines: EmissionLinesIntegratedInput
 }
@@ -5055,7 +5048,7 @@ input SpectralDefinitionIntegratedInput {
 """
 Spectral definition input with surface units.  Specify exactly one of "bandNormalized" or "emissionLines"
 """
-input SpectralDefinitionSurfaceInput {
+input SpectralDefinitionSurfaceInput @oneOf {
   bandNormalized: BandNormalizedSurfaceInput
   emissionLines: EmissionLinesSurfaceInput
 }
@@ -5108,7 +5101,7 @@ interface StepConfig {
 """
 Step configuration.  Choose exactly one step type.
 """
-input StepConfigInput {
+input StepConfigInput @oneOf {
   """
   Bias step creation option
   """
@@ -6188,7 +6181,7 @@ type UpdateTargetsResult {
 """
 Wavelength, choose one of the available units
 """
-input WavelengthInput {
+input WavelengthInput @oneOf {
   picometers: PosInt
   angstroms: PosBigDecimal
   nanometers: PosBigDecimal
@@ -6198,7 +6191,7 @@ input WavelengthInput {
 """
 WavelengthDither, choose one of the available units
 """
-input WavelengthDitherInput {
+input WavelengthDitherInput @oneOf {
   picometers: Int
   angstroms: BigDecimal
   nanometers: BigDecimal
@@ -10108,7 +10101,7 @@ type GroupElement {
 }
 
 "A group element identifier. Exactly one of groupId and observationId must be provided."
-input GroupElementInput {
+input GroupElementInput @oneOf {
   groupId: GroupId
   observationId: ObservationId
 }
@@ -14570,7 +14563,7 @@ type TimeSpan {
 """
 Equivalent time amount in several unit options (exactly one must be specified)
 """
-input TimeSpanInput {
+input TimeSpanInput @oneOf {
   """
   TimeSpan in µs
   """
