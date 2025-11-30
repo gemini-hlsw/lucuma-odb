@@ -333,11 +333,10 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
    * Resolve all pending telluric targets for a program.
    * This processes the resolution queue synchronously for testing.
    */
-  def resolveTelluricTargets(@annotation.unused pid: Program.Id): IO[Unit] =
+  def resolveTelluricTargets: IO[Unit] =
     withServices(serviceUser) { services =>
       import Trace.Implicits.noop
       for
-        // Canonicalize the service user first - required for chronicle triggers
         _ <- Services.asSuperUser(UserService.fromSession(services.session).canonicalizeUser(serviceUser))
         // Debug: print t_obscalc contents
         _ <- services.session.transaction.use { _ =>
