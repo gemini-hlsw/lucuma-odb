@@ -274,10 +274,10 @@ object GuideService {
     val timeEstimate = digest.fullTimeEstimate.sum
     val setupTime    = digest.setup.full
     val acqOffsets   = NonEmptyList.fromFoldable(
-      digest.acquisition.offsets.collect { case (StepGuideState.Enabled, o) => GuidedOffset(o) }
+      digest.acquisition.offsets.collect { case (o, StepGuideState.Enabled) => GuidedOffset(o) }
     ).map(AcquisitionOffsets.apply)
     val sciOffsets   = NonEmptyList.fromFoldable(
-      digest.science.offsets.collect { case (StepGuideState.Enabled, o) => GuidedOffset(o) }
+      digest.science.offsets.collect { case (o, StepGuideState.Enabled) => GuidedOffset(o) }
     ).map(ScienceOffsets.apply)
 
     val (site, agsParams, centralWavelength): (Site, AgsParams, Wavelength) = params.observingMode match

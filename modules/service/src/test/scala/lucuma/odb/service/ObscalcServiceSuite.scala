@@ -204,8 +204,8 @@ class ObscalcServiceSuite extends ObscalcServiceSuiteSupport:
             ObserveClass.Acquisition,
             CategorizedTime(ChargeClass.Program -> TimeSpan.unsafeFromMicroseconds(219362500L)),
             SortedSet(
-              (StepGuideState.Enabled, Offset.Zero),
-              (StepGuideState.Enabled, Offset.microarcseconds.reverseGet(10000000L, 0L))
+              (Offset.Zero, StepGuideState.Enabled),
+              (Offset.microarcseconds.reverseGet(10000000L, 0L), StepGuideState.Enabled)
             ),
             NonNegInt.unsafeFrom(2),
             ExecutionState.NotStarted
@@ -214,11 +214,11 @@ class ObscalcServiceSuite extends ObscalcServiceSuiteSupport:
             ObserveClass.Science,
             CategorizedTime(ChargeClass.Program -> TimeSpan.FromSeconds.getOption(ScienceSequence).get),
             SortedSet(
-              (StepGuideState.Disabled, Offset.Zero),
-              (StepGuideState.Disabled, Offset.microarcseconds.reverseGet(0L, 15000000L)),
-              (StepGuideState.Enabled, Offset.microarcseconds.reverseGet(0L, 1295985000000L)),
-              (StepGuideState.Enabled, Offset.Zero),
-              (StepGuideState.Enabled, Offset.microarcseconds.reverseGet(0L, 15000000L))
+              (Offset.Zero, StepGuideState.Disabled),
+              (Offset.Zero, StepGuideState.Enabled),
+              (Offset.microarcseconds.reverseGet(0L, 15000000L), StepGuideState.Disabled),
+              (Offset.microarcseconds.reverseGet(0L, 15000000L), StepGuideState.Enabled),
+              (Offset.microarcseconds.reverseGet(0L, 1295985000000L), StepGuideState.Enabled)
             ),
             NonNegInt.unsafeFrom(3),
             ExecutionState.NotStarted
