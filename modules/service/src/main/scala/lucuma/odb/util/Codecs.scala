@@ -621,15 +621,14 @@ trait Codecs {
   lazy val sequence_digest: Codec[SequenceDigest] =
     (obs_class *: categorized_time *: offset_array *: _guide_state *: int4_nonneg *: execution_state).imap {
       case (oClass, pTime, offsets, guideStates, aCount, execState) =>
-        val guidedOffsets = offsets.zip(guideStates).map { case (o, g) => (g, o) }
+        val guidedOffsets = offsets.zip(guideStates)
         SequenceDigest(oClass, pTime, SortedSet.from(guidedOffsets), aCount, execState)
     } { sd =>
-      val offsetsList = sd.offsets.toList
       (
         sd.observeClass,
         sd.timeEstimate,
-        offsetsList.map(_._2),
-        offsetsList.map(_._1),
+        sd.offsets.toList.map(_._1),
+        sd.offsets.toList.map(_._2),
         sd.atomCount,
         sd.executionState
       )

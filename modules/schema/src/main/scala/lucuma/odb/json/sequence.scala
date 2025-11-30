@@ -98,38 +98,25 @@ trait SequenceCodec {
       )
     }
 
-  private given Decoder[(StepGuideState, Offset)] =
-    Decoder.instance: c =>
-      for
-        g <- c.downField("guideState").as[StepGuideState]
-        o <- c.downField("offset").as[Offset]
-      yield (g, o)
-
   given Decoder[SequenceDigest] =
     Decoder.instance: c =>
       for
-        o <- c.downField("observeClass").as[ObserveClass]
-        t <- c.downField("timeEstimate").as[CategorizedTime]
-        f <- c.downField("guidedOffsets").as[List[(StepGuideState, Offset)]]
-              .map(SortedSet.from)
-              .orElse(
-                c.downField("offsets").as[List[Offset]]
-                  .map(_.map(off => (StepGuideState.Enabled, off)))
-                  .map(SortedSet.from)
-              )
-        n <- c.downField("atomCount").as[NonNegInt]
-        e <- c.downField("executionState").as[ExecutionState]
-      yield SequenceDigest(o, t, f, n, e)
+        o  <- c.downField("observeClass").as[ObserveClass]
+        t  <- c.downField("timeEstimate").as[CategorizedTime]
+        os <- c.downField("offsets").as[List[Offset]]
+        gs <- c.downField("guideStates").as[List[StepGuideState]]
+        n  <- c.downField("atomCount").as[NonNegInt]
+        e  <- c.downField("executionState").as[ExecutionState]
+      yield SequenceDigest(o, t, SortedSet.from(os.zip(gs)), n, e)
 
   given (using Encoder[Offset], Encoder[TimeSpan]): Encoder[SequenceDigest] =
     Encoder.instance: (a: SequenceDigest) =>
+      val offsetsList = a.offsets.toList
       Json.obj(
         "observeClass"   -> a.observeClass.asJson,
         "timeEstimate"   -> a.timeEstimate.asJson,
-        "offsets"        -> a.offsets.toList.map(_._2).distinct.asJson,
-        "guidedOffsets"  -> a.offsets.toList.map { case (g, o) =>
-                             Json.obj("guideState" -> g.asJson, "offset" -> o.asJson)
-                           }.asJson,
+        "offsets"        -> offsetsList.map(_._1).asJson,
+        "guideStates"    -> offsetsList.map(_._2).asJson,
         "atomCount"      -> a.atomCount.asJson,
         "executionState" -> a.executionState.asJson
       )
