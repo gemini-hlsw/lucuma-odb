@@ -29,10 +29,7 @@ object TelluricTargetTopic:
   ) extends TopicElement
 
   private val topic =
-    OdbTopic.define[
-      (Observation.Id, Program.Id, Option[CalculationState], Option[CalculationState]),
-      Element
-    ](
+    OdbTopic.define[(Observation.Id, Program.Id, Option[CalculationState], Option[CalculationState]), Element](
       "TelluricTarget",
       id"ch_telluric_resolution",
       _._2,

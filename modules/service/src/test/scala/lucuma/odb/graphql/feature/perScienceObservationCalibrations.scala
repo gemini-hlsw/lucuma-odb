@@ -6,10 +6,9 @@ package lucuma.odb.feature
 import cats.effect.IO
 import cats.syntax.all.*
 import io.circe.Decoder
-import lucuma.catalog.CatalogTargetResult
-import lucuma.catalog.telluric.TelluricSearchInput
 import lucuma.catalog.telluric.TelluricStar
 import lucuma.catalog.telluric.TelluricTargetsClient
+import lucuma.odb.graphql.TelluricClientMock
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.Flamingos2Fpu
 import lucuma.core.enums.ObservationWorkflowState
@@ -46,12 +45,10 @@ class perScienceObservationCalibrations
 
   val DefaultSnAt: Wavelength = Wavelength.fromIntNanometers(510).get
 
-  // Use validUsers from ExecutionTestSupport (includes pi, pi2, serviceUser, staff)
-
   val when = LocalDateTime.of(2024, 1, 1, 12, 0, 0).toInstant(ZoneOffset.UTC)
 
-  // Test telluric star returned by the mock
-  val testTelluricStar = TelluricStar(
+  // Mock telluric star
+  val mockStar = TelluricStar(
     hip = 12345,
     spType = TelluricType.A0V,
     coordinates = Coordinates(
@@ -64,11 +61,10 @@ class perScienceObservationCalibrations
     order = TelluricCalibrationOrder.Before
   )
 
-  // Test sidereal target corresponding to testTelluricStar
-  val testSiderealTarget = Target.Sidereal(
+  val mockTarget = Target.Sidereal(
     name = "HIP 12345".refined,
     tracking = SiderealTracking(
-      baseCoordinates = testTelluricStar.coordinates,
+      baseCoordinates = mockStar.coordinates,
       epoch = lucuma.core.math.Epoch.J2000,
       properMotion = None,
       radialVelocity = None,
@@ -80,14 +76,8 @@ class perScienceObservationCalibrations
     catalogInfo = None
   )
 
-  // Override telluricClient to return mock client
   override protected def telluricClient: IO[TelluricTargetsClient[IO]] =
-    IO.pure(new TelluricTargetsClient[IO] {
-      def search(input: TelluricSearchInput): IO[List[TelluricStar]] =
-        IO.pure(List(testTelluricStar))
-      def searchTarget(input: TelluricSearchInput): IO[List[(TelluricStar, Option[CatalogTargetResult])]] =
-        IO.pure(List((testTelluricStar, Some(CatalogTargetResult(testSiderealTarget, None)))))
-    })
+    TelluricClientMock(mockStar, mockTarget)
 
   case class GroupInfo(
     id:               Group.Id,
@@ -683,7 +673,7 @@ class perScienceObservationCalibrations
       assertEquals(removed.size, 0)
     }
 
-  test("telluric observation has real telluric star target".only):
+  test("telluric observation can get a real target".only):
     for {
       pid         <- createProgramAs(pi)
       tid         <- createTargetWithProfileAs(pi, pid)
@@ -692,21 +682,19 @@ class perScienceObservationCalibrations
       _           <- runObscalcUpdate(pid, oid)
       _           <- recalculateCalibrations(pid, when)
       _           <- runObscalcUpdate(pid, oid)
-      _           <- sleep >> resolveTelluricTargets(pid)
+      _           <- sleep >> resolveTelluricTargets
       obs         <- queryObservation(oid)
       groupId     =  obs.groupId.get
       obsInGroup  <- queryObservationsInGroup(groupId)
       telluricOid =  obsInGroup.find(_.calibrationRole.contains(CalibrationRole.Telluric)).get.id
       telluricObs <- queryObservationWithTarget(telluricOid)
     } yield {
-      println(s"science: $oid, telluric: $telluricOid")
-      // Verify we got a real telluric star from the mock, not a placeholder
       assertEquals(telluricObs.targetName, Some("HIP 12345"))
       assertEquals(telluricObs.targetRa, Some("08:13:49.440000"))
       assertEquals(telluricObs.targetDec, Some("+45:40:40.800000"))
     }
 
-  test("each F2 observation gets its own unique telluric observation and target"):
+  test("telluric observation targets are not shared"):
     for {
       pid                <- createProgramAs(pi)
       tid1               <- createTargetWithProfileAs(pi, pid)

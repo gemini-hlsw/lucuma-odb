@@ -250,7 +250,7 @@ object CalcMain extends MainParams:
       gaiaClient <- c.gaiaClient
       itc        <- c.itcClient
       horizonsClient <- c.horizonsClientResource
-      telClient  <- c.telluricClient
+      telClient  = TelluricTargetsClient.noop[F]
       ptc        <- Resource.eval(pool.use(TimeEstimateCalculatorImplementation.fromSession(_, enums)))
       t          <- topic(pool)
       user       <- Resource.eval(serviceUser[F](c))

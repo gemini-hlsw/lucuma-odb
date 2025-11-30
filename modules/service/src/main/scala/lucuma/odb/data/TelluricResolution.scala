@@ -9,7 +9,14 @@ import lucuma.core.model.Target
 import lucuma.core.util.CalculationState
 import lucuma.core.util.Timestamp
 
+/**
+  * Data classes for the telluric resolution daemon
+  * Heavily inspired by Obscalc
+  */
 object TelluricResolution:
+  /**
+   * Metadata for each target we need to resolve
+   */
   case class Meta(
     observationId:        Observation.Id,
     programId:            Program.Id,
@@ -23,6 +30,9 @@ object TelluricResolution:
     errorMessage:         Option[String]
   )
 
+  /**
+   h* Identifies an observation that needs resolving
+   */
   case class Pending(
     observationId:        Observation.Id,
     programId:            Program.Id,

@@ -50,7 +50,7 @@ object PerScienceObservationCalibrationsService:
       val groupService  = S.groupService
       val observationService = S.observationService
       val obsModeService = S.observingModeServices
-      val telluricResolutionService = S.telluricResolutionService
+      val telluricTargets = S.telluricResolutionService
 
       private def groupNameForObservation(
         config:          CalibrationConfigSubset,
@@ -144,10 +144,10 @@ object PerScienceObservationCalibrationsService:
           telluricGroupId: Group.Id,
           telluricIndex:   NonNegShort
         ): F[Observation.Id] =
-          // Minimal input to create the telluric obs with empty asterism
+          // Minimal input to create the telluric obs
           val targetEnvironment = TargetEnvironmentInput.Create(
             explicitBase = none,
-            asterism = none,
+            asterism = none, // We resolve the target later
             useBlindOffset = false.some,
             blindOffsetTarget = none,
             blindOffsetType = BlindOffsetType.Manual
@@ -181,7 +181,7 @@ object PerScienceObservationCalibrationsService:
           scienceIndex  <- obsGroupIndex(scienceOid)
           telluricIndex = NonNegShort.unsafeFrom((scienceIndex.value + 1).toShort)
           telluricId    <- insertTelluricObservation(pid, telluricGroupId, telluricIndex)
-          _             <- telluricResolutionService.recordResolutionRequest(pid, telluricId, scienceOid)
+          _             <- telluricTargets.recordResolutionRequest(pid, telluricId, scienceOid)
           _             <- syncConfiguration(scienceOid, telluricId)
         yield telluricId
 
