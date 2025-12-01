@@ -417,20 +417,25 @@ ThisBuild / ocsBuildInfo := {
   import scala.util.matching.*
 
   val buildInfoFile = (itcService / baseDirectory).value / "ocslib" / "build-info.json"
-  val content       = IO.read(buildInfoFile)
 
-  def extractField(pattern: Regex, fieldName: String): String =
-    pattern.findFirstMatchIn(content) match {
-      case Some(m) => m.group(1)
-      case None    => throw new RuntimeException(s"$fieldName not found in build-info.json")
-    }
+  if (buildInfoFile.exists()) {
+    val content = IO.read(buildInfoFile)
 
-  val gitHash     = extractField(""""ocs_git_hash":\s*"([^"]+)"""".r, "ocs_git_hash")
-  val gitBranch   = extractField(""""ocs_git_branch":\s*"([^"]+)"""".r, "ocs_git_branch")
-  val gitDescribe = extractField(""""ocs_git_describe":\s*"([^"]+)"""".r, "ocs_git_describe")
-  val local       = extractField(""""local":\s*(true|false)""".r, "local").toBoolean
+    def extractField(pattern: Regex, fieldName: String): String =
+      pattern.findFirstMatchIn(content) match {
+        case Some(m) => m.group(1)
+        case None    => throw new RuntimeException(s"$fieldName not found in build-info.json")
+      }
 
-  (gitHash, gitBranch, gitDescribe, local)
+    val gitHash     = extractField(""""ocs_git_hash":\s*"([^"]+)"""".r, "ocs_git_hash")
+    val gitBranch   = extractField(""""ocs_git_branch":\s*"([^"]+)"""".r, "ocs_git_branch")
+    val gitDescribe = extractField(""""ocs_git_describe":\s*"([^"]+)"""".r, "ocs_git_describe")
+    val local       = extractField(""""local":\s*(true|false)""".r, "local").toBoolean
+
+    (gitHash, gitBranch, gitDescribe, local)
+  } else {
+    ("unknown", "unknown", "unknown", true)
+  }
 }
 
 ThisBuild / ocsGitHash     := ocsBuildInfo.value._1
