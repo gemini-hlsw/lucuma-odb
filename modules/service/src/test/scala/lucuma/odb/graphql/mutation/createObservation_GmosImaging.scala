@@ -257,6 +257,9 @@ class createObservation_GmosImaging extends OdbSuite:
                 }
                 observingMode: {
                   gmosNorthImaging: {
+                    variant: {
+                      interleaved: {}
+                    }
                     filters: []
                   }
                 }
@@ -296,6 +299,9 @@ class createObservation_GmosImaging extends OdbSuite:
                 }
                 observingMode: {
                   gmosSouthImaging: {
+                    variant: {
+                      interleaved: {}
+                    }
                     filters: []
                   }
                 }
@@ -353,6 +359,9 @@ class createObservation_GmosImaging extends OdbSuite:
                 }
                 observingMode: {
                   gmosNorthImaging: {
+                    variant: {
+                      interleaved: {}
+                    }
                     filters: [
                       {
                         filter: G_PRIME
@@ -529,6 +538,9 @@ class createObservation_GmosImaging extends OdbSuite:
                 }
                 observingMode: {
                   gmosNorthImaging: {
+                    variant: {
+                      interleaved: {}
+                    }
                     filters: [
                       { filter: G_PRIME },
                       { filter: R_PRIME }
@@ -604,6 +616,9 @@ class createObservation_GmosImaging extends OdbSuite:
                 }
                 observingMode: {
                   gmosSouthImaging: {
+                    variant: {
+                      interleaved: {}
+                    }
                     filters: [
                       { filter: G_PRIME },
                       { filter: R_PRIME }
@@ -677,6 +692,9 @@ class createObservation_GmosImaging extends OdbSuite:
                 }
                 observingMode: {
                   gmosNorthImaging: {
+                    variant: {
+                      interleaved: {}
+                    }
                     filters: [
                       {
                         filter: G_PRIME
@@ -742,31 +760,35 @@ class createObservation_GmosImaging extends OdbSuite:
                 }
                 observingMode: {
                   gmosSouthImaging: {
+                    variant: {
+                      grouped: {
+                        offsets: {
+                          uniform: {
+                            cornerA: {
+                              p: { arcseconds: 10.0 }
+                              q: { arcseconds: 11.0 }
+                            }
+                            cornerB: {
+                              p: { arcseconds: 12.0 }
+                              q: { arcseconds: 13.0 }
+                            }
+                          }
+                        }
+                        skyOffsets: {
+                          random: {
+                            size: { arcseconds: 14.0 }
+                            center: {
+                              p: { arcseconds: 15.0 }
+                              q: { arcseconds: 16.0 }
+                            }
+                          }
+                        }
+                      }
+                    }
                     filters: [
                       { filter: G_PRIME },
                       { filter: R_PRIME }
                     ]
-                    objectOffsetGenerator: {
-                      uniform: {
-                        cornerA: {
-                          p: { arcseconds: 10.0 }
-                          q: { arcseconds: 11.0 }
-                        }
-                        cornerB: {
-                          p: { arcseconds: 12.0 }
-                          q: { arcseconds: 13.0 }
-                        }
-                      }
-                    }
-                    skyOffsetGenerator: {
-                      random: {
-                        size: { arcseconds: 14.0 }
-                        center: {
-                          p: { arcseconds: 15.0 }
-                          q: { arcseconds: 16.0 }
-                        }
-                      }
-                    }
                   }
                 }
               }
@@ -774,42 +796,46 @@ class createObservation_GmosImaging extends OdbSuite:
               observation {
                 observingMode {
                   gmosSouthImaging {
-                    objectOffsetGenerator {
-                      generatorType
-                      enumerated {
-                        values {
-                          offset {
-                            p { arcseconds }
-                            q { arcseconds }
+                    variant {
+                      grouped {
+                        offsets {
+                          generatorType
+                          enumerated {
+                            values {
+                              offset {
+                                p { arcseconds }
+                                q { arcseconds }
+                              }
+                              guiding
+                            }
                           }
-                          guiding
+                          uniform {
+                            cornerA {
+                              p { arcseconds }
+                              q { arcseconds }
+                            }
+                            cornerB {
+                              p { arcseconds }
+                              q { arcseconds }
+                            }
+                          }
                         }
-                      }
-                      uniform {
-                        cornerA {
-                          p { arcseconds }
-                          q { arcseconds }
-                        }
-                        cornerB {
-                          p { arcseconds }
-                          q { arcseconds }
-                        }
-                      }
-                    }
-                    skyOffsetGenerator {
-                      generatorType
-                      random {
-                        size { arcseconds }
-                        center {
-                          p { arcseconds }
-                          q { arcseconds }
-                        }
-                      }
-                      spiral {
-                        size { arcseconds }
-                        center {
-                          p { arcseconds }
-                          q { arcseconds }
+                        skyOffsets {
+                          generatorType
+                          random {
+                            size { arcseconds }
+                            center {
+                              p { arcseconds }
+                              q { arcseconds }
+                            }
+                          }
+                          spiral {
+                            size { arcseconds }
+                            center {
+                              p { arcseconds }
+                              q { arcseconds }
+                            }
+                          }
                         }
                       }
                     }
@@ -824,30 +850,34 @@ class createObservation_GmosImaging extends OdbSuite:
               "observation": {
                 "observingMode": {
                   "gmosSouthImaging": {
-                    "objectOffsetGenerator": {
-                      "generatorType": "UNIFORM",
-                      "enumerated": null,
-                      "uniform": {
-                        "cornerA": {
-                          "p": { "arcseconds": 10 },
-                          "q": { "arcseconds": 11 }
+                    "variant": {
+                      "grouped": {
+                        "offsets": {
+                          "generatorType": "UNIFORM",
+                          "enumerated": null,
+                          "uniform": {
+                            "cornerA": {
+                              "p": { "arcseconds": 10 },
+                              "q": { "arcseconds": 11 }
+                            },
+                            "cornerB": {
+                              "p": { "arcseconds": 12 },
+                              "q": { "arcseconds": 13 }
+                            }
+                          }
                         },
-                        "cornerB": {
-                          "p": { "arcseconds": 12 },
-                          "q": { "arcseconds": 13 }
+                        "skyOffsets": {
+                          "generatorType": "RANDOM",
+                          "random": {
+                            "size": { "arcseconds":  14 },
+                            "center": {
+                              "p": { "arcseconds": 15 },
+                              "q": { "arcseconds": 16 }
+                            }
+                          },
+                          "spiral": null
                         }
                       }
-                    },
-                    "skyOffsetGenerator": {
-                      "generatorType": "RANDOM",
-                      "random": {
-                        "size": { "arcseconds":  14 },
-                        "center": {
-                          "p": { "arcseconds": 15 },
-                          "q": { "arcseconds": 16 }
-                        }
-                      },
-                      "spiral": null
                     }
                   }
                 }
@@ -885,43 +915,47 @@ class createObservation_GmosImaging extends OdbSuite:
                   }
                   observingMode: {
                     gmosSouthImaging: {
+                      variant: {
+                        grouped: {
+                          offsets: {
+                            enumerated: {
+                              values: [
+                                {
+                                  offset: {
+                                    p: { arcseconds: 10.0 }
+                                    q: { arcseconds: 11.0 }
+                                  }
+                                  guiding: ENABLED
+                                },
+                                {
+                                  offset: {
+                                    p: { arcseconds: 12.0 }
+                                    q: { arcseconds: 13.0 }
+                                  }
+                                  guiding: ENABLED
+                                }
+                              ]
+                            }
+                          }
+                          skyOffsets: {
+                            enumerated: {
+                              values: [
+                                {
+                                  offset: {
+                                    p: { arcseconds: 14.0 }
+                                    q: { arcseconds: 15.0 }
+                                  }
+                                  guiding: DISABLED
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      }
                       filters: [
                         { filter: G_PRIME },
                         { filter: R_PRIME }
                       ]
-                      objectOffsetGenerator: {
-                        enumerated: {
-                          values: [
-                            {
-                              offset: {
-                                p: { arcseconds: 10.0 }
-                                q: { arcseconds: 11.0 }
-                              }
-                              guiding: ENABLED
-                            },
-                            {
-                              offset: {
-                                p: { arcseconds: 12.0 }
-                                q: { arcseconds: 13.0 }
-                              }
-                              guiding: ENABLED
-                            }
-                          ]
-                        }
-                      }
-                      skyOffsetGenerator: {
-                        enumerated: {
-                          values: [
-                            {
-                              offset: {
-                                p: { arcseconds: 14.0 }
-                                q: { arcseconds: 15.0 }
-                              }
-                              guiding: DISABLED
-                            }
-                          ]
-                        }
-                      }
                     }
                   }
                 }
@@ -930,27 +964,31 @@ class createObservation_GmosImaging extends OdbSuite:
               observation {
                 observingMode {
                   gmosSouthImaging {
-                    objectOffsetGenerator {
-                      generatorType
-                      enumerated {
-                        values {
-                          offset {
-                            p { arcseconds }
-                            q { arcseconds }
+                    variant {
+                      grouped {
+                        offsets {
+                          generatorType
+                          enumerated {
+                            values {
+                              offset {
+                                p { arcseconds }
+                                q { arcseconds }
+                              }
+                              guiding
+                            }
                           }
-                          guiding
                         }
-                      }
-                    }
-                    skyOffsetGenerator {
-                      generatorType
-                      enumerated {
-                        values {
-                          offset {
-                            p { arcseconds }
-                            q { arcseconds }
+                        skyOffsets {
+                          generatorType
+                          enumerated {
+                            values {
+                              offset {
+                                p { arcseconds }
+                                q { arcseconds }
+                              }
+                              guiding
+                            }
                           }
-                          guiding
                         }
                       }
                     }
@@ -966,39 +1004,43 @@ class createObservation_GmosImaging extends OdbSuite:
                 "observation": {
                   "observingMode": {
                     "gmosSouthImaging": {
-                      "objectOffsetGenerator": {
-                        "generatorType": "ENUMERATED",
-                        "enumerated": {
-                          "values": [
-                            {
-                              "offset": {
-                                "p": { "arcseconds": 10 },
-                                "q": { "arcseconds": 11 }
-                              },
-                              "guiding": "ENABLED"
-                            },
-                            {
-                              "offset": {
-                                "p": { "arcseconds": 12 },
-                                "q": { "arcseconds": 13 }
-                              },
-                              "guiding": "ENABLED"
+                      "variant": {
+                        "grouped": {
+                          "offsets": {
+                            "generatorType": "ENUMERATED",
+                            "enumerated": {
+                              "values": [
+                                {
+                                  "offset": {
+                                    "p": { "arcseconds": 10 },
+                                    "q": { "arcseconds": 11 }
+                                  },
+                                  "guiding": "ENABLED"
+                                },
+                                {
+                                  "offset": {
+                                    "p": { "arcseconds": 12 },
+                                    "q": { "arcseconds": 13 }
+                                  },
+                                  "guiding": "ENABLED"
+                                }
+                              ]
                             }
-                          ]
-                        }
-                      },
-                      "skyOffsetGenerator": {
-                        "generatorType": "ENUMERATED",
-                        "enumerated": {
-                          "values": [
-                            {
-                              "offset": {
-                                "p": { "arcseconds": 14 },
-                                "q": { "arcseconds": 15 }
-                              },
-                              "guiding": "DISABLED"
+                          },
+                          "skyOffsets": {
+                            "generatorType": "ENUMERATED",
+                            "enumerated": {
+                              "values": [
+                                {
+                                  "offset": {
+                                    "p": { "arcseconds": 14 },
+                                    "q": { "arcseconds": 15 }
+                                  },
+                                  "guiding": "DISABLED"
+                                }
+                              ]
                             }
-                          ]
+                          }
                         }
                       }
                     }
@@ -1036,15 +1078,19 @@ class createObservation_GmosImaging extends OdbSuite:
                 }
                 observingMode: {
                   gmosSouthImaging: {
+                    variant: {
+                      grouped: {
+                        offsets: {
+                          spiral: {
+                            size: { arcseconds: 14.0 }
+                          }
+                        }
+                      }
+                    }
                     filters: [
                       { filter: G_PRIME },
                       { filter: R_PRIME }
                     ]
-                    objectOffsetGenerator: {
-                      spiral: {
-                        size: { arcseconds: 14.0 }
-                      }
-                    }
                   }
                 }
               }
@@ -1052,13 +1098,17 @@ class createObservation_GmosImaging extends OdbSuite:
               observation {
                 observingMode {
                   gmosSouthImaging {
-                    objectOffsetGenerator {
-                      generatorType
-                      spiral {
-                        size { arcseconds }
-                        center {
-                          p { arcseconds }
-                          q { arcseconds }
+                    variant {
+                      grouped {
+                        offsets {
+                          generatorType
+                          spiral {
+                            size { arcseconds }
+                            center {
+                              p { arcseconds }
+                              q { arcseconds }
+                            }
+                          }
                         }
                       }
                     }
@@ -1073,13 +1123,17 @@ class createObservation_GmosImaging extends OdbSuite:
               "observation": {
                 "observingMode": {
                   "gmosSouthImaging": {
-                    "objectOffsetGenerator": {
-                      "generatorType": "SPIRAL",
-                      "spiral": {
-                        "size": { "arcseconds":  14 },
-                        "center": {
-                          "p": { "arcseconds": 0 },
-                          "q": { "arcseconds": 0 }
+                    "variant": {
+                      "grouped": {
+                        "offsets": {
+                          "generatorType": "SPIRAL",
+                          "spiral": {
+                            "size": { "arcseconds":  14 },
+                            "center": {
+                              "p": { "arcseconds": 0 },
+                              "q": { "arcseconds": 0 }
+                            }
+                          }
                         }
                       }
                     }

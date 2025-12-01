@@ -5,6 +5,7 @@ package lucuma.odb.graphql
 package mapping
 
 import cats.Order
+import grackle.Path
 import grackle.Query.Binding
 import grackle.Query.Filter
 import grackle.Query.OrderBy
@@ -39,6 +40,42 @@ trait GmosImagingMapping[F[_]] extends GmosImagingView[F]
 
   import GmosImagingMapping.*
 
+  def gmosGroupedFilterImagingMapping(
+    path:           Path,
+    offsetsJoinCol: ColumnRef,
+    cols:           GmosImagingCommonColumns
+  ): ObjectMapping =
+    ObjectMapping(path)(
+      SqlField("observationId", cols.Grouped.ObservationId, key = true, hidden = true),
+      SqlField("order",         cols.Grouped.WavelengthOrder),
+      SqlField("skyCount",      cols.Sky.Count),
+      SqlObject("offsets",      Join(offsetsJoinCol, OffsetGeneratorView.ObjectObservationId)),
+      SqlObject("skyOffsets",   Join(offsetsJoinCol, OffsetGeneratorView.SkyObservationId)),
+    )
+
+  def gmosPreImagingMapping(
+    path: Path,
+    cols: GmosImagingCommonColumns
+  ): ObjectMapping =
+    ObjectMapping(path)(
+      SqlField("observationId", cols.PreImaging.ObservationId, key = true, hidden = true),
+      SqlObject("offset1"),
+      SqlObject("offset2"),
+      SqlObject("offset3"),
+      SqlObject("offset4")
+    )
+
+  def gmosImagingVariantMapping(
+    path: Path,
+    cols: GmosImagingCommonColumns
+  ): ObjectMapping =
+    ObjectMapping(path)(
+      SqlField("observationId", cols.ObservationId, key = true, hidden = true),
+      SqlField("variantType", cols.ImagingType),
+      SqlObject("grouped"),
+      SqlObject("preImaging")
+    )
+
   private object CommonImagingFields:
 
     val multipleFiltersMode: FieldMapping        = explicitOrElseDefault[MultipleFiltersMode]("multipleFiltersMode", "explicitMultipleFiltersMode", "defaultMultipleFiltersMode")
@@ -67,34 +104,34 @@ trait GmosImagingMapping[F[_]] extends GmosImagingView[F]
   lazy val GmosNorthImagingMapping: ObjectMapping =
     ObjectMapping(GmosNorthImagingType)(
 
-      SqlField("observationId",   GmosNorthImagingView.ObservationId, key = true, hidden = true),
-      SqlObject("filters",        Join(GmosNorthImagingView.ObservationId, GmosNorthImagingFilterTable.ObservationId)),
-      SqlObject("initialFilters", Join(GmosNorthImagingView.ObservationId, GmosNorthImagingFilterTable.ObservationId)),
+      SqlField("observationId",   GmosNorthImagingView.Common.ObservationId, key = true, hidden = true),
 
-      SqlField("offsetsString", GmosNorthImagingView.Offsets, hidden = true),
+      SqlObject("variant"),
+
+      SqlObject("filters",        Join(GmosNorthImagingView.Common.ObservationId, GmosNorthImagingFilterTable.ObservationId)),
+      SqlObject("initialFilters", Join(GmosNorthImagingView.Common.ObservationId, GmosNorthImagingFilterTable.ObservationId)),
+
+      SqlField("offsetsString", GmosNorthImagingView.Common.Offsets, hidden = true),
       CommonImagingFields.offsets,
 
-      SqlObject("objectOffsetGenerator", Join(GmosNorthImagingView.ObservationId, OffsetGeneratorView.ObjectObservationId)),
-      SqlObject("skyOffsetGenerator",    Join(GmosNorthImagingView.ObservationId, OffsetGeneratorView.SkyObservationId)),
-
       CommonImagingFields.multipleFiltersMode,
-      SqlField("explicitMultipleFiltersMode", GmosNorthImagingView.ExplicitMultipleFiltersMode),
+      SqlField("explicitMultipleFiltersMode", GmosNorthImagingView.Common.ExplicitMultipleFiltersMode),
       CommonImagingFields.defaultMultipleFiltersMode,
 
       CommonImagingFields.bin,
-      SqlField("explicitBin", GmosNorthImagingView.ExplicitBin),
-      SqlField("defaultBin",  GmosNorthImagingView.DefaultBin),
+      SqlField("explicitBin", GmosNorthImagingView.Common.ExplicitBin),
+      SqlField("defaultBin",  GmosNorthImagingView.Common.DefaultBin),
 
       CommonImagingFields.ampReadMode,
-      SqlField("explicitAmpReadMode", GmosNorthImagingView.ExplicitAmpReadMode),
+      SqlField("explicitAmpReadMode", GmosNorthImagingView.Common.ExplicitAmpReadMode),
       CommonImagingFields.defaultAmpReadMode,
 
       CommonImagingFields.ampGain,
-      SqlField("explicitAmpGain", GmosNorthImagingView.ExplicitAmpGain),
+      SqlField("explicitAmpGain", GmosNorthImagingView.Common.ExplicitAmpGain),
       CommonImagingFields.defaultAmpGain,
 
       CommonImagingFields.roi,
-      SqlField("explicitRoi", GmosNorthImagingView.ExplicitRoi),
+      SqlField("explicitRoi", GmosNorthImagingView.Common.ExplicitRoi),
       CommonImagingFields.defaultRoi,
     )
 
@@ -128,35 +165,34 @@ trait GmosImagingMapping[F[_]] extends GmosImagingView[F]
 
   lazy val GmosSouthImagingMapping: ObjectMapping =
     ObjectMapping(GmosSouthImagingType)(
+      SqlField("observationId",   GmosSouthImagingView.Common.ObservationId, key = true, hidden = true),
 
-      SqlField("observationId",   GmosSouthImagingView.ObservationId, key = true, hidden = true),
-      SqlObject("filters",        Join(GmosSouthImagingView.ObservationId, GmosSouthImagingFilterTable.ObservationId)),
-      SqlObject("initialFilters", Join(GmosSouthImagingView.ObservationId, GmosSouthImagingFilterTable.ObservationId)),
+      SqlObject("variant"),
 
-      SqlField("offsetsString", GmosSouthImagingView.Offsets, hidden = true),
+      SqlObject("filters",        Join(GmosSouthImagingView.Common.ObservationId, GmosSouthImagingFilterTable.ObservationId)),
+      SqlObject("initialFilters", Join(GmosSouthImagingView.Common.ObservationId, GmosSouthImagingFilterTable.ObservationId)),
+
+      SqlField("offsetsString", GmosSouthImagingView.Common.Offsets, hidden = true),
       CommonImagingFields.offsets,
 
-      SqlObject("objectOffsetGenerator", Join(GmosSouthImagingView.ObservationId, OffsetGeneratorView.ObjectObservationId)),
-      SqlObject("skyOffsetGenerator",    Join(GmosSouthImagingView.ObservationId, OffsetGeneratorView.SkyObservationId)),
-
       CommonImagingFields.multipleFiltersMode,
-      SqlField("explicitMultipleFiltersMode", GmosSouthImagingView.ExplicitMultipleFiltersMode),
+      SqlField("explicitMultipleFiltersMode", GmosSouthImagingView.Common.ExplicitMultipleFiltersMode),
       CommonImagingFields.defaultMultipleFiltersMode,
 
       CommonImagingFields.bin,
-      SqlField("explicitBin", GmosSouthImagingView.ExplicitBin),
-      SqlField("defaultBin",  GmosSouthImagingView.DefaultBin),
+      SqlField("explicitBin", GmosSouthImagingView.Common.ExplicitBin),
+      SqlField("defaultBin",  GmosSouthImagingView.Common.DefaultBin),
 
       CommonImagingFields.ampReadMode,
-      SqlField("explicitAmpReadMode", GmosSouthImagingView.ExplicitAmpReadMode),
+      SqlField("explicitAmpReadMode", GmosSouthImagingView.Common.ExplicitAmpReadMode),
       CommonImagingFields.defaultAmpReadMode,
 
       CommonImagingFields.ampGain,
-      SqlField("explicitAmpGain", GmosSouthImagingView.ExplicitAmpGain),
+      SqlField("explicitAmpGain", GmosSouthImagingView.Common.ExplicitAmpGain),
       CommonImagingFields.defaultAmpGain,
 
       CommonImagingFields.roi,
-      SqlField("explicitRoi", GmosSouthImagingView.ExplicitRoi),
+      SqlField("explicitRoi", GmosSouthImagingView.Common.ExplicitRoi),
       CommonImagingFields.defaultRoi,
     )
 
@@ -175,6 +211,37 @@ trait GmosImagingMapping[F[_]] extends GmosImagingView[F]
         ObservingModeRowVersion.Initial
       )
 
+  lazy val GmosImagingMappings: List[TypeMapping] =
+    List(
+      gmosImagingVariantMapping(
+        GmosNorthImagingType / "variant",
+        GmosNorthImagingView.Common
+      ),
+      gmosImagingVariantMapping(
+        GmosSouthImagingType / "variant",
+        GmosSouthImagingView.Common
+      ),
+      gmosGroupedFilterImagingMapping(
+        GmosNorthImagingType / "variant" / "grouped",
+        GmosNorthImagingView.Common.ObservationId,
+        GmosNorthImagingView.Common
+      ),
+      gmosGroupedFilterImagingMapping(
+        GmosSouthImagingType / "variant" / "grouped",
+        GmosSouthImagingView.Common.ObservationId,
+        GmosSouthImagingView.Common
+      ),
+      gmosPreImagingMapping(
+        GmosNorthImagingType / "variant" / "preImaging",
+        GmosNorthImagingView.Common
+      ),
+      gmosPreImagingMapping(
+        GmosSouthImagingType / "variant" / "preImaging",
+        GmosSouthImagingView.Common
+      ),
+      GmosNorthImagingMapping,
+      GmosSouthImagingMapping
+    )
 }
 
 object GmosImagingMapping:
