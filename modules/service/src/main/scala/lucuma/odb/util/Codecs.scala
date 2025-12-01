@@ -597,7 +597,7 @@ trait Codecs {
   lazy val setup_time: Codec[SetupTime] =
     (time_span *: time_span).to[SetupTime]
 
-  lazy val offset_array: Codec[List[Offset]] =
+  lazy val _offset_array: Codec[List[Offset]] =
     _int8.eimap { arr =>
       val len = arr.size / 2
       if (arr.size % 2 =!= 0) "Expected an even number of offset coordinates".asLeft
@@ -619,7 +619,7 @@ trait Codecs {
     }
 
   lazy val sequence_digest: Codec[SequenceDigest] =
-    (obs_class *: categorized_time *: offset_array *: _guide_state *: int4_nonneg *: execution_state).imap {
+    (obs_class *: categorized_time *: _offset_array *: _guide_state *: int4_nonneg *: execution_state).imap {
       case (oClass, pTime, offsets, guideStates, aCount, execState) =>
         val guidedOffsets = offsets.zip(guideStates).map(TelescopeConfig.apply.tupled)
         SequenceDigest(oClass, pTime, SortedSet.from(guidedOffsets), aCount, execState)

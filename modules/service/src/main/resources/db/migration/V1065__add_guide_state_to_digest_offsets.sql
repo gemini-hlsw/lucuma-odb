@@ -12,12 +12,13 @@ ALTER TABLE t_obscalc
 DELETE FROM t_execution_digest;
 
 UPDATE t_obscalc SET
+  c_obscalc_state = 'pending',
   c_acq_offsets = NULL,
   c_acq_offset_guide_states = NULL,
   c_sci_offsets = NULL,
   c_sci_offset_guide_states = NULL;
 
--- Each offset needs a guide state
+-- Each offset needs a guide state, array sizes must match
 ALTER TABLE t_execution_digest
   ADD CONSTRAINT t_execution_digest_acq_offsets_guide_states_length
     CHECK (array_length(c_acq_offsets, 1) IS NOT DISTINCT FROM array_length(c_acq_offset_guide_states, 1)),

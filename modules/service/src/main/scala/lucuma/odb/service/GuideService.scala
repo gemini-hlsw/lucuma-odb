@@ -20,6 +20,7 @@ import io.circe.refined.given
 import io.circe.syntax.*
 import lucuma.ags
 import lucuma.ags.*
+import lucuma.ags.syntax.*
 import lucuma.catalog.clients.GaiaClient
 import lucuma.catalog.votable.*
 import lucuma.core.enums.Flamingos2LyotWheel
@@ -27,7 +28,6 @@ import lucuma.core.enums.GuideProbe
 import lucuma.core.enums.GuideSpeed
 import lucuma.core.enums.PortDisposition
 import lucuma.core.enums.Site
-import lucuma.core.enums.StepGuideState
 import lucuma.core.geom.ShapeExpression
 import lucuma.core.geom.gmos.candidatesArea
 import lucuma.core.geom.jts.interpreter.given
@@ -47,7 +47,6 @@ import lucuma.core.model.Target
 import lucuma.core.model.Tracking
 import lucuma.core.model.User
 import lucuma.core.model.sequence.ExecutionDigest
-import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.model.sequence.flamingos2.Flamingos2FpuMask
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
@@ -274,16 +273,8 @@ object GuideService {
   ) {
     val timeEstimate = digest.fullTimeEstimate.sum
     val setupTime    = digest.setup.full
-    val acqOffsets   =
-      NonEmptyList.fromFoldable:
-        digest.acquisition.configs.collect:
-          case TelescopeConfig(o, StepGuideState.Enabled) => GuidedOffset(o)
-      .map(AcquisitionOffsets.apply)
-    val sciOffsets   =
-      NonEmptyList.fromFoldable:
-        digest.science.configs.collect:
-          case TelescopeConfig(o, StepGuideState.Enabled) => GuidedOffset(o)
-      .map(ScienceOffsets.apply)
+    val acqOffsets   = NonEmptyList.fromFoldable(digest.acquisition.configs).flatMap(_.asAcqOffsets)
+    val sciOffsets   = NonEmptyList.fromFoldable(digest.science.configs).flatMap(_.asSciOffsets)
 
     val (site, agsParams, centralWavelength): (Site, AgsParams, Wavelength) = params.observingMode match
       case mode: gmos.longslit.Config.GmosNorth =>
