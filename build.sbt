@@ -51,8 +51,8 @@ val testcontainersScalaVersion = "0.43.0" // check test output if you attempt to
 val weaverVersion              = "0.8.4"
 
 ThisBuild / tlBaseVersion      := "0.54"
-ThisBuild / scalaVersion       := "3.7.3"
-ThisBuild / crossScalaVersions := Seq("3.7.3")
+ThisBuild / scalaVersion       := "3.7.4"
+ThisBuild / crossScalaVersions := Seq("3.7.4")
 ThisBuild / scalacOptions     ++= Seq("-Xmax-inlines", "50") // Hash derivation fails with default of 32
 
 ThisBuild / Test / fork              := false
@@ -136,9 +136,9 @@ ThisBuild / githubWorkflowBuild ~= (_.map(step =>
 
 lazy val CheckoutFullWithLfs: WorkflowStep =
   WorkflowStep.Use(
-    UseRef.Public("actions", "checkout", "v4"),
-    name = Some("Checkout current branch (full)"),
-    params = Map("fetch-depth" -> "0", "lfs" -> "true")
+    UseRef.Public("nschloe", "action-cached-lfs-checkout", "v1"),
+    name = Some("Checkout current branch"),
+    params = Map("fetch-depth" -> "0")
   )
 
 ThisBuild / githubWorkflowJobSetup := {
@@ -417,20 +417,25 @@ ThisBuild / ocsBuildInfo := {
   import scala.util.matching.*
 
   val buildInfoFile = (itcService / baseDirectory).value / "ocslib" / "build-info.json"
-  val content       = IO.read(buildInfoFile)
 
-  def extractField(pattern: Regex, fieldName: String): String =
-    pattern.findFirstMatchIn(content) match {
-      case Some(m) => m.group(1)
-      case None    => throw new RuntimeException(s"$fieldName not found in build-info.json")
-    }
+  if (buildInfoFile.exists()) {
+    val content = IO.read(buildInfoFile)
 
-  val gitHash     = extractField(""""ocs_git_hash":\s*"([^"]+)"""".r, "ocs_git_hash")
-  val gitBranch   = extractField(""""ocs_git_branch":\s*"([^"]+)"""".r, "ocs_git_branch")
-  val gitDescribe = extractField(""""ocs_git_describe":\s*"([^"]+)"""".r, "ocs_git_describe")
-  val local       = extractField(""""local":\s*(true|false)""".r, "local").toBoolean
+    def extractField(pattern: Regex, fieldName: String): String =
+      pattern.findFirstMatchIn(content) match {
+        case Some(m) => m.group(1)
+        case None    => throw new RuntimeException(s"$fieldName not found in build-info.json")
+      }
 
-  (gitHash, gitBranch, gitDescribe, local)
+    val gitHash     = extractField(""""ocs_git_hash":\s*"([^"]+)"""".r, "ocs_git_hash")
+    val gitBranch   = extractField(""""ocs_git_branch":\s*"([^"]+)"""".r, "ocs_git_branch")
+    val gitDescribe = extractField(""""ocs_git_describe":\s*"([^"]+)"""".r, "ocs_git_describe")
+    val local       = extractField(""""local":\s*(true|false)""".r, "local").toBoolean
+
+    (gitHash, gitBranch, gitDescribe, local)
+  } else {
+    ("unknown", "unknown", "unknown", true)
+  }
 }
 
 ThisBuild / ocsGitHash     := ocsBuildInfo.value._1
