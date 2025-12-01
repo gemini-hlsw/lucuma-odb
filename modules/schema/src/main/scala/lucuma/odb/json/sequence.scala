@@ -112,11 +112,12 @@ trait SequenceCodec {
 
   given (using Encoder[Offset], Encoder[TimeSpan]): Encoder[SequenceDigest] =
     Encoder.instance: (a: SequenceDigest) =>
+      val configList = a.configs.toList
       Json.obj(
         "observeClass"   -> a.observeClass.asJson,
         "timeEstimate"   -> a.timeEstimate.asJson,
-        "offsets"        -> a.configs.map(_.offset).asJson,
-        "guideStates"    -> a.configs.map(_.guiding).asJson,
+        "offsets"        -> configList.map(_.offset).asJson,
+        "guideStates"    -> configList.map(_.guiding).asJson,
         "atomCount"      -> a.atomCount.asJson,
         "executionState" -> a.executionState.asJson
       )
