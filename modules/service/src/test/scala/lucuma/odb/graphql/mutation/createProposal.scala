@@ -128,7 +128,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
           }
         """,
         expected =
-          List("Argument 'input.SET.type' is invalid: Only one of 'classical', 'demoScience', 'directorsTime', 'fastTurnaround', 'largeProgram', 'poorWeather', 'queue' or 'systemVerfication' may be provided.").asLeft
+          List("Exactly one key must be specified for oneOf input object ProposalTypeInput in field 'createProposal' of type 'Mutation', but found 'demoScience', 'directorsTime'").asLeft
       )
     }
   }
