@@ -77,6 +77,7 @@ import lucuma.odb.data.Tag
 import lucuma.odb.data.TimeCharge.DiscountDiscriminator
 import lucuma.odb.data.TimingWindowEndTypeEnum
 import lucuma.odb.data.UserType
+import lucuma.odb.data.WavelengthOrder
 import lucuma.odb.sequence.data.OffsetGeneratorType
 import lucuma.odb.service.ObservationWorkflowService
 import lucuma.odb.syntax.exposureTimeMode.*
@@ -707,6 +708,9 @@ trait Codecs {
 
   val water_vapor: Codec[WaterVapor] =
     enumerated[WaterVapor](Type.varchar)
+
+  val wavelength_order: Codec[WavelengthOrder] =
+    enumerated[WavelengthOrder](Type("e_wavelength_order"))
 
   val wavelength_pm: Codec[Wavelength] =
     int4.eimap(

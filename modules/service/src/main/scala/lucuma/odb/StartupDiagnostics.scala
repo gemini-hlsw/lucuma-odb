@@ -65,6 +65,7 @@ object StartupDiagnostics:
           checkPostgresEnum(exposure_time_mode_type),
           checkPostgresEnum(gcal_baseline),
           checkPostgresEnum(gcal_lamp_type),
+          checkPostgresEnum(gmos_imaging_type),
           checkPostgresEnum(gmos_long_slit_acquisition_roi),
           checkPostgresEnum(gender),
           checkPostgresEnum(guide_state),
@@ -108,6 +109,7 @@ object StartupDiagnostics:
                 checkPostgresEnum(user_state)          
           },
           checkPostgresEnum(user_type),
+          checkPostgresEnum(wavelength_order),
 
           // Postgres Lookup Tables
           checkPostgresLookupTable(atom_execution_state, "t_atom_execution_state"),

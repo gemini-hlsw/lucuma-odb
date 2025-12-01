@@ -19,7 +19,7 @@ trait ConfigurationGmosImagingMappings[F[_]] extends GmosImagingView[F]
 
   private lazy val ConfigurationGmosNorthImagingMapping: ObjectMapping =
     ObjectMapping(ObservationType / "configuration" / "observingMode" / "gmosNorthImaging")(
-      SqlField("observationId", GmosNorthImagingView.ObservationId, key = true, hidden = true),
+      SqlField("observationId", GmosNorthImagingView.Common.ObservationId, key = true, hidden = true),
       SqlField("filters", GmosNorthImagingView.Filters),
     )
 
@@ -38,7 +38,7 @@ trait ConfigurationGmosImagingMappings[F[_]] extends GmosImagingView[F]
   
   private lazy val ConfigurationGmosSouthImagingMapping: ObjectMapping =
     ObjectMapping(ObservationType / "configuration" / "observingMode" / "gmosSouthImaging")(
-      SqlField("observationId", GmosSouthImagingView.ObservationId, key = true, hidden = true),
+      SqlField("observationId", GmosSouthImagingView.Common.ObservationId, key = true, hidden = true),
       SqlField("filters", GmosSouthImagingView.Filters),
     )
 
