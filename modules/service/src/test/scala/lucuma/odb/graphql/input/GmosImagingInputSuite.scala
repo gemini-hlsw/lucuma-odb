@@ -3,6 +3,7 @@
 
 package lucuma.odb.graphql.input
 
+import cats.syntax.option.*
 import io.circe.testing.ArbitraryInstances
 import lucuma.core.enums.GmosAmpGain
 import lucuma.core.enums.GmosAmpReadMode
@@ -18,8 +19,7 @@ class GmosImagingInputSuite extends DisciplineSuite with ArbitraryInstances :
 
   test("GmosImagingInput.Create.Common stores explicit values correctly") {
     val common = GmosImagingInput.Create.Common(
-      objectOffsetGenerator = None,
-      skyOffsetGenerator = None,
+      variant = GmosImagingVariantInput.Interleaved,
       explicitMultipleFiltersMode = Some(MultipleFiltersMode.Interleaved),
       explicitBin = Some(GmosBinning.Two),
       explicitAmpReadMode = Some(GmosAmpReadMode.Slow),
@@ -39,8 +39,7 @@ class GmosImagingInputSuite extends DisciplineSuite with ArbitraryInstances :
     import lucuma.odb.data.Nullable
 
     val editCommon = GmosImagingInput.Edit.Common(
-      objectOffsetGenerator = Nullable.Absent,
-      skyOffsetGenerator    = Nullable.Absent,
+      variant = GmosImagingVariantInput.Interleaved.some,
       explicitMultipleFiltersMode = Nullable.NonNull(MultipleFiltersMode.Interleaved),
       explicitBin = Nullable.NonNull(GmosBinning.Two),
       explicitAmpReadMode = Nullable.NonNull(GmosAmpReadMode.Slow),
@@ -49,7 +48,7 @@ class GmosImagingInputSuite extends DisciplineSuite with ArbitraryInstances :
       offsets = List.empty
     )
 
-    val createCommon = editCommon.toCreate
+    val createCommon = editCommon.toCreate.toOption.get
 
     assertEquals(createCommon.explicitMultipleFiltersMode, Some(MultipleFiltersMode.Interleaved))
     assertEquals(createCommon.explicitBin, Some(GmosBinning.Two))
@@ -85,8 +84,7 @@ class GmosImagingInputSuite extends DisciplineSuite with ArbitraryInstances :
     )
 
     val common = GmosImagingInput.Create.Common(
-      objectOffsetGenerator = None,
-      skyOffsetGenerator = None,
+      variant = GmosImagingVariantInput.Interleaved,
       explicitMultipleFiltersMode = None,
       explicitBin = None,
       explicitAmpReadMode = None,
