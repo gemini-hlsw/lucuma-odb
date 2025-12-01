@@ -8,7 +8,6 @@ import cats.syntax.all.*
 import io.circe.Decoder
 import lucuma.catalog.telluric.TelluricStar
 import lucuma.catalog.telluric.TelluricTargetsClient
-import lucuma.odb.graphql.TelluricClientMock
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.Flamingos2Fpu
 import lucuma.core.enums.ObservationWorkflowState
@@ -27,6 +26,7 @@ import lucuma.core.model.Target
 import lucuma.core.model.TelluricType
 import lucuma.core.util.TimeSpan
 import lucuma.odb.graphql.OdbSuite
+import lucuma.odb.graphql.TelluricClientMock
 import lucuma.odb.graphql.query.ExecutionTestSupportForFlamingos2
 import lucuma.odb.graphql.query.ObservingModeSetupOperations
 import lucuma.odb.graphql.subscription.SubscriptionUtils
@@ -673,7 +673,7 @@ class perScienceObservationCalibrations
       assertEquals(removed.size, 0)
     }
 
-  test("telluric observation can get a real target".only):
+  test("telluric observation can get a real target"):
     for {
       pid         <- createProgramAs(pi)
       tid         <- createTargetWithProfileAs(pi, pid)
@@ -704,6 +704,7 @@ class perScienceObservationCalibrations
       oid2               <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid2))
       _                  <- runObscalcUpdate(pid, oid2)
       (added, removed)   <- recalculateCalibrations(pid, when)
+      _                  <- sleep >> resolveTelluricTargets
       obs1               <- queryObservation(oid1)
       obs2               <- queryObservation(oid2)
       obsInGroup1        <- queryObservationsInGroup(obs1.groupId.get)
@@ -794,6 +795,7 @@ class perScienceObservationCalibrations
       oid                  <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
       _                    <- runObscalcUpdate(pid, oid)
       (added1, removed1)   <- recalculateCalibrations(pid, when)
+      _                    <- sleep >> resolveTelluricTargets
       obs1                 <- queryObservation(oid)
       groupId              =  obs1.groupId.get
       obsInGroup1          <- queryObservationsInGroup(groupId)
@@ -920,6 +922,7 @@ class perScienceObservationCalibrations
         oid          <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
         _            <- runObscalcUpdate(pid, oid)
         _            <- recalculateCalibrations(pid, when)
+        _            <- sleep >> resolveTelluricTargets
         obsBefore    <- queryObservation(oid)
         groupId      =  obsBefore.groupId.get
         obsInGroup1  <- queryObservationsInGroup(groupId)

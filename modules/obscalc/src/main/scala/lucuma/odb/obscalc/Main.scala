@@ -216,7 +216,6 @@ object CalcMain extends MainParams:
     itcClient:   ItcClient[F],
     gaiaClient:  GaiaClient[F],
     horizonsClient: HorizonsClient[F],
-    telClient:   TelluricTargetsClient[F]
   )(session: Session[F]): F[Services[F]] =
     Services.forUser(
       user,
@@ -230,7 +229,7 @@ object CalcMain extends MainParams:
       gaiaClient,
       S3FileService.noop[F],
       horizonsClient,
-      telClient
+      TelluricTargetsClient.noop[F]
     )(session).pure[F].flatTap: _ =>
       val us = UserService.fromSession(session)
       Services.asSuperUser(us.canonicalizeUser(user))
@@ -250,7 +249,6 @@ object CalcMain extends MainParams:
       gaiaClient <- c.gaiaClient
       itc        <- c.itcClient
       horizonsClient <- c.horizonsClientResource
-      telClient  = TelluricTargetsClient.noop[F]
       ptc        <- Resource.eval(pool.use(TimeEstimateCalculatorImplementation.fromSession(_, enums)))
       t          <- topic(pool)
       user       <- Resource.eval(serviceUser[F](c))
@@ -285,7 +283,6 @@ object CalcMain extends MainParams:
                           itc,
                           gaiaClient,
                           horizonsClient,
-                          telClient
                       )))
     yield o
 

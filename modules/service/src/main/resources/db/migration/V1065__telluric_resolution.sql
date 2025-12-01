@@ -1,4 +1,14 @@
--- Telluric Target Resolution
+
+CREATE OR REPLACE FUNCTION is_telluric_calibration(obs_id d_observation_id)
+RETURNS BOOLEAN AS $$
+BEGIN
+  RETURN EXISTS (
+    SELECT 1 FROM t_observation
+    WHERE c_observation_id = obs_id
+      AND c_calibration_role = 'telluric'
+  );
+END;
+$$ LANGUAGE plpgsql STABLE;
 
 -- Telluric target tracking based on obscalc
 CREATE TABLE t_telluric_resolution (
@@ -8,6 +18,11 @@ CREATE TABLE t_telluric_resolution (
   FOREIGN KEY (c_observation_id)
     REFERENCES t_observation(c_observation_id)
     ON DELETE CASCADE,
+
+  -- the observation is a telluric calibration
+  CONSTRAINT check_observation_is_telluric CHECK (
+    is_telluric_calibration(c_observation_id)
+  ),
 
   -- Foreign keys
   c_program_id             d_program_id      NOT NULL,
@@ -78,7 +93,6 @@ CREATE TRIGGER ch_telluric_resolution_trigger
   EXECUTE FUNCTION ch_telluric_resolution_edit();
 
 -- Modify the calibration target constraint to allow telluric observations without targets
--- (they start empty and get resolved by the TelluricResolutionService)
 CREATE OR REPLACE FUNCTION validate_calibration_has_target()
 RETURNS TRIGGER AS $$
 DECLARE
@@ -97,8 +111,7 @@ BEGIN
     RETURN NEW;
   END IF;
 
-  -- Only check for twilight, spectrophotometric, and photometric calibrations
-  -- (telluric is excluded because targets are resolved asynchronously)
+  -- check for twilight, spectrophotometric, and photometric calibrations
   IF current_calib_role IN ('twilight', 'spectrophotometric', 'photometric') THEN
 
     SELECT COUNT(*) INTO target_count

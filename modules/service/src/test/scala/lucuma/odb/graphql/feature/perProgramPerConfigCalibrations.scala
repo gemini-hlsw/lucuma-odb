@@ -42,7 +42,6 @@ import lucuma.odb.graphql.query.ExecutionQuerySetupOperations
 import lucuma.odb.graphql.query.ExecutionTestSupport
 import lucuma.odb.graphql.subscription.SubscriptionUtils
 import lucuma.odb.json.wavelength.decoder.given
-import lucuma.odb.service.CalibrationsService
 import lucuma.odb.service.PerProgramPerConfigCalibrationsService
 import lucuma.odb.service.Services
 import lucuma.odb.service.SpecPhotoCalibrations
@@ -489,14 +488,13 @@ class perProgramPerConfigCalibrations
   test("select calibration target") {
     for {
       tpid <- withServices(service) { s =>
-                Services.asSuperUser:
-                  s.session.transaction.use { xa =>
-                      s.programService
-                        .insertCalibrationProgram(
-                          ProgramPropertiesInput.Create.Default.some,
-                          CalibrationRole.SpectroPhotometric,
-                          Description.unsafeFrom("SPECTROTEST"))(using xa)
-                }
+                s.transactionally:
+                  Services.asSuperUser:
+                    s.programService
+                      .insertCalibrationProgram(
+                        ProgramPropertiesInput.Create.Default.some,
+                        CalibrationRole.SpectroPhotometric,
+                        Description.unsafeFrom("SPECTROTEST"))
               }
       // PI program
       pid  <- createProgramAs(pi)
@@ -679,10 +677,9 @@ class perProgramPerConfigCalibrations
               )
       // In reality this is done listening to events but we can explicitly call the function here
       _     <- withServices(service) { services =>
-                  services.session.transaction.use { xa =>
+                  services.transactionally:
                     Services.asSuperUser:
-                      services.calibrationsService.recalculateCalibrationTarget(pid, cid1)(using xa)
-                  }
+                      services.calibrationsService.recalculateCalibrationTarget(pid, cid1)
                }
       ob2   <- queryObservations(pid)
       (cid2, ct2) = ob2.collect {
@@ -1006,6 +1003,7 @@ class perProgramPerConfigCalibrations
       _         <- setCalculatedWorkflowState(calibIds1.head, ObservationWorkflowState.Ongoing)
       // Change the observation configuration
       _         <- updateCentralWavelength(oid1, Wavelength.fromIntNanometers(600).get)
+      _         <- runObscalcUpdate(pid, oid1)
       // Run calibrations again - should keep the Ongoing calibration and add new ones
       _         <- recalculateCalibrations(pid, when)
       ob2       <- queryObservations(pid)
@@ -1594,6 +1592,7 @@ class perProgramPerConfigCalibrations
         calibIds = ob1.callibrationIds
         _    <- setCalculatedWorkflowState(calibIds.head, state)
         _    <- updateCentralWavelength(oid, Wavelength.fromIntNanometers(600).get)
+        _    <- runObscalcUpdate(pid, oid)
         _    <- recalculateCalibrations(pid, when)
         ob2  <- queryObservations(pid)
       } yield {

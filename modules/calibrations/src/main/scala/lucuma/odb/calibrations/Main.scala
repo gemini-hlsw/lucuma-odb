@@ -34,7 +34,7 @@ import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.S3FileService
 import lucuma.odb.service.Services
 import lucuma.odb.service.Services.Syntax.*
-import lucuma.odb.service.TelluricResolutionDaemon
+import lucuma.odb.service.TelluricTargetsDaemon
 import lucuma.odb.service.UserService
 import lucuma.odb.util.LucumaEntryPoint
 import natchez.Trace
@@ -47,8 +47,6 @@ import org.typelevel.log4cats.LoggerFactory
 import org.typelevel.log4cats.slf4j.Slf4jFactory
 import org.typelevel.log4cats.syntax.*
 import skunk.{Command as _, *}
-
-import scala.concurrent.duration.FiniteDuration
 
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -177,7 +175,7 @@ object CMain extends MainParams {
             .compile.drain.start.void)
     } yield ()
 
-  def runTelluricResolutionDaemon[F[_]: {Async, Parallel, Logger, LoggerFactory}](
+  def runTelluricTargetsDaemon[F[_]: {Async, Parallel, Logger, LoggerFactory}](
     connectionsLimit: Int,
     pollPeriod: FiniteDuration,
     telluricTopic: Topic[F, TelluricTargetTopic.Element],
@@ -186,14 +184,14 @@ object CMain extends MainParams {
   ): Resource[F, Unit] =
     Resource.eval:
       info"Telluric Resolution Daemon starting" *>
-      TelluricResolutionDaemon.run(
-        connectionsLimit = connectionsLimit,
-        pollPeriod = pollPeriod,
-        batchSize = 10,
-        topic = telluricTopic,
-        obscalcTopic = obscalcTopic,
-        services = services
-      )
+        TelluricTargetsDaemon.run(
+          connectionsLimit = connectionsLimit,
+          pollPeriod = pollPeriod,
+          batchSize = 10,
+          topic = telluricTopic,
+          obscalcTopic = obscalcTopic,
+          services = services
+        )
 
   def services[F[_]: Temporal: Async: Parallel: UUIDGen: Trace: Logger: LoggerFactory](
     user: Option[User],
@@ -255,7 +253,7 @@ object CMain extends MainParams {
       itcClient          <- c.itcClient
       servicesResource   = pool.evalMap(services(user, enums, c.email, c.commitHash, ptc, httpClient, itcClient, gaiaClient, horizonsClient, telClient))
       _                  <- runCalibrationsDaemon(obsT, ctT, servicesResource)
-      _                  <- runTelluricResolutionDaemon(c.database.maxObscalcConnections, c.obscalcPoll, trT, obsT, servicesResource)
+      _                  <- runTelluricTargetsDaemon(c.database.maxObscalcConnections, c.obscalcPoll, trT, obsT, servicesResource)
     } yield ExitCode.Success
 
   /** Our logical entry point. */
