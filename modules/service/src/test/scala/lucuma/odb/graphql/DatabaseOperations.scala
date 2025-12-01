@@ -878,6 +878,9 @@ trait DatabaseOperations { this: OdbSuite =>
         val offsetsField = offsets.fold("")(offsets => s", offsets: $offsets")
         s"""{
           gmosNorthImaging: {
+            variant: {
+              interleaved: {}
+            }
             filters: [
               {
                 filter: R_PRIME
@@ -893,6 +896,9 @@ trait DatabaseOperations { this: OdbSuite =>
         val offsetsField = offsets.fold("")(offsets => s", offsets: $offsets")
         s"""{
           gmosSouthImaging: {
+            variant: {
+              interleaved: {}
+            }
             filters: [
               {
                 filter: R_PRIME

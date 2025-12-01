@@ -16,12 +16,11 @@ import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.Observation
 import lucuma.odb.data.ExposureTimeModeId
 import lucuma.odb.data.ExposureTimeModeRole
-import lucuma.odb.data.Nullable
 import lucuma.odb.data.ObservingModeRowVersion
 import lucuma.odb.data.OffsetGeneratorRole
 import lucuma.odb.format.spatialOffsets.*
 import lucuma.odb.graphql.input.GmosImagingInput
-import lucuma.odb.graphql.input.OffsetGeneratorInput
+import lucuma.odb.graphql.input.GmosImagingVariantInput
 import lucuma.odb.sequence.gmos.imaging.Config
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.GmosCodecs.*
@@ -202,11 +201,11 @@ object GmosImagingService:
 
               // Insert the offset generators
               _  <- ResultT.liftF:
-                      input.common.objectOffsetGenerator.traverse_ : og =>
+                      GmosImagingVariantInput.offsets.getOption(input.common.variant).traverse_ : og =>
                         services.offsetGeneratorService.insert(oids, og, OffsetGeneratorRole.Object)
 
               _  <- ResultT.liftF:
-                      input.common.skyOffsetGenerator.traverse_ : og =>
+                      GmosImagingVariantInput.skyOffsets.getOption(input.common.variant).traverse_ : og =>
                         services.offsetGeneratorService.insert(oids, og, OffsetGeneratorRole.Sky)
 
             yield ()
@@ -314,21 +313,21 @@ object GmosImagingService:
                 _   <- ResultT.liftF(insertFilters(cur, filterTable, filterCodec, ObservingModeRowVersion.Current))
               yield ()
 
-          def updateOffsetForRole(
-            input: Nullable[OffsetGeneratorInput],
-            role:  OffsetGeneratorRole
-          ): F[Unit] =
-            input.toOptionOption.fold(Concurrent[F].unit): in =>
-              services.offsetGeneratorService.replace(oids, in, role)
-
-          val offsetUpdates =
-            updateOffsetForRole(edit.common.objectOffsetGenerator, OffsetGeneratorRole.Object) *>
-            updateOffsetForRole(edit.common.skyOffsetGenerator, OffsetGeneratorRole.Sky)
+//          def updateOffsetForRole(
+//            input: Nullable[OffsetGeneratorInput],
+//            role:  OffsetGeneratorRole
+//          ): F[Unit] =
+//            input.toOptionOption.fold(Concurrent[F].unit): in =>
+//              services.offsetGeneratorService.replace(oids, in, role)
+//
+//          val offsetUpdates =
+//            updateOffsetForRole(edit.common.objectOffsetGenerator, OffsetGeneratorRole.Object) *>
+//            updateOffsetForRole(edit.common.skyOffsetGenerator, OffsetGeneratorRole.Sky)
 
           (for
             _ <- ResultT.liftF(modeUpdates)
             _ <- filterUpdates
-            _ <- ResultT.liftF(offsetUpdates)
+//            _ <- ResultT.liftF(offsetUpdates)
           yield ()).value
 
       override def cloneNorth(
@@ -438,7 +437,14 @@ object GmosImagingService:
             ${gmos_amp_read_mode.opt},
             ${gmos_amp_gain.opt},
             ${gmos_roi.opt},
-            ${text}
+            ${text},
+            $gmos_imaging_type,
+            $wavelength_order,
+            $int4_nonneg,
+            $offset,
+            $offset,
+            $offset,
+            $offset
           )"""(
             oid,
             common.explicitMultipleFiltersMode,
@@ -446,7 +452,14 @@ object GmosImagingService:
             common.explicitAmpReadMode,
             common.explicitAmpGain,
             common.explicitRoi,
-            common.formattedOffsets
+            common.formattedOffsets,
+            common.variant.variantType,
+            common.variant.toGrouped.order,
+            common.variant.toGrouped.skyCount,
+            common.variant.toPreImaging.offset1,
+            common.variant.toPreImaging.offset2,
+            common.variant.toPreImaging.offset3,
+            common.variant.toPreImaging.offset4,
           )
 
       sql"""
@@ -457,7 +470,18 @@ object GmosImagingService:
           c_amp_read_mode,
           c_amp_gain,
           c_roi,
-          c_offsets
+          c_offsets,
+          c_imaging_type,
+          c_wavelength_order,
+          c_sky_count,
+          c_pre_imaging_off1_p,
+          c_pre_imaging_off1_q,
+          c_pre_imaging_off2_p,
+          c_pre_imaging_off2_q,
+          c_pre_imaging_off3_p,
+          c_pre_imaging_off3_q,
+          c_pre_imaging_off4_p,
+          c_pre_imaging_off4_q
         ) VALUES
       """(Void) |+| modeEntries.intercalate(void", ")
 

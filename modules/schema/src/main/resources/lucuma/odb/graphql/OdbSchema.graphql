@@ -2178,6 +2178,8 @@ Edit or create GMOS North Imaging advanced configuration
 """
 input GmosNorthImagingInput {
 
+  variant: GmosImagingVariantInput!
+
   """
   The filters field must be specified with at least one filter. It cannot be unset with a null value.
   """
@@ -2187,12 +2189,6 @@ input GmosNorthImagingInput {
   The offsets field may be unset by assigning a null value, or ignored by skipping it altogether
   """
   offsets: [OffsetInput!]
-
-  "Temporary, WIP -- will be moved."
-  objectOffsetGenerator: OffsetGeneratorInput
-
-  "Temporary, WIP -- will be moved."
-  skyOffsetGenerator: OffsetGeneratorInput
 
   """
   How sequences are generated when multiple filters are specified.
@@ -2691,6 +2687,8 @@ Edit or create GMOS South Imaging advanced configuration
 """
 input GmosSouthImagingInput {
 
+  variant: GmosImagingVariantInput!
+
   """
   The filters field must be specified with at least one filter. It cannot be unset with a null value.
   """
@@ -2700,12 +2698,6 @@ input GmosSouthImagingInput {
   The offsets field may be unset by assigning a null value, or ignored by skipping it altogether
   """
   offsets: [OffsetInput!]
-
-  "Temporary, WIP -- will be moved."
-  objectOffsetGenerator: OffsetGeneratorInput
-
-  "Temporary, WIP -- will be moved."
-  skyOffsetGenerator: OffsetGeneratorInput
 
   """
   How sequences are generated when multiple filters are specified.
@@ -9164,6 +9156,70 @@ type GmosNorthLongSlit {
 }
 
 """
+Wavength observation order, either decreasing or increasting by wavelength.
+"""
+enum WavelengthOrder {
+  DECREASING,
+  INCREASING
+}
+
+"""
+The available GMOS imaging categories.  Each category will produce a distinct
+sequence.
+"""
+enum GmosImagingVariantType {
+  GROUPED,
+  INTERLEAVED,
+  PRE_IMAGING
+}
+
+type GmosImagingVariant {
+  variantType: GmosImagingVariantType!
+
+  grouped: GmosGroupedFilterImaging
+  preImaging: GmosPreImaging
+}
+
+input GmosImagingVariantInput @oneOf {
+  grouped: GmosGroupedFilterImagingInput
+  interleaved: GmosInterleavedFilterImagingInput
+  preImaging: GmosPreImagingInput
+}
+
+type GmosGroupedFilterImaging {
+  order: WavelengthOrder!
+
+  offsets: OffsetGenerator
+  skyCount: NonNegInt!
+  skyOffsets: OffsetGenerator
+}
+
+input GmosGroupedFilterImagingInput {
+  order: WavelengthOrder
+  offsets: OffsetGeneratorInput
+  skyCount: NonNegInt
+  skyOffsets: OffsetGeneratorInput
+}
+
+input GmosInterleavedFilterImagingInput {
+  _placeholder: Boolean = true
+}
+
+type GmosPreImaging {
+  offset1: Offset!
+  offset2: Offset!
+  offset3: Offset!
+  offset4: Offset!
+}
+
+input GmosPreImagingInput {
+  offset1: OffsetInput!
+  offset2: OffsetInput!
+  offset3: OffsetInput!
+  offset4: OffsetInput!
+}
+
+"""
 Imaging filters combine an actual filter with an exposure time mode.
 """
 type GmosNorthImagingFilter {
@@ -9192,6 +9248,8 @@ GMOS North Imaging mode
 """
 type GmosNorthImaging {
 
+  variant: GmosImagingVariant!
+
   """
   GMOS North Filters for imaging mode (multiple filters allowed)
   """
@@ -9206,12 +9264,6 @@ type GmosNorthImaging {
   Spatial offsets
   """
   offsets: [Offset!]!
-
-  "Temporary, WIP -- will be moved."
-  objectOffsetGenerator: OffsetGenerator
-
-  "Temporary, WIP -- will be moved."
-  skyOffsetGenerator: OffsetGenerator
 
   """
   MultipleFiltersMode, either explicitly specified in explicitMultipleFiltersMode or else taken
@@ -9858,6 +9910,8 @@ GMOS South Imaging mode
 """
 type GmosSouthImaging {
 
+  variant: GmosImagingVariant!
+
   """
   GMOS South Filters for imaging mode (multiple filters allowed)
   """
@@ -9872,12 +9926,6 @@ type GmosSouthImaging {
   Spatial offsets
   """
   offsets: [Offset!]!
-
-  "Temporary, WIP -- will be moved."
-  objectOffsetGenerator: OffsetGenerator
-
-  "Temporary, WIP -- will be moved."
-  skyOffsetGenerator: OffsetGenerator
 
   """
   MultipleFiltersMode, either explicitly specified in explicitMultipleFiltersMode or else taken

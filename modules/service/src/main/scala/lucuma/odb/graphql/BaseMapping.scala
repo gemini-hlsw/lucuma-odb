@@ -172,6 +172,9 @@ trait BaseMapping[F[_]]
   lazy val GmosCustomSlitWidthType                 = schema.ref("GmosCustomSlitWidth")
   lazy val GmosDtaxType                            = schema.ref("GmosDtax")
   lazy val GmosGratingOrderType                    = schema.ref("GmosGratingOrder")
+  lazy val GmosGroupedFilterImagingType            = schema.ref("GmosGroupedFilterImaging")
+  lazy val GmosImagingVariantType                  = schema.ref("GmosImagingVariant")
+  lazy val GmosImagingVariantTypeType              = schema.ref("GmosImagingVariantType")
   lazy val GmosLongSlitAcquisitionRoiType          = schema.ref("GmosLongSlitAcquisitionRoi")
   lazy val GmosNorthAtomType                       = schema.ref("GmosNorthAtom")
   lazy val GmosNorthBuiltinFpuType                 = schema.ref("GmosNorthBuiltinFpu")
@@ -189,6 +192,7 @@ trait BaseMapping[F[_]]
   lazy val GmosNorthStageModeType                  = schema.ref("GmosNorthStageMode")
   lazy val GmosNorthStaticType                     = schema.ref("GmosNorthStatic")
   lazy val GmosNorthStepType                       = schema.ref("GmosNorthStep")
+  lazy val GmosPreImagingType                      = schema.ref("GmosPreImaging")
   lazy val GmosRoiType                             = schema.ref("GmosRoi")
   lazy val GmosSouthAtomType                       = schema.ref("GmosSouthAtom")
   lazy val GmosSouthBuiltinFpuType                 = schema.ref("GmosSouthBuiltinFpu")
@@ -410,6 +414,7 @@ trait BaseMapping[F[_]]
   lazy val VisitIdType                             = schema.ref("VisitId")
   lazy val VisitSelectResultType                   = schema.ref("VisitSelectResult")
   lazy val WaterVaporType                          = schema.ref("WaterVapor")
+  lazy val WavelengthOrderType                     = schema.ref("WavelengthOrder")
   lazy val WavelengthType                          = schema.ref("Wavelength")
 
 }

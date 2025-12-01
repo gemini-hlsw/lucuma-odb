@@ -86,10 +86,10 @@ trait OffsetGeneratorMapping[F[_]] extends OffsetGeneratorView[F] with Enumerate
 
   lazy val OffsetGeneratorMappings: List[TypeMapping] =
     List(
-      enumeratedOffsetGeneratorMapping(GmosNorthImagingType / "objectOffsetGenerator" / "enumerated", OffsetGeneratorView.Enumerated.ObservationId, EnumeratedOffsetView.ObjectObservationId),
-      enumeratedOffsetGeneratorMapping(GmosNorthImagingType / "skyOffsetGenerator"    / "enumerated", OffsetGeneratorView.Enumerated.ObservationId, EnumeratedOffsetView.SkyObservationId),
-      enumeratedOffsetGeneratorMapping(GmosSouthImagingType / "objectOffsetGenerator" / "enumerated", OffsetGeneratorView.Enumerated.ObservationId, EnumeratedOffsetView.ObjectObservationId),
-      enumeratedOffsetGeneratorMapping(GmosSouthImagingType / "skyOffsetGenerator"    / "enumerated", OffsetGeneratorView.Enumerated.ObservationId, EnumeratedOffsetView.SkyObservationId),
+      enumeratedOffsetGeneratorMapping(GmosNorthImagingType / "variant" / "grouped" / "offsets"    / "enumerated", OffsetGeneratorView.Enumerated.ObservationId, EnumeratedOffsetView.ObjectObservationId),
+      enumeratedOffsetGeneratorMapping(GmosNorthImagingType / "variant" / "grouped" / "skyOffsets" / "enumerated", OffsetGeneratorView.Enumerated.ObservationId, EnumeratedOffsetView.SkyObservationId),
+      enumeratedOffsetGeneratorMapping(GmosSouthImagingType / "variant" / "grouped" / "offsets"    / "enumerated", OffsetGeneratorView.Enumerated.ObservationId, EnumeratedOffsetView.ObjectObservationId),
+      enumeratedOffsetGeneratorMapping(GmosSouthImagingType / "variant" / "grouped" / "skyOffsets" / "enumerated", OffsetGeneratorView.Enumerated.ObservationId, EnumeratedOffsetView.SkyObservationId),
       OffsetGeneratorMapping,
       RandomOffsetGeneratorMapping,
       SpiralOffsetGeneratorMapping,
