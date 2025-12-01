@@ -322,12 +322,16 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
    * @return list of added and removed calibration observations
    */
   def recalculateCalibrations(pid: Program.Id, when: Instant): IO[(List[Observation.Id], List[Observation.Id])] =
+    import Trace.Implicits.noop
     withServices(serviceUser): services =>
-      services.session.transaction.use: xa =>
-        Services.asSuperUser:
-          services
-            .calibrationsService
-            .recalculateCalibrations(pid, when)(using xa)
+      for
+        _ <- Services.asSuperUser(UserService.fromSession(services.session).canonicalizeUser(serviceUser))
+        r <- services.transactionally:
+               Services.asSuperUser:
+                 services
+                   .calibrationsService
+                   .recalculateCalibrations(pid, when)
+      yield r
 
   /**
    * Resolve all pending telluric targets for a program.

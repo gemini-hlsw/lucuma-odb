@@ -22,7 +22,7 @@ import org.typelevel.log4cats.syntax.*
 
 import scala.concurrent.duration.*
 
-object TelluricResolutionDaemon:
+object TelluricTargetsDaemon:
 
   /**
    * Run the telluric resolution daemon.

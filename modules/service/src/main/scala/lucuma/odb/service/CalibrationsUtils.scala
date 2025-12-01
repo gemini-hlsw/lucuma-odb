@@ -116,12 +116,27 @@ trait WorkflowStateQueries[F[_]: Monad] {
   def onlyDefinedAndReady[A](obs: List[A], oid: A => Observation.Id)(using Services[F]): F[List[A]] =
     filterWorkflowStateIn(obs, oid, List(ObservationWorkflowState.Defined, ObservationWorkflowState.Ready))
 
+  def onlyDefinedAndReadyWithCalculatedState[A](obs: List[A], oid: A => Observation.Id)(using Services[F]): F[List[A]] =
+    obs.filterA: obs =>
+      selectObscalcWorkflowStateIfCalculated(oid(obs)).map: calculatedState =>
+        calculatedState.exists(s => s === ObservationWorkflowState.Defined || s === ObservationWorkflowState.Ready)
+
   def selectObscalcWorkflowState(oid: Observation.Id)(using Services[F]): F[Option[ObservationWorkflowState]] =
     session.option(
       sql"""
         SELECT c_workflow_state
         FROM t_obscalc
         WHERE c_observation_id = $observation_id
+      """.query(observation_workflow_state.opt)
+    )(oid).map(_.flatten)
+
+  def selectObscalcWorkflowStateIfCalculated(oid: Observation.Id)(using Services[F]): F[Option[ObservationWorkflowState]] =
+    session.option(
+      sql"""
+        SELECT c_workflow_state
+        FROM t_obscalc
+        WHERE c_observation_id = $observation_id
+          AND c_obscalc_state = 'ready'
       """.query(observation_workflow_state.opt)
     )(oid).map(_.flatten)
 }
