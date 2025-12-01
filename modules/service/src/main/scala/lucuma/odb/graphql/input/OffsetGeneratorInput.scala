@@ -39,6 +39,11 @@ object OffsetGeneratorInput:
     values: NonEmptyList[TelescopeConfig]
   ) extends OffsetGeneratorInput
 
+//  object Enumerated:
+//
+//    val values: Lens[Enumerated, NonEmptyList[TelescopeConfig]] =
+//      GenLens[Enumerated](_.values)
+
   case class Random(
     size:   Angle,
     center: Offset
@@ -58,7 +63,12 @@ object OffsetGeneratorInput:
     val cornerA: Lens[Uniform, Offset] = GenLens[Uniform](_.cornerA)
     val cornerB: Lens[Uniform, Offset] = GenLens[Uniform](_.cornerB)
 
-  private def uniform: Prism[OffsetGeneratorInput, Uniform] = GenPrism[OffsetGeneratorInput, Uniform]
+//  val enumerated: Prism[OffsetGeneratorInput, Enumerated] = GenPrism[OffsetGeneratorInput, Enumerated]
+//
+//  val offsets: Optional[OffsetGeneratorInput, NonEmptyList[TelescopeConfig]] =
+//    enumerated.andThen(Enumerated.values)
+
+  val uniform: Prism[OffsetGeneratorInput, Uniform]   = GenPrism[OffsetGeneratorInput, Uniform]
   val cornerA: Optional[OffsetGeneratorInput, Offset] = uniform.andThen(Uniform.cornerA)
   val cornerB: Optional[OffsetGeneratorInput, Offset] = uniform.andThen(Uniform.cornerB)
 
