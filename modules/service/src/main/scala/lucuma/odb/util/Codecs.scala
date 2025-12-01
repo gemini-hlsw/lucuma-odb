@@ -621,14 +621,14 @@ trait Codecs {
   lazy val sequence_digest: Codec[SequenceDigest] =
     (obs_class *: categorized_time *: offset_array *: _guide_state *: int4_nonneg *: execution_state).imap {
       case (oClass, pTime, offsets, guideStates, aCount, execState) =>
-        val guidedOffsets = offsets.zip(guideStates)
+        val guidedOffsets = offsets.zip(guideStates).map(TelescopeConfig.apply.tupled)
         SequenceDigest(oClass, pTime, SortedSet.from(guidedOffsets), aCount, execState)
     } { sd =>
       (
         sd.observeClass,
         sd.timeEstimate,
-        sd.offsets.toList.map(_._1),
-        sd.offsets.toList.map(_._2),
+        sd.configs.toList.map(_.offset),
+        sd.configs.toList.map(_.guiding),
         sd.atomCount,
         sd.executionState
       )

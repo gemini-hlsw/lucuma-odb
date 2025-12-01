@@ -47,6 +47,7 @@ import lucuma.core.model.Target
 import lucuma.core.model.Tracking
 import lucuma.core.model.User
 import lucuma.core.model.sequence.ExecutionDigest
+import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.model.sequence.flamingos2.Flamingos2FpuMask
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
@@ -273,12 +274,16 @@ object GuideService {
   ) {
     val timeEstimate = digest.fullTimeEstimate.sum
     val setupTime    = digest.setup.full
-    val acqOffsets   = NonEmptyList.fromFoldable(
-      digest.acquisition.offsets.collect { case (o, StepGuideState.Enabled) => GuidedOffset(o) }
-    ).map(AcquisitionOffsets.apply)
-    val sciOffsets   = NonEmptyList.fromFoldable(
-      digest.science.offsets.collect { case (o, StepGuideState.Enabled) => GuidedOffset(o) }
-    ).map(ScienceOffsets.apply)
+    val acqOffsets   =
+      NonEmptyList.fromFoldable:
+        digest.acquisition.configs.collect:
+          case TelescopeConfig(o, StepGuideState.Enabled) => GuidedOffset(o)
+      .map(AcquisitionOffsets.apply)
+    val sciOffsets   =
+      NonEmptyList.fromFoldable:
+        digest.science.configs.collect:
+          case TelescopeConfig(o, StepGuideState.Enabled) => GuidedOffset(o)
+      .map(ScienceOffsets.apply)
 
     val (site, agsParams, centralWavelength): (Site, AgsParams, Wavelength) = params.observingMode match
       case mode: gmos.longslit.Config.GmosNorth =>

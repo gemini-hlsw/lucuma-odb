@@ -107,16 +107,16 @@ trait SequenceCodec {
         gs <- c.downField("guideStates").as[List[StepGuideState]]
         n  <- c.downField("atomCount").as[NonNegInt]
         e  <- c.downField("executionState").as[ExecutionState]
-      yield SequenceDigest(o, t, SortedSet.from(os.zip(gs)), n, e)
+        tc = os.zip(gs).map(TelescopeConfig.apply.tupled)
+      yield SequenceDigest(o, t, SortedSet.from(tc), n, e)
 
   given (using Encoder[Offset], Encoder[TimeSpan]): Encoder[SequenceDigest] =
     Encoder.instance: (a: SequenceDigest) =>
-      val offsetsList = a.offsets.toList
       Json.obj(
         "observeClass"   -> a.observeClass.asJson,
         "timeEstimate"   -> a.timeEstimate.asJson,
-        "offsets"        -> offsetsList.map(_._1).asJson,
-        "guideStates"    -> offsetsList.map(_._2).asJson,
+        "offsets"        -> a.configs.map(_.offset).asJson,
+        "guideStates"    -> a.configs.map(_.guiding).asJson,
         "atomCount"      -> a.atomCount.asJson,
         "executionState" -> a.executionState.asJson
       )
