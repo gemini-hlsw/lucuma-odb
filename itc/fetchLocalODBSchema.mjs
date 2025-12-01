@@ -20,7 +20,14 @@ const response = await fetch(new URL(url), {
     'Content-Type': 'application/json',
   },
   method: 'POST',
-  body: JSON.stringify({ query: getIntrospectionQuery() }),
+  body: JSON.stringify({
+    query: getIntrospectionQuery({
+      specifiedByUrl: true,
+      oneOf: true,
+      inputValueDeprecation: true,
+      directiveIsRepeatable: true,
+    }),
+  }),
 });
 
 if (!response.ok) {
@@ -34,8 +41,7 @@ console.log('Fetched ODB schema from local server.');
 const json = await response.json();
 
 if (json.errors) {
-  console.error('Errors in introspection query response:', json.errors);
-  throw new Error('Introspection query returned errors');
+  throw new Error('Introspection query returned errors', { cause: json.errors });
 }
 
 const schema = printSchema(buildClientSchema(json.data));
