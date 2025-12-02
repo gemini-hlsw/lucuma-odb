@@ -4107,7 +4107,7 @@ class updateObservations extends OdbSuite
     for
       p <- createProgramAs(pi)
       t <- createTargetAs(pi, p, sourceProfile = gaussian)
-      o <- createGmosNorthImagingObservationAs(pi, p, iq = ImageQuality.Preset.OnePointZero, offsets = None, t)
+      o <- createGmosNorthImagingObservationAs(pi, p, iq = ImageQuality.Preset.OnePointZero, t)
       _ <- expectBinning(o, GmosBinning.Two)
       _ <- query(pi, updateObservationsMutation(o, update, throwawayQuery))
       _ <- expectBinning(o, GmosBinning.One)

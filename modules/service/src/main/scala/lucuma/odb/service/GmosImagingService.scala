@@ -18,7 +18,6 @@ import lucuma.odb.data.ExposureTimeModeId
 import lucuma.odb.data.ExposureTimeModeRole
 import lucuma.odb.data.ObservingModeRowVersion
 import lucuma.odb.data.OffsetGeneratorRole
-import lucuma.odb.format.spatialOffsets.*
 import lucuma.odb.graphql.input.GmosImagingInput
 import lucuma.odb.sequence.gmos.imaging.Config
 import lucuma.odb.sequence.gmos.imaging.Variant
@@ -26,7 +25,6 @@ import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.GmosCodecs.*
 import skunk.*
 import skunk.codec.numeric.int8
-import skunk.codec.text.text
 import skunk.implicits.*
 
 import Services.Syntax.*
@@ -359,20 +357,13 @@ object GmosImagingService:
 
     val common: Decoder[Config.Common] =
       (
-        multiple_filters_mode.opt *:
         gmos_binning              *:
         gmos_binning.opt          *:
         gmos_amp_read_mode.opt    *:
         gmos_amp_gain.opt         *:
-        gmos_roi.opt              *:
-        text
-      ).emap: (mf, defaultBin, explicitBin, arm, ag, roi, offsets) =>
-        if offsets.isEmpty then
-          Config.Common(defaultBin, explicitBin, mf, arm, ag, roi, Nil).asRight
-        else
-          OffsetsFormat.getOption(offsets) match
-            case Some(offs) => Config.Common(defaultBin, explicitBin, mf, arm, ag, roi, offs).asRight
-            case None => s"Could not parse '$offsets' as a spatial offsets list.".asLeft
+        gmos_roi.opt
+      ).map: (defaultBin, explicitBin, arm, ag, roi) =>
+        Config.Common(defaultBin, explicitBin, arm, ag, roi)
 
     val north: Decoder[Config.GmosNorth] =
       (_gmos_north_filter *:
@@ -400,13 +391,11 @@ object GmosImagingService:
         SELECT
           c_observation_id,
           c_filters,
-          c_multiple_filters_mode,
           c_bin_default,
           c_bin,
           c_amp_read_mode,
           c_amp_gain,
-          c_roi,
-          c_offsets
+          c_roi
         FROM #$viewName
         WHERE
       """(Void) |+| observationIdIn(oids)
@@ -432,12 +421,10 @@ object GmosImagingService:
         which.map: oid =>
           sql"""(
             $observation_id,
-            ${multiple_filters_mode.opt},
             ${gmos_binning.opt},
             ${gmos_amp_read_mode.opt},
             ${gmos_amp_gain.opt},
             ${gmos_roi.opt},
-            ${text},
             $gmos_imaging_type,
             $wavelength_order,
             $int4_nonneg,
@@ -447,12 +434,10 @@ object GmosImagingService:
             $offset
           )"""(
             oid,
-            common.explicitMultipleFiltersMode,
             common.explicitBin,
             common.explicitAmpReadMode,
             common.explicitAmpGain,
             common.explicitRoi,
-            common.formattedOffsets,
             common.variant.variantType,
             common.variant.toGrouped.order,
             common.variant.toGrouped.skyCount,
@@ -465,12 +450,10 @@ object GmosImagingService:
       sql"""
         INSERT INTO #$modeTable (
           c_observation_id,
-          c_multiple_filters_mode,
           c_bin,
           c_amp_read_mode,
           c_amp_gain,
           c_roi,
-          c_offsets,
           c_imaging_type,
           c_wavelength_order,
           c_sky_count,
@@ -503,21 +486,17 @@ object GmosImagingService:
       sql"""
         INSERT INTO #$tableName (
           c_observation_id,
-          c_multiple_filters_mode,
           c_bin,
           c_amp_read_mode,
           c_amp_gain,
-          c_roi,
-          c_offsets
+          c_roi
         )
         SELECT
           """.apply(Void) |+| sql"$observation_id".apply(newId) |+| sql""",
-          c_multiple_filters_mode,
           c_bin,
           c_amp_read_mode,
           c_amp_gain,
-          c_roi,
-          c_offsets
+          c_roi
         FROM #$tableName
         WHERE c_observation_id = """.apply(Void) |+| sql"$observation_id".apply(originalId)
 
@@ -560,19 +539,15 @@ object GmosImagingService:
     def commonUpdates(
       input: GmosImagingInput.Edit.Common
     ): List[AppliedFragment] =
-      val upMultipleFiltersMode = sql"c_multiple_filters_mode = ${multiple_filters_mode.opt}"
       val upBin = sql"c_bin = ${gmos_binning.opt}"
       val upAmpReadMode = sql"c_amp_read_mode = ${gmos_amp_read_mode.opt}"
       val upAmpGain = sql"c_amp_gain = ${gmos_amp_gain.opt}"
       val upRoi = sql"c_roi = ${gmos_roi.opt}"
-      val upOffsets = sql"c_offsets = ${text}"
       List(
-        input.explicitMultipleFiltersMode.toOptionOption.map(upMultipleFiltersMode),
         input.explicitBin.toOptionOption.map(upBin),
         input.explicitAmpReadMode.toOptionOption.map(upAmpReadMode),
         input.explicitAmpGain.toOptionOption.map(upAmpGain),
-        input.explicitRoi.toOptionOption.map(upRoi),
-        upOffsets(input.formattedOffsets).some
+        input.explicitRoi.toOptionOption.map(upRoi)
       ).flatten
 
     def deleteCurrentFiltersAndEtms(
