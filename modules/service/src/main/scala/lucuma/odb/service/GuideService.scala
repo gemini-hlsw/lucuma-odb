@@ -20,6 +20,7 @@ import io.circe.refined.given
 import io.circe.syntax.*
 import lucuma.ags
 import lucuma.ags.*
+import lucuma.ags.syntax.*
 import lucuma.catalog.clients.GaiaClient
 import lucuma.catalog.votable.*
 import lucuma.core.enums.Flamingos2LyotWheel
@@ -272,8 +273,8 @@ object GuideService {
   ) {
     val timeEstimate = digest.fullTimeEstimate.sum
     val setupTime    = digest.setup.full
-    val acqOffsets   = NonEmptyList.fromFoldable(digest.acquisition.offsets).map(AcquisitionOffsets.apply)
-    val sciOffsets   = NonEmptyList.fromFoldable(digest.science.offsets).map(ScienceOffsets.apply)
+    val acqOffsets   = NonEmptyList.fromFoldable(digest.acquisition.telescopeConfigs).flatMap(_.asAcqOffsets)
+    val sciOffsets   = NonEmptyList.fromFoldable(digest.science.telescopeConfigs).flatMap(_.asSciOffsets)
 
     val (site, agsParams, centralWavelength): (Site, AgsParams, Wavelength) = params.observingMode match
       case mode: gmos.longslit.Config.GmosNorth =>

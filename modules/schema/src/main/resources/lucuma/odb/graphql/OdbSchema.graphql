@@ -12513,9 +12513,9 @@ type SequenceDigest {
   timeEstimate: CategorizedTime!
 
   """
-  Unique offsets that occur in the sequence.
+  TelescopeConfig (offset + guiding) for each step.
   """
-  offsets: [Offset!]!
+  telescopeConfigs: [TelescopeConfig!]!
 
   """
   Total count of anticipated atoms, including the 'nextAtom', 'possibleFuture'

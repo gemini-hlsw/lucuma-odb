@@ -116,9 +116,12 @@ class executionDigest extends ExecutionTestSupportForGmos {
                     nonCharged { seconds }
                     total { seconds }
                   }
-                  offsets {
-                    p { arcseconds }
-                    q { arcseconds }
+                  telescopeConfigs {
+                    offset {
+                      p { arcseconds }
+                      q { arcseconds }
+                    }
+                    guiding
                   }
                   atomCount
                 }
@@ -158,30 +161,34 @@ class executionDigest extends ExecutionTestSupportForGmos {
                       "seconds" : ${ProgramTime.asJson}
                     }
                   },
-                  "offsets" : [
+                  "telescopeConfigs" : [
                     {
-                      "p" : {
-                        "arcseconds" : 0.000000
+                      "offset" : {
+                        "p" : { "arcseconds" : 0.000000 },
+                        "q" : { "arcseconds" : -15.000000 }
                       },
-                      "q" : {
-                        "arcseconds" : -15.000000
-                      }
+                      "guiding" : "ENABLED"
                     },
                     {
-                      "p" : {
-                        "arcseconds" : 0.000000
+                      "offset" : {
+                        "p" : { "arcseconds" : 0.000000 },
+                        "q" : { "arcseconds" : 0.000000 }
                       },
-                      "q" : {
-                        "arcseconds" : 0.000000
-                      }
+                      "guiding" : "ENABLED"
                     },
                     {
-                      "p" : {
-                        "arcseconds" : 0.000000
+                      "offset" : {
+                        "p" : { "arcseconds" : 0.000000 },
+                        "q" : { "arcseconds" : 0.000000 }
                       },
-                      "q" : {
-                        "arcseconds" : 15.000000
-                      }
+                      "guiding" : "DISABLED"
+                    },
+                    {
+                      "offset" : {
+                        "p" : { "arcseconds" : 0.000000 },
+                        "q" : { "arcseconds" : 15.000000 }
+                      },
+                      "guiding" : "ENABLED"
                     }
                   ],
                   "atomCount": 4
@@ -692,7 +699,7 @@ class executionDigest extends ExecutionTestSupportForGmos {
                             "seconds" : 0.000000
                           }
                         },
-                        "offsets" : [],
+                        "telescopeConfigs" : [],
                         "atomCount": 0
                       }
                     }
