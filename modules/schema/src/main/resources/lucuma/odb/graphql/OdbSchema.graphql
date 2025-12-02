@@ -12515,7 +12515,7 @@ type SequenceDigest {
   """
   TelescopeConfig (offset + guiding) for each step.
   """
-  configs: [TelescopeConfig!]!
+  telescopeConfigs: [TelescopeConfig!]!
 
   """
   Total count of anticipated atoms, including the 'nextAtom', 'possibleFuture'

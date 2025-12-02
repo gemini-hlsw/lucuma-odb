@@ -99,7 +99,7 @@ trait SequenceCodec {
       for
         o  <- c.downField("observeClass").as[ObserveClass]
         t  <- c.downField("timeEstimate").as[CategorizedTime]
-        tc <- c.downField("configs").as[SortedSet[TelescopeConfig]]
+        tc <- c.downField("telescopeConfigs").as[SortedSet[TelescopeConfig]]
         n  <- c.downField("atomCount").as[NonNegInt]
         e  <- c.downField("executionState").as[ExecutionState]
       yield SequenceDigest(o, t, tc, n, e)
@@ -107,11 +107,11 @@ trait SequenceCodec {
   given (using Encoder[Offset], Encoder[TimeSpan]): Encoder[SequenceDigest] =
     Encoder.instance: (a: SequenceDigest) =>
       Json.obj(
-        "observeClass"   -> a.observeClass.asJson,
-        "timeEstimate"   -> a.timeEstimate.asJson,
-        "configs"        -> a.configs.asJson,
-        "atomCount"      -> a.atomCount.asJson,
-        "executionState" -> a.executionState.asJson
+        "observeClass"     -> a.observeClass.asJson,
+        "timeEstimate"     -> a.timeEstimate.asJson,
+        "telescopeConfigs" -> a.configs.asJson,
+        "atomCount"        -> a.atomCount.asJson,
+        "executionState"   -> a.executionState.asJson
       )
 
   given Decoder[ExecutionDigest] =

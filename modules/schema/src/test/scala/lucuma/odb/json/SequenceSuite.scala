@@ -81,5 +81,5 @@ class SequenceSuite extends DisciplineSuite with ArbitraryInstances:
     )
     val json = digest.asJson
     // configs are serialized directly
-    val configsJson = json.hcursor.downField("configs").as[SortedSet[TelescopeConfig]].toOption.get
+    val configsJson = json.hcursor.downField("telescopeConfigs").as[SortedSet[TelescopeConfig]].toOption.get
     assertEquals(configsJson, configs)

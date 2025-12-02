@@ -758,7 +758,7 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos:
                    digest {
                      value {
                        science {
-                         configs {
+                         telescopeConfigs {
                            offset { q { arcseconds } }
                            guiding
                          }
@@ -809,7 +809,7 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos:
                   "digest": {
                     "value": {
                       "science": {
-                        "configs": [
+                        "telescopeConfigs": [
                           {
                             "offset": { "q": { "arcseconds": -20.000000 } },
                             "guiding": "ENABLED"

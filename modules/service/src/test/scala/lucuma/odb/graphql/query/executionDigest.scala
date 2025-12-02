@@ -116,7 +116,7 @@ class executionDigest extends ExecutionTestSupportForGmos {
                     nonCharged { seconds }
                     total { seconds }
                   }
-                  configs {
+                  telescopeConfigs {
                     offset {
                       p { arcseconds }
                       q { arcseconds }
@@ -161,7 +161,7 @@ class executionDigest extends ExecutionTestSupportForGmos {
                       "seconds" : ${ProgramTime.asJson}
                     }
                   },
-                  "configs" : [
+                  "telescopeConfigs" : [
                     {
                       "offset" : {
                         "p" : { "arcseconds" : 0.000000 },
@@ -699,7 +699,7 @@ class executionDigest extends ExecutionTestSupportForGmos {
                             "seconds" : 0.000000
                           }
                         },
-                        "configs" : [],
+                        "telescopeConfigs" : [],
                         "atomCount": 0
                       }
                     }
