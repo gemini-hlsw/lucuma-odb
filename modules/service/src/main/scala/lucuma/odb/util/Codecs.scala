@@ -618,9 +618,9 @@ trait Codecs {
     }
 
   lazy val sequence_digest: Codec[SequenceDigest] =
-    (obs_class *: categorized_time *: _offset_array *: _guide_state *: int4_nonneg *: execution_state).imap {
+    (obs_class *: categorized_time *: _offset_array.opt *: _guide_state.opt *: int4_nonneg *: execution_state).imap {
       case (oClass, pTime, offsets, guideStates, aCount, execState) =>
-        val config = offsets.zip(guideStates).map(TelescopeConfig.apply.tupled)
+        val config = offsets.getOrElse(Nil).zip(guideStates.getOrElse(Nil)).map(TelescopeConfig.apply.tupled)
         SequenceDigest(oClass, pTime, SortedSet.from(config), aCount, execState)
     } { sd =>
       // Don't inline to get a consistent sort
@@ -628,8 +628,8 @@ trait Codecs {
       (
         sd.observeClass,
         sd.timeEstimate,
-        telescopeConfigs.map(_.offset),
-        telescopeConfigs.map(_.guiding),
+        Some(telescopeConfigs.map(_.offset)),
+        Some(telescopeConfigs.map(_.guiding)),
         sd.atomCount,
         sd.executionState
       )
