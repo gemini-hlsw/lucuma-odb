@@ -12,9 +12,6 @@ import lucuma.core.enums.GmosBinning
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosRoi
 import lucuma.core.enums.GmosSouthFilter
-import lucuma.core.enums.MultipleFiltersMode
-import lucuma.core.math.Offset
-import lucuma.core.math.arb.ArbOffset
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.arb.ArbExposureTimeMode
 import lucuma.core.util.arb.ArbEnumerated
@@ -28,7 +25,6 @@ trait ArbGmosImagingInput:
 
   import ArbEnumerated.given
   import ArbExposureTimeMode.given
-  import ArbOffset.given
 
   given [L: Arbitrary]: Arbitrary[GmosImagingFilterInput[L]] =
     Arbitrary:
@@ -40,13 +36,11 @@ trait ArbGmosImagingInput:
   given Arbitrary[GmosImagingInput.Create.Common] =
     Arbitrary {
       for {
-        f <- arbitrary[Option[MultipleFiltersMode]]
         b <- arbitrary[Option[GmosBinning]]
         m <- arbitrary[Option[GmosAmpReadMode]]
         g <- arbitrary[Option[GmosAmpGain]]
         r <- arbitrary[Option[GmosRoi]]
-        s <- arbitrary[List[Offset]]
-      } yield GmosImagingInput.Create.Common(Variant.Interleaved, f, b, m, g, r, s)
+      } yield GmosImagingInput.Create.Common(Variant.Interleaved, b, m, g, r)
     }
 
   given Arbitrary[GmosImagingInput.Create.North] =
@@ -70,13 +64,11 @@ trait ArbGmosImagingInput:
   given arbEditCommon: Arbitrary[GmosImagingInput.Edit.Common] =
     Arbitrary:
       for {
-        f <- arbitrary[Nullable[MultipleFiltersMode]]
         b <- arbitrary[Nullable[GmosBinning]]
         m <- arbitrary[Nullable[GmosAmpReadMode]]
         g <- arbitrary[Nullable[GmosAmpGain]]
         r <- arbitrary[Nullable[GmosRoi]]
-        s <- arbitrary[List[Offset]]
-      } yield GmosImagingInput.Edit.Common(Variant.Interleaved.some, f, b, m, g, r, s)
+      } yield GmosImagingInput.Edit.Common(Variant.Interleaved.some, b, m, g, r)
 
   given arbEditCommonN: Arbitrary[GmosImagingInput.Edit.North] =
     Arbitrary {

@@ -591,28 +591,26 @@ trait DatabaseOperations { this: OdbSuite =>
     createObservationAs(user, pid, None, tids*)
 
   def createGmosNorthImagingObservationAs(user: User, pid: Program.Id, tids: Target.Id*): IO[Observation.Id] =
-    createGmosNorthImagingObservationAs(user, pid, ImageQuality.Preset.PointEight, None, tids*)
+    createGmosNorthImagingObservationAs(user, pid, ImageQuality.Preset.PointEight, tids*)
 
   def createGmosNorthImagingObservationAs(
     user:    User,
     pid:     Program.Id,
     iq:      ImageQuality.Preset = ImageQuality.Preset.PointEight,
-    offsets: Option[String] = None,
     tids:    Target.Id*
   ): IO[Observation.Id] =
-    createObservationWithSpatialOffsets(user, pid, ObservingModeType.GmosNorthImaging, iq, offsets, tids*)
+    createObservationWithSpatialOffsets(user, pid, ObservingModeType.GmosNorthImaging, iq, None, tids*)
 
   def createGmosSouthImagingObservationAs(user: User, pid: Program.Id, tids: Target.Id*): IO[Observation.Id] =
-    createGmosSouthImagingObservationAs(user, pid, ImageQuality.Preset.PointEight, None, tids*)
+    createGmosSouthImagingObservationAs(user, pid, ImageQuality.Preset.PointEight, tids*)
 
   def createGmosSouthImagingObservationAs(
     user:    User,
     pid:     Program.Id,
     iq:      ImageQuality.Preset = ImageQuality.Preset.PointEight,
-    offsets: Option[String] = None,
     tids:    Target.Id*
   ): IO[Observation.Id] =
-    createObservationWithSpatialOffsets(user, pid, ObservingModeType.GmosSouthImaging, iq, offsets, tids*)
+    createObservationWithSpatialOffsets(user, pid, ObservingModeType.GmosSouthImaging, iq, None, tids*)
 
   def createFlamingos2LongSlitObservationAs(user: User, pid: Program.Id, tids: Target.Id*): IO[Observation.Id] =
     createFlamingos2LongSlitObservationAs(user, pid, ImageQuality.Preset.PointEight, None, tids*)
@@ -838,6 +836,9 @@ trait DatabaseOperations { this: OdbSuite =>
       case ObservingModeType.GmosNorthImaging =>
         """{
           gmosNorthImaging: {
+            variant: {
+              grouped: {}
+            }
             filters: [
               { filter: R_PRIME },
               { filter: G_PRIME }
@@ -847,6 +848,9 @@ trait DatabaseOperations { this: OdbSuite =>
       case ObservingModeType.GmosSouthImaging =>
         """{
           gmosSouthImaging: {
+            variant: {
+              grouped: {}
+            }
             filters: [
               { filter: R_PRIME },
               { filter: G_PRIME }
@@ -875,7 +879,6 @@ trait DatabaseOperations { this: OdbSuite =>
   private def observingModeWithSpatialOffsets(observingMode: ObservingModeType, offsets: Option[String]): String =
     observingMode match
       case ObservingModeType.GmosNorthImaging =>
-        val offsetsField = offsets.fold("")(offsets => s", offsets: $offsets")
         s"""{
           gmosNorthImaging: {
             variant: {
@@ -889,11 +892,9 @@ trait DatabaseOperations { this: OdbSuite =>
                 filter: G_PRIME
               }
             ]
-            $offsetsField
           }
         }"""
       case ObservingModeType.GmosSouthImaging =>
-        val offsetsField = offsets.fold("")(offsets => s", offsets: $offsets")
         s"""{
           gmosSouthImaging: {
             variant: {
@@ -907,7 +908,6 @@ trait DatabaseOperations { this: OdbSuite =>
                 filter: G_PRIME
               }
             ]
-            $offsetsField
           }
         }"""
       case ObservingModeType.Flamingos2LongSlit =>
