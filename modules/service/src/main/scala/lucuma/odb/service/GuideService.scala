@@ -273,8 +273,8 @@ object GuideService {
   ) {
     val timeEstimate = digest.fullTimeEstimate.sum
     val setupTime    = digest.setup.full
-    val acqOffsets   = NonEmptyList.fromFoldable(digest.acquisition.configs).flatMap(_.asAcqOffsets)
-    val sciOffsets   = NonEmptyList.fromFoldable(digest.science.configs).flatMap(_.asSciOffsets)
+    val acqOffsets   = NonEmptyList.fromFoldable(digest.acquisition.telescopeConfigs).flatMap(_.asAcqOffsets)
+    val sciOffsets   = NonEmptyList.fromFoldable(digest.science.telescopeConfigs).flatMap(_.asSciOffsets)
 
     val (site, agsParams, centralWavelength): (Site, AgsParams, Wavelength) = params.observingMode match
       case mode: gmos.longslit.Config.GmosNorth =>

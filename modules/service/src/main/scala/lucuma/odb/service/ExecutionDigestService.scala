@@ -102,6 +102,8 @@ object ExecutionDigestService {
         hash:   Md5Hash,
         digest: ExecutionDigest
       )(using Transaction[F]): F[Unit] =
+        val acqConfigs = digest.acquisition.telescopeConfigs.toList
+        val sciConfigs = digest.science.telescopeConfigs.toList
         session.execute(Statements.InsertOrUpdateExecutionDigest)(
           pid,
           oid,
@@ -111,15 +113,15 @@ object ExecutionDigestService {
           digest.acquisition.observeClass,
           digest.acquisition.timeEstimate(ChargeClass.NonCharged),
           digest.acquisition.timeEstimate(ChargeClass.Program),
-          digest.acquisition.configs.toList.map(_.offset),
-          digest.acquisition.configs.toList.map(_.guiding),
+          acqConfigs.map(_.offset),
+          acqConfigs.map(_.guiding),
           digest.acquisition.atomCount,
           digest.acquisition.executionState,
           digest.science.observeClass,
           digest.science.timeEstimate(ChargeClass.NonCharged),
           digest.science.timeEstimate(ChargeClass.Program),
-          digest.science.configs.toList.map(_.offset),
-          digest.science.configs.toList.map(_.guiding),
+          sciConfigs.map(_.offset),
+          sciConfigs.map(_.guiding),
           digest.science.atomCount,
           digest.science.executionState,
           hash,
@@ -128,15 +130,15 @@ object ExecutionDigestService {
           digest.acquisition.observeClass,
           digest.acquisition.timeEstimate(ChargeClass.NonCharged),
           digest.acquisition.timeEstimate(ChargeClass.Program),
-          digest.acquisition.configs.toList.map(_.offset),
-          digest.acquisition.configs.toList.map(_.guiding),
+          acqConfigs.map(_.offset),
+          acqConfigs.map(_.guiding),
           digest.acquisition.atomCount,
           digest.acquisition.executionState,
           digest.science.observeClass,
           digest.science.timeEstimate(ChargeClass.NonCharged),
           digest.science.timeEstimate(ChargeClass.Program),
-          digest.science.configs.toList.map(_.offset),
-          digest.science.configs.toList.map(_.guiding),
+          sciConfigs.map(_.offset),
+          sciConfigs.map(_.guiding),
           digest.science.atomCount,
           digest.science.executionState
         )

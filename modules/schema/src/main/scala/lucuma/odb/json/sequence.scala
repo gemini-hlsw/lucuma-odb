@@ -33,6 +33,7 @@ import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.StepEstimate
 import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.util.TimeSpan
+
 import scala.collection.immutable.SortedSet
 
 trait SequenceCodec {
@@ -109,7 +110,7 @@ trait SequenceCodec {
       Json.obj(
         "observeClass"     -> a.observeClass.asJson,
         "timeEstimate"     -> a.timeEstimate.asJson,
-        "telescopeConfigs" -> a.configs.asJson,
+        "telescopeConfigs" -> a.telescopeConfigs.asJson,
         "atomCount"        -> a.atomCount.asJson,
         "executionState"   -> a.executionState.asJson
       )

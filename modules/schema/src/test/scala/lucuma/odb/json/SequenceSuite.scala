@@ -3,15 +3,23 @@
 
 package lucuma.odb.json
 
+import eu.timepit.refined.types.numeric.NonNegInt
+import io.circe.syntax.*
 import io.circe.testing.ArbitraryInstances
 import io.circe.testing.CodecTests
+import lucuma.core.enums.ExecutionState
+import lucuma.core.enums.ObserveClass
+import lucuma.core.enums.StepGuideState
+import lucuma.core.math.Offset
 import lucuma.core.model.sequence.Atom
+import lucuma.core.model.sequence.CategorizedTime
 import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.ExecutionConfig
 import lucuma.core.model.sequence.ExecutionSequence
 import lucuma.core.model.sequence.InstrumentExecutionConfig
 import lucuma.core.model.sequence.SequenceDigest
 import lucuma.core.model.sequence.Step
+import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.model.sequence.arb.ArbAtom
 import lucuma.core.model.sequence.arb.ArbDataset
 import lucuma.core.model.sequence.arb.ArbExecutionConfig
@@ -25,14 +33,7 @@ import lucuma.core.model.sequence.gmos.arb.ArbDynamicConfig
 import lucuma.core.model.sequence.gmos.arb.ArbStaticConfig
 import lucuma.core.util.arb.ArbGid
 import munit.DisciplineSuite
-import io.circe.syntax.*
-import lucuma.core.enums.ExecutionState
-import lucuma.core.enums.ObserveClass
-import lucuma.core.enums.StepGuideState
-import lucuma.core.math.Offset
-import lucuma.core.model.sequence.CategorizedTime
-import lucuma.core.model.sequence.TelescopeConfig
-import eu.timepit.refined.types.numeric.NonNegInt
+
 import scala.collection.immutable.SortedSet
 
 class SequenceSuite extends DisciplineSuite with ArbitraryInstances:

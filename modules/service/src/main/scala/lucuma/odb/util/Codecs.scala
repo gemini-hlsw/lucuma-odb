@@ -90,9 +90,9 @@ import spire.math.interval.Closed
 import spire.math.interval.Open
 import spire.math.interval.ValueBound
 
+import scala.collection.immutable.SortedSet
 import scala.util.control.Exception
 import scala.util.matching.Regex
-import scala.collection.immutable.SortedSet
 
 
 // Codecs for some atomic types.
@@ -623,12 +623,13 @@ trait Codecs {
         val config = offsets.zip(guideStates).map(TelescopeConfig.apply.tupled)
         SequenceDigest(oClass, pTime, SortedSet.from(config), aCount, execState)
     } { sd =>
-      val configs = sd.configs.toList
+      // Don't inline to get a consistent sort
+      val telescopeConfigs = sd.telescopeConfigs.toList
       (
         sd.observeClass,
         sd.timeEstimate,
-        configs.map(_.offset),
-        configs.map(_.guiding),
+        telescopeConfigs.map(_.offset),
+        telescopeConfigs.map(_.guiding),
         sd.atomCount,
         sd.executionState
       )

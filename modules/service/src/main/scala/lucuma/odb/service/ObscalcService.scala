@@ -4,6 +4,7 @@
 package lucuma.odb.service
 
 import cats.data.EitherT
+import cats.data.Nested
 import cats.data.NonEmptyList
 import cats.effect.Concurrent
 import cats.syntax.applicative.*
@@ -593,6 +594,10 @@ object ObscalcService:
       """.query(pending_obscalc)
 
     private def updatesForResult(r: Obscalc.Result): NonEmptyList[AppliedFragment] =
+
+      // Don't inline these or sorting could be incorrect
+      val acqConfigs = r.digest.map(_.acquisition.telescopeConfigs.toList)
+      val sciConfigs = r.digest.map(_.science.telescopeConfigs.toList)
       NonEmptyList.of(
         sql"c_odb_error            = ${odb_error.opt}"(r.odbError),
 
@@ -620,8 +625,8 @@ object ObscalcService:
         sql"c_acq_obs_class           = ${obs_class.opt}"(r.digest.map(_.acquisition.observeClass)),
         sql"c_acq_non_charged_time    = ${time_span.opt}"(r.digest.map(_.acquisition.timeEstimate(ChargeClass.NonCharged))),
         sql"c_acq_program_time        = ${time_span.opt}"(r.digest.map(_.acquisition.timeEstimate(ChargeClass.Program))),
-        sql"c_acq_offsets             = ${_offset_array.opt}"(r.digest.map(_.acquisition.configs.toList.map(_.offset))),
-        sql"c_acq_offset_guide_states = ${_guide_state.opt}"(r.digest.map(_.acquisition.configs.toList.map(_.guiding))),
+        sql"c_acq_offsets             = ${_offset_array.opt}"(Nested(acqConfigs).map(_.offset).value),
+        sql"c_acq_offset_guide_states = ${_guide_state.opt}"(Nested(acqConfigs).map(_.guiding).value),
         sql"c_acq_atom_count          = ${int4_nonneg.opt}"(r.digest.map(_.acquisition.atomCount)),
         sql"c_acq_execution_state     = ${execution_state.opt}"(r.digest.map(_.acquisition.executionState)),
 
@@ -629,8 +634,8 @@ object ObscalcService:
         sql"c_sci_obs_class           = ${obs_class.opt}"(r.digest.map(_.science.observeClass)),
         sql"c_sci_non_charged_time    = ${time_span.opt}"(r.digest.map(_.science.timeEstimate(ChargeClass.NonCharged))),
         sql"c_sci_program_time        = ${time_span.opt}"(r.digest.map(_.science.timeEstimate(ChargeClass.Program))),
-        sql"c_sci_offsets             = ${_offset_array.opt}"(r.digest.map(_.science.configs.toList.map(_.offset))),
-        sql"c_sci_offset_guide_states = ${_guide_state.opt}"(r.digest.map(_.science.configs.toList.map(_.guiding))),
+        sql"c_sci_offsets             = ${_offset_array.opt}"(Nested(sciConfigs).map(_.offset).value),
+        sql"c_sci_offset_guide_states = ${_guide_state.opt}"(Nested(sciConfigs).map(_.guiding).value),
         sql"c_sci_atom_count          = ${int4_nonneg.opt}"(r.digest.map(_.science.atomCount)),
         sql"c_sci_execution_state     = ${execution_state.opt}"(r.digest.map(_.science.executionState)),
 

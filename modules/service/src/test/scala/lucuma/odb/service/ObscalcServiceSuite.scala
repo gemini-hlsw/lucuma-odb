@@ -37,6 +37,7 @@ import lucuma.odb.util.Codecs.observation_id
 import lucuma.odb.util.Codecs.program_id
 import skunk.*
 import skunk.implicits.*
+
 import scala.collection.immutable.SortedSet
 
 trait ObscalcServiceSuiteSupport extends ExecutionTestSupportForGmos:
