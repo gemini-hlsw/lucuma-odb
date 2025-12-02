@@ -20,6 +20,7 @@ import lucuma.core.model.arb.ArbExposureTimeMode
 import lucuma.core.util.arb.ArbEnumerated
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.arb.ArbNullable.given
+import lucuma.odb.sequence.gmos.imaging.Variant
 import org.scalacheck.*
 import org.scalacheck.Arbitrary.arbitrary
 
@@ -45,7 +46,7 @@ trait ArbGmosImagingInput:
         g <- arbitrary[Option[GmosAmpGain]]
         r <- arbitrary[Option[GmosRoi]]
         s <- arbitrary[List[Offset]]
-      } yield GmosImagingInput.Create.Common(GmosImagingVariantInput.Interleaved, f, b, m, g, r, s)
+      } yield GmosImagingInput.Create.Common(Variant.Interleaved, f, b, m, g, r, s)
     }
 
   given Arbitrary[GmosImagingInput.Create.North] =
@@ -75,7 +76,7 @@ trait ArbGmosImagingInput:
         g <- arbitrary[Nullable[GmosAmpGain]]
         r <- arbitrary[Nullable[GmosRoi]]
         s <- arbitrary[List[Offset]]
-      } yield GmosImagingInput.Edit.Common(GmosImagingVariantInput.Interleaved.some, f, b, m, g, r, s)
+      } yield GmosImagingInput.Edit.Common(Variant.Interleaved.some, f, b, m, g, r, s)
 
   given arbEditCommonN: Arbitrary[GmosImagingInput.Edit.North] =
     Arbitrary {
