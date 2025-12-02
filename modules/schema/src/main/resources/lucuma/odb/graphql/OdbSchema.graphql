@@ -2178,7 +2178,7 @@ Edit or create GMOS North Imaging advanced configuration
 """
 input GmosNorthImagingInput {
 
-  variant: GmosImagingVariantInput!
+  variant: GmosImagingVariantInput
 
   """
   The filters field must be specified with at least one filter. It cannot be unset with a null value.
@@ -2687,7 +2687,7 @@ Edit or create GMOS South Imaging advanced configuration
 """
 input GmosSouthImagingInput {
 
-  variant: GmosImagingVariantInput!
+  variant: GmosImagingVariantInput
 
   """
   The filters field must be specified with at least one filter. It cannot be unset with a null value.

@@ -15,6 +15,7 @@ import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.format.spatialOffsets.*
 import lucuma.odb.graphql.binding.*
+import lucuma.odb.sequence.gmos.imaging.Variant
 
 object GmosImagingInput:
 
@@ -31,7 +32,7 @@ object GmosImagingInput:
     type South = Create[GmosSouthFilter]
 
     case class Common(
-      variant:                     GmosImagingVariantInput,
+      variant:                     Variant,
       explicitMultipleFiltersMode: Option[MultipleFiltersMode],
       explicitBin:                 Option[GmosBinning],
       explicitAmpReadMode:         Option[GmosAmpReadMode],
@@ -104,7 +105,7 @@ object GmosImagingInput:
     type South = Edit[GmosSouthFilter]
 
     case class Common(
-      variant:                     Option[GmosImagingVariantInput],
+      variant:                     Option[Variant],
       explicitMultipleFiltersMode: Nullable[MultipleFiltersMode],
       explicitBin:                 Nullable[GmosBinning],
       explicitAmpReadMode:         Nullable[GmosAmpReadMode],

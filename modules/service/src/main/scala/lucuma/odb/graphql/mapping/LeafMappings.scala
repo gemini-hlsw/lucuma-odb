@@ -54,13 +54,13 @@ import lucuma.odb.data.EditType
 import lucuma.odb.data.ExecutionEventType
 import lucuma.odb.data.Existence
 import lucuma.odb.data.Extinction
-import lucuma.odb.data.GmosImagingVariantType
 import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.data.StepExecutionState
 import lucuma.odb.data.Tag
 import lucuma.odb.data.UserType
 import lucuma.odb.data.WavelengthOrder
 import lucuma.odb.sequence.data.OffsetGeneratorType
+import lucuma.odb.sequence.gmos.imaging.{ VariantType => GmosImagingVariantType }
 
 import java.time.LocalDate
 

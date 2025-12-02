@@ -3472,6 +3472,9 @@ class updateObservations extends OdbSuite
       }
       observingMode: {
         gmosNorthImaging: {
+          variant: {
+            interleaved: {}
+          }
           filters: [
             { filter: G_PRIME },
             { filter: R_PRIME }
@@ -3565,39 +3568,43 @@ class updateObservations extends OdbSuite
       }
       observingMode: {
         gmosNorthImaging: {
+          variant: {
+            grouped: {
+              offsets: {
+                enumerated: {
+                  values: [
+                    {
+                      offset: {
+                        p: { arcseconds: 10.0 }
+                        q: { arcseconds: 11.0 }
+                      }
+                      guiding: ENABLED
+                    },
+                    {
+                      offset: {
+                        p: { arcseconds: 12.0 }
+                        q: { arcseconds: 13.0 }
+                      }
+                      guiding: ENABLED
+                    }
+                  ]
+                }
+              }
+              skyOffsets: {
+                random: {
+                  size: { arcseconds: 14.0 }
+                  center: {
+                    p: { arcseconds: 15.0 }
+                    q: { arcseconds: 16.0 }
+                  }
+                }
+              }
+            }
+          }
           filters: [
             { filter: G_PRIME },
             { filter: R_PRIME }
           ]
-          objectOffsetGenerator: {
-            enumerated: {
-              values: [
-                {
-                  offset: {
-                    p: { arcseconds: 10.0 }
-                    q: { arcseconds: 11.0 }
-                  }
-                  guiding: ENABLED
-                },
-                {
-                  offset: {
-                    p: { arcseconds: 12.0 }
-                    q: { arcseconds: 13.0 }
-                  }
-                  guiding: ENABLED
-                }
-              ]
-            }
-          }
-          skyOffsetGenerator: {
-            random: {
-              size: { arcseconds: 14.0 }
-              center: {
-                p: { arcseconds: 15.0 }
-                q: { arcseconds: 16.0 }
-              }
-            }
-          }
           explicitBin: ONE
           explicitAmpReadMode: SLOW
           explicitAmpGain: LOW
@@ -3611,28 +3618,32 @@ class updateObservations extends OdbSuite
         instrument
         observingMode {
           gmosNorthImaging {
+            variant {
+              grouped {
+                offsets {
+                  enumerated {
+                    values {
+                      offset {
+                        p { arcseconds }
+                        q { arcseconds }
+                      }
+                      guiding
+                    }
+                  }
+                }
+                skyOffsets {
+                  random {
+                    size { arcseconds }
+                    center {
+                      p { arcseconds }
+                      q { arcseconds }
+                    }
+                  }
+                }
+              }
+            }
             filters {
               filter
-            }
-            objectOffsetGenerator {
-              enumerated {
-                values {
-                  offset {
-                    p { arcseconds }
-                    q { arcseconds }
-                  }
-                  guiding
-                }
-              }
-            }
-            skyOffsetGenerator {
-              random {
-                size { arcseconds }
-                center {
-                  p { arcseconds }
-                  q { arcseconds }
-                }
-              }
             }
             multipleFiltersMode
             bin
@@ -3653,39 +3664,43 @@ class updateObservations extends OdbSuite
               "instrument": "GMOS_NORTH",
               "observingMode": {
                 "gmosNorthImaging": {
+                  "variant": {
+                    "grouped": {
+                      "offsets": {
+                        "enumerated": {
+                          "values": [
+                            {
+                              "offset": {
+                                "p": { "arcseconds": 10 },
+                                "q": { "arcseconds": 11 }
+                              },
+                              "guiding": "ENABLED"
+                            },
+                            {
+                              "offset": {
+                                "p": { "arcseconds": 12 },
+                                "q": { "arcseconds": 13 }
+                              },
+                              "guiding": "ENABLED"
+                            }
+                          ]
+                        }
+                      },
+                      "skyOffsets": {
+                        "random": {
+                          "size": { "arcseconds": 14 },
+                          "center": {
+                            "p": { "arcseconds": 15 },
+                            "q": { "arcseconds": 16 }
+                          }
+                        }
+                      }
+                    }
+                  },
                   "filters": [
                     { "filter": "G_PRIME" },
                     { "filter": "R_PRIME" }
                   ],
-                  "objectOffsetGenerator": {
-                    "enumerated": {
-                      "values": [
-                        {
-                          "offset": {
-                            "p": { "arcseconds": 10 },
-                            "q": { "arcseconds": 11 }
-                          },
-                          "guiding": "ENABLED"
-                        },
-                        {
-                          "offset": {
-                            "p": { "arcseconds": 12 },
-                            "q": { "arcseconds": 13 }
-                          },
-                          "guiding": "ENABLED"
-                        }
-                      ]
-                    }
-                  },
-                  "skyOffsetGenerator": {
-                    "random": {
-                      "size": { "arcseconds": 14 },
-                      "center": {
-                        "p": { "arcseconds": 15 },
-                        "q": { "arcseconds": 16 }
-                      }
-                    }
-                  },
                   "multipleFiltersMode": "GROUPED",
                   "bin": "ONE",
                   "ampReadMode": "SLOW",
@@ -3702,24 +3717,28 @@ class updateObservations extends OdbSuite
     val update1 = """
       observingMode: {
         gmosNorthImaging: {
+          variant: {
+            grouped: {
+              offsets: {
+                enumerated: {
+                  values: [
+                    {
+                      offset: {
+                        p: { arcseconds: 17.0 }
+                        q: { arcseconds: 18.0 }
+                      }
+                      guiding: ENABLED
+                    }
+                  ]
+                }
+              }
+              skyOffsets: null
+            }
+          }
           filters: [
             { filter: I_PRIME },
             { filter: Z_PRIME }
           ]
-          objectOffsetGenerator: {
-            enumerated: {
-              values: [
-                {
-                  offset: {
-                    p: { arcseconds: 17.0 }
-                    q: { arcseconds: 18.0 }
-                  }
-                  guiding: ENABLED
-                }
-              ]
-            }
-          }
-          skyOffsetGenerator: null
           explicitMultipleFiltersMode: INTERLEAVED
           explicitBin: FOUR
           explicitAmpReadMode: FAST
@@ -3738,24 +3757,28 @@ class updateObservations extends OdbSuite
               "instrument": "GMOS_NORTH",
               "observingMode": {
                 "gmosNorthImaging": {
+                  "variant": {
+                    "grouped": {
+                      "offsets": {
+                        "enumerated": {
+                          "values": [
+                            {
+                              "offset": {
+                                "p": { "arcseconds": 17 },
+                                "q": { "arcseconds": 18 }
+                              },
+                              "guiding": "ENABLED"
+                            }
+                          ]
+                        }
+                      },
+                      "skyOffsets": null
+                    }
+                  },
                   "filters": [
                     { "filter": "I_PRIME" },
                     { "filter": "Z_PRIME" }
                   ],
-                  "objectOffsetGenerator": {
-                    "enumerated": {
-                      "values": [
-                        {
-                          "offset": {
-                            "p": { "arcseconds": 17 },
-                            "q": { "arcseconds": 18 }
-                          },
-                          "guiding": "ENABLED"
-                        }
-                      ]
-                    }
-                  },
-                  "skyOffsetGenerator": null,
                   "multipleFiltersMode": "INTERLEAVED",
                   "bin": "FOUR",
                   "ampReadMode": "FAST",

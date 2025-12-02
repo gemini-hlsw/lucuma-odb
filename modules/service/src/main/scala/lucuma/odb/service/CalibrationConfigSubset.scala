@@ -27,7 +27,6 @@ import lucuma.core.math.Wavelength
 import lucuma.odb.graphql.input.Flamingos2LongSlitInput
 import lucuma.odb.graphql.input.GmosImagingFilterInput
 import lucuma.odb.graphql.input.GmosImagingInput
-import lucuma.odb.graphql.input.GmosImagingVariantInput
 import lucuma.odb.graphql.input.GmosLongSlitInput
 import lucuma.odb.graphql.input.ObservingModeInput
 import lucuma.odb.sequence.ObservingMode
@@ -138,7 +137,7 @@ object CalibrationConfigSubset:
         GmosImagingInput.Create(
           filters.map(f => GmosImagingFilterInput(f, none)),
           GmosImagingInput.Create.Common(
-            GmosImagingVariantInput.Grouped.Default,
+            lucuma.odb.sequence.gmos.imaging.Variant.Grouped.Default,
             none, // Do we need multipleFiltersMode here?
             binning.some,
             ampReadMode.some,
@@ -169,7 +168,7 @@ object CalibrationConfigSubset:
         GmosImagingInput.Create(
           filters.map(f => GmosImagingFilterInput(f, none)),
           GmosImagingInput.Create.Common(
-            GmosImagingVariantInput.Grouped.Default,
+            lucuma.odb.sequence.gmos.imaging.Variant.Grouped.Default,
             none, // Do we need multipleFiltersMode here?
             binning.some,
             ampReadMode.some,
