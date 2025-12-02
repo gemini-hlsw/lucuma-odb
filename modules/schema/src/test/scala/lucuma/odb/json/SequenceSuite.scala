@@ -25,8 +25,16 @@ import lucuma.core.model.sequence.gmos.arb.ArbDynamicConfig
 import lucuma.core.model.sequence.gmos.arb.ArbStaticConfig
 import lucuma.core.util.arb.ArbGid
 import munit.DisciplineSuite
+import io.circe.syntax.*
+import lucuma.core.enums.ExecutionState
+import lucuma.core.enums.ObserveClass
+import lucuma.core.enums.StepGuideState
+import lucuma.core.math.Offset
+import lucuma.core.model.sequence.CategorizedTime
+import lucuma.core.model.sequence.TelescopeConfig
+import eu.timepit.refined.types.numeric.NonNegInt
 
-class SequenceSuite extends DisciplineSuite with ArbitraryInstances {
+class SequenceSuite extends DisciplineSuite with ArbitraryInstances:
 
   import ArbAtom.given
   import ArbDataset.given
@@ -54,4 +62,23 @@ class SequenceSuite extends DisciplineSuite with ArbitraryInstances {
   checkAll("ExecutionConfig[GmosNorth]",   CodecTests[ExecutionConfig[StaticConfig.GmosNorth, DynamicConfig.GmosNorth]].codec)
   checkAll("InstrumentExecutionConfig",    CodecTests[InstrumentExecutionConfig].codec)
 
-}
+  test("offsets derived from configs"):
+    val offset1 = Offset.Zero
+    val offset2 = Offset.Zero.copy(q = Offset.Q.signedDecimalArcseconds.reverseGet(BigDecimal(10)))
+    val configs = List(
+      TelescopeConfig(offset1, StepGuideState.Enabled),
+      TelescopeConfig(offset1, StepGuideState.Disabled),
+      TelescopeConfig(offset2, StepGuideState.Enabled)
+    )
+    val digest = SequenceDigest(
+      ObserveClass.Science,
+      CategorizedTime.Zero,
+      configs,
+      NonNegInt.unsafeFrom(1),
+      ExecutionState.Ongoing
+    )
+    val json = digest.asJson
+    // offsets are serialized from configs as unique offsets
+    val offsets = json.hcursor.downField("offsets").as[List[Offset]].toOption.get
+    assertEquals(offsets.length, 2)
+    assertEquals(offsets.toSet, Set(offset1, offset2))

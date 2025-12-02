@@ -3,7 +3,6 @@
 
 package lucuma.odb.service
 
-import cats.Order.catsKernelOrderingForOrder
 import cats.effect.IO
 import cats.syntax.eq.*
 import cats.syntax.option.*
@@ -38,7 +37,6 @@ import lucuma.odb.util.Codecs.observation_id
 import lucuma.odb.util.Codecs.program_id
 import skunk.*
 import skunk.implicits.*
-
 import scala.collection.immutable.SortedSet
 
 trait ObscalcServiceSuiteSupport extends ExecutionTestSupportForGmos:
@@ -204,23 +202,23 @@ class ObscalcServiceSuite extends ObscalcServiceSuiteSupport:
           SequenceDigest(
             ObserveClass.Acquisition,
             CategorizedTime(ChargeClass.Program -> TimeSpan.unsafeFromMicroseconds(219362500L)),
-            SortedSet(
+            SortedSet.from(List(
               TelescopeConfig(Offset.Zero, StepGuideState.Enabled),
               TelescopeConfig(Offset.microarcseconds.reverseGet(10000000L, 0L), StepGuideState.Enabled)
-            ),
+            )),
             NonNegInt.unsafeFrom(2),
             ExecutionState.NotStarted
           ),
           SequenceDigest(
             ObserveClass.Science,
             CategorizedTime(ChargeClass.Program -> TimeSpan.FromSeconds.getOption(ScienceSequence).get),
-            SortedSet(
+            SortedSet.from(List(
               TelescopeConfig(Offset.Zero, StepGuideState.Disabled),
               TelescopeConfig(Offset.Zero, StepGuideState.Enabled),
               TelescopeConfig(Offset.microarcseconds.reverseGet(0L, 15000000L), StepGuideState.Disabled),
               TelescopeConfig(Offset.microarcseconds.reverseGet(0L, 15000000L), StepGuideState.Enabled),
               TelescopeConfig(Offset.microarcseconds.reverseGet(0L, 1295985000000L), StepGuideState.Enabled)
-            ),
+            )),
             NonNegInt.unsafeFrom(3),
             ExecutionState.NotStarted
           )

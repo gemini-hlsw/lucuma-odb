@@ -3,7 +3,6 @@
 
 package lucuma.odb.json
 
-import cats.Order.catsKernelOrderingForOrder
 import cats.data.NonEmptyList
 import cats.syntax.either.*
 import eu.timepit.refined.types.numeric.NonNegInt
@@ -34,7 +33,6 @@ import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.StepEstimate
 import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.util.TimeSpan
-
 import scala.collection.immutable.SortedSet
 
 trait SequenceCodec {
@@ -101,19 +99,17 @@ trait SequenceCodec {
       for
         o  <- c.downField("observeClass").as[ObserveClass]
         t  <- c.downField("timeEstimate").as[CategorizedTime]
-        tc <- c.downField("configs").as[List[TelescopeConfig]]
+        tc <- c.downField("configs").as[SortedSet[TelescopeConfig]]
         n  <- c.downField("atomCount").as[NonNegInt]
         e  <- c.downField("executionState").as[ExecutionState]
-      yield SequenceDigest(o, t, SortedSet.from(tc), n, e)
+      yield SequenceDigest(o, t, tc, n, e)
 
   given (using Encoder[Offset], Encoder[TimeSpan]): Encoder[SequenceDigest] =
     Encoder.instance: (a: SequenceDigest) =>
-      val configList = a.configs.toList
       Json.obj(
         "observeClass"   -> a.observeClass.asJson,
         "timeEstimate"   -> a.timeEstimate.asJson,
-        "offsets"        -> configList.map(_.offset).distinct.asJson,
-        "configs"        -> configList.asJson,
+        "configs"        -> a.configs.asJson,
         "atomCount"      -> a.atomCount.asJson,
         "executionState" -> a.executionState.asJson
       )

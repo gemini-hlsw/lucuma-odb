@@ -4,7 +4,6 @@
 package lucuma.odb.util
 
 import cats.data.NonEmptyList
-import cats.implicits.catsKernelOrderingForOrder
 import cats.syntax.apply.*
 import cats.syntax.either.*
 import cats.syntax.eq.*
@@ -91,9 +90,9 @@ import spire.math.interval.Closed
 import spire.math.interval.Open
 import spire.math.interval.ValueBound
 
-import scala.collection.immutable.SortedSet
 import scala.util.control.Exception
 import scala.util.matching.Regex
+import scala.collection.immutable.SortedSet
 
 
 // Codecs for some atomic types.
@@ -621,14 +620,15 @@ trait Codecs {
   lazy val sequence_digest: Codec[SequenceDigest] =
     (obs_class *: categorized_time *: _offset_array *: _guide_state *: int4_nonneg *: execution_state).imap {
       case (oClass, pTime, offsets, guideStates, aCount, execState) =>
-        val guidedOffsets = offsets.zip(guideStates).map(TelescopeConfig.apply.tupled)
-        SequenceDigest(oClass, pTime, SortedSet.from(guidedOffsets), aCount, execState)
+        val config = offsets.zip(guideStates).map(TelescopeConfig.apply.tupled)
+        SequenceDigest(oClass, pTime, SortedSet.from(config), aCount, execState)
     } { sd =>
+      val configs = sd.configs.toList
       (
         sd.observeClass,
         sd.timeEstimate,
-        sd.configs.toList.map(_.offset),
-        sd.configs.toList.map(_.guiding),
+        configs.map(_.offset),
+        configs.map(_.guiding),
         sd.atomCount,
         sd.executionState
       )

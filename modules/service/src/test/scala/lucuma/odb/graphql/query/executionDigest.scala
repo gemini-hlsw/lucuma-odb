@@ -164,14 +164,6 @@ class executionDigest extends ExecutionTestSupportForGmos {
                         "arcseconds" : 0.000000
                       },
                       "q" : {
-                        "arcseconds" : -15.000000
-                      }
-                    },
-                    {
-                      "p" : {
-                        "arcseconds" : 0.000000
-                      },
-                      "q" : {
                         "arcseconds" : 0.000000
                       }
                     },
@@ -181,6 +173,14 @@ class executionDigest extends ExecutionTestSupportForGmos {
                       },
                       "q" : {
                         "arcseconds" : 15.000000
+                      }
+                    },
+                    {
+                      "p" : {
+                        "arcseconds" : 0.000000
+                      },
+                      "q" : {
+                        "arcseconds" : -15.000000
                       }
                     }
                   ],
