@@ -20,8 +20,8 @@ import lucuma.odb.data.ObservingModeRowVersion
 import lucuma.odb.data.OffsetGeneratorRole
 import lucuma.odb.format.spatialOffsets.*
 import lucuma.odb.graphql.input.GmosImagingInput
-import lucuma.odb.graphql.input.GmosImagingVariantInput
 import lucuma.odb.sequence.gmos.imaging.Config
+import lucuma.odb.sequence.gmos.imaging.Variant
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.GmosCodecs.*
 import skunk.*
@@ -201,11 +201,11 @@ object GmosImagingService:
 
               // Insert the offset generators
               _  <- ResultT.liftF:
-                      GmosImagingVariantInput.offsets.getOption(input.common.variant).traverse_ : og =>
+                      Variant.offsets.getOption(input.common.variant).traverse_ : og =>
                         services.offsetGeneratorService.insert(oids, og, OffsetGeneratorRole.Object)
 
               _  <- ResultT.liftF:
-                      GmosImagingVariantInput.skyOffsets.getOption(input.common.variant).traverse_ : og =>
+                      Variant.skyOffsets.getOption(input.common.variant).traverse_ : og =>
                         services.offsetGeneratorService.insert(oids, og, OffsetGeneratorRole.Sky)
 
             yield ()
