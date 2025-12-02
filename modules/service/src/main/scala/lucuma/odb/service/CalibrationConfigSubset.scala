@@ -138,12 +138,10 @@ object CalibrationConfigSubset:
           filters.map(f => GmosImagingFilterInput(f, none)),
           GmosImagingInput.Create.Common(
             lucuma.odb.sequence.gmos.imaging.Variant.Grouped.Default,
-            none, // Do we need multipleFiltersMode here?
             binning.some,
             ampReadMode.some,
             ampGain.some,
-            roi.some,
-            Nil // TODO do we need offsets here?
+            roi.some
           )
         ).some,
         none,
@@ -169,12 +167,10 @@ object CalibrationConfigSubset:
           filters.map(f => GmosImagingFilterInput(f, none)),
           GmosImagingInput.Create.Common(
             lucuma.odb.sequence.gmos.imaging.Variant.Grouped.Default,
-            none, // Do we need multipleFiltersMode here?
             binning.some,
             ampReadMode.some,
             ampGain.some,
-            roi.some,
-            Nil // TODO do we need offsets here?
+            roi.some
           )
         ).some,
         none

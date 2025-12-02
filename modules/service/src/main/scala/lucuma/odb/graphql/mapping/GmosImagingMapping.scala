@@ -15,22 +15,16 @@ import grackle.QueryCompiler.Elab
 import grackle.Result
 import grackle.TypeRef
 import grackle.skunk.SkunkMapping
-import io.circe.*
-import io.circe.syntax.*
 import lucuma.core.enums.GmosAmpGain
 import lucuma.core.enums.GmosAmpReadMode
 import lucuma.core.enums.GmosBinning
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosRoi
 import lucuma.core.enums.GmosSouthFilter
-import lucuma.core.enums.MultipleFiltersMode
-import lucuma.core.math.Offset
 import lucuma.odb.data.ObservingModeRowVersion
-import lucuma.odb.format.spatialOffsets.*
 import lucuma.odb.graphql.predicate.LeafPredicates
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.graphql.table.*
-import lucuma.odb.json.offset.query.given
 
 trait GmosImagingMapping[F[_]] extends GmosImagingView[F]
                                   with GmosImagingFilterTable[F]
@@ -78,9 +72,6 @@ trait GmosImagingMapping[F[_]] extends GmosImagingView[F]
 
   private object CommonImagingFields:
 
-    val multipleFiltersMode: FieldMapping        = explicitOrElseDefault[MultipleFiltersMode]("multipleFiltersMode", "explicitMultipleFiltersMode", "defaultMultipleFiltersMode")
-    val defaultMultipleFiltersMode: FieldMapping = CursorField[MultipleFiltersMode]("defaultMultipleFiltersMode", _ => Result(DefaultMultipleFiltersMode))
-
     val bin: FieldMapping = explicitOrElseDefault[GmosBinning]("bin", "explicitBin", "defaultBin")
 
     val ampReadMode: FieldMapping        = explicitOrElseDefault[GmosAmpReadMode]("ampReadMode", "explicitAmpReadMode", "defaultAmpReadMode")
@@ -92,15 +83,6 @@ trait GmosImagingMapping[F[_]] extends GmosImagingView[F]
     val roi: FieldMapping        = explicitOrElseDefault[GmosRoi]("roi", "explicitRoi", "defaultRoi")
     val defaultRoi: FieldMapping = CursorField[GmosRoi]("defaultRoi", _ => Result(DefaultRoi))
 
-    val offsets: FieldMapping =
-      CursorFieldJson("offsets",
-        cursor =>
-          cursor
-            .field("offsetsString", None)
-            .flatMap(_.as[String].map(s => if (s.isEmpty) defaultOffsetsJson else decodeSpatialOffsets(s))),
-        List("offsetsString")
-      )
-
   lazy val GmosNorthImagingMapping: ObjectMapping =
     ObjectMapping(GmosNorthImagingType)(
 
@@ -110,13 +92,6 @@ trait GmosImagingMapping[F[_]] extends GmosImagingView[F]
 
       SqlObject("filters",        Join(GmosNorthImagingView.Common.ObservationId, GmosNorthImagingFilterTable.ObservationId)),
       SqlObject("initialFilters", Join(GmosNorthImagingView.Common.ObservationId, GmosNorthImagingFilterTable.ObservationId)),
-
-      SqlField("offsetsString", GmosNorthImagingView.Common.Offsets, hidden = true),
-      CommonImagingFields.offsets,
-
-      CommonImagingFields.multipleFiltersMode,
-      SqlField("explicitMultipleFiltersMode", GmosNorthImagingView.Common.ExplicitMultipleFiltersMode),
-      CommonImagingFields.defaultMultipleFiltersMode,
 
       CommonImagingFields.bin,
       SqlField("explicitBin", GmosNorthImagingView.Common.ExplicitBin),
@@ -171,13 +146,6 @@ trait GmosImagingMapping[F[_]] extends GmosImagingView[F]
 
       SqlObject("filters",        Join(GmosSouthImagingView.Common.ObservationId, GmosSouthImagingFilterTable.ObservationId)),
       SqlObject("initialFilters", Join(GmosSouthImagingView.Common.ObservationId, GmosSouthImagingFilterTable.ObservationId)),
-
-      SqlField("offsetsString", GmosSouthImagingView.Common.Offsets, hidden = true),
-      CommonImagingFields.offsets,
-
-      CommonImagingFields.multipleFiltersMode,
-      SqlField("explicitMultipleFiltersMode", GmosSouthImagingView.Common.ExplicitMultipleFiltersMode),
-      CommonImagingFields.defaultMultipleFiltersMode,
 
       CommonImagingFields.bin,
       SqlField("explicitBin", GmosSouthImagingView.Common.ExplicitBin),
@@ -249,11 +217,3 @@ object GmosImagingMapping:
   private val DefaultAmpReadMode: GmosAmpReadMode = GmosAmpReadMode.Slow
   private val DefaultAmpGain: GmosAmpGain = GmosAmpGain.Low
   private val DefaultRoi: GmosRoi = GmosRoi.FullFrame
-  private val DefaultMultipleFiltersMode: MultipleFiltersMode = MultipleFiltersMode.Grouped
-
-  def decodeSpatialOffsets(s: String): Json =
-    if (s.trim.isEmpty) List.empty[Offset].asJson
-    else OffsetsFormat.getOption(s).getOrElse(List.empty[Offset]).asJson
-
-  val defaultOffsetsJson: Json =
-    List.empty[Offset].asJson
