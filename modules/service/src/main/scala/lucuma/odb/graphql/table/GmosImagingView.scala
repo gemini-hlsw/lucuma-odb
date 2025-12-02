@@ -7,7 +7,6 @@ package table
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.GmosCodecs.*
 import skunk.codec.numeric.int8
-import skunk.codec.text.*
 
 trait GmosImagingView[F[_]] extends BaseMapping[F]:
 
@@ -21,8 +20,6 @@ trait GmosImagingView[F[_]] extends BaseMapping[F]:
     val ExplicitAmpReadMode: ColumnRef         = col("c_amp_read_mode", gmos_amp_read_mode.opt)
     val ExplicitAmpGain: ColumnRef             = col("c_amp_gain", gmos_amp_gain.opt)
     val ExplicitRoi: ColumnRef                 = col("c_roi", gmos_roi.opt)
-    val Offsets: ColumnRef                     = col("c_offsets", text)
-    val ExplicitMultipleFiltersMode: ColumnRef = col("c_multiple_filters_mode", multiple_filters_mode.opt)
 
     object Sky:
       val Count: ColumnRef = col("c_sky_count", int4_nonneg)
