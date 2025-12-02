@@ -30,6 +30,11 @@ ALTER TABLE t_gmos_south_imaging
 -- Evolution from V1064__offset_generator.sql version.
 
 DROP VIEW v_gmos_north_imaging;
+
+ALTER TABLE t_gmos_north_imaging
+  DROP COLUMN c_multiple_filters_mode,
+  DROP COLUMN c_offsets;
+
 CREATE VIEW v_gmos_north_imaging AS
   SELECT
     i.*,
@@ -48,6 +53,11 @@ CREATE VIEW v_gmos_north_imaging AS
   ) AS f USING (c_observation_id);
 
 DROP VIEW v_gmos_south_imaging;
+
+ALTER TABLE t_gmos_south_imaging
+  DROP COLUMN c_multiple_filters_mode,
+  DROP COLUMN c_offsets;
+
 CREATE VIEW v_gmos_south_imaging AS
   SELECT
     i.*,
