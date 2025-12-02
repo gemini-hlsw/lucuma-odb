@@ -12,6 +12,7 @@ import lucuma.core.enums.GmosRoi
 import lucuma.core.enums.MultipleFiltersMode
 import lucuma.core.math.Offset
 import lucuma.odb.format.spatialOffsets.*
+import lucuma.odb.sequence.gmos.imaging.Variant
 import munit.DisciplineSuite
 import munit.FunSuite
 
@@ -19,7 +20,7 @@ class GmosImagingInputSuite extends DisciplineSuite with ArbitraryInstances :
 
   test("GmosImagingInput.Create.Common stores explicit values correctly") {
     val common = GmosImagingInput.Create.Common(
-      variant = GmosImagingVariantInput.Interleaved,
+      variant = Variant.Interleaved,
       explicitMultipleFiltersMode = Some(MultipleFiltersMode.Interleaved),
       explicitBin = Some(GmosBinning.Two),
       explicitAmpReadMode = Some(GmosAmpReadMode.Slow),
@@ -39,7 +40,7 @@ class GmosImagingInputSuite extends DisciplineSuite with ArbitraryInstances :
     import lucuma.odb.data.Nullable
 
     val editCommon = GmosImagingInput.Edit.Common(
-      variant = GmosImagingVariantInput.Interleaved.some,
+      variant = Variant.Interleaved.some,
       explicitMultipleFiltersMode = Nullable.NonNull(MultipleFiltersMode.Interleaved),
       explicitBin = Nullable.NonNull(GmosBinning.Two),
       explicitAmpReadMode = Nullable.NonNull(GmosAmpReadMode.Slow),
@@ -84,7 +85,7 @@ class GmosImagingInputSuite extends DisciplineSuite with ArbitraryInstances :
     )
 
     val common = GmosImagingInput.Create.Common(
-      variant = GmosImagingVariantInput.Interleaved,
+      variant = Variant.Interleaved,
       explicitMultipleFiltersMode = None,
       explicitBin = None,
       explicitAmpReadMode = None,

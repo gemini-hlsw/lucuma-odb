@@ -5,6 +5,8 @@ package lucuma.odb.data
 
 import lucuma.core.util.Enumerated
 
+// TODO: move to core
+
 enum WavelengthOrder(val tag: String) derives Enumerated:
   case Decreasing extends WavelengthOrder("decreasing")
   case Increasing extends WavelengthOrder("increasing")
