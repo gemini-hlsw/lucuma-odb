@@ -19,13 +19,13 @@ import eu.timepit.refined.types.numeric.PosInt
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosSouthFilter
 import lucuma.core.enums.StepGuideState
-import lucuma.core.geom.OffsetGenerator
+import lucuma.core.geom.{ OffsetGenerator => OffsetGeneratorImpl }
 import lucuma.core.math.Angle
 import lucuma.core.math.Offset
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.odb.data.OffsetGeneratorRole
-import lucuma.odb.graphql.input.OffsetGeneratorInput
+import lucuma.odb.sequence.data.OffsetGenerator
 import lucuma.odb.sequence.data.OffsetGeneratorType
 import lucuma.odb.util.Codecs.angle_µas
 import lucuma.odb.util.Codecs.guide_state
@@ -44,7 +44,7 @@ sealed trait OffsetGeneratorService[F[_]]:
 
   def insert(
     oids:  NonEmptyList[Observation.Id],
-    input: OffsetGeneratorInput,
+    input: OffsetGenerator,
     role:  OffsetGeneratorRole,
   ): F[Unit]
 
@@ -55,7 +55,7 @@ sealed trait OffsetGeneratorService[F[_]]:
 
   def replace(
     oids:  NonEmptyList[Observation.Id],
-    input: Option[OffsetGeneratorInput],
+    input: Option[OffsetGenerator],
     role:  OffsetGeneratorRole
   ): F[Unit]
 
@@ -93,14 +93,14 @@ object OffsetGeneratorService:
 
       override def insert(
         oids:  NonEmptyList[Observation.Id],
-        input: OffsetGeneratorInput,
+        input: OffsetGenerator,
         role:  OffsetGeneratorRole,
       ): F[Unit] =
         val unit = Concurrent[F].unit
 
         val insertOffsetsIfEnumerated: F[Unit] =
           input match
-            case OffsetGeneratorInput.Enumerated(offs) =>
+            case OffsetGenerator.Enumerated(offs) =>
               session.exec(Statements.insertEnumeratedOffsets(oids, offs, role))
             case _                                     =>
               unit
@@ -115,7 +115,7 @@ object OffsetGeneratorService:
 
       override def replace(
         oids:  NonEmptyList[Observation.Id],
-        input: Option[OffsetGeneratorInput],
+        input: Option[OffsetGenerator],
         role:  OffsetGeneratorRole
       ): F[Unit] =
         delete(oids, role) *>
@@ -180,22 +180,22 @@ object OffsetGeneratorService:
       private def selectInput(
         oid:  Observation.Id,
         role: OffsetGeneratorRole
-      ): F[Option[OffsetGeneratorInput]] =
+      ): F[Option[OffsetGenerator]] =
         for
           ps <- session.option(Statements.SelectInput)(oid, role)
           r  <- ps.traverse: (gen, a, b, s, c) =>
                   gen match
-                    case OffsetGeneratorType.NoGenerator => OffsetGeneratorInput.NoGenerator.pure[F]
-                    case OffsetGeneratorType.Enumerated  => selectEnumeratedOffsets(oid, role).map(OffsetGeneratorInput.Enumerated.apply)
-                    case OffsetGeneratorType.Uniform        => OffsetGeneratorInput.Uniform(a, b).pure[F]
-                    case OffsetGeneratorType.Random      => OffsetGeneratorInput.Random(s, c).pure[F]
-                    case OffsetGeneratorType.Spiral      => OffsetGeneratorInput.Spiral(s, c).pure[F]
+                    case OffsetGeneratorType.NoGenerator => OffsetGenerator.NoGenerator.pure[F]
+                    case OffsetGeneratorType.Enumerated  => selectEnumeratedOffsets(oid, role).map(OffsetGenerator.Enumerated.apply)
+                    case OffsetGeneratorType.Uniform     => OffsetGenerator.Uniform(a, b).pure[F]
+                    case OffsetGeneratorType.Random      => OffsetGenerator.Random(s, c).pure[F]
+                    case OffsetGeneratorType.Spiral      => OffsetGenerator.Spiral(s, c).pure[F]
         yield r
 
       private def generate(
         count:             Int,
         seed:              Long,
-        input:             OffsetGeneratorInput,
+        input:             OffsetGenerator,
         defaultGuideState: StepGuideState
       ): F[List[TelescopeConfig]] =
         def withSeededRandom(fa: (Monad[F], Random[F]) ?=> F[NonEmptyList[Offset]]): F[List[TelescopeConfig]] =
@@ -205,15 +205,15 @@ object OffsetGeneratorService:
 
         PosInt.unapply(count).fold(List.empty[TelescopeConfig].pure[F]): posN =>
           input match
-            case OffsetGeneratorInput.NoGenerator          =>
+            case OffsetGenerator.NoGenerator          =>
               List.empty[TelescopeConfig].pure[F]
 
-            case OffsetGeneratorInput.Enumerated(lst)      =>
+            case OffsetGenerator.Enumerated(lst)      =>
               // Enumerated positions come with an explicit guide state so the
               // default is ignored.
               LazyList.continually(lst.toList).flatten.take(count).toList.pure[F]
 
-            case OffsetGeneratorInput.Uniform(a, b)           =>
+            case OffsetGenerator.Uniform(a, b)        =>
               val w = (a.p.toSignedDecimalArcseconds - b.p.toSignedDecimalArcseconds).abs
               val h = (a.q.toSignedDecimalArcseconds - b.q.toSignedDecimalArcseconds).abs
 
@@ -242,13 +242,13 @@ object OffsetGeneratorService:
 
               offsets.take(count).map(o => TelescopeConfig(o, defaultGuideState)).pure[F]
 
-            case OffsetGeneratorInput.Random(size, center) =>
+            case OffsetGenerator.Random(size, center) =>
               withSeededRandom:
-                OffsetGenerator.random(posN, size, center)
+                OffsetGeneratorImpl.random(posN, size, center)
 
-            case OffsetGeneratorInput.Spiral(size, center) =>
+            case OffsetGenerator.Spiral(size, center) =>
               withSeededRandom:
-                OffsetGenerator.spiral(posN, size, center)
+                OffsetGeneratorImpl.spiral(posN, size, center)
 
       private def selectEnumeratedOffsets(
         oid:  Observation.Id,
@@ -313,7 +313,7 @@ object OffsetGeneratorService:
 
     def insert(
       which: NonEmptyList[Observation.Id],
-      ogi:   OffsetGeneratorInput,
+      ogi:   OffsetGenerator,
       role:  OffsetGeneratorRole
     ): AppliedFragment =
       def orZero(a: Option[Angle]): Angle = a.getOrElse(Angle.Angle0)
@@ -335,13 +335,13 @@ object OffsetGeneratorService:
             oid,
             role,
             ogi.offsetGeneratorType,
-            orZero(OffsetGeneratorInput.cornerA.getOption(ogi).map(_.p.toAngle)),
-            orZero(OffsetGeneratorInput.cornerA.getOption(ogi).map(_.q.toAngle)),
-            orZero(OffsetGeneratorInput.cornerB.getOption(ogi).map(_.p.toAngle)),
-            orZero(OffsetGeneratorInput.cornerB.getOption(ogi).map(_.q.toAngle)),
-            orZero(OffsetGeneratorInput.size.getOption(ogi)),
-            orZero(OffsetGeneratorInput.center.getOption(ogi).map(_.p.toAngle)),
-            orZero(OffsetGeneratorInput.center.getOption(ogi).map(_.q.toAngle))
+            orZero(OffsetGenerator.cornerA.getOption(ogi).map(_.p.toAngle)),
+            orZero(OffsetGenerator.cornerA.getOption(ogi).map(_.q.toAngle)),
+            orZero(OffsetGenerator.cornerB.getOption(ogi).map(_.p.toAngle)),
+            orZero(OffsetGenerator.cornerB.getOption(ogi).map(_.q.toAngle)),
+            orZero(OffsetGenerator.size.getOption(ogi)),
+            orZero(OffsetGenerator.center.getOption(ogi).map(_.p.toAngle)),
+            orZero(OffsetGenerator.center.getOption(ogi).map(_.q.toAngle))
           )
 
       void"""
