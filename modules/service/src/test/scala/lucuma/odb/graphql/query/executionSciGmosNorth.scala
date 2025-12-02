@@ -758,8 +758,9 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos:
                    digest {
                      value {
                        science {
-                         offsets {
-                           q { arcseconds }
+                         configs {
+                           offset { q { arcseconds } }
+                           guiding
                          }
                        }
                      }
@@ -808,15 +809,22 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos:
                   "digest": {
                     "value": {
                       "science": {
-                        "offsets": [
+                        "configs": [
                           {
-                            "q": { "arcseconds": -20.000000 }
+                            "offset": { "q": { "arcseconds": -20.000000 } },
+                            "guiding": "ENABLED"
                           },
                           {
-                            "q": { "arcseconds": 0.000000 }
+                            "offset": { "q": { "arcseconds": -20.000000 } },
+                            "guiding": "DISABLED"
                           },
                           {
-                            "q": { "arcseconds": 20.000000 }
+                            "offset": { "q": { "arcseconds": 0.000000 } },
+                            "guiding": "ENABLED"
+                          },
+                          {
+                            "offset": { "q": { "arcseconds": 20.000000 } },
+                            "guiding": "ENABLED"
                           }
                         ]
                       }

@@ -33,6 +33,7 @@ import lucuma.core.math.Offset
 import lucuma.core.model.sequence.CategorizedTime
 import lucuma.core.model.sequence.TelescopeConfig
 import eu.timepit.refined.types.numeric.NonNegInt
+import scala.collection.immutable.SortedSet
 
 class SequenceSuite extends DisciplineSuite with ArbitraryInstances:
 
@@ -49,6 +50,7 @@ class SequenceSuite extends DisciplineSuite with ArbitraryInstances:
 
   import offset.query.given
   import sequence.given
+  import stepconfig.given
   import time.query.given
   import wavelength.query.given
   import gmos.given
@@ -62,10 +64,10 @@ class SequenceSuite extends DisciplineSuite with ArbitraryInstances:
   checkAll("ExecutionConfig[GmosNorth]",   CodecTests[ExecutionConfig[StaticConfig.GmosNorth, DynamicConfig.GmosNorth]].codec)
   checkAll("InstrumentExecutionConfig",    CodecTests[InstrumentExecutionConfig].codec)
 
-  test("offsets derived from configs"):
+  test("configs roundtrip"):
     val offset1 = Offset.Zero
     val offset2 = Offset.Zero.copy(q = Offset.Q.signedDecimalArcseconds.reverseGet(BigDecimal(10)))
-    val configs = List(
+    val configs = SortedSet(
       TelescopeConfig(offset1, StepGuideState.Enabled),
       TelescopeConfig(offset1, StepGuideState.Disabled),
       TelescopeConfig(offset2, StepGuideState.Enabled)
@@ -78,7 +80,6 @@ class SequenceSuite extends DisciplineSuite with ArbitraryInstances:
       ExecutionState.Ongoing
     )
     val json = digest.asJson
-    // offsets are serialized from configs as unique offsets
-    val offsets = json.hcursor.downField("offsets").as[List[Offset]].toOption.get
-    assertEquals(offsets.length, 2)
-    assertEquals(offsets.toSet, Set(offset1, offset2))
+    // configs are serialized directly
+    val configsJson = json.hcursor.downField("configs").as[SortedSet[TelescopeConfig]].toOption.get
+    assertEquals(configsJson, configs)
