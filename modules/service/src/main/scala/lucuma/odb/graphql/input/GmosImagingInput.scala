@@ -9,11 +9,9 @@ import grackle.Result
 import grackle.syntax.*
 import lucuma.core.enums.*
 import lucuma.core.enums.GmosBinning
-import lucuma.core.math.Offset
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
-import lucuma.odb.format.spatialOffsets.*
 import lucuma.odb.graphql.binding.*
 import lucuma.odb.sequence.gmos.imaging.Variant
 
@@ -32,17 +30,12 @@ object GmosImagingInput:
     type South = Create[GmosSouthFilter]
 
     case class Common(
-      variant:                     Variant,
-      explicitMultipleFiltersMode: Option[MultipleFiltersMode],
-      explicitBin:                 Option[GmosBinning],
-      explicitAmpReadMode:         Option[GmosAmpReadMode],
-      explicitAmpGain:             Option[GmosAmpGain],
-      explicitRoi:                 Option[GmosRoi],
-      offsets:                     List[Offset]
-    ):
-      // Formatted to store in a text column in the database
-      val formattedOffsets: String =
-        if (offsets.isEmpty) "" else OffsetsFormat.reverseGet(offsets)
+      variant:             Variant,
+      explicitBin:         Option[GmosBinning],
+      explicitAmpReadMode: Option[GmosAmpReadMode],
+      explicitAmpGain:     Option[GmosAmpGain],
+      explicitRoi:         Option[GmosRoi]
+    )
 
     private def binding[F](
       FilterBinding: Matcher[GmosImagingFilterInput[F]]
@@ -51,8 +44,6 @@ object GmosImagingInput:
         case List(
           GmosImagingVariantInput.Binding("variant", rVariant),
           FilterBinding.List("filters", rFilters),
-          OffsetInput.Binding.List.Option("offsets", rOffsets),
-          MultipleFiltersModeBinding.Option("explicitMultipleFiltersMode", rExplicitMultipleFiltersMode),
           GmosBinningBinding.Option("explicitBin", rExplicitBin),
           GmosAmpReadModeBinding.Option("explicitAmpReadMode", rExplicitAmpReadMode),
           GmosAmpGainBinding.Option("explicitAmpGain", rExplicitAmpGain),
@@ -60,21 +51,19 @@ object GmosImagingInput:
         ) => (
           rVariant,
           rFilters,
-          rOffsets,
-          rExplicitMultipleFiltersMode,
           rExplicitBin,
           rExplicitAmpReadMode,
           rExplicitAmpGain,
           rExplicitRoi,
         ).parTupled.flatMap:
-          case (variant, filters, offsets, exMfn, exBin, exAmpReadMode, exAmpGain, exRoi) =>
+          case (variant, filters, exBin, exAmpReadMode, exAmpGain, exRoi) =>
             NonEmptyList.fromList(filters).fold(
               OdbError.InvalidArgument("At least one filter must be specified for GMOS imaging observations.".some).asFailure
             ): filters =>
               Result(
                 Create(
                   filters,
-                  Common(variant, exMfn, exBin, exAmpReadMode, exAmpGain, exRoi, offsets.orEmpty)
+                  Common(variant, exBin, exAmpReadMode, exAmpGain, exRoi)
                 )
               )
 
@@ -105,30 +94,23 @@ object GmosImagingInput:
     type South = Edit[GmosSouthFilter]
 
     case class Common(
-      variant:                     Option[Variant],
-      explicitMultipleFiltersMode: Nullable[MultipleFiltersMode],
-      explicitBin:                 Nullable[GmosBinning],
-      explicitAmpReadMode:         Nullable[GmosAmpReadMode],
-      explicitAmpGain:             Nullable[GmosAmpGain],
-      explicitRoi:                 Nullable[GmosRoi],
-      offsets:                     List[Offset]
+      variant:             Option[Variant],
+      explicitBin:         Nullable[GmosBinning],
+      explicitAmpReadMode: Nullable[GmosAmpReadMode],
+      explicitAmpGain:     Nullable[GmosAmpGain],
+      explicitRoi:         Nullable[GmosRoi]
     ):
-      // Formatted to store in a text column in the database
-      val formattedOffsets: String =
-        if (offsets.isEmpty) "" else OffsetsFormat.reverseGet(offsets)
 
       def toCreate: Result[Create.Common] =
         Result
           .fromOption(variant, OdbError.InvalidArgument("An imaging type definition is required for GMOS imaging.".some).asProblem)
           .map: variant =>
             Create.Common(
-              variant                     = variant,
-              explicitMultipleFiltersMode = explicitMultipleFiltersMode.toOption,
-              explicitBin                 = explicitBin.toOption,
-              explicitAmpReadMode         = explicitAmpReadMode.toOption,
-              explicitAmpGain             = explicitAmpGain.toOption,
-              explicitRoi                 = explicitRoi.toOption,
-              offsets                     = offsets
+              variant             = variant,
+              explicitBin         = explicitBin.toOption,
+              explicitAmpReadMode = explicitAmpReadMode.toOption,
+              explicitAmpGain     = explicitAmpGain.toOption,
+              explicitRoi         = explicitRoi.toOption
             )
 
     private def binding[F](
@@ -138,23 +120,19 @@ object GmosImagingInput:
         case List(
           GmosImagingVariantInput.Binding.Option("variant", rVariant),
           FilterBinding.List.Option("filters", rFilters),
-          OffsetInput.Binding.List.Option("offsets", rOffsets),
-          MultipleFiltersModeBinding.Nullable("explicitMultipleFiltersMode", rExplicitMultipleFiltersMode),
           GmosBinningBinding.Nullable("explicitBin", rExplicitBin),
           GmosAmpReadModeBinding.Nullable("explicitAmpReadMode", rExplicitAmpReadMode),
           GmosAmpGainBinding.Nullable("explicitAmpGain", rExplicitAmpGain),
-          GmosRoiBinding.Nullable("explicitRoi", rExplicitRoi),
+          GmosRoiBinding.Nullable("explicitRoi", rExplicitRoi)
         ) => (
           rVariant,
           rFilters,
-          rOffsets,
-          rExplicitMultipleFiltersMode,
           rExplicitBin,
           rExplicitAmpReadMode,
           rExplicitAmpGain,
           rExplicitRoi,
         ).parTupled.flatMap:
-          case (variant, filters, offsets, exMfm, exBin, exAmpReadMode, exAmpGain, exRoi) =>
+          case (variant, filters, exBin, exAmpReadMode, exAmpGain, exRoi) =>
             filters
               .traverse: fs =>
                 NonEmptyList.fromList(fs).fold(
@@ -163,7 +141,7 @@ object GmosImagingInput:
               .map: fsUpdate =>
                 Edit(
                   fsUpdate,
-                  Common(variant, exMfm, exBin, exAmpReadMode, exAmpGain, exRoi, offsets.orEmpty)
+                  Common(variant, exBin, exAmpReadMode, exAmpGain, exRoi)
                 )
 
     val NorthBinding: Matcher[Edit[GmosNorthFilter]] =

@@ -238,7 +238,6 @@ trait BaseMapping[F[_]]
   lazy val MonitoringProgramReferenceType          = schema.ref("MonitoringProgramReference")
   lazy val MosPreImagingType                       = schema.ref("MosPreImaging")
   lazy val MutationType                            = schema.ref("Mutation")
-  lazy val MultipleFiltersModeType                 = schema.ref("MultipleFiltersMode")
   lazy val NonEmptyStringType                      = schema.ref("NonEmptyString")
   lazy val NonNegIntType                           = schema.ref("NonNegInt")
   lazy val NonNegShortType                         = schema.ref("NonNegShort")
