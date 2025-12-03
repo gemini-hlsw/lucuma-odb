@@ -82,12 +82,6 @@ trait TelluricResolutionService[F[_]]:
   )(using ServiceAccess, NoTransaction[F]): F[Option[TelluricResolution.Meta]]
 
   /**
-   * Invalidates all telluric targets globally, setting them back to 'pending'.
-   * Deletes resolved targets so they revert to placeholders.
-   */
-  def invalidateAll(using ServiceAccess, Transaction[F]): F[Int]
-
-  /**
    * Rechecks telluric resolution for observations linked to a science observation.
    * Re-queries for telluric star and only replaces target if different.
    * Called when science observation changes (obscalc ready).
@@ -281,18 +275,6 @@ object TelluricResolutionService:
                             error"Telluric resolution permanently failed after ${pending.failureCount} attempts: $errorMsg" *>
                             updateToReady(none, errorMsg.some)
         yield meta
-
-      override def invalidateAll(using ServiceAccess, Transaction[F]): F[Int] =
-        Services.asSuperUser:
-            for
-              // Update all entries to pending state
-              // Old targets will be cleaned up by orphan calibration targets cleanup
-              count    <- session.execute(Statements.invalidateAllTellurics)
-              _        <- info"Invalidated $count telluric resolution entries"
-            yield count match {
-              case skunk.data.Completion.Update(count) => count.toInt
-              case _ => 0
-            }
 
       override def recheckForScienceObservation(
         scienceObsId: Observation.Id
@@ -564,24 +546,6 @@ object TelluricResolutionService:
           sql"""
             INSERT INTO t_asterism_target (c_program_id, c_observation_id, c_target_id)
             VALUES ($program_id, $observation_id, $target_id)
-          """.command
-
-        val selectAllResolvedTellurics: Query[Void, (Observation.Id, Target.Id)] =
-          sql"""
-            SELECT c_observation_id, c_resolved_target_id
-            FROM   t_telluric_resolution
-            WHERE  c_resolved_target_id IS NOT NULL
-          """.query(observation_id *: target_id)
-
-        val invalidateAllTellurics: Command[Void] =
-          sql"""
-            UPDATE t_telluric_resolution
-            SET    c_state = 'pending',
-                   c_last_invalidation = now(),
-                   c_retry_at = NULL,
-                   c_failure_count = 0,
-                   c_resolved_target_id = NULL,
-                   c_error_message = NULL
           """.command
 
         val insertResolutionRequest: Command[(Observation.Id, Program.Id, Observation.Id)] =
