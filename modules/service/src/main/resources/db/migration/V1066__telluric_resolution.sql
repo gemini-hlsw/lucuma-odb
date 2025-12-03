@@ -1,5 +1,5 @@
 
-CREATE OR REPLACE FUNCTION is_telluric_calibration(obs_id d_observation_id)
+CREATE FUNCTION is_telluric_calibration(obs_id d_observation_id)
 RETURNS BOOLEAN AS $$
 BEGIN
   RETURN EXISTS (
@@ -10,11 +10,11 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql STABLE;
 
--- Telluric target tracking based on obscalc
+-- Telluric target tracking (closely based on obscalc)
 CREATE TABLE t_telluric_resolution (
-  -- Primary key: the telluric observation
   c_observation_id         d_observation_id  NOT NULL PRIMARY KEY,
 
+  -- Delete if the parent gets deleted
   FOREIGN KEY (c_observation_id)
     REFERENCES t_observation(c_observation_id)
     ON DELETE CASCADE,
@@ -24,7 +24,6 @@ CREATE TABLE t_telluric_resolution (
     is_telluric_calibration(c_observation_id)
   ),
 
-  -- Foreign keys
   c_program_id             d_program_id      NOT NULL,
   c_science_observation_id d_observation_id  NOT NULL,
 
@@ -37,12 +36,12 @@ CREATE TABLE t_telluric_resolution (
   -- When the last result was written
   c_last_update            TIMESTAMP         NOT NULL DEFAULT now(),
 
-  -- Retry tracking (exponential backoff)
+  -- Retry tracking
   c_retry_at               TIMESTAMP         NULL DEFAULT NULL,
   c_failure_count          INTEGER           NOT NULL DEFAULT 0
     CHECK (c_failure_count >= 0),
 
-  -- Result: resolved target (if successful)
+  -- Result: resolved target
   c_resolved_target_id     d_target_id       NULL,
 
   -- Error message (if permanently failed)
@@ -58,7 +57,7 @@ CREATE TABLE t_telluric_resolution (
   )
 );
 
--- Function to publish resolution events
+-- Function to publish telluric events
 CREATE OR REPLACE FUNCTION ch_telluric_resolution_edit()
   RETURNS trigger AS $$
 BEGIN
@@ -76,17 +75,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Index for efficient polling queries
-CREATE INDEX idx_telluric_resolution_pending
-  ON t_telluric_resolution(c_program_id, c_state)
-  WHERE c_state IN ('pending', 'retry');
-
--- Index for startup batch processing
-CREATE INDEX idx_telluric_resolution_retry_at
-  ON t_telluric_resolution(c_retry_at)
-  WHERE c_state = 'retry' AND c_retry_at IS NOT NULL;
-
--- Trigger on t_telluric_resolution
 CREATE TRIGGER ch_telluric_resolution_trigger
   AFTER INSERT OR UPDATE ON t_telluric_resolution
   FOR EACH ROW

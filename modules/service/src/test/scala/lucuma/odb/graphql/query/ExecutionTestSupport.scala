@@ -37,7 +37,6 @@ import lucuma.odb.service.Services
 import lucuma.odb.service.UserService
 import lucuma.odb.util.Codecs.*
 import natchez.Trace
-import skunk.codec.all.text
 import skunk.implicits.*
 
 import java.time.Instant
@@ -356,29 +355,11 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
     withServices(serviceUser) { services =>
       import Trace.Implicits.noop
       for
-        _ <- Services.asSuperUser(UserService.fromSession(services.session).canonicalizeUser(serviceUser))
-        // Debug: print t_obscalc contents
-        _ <- services.session.transaction.use { _ =>
-               val query = sql"""
-                 SELECT c_observation_id, c_obscalc_state, c_odb_error::text,
-                        c_full_setup_time, c_acq_program_time, c_sci_program_time
-                 FROM t_obscalc
-               """.query(observation_id *: calculation_state *: text.opt *: time_span.opt *: time_span.opt *: time_span.opt)
-               services.session.execute(query).flatMap { rows =>
-                 IO.println(s"=== t_obscalc contents ===") *>
-                 rows.traverse_ { case (oid, state, err, setup, acq, sci) =>
-                   IO.println(s"  $oid: state=$state, error=$err, setup=$setup, acq=$acq, sci=$sci")
-                 } *>
-                 IO.println(s"=== end t_obscalc ===")
-               }
-             }
-        pending <- services.session.transaction.use { _ =>
+        _       <- Services.asSuperUser(UserService.fromSession(services.session).canonicalizeUser(serviceUser))
+        pending <- services.session.transaction.use: _ =>
                      Services.asSuperUser(services.telluricTargetsService.load(100))
-                   }
-        _       <- IO.println(s"Pending telluric resolutions: $pending")
-        _       <- pending.traverse_ { p =>
+        _       <- pending.traverse_ : p =>
                      Services.asSuperUser(services.telluricTargetsService.resolveTargets(p))
-                   }
       yield ()
     }
 }
