@@ -5,7 +5,6 @@ package lucuma.odb.sequence
 package gmos.imaging
 
 import cats.Eq
-import cats.data.NonEmptyList
 import lucuma.core.enums.GmosAmpCount
 import lucuma.core.enums.GmosAmpGain
 import lucuma.core.enums.GmosAmpReadMode
@@ -17,6 +16,7 @@ import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
 import lucuma.core.model.sequence.gmos.GmosCcdMode
 import lucuma.core.util.Enumerated
+import lucuma.odb.sequence.syntax.hash.*
 import lucuma.odb.sequence.util.HashBytes
 
 import java.io.ByteArrayOutputStream
@@ -28,7 +28,7 @@ import java.io.DataOutputStream
  */
 sealed trait Config[L: Enumerated]:
 
-  def filters: NonEmptyList[L]
+  def variant: Variant[L]
 
   def bin: GmosBinning =
     explicitBin.getOrElse(defaultBin)
@@ -61,11 +61,11 @@ sealed trait Config[L: Enumerated]:
       ampReadMode
     )
 
-  def hashBytes: Array[Byte] = {
+  def hashBytes: Array[Byte] =
     val bao: ByteArrayOutputStream = new ByteArrayOutputStream(256)
     val out: DataOutputStream      = new DataOutputStream(bao)
 
-    filters.toList.foreach(f => out.writeChars(Enumerated[L].tag(f)))
+    out.write(variant.hashBytes)
     out.writeChars(bin.tag)
     out.writeChars(ampGain.tag)
     out.writeChars(ampReadMode.tag)
@@ -73,7 +73,6 @@ sealed trait Config[L: Enumerated]:
 
     out.close()
     bao.toByteArray
-  }
 
 object Config:
 
@@ -100,9 +99,34 @@ object Config:
           a.explicitAmpGain,
           a.explicitRoi
         )
+/*
+  type GmosNorth = Config[GmosNorthFilter]
+  type GmosSouth = Config[GmosSouthFilter]
 
+  def apply[L: Enumerated](
+    v: Variant[L],
+    c: Common
+  ): Config[L] =
+    new Config[L]:
+      def variant: Variant[L]                          = v
+      def defaultBin: GmosBinning                      = c.defaultBin
+      def explicitBin: Option[GmosBinning]             = c.explicitBin
+      def explicitAmpReadMode: Option[GmosAmpReadMode] = c.explicitAmpReadMode
+      def explicitAmpGain: Option[GmosAmpGain]         = c.explicitAmpGain
+      def explicitRoi: Option[GmosRoi]                 = c.explicitRoi
+
+  given [L: Eq]: Eq[Config[L]] =
+    Eq.by: a =>
+      (
+        a.variant,
+        a.defaultBin,
+        a.explicitBin,
+        a.explicitAmpReadMode,
+        a.explicitRoi
+      )
+*/
   final case class GmosNorth (
-    filters: NonEmptyList[GmosNorthFilter],
+    variant: Variant[GmosNorthFilter],
     common:  Common
   ) extends Config[GmosNorthFilter]:
 
@@ -122,18 +146,13 @@ object Config:
       common.explicitRoi
 
   object GmosNorth:
-
     given Eq[GmosNorth] =
-      Eq.by: a =>
-        (
-          a.filters,
-          a.common
-        )
+      Eq.by(a => (a.variant, a.common))
 
     given HashBytes[GmosNorth] = _.hashBytes
 
   final case class GmosSouth(
-    filters: NonEmptyList[GmosSouthFilter],
+    variant: Variant[GmosSouthFilter],
     common:  Common
   ) extends Config[GmosSouthFilter]:
 
@@ -155,10 +174,6 @@ object Config:
   object GmosSouth:
 
     given Eq[GmosSouth] =
-      Eq.by: a =>
-        (
-          a.filters,
-          a.common
-        )
+      Eq.by(a => (a.variant, a.common))
 
     given HashBytes[GmosSouth] = _.hashBytes

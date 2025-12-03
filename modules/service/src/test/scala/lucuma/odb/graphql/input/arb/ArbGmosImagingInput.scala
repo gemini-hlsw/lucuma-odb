@@ -34,58 +34,53 @@ trait ArbGmosImagingInput:
       yield GmosImagingFilterInput(f, e)
 
   given Arbitrary[GmosImagingInput.Create.Common] =
-    Arbitrary {
-      for {
+    Arbitrary:
+      for
         b <- arbitrary[Option[GmosBinning]]
         m <- arbitrary[Option[GmosAmpReadMode]]
         g <- arbitrary[Option[GmosAmpGain]]
         r <- arbitrary[Option[GmosRoi]]
-      } yield GmosImagingInput.Create.Common(Variant.Interleaved, b, m, g, r)
-    }
+      yield GmosImagingInput.Create.Common(b, m, g, r)
 
   given Arbitrary[GmosImagingInput.Create.North] =
-    Arbitrary {
-      for {
+    Arbitrary:
+      for
         f1 <- arbitrary[GmosImagingFilterInput[GmosNorthFilter]]
         fs <- arbitrary[List[GmosImagingFilterInput[GmosNorthFilter]]]
         c <- arbitrary[GmosImagingInput.Create.Common]
-      } yield GmosImagingInput.Create(NonEmptyList(f1, fs), c)
-    }
+      yield GmosImagingInput.Create(Variant.Grouped.default(NonEmptyList(f1, fs)), c)
 
   given Arbitrary[GmosImagingInput.Create.South] =
-    Arbitrary {
-      for {
+    Arbitrary:
+      for
         f1 <- arbitrary[GmosImagingFilterInput[GmosSouthFilter]]
         fs <- arbitrary[List[GmosImagingFilterInput[GmosSouthFilter]]]
-        c <- arbitrary[GmosImagingInput.Create.Common]
-      } yield GmosImagingInput.Create(NonEmptyList(f1, fs), c)
-    }
+        c  <- arbitrary[GmosImagingInput.Create.Common]
+      yield GmosImagingInput.Create(Variant.Grouped.default(NonEmptyList(f1, fs)), c)
 
   given arbEditCommon: Arbitrary[GmosImagingInput.Edit.Common] =
     Arbitrary:
-      for {
+      for
         b <- arbitrary[Nullable[GmosBinning]]
         m <- arbitrary[Nullable[GmosAmpReadMode]]
         g <- arbitrary[Nullable[GmosAmpGain]]
         r <- arbitrary[Nullable[GmosRoi]]
-      } yield GmosImagingInput.Edit.Common(Variant.Interleaved.some, b, m, g, r)
+      yield GmosImagingInput.Edit.Common(b, m, g, r)
 
   given arbEditCommonN: Arbitrary[GmosImagingInput.Edit.North] =
-    Arbitrary {
-      for {
+    Arbitrary:
+      for
         s <- Gen.choose(1, 4)
         f <- Gen.option(Gen.listOfN(s, arbitrary[GmosImagingFilterInput[GmosNorthFilter]]).map(NonEmptyList.fromListUnsafe))
         c <- arbitrary[GmosImagingInput.Edit.Common]
-      } yield GmosImagingInput.Edit(f, c)
-    }
+      yield GmosImagingInput.Edit(GmosImagingVariantInput.Interleaved(f).some, c)
 
   given arbEditCommonS: Arbitrary[GmosImagingInput.Edit.South] =
-    Arbitrary {
-      for {
+    Arbitrary:
+      for
         s <- Gen.choose(1, 4)
         f <- Gen.option(Gen.listOfN(s, arbitrary[GmosImagingFilterInput[GmosSouthFilter]]).map(NonEmptyList.fromListUnsafe))
         c <- arbitrary[GmosImagingInput.Edit.Common]
-      } yield GmosImagingInput.Edit(f, c)
-    }
+      yield GmosImagingInput.Edit(GmosImagingVariantInput.Interleaved(f).some, c)
 
 object ArbGmosImagingInput extends ArbGmosImagingInput
