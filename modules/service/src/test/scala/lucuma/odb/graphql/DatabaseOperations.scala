@@ -837,24 +837,26 @@ trait DatabaseOperations { this: OdbSuite =>
         """{
           gmosNorthImaging: {
             variant: {
-              grouped: {}
+              grouped: {
+                filters: [
+                  { filter: R_PRIME },
+                  { filter: G_PRIME }
+                ]
+              }
             }
-            filters: [
-              { filter: R_PRIME },
-              { filter: G_PRIME }
-            ]
           }
         }"""
       case ObservingModeType.GmosSouthImaging =>
         """{
           gmosSouthImaging: {
             variant: {
-              grouped: {}
+              grouped: {
+                filters: [
+                  { filter: R_PRIME },
+                  { filter: G_PRIME }
+                ]
+              }
             }
-            filters: [
-              { filter: R_PRIME },
-              { filter: G_PRIME }
-            ]
           }
         }"""
       case ObservingModeType.GmosNorthLongSlit =>
@@ -882,32 +884,26 @@ trait DatabaseOperations { this: OdbSuite =>
         s"""{
           gmosNorthImaging: {
             variant: {
-              interleaved: {}
-            }
-            filters: [
-              {
-                filter: R_PRIME
-              },
-              {
-                filter: G_PRIME
+              interleaved: {
+                filters: [
+                  { filter: R_PRIME },
+                  { filter: G_PRIME }
+                ]
               }
-            ]
+            }
           }
         }"""
       case ObservingModeType.GmosSouthImaging =>
         s"""{
           gmosSouthImaging: {
             variant: {
-              interleaved: {}
-            }
-            filters: [
-              {
-                filter: R_PRIME
-              },
-              {
-                filter: G_PRIME
+              interleaved: {
+                filters: [
+                  { filter: R_PRIME },
+                  { filter: G_PRIME }
+                ]
               }
-            ]
+            }
           }
         }"""
       case ObservingModeType.Flamingos2LongSlit =>
