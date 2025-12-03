@@ -181,7 +181,7 @@ object PerScienceObservationCalibrationsService:
           scienceIndex  <- obsGroupIndex(scienceOid)
           telluricIndex = NonNegShort.unsafeFrom((scienceIndex.value + 1).toShort)
           telluricId    <- insertTelluricObservation(pid, telluricGroupId, telluricIndex)
-          _             <- telluricTargets.recordResolutionRequest(pid, telluricId, scienceOid)
+          _             <- telluricTargets.requestTelluricTarget(pid, telluricId, scienceOid)
           _             <- syncConfiguration(scienceOid, telluricId)
         yield telluricId
 
