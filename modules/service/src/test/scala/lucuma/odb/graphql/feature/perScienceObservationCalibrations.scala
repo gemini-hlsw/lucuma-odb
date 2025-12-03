@@ -599,7 +599,6 @@ class perScienceObservationCalibrations
       tid              <- createTargetWithProfileAs(pi, pid)
       // Create F2 observation directly in the parent group
       oid              <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
-      _                <- runObscalcUpdate(pid, oid)
       _                <- moveObservationAs(pi, oid, parentGroupId.some)  // Move to parent group
       _                <- recalculateCalibrations(pid, when)
       obs              <- queryObservation(oid)
@@ -626,7 +625,6 @@ class perScienceObservationCalibrations
       tid1             <- createTargetWithProfileAs(pi, pid)
       tid2             <- createTargetWithProfileAs(pi, pid)
       f2Oid            <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid1))
-      _                <- runObscalcUpdate(pid, f2Oid)
       _                <- moveObservationAs(pi, f2Oid, parentGroupId.some)
       // Add gmos after f2
       gmosOid          <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid2))
@@ -681,7 +679,6 @@ class perScienceObservationCalibrations
       _           <- setScienceRequirements(oid)
       _           <- runObscalcUpdate(pid, oid)
       _           <- recalculateCalibrations(pid, when)
-      _           <- runObscalcUpdate(pid, oid)
       _           <- sleep >> resolveTelluricTargets
       obs         <- queryObservation(oid)
       groupId     =  obs.groupId.get
@@ -880,7 +877,9 @@ class perScienceObservationCalibrations
       tid2 <- createTargetWithProfileAs(pi, pid)
       oid1 <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid1))
       oid2 <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid2))
-      // Don't set workflow state to Ready
+      // Explicitly set both observations to Inactive workflow state
+      _    <- setObservationWorkflowState(pi, oid1, ObservationWorkflowState.Inactive)
+      _    <- setObservationWorkflowState(pi, oid2, ObservationWorkflowState.Inactive)
       _    <- recalculateCalibrations(pid, when)
       obs1 <- queryObservation(oid1)
       obs2 <- queryObservation(oid2)

@@ -252,7 +252,7 @@ object Services:
    * Construct a `Services` for the given `User` and `Session`. Service instances are constructed
    * lazily.
    */
-  def forUser[F[_]: Async](
+  def forUser[F[_]](
     user0: User,
     enums0: Enums,
     mapping0: Option[Session[F] => Mapping[F]],
@@ -264,9 +264,9 @@ object Services:
     gaiaClient0: GaiaClient[F],
     s3FileService0: S3FileService[F],
     horizonsClient: HorizonsClient[F],
-    telluricClient: TelluricTargetsClient[F]
+    telluricClient0: TelluricTargetsClient[F],
   )(s: Session[F])(
-    using tf: Trace[F], uf: UUIDGen[F], cf: Temporal[F], par: Parallel[F], log: Logger[F], lf: LoggerFactory[F]
+    using tf: Trace[F], uf: UUIDGen[F], cf: Temporal[F], par: Parallel[F], log: Logger[F], lf: LoggerFactory[F], as: Async[F]
   ): Services[F[_]] =
     new Services[F]:
 
@@ -366,7 +366,7 @@ object Services:
       lazy val proposalService = ProposalService.instantiate(emailConfig)
       lazy val userInvitationService = UserInvitationService.instantiate(emailConfig)
       lazy val trackingService = TrackingService.instantiate(horizonsClient)
-      lazy val telluricResolutionService: TelluricResolutionService[F] = TelluricResolutionService.instantiate(telluricClient)
+      lazy val telluricResolutionService: TelluricResolutionService[F] = TelluricResolutionService.instantiate(telluricClient0)
 
   /**
    * This adds syntax to access the members of `Services` and the current `Transaction` when they
