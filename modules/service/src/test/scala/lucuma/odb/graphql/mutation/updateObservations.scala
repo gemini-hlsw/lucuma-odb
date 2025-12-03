@@ -3473,13 +3473,13 @@ class updateObservations extends OdbSuite
       observingMode: {
         gmosNorthImaging: {
           variant: {
-            interleaved: {}
+            interleaved: {
+              filters: [
+                { filter: G_PRIME },
+                { filter: R_PRIME }
+              ]
+            }
           }
-          filters: [
-            { filter: G_PRIME },
-            { filter: R_PRIME }
-          ]
-          explicitMultipleFiltersMode: INTERLEAVED
           explicitBin: TWO
           explicitAmpReadMode: FAST
           explicitAmpGain: HIGH
@@ -3493,26 +3493,32 @@ class updateObservations extends OdbSuite
         instrument
         observingMode {
           gmosNorthImaging {
-            filters {
-              filter
+            variant {
+              interleaved {
+                filters {
+                  filter
+                }
+              }
             }
             initialFilters {
               filter
             }
-            multipleFiltersMode
             bin
             ampReadMode
             ampGain
             roi
           }
           gmosSouthImaging {
-            filters {
-              filter
+            variant {
+              interleaved {
+                filters {
+                  filter
+                }
+              }
             }
             initialFilters {
               filter
             }
-            multipleFiltersMode
             bin
             ampReadMode
             ampGain
@@ -3531,15 +3537,18 @@ class updateObservations extends OdbSuite
               "instrument": "GMOS_NORTH",
               "observingMode": {
                 "gmosNorthImaging": {
-                  "filters": [
-                    { "filter": "G_PRIME" },
-                    { "filter": "R_PRIME" }
-                  ],
+                  "variant": {
+                    "interleaved": {
+                      "filters": [
+                        { "filter": "G_PRIME" },
+                        { "filter": "R_PRIME" }
+                      ]
+                    }
+                  },
                   "initialFilters": [
                     { "filter": "G_PRIME" },
                     { "filter": "R_PRIME" }
                   ],
-                  "multipleFiltersMode": "INTERLEAVED",
                   "bin": "TWO",
                   "ampReadMode": "FAST",
                   "ampGain": "HIGH",
@@ -3570,6 +3579,10 @@ class updateObservations extends OdbSuite
         gmosNorthImaging: {
           variant: {
             grouped: {
+              filters: [
+                { filter: G_PRIME },
+                { filter: R_PRIME }
+              ]
               offsets: {
                 enumerated: {
                   values: [
@@ -3601,10 +3614,6 @@ class updateObservations extends OdbSuite
               }
             }
           }
-          filters: [
-            { filter: G_PRIME },
-            { filter: R_PRIME }
-          ]
           explicitBin: ONE
           explicitAmpReadMode: SLOW
           explicitAmpGain: LOW
@@ -3620,6 +3629,9 @@ class updateObservations extends OdbSuite
           gmosNorthImaging {
             variant {
               grouped {
+                filters {
+                  filter
+                }
                 offsets {
                   enumerated {
                     values {
@@ -3642,10 +3654,6 @@ class updateObservations extends OdbSuite
                 }
               }
             }
-            filters {
-              filter
-            }
-            multipleFiltersMode
             bin
             ampReadMode
             ampGain
@@ -3666,6 +3674,10 @@ class updateObservations extends OdbSuite
                 "gmosNorthImaging": {
                   "variant": {
                     "grouped": {
+                      "filters": [
+                        { "filter": "G_PRIME" },
+                        { "filter": "R_PRIME" }
+                      ],
                       "offsets": {
                         "enumerated": {
                           "values": [
@@ -3697,11 +3709,6 @@ class updateObservations extends OdbSuite
                       }
                     }
                   },
-                  "filters": [
-                    { "filter": "G_PRIME" },
-                    { "filter": "R_PRIME" }
-                  ],
-                  "multipleFiltersMode": "GROUPED",
                   "bin": "ONE",
                   "ampReadMode": "SLOW",
                   "ampGain": "LOW",
@@ -3719,6 +3726,10 @@ class updateObservations extends OdbSuite
         gmosNorthImaging: {
           variant: {
             grouped: {
+              filters: [
+                { filter: I_PRIME },
+                { filter: Z_PRIME }
+              ]
               offsets: {
                 enumerated: {
                   values: [
@@ -3735,11 +3746,6 @@ class updateObservations extends OdbSuite
               skyOffsets: null
             }
           }
-          filters: [
-            { filter: I_PRIME },
-            { filter: Z_PRIME }
-          ]
-          explicitMultipleFiltersMode: INTERLEAVED
           explicitBin: FOUR
           explicitAmpReadMode: FAST
           explicitAmpGain: HIGH
@@ -3759,6 +3765,10 @@ class updateObservations extends OdbSuite
                 "gmosNorthImaging": {
                   "variant": {
                     "grouped": {
+                      "filters": [
+                        { "filter": "I_PRIME" },
+                        { "filter": "Z_PRIME" }
+                      ],
                       "offsets": {
                         "enumerated": {
                           "values": [
@@ -3775,11 +3785,6 @@ class updateObservations extends OdbSuite
                       "skyOffsets": null
                     }
                   },
-                  "filters": [
-                    { "filter": "I_PRIME" },
-                    { "filter": "Z_PRIME" }
-                  ],
-                  "multipleFiltersMode": "INTERLEAVED",
                   "bin": "FOUR",
                   "ampReadMode": "FAST",
                   "ampGain": "HIGH",
@@ -3812,10 +3817,14 @@ class updateObservations extends OdbSuite
       }
       observingMode: {
         gmosNorthImaging: {
-          filters: [
-            { filter: G_PRIME },
-            { filter: R_PRIME }
-          ]
+          variant: {
+            interleaved: {
+              filters: [
+                { filter: G_PRIME },
+                { filter: R_PRIME }
+              ]
+            }
+          }
         }
       }
     """
@@ -3825,8 +3834,12 @@ class updateObservations extends OdbSuite
         instrument
         observingMode {
           gmosNorthImaging {
-            filters {
-              filter
+            variant {
+              interleaved {
+                filters {
+                  filter
+                }
+              }
             }
           }
         }
@@ -3842,10 +3855,14 @@ class updateObservations extends OdbSuite
               "instrument": "GMOS_NORTH",
               "observingMode": {
                 "gmosNorthImaging": {
-                  "filters": [
-                    { "filter": "G_PRIME" },
-                    { "filter": "R_PRIME" }
-                  ]
+                  "variant": {
+                    "interleaved": {
+                      "filters": [
+                        { "filter": "G_PRIME" },
+                        { "filter": "R_PRIME" }
+                      ]
+                    }
+                  }
                 }
               }
             }
@@ -3878,8 +3895,10 @@ class updateObservations extends OdbSuite
         instrument
         observingMode {
           gmosNorthImaging {
-            filters {
-              filter
+            variant {
+              interleaved {
+                filters { filter }
+              }
             }
           }
           gmosNorthLongSlit {
@@ -3923,10 +3942,14 @@ class updateObservations extends OdbSuite
       }
       observingMode: {
         gmosNorthImaging: {
-          filters: [
-            { filter: G_PRIME },
-            { filter: R_PRIME }
-          ]
+          variant: {
+            interleaved: {
+              filters: [
+                { filter: G_PRIME },
+                { filter: R_PRIME }
+              ]
+            }
+          }
         }
       }
     """
@@ -3937,8 +3960,10 @@ class updateObservations extends OdbSuite
         observingMode {
           mode
           gmosNorthImaging {
-            filters {
-              filter
+            variant {
+              interleaved {
+                filters { filter }
+              }
             }
           }
         }
@@ -3955,10 +3980,14 @@ class updateObservations extends OdbSuite
               "observingMode": {
                 "mode": "GMOS_NORTH_IMAGING",
                 "gmosNorthImaging": {
-                  "filters": [
-                    { "filter": "G_PRIME" },
-                    { "filter": "R_PRIME" }
-                  ]
+                  "variant": {
+                    "interleaved": {
+                      "filters": [
+                        { "filter": "G_PRIME" },
+                        { "filter": "R_PRIME" }
+                      ]
+                    }
+                  }
                 }
               }
             }
@@ -4006,8 +4035,10 @@ class updateObservations extends OdbSuite
       observations {
         observingMode {
           gmosSouthImaging {
-            filters {
-              filter
+            variant {
+              grouped {
+                filters { filter }
+              }
             }
             explicitBin
           }
@@ -4023,10 +4054,14 @@ class updateObservations extends OdbSuite
               {
                 "observingMode": {
                   "gmosSouthImaging": {
-                    "filters": [
-                      { "filter": "G_PRIME" },
-                      { "filter": "R_PRIME" }
-                    ],
+                    "variant": {
+                      "grouped": {
+                        "filters": [
+                          { "filter": "G_PRIME" },
+                          { "filter": "R_PRIME" }
+                        ]
+                      }
+                    },
                     "explicitBin": "FOUR"
                   }
                 }
@@ -4119,7 +4154,11 @@ class updateObservations extends OdbSuite
     val update = """
       observingMode: {
         gmosNorthImaging: {
-          filters: []
+          variant: {
+            interleaved: {
+              filters: []
+            }
+          }
         }
       }
     """
@@ -4128,15 +4167,17 @@ class updateObservations extends OdbSuite
       observations {
         observingMode {
           gmosNorthImaging {
-            filters {
-              filter
+            variant {
+              interleaved {
+                filters { filter }
+              }
             }
           }
         }
       }
     """
 
-    val expected = "Argument 'input.SET.observingMode.gmosNorthImaging' is invalid: At least one filter must be specified for GMOS imaging observations.".asLeft
+    val expected = "Argument 'input.SET.observingMode.gmosNorthImaging.variant.interleaved' is invalid: At least one filter must be specified for GMOS imaging observations.".asLeft
     oneUpdateTest(pi, update, query, expected)
 
   test("observing mode: (fail to) update existing GMOS imaging with empty filters - rollback other changes"):
@@ -4145,10 +4186,14 @@ class updateObservations extends OdbSuite
         val initialUpdate = """
           observingMode: {
             gmosNorthImaging: {
-              filters: [
-                { filter: G_PRIME },
-                { filter: R_PRIME }
-              ],
+              variant: {
+                interleaved: {
+                  filters: [
+                    { filter: G_PRIME },
+                    { filter: R_PRIME }
+                  ]
+                }
+              }
               explicitBin: TWO,
               explicitAmpGain: LOW
             }
@@ -4158,8 +4203,12 @@ class updateObservations extends OdbSuite
         val failingUpdate = """
           observingMode: {
             gmosNorthImaging: {
-              filters: [],
-              explicitBin: FOUR,
+              variant: {
+                interleaved: {
+                  filters: []
+                }
+              }
+              explicitBin: FOUR
               explicitAmpGain: HIGH
             }
           }
@@ -4169,8 +4218,10 @@ class updateObservations extends OdbSuite
           observations {
             observingMode {
               gmosNorthImaging {
-                filters {
-                  filter
+                variant {
+                  interleaved {
+                    filters { filter }
+                  }
                 }
                 bin
                 ampGain
@@ -4190,10 +4241,14 @@ class updateObservations extends OdbSuite
                     {
                       "observingMode": {
                         "gmosNorthImaging": {
-                          "filters": [
-                            { "filter": "G_PRIME" },
-                            { "filter": "R_PRIME" }
-                          ],
+                          "variant": {
+                            "interleaved": {
+                              "filters": [
+                                { "filter": "G_PRIME" },
+                                { "filter": "R_PRIME" }
+                              ]
+                            }
+                          },
                           "bin": "TWO",
                           "ampGain": "LOW"
                         }
@@ -4207,7 +4262,7 @@ class updateObservations extends OdbSuite
           _ <- expect(
             user = pi,
             query = updateObservationsMutation(oid, failingUpdate, query),
-            expected = List("Argument 'input.SET.observingMode.gmosNorthImaging' is invalid: At least one filter must be specified for GMOS imaging observations.").asLeft
+            expected = List("Argument 'input.SET.observingMode.gmosNorthImaging.variant.interleaved' is invalid: At least one filter must be specified for GMOS imaging observations.").asLeft
           )
           // Verify that ALL values remain unchanged (transaction rollback)
           _ <- expect(
@@ -4217,7 +4272,11 @@ class updateObservations extends OdbSuite
                 observation(observationId: "$oid") {
                   observingMode {
                     gmosNorthImaging {
-                      filters { filter }
+                      variant {
+                        interleaved {
+                          filters { filter }
+                        }
+                      }
                       initialFilters { filter }
                       bin
                       ampGain
@@ -4231,10 +4290,14 @@ class updateObservations extends OdbSuite
                 "observation": {
                   "observingMode": {
                     "gmosNorthImaging": {
-                      "filters": [
-                        { "filter": "G_PRIME" },
-                        { "filter": "R_PRIME" }
-                      ],
+                      "variant": {
+                        "interleaved": {
+                          "filters": [
+                            { "filter": "G_PRIME" },
+                            { "filter": "R_PRIME" }
+                          ]
+                        }
+                      },
                       "initialFilters": [
                         { "filter": "G_PRIME" },
                         { "filter": "R_PRIME" }
@@ -4263,12 +4326,15 @@ class updateObservations extends OdbSuite
       }
       observingMode: {
         gmosNorthImaging: {
-          filters: [
-            { filter: G_PRIME },
-            { filter: R_PRIME },
-            { filter: I_PRIME }
-          ]
-          explicitMultipleFiltersMode: INTERLEAVED
+          variant: {
+            interleaved: {
+              filters: [
+                { filter: G_PRIME },
+                { filter: R_PRIME },
+                { filter: I_PRIME }
+              ]
+            }
+          }
           explicitBin: TWO
           explicitAmpReadMode: SLOW
           explicitAmpGain: LOW
@@ -4282,8 +4348,11 @@ class updateObservations extends OdbSuite
         instrument
         observingMode {
           gmosNorthImaging {
-            filters { filter }
-            multipleFiltersMode
+            variant {
+              interleaved {
+                filters { filter }
+              }
+            }
             bin
             ampReadMode
             ampGain
@@ -4301,12 +4370,15 @@ class updateObservations extends OdbSuite
               "instrument": "GMOS_NORTH",
               "observingMode": {
                 "gmosNorthImaging": {
-                  "filters": [
-                    { "filter": "G_PRIME" },
-                    { "filter": "R_PRIME" },
-                    { "filter": "I_PRIME" }
-                  ],
-                  "multipleFiltersMode": "INTERLEAVED",
+                  "variant": {
+                    "interleaved": {
+                      "filters": [
+                        { "filter": "G_PRIME" },
+                        { "filter": "R_PRIME" },
+                        { "filter": "I_PRIME" }
+                      ]
+                    }
+                  },
                   "bin": "TWO",
                   "ampReadMode": "SLOW",
                   "ampGain": "LOW",
@@ -4334,12 +4406,15 @@ class updateObservations extends OdbSuite
       }
       observingMode: {
         gmosSouthImaging: {
-          filters: [
-            { filter: G_PRIME },
-            { filter: R_PRIME },
-            { filter: I_PRIME }
-          ]
-          explicitMultipleFiltersMode: INTERLEAVED
+          variant: {
+            interleaved: {
+              filters: [
+                { filter: G_PRIME },
+                { filter: R_PRIME },
+                { filter: I_PRIME }
+              ]
+            }
+          }
           explicitBin: FOUR
           explicitAmpReadMode: FAST
           explicitAmpGain: HIGH
@@ -4353,8 +4428,11 @@ class updateObservations extends OdbSuite
         instrument
         observingMode {
           gmosSouthImaging {
-            filters { filter }
-            multipleFiltersMode
+            variant {
+              interleaved {
+                filters { filter }
+              }
+            }
             bin
             ampReadMode
             ampGain
@@ -4372,12 +4450,15 @@ class updateObservations extends OdbSuite
               "instrument": "GMOS_SOUTH",
               "observingMode": {
                 "gmosSouthImaging": {
-                  "filters":  [
-                    { "filter": "G_PRIME" },
-                    { "filter": "R_PRIME" },
-                    { "filter": "I_PRIME" }
-                  ],
-                  "multipleFiltersMode": "INTERLEAVED",
+                  "variant": {
+                    "interleaved": {
+                      "filters":  [
+                        { "filter": "G_PRIME" },
+                        { "filter": "R_PRIME" },
+                        { "filter": "I_PRIME" }
+                      ]
+                    }
+                  },
                   "bin": "FOUR",
                   "ampReadMode": "FAST",
                   "ampGain": "HIGH",

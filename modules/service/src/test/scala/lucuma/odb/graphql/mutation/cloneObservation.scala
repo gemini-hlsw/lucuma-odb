@@ -151,30 +151,76 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
           }
         }
         gmosNorthImaging {
-          filters { filter }
+          variant {
+            grouped {
+              filters { filter }
+              order
+              skyCount
+            }
+            interleaved {
+              filters { filter }
+            }
+            preImaging {
+              filters { filter }
+              offset1 {
+                p { arcseconds }
+                q { arcseconds }
+              }
+              offset2 {
+                p { arcseconds }
+                q { arcseconds }
+              }
+              offset3 {
+                p { arcseconds }
+                q { arcseconds }
+              }
+              offset4 {
+                p { arcseconds }
+                q { arcseconds }
+              }
+            }
+          }
           initialFilters { filter }
-          multipleFiltersMode
           bin
           ampReadMode
           ampGain
           roi
-          offsets {
-            p { arcseconds }
-            q { arcseconds }
-          }
         }
         gmosSouthImaging {
-          filters { filter }
+          variant {
+            grouped {
+              filters { filter }
+              order
+              skyCount
+            }
+            interleaved {
+              filters { filter }
+            }
+            preImaging {
+              filters { filter }
+              offset1 {
+                p { arcseconds }
+                q { arcseconds }
+              }
+              offset2 {
+                p { arcseconds }
+                q { arcseconds }
+              }
+              offset3 {
+                p { arcseconds }
+                q { arcseconds }
+              }
+              offset4 {
+                p { arcseconds }
+                q { arcseconds }
+              }
+            }
+          }
           initialFilters { filter }
-          multipleFiltersMode
           bin
           ampReadMode
           ampGain
           roi
-          offsets {
-            p { arcseconds }
-            q { arcseconds }
-          }
         }
         flamingos2LongSlit {
           disperser
@@ -559,9 +605,12 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
                   originalObservation {
                     observingMode {
                       gmosNorthImaging {
-                        ${filtersQuery("filters")}
+                        variant {
+                          interleaved {
+                            ${filtersQuery("filters")}
+                          }
+                        }
                         ${filtersQuery("initialFilters")}
-                        multipleFiltersMode
                         bin
                         ampReadMode
                         ampGain
@@ -572,9 +621,12 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
                   newObservation {
                     observingMode {
                       gmosNorthImaging {
-                        ${filtersQuery("filters")}
+                        variant {
+                          interleaved {
+                            ${filtersQuery("filters")}
+                          }
+                        }
                         ${filtersQuery("initialFilters")}
-                        multipleFiltersMode
                         bin
                         ampReadMode
                         ampGain
@@ -592,15 +644,18 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
                     "originalObservation": {
                       "observingMode": {
                         "gmosNorthImaging": {
-                          "filters": [
-                            ${filterJson(GmosNorthFilter.GPrime, 100, 1210)},
-                            ${filterJson(GmosNorthFilter.RPrime, 100, 1210)}
-                          ],
+                          "variant": {
+                            "interleaved": {
+                              "filters": [
+                                ${filterJson(GmosNorthFilter.GPrime, 100, 1210)},
+                                ${filterJson(GmosNorthFilter.RPrime, 100, 1210)}
+                              ]
+                            }
+                          },
                           "initialFilters": [
                             ${filterJson(GmosNorthFilter.GPrime, 100, 1210)},
                             ${filterJson(GmosNorthFilter.RPrime, 100, 1210)}
                           ],
-                          "multipleFiltersMode": "GROUPED",
                           "bin": "TWO",
                           "ampReadMode": "SLOW",
                           "ampGain": "LOW",
@@ -611,15 +666,18 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
                     "newObservation": {
                       "observingMode": {
                         "gmosNorthImaging": {
-                          "filters": [
-                            ${filterJson(GmosNorthFilter.GPrime, 100, 1210)},
-                            ${filterJson(GmosNorthFilter.RPrime, 100, 1210)}
-                          ],
+                          "variant": {
+                            "interleaved": {
+                              "filters": [
+                                ${filterJson(GmosNorthFilter.GPrime, 100, 1210)},
+                                ${filterJson(GmosNorthFilter.RPrime, 100, 1210)}
+                              ]
+                            }
+                          },
                           "initialFilters": [
                             ${filterJson(GmosNorthFilter.GPrime, 100, 1210)},
                             ${filterJson(GmosNorthFilter.RPrime, 100, 1210)}
                           ],
-                          "multipleFiltersMode": "GROUPED",
                           "bin": "TWO",
                           "ampReadMode": "SLOW",
                           "ampGain": "LOW",
