@@ -52,6 +52,19 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
   def runObscalcUpdate(p: Program.Id, o: Observation.Id): IO[Unit] =
     runObscalcUpdateAs(serviceUser, p, o)
 
+  private def runProgramObscalc(pid: Program.Id): IO[Unit] =
+    withSession: session =>
+      session.execute(
+        sql"""
+          SELECT c_observation_id
+          FROM t_obscalc
+          WHERE c_program_id = $program_id
+            AND c_obscalc_state IN ('pending', 'retry')
+        """.query(observation_id)
+      )(pid)
+    .flatMap: oids =>
+      oids.traverse_(oid => runObscalcUpdate(pid, oid))
+
   override val validUsers: List[User] =
     List(pi, pi2, serviceUser, staff)
 
@@ -323,15 +336,17 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
    */
   def recalculateCalibrations(pid: Program.Id, when: Instant): IO[(List[Observation.Id], List[Observation.Id])] =
     import Trace.Implicits.noop
-    withServices(serviceUser): services =>
-      for
-        _ <- Services.asSuperUser(UserService.fromSession(services.session).canonicalizeUser(serviceUser))
-        r <- services.transactionally:
-               Services.asSuperUser:
-                 services
-                   .calibrationsService
-                   .recalculateCalibrations(pid, when)
-      yield r
+    // First run obscalc for all pending observations in this program
+    runProgramObscalc(pid) *>
+      withServices(serviceUser): services =>
+        for
+          _ <- Services.asSuperUser(UserService.fromSession(services.session).canonicalizeUser(serviceUser))
+          r <- services.transactionally:
+                Services.asSuperUser:
+                  services
+                    .calibrationsService
+                    .recalculateCalibrations(pid, when)
+        yield r
 
   /**
    * Resolve all pending telluric targets for a program.

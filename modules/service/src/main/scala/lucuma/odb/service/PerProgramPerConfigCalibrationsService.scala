@@ -308,7 +308,7 @@ object PerProgramPerConfigCalibrationsService:
 
         for {
           // Filter for only 'defined' or 'ready' observations where obscalc has been calculated
-          activeGmosSci   <- onlyDefinedAndReadyWithCalculatedState(gmosSci, _.id)
+          activeGmosSci   <- onlyDefinedAndReady(gmosSci, _.id)
           // unique GMOS configurations
           uniqueSci       = uniqueConfiguration(activeGmosSci)
           // Extract props from all science observations
