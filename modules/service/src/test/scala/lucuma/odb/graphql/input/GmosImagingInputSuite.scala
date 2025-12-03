@@ -3,13 +3,11 @@
 
 package lucuma.odb.graphql.input
 
-import cats.syntax.option.*
 import io.circe.testing.ArbitraryInstances
 import lucuma.core.enums.GmosAmpGain
 import lucuma.core.enums.GmosAmpReadMode
 import lucuma.core.enums.GmosBinning
 import lucuma.core.enums.GmosRoi
-import lucuma.odb.sequence.gmos.imaging.Variant
 import munit.DisciplineSuite
 import munit.FunSuite
 
@@ -17,7 +15,6 @@ class GmosImagingInputSuite extends DisciplineSuite with ArbitraryInstances :
 
   test("GmosImagingInput.Create.Common stores explicit values correctly") {
     val common = GmosImagingInput.Create.Common(
-      variant = Variant.Interleaved,
       explicitBin = Some(GmosBinning.Two),
       explicitAmpReadMode = Some(GmosAmpReadMode.Slow),
       explicitAmpGain = Some(GmosAmpGain.Low),
@@ -34,14 +31,13 @@ class GmosImagingInputSuite extends DisciplineSuite with ArbitraryInstances :
     import lucuma.odb.data.Nullable
 
     val editCommon = GmosImagingInput.Edit.Common(
-      variant = Variant.Interleaved.some,
       explicitBin = Nullable.NonNull(GmosBinning.Two),
       explicitAmpReadMode = Nullable.NonNull(GmosAmpReadMode.Slow),
       explicitAmpGain = Nullable.Null,
       explicitRoi = Nullable.Absent
     )
 
-    val createCommon = editCommon.toCreate.toOption.get
+    val createCommon = editCommon.toCreate
 
     assertEquals(createCommon.explicitBin, Some(GmosBinning.Two))
     assertEquals(createCommon.explicitAmpReadMode, Some(GmosAmpReadMode.Slow))

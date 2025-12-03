@@ -65,7 +65,7 @@ object StartupDiagnostics:
           checkPostgresEnum(exposure_time_mode_type),
           checkPostgresEnum(gcal_baseline),
           checkPostgresEnum(gcal_lamp_type),
-          checkPostgresEnum(gmos_imaging_type),
+          checkPostgresEnum(gmos_imaging_variant),
           checkPostgresEnum(gmos_long_slit_acquisition_roi),
           checkPostgresEnum(gender),
           checkPostgresEnum(guide_state),

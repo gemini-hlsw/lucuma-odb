@@ -2178,12 +2178,7 @@ Edit or create GMOS North Imaging advanced configuration
 """
 input GmosNorthImagingInput {
 
-  variant: GmosImagingVariantInput
-
-  """
-  The filters field must be specified with at least one filter. It cannot be unset with a null value.
-  """
-  filters: [GmosNorthImagingFilterInput!]
+  variant: GmosNorthImagingVariantInput
 
   """
   The explicitBin field may be unset by assigning a null value, or ignored by skipping it altogether
@@ -2676,12 +2671,7 @@ Edit or create GMOS South Imaging advanced configuration
 """
 input GmosSouthImagingInput {
 
-  variant: GmosImagingVariantInput
-
-  """
-  The filters field must be specified with at least one filter. It cannot be unset with a null value.
-  """
-  filters: [GmosSouthImagingFilterInput!]
+  variant: GmosSouthImagingVariantInput
 
   """
   The explicitBin field may be unset by assigning a null value, or ignored by skipping it altogether
@@ -9151,20 +9141,36 @@ enum GmosImagingVariantType {
   PRE_IMAGING
 }
 
-type GmosImagingVariant {
+type GmosNorthImagingVariant {
   variantType: GmosImagingVariantType!
 
-  grouped: GmosGroupedFilterImaging
-  preImaging: GmosPreImaging
+  grouped:     GmosNorthGroupedImaging
+  interleaved: GmosNorthInterleavedImaging
+  preImaging:  GmosNorthPreImaging
 }
 
-input GmosImagingVariantInput @oneOf {
-  grouped: GmosGroupedFilterImagingInput
-  interleaved: GmosInterleavedFilterImagingInput
-  preImaging: GmosPreImagingInput
+input GmosNorthImagingVariantInput @oneOf {
+  grouped:     GmosNorthGroupedImagingInput
+  interleaved: GmosNorthInterleavedImagingInput
+  preImaging:  GmosNorthPreImagingInput
 }
 
-type GmosGroupedFilterImaging {
+type GmosSouthImagingVariant {
+  variantType: GmosImagingVariantType!
+
+  grouped:     GmosSouthGroupedImaging
+  interleaved: GmosSouthInterleavedImaging
+  preImaging:  GmosSouthPreImaging
+}
+
+input GmosSouthImagingVariantInput @oneOf {
+  grouped:     GmosSouthGroupedImagingInput
+  interleaved: GmosSouthInterleavedImagingInput
+  preImaging:  GmosSouthPreImagingInput
+}
+
+type GmosNorthGroupedImaging {
+  filters: [GmosNorthImagingFilter!]!
   order: WavelengthOrder!
 
   offsets: OffsetGenerator
@@ -9172,29 +9178,101 @@ type GmosGroupedFilterImaging {
   skyOffsets: OffsetGenerator
 }
 
-input GmosGroupedFilterImagingInput {
+input GmosNorthGroupedImagingInput {
+
+  """
+  The filters field must be specified with at least one filter. It cannot be unset with a null value.
+  """
+  filters: [GmosNorthImagingFilterInput!]
   order: WavelengthOrder
+
   offsets: OffsetGeneratorInput
   skyCount: NonNegInt
   skyOffsets: OffsetGeneratorInput
 }
 
-input GmosInterleavedFilterImagingInput {
-  _placeholder: Boolean = true
+type GmosSouthGroupedImaging {
+  filters: [GmosSouthImagingFilter!]!
+  order: WavelengthOrder!
+
+  offsets: OffsetGenerator
+  skyCount: NonNegInt!
+  skyOffsets: OffsetGenerator
 }
 
-type GmosPreImaging {
+input GmosSouthGroupedImagingInput {
+
+  """
+  The filters field must be specified with at least one filter. It cannot be unset with a null value.
+  """
+  filters: [GmosSouthImagingFilterInput!]
+  order: WavelengthOrder
+
+  offsets: OffsetGeneratorInput
+  skyCount: NonNegInt
+  skyOffsets: OffsetGeneratorInput
+}
+
+type GmosNorthInterleavedImaging {
+  filters: [GmosNorthImagingFilter!]!
+}
+
+input GmosNorthInterleavedImagingInput {
+  """
+  The filters field must be specified with at least one filter. It cannot be unset with a null value.
+  """
+  filters: [GmosNorthImagingFilterInput!]
+}
+
+type GmosSouthInterleavedImaging {
+  filters: [GmosSouthImagingFilter!]!
+}
+
+input GmosSouthInterleavedImagingInput {
+  """
+  The filters field must be specified with at least one filter. It cannot be unset with a null value.
+  """
+  filters: [GmosSouthImagingFilterInput!]
+}
+
+type GmosNorthPreImaging {
+  filters: [GmosNorthImagingFilter!]!
   offset1: Offset!
   offset2: Offset!
   offset3: Offset!
   offset4: Offset!
 }
 
-input GmosPreImagingInput {
-  offset1: OffsetInput!
-  offset2: OffsetInput!
-  offset3: OffsetInput!
-  offset4: OffsetInput!
+input GmosNorthPreImagingInput {
+  """
+  The filters field must be specified with at least one filter. It cannot be unset with a null value.
+  """
+  filters: [GmosNorthImagingFilterInput!]
+
+  offset1: OffsetInput
+  offset2: OffsetInput
+  offset3: OffsetInput
+  offset4: OffsetInput
+}
+
+type GmosSouthPreImaging {
+  filters: [GmosSouthImagingFilter!]!
+  offset1: Offset!
+  offset2: Offset!
+  offset3: Offset!
+  offset4: Offset!
+}
+
+input GmosSouthPreImagingInput {
+  """
+  The filters field must be specified with at least one filter. It cannot be unset with a null value.
+  """
+  filters: [GmosSouthImagingFilterInput!]
+
+  offset1: OffsetInput
+  offset2: OffsetInput
+  offset3: OffsetInput
+  offset4: OffsetInput
 }
 
 """
@@ -9226,12 +9304,7 @@ GMOS North Imaging mode
 """
 type GmosNorthImaging {
 
-  variant: GmosImagingVariant!
-
-  """
-  GMOS North Filters for imaging mode (multiple filters allowed)
-  """
-  filters: [GmosNorthImagingFilter!]!
+  variant: GmosNorthImagingVariant!
 
   """
   Initial GMOS North Filters that were used when creating the imaging mode
@@ -9866,12 +9939,7 @@ GMOS South Imaging mode
 """
 type GmosSouthImaging {
 
-  variant: GmosImagingVariant!
-
-  """
-  GMOS South Filters for imaging mode (multiple filters allowed)
-  """
-  filters: [GmosSouthImagingFilter!]!
+  variant: GmosSouthImagingVariant!
 
   """
   Initial GMOS South Filters that were used when creating the imaging mode

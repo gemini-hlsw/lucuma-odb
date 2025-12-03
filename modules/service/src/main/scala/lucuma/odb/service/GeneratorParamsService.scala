@@ -289,14 +289,14 @@ object GeneratorParamsService {
             val mode = InstrumentMode.Flamingos2Spectroscopy(disperser, filter, fpu)
             GeneratorParams(itcObsParams(acq, sci, obsParams, mode), obsParams.scienceBand, f2, obsParams.calibrationRole, obsParams.declaredComplete, obsParams.acqResetTime)
 
-          case gn @ gmos.imaging.Config.GmosNorth(filters = filters) =>
+          case gn @ gmos.imaging.Config.GmosNorth(_, _) =>
             // FIXME: This is not right we have n filters
-            val mode = InstrumentMode.GmosNorthImaging(filters.head, gn.ccdMode.some)
+            val mode = InstrumentMode.GmosNorthImaging(gn.variant.filters.head, gn.ccdMode.some)
             GeneratorParams(itcObsParamsWithRequirementEtm(mode), obsParams.scienceBand, gn, obsParams.calibrationRole, obsParams.declaredComplete, obsParams.acqResetTime)
 
-          case gs @ gmos.imaging.Config.GmosSouth(filters = filters) =>
+          case gs @ gmos.imaging.Config.GmosSouth(_, _) =>
             // FIXME: This is not right we have n filters
-            val mode = InstrumentMode.GmosSouthImaging(filters.head, gs.ccdMode.some)
+            val mode = InstrumentMode.GmosSouthImaging(gs.variant.filters.head, gs.ccdMode.some)
             GeneratorParams(itcObsParamsWithRequirementEtm(mode), obsParams.scienceBand, gs, obsParams.calibrationRole, obsParams.declaredComplete, obsParams.acqResetTime)
 
       private def itcObsParams(

@@ -1,28 +1,28 @@
 ALTER TABLE t_gmos_north_imaging
-  ADD COLUMN c_imaging_type       e_gmos_imaging_type NOT NULL DEFAULT 'grouped',
-  ADD COLUMN c_wavelength_order   e_wavelength_order  NOT NULL DEFAULT 'decreasing',
-  ADD COLUMN c_sky_count          int                 NOT NULL DEFAULT 0 CHECK (c_sky_count >= 0),
-  ADD COLUMN c_pre_imaging_off1_p d_angle_µas         NOT NULL DEFAULT 0,
-  ADD COLUMN c_pre_imaging_off1_q d_angle_µas         NOT NULL DEFAULT 0,
-  ADD COLUMN c_pre_imaging_off2_p d_angle_µas         NOT NULL DEFAULT 0,
-  ADD COLUMN c_pre_imaging_off2_q d_angle_µas         NOT NULL DEFAULT 0,
-  ADD COLUMN c_pre_imaging_off3_p d_angle_µas         NOT NULL DEFAULT 0,
-  ADD COLUMN c_pre_imaging_off3_q d_angle_µas         NOT NULL DEFAULT 0,
-  ADD COLUMN c_pre_imaging_off4_p d_angle_µas         NOT NULL DEFAULT 0,
-  ADD COLUMN c_pre_imaging_off4_q d_angle_µas         NOT NULL DEFAULT 0;
+  ADD COLUMN c_variant            e_gmos_imaging_variant NOT NULL DEFAULT 'grouped',
+  ADD COLUMN c_wavelength_order   e_wavelength_order     NOT NULL DEFAULT 'decreasing',
+  ADD COLUMN c_sky_count          int                    NOT NULL DEFAULT 0 CHECK (c_sky_count >= 0),
+  ADD COLUMN c_pre_imaging_off1_p d_angle_µas            NOT NULL DEFAULT 0,
+  ADD COLUMN c_pre_imaging_off1_q d_angle_µas            NOT NULL DEFAULT 0,
+  ADD COLUMN c_pre_imaging_off2_p d_angle_µas            NOT NULL DEFAULT 0,
+  ADD COLUMN c_pre_imaging_off2_q d_angle_µas            NOT NULL DEFAULT 0,
+  ADD COLUMN c_pre_imaging_off3_p d_angle_µas            NOT NULL DEFAULT 0,
+  ADD COLUMN c_pre_imaging_off3_q d_angle_µas            NOT NULL DEFAULT 0,
+  ADD COLUMN c_pre_imaging_off4_p d_angle_µas            NOT NULL DEFAULT 0,
+  ADD COLUMN c_pre_imaging_off4_q d_angle_µas            NOT NULL DEFAULT 0;
 
 ALTER TABLE t_gmos_south_imaging
-  ADD COLUMN c_imaging_type       e_gmos_imaging_type NOT NULL DEFAULT 'grouped',
-  ADD COLUMN c_wavelength_order   e_wavelength_order  NOT NULL DEFAULT 'decreasing',
-  ADD COLUMN c_sky_count          int                 NOT NULL DEFAULT 0 CHECK (c_sky_count >= 0),
-  ADD COLUMN c_pre_imaging_off1_p d_angle_µas         NOT NULL DEFAULT 0,
-  ADD COLUMN c_pre_imaging_off1_q d_angle_µas         NOT NULL DEFAULT 0,
-  ADD COLUMN c_pre_imaging_off2_p d_angle_µas         NOT NULL DEFAULT 0,
-  ADD COLUMN c_pre_imaging_off2_q d_angle_µas         NOT NULL DEFAULT 0,
-  ADD COLUMN c_pre_imaging_off3_p d_angle_µas         NOT NULL DEFAULT 0,
-  ADD COLUMN c_pre_imaging_off3_q d_angle_µas         NOT NULL DEFAULT 0,
-  ADD COLUMN c_pre_imaging_off4_p d_angle_µas         NOT NULL DEFAULT 0,
-  ADD COLUMN c_pre_imaging_off4_q d_angle_µas         NOT NULL DEFAULT 0;
+  ADD COLUMN c_variant            e_gmos_imaging_variant NOT NULL DEFAULT 'grouped',
+  ADD COLUMN c_wavelength_order   e_wavelength_order     NOT NULL DEFAULT 'decreasing',
+  ADD COLUMN c_sky_count          int                    NOT NULL DEFAULT 0 CHECK (c_sky_count >= 0),
+  ADD COLUMN c_pre_imaging_off1_p d_angle_µas            NOT NULL DEFAULT 0,
+  ADD COLUMN c_pre_imaging_off1_q d_angle_µas            NOT NULL DEFAULT 0,
+  ADD COLUMN c_pre_imaging_off2_p d_angle_µas            NOT NULL DEFAULT 0,
+  ADD COLUMN c_pre_imaging_off2_q d_angle_µas            NOT NULL DEFAULT 0,
+  ADD COLUMN c_pre_imaging_off3_p d_angle_µas            NOT NULL DEFAULT 0,
+  ADD COLUMN c_pre_imaging_off3_q d_angle_µas            NOT NULL DEFAULT 0,
+  ADD COLUMN c_pre_imaging_off4_p d_angle_µas            NOT NULL DEFAULT 0,
+  ADD COLUMN c_pre_imaging_off4_q d_angle_µas            NOT NULL DEFAULT 0;
 
 -- Update the views to pick up the new columns.  Add embedded ids for the
 -- imaging type options.
@@ -39,8 +39,9 @@ CREATE VIEW v_gmos_north_imaging AS
   SELECT
     i.*,
     f.c_filters,
-    CASE WHEN i.c_imaging_type = 'grouped'      THEN i.c_observation_id END AS c_grouped_observation_id,
-    CASE WHEN i.c_imaging_type = 'pre_imaging'  THEN i.c_observation_id END AS c_pre_imaging_observation_id
+    CASE WHEN i.c_variant = 'grouped'      THEN i.c_observation_id END AS c_grouped_observation_id,
+    CASE WHEN i.c_variant = 'interleaved'  THEN i.c_observation_id END AS c_interleaved_observation_id,
+    CASE WHEN i.c_variant = 'pre_imaging'  THEN i.c_observation_id END AS c_pre_imaging_observation_id
   FROM
     t_gmos_north_imaging i
   LEFT JOIN (
@@ -62,8 +63,9 @@ CREATE VIEW v_gmos_south_imaging AS
   SELECT
     i.*,
     f.c_filters,
-    CASE WHEN i.c_imaging_type = 'grouped'      THEN i.c_observation_id END AS c_grouped_observation_id,
-    CASE WHEN i.c_imaging_type = 'pre_imaging'  THEN i.c_observation_id END AS c_pre_imaging_observation_id
+    CASE WHEN i.c_variant = 'grouped'      THEN i.c_observation_id END AS c_grouped_observation_id,
+    CASE WHEN i.c_variant = 'interleaved'  THEN i.c_observation_id END AS c_interleaved_observation_id,
+    CASE WHEN i.c_variant = 'pre_imaging'  THEN i.c_observation_id END AS c_pre_imaging_observation_id
   FROM
     t_gmos_south_imaging i
   LEFT JOIN (
