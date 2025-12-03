@@ -11,9 +11,7 @@ import cats.syntax.all.*
 import fs2.Stream
 import fs2.concurrent.Topic
 import lucuma.core.util.CalculationState
-import lucuma.odb.data.EditType
 import lucuma.odb.data.TelluricTargets
-import lucuma.odb.graphql.topic.ObscalcTopic
 import lucuma.odb.graphql.topic.TelluricTargetTopic
 import lucuma.odb.service.Services.Syntax.*
 import org.typelevel.log4cats.Logger
@@ -32,7 +30,6 @@ object TelluricTargetsDaemon:
     pollPeriod:       FiniteDuration,
     batchSize:        Int,
     topic:            Topic[F, TelluricTargetTopic.Element],
-    obscalcTopic:     Topic[F, ObscalcTopic.Element],
     services:         Resource[F, Services[F]]
   ): F[Unit] =
     given Logger[F] = LoggerFactory[F].getLoggerFromName("telluric-targets")
@@ -60,23 +57,6 @@ object TelluricTargetsDaemon:
             Services.asSuperUser:
               telluricTargetsService.load(connectionsLimit)
         .flatMap(Stream.emits)
-
-    // Recheck telluric targets when science observations change.
-    // Triggered by obscalc events ready
-    val recheckStream: Stream[F, Unit] =
-      obscalcTopic.subscribe(100).evalMapFilter: e =>
-        Option.when(
-          e.newState.exists(_ === CalculationState.Ready) && // Only ready obscalc
-          (e.editType === EditType.Created || e.editType === EditType.Updated)
-        )(e.observationId).traverse: oid =>
-          services.useTransactionally:
-            Services.asSuperUser:
-              calibrationsService.isCalibration(oid)
-          .flatMap: isCalib =>
-            (info"Science observation $oid changed, rechecking telluric targets" *>
-            services.useNonTransactionally:
-              Services.asSuperUser:
-                telluricTargetsService.recheckForScienceObservation(oid)).unlessA(isCalib)
 
     val mainStream: Stream[F, Unit] =
       eventStream
@@ -130,6 +110,4 @@ object TelluricTargetsDaemon:
       _ <- startupBatch
       _ <- info"Starting telluric resolution event/poll streams"
       _ <- mainStream.compile.drain.start.void
-      _ <- info"Starting telluric recheck stream for obscalc events"
-      _ <- recheckStream.compile.drain.start.void
     yield ()
