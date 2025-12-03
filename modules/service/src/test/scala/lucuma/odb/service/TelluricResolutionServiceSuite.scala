@@ -22,8 +22,8 @@ class TelluricResolutionServiceSuite extends TelluricResolutionServiceSuiteSuppo
     for {
       _ <- cleanup
       pid <- createTestProgram
-      oid1 <- createTestObservation(pid)
-      oid2 <- createTestObservation(pid)
+      oid1 <- createTelluricCalibrationObservation(pid)
+      oid2 <- createTelluricCalibrationObservation(pid)
       sid <- createTestObservation(pid)
 
       // Insert test data using direct DB
@@ -46,8 +46,8 @@ class TelluricResolutionServiceSuite extends TelluricResolutionServiceSuiteSuppo
     for {
       _ <- cleanup
       pid <- createTestProgram
-      oid1 <- createTestObservation(pid)
-      oid2 <- createTestObservation(pid)
+      oid1 <- createTelluricCalibrationObservation(pid)
+      oid2 <- createTelluricCalibrationObservation(pid)
       sid <- createTestObservation(pid)
 
       // Insert test data using direct DB
@@ -74,7 +74,7 @@ class TelluricResolutionServiceSuite extends TelluricResolutionServiceSuiteSuppo
     for {
       _ <- cleanup
       pid <- createTestProgram
-      oid <- createTestObservation(pid)
+      oid <- createTelluricCalibrationObservation(pid)
       sid <- createTestObservation(pid)
 
       // Insert test data using direct DB
@@ -108,7 +108,7 @@ class TelluricResolutionServiceSuite extends TelluricResolutionServiceSuiteSuppo
     for {
       _ <- cleanup
       pid <- createTestProgram
-      oid <- createTestObservation(pid)
+      oid <- createTelluricCalibrationObservation(pid)
       sid <- createTestObservation(pid)
 
       // Insert entry with 'calculating' state
@@ -126,8 +126,8 @@ class TelluricResolutionServiceSuite extends TelluricResolutionServiceSuiteSuppo
     for {
       _ <- cleanup
       pid <- createTestProgram
-      oid1 <- createTestObservation(pid)
-      oid2 <- createTestObservation(pid)
+      oid1 <- createTelluricCalibrationObservation(pid)
+      oid2 <- createTelluricCalibrationObservation(pid)
       sid <- createTestObservation(pid)
 
       // Insert pending entries for both observations
@@ -156,7 +156,7 @@ class TelluricResolutionServiceSuite extends TelluricResolutionServiceSuiteSuppo
       sid <- createTestObservation(pid)
 
       // Insert 10 pending entries
-      oids <- (1 to 10).toList.traverse(_ => createTestObservation(pid))
+      oids <- (1 to 10).toList.traverse(_ => createTelluricCalibrationObservation(pid))
       _ <- oids.traverse(oid => insertPending(createPendingEntry(pid, oid, sid)))
 
       // Load only 5
@@ -177,9 +177,9 @@ class TelluricResolutionServiceSuite extends TelluricResolutionServiceSuiteSuppo
       _ <- cleanup
       pid <- createTestProgram
       sid <- createTestObservation(pid)
-      oid1 <- createTestObservation(pid)
-      oid2 <- createTestObservation(pid)
-      oid3 <- createTestObservation(pid)
+      oid1 <- createTelluricCalibrationObservation(pid)
+      oid2 <- createTelluricCalibrationObservation(pid)
+      oid3 <- createTelluricCalibrationObservation(pid)
 
       // Insert 2 pending entries (ready to process)
       _ <- insertPending(createPendingEntry(pid, oid1, sid))
@@ -220,7 +220,7 @@ class TelluricResolutionServiceSuite extends TelluricResolutionServiceSuiteSuppo
       _ <- cleanup
       pid <- createTestProgram
       sid <- createTestObservation(pid)
-      oid <- createTestObservation(pid)
+      oid <- createTelluricCalibrationObservation(pid)
 
       // Insert retry entry with retry_at in the past
       pastRetry = createMetaEntry(pid, oid, sid, CalculationState.Retry).copy(
@@ -248,10 +248,10 @@ class TelluricResolutionServiceSuite extends TelluricResolutionServiceSuiteSuppo
       sid <- createTestObservation(pid)
 
       // Insert entries with various states
-      oid1 <- createTestObservation(pid)
-      oid2 <- createTestObservation(pid)
-      oid3 <- createTestObservation(pid)
-      oid4 <- createTestObservation(pid)
+      oid1 <- createTelluricCalibrationObservation(pid)
+      oid2 <- createTelluricCalibrationObservation(pid)
+      oid3 <- createTelluricCalibrationObservation(pid)
+      oid4 <- createTelluricCalibrationObservation(pid)
 
       _ <- insertMeta(createMetaEntry(pid, oid1, sid, CalculationState.Ready))
       _ <- insertMeta(createMetaEntry(pid, oid2, sid, CalculationState.Retry).copy(
@@ -278,7 +278,7 @@ class TelluricResolutionServiceSuite extends TelluricResolutionServiceSuiteSuppo
     for {
       _ <- cleanup
       pid <- createTestProgram
-      oid <- createTestObservation(pid)
+      oid <- createTelluricCalibrationObservation(pid)
       sid <- createTestObservation(pid)
 
       // Insert pending entry
@@ -302,7 +302,7 @@ class TelluricResolutionServiceSuite extends TelluricResolutionServiceSuiteSuppo
     for {
       _ <- cleanup
       pid <- createTestProgram
-      oid <- createTestObservation(pid)
+      oid <- createTelluricCalibrationObservation(pid)
       sid <- createTestObservation(pid)
 
       // Insert retry entry with retry_at in the past
@@ -333,7 +333,7 @@ class TelluricResolutionServiceSuite extends TelluricResolutionServiceSuiteSuppo
       sid <- createTestObservation(pid)
 
       // Insert 5 pending entries
-      oids <- (1 to 5).toList.traverse(_ => createTestObservation(pid))
+      oids <- (1 to 5).toList.traverse(_ => createTelluricCalibrationObservation(pid))
       _ <- oids.traverse(oid => insertPending(createPendingEntry(pid, oid, sid)))
 
       // First load gets 3
@@ -370,7 +370,7 @@ class TelluricResolutionServiceSuite extends TelluricResolutionServiceSuiteSuppo
     for {
       _ <- cleanup
       pid <- createTestProgram
-      oid <- createTestObservation(pid)
+      oid <- createTelluricCalibrationObservation(pid)
       sid <- createTestObservation(pid)
 
       // Insert entry with 'ready' state
