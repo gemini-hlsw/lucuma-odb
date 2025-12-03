@@ -5,6 +5,7 @@ package lucuma.odb.service
 
 import cats.effect.IO
 import cats.syntax.either.*
+import lucuma.core.enums.CalibrationRole
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
@@ -230,6 +231,21 @@ trait TelluricResolutionServiceSuiteSupport extends ExecutionTestSupportForGmos:
 
   def createTestObservation(pid: Program.Id): IO[Observation.Id] =
     createGmosNorthLongSlitObservationAs(serviceUser, pid, Nil)
+
+  def createTelluricCalibrationObservation(pid: Program.Id): IO[Observation.Id] =
+    for {
+      oid <- createTestObservation(pid)
+      _   <- setCalibrationRole(oid, CalibrationRole.Telluric)
+    } yield oid
+
+  def setCalibrationRole(oid: Observation.Id, role: CalibrationRole): IO[Unit] =
+    withSession: session =>
+      val update = sql"""
+        UPDATE t_observation
+        SET c_calibration_role = $calibration_role
+        WHERE c_observation_id = $observation_id
+      """.command
+      session.execute(update)((role, oid)).void
 
   def createTestTarget(pid: Program.Id): IO[Target.Id] =
     createTargetAs(serviceUser, pid, "Test Target")
