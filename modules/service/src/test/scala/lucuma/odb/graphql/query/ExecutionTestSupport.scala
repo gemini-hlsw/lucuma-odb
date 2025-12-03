@@ -373,11 +373,11 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
                }
              }
         pending <- services.session.transaction.use { _ =>
-                     Services.asSuperUser(services.telluricResolutionService.load(100))
+                     Services.asSuperUser(services.telluricTargetsService.load(100))
                    }
         _       <- IO.println(s"Pending telluric resolutions: $pending")
         _       <- pending.traverse_ { p =>
-                     Services.asSuperUser(services.telluricResolutionService.resolveAndUpdate(p))
+                     Services.asSuperUser(services.telluricTargetsService.resolveAndUpdate(p))
                    }
       yield ()
     }

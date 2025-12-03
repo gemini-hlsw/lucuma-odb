@@ -10,10 +10,10 @@ import lucuma.core.util.CalculationState
 import lucuma.core.util.Timestamp
 
 /**
-  * Data classes for the telluric resolution daemon
+  * Data classes for the telluric targets service
   * Heavily inspired by Obscalc
   */
-object TelluricResolution:
+object TelluricTargets:
   /**
    * Metadata for each target we need to resolve
    */

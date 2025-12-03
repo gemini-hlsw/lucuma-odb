@@ -212,8 +212,8 @@ trait Services[F[_]]:
 
   def obscalcService: ObscalcService[F]
 
-  /** Construct a `TelluricResolutionService`, given a `TelluricTargetsClient`. */
-  def telluricResolutionService: TelluricResolutionService[F]
+  /** Construct a `TelluricTargetsService`, given a `TelluricTargetsClient`. */
+  def telluricTargetsService: TelluricTargetsService[F]
 
   /** The `TimeAccounting` service. */
   def timeAccountingService: TimeAccountingService[F]
@@ -366,7 +366,7 @@ object Services:
       lazy val proposalService = ProposalService.instantiate(emailConfig)
       lazy val userInvitationService = UserInvitationService.instantiate(emailConfig)
       lazy val trackingService = TrackingService.instantiate(horizonsClient)
-      lazy val telluricResolutionService: TelluricResolutionService[F] = TelluricResolutionService.instantiate(telluricClient0)
+      lazy val telluricTargetsService: TelluricTargetsService[F] = TelluricTargetsService.instantiate(telluricClient0)
 
   /**
    * This adds syntax to access the members of `Services` and the current `Transaction` when they
@@ -422,7 +422,7 @@ object Services:
     def guideService[F[_]](using Services[F]): GuideService[F] = summon[Services[F]].guideService
     def userInvitationService[F[_]](using Services[F]): UserInvitationService[F] = summon[Services[F]].userInvitationService
     def emailService[F[_]](using Services[F]) = summon[Services[F]].emailService
-    def telluricResolutionService[F[_]](using Services[F]): TelluricResolutionService[F] = summon[Services[F]].telluricResolutionService
+    def telluricTargetsService[F[_]](using Services[F]): TelluricTargetsService[F] = summon[Services[F]].telluricTargetsService
     def metadata[F[_]](using Services[F]) = summon[Services[F]].metadata
 
     def requirePiAccess[F[_], A](fa: Services.PiAccess ?=> F[Result[A]])(using Services[F], Applicative[F]): F[Result[A]] =

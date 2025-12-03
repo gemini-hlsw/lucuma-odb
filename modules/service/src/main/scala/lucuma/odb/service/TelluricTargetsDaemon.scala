@@ -12,7 +12,7 @@ import fs2.Stream
 import fs2.concurrent.Topic
 import lucuma.core.util.CalculationState
 import lucuma.odb.data.EditType
-import lucuma.odb.data.TelluricResolution
+import lucuma.odb.data.TelluricTargets
 import lucuma.odb.graphql.topic.ObscalcTopic
 import lucuma.odb.graphql.topic.TelluricTargetTopic
 import lucuma.odb.service.Services.Syntax.*
@@ -39,7 +39,7 @@ object TelluricTargetsDaemon:
 
     // Stream of pending requestes
     // Filter for transitions TO 'pending' state
-    val eventStream: Stream[F, TelluricResolution.Pending] =
+    val eventStream: Stream[F, TelluricTargets.Pending] =
       topic.subscribe(1024).evalMapFilter: e =>
         Option
           .when(
@@ -49,16 +49,16 @@ object TelluricTargetsDaemon:
           .flatTraverse: oid =>
             services.useTransactionally:
               Services.asSuperUser:
-                telluricResolutionService.loadObs(oid)
+                telluricTargetsService.loadObs(oid)
 
     // pending entries to handle 'pending' and 'retry' entries
-    val pollStream: Stream[F, TelluricResolution.Pending] =
+    val pollStream: Stream[F, TelluricTargets.Pending] =
       Stream
         .awakeEvery(pollPeriod)
         .evalMap: _ =>
           services.useTransactionally:
             Services.asSuperUser:
-              telluricResolutionService.load(connectionsLimit)
+              telluricTargetsService.load(connectionsLimit)
         .flatMap(Stream.emits)
 
     // Recheck telluric targets when science observations change.
@@ -76,7 +76,7 @@ object TelluricTargetsDaemon:
             (info"Science observation $oid changed, rechecking telluric targets" *>
             services.useNonTransactionally:
               Services.asSuperUser:
-                telluricResolutionService.recheckForScienceObservation(oid)).unlessA(isCalib)
+                telluricTargetsService.recheckForScienceObservation(oid)).unlessA(isCalib)
 
     val mainStream: Stream[F, Unit] =
       eventStream
@@ -86,7 +86,7 @@ object TelluricTargetsDaemon:
         .parEvalMapUnordered(connectionsLimit): pending =>
           services.useNonTransactionally:
             Services.asSuperUser:
-              telluricResolutionService
+              telluricTargetsService
                 .resolveAndUpdate(pending)
                 .map((pending, _))
         .evalTap: result =>
@@ -99,7 +99,7 @@ object TelluricTargetsDaemon:
       def processBatch: F[Boolean] =
         services.useTransactionally:
           Services.asSuperUser:
-            telluricResolutionService.load(batchSize)
+            telluricTargetsService.load(batchSize)
         .flatMap: batch =>
           if batch.isEmpty then
             false.pure[F]
@@ -107,7 +107,7 @@ object TelluricTargetsDaemon:
             batch.parTraverse_ : pending =>
               services.useNonTransactionally:
                 Services.asSuperUser:
-                  telluricResolutionService.resolveAndUpdate(pending)
+                  telluricTargetsService.resolveAndUpdate(pending)
             .as(true)
 
       def runStart(processed: Int): F[Unit] =
@@ -125,7 +125,7 @@ object TelluricTargetsDaemon:
       _ <- info"Resetting 'calculating' entries to 'pending'"
       _ <- services.useTransactionally:
              Services.asSuperUser:
-               telluricResolutionService.reset
+               telluricTargetsService.reset
       _ <- info"Processing pending resolutions on startup"
       _ <- startupBatch
       _ <- info"Starting telluric resolution event/poll streams"

@@ -8,12 +8,12 @@ import eu.timepit.refined.types.numeric.PosLong
 import lucuma.core.model.Observation
 import lucuma.core.util.CalculationState
 import lucuma.core.util.Timestamp
-import lucuma.odb.data.TelluricResolution
+import lucuma.odb.data.TelluricTargets
 import lucuma.odb.graphql.TestUsers
 
 import java.time.LocalDateTime
 
-class TelluricResolutionServiceSuite extends TelluricResolutionServiceSuiteSupport {
+class TelluricTargetsServiceSuite extends TelluricTargetsServiceSuiteSupport {
 
   override val serviceUser = TestUsers.service(nextId)
   override val validUsers = List(serviceUser)

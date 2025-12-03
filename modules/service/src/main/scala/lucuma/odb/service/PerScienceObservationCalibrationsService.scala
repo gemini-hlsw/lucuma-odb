@@ -50,7 +50,7 @@ object PerScienceObservationCalibrationsService:
       val groupService  = S.groupService
       val observationService = S.observationService
       val obsModeService = S.observingModeServices
-      val telluricTargets = S.telluricResolutionService
+      val telluricTargets = S.telluricTargetsService
 
       private def groupNameForObservation(
         config:          CalibrationConfigSubset,

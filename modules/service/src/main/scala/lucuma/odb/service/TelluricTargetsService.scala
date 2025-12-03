@@ -22,7 +22,7 @@ import lucuma.core.model.Target
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.odb.data.Existence
-import lucuma.odb.data.TelluricResolution
+import lucuma.odb.data.TelluricTargets
 import lucuma.odb.graphql.input.CatalogInfoInput
 import lucuma.odb.graphql.input.SiderealInput
 import lucuma.odb.graphql.input.TargetPropertiesInput
@@ -41,7 +41,7 @@ import skunk.implicits.*
 import scala.collection.immutable.SortedMap
 import scala.concurrent.duration.*
 
-trait TelluricResolutionService[F[_]]:
+trait TelluricTargetsService[F[_]]:
 
   /**
    * Marks all 'calculating' entries as 'pending' on startup.
@@ -53,7 +53,7 @@ trait TelluricResolutionService[F[_]]:
    * Loads up to `max` pending/retry resolution entries.
    * Changes state to 'calculating' before returning.
    */
-  def load(max: Int): F[List[TelluricResolution.Pending]]
+  def load(max: Int): F[List[TelluricTargets.Pending]]
 
   /**
    * Loads a specific pending resolution entry.
@@ -61,7 +61,7 @@ trait TelluricResolutionService[F[_]]:
    */
   def loadObs(
     oid: Observation.Id
-  )(using ServiceAccess, Transaction[F]): F[Option[TelluricResolution.Pending]]
+  )(using ServiceAccess, Transaction[F]): F[Option[TelluricTargets.Pending]]
 
   /**
    * Records a new telluric resolution request.
@@ -78,8 +78,8 @@ trait TelluricResolutionService[F[_]]:
    * Must be called outside a transaction (uses TelluricTargetsClient).
    */
   def resolveAndUpdate(
-    pending: TelluricResolution.Pending
-  )(using ServiceAccess, NoTransaction[F]): F[Option[TelluricResolution.Meta]]
+    pending: TelluricTargets.Pending
+  )(using ServiceAccess, NoTransaction[F]): F[Option[TelluricTargets.Meta]]
 
   /**
    * Rechecks telluric resolution for observations linked to a science observation.
@@ -90,7 +90,7 @@ trait TelluricResolutionService[F[_]]:
     scienceObsId: Observation.Id
   )(using ServiceAccess, NoTransaction[F]): F[Unit]
 
-object TelluricResolutionService:
+object TelluricTargetsService:
 
   /** Convert a TelluricStar to a Target.Sidereal */
   def toSiderealTarget(star: TelluricStar): Target.Sidereal =
@@ -111,8 +111,8 @@ object TelluricResolutionService:
 
   def instantiate[F[_]: {Temporal, LoggerFactory as LF, Services as S}](
     telluricClient: TelluricTargetsClient[F]
-  ): TelluricResolutionService[F] =
-    new TelluricResolutionService[F]:
+  ): TelluricTargetsService[F] =
+    new TelluricTargetsService[F]:
       given Logger[F] = LF.getLoggerFromName("telluric-targets")
 
       // Exponential backoff calculation
@@ -125,14 +125,14 @@ object TelluricResolutionService:
       override def reset(using ServiceAccess, Transaction[F]): F[Unit] =
         session.execute(Statements.resetCalculating).void
 
-      override def load(max: Int): F[List[TelluricResolution.Pending]] =
+      override def load(max: Int): F[List[TelluricTargets.Pending]] =
         session
           .prepareR(Statements.loadPending(max))
           .use(_.stream(Void, 1024).compile.toList)
 
       override def loadObs(
         oid: Observation.Id
-      )(using ServiceAccess, Transaction[F]): F[Option[TelluricResolution.Pending]] =
+      )(using ServiceAccess, Transaction[F]): F[Option[TelluricTargets.Pending]] =
         session
           .prepareR(Statements.loadPendingObs)
           .use(_.option(oid))
@@ -147,13 +147,13 @@ object TelluricResolutionService:
         ).void
 
       override def resolveAndUpdate(
-        pending: TelluricResolution.Pending
-      )(using ServiceAccess, NoTransaction[F]): F[Option[TelluricResolution.Meta]] =
+        pending: TelluricTargets.Pending
+      )(using ServiceAccess, NoTransaction[F]): F[Option[TelluricTargets.Meta]] =
 
         def updateToReady(
           targetId: Option[Target.Id],
           errorMsg: Option[String]
-        ): F[Option[TelluricResolution.Meta]] =
+        ): F[Option[TelluricTargets.Meta]] =
           S.transactionally:
             session
               .prepareR(Statements.updateToReady)
@@ -162,7 +162,7 @@ object TelluricResolutionService:
         def updateToRetry(
           failureCount: Int,
           errorMsg: String
-        ): F[Option[TelluricResolution.Meta]] =
+        ): F[Option[TelluricTargets.Meta]] =
           val retryDelay = calculateRetryAt(failureCount)
           S.transactionally:
             session
@@ -400,7 +400,7 @@ object TelluricResolutionService:
             WHERE  c_state = 'calculating'
           """.command
 
-        def loadPending(max: Int): Query[Void, TelluricResolution.Pending] =
+        def loadPending(max: Int): Query[Void, TelluricTargets.Pending] =
           sql"""
             UPDATE t_telluric_resolution
             SET    c_state = 'calculating'
@@ -420,12 +420,12 @@ object TelluricResolutionService:
                        c_failure_count
            """.query(observation_id *: program_id *: observation_id *: tsTimestamp *: int4)
                .map { case (oid, pid, scienceOid, lastInv, failCount) =>
-                 TelluricResolution.Pending(oid, pid, scienceOid,
+                 TelluricTargets.Pending(oid, pid, scienceOid,
                    Timestamp.fromLocalDateTimeTruncatedAndBounded(lastInv), failCount)
               }
               .contramap[Void](_ => max)
 
-        val loadPendingObs: Query[Observation.Id, TelluricResolution.Pending] =
+        val loadPendingObs: Query[Observation.Id, TelluricTargets.Pending] =
           sql"""
             UPDATE t_telluric_resolution
             SET    c_state = 'calculating'
@@ -439,11 +439,11 @@ object TelluricResolutionService:
                        c_failure_count
 """.query(observation_id *: program_id *: observation_id *: tsTimestamp *: int4)
               .map { case (oid, pid, scienceOid, lastInv, failCount) =>
-                TelluricResolution.Pending(oid, pid, scienceOid,
+                TelluricTargets.Pending(oid, pid, scienceOid,
                   Timestamp.fromLocalDateTimeTruncatedAndBounded(lastInv), failCount)
               }
 
-        val updateToReady: Query[(Option[Target.Id], Option[String], Observation.Id, java.time.LocalDateTime), TelluricResolution.Meta] =
+        val updateToReady: Query[(Option[Target.Id], Option[String], Observation.Id, java.time.LocalDateTime), TelluricTargets.Meta] =
           sql"""
             UPDATE t_telluric_resolution
             SET    c_state = 'ready',
@@ -468,14 +468,14 @@ object TelluricResolutionService:
             observation_id *: program_id *: observation_id *: calculation_state *:
             tsTimestamp *: tsTimestamp *: tsTimestamp.opt *: int4 *: target_id.opt *: text.opt
            ).map { case (oid, pid, scienceOid, state, lastInv, lastUpd, retryAt, failCount, targetId, errorMsg) =>
-            TelluricResolution.Meta(oid, pid, scienceOid, state,
+            TelluricTargets.Meta(oid, pid, scienceOid, state,
               Timestamp.fromLocalDateTimeTruncatedAndBounded(lastInv),
               Timestamp.fromLocalDateTimeTruncatedAndBounded(lastUpd),
               retryAt.map(t => Timestamp.fromLocalDateTimeTruncatedAndBounded(t)),
               failCount, targetId, errorMsg)
          }
 
-        val updateToRetry: Query[(Int, String, String, Observation.Id), TelluricResolution.Meta] =
+        val updateToRetry: Query[(Int, String, String, Observation.Id), TelluricTargets.Meta] =
           sql"""
             UPDATE t_telluric_resolution
             SET    c_state = 'retry',
@@ -498,7 +498,7 @@ object TelluricResolutionService:
             observation_id *: program_id *: observation_id *: calculation_state *:
             tsTimestamp *: tsTimestamp *: tsTimestamp.opt *: int4 *: target_id.opt *: text.opt
 ).map { case (oid, pid, scienceOid, state, lastInv, lastUpd, retryAt, failCount, targetId, errorMsg) =>
-              TelluricResolution.Meta(oid, pid, scienceOid, state,
+              TelluricTargets.Meta(oid, pid, scienceOid, state,
                 Timestamp.fromLocalDateTimeTruncatedAndBounded(lastInv),
                 Timestamp.fromLocalDateTimeTruncatedAndBounded(lastUpd),
                 retryAt.map(t => Timestamp.fromLocalDateTimeTruncatedAndBounded(t)),
