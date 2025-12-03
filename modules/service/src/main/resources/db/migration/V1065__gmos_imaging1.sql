@@ -1,4 +1,4 @@
-CREATE TYPE e_gmos_imaging_type AS ENUM(
+CREATE TYPE e_gmos_imaging_variant AS ENUM(
   'grouped',
   'interleaved',
   'pre_imaging'
