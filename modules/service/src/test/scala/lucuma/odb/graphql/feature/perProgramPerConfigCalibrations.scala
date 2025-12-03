@@ -840,7 +840,7 @@ class perProgramPerConfigCalibrations
       a       <- Ref.of[IO, List[Observation.Id]](Nil) // Removed observation
       // The third twilight
       rd      = ad.get(2).get
-      _       <- subscriptionExpectF(
+      _       <- subscriptionExpectFT(
                     user      = pi,
                     query     = deletedSubscription(pid),
                     mutations =
@@ -873,10 +873,6 @@ class perProgramPerConfigCalibrations
                                                     """ :: b :: Nil
                         case l => l
                       },
-                      // N.B. for the deletion events the order isn't guaranteed
-                      // because, I think, the DELETE FROM t_observation WHERE c_observation_id IN (...)
-                      // can delete the calibrations in any order.  Unfortunately
-                      // we expect the events in a particular order though.
                       a.get.map(_.map: cid =>
                         json"""
                           {
@@ -888,7 +884,13 @@ class perProgramPerConfigCalibrations
                           }
                         """
                       )
-                    ).mapN(_ ::: _)
+                    ).mapN(_ ::: _),
+                    transform = _.sortBy(u =>
+                      val oe = u.hcursor.downField("observationEdit")
+                      val id = oe.downField("observationId").as[Observation.Id].toOption.map(_.value.value)
+                      val et = oe.downField("editType").as[EditType].toOption.map(_.tag)
+                      (id, et)
+                    )
                   )
     } yield ()
   }

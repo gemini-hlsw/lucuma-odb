@@ -6,6 +6,10 @@ package lucuma.odb.feature
 import cats.effect.IO
 import cats.syntax.all.*
 import io.circe.Decoder
+import io.circe.Json
+import io.circe.syntax.*
+import lucuma.catalog.clients.SimbadClientMock
+import lucuma.catalog.clients.TelluricTargetsClientMock
 import lucuma.catalog.telluric.TelluricStar
 import lucuma.catalog.telluric.TelluricTargetsClient
 import lucuma.core.enums.CalibrationRole
@@ -25,7 +29,6 @@ import lucuma.core.model.SpectralDefinition
 import lucuma.core.model.Target
 import lucuma.core.model.TelluricType
 import lucuma.core.util.TimeSpan
-import lucuma.catalog.clients.TelluricTargetsClientMock
 import lucuma.odb.graphql.OdbSuite
 import lucuma.odb.graphql.query.ExecutionTestSupportForFlamingos2
 import lucuma.odb.graphql.query.ObservingModeSetupOperations
@@ -76,8 +79,27 @@ class perScienceObservationCalibrations
     catalogInfo = None
   )
 
+  // Create JSON with exact field names as expected by TelluricTargetsClient decoder
+  // Field names match the telluric-targets service API response format
+  val mockTelluricJson: Json = Json.obj(
+    "data" -> Json.obj(
+      "search" -> Json.arr(
+        Json.obj(
+          "HIP" -> mockStar.hip.asJson,
+          "spType" -> Json.fromString(mockStar.spType.tag),
+          "RA" -> mockStar.coordinates.ra.toAngle.toDoubleDegrees.asJson,
+          "Dec" -> mockStar.coordinates.dec.toAngle.toSignedDoubleDegrees.asJson,
+          "Distance" -> mockStar.distance.asJson,
+          "Hmag" -> mockStar.hmag.asJson,
+          "Score" -> mockStar.score.asJson,
+          "Order" -> Json.fromString(mockStar.order.tag)
+        )
+      )
+    )
+  )
+
   override protected def telluricClient: IO[TelluricTargetsClient[IO]] =
-    TelluricTargetsClientMock.withSingleStar(mockStar, mockTarget)
+    TelluricTargetsClientMock.fromJson(mockTelluricJson, SimbadClientMock.withSingleTarget(mockTarget))
 
   case class GroupInfo(
     id:               Group.Id,

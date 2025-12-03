@@ -11,7 +11,7 @@ import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.util.CalculationState
 import lucuma.core.util.Timestamp
-import lucuma.odb.data.TelluricResolution
+import lucuma.odb.data.TelluricTargets
 import lucuma.odb.graphql.query.ExecutionTestSupportForGmos
 import lucuma.odb.json.tellurictype.transport.given
 import lucuma.odb.service.Services.ServiceAccess
@@ -23,30 +23,30 @@ import skunk.implicits.*
 
 import java.time.LocalDateTime
 
-trait TelluricResolutionServiceSuiteSupport extends ExecutionTestSupportForGmos:
+trait TelluricTargetsServiceSuiteSupport extends ExecutionTestSupportForGmos:
 
   // Service instantiation helpers (following ObscalcServiceSuiteSupport pattern)
-  def withTelluricResolutionService[A](f: ServiceAccess ?=> TelluricResolutionService[IO] => IO[A]): IO[A] =
+  def withTelluricTargetsService[A](f: ServiceAccess ?=> TelluricTargetsService[IO] => IO[A]): IO[A] =
     withServicesForObscalc(serviceUser): services =>
-      f(services.telluricResolutionService)
+      f(services.telluricTargetsService)
 
-  def withTelluricResolutionServiceTransactionally[A](f: (ServiceAccess, Transaction[IO]) ?=> TelluricResolutionService[IO] => IO[A]): IO[A] =
+  def withTelluricTargetsServiceTransactionally[A](f: (ServiceAccess, Transaction[IO]) ?=> TelluricTargetsService[IO] => IO[A]): IO[A] =
     withServicesForObscalc(serviceUser): services =>
       services.transactionally:
-        f(services.telluricResolutionService)
+        f(services.telluricTargetsService)
 
   // Service wrapper methods (use service methods)
   def reset: IO[Unit] =
-    withTelluricResolutionServiceTransactionally(_.reset)
+    withTelluricTargetsServiceTransactionally(_.reset)
 
-  def load(max: Int): IO[List[TelluricResolution.Pending]] =
-    withTelluricResolutionServiceTransactionally(_.load(max))
+  def load(max: Int): IO[List[TelluricTargets.Pending]] =
+    withTelluricTargetsServiceTransactionally(_.load(max))
 
-  def loadObs(oid: Observation.Id): IO[Option[TelluricResolution.Pending]] =
-    withTelluricResolutionServiceTransactionally(_.loadObs(oid))
+  def loadObs(oid: Observation.Id): IO[Option[TelluricTargets.Pending]] =
+    withTelluricTargetsServiceTransactionally(_.loadObs(oid))
 
   // Direct DB operations for test setup
-  def insertPending(pending: TelluricResolution.Pending): IO[Unit] =
+  def insertPending(pending: TelluricTargets.Pending): IO[Unit] =
     withSession: session =>
       val ins: Command[(Program.Id, Observation.Id, Observation.Id, Timestamp, Int)] = sql"""
         INSERT INTO t_telluric_resolution (
@@ -76,7 +76,7 @@ trait TelluricResolutionServiceSuiteSupport extends ExecutionTestSupportForGmos:
         pending.failureCount
       ).void
 
-  def insertMeta(meta: TelluricResolution.Meta): IO[Unit] =
+  def insertMeta(meta: TelluricTargets.Meta): IO[Unit] =
     withSession: session =>
       val ins: Command[(Program.Id, Observation.Id, Observation.Id, CalculationState, Timestamp, Timestamp, Option[java.time.LocalDateTime], Int, Option[Target.Id], Option[String])] = sql"""
         INSERT INTO t_telluric_resolution (
@@ -130,9 +130,9 @@ trait TelluricResolutionServiceSuiteSupport extends ExecutionTestSupportForGmos:
       session.execute(truncate).void
 
   // Direct DB queries for verification
-  def selectMeta(oid: Observation.Id): IO[Option[TelluricResolution.Meta]] =
+  def selectMeta(oid: Observation.Id): IO[Option[TelluricTargets.Meta]] =
     withSession: session =>
-      val select: Query[Observation.Id, TelluricResolution.Meta] = sql"""
+      val select: Query[Observation.Id, TelluricTargets.Meta] = sql"""
         SELECT c_observation_id,
                c_program_id,
                c_science_observation_id,
@@ -149,7 +149,7 @@ trait TelluricResolutionServiceSuiteSupport extends ExecutionTestSupportForGmos:
         observation_id *: program_id *: observation_id *: calculation_state *:
         timestamp *: timestamp *: timestamp.opt *: int4 *: target_id.opt *: text.opt
        ).map { case (oid, pid, scienceOid, state, lastInv, lastUpd, retryAt, failCount, targetId, errorMsg) =>
-        TelluricResolution.Meta(oid, pid, scienceOid, state,
+        TelluricTargets.Meta(oid, pid, scienceOid, state,
           Timestamp.fromLocalDateTimeTruncatedAndBounded(lastInv),
           Timestamp.fromLocalDateTimeTruncatedAndBounded(lastUpd),
           retryAt.map(t => Timestamp.fromLocalDateTimeTruncatedAndBounded(t)),
@@ -158,9 +158,9 @@ trait TelluricResolutionServiceSuiteSupport extends ExecutionTestSupportForGmos:
 
       session.prepareR(select).use(_.option(oid))
 
-  def selectAllMeta: IO[List[TelluricResolution.Meta]] =
+  def selectAllMeta: IO[List[TelluricTargets.Meta]] =
     withSession: session =>
-      val select: Query[Void, TelluricResolution.Meta] = sql"""
+      val select: Query[Void, TelluricTargets.Meta] = sql"""
         SELECT c_observation_id,
                c_program_id,
                c_science_observation_id,
@@ -177,7 +177,7 @@ trait TelluricResolutionServiceSuiteSupport extends ExecutionTestSupportForGmos:
         observation_id *: program_id *: observation_id *: calculation_state *:
         timestamp *: timestamp *: timestamp.opt *: int4 *: target_id.opt *: text.opt
        ).map { case (oid, pid, scienceOid, state, lastInv, lastUpd, retryAt, failCount, targetId, errorMsg) =>
-        TelluricResolution.Meta(oid, pid, scienceOid, state,
+        TelluricTargets.Meta(oid, pid, scienceOid, state,
           Timestamp.fromLocalDateTimeTruncatedAndBounded(lastInv),
           Timestamp.fromLocalDateTimeTruncatedAndBounded(lastUpd),
           retryAt.map(t => Timestamp.fromLocalDateTimeTruncatedAndBounded(t)),
@@ -199,8 +199,8 @@ trait TelluricResolutionServiceSuiteSupport extends ExecutionTestSupportForGmos:
   def randomTime: Timestamp =
     Timestamp.fromLocalDateTimeTruncatedAndBounded(LocalDateTime.now().minusDays(1))
 
-  def createPendingEntry(pid: Program.Id, oid: Observation.Id, sid: Observation.Id): TelluricResolution.Pending =
-    TelluricResolution.Pending(
+  def createPendingEntry(pid: Program.Id, oid: Observation.Id, sid: Observation.Id): TelluricTargets.Pending =
+    TelluricTargets.Pending(
       observationId = oid,
       programId = pid,
       scienceObservationId = sid,
@@ -208,8 +208,8 @@ trait TelluricResolutionServiceSuiteSupport extends ExecutionTestSupportForGmos:
       failureCount = 0
     )
 
-  def createMetaEntry(pid: Program.Id, oid: Observation.Id, sid: Observation.Id, state: CalculationState): TelluricResolution.Meta =
-    TelluricResolution.Meta(
+  def createMetaEntry(pid: Program.Id, oid: Observation.Id, sid: Observation.Id, state: CalculationState): TelluricTargets.Meta =
+    TelluricTargets.Meta(
       observationId = oid,
       programId = pid,
       scienceObservationId = sid,
@@ -259,7 +259,7 @@ trait TelluricResolutionServiceSuiteSupport extends ExecutionTestSupportForGmos:
       """.command
       session.execute(update)((durationSeconds, oid)).void
 
-  // Direct DB query for F2 config (mirrors the query in TelluricResolutionService)
+  // Direct DB query for F2 config (mirrors the query in TelluricTargetsService)
   def selectF2Config(oid: Observation.Id): IO[Option[(lucuma.core.model.TelluricType, Long)]] =
     withSession: session =>
       val query: Query[Observation.Id, (lucuma.core.model.TelluricType, Long)] = sql"""
