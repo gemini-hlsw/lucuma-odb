@@ -79,8 +79,6 @@ class perScienceObservationCalibrations
     catalogInfo = None
   )
 
-  // Create JSON with exact field names as expected by TelluricTargetsClient decoder
-  // Field names match the telluric-targets service API response format
   val mockTelluricJson: Json = Json.obj(
     "data" -> Json.obj(
       "search" -> Json.arr(

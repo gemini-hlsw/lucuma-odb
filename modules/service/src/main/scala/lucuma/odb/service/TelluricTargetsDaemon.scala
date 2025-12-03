@@ -101,7 +101,7 @@ object TelluricTargetsDaemon:
       info"Starting batch processing of all pending telluric resolutions..." *>
       runStart(0)
 
-    for
+    for {
       _ <- info"Resetting 'calculating' entries to 'pending'"
       _ <- services.useTransactionally:
              Services.asSuperUser:
@@ -110,4 +110,4 @@ object TelluricTargetsDaemon:
       _ <- startupBatch
       _ <- info"Starting telluric resolution event/poll streams"
       _ <- mainStream.compile.drain.start.void
-    yield ()
+    } yield ()

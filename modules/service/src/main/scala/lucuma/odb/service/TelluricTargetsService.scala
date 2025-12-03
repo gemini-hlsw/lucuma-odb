@@ -119,6 +119,7 @@ object TelluricTargetsService:
             yield (coords, f2Config).tupled.map((c, cfg) => (c, cfg.telluricType))
 
       // Exponential backoff calculation
+      // Should this be configurable?
       private def calculateRetryAt(failureCount: Int): FiniteDuration =
         val baseDelay = 30.seconds
         val maxDelay = 1.hour
@@ -154,13 +155,11 @@ object TelluricTargetsService:
         telluricId: Observation.Id,
         scienceId:  Observation.Id
       )(using ServiceAccess, Transaction[F]): F[Unit] =
-        session.execute(Statements.InsertResolutionRequest)(
-          telluricId, pid, scienceId
-        ).void
+        session.execute(Statements.InsertResolutionRequest)(telluricId, pid, scienceId).void
 
       override def resolveTargets(
         pending: TelluricTargets.Pending
-      )(using ServiceAccess, NoTransaction[F]): F[Option[TelluricTargets.Meta]] =
+      )(using ServiceAccess, NoTransaction[F]): F[Option[TelluricTargets.Meta]] = {
 
         def requestRetry(
           targetId: Option[Target.Id],
@@ -182,11 +181,9 @@ object TelluricTargetsService:
               .use(_.option((failureCount + 1, s"${retryDelay.toSeconds} seconds", errorMsg, pending.observationId)))
 
         def queryParams: F[Either[String, (Coordinates, TelluricType)]] =
-          fetchSearchParams(pending.scienceObservationId).map:
-            case Some(params) => Right(params)
-            case None => Left(s"Missing coordinates or F2 config for science observation ${pending.scienceObservationId}")
+          fetchSearchParams(pending.scienceObservationId)
+            .map(_.toRight(s"Missing coordinates or F2 config for science observation ${pending.scienceObservationId}"))
 
-        // Create target from sidereal data and update asterism (in transaction)
         def createAndLinkTarget(sidereal: Target.Sidereal): F[Target.Id] =
           S.transactionally:
             Services.asSuperUser:
@@ -235,18 +232,21 @@ object TelluricTargetsService:
                 val sidereal = catalogResult.map(_.target).getOrElse(star.asSiderealTarget)
                 info"Found telluric star HIP ${star.hip} for observation ${pending.observationId}" *>
                   createAndLinkTarget(sidereal).map(_.asRight)
-              case None =>
+
+              case None                        =>
                 val msg = s"No telluric stars found for observation ${pending.observationId}"
                 Logger[F].warn(msg).as(msg.asLeft)
 
         def handleResult(result: Either[String, Target.Id]): F[Option[TelluricTargets.Meta]] =
           result match
-            case Right(targetId) =>
+            case Right(targetId)                            =>
               requestRetry(targetId.some, none)
+
             case Left(errorMsg) if pending.failureCount < 5 =>
               warn"Telluric target resolution failed (attempt ${pending.failureCount + 1}), will retry: $errorMsg" *>
                 retryRequest(pending.failureCount, errorMsg)
-            case Left(errorMsg) =>
+
+            case Left(errorMsg)                             =>
               error"Telluric target resolution permanently failed after ${pending.failureCount} attempts: $errorMsg" *>
                 requestRetry(none, errorMsg.some)
 
@@ -259,10 +259,10 @@ object TelluricTargetsService:
                         )
           meta       <- handleResult(result)
         } yield meta
+      }
 
       object Statements:
 
-        // Codecs for reuse
         val pending: Codec[TelluricTargets.Pending] =
           (observation_id *: program_id *: observation_id *: core_timestamp *: int4)
             .to[TelluricTargets.Pending]
@@ -272,7 +272,6 @@ object TelluricTargetsService:
            core_timestamp *: core_timestamp *: core_timestamp.opt *: int4 *:
            target_id.opt *: text.opt).to[TelluricTargets.Meta]
 
-        // Column helpers
         private val pendingColumns: String =
           "c_observation_id, c_program_id, c_science_observation_id, c_last_invalidation, c_failure_count"
 
