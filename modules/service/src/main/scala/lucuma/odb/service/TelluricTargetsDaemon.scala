@@ -87,7 +87,7 @@ object TelluricTargetsDaemon:
           services.useNonTransactionally:
             Services.asSuperUser:
               telluricTargetsService
-                .resolveAndUpdate(pending)
+                .resolveTargets(pending)
                 .map((pending, _))
         .evalTap: result =>
           val (pending, meta) = result
@@ -107,7 +107,7 @@ object TelluricTargetsDaemon:
             batch.parTraverse_ : pending =>
               services.useNonTransactionally:
                 Services.asSuperUser:
-                  telluricTargetsService.resolveAndUpdate(pending)
+                  telluricTargetsService.resolveTargets(pending)
             .as(true)
 
       def runStart(processed: Int): F[Unit] =
