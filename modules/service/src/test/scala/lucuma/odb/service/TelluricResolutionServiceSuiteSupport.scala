@@ -45,9 +45,6 @@ trait TelluricResolutionServiceSuiteSupport extends ExecutionTestSupportForGmos:
   def loadObs(oid: Observation.Id): IO[Option[TelluricResolution.Pending]] =
     withTelluricResolutionServiceTransactionally(_.loadObs(oid))
 
-  def invalidateAll: IO[Int] =
-    withTelluricResolutionServiceTransactionally(_.invalidateAll)
-
   // Direct DB operations for test setup
   def insertPending(pending: TelluricResolution.Pending): IO[Unit] =
     withSession: session =>

@@ -241,39 +241,6 @@ class TelluricResolutionServiceSuite extends TelluricResolutionServiceSuiteSuppo
       assertEquals(state, CalculationState.Calculating, "State should change to calculating")
     }
 
-  test("invalidateAll - resets all entries to pending"):
-    for {
-      _ <- cleanup
-      pid <- createTestProgram
-      sid <- createTestObservation(pid)
-
-      // Insert entries with various states
-      oid1 <- createTelluricCalibrationObservation(pid)
-      oid2 <- createTelluricCalibrationObservation(pid)
-      oid3 <- createTelluricCalibrationObservation(pid)
-      oid4 <- createTelluricCalibrationObservation(pid)
-
-      _ <- insertMeta(createMetaEntry(pid, oid1, sid, CalculationState.Ready))
-      _ <- insertMeta(createMetaEntry(pid, oid2, sid, CalculationState.Retry).copy(
-        retryAt = Some(Timestamp.fromLocalDateTimeTruncatedAndBounded(LocalDateTime.now().plusHours(1))),
-        failureCount = 3
-      ))
-      _ <- insertMeta(createMetaEntry(pid, oid3, sid, CalculationState.Calculating))
-      _ <- insertMeta(createMetaEntry(pid, oid4, sid, CalculationState.Pending))
-
-      // Invalidate all
-      count <- invalidateAll
-
-      // Verify all are pending
-      states <- selectAllMeta
-    } yield {
-      assertEquals(count, 4, "Should invalidate all 4 entries")
-      assertEquals(states.length, 4, "Should have 4 entries")
-      assert(states.forall(_.state == CalculationState.Pending), "All should be pending")
-      assert(states.forall(_.retryAt.isEmpty), "All retry_at should be None")
-      assert(states.forall(_.failureCount == 0), "All failure_count should be 0")
-    }
-
   test("load - changes state from pending to calculating"):
     for {
       _ <- cleanup
