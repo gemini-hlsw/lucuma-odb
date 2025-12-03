@@ -802,16 +802,3 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
         .flatMap(_.get)
 
 }
-
-object TelluricClientMock:
-  import lucuma.catalog.CatalogTargetResult
-  import lucuma.catalog.telluric.TelluricSearchInput
-  import lucuma.catalog.telluric.TelluricStar
-
-  def apply(star: TelluricStar, target: lucuma.core.model.Target.Sidereal): IO[TelluricTargetsClient[IO]] =
-    IO.pure(new TelluricTargetsClient[IO] {
-      def search(input: TelluricSearchInput): IO[List[TelluricStar]] =
-        IO.pure(List(star))
-      def searchTarget(input: TelluricSearchInput): IO[List[(TelluricStar, Option[CatalogTargetResult])]] =
-        IO.pure(List((star, Some(CatalogTargetResult(target, None)))))
-    })

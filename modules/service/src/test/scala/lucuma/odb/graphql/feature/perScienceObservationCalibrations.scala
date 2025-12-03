@@ -25,8 +25,8 @@ import lucuma.core.model.SpectralDefinition
 import lucuma.core.model.Target
 import lucuma.core.model.TelluricType
 import lucuma.core.util.TimeSpan
+import lucuma.catalog.clients.TelluricTargetsClientMock
 import lucuma.odb.graphql.OdbSuite
-import lucuma.odb.graphql.TelluricClientMock
 import lucuma.odb.graphql.query.ExecutionTestSupportForFlamingos2
 import lucuma.odb.graphql.query.ObservingModeSetupOperations
 import lucuma.odb.graphql.subscription.SubscriptionUtils
@@ -77,7 +77,7 @@ class perScienceObservationCalibrations
   )
 
   override protected def telluricClient: IO[TelluricTargetsClient[IO]] =
-    TelluricClientMock(mockStar, mockTarget)
+    TelluricTargetsClientMock.withSingleStar(mockStar, mockTarget)
 
   case class GroupInfo(
     id:               Group.Id,
