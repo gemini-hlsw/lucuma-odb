@@ -19,8 +19,9 @@ import lucuma.core.model.SiderealTracking
 import lucuma.core.model.SourceProfile
 import lucuma.core.model.SpectralDefinition
 import lucuma.core.model.Target
-import lucuma.core.util.Timestamp
+import lucuma.core.model.TelluricType
 import lucuma.core.syntax.timespan.*
+import lucuma.core.util.Timestamp
 import lucuma.odb.data.Existence
 import lucuma.odb.data.TelluricTargets
 import lucuma.odb.graphql.input.CatalogInfoInput
@@ -35,14 +36,11 @@ import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.LoggerFactory
 import org.typelevel.log4cats.syntax.*
 import skunk.*
-import skunk.codec.all.{timestamp as tsTimestamp, *}
+import skunk.codec.all.*
 import skunk.implicits.*
 
 import scala.collection.immutable.SortedMap
 import scala.concurrent.duration.*
-
-import lucuma.core.model.TelluricType
-import java.time.LocalDateTime
 
 trait TelluricTargetsService[F[_]]:
 
@@ -114,7 +112,7 @@ object TelluricTargetsService:
         S.transactionally:
           Services.asSuperUser:
             for
-              coords   <- session.prepareR(Statements.selectTargetCoordinates)
+              coords   <- session.prepareR(Statements.SelectTargetCoordinates)
                             .use(_.option(scienceObsId))
               f2Config <- flamingos2LongSlitService.select(List(scienceObsId))
                             .map(_.get(scienceObsId))
@@ -128,18 +126,18 @@ object TelluricTargetsService:
         FiniteDuration(math.min(delay.toSeconds, maxDelay.toSeconds), SECONDS)
 
       override def reset(using ServiceAccess, Transaction[F]): F[Unit] =
-        session.execute(Statements.resetCalculating).void
+        session.execute(Statements.ResetCalculating).void
 
       override def load(max: Int): F[List[TelluricTargets.Pending]] =
         session
-          .prepareR(Statements.loadPending(max))
-          .use(_.stream(Void, 1024).compile.toList)
+          .prepareR(Statements.LoadPending)
+          .use(_.stream(max, 1024).compile.toList)
 
       override def loadObs(
         oid: Observation.Id
       )(using ServiceAccess, Transaction[F]): F[Option[TelluricTargets.Pending]] =
         session
-          .prepareR(Statements.loadPendingObs)
+          .prepareR(Statements.LoadPendingObs)
           .use(_.option(oid))
 
       private def mkSearchInput(coords: Coordinates, telluricType: TelluricType): TelluricSearchInput =
@@ -156,7 +154,7 @@ object TelluricTargetsService:
         telluricId: Observation.Id,
         scienceId:  Observation.Id
       )(using ServiceAccess, Transaction[F]): F[Unit] =
-        session.execute(Statements.insertResolutionRequest)(
+        session.execute(Statements.InsertResolutionRequest)(
           telluricId, pid, scienceId
         ).void
 
@@ -170,8 +168,8 @@ object TelluricTargetsService:
         ): F[Option[TelluricTargets.Meta]] =
           S.transactionally:
             session
-              .prepareR(Statements.requestReady)
-              .use(_.option((targetId, errorMsg, pending.observationId, pending.lastInvalidation.toLocalDateTime)))
+              .prepareR(Statements.RequestReady)
+              .use(_.option((targetId, errorMsg, pending.observationId, pending.lastInvalidation)))
 
         def retryRequest(
           failureCount: Int,
@@ -180,7 +178,7 @@ object TelluricTargetsService:
           val retryDelay = calculateRetryAt(failureCount)
           S.transactionally:
             session
-              .prepareR(Statements.retryRequest)
+              .prepareR(Statements.RetryRequest)
               .use(_.option((failureCount + 1, s"${retryDelay.toSeconds} seconds", errorMsg, pending.observationId)))
 
         def queryParams: F[Either[String, (Coordinates, TelluricType)]] =
@@ -216,54 +214,74 @@ object TelluricTargetsService:
                                   role = CalibrationRole.Telluric.some
                                 ).orError
                 // Get current target
-                oldTargetOpt <- session.prepareR(Statements.selectTelluricObservationTarget)
+                oldTargetOpt <- session.prepareR(Statements.SelectTelluricObservationTarget)
                                   .use(_.option(pending.observationId))
                 // Old targets will be cleaned up by orphan calibration
                 _            <- oldTargetOpt match
                                   case Some(_) =>
-                                    session.execute(Statements.updateTelluricObservationTarget)(
+                                    session.execute(Statements.UpdateTelluricObservationTarget)(
                                       (targetId, pending.observationId)
                                     )
                                   case None =>
-                                    session.execute(Statements.insertTelluricObservationTarget)(
+                                    session.execute(Statements.InsertTelluricObservationTarget)(
                                       (pending.programId, pending.observationId, targetId)
                                     )
               } yield targetId
 
-        // Main resolution logic
+        def searchAndResolve(coords: Coordinates, telluricType: TelluricType): F[Either[String, Target.Id]] =
+          telluricClient.searchTarget(mkSearchInput(coords, telluricType)).flatMap: results =>
+            results.headOption match
+              case Some((star, catalogResult)) =>
+                val sidereal = catalogResult.map(_.target).getOrElse(star.asSiderealTarget)
+                info"Found telluric star HIP ${star.hip} for observation ${pending.observationId}" *>
+                  createAndLinkTarget(sidereal).map(_.asRight)
+              case None =>
+                val msg = s"No telluric stars found for observation ${pending.observationId}"
+                Logger[F].warn(msg).as(msg.asLeft)
+
+        def handleResult(result: Either[String, Target.Id]): F[Option[TelluricTargets.Meta]] =
+          result match
+            case Right(targetId) =>
+              requestRetry(targetId.some, none)
+            case Left(errorMsg) if pending.failureCount < 5 =>
+              warn"Telluric target resolution failed (attempt ${pending.failureCount + 1}), will retry: $errorMsg" *>
+                retryRequest(pending.failureCount, errorMsg)
+            case Left(errorMsg) =>
+              error"Telluric target resolution permanently failed after ${pending.failureCount} attempts: $errorMsg" *>
+                requestRetry(none, errorMsg.some)
+
         for {
           _          <- info"Resolving telluric target for observation ${pending.observationId}"
           searchData <- queryParams
-          result     <- searchData match
-                          case Right((coords, telluricType)) =>
-                            telluricClient.searchTarget(mkSearchInput(coords, telluricType)).flatMap: results =>
-                              results.headOption match
-                                case Some((star, catalogResult)) =>
-                                  // Use catalog result if available, otherwise convert TelluricStar
-                                  val sidereal = catalogResult
-                                    .map(_.target)
-                                    .getOrElse(star.asSiderealTarget)
-                                  info"Found telluric star HIP ${star.hip} for observation ${pending.observationId}" *>
-                                    createAndLinkTarget(sidereal).map(Right(_))
-                                case None =>
-                                  val msg = s"No telluric stars found for observation ${pending.observationId}"
-                                  Logger[F].info(msg).as(msg.asLeft)
-                          case Left(msg) =>
-                            error"$msg".as(Left(msg))
-          meta       <- result match
-                          case Right(targetId) =>
-                            requestRetry(targetId.some, none)
-                          case Left(errorMsg) if pending.failureCount < 5 =>
-                            warn"Telluric target resolution failed (attempt ${pending.failureCount + 1}), will retry: $errorMsg" *>
-                            retryRequest(pending.failureCount, errorMsg)
-                          case Left(errorMsg) =>
-                            error"Telluric target resolution permanently failed after ${pending.failureCount} attempts: $errorMsg" *>
-                            requestRetry(none, errorMsg.some)
+          result     <- searchData.fold(
+                          msg => error"$msg".as(msg.asLeft),
+                          searchAndResolve.tupled
+                        )
+          meta       <- handleResult(result)
         } yield meta
 
       object Statements:
 
-        val resetCalculating: Command[Void] =
+        // Codecs for reuse
+        val pending: Codec[TelluricTargets.Pending] =
+          (observation_id *: program_id *: observation_id *: core_timestamp *: int4)
+            .to[TelluricTargets.Pending]
+
+        val meta: Codec[TelluricTargets.Meta] =
+          (observation_id *: program_id *: observation_id *: calculation_state *:
+           core_timestamp *: core_timestamp *: core_timestamp.opt *: int4 *:
+           target_id.opt *: text.opt).to[TelluricTargets.Meta]
+
+        // Column helpers
+        private val pendingColumns: String =
+          "c_observation_id, c_program_id, c_science_observation_id, c_last_invalidation, c_failure_count"
+
+        private val metaColumns: String =
+          """c_observation_id, c_program_id, c_science_observation_id, c_state,
+             c_last_invalidation, c_last_update, c_retry_at, c_failure_count,
+             c_resolved_target_id, c_error_message"""
+
+        val ResetCalculating: Command[Void] =
           sql"""
             UPDATE t_telluric_resolution
             SET    c_state = 'pending',
@@ -272,7 +290,7 @@ object TelluricTargetsService:
             WHERE  c_state = 'calculating'
           """.command
 
-        def loadPending(max: Int): Query[Void, TelluricTargets.Pending] =
+        val LoadPending: Query[Int, TelluricTargets.Pending] =
           sql"""
             UPDATE t_telluric_resolution
             SET    c_state = 'calculating'
@@ -285,37 +303,20 @@ object TelluricTargetsService:
               LIMIT  $int4
               FOR UPDATE SKIP LOCKED
             )
-            RETURNING c_observation_id,
-                      c_program_id,
-                      c_science_observation_id,
-                      c_last_invalidation,
-                       c_failure_count
-           """.query(observation_id *: program_id *: observation_id *: tsTimestamp *: int4)
-               .map { case (oid, pid, scienceOid, lastInv, failCount) =>
-                 TelluricTargets.Pending(oid, pid, scienceOid,
-                   Timestamp.fromLocalDateTimeTruncatedAndBounded(lastInv), failCount)
-              }
-              .contramap[Void](_ => max)
+            RETURNING #$pendingColumns
+          """.query(pending)
 
-        val loadPendingObs: Query[Observation.Id, TelluricTargets.Pending] =
+        val LoadPendingObs: Query[Observation.Id, TelluricTargets.Pending] =
           sql"""
             UPDATE t_telluric_resolution
             SET    c_state = 'calculating'
             WHERE  c_observation_id = $observation_id
               AND  c_state IN ('pending', 'retry')
               AND  (c_retry_at IS NULL OR c_retry_at <= now())
-            RETURNING c_observation_id,
-                      c_program_id,
-                      c_science_observation_id,
-                      c_last_invalidation,
-                       c_failure_count
-""".query(observation_id *: program_id *: observation_id *: tsTimestamp *: int4)
-              .map { case (oid, pid, scienceOid, lastInv, failCount) =>
-                TelluricTargets.Pending(oid, pid, scienceOid,
-                  Timestamp.fromLocalDateTimeTruncatedAndBounded(lastInv), failCount)
-              }
+            RETURNING #$pendingColumns
+          """.query(pending)
 
-        val requestReady: Query[(Option[Target.Id], Option[String], Observation.Id, LocalDateTime), TelluricTargets.Meta] =
+        val RequestReady: Query[(Option[Target.Id], Option[String], Observation.Id, Timestamp), TelluricTargets.Meta] =
           sql"""
             UPDATE t_telluric_resolution
             SET    c_state = 'ready',
@@ -325,29 +326,11 @@ object TelluricTargetsService:
                    c_retry_at = NULL,
                    c_failure_count = 0
             WHERE  c_observation_id = $observation_id
-              AND  c_last_invalidation = $tsTimestamp
-            RETURNING c_observation_id,
-                      c_program_id,
-                      c_science_observation_id,
-                      c_state,
-                      c_last_invalidation,
-                      c_last_update,
-                      c_retry_at,
-                      c_failure_count,
-                      c_resolved_target_id,
-                      c_error_message
-          """.query(
-            observation_id *: program_id *: observation_id *: calculation_state *:
-            tsTimestamp *: tsTimestamp *: tsTimestamp.opt *: int4 *: target_id.opt *: text.opt
-          ).map { case (oid, pid, scienceOid, state, lastInv, lastUpd, retryAt, failCount, targetId, errorMsg) =>
-            TelluricTargets.Meta(oid, pid, scienceOid, state,
-              Timestamp.fromLocalDateTimeTruncatedAndBounded(lastInv),
-              Timestamp.fromLocalDateTimeTruncatedAndBounded(lastUpd),
-              retryAt.map(t => Timestamp.fromLocalDateTimeTruncatedAndBounded(t)),
-              failCount, targetId, errorMsg)
-         }
+              AND  c_last_invalidation = $core_timestamp
+            RETURNING #$metaColumns
+          """.query(meta)
 
-        val retryRequest: Query[(Int, String, String, Observation.Id), TelluricTargets.Meta] =
+        val RetryRequest: Query[(Int, String, String, Observation.Id), TelluricTargets.Meta] =
           sql"""
             UPDATE t_telluric_resolution
             SET    c_state = 'retry',
@@ -356,28 +339,10 @@ object TelluricTargetsService:
                    c_retry_at = now() + $text::interval,
                    c_error_message = $text
             WHERE  c_observation_id = $observation_id
-            RETURNING c_observation_id,
-                      c_program_id,
-                      c_science_observation_id,
-                      c_state,
-                      c_last_invalidation,
-                      c_last_update,
-                      c_retry_at,
-                      c_failure_count,
-                      c_resolved_target_id,
-                      c_error_message
-          """.query(
-            observation_id *: program_id *: observation_id *: calculation_state *:
-            tsTimestamp *: tsTimestamp *: tsTimestamp.opt *: int4 *: target_id.opt *: text.opt
-).map { case (oid, pid, scienceOid, state, lastInv, lastUpd, retryAt, failCount, targetId, errorMsg) =>
-              TelluricTargets.Meta(oid, pid, scienceOid, state,
-                Timestamp.fromLocalDateTimeTruncatedAndBounded(lastInv),
-                Timestamp.fromLocalDateTimeTruncatedAndBounded(lastUpd),
-                retryAt.map(t => Timestamp.fromLocalDateTimeTruncatedAndBounded(t)),
-                failCount, targetId, errorMsg)
-           }
+            RETURNING #$metaColumns
+          """.query(meta)
 
-        val selectTargetCoordinates: Query[Observation.Id, Coordinates] =
+        val SelectTargetCoordinates: Query[Observation.Id, Coordinates] =
           sql"""
             SELECT t.c_sid_ra, t.c_sid_dec
             FROM   t_asterism_target a
@@ -388,7 +353,7 @@ object TelluricTargetsService:
             LIMIT  1
           """.query(right_ascension *: declination).map(Coordinates.apply)
 
-        val selectTelluricObservationTarget: Query[Observation.Id, Target.Id] =
+        val SelectTelluricObservationTarget: Query[Observation.Id, Target.Id] =
           sql"""
             SELECT a.c_target_id
             FROM   t_asterism_target a
@@ -396,20 +361,20 @@ object TelluricTargetsService:
             LIMIT  1
           """.query(target_id)
 
-        val updateTelluricObservationTarget: Command[(Target.Id, Observation.Id)] =
+        val UpdateTelluricObservationTarget: Command[(Target.Id, Observation.Id)] =
           sql"""
             UPDATE t_asterism_target
             SET    c_target_id = $target_id
             WHERE  c_observation_id = $observation_id
           """.command
 
-        val insertTelluricObservationTarget: Command[(Program.Id, Observation.Id, Target.Id)] =
+        val InsertTelluricObservationTarget: Command[(Program.Id, Observation.Id, Target.Id)] =
           sql"""
             INSERT INTO t_asterism_target (c_program_id, c_observation_id, c_target_id)
             VALUES ($program_id, $observation_id, $target_id)
           """.command
 
-        val insertResolutionRequest: Command[(Observation.Id, Program.Id, Observation.Id)] =
+        val InsertResolutionRequest: Command[(Observation.Id, Program.Id, Observation.Id)] =
           sql"""
             INSERT INTO t_telluric_resolution (
               c_observation_id,
