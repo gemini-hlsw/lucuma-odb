@@ -83,15 +83,6 @@ trait TelluricTargetsService[F[_]]:
     pending: TelluricTargets.Pending
   )(using ServiceAccess, NoTransaction[F]): F[Option[TelluricTargets.Meta]]
 
-  /**
-   * Rechecks telluric resolution for observations linked to a science observation.
-   * Re-queries for telluric star and only replaces target if different.
-   * Called when science observation changes (obscalc ready).
-   */
-  def recheckForScienceObservation(
-    scienceObsId: Observation.Id
-  )(using ServiceAccess, NoTransaction[F]): F[Unit]
-
 object TelluricTargetsService:
 
   // TODO: move to core
@@ -263,108 +254,12 @@ object TelluricTargetsService:
                           case Right(targetId) =>
                             requestRetry(targetId.some, none)
                           case Left(errorMsg) if pending.failureCount < 5 =>
-                            warn"Telluric resolution failed (attempt ${pending.failureCount + 1}), will retry: $errorMsg" *>
+                            warn"Telluric target resolution failed (attempt ${pending.failureCount + 1}), will retry: $errorMsg" *>
                             retryRequest(pending.failureCount, errorMsg)
                           case Left(errorMsg) =>
-                            error"Telluric resolution permanently failed after ${pending.failureCount} attempts: $errorMsg" *>
+                            error"Telluric target resolution permanently failed after ${pending.failureCount} attempts: $errorMsg" *>
                             requestRetry(none, errorMsg.some)
         } yield meta
-
-      override def recheckForScienceObservation(
-        scienceObsId: Observation.Id
-      )(using ServiceAccess, NoTransaction[F]): F[Unit] =
-
-        def extractHip(name: String): Option[Int] =
-          name.stripPrefix("HIP ").toIntOption
-
-        def recheckOne(telluricObsId: Observation.Id, programId: Program.Id, currentTargetId: Target.Id): F[Unit] =
-          for
-            // Get current target name to extract HIP number
-            currentName <- S.transactionally:
-                             Services.asSuperUser:
-                               session.prepareR(Statements.selectTargetName).use(_.unique(currentTargetId))
-            currentHip   = extractHip(currentName)
-
-            // Get science observation data for search and perform comparison
-            searchParams <- fetchSearchParams(scienceObsId)
-            _ <- searchParams match
-                   case Some((coords, telluricType)) =>
-                     telluricClient.search(mkSearchInput(coords, telluricType)).flatMap: stars =>
-                       stars.headOption match
-                         case Some(star) =>
-                           if currentHip.contains(star.hip) then
-                             info"Telluric star unchanged for $telluricObsId (HIP ${star.hip})"
-                           else
-                             info"Telluric star changed for $telluricObsId: ${currentName} -> HIP ${star.hip}" *>
-                             S.transactionally:
-                               Services.asSuperUser:
-                                 for
-                                   // Create new target
-                                   newTargetId <- createNewTelluricTarget(programId, star)
-                                   // Update observation to point to new target
-                                   // Old target will be cleaned up by orphan calibration targets cleanup
-                                   _ <- session.execute(Statements.updateTelluricObservationTarget)(
-                                          (newTargetId, telluricObsId)
-                                        )
-                                   // Update resolution record
-                                   _ <- session.execute(
-                                          sql"""
-                                            UPDATE t_telluric_resolution
-                                            SET c_resolved_target_id = $target_id,
-                                                c_last_update = now()
-                                            WHERE c_observation_id = $observation_id
-                                          """.command
-                                        )(newTargetId, telluricObsId)
-                                 yield ()
-                         case None =>
-                           warn"No telluric stars found during recheck for $telluricObsId"
-                   case None =>
-                     warn"Missing coordinates or F2 config during recheck for $telluricObsId"
-          yield ()
-
-        def createNewTelluricTarget(
-          pid: Program.Id,
-          star: TelluricStar
-        )(using Transaction[F], Services.SuperUserAccess): F[Target.Id] =
-          val targetInput = TargetPropertiesInput.Create(
-            name = NonEmptyString.unsafeFrom(s"HIP ${star.hip}"),
-            subtypeInfo = SiderealInput.Create(
-              ra = star.coordinates.ra,
-              dec = star.coordinates.dec,
-              epoch = Epoch.J2000,
-              properMotion = None,
-              radialVelocity = None,
-              parallax = None,
-              catalogInfo = None
-            ),
-            sourceProfile = SourceProfile.Point(
-              SpectralDefinition.BandNormalized(None, SortedMap.empty)
-            ),
-            existence = Existence.Present
-          )
-          targetService.createTarget(
-            AccessControl.unchecked(targetInput, pid, program_id),
-            disposition = TargetDisposition.Calibration,
-            role = CalibrationRole.Telluric.some
-          ).orError
-
-        // Main logic: find all resolved telluric entries for this science observation and recheck them
-        // Also reset any failed entries to pending so they can be retried
-        for
-          resolved <- S.transactionally:
-                        Services.asSuperUser:
-                          session.prepareR(Statements.selectResolvedForScienceObs)
-                            .use(_.stream(scienceObsId, 64).compile.toList)
-          _        <- resolved.traverse_(recheckOne.tupled)
-          // Reset failed entries (ready state with no resolved target) to pending
-          completion <- S.transactionally:
-                          Services.asSuperUser:
-                            session.execute(Statements.resetFailedForScienceObs)(scienceObsId)
-          resetCount = completion match
-                         case skunk.data.Completion.Update(n) => n.toInt
-                         case _ => 0
-          _        <- info"Reset $resetCount failed telluric entries to pending for science observation $scienceObsId".whenA(resetCount > 0)
-        yield ()
 
       object Statements:
 
@@ -530,33 +425,4 @@ object TelluricTargetsService:
               now()
             )
             ON CONFLICT (c_observation_id) DO NOTHING
-          """.command
-
-        val selectResolvedForScienceObs: Query[Observation.Id, (Observation.Id, Program.Id, Target.Id)] =
-          sql"""
-            SELECT c_observation_id, c_program_id, c_resolved_target_id
-            FROM   t_telluric_resolution
-            WHERE  c_science_observation_id = $observation_id
-              AND  c_state = 'ready'
-              AND  c_resolved_target_id IS NOT NULL
-          """.query(observation_id *: program_id *: target_id)
-
-        val selectTargetName: Query[Target.Id, String] =
-          sql"""
-            SELECT c_name
-            FROM   t_target
-            WHERE  c_target_id = $target_id
-          """.query(text)
-
-        val resetFailedForScienceObs: Command[Observation.Id] =
-          sql"""
-            UPDATE t_telluric_resolution
-            SET    c_state = 'pending',
-                   c_last_invalidation = now(),
-                   c_retry_at = NULL,
-                   c_failure_count = 0,
-                   c_error_message = NULL
-            WHERE  c_science_observation_id = $observation_id
-              AND  c_state = 'ready'
-              AND  c_resolved_target_id IS NULL
           """.command
