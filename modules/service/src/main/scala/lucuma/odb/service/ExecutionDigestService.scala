@@ -5,35 +5,26 @@ package lucuma.odb.service
 
 import cats.data.NonEmptyList
 import cats.effect.Concurrent
-import cats.implicits.catsKernelOrderingForOrder
 import cats.syntax.applicative.*
 import cats.syntax.applicativeError.*
-import cats.syntax.apply.*
-import cats.syntax.either.*
 import cats.syntax.eq.*
 import cats.syntax.functor.*
-import cats.syntax.traverse.*
 import eu.timepit.refined.types.numeric.NonNegInt
 import lucuma.core.enums.ChargeClass
 import lucuma.core.enums.ExecutionState
 import lucuma.core.enums.ObserveClass
+import lucuma.core.enums.StepGuideState
 import lucuma.core.math.Offset
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.sequence.ExecutionDigest
-import lucuma.core.model.sequence.SequenceDigest
-import lucuma.core.model.sequence.SetupTime
 import lucuma.core.util.TimeSpan
 import lucuma.odb.data.Md5Hash
 import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.util.Codecs.*
 import org.typelevel.log4cats.Logger
 import skunk.*
-import skunk.codec.numeric._int8
-import skunk.data.Arr
 import skunk.implicits.*
-
-import scala.collection.immutable.SortedSet
 
 sealed trait ExecutionDigestService[F[_]] {
 
@@ -111,6 +102,8 @@ object ExecutionDigestService {
         hash:   Md5Hash,
         digest: ExecutionDigest
       )(using Transaction[F]): F[Unit] =
+        val acqConfigs = digest.acquisition.telescopeConfigs.toList
+        val sciConfigs = digest.science.telescopeConfigs.toList
         session.execute(Statements.InsertOrUpdateExecutionDigest)(
           pid,
           oid,
@@ -120,13 +113,15 @@ object ExecutionDigestService {
           digest.acquisition.observeClass,
           digest.acquisition.timeEstimate(ChargeClass.NonCharged),
           digest.acquisition.timeEstimate(ChargeClass.Program),
-          digest.acquisition.offsets.toList,
+          acqConfigs.map(_.offset),
+          acqConfigs.map(_.guiding),
           digest.acquisition.atomCount,
           digest.acquisition.executionState,
           digest.science.observeClass,
           digest.science.timeEstimate(ChargeClass.NonCharged),
           digest.science.timeEstimate(ChargeClass.Program),
-          digest.science.offsets.toList,
+          sciConfigs.map(_.offset),
+          sciConfigs.map(_.guiding),
           digest.science.atomCount,
           digest.science.executionState,
           hash,
@@ -135,13 +130,15 @@ object ExecutionDigestService {
           digest.acquisition.observeClass,
           digest.acquisition.timeEstimate(ChargeClass.NonCharged),
           digest.acquisition.timeEstimate(ChargeClass.Program),
-          digest.acquisition.offsets.toList,
+          acqConfigs.map(_.offset),
+          acqConfigs.map(_.guiding),
           digest.acquisition.atomCount,
           digest.acquisition.executionState,
           digest.science.observeClass,
           digest.science.timeEstimate(ChargeClass.NonCharged),
           digest.science.timeEstimate(ChargeClass.Program),
-          digest.science.offsets.toList,
+          sciConfigs.map(_.offset),
+          sciConfigs.map(_.guiding),
           digest.science.atomCount,
           digest.science.executionState
         )
@@ -154,44 +151,6 @@ object ExecutionDigestService {
 
   object Statements {
 
-    private val setup_time: Codec[SetupTime] =
-      (time_span *: time_span).to[SetupTime]
-
-    private val offset_array: Codec[List[Offset]] =
-      _int8.eimap { arr =>
-        val len = arr.size / 2
-        if (arr.size % 2 =!= 0) "Expected an even number of offset coordinates".asLeft
-        else arr.reshape(len, 2).fold("Quite unexpectedly, cannot reshape offsets to an Nx2 array".asLeft[List[Offset]]) { arr =>
-          Either.fromOption(
-            (0 until len).toList.traverse { index =>
-              (arr.get(index, 0), arr.get(index, 1)).mapN { (p, q) =>
-                Offset.signedMicroarcseconds.reverseGet((p, q))
-              }
-            },
-            "Invalid offset array"
-          )
-        }
-      } { offsets =>
-        Arr
-          .fromFoldable(offsets.flatMap(o => Offset.signedMicroarcseconds.get(o).toList))
-          .reshape(offsets.size, 2)
-          .get
-      }
-
-    private val sequence_digest: Codec[SequenceDigest] =
-      (obs_class *: categorized_time *: offset_array *: int4_nonneg *: execution_state).imap { case (oClass, pTime, offsets, aCount, execState) =>
-        SequenceDigest(oClass, pTime, SortedSet.from(offsets), aCount, execState)
-      } { sd => (
-        sd.observeClass,
-        sd.timeEstimate,
-        sd.offsets.toList,
-        sd.atomCount,
-        sd.executionState
-      )}
-
-    private val execution_digest: Codec[ExecutionDigest] =
-      (setup_time *: sequence_digest *: sequence_digest).to[ExecutionDigest]
-
     private val DigestColumns: String =
       """
         c_full_setup_time,
@@ -200,12 +159,14 @@ object ExecutionDigestService {
         c_acq_non_charged_time,
         c_acq_program_time,
         c_acq_offsets,
+        c_acq_offset_guide_states,
         c_acq_atom_count,
         c_acq_execution_state,
         c_sci_obs_class,
         c_sci_non_charged_time,
         c_sci_program_time,
         c_sci_offsets,
+        c_sci_offset_guide_states,
         c_sci_atom_count,
         c_sci_execution_state
       """
@@ -251,12 +212,14 @@ object ExecutionDigestService {
       TimeSpan,
       TimeSpan,
       List[Offset],
+      List[StepGuideState],
       NonNegInt,
       ExecutionState,
       ObserveClass,
       TimeSpan,
       TimeSpan,
       List[Offset],
+      List[StepGuideState],
       NonNegInt,
       ExecutionState,
       Md5Hash,
@@ -266,12 +229,14 @@ object ExecutionDigestService {
       TimeSpan,
       TimeSpan,
       List[Offset],
+      List[StepGuideState],
       NonNegInt,
       ExecutionState,
       ObserveClass,
       TimeSpan,
       TimeSpan,
       List[Offset],
+      List[StepGuideState],
       NonNegInt,
       ExecutionState
     )] =
@@ -286,12 +251,14 @@ object ExecutionDigestService {
           c_acq_non_charged_time,
           c_acq_program_time,
           c_acq_offsets,
+          c_acq_offset_guide_states,
           c_acq_atom_count,
           c_acq_execution_state,
           c_sci_obs_class,
           c_sci_non_charged_time,
           c_sci_program_time,
           c_sci_offsets,
+          c_sci_offset_guide_states,
           c_sci_atom_count,
           c_sci_execution_state
         ) SELECT
@@ -303,31 +270,35 @@ object ExecutionDigestService {
           $obs_class,
           $time_span,
           $time_span,
-          $offset_array,
+          $_offset_array,
+          $_guide_state,
           $int4_nonneg,
           $execution_state,
           $obs_class,
           $time_span,
           $time_span,
-          $offset_array,
+          $_offset_array,
+          $_guide_state,
           $int4_nonneg,
           $execution_state
         ON CONFLICT ON CONSTRAINT t_execution_digest_pkey DO UPDATE
-          SET c_hash                 = $md5_hash,
-              c_full_setup_time      = $time_span,
-              c_reacq_setup_time     = $time_span,
-              c_acq_obs_class        = $obs_class,
-              c_acq_non_charged_time = $time_span,
-              c_acq_program_time     = $time_span,
-              c_acq_offsets          = $offset_array,
-              c_acq_atom_count       = $int4_nonneg,
-              c_acq_execution_state  = $execution_state,
-              c_sci_obs_class        = $obs_class,
-              c_sci_non_charged_time = $time_span,
-              c_sci_program_time     = $time_span,
-              c_sci_offsets          = $offset_array,
-              c_sci_atom_count       = $int4_nonneg,
-              c_sci_execution_state  = $execution_state
+          SET c_hash                    = $md5_hash,
+              c_full_setup_time         = $time_span,
+              c_reacq_setup_time        = $time_span,
+              c_acq_obs_class           = $obs_class,
+              c_acq_non_charged_time    = $time_span,
+              c_acq_program_time        = $time_span,
+              c_acq_offsets             = $_offset_array,
+              c_acq_offset_guide_states = $_guide_state,
+              c_acq_atom_count          = $int4_nonneg,
+              c_acq_execution_state     = $execution_state,
+              c_sci_obs_class           = $obs_class,
+              c_sci_non_charged_time    = $time_span,
+              c_sci_program_time        = $time_span,
+              c_sci_offsets             = $_offset_array,
+              c_sci_offset_guide_states = $_guide_state,
+              c_sci_atom_count          = $int4_nonneg,
+              c_sci_execution_state     = $execution_state
       """.command
 
   }

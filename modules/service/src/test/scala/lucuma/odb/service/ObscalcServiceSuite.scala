@@ -3,7 +3,6 @@
 
 package lucuma.odb.service
 
-import cats.Order.catsKernelOrderingForOrder
 import cats.effect.IO
 import cats.syntax.eq.*
 import cats.syntax.option.*
@@ -12,6 +11,7 @@ import lucuma.core.enums.ChargeClass
 import lucuma.core.enums.ExecutionState
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.ObserveClass
+import lucuma.core.enums.StepGuideState
 import lucuma.core.math.Offset
 import lucuma.core.math.Wavelength
 import lucuma.core.model.Observation
@@ -23,6 +23,7 @@ import lucuma.core.model.sequence.CategorizedTime
 import lucuma.core.model.sequence.ExecutionDigest
 import lucuma.core.model.sequence.SequenceDigest
 import lucuma.core.model.sequence.SetupTime
+import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.util.CalculationState
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
@@ -202,14 +203,23 @@ class ObscalcServiceSuite extends ObscalcServiceSuiteSupport:
           SequenceDigest(
             ObserveClass.Acquisition,
             CategorizedTime(ChargeClass.Program -> TimeSpan.unsafeFromMicroseconds(219362500L)),
-            SortedSet(Offset.Zero, Offset.microarcseconds.reverseGet(10000000L, 0L)),
+            SortedSet.from(List(
+              TelescopeConfig(Offset.Zero, StepGuideState.Enabled),
+              TelescopeConfig(Offset.microarcseconds.reverseGet(10000000L, 0L), StepGuideState.Enabled)
+            )),
             NonNegInt.unsafeFrom(2),
             ExecutionState.NotStarted
           ),
           SequenceDigest(
             ObserveClass.Science,
             CategorizedTime(ChargeClass.Program -> TimeSpan.FromSeconds.getOption(ScienceSequence).get),
-            SortedSet(Offset.microarcseconds.reverseGet(0L, 1295985000000L), Offset.Zero, Offset.microarcseconds.reverseGet(0L, 15000000L)),
+            SortedSet.from(List(
+              TelescopeConfig(Offset.Zero, StepGuideState.Disabled),
+              TelescopeConfig(Offset.Zero, StepGuideState.Enabled),
+              TelescopeConfig(Offset.microarcseconds.reverseGet(0L, 15000000L), StepGuideState.Disabled),
+              TelescopeConfig(Offset.microarcseconds.reverseGet(0L, 15000000L), StepGuideState.Enabled),
+              TelescopeConfig(Offset.microarcseconds.reverseGet(0L, 1295985000000L), StepGuideState.Enabled)
+            )),
             NonNegInt.unsafeFrom(3),
             ExecutionState.NotStarted
           )

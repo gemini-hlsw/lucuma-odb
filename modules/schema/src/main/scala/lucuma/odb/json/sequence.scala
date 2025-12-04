@@ -3,7 +3,6 @@
 
 package lucuma.odb.json
 
-import cats.Order.catsKernelOrderingForOrder
 import cats.data.NonEmptyList
 import cats.syntax.either.*
 import eu.timepit.refined.types.numeric.NonNegInt
@@ -39,7 +38,6 @@ import scala.collection.immutable.SortedSet
 
 trait SequenceCodec {
 
-  import offset.decoder.given
   import stepconfig.given
   import timeaccounting.given
 
@@ -100,21 +98,21 @@ trait SequenceCodec {
   given Decoder[SequenceDigest] =
     Decoder.instance: c =>
       for
-        o <- c.downField("observeClass").as[ObserveClass]
-        t <- c.downField("timeEstimate").as[CategorizedTime]
-        f <- c.downField("offsets").as[List[Offset]].map(SortedSet.from)
-        n <- c.downField("atomCount").as[NonNegInt]
-        e <- c.downField("executionState").as[ExecutionState]
-      yield SequenceDigest(o, t, f, n, e)
+        o  <- c.downField("observeClass").as[ObserveClass]
+        t  <- c.downField("timeEstimate").as[CategorizedTime]
+        tc <- c.downField("telescopeConfigs").as[SortedSet[TelescopeConfig]]
+        n  <- c.downField("atomCount").as[NonNegInt]
+        e  <- c.downField("executionState").as[ExecutionState]
+      yield SequenceDigest(o, t, tc, n, e)
 
   given (using Encoder[Offset], Encoder[TimeSpan]): Encoder[SequenceDigest] =
     Encoder.instance: (a: SequenceDigest) =>
       Json.obj(
-        "observeClass"   -> a.observeClass.asJson,
-        "timeEstimate"   -> a.timeEstimate.asJson,
-        "offsets"        -> a.offsets.toList.asJson,
-        "atomCount"      -> a.atomCount.asJson,
-        "executionState" -> a.executionState.asJson
+        "observeClass"     -> a.observeClass.asJson,
+        "timeEstimate"     -> a.timeEstimate.asJson,
+        "telescopeConfigs" -> a.telescopeConfigs.asJson,
+        "atomCount"        -> a.atomCount.asJson,
+        "executionState"   -> a.executionState.asJson
       )
 
   given Decoder[ExecutionDigest] =

@@ -3617,7 +3617,7 @@ type Offset {
 """
 Offset component (p or q) input parameters. Choose one angle units definition.
 """
-input OffsetComponentInput {
+input OffsetComponentInput @oneOf {
   """
   Angle in µas
   """
@@ -5696,7 +5696,7 @@ input TimingWindowInput {
 """
 Un-normalized SED input parameters.  Define one value only.
 """
-input UnnormalizedSedInput {
+input UnnormalizedSedInput @oneOf {
   stellarLibrary: StellarLibrarySpectrum
   coolStar: CoolStarTemperature
   galaxy: GalaxySpectrum
@@ -12513,9 +12513,9 @@ type SequenceDigest {
   timeEstimate: CategorizedTime!
 
   """
-  Unique offsets that occur in the sequence.
+  TelescopeConfig (offset + guiding) for each step.
   """
-  offsets: [Offset!]!
+  telescopeConfigs: [TelescopeConfig!]!
 
   """
   Total count of anticipated atoms, including the 'nextAtom', 'possibleFuture'
