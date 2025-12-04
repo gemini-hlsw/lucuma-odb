@@ -146,7 +146,7 @@ object TelluricTargetsService:
         TelluricSearchInput(
           coordinates = coords,
           duration = 1.hourTimeSpan,
-          brightest = BigDecimal(3.5),
+          brightest = BigDecimal(8),
           spType = telluricType
         )
 
