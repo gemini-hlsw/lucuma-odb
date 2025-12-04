@@ -43,7 +43,9 @@ case class SpectroscopyRow(
   resolution:     PosInt,
   ao:             Boolean,
   capability:     Option[Capability],
-  site:           Site
+  site:           Site,
+  hminHot:        Option[BigDecimal],
+  hminSolar:      Option[BigDecimal]
 ) extends ConfigurationRow
 
 trait RowParsers:
@@ -102,31 +104,39 @@ object SpectroscopyRow extends RowParsers {
       case s  => Capability.values.find(_.label === s).map(_.some)
     }
 
+  val optBigDecimal: Parser0[Option[BigDecimal]] =
+    vchar.rep0.string.map {
+      case "" => none
+      case s  => scala.util.Try(BigDecimal(s)).toOption
+    }
+
   /**
    * A single line in the .tsv file is split into 1 or more rows according to the FPU option.  So a
     * value of "singleslit,multislit" becames two rows identical in every respect except tht one is
     * single slit and the other multislit (MOS).
    */
   val rows: Parser[List[SpectroscopyRow]] = (
-    (instrument <* htab) ~
-    (string     <* htab) ~
-    (fpuOptions <* htab) ~
-    (string     <* htab) ~
-    (arcsec     <* htab) ~
-    (arcsec     <* htab) ~
-    (string     <* htab) ~
-    (filter     <* htab) ~
-    (µm         <* htab) ~
-    (µm         <* htab) ~
-    (µm         <* htab) ~
-    (µm         <* htab) ~
-    (posInt     <* htab) ~
-    (ao         <* htab) ~
-    (capability <* htab) ~
-    site
-  ).map { case (((((((((((((((inst, desc), fpuOpts), fpu), slitWidth), slitLength), disp), filter), min), max), opt), cov), res), ao), capability), site) =>
+    (instrument    <* htab) ~
+    (string        <* htab) ~
+    (fpuOptions    <* htab) ~
+    (string        <* htab) ~
+    (arcsec        <* htab) ~
+    (arcsec        <* htab) ~
+    (string        <* htab) ~
+    (filter        <* htab) ~
+    (µm            <* htab) ~
+    (µm            <* htab) ~
+    (µm            <* htab) ~
+    (µm            <* htab) ~
+    (posInt        <* htab) ~
+    (ao            <* htab) ~
+    (capability    <* htab) ~
+    (site          <* htab) ~
+    (optBigDecimal <* htab) ~
+    optBigDecimal
+  ).map { case (((((((((((((((((inst, desc), fpuOpts), fpu), slitWidth), slitLength), disp), filter), min), max), opt), cov), res), ao), capability), site), hminHot), hminSolar) =>
     fpuOpts.toList.map { fpuOpt =>
-      SpectroscopyRow(inst, desc, fpuOpt, fpu, slitWidth, slitLength, disp, filter, min, max, opt, cov, res, ao, capability, site)
+      SpectroscopyRow(inst, desc, fpuOpt, fpu, slitWidth, slitLength, disp, filter, min, max, opt, cov, res, ao, capability, site, hminHot, hminSolar)
     }
   }
 
