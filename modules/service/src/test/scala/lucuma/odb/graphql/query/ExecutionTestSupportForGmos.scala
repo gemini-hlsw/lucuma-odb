@@ -101,13 +101,13 @@ trait ExecutionTestSupportForGmos extends ExecutionTestSupport:
       Gcal(
         Gcal.Lamp.fromContinuum(GcalContinuum.QuartzHalogen5W),
         GcalFilter.Gmos,
-        GcalDiffuser.Visible,
-        GcalShutter.Closed
+        GcalDiffuser.Ir,
+        GcalShutter.Open
       ),
       GcalBaselineType.Night,
       PosInt.unsafeFrom(1),
       LegacyInstrumentConfig(
-        TimeSpan.unsafeFromMicroseconds(5_000_000L)
+        TimeSpan.unsafeFromMicroseconds(1_000_000L)
       )
     )
 
