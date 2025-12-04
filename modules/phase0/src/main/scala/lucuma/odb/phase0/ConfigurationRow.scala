@@ -115,6 +115,12 @@ object SpectroscopyRow extends RowParsers {
     * value of "singleslit,multislit" becames two rows identical in every respect except tht one is
     * single slit and the other multislit (MOS).
    */
+  val hminColumns: Parser0[(Option[BigDecimal], Option[BigDecimal])] =
+    ((htab *> optBigDecimal) ~ (htab *> optBigDecimal)).?.map {
+      case Some((hot, solar)) => (hot, solar)
+      case None               => (none, none)
+    }
+
   val rows: Parser[List[SpectroscopyRow]] = (
     (instrument    <* htab) ~
     (string        <* htab) ~
@@ -131,10 +137,9 @@ object SpectroscopyRow extends RowParsers {
     (posInt        <* htab) ~
     (ao            <* htab) ~
     (capability    <* htab) ~
-    (site          <* htab) ~
-    (optBigDecimal <* htab) ~
-    optBigDecimal
-  ).map { case (((((((((((((((((inst, desc), fpuOpts), fpu), slitWidth), slitLength), disp), filter), min), max), opt), cov), res), ao), capability), site), hminHot), hminSolar) =>
+    site ~
+    hminColumns
+  ).map { case ((((((((((((((((inst, desc), fpuOpts), fpu), slitWidth), slitLength), disp), filter), min), max), opt), cov), res), ao), capability), site), (hminHot, hminSolar)) =>
     fpuOpts.toList.map { fpuOpt =>
       SpectroscopyRow(inst, desc, fpuOpt, fpu, slitWidth, slitLength, disp, filter, min, max, opt, cov, res, ao, capability, site, hminHot, hminSolar)
     }
