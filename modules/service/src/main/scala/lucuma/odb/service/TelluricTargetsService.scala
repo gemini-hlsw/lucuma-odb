@@ -81,6 +81,15 @@ trait TelluricTargetsService[F[_]]:
     pending: TelluricTargets.Pending
   )(using ServiceAccess, NoTransaction[F]): F[Option[TelluricTargets.Meta]]
 
+  /**
+   * Rechecks telluric resolution for observations linked to a science observation.
+   * Re-queries for telluric star and only replaces target if different.
+   * Called when science observation changes (obscalc ready).
+   */
+  def recheckForScienceObservation(
+    scienceObsId: Observation.Id
+  )(using ServiceAccess, NoTransaction[F]): F[Unit]
+
 object TelluricTargetsService:
 
   // TODO: move to core
@@ -150,6 +159,33 @@ object TelluricTargetsService:
           spType = telluricType
         )
 
+      // Shared helper to create a telluric calibration target from sidereal data
+      private def createTargetFromSidereal(
+        pid: Program.Id,
+        sidereal: Target.Sidereal
+      )(using Transaction[F], Services.SuperUserAccess): F[Target.Id] =
+        val catalog = sidereal.catalogInfo.map: ci =>
+          CatalogInfoInput(ci.catalog.some, ci.id.some, ci.objectType)
+        val target = TargetPropertiesInput.Create(
+          name = sidereal.name,
+          subtypeInfo = SiderealInput.Create(
+            ra = sidereal.tracking.baseCoordinates.ra,
+            dec = sidereal.tracking.baseCoordinates.dec,
+            epoch = sidereal.tracking.epoch,
+            properMotion = sidereal.tracking.properMotion,
+            radialVelocity = sidereal.tracking.radialVelocity,
+            parallax = sidereal.tracking.parallax,
+            catalogInfo = catalog
+          ),
+          sourceProfile = sidereal.sourceProfile,
+          existence = Existence.Present
+        )
+        targetService.createTarget(
+          AccessControl.unchecked(target, pid, program_id),
+          disposition = TargetDisposition.Calibration,
+          role = CalibrationRole.Telluric.some
+        ).orError
+
       override def requestTelluricTarget(
         pid:        Program.Id,
         telluricId: Observation.Id,
@@ -187,29 +223,8 @@ object TelluricTargetsService:
         def createAndLinkTarget(sidereal: Target.Sidereal): F[Target.Id] =
           S.transactionally:
             Services.asSuperUser:
-              val catalog = sidereal.catalogInfo.map: ci =>
-                CatalogInfoInput(ci.catalog.some, ci.id.some, ci.objectType)
-              val target = TargetPropertiesInput.Create(
-                name = sidereal.name,
-                subtypeInfo = SiderealInput.Create(
-                  ra = sidereal.tracking.baseCoordinates.ra,
-                  dec = sidereal.tracking.baseCoordinates.dec,
-                  epoch = sidereal.tracking.epoch,
-                  properMotion = sidereal.tracking.properMotion,
-                  radialVelocity = sidereal.tracking.radialVelocity,
-                  parallax = sidereal.tracking.parallax,
-                  catalogInfo = catalog
-                ),
-                sourceProfile = sidereal.sourceProfile,
-                existence = Existence.Present
-              )
-
-              for {
-                targetId     <- targetService.createTarget(
-                                  AccessControl.unchecked(target, pending.programId, program_id),
-                                  disposition = TargetDisposition.Calibration,
-                                  role = CalibrationRole.Telluric.some
-                                ).orError
+              for
+                targetId     <- createTargetFromSidereal(pending.programId, sidereal)
                 // Get current target
                 oldTargetOpt <- session.prepareR(Statements.SelectTelluricObservationTarget)
                                   .use(_.option(pending.observationId))
@@ -223,62 +238,139 @@ object TelluricTargetsService:
                                     session.execute(Statements.InsertTelluricObservationTarget)(
                                       (pending.programId, pending.observationId, targetId)
                                     )
-              } yield targetId
+              yield targetId
 
-        def searchAndResolve(coords: Coordinates, telluricType: TelluricType): F[Either[String, Target.Id]] =
-          telluricClient.searchTarget(mkSearchInput(coords, telluricType)).flatMap: results =>
-            results.headOption match
-              case Some((star, catalogResult)) =>
-                val sidereal = catalogResult.map(_.target).getOrElse(star.asSiderealTarget)
-                info"Found telluric star HIP ${star.hip} for observation ${pending.observationId}" *>
-                  createAndLinkTarget(sidereal).map(_.asRight)
-
-              case None                        =>
-                val msg = s"No telluric stars found for observation ${pending.observationId}"
-                Logger[F].warn(msg).as(msg.asLeft)
-
-        def handleResult(result: Either[String, Target.Id]): F[Option[TelluricTargets.Meta]] =
-          result match
-            case Right(targetId)                            =>
-              requestRetry(targetId.some, none)
-
-            case Left(errorMsg) if pending.failureCount < 5 =>
-              warn"Telluric target resolution failed (attempt ${pending.failureCount + 1}), will retry: $errorMsg" *>
-                retryRequest(pending.failureCount, errorMsg)
-
-            case Left(errorMsg)                             =>
-              error"Telluric target resolution permanently failed after ${pending.failureCount} attempts: $errorMsg" *>
-                requestRetry(none, errorMsg.some)
-
+        // Main resolution logic
         for {
           _          <- info"Resolving telluric target for observation ${pending.observationId}"
           searchData <- queryParams
-          result     <- searchData.fold(
-                          msg => error"$msg".as(msg.asLeft),
-                          searchAndResolve.tupled
-                        )
-          meta       <- handleResult(result)
+          result     <- searchData match
+                          case Right((coords, telluricType)) =>
+                            telluricClient.searchTarget(mkSearchInput(coords, telluricType)).flatMap: results =>
+                              results.headOption match
+                                case Some((star, catalogResult)) =>
+                                  // Use catalog result if available, otherwise convert TelluricStar
+                                  val sidereal = catalogResult
+                                    .map(_.target)
+                                    .getOrElse(star.asSiderealTarget)
+                                  info"Found telluric star HIP ${star.hip} for observation ${pending.observationId}" *>
+                                    createAndLinkTarget(sidereal).map(Right(_))
+                                case None =>
+                                  val msg = s"No telluric stars found for observation ${pending.observationId}"
+                                  Logger[F].info(msg).as(msg.asLeft)
+                          case Left(msg) =>
+                            error"$msg".as(Left(msg))
+          meta       <- result match
+                          case Right(targetId) =>
+                            requestRetry(targetId.some, none)
+                          case Left(errorMsg) if pending.failureCount < 5 =>
+                            warn"Telluric resolution failed (attempt ${pending.failureCount + 1}), will retry: $errorMsg" *>
+                            retryRequest(pending.failureCount, errorMsg)
+                          case Left(errorMsg) =>
+                            error"Telluric resolution permanently failed after ${pending.failureCount} attempts: $errorMsg" *>
+                            requestRetry(none, errorMsg.some)
         } yield meta
       }
 
+      override def recheckForScienceObservation(
+        scienceObsId: Observation.Id
+      )(using ServiceAccess, NoTransaction[F]): F[Unit] =
+
+        def extractHip(name: String): Option[Int] =
+          name.stripPrefix("HIP ").toIntOption
+
+        def recheckOne(telluricObsId: Observation.Id, programId: Program.Id, currentTargetId: Target.Id): F[Unit] =
+          for
+            // Get current target name to extract HIP number
+            currentName <- S.transactionally:
+                             Services.asSuperUser:
+                               session.prepareR(Statements.SelectTargetName).use(_.unique(currentTargetId))
+            currentHip   = extractHip(currentName)
+
+            // Get science observation data for search and perform comparison
+            searchParams <- fetchSearchParams(scienceObsId)
+            _ <- searchParams match
+                   case Some((coords, telluricType)) =>
+                     telluricClient.search(mkSearchInput(coords, telluricType)).flatMap: stars =>
+                       stars.headOption match
+                         case Some(star) =>
+                           if currentHip.contains(star.hip) then
+                             info"Telluric star unchanged for $telluricObsId (HIP ${star.hip})"
+                           else
+                             info"Telluric star changed for $telluricObsId: ${currentName} -> HIP ${star.hip}" *>
+                             S.transactionally:
+                               Services.asSuperUser:
+                                 for
+                                   // Create new target
+                                   newTargetId <- createNewTelluricTarget(programId, star)
+                                   // Update observation to point to new target
+                                   // Old target will be cleaned up by orphan calibration targets cleanup
+                                   _ <- session.execute(Statements.UpdateTelluricObservationTarget)(
+                                          (newTargetId, telluricObsId)
+                                        )
+                                   // Update resolution record
+                                   _ <- session.execute(Statements.UpdateResolvedTarget)(
+                                          (newTargetId, telluricObsId)
+                                        )
+                                 yield ()
+                         case None =>
+                           warn"No telluric stars found during recheck for $telluricObsId"
+                   case None =>
+                     warn"Missing coordinates or F2 config during recheck for $telluricObsId"
+          yield ()
+
+        def createNewTelluricTarget(
+          pid: Program.Id,
+          star: TelluricStar
+        )(using Transaction[F], Services.SuperUserAccess): F[Target.Id] =
+          createTargetFromSidereal(pid, star.asSiderealTarget)
+
+        // Main logic: find all resolved telluric entries for this science observation and recheck them
+        // Also reset any failed entries to pending so they can be retried
+        for
+          resolved <- S.transactionally:
+                        Services.asSuperUser:
+                          session.prepareR(Statements.SelectResolvedForScienceObs)
+                            .use(_.stream(scienceObsId, 64).compile.toList)
+          _        <- resolved.traverse_(recheckOne.tupled)
+          // Reset failed entries (ready state with no resolved target) to pending
+          completion <- S.transactionally:
+                          Services.asSuperUser:
+                            session.execute(Statements.ResetFailedForScienceObs)(scienceObsId)
+          resetCount = completion match
+                         case skunk.data.Completion.Update(n) => n.toInt
+                         case _ => 0
+          _        <- info"Reset $resetCount failed telluric entries to pending for science observation $scienceObsId".whenA(resetCount > 0)
+        yield ()
+
       object Statements:
 
-        val pending: Codec[TelluricTargets.Pending] =
-          (observation_id *: program_id *: observation_id *: core_timestamp *: int4)
-            .to[TelluricTargets.Pending]
+        private val pendingColumns: String =
+          """c_observation_id,
+             c_program_id,
+             c_science_observation_id,
+             c_last_invalidation,
+             c_failure_count"""
 
-        val meta: Codec[TelluricTargets.Meta] =
+        private val metaColumns: String =
+          """c_observation_id,
+             c_program_id,
+             c_science_observation_id,
+             c_state,
+             c_last_invalidation,
+             c_last_update,
+             c_retry_at,
+             c_failure_count,
+             c_resolved_target_id,
+             c_error_message"""
+
+        private val pending: Decoder[TelluricTargets.Pending] =
+          (observation_id *: program_id *: observation_id *: core_timestamp *: int4).to[TelluricTargets.Pending]
+
+        private val meta: Decoder[TelluricTargets.Meta] =
           (observation_id *: program_id *: observation_id *: calculation_state *:
            core_timestamp *: core_timestamp *: core_timestamp.opt *: int4 *:
            target_id.opt *: text.opt).to[TelluricTargets.Meta]
-
-        private val pendingColumns: String =
-          "c_observation_id, c_program_id, c_science_observation_id, c_last_invalidation, c_failure_count"
-
-        private val metaColumns: String =
-          """c_observation_id, c_program_id, c_science_observation_id, c_state,
-             c_last_invalidation, c_last_update, c_retry_at, c_failure_count,
-             c_resolved_target_id, c_error_message"""
 
         val ResetCalculating: Command[Void] =
           sql"""
@@ -389,4 +481,41 @@ object TelluricTargetsService:
               now()
             )
             ON CONFLICT (c_observation_id) DO NOTHING
+          """.command
+
+        val SelectResolvedForScienceObs: Query[Observation.Id, (Observation.Id, Program.Id, Target.Id)] =
+          sql"""
+            SELECT c_observation_id, c_program_id, c_resolved_target_id
+            FROM   t_telluric_resolution
+            WHERE  c_science_observation_id = $observation_id
+              AND  c_state = 'ready'
+              AND  c_resolved_target_id IS NOT NULL
+          """.query(observation_id *: program_id *: target_id)
+
+        val SelectTargetName: Query[Target.Id, String] =
+          sql"""
+            SELECT c_name
+            FROM   t_target
+            WHERE  c_target_id = $target_id
+          """.query(text)
+
+        val UpdateResolvedTarget: Command[(Target.Id, Observation.Id)] =
+          sql"""
+            UPDATE t_telluric_resolution
+            SET    c_resolved_target_id = $target_id,
+                   c_last_update = now()
+            WHERE  c_observation_id = $observation_id
+          """.command
+
+        val ResetFailedForScienceObs: Command[Observation.Id] =
+          sql"""
+            UPDATE t_telluric_resolution
+            SET    c_state = 'pending',
+                   c_last_invalidation = now(),
+                   c_retry_at = NULL,
+                   c_failure_count = 0,
+                   c_error_message = NULL
+            WHERE  c_science_observation_id = $observation_id
+              AND  c_state = 'ready'
+              AND  c_resolved_target_id IS NULL
           """.command

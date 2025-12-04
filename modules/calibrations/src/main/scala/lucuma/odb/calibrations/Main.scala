@@ -179,6 +179,7 @@ object CMain extends MainParams {
     connectionsLimit: Int,
     pollPeriod: FiniteDuration,
     telluricTopic: Topic[F, TelluricTargetTopic.Element],
+    obscalcTopic: Topic[F, ObscalcTopic.Element],
     services: Resource[F, Services[F]]
   ): Resource[F, Unit] =
     Resource.eval:
@@ -188,6 +189,7 @@ object CMain extends MainParams {
           pollPeriod = pollPeriod,
           batchSize = 10,
           topic = telluricTopic,
+          obscalcTopic = obscalcTopic,
           services = services
         )
 
@@ -251,7 +253,7 @@ object CMain extends MainParams {
       itcClient          <- c.itcClient
       servicesResource   = pool.evalMap(services(user, enums, c.email, c.commitHash, ptc, httpClient, itcClient, gaiaClient, horizonsClient, telClient))
       _                  <- runCalibrationsDaemon(obsT, ctT, servicesResource)
-      _                  <- runTelluricTargetsDaemon(c.database.maxObscalcConnections, c.obscalcPoll, trT, servicesResource)
+      _                  <- runTelluricTargetsDaemon(c.database.maxObscalcConnections, c.obscalcPoll, trT, obsT, servicesResource)
     } yield ExitCode.Success
 
   /** Our logical entry point. */
