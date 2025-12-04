@@ -67,7 +67,7 @@ trait ExecutionTestSupportForGmos extends ExecutionTestSupport:
       GmosAmpGain.Low
     )
 
-  // NB: 2x4, no filter
+  // NB: 2x2, no filter
   val gn_key_1_00: Gmos.TableKey[GmosNorthGrating, GmosNorthFilter, GmosNorthFpu] =
     Gmos.TableKey(
       Gmos.GratingConfigKey(
@@ -78,7 +78,7 @@ trait ExecutionTestSupportForGmos extends ExecutionTestSupport:
       none,
       GmosNorthFpu.LongSlit_1_00.some,
       GmosXBinning.Two,
-      GmosYBinning.Four,
+      GmosYBinning.Two,
       GmosAmpGain.Low
     )
 
@@ -101,13 +101,13 @@ trait ExecutionTestSupportForGmos extends ExecutionTestSupport:
       Gcal(
         Gcal.Lamp.fromContinuum(GcalContinuum.QuartzHalogen5W),
         GcalFilter.Gmos,
-        GcalDiffuser.Ir,
-        GcalShutter.Open
+        GcalDiffuser.Visible,
+        GcalShutter.Closed
       ),
       GcalBaselineType.Night,
       PosInt.unsafeFrom(1),
       LegacyInstrumentConfig(
-        TimeSpan.unsafeFromMicroseconds(1_000_000L)
+        TimeSpan.unsafeFromMicroseconds(5_000_000L)
       )
     )
 
