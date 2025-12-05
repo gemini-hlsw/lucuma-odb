@@ -34,6 +34,10 @@ import lucuma.odb.logic.Generator
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.Services
+import lucuma.odb.service.UserService
+import lucuma.odb.util.Codecs.*
+import natchez.Trace
+import skunk.implicits.*
 
 import java.time.Instant
 
@@ -46,6 +50,19 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
 
   def runObscalcUpdate(p: Program.Id, o: Observation.Id): IO[Unit] =
     runObscalcUpdateAs(serviceUser, p, o)
+
+  private def runProgramObscalc(pid: Program.Id): IO[Unit] =
+    withSession: session =>
+      session.execute(
+        sql"""
+          SELECT c_observation_id
+          FROM t_obscalc
+          WHERE c_program_id = $program_id
+            AND c_obscalc_state IN ('pending', 'retry')
+        """.query(observation_id)
+      )(pid)
+    .flatMap: oids =>
+      oids.traverse_(oid => runObscalcUpdate(pid, oid))
 
   override val validUsers: List[User] =
     List(pi, pi2, serviceUser, staff)
@@ -317,10 +334,32 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
    * @return list of added and removed calibration observations
    */
   def recalculateCalibrations(pid: Program.Id, when: Instant): IO[(List[Observation.Id], List[Observation.Id])] =
-    withServices(serviceUser): services =>
-      services.session.transaction.use: xa =>
-        Services.asSuperUser:
-          services
-            .calibrationsService
-            .recalculateCalibrations(pid, when)(using xa)
+    import Trace.Implicits.noop
+    // First run obscalc for all pending observations in this program
+    runProgramObscalc(pid) *>
+      withServices(serviceUser): services =>
+        for
+          _ <- Services.asSuperUser(UserService.fromSession(services.session).canonicalizeUser(serviceUser))
+          r <- services.transactionally:
+                Services.asSuperUser:
+                  services
+                    .calibrationsService
+                    .recalculateCalibrations(pid, when)
+        yield r
+
+  /**
+   * Resolve all pending telluric targets for a program.
+   * This processes the resolution queue synchronously for testing.
+   */
+  def resolveTelluricTargets: IO[Unit] =
+    withServices(serviceUser) { services =>
+      import Trace.Implicits.noop
+      for
+        _       <- Services.asSuperUser(UserService.fromSession(services.session).canonicalizeUser(serviceUser))
+        pending <- services.session.transaction.use: _ =>
+                     Services.asSuperUser(services.telluricTargetsService.load(100))
+        _       <- pending.traverse_ : p =>
+                     Services.asSuperUser(services.telluricTargetsService.resolveTargets(p))
+      yield ()
+    }
 }

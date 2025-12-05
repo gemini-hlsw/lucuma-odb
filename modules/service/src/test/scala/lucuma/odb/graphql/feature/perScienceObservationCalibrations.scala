@@ -6,38 +6,98 @@ package lucuma.odb.feature
 import cats.effect.IO
 import cats.syntax.all.*
 import io.circe.Decoder
+import io.circe.Json
+import io.circe.syntax.*
+import lucuma.catalog.clients.SimbadClientMock
+import lucuma.catalog.clients.TelluricTargetsClientMock
+import lucuma.catalog.telluric.TelluricStar
+import lucuma.catalog.telluric.TelluricTargetsClient
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.Flamingos2Fpu
 import lucuma.core.enums.ObservationWorkflowState
+import lucuma.core.enums.TelluricCalibrationOrder
+import lucuma.core.math.Coordinates
+import lucuma.core.math.Declination
+import lucuma.core.math.RightAscension
 import lucuma.core.math.Wavelength
 import lucuma.core.model.Group
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
+import lucuma.core.model.SiderealTracking
+import lucuma.core.model.SourceProfile
+import lucuma.core.model.SpectralDefinition
+import lucuma.core.model.Target
+import lucuma.core.model.TelluricType
 import lucuma.core.util.TimeSpan
 import lucuma.odb.graphql.OdbSuite
-import lucuma.odb.graphql.TestUsers
-import lucuma.odb.graphql.query.ExecutionTestSupport
+import lucuma.odb.graphql.query.ExecutionTestSupportForFlamingos2
 import lucuma.odb.graphql.query.ObservingModeSetupOperations
 import lucuma.odb.graphql.subscription.SubscriptionUtils
 import lucuma.odb.json.time.transport.given
+import lucuma.refined.*
 
 import java.time.LocalDateTime
 import java.time.ZoneOffset
+import scala.collection.immutable.SortedMap
 
 class perScienceObservationCalibrations
   extends OdbSuite
   with SubscriptionUtils
-  with ExecutionTestSupport
+  with ExecutionTestSupportForFlamingos2
   with ObservingModeSetupOperations:
-
-  override val pi = TestUsers.Standard.pi(1, 101)
-  val service     = TestUsers.service(3)
 
   val DefaultSnAt: Wavelength = Wavelength.fromIntNanometers(510).get
 
-  override val validUsers = List(pi, service)
-
   val when = LocalDateTime.of(2024, 1, 1, 12, 0, 0).toInstant(ZoneOffset.UTC)
+
+  // Mock telluric star
+  val mockStar = TelluricStar(
+    hip = 12345,
+    spType = TelluricType.A0V,
+    coordinates = Coordinates(
+      RightAscension.fromDoubleDegrees(123.456),
+      Declination.fromDoubleDegrees(45.678).getOrElse(Declination.Zero)
+    ),
+    distance = 100.5,
+    hmag = 7.5,
+    score = 0.95,
+    order = TelluricCalibrationOrder.Before
+  )
+
+  val mockTarget = Target.Sidereal(
+    name = "HIP 12345".refined,
+    tracking = SiderealTracking(
+      baseCoordinates = mockStar.coordinates,
+      epoch = lucuma.core.math.Epoch.J2000,
+      properMotion = None,
+      radialVelocity = None,
+      parallax = None
+    ),
+    sourceProfile = SourceProfile.Point(
+      SpectralDefinition.BandNormalized(None, SortedMap.empty)
+    ),
+    catalogInfo = None
+  )
+
+  val mockTelluricJson: Json = Json.obj(
+    "data" -> Json.obj(
+      "search" -> Json.arr(
+        Json.obj(
+          "HIP" -> mockStar.hip.asJson,
+          "spType" -> Json.fromString(mockStar.spType.tag),
+          "RA" -> mockStar.coordinates.ra.toAngle.toDoubleDegrees.asJson,
+          "Dec" -> mockStar.coordinates.dec.toAngle.toSignedDoubleDegrees.asJson,
+          "Distance" -> mockStar.distance.asJson,
+          "Hmag" -> mockStar.hmag.asJson,
+          "Score" -> mockStar.score.asJson,
+          "Order" -> Json.fromString(mockStar.order.tag)
+        )
+      )
+    )
+  )
+
+  override protected def telluricClient: IO[TelluricTargetsClient[IO]] =
+    TelluricTargetsClientMock.fromJson(mockTelluricJson, SimbadClientMock.withSingleTarget(mockTarget))
 
   case class GroupInfo(
     id:               Group.Id,
@@ -72,7 +132,7 @@ class perScienceObservationCalibrations
 
   private def queryObservationsInGroup(gid: Group.Id): IO[List[ObservationWithRole]] =
     query(
-      service,
+      serviceUser,
       s"""query {
             group(groupId: "$gid") {
               elements {
@@ -97,7 +157,7 @@ class perScienceObservationCalibrations
 
   private def queryObservationWithTarget(oid: Observation.Id): IO[ObsWithTarget] =
     query(
-      service,
+      serviceUser,
       s"""query {
             observation(observationId: "$oid") {
               id
@@ -133,7 +193,7 @@ class perScienceObservationCalibrations
 
   private def queryObservationExists(oid: Observation.Id): IO[Boolean] =
     query(
-      service,
+      serviceUser,
       s"""query {
             observation(observationId: "$oid") {
               id
@@ -145,7 +205,7 @@ class perScienceObservationCalibrations
 
   private def queryTargetExists(tid: lucuma.core.model.Target.Id): IO[Boolean] =
     query(
-      service,
+      serviceUser,
       s"""query {
             target(targetId: "$tid") {
               id
@@ -157,7 +217,7 @@ class perScienceObservationCalibrations
 
   private def queryGroup(gid: Group.Id): IO[GroupInfo] =
     query(
-      service,
+      serviceUser,
       s"""query {
             group(groupId: "$gid") {
               id
@@ -181,7 +241,7 @@ class perScienceObservationCalibrations
 
   private def queryObservation(oid: Observation.Id): IO[ObsInfo] =
     query(
-      service,
+      serviceUser,
       s"""query {
             observation(observationId: "$oid") {
               id
@@ -197,7 +257,7 @@ class perScienceObservationCalibrations
 
   private def queryGroupExists(gid: Group.Id): IO[Boolean] =
     query(
-      service,
+      serviceUser,
       s"""query {
             group(groupId: "$gid") {
               id
@@ -236,9 +296,38 @@ class perScienceObservationCalibrations
       }"""
     ).void
 
+  private def setScienceRequirements(oid: Observation.Id, snAt: Wavelength = DefaultSnAt): IO[Unit] =
+    query(
+      pi,
+      s"""mutation {
+        updateObservations(input: {
+          SET: {
+            scienceRequirements: {
+              exposureTimeMode: {
+                signalToNoise: {
+                  value: 75.000,
+                  at: { nanometers: ${snAt.toNanometers} }
+                }
+              },
+              spectroscopy: {
+                wavelength: { nanometers: 1390.000 },
+                resolution: 10,
+                wavelengthCoverage: { nanometers: 0.010 },
+                focalPlane: SINGLE_SLIT,
+                focalPlaneAngle: { arcseconds: 5 }
+              }
+            }
+          }
+          WHERE: { id: { EQ: "$oid" } }
+        }) {
+          observations { id }
+        }
+      }"""
+    ).void
+
   private def queryObservationFpu(oid: Observation.Id): IO[Option[Flamingos2Fpu]] =
     query(
-      service,
+      serviceUser,
       s"""query {
             observation(observationId: "$oid") {
               id
@@ -262,7 +351,7 @@ class perScienceObservationCalibrations
     case class GroupWrapper(id: Group.Id) derives Decoder
     case class GroupElementWrapper(group: Option[GroupWrapper]) derives Decoder
     query(
-      service,
+      serviceUser,
       s"""query {
             program(programId: "$pid") {
               allGroupElements {
@@ -530,7 +619,6 @@ class perScienceObservationCalibrations
       tid              <- createTargetWithProfileAs(pi, pid)
       // Create F2 observation directly in the parent group
       oid              <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
-      _                <- runObscalcUpdate(pid, oid)
       _                <- moveObservationAs(pi, oid, parentGroupId.some)  // Move to parent group
       _                <- recalculateCalibrations(pid, when)
       obs              <- queryObservation(oid)
@@ -557,7 +645,6 @@ class perScienceObservationCalibrations
       tid1             <- createTargetWithProfileAs(pi, pid)
       tid2             <- createTargetWithProfileAs(pi, pid)
       f2Oid            <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid1))
-      _                <- runObscalcUpdate(pid, f2Oid)
       _                <- moveObservationAs(pi, f2Oid, parentGroupId.some)
       // Add gmos after f2
       gmosOid          <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid2))
@@ -604,25 +691,27 @@ class perScienceObservationCalibrations
       assertEquals(removed.size, 0)
     }
 
-  test("telluric observation has placeholder target with correct properties"):
+  test("telluric observation can get a real target"):
     for {
       pid         <- createProgramAs(pi)
       tid         <- createTargetWithProfileAs(pi, pid)
       oid         <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+      _           <- setScienceRequirements(oid)
       _           <- runObscalcUpdate(pid, oid)
       _           <- recalculateCalibrations(pid, when)
+      _           <- sleep >> resolveTelluricTargets
       obs         <- queryObservation(oid)
       groupId     =  obs.groupId.get
       obsInGroup  <- queryObservationsInGroup(groupId)
       telluricOid =  obsInGroup.find(_.calibrationRole.contains(CalibrationRole.Telluric)).get.id
       telluricObs <- queryObservationWithTarget(telluricOid)
     } yield {
-      assertEquals(telluricObs.targetName, Some("Telluric Target (TBD)"))
-      assertEquals(telluricObs.targetRa, Some("00:00:00.000000"))
-      assertEquals(telluricObs.targetDec, Some("+00:00:00.000000"))
+      assertEquals(telluricObs.targetName, Some("HIP 12345"))
+      assertEquals(telluricObs.targetRa, Some("08:13:49.440000"))
+      assertEquals(telluricObs.targetDec, Some("+45:40:40.800000"))
     }
 
-  test("each F2 observation gets its own unique telluric observation and target"):
+  test("telluric observation targets are not shared"):
     for {
       pid                <- createProgramAs(pi)
       tid1               <- createTargetWithProfileAs(pi, pid)
@@ -632,6 +721,7 @@ class perScienceObservationCalibrations
       oid2               <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid2))
       _                  <- runObscalcUpdate(pid, oid2)
       (added, removed)   <- recalculateCalibrations(pid, when)
+      _                  <- sleep >> resolveTelluricTargets
       obs1               <- queryObservation(oid1)
       obs2               <- queryObservation(oid2)
       obsInGroup1        <- queryObservationsInGroup(obs1.groupId.get)
@@ -722,6 +812,7 @@ class perScienceObservationCalibrations
       oid                  <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
       _                    <- runObscalcUpdate(pid, oid)
       (added1, removed1)   <- recalculateCalibrations(pid, when)
+      _                    <- sleep >> resolveTelluricTargets
       obs1                 <- queryObservation(oid)
       groupId              =  obs1.groupId.get
       obsInGroup1          <- queryObservationsInGroup(groupId)
@@ -806,7 +897,9 @@ class perScienceObservationCalibrations
       tid2 <- createTargetWithProfileAs(pi, pid)
       oid1 <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid1))
       oid2 <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid2))
-      // Don't set workflow state to Ready
+      // Explicitly set both observations to Inactive workflow state
+      _    <- setObservationWorkflowState(pi, oid1, ObservationWorkflowState.Inactive)
+      _    <- setObservationWorkflowState(pi, oid2, ObservationWorkflowState.Inactive)
       _    <- recalculateCalibrations(pid, when)
       obs1 <- queryObservation(oid1)
       obs2 <- queryObservation(oid2)
@@ -848,6 +941,7 @@ class perScienceObservationCalibrations
         oid          <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
         _            <- runObscalcUpdate(pid, oid)
         _            <- recalculateCalibrations(pid, when)
+        _            <- sleep >> resolveTelluricTargets
         obsBefore    <- queryObservation(oid)
         groupId      =  obsBefore.groupId.get
         obsInGroup1  <- queryObservationsInGroup(groupId)

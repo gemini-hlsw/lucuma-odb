@@ -97,33 +97,50 @@ extension[F[_], A](r: F[Result[A]])
       case Result.InternalError(a) => F.raiseError(a)
     }
 
-trait WorkflowStateQueries[F[_]: Monad] {
+trait WorkflowStateQueries[F[_]: Monad: Services] {
 
-  private def filterWorkflow[A](obs: List[A], oid: A => Observation.Id, states: List[ObservationWorkflowState], f: Boolean => Boolean)(using Services[F]) =
-    obs.filterA: obs =>
-      selectObscalcWorkflowState(oid(obs)).map: calculatedState =>
-        f(calculatedState.exists(s => states.exists(_ === s)))
 
-  def filterWorkflowStateNotIn[A](obs: List[A], oid: A => Observation.Id, states: List[ObservationWorkflowState])(using Services[F]) =
-    filterWorkflow(obs, oid, states, a => !a)
+  def filterWorkflowStateNotIn[A](obs: List[A], oid: A => Observation.Id, states: List[ObservationWorkflowState]) =
+    filterWorkflow(obs, oid, states, !_, ready = false)
 
-  def filterWorkflowStateIn[A](obs: List[A], oid: A => Observation.Id, states: List[ObservationWorkflowState])(using Services[F]) =
+  def filterWorkflowStateIn[A](obs: List[A], oid: A => Observation.Id, states: List[ObservationWorkflowState]) =
     filterWorkflow(obs, oid, states, identity)
 
-  def excludeOngoingAndCompleted[A](obs: List[A], oid: A => Observation.Id)(using Services[F]): F[List[A]] =
+  def excludeOngoingAndCompleted[A](obs: List[A], oid: A => Observation.Id): F[List[A]] =
     filterWorkflowStateNotIn(obs, oid, List(ObservationWorkflowState.Ongoing, ObservationWorkflowState.Completed))
 
-  def onlyDefinedAndReady[A](obs: List[A], oid: A => Observation.Id)(using Services[F]): F[List[A]] =
+  def onlyDefinedAndReady[A](obs: List[A], oid: A => Observation.Id): F[List[A]] =
     filterWorkflowStateIn(obs, oid, List(ObservationWorkflowState.Defined, ObservationWorkflowState.Ready))
 
-  def selectObscalcWorkflowState(oid: Observation.Id)(using Services[F]): F[Option[ObservationWorkflowState]] =
-    session.option(
-      sql"""
-        SELECT c_workflow_state
-        FROM t_obscalc
-        WHERE c_observation_id = $observation_id
-      """.query(observation_workflow_state.opt)
-    )(oid).map(_.flatten)
+  private val WorkflowStateReadyQuery =
+    sql"""
+      SELECT c_workflow_state
+      FROM t_obscalc
+      WHERE c_observation_id = $observation_id
+        AND c_obscalc_state = 'ready'
+    """.query(observation_workflow_state.opt)
+
+  private val WorkflowStateAnyQuery =
+    sql"""
+      SELECT c_workflow_state
+      FROM t_obscalc
+      WHERE c_observation_id = $observation_id
+    """.query(observation_workflow_state.opt)
+
+  private def filterWorkflow[A](obs: List[A], oid: A => Observation.Id, states: List[ObservationWorkflowState], f: Boolean => Boolean, ready: Boolean = true) =
+    val selectFn = if (ready) selectObscalcWorkflowState else selectObscalcWorkflowStateAny
+    obs.filterA: obs =>
+      selectFn(oid(obs)).map: calculatedState =>
+        f(calculatedState.exists(s => states.exists(_ === s)))
+
+  private def selectWorkflowState(oid: Observation.Id, onlyReady: Boolean): F[Option[ObservationWorkflowState]] =
+    session.option(if (onlyReady) WorkflowStateReadyQuery else WorkflowStateAnyQuery)(oid).map(_.flatten)
+
+  def selectObscalcWorkflowState(oid: Observation.Id): F[Option[ObservationWorkflowState]] =
+    selectWorkflowState(oid, onlyReady = true)
+
+  def selectObscalcWorkflowStateAny(oid: Observation.Id): F[Option[ObservationWorkflowState]] =
+    selectWorkflowState(oid, onlyReady = false)
 }
 
 trait SpecPhotoCalibrations extends CalibrationTargetLocator {
