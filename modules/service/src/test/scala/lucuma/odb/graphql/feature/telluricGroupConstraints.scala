@@ -93,3 +93,17 @@ class telluricGroupConstraints
     yield
       assert(groupBefore, "Group should exist before deletion")
       assert(!groupAfter, "Group should be removed after recalculateCalibrations")
+
+  test("telluric group rejects creating child groups"):
+    for
+      pid  <- createProgramAs(pi)
+      tid  <- createTargetWithProfileAs(pi, pid)
+      oid  <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+      _    <- runObscalcUpdate(pid, oid)
+      _    <- recalculateCalibrations(pid, when)
+      obs  <- queryObservation(oid)
+      gid  =  obs.groupId.get
+      // Try to create a group inside the telluric group - should fail
+      err  <- createGroupAs(pi, pid, parentGroupId = Some(gid)).intercept[UnexpectedStatus]
+    yield
+      assertEquals(err.status.code, 500)

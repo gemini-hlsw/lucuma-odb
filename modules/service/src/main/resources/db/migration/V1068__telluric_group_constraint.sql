@@ -75,3 +75,36 @@ AFTER INSERT OR UPDATE OF c_group_id, c_calibration_role, c_existence ON t_obser
 DEFERRABLE INITIALLY DEFERRED
 FOR EACH ROW
 EXECUTE FUNCTION check_telluric_group_observations();
+
+-- Prevent creating groups inside telluric groups
+CREATE OR REPLACE FUNCTION check_no_groups_in_telluric_group()
+RETURNS TRIGGER AS $$
+DECLARE
+  parent_is_telluric BOOLEAN;
+BEGIN
+  -- Only check if group has a parent
+  IF NEW.c_parent_id IS NULL THEN
+    RETURN NEW;
+  END IF;
+
+  -- Check if the parent is a telluric system group
+  SELECT EXISTS (
+    SELECT 1 FROM t_group g
+    WHERE g.c_group_id = NEW.c_parent_id
+      AND g.c_system = true
+      AND 'telluric' = ANY(g.c_calibration_roles)
+  ) INTO parent_is_telluric;
+
+  IF parent_is_telluric THEN
+    RAISE EXCEPTION 'Cannot create group inside telluric group %', NEW.c_parent_id;
+  END IF;
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE CONSTRAINT TRIGGER check_no_groups_in_telluric_group_trigger
+AFTER INSERT OR UPDATE OF c_parent_id ON t_group
+DEFERRABLE INITIALLY DEFERRED
+FOR EACH ROW
+EXECUTE FUNCTION check_no_groups_in_telluric_group();
