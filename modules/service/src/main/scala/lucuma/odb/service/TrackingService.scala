@@ -22,7 +22,7 @@ import lucuma.core.model.AirMass
 import lucuma.core.model.AirMassBound
 import lucuma.core.model.CompositeTracking
 import lucuma.core.model.ConstantTracking
-import lucuma.core.model.EphemerisKey
+import lucuma.core.model.Ephemeris
 import lucuma.core.model.EphemerisTracking
 import lucuma.core.model.Extinction
 import lucuma.core.model.Observation
@@ -34,8 +34,6 @@ import lucuma.core.model.Tracking
 import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
 import lucuma.horizons.HorizonsClient
-import lucuma.horizons.HorizonsEphemeris
-import lucuma.horizons.HorizonsEphemerisEntry
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.service.Services.Syntax.*
@@ -336,28 +334,28 @@ object TrackingService:
               Left(Snapshot(oid, explicitBase.fold(composite)(b => (ConstantTracking.apply(b), 0)), ts))
           .value
 
-      private def mkEphemerisTrackingEx(tid: Target.Id, key: EphemerisKey, site: Option[Site], interval: TimestampInterval, force: Boolean): ResultT[F, (EphemerisTracking, Int)] =
+      private def mkEphemerisTrackingEx(tid: Target.Id, key: Ephemeris.Key, site: Option[Site], interval: TimestampInterval, force: Boolean): ResultT[F, (EphemerisTracking, Int)] =
         (key, site) match
-          case (h: EphemerisKey.Horizons, Some(site)) => mkHorizonsEphemerisTrackingEx(h, site, interval, force: Boolean)
-          case (h: EphemerisKey.Horizons, None)       => ResultT.failure(OdbError.InvalidTarget(tid, s"Cannot determine site for $tid ephemeris.".some).asProblem)
-          case (u: EphemerisKey.UserSupplied, _)      => ResultT.failure(OdbError.InvalidTarget(tid, s"Target $tid has a user-defined ephemeris key (not implemented yet).".some).asProblem)
+          case (h: Ephemeris.Key.Horizons, Some(site)) => mkHorizonsEphemerisTrackingEx(h, site, interval, force: Boolean)
+          case (h: Ephemeris.Key.Horizons, None)       => ResultT.failure(OdbError.InvalidTarget(tid, s"Cannot determine site for $tid ephemeris.".some).asProblem)
+          case (u: Ephemeris.Key.UserSupplied, _)      => ResultT.failure(OdbError.InvalidTarget(tid, s"Target $tid has a user-defined ephemeris key (not implemented yet).".some).asProblem)
         
 
-      private def mkHorizonsEphemerisTrackingEx(key: EphemerisKey.Horizons, site: Site, interval: TimestampInterval, force: Boolean): ResultT[F, (EphemerisTracking, Int)] =
+      private def mkHorizonsEphemerisTrackingEx(key: Ephemeris.Key.Horizons, site: Site, interval: TimestampInterval, force: Boolean): ResultT[F, (EphemerisTracking, Int)] =
         loadOrPurgeHorizonsEphemerisEx(key, site, interval, force).flatMap:
-          case Right(eph) => ResultT.success((eph.ephemerisTracking, 0))
+          case Right(eph) => ResultT.success((eph.toEphemerisTracking, 0))
           case Left(misses) => 
             fetchHorizonsEphemeris(key, site, interval)
               .flatTap(cacheHorizonsEphemeris)
-              .map(a => (a.ephemerisTracking, misses))
+              .map(a => (a.toEphemerisTracking, misses))
 
-      private def fetchHorizonsEphemeris(key: EphemerisKey.Horizons, site: Site, interval: TimestampInterval): ResultT[F, HorizonsEphemeris] =
+      private def fetchHorizonsEphemeris(key: Ephemeris.Key.Horizons, site: Site, interval: TimestampInterval): ResultT[F, Ephemeris.Horizons] =
         ResultT:
           horizonsClient
             .alignedEphemeris(key, site, interval.start.toInstant, interval.days, interval.cadence)
             .map(Result.fromEither)
           
-      private def cacheHorizonsEphemeris(eph: HorizonsEphemeris): ResultT[F, Unit] =
+      private def cacheHorizonsEphemeris(eph: Ephemeris.Horizons): ResultT[F, Unit] =
         ResultT.liftF:
           Statements.StorableHorizonsEphemerisEntry
             .flatten(eph)
@@ -367,7 +365,7 @@ object TrackingService:
                 ps.execute(es)
             .void
 
-      private def loadOrPurgeHorizonsEphemerisEx(key: EphemerisKey.Horizons, site: Site, interval: TimestampInterval, purge: Boolean): ResultT[F, Either[Int, HorizonsEphemeris]] =
+      private def loadOrPurgeHorizonsEphemerisEx(key: Ephemeris.Key.Horizons, site: Site, interval: TimestampInterval, purge: Boolean): ResultT[F, Either[Int, Ephemeris.Horizons]] =
         if purge then
           ResultT.liftF:
             session.prepareR(Statements.DeleteEphemerisEntries).use: pc =>
@@ -384,13 +382,13 @@ object TrackingService:
                   if misses > 0 then
                     Left(misses)
                   else
-                    Right(HorizonsEphemeris(key, site, interval.start.toInstant, interval.end.toInstant, es))
+                    Right(Ephemeris.Horizons(key, site, interval.start.toInstant, interval.end.toInstant, es))
 
   private object Statements:
 
-    /* This flattens a `HorizonsEphemeris` and constrains its `when` values to a storable range. */
+    /* This flattens a `Ephemeris.Horizons` and constrains its `when` values to a storable range. */
     case class StorableHorizonsEphemerisEntry(
-      key: EphemerisKey.Horizons,
+      key: Ephemeris.Key.Horizons,
       site: Site,
       when: Timestamp,
       coordinates: Coordinates,
@@ -401,9 +399,9 @@ object TrackingService:
       surfaceBrightness: Option[Double],
     )
     object StorableHorizonsEphemerisEntry:
-      def flatten(ephemeris: HorizonsEphemeris): Option[NonEmptyList[StorableHorizonsEphemerisEntry]] =
+      def flatten(ephemeris: Ephemeris.Horizons): Option[NonEmptyList[StorableHorizonsEphemerisEntry]] =
         NonEmptyList.fromList:
-          ephemeris.entries.flatMap: entry =>
+          ephemeris.elements.flatMap: entry =>
             Timestamp.fromInstant(entry.when).map: when =>
               StorableHorizonsEphemerisEntry(
                 ephemeris.key,
@@ -492,7 +490,7 @@ object TrackingService:
       """.command
     }
 
-    val SelectHorizonsEphemerisEntries: Query[(EphemerisKey.Horizons, Site, TimestampInterval), HorizonsEphemerisEntry] =
+    val SelectHorizonsEphemerisEntries: Query[(Ephemeris.Key.Horizons, Site, TimestampInterval), Ephemeris.Horizons.Element] =
       sql"""
         SELECT
           c_when,      
@@ -511,7 +509,7 @@ object TrackingService:
         AND   c_when >= $core_timestamp
         AND   c_when <= $core_timestamp
       """
-        .contramap[(EphemerisKey.Horizons, Site, TimestampInterval)]: (key, site, interval) =>
+        .contramap[(Ephemeris.Key.Horizons, Site, TimestampInterval)]: (key, site, interval) =>
           (key.keyType, key.des, site, interval.alignedStart, interval.alignedEnd)
         .query(
           core_timestamp      *: 
@@ -523,11 +521,11 @@ object TrackingService:
           numeric             *: 
           numeric.opt
       ).map: (ts, ra, dec, v, am, e, vm, sb) =>
-        HorizonsEphemerisEntry(
+        Ephemeris.Horizons.Element(
           ts.toInstant, Coordinates(ra, dec), v, am, e, vm.toDouble, sb.map(_.toDouble)
         )
 
-    val DeleteEphemerisEntries: Command[(EphemerisKey.Horizons, Site)] =
+    val DeleteEphemerisEntries: Command[(Ephemeris.Key.Horizons, Site)] =
       sql"""
         DELETE
         FROM  t_ephemeris
@@ -535,6 +533,6 @@ object TrackingService:
         AND   c_des = $varchar
         AND   c_site = $site
       """
-        .contramap[(EphemerisKey.Horizons, Site)]: (key, site) =>
+        .contramap[(Ephemeris.Key.Horizons, Site)]: (key, site) =>
           (key.keyType, key.des, site)
         .command

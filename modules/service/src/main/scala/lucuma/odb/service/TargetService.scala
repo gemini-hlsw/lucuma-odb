@@ -24,7 +24,7 @@ import lucuma.core.math.Arc.Partial
 import lucuma.core.math.Parallax
 import lucuma.core.math.ProperMotion
 import lucuma.core.math.RadialVelocity
-import lucuma.core.model.EphemerisKey
+import lucuma.core.model.Ephemeris
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.SourceProfile
@@ -107,7 +107,7 @@ object TargetService {
         input.foldWithId(OdbError.NotAuthorized(user.id).asFailureF): (input, pid) =>
           val af = input.subtypeInfo match
             case s: SiderealInput.Create  => Statements.insertSiderealFragment(pid, input.name, s, input.sourceProfile.asJson, disposition, role)
-            case n: EphemerisKey => Statements.insertNonsiderealFragment(pid, input.name, n, input.sourceProfile.asJson, disposition, role)
+            case n: Ephemeris.Key => Statements.insertNonsiderealFragment(pid, input.name, n, input.sourceProfile.asJson, disposition, role)
             case OpportunityInput.Create(r) => Statements.insertOpportunityFragment(pid, input.name, r, input.sourceProfile.asJson, disposition, role)
           session.prepareR(af.fragment.query(target_id)).use: ps =>
             ps.unique(af.argument).map(Result.success)
@@ -300,7 +300,7 @@ object TargetService {
     def insertNonsiderealFragment(
       pid:           Program.Id,
       name:          NonEmptyString,
-      ek:            EphemerisKey,
+      ek:            Ephemeris.Key,
       sourceProfile: Json,
       disposition:   TargetDisposition,
       role:          Option[CalibrationRole]
@@ -333,7 +333,7 @@ object TargetService {
         name,
         NonEmptyString.from(ek.des).toOption.get, // we know this is never emptyek.des ~
         ek.keyType,
-        NonEmptyString.from(EphemerisKey.fromString.reverseGet(ek)).toOption.get, // we know this is never empty
+        NonEmptyString.from(Ephemeris.Key.fromString.reverseGet(ek)).toOption.get, // we know this is never empty
         sourceProfile,
         disposition,
         role
@@ -434,7 +434,7 @@ object TargetService {
     // When we update tracking, set the opposite tracking fields to null.
     // If this causes a constraint error it means that the user changed the target type but did not
     // specify every field. We can catch this case and report a useful error.
-    def subtypeInfoUpdates(tracking: SiderealInput.Edit | EphemerisKey | OpportunityInput.Edit): List[AppliedFragment] =
+    def subtypeInfoUpdates(tracking: SiderealInput.Edit | Ephemeris.Key | OpportunityInput.Edit): List[AppliedFragment] =
 
       val NullOutNonsiderealFields =
         List(
@@ -484,12 +484,12 @@ object TargetService {
           NullOutNonsiderealFields ++
           NullOutOpportunityFields
 
-        case ek: EphemerisKey =>
+        case ek: Ephemeris.Key =>
           void"c_type = 'nonsidereal'" ::
           List(
             sql"c_nsid_des = $text".apply(ek.des),
             sql"c_nsid_key_type = $ephemeris_key_type".apply(ek.keyType),
-            sql"c_nsid_key = $text".apply(EphemerisKey.fromString.reverseGet(ek)),
+            sql"c_nsid_key = $text".apply(Ephemeris.Key.fromString.reverseGet(ek)),
           ) ++
           NullOutSiderealFields ++
           NullOutOpportunityFields

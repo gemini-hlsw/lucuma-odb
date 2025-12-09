@@ -7,7 +7,7 @@ package input
 import cats.syntax.all.*
 import eu.timepit.refined.types.string.NonEmptyString
 import grackle.Result
-import lucuma.core.model.EphemerisKey
+import lucuma.core.model.Ephemeris
 import lucuma.core.model.SourceProfile
 import lucuma.odb.data.Existence
 import lucuma.odb.graphql.binding.*
@@ -17,14 +17,14 @@ object TargetPropertiesInput {
 
   final case class Create(
     name: NonEmptyString,
-    subtypeInfo: SiderealInput.Create | EphemerisKey | OpportunityInput.Create,
+    subtypeInfo: SiderealInput.Create | Ephemeris.Key | OpportunityInput.Create,
     sourceProfile: SourceProfile,
     existence: Existence
   )
 
   final case class Edit(
     name: Option[NonEmptyString],
-    subtypeInfo: Option[SiderealInput.Edit | EphemerisKey | OpportunityInput.Edit],
+    subtypeInfo: Option[SiderealInput.Edit | Ephemeris.Key | OpportunityInput.Edit],
     sourceProfile: Option[SourceProfile => Result[SourceProfile]],
     existence: Option[Existence]
   )
