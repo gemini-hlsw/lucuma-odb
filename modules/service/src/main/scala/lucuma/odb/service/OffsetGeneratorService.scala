@@ -19,7 +19,7 @@ import eu.timepit.refined.types.numeric.PosInt
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosSouthFilter
 import lucuma.core.enums.StepGuideState
-import lucuma.core.geom.{ OffsetGenerator => OffsetGeneratorImpl }
+import lucuma.core.geom.OffsetGenerator as OffsetGeneratorImpl
 import lucuma.core.math.Angle
 import lucuma.core.math.Offset
 import lucuma.core.model.Observation

@@ -60,7 +60,7 @@ import lucuma.odb.data.Tag
 import lucuma.odb.data.UserType
 import lucuma.odb.data.WavelengthOrder
 import lucuma.odb.sequence.data.OffsetGeneratorType
-import lucuma.odb.sequence.gmos.imaging.{ VariantType => GmosImagingVariantType }
+import lucuma.odb.sequence.gmos.imaging.VariantType as GmosImagingVariantType
 
 import java.time.LocalDate
 
