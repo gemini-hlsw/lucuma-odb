@@ -32,14 +32,14 @@ import lucuma.core.syntax.timespan.*
 import lucuma.core.util.CalculatedValue
 import lucuma.core.util.CalculationState
 import lucuma.odb.graphql.input.AllocationInput
-import lucuma.odb.graphql.mutation.UpdateConstraintSetOps
+import lucuma.odb.graphql.mutation.UpdateObservationsOps
 import lucuma.odb.json.all.transport.given
 import lucuma.odb.service.ObservationService
 import lucuma.odb.service.ObservationWorkflowService
 
 class observation_workflow
   extends ExecutionTestSupportForGmos
-     with UpdateConstraintSetOps {
+     with UpdateObservationsOps {
 
   // ra and dec values in degrees
   val RaStart = 90
