@@ -17,6 +17,7 @@ import fs2.io.net.Network
 import grackle.skunk.SkunkMonitor
 import io.laserdisc.pure.s3.tagless.S3AsyncClientOp
 import lucuma.catalog.clients.GaiaClient
+import lucuma.catalog.telluric.TelluricTargetsClient
 import lucuma.core.model.User
 import lucuma.graphql.routes.GraphQLService
 import lucuma.horizons.HorizonsClient
@@ -213,6 +214,7 @@ object FMain extends MainParams {
       config.email,
       config.itcClient,
       config.gaiaClient,
+      config.telluricClient,
       config.commitHash,
       config.goaUsers,
       config.ssoClient,
@@ -231,6 +233,7 @@ object FMain extends MainParams {
     emailConfig:          Config.Email,
     itcClientResource:    Resource[F, ItcClient[F]],
     gaiaClientResource:   Resource[F, GaiaClient[F]],
+    telluricCliResource:  Resource[F, TelluricTargetsClient[F]],
     commitHash:           CommitHash,
     goaUsers:             Set[User.Id],
     ssoClientResource:    Resource[F, SsoClient[F, User]],
@@ -245,6 +248,7 @@ object FMain extends MainParams {
       pool              <- databasePoolResource[F](databaseConfig)
       itcClient         <- itcClientResource
       gaiaClient        <- gaiaClientResource
+      telluricClient    <- telluricCliResource
       ssoClient         <- ssoClientResource
       httpClient        <- httpClientResource
       horizonsClient    <- horizonsClientResource

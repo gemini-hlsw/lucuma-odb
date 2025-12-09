@@ -339,24 +339,24 @@ object Config:
       WavelengthDither.decimalNanometers.getOption(BigDecimal(-ditherNm)).get
     )
 
-  // ShortCut 3374
+  // ShortCut 3374, 6778
   def defaultWavelengthDithersNorth(grating: GmosNorthGrating): List[WavelengthDither] =
     defaultWavelengthDithers(grating match
       case GmosNorthGrating.B1200_G5301 |
            GmosNorthGrating.R831_G5302  |
-           GmosNorthGrating.R600_G5304  |
-           GmosNorthGrating.B480_G5309  => 5
-      case GmosNorthGrating.R400_G5310  => 8
+           GmosNorthGrating.R600_G5304  => 5
+      case GmosNorthGrating.R400_G5310  |
+           GmosNorthGrating.B480_G5309  => 8
       case GmosNorthGrating.R150_G5308  => 20
     )
 
-  // ShortCut 3374
+  // ShortCut 3374, 6778
   def defaultWavelengthDithersSouth(grating: GmosSouthGrating): List[WavelengthDither] =
     defaultWavelengthDithers(grating match
       case GmosSouthGrating.B1200_G5321 |
            GmosSouthGrating.R831_G5322  |
-           GmosSouthGrating.R600_G5324  |
-           GmosSouthGrating.B480_G5327  => 5
-      case GmosSouthGrating.R400_G5325  => 8
+           GmosSouthGrating.R600_G5324  => 5
+      case GmosSouthGrating.R400_G5325  |
+           GmosSouthGrating.B480_G5327  => 8
       case GmosSouthGrating.R150_G5326  => 20
     )

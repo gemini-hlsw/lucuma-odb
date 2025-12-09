@@ -182,10 +182,39 @@ class updateTargets extends OdbSuite {
     } yield ()
   }
 
-  test("delete orphan calibration targets") {
+  test("delete orphan photometric calibration targets") {
     for {
       pid  <-  createProgramAs(pi)
       tid  <- createTargetViaServiceAs(pi, pid, TargetDisposition.Calibration, CalibrationRole.Photometric.some)
+      _    <- withServices(service) { s =>
+                s.session.transaction.use { xa =>
+                  s.targetService.deleteOrphanCalibrationTargets(pid)(using xa)
+                }
+              }
+      _    <- expect(
+                user = staff,
+                query = s"""
+                  query {
+                      target(targetId: ${tid.asJson}) {
+                        id
+                      }
+                    }
+                  """,
+                expected = Right(
+                    json"""
+                    {
+                      "target": null
+                    }
+                  """
+                )
+              )
+    } yield ()
+  }
+
+  test("delete orphan telluric calibration targets") {
+    for {
+      pid  <-  createProgramAs(pi)
+      tid  <- createTargetViaServiceAs(pi, pid, TargetDisposition.Calibration, CalibrationRole.Telluric.some)
       _    <- withServices(service) { s =>
                 s.session.transaction.use { xa =>
                   s.targetService.deleteOrphanCalibrationTargets(pid)(using xa)

@@ -11,6 +11,7 @@ import cats.effect.std.UUIDGen
 import cats.implicits.*
 import fs2.compression.Compression
 import lucuma.catalog.clients.GaiaClient
+import lucuma.catalog.telluric.TelluricTargetsClient
 import lucuma.core.model.Access
 import lucuma.core.model.AccessControlException
 import lucuma.core.model.Observation
@@ -69,6 +70,7 @@ object SchedulerRoutes:
           gaiaClient,
           S3FileService.noop[F],
           horizonsClient,
+          TelluricTargetsClient.noop[F]
         )).use(fa),
       ssoClient
     )

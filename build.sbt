@@ -12,7 +12,7 @@ val catsVersion                = "2.13.0"
 val circeVersion               = "0.14.15"
 val circeRefinedVersion        = "0.15.1"
 val cirisVersion               = "3.11.1"
-val clueVersion                = "0.50.1"
+val clueVersion                = "0.51.0"
 val declineVersion             = "2.5.0"
 val dropwizardVersion          = "4.2.37"
 val flywayVersion              = "9.22.3"
@@ -29,8 +29,8 @@ val keySemaphoreVersion        = "0.3.0-M1"
 val kittensVersion             = "3.5.0"
 val logbackVersion             = "1.5.21"
 val log4catsVersion            = "2.7.1"
-val lucumaCoreVersion          = "0.160.0"
-val lucumaGraphQLRoutesVersion = "0.11.6"
+val lucumaCoreVersion          = "0.162.0"
+val lucumaGraphQLRoutesVersion = "0.11.7"
 val monocleVersion             = "3.3.0"
 val munitVersion               = "1.2.1"
 val munitCatsEffectVersion     = "2.1.0"   // check test output if you attempt to update this
@@ -791,3 +791,7 @@ lazy val phase0 = project
       "org.typelevel" %% "discipline-munit"    % munitDisciplineVersion % Test
     )
   )
+
+// Command aliases for starting/stopping all services
+addCommandAlias("allStart", ";service/reStart;obscalc/reStart;calibrations/reStart")
+addCommandAlias("allStop", ";service/reStop;obscalc/reStop;calibrations/reStop")

@@ -17,6 +17,7 @@ import fs2.concurrent.Topic
 import fs2.io.net.Network
 import grackle.Result
 import lucuma.catalog.clients.GaiaClient
+import lucuma.catalog.telluric.TelluricTargetsClient
 import lucuma.core.model.Access
 import lucuma.core.model.User
 import lucuma.core.util.CalculationState
@@ -27,11 +28,13 @@ import lucuma.odb.data.EditType
 import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.graphql.topic.CalibTimeTopic
 import lucuma.odb.graphql.topic.ObscalcTopic
+import lucuma.odb.graphql.topic.TelluricTargetTopic
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.S3FileService
 import lucuma.odb.service.Services
 import lucuma.odb.service.Services.Syntax.*
+import lucuma.odb.service.TelluricTargetsDaemon
 import lucuma.odb.service.UserService
 import lucuma.odb.util.LucumaEntryPoint
 import natchez.Trace
@@ -127,13 +130,14 @@ object CMain extends MainParams {
       sso.get(Authorization(Credentials.Token(CIString("Bearer"), c.serviceJwt)))
 
   def topics[F[_]: Concurrent: Logger: Trace](pool: Resource[F, Session[F]]):
-   Resource[F, (Topic[F, ObscalcTopic.Element], Topic[F, CalibTimeTopic.Element])] =
+   Resource[F, (Topic[F, ObscalcTopic.Element], Topic[F, CalibTimeTopic.Element], Topic[F, TelluricTargetTopic.Element])] =
     for {
       sup <- Supervisor[F]
       ses <- pool
       ctt <- Resource.eval(CalibTimeTopic(ses, 1024, sup))
       top <- Resource.eval(ObscalcTopic(ses, 1024, sup))
-    } yield (top, ctt)
+      trt <- Resource.eval(TelluricTargetTopic(ses, 1024, sup))
+    } yield (top, ctt, trt)
 
   def runCalibrationsDaemon[F[_]: {Async, Logger, Clock as C}](
     obscalcTopic: Topic[F, ObscalcTopic.Element],
@@ -163,13 +167,29 @@ object CMain extends MainParams {
                     } yield Result.unit
             }.compile.drain.start.void)
       _  <- Resource.eval(info"Start listening for calibration time changes")
-      _  <- Resource.eval(calibTopic.subscribe(100).evalMap { elem =>
+      _  <- Resource.eval(calibTopic.subscribe(100).evalMap: elem =>
               services.useTransactionally:
                 Services.asSuperUser:
                   calibrationsService.recalculateCalibrationTarget(elem.programId, elem.observationId)
                     .map(Result.success)
-            }.compile.drain.start.void)
+            .compile.drain.start.void)
     } yield ()
+
+  def runTelluricTargetsDaemon[F[_]: {Async, Parallel, Logger, LoggerFactory}](
+    connectionsLimit: Int,
+    pollPeriod: FiniteDuration,
+    telluricTopic: Topic[F, TelluricTargetTopic.Element],
+    services: Resource[F, Services[F]]
+  ): Resource[F, Unit] =
+    Resource.eval:
+      info"Telluric Resolution Daemon starting" *>
+        TelluricTargetsDaemon.run(
+          connectionsLimit = connectionsLimit,
+          pollPeriod = pollPeriod,
+          batchSize = 10,
+          topic = telluricTopic,
+          services = services
+        )
 
   def services[F[_]: Temporal: Async: Parallel: UUIDGen: Trace: Logger: LoggerFactory](
     user: Option[User],
@@ -180,7 +200,8 @@ object CMain extends MainParams {
     httpClient: Client[F],
     itcClient: ItcClient[F],
     gaiaClient: GaiaClient[F],
-    horizonsClient: HorizonsClient[F]
+    horizonsClient: HorizonsClient[F],
+    telClient: TelluricTargetsClient[F],
   )(pool: Session[F]): F[Services[F]] =
     user match {
       case Some(u) if u.role.access === Access.Service =>
@@ -196,6 +217,7 @@ object CMain extends MainParams {
           gaiaClient,
           S3FileService.noop[F],
           horizonsClient,
+          telClient
         )(pool).pure[F].flatTap { _ =>
           val us = UserService.fromSession(pool)
           Services.asSuperUser(us.canonicalizeUser(u))
@@ -214,33 +236,22 @@ object CMain extends MainParams {
    */
   def server[F[_]: Async: Parallel: Logger: LoggerFactory: Trace: Console: Network: SecureRandom]: Resource[F, ExitCode] =
     for {
-      c           <- Resource.eval(Config.fromCiris.load[F])
-      _           <- Resource.eval(banner[F](c))
-      ep          <- LucumaEntryPoint.entryPointResource(ServiceName, c)
-      pool        <- databasePoolResource[F](c.database)
-      enums       <- Resource.eval(pool.use(Enums.load))
-      (obsT, ctT) <- topics(pool)
-      user        <- Resource.eval(serviceUser[F](c))
-      httpClient  <- c.httpClientResource
-      horizonsClient <- c.horizonsClientResource
-      itcClient   <- c.itcClient
-      gaiaClient  <- c.gaiaClient
-      ptc         <- Resource.eval(pool.use(TimeEstimateCalculatorImplementation.fromSession(_, enums)))
-      _           <- runCalibrationsDaemon(
-                       obsT,
-                       ctT,
-                       pool.evalMap(
-                         services(
-                           user,
-                           enums,
-                           c.email,
-                           c.commitHash,
-                           ptc,
-                           httpClient,
-                           itcClient,
-                           gaiaClient,
-                           horizonsClient
-                     )))
+      c                  <- Resource.eval(Config.fromCiris.load[F])
+      _                  <- Resource.eval(banner[F](c))
+      ep                 <- LucumaEntryPoint.entryPointResource(ServiceName, c)
+      pool               <- databasePoolResource[F](c.database)
+      enums              <- Resource.eval(pool.use(Enums.load))
+      (obsT, ctT, trT)   <- topics(pool)
+      user               <- Resource.eval(serviceUser[F](c))
+      httpClient         <- c.httpClientResource
+      gaiaClient         <- c.gaiaClient
+      horizonsClient     <- c.horizonsClientResource
+      telClient          <- c.telluricClient
+      ptc                <- Resource.eval(pool.use(TimeEstimateCalculatorImplementation.fromSession(_, enums)))
+      itcClient          <- c.itcClient
+      servicesResource   = pool.evalMap(services(user, enums, c.email, c.commitHash, ptc, httpClient, itcClient, gaiaClient, horizonsClient, telClient))
+      _                  <- runCalibrationsDaemon(obsT, ctT, servicesResource)
+      _                  <- runTelluricTargetsDaemon(c.database.maxObscalcConnections, c.obscalcPoll, trT, servicesResource)
     } yield ExitCode.Success
 
   /** Our logical entry point. */

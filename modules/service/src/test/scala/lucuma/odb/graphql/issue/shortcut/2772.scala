@@ -191,7 +191,7 @@ class ShortCut_2772 extends ExecutionTestSupportForGmos {
                               "instrumentConfig": {
                                 "readout": {
                                   "xBin": "TWO",
-                                  "yBin": "FOUR"
+                                  "yBin": "TWO"
                                 }
                               }
                             },
@@ -202,7 +202,7 @@ class ShortCut_2772 extends ExecutionTestSupportForGmos {
                               "instrumentConfig": {
                                 "readout": {
                                   "xBin": "TWO",
-                                  "yBin": "FOUR"
+                                  "yBin": "TWO"
                                 }
                               }
                             },
@@ -213,7 +213,7 @@ class ShortCut_2772 extends ExecutionTestSupportForGmos {
                               "instrumentConfig": {
                                 "readout": {
                                   "xBin": "TWO",
-                                  "yBin": "FOUR"
+                                  "yBin": "TWO"
                                 }
                               }
                             },
@@ -224,7 +224,7 @@ class ShortCut_2772 extends ExecutionTestSupportForGmos {
                               "instrumentConfig": {
                                 "readout": {
                                   "xBin": "TWO",
-                                  "yBin": "FOUR"
+                                  "yBin": "TWO"
                                 }
                               }
                             }

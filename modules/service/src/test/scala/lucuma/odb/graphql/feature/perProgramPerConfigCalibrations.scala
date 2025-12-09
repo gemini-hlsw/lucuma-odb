@@ -42,7 +42,6 @@ import lucuma.odb.graphql.query.ExecutionQuerySetupOperations
 import lucuma.odb.graphql.query.ExecutionTestSupport
 import lucuma.odb.graphql.subscription.SubscriptionUtils
 import lucuma.odb.json.wavelength.decoder.given
-import lucuma.odb.service.CalibrationsService
 import lucuma.odb.service.PerProgramPerConfigCalibrationsService
 import lucuma.odb.service.Services
 import lucuma.odb.service.SpecPhotoCalibrations
@@ -489,14 +488,13 @@ class perProgramPerConfigCalibrations
   test("select calibration target") {
     for {
       tpid <- withServices(service) { s =>
-                Services.asSuperUser:
-                  s.session.transaction.use { xa =>
-                      s.programService
-                        .insertCalibrationProgram(
-                          ProgramPropertiesInput.Create.Default.some,
-                          CalibrationRole.SpectroPhotometric,
-                          Description.unsafeFrom("SPECTROTEST"))(using xa)
-                }
+                s.transactionally:
+                  Services.asSuperUser:
+                    s.programService
+                      .insertCalibrationProgram(
+                        ProgramPropertiesInput.Create.Default.some,
+                        CalibrationRole.SpectroPhotometric,
+                        Description.unsafeFrom("SPECTROTEST"))
               }
       // PI program
       pid  <- createProgramAs(pi)
@@ -679,10 +677,9 @@ class perProgramPerConfigCalibrations
               )
       // In reality this is done listening to events but we can explicitly call the function here
       _     <- withServices(service) { services =>
-                 services.session.transaction.use { xa =>
-                   Services.asSuperUser:
-                     services.calibrationsService.recalculateCalibrationTarget(pid, cid1)(using xa)
-                 }
+                  services.transactionally:
+                    Services.asSuperUser:
+                      services.calibrationsService.recalculateCalibrationTarget(pid, cid1)
                }
       ob2   <- queryObservations(pid)
       (cid2, ct2) = ob2.collect {
@@ -828,69 +825,73 @@ class perProgramPerConfigCalibrations
 
   test("events for deleting a calibration observation") {
     for {
-      pid  <- createProgram(pi, "foo")
-      tid1 <- createTargetAs(pi, pid, "One")
-      tid2 <- createTargetAs(pi, pid, "Two")
-      oid1 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid1)
-      oid2 <- createObservationAs(pi, pid, ObservingModeType.GmosSouthLongSlit.some, tid2)
-      _    <- prepareObservation(pi, pid, oid1, tid1) *> prepareObservation(pi, pid, oid2, tid2)
+      pid     <- createProgram(pi, "foo")
+      tid1    <- createTargetAs(pi, pid, "One")
+      tid2    <- createTargetAs(pi, pid, "Two")
+      oid1    <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid1)
+      oid2    <- createObservationAs(pi, pid, ObservingModeType.GmosSouthLongSlit.some, tid2)
+      _       <- prepareObservation(pi, pid, oid1, tid1) *> prepareObservation(pi, pid, oid2, tid2)
               // This will add four calibrations
       (ad, _) <- recalculateCalibrations(pid, when)
+      // Run obscalc on newly created calibrations so they're 'ready' and don't generate extra events
+      _       <- ad.traverse_(cid => runObscalcUpdate(pid, cid))
               // This should delete two
-      _    <- deleteObservation(pi, oid2)
-      a    <- Ref.of[IO, List[Observation.Id]](Nil) // Removed observation
+      _       <- deleteObservation(pi, oid2)
+      a       <- Ref.of[IO, List[Observation.Id]](Nil) // Removed observation
       // The third twilight
-      rd = ad.get(2).get
-      _    <- subscriptionExpectF(
-                user      = pi,
-                query     = deletedSubscription(pid),
-                mutations =
-                  Right(recalculateCalibrations(pid, when).flatMap { case (_, cids) =>
-                    a.set(cids)
-                  }),
-                expectedF = (
-                  a.get.map(_.map: cid =>
-                    json"""
-                      {
-                        "observationEdit" : {
-                          "observationId" : $cid,
-                          "editType" : "UPDATED",
-                          "value" : null
-                        }
-                      }
-                    """
-                  ).map {
-                     // A twligiht observation is updated, we'll hardcode this
-                     case List(a, b) => a :: json"""{
-                                                     "observationEdit" : {
-                                                       "observationId" : $rd,
-                                                       "editType" : "UPDATED",
-                                                       "value" : {
-                                                         "id" : $rd,
-                                                         "title": "Twilight"
-                                                       }
-                                                     }
-                                                   }
-                                                 """ :: b :: Nil
-                     case l => l
-                  },
-                  // N.B. for the deletion events the order isn't guaranteed
-                  // because, I think, the DELETE FROM t_observation WHERE c_observation_id IN (...)
-                  // can delete the calibrations in any order.  Unfortunately
-                  // we expect the events in a particular order though.
-                  a.get.map(_.map: cid =>
-                    json"""
-                      {
-                        "observationEdit" : {
-                          "observationId" : $cid,
-                          "editType" : "HARD_DELETE",
-                          "value" : null
-                        }
-                      }
-                    """
+      rd      = ad.get(2).get
+      _       <- subscriptionExpectFT(
+                    user      = pi,
+                    query     = deletedSubscription(pid),
+                    mutations =
+                      Right(recalculateCalibrations(pid, when).flatMap { case (_, cids) =>
+                        a.set(cids)
+                      }),
+                    expectedF = (
+                      a.get.map(_.map: cid =>
+                        json"""
+                          {
+                            "observationEdit" : {
+                              "observationId" : $cid,
+                              "editType" : "UPDATED",
+                              "value" : null
+                            }
+                          }
+                        """
+                      ).map {
+                        // A twligiht observation is updated, we'll hardcode this
+                        case List(a, b) => a :: json"""{
+                                                        "observationEdit" : {
+                                                          "observationId" : $rd,
+                                                          "editType" : "UPDATED",
+                                                          "value" : {
+                                                            "id" : $rd,
+                                                            "title": "Twilight"
+                                                          }
+                                                        }
+                                                      }
+                                                    """ :: b :: Nil
+                        case l => l
+                      },
+                      a.get.map(_.map: cid =>
+                        json"""
+                          {
+                            "observationEdit" : {
+                              "observationId" : $cid,
+                              "editType" : "HARD_DELETE",
+                              "value" : null
+                            }
+                          }
+                        """
+                      )
+                    ).mapN(_ ::: _),
+                    transform = _.sortBy(u =>
+                      val oe = u.hcursor.downField("observationEdit")
+                      val id = oe.downField("observationId").as[Observation.Id].toOption.map(_.value.value)
+                      val et = oe.downField("editType").as[EditType].toOption.map(_.tag)
+                      (id, et)
+                    )
                   )
-                ).mapN(_ ::: _)
-              )
     } yield ()
   }
 
@@ -1006,6 +1007,7 @@ class perProgramPerConfigCalibrations
       _         <- setCalculatedWorkflowState(calibIds1.head, ObservationWorkflowState.Ongoing)
       // Change the observation configuration
       _         <- updateCentralWavelength(oid1, Wavelength.fromIntNanometers(600).get)
+      _         <- runObscalcUpdate(pid, oid1)
       // Run calibrations again - should keep the Ongoing calibration and add new ones
       _         <- recalculateCalibrations(pid, when)
       ob2       <- queryObservations(pid)
@@ -1573,7 +1575,6 @@ class perProgramPerConfigCalibrations
         _    <- updateTargetProperties(pi, tid, RightAscension.Zero.toAngle.toMicroarcseconds, Declination.Zero.toAngle.toMicroarcseconds, 0.0)
         _    <- scienceRequirements(pi, oid, DefaultSnAt)
         _    <- setCalculatedWorkflowState(oid, state)
-        _    <- runObscalcUpdate(pid, oid)
         _    <- recalculateCalibrations(pid, when)
         ob   <- queryObservations(pid)
         gr   <- groupElementsAs(pi, pid, None)
@@ -1585,17 +1586,20 @@ class perProgramPerConfigCalibrations
   test("don't delete ongoing and completed calibrations"):
     List(ObservationWorkflowState.Ongoing, ObservationWorkflowState.Completed).traverse_ : state =>
       for {
-        pid  <- createProgramAs(pi)
-        tid  <- createTargetAs(pi, pid, "Target")
-        oid  <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid)
-        _    <- prepareObservation(pi, pid, oid, tid)
-        _    <- recalculateCalibrations(pid, when)
-        ob1  <- queryObservations(pid)
-        calibIds = ob1.callibrationIds
-        _    <- setCalculatedWorkflowState(calibIds.head, state)
-        _    <- updateCentralWavelength(oid, Wavelength.fromIntNanometers(600).get)
-        _    <- recalculateCalibrations(pid, when)
-        ob2  <- queryObservations(pid)
+        pid        <- createProgramAs(pi)
+        tid        <- createTargetAs(pi, pid, "Target")
+        oid        <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid)
+        _          <- prepareObservation(pi, pid, oid, tid)
+        (added, _) <- recalculateCalibrations(pid, when)
+        // Run obscalc on newly created calibrations so they're 'ready' before we set workflow state
+        _          <- added.traverse_(cid => runObscalcUpdate(pid, cid))
+        ob1        <- queryObservations(pid)
+        calibIds   = ob1.callibrationIds
+        _          <- setCalculatedWorkflowState(calibIds.head, state)
+        _          <- updateCentralWavelength(oid, Wavelength.fromIntNanometers(600).get)
+        _          <- runObscalcUpdate(pid, oid)
+        _          <- recalculateCalibrations(pid, when)
+        ob2        <- queryObservations(pid)
       } yield {
         // Calibration preserved + 2 new calibrations
         assertEquals(ob2.countCalibrations, 3)
