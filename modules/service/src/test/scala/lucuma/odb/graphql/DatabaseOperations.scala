@@ -2797,7 +2797,7 @@ trait DatabaseOperations { this: OdbSuite =>
   def horizonsFixture: Map[Set[(String, String)], String] = Map(
 
     Set(
-      ("format", "text"), ("MAKE_EPHEM", "YES"), ("CENTER", "coord"), ("COORD_TYPE", "GEODETIC"), ("COMMAND", "'NAME=1P;CAP'"), ("SITE_COORD", "'204.530945,19.823807,4.213'"), ("START_TIME", "'2025-May-02 00:00:00.000'"), ("STOP_TIME", "'2025-May-03 00:00:00.000'"), ("STEP_SIZE", "60m"), ("extra_prec", "YES"), ("time_digits", "FRACSEC"), ("QUANTITIES", "'1,3,8,9'")) ->
+      ("format", "text"), ("MAKE_EPHEM", "YES"), ("CENTER", "T15"), ("COMMAND", "'NAME=1P;CAP'"), ("START_TIME", "'2025-May-02 00:00:00.000'"), ("STOP_TIME", "'2025-May-03 00:00:00.000'"), ("STEP_SIZE", "60m"), ("extra_prec", "YES"), ("time_digits", "FRACSEC"), ("QUANTITIES", "'1,3,8,9'")) ->
       """
       |API VERSION: 1.2
       |API SOURCE: NASA/JPL Horizons API
@@ -2836,7 +2836,7 @@ trait DatabaseOperations { this: OdbSuite =>
       |*******************************************************************************
       |Target body name: 1P/Halley                       {source: JPL#75}
       |Center body name: Earth (399)                     {source: DE441}
-      |Center-site name: (user defined site below)
+      |Center-site name: Gemini North Observatory, Maunakea
       |*******************************************************************************
       |Start time      : A.D. 2025-May-02 00:00:00.0000 UT      
       |Stop  time      : A.D. 2025-May-03 00:00:00.0000 UT      
@@ -2844,8 +2844,8 @@ trait DatabaseOperations { this: OdbSuite =>
       |*******************************************************************************
       |Target pole/equ : undefined
       |Target radii    : 5.5 km                                                       
-      |Center geodetic : 204.530945, 19.823807, 4.213    {E-lon(deg),Lat(deg),Alt(km)}
-      |Center cylindric: 204.530945,6006.44268,2150.78648 {E-lon(deg),Dxy(km),Dz(km)}
+      |Center geodetic : 204.5309, 19.8238126, 4.24672   {E-lon(deg),Lat(deg),Alt(km)}
+      |Center cylindric: 204.5309,6006.47419,2150.79851  {E-lon(deg),Dxy(km),Dz(km)}
       |Center pole/equ : ITRF93                          {East-longitude positive}
       |Center radii    : 6378.137, 6378.137, 6356.752 km {Equator_a, b, pole_c}       
       |Target primary  : Sun
