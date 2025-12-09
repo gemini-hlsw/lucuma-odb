@@ -13,12 +13,12 @@ import lucuma.core.enums.GmosNorthGrating
 import lucuma.core.model.ConfigurationRequest
 import lucuma.core.model.Observation
 import lucuma.core.model.User
-import lucuma.odb.graphql.mutation.UpdateConstraintSetOps
+import lucuma.odb.graphql.mutation.UpdateObservationsOps
 
 class configurationRequests_applicableObservations
   extends OdbSuite 
      with ObservingModeSetupOperations 
-     with UpdateConstraintSetOps {
+     with UpdateObservationsOps {
 
   val pi = TestUsers.Standard.pi(1, 30)
   val admin = TestUsers.Standard.admin(3, 32)

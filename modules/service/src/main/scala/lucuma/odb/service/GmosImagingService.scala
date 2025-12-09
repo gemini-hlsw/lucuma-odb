@@ -390,10 +390,11 @@ object GmosImagingService:
             .compile
             .toList
             .map: lst =>
-              if lst.isEmpty then ().success
+              if lst.isEmpty then
+                ().success
               else
                 val obsList = if lst.sizeIs >= 5 then lst.take(5).mkString("", ", ", " ...") else lst.mkString(", ")
-                OdbError.InvalidArgument(s"One or more observations are not GMOS ${site.longName} ${selectedVariant.display}: $obsList".some).asFailure
+                OdbError.InvalidArgument(s"Filters are required when switching to GMOS ${siteName(site).capitalize} imaging ${selectedVariant.display}. Observations whose variant would change: $obsList".some).asFailure
 
   object Statements:
 
@@ -457,18 +458,6 @@ object GmosImagingService:
         FROM #$viewName
         WHERE
       """(Void) |+| observationIdIn(oids)
-
-//    def selectObservationsThatMatchVariant(
-//      viewName:    String,
-//      variantType: VariantType,
-//      oids:        List[Observation.Id]
-//    ): AppliedFragment =
-//      sql"""
-//        SELECT o.c_observation_id
-//        FROM t_observation o
-//        INNER JOIN #$viewName v ON v.c_observation_id = o.c_observation_id
-//        WHERE v.c_variant = $gmos_imaging_variant
-//          AND """(variantType) |+| observationIdIn(oids)
 
     def selectObservationsNotMatchingVariant(
       variantType: VariantType,
