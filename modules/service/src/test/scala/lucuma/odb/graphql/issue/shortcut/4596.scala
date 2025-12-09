@@ -26,7 +26,7 @@ import lucuma.core.model.User
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.syntax.timespan.*
 import lucuma.itc.IntegrationTime
-import lucuma.odb.graphql.mutation.UpdateConstraintSetOps
+import lucuma.odb.graphql.mutation.UpdateObservationsOps
 import lucuma.odb.graphql.query.ExecutionTestSupportForGmos
 import lucuma.odb.graphql.query.ObservingModeSetupOperations
 import lucuma.odb.json.all.transport.given
@@ -35,7 +35,7 @@ import lucuma.odb.json.all.transport.given
 class ShortCut_4596 extends OdbSuite
   with ExecutionTestSupportForGmos
   with ObservingModeSetupOperations
-  with UpdateConstraintSetOps {
+  with UpdateObservationsOps {
 
   val guideTargetName: String = GuideStarName.gaiaSourceId.reverseGet(1L).value.value
 
