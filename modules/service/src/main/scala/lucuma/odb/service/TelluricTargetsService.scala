@@ -5,19 +5,13 @@ package lucuma.odb.service
 
 import cats.effect.Temporal
 import cats.syntax.all.*
-import eu.timepit.refined.types.string.NonEmptyString
 import lucuma.catalog.telluric.TelluricSearchInput
-import lucuma.catalog.telluric.TelluricStar
 import lucuma.catalog.telluric.TelluricTargetsClient
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.TargetDisposition
 import lucuma.core.math.Coordinates
-import lucuma.core.math.Epoch
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
-import lucuma.core.model.SiderealTracking
-import lucuma.core.model.SourceProfile
-import lucuma.core.model.SpectralDefinition
 import lucuma.core.model.Target
 import lucuma.core.model.TelluricType
 import lucuma.core.syntax.timespan.*
@@ -39,7 +33,6 @@ import skunk.*
 import skunk.codec.all.*
 import skunk.implicits.*
 
-import scala.collection.immutable.SortedMap
 import scala.concurrent.duration.*
 
 trait TelluricTargetsService[F[_]]:
@@ -82,24 +75,6 @@ trait TelluricTargetsService[F[_]]:
   )(using ServiceAccess, NoTransaction[F]): F[Option[TelluricTargets.Meta]]
 
 object TelluricTargetsService:
-
-  // TODO: move to core
-  extension (star: TelluricStar)
-    def asSiderealTarget: Target.Sidereal =
-      Target.Sidereal(
-        name = NonEmptyString.unsafeFrom(s"HIP ${star.hip}"),
-        tracking = SiderealTracking(
-          baseCoordinates = star.coordinates,
-          epoch = Epoch.J2000,
-          properMotion = None,
-          radialVelocity = None,
-          parallax = None
-        ),
-        sourceProfile = SourceProfile.Point(
-          SpectralDefinition.BandNormalized(None, SortedMap.empty)
-        ),
-        catalogInfo = None
-      )
 
   def instantiate[F[_]: {Temporal, LoggerFactory as LF, Services as S}](
     telluricClient: TelluricTargetsClient[F]
