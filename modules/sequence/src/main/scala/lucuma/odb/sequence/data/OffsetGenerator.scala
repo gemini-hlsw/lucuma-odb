@@ -4,10 +4,10 @@
 package lucuma.odb.sequence.data
 
 import cats.Eq
+import cats.data.NonEmptyList
 import cats.derived.*
 import cats.syntax.eq.*
 import cats.syntax.option.*
-import cats.data.NonEmptyList
 import lucuma.core.math.Angle
 import lucuma.core.math.Offset
 import lucuma.core.model.sequence.TelescopeConfig

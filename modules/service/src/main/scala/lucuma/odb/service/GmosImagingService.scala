@@ -16,15 +16,15 @@ import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.Observation
 import lucuma.odb.data.ExposureTimeModeId
 import lucuma.odb.data.ExposureTimeModeRole
-import lucuma.odb.data.ObservingModeRowVersion
-import lucuma.odb.data.OffsetGeneratorRole
-import lucuma.odb.graphql.input.GmosImagingInput
-import lucuma.odb.graphql.input.GmosImagingFilterInput
-import lucuma.odb.graphql.input.GmosImagingVariantInput
 import lucuma.odb.data.Nullable
+import lucuma.odb.data.ObservingModeRowVersion
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
+import lucuma.odb.data.OffsetGeneratorRole
 import lucuma.odb.data.WavelengthOrder
+import lucuma.odb.graphql.input.GmosImagingFilterInput
+import lucuma.odb.graphql.input.GmosImagingInput
+import lucuma.odb.graphql.input.GmosImagingVariantInput
 import lucuma.odb.sequence.data.OffsetGenerator
 import lucuma.odb.sequence.gmos.imaging.Config
 import lucuma.odb.sequence.gmos.imaging.Variant
@@ -32,8 +32,8 @@ import lucuma.odb.sequence.gmos.imaging.VariantType
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.GmosCodecs.*
 import skunk.*
-import skunk.data.Arr
 import skunk.codec.numeric.int8
+import skunk.data.Arr
 import skunk.implicits.*
 
 import Services.Syntax.*

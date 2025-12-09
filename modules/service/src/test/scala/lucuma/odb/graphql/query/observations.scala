@@ -509,7 +509,11 @@ class observations extends OdbSuite {
                         }
                         observingMode {
                           gmosNorthImaging {
-                            filters { filter }
+                            variant {
+                              interleaved {
+                                filters { filter }
+                              }
+                            }
                             initialFilters { filter }
                             bin
                             ampReadMode
@@ -533,10 +537,14 @@ class observations extends OdbSuite {
                             },
                             "observingMode": {
                               "gmosNorthImaging": {
-                                "filters": [
-                                  { "filter": "G_PRIME" },
-                                  { "filter": "R_PRIME" }
-                                ],
+                                "variant": {
+                                  "interleaved": {
+                                    "filters": [
+                                      { "filter": "G_PRIME" },
+                                      { "filter": "R_PRIME" }
+                                    ]
+                                  }
+                                },
                                 "initialFilters": [
                                   { "filter": "G_PRIME" },
                                   { "filter": "R_PRIME" }
@@ -572,7 +580,11 @@ class observations extends OdbSuite {
                         id
                         observingMode {
                           gmosSouthImaging {
-                            filters { filter }
+                            variant {
+                              interleaved {
+                                filters { filter }
+                              }
+                            }
                             initialFilters { filter }
                             bin
                             ampReadMode
@@ -593,10 +605,14 @@ class observations extends OdbSuite {
                             "id": $oid,
                             "observingMode": {
                               "gmosSouthImaging": {
-                                "filters": [
-                                  { "filter": "G_PRIME" },
-                                  { "filter": "R_PRIME" }
-                                ],
+                                "variant": {
+                                  "interleaved": {
+                                    "filters": [
+                                      { "filter": "G_PRIME" },
+                                      { "filter": "R_PRIME" }
+                                    ]
+                                  }
+                                },
                                 "initialFilters": [
                                   { "filter": "G_PRIME" },
                                   { "filter": "R_PRIME" }
@@ -656,7 +672,11 @@ class observations extends OdbSuite {
                       observingMode {
                         mode
                         gmosNorthImaging {
-                          filters { filter }
+                          variant {
+                            interleaved {
+                              filters { filter }
+                            }
+                          }
                           initialFilters { filter }
                           bin
                           ampReadMode
@@ -664,7 +684,11 @@ class observations extends OdbSuite {
                           roi
                         }
                         gmosSouthImaging {
-                          filters { filter }
+                          variant {
+                            interleaved {
+                              filters { filter }
+                            }
+                          }
                           initialFilters { filter }
                           bin
                           ampReadMode
@@ -687,10 +711,14 @@ class observations extends OdbSuite {
                           "observingMode": {
                             "mode": "GMOS_NORTH_IMAGING",
                             "gmosNorthImaging": {
-                              "filters": [
-                                { "filter": "G_PRIME" },
-                                { "filter": "R_PRIME" }
-                              ],
+                              "variant": {
+                                "interleaved": {
+                                  "filters": [
+                                    { "filter": "G_PRIME" },
+                                    { "filter": "R_PRIME" }
+                                  ]
+                                }
+                              },
                               "initialFilters": [
                                 { "filter": "G_PRIME" },
                                 { "filter": "R_PRIME" }
@@ -710,10 +738,14 @@ class observations extends OdbSuite {
                             "mode": "GMOS_SOUTH_IMAGING",
                             "gmosNorthImaging": null,
                             "gmosSouthImaging": {
-                              "filters": [
-                                { "filter": "G_PRIME" },
-                                { "filter": "R_PRIME" }
-                              ],
+                              "variant": {
+                                "interleaved": {
+                                  "filters": [
+                                    { "filter": "G_PRIME" },
+                                    { "filter": "R_PRIME" }
+                                  ]
+                                }
+                              },
                               "initialFilters": [
                                 { "filter": "G_PRIME" },
                                 { "filter": "R_PRIME" }
@@ -745,7 +777,11 @@ class observations extends OdbSuite {
             observation(observationId: "$oid") {
               observingMode {
                 gmosNorthImaging {
-                  filters { filter }
+                  variant {
+                    interleaved {
+                      filters { filter }
+                    }
+                  }
                   initialFilters { filter }
                 }
               }
@@ -758,10 +794,14 @@ class observations extends OdbSuite {
               "observation": {
                 "observingMode": {
                   "gmosNorthImaging": {
-                    "filters": [
-                      { "filter": "G_PRIME" },
-                      { "filter": "R_PRIME" }
-                    ],
+                    "variant": {
+                      "interleaved": {
+                        "filters": [
+                          { "filter": "G_PRIME" },
+                          { "filter": "R_PRIME" }
+                        ]
+                      }
+                    },
                     "initialFilters": [
                       { "filter": "G_PRIME" },
                       { "filter": "R_PRIME" }
@@ -782,10 +822,14 @@ class observations extends OdbSuite {
               SET: {
                 observingMode: {
                   gmosNorthImaging: {
-                    filters: [
-                      { filter: I_PRIME },
-                      { filter: Z_PRIME }
-                    ]
+                    variant: {
+                      interleaved: {
+                        filters: [
+                          { filter: I_PRIME },
+                          { filter: Z_PRIME }
+                        ]
+                      }
+                    }
                   }
                 }
               }
@@ -794,7 +838,11 @@ class observations extends OdbSuite {
                 id
                 observingMode {
                   gmosNorthImaging {
-                    filters { filter }
+                    variant {
+                      interleaved {
+                        filters { filter }
+                      }
+                    }
                     initialFilters { filter }
                   }
                 }
@@ -811,10 +859,14 @@ class observations extends OdbSuite {
                     "id": $oid,
                     "observingMode": {
                       "gmosNorthImaging": {
-                        "filters": [
-                          { "filter": "I_PRIME" },
-                          { "filter": "Z_PRIME" }
-                        ],
+                        "variant": {
+                          "interleaved": {
+                            "filters": [
+                              { "filter": "I_PRIME" },
+                              { "filter": "Z_PRIME" }
+                            ]
+                          }
+                        },
                         "initialFilters": [
                           { "filter": "G_PRIME" },
                           { "filter": "R_PRIME" }
