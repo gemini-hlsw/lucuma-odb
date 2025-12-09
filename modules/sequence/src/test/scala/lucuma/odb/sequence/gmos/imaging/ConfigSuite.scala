@@ -18,9 +18,8 @@ class ConfigSuite extends FunSuite:
     BandNormalized(None, SortedMap.empty)
 
   test("Config.GmosNorth explicit binning overrides default"):
-    val filters = NonEmptyList.of(GmosNorthFilter.GPrime)
     val config = Config.GmosNorth(
-      filters = filters,
+      variant = Variant.Interleaved(NonEmptyList.of(GmosNorthFilter.GPrime)),
       common  = Config.Common(
         defaultBin  = GmosBinning.Two,
         explicitBin = Some(GmosBinning.One)
@@ -30,9 +29,8 @@ class ConfigSuite extends FunSuite:
     assertEquals(config.bin, GmosBinning.One) // explicit value overrides default
 
   test("Config.GmosSouth explicit binning overrides default"):
-    val filters = NonEmptyList.of(GmosSouthFilter.GPrime)
     val config = Config.GmosSouth(
-      filters = filters,
+      variant = Variant.Interleaved(NonEmptyList.of(GmosSouthFilter.GPrime)),
       common  = Config.Common(
         defaultBin  = GmosBinning.Two,
         explicitBin = Some(GmosBinning.One),

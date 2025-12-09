@@ -51,7 +51,7 @@ object GmosImagingVariantInput:
       FilterCheck.notEmpty(filters).map: fs =>
         Variant.Grouped(
           fs,
-          order.getOrElse(WavelengthOrder.Decreasing),
+          order.getOrElse(WavelengthOrder.Increasing),
           offsets.toOption.getOrElse(OffsetGenerator.NoGenerator),
           skyCount.getOrElse(NonNegInt.unsafeFrom(0)),
           skyOffsets.toOption.getOrElse(OffsetGenerator.NoGenerator)

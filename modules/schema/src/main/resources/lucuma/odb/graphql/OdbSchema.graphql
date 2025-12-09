@@ -9124,7 +9124,7 @@ type GmosNorthLongSlit {
 }
 
 """
-Wavength observation order, either decreasing or increasting by wavelength.
+Wavength observation order, either decreasing or increasing by wavelength.
 """
 enum WavelengthOrder {
   DECREASING,
@@ -9141,6 +9141,10 @@ enum GmosImagingVariantType {
   PRE_IMAGING
 }
 
+"""
+The specific imaging sub-type, one of which will be defined and the remaining
+options null.
+"""
 type GmosNorthImagingVariant {
   variantType: GmosImagingVariantType!
 
@@ -9149,12 +9153,21 @@ type GmosNorthImagingVariant {
   preImaging:  GmosNorthPreImaging
 }
 
+"""
+Input that specifies which imaging sub-type is desired along with its configuration
+details.  Exactly one of the options should be defined and the other two left
+unspecified.
+"""
 input GmosNorthImagingVariantInput @oneOf {
   grouped:     GmosNorthGroupedImagingInput
   interleaved: GmosNorthInterleavedImagingInput
   preImaging:  GmosNorthPreImagingInput
 }
 
+"""
+The specific imaging sub-type, one of which will be defined and the remaining
+options null.
+"""
 type GmosSouthImagingVariant {
   variantType: GmosImagingVariantType!
 
@@ -9163,53 +9176,163 @@ type GmosSouthImagingVariant {
   preImaging:  GmosSouthPreImaging
 }
 
+"""
+Input that specifies which imaging sub-type is desired along with its configuration
+details.  Exactly one of the options should be defined and the other two left
+unspecified.
+"""
 input GmosSouthImagingVariantInput @oneOf {
   grouped:     GmosSouthGroupedImagingInput
   interleaved: GmosSouthInterleavedImagingInput
   preImaging:  GmosSouthPreImagingInput
 }
 
+"""
+When doing "grouped" filter imaging, datasets associated with a particular
+filter are collected consecutively before moving on to other filters (if any).
+Sky datasets may be collected before and after each group of object datasets.
+"""
 type GmosNorthGroupedImaging {
+
+  "The filters (at least one is required) for each group of datasets."
   filters: [GmosNorthImagingFilter!]!
+
+  """
+  Whether the filters should appear in the sequence in increasing or decreasing
+  order by their wavelength.
+  """
   order: WavelengthOrder!
 
+  """
+  Offset generator for the science object datasets. The same offset sequence
+  is created for each filter using the specified generator.
+  """
   offsets: OffsetGenerator
+
+  """
+  Number of sky positions to collect before and after object datasets. For
+  example, if set to 2 there will be two sky positions before a group of object
+  exposures and two more after using the same filter as the object datasets.
+  """
   skyCount: NonNegInt!
+
+  """
+  Offset generator to use for the sky datasets.
+  """
   skyOffsets: OffsetGenerator
 }
 
+"""
+Input used for specifying a "grouped" filter GMOS imaging subtype.
+"""
 input GmosNorthGroupedImagingInput {
 
   """
-  The filters field must be specified with at least one filter. It cannot be unset with a null value.
+  The filters field must be specified with at least one filter. It cannot be
+  unset with a null value.
   """
   filters: [GmosNorthImagingFilterInput!]
+
+  """
+  Whether the filters should appear in the sequence in increasing or decreasing
+  order by their wavelength.  Defaults to `INCREASING` on create, absent (i.e.,
+  not modified) on update.
+  """
   order: WavelengthOrder
 
+  """
+  Offset generator for the science object datasets. GPP creates the same offset
+  sequence for each filter using the specified generator. If not specified,
+  no offsets will be used.
+  """
   offsets: OffsetGeneratorInput
+
+  """
+  Number of sky positions to collect before and after object datasets. For
+  example, if set to 2 there will be two sky positions before a group of object
+  exposures and two more after using the same filter as the object datasets.
+  Defaults to 0 on creation, absent (i.e., not modified) on update.
+  """
   skyCount: NonNegInt
+
+  """
+  Offset generator to use for sky positions.  If not specified, no offsets will
+  be used.
+  """
   skyOffsets: OffsetGeneratorInput
 }
 
+"""
+When doing "grouped" filter imaging, datasets associated with a particular
+filter are collected consecutively before moving on to other filters (if any).
+Sky datasets may be collected before and after each group of object datasets.
+"""
 type GmosSouthGroupedImaging {
+  "The filters (at least one is required) for each group of datasets."
   filters: [GmosSouthImagingFilter!]!
+
+  """
+  Whether the filters should appear in the sequence in increasing or decreasing
+  order by their wavelength.
+  """
   order: WavelengthOrder!
 
+  """
+  Offset generator for the science object datasets. The same offset sequence
+  is created for each filter using the specified generator.
+  """
   offsets: OffsetGenerator
+
+  """
+  Number of sky positions to collect before and after object datasets. For
+  example, if set to 2 there will be two sky positions before a group of object
+  exposures and two more after using the same filter as the object datasets.
+  """
   skyCount: NonNegInt!
+
+  """
+  Offset generator to use for the sky datasets.
+  """
   skyOffsets: OffsetGenerator
 }
 
+"""
+Input used for specifying a "grouped" filter GMOS imaging subtype.
+"""
 input GmosSouthGroupedImagingInput {
 
   """
-  The filters field must be specified with at least one filter. It cannot be unset with a null value.
+  The filters field must be specified with at least one filter. It cannot be
+  unset with a null value.
   """
   filters: [GmosSouthImagingFilterInput!]
+
+  """
+  Whether the filters should appear in the sequence in increasing or decreasing
+  order by their wavelength.  Defaults to `INCREASING` on create, absent (i.e.,
+  not modified) on update.
+  """
   order: WavelengthOrder
 
+  """
+  Offset generator for the science object datasets. GPP creates the same offset
+  sequence for each filter using the specified generator. If not specified,
+  no offsets will be used.
+  """
   offsets: OffsetGeneratorInput
+
+  """
+  Number of sky positions to collect before and after object datasets. For
+  example, if set to 2 there will be two sky positions before a group of object
+  exposures and two more after using the same filter as the object datasets.
+  Defaults to 0 on creation, absent (i.e., not modified) on update.
+  """
   skyCount: NonNegInt
+
+  """
+  Offset generator to use for sky positions.  If not specified, no offsets will
+  be used.
+  """
   skyOffsets: OffsetGeneratorInput
 }
 
