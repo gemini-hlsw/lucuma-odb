@@ -6675,6 +6675,11 @@ enum CatalogName {
   CatalogName Gaia
   """
   GAIA
+
+  """
+  CatalogName Telluric
+  """
+  TELLURIC
 }
 
 """
