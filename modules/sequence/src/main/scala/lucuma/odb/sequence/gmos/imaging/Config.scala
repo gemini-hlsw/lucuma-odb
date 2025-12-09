@@ -99,32 +99,7 @@ object Config:
           a.explicitAmpGain,
           a.explicitRoi
         )
-/*
-  type GmosNorth = Config[GmosNorthFilter]
-  type GmosSouth = Config[GmosSouthFilter]
 
-  def apply[L: Enumerated](
-    v: Variant[L],
-    c: Common
-  ): Config[L] =
-    new Config[L]:
-      def variant: Variant[L]                          = v
-      def defaultBin: GmosBinning                      = c.defaultBin
-      def explicitBin: Option[GmosBinning]             = c.explicitBin
-      def explicitAmpReadMode: Option[GmosAmpReadMode] = c.explicitAmpReadMode
-      def explicitAmpGain: Option[GmosAmpGain]         = c.explicitAmpGain
-      def explicitRoi: Option[GmosRoi]                 = c.explicitRoi
-
-  given [L: Eq]: Eq[Config[L]] =
-    Eq.by: a =>
-      (
-        a.variant,
-        a.defaultBin,
-        a.explicitBin,
-        a.explicitAmpReadMode,
-        a.explicitRoi
-      )
-*/
   final case class GmosNorth (
     variant: Variant[GmosNorthFilter],
     common:  Common
