@@ -19,11 +19,14 @@ import lucuma.odb.data.WavelengthOrder
 import lucuma.odb.graphql.binding.*
 import lucuma.odb.sequence.data.OffsetGenerator
 import lucuma.odb.sequence.gmos.imaging.Variant
+import lucuma.odb.sequence.gmos.imaging.VariantType
 
 sealed trait GmosImagingVariantInput[L]:
   def create: Result[Variant[L]]
 
   def filters: Option[NonEmptyList[L]]
+
+  def validate: Option[VariantType]
 
 object GmosImagingVariantInput:
 
@@ -54,11 +57,17 @@ object GmosImagingVariantInput:
           skyOffsets.toOption.getOrElse(OffsetGenerator.NoGenerator)
         )
 
+    def validate: Option[VariantType] =
+      Option.when(filters.isEmpty && (order.isDefined || offsets.isDefined || skyCount.isDefined || skyOffsets.isDefined))(VariantType.Grouped)
+
   case class Interleaved[L](
     filters: Option[NonEmptyList[L]]
   ) extends GmosImagingVariantInput[L]:
     def create: Result[Variant[L]] =
       FilterCheck.notEmpty(filters).map(Variant.Interleaved.apply)
+
+    def validate: Option[VariantType] =
+      Option.when(filters.isEmpty)(VariantType.Interleaved)
 
   case class PreImaging[L](
     filters: Option[NonEmptyList[L]],
@@ -76,6 +85,9 @@ object GmosImagingVariantInput:
           offset3.getOrElse(Offset.Zero),
           offset4.getOrElse(Offset.Zero)
         )
+
+    def validate: Option[VariantType] =
+      Option.when(filters.isEmpty && (offset1.isDefined || offset2.isDefined || offset3.isDefined || offset4.isDefined))(VariantType.PreImaging)
 
   def binding[L](
     FilterBinding: Matcher[L]
