@@ -5,7 +5,7 @@ package lucuma.odb.sequence.gmos.imaging
 
 import lucuma.core.util.Enumerated
 
-enum VariantType(val tag: String) derives Enumerated:
-  case Grouped     extends VariantType("grouped")
-  case Interleaved extends VariantType("interleaved")
-  case PreImaging  extends VariantType("pre_imaging")
+enum VariantType(val tag: String, val display: String) derives Enumerated:
+  case Grouped     extends VariantType("grouped", "Grouped")
+  case Interleaved extends VariantType("interleaved", "Interleaved")
+  case PreImaging  extends VariantType("pre_imaging", "Pre-Imaging")
