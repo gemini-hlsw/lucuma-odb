@@ -8,6 +8,9 @@ import cats.syntax.all.*
 import lucuma.catalog.telluric.TelluricSearchInput
 import lucuma.catalog.telluric.TelluricTargetsClient
 import lucuma.core.enums.CalibrationRole
+import lucuma.core.enums.Flamingos2Disperser
+import lucuma.core.enums.Flamingos2Filter
+import lucuma.core.enums.Flamingos2Fpu
 import lucuma.core.enums.TargetDisposition
 import lucuma.core.math.Coordinates
 import lucuma.core.model.Observation
@@ -22,10 +25,12 @@ import lucuma.odb.graphql.input.CatalogInfoInput
 import lucuma.odb.graphql.input.SiderealInput
 import lucuma.odb.graphql.input.TargetPropertiesInput
 import lucuma.odb.graphql.mapping.AccessControl
+import lucuma.odb.sequence.flamingos2.longslit.Config as F2Config
 import lucuma.odb.service.Services.ServiceAccess
 import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.Codecs.calculation_state
+import lucuma.odb.util.Flamingos2Codecs.*
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.LoggerFactory
 import org.typelevel.log4cats.syntax.*
@@ -76,6 +81,8 @@ trait TelluricTargetsService[F[_]]:
 
 object TelluricTargetsService:
 
+  val DefaultHmin: BigDecimal = BigDecimal(8)
+
   def instantiate[F[_]: {Temporal, LoggerFactory as LF, Services as S}](
     telluricClient: TelluricTargetsClient[F]
   ): TelluricTargetsService[F] =
@@ -83,7 +90,7 @@ object TelluricTargetsService:
       given Logger[F] = LF.getLoggerFromName("telluric-targets")
 
       private def fetchSearchParams(scienceObsId: Observation.Id)(
-        using ServiceAccess): F[Option[(Coordinates, TelluricType)]] =
+        using ServiceAccess): F[Option[(Coordinates, F2Config)]] =
         S.transactionally:
           Services.asSuperUser:
             for
@@ -91,7 +98,20 @@ object TelluricTargetsService:
                             .use(_.option(scienceObsId))
               f2Config <- flamingos2LongSlitService.select(List(scienceObsId))
                             .map(_.get(scienceObsId))
-            yield (coords, f2Config).tupled.map((c, cfg) => (c, cfg.telluricType))
+            yield (coords, f2Config).tupled
+
+      private def lookupHmin(config: F2Config)(using ServiceAccess): F[BigDecimal] =
+        S.transactionally:
+          Services.asSuperUser:
+            session.prepareR(Statements.SelectHmin).use: ps =>
+              ps.option((config.disperser, config.filter, config.fpu)).map: result =>
+                val hmin = result.flatMap: (hminHot, hminSolar) =>
+                  config.telluricType match
+                    case TelluricType.Solar     => hminSolar
+                    case TelluricType.Hot       => hminHot
+                    case TelluricType.A0V       => hminHot
+                    case _: TelluricType.Manual => hminHot
+                hmin.getOrElse(DefaultHmin)
 
       // Exponential backoff calculation
       // Should this be configurable?
@@ -116,13 +136,12 @@ object TelluricTargetsService:
           .prepareR(Statements.LoadPendingObs)
           .use(_.option(oid))
 
-      private def mkSearchInput(coords: Coordinates, telluricType: TelluricType): TelluricSearchInput =
-        // TODO duration and brightest should not be hardcoded
+      private def mkSearchInput(coords: Coordinates, config: F2Config, brightness: BigDecimal): TelluricSearchInput =
         TelluricSearchInput(
           coordinates = coords,
           duration = 1.hourTimeSpan,
-          brightest = BigDecimal(8),
-          spType = telluricType
+          brightest = brightness,
+          spType = config.telluricType
         )
 
       override def requestTelluricTarget(
@@ -155,7 +174,7 @@ object TelluricTargetsService:
               .prepareR(Statements.RetryRequest)
               .use(_.option((failureCount + 1, s"${retryDelay.toSeconds} seconds", errorMsg, pending.observationId)))
 
-        def queryParams: F[Either[String, (Coordinates, TelluricType)]] =
+        def queryParams: F[Either[String, (Coordinates, F2Config)]] =
           fetchSearchParams(pending.scienceObservationId)
             .map(_.toRight(s"Missing coordinates or F2 config for science observation ${pending.scienceObservationId}"))
 
@@ -200,17 +219,19 @@ object TelluricTargetsService:
                                     )
               } yield targetId
 
-        def searchAndResolve(coords: Coordinates, telluricType: TelluricType): F[Either[String, Target.Id]] =
-          telluricClient.searchTarget(mkSearchInput(coords, telluricType)).flatMap: results =>
-            results.headOption match
-              case Some((star, catalogResult)) =>
-                val sidereal = catalogResult.map(_.target).getOrElse(star.asSiderealTarget)
-                info"Found telluric star HIP ${star.hip} for observation ${pending.observationId}" *>
-                  createAndLinkTarget(sidereal).map(_.asRight)
-
-              case None                        =>
-                val msg = s"No telluric stars found for observation ${pending.observationId}"
-                Logger[F].warn(msg).as(msg.asLeft)
+        def searchAndResolve(coords: Coordinates, config: F2Config): F[Either[String, Target.Id]] =
+          for
+            brightness <- lookupHmin(config)
+            results    <- telluricClient.searchTarget(mkSearchInput(coords, config, brightness))
+            result     <- results.headOption match
+                            case Some((star, catalogResult)) =>
+                              val sidereal = catalogResult.map(_.target).getOrElse(star.asSiderealTarget)
+                              info"Found telluric star HIP ${star.hip} for observation ${pending.observationId}" *>
+                                createAndLinkTarget(sidereal).map(_.asRight)
+                            case None =>
+                              val msg = s"No telluric stars found for observation ${pending.observationId}"
+                              Logger[F].warn(msg).as(msg.asLeft)
+          yield result
 
         def handleResult(result: Either[String, Target.Id]): F[Option[TelluricTargets.Meta]] =
           result match
@@ -365,3 +386,14 @@ object TelluricTargetsService:
             )
             ON CONFLICT (c_observation_id) DO NOTHING
           """.command
+
+        val SelectHmin: Query[(Flamingos2Disperser, Flamingos2Filter, Flamingos2Fpu), (Option[BigDecimal], Option[BigDecimal])] =
+          sql"""
+            SELECT sco.c_hmin_hot, sco.c_hmin_solar
+            FROM t_spectroscopy_config_option_f2 f2
+            JOIN t_spectroscopy_config_option sco
+              ON sco.c_instrument = f2.c_instrument AND sco.c_index = f2.c_index
+            WHERE f2.c_disperser = $flamingos_2_disperser
+              AND f2.c_filter = $flamingos_2_filter
+              AND f2.c_fpu = $flamingos_2_fpu
+          """.query(numeric.opt *: numeric.opt)
