@@ -3,6 +3,7 @@
 
 package lucuma.odb.service
 
+import cats.Monad
 import cats.effect.Temporal
 import cats.syntax.all.*
 import lucuma.catalog.telluric.TelluricSearchInput
@@ -18,6 +19,7 @@ import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.TelluricType
 import lucuma.core.syntax.timespan.*
+import lucuma.core.util.NewType
 import lucuma.core.util.Timestamp
 import lucuma.odb.data.Existence
 import lucuma.odb.data.TelluricTargets
@@ -79,12 +81,41 @@ trait TelluricTargetsService[F[_]]:
     pending: TelluricTargets.Pending
   )(using ServiceAccess, NoTransaction[F]): F[Option[TelluricTargets.Meta]]
 
-object TelluricTargetsService:
+case class HminBrightnessKey(
+  disperser: Flamingos2Disperser,
+  filter: Flamingos2Filter,
+  fpu: Flamingos2Fpu
+)
 
+object HminBrightnessCache extends NewType[Map[HminBrightnessKey, (Option[BigDecimal], Option[BigDecimal])]]:
+  val Empty: HminBrightnessCache = HminBrightnessCache(Map.empty)
   val DefaultHmin: BigDecimal = BigDecimal(8)
 
+  extension(m: HminBrightnessCache)
+    def lookup(config: F2Config): BigDecimal =
+      val key = HminBrightnessKey(config.disperser, config.filter, config.fpu)
+      m.value.get(key).flatMap: (hminHot, hminSolar) =>
+        config.telluricType match
+          case TelluricType.Solar     => hminSolar
+          case TelluricType.Hot       => hminHot
+          case TelluricType.A0V       => hminHot
+          case _: TelluricType.Manual => hminHot
+      .getOrElse(HminBrightnessCache.DefaultHmin)
+end HminBrightnessCache
+
+type HminBrightnessCache = HminBrightnessCache.Type
+
+object TelluricTargetsService:
+
+  def loadBrightnessCache[F[_]: Monad](session: Session[F]): F[HminBrightnessCache] =
+    session.execute(Statements.SelectAllHmin).map: rows =>
+      HminBrightnessCache(rows.map { case (disperser, filter, fpu, hminHot, hminSolar) =>
+        HminBrightnessKey(disperser, filter, fpu) -> (hminHot, hminSolar)
+      }.toMap)
+
   def instantiate[F[_]: {Temporal, LoggerFactory as LF, Services as S}](
-    telluricClient: TelluricTargetsClient[F]
+    telluricClient: TelluricTargetsClient[F],
+    hminCache: HminBrightnessCache
   ): TelluricTargetsService[F] =
     new TelluricTargetsService[F]:
       given Logger[F] = LF.getLoggerFromName("telluric-targets")
@@ -99,19 +130,6 @@ object TelluricTargetsService:
               f2Config <- flamingos2LongSlitService.select(List(scienceObsId))
                             .map(_.get(scienceObsId))
             yield (coords, f2Config).tupled
-
-      private def lookupHmin(config: F2Config)(using ServiceAccess): F[BigDecimal] =
-        S.transactionally:
-          Services.asSuperUser:
-            session.prepareR(Statements.SelectHmin).use: ps =>
-              ps.option((config.disperser, config.filter, config.fpu)).map: result =>
-                val hmin = result.flatMap: (hminHot, hminSolar) =>
-                  config.telluricType match
-                    case TelluricType.Solar     => hminSolar
-                    case TelluricType.Hot       => hminHot
-                    case TelluricType.A0V       => hminHot
-                    case _: TelluricType.Manual => hminHot
-                hmin.getOrElse(DefaultHmin)
 
       // Exponential backoff calculation
       // Should this be configurable?
@@ -220,18 +238,15 @@ object TelluricTargetsService:
               } yield targetId
 
         def searchAndResolve(coords: Coordinates, config: F2Config): F[Either[String, Target.Id]] =
-          for
-            brightness <- lookupHmin(config)
-            results    <- telluricClient.searchTarget(mkSearchInput(coords, config, brightness))
-            result     <- results.headOption match
-                            case Some((star, catalogResult)) =>
-                              val sidereal = catalogResult.map(_.target).getOrElse(star.asSiderealTarget)
-                              info"Found telluric star HIP ${star.hip} for observation ${pending.observationId}" *>
-                                createAndLinkTarget(sidereal).map(_.asRight)
-                            case None =>
-                              val msg = s"No telluric stars found for observation ${pending.observationId}"
-                              Logger[F].warn(msg).as(msg.asLeft)
-          yield result
+          val brightness = hminCache.lookup(config)
+          telluricClient.searchTarget(mkSearchInput(coords, config, brightness)).flatMap:
+            case (star, catalogResult) :: _ =>
+              val sidereal = catalogResult.map(_.target).getOrElse(star.asSiderealTarget)
+              info"Found telluric star HIP ${star.hip} for observation ${pending.observationId}" *>
+                createAndLinkTarget(sidereal).map(_.asRight)
+            case Nil =>
+              val msg = s"No telluric stars found for observation ${pending.observationId}"
+              Logger[F].warn(msg).as(msg.asLeft)
 
         def handleResult(result: Either[String, Target.Id]): F[Option[TelluricTargets.Meta]] =
           result match
@@ -387,13 +402,15 @@ object TelluricTargetsService:
             ON CONFLICT (c_observation_id) DO NOTHING
           """.command
 
-        val SelectHmin: Query[(Flamingos2Disperser, Flamingos2Filter, Flamingos2Fpu), (Option[BigDecimal], Option[BigDecimal])] =
-          sql"""
-            SELECT sco.c_hmin_hot, sco.c_hmin_solar
-            FROM t_spectroscopy_config_option_f2 f2
-            JOIN t_spectroscopy_config_option sco
-              ON sco.c_instrument = f2.c_instrument AND sco.c_index = f2.c_index
-            WHERE f2.c_disperser = $flamingos_2_disperser
-              AND f2.c_filter = $flamingos_2_filter
-              AND f2.c_fpu = $flamingos_2_fpu
-          """.query(numeric.opt *: numeric.opt)
+  object Statements:
+    // lead the limits for all the f2 configurations
+    val SelectAllHmin: Query[Void, (Flamingos2Disperser, Flamingos2Filter, Flamingos2Fpu, Option[BigDecimal], Option[BigDecimal])] =
+      sql"""
+        SELECT f2config.c_disperser, f2config.c_filter, f2config.c_fpu,
+               config.c_hmin_hot, config.c_hmin_solar
+        FROM   t_spectroscopy_config_option_f2 f2config
+        JOIN   t_spectroscopy_config_option config
+          ON   config.c_instrument = f2config.c_instrument AND config.c_index = f2config.c_index
+        WHERE  config.c_instrument = 'Flamingos2'
+      """.query(flamingos_2_disperser *: flamingos_2_filter *: flamingos_2_fpu *: numeric.opt *: numeric.opt)
+
