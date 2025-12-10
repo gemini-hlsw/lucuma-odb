@@ -31,10 +31,12 @@ import lucuma.odb.graphql.topic.ObscalcTopic
 import lucuma.odb.graphql.topic.TelluricTargetTopic
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.util.CommitHash
+import lucuma.odb.service.HminBrightnessCache
 import lucuma.odb.service.S3FileService
 import lucuma.odb.service.Services
 import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.service.TelluricTargetsDaemon
+import lucuma.odb.service.TelluricTargetsService
 import lucuma.odb.service.UserService
 import lucuma.odb.util.LucumaEntryPoint
 import natchez.Trace
@@ -202,6 +204,7 @@ object CMain extends MainParams {
     gaiaClient: GaiaClient[F],
     horizonsClient: HorizonsClient[F],
     telClient: TelluricTargetsClient[F],
+    hminCache: HminBrightnessCache,
   )(pool: Session[F]): F[Services[F]] =
     user match {
       case Some(u) if u.role.access === Access.Service =>
@@ -217,7 +220,8 @@ object CMain extends MainParams {
           gaiaClient,
           S3FileService.noop[F],
           horizonsClient,
-          telClient
+          telClient,
+          hminCache
         )(pool).pure[F].flatTap { _ =>
           val us = UserService.fromSession(pool)
           Services.asSuperUser(us.canonicalizeUser(u))
@@ -249,7 +253,9 @@ object CMain extends MainParams {
       telClient          <- c.telluricClient
       ptc                <- Resource.eval(pool.use(TimeEstimateCalculatorImplementation.fromSession(_, enums)))
       itcClient          <- c.itcClient
-      servicesResource   = pool.evalMap(services(user, enums, c.email, c.commitHash, ptc, httpClient, itcClient, gaiaClient, horizonsClient, telClient))
+      hminCache          <- Resource.eval(pool.use(TelluricTargetsService.loadBrightnessCache))
+      _                  <- Resource.eval(info"Loading ${hminCache.value.size} configurations for telluric brightness")
+      servicesResource   = pool.evalMap(services(user, enums, c.email, c.commitHash, ptc, httpClient, itcClient, gaiaClient, horizonsClient, telClient, hminCache))
       _                  <- runCalibrationsDaemon(obsT, ctT, servicesResource)
       _                  <- runTelluricTargetsDaemon(c.database.maxObscalcConnections, c.obscalcPoll, trT, servicesResource)
     } yield ExitCode.Success

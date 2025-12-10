@@ -265,6 +265,7 @@ object Services:
     s3FileService0: S3FileService[F],
     horizonsClient: HorizonsClient[F],
     telluricClient0: TelluricTargetsClient[F],
+    hminCache0: HminBrightnessCache = HminBrightnessCache.Empty,
   )(s: Session[F])(
     using tf: Trace[F], uf: UUIDGen[F], cf: Temporal[F], par: Parallel[F], log: Logger[F], lf: LoggerFactory[F], as: Async[F]
   ): Services[F[_]] =
@@ -312,7 +313,6 @@ object Services:
         using NoTransaction[F]
       ): ResultT[F, A] =
         ResultT(transactionally { val x = fa; x.value })
-
 
       // Services as passed their "owning" `Services` (i.e., `this`) on instantiation, which is
       // circular and requires everything to be done lazily, which luckily is what we want. No point
@@ -366,7 +366,7 @@ object Services:
       lazy val proposalService = ProposalService.instantiate(emailConfig)
       lazy val userInvitationService = UserInvitationService.instantiate(emailConfig)
       lazy val trackingService = TrackingService.instantiate(horizonsClient)
-      lazy val telluricTargetsService: TelluricTargetsService[F] = TelluricTargetsService.instantiate(telluricClient0)
+      lazy val telluricTargetsService: TelluricTargetsService[F] = TelluricTargetsService.instantiate(telluricClient0, hminCache0)
 
   /**
    * This adds syntax to access the members of `Services` and the current `Transaction` when they
