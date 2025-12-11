@@ -83,9 +83,13 @@ class createObservation_GmosImaging extends OdbSuite:
                   "gmosNorthImaging": {
                     "variant": {
                       "interleaved": {
-                        "offsets": null,
+                        "offsets": {
+                          "generatorType": "NONE"
+                        },
                         "skyCount": 1,
-                        "skyOffsets": null
+                        "skyOffsets": {
+                          "generatorType": "NONE"
+                        }
                       }
                     },
                     "filters": [
@@ -304,6 +308,43 @@ class createObservation_GmosImaging extends OdbSuite:
             }
           }
         """, List("Argument 'input.SET.observingMode.gmosNorthImaging' is invalid: At least one filter must be specified for GMOS imaging observations.").asLeft)
+
+  test("cannot create GMOS North without specifying the variant"):
+    createProgramAs(pi).flatMap: pid =>
+      createTargetAs(pi, pid).flatMap: tid =>
+        expect(pi, s"""
+          mutation {
+            createObservation(input: {
+              programId: ${pid.asJson}
+              SET: {
+                targetEnvironment: {
+                  asterism: [${tid.asJson}]
+                }
+                scienceRequirements: {
+                  imaging: {
+                    minimumFov: { arcseconds: 100 }
+                    narrowFilters: false
+                    broadFilters: false
+                    combinedFilters: true
+                  }
+                }
+                observingMode: {
+                  gmosNorthImaging: {
+                    filters: []
+                  }
+                }
+              }
+            }) {
+              observation {
+                observingMode {
+                  gmosNorthImaging {
+                    filters { filter }
+                  }
+                }
+              }
+            }
+          }
+        """, List("Argument 'input.SET.observingMode.gmosNorthImaging.variant' is invalid: Input is not optional").asLeft)
 
   test("cannot create GMOS South with empty filters"):
     createProgramAs(pi).flatMap: pid =>
@@ -538,7 +579,7 @@ class createObservation_GmosImaging extends OdbSuite:
       """
     )
 
-  test("can create with uniform object and random sky offset generators"):
+  test("can create with grouped filters, uniform object and random sky offset generators"):
     createProgramAs(pi).flatMap: pid =>
       createTargetAs(pi, pid).flatMap: tid =>
         expect(pi, s"""
@@ -692,7 +733,7 @@ class createObservation_GmosImaging extends OdbSuite:
         """.asRight
       )
 
-  test("can create with enumerated generators"):
+  def testEnumeratedGenerator(variantName: String): IO[Unit] =
     createProgramAs(pi).flatMap: pid =>
       createTargetAs(pi, pid).flatMap: tid =>
         expect(pi,
@@ -721,7 +762,7 @@ class createObservation_GmosImaging extends OdbSuite:
                   observingMode: {
                     gmosSouthImaging: {
                       variant: {
-                        grouped: {
+                        $variantName: {
                           offsets: {
                             enumerated: {
                               values: [
@@ -770,7 +811,7 @@ class createObservation_GmosImaging extends OdbSuite:
                 observingMode {
                   gmosSouthImaging {
                     variant {
-                      grouped {
+                      $variantName {
                         offsets {
                           generatorType
                           enumerated {
@@ -810,7 +851,7 @@ class createObservation_GmosImaging extends OdbSuite:
                   "observingMode": {
                     "gmosSouthImaging": {
                       "variant": {
-                        "grouped": {
+                        $variantName: {
                           "offsets": {
                             "generatorType": "ENUMERATED",
                             "enumerated": {
@@ -855,6 +896,12 @@ class createObservation_GmosImaging extends OdbSuite:
             }
           """.asRight
         )
+
+  test("can create with grouped filters, enumerated generators"):
+    testEnumeratedGenerator("grouped")
+
+  test("can create with interleaved filters, enumerated generators"):
+    testEnumeratedGenerator("interleaved")
 
   test("can create with spiral generator"):
     createProgramAs(pi).flatMap: pid =>
