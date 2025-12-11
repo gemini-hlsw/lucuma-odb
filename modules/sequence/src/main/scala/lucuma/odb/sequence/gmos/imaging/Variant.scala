@@ -13,11 +13,7 @@ import lucuma.odb.data.WavelengthOrder
 import lucuma.odb.sequence.data.OffsetGenerator
 import lucuma.odb.sequence.syntax.hash.*
 import lucuma.odb.sequence.util.HashBytes
-import monocle.Lens
 import monocle.Optional
-import monocle.Prism
-import monocle.macros.GenLens
-import monocle.macros.GenPrism
 
 import java.io.ByteArrayOutputStream
 import java.io.DataOutputStream
@@ -70,12 +66,6 @@ object Variant:
         skyOffsets = OffsetGenerator.NoGenerator
       )
 
-    val offsets: Lens[Grouped, OffsetGenerator] =
-      GenLens[Grouped](_.offsets)
-
-    def skyOffsets: Lens[Grouped, OffsetGenerator] =
-      GenLens[Grouped](_.skyOffsets)
-
     given HashBytes[Grouped] with
       def hashBytes(g: Grouped): Array[Byte] =
         val bao: ByteArrayOutputStream = new ByteArrayOutputStream(256)
@@ -97,15 +87,6 @@ object Variant:
           g.skyCount,
           g.skyOffsets
         )
-
-  val grouped: Prism[Variant, Grouped] =
-    GenPrism[Variant, Grouped]
-
-  val offsets: Optional[Variant, OffsetGenerator] =
-    grouped.andThen(Grouped.offsets)
-
-  val skyOffsets: Optional[Variant, OffsetGenerator] =
-    grouped.andThen(Grouped.skyOffsets)
 
   case class Interleaved(
     offsets:    OffsetGenerator,
@@ -174,6 +155,28 @@ object Variant:
           p.offset3,
           p.offset4
         )
+
+  val offsets: Optional[Variant, OffsetGenerator] =
+    Optional.apply[Variant, OffsetGenerator] {
+      case Variant.Grouped(_, o, _, _)    => o.some
+      case Variant.Interleaved(o, _, _)   => o.some
+      case Variant.PreImaging(_, _, _, _) => none
+    } { og => {
+      case v @ Variant.Grouped(_, _, _, _)    => v.copy(offsets = og)
+      case v @ Variant.Interleaved(_, _, _)   => v.copy(offsets = og)
+      case v @ Variant.PreImaging(_, _, _, _) => v
+    }}
+
+  val skyOffsets: Optional[Variant, OffsetGenerator] =
+    Optional.apply[Variant, OffsetGenerator] {
+      case Variant.Grouped(_, _, _, s)    => s.some
+      case Variant.Interleaved(_, _, s)   => s.some
+      case Variant.PreImaging(_, _, _, _) => none
+    } { og => {
+      case v @ Variant.Grouped(_, _, _, _)    => v.copy(skyOffsets = og)
+      case v @ Variant.Interleaved(_, _, _)   => v.copy(skyOffsets = og)
+      case v @ Variant.PreImaging(_, _, _, _) => v
+    }}
 
   case class Fields(
     variantType: VariantType,
