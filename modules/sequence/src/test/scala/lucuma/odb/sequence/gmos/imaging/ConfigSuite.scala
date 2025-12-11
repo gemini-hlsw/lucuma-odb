@@ -19,7 +19,8 @@ class ConfigSuite extends FunSuite:
 
   test("Config.GmosNorth explicit binning overrides default"):
     val config = Config.GmosNorth(
-      variant = Variant.Interleaved(NonEmptyList.of(GmosNorthFilter.GPrime)),
+      variant = Variant.Interleaved.Default,
+      NonEmptyList.of(GmosNorthFilter.GPrime),
       common  = Config.Common(
         defaultBin  = GmosBinning.Two,
         explicitBin = Some(GmosBinning.One)
@@ -30,7 +31,8 @@ class ConfigSuite extends FunSuite:
 
   test("Config.GmosSouth explicit binning overrides default"):
     val config = Config.GmosSouth(
-      variant = Variant.Interleaved(NonEmptyList.of(GmosSouthFilter.GPrime)),
+      variant = Variant.Interleaved.Default,
+      NonEmptyList.of(GmosSouthFilter.GPrime),
       common  = Config.Common(
         defaultBin  = GmosBinning.Two,
         explicitBin = Some(GmosBinning.One),

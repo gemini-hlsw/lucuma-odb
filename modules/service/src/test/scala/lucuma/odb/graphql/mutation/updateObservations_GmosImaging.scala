@@ -35,13 +35,13 @@ class updateObservations_GmosImaging extends OdbSuite with UpdateObservationsOps
       }
       observingMode: {
         gmosNorthImaging: {
+          filters: [
+            { filter: G_PRIME },
+            { filter: R_PRIME },
+            { filter: I_PRIME }
+          ]
           variant: {
             interleaved: {
-              filters: [
-                { filter: G_PRIME },
-                { filter: R_PRIME },
-                { filter: I_PRIME }
-              ]
             }
           }
           explicitBin: TWO
@@ -57,9 +57,10 @@ class updateObservations_GmosImaging extends OdbSuite with UpdateObservationsOps
         instrument
         observingMode {
           gmosNorthImaging {
+            filters { filter }
             variant {
               interleaved {
-                filters { filter }
+                skyCount
               }
             }
             bin
@@ -79,13 +80,14 @@ class updateObservations_GmosImaging extends OdbSuite with UpdateObservationsOps
               "instrument": "GMOS_NORTH",
               "observingMode": {
                 "gmosNorthImaging": {
+                  "filters": [
+                    { "filter": "G_PRIME" },
+                    { "filter": "R_PRIME" },
+                    { "filter": "I_PRIME" }
+                  ],
                   "variant": {
                     "interleaved": {
-                      "filters": [
-                        { "filter": "G_PRIME" },
-                        { "filter": "R_PRIME" },
-                        { "filter": "I_PRIME" }
-                      ]
+                      "skyCount": 0
                     }
                   },
                   "bin": "TWO",
@@ -114,13 +116,14 @@ class updateObservations_GmosImaging extends OdbSuite with UpdateObservationsOps
       }
       observingMode: {
         gmosSouthImaging: {
+          filters: [
+            { filter: G_PRIME },
+            { filter: R_PRIME },
+            { filter: I_PRIME }
+          ]
           variant: {
             interleaved: {
-              filters: [
-                { filter: G_PRIME },
-                { filter: R_PRIME },
-                { filter: I_PRIME }
-              ]
+              skyCount: 3
             }
           }
           explicitBin: FOUR
@@ -136,9 +139,10 @@ class updateObservations_GmosImaging extends OdbSuite with UpdateObservationsOps
         instrument
         observingMode {
           gmosSouthImaging {
+            filters { filter }
             variant {
               interleaved {
-                filters { filter }
+                skyCount
               }
             }
             bin
@@ -158,13 +162,14 @@ class updateObservations_GmosImaging extends OdbSuite with UpdateObservationsOps
               "instrument": "GMOS_SOUTH",
               "observingMode": {
                 "gmosSouthImaging": {
+                  "filters":  [
+                    { "filter": "G_PRIME" },
+                    { "filter": "R_PRIME" },
+                    { "filter": "I_PRIME" }
+                  ],
                   "variant": {
                     "interleaved": {
-                      "filters":  [
-                        { "filter": "G_PRIME" },
-                        { "filter": "R_PRIME" },
-                        { "filter": "I_PRIME" }
-                      ]
+                      "skyCount": 3
                     }
                   },
                   "bin": "FOUR",
@@ -194,12 +199,12 @@ class updateObservations_GmosImaging extends OdbSuite with UpdateObservationsOps
       }
       observingMode: {
         gmosNorthImaging: {
+          filters: [
+            { filter: G_PRIME },
+            { filter: R_PRIME }
+          ]
           variant: {
             grouped: {
-              filters: [
-                { filter: G_PRIME },
-                { filter: R_PRIME }
-              ]
               offsets: {
                 enumerated: {
                   values: [
@@ -244,11 +249,9 @@ class updateObservations_GmosImaging extends OdbSuite with UpdateObservationsOps
         instrument
         observingMode {
           gmosNorthImaging {
+            filters { filter }
             variant {
               grouped {
-                filters {
-                  filter
-                }
                 offsets {
                   enumerated {
                     values {
@@ -289,12 +292,12 @@ class updateObservations_GmosImaging extends OdbSuite with UpdateObservationsOps
               "instrument": "GMOS_NORTH",
               "observingMode": {
                 "gmosNorthImaging": {
+                  "filters": [
+                    { "filter": "G_PRIME" },
+                    { "filter": "R_PRIME" }
+                  ],
                   "variant": {
                     "grouped": {
-                      "filters": [
-                        { "filter": "G_PRIME" },
-                        { "filter": "R_PRIME" }
-                      ],
                       "offsets": {
                         "enumerated": {
                           "values": [
@@ -341,12 +344,12 @@ class updateObservations_GmosImaging extends OdbSuite with UpdateObservationsOps
     val update1 = """
       observingMode: {
         gmosNorthImaging: {
+          filters: [
+            { filter: I_PRIME },
+            { filter: Z_PRIME }
+          ]
           variant: {
             grouped: {
-              filters: [
-                { filter: I_PRIME },
-                { filter: Z_PRIME }
-              ]
               offsets: {
                 enumerated: {
                   values: [
@@ -380,12 +383,12 @@ class updateObservations_GmosImaging extends OdbSuite with UpdateObservationsOps
               "instrument": "GMOS_NORTH",
               "observingMode": {
                 "gmosNorthImaging": {
+                  "filters": [
+                    { "filter": "I_PRIME" },
+                    { "filter": "Z_PRIME" }
+                  ],
                   "variant": {
                     "grouped": {
-                      "filters": [
-                        { "filter": "I_PRIME" },
-                        { "filter": "Z_PRIME" }
-                      ],
                       "offsets": {
                         "enumerated": {
                           "values": [
@@ -434,12 +437,12 @@ class updateObservations_GmosImaging extends OdbSuite with UpdateObservationsOps
       }
       observingMode: {
         gmosNorthImaging: {
+          filters: [
+            { filter: G_PRIME },
+            { filter: R_PRIME }
+          ]
           variant: {
             interleaved: {
-              filters: [
-                { filter: G_PRIME },
-                { filter: R_PRIME }
-              ]
             }
           }
         }
@@ -451,11 +454,10 @@ class updateObservations_GmosImaging extends OdbSuite with UpdateObservationsOps
         instrument
         observingMode {
           gmosNorthImaging {
+            filters { filter }
             variant {
               interleaved {
-                filters {
-                  filter
-                }
+                skyCount
               }
             }
           }
@@ -472,12 +474,13 @@ class updateObservations_GmosImaging extends OdbSuite with UpdateObservationsOps
               "instrument": "GMOS_NORTH",
               "observingMode": {
                 "gmosNorthImaging": {
+                  "filters": [
+                    { "filter": "G_PRIME" },
+                    { "filter": "R_PRIME" }
+                  ],
                   "variant": {
                     "interleaved": {
-                      "filters": [
-                        { "filter": "G_PRIME" },
-                        { "filter": "R_PRIME" }
-                      ]
+                      "skyCount": 0
                     }
                   }
                 }
@@ -512,9 +515,10 @@ class updateObservations_GmosImaging extends OdbSuite with UpdateObservationsOps
         instrument
         observingMode {
           gmosNorthImaging {
+            filters { filter }
             variant {
               interleaved {
-                filters { filter }
+                skyCount
               }
             }
           }
@@ -553,9 +557,9 @@ class updateObservations_GmosImaging extends OdbSuite with UpdateObservationsOps
         instrument
         observingMode {
           gmosNorthImaging {
+            filters { filter }
             variant {
               grouped {
-                filters { filter }
                 order
                 offsets {
                   spiral {
@@ -578,10 +582,27 @@ class updateObservations_GmosImaging extends OdbSuite with UpdateObservationsOps
                 }
               }
               interleaved {
-                filters { filter }
+                offsets {
+                  spiral {
+                    size { arcseconds }
+                    center {
+                      p { arcseconds }
+                      q { arcseconds }
+                    }
+                  }
+                }
+                skyCount
+                skyOffsets {
+                  random {
+                    size { arcseconds }
+                    center {
+                      p { arcseconds }
+                      q { arcseconds }
+                    }
+                  }
+                }
               }
               preImaging {
-                filters { filter }
                 offset1 {
                   p { arcseconds }
                   q { arcseconds }
@@ -616,13 +637,13 @@ class updateObservations_GmosImaging extends OdbSuite with UpdateObservationsOps
       }
       observingMode: {
         gmosNorthImaging: {
+          filters: [
+            { filter: G_PRIME },
+            { filter: R_PRIME }
+          ]
           variant: {
             grouped: {
-              filters: [
-                { filter: G_PRIME },
-                { filter: R_PRIME }
-              ]
-              order: INCREASING
+              order: DECREASING
               offsets: {
                 spiral: {
                   size: { arcseconds: 10 }
@@ -657,13 +678,13 @@ class updateObservations_GmosImaging extends OdbSuite with UpdateObservationsOps
               "instrument": "GMOS_NORTH",
               "observingMode": {
                 "gmosNorthImaging": {
+                  "filters": [
+                    { "filter": "G_PRIME" },
+                    { "filter": "R_PRIME" }
+                  ],
                   "variant": {
                     "grouped": {
-                      "filters": [
-                        { "filter": "G_PRIME" },
-                        { "filter": "R_PRIME" }
-                      ],
-                      "order": "INCREASING",
+                      "order": "DECREASING",
                       "offsets": {
                         "spiral": {
                           "size": { "arcseconds": 10 },
@@ -700,10 +721,6 @@ class updateObservations_GmosImaging extends OdbSuite with UpdateObservationsOps
         gmosNorthImaging: {
           variant: {
             interleaved: {
-              filters: [
-                { filter: G_PRIME },
-                { filter: R_PRIME }
-              ]
             }
           }
         }
@@ -719,13 +736,16 @@ class updateObservations_GmosImaging extends OdbSuite with UpdateObservationsOps
               "instrument": "GMOS_NORTH",
               "observingMode": {
                 "gmosNorthImaging": {
+                  "filters": [
+                    { "filter": "G_PRIME" },
+                    { "filter": "R_PRIME" }
+                  ],
                   "variant": {
                     "grouped": null,
                     "interleaved": {
-                      "filters": [
-                        { "filter": "G_PRIME" },
-                        { "filter": "R_PRIME" }
-                      ]
+                      "offsets": null,
+                      "skyCount": 0,
+                      "skyOffsets": null
                     },
                     "preImaging": null
                   }
@@ -742,10 +762,6 @@ class updateObservations_GmosImaging extends OdbSuite with UpdateObservationsOps
         gmosNorthImaging: {
           variant: {
             grouped: {
-              filters: [
-                { filter: G_PRIME },
-                { filter: R_PRIME }
-              ]
             }
           }
         }
@@ -761,13 +777,13 @@ class updateObservations_GmosImaging extends OdbSuite with UpdateObservationsOps
               "instrument": "GMOS_NORTH",
               "observingMode": {
                 "gmosNorthImaging": {
+                  "filters": [
+                    { "filter": "G_PRIME" },
+                    { "filter": "R_PRIME" }
+                  ],
                   "variant": {
                     "grouped": {
-                      "filters": [
-                        { "filter": "G_PRIME" },
-                        { "filter": "R_PRIME" }
-                      ],
-                      "order": "DECREASING",
+                      "order": "INCREASING",
                       "offsets": null,
                       "skyCount": 0,
                       "skyOffsets": null
@@ -799,9 +815,9 @@ class updateObservations_GmosImaging extends OdbSuite with UpdateObservationsOps
         instrument
         observingMode {
           gmosNorthImaging {
+            filters { filter }
             variant {
               grouped {
-                filters { filter }
                 order
                 offsets {
                   spiral {
@@ -824,10 +840,27 @@ class updateObservations_GmosImaging extends OdbSuite with UpdateObservationsOps
                 }
               }
               interleaved {
-                filters { filter }
+                offsets {
+                  spiral {
+                    size { arcseconds }
+                    center {
+                      p { arcseconds }
+                      q { arcseconds }
+                    }
+                  }
+                }
+                skyCount
+                skyOffsets {
+                  random {
+                    size { arcseconds }
+                    center {
+                      p { arcseconds }
+                      q { arcseconds }
+                    }
+                  }
+                }
               }
               preImaging {
-                filters { filter }
                 offset1 {
                   p { arcseconds }
                   q { arcseconds }
@@ -862,12 +895,12 @@ class updateObservations_GmosImaging extends OdbSuite with UpdateObservationsOps
       }
       observingMode: {
         gmosNorthImaging: {
+          filters: [
+            { filter: G_PRIME },
+            { filter: R_PRIME }
+          ]
           variant: {
             preImaging: {
-              filters: [
-                { filter: G_PRIME },
-                { filter: R_PRIME }
-              ]
               offset1: {
                 p: { arcseconds: 10 }
                 q: { arcseconds: 11 }
@@ -899,14 +932,14 @@ class updateObservations_GmosImaging extends OdbSuite with UpdateObservationsOps
               "instrument": "GMOS_NORTH",
               "observingMode": {
                 "gmosNorthImaging": {
+                  "filters": [
+                    { "filter": "G_PRIME" },
+                    { "filter": "R_PRIME" }
+                  ],
                   "variant": {
                     "grouped": null,
                     "interleaved": null,
                     "preImaging": {
-                      "filters": [
-                        { "filter": "G_PRIME" },
-                        { "filter": "R_PRIME" }
-                      ],
                       "offset1": {
                         "p": { "arcseconds": 10 },
                         "q": { "arcseconds": 11 }
@@ -938,10 +971,15 @@ class updateObservations_GmosImaging extends OdbSuite with UpdateObservationsOps
         gmosNorthImaging: {
           variant: {
             interleaved: {
-              filters: [
-                { filter: G_PRIME },
-                { filter: R_PRIME }
-              ]
+              offsets: {
+                spiral: {
+                  size: { arcseconds: 20 }
+                  center: {
+                    p: { arcseconds: 21 }
+                    q: { arcseconds: 22 }
+                  }
+                }
+              }
             }
           }
         }
@@ -957,13 +995,24 @@ class updateObservations_GmosImaging extends OdbSuite with UpdateObservationsOps
               "instrument": "GMOS_NORTH",
               "observingMode": {
                 "gmosNorthImaging": {
+                  "filters": [
+                    { "filter": "G_PRIME" },
+                    { "filter": "R_PRIME" }
+                  ],
                   "variant": {
                     "grouped": null,
                     "interleaved": {
-                      "filters": [
-                        { "filter": "G_PRIME" },
-                        { "filter": "R_PRIME" }
-                      ]
+                      "offsets": {
+                        "spiral": {
+                          "size": { "arcseconds":  20},
+                          "center": {
+                            "p": { "arcseconds":  21 },
+                            "q": { "arcseconds":  22 }
+                          }
+                        }
+                      },
+                      "skyCount": 0,
+                      "skyOffsets": null
                     },
                     "preImaging": null
                   }
@@ -980,10 +1029,6 @@ class updateObservations_GmosImaging extends OdbSuite with UpdateObservationsOps
         gmosNorthImaging: {
           variant: {
             preImaging: {
-              filters: [
-                { filter: G_PRIME },
-                { filter: R_PRIME }
-              ]
             }
           }
         }
@@ -999,14 +1044,14 @@ class updateObservations_GmosImaging extends OdbSuite with UpdateObservationsOps
               "instrument": "GMOS_NORTH",
               "observingMode": {
                 "gmosNorthImaging": {
+                  "filters": [
+                    { "filter": "G_PRIME" },
+                    { "filter": "R_PRIME" }
+                  ],
                   "variant": {
                     "grouped": null,
                     "interleaved": null,
                     "preImaging": {
-                      "filters": [
-                        { "filter": "G_PRIME" },
-                        { "filter": "R_PRIME" }
-                      ],
                       "offset1": {
                         "p": { "arcseconds": 0 },
                         "q": { "arcseconds": 0 }
@@ -1049,9 +1094,9 @@ class updateObservations_GmosImaging extends OdbSuite with UpdateObservationsOps
         instrument
         observingMode {
           gmosNorthImaging {
+            filters { filter }
             variant {
               grouped {
-                filters { filter }
                 order
                 skyCount
               }
@@ -1072,12 +1117,12 @@ class updateObservations_GmosImaging extends OdbSuite with UpdateObservationsOps
       }
       observingMode: {
         gmosNorthImaging: {
+          filters: [
+            { filter: G_PRIME },
+            { filter: R_PRIME }
+          ]
           variant: {
             grouped: {
-              filters: [
-                { filter: G_PRIME },
-                { filter: R_PRIME }
-              ]
               order: INCREASING
               offsets: {
                 spiral: {
@@ -1113,12 +1158,12 @@ class updateObservations_GmosImaging extends OdbSuite with UpdateObservationsOps
               "instrument": "GMOS_NORTH",
               "observingMode": {
                 "gmosNorthImaging": {
+                  "filters": [
+                    { "filter": "G_PRIME" },
+                    { "filter": "R_PRIME" }
+                  ],
                   "variant": {
                     "grouped": {
-                      "filters": [
-                        { "filter": "G_PRIME" },
-                        { "filter": "R_PRIME" }
-                      ],
                       "order": "INCREASING",
                       "skyCount": 2
                     }
@@ -1152,12 +1197,12 @@ class updateObservations_GmosImaging extends OdbSuite with UpdateObservationsOps
               "instrument": "GMOS_NORTH",
               "observingMode": {
                 "gmosNorthImaging": {
+                  "filters": [
+                    { "filter": "G_PRIME" },
+                    { "filter": "R_PRIME" }
+                  ],
                   "variant": {
                     "grouped": {
-                      "filters": [
-                        { "filter": "G_PRIME" },
-                        { "filter": "R_PRIME" }
-                      ],
                       "order": "INCREASING",
                       "skyCount": 3
                     }
@@ -1178,119 +1223,6 @@ class updateObservations_GmosImaging extends OdbSuite with UpdateObservationsOps
       )
     )
 
-  test("observing mode: cannot switch variant without setting filters"):
-
-    val query = """
-      observations {
-        instrument
-        observingMode {
-          gmosNorthImaging {
-            variant {
-              grouped {
-                filters { filter }
-                order
-                skyCount
-              }
-              interleaved {
-                filters { filter }
-              }
-            }
-          }
-        }
-      }
-    """
-
-    val update0 = """
-      scienceRequirements: {
-        exposureTimeMode: {
-          signalToNoise: {
-            value: 100.0
-            at: { nanometers: 500.0 }
-          }
-        }
-      }
-      observingMode: {
-        gmosNorthImaging: {
-          variant: {
-            interleaved: {
-              filters: [
-                { filter: G_PRIME },
-                { filter: R_PRIME }
-              ]
-            }
-          }
-        }
-      }
-    """
-
-    val expected0 = (_: Observation.Id) =>
-      json"""
-      {
-        "updateObservations": {
-          "observations": [
-            {
-              "instrument": "GMOS_NORTH",
-              "observingMode": {
-                "gmosNorthImaging": {
-                  "variant": {
-                    "grouped": null,
-                    "interleaved": {
-                      "filters": [
-                        { "filter": "G_PRIME" },
-                        { "filter": "R_PRIME" }
-                      ]
-                    }
-                  }
-                }
-              }
-            }
-          ]
-        }
-      }
-    """.asRight
-
-    val update1 = """
-      observingMode: {
-        gmosNorthImaging: {
-          variant: {
-            grouped: {
-              order: INCREASING
-              offsets: {
-                spiral: {
-                  size: { arcseconds: 10 }
-                  center: {
-                    p: { arcseconds: 11 }
-                    q: { arcseconds: 12 }
-                  }
-                }
-              }
-              skyCount: 2
-              skyOffsets: {
-                random: {
-                  size: { arcseconds: 13 }
-                  center: {
-                    p: { arcseconds: 14 }
-                    q: { arcseconds: 15 }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    """
-
-    val expected1 = (oid: Observation.Id) =>
-      s"Filters are required when switching to GMOS North imaging Grouped. Observations whose variant would change: $oid".asLeft
-
-    multiUpdateTestWithOid(
-      pi,
-      List(
-        (update0, query, expected0),
-        (update1, query, expected1)
-      )
-    )
-
   test("observing mode: delete GMOS imaging"):
 
     val update0 = """
@@ -1304,12 +1236,12 @@ class updateObservations_GmosImaging extends OdbSuite with UpdateObservationsOps
       }
       observingMode: {
         gmosNorthImaging: {
+          filters: [
+            { filter: G_PRIME },
+            { filter: R_PRIME }
+          ]
           variant: {
             interleaved: {
-              filters: [
-                { filter: G_PRIME },
-                { filter: R_PRIME }
-              ]
             }
           }
         }
@@ -1322,11 +1254,7 @@ class updateObservations_GmosImaging extends OdbSuite with UpdateObservationsOps
         observingMode {
           mode
           gmosNorthImaging {
-            variant {
-              interleaved {
-                filters { filter }
-              }
-            }
+            filters { filter }
           }
         }
       }
@@ -1342,14 +1270,10 @@ class updateObservations_GmosImaging extends OdbSuite with UpdateObservationsOps
               "observingMode": {
                 "mode": "GMOS_NORTH_IMAGING",
                 "gmosNorthImaging": {
-                  "variant": {
-                    "interleaved": {
-                      "filters": [
-                        { "filter": "G_PRIME" },
-                        { "filter": "R_PRIME" }
-                      ]
-                    }
-                  }
+                  "filters": [
+                    { "filter": "G_PRIME" },
+                    { "filter": "R_PRIME" }
+                  ]
                 }
               }
             }
@@ -1397,11 +1321,7 @@ class updateObservations_GmosImaging extends OdbSuite with UpdateObservationsOps
       observations {
         observingMode {
           gmosSouthImaging {
-            variant {
-              grouped {
-                filters { filter }
-              }
-            }
+            filters { filter }
             explicitBin
           }
         }
@@ -1416,14 +1336,10 @@ class updateObservations_GmosImaging extends OdbSuite with UpdateObservationsOps
               {
                 "observingMode": {
                   "gmosSouthImaging": {
-                    "variant": {
-                      "grouped": {
-                        "filters": [
-                          { "filter": "G_PRIME" },
-                          { "filter": "R_PRIME" }
-                        ]
-                      }
-                    },
+                    "filters": [
+                      { "filter": "G_PRIME" },
+                      { "filter": "R_PRIME" }
+                    ],
                     "explicitBin": "FOUR"
                   }
                 }
@@ -1516,11 +1432,7 @@ class updateObservations_GmosImaging extends OdbSuite with UpdateObservationsOps
     val update = """
       observingMode: {
         gmosNorthImaging: {
-          variant: {
-            interleaved: {
-              filters: []
-            }
-          }
+          filters: []
         }
       }
     """
@@ -1529,17 +1441,13 @@ class updateObservations_GmosImaging extends OdbSuite with UpdateObservationsOps
       observations {
         observingMode {
           gmosNorthImaging {
-            variant {
-              interleaved {
-                filters { filter }
-              }
-            }
+            filters { filter }
           }
         }
       }
     """
 
-    val expected = "Argument 'input.SET.observingMode.gmosNorthImaging.variant.interleaved' is invalid: At least one filter must be specified for GMOS imaging observations.".asLeft
+    val expected = "Argument 'input.SET.observingMode.gmosNorthImaging' is invalid: At least one filter must be specified for GMOS imaging observations.".asLeft
     oneUpdateTest(pi, update, query, expected)
 
   test("observing mode: (fail to) update existing GMOS imaging with empty filters - rollback other changes"):
@@ -1548,12 +1456,13 @@ class updateObservations_GmosImaging extends OdbSuite with UpdateObservationsOps
         val initialUpdate = """
           observingMode: {
             gmosNorthImaging: {
+              filters: [
+                { filter: G_PRIME },
+                { filter: R_PRIME }
+              ]
               variant: {
                 interleaved: {
-                  filters: [
-                    { filter: G_PRIME },
-                    { filter: R_PRIME }
-                  ]
+                  skyCount: 7
                 }
               }
               explicitBin: TWO,
@@ -1565,11 +1474,7 @@ class updateObservations_GmosImaging extends OdbSuite with UpdateObservationsOps
         val failingUpdate = """
           observingMode: {
             gmosNorthImaging: {
-              variant: {
-                interleaved: {
-                  filters: []
-                }
-              }
+              filters: []
               explicitBin: FOUR
               explicitAmpGain: HIGH
             }
@@ -1580,11 +1485,7 @@ class updateObservations_GmosImaging extends OdbSuite with UpdateObservationsOps
           observations {
             observingMode {
               gmosNorthImaging {
-                variant {
-                  interleaved {
-                    filters { filter }
-                  }
-                }
+                filters { filter }
                 bin
                 ampGain
               }
@@ -1603,14 +1504,10 @@ class updateObservations_GmosImaging extends OdbSuite with UpdateObservationsOps
                     {
                       "observingMode": {
                         "gmosNorthImaging": {
-                          "variant": {
-                            "interleaved": {
-                              "filters": [
-                                { "filter": "G_PRIME" },
-                                { "filter": "R_PRIME" }
-                              ]
-                            }
-                          },
+                          "filters": [
+                            { "filter": "G_PRIME" },
+                            { "filter": "R_PRIME" }
+                          ],
                           "bin": "TWO",
                           "ampGain": "LOW"
                         }
@@ -1624,7 +1521,7 @@ class updateObservations_GmosImaging extends OdbSuite with UpdateObservationsOps
           _ <- expect(
             user = pi,
             query = updateObservationsMutation(oid, failingUpdate, query),
-            expected = List("Argument 'input.SET.observingMode.gmosNorthImaging.variant.interleaved' is invalid: At least one filter must be specified for GMOS imaging observations.").asLeft
+            expected = List("Argument 'input.SET.observingMode.gmosNorthImaging' is invalid: At least one filter must be specified for GMOS imaging observations.").asLeft
           )
           // Verify that ALL values remain unchanged (transaction rollback)
           _ <- expect(
@@ -1634,9 +1531,10 @@ class updateObservations_GmosImaging extends OdbSuite with UpdateObservationsOps
                 observation(observationId: "$oid") {
                   observingMode {
                     gmosNorthImaging {
+                      filters { filter }
                       variant {
                         interleaved {
-                          filters { filter }
+                          skyCount
                         }
                       }
                       initialFilters { filter }
@@ -1652,12 +1550,13 @@ class updateObservations_GmosImaging extends OdbSuite with UpdateObservationsOps
                 "observation": {
                   "observingMode": {
                     "gmosNorthImaging": {
+                      "filters": [
+                        { "filter": "G_PRIME" },
+                        { "filter": "R_PRIME" }
+                      ],
                       "variant": {
                         "interleaved": {
-                          "filters": [
-                            { "filter": "G_PRIME" },
-                            { "filter": "R_PRIME" }
-                          ]
+                          "skyCount": 7
                         }
                       },
                       "initialFilters": [

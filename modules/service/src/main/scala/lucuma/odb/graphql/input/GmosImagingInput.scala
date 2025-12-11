@@ -3,6 +3,7 @@
 
 package lucuma.odb.graphql.input
 
+import cats.data.NonEmptyList
 import cats.syntax.all.*
 import grackle.Result
 import lucuma.core.enums.*
@@ -15,10 +16,22 @@ import lucuma.odb.sequence.gmos.imaging.Variant
 
 object GmosImagingInput:
 
+  private object FilterCheck:
+    val AtLeastOne: OdbError =
+      OdbError.InvalidArgument("At least one filter must be specified for GMOS imaging observations.".some)
+
+    def notEmpty[L](filters: Result[List[L]]): Result[NonEmptyList[L]] =
+      filters.flatMap: fs =>
+        Result.fromOption(NonEmptyList.fromList(fs), AtLeastOne.asProblem)
+
+    def notEmptyIfPresent[L](filters: Result[Option[List[L]]]): Result[Option[NonEmptyList[L]]] =
+      filters.flatMap(_.traverse(fs => Result.fromOption(NonEmptyList.fromList(fs), AtLeastOne.asProblem)))
+
   // Create ---------------------------------------------------------------------
 
   case class Create[L](
-    variant: Variant[L],
+    variant: Variant,
+    filters: NonEmptyList[L],
     common:  Create.Common
   )
 
@@ -37,23 +50,23 @@ object GmosImagingInput:
     private def binding[L](
       FilterBinding: Matcher[L]
     ): Matcher[Create[L]] =
-      val VariantBinding = GmosImagingVariantInput.binding(FilterBinding)
       ObjectFieldsBinding.rmap:
         case List(
-          VariantBinding("variant", rVariant),
+          GmosImagingVariantInput.Binding("variant", rVariant),
+          FilterBinding.List("filters", rFilters),
           GmosBinningBinding.Option("explicitBin", rExplicitBin),
           GmosAmpReadModeBinding.Option("explicitAmpReadMode", rExplicitAmpReadMode),
           GmosAmpGainBinding.Option("explicitAmpGain", rExplicitAmpGain),
           GmosRoiBinding.Option("explicitRoi", rExplicitRoi),
         ) => (
           rVariant,
+          FilterCheck.notEmpty(rFilters),
           rExplicitBin,
           rExplicitAmpReadMode,
           rExplicitAmpGain,
           rExplicitRoi,
-        ).parTupled.flatMap: (variant, exBin, exAmpReadMode, exAmpGain, exRoi) =>
-          variant.create.map: v =>
-            Create(v, Common(exBin, exAmpReadMode, exAmpGain, exRoi))
+        ).parMapN: (variant, filters, exBin, exAmpReadMode, exAmpGain, exRoi) =>
+          Create(variant.toVariant, filters, Common(exBin, exAmpReadMode, exAmpGain, exRoi))
 
     val NorthBinding: Matcher[North] =
       binding(GmosImagingFilterInput.NorthBinding)
@@ -67,14 +80,15 @@ object GmosImagingInput:
   // Edit ---------------------------------------------------------------------
 
   case class Edit[L](
-    variant: Option[GmosImagingVariantInput[L]],
+    variant: Option[GmosImagingVariantInput],
+    filters: Option[NonEmptyList[L]],
     common:  Edit.Common
   ):
     def toCreate: Result[Create[L]] =
       for
-        v0 <- Result.fromOption(variant, OdbError.InvalidArgument("At least one filter must be specified for GMOS imaging observations".some).asProblem)
-        v1 <- v0.create
-      yield Create(v1, common.toCreate)
+        v  <- Result.fromOption(variant.map(_.toVariant), OdbError.InvalidArgument("An imaging variant must be suplied for GMOS imaging observations".some).asProblem)
+        fs <- Result.fromOption(filters, OdbError.InvalidArgument("At least one filter must be specified for GMOS imaging observations".some).asProblem)
+      yield Create(v, fs, common.toCreate)
 
   object Edit:
 
@@ -98,22 +112,23 @@ object GmosImagingInput:
     private def binding[L](
       FilterBinding: Matcher[GmosImagingFilterInput[L]]
     ): Matcher[Edit[GmosImagingFilterInput[L]]] =
-      val VariantBinding = GmosImagingVariantInput.binding(FilterBinding)
       ObjectFieldsBinding.rmap:
         case List(
-          VariantBinding.Option("variant", rVariant),
+          GmosImagingVariantInput.Binding.Option("variant", rVariant),
+          FilterBinding.List.Option("filters", rFilters),
           GmosBinningBinding.Nullable("explicitBin", rExplicitBin),
           GmosAmpReadModeBinding.Nullable("explicitAmpReadMode", rExplicitAmpReadMode),
           GmosAmpGainBinding.Nullable("explicitAmpGain", rExplicitAmpGain),
           GmosRoiBinding.Nullable("explicitRoi", rExplicitRoi)
         ) => (
           rVariant,
+          FilterCheck.notEmptyIfPresent(rFilters),
           rExplicitBin,
           rExplicitAmpReadMode,
           rExplicitAmpGain,
           rExplicitRoi,
-        ).parTupled.map: (variant, exBin, exAmpReadMode, exAmpGain, exRoi) =>
-          Edit(variant, Common(exBin, exAmpReadMode, exAmpGain, exRoi))
+        ).parMapN: (variant, filters, exBin, exAmpReadMode, exAmpGain, exRoi) =>
+          Edit(variant, filters, Common(exBin, exAmpReadMode, exAmpGain, exRoi))
 
     val NorthBinding: Matcher[North] =
       binding(GmosImagingFilterInput.NorthBinding)

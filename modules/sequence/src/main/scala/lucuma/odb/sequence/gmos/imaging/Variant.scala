@@ -4,9 +4,8 @@
 package lucuma.odb.sequence.gmos.imaging
 
 import cats.Eq
-import cats.Functor
-import cats.data.NonEmptyList
 import cats.syntax.eq.*
+import cats.syntax.option.*
 import eu.timepit.refined.cats.*
 import eu.timepit.refined.types.numeric.NonNegInt
 import lucuma.core.math.Offset
@@ -23,70 +22,65 @@ import monocle.macros.GenPrism
 import java.io.ByteArrayOutputStream
 import java.io.DataOutputStream
 
-sealed trait Variant[A]:
+sealed trait Variant:
 
   import Variant.*
 
   def variantType: VariantType =
     this match
-      case Grouped(_, _, _, _, _)    => VariantType.Grouped
-      case Interleaved(_)            => VariantType.Interleaved
-      case PreImaging(_, _, _, _, _) => VariantType.PreImaging
+      case Grouped(_, _, _, _)    => VariantType.Grouped
+      case Interleaved(_, _, _)   => VariantType.Interleaved
+      case PreImaging(_, _, _, _) => VariantType.PreImaging
 
-  def fold[B](
-    fg: Grouped[A]     => B,
-    fi: Interleaved[A] => B,
-    fp: PreImaging[A]  => B
-  ): B =
+  def fold[A](
+    fg: Grouped     => A,
+    fi: Interleaved => A,
+    fp: PreImaging  => A
+  ): A =
     this match
-      case g @ Grouped(_, _, _, _, _)    => fg(g)
-      case i @ Interleaved(_)            => fi(i)
-      case p @ PreImaging(_, _, _, _, _) => fp(p)
+      case g @ Grouped(_, _, _, _)    => fg(g)
+      case i @ Interleaved(_, _, _)   => fi(i)
+      case p @ PreImaging(_, _, _, _) => fp(p)
 
-  def filters: NonEmptyList[A]
+  def grouped: Option[Grouped] =
+    fold(_.some, _ => none, _ => none)
 
-  def toGrouped: Grouped[A] =
-    fold(identity, i => Grouped.default(i.filters), p => Grouped.default(p.filters))
+  def interleaved: Option[Interleaved] =
+    fold(_ => none, _.some, _ => none)
 
-  def toInterleaved: Interleaved[A] =
-    fold(g => Interleaved.default(g.filters), identity, p => Interleaved.default(p.filters))
-
-  def toPreImaging: PreImaging[A] =
-    fold(g => PreImaging.default(g.filters), i => PreImaging.default(i.filters), identity)
+  def preImaging: Option[PreImaging] =
+    fold(_ => none, _ => none, _.some)
 
 object Variant:
 
-  case class Grouped[A](
-    filters:    NonEmptyList[A],
+  case class Grouped(
     order:      WavelengthOrder,
     offsets:    OffsetGenerator,
     skyCount:   NonNegInt,
     skyOffsets: OffsetGenerator
-  ) extends Variant[A]
+  ) extends Variant
 
   object Grouped:
 
-    def default[A](filters: NonEmptyList[A]): Grouped[A] =
+    val Default: Grouped =
       Grouped(
-        filters    = filters,
-        order      = WavelengthOrder.Decreasing,
+        order      = WavelengthOrder.Increasing,
         offsets    = OffsetGenerator.NoGenerator,
         skyCount   = NonNegInt.MinValue,
         skyOffsets = OffsetGenerator.NoGenerator
       )
 
-    def offsets[A]: Lens[Grouped[A], OffsetGenerator] =
-      GenLens[Grouped[A]](_.offsets)
+    val offsets: Lens[Grouped, OffsetGenerator] =
+      GenLens[Grouped](_.offsets)
 
-    def skyOffsets[A]: Lens[Grouped[A], OffsetGenerator] =
-      GenLens[Grouped[A]](_.skyOffsets)
+    def skyOffsets: Lens[Grouped, OffsetGenerator] =
+      GenLens[Grouped](_.skyOffsets)
 
-    given [A: HashBytes]: HashBytes[Grouped[A]] with
-      def hashBytes(g: Grouped[A]): Array[Byte] =
+    given HashBytes[Grouped] with
+      def hashBytes(g: Grouped): Array[Byte] =
         val bao: ByteArrayOutputStream = new ByteArrayOutputStream(256)
         val out: DataOutputStream      = new DataOutputStream(bao)
 
-        out.write(g.filters.hashBytes)
         out.write(g.order.hashBytes)
         out.write(g.offsets.hashBytes)
         out.write(g.skyCount.hashBytes)
@@ -95,81 +89,94 @@ object Variant:
         out.close()
         bao.toByteArray
 
-    given [A: Eq]: Eq[Grouped[A]] =
+    given Eq[Grouped] =
       Eq.by: g =>
-        (
-          g.filters,
+       (
           g.order,
           g.offsets,
           g.skyCount,
           g.skyOffsets
         )
 
-  def grouped[A]: Prism[Variant[A], Grouped[A]] =
-    GenPrism[Variant[A], Grouped[A]]
+  val grouped: Prism[Variant, Grouped] =
+    GenPrism[Variant, Grouped]
 
-  def offsets[A]: Optional[Variant[A], OffsetGenerator] =
+  val offsets: Optional[Variant, OffsetGenerator] =
     grouped.andThen(Grouped.offsets)
 
-  def skyOffsets[A]: Optional[Variant[A], OffsetGenerator] =
+  val skyOffsets: Optional[Variant, OffsetGenerator] =
     grouped.andThen(Grouped.skyOffsets)
 
-  case class Interleaved[A](
-    filters: NonEmptyList[A],
-  ) extends Variant[A]
+  case class Interleaved(
+    offsets:    OffsetGenerator,
+    skyCount:   NonNegInt,
+    skyOffsets: OffsetGenerator
+  ) extends Variant
 
   object Interleaved:
-    def default[A](filters: NonEmptyList[A]): Interleaved[A] =
-      Interleaved(filters)
+    val Default: Interleaved =
+      Interleaved(
+        offsets    = OffsetGenerator.NoGenerator,
+        skyCount   = NonNegInt.MinValue,
+        skyOffsets = OffsetGenerator.NoGenerator
+      )
 
-    given [A: HashBytes]: HashBytes[Interleaved[A]] with
-      def hashBytes(i: Interleaved[A]): Array[Byte] =
-        i.filters.hashBytes
+    given HashBytes[Interleaved] with
+      def hashBytes(i: Interleaved): Array[Byte] =
+        val bao: ByteArrayOutputStream = new ByteArrayOutputStream(256)
+        val out: DataOutputStream      = new DataOutputStream(bao)
 
-    given [A: Eq]: Eq[Interleaved[A]] =
-      Eq.by(_.filters)
+        out.write(i.offsets.hashBytes)
+        out.write(i.skyCount.hashBytes)
+        out.write(i.skyOffsets.hashBytes)
 
-  case class PreImaging[A](
-    filters: NonEmptyList[A],
+        out.close()
+        bao.toByteArray
+
+    given Eq[Interleaved] =
+      Eq.by: g =>
+       (
+          g.offsets,
+          g.skyCount,
+          g.skyOffsets
+        )
+
+  case class PreImaging(
     offset1: Offset,
     offset2: Offset,
     offset3: Offset,
     offset4: Offset
-  ) extends Variant[A]
+  ) extends Variant
 
   object PreImaging:
-    def default[A](filters: NonEmptyList[A]): PreImaging[A] =
+    val Default: PreImaging =
       PreImaging(
-        filters = filters,
         offset1 = Offset.Zero,
         offset2 = Offset.Zero,
         offset3 = Offset.Zero,
         offset4 = Offset.Zero
       )
 
-    given [A: HashBytes]: HashBytes[PreImaging[A]] with
-      def hashBytes(p: PreImaging[A]): Array[Byte] =
+    given HashBytes[PreImaging] with
+      def hashBytes(p: PreImaging): Array[Byte] =
         Array.concat(
-          p.filters.hashBytes,
           p.offset1.hashBytes,
           p.offset2.hashBytes,
           p.offset3.hashBytes,
           p.offset4.hashBytes
         )
 
-    given [A: Eq]: Eq[PreImaging[A]] =
+    given Eq[PreImaging] =
       Eq.by: p =>
         (
-          p.filters,
           p.offset1,
           p.offset2,
           p.offset3,
           p.offset4
         )
 
-  case class Fields[A](
+  case class Fields(
     variantType: VariantType,
-    filters:     NonEmptyList[A],
     order:       WavelengthOrder,
     skyCount:    NonNegInt,
     offset1:     Offset,
@@ -180,31 +187,21 @@ object Variant:
     def toVariant(
       objectGen: OffsetGenerator,
       skyGen:    OffsetGenerator
-    ): Variant[A] =
+    ): Variant =
       variantType match
-        case VariantType.Grouped     => Grouped(filters, order, objectGen, skyCount, skyGen)
-        case VariantType.Interleaved => Interleaved(filters)
-        case VariantType.PreImaging  => PreImaging(filters, offset1, offset2, offset3, offset4)
+        case VariantType.Grouped     => Grouped(order, objectGen, skyCount, skyGen)
+        case VariantType.Interleaved => Interleaved(objectGen, skyCount, skyGen)
+        case VariantType.PreImaging  => PreImaging(offset1, offset2, offset3, offset4)
 
 
-  given [A: HashBytes]: HashBytes[Variant[A]] with
-    def hashBytes(v: Variant[A]): Array[Byte] =
+  given HashBytes[Variant] with
+    def hashBytes(v: Variant): Array[Byte] =
       v.fold(_.hashBytes, _.hashBytes, _.hashBytes)
 
-  given [A: Eq]: Eq[Variant[A]] with
-    def eqv(x: Variant[A], y: Variant[A]): Boolean =
+  given Eq[Variant] with
+    def eqv(x: Variant, y: Variant): Boolean =
       (x, y) match
-        case (a @ Grouped(_, _, _, _, _), b @ Grouped(_, _, _, _, _))       => a === b
-        case (a @ Interleaved(_), b @ Interleaved(_))                       => a === b
-        case (a @ PreImaging(_, _, _, _, _), b @ PreImaging(_, _, _, _, _)) => a === b
-        case _                                                              => false
-
-  given [A]: Functor[Variant] with
-    def map[A, B](fa: Variant[A])(f: A => B): Variant[B] =
-      fa match
-        case Grouped(filters, order, offsets, skyCount, skyOffsets)  =>
-          Grouped(filters.map(f), order, offsets, skyCount, skyOffsets)
-        case Interleaved(filters)                                    =>
-          Interleaved(filters.map(f))
-        case PreImaging(filters, offset1, offset2, offset3, offset4) =>
-          PreImaging(filters.map(f), offset1, offset2, offset3, offset4)
+        case (a @ Grouped(_, _, _, _),    b @ Grouped(_, _, _, _))    => a === b
+        case (a @ Interleaved(_, _, _),   b @ Interleaved(_, _, _))   => a === b
+        case (a @ PreImaging(_, _, _, _), b @ PreImaging(_, _, _, _)) => a === b
+        case _                                                        => false

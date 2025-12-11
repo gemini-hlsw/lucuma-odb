@@ -56,43 +56,55 @@ trait ArbGmosImagingInput:
       fs <- arbitrary[List[A]]
     yield NonEmptyList.fromListUnsafe(f1 :: fs).distinctBy(f)
 
-  def genGrouped[A: Arbitrary, L: Order](f: A => L): Gen[Variant.Grouped[A]] =
-    for
-      fs <- genFilterList[A, L](f)
-      wo <- arbitrary[WavelengthOrder]
-      of <- arbitrary[OffsetGenerator]
-      sc <- Gen.choose(0, 100).map(NonNegInt.unsafeFrom)
-      so <- arbitrary[OffsetGenerator]
-    yield Variant.Grouped(fs, wo, of, sc, so)
+  given arbVariantGrouped: Arbitrary[Variant.Grouped] =
+    Arbitrary:
+      for
+        wo <- arbitrary[WavelengthOrder]
+        of <- arbitrary[OffsetGenerator]
+        sc <- Gen.choose(0, 100).map(NonNegInt.unsafeFrom)
+        so <- arbitrary[OffsetGenerator]
+      yield Variant.Grouped(wo, of, sc, so)
 
-  def genInterleaved[A: Arbitrary, L: Order](f: A => L): Gen[Variant.Interleaved[A]] =
-    genFilterList[A, L](f).map(Variant.Interleaved.apply)
+  given arbVariantInterleaved: Arbitrary[Variant.Interleaved] =
+    Arbitrary:
+      for
+        of <- arbitrary[OffsetGenerator]
+        sc <- Gen.choose(0, 100).map(NonNegInt.unsafeFrom)
+        so <- arbitrary[OffsetGenerator]
+      yield Variant.Interleaved(of, sc, so)
 
-  def genPreImaging[A: Arbitrary, L: Order](f: A => L): Gen[Variant.PreImaging[A]] =
-    for
-      fs <- genFilterList[A, L](f)
-      o1 <- arbitrary[Offset]
-      o2 <- arbitrary[Offset]
-      o3 <- arbitrary[Offset]
-      o4 <- arbitrary[Offset]
-    yield Variant.PreImaging(fs, o1, o2, o3, o4)
+  given arbVariantPreImaging: Arbitrary[Variant.PreImaging] =
+    Arbitrary:
+      for
+        o1 <- arbitrary[Offset]
+        o2 <- arbitrary[Offset]
+        o3 <- arbitrary[Offset]
+        o4 <- arbitrary[Offset]
+      yield Variant.PreImaging(o1, o2, o3, o4)
 
-  def genVariant[A: Arbitrary, L: Order](f: A => L): Gen[Variant[A]] =
-    Gen.oneOf(genGrouped(f), genInterleaved(f), genPreImaging(f))
+  given Arbitrary[Variant] =
+    Arbitrary:
+      Gen.oneOf(
+        arbitrary[Variant.Grouped](using arbVariantGrouped),
+        arbitrary[Variant.Interleaved](using arbVariantInterleaved),
+        arbitrary[Variant.PreImaging](using arbVariantPreImaging)
+      )
 
   given Arbitrary[GmosImagingInput.Create.North] =
     Arbitrary:
       for
-        v <- genVariant[GmosImagingFilterInput[GmosNorthFilter], GmosNorthFilter](_.filter)
+        v <- arbitrary[Variant]
+        f <- genFilterList[GmosImagingFilterInput[GmosNorthFilter], GmosNorthFilter](_.filter)
         c <- arbitrary[GmosImagingInput.Create.Common]
-      yield GmosImagingInput.Create(v, c)
+      yield GmosImagingInput.Create(v, f, c)
 
   given Arbitrary[GmosImagingInput.Create.South] =
     Arbitrary:
       for
-        v <- genVariant[GmosImagingFilterInput[GmosSouthFilter], GmosSouthFilter](_.filter)
+        v <- arbitrary[Variant]
+        f <- genFilterList[GmosImagingFilterInput[GmosSouthFilter], GmosSouthFilter](_.filter)
         c <- arbitrary[GmosImagingInput.Create.Common]
-      yield GmosImagingInput.Create(v, c)
+      yield GmosImagingInput.Create(v, f, c)
 
   given arbEditCommon: Arbitrary[GmosImagingInput.Edit.Common] =
     Arbitrary:
@@ -103,42 +115,54 @@ trait ArbGmosImagingInput:
         r <- arbitrary[Nullable[GmosRoi]]
       yield GmosImagingInput.Edit.Common(b, m, g, r)
 
-  def genGroupedInput[A: Arbitrary, L: Order](f: A => L): Gen[GmosImagingVariantInput[A]] =
-    for
-      fs <- Gen.option(genFilterList[A, L](f))
-      wo <- arbitrary[Option[WavelengthOrder]]
-      of <- arbitrary[Nullable[OffsetGenerator]]
-      sc <- Gen.option(Gen.choose(0, 100).map(NonNegInt.unsafeFrom))
-      so <- arbitrary[Nullable[OffsetGenerator]]
-    yield GmosImagingVariantInput.Grouped(fs, wo, of, sc, so)
+  given arbVariantInputGrouped: Arbitrary[GmosImagingVariantInput.Grouped] =
+    Arbitrary:
+      for
+        wo <- arbitrary[Option[WavelengthOrder]]
+        of <- arbitrary[Nullable[OffsetGenerator]]
+        sc <- Gen.option(Gen.choose(0, 100).map(NonNegInt.unsafeFrom))
+        so <- arbitrary[Nullable[OffsetGenerator]]
+      yield GmosImagingVariantInput.Grouped(wo, of, sc, so)
 
-  def genInterleavedInput[A: Arbitrary, L: Order](f: A => L): Gen[GmosImagingVariantInput[A]] =
-      Gen.option(genFilterList[A, L](f)).map(GmosImagingVariantInput.Interleaved.apply)
+  given arbVariantInputInterleaved: Arbitrary[GmosImagingVariantInput.Interleaved] =
+    Arbitrary:
+      for
+        of <- arbitrary[Nullable[OffsetGenerator]]
+        sc <- Gen.option(Gen.choose(0, 100).map(NonNegInt.unsafeFrom))
+        so <- arbitrary[Nullable[OffsetGenerator]]
+      yield GmosImagingVariantInput.Interleaved(of, sc, so)
 
-  def genPreImagingInput[A: Arbitrary, L: Order](f: A => L): Gen[GmosImagingVariantInput[A]] =
-    for
-      fs <- Gen.option(genFilterList[A, L](f))
-      o1 <- arbitrary[Option[Offset]]
-      o2 <- arbitrary[Option[Offset]]
-      o3 <- arbitrary[Option[Offset]]
-      o4 <- arbitrary[Option[Offset]]
-    yield GmosImagingVariantInput.PreImaging(fs, o1, o2, o3, o4)
+  given arbVariantInputPreImaging: Arbitrary[GmosImagingVariantInput.PreImaging] =
+    Arbitrary:
+      for
+        o1 <- arbitrary[Option[Offset]]
+        o2 <- arbitrary[Option[Offset]]
+        o3 <- arbitrary[Option[Offset]]
+        o4 <- arbitrary[Option[Offset]]
+      yield GmosImagingVariantInput.PreImaging(o1, o2, o3, o4)
 
-  def genVariantInput[A: Arbitrary, L: Order](f: A => L): Gen[GmosImagingVariantInput[A]] =
-    Gen.oneOf(genGroupedInput(f), genInterleavedInput(f), genPreImagingInput(f))
+  given Arbitrary[GmosImagingVariantInput] =
+    Arbitrary:
+      Gen.oneOf(
+        arbitrary[GmosImagingVariantInput.Grouped](using arbVariantInputGrouped),
+        arbitrary[GmosImagingVariantInput.Interleaved](using arbVariantInputInterleaved),
+        arbitrary[GmosImagingVariantInput.PreImaging](using arbVariantInputPreImaging)
+      )
 
   given arbEditCommonN: Arbitrary[GmosImagingInput.Edit.North] =
     Arbitrary:
       for
-        v <- Gen.option(genVariantInput[GmosImagingFilterInput[GmosNorthFilter], GmosNorthFilter](_.filter))
+        v <- arbitrary[Option[GmosImagingVariantInput]]
+        f <- Gen.option(genFilterList[GmosImagingFilterInput[GmosNorthFilter], GmosNorthFilter](_.filter))
         c <- arbitrary[GmosImagingInput.Edit.Common]
-      yield GmosImagingInput.Edit(v, c)
+      yield GmosImagingInput.Edit(v, f, c)
 
   given arbEditCommonS: Arbitrary[GmosImagingInput.Edit.South] =
     Arbitrary:
       for
-        v <- Gen.option(genVariantInput[GmosImagingFilterInput[GmosSouthFilter], GmosSouthFilter](_.filter))
+        v <- arbitrary[Option[GmosImagingVariantInput]]
+        f <- Gen.option(genFilterList[GmosImagingFilterInput[GmosSouthFilter], GmosSouthFilter](_.filter))
         c <- arbitrary[GmosImagingInput.Edit.Common]
-      yield GmosImagingInput.Edit(v, c)
+      yield GmosImagingInput.Edit(v, f, c)
 
 object ArbGmosImagingInput extends ArbGmosImagingInput

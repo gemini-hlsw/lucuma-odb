@@ -6,20 +6,20 @@ package lucuma.odb.service
 import cats.data.NonEmptyList
 import cats.effect.Concurrent
 import cats.syntax.all.*
+import eu.timepit.refined.types.numeric.NonNegInt
 import grackle.Result
 import grackle.ResultT
 import grackle.syntax.*
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosSouthFilter
 import lucuma.core.enums.Site
+import lucuma.core.math.Offset
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.Observation
 import lucuma.odb.data.ExposureTimeModeId
 import lucuma.odb.data.ExposureTimeModeRole
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.ObservingModeRowVersion
-import lucuma.odb.data.OdbError
-import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.data.OffsetGeneratorRole
 import lucuma.odb.data.WavelengthOrder
 import lucuma.odb.graphql.input.GmosImagingFilterInput
@@ -121,44 +121,43 @@ object GmosImagingService:
       override def selectNorth(
         which: List[Observation.Id]
       ): F[Map[Observation.Id, Config.GmosNorth]] =
-        select(Site.GN, which, Statements.north).map: m =>
-          m.view.mapValues((v, c) => Config.GmosNorth(v, c)).toMap
+        select(Site.GN, which, _gmos_north_filter).map: m =>
+          m.view.mapValues((fs, v, c) => Config.GmosNorth(v, fs, c)).toMap
 
       override def selectSouth(
         which: List[Observation.Id]
       ): F[Map[Observation.Id, Config.GmosSouth]] =
-        select(Site.GS, which, Statements.south).map: m =>
-          m.view.mapValues((v, c) => Config.GmosSouth(v, c)).toMap
+        select(Site.GS, which, _gmos_south_filter).map: m =>
+          m.view.mapValues((fs, v, c) => Config.GmosSouth(v, fs, c)).toMap
 
-      private def select[A](
+      private def select[L](
         site:    Site,
         which:   List[Observation.Id],
-        decoder: Decoder[(Variant.Fields[A], Config.Common)]
-      ): F[Map[Observation.Id, (Variant[A], Config.Common)]] =
+        filters: Codec[Arr[L]]
+      ): F[Map[Observation.Id, (NonEmptyList[L], Variant, Config.Common)]] =
         NonEmptyList
           .fromList(which)
-          .fold(Map.empty[Observation.Id, (Variant[A], Config.Common)].pure[F]): oids =>
+          .fold(Map.empty[Observation.Id, (NonEmptyList[L], Variant, Config.Common)].pure[F]): oids =>
 
-            val fieldMap =
+            val decoder: Decoder[(NonEmptyList[L], Variant.Fields, Config.Common)] =
+              Statements.filters(filters) *: Statements.variant_fields *: Statements.common
+
+            val precursorMap =
               val af = Statements.select(modeViewName(site), oids)
               session.prepareR(af.fragment.query(observation_id *: decoder)).use: pq =>
                 pq.stream(af.argument, chunkSize = 1024)
                   .compile
                   .toList
-                  .map: lst =>
-                    lst
-                      .map: (oid, fields, common) =>
-                        oid -> (fields, common)
-                      .toMap
+                  .map(_.map((oid, fs, variantFields, common) => oid -> (fs, variantFields, common)).toMap)
 
             for
-              f <- fieldMap
+              c <- precursorMap
               o <- services.offsetGeneratorService.select(oids, OffsetGeneratorRole.Object)
               s <- services.offsetGeneratorService.select(oids, OffsetGeneratorRole.Sky)
-            yield f.view.map { case (oid, (fields, common)) =>
+            yield c.view.map { case (oid, (fs, variantFields, common)) =>
               val og = o.getOrElse(oid, OffsetGenerator.NoGenerator)
               val sg = s.getOrElse(oid, OffsetGenerator.NoGenerator)
-              oid -> (fields.toVariant(og, sg), common)
+              oid -> (fs, variantFields.toVariant(og, sg), common)
             }.toMap
 
       override def selectNorthSeeds(
@@ -213,7 +212,7 @@ object GmosImagingService:
               _   <- ResultT.liftF(session.exec(Statements.insert(modeTableName(site), input, oids)))
 
               // Resolve the exposure time modes for acquisition and science
-              r   <- ResultT(services.exposureTimeModeService.resolve(modeName, none, input.variant.filters.map(f => (f.filter, f.exposureTimeMode)), reqEtm, which))
+              r   <- ResultT(services.exposureTimeModeService.resolve(modeName, none, input.filters.map(f => (f.filter, f.exposureTimeMode)), reqEtm, which))
 
               // Insert the acquisition and science filters (initial / immutable version)
               ids <- ResultT.liftF(services.exposureTimeModeService.insertResolvedAcquisitionAndScience(r))
@@ -311,7 +310,7 @@ object GmosImagingService:
                     observationIdIn(oids)
 
           val filterUpdates =
-            edit.variant.flatMap(_.filters).fold(ResultT.unit): fs =>
+            edit.filters.fold(ResultT.unit): fs =>
               for
                 _ <- ResultT.liftF(session.exec(Statements.deleteCurrentFiltersAndEtms(filterTableName(site), oids)))
 
@@ -325,34 +324,38 @@ object GmosImagingService:
               yield ()
 
           def updateOffsetForRole(
-            input: Nullable[OffsetGenerator],
-            role:  OffsetGeneratorRole
+            input:   Nullable[OffsetGenerator],
+            variant: VariantType,
+            role:    OffsetGeneratorRole
           ): F[Unit] =
-            input.toOptionOption.fold(Concurrent[F].unit): in =>
+            input.toOptionOption.fold(
+              // the offset generator field was Absent, which means we should
+              // default it to no generator when switching variants.
+              session.exec(
+                Statements.deleteOffsetGeneratorWhenNotMatchingVariant(
+                  modeTableName(site),
+                  oids,
+                  variant,
+                  role
+                )
+              )
+            ): in =>
               services.offsetGeneratorService.replace(oids, in, role)
 
           val offsetUpdates =
             edit.variant.fold(().pure[F]): v =>
               val (o, s) = v match
-                case GmosImagingVariantInput.Grouped(_, _, offsets, _, skyOffsets) => (offsets, skyOffsets)
-                case _                                                             => (Nullable.Null, Nullable.Null)
+                case GmosImagingVariantInput.Grouped(_, offsets, _, skyOffsets)  => (offsets, skyOffsets)
+                case GmosImagingVariantInput.Interleaved(offsets, _, skyOffsets) => (offsets, skyOffsets)
+                case _                                                           => (Nullable.Null, Nullable.Null)
 
-              updateOffsetForRole(o, OffsetGeneratorRole.Object) *>
-              updateOffsetForRole(s, OffsetGeneratorRole.Sky)
-
-          // If we are updating the variant, and if filters are not specified,
-          // then we need to ensure that all the observations are already using
-          // this variant.  Filters are always required so we cannot switch
-          // variants without requiring filters.
-          val variantValidation: ResultT[F, Unit] =
-            edit.variant.flatMap(_.validate).fold(ResultT.unit): vt =>
-              ResultT(validateVariantUpdate(vt, site, oids))
+              updateOffsetForRole(o, v.variantType, OffsetGeneratorRole.Object) *>
+              updateOffsetForRole(s, v.variantType, OffsetGeneratorRole.Sky)
 
           (for
-            _ <- variantValidation
+            _ <- ResultT.liftF(offsetUpdates)
             _ <- ResultT.liftF(modeUpdates)
             _ <- filterUpdates
-            _ <- ResultT.liftF(offsetUpdates)
           yield ()).value
 
       override def cloneNorth(
@@ -379,24 +382,24 @@ object GmosImagingService:
         session.exec(Statements.cloneFiltersAndEtms(filterTableName(site), observationId, newObservationId, etms)) *>
         services.offsetGeneratorService.clone(observationId, newObservationId)
 
-      private def validateVariantUpdate(
-        selectedVariant: VariantType,
-        site:            Site,
-        oids:            NonEmptyList[Observation.Id]
-      ): F[Result[Unit]] =
-        val af = Statements.selectObservationsNotMatchingVariant(selectedVariant, modeTableName(site), oids)
-        session.prepareR(af.fragment.query(observation_id)).use: pq =>
-          pq.stream(af.argument, chunkSize = 1024)
-            .compile
-            .toList
-            .map: lst =>
-              if lst.isEmpty then
-                ().success
-              else
-                val obsList = if lst.sizeIs >= 5 then lst.take(5).mkString("", ", ", " ...") else lst.mkString(", ")
-                OdbError.InvalidArgument(s"Filters are required when switching to GMOS ${siteName(site).capitalize} imaging ${selectedVariant.display}. Observations whose variant would change: $obsList".some).asFailure
-
   object Statements:
+
+    def filters[L](_filter_codec: Codec[Arr[L]]): Decoder[NonEmptyList[L]] =
+      _filter_codec.emap: fs =>
+        Either.fromOption(
+          NonEmptyList.fromList(fs.toList),
+          "Filters list cannot be empty"
+        )
+
+    val variant_fields: Decoder[Variant.Fields] =
+      (gmos_imaging_variant *:
+       wavelength_order     *:
+       int4_nonneg          *:
+       offset               *:
+       offset               *:
+       offset               *:
+       offset
+      ).to[Variant.Fields]
 
     val common: Decoder[Config.Common] =
       (
@@ -405,31 +408,7 @@ object GmosImagingService:
         gmos_amp_read_mode.opt    *:
         gmos_amp_gain.opt         *:
         gmos_roi.opt
-      ).map: (defaultBin, explicitBin, arm, ag, roi) =>
-        Config.Common(defaultBin, explicitBin, arm, ag, roi)
-
-    def variantFields[L](
-      _filter_codec: Codec[Arr[L]]
-    ): Decoder[Variant.Fields[L]] =
-      (gmos_imaging_variant *:
-       _filter_codec        *:
-       wavelength_order     *:
-       int4_nonneg          *:
-       offset               *:
-       offset               *:
-       offset               *:
-       offset
-      ).emap { case (t, fs, w, sc, o1, o2, o3, o4) =>
-        NonEmptyList.fromList(fs.toList).fold(
-          "Filters list cannot  be empty".asLeft
-        )(fs => Variant.Fields(t, fs, w, sc, o1, o2, o3, o4).asRight)
-      }
-
-    val north: Decoder[(Variant.Fields[GmosNorthFilter], Config.Common)] =
-      variantFields(_gmos_north_filter) *: common
-
-    val south: Decoder[(Variant.Fields[GmosSouthFilter], Config.Common)] =
-      variantFields(_gmos_south_filter) *: common
+      ).to[Config.Common]
 
     def select(
       viewName: String,
@@ -438,8 +417,8 @@ object GmosImagingService:
       sql"""
         SELECT
           c_observation_id,
-          c_variant,
           c_filters,
+          c_variant,
           c_wavelength_order,
           c_sky_count,
           c_pre_imaging_off1_p,
@@ -458,6 +437,21 @@ object GmosImagingService:
         FROM #$viewName
         WHERE
       """(Void) |+| observationIdIn(oids)
+
+    def deleteOffsetGeneratorWhenNotMatchingVariant(
+      tableName: String,
+      which:     NonEmptyList[Observation.Id],
+      variant:   VariantType,
+      role:      OffsetGeneratorRole
+    ): AppliedFragment =
+      sql"""
+        DELETE FROM t_offset_generator AS og
+        USING #$tableName AS img
+        WHERE og.c_observation_id = img.c_observation_id
+          AND og.c_role = $offset_generator_role
+          AND og.c_observation_id IN ${observation_id.list(which.length).values}
+          AND img.c_variant <> $gmos_imaging_variant
+      """.apply(role, which.toList, variant)
 
     def selectObservationsNotMatchingVariant(
       variantType: VariantType,
@@ -516,12 +510,12 @@ object GmosImagingService:
             input.common.explicitAmpGain,
             input.common.explicitRoi,
             input.variant.variantType,
-            input.variant.toGrouped.order,
-            input.variant.toGrouped.skyCount,
-            input.variant.toPreImaging.offset1,
-            input.variant.toPreImaging.offset2,
-            input.variant.toPreImaging.offset3,
-            input.variant.toPreImaging.offset4,
+            input.variant.grouped.map(_.order).getOrElse(Variant.Grouped.Default.order),
+            input.variant.grouped.map(_.skyCount).orElse(input.variant.interleaved.map(_.skyCount)).getOrElse(NonNegInt.MinValue),
+            input.variant.preImaging.map(_.offset1).getOrElse(Offset.Zero),
+            input.variant.preImaging.map(_.offset2).getOrElse(Offset.Zero),
+            input.variant.preImaging.map(_.offset3).getOrElse(Offset.Zero),
+            input.variant.preImaging.map(_.offset4).getOrElse(Offset.Zero)
           )
 
       sql"""
@@ -649,31 +643,53 @@ object GmosImagingService:
         input.explicitRoi.toOptionOption.map(upRoi)
       ).flatten
 
-    def variantUpdates[L](
-      input: GmosImagingVariantInput[L]
+    def variantUpdates(
+      input: GmosImagingVariantInput
     ): List[AppliedFragment] =
-      val upVariant    = sql"c_variant = ${gmos_imaging_variant}"
-      val dummyFilters = NonEmptyList.one(0)
+      val upVariant  = sql"c_variant   = $gmos_imaging_variant"
+
+      def upSkyCount(variant: VariantType, skyCount: Option[NonNegInt]): AppliedFragment =
+        (variant, skyCount) match
+          case (VariantType.PreImaging, _) =>
+            sql"c_sky_count = $int4_nonneg"(NonNegInt.MinValue)
+
+          case (v, None)                   =>
+            sql"""
+              c_sky_count =
+                CASE
+                  WHEN c_variant = $gmos_imaging_variant THEN c_sky_count
+                  ELSE $int4_nonneg
+                END
+            """.apply(v, NonNegInt.MinValue)
+
+          case (v, Some(sc))               =>
+            sql"""
+              c_sky_count =
+                CASE
+                  WHEN c_variant = $gmos_imaging_variant THEN $int4_nonneg
+                  ELSE $int4_nonneg
+                END
+            """.apply(v, sc, NonNegInt.MinValue)
 
       def grouped: List[AppliedFragment] =
-        val upOrder    = sql"c_wavelength_order = ${wavelength_order}"
-        val upSkyCount = sql"c_sky_count        = ${int4_nonneg}"
+        val upOrder = sql"c_wavelength_order = ${wavelength_order}"
 
         input match
-          case GmosImagingVariantInput.Grouped(_, order, _, skyCount, _) =>
+          case GmosImagingVariantInput.Grouped(order, _, skyCount, _) =>
             List(
-              upVariant(VariantType.Grouped).some,
-              order.map(upOrder),
-              skyCount.map(upSkyCount)
-            ).flatten
+              upVariant(VariantType.Grouped),
+              upSkyCount(VariantType.Grouped, skyCount)
+            ) ++ order.map(upOrder).toList
           case _                                                         =>
-            val zero = Variant.Grouped.default(dummyFilters)
-            List(upOrder(zero.order), upSkyCount(zero.skyCount))
+            List(upOrder(Variant.Grouped.Default.order))
 
       def interleaved: List[AppliedFragment] =
         input match
-          case GmosImagingVariantInput.Interleaved(_) =>
-            List(upVariant(VariantType.Interleaved))
+          case GmosImagingVariantInput.Interleaved(_, skyCount, _) =>
+            List(
+              upVariant(VariantType.Interleaved),
+              upSkyCount(VariantType.Interleaved, skyCount)
+            )
           case _                                      =>
             Nil
 
@@ -688,8 +704,8 @@ object GmosImagingService:
         val upPre4q = sql"c_pre_imaging_off4_q = ${angle_µas}"
 
         input match
-          case GmosImagingVariantInput.PreImaging(_, o1, o2, o3, o4) =>
-            List(
+          case GmosImagingVariantInput.PreImaging(o1, o2, o3, o4) =>
+            upSkyCount(VariantType.PreImaging, None) :: List(
               upVariant(VariantType.PreImaging).some,
               o1.map(o => upPre1p(o.p.toAngle)),
               o1.map(o => upPre1q(o.q.toAngle)),
@@ -701,7 +717,7 @@ object GmosImagingService:
               o4.map(o => upPre4q(o.q.toAngle))
             ).flatten
           case _                                                     =>
-            val zero = Variant.PreImaging.default(dummyFilters)
+            val zero = Variant.PreImaging.Default
             List(
               upPre1p(zero.offset1.p.toAngle),
               upPre1q(zero.offset1.q.toAngle),
