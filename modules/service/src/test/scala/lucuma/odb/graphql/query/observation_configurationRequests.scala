@@ -66,9 +66,9 @@ class observation_configurationRequests
           gmos${site}Imaging: {
             variant: {
               interleaved: {
-                filters: ${fs.mkString("[", ",\n", "]")}
               }
             }
+            filters: ${fs.mkString("[", ",\n", "]")}
           }
         }
       """
