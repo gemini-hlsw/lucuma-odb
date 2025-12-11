@@ -57,3 +57,6 @@ grep -v pg_catalog.set_config /tmp/$HEROKU_APP.temp > /tmp/$HEROKU_APP.sql
 
 echo "🍏 Restoring dump to local database."
 psql -h $PG_HOST -U $PG_USER -d $PG_DATABASE < /tmp/$HEROKU_APP.sql > /dev/null 2>&1
+
+echo "🍏 Fixing program references (temporary, hopefully)."
+psql -h $PG_HOST -U $PG_USER -d $PG_DATABASE -c 'update t_program set c_program_id = c_program_id' > /dev/null 2>&1
