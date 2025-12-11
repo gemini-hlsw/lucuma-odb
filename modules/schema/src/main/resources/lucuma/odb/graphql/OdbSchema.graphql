@@ -9160,8 +9160,13 @@ options null.
 type GmosImagingVariant {
   variantType: GmosImagingVariantType!
 
+  "Grouped mode collects all datasets for each filter before changing filters."
   grouped:     GmosGroupedImagingVariant
+
+  "Interleaved mode cycles through all filters repeatedly."
   interleaved: GmosInterleavedImagingVariant
+
+  "PreImaging mode is used for MOS mask creation."
   preImaging:  GmosPreImagingVariant
 }
 
@@ -9171,8 +9176,14 @@ details.  Exactly one of the options should be defined and the other two left
 unspecified.
 """
 input GmosImagingVariantInput @oneOf {
+
+  "Grouped mode collects all datasets for each filter before changing filters."
   grouped:     GmosGroupedImagingVariantInput
+
+  "Interleaved mode cycles through all filters repeatedly."
   interleaved: GmosInterleavedImagingVariantInput
+
+  "PreImaging mode is used for MOS mask creation."
   preImaging:  GmosPreImagingVariantInput
 }
 
@@ -9257,7 +9268,8 @@ type GmosInterleavedImagingVariant {
 
   """
   Number of sky positions to collect, per filter, before and after a series of
-  object datasets.
+  object datasets.  For example, if set to 2 and 2 filters are in use, there
+  would be 4 sky positions before (2 per filter) and 4 after (2 per filter).
   """
   skyCount: NonNegInt!
 
@@ -9287,7 +9299,8 @@ input GmosInterleavedImagingVariantInput {
 
   """
   Offset generator to use for sky positions.  If not specified, no offsets will
-  be used.
+  be used.  When specifying an offset generator, the skyCount should be set to
+  a value greater than 0.
   """
   skyOffsets: OffsetGeneratorInput
 
