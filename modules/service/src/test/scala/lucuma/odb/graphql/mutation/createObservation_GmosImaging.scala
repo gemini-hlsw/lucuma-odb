@@ -56,10 +56,17 @@ class createObservation_GmosImaging extends OdbSuite:
                   gmosNorthImaging {
                     variant {
                       interleaved {
-                        filters {
-                          filter
+                        offsets {
+                          generatorType
+                        }
+                        skyCount
+                        skyOffsets {
+                          generatorType
                         }
                       }
+                    }
+                    filters {
+                      filter
                     }
                     bin
                     ampReadMode
@@ -76,12 +83,15 @@ class createObservation_GmosImaging extends OdbSuite:
                   "gmosNorthImaging": {
                     "variant": {
                       "interleaved": {
-                        "filters": [
-                          { "filter": "G_PRIME" },
-                          { "filter": "R_PRIME" }
-                        ]
+                        "offsets": null,
+                        "skyCount": 1,
+                        "skyOffsets": null
                       }
                     },
+                    "filters": [
+                      { "filter": "G_PRIME" },
+                      { "filter": "R_PRIME" }
+                    ],
                     "bin": "TWO",
                     "ampReadMode": "SLOW",
                     "ampGain": "LOW",
@@ -125,11 +135,10 @@ class createObservation_GmosImaging extends OdbSuite:
                   gmosNorthImaging {
                     variant {
                       interleaved {
-                        filters {
-                          filter
-                        }
+                        skyCount
                       }
                     }
+                    filters { filter }
                     bin
                     ampReadMode
                     ampGain
@@ -145,12 +154,13 @@ class createObservation_GmosImaging extends OdbSuite:
                   "gmosNorthImaging": {
                     "variant": {
                       "interleaved": {
-                        "filters": [
-                          { "filter": "G_PRIME" },
-                          { "filter": "R_PRIME" }
-                        ]
+                        "skyCount": 1
                       }
                     },
+                    "filters": [
+                      { "filter": "G_PRIME" },
+                      { "filter": "R_PRIME" }
+                    ],
                     "bin": "ONE",
                     "ampReadMode": "SLOW",
                     "ampGain": "LOW",
@@ -172,10 +182,11 @@ class createObservation_GmosImaging extends OdbSuite:
                   gmosSouthImaging {
                     variant {
                       interleaved {
-                        filters {
-                          filter
-                        }
+                        skyCount
                       }
+                    }
+                    filters {
+                      filter
                     }
                     bin
                     ampReadMode
@@ -192,16 +203,17 @@ class createObservation_GmosImaging extends OdbSuite:
                   "gmosSouthImaging": {
                     "variant": {
                       "interleaved": {
-                        "filters": [
-                          {
-                            "filter": "G_PRIME"
-                          },
-                          {
-                            "filter": "R_PRIME"
-                          }
-                        ]
+                        "skyCount": 1
                       }
                     },
+                    "filters": [
+                      {
+                        "filter": "G_PRIME"
+                      },
+                      {
+                        "filter": "R_PRIME"
+                      }
+                    ],
                     "bin": "TWO",
                     "ampReadMode": "SLOW",
                     "ampGain": "LOW",
@@ -275,9 +287,9 @@ class createObservation_GmosImaging extends OdbSuite:
                   gmosNorthImaging: {
                     variant: {
                       interleaved: {
-                        filters: []
                       }
                     }
+                    filters: []
                   }
                 }
               }
@@ -285,19 +297,13 @@ class createObservation_GmosImaging extends OdbSuite:
               observation {
                 observingMode {
                   gmosNorthImaging {
-                    variant {
-                      interleaved {
-                        filters {
-                          filter
-                        }
-                      }
-                    }
+                    filters { filter }
                   }
                 }
               }
             }
           }
-        """, List("Argument 'input.SET.observingMode.gmosNorthImaging.variant.interleaved' is invalid: At least one filter must be specified for GMOS imaging observations.").asLeft)
+        """, List("Argument 'input.SET.observingMode.gmosNorthImaging' is invalid: At least one filter must be specified for GMOS imaging observations.").asLeft)
 
   test("cannot create GMOS South with empty filters"):
     createProgramAs(pi).flatMap: pid =>
@@ -322,9 +328,9 @@ class createObservation_GmosImaging extends OdbSuite:
                   gmosSouthImaging: {
                     variant: {
                       interleaved: {
-                        filters: []
                       }
                     }
+                    filters: []
                   }
                 }
               }
@@ -332,19 +338,13 @@ class createObservation_GmosImaging extends OdbSuite:
               observation {
                 observingMode {
                   gmosSouthImaging {
-                    variant {
-                      interleaved {
-                        filters {
-                          filter
-                        }
-                      }
-                    }
+                    filters { filter }
                   }
                 }
               }
             }
           }
-        """, List("Argument 'input.SET.observingMode.gmosSouthImaging.variant.interleaved' is invalid: At least one filter must be specified for GMOS imaging observations.").asLeft)
+        """, List("Argument 'input.SET.observingMode.gmosSouthImaging' is invalid: At least one filter must be specified for GMOS imaging observations.").asLeft)
 
   private def gmosImagingFilterTest(
     reqEtm:    Option[Int],
@@ -387,18 +387,18 @@ class createObservation_GmosImaging extends OdbSuite:
                   gmosNorthImaging: {
                     variant: {
                       interleaved: {
-                        filters: [
-                          {
-                            filter: G_PRIME
-                            ${etmInput(gEtm)}
-                          },
-                          {
-                            filter: R_PRIME
-                            ${etmInput(rEtm)}
-                          }
-                        ]
                       }
                     }
+                    filters: [
+                      {
+                        filter: G_PRIME
+                        ${etmInput(gEtm)}
+                      },
+                      {
+                        filter: R_PRIME
+                        ${etmInput(rEtm)}
+                      }
+                    ]
                   }
                 }
               }
@@ -406,16 +406,12 @@ class createObservation_GmosImaging extends OdbSuite:
               observation {
                 observingMode {
                   gmosNorthImaging {
-                    variant {
-                      interleaved {
-                        filters {
-                          filter
-                          exposureTimeMode {
-                            signalToNoise {
-                              value
-                              at { nanometers }
-                            }
-                          }
+                    filters {
+                      filter
+                      exposureTimeMode {
+                        signalToNoise {
+                          value
+                          at { nanometers }
                         }
                       }
                     }
@@ -439,14 +435,10 @@ class createObservation_GmosImaging extends OdbSuite:
               "observation": {
                 "observingMode": {
                   "gmosNorthImaging": {
-                    "variant": {
-                      "interleaved": {
-                        "filters": [
-                          ${gExpected},
-                          ${rExpected}
-                        ]
-                      }
-                    },
+                    "filters": [
+                      ${gExpected},
+                      ${rExpected}
+                    ],
                     "initialFilters": [
                       ${gExpected},
                       ${rExpected}
@@ -575,10 +567,6 @@ class createObservation_GmosImaging extends OdbSuite:
                   gmosSouthImaging: {
                     variant: {
                       grouped: {
-                        filters: [
-                          { filter: G_PRIME },
-                          { filter: R_PRIME }
-                        ]
                         offsets: {
                           uniform: {
                             cornerA: {
@@ -602,6 +590,10 @@ class createObservation_GmosImaging extends OdbSuite:
                         }
                       }
                     }
+                    filters: [
+                      { filter: G_PRIME },
+                      { filter: R_PRIME }
+                    ]
                   }
                 }
               }
@@ -730,10 +722,6 @@ class createObservation_GmosImaging extends OdbSuite:
                     gmosSouthImaging: {
                       variant: {
                         grouped: {
-                          filters: [
-                            { filter: G_PRIME },
-                            { filter: R_PRIME }
-                          ]
                           offsets: {
                             enumerated: {
                               values: [
@@ -769,6 +757,10 @@ class createObservation_GmosImaging extends OdbSuite:
                           }
                         }
                       }
+                      filters: [
+                        { filter: G_PRIME },
+                        { filter: R_PRIME }
+                      ]
                     }
                   }
                 }
@@ -893,10 +885,6 @@ class createObservation_GmosImaging extends OdbSuite:
                   gmosSouthImaging: {
                     variant: {
                       grouped: {
-                        filters: [
-                          { filter: G_PRIME },
-                          { filter: R_PRIME }
-                        ]
                         offsets: {
                           spiral: {
                             size: { arcseconds: 14.0 }
@@ -904,6 +892,10 @@ class createObservation_GmosImaging extends OdbSuite:
                         }
                       }
                     }
+                    filters: [
+                      { filter: G_PRIME },
+                      { filter: R_PRIME }
+                    ]
                   }
                 }
               }
@@ -987,10 +979,6 @@ class createObservation_GmosImaging extends OdbSuite:
                   gmosSouthImaging: {
                     variant: {
                       preImaging: {
-                        filters: [
-                          { filter: G_PRIME },
-                          { filter: R_PRIME }
-                        ],
                         offset1: {
                           p: { arcseconds: 0 }
                           q: { arcseconds: 1 }
@@ -1009,6 +997,10 @@ class createObservation_GmosImaging extends OdbSuite:
                         }
                       }
                     }
+                    filters: [
+                      { filter: G_PRIME },
+                      { filter: R_PRIME }
+                    ]
                   }
                 }
               }

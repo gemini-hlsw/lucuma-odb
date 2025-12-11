@@ -5,6 +5,7 @@ package lucuma.odb.sequence
 package gmos.imaging
 
 import cats.Eq
+import cats.data.NonEmptyList
 import lucuma.core.enums.GmosAmpCount
 import lucuma.core.enums.GmosAmpGain
 import lucuma.core.enums.GmosAmpReadMode
@@ -24,11 +25,12 @@ import java.io.DataOutputStream
 
 /**
  * Configuration for the GMOS Imaging science mode.
- * @tparam L filter type
  */
 sealed trait Config[L: Enumerated]:
 
-  def variant: Variant[L]
+  def variant: Variant
+
+  def filters: NonEmptyList[L]
 
   def bin: GmosBinning =
     explicitBin.getOrElse(defaultBin)
@@ -66,6 +68,7 @@ sealed trait Config[L: Enumerated]:
     val out: DataOutputStream      = new DataOutputStream(bao)
 
     out.write(variant.hashBytes)
+    out.write(filters.hashBytes)
     out.writeChars(bin.tag)
     out.writeChars(ampGain.tag)
     out.writeChars(ampReadMode.tag)
@@ -101,7 +104,8 @@ object Config:
         )
 
   final case class GmosNorth (
-    variant: Variant[GmosNorthFilter],
+    variant: Variant,
+    filters: NonEmptyList[GmosNorthFilter],
     common:  Common
   ) extends Config[GmosNorthFilter]:
 
@@ -122,12 +126,13 @@ object Config:
 
   object GmosNorth:
     given Eq[GmosNorth] =
-      Eq.by(a => (a.variant, a.common))
+      Eq.by(a => (a.variant, a.filters, a.common))
 
     given HashBytes[GmosNorth] = _.hashBytes
 
   final case class GmosSouth(
-    variant: Variant[GmosSouthFilter],
+    variant: Variant,
+    filters: NonEmptyList[GmosSouthFilter],
     common:  Common
   ) extends Config[GmosSouthFilter]:
 
@@ -149,6 +154,6 @@ object Config:
   object GmosSouth:
 
     given Eq[GmosSouth] =
-      Eq.by(a => (a.variant, a.common))
+      Eq.by(a => (a.variant, a.filters, a.common))
 
     given HashBytes[GmosSouth] = _.hashBytes

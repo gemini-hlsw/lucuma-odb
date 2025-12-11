@@ -135,9 +135,8 @@ object CalibrationConfigSubset:
         none,
         none,
         GmosImagingInput.Create(
-          lucuma.odb.sequence.gmos.imaging.Variant.Grouped.default(
-            filters.map(f => GmosImagingFilterInput(f, none))
-          ),
+          lucuma.odb.sequence.gmos.imaging.Variant.Grouped.Default,
+          filters.map(f => GmosImagingFilterInput(f, none)),
           GmosImagingInput.Create.Common(
             binning.some,
             ampReadMode.some,
@@ -165,9 +164,8 @@ object CalibrationConfigSubset:
         none,
         none,
         GmosImagingInput.Create(
-          lucuma.odb.sequence.gmos.imaging.Variant.Grouped.default(
-            filters.map(f => GmosImagingFilterInput(f, none))
-          ),
+          lucuma.odb.sequence.gmos.imaging.Variant.Grouped.Default,
+          filters.map(f => GmosImagingFilterInput(f, none)),
           GmosImagingInput.Create.Common(
             binning.some,
             ampReadMode.some,
@@ -224,7 +222,7 @@ object CalibrationConfigSubset:
           )
         case gni: ImagingConfig.GmosNorth =>
           GmosNImagingConfigs(
-            gni.variant.filters,
+            gni.filters,
             gni.bin,
             gni.ampReadMode,
             gni.ampGain,
@@ -232,7 +230,7 @@ object CalibrationConfigSubset:
           )
         case gsi: ImagingConfig.GmosSouth =>
           GmosSImagingConfigs(
-            gsi.variant.filters,
+            gsi.filters,
             gsi.bin,
             gsi.ampReadMode,
             gsi.ampGain,
