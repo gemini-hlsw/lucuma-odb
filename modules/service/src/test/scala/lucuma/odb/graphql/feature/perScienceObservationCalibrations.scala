@@ -35,6 +35,7 @@ import lucuma.odb.graphql.query.ObservingModeSetupOperations
 import lucuma.odb.graphql.subscription.SubscriptionUtils
 import lucuma.odb.json.time.transport.given
 import lucuma.refined.*
+import org.http4s.client.UnexpectedStatus
 
 import java.time.LocalDateTime
 import java.time.ZoneOffset
@@ -112,13 +113,9 @@ class perScienceObservationCalibrations
   ) derives Decoder
 
   case class ObsInfo(
-    id:         Observation.Id,
-    groupId:    Option[Group.Id],
-    groupIndex: Option[Int]
-  ) derives Decoder
-
-  case class ObservationWithRole(
     id:              Observation.Id,
+    groupId:         Option[Group.Id],
+    groupIndex:      Option[Int],
     calibrationRole: Option[CalibrationRole]
   ) derives Decoder
 
@@ -130,7 +127,7 @@ class perScienceObservationCalibrations
     targetDec: Option[String]
   ) derives Decoder
 
-  private def queryObservationsInGroup(gid: Group.Id): IO[List[ObservationWithRole]] =
+  private def queryObservationsInGroup(gid: Group.Id): IO[List[ObsInfo]] =
     query(
       serviceUser,
       s"""query {
@@ -138,6 +135,8 @@ class perScienceObservationCalibrations
               elements {
                 observation {
                   id
+                  groupId
+                  groupIndex
                   calibrationRole
                 }
               }
@@ -150,7 +149,7 @@ class perScienceObservationCalibrations
         .values
         .toList
         .flatten
-        .flatMap(_.hcursor.downField("observation").as[Option[ObservationWithRole]].toOption)
+        .flatMap(_.hcursor.downField("observation").as[Option[ObsInfo]].toOption)
         .flatten
       elements.pure[IO]
     }
@@ -247,6 +246,7 @@ class perScienceObservationCalibrations
               id
               groupId
               groupIndex
+              calibrationRole
             }
           }"""
     ).flatMap { c =>
@@ -1004,3 +1004,30 @@ class perScienceObservationCalibrations
         assertEquals(added2.size, 0)
         assertEquals(removed2.size, 0)
       }
+
+  test("telluric group rejects second science observation"):
+    for {
+      pid   <- createProgramAs(pi)
+      tid   <- createTargetWithProfileAs(pi, pid)
+      oid1  <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+      _     <- runObscalcUpdate(pid, oid1)
+      _     <- recalculateCalibrations(pid, when)
+      obs1  <- queryObservation(oid1)
+      gid   =  obs1.groupId.get
+      oid2  <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+      err   <- moveObservationAs(serviceUser, oid2, Some(gid)).intercept[UnexpectedStatus]
+    } yield
+      assertEquals(err.status.code, 500)
+
+  test("telluric group rejects creating child groups"):
+    for
+      pid  <- createProgramAs(pi)
+      tid  <- createTargetWithProfileAs(pi, pid)
+      oid  <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+      _    <- runObscalcUpdate(pid, oid)
+      _    <- recalculateCalibrations(pid, when)
+      obs  <- queryObservation(oid)
+      gid  =  obs.groupId.get
+      err  <- createGroupAs(pi, pid, parentGroupId = Some(gid)).intercept[UnexpectedStatus]
+    yield
+      assertEquals(err.status.code, 500)

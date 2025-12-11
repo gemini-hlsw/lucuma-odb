@@ -12,6 +12,8 @@
 /itc/model/
 /itc/testkit/
 /modules/binding/
+/modules/calibrations/
+/modules/obscalc/
 /modules/phase0/
 /modules/schema/
 /modules/sequence/
