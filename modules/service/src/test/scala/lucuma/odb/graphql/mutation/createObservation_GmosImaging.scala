@@ -579,7 +579,7 @@ class createObservation_GmosImaging extends OdbSuite:
       """
     )
 
-  test("can create with grouped filters, uniform object and random sky offset generators"):
+  def testNotEnumeratedGenerator(variantName: String): IO[Unit] =
     createProgramAs(pi).flatMap: pid =>
       createTargetAs(pi, pid).flatMap: tid =>
         expect(pi, s"""
@@ -607,7 +607,7 @@ class createObservation_GmosImaging extends OdbSuite:
                 observingMode: {
                   gmosSouthImaging: {
                     variant: {
-                      grouped: {
+                      $variantName: {
                         offsets: {
                           uniform: {
                             cornerA: {
@@ -643,7 +643,7 @@ class createObservation_GmosImaging extends OdbSuite:
                 observingMode {
                   gmosSouthImaging {
                     variant {
-                      grouped {
+                      $variantName {
                         offsets {
                           generatorType
                           enumerated {
@@ -697,7 +697,7 @@ class createObservation_GmosImaging extends OdbSuite:
                 "observingMode": {
                   "gmosSouthImaging": {
                     "variant": {
-                      "grouped": {
+                      $variantName: {
                         "offsets": {
                           "generatorType": "UNIFORM",
                           "enumerated": null,
@@ -732,6 +732,12 @@ class createObservation_GmosImaging extends OdbSuite:
           }
         """.asRight
       )
+
+  test("can create with grouped filters, uniform object and random sky offset generators"):
+    testNotEnumeratedGenerator("grouped")
+
+  test("can create with interleaved filters, uniform object and random sky offset generators"):
+    testNotEnumeratedGenerator("interleaved")
 
   def testEnumeratedGenerator(variantName: String): IO[Unit] =
     createProgramAs(pi).flatMap: pid =>
