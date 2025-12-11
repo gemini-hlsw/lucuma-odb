@@ -60,12 +60,12 @@ class OffsetGeneratorServiceSuite extends OdbSuite with munit.ScalaCheckEffectSu
                   }
                   observingMode: {
                     gmosSouthImaging: {
+                      filters: [
+                        { filter: G_PRIME },
+                        { filter: R_PRIME }
+                      ]
                       variant: {
                         grouped: {
-                          filters: [
-                            { filter: G_PRIME },
-                            { filter: R_PRIME }
-                          ]
                           offsets: {
                             $obj
                           }
