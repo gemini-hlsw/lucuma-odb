@@ -150,23 +150,22 @@ object CMain extends MainParams {
       _  <- Resource.eval(info"Calibrations Service starting")
       _  <- Resource.eval(info"Start listening for obscalc changes")
       _  <- Resource.eval(obscalcTopic.subscribe(100).evalMap { elem =>
-              services.use: svc =>
-                services.useTransactionally:
-                  Services.asSuperUser:
-                    for {
-                      i <- svc.calibrationsService.isCalibration(elem.observationId)
-                      _ <- (info"Calibrations Service Obscalc channel: Element(${elem.observationId},${elem.programId},${elem.editType},oldState=${elem.oldState},newState=${elem.newState},${elem.users}), is calibration: $i").whenA(i)
-                      t <- C.realTimeInstant.map(LocalDate.ofInstant(_, ZoneOffset.UTC))
-                      _ <- calibrationsService
-                            .recalculateCalibrations(
-                              elem.programId,
-                              LocalDateTime.of(t, LocalTime.MIDNIGHT).toInstant(ZoneOffset.UTC)
-                            ).whenA(!i &&
-                                    elem.newState.exists(_ === CalculationState.Ready) &&
-                                    elem.oldState =!= elem.newState &&
-                                    (elem.editType === EditType.Created ||
-                                     elem.editType === EditType.Updated))
-                    } yield Result.unit
+              services.useTransactionally:
+                Services.asSuperUser:
+                  for {
+                    i <- calibrationsService.isCalibration(elem.observationId)
+                    _ <- (info"Calibrations Service Obscalc channel: Element(${elem.observationId},${elem.programId},${elem.editType},oldState=${elem.oldState},newState=${elem.newState},${elem.users}), is calibration: $i").whenA(i)
+                    t <- C.realTimeInstant.map(LocalDate.ofInstant(_, ZoneOffset.UTC))
+                    _ <- calibrationsService
+                          .recalculateCalibrations(
+                            elem.programId,
+                            LocalDateTime.of(t, LocalTime.MIDNIGHT).toInstant(ZoneOffset.UTC)
+                          ).whenA(!i &&
+                                  elem.newState.exists(_ === CalculationState.Ready) &&
+                                  elem.oldState =!= elem.newState &&
+                                  (elem.editType === EditType.Created ||
+                                   elem.editType === EditType.Updated))
+                  } yield Result.unit
             }.compile.drain.start.void)
       _  <- Resource.eval(info"Start listening for calibration time changes")
       _  <- Resource.eval(calibTopic.subscribe(100).evalMap: elem =>
