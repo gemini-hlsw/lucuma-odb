@@ -836,12 +836,12 @@ trait DatabaseOperations { this: OdbSuite =>
       case ObservingModeType.GmosNorthImaging =>
         """{
           gmosNorthImaging: {
+            filters: [
+              { filter: R_PRIME },
+              { filter: G_PRIME }
+            ]
             variant: {
               grouped: {
-                filters: [
-                  { filter: R_PRIME },
-                  { filter: G_PRIME }
-                ]
               }
             }
           }
@@ -849,12 +849,12 @@ trait DatabaseOperations { this: OdbSuite =>
       case ObservingModeType.GmosSouthImaging =>
         """{
           gmosSouthImaging: {
+            filters: [
+              { filter: R_PRIME },
+              { filter: G_PRIME }
+            ]
             variant: {
               grouped: {
-                filters: [
-                  { filter: R_PRIME },
-                  { filter: G_PRIME }
-                ]
               }
             }
           }
@@ -885,12 +885,13 @@ trait DatabaseOperations { this: OdbSuite =>
           gmosNorthImaging: {
             variant: {
               interleaved: {
-                filters: [
-                  { filter: R_PRIME },
-                  { filter: G_PRIME }
-                ]
+                skyCount: 1
               }
             }
+            filters: [
+              { filter: R_PRIME },
+              { filter: G_PRIME }
+            ]
           }
         }"""
       case ObservingModeType.GmosSouthImaging =>
@@ -898,12 +899,13 @@ trait DatabaseOperations { this: OdbSuite =>
           gmosSouthImaging: {
             variant: {
               interleaved: {
-                filters: [
-                  { filter: R_PRIME },
-                  { filter: G_PRIME }
-                ]
+                skyCount: 1
               }
             }
+            filters: [
+              { filter: R_PRIME },
+              { filter: G_PRIME }
+            ]
           }
         }"""
       case ObservingModeType.Flamingos2LongSlit =>
