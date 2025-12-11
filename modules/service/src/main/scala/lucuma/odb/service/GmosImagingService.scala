@@ -453,24 +453,6 @@ object GmosImagingService:
           AND img.c_variant <> $gmos_imaging_variant
       """.apply(role, which.toList, variant)
 
-    def selectObservationsNotMatchingVariant(
-      variantType: VariantType,
-      modeTable:   String,
-      oids:        NonEmptyList[Observation.Id]
-    ): AppliedFragment =
-      void"""
-        SELECT o.c_observation_id
-        FROM t_observation o
-        WHERE """ |+| observationIdIn(oids) |+|
-      sql"""
-        AND NOT EXISTS (
-          SELECT 1
-          FROM #$modeTable v
-          WHERE v.c_observation_id = o.c_observation_id
-            AND v.c_variant = $gmos_imaging_variant
-        )
-      """(variantType)
-
     def selectSeeds(
       tableName: String,
       oid:       Observation.Id
@@ -648,6 +630,10 @@ object GmosImagingService:
     ): List[AppliedFragment] =
       val upVariant  = sql"c_variant   = $gmos_imaging_variant"
 
+      // Sky count requires special handling because it is used by two different
+      // modes.  If we are simply updating an existing mode, then we don't
+      // change the sky count value unless it is explicitly set.  If we are
+      // switching modes, then we reset the value if it is not explicitly set.
       def upSkyCount(variant: VariantType, skyCount: Option[NonNegInt]): AppliedFragment =
         (variant, skyCount) match
           case (VariantType.PreImaging, _) =>
@@ -662,14 +648,8 @@ object GmosImagingService:
                 END
             """.apply(v, NonNegInt.MinValue)
 
-          case (v, Some(sc))               =>
-            sql"""
-              c_sky_count =
-                CASE
-                  WHEN c_variant = $gmos_imaging_variant THEN $int4_nonneg
-                  ELSE $int4_nonneg
-                END
-            """.apply(v, sc, NonNegInt.MinValue)
+          case (_, Some(sc))               =>
+            sql"c_sky_count = $int4_nonneg"(sc)
 
       def grouped: List[AppliedFragment] =
         val upOrder = sql"c_wavelength_order = ${wavelength_order}"
