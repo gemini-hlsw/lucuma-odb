@@ -1,6 +1,6 @@
 ALTER TABLE t_gmos_north_imaging
   ADD COLUMN c_variant            e_gmos_imaging_variant NOT NULL DEFAULT 'grouped',
-  ADD COLUMN c_wavelength_order   e_wavelength_order     NOT NULL DEFAULT 'decreasing',
+  ADD COLUMN c_wavelength_order   e_wavelength_order     NOT NULL DEFAULT 'increasing',
   ADD COLUMN c_sky_count          int                    NOT NULL DEFAULT 0 CHECK (c_sky_count >= 0),
   ADD COLUMN c_pre_imaging_off1_p d_angle_µas            NOT NULL DEFAULT 0,
   ADD COLUMN c_pre_imaging_off1_q d_angle_µas            NOT NULL DEFAULT 0,
@@ -13,7 +13,7 @@ ALTER TABLE t_gmos_north_imaging
 
 ALTER TABLE t_gmos_south_imaging
   ADD COLUMN c_variant            e_gmos_imaging_variant NOT NULL DEFAULT 'grouped',
-  ADD COLUMN c_wavelength_order   e_wavelength_order     NOT NULL DEFAULT 'decreasing',
+  ADD COLUMN c_wavelength_order   e_wavelength_order     NOT NULL DEFAULT 'increasing',
   ADD COLUMN c_sky_count          int                    NOT NULL DEFAULT 0 CHECK (c_sky_count >= 0),
   ADD COLUMN c_pre_imaging_off1_p d_angle_µas            NOT NULL DEFAULT 0,
   ADD COLUMN c_pre_imaging_off1_q d_angle_µas            NOT NULL DEFAULT 0,
