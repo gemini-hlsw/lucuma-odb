@@ -112,13 +112,6 @@ class perScienceObservationCalibrations
     parentIndex:      Int
   ) derives Decoder
 
-  case class ObsInfo(
-    id:              Observation.Id,
-    groupId:         Option[Group.Id],
-    groupIndex:      Option[Int],
-    calibrationRole: Option[CalibrationRole]
-  ) derives Decoder
-
   case class ObsWithTarget(
     id: Observation.Id,
     targetId: Option[lucuma.core.model.Target.Id],
@@ -234,23 +227,6 @@ class perScienceObservationCalibrations
           }"""
     ).flatMap { c =>
       c.hcursor.downField("group").as[GroupInfo]
-        .leftMap(f => new RuntimeException(f.message))
-        .liftTo[IO]
-    }
-
-  private def queryObservation(oid: Observation.Id): IO[ObsInfo] =
-    query(
-      serviceUser,
-      s"""query {
-            observation(observationId: "$oid") {
-              id
-              groupId
-              groupIndex
-              calibrationRole
-            }
-          }"""
-    ).flatMap { c =>
-      c.hcursor.downField("observation").as[ObsInfo]
         .leftMap(f => new RuntimeException(f.message))
         .liftTo[IO]
     }

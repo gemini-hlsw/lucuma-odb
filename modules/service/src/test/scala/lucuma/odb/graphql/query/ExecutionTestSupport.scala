@@ -7,6 +7,7 @@ package query
 import cats.effect.Clock
 import cats.effect.IO
 import cats.syntax.all.*
+import io.circe.Decoder
 import io.circe.Json
 import io.circe.literal.*
 import lucuma.core.enums.CalibrationRole
@@ -17,6 +18,7 @@ import lucuma.core.math.Angle
 import lucuma.core.math.Offset
 import lucuma.core.math.Wavelength
 import lucuma.core.math.WavelengthDither
+import lucuma.core.model.Group
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
@@ -361,5 +363,29 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
         _       <- pending.traverse_ : p =>
                      Services.asSuperUser(services.telluricTargetsService.resolveTargets(p))
       yield ()
+    }
+
+  case class ObsInfo(
+    id:              Observation.Id,
+    groupId:         Option[Group.Id],
+    groupIndex:      Option[Int],
+    calibrationRole: Option[CalibrationRole]
+  ) derives Decoder
+
+  def queryObservation(oid: Observation.Id): IO[ObsInfo] =
+    query(
+      serviceUser,
+      s"""query {
+            observation(observationId: "$oid") {
+              id
+              groupId
+              groupIndex
+              calibrationRole
+            }
+          }"""
+    ).flatMap { c =>
+      c.hcursor.downField("observation").as[ObsInfo]
+        .leftMap(f => new RuntimeException(f.message))
+        .liftTo[IO]
     }
 }
