@@ -157,10 +157,8 @@ classDiagram
     GmosComponent <|-- GmosSouthComponent
 
     %% Shared GMOS component types.
-    class GmosOiwfs { }
     class GmosNodAndShuffle { Boolean supported }
 
-    GmosComponent <|-- GmosOiwfs
     GmosComponent <|-- GmosNodAndShuffle
 
     %% GMOS North component types.
