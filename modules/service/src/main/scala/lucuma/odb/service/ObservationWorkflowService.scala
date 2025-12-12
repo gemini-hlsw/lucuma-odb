@@ -693,12 +693,19 @@ object ObservationWorkflowService {
           .flatMap: oids =>
             filterState(oids, states, commitHash, itcClient, ptc)
 
-      private def getObservationsForTargets(whichTargets: AppliedFragment)(using NoTransaction[F]): F[Map[Target.Id, List[Observation.Id]]] =
+      // Returns Map[Target.Id, List[(Observation.Id, Option[CalibrationRole])]]
+      // Targets not in any observation have an empty list
+      private def getObservationsForTargets(whichTargets: AppliedFragment)(using NoTransaction[F]): F[Map[Target.Id, List[(Observation.Id, Option[CalibrationRole])]]] =
         services.transactionally:
           val af = Statements.selectObservationsForTargets(whichTargets)
-          session.prepareR(af.fragment.query(target_id *: observation_id.opt)).use: pq =>
+          session.prepareR(af.fragment.query(target_id *: observation_id.opt *: calibration_role.opt)).use: pq =>
             pq.stream(af.argument, 1024).compile.toList.map: list =>
-              list.groupMap(_._1)(_._2).view.mapValues(_.flatten).toMap
+              list.groupMap(_._1) { case (_, oidOpt, calRole) => oidOpt.map((_, calRole)) }
+                  .view.mapValues(_.flatten).toMap
+
+      // Calibration roles that prevent target editing
+      private val nonEditableCalibrationRoles: Set[CalibrationRole] =
+        Set(CalibrationRole.Twilight, CalibrationRole.Photometric, CalibrationRole.SpectroPhotometric)
 
       override def filterTargets(
         which: AppliedFragment,
@@ -709,19 +716,29 @@ object ObservationWorkflowService {
       )(using NoTransaction[F], SuperUserAccess): F[Result[List[Target.Id]]] =
         getObservationsForTargets(which)
           .flatMap: map =>
-            getWorkflows(map.values.toList.flatten, commitHash, itcClient, ptc)
+            val oids = map.values.toList.flatten.map(_._1)
+            getWorkflows(oids, commitHash, itcClient, ptc)
               .map: res =>
                 res.flatMap: wfs =>
-                  map.toList.foldLeft(Result(Nil)):
-                    case (accum, (tid, oids)) =>
+                  map.toList.foldLeft(Result(List.empty[Target.Id])):
+                    case (accum, (tid, obsWithRoles)) =>
+                      val oids = obsWithRoles.map(_._1)
                       oids.traverse(wfs.get) match
                         case None => Result.internalError("Unpossible: query returned one or more bogus oids")
-                        case Some(wfs) =>
-                          if wfs.forall(_.isCompatibleWith(states)) then accum.map(tid :: _)
-                          else accum.withProblems:
+                        case Some(workflows) =>
+                          val workflowOk = workflows.forall(_.isCompatibleWith(states))
+                          // Block if target is in any non-editable calibration observation
+                          val inNonEditableCalibObs = obsWithRoles.exists:
+                            case (_, Some(role)) => nonEditableCalibrationRoles.contains(role)
+                            case _ => false
+
+                          if inNonEditableCalibObs then accum.withProblems:
+                            val msg = s"Target $tid cannot be edited because it is in a calibration observation that does not allow target modifications."
+                            OdbError.InvalidTarget(tid, msg.some).asProblemNec
+                          else if !workflowOk then accum.withProblems:
                             val msg = s"Target $tid is not eligible for this operation due to the workflow state of one or more associated observations."
-                            OdbError.InvalidTarget(tid, msg.some)
-                              .asProblemNec
+                            OdbError.InvalidTarget(tid, msg.some).asProblemNec
+                          else accum.map(tid :: _)
 
   }
 
@@ -809,13 +826,15 @@ object ObservationWorkflowService {
         AND c_program_id = $program_id
       """.query(observation_id)
 
-    /** An applied fragment returning (Target.Id, Option[Observation.Id]) */
+    /** An applied fragment returning (Target.Id, Option[Observation.Id], Option[CalibrationRole]) */
     def selectObservationsForTargets(whichTargets: AppliedFragment): AppliedFragment =
       void"""
-        SELECT t.c_target_id, a.c_observation_id
+        SELECT t.c_target_id, a.c_observation_id, o.c_calibration_role
         FROM t_target t
         LEFT JOIN t_asterism_target a
         ON t.c_target_id = a.c_target_id
+        LEFT JOIN t_observation o
+        ON a.c_observation_id = o.c_observation_id
         WHERE t.c_target_id IN (""" |+| whichTargets |+| void""")
         """
 
