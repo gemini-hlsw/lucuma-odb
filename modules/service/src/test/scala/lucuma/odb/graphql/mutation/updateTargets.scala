@@ -2110,4 +2110,125 @@ class updateTargets extends OdbSuite {
     }
   }
 
+  test("update telluric target is allowed"):
+    for {
+      pid <- createProgramAs(pi)
+      tid <- createTargetAs(pi, pid)
+      oid <- createObservationAs(pi, pid, tid)
+      _   <- setObservationCalibrationRole(List(oid), CalibrationRole.Telluric)
+      _   <- expect(
+               user = pi,
+               query = s"""
+                 mutation {
+                   updateTargets(input: {
+                     SET: {
+                       name: "updated"
+                     }
+                     WHERE: {
+                       id: { EQ: "$tid"}
+                     }
+                   }) {
+                     targets {
+                       id
+                       name
+                     }
+                   }
+                 }
+               """,
+               expected = Right(
+                 json"""
+                   {
+                     "updateTargets" : {
+                       "targets" : [
+                         {
+                           "id" : $tid,
+                           "name" : "updated"
+                         }
+                       ]
+                     }
+                   }
+                 """
+               )
+             )
+    } yield ()
+
+  test("update target in photometric is not allowed"):
+    for {
+      pid <- createProgramAs(pi)
+      tid <- createTargetAs(pi, pid)
+      oid <- createObservationAs(pi, pid, tid)
+      _   <- setObservationCalibrationRole(List(oid), CalibrationRole.Photometric)
+      _   <- expect(
+               user = pi,
+               query = s"""
+                 mutation {
+                   updateTargets(input: {
+                     SET: {
+                       name: "updated"
+                     }
+                     WHERE: {
+                       id: { EQ: "$tid"}
+                     }
+                   }) {
+                     targets {
+                       id
+                     }
+                   }
+                 }
+               """,
+               expected = Left(List(s"Target $tid cannot be edited because it is in a calibration observation."))
+             )
+    } yield ()
+
+  test("update target in a calibration program is allowed"):
+    for {
+      pid <- withServices(service) { s =>
+               Services.asSuperUser:
+                 s.session.transaction.use { xa =>
+                   s.programService
+                     .insertCalibrationProgram(
+                       ProgramPropertiesInput.Create.Default.some,
+                       CalibrationRole.Photometric,
+                       Description.unsafeFrom("PHOTOTEST"))(using xa)
+               }
+             }
+      tid <- createTargetAs(staff, pid)
+      _   <- expect(
+               user = staff,
+               query = s"""
+                 mutation {
+                   updateTargets(input: {
+                     SET: {
+                       name: "updated"
+                     }
+                     WHERE: {
+                       id: { EQ: "$tid"}
+                     }
+                   }) {
+                     targets {
+                       id
+                       name
+                       calibrationRole
+                     }
+                   }
+                 }
+               """,
+               expected = Right(
+                 json"""
+                   {
+                     "updateTargets" : {
+                       "targets" : [
+                         {
+                           "id" : $tid,
+                           "name" : "updated",
+                           "calibrationRole" : "PHOTOMETRIC"
+                         }
+                       ]
+                     }
+                   }
+                 """
+               )
+             )
+    } yield ()
+
 }
