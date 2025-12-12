@@ -164,6 +164,8 @@ object TargetService {
           } recover {
             case SqlState.CheckViolation(ex) if ex.constraintName == Some("ra_dec_epoch_all_defined") =>
               UpdateTargetsResponse.TrackingSwitchFailed("Sidereal targets require RA, Dec, and Epoch to be defined.")
+            case SqlState.RaiseException(ex) if ex.message.contains("cannot be edited because it is in a calibration observation") =>
+              UpdateTargetsResponse.TrackingSwitchFailed(ex.message)
           }
 
       private def clone(targetId: Target.Id, pid: Program.Id): F[Target.Id] =
