@@ -64,33 +64,11 @@ sealed trait OffsetGenerator:
           LazyList.continually(lst.toList).flatten.take(count.value).toList.pure[F]
 
         case OffsetGenerator.Uniform(a, b)        =>
-          val w = (a.p.toSignedDecimalArcseconds - b.p.toSignedDecimalArcseconds).abs
-          val h = (a.q.toSignedDecimalArcseconds - b.q.toSignedDecimalArcseconds).abs
-
-          val (rows, cols) =
-            if h <= 0.000001 then
-              (1, posN.value)
-            else
-              val aspectRatio = w / h
-
-              val cols0 = 1 max Math.sqrt(posN.value * aspectRatio.doubleValue).round.toInt
-              val rows  = 1 max (posN.value.toDouble / cols0).ceil.toInt
-              val cols  = (posN.value.toDouble / rows).ceil.toInt
-              (rows, cols)
-
-          val stepP = if cols <= 2 then w else w / (cols - 1) // arcseconds
-          val stepQ = if rows <= 2 then h else h / (rows - 1) // arcseconds
-
-          val p0 = a.p.toSignedDecimalArcseconds max b.p.toSignedDecimalArcseconds
-          val q0 = a.q.toSignedDecimalArcseconds max b.q.toSignedDecimalArcseconds
-          val o  = Offset.signedDecimalArcseconds.reverseGet((p0, q0))
-
-          val offsets =
-            (0 until rows).toList.flatMap: r =>
-              (0 until cols).toList.map: c =>
-                o + Offset.signedDecimalArcseconds.reverseGet(-stepP * c, -stepQ * r)
-
-          offsets.take(count.value).map(o => TelescopeConfig(o, defaultGuideState)).pure[F]
+          OffsetGeneratorImpl
+            .uniform(posN, a, b)
+            .toList
+            .map(o => TelescopeConfig(o, defaultGuideState))
+            .pure[F]
 
         case OffsetGenerator.Random(size, center) =>
           withSeededRandom:
