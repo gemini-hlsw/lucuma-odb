@@ -291,15 +291,15 @@ object ObservationService {
         )
 
         def doDelete: F[Result[Unit]] =
-          val enc = observation_id.nel(oids)          
+          val enc = observation_id.nel(oids)
           session
             .prepareR(Statements.deleteCalibrationObservations(enc))
             .use: pq =>
               pq.stream(oids, 1024).compile.toList.flatMap: deleted =>
                 if oids.toList.sorted === deleted.sorted then Result.unit.pure[F]
-                else 
+                else
                   transaction.rollback >>
-                  OdbError.InvalidObservationList(oids, s"One or more specified observations are not calibrations.".some).asFailureF
+                    OdbError.InvalidObservationList(oids, s"One or more specified observations are not calibrations.".some).asFailureF
 
         // delete asterisms and observations
         for {
@@ -495,35 +495,39 @@ object ObservationService {
                 .map: list =>
                   list.groupMap(_._1)(_._2)
 
+      private def isTelluricGroup(sys: Option[Boolean], roles: Option[List[CalibrationRole]]): Boolean =
+        sys.exists(_ === true) && roles.exists(_.exists(_ === CalibrationRole.Telluric))
+
       /** Clone the observation. We assume access has been checked already. */
       private def cloneObservationUnconditionally(
         observationId: Observation.Id,
         SET:           Option[ObservationPropertiesInput.Edit]
       )(using Transaction[F]): F[Result[(Program.Id, Observation.Id)]] = {
+        // target group from SET
+        val targetGroupId: Option[Group.Id] = SET.flatMap(_.group.toOption)
 
-        // First we need the pid, observing mode, and grouping information
-        val selPid = sql"select c_program_id, c_observing_mode_type, c_group_id, c_group_index from t_observation where c_observation_id = $observation_id"
-        session.prepareR(selPid.query(program_id *: observing_mode_type.opt *: group_id.opt *: int2_nonneg)).use(_.unique(observationId)).flatMap {
+        // Get pid, observing mode, grouping info, and group metadata for both source and target
+        session.prepareR(Statements.selObsInfo(targetGroupId)).use(_.unique(observationId)).flatMap {
 
-          case (pid, observingMode, gid, gix) =>
+          case (pid, observingMode, gid, gix, system, calibRoles, parentId, targetSystem, targetCalibRoles) =>
 
-            // Desired group index is gix + 1
-            val destGroupIndex = NonNegShort.unsafeFrom((gix.value + 1).toShort)
-
-            // Ok the obs exists, so let's clone its main row in t_observation. If this returns
-            // None then it means the user doesn't have permission to see the obs.
-            val cObsStmt = Statements.cloneObservation(observationId, destGroupIndex)
-            val cloneObs = session.prepareR(cObsStmt.fragment.query(observation_id)).use(_.option(cObsStmt.argument))
+            // If in a telluric group, clone goes to parent group; otherwise stays in same group
+            val telluricGroup = isTelluricGroup(system, calibRoles)
+            val (dgid, dgix) = if telluricGroup then (parentId, None) else (gid, NonNegShort.from((gix.value + 1).toShort).toOption)
 
             // Action to open a hole in the destination program/group after the observation we're cloning
             val openHole: F[NonNegShort] =
               session.execute(sql"set constraints all deferred".command) >>
-              session.prepareR(sql"select group_open_hole($program_id, ${group_id.opt}, ${int2_nonneg.opt})".query(int2_nonneg)).use { pq =>
-                pq.unique(pid, gid, destGroupIndex.some)
-              }
+                session.prepareR(sql"select group_open_hole($program_id, ${group_id.opt}, ${int2_nonneg.opt})".query(int2_nonneg)).use:
+                  _.unique(pid, dgid, dgix)
+
+            // Clone the observation row, placing it in the destinnation group id
+            def cloneObs(dgi: NonNegShort): F[Option[Observation.Id]] =
+              val cObsStmt = Statements.cloneObservation(observationId, dgid, dgi)
+              session.prepareR(cObsStmt.fragment.query(observation_id)).use(_.option(cObsStmt.argument))
 
             // Ok let's do the clone.
-            (openHole >> cloneObs).flatMap {
+            openHole.flatMap(cloneObs).flatMap {
 
               case None =>
                 // User doesn't have permission to see the obs
@@ -543,8 +547,16 @@ object ObservationService {
                     blindOffsetsService.cloneBlindOffset(pid, observationId, oid2)
                   else Result.unit.pure
 
+                val isATelluricGroup = isTelluricGroup(targetSystem, targetCalibRoles)
+
+                val effectiveSET: Option[ObservationPropertiesInput.Edit] =
+                  if !telluricGroup then SET
+                  else SET.map: s =>
+                    if isATelluricGroup then s.copy(group = Nullable.Absent, groupIndex = None)
+                    else s
+
                 val doUpdate =
-                  SET match
+                  effectiveSET match
                     case None    => Result((pid, oid2)).pure[F] // nothing to do
                     case Some(s) =>
                       updateObservations(Services.asSuperUser(AccessControl.unchecked(s, List(oid2), observation_id))).map { r =>
@@ -1061,7 +1073,7 @@ object ObservationService {
      * Clone the base slice (just t_observation) and return the new obs id, or none if the original
      * doesn't exist or isn't accessible.
      */
-    def cloneObservation(oid: Observation.Id, gix: NonNegShort): AppliedFragment =
+    def cloneObservation(oid: Observation.Id, gid: Option[Group.Id], gix: NonNegShort): AppliedFragment =
       sql"""
         INSERT INTO t_observation (
           c_program_id,
@@ -1101,7 +1113,7 @@ object ObservationService {
         )
         SELECT
           c_program_id,
-          c_group_id,
+          ${group_id.opt},
           $int2_nonneg,
           c_title,
           c_subtitle,
@@ -1137,7 +1149,7 @@ object ObservationService {
       FROM t_observation
       WHERE c_observation_id = $observation_id
       RETURNING c_observation_id
-      """.apply(gix, oid)
+      """.apply(gid, gix, oid)
 
     def moveObservations(gid: Option[Group.Id], index: Option[NonNegShort], which: AppliedFragment): AppliedFragment =
       sql"""
@@ -1193,6 +1205,20 @@ object ObservationService {
         FROM t_observation
         WHERE c_program_id = $program_id AND c_existence = 'present'
       """.query(observation_id *: science_band.opt)
+
+    // Get pid, observing mode, grouping info, and group metadata for telluric detection
+    // for both source observation's group and target group
+    def selObsInfo(targetGroupId: Option[Group.Id]): Query[Observation.Id, (Program.Id, Option[ObservingModeType], Option[Group.Id], NonNegShort, Option[Boolean], Option[List[CalibrationRole]], Option[Group.Id], Option[Boolean], Option[List[CalibrationRole]])] =
+      sql"""
+        SELECT o.c_program_id, o.c_observing_mode_type, o.c_group_id, o.c_group_index,
+               g.c_system, g.c_calibration_roles, g.c_parent_id,
+               t.c_system, t.c_calibration_roles
+        FROM t_observation o
+        LEFT JOIN t_group g ON g.c_group_id = o.c_group_id
+        LEFT JOIN t_group t ON t.c_group_id = ${group_id.opt}
+        WHERE o.c_observation_id = $observation_id
+      """.query(program_id *: observing_mode_type.opt *: group_id.opt *: int2_nonneg *: bool.opt *: _calibration_role.opt *: group_id.opt *: bool.opt *: _calibration_role.opt)
+        .contramap(oid => (targetGroupId, oid))
 
   }
 
