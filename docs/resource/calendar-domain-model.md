@@ -29,6 +29,12 @@ classDiagram
         SCIENCE
         ENGINEERING
     }
+
+    class Instrument {
+        <<enum>>
+        GMOS_NORTH
+        GMOS_SOUTH
+    }
 ```
 
 ## Telescope
@@ -145,6 +151,7 @@ classDiagram
     %% Base instrument component type.
     class InstrumentComponent {
         Site site
+        Instrument instrument
     }
 
     %% Base GMOS component grouping.
@@ -202,4 +209,116 @@ classDiagram
         CallForProposalsType? callForProposalsType
         List~string~? callForProposalsIds
     }
+```
+
+## Telescope Subsystem
+
+Telescope subsystem status over time.
+
+```mermaid
+classDiagram
+
+    %% Coarse discriminator
+    class Subsystem {
+        <<enum>>
+        PWFS1
+        PWFS2
+        GEMS
+        ALTAIR
+        LGS
+        GPOL
+        DOME_SHUTTERS
+        DOME_VENT_GATES
+        POWER_SOURCE
+    }
+
+    %% ADT root (not instantiable)
+    class TelescopeSubsystem {
+        Subsystem subsystem
+    }
+
+    %% Operational status over time (site-specific)
+    class TelescopeSubsystemStatus {
+        Boolean available
+        Usage usage
+        TimestampInterval interval
+        Site site
+    }
+
+    %% One subsystem, many time-bounded statuses
+    TelescopeSubsystemStatus --> TelescopeSubsystem
+
+    %% Simple subsystems
+    TelescopeSubsystem <|-- Pwfs1
+    TelescopeSubsystem <|-- Pwfs2
+    TelescopeSubsystem <|-- Gpol
+    TelescopeSubsystem <|-- Gems
+    TelescopeSubsystem <|-- Altair
+    TelescopeSubsystem <|-- Lgs
+
+    %% Subsystems with additional domain data
+    TelescopeSubsystem <|-- DomeShutters
+    class DomeShutters {
+        DomeShutterElevationRange allowedElevation
+    }
+
+    TelescopeSubsystem <|-- DomeVentGates
+    class DomeVentGates {
+        %% TODO: Very generic right now.
+        PointingRestriction pointingRestriction
+    }
+
+    TelescopeSubsystem <|-- PowerSourceSubsystem
+    class PowerSourceSubsystem {
+        PowerSourceSettings currentSource
+    }
+
+    %% Supporting enums
+    class PowerSourceSettings {
+        <<enum>>
+        COMMERCIAL
+        GENERATOR
+    }
+
+    class PointingRestriction {
+        <<enum>>
+        NONE
+        LIMITED
+        PROHIBITED
+    }
+
+    class DomeShutterElevationRange {
+        Float minDegrees
+        Float maxDegrees
+    }
+```
+
+## Staff
+
+Staff observer qualifications and instrument training certifications status.
+
+```mermaid
+classDiagram
+
+    class StaffMember {
+        String id
+        String firstName
+        String lastName
+    }
+
+    %% TODO: Does staff need to be qualifed per site?
+    class ObserverQualification {
+        Site site
+        TimestampInterval certifiedPeriod
+    }
+
+    class InstrumentTraining {
+        Instrument instrument
+        Site site
+        TimestampInterval certifiedPeriod
+    }
+
+    StaffMember "1" --> "0..*" ObserverQualification
+    StaffMember "1" --> "0..*" InstrumentTraining
+
 ```
