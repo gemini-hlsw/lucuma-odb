@@ -6,7 +6,6 @@ package table
 
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.GmosCodecs.*
-import skunk.codec.numeric.int8
 
 trait GmosImagingView[F[_]] extends BaseMapping[F]:
 
@@ -23,7 +22,6 @@ trait GmosImagingView[F[_]] extends BaseMapping[F]:
 
     object Sky:
       val Count: ColumnRef = col("c_sky_count", int4_nonneg)
-      val Seed: ColumnRef  = col("c_sky_seed",  int8)
 
     object Grouped:
       val ObservationId: ColumnRef   = col("c_grouped_observation_id", observation_id.embedded)
