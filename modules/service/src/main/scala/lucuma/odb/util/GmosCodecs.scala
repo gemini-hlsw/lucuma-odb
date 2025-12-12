@@ -33,6 +33,7 @@ import lucuma.core.model.sequence.gmos.GmosFpuMask
 import lucuma.core.model.sequence.gmos.GmosGratingConfig
 import lucuma.core.model.sequence.gmos.StaticConfig
 import lucuma.core.util.Enumerated
+import lucuma.odb.sequence.gmos.imaging.VariantType
 import skunk.*
 import skunk.codec.all.*
 import skunk.data.Arr
@@ -61,6 +62,9 @@ trait GmosCodecs {
 
   val gmos_grating_order: Codec[GmosGratingOrder] =
     enumerated(Type.varchar)
+
+  val gmos_imaging_variant: Codec[VariantType] =
+    enumerated(Type("e_gmos_imaging_variant"))
 
   val gmos_long_slit_acquisition_roi: Codec[GmosLongSlitAcquisitionRoi] =
     enumerated(Type("e_gmos_long_slit_acquisition_roi"))

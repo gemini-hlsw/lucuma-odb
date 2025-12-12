@@ -8,10 +8,12 @@ import grackle.Path
 import lucuma.core.math.Angle
 
 import table.EnumeratedOffsetView
+import table.GmosImagingView
 import table.OffsetGeneratorView
 import table.StepRecordView
 
 trait OffsetMapping[F[_]] extends EnumeratedOffsetView[F]
+                             with GmosImagingView[F]
                              with OffsetGeneratorView[F]
                              with StepRecordView[F]:
 
@@ -44,7 +46,28 @@ trait OffsetMapping[F[_]] extends EnumeratedOffsetView[F]
   private lazy val SpiralPath:     Path = SpiralOffsetGeneratorType / "center"
   private lazy val StepRecordPath: Path = StepRecordType / "telescopeConfig" / "offset"
 
+  private def preImagingMappings(
+    p: Path,
+    c: GmosImagingCommonColumns
+  ): List[TypeMapping] =
+    List(
+      offsetMappingAtPath(p / "offset1", c.PreImaging.ObservationId),
+      offsetComponentMappingAtPath(p / "offset1" / "p", c.PreImaging.Offset1P),
+      offsetComponentMappingAtPath(p / "offset1" / "q", c.PreImaging.Offset1Q),
+      offsetMappingAtPath(p / "offset2", c.PreImaging.ObservationId),
+      offsetComponentMappingAtPath(p / "offset2" / "p", c.PreImaging.Offset2P),
+      offsetComponentMappingAtPath(p / "offset2" / "q", c.PreImaging.Offset2Q),
+      offsetMappingAtPath(p / "offset3", c.PreImaging.ObservationId),
+      offsetComponentMappingAtPath(p / "offset3" / "p", c.PreImaging.Offset3P),
+      offsetComponentMappingAtPath(p / "offset3" / "q", c.PreImaging.Offset3Q),
+      offsetMappingAtPath(p / "offset4", c.PreImaging.ObservationId),
+      offsetComponentMappingAtPath(p / "offset4" / "p", c.PreImaging.Offset4P),
+      offsetComponentMappingAtPath(p / "offset4" / "q", c.PreImaging.Offset4Q),
+    )
+
   lazy val OffsetMappings: List[TypeMapping] =
+    preImagingMappings(GmosNorthImagingType / "variant" / "preImaging", GmosNorthImagingView.Common) ++
+    preImagingMappings(GmosSouthImagingType / "variant" / "preImaging", GmosSouthImagingView.Common) ++
     List(
       offsetMappingAtPath(EnumeratedPath, EnumeratedOffsetView.ObservationId, EnumeratedOffsetView.OffsetGeneratorRole, EnumeratedOffsetView.Index),
       offsetComponentMappingAtPath(EnumeratedPath / "p", EnumeratedOffsetView.OffsetP, EnumeratedOffsetView.ObservationId, EnumeratedOffsetView.OffsetGeneratorRole, EnumeratedOffsetView.Index),

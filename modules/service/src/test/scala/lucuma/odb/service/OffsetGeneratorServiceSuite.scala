@@ -64,11 +64,15 @@ class OffsetGeneratorServiceSuite extends OdbSuite with munit.ScalaCheckEffectSu
                         { filter: G_PRIME },
                         { filter: R_PRIME }
                       ]
-                      objectOffsetGenerator: {
-                        $obj
-                      }
-                      skyOffsetGenerator: {
-                        $sky
+                      variant: {
+                        grouped: {
+                          offsets: {
+                            $obj
+                          }
+                          skyOffsets: {
+                            $sky
+                          }
+                        }
                       }
                     }
                   }

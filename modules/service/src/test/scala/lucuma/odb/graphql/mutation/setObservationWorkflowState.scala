@@ -27,7 +27,7 @@ import lucuma.odb.json.all.transport.given
 class setObservationWorkflowState
   extends ExecutionTestSupportForGmos
      with ObservingModeSetupOperations
-     with UpdateConstraintSetOps {
+     with UpdateObservationsOps {
 
 
   // required in order to get the correct "complete" execution status below (see executionState.scala)
