@@ -10,8 +10,6 @@ import eu.timepit.refined.types.numeric.NonNegInt
 import grackle.Result
 import grackle.ResultT
 import grackle.syntax.*
-import lucuma.core.enums.GmosNorthFilter
-import lucuma.core.enums.GmosSouthFilter
 import lucuma.core.enums.Site
 import lucuma.core.math.Offset
 import lucuma.core.model.ExposureTimeMode
@@ -32,7 +30,6 @@ import lucuma.odb.sequence.gmos.imaging.VariantType
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.GmosCodecs.*
 import skunk.*
-import skunk.codec.numeric.int8
 import skunk.data.Arr
 import skunk.implicits.*
 
@@ -47,14 +44,6 @@ sealed trait GmosImagingService[F[_]]:
   def selectSouth(
     which: List[Observation.Id]
   ): F[Map[Observation.Id, Config.GmosSouth]]
-
-  def selectNorthSeeds(
-    oid: Observation.Id
-  ): F[Map[GmosNorthFilter, Long]]
-
-  def selectSouthSeeds(
-    ooid: Observation.Id
-  ): F[Map[GmosSouthFilter, Long]]
 
   def insertNorth(
     input:  GmosImagingInput.Create.North,
@@ -159,29 +148,6 @@ object GmosImagingService:
               val sg = s.getOrElse(oid, OffsetGenerator.NoGenerator)
               oid -> (fs, variantFields.toVariant(og, sg), common)
             }.toMap
-
-      override def selectNorthSeeds(
-        oid: Observation.Id
-      ): F[Map[GmosNorthFilter, Long]] =
-        selectSeeds[GmosNorthFilter](Site.GN, oid, gmos_north_filter)
-
-      override def selectSouthSeeds(
-        oid: Observation.Id
-      ): F[Map[GmosSouthFilter, Long]] =
-        selectSeeds[GmosSouthFilter](Site.GS, oid, gmos_south_filter)
-
-      private def selectSeeds[A](
-        site:    Site,
-        oid:     Observation.Id,
-        decoder: Decoder[A]
-      ): F[Map[A, Long]] =
-        val af = Statements.selectSeeds(filterTableName(site), oid)
-        session.prepareR(af.fragment.query(decoder *: int8)).use: pq =>
-          pq.stream(af.argument, chunkSize=64)
-            .compile
-            .toList
-            .map(_.toMap)
-
 
       override def insertNorth(
         input:  GmosImagingInput.Create.North,
@@ -452,18 +418,6 @@ object GmosImagingService:
           AND og.c_observation_id IN ${observation_id.list(which.length).values}
           AND img.c_variant <> $gmos_imaging_variant
       """.apply(role, which.toList, variant)
-
-    def selectSeeds(
-      tableName: String,
-      oid:       Observation.Id
-    ): AppliedFragment =
-      sql"""
-        SELECT
-          c_filter,
-          c_seed
-        FROM #$tableName
-        WHERE c_observation_id = $observation_id
-      """.apply(oid)
 
     def insert[L](
       modeTable: String,
