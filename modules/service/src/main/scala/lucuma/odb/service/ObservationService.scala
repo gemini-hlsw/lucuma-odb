@@ -495,33 +495,38 @@ object ObservationService {
                 .map: list =>
                   list.groupMap(_._1)(_._2)
 
+      private def isTelluricGroup(sys: Option[Boolean], roles: Option[List[CalibrationRole]]): Boolean =
+        sys.exists(_ === true) && roles.exists(_.exists(_ === CalibrationRole.Telluric))
+
       /** Clone the observation. We assume access has been checked already. */
       private def cloneObservationUnconditionally(
         observationId: Observation.Id,
         SET:           Option[ObservationPropertiesInput.Edit]
       )(using Transaction[F]): F[Result[(Program.Id, Observation.Id)]] = {
-        //
-        // First we need the pid, observing mode, and grouping information
-        session.prepareR(Statements.selObsInfo.query(program_id *: observing_mode_type.opt *: group_id.opt *: int2_nonneg *: bool.opt *: _calibration_role.opt *: group_id.opt)).use(_.unique(observationId)).flatMap {
+        // target group from SET
+        val targetGroupId: Option[Group.Id] = SET.flatMap(_.group.toOption)
 
-          case (pid, observingMode, gid, gix, system, calibRoles, parentId) =>
+        // Get pid, observing mode, grouping info, and group metadata for both source and target
+        session.prepareR(Statements.selObsInfo(targetGroupId)).use(_.unique(observationId)).flatMap {
+
+          case (pid, observingMode, gid, gix, system, calibRoles, parentId, targetSystem, targetCalibRoles) =>
 
             // If in a telluric group, clone goes to parent group; otherwise stays in same group
-            val isTelluricGroup = system.exists(_ === true) && calibRoles.exists(_.exists(_ === CalibrationRole.Telluric))
-            val (dgid, dgix) = if isTelluricGroup then (parentId, None) else (gid, NonNegShort.from((gix.value + 1).toShort).toOption)
+            val telluricGroup = isTelluricGroup(system, calibRoles)
+            val (dgid, dgix) = if telluricGroup then (parentId, None) else (gid, NonNegShort.from((gix.value + 1).toShort).toOption)
 
-            // Action to open a hole in the destination program/group
+            // Action to open a hole in the destination program/group after the observation we're cloning
             val openHole: F[NonNegShort] =
               session.execute(sql"set constraints all deferred".command) >>
                 session.prepareR(sql"select group_open_hole($program_id, ${group_id.opt}, ${int2_nonneg.opt})".query(int2_nonneg)).use:
                   _.unique(pid, dgid, dgix)
 
-            // Clone the observation row, placing it in dgid at the index returned by openHole
+            // Clone the observation row, placing it in the destinnation group id
             def cloneObs(dgi: NonNegShort): F[Option[Observation.Id]] =
               val cObsStmt = Statements.cloneObservation(observationId, dgid, dgi)
               session.prepareR(cObsStmt.fragment.query(observation_id)).use(_.option(cObsStmt.argument))
 
-            // Do the clone
+            // Ok let's do the clone.
             openHole.flatMap(cloneObs).flatMap {
 
               case None =>
@@ -542,8 +547,16 @@ object ObservationService {
                     blindOffsetsService.cloneBlindOffset(pid, observationId, oid2)
                   else Result.unit.pure
 
+                val isATelluricGroup = isTelluricGroup(targetSystem, targetCalibRoles)
+
+                val effectiveSET: Option[ObservationPropertiesInput.Edit] =
+                  if !telluricGroup then SET
+                  else SET.map: s =>
+                    if isATelluricGroup then s.copy(group = Nullable.Absent, groupIndex = None)
+                    else s
+
                 val doUpdate =
-                  SET match
+                  effectiveSET match
                     case None    => Result((pid, oid2)).pure[F] // nothing to do
                     case Some(s) =>
                       updateObservations(Services.asSuperUser(AccessControl.unchecked(s, List(oid2), observation_id))).map { r =>
@@ -1194,14 +1207,18 @@ object ObservationService {
       """.query(observation_id *: science_band.opt)
 
     // Get pid, observing mode, grouping info, and group metadata for telluric detection
-    val selObsInfo: Fragment[Observation.Id] =
+    // for both source observation's group and target group
+    def selObsInfo(targetGroupId: Option[Group.Id]): Query[Observation.Id, (Program.Id, Option[ObservingModeType], Option[Group.Id], NonNegShort, Option[Boolean], Option[List[CalibrationRole]], Option[Group.Id], Option[Boolean], Option[List[CalibrationRole]])] =
       sql"""
         SELECT o.c_program_id, o.c_observing_mode_type, o.c_group_id, o.c_group_index,
-               g.c_system, g.c_calibration_roles, g.c_parent_id
+               g.c_system, g.c_calibration_roles, g.c_parent_id,
+               t.c_system, t.c_calibration_roles
         FROM t_observation o
         LEFT JOIN t_group g ON g.c_group_id = o.c_group_id
+        LEFT JOIN t_group t ON t.c_group_id = ${group_id.opt}
         WHERE o.c_observation_id = $observation_id
-      """
+      """.query(program_id *: observing_mode_type.opt *: group_id.opt *: int2_nonneg *: bool.opt *: _calibration_role.opt *: group_id.opt *: bool.opt *: _calibration_role.opt)
+        .contramap(oid => (targetGroupId, oid))
 
   }
 

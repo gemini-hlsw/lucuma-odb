@@ -1611,8 +1611,8 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations with E
       oid2  <- cloneObservationAs(pi, oid)
       obs2  <- queryObservation(oid2)
     yield
-      assertEquals(obs.groupId, Some(gid))
-      assertEquals(obs2.groupId, None)
+      assertEquals(obs.groupId, gid.some)
+      assertEquals(obs2.groupId, none)
 
   test("cloning from telluric group nested in parent places clone in parent group"):
     for
@@ -1627,8 +1627,67 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations with E
       oid2       <- cloneObservationAs(pi, oid)
       obs2       <- queryObservation(oid2)
     yield
-      assertNotEquals(telluricGid, parentGid, "telluric group should be different from parent")
-      assertEquals(obs.groupId, Some(telluricGid))
-      assertEquals(obs2.groupId, Some(parentGid))
+      assertNotEquals(telluricGid, parentGid)
+      assertEquals(obs.groupId, telluricGid.some)
+      assertEquals(obs2.groupId, parentGid.some)
+
+  // This is what explore does
+  test("cloning telluric obs ignores SET when targeting telluric group"):
+    for
+      pid   <- createProgramAs(pi)
+      tid   <- createTargetWithProfileAs(pi, pid)
+      oid   <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+      _     <- runObscalcUpdate(pid, oid)
+      _     <- recalculateCalibrations(pid, calibWhen)
+      obs   <- queryObservation(oid)
+      gid   =  obs.groupId.get
+      // Clone while explicitly trying to place in telluric group via SET
+      json  <- query(
+                 user = pi,
+                 query = s"""
+                   mutation {
+                     cloneObservation(input: {
+                       observationId: "$oid"
+                       SET: { groupId: "$gid" }
+                     }) {
+                       newObservation { id }
+                     }
+                   }
+                 """
+               )
+      oid2  =  json.hcursor.downFields("cloneObservation", "newObservation", "id").require[Observation.Id]
+      obs2  <- queryObservation(oid2)
+    yield
+      assertEquals(obs.groupId, gid.some)
+      assertEquals(obs2.groupId, none)
+
+  test("cloning from telluric group allows SET to specify non-telluric group"):
+    for
+      pid          <- createProgramAs(pi)
+      tid          <- createTargetWithProfileAs(pi, pid)
+      oid          <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+      nonTelluric  <- createGroupAs(pi, pid)
+      _            <- runObscalcUpdate(pid, oid)
+      _            <- recalculateCalibrations(pid, calibWhen)
+      obs          <- queryObservation(oid)
+      telluricGid  =  obs.groupId.get
+      json         <- query(
+                        user = pi,
+                        query = s"""
+                          mutation {
+                            cloneObservation(input: {
+                              observationId: "$oid"
+                              SET: { groupId: "$nonTelluric" }
+                            }) {
+                              newObservation { id }
+                            }
+                          }
+                        """
+                      )
+      oid2         =  json.hcursor.downFields("cloneObservation", "newObservation", "id").require[Observation.Id]
+      obs2         <- queryObservation(oid2)
+    yield
+      assertEquals(obs.groupId, telluricGid.some)
+      assertEquals(obs2.groupId, nonTelluric.some)
 
 }
