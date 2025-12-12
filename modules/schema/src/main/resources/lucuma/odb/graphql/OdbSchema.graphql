@@ -3449,7 +3449,7 @@ input SetObservationWorkflowStateInput {
 }
 
 """
-Nonsidereal target parameters.  Supply `keyType` and `des` or `key`
+Nonsidereal target parameters.  Supply (`keyType` and `des`) or (`key`)
 """
 input NonsiderealInput {
   """
