@@ -3,23 +3,14 @@
 
 package lucuma.odb.service
 
-import cats.Monad
 import cats.data.NonEmptyList
-import cats.effect.Async
 import cats.effect.Concurrent
-import cats.effect.std.Random
-import cats.syntax.applicative.*
 import cats.syntax.apply.*
 import cats.syntax.either.*
 import cats.syntax.flatMap.*
 import cats.syntax.foldable.*
 import cats.syntax.functor.*
-import cats.syntax.traverse.*
-import eu.timepit.refined.types.numeric.PosInt
-import lucuma.core.enums.GmosNorthFilter
-import lucuma.core.enums.GmosSouthFilter
 import lucuma.core.enums.StepGuideState
-import lucuma.core.geom.OffsetGenerator as OffsetGeneratorImpl
 import lucuma.core.math.Angle
 import lucuma.core.math.Offset
 import lucuma.core.model.Observation
@@ -36,6 +27,7 @@ import lucuma.odb.util.Codecs.offset_generator_type
 import lucuma.odb.util.Codecs.telescope_config
 import skunk.*
 import skunk.codec.numeric.int4
+import skunk.codec.numeric.int8
 import skunk.implicits.*
 
 import Services.Syntax.*
@@ -46,6 +38,11 @@ sealed trait OffsetGeneratorService[F[_]]:
     oids: NonEmptyList[Observation.Id],
     role: OffsetGeneratorRole
   ): F[Map[Observation.Id, OffsetGenerator]]
+
+  def selectWithSeed(
+    oids: NonEmptyList[Observation.Id],
+    role: OffsetGeneratorRole
+  ): F[Map[Observation.Id, (OffsetGenerator, Long)]]
 
   def insert(
     oids:  NonEmptyList[Observation.Id],
@@ -69,42 +66,29 @@ sealed trait OffsetGeneratorService[F[_]]:
     newId:      Observation.Id
   ): F[Unit]
 
-  def generateGmosNorthImagingObject(
-    oid:          Observation.Id,
-    filterCounts: Map[GmosNorthFilter, (Int, Long)]
-  ): F[Map[GmosNorthFilter, List[TelescopeConfig]]]
-
-  def generateGmosNorthImagingSky(
-    oid:   Observation.Id,
-    count: Int,
-    seed:  Long
-  ): F[List[TelescopeConfig]]
-
-  def generateGmosSouthImagingObject(
-    oid:          Observation.Id,
-    filterCounts: Map[GmosSouthFilter, (Int, Long)]
-  ): F[Map[GmosSouthFilter, List[TelescopeConfig]]]
-
-  def generateGmosSouthImagingSky(
-    oid:   Observation.Id,
-    count: Int,
-    seed:  Long
-  ): F[List[TelescopeConfig]]
-
 object OffsetGeneratorService:
 
-  def instantiate[F[_]: Async: Concurrent](using Services[F]): OffsetGeneratorService[F] =
+  def instantiate[F[_]: Concurrent](using Services[F]): OffsetGeneratorService[F] =
     new OffsetGeneratorService[F]:
 
       override def select(
         oids: NonEmptyList[Observation.Id],
         role: OffsetGeneratorRole
       ): F[Map[Observation.Id, OffsetGenerator]] =
+        selectWithSeed(oids, role).map(_.view.mapValues(_._1).toMap)
 
-        val generatorData: F[Map[Observation.Id, Either[Unit, OffsetGenerator]]] =
+      override def selectWithSeed(
+        oids: NonEmptyList[Observation.Id],
+        role: OffsetGeneratorRole
+      ): F[Map[Observation.Id, (OffsetGenerator, Long)]] =
+
+        val generatorData: F[Map[Observation.Id, (Either[Unit, OffsetGenerator], Long)]] =
           val af = Statements.select(oids, role)
-          session.prepareR(af.fragment.query(observation_id *: Statements.offset_generator)).use: pq =>
-            pq.stream(af.argument, chunkSize = 1024).compile.toList.map(_.toMap)
+          session.prepareR(af.fragment.query(observation_id *: Statements.offset_generator *: int8)).use: pq =>
+            pq.stream(af.argument, chunkSize = 1024)
+              .compile
+              .toList
+              .map(_.map((oid, e, seed) => oid -> (e, seed)).toMap)
 
         val enumeratedOffsets: F[Map[Observation.Id, List[TelescopeConfig]]] =
           val af = Statements.selectEnumeratedOffsets(oids, role)
@@ -123,11 +107,11 @@ object OffsetGeneratorService:
         yield
           g.view
            .map:
-             case (oid, Left(()))   =>
+             case (oid, (Left(()), s))   =>
                val os = e.get(oid).flatMap(NonEmptyList.fromList)
-               oid -> os.fold(OffsetGenerator.NoGenerator)(OffsetGenerator.Enumerated.apply)
-             case (oid, Right(gen)) =>
-               oid -> gen
+               oid -> (os.fold(OffsetGenerator.NoGenerator)(OffsetGenerator.Enumerated.apply), s)
+             case (oid, (Right(gen), s)) =>
+               oid -> (gen, s)
            .toMap
 
       override def insert(
@@ -168,112 +152,6 @@ object OffsetGeneratorService:
         session.execute(Statements.CloneOffsetGenerator)(newId, originalId) *>
         session.execute(Statements.CloneEnumeratedOffsets)(newId, originalId).void
 
-      override def generateGmosNorthImagingObject(
-        o:  Observation.Id,
-        fs: Map[GmosNorthFilter, (Int, Long)]
-      ): F[Map[GmosNorthFilter, List[TelescopeConfig]]] =
-        generateGmosImagingObject(o, fs)
-
-      override def generateGmosSouthImagingObject(
-        o:  Observation.Id,
-        fs: Map[GmosSouthFilter, (Int, Long)]
-      ): F[Map[GmosSouthFilter, List[TelescopeConfig]]] =
-        generateGmosImagingObject(o, fs)
-
-      private def generateGmosImagingObject[A](
-        oid:    Observation.Id,
-        counts: Map[A, (Int, Long)]
-      ): F[Map[A, List[TelescopeConfig]]] =
-        for
-          in <- select(NonEmptyList.one(oid), OffsetGeneratorRole.Object).map(_.get(oid))
-          os <- in.fold(List.empty.pure[F]): in =>
-                  counts.toList.traverse:
-                    case (a, (count, seed)) => generate(count, seed, in, StepGuideState.Enabled).tupleLeft(a)
-        yield os.toMap
-
-      override def generateGmosNorthImagingSky(
-        oid:   Observation.Id,
-        count: Int,
-        seed:  Long
-      ): F[List[TelescopeConfig]] =
-        generateGmosImagingSky(oid, count, seed)
-
-      override def generateGmosSouthImagingSky(
-        oid:   Observation.Id,
-        count: Int,
-        seed:  Long
-      ): F[List[TelescopeConfig]] =
-        generateGmosImagingSky(oid, count, seed)
-
-      private def generateGmosImagingSky[A](
-        oid:   Observation.Id,
-        count: Int,
-        seed:  Long
-      ): F[List[TelescopeConfig]] =
-        for
-          in <- select(NonEmptyList.one(oid), OffsetGeneratorRole.Sky).map(_.get(oid))
-          os <- in.fold(List.empty.pure[F]): in =>
-                  generate(count, seed, in, StepGuideState.Disabled)
-        yield os
-
-      private def generate(
-        count:             Int,
-        seed:              Long,
-        input:             OffsetGenerator,
-        defaultGuideState: StepGuideState
-      ): F[List[TelescopeConfig]] =
-        def withSeededRandom(fa: (Monad[F], Random[F]) ?=> F[NonEmptyList[Offset]]): F[List[TelescopeConfig]] =
-          Random.scalaUtilRandomSeedLong(seed).flatMap: r =>
-            given Random[F] = r
-            fa.map(_.toList.map(o => TelescopeConfig(o, defaultGuideState)))
-
-        PosInt.unapply(count).fold(List.empty[TelescopeConfig].pure[F]): posN =>
-          input match
-            case OffsetGenerator.NoGenerator          =>
-              List.empty[TelescopeConfig].pure[F]
-
-            case OffsetGenerator.Enumerated(lst)      =>
-              // Enumerated positions come with an explicit guide state so the
-              // default is ignored.
-              LazyList.continually(lst.toList).flatten.take(count).toList.pure[F]
-
-            case OffsetGenerator.Uniform(a, b)        =>
-              val w = (a.p.toSignedDecimalArcseconds - b.p.toSignedDecimalArcseconds).abs
-              val h = (a.q.toSignedDecimalArcseconds - b.q.toSignedDecimalArcseconds).abs
-
-              val (rows, cols) =
-                if h <= 0.000001 then
-                  (1, posN.value)
-                else
-                  val aspectRatio = w / h
-
-                  val cols0 = 1 max Math.sqrt(posN.value * aspectRatio.doubleValue).round.toInt
-                  val rows  = 1 max (posN.value.toDouble / cols0).ceil.toInt
-                  val cols  = (posN.value.toDouble / rows).ceil.toInt
-                  (rows, cols)
-
-              val stepP = if cols <= 2 then w else w / (cols - 1) // arcseconds
-              val stepQ = if rows <= 2 then h else h / (rows - 1) // arcseconds
-
-              val p0 = a.p.toSignedDecimalArcseconds max b.p.toSignedDecimalArcseconds
-              val q0 = a.q.toSignedDecimalArcseconds max b.q.toSignedDecimalArcseconds
-              val o  = Offset.signedDecimalArcseconds.reverseGet((p0, q0))
-
-              val offsets =
-                (0 until rows).toList.flatMap: r =>
-                  (0 until cols).toList.map: c =>
-                    o + Offset.signedDecimalArcseconds.reverseGet(-stepP * c, -stepQ * r)
-
-              offsets.take(count).map(o => TelescopeConfig(o, defaultGuideState)).pure[F]
-
-            case OffsetGenerator.Random(size, center) =>
-              withSeededRandom:
-                OffsetGeneratorImpl.random(posN, size, center)
-
-            case OffsetGenerator.Spiral(size, center) =>
-              withSeededRandom:
-                OffsetGeneratorImpl.spiral(posN, size, center)
-
   object Statements:
 
     val offset_generator: Codec[Either[Unit, OffsetGenerator]] =
@@ -313,7 +191,8 @@ object OffsetGeneratorService:
           c_uniform_corner_a_p,
           c_uniform_corner_a_q,
           c_uniform_corner_b_p,
-          c_uniform_corner_b_q
+          c_uniform_corner_b_q,
+          c_seed
         FROM t_offset_generator
         WHERE
       """ |+| observationIdIn(oids) |+| sql" AND c_role = $offset_generator_role"(role)
@@ -427,6 +306,8 @@ object OffsetGeneratorService:
           c_observation_id IN ${observation_id.list(which.length).values}
       """.apply(role, which.toList)
 
+    // TODO: The random generator seed, is not cloned.  Should it be?
+    // If so, the cloned observation would have the same "random" offsets.
     val CloneOffsetGenerator: Command[(Observation.Id, Observation.Id)] =
       sql"""
         INSERT INTO t_offset_generator (
