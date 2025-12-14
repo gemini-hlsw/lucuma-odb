@@ -1083,6 +1083,7 @@ class perScienceObservationCalibrations
     } yield {
       // Mock star has TelluricType.A0V => SED should A0V
       assertEquals(targetSed, Some("A0_V"))
+    }
 
   private def queryObservationConstraints(oid: Observation.Id): IO[Json] =
     query(

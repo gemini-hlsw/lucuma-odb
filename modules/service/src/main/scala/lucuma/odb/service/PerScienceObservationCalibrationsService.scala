@@ -4,6 +4,7 @@
 package lucuma.odb.service
 
 import cats.data.NonEmptyList
+import cats.data.OptionT
 import cats.effect.Concurrent
 import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.NonNegShort
@@ -129,24 +130,21 @@ object PerScienceObservationCalibrationsService:
           .prepareR(Statements.selectTelluricObservation)
           .use(_.option((gid, CalibrationRole.Telluric)))
 
-      private def getScienceObservationDuration(
+      private def obsDuration(
         scienceOid: Observation.Id
-      )(using Transaction[F]): F[TimeSpan] =
-        S.session
-          .prepareR(Statements.selectScienceDuration)
-          .use(_.unique(scienceOid))
-          .recoverWith:
-            case _ =>
-              // If obscal data is not available yet, use default 1 hour
-              // This shouldn't happen in practice as obscal runs before calibration generation
-              info"No obscal data for science observation $scienceOid, using 1 hour default for telluric search" >>
-                TimeSpan.fromSeconds(3600).pure[F]
+      )(using Transaction[F]): F[Option[TimeSpan]] =
+        S.obscalcService
+          .selectOne(scienceOid)
+          .map:
+            _.flatMap(_.result)
+              .flatMap(_.digest)
+              .map(_.fullTimeEstimate.programTime)
 
       private def createTelluricObservation(
         pid:             Program.Id,
         scienceOid:      Observation.Id,
         telluricGroupId: Group.Id
-      )(using Transaction[F], SuperUserAccess): F[Observation.Id] =
+      )(using Transaction[F], SuperUserAccess): F[Option[Observation.Id]] =
         def obsGroupIndex(scienceOid: Observation.Id): F[NonNegShort] =
           S.session
             .prepareR(Statements.selectScienceObservationIndex)
@@ -190,14 +188,14 @@ object PerScienceObservationCalibrationsService:
               calibrationRole = CalibrationRole.Telluric.some
             ).orError
 
-        for
-          scienceIndex     <- obsGroupIndex(scienceOid)
-          telluricIndex    = NonNegShort.unsafeFrom((scienceIndex.value + 1).toShort)
-          scienceDuration  <- getScienceObservationDuration(scienceOid)
-          telluricId       <- insertTelluricObservation(pid, telluricGroupId, telluricIndex)
-          _                <- telluricTargets.requestTelluricTarget(pid, telluricId, scienceOid, scienceDuration)
-          _                <- syncConfiguration(scienceOid, telluricId)
-        yield telluricId
+        (for
+          duration      <- OptionT(obsDuration(scienceOid))
+          scienceIndex  <- OptionT.liftF(obsGroupIndex(scienceOid))
+          telluricIndex  = NonNegShort.unsafeFrom((scienceIndex.value + 1).toShort)
+          telluricId    <- OptionT.liftF(insertTelluricObservation(pid, telluricGroupId, telluricIndex))
+          _             <- OptionT.liftF(telluricTargets.requestTelluricTarget(pid, telluricId, scienceOid, duration))
+          _             <- OptionT.liftF(syncConfiguration(scienceOid, telluricId))
+        yield telluricId).value
 
       private def deleteTelluricObservationsFromGroups(
         groupIds: List[Group.Id]
@@ -237,7 +235,7 @@ object PerScienceObservationCalibrationsService:
           case Some(telluricId) =>
             syncConfiguration(obs.id, telluricId).as(none[Observation.Id])
           case None             =>
-            createTelluricObservation(pid, obs.id, gid).map(_.some)
+            createTelluricObservation(pid, obs.id, gid)
 
       private def generateTelluricForScience(
         pid:  Program.Id,
@@ -380,14 +378,6 @@ object PerScienceObservationCalibrationsService:
             FROM   t_observation
             WHERE  c_observation_id = $observation_id
           """.query(int2_nonneg)
-
-        val selectScienceDuration: Query[Observation.Id, TimeSpan] =
-          sql"""
-            SELECT (c_full_setup_time + c_sci_program_time)
-            FROM   t_obscalc
-            WHERE  c_observation_id = $observation_id
-              AND  c_odb_error IS NULL
-          """.query(time_span)
 
         def syncObservationConfiguration(
           sourceOid: Observation.Id,

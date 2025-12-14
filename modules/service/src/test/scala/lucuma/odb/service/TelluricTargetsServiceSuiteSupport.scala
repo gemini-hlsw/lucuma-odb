@@ -126,7 +126,7 @@ trait TelluricTargetsServiceSuiteSupport extends ExecutionTestSupportForGmos:
   private val metaCodec: Codec[TelluricTargets.Meta] =
     (observation_id *: program_id *: observation_id *: calculation_state *:
      core_timestamp *: core_timestamp *: core_timestamp.opt *: int4 *:
-     target_id.opt *: text.opt).to[TelluricTargets.Meta]
+     target_id.opt *: text.opt *: time_span).to[TelluricTargets.Meta]
 
   // Direct DB queries for verification
   def selectMeta(oid: Observation.Id): IO[Option[TelluricTargets.Meta]] =
@@ -141,7 +141,8 @@ trait TelluricTargetsServiceSuiteSupport extends ExecutionTestSupportForGmos:
                c_retry_at,
                c_failure_count,
                c_resolved_target_id,
-               c_error_message
+               c_error_message,
+               c_science_duration
         FROM t_telluric_resolution
         WHERE c_observation_id = $observation_id
       """.query(metaCodec)
@@ -160,7 +161,8 @@ trait TelluricTargetsServiceSuiteSupport extends ExecutionTestSupportForGmos:
                c_retry_at,
                c_failure_count,
                c_resolved_target_id,
-               c_error_message
+               c_error_message,
+               c_science_duration
         FROM t_telluric_resolution
         ORDER BY c_last_invalidation
       """.query(metaCodec)
@@ -181,15 +183,18 @@ trait TelluricTargetsServiceSuiteSupport extends ExecutionTestSupportForGmos:
     Timestamp.unsafeFromInstantTruncated(java.time.Instant.now)
 
   def createPendingEntry(pid: Program.Id, oid: Observation.Id, sid: Observation.Id): TelluricTargets.Pending =
+    import lucuma.core.syntax.timespan.*
     TelluricTargets.Pending(
       observationId = oid,
       programId = pid,
       scienceObservationId = sid,
       lastInvalidation = randomTime,
-      failureCount = 0
+      failureCount = 0,
+      scienceDuration = 1.hourTimeSpan
     )
 
   def createMetaEntry(pid: Program.Id, oid: Observation.Id, sid: Observation.Id, state: CalculationState): TelluricTargets.Meta =
+    import lucuma.core.syntax.timespan.*
     TelluricTargets.Meta(
       observationId = oid,
       programId = pid,
@@ -200,7 +205,8 @@ trait TelluricTargetsServiceSuiteSupport extends ExecutionTestSupportForGmos:
       retryAt = None,
       failureCount = 0,
       resolvedTargetId = None,
-      errorMessage = None
+      errorMessage = None,
+      scienceDuration = 1.hourTimeSpan
     )
 
   // Convenience helpers

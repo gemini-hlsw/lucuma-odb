@@ -20,7 +20,6 @@ import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.TelluricType
 import lucuma.core.model.UnnormalizedSED
-import lucuma.core.syntax.timespan.*
 import lucuma.core.util.NewType
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
@@ -70,13 +69,12 @@ trait TelluricTargetsService[F[_]]:
   /**
    * Records a new telluric resolution request.
    * Called when a telluric observation is created.
-   * @param scienceDuration Total program-charged time (science + setup overhead) from obscal
    */
   def requestTelluricTarget(
-    pid:               Program.Id,
-    telluricId:       Observation.Id,
-    scienceId:        Observation.Id,
-    scienceDuration:  TimeSpan
+    pid:             Program.Id,
+    telluricId:      Observation.Id,
+    scienceId:       Observation.Id,
+    scienceDuration: TimeSpan
   )(using ServiceAccess, Transaction[F]): F[Unit]
 
   /**
@@ -88,8 +86,8 @@ trait TelluricTargetsService[F[_]]:
 
 case class HminBrightnessKey(
   disperser: Flamingos2Disperser,
-  filter: Flamingos2Filter,
-  fpu: Flamingos2Fpu
+  filter:    Flamingos2Filter,
+  fpu:       Flamingos2Fpu
 )
 
 object HminBrightnessCache extends NewType[Map[HminBrightnessKey, (Option[BigDecimal], Option[BigDecimal])]]:
