@@ -374,24 +374,24 @@ object PerScienceObservationCalibrationsService:
           sql"""
             UPDATE t_observation target
             SET
-              c_cloud_extinction = source.c_cloud_extinction,
-              c_image_quality = source.c_image_quality,
-              c_sky_background = source.c_sky_background,
-              c_water_vapor = source.c_water_vapor,
-              c_air_mass_min = source.c_air_mass_min,
-              c_air_mass_max = source.c_air_mass_max,
-              c_hour_angle_min = source.c_hour_angle_min,
-              c_hour_angle_max = source.c_hour_angle_max,
-              c_spec_wavelength = source.c_spec_wavelength,
-              c_spec_resolution = source.c_spec_resolution,
+              c_cloud_extinction         = source.c_cloud_extinction,
+              c_image_quality            = source.c_image_quality,
+              c_sky_background           = source.c_sky_background,
+              c_water_vapor              = source.c_water_vapor,
+              c_air_mass_min             = source.c_air_mass_min,
+              c_air_mass_max             = source.c_air_mass_max,
+              c_hour_angle_min           = source.c_hour_angle_min,
+              c_hour_angle_max           = source.c_hour_angle_max,
+              c_spec_wavelength          = source.c_spec_wavelength,
+              c_spec_resolution          = source.c_spec_resolution,
               c_spec_wavelength_coverage = source.c_spec_wavelength_coverage,
-              c_spec_focal_plane = source.c_spec_focal_plane,
-              c_spec_focal_plane_angle = source.c_spec_focal_plane_angle,
-              c_spec_capability = source.c_spec_capability,
-              c_img_minimum_fov = source.c_img_minimum_fov,
-              c_img_narrow_filters = source.c_img_narrow_filters,
-              c_img_broad_filters = source.c_img_broad_filters,
-              c_img_combined_filters = source.c_img_combined_filters
+              c_spec_focal_plane         = source.c_spec_focal_plane,
+              c_spec_focal_plane_angle   = source.c_spec_focal_plane_angle,
+              c_spec_capability          = source.c_spec_capability,
+              c_img_minimum_fov          = source.c_img_minimum_fov,
+              c_img_narrow_filters       = source.c_img_narrow_filters,
+              c_img_broad_filters        = source.c_img_broad_filters,
+              c_img_combined_filters     = source.c_img_combined_filters
             FROM t_observation source
             WHERE source.c_observation_id = $observation_id
               AND target.c_observation_id = $observation_id

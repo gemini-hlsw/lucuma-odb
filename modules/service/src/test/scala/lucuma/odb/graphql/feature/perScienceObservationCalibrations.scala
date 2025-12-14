@@ -773,12 +773,18 @@ class perScienceObservationCalibrations
       groupId      =  obs1.groupId.get
       obsInGroup1  <- queryObservationsInGroup(groupId)
       telluric1Oid =  obsInGroup1.find(_.calibrationRole.contains(CalibrationRole.Telluric)).get.id
+      scienceConds <- queryObservationConstraints(oid)
+      conds1       <- queryObservationConstraints(telluric1Oid)
       _            <- recalculateCalibrations(pid, when)
       obsInGroup2  <- queryObservationsInGroup(groupId)
       telluric2Oid =  obsInGroup2.find(_.calibrationRole.contains(CalibrationRole.Telluric)).get.id
+      conds2       <- queryObservationConstraints(telluric2Oid)
     } yield {
       assertEquals(obsInGroup2.size, 2)
       assertEquals(telluric1Oid, telluric2Oid)
+      // Verify conditions
+      assertEquals(conds1, scienceConds)
+      assertEquals(conds2, scienceConds)
     }
 
   test("changing F2 to GMOS deletes telluric observation"):
@@ -1031,3 +1037,35 @@ class perScienceObservationCalibrations
       err  <- createGroupAs(pi, pid, parentGroupId = Some(gid)).intercept[UnexpectedStatus]
     yield
       assertEquals(err.status.code, 500)
+
+  private def queryObservationConstraints(oid: Observation.Id): IO[Json] =
+    query(
+      serviceUser,
+      s"""query {
+            observation(observationId: "$oid") {
+              id
+              constraintSet {
+                cloudExtinction
+                imageQuality
+                skyBackground
+                waterVapor
+                elevationRange {
+                  airMass {
+                    min
+                    max
+                  }
+                  hourAngle {
+                    minHours
+                    maxHours
+                  }
+                }
+              }
+            }
+          }"""
+    ).map { c =>
+      c.hcursor
+        .downField("observation")
+        .downField("constraintSet")
+        .focus
+        .getOrElse(Json.Null)
+    }
