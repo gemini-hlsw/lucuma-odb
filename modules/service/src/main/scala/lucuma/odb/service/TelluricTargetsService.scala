@@ -22,6 +22,7 @@ import lucuma.core.model.TelluricType
 import lucuma.core.model.UnnormalizedSED
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.NewType
+import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.odb.data.Existence
 import lucuma.odb.data.TelluricTargets
@@ -69,11 +70,13 @@ trait TelluricTargetsService[F[_]]:
   /**
    * Records a new telluric resolution request.
    * Called when a telluric observation is created.
+   * @param scienceDuration Total program-charged time (science + setup overhead) from obscal
    */
   def requestTelluricTarget(
-    pid:        Program.Id,
-    telluricId: Observation.Id,
-    scienceId:  Observation.Id
+    pid:               Program.Id,
+    telluricId:       Observation.Id,
+    scienceId:        Observation.Id,
+    scienceDuration:  TimeSpan
   )(using ServiceAccess, Transaction[F]): F[Unit]
 
   /**
@@ -165,11 +168,12 @@ object TelluricTargetsService:
         )
 
       override def requestTelluricTarget(
-        pid:        Program.Id,
-        telluricId: Observation.Id,
-        scienceId:  Observation.Id
+        pid:              Program.Id,
+        telluricId:      Observation.Id,
+        scienceId:       Observation.Id,
+        scienceDuration: TimeSpan
       )(using ServiceAccess, Transaction[F]): F[Unit] =
-        session.execute(Statements.InsertResolutionRequest)(telluricId, pid, scienceId).void
+        session.execute(Statements.InsertResolutionRequest)(telluricId, pid, scienceId, scienceDuration).void
 
       override def resolveTargets(
         pending: TelluricTargets.Pending
@@ -287,21 +291,21 @@ object TelluricTargetsService:
       object Statements:
 
         val pending: Codec[TelluricTargets.Pending] =
-          (observation_id *: program_id *: observation_id *: core_timestamp *: int4)
+          (observation_id *: program_id *: observation_id *: core_timestamp *: int4 *: time_span)
             .to[TelluricTargets.Pending]
 
         val meta: Codec[TelluricTargets.Meta] =
           (observation_id *: program_id *: observation_id *: calculation_state *:
            core_timestamp *: core_timestamp *: core_timestamp.opt *: int4 *:
-           target_id.opt *: text.opt).to[TelluricTargets.Meta]
+           target_id.opt *: text.opt *: time_span).to[TelluricTargets.Meta]
 
         private val pendingColumns: String =
-          "c_observation_id, c_program_id, c_science_observation_id, c_last_invalidation, c_failure_count"
+          "c_observation_id, c_program_id, c_science_observation_id, c_last_invalidation, c_failure_count, c_science_duration"
 
         private val metaColumns: String =
           """c_observation_id, c_program_id, c_science_observation_id, c_state,
              c_last_invalidation, c_last_update, c_retry_at, c_failure_count,
-             c_resolved_target_id, c_error_message"""
+             c_resolved_target_id, c_error_message, c_science_duration"""
 
         val ResetCalculating: Command[Void] =
           sql"""
@@ -396,18 +400,20 @@ object TelluricTargetsService:
             VALUES ($program_id, $observation_id, $target_id)
           """.command
 
-        val InsertResolutionRequest: Command[(Observation.Id, Program.Id, Observation.Id)] =
+        val InsertResolutionRequest: Command[(Observation.Id, Program.Id, Observation.Id, TimeSpan)] =
           sql"""
             INSERT INTO t_telluric_resolution (
               c_observation_id,
               c_program_id,
               c_science_observation_id,
+              c_science_duration,
               c_state,
               c_last_invalidation
             ) VALUES (
               $observation_id,
               $program_id,
               $observation_id,
+              $time_span,
               'pending',
               now()
             )
