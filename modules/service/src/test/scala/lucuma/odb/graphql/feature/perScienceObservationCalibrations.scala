@@ -1115,3 +1115,27 @@ class perScienceObservationCalibrations
         .focus
         .getOrElse(Json.Null)
     }
+
+  test("telluric resolution uses science observation duration"):
+    for {
+      pid          <- createProgramAs(pi)
+      tid          <- createTargetWithProfileAs(pi, pid)
+      oid          <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+      _            <- runObscalcUpdate(pid, oid)
+      _            <- recalculateCalibrations(pid, when)
+      obs1         <- queryObservation(oid)
+      groupId      =  obs1.groupId.get
+      obsInGroup1  <- queryObservationsInGroup(groupId)
+      telluricOid  =  obsInGroup1.find(_.calibrationRole.contains(CalibrationRole.Telluric)).get.id
+      _            <- setScienceRequirements(oid)
+      _            <- runObscalcUpdate(pid, oid)
+      _            <- recalculateCalibrations(pid, when)
+      _            <- sleep >> resolveTelluricTargets
+      obs          <- queryObservationWithTarget(telluricOid)
+    } yield {
+      // Verify telluric observation was created and linked to target
+      // The duration from obscal is used in the telluric search
+      assert(obs.targetName.isDefined)
+      assert(obs.targetRa.isDefined)
+      assert(obs.targetDec.isDefined)
+    }

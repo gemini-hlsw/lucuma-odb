@@ -159,10 +159,15 @@ object TelluricTargetsService:
           .prepareR(Statements.LoadPendingObs)
           .use(_.option(oid))
 
-      private def mkSearchInput(coords: Coordinates, config: F2Config, brightness: BigDecimal): TelluricSearchInput =
+      private def mkSearchInput(
+        coords: Coordinates,
+        config: F2Config,
+        brightness: BigDecimal,
+        duration: TimeSpan
+      ): TelluricSearchInput =
         TelluricSearchInput(
           coordinates = coords,
-          duration = 1.hourTimeSpan,
+          duration = duration,
           brightest = brightness,
           spType = config.telluricType
         )
@@ -252,7 +257,7 @@ object TelluricTargetsService:
 
         def searchAndResolve(coords: Coordinates, config: F2Config): F[Either[String, Target.Id]] =
           val brightness = hminCache.lookup(config)
-          telluricClient.searchTarget(mkSearchInput(coords, config, brightness)).flatMap:
+          telluricClient.searchTarget(mkSearchInput(coords, config, brightness, pending.scienceDuration)).flatMap:
             // pick the first result
             case (star, catalogResult) :: _ =>
               val sidereal =

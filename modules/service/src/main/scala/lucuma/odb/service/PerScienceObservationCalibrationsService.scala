@@ -129,6 +129,19 @@ object PerScienceObservationCalibrationsService:
           .prepareR(Statements.selectTelluricObservation)
           .use(_.option((gid, CalibrationRole.Telluric)))
 
+      private def getScienceObservationDuration(
+        scienceOid: Observation.Id
+      )(using Transaction[F]): F[TimeSpan] =
+        S.session
+          .prepareR(Statements.selectScienceDuration)
+          .use(_.unique(scienceOid))
+          .recoverWith:
+            case _ =>
+              // If obscal data is not available yet, use default 1 hour
+              // This shouldn't happen in practice as obscal runs before calibration generation
+              info"No obscal data for science observation $scienceOid, using 1 hour default for telluric search" >>
+                TimeSpan.fromSeconds(3600).pure[F]
+
       private def createTelluricObservation(
         pid:             Program.Id,
         scienceOid:      Observation.Id,
@@ -178,11 +191,12 @@ object PerScienceObservationCalibrationsService:
             ).orError
 
         for
-          scienceIndex  <- obsGroupIndex(scienceOid)
-          telluricIndex = NonNegShort.unsafeFrom((scienceIndex.value + 1).toShort)
-          telluricId    <- insertTelluricObservation(pid, telluricGroupId, telluricIndex)
-          _             <- telluricTargets.requestTelluricTarget(pid, telluricId, scienceOid)
-          _             <- syncConfiguration(scienceOid, telluricId)
+          scienceIndex     <- obsGroupIndex(scienceOid)
+          telluricIndex    = NonNegShort.unsafeFrom((scienceIndex.value + 1).toShort)
+          scienceDuration  <- getScienceObservationDuration(scienceOid)
+          telluricId       <- insertTelluricObservation(pid, telluricGroupId, telluricIndex)
+          _                <- telluricTargets.requestTelluricTarget(pid, telluricId, scienceOid, scienceDuration)
+          _                <- syncConfiguration(scienceOid, telluricId)
         yield telluricId
 
       private def deleteTelluricObservationsFromGroups(
@@ -366,6 +380,14 @@ object PerScienceObservationCalibrationsService:
             FROM   t_observation
             WHERE  c_observation_id = $observation_id
           """.query(int2_nonneg)
+
+        val selectScienceDuration: Query[Observation.Id, TimeSpan] =
+          sql"""
+            SELECT (c_full_setup_time + c_sci_program_time)
+            FROM   t_obscalc
+            WHERE  c_observation_id = $observation_id
+              AND  c_odb_error IS NULL
+          """.query(time_span)
 
         def syncObservationConfiguration(
           sourceOid: Observation.Id,
