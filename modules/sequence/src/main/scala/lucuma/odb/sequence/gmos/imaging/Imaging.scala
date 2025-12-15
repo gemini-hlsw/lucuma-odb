@@ -3,11 +3,13 @@
 
 package lucuma.odb.sequence
 package gmos
-package longslit
+package imaging
 
 import cats.Monad
 import cats.data.EitherT
-import lucuma.core.enums.CalibrationRole
+import lucuma.core.enums.GmosNorthFilter
+import lucuma.core.enums.GmosSouthFilter
+import lucuma.core.enums.MosPreImaging
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.gmos.DynamicConfig
 import lucuma.core.model.sequence.gmos.StaticConfig
@@ -17,7 +19,7 @@ import lucuma.odb.data.OdbError
 
 import java.util.UUID
 
-object LongSlit:
+object Imaging:
 
   private def instantiate[F[_]: Monad, S, D](
     static:      S,
@@ -33,36 +35,36 @@ object LongSlit:
     observationId:  Observation.Id,
     estimator:      TimeEstimateCalculator[StaticConfig.GmosNorth, DynamicConfig.GmosNorth],
     namespace:      UUID,
-    expander:       SmartGcalExpander[F, DynamicConfig.GmosNorth],
     config:         Config.GmosNorth,
     acquisitionItc: Either[OdbError, IntegrationTime],
-    scienceItc:     Either[OdbError, IntegrationTime],
-    calRole:        Option[CalibrationRole],
+    scienceItc:     Either[OdbError, Map[GmosNorthFilter, IntegrationTime]],
     lastAcqReset:   Option[Timestamp]
   ): F[Either[OdbError, ExecutionConfigGenerator[StaticConfig.GmosNorth, DynamicConfig.GmosNorth]]] =
-    val static = InitialConfigs.GmosNorthStatic
+    val static = config.variant.variantType match
+      case VariantType.PreImaging => InitialConfigs.GmosNorthStatic.copy(mosPreImaging = MosPreImaging.IsMosPreImaging)
+      case _                      => InitialConfigs.GmosNorthStatic
+
     instantiate(
       static,
-      Acquisition.gmosNorth(observationId, estimator, static, namespace, config, acquisitionItc, calRole, lastAcqReset),
-      Science.gmosNorth(observationId, estimator, static, namespace, expander, config, scienceItc, calRole)
+      Acquisition.gmosNorth(observationId, estimator, static, namespace, config, acquisitionItc, lastAcqReset),
+      Science.gmosNorth(observationId, estimator, static, namespace, config, scienceItc)
     )
 
   def gmosSouth[F[_]: Monad](
     observationId:  Observation.Id,
     estimator:      TimeEstimateCalculator[StaticConfig.GmosSouth, DynamicConfig.GmosSouth],
     namespace:      UUID,
-    expander:       SmartGcalExpander[F, DynamicConfig.GmosSouth],
     config:         Config.GmosSouth,
     acquisitionItc: Either[OdbError, IntegrationTime],
-    scienceItc:     Either[OdbError, IntegrationTime],
-    calRole:        Option[CalibrationRole],
+    scienceItc:     Either[OdbError, Map[GmosSouthFilter, IntegrationTime]],
     lastAcqReset:   Option[Timestamp]
   ): F[Either[OdbError, ExecutionConfigGenerator[StaticConfig.GmosSouth, DynamicConfig.GmosSouth]]] =
-    val static = InitialConfigs.GmosSouthStatic
+    val static = config.variant.variantType match
+      case VariantType.PreImaging => InitialConfigs.GmosSouthStatic.copy(mosPreImaging = MosPreImaging.IsMosPreImaging)
+      case _                      => InitialConfigs.GmosSouthStatic
+
     instantiate(
       static,
-      Acquisition.gmosSouth(observationId, estimator, static, namespace, config, acquisitionItc, calRole, lastAcqReset),
-      Science.gmosSouth(observationId, estimator, static, namespace, expander, config, scienceItc, calRole)
+      Acquisition.gmosSouth(observationId, estimator, static, namespace, config, acquisitionItc, lastAcqReset),
+      Science.gmosSouth(observationId, estimator, static, namespace, config, scienceItc)
     )
-
-end LongSlit
