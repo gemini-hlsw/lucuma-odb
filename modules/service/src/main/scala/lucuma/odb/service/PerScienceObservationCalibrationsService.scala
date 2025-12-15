@@ -136,7 +136,7 @@ object PerScienceObservationCalibrationsService:
       )(using Transaction[F]): F[Option[TimeSpan]] =
         obscalcService.selectExecutionDigest(scienceOid).map:
           _.flatMap(_.value.toOption)
-            .map(d => d.setup.full |+| d.science.timeEstimate.programTime)
+            .map(d => d.science.timeEstimate.programTime |+| d.science.timeEstimate.nonCharged)
 
       private def createTelluricObservation(
         pid:             Program.Id,

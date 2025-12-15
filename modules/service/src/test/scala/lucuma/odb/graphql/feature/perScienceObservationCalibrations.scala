@@ -1109,7 +1109,7 @@ class perScienceObservationCalibrations
                           services.obscalcService.selectOne(oid).map:
                             _.flatMap(_.result)
                               .flatMap(_.digest)
-                              .map(d => d.setup.full |+| d.science.timeEstimate.programTime)
+                              .map(d => d.science.timeEstimate.programTime |+| d.science.timeEstimate.nonCharged)
       storedDur    <- selectMeta(telluricOid).map(_.map(_.scienceDuration))
     } yield {
       assert(obs.targetName.isDefined)
