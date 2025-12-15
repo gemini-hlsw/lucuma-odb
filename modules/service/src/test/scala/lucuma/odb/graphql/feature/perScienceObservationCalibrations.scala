@@ -34,6 +34,7 @@ import lucuma.odb.graphql.query.ExecutionTestSupportForFlamingos2
 import lucuma.odb.graphql.query.ObservingModeSetupOperations
 import lucuma.odb.graphql.subscription.SubscriptionUtils
 import lucuma.odb.json.time.transport.given
+import lucuma.odb.service.TelluricTargetsServiceSuiteSupport
 import lucuma.refined.*
 import org.http4s.client.UnexpectedStatus
 
@@ -45,7 +46,8 @@ class perScienceObservationCalibrations
   extends OdbSuite
   with SubscriptionUtils
   with ExecutionTestSupportForFlamingos2
-  with ObservingModeSetupOperations:
+  with ObservingModeSetupOperations
+  with TelluricTargetsServiceSuiteSupport:
 
   val DefaultSnAt: Wavelength = Wavelength.fromIntNanometers(510).get
 
@@ -646,6 +648,7 @@ class perScienceObservationCalibrations
       // Create F2 observation directly in the parent group
       oid              <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
       _                <- moveObservationAs(pi, oid, parentGroupId.some)  // Move to parent group
+      _                <- runObscalcUpdate(pid, oid)
       _                <- recalculateCalibrations(pid, when)
       obs              <- queryObservation(oid)
       telluricGroupId  =  obs.groupId.get
@@ -679,6 +682,7 @@ class perScienceObservationCalibrations
       gmosBefore       <- queryObservation(gmosOid)
       originalGroupId  =  f2Before.groupId
       originalIndex    =  f2Before.groupIndex
+      _                <- runObscalcUpdate(pid, f2Oid)
       _                <- recalculateCalibrations(pid, when)
       // check it is idempotent
       _                <- recalculateCalibrations(pid, when)
@@ -1064,7 +1068,6 @@ class perScienceObservationCalibrations
     yield
       assertEquals(err.status.code, 500)
 
-
   test("telluric target gets SED from telluric type when not set"):
     for {
       pid         <- createProgramAs(pi)
@@ -1085,38 +1088,6 @@ class perScienceObservationCalibrations
       assertEquals(targetSed, Some("A0_V"))
     }
 
-  private def queryObservationConstraints(oid: Observation.Id): IO[Json] =
-    query(
-      serviceUser,
-      s"""query {
-            observation(observationId: "$oid") {
-              id
-              constraintSet {
-                cloudExtinction
-                imageQuality
-                skyBackground
-                waterVapor
-                elevationRange {
-                  airMass {
-                    min
-                    max
-                  }
-                  hourAngle {
-                    minHours
-                    maxHours
-                  }
-                }
-              }
-            }
-          }"""
-    ).map { c =>
-      c.hcursor
-        .downField("observation")
-        .downField("constraintSet")
-        .focus
-        .getOrElse(Json.Null)
-    }
-
   test("telluric resolution uses science observation duration"):
     for {
       pid          <- createProgramAs(pi)
@@ -1133,10 +1104,14 @@ class perScienceObservationCalibrations
       _            <- recalculateCalibrations(pid, when)
       _            <- sleep >> resolveTelluricTargets
       obs          <- queryObservationWithTarget(telluricOid)
+      obscalcDur   <- withServicesForObscalc(serviceUser): services =>
+                        services.transactionally:
+                          services.obscalcService.selectOne(oid).map:
+                            _.flatMap(_.result)
+                              .flatMap(_.digest)
+                              .map(d => d.setup.full |+| d.science.timeEstimate.programTime)
+      storedDur    <- selectMeta(telluricOid).map(_.map(_.scienceDuration))
     } yield {
-      // Verify telluric observation was created and linked to target
-      // The duration from obscal is used in the telluric search
       assert(obs.targetName.isDefined)
-      assert(obs.targetRa.isDefined)
-      assert(obs.targetDec.isDefined)
+      assertEquals(storedDur, obscalcDur)
     }

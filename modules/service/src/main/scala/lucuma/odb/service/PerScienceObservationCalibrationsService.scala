@@ -52,6 +52,7 @@ object PerScienceObservationCalibrationsService:
       val observationService = S.observationService
       val obsModeService = S.observingModeServices
       val telluricTargets = S.telluricTargetsService
+      val obscalcService = S.obscalcService
 
       private def groupNameForObservation(
         config:          CalibrationConfigSubset,
@@ -133,12 +134,9 @@ object PerScienceObservationCalibrationsService:
       private def obsDuration(
         scienceOid: Observation.Id
       )(using Transaction[F]): F[Option[TimeSpan]] =
-        S.obscalcService
-          .selectOne(scienceOid)
-          .map:
-            _.flatMap(_.result)
-              .flatMap(_.digest)
-              .map(_.fullTimeEstimate.programTime)
+        obscalcService.selectExecutionDigest(scienceOid).map:
+          _.flatMap(_.value.toOption)
+            .map(d => d.setup.full |+| d.science.timeEstimate.programTime)
 
       private def createTelluricObservation(
         pid:             Program.Id,

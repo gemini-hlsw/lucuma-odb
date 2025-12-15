@@ -10,16 +10,17 @@ import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.core.util.CalculationState
+import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.odb.data.TelluricTargets
-import lucuma.odb.graphql.query.ExecutionTestSupportForGmos
+import lucuma.odb.graphql.query.ExecutionTestSupportForFlamingos2
 import lucuma.odb.service.Services.ServiceAccess
 import lucuma.odb.util.Codecs.*
 import skunk.*
 import skunk.codec.all.*
 import skunk.implicits.*
 
-trait TelluricTargetsServiceSuiteSupport extends ExecutionTestSupportForGmos:
+trait TelluricTargetsServiceSuiteSupport extends ExecutionTestSupportForFlamingos2:
 
   def withTelluricTargetsServiceTransactionally[A](
     f: (ServiceAccess, Transaction[IO]) ?=> TelluricTargetsService[IO] => IO[A]
@@ -39,7 +40,7 @@ trait TelluricTargetsServiceSuiteSupport extends ExecutionTestSupportForGmos:
 
   def insertPending(pending: TelluricTargets.Pending): IO[Unit] =
     withSession: session =>
-      val ins: Command[(Program.Id, Observation.Id, Observation.Id, Timestamp, Int)] =
+      val ins: Command[(Program.Id, Observation.Id, Observation.Id, Timestamp, Int, TimeSpan)] =
         sql"""
               INSERT INTO t_telluric_resolution (
                 c_program_id,
@@ -47,30 +48,33 @@ trait TelluricTargetsServiceSuiteSupport extends ExecutionTestSupportForGmos:
                 c_science_observation_id,
                 c_last_invalidation,
                 c_failure_count,
-                c_state
+                c_state,
+                c_science_duration
               ) VALUES (
                 $program_id,
                 $observation_id,
                 $observation_id,
                 $core_timestamp,
                 $int4,
-                'pending'::e_calculation_state
+                'pending'::e_calculation_state,
+                $time_span
               )
               ON CONFLICT ON CONSTRAINT t_telluric_resolution_pkey DO UPDATE
                 SET c_last_invalidation = $core_timestamp
-            """.command.contramap((p, o, s, t, f) => (p, o, s, t, f, t))
+            """.command.contramap((p, o, s, t, f, d) => (p, o, s, t, f, d, t))
 
       session.execute(ins)(
         pending.programId,
         pending.observationId,
         pending.scienceObservationId,
         pending.lastInvalidation,
-        pending.failureCount
+        pending.failureCount,
+        pending.scienceDuration
       ).void
 
   def insertMeta(meta: TelluricTargets.Meta): IO[Unit] =
     withSession: session =>
-      val ins: Command[(Program.Id, Observation.Id, Observation.Id, CalculationState, Timestamp, Timestamp, Option[Timestamp], Int, Option[Target.Id], Option[String])] =
+      val ins: Command[(Program.Id, Observation.Id, Observation.Id, CalculationState, Timestamp, Timestamp, Option[Timestamp], Int, Option[Target.Id], Option[String], TimeSpan)] =
         sql"""
               INSERT INTO t_telluric_resolution (
                 c_program_id,
@@ -82,7 +86,8 @@ trait TelluricTargetsServiceSuiteSupport extends ExecutionTestSupportForGmos:
                 c_retry_at,
                 c_failure_count,
                 c_resolved_target_id,
-                c_error_message
+                c_error_message,
+                c_science_duration
               ) VALUES (
                 $program_id,
                 $observation_id,
@@ -93,7 +98,8 @@ trait TelluricTargetsServiceSuiteSupport extends ExecutionTestSupportForGmos:
                 ${core_timestamp.opt},
                 $int4,
                 ${target_id.opt},
-                ${text.opt}
+                ${text.opt},
+                $time_span
               )
               ON CONFLICT ON CONSTRAINT t_telluric_resolution_pkey DO UPDATE
                 SET c_state = EXCLUDED.c_state,
@@ -114,7 +120,8 @@ trait TelluricTargetsServiceSuiteSupport extends ExecutionTestSupportForGmos:
         meta.retryAt,
         meta.failureCount,
         meta.resolvedTargetId,
-        meta.errorMessage
+        meta.errorMessage,
+        meta.scienceDuration
       ).void
 
   val cleanup: IO[Unit] =
@@ -182,19 +189,28 @@ trait TelluricTargetsServiceSuiteSupport extends ExecutionTestSupportForGmos:
   val randomTime: Timestamp =
     Timestamp.unsafeFromInstantTruncated(java.time.Instant.now)
 
-  def createPendingEntry(pid: Program.Id, oid: Observation.Id, sid: Observation.Id): TelluricTargets.Pending =
-    import lucuma.core.syntax.timespan.*
+  def createPendingEntry(
+    pid:             Program.Id,
+    oid:             Observation.Id,
+    sid:             Observation.Id,
+    scienceDuration: TimeSpan
+  ): TelluricTargets.Pending =
     TelluricTargets.Pending(
       observationId = oid,
       programId = pid,
       scienceObservationId = sid,
       lastInvalidation = randomTime,
       failureCount = 0,
-      scienceDuration = 1.hourTimeSpan
+      scienceDuration = scienceDuration
     )
 
-  def createMetaEntry(pid: Program.Id, oid: Observation.Id, sid: Observation.Id, state: CalculationState): TelluricTargets.Meta =
-    import lucuma.core.syntax.timespan.*
+  def createMetaEntry(
+    pid:             Program.Id,
+    oid:             Observation.Id,
+    sid:             Observation.Id,
+    state:           CalculationState,
+    scienceDuration: TimeSpan
+  ): TelluricTargets.Meta =
     TelluricTargets.Meta(
       observationId = oid,
       programId = pid,
@@ -206,7 +222,7 @@ trait TelluricTargetsServiceSuiteSupport extends ExecutionTestSupportForGmos:
       failureCount = 0,
       resolvedTargetId = None,
       errorMessage = None,
-      scienceDuration = 1.hourTimeSpan
+      scienceDuration = scienceDuration
     )
 
   // Convenience helpers
