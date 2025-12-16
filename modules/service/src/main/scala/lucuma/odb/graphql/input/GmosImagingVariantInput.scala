@@ -9,9 +9,9 @@ import eu.timepit.refined.types.numeric.NonNegInt
 import grackle.syntax.*
 import lucuma.core.math.Offset
 import lucuma.odb.data.Nullable
-import lucuma.odb.data.WavelengthOrder
+import lucuma.core.enums.WavelengthOrder
 import lucuma.odb.graphql.binding.*
-import lucuma.odb.sequence.data.OffsetGenerator
+import lucuma.odb.sequence.data.TelescopeConfigGenerator
 import lucuma.odb.sequence.gmos.imaging.Variant
 import lucuma.odb.sequence.gmos.imaging.VariantType
 
@@ -23,30 +23,30 @@ object GmosImagingVariantInput:
 
   case class Grouped(
     order:      Option[WavelengthOrder],
-    offsets:    Nullable[OffsetGenerator],
+    offsets:    Nullable[TelescopeConfigGenerator],
     skyCount:   Option[NonNegInt],
-    skyOffsets: Nullable[OffsetGenerator]
+    skyOffsets: Nullable[TelescopeConfigGenerator]
   ) extends GmosImagingVariantInput:
     def toVariant: Variant =
       Variant.Grouped(
         order.getOrElse(WavelengthOrder.Increasing),
-        offsets.toOption.getOrElse(OffsetGenerator.NoGenerator),
+        offsets.toOption.getOrElse(TelescopeConfigGenerator.NoGenerator),
         skyCount.getOrElse(NonNegInt.unsafeFrom(0)),
-        skyOffsets.toOption.getOrElse(OffsetGenerator.NoGenerator)
+        skyOffsets.toOption.getOrElse(TelescopeConfigGenerator.NoGenerator)
       )
     def variantType: VariantType =
       VariantType.Grouped
 
   case class Interleaved(
-    offsets:    Nullable[OffsetGenerator],
+    offsets:    Nullable[TelescopeConfigGenerator],
     skyCount:   Option[NonNegInt],
-    skyOffsets: Nullable[OffsetGenerator]
+    skyOffsets: Nullable[TelescopeConfigGenerator]
   ) extends GmosImagingVariantInput:
     def toVariant: Variant =
       Variant.Interleaved(
-        offsets.toOption.getOrElse(OffsetGenerator.NoGenerator),
+        offsets.toOption.getOrElse(TelescopeConfigGenerator.NoGenerator),
         skyCount.getOrElse(NonNegInt.unsafeFrom(0)),
-        skyOffsets.toOption.getOrElse(OffsetGenerator.NoGenerator)
+        skyOffsets.toOption.getOrElse(TelescopeConfigGenerator.NoGenerator)
       )
     def variantType: VariantType =
       VariantType.Interleaved
@@ -72,9 +72,9 @@ object GmosImagingVariantInput:
       ObjectFieldsBinding.rmap:
         case List(
           WavelengthOrderBinding.Option("order", rOrder),
-          OffsetGeneratorInput.Binding.Nullable("offsets", rOffsets),
+          TelescopeConfigGeneratorInput.Binding.Nullable("offsets", rOffsets),
           NonNegIntBinding.Option("skyCount", rSkyCount),
-          OffsetGeneratorInput.Binding.Nullable("skyOffsets", rSkyOffsets)
+          TelescopeConfigGeneratorInput.Binding.Nullable("skyOffsets", rSkyOffsets)
         ) => (rOrder, rOffsets, rSkyCount, rSkyOffsets).parMapN:
           (order, offsets, skyCount, skyOffsets) =>
             Grouped(order, offsets, skyCount, skyOffsets)
@@ -82,9 +82,9 @@ object GmosImagingVariantInput:
     val InterleavedBinding: Matcher[GmosImagingVariantInput] =
       ObjectFieldsBinding.rmap:
         case List(
-          OffsetGeneratorInput.Binding.Nullable("offsets", rOffsets),
+          TelescopeConfigGeneratorInput.Binding.Nullable("offsets", rOffsets),
           NonNegIntBinding.Option("skyCount", rSkyCount),
-          OffsetGeneratorInput.Binding.Nullable("skyOffsets", rSkyOffsets)
+          TelescopeConfigGeneratorInput.Binding.Nullable("skyOffsets", rSkyOffsets)
         ) => (rOffsets, rSkyCount, rSkyOffsets).parMapN:
           (offsets, skyCount, skyOffsets) =>
             Interleaved(offsets, skyCount, skyOffsets)
