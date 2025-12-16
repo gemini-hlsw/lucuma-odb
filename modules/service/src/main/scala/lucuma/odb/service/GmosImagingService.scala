@@ -19,12 +19,12 @@ import lucuma.odb.data.ExposureTimeModeId
 import lucuma.odb.data.ExposureTimeModeRole
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.ObservingModeRowVersion
-import lucuma.odb.data.OffsetGeneratorRole
-import lucuma.odb.data.WavelengthOrder
+import lucuma.odb.data.TelescopeConfigGeneratorRole
+import lucuma.core.enums.WavelengthOrder
 import lucuma.odb.graphql.input.GmosImagingFilterInput
 import lucuma.odb.graphql.input.GmosImagingInput
 import lucuma.odb.graphql.input.GmosImagingVariantInput
-import lucuma.odb.sequence.data.OffsetGenerator
+import lucuma.odb.sequence.data.TelescopeConfigGenerator
 import lucuma.odb.sequence.gmos.imaging.Config
 import lucuma.odb.sequence.gmos.imaging.Filter
 import lucuma.odb.sequence.gmos.imaging.Variant
@@ -145,11 +145,11 @@ object GmosImagingService:
 
             for
               c <- precursorMap
-              o <- services.offsetGeneratorService.select(oids, OffsetGeneratorRole.Object)
-              s <- services.offsetGeneratorService.select(oids, OffsetGeneratorRole.Sky)
+              o <- services.telescopeConfigGeneratorService.select(oids, TelescopeConfigGeneratorRole.Object)
+              s <- services.telescopeConfigGeneratorService.select(oids, TelescopeConfigGeneratorRole.Sky)
             yield c.view.map { case (oid, (fs, variantFields, common)) =>
-              val og = o.getOrElse(oid, OffsetGenerator.NoGenerator)
-              val sg = s.getOrElse(oid, OffsetGenerator.NoGenerator)
+              val og = o.getOrElse(oid, TelescopeConfigGenerator.NoGenerator)
+              val sg = s.getOrElse(oid, TelescopeConfigGenerator.NoGenerator)
               oid -> (fs, variantFields.toVariant(og, sg), common)
             }.toMap
 
@@ -196,12 +196,11 @@ object GmosImagingService:
               // Insert the offset generators
               _  <- ResultT.liftF:
                       Variant.offsets.getOption(input.variant).traverse_ : og =>
-                        services.offsetGeneratorService.insert(oids, og, OffsetGeneratorRole.Object)
+                        services.telescopeConfigGeneratorService.insert(oids, og, TelescopeConfigGeneratorRole.Object)
 
               _  <- ResultT.liftF:
                       Variant.skyOffsets.getOption(input.variant).traverse_ : og =>
-                        services.offsetGeneratorService.insert(oids, og, OffsetGeneratorRole.Sky)
-
+                        services.telescopeConfigGeneratorService.insert(oids, og, TelescopeConfigGeneratorRole.Sky)
             yield ()
           .value
 
@@ -294,9 +293,9 @@ object GmosImagingService:
               yield ()
 
           def updateOffsetForRole(
-            input:   Nullable[OffsetGenerator],
+            input:   Nullable[TelescopeConfigGenerator],
             variant: VariantType,
-            role:    OffsetGeneratorRole
+            role:    TelescopeConfigGeneratorRole
           ): F[Unit] =
             input.toOptionOption.fold(
               // the offset generator field was Absent, which means we should
@@ -310,7 +309,7 @@ object GmosImagingService:
                 )
               )
             ): in =>
-              services.offsetGeneratorService.replace(oids, in, role)
+              services.telescopeConfigGeneratorService.replace(oids, in, role)
 
           val offsetUpdates =
             edit.variant.fold(().pure[F]): v =>
@@ -319,8 +318,8 @@ object GmosImagingService:
                 case GmosImagingVariantInput.Interleaved(offsets, _, skyOffsets) => (offsets, skyOffsets)
                 case _                                                           => (Nullable.Null, Nullable.Null)
 
-              updateOffsetForRole(o, v.variantType, OffsetGeneratorRole.Object) *>
-              updateOffsetForRole(s, v.variantType, OffsetGeneratorRole.Sky)
+              updateOffsetForRole(o, v.variantType, TelescopeConfigGeneratorRole.Object) *>
+              updateOffsetForRole(s, v.variantType, TelescopeConfigGeneratorRole.Sky)
 
           (for
             _ <- ResultT.liftF(offsetUpdates)
@@ -350,7 +349,7 @@ object GmosImagingService:
       )(using Services[F]): F[Unit] =
         session.exec(Statements.clone(modeTableName(site), observationId, newObservationId))                       *>
         session.exec(Statements.cloneFiltersAndEtms(filterTableName(site), observationId, newObservationId, etms)) *>
-        services.offsetGeneratorService.clone(observationId, newObservationId)
+        services.telescopeConfigGeneratorService.clone(observationId, newObservationId)
 
   object Statements:
 
@@ -475,7 +474,7 @@ object GmosImagingService:
       tableName: String,
       which:     NonEmptyList[Observation.Id],
       variant:   VariantType,
-      role:      OffsetGeneratorRole
+      role:      TelescopeConfigGeneratorRole
     ): AppliedFragment =
       sql"""
         DELETE FROM t_offset_generator AS og

@@ -3,7 +3,7 @@
 
 package lucuma.odb.graphql.binding
 
-import lucuma.odb.data.WavelengthOrder
+import lucuma.core.enums.WavelengthOrder
 
 val WavelengthOrderBinding: Matcher[WavelengthOrder] =
   enumeratedBinding
