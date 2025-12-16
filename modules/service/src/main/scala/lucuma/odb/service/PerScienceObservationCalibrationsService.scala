@@ -4,6 +4,7 @@
 package lucuma.odb.service
 
 import cats.data.NonEmptyList
+import cats.data.OptionT
 import cats.effect.Concurrent
 import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.NonNegShort
@@ -51,6 +52,7 @@ object PerScienceObservationCalibrationsService:
       val observationService = S.observationService
       val obsModeService = S.observingModeServices
       val telluricTargets = S.telluricTargetsService
+      val obscalcService = S.obscalcService
 
       private def groupNameForObservation(
         config:          CalibrationConfigSubset,
@@ -129,11 +131,18 @@ object PerScienceObservationCalibrationsService:
           .prepareR(Statements.selectTelluricObservation)
           .use(_.option((gid, CalibrationRole.Telluric)))
 
+      private def obsDuration(
+        scienceOid: Observation.Id
+      )(using Transaction[F]): F[Option[TimeSpan]] =
+        obscalcService.selectExecutionDigest(scienceOid).map:
+          _.flatMap(_.value.toOption)
+            .map(d => d.science.timeEstimate.sum |+| d.science.timeEstimate.nonCharged)
+
       private def createTelluricObservation(
         pid:             Program.Id,
         scienceOid:      Observation.Id,
         telluricGroupId: Group.Id
-      )(using Transaction[F], SuperUserAccess): F[Observation.Id] =
+      )(using Transaction[F], SuperUserAccess): F[Option[Observation.Id]] =
         def obsGroupIndex(scienceOid: Observation.Id): F[NonNegShort] =
           S.session
             .prepareR(Statements.selectScienceObservationIndex)
@@ -177,13 +186,14 @@ object PerScienceObservationCalibrationsService:
               calibrationRole = CalibrationRole.Telluric.some
             ).orError
 
-        for
-          scienceIndex  <- obsGroupIndex(scienceOid)
-          telluricIndex = NonNegShort.unsafeFrom((scienceIndex.value + 1).toShort)
-          telluricId    <- insertTelluricObservation(pid, telluricGroupId, telluricIndex)
-          _             <- telluricTargets.requestTelluricTarget(pid, telluricId, scienceOid)
-          _             <- syncConfiguration(scienceOid, telluricId)
-        yield telluricId
+        (for
+          duration      <- OptionT(obsDuration(scienceOid))
+          scienceIndex  <- OptionT.liftF(obsGroupIndex(scienceOid))
+          telluricIndex  = NonNegShort.unsafeFrom((scienceIndex.value + 1).toShort)
+          telluricId    <- OptionT.liftF(insertTelluricObservation(pid, telluricGroupId, telluricIndex))
+          _             <- OptionT.liftF(telluricTargets.requestTelluricTarget(pid, telluricId, scienceOid, duration))
+          _             <- OptionT.liftF(syncConfiguration(scienceOid, telluricId))
+        yield telluricId).value
 
       private def deleteTelluricObservationsFromGroups(
         groupIds: List[Group.Id]
@@ -223,7 +233,7 @@ object PerScienceObservationCalibrationsService:
           case Some(telluricId) =>
             syncConfiguration(obs.id, telluricId).as(none[Observation.Id])
           case None             =>
-            createTelluricObservation(pid, obs.id, gid).map(_.some)
+            createTelluricObservation(pid, obs.id, gid)
 
       private def generateTelluricForScience(
         pid:  Program.Id,
@@ -374,24 +384,24 @@ object PerScienceObservationCalibrationsService:
           sql"""
             UPDATE t_observation target
             SET
-              c_cloud_extinction = source.c_cloud_extinction,
-              c_image_quality = source.c_image_quality,
-              c_sky_background = source.c_sky_background,
-              c_water_vapor = source.c_water_vapor,
-              c_air_mass_min = source.c_air_mass_min,
-              c_air_mass_max = source.c_air_mass_max,
-              c_hour_angle_min = source.c_hour_angle_min,
-              c_hour_angle_max = source.c_hour_angle_max,
-              c_spec_wavelength = source.c_spec_wavelength,
-              c_spec_resolution = source.c_spec_resolution,
+              c_cloud_extinction         = source.c_cloud_extinction,
+              c_image_quality            = source.c_image_quality,
+              c_sky_background           = source.c_sky_background,
+              c_water_vapor              = source.c_water_vapor,
+              c_air_mass_min             = source.c_air_mass_min,
+              c_air_mass_max             = source.c_air_mass_max,
+              c_hour_angle_min           = source.c_hour_angle_min,
+              c_hour_angle_max           = source.c_hour_angle_max,
+              c_spec_wavelength          = source.c_spec_wavelength,
+              c_spec_resolution          = source.c_spec_resolution,
               c_spec_wavelength_coverage = source.c_spec_wavelength_coverage,
-              c_spec_focal_plane = source.c_spec_focal_plane,
-              c_spec_focal_plane_angle = source.c_spec_focal_plane_angle,
-              c_spec_capability = source.c_spec_capability,
-              c_img_minimum_fov = source.c_img_minimum_fov,
-              c_img_narrow_filters = source.c_img_narrow_filters,
-              c_img_broad_filters = source.c_img_broad_filters,
-              c_img_combined_filters = source.c_img_combined_filters
+              c_spec_focal_plane         = source.c_spec_focal_plane,
+              c_spec_focal_plane_angle   = source.c_spec_focal_plane_angle,
+              c_spec_capability          = source.c_spec_capability,
+              c_img_minimum_fov          = source.c_img_minimum_fov,
+              c_img_narrow_filters       = source.c_img_narrow_filters,
+              c_img_broad_filters        = source.c_img_broad_filters,
+              c_img_combined_filters     = source.c_img_combined_filters
             FROM t_observation source
             WHERE source.c_observation_id = $observation_id
               AND target.c_observation_id = $observation_id

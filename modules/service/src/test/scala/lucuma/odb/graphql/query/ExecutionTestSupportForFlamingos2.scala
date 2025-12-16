@@ -275,3 +275,35 @@ trait ExecutionTestSupportForFlamingos2 extends ExecutionTestSupport:
       "observeClass" -> "NIGHT_CAL".asJson,
       "steps" -> gcalSteps.asJson
     )
+
+  def queryObservationConstraints(oid: Observation.Id): IO[Json] =
+    query(
+      serviceUser,
+      s"""query {
+            observation(observationId: "$oid") {
+              id
+              constraintSet {
+                cloudExtinction
+                imageQuality
+                skyBackground
+                waterVapor
+                elevationRange {
+                  airMass {
+                    min
+                    max
+                  }
+                  hourAngle {
+                    minHours
+                    maxHours
+                  }
+                }
+              }
+            }
+          }"""
+    ).map { c =>
+      c.hcursor
+        .downField("observation")
+        .downField("constraintSet")
+        .focus
+        .getOrElse(Json.Null)
+    }

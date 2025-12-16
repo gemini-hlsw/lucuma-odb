@@ -34,6 +34,7 @@ import lucuma.odb.graphql.query.ExecutionTestSupportForFlamingos2
 import lucuma.odb.graphql.query.ObservingModeSetupOperations
 import lucuma.odb.graphql.subscription.SubscriptionUtils
 import lucuma.odb.json.time.transport.given
+import lucuma.odb.service.TelluricTargetsServiceSuiteSupport
 import lucuma.refined.*
 import org.http4s.client.UnexpectedStatus
 
@@ -45,7 +46,8 @@ class perScienceObservationCalibrations
   extends OdbSuite
   with SubscriptionUtils
   with ExecutionTestSupportForFlamingos2
-  with ObservingModeSetupOperations:
+  with ObservingModeSetupOperations
+  with TelluricTargetsServiceSuiteSupport:
 
   val DefaultSnAt: Wavelength = Wavelength.fromIntNanometers(510).get
 
@@ -646,6 +648,7 @@ class perScienceObservationCalibrations
       // Create F2 observation directly in the parent group
       oid              <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
       _                <- moveObservationAs(pi, oid, parentGroupId.some)  // Move to parent group
+      _                <- runObscalcUpdate(pid, oid)
       _                <- recalculateCalibrations(pid, when)
       obs              <- queryObservation(oid)
       telluricGroupId  =  obs.groupId.get
@@ -679,6 +682,7 @@ class perScienceObservationCalibrations
       gmosBefore       <- queryObservation(gmosOid)
       originalGroupId  =  f2Before.groupId
       originalIndex    =  f2Before.groupIndex
+      _                <- runObscalcUpdate(pid, f2Oid)
       _                <- recalculateCalibrations(pid, when)
       // check it is idempotent
       _                <- recalculateCalibrations(pid, when)
@@ -799,12 +803,18 @@ class perScienceObservationCalibrations
       groupId      =  obs1.groupId.get
       obsInGroup1  <- queryObservationsInGroup(groupId)
       telluric1Oid =  obsInGroup1.find(_.calibrationRole.contains(CalibrationRole.Telluric)).get.id
+      scienceConds <- queryObservationConstraints(oid)
+      conds1       <- queryObservationConstraints(telluric1Oid)
       _            <- recalculateCalibrations(pid, when)
       obsInGroup2  <- queryObservationsInGroup(groupId)
       telluric2Oid =  obsInGroup2.find(_.calibrationRole.contains(CalibrationRole.Telluric)).get.id
+      conds2       <- queryObservationConstraints(telluric2Oid)
     } yield {
       assertEquals(obsInGroup2.size, 2)
       assertEquals(telluric1Oid, telluric2Oid)
+      // Verify conditions
+      assertEquals(conds1, scienceConds)
+      assertEquals(conds2, scienceConds)
     }
 
   test("changing F2 to GMOS deletes telluric observation"):
@@ -1076,4 +1086,32 @@ class perScienceObservationCalibrations
     } yield {
       // Mock star has TelluricType.A0V => SED should A0V
       assertEquals(targetSed, Some("A0_V"))
+    }
+
+  test("telluric resolution uses science observation duration"):
+    for {
+      pid          <- createProgramAs(pi)
+      tid          <- createTargetWithProfileAs(pi, pid)
+      oid          <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+      _            <- runObscalcUpdate(pid, oid)
+      _            <- recalculateCalibrations(pid, when)
+      obs1         <- queryObservation(oid)
+      groupId      =  obs1.groupId.get
+      obsInGroup1  <- queryObservationsInGroup(groupId)
+      telluricOid  =  obsInGroup1.find(_.calibrationRole.contains(CalibrationRole.Telluric)).get.id
+      _            <- setScienceRequirements(oid)
+      _            <- runObscalcUpdate(pid, oid)
+      _            <- recalculateCalibrations(pid, when)
+      _            <- sleep >> resolveTelluricTargets
+      obs          <- queryObservationWithTarget(telluricOid)
+      obscalcDur   <- withServicesForObscalc(serviceUser): services =>
+                        services.transactionally:
+                          services.obscalcService.selectOne(oid).map:
+                            _.flatMap(_.result)
+                              .flatMap(_.digest)
+                              .map(d => d.science.timeEstimate.programTime |+| d.science.timeEstimate.nonCharged)
+      storedDur    <- selectMeta(telluricOid).map(_.map(_.scienceDuration))
+    } yield {
+      assert(obs.targetName.isDefined)
+      assertEquals(storedDur, obscalcDur)
     }
