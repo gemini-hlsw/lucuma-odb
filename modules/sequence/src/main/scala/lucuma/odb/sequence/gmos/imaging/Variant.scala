@@ -10,7 +10,7 @@ import eu.timepit.refined.cats.*
 import eu.timepit.refined.types.numeric.NonNegInt
 import lucuma.core.math.Offset
 import lucuma.odb.data.WavelengthOrder
-import lucuma.odb.sequence.data.OffsetGenerator
+import lucuma.odb.sequence.data.TelescopeConfigGenerator
 import lucuma.odb.sequence.syntax.hash.*
 import lucuma.odb.sequence.util.HashBytes
 import monocle.Optional
@@ -51,9 +51,9 @@ object Variant:
 
   case class Grouped(
     order:      WavelengthOrder,
-    offsets:    OffsetGenerator,
+    offsets:    TelescopeConfigGenerator,
     skyCount:   NonNegInt,
-    skyOffsets: OffsetGenerator
+    skyOffsets: TelescopeConfigGenerator
   ) extends Variant
 
   object Grouped:
@@ -61,9 +61,9 @@ object Variant:
     val Default: Grouped =
       Grouped(
         order      = WavelengthOrder.Increasing,
-        offsets    = OffsetGenerator.NoGenerator,
+        offsets    = TelescopeConfigGenerator.NoGenerator,
         skyCount   = NonNegInt.MinValue,
-        skyOffsets = OffsetGenerator.NoGenerator
+        skyOffsets = TelescopeConfigGenerator.NoGenerator
       )
 
     given HashBytes[Grouped] with
@@ -89,17 +89,17 @@ object Variant:
         )
 
   case class Interleaved(
-    offsets:    OffsetGenerator,
+    offsets:    TelescopeConfigGenerator,
     skyCount:   NonNegInt,
-    skyOffsets: OffsetGenerator
+    skyOffsets: TelescopeConfigGenerator
   ) extends Variant
 
   object Interleaved:
     val Default: Interleaved =
       Interleaved(
-        offsets    = OffsetGenerator.NoGenerator,
+        offsets    = TelescopeConfigGenerator.NoGenerator,
         skyCount   = NonNegInt.MinValue,
-        skyOffsets = OffsetGenerator.NoGenerator
+        skyOffsets = TelescopeConfigGenerator.NoGenerator
       )
 
     given HashBytes[Interleaved] with
@@ -156,8 +156,8 @@ object Variant:
           p.offset4
         )
 
-  val offsets: Optional[Variant, OffsetGenerator] =
-    Optional.apply[Variant, OffsetGenerator] {
+  val offsets: Optional[Variant, TelescopeConfigGenerator] =
+    Optional.apply[Variant, TelescopeConfigGenerator] {
       case Variant.Grouped(_, o, _, _)    => o.some
       case Variant.Interleaved(o, _, _)   => o.some
       case Variant.PreImaging(_, _, _, _) => none
@@ -167,8 +167,8 @@ object Variant:
       case v @ Variant.PreImaging(_, _, _, _) => v
     }}
 
-  val skyOffsets: Optional[Variant, OffsetGenerator] =
-    Optional.apply[Variant, OffsetGenerator] {
+  val skyOffsets: Optional[Variant, TelescopeConfigGenerator] =
+    Optional.apply[Variant, TelescopeConfigGenerator] {
       case Variant.Grouped(_, _, _, s)    => s.some
       case Variant.Interleaved(_, _, s)   => s.some
       case Variant.PreImaging(_, _, _, _) => none
@@ -188,8 +188,8 @@ object Variant:
     offset4:     Offset
   ):
     def toVariant(
-      objectGen: OffsetGenerator,
-      skyGen:    OffsetGenerator
+      objectGen: TelescopeConfigGenerator,
+      skyGen:    TelescopeConfigGenerator
     ): Variant =
       variantType match
         case VariantType.Grouped     => Grouped(order, objectGen, skyCount, skyGen)

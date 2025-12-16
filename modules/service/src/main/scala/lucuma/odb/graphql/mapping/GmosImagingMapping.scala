@@ -28,7 +28,7 @@ import lucuma.odb.graphql.table.*
 
 trait GmosImagingMapping[F[_]] extends GmosImagingView[F]
                                   with GmosImagingFilterTable[F]
-                                  with OffsetGeneratorView[F]
+                                  with TelescopeConfigGeneratorView[F]
                                   with OptionalFieldMapping[F]
                                   with Predicates[F] { this: SkunkMapping[F] =>
 
@@ -42,8 +42,8 @@ trait GmosImagingMapping[F[_]] extends GmosImagingView[F]
       SqlField("observationId", c.Grouped.ObservationId, key = true, hidden = true),
       SqlField("order",         c.Grouped.WavelengthOrder),
       SqlField("skyCount",      c.Sky.Count),
-      SqlObject("offsets",      Join(c.ObservationId, OffsetGeneratorView.ObjectObservationId)),
-      SqlObject("skyOffsets",   Join(c.ObservationId, OffsetGeneratorView.SkyObservationId)),
+      SqlObject("offsets",      Join(c.ObservationId, TelescopeConfigGeneratorView.ObjectObservationId)),
+      SqlObject("skyOffsets",   Join(c.ObservationId, TelescopeConfigGeneratorView.SkyObservationId)),
     )
 
   lazy val GmosNorthGroupedImagingMapping: ObjectMapping =
@@ -60,8 +60,8 @@ trait GmosImagingMapping[F[_]] extends GmosImagingView[F]
     ObjectMapping(p)(
       SqlField("observationId", c.Interleaved.ObservationId, key = true, hidden = true),
       SqlField("skyCount",      c.Sky.Count),
-      SqlObject("offsets",      Join(c.ObservationId, OffsetGeneratorView.ObjectObservationId)),
-      SqlObject("skyOffsets",   Join(c.ObservationId, OffsetGeneratorView.SkyObservationId)),
+      SqlObject("offsets",      Join(c.ObservationId, TelescopeConfigGeneratorView.ObjectObservationId)),
+      SqlObject("skyOffsets",   Join(c.ObservationId, TelescopeConfigGeneratorView.SkyObservationId)),
     )
 
   lazy val GmosNorthInterleavedImagingMapping: ObjectMapping =

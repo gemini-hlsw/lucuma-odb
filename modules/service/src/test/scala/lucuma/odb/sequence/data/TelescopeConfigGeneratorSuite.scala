@@ -11,7 +11,7 @@ import lucuma.core.enums.StepGuideState
 import lucuma.core.math.Angle
 import lucuma.core.math.Offset
 import lucuma.core.model.sequence.TelescopeConfig
-import lucuma.odb.sequence.data.OffsetGenerator
+import lucuma.odb.sequence.data.TelescopeConfigGenerator
 import munit.CatsEffectSuite
 import munit.ScalaCheckEffectSuite
 import org.scalacheck.Arbitrary
@@ -19,10 +19,11 @@ import org.scalacheck.Arbitrary.arbitrary
 import org.scalacheck.Gen
 import org.scalacheck.effect.PropF
 import org.scalacheck.effect.PropF.forAllF
+import lucuma.core.geom.OffsetGenerator
 
-class OffsetGeneratorSuite extends CatsEffectSuite with ScalaCheckEffectSuite:
+class TelescopeConfigGeneratorSuite extends CatsEffectSuite with ScalaCheckEffectSuite:
 
-  extension (g: OffsetGenerator)
+  extension (g: TelescopeConfigGenerator)
     def generate(
       c: Int,
       s: Long = 0L,
@@ -51,13 +52,13 @@ class OffsetGeneratorSuite extends CatsEffectSuite with ScalaCheckEffectSuite:
   test("none"):
     val expected = List.empty[TelescopeConfig]
     runTests(
-      OffsetGenerator.NoGenerator.generate(0) -> expected,
-      OffsetGenerator.NoGenerator.generate(1) -> expected,
-      OffsetGenerator.NoGenerator.generate(2) -> expected
+      TelescopeConfigGenerator.NoGenerator.generate(0) -> expected,
+      TelescopeConfigGenerator.NoGenerator.generate(1) -> expected,
+      TelescopeConfigGenerator.NoGenerator.generate(2) -> expected
     )
 
   test("enumerated"):
-    val gen = OffsetGenerator.Enumerated(
+    val gen = TelescopeConfigGenerator.Enumerated(
       NonEmptyList.of(
         telescopeConfig(10, 11),
         telescopeConfig(12, 13, StepGuideState.Disabled)
@@ -77,7 +78,7 @@ class OffsetGeneratorSuite extends CatsEffectSuite with ScalaCheckEffectSuite:
         TelescopeConfig(Offset.signedMicroarcseconds.reverseGet(p, q), StepGuideState.Enabled)
 
     // 2:1 aspect ratio
-    val gen = OffsetGenerator.Uniform(offset(10, 10), offset(30, 20))
+    val gen = TelescopeConfigGenerator.FromOffsetGenerator(OffsetGenerator.Uniform(offset(10, 10), offset(30, 20)))
 
     // 4 x 2
     val expected8: List[TelescopeConfig] =
@@ -113,7 +114,7 @@ class OffsetGeneratorSuite extends CatsEffectSuite with ScalaCheckEffectSuite:
       .withMaxDiscardRatio(5)
 
   private def randomGeneratorTest(
-    gen:            OffsetGenerator,
+    gen:            TelescopeConfigGenerator,
     sizeArcseconds: Int
   ): PropF[IO] =
     forAllF: (cs: CountAndSeed) =>
@@ -126,13 +127,13 @@ class OffsetGeneratorSuite extends CatsEffectSuite with ScalaCheckEffectSuite:
 
   test("random"):
     randomGeneratorTest(
-      OffsetGenerator.Random(Angle.signedMicroarcseconds.reverseGet(20_000_000), Offset.Zero),
+      TelescopeConfigGenerator.FromOffsetGenerator(OffsetGenerator.Random(Angle.signedMicroarcseconds.reverseGet(20_000_000), Offset.Zero)),
       20
     )
 
 
   test("spiral"):
     randomGeneratorTest(
-      OffsetGenerator.Spiral(Angle.signedMicroarcseconds.reverseGet(20_000_000), Offset.Zero),
+      TelescopeConfigGenerator.FromOffsetGenerator(OffsetGenerator.Spiral(Angle.signedMicroarcseconds.reverseGet(20_000_000), Offset.Zero)),
       20
     )
