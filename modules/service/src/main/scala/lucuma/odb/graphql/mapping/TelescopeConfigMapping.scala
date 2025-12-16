@@ -29,7 +29,7 @@ trait TelescopeConfigMapping[F[_]] extends EnumeratedOffsetView[F] with StepReco
   lazy val TelescopeConfigMappings: List[ObjectMapping] =
     List(
       telescopeConfigMappingAtPath(
-        EnumeratedOffsetGeneratorType / "values",
+        EnumeratedTelescopeConfigGeneratorType / "values",
         EnumeratedOffsetView.GuideState,
         "observationId" -> EnumeratedOffsetView.ObservationId,
         "role"          -> EnumeratedOffsetView.OffsetGeneratorRole,

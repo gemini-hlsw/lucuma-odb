@@ -58,8 +58,8 @@ import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.data.StepExecutionState
 import lucuma.odb.data.Tag
 import lucuma.odb.data.UserType
-import lucuma.odb.data.WavelengthOrder
-import lucuma.odb.sequence.data.OffsetGeneratorType
+import lucuma.core.enums.WavelengthOrder
+import lucuma.odb.sequence.data.TelescopeConfigGeneratorType
 import lucuma.odb.sequence.gmos.imaging.VariantType as GmosImagingVariantType
 
 import java.time.LocalDate
@@ -168,7 +168,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[ObservationReference](ObservationReferenceLabelType),
       LeafMapping[ObservationWorkflowState](ObservationWorkflowStateType),
       LeafMapping[ObserveClass](ObserveClassType),
-      LeafMapping[OffsetGeneratorType](OffsetGeneratorTypeType),
+      LeafMapping[TelescopeConfigGeneratorType](TelescopeConfigGeneratorTypeType),
       LeafMapping[Partner](PartnerType),
       LeafMapping[PartnerLinkType](PartnerLinkTypeType),
       LeafMapping[PosAngleConstraintMode](PosAngleConstraintModeType),

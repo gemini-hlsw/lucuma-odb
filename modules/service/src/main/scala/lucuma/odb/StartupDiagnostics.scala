@@ -75,7 +75,7 @@ object StartupDiagnostics:
           checkPostgresEnum(observing_mode_row_version),
           checkPostgresEnum(observing_mode_type),
           checkPostgresEnum(offset_generator_role),
-          checkPostgresEnum(offset_generator_type),
+          checkPostgresEnum(telescope_config_generator_type),
           checkPostgresEnum(pac_mode),
           checkPostgresEnum(partner_link_type),
           checkPostgresEnum(program_type),

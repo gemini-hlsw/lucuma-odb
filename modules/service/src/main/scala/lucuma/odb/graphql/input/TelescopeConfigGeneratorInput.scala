@@ -12,11 +12,12 @@ import lucuma.core.math.Offset
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.binding.*
-import lucuma.odb.sequence.data.OffsetGenerator
+import lucuma.odb.sequence.data.TelescopeConfigGenerator
+import lucuma.core.geom.OffsetGenerator
 
-object OffsetGeneratorInput:
+object TelescopeConfigGeneratorInput:
 
-  private val EnumeratedBinding: Matcher[OffsetGenerator.Enumerated] =
+  private val EnumeratedBinding: Matcher[TelescopeConfigGenerator.Enumerated] =
     ObjectFieldsBinding.rmap:
       case List(
         TelescopeConfigInput.Binding.List("values", rValues)
@@ -24,33 +25,33 @@ object OffsetGeneratorInput:
         NonEmptyList
           .fromList(lst)
           .fold(OdbError.InvalidArgument("'enumerated' offsets must have at least one offset position".some).asFailure): nel =>
-            OffsetGenerator.Enumerated(nel).success
+            TelescopeConfigGenerator.Enumerated(nel).success
 
-  private val RandomBinding: Matcher[OffsetGenerator.Random] =
+  private val RandomBinding: Matcher[TelescopeConfigGenerator.FromOffsetGenerator] =
     ObjectFieldsBinding.rmap:
       case List(
         AngleInput.Binding("size", rSize),
         OffsetInput.Binding.Option("center", rCenter)
       ) => (rSize, rCenter).parMapN: (size, center) =>
-        OffsetGenerator.Random(size, center.getOrElse(Offset.Zero))
+        TelescopeConfigGenerator.FromOffsetGenerator(OffsetGenerator.Random(size, center.getOrElse(Offset.Zero)))
 
-  private val SpiralBinding: Matcher[OffsetGenerator.Spiral] =
+  private val SpiralBinding: Matcher[TelescopeConfigGenerator.FromOffsetGenerator] =
     ObjectFieldsBinding.rmap:
       case List(
         AngleInput.Binding("size", rSize),
         OffsetInput.Binding.Option("center", rCenter)
       ) => (rSize, rCenter).parMapN: (size, center) =>
-        OffsetGenerator.Spiral(size, center.getOrElse(Offset.Zero))
+        TelescopeConfigGenerator.FromOffsetGenerator(OffsetGenerator.Spiral(size, center.getOrElse(Offset.Zero)))
 
-  private val UniformBinding: Matcher[OffsetGenerator.Uniform] =
+  private val UniformBinding: Matcher[TelescopeConfigGenerator.FromOffsetGenerator] =
     ObjectFieldsBinding.rmap:
       case List(
         OffsetInput.Binding("cornerA", rCornerA),
         OffsetInput.Binding("cornerB", rCornerB)
       ) => (rCornerA, rCornerB).parMapN: (a, b) =>
-        OffsetGenerator.Uniform(a, b)
+        TelescopeConfigGenerator.FromOffsetGenerator(OffsetGenerator.Uniform(a, b))
 
-  val Binding: Matcher[OffsetGenerator] =
+  val Binding: Matcher[TelescopeConfigGenerator] =
     ObjectFieldsBinding.rmap:
       case List(
         EnumeratedBinding.Option("enumerated", rEnumerated),
@@ -58,7 +59,7 @@ object OffsetGeneratorInput:
         SpiralBinding.Option("spiral", rSpiral),
         UniformBinding.Option("uniform", rUniform)
       ) => (rEnumerated, rRandom, rSpiral, rUniform).parTupled.flatMap:
-        case (None,    None,    None,    None   ) => OffsetGenerator.NoGenerator.success
+        case (None,    None,    None,    None   ) => TelescopeConfigGenerator.NoGenerator.success
         case (Some(e), None,    None,    None   ) => e.success
         case (None,    Some(r), None,    None   ) => r.success
         case (None,    None,    Some(s), None   ) => s.success

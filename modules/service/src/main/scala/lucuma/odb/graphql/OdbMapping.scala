@@ -203,7 +203,7 @@ object OdbMapping {
           with MutationMapping[F]
           with NonsiderealMapping[F]
           with AttachmentMapping[F]
-          with OffsetGeneratorMapping[F]
+          with TelescopeConfigGeneratorMapping[F]
           with ObscalcUpdateMapping[F]
           with ObservationEditMapping[F]
           with ObservationMapping[F]
@@ -581,7 +581,7 @@ object OdbMapping {
                 GmosSouthGratingConfigMappings,
                 LeafMappings,
                 ObservationSelectResultMappings,
-                OffsetGeneratorMappings,
+                TelescopeConfigGeneratorMappings,
                 OffsetMappings,
                 RegionMappings,
                 RightAscensionMappings,
