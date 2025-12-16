@@ -3628,13 +3628,13 @@ will be defined.  All others will be `null`.  The `generatorType` corresponds to
 the entry (if any) that is defined.  If the generator type of `NONE`, then none
 of the entries will be defined.
 """
-type OffsetGenerator {
-  generatorType: OffsetGeneratorType!
+type TelescopeConfigGenerator {
+  generatorType: TelescopeConfigGeneratorType!
 
-  enumerated: EnumeratedOffsetGenerator
-  random:     RandomOffsetGenerator
-  spiral:     SpiralOffsetGenerator
-  uniform:    UniformOffsetGenerator
+  enumerated: EnumeratedTelescopeConfigGenerator
+  random:     RandomTelescopeConfigGenerator
+  spiral:     SpiralTelescopeConfigGenerator
+  uniform:    UniformTelescopeConfigGenerator
 }
 
 """
@@ -3642,14 +3642,14 @@ An offset generator is specified by defining one of the `enumerated`, `random`,
 `spiral` or `uniform` options.  If none are defined, the generator type will be
 `NONE`.
 """
-input OffsetGeneratorInput {
-  enumerated: EnumeratedOffsetGeneratorInput
-  random:     RandomOffsetGeneratorInput
-  spiral:     SpiralOffsetGeneratorInput
-  uniform:    UniformOffsetGeneratorInput
+input TelescopeConfigGeneratorInput @oneOf {
+  enumerated: EnumeratedTelescopeConfigGeneratorInput
+  random:     RandomTelescopeConfigGeneratorInput
+  spiral:     SpiralTelescopeConfigGeneratorInput
+  uniform:    UniformTelescopeConfigGeneratorInput
 }
 
-enum OffsetGeneratorType {
+enum TelescopeConfigGeneratorType {
   NONE,
   ENUMERATED,
   RANDOM,
@@ -3660,14 +3660,14 @@ enum OffsetGeneratorType {
 """
 In the `ENUMERATED` option offsets are explicitly specified instead of calculated.
 """
-type EnumeratedOffsetGenerator {
+type EnumeratedTelescopeConfigGenerator {
   # Explicit offset (and guiding values).  If the list is empty then this
   # is essentially the same as `NONE`.  If the ITC prescribes _n_ steps for
   # an observation, but only _m_ < _n_ are provided, the sequence repeats.
   values: [TelescopeConfig!]!
 }
 
-input EnumeratedOffsetGeneratorInput {
+input EnumeratedTelescopeConfigGeneratorInput {
   # TelescopeConfigInput groups an offset position with a guide state (guided or not guided).
   # Not-guided offsets are intended for sky positions.
   values: [TelescopeConfigInput!]!
@@ -3675,12 +3675,12 @@ input EnumeratedOffsetGeneratorInput {
 
 # The random offset pattern is defined by the limiting `size` and
 # the `center` point.  The offsets are random, but non-repeating.
-type RandomOffsetGenerator {
+type RandomTelescopeConfigGenerator {
   size: Angle!
   center: Offset!
 }
 
-input RandomOffsetGeneratorInput {
+input RandomTelescopeConfigGeneratorInput {
   # Radius defining the circular area in which all offsets will be placed.
   size: AngleInput!
 
@@ -3689,12 +3689,12 @@ input RandomOffsetGeneratorInput {
 }
 
 # A Fermat spiral pattern limited by the given size.
-type SpiralOffsetGenerator {
+type SpiralTelescopeConfigGenerator {
   size: Angle!
   center: Offset!
 }
 
-input SpiralOffsetGeneratorInput {
+input SpiralTelescopeConfigGeneratorInput {
   # Radius defining the circular area in which all offsets will be placed.
   size: AngleInput!
 
@@ -3706,7 +3706,7 @@ input SpiralOffsetGeneratorInput {
 Defines a region of the sky using two corners.  Exposures are
 then distributed across this region as evenly as possible.
 """
-type UniformOffsetGenerator {
+type UniformTelescopeConfigGenerator {
   cornerA: Offset!
   cornerB: Offset!
 }
@@ -3715,7 +3715,7 @@ type UniformOffsetGenerator {
 Defines the region over which the pattern of offsets will be distributed.
 The number of points is determined by integration time calculator results.
 """
-input UniformOffsetGeneratorInput {
+input UniformTelescopeConfigGeneratorInput {
   cornerA: OffsetInput!
   cornerB: OffsetInput!
 }
@@ -9204,7 +9204,7 @@ type GmosGroupedImagingVariant {
   Offset generator for the science object datasets. The same offset sequence is
   created for each filter using the specified generator.
   """
-  offsets: OffsetGenerator
+  offsets: TelescopeConfigGenerator
 
   """
   Number of sky positions to collect before and after object datasets. For
@@ -9216,7 +9216,7 @@ type GmosGroupedImagingVariant {
   """
   Offset generator to use for the sky datasets.
   """
-  skyOffsets: OffsetGenerator
+  skyOffsets: TelescopeConfigGenerator
 }
 
 """
@@ -9236,7 +9236,7 @@ input GmosGroupedImagingVariantInput {
   created for each filter using the specified generator.  If not specified, no
   offsets will be used.
   """
-  offsets: OffsetGeneratorInput
+  offsets: TelescopeConfigGeneratorInput
 
   """
   Number of sky positions to collect before and after object datasets. For
@@ -9250,7 +9250,7 @@ input GmosGroupedImagingVariantInput {
   Offset generator to use for sky positions.  If not specified, no offsets will
   be used.
   """
-  skyOffsets: OffsetGeneratorInput
+  skyOffsets: TelescopeConfigGeneratorInput
 
 }
 
@@ -9264,7 +9264,7 @@ type GmosInterleavedImagingVariant {
   Offset generator for the science object datasets. The offset pattern is
   applied to the sequence of science datasets as a whole.
   """
-  offsets: OffsetGenerator
+  offsets: TelescopeConfigGenerator
 
   """
   Number of sky positions to collect, per filter, before and after a series of
@@ -9276,7 +9276,7 @@ type GmosInterleavedImagingVariant {
   """
   Offset generator to use for the sky datasets.
   """
-  skyOffsets: OffsetGenerator
+  skyOffsets: TelescopeConfigGenerator
 }
 
 """
@@ -9288,7 +9288,7 @@ input GmosInterleavedImagingVariantInput {
   Offset generator for the science object datasets. The offset pattern is
   created for the sequence of science datasets as a whole.
   """
-  offsets: OffsetGeneratorInput
+  offsets: TelescopeConfigGeneratorInput
 
   """
   Number of sky positions to collect, per filter, before and after a series of
@@ -9302,7 +9302,7 @@ input GmosInterleavedImagingVariantInput {
   be used.  When specifying an offset generator, the skyCount should be set to
   a value greater than 0.
   """
-  skyOffsets: OffsetGeneratorInput
+  skyOffsets: TelescopeConfigGeneratorInput
 
 }
 
