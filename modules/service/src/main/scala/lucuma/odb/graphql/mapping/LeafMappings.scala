@@ -58,7 +58,7 @@ import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.data.StepExecutionState
 import lucuma.odb.data.Tag
 import lucuma.odb.data.UserType
-import lucuma.odb.data.WavelengthOrder
+import lucuma.core.enums.WavelengthOrder
 import lucuma.odb.sequence.data.TelescopeConfigGeneratorType
 import lucuma.odb.sequence.gmos.imaging.VariantType as GmosImagingVariantType
 

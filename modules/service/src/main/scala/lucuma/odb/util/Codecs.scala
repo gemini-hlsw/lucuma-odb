@@ -77,7 +77,7 @@ import lucuma.odb.data.Tag
 import lucuma.odb.data.TimeCharge.DiscountDiscriminator
 import lucuma.odb.data.TimingWindowEndTypeEnum
 import lucuma.odb.data.UserType
-import lucuma.odb.data.WavelengthOrder
+import lucuma.core.enums.WavelengthOrder
 import lucuma.odb.sequence.data.TelescopeConfigGeneratorType
 import lucuma.odb.service.ObservationWorkflowService
 import lucuma.odb.syntax.exposureTimeMode.*

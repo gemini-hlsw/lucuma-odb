@@ -19,7 +19,7 @@ import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.arb.ArbExposureTimeMode
 import lucuma.core.util.arb.ArbEnumerated
 import lucuma.odb.data.Nullable
-import lucuma.odb.data.WavelengthOrder
+import lucuma.core.enums.WavelengthOrder
 import lucuma.odb.data.arb.ArbNullable.given
 import lucuma.odb.sequence.data.TelescopeConfigGenerator
 import lucuma.odb.sequence.data.arb.ArbTelescopeConfigGenerator

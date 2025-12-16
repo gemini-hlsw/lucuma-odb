@@ -3642,7 +3642,7 @@ An offset generator is specified by defining one of the `enumerated`, `random`,
 `spiral` or `uniform` options.  If none are defined, the generator type will be
 `NONE`.
 """
-input TelescopeConfigGeneratorInput {
+input TelescopeConfigGeneratorInput @oneOf {
   enumerated: EnumeratedTelescopeConfigGeneratorInput
   random:     RandomTelescopeConfigGeneratorInput
   spiral:     SpiralTelescopeConfigGeneratorInput
