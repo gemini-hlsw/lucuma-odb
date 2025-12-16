@@ -12,12 +12,14 @@ import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.Flamingos2Disperser
 import lucuma.core.enums.Flamingos2Filter
 import lucuma.core.enums.Flamingos2Fpu
+import lucuma.core.enums.StellarLibrarySpectrum
 import lucuma.core.enums.TargetDisposition
 import lucuma.core.math.Coordinates
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.TelluricType
+import lucuma.core.model.UnnormalizedSED
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.NewType
 import lucuma.core.util.Timestamp
@@ -237,11 +239,21 @@ object TelluricTargetsService:
                                     )
               } yield targetId
 
+        extension (target: Target.Sidereal)
+          def sedFromTelluricType(telluricType: TelluricType): Target.Sidereal =
+            val sed = telluricType match
+              case TelluricType.Solar => UnnormalizedSED.StellarLibrary(StellarLibrarySpectrum.G2V)
+              case _                  => UnnormalizedSED.StellarLibrary(StellarLibrarySpectrum.A0V)
+            Target.Sidereal.unnormalizedSED.modify(_.orElse(sed.some))(target)
+
         def searchAndResolve(coords: Coordinates, config: F2Config): F[Either[String, Target.Id]] =
           val brightness = hminCache.lookup(config)
           telluricClient.searchTarget(mkSearchInput(coords, config, brightness)).flatMap:
+            // pick the first result
             case (star, catalogResult) :: _ =>
-              val sidereal = catalogResult.map(_.target).getOrElse(star.asSiderealTarget)
+              val sidereal =
+                catalogResult.map(_.target).getOrElse(star.asSiderealTarget).sedFromTelluricType(config.telluricType)
+
               info"Found telluric star HIP ${star.hip} for observation ${pending.observationId}" *>
                 createAndLinkTarget(sidereal).map(_.asRight)
             case Nil =>
@@ -413,4 +425,3 @@ object TelluricTargetsService:
           ON   config.c_instrument = f2config.c_instrument AND config.c_index = f2config.c_index
         WHERE  config.c_instrument = 'Flamingos2'
       """.query(flamingos_2_disperser *: flamingos_2_filter *: flamingos_2_fpu *: numeric.opt *: numeric.opt)
-

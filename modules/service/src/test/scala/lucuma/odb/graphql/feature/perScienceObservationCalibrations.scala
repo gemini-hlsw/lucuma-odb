@@ -214,6 +214,32 @@ class perScienceObservationCalibrations
       c.hcursor.downField("target").focus.exists(!_.isNull)
     }
 
+  private def queryTargetSed(tid: lucuma.core.model.Target.Id): IO[Option[String]] =
+    query(
+      serviceUser,
+      s"""query {
+            target(targetId: "$tid") {
+              sourceProfile {
+                point {
+                  bandNormalized {
+                    sed { stellarLibrary }
+                  }
+                }
+              }
+            }
+          }"""
+    ).map { c =>
+      c.hcursor
+        .downField("target")
+        .downField("sourceProfile")
+        .downField("point")
+        .downField("bandNormalized")
+        .downField("sed")
+        .downField("stellarLibrary")
+        .as[String]
+        .toOption
+    }
+
   private def queryGroup(gid: Group.Id): IO[GroupInfo] =
     query(
       serviceUser,
@@ -1031,3 +1057,23 @@ class perScienceObservationCalibrations
       err  <- createGroupAs(pi, pid, parentGroupId = Some(gid)).intercept[UnexpectedStatus]
     yield
       assertEquals(err.status.code, 500)
+
+  test("telluric target gets SED from telluric type when not set"):
+    for {
+      pid         <- createProgramAs(pi)
+      tid         <- createTargetWithProfileAs(pi, pid)
+      oid         <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+      _           <- setScienceRequirements(oid)
+      _           <- runObscalcUpdate(pid, oid)
+      _           <- recalculateCalibrations(pid, when)
+      _           <- sleep >> resolveTelluricTargets
+      obs         <- queryObservation(oid)
+      groupId     =  obs.groupId.get
+      obsInGroup  <- queryObservationsInGroup(groupId)
+      telluricOid =  obsInGroup.find(_.calibrationRole.contains(CalibrationRole.Telluric)).get.id
+      telluricObs <- queryObservationWithTarget(telluricOid)
+      targetSed   <- telluricObs.targetId.flatTraverse(queryTargetSed)
+    } yield {
+      // Mock star has TelluricType.A0V => SED should A0V
+      assertEquals(targetSed, Some("A0_V"))
+    }
