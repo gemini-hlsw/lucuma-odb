@@ -5,6 +5,7 @@ package lucuma.odb.service
 
 import cats.data.NonEmptyList
 import cats.effect.Concurrent
+import cats.parse.*
 import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.NonNegInt
 import grackle.Result
@@ -25,12 +26,14 @@ import lucuma.odb.graphql.input.GmosImagingInput
 import lucuma.odb.graphql.input.GmosImagingVariantInput
 import lucuma.odb.sequence.data.OffsetGenerator
 import lucuma.odb.sequence.gmos.imaging.Config
+import lucuma.odb.sequence.gmos.imaging.Filter
 import lucuma.odb.sequence.gmos.imaging.Variant
 import lucuma.odb.sequence.gmos.imaging.VariantType
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.GmosCodecs.*
 import skunk.*
 import skunk.data.Arr
+import skunk.data.Type
 import skunk.implicits.*
 
 import Services.Syntax.*
@@ -110,34 +113,35 @@ object GmosImagingService:
       override def selectNorth(
         which: List[Observation.Id]
       ): F[Map[Observation.Id, Config.GmosNorth]] =
-        select(Site.GN, which, _gmos_north_filter).map: m =>
+        select(Site.GN, which, gmos_north_filter).map: m =>
           m.view.mapValues((fs, v, c) => Config.GmosNorth(v, fs, c)).toMap
 
       override def selectSouth(
         which: List[Observation.Id]
       ): F[Map[Observation.Id, Config.GmosSouth]] =
-        select(Site.GS, which, _gmos_south_filter).map: m =>
+        select(Site.GS, which, gmos_south_filter).map: m =>
           m.view.mapValues((fs, v, c) => Config.GmosSouth(v, fs, c)).toMap
 
       private def select[L](
-        site:    Site,
-        which:   List[Observation.Id],
-        filters: Codec[Arr[L]]
-      ): F[Map[Observation.Id, (NonEmptyList[L], Variant, Config.Common)]] =
+        site:   Site,
+        which:  List[Observation.Id],
+        filter: Codec[L]
+      ): F[Map[Observation.Id, (NonEmptyList[Filter[L]], Variant, Config.Common)]] =
         NonEmptyList
           .fromList(which)
-          .fold(Map.empty[Observation.Id, (NonEmptyList[L], Variant, Config.Common)].pure[F]): oids =>
+          .fold(Map.empty[Observation.Id, (NonEmptyList[Filter[L]], Variant, Config.Common)].pure[F]): oids =>
 
-            val decoder: Decoder[(NonEmptyList[L], Variant.Fields, Config.Common)] =
-              Statements.filters(filters) *: Statements.variant_fields *: Statements.common
+            val decoder: Decoder[(NonEmptyList[Filter[L]], Variant.Fields, Config.Common)] =
+              Statements.filter_list(filter) *: Statements.variant_fields *: Statements.common
 
             val precursorMap =
-              val af = Statements.select(modeViewName(site), oids)
-              session.prepareR(af.fragment.query(observation_id *: decoder)).use: pq =>
-                pq.stream(af.argument, chunkSize = 1024)
-                  .compile
-                  .toList
-                  .map(_.map((oid, fs, variantFields, common) => oid -> (fs, variantFields, common)).toMap)
+              val af = Statements.select(modeTableName(site), filterTableName(site), oids)
+              session
+                .prepareR(af.fragment.query(observation_id *: decoder)).use: pq =>
+                  pq.stream(af.argument, chunkSize = 1024)
+                    .compile
+                    .toList
+                    .map(_.map((oid, fs, variantFields, common) => oid -> (fs, variantFields, common)).toMap)
 
             for
               c <- precursorMap
@@ -350,12 +354,48 @@ object GmosImagingService:
 
   object Statements:
 
-    def filters[L](_filter_codec: Codec[Arr[L]]): Decoder[NonEmptyList[L]] =
-      _filter_codec.emap: fs =>
-        Either.fromOption(
-          NonEmptyList.fromList(fs.toList),
-          "Filters list cannot be empty"
-        )
+    // Creates the codec for a single filter / ETM pair.  This corresponds to
+    // the s_filter_exposure_time_mode composite type ("s" for struct).
+    def filter[L](filter_codec: Codec[L]): Codec[Filter[L]] =
+      (filter_codec       *:
+       exposure_time_mode
+      ).to[Filter[L]]
+
+    // Decoder for a list of fiter / ETM pairs
+    def filter_list[L](filter_codec: Codec[L]): Decoder[NonEmptyList[Filter[L]]] =
+      val fieldText: Parser0[String] =
+        Parser.charsWhile0(c => c =!= ',' && c =!= ')').string
+
+      val field: Parser0[Option[String]] =
+        fieldText.map:
+          case ""     => none
+          case "null" => none
+          case s      => s.some
+
+      val fields: Parser0[List[Option[String]]] =
+        (field ~ (Parser.char(',') *> field).rep0).map: (h, t) =>
+          h :: t
+
+      val row: Parser[List[Option[String]]] =
+        fields.with1.between(Parser.char('('), Parser.char(')'))
+
+      // s_filter_exposure_time_mode codec
+      val codec = filter(filter_codec)
+
+      def encode(a: Filter[L]): String =
+        codec.encode(a).map(_.getOrElse("")).mkString("(", ",", ")")
+
+      def decode(s: String): Either[String, Filter[L]] =
+        row.parseAll(s) match
+          case Left(err)     => s"Could not parse the filter / exposure time mode row: ${err.toString}".asLeft
+          case Right(fields) => codec.decode(0, fields).leftMap(e => s"Filter / exposure time  mode row decoder failure: ${e.message}")
+
+      // I just need the decoder, but want to use `Codec.array`.  The encoder
+      // might work as well, but it hasn't been tested.  We'll just make the
+      // return type `Decoder`.
+      Codec
+        .array(encode, decode, Type("_s_filter_exposure_time_mode", List(Type("s_filter_exposure_time_mode", List(Type("d_tag"), Type("e_exp_time_mode"), Type("d_wavelength_pm"), Type("numeric"), Type("interval"), Type("int4"))))))
+        .eimap(arr => NonEmptyList.fromList(arr.toList).toRight("At least one filter entry expected"))(Arr.fromFoldable)
 
     val variant_fields: Decoder[Variant.Fields] =
       (gmos_imaging_variant *:
@@ -377,32 +417,59 @@ object GmosImagingService:
       ).to[Config.Common]
 
     def select(
-      viewName: String,
-      oids:     NonEmptyList[Observation.Id]
+      table:       String,
+      filterTable: String,
+      oids:        NonEmptyList[Observation.Id]
     ): AppliedFragment =
       sql"""
+        WITH selected_observations AS (
+          SELECT
+            t.c_observation_id
+          FROM #$table t
+          WHERE """(Void) |+| observationIdIn(oids) |+| sql"""
+        ),
+        aggregated_filters AS (
+          SELECT
+            f.c_observation_id,
+            array_agg(
+              ROW(
+                f.c_filter,
+                e.c_exposure_time_mode,
+                e.c_signal_to_noise_at,
+                e.c_signal_to_noise,
+                e.c_exposure_time,
+                e.c_exposure_count
+              )::s_filter_exposure_time_mode
+              ORDER BY f.c_filter
+            ) AS c_filters
+          FROM #$filterTable f
+          JOIN t_exposure_time_mode e ON e.c_exposure_time_mode_id = f.c_exposure_time_mode_id
+          JOIN selected_observations s ON s.c_observation_id  = f.c_observation_id
+          WHERE f.c_version = 'current'
+          GROUP BY f.c_observation_id
+        )
         SELECT
-          c_observation_id,
-          c_filters,
-          c_variant,
-          c_wavelength_order,
-          c_sky_count,
-          c_pre_imaging_off1_p,
-          c_pre_imaging_off1_q,
-          c_pre_imaging_off2_p,
-          c_pre_imaging_off2_q,
-          c_pre_imaging_off3_p,
-          c_pre_imaging_off3_q,
-          c_pre_imaging_off4_p,
-          c_pre_imaging_off4_q,
-          c_bin_default,
-          c_bin,
-          c_amp_read_mode,
-          c_amp_gain,
-          c_roi
-        FROM #$viewName
-        WHERE
-      """(Void) |+| observationIdIn(oids)
+          t.c_observation_id,
+          f.c_filters,
+          t.c_variant,
+          t.c_wavelength_order,
+          t.c_sky_count,
+          t.c_pre_imaging_off1_p,
+          t.c_pre_imaging_off1_q,
+          t.c_pre_imaging_off2_p,
+          t.c_pre_imaging_off2_q,
+          t.c_pre_imaging_off3_p,
+          t.c_pre_imaging_off3_q,
+          t.c_pre_imaging_off4_p,
+          t.c_pre_imaging_off4_q,
+          t.c_bin_default,
+          t.c_bin,
+          t.c_amp_read_mode,
+          t.c_amp_gain,
+          t.c_roi
+        FROM #$table t
+        JOIN aggregated_filters f ON f.c_observation_id = t.c_observation_id;
+      """(Void)
 
     def deleteOffsetGeneratorWhenNotMatchingVariant(
       tableName: String,

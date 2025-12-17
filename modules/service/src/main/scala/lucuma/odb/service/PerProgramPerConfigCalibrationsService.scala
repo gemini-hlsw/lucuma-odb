@@ -66,7 +66,7 @@ object PerProgramPerConfigCalibrationsService:
         calibConfigs: List[ObsExtract[CalibrationConfigSubset]]
       ): Map[CalibrationConfigSubset, CalObsProps] =
         calibConfigs.groupBy(_.data).map { case (k, v) =>
-          val w = v.map(_.itc.map(_.spectroscopy.exposureTimeMode.at)).flattenOption match
+          val w = v.map(_.itc.flatMap(_.spectroscopy.headOption).map(_.exposureTimeMode.at)).flattenOption match
             case Nil =>
                none[Wavelength]
             case ws  =>
