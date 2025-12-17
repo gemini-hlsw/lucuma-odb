@@ -30,7 +30,7 @@ sealed trait Config[L: Enumerated]:
 
   def variant: Variant
 
-  def filters: NonEmptyList[L]
+  def filters: NonEmptyList[Filter[L]]
 
   def bin: GmosBinning =
     explicitBin.getOrElse(defaultBin)
@@ -105,7 +105,7 @@ object Config:
 
   final case class GmosNorth (
     variant: Variant,
-    filters: NonEmptyList[GmosNorthFilter],
+    filters: NonEmptyList[Filter[GmosNorthFilter]],
     common:  Common
   ) extends Config[GmosNorthFilter]:
 
@@ -132,7 +132,7 @@ object Config:
 
   final case class GmosSouth(
     variant: Variant,
-    filters: NonEmptyList[GmosSouthFilter],
+    filters: NonEmptyList[Filter[GmosSouthFilter]],
     common:  Common
   ) extends Config[GmosSouthFilter]:
 
