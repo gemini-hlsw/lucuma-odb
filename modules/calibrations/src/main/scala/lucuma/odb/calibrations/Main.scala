@@ -192,7 +192,7 @@ object CMain extends MainParams {
           services = services
         )
 
-  def services[F[_]: Temporal: Parallel: UUIDGen: Trace: Logger: LoggerFactory](
+  def services[F[_]: Temporal: UUIDGen: Trace: Logger: LoggerFactory](
     user: Option[User],
     enums: Enums,
     emailConfig: Config.Email,

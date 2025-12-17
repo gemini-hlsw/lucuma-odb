@@ -4,7 +4,6 @@
 package lucuma.odb.service
 
 import cats.Order
-import cats.Parallel
 import cats.data.EitherT
 import cats.data.NonEmptyChain
 import cats.data.NonEmptyList
@@ -21,7 +20,6 @@ import cats.syntax.functor.*
 import cats.syntax.functorFilter.*
 import cats.syntax.option.*
 import cats.syntax.order.*
-import cats.syntax.parallel.*
 import cats.syntax.traverse.*
 import eu.timepit.refined.cats.*
 import eu.timepit.refined.types.numeric.PosInt
@@ -35,7 +33,6 @@ import io.circe.syntax.*
 import lucuma.core.data.Zipper
 import lucuma.core.data.ZipperCodec.given
 import lucuma.core.enums.Band
-import lucuma.core.enums.SequenceType
 import lucuma.core.math.SignalToNoise
 import lucuma.core.math.SingleSN
 import lucuma.core.math.TotalSN
@@ -48,7 +45,6 @@ import lucuma.itc.AsterismIntegrationTimes
 import lucuma.itc.IntegrationTime
 import lucuma.itc.SignalToNoiseAt
 import lucuma.itc.TargetIntegrationTime
-import lucuma.itc.client.ClientCalculationResult
 import lucuma.itc.client.InstrumentMode
 import lucuma.itc.client.ItcClient
 import lucuma.odb.data.Md5Hash
@@ -253,7 +249,7 @@ object ItcService {
 
   }
 
-  def instantiate[F[_]: Concurrent: Parallel: Logger](client: ItcClient[F])(using Services[F]): ItcService[F] =
+  def instantiate[F[_]: Concurrent: Logger](client: ItcClient[F])(using Services[F]): ItcService[F] =
     new ItcService[F] {
 
       override def lookup(
@@ -273,7 +269,7 @@ object ItcService {
       )(using NoTransaction[F]): F[Either[OdbError, AsterismResults]] =
         (for {
           p <- EitherT.fromEither(params.itcInput.leftMap(m => Error.invalidObservation(oid, GeneratorParamsService.Error.MissingData(m))))
-          r <- EitherT(callRemoteItc(p))
+          r <- EitherT(callRemoteItc(oid, p))
           _ <- EitherT.liftF(services.transactionally(insertOrUpdate(pid, oid, p, r)))
         } yield r).value
 
@@ -341,7 +337,7 @@ object ItcService {
       private def safeAcquisitionCall(targets: ItcInput): F[Either[OdbError, AsterismIntegrationTimes]] =
         def go(min: TimeSpan, max: TimeSpan): F[Either[OdbError, AsterismIntegrationTimes]] =
           client
-            .imaging(targets.imagingInput(SequenceType.Acquisition), useCache = false)
+            .imaging(targets.acquisitionInput, useCache = false)
             .map:
               _.targetTimes.modifyValue:
                 _.map:
@@ -361,7 +357,7 @@ object ItcService {
               .partitionErrors
               .leftMap(convertErrors(targets))
 
-        targets.imaging.mode match
+        targets.acquisitionInput.mode match
           case InstrumentMode.GmosNorthSpectroscopy(_, _, _, _, _, _) |
                InstrumentMode.GmosSouthSpectroscopy(_, _, _, _, _, _) |
                InstrumentMode.GmosNorthImaging(_, _)                  |
@@ -374,29 +370,39 @@ object ItcService {
                lucuma.odb.sequence.flamingos2.MaxAcquisitionExposureTime)
 
       private def callRemoteItc(
+        oid:     Observation.Id,
         targets: ItcInput
       )(using NoTransaction[F]): F[Either[OdbError, AsterismResults]] =
-        (safeAcquisitionCall(targets), client.spectroscopy(targets.spectroscopyInput(SequenceType.Science), useCache = false)).parMapN {
-          case (imgResult, ClientCalculationResult(_, specOutcomes)) =>
-            val specResult = specOutcomes.partitionErrors.leftMap(convertErrors(targets))
 
-            for
-              img    <- imgResult
-              spec   <- specResult
-              result <-
-                AsterismResults.fromResults(
-                  img.value.zipWithIndex.map { case (targetIntegrationTime, index) =>
-                    val (targetId, targetInput) = targets.targetVector.getUnsafe(index)
-                    TargetResult(targetId, /*(targets.imaging, targetInput),*/ targetIntegrationTime.times.focus, targetIntegrationTime.signalToNoiseAt)
-                  },
-                  spec.value.zipWithIndex.map { case (targetIntegrationTime, index) =>
-                    val (targetId, targetInput) = targets.targetVector.getUnsafe(index)
-                    TargetResult(targetId, /*(targets.spectroscopy, targetInput),*/ targetIntegrationTime.times.focus, targetIntegrationTime.signalToNoiseAt)
-                  },
-                ).toRight(Error.targetMismatch)
-            yield result
-        }
-        .handleError: t =>
+        // TODO: for now support only a single science result. We have all the
+        // inputs we need now though in order to call ITC repeatedly and process
+        // all the results.
+
+        val res = for
+          acq <- safeAcquisitionCall(targets)
+          img <- targets.imagingInputs.headOption.traverse(input => client.imaging(input, useCache = false))
+          spc <- targets.spectroscopyInputs.headOption.traverse(input => client.spectroscopy(input, useCache = false))
+        yield
+          val sci = img.orElse(spc).toRight(OdbError.InvalidObservation(oid, s"The observation has neither imaging nor spectroscopy mode.".some))
+          acq.flatMap: acqResult =>
+            sci.flatMap: sciResult =>
+              sciResult
+                .targetTimes
+                .partitionErrors
+                .leftMap(convertErrors(targets))
+                .flatMap: sciResult =>
+                  AsterismResults.fromResults(
+                    acqResult.value.zipWithIndex.map { case (targetIntegrationTime, index) =>
+                      val (targetId, targetInput) = targets.targetVector.getUnsafe(index)
+                      TargetResult(targetId, /*(targets.imaging, targetInput),*/ targetIntegrationTime.times.focus, targetIntegrationTime.signalToNoiseAt)
+                    },
+                    sciResult.value.zipWithIndex.map { case (targetIntegrationTime, index) =>
+                      val (targetId, targetInput) = targets.targetVector.getUnsafe(index)
+                      TargetResult(targetId, /*(targets.spectroscopy, targetInput),*/ targetIntegrationTime.times.focus, targetIntegrationTime.signalToNoiseAt)
+                    }
+                  ).toRight(Error.targetMismatch)
+
+        res.handleError: t =>
           OdbError.RemoteServiceCallError(s"Error calling ITC service: ${t.getMessage}".some).asLeft
 
       @annotation.nowarn("msg=unused implicit parameter")

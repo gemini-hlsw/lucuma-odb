@@ -5,7 +5,6 @@ package lucuma.odb.sequence
 package data
 
 import cats.data.NonEmptyList
-import lucuma.core.enums.SequenceType
 import lucuma.core.model.Target
 import lucuma.core.util.Timestamp
 import lucuma.itc.client.ImagingParameters
@@ -27,7 +26,8 @@ class ItcInputSuite extends FunSuite:
     val mode = arbitrary[InstrumentMode].sample.get
     ItcInput(
       arbitrary[ImagingParameters].sample.get.copy(mode = mode),
-      arbitrary[SpectroscopyParameters].sample.get.copy(mode = mode),
+      List.empty,
+      List(arbitrary[SpectroscopyParameters].sample.get.copy(mode = mode)),
       targets,
       blindOffsetTarget
     )
@@ -41,8 +41,8 @@ class ItcInputSuite extends FunSuite:
       Some(blindOffsetTarget)
     )
 
-    val acquisitionInput = itcInput.imagingInput(SequenceType.Acquisition)
-    val scienceInput = itcInput.spectroscopyInput(SequenceType.Science)
+    val acquisitionInput = itcInput.acquisitionInput
+    val scienceInput     = itcInput.spectroscopyInputs.head
 
     // Acquisition should use blind offset target only
     assertEquals(acquisitionInput.asterism.length, 1)
@@ -60,8 +60,8 @@ class ItcInputSuite extends FunSuite:
 
     val itcInput = createItcInput(regularTargets, None)
 
-    val acquisitionInput = itcInput.imagingInput(SequenceType.Acquisition)
-    val scienceInput = itcInput.spectroscopyInput(SequenceType.Science)
+    val acquisitionInput = itcInput.acquisitionInput
+    val scienceInput     = itcInput.spectroscopyInputs.head
 
     // Both should use all regular targets when no blind offset
     assertEquals(acquisitionInput.asterism.length, 2)
@@ -77,7 +77,7 @@ class ItcInputSuite extends FunSuite:
       Some(blindOffsetTarget)
     )
 
-    val scienceInput = itcInput.spectroscopyInput(SequenceType.Science)
+    val scienceInput = itcInput.spectroscopyInputs.head
 
     // Science sequence should always use regular targets, never blind offset
     assertEquals(scienceInput.asterism.length, 1)
