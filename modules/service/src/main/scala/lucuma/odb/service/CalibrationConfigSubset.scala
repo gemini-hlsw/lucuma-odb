@@ -222,7 +222,7 @@ object CalibrationConfigSubset:
           )
         case gni: ImagingConfig.GmosNorth =>
           GmosNImagingConfigs(
-            gni.filters,
+            gni.filters.map(_._1),
             gni.bin,
             gni.ampReadMode,
             gni.ampGain,
@@ -230,7 +230,7 @@ object CalibrationConfigSubset:
           )
         case gsi: ImagingConfig.GmosSouth =>
           GmosSImagingConfigs(
-            gsi.filters,
+            gsi.filters.map(_._1),
             gsi.bin,
             gsi.ampReadMode,
             gsi.ampGain,
