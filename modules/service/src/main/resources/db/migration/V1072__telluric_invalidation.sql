@@ -33,8 +33,7 @@ BEGIN
 END;
 $$;
 
--- Listen to c_last_update obscalc changes, some of those will need to invalidate
--- telluric target. Only for science observations (not calibrations).
+-- Listen to c_last_update obscalc changes, and may invalidate the telluric target
 CREATE OR REPLACE FUNCTION cascade_telluric_invalidation()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -56,6 +55,6 @@ CREATE TRIGGER cascade_telluric_invalidation_trigger
   FOR EACH ROW
   EXECUTE FUNCTION cascade_telluric_invalidation();
 
--- hash of telluric search parameters
+-- Store hash of telluric search parameters to detect changes
 ALTER TABLE t_telluric_resolution
 ADD COLUMN c_params_hash bytea NULL;

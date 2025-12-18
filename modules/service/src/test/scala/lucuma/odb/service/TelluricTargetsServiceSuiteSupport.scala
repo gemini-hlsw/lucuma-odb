@@ -12,6 +12,7 @@ import lucuma.core.model.User
 import lucuma.core.util.CalculationState
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
+import lucuma.odb.data.Md5Hash
 import lucuma.odb.data.TelluricTargets
 import lucuma.odb.graphql.query.ExecutionTestSupportForFlamingos2
 import lucuma.odb.service.Services.ServiceAccess
@@ -185,6 +186,15 @@ trait TelluricTargetsServiceSuiteSupport extends ExecutionTestSupportForFlamingo
       """.query(calculation_state)
       session.unique(query)(oid)
 
+  def selectParamsHash(oid: Observation.Id): IO[Option[Md5Hash]] =
+    withSession: session =>
+      val query = sql"""
+        SELECT c_params_hash
+        FROM t_telluric_resolution
+        WHERE c_observation_id = $observation_id
+      """.query(md5_hash.opt)
+      session.unique(query)(oid)
+
   // Test data factories
   val randomTime: Timestamp =
     Timestamp.unsafeFromInstantTruncated(java.time.Instant.now)
@@ -201,7 +211,8 @@ trait TelluricTargetsServiceSuiteSupport extends ExecutionTestSupportForFlamingo
       scienceObservationId = sid,
       lastInvalidation = randomTime,
       failureCount = 0,
-      scienceDuration = scienceDuration
+      scienceDuration = scienceDuration,
+      paramsHash = None
     )
 
   def createMetaEntry(

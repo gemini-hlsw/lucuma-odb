@@ -34,6 +34,8 @@ import lucuma.core.enums.SequenceType
 import lucuma.core.enums.SlewStage
 import lucuma.core.enums.StepStage
 import lucuma.core.enums.TimeAccountingCategory
+import lucuma.core.math.Angle
+import lucuma.core.math.Coordinates
 import lucuma.core.model.CallForProposals
 import lucuma.core.model.Client
 import lucuma.core.model.ConfigurationRequest
@@ -1435,6 +1437,36 @@ trait DatabaseOperations { this: OdbSuite =>
               id
               name
             }
+          }
+        }
+      """
+    ).void
+
+  def updateTargetPropertiesAs(user: User, tid: Target.Id, coords: Coordinates, rv: Double = 0.0): IO[Unit] =
+    query(
+      user = user,
+      query = s"""
+        mutation {
+          updateTargets(input: {
+            SET: {
+              sidereal: {
+                ra: { degrees: ${coords.ra.toAngle.toDoubleDegrees} }
+                dec: { degrees: ${coords.dec.toAngle.toDoubleDegrees} }
+                radialVelocity: { metersPerSecond: $rv }
+                epoch: "J2000.000"
+              },
+              sourceProfile: {
+                point: {
+                  bandNormalized: {
+                    sed: { stellarLibrary: B5_III },
+                    brightnesses: [{ band: R, value: 15.0, units: VEGA_MAGNITUDE }]
+                  }
+                }
+              }
+            }
+            WHERE: { id: { EQ: "$tid" } }
+          }) {
+            targets { id }
           }
         }
       """

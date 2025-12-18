@@ -1115,3 +1115,31 @@ class perScienceObservationCalibrations
       assert(obs.targetName.isDefined)
       assertEquals(storedDur, obscalcDur)
     }
+
+  test("coordinate change triggers re-resolution with new hash"):
+    for {
+      pid          <- createProgramAs(pi)
+      tid          <- createTargetWithProfileAs(pi, pid)
+      oid          <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+      _            <- setScienceRequirements(oid)
+      _            <- runObscalcUpdate(pid, oid)
+      _            <- recalculateCalibrations(pid, when)
+      _            <- sleep >> resolveTelluricTargets
+      obs1         <- queryObservation(oid)
+      groupId      =  obs1.groupId.get
+      obsInGroup   <- queryObservationsInGroup(groupId)
+      telluricOid  =  obsInGroup.find(_.calibrationRole.contains(CalibrationRole.Telluric)).get.id
+      hash1        <- selectParamsHash(telluricOid)
+      meta1        <- selectMeta(telluricOid)
+      _            <- updateTargetPropertiesAs(pi, tid, Coordinates.Zero)
+      _            <- runObscalcUpdate(pid, oid)
+      _            <- sleep >> resolveTelluricTargets
+      hash2        <- selectParamsHash(telluricOid)
+      meta2        <- selectMeta(telluricOid)
+    } yield {
+      assert(hash1.isDefined)
+      assert(meta1.exists(_.resolvedTargetId.isDefined))
+      assertNotEquals(hash1, hash2)
+      // The should have different ids but our mock service returns always the same
+      assert(meta2.exists(_.resolvedTargetId.isDefined))
+    }
