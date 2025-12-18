@@ -38,8 +38,6 @@ object TelluricTargetsDaemon:
     // Filter for transitions TO 'pending' state
     val eventStream: Stream[F, TelluricTargets.Pending] =
       topic.subscribe(1024)
-        .evalTap: e =>
-          info"Received telluric topic event: obs=${e.observationId}, oldState=${e.oldState}, newState=${e.newState}"
         .evalMapFilter: e =>
           Option
             .when(
@@ -47,7 +45,6 @@ object TelluricTargetsDaemon:
               e.newState.exists(_ === CalculationState.Pending)
             )(e.observationId)
             .flatTraverse: oid =>
-              info"Loading pending entry for invalidated observation $oid" *>
               services.useTransactionally:
                 Services.asSuperUser:
                   telluricTargetsService.loadObs(oid)

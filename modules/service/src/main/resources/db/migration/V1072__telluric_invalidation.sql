@@ -56,6 +56,6 @@ CREATE TRIGGER cascade_telluric_invalidation_trigger
   FOR EACH ROW
   EXECUTE FUNCTION cascade_telluric_invalidation();
 
--- Store hash of telluric search parameters to detect changes
+-- hash of telluric search parameters
 ALTER TABLE t_telluric_resolution
 ADD COLUMN c_params_hash bytea NULL;
