@@ -279,23 +279,29 @@ object TelluricTargetsService:
           val searchInput = mkSearchInput(coords, config, brightness, pending.scienceDuration.min(F2MaxDuration))
           val paramsHash = Md5Hash.unsafeFromByteArray(searchInput.md5)
 
+          def doSearch: F[(Either[String, Target.Id], Md5Hash)] =
+            telluricClient.searchTarget(searchInput).flatMap:
+              case (star, catalogResult) :: _ =>
+                val sidereal =
+                  catalogResult.map(_.target).getOrElse(star.asSiderealTarget).sedFromTelluricType(config.telluricType)
+
+                info"Found telluric star HIP ${star.hip} for observation ${pending.observationId}" *>
+                  createAndLinkTarget(sidereal).map(tid => (tid.asRight, paramsHash))
+              case Nil =>
+                val msg = s"No telluric stars found for observation ${pending.observationId}"
+                Logger[F].warn(msg).as((msg.asLeft, paramsHash))
+
           pending.paramsHash match
             case Some(storedHash) if storedHash === paramsHash =>
-              info"Hash unchanged for ${pending.observationId}, skipping re-request" *>
+              debug"Params hash unchanged for ${pending.observationId}, skipping re-request" *>
                 fetchExistingTargetId.map:
                   case Some(tid) => (tid.asRight, paramsHash)
                   case None      => ("No existing target found".asLeft, paramsHash)
-            case _ =>
-              telluricClient.searchTarget(searchInput).flatMap:
-                case (star, catalogResult) :: _ =>
-                  val sidereal =
-                    catalogResult.map(_.target).getOrElse(star.asSiderealTarget).sedFromTelluricType(config.telluricType)
-
-                  info"Found telluric star HIP ${star.hip} for observation ${pending.observationId}" *>
-                    createAndLinkTarget(sidereal).map(tid => (tid.asRight, paramsHash))
-                case Nil =>
-                  val msg = s"No telluric stars found for observation ${pending.observationId}"
-                  Logger[F].warn(msg).as((msg.asLeft, paramsHash))
+            case Some(storedHash) =>
+              debug"Params hash changed for ${pending.observationId}, searching for new target" *>
+                doSearch
+            case None =>
+              doSearch
 
         def handleResult(result: Either[String, Target.Id], paramsHash: Option[Md5Hash]): F[Option[TelluricTargets.Meta]] =
           result match

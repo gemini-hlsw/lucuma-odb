@@ -34,12 +34,17 @@ END;
 $$;
 
 -- Listen to c_last_update obscalc changes, some of those will need to invalidate
--- telluric target
+-- telluric target. Only for science observations (not calibrations).
 CREATE OR REPLACE FUNCTION cascade_telluric_invalidation()
 RETURNS TRIGGER AS $$
 BEGIN
   IF NEW.c_last_update IS DISTINCT FROM OLD.c_last_update
-     AND NEW.c_workflow_state IN ('ready', 'defined') THEN
+     AND NEW.c_workflow_state IN ('ready', 'defined')
+     AND NOT EXISTS (
+       SELECT 1 FROM t_observation
+       WHERE c_observation_id = NEW.c_observation_id
+         AND c_calibration_role IS NOT NULL
+     ) THEN
     CALL invalidate_telluric_resolution(NEW.c_observation_id);
   END IF;
   RETURN NEW;
