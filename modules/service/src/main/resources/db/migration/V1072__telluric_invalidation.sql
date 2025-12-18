@@ -50,3 +50,7 @@ CREATE TRIGGER cascade_telluric_invalidation_trigger
   AFTER UPDATE OF c_last_update ON t_obscalc
   FOR EACH ROW
   EXECUTE FUNCTION cascade_telluric_invalidation();
+
+-- Store hash of telluric search parameters to detect changes
+ALTER TABLE t_telluric_resolution
+ADD COLUMN c_params_hash bytea NULL;

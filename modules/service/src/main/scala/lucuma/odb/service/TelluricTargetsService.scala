@@ -24,12 +24,15 @@ import lucuma.core.util.NewType
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.odb.data.Existence
+import lucuma.odb.data.Md5Hash
 import lucuma.odb.data.TelluricTargets
 import lucuma.odb.graphql.input.CatalogInfoInput
 import lucuma.odb.graphql.input.SiderealInput
 import lucuma.odb.graphql.input.TargetPropertiesInput
 import lucuma.odb.graphql.mapping.AccessControl
 import lucuma.odb.sequence.flamingos2.longslit.Config as F2Config
+import lucuma.odb.sequence.syntax.hash.*
+import lucuma.odb.sequence.util.HashBytes
 import lucuma.odb.service.Services.ServiceAccess
 import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.util.Codecs.*
@@ -110,6 +113,15 @@ type HminBrightnessCache = HminBrightnessCache.Type
 
 object TelluricTargetsService:
 
+  given HashBytes[TelluricSearchInput] with
+    def hashBytes(input: TelluricSearchInput): Array[Byte] =
+      Array.concat(
+        input.coordinates.hashBytes,
+        input.duration.hashBytes,
+        input.brightest.hashBytes,
+        input.spType.hashBytes
+      )
+
   def loadBrightnessCache[F[_]: Monad](session: Session[F]): F[HminBrightnessCache] =
     session.execute(Statements.SelectAllHmin).map: rows =>
       HminBrightnessCache(rows.map { case (disperser, filter, fpu, hminHot, hminSolar) =>
@@ -185,13 +197,14 @@ object TelluricTargetsService:
       )(using ServiceAccess, NoTransaction[F]): F[Option[TelluricTargets.Meta]] = {
 
         def requestRetry(
-          targetId: Option[Target.Id],
-          errorMsg: Option[String]
+          targetId:   Option[Target.Id],
+          errorMsg:   Option[String],
+          paramsHash: Option[Md5Hash]
         ): F[Option[TelluricTargets.Meta]] =
           S.transactionally:
             session
               .prepareR(Statements.RequestReady)
-              .use(_.option((targetId, errorMsg, pending.observationId, pending.lastInvalidation)))
+              .use(_.option((targetId, errorMsg, paramsHash, pending.observationId, pending.lastInvalidation)))
 
         def retryRequest(
           failureCount: Int,
@@ -255,24 +268,27 @@ object TelluricTargetsService:
               case _                  => UnnormalizedSED.StellarLibrary(StellarLibrarySpectrum.A0V)
             Target.Sidereal.unnormalizedSED.modify(_.orElse(sed.some))(target)
 
-        def searchAndResolve(coords: Coordinates, config: F2Config): F[Either[String, Target.Id]] =
+        def searchAndResolve(coords: Coordinates, config: F2Config): F[(Either[String, Target.Id], Md5Hash)] =
           val brightness = hminCache.lookup(config)
-          telluricClient.searchTarget(mkSearchInput(coords, config, brightness, pending.scienceDuration.min(F2MaxDuration))).flatMap:
+          val searchInput = mkSearchInput(coords, config, brightness, pending.scienceDuration.min(F2MaxDuration))
+          val paramsHash = Md5Hash.unsafeFromByteArray(searchInput.md5)
+
+          telluricClient.searchTarget(searchInput).flatMap:
             // pick the first result
             case (star, catalogResult) :: _ =>
               val sidereal =
                 catalogResult.map(_.target).getOrElse(star.asSiderealTarget).sedFromTelluricType(config.telluricType)
 
               info"Found telluric star HIP ${star.hip} for observation ${pending.observationId}" *>
-                createAndLinkTarget(sidereal).map(_.asRight)
+                createAndLinkTarget(sidereal).map(tid => (tid.asRight, paramsHash))
             case Nil =>
               val msg = s"No telluric stars found for observation ${pending.observationId}"
-              Logger[F].warn(msg).as(msg.asLeft)
+              Logger[F].warn(msg).as((msg.asLeft, paramsHash))
 
-        def handleResult(result: Either[String, Target.Id]): F[Option[TelluricTargets.Meta]] =
+        def handleResult(result: Either[String, Target.Id], paramsHash: Option[Md5Hash]): F[Option[TelluricTargets.Meta]] =
           result match
             case Right(targetId)                            =>
-              requestRetry(targetId.some, none)
+              requestRetry(targetId.some, none, paramsHash)
 
             case Left(errorMsg) if pending.failureCount < 5 =>
               warn"Telluric target resolution failed (attempt ${pending.failureCount + 1}), will retry: $errorMsg" *>
@@ -280,16 +296,16 @@ object TelluricTargetsService:
 
             case Left(errorMsg)                             =>
               error"Telluric target resolution permanently failed after ${pending.failureCount} attempts: $errorMsg" *>
-                requestRetry(none, errorMsg.some)
+                requestRetry(none, errorMsg.some, paramsHash)
 
         for {
-          _          <- info"Resolving telluric target for observation ${pending.observationId}"
-          searchData <- queryParams
-          result     <- searchData.fold(
-                          msg => error"$msg".as(msg.asLeft),
-                          searchAndResolve.tupled
-                        )
-          meta       <- handleResult(result)
+          _                    <- info"Resolving telluric target for observation ${pending.observationId}"
+          searchData           <- queryParams
+          (result, paramsHash) <- searchData.fold(
+                                    msg => error"$msg".as((msg.asLeft[Target.Id], none[Md5Hash])),
+                                    searchAndResolve.tupled.andThen(_.map { case (r, h) => (r, h.some) })
+                                  )
+          meta                 <- handleResult(result, paramsHash)
         } yield meta
       }
 
@@ -347,13 +363,14 @@ object TelluricTargetsService:
             RETURNING #$pendingColumns
           """.query(pending)
 
-        val RequestReady: Query[(Option[Target.Id], Option[String], Observation.Id, Timestamp), TelluricTargets.Meta] =
+        val RequestReady: Query[(Option[Target.Id], Option[String], Option[Md5Hash], Observation.Id, Timestamp), TelluricTargets.Meta] =
           sql"""
             UPDATE t_telluric_resolution
             SET    c_state = 'ready',
                    c_last_update = now(),
                    c_resolved_target_id = ${target_id.opt},
                    c_error_message = ${text.opt},
+                   c_params_hash = ${md5_hash.opt},
                    c_retry_at = NULL,
                    c_failure_count = 0
             WHERE  c_observation_id = $observation_id
