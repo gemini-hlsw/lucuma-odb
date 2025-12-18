@@ -29,7 +29,7 @@ val keySemaphoreVersion        = "0.3.0-M1"
 val kittensVersion             = "3.5.0"
 val logbackVersion             = "1.5.21"
 val log4catsVersion            = "2.7.1"
-val lucumaCoreVersion          = "0.162.0"
+val lucumaCoreVersion          = "0.164.0"
 val lucumaGraphQLRoutesVersion = "0.11.7"
 val monocleVersion             = "3.3.0"
 val munitVersion               = "1.2.1"
@@ -87,13 +87,13 @@ ThisBuild / githubWorkflowBuildPreamble ~= { steps =>
   ) ++ steps
 }
 
-// ThisBuild / githubWorkflowBuildPreamble +=
-//   WorkflowStep.Use(
-//     UseRef.Public("gemini-hlsw", "migration-validator-action", "main"),
-//     name = Some("Validate Migrations"),
-//     params = Map("path" -> "modules/service/src/main/resources/db/migration/"),
-//     cond = Some("github.event_name == 'pull_request'  && matrix.shard == '1'")
-//   )
+ThisBuild / githubWorkflowBuildPreamble +=
+  WorkflowStep.Use(
+    UseRef.Public("gemini-hlsw", "migration-validator-action", "main"),
+    name = Some("Validate Migrations"),
+    params = Map("path" -> "modules/service/src/main/resources/db/migration/"),
+    cond = Some("github.event_name == 'pull_request'  && matrix.shard == '1'")
+  )
 
 ThisBuild / githubWorkflowBuildPreamble +=
   WorkflowStep.Use(
