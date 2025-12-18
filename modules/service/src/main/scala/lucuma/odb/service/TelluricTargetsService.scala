@@ -123,6 +123,8 @@ object TelluricTargetsService:
     new TelluricTargetsService[F]:
       given Logger[F] = LF.getLoggerFromName("telluric-targets")
 
+      val F2MaxDuration = TimeSpan.fromHours(3).get
+
       private def fetchSearchParams(scienceObsId: Observation.Id)(
         using ServiceAccess): F[Option[(Coordinates, F2Config)]] =
         S.transactionally:
@@ -158,16 +160,16 @@ object TelluricTargetsService:
           .use(_.option(oid))
 
       private def mkSearchInput(
-        coords: Coordinates,
-        config: F2Config,
+        coords:     Coordinates,
+        config:     F2Config,
         brightness: BigDecimal,
-        duration: TimeSpan
-      ): TelluricSearchInput =
+        duration:   TimeSpan
+      ) =
         TelluricSearchInput(
           coordinates = coords,
-          duration = duration,
-          brightest = brightness,
-          spType = config.telluricType
+          duration    = duration,
+          brightest   = brightness,
+          spType      = config.telluricType
         )
 
       override def requestTelluricTarget(
@@ -255,7 +257,7 @@ object TelluricTargetsService:
 
         def searchAndResolve(coords: Coordinates, config: F2Config): F[Either[String, Target.Id]] =
           val brightness = hminCache.lookup(config)
-          telluricClient.searchTarget(mkSearchInput(coords, config, brightness, pending.scienceDuration)).flatMap:
+          telluricClient.searchTarget(mkSearchInput(coords, config, brightness, pending.scienceDuration.min(F2MaxDuration))).flatMap:
             // pick the first result
             case (star, catalogResult) :: _ =>
               val sidereal =
