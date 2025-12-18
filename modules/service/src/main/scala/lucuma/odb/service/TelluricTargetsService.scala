@@ -268,22 +268,34 @@ object TelluricTargetsService:
               case _                  => UnnormalizedSED.StellarLibrary(StellarLibrarySpectrum.A0V)
             Target.Sidereal.unnormalizedSED.modify(_.orElse(sed.some))(target)
 
+        def fetchExistingTargetId: F[Option[Target.Id]] =
+          S.transactionally:
+            session
+              .prepareR(Statements.SelectResolvedTarget)
+              .use(_.option(pending.observationId))
+
         def searchAndResolve(coords: Coordinates, config: F2Config): F[(Either[String, Target.Id], Md5Hash)] =
           val brightness = hminCache.lookup(config)
           val searchInput = mkSearchInput(coords, config, brightness, pending.scienceDuration.min(F2MaxDuration))
           val paramsHash = Md5Hash.unsafeFromByteArray(searchInput.md5)
 
-          telluricClient.searchTarget(searchInput).flatMap:
-            // pick the first result
-            case (star, catalogResult) :: _ =>
-              val sidereal =
-                catalogResult.map(_.target).getOrElse(star.asSiderealTarget).sedFromTelluricType(config.telluricType)
+          pending.paramsHash match
+            case Some(storedHash) if storedHash === paramsHash =>
+              info"Hash unchanged for ${pending.observationId}, skipping re-request" *>
+                fetchExistingTargetId.map:
+                  case Some(tid) => (tid.asRight, paramsHash)
+                  case None      => ("No existing target found".asLeft, paramsHash)
+            case _ =>
+              telluricClient.searchTarget(searchInput).flatMap:
+                case (star, catalogResult) :: _ =>
+                  val sidereal =
+                    catalogResult.map(_.target).getOrElse(star.asSiderealTarget).sedFromTelluricType(config.telluricType)
 
-              info"Found telluric star HIP ${star.hip} for observation ${pending.observationId}" *>
-                createAndLinkTarget(sidereal).map(tid => (tid.asRight, paramsHash))
-            case Nil =>
-              val msg = s"No telluric stars found for observation ${pending.observationId}"
-              Logger[F].warn(msg).as((msg.asLeft, paramsHash))
+                  info"Found telluric star HIP ${star.hip} for observation ${pending.observationId}" *>
+                    createAndLinkTarget(sidereal).map(tid => (tid.asRight, paramsHash))
+                case Nil =>
+                  val msg = s"No telluric stars found for observation ${pending.observationId}"
+                  Logger[F].warn(msg).as((msg.asLeft, paramsHash))
 
         def handleResult(result: Either[String, Target.Id], paramsHash: Option[Md5Hash]): F[Option[TelluricTargets.Meta]] =
           result match
@@ -312,7 +324,7 @@ object TelluricTargetsService:
       object Statements:
 
         val pending: Codec[TelluricTargets.Pending] =
-          (observation_id *: program_id *: observation_id *: core_timestamp *: int4 *: time_span)
+          (observation_id *: program_id *: observation_id *: core_timestamp *: int4 *: time_span *: md5_hash.opt)
             .to[TelluricTargets.Pending]
 
         val meta: Codec[TelluricTargets.Meta] =
@@ -321,7 +333,7 @@ object TelluricTargetsService:
            target_id.opt *: text.opt *: time_span).to[TelluricTargets.Meta]
 
         private val pendingColumns: String =
-          "c_observation_id, c_program_id, c_science_observation_id, c_last_invalidation, c_failure_count, c_science_duration"
+          "c_observation_id, c_program_id, c_science_observation_id, c_last_invalidation, c_failure_count, c_science_duration, c_params_hash"
 
         private val metaColumns: String =
           """c_observation_id, c_program_id, c_science_observation_id, c_state,
@@ -441,6 +453,14 @@ object TelluricTargetsService:
             )
             ON CONFLICT (c_observation_id) DO NOTHING
           """.command
+
+        val SelectResolvedTarget: Query[Observation.Id, Target.Id] =
+          sql"""
+            SELECT c_resolved_target_id
+            FROM   t_telluric_resolution
+            WHERE  c_observation_id = $observation_id
+              AND  c_resolved_target_id IS NOT NULL
+          """.query(target_id)
 
   object Statements:
     // lead the limits for all the f2 configurations
