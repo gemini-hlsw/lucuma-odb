@@ -29,6 +29,7 @@ import lucuma.core.model.SpectralDefinition
 import lucuma.core.model.Target
 import lucuma.core.model.TelluricType
 import lucuma.core.util.TimeSpan
+import lucuma.core.util.Timestamp
 import lucuma.odb.graphql.OdbSuite
 import lucuma.odb.graphql.query.ExecutionTestSupportForFlamingos2
 import lucuma.odb.graphql.query.ObservingModeSetupOperations
@@ -1117,11 +1118,14 @@ class perScienceObservationCalibrations
     }
 
   test("coordinate change triggers re-resolution with new hash"):
+    val obsTime = Timestamp.fromInstantTruncated(when).get
+
     for {
       pid          <- createProgramAs(pi)
       tid          <- createTargetWithProfileAs(pi, pid)
       oid          <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
       _            <- setScienceRequirements(oid)
+      _            <- setObservationTimeAndDuration(pi, oid, obsTime.some, none)
       _            <- runObscalcUpdate(pid, oid)
       _            <- recalculateCalibrations(pid, when)
       _            <- sleep >> resolveTelluricTargets

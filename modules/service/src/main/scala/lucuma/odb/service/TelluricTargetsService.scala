@@ -142,11 +142,17 @@ object TelluricTargetsService:
         S.transactionally:
           Services.asSuperUser:
             for
-              coords   <- session.prepareR(Statements.SelectTargetCoordinates)
-                            .use(_.option(scienceObsId))
-              f2Config <- flamingos2LongSlitService.select(List(scienceObsId))
-                            .map(_.get(scienceObsId))
-            yield (coords, f2Config).tupled
+              obsTimeOpt <- session.prepareR(Statements.SelectObservationTime).use(_.option(scienceObsId))
+              coordsOpt  <- obsTimeOpt match
+                              case Some(obsTime) =>
+                                trackingService
+                                  .getCoordinatesSnapshot(scienceObsId, obsTime, false)
+                                  .map(_.toOption.map(_.base))
+                              case None =>
+                                session.prepareR(Statements.SelectTargetCoordinates).use(_.option(scienceObsId))
+              f2Config   <- flamingos2LongSlitService.select(List(scienceObsId))
+                              .map(_.get(scienceObsId))
+            yield (coordsOpt, f2Config).tupled
 
       // Exponential backoff calculation
       // Should this be configurable?
@@ -427,6 +433,14 @@ object TelluricTargetsService:
             WHERE  c_observation_id = $observation_id
             RETURNING #$metaColumns
           """.query(meta)
+
+        val SelectObservationTime: Query[Observation.Id, Timestamp] =
+          sql"""
+            SELECT c_observation_time
+            FROM   t_observation
+            WHERE  c_observation_id = $observation_id
+              AND  c_observation_time IS NOT NULL
+          """.query(core_timestamp)
 
         val SelectTargetCoordinates: Query[Observation.Id, Coordinates] =
           sql"""
