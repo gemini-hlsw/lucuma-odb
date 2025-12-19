@@ -9,6 +9,7 @@ import lucuma.core.model.Target
 import lucuma.core.util.CalculationState
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
+import lucuma.odb.data.Md5Hash
 
 /**
   * Data classes for the telluric targets service
@@ -41,5 +42,6 @@ object TelluricTargets:
     scienceObservationId: Observation.Id,
     lastInvalidation:     Timestamp,
     failureCount:         Int,
-    scienceDuration:      TimeSpan
+    scienceDuration:      TimeSpan,
+    paramsHash:           Option[Md5Hash]
   )

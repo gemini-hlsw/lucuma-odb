@@ -7,6 +7,7 @@ import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.numeric.PosLong
 import io.circe.Encoder
+import lucuma.core.math.Coordinates
 import lucuma.core.math.Offset
 import lucuma.core.math.SignalToNoise
 import lucuma.core.math.Wavelength
@@ -82,6 +83,13 @@ object HashBytes:
   given HashBytes[Boolean] =
     HashBytes.by(_.hashCode)
 
+  given HashBytes[BigDecimal] with
+    def hashBytes(bd: BigDecimal): Array[Byte] =
+      Array.concat(
+        toByteArray(BigInt(bd.underlying().unscaledValue()), 16),
+        bd.scale.hashBytes
+      )
+
   given given_HashBytes_Gid[A: Gid]: HashBytes[A] with
     def hashBytes(a: A): Array[Byte] =
       Array.concat(
@@ -113,15 +121,18 @@ object HashBytes:
   given HashBytes[Offset] =
     HashBytes.by2(_.p, _.q)
 
+  given HashBytes[Coordinates] with
+    def hashBytes(c: Coordinates): Array[Byte] =
+      Array.concat(
+        c.ra.toAngle.toMicroarcseconds.hashBytes,
+        c.dec.toAngle.toMicroarcseconds.hashBytes
+      )
+
   given HashBytes[Wavelength] =
     HashBytes.by(_.toPicometers.value)
 
-  given HashBytes[SignalToNoise] with
-    def hashBytes(s: SignalToNoise): Array[Byte] =
-      Array.concat(
-        toByteArray(BigInt(s.toBigDecimal.underlying().unscaledValue()), 11),
-        s.toBigDecimal.scale.hashBytes
-      )
+  given HashBytes[SignalToNoise] =
+    HashBytes.by(_.toBigDecimal)
 
   given HashBytes[ExposureTimeMode.SignalToNoiseMode] =
     HashBytes.by2(_.value, _.at)

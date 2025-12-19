@@ -24,12 +24,15 @@ import lucuma.core.util.NewType
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.odb.data.Existence
+import lucuma.odb.data.Md5Hash
 import lucuma.odb.data.TelluricTargets
 import lucuma.odb.graphql.input.CatalogInfoInput
 import lucuma.odb.graphql.input.SiderealInput
 import lucuma.odb.graphql.input.TargetPropertiesInput
 import lucuma.odb.graphql.mapping.AccessControl
 import lucuma.odb.sequence.flamingos2.longslit.Config as F2Config
+import lucuma.odb.sequence.syntax.hash.*
+import lucuma.odb.sequence.util.HashBytes
 import lucuma.odb.service.Services.ServiceAccess
 import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.util.Codecs.*
@@ -110,6 +113,15 @@ type HminBrightnessCache = HminBrightnessCache.Type
 
 object TelluricTargetsService:
 
+  given HashBytes[TelluricSearchInput] with
+    def hashBytes(input: TelluricSearchInput): Array[Byte] =
+      Array.concat(
+        input.coordinates.hashBytes,
+        input.duration.hashBytes,
+        input.brightest.hashBytes,
+        input.spType.hashBytes
+      )
+
   def loadBrightnessCache[F[_]: Monad](session: Session[F]): F[HminBrightnessCache] =
     session.execute(Statements.SelectAllHmin).map: rows =>
       HminBrightnessCache(rows.map { case (disperser, filter, fpu, hminHot, hminSolar) =>
@@ -184,14 +196,21 @@ object TelluricTargetsService:
         pending: TelluricTargets.Pending
       )(using ServiceAccess, NoTransaction[F]): F[Option[TelluricTargets.Meta]] = {
 
-        def requestRetry(
-          targetId: Option[Target.Id],
-          errorMsg: Option[String]
+        def requestReady(
+          targetId:   Option[Target.Id],
+          errorMsg:   Option[String],
+          paramsHash: Option[Md5Hash]
         ): F[Option[TelluricTargets.Meta]] =
           S.transactionally:
             session
               .prepareR(Statements.RequestReady)
-              .use(_.option((targetId, errorMsg, pending.observationId, pending.lastInvalidation)))
+              .use(_.option((targetId, errorMsg, paramsHash, pending.observationId, pending.lastInvalidation)))
+
+        def resetToReady: F[Option[TelluricTargets.Meta]] =
+          S.transactionally:
+            session
+              .prepareR(Statements.ResetToReady)
+              .use(_.option((pending.observationId, pending.lastInvalidation)))
 
         def retryRequest(
           failureCount: Int,
@@ -255,24 +274,37 @@ object TelluricTargetsService:
               case _                  => UnnormalizedSED.StellarLibrary(StellarLibrarySpectrum.A0V)
             Target.Sidereal.unnormalizedSED.modify(_.orElse(sed.some))(target)
 
-        def searchAndResolve(coords: Coordinates, config: F2Config): F[Either[String, Target.Id]] =
+        def searchAndResolve(coords: Coordinates, config: F2Config): F[Option[(Either[String, Target.Id], Md5Hash)]] =
           val brightness = hminCache.lookup(config)
-          telluricClient.searchTarget(mkSearchInput(coords, config, brightness, pending.scienceDuration.min(F2MaxDuration))).flatMap:
-            // pick the first result
-            case (star, catalogResult) :: _ =>
-              val sidereal =
-                catalogResult.map(_.target).getOrElse(star.asSiderealTarget).sedFromTelluricType(config.telluricType)
+          val searchInput = mkSearchInput(coords, config, brightness, pending.scienceDuration.min(F2MaxDuration))
+          val paramsHash = Md5Hash.unsafeFromByteArray(searchInput.md5)
 
-              info"Found telluric star HIP ${star.hip} for observation ${pending.observationId}" *>
-                createAndLinkTarget(sidereal).map(_.asRight)
-            case Nil =>
-              val msg = s"No telluric stars found for observation ${pending.observationId}"
-              Logger[F].warn(msg).as(msg.asLeft)
+          def doSearch: F[Option[(Either[String, Target.Id], Md5Hash)]] =
+            telluricClient.searchTarget(searchInput).flatMap:
+              case (star, catalogResult) :: _ =>
+                val sidereal =
+                  catalogResult.map(_.target).getOrElse(star.asSiderealTarget).sedFromTelluricType(config.telluricType)
 
-        def handleResult(result: Either[String, Target.Id]): F[Option[TelluricTargets.Meta]] =
+                info"Found telluric star HIP ${star.hip} for observation ${pending.observationId}" *>
+                  createAndLinkTarget(sidereal).map(tid => (tid.asRight[String], paramsHash).some)
+              case Nil =>
+                val msg = s"No telluric stars found for observation ${pending.observationId}"
+                Logger[F].warn(msg).as((msg.asLeft[Target.Id], paramsHash).some)
+
+          pending.paramsHash match
+            case Some(storedHash) if storedHash === paramsHash =>
+              debug"Params hash unchanged for ${pending.observationId}, skipping" *>
+                resetToReady.as(none) // mark it as ready
+            case Some(_) =>
+              debug"Params hash changed for ${pending.observationId}, searching for new target" *>
+                doSearch
+            case None =>
+              doSearch
+
+        def handleResult(result: Either[String, Target.Id], paramsHash: Md5Hash): F[Option[TelluricTargets.Meta]] =
           result match
             case Right(targetId)                            =>
-              requestRetry(targetId.some, none)
+              requestReady(targetId.some, none, paramsHash.some)
 
             case Left(errorMsg) if pending.failureCount < 5 =>
               warn"Telluric target resolution failed (attempt ${pending.failureCount + 1}), will retry: $errorMsg" *>
@@ -280,23 +312,33 @@ object TelluricTargetsService:
 
             case Left(errorMsg)                             =>
               error"Telluric target resolution permanently failed after ${pending.failureCount} attempts: $errorMsg" *>
-                requestRetry(none, errorMsg.some)
+                requestReady(none, errorMsg.some, paramsHash.some)
+
+        def handleMissingParams(msg: String): F[Option[TelluricTargets.Meta]] =
+          error"$msg" *>
+            (if pending.failureCount < 5 then
+              retryRequest(pending.failureCount, msg)
+            else
+              requestReady(none, msg.some, none))
 
         for {
           _          <- info"Resolving telluric target for observation ${pending.observationId}"
           searchData <- queryParams
-          result     <- searchData.fold(
-                          msg => error"$msg".as(msg.asLeft),
+          resultOpt  <- searchData.fold(
+                          _ => none[(Either[String, Target.Id], Md5Hash)].pure[F],
                           searchAndResolve.tupled
                         )
-          meta       <- handleResult(result)
+          meta       <- (searchData, resultOpt) match
+                          case (Left(msg), _)               => handleMissingParams(msg)
+                          case (_, None)                    => none[TelluricTargets.Meta].pure[F]
+                          case (_, Some((result, hash)))    => handleResult(result, hash)
         } yield meta
       }
 
       object Statements:
 
         val pending: Codec[TelluricTargets.Pending] =
-          (observation_id *: program_id *: observation_id *: core_timestamp *: int4 *: time_span)
+          (observation_id *: program_id *: observation_id *: core_timestamp *: int4 *: time_span *: md5_hash.opt)
             .to[TelluricTargets.Pending]
 
         val meta: Codec[TelluricTargets.Meta] =
@@ -305,7 +347,7 @@ object TelluricTargetsService:
            target_id.opt *: text.opt *: time_span).to[TelluricTargets.Meta]
 
         private val pendingColumns: String =
-          "c_observation_id, c_program_id, c_science_observation_id, c_last_invalidation, c_failure_count, c_science_duration"
+          "c_observation_id, c_program_id, c_science_observation_id, c_last_invalidation, c_failure_count, c_science_duration, c_params_hash"
 
         private val metaColumns: String =
           """c_observation_id, c_program_id, c_science_observation_id, c_state,
@@ -347,13 +389,26 @@ object TelluricTargetsService:
             RETURNING #$pendingColumns
           """.query(pending)
 
-        val RequestReady: Query[(Option[Target.Id], Option[String], Observation.Id, Timestamp), TelluricTargets.Meta] =
+        val RequestReady: Query[(Option[Target.Id], Option[String], Option[Md5Hash], Observation.Id, Timestamp), TelluricTargets.Meta] =
           sql"""
             UPDATE t_telluric_resolution
             SET    c_state = 'ready',
                    c_last_update = now(),
                    c_resolved_target_id = ${target_id.opt},
                    c_error_message = ${text.opt},
+                   c_params_hash = ${md5_hash.opt},
+                   c_retry_at = NULL,
+                   c_failure_count = 0
+            WHERE  c_observation_id = $observation_id
+              AND  c_last_invalidation = $core_timestamp
+            RETURNING #$metaColumns
+          """.query(meta)
+
+        val ResetToReady: Query[(Observation.Id, Timestamp), TelluricTargets.Meta] =
+          sql"""
+            UPDATE t_telluric_resolution
+            SET    c_state = 'ready',
+                   c_last_update = now(),
                    c_retry_at = NULL,
                    c_failure_count = 0
             WHERE  c_observation_id = $observation_id
