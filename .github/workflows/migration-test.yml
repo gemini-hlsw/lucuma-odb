@@ -1,0 +1,81 @@
+name: Test Migrations Against Heroku Backups
+
+on:
+  pull_request:
+    paths:
+      - 'modules/service/src/main/resources/db/migration/**'
+  workflow_dispatch:
+
+env:
+  HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
+  PG_HOST: localhost
+  PG_USER: jimmy
+  PG_DATABASE: lucuma-odb
+  PGPASSWORD: banana
+
+jobs:
+  test-migrations:
+    name: Test against ${{ matrix.environment }}
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+
+    strategy:
+      fail-fast: false
+      matrix:
+        environment: [dev, staging, production]
+
+    steps:
+      - name: Checkout current branch
+        uses: nschloe/action-cached-lfs-checkout@v1
+        with:
+          fetch-depth: 0
+
+      - name: Setup Java (temurin@17)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+          cache: sbt
+
+      - name: Setup sbt
+        uses: sbt/setup-sbt@v1
+
+      - name: Install PostgreSQL client tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client-15
+
+      - name: Install Heroku CLI
+        run: |
+          curl https://cli-assets.heroku.com/install.sh | sh
+          heroku --version
+
+      - name: Set up cert permissions
+        run: chmod 600 test-cert/server.key
+
+      - name: Set up cert permissions (2)
+        run: sudo chown 999 test-cert/server.key
+
+      - name: Start PostgreSQL via Docker Compose
+        run: docker compose up -d db
+
+      - name: Run migration test against ${{ matrix.environment }}
+        id: migrate
+        timeout-minutes: 15
+        run: ./scripts/test-migration-from-heroku.sh ${{ matrix.environment }}
+
+      - name: Show service logs on failure
+        if: failure() && steps.migrate.outcome == 'failure'
+        run: |
+          echo "=== Service Log ==="
+          cat /tmp/service-${{ matrix.environment }}.log || echo "No service log available"
+
+          echo "=== Database Restore Log ==="
+          cat /tmp/restore-${{ matrix.environment }}.log || echo "No restore log available"
+
+      - name: Cleanup
+        if: always()
+        run: |
+          docker compose down
+          rm -f /tmp/lucuma-postgres-odb-*.dump /tmp/lucuma-postgres-odb-*.sql /tmp/lucuma-postgres-odb-*.temp
+          rm -f /tmp/service-*.log /tmp/restore-*.log
