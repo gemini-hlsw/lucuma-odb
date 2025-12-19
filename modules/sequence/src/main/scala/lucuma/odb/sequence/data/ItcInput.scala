@@ -27,15 +27,15 @@ import scala.collection.mutable.ArrayBuilder
  * observation when everything necessary is present and defined.
  */
 case class ItcInput(
-  acquisition:         ImagingParameters,
+  acquisition:         Option[ImagingParameters],
   imaging:             List[ImagingParameters],
   spectroscopy:        List[SpectroscopyParameters],
   targets:             NonEmptyList[(Target.Id, TargetInput, Option[Timestamp])],
   blindOffsetTarget:   Option[(Target.Id, TargetInput, Option[Timestamp])],
 ) derives Eq:
 
-  def acquisitionInput: ImagingInput =
-    ImagingInput(acquisition, blindOffsetTarget.fold(targets.map(_._2))(r => NonEmptyList.one(r._2)))
+  def acquisitionInput: Option[ImagingInput] =
+    acquisition.map(ImagingInput(_, blindOffsetTarget.fold(targets.map(_._2))(r => NonEmptyList.one(r._2))))
 
   def imagingInputs: List[ImagingInput] =
     imaging.map(ImagingInput(_, targets.map(_._2)))
