@@ -10,3 +10,6 @@ CREATE TYPE s_filter_exposure_time_mode AS (
   c_exposure_time        interval,
   c_exposure_count       integer
 );
+
+-- We'll change the asterism result so any cached json values must be dropped.
+TRUNCATE TABLE t_itc_result;
