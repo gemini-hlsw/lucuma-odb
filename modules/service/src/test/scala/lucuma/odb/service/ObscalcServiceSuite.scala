@@ -186,12 +186,12 @@ class ObscalcServiceSuite extends ObscalcServiceSuiteSupport:
       Obscalc.ItcResult(
         ItcService.TargetResult(
           tid,
-          fakeItcSpectroscopyResult,
+          fakeItcImagingResult,
           none
-        ),
+        ).some,
         ItcService.TargetResult(
           tid,
-          fakeItcImagingResult,
+          fakeItcSpectroscopyResult,
           Wavelength.fromIntPicometers(500000).map(fakeSignalToNoiseAt)
         )
       ),
