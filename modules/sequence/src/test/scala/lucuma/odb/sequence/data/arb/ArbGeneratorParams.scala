@@ -37,13 +37,13 @@ trait ArbGeneratorParams:
 
   private def genItcInput(mo: InstrumentMode): Gen[ItcInput] =
     for
-      aq <- arbitrary[ImagingParameters]
+      aq <- arbitrary[Option[ImagingParameters]]
       im <- arbitrary[List[ImagingParameters]]
       sm <- arbitrary[List[SpectroscopyParameters]]
       s  <- Gen.choose(1, 4)
       t  <- Gen.listOfN(s, arbitrary[(Target.Id, TargetInput, Option[Timestamp])]).map(NonEmptyList.fromListUnsafe)
       bo <- Gen.option(arbitrary[(Target.Id, TargetInput, Option[Timestamp])])
-    yield ItcInput(aq.copy(mode = mo), im.map(_.copy(mode = mo)), sm.map(_.copy(mode = mo)), t, bo)
+    yield ItcInput(aq.map(_.copy(mode = mo)), im.map(_.copy(mode = mo)), sm.map(_.copy(mode = mo)), t, bo)
 
   val genGmosNorthLongSlit: Gen[GeneratorParams] =
     for

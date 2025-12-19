@@ -11204,9 +11204,9 @@ type Itc {
   science: ItcResultSet!
 
   """
-  The ITC result for the acquisition part of the sequence
+  The ITC result for the acquisition part of the sequence, if any.
   """
-  acquisition: ItcResultSet!
+  acquisition: ItcResultSet
 }
 
 """
