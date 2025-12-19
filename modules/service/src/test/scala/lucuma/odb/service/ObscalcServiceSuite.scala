@@ -13,12 +13,10 @@ import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.StepGuideState
 import lucuma.core.math.Offset
-import lucuma.core.math.Wavelength
 import lucuma.core.model.Observation
 import lucuma.core.model.ObservationValidation
 import lucuma.core.model.ObservationWorkflow
 import lucuma.core.model.Program
-import lucuma.core.model.Target
 import lucuma.core.model.sequence.CategorizedTime
 import lucuma.core.model.sequence.ExecutionDigest
 import lucuma.core.model.sequence.SequenceDigest
@@ -150,7 +148,7 @@ class ObscalcServiceSuite extends ObscalcServiceSuiteSupport:
 
   val ScienceSequence = Atom1 + Atom2 + Atom3
 
-  val setup: IO[(Program.Id, Target.Id, Observation.Id)] =
+  val setup: IO[(Program.Id, Observation.Id)] =
     for
       _ <- cleanup
       p <- createProgram
@@ -179,22 +177,11 @@ class ObscalcServiceSuite extends ObscalcServiceSuiteSupport:
           }
         """
       )
-    yield (p, t, o)
+    yield (p, o)
 
-  def fakeWithTargetResult(tid: Target.Id): Obscalc.Result =
-    Obscalc.Result.WithTarget(
-      Obscalc.ItcResult(
-        ItcService.TargetResult(
-          tid,
-          fakeItcImagingResult,
-          none
-        ).some,
-        ItcService.TargetResult(
-          tid,
-          fakeItcSpectroscopyResult,
-          Wavelength.fromIntPicometers(500000).map(fakeSignalToNoiseAt)
-        )
-      ),
+  val fakeSuccessResult: Obscalc.Result =
+    Obscalc.Result.Success(
+      true,
       ExecutionDigest(
           SetupTime(
             TimeSpan.unsafeFromMicroseconds(960000000),
@@ -243,20 +230,20 @@ class ObscalcServiceSuite extends ObscalcServiceSuiteSupport:
     yield ()
 
   test("calc with target"):
-    setup.flatTap: (p, t, o) =>
+    setup.flatTap: (p, o) =>
       assertIO(
         calculateOnly(Obscalc.PendingCalc(p, o, randomTime)),
-        fakeWithTargetResult(t)
+        fakeSuccessResult
       )
 
   test("load"):
-    setup.flatTap: (p, _, o) =>
+    setup.flatTap: (p, o) =>
        val pc = Obscalc.PendingCalc(p, o, randomTime)
        assertIO(insert(pc) *> load, List(pc)) *>
        assertIO(calculationState(o), CalculationState.Calculating)
 
   test("update then select"):
-    setup.flatTap: (p, _, o) =>
+    setup.flatTap: (p, o) =>
       val pc = Obscalc.PendingCalc(p, o, randomTime)
       calculateOnly(pc).flatTap: r =>
         assertIO(
@@ -285,12 +272,12 @@ class ObscalcServiceSuite extends ObscalcServiceSuiteSupport:
     yield ()
 
   test("update then load"):
-    (setup <* cleanup).flatTap: (p, _, o) =>
+    (setup <* cleanup).flatTap: (p, o) =>
       val pc = Obscalc.PendingCalc(p, o, randomTime)
       assertIO(insert(pc) *> calculateAndUpdate(pc) *> load, Nil)
 
   test("invalidate, update then load"):
-    setup.flatTap: (p, _, o) =>
+    setup.flatTap: (p, o) =>
       val pc  = Obscalc.PendingCalc(p, o, randomTime)
       val pc2 = pc.copy(lastInvalidation = randomTime.plusMicrosOption(1).get)
       assertIO(insert(pc2) *> calculateAndUpdate(pc) *> load, List(pc2))
@@ -325,7 +312,7 @@ class ObscalcServiceSuite extends ObscalcServiceSuiteSupport:
         """.command
         session.execute(cmd)(o).void
 
-    val res = (setup <* cleanup).flatMap: (_, _, o) =>
+    val res = (setup <* cleanup).flatMap: (_, o) =>
       setWavelengthToMagicValue(o) *>
       load.flatMap: lst =>
         calculateAndUpdate(lst.head) *> selectStates
