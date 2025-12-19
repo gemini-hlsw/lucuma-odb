@@ -131,7 +131,7 @@ object HashBytes:
     HashBytes.by2(_.p, _.q)
 
   given HashBytes[Coordinates] =
-    HashBytes.by2(_.ra.toAngle, _dec.toAngle)
+    HashBytes.by2(_.ra.toAngle, _.dec.toAngle)
 
   given HashBytes[TelescopeConfig] =
     HashBytes.by2(_.guiding, _.offset)
