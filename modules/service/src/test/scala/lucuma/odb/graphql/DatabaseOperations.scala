@@ -2857,60 +2857,60 @@ trait DatabaseOperations { this: OdbSuite =>
       |Standard model:
       |  ALN=  .1112620426   NK=  4.6142   NM=  2.15     NN=  5.093    R0=  2.808
       |
-      |COMET comments 
+      |COMET comments
       |1: soln ref.= JPL#75, data arc: 1835-08-21 to 1994-01-11
       |2: k1=8.0, k2=5.0, phase coef.=0.03;
       |*******************************************************************************
       |
       |
       |*******************************************************************************
-      |Ephemeris / API_USER Mon Nov 24 11:37:17 2025 Pasadena, USA      / Horizons    
+      |Ephemeris / API_USER Mon Nov 24 11:37:17 2025 Pasadena, USA      / Horizons
       |*******************************************************************************
       |Target body name: 1P/Halley                       {source: JPL#75}
       |Center body name: Earth (399)                     {source: DE441}
       |Center-site name: Gemini North Observatory, Maunakea
       |*******************************************************************************
-      |Start time      : A.D. 2025-May-02 00:00:00.0000 UT      
-      |Stop  time      : A.D. 2025-May-03 00:00:00.0000 UT      
+      |Start time      : A.D. 2025-May-02 00:00:00.0000 UT
+      |Stop  time      : A.D. 2025-May-03 00:00:00.0000 UT
       |Step-size       : 60 minutes
       |*******************************************************************************
       |Target pole/equ : undefined
-      |Target radii    : 5.5 km                                                       
+      |Target radii    : 5.5 km
       |Center geodetic : 204.5309, 19.8238126, 4.24672   {E-lon(deg),Lat(deg),Alt(km)}
       |Center cylindric: 204.5309,6006.47419,2150.79851  {E-lon(deg),Dxy(km),Dz(km)}
       |Center pole/equ : ITRF93                          {East-longitude positive}
-      |Center radii    : 6378.137, 6378.137, 6356.752 km {Equator_a, b, pole_c}       
+      |Center radii    : 6378.137, 6378.137, 6356.752 km {Equator_a, b, pole_c}
       |Target primary  : Sun
       |Vis. interferer : MOON (R_eq= 1737.400) km        {source: DE441}
       |Rel. light bend : Sun                             {source: DE441}
-      |Rel. lght bnd GM: 1.3271E+11 km^3/s^2                                          
+      |Rel. lght bnd GM: 1.3271E+11 km^3/s^2
       |Small-body perts: Yes                             {source: SB441-N16}
       |Atmos refraction: NO (AIRLESS)
       |RA format       : HMS
-      |Time format     : CAL 
+      |Time format     : CAL
       |Calendar mode   : Mixed Julian/Gregorian
-      |EOP file        : eop.251121.p260217                                           
+      |EOP file        : eop.251121.p260217
       |EOP coverage    : DATA-BASED 1962-JAN-20 TO 2025-NOV-21. PREDICTS-> 2026-FEB-16
-      |Units conversion: 1 au= 149597870.700 km, c= 299792.458 km/s, 1 day= 86400.0 s 
+      |Units conversion: 1 au= 149597870.700 km, c= 299792.458 km/s, 1 day= 86400.0 s
       |Table cut-offs 1: Elevation (-90.0deg=NO ),Airmass (>38.000=NO), Daylight (NO )
       |Table cut-offs 2: Solar elongation (  0.0,180.0=NO ),Local Hour Angle( 0.0=NO )
-      |Table cut-offs 3: RA/DEC angular rate (     0.0=NO )                           
+      |Table cut-offs 3: RA/DEC angular rate (     0.0=NO )
       |*******************************************************************************
       |Initial IAU76/J2000 heliocentric ecliptic osculating elements (au, days, deg.):
-      |  EPOCH=  2439875.5 ! 1968-Jan-20.0000000 (TDB)    RMSW= n.a.                  
-      |  EC= .9679359956953212   QR= .5748638313743413   TP= 2446469.9736161465      
-      |  OM= 59.09894720612437   W= 112.2414314637764    IN= 162.1905300439129       
+      |  EPOCH=  2439875.5 ! 1968-Jan-20.0000000 (TDB)    RMSW= n.a.
+      |  EC= .9679359956953212   QR= .5748638313743413   TP= 2446469.9736161465
+      |  OM= 59.09894720612437   W= 112.2414314637764    IN= 162.1905300439129
       |  Equivalent ICRF heliocentric cartesian coordinates (au, au/d):
       |  X=-1.331029360169393E+01  Y= 2.541249958785733E+01  Z= 2.637549316318327E+00
       |  VX= 1.418949944126011E-03 VY=-1.422475975617656E-03 VZ= 4.131321199969281E-05
-      |Comet physical (GM= km^3/s^2; RAD= km):                                        
-      |  GM= n.a.                RAD= 5.5                                            
-      |  M1=  5.5      M2=  13.6     k1=  8.     k2=  5.      PHCOF=  .030           
-      |Comet non-gravitational force model (AMRAT=m^2/kg;A1-A3=au/d^2;DT=days;R0=au): 
-      |  AMRAT=  0.                                      DT=  0.                     
-      |  A1= 4.887055233121E-10  A2= 1.554720290005E-10  A3= 0.                      
-      |Standard model:                                                               
-      |  ALN=  .1112620426   NK=  4.6142   NM=  2.15     NN=  5.093    R0=  2.808    
+      |Comet physical (GM= km^3/s^2; RAD= km):
+      |  GM= n.a.                RAD= 5.5
+      |  M1=  5.5      M2=  13.6     k1=  8.     k2=  5.      PHCOF=  .030
+      |Comet non-gravitational force model (AMRAT=m^2/kg;A1-A3=au/d^2;DT=days;R0=au):
+      |  AMRAT=  0.                                      DT=  0.
+      |  A1= 4.887055233121E-10  A2= 1.554720290005E-10  A3= 0.
+      |Standard model:
+      |  ALN=  .1112620426   NK=  4.6142   NM=  2.15     NN=  5.093    R0=  2.808
       |*****************************************************************************************************************
       |Date__(UT)__HR:MN:SC.fff     R.A._________(ICRF)_________DEC  dRA*cosD d(DEC)/dt  a-mass mag_ex    T-mag   N-mag
       |*****************************************************************************************************************
