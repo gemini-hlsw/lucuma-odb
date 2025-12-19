@@ -273,7 +273,7 @@ object FMain extends MainParams {
       val schedulerRoutes    = SchedulerRoutes.apply[F](pool, ssoClient, enums, emailConfig, commitHash, ptc, httpClient, itcClient, gaiaClient, horizonsClient)
       val metadataRoutes     = GraphQLRoutes.enumMetadata(metadataService)
       val emailWebhookRoutes = EmailWebhookRoutes(webhookService, emailConfig)
-      val proxyRoutes        = ProxyRoutes[F](proxyHttpClient, ssoClient, proxyConfig)
+      val proxyRoutes        = ProxyRoutes[F](proxyHttpClient, proxyConfig)
       middleware(graphQLRoutes(wsb) <+> attachmentRoutes <+> metadataRoutes <+> emailWebhookRoutes <+> schedulerRoutes <+> proxyRoutes)
     }
 
