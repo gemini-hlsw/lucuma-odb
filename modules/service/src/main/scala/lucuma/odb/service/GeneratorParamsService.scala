@@ -267,7 +267,7 @@ object GeneratorParamsService {
                   filter = a.explicitFilter.getOrElse(a.defaultFilter).some,
                   roi    = a.explicitRoi.getOrElse(a.roi).imagingRoi.some
                 )
-              ),
+              ).some,
               imaging      = Nil,
               spectroscopy = List(SpectroscopyParameters(
                 c.exposureTimeMode,
@@ -296,7 +296,7 @@ object GeneratorParamsService {
                   filter = a.explicitFilter.getOrElse(a.defaultFilter).some,
                   roi    = a.explicitRoi.getOrElse(a.roi).imagingRoi.some
                 )
-              ),
+              ).some,
               imaging      = Nil,
               spectroscopy = List(SpectroscopyParameters(
                 c.exposureTimeMode,
@@ -316,7 +316,7 @@ object GeneratorParamsService {
                 acq,
                 consInput,
                 mode.asImaging(acq.at)
-              ),
+              ).some,
               imaging      = Nil,
               spectroscopy = List(SpectroscopyParameters(
                 sci,
@@ -336,9 +336,7 @@ object GeneratorParamsService {
                 InstrumentMode.GmosNorthImaging(f.filter, gn.ccdMode.some)
               )
 
-            // TODO: What do we do for acquisition?  I'll grab the first filter
-            //  for now.
-            val itcInput = mkItcInput(inputs.head, inputs.toList, Nil, obsParams)
+            val itcInput = mkItcInput(none, inputs.toList, Nil, obsParams)
             GeneratorParams(itcInput, obsParams.scienceBand, gn, obsParams.calibrationRole, obsParams.declaredComplete, obsParams.acqResetTime)
 
           case gs @ gmos.imaging.Config.GmosSouth(_, fs, _) =>
@@ -350,13 +348,11 @@ object GeneratorParamsService {
                 InstrumentMode.GmosSouthImaging(f.filter, gs.ccdMode.some)
               )
 
-            // TODO: What do we do for acquisition?  I'll grab the first filter
-            //  for now.
-            val itcInput = mkItcInput(inputs.head, inputs.toList, Nil, obsParams)
+            val itcInput = mkItcInput(none, inputs.toList, Nil, obsParams)
             GeneratorParams(itcInput, obsParams.scienceBand, gs, obsParams.calibrationRole, obsParams.declaredComplete, obsParams.acqResetTime)
 
       private def mkItcInput(
-        acquisition:  ImagingParameters,
+        acquisition:  Option[ImagingParameters],
         imaging:      List[ImagingParameters],
         spectroscopy: List[SpectroscopyParameters],
         obsParams:    ObsParams

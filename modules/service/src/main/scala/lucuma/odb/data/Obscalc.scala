@@ -59,12 +59,12 @@ object Obscalc:
   )
 
   final case class ItcResult(
-    imaging:      ItcService.TargetResult,
+    imaging:      Option[ItcService.TargetResult],
     spectroscopy: ItcService.TargetResult
   ):
     def toAsterismResults: Option[ItcService.AsterismResults] =
       ItcService.AsterismResults.fromResults(
-        Zipper.one(imaging),
+        imaging.map(Zipper.one),
         Zipper.one(spectroscopy)
       )
 

@@ -5,8 +5,9 @@ package lucuma.odb.sequence
 package data
 
 import cats.data.NonEmptyList
+import cats.syntax.eq.*
+import cats.syntax.functor.*
 import lucuma.core.model.Target
-import lucuma.core.util.Timestamp
 import lucuma.itc.client.ImagingParameters
 import lucuma.itc.client.InstrumentMode
 import lucuma.itc.client.SpectroscopyParameters
@@ -14,71 +15,47 @@ import lucuma.itc.client.TargetInput
 import lucuma.itc.client.arb.ArbInstrumentMode.given
 import lucuma.itc.client.arb.ArbIntegrationTimeInput.given
 import lucuma.itc.client.arb.ArbTargetInput.given
-import munit.FunSuite
+import munit.ScalaCheckSuite
+import org.scalacheck.Arbitrary
 import org.scalacheck.Arbitrary.arbitrary
+import org.scalacheck.Gen
+import org.scalacheck.Prop.*
 
-class ItcInputSuite extends FunSuite:
+class ItcInputSuite extends ScalaCheckSuite:
 
-  private def createItcInput(
-    targets: NonEmptyList[(Target.Id, TargetInput, Option[Timestamp])],
-    blindOffsetTarget: Option[(Target.Id, TargetInput, Option[Timestamp])]
-  ): ItcInput =
-    val mode = arbitrary[InstrumentMode].sample.get
-    ItcInput(
-      arbitrary[ImagingParameters].sample.get.copy(mode = mode),
-      List.empty,
-      List(arbitrary[SpectroscopyParameters].sample.get.copy(mode = mode)),
-      targets,
-      blindOffsetTarget
-    )
+  given Arbitrary[ItcInput] =
+    Arbitrary:
+      for
+        m <- arbitrary[InstrumentMode]
+        a <- arbitrary[Option[ImagingParameters]]
+        s <- arbitrary[SpectroscopyParameters]
+        c <- Gen.choose(1, 10)
+        t <- Gen.listOfN(c, arbitrary[TargetInput])
+        b <- arbitrary[Option[TargetInput]]
+      yield
+        val targetIds = (1 to c).map(i => Target.Id.fromLong(i.toLong).get)
+        val targets   = NonEmptyList.fromListUnsafe(targetIds.zip(t).map((id, target) => (id, target, None)).toList)
 
-  test("acquisition sequence uses blind offset target when available"):
-    val regularTarget = (Target.Id.fromLong(1L).get, arbitrary[TargetInput].sample.get, None)
-    val blindOffsetTarget = (Target.Id.fromLong(2L).get, arbitrary[TargetInput].sample.get, None)
+        ItcInput(
+          a.map(_.copy(mode = m)),
+          List.empty,
+          List(s.copy(mode = m)),
+          targets,
+          b.map(input => (Target.Id.fromLong((c + 1).toLong).get, input, None))
+        )
 
-    val itcInput = createItcInput(
-      NonEmptyList.one(regularTarget),
-      Some(blindOffsetTarget)
-    )
+  property("acquisition sequence uses blind offset target when available, science sequence never uses blind offset"):
+    forAll { (itcInput: ItcInput) =>
+      val acquisitionInput = itcInput.acquisitionInput
+      val scienceInputs    = itcInput.spectroscopyInputs
 
-    val acquisitionInput = itcInput.acquisitionInput
-    val scienceInput     = itcInput.spectroscopyInputs.head
+      // Acquisition should use blind offset target only.
+      val bot = itcInput.blindOffsetTarget.map(_._2)
+      acquisitionInput.foreach: acq =>
+        assertEquals(acq.asterism.length, bot.as(1).getOrElse(itcInput.targets.length))
+        assertEquals(acq.asterism.head,   bot.getOrElse(itcInput.targets.head._2))
 
-    // Acquisition should use blind offset target only
-    assertEquals(acquisitionInput.asterism.length, 1)
-    assertEquals(acquisitionInput.asterism.head, blindOffsetTarget._2)
-
-    // Science should use regular targets only
-    assertEquals(scienceInput.asterism.length, 1)
-    assertEquals(scienceInput.asterism.head, regularTarget._2)
-
-  test("both sequences use regular targets when no blind offset exists"):
-    val regularTargets = NonEmptyList.of(
-      (Target.Id.fromLong(1L).get, arbitrary[TargetInput].sample.get, None),
-      (Target.Id.fromLong(2L).get, arbitrary[TargetInput].sample.get, None)
-    )
-
-    val itcInput = createItcInput(regularTargets, None)
-
-    val acquisitionInput = itcInput.acquisitionInput
-    val scienceInput     = itcInput.spectroscopyInputs.head
-
-    // Both should use all regular targets when no blind offset
-    assertEquals(acquisitionInput.asterism.length, 2)
-    assertEquals(scienceInput.asterism.length, 2)
-    assertEquals(acquisitionInput.asterism, scienceInput.asterism)
-
-  test("science sequence ignores blind offset target"):
-    val regularTarget = (Target.Id.fromLong(1L).get, arbitrary[TargetInput].sample.get, None)
-    val blindOffsetTarget = (Target.Id.fromLong(2L).get, arbitrary[TargetInput].sample.get, None)
-
-    val itcInput = createItcInput(
-      NonEmptyList.one(regularTarget),
-      Some(blindOffsetTarget)
-    )
-
-    val scienceInput = itcInput.spectroscopyInputs.head
-
-    // Science sequence should always use regular targets, never blind offset
-    assertEquals(scienceInput.asterism.length, 1)
-    assertEquals(scienceInput.asterism.head, regularTarget._2)
+      // Science should use regular targets only
+      assert(scienceInputs.forall(_.asterism.length === itcInput.targets.size))
+      assert(scienceInputs.forall(_.asterism.head === itcInput.targets.head._2))
+    }

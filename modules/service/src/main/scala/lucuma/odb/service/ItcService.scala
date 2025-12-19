@@ -45,6 +45,7 @@ import lucuma.itc.AsterismIntegrationTimes
 import lucuma.itc.IntegrationTime
 import lucuma.itc.SignalToNoiseAt
 import lucuma.itc.TargetIntegrationTime
+import lucuma.itc.client.ImagingInput
 import lucuma.itc.client.InstrumentMode
 import lucuma.itc.client.ItcClient
 import lucuma.odb.data.Md5Hash
@@ -184,34 +185,34 @@ object ItcService {
   }
 
   case class AsterismResults private (
-    acquisitionResult: Zipper[TargetResult],
-    scienceResult: Zipper[TargetResult]
+    acquisitionResult: Option[Zipper[TargetResult]],
+    scienceResult:     Zipper[TargetResult]
   )
 
-  object AsterismResults {
+  object AsterismResults:
 
-    def fromResults(acquisition: Zipper[TargetResult], science: Zipper[TargetResult]): Option[AsterismResults] =
-      if (acquisition.toNel.map(_.targetId).sortBy(_.value) === science.toNel.map(_.targetId).sortBy(_.value)) {
-        AsterismResults(acquisition, science).some
-      } else none
+    private def targetIds(z: Zipper[TargetResult]): NonEmptyList[Target.Id] =
+      z.toNel.map(_.targetId).sortBy(_.value)
+
+    def fromResults(acquisition: Option[Zipper[TargetResult]], science: Zipper[TargetResult]): Option[AsterismResults] =
+      Option.when(acquisition.forall(z => targetIds(z) === targetIds(science)))(
+        AsterismResults(acquisition, science)
+      )
 
     given Encoder[AsterismResults] =
-      Encoder.instance { rs =>
+      Encoder.instance: rs =>
         Json.obj(
           "science" -> rs.scienceResult.widen[TargetResult].asJson,
-          "acquisition" -> rs.acquisitionResult.widen[TargetResult].asJson
+          "acquisition" -> rs.acquisitionResult.map(_.widen[TargetResult]).asJson
         )
-      }
 
     given Decoder[AsterismResults] =
-      Decoder.instance { c =>
-        for {
+      Decoder.instance: c =>
+        for
           science     <- c.downField("science").as[Zipper[TargetResult]]
-          acquisition <- c.downField("acquisition").as[Zipper[TargetResult]]
+          acquisition <- c.downField("acquisition").as[Option[Zipper[TargetResult]]]
           result      <- fromResults(acquisition, science).toRight(DecodingFailure("Target mismatch", c.history))
-        } yield result
-      }
-  }
+        yield result
 
   opaque type Result = Either[OdbError, AsterismResults]
 
@@ -334,10 +335,10 @@ object ItcService {
 
       // According to the spec we default if the target is too bright
       // https://app.shortcut.com/lucuma/story/1999/determine-exposure-time-for-acquisition-images
-      private def safeAcquisitionCall(targets: ItcInput): F[Either[OdbError, AsterismIntegrationTimes]] =
-        def go(min: TimeSpan, max: TimeSpan): F[Either[OdbError, AsterismIntegrationTimes]] =
+      private def safeAcquisitionCall(targets: ItcInput): F[Option[Either[OdbError, AsterismIntegrationTimes]]] =
+        def go(input: ImagingInput, min: TimeSpan, max: TimeSpan): F[Either[OdbError, AsterismIntegrationTimes]] =
           client
-            .imaging(targets.acquisitionInput, useCache = false)
+            .imaging(input, useCache = false)
             .map:
               _.targetTimes.modifyValue:
                 _.map:
@@ -357,17 +358,21 @@ object ItcService {
               .partitionErrors
               .leftMap(convertErrors(targets))
 
-        targets.acquisitionInput.mode match
-          case InstrumentMode.GmosNorthSpectroscopy(_, _, _, _, _, _) |
-               InstrumentMode.GmosSouthSpectroscopy(_, _, _, _, _, _) |
-               InstrumentMode.GmosNorthImaging(_, _)                  |
-               InstrumentMode.GmosSouthImaging(_, _)                    =>
-            go(lucuma.odb.sequence.gmos.MinAcquisitionExposureTime,
-               lucuma.odb.sequence.gmos.MaxAcquisitionExposureTime)
-          case InstrumentMode.Flamingos2Spectroscopy(_, _, _)         |
-               InstrumentMode.Flamingos2Imaging(_)                      =>
-            go(lucuma.odb.sequence.flamingos2.MinAcquisitionExposureTime,
-               lucuma.odb.sequence.flamingos2.MaxAcquisitionExposureTime)
+        targets.acquisitionInput.traverse: in =>
+
+          in.mode match
+            case InstrumentMode.GmosNorthSpectroscopy(_, _, _, _, _, _) |
+                 InstrumentMode.GmosSouthSpectroscopy(_, _, _, _, _, _) |
+                 InstrumentMode.GmosNorthImaging(_, _)                  |
+                 InstrumentMode.GmosSouthImaging(_, _)                    =>
+              go(in,
+                 lucuma.odb.sequence.gmos.MinAcquisitionExposureTime,
+                 lucuma.odb.sequence.gmos.MaxAcquisitionExposureTime)
+            case InstrumentMode.Flamingos2Spectroscopy(_, _, _)         |
+                 InstrumentMode.Flamingos2Imaging(_)                      =>
+              go(in,
+                 lucuma.odb.sequence.flamingos2.MinAcquisitionExposureTime,
+                 lucuma.odb.sequence.flamingos2.MaxAcquisitionExposureTime)
 
       private def callRemoteItc(
         oid:     Observation.Id,
@@ -378,29 +383,37 @@ object ItcService {
         // inputs we need now though in order to call ITC repeatedly and process
         // all the results.
 
+        def toTargetResults(a: AsterismIntegrationTimes): Zipper[TargetResult] =
+          a.value.zipWithIndex.map { case (targetIntegrationTime, index) =>
+            val (targetId, targetInput) = targets.targetVector.getUnsafe(index)
+            TargetResult(targetId, targetIntegrationTime.times.focus, targetIntegrationTime.signalToNoiseAt)
+          }
+
+
         val res = for
           acq <- safeAcquisitionCall(targets)
           img <- targets.imagingInputs.headOption.traverse(input => client.imaging(input, useCache = false))
           spc <- targets.spectroscopyInputs.headOption.traverse(input => client.spectroscopy(input, useCache = false))
         yield
           val sci = img.orElse(spc).toRight(OdbError.InvalidObservation(oid, s"The observation has neither imaging nor spectroscopy mode.".some))
-          acq.flatMap: acqResult =>
+
+          val sciZipper: Either[OdbError, Zipper[TargetResult]] =
             sci.flatMap: sciResult =>
               sciResult
                 .targetTimes
                 .partitionErrors
                 .leftMap(convertErrors(targets))
-                .flatMap: sciResult =>
-                  AsterismResults.fromResults(
-                    acqResult.value.zipWithIndex.map { case (targetIntegrationTime, index) =>
-                      val (targetId, targetInput) = targets.targetVector.getUnsafe(index)
-                      TargetResult(targetId, /*(targets.imaging, targetInput),*/ targetIntegrationTime.times.focus, targetIntegrationTime.signalToNoiseAt)
-                    },
-                    sciResult.value.zipWithIndex.map { case (targetIntegrationTime, index) =>
-                      val (targetId, targetInput) = targets.targetVector.getUnsafe(index)
-                      TargetResult(targetId, /*(targets.spectroscopy, targetInput),*/ targetIntegrationTime.times.focus, targetIntegrationTime.signalToNoiseAt)
-                    }
-                  ).toRight(Error.targetMismatch)
+                .map(toTargetResults)
+
+          val acqZipper: Option[Either[OdbError, Zipper[TargetResult]]] =
+            acq.map(_.map(toTargetResults))
+
+          val res = acqZipper.fold(sciZipper.map(sz => AsterismResults.fromResults(none, sz))): eaz =>
+            eaz.flatMap: az =>
+              sciZipper.flatMap: sz =>
+                AsterismResults.fromResults(az.some, sz).asRight[OdbError]
+
+          res.flatMap(_.toRight(Error.targetMismatch))
 
         res.handleError: t =>
           OdbError.RemoteServiceCallError(s"Error calling ITC service: ${t.getMessage}".some).asLeft

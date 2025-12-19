@@ -293,7 +293,7 @@ object ObscalcService:
           dig => (
             r.fold(
               _ => Obscalc.Result.WithoutTarget(dig._1, w),
-              i => Obscalc.Result.WithTarget(Obscalc.ItcResult(i.acquisitionResult.focus, i.scienceResult.focus), dig._1, w)
+              i => Obscalc.Result.WithTarget(Obscalc.ItcResult(i.acquisitionResult.map(_.focus), i.scienceResult.focus), dig._1, w)
             ),
             dig._2
           )
@@ -358,7 +358,7 @@ object ObscalcService:
       (target_id *: integration_time *: signal_to_noise_at.opt).to[ItcService.TargetResult]
 
     val itc_result: Codec[Obscalc.ItcResult] =
-      (target_result *: target_result).to[Obscalc.ItcResult]
+      (target_result.opt *: target_result).to[Obscalc.ItcResult]
 
     val observation_workflow: Codec[ObservationWorkflow] =
       (observation_workflow_state *: _observation_workflow_state *: _observation_validation).to[ObservationWorkflow]
@@ -602,12 +602,12 @@ object ObscalcService:
         sql"c_odb_error            = ${odb_error.opt}"(r.odbError),
 
         // Imaging ITC Results
-        sql"c_img_target_id        = ${target_id.opt}"(r.itcResult.map(_.imaging.targetId)),
-        sql"c_img_exposure_time    = ${time_span.opt}"(r.itcResult.map(_.imaging.value.exposureTime)),
-        sql"c_img_exposure_count   = ${int4_pos.opt}"(r.itcResult.map(_.imaging.value.exposureCount)),
-        sql"c_img_wavelength       = ${wavelength_pm.opt}"(r.itcResult.flatMap(_.imaging.signalToNoise).map(_.wavelength)),
-        sql"c_img_single_sn        = ${signal_to_noise.opt}"(r.itcResult.flatMap(_.imaging.signalToNoise).map(_.single.value)),
-        sql"c_img_total_sn         = ${signal_to_noise.opt}"(r.itcResult.flatMap(_.imaging.signalToNoise).map(_.total.value)),
+        sql"c_img_target_id        = ${target_id.opt}"(r.itcResult.flatMap(_.imaging).map(_.targetId)),
+        sql"c_img_exposure_time    = ${time_span.opt}"(r.itcResult.flatMap(_.imaging).map(_.value.exposureTime)),
+        sql"c_img_exposure_count   = ${int4_pos.opt}"(r.itcResult.flatMap(_.imaging).map(_.value.exposureCount)),
+        sql"c_img_wavelength       = ${wavelength_pm.opt}"(r.itcResult.flatMap(_.imaging).flatMap(_.signalToNoise).map(_.wavelength)),
+        sql"c_img_single_sn        = ${signal_to_noise.opt}"(r.itcResult.flatMap(_.imaging).flatMap(_.signalToNoise).map(_.single.value)),
+        sql"c_img_total_sn         = ${signal_to_noise.opt}"(r.itcResult.flatMap(_.imaging).flatMap(_.signalToNoise).map(_.total.value)),
 
         // Spectroscopy ITC Results
         sql"c_spec_target_id       = ${target_id.opt}"(r.itcResult.map(_.spectroscopy.targetId)),
