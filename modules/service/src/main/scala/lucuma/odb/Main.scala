@@ -26,6 +26,7 @@ import lucuma.odb.graphql.AttachmentRoutes
 import lucuma.odb.graphql.EmailWebhookRoutes
 import lucuma.odb.graphql.GraphQLRoutes
 import lucuma.odb.graphql.OdbMapping
+import lucuma.odb.graphql.ProxyRoutes
 import lucuma.odb.graphql.SchedulerRoutes
 import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
@@ -223,7 +224,9 @@ object FMain extends MainParams {
       S3FileService.s3AsyncClientOpsResource(config.aws),
       S3FileService.s3PresignerResource(config.aws),
       config.httpClientResource,
-      config.horizonsClientResource
+      config.horizonsClientResource,
+      config.corsHttpClientResource,
+      config.proxy
     )
 
   /** A resource that yields our HttpRoutes, wrapped in accessory middleware. */
@@ -243,6 +246,8 @@ object FMain extends MainParams {
     s3PresignerResource:  Resource[F, S3Presigner],
     httpClientResource:   Resource[F, Client[F]],
     horizonsClientResource: Resource[F, HorizonsClient[F]],
+    corsHttpClientResource: Resource[F, Client[F]],
+    proxyConfig:          Config.CORSProxy
   ): Resource[F, WebSocketBuilder2[F] => HttpRoutes[F]] =
     for {
       pool              <- databasePoolResource[F](databaseConfig)
@@ -252,6 +257,7 @@ object FMain extends MainParams {
       ssoClient         <- ssoClientResource
       httpClient        <- httpClientResource
       horizonsClient    <- horizonsClientResource
+      proxyHttpClient   <- corsHttpClientResource
       userSvc           <- pool.map(UserService.fromSession(_))
       middleware        <- Resource.eval(ServerMiddleware(corsOverHttps, domain, ssoClient, userSvc))
       enums             <- Resource.eval(pool.use(Enums.load))
@@ -267,7 +273,8 @@ object FMain extends MainParams {
       val schedulerRoutes    = SchedulerRoutes.apply[F](pool, ssoClient, enums, emailConfig, commitHash, ptc, httpClient, itcClient, gaiaClient, horizonsClient)
       val metadataRoutes     = GraphQLRoutes.enumMetadata(metadataService)
       val emailWebhookRoutes = EmailWebhookRoutes(webhookService, emailConfig)
-      middleware(graphQLRoutes(wsb) <+> attachmentRoutes <+>  metadataRoutes <+> emailWebhookRoutes <+> schedulerRoutes)
+      val proxyRoutes        = ProxyRoutes[F](proxyHttpClient, ssoClient, proxyConfig)
+      middleware(graphQLRoutes(wsb) <+> attachmentRoutes <+> metadataRoutes <+> emailWebhookRoutes <+> schedulerRoutes <+> proxyRoutes)
     }
 
   /** A startup action that runs database migrations using Flyway. */

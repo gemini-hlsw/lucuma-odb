@@ -14,6 +14,7 @@ import eu.timepit.refined.types.string.NonEmptyString
 import fs2.aws.s3.models.Models.BucketName
 import fs2.aws.s3.models.Models.FileKey
 import fs2.io.net.Network
+import fs2.io.net.tls.TLSContext
 import lucuma.catalog.clients.GaiaClient
 import lucuma.catalog.clients.SimbadClient
 import lucuma.catalog.telluric.TelluricTargetsClient
@@ -57,7 +58,8 @@ case class Config(
   commitHash:    CommitHash,                // From Heroku Dyno Metadata
   goaUsers:      Set[User.Id],              // Gemini Observatory Archive user id(s)
   obscalcPoll:   FiniteDuration,            // Obscalc poll period
-  httpClient:    Config.HttpClient          // Configuration for HTTP requests made by the ODB
+  httpClient:    Config.HttpClient,         // Configuration for HTTP requests made by the ODB
+  proxy:         Config.CORSProxy           // CORS proxy configuration
 ):
 
   // People send us their JWTs. We need to be able to extract them from the request, decode them,
@@ -72,6 +74,17 @@ case class Config(
       .withTimeout(httpClient.timeout)
       .withIdleConnectionTime(httpClient.effectiveIdleConnectionTime)
       .build
+
+  // http client for the cors proxyp without SSL (horizons uses a weird ssl cert)
+  def corsHttpClientResource[F[_]: Async: Network]: Resource[F, Client[F]] =
+    for {
+      tctx <- TLSContext.Builder.forAsync[F].insecureResource
+      http <- EmberClientBuilder.default[F]
+        .withTimeout(httpClient.timeout)
+        .withIdleConnectionTime(httpClient.effectiveIdleConnectionTime)
+        .withTLSContext(tctx)
+        .build
+    } yield http
 
   def horizonsClientResource[F[_]: Async: Network: Logger]: Resource[F, HorizonsClient[F]] =
     httpClientResource.map(HorizonsClient.apply(_, 5, 1.second))
@@ -298,6 +311,15 @@ object Config:
       envOrProp("HTTP_CLIENT_IDLE_CONNECTION_TIME").as[Duration].default(60.seconds) // 60s is Ember's default
     ).parMapN(HttpClient.apply)
 
+  case class CORSProxy(allowedDomains: List[String])
+
+  object CORSProxy:
+    lazy val fromCiris: ConfigValue[Effect, CORSProxy] =
+      envOrProp("ODB_PROXY_ALLOWED_DOMAINS")
+        .as[List[String]]
+        .default(List("irsa.ipac.caltech.edu", "ssd.jpl.nasa.gov"))
+        .map(CORSProxy.apply)
+
   private given ConfigDecoder[String, PublicKey] =
     ConfigDecoder[String].mapOption("Public Key"): s =>
       GpgPublicKeyReader.publicKey(s).toOption
@@ -341,5 +363,6 @@ object Config:
     optValue("CommitHash", BuildInfo.gitHeadCommit).as[CommitHash].default(CommitHash.Zero),
     envOrProp("GOA_USER_IDS").as[List[User.Id]].map(_.toSet).default(Set.empty),
     envOrProp("OBSCALC_POLL_SECONDS").as[FiniteDuration].default(10.seconds),
-    HttpClient.fromCiris
+    HttpClient.fromCiris,
+    CORSProxy.fromCiris
   ).parMapN(Config.apply)
