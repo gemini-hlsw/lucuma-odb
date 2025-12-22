@@ -23,13 +23,13 @@ import lucuma.core.model.Attachment
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.itc.client.ItcClient
+import lucuma.odb.data.Itc
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.binding.BooleanBinding
 import lucuma.odb.graphql.table.TimingWindowView
 import lucuma.odb.json.configurationrequest.query.given
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.util.CommitHash
-import lucuma.odb.service.ItcService
 import lucuma.odb.service.Services
 import skunk.Transaction
 
@@ -116,9 +116,13 @@ trait ObservationMapping[F[_]]
   }
 
   def itcQueryHandler: EffectHandler[F] = {
+    import lucuma.odb.json.itc.given
+    import lucuma.odb.json.time.query.given
+    import lucuma.odb.json.wavelength.query.given
+
     val readEnv: Env => Result[Unit] = _ => ().success
 
-    val calculate: (Program.Id, Observation.Id, Unit) => F[Result[ItcService.AsterismResults]] =
+    val calculate: (Program.Id, Observation.Id, Unit) => F[Result[Itc]] =
       (pid, oid, _) =>
         services.use { implicit s =>
           itcService

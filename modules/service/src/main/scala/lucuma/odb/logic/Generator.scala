@@ -39,6 +39,7 @@ import lucuma.core.model.sequence.gmos.StaticConfig.GmosNorth as GmosNorthStatic
 import lucuma.core.model.sequence.gmos.StaticConfig.GmosSouth as GmosSouthStatic
 import lucuma.core.util.Timestamp
 import lucuma.itc.IntegrationTime
+import lucuma.odb.data.Itc
 import lucuma.odb.data.Md5Hash
 import lucuma.odb.data.OdbError
 import lucuma.odb.sequence.ExecutionConfigGenerator
@@ -51,7 +52,6 @@ import lucuma.odb.sequence.gmos.longslit.LongSlit
 import lucuma.odb.sequence.syntax.hash.*
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.sequence.util.SequenceIds
-import lucuma.odb.service.ItcService
 import lucuma.odb.service.NoTransaction
 import lucuma.odb.service.Services
 import lucuma.odb.service.Services.Syntax.*
@@ -109,7 +109,7 @@ sealed trait Generator[F[_]] {
   def calculateDigest(
     programId:      Program.Id,
     observationId:  Observation.Id,
-    asterismResult: Either[OdbError, ItcService.AsterismResults],
+    asterismResult: Either[OdbError, Itc],
     params:         GeneratorParams,
     when:           Option[Timestamp] = None
   )(using NoTransaction[F], Services.ServiceAccess): F[Either[OdbError, ExecutionDigest]]
@@ -117,7 +117,7 @@ sealed trait Generator[F[_]] {
   def calculateScienceAtomDigests(
     programId:      Program.Id,
     observationId:  Observation.Id,
-    asterismResult: Either[OdbError, ItcService.AsterismResults],
+    asterismResult: Either[OdbError, Itc],
     params:         GeneratorParams,
     when:           Option[Timestamp] = None
   )(using NoTransaction[F], Services.ServiceAccess): F[Either[OdbError, Stream[Pure, AtomDigest]]]
@@ -156,13 +156,13 @@ sealed trait Generator[F[_]] {
   def executionState(
     pid:    Program.Id,
     oid:    Observation.Id,
-    itcRes: ItcService.AsterismResults,
+    itcRes: Itc,
     params: GeneratorParams,
   )(using Services.ServiceAccess): F[ExecutionState]
 
   /** Equivalent to executionState above, but computes many results. */
   def executionStates(
-    input: Map[Observation.Id, (Program.Id, ItcService.AsterismResults, GeneratorParams)]
+    input: Map[Observation.Id, (Program.Id, Itc, GeneratorParams)]
   )(using NoTransaction[F], Services.ServiceAccess): F[Map[Observation.Id, ExecutionState]]
 
 }
@@ -210,7 +210,7 @@ object Generator {
       private case class Context(
         pid:    Program.Id,
         oid:    Observation.Id,
-        itcRes: Either[OdbError, ItcService.AsterismResults],
+        itcRes: Either[OdbError, Itc],
         params: GeneratorParams
       ) {
 
@@ -218,10 +218,10 @@ object Generator {
           SequenceIds.namespace(commitHash, oid, params)
 
         val acquisitionIntegrationTime: Either[OdbError, Option[IntegrationTime]] =
-          itcRes.map(_.acquisitionResult.map(_.focus.value))
+          itcRes.map(_.acquisition.map(_.results.focus.value))
 
         val scienceIntegrationTime: Either[OdbError, IntegrationTime] =
-          itcRes.map(_.scienceResult.focus.value)
+          itcRes.map(_.science.results.focus.value)
 
         val hash: Md5Hash = {
           val md5 = MessageDigest.getInstance("MD5")
@@ -263,14 +263,14 @@ object Generator {
         )(using NoTransaction[F]): EitherT[F, OdbError, Context] = {
           val itc = itcService
 
-          val opc: F[Either[OdbError, (GeneratorParams, Option[ItcService.AsterismResults])]] =
+          val opc: F[Either[OdbError, (GeneratorParams, Option[Itc])]] =
             services.transactionally:
               (for
                 p <- EitherT(generatorParamsService.selectOne(pid, oid).map(_.leftMap(e => Error.sequenceUnavailable(oid, e.format))))
                 c <- EitherT.liftF(itc.selectOne(pid, oid, p))
               yield (p, c)).value
 
-          def callItc(p: GeneratorParams): EitherT[F, OdbError, ItcService.AsterismResults] =
+          def callItc(p: GeneratorParams): EitherT[F, OdbError, Itc] =
             EitherT(itc.callRemote(pid, oid, p))
 
           for {
@@ -323,7 +323,7 @@ object Generator {
       override def calculateDigest(
         pid:             Program.Id,
         oid:             Observation.Id,
-        asterismResults: Either[OdbError, ItcService.AsterismResults],
+        asterismResults: Either[OdbError, Itc],
         params:          GeneratorParams,
         when:            Option[Timestamp] = None
       )(using NoTransaction[F], Services.ServiceAccess): F[Either[OdbError, ExecutionDigest]] =
@@ -443,7 +443,7 @@ object Generator {
       override def calculateScienceAtomDigests(
         pid:    Program.Id,
         oid:    Observation.Id,
-        ast:    Either[OdbError, ItcService.AsterismResults],
+        ast:    Either[OdbError, Itc],
         params: GeneratorParams,
         when:   Option[Timestamp] = None
       )(using NoTransaction[F], Services.ServiceAccess): F[Either[OdbError, Stream[Pure, AtomDigest]]] =
@@ -570,7 +570,7 @@ object Generator {
       override def executionState(
         pid:    Program.Id,
         oid:    Observation.Id,
-        itcRes: ItcService.AsterismResults,
+        itcRes: Itc,
         params: GeneratorParams,
       )(using Services.ServiceAccess): F[ExecutionState] =
         digestWithParamsAndHash(Context(pid, oid, Right(itcRes), params), None)
@@ -581,7 +581,7 @@ object Generator {
             case Right(d) => d.science.executionState
 
       override def executionStates(
-        input: Map[Observation.Id, (Program.Id, ItcService.AsterismResults, GeneratorParams)]
+        input: Map[Observation.Id, (Program.Id, Itc, GeneratorParams)]
       )(using NoTransaction[F], Services.ServiceAccess): F[Map[Observation.Id, ExecutionState]] =
         services
           .transactionally:
