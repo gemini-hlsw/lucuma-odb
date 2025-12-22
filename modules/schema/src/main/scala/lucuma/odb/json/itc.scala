@@ -3,14 +3,18 @@
 
 package lucuma.odb.json
 
+import cats.syntax.either.*
 import eu.timepit.refined.types.numeric.PosInt
 import io.circe.Decoder
+import io.circe.DecodingFailure
 import io.circe.Encoder
 import io.circe.Json
 import io.circe.refined.*
 import io.circe.syntax.*
 import lucuma.core.data.Zipper
 import lucuma.core.data.ZipperCodec
+import lucuma.core.enums.GmosNorthFilter
+import lucuma.core.enums.GmosSouthFilter
 import lucuma.core.math.SignalToNoise
 import lucuma.core.math.SingleSN
 import lucuma.core.math.TotalSN
@@ -20,6 +24,8 @@ import lucuma.core.util.TimeSpan
 import lucuma.itc.IntegrationTime
 import lucuma.itc.SignalToNoiseAt
 import lucuma.odb.data.Itc
+import lucuma.odb.data.Itc.ModeData
+import lucuma.odb.data.Itc.ModeDataType
 import lucuma.odb.data.Itc.Result
 import lucuma.odb.data.Itc.ResultSet
 
@@ -30,11 +36,11 @@ trait ItcCodec:
   import ZipperCodec.given
 
   given Decoder[SignalToNoiseAt] = c =>
-    for {
+    for
       w <- c.downField("wavelength").as[Wavelength]
       s <- c.downField("single").as[SignalToNoise]
       t <- c.downField("total").as[SignalToNoise]
-    } yield SignalToNoiseAt(w, SingleSN(s), TotalSN(t))
+    yield SignalToNoiseAt(w, SingleSN(s), TotalSN(t))
 
   // N.B. lucuma.itc.SignalToNoiseAt defines its own encoder consistent with
   // this decoder.  Perhaps we should move the decoder there as well.
@@ -57,13 +63,39 @@ trait ItcCodec:
         "signalToNoiseAt" -> a.signalToNoise.asJson
       )
 
+  given Decoder[ModeData.GmosNorthImaging] = c =>
+    c.downField("filter").as[GmosNorthFilter].map(ModeData.GmosNorthImaging.apply)
+
+  given Decoder[ModeData.GmosSouthImaging] = c =>
+    c.downField("filter").as[GmosSouthFilter].map(ModeData.GmosSouthImaging.apply)
+
+  given Decoder[ModeData] = c =>
+    for
+      t <- c.downField("dataType").as[ModeDataType]
+      r <- t match
+             case ModeDataType.Empty            => ModeData.Empty.asRight[DecodingFailure]
+             case ModeDataType.GmosNorthImaging => c.as[ModeData.GmosNorthImaging]
+             case ModeDataType.GmosSouthImaging => c.as[ModeData.GmosSouthImaging]
+    yield r
+
+  given Encoder[ModeData] =
+    Encoder.instance: a =>
+      val fields = a match
+        case ModeData.Empty               => Nil
+        case ModeData.GmosNorthImaging(f) => List("filter" -> f.asJson)
+        case ModeData.GmosSouthImaging(f) => List("filter" -> f.asJson)
+      Json.fromFields(("dataType", a.dataType.asJson) :: fields)
+
   given Decoder[ResultSet] =
     Decoder.instance: c =>
-      c.as[Zipper[Result]].map(z => ResultSet(z))
+      for
+        m <- c.downField("modeData").as[ModeData]
+        z <- c.as[Zipper[Result]]
+      yield ResultSet(m, z)
 
   given (using Encoder[TimeSpan], Encoder[Wavelength]): Encoder[ResultSet] =
     Encoder.instance: a =>
-      a.results.asJson
+      a.results.asJson.mapObject(_.add("modeData", a.modeData.asJson))
 
   given Decoder[Itc] =
     Decoder.instance: c =>
