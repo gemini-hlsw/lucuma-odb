@@ -35,6 +35,7 @@ import lucuma.itc.client.ImagingInput
 import lucuma.itc.client.InstrumentMode
 import lucuma.itc.client.ItcClient
 import lucuma.odb.data.Itc
+import lucuma.odb.data.Itc.ModeData
 import lucuma.odb.data.Md5Hash
 import lucuma.odb.data.OdbError
 import lucuma.odb.sequence.data.GeneratorParams
@@ -321,10 +322,10 @@ object ItcService {
           val acqZipper: Option[Either[OdbError, Zipper[Itc.Result]]] =
             acq.map(_.map(toTargetResults))
 
-          val res = acqZipper.fold(sciZipper.map(sz => Itc.fromResults(none, sz))): eaz =>
+          val res = acqZipper.fold(sciZipper.map(sz => Itc.fromResults(ModeData.Empty, none, sz))): eaz =>
             eaz.flatMap: az =>
               sciZipper.flatMap: sz =>
-                Itc.fromResults(az.some, sz).asRight[OdbError]
+                Itc.fromResults(ModeData.Empty, az.some, sz).asRight[OdbError]
 
           res.flatMap(_.toRight(Error.targetMismatch))
 
