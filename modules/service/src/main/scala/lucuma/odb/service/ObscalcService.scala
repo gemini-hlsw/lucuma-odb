@@ -32,6 +32,7 @@ import lucuma.core.model.sequence.ExecutionDigest
 import lucuma.core.util.CalculatedValue
 import lucuma.core.util.CalculationState
 import lucuma.core.util.Timestamp
+import lucuma.odb.data.Itc
 import lucuma.odb.data.Obscalc
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
@@ -257,7 +258,7 @@ object ObscalcService:
                 .map(_.leftMap(e => sequenceUnavailable(e.format)))
 
         def workflow(
-          itc: Option[ItcService.AsterismResults],
+          itc: Option[Itc],
           dig: Option[ExecutionDigest]
         ): F[ObservationWorkflow] =
           Logger[F].info(s"${pending.observationId}: calculating workflow") *>
@@ -271,7 +272,7 @@ object ObscalcService:
 
         val gen = generator
 
-        def digest(itcResult: Either[OdbError, ItcService.AsterismResults]): F[Either[OdbError, (ExecutionDigest, Stream[Pure, AtomDigest])]] =
+        def digest(itcResult: Either[OdbError, Itc]): F[Either[OdbError, (ExecutionDigest, Stream[Pure, AtomDigest])]] =
           Logger[F].info(s"${pending.observationId}: calculating digest") *>
           ((for
             p <- params

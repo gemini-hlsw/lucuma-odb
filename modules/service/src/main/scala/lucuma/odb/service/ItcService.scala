@@ -3,7 +3,6 @@
 
 package lucuma.odb.service
 
-import cats.Order
 import cats.data.EitherT
 import cats.data.NonEmptyChain
 import cats.data.NonEmptyList
@@ -21,33 +20,21 @@ import cats.syntax.functorFilter.*
 import cats.syntax.option.*
 import cats.syntax.order.*
 import cats.syntax.traverse.*
-import eu.timepit.refined.cats.*
-import eu.timepit.refined.types.numeric.PosInt
 import fs2.Stream
-import io.circe.Decoder
-import io.circe.DecodingFailure
-import io.circe.Encoder
-import io.circe.Json
-import io.circe.refined.*
 import io.circe.syntax.*
 import lucuma.core.data.Zipper
-import lucuma.core.data.ZipperCodec.given
 import lucuma.core.enums.Band
-import lucuma.core.math.SignalToNoise
-import lucuma.core.math.SingleSN
-import lucuma.core.math.TotalSN
-import lucuma.core.math.Wavelength
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.util.TimeSpan
 import lucuma.itc.AsterismIntegrationTimes
 import lucuma.itc.IntegrationTime
-import lucuma.itc.SignalToNoiseAt
 import lucuma.itc.TargetIntegrationTime
 import lucuma.itc.client.ImagingInput
 import lucuma.itc.client.InstrumentMode
 import lucuma.itc.client.ItcClient
+import lucuma.odb.data.Itc
 import lucuma.odb.data.Md5Hash
 import lucuma.odb.data.OdbError
 import lucuma.odb.sequence.data.GeneratorParams
@@ -68,8 +55,6 @@ import scala.concurrent.duration.*
 
 sealed trait ItcService[F[_]] {
 
-  import ItcService.AsterismResults
-
   /**
    * Obtains the ITC results for a single target, first checking the cache and
    * then performing a query to the remote ITC service if necessary.
@@ -77,7 +62,7 @@ sealed trait ItcService[F[_]] {
   def lookup(
     programId:     Program.Id,
     observationId: Observation.Id
-  )(using NoTransaction[F]): F[Either[OdbError, AsterismResults]]
+  )(using NoTransaction[F]): F[Either[OdbError, Itc]]
 
   /**
    * Using the provided generator parameters, calls the remote ITC service to
@@ -87,7 +72,7 @@ sealed trait ItcService[F[_]] {
     programId:     Program.Id,
     observationId: Observation.Id,
     params:        GeneratorParams
-  )(using NoTransaction[F]): F[Either[OdbError, AsterismResults]]
+  )(using NoTransaction[F]): F[Either[OdbError, Itc]]
 
   /**
    * Selects the cached ITC results for a single observation, if available and
@@ -97,7 +82,7 @@ sealed trait ItcService[F[_]] {
     programId:    Program.Id,
     observatinId: Observation.Id,
     params:       GeneratorParams
-  )(using Transaction[F]): F[Option[AsterismResults]]
+  )(using Transaction[F]): F[Option[Itc]]
 
   /**
    * Selects the cached ITC results for a program, for those observations where
@@ -107,11 +92,11 @@ sealed trait ItcService[F[_]] {
   def selectAll(
     programId: Program.Id,
     params:    Map[Observation.Id, GeneratorParams]
-  )(using Transaction[F]): F[Map[Observation.Id, AsterismResults]]
+  )(using Transaction[F]): F[Map[Observation.Id, Itc]]
 
   def selectAll(
     params: Map[Observation.Id, GeneratorParams]
-  )(using Transaction[F], SuperUserAccess): F[Map[Observation.Id, AsterismResults]]
+  )(using Transaction[F], SuperUserAccess): F[Map[Observation.Id, Itc]]
 
 }
 
@@ -142,86 +127,14 @@ object ItcService {
 
   end Error
 
-  case class TargetResult(targetId: Target.Id, value: IntegrationTime, signalToNoise: Option[SignalToNoiseAt]) {
-    def totalTime: Option[TimeSpan] = {
-      val total = BigInt(value.exposureTime.toMicroseconds) * value.exposureCount.value
-      Option.when(total.isValidLong)(TimeSpan.fromMicroseconds(total.longValue)).flatten
-    }
-  }
-
-  object TargetResult {
-    given Order[TargetResult] =
-      Order.by { s => (s.totalTime, s.targetId) }
-
-    import lucuma.odb.json.time.query.given
-    import lucuma.odb.json.wavelength.query.given
-
-    given Decoder[SignalToNoiseAt] = c =>
-      for {
-        w <- c.downField("wavelength").as[Wavelength]
-        s <- c.downField("single").as[SignalToNoise]
-        t <- c.downField("total").as[SignalToNoise]
-      } yield SignalToNoiseAt(w, SingleSN(s), TotalSN(t))
-
-    given Decoder[TargetResult] =
-      Decoder.instance { c =>
-        for {
-          targetId        <- c.downField("targetId").as[Target.Id]
-          exposureTime    <- c.downField("exposureTime").as[TimeSpan]
-          exposureCount   <- c.downField("exposureCount").as[PosInt]
-          signalToNoiseAt <- c.downField("signalToNoiseAt").as[Option[SignalToNoiseAt]]
-        } yield TargetResult(targetId, IntegrationTime(exposureTime, exposureCount), signalToNoiseAt)
-      }
-
-    given Encoder[TargetResult] =
-      Encoder.instance { s =>
-        Json.obj(
-          "targetId"        -> s.targetId.asJson,
-          "exposureTime"    -> s.value.exposureTime.asJson,
-          "exposureCount"   -> s.value.exposureCount.value.asJson,
-          "signalToNoiseAt" -> s.signalToNoise.asJson
-        )
-      }
-  }
-
-  case class AsterismResults private (
-    acquisitionResult: Option[Zipper[TargetResult]],
-    scienceResult:     Zipper[TargetResult]
-  )
-
-  object AsterismResults:
-
-    private def targetIds(z: Zipper[TargetResult]): NonEmptyList[Target.Id] =
-      z.toNel.map(_.targetId).sortBy(_.value)
-
-    def fromResults(acquisition: Option[Zipper[TargetResult]], science: Zipper[TargetResult]): Option[AsterismResults] =
-      Option.when(acquisition.forall(z => targetIds(z) === targetIds(science)))(
-        AsterismResults(acquisition, science)
-      )
-
-    given Encoder[AsterismResults] =
-      Encoder.instance: rs =>
-        Json.obj(
-          "science" -> rs.scienceResult.widen[TargetResult].asJson,
-          "acquisition" -> rs.acquisitionResult.map(_.widen[TargetResult]).asJson
-        )
-
-    given Decoder[AsterismResults] =
-      Decoder.instance: c =>
-        for
-          science     <- c.downField("science").as[Zipper[TargetResult]]
-          acquisition <- c.downField("acquisition").as[Option[Zipper[TargetResult]]]
-          result      <- fromResults(acquisition, science).toRight(DecodingFailure("Target mismatch", c.history))
-        yield result
-
-  opaque type Result = Either[OdbError, AsterismResults]
+  opaque type Result = Either[OdbError, Itc]
 
   object Result:
-    def apply(e: Either[OdbError, AsterismResults]): Result =
+    def apply(e: Either[OdbError, Itc]): Result =
       e
 
   extension (r: Result)
-    def toEither: Either[OdbError, AsterismResults] =
+    def toEither: Either[OdbError, Itc] =
       r
 
   def pollVersionsForever[F[_]: Async: Logger](
@@ -256,7 +169,7 @@ object ItcService {
       override def lookup(
         pid: Program.Id,
         oid: Observation.Id
-      )(using NoTransaction[F]): F[Either[OdbError, AsterismResults]] =
+      )(using NoTransaction[F]): F[Either[OdbError, Itc]] =
         (for {
           pr     <- EitherT(attemptLookup(pid, oid))
           (params, oa) = pr
@@ -267,7 +180,7 @@ object ItcService {
         pid:    Program.Id,
         oid:    Observation.Id,
         params: GeneratorParams
-      )(using NoTransaction[F]): F[Either[OdbError, AsterismResults]] =
+      )(using NoTransaction[F]): F[Either[OdbError, Itc]] =
         (for {
           p <- EitherT.fromEither(params.itcInput.leftMap(m => Error.invalidObservation(oid, GeneratorParamsService.Error.MissingData(m))))
           r <- EitherT(callRemoteItc(oid, p))
@@ -278,7 +191,7 @@ object ItcService {
       private def attemptLookup(
         pid: Program.Id,
         oid: Observation.Id
-      )(using NoTransaction[F]): F[Either[OdbError, (GeneratorParams, Option[AsterismResults])]] =
+      )(using NoTransaction[F]): F[Either[OdbError, (GeneratorParams, Option[Itc])]] =
         services.transactionally {
           (for {
             p <- EitherT(generatorParamsService.selectOne(pid, oid).map(_.leftMap(Error.invalidObservation(oid, _))))
@@ -290,7 +203,7 @@ object ItcService {
         pid:    Program.Id,
         oid:    Observation.Id,
         params: GeneratorParams
-      )(using Transaction[F]): F[Option[AsterismResults]] =
+      )(using Transaction[F]): F[Option[Itc]] =
         params.itcInput.toOption.flatTraverse: ps =>
           val inputHash = Md5Hash.unsafeFromByteArray(ps.md5)
           session
@@ -301,10 +214,10 @@ object ItcService {
       override def selectAll(
         pid:    Program.Id,
         params: Map[Observation.Id, GeneratorParams]
-      )(using Transaction[F]): F[Map[Observation.Id, AsterismResults]] =
+      )(using Transaction[F]): F[Map[Observation.Id, Itc]] =
         session
           .execute(Statements.SelectAllItcResults)(pid)
-          .map: (rows: List[(Observation.Id, Md5Hash, AsterismResults)]) =>
+          .map: (rows: List[(Observation.Id, Md5Hash, Itc)]) =>
             rows.map: (oid, hash, results) =>
               params.get(oid).flatMap(_.itcInput.toOption).flatMap: ps =>
                 val inputHash = Md5Hash.unsafeFromByteArray(ps.md5)
@@ -314,7 +227,7 @@ object ItcService {
 
       override def selectAll(
         params: Map[Observation.Id, GeneratorParams]
-      )(using Transaction[F], SuperUserAccess): F[Map[Observation.Id, AsterismResults]] =
+      )(using Transaction[F], SuperUserAccess): F[Map[Observation.Id, Itc]] =
         NonEmptyList.fromList(params.keys.toList).fold(Map.empty.pure[F]): nel =>
           val enc = observation_id.nel(nel)
           session
@@ -377,16 +290,16 @@ object ItcService {
       private def callRemoteItc(
         oid:     Observation.Id,
         targets: ItcInput
-      )(using NoTransaction[F]): F[Either[OdbError, AsterismResults]] =
+      )(using NoTransaction[F]): F[Either[OdbError, Itc]] =
 
         // TODO: for now support only a single science result. We have all the
         // inputs we need now though in order to call ITC repeatedly and process
         // all the results.
 
-        def toTargetResults(a: AsterismIntegrationTimes): Zipper[TargetResult] =
+        def toTargetResults(a: AsterismIntegrationTimes): Zipper[Itc.Result] =
           a.value.zipWithIndex.map { case (targetIntegrationTime, index) =>
             val (targetId, targetInput) = targets.targetVector.getUnsafe(index)
-            TargetResult(targetId, targetIntegrationTime.times.focus, targetIntegrationTime.signalToNoiseAt)
+            Itc.Result(targetId, targetIntegrationTime.times.focus, targetIntegrationTime.signalToNoiseAt)
           }
 
 
@@ -397,7 +310,7 @@ object ItcService {
         yield
           val sci = img.orElse(spc).toRight(OdbError.InvalidObservation(oid, s"The observation has neither imaging nor spectroscopy mode.".some))
 
-          val sciZipper: Either[OdbError, Zipper[TargetResult]] =
+          val sciZipper: Either[OdbError, Zipper[Itc.Result]] =
             sci.flatMap: sciResult =>
               sciResult
                 .targetTimes
@@ -405,13 +318,13 @@ object ItcService {
                 .leftMap(convertErrors(targets))
                 .map(toTargetResults)
 
-          val acqZipper: Option[Either[OdbError, Zipper[TargetResult]]] =
+          val acqZipper: Option[Either[OdbError, Zipper[Itc.Result]]] =
             acq.map(_.map(toTargetResults))
 
-          val res = acqZipper.fold(sciZipper.map(sz => AsterismResults.fromResults(none, sz))): eaz =>
+          val res = acqZipper.fold(sciZipper.map(sz => Itc.fromResults(none, sz))): eaz =>
             eaz.flatMap: az =>
               sciZipper.flatMap: sz =>
-                AsterismResults.fromResults(az.some, sz).asRight[OdbError]
+                Itc.fromResults(az.some, sz).asRight[OdbError]
 
           res.flatMap(_.toRight(Error.targetMismatch))
 
@@ -423,7 +336,7 @@ object ItcService {
         pid:     Program.Id,
         oid:     Observation.Id,
         input:   ItcInput,
-        results: AsterismResults
+        results: Itc
       )(using Transaction[F]): F[Unit] =
         val h = Md5Hash.unsafeFromByteArray(input.md5)
         session.execute(Statements.InsertOrUpdateItcResult)(pid, oid, h, results, h, results)
@@ -435,9 +348,13 @@ object ItcService {
     }
 
   object Statements {
-    private val asterism_results: Codec[AsterismResults] =
+    import lucuma.odb.json.itc.given
+    import lucuma.odb.json.time.transport.given
+    import lucuma.odb.json.wavelength.transport.given
+
+    private val itc: Codec[Itc] =
       jsonb.eimap(
-        _.as[AsterismResults].leftMap(f => s"Could not decode AsterismResults: ${f.message}")
+        _.as[Itc].leftMap(f => s"Could not decode ITC results: ${f.message}")
       )(_.asJson)
 
     val UpdateItcVersion: Command[(
@@ -453,7 +370,7 @@ object ItcService {
     val SelectOneItcResult: Query[(
       Program.Id,
       Observation.Id,
-    ), (Md5Hash, AsterismResults)] =
+    ), (Md5Hash, Itc)] =
       sql"""
         SELECT
           c_hash,
@@ -461,9 +378,9 @@ object ItcService {
         FROM t_itc_result
         WHERE c_program_id     = $program_id     AND
               c_observation_id = $observation_id
-      """.query(md5_hash *: asterism_results)
+      """.query(md5_hash *: itc)
 
-    val SelectAllItcResults: Query[Program.Id, (Observation.Id, Md5Hash, AsterismResults)] =
+    val SelectAllItcResults: Query[Program.Id, (Observation.Id, Md5Hash, Itc)] =
       sql"""
         SELECT
           c_observation_id,
@@ -471,9 +388,9 @@ object ItcService {
           c_asterism_results
         FROM t_itc_result
         WHERE c_program_id = $program_id
-      """.query(observation_id *: md5_hash *: asterism_results)
+      """.query(observation_id *: md5_hash *: itc)
 
-    def selectAllItcResults[A <: NonEmptyList[Observation.Id]](enc: skunk.Encoder[A]): Query[A, (Observation.Id, Md5Hash, AsterismResults)] =
+    def selectAllItcResults[A <: NonEmptyList[Observation.Id]](enc: skunk.Encoder[A]): Query[A, (Observation.Id, Md5Hash, Itc)] =
       sql"""
         SELECT
           c_observation_id,
@@ -481,15 +398,15 @@ object ItcService {
           c_asterism_results
         FROM t_itc_result
         WHERE c_observation_id IN ($enc)
-      """.query(observation_id *: md5_hash *: asterism_results)
+      """.query(observation_id *: md5_hash *: itc)
 
     val InsertOrUpdateItcResult: Command[(
       Program.Id,
       Observation.Id,
       Md5Hash,
-      AsterismResults,
+      Itc,
       Md5Hash,
-      AsterismResults
+      Itc
     )] =
       sql"""
         INSERT INTO t_itc_result (
@@ -501,10 +418,10 @@ object ItcService {
           $program_id,
           $observation_id,
           $md5_hash,
-          $asterism_results
+          $itc
         ON CONFLICT ON CONSTRAINT t_itc_result_pkey DO UPDATE
           SET c_hash             = $md5_hash,
-              c_asterism_results = $asterism_results
+              c_asterism_results = $itc
       """.command
 
   }

@@ -619,7 +619,7 @@ lazy val itcLegacyTests = project
 lazy val schema =
   crossProject(JVMPlatform, JSPlatform)
     .crossType(CrossType.Pure)
-    .dependsOn(ssoFrontendClient)
+    .dependsOn(itcModel, ssoFrontendClient)
     .in(file("modules/schema"))
     .settings(
       name := "lucuma-odb-schema",
