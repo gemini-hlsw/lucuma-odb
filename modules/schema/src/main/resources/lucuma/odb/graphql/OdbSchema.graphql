@@ -10689,6 +10689,40 @@ An 'Int` in the range 0 to 100
 scalar IntPercent
 
 """
+A single ITC call result.
+"""
+type ItcResult {
+  targetId: TargetId!
+  exposureTime: TimeSpan!
+  exposureCount: NonNegInt!
+  signalToNoiseAt: SignalToNoiseAt
+}
+
+enum ItcModeDataType {
+  EMPTY,
+  GMOS_NORTH_IMAGING,
+  GMOS_SOUTH_IMAGING
+}
+
+interface ItcModeData {
+  dataType: ItcModeDataType!
+}
+
+type EmptyItcModeData implements ItcModeData {
+  dataType: ItcModeDataType!
+}
+
+type GmosNorthImagingItcModeData implements ItcModeData {
+  dataType: ItcModeDataType!
+  filter:   GmosNorthFilter!
+}
+
+type GmosSouthImagingItcModeData implements ItcModeData {
+  dataType: ItcModeDataType!
+  filter:   GmosSouthFilter!
+}
+
+"""
 Contains the result of calling the ITC for a particular observation.  Since
 the observation may contain multiple targets, there may be multiple results.
 The "result" field contains the selected, representative, result for all
@@ -10698,6 +10732,7 @@ successes, the overall "result" will be a failure. The "all" field contains
 results for all targets regardless.
 """
 type ItcResultSet {
+  modeData: ItcModeData!
   selected: ItcResult!
   all: [ItcResult!]
   index: NonNegInt!
@@ -10723,15 +10758,6 @@ type SignalToNoiseAt {
   wavelength: Wavelength!
 }
 
-"""
-A single ITC call result.
-"""
-type ItcResult {
-  targetId: TargetId!
-  exposureTime: TimeSpan!
-  exposureCount: NonNegInt!
-  signalToNoiseAt: SignalToNoiseAt
-}
 
 type LineFluxIntegrated {
   value: PosBigDecimal!
