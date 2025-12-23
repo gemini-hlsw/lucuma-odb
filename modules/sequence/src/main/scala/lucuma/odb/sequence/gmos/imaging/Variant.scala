@@ -8,8 +8,8 @@ import cats.syntax.eq.*
 import cats.syntax.option.*
 import eu.timepit.refined.cats.*
 import eu.timepit.refined.types.numeric.NonNegInt
-import lucuma.core.math.Offset
 import lucuma.core.enums.WavelengthOrder
+import lucuma.core.math.Offset
 import lucuma.odb.sequence.data.TelescopeConfigGenerator
 import lucuma.odb.sequence.syntax.hash.*
 import lucuma.odb.sequence.util.HashBytes

@@ -7,9 +7,9 @@ package input
 import cats.syntax.parallel.*
 import eu.timepit.refined.types.numeric.NonNegInt
 import grackle.syntax.*
+import lucuma.core.enums.WavelengthOrder
 import lucuma.core.math.Offset
 import lucuma.odb.data.Nullable
-import lucuma.core.enums.WavelengthOrder
 import lucuma.odb.graphql.binding.*
 import lucuma.odb.sequence.data.TelescopeConfigGenerator
 import lucuma.odb.sequence.gmos.imaging.Variant

@@ -5,12 +5,12 @@ package lucuma.odb.sequence.data
 package arb
 
 import cats.data.NonEmptyList
+import lucuma.core.geom.OffsetGenerator
 import lucuma.core.geom.arb.ArbOffsetGenerator
 import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.model.sequence.arb.ArbTelescopeConfig
 import org.scalacheck.*
 import org.scalacheck.Arbitrary.arbitrary
-import lucuma.core.geom.OffsetGenerator
 
 trait ArbTelescopeConfigGenerator:
   import ArbOffsetGenerator.given

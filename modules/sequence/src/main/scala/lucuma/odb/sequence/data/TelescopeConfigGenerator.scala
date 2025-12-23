@@ -22,10 +22,10 @@ import lucuma.core.math.Offset
 import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.odb.sequence.syntax.hash.*
 import lucuma.odb.sequence.util.HashBytes
+import monocle.Iso
 import monocle.Optional
 import monocle.Prism
 import monocle.macros.GenPrism
-import monocle.Iso
 
 sealed trait TelescopeConfigGenerator:
 
