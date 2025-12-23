@@ -6754,7 +6754,7 @@ enum ObservingModeType {
   """
   ObservingModeType Flamingos2LongSlit
   """
-  FLAMINGOS_2LONG_SLIT
+  FLAMINGOS_2_LONG_SLIT
 
   """
   ObservingModeType GmosNorthImaging
