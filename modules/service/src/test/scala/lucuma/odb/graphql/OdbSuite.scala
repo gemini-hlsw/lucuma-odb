@@ -413,7 +413,9 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       s3ClientOpsResource,
       s3PresignerResource,
       httpClient.pure[Resource[IO, *]],
-      horizonsClient.pure[Resource[IO, *]]
+      horizonsClient.pure[Resource[IO, *]],
+      httpClient.pure[Resource[IO, *]],
+      Config.CORSProxy(List.empty)
     ).map(_.map(_.orNotFound))
 
   /** Resource yielding an instantiated OdbMapping, which we can use for some whitebox testing. */
