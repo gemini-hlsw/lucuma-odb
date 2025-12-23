@@ -8,12 +8,12 @@ import cats.data.NonEmptyList
 import cats.syntax.option.*
 import cats.syntax.parallel.*
 import grackle.syntax.*
+import lucuma.core.geom.OffsetGenerator
 import lucuma.core.math.Offset
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.binding.*
 import lucuma.odb.sequence.data.TelescopeConfigGenerator
-import lucuma.core.geom.OffsetGenerator
 
 object TelescopeConfigGeneratorInput:
 

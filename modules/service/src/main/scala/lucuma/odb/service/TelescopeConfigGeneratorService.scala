@@ -11,6 +11,7 @@ import cats.syntax.flatMap.*
 import cats.syntax.foldable.*
 import cats.syntax.functor.*
 import lucuma.core.enums.StepGuideState
+import lucuma.core.geom.OffsetGenerator
 import lucuma.core.math.Angle
 import lucuma.core.math.Offset
 import lucuma.core.model.Observation
@@ -23,15 +24,14 @@ import lucuma.odb.util.Codecs.guide_state
 import lucuma.odb.util.Codecs.observation_id
 import lucuma.odb.util.Codecs.offset
 import lucuma.odb.util.Codecs.offset_generator_role
-import lucuma.odb.util.Codecs.telescope_config_generator_type
 import lucuma.odb.util.Codecs.telescope_config
+import lucuma.odb.util.Codecs.telescope_config_generator_type
 import skunk.*
 import skunk.codec.numeric.int4
 import skunk.codec.numeric.int8
 import skunk.implicits.*
 
 import Services.Syntax.*
-import lucuma.core.geom.OffsetGenerator
 
 sealed trait TelescopeConfigGeneratorService[F[_]]:
 

@@ -8,6 +8,7 @@ import cats.effect.IO
 import cats.syntax.foldable.*
 import eu.timepit.refined.types.numeric.NonNegInt
 import lucuma.core.enums.StepGuideState
+import lucuma.core.geom.OffsetGenerator
 import lucuma.core.math.Angle
 import lucuma.core.math.Offset
 import lucuma.core.model.sequence.TelescopeConfig
@@ -19,7 +20,6 @@ import org.scalacheck.Arbitrary.arbitrary
 import org.scalacheck.Gen
 import org.scalacheck.effect.PropF
 import org.scalacheck.effect.PropF.forAllF
-import lucuma.core.geom.OffsetGenerator
 
 class TelescopeConfigGeneratorSuite extends CatsEffectSuite with ScalaCheckEffectSuite:
 

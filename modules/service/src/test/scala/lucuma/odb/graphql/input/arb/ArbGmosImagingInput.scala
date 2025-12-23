@@ -13,13 +13,13 @@ import lucuma.core.enums.GmosBinning
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosRoi
 import lucuma.core.enums.GmosSouthFilter
+import lucuma.core.enums.WavelengthOrder
 import lucuma.core.math.Offset
 import lucuma.core.math.arb.ArbOffset
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.arb.ArbExposureTimeMode
 import lucuma.core.util.arb.ArbEnumerated
 import lucuma.odb.data.Nullable
-import lucuma.core.enums.WavelengthOrder
 import lucuma.odb.data.arb.ArbNullable.given
 import lucuma.odb.sequence.data.TelescopeConfigGenerator
 import lucuma.odb.sequence.data.arb.ArbTelescopeConfigGenerator
