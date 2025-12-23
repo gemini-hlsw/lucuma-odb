@@ -58,7 +58,9 @@ import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.data.StepExecutionState
 import lucuma.odb.data.Tag
 import lucuma.odb.data.UserType
+import lucuma.odb.data.WavelengthOrder
 import lucuma.odb.sequence.data.OffsetGeneratorType
+import lucuma.odb.sequence.gmos.imaging.VariantType as GmosImagingVariantType
 
 import java.time.LocalDate
 
@@ -134,6 +136,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[GmosCustomSlitWidth](GmosCustomSlitWidthType),
       LeafMapping[GmosDtax](GmosDtaxType),
       LeafMapping[GmosGratingOrder](GmosGratingOrderType),
+      LeafMapping[GmosImagingVariantType](GmosImagingVariantTypeType),
       LeafMapping[GmosLongSlitAcquisitionRoi](GmosLongSlitAcquisitionRoiType),
       LeafMapping[GmosNorthFpu](GmosNorthBuiltinFpuType),
       LeafMapping[GmosNorthDetector](GmosNorthDetectorType),
@@ -156,7 +159,6 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[IntPercent](IntPercentType),
       LeafMapping[Long](LongType),
       LeafMapping[MosPreImaging](MosPreImagingType),
-      LeafMapping[MultipleFiltersMode](MultipleFiltersModeType),
       LeafMapping[NonEmptyString](NonEmptyStringType),
       LeafMapping[NonNegInt](NonNegIntType),
       LeafMapping[NonNegShort](NonNegShortType),
@@ -215,6 +217,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[UserType](UserTypeType),
       LeafMapping[Visit.Id](VisitIdType),
       LeafMapping[WaterVapor](WaterVaporType),
+      LeafMapping[WavelengthOrder](WavelengthOrderType)
     )
 
 }

@@ -11,7 +11,7 @@ import skunk.codec.all.*
 
 trait GmosLongSlitView[F[_]] extends BaseMapping[F]:
 
-  class CommonColumns(implicit val tableName: TableName):
+  class GmosLongSlitCommonColumns(implicit val tableName: TableName):
 
     val ObservationId: ColumnRef            = col("c_observation_id", observation_id)
 
@@ -47,7 +47,7 @@ trait GmosLongSlitView[F[_]] extends BaseMapping[F]:
     val InitialFilter: ColumnRef  = col("c_initial_filter", gmos_north_filter.opt)
     val InitialFpu: ColumnRef     = col("c_initial_fpu", gmos_north_fpu)
 
-    val Common: CommonColumns     = new CommonColumns()
+    val Common: GmosLongSlitCommonColumns     = new GmosLongSlitCommonColumns()
 
   object GmosSouthLongSlitView extends TableDef("v_gmos_south_long_slit"):
 
@@ -61,4 +61,4 @@ trait GmosLongSlitView[F[_]] extends BaseMapping[F]:
     val InitialFilter: ColumnRef  = col("c_initial_filter", gmos_south_filter.opt)
     val InitialFpu: ColumnRef     = col("c_initial_fpu", gmos_south_fpu)
 
-    val Common: CommonColumns     = new CommonColumns()
+    val Common: GmosLongSlitCommonColumns     = new GmosLongSlitCommonColumns()

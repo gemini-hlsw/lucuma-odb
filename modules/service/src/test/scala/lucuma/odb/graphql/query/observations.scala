@@ -509,6 +509,11 @@ class observations extends OdbSuite {
                         }
                         observingMode {
                           gmosNorthImaging {
+                            variant {
+                              interleaved {
+                                skyCount
+                              }
+                            }
                             filters { filter }
                             initialFilters { filter }
                             bin
@@ -533,6 +538,11 @@ class observations extends OdbSuite {
                             },
                             "observingMode": {
                               "gmosNorthImaging": {
+                                "variant": {
+                                  "interleaved": {
+                                    "skyCount": 1
+                                  }
+                                },
                                 "filters": [
                                   { "filter": "G_PRIME" },
                                   { "filter": "R_PRIME" }
@@ -572,6 +582,11 @@ class observations extends OdbSuite {
                         id
                         observingMode {
                           gmosSouthImaging {
+                            variant {
+                              interleaved {
+                                skyCount
+                              }
+                            }
                             filters { filter }
                             initialFilters { filter }
                             bin
@@ -593,6 +608,11 @@ class observations extends OdbSuite {
                             "id": $oid,
                             "observingMode": {
                               "gmosSouthImaging": {
+                                "variant": {
+                                  "interleaved": {
+                                    "skyCount": 1
+                                  }
+                                },
                                 "filters": [
                                   { "filter": "G_PRIME" },
                                   { "filter": "R_PRIME" }
@@ -656,6 +676,11 @@ class observations extends OdbSuite {
                       observingMode {
                         mode
                         gmosNorthImaging {
+                          variant {
+                            interleaved {
+                              skyCount
+                            }
+                          }
                           filters { filter }
                           initialFilters { filter }
                           bin
@@ -664,6 +689,11 @@ class observations extends OdbSuite {
                           roi
                         }
                         gmosSouthImaging {
+                          variant {
+                            interleaved {
+                              skyCount
+                            }
+                          }
                           filters { filter }
                           initialFilters { filter }
                           bin
@@ -687,6 +717,11 @@ class observations extends OdbSuite {
                           "observingMode": {
                             "mode": "GMOS_NORTH_IMAGING",
                             "gmosNorthImaging": {
+                              "variant": {
+                                "interleaved": {
+                                  "skyCount": 1
+                                }
+                              },
                               "filters": [
                                 { "filter": "G_PRIME" },
                                 { "filter": "R_PRIME" }
@@ -710,6 +745,11 @@ class observations extends OdbSuite {
                             "mode": "GMOS_SOUTH_IMAGING",
                             "gmosNorthImaging": null,
                             "gmosSouthImaging": {
+                              "variant": {
+                                "interleaved": {
+                                  "skyCount": 1
+                                }
+                              },
                               "filters": [
                                 { "filter": "G_PRIME" },
                                 { "filter": "R_PRIME" }

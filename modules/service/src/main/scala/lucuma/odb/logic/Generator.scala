@@ -217,8 +217,8 @@ object Generator {
         def namespace: UUID =
           SequenceIds.namespace(commitHash, oid, params)
 
-        val acquisitionIntegrationTime: Either[OdbError, IntegrationTime] =
-          itcRes.map(_.acquisitionResult.focus.value)
+        val acquisitionIntegrationTime: Either[OdbError, Option[IntegrationTime]] =
+          itcRes.map(_.acquisitionResult.map(_.focus.value))
 
         val scienceIntegrationTime: Either[OdbError, IntegrationTime] =
           itcRes.map(_.scienceResult.focus.value)
@@ -230,10 +230,13 @@ object Generator {
           md5.update(params.hashBytes)
 
           // Integration Time
-          List(acquisitionIntegrationTime, scienceIntegrationTime).foreach { ving =>
-            ving.fold(_ => Array.emptyByteArray, ing => md5.update(ing.exposureTime.hashBytes))
-            ving.fold(_ => Array.emptyByteArray, ing => md5.update(ing.exposureCount.hashBytes))
-          }
+          List(acquisitionIntegrationTime.toOption.flatten, scienceIntegrationTime.toOption)
+            .zipWithIndex
+            .foreach: (time, index) =>
+              md5.update(index.hashBytes)
+              time.foreach: t =>
+                md5.update(t.exposureTime.hashBytes)
+                md5.update(t.exposureCount.hashBytes)
 
           // Commit Hash
           md5.update(commitHash.hashBytes)
@@ -355,14 +358,24 @@ object Generator {
                 p <- gen.executionConfig(visits, events, steps, t)
               yield p
 
+      private def requireAcquisitionTime(
+        oid: Observation.Id,
+        acq: Either[OdbError, Option[IntegrationTime]]
+      ): Either[OdbError, IntegrationTime] =
+        acq.flatMap: o =>
+          o.toRight(OdbError.InvalidObservation(oid, s"An acquisition integration time is required for this observation".some))
+
       private def flamingos2LongSlit(
         ctx:    Context,
         config: lucuma.odb.sequence.flamingos2.longslit.Config,
         when:   Option[Timestamp]
       )(using Services.ServiceAccess): EitherT[F, OdbError, (ProtoFlamingos2, ExecutionState)] =
         import lucuma.odb.sequence.flamingos2.longslit.LongSlit
-        val gen = LongSlit.instantiate(ctx.oid, calculator.flamingos2, ctx.namespace, exp.flamingos2, config, ctx.acquisitionIntegrationTime, ctx.scienceIntegrationTime, ctx.params.acqResetTime)
+
+        val acq = requireAcquisitionTime(ctx.oid, ctx.acquisitionIntegrationTime)
+        val gen = LongSlit.instantiate(ctx.oid, calculator.flamingos2, ctx.namespace, exp.flamingos2, config, acq, ctx.scienceIntegrationTime, ctx.params.acqResetTime)
         val srs = services.flamingos2SequenceService.selectStepRecords(ctx.oid)
+
         for
           g <- EitherT(gen)
           p <- protoExecutionConfig(ctx, g, srs, when)
@@ -374,8 +387,11 @@ object Generator {
         role:   Option[CalibrationRole],
         when:   Option[Timestamp]
       )(using Services.ServiceAccess): EitherT[F, OdbError, (ProtoGmosNorth, ExecutionState)] =
-        val gen = LongSlit.gmosNorth(ctx.oid, calculator.gmosNorth, ctx.namespace, exp.gmosNorth, config, ctx.acquisitionIntegrationTime, ctx.scienceIntegrationTime, role, ctx.params.acqResetTime)
+
+        val acq = requireAcquisitionTime(ctx.oid, ctx.acquisitionIntegrationTime)
+        val gen = LongSlit.gmosNorth(ctx.oid, calculator.gmosNorth, ctx.namespace, exp.gmosNorth, config, acq, ctx.scienceIntegrationTime, role, ctx.params.acqResetTime)
         val srs = services.gmosSequenceService.selectGmosNorthStepRecords(ctx.oid)
+
         for
           g <- EitherT(gen)
           p <- protoExecutionConfig(ctx, g, srs, when)
@@ -387,8 +403,11 @@ object Generator {
         role:   Option[CalibrationRole],
         when:   Option[Timestamp]
       )(using Services.ServiceAccess): EitherT[F, OdbError, (ProtoGmosSouth, ExecutionState)] =
-        val gen = LongSlit.gmosSouth(ctx.oid, calculator.gmosSouth, ctx.namespace, exp.gmosSouth, config, ctx.acquisitionIntegrationTime, ctx.scienceIntegrationTime, role, ctx.params.acqResetTime)
+
+        val acq = requireAcquisitionTime(ctx.oid, ctx.acquisitionIntegrationTime)
+        val gen = LongSlit.gmosSouth(ctx.oid, calculator.gmosSouth, ctx.namespace, exp.gmosSouth, config, acq, ctx.scienceIntegrationTime, role, ctx.params.acqResetTime)
         val srs = services.gmosSequenceService.selectGmosSouthStepRecords(ctx.oid)
+
         for
           g <- EitherT(gen)
           p <- protoExecutionConfig(ctx, g, srs, when)

@@ -8,6 +8,7 @@ import lucuma.odb.util.Codecs.angle_µas
 import lucuma.odb.util.Codecs.observation_id
 import lucuma.odb.util.Codecs.offset_generator_role
 import lucuma.odb.util.Codecs.offset_generator_type
+import skunk.codec.numeric.int8
 
 trait OffsetGeneratorView[F[_]] extends BaseMapping[F]:
 
@@ -18,6 +19,7 @@ trait OffsetGeneratorView[F[_]] extends BaseMapping[F]:
     val SkyObservationId: ColumnRef    = col("c_sky_observation_id", observation_id.embedded)
 
     val OffsetGeneratorRole: ColumnRef = col("c_role", offset_generator_role)
+    val Seed: ColumnRef                = col("c_seed",                  int8)
 
     object Enumerated:
       val ObservationId: ColumnRef       = col("c_enumerated_observation_id", observation_id.embedded)
