@@ -7,17 +7,17 @@ package input
 import cats.syntax.parallel.*
 import eu.timepit.refined.types.numeric.NonNegInt
 import grackle.syntax.*
+import lucuma.core.enums.GmosImagingVariantType
 import lucuma.core.enums.WavelengthOrder
 import lucuma.core.math.Offset
 import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.binding.*
 import lucuma.odb.sequence.data.TelescopeConfigGenerator
 import lucuma.odb.sequence.gmos.imaging.Variant
-import lucuma.odb.sequence.gmos.imaging.VariantType
 
 sealed trait GmosImagingVariantInput:
   def toVariant: Variant
-  def variantType: VariantType
+  def variantType: GmosImagingVariantType
 
 object GmosImagingVariantInput:
 
@@ -34,8 +34,8 @@ object GmosImagingVariantInput:
         skyCount.getOrElse(NonNegInt.unsafeFrom(0)),
         skyOffsets.toOption.getOrElse(TelescopeConfigGenerator.NoGenerator)
       )
-    def variantType: VariantType =
-      VariantType.Grouped
+    def variantType: GmosImagingVariantType =
+      GmosImagingVariantType.Grouped
 
   case class Interleaved(
     offsets:    Nullable[TelescopeConfigGenerator],
@@ -48,8 +48,8 @@ object GmosImagingVariantInput:
         skyCount.getOrElse(NonNegInt.unsafeFrom(0)),
         skyOffsets.toOption.getOrElse(TelescopeConfigGenerator.NoGenerator)
       )
-    def variantType: VariantType =
-      VariantType.Interleaved
+    def variantType: GmosImagingVariantType =
+      GmosImagingVariantType.Interleaved
 
   case class PreImaging(
     offset1: Option[Offset],
@@ -64,8 +64,8 @@ object GmosImagingVariantInput:
         offset3.getOrElse(Offset.Zero),
         offset4.getOrElse(Offset.Zero)
       )
-    def variantType: VariantType =
-      VariantType.PreImaging
+    def variantType: GmosImagingVariantType =
+      GmosImagingVariantType.PreImaging
 
   val Binding: Matcher[GmosImagingVariantInput] =
     val GroupedBinding: Matcher[GmosImagingVariantInput] =
