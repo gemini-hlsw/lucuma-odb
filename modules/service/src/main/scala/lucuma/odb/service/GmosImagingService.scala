@@ -11,6 +11,7 @@ import eu.timepit.refined.types.numeric.NonNegInt
 import grackle.Result
 import grackle.ResultT
 import grackle.syntax.*
+import lucuma.core.enums.GmosImagingVariantType
 import lucuma.core.enums.Site
 import lucuma.core.enums.WavelengthOrder
 import lucuma.core.math.Offset
@@ -28,7 +29,6 @@ import lucuma.odb.sequence.data.TelescopeConfigGenerator
 import lucuma.odb.sequence.gmos.imaging.Config
 import lucuma.odb.sequence.gmos.imaging.Filter
 import lucuma.odb.sequence.gmos.imaging.Variant
-import lucuma.odb.sequence.gmos.imaging.VariantType
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.GmosCodecs.*
 import skunk.*
@@ -294,7 +294,7 @@ object GmosImagingService:
 
           def updateOffsetForRole(
             input:   Nullable[TelescopeConfigGenerator],
-            variant: VariantType,
+            variant: GmosImagingVariantType,
             role:    TelescopeConfigGeneratorRole
           ): F[Unit] =
             input.toOptionOption.fold(
@@ -473,7 +473,7 @@ object GmosImagingService:
     def deleteOffsetGeneratorWhenNotMatchingVariant(
       tableName: String,
       which:     NonEmptyList[Observation.Id],
-      variant:   VariantType,
+      variant:   GmosImagingVariantType,
       role:      TelescopeConfigGeneratorRole
     ): AppliedFragment =
       sql"""
@@ -654,9 +654,9 @@ object GmosImagingService:
       // modes.  If we are simply updating an existing mode, then we don't
       // change the sky count value unless it is explicitly set.  If we are
       // switching modes, then we reset the value if it is not explicitly set.
-      def upSkyCount(variant: VariantType, skyCount: Option[NonNegInt]): AppliedFragment =
+      def upSkyCount(variant: GmosImagingVariantType, skyCount: Option[NonNegInt]): AppliedFragment =
         (variant, skyCount) match
-          case (VariantType.PreImaging, _) =>
+          case (GmosImagingVariantType.PreImaging, _) =>
             sql"c_sky_count = $int4_nonneg"(NonNegInt.MinValue)
 
           case (v, None)                   =>
@@ -677,8 +677,8 @@ object GmosImagingService:
         input match
           case GmosImagingVariantInput.Grouped(order, _, skyCount, _) =>
             List(
-              upVariant(VariantType.Grouped),
-              upSkyCount(VariantType.Grouped, skyCount)
+              upVariant(GmosImagingVariantType.Grouped),
+              upSkyCount(GmosImagingVariantType.Grouped, skyCount)
             ) ++ order.map(upOrder).toList
           case _                                                         =>
             List(upOrder(Variant.Grouped.Default.order))
@@ -687,8 +687,8 @@ object GmosImagingService:
         input match
           case GmosImagingVariantInput.Interleaved(_, skyCount, _) =>
             List(
-              upVariant(VariantType.Interleaved),
-              upSkyCount(VariantType.Interleaved, skyCount)
+              upVariant(GmosImagingVariantType.Interleaved),
+              upSkyCount(GmosImagingVariantType.Interleaved, skyCount)
             )
           case _                                      =>
             Nil
@@ -705,8 +705,8 @@ object GmosImagingService:
 
         input match
           case GmosImagingVariantInput.PreImaging(o1, o2, o3, o4) =>
-            upSkyCount(VariantType.PreImaging, None) :: List(
-              upVariant(VariantType.PreImaging).some,
+            upSkyCount(GmosImagingVariantType.PreImaging, None) :: List(
+              upVariant(GmosImagingVariantType.PreImaging).some,
               o1.map(o => upPre1p(o.p.toAngle)),
               o1.map(o => upPre1q(o.q.toAngle)),
               o2.map(o => upPre2p(o.p.toAngle)),

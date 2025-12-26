@@ -16,7 +16,6 @@ import io.circe.refined.*
 import io.circe.syntax.*
 import lucuma.core.data.EmailAddress
 import lucuma.core.enums.*
-import lucuma.core.enums.WavelengthOrder
 import lucuma.core.math.Epoch
 import lucuma.core.math.SignalToNoise
 import lucuma.core.model.Attachment
@@ -59,8 +58,6 @@ import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.data.StepExecutionState
 import lucuma.odb.data.Tag
 import lucuma.odb.data.UserType
-import lucuma.odb.sequence.data.TelescopeConfigGeneratorType
-import lucuma.odb.sequence.gmos.imaging.VariantType as GmosImagingVariantType
 
 import java.time.LocalDate
 

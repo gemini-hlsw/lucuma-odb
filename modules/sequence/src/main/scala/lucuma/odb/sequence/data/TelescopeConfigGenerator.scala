@@ -16,6 +16,7 @@ import cats.syntax.functor.*
 import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.numeric.PosInt
 import lucuma.core.enums.StepGuideState
+import lucuma.core.enums.TelescopeConfigGeneratorType
 import lucuma.core.geom.OffsetGenerator
 import lucuma.core.math.Angle
 import lucuma.core.math.Offset

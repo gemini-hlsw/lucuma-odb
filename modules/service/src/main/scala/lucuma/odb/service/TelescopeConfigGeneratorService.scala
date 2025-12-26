@@ -11,6 +11,7 @@ import cats.syntax.flatMap.*
 import cats.syntax.foldable.*
 import cats.syntax.functor.*
 import lucuma.core.enums.StepGuideState
+import lucuma.core.enums.TelescopeConfigGeneratorType
 import lucuma.core.geom.OffsetGenerator
 import lucuma.core.math.Angle
 import lucuma.core.math.Offset
@@ -18,7 +19,6 @@ import lucuma.core.model.Observation
 import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.odb.data.TelescopeConfigGeneratorRole
 import lucuma.odb.sequence.data.TelescopeConfigGenerator
-import lucuma.odb.sequence.data.TelescopeConfigGeneratorType
 import lucuma.odb.util.Codecs.angle_µas
 import lucuma.odb.util.Codecs.guide_state
 import lucuma.odb.util.Codecs.observation_id
