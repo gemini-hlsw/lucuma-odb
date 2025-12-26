@@ -13,16 +13,16 @@ import lucuma.core.enums.GmosBinning
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosRoi
 import lucuma.core.enums.GmosSouthFilter
+import lucuma.core.enums.WavelengthOrder
 import lucuma.core.math.Offset
 import lucuma.core.math.arb.ArbOffset
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.arb.ArbExposureTimeMode
 import lucuma.core.util.arb.ArbEnumerated
 import lucuma.odb.data.Nullable
-import lucuma.odb.data.WavelengthOrder
 import lucuma.odb.data.arb.ArbNullable.given
-import lucuma.odb.sequence.data.OffsetGenerator
-import lucuma.odb.sequence.data.arb.ArbOffsetGenerator
+import lucuma.odb.sequence.data.TelescopeConfigGenerator
+import lucuma.odb.sequence.data.arb.ArbTelescopeConfigGenerator
 import lucuma.odb.sequence.gmos.imaging.Variant
 import org.scalacheck.*
 import org.scalacheck.Arbitrary.arbitrary
@@ -32,7 +32,7 @@ trait ArbGmosImagingInput:
   import ArbEnumerated.given
   import ArbExposureTimeMode.given
   import ArbOffset.given
-  import ArbOffsetGenerator.given
+  import ArbTelescopeConfigGenerator.given
 
   given [L: Arbitrary]: Arbitrary[GmosImagingFilterInput[L]] =
     Arbitrary:
@@ -60,17 +60,17 @@ trait ArbGmosImagingInput:
     Arbitrary:
       for
         wo <- arbitrary[WavelengthOrder]
-        of <- arbitrary[OffsetGenerator]
+        of <- arbitrary[TelescopeConfigGenerator]
         sc <- Gen.choose(0, 100).map(NonNegInt.unsafeFrom)
-        so <- arbitrary[OffsetGenerator]
+        so <- arbitrary[TelescopeConfigGenerator]
       yield Variant.Grouped(wo, of, sc, so)
 
   given arbVariantInterleaved: Arbitrary[Variant.Interleaved] =
     Arbitrary:
       for
-        of <- arbitrary[OffsetGenerator]
+        of <- arbitrary[TelescopeConfigGenerator]
         sc <- Gen.choose(0, 100).map(NonNegInt.unsafeFrom)
-        so <- arbitrary[OffsetGenerator]
+        so <- arbitrary[TelescopeConfigGenerator]
       yield Variant.Interleaved(of, sc, so)
 
   given arbVariantPreImaging: Arbitrary[Variant.PreImaging] =
@@ -119,17 +119,17 @@ trait ArbGmosImagingInput:
     Arbitrary:
       for
         wo <- arbitrary[Option[WavelengthOrder]]
-        of <- arbitrary[Nullable[OffsetGenerator]]
+        of <- arbitrary[Nullable[TelescopeConfigGenerator]]
         sc <- Gen.option(Gen.choose(0, 100).map(NonNegInt.unsafeFrom))
-        so <- arbitrary[Nullable[OffsetGenerator]]
+        so <- arbitrary[Nullable[TelescopeConfigGenerator]]
       yield GmosImagingVariantInput.Grouped(wo, of, sc, so)
 
   given arbVariantInputInterleaved: Arbitrary[GmosImagingVariantInput.Interleaved] =
     Arbitrary:
       for
-        of <- arbitrary[Nullable[OffsetGenerator]]
+        of <- arbitrary[Nullable[TelescopeConfigGenerator]]
         sc <- Gen.option(Gen.choose(0, 100).map(NonNegInt.unsafeFrom))
-        so <- arbitrary[Nullable[OffsetGenerator]]
+        so <- arbitrary[Nullable[TelescopeConfigGenerator]]
       yield GmosImagingVariantInput.Interleaved(of, sc, so)
 
   given arbVariantInputPreImaging: Arbitrary[GmosImagingVariantInput.PreImaging] =

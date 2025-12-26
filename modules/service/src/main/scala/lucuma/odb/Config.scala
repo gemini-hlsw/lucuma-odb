@@ -35,6 +35,7 @@ import org.http4s.client.Client
 import org.http4s.ember.client.EmberClientBuilder
 import org.http4s.syntax.all.*
 import org.typelevel.log4cats.Logger
+import org.typelevel.log4cats.LoggerFactory
 
 import java.net.URI
 import java.net.URISyntaxException
@@ -82,7 +83,7 @@ case class Config(
       ItcClient.create(itc.root, httpClient)
 
   // Gaia client resource
-  def gaiaClient[F[_]: Async: Network]: Resource[F, GaiaClient[F]] =
+  def gaiaClient[F[_]: Async: Network: LoggerFactory]: Resource[F, GaiaClient[F]] =
     httpClientResource[F].map: httpClient =>
       GaiaClient.build[F](httpClient, adapters = GaiaClient.DefaultAdapters)
 
