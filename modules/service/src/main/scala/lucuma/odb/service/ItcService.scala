@@ -4,6 +4,7 @@
 package lucuma.odb.service
 
 import cats.Order
+import cats.Parallel
 import cats.data.EitherT
 import cats.data.NonEmptyChain
 import cats.data.NonEmptyList
@@ -21,6 +22,7 @@ import cats.syntax.functor.*
 import cats.syntax.functorFilter.*
 import cats.syntax.option.*
 import cats.syntax.order.*
+import cats.syntax.parallel.*
 import cats.syntax.traverse.*
 import fs2.Stream
 import io.circe.syntax.*
@@ -168,7 +170,7 @@ object ItcService {
 
   }
 
-  def instantiate[F[_]: Concurrent: Logger](client: ItcClient[F])(using Services[F]): ItcService[F] =
+  def instantiate[F[_]: Concurrent: Parallel: Logger](client: ItcClient[F])(using Services[F]): ItcService[F] =
     new ItcService[F] {
 
       override def lookup(
@@ -356,7 +358,7 @@ object ItcService {
         val clientCalculationResults: F[Either[OdbError, NonEmptyList[ClientCalculationResult]]] =
           input
             .scienceInput
-            .traverse: in =>
+            .parTraverse: in =>
               client.imaging(in, useCache = false)
             .map(_.asRight)
             .handleError: err =>

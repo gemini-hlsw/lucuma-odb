@@ -10733,20 +10733,20 @@ interface Itc {
   itcType: ItcType!
 }
 
-type ItcSpectroscopy {
+type ItcGmosNorthImaging implements Itc {
+  itcType: ItcType!
+  gmosNorthImagingScience: [ItcGmosNorthImagingResultSet!]!
+}
+
+type ItcGmosSouthImaging implements Itc {
+  itcType: ItcType!
+  gmosSouthImagingScience: [ItcGmosSouthImagingResultSet!]!
+}
+
+type ItcSpectroscopy implements Itc {
   itcType:     ItcType!
   acquisition: ItcResultSet!
-  science:     ItcResultSet!
-}
-
-type ItcGmosNorthImaging {
-  itcType: ItcType!
-  science: [ItcGmosNorthImagingResultSet!]!
-}
-
-type ItcGmosSouthImaging {
-  itcType: ItcType!
-  science: [ItcGmosSouthImagingResultSet!]!
+  spectroscopyScience: ItcResultSet!
 }
 
 """

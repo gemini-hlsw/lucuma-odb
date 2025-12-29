@@ -2551,9 +2551,29 @@ trait DatabaseOperations { this: OdbSuite =>
         ) {
           matches {
             itc {
-              science {
-                selected {
-                  targetId
+              ... on ItcGmosNorthImaging {
+                gmosNorthImagingScience {
+                  results {
+                    selected {
+                      targetId
+                    }
+                  }
+                }
+              }
+              ... on ItcGmosSouthImaging {
+                gmosSouthImagingScience {
+                  results {
+                    selected {
+                      targetId
+                    }
+                  }
+                }
+              }
+              ... on ItcSpectroscopy {
+                spectroscopyScience {
+                  selected {
+                    targetId
+                  }
                 }
               }
             }

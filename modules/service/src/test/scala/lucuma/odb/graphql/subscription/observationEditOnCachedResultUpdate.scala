@@ -55,11 +55,7 @@ class observationEditOnCachedResultUpdate extends ExecutionTestSupportForGmos wi
           query {
             observation(observationId: "$oid") {
               itc {
-                science {
-                  selected {
-                    exposureCount
-                  }
-                }
+                itcType
               }
             }
           }

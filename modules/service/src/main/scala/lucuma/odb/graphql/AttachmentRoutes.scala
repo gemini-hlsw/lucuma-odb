@@ -3,6 +3,7 @@
 
 package lucuma.odb.graphql
 
+import cats.Parallel
 import cats.effect.*
 import cats.effect.std.SecureRandom
 import cats.effect.std.UUIDGen
@@ -41,7 +42,7 @@ object AttachmentRoutes {
   }
 
   // the normal constructor
-  def apply[F[_]: Async: Logger: LoggerFactory: Trace: SecureRandom](
+  def apply[F[_]: Async: Parallel: Logger: LoggerFactory: Trace: SecureRandom](
     pool:           Resource[F, Session[F]],
     s3:             S3FileService[F],
     ssoClient:      SsoClient[F, User],
