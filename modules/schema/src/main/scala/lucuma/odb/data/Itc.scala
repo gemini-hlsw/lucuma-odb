@@ -3,6 +3,7 @@
 
 package lucuma.odb.data
 
+import cats.Eq
 import cats.Order
 import cats.data.NonEmptyList
 import cats.data.NonEmptyMap
@@ -33,6 +34,20 @@ sealed trait Itc:
 
 object Itc:
 
+  // Corresponds to ItcResult in the OdbSchema.graphql
+  case class Result(
+    targetId:      Target.Id,
+    value:         IntegrationTime,
+    signalToNoise: Option[SignalToNoiseAt]
+  ):
+    def totalTime: Option[TimeSpan] =
+      val total = BigInt(value.exposureTime.toMicroseconds) * value.exposureCount.value
+      Option.when(total.isValidLong)(TimeSpan.fromMicroseconds(total.longValue)).flatten
+
+  object Result:
+    given Order[Result] =
+      Order.by(s => (s.totalTime, s.targetId))
+
   // ITC result type discriminator.
   enum Type(val tag: String) derives Enumerated:
     case GmosNorthImaging extends Type("gmos_north_imaging")
@@ -55,6 +70,10 @@ object Itc:
           cnt + z.focus.value.exposureCount.value
         }
 
+  object GmosNorthImaging:
+    given Eq[GmosNorthImaging] =
+      Eq.by(_.science)
+
   val gmosNorthImaging: Prism[Itc, GmosNorthImaging] =
     GenPrism[Itc, GmosNorthImaging]
 
@@ -74,6 +93,10 @@ object Itc:
           cnt + z.focus.value.exposureCount.value
         }
 
+  object GmosSouthImaging:
+    given Eq[GmosSouthImaging] =
+      Eq.by(_.science)
+
   val gmosSouthImaging: Prism[Itc, GmosSouthImaging] =
     GenPrism[Itc, GmosSouthImaging]
 
@@ -92,19 +115,21 @@ object Itc:
     override def scienceExposureCount: PosInt =
       science.focus.value.exposureCount
 
+  object Spectroscopy:
+    given Eq[Spectroscopy] =
+      Eq.by: a =>
+        (
+          a.acquisition,
+          a.science
+        )
+
   val spectroscopy: Prism[Itc, Spectroscopy] =
     GenPrism[Itc, Spectroscopy]
 
-  // Corresponds to ItcResult in the OdbSchema.graphql
-  case class Result(
-    targetId:      Target.Id,
-    value:         IntegrationTime,
-    signalToNoise: Option[SignalToNoiseAt]
-  ):
-    def totalTime: Option[TimeSpan] =
-      val total = BigInt(value.exposureTime.toMicroseconds) * value.exposureCount.value
-      Option.when(total.isValidLong)(TimeSpan.fromMicroseconds(total.longValue)).flatten
-
-  object Result:
-    given Order[Result] =
-      Order.by(s => (s.totalTime, s.targetId))
+  given Eq[Itc] =
+    Eq.instance {
+      case (a: GmosNorthImaging, b: GmosNorthImaging) => a === b
+      case (a: GmosSouthImaging, b: GmosSouthImaging) => a === b
+      case (a: Spectroscopy,     b: Spectroscopy    ) => a === b
+      case _                                          => false
+    }

@@ -61,9 +61,11 @@ trait ItcCodec:
         "signalToNoiseAt" -> a.signalToNoise.asJson
       )
 
-  private def imagingScienceNemDecoder[A: Decoder: Order]: Decoder[NonEmptyMap[A, Zipper[Itc.Result]]] =
+  private def imagingScienceNemDecoder[A: Decoder: Order](
+    fieldName: String
+  ): Decoder[NonEmptyMap[A, Zipper[Itc.Result]]] =
     Decoder.instance: c =>
-      c.downField("science")
+      c.downField(fieldName)
        .values
        .flatMap(it => NonEmptyList.fromList(it.toList))
        .toRight(DecodingFailure("Expecting at least one ITC result set.", c.history))
@@ -77,16 +79,16 @@ trait ItcCodec:
          res.map(_.toNem)
 
   given Decoder[Itc.GmosNorthImaging] =
-    imagingScienceNemDecoder[GmosNorthFilter].map(Itc.GmosNorthImaging.apply)
+    imagingScienceNemDecoder[GmosNorthFilter]("gmosNorthImagingScience").map(Itc.GmosNorthImaging.apply)
 
   given Decoder[Itc.GmosSouthImaging] =
-    imagingScienceNemDecoder[GmosSouthFilter].map(Itc.GmosSouthImaging.apply)
+    imagingScienceNemDecoder[GmosSouthFilter]("gmosSouthImagingScience").map(Itc.GmosSouthImaging.apply)
 
   given Decoder[Itc.Spectroscopy] =
     Decoder.instance: c =>
       for
         acquisition <- c.downField("acquisition").as[Zipper[Itc.Result]]
-        science     <- c.downField("science").as[Zipper[Itc.Result]]
+        science     <- c.downField("spectroscopyScience").as[Zipper[Itc.Result]]
       yield Itc.Spectroscopy(acquisition, science)
 
   private def imagingScienceNemEncoder[A: Encoder](
@@ -101,21 +103,25 @@ trait ItcCodec:
           )
 
   given (using Encoder[TimeSpan], Encoder[Wavelength]): Encoder[Itc.GmosNorthImaging] =
-    imagingScienceNemEncoder[GmosNorthFilter]
-      .contramap[Itc.GmosNorthImaging](_.science)
-      .mapJson(_.mapObject(_.add("itcType", Itc.Type.GmosNorthImaging.asJson)))
+    Encoder.instance: a =>
+      Json.obj(
+        "itcType"                 -> Itc.Type.GmosNorthImaging.asJson,
+        "gmosNorthImagingScience" -> a.science.asJson(using imagingScienceNemEncoder[GmosNorthFilter])
+      )
 
   given (using Encoder[TimeSpan], Encoder[Wavelength]): Encoder[Itc.GmosSouthImaging] =
-    imagingScienceNemEncoder[GmosSouthFilter]
-      .contramap[Itc.GmosSouthImaging](_.science)
-      .mapJson(_.mapObject(_.add("itcType", Itc.Type.GmosSouthImaging.asJson)))
+    Encoder.instance: a =>
+      Json.obj(
+        "itcType"                 -> Itc.Type.GmosSouthImaging.asJson,
+        "gmosSouthImagingScience" -> a.science.asJson(using imagingScienceNemEncoder[GmosSouthFilter])
+      )
 
   given (using Encoder[TimeSpan], Encoder[Wavelength]): Encoder[Itc.Spectroscopy] =
     Encoder.instance: a =>
       Json.obj(
-        "itcType"     -> Itc.Type.Spectroscopy.asJson,
-        "acquisition" -> a.acquisition.asJson,
-        "science"     -> a.science.asJson
+        "itcType"             -> Itc.Type.Spectroscopy.asJson,
+        "acquisition"         -> a.acquisition.asJson,
+        "spectroscopyScience" -> a.science.asJson
       )
 
   given Decoder[Itc] =

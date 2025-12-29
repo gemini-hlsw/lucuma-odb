@@ -3,6 +3,7 @@
 
 package lucuma.odb.graphql
 
+import cats.Parallel
 import cats.data.NonEmptyList
 import cats.effect.*
 import cats.effect.std.SecureRandom
@@ -43,7 +44,7 @@ import skunk.Session
 object SchedulerRoutes:
 
   // the normal constructor
-  def apply[F[_]: Async: Logger: LoggerFactory: Trace: SecureRandom](
+  def apply[F[_]: Async: Parallel: Logger: LoggerFactory: Trace: SecureRandom](
     pool:           Resource[F, Session[F]],
     ssoClient:      SsoClient[F, User],
     enums:          Enums,

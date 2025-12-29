@@ -119,6 +119,8 @@ object GeneratorParamsService {
           case (ConflictingData, ConflictingData)                       => true
           case _                                                        => false
 
+// TODO REMOVE?
+//
   extension (mode: InstrumentMode)
     def asImaging(λ: Wavelength): InstrumentMode =
       mode match
@@ -323,7 +325,9 @@ object GeneratorParamsService {
             spectroscopyGeneratorParams(
               obsMode = f2,
               acqEtm  = acq,
-              acqMode = sciMode.asImaging(acq.at),
+              acqMode = sciMode.copy(
+                filter = F2Acquisition.toAcquisitionFilter(sciMode.filter)
+              ),
               sciEtm  = sci,
               sciMode = sciMode
             )
