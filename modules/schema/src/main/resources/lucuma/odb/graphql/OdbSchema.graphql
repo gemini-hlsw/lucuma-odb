@@ -10698,28 +10698,10 @@ type ItcResult {
   signalToNoiseAt: SignalToNoiseAt
 }
 
-enum ItcModeDataType {
-  EMPTY,
+enum ItcType {
+  SPECTROSCOPY,
   GMOS_NORTH_IMAGING,
   GMOS_SOUTH_IMAGING
-}
-
-interface ItcModeData {
-  dataType: ItcModeDataType!
-}
-
-type EmptyItcModeData implements ItcModeData {
-  dataType: ItcModeDataType!
-}
-
-type GmosNorthImagingItcModeData implements ItcModeData {
-  dataType: ItcModeDataType!
-  filter:   GmosNorthFilter!
-}
-
-type GmosSouthImagingItcModeData implements ItcModeData {
-  dataType: ItcModeDataType!
-  filter:   GmosSouthFilter!
 }
 
 """
@@ -10732,10 +10714,39 @@ successes, the overall "result" will be a failure. The "all" field contains
 results for all targets regardless.
 """
 type ItcResultSet {
-  modeData: ItcModeData!
   selected: ItcResult!
   all: [ItcResult!]
   index: NonNegInt!
+}
+
+type ItcGmosNorthImagingResultSet {
+  filter:  GmosNorthFilter!
+  results: ItcResultSet!
+}
+
+type ItcGmosSouthImagingResultSet {
+  filter:  GmosSouthFilter!
+  results: ItcResultSet!
+}
+
+interface Itc {
+  itcType: ItcType!
+}
+
+type ItcSpectroscopy {
+  itcType:     ItcType!
+  acquisition: ItcResultSet!
+  science:     ItcResultSet!
+}
+
+type ItcGmosNorthImaging {
+  itcType: ItcType!
+  science: [ItcGmosNorthImagingResultSet!]!
+}
+
+type ItcGmosSouthImaging {
+  itcType: ItcType!
+  science: [ItcGmosSouthImagingResultSet!]!
 }
 
 """
@@ -11223,17 +11234,6 @@ input CreateConfigurationRequestInput {
   SET: ConfigurationRequestProperties
 }
 
-type Itc {
-  """
-  The ITC result for the science part of the sequence
-  """
-  science: ItcResultSet!
-
-  """
-  The ITC result for the acquisition part of the sequence, if any.
-  """
-  acquisition: ItcResultSet
-}
 
 """
 ObservationId id formatted as `o-[1-9a-f][0-9a-f]*`

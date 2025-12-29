@@ -3,9 +3,11 @@
 
 package lucuma.odb.service
 
+import cats.Order
 import cats.data.EitherT
 import cats.data.NonEmptyChain
 import cats.data.NonEmptyList
+import cats.data.NonEmptyMap
 import cats.effect.Async
 import cats.effect.Concurrent
 import cats.effect.Resource
@@ -24,6 +26,8 @@ import fs2.Stream
 import io.circe.syntax.*
 import lucuma.core.data.Zipper
 import lucuma.core.enums.Band
+import lucuma.core.enums.GmosNorthFilter
+import lucuma.core.enums.GmosSouthFilter
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
@@ -31,11 +35,11 @@ import lucuma.core.util.TimeSpan
 import lucuma.itc.AsterismIntegrationTimes
 import lucuma.itc.IntegrationTime
 import lucuma.itc.TargetIntegrationTime
+import lucuma.itc.client.ClientCalculationResult
 import lucuma.itc.client.ImagingInput
 import lucuma.itc.client.InstrumentMode
 import lucuma.itc.client.ItcClient
 import lucuma.odb.data.Itc
-import lucuma.odb.data.Itc.ModeData
 import lucuma.odb.data.Md5Hash
 import lucuma.odb.data.OdbError
 import lucuma.odb.sequence.data.GeneratorParams
@@ -244,93 +248,163 @@ object ItcService {
                   yield pair
                 .toMap
 
-      private def convertErrors(targets: ItcInput)(itcErrors: NonEmptyChain[(lucuma.itc.Error, Int)]): OdbError =
-        Error.itcError(itcErrors.map { case (e, i) => (targets.targetVector.get(i).map(_._1), e.message) }.toNonEmptyList)
 
       // According to the spec we default if the target is too bright
       // https://app.shortcut.com/lucuma/story/1999/determine-exposure-time-for-acquisition-images
-      private def safeAcquisitionCall(targets: ItcInput): F[Option[Either[OdbError, AsterismIntegrationTimes]]] =
-        def go(input: ImagingInput, min: TimeSpan, max: TimeSpan): F[Either[OdbError, AsterismIntegrationTimes]] =
-          client
-            .imaging(input, useCache = false)
-            .map:
-              _.targetTimes.modifyValue:
-                _.map:
-                  _.modifyValue:
-                    case Left(lucuma.itc.Error.SourceTooBright(_))    =>
-                      TargetIntegrationTime(
-                        Zipper.one(IntegrationTime(min, 1.refined)),
-                        Band.R.asLeft, // Band is meaningless here, but we need to provide one
-                        None, // Imaging doesn't return signal-to-noise at
-                        Nil // No ccd data for this case
-                      ).asRight
-                    case Right(r) if r.times.focus.exposureTime > max =>
-                      r.copy(times = r.times.map(_.copy(exposureTime = max))).asRight
-                    case Right(r) if r.times.focus.exposureTime < min =>
-                      r.copy(times = r.times.map(_.copy(exposureTime = min))).asRight
-                    case other => other
-              .partitionErrors
-              .leftMap(convertErrors(targets))
+      private def safeAcquisitionCall(
+        oid:     Observation.Id,
+        input:   ImagingInput,
+        targets: NonEmptyList[ItcInput.TargetDefinition]
+      ): EitherT[F, OdbError, Zipper[Itc.Result]] =
+        def go(min: TimeSpan, max: TimeSpan): EitherT[F, OdbError, Zipper[Itc.Result]] =
+          EitherT:
+            client
+              .imaging(input, useCache = false)
+              .map: ccr =>
+                val modifiedTargetTimes =
+                  ccr.targetTimes.modifyValue:
+                    _.map:
+                      _.modifyValue:
+                        case Left(lucuma.itc.Error.SourceTooBright(_))    =>
+                          TargetIntegrationTime(
+                            Zipper.one(IntegrationTime(min, 1.refined)),
+                            Band.R.asLeft, // Band is meaningless here, but we need to provide one
+                            None, // Imaging doesn't return signal-to-noise at
+                            Nil // No ccd data for this case
+                          ).asRight
+                        case Right(r) if r.times.focus.exposureTime > max =>
+                          r.copy(times = r.times.map(_.copy(exposureTime = max))).asRight
+                        case Right(r) if r.times.focus.exposureTime < min =>
+                          r.copy(times = r.times.map(_.copy(exposureTime = min))).asRight
+                        case other => other
 
-        targets.acquisitionInput.traverse: in =>
+                val modifiedCcr = ClientCalculationResult(ccr.versions, modifiedTargetTimes)
+                toTargetResults(targets, NonEmptyList.one(modifiedCcr)).map(_.head)
 
-          in.mode match
-            case InstrumentMode.GmosNorthSpectroscopy(_, _, _, _, _, _) |
-                 InstrumentMode.GmosSouthSpectroscopy(_, _, _, _, _, _) |
-                 InstrumentMode.GmosNorthImaging(_, _)                  |
-                 InstrumentMode.GmosSouthImaging(_, _)                    =>
-              go(in,
-                 lucuma.odb.sequence.gmos.MinAcquisitionExposureTime,
-                 lucuma.odb.sequence.gmos.MaxAcquisitionExposureTime)
-            case InstrumentMode.Flamingos2Spectroscopy(_, _, _)         |
-                 InstrumentMode.Flamingos2Imaging(_)                      =>
-              go(in,
-                 lucuma.odb.sequence.flamingos2.MinAcquisitionExposureTime,
-                 lucuma.odb.sequence.flamingos2.MaxAcquisitionExposureTime)
+        input.mode match
+          case InstrumentMode.GmosNorthSpectroscopy(_, _, _, _, _, _) |
+               InstrumentMode.GmosSouthSpectroscopy(_, _, _, _, _, _) =>
+            go(lucuma.odb.sequence.gmos.MinAcquisitionExposureTime,
+               lucuma.odb.sequence.gmos.MaxAcquisitionExposureTime)
+          case InstrumentMode.Flamingos2Spectroscopy(_, _, _)         =>
+            go(lucuma.odb.sequence.flamingos2.MinAcquisitionExposureTime,
+               lucuma.odb.sequence.flamingos2.MaxAcquisitionExposureTime)
+          case m                                                      =>
+            EitherT.leftT:
+              OdbError.InvalidObservation(oid, s"Acquisition is not supported for ${m.displayName}".some)
+
+      private def toTargetResults(
+        targets: NonEmptyList[ItcInput.TargetDefinition],
+        results: NonEmptyList[ClientCalculationResult],
+      ): Either[OdbError, NonEmptyList[Zipper[Itc.Result]]] =
+
+        def convertErrors(
+          itcErrors: NonEmptyChain[(lucuma.itc.Error, Int)]
+        ): OdbError =
+          Error.itcError:
+            itcErrors.map { case (e, i) =>
+              targets.get(i).map(_.targetId) -> e.message
+            }.toNonEmptyList
+
+        results.traverse: r =>
+          r.targetTimes
+           .partitionErrors
+           .leftMap(convertErrors)
+           .map: a =>
+             a.value.zipWithIndex.map { case (intTime, index) =>
+               val t = targets.get(index).get
+               Itc.Result(t.targetId, intTime.times.focus, intTime.signalToNoiseAt)
+             }
+
+      sealed trait Imaging[A]:
+        def pf: PartialFunction[InstrumentMode, A]
+        def wrap(nem: NonEmptyMap[A, Zipper[Itc.Result]]): Itc
+
+      object Imaging:
+        case object GmosNorthImaging extends Imaging[GmosNorthFilter]:
+          override def pf: PartialFunction[InstrumentMode, GmosNorthFilter] = {
+            case InstrumentMode.GmosNorthImaging(f, _) => f
+          }
+          override def wrap(nem: NonEmptyMap[GmosNorthFilter, Zipper[Itc.Result]]): Itc =
+            Itc.GmosNorthImaging(nem)
+
+        case object GmosSouthImaging extends Imaging[GmosSouthFilter]:
+          override def pf: PartialFunction[InstrumentMode, GmosSouthFilter] = {
+            case InstrumentMode.GmosSouthImaging(f, _) => f
+          }
+          override def wrap(nem: NonEmptyMap[GmosSouthFilter, Zipper[Itc.Result]]): Itc =
+            Itc.GmosSouthImaging(nem)
+
+      private def callRemoteImagingItc[A: Order](
+        oid:   Observation.Id,
+        input: ItcInput.Imaging,
+        im:    Imaging[A]
+      ): EitherT[F, OdbError, Itc] =
+
+        def extractFilters(
+          remaining: List[InstrumentMode],
+          filters:   List[A]
+        ): Either[OdbError, NonEmptyList[A]] =
+          remaining match
+            case Nil    =>
+              // remaining originally comes from a NonEmptyList
+              NonEmptyList.fromListUnsafe(filters.reverse).asRight
+            case h :: t =>
+              if im.pf.isDefinedAt(h) then extractFilters(t, im.pf(h) :: filters)
+              else OdbError.InvalidObservation(oid, s"Mixed instrument mode observations are not supported.".some).asLeft
+
+        val clientCalculationResults: F[Either[OdbError, NonEmptyList[ClientCalculationResult]]] =
+          input
+            .scienceInput
+            .traverse: in =>
+              client.imaging(in, useCache = false)
+            .map(_.asRight)
+            .handleError: err =>
+              OdbError.RemoteServiceCallError(s"Error calling ITC service: ${err.getMessage}".some).asLeft
+
+        for
+          fs <- EitherT.fromEither(extractFilters(input.science.map(_.mode).toList, Nil))
+          cs <- EitherT(clientCalculationResults)
+          ts  <- EitherT.fromEither(toTargetResults(input.targets, cs))
+        yield im.wrap(fs.zip(ts).toNem)
+
 
       private def callRemoteItc(
-        oid:     Observation.Id,
-        targets: ItcInput
+        oid:   Observation.Id,
+        input: ItcInput
       )(using NoTransaction[F]): F[Either[OdbError, Itc]] =
 
-        // TODO: for now support only a single science result. We have all the
-        // inputs we need now though in order to call ITC repeatedly and process
-        // all the results.
+        def imaging(im: ItcInput.Imaging): EitherT[F, OdbError, Itc] =
+          im.science.head.mode match
+            case InstrumentMode.GmosNorthImaging(_, _) =>
+              callRemoteImagingItc(oid, im, Imaging.GmosNorthImaging)
 
-        def toTargetResults(a: AsterismIntegrationTimes): Zipper[Itc.Result] =
-          a.value.zipWithIndex.map { case (targetIntegrationTime, index) =>
-            val (targetId, targetInput) = targets.targetVector.getUnsafe(index)
-            Itc.Result(targetId, targetIntegrationTime.times.focus, targetIntegrationTime.signalToNoiseAt)
-          }
+            case InstrumentMode.GmosSouthImaging(_, _) =>
+              callRemoteImagingItc(oid, im, Imaging.GmosSouthImaging)
 
+            case m                                     =>
+              EitherT.leftT:
+                OdbError.InvalidObservation(oid, s"Imaging ITC lookup is not supported for ${m.displayName}.".some)
 
-        val res = for
-          acq <- safeAcquisitionCall(targets)
-          img <- targets.imagingInputs.headOption.traverse(input => client.imaging(input, useCache = false))
-          spc <- targets.spectroscopyInputs.headOption.traverse(input => client.spectroscopy(input, useCache = false))
-        yield
-          val sci = img.orElse(spc).toRight(OdbError.InvalidObservation(oid, s"The observation has neither imaging nor spectroscopy mode.".some))
+        def spectroscopy(sp: ItcInput.Spectroscopy): EitherT[F, OdbError, Itc] =
+          val callSpectroscopy: EitherT[F, OdbError, ClientCalculationResult] =
+            EitherT:
+              client
+                .spectroscopy(sp.scienceInput, useCache = false)
+                .map(_.asRight)
+                .handleError: t =>
+                  OdbError.RemoteServiceCallError(s"Error calling ITC service: ${t.getMessage}".some).asLeft
 
-          val sciZipper: Either[OdbError, Zipper[Itc.Result]] =
-            sci.flatMap: sciResult =>
-              sciResult
-                .targetTimes
-                .partitionErrors
-                .leftMap(convertErrors(targets))
-                .map(toTargetResults)
+          for
+            acq <- safeAcquisitionCall(oid, sp.acquisitionInput, sp.acquisitionTargets)
+            cr  <- callSpectroscopy
+            sci <- EitherT.fromEither(toTargetResults(sp.targets, NonEmptyList.one(cr)).map(_.head))
+          yield Itc.Spectroscopy(acq, sci)
 
-          val acqZipper: Option[Either[OdbError, Zipper[Itc.Result]]] =
-            acq.map(_.map(toTargetResults))
-
-          val res = acqZipper.fold(sciZipper.map(sz => Itc.fromResults(ModeData.Empty, none, sz))): eaz =>
-            eaz.flatMap: az =>
-              sciZipper.flatMap: sz =>
-                Itc.fromResults(ModeData.Empty, az.some, sz).asRight[OdbError]
-
-          res.flatMap(_.toRight(Error.targetMismatch))
-
-        res.handleError: t =>
-          OdbError.RemoteServiceCallError(s"Error calling ITC service: ${t.getMessage}".some).asLeft
+        (input match
+          case im @ ItcInput.Imaging(science, _)      => imaging(im)
+          case sp @ ItcInput.Spectroscopy(_, _, _, _) => spectroscopy(sp)
+        ).value
 
       @annotation.nowarn("msg=unused implicit parameter")
       private def insertOrUpdate(
