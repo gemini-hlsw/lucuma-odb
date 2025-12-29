@@ -52,42 +52,44 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
         observation(observationId: "$oid") {
           id
           itc {
-            science {
-              selected {
-                targetId
-                exposureTime {
-                  seconds
-                }
-                exposureCount
-                signalToNoiseAt {
-                  wavelength {
-                    picometers
+            ... on ItcSpectroscopy {
+              spectroscopyScience {
+                selected {
+                  targetId
+                  exposureTime {
+                    seconds
                   }
-                  single
-                  total
-                }
-              }
-              all {
-                targetId
-              }
-            }
-            acquisition {
-              selected {
-                targetId
-                exposureTime {
-                  seconds
-                }
-                exposureCount
-                signalToNoiseAt {
-                  wavelength {
-                    picometers
+                  exposureCount
+                  signalToNoiseAt {
+                    wavelength {
+                      picometers
+                    }
+                    single
+                    total
                   }
-                  single
-                  total
+                }
+                all {
+                  targetId
                 }
               }
-              all {
-                targetId
+              acquisition {
+                selected {
+                  targetId
+                  exposureTime {
+                    seconds
+                  }
+                  exposureCount
+                  signalToNoiseAt {
+                    wavelength {
+                      picometers
+                    }
+                    single
+                    total
+                  }
+                }
+                all {
+                  targetId
+                }
               }
             }
           }
@@ -102,7 +104,7 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
         "observation": {
           "id": $oid,
           "itc": {
-            "science": {
+            "spectroscopyScience": {
               "selected": {
               "targetId": $tid,
                 "exposureTime": {
@@ -156,12 +158,14 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
             query {
               observation(observationId: "$oid") {
                 itc {
-                  science {
-                    selected {
-                      targetId
-                    }
-                    all {
-                      targetId
+                  ... on ItcSpectroscopy {
+                    spectroscopyScience {
+                      selected {
+                        targetId
+                      }
+                      all {
+                        targetId
+                      }
                     }
                   }
                 }
@@ -173,7 +177,7 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
             {
               "observation": {
                 "itc": {
-                  "science": {
+                  "spectroscopyScience": {
                     "selected": {
                       "targetId": $tid0
                     },
@@ -282,13 +286,7 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
           s"""
             query {
               observation(observationId: "$o") {
-                itc {
-                  science {
-                    selected {
-                      targetId
-                    }
-                  }
-                }
+                itc { itcType }
               }
             }
           """,
@@ -366,13 +364,7 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
           s"""
             query {
               observation(observationId: "$o") {
-                itc {
-                  science {
-                    selected {
-                      targetId
-                    }
-                  }
-                }
+                itc { itcType }
               }
             }
           """,
@@ -444,13 +436,7 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
           s"""
             query {
               observation(observationId: "$o") {
-                itc {
-                  science {
-                    selected {
-                      targetId
-                    }
-                  }
-                }
+                itc { itcType }
               }
             }
           """,
