@@ -26,7 +26,6 @@ import lucuma.core.util.TimeSpan
 import lucuma.itc.IntegrationTime
 import lucuma.itc.SignalToNoiseAt
 import lucuma.odb.data.Itc
-//import lucuma.odb.data.Itc.ResultSet
 
 trait ItcCodec:
 

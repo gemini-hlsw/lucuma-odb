@@ -25,6 +25,9 @@ import monocle.Prism
 
 import scala.collection.mutable.ArrayBuilder
 
+/**
+ * A simple ITC input creation ADT, separating imaging vs spectroscopy.
+ */
 sealed trait ItcInput:
   def targets: NonEmptyList[ItcInput.TargetDefinition]
 
@@ -48,6 +51,10 @@ object ItcInput:
       bld.addAll(t.time.hashBytes)
     bld.result()
 
+  /**
+   * ImagingInputs per-filter (as contained in the IntrumentMode in
+   * ImagingParameters).
+   */
   case class Imaging(
     science: NonEmptyList[ImagingParameters],
     targets: NonEmptyList[TargetDefinition],
@@ -65,6 +72,10 @@ object ItcInput:
         bld.addAll(hashTargets(a.targets))
         bld.result()
 
+  /**
+   * Spectroscopy inputs include imaging parameters (for acquisition),
+   * the main spectrocopy input, and an optional blind offset target.
+   */
   case class Spectroscopy(
     acquisition: ImagingParameters,
     science:     SpectroscopyParameters,

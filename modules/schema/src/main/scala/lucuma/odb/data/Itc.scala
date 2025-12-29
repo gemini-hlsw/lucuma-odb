@@ -19,6 +19,11 @@ import lucuma.itc.SignalToNoiseAt
 import monocle.Prism
 import monocle.macros.GenPrism
 
+/**
+ * ITC result data.  Because the results differ depending upon whether it is
+ * imaging or spectroscopy, and which particular instrument is in use, there
+ * are specific types for each case.
+ */
 sealed trait Itc:
 
   // Used in the circe decoder.  Itc results are stored in a jsonb column.
@@ -28,11 +33,15 @@ sealed trait Itc:
 
 object Itc:
 
+  // ITC result type discriminator.
   enum Type(val tag: String) derives Enumerated:
     case GmosNorthImaging extends Type("gmos_north_imaging")
     case GmosSouthImaging extends Type("gmos_south_imaging")
     case Spectroscopy     extends Type("spectroscopy")
 
+  /**
+   * GMOS North imaging results.  There are results per-GMOS North filter.
+   */
   case class GmosNorthImaging(
     science: NonEmptyMap[GmosNorthFilter, Zipper[Result]]
   ) extends Itc:
@@ -49,6 +58,9 @@ object Itc:
   val gmosNorthImaging: Prism[Itc, GmosNorthImaging] =
     GenPrism[Itc, GmosNorthImaging]
 
+  /**
+   * GMOS South imaging results.  There are results per-GMOS South filter.
+   */
   case class GmosSouthImaging(
     science: NonEmptyMap[GmosSouthFilter, Zipper[Result]]
   ) extends Itc:
@@ -65,6 +77,10 @@ object Itc:
   val gmosSouthImaging: Prism[Itc, GmosSouthImaging] =
     GenPrism[Itc, GmosSouthImaging]
 
+  /**
+   * Spectroscopy results for all instruments. Spectroscopy has separate
+   * acquisition and science results.
+   */
   case class Spectroscopy(
     acquisition: Zipper[Result],
     science:     Zipper[Result]
@@ -92,15 +108,3 @@ object Itc:
   object Result:
     given Order[Result] =
       Order.by(s => (s.totalTime, s.targetId))
-
-//  private def targetIds(z: Zipper[Result]): NonEmptyList[Target.Id] =
-//    z.toNel.map(_.targetId).sortBy(_.value)
-//
-//  def fromResults(
-//    modeData:    ModeData,
-//    acquisition: Option[Zipper[Result]],
-//    science:     NonEmptyList[Zipper[Result]]
-//  ): Option[Itc] =
-//    Option.when(acquisition.forall(z => targetIds(z) === targetIds(science)))(
-//      Itc(acquisition.map(ResultSet(modeData, _)), science.map(ResultSet(modeData, _))
-//    )
