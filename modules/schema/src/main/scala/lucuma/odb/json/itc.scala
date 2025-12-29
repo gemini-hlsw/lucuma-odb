@@ -3,7 +3,9 @@
 
 package lucuma.odb.json
 
-import cats.syntax.either.*
+import cats.Order
+import cats.data.NonEmptyList
+import cats.data.NonEmptyMap
 import eu.timepit.refined.types.numeric.PosInt
 import io.circe.Decoder
 import io.circe.DecodingFailure
@@ -24,10 +26,7 @@ import lucuma.core.util.TimeSpan
 import lucuma.itc.IntegrationTime
 import lucuma.itc.SignalToNoiseAt
 import lucuma.odb.data.Itc
-import lucuma.odb.data.Itc.ModeData
-import lucuma.odb.data.Itc.ModeDataType
-import lucuma.odb.data.Itc.Result
-import lucuma.odb.data.Itc.ResultSet
+//import lucuma.odb.data.Itc.ResultSet
 
 trait ItcCodec:
 
@@ -45,16 +44,16 @@ trait ItcCodec:
   // N.B. lucuma.itc.SignalToNoiseAt defines its own encoder consistent with
   // this decoder.  Perhaps we should move the decoder there as well.
 
-  given Decoder[Result] =
+  given Decoder[Itc.Result] =
     Decoder.instance: c =>
       for
         targetId        <- c.downField("targetId").as[Target.Id]
         exposureTime    <- c.downField("exposureTime").as[TimeSpan]
         exposureCount   <- c.downField("exposureCount").as[PosInt]
         signalToNoiseAt <- c.downField("signalToNoiseAt").as[Option[SignalToNoiseAt]]
-      yield Result(targetId, IntegrationTime(exposureTime, exposureCount), signalToNoiseAt)
+      yield Itc.Result(targetId, IntegrationTime(exposureTime, exposureCount), signalToNoiseAt)
 
-  given (using Encoder[TimeSpan], Encoder[Wavelength]): Encoder[Result] =
+  given (using Encoder[TimeSpan], Encoder[Wavelength]): Encoder[Itc.Result] =
     Encoder.instance: a =>
       Json.obj(
         "targetId"        -> a.targetId.asJson,
@@ -63,52 +62,76 @@ trait ItcCodec:
         "signalToNoiseAt" -> a.signalToNoise.asJson
       )
 
-  given Decoder[ModeData.GmosNorthImaging] = c =>
-    c.downField("filter").as[GmosNorthFilter].map(ModeData.GmosNorthImaging.apply)
+  private def imagingScienceNemDecoder[A: Decoder: Order]: Decoder[NonEmptyMap[A, Zipper[Itc.Result]]] =
+    Decoder.instance: c =>
+      c.downField("science")
+       .values
+       .flatMap(it => NonEmptyList.fromList(it.toList))
+       .toRight(DecodingFailure("Expecting at least one ITC result set.", c.history))
+       .flatMap: nel =>
+         val res = nel.traverse: json =>
+           val c = json.hcursor
+           for
+             filter  <- c.downField("filter").as[A]
+             results <- c.downField("results").as[Zipper[Itc.Result]]
+           yield filter -> results
+         res.map(_.toNem)
 
-  given Decoder[ModeData.GmosSouthImaging] = c =>
-    c.downField("filter").as[GmosSouthFilter].map(ModeData.GmosSouthImaging.apply)
+  given Decoder[Itc.GmosNorthImaging] =
+    imagingScienceNemDecoder[GmosNorthFilter].map(Itc.GmosNorthImaging.apply)
 
-  given Decoder[ModeData] = c =>
-    for
-      t <- c.downField("dataType").as[ModeDataType]
-      r <- t match
-             case ModeDataType.Empty            => ModeData.Empty.asRight[DecodingFailure]
-             case ModeDataType.GmosNorthImaging => c.as[ModeData.GmosNorthImaging]
-             case ModeDataType.GmosSouthImaging => c.as[ModeData.GmosSouthImaging]
-    yield r
+  given Decoder[Itc.GmosSouthImaging] =
+    imagingScienceNemDecoder[GmosSouthFilter].map(Itc.GmosSouthImaging.apply)
 
-  given Encoder[ModeData] =
-    Encoder.instance: a =>
-      val fields = a match
-        case ModeData.Empty               => Nil
-        case ModeData.GmosNorthImaging(f) => List("filter" -> f.asJson)
-        case ModeData.GmosSouthImaging(f) => List("filter" -> f.asJson)
-      Json.fromFields(("dataType", a.dataType.asJson) :: fields)
-
-  given Decoder[ResultSet] =
+  given Decoder[Itc.Spectroscopy] =
     Decoder.instance: c =>
       for
-        m <- c.downField("modeData").as[ModeData]
-        z <- c.as[Zipper[Result]]
-      yield ResultSet(m, z)
+        acquisition <- c.downField("acquisition").as[Zipper[Itc.Result]]
+        science     <- c.downField("science").as[Zipper[Itc.Result]]
+      yield Itc.Spectroscopy(acquisition, science)
 
-  given (using Encoder[TimeSpan], Encoder[Wavelength]): Encoder[ResultSet] =
+  private def imagingScienceNemEncoder[A: Encoder](
+    using Encoder[TimeSpan], Encoder[Wavelength]
+  ): Encoder[NonEmptyMap[A, Zipper[Itc.Result]]] =
     Encoder.instance: a =>
-      a.results.asJson.mapObject(_.add("modeData", a.modeData.asJson))
+      Json.fromValues:
+        a.toNel.toList.map: (filter, results) =>
+          Json.obj(
+            "filter"  -> filter.asJson,
+            "results" -> results.asJson
+          )
 
-  given Decoder[Itc] =
-    Decoder.instance: c =>
-      for
-        acquisition <- c.downField("acquisition").as[Option[ResultSet]]
-        science     <- c.downField("science").as[ResultSet]
-      yield Itc(acquisition, science)
+  given (using Encoder[TimeSpan], Encoder[Wavelength]): Encoder[Itc.GmosNorthImaging] =
+    imagingScienceNemEncoder[GmosNorthFilter]
+      .contramap[Itc.GmosNorthImaging](_.science)
+      .mapJson(_.mapObject(_.add("itcType", Itc.Type.GmosNorthImaging.asJson)))
 
-  given (using Encoder[TimeSpan], Encoder[Wavelength]): Encoder[Itc] =
+  given (using Encoder[TimeSpan], Encoder[Wavelength]): Encoder[Itc.GmosSouthImaging] =
+    imagingScienceNemEncoder[GmosSouthFilter]
+      .contramap[Itc.GmosSouthImaging](_.science)
+      .mapJson(_.mapObject(_.add("itcType", Itc.Type.GmosSouthImaging.asJson)))
+
+  given (using Encoder[TimeSpan], Encoder[Wavelength]): Encoder[Itc.Spectroscopy] =
     Encoder.instance: a =>
       Json.obj(
+        "itcType"     -> Itc.Type.Spectroscopy.asJson,
         "acquisition" -> a.acquisition.asJson,
         "science"     -> a.science.asJson
       )
+
+  given Decoder[Itc] =
+    Decoder.instance: c =>
+      c.downField("itcType")
+       .as[Itc.Type]
+       .flatMap:
+         case Itc.Type.GmosNorthImaging => Decoder[Itc.GmosNorthImaging].apply(c)
+         case Itc.Type.GmosSouthImaging => Decoder[Itc.GmosSouthImaging].apply(c)
+         case Itc.Type.Spectroscopy     => Decoder[Itc.Spectroscopy].apply(c)
+
+  given (using Encoder[TimeSpan], Encoder[Wavelength]): Encoder[Itc] =
+    Encoder.instance:
+      case a @ Itc.GmosNorthImaging(_) => Encoder[Itc.GmosNorthImaging].apply(a)
+      case a @ Itc.GmosSouthImaging(_) => Encoder[Itc.GmosSouthImaging].apply(a)
+      case a @ Itc.Spectroscopy(_, _)  => Encoder[Itc.Spectroscopy].apply(a)
 
 object itc extends ItcCodec
