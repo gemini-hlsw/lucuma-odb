@@ -29,7 +29,8 @@ import lucuma.odb.json.wavelength.transport.given
 import monocle.Prism
 import monocle.macros.GenPrism
 
-sealed trait InstrumentMode
+sealed trait InstrumentMode:
+  def displayName: String
 
 object InstrumentMode {
 
@@ -40,7 +41,9 @@ object InstrumentMode {
     fpu:               GmosFpu.North,
     ccdMode:           Option[GmosCcdMode],
     roi:               Option[GmosRoi]
-  ) extends InstrumentMode derives Eq
+  ) extends InstrumentMode derives Eq:
+    override def displayName: String =
+      "GMOS North Spectroscopy"
 
   object GmosNorthSpectroscopy {
 
@@ -74,7 +77,9 @@ object InstrumentMode {
     fpu:               GmosFpu.South,
     ccdMode:           Option[GmosCcdMode],
     roi:               Option[GmosRoi]
-  ) extends InstrumentMode derives Eq
+  ) extends InstrumentMode derives Eq:
+    override def displayName: String =
+      "GMOS South Spectroscopy"
 
   object GmosSouthSpectroscopy:
 
@@ -103,7 +108,9 @@ object InstrumentMode {
     disperser: Flamingos2Disperser,
     filter:    Flamingos2Filter,
     fpu:       Flamingos2Fpu
-  ) extends InstrumentMode derives Eq
+  ) extends InstrumentMode derives Eq:
+    override def displayName: String =
+      "Flamingos 2 Spectroscopy"
 
   object Flamingos2Spectroscopy:
 
@@ -126,7 +133,9 @@ object InstrumentMode {
   case class GmosNorthImaging(
     filter:  GmosNorthFilter,
     ccdMode: Option[GmosCcdMode]
-  ) extends InstrumentMode derives Eq
+  ) extends InstrumentMode derives Eq:
+    override def displayName: String =
+      "GMOS North Imaging"
 
   object GmosNorthImaging:
 
@@ -145,7 +154,9 @@ object InstrumentMode {
   case class GmosSouthImaging(
     filter:  GmosSouthFilter,
     ccdMode: Option[GmosCcdMode]
-  ) extends InstrumentMode derives Eq
+  ) extends InstrumentMode derives Eq:
+    override def displayName: String =
+      "GMOS South Imaging"
 
   object GmosSouthImaging:
 
@@ -163,7 +174,9 @@ object InstrumentMode {
 
   case class Flamingos2Imaging(
     filter: Flamingos2Filter
-  ) extends InstrumentMode derives Eq
+  ) extends InstrumentMode derives Eq:
+    override def displayName: String =
+      "Flamingos 2 Imaging"
 
   object Flamingos2Imaging:
 

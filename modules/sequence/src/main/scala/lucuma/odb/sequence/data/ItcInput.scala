@@ -5,10 +5,12 @@ package lucuma.odb.sequence
 package data
 
 import cats.Eq
+import cats.Order
 import cats.Order.given
 import cats.data.NonEmptyList
-import cats.data.NonEmptyVector
 import cats.derived.*
+import cats.syntax.eq.*
+import cats.syntax.option.*
 import lucuma.core.model.Target
 import lucuma.core.util.Timestamp
 import lucuma.itc.client.ImagingInput
@@ -19,54 +21,89 @@ import lucuma.itc.client.TargetInput
 import lucuma.odb.sequence.syntax.all.*
 import lucuma.odb.sequence.util.HashBytes
 import lucuma.odb.sequence.util.HashBytes.given
+import monocle.Prism
 
 import scala.collection.mutable.ArrayBuilder
 
-/**
- * Parameters required for producing ITC inputs.  These are extracted from an
- * observation when everything necessary is present and defined.
- */
-case class ItcInput(
-  acquisition:         Option[ImagingParameters],
-  imaging:             List[ImagingParameters],
-  spectroscopy:        List[SpectroscopyParameters],
-  targets:             NonEmptyList[(Target.Id, TargetInput, Option[Timestamp])],
-  blindOffsetTarget:   Option[(Target.Id, TargetInput, Option[Timestamp])],
-) derives Eq:
-
-  def acquisitionInput: Option[ImagingInput] =
-    acquisition.map(ImagingInput(_, blindOffsetTarget.fold(targets.map(_._2))(r => NonEmptyList.one(r._2))))
-
-  def imagingInputs: List[ImagingInput] =
-    imaging.map(ImagingInput(_, targets.map(_._2)))
-
-  def spectroscopyInputs: List[SpectroscopyInput] =
-    spectroscopy.map(SpectroscopyInput(_, targets.map(_._2)))
-
-  lazy val targetVector: NonEmptyVector[(Target.Id, TargetInput)] =
-    targets.map(t => (t._1, t._2)).toNev
+sealed trait ItcInput:
+  def targets: NonEmptyList[ItcInput.TargetDefinition]
 
 object ItcInput:
 
-  given HashBytes[ItcInput] with
-    given HashBytes[TargetInput]            = HashBytes.forJsonEncoder
-    given HashBytes[ImagingParameters]      = HashBytes.forJsonEncoder
-    given HashBytes[SpectroscopyParameters] = HashBytes.forJsonEncoder
+  private given HashBytes[TargetInput]            = HashBytes.forJsonEncoder
+  private given HashBytes[ImagingParameters]      = HashBytes.forJsonEncoder
+  private given HashBytes[SpectroscopyParameters] = HashBytes.forJsonEncoder
 
-    def hashBytes(a: ItcInput): Array[Byte] =
-      def targetsBytes(
-        targets: NonEmptyList[(Target.Id, TargetInput, Option[Timestamp])]
-      ): Array[Byte] =
+  case class TargetDefinition(
+    targetId: Target.Id,
+    input:    TargetInput,
+    time:     Option[Timestamp]
+  ) derives Eq
+
+  private def hashTargets(nel: NonEmptyList[TargetDefinition]): Array[Byte] =
+    val bld = ArrayBuilder.make[Byte]
+    nel.toList.sortBy(_.targetId).foreach: t =>
+      bld.addAll(t.targetId.hashBytes)
+      bld.addAll(t.input.hashBytes)
+      bld.addAll(t.time.hashBytes)
+    bld.result()
+
+  case class Imaging(
+    science: NonEmptyList[ImagingParameters],
+    targets: NonEmptyList[TargetDefinition],
+  ) extends ItcInput derives Eq:
+
+    def scienceInput: NonEmptyList[ImagingInput] =
+      science.map(ImagingInput(_, targets.map(_.input)))
+
+  object Imaging:
+    given HashBytes[Imaging] with
+      def hashBytes(a: Imaging): Array[Byte] =
         val bld = ArrayBuilder.make[Byte]
-        targets.toList.sortBy(_._1).foreach: (tid, tinput, customSedTimestamp) =>
-          bld.addAll(tid.hashBytes)
-          bld.addAll(tinput.hashBytes)
-          bld.addAll(customSedTimestamp.hashBytes)
+        a.science.toList.foreach: params =>
+          bld.addAll(params.hashBytes)
+        bld.addAll(hashTargets(a.targets))
         bld.result()
 
-      Array.concat(
-        a.acquisition.hashBytes,
-        a.imaging.hashBytes,
-        a.spectroscopy.hashBytes,
-        targetsBytes(a.blindOffsetTarget.fold(a.targets)(_ :: a.targets))
-      )
+  case class Spectroscopy(
+    acquisition: ImagingParameters,
+    science:     SpectroscopyParameters,
+    targets:     NonEmptyList[TargetDefinition],
+    blindOffset: Option[TargetDefinition]
+  ) extends ItcInput derives Eq:
+
+    def acquisitionTargets: NonEmptyList[TargetDefinition] =
+      blindOffset.fold(targets)(NonEmptyList.one)
+
+    def acquisitionInput: ImagingInput =
+      ImagingInput(acquisition, acquisitionTargets.map(_.input))
+
+    def scienceInput: SpectroscopyInput =
+      SpectroscopyInput(science, targets.map(_.input))
+
+  object Spectroscopy:
+    given HashBytes[Spectroscopy] with
+      def hashBytes(a: Spectroscopy): Array[Byte] =
+        Array.concat(
+          a.acquisition.hashBytes,
+          a.science.hashBytes,
+          hashTargets(a.blindOffset.fold(a.targets)(_ :: a.targets))
+        )
+
+  val spectroscopy: Prism[ItcInput, ItcInput.Spectroscopy] =
+    Prism[ItcInput, ItcInput.Spectroscopy] {
+      case s: ItcInput.Spectroscopy => s.some
+      case _                        => none
+    }(identity)
+
+  given Eq[ItcInput] =
+    Eq.instance:
+      case (im0: Imaging,      im1: Imaging)      => im0 === im1
+      case (sp0: Spectroscopy, sp1: Spectroscopy) => sp0 === sp1
+      case _                                      => false
+
+  given HashBytes[ItcInput] with
+    def hashBytes(a: ItcInput): Array[Byte] =
+      a match
+        case in @ Imaging(_, _)            => in.hashBytes
+        case in @ Spectroscopy(_, _, _, _) => in.hashBytes
