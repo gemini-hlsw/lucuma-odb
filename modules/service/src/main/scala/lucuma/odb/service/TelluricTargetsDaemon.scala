@@ -34,6 +34,8 @@ object TelluricTargetsDaemon:
   ): F[Unit] =
     given Logger[F] = LoggerFactory[F].getLoggerFromName("telluric-targets")
 
+    val WaitToRestart = 5.seconds
+
     // Stream of pending requestes
     // Filter for transitions TO 'pending' state
     val eventStream: Stream[F, TelluricTargets.Pending] =
@@ -74,6 +76,12 @@ object TelluricTargetsDaemon:
           val (pending, meta) = result
           info"Resolved telluric for ${pending.observationId}: $meta"
         .void
+        .attempts(Stream.constant(WaitToRestart))
+        .evalTap:
+          case Left(e)  => error"Telluric daemon error: ${e.getMessage}, restarting in $WaitToRestart..."
+          case Right(_) => Async[F].unit
+        .collect:
+          case Right(a) => a
 
     // Initial processing on startup
     def startupBatch: F[Unit] =
