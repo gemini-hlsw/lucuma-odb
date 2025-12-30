@@ -72,16 +72,11 @@ object TelluricTargetsDaemon:
               telluricTargetsService
                 .resolveTargets(pending)
                 .map((pending, _))
-        .evalTap: result =>
-          val (pending, meta) = result
-          info"Resolved telluric for ${pending.observationId}: $meta"
-        .void
         .attempts(Stream.constant(WaitToRestart))
         .evalTap:
           case Left(e)  => error"Telluric daemon error: ${e.getMessage}, restarting in $WaitToRestart..."
-          case Right(_) => Async[F].unit
-        .collect:
-          case Right(a) => a
+          case Right((pending, meta)) => info"Resolved telluric for ${pending.observationId}: $meta"
+        .void
 
     // Initial processing on startup
     def startupBatch: F[Unit] =
