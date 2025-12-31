@@ -78,12 +78,15 @@ object OdbMapping {
   }
 
   // Loads a GraphQL file from the classpath, relative to this Class.
-  def unsafeLoadSchema(fileName: String): Schema = {
+  private def unsafeLoadSchema(fileName: String): Schema = {
     val stream = getClass.getResourceAsStream(fileName)
     val src  = Source.fromInputStream(stream, "UTF-8")
     try Schema(src.getLines().mkString("\n")).toEither.fold(x => sys.error(s"Invalid schema: $fileName: ${x.toList.mkString(", ")}"), identity)
     finally src.close()
   }
+
+  def unsafeLoadOdbSchema: Schema =
+    unsafeLoadSchema("OdbSchema.graphql")
 
   private implicit def monoidPartialFunction[A, B]: Monoid[PartialFunction[A, B]] =
     Monoid.instance(PartialFunction.empty, _ orElse _)
@@ -299,7 +302,7 @@ object OdbMapping {
 
           // Our schema
           val schema: Schema =
-            schema0.getOrElse(unsafeLoadSchema("OdbSchema.graphql") |+| enums.schema)
+            schema0.getOrElse(unsafeLoadOdbSchema |+| enums.schema)
 
           // Our services and resources needed by various mappings.
           override val commitHash = commitHash0
