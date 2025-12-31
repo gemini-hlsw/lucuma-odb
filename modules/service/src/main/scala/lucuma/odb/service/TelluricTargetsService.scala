@@ -42,6 +42,7 @@ import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.LoggerFactory
 import org.typelevel.log4cats.syntax.*
 import skunk.*
+import skunk.SqlState
 import skunk.codec.all.*
 import skunk.implicits.*
 
@@ -232,7 +233,7 @@ object TelluricTargetsService:
           fetchSearchParams(pending.scienceObservationId)
             .map(_.toRight(s"Missing coordinates or F2 config for science observation ${pending.scienceObservationId}"))
 
-        def createAndLinkTarget(sidereal: Target.Sidereal): F[Target.Id] =
+        def createAndLinkTarget(sidereal: Target.Sidereal): F[Option[Target.Id]] =
           S.transactionally:
             Services.asSuperUser:
               val catalog = sidereal.catalogInfo.map: ci =>
@@ -271,7 +272,12 @@ object TelluricTargetsService:
                                     session.execute(Statements.InsertTelluricObservationTarget)(
                                       (pending.programId, pending.observationId, targetId)
                                     )
-              } yield targetId
+              } yield targetId.some
+          .recover:
+            case SqlState.ForeignKeyViolation(_) =>
+              // Observation could be deleted during resolution, this is not common but it is legal
+              // we see it on the logs
+              none
 
         extension (target: Target.Sidereal)
           def sedFromTelluricType(telluricType: TelluricType): Target.Sidereal =
@@ -285,17 +291,28 @@ object TelluricTargetsService:
           val searchInput = mkSearchInput(coords, config, brightness, pending.scienceDuration.min(F2MaxDuration))
           val paramsHash = Md5Hash.unsafeFromByteArray(searchInput.md5)
 
-          def doSearch: F[Option[(Either[String, Target.Id], Md5Hash)]] =
-            telluricClient.searchTarget(searchInput).flatMap:
-              case (star, catalogResult) :: _ =>
-                val sidereal =
-                  catalogResult.map(_.target).getOrElse(star.asSiderealTarget).sedFromTelluricType(config.telluricType)
+          def observationExists: F[Boolean] =
+            session.prepareR(Statements.ObservationExists)
+              .use(_.option(pending.observationId))
+              .map(_.isDefined)
 
-                info"Found telluric star HIP ${star.hip} for observation ${pending.observationId}" *>
-                  createAndLinkTarget(sidereal).map(tid => (tid.asRight[String], paramsHash).some)
-              case Nil =>
-                val msg = s"No telluric stars found for observation ${pending.observationId}"
-                Logger[F].warn(msg).as((msg.asLeft[Target.Id], paramsHash).some)
+          def doSearch: F[Option[(Either[String, Target.Id], Md5Hash)]] =
+            observationExists.ifM(
+              telluricClient.searchTarget(searchInput).flatMap:
+                case (star, catalogResult) :: _ =>
+                  val sidereal =
+                    catalogResult.map(_.target).getOrElse(star.asSiderealTarget).sedFromTelluricType(config.telluricType)
+
+                  info"Found telluric star HIP ${star.hip} for observation ${pending.observationId}" *>
+                    createAndLinkTarget(sidereal).map:
+                      case Some(tid) => (tid.asRight[String], paramsHash).some
+                      case _         => none
+                case Nil =>
+                  val msg = s"No telluric stars found for observation ${pending.observationId}"
+                  Logger[F].warn(msg).as((msg.asLeft[Target.Id], paramsHash).some),
+              // Observation was deleted before resolving the target
+              warn"Observation ${pending.observationId} deleted, sikp resolution".as(none)
+            )
 
           pending.paramsHash match
             case Some(storedHash) if storedHash === paramsHash =>
@@ -473,6 +490,13 @@ object TelluricTargetsService:
             INSERT INTO t_asterism_target (c_program_id, c_observation_id, c_target_id)
             VALUES ($program_id, $observation_id, $target_id)
           """.command
+
+        val ObservationExists: Query[Observation.Id, Observation.Id] =
+          sql"""
+            SELECT c_observation_id
+            FROM   t_observation
+            WHERE  c_observation_id = $observation_id
+          """.query(observation_id)
 
         val InsertResolutionRequest: Command[(Observation.Id, Program.Id, Observation.Id, TimeSpan)] =
           sql"""
