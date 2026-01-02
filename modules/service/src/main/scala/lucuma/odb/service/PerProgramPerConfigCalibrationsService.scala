@@ -31,6 +31,7 @@ import lucuma.odb.graphql.input.ScienceRequirementsInput
 import lucuma.odb.graphql.input.SpectroscopyScienceRequirementsInput
 import lucuma.odb.graphql.mapping.AccessControl
 import lucuma.odb.sequence.ObservingMode
+import lucuma.odb.sequence.data.ItcInput
 import lucuma.odb.service.CalibrationConfigSubset.*
 import lucuma.odb.service.CalibrationsService.PerProgramPerConfigCalibrationTypes
 import lucuma.odb.service.Services.ServiceAccess
@@ -66,7 +67,7 @@ object PerProgramPerConfigCalibrationsService:
         calibConfigs: List[ObsExtract[CalibrationConfigSubset]]
       ): Map[CalibrationConfigSubset, CalObsProps] =
         calibConfigs.groupBy(_.data).map { case (k, v) =>
-          val w = v.map(_.itc.map(_.spectroscopy.exposureTimeMode.at)).flattenOption match
+          val w = v.map(ex => ex.itc.flatMap(ItcInput.spectroscopy.getOption).map(_.science.exposureTimeMode.at)).flattenOption match
             case Nil =>
                none[Wavelength]
             case ws  =>

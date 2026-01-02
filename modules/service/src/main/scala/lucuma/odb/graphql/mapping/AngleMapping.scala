@@ -11,14 +11,14 @@ import lucuma.core.math.HourAngle
 import lucuma.odb.graphql.table.ChronConditionsEntryView
 import lucuma.odb.graphql.table.ImagingConfigOptionTable
 import lucuma.odb.graphql.table.ObservationView
-import lucuma.odb.graphql.table.OffsetGeneratorView
 import lucuma.odb.graphql.table.SpectroscopyConfigOptionTable
+import lucuma.odb.graphql.table.TelescopeConfigGeneratorView
 import lucuma.odb.graphql.util.MappingExtras
 
 trait AngleMapping[F[_]] extends ObservationView[F]
                             with ChronConditionsEntryView[F]
                             with ImagingConfigOptionTable[F]
-                            with OffsetGeneratorView[F]
+                            with TelescopeConfigGeneratorView[F]
                             with SpectroscopyConfigOptionTable[F]
                             with MappingExtras[F] {
 
@@ -69,8 +69,8 @@ trait AngleMapping[F[_]] extends ObservationView[F]
       angleMappingAtPath(SpectroscopyConfigOptionType / "slitLength", SpectroscopyConfigOptionTable.SlitLength, SpectroscopyConfigOptionTable.Instrument, SpectroscopyConfigOptionTable.Index),
       angleMappingAtPath(ImagingConfigOptionType / "fov", ImagingConfigOptionTable.Fov, ImagingConfigOptionTable.Instrument, ImagingConfigOptionTable.Index),
       angleMappingAtPath(ImagingScienceRequirementsType / "minimumFov", Imaging.MinimumFovAngle.Value, Imaging.MinimumFovAngle.SyntheticId),
-      angleMappingAtPath(RandomOffsetGeneratorType / "size", OffsetGeneratorView.Size, OffsetGeneratorView.Random.ObservationId, OffsetGeneratorView.Random.OffsetGeneratorRole),
-      angleMappingAtPath(SpiralOffsetGeneratorType / "size", OffsetGeneratorView.Size, OffsetGeneratorView.Spiral.ObservationId, OffsetGeneratorView.Spiral.OffsetGeneratorRole)
+      angleMappingAtPath(RandomTelescopeConfigGeneratorType / "size", TelescopeConfigGeneratorView.Size, TelescopeConfigGeneratorView.Random.ObservationId, TelescopeConfigGeneratorView.Random.TelescopeConfigGeneratorRole),
+      angleMappingAtPath(SpiralTelescopeConfigGeneratorType / "size", TelescopeConfigGeneratorView.Size, TelescopeConfigGeneratorView.Spiral.ObservationId, TelescopeConfigGeneratorView.Spiral.TelescopeConfigGeneratorRole)
     )
 
 }

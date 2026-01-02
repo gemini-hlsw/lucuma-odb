@@ -44,7 +44,7 @@ trait GmosLongSlitMapping[F[_]]
      with OptionalFieldMapping[F]
      with Predicates[F] { this: SkunkMapping[F] =>
 
-  private class CommonFieldMappings(cc: CommonColumns):
+  private class CommonFieldMappings(cc: GmosLongSlitCommonColumns):
 
     import GmosLongSlitMapping._
 
