@@ -367,7 +367,7 @@ object ItcService {
         for
           fs <- EitherT.fromEither(extractFilters(input.science.map(_.mode).toList, Nil))
           cs <- EitherT(clientCalculationResults)
-          ts  <- EitherT.fromEither(toTargetResults(input.targets, cs))
+          ts <- EitherT.fromEither(toTargetResults(input.targets, cs))
         yield im.wrap(fs.zip(ts).toNem)
 
 

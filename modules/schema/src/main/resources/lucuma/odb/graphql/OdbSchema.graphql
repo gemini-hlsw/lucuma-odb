@@ -10689,7 +10689,7 @@ An 'Int` in the range 0 to 100
 scalar IntPercent
 
 """
-A single ITC call result.
+An ITC result for a single target.
 """
 type ItcResult {
   targetId: TargetId!
@@ -10698,6 +10698,9 @@ type ItcResult {
   signalToNoiseAt: SignalToNoiseAt
 }
 
+"""
+A discriminator for the types of ITC results.
+"""
 enum ItcType {
   SPECTROSCOPY,
   GMOS_NORTH_IMAGING,
@@ -10705,13 +10708,13 @@ enum ItcType {
 }
 
 """
-Contains the result of calling the ITC for a particular observation.  Since
-the observation may contain multiple targets, there may be multiple results.
-The "result" field contains the selected, representative, result for all
-targets.  If there are multiple successful results, this will be the one that
-prescribes the longest observation. If there is a mix of failures and
-successes, the overall "result" will be a failure. The "all" field contains
-results for all targets regardless.
+Contains the result of calling the ITC for all targets, but a single instrument
+configuration.  Since the observation may contain multiple targets, there may
+be multiple results. The "result" field contains the selected, representative,
+result for all targets.  If there are multiple successful results, this will
+be the one that prescribes the longest observation. If there is a mix of
+failures and successes, the overall "result" will be a failure. The "all" field
+contains results for all targets regardless.
 """
 type ItcResultSet {
   selected: ItcResult!
@@ -10719,32 +10722,58 @@ type ItcResultSet {
   index: NonNegInt!
 }
 
+"""
+Combines a GMOS North filter with an `ItcResultSet`. In other words, ITC
+results for all targets but a single filter.
+"""
 type ItcGmosNorthImagingResultSet {
   filter:  GmosNorthFilter!
   results: ItcResultSet!
 }
 
+"""
+Combines a GMOS South filter with an `ItcResultSet`. In other words, ITC
+results for all targets but a single filter.
+"""
 type ItcGmosSouthImagingResultSet {
   filter:  GmosSouthFilter!
   results: ItcResultSet!
 }
 
+"""
+ITC results for a particular observation, including relevant instrument
+configurations and targets.  There are specific instances for each `ItcType`.
+"""
 interface Itc {
+
+  "The type of the Itc results."
   itcType: ItcType!
+
 }
 
+"""
+GMOS North imaging ITC results.  Here each filter is paired with its result
+set.
+"""
 type ItcGmosNorthImaging implements Itc {
   itcType: ItcType!
   gmosNorthImagingScience: [ItcGmosNorthImagingResultSet!]!
 }
 
+"""
+GMOS South imaging ITC results.  Here each filter is paired with its result
+set.
+"""
 type ItcGmosSouthImaging implements Itc {
   itcType: ItcType!
   gmosSouthImagingScience: [ItcGmosSouthImagingResultSet!]!
 }
 
+"""
+ITC results for spectroscopy observations.
+"""
 type ItcSpectroscopy implements Itc {
-  itcType:     ItcType!
+  itcType: ItcType!
   acquisition: ItcResultSet!
   spectroscopyScience: ItcResultSet!
 }
