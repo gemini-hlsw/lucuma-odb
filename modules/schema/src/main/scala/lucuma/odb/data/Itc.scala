@@ -30,11 +30,16 @@ sealed trait Itc:
   // Used in the circe decoder.  Itc results are stored in a jsonb column.
   def dataType: Itc.Type
 
+  /**
+   * The expected total science exposure count.  This is used for limiting
+   * sequence generation to reasonable values.
+   */
   def scienceExposureCount: PosInt
 
 object Itc:
 
-  // Corresponds to ItcResult in the OdbSchema.graphql
+  // ItcResult in the OdbSchema.graphql corresponds to Result below. An
+  // ItcResultSet corresponds to a Zipper[Result].
   case class Result(
     targetId:      Target.Id,
     value:         IntegrationTime,
