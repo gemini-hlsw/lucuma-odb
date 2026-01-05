@@ -4,7 +4,7 @@
 package lucuma.odb.service
 
 import cats.data.NonEmptyList
-import cats.effect.Concurrent
+import cats.effect.Async
 import cats.implicits.*
 import grackle.Result
 import grackle.ResultT
@@ -238,7 +238,7 @@ object ObservationWorkflowService {
       case _                             => ObservationValidation.configuration(ge.format)
 
   /* Construct an instance. */
-  def instantiate[F[_]: Concurrent](using Services[F]): ObservationWorkflowService[F] =
+  def instantiate[F[_]: Async](using Services[F]): ObservationWorkflowService[F] =
     new ObservationWorkflowService[F] {
 
       // Make the enums available in a stable and implicit way
