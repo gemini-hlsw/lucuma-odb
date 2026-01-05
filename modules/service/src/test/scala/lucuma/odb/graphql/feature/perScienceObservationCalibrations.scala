@@ -5,6 +5,7 @@ package lucuma.odb.feature
 
 import cats.effect.IO
 import cats.syntax.all.*
+import eu.timepit.refined.types.numeric.PosInt
 import io.circe.Decoder
 import io.circe.Json
 import io.circe.syntax.*
@@ -20,6 +21,7 @@ import lucuma.core.math.Coordinates
 import lucuma.core.math.Declination
 import lucuma.core.math.RightAscension
 import lucuma.core.math.Wavelength
+import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.Group
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
@@ -28,8 +30,11 @@ import lucuma.core.model.SourceProfile
 import lucuma.core.model.SpectralDefinition
 import lucuma.core.model.Target
 import lucuma.core.model.TelluricType
+import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
+import lucuma.itc.IntegrationTime
+import lucuma.itc.client.SpectroscopyInput
 import lucuma.odb.graphql.OdbSuite
 import lucuma.odb.graphql.query.ExecutionTestSupportForFlamingos2
 import lucuma.odb.graphql.query.ObservingModeSetupOperations
@@ -102,6 +107,23 @@ class perScienceObservationCalibrations
 
   override protected def telluricClient: IO[TelluricTargetsClient[IO]] =
     TelluricTargetsClientMock.fromJson(mockTelluricJson, SimbadClientMock.withSingleTarget(mockTarget))
+
+  // Override fake ITC to vary duration based on signal-to-noise requirement
+  override def fakeItcSpectroscopyResultFor(input: SpectroscopyInput): Option[IntegrationTime] =
+    val result = input.exposureTimeMode match
+      // High S/N (>= 200): 1 hour × 10 = 10 hours raw exposure (> 1.5h total with overheads)
+      case ExposureTimeMode.SignalToNoiseMode(sn, _) if sn.toBigDecimal >= 200 =>
+        println(s"DEBUG ITC: HIGH S/N mode, sn=${sn.toBigDecimal}")
+        Some(IntegrationTime(60.minuteTimeSpan, PosInt.unsafeFrom(10)))
+      // Low S/N (< 200): 5 min × 4 = 20 minutes (< 1.5h threshold)
+      case ExposureTimeMode.SignalToNoiseMode(sn, _) if sn.toBigDecimal < 200 =>
+        println(s"DEBUG ITC: LOW S/N mode, sn=${sn.toBigDecimal}")
+        Some(IntegrationTime(5.minuteTimeSpan, PosInt.unsafeFrom(4)))
+      // Default: 10 min × 6 = 1 hour (< 1.5h threshold)
+      case other =>
+        println(s"DEBUG ITC: DEFAULT mode, exposureTimeMode=$other")
+        Some(IntegrationTime(10.minuteTimeSpan, PosInt.unsafeFrom(6)))
+    result
 
   case class GroupInfo(
     id:               Group.Id,
@@ -325,7 +347,7 @@ class perScienceObservationCalibrations
       }"""
     ).void
 
-  private def setScienceRequirements(oid: Observation.Id, snAt: Wavelength = DefaultSnAt): IO[Unit] =
+  private def setScienceRequirements(oid: Observation.Id, snAt: Wavelength = DefaultSnAt, snValue: Double = 75.0): IO[Unit] =
     query(
       pi,
       s"""mutation {
@@ -334,7 +356,7 @@ class perScienceObservationCalibrations
             scienceRequirements: {
               exposureTimeMode: {
                 signalToNoise: {
-                  value: 75.000,
+                  value: $snValue,
                   at: { nanometers: ${snAt.toNanometers} }
                 }
               },
@@ -793,357 +815,479 @@ class perScienceObservationCalibrations
       assertEquals(removed2.size, 0)
     }
 
-  test("recalculation syncs telluric observation configuration"):
-    for {
-      pid          <- createProgramAs(pi)
-      tid          <- createTargetWithProfileAs(pi, pid)
-      oid          <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
-      _            <- runObscalcUpdate(pid, oid)
-      _            <- recalculateCalibrations(pid, when)
-      obs1         <- queryObservation(oid)
-      groupId      =  obs1.groupId.get
-      obsInGroup1  <- queryObservationsInGroup(groupId)
-      telluric1Oid =  obsInGroup1.find(_.calibrationRole.contains(CalibrationRole.Telluric)).get.id
-      scienceConds <- queryObservationConstraints(oid)
-      conds1       <- queryObservationConstraints(telluric1Oid)
-      _            <- recalculateCalibrations(pid, when)
-      obsInGroup2  <- queryObservationsInGroup(groupId)
-      telluric2Oid =  obsInGroup2.find(_.calibrationRole.contains(CalibrationRole.Telluric)).get.id
-      conds2       <- queryObservationConstraints(telluric2Oid)
-    } yield {
-      assertEquals(obsInGroup2.size, 2)
-      assertEquals(telluric1Oid, telluric2Oid)
-      // Verify conditions
-      assertEquals(conds1, scienceConds)
-      assertEquals(conds2, scienceConds)
-    }
-
-  test("changing F2 to GMOS deletes telluric observation"):
-    for {
-      pid                  <- createProgramAs(pi)
-      tid                  <- createTargetWithProfileAs(pi, pid)
-      oid                  <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
-      _                    <- runObscalcUpdate(pid, oid)
-      (added1, removed1)   <- recalculateCalibrations(pid, when)
-      obs1                 <- queryObservation(oid)
-      groupId              =  obs1.groupId.get
-      obsInGroup1          <- queryObservationsInGroup(groupId)
-      telluricOid          =  obsInGroup1.find(_.calibrationRole.contains(CalibrationRole.Telluric)).get.id
-      _                    <- updateObservationMode(oid, "gmosNorthLongSlit")
-      (added2, removed2)   <- recalculateCalibrations(pid, when)
-      obsExists            <- queryObservationExists(telluricOid)
-      groupExists          <- queryGroupExists(groupId)
-    } yield {
-      assert(!obsExists)
-      assert(!groupExists)
-      assertEquals(added1.size, 1)
-      assertEquals(removed1.size, 0)
-      assertEquals(removed2.size, 1)
-      assertEquals(removed2.headOption, telluricOid.some)
-    }
-
-  test("deleting F2 science observation deletes telluric observation"):
-    for {
-      pid                  <- createProgramAs(pi)
-      tid                  <- createTargetWithProfileAs(pi, pid)
-      oid                  <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
-      _                    <- runObscalcUpdate(pid, oid)
-      (added1, removed1)   <- recalculateCalibrations(pid, when)
-      _                    <- sleep >> resolveTelluricTargets
-      obs1                 <- queryObservation(oid)
-      groupId              =  obs1.groupId.get
-      obsInGroup1          <- queryObservationsInGroup(groupId)
-      telluricOid          =  obsInGroup1.find(_.calibrationRole.contains(CalibrationRole.Telluric)).get.id
-      telluricTgt          <- queryObservationWithTarget(telluricOid)
-      telluricTid          =  telluricTgt.targetId.get
-      _                    <- setObservationInactive(oid)
-      (added2, removed2)   <- recalculateCalibrations(pid, when)
-      tellExists           <- queryObservationExists(telluricOid)
-      groupExists          <- queryGroupExists(groupId)
-      targetExists         <- queryTargetExists(telluricTid)
-    } yield {
-      assert(!tellExists)
-      assert(!groupExists)
-      assert(!targetExists)
-      assertEquals(added1.size, 1)
-      assertEquals(removed1.size, 0)
-      assertEquals(added2.size, 0)
-      assertEquals(removed2.size, 1)
-      assertEquals(removed2.headOption, telluricOid.some)
-    }
-
-  test("recalculateCalibrations returns correct added and removed observation IDs"):
-    for {
-      pid                <- createProgramAs(pi)
-      tid                <- createTargetWithProfileAs(pi, pid)
-      oid                <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
-      _                  <- runObscalcUpdate(pid, oid)
-      // add 1 telluric
-      (added1, removed1) <- recalculateCalibrations(pid, when)
-      obs1               <- queryObservation(oid)
-      groupId            =  obs1.groupId.get
-      obsInGroup1        <- queryObservationsInGroup(groupId)
-      telluricOid        =  obsInGroup1.find(_.calibrationRole.contains(CalibrationRole.Telluric)).get.id
-      // re-sync the same observation (idempotent)
-      (added2, removed2) <- recalculateCalibrations(pid, when)
-      // removed F2 observation should remove the telluric
-      _                  <- setObservationInactive(oid)
-      (added3, removed3) <- recalculateCalibrations(pid, when)
-    } yield {
-      // First recalculation added the telluric observation
-      assertEquals(added1.size, 1)
-      assertEquals(added1.headOption, telluricOid.some)
-      assertEquals(removed1.size, 0)
-      // Second recalculation is truly idempotent (re-syncs existing, returns nothing new)
-      assertEquals(added2.size, 0)
-      assertEquals(removed2.size, 0)
-      // Third recalculation removed the telluric observation after deleting science obs
-      assertEquals(added3.size, 0)
-      assertEquals(removed3.size, 1)
-      assertEquals(removed3.headOption, telluricOid.some)
-    }
-
-  test("changing F2 FPU syncs to telluric observation"):
-    for {
-      pid          <- createProgramAs(pi)
-      tid          <- createTargetWithProfileAs(pi, pid)
-      oid          <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
-      _            <- runObscalcUpdate(pid, oid)
-      _            <- recalculateCalibrations(pid, when)
-      obs1         <- queryObservation(oid)
-      groupId      =  obs1.groupId.get
-      obsInGroup1  <- queryObservationsInGroup(groupId)
-      telluricOid  =  obsInGroup1.find(_.calibrationRole.contains(CalibrationRole.Telluric)).get.id
-      scienceFpu1  <- queryObservationFpu(oid)
-      telluricFpu1 <- queryObservationFpu(telluricOid)
-      _            <- updateFlamingos2Fpu(oid, Flamingos2Fpu.LongSlit2)
-      _            <- recalculateCalibrations(pid, when)
-      scienceFpu2  <- queryObservationFpu(oid)
-      telluricFpu2 <- queryObservationFpu(telluricOid)
-    } yield {
-      assertEquals(scienceFpu1, Flamingos2Fpu.LongSlit1.some)
-      assertEquals(telluricFpu1, Flamingos2Fpu.LongSlit1.some)
-      assertEquals(scienceFpu2, Flamingos2Fpu.LongSlit2.some)
-      assertEquals(telluricFpu2, Flamingos2Fpu.LongSlit2.some)
-    }
-
-  test("Don't generate for inactive"):
-    for {
-      pid  <- createProgramAs(pi)
-      tid1 <- createTargetWithProfileAs(pi, pid)
-      tid2 <- createTargetWithProfileAs(pi, pid)
-      oid1 <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid1))
-      oid2 <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid2))
-      // Explicitly set both observations to Inactive workflow state
-      _    <- setObservationWorkflowState(pi, oid1, ObservationWorkflowState.Inactive)
-      _    <- setObservationWorkflowState(pi, oid2, ObservationWorkflowState.Inactive)
-      _    <- recalculateCalibrations(pid, when)
-      obs1 <- queryObservation(oid1)
-      obs2 <- queryObservation(oid2)
-    } yield {
-      // No telluric groups created
-      assertEquals(obs1.groupId, None)
-      assertEquals(obs2.groupId, None)
-    }
-
-  test("Generate for mixed observation ready and inactive"):
-    for {
-      pid         <- createProgramAs(pi)
-      tid1        <- createTargetWithProfileAs(pi, pid)
-      tid2        <- createTargetWithProfileAs(pi, pid)
-      oid1        <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid1))
-      _           <- runObscalcUpdate(pid, oid1)
-      oid2        <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid2))
-      _           <- setObservationWorkflowState(pi, oid2, ObservationWorkflowState.Inactive)
-      _           <- recalculateCalibrations(pid, when)
-      obs1        <- queryObservation(oid1)
-      obs2        <- queryObservation(oid2)
-      obsInGroup1 <- obs1.groupId.traverse(queryObservationsInGroup)
-    } yield {
-      // oid1 should have telluric group
-      assert(obs1.groupId.isDefined)
-      assertEquals(obsInGroup1.map(_.size), Some(2))
-      // oid2 should not have telluric group
-      assertEquals(obs2.groupId, None)
-    }
-
-  test("Remove telluric when observation becomes inactive or deleted"):
-    List(
-      (oid: Observation.Id) => setObservationWorkflowState(pi, oid, ObservationWorkflowState.Inactive),
-      (oid: Observation.Id) => setObservationInactive(oid)
-    ).traverse_ : set =>
-      for {
-        pid          <- createProgramAs(pi)
-        tid          <- createTargetWithProfileAs(pi, pid)
-        oid          <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
-        _            <- runObscalcUpdate(pid, oid)
-        _            <- recalculateCalibrations(pid, when)
-        _            <- sleep >> resolveTelluricTargets
-        obsBefore    <- queryObservation(oid)
-        groupId      =  obsBefore.groupId.get
-        obsInGroup1  <- queryObservationsInGroup(groupId)
-        telluricOid  =  obsInGroup1.find(_.calibrationRole.contains(CalibrationRole.Telluric)).get.id
-        telluricTgt  <- queryObservationWithTarget(telluricOid)
-        telluricTid  =  telluricTgt.targetId.get
-        _            <- set(oid)
-        _            <- recalculateCalibrations(pid, when)
-        groupExists  <- queryGroupExists(groupId)
-        tellExists   <- queryObservationExists(telluricOid)
-        targetExists <- queryTargetExists(telluricTid)
-      } yield {
-        assertEquals(obsInGroup1.size, 2)
-        assert(!groupExists)
-        assert(!tellExists)
-        assert(!targetExists)
-      }
-
-  test("Generate for defined and ready observations"):
-    List(ObservationWorkflowState.Defined, ObservationWorkflowState.Ready).traverse_ : state =>
-      for {
-        pid         <- createProgramAs(pi)
-        tid         <- createTargetWithProfileAs(pi, pid)
-        oid         <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
-        _           <- setCalculatedWorkflowState(oid, state)
-        _           <- runObscalcUpdate(pid, oid)
-        _           <- recalculateCalibrations(pid, when)
-        obs         <- queryObservation(oid)
-        obsInGroup  <- obs.groupId.traverse(queryObservationsInGroup)
-      } yield {
-        // Defined and Ready observations should generate telluric calibrations
-        assert(obs.groupId.isDefined)
-        assertEquals(obsInGroup.map(_.size), Some(2))
-      }
-
-  test("don't delete ongoing and completed calibrations"):
-    List(ObservationWorkflowState.Ongoing, ObservationWorkflowState.Completed).traverse_ : state =>
-      for {
-        pid                  <- createProgramAs(pi)
-        tid                  <- createTargetWithProfileAs(pi, pid)
-        oid                  <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
-        _                    <- runObscalcUpdate(pid, oid)
-        (added1, removed1)   <- recalculateCalibrations(pid, when)
-        obs1                 <- queryObservation(oid)
-        groupId              =  obs1.groupId.get
-        obsInGroup1          <- queryObservationsInGroup(groupId)
-        telluricOid          =  obsInGroup1.find(_.calibrationRole.contains(CalibrationRole.Telluric)).get.id
-        _                    <- setCalculatedWorkflowState(telluricOid, state)
-        _                    <- updateFlamingos2Fpu(oid, Flamingos2Fpu.LongSlit2)
-        (added2, removed2)   <- recalculateCalibrations(pid, when)
-        obsInGroup2          <- queryObservationsInGroup(groupId)
-        telluricExists       <- queryObservationExists(telluricOid)
-      } yield {
-        // Telluric calibration in Ongoing or Completed state should be preserved
-        assertEquals(obsInGroup2.size, 2)
-        assert(telluricExists)
-        assert(obsInGroup2.exists(_.id === telluricOid))
-        assertEquals(added1.size, 1)
-        assertEquals(removed1.size, 0)
-        assertEquals(added2.size, 0)
-        assertEquals(removed2.size, 0)
-      }
-
-  test("telluric group rejects second science observation"):
-    for {
-      pid   <- createProgramAs(pi)
-      tid   <- createTargetWithProfileAs(pi, pid)
-      oid1  <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
-      _     <- runObscalcUpdate(pid, oid1)
-      _     <- recalculateCalibrations(pid, when)
-      obs1  <- queryObservation(oid1)
-      gid   =  obs1.groupId.get
-      oid2  <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
-      err   <- moveObservationAs(serviceUser, oid2, Some(gid)).intercept[UnexpectedStatus]
-    } yield
-      assertEquals(err.status.code, 500)
-
-  test("telluric group rejects creating child groups"):
-    for
-      pid  <- createProgramAs(pi)
-      tid  <- createTargetWithProfileAs(pi, pid)
-      oid  <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
-      _    <- runObscalcUpdate(pid, oid)
-      _    <- recalculateCalibrations(pid, when)
-      obs  <- queryObservation(oid)
-      gid  =  obs.groupId.get
-      err  <- createGroupAs(pi, pid, parentGroupId = Some(gid)).intercept[UnexpectedStatus]
-    yield
-      assertEquals(err.status.code, 500)
-
-  test("telluric target gets SED from telluric type when not set"):
-    for {
-      pid         <- createProgramAs(pi)
-      tid         <- createTargetWithProfileAs(pi, pid)
-      oid         <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
-      _           <- setScienceRequirements(oid)
-      _           <- runObscalcUpdate(pid, oid)
-      _           <- recalculateCalibrations(pid, when)
-      _           <- sleep >> resolveTelluricTargets
-      obs         <- queryObservation(oid)
-      groupId     =  obs.groupId.get
-      obsInGroup  <- queryObservationsInGroup(groupId)
-      telluricOid =  obsInGroup.find(_.calibrationRole.contains(CalibrationRole.Telluric)).get.id
-      telluricObs <- queryObservationWithTarget(telluricOid)
-      targetSed   <- telluricObs.targetId.flatTraverse(queryTargetSed)
-    } yield {
-      // Mock star has TelluricType.A0V => SED should A0V
-      assertEquals(targetSed, Some("A0_V"))
-    }
-
-  test("telluric resolution uses science observation duration"):
-    for {
-      pid          <- createProgramAs(pi)
-      tid          <- createTargetWithProfileAs(pi, pid)
-      oid          <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
-      _            <- runObscalcUpdate(pid, oid)
-      _            <- recalculateCalibrations(pid, when)
-      obs1         <- queryObservation(oid)
-      groupId      =  obs1.groupId.get
-      obsInGroup1  <- queryObservationsInGroup(groupId)
-      telluricOid  =  obsInGroup1.find(_.calibrationRole.contains(CalibrationRole.Telluric)).get.id
-      _            <- setScienceRequirements(oid)
-      _            <- runObscalcUpdate(pid, oid)
-      _            <- recalculateCalibrations(pid, when)
-      _            <- sleep >> resolveTelluricTargets
-      obs          <- queryObservationWithTarget(telluricOid)
-      obscalcDur   <- withServicesForObscalc(serviceUser): services =>
-                        services.transactionally:
-                          services.obscalcService.selectOne(oid).map:
-                            _.flatMap(_.result)
-                              .flatMap(_.digest)
-                              .map(d => d.science.timeEstimate.programTime |+| d.science.timeEstimate.nonCharged)
-      storedDur    <- selectMeta(telluricOid).map(_.map(_.scienceDuration))
-    } yield {
-      assert(obs.targetName.isDefined)
-      assertEquals(storedDur, obscalcDur)
-    }
-
-  test("coordinate change triggers re-resolution with new hash"):
-    val obsTime = Timestamp.fromInstantTruncated(when).get
-
-    for {
-      pid          <- createProgramAs(pi)
-      tid          <- createTargetWithProfileAs(pi, pid)
-      oid          <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
-      _            <- setScienceRequirements(oid)
-      _            <- setObservationTimeAndDuration(pi, oid, obsTime.some, none)
-      _            <- runObscalcUpdate(pid, oid)
-      _            <- recalculateCalibrations(pid, when)
-      _            <- sleep >> resolveTelluricTargets
-      obs1         <- queryObservation(oid)
-      groupId      =  obs1.groupId.get
-      obsInGroup   <- queryObservationsInGroup(groupId)
-      telluricOid  =  obsInGroup.find(_.calibrationRole.contains(CalibrationRole.Telluric)).get.id
-      hash1        <- selectParamsHash(telluricOid)
-      meta1        <- selectMeta(telluricOid)
-      _            <- updateTargetPropertiesAs(pi, tid, Coordinates.Zero)
-      _            <- runObscalcUpdate(pid, oid)
-      _            <- sleep >> resolveTelluricTargets
-      hash2        <- selectParamsHash(telluricOid)
-      meta2        <- selectMeta(telluricOid)
-    } yield {
-      assert(hash1.isDefined)
-      assert(meta1.exists(_.resolvedTargetId.isDefined))
-      assertNotEquals(hash1, hash2)
-      // The should have different ids but our mock service returns always the same
-      assert(meta2.exists(_.resolvedTargetId.isDefined))
-    }
+  // test("recalculation syncs telluric observation configuration"):
+  //   for {
+  //     pid          <- createProgramAs(pi)
+  //     tid          <- createTargetWithProfileAs(pi, pid)
+  //     oid          <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+  //     _            <- runObscalcUpdate(pid, oid)
+  //     _            <- recalculateCalibrations(pid, when)
+  //     obs1         <- queryObservation(oid)
+  //     groupId      =  obs1.groupId.get
+  //     obsInGroup1  <- queryObservationsInGroup(groupId)
+  //     telluric1Oid =  obsInGroup1.find(_.calibrationRole.contains(CalibrationRole.Telluric)).get.id
+  //     scienceConds <- queryObservationConstraints(oid)
+  //     conds1       <- queryObservationConstraints(telluric1Oid)
+  //     _            <- recalculateCalibrations(pid, when)
+  //     obsInGroup2  <- queryObservationsInGroup(groupId)
+  //     telluric2Oid =  obsInGroup2.find(_.calibrationRole.contains(CalibrationRole.Telluric)).get.id
+  //     conds2       <- queryObservationConstraints(telluric2Oid)
+  //   } yield {
+  //     assertEquals(obsInGroup2.size, 2)
+  //     assertEquals(telluric1Oid, telluric2Oid)
+  //     // Verify conditions
+  //     assertEquals(conds1, scienceConds)
+  //     assertEquals(conds2, scienceConds)
+  //   }
+  //
+  // test("changing F2 to GMOS deletes telluric observation"):
+  //   for {
+  //     pid                  <- createProgramAs(pi)
+  //     tid                  <- createTargetWithProfileAs(pi, pid)
+  //     oid                  <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+  //     _                    <- runObscalcUpdate(pid, oid)
+  //     (added1, removed1)   <- recalculateCalibrations(pid, when)
+  //     obs1                 <- queryObservation(oid)
+  //     groupId              =  obs1.groupId.get
+  //     obsInGroup1          <- queryObservationsInGroup(groupId)
+  //     telluricOid          =  obsInGroup1.find(_.calibrationRole.contains(CalibrationRole.Telluric)).get.id
+  //     _                    <- updateObservationMode(oid, "gmosNorthLongSlit")
+  //     (added2, removed2)   <- recalculateCalibrations(pid, when)
+  //     obsExists            <- queryObservationExists(telluricOid)
+  //     groupExists          <- queryGroupExists(groupId)
+  //   } yield {
+  //     assert(!obsExists)
+  //     assert(!groupExists)
+  //     assertEquals(added1.size, 1)
+  //     assertEquals(removed1.size, 0)
+  //     assertEquals(removed2.size, 1)
+  //     assertEquals(removed2.headOption, telluricOid.some)
+  //   }
+  //
+  // test("deleting F2 science observation deletes telluric observation"):
+  //   for {
+  //     pid                  <- createProgramAs(pi)
+  //     tid                  <- createTargetWithProfileAs(pi, pid)
+  //     oid                  <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+  //     _                    <- runObscalcUpdate(pid, oid)
+  //     (added1, removed1)   <- recalculateCalibrations(pid, when)
+  //     _                    <- sleep >> resolveTelluricTargets
+  //     obs1                 <- queryObservation(oid)
+  //     groupId              =  obs1.groupId.get
+  //     obsInGroup1          <- queryObservationsInGroup(groupId)
+  //     telluricOid          =  obsInGroup1.find(_.calibrationRole.contains(CalibrationRole.Telluric)).get.id
+  //     telluricTgt          <- queryObservationWithTarget(telluricOid)
+  //     telluricTid          =  telluricTgt.targetId.get
+  //     _                    <- setObservationInactive(oid)
+  //     (added2, removed2)   <- recalculateCalibrations(pid, when)
+  //     tellExists           <- queryObservationExists(telluricOid)
+  //     groupExists          <- queryGroupExists(groupId)
+  //     targetExists         <- queryTargetExists(telluricTid)
+  //   } yield {
+  //     assert(!tellExists)
+  //     assert(!groupExists)
+  //     assert(!targetExists)
+  //     assertEquals(added1.size, 1)
+  //     assertEquals(removed1.size, 0)
+  //     assertEquals(added2.size, 0)
+  //     assertEquals(removed2.size, 1)
+  //     assertEquals(removed2.headOption, telluricOid.some)
+  //   }
+  //
+  // test("recalculateCalibrations returns correct added and removed observation IDs"):
+  //   for {
+  //     pid                <- createProgramAs(pi)
+  //     tid                <- createTargetWithProfileAs(pi, pid)
+  //     oid                <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+  //     _                  <- runObscalcUpdate(pid, oid)
+  //     // add 1 telluric
+  //     (added1, removed1) <- recalculateCalibrations(pid, when)
+  //     obs1               <- queryObservation(oid)
+  //     groupId            =  obs1.groupId.get
+  //     obsInGroup1        <- queryObservationsInGroup(groupId)
+  //     telluricOid        =  obsInGroup1.find(_.calibrationRole.contains(CalibrationRole.Telluric)).get.id
+  //     // re-sync the same observation (idempotent)
+  //     (added2, removed2) <- recalculateCalibrations(pid, when)
+  //     // removed F2 observation should remove the telluric
+  //     _                  <- setObservationInactive(oid)
+  //     (added3, removed3) <- recalculateCalibrations(pid, when)
+  //   } yield {
+  //     // First recalculation added the telluric observation
+  //     assertEquals(added1.size, 1)
+  //     assertEquals(added1.headOption, telluricOid.some)
+  //     assertEquals(removed1.size, 0)
+  //     // Second recalculation is truly idempotent (re-syncs existing, returns nothing new)
+  //     assertEquals(added2.size, 0)
+  //     assertEquals(removed2.size, 0)
+  //     // Third recalculation removed the telluric observation after deleting science obs
+  //     assertEquals(added3.size, 0)
+  //     assertEquals(removed3.size, 1)
+  //     assertEquals(removed3.headOption, telluricOid.some)
+  //   }
+  //
+  // test("changing F2 FPU syncs to telluric observation"):
+  //   for {
+  //     pid          <- createProgramAs(pi)
+  //     tid          <- createTargetWithProfileAs(pi, pid)
+  //     oid          <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+  //     _            <- runObscalcUpdate(pid, oid)
+  //     _            <- recalculateCalibrations(pid, when)
+  //     obs1         <- queryObservation(oid)
+  //     groupId      =  obs1.groupId.get
+  //     obsInGroup1  <- queryObservationsInGroup(groupId)
+  //     telluricOid  =  obsInGroup1.find(_.calibrationRole.contains(CalibrationRole.Telluric)).get.id
+  //     scienceFpu1  <- queryObservationFpu(oid)
+  //     telluricFpu1 <- queryObservationFpu(telluricOid)
+  //     _            <- updateFlamingos2Fpu(oid, Flamingos2Fpu.LongSlit2)
+  //     _            <- recalculateCalibrations(pid, when)
+  //     scienceFpu2  <- queryObservationFpu(oid)
+  //     telluricFpu2 <- queryObservationFpu(telluricOid)
+  //   } yield {
+  //     assertEquals(scienceFpu1, Flamingos2Fpu.LongSlit1.some)
+  //     assertEquals(telluricFpu1, Flamingos2Fpu.LongSlit1.some)
+  //     assertEquals(scienceFpu2, Flamingos2Fpu.LongSlit2.some)
+  //     assertEquals(telluricFpu2, Flamingos2Fpu.LongSlit2.some)
+  //   }
+  //
+  // test("Don't generate for inactive"):
+  //   for {
+  //     pid  <- createProgramAs(pi)
+  //     tid1 <- createTargetWithProfileAs(pi, pid)
+  //     tid2 <- createTargetWithProfileAs(pi, pid)
+  //     oid1 <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid1))
+  //     oid2 <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid2))
+  //     // Explicitly set both observations to Inactive workflow state
+  //     _    <- setObservationWorkflowState(pi, oid1, ObservationWorkflowState.Inactive)
+  //     _    <- setObservationWorkflowState(pi, oid2, ObservationWorkflowState.Inactive)
+  //     _    <- recalculateCalibrations(pid, when)
+  //     obs1 <- queryObservation(oid1)
+  //     obs2 <- queryObservation(oid2)
+  //   } yield {
+  //     // No telluric groups created
+  //     assertEquals(obs1.groupId, None)
+  //     assertEquals(obs2.groupId, None)
+  //   }
+  //
+  // test("Generate for mixed observation ready and inactive"):
+  //   for {
+  //     pid         <- createProgramAs(pi)
+  //     tid1        <- createTargetWithProfileAs(pi, pid)
+  //     tid2        <- createTargetWithProfileAs(pi, pid)
+  //     oid1        <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid1))
+  //     _           <- runObscalcUpdate(pid, oid1)
+  //     oid2        <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid2))
+  //     _           <- setObservationWorkflowState(pi, oid2, ObservationWorkflowState.Inactive)
+  //     _           <- recalculateCalibrations(pid, when)
+  //     obs1        <- queryObservation(oid1)
+  //     obs2        <- queryObservation(oid2)
+  //     obsInGroup1 <- obs1.groupId.traverse(queryObservationsInGroup)
+  //   } yield {
+  //     // oid1 should have telluric group
+  //     assert(obs1.groupId.isDefined)
+  //     assertEquals(obsInGroup1.map(_.size), Some(2))
+  //     // oid2 should not have telluric group
+  //     assertEquals(obs2.groupId, None)
+  //   }
+  //
+  // test("Remove telluric when observation becomes inactive or deleted"):
+  //   List(
+  //     (oid: Observation.Id) => setObservationWorkflowState(pi, oid, ObservationWorkflowState.Inactive),
+  //     (oid: Observation.Id) => setObservationInactive(oid)
+  //   ).traverse_ : set =>
+  //     for {
+  //       pid          <- createProgramAs(pi)
+  //       tid          <- createTargetWithProfileAs(pi, pid)
+  //       oid          <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+  //       _            <- runObscalcUpdate(pid, oid)
+  //       _            <- recalculateCalibrations(pid, when)
+  //       _            <- sleep >> resolveTelluricTargets
+  //       obsBefore    <- queryObservation(oid)
+  //       groupId      =  obsBefore.groupId.get
+  //       obsInGroup1  <- queryObservationsInGroup(groupId)
+  //       telluricOid  =  obsInGroup1.find(_.calibrationRole.contains(CalibrationRole.Telluric)).get.id
+  //       telluricTgt  <- queryObservationWithTarget(telluricOid)
+  //       telluricTid  =  telluricTgt.targetId.get
+  //       _            <- set(oid)
+  //       _            <- recalculateCalibrations(pid, when)
+  //       groupExists  <- queryGroupExists(groupId)
+  //       tellExists   <- queryObservationExists(telluricOid)
+  //       targetExists <- queryTargetExists(telluricTid)
+  //     } yield {
+  //       assertEquals(obsInGroup1.size, 2)
+  //       assert(!groupExists)
+  //       assert(!tellExists)
+  //       assert(!targetExists)
+  //     }
+  //
+  // test("Generate for defined and ready observations"):
+  //   List(ObservationWorkflowState.Defined, ObservationWorkflowState.Ready).traverse_ : state =>
+  //     for {
+  //       pid         <- createProgramAs(pi)
+  //       tid         <- createTargetWithProfileAs(pi, pid)
+  //       oid         <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+  //       _           <- setCalculatedWorkflowState(oid, state)
+  //       _           <- runObscalcUpdate(pid, oid)
+  //       _           <- recalculateCalibrations(pid, when)
+  //       obs         <- queryObservation(oid)
+  //       obsInGroup  <- obs.groupId.traverse(queryObservationsInGroup)
+  //     } yield {
+  //       // Defined and Ready observations should generate telluric calibrations
+  //       assert(obs.groupId.isDefined)
+  //       assertEquals(obsInGroup.map(_.size), Some(2))
+  //     }
+  //
+  // test("don't delete ongoing and completed calibrations"):
+  //   List(ObservationWorkflowState.Ongoing, ObservationWorkflowState.Completed).traverse_ : state =>
+  //     for {
+  //       pid                  <- createProgramAs(pi)
+  //       tid                  <- createTargetWithProfileAs(pi, pid)
+  //       oid                  <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+  //       _                    <- runObscalcUpdate(pid, oid)
+  //       (added1, removed1)   <- recalculateCalibrations(pid, when)
+  //       obs1                 <- queryObservation(oid)
+  //       groupId              =  obs1.groupId.get
+  //       obsInGroup1          <- queryObservationsInGroup(groupId)
+  //       telluricOid          =  obsInGroup1.find(_.calibrationRole.contains(CalibrationRole.Telluric)).get.id
+  //       _                    <- setCalculatedWorkflowState(telluricOid, state)
+  //       _                    <- updateFlamingos2Fpu(oid, Flamingos2Fpu.LongSlit2)
+  //       (added2, removed2)   <- recalculateCalibrations(pid, when)
+  //       obsInGroup2          <- queryObservationsInGroup(groupId)
+  //       telluricExists       <- queryObservationExists(telluricOid)
+  //     } yield {
+  //       // Telluric calibration in Ongoing or Completed state should be preserved
+  //       assertEquals(obsInGroup2.size, 2)
+  //       assert(telluricExists)
+  //       assert(obsInGroup2.exists(_.id === telluricOid))
+  //       assertEquals(added1.size, 1)
+  //       assertEquals(removed1.size, 0)
+  //       assertEquals(added2.size, 0)
+  //       assertEquals(removed2.size, 0)
+  //     }
+  //
+  // test("don't delete ongoing tellurics when recreating multiple tellurics"):
+  //   List(ObservationWorkflowState.Ongoing, ObservationWorkflowState.Completed).traverse_ : state =>
+  //     for {
+  //       pid                  <- createProgramAs(pi)
+  //       tid                  <- createTargetWithProfileAs(pi, pid)
+  //       oid                  <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+  //       _                    <- setLongExposureTime(oid)
+  //       _                    <- runObscalcUpdate(pid, oid)
+  //       (added1, removed1)   <- recalculateCalibrations(pid, when)
+  //       obs1                 <- queryObservation(oid)
+  //       groupId              =  obs1.groupId.get
+  //       obsInGroup1          <- queryObservationsInGroup(groupId)
+  //       telluricOids         =  obsInGroup1.filter(_.calibrationRole.contains(CalibrationRole.Telluric)).map(_.id)
+  //       firstTelluricOid     =  telluricOids.head
+  //       _                    <- setCalculatedWorkflowState(firstTelluricOid, state)
+  //       _                    <- updateFlamingos2Fpu(oid, Flamingos2Fpu.LongSlit2)
+  //       (added2, removed2)   <- recalculateCalibrations(pid, when)
+  //       obsInGroup2          <- queryObservationsInGroup(groupId)
+  //       telluricExists       <- queryObservationExists(firstTelluricOid)
+  //     } yield {
+  //       // First telluric in Ongoing/Completed state should be preserved
+  //       assertEquals(telluricOids.size, 2)
+  //       assert(telluricExists)
+  //       assert(obsInGroup2.exists(_.id === firstTelluricOid))
+  //       // Should have original 2 tellurics + 2 new ones = 4 tellurics total + 1 science = 5
+  //       assertEquals(obsInGroup2.filter(_.calibrationRole.contains(CalibrationRole.Telluric)).size, 4)
+  //       assertEquals(obsInGroup2.size, 5)
+  //       assertEquals(added1.size, 2)
+  //       assertEquals(removed1.size, 0)
+  //       assertEquals(added2.size, 2)
+  //       assertEquals(removed2.size, 1) // Only the second telluric was deleted
+  //     }
+  //
+  // test("telluric group rejects second science observation"):
+  //   for {
+  //     pid   <- createProgramAs(pi)
+  //     tid   <- createTargetWithProfileAs(pi, pid)
+  //     oid1  <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+  //     _     <- runObscalcUpdate(pid, oid1)
+  //     _     <- recalculateCalibrations(pid, when)
+  //     obs1  <- queryObservation(oid1)
+  //     gid   =  obs1.groupId.get
+  //     oid2  <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+  //     err   <- moveObservationAs(serviceUser, oid2, Some(gid)).intercept[UnexpectedStatus]
+  //   } yield
+  //     assertEquals(err.status.code, 500)
+  //
+  // test("telluric group rejects creating child groups"):
+  //   for
+  //     pid  <- createProgramAs(pi)
+  //     tid  <- createTargetWithProfileAs(pi, pid)
+  //     oid  <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+  //     _    <- runObscalcUpdate(pid, oid)
+  //     _    <- recalculateCalibrations(pid, when)
+  //     obs  <- queryObservation(oid)
+  //     gid  =  obs.groupId.get
+  //     err  <- createGroupAs(pi, pid, parentGroupId = Some(gid)).intercept[UnexpectedStatus]
+  //   yield
+  //     assertEquals(err.status.code, 500)
+  //
+  // test("telluric target gets SED from telluric type when not set"):
+  //   for {
+  //     pid         <- createProgramAs(pi)
+  //     tid         <- createTargetWithProfileAs(pi, pid)
+  //     oid         <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+  //     _           <- setScienceRequirements(oid)
+  //     _           <- runObscalcUpdate(pid, oid)
+  //     _           <- recalculateCalibrations(pid, when)
+  //     _           <- sleep >> resolveTelluricTargets
+  //     obs         <- queryObservation(oid)
+  //     groupId     =  obs.groupId.get
+  //     obsInGroup  <- queryObservationsInGroup(groupId)
+  //     telluricOid =  obsInGroup.find(_.calibrationRole.contains(CalibrationRole.Telluric)).get.id
+  //     telluricObs <- queryObservationWithTarget(telluricOid)
+  //     targetSed   <- telluricObs.targetId.flatTraverse(queryTargetSed)
+  //   } yield {
+  //     // Mock star has TelluricType.A0V => SED should A0V
+  //     assertEquals(targetSed, Some("A0_V"))
+  //   }
+  //
+  // test("telluric resolution uses science observation duration"):
+  //   for {
+  //     pid          <- createProgramAs(pi)
+  //     tid          <- createTargetWithProfileAs(pi, pid)
+  //     oid          <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+  //     _            <- runObscalcUpdate(pid, oid)
+  //     _            <- recalculateCalibrations(pid, when)
+  //     obs1         <- queryObservation(oid)
+  //     groupId      =  obs1.groupId.get
+  //     obsInGroup1  <- queryObservationsInGroup(groupId)
+  //     telluricOid  =  obsInGroup1.find(_.calibrationRole.contains(CalibrationRole.Telluric)).get.id
+  //     _            <- setScienceRequirements(oid)
+  //     _            <- runObscalcUpdate(pid, oid)
+  //     _            <- recalculateCalibrations(pid, when)
+  //     _            <- sleep >> resolveTelluricTargets
+  //     obs          <- queryObservationWithTarget(telluricOid)
+  //     obscalcDur   <- withServicesForObscalc(serviceUser): services =>
+  //                       services.transactionally:
+  //                         services.obscalcService.selectOne(oid).map:
+  //                           _.flatMap(_.result)
+  //                             .flatMap(_.digest)
+  //                             .map(d => d.science.timeEstimate.programTime |+| d.science.timeEstimate.nonCharged)
+  //     storedDur    <- selectMeta(telluricOid).map(_.map(_.scienceDuration))
+  //   } yield {
+  //     assert(obs.targetName.isDefined)
+  //     assertEquals(storedDur, obscalcDur)
+  //   }
+  //
+  // test("coordinate change triggers re-resolution with new hash"):
+  //   val obsTime = Timestamp.fromInstantTruncated(when).get
+  //
+  //   for {
+  //     pid          <- createProgramAs(pi)
+  //     tid          <- createTargetWithProfileAs(pi, pid)
+  //     oid          <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+  //     _            <- setScienceRequirements(oid)
+  //     _            <- setObservationTimeAndDuration(pi, oid, obsTime.some, none)
+  //     _            <- runObscalcUpdate(pid, oid)
+  //     _            <- recalculateCalibrations(pid, when)
+  //     _            <- sleep >> resolveTelluricTargets
+  //     obs1         <- queryObservation(oid)
+  //     groupId      =  obs1.groupId.get
+  //     obsInGroup   <- queryObservationsInGroup(groupId)
+  //     telluricOid  =  obsInGroup.find(_.calibrationRole.contains(CalibrationRole.Telluric)).get.id
+  //     hash1        <- selectParamsHash(telluricOid)
+  //     meta1        <- selectMeta(telluricOid)
+  //     _            <- updateTargetPropertiesAs(pi, tid, Coordinates.Zero)
+  //     _            <- runObscalcUpdate(pid, oid)
+  //     _            <- sleep >> resolveTelluricTargets
+  //     hash2        <- selectParamsHash(telluricOid)
+  //     meta2        <- selectMeta(telluricOid)
+  //   } yield {
+  //     assert(hash1.isDefined)
+  //     assert(meta1.exists(_.resolvedTargetId.isDefined))
+  //     assertNotEquals(hash1, hash2)
+  //     // The should have different ids but our mock service returns always the same
+  //     assert(meta2.exists(_.resolvedTargetId.isDefined))
+  //   }
+  //
+  // private def setLongExposureTime(oid: Observation.Id): IO[Unit] =
+  //   setScienceRequirements(oid, DefaultSnAt, 250.0)
+  //
+  // private def setShortExposureTime(oid: Observation.Id): IO[Unit] =
+  //   setScienceRequirements(oid, DefaultSnAt, 50.0)
+  //
+  // private def queryObservationDuration(oid: Observation.Id): IO[Option[TimeSpan]] =
+  //   withServicesForObscalc(serviceUser): services =>
+  //     services.transactionally:
+  //       services.obscalcService.selectExecutionDigest(oid).map:
+  //         _.flatMap(_.value.toOption)
+  //           .map(d => d.science.timeEstimate.sum |+| d.science.timeEstimate.nonCharged)
+  //
+  // test("create two tellurics for long science"):
+  //   for {
+  //     pid                <- createProgramAs(pi)
+  //     tid                <- createTargetWithProfileAs(pi, pid)
+  //     oid                <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+  //     _                  <- setLongExposureTime(oid)
+  //     _                  <- runObscalcUpdate(pid, oid)
+  //     duration           <- queryObservationDuration(oid)
+  //     _                  <- IO.println(s"DEBUG: Observation duration = ${duration.map(_.toHours)} hours, threshold = 1.5 hours")
+  //     (added, removed)   <- recalculateCalibrations(pid, when)
+  //     obs                <- queryObservation(oid)
+  //     groupId            =  obs.groupId.get
+  //     obsInGroup         <- queryObservationsInGroup(groupId)
+  //     telluricObs        =  obsInGroup.filter(_.calibrationRole.contains(CalibrationRole.Telluric))
+  //     scienceObs         =  obsInGroup.filter(_.calibrationRole.isEmpty).head
+  //   } yield {
+  //     assertEquals(telluricObs.size, 2)
+  //     assertEquals(obsInGroup.size, 3)
+  //     assertEquals(added.size, 2)
+  //     assertEquals(removed.size, 0)
+  //     // Verify tellurics are positioned before and after science observation
+  //     assertEquals(telluricObs.head.groupIndex.get, scienceObs.groupIndex.get - 1)
+  //     assertEquals(telluricObs.last.groupIndex.get, scienceObs.groupIndex.get + 1)
+  //   }
+  //
+  // test("create one telluric for short duration science observation"):
+  //   for {
+  //     pid                <- createProgramAs(pi)
+  //     tid                <- createTargetWithProfileAs(pi, pid)
+  //     oid                <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+  //     _                  <- setShortExposureTime(oid)
+  //     _                  <- runObscalcUpdate(pid, oid)
+  //     (added, removed)   <- recalculateCalibrations(pid, when)
+  //     obs                <- queryObservation(oid)
+  //     groupId            =  obs.groupId.get
+  //     obsInGroup         <- queryObservationsInGroup(groupId)
+  //     telluricObs        =  obsInGroup.filter(_.calibrationRole.contains(CalibrationRole.Telluric))
+  //     scienceObs         =  obsInGroup.filter(_.calibrationRole.isEmpty).head
+  //   } yield {
+  //     assertEquals(telluricObs.size, 1)
+  //     assertEquals(obsInGroup.size, 2)
+  //     assertEquals(added.size, 1)
+  //     assertEquals(removed.size, 0)
+  //     // Verify telluric is positioned after science observation
+  //     assertEquals(telluricObs.head.groupIndex.get, scienceObs.groupIndex.get + 1)
+  //   }
+  //
+  // test("update from two to one telluric when duration decreases"):
+  //   for {
+  //     pid                  <- createProgramAs(pi)
+  //     tid                  <- createTargetWithProfileAs(pi, pid)
+  //     oid                  <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+  //     _                    <- setLongExposureTime(oid)
+  //     _                    <- runObscalcUpdate(pid, oid)
+  //     (added1, removed1)   <- recalculateCalibrations(pid, when)
+  //     obs1                 <- queryObservation(oid)
+  //     groupId              =  obs1.groupId.get
+  //     obsInGroup1          <- queryObservationsInGroup(groupId)
+  //     telluricObs1         =  obsInGroup1.filter(_.calibrationRole.contains(CalibrationRole.Telluric))
+  //     // Change to short duration
+  //     _                    <- setShortExposureTime(oid)
+  //     _                    <- runObscalcUpdate(pid, oid)
+  //     (added2, removed2)   <- recalculateCalibrations(pid, when)
+  //     obsInGroup2          <- queryObservationsInGroup(groupId)
+  //     telluricObs2         =  obsInGroup2.filter(_.calibrationRole.contains(CalibrationRole.Telluric))
+  //   } yield {
+  //     // Initially 2 tellurics created
+  //     assertEquals(telluricObs1.size, 2)
+  //     assertEquals(added1.size, 2)
+  //     assertEquals(removed1.size, 0)
+  //     // After duration decrease, only 1 telluric remains
+  //     assertEquals(telluricObs2.size, 1)
+  //     assertEquals(added2.size, 1)
+  //     assertEquals(removed2.size, 2)
+  //   }

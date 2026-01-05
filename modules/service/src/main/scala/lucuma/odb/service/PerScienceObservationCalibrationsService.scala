@@ -4,7 +4,6 @@
 package lucuma.odb.service
 
 import cats.data.NonEmptyList
-import cats.data.OptionT
 import cats.effect.Concurrent
 import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.NonNegShort
@@ -183,20 +182,20 @@ object PerScienceObservationCalibrationsService:
             calibrationRole = CalibrationRole.Telluric.some
           ).orError
 
-      private def createSingleTelluric(
+      private def createTelluricObs(
         pid:             Program.Id,
         scienceOid:      Observation.Id,
         telluricGroupId: Group.Id,
         telluricIndex:   NonNegShort,
         duration:        TimeSpan
       )(using Transaction[F], SuperUserAccess): F[Observation.Id] =
-        for
+        for {
           telluricId <- insertTelluricObservation(pid, telluricGroupId, telluricIndex)
           _          <- telluricTargets.requestTelluricTarget(pid, telluricId, scienceOid, duration)
           _          <- syncConfiguration(scienceOid, telluricId)
-        yield telluricId
+        } yield telluricId
 
-      private def createTelluricObservation(
+      private def createTelluricCalibrations(
         pid:             Program.Id,
         scienceOid:      Observation.Id,
         telluricGroupId: Group.Id
@@ -210,22 +209,22 @@ object PerScienceObservationCalibrationsService:
           duration <- obsDuration(scienceOid)
           created  <- duration match
             case Some(d) if d > MultiTelluricThreshold =>
-              // Create 2 tellurics: before and after
-              for
-                scienceIndex <- obsGroupIndex(scienceOid)
-                beforeIndex   = NonNegShort.unsafeFrom(scienceIndex.value.toShort)
-                before       <- createSingleTelluric(pid, scienceOid, telluricGroupId, beforeIndex, d)
-                afterIndex    = NonNegShort.unsafeFrom((scienceIndex.value + 2).toShort)
-                after        <- createSingleTelluric(pid, scienceOid, telluricGroupId, afterIndex, d)
-              yield List(before, after)
+              // Over 1.5h 1 tellurics before and 1 after
+              for {
+                sciIdx <- obsGroupIndex(scienceOid)
+                bIdx   = NonNegShort.unsafeFrom(sciIdx.value.toShort)
+                c1     <- createTelluricObs(pid, scienceOid, telluricGroupId, bIdx, d)
+                aftIdx = NonNegShort.unsafeFrom((sciIdx.value + 2).toShort)
+                c2     <- createTelluricObs(pid, scienceOid, telluricGroupId, aftIdx, d)
+              } yield List(c1, c2)
 
             case Some(d) =>
-              // Create 1 telluric: after science
-              for
-                scienceIndex <- obsGroupIndex(scienceOid)
-                afterIndex    = NonNegShort.unsafeFrom((scienceIndex.value + 1).toShort)
-                telluricId   <- createSingleTelluric(pid, scienceOid, telluricGroupId, afterIndex, d)
-              yield List(telluricId)
+              // Less than 1.5h one telluric after scienc
+              for {
+                sciIdx <- obsGroupIndex(scienceOid)
+                aftIdx = NonNegShort.unsafeFrom((sciIdx.value + 1).toShort)
+                cal    <- createTelluricObs(pid, scienceOid, telluricGroupId, aftIdx, d)
+              } yield List(cal)
 
             case None =>
               // No duration available, skip
@@ -266,12 +265,14 @@ object PerScienceObservationCalibrationsService:
         obs: ObsExtract[CalibrationConfigSubset],
         gid: Group.Id
       )(using Transaction[F], SuperUserAccess): F[List[Observation.Id]] =
-        for
-          existingTellurics <- findAllTelluricObservations(gid)
-          _                 <- NonEmptyList.fromList(existingTellurics)
-                                 .traverse_(nel => observationService.deleteCalibrationObservations(nel))
-          created           <- createTelluricObservation(pid, obs.id, gid)
-        yield created
+        for {
+          existing <- findAllTelluricObservations(gid)
+          // Never delete observations with data
+          toDelete <- excludeOngoingAndCompleted(existing, identity)
+          _        <- NonEmptyList.fromList(toDelete)
+                       .traverse_(observationService.deleteCalibrationObservations)
+          created  <- createTelluricCalibrations(pid, obs.id, gid)
+        } yield created
 
       private def generateTelluricForScience(
         pid:  Program.Id,
@@ -369,10 +370,17 @@ object PerScienceObservationCalibrationsService:
                                 case (gid, obsWithIndices) if obsWithIndices.forall((o, _) => toUnlink.exists(_ === o)) => gid
           // Delete telluric calibration observations from empty groups
           deleted           <- deleteTelluricObservationsFromGroups(emptyGroupIds.toList)
-          _                 <- (info"Deleted ${toMove.size} observations to telluric groups on program $pid: $deleted").whenA(toMove.nonEmpty)
+          _                 <- (info"Deleted ${deleted.size} telluric observations on program $pid: $deleted").whenA(deleted.nonEmpty)
+          deletedSet        = deleted.toSet
+          // delete groups where all tellurics are gone
+          groupsToDelete    = emptyGroupIds.filter: gid =>
+                                allObsInGroups.get(gid).forall: obsWithIndices =>
+                                  obsWithIndices
+                                    .filter((oid, _) => telluricObsSet.contains(oid))
+                                    .forall((oid, _) => deletedSet.contains(oid))
           // Delete empty telluric groups using deleteSystemGroup
-          _                 <- (info"Remove ${emptyGroupIds.size} empty telluric groups on program $pid: $emptyGroupIds").whenA(toMove.nonEmpty)
-          _                 <- emptyGroupIds.toList.traverse_(gid => groupService.deleteSystemGroup(pid, gid))
+          _                 <- (info"Remove ${groupsToDelete.size} empty telluric groups on program $pid: $groupsToDelete").whenA(groupsToDelete.nonEmpty)
+          _                 <- groupsToDelete.toList.traverse_(gid => groupService.deleteSystemGroup(pid, gid))
           // Reload tree for group creation/lookup
           tree              <- groupService.selectGroups(pid)
           // Create/sync telluric for each science obs
