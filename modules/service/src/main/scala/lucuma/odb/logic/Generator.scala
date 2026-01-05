@@ -5,6 +5,8 @@ package lucuma.odb.logic
 
 import cats.Eq
 import cats.data.EitherT
+import cats.data.NonEmptyList
+import cats.data.NonEmptyMap
 import cats.effect.Concurrent
 import cats.syntax.applicative.*
 import cats.syntax.apply.*
@@ -17,6 +19,7 @@ import cats.syntax.traverse.*
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.api.RefinedTypeOps
 import eu.timepit.refined.numeric.Interval
+import eu.timepit.refined.types.numeric.NonNegInt
 import fs2.Pure
 import fs2.Stream
 import lucuma.core.data.Zipper
@@ -42,6 +45,7 @@ import lucuma.core.util.Timestamp
 import lucuma.odb.data.Itc
 import lucuma.odb.data.Md5Hash
 import lucuma.odb.data.OdbError
+import lucuma.odb.data.TelescopeConfigGeneratorRole
 import lucuma.odb.sequence.ExecutionConfigGenerator
 import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.sequence.data.ProtoExecutionConfig
@@ -365,6 +369,16 @@ object Generator {
                 p <- gen.executionConfig(visits, events, steps, t)
               yield p
 
+      private def requireImagingItc[A](
+        name: String,
+        oid:  Observation.Id,
+        itc:  Either[OdbError, Itc],
+        img:  Itc => Option[A]
+      ): Either[OdbError, A] =
+        itc.flatMap: i =>
+          img(i).toRight:
+            OdbError.InvalidObservation(oid, s"Expecting $name ITC results for this observation".some)
+
       private def requireSpectroscopyItc(
         oid: Observation.Id,
         itc: Either[OdbError, Itc]
@@ -389,6 +403,22 @@ object Generator {
           p <- protoExecutionConfig(ctx, g, srs, when)
         yield p
 
+      private def gmosNorthImaging(
+        ctx:    Context,
+        config: lucuma.odb.sequence.gmos.imaging.Config.GmosNorth,
+        when:   Option[Timestamp]
+      )(using Services.ServiceAccess): EitherT[F, OdbError, (ProtoGmosNorth, ExecutionState)] =
+        import lucuma.odb.sequence.gmos.imaging.Imaging
+
+        val itc = requireImagingItc("GMOS North Imaging", ctx.oid, ctx.itcRes, Itc.gmosNorthImaging.getOption)
+        val gen = Imaging.gmosNorth(ctx.oid, calculator.gmosNorth, ctx.namespace, config, itc)
+        val srs = services.gmosSequenceService.selectGmosNorthStepRecords(ctx.oid)
+
+        for
+          g <- EitherT(gen)
+          p <- protoExecutionConfig(ctx, g, srs, when)
+        yield p
+
       private def gmosNorthLongSlit(
         ctx:    Context,
         config: lucuma.odb.sequence.gmos.longslit.Config.GmosNorth,
@@ -399,6 +429,22 @@ object Generator {
         val itc = requireSpectroscopyItc(ctx.oid, ctx.itcRes)
         val gen = LongSlit.gmosNorth(ctx.oid, calculator.gmosNorth, ctx.namespace, exp.gmosNorth, config, itc, role, ctx.params.acqResetTime)
         val srs = services.gmosSequenceService.selectGmosNorthStepRecords(ctx.oid)
+
+        for
+          g <- EitherT(gen)
+          p <- protoExecutionConfig(ctx, g, srs, when)
+        yield p
+
+      private def gmosSouthImaging(
+        ctx:    Context,
+        config: lucuma.odb.sequence.gmos.imaging.Config.GmosSouth,
+        when:   Option[Timestamp]
+      )(using Services.ServiceAccess): EitherT[F, OdbError, (ProtoGmosSouth, ExecutionState)] =
+        import lucuma.odb.sequence.gmos.imaging.Imaging
+
+        val itc = requireImagingItc("GMOS South Imaging", ctx.oid, ctx.itcRes, Itc.gmosSouthImaging.getOption)
+        val gen = Imaging.gmosSouth(ctx.oid, calculator.gmosSouth, ctx.namespace, config, itc)
+        val srs = services.gmosSequenceService.selectGmosSouthStepRecords(ctx.oid)
 
         for
           g <- EitherT(gen)
@@ -429,23 +475,25 @@ object Generator {
           .fromEither(Error.sequenceTooLong(ctx.oid).asLeft[ExecutionDigest])
           .unlessA(ctx.itcRes.toOption.forall(_.scienceExposureCount.value <= SequenceAtomLimit)) *>
         (ctx.params match
-          case GeneratorParams(_, _, config: flamingos2.longslit.Config, role, declaredComplete, _) =>
+          case GeneratorParams(_, _, config: flamingos2.longslit.Config, role, _, _) =>
             flamingos2LongSlit(ctx, config, when).flatMap: (p, e) =>
               EitherT.fromEither[F](executionDigest(ctx.oid, p, e, calculator.flamingos2.estimateSetup))
 
-          case GeneratorParams(_, _, config: gmos.longslit.Config.GmosNorth, role, declaredComplete, _) =>
+          case GeneratorParams(_, _, config: gmos.imaging.Config.GmosNorth, _, _, _) =>
+            gmosNorthImaging(ctx, config, when).flatMap: (p, e) =>
+              EitherT.fromEither[F](executionDigest(ctx.oid, p, e, calculator.gmosNorth.estimateSetup))
+
+          case GeneratorParams(_, _, config: gmos.longslit.Config.GmosNorth, role, _, _) =>
             gmosNorthLongSlit(ctx, config, role, when).flatMap: (p, e) =>
               EitherT.fromEither[F](executionDigest(ctx.oid, p, e, calculator.gmosNorth.estimateSetup))
 
-          case GeneratorParams(_, _, config: gmos.longslit.Config.GmosSouth, role, declaredComplete, _) =>
-            gmosSouthLongSlit(ctx, config, role, when).flatMap: (p, e) =>
+          case GeneratorParams(_, _, config: gmos.imaging.Config.GmosSouth, _, _, _) =>
+            gmosSouthImaging(ctx, config, when).flatMap: (p, e) =>
               EitherT.fromEither[F](executionDigest(ctx.oid, p, e, calculator.gmosSouth.estimateSetup))
 
-          case GeneratorParams(_, _, config: gmos.imaging.Config.GmosNorth, _, _, _) =>
-            EitherT.leftT[F, ExecutionDigest](OdbError.SequenceUnavailable(ctx.oid, "GMOS North imaging sequence generation is not yet implemented".some))
-
-          case GeneratorParams(_, _, config: gmos.imaging.Config.GmosSouth, _, _, _) =>
-            EitherT.leftT[F, ExecutionDigest](OdbError.SequenceUnavailable(ctx.oid, "GMOS South imaging sequence generation is not yet implemented".some))
+          case GeneratorParams(_, _, config: gmos.longslit.Config.GmosSouth, role, _, _) =>
+            gmosSouthLongSlit(ctx, config, role, when).flatMap: (p, e) =>
+              EitherT.fromEither[F](executionDigest(ctx.oid, p, e, calculator.gmosSouth.estimateSetup))
         )
 
       override def calculateScienceAtomDigests(
@@ -465,20 +513,20 @@ object Generator {
           .fromEither(Error.sequenceTooLong(ctx.oid).asLeft[ExecutionDigest])
           .unlessA(ctx.itcRes.toOption.forall(_.scienceExposureCount.value <= SequenceAtomLimit)) *>
         (ctx.params match
-          case GeneratorParams(_, _, config: flamingos2.longslit.Config, role, declaredComplete, _) =>
+          case GeneratorParams(_, _, config: flamingos2.longslit.Config, role, _, _) =>
             flamingos2LongSlit(ctx, config, when).map((p, _) => p.science.map(AtomDigest.fromAtom))
 
-          case GeneratorParams(_, _, config: gmos.longslit.Config.GmosNorth, role, declaredComplete, _) =>
+          case GeneratorParams(_, _, config: gmos.imaging.Config.GmosNorth, _, _, _) =>
+            gmosNorthImaging(ctx, config, when).map((p, _) => p.science.map(AtomDigest.fromAtom))
+
+          case GeneratorParams(_, _, config: gmos.longslit.Config.GmosNorth, role, _, _) =>
             gmosNorthLongSlit(ctx, config, role, when).map((p, _) => p.science.map(AtomDigest.fromAtom))
 
-          case GeneratorParams(_, _, config: gmos.longslit.Config.GmosSouth, role, declaredComplete, _) =>
-            gmosSouthLongSlit(ctx, config, role, when).map((p, _) => p.science.map(AtomDigest.fromAtom))
-
-          case GeneratorParams(_, _, config: gmos.imaging.Config.GmosNorth, _, _, _) =>
-            EitherT.leftT[F, Stream[Pure, AtomDigest]](OdbError.SequenceUnavailable(ctx.oid, "GMOS North imaging sequence generation is not yet implemented".some))
-
           case GeneratorParams(_, _, config: gmos.imaging.Config.GmosSouth, _, _, _) =>
-            EitherT.leftT[F, Stream[Pure, AtomDigest]](OdbError.SequenceUnavailable(ctx.oid, "GMOS South imaging sequence generation is not yet implemented".some))
+            gmosSouthImaging(ctx, config, when).map((p, _) => p.science.map(AtomDigest.fromAtom))
+
+          case GeneratorParams(_, _, config: gmos.longslit.Config.GmosSouth, role, _, _) =>
+            gmosSouthLongSlit(ctx, config, role, when).map((p, _) => p.science.map(AtomDigest.fromAtom))
         )
 
       override def generate(

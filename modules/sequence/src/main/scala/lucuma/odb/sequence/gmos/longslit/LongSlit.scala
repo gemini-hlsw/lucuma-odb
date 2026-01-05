@@ -2,17 +2,12 @@
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
 package lucuma.odb.sequence
-package gmos.longslit
+package gmos
+package longslit
 
 import cats.Monad
 import cats.data.EitherT
-import cats.syntax.option.*
 import lucuma.core.enums.CalibrationRole
-import lucuma.core.enums.GmosNorthDetector
-import lucuma.core.enums.GmosNorthStageMode
-import lucuma.core.enums.GmosSouthDetector
-import lucuma.core.enums.GmosSouthStageMode
-import lucuma.core.enums.MosPreImaging
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.gmos.DynamicConfig
 import lucuma.core.model.sequence.gmos.StaticConfig
@@ -23,22 +18,6 @@ import lucuma.odb.data.OdbError
 import java.util.UUID
 
 object LongSlit:
-
-  val GmosNorthStatic: StaticConfig.GmosNorth =
-    StaticConfig.GmosNorth(
-      GmosNorthStageMode.FollowXy,
-      GmosNorthDetector.Hamamatsu,
-      MosPreImaging.IsNotMosPreImaging,
-      none
-    )
-
-  val GmosSouthStatic: StaticConfig.GmosSouth =
-    StaticConfig.GmosSouth(
-      GmosSouthStageMode.FollowXyz,
-      GmosSouthDetector.Hamamatsu,
-      MosPreImaging.IsNotMosPreImaging,
-      none
-    )
 
   private def instantiate[F[_]: Monad, S, D](
     static:      S,
@@ -60,10 +39,11 @@ object LongSlit:
     calRole:        Option[CalibrationRole],
     lastAcqReset:   Option[Timestamp]
   ): F[Either[OdbError, ExecutionConfigGenerator[StaticConfig.GmosNorth, DynamicConfig.GmosNorth]]] =
+    val static = InitialConfigs.GmosNorthStatic
     instantiate(
-      GmosNorthStatic,
-      Acquisition.gmosNorth(observationId, estimator, GmosNorthStatic, namespace, config, itc.map(_.acquisition.focus.value), calRole, lastAcqReset),
-      Science.gmosNorth(observationId, estimator, GmosNorthStatic, namespace, expander, config, itc.map(_.science.focus.value), calRole)
+      static,
+      Acquisition.gmosNorth(observationId, estimator, static, namespace, config, itc.map(_.acquisition.focus.value), calRole, lastAcqReset),
+      Science.gmosNorth(observationId, estimator, static, namespace, expander, config, itc.map(_.science.focus.value), calRole)
     )
 
   def gmosSouth[F[_]: Monad](
@@ -76,10 +56,11 @@ object LongSlit:
     calRole:        Option[CalibrationRole],
     lastAcqReset:   Option[Timestamp]
   ): F[Either[OdbError, ExecutionConfigGenerator[StaticConfig.GmosSouth, DynamicConfig.GmosSouth]]] =
+    val static = InitialConfigs.GmosSouthStatic
     instantiate(
-      GmosSouthStatic,
-      Acquisition.gmosSouth(observationId, estimator, GmosSouthStatic, namespace, config, itc.map(_.acquisition.focus.value), calRole, lastAcqReset),
-      Science.gmosSouth(observationId, estimator, GmosSouthStatic, namespace, expander, config, itc.map(_.science.focus.value), calRole)
+      static,
+      Acquisition.gmosSouth(observationId, estimator, static, namespace, config, itc.map(_.acquisition.focus.value), calRole, lastAcqReset),
+      Science.gmosSouth(observationId, estimator, static, namespace, expander, config, itc.map(_.science.focus.value), calRole)
     )
 
 end LongSlit
