@@ -54,6 +54,8 @@ object PerScienceObservationCalibrationsService:
       val telluricTargets = S.telluricTargetsService
       val obscalcService = S.obscalcService
 
+      private val MultiTelluricThreshold: TimeSpan = TimeSpan.fromHours(1.5).get
+
       private def groupNameForObservation(
         config:          CalibrationConfigSubset,
         calibrationRole: CalibrationRole,
@@ -131,6 +133,11 @@ object PerScienceObservationCalibrationsService:
           .prepareR(Statements.selectTelluricObservation)
           .use(_.option((gid, CalibrationRole.Telluric)))
 
+      private def findAllTelluricObservations(gid: Group.Id): F[List[Observation.Id]] =
+        S.session
+          .prepareR(Statements.selectAllTelluricObservations)
+          .use(_.stream((gid, CalibrationRole.Telluric), 10).compile.toList)
+
       private def obsDuration(
         scienceOid: Observation.Id
       )(using Transaction[F]): F[Option[TimeSpan]] =
@@ -138,62 +145,92 @@ object PerScienceObservationCalibrationsService:
           _.flatMap(_.value.toOption)
             .map(d => d.science.timeEstimate.sum |+| d.science.timeEstimate.nonCharged)
 
+      private def insertTelluricObservation(
+        pid:             Program.Id,
+        telluricGroupId: Group.Id,
+        telluricIndex:   NonNegShort
+      )(using Transaction[F], SuperUserAccess): F[Observation.Id] =
+        // Minimal input to create the telluric obs
+        val targetEnvironment = TargetEnvironmentInput.Create(
+          explicitBase = none,
+          asterism = none, // We resolve the target later
+          useBlindOffset = false.some,
+          blindOffsetTarget = none,
+          blindOffsetType = BlindOffsetType.Manual
+        )
+
+        val obsInput = ObservationPropertiesInput.Create(
+          subtitle = none,
+          scienceBand = none,
+          posAngleConstraint = PosAngleConstraintInput(
+            mode = PosAngleConstraintMode.AverageParallactic.some,
+            angle = none
+          ).some,
+          targetEnvironment = targetEnvironment.some,
+          constraintSet = none,
+          timingWindows = none,
+          attachments = none,
+          scienceRequirements = none,
+          observingMode = none,
+          existence = Existence.Present.some,
+          group = telluricGroupId.some,
+          groupIndex = telluricIndex.some,
+          observerNotes = none
+        )
+        observationService
+          .createObservation(
+            AccessControl.unchecked(obsInput, pid, program_id),
+            calibrationRole = CalibrationRole.Telluric.some
+          ).orError
+
+      private def createSingleTelluric(
+        pid:             Program.Id,
+        scienceOid:      Observation.Id,
+        telluricGroupId: Group.Id,
+        telluricIndex:   NonNegShort,
+        duration:        TimeSpan
+      )(using Transaction[F], SuperUserAccess): F[Observation.Id] =
+        for
+          telluricId <- insertTelluricObservation(pid, telluricGroupId, telluricIndex)
+          _          <- telluricTargets.requestTelluricTarget(pid, telluricId, scienceOid, duration)
+          _          <- syncConfiguration(scienceOid, telluricId)
+        yield telluricId
+
       private def createTelluricObservation(
         pid:             Program.Id,
         scienceOid:      Observation.Id,
         telluricGroupId: Group.Id
-      )(using Transaction[F], SuperUserAccess): F[Option[Observation.Id]] =
+      )(using Transaction[F], SuperUserAccess): F[List[Observation.Id]] =
         def obsGroupIndex(scienceOid: Observation.Id): F[NonNegShort] =
           S.session
             .prepareR(Statements.selectScienceObservationIndex)
             .use(_.unique(scienceOid))
 
-        def insertTelluricObservation(
-          pid:             Program.Id,
-          telluricGroupId: Group.Id,
-          telluricIndex:   NonNegShort
-        ): F[Observation.Id] =
-          // Minimal input to create the telluric obs
-          val targetEnvironment = TargetEnvironmentInput.Create(
-            explicitBase = none,
-            asterism = none, // We resolve the target later
-            useBlindOffset = false.some,
-            blindOffsetTarget = none,
-            blindOffsetType = BlindOffsetType.Manual
-          )
+        for
+          duration <- obsDuration(scienceOid)
+          created  <- duration match
+            case Some(d) if d > MultiTelluricThreshold =>
+              // Create 2 tellurics: before and after
+              for
+                scienceIndex <- obsGroupIndex(scienceOid)
+                beforeIndex   = NonNegShort.unsafeFrom(scienceIndex.value.toShort)
+                before       <- createSingleTelluric(pid, scienceOid, telluricGroupId, beforeIndex, d)
+                afterIndex    = NonNegShort.unsafeFrom((scienceIndex.value + 2).toShort)
+                after        <- createSingleTelluric(pid, scienceOid, telluricGroupId, afterIndex, d)
+              yield List(before, after)
 
-          val obsInput = ObservationPropertiesInput.Create(
-            subtitle = none,
-            scienceBand = none,
-            posAngleConstraint = PosAngleConstraintInput(
-              mode = PosAngleConstraintMode.AverageParallactic.some,
-              angle = none
-            ).some,
-            targetEnvironment = targetEnvironment.some,
-            constraintSet = none,
-            timingWindows = none,
-            attachments = none,
-            scienceRequirements = none,
-            observingMode = none,
-            existence = Existence.Present.some,
-            group = telluricGroupId.some,
-            groupIndex = telluricIndex.some,
-            observerNotes = none
-          )
-          observationService
-            .createObservation(
-              AccessControl.unchecked(obsInput, pid, program_id),
-              calibrationRole = CalibrationRole.Telluric.some
-            ).orError
+            case Some(d) =>
+              // Create 1 telluric: after science
+              for
+                scienceIndex <- obsGroupIndex(scienceOid)
+                afterIndex    = NonNegShort.unsafeFrom((scienceIndex.value + 1).toShort)
+                telluricId   <- createSingleTelluric(pid, scienceOid, telluricGroupId, afterIndex, d)
+              yield List(telluricId)
 
-        (for
-          duration      <- OptionT(obsDuration(scienceOid))
-          scienceIndex  <- OptionT.liftF(obsGroupIndex(scienceOid))
-          telluricIndex  = NonNegShort.unsafeFrom((scienceIndex.value + 1).toShort)
-          telluricId    <- OptionT.liftF(insertTelluricObservation(pid, telluricGroupId, telluricIndex))
-          _             <- OptionT.liftF(telluricTargets.requestTelluricTarget(pid, telluricId, scienceOid, duration))
-          _             <- OptionT.liftF(syncConfiguration(scienceOid, telluricId))
-        yield telluricId).value
+            case None =>
+              // No duration available, skip
+              List.empty[Observation.Id].pure[F]
+        yield created
 
       private def deleteTelluricObservationsFromGroups(
         groupIds: List[Group.Id]
@@ -228,22 +265,23 @@ object PerScienceObservationCalibrationsService:
         pid: Program.Id,
         obs: ObsExtract[CalibrationConfigSubset],
         gid: Group.Id
-      )(using Transaction[F], SuperUserAccess): F[Option[Observation.Id]] =
-        findTelluricObservation(gid).flatMap:
-          case Some(telluricId) =>
-            syncConfiguration(obs.id, telluricId).as(none[Observation.Id])
-          case None             =>
-            createTelluricObservation(pid, obs.id, gid)
+      )(using Transaction[F], SuperUserAccess): F[List[Observation.Id]] =
+        for
+          existingTellurics <- findAllTelluricObservations(gid)
+          _                 <- NonEmptyList.fromList(existingTellurics)
+                                 .traverse_(nel => observationService.deleteCalibrationObservations(nel))
+          created           <- createTelluricObservation(pid, obs.id, gid)
+        yield created
 
       private def generateTelluricForScience(
         pid:  Program.Id,
         tree: GroupTree,
         obs:  ObsExtract[CalibrationConfigSubset]
-      )(using Transaction[F], SuperUserAccess): F[Option[Observation.Id]] =
+      )(using Transaction[F], SuperUserAccess): F[List[Observation.Id]] =
         for
-          gid <- readTelluricGroup(pid, tree, obs)
-          tid <- syncTelluricObservation(pid, obs, gid)
-        yield tid
+          gid  <- readTelluricGroup(pid, tree, obs)
+          tids <- syncTelluricObservation(pid, obs, gid)
+        yield tids
 
       private def syncConfiguration(
         sourceOid: Observation.Id,
@@ -338,9 +376,9 @@ object PerScienceObservationCalibrationsService:
           // Reload tree for group creation/lookup
           tree              <- groupService.selectGroups(pid)
           // Create/sync telluric for each science obs
-          added             <- activeScienceObs.traverse(obs => generateTelluricForScience(pid, tree, obs))
-          _                 <- (info"Added ${added.size} telluric observation on program $pid: $added").whenA(toMove.nonEmpty)
-        yield (added.flatten, deleted)
+          added             <- activeScienceObs.flatTraverse(obs => generateTelluricForScience(pid, tree, obs))
+          _                 <- (info"Added ${added.size} telluric observations on program $pid: $added").whenA(added.nonEmpty)
+        yield (added, deleted)
 
       object Statements:
 
@@ -351,6 +389,15 @@ object PerScienceObservationCalibrationsService:
             WHERE  c_group_id         = $group_id
               AND  c_calibration_role = $calibration_role
             LIMIT 1
+          """.query(observation_id)
+
+        val selectAllTelluricObservations: Query[(Group.Id, CalibrationRole), Observation.Id] =
+          sql"""
+            SELECT c_observation_id
+            FROM   t_observation
+            WHERE  c_group_id         = $group_id
+              AND  c_calibration_role = $calibration_role
+            ORDER BY c_group_index
           """.query(observation_id)
 
         def selectObservingModeTypes(
