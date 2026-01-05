@@ -1147,3 +1147,125 @@ class perScienceObservationCalibrations
       // The should have different ids but our mock service returns always the same
       assert(meta2.exists(_.resolvedTargetId.isDefined))
     }
+
+  private def setLongExposureTime(oid: Observation.Id): IO[Unit] =
+    query(
+      serviceUser,
+      s"""
+        mutation {
+          updateObservations(input: {
+            WHERE: { id: { EQ: "$oid" } },
+            SET: {
+              scienceRequirements: {
+                exposureTimeMode: {
+                  timeAndCount: {
+                    time: { minutes: 30 },
+                    count: 4
+                  }
+                }
+              }
+            }
+          }) {
+            observations { id }
+          }
+        }
+      """
+    ).void
+
+  private def setShortExposureTime(oid: Observation.Id): IO[Unit] =
+    query(
+      serviceUser,
+      s"""
+        mutation {
+          updateObservations(input: {
+            WHERE: { id: { EQ: "$oid" } },
+            SET: {
+              scienceRequirements: {
+                exposureTimeMode: {
+                  timeAndCount: {
+                    time: { minutes: 15 },
+                    count: 1
+                  }
+                }
+              }
+            }
+          }) {
+            observations { id }
+          }
+        }
+      """
+    ).void
+
+  test("create two tellurics for long duration science observation"):
+    for {
+      pid                <- createProgramAs(pi)
+      tid                <- createTargetWithProfileAs(pi, pid)
+      oid                <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+      _                  <- setLongExposureTime(oid)
+      _                  <- runObscalcUpdate(pid, oid)
+      (added, removed)   <- recalculateCalibrations(pid, when)
+      obs                <- queryObservation(oid)
+      groupId            =  obs.groupId.get
+      obsInGroup         <- queryObservationsInGroup(groupId)
+      telluricObs        =  obsInGroup.filter(_.calibrationRole.contains(CalibrationRole.Telluric))
+      scienceObs         =  obsInGroup.filter(_.calibrationRole.isEmpty).head
+    } yield {
+      assertEquals(telluricObs.size, 2)
+      assertEquals(obsInGroup.size, 3)
+      assertEquals(added.size, 2)
+      assertEquals(removed.size, 0)
+      // Verify tellurics are positioned before and after science observation
+      assertEquals(telluricObs.head.groupIndex.get, scienceObs.groupIndex.get - 1)
+      assertEquals(telluricObs.last.groupIndex.get, scienceObs.groupIndex.get + 1)
+    }
+
+  test("create one telluric for short duration science observation"):
+    for {
+      pid                <- createProgramAs(pi)
+      tid                <- createTargetWithProfileAs(pi, pid)
+      oid                <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+      _                  <- setShortExposureTime(oid)
+      _                  <- runObscalcUpdate(pid, oid)
+      (added, removed)   <- recalculateCalibrations(pid, when)
+      obs                <- queryObservation(oid)
+      groupId            =  obs.groupId.get
+      obsInGroup         <- queryObservationsInGroup(groupId)
+      telluricObs        =  obsInGroup.filter(_.calibrationRole.contains(CalibrationRole.Telluric))
+      scienceObs         =  obsInGroup.filter(_.calibrationRole.isEmpty).head
+    } yield {
+      assertEquals(telluricObs.size, 1)
+      assertEquals(obsInGroup.size, 2)
+      assertEquals(added.size, 1)
+      assertEquals(removed.size, 0)
+      // Verify telluric is positioned after science observation
+      assertEquals(telluricObs.head.groupIndex.get, scienceObs.groupIndex.get + 1)
+    }
+
+  test("update from two to one telluric when duration decreases"):
+    for {
+      pid                  <- createProgramAs(pi)
+      tid                  <- createTargetWithProfileAs(pi, pid)
+      oid                  <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+      _                    <- setLongExposureTime(oid)
+      _                    <- runObscalcUpdate(pid, oid)
+      (added1, removed1)   <- recalculateCalibrations(pid, when)
+      obs1                 <- queryObservation(oid)
+      groupId              =  obs1.groupId.get
+      obsInGroup1          <- queryObservationsInGroup(groupId)
+      telluricObs1         =  obsInGroup1.filter(_.calibrationRole.contains(CalibrationRole.Telluric))
+      // Change to short duration
+      _                    <- setShortExposureTime(oid)
+      _                    <- runObscalcUpdate(pid, oid)
+      (added2, removed2)   <- recalculateCalibrations(pid, when)
+      obsInGroup2          <- queryObservationsInGroup(groupId)
+      telluricObs2         =  obsInGroup2.filter(_.calibrationRole.contains(CalibrationRole.Telluric))
+    } yield {
+      // Initially 2 tellurics created
+      assertEquals(telluricObs1.size, 2)
+      assertEquals(added1.size, 2)
+      assertEquals(removed1.size, 0)
+      // After duration decrease, only 1 telluric remains
+      assertEquals(telluricObs2.size, 1)
+      assertEquals(added2.size, 1)
+      assertEquals(removed2.size, 2)
+    }
