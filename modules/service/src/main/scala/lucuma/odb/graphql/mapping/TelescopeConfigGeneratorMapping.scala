@@ -23,7 +23,7 @@ trait TelescopeConfigGeneratorMapping[F[_]] extends TelescopeConfigGeneratorView
   ): ObjectMapping =
     ObjectMapping(path)(
       SqlField("observationId", TelescopeConfigGeneratorView.Enumerated.ObservationId, key = true, hidden = true),
-      SqlField("role",          TelescopeConfigGeneratorView.Enumerated.TelescopeConfigGeneratorRole, key = true, hidden = true),
+      SqlField("role",          TelescopeConfigGeneratorView.Enumerated.Role, key = true, hidden = true),
       SqlObject("values",       Join(parentIdColumn, childIdColumn))
     )
 
@@ -38,23 +38,25 @@ trait TelescopeConfigGeneratorMapping[F[_]] extends TelescopeConfigGeneratorView
   lazy val RandomTelescopeConfigGeneratorMapping: ObjectMapping =
     ObjectMapping(RandomTelescopeConfigGeneratorType)(
       SqlField("observationId", TelescopeConfigGeneratorView.Random.ObservationId, key = true, hidden = true),
-      SqlField("role",          TelescopeConfigGeneratorView.Random.TelescopeConfigGeneratorRole, key = true, hidden = true),
+      SqlField("role",          TelescopeConfigGeneratorView.Random.Role, key = true, hidden = true),
       SqlObject("size"),
-      SqlObject("center")
+      SqlObject("center"),
+      SqlField("seed",          TelescopeConfigGeneratorView.Random.Seed)
     )
 
   lazy val SpiralTelescopeConfigGeneratorMapping: ObjectMapping =
     ObjectMapping(SpiralTelescopeConfigGeneratorType)(
       SqlField("observationId", TelescopeConfigGeneratorView.Spiral.ObservationId, key = true, hidden = true),
-      SqlField("role",          TelescopeConfigGeneratorView.Spiral.TelescopeConfigGeneratorRole, key = true, hidden = true),
+      SqlField("role",          TelescopeConfigGeneratorView.Spiral.Role, key = true, hidden = true),
       SqlObject("size"),
-      SqlObject("center")
+      SqlObject("center"),
+      SqlField("seed",          TelescopeConfigGeneratorView.Spiral.Seed)
     )
 
   lazy val UniformTelescopeConfigGeneratorMapping: ObjectMapping =
     ObjectMapping(UniformTelescopeConfigGeneratorType)(
       SqlField("observationId", TelescopeConfigGeneratorView.Uniform.ObservationId, key = true, hidden = true),
-      SqlField("role",          TelescopeConfigGeneratorView.Uniform.TelescopeConfigGeneratorRole, key = true, hidden = true),
+      SqlField("role",          TelescopeConfigGeneratorView.Uniform.Role, key = true, hidden = true),
       SqlObject("cornerA"),
       SqlObject("cornerB")
     )
@@ -62,25 +64,25 @@ trait TelescopeConfigGeneratorMapping[F[_]] extends TelescopeConfigGeneratorView
   lazy val TelescopeConfigGeneratorMapping: ObjectMapping =
     ObjectMapping(TelescopeConfigGeneratorType)(
       SqlField("observationId", TelescopeConfigGeneratorView.ObservationId, key = true, hidden = true),
-      SqlField("role", TelescopeConfigGeneratorView.TelescopeConfigGeneratorRole, key = true, hidden = true),
+      SqlField("role",          TelescopeConfigGeneratorView.Role, key = true, hidden = true),
 
       SqlField("generatorType", TelescopeConfigGeneratorView.TelescopeConfigGeneratorType),
 
       SqlObject("enumerated", Join(List(
-        TelescopeConfigGeneratorView.ObservationId       -> TelescopeConfigGeneratorView.Enumerated.ObservationId,
-        TelescopeConfigGeneratorView.TelescopeConfigGeneratorRole -> TelescopeConfigGeneratorView.Enumerated.TelescopeConfigGeneratorRole
+        TelescopeConfigGeneratorView.ObservationId -> TelescopeConfigGeneratorView.Enumerated.ObservationId,
+        TelescopeConfigGeneratorView.Role          -> TelescopeConfigGeneratorView.Enumerated.Role
       ))),
       SqlObject("random",     Join(List(
-        TelescopeConfigGeneratorView.ObservationId       -> TelescopeConfigGeneratorView.Random.ObservationId,
-        TelescopeConfigGeneratorView.TelescopeConfigGeneratorRole -> TelescopeConfigGeneratorView.Random.TelescopeConfigGeneratorRole
+        TelescopeConfigGeneratorView.ObservationId -> TelescopeConfigGeneratorView.Random.ObservationId,
+        TelescopeConfigGeneratorView.Role          -> TelescopeConfigGeneratorView.Random.Role
       ))),
       SqlObject("spiral",     Join(List(
-        TelescopeConfigGeneratorView.ObservationId       -> TelescopeConfigGeneratorView.Spiral.ObservationId,
-        TelescopeConfigGeneratorView.TelescopeConfigGeneratorRole -> TelescopeConfigGeneratorView.Spiral.TelescopeConfigGeneratorRole
+        TelescopeConfigGeneratorView.ObservationId -> TelescopeConfigGeneratorView.Spiral.ObservationId,
+        TelescopeConfigGeneratorView.Role          -> TelescopeConfigGeneratorView.Spiral.Role
       ))),
       SqlObject("uniform",    Join(List(
-        TelescopeConfigGeneratorView.ObservationId       -> TelescopeConfigGeneratorView.Uniform.ObservationId,
-        TelescopeConfigGeneratorView.TelescopeConfigGeneratorRole -> TelescopeConfigGeneratorView.Uniform.TelescopeConfigGeneratorRole
+        TelescopeConfigGeneratorView.ObservationId -> TelescopeConfigGeneratorView.Uniform.ObservationId,
+        TelescopeConfigGeneratorView.Role          -> TelescopeConfigGeneratorView.Uniform.Role
       )))
     )
 

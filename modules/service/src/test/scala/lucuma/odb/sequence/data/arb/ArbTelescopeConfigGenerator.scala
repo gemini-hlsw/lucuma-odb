@@ -5,15 +5,13 @@ package lucuma.odb.sequence.data
 package arb
 
 import cats.data.NonEmptyList
-import lucuma.core.geom.OffsetGenerator
 import lucuma.core.geom.arb.ArbOffsetGenerator
 import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.model.sequence.arb.ArbTelescopeConfig
 import org.scalacheck.*
 import org.scalacheck.Arbitrary.arbitrary
 
-trait ArbTelescopeConfigGenerator:
-  import ArbOffsetGenerator.given
+trait ArbTelescopeConfigGenerator extends ArbOffsetGenerator:
   import ArbTelescopeConfig.given
 
   given Arbitrary[TelescopeConfigGenerator.NoGenerator.type] =
@@ -27,17 +25,34 @@ trait ArbTelescopeConfigGenerator:
         tcs <- arbitrary[List[TelescopeConfig]]
       yield TelescopeConfigGenerator.Enumerated(NonEmptyList(tc0, tcs))
 
-  given Arbitrary[TelescopeConfigGenerator.FromOffsetGenerator] =
+  given Arbitrary[TelescopeConfigGenerator.Random] =
     Arbitrary:
-      arbitrary[OffsetGenerator].map(TelescopeConfigGenerator.FromOffsetGenerator(_))
-    
+      for
+        g <- genRandomOffsetGenerator
+        s <- arbitrary[Long]
+      yield TelescopeConfigGenerator.Random(g, s)
+
+  given Arbitrary[TelescopeConfigGenerator.Spiral] =
+    Arbitrary:
+      for
+        g <- genSpiralOffsetGenerator
+        s <- arbitrary[Long]
+      yield TelescopeConfigGenerator.Spiral(g, s)
+
+  given Arbitrary[TelescopeConfigGenerator.Uniform] =
+    Arbitrary:
+      for
+        g <- genUniformOffsetGenerator
+      yield TelescopeConfigGenerator.Uniform(g)
 
   given Arbitrary[TelescopeConfigGenerator] =
     Arbitrary:
       Gen.oneOf(
         arbitrary[TelescopeConfigGenerator.NoGenerator.type],
         arbitrary[TelescopeConfigGenerator.Enumerated],
-        arbitrary[TelescopeConfigGenerator.FromOffsetGenerator]
+        arbitrary[TelescopeConfigGenerator.Random],
+        arbitrary[TelescopeConfigGenerator.Spiral],
+        arbitrary[TelescopeConfigGenerator.Uniform]
       )
 
 object ArbTelescopeConfigGenerator extends ArbTelescopeConfigGenerator

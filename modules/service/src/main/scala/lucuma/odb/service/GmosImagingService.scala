@@ -25,6 +25,7 @@ import lucuma.odb.data.TelescopeConfigGeneratorRole
 import lucuma.odb.graphql.input.GmosImagingFilterInput
 import lucuma.odb.graphql.input.GmosImagingInput
 import lucuma.odb.graphql.input.GmosImagingVariantInput
+import lucuma.odb.graphql.input.TelescopeConfigGeneratorInput
 import lucuma.odb.sequence.data.TelescopeConfigGenerator
 import lucuma.odb.sequence.gmos.imaging.Config
 import lucuma.odb.sequence.gmos.imaging.Filter
@@ -195,11 +196,11 @@ object GmosImagingService:
 
               // Insert the offset generators
               _  <- ResultT.liftF:
-                      Variant.offsets.getOption(input.variant).traverse_ : og =>
+                      GmosImagingVariantInput.offsets.getOption(input.variant).flatMap(_.toOption).traverse_ : og =>
                         services.telescopeConfigGeneratorService.insert(oids, og, TelescopeConfigGeneratorRole.Object)
 
               _  <- ResultT.liftF:
-                      Variant.skyOffsets.getOption(input.variant).traverse_ : og =>
+                      GmosImagingVariantInput.skyOffsets.getOption(input.variant).flatMap(_.toOption).traverse_ : og =>
                         services.telescopeConfigGeneratorService.insert(oids, og, TelescopeConfigGeneratorRole.Sky)
             yield ()
           .value
@@ -293,7 +294,7 @@ object GmosImagingService:
               yield ()
 
           def updateOffsetForRole(
-            input:   Nullable[TelescopeConfigGenerator],
+            input:   Nullable[TelescopeConfigGeneratorInput],
             variant: GmosImagingVariantType,
             role:    TelescopeConfigGeneratorRole
           ): F[Unit] =
@@ -512,12 +513,12 @@ object GmosImagingService:
             input.common.explicitAmpGain,
             input.common.explicitRoi,
             input.variant.variantType,
-            input.variant.grouped.map(_.order).getOrElse(Variant.Grouped.Default.order),
-            input.variant.grouped.map(_.skyCount).orElse(input.variant.interleaved.map(_.skyCount)).getOrElse(NonNegInt.MinValue),
-            input.variant.preImaging.map(_.offset1).getOrElse(Offset.Zero),
-            input.variant.preImaging.map(_.offset2).getOrElse(Offset.Zero),
-            input.variant.preImaging.map(_.offset3).getOrElse(Offset.Zero),
-            input.variant.preImaging.map(_.offset4).getOrElse(Offset.Zero)
+            GmosImagingVariantInput.order.getOption(input.variant).flatten.getOrElse(Variant.Grouped.Default.order),
+            GmosImagingVariantInput.skyCount.getOption(input.variant).flatten.getOrElse(NonNegInt.MinValue),
+            GmosImagingVariantInput.preImaging.getOption(input.variant).flatMap(_.offset1).getOrElse(Offset.Zero),
+            GmosImagingVariantInput.preImaging.getOption(input.variant).flatMap(_.offset2).getOrElse(Offset.Zero),
+            GmosImagingVariantInput.preImaging.getOption(input.variant).flatMap(_.offset3).getOrElse(Offset.Zero),
+            GmosImagingVariantInput.preImaging.getOption(input.variant).flatMap(_.offset4).getOrElse(Offset.Zero)
           )
 
       sql"""
