@@ -4,6 +4,7 @@
 package lucuma.odb.graphql
 package input
 
+import cats.syntax.option.*
 import cats.syntax.parallel.*
 import eu.timepit.refined.types.numeric.NonNegInt
 import grackle.syntax.*
@@ -12,44 +13,37 @@ import lucuma.core.enums.WavelengthOrder
 import lucuma.core.math.Offset
 import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.binding.*
-import lucuma.odb.sequence.data.TelescopeConfigGenerator
-import lucuma.odb.sequence.gmos.imaging.Variant
+import monocle.Optional
+import monocle.Prism
+import monocle.macros.GenPrism
 
 sealed trait GmosImagingVariantInput:
-  def toVariant: Variant
   def variantType: GmosImagingVariantType
 
 object GmosImagingVariantInput:
 
   case class Grouped(
     order:      Option[WavelengthOrder],
-    offsets:    Nullable[TelescopeConfigGenerator],
+    offsets:    Nullable[TelescopeConfigGeneratorInput],
     skyCount:   Option[NonNegInt],
-    skyOffsets: Nullable[TelescopeConfigGenerator]
+    skyOffsets: Nullable[TelescopeConfigGeneratorInput]
   ) extends GmosImagingVariantInput:
-    def toVariant: Variant =
-      Variant.Grouped(
-        order.getOrElse(WavelengthOrder.Increasing),
-        offsets.toOption.getOrElse(TelescopeConfigGenerator.NoGenerator),
-        skyCount.getOrElse(NonNegInt.unsafeFrom(0)),
-        skyOffsets.toOption.getOrElse(TelescopeConfigGenerator.NoGenerator)
-      )
     def variantType: GmosImagingVariantType =
       GmosImagingVariantType.Grouped
 
+  val grouped: Prism[GmosImagingVariantInput, Grouped] =
+    GenPrism[GmosImagingVariantInput, Grouped]
+
   case class Interleaved(
-    offsets:    Nullable[TelescopeConfigGenerator],
+    offsets:    Nullable[TelescopeConfigGeneratorInput],
     skyCount:   Option[NonNegInt],
-    skyOffsets: Nullable[TelescopeConfigGenerator]
+    skyOffsets: Nullable[TelescopeConfigGeneratorInput]
   ) extends GmosImagingVariantInput:
-    def toVariant: Variant =
-      Variant.Interleaved(
-        offsets.toOption.getOrElse(TelescopeConfigGenerator.NoGenerator),
-        skyCount.getOrElse(NonNegInt.unsafeFrom(0)),
-        skyOffsets.toOption.getOrElse(TelescopeConfigGenerator.NoGenerator)
-      )
     def variantType: GmosImagingVariantType =
       GmosImagingVariantType.Interleaved
+
+  val interleaved: Prism[GmosImagingVariantInput, Interleaved] =
+    GenPrism[GmosImagingVariantInput, Interleaved]
 
   case class PreImaging(
     offset1: Option[Offset],
@@ -57,15 +51,56 @@ object GmosImagingVariantInput:
     offset3: Option[Offset],
     offset4: Option[Offset]
   ) extends GmosImagingVariantInput:
-    def toVariant: Variant =
-      Variant.PreImaging(
-        offset1.getOrElse(Offset.Zero),
-        offset2.getOrElse(Offset.Zero),
-        offset3.getOrElse(Offset.Zero),
-        offset4.getOrElse(Offset.Zero)
-      )
     def variantType: GmosImagingVariantType =
       GmosImagingVariantType.PreImaging
+
+  val preImaging: Prism[GmosImagingVariantInput, PreImaging] =
+    GenPrism[GmosImagingVariantInput, PreImaging]
+
+  val order: Optional[GmosImagingVariantInput, Option[WavelengthOrder]] =
+    Optional[GmosImagingVariantInput, Option[WavelengthOrder]] {
+      case Grouped(o, _, _, _) => o.some
+      case _                   => none
+    } { order => {
+      case Grouped(_, offsets, skyCount, skyOffsets) => Grouped(order, offsets, skyCount, skyOffsets)
+      case in                                        => in
+    }}
+
+  val offsets: Optional[GmosImagingVariantInput, Nullable[TelescopeConfigGeneratorInput]] =
+    Optional[GmosImagingVariantInput, Nullable[TelescopeConfigGeneratorInput]] {
+      case Grouped(_, o, _, _)  => o.some
+      case Interleaved(o, _, _) => o.some
+      case _                    => none
+    } { gen => {
+      case Grouped(order, _, skyCount, skyOffsets) => Grouped(order, gen, skyCount, skyOffsets)
+      case Interleaved(_, skyCount, skyOffsets)    => Interleaved(gen, skyCount, skyOffsets)
+      case in                                      => in
+    }}
+
+  val skyCount: Optional[GmosImagingVariantInput, Option[NonNegInt]] =
+    Optional[GmosImagingVariantInput, Option[NonNegInt]] {
+      case Grouped(_, _, c, _)  => c.some
+      case Interleaved(_, c, _) => c.some
+      case _                    => none
+    } { skyCount => {
+      case Grouped(order, offsets, _, skyOffsets) => Grouped(order, offsets, skyCount, skyOffsets)
+      case Interleaved(offsets, _, skyOffsets)    => Interleaved(offsets, skyCount, skyOffsets)
+      case in                                     => in
+    }}
+
+  val skyOffsets: Optional[GmosImagingVariantInput, Nullable[TelescopeConfigGeneratorInput]] =
+    Optional[GmosImagingVariantInput, Nullable[TelescopeConfigGeneratorInput]] {
+      case Grouped(_, _, _, o)  => o.some
+      case Interleaved(_, _, o) => o.some
+      case _                    => none
+    } { gen => {
+      case Grouped(order, offsets, skyCount, _) => Grouped(order, offsets, skyCount, gen)
+      case Interleaved(offsets, skyCount, _)    => Interleaved(offsets, skyCount, gen)
+      case in                                   => in
+    }}
+
+  val Default: GmosImagingVariantInput =
+    Grouped(none, Nullable.Absent, none, Nullable.Absent)
 
   val Binding: Matcher[GmosImagingVariantInput] =
     val GroupedBinding: Matcher[GmosImagingVariantInput] =

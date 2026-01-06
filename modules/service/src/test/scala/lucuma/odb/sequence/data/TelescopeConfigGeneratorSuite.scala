@@ -16,7 +16,6 @@ import lucuma.odb.sequence.data.TelescopeConfigGenerator
 import munit.CatsEffectSuite
 import munit.ScalaCheckEffectSuite
 import org.scalacheck.Arbitrary
-import org.scalacheck.Arbitrary.arbitrary
 import org.scalacheck.Gen
 import org.scalacheck.effect.PropF
 import org.scalacheck.effect.PropF.forAllF
@@ -26,10 +25,9 @@ class TelescopeConfigGeneratorSuite extends CatsEffectSuite with ScalaCheckEffec
   extension (g: TelescopeConfigGenerator)
     def generate(
       c: Int,
-      s: Long = 0L,
       d: StepGuideState = StepGuideState.Enabled
     ): IO[List[TelescopeConfig]] =
-      g.generate[IO](NonNegInt.unsafeFrom(c), s, d)
+      g.generate[IO](NonNegInt.unsafeFrom(c), d)
 
   private def offset(
     p: Int,
@@ -78,7 +76,7 @@ class TelescopeConfigGeneratorSuite extends CatsEffectSuite with ScalaCheckEffec
         TelescopeConfig(Offset.signedMicroarcseconds.reverseGet(p, q), StepGuideState.Enabled)
 
     // 2:1 aspect ratio
-    val gen = TelescopeConfigGenerator.FromOffsetGenerator(OffsetGenerator.Uniform(offset(10, 10), offset(30, 20)))
+    val gen = TelescopeConfigGenerator.Uniform(OffsetGenerator.Uniform(offset(10, 10), offset(30, 20)))
 
     // 4 x 2
     val expected8: List[TelescopeConfig] =
@@ -96,17 +94,9 @@ class TelescopeConfigGeneratorSuite extends CatsEffectSuite with ScalaCheckEffec
       gen.generate(18) -> expected18
     )
 
-  case class CountAndSeed(
-    count: NonNegInt,
-    seed:  Long
-  )
-
-  given Arbitrary[CountAndSeed] =
+  given Arbitrary[NonNegInt] =
     Arbitrary:
-      for
-        c <- Gen.choose(0, 100)
-        s <- arbitrary[Long]
-      yield CountAndSeed(NonNegInt.unsafeFrom(c), s)
+      Gen.choose(0, 100).map(NonNegInt.unsafeFrom)
 
   override def scalaCheckTestParameters =
     super.scalaCheckTestParameters
@@ -117,23 +107,22 @@ class TelescopeConfigGeneratorSuite extends CatsEffectSuite with ScalaCheckEffec
     gen:            TelescopeConfigGenerator,
     sizeArcseconds: Int
   ): PropF[IO] =
-    forAllF: (cs: CountAndSeed) =>
+    forAllF: (c: NonNegInt) =>
       assertIOBoolean:
-        gen.generate[IO](cs.count, cs.seed).map: lst =>
-          val sizeCorrect     = lst.sizeIs == (cs.count.value)
+        gen.generate[IO](c).map: lst =>
+          val sizeCorrect     = lst.sizeIs == (c.value)
           val withinSizeLimit = lst.forall(_.offset.distance(Offset.Zero).toMicroarcseconds < (sizeArcseconds * 1_000_000))
           val notRepeating    = lst == lst.distinctBy(_.offset)
           sizeCorrect && withinSizeLimit && notRepeating
 
   test("random"):
     randomGeneratorTest(
-      TelescopeConfigGenerator.FromOffsetGenerator(OffsetGenerator.Random(Angle.signedMicroarcseconds.reverseGet(20_000_000), Offset.Zero)),
+      TelescopeConfigGenerator.Random(OffsetGenerator.Random(Angle.signedMicroarcseconds.reverseGet(20_000_000), Offset.Zero), 0),
       20
     )
 
-
   test("spiral"):
     randomGeneratorTest(
-      TelescopeConfigGenerator.FromOffsetGenerator(OffsetGenerator.Spiral(Angle.signedMicroarcseconds.reverseGet(20_000_000), Offset.Zero)),
+      TelescopeConfigGenerator.Spiral(OffsetGenerator.Spiral(Angle.signedMicroarcseconds.reverseGet(20_000_000), Offset.Zero), 0),
       20
     )

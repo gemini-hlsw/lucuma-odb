@@ -18,6 +18,7 @@ import lucuma.core.math.Offset
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.odb.data.TelescopeConfigGeneratorRole
+import lucuma.odb.graphql.input.TelescopeConfigGeneratorInput
 import lucuma.odb.sequence.data.TelescopeConfigGenerator
 import lucuma.odb.util.Codecs.angle_µas
 import lucuma.odb.util.Codecs.guide_state
@@ -40,14 +41,9 @@ sealed trait TelescopeConfigGeneratorService[F[_]]:
     role: TelescopeConfigGeneratorRole
   ): F[Map[Observation.Id, TelescopeConfigGenerator]]
 
-  def selectWithSeed(
-    oids: NonEmptyList[Observation.Id],
-    role: TelescopeConfigGeneratorRole
-  ): F[Map[Observation.Id, (TelescopeConfigGenerator, Long)]]
-
   def insert(
     oids:  NonEmptyList[Observation.Id],
-    input: TelescopeConfigGenerator,
+    input: TelescopeConfigGeneratorInput,
     role:  TelescopeConfigGeneratorRole,
   ): F[Unit]
 
@@ -58,7 +54,7 @@ sealed trait TelescopeConfigGeneratorService[F[_]]:
 
   def replace(
     oids:  NonEmptyList[Observation.Id],
-    input: Option[TelescopeConfigGenerator],
+    input: Option[TelescopeConfigGeneratorInput],
     role:  TelescopeConfigGeneratorRole
   ): F[Unit]
 
@@ -76,20 +72,14 @@ object TelescopeConfigGeneratorService:
         oids: NonEmptyList[Observation.Id],
         role: TelescopeConfigGeneratorRole
       ): F[Map[Observation.Id, TelescopeConfigGenerator]] =
-        selectWithSeed(oids, role).map(_.view.mapValues(_._1).toMap)
 
-      override def selectWithSeed(
-        oids: NonEmptyList[Observation.Id],
-        role: TelescopeConfigGeneratorRole
-      ): F[Map[Observation.Id, (TelescopeConfigGenerator, Long)]] =
-
-        val generatorData: F[Map[Observation.Id, (Either[Unit, TelescopeConfigGenerator], Long)]] =
+        val generatorData: F[Map[Observation.Id, Either[Unit, TelescopeConfigGenerator]]] =
           val af = Statements.select(oids, role)
-          session.prepareR(af.fragment.query(observation_id *: Statements.offset_generator *: int8)).use: pq =>
+          session.prepareR(af.fragment.query(observation_id *: Statements.offset_generator)).use: pq =>
             pq.stream(af.argument, chunkSize = 1024)
               .compile
               .toList
-              .map(_.map((oid, e, seed) => oid -> (e, seed)).toMap)
+              .map(_.toMap)
 
         val enumeratedOffsets: F[Map[Observation.Id, List[TelescopeConfig]]] =
           val af = Statements.selectEnumeratedOffsets(oids, role)
@@ -108,23 +98,23 @@ object TelescopeConfigGeneratorService:
         yield
           g.view
            .map:
-             case (oid, (Left(()), s))   =>
+             case (oid, Left(()))   =>
                val os = e.get(oid).flatMap(NonEmptyList.fromList)
-               oid -> (os.fold(TelescopeConfigGenerator.NoGenerator)(TelescopeConfigGenerator.Enumerated.apply), s)
-             case (oid, (Right(gen), s)) =>
-               oid -> (gen, s)
+               oid -> os.fold(TelescopeConfigGenerator.NoGenerator)(TelescopeConfigGenerator.Enumerated.apply)
+             case (oid, Right(gen)) =>
+               oid -> gen
            .toMap
 
       override def insert(
         oids:  NonEmptyList[Observation.Id],
-        input: TelescopeConfigGenerator,
+        input: TelescopeConfigGeneratorInput,
         role:  TelescopeConfigGeneratorRole,
       ): F[Unit] =
         val unit = Concurrent[F].unit
 
         val insertOffsetsIfEnumerated: F[Unit] =
           input match
-            case TelescopeConfigGenerator.Enumerated(offs) =>
+            case TelescopeConfigGeneratorInput.EnumeratedInput(offs) =>
               session.exec(Statements.insertEnumeratedOffsets(oids, offs, role))
             case _                                     =>
               unit
@@ -139,7 +129,7 @@ object TelescopeConfigGeneratorService:
 
       override def replace(
         oids:  NonEmptyList[Observation.Id],
-        input: Option[TelescopeConfigGenerator],
+        input: Option[TelescopeConfigGeneratorInput],
         role:  TelescopeConfigGeneratorRole
       ): F[Unit] =
         delete(oids, role) *>
@@ -161,21 +151,28 @@ object TelescopeConfigGeneratorService:
         angle_µas             *:  // size
         offset                *:  // center
         offset                *:  // cornerA
-        offset                    // cornerB
-      ).imap[Either[Unit, TelescopeConfigGenerator]] { (genType, s, c, a, b) =>
+        offset                *:  // cornerB
+        int8                      // seed
+      ).imap[Either[Unit, TelescopeConfigGenerator]] { (genType, z, c, a, b, s) =>
           genType match
             case TelescopeConfigGeneratorType.NoGenerator => TelescopeConfigGenerator.NoGenerator.asRight
             case TelescopeConfigGeneratorType.Enumerated  => ().asLeft
-            case TelescopeConfigGeneratorType.Uniform     => TelescopeConfigGenerator.FromOffsetGenerator(OffsetGenerator.Uniform(a, b)).asRight
-            case TelescopeConfigGeneratorType.Random      => TelescopeConfigGenerator.FromOffsetGenerator(OffsetGenerator.Random(s, c)).asRight
-            case TelescopeConfigGeneratorType.Spiral      => TelescopeConfigGenerator.FromOffsetGenerator(OffsetGenerator.Spiral(s, c)).asRight
+            case TelescopeConfigGeneratorType.Random      => TelescopeConfigGenerator.Random(OffsetGenerator.Random(z, c), s).asRight
+            case TelescopeConfigGeneratorType.Spiral      => TelescopeConfigGenerator.Spiral(OffsetGenerator.Spiral(z, c), s).asRight
+            case TelescopeConfigGeneratorType.Uniform     => TelescopeConfigGenerator.Uniform(OffsetGenerator.Uniform(a, b)).asRight
       } {
-        case Right(TelescopeConfigGenerator.NoGenerator)    => (TelescopeConfigGeneratorType.NoGenerator, Angle.Angle0, Offset.Zero, Offset.Zero, Offset.Zero)
-        case Right(TelescopeConfigGenerator.FromOffsetGenerator(OffsetGenerator.Random(s, c)))   => (TelescopeConfigGeneratorType.Random,      s,            c,           Offset.Zero, Offset.Zero)
-        case Right(TelescopeConfigGenerator.FromOffsetGenerator(OffsetGenerator.Spiral(s, c)))   => (TelescopeConfigGeneratorType.Spiral,      s,            c,           Offset.Zero, Offset.Zero)
-        case Right(TelescopeConfigGenerator.FromOffsetGenerator(OffsetGenerator.Uniform(a, b)))  => (TelescopeConfigGeneratorType.Uniform,     Angle.Angle0, Offset.Zero, a,           b)
-        case Left(())                              => (TelescopeConfigGeneratorType.Enumerated,  Angle.Angle0, Offset.Zero, Offset.Zero, Offset.Zero)
-        case Right(TelescopeConfigGenerator.Enumerated(os)) => (TelescopeConfigGeneratorType.Enumerated,  Angle.Angle0, Offset.Zero, Offset.Zero, Offset.Zero)
+        case Right(TelescopeConfigGenerator.NoGenerator)                               =>
+          (TelescopeConfigGeneratorType.NoGenerator, Angle.Angle0, Offset.Zero, Offset.Zero, Offset.Zero, 0L)
+        case Right(TelescopeConfigGenerator.Random(OffsetGenerator.Random(z, c), s))   =>
+          (TelescopeConfigGeneratorType.Random,      z,            c,           Offset.Zero, Offset.Zero,  s)
+        case Right(TelescopeConfigGenerator.Spiral(OffsetGenerator.Spiral(z, c), s))   =>
+          (TelescopeConfigGeneratorType.Spiral,      z,            c,           Offset.Zero, Offset.Zero,  s)
+        case Right(TelescopeConfigGenerator.Uniform(OffsetGenerator.Uniform(a, b)))    =>
+          (TelescopeConfigGeneratorType.Uniform,     Angle.Angle0, Offset.Zero, a,           b,           0L)
+        case Left(())                                                                  =>
+          (TelescopeConfigGeneratorType.Enumerated,  Angle.Angle0, Offset.Zero, Offset.Zero, Offset.Zero, 0L)
+        case Right(TelescopeConfigGenerator.Enumerated(os))                            =>
+          (TelescopeConfigGeneratorType.Enumerated,  Angle.Angle0, Offset.Zero, Offset.Zero, Offset.Zero, 0L)
       }
 
     def select(
@@ -215,11 +212,9 @@ object TelescopeConfigGeneratorService:
 
     def insert(
       which: NonEmptyList[Observation.Id],
-      ogi:   TelescopeConfigGenerator,
+      ogi:   TelescopeConfigGeneratorInput,
       role:  TelescopeConfigGeneratorRole
     ): AppliedFragment =
-      def orZero(a: Option[Angle]): Angle = a.getOrElse(Angle.Angle0)
-
       val values =
         which.map: oid =>
           sql"""(
@@ -232,18 +227,20 @@ object TelescopeConfigGeneratorService:
             $angle_µas,
             $angle_µas,
             $angle_µas,
-            $angle_µas
+            $angle_µas,
+            COALESCE(${int8.opt}, DEFAULT)
           )"""(
             oid,
             role,
-            ogi.offsetGeneratorType,
-            orZero(TelescopeConfigGenerator.cornerA.getOption(ogi).map(_.p.toAngle)),
-            orZero(TelescopeConfigGenerator.cornerA.getOption(ogi).map(_.q.toAngle)),
-            orZero(TelescopeConfigGenerator.cornerB.getOption(ogi).map(_.p.toAngle)),
-            orZero(TelescopeConfigGenerator.cornerB.getOption(ogi).map(_.q.toAngle)),
-            orZero(TelescopeConfigGenerator.size.getOption(ogi)),
-            orZero(TelescopeConfigGenerator.center.getOption(ogi).map(_.p.toAngle)),
-            orZero(TelescopeConfigGenerator.center.getOption(ogi).map(_.q.toAngle))
+            ogi.generatorType,
+            ogi._cornerA.p.toAngle,
+            ogi._cornerA.q.toAngle,
+            ogi._cornerB.p.toAngle,
+            ogi._cornerB.q.toAngle,
+            ogi._size,
+            ogi._center.p.toAngle,
+            ogi._center.q.toAngle,
+            ogi._seed
           )
 
       void"""
@@ -257,7 +254,8 @@ object TelescopeConfigGeneratorService:
           c_uniform_corner_b_q,
           c_size,
           c_center_offset_p,
-          c_center_offset_q
+          c_center_offset_q,
+          c_seed
         ) VALUES
       """ |+| values.intercalate(void", ")
 

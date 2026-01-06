@@ -6,24 +6,17 @@ package arb
 
 import cats.Order
 import cats.data.NonEmptyList
-import eu.timepit.refined.types.numeric.NonNegInt
 import lucuma.core.enums.GmosAmpGain
 import lucuma.core.enums.GmosAmpReadMode
 import lucuma.core.enums.GmosBinning
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosRoi
 import lucuma.core.enums.GmosSouthFilter
-import lucuma.core.enums.WavelengthOrder
-import lucuma.core.math.Offset
-import lucuma.core.math.arb.ArbOffset
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.arb.ArbExposureTimeMode
 import lucuma.core.util.arb.ArbEnumerated
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.arb.ArbNullable.given
-import lucuma.odb.sequence.data.TelescopeConfigGenerator
-import lucuma.odb.sequence.data.arb.ArbTelescopeConfigGenerator
-import lucuma.odb.sequence.gmos.imaging.Variant
 import org.scalacheck.*
 import org.scalacheck.Arbitrary.arbitrary
 
@@ -31,8 +24,7 @@ trait ArbGmosImagingInput:
 
   import ArbEnumerated.given
   import ArbExposureTimeMode.given
-  import ArbOffset.given
-  import ArbTelescopeConfigGenerator.given
+  import ArbGmosImagingVariantInput.given
 
   given [L: Arbitrary]: Arbitrary[GmosImagingFilterInput[L]] =
     Arbitrary:
@@ -56,44 +48,10 @@ trait ArbGmosImagingInput:
       fs <- arbitrary[List[A]]
     yield NonEmptyList.fromListUnsafe(f1 :: fs).distinctBy(f)
 
-  given arbVariantGrouped: Arbitrary[Variant.Grouped] =
-    Arbitrary:
-      for
-        wo <- arbitrary[WavelengthOrder]
-        of <- arbitrary[TelescopeConfigGenerator]
-        sc <- Gen.choose(0, 100).map(NonNegInt.unsafeFrom)
-        so <- arbitrary[TelescopeConfigGenerator]
-      yield Variant.Grouped(wo, of, sc, so)
-
-  given arbVariantInterleaved: Arbitrary[Variant.Interleaved] =
-    Arbitrary:
-      for
-        of <- arbitrary[TelescopeConfigGenerator]
-        sc <- Gen.choose(0, 100).map(NonNegInt.unsafeFrom)
-        so <- arbitrary[TelescopeConfigGenerator]
-      yield Variant.Interleaved(of, sc, so)
-
-  given arbVariantPreImaging: Arbitrary[Variant.PreImaging] =
-    Arbitrary:
-      for
-        o1 <- arbitrary[Offset]
-        o2 <- arbitrary[Offset]
-        o3 <- arbitrary[Offset]
-        o4 <- arbitrary[Offset]
-      yield Variant.PreImaging(o1, o2, o3, o4)
-
-  given Arbitrary[Variant] =
-    Arbitrary:
-      Gen.oneOf(
-        arbitrary[Variant.Grouped](using arbVariantGrouped),
-        arbitrary[Variant.Interleaved](using arbVariantInterleaved),
-        arbitrary[Variant.PreImaging](using arbVariantPreImaging)
-      )
-
   given Arbitrary[GmosImagingInput.Create.North] =
     Arbitrary:
       for
-        v <- arbitrary[Variant]
+        v <- arbitrary[GmosImagingVariantInput]
         f <- genFilterList[GmosImagingFilterInput[GmosNorthFilter], GmosNorthFilter](_.filter)
         c <- arbitrary[GmosImagingInput.Create.Common]
       yield GmosImagingInput.Create(v, f, c)
@@ -101,7 +59,7 @@ trait ArbGmosImagingInput:
   given Arbitrary[GmosImagingInput.Create.South] =
     Arbitrary:
       for
-        v <- arbitrary[Variant]
+        v <- arbitrary[GmosImagingVariantInput]
         f <- genFilterList[GmosImagingFilterInput[GmosSouthFilter], GmosSouthFilter](_.filter)
         c <- arbitrary[GmosImagingInput.Create.Common]
       yield GmosImagingInput.Create(v, f, c)
@@ -114,40 +72,6 @@ trait ArbGmosImagingInput:
         g <- arbitrary[Nullable[GmosAmpGain]]
         r <- arbitrary[Nullable[GmosRoi]]
       yield GmosImagingInput.Edit.Common(b, m, g, r)
-
-  given arbVariantInputGrouped: Arbitrary[GmosImagingVariantInput.Grouped] =
-    Arbitrary:
-      for
-        wo <- arbitrary[Option[WavelengthOrder]]
-        of <- arbitrary[Nullable[TelescopeConfigGenerator]]
-        sc <- Gen.option(Gen.choose(0, 100).map(NonNegInt.unsafeFrom))
-        so <- arbitrary[Nullable[TelescopeConfigGenerator]]
-      yield GmosImagingVariantInput.Grouped(wo, of, sc, so)
-
-  given arbVariantInputInterleaved: Arbitrary[GmosImagingVariantInput.Interleaved] =
-    Arbitrary:
-      for
-        of <- arbitrary[Nullable[TelescopeConfigGenerator]]
-        sc <- Gen.option(Gen.choose(0, 100).map(NonNegInt.unsafeFrom))
-        so <- arbitrary[Nullable[TelescopeConfigGenerator]]
-      yield GmosImagingVariantInput.Interleaved(of, sc, so)
-
-  given arbVariantInputPreImaging: Arbitrary[GmosImagingVariantInput.PreImaging] =
-    Arbitrary:
-      for
-        o1 <- arbitrary[Option[Offset]]
-        o2 <- arbitrary[Option[Offset]]
-        o3 <- arbitrary[Option[Offset]]
-        o4 <- arbitrary[Option[Offset]]
-      yield GmosImagingVariantInput.PreImaging(o1, o2, o3, o4)
-
-  given Arbitrary[GmosImagingVariantInput] =
-    Arbitrary:
-      Gen.oneOf(
-        arbitrary[GmosImagingVariantInput.Grouped](using arbVariantInputGrouped),
-        arbitrary[GmosImagingVariantInput.Interleaved](using arbVariantInputInterleaved),
-        arbitrary[GmosImagingVariantInput.PreImaging](using arbVariantInputPreImaging)
-      )
 
   given arbEditCommonN: Arbitrary[GmosImagingInput.Edit.North] =
     Arbitrary:
