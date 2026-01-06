@@ -1042,6 +1042,39 @@ class perScienceObservationCalibrations
         assertEquals(removed2.size, 0)
       }
 
+  test("don't delete ongoing tellurics when recreating multiple tellurics"):
+    List(ObservationWorkflowState.Ongoing, ObservationWorkflowState.Completed).traverse_ : state =>
+      for {
+        pid                  <- createProgramAs(pi)
+        tid                  <- createTargetWithProfileAs(pi, pid)
+        oid                  <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+        _                    <- setLongExposureTime(oid)
+        _                    <- runObscalcUpdate(pid, oid)
+        (added1, removed1)   <- recalculateCalibrations(pid, when)
+        obs1                 <- queryObservation(oid)
+        groupId              =  obs1.groupId.get
+        obsInGroup1          <- queryObservationsInGroup(groupId)
+        telluricOids         =  obsInGroup1.filter(_.calibrationRole.contains(CalibrationRole.Telluric)).map(_.id)
+        firstTelluricOid     =  telluricOids.head
+        _                    <- setCalculatedWorkflowState(firstTelluricOid, state)
+        _                    <- updateFlamingos2Fpu(oid, Flamingos2Fpu.LongSlit2)
+        (added2, removed2)   <- recalculateCalibrations(pid, when)
+        obsInGroup2          <- queryObservationsInGroup(groupId)
+        telluricExists       <- queryObservationExists(firstTelluricOid)
+      } yield {
+        // First telluric in Ongoing/Completed state should be preserved
+        assertEquals(telluricOids.size, 2)
+        assert(telluricExists)
+        assert(obsInGroup2.exists(_.id === firstTelluricOid))
+        // Should have original 2 tellurics + 2 new ones = 4 tellurics total + 1 science = 5
+        assertEquals(obsInGroup2.filter(_.calibrationRole.contains(CalibrationRole.Telluric)).size, 4)
+        assertEquals(obsInGroup2.size, 5)
+        assertEquals(added1.size, 2)
+        assertEquals(removed1.size, 0)
+        assertEquals(added2.size, 2)
+        assertEquals(removed2.size, 1) // Only the second telluric was deleted
+      }
+
   test("telluric group rejects second science observation"):
     for {
       pid   <- createProgramAs(pi)
