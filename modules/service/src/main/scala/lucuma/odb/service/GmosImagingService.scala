@@ -310,14 +310,14 @@ object GmosImagingService:
             input.toOptionOption.fold(
               // the offset generator field was Absent, which means we should
               // default it to no generator when switching variants.
-              session.exec(
-                Statements.deleteOffsetGeneratorWhenNotMatchingVariant(
-                  modeTableName(site),
+              services
+                .telescopeConfigGeneratorService
+                .resetWhenVariantNotMatching(
                   oids,
+                  site,
                   variant,
                   role
                 )
-              )
             ): in =>
               services.telescopeConfigGeneratorService.replace(oids, in, role)
 
@@ -479,21 +479,6 @@ object GmosImagingService:
         FROM #$table t
         JOIN aggregated_filters f ON f.c_observation_id = t.c_observation_id;
       """(Void)
-
-    def deleteOffsetGeneratorWhenNotMatchingVariant(
-      tableName: String,
-      which:     NonEmptyList[Observation.Id],
-      variant:   GmosImagingVariantType,
-      role:      TelescopeConfigGeneratorRole
-    ): AppliedFragment =
-      sql"""
-        DELETE FROM t_offset_generator AS og
-        USING #$tableName AS img
-        WHERE og.c_observation_id = img.c_observation_id
-          AND og.c_role = $offset_generator_role
-          AND og.c_observation_id IN ${observation_id.list(which.length).values}
-          AND img.c_variant <> $gmos_imaging_variant
-      """.apply(role, which.toList, variant)
 
     def insert[L](
       modeTable: String,
