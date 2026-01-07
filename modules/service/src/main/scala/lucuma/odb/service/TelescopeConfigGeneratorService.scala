@@ -228,8 +228,7 @@ object TelescopeConfigGeneratorService:
             $angle_µas,
             $angle_µas,
             $angle_µas,
-            COALESCE(${int8.opt}, DEFAULT)
-          )"""(
+          """(
             oid,
             role,
             ogi.generatorType,
@@ -239,9 +238,8 @@ object TelescopeConfigGeneratorService:
             ogi._cornerB.q.toAngle,
             ogi._size,
             ogi._center.p.toAngle,
-            ogi._center.q.toAngle,
-            ogi._seed
-          )
+            ogi._center.q.toAngle
+          ) |+| ogi._seed.fold(void"DEFAULT")(s => sql"$int8"(s)) |+| void")"
 
       void"""
         INSERT INTO t_offset_generator (

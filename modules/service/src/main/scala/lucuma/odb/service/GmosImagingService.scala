@@ -32,6 +32,7 @@ import lucuma.odb.sequence.gmos.imaging.Filter
 import lucuma.odb.sequence.gmos.imaging.Variant
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.GmosCodecs.*
+import monocle.Optional
 import skunk.*
 import skunk.data.Arr
 import skunk.data.Type
@@ -175,7 +176,16 @@ object GmosImagingService:
         reqEtm:      Option[ExposureTimeMode],
         which:       List[Observation.Id]
       )(using Transaction[F]): F[Result[Unit]] =
-        val modeName = s"GMOS ${siteName(site).capitalize} Imaging"
+        val modeName          = s"GMOS ${siteName(site).capitalize} Imaging"
+
+        def offsetInput(
+          in: Optional[GmosImagingVariantInput, Nullable[TelescopeConfigGeneratorInput]]
+        ): TelescopeConfigGeneratorInput =
+          in.getOption(input.variant).flatMap(_.toOption).getOrElse(TelescopeConfigGeneratorInput.NoGeneratorInput)
+
+        val offsets    = offsetInput(GmosImagingVariantInput.offsets)
+        val skyOffsets = offsetInput(GmosImagingVariantInput.skyOffsets)
+
         NonEmptyList
           .fromList(which)
           .fold(ResultT.unit[F]): oids =>
@@ -196,12 +206,11 @@ object GmosImagingService:
 
               // Insert the offset generators
               _  <- ResultT.liftF:
-                      GmosImagingVariantInput.offsets.getOption(input.variant).flatMap(_.toOption).traverse_ : og =>
-                        services.telescopeConfigGeneratorService.insert(oids, og, TelescopeConfigGeneratorRole.Object)
+                      services.telescopeConfigGeneratorService.insert(oids, offsets, TelescopeConfigGeneratorRole.Object)
 
               _  <- ResultT.liftF:
-                      GmosImagingVariantInput.skyOffsets.getOption(input.variant).flatMap(_.toOption).traverse_ : og =>
-                        services.telescopeConfigGeneratorService.insert(oids, og, TelescopeConfigGeneratorRole.Sky)
+                      services.telescopeConfigGeneratorService.insert(oids, skyOffsets, TelescopeConfigGeneratorRole.Sky)
+
             yield ()
           .value
 
