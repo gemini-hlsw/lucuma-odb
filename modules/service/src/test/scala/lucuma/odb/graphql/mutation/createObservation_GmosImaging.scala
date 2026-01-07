@@ -909,50 +909,57 @@ class createObservation_GmosImaging extends OdbSuite:
   test("can create with interleaved filters, enumerated generators"):
     testEnumeratedGenerator("interleaved")
 
+  def spiralImagingInput(
+    pid: Program.Id,
+    tid: Target.Id,
+    spiral: String
+  ): String =
+    s"""
+      {
+        programId: ${pid.asJson}
+        SET: {
+          targetEnvironment: {
+            asterism: [${tid.asJson}]
+          }
+          scienceRequirements: {
+            exposureTimeMode: {
+              signalToNoise: {
+                value: 10.0
+                at: { nanometers: 500.0 }
+              }
+            }
+            imaging: {
+              minimumFov: { arcseconds: 100 }
+              narrowFilters: false
+              broadFilters: false
+              combinedFilters: true
+            }
+          }
+          observingMode: {
+            gmosSouthImaging: {
+              variant: {
+                grouped: {
+                  offsets: {
+                    spiral: $spiral
+                  }
+                }
+              }
+              filters: [
+                { filter: G_PRIME },
+                { filter: R_PRIME }
+              ]
+            }
+          }
+        }
+      }
+    """
+
   test("can create with spiral generator"):
     createProgramAs(pi).flatMap: pid =>
       createTargetAs(pi, pid).flatMap: tid =>
         expect(pi, s"""
           mutation {
-            createObservation(input: {
-              programId: ${pid.asJson}
-              SET: {
-                targetEnvironment: {
-                  asterism: [${tid.asJson}]
-                }
-                scienceRequirements: {
-                  exposureTimeMode: {
-                    signalToNoise: {
-                      value: 10.0
-                      at: { nanometers: 500.0 }
-                    }
-                  }
-                  imaging: {
-                    minimumFov: { arcseconds: 100 }
-                    narrowFilters: false
-                    broadFilters: false
-                    combinedFilters: true
-                  }
-                }
-                observingMode: {
-                  gmosSouthImaging: {
-                    variant: {
-                      grouped: {
-                        offsets: {
-                          spiral: {
-                            size: { arcseconds: 14.0 }
-                          }
-                        }
-                      }
-                    }
-                    filters: [
-                      { filter: G_PRIME },
-                      { filter: R_PRIME }
-                    ]
-                  }
-                }
-              }
-            }) {
+            createObservation(input: ${spiralImagingInput(pid, tid, "{size: { arcseconds: 14.0 }}")}) {
               observation {
                 observingMode {
                   gmosSouthImaging {
@@ -1002,6 +1009,92 @@ class createObservation_GmosImaging extends OdbSuite:
           }
         """.asRight
       )
+
+  test("can create with spiral generator and explicit seed"):
+    createProgramAs(pi).flatMap: pid =>
+      createTargetAs(pi, pid).flatMap: tid =>
+        expect(pi, s"""
+          mutation {
+            createObservation(input: ${spiralImagingInput(pid, tid, "{ size: { arcseconds: 14.0 }, seed: 42 }")}) {
+              observation {
+                observingMode {
+                  gmosSouthImaging {
+                    variant {
+                      grouped {
+                        offsets {
+                          generatorType
+                          spiral {
+                            seed
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        """, json"""
+          {
+            "createObservation": {
+              "observation": {
+                "observingMode": {
+                  "gmosSouthImaging": {
+                    "variant": {
+                      "grouped": {
+                        "offsets": {
+                          "generatorType": "SPIRAL",
+                          "spiral": {
+                            "seed": 42
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        """.asRight
+      )
+
+  test("can create with spiral generator and random seed"):
+    val randomSeed: IO[Long] =
+      createProgramAs(pi).flatMap: pid =>
+        createTargetAs(pi, pid).flatMap: tid =>
+          query(pi, s"""
+            mutation {
+              createObservation(input: ${spiralImagingInput(pid, tid, "{size: { arcseconds: 14.0 }}")}) {
+                observation {
+                  observingMode {
+                    gmosSouthImaging {
+                      variant {
+                        grouped {
+                          offsets {
+                            generatorType
+                            spiral {
+                              seed
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }"""
+          ).map: json =>
+            json
+              .hcursor
+              .downFields("createObservation", "observation", "observingMode", "gmosSouthImaging", "variant", "grouped", "offsets", "spiral", "seed")
+              .require[Long]
+
+    val seedsDiffer = for
+      s0 <- randomSeed
+      s1 <- randomSeed
+    yield s0 =!= s1
+
+    assertIOBoolean(seedsDiffer)
 
   test("can create pre-imaging"):
     createProgramAs(pi).flatMap: pid =>
