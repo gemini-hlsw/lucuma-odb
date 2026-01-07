@@ -3678,28 +3678,36 @@ input EnumeratedTelescopeConfigGeneratorInput {
 type RandomTelescopeConfigGenerator {
   size: Angle!
   center: Offset!
+  seed: Long!
 }
 
 input RandomTelescopeConfigGeneratorInput {
-  # Radius defining the circular area in which all offsets will be placed.
+  "Radius defining the circular area in which all offsets will be placed."
   size: AngleInput!
 
-  # Defaults to (0, 0).
+  "Center of the random pattern.  Defaults to (0, 0)."
   center: OffsetInput
+
+  "Random generator seed, which will default to a random value if not specified."
+  seed: Long
 }
 
 # A Fermat spiral pattern limited by the given size.
 type SpiralTelescopeConfigGenerator {
   size: Angle!
   center: Offset!
+  seed: Long!
 }
 
 input SpiralTelescopeConfigGeneratorInput {
-  # Radius defining the circular area in which all offsets will be placed.
+  "Radius defining the circular area in which all offsets will be placed."
   size: AngleInput!
 
-  # Defaults to (0, 0).
+  "Center of the spiral pattern.  Defaults to (0, 0)."
   center: OffsetInput
+
+  "Random generator seed, which will default to a random value if not specified."
+  seed: Long
 }
 
 """
@@ -9204,7 +9212,7 @@ type GmosGroupedImagingVariant {
   Offset generator for the science object datasets. The same offset sequence is
   created for each filter using the specified generator.
   """
-  offsets: TelescopeConfigGenerator
+  offsets: TelescopeConfigGenerator!
 
   """
   Number of sky positions to collect before and after object datasets. For
@@ -9216,7 +9224,7 @@ type GmosGroupedImagingVariant {
   """
   Offset generator to use for the sky datasets.
   """
-  skyOffsets: TelescopeConfigGenerator
+  skyOffsets: TelescopeConfigGenerator!
 }
 
 """
@@ -9264,7 +9272,7 @@ type GmosInterleavedImagingVariant {
   Offset generator for the science object datasets. The offset pattern is
   applied to the sequence of science datasets as a whole.
   """
-  offsets: TelescopeConfigGenerator
+  offsets: TelescopeConfigGenerator!
 
   """
   Number of sky positions to collect, per filter, before and after a series of
@@ -9276,7 +9284,7 @@ type GmosInterleavedImagingVariant {
   """
   Offset generator to use for the sky datasets.
   """
-  skyOffsets: TelescopeConfigGenerator
+  skyOffsets: TelescopeConfigGenerator!
 }
 
 """

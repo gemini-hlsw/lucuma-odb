@@ -12,7 +12,6 @@ import lucuma.odb.data.Nullable
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.binding.*
-import lucuma.odb.sequence.gmos.imaging.Variant
 
 object GmosImagingInput:
 
@@ -30,7 +29,7 @@ object GmosImagingInput:
   // Create ---------------------------------------------------------------------
 
   case class Create[L](
-    variant: Variant,
+    variant: GmosImagingVariantInput,
     filters: NonEmptyList[L],
     common:  Create.Common
   )
@@ -66,7 +65,7 @@ object GmosImagingInput:
           rExplicitAmpGain,
           rExplicitRoi,
         ).parMapN: (variant, filters, exBin, exAmpReadMode, exAmpGain, exRoi) =>
-          Create(variant.toVariant, filters, Common(exBin, exAmpReadMode, exAmpGain, exRoi))
+          Create(variant, filters, Common(exBin, exAmpReadMode, exAmpGain, exRoi))
 
     val NorthBinding: Matcher[North] =
       binding(GmosImagingFilterInput.NorthBinding)
@@ -86,7 +85,7 @@ object GmosImagingInput:
   ):
     def toCreate: Result[Create[L]] =
       for
-        v  <- Result.fromOption(variant.map(_.toVariant), OdbError.InvalidArgument("An imaging variant must be suplied for GMOS imaging observations".some).asProblem)
+        v  <- Result.fromOption(variant, OdbError.InvalidArgument("An imaging variant must be suplied for GMOS imaging observations".some).asProblem)
         fs <- Result.fromOption(filters, OdbError.InvalidArgument("At least one filter must be specified for GMOS imaging observations".some).asProblem)
       yield Create(v, fs, common.toCreate)
 

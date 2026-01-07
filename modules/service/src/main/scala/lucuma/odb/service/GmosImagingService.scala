@@ -25,12 +25,14 @@ import lucuma.odb.data.TelescopeConfigGeneratorRole
 import lucuma.odb.graphql.input.GmosImagingFilterInput
 import lucuma.odb.graphql.input.GmosImagingInput
 import lucuma.odb.graphql.input.GmosImagingVariantInput
+import lucuma.odb.graphql.input.TelescopeConfigGeneratorInput
 import lucuma.odb.sequence.data.TelescopeConfigGenerator
 import lucuma.odb.sequence.gmos.imaging.Config
 import lucuma.odb.sequence.gmos.imaging.Filter
 import lucuma.odb.sequence.gmos.imaging.Variant
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.GmosCodecs.*
+import monocle.Optional
 import skunk.*
 import skunk.data.Arr
 import skunk.data.Type
@@ -175,6 +177,15 @@ object GmosImagingService:
         which:       List[Observation.Id]
       )(using Transaction[F]): F[Result[Unit]] =
         val modeName = s"GMOS ${siteName(site).capitalize} Imaging"
+
+        def offsetInput(
+          in: Optional[GmosImagingVariantInput, Nullable[TelescopeConfigGeneratorInput]]
+        ): TelescopeConfigGeneratorInput =
+          in.getOption(input.variant).flatMap(_.toOption).getOrElse(TelescopeConfigGeneratorInput.NoGeneratorInput)
+
+        val offsets    = offsetInput(GmosImagingVariantInput.offsets)
+        val skyOffsets = offsetInput(GmosImagingVariantInput.skyOffsets)
+
         NonEmptyList
           .fromList(which)
           .fold(ResultT.unit[F]): oids =>
@@ -195,12 +206,11 @@ object GmosImagingService:
 
               // Insert the offset generators
               _  <- ResultT.liftF:
-                      Variant.offsets.getOption(input.variant).traverse_ : og =>
-                        services.telescopeConfigGeneratorService.insert(oids, og, TelescopeConfigGeneratorRole.Object)
+                      services.telescopeConfigGeneratorService.insert(oids, offsets, TelescopeConfigGeneratorRole.Object)
 
               _  <- ResultT.liftF:
-                      Variant.skyOffsets.getOption(input.variant).traverse_ : og =>
-                        services.telescopeConfigGeneratorService.insert(oids, og, TelescopeConfigGeneratorRole.Sky)
+                      services.telescopeConfigGeneratorService.insert(oids, skyOffsets, TelescopeConfigGeneratorRole.Sky)
+
             yield ()
           .value
 
@@ -293,21 +303,21 @@ object GmosImagingService:
               yield ()
 
           def updateOffsetForRole(
-            input:   Nullable[TelescopeConfigGenerator],
+            input:   Nullable[TelescopeConfigGeneratorInput],
             variant: GmosImagingVariantType,
             role:    TelescopeConfigGeneratorRole
           ): F[Unit] =
             input.toOptionOption.fold(
               // the offset generator field was Absent, which means we should
               // default it to no generator when switching variants.
-              session.exec(
-                Statements.deleteOffsetGeneratorWhenNotMatchingVariant(
-                  modeTableName(site),
+              services
+                .telescopeConfigGeneratorService
+                .resetWhenVariantNotMatching(
                   oids,
+                  site,
                   variant,
                   role
                 )
-              )
             ): in =>
               services.telescopeConfigGeneratorService.replace(oids, in, role)
 
@@ -470,21 +480,6 @@ object GmosImagingService:
         JOIN aggregated_filters f ON f.c_observation_id = t.c_observation_id;
       """(Void)
 
-    def deleteOffsetGeneratorWhenNotMatchingVariant(
-      tableName: String,
-      which:     NonEmptyList[Observation.Id],
-      variant:   GmosImagingVariantType,
-      role:      TelescopeConfigGeneratorRole
-    ): AppliedFragment =
-      sql"""
-        DELETE FROM t_offset_generator AS og
-        USING #$tableName AS img
-        WHERE og.c_observation_id = img.c_observation_id
-          AND og.c_role = $offset_generator_role
-          AND og.c_observation_id IN ${observation_id.list(which.length).values}
-          AND img.c_variant <> $gmos_imaging_variant
-      """.apply(role, which.toList, variant)
-
     def insert[L](
       modeTable: String,
       input:     GmosImagingInput.Create[L],
@@ -512,12 +507,12 @@ object GmosImagingService:
             input.common.explicitAmpGain,
             input.common.explicitRoi,
             input.variant.variantType,
-            input.variant.grouped.map(_.order).getOrElse(Variant.Grouped.Default.order),
-            input.variant.grouped.map(_.skyCount).orElse(input.variant.interleaved.map(_.skyCount)).getOrElse(NonNegInt.MinValue),
-            input.variant.preImaging.map(_.offset1).getOrElse(Offset.Zero),
-            input.variant.preImaging.map(_.offset2).getOrElse(Offset.Zero),
-            input.variant.preImaging.map(_.offset3).getOrElse(Offset.Zero),
-            input.variant.preImaging.map(_.offset4).getOrElse(Offset.Zero)
+            GmosImagingVariantInput.order.getOption(input.variant).flatten.getOrElse(Variant.Grouped.Default.order),
+            GmosImagingVariantInput.skyCount.getOption(input.variant).flatten.getOrElse(NonNegInt.MinValue),
+            GmosImagingVariantInput.preImaging.getOption(input.variant).flatMap(_.offset1).getOrElse(Offset.Zero),
+            GmosImagingVariantInput.preImaging.getOption(input.variant).flatMap(_.offset2).getOrElse(Offset.Zero),
+            GmosImagingVariantInput.preImaging.getOption(input.variant).flatMap(_.offset3).getOrElse(Offset.Zero),
+            GmosImagingVariantInput.preImaging.getOption(input.variant).flatMap(_.offset4).getOrElse(Offset.Zero)
           )
 
       sql"""
