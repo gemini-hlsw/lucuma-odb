@@ -253,6 +253,7 @@ class updateObservations_GmosImaging extends OdbSuite with UpdateObservationsOps
             variant {
               grouped {
                 offsets {
+                  generatorType
                   enumerated {
                     values {
                       offset {
@@ -264,6 +265,7 @@ class updateObservations_GmosImaging extends OdbSuite with UpdateObservationsOps
                   }
                 }
                 skyOffsets {
+                  generatorType
                   random {
                     size { arcseconds }
                     center {
@@ -299,6 +301,7 @@ class updateObservations_GmosImaging extends OdbSuite with UpdateObservationsOps
                   "variant": {
                     "grouped": {
                       "offsets": {
+                        "generatorType": "ENUMERATED",
                         "enumerated": {
                           "values": [
                             {
@@ -319,6 +322,7 @@ class updateObservations_GmosImaging extends OdbSuite with UpdateObservationsOps
                         }
                       },
                       "skyOffsets": {
+                        "generatorType": "RANDOM",
                         "random": {
                           "size": { "arcseconds": 14 },
                           "center": {
@@ -390,6 +394,7 @@ class updateObservations_GmosImaging extends OdbSuite with UpdateObservationsOps
                   "variant": {
                     "grouped": {
                       "offsets": {
+                        "generatorType": "ENUMERATED",
                         "enumerated": {
                           "values": [
                             {
@@ -402,7 +407,10 @@ class updateObservations_GmosImaging extends OdbSuite with UpdateObservationsOps
                           ]
                         }
                       },
-                      "skyOffsets": null
+                      "skyOffsets": {
+                        "generatorType": "NONE",
+                        "random": null
+                      }
                     }
                   },
                   "bin": "FOUR",
@@ -562,6 +570,7 @@ class updateObservations_GmosImaging extends OdbSuite with UpdateObservationsOps
               grouped {
                 order
                 offsets {
+                  generatorType
                   spiral {
                     size { arcseconds }
                     center {
@@ -572,6 +581,7 @@ class updateObservations_GmosImaging extends OdbSuite with UpdateObservationsOps
                 }
                 skyCount
                 skyOffsets {
+                  generatorType
                   random {
                     size { arcseconds }
                     center {
@@ -583,6 +593,7 @@ class updateObservations_GmosImaging extends OdbSuite with UpdateObservationsOps
               }
               interleaved {
                 offsets {
+                  generatorType
                   spiral {
                     size { arcseconds }
                     center {
@@ -593,6 +604,7 @@ class updateObservations_GmosImaging extends OdbSuite with UpdateObservationsOps
                 }
                 skyCount
                 skyOffsets {
+                  generatorType
                   random {
                     size { arcseconds }
                     center {
@@ -686,6 +698,7 @@ class updateObservations_GmosImaging extends OdbSuite with UpdateObservationsOps
                     "grouped": {
                       "order": "DECREASING",
                       "offsets": {
+                        "generatorType": "SPIRAL",
                         "spiral": {
                           "size": { "arcseconds": 10 },
                           "center": {
@@ -696,6 +709,7 @@ class updateObservations_GmosImaging extends OdbSuite with UpdateObservationsOps
                       },
                       "skyCount": 2,
                       "skyOffsets": {
+                        "generatorType": "RANDOM",
                         "random": {
                           "size": { "arcseconds": 13 },
                           "center": {
@@ -743,9 +757,15 @@ class updateObservations_GmosImaging extends OdbSuite with UpdateObservationsOps
                   "variant": {
                     "grouped": null,
                     "interleaved": {
-                      "offsets": null,
+                      "offsets": {
+                        "generatorType": "NONE",
+                        "spiral": null
+                      },
                       "skyCount": 0,
-                      "skyOffsets": null
+                      "skyOffsets": {
+                        "generatorType": "NONE",
+                        "random": null
+                      }
                     },
                     "preImaging": null
                   }
@@ -784,9 +804,15 @@ class updateObservations_GmosImaging extends OdbSuite with UpdateObservationsOps
                   "variant": {
                     "grouped": {
                       "order": "INCREASING",
-                      "offsets": null,
+                      "offsets": {
+                        "generatorType": "NONE",
+                        "spiral": null
+                      },
                       "skyCount": 0,
-                      "skyOffsets": null
+                      "skyOffsets": {
+                        "generatorType": "NONE",
+                        "random": null
+                      }
                     },
                     "interleaved": null,
                     "preImaging": null
@@ -808,9 +834,8 @@ class updateObservations_GmosImaging extends OdbSuite with UpdateObservationsOps
       )
     )
 
-  test("observing mode: preImaging -> interleaved -> preImaging"):
-
-    val query = """
+  val preImagingInterleavedSwitchQuery: String =
+    s"""
       observations {
         instrument
         observingMode {
@@ -820,6 +845,7 @@ class updateObservations_GmosImaging extends OdbSuite with UpdateObservationsOps
               grouped {
                 order
                 offsets {
+                  generatorType
                   spiral {
                     size { arcseconds }
                     center {
@@ -830,6 +856,7 @@ class updateObservations_GmosImaging extends OdbSuite with UpdateObservationsOps
                 }
                 skyCount
                 skyOffsets {
+                  generatorType
                   random {
                     size { arcseconds }
                     center {
@@ -841,6 +868,7 @@ class updateObservations_GmosImaging extends OdbSuite with UpdateObservationsOps
               }
               interleaved {
                 offsets {
+                  generatorType
                   spiral {
                     size { arcseconds }
                     center {
@@ -851,6 +879,7 @@ class updateObservations_GmosImaging extends OdbSuite with UpdateObservationsOps
                 }
                 skyCount
                 skyOffsets {
+                  generatorType
                   random {
                     size { arcseconds }
                     center {
@@ -883,6 +912,8 @@ class updateObservations_GmosImaging extends OdbSuite with UpdateObservationsOps
         }
       }
     """
+
+  test("observing mode: preImaging -> interleaved -> preImaging"):
 
     val update0 = """
       scienceRequirements: {
@@ -1003,6 +1034,7 @@ class updateObservations_GmosImaging extends OdbSuite with UpdateObservationsOps
                     "grouped": null,
                     "interleaved": {
                       "offsets": {
+                        "generatorType": "SPIRAL",
                         "spiral": {
                           "size": { "arcseconds":  20},
                           "center": {
@@ -1012,7 +1044,10 @@ class updateObservations_GmosImaging extends OdbSuite with UpdateObservationsOps
                         }
                       },
                       "skyCount": 0,
-                      "skyOffsets": null
+                      "skyOffsets": {
+                        "generatorType": "NONE",
+                        "random": null
+                      }
                     },
                     "preImaging": null
                   }
@@ -1081,9 +1116,148 @@ class updateObservations_GmosImaging extends OdbSuite with UpdateObservationsOps
     multiUpdateTest(
       pi,
       List(
-        (update0, query, expected0), // initial preImaging
-        (update1, query, expected1), // interleaved
-        (update2, query, expected2)  // return to preImaging
+        (update0, preImagingInterleavedSwitchQuery, expected0), // initial preImaging
+        (update1, preImagingInterleavedSwitchQuery, expected1), // interleaved
+        (update2, preImagingInterleavedSwitchQuery, expected2)  // return to preImaging
+      )
+    )
+
+  test("observing mode: preImaging -> interleaved (no offsets)"):
+
+    val update0 = """
+      scienceRequirements: {
+        exposureTimeMode: {
+          signalToNoise: {
+            value: 100.0
+            at: { nanometers: 500.0 }
+          }
+        }
+      }
+      observingMode: {
+        gmosNorthImaging: {
+          filters: [
+            { filter: G_PRIME },
+            { filter: R_PRIME }
+          ]
+          variant: {
+            preImaging: {
+              offset1: {
+                p: { arcseconds: 10 }
+                q: { arcseconds: 11 }
+              }
+              offset2: {
+                p: { arcseconds: 12 }
+                q: { arcseconds: 13 }
+              }
+              offset3: {
+                p: { arcseconds: 14 }
+                q: { arcseconds: 15 }
+              }
+              offset4: {
+                p: { arcseconds: 16 }
+                q: { arcseconds: 17 }
+              }
+            }
+          }
+        }
+      }
+    """
+
+    val expected0 =
+      json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "instrument": "GMOS_NORTH",
+              "observingMode": {
+                "gmosNorthImaging": {
+                  "filters": [
+                    { "filter": "G_PRIME" },
+                    { "filter": "R_PRIME" }
+                  ],
+                  "variant": {
+                    "grouped": null,
+                    "interleaved": null,
+                    "preImaging": {
+                      "offset1": {
+                        "p": { "arcseconds": 10 },
+                        "q": { "arcseconds": 11 }
+                      },
+                      "offset2": {
+                        "p": { "arcseconds": 12 },
+                        "q": { "arcseconds": 13 }
+                      },
+                      "offset3": {
+                        "p": { "arcseconds": 14 },
+                        "q": { "arcseconds": 15 }
+                      },
+                      "offset4": {
+                        "p": { "arcseconds": 16 },
+                        "q": { "arcseconds": 17 }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    """.asRight
+
+    val update1 = """
+      observingMode: {
+        gmosNorthImaging: {
+          variant: {
+            interleaved: {
+            }
+          }
+        }
+      }
+    """
+
+    val expected1 =
+      json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "instrument": "GMOS_NORTH",
+              "observingMode": {
+                "gmosNorthImaging": {
+                  "filters": [
+                    { "filter": "G_PRIME" },
+                    { "filter": "R_PRIME" }
+                  ],
+                  "variant": {
+                    "grouped": null,
+                    "interleaved": {
+                      "offsets": {
+                        "generatorType": "NONE",
+                        "spiral": null
+                      },
+                      "skyCount": 0,
+                      "skyOffsets": {
+                        "generatorType": "NONE",
+                        "random": null
+                      }
+                    },
+                    "preImaging": null
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    """.asRight
+
+    multiUpdateTest(
+      pi,
+      List(
+        (update0, preImagingInterleavedSwitchQuery, expected0), // initial preImaging
+        (update1, preImagingInterleavedSwitchQuery, expected1), // interleaved
       )
     )
 

@@ -9212,7 +9212,7 @@ type GmosGroupedImagingVariant {
   Offset generator for the science object datasets. The same offset sequence is
   created for each filter using the specified generator.
   """
-  offsets: TelescopeConfigGenerator
+  offsets: TelescopeConfigGenerator!
 
   """
   Number of sky positions to collect before and after object datasets. For
@@ -9224,7 +9224,7 @@ type GmosGroupedImagingVariant {
   """
   Offset generator to use for the sky datasets.
   """
-  skyOffsets: TelescopeConfigGenerator
+  skyOffsets: TelescopeConfigGenerator!
 }
 
 """
@@ -9272,7 +9272,7 @@ type GmosInterleavedImagingVariant {
   Offset generator for the science object datasets. The offset pattern is
   applied to the sequence of science datasets as a whole.
   """
-  offsets: TelescopeConfigGenerator
+  offsets: TelescopeConfigGenerator!
 
   """
   Number of sky positions to collect, per filter, before and after a series of
@@ -9284,7 +9284,7 @@ type GmosInterleavedImagingVariant {
   """
   Offset generator to use for the sky datasets.
   """
-  skyOffsets: TelescopeConfigGenerator
+  skyOffsets: TelescopeConfigGenerator!
 }
 
 """

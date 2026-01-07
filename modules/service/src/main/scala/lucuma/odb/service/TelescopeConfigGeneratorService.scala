@@ -10,6 +10,8 @@ import cats.syntax.either.*
 import cats.syntax.flatMap.*
 import cats.syntax.foldable.*
 import cats.syntax.functor.*
+import lucuma.core.enums.GmosImagingVariantType
+import lucuma.core.enums.Site
 import lucuma.core.enums.StepGuideState
 import lucuma.core.enums.TelescopeConfigGeneratorType
 import lucuma.core.geom.OffsetGenerator
@@ -27,6 +29,7 @@ import lucuma.odb.util.Codecs.offset
 import lucuma.odb.util.Codecs.offset_generator_role
 import lucuma.odb.util.Codecs.telescope_config
 import lucuma.odb.util.Codecs.telescope_config_generator_type
+import lucuma.odb.util.GmosCodecs.gmos_imaging_variant
 import skunk.*
 import skunk.codec.numeric.int4
 import skunk.codec.numeric.int8
@@ -50,6 +53,13 @@ sealed trait TelescopeConfigGeneratorService[F[_]]:
   def delete(
     oids: NonEmptyList[Observation.Id],
     role: TelescopeConfigGeneratorRole
+  ): F[Unit]
+
+  def resetWhenVariantNotMatching(
+    oids:       NonEmptyList[Observation.Id],
+    site:       Site,
+    newVariant: GmosImagingVariantType,
+    role:       TelescopeConfigGeneratorRole
   ): F[Unit]
 
   def replace(
@@ -127,14 +137,27 @@ object TelescopeConfigGeneratorService:
       ): F[Unit] =
         session.exec(Statements.deleteOffsetGenerator(oids, role)) // cascades to enumerated offsets
 
+      def resetWhenVariantNotMatching(
+        oids:       NonEmptyList[Observation.Id],
+        site:       Site,
+        newVariant: GmosImagingVariantType,
+        role:       TelescopeConfigGeneratorRole
+      ): F[Unit] =
+        session.exec:
+          Statements.resetWhenVariantNotMatching(
+            oids,
+            GmosImagingService.modeTableName(site),
+            newVariant,
+            role
+          )
+
       override def replace(
         oids:  NonEmptyList[Observation.Id],
         input: Option[TelescopeConfigGeneratorInput],
         role:  TelescopeConfigGeneratorRole
       ): F[Unit] =
         delete(oids, role) *>
-        input.fold(Concurrent[F].unit): in =>
-          insert(oids, in, role)
+        insert(oids, input.getOrElse(TelescopeConfigGeneratorInput.NoGeneratorInput), role)
 
       override def clone(
         originalId: Observation.Id,
@@ -256,6 +279,47 @@ object TelescopeConfigGeneratorService:
           c_seed
         ) VALUES
       """ |+| values.intercalate(void", ")
+
+    def resetWhenVariantNotMatching(
+      which:        NonEmptyList[Observation.Id],
+      imgTableName: String,
+      newVariant:   GmosImagingVariantType,
+      role:         TelescopeConfigGeneratorRole
+    ): AppliedFragment =
+      val input = TelescopeConfigGeneratorInput.NoGeneratorInput
+
+      sql"""
+        UPDATE t_offset_generator og
+        SET
+          c_type               = $telescope_config_generator_type,
+          c_uniform_corner_a_p = $angle_µas,
+          c_uniform_corner_a_q = $angle_µas,
+          c_uniform_corner_b_p = $angle_µas,
+          c_uniform_corner_b_q = $angle_µas,
+          c_size               = $angle_µas,
+          c_center_offset_p    = $angle_µas,
+          c_center_offset_q    = $angle_µas
+        WHERE og.c_role = $offset_generator_role
+          AND og.c_observation_id IN ${observation_id.list(which.length).values}
+          AND EXISTS (
+            SELECT 1
+            FROM #$imgTableName im
+            WHERE im.c_observation_id = og.c_observation_id
+              AND im.c_variant IS DISTINCT FROM $gmos_imaging_variant
+          )
+      """(
+        input.generatorType,
+        input._cornerA.p.toAngle,
+        input._cornerA.q.toAngle,
+        input._cornerB.p.toAngle,
+        input._cornerB.q.toAngle,
+        input._size,
+        input._center.p.toAngle,
+        input._center.q.toAngle,
+        role,
+        which.toList,
+        newVariant
+      )
 
     def insertEnumeratedOffsets(
       which: NonEmptyList[Observation.Id],
