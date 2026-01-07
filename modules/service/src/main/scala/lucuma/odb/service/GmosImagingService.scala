@@ -176,7 +176,7 @@ object GmosImagingService:
         reqEtm:      Option[ExposureTimeMode],
         which:       List[Observation.Id]
       )(using Transaction[F]): F[Result[Unit]] =
-        val modeName          = s"GMOS ${siteName(site).capitalize} Imaging"
+        val modeName = s"GMOS ${siteName(site).capitalize} Imaging"
 
         def offsetInput(
           in: Optional[GmosImagingVariantInput, Nullable[TelescopeConfigGeneratorInput]]
