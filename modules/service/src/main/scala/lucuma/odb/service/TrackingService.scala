@@ -51,6 +51,8 @@ import java.time.Instant
 import java.time.ZoneOffset
 import java.time.ZonedDateTime
 import scala.concurrent.duration.*
+import lucuma.core.model.Ephemeris.UserSupplied
+import lucuma.core.model.Ephemeris.Horizons
 
 trait TrackingService[F[_]]:
   import TrackingService.Snapshot
@@ -117,10 +119,8 @@ trait TrackingService[F[_]]:
   /** Create a new user-supplied ephemeris associated with the specified program. */
   def createUserSuppliedEphemeris(
     pid: Program.Id,
-    site: Site,
-    elements: NonEmptyList[Ephemeris.UserSupplied.Element]
-  ): F[Result[Ephemeris.UserSupplied]] =
-    ???
+    elements: PerSite[List[Ephemeris.UserSupplied.Element]]
+  ): F[Result[Ephemeris.Key.UserSupplied]]
 
   /** 
    * Replace a user-supplied ephemeris. Calling user must have edit permission for the
@@ -128,17 +128,11 @@ trait TrackingService[F[_]]:
    * */
   def replaceUserSuppliedEphemeris(
     ephemeris: Ephemeris.UserSupplied
-  ): F[Result[Ephemeris.UserSupplied]] =
-    ???
+  ): F[Result[Unit]]
 
-  /** 
-   * Get a user-supplied ephemeris. Calling user must have read permission for the
-   * associated program. 
-   */
-  def getUserSuppliedEphemeris(
+  def deleteUserSuppliedEphemeris(
     key: Ephemeris.Key.UserSupplied
-  ): F[Result[Ephemeris.UserSupplied]] =
-    ???
+  ): F[Result[Unit]]
 
 object TrackingService:
 
@@ -323,6 +317,30 @@ object TrackingService:
                         .map(oid -> _)
                   .map(_.toMap)
 
+      def replaceUserSuppliedEphemeris(
+        ephemeris: Ephemeris.UserSupplied
+      ): F[Result[Unit]] =
+        // TODO: check program access
+        (deleteEphemeris(ephemeris.key) *> storeEphemeris(ephemeris)).value
+
+      def createUserSuppliedEphemeris(
+        pid: Program.Id, // todo: we're not using this yet!
+        elements: PerSite[List[Ephemeris.UserSupplied.Element]]
+      ): F[Result[Ephemeris.Key.UserSupplied]] =
+        // TODO: check program access
+        ResultT
+          .liftF(session.unique(Statements.CreateUserSuppliedEphemerisKey))
+          .map(UserSupplied(_, elements))
+          .flatTap(storeEphemeris(_))
+          .map(_.key)
+          .value
+              
+      def deleteUserSuppliedEphemeris(
+        key: Ephemeris.Key.UserSupplied
+      ): F[Result[Unit]] =
+        // TODO: check program access
+        deleteEphemeris(key).value
+
       private def getSiteAndExplicitBaseCoordinates(oids: List[Observation.Id], when: TimestampInterval): F[(Map[Observation.Id, Coordinates], Map[Observation.Id, Site])] =
         NonEmptyList.fromList(oids.distinct) match
           case None => (Map.empty, Map.empty).pure[F]
@@ -371,22 +389,17 @@ object TrackingService:
               case k: Ephemeris.Key.UserSupplied => mkUserSuppliedEphemerisTracking(k, site, interval)        
 
       private def mkHorizonsEphemerisTracking(key: Ephemeris.Key.Horizons, site: Site, interval: TimestampInterval, force: Boolean): ResultT[F, (EphemerisTracking, Int)] =
-        loadOrPurgeHorizonsEphemerisEx(key, site, interval, force).flatMap:
+        val pre = if force then deleteEphemeris(key).as(Left(interval.expectedAlignedElements)) else loadHorizonsEphemeris(key, site, interval)
+        pre.flatMap:
           case Right(eph) => ResultT.success((eph.toEphemerisTracking(site), 0))
           case Left(misses) => 
             fetchHorizonsEphemeris(key, interval)
-              .flatTap(cacheHorizonsEphemeris)
+              .flatTap(storeEphemeris)
               .map(a => (a.toEphemerisTracking(site), misses))
 
       private def mkUserSuppliedEphemerisTracking(key: Ephemeris.Key.UserSupplied, site: Site, interval: TimestampInterval): ResultT[F, (EphemerisTracking, Int)] =
-        ResultT.liftF:
-          session.prepareR(Statements.SelectUserSuppliedEphemerisEntries).use: pq =>
-            pq.stream((key, interval), 1024)
-              .compile
-              .toList
-              .map(PerSite.fromPairs)
-              .map: ps =>
-                (Ephemeris.UserSupplied(key, ps).toEphemerisTracking(site), 0) 
+        loadUserSuppliedEphemeris(key, interval).map: e =>
+          (e.toEphemerisTracking(site), 0)
 
       private def fetchHorizonsEphemeris(key: Ephemeris.Key.Horizons, interval: TimestampInterval): ResultT[F, Ephemeris.Horizons] =
         ResultT:
@@ -394,38 +407,48 @@ object TrackingService:
             .alignedEphemeris(key, interval.start.toInstant, interval.days, interval.cadence)
             .map(Result.fromEither)
           
-      private def cacheHorizonsEphemeris(eph: Ephemeris.Horizons): ResultT[F, Unit] =
+      private def storeEphemeris[E <: Ephemeris.Element](eph: Ephemeris[E]): ResultT[F, Unit] =
         ResultT.liftF:
           Statements.StorableEphemerisElement
             .flatten(eph)
             .traverse: es =>
-              val stmt = Statements.insertOrUpdateHorizonsEphemeris(es)
+              val stmt = Statements.storeEphemeris(es)
               session.prepareR(stmt).use: ps =>
                 ps.execute(es)
             .void
 
-      private def loadOrPurgeHorizonsEphemerisEx(key: Ephemeris.Key.Horizons, site: Site, interval: TimestampInterval, purge: Boolean): ResultT[F, Either[Int, Ephemeris.Horizons]] =
-        if purge then
-          ResultT.liftF:
-            session.prepareR(Statements.DeleteEphemerisEntries).use: pc =>
-              pc.execute(key).as(Left(interval.expectedAlignedElements))
-        else
-          ResultT.liftF:
-            session.prepareR(Statements.SelectHorizonsEphemerisEntries).use: pq =>
-              pq.stream((key, site, interval), 1024)
-                .compile
-                .toList
-                .map: es =>                   
-                  val instants = es.map(_._2.when).toSet  
-                  val misses   = interval.expectedInstants.count(i => !instants.contains(i))
-                  if misses > 0 then
-                    Left(misses)
-                  else
-                    Right(Ephemeris.Horizons(key, interval.start.toInstant, interval.end.toInstant, PerSite.fromPairs(es)))
+      private def deleteEphemeris(key: Ephemeris.Key): ResultT[F, Unit] =
+        ResultT.liftF:
+          session.prepareR(Statements.DeleteEphemerisEntries).use: pc =>
+            pc.execute(key).void
+
+      private def loadUserSuppliedEphemeris(key: Ephemeris.Key.UserSupplied, interval: TimestampInterval): ResultT[F, Ephemeris.UserSupplied] =
+        ResultT.liftF:
+          session.prepareR(Statements.SelectUserSuppliedEphemerisEntries).use: pq =>
+            pq.stream((key, interval), 1024)
+              .compile
+              .toList
+              .map(PerSite.fromPairs)
+              .map: ps =>
+                Ephemeris.UserSupplied(key, ps)
+
+      private def loadHorizonsEphemeris(key: Ephemeris.Key.Horizons, site: Site, interval: TimestampInterval): ResultT[F, Either[Int, Ephemeris.Horizons]] =
+        ResultT.liftF:
+          session.prepareR(Statements.SelectHorizonsEphemerisEntries).use: pq =>
+            pq.stream((key, site, interval), 1024)
+              .compile
+              .toList
+              .map: es =>                   
+                val instants = es.map(_._2.when).toSet  
+                val misses   = interval.expectedInstants.count(i => !instants.contains(i))
+                if misses > 0 then
+                  Left(misses)
+                else
+                  Right(Ephemeris.Horizons(key, interval.start.toInstant, interval.end.toInstant, PerSite.fromPairs(es)))
 
   private object Statements:
 
-    /* This flattens a `Ephemeris.Horizons` and constrains its `when` values to a storable range. */
+    /* This flattens a `Ephemeris` and constrains its `when` values to a storable range. */
     case class StorableEphemerisElement(
       key: Ephemeris.Key,
       site: Site,
@@ -439,45 +462,39 @@ object TrackingService:
     )
     object StorableEphemerisElement:
 
-      def flatten(ephemeris: Ephemeris.Horizons): Option[NonEmptyList[StorableEphemerisElement]] =
+      def flatten[E <: Ephemeris.Element](ephemeris: Ephemeris[E]): Option[NonEmptyList[StorableEphemerisElement]] =
         ephemeris
           .elements
           .mapWithSite: (site, elements) =>
             NonEmptyList.fromList:
               elements.flatMap: entry =>
                 Timestamp.fromInstant(entry.when).map: when =>
-                  StorableEphemerisElement(
-                    ephemeris.key,
-                    site,
-                    when,
-                    entry.coordinates,
-                    entry.velocity,
-                    entry.airmass.filterNot(_.value.value > AirMassBound.Max.value.value.value.value), // Horizons returns airmasses > 3
-                    entry.extinction.filterNot(Extinction.FromMilliVegaMagnitude.reverseGet(_) >= 1), // also extinctions > 1
-                    Some(entry.visualMagnitude),
-                    entry.surfaceBrightness,
-                  )
+                  entry match
+                    case UserSupplied.Element(_, coordinates, velocity) => 
+                      StorableEphemerisElement(
+                        ephemeris.key,
+                        site,
+                        when,
+                        coordinates,
+                        velocity,
+                        None,
+                        None,
+                        None,
+                        None
+                      )
+                    case Horizons.Element(_, coordinates, velocity, airmass, extinction, visualMagnitude, surfaceBrightness) =>
+                      StorableEphemerisElement(
+                        ephemeris.key,
+                        site,
+                        when,
+                        coordinates,
+                        velocity,
+                        airmass.filterNot(_.value.value > AirMassBound.Max.value.value.value.value), // Horizons returns airmasses > 3
+                        extinction.filterNot(Extinction.FromMilliVegaMagnitude.reverseGet(_) >= 1), // also extinctions > 1
+                        Some(visualMagnitude),
+                        surfaceBrightness,
+                      )
           .combineAll
-            
-      def flatten(ephemeris: Ephemeris.UserSupplied): Option[NonEmptyList[StorableEphemerisElement]] =
-        ephemeris
-          .elements
-          .mapWithSite: (site, elements) =>
-            NonEmptyList.fromList:
-              elements.flatMap: entry =>
-                Timestamp.fromInstant(entry.when).map: when =>
-                  StorableEphemerisElement(
-                    ephemeris.key,
-                    site,
-                    when,
-                    entry.coordinates,
-                    entry.velocity,
-                    None,
-                    None,
-                    None,
-                    None
-                  )
-          .combineAll          
 
     def selectSiteAndExplicitBaseCoordinates(oids: NonEmptyList[Observation.Id], when: TimestampInterval, metadata: Metadata): Query[oids.type, (Observation.Id, Option[Site], Option[Coordinates])] =
       sql"""
@@ -497,7 +514,7 @@ object TrackingService:
             
             (oid, osite, (ora, odec).mapN(Coordinates.apply))
 
-    def insertOrUpdateHorizonsEphemeris[A <: NonEmptyList[StorableEphemerisElement]](entries: A): Command[entries.type] = {
+    def storeEphemeris[A <: NonEmptyList[StorableEphemerisElement]](entries: A): Command[entries.type] = {
 
       val enc: Encoder[StorableEphemerisElement] =
         ( 
@@ -618,13 +635,18 @@ object TrackingService:
       ).map: (site, ts, ra, dec, v) =>
         site -> Ephemeris.UserSupplied.Element(ts.toInstant, Coordinates(ra, dec), v)
 
-    val DeleteEphemerisEntries: Command[Ephemeris.Key.Horizons] =
+    val DeleteEphemerisEntries: Command[Ephemeris.Key] =
       sql"""
         DELETE
         FROM  t_ephemeris
         WHERE c_key_type = $ephemeris_key_type
         AND   c_des = $varchar
       """
-        .contramap[Ephemeris.Key.Horizons]: key =>
+        .contramap[Ephemeris.Key]: key =>
           (key.keyType, key.des)
         .command
+
+    val CreateUserSuppliedEphemerisKey: Query[skunk.Void, Ephemeris.Key.UserSupplied] =
+      sql"""
+        SELECT nextval('s_user_supplied_ephemeris_id')
+      """.query(int4).map(Ephemeris.Key.UserSupplied.apply)

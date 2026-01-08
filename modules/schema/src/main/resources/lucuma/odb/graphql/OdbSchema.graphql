@@ -3449,7 +3449,17 @@ input SetObservationWorkflowStateInput {
 }
 
 """
-Nonsidereal target parameters.  Supply `keyType` and `des` or `key`
+Input for an element in a user-supplied ephemeris. All values must be specified.
+"""
+input UserSuppliedEphemerisElement {
+  when: Timestamp
+  coordinates: CoordinatesInput
+  velocity: OffsetInput
+}
+
+"""
+Nonsidereal target parameters. 
+For the key, if specified, provide either (`keyType` and `des`) or `key`.
 """
 input NonsiderealInput {
   """
@@ -3466,6 +3476,12 @@ input NonsiderealInput {
   The key field must be either specified or skipped altogether.  It cannot be unset with a null value.
   """
   key: NonEmptyString
+
+  """
+  Ephemeris must be specified if (and only if) the key type is USER_SUPPLIED.
+  """
+  ephemeris: [UserSuppliedEphemerisElement!]
+
 }
 
 """
