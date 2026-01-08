@@ -13,8 +13,13 @@ import eu.timepit.refined.types.string.NonEmptyString
 
 object NonsiderealInput {
 
-  type Create = Either[Ephemeris.Key.Horizons, List[Ephemeris.UserSupplied.Element]]
-  type Update = Either[Ephemeris.Key.Horizons, (Ephemeris.Key.UserSupplied,  List[Ephemeris.UserSupplied.Element])]
+  enum Create:
+    case Horizons(key: Ephemeris.Key.Horizons)
+    case UserSupplied(ephemeris: List[Ephemeris.UserSupplied.Element])
+
+  enum Edit:
+    case Horizons(key: Ephemeris.Key.Horizons)
+    case UserSupplied(key: Ephemeris.Key.UserSupplied, ephemeris: List[Ephemeris.UserSupplied.Element])
 
   val EphemerisKeyTypeBinding = enumeratedBinding[EphemerisKeyType]
   val EphemerisKeyBinding: Matcher[Ephemeris.Key] =
@@ -37,14 +42,14 @@ object NonsiderealInput {
       ) =>
         val rEphemerisKey = (rKeyType, rDes, rKey).parTupled.flatMap(resolveKey)
         (rEphemerisKey, rEphemeris).parTupled.flatMap:
-          case (None, Some(eph)) => Result.success(Right(eph))
-          case (Some(k: Ephemeris.Key.Horizons), None) => Result.success(Left(k))
+          case (None, Some(eph)) => Result.success(Create.UserSupplied(eph))
+          case (Some(k: Ephemeris.Key.Horizons), None) => Result.success(Create.Horizons(k))
           case (Some(k: Ephemeris.Key.Horizons), Some(_)) => Result.failure("Cannot specify a Horizons key with a user-supplied ephemeris.")
           case (Some(k: Ephemeris.Key.UserSupplied), _) => Result.failure("Cannot specify a user-supplied ephemeris key on creation.")
           case (None, None) => Result.failure("Must specify either a Horizons key or a user-supplied ephemeris, but not both.")
     }
 
-  val UpdateBinding: Matcher[Update] =
+  val EditBinding: Matcher[Edit] =
     ObjectFieldsBinding.rmap {
       case List(
         EphemerisKeyTypeBinding.Option("keyType", rKeyType),
@@ -54,39 +59,12 @@ object NonsiderealInput {
       ) =>
         val rEphemerisKey = (rKeyType, rDes, rKey).parTupled.flatMap(resolveKey)
         (rEphemerisKey, rEphemeris).parTupled.flatMap:
-          case (Some(k: Ephemeris.Key.Horizons), None) => Result.success(Left(k))
+          case (Some(k: Ephemeris.Key.Horizons), None) => Result.success(Edit.Horizons(k))
           case (Some(k: Ephemeris.Key.Horizons), Some(_)) => Result.failure("Cannot specify a Horizons key with a user-supplied ephemeris.")
-          case (Some(k: Ephemeris.Key.UserSupplied), Some(eph)) => Result.success(Right(k, eph))
+          case (Some(k: Ephemeris.Key.UserSupplied), Some(eph)) => Result.success(Edit.UserSupplied(k, eph))
           case (Some(k: Ephemeris.Key.UserSupplied), None) => Result.failure("Must specify an ephemeris if the key type is user-supplied.")
           case (None, _) => Result.failure("Must specify an ephemeris key on update.")
     }
 
-
-
-  val Binding: Matcher[Ephemeris.Key] =
-    ObjectFieldsBinding.rmap {
-      case List(
-        EphemerisKeyTypeBinding.Option("keyType", rKeyType),
-        NonEmptyStringBinding.Option("des", rDes),
-        NonEmptyStringBinding.Option("key", rKey),
-        UserSuppliedEphemerisElementInput.Binding.List.Option("ephemeris", rEphemeris),
-      ) =>
-        (rKeyType, rDes, rKey).parTupled.flatMap {
-
-          case (Some(k), Some(d), None) =>
-            Ephemeris.Key.fromTypeAndDes.getOption((k, d.value)) match {
-              case Some(k) => Result(k)
-              case None    => Matcher.validationFailure(s"Invalid designation '$d' for key type $k.")
-            }
-          case (None, None, Some(k)) =>
-            Ephemeris.Key.fromString.getOption(k.value) match {
-              case Some(k) => Result(k)
-              case None    => Matcher.validationFailure(s"Invalid ephemeris key: '$k'.")
-            }
-          case _ =>
-            Matcher.validationFailure(s"You must either provide key, or provide both keyType and des.")
-
-        }
-    }
 }
 

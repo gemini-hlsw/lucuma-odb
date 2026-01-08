@@ -60,6 +60,7 @@ import skunk.codec.all.*
 import skunk.implicits.*
 
 import Services.Syntax.*
+import lucuma.odb.graphql.input.NonsiderealInput
 
 trait TargetService[F[_]] {
   def createTarget(
@@ -107,7 +108,8 @@ object TargetService {
         input.foldWithId(OdbError.NotAuthorized(user.id).asFailureF): (input, pid) =>
           val af = input.subtypeInfo match
             case s: SiderealInput.Create  => Statements.insertSiderealFragment(pid, input.name, s, input.sourceProfile.asJson, disposition, role)
-            case n: Ephemeris.Key => Statements.insertNonsiderealFragment(pid, input.name, n, input.sourceProfile.asJson, disposition, role)
+            case NonsiderealInput.Create.Horizons(k) => Statements.insertNonsiderealFragment(pid, input.name, k, input.sourceProfile.asJson, disposition, role)
+            case NonsiderealInput.Create.UserSupplied(k) => ???
             case OpportunityInput.Create(r) => Statements.insertOpportunityFragment(pid, input.name, r, input.sourceProfile.asJson, disposition, role)
           session.prepareR(af.fragment.query(target_id)).use: ps =>
             ps.unique(af.argument).map(Result.success)
@@ -434,7 +436,7 @@ object TargetService {
     // When we update tracking, set the opposite tracking fields to null.
     // If this causes a constraint error it means that the user changed the target type but did not
     // specify every field. We can catch this case and report a useful error.
-    def subtypeInfoUpdates(tracking: SiderealInput.Edit | Ephemeris.Key | OpportunityInput.Edit): List[AppliedFragment] =
+    def subtypeInfoUpdates(tracking: SiderealInput.Edit | NonsiderealInput.Edit | OpportunityInput.Edit): List[AppliedFragment] =
 
       val NullOutNonsiderealFields =
         List(
@@ -484,7 +486,7 @@ object TargetService {
           NullOutNonsiderealFields ++
           NullOutOpportunityFields
 
-        case ek: Ephemeris.Key =>
+        case NonsiderealInput.Edit.Horizons(ek) =>
           void"c_type = 'nonsidereal'" ::
           List(
             sql"c_nsid_des = $text".apply(ek.des),
@@ -493,6 +495,8 @@ object TargetService {
           ) ++
           NullOutSiderealFields ++
           NullOutOpportunityFields
+
+        case NonsiderealInput.Edit.UserSupplied(k, eph) => ???
 
         case opp: OpportunityInput.Edit =>
           void"c_type = 'opportunity'" ::
