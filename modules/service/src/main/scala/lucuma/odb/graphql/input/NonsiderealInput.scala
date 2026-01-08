@@ -10,16 +10,17 @@ import lucuma.core.enums.EphemerisKeyType
 import lucuma.core.model.Ephemeris
 import lucuma.odb.graphql.binding.*
 import eu.timepit.refined.types.string.NonEmptyString
+import lucuma.core.data.PerSite
 
 object NonsiderealInput {
 
   enum Create:
     case Horizons(key: Ephemeris.Key.Horizons)
-    case UserSupplied(ephemeris: List[Ephemeris.UserSupplied.Element])
+    case UserSupplied(ephemeris: PerSite[List[Ephemeris.UserSupplied.Element]])
 
   enum Edit:
     case Horizons(key: Ephemeris.Key.Horizons)
-    case UserSupplied(key: Ephemeris.Key.UserSupplied, ephemeris: List[Ephemeris.UserSupplied.Element])
+    case UserSupplied(key: Ephemeris.Key.UserSupplied, ephemeris: PerSite[List[Ephemeris.UserSupplied.Element]])
 
   val EphemerisKeyTypeBinding = enumeratedBinding[EphemerisKeyType]
   val EphemerisKeyBinding: Matcher[Ephemeris.Key] =
@@ -38,7 +39,7 @@ object NonsiderealInput {
         EphemerisKeyTypeBinding.Option("keyType", rKeyType),
         NonEmptyStringBinding.Option("des", rDes),
         EphemerisKeyBinding.Option("key", rKey),
-        UserSuppliedEphemerisElementInput.Binding.List.Option("ephemeris", rEphemeris),
+        UserSuppliedEphemerisInput.Binding.Option("ephemeris", rEphemeris),
       ) =>
         val rEphemerisKey = (rKeyType, rDes, rKey).parTupled.flatMap(resolveKey)
         (rEphemerisKey, rEphemeris).parTupled.flatMap:
@@ -55,7 +56,7 @@ object NonsiderealInput {
         EphemerisKeyTypeBinding.Option("keyType", rKeyType),
         NonEmptyStringBinding.Option("des", rDes),
         EphemerisKeyBinding.Option("key", rKey),
-        UserSuppliedEphemerisElementInput.Binding.List.Option("ephemeris", rEphemeris),
+        UserSuppliedEphemerisInput.Binding.Option("ephemeris", rEphemeris),
       ) =>
         val rEphemerisKey = (rKeyType, rDes, rKey).parTupled.flatMap(resolveKey)
         (rEphemerisKey, rEphemeris).parTupled.flatMap:

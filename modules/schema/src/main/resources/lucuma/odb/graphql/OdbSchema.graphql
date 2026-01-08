@@ -3458,6 +3458,14 @@ input UserSuppliedEphemerisElement {
 }
 
 """
+Input for a user-supplied ephemeris. Both sites must be specified (but may be empty).
+"""
+input UserSuppliedEphemeris {
+  gn: [UserSuppliedEphemerisElement!]!
+  gs: [UserSuppliedEphemerisElement!]!
+}
+
+"""
 Nonsidereal target parameters. 
 For the key, if specified, provide either (`keyType` and `des`) or `key`.
 """
@@ -3480,7 +3488,7 @@ input NonsiderealInput {
   """
   Ephemeris must be specified if (and only if) the key type is USER_SUPPLIED.
   """
-  ephemeris: [UserSuppliedEphemerisElement!]
+  ephemeris: UserSuppliedEphemeris
 
 }
 
