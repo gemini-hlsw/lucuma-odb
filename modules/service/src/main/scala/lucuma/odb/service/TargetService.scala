@@ -61,6 +61,7 @@ import skunk.implicits.*
 
 import Services.Syntax.*
 import lucuma.odb.graphql.input.NonsiderealInput
+import grackle.ResultT
 
 trait TargetService[F[_]] {
   def createTarget(
@@ -106,14 +107,20 @@ object TargetService {
         role: Option[CalibrationRole] = None
       )(using Transaction[F]): F[Result[Target.Id]] =
         input.foldWithId(OdbError.NotAuthorized(user.id).asFailureF): (input, pid) =>
-          val af = input.subtypeInfo match
-            case s: SiderealInput.Create  => Statements.insertSiderealFragment(pid, input.name, s, input.sourceProfile.asJson, disposition, role)
-            case NonsiderealInput.Create.Horizons(k) => Statements.insertNonsiderealFragment(pid, input.name, k, input.sourceProfile.asJson, disposition, role)
-            case NonsiderealInput.Create.UserSupplied(k) => ???
-            case OpportunityInput.Create(r) => Statements.insertOpportunityFragment(pid, input.name, r, input.sourceProfile.asJson, disposition, role)
-          session.prepareR(af.fragment.query(target_id)).use: ps =>
-            ps.unique(af.argument).map(Result.success)
-
+          val insertFragment: ResultT[F, AppliedFragment] = input.subtypeInfo match
+            case s: SiderealInput.Create  => Statements.insertSiderealFragment(pid, input.name, s, input.sourceProfile.asJson, disposition, role).pure
+            case OpportunityInput.Create(r) => Statements.insertOpportunityFragment(pid, input.name, r, input.sourceProfile.asJson, disposition, role).pure
+            case NonsiderealInput.Create.Horizons(k) => Statements.insertNonsiderealFragment(pid, input.name, k, input.sourceProfile.asJson, disposition, role).pure
+            case NonsiderealInput.Create.UserSupplied(elems) =>
+              ResultT(trackingService.createUserSuppliedEphemeris(pid, elems)).map: k =>
+                 Statements.insertNonsiderealFragment(pid, input.name, k, input.sourceProfile.asJson, disposition, role)
+          insertFragment
+            .flatMap: af =>
+              ResultT.liftF:
+                session.prepareR(af.fragment.query(target_id)).use: ps =>
+                  ps.unique(af.argument)
+            .value
+            
       override def updateTargets(checked: AccessControl.Checked[TargetPropertiesInput.Edit])(using Transaction[F]): F[Result[List[Target.Id]]] =
         checked.fold(Result(Nil).pure[F]): (props, which) =>
           updateTargetsImpl(props, which).map:
@@ -123,6 +130,15 @@ object TargetService {
 
       private def updateTargetsImpl(input: TargetPropertiesInput.Edit, which: AppliedFragment)(using Transaction[F]): F[UpdateTargetsResponse] =
 
+        // Updates to the user-supplied ephemeris, if any
+        val replaceEphemeris: F[Unit] = 
+          input
+            .subtypeInfo
+            .collect:
+              case NonsiderealInput.Edit.UserSupplied(k, elems) =>
+                trackingService.replaceUserSuppliedEphemeris(Ephemeris.UserSupplied(k, elems))
+            .sequence_
+
         // Updates that don't concern source profile
         val nonSourceProfileUpdates: Stream[F, Target.Id] = {
           val update = Statements.updateTargets(input, which)
@@ -131,42 +147,44 @@ object TargetService {
           }
         }
 
-        input.sourceProfile match {
-          case None =>
+        replaceEphemeris >> {
+          input.sourceProfile match {
+            case None =>
 
-            // We're not updating the source profile, so we're basically done
-            nonSourceProfileUpdates.compile.toList.map(UpdateTargetsResponse.Success(_))
+              // We're not updating the source profile, so we're basically done
+              nonSourceProfileUpdates.compile.toList.map(UpdateTargetsResponse.Success(_))
 
-          case Some(fun) =>
+            case Some(fun) =>
 
-            // Here we must (embarrassingly) update each source profile individually, but we can
-            // save a little bit of overhaed by preparing the statements once and reusing them.
-            Stream.resource((
-              session.prepareR(sql"select c_source_profile from t_target where c_target_id = $target_id".query(jsonb)),
-              session.prepareR(sql"update t_target set c_source_profile = $jsonb where c_target_id = $target_id".command)
-            ).tupled).flatMap { (read, update) =>
-              nonSourceProfileUpdates.evalMap { tid =>
-                read.unique(tid).map(_.hcursor.as[SourceProfile]).flatMap {
-                  case Left(err) => Result.failure(err.getMessage).pure[F]
-                  case Right(sp) => fun(sp).map(_.asJson).traverse(update.execute(_, tid).as(tid))
+              // Here we must (embarrassingly) update each source profile individually, but we can
+              // save a little bit of overhaed by preparing the statements once and reusing them.
+              Stream.resource((
+                session.prepareR(sql"select c_source_profile from t_target where c_target_id = $target_id".query(jsonb)),
+                session.prepareR(sql"update t_target set c_source_profile = $jsonb where c_target_id = $target_id".command)
+              ).tupled).flatMap { (read, update) =>
+                nonSourceProfileUpdates.evalMap { tid =>
+                  read.unique(tid).map(_.hcursor.as[SourceProfile]).flatMap {
+                    case Left(err) => Result.failure(err.getMessage).pure[F]
+                    case Right(sp) => fun(sp).map(_.asJson).traverse(update.execute(_, tid).as(tid))
+                  }
                 }
-              }
-            } .compile.toList.map(_.sequence).flatMap { r =>
+              } .compile.toList.map(_.sequence).flatMap { r =>
 
-              // If any source profile updates failed then roll back.
-              r match {
-                case Result.Success(ids)      => UpdateTargetsResponse.Success(ids).pure[F]
-                case Result.Failure(ps)       => transaction.rollback.as(UpdateTargetsResponse.SourceProfileUpdatesFailed(ps))
-                case Result.Warning(ps, ids)  => transaction.rollback.as(UpdateTargetsResponse.SourceProfileUpdatesFailed(ps))
-                case Result.InternalError(th) => Concurrent[F].raiseError(th) // ok? or should we do something else here?
+                // If any source profile updates failed then roll back.
+                r match {
+                  case Result.Success(ids)      => UpdateTargetsResponse.Success(ids).pure[F]
+                  case Result.Failure(ps)       => transaction.rollback.as(UpdateTargetsResponse.SourceProfileUpdatesFailed(ps))
+                  case Result.Warning(ps, ids)  => transaction.rollback.as(UpdateTargetsResponse.SourceProfileUpdatesFailed(ps))
+                  case Result.InternalError(th) => Concurrent[F].raiseError(th) // ok? or should we do something else here?
+                }
+
               }
 
+            } recover {
+              case SqlState.CheckViolation(ex) if ex.constraintName == Some("ra_dec_epoch_all_defined") =>
+                UpdateTargetsResponse.TrackingSwitchFailed("Sidereal targets require RA, Dec, and Epoch to be defined.")
             }
-
-          } recover {
-            case SqlState.CheckViolation(ex) if ex.constraintName == Some("ra_dec_epoch_all_defined") =>
-              UpdateTargetsResponse.TrackingSwitchFailed("Sidereal targets require RA, Dec, and Epoch to be defined.")
-          }
+        }
 
       private def clone(targetId: Target.Id, pid: Program.Id): F[Target.Id] =
         val stmt = Statements.cloneTarget(pid, targetId)
@@ -486,17 +504,15 @@ object TargetService {
           NullOutNonsiderealFields ++
           NullOutOpportunityFields
 
-        case NonsiderealInput.Edit.Horizons(ek) =>
+        case e: NonsiderealInput.Edit =>          
           void"c_type = 'nonsidereal'" ::
           List(
-            sql"c_nsid_des = $text".apply(ek.des),
-            sql"c_nsid_key_type = $ephemeris_key_type".apply(ek.keyType),
-            sql"c_nsid_key = $text".apply(Ephemeris.Key.fromString.reverseGet(ek)),
+            sql"c_nsid_des = $text".apply(e.key.des),
+            sql"c_nsid_key_type = $ephemeris_key_type".apply(e.key.keyType),
+            sql"c_nsid_key = $text".apply(Ephemeris.Key.fromString.reverseGet(e.key)),
           ) ++
           NullOutSiderealFields ++
           NullOutOpportunityFields
-
-        case NonsiderealInput.Edit.UserSupplied(k, eph) => ???
 
         case opp: OpportunityInput.Edit =>
           void"c_type = 'opportunity'" ::

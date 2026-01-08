@@ -19,6 +19,7 @@ object NonsiderealInput {
     case UserSupplied(ephemeris: PerSite[List[Ephemeris.UserSupplied.Element]])
 
   enum Edit:
+    def key: Ephemeris.Key
     case Horizons(key: Ephemeris.Key.Horizons)
     case UserSupplied(key: Ephemeris.Key.UserSupplied, ephemeris: PerSite[List[Ephemeris.UserSupplied.Element]])
 
