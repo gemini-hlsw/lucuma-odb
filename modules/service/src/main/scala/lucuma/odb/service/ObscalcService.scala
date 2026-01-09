@@ -23,8 +23,6 @@ import grackle.Result
 import grackle.syntax.*
 import lucuma.core.enums.ChargeClass
 import lucuma.core.enums.ObservationWorkflowState
-import lucuma.core.math.SingleSN
-import lucuma.core.math.TotalSN
 import lucuma.core.model.Observation
 import lucuma.core.model.ObservationWorkflow
 import lucuma.core.model.Program
@@ -34,8 +32,7 @@ import lucuma.core.model.sequence.ExecutionDigest
 import lucuma.core.util.CalculatedValue
 import lucuma.core.util.CalculationState
 import lucuma.core.util.Timestamp
-import lucuma.itc.IntegrationTime
-import lucuma.itc.SignalToNoiseAt
+import lucuma.odb.data.Itc
 import lucuma.odb.data.Obscalc
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
@@ -45,6 +42,7 @@ import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.util.Codecs.*
 import org.typelevel.log4cats.Logger
 import skunk.*
+import skunk.codec.boolean.bool
 import skunk.codec.numeric.int4
 import skunk.implicits.*
 
@@ -260,7 +258,7 @@ object ObscalcService:
                 .map(_.leftMap(e => sequenceUnavailable(e.format)))
 
         def workflow(
-          itc: Option[ItcService.AsterismResults],
+          itc: Option[Itc],
           dig: Option[ExecutionDigest]
         ): F[ObservationWorkflow] =
           Logger[F].info(s"${pending.observationId}: calculating workflow") *>
@@ -274,7 +272,7 @@ object ObscalcService:
 
         val gen = generator
 
-        def digest(itcResult: Either[OdbError, ItcService.AsterismResults]): F[Either[OdbError, (ExecutionDigest, Stream[Pure, AtomDigest])]] =
+        def digest(itcResult: Either[OdbError, Itc]): F[Either[OdbError, (ExecutionDigest, Stream[Pure, AtomDigest])]] =
           Logger[F].info(s"${pending.observationId}: calculating digest") *>
           ((for
             p <- params
@@ -283,21 +281,16 @@ object ObscalcService:
           yield (d, a)).value).flatTap: da =>
             Logger[F].info(s"${pending.observationId}: finished calculting digest: $da")
 
-        val result = for
-          r <- itcService.lookup(pending.programId, pending.observationId)
-          _ <- Logger[F].info(s"${pending.observationId}: itc lookup: $r")
-          d <- digest(r)
-          w <- workflow(r.toOption, d.toOption.map(_._1))
-        yield d.fold(
-          err => (Obscalc.Result.Error(err, w), Stream.empty),
-          dig => (
-            r.fold(
-              _ => Obscalc.Result.WithoutTarget(dig._1, w),
-              i => Obscalc.Result.WithTarget(Obscalc.ItcResult(i.acquisitionResult.focus, i.scienceResult.focus), dig._1, w)
-            ),
-            dig._2
+        val result: F[(Obscalc.Result, Stream[Pure, AtomDigest])] =
+          for
+            r <- itcService.lookup(pending.programId, pending.observationId)
+            _ <- Logger[F].info(s"${pending.observationId}: itc lookup: $r")
+            d <- digest(r)
+            w <- workflow(r.toOption, d.toOption.map(_._1))
+          yield d.fold(
+            err => (Obscalc.Result.Error(err, w), Stream.empty),
+            dig => (Obscalc.Result.Success(r.fold(_ => false, _ => true), dig._1, w), dig._2)
           )
-        )
 
         Logger[F].info(s"${pending.observationId}: *** start calculating") *>
         result.flatTap: r =>
@@ -345,32 +338,16 @@ object ObscalcService:
       int4_nonneg           // c_failure_count
     ).to[Obscalc.Meta]
 
-    val integration_time: Codec[IntegrationTime] =
-      (time_span *: int4_pos).to[IntegrationTime]
-
-    val signal_to_noise_at: Codec[SignalToNoiseAt] =
-      (wavelength_pm *: signal_to_noise *: signal_to_noise)
-        .imap((w, s, t) => SignalToNoiseAt(w, SingleSN(s), TotalSN(t)))(
-          sna => (sna.wavelength, sna.single.value, sna.total.value)
-        )
-
-    val target_result: Codec[ItcService.TargetResult] =
-      (target_id *: integration_time *: signal_to_noise_at.opt).to[ItcService.TargetResult]
-
-    val itc_result: Codec[Obscalc.ItcResult] =
-      (target_result *: target_result).to[Obscalc.ItcResult]
-
     val observation_workflow: Codec[ObservationWorkflow] =
       (observation_workflow_state *: _observation_workflow_state *: _observation_validation).to[ObservationWorkflow]
 
     val obscalc_result_opt: Codec[Option[Obscalc.Result]] =
-      (odb_error.opt *: itc_result.opt *: execution_digest.opt *: observation_workflow).eimap {
-        case (None, None, None, _)        => none.asRight
-        case (Some(e), None, None, wf)    => Obscalc.Result.Error(e, wf).some.asRight
-        case (None, None, Some(d), wf)    => Obscalc.Result.WithoutTarget(d, wf).some.asRight
-        case (None, Some(i), Some(d), wf) => Obscalc.Result.WithTarget(i, d, wf).some.asRight
-        case (e, i, d, wf)                => s"Could not decode obscalc result: $e, $i, $d, $wf".asLeft
-      }(r => (r.flatMap(_.odbError), r.flatMap(_.itcResult), r.flatMap(_.digest), r.map(_.workflow).getOrElse(UndefinedWorkflow)))
+      (odb_error.opt *: bool *: execution_digest.opt *: observation_workflow).eimap {
+        case (None, _, None, _)     => none.asRight
+        case (Some(e), _, None, wf) => Obscalc.Result.Error(e, wf).some.asRight
+        case (None, t, Some(d), wf) => Obscalc.Result.Success(t, d, wf).some.asRight
+        case (e, t, d, wf)          => s"Could not decode obscalc result: $e, $t, $d, $wf".asLeft
+      }(r => (r.flatMap(_.odbError), r.map(_.hasItcResult).getOrElse(false), r.flatMap(_.digest), r.map(_.workflow).getOrElse(UndefinedWorkflow)))
 
     val obscalc_entry: Codec[Obscalc.Entry] =
       (obscalc_meta *: obscalc_result_opt).to[Obscalc.Entry]
@@ -396,20 +373,7 @@ object ObscalcService:
       prefixedColumns(
         prefix,
         "c_odb_error",
-
-        "c_img_target_id",
-        "c_img_exposure_time",
-        "c_img_exposure_count",
-        "c_img_wavelength",
-        "c_img_single_sn",
-        "c_img_total_sn",
-
-        "c_spec_target_id",
-        "c_spec_exposure_time",
-        "c_spec_exposure_count",
-        "c_spec_wavelength",
-        "c_spec_single_sn",
-        "c_spec_total_sn",
+        "c_has_itc_result",
 
         "c_full_setup_time",
         "c_reacq_setup_time",
@@ -600,22 +564,7 @@ object ObscalcService:
       val sciConfigs = r.digest.map(_.science.telescopeConfigs.toList)
       NonEmptyList.of(
         sql"c_odb_error            = ${odb_error.opt}"(r.odbError),
-
-        // Imaging ITC Results
-        sql"c_img_target_id        = ${target_id.opt}"(r.itcResult.map(_.imaging.targetId)),
-        sql"c_img_exposure_time    = ${time_span.opt}"(r.itcResult.map(_.imaging.value.exposureTime)),
-        sql"c_img_exposure_count   = ${int4_pos.opt}"(r.itcResult.map(_.imaging.value.exposureCount)),
-        sql"c_img_wavelength       = ${wavelength_pm.opt}"(r.itcResult.flatMap(_.imaging.signalToNoise).map(_.wavelength)),
-        sql"c_img_single_sn        = ${signal_to_noise.opt}"(r.itcResult.flatMap(_.imaging.signalToNoise).map(_.single.value)),
-        sql"c_img_total_sn         = ${signal_to_noise.opt}"(r.itcResult.flatMap(_.imaging.signalToNoise).map(_.total.value)),
-
-        // Spectroscopy ITC Results
-        sql"c_spec_target_id       = ${target_id.opt}"(r.itcResult.map(_.spectroscopy.targetId)),
-        sql"c_spec_exposure_time   = ${time_span.opt}"(r.itcResult.map(_.spectroscopy.value.exposureTime)),
-        sql"c_spec_exposure_count  = ${int4_pos.opt}"(r.itcResult.map(_.spectroscopy.value.exposureCount)),
-        sql"c_spec_wavelength      = ${wavelength_pm.opt}"(r.itcResult.flatMap(_.spectroscopy.signalToNoise).map(_.wavelength)),
-        sql"c_spec_single_sn       = ${signal_to_noise.opt}"(r.itcResult.flatMap(_.spectroscopy.signalToNoise).map(_.single.value)),
-        sql"c_spec_total_sn        = ${signal_to_noise.opt}"(r.itcResult.flatMap(_.spectroscopy.signalToNoise).map(_.total.value)),
+        sql"c_has_itc_result       = ${bool}"(r.hasItcResult),
 
         // Setup Times
         sql"c_full_setup_time      = ${time_span.opt}"(r.digest.map(_.setup.full)),

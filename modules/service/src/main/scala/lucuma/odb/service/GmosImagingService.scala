@@ -3,31 +3,39 @@
 
 package lucuma.odb.service
 
-import cats.Applicative
 import cats.data.NonEmptyList
 import cats.effect.Concurrent
+import cats.parse.*
 import cats.syntax.all.*
+import eu.timepit.refined.types.numeric.NonNegInt
 import grackle.Result
 import grackle.ResultT
 import grackle.syntax.*
-import lucuma.core.enums.GmosNorthFilter
-import lucuma.core.enums.GmosSouthFilter
+import lucuma.core.enums.GmosImagingVariantType
+import lucuma.core.enums.Site
+import lucuma.core.enums.WavelengthOrder
+import lucuma.core.math.Offset
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.Observation
 import lucuma.odb.data.ExposureTimeModeId
 import lucuma.odb.data.ExposureTimeModeRole
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.ObservingModeRowVersion
-import lucuma.odb.data.OffsetGeneratorRole
-import lucuma.odb.format.spatialOffsets.*
+import lucuma.odb.data.TelescopeConfigGeneratorRole
+import lucuma.odb.graphql.input.GmosImagingFilterInput
 import lucuma.odb.graphql.input.GmosImagingInput
-import lucuma.odb.graphql.input.OffsetGeneratorInput
+import lucuma.odb.graphql.input.GmosImagingVariantInput
+import lucuma.odb.graphql.input.TelescopeConfigGeneratorInput
+import lucuma.odb.sequence.data.TelescopeConfigGenerator
 import lucuma.odb.sequence.gmos.imaging.Config
+import lucuma.odb.sequence.gmos.imaging.Filter
+import lucuma.odb.sequence.gmos.imaging.Variant
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.GmosCodecs.*
+import monocle.Optional
 import skunk.*
-import skunk.codec.numeric.int8
-import skunk.codec.text.text
+import skunk.data.Arr
+import skunk.data.Type
 import skunk.implicits.*
 
 import Services.Syntax.*
@@ -41,14 +49,6 @@ sealed trait GmosImagingService[F[_]]:
   def selectSouth(
     which: List[Observation.Id]
   ): F[Map[Observation.Id, Config.GmosSouth]]
-
-  def selectNorthSeeds(
-    oid: Observation.Id
-  ): F[Map[GmosNorthFilter, Long]]
-
-  def selectSouthSeeds(
-    ooid: Observation.Id
-  ): F[Map[GmosSouthFilter, Long]]
 
   def insertNorth(
     input:  GmosImagingInput.Create.North,
@@ -94,99 +94,103 @@ sealed trait GmosImagingService[F[_]]:
 
 object GmosImagingService:
 
+  val siteName: Site => String = {
+    case Site.GN => "north"
+    case Site.GS => "south"
+  }
+
+  def modeViewName(s: Site): String =
+    s"v_gmos_${siteName(s)}_imaging"
+
+  def modeTableName(s: Site): String =
+    s"t_gmos_${siteName(s)}_imaging"
+
+  def filterTableName(s: Site): String =
+    s"t_gmos_${siteName(s)}_imaging_filter"
+
+
   def instantiate[F[_]: Concurrent](using Services[F]): GmosImagingService[F] =
     new GmosImagingService[F]:
 
       override def selectNorth(
         which: List[Observation.Id]
       ): F[Map[Observation.Id, Config.GmosNorth]] =
-        select("v_gmos_north_imaging", which, Statements.north)
+        select(Site.GN, which, gmos_north_filter).map: m =>
+          m.view.mapValues((fs, v, c) => Config.GmosNorth(v, fs, c)).toMap
 
       override def selectSouth(
         which: List[Observation.Id]
       ): F[Map[Observation.Id, Config.GmosSouth]] =
-        select("v_gmos_south_imaging", which, Statements.south)
+        select(Site.GS, which, gmos_south_filter).map: m =>
+          m.view.mapValues((fs, v, c) => Config.GmosSouth(v, fs, c)).toMap
 
-      private def select[A](
-        view:    String,
-        which:   List[Observation.Id],
-        decoder: Decoder[A]
-      ): F[Map[Observation.Id, A]] =
+      private def select[L](
+        site:   Site,
+        which:  List[Observation.Id],
+        filter: Codec[L]
+      ): F[Map[Observation.Id, (NonEmptyList[Filter[L]], Variant, Config.Common)]] =
         NonEmptyList
           .fromList(which)
-          .fold(Applicative[F].pure(List.empty)): oids =>
-            val af = Statements.select(view, oids)
-            session.prepareR(af.fragment.query(observation_id *: decoder)).use: pq =>
-              pq.stream(af.argument, chunkSize = 1024).compile.toList
-          .map(_.toMap)
+          .fold(Map.empty[Observation.Id, (NonEmptyList[Filter[L]], Variant, Config.Common)].pure[F]): oids =>
 
-      override def selectNorthSeeds(
-        oid: Observation.Id
-      ): F[Map[GmosNorthFilter, Long]] =
-        selectSeeds[GmosNorthFilter]("t_gmos_north_imaging_filter", oid, gmos_north_filter)
+            val decoder: Decoder[(NonEmptyList[Filter[L]], Variant.Fields, Config.Common)] =
+              Statements.filter_list(filter) *: Statements.variant_fields *: Statements.common
 
-      override def selectSouthSeeds(
-        oid: Observation.Id
-      ): F[Map[GmosSouthFilter, Long]] =
-        selectSeeds[GmosSouthFilter]("t_gmos_south_imaging_filter", oid, gmos_south_filter)
+            val precursorMap =
+              val af = Statements.select(modeTableName(site), filterTableName(site), oids)
+              session
+                .prepareR(af.fragment.query(observation_id *: decoder)).use: pq =>
+                  pq.stream(af.argument, chunkSize = 1024)
+                    .compile
+                    .toList
+                    .map(_.map((oid, fs, variantFields, common) => oid -> (fs, variantFields, common)).toMap)
 
-      private def selectSeeds[A](
-        table:   String,
-        oid:     Observation.Id,
-        decoder: Decoder[A]
-      ): F[Map[A, Long]] =
-        val af = Statements.selectSeeds(table, oid)
-        session.prepareR(af.fragment.query(decoder *: int8)).use: pq =>
-          pq.stream(af.argument, chunkSize=64)
-            .compile
-            .toList
-            .map(_.toMap)
-
+            for
+              c <- precursorMap
+              o <- services.telescopeConfigGeneratorService.select(oids, TelescopeConfigGeneratorRole.Object)
+              s <- services.telescopeConfigGeneratorService.select(oids, TelescopeConfigGeneratorRole.Sky)
+            yield c.view.map { case (oid, (fs, variantFields, common)) =>
+              val og = o.getOrElse(oid, TelescopeConfigGenerator.NoGenerator)
+              val sg = s.getOrElse(oid, TelescopeConfigGenerator.NoGenerator)
+              oid -> (fs, variantFields.toVariant(og, sg), common)
+            }.toMap
 
       override def insertNorth(
         input:  GmosImagingInput.Create.North,
         reqEtm: Option[ExposureTimeMode],
         which:  List[Observation.Id]
       )(using Transaction[F]): F[Result[Unit]] =
-        insert(
-          "GMOS North Imaging",
-          "t_gmos_north_imaging",
-          "t_gmos_north_imaging_filter",
-          gmos_north_filter,
-          input,
-          reqEtm,
-          which
-        )
+        insert(Site.GN, gmos_north_filter, input, reqEtm, which)
 
       override def insertSouth(
         input:  GmosImagingInput.Create.South,
         reqEtm: Option[ExposureTimeMode],
         which:  List[Observation.Id]
       )(using Transaction[F]): F[Result[Unit]] =
-        insert(
-          "GMOS South Imaging",
-          "t_gmos_south_imaging",
-          "t_gmos_south_imaging_filter",
-          gmos_south_filter,
-          input,
-          reqEtm,
-          which
-        )
+        insert(Site.GS, gmos_south_filter, input, reqEtm, which)
 
       private def insert[L](
-        modeName:    String,
-        modeTable:   String,
-        filterTable: String,
+        site:        Site,
         filterCodec: Codec[L],
-        input:       GmosImagingInput.Create[L],
+        input:       GmosImagingInput.Create[GmosImagingFilterInput[L]],
         reqEtm:      Option[ExposureTimeMode],
         which:       List[Observation.Id]
       )(using Transaction[F]): F[Result[Unit]] =
+        val modeName = s"GMOS ${siteName(site).capitalize} Imaging"
+
+        def offsetInput(
+          in: Optional[GmosImagingVariantInput, Nullable[TelescopeConfigGeneratorInput]]
+        ): TelescopeConfigGeneratorInput =
+          in.getOption(input.variant).flatMap(_.toOption).getOrElse(TelescopeConfigGeneratorInput.NoGeneratorInput)
+
+        val offsets    = offsetInput(GmosImagingVariantInput.offsets)
+        val skyOffsets = offsetInput(GmosImagingVariantInput.skyOffsets)
+
         NonEmptyList
           .fromList(which)
           .fold(ResultT.unit[F]): oids =>
             for
-              _   <- ResultT.liftF(session.exec(Statements.insert(modeTable, input.common, oids)))
+              _   <- ResultT.liftF(session.exec(Statements.insert(modeTableName(site), input, oids)))
 
               // Resolve the exposure time modes for acquisition and science
               r   <- ResultT(services.exposureTimeModeService.resolve(modeName, none, input.filters.map(f => (f.filter, f.exposureTimeMode)), reqEtm, which))
@@ -194,20 +198,18 @@ object GmosImagingService:
               // Insert the acquisition and science filters (initial / immutable version)
               ids <- ResultT.liftF(services.exposureTimeModeService.insertResolvedAcquisitionAndScience(r))
               ini  = stripAcquisition(ids)
-              _   <- ResultT.liftF(insertFilters(ini, filterTable, filterCodec, ObservingModeRowVersion.Initial))
+              _   <- ResultT.liftF(insertFilters(ini, site, filterCodec, ObservingModeRowVersion.Initial))
 
               // Insert the science filters (current / mutable version)
               cur <- ResultT.liftF(services.exposureTimeModeService.insertResolvedScienceOnly(stripAcquisition(r)))
-              _   <- ResultT.liftF(insertFilters(cur, filterTable, filterCodec, ObservingModeRowVersion.Current))
+              _   <- ResultT.liftF(insertFilters(cur, site, filterCodec, ObservingModeRowVersion.Current))
 
               // Insert the offset generators
               _  <- ResultT.liftF:
-                      input.common.objectOffsetGenerator.traverse_ : og =>
-                        services.offsetGeneratorService.insert(oids, og, OffsetGeneratorRole.Object)
+                      services.telescopeConfigGeneratorService.insert(oids, offsets, TelescopeConfigGeneratorRole.Object)
 
               _  <- ResultT.liftF:
-                      input.common.skyOffsetGenerator.traverse_ : og =>
-                        services.offsetGeneratorService.insert(oids, og, OffsetGeneratorRole.Sky)
+                      services.telescopeConfigGeneratorService.insert(oids, skyOffsets, TelescopeConfigGeneratorRole.Sky)
 
             yield ()
           .value
@@ -219,7 +221,7 @@ object GmosImagingService:
 
       private def insertFilters[L](
         etms:        Map[Observation.Id, NonEmptyList[(L, ExposureTimeModeId)]],
-        filterTable: String,
+        site:        Site,
         filterCodec: Codec[L],
         version:     ObservingModeRowVersion
       ): F[Unit] =
@@ -229,81 +231,67 @@ object GmosImagingService:
               fs.toList.map: (filter, eid) =>
                 (oid, filter, eid)
           .traverse_ : rs =>
-            session.exec(Statements.insertFilters(filterTable, filterCodec, rs, version))
+            session.exec(Statements.insertFilters(filterTableName(site), filterCodec, rs, version))
 
       override def deleteNorth(
         which: List[Observation.Id]
       )(using Transaction[F]): F[Unit] =
-        delete("t_gmos_north_imaging", which)
+        delete(Site.GN, which)
 
       override def deleteSouth(
         which: List[Observation.Id]
       )(using Transaction[F]): F[Unit] =
-        delete("t_gmos_south_imaging", which)
+        delete(Site.GS, which)
 
       private def delete(
-        modeTable: String,
-        which:     List[Observation.Id]
+        site:  Site,
+        which: List[Observation.Id]
       )(using Transaction[F]): F[Unit] =
         services
           .exposureTimeModeService
           .deleteMany(which, ExposureTimeModeRole.Acquisition, ExposureTimeModeRole.Science)
           .productR:
-            session.exec(Statements.delete(modeTable, which))
+            session.exec(Statements.delete(modeTableName(site), which))
 
       override def updateNorth(
         SET: GmosImagingInput.Edit.North,
         which: List[Observation.Id]
       )(using Transaction[F]): F[Result[Unit]] =
-        update(
-          "GMOS North Imaging",
-          "t_gmos_north_imaging",
-          "t_gmos_north_imaging_filter",
-          gmos_north_filter,
-          SET,
-          none,
-          which
-        )
+        update(Site.GN, gmos_north_filter, SET, none, which)
 
       override def updateSouth(
         SET: GmosImagingInput.Edit.South,
         which: List[Observation.Id]
       )(using Transaction[F]): F[Result[Unit]] =
-        update(
-          "GMOS South Imaging",
-          "t_gmos_south_imaging",
-          "t_gmos_south_imaging_filter",
-          gmos_south_filter,
-          SET,
-          none,
-          which
-        )
+        update(Site.GS, gmos_south_filter, SET, none, which)
 
       private def update[L](
-        modeName:       String,
-        modeTable:      String,
-        filterTable:    String,
+        site:           Site,
         filterCodec:    Codec[L],
-        edit:           GmosImagingInput.Edit[L],
+        edit:           GmosImagingInput.Edit[GmosImagingFilterInput[L]],
         newRequirement: Option[ExposureTimeMode],
         which:          List[Observation.Id]
       )(using Transaction[F]): F[Result[Unit]] =
+        val modeName = s"GMOS ${siteName(site)} Imaging"
 
         NonEmptyList.fromList(which).fold(().success.pure): oids =>
           val modeUpdates =
             NonEmptyList
-              .fromList(Statements.commonUpdates(edit.common))
+              .fromList(
+                Statements.commonUpdates(edit.common) ++
+                edit.variant.toList.flatMap(Statements.variantUpdates)
+               )
               .traverse_ : us =>
                 session.exec:
-                  sql"UPDATE #$modeTable SET "(Void) |+|
-                    us.intercalate(void", ")         |+|
-                    void" WHERE "                    |+|
+                  sql"UPDATE #${modeTableName(site)} SET "(Void) |+|
+                    us.intercalate(void", ")                     |+|
+                    void" WHERE "                                |+|
                     observationIdIn(oids)
 
           val filterUpdates =
             edit.filters.fold(ResultT.unit): fs =>
               for
-                _ <- ResultT.liftF(session.exec(Statements.deleteCurrentFiltersAndEtms(filterTable, oids)))
+                _ <- ResultT.liftF(session.exec(Statements.deleteCurrentFiltersAndEtms(filterTableName(site), oids)))
 
                 // Resolve the exposure time modes for acquisition and science
                 r   <- ResultT(services.exposureTimeModeService.resolve(modeName, none, fs.map(f => (f.filter, f.exposureTimeMode)), newRequirement, which))
@@ -311,24 +299,42 @@ object GmosImagingService:
                 // Insert the acquisition and science filters (current / mutable version)
                 ids <- ResultT.liftF(services.exposureTimeModeService.insertResolvedAcquisitionAndScience(r))
                 cur  = stripAcquisition(ids)
-                _   <- ResultT.liftF(insertFilters(cur, filterTable, filterCodec, ObservingModeRowVersion.Current))
+                _   <- ResultT.liftF(insertFilters(cur, site, filterCodec, ObservingModeRowVersion.Current))
               yield ()
 
           def updateOffsetForRole(
-            input: Nullable[OffsetGeneratorInput],
-            role:  OffsetGeneratorRole
+            input:   Nullable[TelescopeConfigGeneratorInput],
+            variant: GmosImagingVariantType,
+            role:    TelescopeConfigGeneratorRole
           ): F[Unit] =
-            input.toOptionOption.fold(Concurrent[F].unit): in =>
-              services.offsetGeneratorService.replace(oids, in, role)
+            input.toOptionOption.fold(
+              // the offset generator field was Absent, which means we should
+              // default it to no generator when switching variants.
+              services
+                .telescopeConfigGeneratorService
+                .resetWhenVariantNotMatching(
+                  oids,
+                  site,
+                  variant,
+                  role
+                )
+            ): in =>
+              services.telescopeConfigGeneratorService.replace(oids, in, role)
 
           val offsetUpdates =
-            updateOffsetForRole(edit.common.objectOffsetGenerator, OffsetGeneratorRole.Object) *>
-            updateOffsetForRole(edit.common.skyOffsetGenerator, OffsetGeneratorRole.Sky)
+            edit.variant.fold(().pure[F]): v =>
+              val (o, s) = v match
+                case GmosImagingVariantInput.Grouped(_, offsets, _, skyOffsets)  => (offsets, skyOffsets)
+                case GmosImagingVariantInput.Interleaved(offsets, _, skyOffsets) => (offsets, skyOffsets)
+                case _                                                           => (Nullable.Null, Nullable.Null)
+
+              updateOffsetForRole(o, v.variantType, TelescopeConfigGeneratorRole.Object) *>
+              updateOffsetForRole(s, v.variantType, TelescopeConfigGeneratorRole.Sky)
 
           (for
+            _ <- ResultT.liftF(offsetUpdates)
             _ <- ResultT.liftF(modeUpdates)
             _ <- filterUpdates
-            _ <- ResultT.liftF(offsetUpdates)
           yield ()).value
 
       override def cloneNorth(
@@ -336,128 +342,197 @@ object GmosImagingService:
         newObservationId: Observation.Id,
         etms:             List[(ExposureTimeModeId, ExposureTimeModeId)]
       )(using Transaction[F]): F[Unit] =
-        clone("t_gmos_north_imaging", "t_gmos_north_imaging_filter", observationId, newObservationId, etms)
+        clone(Site.GN, observationId, newObservationId, etms)
 
       override def cloneSouth(
         observationId:    Observation.Id,
         newObservationId: Observation.Id,
         etms:             List[(ExposureTimeModeId, ExposureTimeModeId)]
       )(using Transaction[F]): F[Unit] =
-        clone("t_gmos_south_imaging", "t_gmos_south_imaging_filter", observationId, newObservationId, etms)
+        clone(Site.GS, observationId, newObservationId, etms)
 
       private def clone(
-        modeTableName:    String,
-        filterTableName:  String,
+        site:             Site,
         observationId:    Observation.Id,
         newObservationId: Observation.Id,
         etms:             List[(ExposureTimeModeId, ExposureTimeModeId)]
       )(using Services[F]): F[Unit] =
-        session.exec(Statements.clone(modeTableName, observationId, newObservationId))                       *>
-        session.exec(Statements.cloneFiltersAndEtms(filterTableName, observationId, newObservationId, etms)) *>
-        services.offsetGeneratorService.clone(observationId, newObservationId)
+        session.exec(Statements.clone(modeTableName(site), observationId, newObservationId))                       *>
+        session.exec(Statements.cloneFiltersAndEtms(filterTableName(site), observationId, newObservationId, etms)) *>
+        services.telescopeConfigGeneratorService.clone(observationId, newObservationId)
 
   object Statements:
 
+    // Creates the codec for a single filter / ETM pair.  This corresponds to
+    // the s_filter_exposure_time_mode composite type ("s" for struct).
+    def filter[L](filter_codec: Codec[L]): Codec[Filter[L]] =
+      (filter_codec       *:
+       exposure_time_mode
+      ).to[Filter[L]]
+
+    // Decoder for a list of fiter / ETM pairs
+    def filter_list[L](filter_codec: Codec[L]): Decoder[NonEmptyList[Filter[L]]] =
+      val fieldText: Parser0[String] =
+        Parser.charsWhile0(c => c =!= ',' && c =!= ')').string
+
+      val field: Parser0[Option[String]] =
+        fieldText.map:
+          case ""     => none
+          case "null" => none
+          case s      => s.some
+
+      val fields: Parser0[List[Option[String]]] =
+        (field ~ (Parser.char(',') *> field).rep0).map: (h, t) =>
+          h :: t
+
+      val row: Parser[List[Option[String]]] =
+        fields.with1.between(Parser.char('('), Parser.char(')'))
+
+      // s_filter_exposure_time_mode codec
+      val codec = filter(filter_codec)
+
+      def encode(a: Filter[L]): String =
+        codec.encode(a).map(_.getOrElse("")).mkString("(", ",", ")")
+
+      def decode(s: String): Either[String, Filter[L]] =
+        row.parseAll(s) match
+          case Left(err)     => s"Could not parse the filter / exposure time mode row: ${err.toString}".asLeft
+          case Right(fields) => codec.decode(0, fields).leftMap(e => s"Filter / exposure time  mode row decoder failure: ${e.message}")
+
+      // I just need the decoder, but want to use `Codec.array`.  The encoder
+      // might work as well, but it hasn't been tested.  We'll just make the
+      // return type `Decoder`.
+      Codec
+        .array(encode, decode, Type("_s_filter_exposure_time_mode", List(Type("s_filter_exposure_time_mode", List(Type("d_tag"), Type("e_exp_time_mode"), Type("d_wavelength_pm"), Type("numeric"), Type("interval"), Type("int4"))))))
+        .eimap(arr => NonEmptyList.fromList(arr.toList).toRight("At least one filter entry expected"))(Arr.fromFoldable)
+
+    val variant_fields: Decoder[Variant.Fields] =
+      (gmos_imaging_variant *:
+       wavelength_order     *:
+       int4_nonneg          *:
+       offset               *:
+       offset               *:
+       offset               *:
+       offset
+      ).to[Variant.Fields]
+
     val common: Decoder[Config.Common] =
       (
-        multiple_filters_mode.opt *:
         gmos_binning              *:
         gmos_binning.opt          *:
         gmos_amp_read_mode.opt    *:
         gmos_amp_gain.opt         *:
-        gmos_roi.opt              *:
-        text
-      ).emap: (mf, defaultBin, explicitBin, arm, ag, roi, offsets) =>
-        if offsets.isEmpty then
-          Config.Common(defaultBin, explicitBin, mf, arm, ag, roi, Nil).asRight
-        else
-          OffsetsFormat.getOption(offsets) match
-            case Some(offs) => Config.Common(defaultBin, explicitBin, mf, arm, ag, roi, offs).asRight
-            case None => s"Could not parse '$offsets' as a spatial offsets list.".asLeft
-
-    val north: Decoder[Config.GmosNorth] =
-      (_gmos_north_filter *:
-       common
-      ).emap { case (f, c) =>
-        NonEmptyList.fromList(f.toList).fold(
-          "Filters list cannot be empty".asLeft
-        )(Config.GmosNorth(_, c).asRight)
-      }
-
-    val south: Decoder[Config.GmosSouth] =
-      (_gmos_south_filter *:
-       common
-      ).emap { case (f, c) =>
-        NonEmptyList.fromList(f.toList).fold(
-          "Filters list cannot be empty".asLeft
-        )(Config.GmosSouth(_, c).asRight)
-      }
+        gmos_roi.opt
+      ).to[Config.Common]
 
     def select(
-      viewName: String,
-      oids:     NonEmptyList[Observation.Id]
+      table:       String,
+      filterTable: String,
+      oids:        NonEmptyList[Observation.Id]
     ): AppliedFragment =
       sql"""
+        WITH selected_observations AS (
+          SELECT
+            t.c_observation_id
+          FROM #$table t
+          WHERE """(Void) |+| observationIdIn(oids) |+| sql"""
+        ),
+        aggregated_filters AS (
+          SELECT
+            f.c_observation_id,
+            array_agg(
+              ROW(
+                f.c_filter,
+                e.c_exposure_time_mode,
+                e.c_signal_to_noise_at,
+                e.c_signal_to_noise,
+                e.c_exposure_time,
+                e.c_exposure_count
+              )::s_filter_exposure_time_mode
+              ORDER BY f.c_filter
+            ) AS c_filters
+          FROM #$filterTable f
+          JOIN t_exposure_time_mode e ON e.c_exposure_time_mode_id = f.c_exposure_time_mode_id
+          JOIN selected_observations s ON s.c_observation_id  = f.c_observation_id
+          WHERE f.c_version = 'current'
+          GROUP BY f.c_observation_id
+        )
         SELECT
-          c_observation_id,
-          c_filters,
-          c_multiple_filters_mode,
-          c_bin_default,
-          c_bin,
-          c_amp_read_mode,
-          c_amp_gain,
-          c_roi,
-          c_offsets
-        FROM #$viewName
-        WHERE
-      """(Void) |+| observationIdIn(oids)
+          t.c_observation_id,
+          f.c_filters,
+          t.c_variant,
+          t.c_wavelength_order,
+          t.c_sky_count,
+          t.c_pre_imaging_off1_p,
+          t.c_pre_imaging_off1_q,
+          t.c_pre_imaging_off2_p,
+          t.c_pre_imaging_off2_q,
+          t.c_pre_imaging_off3_p,
+          t.c_pre_imaging_off3_q,
+          t.c_pre_imaging_off4_p,
+          t.c_pre_imaging_off4_q,
+          t.c_bin_default,
+          t.c_bin,
+          t.c_amp_read_mode,
+          t.c_amp_gain,
+          t.c_roi
+        FROM #$table t
+        JOIN aggregated_filters f ON f.c_observation_id = t.c_observation_id;
+      """(Void)
 
-    def selectSeeds(
-      tableName: String,
-      oid:       Observation.Id
-    ): AppliedFragment =
-      sql"""
-        SELECT
-          c_filter,
-          c_seed
-        FROM #$tableName
-        WHERE c_observation_id = $observation_id
-      """.apply(oid)
-
-    def insert(
+    def insert[L](
       modeTable: String,
-      common:    GmosImagingInput.Create.Common,
+      input:     GmosImagingInput.Create[L],
       which:     NonEmptyList[Observation.Id]
     ): AppliedFragment =
       val modeEntries =
         which.map: oid =>
           sql"""(
             $observation_id,
-            ${multiple_filters_mode.opt},
             ${gmos_binning.opt},
             ${gmos_amp_read_mode.opt},
             ${gmos_amp_gain.opt},
             ${gmos_roi.opt},
-            ${text}
+            $gmos_imaging_variant,
+            $wavelength_order,
+            $int4_nonneg,
+            $offset,
+            $offset,
+            $offset,
+            $offset
           )"""(
             oid,
-            common.explicitMultipleFiltersMode,
-            common.explicitBin,
-            common.explicitAmpReadMode,
-            common.explicitAmpGain,
-            common.explicitRoi,
-            common.formattedOffsets
+            input.common.explicitBin,
+            input.common.explicitAmpReadMode,
+            input.common.explicitAmpGain,
+            input.common.explicitRoi,
+            input.variant.variantType,
+            GmosImagingVariantInput.order.getOption(input.variant).flatten.getOrElse(Variant.Grouped.Default.order),
+            GmosImagingVariantInput.skyCount.getOption(input.variant).flatten.getOrElse(NonNegInt.MinValue),
+            GmosImagingVariantInput.preImaging.getOption(input.variant).flatMap(_.offset1).getOrElse(Offset.Zero),
+            GmosImagingVariantInput.preImaging.getOption(input.variant).flatMap(_.offset2).getOrElse(Offset.Zero),
+            GmosImagingVariantInput.preImaging.getOption(input.variant).flatMap(_.offset3).getOrElse(Offset.Zero),
+            GmosImagingVariantInput.preImaging.getOption(input.variant).flatMap(_.offset4).getOrElse(Offset.Zero)
           )
 
       sql"""
         INSERT INTO #$modeTable (
           c_observation_id,
-          c_multiple_filters_mode,
           c_bin,
           c_amp_read_mode,
           c_amp_gain,
           c_roi,
-          c_offsets
+          c_variant,
+          c_wavelength_order,
+          c_sky_count,
+          c_pre_imaging_off1_p,
+          c_pre_imaging_off1_q,
+          c_pre_imaging_off2_p,
+          c_pre_imaging_off2_q,
+          c_pre_imaging_off3_p,
+          c_pre_imaging_off3_q,
+          c_pre_imaging_off4_p,
+          c_pre_imaging_off4_q
         ) VALUES
       """(Void) |+| modeEntries.intercalate(void", ")
 
@@ -479,21 +554,39 @@ object GmosImagingService:
       sql"""
         INSERT INTO #$tableName (
           c_observation_id,
-          c_multiple_filters_mode,
           c_bin,
           c_amp_read_mode,
           c_amp_gain,
           c_roi,
-          c_offsets
+          c_variant,
+          c_wavelength_order,
+          c_sky_count,
+          c_pre_imaging_off1_p,
+          c_pre_imaging_off1_q,
+          c_pre_imaging_off2_p,
+          c_pre_imaging_off2_q,
+          c_pre_imaging_off3_p,
+          c_pre_imaging_off3_q,
+          c_pre_imaging_off4_p,
+          c_pre_imaging_off4_q
         )
         SELECT
           """.apply(Void) |+| sql"$observation_id".apply(newId) |+| sql""",
-          c_multiple_filters_mode,
           c_bin,
           c_amp_read_mode,
           c_amp_gain,
           c_roi,
-          c_offsets
+          c_variant,
+          c_wavelength_order,
+          c_sky_count,
+          c_pre_imaging_off1_p,
+          c_pre_imaging_off1_q,
+          c_pre_imaging_off2_p,
+          c_pre_imaging_off2_q,
+          c_pre_imaging_off3_p,
+          c_pre_imaging_off3_q,
+          c_pre_imaging_off4_p,
+          c_pre_imaging_off4_q
         FROM #$tableName
         WHERE c_observation_id = """.apply(Void) |+| sql"$observation_id".apply(originalId)
 
@@ -536,20 +629,103 @@ object GmosImagingService:
     def commonUpdates(
       input: GmosImagingInput.Edit.Common
     ): List[AppliedFragment] =
-      val upMultipleFiltersMode = sql"c_multiple_filters_mode = ${multiple_filters_mode.opt}"
       val upBin = sql"c_bin = ${gmos_binning.opt}"
       val upAmpReadMode = sql"c_amp_read_mode = ${gmos_amp_read_mode.opt}"
       val upAmpGain = sql"c_amp_gain = ${gmos_amp_gain.opt}"
       val upRoi = sql"c_roi = ${gmos_roi.opt}"
-      val upOffsets = sql"c_offsets = ${text}"
       List(
-        input.explicitMultipleFiltersMode.toOptionOption.map(upMultipleFiltersMode),
         input.explicitBin.toOptionOption.map(upBin),
         input.explicitAmpReadMode.toOptionOption.map(upAmpReadMode),
         input.explicitAmpGain.toOptionOption.map(upAmpGain),
-        input.explicitRoi.toOptionOption.map(upRoi),
-        upOffsets(input.formattedOffsets).some
+        input.explicitRoi.toOptionOption.map(upRoi)
       ).flatten
+
+    def variantUpdates(
+      input: GmosImagingVariantInput
+    ): List[AppliedFragment] =
+      val upVariant  = sql"c_variant   = $gmos_imaging_variant"
+
+      // Sky count requires special handling because it is used by two different
+      // modes.  If we are simply updating an existing mode, then we don't
+      // change the sky count value unless it is explicitly set.  If we are
+      // switching modes, then we reset the value if it is not explicitly set.
+      def upSkyCount(variant: GmosImagingVariantType, skyCount: Option[NonNegInt]): AppliedFragment =
+        (variant, skyCount) match
+          case (GmosImagingVariantType.PreImaging, _) =>
+            sql"c_sky_count = $int4_nonneg"(NonNegInt.MinValue)
+
+          case (v, None)                   =>
+            sql"""
+              c_sky_count =
+                CASE
+                  WHEN c_variant = $gmos_imaging_variant THEN c_sky_count
+                  ELSE $int4_nonneg
+                END
+            """.apply(v, NonNegInt.MinValue)
+
+          case (_, Some(sc))               =>
+            sql"c_sky_count = $int4_nonneg"(sc)
+
+      def grouped: List[AppliedFragment] =
+        val upOrder = sql"c_wavelength_order = ${wavelength_order}"
+
+        input match
+          case GmosImagingVariantInput.Grouped(order, _, skyCount, _) =>
+            List(
+              upVariant(GmosImagingVariantType.Grouped),
+              upSkyCount(GmosImagingVariantType.Grouped, skyCount)
+            ) ++ order.map(upOrder).toList
+          case _                                                         =>
+            List(upOrder(Variant.Grouped.Default.order))
+
+      def interleaved: List[AppliedFragment] =
+        input match
+          case GmosImagingVariantInput.Interleaved(_, skyCount, _) =>
+            List(
+              upVariant(GmosImagingVariantType.Interleaved),
+              upSkyCount(GmosImagingVariantType.Interleaved, skyCount)
+            )
+          case _                                      =>
+            Nil
+
+      def preImaging: List[AppliedFragment] =
+        val upPre1p = sql"c_pre_imaging_off1_p = ${angle_µas}"
+        val upPre1q = sql"c_pre_imaging_off1_q = ${angle_µas}"
+        val upPre2p = sql"c_pre_imaging_off2_p = ${angle_µas}"
+        val upPre2q = sql"c_pre_imaging_off2_q = ${angle_µas}"
+        val upPre3p = sql"c_pre_imaging_off3_p = ${angle_µas}"
+        val upPre3q = sql"c_pre_imaging_off3_q = ${angle_µas}"
+        val upPre4p = sql"c_pre_imaging_off4_p = ${angle_µas}"
+        val upPre4q = sql"c_pre_imaging_off4_q = ${angle_µas}"
+
+        input match
+          case GmosImagingVariantInput.PreImaging(o1, o2, o3, o4) =>
+            upSkyCount(GmosImagingVariantType.PreImaging, None) :: List(
+              upVariant(GmosImagingVariantType.PreImaging).some,
+              o1.map(o => upPre1p(o.p.toAngle)),
+              o1.map(o => upPre1q(o.q.toAngle)),
+              o2.map(o => upPre2p(o.p.toAngle)),
+              o2.map(o => upPre2q(o.q.toAngle)),
+              o3.map(o => upPre3p(o.p.toAngle)),
+              o3.map(o => upPre3q(o.q.toAngle)),
+              o4.map(o => upPre4p(o.p.toAngle)),
+              o4.map(o => upPre4q(o.q.toAngle))
+            ).flatten
+          case _                                                     =>
+            val zero = Variant.PreImaging.Default
+            List(
+              upPre1p(zero.offset1.p.toAngle),
+              upPre1q(zero.offset1.q.toAngle),
+              upPre2p(zero.offset2.p.toAngle),
+              upPre2q(zero.offset2.q.toAngle),
+              upPre3p(zero.offset3.p.toAngle),
+              upPre3q(zero.offset3.q.toAngle),
+              upPre4p(zero.offset4.p.toAngle),
+              upPre4q(zero.offset4.q.toAngle)
+            )
+
+      grouped ++ interleaved ++ preImaging
+
 
     def deleteCurrentFiltersAndEtms(
       tableName: String,

@@ -5,6 +5,6 @@ package lucuma.odb.data
 
 import lucuma.core.util.Enumerated
 
-enum OffsetGeneratorRole(val tag: String) derives Enumerated:
-  case Object extends OffsetGeneratorRole("object")
-  case Sky    extends OffsetGeneratorRole("sky")
+enum TelescopeConfigGeneratorRole(val tag: String) derives Enumerated:
+  case Object extends TelescopeConfigGeneratorRole("object")
+  case Sky    extends TelescopeConfigGeneratorRole("sky")

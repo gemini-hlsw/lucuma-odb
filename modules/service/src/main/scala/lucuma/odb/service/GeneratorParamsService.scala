@@ -21,12 +21,9 @@ import cats.syntax.functorFilter.*
 import cats.syntax.option.*
 import cats.syntax.traverse.*
 import lucuma.core.enums.CalibrationRole
-import lucuma.core.enums.GmosNorthFilter
-import lucuma.core.enums.GmosSouthFilter
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.ScienceBand
 import lucuma.core.math.RadialVelocity
-import lucuma.core.math.Wavelength
 import lucuma.core.model.ConstraintSet
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.Observation
@@ -39,12 +36,6 @@ import lucuma.core.util.Timestamp
 import lucuma.itc.client.GmosFpu
 import lucuma.itc.client.ImagingParameters
 import lucuma.itc.client.InstrumentMode
-import lucuma.itc.client.InstrumentMode.Flamingos2Imaging
-import lucuma.itc.client.InstrumentMode.Flamingos2Spectroscopy
-import lucuma.itc.client.InstrumentMode.GmosNorthImaging
-import lucuma.itc.client.InstrumentMode.GmosNorthSpectroscopy
-import lucuma.itc.client.InstrumentMode.GmosSouthImaging
-import lucuma.itc.client.InstrumentMode.GmosSouthSpectroscopy
 import lucuma.itc.client.ItcConstraintsInput.*
 import lucuma.itc.client.SpectroscopyParameters
 import lucuma.itc.client.TargetInput
@@ -56,8 +47,6 @@ import lucuma.odb.sequence.data.MissingParam
 import lucuma.odb.sequence.data.MissingParamSet
 import lucuma.odb.sequence.flamingos2
 import lucuma.odb.sequence.flamingos2.longslit.Acquisition as F2Acquisition
-import lucuma.odb.sequence.gmos.longslit.Acquisition
-import lucuma.odb.syntax.exposureTimeMode.*
 import lucuma.odb.util.Codecs.*
 import skunk.*
 import skunk.circe.codec.json.*
@@ -119,22 +108,6 @@ object GeneratorParamsService {
           case (MissingData(p0), MissingData(p1))                       => p0 === p1
           case (ConflictingData, ConflictingData)                       => true
           case _                                                        => false
-
-  extension (mode: InstrumentMode)
-    def asImaging(λ: Wavelength): InstrumentMode =
-      mode match
-        case Flamingos2Imaging(_)                    =>
-          mode
-        case Flamingos2Spectroscopy(_, f, _)         =>
-          InstrumentMode.Flamingos2Imaging(F2Acquisition.toAcquisitionFilter(f))
-        case GmosNorthImaging(_, _)                  =>
-          mode
-        case GmosNorthSpectroscopy(_, _, _, _, _, _) =>
-          InstrumentMode.GmosNorthImaging(Acquisition.filter(GmosNorthFilter.acquisition, λ, _.wavelength), none)
-        case GmosSouthImaging(_, _)                  =>
-          mode
-        case GmosSouthSpectroscopy(_, _, _, _, _, _) =>
-          InstrumentMode.GmosSouthImaging(Acquisition.filter(GmosSouthFilter.acquisition, λ, _.wavelength), none)
 
   def instantiate[F[_]: Concurrent](using Services[F]): GeneratorParamsService[F] =
     new GeneratorParamsService[F] {
@@ -249,22 +222,38 @@ object GeneratorParamsService {
         config:    Option[ObservingMode]
       ): Either[Error, GeneratorParams] =
 
-        // Placeholder until we straighten out GMOS imaging
-        def itcObsParamsWithRequirementEtm(
-          mode: InstrumentMode
-        ): Either[MissingParamSet, ItcInput] =
-          obsParams
-            .exposureTimeMode
-            .toRight:
-              MissingParamSet.fromParams(NonEmptyList.one(MissingParam.forObservation("exposure time mode")))
-            .flatMap: etm =>
-              val sci = etm
-              val acq = ExposureTimeMode.forAcquisition(etm.at)
-              itcObsParams(acq, sci, obsParams, mode)
+        def spectroscopyGeneratorParams(
+          obsMode: ObservingMode,
+          acqEtm:  ExposureTimeMode,
+          acqMode: InstrumentMode,
+          sciEtm:  ExposureTimeMode,
+          sciMode: InstrumentMode
+        ): GeneratorParams =
+
+          val consInput   = obsParams.constraints.toInput
+          val acquisition = ImagingParameters(acqEtm, consInput, acqMode)
+          val science     = SpectroscopyParameters(sciEtm, consInput, sciMode)
+
+          val itcInput    = (
+             obsParams.targets.traverse(itcTargetParams),
+             // the db guarantees at most one BO
+             obsParams.blindOffset.traverse(itcTargetParams)
+            ).mapN { case (regularTargetInputs, blindOffsetTargetInput) =>
+              ItcInput.Spectroscopy(
+                acquisition,
+                science,
+                regularTargetInputs,
+                blindOffsetTargetInput
+              )
+            }
+            .leftMap(MissingParamSet.fromParams)
+            .toEither
+
+          GeneratorParams(itcInput, obsParams.scienceBand, obsMode, obsParams.calibrationRole, obsParams.declaredComplete, obsParams.acqResetTime)
 
         observingMode(obsParams.targets, config).map:
           case gn @ gmos.longslit.Config.GmosNorth(g, f, u, c, a) =>
-            val mode = InstrumentMode.GmosNorthSpectroscopy(
+            val sciMode = InstrumentMode.GmosNorthSpectroscopy(
               c.centralWavelength,
               g,
               f,
@@ -272,10 +261,19 @@ object GeneratorParamsService {
               gn.ccdMode.some,
               gn.roi.some
             )
-            GeneratorParams(itcObsParams(a.exposureTimeMode, c.exposureTimeMode, obsParams, mode), obsParams.scienceBand, gn, obsParams.calibrationRole, obsParams.declaredComplete, obsParams.acqResetTime)
+            spectroscopyGeneratorParams(
+              obsMode = gn,
+              acqEtm  = a.exposureTimeMode,
+              acqMode = sciMode.copy(
+                filter = a.explicitFilter.getOrElse(a.defaultFilter).some,
+                roi    = a.explicitRoi.getOrElse(a.roi).imagingRoi.some
+              ),
+              sciEtm   = c.exposureTimeMode,
+              sciMode  = sciMode
+            )
 
           case gs @ gmos.longslit.Config.GmosSouth(g, f, u, c, a) =>
-            val mode = InstrumentMode.GmosSouthSpectroscopy(
+            val sciMode = InstrumentMode.GmosSouthSpectroscopy(
               c.centralWavelength,
               g,
               f,
@@ -283,59 +281,68 @@ object GeneratorParamsService {
               gs.ccdMode.some,
               gs.roi.some
             )
-            GeneratorParams(itcObsParams(a.exposureTimeMode, c.exposureTimeMode, obsParams, mode), obsParams.scienceBand, gs, obsParams.calibrationRole, obsParams.declaredComplete, obsParams.acqResetTime)
+            spectroscopyGeneratorParams(
+              obsMode = gs,
+              acqEtm  = a.exposureTimeMode,
+              acqMode = sciMode.copy(
+                filter = a.explicitFilter.getOrElse(a.defaultFilter).some,
+                roi    = a.explicitRoi.getOrElse(a.roi).imagingRoi.some
+              ),
+              sciEtm   = c.exposureTimeMode,
+              sciMode  = sciMode
+            )
 
-          case f2 @ flamingos2.longslit.Config(disperser = disperser, filter = filter, fpu = fpu, acquisitionExposureTimeMode = acq, scienceExposureTimeMode = sci) =>
-            val mode = InstrumentMode.Flamingos2Spectroscopy(disperser, filter, fpu)
-            GeneratorParams(itcObsParams(acq, sci, obsParams, mode), obsParams.scienceBand, f2, obsParams.calibrationRole, obsParams.declaredComplete, obsParams.acqResetTime)
+          case f2 @ flamingos2.longslit.Config(disperser, filter, fpu, acq, sci, _, _, _, _, _, _, _, _) =>
+            val sciMode   = InstrumentMode.Flamingos2Spectroscopy(disperser, filter, fpu)
+            spectroscopyGeneratorParams(
+              obsMode = f2,
+              acqEtm  = acq,
+              acqMode = sciMode.copy(
+                filter = F2Acquisition.toAcquisitionFilter(sciMode.filter)
+              ),
+              sciEtm  = sci,
+              sciMode = sciMode
+            )
 
-          case gn @ gmos.imaging.Config.GmosNorth(filters = filters) =>
-            // FIXME: This is not right we have n filters
-            val mode = InstrumentMode.GmosNorthImaging(filters.head, gn.ccdMode.some)
-            GeneratorParams(itcObsParamsWithRequirementEtm(mode), obsParams.scienceBand, gn, obsParams.calibrationRole, obsParams.declaredComplete, obsParams.acqResetTime)
+          case gn @ gmos.imaging.Config.GmosNorth(_, fs, _) =>
+            // An input per filter.
+            val inputs = fs.map: f =>
+              ImagingParameters(
+                f.exposureTimeMode,
+                obsParams.constraints.toInput,
+                InstrumentMode.GmosNorthImaging(f.filter, gn.ccdMode.some)
+              )
 
-          case gs @ gmos.imaging.Config.GmosSouth(filters = filters) =>
-            // FIXME: This is not right we have n filters
-            val mode = InstrumentMode.GmosSouthImaging(filters.head, gs.ccdMode.some)
-            GeneratorParams(itcObsParamsWithRequirementEtm(mode), obsParams.scienceBand, gs, obsParams.calibrationRole, obsParams.declaredComplete, obsParams.acqResetTime)
+            val itcInput =
+              obsParams
+                .targets
+                .traverse(itcTargetParams)
+                .map(ItcInput.Imaging(inputs, _))
+                .leftMap(MissingParamSet.fromParams)
+                .toEither
 
-      private def itcObsParams(
-        acqEtm:    ExposureTimeMode,
-        sciEtm:    ExposureTimeMode,
-        obsParams: ObsParams,
-        mode:      InstrumentMode
-      ): Either[MissingParamSet, ItcInput] =
+            GeneratorParams(itcInput, obsParams.scienceBand, gn, obsParams.calibrationRole, obsParams.declaredComplete, none)
 
-        // TODO: We have a mismatch here between the ITC and the ODB that we'll
-        // need to sort out in order to do imaging.  The ITC takes imaging
-        // parameters and spectroscopy parameters.  We're using the imaging
-        // parameters for acquisition always.  Also, we need to handle the case
-        // where we have multiple filters each with its own ETM.
+          case gs @ gmos.imaging.Config.GmosSouth(_, fs, _) =>
+            // An input per filter.
+            val inputs = fs.map: f =>
+              ImagingParameters(
+                f.exposureTimeMode,
+                obsParams.constraints.toInput,
+                InstrumentMode.GmosSouthImaging(f.filter, gs.ccdMode.some)
+              )
 
-        (obsParams.targets.traverse(itcTargetParams),
-         // the db guarantees at most one BO
-         obsParams.blindOffset.traverse(itcTargetParams)
-        ).mapN { case (regularTargetInputs, blindOffsetTargetInput) =>
-          val ici = obsParams.constraints.toInput
-          ItcInput(
-            ImagingParameters(
-              acqEtm,
-              ici,
-              mode.asImaging(acqEtm.at)
-            ),
-            SpectroscopyParameters(
-              sciEtm,
-              ici,
-              mode
-            ),
-            regularTargetInputs,
-            blindOffsetTargetInput
-          )
-        }
-        .leftMap(MissingParamSet.fromParams)
-        .toEither
+            val itcInput =
+              obsParams
+                .targets
+                .traverse(itcTargetParams)
+                .map(ItcInput.Imaging(inputs, _))
+                .leftMap(MissingParamSet.fromParams)
+                .toEither
 
-      private def itcTargetParams(targetParams: TargetParams): ValidatedNel[MissingParam, (Target.Id, TargetInput, Option[Timestamp])] = {
+            GeneratorParams(itcInput, obsParams.scienceBand, gs, obsParams.calibrationRole, obsParams.declaredComplete, none)
+
+      private def itcTargetParams(targetParams: TargetParams): ValidatedNel[MissingParam, ItcInput.TargetDefinition] = {
         // If emission line, SED not required, otherwhise must be defined
         def hasITCRequiredSEDParam(sp: SourceProfile): Boolean =
           SourceProfile.unnormalizedSED.getOption(sp).flatten.isDefined ||
@@ -361,7 +368,11 @@ object GeneratorParamsService {
            Validated.condNel(validBrightness, (), MissingParam.forTarget(tid, "brightness measure")),
            Validated.condNel(validCustomSed, (), MissingParam.forTarget(tid, "custom SED attachment"))
           ).mapN: (sp,_, _, _) =>
-            (tid, TargetInput(sp, targetParams.radialVelocity.getOrElse(RadialVelocity.Zero)), targetParams.customSedTimestamp)
+            ItcInput.TargetDefinition(
+              tid,
+              TargetInput(sp, targetParams.radialVelocity.getOrElse(RadialVelocity.Zero)),
+              targetParams.customSedTimestamp
+            )
       }
 
     }

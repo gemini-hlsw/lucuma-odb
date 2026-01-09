@@ -7,7 +7,6 @@ package table
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.GmosCodecs.*
 import skunk.codec.numeric.int4
-import skunk.codec.numeric.int8
 
 trait GmosImagingFilterTable[F[_]] extends BaseMapping[F]:
 
@@ -17,7 +16,6 @@ trait GmosImagingFilterTable[F[_]] extends BaseMapping[F]:
     val Filter: ColumnRef             = col("c_filter",                gmos_north_filter)
     val ExposureTimeModeId: ColumnRef = col("c_exposure_time_mode_id", int4)
     val Version: ColumnRef            = col("c_version",               observing_mode_row_version)
-    val Seed: ColumnRef               = col("c_seed",                  int8)
 
   object GmosSouthImagingFilterTable extends TableDef("t_gmos_south_imaging_filter"):
 
@@ -25,4 +23,3 @@ trait GmosImagingFilterTable[F[_]] extends BaseMapping[F]:
     val Filter: ColumnRef             = col("c_filter",                gmos_south_filter)
     val ExposureTimeModeId: ColumnRef = col("c_exposure_time_mode_id", int4)
     val Version: ColumnRef            = col("c_version",               observing_mode_row_version)
-    val Seed: ColumnRef               = col("c_seed",                  int8)
