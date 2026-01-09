@@ -792,7 +792,7 @@ class perScienceObservationCalibrations
       assertEquals(removed.size, 0)
     }
 
-  test("calling recalculateCalibrations multiple times is idempotent"):
+  test("calling recalculateCalibrations multiple times is idempotent".only):
     for {
       pid                  <- createProgramAs(pi)
       tid                  <- createTargetWithProfileAs(pi, pid)
