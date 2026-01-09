@@ -266,12 +266,26 @@ object PerScienceObservationCalibrationsService:
         gid: Group.Id
       )(using Transaction[F], SuperUserAccess): F[List[Observation.Id]] =
         for {
-          existing <- findAllTelluricObservations(gid)
-          // Never delete observations with data
-          toDelete <- excludeOngoingAndCompleted(existing, identity)
-          _        <- NonEmptyList.fromList(toDelete)
-                       .traverse_(observationService.deleteCalibrationObservations)
-          created  <- createTelluricCalibrations(pid, obs.id, gid)
+          existing      <- findAllTelluricObservations(gid)
+          deletable     <- excludeOngoingAndCompleted(existing, identity)
+          duration      <- obsDuration(obs.id)
+          requiredCount  = duration match
+                             case Some(d) if d > MultiTelluricThreshold => 2
+                             case Some(_)                               => 1
+                             case None                                  => 0
+          // Only delete/recreate if total count changes (use existing, not deletable)
+          created       <- if (existing.size != requiredCount)
+                             for
+                               _ <- NonEmptyList.fromList(deletable)
+                                     .traverse_(observationService.deleteCalibrationObservations)
+                               c <- createTelluricCalibrations(pid, obs.id, gid)
+                             yield c
+                           else
+                             List.empty.pure[F]
+          // Always sync configuration on all deletable (non-executed) tellurics
+          allTellurics  <- findAllTelluricObservations(gid)
+          toSync        <- excludeOngoingAndCompleted(allTellurics, identity)
+          _             <- toSync.traverse_(tid => syncConfiguration(obs.id, tid))
         } yield created
 
       private def generateTelluricForScience(
