@@ -266,12 +266,12 @@ object PerScienceObservationCalibrationsService:
         gid: Group.Id
       )(using Transaction[F], SuperUserAccess): F[List[Observation.Id]] =
         for {
-          existingTellurics <- findAllTelluricObservations(gid)
+          existing <- findAllTelluricObservations(gid)
           // Never delete observations with data
-          toDelete          <- excludeOngoingAndCompleted(existingTellurics, identity)
-          _                 <- NonEmptyList.fromList(toDelete)
-                                 .traverse_(nel => observationService.deleteCalibrationObservations(nel))
-          created           <- createTelluricCalibrations(pid, obs.id, gid)
+          toDelete <- excludeOngoingAndCompleted(existing, identity)
+          _        <- NonEmptyList.fromList(toDelete)
+                       .traverse_(observationService.deleteCalibrationObservations)
+          created  <- createTelluricCalibrations(pid, obs.id, gid)
         } yield created
 
       private def generateTelluricForScience(
@@ -372,7 +372,7 @@ object PerScienceObservationCalibrationsService:
           deleted           <- deleteTelluricObservationsFromGroups(emptyGroupIds.toList)
           _                 <- (info"Deleted ${deleted.size} telluric observations on program $pid: $deleted").whenA(deleted.nonEmpty)
           deletedSet        = deleted.toSet
-          // Only delete groups where ALL tellurics were successfully deleted
+          // delete groups where all tellurics are gone
           groupsToDelete    = emptyGroupIds.filter: gid =>
                                 allObsInGroups.get(gid).forall: obsWithIndices =>
                                   obsWithIndices
