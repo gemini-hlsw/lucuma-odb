@@ -281,8 +281,11 @@ object PerScienceObservationCalibrationsService:
                                c <- createTelluricCalibrations(pid, obs.id, gid)
                              yield c
                            else
-                             // Sync configuration only on deletable ones
-                             deletable.traverse_(tid => syncConfiguration(obs.id, tid)).as(List.empty)
+                             List.empty.pure[F]
+          // Always sync configuration on all deletable (non-executed) tellurics
+          allTellurics  <- findAllTelluricObservations(gid)
+          toSync        <- excludeOngoingAndCompleted(allTellurics, identity)
+          _             <- toSync.traverse_(tid => syncConfiguration(obs.id, tid))
         } yield created
 
       private def generateTelluricForScience(
