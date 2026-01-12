@@ -10,7 +10,7 @@ import cats.syntax.all.*
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.util.Enumerated
 import lucuma.odb.service.ObservationWorkflowService
-import lucuma.odb.util.Codecs.*
+import lucuma.odb.util.Codecs.{*, given}
 import lucuma.odb.util.GmosCodecs.*
 import org.tpolecat.typename.TypeName
 import org.typelevel.log4cats.Logger
@@ -71,7 +71,7 @@ object StartupDiagnostics:
           checkPostgresEnum(guide_state),
           checkPostgresEnum(multiple_filters_mode),
           checkPostgresEnum(obs_class),
-          checkPostgresEnum(observation_workflow_state),          
+          checkPostgresEnum(observation_workflow_state),
           checkPostgresEnum(observing_mode_row_version),
           checkPostgresEnum(observing_mode_type),
           checkPostgresEnum(offset_generator_role),
@@ -90,6 +90,7 @@ object StartupDiagnostics:
           checkPostgresEnum(step_stage),
           checkPostgresEnum(step_type),
           checkPostgresEnum(target_disposition),
+          checkPostgresEnum(telluric_calibration_order),
           checkPostgresEnum(tg_op),
           checkPostgresEnum(time_charge_correction_op),
           checkPostgresEnum(time_charge_discount_type),
@@ -100,13 +101,13 @@ object StartupDiagnostics:
           {
             // Hack, sorry. ObservationWorkflowService.UserState is an enum in the db but a union type here.
             NonEmptyList
-              .fromList: 
+              .fromList:
                 Enumerated[ObservationWorkflowState].all.collect:
                   case a: ObservationWorkflowService.UserState => a
               .fold(StateT.pure(())): nel =>
                 given Enumerated[ObservationWorkflowService.UserState] =
                   Enumerated.fromNEL(nel).withTag(_.tag)
-                checkPostgresEnum(user_state)          
+                checkPostgresEnum(user_state)
           },
           checkPostgresEnum(user_type),
           checkPostgresEnum(wavelength_order),
@@ -148,13 +149,13 @@ object StartupDiagnostics:
           assertUnusedPostgresEnum(Type("e_source_profile_type")),
 
           // This should come last
-          checkEnumCoverage, 
+          checkEnumCoverage,
 
         )
 
-      def runAllDiagnostics(fatal: Boolean): F[Unit] =        
+      def runAllDiagnostics(fatal: Boolean): F[Unit] =
         Logger[F].info("Running startup diagnostics.") >>
-        allDiagnostics.sequence.runS(DiagState(Nil, Nil)).map(_.errors).flatMap: errors =>
+          allDiagnostics.sequence.runS(DiagState(Nil, Nil)).map(_.errors).flatMap: errors =>
           errors.traverse_(Logger[F].error(_)) >>
             Logger[F].info("Startup diagnostics passed.").whenA(errors.isEmpty) >>
             Logger[F].error("Startup diagnostics failed.").whenA(errors.nonEmpty) >>

@@ -60,7 +60,7 @@ class perScienceObservationCalibrations
   val when = LocalDateTime.of(2024, 1, 1, 12, 0, 0).toInstant(ZoneOffset.UTC)
 
   // Mock telluric star
-  val mockStar = TelluricStar(
+  val mockStarBefore = TelluricStar(
     hip = 12345,
     spType = TelluricType.A0V,
     coordinates = Coordinates(
@@ -73,10 +73,23 @@ class perScienceObservationCalibrations
     order = TelluricCalibrationOrder.Before
   )
 
+  val mockStarAfter = TelluricStar(
+    hip = 12346,
+    spType = TelluricType.A0V,
+    coordinates = Coordinates(
+      RightAscension.fromDoubleDegrees(123.789),
+      Declination.fromDoubleDegrees(45.123).getOrElse(Declination.Zero)
+    ),
+    distance = 98.2,
+    hmag = 7.8,
+    score = 0.92,
+    order = TelluricCalibrationOrder.After
+  )
+
   val mockTarget = Target.Sidereal(
     name = "HIP 12345".refined,
     tracking = SiderealTracking(
-      baseCoordinates = mockStar.coordinates,
+      baseCoordinates = mockStarBefore.coordinates,
       epoch = lucuma.core.math.Epoch.J2000,
       properMotion = None,
       radialVelocity = None,
@@ -92,14 +105,24 @@ class perScienceObservationCalibrations
     "data" -> Json.obj(
       "search" -> Json.arr(
         Json.obj(
-          "HIP" -> mockStar.hip.asJson,
-          "spType" -> Json.fromString(mockStar.spType.tag),
-          "RA" -> mockStar.coordinates.ra.toAngle.toDoubleDegrees.asJson,
-          "Dec" -> mockStar.coordinates.dec.toAngle.toSignedDoubleDegrees.asJson,
-          "Distance" -> mockStar.distance.asJson,
-          "Hmag" -> mockStar.hmag.asJson,
-          "Score" -> mockStar.score.asJson,
-          "Order" -> Json.fromString(mockStar.order.tag)
+          "HIP" -> mockStarBefore.hip.asJson,
+          "spType" -> Json.fromString(mockStarBefore.spType.tag),
+          "RA" -> mockStarBefore.coordinates.ra.toAngle.toDoubleDegrees.asJson,
+          "Dec" -> mockStarBefore.coordinates.dec.toAngle.toSignedDoubleDegrees.asJson,
+          "Distance" -> mockStarBefore.distance.asJson,
+          "Hmag" -> mockStarBefore.hmag.asJson,
+          "Score" -> mockStarBefore.score.asJson,
+          "Order" -> Json.fromString(mockStarBefore.order.tag)
+        ),
+        Json.obj(
+          "HIP" -> mockStarAfter.hip.asJson,
+          "spType" -> Json.fromString(mockStarAfter.spType.tag),
+          "RA" -> mockStarAfter.coordinates.ra.toAngle.toDoubleDegrees.asJson,
+          "Dec" -> mockStarAfter.coordinates.dec.toAngle.toSignedDoubleDegrees.asJson,
+          "Distance" -> mockStarAfter.distance.asJson,
+          "Hmag" -> mockStarAfter.hmag.asJson,
+          "Score" -> mockStarAfter.score.asJson,
+          "Order" -> Json.fromString(mockStarAfter.order.tag)
         )
       )
     )
@@ -1243,14 +1266,18 @@ class perScienceObservationCalibrations
       obsInGroup         <- queryObservationsInGroup(groupId)
       telluricObs        =  obsInGroup.filter(_.calibrationRole.contains(CalibrationRole.Telluric))
       scienceObs         =  obsInGroup.filter(_.calibrationRole.isEmpty).head
+      metas              <- added.traverse(selectMeta)
+      orders             =  metas.flatten.map(_.calibrationOrder)
     } yield {
       assertEquals(telluricObs.size, 2)
       assertEquals(obsInGroup.size, 3)
       assertEquals(added.size, 2)
       assertEquals(removed.size, 0)
-      // Verify tellurics are positioned before and after science observation
+      // Verify tellurics positions in the group
       assertEquals(telluricObs.head.groupIndex.get, scienceObs.groupIndex.get - 1)
       assertEquals(telluricObs.last.groupIndex.get, scienceObs.groupIndex.get + 1)
+      assert(orders.contains(TelluricCalibrationOrder.Before))
+      assert(orders.contains(TelluricCalibrationOrder.After))
     }
 
   test("create one telluric for short duration science observation"):
@@ -1266,13 +1293,15 @@ class perScienceObservationCalibrations
       obsInGroup         <- queryObservationsInGroup(groupId)
       telluricObs        =  obsInGroup.filter(_.calibrationRole.contains(CalibrationRole.Telluric))
       scienceObs         =  obsInGroup.filter(_.calibrationRole.isEmpty).head
+      meta               <- selectMeta(added.head)
     } yield {
       assertEquals(telluricObs.size, 1)
       assertEquals(obsInGroup.size, 2)
       assertEquals(added.size, 1)
       assertEquals(removed.size, 0)
-      // Verify telluric is positioned after science observation
+      // Verify tellurics positions in the group
       assertEquals(telluricObs.head.groupIndex.get, scienceObs.groupIndex.get + 1)
+      assertEquals(meta.get.calibrationOrder, TelluricCalibrationOrder.After)
     }
 
   test("update from two to one telluric when duration decreases"):
@@ -1294,11 +1323,11 @@ class perScienceObservationCalibrations
       obsInGroup2          <- queryObservationsInGroup(groupId)
       telluricObs2         =  obsInGroup2.filter(_.calibrationRole.contains(CalibrationRole.Telluric))
     } yield {
-      // Initially 2 tellurics created
+      // first we have 2 tellurics
       assertEquals(telluricObs1.size, 2)
       assertEquals(added1.size, 2)
       assertEquals(removed1.size, 0)
-      // After duration decrease, both tellurics deleted and 1 new one created
+      // As duration is shorter we only need one
       assertEquals(telluricObs2.size, 1)
       assertEquals(added2.size, 1)
       assertEquals(removed2.size, 2)

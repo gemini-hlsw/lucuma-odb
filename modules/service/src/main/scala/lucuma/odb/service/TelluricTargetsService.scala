@@ -14,6 +14,7 @@ import lucuma.core.enums.Flamingos2Filter
 import lucuma.core.enums.Flamingos2Fpu
 import lucuma.core.enums.StellarLibrarySpectrum
 import lucuma.core.enums.TargetDisposition
+import lucuma.core.enums.TelluricCalibrationOrder
 import lucuma.core.math.Coordinates
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
@@ -78,7 +79,8 @@ trait TelluricTargetsService[F[_]]:
     pid:             Program.Id,
     telluricId:      Observation.Id,
     scienceId:       Observation.Id,
-    scienceDuration: TimeSpan
+    scienceDuration: TimeSpan,
+    order:           TelluricCalibrationOrder
   )(using ServiceAccess, Transaction[F]): F[Unit]
 
   /**
@@ -195,9 +197,10 @@ object TelluricTargetsService:
         pid:              Program.Id,
         telluricId:      Observation.Id,
         scienceId:       Observation.Id,
-        scienceDuration: TimeSpan
+        scienceDuration: TimeSpan,
+        order:           TelluricCalibrationOrder
       )(using ServiceAccess, Transaction[F]): F[Unit] =
-        session.execute(Statements.InsertResolutionRequest)(telluricId, pid, scienceId, scienceDuration).void
+        session.execute(Statements.InsertResolutionRequest)(telluricId, pid, scienceId, scienceDuration, order).void
 
       override def resolveTargets(
         pending: TelluricTargets.Pending
@@ -298,20 +301,26 @@ object TelluricTargetsService:
 
           def doSearch: F[Option[(Either[String, Target.Id], Md5Hash)]] =
             observationExists.ifM(
-              telluricClient.searchTarget(searchInput).flatMap:
-                case (star, catalogResult) :: _ =>
-                  val sidereal =
-                    catalogResult.map(_.target).getOrElse(star.asSiderealTarget).sedFromTelluricType(config.telluricType)
+              telluricClient.searchTarget(searchInput).flatMap { results =>
+                // Find star matching the calibration order
+                val matchingStar = results.find(_._1.order == pending.calibrationOrder)
+                  .orElse(results.headOption)
 
-                  info"Found telluric star HIP ${star.hip} for observation ${pending.observationId}" *>
-                    createAndLinkTarget(sidereal).map:
-                      case Some(tid) => (tid.asRight[String], paramsHash).some
-                      case _         => none
-                case Nil =>
-                  val msg = s"No telluric stars found for observation ${pending.observationId}"
-                  Logger[F].warn(msg).as((msg.asLeft[Target.Id], paramsHash).some),
+                matchingStar match
+                  case Some((star, catalogResult)) =>
+                    val sidereal =
+                      catalogResult.map(_.target).getOrElse(star.asSiderealTarget).sedFromTelluricType(config.telluricType)
+
+                    info"Found telluric star HIP ${star.hip} with order: ${star.order} for ${pending.calibrationOrder} observation ${pending.observationId}" *>
+                      createAndLinkTarget(sidereal).map:
+                        case Some(tid) => (tid.asRight[String], paramsHash).some
+                        case _         => none
+                  case None =>
+                    val msg = s"No telluric stars found for observation ${pending.observationId}"
+                    Logger[F].warn(msg).as((msg.asLeft[Target.Id], paramsHash).some)
+              },
               // Observation was deleted before resolving the target
-              warn"Observation ${pending.observationId} deleted, sikp resolution".as(none)
+              warn"Observation ${pending.observationId} deleted, skip resolution".as(none)
             )
 
           pending.paramsHash match
@@ -361,21 +370,21 @@ object TelluricTargetsService:
       object Statements:
 
         val pending: Codec[TelluricTargets.Pending] =
-          (observation_id *: program_id *: observation_id *: core_timestamp *: int4 *: time_span *: md5_hash.opt)
+          (observation_id *: program_id *: observation_id *: core_timestamp *: int4 *: time_span *: md5_hash.opt *: telluric_calibration_order)
             .to[TelluricTargets.Pending]
 
         val meta: Codec[TelluricTargets.Meta] =
           (observation_id *: program_id *: observation_id *: calculation_state *:
            core_timestamp *: core_timestamp *: core_timestamp.opt *: int4 *:
-           target_id.opt *: text.opt *: time_span).to[TelluricTargets.Meta]
+           target_id.opt *: text.opt *: time_span *: telluric_calibration_order).to[TelluricTargets.Meta]
 
         private val pendingColumns: String =
-          "c_observation_id, c_program_id, c_science_observation_id, c_last_invalidation, c_failure_count, c_science_duration, c_params_hash"
+          "c_observation_id, c_program_id, c_science_observation_id, c_last_invalidation, c_failure_count, c_science_duration, c_params_hash, c_calibration_order"
 
         private val metaColumns: String =
           """c_observation_id, c_program_id, c_science_observation_id, c_state,
              c_last_invalidation, c_last_update, c_retry_at, c_failure_count,
-             c_resolved_target_id, c_error_message, c_science_duration"""
+             c_resolved_target_id, c_error_message, c_science_duration, c_calibration_order"""
 
         val ResetCalculating: Command[Void] =
           sql"""
@@ -498,13 +507,14 @@ object TelluricTargetsService:
             WHERE  c_observation_id = $observation_id
           """.query(observation_id)
 
-        val InsertResolutionRequest: Command[(Observation.Id, Program.Id, Observation.Id, TimeSpan)] =
+        val InsertResolutionRequest: Command[(Observation.Id, Program.Id, Observation.Id, TimeSpan, TelluricCalibrationOrder)] =
           sql"""
             INSERT INTO t_telluric_resolution (
               c_observation_id,
               c_program_id,
               c_science_observation_id,
               c_science_duration,
+              c_calibration_order,
               c_state,
               c_last_invalidation
             ) VALUES (
@@ -512,6 +522,7 @@ object TelluricTargetsService:
               $program_id,
               $observation_id,
               $time_span,
+              $telluric_calibration_order,
               'pending',
               now()
             )

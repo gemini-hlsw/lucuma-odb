@@ -11,6 +11,7 @@ import eu.timepit.refined.types.string.NonEmptyString
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObservingModeType
+import lucuma.core.enums.TelluricCalibrationOrder
 import lucuma.core.model.Group
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
@@ -187,11 +188,12 @@ object PerScienceObservationCalibrationsService:
         scienceOid:      Observation.Id,
         telluricGroupId: Group.Id,
         telluricIndex:   NonNegShort,
-        duration:        TimeSpan
+        duration:        TimeSpan,
+        order:           TelluricCalibrationOrder
       )(using Transaction[F], SuperUserAccess): F[Observation.Id] =
         for {
           telluricId <- insertTelluricObservation(pid, telluricGroupId, telluricIndex)
-          _          <- telluricTargets.requestTelluricTarget(pid, telluricId, scienceOid, duration)
+          _          <- telluricTargets.requestTelluricTarget(pid, telluricId, scienceOid, duration, order)
           _          <- syncConfiguration(scienceOid, telluricId)
         } yield telluricId
 
@@ -209,21 +211,21 @@ object PerScienceObservationCalibrationsService:
           duration <- obsDuration(scienceOid)
           created  <- duration match
             case Some(d) if d > MultiTelluricThreshold =>
-              // Over 1.5h 1 tellurics before and 1 after
+              // Over 1.5h: 1 telluric before and 1 after
               for {
                 sciIdx <- obsGroupIndex(scienceOid)
                 bIdx   = NonNegShort.unsafeFrom(sciIdx.value.toShort)
-                c1     <- createTelluricObs(pid, scienceOid, telluricGroupId, bIdx, d)
+                c1     <- createTelluricObs(pid, scienceOid, telluricGroupId, bIdx, d, TelluricCalibrationOrder.Before)
                 aftIdx = NonNegShort.unsafeFrom((sciIdx.value + 2).toShort)
-                c2     <- createTelluricObs(pid, scienceOid, telluricGroupId, aftIdx, d)
+                c2     <- createTelluricObs(pid, scienceOid, telluricGroupId, aftIdx, d, TelluricCalibrationOrder.After)
               } yield List(c1, c2)
 
             case Some(d) =>
-              // Less than 1.5h one telluric after scienc
+              // Less than 1.5h: one telluric after science
               for {
                 sciIdx <- obsGroupIndex(scienceOid)
                 aftIdx = NonNegShort.unsafeFrom((sciIdx.value + 1).toShort)
-                cal    <- createTelluricObs(pid, scienceOid, telluricGroupId, aftIdx, d)
+                cal    <- createTelluricObs(pid, scienceOid, telluricGroupId, aftIdx, d, TelluricCalibrationOrder.After)
               } yield List(cal)
 
             case None =>
