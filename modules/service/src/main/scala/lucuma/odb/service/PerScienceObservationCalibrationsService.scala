@@ -264,7 +264,7 @@ object PerScienceObservationCalibrationsService:
         pid: Program.Id,
         obs: ObsExtract[CalibrationConfigSubset],
         gid: Group.Id
-      )(using Transaction[F], SuperUserAccess): F[List[Observation.Id]] =
+      )(using Transaction[F], SuperUserAccess): F[(List[Observation.Id], List[Observation.Id])] =
         for {
           existing      <- findAllTelluricObservations(gid)
           deletable     <- excludeOngoingAndCompleted(existing, identity)
@@ -273,30 +273,30 @@ object PerScienceObservationCalibrationsService:
                              case Some(d) if d > MultiTelluricThreshold => 2
                              case Some(_)                               => 1
                              case None                                  => 0
-          // Only delete/recreate if total count changes (use existing, not deletable)
-          created       <- if (existing.size != requiredCount)
-                             for
-                               _ <- NonEmptyList.fromList(deletable)
-                                     .traverse_(observationService.deleteCalibrationObservations)
-                               c <- createTelluricCalibrations(pid, obs.id, gid)
-                             yield c
-                           else
-                             List.empty.pure[F]
-          // Always sync configuration on all deletable (non-executed) tellurics
+          // Delete/recreate if count changes
+          (created, deleted) <- if (existing.size != requiredCount)
+                                  for
+                                    _ <- NonEmptyList.fromList(deletable)
+                                          .traverse_(observationService.deleteCalibrationObservations)
+                                    c <- createTelluricCalibrations(pid, obs.id, gid)
+                                  yield (c, deletable)
+                                else
+                                  (List.empty, List.empty).pure[F]
+          // sync configuration on all deletable tellurics
           allTellurics  <- findAllTelluricObservations(gid)
           toSync        <- excludeOngoingAndCompleted(allTellurics, identity)
           _             <- toSync.traverse_(tid => syncConfiguration(obs.id, tid))
-        } yield created
+        } yield (created, deleted)
 
       private def generateTelluricForScience(
         pid:  Program.Id,
         tree: GroupTree,
         obs:  ObsExtract[CalibrationConfigSubset]
-      )(using Transaction[F], SuperUserAccess): F[List[Observation.Id]] =
+      )(using Transaction[F], SuperUserAccess): F[(List[Observation.Id], List[Observation.Id])] =
         for
-          gid  <- readTelluricGroup(pid, tree, obs)
-          tids <- syncTelluricObservation(pid, obs, gid)
-        yield tids
+          gid    <- readTelluricGroup(pid, tree, obs)
+          result <- syncTelluricObservation(pid, obs, gid)
+        yield result
 
       private def syncConfiguration(
         sourceOid: Observation.Id,
@@ -367,7 +367,7 @@ object PerScienceObservationCalibrationsService:
           allObsInGroups    <- groupService.selectGroups(pid, obsFilter = void"true").map(telluricGroups).map(_.toMap)
           // Collect telluric observation IDs from all groups
           telluricObsSet    <- allObsInGroups.keys.toList
-                                 .flatTraverse(gid => findTelluricObservation(gid).map(_.toList))
+                                 .flatTraverse(findAllTelluricObservations)
                                  .map(_.toSet)
           // Obervations to remove from telluric groups
           toUnlink          = allObsInGroups.values.flatten.map(_._1).filterNot(a => currentObsIds.exists(_ === a)).toSet
@@ -398,9 +398,11 @@ object PerScienceObservationCalibrationsService:
           // Reload tree for group creation/lookup
           tree              <- groupService.selectGroups(pid)
           // Create/sync telluric for each science obs
-          added             <- activeScienceObs.flatTraverse(obs => generateTelluricForScience(pid, tree, obs))
+          results           <- activeScienceObs.traverse(obs => generateTelluricForScience(pid, tree, obs))
+          added              = results.flatMap(_._1)
+          allDeleted         = deleted ++ results.flatMap(_._2)
           _                 <- (info"Added ${added.size} telluric observations on program $pid: $added").whenA(added.nonEmpty)
-        yield (added, deleted)
+        yield (added, allDeleted)
 
       object Statements:
 
