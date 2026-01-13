@@ -12,7 +12,7 @@ import lucuma.odb.sequence.data.ItcInput
 class ShortCut_7265 extends ExecutionTestSupportForGmos:
 
   test("issue #7265: itc acquisition lookup uses acquisition filter"):
-    val spectroscopy: IO[InstrumentMode.GmosNorthSpectroscopy] = for
+    val imaging: IO[InstrumentMode.GmosNorthImaging] = for
       p <- createProgram
       t <- createTargetAs(pi, p, "Science Target")
       o <- createObservationWithModeAs(pi, p, List(t), s"""
@@ -37,7 +37,7 @@ class ShortCut_7265 extends ExecutionTestSupportForGmos:
                   e.leftMap(error => new RuntimeException(s"unexpected error: $error")).liftTo[IO]
       i <- r.itcInput.leftMap(error => new RuntimeException(s"unexpected error: $error")).liftTo[IO]
       s <- ItcInput.spectroscopy.getOption(i).toRight(new RuntimeException(s"expected spectroscopy input: $i")).liftTo[IO]
-      g <- InstrumentMode.gmosNorthSpectroscopy.getOption(s.acquisition.mode).toRight(new RuntimeException(s"expected GMOS North Spectroscopy: $s")).liftTo[IO]
+      g <- InstrumentMode.gmosNorthImaging.getOption(s.acquisition.mode).toRight(new RuntimeException(s"expected GMOS North Imaging: $s")).liftTo[IO]
     yield g
 
-    assertIO(spectroscopy.map(_.filter), Some(GmosNorthFilter.ZPrime))
+    assertIO(imaging.map(_.filter), GmosNorthFilter.ZPrime)
