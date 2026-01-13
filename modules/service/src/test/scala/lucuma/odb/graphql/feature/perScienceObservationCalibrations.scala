@@ -5,6 +5,7 @@ package lucuma.odb.feature
 
 import cats.effect.IO
 import cats.syntax.all.*
+import eu.timepit.refined.types.numeric.PosInt
 import io.circe.Decoder
 import io.circe.Json
 import io.circe.syntax.*
@@ -20,6 +21,7 @@ import lucuma.core.math.Coordinates
 import lucuma.core.math.Declination
 import lucuma.core.math.RightAscension
 import lucuma.core.math.Wavelength
+import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.Group
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
@@ -28,8 +30,11 @@ import lucuma.core.model.SourceProfile
 import lucuma.core.model.SpectralDefinition
 import lucuma.core.model.Target
 import lucuma.core.model.TelluricType
+import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
+import lucuma.itc.IntegrationTime
+import lucuma.itc.client.SpectroscopyInput
 import lucuma.odb.graphql.OdbSuite
 import lucuma.odb.graphql.query.ExecutionTestSupportForFlamingos2
 import lucuma.odb.graphql.query.ObservingModeSetupOperations
@@ -55,7 +60,7 @@ class perScienceObservationCalibrations
   val when = LocalDateTime.of(2024, 1, 1, 12, 0, 0).toInstant(ZoneOffset.UTC)
 
   // Mock telluric star
-  val mockStar = TelluricStar(
+  val mockStarBefore = TelluricStar(
     hip = 12345,
     spType = TelluricType.A0V,
     coordinates = Coordinates(
@@ -68,10 +73,23 @@ class perScienceObservationCalibrations
     order = TelluricCalibrationOrder.Before
   )
 
+  val mockStarAfter = TelluricStar(
+    hip = 12346,
+    spType = TelluricType.A0V,
+    coordinates = Coordinates(
+      RightAscension.fromDoubleDegrees(123.789),
+      Declination.fromDoubleDegrees(45.123).getOrElse(Declination.Zero)
+    ),
+    distance = 98.2,
+    hmag = 7.8,
+    score = 0.92,
+    order = TelluricCalibrationOrder.After
+  )
+
   val mockTarget = Target.Sidereal(
     name = "HIP 12345".refined,
     tracking = SiderealTracking(
-      baseCoordinates = mockStar.coordinates,
+      baseCoordinates = mockStarBefore.coordinates,
       epoch = lucuma.core.math.Epoch.J2000,
       properMotion = None,
       radialVelocity = None,
@@ -87,14 +105,24 @@ class perScienceObservationCalibrations
     "data" -> Json.obj(
       "search" -> Json.arr(
         Json.obj(
-          "HIP" -> mockStar.hip.asJson,
-          "spType" -> Json.fromString(mockStar.spType.tag),
-          "RA" -> mockStar.coordinates.ra.toAngle.toDoubleDegrees.asJson,
-          "Dec" -> mockStar.coordinates.dec.toAngle.toSignedDoubleDegrees.asJson,
-          "Distance" -> mockStar.distance.asJson,
-          "Hmag" -> mockStar.hmag.asJson,
-          "Score" -> mockStar.score.asJson,
-          "Order" -> Json.fromString(mockStar.order.tag)
+          "HIP" -> mockStarBefore.hip.asJson,
+          "spType" -> Json.fromString(mockStarBefore.spType.tag),
+          "RA" -> mockStarBefore.coordinates.ra.toAngle.toDoubleDegrees.asJson,
+          "Dec" -> mockStarBefore.coordinates.dec.toAngle.toSignedDoubleDegrees.asJson,
+          "Distance" -> mockStarBefore.distance.asJson,
+          "Hmag" -> mockStarBefore.hmag.asJson,
+          "Score" -> mockStarBefore.score.asJson,
+          "Order" -> Json.fromString(mockStarBefore.order.tag)
+        ),
+        Json.obj(
+          "HIP" -> mockStarAfter.hip.asJson,
+          "spType" -> Json.fromString(mockStarAfter.spType.tag),
+          "RA" -> mockStarAfter.coordinates.ra.toAngle.toDoubleDegrees.asJson,
+          "Dec" -> mockStarAfter.coordinates.dec.toAngle.toSignedDoubleDegrees.asJson,
+          "Distance" -> mockStarAfter.distance.asJson,
+          "Hmag" -> mockStarAfter.hmag.asJson,
+          "Score" -> mockStarAfter.score.asJson,
+          "Order" -> Json.fromString(mockStarAfter.order.tag)
         )
       )
     )
@@ -102,6 +130,14 @@ class perScienceObservationCalibrations
 
   override protected def telluricClient: IO[TelluricTargetsClient[IO]] =
     TelluricTargetsClientMock.fromJson(mockTelluricJson, SimbadClientMock.withSingleTarget(mockTarget))
+
+  // Override fake ITC to vary duration based on exposure time mode
+  override def fakeItcSpectroscopyResultFor(input: SpectroscopyInput): Option[IntegrationTime] =
+    input.exposureTimeMode match
+      case ExposureTimeMode.TimeAndCountMode(time, count, _) =>
+        Some(IntegrationTime(time, count))
+      case ExposureTimeMode.SignalToNoiseMode(sn, _) =>
+        Some(IntegrationTime(5.minuteTimeSpan, PosInt.unsafeFrom(4)))
 
   case class GroupInfo(
     id:               Group.Id,
@@ -325,7 +361,7 @@ class perScienceObservationCalibrations
       }"""
     ).void
 
-  private def setScienceRequirements(oid: Observation.Id, snAt: Wavelength = DefaultSnAt): IO[Unit] =
+  private def setScienceRequirements(oid: Observation.Id, snAt: Wavelength = DefaultSnAt, snValue: Double = 75.0): IO[Unit] =
     query(
       pi,
       s"""mutation {
@@ -334,7 +370,7 @@ class perScienceObservationCalibrations
             scienceRequirements: {
               exposureTimeMode: {
                 signalToNoise: {
-                  value: 75.000,
+                  value: $snValue,
                   at: { nanometers: ${snAt.toNanometers} }
                 }
               },
@@ -917,7 +953,8 @@ class perScienceObservationCalibrations
       scienceFpu1  <- queryObservationFpu(oid)
       telluricFpu1 <- queryObservationFpu(telluricOid)
       _            <- updateFlamingos2Fpu(oid, Flamingos2Fpu.LongSlit2)
-      _            <- recalculateCalibrations(pid, when)
+      _            <- runObscalcUpdate(pid, oid)
+      _            <- sleep >> recalculateCalibrations(pid, when)
       scienceFpu2  <- queryObservationFpu(oid)
       telluricFpu2 <- queryObservationFpu(telluricOid)
     } yield {
@@ -1042,6 +1079,40 @@ class perScienceObservationCalibrations
         assertEquals(removed2.size, 0)
       }
 
+  test("don't delete ongoing tellurics when recreating multiple tellurics"):
+    List(ObservationWorkflowState.Ongoing, ObservationWorkflowState.Completed).traverse_ : state =>
+      for {
+        pid                  <- createProgramAs(pi)
+        tid                  <- createTargetWithProfileAs(pi, pid)
+        oid                  <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+        _                    <- setExposureTime(oid, 120)
+        _                    <- runObscalcUpdate(pid, oid)
+        (added1, removed1)   <- recalculateCalibrations(pid, when)
+        obs1                 <- queryObservation(oid)
+        groupId              =  obs1.groupId.get
+        obsInGroup1          <- queryObservationsInGroup(groupId)
+        telluricOids         =  obsInGroup1.filter(_.calibrationRole.contains(CalibrationRole.Telluric)).map(_.id)
+        firstTelluricOid     =  telluricOids.head
+        _                    <- setCalculatedWorkflowState(firstTelluricOid, state)
+        _                    <- updateFlamingos2Fpu(oid, Flamingos2Fpu.LongSlit2)
+        _                    <- runObscalcUpdate(pid, oid)
+        (added2, removed2)   <- recalculateCalibrations(pid, when)
+        obsInGroup2          <- queryObservationsInGroup(groupId)
+        telluricExists       <- queryObservationExists(firstTelluricOid)
+      } yield {
+        // First telluric in Ongoing/Completed state should be preserved
+        assertEquals(telluricOids.size, 2)
+        assert(telluricExists)
+        assert(obsInGroup2.exists(_.id === firstTelluricOid))
+        // Count unchanged (2), config synced on deletable telluric
+        assertEquals(obsInGroup2.filter(_.calibrationRole.contains(CalibrationRole.Telluric)).size, 2)
+        assertEquals(obsInGroup2.size, 3) // 2 tellurics + 1 science
+        assertEquals(added1.size, 2)
+        assertEquals(removed1.size, 0)
+        assertEquals(added2.size, 0) // No count change, just config sync
+        assertEquals(removed2.size, 0)
+      }
+
   test("telluric group rejects second science observation"):
     for {
       pid   <- createProgramAs(pi)
@@ -1146,4 +1217,118 @@ class perScienceObservationCalibrations
       assertNotEquals(hash1, hash2)
       // The should have different ids but our mock service returns always the same
       assert(meta2.exists(_.resolvedTargetId.isDefined))
+    }
+
+  private def setExposureTime(oid: Observation.Id, totalMinutes: Int): IO[Unit] =
+    val perExposureMinutes = totalMinutes / 6
+    query(
+      pi,
+      s"""mutation {
+        updateObservations(input: {
+          WHERE: { id: { EQ: "$oid" } }
+          SET: {
+            observingMode: {
+              flamingos2LongSlit: {
+                exposureTimeMode: {
+                  timeAndCount: {
+                    time: { minutes: $perExposureMinutes },
+                    count: 6,
+                    at: { nanometers: 1390 }
+                  }
+                }
+              }
+            }
+          }
+        }) {
+          observations { id }
+        }
+      }"""
+    ).void
+
+  private def queryObservationDuration(oid: Observation.Id): IO[Option[TimeSpan]] =
+    withServicesForObscalc(serviceUser): services =>
+      services.transactionally:
+        services.obscalcService.selectExecutionDigest(oid).map:
+          _.flatMap(_.value.toOption)
+            .map(d => d.science.timeEstimate.sum |+| d.science.timeEstimate.nonCharged)
+
+  test("create two tellurics for long science"):
+    for {
+      pid                <- createProgramAs(pi)
+      tid                <- createTargetWithProfileAs(pi, pid)
+      oid                <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+      _                  <- setExposureTime(oid, 120)
+      _                  <- runObscalcUpdate(pid, oid)
+      duration           <- queryObservationDuration(oid)
+      (added, removed)   <- recalculateCalibrations(pid, when)
+      obs                <- queryObservation(oid)
+      groupId            =  obs.groupId.get
+      obsInGroup         <- queryObservationsInGroup(groupId)
+      telluricObs        =  obsInGroup.filter(_.calibrationRole.contains(CalibrationRole.Telluric))
+      scienceObs         =  obsInGroup.filter(_.calibrationRole.isEmpty).head
+      metas              <- added.traverse(selectMeta)
+      orders             =  metas.flatten.map(_.calibrationOrder)
+    } yield {
+      assertEquals(telluricObs.size, 2)
+      assertEquals(obsInGroup.size, 3)
+      assertEquals(added.size, 2)
+      assertEquals(removed.size, 0)
+      // Verify tellurics positions in the group
+      assertEquals(telluricObs.head.groupIndex.get, scienceObs.groupIndex.get - 1)
+      assertEquals(telluricObs.last.groupIndex.get, scienceObs.groupIndex.get + 1)
+      assert(orders.contains(TelluricCalibrationOrder.Before))
+      assert(orders.contains(TelluricCalibrationOrder.After))
+    }
+
+  test("create one telluric for short duration science observation"):
+    for {
+      pid                <- createProgramAs(pi)
+      tid                <- createTargetWithProfileAs(pi, pid)
+      oid                <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+      _                  <- setExposureTime(oid, 60)
+      _                  <- runObscalcUpdate(pid, oid)
+      (added, removed)   <- recalculateCalibrations(pid, when)
+      obs                <- queryObservation(oid)
+      groupId            =  obs.groupId.get
+      obsInGroup         <- queryObservationsInGroup(groupId)
+      telluricObs        =  obsInGroup.filter(_.calibrationRole.contains(CalibrationRole.Telluric))
+      scienceObs         =  obsInGroup.filter(_.calibrationRole.isEmpty).head
+      meta               <- selectMeta(added.head)
+    } yield {
+      assertEquals(telluricObs.size, 1)
+      assertEquals(obsInGroup.size, 2)
+      assertEquals(added.size, 1)
+      assertEquals(removed.size, 0)
+      // Verify tellurics positions in the group
+      assertEquals(telluricObs.head.groupIndex.get, scienceObs.groupIndex.get + 1)
+      assertEquals(meta.get.calibrationOrder, TelluricCalibrationOrder.After)
+    }
+
+  test("update from two to one telluric when duration decreases"):
+    for {
+      pid                  <- createProgramAs(pi)
+      tid                  <- createTargetWithProfileAs(pi, pid)
+      oid                  <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+      _                    <- setExposureTime(oid, 120)
+      _                    <- runObscalcUpdate(pid, oid)
+      (added1, removed1)   <- recalculateCalibrations(pid, when)
+      obs1                 <- queryObservation(oid)
+      groupId              =  obs1.groupId.get
+      obsInGroup1          <- queryObservationsInGroup(groupId)
+      telluricObs1         =  obsInGroup1.filter(_.calibrationRole.contains(CalibrationRole.Telluric))
+      // Change to short duration
+      _                    <- setExposureTime(oid, 60)
+      _                    <- runObscalcUpdate(pid, oid)
+      (added2, removed2)   <- recalculateCalibrations(pid, when)
+      obsInGroup2          <- queryObservationsInGroup(groupId)
+      telluricObs2         =  obsInGroup2.filter(_.calibrationRole.contains(CalibrationRole.Telluric))
+    } yield {
+      // first we have 2 tellurics
+      assertEquals(telluricObs1.size, 2)
+      assertEquals(added1.size, 2)
+      assertEquals(removed1.size, 0)
+      // As duration is shorter we only need one
+      assertEquals(telluricObs2.size, 1)
+      assertEquals(added2.size, 1)
+      assertEquals(removed2.size, 2)
     }
