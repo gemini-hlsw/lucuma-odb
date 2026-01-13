@@ -27,6 +27,7 @@ import lucuma.core.math.Wavelength
 import lucuma.odb.graphql.input.Flamingos2LongSlitInput
 import lucuma.odb.graphql.input.GmosImagingFilterInput
 import lucuma.odb.graphql.input.GmosImagingInput
+import lucuma.odb.graphql.input.GmosImagingVariantInput
 import lucuma.odb.graphql.input.GmosLongSlitInput
 import lucuma.odb.graphql.input.ObservingModeInput
 import lucuma.odb.sequence.ObservingMode
@@ -135,16 +136,13 @@ object CalibrationConfigSubset:
         none,
         none,
         GmosImagingInput.Create(
+          GmosImagingVariantInput.Default,
           filters.map(f => GmosImagingFilterInput(f, none)),
           GmosImagingInput.Create.Common(
-            none,
-            none,
-            none, // Do we need multipleFiltersMode here?
             binning.some,
             ampReadMode.some,
             ampGain.some,
-            roi.some,
-            Nil // TODO do we need offsets here?
+            roi.some
           )
         ).some,
         none,
@@ -167,16 +165,13 @@ object CalibrationConfigSubset:
         none,
         none,
         GmosImagingInput.Create(
+          GmosImagingVariantInput.Default,
           filters.map(f => GmosImagingFilterInput(f, none)),
           GmosImagingInput.Create.Common(
-            none,
-            none,
-            none, // Do we need multipleFiltersMode here?
             binning.some,
             ampReadMode.some,
             ampGain.some,
-            roi.some,
-            Nil // TODO do we need offsets here?
+            roi.some
           )
         ).some,
         none
@@ -228,7 +223,7 @@ object CalibrationConfigSubset:
           )
         case gni: ImagingConfig.GmosNorth =>
           GmosNImagingConfigs(
-            gni.filters,
+            gni.filters.map(_._1),
             gni.bin,
             gni.ampReadMode,
             gni.ampGain,
@@ -236,7 +231,7 @@ object CalibrationConfigSubset:
           )
         case gsi: ImagingConfig.GmosSouth =>
           GmosSImagingConfigs(
-            gsi.filters,
+            gsi.filters.map(_._1),
             gsi.bin,
             gsi.ampReadMode,
             gsi.ampGain,

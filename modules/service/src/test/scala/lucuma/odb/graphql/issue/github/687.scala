@@ -25,8 +25,10 @@ class GitHub_687 extends OdbSuite with ObservingModeSetupOperations {
         query {
           observation(observationId: ${o1.asJson}) {
             itc {
-              science {
-                index
+              ... on ItcSpectroscopy {
+                spectroscopyScience {
+                  index
+                }
               }
             }
           }
@@ -37,7 +39,7 @@ class GitHub_687 extends OdbSuite with ObservingModeSetupOperations {
             {
               "observation" : {
                 "itc" : {
-                  "science" : {
+                  "spectroscopyScience" : {
                     "index" : 0
                   }
                 }

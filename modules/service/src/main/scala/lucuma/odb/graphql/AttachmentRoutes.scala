@@ -42,7 +42,7 @@ object AttachmentRoutes {
   }
 
   // the normal constructor
-  def apply[F[_]: Async: Logger: LoggerFactory: Parallel: Trace: SecureRandom](
+  def apply[F[_]: Async: Parallel: Logger: LoggerFactory: Trace: SecureRandom](
     pool:           Resource[F, Session[F]],
     s3:             S3FileService[F],
     ssoClient:      SsoClient[F, User],

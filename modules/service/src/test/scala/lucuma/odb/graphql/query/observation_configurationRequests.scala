@@ -20,12 +20,12 @@ import lucuma.core.model.Observation
 import lucuma.core.model.User
 import lucuma.core.syntax.string.*
 import lucuma.core.util.Enumerated
-import lucuma.odb.graphql.mutation.UpdateConstraintSetOps
+import lucuma.odb.graphql.mutation.UpdateObservationsOps
 
 class observation_configurationRequests 
   extends OdbSuite 
      with ObservingModeSetupOperations 
-     with UpdateConstraintSetOps {
+     with UpdateObservationsOps {
 
   val pi       = TestUsers.Standard.pi(1, 30)
   val admin    = TestUsers.Standard.admin(2, 31)
@@ -64,6 +64,10 @@ class observation_configurationRequests
       s"""
         observingMode: {
           gmos${site}Imaging: {
+            variant: {
+              interleaved: {
+              }
+            }
             filters: ${fs.mkString("[", ",\n", "]")}
           }
         }
