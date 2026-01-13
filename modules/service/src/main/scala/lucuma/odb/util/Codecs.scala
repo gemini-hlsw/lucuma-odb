@@ -659,9 +659,6 @@ trait Codecs {
   val _calibration_role: Codec[List[CalibrationRole]] =
     _enumerated[CalibrationRole](Type("_e_calibration_role", List(Type("e_calibration_role"))))
 
-  given Enumerated[TelluricCalibrationOrder] =
-    Enumerated.from(TelluricCalibrationOrder.Before, TelluricCalibrationOrder.After).withTag(_.tag)
-
   val telluric_calibration_order: Codec[TelluricCalibrationOrder] =
     enumerated(Type("e_telluric_calibration_order"))
 

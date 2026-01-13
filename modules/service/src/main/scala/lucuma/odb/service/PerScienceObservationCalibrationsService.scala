@@ -135,7 +135,7 @@ object PerScienceObservationCalibrationsService:
 
       private def findAllTelluricObservations(gid: Group.Id): F[List[Observation.Id]] =
         S.session
-          .prepareR(Statements.selectAllTelluricObservations)
+          .prepareR(Statements.selectTelluricObservations)
           .use(_.stream((gid, CalibrationRole.Telluric), 10).compile.toList)
 
       private def obsDuration(
@@ -417,7 +417,7 @@ object PerScienceObservationCalibrationsService:
             LIMIT 1
           """.query(observation_id)
 
-        val selectAllTelluricObservations: Query[(Group.Id, CalibrationRole), Observation.Id] =
+        val selectTelluricObservations: Query[(Group.Id, CalibrationRole), Observation.Id] =
           sql"""
             SELECT c_observation_id
             FROM   t_observation

@@ -10,7 +10,7 @@ import cats.syntax.all.*
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.util.Enumerated
 import lucuma.odb.service.ObservationWorkflowService
-import lucuma.odb.util.Codecs.{*, given}
+import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.GmosCodecs.*
 import org.tpolecat.typename.TypeName
 import org.typelevel.log4cats.Logger
