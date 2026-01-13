@@ -264,9 +264,9 @@ object GeneratorParamsService {
             spectroscopyGeneratorParams(
               obsMode = gn,
               acqEtm  = a.exposureTimeMode,
-              acqMode = sciMode.copy(
-                filter = a.explicitFilter.getOrElse(a.defaultFilter).some,
-                roi    = a.explicitRoi.getOrElse(a.roi).imagingRoi.some
+              acqMode = InstrumentMode.GmosNorthImaging(
+                filter  = a.explicitFilter.getOrElse(a.defaultFilter),
+                ccdMode = sciMode.ccdMode
               ),
               sciEtm   = c.exposureTimeMode,
               sciMode  = sciMode
@@ -284,9 +284,9 @@ object GeneratorParamsService {
             spectroscopyGeneratorParams(
               obsMode = gs,
               acqEtm  = a.exposureTimeMode,
-              acqMode = sciMode.copy(
-                filter = a.explicitFilter.getOrElse(a.defaultFilter).some,
-                roi    = a.explicitRoi.getOrElse(a.roi).imagingRoi.some
+              acqMode = InstrumentMode.GmosSouthImaging(
+                filter  = a.explicitFilter.getOrElse(a.defaultFilter),
+                ccdMode = sciMode.ccdMode
               ),
               sciEtm   = c.exposureTimeMode,
               sciMode  = sciMode
@@ -297,8 +297,8 @@ object GeneratorParamsService {
             spectroscopyGeneratorParams(
               obsMode = f2,
               acqEtm  = acq,
-              acqMode = sciMode.copy(
-                filter = F2Acquisition.toAcquisitionFilter(sciMode.filter)
+              acqMode = InstrumentMode.Flamingos2Imaging(
+                F2Acquisition.toAcquisitionFilter(sciMode.filter)
               ),
               sciEtm  = sci,
               sciMode = sciMode
