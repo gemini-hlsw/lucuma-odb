@@ -7,7 +7,6 @@ import cats.Semigroup
 import cats.syntax.all.*
 import grackle.DirectiveDef
 import grackle.EnumType
-import grackle.Mapping
 import grackle.NamedType
 import grackle.ObjectType
 import grackle.Schema
@@ -15,7 +14,7 @@ import grackle.Type
 import org.tpolecat.sourcepos.SourcePos
 
 /** A mixin that provides Semigroup[Schema]. */
-trait SchemaSemigroup[F[_]] extends Mapping[F] {
+trait SchemaSemigroup {
 
   private implicit val SemigroupDirectiveDef: Semigroup[DirectiveDef] = (a, b) =>
     if (a.name != b.name) a
@@ -77,5 +76,5 @@ trait SchemaSemigroup[F[_]] extends Mapping[F] {
 
 }
 
-
+object SchemaSemigroup extends SchemaSemigroup
 
