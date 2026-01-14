@@ -5,7 +5,7 @@ package lucuma.odb.logic
 
 import cats.Eq
 import cats.data.EitherT
-import cats.effect.Concurrent
+import cats.effect.Async
 import cats.syntax.applicative.*
 import cats.syntax.apply.*
 import cats.syntax.either.*
@@ -200,9 +200,9 @@ object Generator {
     def sequenceTooLong(oid: Observation.Id): OdbError =
       sequenceUnavailable(oid, s"The generated sequence is too long (more than $SequenceAtomLimit atoms).")
 
-  def instantiate[F[_]: Concurrent: Services](
-    commitHash:   CommitHash,
-    calculator:   TimeEstimateCalculatorImplementation.ForInstrumentMode
+  def instantiate[F[_]: Async: Services](
+    commitHash: CommitHash,
+    calculator: TimeEstimateCalculatorImplementation.ForInstrumentMode
   ): Generator[F] =
     new Generator[F] {
 
@@ -217,8 +217,6 @@ object Generator {
 
         def namespace: UUID =
           SequenceIds.namespace(commitHash, oid, params)
-
-
 
         val hash: Md5Hash = {
           val md5 = MessageDigest.getInstance("MD5")
@@ -365,6 +363,16 @@ object Generator {
                 p <- gen.executionConfig(visits, events, steps, t)
               yield p
 
+      private def requireImagingItc[A](
+        name: String,
+        oid:  Observation.Id,
+        itc:  Either[OdbError, Itc],
+        img:  Itc => Option[A]
+      ): Either[OdbError, A] =
+        itc.flatMap: i =>
+          img(i).toRight:
+            OdbError.InvalidObservation(oid, s"Expecting $name ITC results for this observation".some)
+
       private def requireSpectroscopyItc(
         oid: Observation.Id,
         itc: Either[OdbError, Itc]
@@ -389,6 +397,22 @@ object Generator {
           p <- protoExecutionConfig(ctx, g, srs, when)
         yield p
 
+      private def gmosNorthImaging(
+        ctx:    Context,
+        config: lucuma.odb.sequence.gmos.imaging.Config.GmosNorth,
+        when:   Option[Timestamp]
+      )(using Services.ServiceAccess): EitherT[F, OdbError, (ProtoGmosNorth, ExecutionState)] =
+        import lucuma.odb.sequence.gmos.imaging.Imaging
+
+        val itc = requireImagingItc("GMOS North Imaging", ctx.oid, ctx.itcRes, Itc.gmosNorthImaging.getOption)
+        val gen = Imaging.gmosNorth(calculator.gmosNorth, ctx.namespace, config, itc)
+        val srs = services.gmosSequenceService.selectGmosNorthStepRecords(ctx.oid)
+
+        for
+          g <- EitherT(gen)
+          p <- protoExecutionConfig(ctx, g, srs, when)
+        yield p
+
       private def gmosNorthLongSlit(
         ctx:    Context,
         config: lucuma.odb.sequence.gmos.longslit.Config.GmosNorth,
@@ -399,6 +423,22 @@ object Generator {
         val itc = requireSpectroscopyItc(ctx.oid, ctx.itcRes)
         val gen = LongSlit.gmosNorth(ctx.oid, calculator.gmosNorth, ctx.namespace, exp.gmosNorth, config, itc, role, ctx.params.acqResetTime)
         val srs = services.gmosSequenceService.selectGmosNorthStepRecords(ctx.oid)
+
+        for
+          g <- EitherT(gen)
+          p <- protoExecutionConfig(ctx, g, srs, when)
+        yield p
+
+      private def gmosSouthImaging(
+        ctx:    Context,
+        config: lucuma.odb.sequence.gmos.imaging.Config.GmosSouth,
+        when:   Option[Timestamp]
+      )(using Services.ServiceAccess): EitherT[F, OdbError, (ProtoGmosSouth, ExecutionState)] =
+        import lucuma.odb.sequence.gmos.imaging.Imaging
+
+        val itc = requireImagingItc("GMOS South Imaging", ctx.oid, ctx.itcRes, Itc.gmosSouthImaging.getOption)
+        val gen = Imaging.gmosSouth(calculator.gmosSouth, ctx.namespace, config, itc)
+        val srs = services.gmosSequenceService.selectGmosSouthStepRecords(ctx.oid)
 
         for
           g <- EitherT(gen)
@@ -429,23 +469,25 @@ object Generator {
           .fromEither(Error.sequenceTooLong(ctx.oid).asLeft[ExecutionDigest])
           .unlessA(ctx.itcRes.toOption.forall(_.scienceExposureCount.value <= SequenceAtomLimit)) *>
         (ctx.params match
-          case GeneratorParams(_, _, config: flamingos2.longslit.Config, role, declaredComplete, _) =>
+          case GeneratorParams(_, _, config: flamingos2.longslit.Config, role, _, _) =>
             flamingos2LongSlit(ctx, config, when).flatMap: (p, e) =>
               EitherT.fromEither[F](executionDigest(ctx.oid, p, e, calculator.flamingos2.estimateSetup))
 
-          case GeneratorParams(_, _, config: gmos.longslit.Config.GmosNorth, role, declaredComplete, _) =>
+          case GeneratorParams(_, _, config: gmos.imaging.Config.GmosNorth, _, _, _) =>
+            gmosNorthImaging(ctx, config, when).flatMap: (p, e) =>
+              EitherT.fromEither[F](executionDigest(ctx.oid, p, e, calculator.gmosNorth.estimateSetup))
+
+          case GeneratorParams(_, _, config: gmos.longslit.Config.GmosNorth, role, _, _) =>
             gmosNorthLongSlit(ctx, config, role, when).flatMap: (p, e) =>
               EitherT.fromEither[F](executionDigest(ctx.oid, p, e, calculator.gmosNorth.estimateSetup))
 
-          case GeneratorParams(_, _, config: gmos.longslit.Config.GmosSouth, role, declaredComplete, _) =>
-            gmosSouthLongSlit(ctx, config, role, when).flatMap: (p, e) =>
+          case GeneratorParams(_, _, config: gmos.imaging.Config.GmosSouth, _, _, _) =>
+            gmosSouthImaging(ctx, config, when).flatMap: (p, e) =>
               EitherT.fromEither[F](executionDigest(ctx.oid, p, e, calculator.gmosSouth.estimateSetup))
 
-          case GeneratorParams(_, _, config: gmos.imaging.Config.GmosNorth, _, _, _) =>
-            EitherT.leftT[F, ExecutionDigest](OdbError.SequenceUnavailable(ctx.oid, "GMOS North imaging sequence generation is not yet implemented".some))
-
-          case GeneratorParams(_, _, config: gmos.imaging.Config.GmosSouth, _, _, _) =>
-            EitherT.leftT[F, ExecutionDigest](OdbError.SequenceUnavailable(ctx.oid, "GMOS South imaging sequence generation is not yet implemented".some))
+          case GeneratorParams(_, _, config: gmos.longslit.Config.GmosSouth, role, _, _) =>
+            gmosSouthLongSlit(ctx, config, role, when).flatMap: (p, e) =>
+              EitherT.fromEither[F](executionDigest(ctx.oid, p, e, calculator.gmosSouth.estimateSetup))
         )
 
       override def calculateScienceAtomDigests(
@@ -465,20 +507,20 @@ object Generator {
           .fromEither(Error.sequenceTooLong(ctx.oid).asLeft[ExecutionDigest])
           .unlessA(ctx.itcRes.toOption.forall(_.scienceExposureCount.value <= SequenceAtomLimit)) *>
         (ctx.params match
-          case GeneratorParams(_, _, config: flamingos2.longslit.Config, role, declaredComplete, _) =>
+          case GeneratorParams(_, _, config: flamingos2.longslit.Config, role, _, _) =>
             flamingos2LongSlit(ctx, config, when).map((p, _) => p.science.map(AtomDigest.fromAtom))
 
-          case GeneratorParams(_, _, config: gmos.longslit.Config.GmosNorth, role, declaredComplete, _) =>
+          case GeneratorParams(_, _, config: gmos.imaging.Config.GmosNorth, _, _, _) =>
+            gmosNorthImaging(ctx, config, when).map((p, _) => p.science.map(AtomDigest.fromAtom))
+
+          case GeneratorParams(_, _, config: gmos.longslit.Config.GmosNorth, role, _, _) =>
             gmosNorthLongSlit(ctx, config, role, when).map((p, _) => p.science.map(AtomDigest.fromAtom))
 
-          case GeneratorParams(_, _, config: gmos.longslit.Config.GmosSouth, role, declaredComplete, _) =>
-            gmosSouthLongSlit(ctx, config, role, when).map((p, _) => p.science.map(AtomDigest.fromAtom))
-
-          case GeneratorParams(_, _, config: gmos.imaging.Config.GmosNorth, _, _, _) =>
-            EitherT.leftT[F, Stream[Pure, AtomDigest]](OdbError.SequenceUnavailable(ctx.oid, "GMOS North imaging sequence generation is not yet implemented".some))
-
           case GeneratorParams(_, _, config: gmos.imaging.Config.GmosSouth, _, _, _) =>
-            EitherT.leftT[F, Stream[Pure, AtomDigest]](OdbError.SequenceUnavailable(ctx.oid, "GMOS South imaging sequence generation is not yet implemented".some))
+            gmosSouthImaging(ctx, config, when).map((p, _) => p.science.map(AtomDigest.fromAtom))
+
+          case GeneratorParams(_, _, config: gmos.longslit.Config.GmosSouth, role, _, _) =>
+            gmosSouthLongSlit(ctx, config, role, when).map((p, _) => p.science.map(AtomDigest.fromAtom))
         )
 
       override def generate(
@@ -502,6 +544,14 @@ object Generator {
             flamingos2LongSlit(ctx, config, when).map: (p, _) =>
               InstrumentExecutionConfig.Flamingos2(executionConfig(p, lim))
 
+          case GeneratorParams(_, _, config: gmos.imaging.Config.GmosNorth, _, _, _) =>
+            gmosNorthImaging(ctx, config, when).map: (p, _) =>
+              InstrumentExecutionConfig.GmosNorth(executionConfig(p, lim))
+
+          case GeneratorParams(_, _, config: gmos.imaging.Config.GmosSouth, _, _, _) =>
+            gmosSouthImaging(ctx, config, when).map: (p, _) =>
+              InstrumentExecutionConfig.GmosSouth(executionConfig(p, lim))
+
           case GeneratorParams(_, _, config: gmos.longslit.Config.GmosNorth, role, _, _) =>
             gmosNorthLongSlit(ctx, config, role, when).map: (p, _) =>
               InstrumentExecutionConfig.GmosNorth(executionConfig(p, lim))
@@ -509,12 +559,6 @@ object Generator {
           case GeneratorParams(_, _, config: gmos.longslit.Config.GmosSouth, role, _, _) =>
             gmosSouthLongSlit(ctx, config, role, when).map: (p, _) =>
               InstrumentExecutionConfig.GmosSouth(executionConfig(p, lim))
-
-          case GeneratorParams(_, _, config: gmos.imaging.Config.GmosNorth, _, _, _) =>
-            EitherT.leftT[F, InstrumentExecutionConfig](OdbError.SequenceUnavailable(ctx.oid, "GMOS North imaging execution config generation is not yet implemented".some))
-
-          case GeneratorParams(_, _, config: gmos.imaging.Config.GmosSouth, _, _, _) =>
-            EitherT.leftT[F, InstrumentExecutionConfig](OdbError.SequenceUnavailable(ctx.oid, "GMOS South imaging execution config generation is not yet implemented".some))
 
       private def executionDigest[S, D](
         oid:       Observation.Id,
