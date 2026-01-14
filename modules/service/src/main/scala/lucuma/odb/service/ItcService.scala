@@ -284,11 +284,11 @@ object ItcService {
                 toTargetResults(targets, NonEmptyList.one(modifiedCcr)).map(_.head)
 
         input.mode match
-          case InstrumentMode.GmosNorthSpectroscopy(_, _, _, _, _, _) |
-               InstrumentMode.GmosSouthSpectroscopy(_, _, _, _, _, _) =>
+          case InstrumentMode.GmosNorthImaging(_, _) |
+               InstrumentMode.GmosSouthImaging(_, _) =>
             go(lucuma.odb.sequence.gmos.MinAcquisitionExposureTime,
                lucuma.odb.sequence.gmos.MaxAcquisitionExposureTime)
-          case InstrumentMode.Flamingos2Spectroscopy(_, _, _)         =>
+          case InstrumentMode.Flamingos2Imaging(_)   =>
             go(lucuma.odb.sequence.flamingos2.MinAcquisitionExposureTime,
                lucuma.odb.sequence.flamingos2.MaxAcquisitionExposureTime)
           case m                                                      =>
