@@ -67,6 +67,20 @@ trait ExecutionTestSupportForGmos extends ExecutionTestSupport:
       GmosAmpGain.Low
     )
 
+  val gn_key_0_75: Gmos.TableKey[GmosNorthGrating, GmosNorthFilter, GmosNorthFpu] =
+    Gmos.TableKey(
+      Gmos.GratingConfigKey(
+        GmosNorthGrating.R150_G5308,
+        GmosGratingOrder.One,
+        BoundedInterval.unsafeOpenUpper(Wavelength.Min, Wavelength.Max)
+      ).some,
+      none,
+      GmosNorthFpu.LongSlit_0_75.some,
+      GmosXBinning.Two,
+      GmosYBinning.Two,
+      GmosAmpGain.Low
+    )
+
   // NB: 2x2, no filter
   val gn_key_1_00: Gmos.TableKey[GmosNorthGrating, GmosNorthFilter, GmosNorthFpu] =
     Gmos.TableKey(
@@ -131,6 +145,8 @@ trait ExecutionTestSupportForGmos extends ExecutionTestSupport:
       List(
         Gmos.TableRow(PosLong.unsafeFrom(1), gn_key_0_50, gn_flat),
         Gmos.TableRow(PosLong.unsafeFrom(1), gn_key_0_50, gn_arc),
+        Gmos.TableRow(PosLong.unsafeFrom(1), gn_key_0_75, gn_flat),
+        Gmos.TableRow(PosLong.unsafeFrom(1), gn_key_0_75, gn_arc),
         Gmos.TableRow(PosLong.unsafeFrom(1), gn_key_1_00, gn_flat),
         Gmos.TableRow(PosLong.unsafeFrom(1), gn_key_1_00, gn_arc),
         Gmos.TableRow(PosLong.unsafeFrom(1), gn_key_5_00, gn_flat),
