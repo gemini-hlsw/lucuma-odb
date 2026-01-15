@@ -58,7 +58,7 @@ class Phase0LoaderSuite extends CatsEffectSuite:
       .compile
       .toList
       .map: rows =>
-        assertEquals(rows.length, 54)
+        assertEquals(rows.length, 42)
 
   test("loadAll gmosNorth imaging configurations"):
     val rdr = FileReader[IO](imgFileName)

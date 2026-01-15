@@ -377,12 +377,6 @@ FLAMINGOS2	HK HK 0.54"	singleslit,multislit	3pixel	0.54	263	R1200HK	HK	1.261	2.5
 FLAMINGOS2	HK HK 0.72"	singleslit,multislit	4pixel	0.72	263	R1200HK	HK	1.261	2.551	1.906	1.29	450	no		s	8.04	8.02
 FLAMINGOS2	HK HK 1.08"	singleslit,multislit	6pixel	1.08	263	R1200HK	HK	1.261	2.551	1.906	1.29	300	no		s	7.88	7.86
 FLAMINGOS2	HK HK 1.44"	singleslit,multislit	8pixel	1.44	263	R1200HK	HK	1.261	2.551	1.906	1.29	225	no		s	9.20	9.19
-FLAMINGOS2	R3K Kb 0.18"	singleslit,multislit	1pixel	0.18	263	R3000	K-blue	1.934	2.177	2.0555	0.243	3600	no		s	5.42	5.47
-FLAMINGOS2	R3K Kb 0.36"	singleslit,multislit	2pixel	0.36	263	R3000	K-blue	1.934	2.177	2.0555	0.243	2900	no		s	5.97	6.01
-FLAMINGOS2	R3K Kb 0.54"	singleslit,multislit	3pixel	0.54	263	R3000	K-blue	1.934	2.177	2.0555	0.243	1933	no		s	6.09	6.13
-FLAMINGOS2	R3K + Kb + 0.72"	singleslit,multislit	4pixel	0.72	263	R3000	K-blue	1.934	2.177	2.0555	0.243	1450	no		s	6.05	6.09
-FLAMINGOS2	R3K + Kb + 1.08"	singleslit,multislit	6pixel	1.08	263	R3000	K-blue	1.934	2.177	2.0555	0.243	967	no		s	5.83	5.87
-FLAMINGOS2	R3K + Kb + 1.44"	singleslit,multislit	8pixel	1.44	263	R3000	K-blue	1.934	2.177	2.0555	0.243	725	no		s	7.10	7.14
 FLAMINGOS2	R3K Ks 0.18"	singleslit,multislit	1pixel	0.18	263	R3000	K-short	1.991	2.32	2.1555	0.329	3600	no		s	5.32	5.35
 FLAMINGOS2	R3K Ks 0.36"	singleslit,multislit	2pixel	0.36	263	R3000	K-short	1.991	2.32	2.1555	0.329	2900	no		s	5.87	5.90
 FLAMINGOS2	R3K Ks 0.54"	singleslit,multislit	3pixel	0.54	263	R3000	K-short	1.991	2.32	2.1555	0.329	1933	no		s	5.99	6.03
@@ -395,12 +389,6 @@ FLAMINGOS2	R3K Kl 0.54"	singleslit,multislit	3pixel	0.54	263	R3000	K-long	1.9	2.
 FLAMINGOS2	R3K + Kl + 0.72"	singleslit,multislit	4pixel	0.72	263	R3000	K-long	1.9	2.483	2.1915	0.583	1450	no		s	6.04	6.08
 FLAMINGOS2	R3K + Kl + 1.08"	singleslit,multislit	6pixel	1.08	263	R3000	K-long	1.9	2.483	2.1915	0.583	967	no		s	5.81	5.85
 FLAMINGOS2	R3K + Kl + 1.44"	singleslit,multislit	8pixel	1.44	263	R3000	K-long	1.9	2.483	2.1915	0.583	725	no		s	7.09	7.13
-FLAMINGOS2	R3K Kr 0.18"	singleslit,multislit	1pixel	0.18	263	R3000	K-red	2.181	2.446	2.3135	0.265	3600	no		s	4.88	4.94
-FLAMINGOS2	R3K Kr 0.36"	singleslit,multislit	2pixel	0.36	263	R3000	K-red	2.181	2.446	2.3135	0.265	2900	no		s	5.43	5.48
-FLAMINGOS2	R3K Kr 0.54"	singleslit,multislit	3pixel	0.54	263	R3000	K-red	2.181	2.446	2.3135	0.265	1933	no		s	5.56	5.61
-FLAMINGOS2	R3K + Kr + 0.72"	singleslit,multislit	4pixel	0.72	263	R3000	K-red	2.181	2.446	2.3135	0.265	1450	no		s	5.52	5.57
-FLAMINGOS2	R3K + Kr + 1.08"	singleslit,multislit	6pixel	1.08	263	R3000	K-red	2.181	2.446	2.3135	0.265	967	no		s	5.30	5.35
-FLAMINGOS2	R3K + Kr + 1.44"	singleslit,multislit	8pixel	1.44	263	R3000	K-red	2.181	2.446	2.3135	0.265	725	no		s	6.57	6.62
 GPI-2	Y	ifu	Coronagraph	0.156	2.8	Prism	Y	0.95	1.14	1.045	0.19	35	yes	coronagraph	s		
 GPI-2	J	ifu	Coronagraph	0.184	2.8	Prism	J	1.12	1.35	1.235	0.23	36	yes	coronagraph	s		
 GPI-2	H	ifu	Coronagraph	0.246	2.8	Prism	H	1.5	1.8	1.65	0.30	46	yes	coronagraph	s		
