@@ -292,13 +292,13 @@ object ObservationService {
         )
 
         def doDelete: F[Result[Unit]] =
-          val enc = observation_id.nel(oids)          
+          val enc = observation_id.nel(oids)
           session
             .prepareR(Statements.deleteCalibrationObservations(enc))
             .use: pq =>
               pq.stream(oids, 1024).compile.toList.flatMap: deleted =>
                 if oids.toList.sorted === deleted.sorted then Result.unit.pure[F]
-                else 
+                else
                   transaction.rollback >>
                   OdbError.InvalidObservationList(oids, s"One or more specified observations are not calibrations.".some).asFailureF
 
@@ -476,6 +476,8 @@ object ObservationService {
               r <- updates.value.recoverWith {
                     case SqlState.CheckViolation(ex) =>
                       OdbError.InvalidArgument(Some(constraintViolationMessage(ex))).asFailureF
+                    case SqlState.RaiseException(ex) =>
+                      OdbError.UpdateFailed(ex.message.some).asFailureF
                   }
               _ <- transaction.rollback.unlessA(r.hasValue) // rollback if something failed
             } yield r
