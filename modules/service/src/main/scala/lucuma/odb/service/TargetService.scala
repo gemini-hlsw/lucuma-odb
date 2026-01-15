@@ -47,6 +47,7 @@ import lucuma.odb.json.angle.query.given
 import lucuma.odb.json.sourceprofile.given
 import lucuma.odb.json.wavelength.query.given
 import lucuma.odb.service.Services.ServiceAccess
+import lucuma.odb.service.Services.SuperUserAccess
 import lucuma.odb.service.TargetService.UpdateTargetsResponse.SourceProfileUpdatesFailed
 import lucuma.odb.service.TargetService.UpdateTargetsResponse.TrackingSwitchFailed
 import lucuma.odb.util.Codecs.*
@@ -62,7 +63,6 @@ import skunk.codec.all.*
 import skunk.implicits.*
 
 import Services.Syntax.*
-import lucuma.odb.service.Services.SuperUserAccess
 
 trait TargetService[F[_]] {
   def createTarget(

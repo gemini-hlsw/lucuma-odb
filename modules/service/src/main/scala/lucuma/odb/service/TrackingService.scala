@@ -39,6 +39,7 @@ import lucuma.core.util.TimestampInterval
 import lucuma.horizons.HorizonsClient
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
+import lucuma.odb.service.Services.SuperUserAccess
 import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.service.Services.asSuperUser
 import lucuma.odb.util.Codecs.*
@@ -52,7 +53,6 @@ import java.time.Instant
 import java.time.ZoneOffset
 import java.time.ZonedDateTime
 import scala.concurrent.duration.*
-import lucuma.odb.service.Services.SuperUserAccess
 
 trait TrackingService[F[_]]:
   import TrackingService.Snapshot

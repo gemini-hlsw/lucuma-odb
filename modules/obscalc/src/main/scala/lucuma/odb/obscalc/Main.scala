@@ -205,7 +205,7 @@ object CalcMain extends MainParams:
       o <- calcAndUpdateStream.compile.drain.background
     yield o
 
-  def services[F[_]: Temporal: Async: Parallel: UUIDGen: Trace: Logger: LoggerFactory](
+  def services[F[_]: Async: Parallel: UUIDGen: Trace: Logger: LoggerFactory](
     user:        User,
     enums:       Enums,
     mapping:     Session[F] => Mapping[F],

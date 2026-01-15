@@ -5,6 +5,7 @@ package lucuma.odb.graphql
 package mapping
 
 import cats.Order
+import grackle.Path
 import grackle.Query.Binding
 import grackle.Query.Filter
 import grackle.Query.OrderBy
@@ -14,35 +15,101 @@ import grackle.QueryCompiler.Elab
 import grackle.Result
 import grackle.TypeRef
 import grackle.skunk.SkunkMapping
-import io.circe.*
-import io.circe.syntax.*
 import lucuma.core.enums.GmosAmpGain
 import lucuma.core.enums.GmosAmpReadMode
 import lucuma.core.enums.GmosBinning
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosRoi
 import lucuma.core.enums.GmosSouthFilter
-import lucuma.core.enums.MultipleFiltersMode
-import lucuma.core.math.Offset
 import lucuma.odb.data.ObservingModeRowVersion
-import lucuma.odb.format.spatialOffsets.*
 import lucuma.odb.graphql.predicate.LeafPredicates
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.graphql.table.*
-import lucuma.odb.json.offset.query.given
 
 trait GmosImagingMapping[F[_]] extends GmosImagingView[F]
                                   with GmosImagingFilterTable[F]
-                                  with OffsetGeneratorView[F]
+                                  with TelescopeConfigGeneratorView[F]
                                   with OptionalFieldMapping[F]
                                   with Predicates[F] { this: SkunkMapping[F] =>
 
   import GmosImagingMapping.*
 
-  private object CommonImagingFields:
+  private def groupedImagingMapping(
+    p: Path,
+    c: GmosImagingCommonColumns
+  ): ObjectMapping =
+    ObjectMapping(p)(
+      SqlField("observationId", c.Grouped.ObservationId, key = true, hidden = true),
+      SqlField("order",         c.Grouped.WavelengthOrder),
+      SqlField("skyCount",      c.Sky.Count),
+      SqlObject("offsets",      Join(c.ObservationId, TelescopeConfigGeneratorView.ObjectObservationId)),
+      SqlObject("skyOffsets",   Join(c.ObservationId, TelescopeConfigGeneratorView.SkyObservationId)),
+    )
 
-    val multipleFiltersMode: FieldMapping        = explicitOrElseDefault[MultipleFiltersMode]("multipleFiltersMode", "explicitMultipleFiltersMode", "defaultMultipleFiltersMode")
-    val defaultMultipleFiltersMode: FieldMapping = CursorField[MultipleFiltersMode]("defaultMultipleFiltersMode", _ => Result(DefaultMultipleFiltersMode))
+  lazy val GmosNorthGroupedImagingMapping: ObjectMapping =
+    groupedImagingMapping(GmosNorthImagingType / "variant" / "grouped", GmosNorthImagingView.Common)
+
+  lazy val GmosSouthGroupedImagingMapping: ObjectMapping =
+    groupedImagingMapping(GmosSouthImagingType / "variant" / "grouped", GmosSouthImagingView.Common)
+
+
+  private def interleavedImagingMapping(
+    p: Path,
+    c: GmosImagingCommonColumns
+  ): ObjectMapping =
+    ObjectMapping(p)(
+      SqlField("observationId", c.Interleaved.ObservationId, key = true, hidden = true),
+      SqlField("skyCount",      c.Sky.Count),
+      SqlObject("offsets",      Join(c.ObservationId, TelescopeConfigGeneratorView.ObjectObservationId)),
+      SqlObject("skyOffsets",   Join(c.ObservationId, TelescopeConfigGeneratorView.SkyObservationId)),
+    )
+
+  lazy val GmosNorthInterleavedImagingMapping: ObjectMapping =
+    interleavedImagingMapping(GmosNorthImagingType / "variant" / "interleaved", GmosNorthImagingView.Common)
+
+  lazy val GmosSouthInterleavedImagingMapping: ObjectMapping =
+    interleavedImagingMapping(GmosSouthImagingType / "variant" / "interleaved", GmosSouthImagingView.Common)
+
+
+  private def preImagingMapping(
+    p: Path,
+    c: GmosImagingCommonColumns
+  ): ObjectMapping =
+    ObjectMapping(p)(
+      SqlField("observationId", c.PreImaging.ObservationId, key = true, hidden = true),
+      SqlObject("offset1"),
+      SqlObject("offset2"),
+      SqlObject("offset3"),
+      SqlObject("offset4")
+    )
+
+  lazy val GmosNorthPreImagingMapping: ObjectMapping =
+    preImagingMapping(GmosNorthImagingType / "variant" / "preImaging", GmosNorthImagingView.Common)
+
+  lazy val GmosSouthPreImagingMapping: ObjectMapping =
+    preImagingMapping(GmosSouthImagingType / "variant" / "preImaging", GmosSouthImagingView.Common)
+
+
+  private def imagingVariantMapping(
+    p: Path,
+    c: GmosImagingCommonColumns
+  ): ObjectMapping =
+    ObjectMapping(p)(
+      SqlField("observationId", c.ObservationId, key = true, hidden = true),
+      SqlField("variantType", c.Variant),
+      SqlObject("grouped"),
+      SqlObject("interleaved"),
+      SqlObject("preImaging")
+    )
+
+  lazy val GmosNorthImagingVariantMapping: ObjectMapping =
+    imagingVariantMapping(GmosNorthImagingType / "variant", GmosNorthImagingView.Common)
+
+  lazy val GmosSouthImagingVariantMapping: ObjectMapping =
+    imagingVariantMapping(GmosSouthImagingType / "variant", GmosSouthImagingView.Common)
+
+
+  private object CommonImagingFields:
 
     val bin: FieldMapping = explicitOrElseDefault[GmosBinning]("bin", "explicitBin", "defaultBin")
 
@@ -55,47 +122,48 @@ trait GmosImagingMapping[F[_]] extends GmosImagingView[F]
     val roi: FieldMapping        = explicitOrElseDefault[GmosRoi]("roi", "explicitRoi", "defaultRoi")
     val defaultRoi: FieldMapping = CursorField[GmosRoi]("defaultRoi", _ => Result(DefaultRoi))
 
-    val offsets: FieldMapping =
-      CursorFieldJson("offsets",
-        cursor =>
-          cursor
-            .field("offsetsString", None)
-            .flatMap(_.as[String].map(s => if (s.isEmpty) defaultOffsetsJson else decodeSpatialOffsets(s))),
-        List("offsetsString")
-      )
+  private def imagingMapping(
+    t: TypeRef,
+    c: GmosImagingCommonColumns,
+    f: ColumnRef
+  ): ObjectMapping =
+    ObjectMapping(t)(
+      SqlField("observationId",  c.ObservationId, key = true, hidden = true),
 
-  lazy val GmosNorthImagingMapping: ObjectMapping =
-    ObjectMapping(GmosNorthImagingType)(
+      SqlObject("variant"),
 
-      SqlField("observationId",   GmosNorthImagingView.ObservationId, key = true, hidden = true),
-      SqlObject("filters",        Join(GmosNorthImagingView.ObservationId, GmosNorthImagingFilterTable.ObservationId)),
-      SqlObject("initialFilters", Join(GmosNorthImagingView.ObservationId, GmosNorthImagingFilterTable.ObservationId)),
-
-      SqlField("offsetsString", GmosNorthImagingView.Offsets, hidden = true),
-      CommonImagingFields.offsets,
-
-      SqlObject("objectOffsetGenerator", Join(GmosNorthImagingView.ObservationId, OffsetGeneratorView.ObjectObservationId)),
-      SqlObject("skyOffsetGenerator",    Join(GmosNorthImagingView.ObservationId, OffsetGeneratorView.SkyObservationId)),
-
-      CommonImagingFields.multipleFiltersMode,
-      SqlField("explicitMultipleFiltersMode", GmosNorthImagingView.ExplicitMultipleFiltersMode),
-      CommonImagingFields.defaultMultipleFiltersMode,
+      SqlObject("filters",        Join(c.ObservationId, f)),
+      SqlObject("initialFilters", Join(c.ObservationId, f)),
 
       CommonImagingFields.bin,
-      SqlField("explicitBin", GmosNorthImagingView.ExplicitBin),
-      SqlField("defaultBin",  GmosNorthImagingView.DefaultBin),
+      SqlField("explicitBin", c.ExplicitBin),
+      SqlField("defaultBin",  c.DefaultBin),
 
       CommonImagingFields.ampReadMode,
-      SqlField("explicitAmpReadMode", GmosNorthImagingView.ExplicitAmpReadMode),
+      SqlField("explicitAmpReadMode", c.ExplicitAmpReadMode),
       CommonImagingFields.defaultAmpReadMode,
 
       CommonImagingFields.ampGain,
-      SqlField("explicitAmpGain", GmosNorthImagingView.ExplicitAmpGain),
+      SqlField("explicitAmpGain", c.ExplicitAmpGain),
       CommonImagingFields.defaultAmpGain,
 
       CommonImagingFields.roi,
-      SqlField("explicitRoi", GmosNorthImagingView.ExplicitRoi),
-      CommonImagingFields.defaultRoi,
+      SqlField("explicitRoi", c.ExplicitRoi),
+      CommonImagingFields.defaultRoi
+    )
+
+  lazy val GmosNorthImagingMapping: ObjectMapping =
+    imagingMapping(
+      GmosNorthImagingType,
+      GmosNorthImagingView.Common,
+      GmosNorthImagingFilterTable.ObservationId
+    )
+
+  lazy val GmosSouthImagingMapping: ObjectMapping =
+    imagingMapping(
+      GmosSouthImagingType,
+      GmosSouthImagingView.Common,
+      GmosSouthImagingFilterTable.ObservationId
     )
 
   // We need an elaborator in order to order the filters predictably and to
@@ -126,40 +194,6 @@ trait GmosImagingMapping[F[_]] extends GmosImagingView[F]
         ObservingModeRowVersion.Initial
       )
 
-  lazy val GmosSouthImagingMapping: ObjectMapping =
-    ObjectMapping(GmosSouthImagingType)(
-
-      SqlField("observationId",   GmosSouthImagingView.ObservationId, key = true, hidden = true),
-      SqlObject("filters",        Join(GmosSouthImagingView.ObservationId, GmosSouthImagingFilterTable.ObservationId)),
-      SqlObject("initialFilters", Join(GmosSouthImagingView.ObservationId, GmosSouthImagingFilterTable.ObservationId)),
-
-      SqlField("offsetsString", GmosSouthImagingView.Offsets, hidden = true),
-      CommonImagingFields.offsets,
-
-      SqlObject("objectOffsetGenerator", Join(GmosSouthImagingView.ObservationId, OffsetGeneratorView.ObjectObservationId)),
-      SqlObject("skyOffsetGenerator",    Join(GmosSouthImagingView.ObservationId, OffsetGeneratorView.SkyObservationId)),
-
-      CommonImagingFields.multipleFiltersMode,
-      SqlField("explicitMultipleFiltersMode", GmosSouthImagingView.ExplicitMultipleFiltersMode),
-      CommonImagingFields.defaultMultipleFiltersMode,
-
-      CommonImagingFields.bin,
-      SqlField("explicitBin", GmosSouthImagingView.ExplicitBin),
-      SqlField("defaultBin",  GmosSouthImagingView.DefaultBin),
-
-      CommonImagingFields.ampReadMode,
-      SqlField("explicitAmpReadMode", GmosSouthImagingView.ExplicitAmpReadMode),
-      CommonImagingFields.defaultAmpReadMode,
-
-      CommonImagingFields.ampGain,
-      SqlField("explicitAmpGain", GmosSouthImagingView.ExplicitAmpGain),
-      CommonImagingFields.defaultAmpGain,
-
-      CommonImagingFields.roi,
-      SqlField("explicitRoi", GmosSouthImagingView.ExplicitRoi),
-      CommonImagingFields.defaultRoi,
-    )
-
   lazy val GmosSouthImagingElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
     case (GmosSouthImagingType, "filters", Nil) =>
       filterElaborator[GmosSouthFilter](
@@ -175,6 +209,23 @@ trait GmosImagingMapping[F[_]] extends GmosImagingView[F]
         ObservingModeRowVersion.Initial
       )
 
+  lazy val GmosImagingMappings: List[TypeMapping] =
+    List(
+      GmosNorthGroupedImagingMapping,
+      GmosSouthGroupedImagingMapping,
+
+      GmosNorthInterleavedImagingMapping,
+      GmosSouthInterleavedImagingMapping,
+
+      GmosNorthPreImagingMapping,
+      GmosSouthPreImagingMapping,
+
+      GmosNorthImagingVariantMapping,
+      GmosSouthImagingVariantMapping,
+
+      GmosNorthImagingMapping,
+      GmosSouthImagingMapping
+    )
 }
 
 object GmosImagingMapping:
@@ -182,11 +233,3 @@ object GmosImagingMapping:
   private val DefaultAmpReadMode: GmosAmpReadMode = GmosAmpReadMode.Slow
   private val DefaultAmpGain: GmosAmpGain = GmosAmpGain.Low
   private val DefaultRoi: GmosRoi = GmosRoi.FullFrame
-  private val DefaultMultipleFiltersMode: MultipleFiltersMode = MultipleFiltersMode.Grouped
-
-  def decodeSpatialOffsets(s: String): Json =
-    if (s.trim.isEmpty) List.empty[Offset].asJson
-    else OffsetsFormat.getOption(s).getOrElse(List.empty[Offset]).asJson
-
-  val defaultOffsetsJson: Json =
-    List.empty[Offset].asJson

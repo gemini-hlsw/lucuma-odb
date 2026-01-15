@@ -26,7 +26,7 @@ trait SequenceState[D] {
    * initialConfig, defines the initial state and subsequent steps edit it
    * in a `State` "program".
    */
-  def initialConfig: D
+  def initialDynamicConfig: D
 
   /**
    * Evaluates the stateful computation to produce a value.
@@ -37,7 +37,7 @@ trait SequenceState[D] {
    * @return result of the state computation
    */
   def eval[A](prog: State[D, A]): A =
-    prog.runA(initialConfig).value
+    prog.runA(initialDynamicConfig).value
 
   def step(f: D => ProtoStep[D]): State[D, ProtoStep[D]] =
     State.inspect[D, ProtoStep[D]](f)

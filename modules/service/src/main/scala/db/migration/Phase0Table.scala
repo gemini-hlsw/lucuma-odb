@@ -22,6 +22,7 @@ import lucuma.odb.util.Flamingos2Codecs.*
 import lucuma.odb.util.GmosCodecs.*
 import skunk.Encoder
 import skunk.codec.boolean.bool
+import skunk.codec.numeric.numeric
 import skunk.codec.text.text
 
 trait Phase0Table[A] {
@@ -74,7 +75,9 @@ object Phase0Table {
         "c_resolution",
         "c_ao",
         "c_capability",
-        "c_site"
+        "c_site",
+        "c_hmin_hot",
+        "c_hmin_solar"
       )
 
     override def encoder: Encoder[SpectroscopyRow] =
@@ -94,7 +97,9 @@ object Phase0Table {
         int4_pos      *:
         bool          *:
         text.opt      *:
-        site
+        site          *:
+        numeric.opt   *:
+        numeric.opt
       ).contramap[SpectroscopyRow] { row => (
         row.instrument,
         row.description,
@@ -111,7 +116,9 @@ object Phase0Table {
         row.resolution,
         row.ao,
         row.capability.map(_.tag),
-        row.site
+        row.site,
+        row.hminHot,
+        row.hminSolar
       )}
 
   }

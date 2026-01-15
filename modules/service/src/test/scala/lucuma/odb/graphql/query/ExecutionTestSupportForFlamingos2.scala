@@ -49,6 +49,13 @@ trait ExecutionTestSupportForFlamingos2 extends ExecutionTestSupport:
       Flamingos2Fpu.LongSlit1.some
     )
 
+  val f2_key_JH2: Flamingos2.TableKey =
+    Flamingos2.TableKey(
+      Flamingos2Disperser.R1200JH.some,
+      Flamingos2Filter.JH,
+      Flamingos2Fpu.LongSlit2.some
+    )
+
   val f2_flat_JH1 =
     SmartGcalValue(
       Gcal(
@@ -83,7 +90,9 @@ trait ExecutionTestSupportForFlamingos2 extends ExecutionTestSupport:
     val rows: List[Flamingos2.TableRow] =
       List(
         Flamingos2.TableRow(PosLong.unsafeFrom(1), f2_key_JH1, f2_flat_JH1),
-        Flamingos2.TableRow(PosLong.unsafeFrom(1), f2_key_JH1, f2_arc_JH1)
+        Flamingos2.TableRow(PosLong.unsafeFrom(1), f2_key_JH1, f2_arc_JH1),
+        Flamingos2.TableRow(PosLong.unsafeFrom(1), f2_key_JH2, f2_flat_JH1),
+        Flamingos2.TableRow(PosLong.unsafeFrom(1), f2_key_JH2, f2_arc_JH1)
       )
 
     servicesFor(pi /* doesn't matter*/).map(_(s)).use: services =>
@@ -275,3 +284,35 @@ trait ExecutionTestSupportForFlamingos2 extends ExecutionTestSupport:
       "observeClass" -> "NIGHT_CAL".asJson,
       "steps" -> gcalSteps.asJson
     )
+
+  def queryObservationConstraints(oid: Observation.Id): IO[Json] =
+    query(
+      serviceUser,
+      s"""query {
+            observation(observationId: "$oid") {
+              id
+              constraintSet {
+                cloudExtinction
+                imageQuality
+                skyBackground
+                waterVapor
+                elevationRange {
+                  airMass {
+                    min
+                    max
+                  }
+                  hourAngle {
+                    minHours
+                    maxHours
+                  }
+                }
+              }
+            }
+          }"""
+    ).map { c =>
+      c.hcursor
+        .downField("observation")
+        .downField("constraintSet")
+        .focus
+        .getOrElse(Json.Null)
+    }

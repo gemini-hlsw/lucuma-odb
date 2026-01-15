@@ -152,29 +152,73 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
         }
         gmosNorthImaging {
           filters { filter }
+          variant {
+            grouped {
+              order
+              skyCount
+            }
+            interleaved {
+              skyCount
+            }
+            preImaging {
+              offset1 {
+                p { arcseconds }
+                q { arcseconds }
+              }
+              offset2 {
+                p { arcseconds }
+                q { arcseconds }
+              }
+              offset3 {
+                p { arcseconds }
+                q { arcseconds }
+              }
+              offset4 {
+                p { arcseconds }
+                q { arcseconds }
+              }
+            }
+          }
           initialFilters { filter }
-          multipleFiltersMode
           bin
           ampReadMode
           ampGain
           roi
-          offsets {
-            p { arcseconds }
-            q { arcseconds }
-          }
         }
         gmosSouthImaging {
           filters { filter }
+          variant {
+            grouped {
+              order
+              skyCount
+            }
+            interleaved {
+              skyCount
+            }
+            preImaging {
+              offset1 {
+                p { arcseconds }
+                q { arcseconds }
+              }
+              offset2 {
+                p { arcseconds }
+                q { arcseconds }
+              }
+              offset3 {
+                p { arcseconds }
+                q { arcseconds }
+              }
+              offset4 {
+                p { arcseconds }
+                q { arcseconds }
+              }
+            }
+          }
           initialFilters { filter }
-          multipleFiltersMode
           bin
           ampReadMode
           ampGain
           roi
-          offsets {
-            p { arcseconds }
-            q { arcseconds }
-          }
         }
         flamingos2LongSlit {
           disperser
@@ -560,8 +604,12 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
                     observingMode {
                       gmosNorthImaging {
                         ${filtersQuery("filters")}
+                        variant {
+                          interleaved {
+                            skyCount
+                          }
+                        }
                         ${filtersQuery("initialFilters")}
-                        multipleFiltersMode
                         bin
                         ampReadMode
                         ampGain
@@ -573,8 +621,12 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
                     observingMode {
                       gmosNorthImaging {
                         ${filtersQuery("filters")}
+                        variant {
+                          interleaved {
+                            skyCount
+                          }
+                        }
                         ${filtersQuery("initialFilters")}
-                        multipleFiltersMode
                         bin
                         ampReadMode
                         ampGain
@@ -596,11 +648,15 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
                             ${filterJson(GmosNorthFilter.GPrime, 100, 1210)},
                             ${filterJson(GmosNorthFilter.RPrime, 100, 1210)}
                           ],
+                          "variant": {
+                            "interleaved": {
+                              "skyCount": 1
+                            }
+                          },
                           "initialFilters": [
                             ${filterJson(GmosNorthFilter.GPrime, 100, 1210)},
                             ${filterJson(GmosNorthFilter.RPrime, 100, 1210)}
                           ],
-                          "multipleFiltersMode": "GROUPED",
                           "bin": "TWO",
                           "ampReadMode": "SLOW",
                           "ampGain": "LOW",
@@ -615,11 +671,15 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
                             ${filterJson(GmosNorthFilter.GPrime, 100, 1210)},
                             ${filterJson(GmosNorthFilter.RPrime, 100, 1210)}
                           ],
+                          "variant": {
+                            "interleaved": {
+                              "skyCount": 1
+                            }
+                          },
                           "initialFilters": [
                             ${filterJson(GmosNorthFilter.GPrime, 100, 1210)},
                             ${filterJson(GmosNorthFilter.RPrime, 100, 1210)}
                           ],
-                          "multipleFiltersMode": "GROUPED",
                           "bin": "TWO",
                           "ampReadMode": "SLOW",
                           "ampGain": "LOW",
@@ -928,7 +988,6 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
                     observingMode {
                       gmosSouthImaging {
                         filters { filter }
-                        multipleFiltersMode
                         bin
                         ampReadMode
                         ampGain
@@ -940,7 +999,6 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
                     observingMode {
                       gmosSouthImaging {
                         filters { filter }
-                        multipleFiltersMode
                         bin
                         ampReadMode
                         ampGain
@@ -962,7 +1020,6 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
                             { "filter": "G_PRIME" },
                             { "filter": "R_PRIME" }
                           ],
-                          "multipleFiltersMode": "GROUPED",
                           "bin": "TWO",
                           "ampReadMode": "SLOW",
                           "ampGain": "LOW",
@@ -977,7 +1034,6 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
                             { "filter": "G_PRIME" },
                             { "filter": "R_PRIME" }
                           ],
-                          "multipleFiltersMode": "GROUPED",
                           "bin": "TWO",
                           "ampReadMode": "SLOW",
                           "ampGain": "LOW",
@@ -1144,15 +1200,15 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
                   observingMode: {
                     gmosNorthImaging: {
                       filters: [
-                        {
-                          filter: R_PRIME
-                        },
-                        {
-                          filter: G_PRIME
-                        }
+                        { filter: R_PRIME },
+                        { filter: G_PRIME }
                       ]
-                      objectOffsetGenerator: $obj
-                      skyOffsetGenerator: $sky
+                      variant: {
+                        grouped: {
+                          offsets: $obj
+                          skyOffsets: $sky
+                        }
+                      }
                     }
                   }
                   constraintSet: {
@@ -1182,73 +1238,77 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
                       newObservation {
                         observingMode {
                           gmosNorthImaging {
-                            objectOffsetGenerator {
-                              enumerated {
-                                values {
-                                  offset {
-                                    p { arcseconds }
-                                    q { arcseconds }
+                            variant {
+                              grouped {
+                                offsets {
+                                  enumerated {
+                                    values {
+                                      offset {
+                                        p { arcseconds }
+                                        q { arcseconds }
+                                      }
+                                      guiding
+                                    }
                                   }
-                                  guiding
-                                }
-                              }
-                              uniform {
-                                cornerA {
-                                  p { arcseconds }
-                                  q { arcseconds }
-                                }
-                                cornerB {
-                                  p { arcseconds }
-                                  q { arcseconds }
-                                }
-                              }
-                              random {
-                                size { arcseconds }
-                                center {
-                                  p { arcseconds }
-                                  q { arcseconds }
-                                }
-                              }
-                              spiral {
-                                size { arcseconds }
-                                center {
-                                  p { arcseconds }
-                                  q { arcseconds }
-                                }
-                              }
-                            }
-                            skyOffsetGenerator {
-                              enumerated {
-                                values {
-                                  offset {
-                                    p { arcseconds }
-                                    q { arcseconds }
+                                  uniform {
+                                    cornerA {
+                                      p { arcseconds }
+                                      q { arcseconds }
+                                    }
+                                    cornerB {
+                                      p { arcseconds }
+                                      q { arcseconds }
+                                    }
                                   }
-                                  guiding
+                                  random {
+                                    size { arcseconds }
+                                    center {
+                                      p { arcseconds }
+                                      q { arcseconds }
+                                    }
+                                  }
+                                  spiral {
+                                    size { arcseconds }
+                                    center {
+                                      p { arcseconds }
+                                      q { arcseconds }
+                                    }
+                                  }
                                 }
-                              }
-                              uniform {
-                                cornerA {
-                                  p { arcseconds }
-                                  q { arcseconds }
-                                }
-                                cornerB {
-                                  p { arcseconds }
-                                  q { arcseconds }
-                                }
-                              }
-                              random {
-                                size { arcseconds }
-                                center {
-                                  p { arcseconds }
-                                  q { arcseconds }
-                                }
-                              }
-                              spiral {
-                                size { arcseconds }
-                                center {
-                                  p { arcseconds }
-                                  q { arcseconds }
+                                skyOffsets {
+                                  enumerated {
+                                    values {
+                                      offset {
+                                        p { arcseconds }
+                                        q { arcseconds }
+                                      }
+                                      guiding
+                                    }
+                                  }
+                                  uniform {
+                                    cornerA {
+                                      p { arcseconds }
+                                      q { arcseconds }
+                                    }
+                                    cornerB {
+                                      p { arcseconds }
+                                      q { arcseconds }
+                                    }
+                                  }
+                                  random {
+                                    size { arcseconds }
+                                    center {
+                                      p { arcseconds }
+                                      q { arcseconds }
+                                    }
+                                  }
+                                  spiral {
+                                    size { arcseconds }
+                                    center {
+                                      p { arcseconds }
+                                      q { arcseconds }
+                                    }
+                                  }
                                 }
                               }
                             }
@@ -1264,8 +1324,12 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
                       "newObservation": {
                         "observingMode": {
                           "gmosNorthImaging": {
-                            "objectOffsetGenerator": $objRes,
-                            "skyOffsetGenerator": $skyRes
+                            "variant": {
+                              "grouped": {
+                                "offsets": $objRes,
+                                "skyOffsets": $skyRes
+                              }
+                            }
                           }
                         }
                       }
@@ -1274,78 +1338,6 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
                 """.asRight
               )
 
-  test("clone GMOS imaging observation preserves spatial offsets") {
-    createProgramAs(pi).flatMap { pid =>
-      createTargetAs(pi, pid).flatMap { tid =>
-        // Create a GMOS North imaging observation with spatial offsets using the simplified helper
-        createGmosNorthImagingObservationAs(pi, pid, ImageQuality.Preset.PointEight, Some("""[
-          { p: { arcseconds: "1.5" }, q: { arcseconds: "2.0" } },
-          { p: { arcseconds: "-0.5" }, q: { arcseconds: "1.0" } }
-        ]"""), tid).flatMap { oid =>
-          // Now clone the observation and verify spatial offsets are preserved
-          expect(
-            user = pi,
-            query = s"""
-              mutation {
-                cloneObservation(input: {
-                  observationId: "$oid"
-                }) {
-                  originalObservation {
-                    observingMode {
-                      gmosNorthImaging {
-                        offsets {
-                          p { arcseconds }
-                          q { arcseconds }
-                        }
-                      }
-                    }
-                  }
-                  newObservation {
-                    observingMode {
-                      gmosNorthImaging {
-                        offsets {
-                          p { arcseconds }
-                          q { arcseconds }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            """,
-            expected = Right(
-              json"""
-                {
-                  "cloneObservation": {
-                    "originalObservation": {
-                      "observingMode": {
-                        "gmosNorthImaging": {
-                          "offsets": [
-                            { "p": { "arcseconds": 1.500000 }, "q": { "arcseconds": 2.000000 } },
-                            { "p": { "arcseconds": -0.500000 }, "q": { "arcseconds": 1.000000 } }
-                          ]
-                        }
-                      }
-                    },
-                    "newObservation": {
-                      "observingMode": {
-                        "gmosNorthImaging": {
-                          "offsets": [
-                            { "p": { "arcseconds": 1.500000 }, "q": { "arcseconds": 2.000000 } },
-                            { "p": { "arcseconds": -0.500000 }, "q": { "arcseconds": 1.000000 } }
-                          ]
-                        }
-                      }
-                    }
-                  }
-                }
-              """
-            )
-          )
-        }
-      }
-    }
-  }
 
   test("clone Flamingos2 long slit observation preserves spatial offsets"):
     for {

@@ -11,8 +11,8 @@ val catsTimeVersion            = "0.6.0"
 val catsVersion                = "2.13.0"
 val circeVersion               = "0.14.15"
 val circeRefinedVersion        = "0.15.1"
-val cirisVersion               = "3.11.1"
-val clueVersion                = "0.51.0"
+val cirisVersion               = "3.12.0"
+val clueVersion                = "0.51.2"
 val declineVersion             = "2.5.0"
 val dropwizardVersion          = "4.2.37"
 val flywayVersion              = "9.22.3"
@@ -27,9 +27,9 @@ val jmhVersion                 = "1.37"
 val jwtVersion                 = "11.0.3"
 val keySemaphoreVersion        = "0.3.0-M1"
 val kittensVersion             = "3.5.0"
-val logbackVersion             = "1.5.21"
+val logbackVersion             = "1.5.24"
 val log4catsVersion            = "2.7.1"
-val lucumaCoreVersion          = "0.162.0-3-8f72cda-20260112T184305Z-SNAPSHOT"
+val lucumaCoreVersion          = "0.169.0"
 val lucumaGraphQLRoutesVersion = "0.11.7"
 val monocleVersion             = "3.3.0"
 val munitVersion               = "1.2.1"
@@ -619,7 +619,7 @@ lazy val itcLegacyTests = project
 lazy val schema =
   crossProject(JVMPlatform, JSPlatform)
     .crossType(CrossType.Pure)
-    .dependsOn(ssoFrontendClient)
+    .dependsOn(itcModel, ssoFrontendClient)
     .in(file("modules/schema"))
     .settings(
       name := "lucuma-odb-schema",

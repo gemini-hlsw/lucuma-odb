@@ -4,7 +4,7 @@
 package lucuma.odb.service
 
 import cats.data.NonEmptyList
-import cats.effect.Concurrent
+import cats.effect.Async
 import cats.implicits.*
 import grackle.Result
 import grackle.ResultT
@@ -34,6 +34,7 @@ import lucuma.core.util.DateInterval
 import lucuma.core.util.Enumerated
 import lucuma.core.util.Timestamp
 import lucuma.itc.client.ItcClient
+import lucuma.odb.data.Itc
 import lucuma.odb.data.ObservationValidationMap
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
@@ -89,7 +90,7 @@ sealed trait ObservationWorkflowService[F[_]] {
    */
   def getCalculatedWorkflow(
     oid:  Observation.Id,
-    itc:  Option[ItcService.AsterismResults],
+    itc:  Option[Itc],
     exec: Option[CoreExecutionState]
   )(using Transaction[F]): F[Result[ObservationWorkflow]]
 
@@ -237,7 +238,7 @@ object ObservationWorkflowService {
       case _                             => ObservationValidation.configuration(ge.format)
 
   /* Construct an instance. */
-  def instantiate[F[_]: Concurrent](using Services[F]): ObservationWorkflowService[F] =
+  def instantiate[F[_]: Async](using Services[F]): ObservationWorkflowService[F] =
     new ObservationWorkflowService[F] {
 
       // Make the enums available in a stable and implicit way
@@ -341,7 +342,7 @@ object ObservationWorkflowService {
 
       private def lookupCachedItcResults(
         input:      Map[Observation.Id, ObservationValidationInfo],
-      )(using Transaction[F], SuperUserAccess): F[Map[Observation.Id, ItcService.AsterismResults]] =
+      )(using Transaction[F], SuperUserAccess): F[Map[Observation.Id, Itc]] =
         itcService
           .selectAll:
             input
@@ -370,7 +371,7 @@ object ObservationWorkflowService {
       // Computes the observation execution state if not cached
       private def executionStates(
         infos:      Map[Observation.Id, ObservationValidationInfo],
-        itcResults: Map[Observation.Id, ItcService.AsterismResults],
+        itcResults: Map[Observation.Id, Itc],
         commitHash: CommitHash,
         ptc:        TimeEstimateCalculatorImplementation.ForInstrumentMode
       )(using NoTransaction[F], SuperUserAccess): F[Map[Observation.Id, ExecutionState]] =
@@ -568,7 +569,7 @@ object ObservationWorkflowService {
         val select: F[Result[(
           Map[Observation.Id, ObservationValidationInfo],
           Map[Observation.Id, ObservationValidationMap],
-          Map[Observation.Id, ItcService.AsterismResults]
+          Map[Observation.Id, Itc]
         )]] =
           services.transactionally:
             (
@@ -600,7 +601,7 @@ object ObservationWorkflowService {
 
       override def getCalculatedWorkflow(
         oid:  Observation.Id,
-        itc:  Option[ItcService.AsterismResults],
+        itc:  Option[Itc],
         exec: Option[CoreExecutionState]
       )(using Transaction[F]): F[Result[ObservationWorkflow]] =
         (for

@@ -3,11 +3,11 @@
 
 package lucuma.odb.json
 
-import lucuma.core.data.PerSite
-import io.circe.Json
-import io.circe.Encoder
-import io.circe.syntax.*
 import io.circe.Decoder
+import io.circe.Encoder
+import io.circe.Json
+import io.circe.syntax.*
+import lucuma.core.data.PerSite
 
 object persite:
 

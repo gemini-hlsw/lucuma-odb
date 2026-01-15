@@ -3,33 +3,47 @@
 
 package lucuma.odb.service
 
+import cats.Monad
 import cats.effect.Temporal
 import cats.syntax.all.*
 import lucuma.catalog.telluric.TelluricSearchInput
 import lucuma.catalog.telluric.TelluricTargetsClient
 import lucuma.core.enums.CalibrationRole
+import lucuma.core.enums.Flamingos2Disperser
+import lucuma.core.enums.Flamingos2Filter
+import lucuma.core.enums.Flamingos2Fpu
+import lucuma.core.enums.StellarLibrarySpectrum
 import lucuma.core.enums.TargetDisposition
+import lucuma.core.enums.TelluricCalibrationOrder
 import lucuma.core.math.Coordinates
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.TelluricType
-import lucuma.core.syntax.timespan.*
+import lucuma.core.model.UnnormalizedSED
+import lucuma.core.util.NewType
+import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.odb.data.Existence
+import lucuma.odb.data.Md5Hash
 import lucuma.odb.data.TelluricTargets
 import lucuma.odb.graphql.input.CatalogInfoInput
 import lucuma.odb.graphql.input.SiderealInput
 import lucuma.odb.graphql.input.TargetPropertiesInput
 import lucuma.odb.graphql.mapping.AccessControl
+import lucuma.odb.sequence.flamingos2.longslit.Config as F2Config
+import lucuma.odb.sequence.syntax.hash.*
+import lucuma.odb.sequence.util.HashBytes
 import lucuma.odb.service.Services.ServiceAccess
 import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.Codecs.calculation_state
+import lucuma.odb.util.Flamingos2Codecs.*
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.LoggerFactory
 import org.typelevel.log4cats.syntax.*
 import skunk.*
+import skunk.SqlState
 import skunk.codec.all.*
 import skunk.implicits.*
 
@@ -62,9 +76,11 @@ trait TelluricTargetsService[F[_]]:
    * Called when a telluric observation is created.
    */
   def requestTelluricTarget(
-    pid:        Program.Id,
-    telluricId: Observation.Id,
-    scienceId:  Observation.Id
+    pid:             Program.Id,
+    telluricId:      Observation.Id,
+    scienceId:       Observation.Id,
+    scienceDuration: TimeSpan,
+    order:           TelluricCalibrationOrder
   )(using ServiceAccess, Transaction[F]): F[Unit]
 
   /**
@@ -74,24 +90,72 @@ trait TelluricTargetsService[F[_]]:
     pending: TelluricTargets.Pending
   )(using ServiceAccess, NoTransaction[F]): F[Option[TelluricTargets.Meta]]
 
+case class HminBrightnessKey(
+  disperser: Flamingos2Disperser,
+  filter:    Flamingos2Filter,
+  fpu:       Flamingos2Fpu
+)
+
+object HminBrightnessCache extends NewType[Map[HminBrightnessKey, (Option[BigDecimal], Option[BigDecimal])]]:
+  val Empty: HminBrightnessCache = HminBrightnessCache(Map.empty)
+  val DefaultHmin: BigDecimal = BigDecimal(8)
+
+  extension(m: HminBrightnessCache)
+    def lookup(config: F2Config): BigDecimal =
+      val key = HminBrightnessKey(config.disperser, config.filter, config.fpu)
+      m.value.get(key).flatMap: (hminHot, hminSolar) =>
+        config.telluricType match
+          case TelluricType.Solar     => hminSolar
+          case TelluricType.Hot       => hminHot
+          case TelluricType.A0V       => hminHot
+          case _: TelluricType.Manual => hminHot
+      .getOrElse(HminBrightnessCache.DefaultHmin)
+end HminBrightnessCache
+
+type HminBrightnessCache = HminBrightnessCache.Type
+
 object TelluricTargetsService:
 
+  given HashBytes[TelluricSearchInput] with
+    def hashBytes(input: TelluricSearchInput): Array[Byte] =
+      Array.concat(
+        input.coordinates.hashBytes,
+        input.duration.hashBytes,
+        input.brightest.hashBytes,
+        input.spType.hashBytes
+      )
+
+  def loadBrightnessCache[F[_]: Monad](session: Session[F]): F[HminBrightnessCache] =
+    session.execute(Statements.SelectAllHmin).map: rows =>
+      HminBrightnessCache(rows.map { case (disperser, filter, fpu, hminHot, hminSolar) =>
+        HminBrightnessKey(disperser, filter, fpu) -> (hminHot, hminSolar)
+      }.toMap)
+
   def instantiate[F[_]: {Temporal, LoggerFactory as LF, Services as S}](
-    telluricClient: TelluricTargetsClient[F]
+    telluricClient: TelluricTargetsClient[F],
+    hminCache: HminBrightnessCache
   ): TelluricTargetsService[F] =
     new TelluricTargetsService[F]:
       given Logger[F] = LF.getLoggerFromName("telluric-targets")
 
+      val F2MaxDuration = TimeSpan.fromHours(3).get
+
       private def fetchSearchParams(scienceObsId: Observation.Id)(
-        using ServiceAccess): F[Option[(Coordinates, TelluricType)]] =
+        using ServiceAccess): F[Option[(Coordinates, F2Config)]] =
         S.transactionally:
           Services.asSuperUser:
             for
-              coords   <- session.prepareR(Statements.SelectTargetCoordinates)
-                            .use(_.option(scienceObsId))
-              f2Config <- flamingos2LongSlitService.select(List(scienceObsId))
-                            .map(_.get(scienceObsId))
-            yield (coords, f2Config).tupled.map((c, cfg) => (c, cfg.telluricType))
+              obsTimeOpt <- session.prepareR(Statements.SelectObservationTime).use(_.option(scienceObsId))
+              coordsOpt  <- obsTimeOpt match
+                              case Some(obsTime) =>
+                                trackingService
+                                  .getCoordinatesSnapshot(scienceObsId, obsTime, false)
+                                  .map(_.toOption.map(_.base))
+                              case None =>
+                                session.prepareR(Statements.SelectTargetCoordinates).use(_.option(scienceObsId))
+              f2Config   <- flamingos2LongSlitService.select(List(scienceObsId))
+                              .map(_.get(scienceObsId))
+            yield (coordsOpt, f2Config).tupled
 
       // Exponential backoff calculation
       // Should this be configurable?
@@ -116,34 +180,47 @@ object TelluricTargetsService:
           .prepareR(Statements.LoadPendingObs)
           .use(_.option(oid))
 
-      private def mkSearchInput(coords: Coordinates, telluricType: TelluricType): TelluricSearchInput =
-        // TODO duration and brightest should not be hardcoded
+      private def mkSearchInput(
+        coords:     Coordinates,
+        config:     F2Config,
+        brightness: BigDecimal,
+        duration:   TimeSpan
+      ) =
         TelluricSearchInput(
           coordinates = coords,
-          duration = 1.hourTimeSpan,
-          brightest = BigDecimal(8),
-          spType = telluricType
+          duration    = duration,
+          brightest   = brightness,
+          spType      = config.telluricType
         )
 
       override def requestTelluricTarget(
-        pid:        Program.Id,
-        telluricId: Observation.Id,
-        scienceId:  Observation.Id
+        pid:              Program.Id,
+        telluricId:      Observation.Id,
+        scienceId:       Observation.Id,
+        scienceDuration: TimeSpan,
+        order:           TelluricCalibrationOrder
       )(using ServiceAccess, Transaction[F]): F[Unit] =
-        session.execute(Statements.InsertResolutionRequest)(telluricId, pid, scienceId).void
+        session.execute(Statements.InsertResolutionRequest)(telluricId, pid, scienceId, scienceDuration, order).void
 
       override def resolveTargets(
         pending: TelluricTargets.Pending
       )(using ServiceAccess, NoTransaction[F]): F[Option[TelluricTargets.Meta]] = {
 
-        def requestRetry(
-          targetId: Option[Target.Id],
-          errorMsg: Option[String]
+        def requestReady(
+          targetId:   Option[Target.Id],
+          errorMsg:   Option[String],
+          paramsHash: Option[Md5Hash]
         ): F[Option[TelluricTargets.Meta]] =
           S.transactionally:
             session
               .prepareR(Statements.RequestReady)
-              .use(_.option((targetId, errorMsg, pending.observationId, pending.lastInvalidation)))
+              .use(_.option((targetId, errorMsg, paramsHash, pending.observationId, pending.lastInvalidation)))
+
+        def resetToReady: F[Option[TelluricTargets.Meta]] =
+          S.transactionally:
+            session
+              .prepareR(Statements.ResetToReady)
+              .use(_.option((pending.observationId, pending.lastInvalidation)))
 
         def retryRequest(
           failureCount: Int,
@@ -155,11 +232,11 @@ object TelluricTargetsService:
               .prepareR(Statements.RetryRequest)
               .use(_.option((failureCount + 1, s"${retryDelay.toSeconds} seconds", errorMsg, pending.observationId)))
 
-        def queryParams: F[Either[String, (Coordinates, TelluricType)]] =
+        def queryParams: F[Either[String, (Coordinates, F2Config)]] =
           fetchSearchParams(pending.scienceObservationId)
             .map(_.toRight(s"Missing coordinates or F2 config for science observation ${pending.scienceObservationId}"))
 
-        def createAndLinkTarget(sidereal: Target.Sidereal): F[Target.Id] =
+        def createAndLinkTarget(sidereal: Target.Sidereal): F[Option[Target.Id]] =
           S.transactionally:
             Services.asSuperUser:
               val catalog = sidereal.catalogInfo.map: ci =>
@@ -198,24 +275,68 @@ object TelluricTargetsService:
                                     session.execute(Statements.InsertTelluricObservationTarget)(
                                       (pending.programId, pending.observationId, targetId)
                                     )
-              } yield targetId
+              } yield targetId.some
+          .recover:
+            case SqlState.ForeignKeyViolation(_) =>
+              // Observation could be deleted during resolution, this is not common but it is legal
+              // we see it on the logs
+              none
 
-        def searchAndResolve(coords: Coordinates, telluricType: TelluricType): F[Either[String, Target.Id]] =
-          telluricClient.searchTarget(mkSearchInput(coords, telluricType)).flatMap: results =>
-            results.headOption match
-              case Some((star, catalogResult)) =>
-                val sidereal = catalogResult.map(_.target).getOrElse(star.asSiderealTarget)
-                info"Found telluric star HIP ${star.hip} for observation ${pending.observationId}" *>
-                  createAndLinkTarget(sidereal).map(_.asRight)
+        extension (target: Target.Sidereal)
+          def sedFromTelluricType(telluricType: TelluricType): Target.Sidereal =
+            val sed = telluricType match
+              case TelluricType.Solar => UnnormalizedSED.StellarLibrary(StellarLibrarySpectrum.G2V)
+              case _                  => UnnormalizedSED.StellarLibrary(StellarLibrarySpectrum.A0V)
+            Target.Sidereal.unnormalizedSED.modify(_.orElse(sed.some))(target)
 
-              case None                        =>
-                val msg = s"No telluric stars found for observation ${pending.observationId}"
-                Logger[F].warn(msg).as(msg.asLeft)
+        def searchAndResolve(coords: Coordinates, config: F2Config): F[Option[(Either[String, Target.Id], Md5Hash)]] =
+          val brightness = hminCache.lookup(config)
+          val searchInput = mkSearchInput(coords, config, brightness, pending.scienceDuration.min(F2MaxDuration))
+          val paramsHash = Md5Hash.unsafeFromByteArray(searchInput.md5)
 
-        def handleResult(result: Either[String, Target.Id]): F[Option[TelluricTargets.Meta]] =
+          def observationExists: F[Boolean] =
+            session.prepareR(Statements.ObservationExists)
+              .use(_.option(pending.observationId))
+              .map(_.isDefined)
+
+          def doSearch: F[Option[(Either[String, Target.Id], Md5Hash)]] =
+            observationExists.ifM(
+              telluricClient.searchTarget(searchInput).flatMap { results =>
+                // Find star matching the calibration order
+                val matchingStar = results.find(_._1.order == pending.calibrationOrder)
+                  .orElse(results.headOption)
+
+                matchingStar match
+                  case Some((star, catalogResult)) =>
+                    val sidereal =
+                      catalogResult.map(_.target).getOrElse(star.asSiderealTarget).sedFromTelluricType(config.telluricType)
+
+                    info"Found telluric star HIP ${star.hip} with order: ${star.order} for ${pending.calibrationOrder} observation ${pending.observationId}" *>
+                      createAndLinkTarget(sidereal).map:
+                        case Some(tid) => (tid.asRight[String], paramsHash).some
+                        case _         => none
+                  case None =>
+                    val msg = s"No telluric stars found for observation ${pending.observationId}"
+                    Logger[F].warn(msg).as((msg.asLeft[Target.Id], paramsHash).some)
+              },
+              // Observation was deleted before resolving the target
+              warn"Observation ${pending.observationId} deleted, skip resolution".as(none)
+            )
+
+          pending.paramsHash match
+            case Some(storedHash) if storedHash === paramsHash =>
+              debug"Params hash unchanged for ${pending.observationId}, skipping" *>
+                resetToReady.as(none) // mark it as ready
+            case Some(_) =>
+              debug"Params hash changed for ${pending.observationId}, searching for new target" *>
+                doSearch
+            case None =>
+              doSearch
+
+        def handleResult(result: Either[String, Target.Id], paramsHash: Md5Hash): F[Option[TelluricTargets.Meta]] =
           result match
             case Right(targetId)                            =>
-              requestRetry(targetId.some, none)
+              requestReady(targetId.some, none, paramsHash.some)
 
             case Left(errorMsg) if pending.failureCount < 5 =>
               warn"Telluric target resolution failed (attempt ${pending.failureCount + 1}), will retry: $errorMsg" *>
@@ -223,37 +344,47 @@ object TelluricTargetsService:
 
             case Left(errorMsg)                             =>
               error"Telluric target resolution permanently failed after ${pending.failureCount} attempts: $errorMsg" *>
-                requestRetry(none, errorMsg.some)
+                requestReady(none, errorMsg.some, paramsHash.some)
+
+        def handleMissingParams(msg: String): F[Option[TelluricTargets.Meta]] =
+          error"$msg" *>
+            (if pending.failureCount < 5 then
+              retryRequest(pending.failureCount, msg)
+            else
+              requestReady(none, msg.some, none))
 
         for {
           _          <- info"Resolving telluric target for observation ${pending.observationId}"
           searchData <- queryParams
-          result     <- searchData.fold(
-                          msg => error"$msg".as(msg.asLeft),
+          resultOpt  <- searchData.fold(
+                          _ => none[(Either[String, Target.Id], Md5Hash)].pure[F],
                           searchAndResolve.tupled
                         )
-          meta       <- handleResult(result)
+          meta       <- (searchData, resultOpt) match
+                          case (Left(msg), _)               => handleMissingParams(msg)
+                          case (_, None)                    => none[TelluricTargets.Meta].pure[F]
+                          case (_, Some((result, hash)))    => handleResult(result, hash)
         } yield meta
       }
 
       object Statements:
 
         val pending: Codec[TelluricTargets.Pending] =
-          (observation_id *: program_id *: observation_id *: core_timestamp *: int4)
+          (observation_id *: program_id *: observation_id *: core_timestamp *: int4 *: time_span *: md5_hash.opt *: telluric_calibration_order)
             .to[TelluricTargets.Pending]
 
         val meta: Codec[TelluricTargets.Meta] =
           (observation_id *: program_id *: observation_id *: calculation_state *:
            core_timestamp *: core_timestamp *: core_timestamp.opt *: int4 *:
-           target_id.opt *: text.opt).to[TelluricTargets.Meta]
+           target_id.opt *: text.opt *: time_span *: telluric_calibration_order).to[TelluricTargets.Meta]
 
         private val pendingColumns: String =
-          "c_observation_id, c_program_id, c_science_observation_id, c_last_invalidation, c_failure_count"
+          "c_observation_id, c_program_id, c_science_observation_id, c_last_invalidation, c_failure_count, c_science_duration, c_params_hash, c_calibration_order"
 
         private val metaColumns: String =
           """c_observation_id, c_program_id, c_science_observation_id, c_state,
              c_last_invalidation, c_last_update, c_retry_at, c_failure_count,
-             c_resolved_target_id, c_error_message"""
+             c_resolved_target_id, c_error_message, c_science_duration, c_calibration_order"""
 
         val ResetCalculating: Command[Void] =
           sql"""
@@ -290,13 +421,26 @@ object TelluricTargetsService:
             RETURNING #$pendingColumns
           """.query(pending)
 
-        val RequestReady: Query[(Option[Target.Id], Option[String], Observation.Id, Timestamp), TelluricTargets.Meta] =
+        val RequestReady: Query[(Option[Target.Id], Option[String], Option[Md5Hash], Observation.Id, Timestamp), TelluricTargets.Meta] =
           sql"""
             UPDATE t_telluric_resolution
             SET    c_state = 'ready',
                    c_last_update = now(),
                    c_resolved_target_id = ${target_id.opt},
                    c_error_message = ${text.opt},
+                   c_params_hash = ${md5_hash.opt},
+                   c_retry_at = NULL,
+                   c_failure_count = 0
+            WHERE  c_observation_id = $observation_id
+              AND  c_last_invalidation = $core_timestamp
+            RETURNING #$metaColumns
+          """.query(meta)
+
+        val ResetToReady: Query[(Observation.Id, Timestamp), TelluricTargets.Meta] =
+          sql"""
+            UPDATE t_telluric_resolution
+            SET    c_state = 'ready',
+                   c_last_update = now(),
                    c_retry_at = NULL,
                    c_failure_count = 0
             WHERE  c_observation_id = $observation_id
@@ -315,6 +459,14 @@ object TelluricTargetsService:
             WHERE  c_observation_id = $observation_id
             RETURNING #$metaColumns
           """.query(meta)
+
+        val SelectObservationTime: Query[Observation.Id, Timestamp] =
+          sql"""
+            SELECT c_observation_time
+            FROM   t_observation
+            WHERE  c_observation_id = $observation_id
+              AND  c_observation_time IS NOT NULL
+          """.query(core_timestamp)
 
         val SelectTargetCoordinates: Query[Observation.Id, Coordinates] =
           sql"""
@@ -348,20 +500,43 @@ object TelluricTargetsService:
             VALUES ($program_id, $observation_id, $target_id)
           """.command
 
-        val InsertResolutionRequest: Command[(Observation.Id, Program.Id, Observation.Id)] =
+        val ObservationExists: Query[Observation.Id, Observation.Id] =
+          sql"""
+            SELECT c_observation_id
+            FROM   t_observation
+            WHERE  c_observation_id = $observation_id
+          """.query(observation_id)
+
+        val InsertResolutionRequest: Command[(Observation.Id, Program.Id, Observation.Id, TimeSpan, TelluricCalibrationOrder)] =
           sql"""
             INSERT INTO t_telluric_resolution (
               c_observation_id,
               c_program_id,
               c_science_observation_id,
+              c_science_duration,
+              c_calibration_order,
               c_state,
               c_last_invalidation
             ) VALUES (
               $observation_id,
               $program_id,
               $observation_id,
+              $time_span,
+              $telluric_calibration_order,
               'pending',
               now()
             )
             ON CONFLICT (c_observation_id) DO NOTHING
           """.command
+
+  object Statements:
+    // lead the limits for all the f2 configurations
+    val SelectAllHmin: Query[Void, (Flamingos2Disperser, Flamingos2Filter, Flamingos2Fpu, Option[BigDecimal], Option[BigDecimal])] =
+      sql"""
+        SELECT f2config.c_disperser, f2config.c_filter, f2config.c_fpu,
+               config.c_hmin_hot, config.c_hmin_solar
+        FROM   t_spectroscopy_config_option_f2 f2config
+        JOIN   t_spectroscopy_config_option config
+          ON   config.c_instrument = f2config.c_instrument AND config.c_index = f2config.c_index
+        WHERE  config.c_instrument = 'Flamingos2'
+      """.query(flamingos_2_disperser *: flamingos_2_filter *: flamingos_2_fpu *: numeric.opt *: numeric.opt)

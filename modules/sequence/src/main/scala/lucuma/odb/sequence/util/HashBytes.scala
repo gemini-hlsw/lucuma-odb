@@ -3,20 +3,27 @@
 
 package lucuma.odb.sequence.util
 
+import cats.data.NonEmptyList
 import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.numeric.PosLong
 import io.circe.Encoder
+import lucuma.core.enums.StepGuideState
+import lucuma.core.math.Angle
+import lucuma.core.math.Coordinates
 import lucuma.core.math.Offset
 import lucuma.core.math.SignalToNoise
 import lucuma.core.math.Wavelength
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.TelluricType
+import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.util.Enumerated
 import lucuma.core.util.Gid
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 
+import java.io.ByteArrayOutputStream
+import java.io.DataOutputStream
 import java.nio.charset.StandardCharsets.UTF_8
 import java.security.MessageDigest
 
@@ -82,6 +89,13 @@ object HashBytes:
   given HashBytes[Boolean] =
     HashBytes.by(_.hashCode)
 
+  given HashBytes[BigDecimal] with
+    def hashBytes(bd: BigDecimal): Array[Byte] =
+      Array.concat(
+        toByteArray(BigInt(bd.underlying().unscaledValue()), 16),
+        bd.scale.hashBytes
+      )
+
   given given_HashBytes_Gid[A: Gid]: HashBytes[A] with
     def hashBytes(a: A): Array[Byte] =
       Array.concat(
@@ -95,11 +109,14 @@ object HashBytes:
   given HashBytes[TimeSpan] =
     HashBytes.by(_.toMicroseconds)
 
+  given HashBytes[Angle] =
+    HashBytes.by(_.toMicroarcseconds)
+
   given HashBytes[Offset.P] =
-    HashBytes.by(_.toAngle.toMicroarcseconds)
+    HashBytes.by(_.toAngle)
 
   given HashBytes[Offset.Q] =
-    HashBytes.by(_.toAngle.toMicroarcseconds)
+    HashBytes.by(_.toAngle)
 
   given HashBytes[TelluricType] =
     case t @ TelluricType.Manual(starTypes) =>
@@ -113,15 +130,17 @@ object HashBytes:
   given HashBytes[Offset] =
     HashBytes.by2(_.p, _.q)
 
+  given HashBytes[Coordinates] =
+    HashBytes.by2(_.ra.toAngle, _.dec.toAngle)
+
+  given HashBytes[TelescopeConfig] =
+    HashBytes.by2(_.guiding, _.offset)
+
   given HashBytes[Wavelength] =
     HashBytes.by(_.toPicometers.value)
 
-  given HashBytes[SignalToNoise] with
-    def hashBytes(s: SignalToNoise): Array[Byte] =
-      Array.concat(
-        toByteArray(BigInt(s.toBigDecimal.underlying().unscaledValue()), 11),
-        s.toBigDecimal.scale.hashBytes
-      )
+  given HashBytes[SignalToNoise] =
+    HashBytes.by(_.toBigDecimal)
 
   given HashBytes[ExposureTimeMode.SignalToNoiseMode] =
     HashBytes.by2(_.value, _.at)
@@ -143,6 +162,20 @@ object HashBytes:
   given [A](using HashBytes[A]): HashBytes[Option[A]] with
     def hashBytes(opt: Option[A]): Array[Byte] =
       opt.fold(Array.emptyByteArray)(HashBytes[A].hashBytes)
+
+  given [A](using HashBytes[A]): HashBytes[List[A]] with
+    def hashBytes(as: List[A]): Array[Byte] =
+      val bao: ByteArrayOutputStream = new ByteArrayOutputStream(256)
+      val out: DataOutputStream      = new DataOutputStream(bao)
+
+      as.foreach(a => out.write(a.hashBytes))
+
+      out.close()
+      bao.toByteArray
+
+  given [A](using HashBytes[A]): HashBytes[NonEmptyList[A]] with
+    def hashBytes(as: NonEmptyList[A]): Array[Byte] =
+      as.toList.hashBytes
 
   given[A](using Enumerated[A]): HashBytes[A] with
     def hashBytes(a: A): Array[Byte] =
