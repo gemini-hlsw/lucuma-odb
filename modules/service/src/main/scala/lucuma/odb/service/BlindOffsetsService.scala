@@ -80,7 +80,7 @@ object BlindOffsetsService:
         observationId: Observation.Id
       )(using Transaction[F], ServiceAccess): F[Unit] =
         // This permanently deletes any existing blind offset target from the t_target table,
-        // database triggers set c_blind_offset_target_id to null and c_blind_offset_type to MANUAL
+        // database triggers set c_blind_offset_target_id to null
         session.execute(Statements.removeBlindOffset)(observationId).void
 
       override def getBlindOffset(
@@ -95,12 +95,19 @@ object BlindOffsetsService:
       )(using Transaction[F], ServiceAccess): F[Result[Unit]] =
         targetEnvironment.fold(Result.unit.pure[F]): te =>
           te.blindOffsetTarget match
-            case Nullable.Absent => Result.unit.pure[F] // No change
+            case Nullable.Absent => 
+              // we may just be switching between manual and automatic, etc.
+              updateNonTargetBlindOffsetFields(observationId, te.useBlindOffset, te.blindOffsetType)
+                .as(Result.unit)
             case Nullable.Null =>
-              removeBlindOffset(observationId).as(Result.unit)
+              (
+                removeBlindOffset(observationId) >>
+                // we may be setting the target id to null to `initialize` automatic blind offsets
+                updateNonTargetBlindOffsetFields(observationId, te.useBlindOffset, te.blindOffsetType)
+              ).as(Result.unit)
             case NonNull(targetInput: TargetPropertiesInput.Create) =>
               for {
-                // Remove existi
+                // Remove existing
                 _          <- removeBlindOffset(observationId)
                 // Then create the new one.
                 result     <- createBlindOffset(programId, observationId, targetInput, te.blindOffsetType)
@@ -121,6 +128,14 @@ object BlindOffsetsService:
                 _.traverse((_, tid) =>
                   session.execute(Statements.updateBlindOffsetTargetId)(tid, newObservationId).void
                 )
+
+      private def updateNonTargetBlindOffsetFields(
+        observationId: Observation.Id,
+        useBlindOffset: Option[Boolean],
+        blindOffsetType: BlindOffsetType
+      ): F[Unit] =
+        val af = Statements.updateNonTargetBlindOffsetFields(observationId, useBlindOffset, blindOffsetType)
+        session.exec(af).void
 
       private object Statements:
 
@@ -154,3 +169,15 @@ object BlindOffsetsService:
             SET c_blind_offset_target_id = $target_id
             WHERE c_observation_id = $observation_id
           """.command
+
+        def updateNonTargetBlindOffsetFields(observationId: Observation.Id, useBlindOffset: Option[Boolean], blindOffsetType: BlindOffsetType): AppliedFragment =
+          {
+            val sets = List(
+              useBlindOffset.map(sql"c_use_blind_offset = $bool"),
+              Some(sql"c_blind_offset_type = $blind_offset_type"(blindOffsetType))
+            ).flatten
+
+            void"UPDATE t_observation "                              |+|
+            void"SET " |+| sets.intercalate(void", ") |+| void" "    |+|
+            sql"WHERE c_observation_id = $observation_id"(observationId)
+          }

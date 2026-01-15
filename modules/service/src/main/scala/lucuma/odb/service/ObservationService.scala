@@ -41,6 +41,7 @@ import lucuma.core.model.Program
 import lucuma.core.model.StandardRole.*
 import lucuma.core.model.Target
 import lucuma.core.syntax.string.*
+import lucuma.odb.data.BlindOffsetType
 import lucuma.odb.data.Existence
 import lucuma.odb.data.ExposureTimeModeRole
 import lucuma.odb.data.ExposureTimeModeType
@@ -640,6 +641,7 @@ object ObservationService {
           SET.observingMode.flatMap(_.observingModeType).map(_.instrument),
           SET.observerNotes,
           SET.targetEnvironment.flatMap(_.useBlindOffset).getOrElse(false),
+          SET.targetEnvironment.map(_.blindOffsetType).getOrElse(BlindOffsetType.Manual),
           calibrationRole
         )
       }
@@ -660,6 +662,7 @@ object ObservationService {
       instrument:          Option[Instrument],
       observerNotes:       Option[NonEmptyString],
       useBlindOffset:      Boolean,
+      blindOffsetType:     BlindOffsetType,
       calibrationRole:     Option[CalibrationRole]
     ): AppliedFragment = {
 
@@ -703,6 +706,7 @@ object ObservationService {
            instrument                                                                                                             ,
            observerNotes                                                                                                          ,
            useBlindOffset                                                                                                         ,
+           blindOffsetType                                                                                                        ,
            calibrationRole                                                                                                        ,
         )
       }
@@ -748,6 +752,7 @@ object ObservationService {
       Option[Instrument]               ,
       Option[NonEmptyString]           ,
       Boolean                          ,
+      BlindOffsetType                  ,
       Option[CalibrationRole]          ,
     )] =
       sql"""
@@ -784,6 +789,7 @@ object ObservationService {
           c_instrument,
           c_observer_notes,
           c_use_blind_offset,
+          c_blind_offset_type,
           c_calibration_role
         )
         SELECT
@@ -819,6 +825,7 @@ object ObservationService {
           ${instrument.opt},
           ${text_nonempty.opt},
           $bool,
+          $blind_offset_type,
           ${calibration_role.opt}
       """
 
