@@ -190,34 +190,6 @@ GMOS-S	B1200 1.0" RG610	singleslit,multislit	1.0"	1.000	330	B1200	RG610	0.61	1.0
 GMOS-S	B1200 1.5" RG610	singleslit,multislit	1.5"	1.500	330	B1200	RG610	0.61	1.03	0.463	0.159	1248	no		s		
 GMOS-S	B1200 2.0" RG610	singleslit,multislit	2.0"	2.000	330	B1200	RG610	0.61	1.03	0.463	0.159	936	no		s		
 GMOS-S	B1200 5.0" RG610	singleslit,multislit	5.0"	5.000	330	B1200	RG610	0.61	1.03	0.463	0.159	374	no		s		
-GMOS-S	B600 0.25"	singleslit,multislit	0.25"	0.250	330	B600	none	0.36	0.72	0.461	0.307	3376	no		s		
-GMOS-S	B600 0.50"	singleslit,multislit	0.50"	0.500	330	B600	none	0.36	0.72	0.461	0.307	1688	no		s		
-GMOS-S	B600 0.75"	singleslit,multislit	0.75"	0.750	330	B600	none	0.36	0.72	0.461	0.307	1125	no		s		
-GMOS-S	B600 1.0"	singleslit,multislit	1.0"	1.000	330	B600	none	0.36	0.72	0.461	0.307	844	no		s		
-GMOS-S	B600 1.5"	singleslit,multislit	1.5"	1.500	330	B600	none	0.36	0.72	0.461	0.307	563	no		s		
-GMOS-S	B600 2.0"	singleslit,multislit	2.0"	2.000	330	B600	none	0.36	0.72	0.461	0.307	422	no		s		
-GMOS-S	B600 5.0"	singleslit,multislit	5.0"	5.000	330	B600	none	0.36	0.72	0.461	0.307	169	no		s		
-GMOS-S	B600 0.25"  GG455	singleslit,multislit	0.25"	0.250	330	B600	GG455	0.46	0.92	0.461	0.307	3376	no		s		
-GMOS-S	B600 0.50"  GG455	singleslit,multislit	0.50"	0.500	330	B600	GG455	0.46	0.92	0.461	0.307	1688	no		s		
-GMOS-S	B600 0.75"  GG455	singleslit,multislit	0.75"	0.750	330	B600	GG455	0.46	0.92	0.461	0.307	1125	no		s		
-GMOS-S	B600 1.0"  GG455	singleslit,multislit	1.0"	1.000	330	B600	GG455	0.46	0.92	0.461	0.307	844	no		s		
-GMOS-S	B600 1.5"  GG455	singleslit,multislit	1.5"	1.500	330	B600	GG455	0.46	0.92	0.461	0.307	563	no		s		
-GMOS-S	B600 2.0"  GG455	singleslit,multislit	2.0"	2.000	330	B600	GG455	0.46	0.92	0.461	0.307	422	no		s		
-GMOS-S	B600 5.0"  GG455	singleslit,multislit	5.0"	5.000	330	B600	GG455	0.46	0.92	0.461	0.307	169	no		s		
-GMOS-S	B600 0.25" OG515	singleslit,multislit	0.25"	0.250	330	B600	OG515	0.52	1.03	0.461	0.307	3376	no		s		
-GMOS-S	B600 0.50" OG515	singleslit,multislit	0.50"	0.500	330	B600	OG515	0.52	1.03	0.461	0.307	1688	no		s		
-GMOS-S	B600 0.75" OG515	singleslit,multislit	0.75"	0.750	330	B600	OG515	0.52	1.03	0.461	0.307	1125	no		s		
-GMOS-S	B600 1.0" OG515	singleslit,multislit	1.0"	1.000	330	B600	OG515	0.52	1.03	0.461	0.307	844	no		s		
-GMOS-S	B600 1.5" OG515	singleslit,multislit	1.5"	1.500	330	B600	OG515	0.52	1.03	0.461	0.307	563	no		s		
-GMOS-S	B600 2.0" OG515	singleslit,multislit	2.0"	2.000	330	B600	OG515	0.52	1.03	0.461	0.307	422	no		s		
-GMOS-S	B600 5.0" OG515	singleslit,multislit	5.0"	5.000	330	B600	OG515	0.52	1.03	0.461	0.307	169	no		s		
-GMOS-S	B600 0.25" RG610	singleslit,multislit	0.25"	0.250	330	B600	RG610	0.61	1.03	0.461	0.307	3376	no		s		
-GMOS-S	B600 0.50" RG610	singleslit,multislit	0.50"	0.500	330	B600	RG610	0.61	1.03	0.461	0.307	1688	no		s		
-GMOS-S	B600 0.75" RG610	singleslit,multislit	0.75"	0.750	330	B600	RG610	0.61	1.03	0.461	0.307	1125	no		s		
-GMOS-S	B600 1.0" RG610	singleslit,multislit	1.0"	1.000	330	B600	RG610	0.61	1.03	0.461	0.307	844	no		s		
-GMOS-S	B600 1.5" RG610	singleslit,multislit	1.5"	1.500	330	B600	RG610	0.61	1.03	0.461	0.307	563	no		s		
-GMOS-S	B600 2.0" RG610	singleslit,multislit	2.0"	2.000	330	B600	RG610	0.61	1.03	0.461	0.307	422	no		s		
-GMOS-S	B600 5.0" RG610	singleslit,multislit	5.0"	5.000	330	B600	RG610	0.61	1.03	0.461	0.307	169	no		s		
 GMOS-S	R831 0.25"	singleslit,multislit	0.25"	0.250	330	R831	none	0.36	0.72	0.757	0.23	8792	no		s		
 GMOS-S	R831 0.50"	singleslit,multislit	0.50"	0.500	330	R831	none	0.36	0.72	0.757	0.23	4396	no		s		
 GMOS-S	R831 0.75"	singleslit,multislit	0.75"	0.750	330	R831	none	0.36	0.72	0.757	0.23	2931	no		s		
@@ -372,10 +344,6 @@ GMOS-S	R150 1.0" CaT	singleslit,multislit	1.0"	1.000	330	R150	CaT	0.78	0.933	0.8
 GMOS-S	R150 1.5" CaT	singleslit,multislit	1.5"	1.500	330	R150	CaT	0.78	0.933	0.86	0.153	210	no		s		
 GMOS-S	R150 2.0" CaT	singleslit,multislit	2.0"	2.000	330	R150	CaT	0.78	0.933	0.86	0.153	158	no		s		
 GMOS-S	R150 5.0" CaT	singleslit,multislit	5.0"	5.000	330	R150	CaT	0.78	0.933	0.86	0.153	63	no		s		
-GMOS-S	B600 IFU1	ifu	IFU-R	3	5	B600	none	0.36	1.03	0.461	0.307	2723	no		s		
-GMOS-S	B600 IFU2	ifu	IFU-2	5	7	B600	g	0.398	0.552	0.461	0.154	2723	no		s		
-GMOS-S	B600 IFU1 NS	ifu	IFU-NS-R	3	5	B600	none	0.36	1.03	0.461	0.307	2723	no	Nod&Shuffle	s		
-GMOS-S	B600 IFU2 NS	ifu	IFU-NS-2	5	7	B600	g	0.398	0.552	0.461	0.154	2723	no	Nod&Shuffle	s		
 GMOS-S	R150 NS1.0 GG455	singleslit,multislit	NS1.0"	1.000	330	R150	GG455	0.46	1.03	0.717	0.57	316	no	Nod&Shuffle	s		
 GMOS-S	R150 NS1.0 OG515	singleslit,multislit	NS1.0"	1.000	330	R150	OG515	0.52	1.03	0.717	0.51	316	no	Nod&Shuffle	s		
 GMOS-S	R831 NS1.0 CaT	singleslit,multislit	NS1.0"	1.000	330	R831	CaT	0.78	0.933	0.757	0.23	2198	no	Nod&Shuffle	s		
