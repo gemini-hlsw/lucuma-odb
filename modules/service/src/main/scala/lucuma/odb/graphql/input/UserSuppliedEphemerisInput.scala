@@ -6,10 +6,10 @@ package input
 
 import cats.syntax.all.*
 import grackle.Result
-import lucuma.core.model.Ephemeris
-import lucuma.odb.graphql.binding.*
 import lucuma.core.data.PerSite
 import lucuma.core.enums.Site
+import lucuma.core.model.Ephemeris
+import lucuma.odb.graphql.binding.*
 
 object UserSuppliedEphemerisInput:
 

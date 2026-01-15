@@ -5,12 +5,12 @@ package lucuma.odb.graphql
 package input
 
 import cats.syntax.all.*
+import eu.timepit.refined.types.string.NonEmptyString
 import grackle.Result
+import lucuma.core.data.PerSite
 import lucuma.core.enums.EphemerisKeyType
 import lucuma.core.model.Ephemeris
 import lucuma.odb.graphql.binding.*
-import eu.timepit.refined.types.string.NonEmptyString
-import lucuma.core.data.PerSite
 
 object NonsiderealInput {
 

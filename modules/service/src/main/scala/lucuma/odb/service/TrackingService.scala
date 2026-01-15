@@ -24,6 +24,8 @@ import lucuma.core.model.AirMassBound
 import lucuma.core.model.CompositeTracking
 import lucuma.core.model.ConstantTracking
 import lucuma.core.model.Ephemeris
+import lucuma.core.model.Ephemeris.Horizons
+import lucuma.core.model.Ephemeris.UserSupplied
 import lucuma.core.model.EphemerisTracking
 import lucuma.core.model.Extinction
 import lucuma.core.model.Observation
@@ -51,8 +53,6 @@ import java.time.Instant
 import java.time.ZoneOffset
 import java.time.ZonedDateTime
 import scala.concurrent.duration.*
-import lucuma.core.model.Ephemeris.UserSupplied
-import lucuma.core.model.Ephemeris.Horizons
 
 trait TrackingService[F[_]]:
   import TrackingService.Snapshot
@@ -649,4 +649,4 @@ object TrackingService:
     val CreateUserSuppliedEphemerisKey: Query[skunk.Void, Ephemeris.Key.UserSupplied] =
       sql"""
         SELECT nextval('s_user_supplied_ephemeris_id')
-      """.query(int4).map(Ephemeris.Key.UserSupplied.apply)
+      """.query(int8).map(Ephemeris.Key.UserSupplied.apply)

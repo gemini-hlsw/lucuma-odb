@@ -11,6 +11,7 @@ import eu.timepit.refined.types.string.NonEmptyString
 import fs2.Stream
 import grackle.Problem
 import grackle.Result
+import grackle.ResultT
 import io.circe.Json
 import io.circe.syntax.*
 import lucuma.core.enums.ArcType
@@ -35,6 +36,7 @@ import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.input.CatalogInfoInput
 import lucuma.odb.graphql.input.CloneTargetInput
+import lucuma.odb.graphql.input.NonsiderealInput
 import lucuma.odb.graphql.input.OpportunityInput
 import lucuma.odb.graphql.input.RegionInput
 import lucuma.odb.graphql.input.SiderealInput
@@ -60,8 +62,6 @@ import skunk.codec.all.*
 import skunk.implicits.*
 
 import Services.Syntax.*
-import lucuma.odb.graphql.input.NonsiderealInput
-import grackle.ResultT
 
 trait TargetService[F[_]] {
   def createTarget(

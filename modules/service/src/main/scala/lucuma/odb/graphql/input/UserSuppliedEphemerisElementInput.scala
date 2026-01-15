@@ -16,7 +16,7 @@ object UserSuppliedEphemerisElementInput:
       case List(
         TimestampBinding("when", rWhen),
         CoordinatesInput.Create.Binding("coordinates", rCoords),
-        OffsetInput.Binding("offset", rOffset),
+        OffsetInput.Binding("velocity", rVelocity),
       ) =>
-        (rWhen, rCoords, rOffset).mapN: (w, c, o) =>
+        (rWhen, rCoords, rVelocity).mapN: (w, c, o) =>
           Ephemeris.UserSupplied.Element(w.toInstant, c, o)
