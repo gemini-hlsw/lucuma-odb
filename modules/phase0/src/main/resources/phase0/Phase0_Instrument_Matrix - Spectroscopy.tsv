@@ -190,6 +190,34 @@ GMOS-S	B1200 1.0" RG610	singleslit,multislit	1.0"	1.000	330	B1200	RG610	0.61	1.0
 GMOS-S	B1200 1.5" RG610	singleslit,multislit	1.5"	1.500	330	B1200	RG610	0.61	1.03	0.463	0.159	1248	no		s		
 GMOS-S	B1200 2.0" RG610	singleslit,multislit	2.0"	2.000	330	B1200	RG610	0.61	1.03	0.463	0.159	936	no		s		
 GMOS-S	B1200 5.0" RG610	singleslit,multislit	5.0"	5.000	330	B1200	RG610	0.61	1.03	0.463	0.159	374	no		s		
+GMOS-S	B600 0.25"	singleslit,multislit	0.25"	0.250	330	B600	none	0.36	0.72	0.461	0.307	3376	no		s		
+GMOS-S	B600 0.50"	singleslit,multislit	0.50"	0.500	330	B600	none	0.36	0.72	0.461	0.307	1688	no		s		
+GMOS-S	B600 0.75"	singleslit,multislit	0.75"	0.750	330	B600	none	0.36	0.72	0.461	0.307	1125	no		s		
+GMOS-S	B600 1.0"	singleslit,multislit	1.0"	1.000	330	B600	none	0.36	0.72	0.461	0.307	844	no		s		
+GMOS-S	B600 1.5"	singleslit,multislit	1.5"	1.500	330	B600	none	0.36	0.72	0.461	0.307	563	no		s		
+GMOS-S	B600 2.0"	singleslit,multislit	2.0"	2.000	330	B600	none	0.36	0.72	0.461	0.307	422	no		s		
+GMOS-S	B600 5.0"	singleslit,multislit	5.0"	5.000	330	B600	none	0.36	0.72	0.461	0.307	169	no		s		
+GMOS-S	B600 0.25"  GG455	singleslit,multislit	0.25"	0.250	330	B600	GG455	0.46	0.92	0.461	0.307	3376	no		s		
+GMOS-S	B600 0.50"  GG455	singleslit,multislit	0.50"	0.500	330	B600	GG455	0.46	0.92	0.461	0.307	1688	no		s		
+GMOS-S	B600 0.75"  GG455	singleslit,multislit	0.75"	0.750	330	B600	GG455	0.46	0.92	0.461	0.307	1125	no		s		
+GMOS-S	B600 1.0"  GG455	singleslit,multislit	1.0"	1.000	330	B600	GG455	0.46	0.92	0.461	0.307	844	no		s		
+GMOS-S	B600 1.5"  GG455	singleslit,multislit	1.5"	1.500	330	B600	GG455	0.46	0.92	0.461	0.307	563	no		s		
+GMOS-S	B600 2.0"  GG455	singleslit,multislit	2.0"	2.000	330	B600	GG455	0.46	0.92	0.461	0.307	422	no		s		
+GMOS-S	B600 5.0"  GG455	singleslit,multislit	5.0"	5.000	330	B600	GG455	0.46	0.92	0.461	0.307	169	no		s		
+GMOS-S	B600 0.25" OG515	singleslit,multislit	0.25"	0.250	330	B600	OG515	0.52	1.03	0.461	0.307	3376	no		s		
+GMOS-S	B600 0.50" OG515	singleslit,multislit	0.50"	0.500	330	B600	OG515	0.52	1.03	0.461	0.307	1688	no		s		
+GMOS-S	B600 0.75" OG515	singleslit,multislit	0.75"	0.750	330	B600	OG515	0.52	1.03	0.461	0.307	1125	no		s		
+GMOS-S	B600 1.0" OG515	singleslit,multislit	1.0"	1.000	330	B600	OG515	0.52	1.03	0.461	0.307	844	no		s		
+GMOS-S	B600 1.5" OG515	singleslit,multislit	1.5"	1.500	330	B600	OG515	0.52	1.03	0.461	0.307	563	no		s		
+GMOS-S	B600 2.0" OG515	singleslit,multislit	2.0"	2.000	330	B600	OG515	0.52	1.03	0.461	0.307	422	no		s		
+GMOS-S	B600 5.0" OG515	singleslit,multislit	5.0"	5.000	330	B600	OG515	0.52	1.03	0.461	0.307	169	no		s		
+GMOS-S	B600 0.25" RG610	singleslit,multislit	0.25"	0.250	330	B600	RG610	0.61	1.03	0.461	0.307	3376	no		s		
+GMOS-S	B600 0.50" RG610	singleslit,multislit	0.50"	0.500	330	B600	RG610	0.61	1.03	0.461	0.307	1688	no		s		
+GMOS-S	B600 0.75" RG610	singleslit,multislit	0.75"	0.750	330	B600	RG610	0.61	1.03	0.461	0.307	1125	no		s		
+GMOS-S	B600 1.0" RG610	singleslit,multislit	1.0"	1.000	330	B600	RG610	0.61	1.03	0.461	0.307	844	no		s		
+GMOS-S	B600 1.5" RG610	singleslit,multislit	1.5"	1.500	330	B600	RG610	0.61	1.03	0.461	0.307	563	no		s		
+GMOS-S	B600 2.0" RG610	singleslit,multislit	2.0"	2.000	330	B600	RG610	0.61	1.03	0.461	0.307	422	no		s		
+GMOS-S	B600 5.0" RG610	singleslit,multislit	5.0"	5.000	330	B600	RG610	0.61	1.03	0.461	0.307	169	no		s		
 GMOS-S	R831 0.25"	singleslit,multislit	0.25"	0.250	330	R831	none	0.36	0.72	0.757	0.23	8792	no		s		
 GMOS-S	R831 0.50"	singleslit,multislit	0.50"	0.500	330	R831	none	0.36	0.72	0.757	0.23	4396	no		s		
 GMOS-S	R831 0.75"	singleslit,multislit	0.75"	0.750	330	R831	none	0.36	0.72	0.757	0.23	2931	no		s		
@@ -344,6 +372,10 @@ GMOS-S	R150 1.0" CaT	singleslit,multislit	1.0"	1.000	330	R150	CaT	0.78	0.933	0.8
 GMOS-S	R150 1.5" CaT	singleslit,multislit	1.5"	1.500	330	R150	CaT	0.78	0.933	0.86	0.153	210	no		s		
 GMOS-S	R150 2.0" CaT	singleslit,multislit	2.0"	2.000	330	R150	CaT	0.78	0.933	0.86	0.153	158	no		s		
 GMOS-S	R150 5.0" CaT	singleslit,multislit	5.0"	5.000	330	R150	CaT	0.78	0.933	0.86	0.153	63	no		s		
+GMOS-S	B600 IFU1	ifu	IFU-R	3	5	B600	none	0.36	1.03	0.461	0.307	2723	no		s		
+GMOS-S	B600 IFU2	ifu	IFU-2	5	7	B600	g	0.398	0.552	0.461	0.154	2723	no		s		
+GMOS-S	B600 IFU1 NS	ifu	IFU-NS-R	3	5	B600	none	0.36	1.03	0.461	0.307	2723	no	Nod&Shuffle	s		
+GMOS-S	B600 IFU2 NS	ifu	IFU-NS-2	5	7	B600	g	0.398	0.552	0.461	0.154	2723	no	Nod&Shuffle	s		
 GMOS-S	R150 NS1.0 GG455	singleslit,multislit	NS1.0"	1.000	330	R150	GG455	0.46	1.03	0.717	0.57	316	no	Nod&Shuffle	s		
 GMOS-S	R150 NS1.0 OG515	singleslit,multislit	NS1.0"	1.000	330	R150	OG515	0.52	1.03	0.717	0.51	316	no	Nod&Shuffle	s		
 GMOS-S	R831 NS1.0 CaT	singleslit,multislit	NS1.0"	1.000	330	R831	CaT	0.78	0.933	0.757	0.23	2198	no	Nod&Shuffle	s		
@@ -377,12 +409,6 @@ FLAMINGOS2	HK HK 0.54"	singleslit,multislit	3pixel	0.54	263	R1200HK	HK	1.261	2.5
 FLAMINGOS2	HK HK 0.72"	singleslit,multislit	4pixel	0.72	263	R1200HK	HK	1.261	2.551	1.906	1.29	450	no		s	8.04	8.02
 FLAMINGOS2	HK HK 1.08"	singleslit,multislit	6pixel	1.08	263	R1200HK	HK	1.261	2.551	1.906	1.29	300	no		s	7.88	7.86
 FLAMINGOS2	HK HK 1.44"	singleslit,multislit	8pixel	1.44	263	R1200HK	HK	1.261	2.551	1.906	1.29	225	no		s	9.20	9.19
-FLAMINGOS2	R3K Kb 0.18"	singleslit,multislit	1pixel	0.18	263	R3000	K-blue	1.934	2.177	2.0555	0.243	3600	no		s	5.42	5.47
-FLAMINGOS2	R3K Kb 0.36"	singleslit,multislit	2pixel	0.36	263	R3000	K-blue	1.934	2.177	2.0555	0.243	2900	no		s	5.97	6.01
-FLAMINGOS2	R3K Kb 0.54"	singleslit,multislit	3pixel	0.54	263	R3000	K-blue	1.934	2.177	2.0555	0.243	1933	no		s	6.09	6.13
-FLAMINGOS2	R3K + Kb + 0.72"	singleslit,multislit	4pixel	0.72	263	R3000	K-blue	1.934	2.177	2.0555	0.243	1450	no		s	6.05	6.09
-FLAMINGOS2	R3K + Kb + 1.08"	singleslit,multislit	6pixel	1.08	263	R3000	K-blue	1.934	2.177	2.0555	0.243	967	no		s	5.83	5.87
-FLAMINGOS2	R3K + Kb + 1.44"	singleslit,multislit	8pixel	1.44	263	R3000	K-blue	1.934	2.177	2.0555	0.243	725	no		s	7.10	7.14
 FLAMINGOS2	R3K Ks 0.18"	singleslit,multislit	1pixel	0.18	263	R3000	K-short	1.991	2.32	2.1555	0.329	3600	no		s	5.32	5.35
 FLAMINGOS2	R3K Ks 0.36"	singleslit,multislit	2pixel	0.36	263	R3000	K-short	1.991	2.32	2.1555	0.329	2900	no		s	5.87	5.90
 FLAMINGOS2	R3K Ks 0.54"	singleslit,multislit	3pixel	0.54	263	R3000	K-short	1.991	2.32	2.1555	0.329	1933	no		s	5.99	6.03
@@ -395,12 +421,6 @@ FLAMINGOS2	R3K Kl 0.54"	singleslit,multislit	3pixel	0.54	263	R3000	K-long	1.9	2.
 FLAMINGOS2	R3K + Kl + 0.72"	singleslit,multislit	4pixel	0.72	263	R3000	K-long	1.9	2.483	2.1915	0.583	1450	no		s	6.04	6.08
 FLAMINGOS2	R3K + Kl + 1.08"	singleslit,multislit	6pixel	1.08	263	R3000	K-long	1.9	2.483	2.1915	0.583	967	no		s	5.81	5.85
 FLAMINGOS2	R3K + Kl + 1.44"	singleslit,multislit	8pixel	1.44	263	R3000	K-long	1.9	2.483	2.1915	0.583	725	no		s	7.09	7.13
-FLAMINGOS2	R3K Kr 0.18"	singleslit,multislit	1pixel	0.18	263	R3000	K-red	2.181	2.446	2.3135	0.265	3600	no		s	4.88	4.94
-FLAMINGOS2	R3K Kr 0.36"	singleslit,multislit	2pixel	0.36	263	R3000	K-red	2.181	2.446	2.3135	0.265	2900	no		s	5.43	5.48
-FLAMINGOS2	R3K Kr 0.54"	singleslit,multislit	3pixel	0.54	263	R3000	K-red	2.181	2.446	2.3135	0.265	1933	no		s	5.56	5.61
-FLAMINGOS2	R3K + Kr + 0.72"	singleslit,multislit	4pixel	0.72	263	R3000	K-red	2.181	2.446	2.3135	0.265	1450	no		s	5.52	5.57
-FLAMINGOS2	R3K + Kr + 1.08"	singleslit,multislit	6pixel	1.08	263	R3000	K-red	2.181	2.446	2.3135	0.265	967	no		s	5.30	5.35
-FLAMINGOS2	R3K + Kr + 1.44"	singleslit,multislit	8pixel	1.44	263	R3000	K-red	2.181	2.446	2.3135	0.265	725	no		s	6.57	6.62
 GPI-2	Y	ifu	Coronagraph	0.156	2.8	Prism	Y	0.95	1.14	1.045	0.19	35	yes	coronagraph	s		
 GPI-2	J	ifu	Coronagraph	0.184	2.8	Prism	J	1.12	1.35	1.235	0.23	36	yes	coronagraph	s		
 GPI-2	H	ifu	Coronagraph	0.246	2.8	Prism	H	1.5	1.8	1.65	0.30	46	yes	coronagraph	s		
