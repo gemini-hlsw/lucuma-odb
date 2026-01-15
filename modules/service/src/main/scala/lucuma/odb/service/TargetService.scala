@@ -62,6 +62,7 @@ import skunk.codec.all.*
 import skunk.implicits.*
 
 import Services.Syntax.*
+import lucuma.odb.service.Services.SuperUserAccess
 
 trait TargetService[F[_]] {
   def createTarget(
@@ -111,8 +112,8 @@ object TargetService {
             case s: SiderealInput.Create  => Statements.insertSiderealFragment(pid, input.name, s, input.sourceProfile.asJson, disposition, role).pure
             case OpportunityInput.Create(r) => Statements.insertOpportunityFragment(pid, input.name, r, input.sourceProfile.asJson, disposition, role).pure
             case NonsiderealInput.Create.Horizons(k) => Statements.insertNonsiderealFragment(pid, input.name, k, input.sourceProfile.asJson, disposition, role).pure
-            case NonsiderealInput.Create.UserSupplied(elems) =>
-              ResultT(trackingService.createUserSuppliedEphemeris(pid, elems)).map: k =>
+            case NonsiderealInput.Create.UserSupplied(elems) =>              
+              ResultT(Services.asSuperUser(trackingService.createUserSuppliedEphemeris(elems))).map: k =>
                  Statements.insertNonsiderealFragment(pid, input.name, k, input.sourceProfile.asJson, disposition, role)
           insertFragment
             .flatMap: af =>
@@ -123,12 +124,12 @@ object TargetService {
             
       override def updateTargets(checked: AccessControl.Checked[TargetPropertiesInput.Edit])(using Transaction[F]): F[Result[List[Target.Id]]] =
         checked.fold(Result(Nil).pure[F]): (props, which) =>
-          updateTargetsImpl(props, which).map:
+          Services.asSuperUser(updateTargetsImpl(props, which)).map:
             case UpdateTargetsResponse.Success(selected)                    => Result.success(selected)
             case UpdateTargetsResponse.SourceProfileUpdatesFailed(problems) => Result.Failure(problems.map(p => OdbError.UpdateFailed(Some(p.message)).asProblem))
             case UpdateTargetsResponse.TrackingSwitchFailed(s)              => OdbError.UpdateFailed(Some(s)).asFailure
 
-      private def updateTargetsImpl(input: TargetPropertiesInput.Edit, which: AppliedFragment)(using Transaction[F]): F[UpdateTargetsResponse] =
+      private def updateTargetsImpl(input: TargetPropertiesInput.Edit, which: AppliedFragment)(using Transaction[F], SuperUserAccess): F[UpdateTargetsResponse] =
 
         // Updates to the user-supplied ephemeris, if any
         val replaceEphemeris: F[Unit] = 
@@ -194,7 +195,7 @@ object TargetService {
         input.foldWithId(OdbError.NotAuthorized(user.id).asFailureF): (input, pid) =>
           import CloneTargetResponse.*
           def update(tid: Target.Id): F[Option[UpdateTargetsResponse]] =
-            input.SET.traverse(updateTargetsImpl(_, sql"SELECT $target_id".apply(tid)))
+            input.SET.traverse(Services.asSuperUser(updateTargetsImpl(_, sql"SELECT $target_id".apply(tid))))
 
           def replaceIn(tid: Target.Id): F[Unit] =
             input.REPLACE_IN.traverse_ { which =>

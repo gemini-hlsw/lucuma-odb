@@ -29,7 +29,6 @@ import lucuma.core.model.Ephemeris.UserSupplied
 import lucuma.core.model.EphemerisTracking
 import lucuma.core.model.Extinction
 import lucuma.core.model.Observation
-import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.Target.Nonsidereal
 import lucuma.core.model.Target.Opportunity
@@ -53,6 +52,7 @@ import java.time.Instant
 import java.time.ZoneOffset
 import java.time.ZonedDateTime
 import scala.concurrent.duration.*
+import lucuma.odb.service.Services.SuperUserAccess
 
 trait TrackingService[F[_]]:
   import TrackingService.Snapshot
@@ -116,23 +116,22 @@ trait TrackingService[F[_]]:
     force: Boolean,
   ): F[Result[Snapshot[Coordinates]]] 
 
-  /** Create a new user-supplied ephemeris associated with the specified program. */
+  /** Create a new user-supplied ephemeris. */
   def createUserSuppliedEphemeris(
-    pid: Program.Id,
     elements: PerSite[List[Ephemeris.UserSupplied.Element]]
-  ): F[Result[Ephemeris.Key.UserSupplied]]
+  )(using SuperUserAccess): F[Result[Ephemeris.Key.UserSupplied]]
 
   /** 
    * Replace a user-supplied ephemeris. Calling user must have edit permission for the
    * associated program. 
-   * */
+   */
   def replaceUserSuppliedEphemeris(
     ephemeris: Ephemeris.UserSupplied
-  ): F[Result[Unit]]
+  )(using SuperUserAccess): F[Result[Unit]]
 
   def deleteUserSuppliedEphemeris(
     key: Ephemeris.Key.UserSupplied
-  ): F[Result[Unit]]
+  )(using SuperUserAccess): F[Result[Unit]]
 
 object TrackingService:
 
@@ -319,15 +318,12 @@ object TrackingService:
 
       def replaceUserSuppliedEphemeris(
         ephemeris: Ephemeris.UserSupplied
-      ): F[Result[Unit]] =
-        // TODO: check program access
+      )(using SuperUserAccess): F[Result[Unit]] =
         (deleteEphemeris(ephemeris.key) *> storeEphemeris(ephemeris)).value
 
       def createUserSuppliedEphemeris(
-        pid: Program.Id, // todo: we're not using this yet!
         elements: PerSite[List[Ephemeris.UserSupplied.Element]]
-      ): F[Result[Ephemeris.Key.UserSupplied]] =
-        // TODO: check program access
+      )(using SuperUserAccess): F[Result[Ephemeris.Key.UserSupplied]] =
         ResultT
           .liftF(session.unique(Statements.CreateUserSuppliedEphemerisKey))
           .map(UserSupplied(_, elements))
@@ -337,8 +333,7 @@ object TrackingService:
               
       def deleteUserSuppliedEphemeris(
         key: Ephemeris.Key.UserSupplied
-      ): F[Result[Unit]] =
-        // TODO: check program access
+      )(using SuperUserAccess): F[Result[Unit]] =
         deleteEphemeris(key).value
 
       private def getSiteAndExplicitBaseCoordinates(oids: List[Observation.Id], when: TimestampInterval): F[(Map[Observation.Id, Coordinates], Map[Observation.Id, Site])] =
