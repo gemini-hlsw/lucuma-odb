@@ -53,5 +53,3 @@ object OneOf3:
   def first[A](a: A):  OneOf3[A, Nothing, Nothing] = First(a)
   def second[B](b: B): OneOf3[Nothing, B, Nothing] = Second(b)
   def third[C](c: C):  OneOf3[Nothing, Nothing, C] = Third(c)
-
-

@@ -6,6 +6,7 @@ package lucuma.odb.sequence.util
 import cats.syntax.eq.*
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.Step
+import lucuma.odb.sequence.data.AtomRecord
 import lucuma.odb.sequence.data.StepRecord
 
 /**
@@ -17,18 +18,27 @@ sealed trait IndexTracker:
   def atomCount: Int
   def stepCount: Int
 
+  def reset(atom: AtomRecord): IndexTracker
+
   def record[D](step: StepRecord[D]): IndexTracker
 
   def toTuple: (Int, Int) =
     (atomCount, stepCount)
 
 object IndexTracker:
-  case object Zero extends IndexTracker:
-    override def atomCount: Int = 0
-    override def stepCount: Int = 0
+  val Zero: IndexTracker = Reset(0)
+
+  case class Reset(
+    atomCount: Int
+  ) extends IndexTracker:
+    override def stepCount: Int =
+      0
+
+    override def reset(atom: AtomRecord): IndexTracker =
+      this
 
     override def record[D](step: StepRecord[D]): IndexTracker =
-      Recording(0, step.atomId, 1, step.id)
+      Recording(atomCount, step.atomId, 1, step.id)
 
   case class Recording(
     atomCount: Int,
@@ -37,14 +47,14 @@ object IndexTracker:
     stepId:    Step.Id
   ) extends IndexTracker:
 
+    override def reset(atom: AtomRecord): IndexTracker =
+      if atom.id === atomId then this
+      else Reset(atomCount + 1)
+
     override def record[D](step: StepRecord[D]): IndexTracker =
-      println("record(" + step + ")")
       if stepId === step.id then
-        println("record: same step id")
         this
       else if atomId === step.atomId then
-        println("record: same atom id")
         copy(stepCount = stepCount + 1, stepId = step.id)
       else
-        println("record: new atom id")
         Recording(atomCount + 1, step.atomId, stepCount = 1, step.id)
