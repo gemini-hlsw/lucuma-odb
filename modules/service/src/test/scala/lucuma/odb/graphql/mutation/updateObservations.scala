@@ -4,12 +4,14 @@
 package lucuma.odb.graphql
 package mutation
 
+import cats.data.NonEmptyList
 import cats.effect.IO
 import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.NonNegShort
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
+import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.TimeAccountingCategory
@@ -19,16 +21,19 @@ import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.core.syntax.timespan.*
+import lucuma.odb.data.OdbError
 import lucuma.odb.graphql.input.AllocationInput
+import lucuma.odb.graphql.query.ExecutionQuerySetupOperations
 import lucuma.odb.service.ObservationService
 
-class updateObservations extends OdbSuite with UpdateObservationsOps:
+class updateObservations extends OdbSuite with UpdateObservationsOps with ExecutionQuerySetupOperations:
 
   val pi: User    = TestUsers.Standard.pi(nextId, nextId)
   val pi2: User   = TestUsers.Standard.pi(nextId, nextId)
   val staff: User = TestUsers.Standard.staff(nextId, nextId)
+  val service     = TestUsers.service(nextId)
 
-  override lazy val validUsers: List[User] = List(pi, pi2, staff)
+  override lazy val validUsers: List[User] = List(pi, pi2, staff, service)
 
   test("general: update that selects nothing") {
     def emptyUpdate(user: User): IO[Unit] =
@@ -3839,3 +3844,58 @@ class updateObservations extends OdbSuite with UpdateObservationsOps:
 
     updateBlindOffsetTest(pi, true) *>
       updateBlindOffsetTest(pi, false)
+
+  test("existence: can delete observation without events"):
+    for {
+      pid <- createProgramAs(pi)
+      oid <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some)
+      _   <- deleteObservation(pi, oid)
+    } yield ()
+
+  test("existence: cannot soft-delete observation with visits"):
+    recordAll(
+      pi,
+      service,
+      ObservingModeType.GmosNorthLongSlit,
+      offset = 10000,
+      atomCount = 1,
+      stepCount = 1,
+      datasetCount = 1).flatMap: on =>
+        expectOdbError(
+          user = pi,
+          query = s"""
+            mutation {
+              updateObservations(input: {
+                SET: { existence: DELETED }
+                WHERE: { id: { EQ: "${on.id}" } }
+              }) {
+                observations { id }
+              }
+            }
+          """,
+          expected = {
+            case OdbError.UpdateFailed(Some(msg)) if msg.contains("Cannot delete observation") && msg.contains("visit") => ()
+          }
+        )
+
+  test("existence: cannot hard-delete calibration observation with visits"):
+    for
+      pid <- createProgramAs(pi)
+      tid <- createTargetAs(pi, pid)
+      oid <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid)
+      _   <- setObservationCalibrationRole(List(oid), CalibrationRole.Telluric)
+      vid <- recordVisitAs(service, lucuma.core.enums.Instrument.GmosNorth, oid)
+      _   <- addSequenceEventAs(service, vid, lucuma.core.enums.SequenceCommand.Start)
+      res <- withServices(service) { services =>
+               services.session.transaction.use { xa =>
+                 services.observationService.deleteCalibrationObservations(NonEmptyList.one(oid))(using xa)
+               }
+             }.attempt
+      _   <- res match
+               case Left(ex) if ex.getMessage.contains("Cannot delete observation") && ex.getMessage.contains("visit") =>
+                 IO.unit
+               case Left(ex) =>
+                 IO.raiseError(new AssertionError(s"Expected deletion to fail with visit constraint, but got: ${ex.getMessage}"))
+               case Right(_) =>
+                 IO.raiseError(new AssertionError("Expected deletion to fail, but it succeeded"))
+    yield ()

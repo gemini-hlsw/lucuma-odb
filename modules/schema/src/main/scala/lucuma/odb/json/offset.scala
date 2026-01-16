@@ -15,7 +15,7 @@ import java.math.RoundingMode.HALF_UP
 
 object offset {
 
-  private def µas[A]: SplitMono[Offset.Component[A], Long] =
+  def µas[A]: SplitMono[Offset.Component[A], Long] =
     Angle.signedMicroarcseconds.reverse.andThen(Offset.Component.angle[A].reverse).reverse
 
   trait DecoderOffset {

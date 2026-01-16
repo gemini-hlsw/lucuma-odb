@@ -14,6 +14,7 @@ import io.circe.literal.*
 import io.circe.refined.*
 import io.circe.syntax.*
 import lucuma.core.data.EmailAddress
+import lucuma.core.data.PerSite
 import lucuma.core.enums.AtomStage
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.CallForProposalsType
@@ -39,6 +40,7 @@ import lucuma.core.math.Coordinates
 import lucuma.core.model.CallForProposals
 import lucuma.core.model.Client
 import lucuma.core.model.ConfigurationRequest
+import lucuma.core.model.Ephemeris
 import lucuma.core.model.ExecutionEvent
 import lucuma.core.model.ExecutionEvent.AtomEvent
 import lucuma.core.model.ExecutionEvent.DatasetEvent
@@ -73,6 +75,7 @@ import lucuma.core.util.DateInterval
 import lucuma.core.util.IdempotencyKey
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
+import lucuma.horizons.HorizonsClient
 import lucuma.odb.FMain
 import lucuma.odb.data.EmailId
 import lucuma.odb.data.Existence
@@ -94,6 +97,7 @@ import skunk.*
 import skunk.codec.boolean.*
 import skunk.syntax.all.*
 
+import java.time.Instant
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
@@ -1038,7 +1042,7 @@ trait DatabaseOperations { this: OdbSuite =>
       json.hcursor.downFields("createObservation", "observation", "id").require[Observation.Id]
     }
 
-  private val DefaultSourceProfile: String =
+  val DefaultSourceProfile: String =
     """
       sourceProfile: {
         point: {
@@ -1063,10 +1067,12 @@ trait DatabaseOperations { this: OdbSuite =>
     pid:  Program.Id,
     sourceProfile: String = DefaultSourceProfile
   ): IO[List[Target.Id]] =
-    (createSiderealTargetAs(user, pid, sourceProfile = sourceProfile),
-     createNonsiderealTargetAs(user, pid, sourceProfile = sourceProfile),
-     createOpportunityTargetAs(user, pid, sourceProfile = sourceProfile)
-    ).mapN(List(_, _, _))
+    createUserDefinedEphemerisFor(Ephemeris.Key.Comet("1P")).flatMap: eph =>
+      (createSiderealTargetAs(user, pid, sourceProfile = sourceProfile),
+      createNonsiderealTargetAs(user, pid, sourceProfile = sourceProfile),
+      createNonsiderealTargetWithUserSuppliedEphemerisAs(user, pid, eph, sourceProfile = sourceProfile),
+      createOpportunityTargetAs(user, pid, sourceProfile = sourceProfile),
+      ).mapN(List(_, _, _, _))
 
   def createTargetAs(
     user: User,
@@ -1195,6 +1201,60 @@ trait DatabaseOperations { this: OdbSuite =>
         .as[Target.Id]
         .leftMap(f => new RuntimeException(f.message))
         .liftTo[IO]
+    }
+
+  /** Fetch a Horizons ephemeris and turn it into a user-defined one. */
+  def createUserDefinedEphemerisFor(key: Ephemeris.Key.Horizons): IO[PerSite[List[Ephemeris.UserSupplied.Element]]] =
+    val start = Instant.ofEpochMilli(1762965822812L) // arbitrary date in Nov 2025
+    HorizonsClient
+      .forTesting[IO](horizonsFixture)
+      .ephemeris(key, start, start.plusSeconds(10000), 50)
+      .map(_.toOption.get)
+      .map: eph =>
+        eph.elements.map: es =>
+          es.map: e =>
+            Ephemeris.UserSupplied.Element(e.when, e.coordinates, e.velocity)
+
+  def createNonsiderealTargetWithUserSuppliedEphemerisAs(
+    user: User,
+    pid:  Program.Id,
+    ephemeris: PerSite[List[Ephemeris.UserSupplied.Element]],
+    name: String = "No Name",
+    sourceProfile: String = DefaultSourceProfile
+  ): IO[Target.Id] =
+    query(
+      user,
+      s"""
+        mutation {
+          createTarget(
+            input: {
+              programId: ${pid.asJson}
+              SET: {
+                name: "$name"
+                nonsidereal: {
+                  ephemeris: ${ephemeris.asGraphQL}
+                }
+                $sourceProfile
+              }
+            }
+          ) {
+            target {
+              id 
+              nonsidereal {
+                key
+              }
+            }
+          }
+        }
+      """
+    ).flatMap { js =>
+      val ac = js.hcursor.downFields("createTarget", "target")
+      val e = for
+        id  <- ac.downFields("id").as[Target.Id]
+        key <- ac.downFields("nonsidereal", "key").as[Ephemeris.Key]
+        _    = assert(key.isInstanceOf[Ephemeris.Key.UserSupplied])
+      yield id
+      e.fold(f => throw new RuntimeException(f.toString), _.pure[IO])
     }
 
   def createIncompleteTargetAs(user: User, pid: Program.Id, name: String = "No Name"): IO[Target.Id] =
@@ -2851,223 +2911,1169 @@ trait DatabaseOperations { this: OdbSuite =>
 
   /** Subclasses can override to add more handlers. */
   def horizonsFixture: Map[Set[(String, String)], String] = Map(
-
-    Set(
-      ("format", "text"), ("MAKE_EPHEM", "YES"), ("CENTER", "T15"), ("COMMAND", "'NAME=1P;CAP'"), ("START_TIME", "'2025-May-02 00:00:00.000'"), ("STOP_TIME", "'2025-May-03 00:00:00.000'"), ("STEP_SIZE", "60m"), ("extra_prec", "YES"), ("time_digits", "FRACSEC"), ("QUANTITIES", "'1,3,8,9'")) ->
-      """
-      |API VERSION: 1.2
-      |API SOURCE: NASA/JPL Horizons API
-      |
-      |*******************************************************************************
-      |JPL/HORIZONS                      1P/Halley                2025-Nov-24 11:37:17
-      |Rec #:90000030        Soln.date: 2025-Nov-21_15:57:34   # obs: 8518 (1835-1994)
-      |
-      |IAU76/J2000 helio. ecliptic osc. elements (au, days, deg., period=Julian yrs):
-      |
-      |  EPOCH=  2439875.5 ! 1968-Jan-20.0000000 (TDB)    RMSW= n.a.
-      |  EC= .9679359956953212   QR= .5748638313743413   TP= 2446469.9736161465
-      |  OM= 59.09894720612437   W= 112.2414314637764    IN= 162.1905300439129
-      |  A= 17.92863504856929    MA= 274.3823371364693   ADIST= 35.28240626576424
-      |  PER= 75.915252807404    N= .012983244           ANGMOM= .018296559
-      |  DAN= 1.78543            DDN= .82795             L= 305.8544912
-      |  B= 16.4450919           MOID= .0745097          TP= 1986-Feb-08.4736161465
-      |
-      |Comet physical (GM= km^3/s^2; RAD= km):
-      |  GM= n.a.                RAD= 5.5
-      |  M1=  5.5      M2=  13.6     k1=  8.     k2=  5.      PHCOF=  .030
-      |Comet non-gravitational force model (AMRAT=m^2/kg;A1-A3=au/d^2;DT=days;R0=au):
-      |  AMRAT=  0.                                      DT=  0.
-      |  A1= 4.887055233121E-10  A2= 1.554720290005E-10  A3= 0.
-      |Standard model:
-      |  ALN=  .1112620426   NK=  4.6142   NM=  2.15     NN=  5.093    R0=  2.808
-      |
-      |COMET comments
-      |1: soln ref.= JPL#75, data arc: 1835-08-21 to 1994-01-11
-      |2: k1=8.0, k2=5.0, phase coef.=0.03;
-      |*******************************************************************************
-      |
-      |
-      |*******************************************************************************
-      |Ephemeris / API_USER Mon Nov 24 11:37:17 2025 Pasadena, USA      / Horizons
-      |*******************************************************************************
-      |Target body name: 1P/Halley                       {source: JPL#75}
-      |Center body name: Earth (399)                     {source: DE441}
-      |Center-site name: Gemini North Observatory, Maunakea
-      |*******************************************************************************
-      |Start time      : A.D. 2025-May-02 00:00:00.0000 UT
-      |Stop  time      : A.D. 2025-May-03 00:00:00.0000 UT
-      |Step-size       : 60 minutes
-      |*******************************************************************************
-      |Target pole/equ : undefined
-      |Target radii    : 5.5 km
-      |Center geodetic : 204.5309, 19.8238126, 4.24672   {E-lon(deg),Lat(deg),Alt(km)}
-      |Center cylindric: 204.5309,6006.47419,2150.79851  {E-lon(deg),Dxy(km),Dz(km)}
-      |Center pole/equ : ITRF93                          {East-longitude positive}
-      |Center radii    : 6378.137, 6378.137, 6356.752 km {Equator_a, b, pole_c}
-      |Target primary  : Sun
-      |Vis. interferer : MOON (R_eq= 1737.400) km        {source: DE441}
-      |Rel. light bend : Sun                             {source: DE441}
-      |Rel. lght bnd GM: 1.3271E+11 km^3/s^2
-      |Small-body perts: Yes                             {source: SB441-N16}
-      |Atmos refraction: NO (AIRLESS)
-      |RA format       : HMS
-      |Time format     : CAL
-      |Calendar mode   : Mixed Julian/Gregorian
-      |EOP file        : eop.251121.p260217
-      |EOP coverage    : DATA-BASED 1962-JAN-20 TO 2025-NOV-21. PREDICTS-> 2026-FEB-16
-      |Units conversion: 1 au= 149597870.700 km, c= 299792.458 km/s, 1 day= 86400.0 s
-      |Table cut-offs 1: Elevation (-90.0deg=NO ),Airmass (>38.000=NO), Daylight (NO )
-      |Table cut-offs 2: Solar elongation (  0.0,180.0=NO ),Local Hour Angle( 0.0=NO )
-      |Table cut-offs 3: RA/DEC angular rate (     0.0=NO )
-      |*******************************************************************************
-      |Initial IAU76/J2000 heliocentric ecliptic osculating elements (au, days, deg.):
-      |  EPOCH=  2439875.5 ! 1968-Jan-20.0000000 (TDB)    RMSW= n.a.
-      |  EC= .9679359956953212   QR= .5748638313743413   TP= 2446469.9736161465
-      |  OM= 59.09894720612437   W= 112.2414314637764    IN= 162.1905300439129
-      |  Equivalent ICRF heliocentric cartesian coordinates (au, au/d):
-      |  X=-1.331029360169393E+01  Y= 2.541249958785733E+01  Z= 2.637549316318327E+00
-      |  VX= 1.418949944126011E-03 VY=-1.422475975617656E-03 VZ= 4.131321199969281E-05
-      |Comet physical (GM= km^3/s^2; RAD= km):
-      |  GM= n.a.                RAD= 5.5
-      |  M1=  5.5      M2=  13.6     k1=  8.     k2=  5.      PHCOF=  .030
-      |Comet non-gravitational force model (AMRAT=m^2/kg;A1-A3=au/d^2;DT=days;R0=au):
-      |  AMRAT=  0.                                      DT=  0.
-      |  A1= 4.887055233121E-10  A2= 1.554720290005E-10  A3= 0.
-      |Standard model:
-      |  ALN=  .1112620426   NK=  4.6142   NM=  2.15     NN=  5.093    R0=  2.808
-      |*****************************************************************************************************************
-      |Date__(UT)__HR:MN:SC.fff     R.A._________(ICRF)_________DEC  dRA*cosD d(DEC)/dt  a-mass mag_ex    T-mag   N-mag
-      |*****************************************************************************************************************
-      |$$SOE
-      |2025-May-02 00:00:00.000 *m  08 09 46.797665 +03 21 19.54244  0.585974  1.072429   1.931  0.210   25.598  29.111
-      |2025-May-02 01:00:00.000 *m  08 09 46.836306 +03 21 20.61530  0.576317  1.071027   1.415  0.154   25.598  29.111
-      |2025-May-02 02:00:00.000 *m  08 09 46.874400 +03 21 21.68666  0.569751  1.069460   1.177  0.128   25.598  29.111
-      |2025-May-02 03:00:00.000 *m  08 09 46.912179 +03 21 22.75638  0.566918  1.067778   1.069  0.116   25.598  29.111
-      |2025-May-02 04:00:00.000 *m  08 09 46.949905 +03 21 23.82438  0.568205  1.066042   1.043  0.114   25.598  29.111
-      |2025-May-02 05:00:00.000 Cm  08 09 46.987858 +03 21 24.89065  0.573718  1.064313   1.090  0.119   25.598  29.111
-      |2025-May-02 06:00:00.000 Am  08 09 47.026316 +03 21 25.95524  0.583271  1.062656   1.227  0.134   25.598  29.111
-      |2025-May-02 07:00:00.000  m  08 09 47.065535 +03 21 27.01825  0.596403  1.061126   1.518  0.165   25.598  29.111
-      |2025-May-02 08:00:00.000  m  08 09 47.105732 +03 21 28.07985  0.612406  1.059774   2.179  0.237   25.598  29.111
-      |2025-May-02 09:00:00.000  m  08 09 47.147069 +03 21 29.14024  0.630376  1.058636   4.323  0.471   25.598  29.111
-      |2025-May-02 10:00:00.000     08 09 47.189642 +03 21 30.19964  0.649275  1.057733    n.a.   n.a.   25.598  29.111
-      |2025-May-02 11:00:00.000     08 09 47.233479 +03 21 31.25831  0.668001  1.057072    n.a.   n.a.   25.598  29.111
-      |2025-May-02 12:00:00.000     08 09 47.278529 +03 21 32.31647  0.685463  1.056642    n.a.   n.a.   25.599  29.111
-      |2025-May-02 13:00:00.000     08 09 47.324675 +03 21 33.37433  0.700657  1.056415    n.a.   n.a.   25.599  29.111
-      |2025-May-02 14:00:00.000     08 09 47.371736 +03 21 34.43209  0.712735  1.056353    n.a.   n.a.   25.599  29.111
-      |2025-May-02 15:00:00.000 A   08 09 47.419481 +03 21 35.48986  0.721062  1.056402    n.a.   n.a.   25.599  29.111
-      |2025-May-02 16:00:00.000 *   08 09 47.467645 +03 21 36.54773  0.725260  1.056503    n.a.   n.a.   25.599  29.111
-      |2025-May-02 17:00:00.000 *   08 09 47.515949 +03 21 37.60571  0.725233  1.056593    n.a.   n.a.   25.599  29.111
-      |2025-May-02 18:00:00.000 *   08 09 47.564114 +03 21 38.66374  0.721176  1.056609    n.a.   n.a.   25.599  29.111
-      |2025-May-02 19:00:00.000 *   08 09 47.611887 +03 21 39.72171  0.713560  1.056495    n.a.   n.a.   25.599  29.111
-      |2025-May-02 20:00:00.000 *   08 09 47.659051 +03 21 40.77946  0.703098  1.056201    n.a.   n.a.   25.599  29.111
-      |2025-May-02 21:00:00.000 *m  08 09 47.705446 +03 21 41.83679  0.690699  1.055691    n.a.   n.a.   25.599  29.111
-      |2025-May-02 22:00:00.000 *m  08 09 47.750978 +03 21 42.89347  0.677406  1.054945  12.398  1.350   25.599  29.111
-      |2025-May-02 23:00:00.000 *m  08 09 47.795623 +03 21 43.94925  0.664320  1.053955   3.214  0.350   25.599  29.111
-      |2025-May-03 00:00:00.000 *m  08 09 47.839432 +03 21 45.00389  0.652531  1.052735   1.882  0.205   25.599  29.111
-      |$$EOE
-      |*****************************************************************************************************************
-      |Column meaning:
-      |
-      |TIME
-      |
-      |  Times PRIOR to 1962 are UT1, a mean-solar time closely related to the
-      |prior but now-deprecated GMT. Times AFTER 1962 are in UTC, the current
-      |civil or "wall-clock" time-scale. UTC is kept within 0.9 seconds of UT1
-      |using integer leap-seconds for 1972 and later years.
-      |
-      |  Conversion from the internal Barycentric Dynamical Time (TDB) of solar
-      |system dynamics to the non-uniform civil UT time-scale requested for output
-      |has not been determined for UTC times after the next July or January 1st.
-      |Therefore, the last known leap-second is used as a constant over future
-      |intervals.
-      |
-      |  Time tags refer to the UT time-scale conversion from TDB on Earth
-      |regardless of observer location within the solar system, although clock
-      |rates may differ due to the local gravity field and no analog to "UT"
-      |may be defined for that location.
-      |
-      |  Any 'b' symbol in the 1st-column denotes a B.C. date. First-column blank
-      |(" ") denotes an A.D. date.
-      |
-      |CALENDAR SYSTEM
-      |
-      |  Mixed calendar mode was active such that calendar dates after AD 1582-Oct-15
-      |(if any) are in the modern Gregorian system. Dates prior to 1582-Oct-5 (if any)
-      |are in the Julian calendar system, which is automatically extended for dates
-      |prior to its adoption on 45-Jan-1 BC.  The Julian calendar is useful for
-      |matching historical dates. The Gregorian calendar more accurately corresponds
-      |to the Earth's orbital motion and seasons. A "Gregorian-only" calendar mode is
-      |available if such physical events are the primary interest.
-      |
-      |  NOTE: "n.a." in output means quantity "not available" at the print-time.
-      |
-      |SOLAR PRESENCE (OBSERVING SITE)
-      |  Time tag is followed by a blank, then a solar-presence symbol:
-      |
-      |      '*'  Daylight (refracted solar upper-limb on or above apparent horizon)
-      |      'C'  Civil twilight/dawn
-      |      'N'  Nautical twilight/dawn
-      |      'A'  Astronomical twilight/dawn
-      |      ' '  Night OR geocentric ephemeris
-      |
-      |LUNAR PRESENCE (OBSERVING SITE)
-      |  The solar-presence symbol is immediately followed by a lunar-presence symbol:
-      |
-      |      'm'  Refracted upper-limb of Moon on or above apparent horizon
-      |      ' '  Refracted upper-limb of Moon below apparent horizon OR geocentric
-      |            ephemeris
-      |
-      |'R.A._________(ICRF)_________DEC' =
-      |  Astrometric right ascension and declination of the target center with
-      |respect to the observing site (coordinate origin) in the reference frame of
-      |the planetary ephemeris (ICRF). Compensated for down-leg light-time delay
-      |aberration.
-      |
-      |  Units: RA  in hours-minutes-seconds of time,    HH MM SS.ff{ffff}
-      |        DEC in degrees-minutes-seconds of arc,  sDD MN SC.f{ffff}
-      |
-      |'dRA*cosD d(DEC)/dt' =
-      |  The angular rate of change in apparent RA and DEC of the target. This is
-      |with respect to the non-inertial IAU76/80 Earth true equator and equinox
-      |of-date reference frame.  d(RA)/dt is multiplied by the cosine of declination
-      |to provide a linear rate in the plane-of-sky. Units: ARCSECONDS PER HOUR
-      |
-      |'a-mass mag_ex' =
-      |    RELATIVE optical airmass and visual magnitude extinction. Airmass is the
-      |ratio between the absolute optical airmass for the targets' refracted CENTER
-      |point to the absolute optical airmass at zenith. Also output is the estimated
-      |visual magnitude extinction due to the atmosphere, as seen by the observer.
-      |AVAILABLE ONLY FOR TOPOCENTRIC EARTH SITES WHEN THE TARGET IS ABOVE THE
-      |HORIZON.  Units: none (airmass) and magnitudes (extinction).
-      |
-      |'T-mag   N-mag' =
-      |  Comets' apparent visual total magnitude ("T-mag") and nuclear magnitude
-      |("N-mag") using the standard IAU model:
-      |
-      |  T-mag= M1 + 5*log10(delta) + k1*log10(r)
-      |  N-mag= M2 + 5*log10(delta) + k2*log10(r) + phcof*beta
-      |
-      |  Units: MAGNITUDES
-      |
-      |Computations by ...
-      |
-      |    Solar System Dynamics Group, Horizons On-Line Ephemeris System
-      |    4800 Oak Grove Drive, Jet Propulsion Laboratory
-      |    Pasadena, CA  91109   USA
-      |
-      |    General site: https://ssd.jpl.nasa.gov/
-      |    Mailing list: https://ssd.jpl.nasa.gov/email_list.html
-      |    System news : https://ssd.jpl.nasa.gov/horizons/news.html
-      |    User Guide  : https://ssd.jpl.nasa.gov/horizons/manual.html
-      |    Connect     : browser        https://ssd.jpl.nasa.gov/horizons/app.html#/x
-      |                  API            https://ssd-api.jpl.nasa.gov/doc/horizons.html
-      |                  command-line   telnet ssd.jpl.nasa.gov 6775
-      |                  e-mail/batch   https://ssd.jpl.nasa.gov/ftp/ssd/horizons_batch.txt
-      |                  scripts        https://ssd.jpl.nasa.gov/ftp/ssd/SCRIPTS
-      |    Author      : Jon.D.Giorgini@jpl.nasa.gov
-      |
-      |*****************************************************************************************************************
-      |""".stripMargin
-        )
+  Set(("format", "text"), ("MAKE_EPHEM", "YES"), ("CENTER", "I11"), ("COMMAND", "'NAME=1P;CAP'"), ("START_TIME", "'2025-May-02 00:00:00.000'"), ("STOP_TIME", "'2025-May-03 00:00:00.000'"), ("STEP_SIZE", "60m"), ("extra_prec", "YES"), ("time_digits", "FRACSEC"), ("QUANTITIES", "'1,3,8,9'")) ->
+  """|API VERSION: 1.2
+  |API SOURCE: NASA/JPL Horizons API
+  |
+  |*******************************************************************************
+  |JPL/HORIZONS                      1P/Halley                2025-Dec-22 13:42:18
+  |Rec #:90000030        Soln.date: 2025-Nov-21_15:57:34   # obs: 8518 (1835-1994)
+  | 
+  |IAU76/J2000 helio. ecliptic osc. elements (au, days, deg., period=Julian yrs):
+  | 
+  |  EPOCH=  2439875.5 ! 1968-Jan-20.0000000 (TDB)    RMSW= n.a.
+  |   EC= .9679359956953212   QR= .5748638313743413   TP= 2446469.9736161465
+  |   OM= 59.09894720612437   W= 112.2414314637764    IN= 162.1905300439129
+  |   A= 17.92863504856929    MA= 274.3823371364693   ADIST= 35.28240626576424
+  |   PER= 75.915252807404    N= .012983244           ANGMOM= .018296559
+  |   DAN= 1.78543            DDN= .82795             L= 305.8544912
+  |   B= 16.4450919           MOID= .0745097          TP= 1986-Feb-08.4736161465
+  | 
+  |Comet physical (GM= km^3/s^2; RAD= km):
+  |   GM= n.a.                RAD= 5.5
+  |   M1=  5.5      M2=  13.6     k1=  8.     k2=  5.      PHCOF=  .030
+  |Comet non-gravitational force model (AMRAT=m^2/kg;A1-A3=au/d^2;DT=days;R0=au):
+  |   AMRAT=  0.                                      DT=  0.
+  |   A1= 4.887055233121E-10  A2= 1.554720290005E-10  A3= 0.
+  | Standard model:
+  |   ALN=  .1112620426   NK=  4.6142   NM=  2.15     NN=  5.093    R0=  2.808
+  | 
+  |COMET comments 
+  |1: soln ref.= JPL#75, data arc: 1835-08-21 to 1994-01-11
+  |2: k1=8.0, k2=5.0, phase coef.=0.03;
+  |*******************************************************************************
+  |
+  |
+  |*******************************************************************************
+  |Ephemeris / API_USER Mon Dec 22 13:42:18 2025 Pasadena, USA      / Horizons    
+  |*******************************************************************************
+  |Target body name: 1P/Halley                       {source: JPL#75}
+  |Center body name: Earth (399)                     {source: DE441}
+  |Center-site name: Gemini South Obs., Cerro Pachon
+  |*******************************************************************************
+  |Start time      : A.D. 2025-May-02 00:00:00.0000 UT      
+  |Stop  time      : A.D. 2025-May-03 00:00:00.0000 UT      
+  |Step-size       : 60 minutes
+  |*******************************************************************************
+  |Target pole/equ : undefined
+  |Target radii    : 5.5 km                                                       
+  |Center geodetic : 289.2634, -30.2406227, 2.71233  {E-lon(deg),Lat(deg),Alt(km)}
+  |Center cylindric: 289.2634,5517.21435,-3194.81213 {E-lon(deg),Dxy(km),Dz(km)}
+  |Center pole/equ : ITRF93                          {East-longitude positive}
+  |Center radii    : 6378.137, 6378.137, 6356.752 km {Equator_a, b, pole_c}       
+  |Target primary  : Sun
+  |Vis. interferer : MOON (R_eq= 1737.400) km        {source: DE441}
+  |Rel. light bend : Sun                             {source: DE441}
+  |Rel. lght bnd GM: 1.3271E+11 km^3/s^2                                          
+  |Small-body perts: Yes                             {source: SB441-N16}
+  |Atmos refraction: NO (AIRLESS)
+  |RA format       : HMS
+  |Time format     : CAL 
+  |Calendar mode   : Mixed Julian/Gregorian
+  |EOP file        : eop.251219.p260317                                           
+  |EOP coverage    : DATA-BASED 1962-JAN-20 TO 2025-DEC-19. PREDICTS-> 2026-MAR-16
+  |Units conversion: 1 au= 149597870.700 km, c= 299792.458 km/s, 1 day= 86400.0 s 
+  |Table cut-offs 1: Elevation (-90.0deg=NO ),Airmass (>38.000=NO), Daylight (NO )
+  |Table cut-offs 2: Solar elongation (  0.0,180.0=NO ),Local Hour Angle( 0.0=NO )
+  |Table cut-offs 3: RA/DEC angular rate (     0.0=NO )                           
+  |*******************************************************************************
+  |Initial IAU76/J2000 heliocentric ecliptic osculating elements (au, days, deg.):
+  |  EPOCH=  2439875.5 ! 1968-Jan-20.0000000 (TDB)    RMSW= n.a.                  
+  |   EC= .9679359956953212   QR= .5748638313743413   TP= 2446469.9736161465      
+  |   OM= 59.09894720612437   W= 112.2414314637764    IN= 162.1905300439129       
+  |  Equivalent ICRF heliocentric cartesian coordinates (au, au/d):
+  |   X=-1.331029360169393E+01  Y= 2.541249958785733E+01  Z= 2.637549316318327E+00
+  |  VX= 1.418949944126011E-03 VY=-1.422475975617656E-03 VZ= 4.131321199969281E-05
+  |Comet physical (GM= km^3/s^2; RAD= km):                                        
+  |   GM= n.a.                RAD= 5.5                                            
+  |   M1=  5.5      M2=  13.6     k1=  8.     k2=  5.      PHCOF=  .030           
+  |Comet non-gravitational force model (AMRAT=m^2/kg;A1-A3=au/d^2;DT=days;R0=au): 
+  |   AMRAT=  0.                                      DT=  0.                     
+  |   A1= 4.887055233121E-10  A2= 1.554720290005E-10  A3= 0.                      
+  | Standard model:                                                               
+  |   ALN=  .1112620426   NK=  4.6142   NM=  2.15     NN=  5.093    R0=  2.808    
+  |*****************************************************************************************************************
+  | Date__(UT)__HR:MN:SC.fff     R.A._________(ICRF)_________DEC  dRA*cosD d(DEC)/dt  a-mass mag_ex    T-mag   N-mag
+  |*****************************************************************************************************************
+  |$$SOE
+  | 2025-May-02 00:00:00.000  m  08 09 46.777840 +03 21 19.75464  0.567941  1.067972   1.346  0.187   25.598  29.111
+  | 2025-May-02 01:00:00.000  m  08 09 46.815969 +03 21 20.82295  0.579097  1.066455   1.622  0.225   25.598  29.111
+  | 2025-May-02 02:00:00.000     08 09 46.854944 +03 21 21.88983  0.593153  1.065084   2.240  0.311   25.598  29.111
+  | 2025-May-02 03:00:00.000     08 09 46.894933 +03 21 22.95546  0.609338  1.063899   4.069  0.566   25.598  29.111
+  | 2025-May-02 04:00:00.000     08 09 46.936049 +03 21 24.02005  0.626736  1.062925  22.801  3.170   25.598  29.111
+  | 2025-May-02 05:00:00.000     08 09 46.978340 +03 21 25.08381  0.644349  1.062172    n.a.   n.a.   25.598  29.111
+  | 2025-May-02 06:00:00.000     08 09 47.021786 +03 21 26.14697  0.661161  1.061637    n.a.   n.a.   25.598  29.111
+  | 2025-May-02 07:00:00.000     08 09 47.066301 +03 21 27.20972  0.676215  1.061300    n.a.   n.a.   25.598  29.111
+  | 2025-May-02 08:00:00.000     08 09 47.111739 +03 21 28.27226  0.688672  1.061127    n.a.   n.a.   25.598  29.111
+  | 2025-May-02 09:00:00.000     08 09 47.157903 +03 21 29.33471  0.697871  1.061076    n.a.   n.a.   25.598  29.111
+  | 2025-May-02 10:00:00.000 A   08 09 47.204559 +03 21 30.39716  0.703375  1.061093    n.a.   n.a.   25.598  29.111
+  | 2025-May-02 11:00:00.000 C   08 09 47.251454 +03 21 31.45964  0.704999  1.061121    n.a.   n.a.   25.599  29.111
+  | 2025-May-02 12:00:00.000 *   08 09 47.298329 +03 21 32.52214  0.702824  1.061102    n.a.   n.a.   25.599  29.111
+  | 2025-May-02 13:00:00.000 *   08 09 47.344942 +03 21 33.58456  0.697194  1.060982    n.a.   n.a.   25.599  29.111
+  | 2025-May-02 14:00:00.000 *   08 09 47.391078 +03 21 34.64678  0.688685  1.060712    n.a.   n.a.   25.599  29.111
+  | 2025-May-02 15:00:00.000 *   08 09 47.436571 +03 21 35.70862  0.678074  1.060255    n.a.   n.a.   25.599  29.111
+  | 2025-May-02 16:00:00.000 *   08 09 47.481311 +03 21 36.76987  0.666279  1.059585    n.a.   n.a.   25.599  29.111
+  | 2025-May-02 17:00:00.000 *m  08 09 47.525252 +03 21 37.83031  0.654302  1.058693   6.127  0.852   25.599  29.111
+  | 2025-May-02 18:00:00.000 *m  08 09 47.568415 +03 21 38.88973  0.643156  1.057583   2.697  0.375   25.599  29.111
+  | 2025-May-02 19:00:00.000 *m  08 09 47.610889 +03 21 39.94791  0.633796  1.056274   1.803  0.251   25.599  29.111
+  | 2025-May-02 20:00:00.000 *m  08 09 47.652821 +03 21 41.00469  0.627055  1.054801   1.430  0.199   25.599  29.111
+  | 2025-May-02 21:00:00.000 *m  08 09 47.694410 +03 21 42.05991  0.623588  1.053208   1.259  0.175   25.599  29.111
+  | 2025-May-02 22:00:00.000 *m  08 09 47.735889 +03 21 43.11350  0.623824  1.051547   1.200  0.167   25.599  29.111
+  | 2025-May-02 23:00:00.000 Am  08 09 47.777513 +03 21 44.16543  0.627938  1.049877   1.229  0.171   25.599  29.111
+  | 2025-May-03 00:00:00.000  m  08 09 47.819540 +03 21 45.21571  0.635841  1.048254   1.358  0.189   25.599  29.111
+  |$$EOE
+  |*****************************************************************************************************************
+  |Column meaning:
+  | 
+  |TIME
+  |
+  |  Times PRIOR to 1962 are UT1, a mean-solar time closely related to the
+  |prior but now-deprecated GMT. Times AFTER 1962 are in UTC, the current
+  |civil or "wall-clock" time-scale. UTC is kept within 0.9 seconds of UT1
+  |using integer leap-seconds for 1972 and later years.
+  |
+  |  Conversion from the internal Barycentric Dynamical Time (TDB) of solar
+  |system dynamics to the non-uniform civil UT time-scale requested for output
+  |has not been determined for UTC times after the next July or January 1st.
+  |Therefore, the last known leap-second is used as a constant over future
+  |intervals.
+  |
+  |  Time tags refer to the UT time-scale conversion from TDB on Earth
+  |regardless of observer location within the solar system, although clock
+  |rates may differ due to the local gravity field and no analog to "UT"
+  |may be defined for that location.
+  |
+  |  Any 'b' symbol in the 1st-column denotes a B.C. date. First-column blank
+  |(" ") denotes an A.D. date.
+  | 
+  |CALENDAR SYSTEM
+  |
+  |  Mixed calendar mode was active such that calendar dates after AD 1582-Oct-15
+  |(if any) are in the modern Gregorian system. Dates prior to 1582-Oct-5 (if any)
+  |are in the Julian calendar system, which is automatically extended for dates
+  |prior to its adoption on 45-Jan-1 BC.  The Julian calendar is useful for
+  |matching historical dates. The Gregorian calendar more accurately corresponds
+  |to the Earth's orbital motion and seasons. A "Gregorian-only" calendar mode is
+  |available if such physical events are the primary interest.
+  |
+  |  NOTE: "n.a." in output means quantity "not available" at the print-time.
+  | 
+  |SOLAR PRESENCE (OBSERVING SITE)
+  |  Time tag is followed by a blank, then a solar-presence symbol:
+  |
+  |       '*'  Daylight (refracted solar upper-limb on or above apparent horizon)
+  |       'C'  Civil twilight/dawn
+  |       'N'  Nautical twilight/dawn
+  |       'A'  Astronomical twilight/dawn
+  |       ' '  Night OR geocentric ephemeris
+  |
+  |LUNAR PRESENCE (OBSERVING SITE)
+  |  The solar-presence symbol is immediately followed by a lunar-presence symbol:
+  |
+  |       'm'  Refracted upper-limb of Moon on or above apparent horizon
+  |       ' '  Refracted upper-limb of Moon below apparent horizon OR geocentric
+  |            ephemeris
+  | 
+  | 'R.A._________(ICRF)_________DEC' =
+  |  Astrometric right ascension and declination of the target center with
+  |respect to the observing site (coordinate origin) in the reference frame of
+  |the planetary ephemeris (ICRF). Compensated for down-leg light-time delay
+  |aberration.
+  |
+  |  Units: RA  in hours-minutes-seconds of time,    HH MM SS.ff{ffff}
+  |         DEC in degrees-minutes-seconds of arc,  sDD MN SC.f{ffff}
+  | 
+  | 'dRA*cosD d(DEC)/dt' =
+  |  The angular rate of change in apparent RA and DEC of the target. This is
+  |with respect to the non-inertial IAU76/80 Earth true equator and equinox
+  |of-date reference frame.  d(RA)/dt is multiplied by the cosine of declination
+  |to provide a linear rate in the plane-of-sky. Units: ARCSECONDS PER HOUR
+  | 
+  | 'a-mass mag_ex' =
+  |    RELATIVE optical airmass and visual magnitude extinction. Airmass is the
+  |ratio between the absolute optical airmass for the targets' refracted CENTER
+  |point to the absolute optical airmass at zenith. Also output is the estimated
+  |visual magnitude extinction due to the atmosphere, as seen by the observer.
+  |AVAILABLE ONLY FOR TOPOCENTRIC EARTH SITES WHEN THE TARGET IS ABOVE THE
+  |HORIZON.  Units: none (airmass) and magnitudes (extinction).
+  | 
+  | 'T-mag   N-mag' =
+  |   Comets' apparent visual total magnitude ("T-mag") and nuclear magnitude
+  |("N-mag") using the standard IAU model:
+  |
+  |   T-mag= M1 + 5*log10(delta) + k1*log10(r)
+  |   N-mag= M2 + 5*log10(delta) + k2*log10(r) + phcof*beta
+  |
+  |   Units: MAGNITUDES
+  |
+  |Computations by ...
+  |
+  |    Solar System Dynamics Group, Horizons On-Line Ephemeris System
+  |    4800 Oak Grove Drive, Jet Propulsion Laboratory
+  |    Pasadena, CA  91109   USA
+  |
+  |    General site: https://ssd.jpl.nasa.gov/
+  |    Mailing list: https://ssd.jpl.nasa.gov/email_list.html
+  |    System news : https://ssd.jpl.nasa.gov/horizons/news.html
+  |    User Guide  : https://ssd.jpl.nasa.gov/horizons/manual.html
+  |    Connect     : browser        https://ssd.jpl.nasa.gov/horizons/app.html#/x
+  |                  API            https://ssd-api.jpl.nasa.gov/doc/horizons.html
+  |                  command-line   telnet ssd.jpl.nasa.gov 6775
+  |                  e-mail/batch   https://ssd.jpl.nasa.gov/ftp/ssd/horizons_batch.txt
+  |                  scripts        https://ssd.jpl.nasa.gov/ftp/ssd/SCRIPTS
+  |    Author      : Jon.D.Giorgini@jpl.nasa.gov
+  |
+  |*****************************************************************************************************************
+  """.stripMargin,
+  Set(("format", "text"), ("MAKE_EPHEM", "YES"), ("CENTER", "T15"), ("COMMAND", "'NAME=1P;CAP'"), ("START_TIME", "'2025-May-02 00:00:00.000'"), ("STOP_TIME", "'2025-May-03 00:00:00.000'"), ("STEP_SIZE", "60m"), ("extra_prec", "YES"), ("time_digits", "FRACSEC"), ("QUANTITIES", "'1,3,8,9'")) ->
+  """|API VERSION: 1.2
+  |API SOURCE: NASA/JPL Horizons API
+  |
+  |*******************************************************************************
+  |JPL/HORIZONS                      1P/Halley                2025-Dec-22 13:43:45
+  |Rec #:90000030        Soln.date: 2025-Nov-21_15:57:34   # obs: 8518 (1835-1994)
+  | 
+  |IAU76/J2000 helio. ecliptic osc. elements (au, days, deg., period=Julian yrs):
+  | 
+  |  EPOCH=  2439875.5 ! 1968-Jan-20.0000000 (TDB)    RMSW= n.a.
+  |   EC= .9679359956953212   QR= .5748638313743413   TP= 2446469.9736161465
+  |   OM= 59.09894720612437   W= 112.2414314637764    IN= 162.1905300439129
+  |   A= 17.92863504856929    MA= 274.3823371364693   ADIST= 35.28240626576424
+  |   PER= 75.915252807404    N= .012983244           ANGMOM= .018296559
+  |   DAN= 1.78543            DDN= .82795             L= 305.8544912
+  |   B= 16.4450919           MOID= .0745097          TP= 1986-Feb-08.4736161465
+  | 
+  |Comet physical (GM= km^3/s^2; RAD= km):
+  |   GM= n.a.                RAD= 5.5
+  |   M1=  5.5      M2=  13.6     k1=  8.     k2=  5.      PHCOF=  .030
+  |Comet non-gravitational force model (AMRAT=m^2/kg;A1-A3=au/d^2;DT=days;R0=au):
+  |   AMRAT=  0.                                      DT=  0.
+  |   A1= 4.887055233121E-10  A2= 1.554720290005E-10  A3= 0.
+  | Standard model:
+  |   ALN=  .1112620426   NK=  4.6142   NM=  2.15     NN=  5.093    R0=  2.808
+  | 
+  |COMET comments 
+  |1: soln ref.= JPL#75, data arc: 1835-08-21 to 1994-01-11
+  |2: k1=8.0, k2=5.0, phase coef.=0.03;
+  |*******************************************************************************
+  |
+  |
+  |*******************************************************************************
+  |Ephemeris / API_USER Mon Dec 22 13:43:46 2025 Pasadena, USA      / Horizons    
+  |*******************************************************************************
+  |Target body name: 1P/Halley                       {source: JPL#75}
+  |Center body name: Earth (399)                     {source: DE441}
+  |Center-site name: Gemini North Observatory, Maunakea
+  |*******************************************************************************
+  |Start time      : A.D. 2025-May-02 00:00:00.0000 UT      
+  |Stop  time      : A.D. 2025-May-03 00:00:00.0000 UT      
+  |Step-size       : 60 minutes
+  |*******************************************************************************
+  |Target pole/equ : undefined
+  |Target radii    : 5.5 km                                                       
+  |Center geodetic : 204.5309, 19.8238126, 4.24672   {E-lon(deg),Lat(deg),Alt(km)}
+  |Center cylindric: 204.5309,6006.47419,2150.79851  {E-lon(deg),Dxy(km),Dz(km)}
+  |Center pole/equ : ITRF93                          {East-longitude positive}
+  |Center radii    : 6378.137, 6378.137, 6356.752 km {Equator_a, b, pole_c}       
+  |Target primary  : Sun
+  |Vis. interferer : MOON (R_eq= 1737.400) km        {source: DE441}
+  |Rel. light bend : Sun                             {source: DE441}
+  |Rel. lght bnd GM: 1.3271E+11 km^3/s^2                                          
+  |Small-body perts: Yes                             {source: SB441-N16}
+  |Atmos refraction: NO (AIRLESS)
+  |RA format       : HMS
+  |Time format     : CAL 
+  |Calendar mode   : Mixed Julian/Gregorian
+  |EOP file        : eop.251219.p260317                                           
+  |EOP coverage    : DATA-BASED 1962-JAN-20 TO 2025-DEC-19. PREDICTS-> 2026-MAR-16
+  |Units conversion: 1 au= 149597870.700 km, c= 299792.458 km/s, 1 day= 86400.0 s 
+  |Table cut-offs 1: Elevation (-90.0deg=NO ),Airmass (>38.000=NO), Daylight (NO )
+  |Table cut-offs 2: Solar elongation (  0.0,180.0=NO ),Local Hour Angle( 0.0=NO )
+  |Table cut-offs 3: RA/DEC angular rate (     0.0=NO )                           
+  |*******************************************************************************
+  |Initial IAU76/J2000 heliocentric ecliptic osculating elements (au, days, deg.):
+  |  EPOCH=  2439875.5 ! 1968-Jan-20.0000000 (TDB)    RMSW= n.a.                  
+  |   EC= .9679359956953212   QR= .5748638313743413   TP= 2446469.9736161465      
+  |   OM= 59.09894720612437   W= 112.2414314637764    IN= 162.1905300439129       
+  |  Equivalent ICRF heliocentric cartesian coordinates (au, au/d):
+  |   X=-1.331029360169393E+01  Y= 2.541249958785733E+01  Z= 2.637549316318327E+00
+  |  VX= 1.418949944126011E-03 VY=-1.422475975617656E-03 VZ= 4.131321199969281E-05
+  |Comet physical (GM= km^3/s^2; RAD= km):                                        
+  |   GM= n.a.                RAD= 5.5                                            
+  |   M1=  5.5      M2=  13.6     k1=  8.     k2=  5.      PHCOF=  .030           
+  |Comet non-gravitational force model (AMRAT=m^2/kg;A1-A3=au/d^2;DT=days;R0=au): 
+  |   AMRAT=  0.                                      DT=  0.                     
+  |   A1= 4.887055233121E-10  A2= 1.554720290005E-10  A3= 0.                      
+  | Standard model:                                                               
+  |   ALN=  .1112620426   NK=  4.6142   NM=  2.15     NN=  5.093    R0=  2.808    
+  |*****************************************************************************************************************
+  | Date__(UT)__HR:MN:SC.fff     R.A._________(ICRF)_________DEC  dRA*cosD d(DEC)/dt  a-mass mag_ex    T-mag   N-mag
+  |*****************************************************************************************************************
+  |$$SOE
+  | 2025-May-02 00:00:00.000 *m  08 09 46.797665 +03 21 19.54244  0.585974  1.072429   1.931  0.209   25.598  29.111
+  | 2025-May-02 01:00:00.000 *m  08 09 46.836306 +03 21 20.61530  0.576317  1.071027   1.415  0.153   25.598  29.111
+  | 2025-May-02 02:00:00.000 *m  08 09 46.874401 +03 21 21.68666  0.569750  1.069460   1.177  0.128   25.598  29.111
+  | 2025-May-02 03:00:00.000 *m  08 09 46.912179 +03 21 22.75638  0.566917  1.067778   1.069  0.116   25.598  29.111
+  | 2025-May-02 04:00:00.000 *m  08 09 46.949905 +03 21 23.82438  0.568205  1.066042   1.043  0.113   25.598  29.111
+  | 2025-May-02 05:00:00.000 Cm  08 09 46.987858 +03 21 24.89065  0.573718  1.064313   1.090  0.118   25.598  29.111
+  | 2025-May-02 06:00:00.000 Am  08 09 47.026316 +03 21 25.95524  0.583271  1.062656   1.227  0.133   25.598  29.111
+  | 2025-May-02 07:00:00.000  m  08 09 47.065535 +03 21 27.01825  0.596403  1.061126   1.518  0.165   25.598  29.111
+  | 2025-May-02 08:00:00.000  m  08 09 47.105732 +03 21 28.07985  0.612406  1.059774   2.179  0.236   25.598  29.111
+  | 2025-May-02 09:00:00.000  m  08 09 47.147068 +03 21 29.14024  0.630376  1.058636   4.323  0.469   25.598  29.111
+  | 2025-May-02 10:00:00.000     08 09 47.189642 +03 21 30.19964  0.649275  1.057733    n.a.   n.a.   25.598  29.111
+  | 2025-May-02 11:00:00.000     08 09 47.233478 +03 21 31.25831  0.668001  1.057072    n.a.   n.a.   25.598  29.111
+  | 2025-May-02 12:00:00.000     08 09 47.278529 +03 21 32.31647  0.685463  1.056641    n.a.   n.a.   25.599  29.111
+  | 2025-May-02 13:00:00.000     08 09 47.324675 +03 21 33.37433  0.700657  1.056415    n.a.   n.a.   25.599  29.111
+  | 2025-May-02 14:00:00.000     08 09 47.371736 +03 21 34.43209  0.712736  1.056353    n.a.   n.a.   25.599  29.111
+  | 2025-May-02 15:00:00.000 A   08 09 47.419481 +03 21 35.48986  0.721062  1.056402    n.a.   n.a.   25.599  29.111
+  | 2025-May-02 16:00:00.000 *   08 09 47.467645 +03 21 36.54773  0.725260  1.056503    n.a.   n.a.   25.599  29.111
+  | 2025-May-02 17:00:00.000 *   08 09 47.515949 +03 21 37.60571  0.725233  1.056593    n.a.   n.a.   25.599  29.111
+  | 2025-May-02 18:00:00.000 *   08 09 47.564114 +03 21 38.66374  0.721177  1.056609    n.a.   n.a.   25.599  29.111
+  | 2025-May-02 19:00:00.000 *   08 09 47.611887 +03 21 39.72171  0.713560  1.056495    n.a.   n.a.   25.599  29.111
+  | 2025-May-02 20:00:00.000 *   08 09 47.659051 +03 21 40.77946  0.703098  1.056201    n.a.   n.a.   25.599  29.111
+  | 2025-May-02 21:00:00.000 *m  08 09 47.705446 +03 21 41.83679  0.690700  1.055691    n.a.   n.a.   25.599  29.111
+  | 2025-May-02 22:00:00.000 *m  08 09 47.750978 +03 21 42.89347  0.677406  1.054945  12.398  1.344   25.599  29.111
+  | 2025-May-02 23:00:00.000 *m  08 09 47.795623 +03 21 43.94925  0.664320  1.053955   3.214  0.348   25.599  29.111
+  | 2025-May-03 00:00:00.000 *m  08 09 47.839432 +03 21 45.00389  0.652531  1.052735   1.882  0.204   25.599  29.111
+  |$$EOE
+  |*****************************************************************************************************************
+  |Column meaning:
+  | 
+  |TIME
+  |
+  |  Times PRIOR to 1962 are UT1, a mean-solar time closely related to the
+  |prior but now-deprecated GMT. Times AFTER 1962 are in UTC, the current
+  |civil or "wall-clock" time-scale. UTC is kept within 0.9 seconds of UT1
+  |using integer leap-seconds for 1972 and later years.
+  |
+  |  Conversion from the internal Barycentric Dynamical Time (TDB) of solar
+  |system dynamics to the non-uniform civil UT time-scale requested for output
+  |has not been determined for UTC times after the next July or January 1st.
+  |Therefore, the last known leap-second is used as a constant over future
+  |intervals.
+  |
+  |  Time tags refer to the UT time-scale conversion from TDB on Earth
+  |regardless of observer location within the solar system, although clock
+  |rates may differ due to the local gravity field and no analog to "UT"
+  |may be defined for that location.
+  |
+  |  Any 'b' symbol in the 1st-column denotes a B.C. date. First-column blank
+  |(" ") denotes an A.D. date.
+  | 
+  |CALENDAR SYSTEM
+  |
+  |  Mixed calendar mode was active such that calendar dates after AD 1582-Oct-15
+  |(if any) are in the modern Gregorian system. Dates prior to 1582-Oct-5 (if any)
+  |are in the Julian calendar system, which is automatically extended for dates
+  |prior to its adoption on 45-Jan-1 BC.  The Julian calendar is useful for
+  |matching historical dates. The Gregorian calendar more accurately corresponds
+  |to the Earth's orbital motion and seasons. A "Gregorian-only" calendar mode is
+  |available if such physical events are the primary interest.
+  |
+  |  NOTE: "n.a." in output means quantity "not available" at the print-time.
+  | 
+  |SOLAR PRESENCE (OBSERVING SITE)
+  |  Time tag is followed by a blank, then a solar-presence symbol:
+  |
+  |       '*'  Daylight (refracted solar upper-limb on or above apparent horizon)
+  |       'C'  Civil twilight/dawn
+  |       'N'  Nautical twilight/dawn
+  |       'A'  Astronomical twilight/dawn
+  |       ' '  Night OR geocentric ephemeris
+  |
+  |LUNAR PRESENCE (OBSERVING SITE)
+  |  The solar-presence symbol is immediately followed by a lunar-presence symbol:
+  |
+  |       'm'  Refracted upper-limb of Moon on or above apparent horizon
+  |       ' '  Refracted upper-limb of Moon below apparent horizon OR geocentric
+  |            ephemeris
+  | 
+  | 'R.A._________(ICRF)_________DEC' =
+  |  Astrometric right ascension and declination of the target center with
+  |respect to the observing site (coordinate origin) in the reference frame of
+  |the planetary ephemeris (ICRF). Compensated for down-leg light-time delay
+  |aberration.
+  |
+  |  Units: RA  in hours-minutes-seconds of time,    HH MM SS.ff{ffff}
+  |         DEC in degrees-minutes-seconds of arc,  sDD MN SC.f{ffff}
+  | 
+  | 'dRA*cosD d(DEC)/dt' =
+  |  The angular rate of change in apparent RA and DEC of the target. This is
+  |with respect to the non-inertial IAU76/80 Earth true equator and equinox
+  |of-date reference frame.  d(RA)/dt is multiplied by the cosine of declination
+  |to provide a linear rate in the plane-of-sky. Units: ARCSECONDS PER HOUR
+  | 
+  | 'a-mass mag_ex' =
+  |    RELATIVE optical airmass and visual magnitude extinction. Airmass is the
+  |ratio between the absolute optical airmass for the targets' refracted CENTER
+  |point to the absolute optical airmass at zenith. Also output is the estimated
+  |visual magnitude extinction due to the atmosphere, as seen by the observer.
+  |AVAILABLE ONLY FOR TOPOCENTRIC EARTH SITES WHEN THE TARGET IS ABOVE THE
+  |HORIZON.  Units: none (airmass) and magnitudes (extinction).
+  | 
+  | 'T-mag   N-mag' =
+  |   Comets' apparent visual total magnitude ("T-mag") and nuclear magnitude
+  |("N-mag") using the standard IAU model:
+  |
+  |   T-mag= M1 + 5*log10(delta) + k1*log10(r)
+  |   N-mag= M2 + 5*log10(delta) + k2*log10(r) + phcof*beta
+  |
+  |   Units: MAGNITUDES
+  |
+  |Computations by ...
+  |
+  |    Solar System Dynamics Group, Horizons On-Line Ephemeris System
+  |    4800 Oak Grove Drive, Jet Propulsion Laboratory
+  |    Pasadena, CA  91109   USA
+  |
+  |    General site: https://ssd.jpl.nasa.gov/
+  |    Mailing list: https://ssd.jpl.nasa.gov/email_list.html
+  |    System news : https://ssd.jpl.nasa.gov/horizons/news.html
+  |    User Guide  : https://ssd.jpl.nasa.gov/horizons/manual.html
+  |    Connect     : browser        https://ssd.jpl.nasa.gov/horizons/app.html#/x
+  |                  API            https://ssd-api.jpl.nasa.gov/doc/horizons.html
+  |                  command-line   telnet ssd.jpl.nasa.gov 6775
+  |                  e-mail/batch   https://ssd.jpl.nasa.gov/ftp/ssd/horizons_batch.txt
+  |                  scripts        https://ssd.jpl.nasa.gov/ftp/ssd/SCRIPTS
+  |    Author      : Jon.D.Giorgini@jpl.nasa.gov
+  |
+  |*****************************************************************************************************************
+  """.stripMargin,
+  Set(("format", "text"), ("MAKE_EPHEM", "YES"), ("CENTER", "T15"), ("COMMAND", "'NAME=1P;CAP'"), ("START_TIME", "'2025-Nov-12 16:43:42.812'"), ("STOP_TIME", "'2025-Nov-12 19:30:22.812'"), ("STEP_SIZE", "3m"), ("extra_prec", "YES"), ("time_digits", "FRACSEC"), ("QUANTITIES", "'1,3,8,9'")) ->
+  """
+  |API VERSION: 1.2
+  |API SOURCE: NASA/JPL Horizons API
+  |
+  |*******************************************************************************
+  |JPL/HORIZONS                      1P/Halley                2026-Jan-12 12:18:50
+  |Rec #:90000030        Soln.date: 2025-Nov-21_15:57:34   # obs: 8518 (1835-1994)
+  | 
+  |IAU76/J2000 helio. ecliptic osc. elements (au, days, deg., period=Julian yrs):
+  | 
+  |  EPOCH=  2439875.5 ! 1968-Jan-20.0000000 (TDB)    RMSW= n.a.
+  |   EC= .9679359956953212   QR= .5748638313743413   TP= 2446469.9736161465
+  |   OM= 59.09894720612437   W= 112.2414314637764    IN= 162.1905300439129
+  |   A= 17.92863504856929    MA= 274.3823371364693   ADIST= 35.28240626576424
+  |   PER= 75.915252807404    N= .012983244           ANGMOM= .018296559
+  |   DAN= 1.78543            DDN= .82795             L= 305.8544912
+  |   B= 16.4450919           MOID= .0745097          TP= 1986-Feb-08.4736161465
+  | 
+  |Comet physical (GM= km^3/s^2; RAD= km):
+  |   GM= n.a.                RAD= 5.5
+  |   M1=  5.5      M2=  13.6     k1=  8.     k2=  5.      PHCOF=  .030
+  |Comet non-gravitational force model (AMRAT=m^2/kg;A1-A3=au/d^2;DT=days;R0=au):
+  |   AMRAT=  0.                                      DT=  0.
+  |   A1= 4.887055233121E-10  A2= 1.554720290005E-10  A3= 0.
+  | Standard model:
+  |   ALN=  .1112620426   NK=  4.6142   NM=  2.15     NN=  5.093    R0=  2.808
+  | 
+  |COMET comments 
+  |1: soln ref.= JPL#75, data arc: 1835-08-21 to 1994-01-11
+  |2: k1=8.0, k2=5.0, phase coef.=0.03;
+  |*******************************************************************************
+  |
+  |
+  |*******************************************************************************
+  |Ephemeris / API_USER Mon Jan 12 12:18:50 2026 Pasadena, USA      / Horizons    
+  |*******************************************************************************
+  |Target body name: 1P/Halley                       {source: JPL#75}
+  |Center body name: Earth (399)                     {source: DE441}
+  |Center-site name: Gemini North Observatory, Maunakea
+  |*******************************************************************************
+  |Start time      : A.D. 2025-Nov-12 16:43:42.8120 UT      
+  |Stop  time      : A.D. 2025-Nov-12 19:30:22.8120 UT      
+  |Step-size       : 3 minutes
+  |*******************************************************************************
+  |Target pole/equ : undefined
+  |Target radii    : 5.5 km                                                       
+  |Center geodetic : 204.5309, 19.8238126, 4.24672   {E-lon(deg),Lat(deg),Alt(km)}
+  |Center cylindric: 204.5309,6006.47419,2150.79851  {E-lon(deg),Dxy(km),Dz(km)}
+  |Center pole/equ : ITRF93                          {East-longitude positive}
+  |Center radii    : 6378.137, 6378.137, 6356.752 km {Equator_a, b, pole_c}       
+  |Target primary  : Sun
+  |Vis. interferer : MOON (R_eq= 1737.400) km        {source: DE441}
+  |Rel. light bend : Sun                             {source: DE441}
+  |Rel. lght bnd GM: 1.3271E+11 km^3/s^2                                          
+  |Small-body perts: Yes                             {source: SB441-N16}
+  |Atmos refraction: NO (AIRLESS)
+  |RA format       : HMS
+  |Time format     : CAL 
+  |Calendar mode   : Mixed Julian/Gregorian
+  |RTS-only print  : NO       
+  |EOP file        : eop.260109.p260407                                           
+  |EOP coverage    : DATA-BASED 1962-JAN-20 TO 2026-JAN-09. PREDICTS-> 2026-APR-06
+  |Units conversion: 1 au= 149597870.700 km, c= 299792.458 km/s, 1 day= 86400.0 s 
+  |Table cut-offs 1: Elevation (-90.0deg=NO ),Airmass (>38.000=NO), Daylight (NO )
+  |Table cut-offs 2: Solar elongation (  0.0,180.0=NO ),Local Hour Angle( 0.0=NO )
+  |Table cut-offs 3: RA/DEC angular rate (     0.0=NO )                           
+  |*******************************************************************************
+  |Initial IAU76/J2000 heliocentric ecliptic osculating elements (au, days, deg.):
+  |  EPOCH=  2439875.5 ! 1968-Jan-20.0000000 (TDB)    RMSW= n.a.                  
+  |   EC= .9679359956953212   QR= .5748638313743413   TP= 2446469.9736161465      
+  |   OM= 59.09894720612437   W= 112.2414314637764    IN= 162.1905300439129       
+  |  Equivalent ICRF heliocentric cartesian coordinates (au, au/d):
+  |   X=-1.331029360169393E+01  Y= 2.541249958785733E+01  Z= 2.637549316318327E+00
+  |  VX= 1.418949944126011E-03 VY=-1.422475975617656E-03 VZ= 4.131321199969281E-05
+  |Comet physical (GM= km^3/s^2; RAD= km):                                        
+  |   GM= n.a.                RAD= 5.5                                            
+  |   M1=  5.5      M2=  13.6     k1=  8.     k2=  5.      PHCOF=  .030           
+  |Comet non-gravitational force model (AMRAT=m^2/kg;A1-A3=au/d^2;DT=days;R0=au): 
+  |   AMRAT=  0.                                      DT=  0.                     
+  |   A1= 4.887055233121E-10  A2= 1.554720290005E-10  A3= 0.                      
+  | Standard model:                                                               
+  |   ALN=  .1112620426   NK=  4.6142   NM=  2.15     NN=  5.093    R0=  2.808    
+  |*****************************************************************************************************************
+  | Date__(UT)__HR:MN:SC.fff     R.A._________(ICRF)_________DEC  dRA*cosD d(DEC)/dt  a-mass mag_ex    T-mag   N-mag
+  |*****************************************************************************************************************
+  |$$SOE
+  | 2025-Nov-12 16:43:42.812 *m  08 21 29.556113 +02 30 44.29204  -1.45667  -0.85351   1.127  0.122   25.572  29.084
+  | 2025-Nov-12 16:46:42.812 *m  08 21 29.551258 +02 30 44.24921  -1.45650  -0.85350   1.133  0.123   25.572  29.084
+  | 2025-Nov-12 16:49:42.812 *m  08 21 29.546404 +02 30 44.20638  -1.45633  -0.85349   1.139  0.123   25.572  29.084
+  | 2025-Nov-12 16:52:42.812 *m  08 21 29.541551 +02 30 44.16355  -1.45615  -0.85347   1.145  0.124   25.572  29.084
+  | 2025-Nov-12 16:55:42.812 *m  08 21 29.536698 +02 30 44.12072  -1.45596  -0.85346   1.152  0.125   25.572  29.084
+  | 2025-Nov-12 16:58:42.812 *m  08 21 29.531846 +02 30 44.07789  -1.45576  -0.85345   1.159  0.126   25.572  29.084
+  | 2025-Nov-12 17:01:42.812 *m  08 21 29.526995 +02 30 44.03506  -1.45555  -0.85344   1.166  0.126   25.572  29.084
+  | 2025-Nov-12 17:04:42.812 *m  08 21 29.522144 +02 30 43.99224  -1.45533  -0.85342   1.174  0.127   25.572  29.084
+  | 2025-Nov-12 17:07:42.812 *m  08 21 29.517294 +02 30 43.94941  -1.45510  -0.85341   1.182  0.128   25.572  29.084
+  | 2025-Nov-12 17:10:42.812 *m  08 21 29.512445 +02 30 43.90658  -1.45486  -0.85339   1.190  0.129   25.572  29.084
+  | 2025-Nov-12 17:13:42.812 *m  08 21 29.507597 +02 30 43.86376  -1.45461  -0.85338   1.198  0.130   25.572  29.084
+  | 2025-Nov-12 17:16:42.812 *m  08 21 29.502749 +02 30 43.82094  -1.45435  -0.85337   1.207  0.131   25.572  29.084
+  | 2025-Nov-12 17:19:42.812 *m  08 21 29.497903 +02 30 43.77811  -1.45408  -0.85335   1.216  0.132   25.572  29.084
+  | 2025-Nov-12 17:22:42.812 *m  08 21 29.493057 +02 30 43.73529  -1.45381  -0.85334   1.226  0.133   25.572  29.084
+  | 2025-Nov-12 17:25:42.812 *m  08 21 29.488212 +02 30 43.69247  -1.45352  -0.85332   1.236  0.134   25.572  29.084
+  | 2025-Nov-12 17:28:42.812 *m  08 21 29.483369 +02 30 43.64965  -1.45322  -0.85331   1.246  0.135   25.572  29.084
+  | 2025-Nov-12 17:31:42.812 *m  08 21 29.478526 +02 30 43.60683  -1.45292  -0.85329   1.257  0.136   25.572  29.084
+  | 2025-Nov-12 17:34:42.812 *m  08 21 29.473684 +02 30 43.56401  -1.45261  -0.85328   1.268  0.137   25.572  29.084
+  | 2025-Nov-12 17:37:42.812 *m  08 21 29.468843 +02 30 43.52119  -1.45228  -0.85326   1.279  0.139   25.572  29.084
+  | 2025-Nov-12 17:40:42.812 *m  08 21 29.464004 +02 30 43.47837  -1.45195  -0.85324   1.291  0.140   25.572  29.084
+  | 2025-Nov-12 17:43:42.812 *m  08 21 29.459165 +02 30 43.43556  -1.45161  -0.85323   1.303  0.141   25.572  29.084
+  | 2025-Nov-12 17:46:42.812 *m  08 21 29.454328 +02 30 43.39274  -1.45127  -0.85321   1.316  0.143   25.572  29.084
+  | 2025-Nov-12 17:49:42.812 *m  08 21 29.449492 +02 30 43.34993  -1.45091  -0.85319   1.329  0.144   25.572  29.084
+  | 2025-Nov-12 17:52:42.812 *m  08 21 29.444657 +02 30 43.30711  -1.45055  -0.85318   1.343  0.146   25.572  29.084
+  | 2025-Nov-12 17:55:42.812 *m  08 21 29.439823 +02 30 43.26430  -1.45017  -0.85316   1.357  0.147   25.572  29.084
+  | 2025-Nov-12 17:58:42.812 *m  08 21 29.434991 +02 30 43.22149  -1.44979  -0.85314   1.372  0.149   25.572  29.084
+  | 2025-Nov-12 18:01:42.812 *m  08 21 29.430160 +02 30 43.17868  -1.44940  -0.85312   1.387  0.150   25.572  29.084
+  | 2025-Nov-12 18:04:42.812 *m  08 21 29.425330 +02 30 43.13587  -1.44900  -0.85310   1.403  0.152   25.572  29.084
+  | 2025-Nov-12 18:07:42.812 *m  08 21 29.420501 +02 30 43.09306  -1.44860  -0.85308   1.420  0.154   25.572  29.084
+  | 2025-Nov-12 18:10:42.812 *m  08 21 29.415674 +02 30 43.05025  -1.44818  -0.85307   1.437  0.156   25.572  29.084
+  | 2025-Nov-12 18:13:42.812 *m  08 21 29.410848 +02 30 43.00744  -1.44776  -0.85305   1.455  0.158   25.572  29.084
+  | 2025-Nov-12 18:16:42.812 *m  08 21 29.406024 +02 30 42.96464  -1.44733  -0.85303   1.474  0.160   25.572  29.084
+  | 2025-Nov-12 18:19:42.812 *m  08 21 29.401201 +02 30 42.92183  -1.44690  -0.85301   1.493  0.162   25.572  29.084
+  | 2025-Nov-12 18:22:42.812 *m  08 21 29.396380 +02 30 42.87903  -1.44645  -0.85299   1.513  0.164   25.572  29.084
+  | 2025-Nov-12 18:25:42.812 *m  08 21 29.391560 +02 30 42.83623  -1.44600  -0.85296   1.534  0.166   25.572  29.084
+  | 2025-Nov-12 18:28:42.812 *m  08 21 29.386742 +02 30 42.79342  -1.44554  -0.85294   1.556  0.169   25.572  29.084
+  | 2025-Nov-12 18:31:42.812 *m  08 21 29.381925 +02 30 42.75062  -1.44508  -0.85292   1.578  0.171   25.572  29.084
+  | 2025-Nov-12 18:34:42.812 *m  08 21 29.377109 +02 30 42.70782  -1.44460  -0.85290   1.602  0.174   25.572  29.084
+  | 2025-Nov-12 18:37:42.812 *m  08 21 29.372296 +02 30 42.66502  -1.44412  -0.85288   1.626  0.176   25.572  29.084
+  | 2025-Nov-12 18:40:42.812 *m  08 21 29.367484 +02 30 42.62223  -1.44364  -0.85286   1.652  0.179   25.572  29.084
+  | 2025-Nov-12 18:43:42.812 *m  08 21 29.362673 +02 30 42.57943  -1.44314  -0.85283   1.678  0.182   25.572  29.084
+  | 2025-Nov-12 18:46:42.812 *m  08 21 29.357864 +02 30 42.53664  -1.44264  -0.85281   1.706  0.185   25.572  29.084
+  | 2025-Nov-12 18:49:42.812 *m  08 21 29.353057 +02 30 42.49384  -1.44214  -0.85279   1.735  0.188   25.572  29.084
+  | 2025-Nov-12 18:52:42.812 *m  08 21 29.348252 +02 30 42.45105  -1.44162  -0.85276   1.766  0.191   25.572  29.084
+  | 2025-Nov-12 18:55:42.812 *m  08 21 29.343448 +02 30 42.40826  -1.44110  -0.85274   1.797  0.195   25.572  29.084
+  | 2025-Nov-12 18:58:42.812 *m  08 21 29.338646 +02 30 42.36547  -1.44058  -0.85271   1.831  0.198   25.572  29.084
+  | 2025-Nov-12 19:01:42.812 *m  08 21 29.333846 +02 30 42.32268  -1.44005  -0.85269   1.865  0.202   25.572  29.084
+  | 2025-Nov-12 19:04:42.812 *m  08 21 29.329048 +02 30 42.27989  -1.43951  -0.85266   1.902  0.206   25.572  29.084
+  | 2025-Nov-12 19:07:42.812 *m  08 21 29.324251 +02 30 42.23711  -1.43896  -0.85264   1.940  0.210   25.572  29.084
+  | 2025-Nov-12 19:10:42.812 *m  08 21 29.319456 +02 30 42.19432  -1.43842  -0.85261   1.980  0.215   25.572  29.084
+  | 2025-Nov-12 19:13:42.812 *m  08 21 29.314663 +02 30 42.15154  -1.43786  -0.85258   2.022  0.219   25.572  29.084
+  | 2025-Nov-12 19:16:42.812 *m  08 21 29.309872 +02 30 42.10876  -1.43730  -0.85256   2.067  0.224   25.572  29.084
+  | 2025-Nov-12 19:19:42.812 *m  08 21 29.305083 +02 30 42.06598  -1.43673  -0.85253   2.113  0.229   25.572  29.084
+  | 2025-Nov-12 19:22:42.812 *m  08 21 29.300296 +02 30 42.02320  -1.43616  -0.85250   2.162  0.234   25.572  29.084
+  | 2025-Nov-12 19:25:42.812 *m  08 21 29.295510 +02 30 41.98042  -1.43559  -0.85247   2.214  0.240   25.572  29.084
+  | 2025-Nov-12 19:28:42.812 *m  08 21 29.290727 +02 30 41.93765  -1.43501  -0.85244   2.269  0.246   25.572  29.084
+  |$$EOE
+  |*****************************************************************************************************************
+  |Column meaning:
+  | 
+  |TIME
+  |
+  |  Times PRIOR to 1962 are UT1, a mean-solar time closely related to the
+  |prior but now-deprecated GMT. Times AFTER 1962 are in UTC, the current
+  |civil or "wall-clock" time-scale. UTC is kept within 0.9 seconds of UT1
+  |using integer leap-seconds for 1972 and later years.
+  |
+  |  Conversion from the internal Barycentric Dynamical Time (TDB) of solar
+  |system dynamics to the non-uniform civil UT time-scale requested for output
+  |has not been determined for UTC times after the next July or January 1st.
+  |Therefore, the last known leap-second is used as a constant over future
+  |intervals.
+  |
+  |  Time tags refer to the UT time-scale conversion from TDB on Earth
+  |regardless of observer location within the solar system, although clock
+  |rates may differ due to the local gravity field and no analog to "UT"
+  |may be defined for that location.
+  |
+  |  Any 'b' symbol in the 1st-column denotes a B.C. date. First-column blank
+  |(" ") denotes an A.D. date.
+  | 
+  |CALENDAR SYSTEM
+  |
+  |  Mixed calendar mode was active such that calendar dates after AD 1582-Oct-15
+  |(if any) are in the modern Gregorian system. Dates prior to 1582-Oct-5 (if any)
+  |are in the Julian calendar system, which is automatically extended for dates
+  |prior to its adoption on 45-Jan-1 BC.  The Julian calendar is useful for
+  |matching historical dates. The Gregorian calendar more accurately corresponds
+  |to the Earth's orbital motion and seasons. A "Gregorian-only" calendar mode is
+  |available if such physical events are the primary interest.
+  |
+  |  NOTE: "n.a." in output means quantity "not available" at the print-time.
+  | 
+  |SOLAR PRESENCE (OBSERVING SITE)
+  |  Time tag is followed by a blank, then a solar-presence condition code:
+  |
+  |       '*'  Daylight (refracted solar upper-limb on or above apparent horizon)
+  |       'C'  Civil twilight/dawn
+  |       'N'  Nautical twilight/dawn
+  |       'A'  Astronomical twilight/dawn
+  |       ' '  Night OR geocentric ephemeris
+  |
+  |LUNAR PRESENCE WITH TARGET RISE/TRANSIT/SET EVENT MARKER (OBSERVING SITE)
+  |  The solar-presence code column is immediately followed by another marker:
+  |
+  |       'm'  Refracted upper-limb of Moon on or above apparent horizon
+  |       ' '  Refracted upper-limb of Moon below apparent horizon OR geocentric
+  |
+  |  The lunar presence marker (an ongoing state) can be over-ridden by a target
+  |  event marker if an event has occurred since the last output step:
+  |
+  |       'r'  Rise          (target body on or went above cut-off RTS elevation)
+  |       'e'  Elevation max (target body maximum elevation angle has occurred)
+  |       't'  Transit       (target body at or passed through observer meridian)
+  |       's'  Set           (target body on or went below cut-off RTS elevation)
+  | 
+  |RTS MARKERS (TVH)
+  |  Rise and set are with respect to the reference ellipsoid true visual horizon
+  |defined by the elevation cut-off angle. Horizon dip and yellow-light refraction
+  |(Earth only) are considered. Accuracy is < or = to twice the requested search
+  |step-size.
+  | 
+  | 'R.A._________(ICRF)_________DEC' =
+  |  Astrometric right ascension and declination of the target center with
+  |respect to the observing site (coordinate origin) in the reference frame of
+  |the planetary ephemeris (ICRF). Compensated for down-leg light-time delay
+  |aberration.
+  |
+  |  Units: RA  in hours-minutes-seconds of time,    HH MM SS.ff{ffff}
+  |         DEC in degrees-minutes-seconds of arc,  sDD MN SC.f{ffff}
+  | 
+  | 'dRA*cosD d(DEC)/dt' =
+  |  The angular rate of change in apparent RA and DEC of the target. This is
+  |with respect to the non-inertial IAU76/80 Earth true equator and equinox
+  |of-date reference frame.  d(RA)/dt is multiplied by the cosine of declination
+  |to provide a linear rate in the plane-of-sky. Units: ARCSECONDS PER HOUR
+  | 
+  | 'a-mass mag_ex' =
+  |    RELATIVE optical airmass and visual magnitude extinction. Airmass is the
+  |ratio between the absolute optical airmass for the targets' refracted CENTER
+  |point to the absolute optical airmass at zenith. Also output is the estimated
+  |visual magnitude extinction due to the atmosphere, as seen by the observer.
+  |AVAILABLE ONLY FOR TOPOCENTRIC EARTH SITES WHEN THE TARGET IS ABOVE THE
+  |HORIZON.  Units: none (airmass) and magnitudes (extinction).
+  | 
+  | 'T-mag   N-mag' =
+  |   Comets' apparent visual total magnitude ("T-mag") and nuclear magnitude
+  |("N-mag") using the standard IAU model:
+  |
+  |   T-mag= M1 + 5*log10(delta) + k1*log10(r)
+  |   N-mag= M2 + 5*log10(delta) + k2*log10(r) + phcof*beta
+  |
+  |   Units: MAGNITUDES
+  |
+  |Computations by ...
+  |
+  |    Solar System Dynamics Group, Horizons On-Line Ephemeris System
+  |    4800 Oak Grove Drive, Jet Propulsion Laboratory
+  |    Pasadena, CA  91109   USA
+  |
+  |    General site: https://ssd.jpl.nasa.gov/
+  |    Mailing list: https://ssd.jpl.nasa.gov/email_list.html
+  |    System news : https://ssd.jpl.nasa.gov/horizons/news.html
+  |    User Guide  : https://ssd.jpl.nasa.gov/horizons/manual.html
+  |    Connect     : browser        https://ssd.jpl.nasa.gov/horizons/app.html#/x
+  |                  API            https://ssd-api.jpl.nasa.gov/doc/horizons.html
+  |                  command-line   telnet ssd.jpl.nasa.gov 6775
+  |                  e-mail/batch   https://ssd.jpl.nasa.gov/ftp/ssd/horizons_batch.txt
+  |                  scripts        https://ssd.jpl.nasa.gov/ftp/ssd/SCRIPTS
+  |    Author      : Jon.D.Giorgini@jpl.nasa.gov
+  |
+  |*****************************************************************************************************************
+  """.stripMargin,
+  Set(("format", "text"), ("MAKE_EPHEM", "YES"), ("CENTER", "I11"), ("COMMAND", "'NAME=1P;CAP'"), ("START_TIME", "'2025-Nov-12 16:43:42.812'"), ("STOP_TIME", "'2025-Nov-12 19:30:22.812'"), ("STEP_SIZE", "3m"), ("extra_prec", "YES"), ("time_digits", "FRACSEC"), ("QUANTITIES", "'1,3,8,9'")) ->
+  """
+  |API VERSION: 1.2
+  |API SOURCE: NASA/JPL Horizons API
+  |
+  |*******************************************************************************
+  |JPL/HORIZONS                      1P/Halley                2026-Jan-12 12:19:38
+  |Rec #:90000030        Soln.date: 2025-Nov-21_15:57:34   # obs: 8518 (1835-1994)
+  | 
+  |IAU76/J2000 helio. ecliptic osc. elements (au, days, deg., period=Julian yrs):
+  | 
+  |  EPOCH=  2439875.5 ! 1968-Jan-20.0000000 (TDB)    RMSW= n.a.
+  |   EC= .9679359956953212   QR= .5748638313743413   TP= 2446469.9736161465
+  |   OM= 59.09894720612437   W= 112.2414314637764    IN= 162.1905300439129
+  |   A= 17.92863504856929    MA= 274.3823371364693   ADIST= 35.28240626576424
+  |   PER= 75.915252807404    N= .012983244           ANGMOM= .018296559
+  |   DAN= 1.78543            DDN= .82795             L= 305.8544912
+  |   B= 16.4450919           MOID= .0745097          TP= 1986-Feb-08.4736161465
+  | 
+  |Comet physical (GM= km^3/s^2; RAD= km):
+  |   GM= n.a.                RAD= 5.5
+  |   M1=  5.5      M2=  13.6     k1=  8.     k2=  5.      PHCOF=  .030
+  |Comet non-gravitational force model (AMRAT=m^2/kg;A1-A3=au/d^2;DT=days;R0=au):
+  |   AMRAT=  0.                                      DT=  0.
+  |   A1= 4.887055233121E-10  A2= 1.554720290005E-10  A3= 0.
+  | Standard model:
+  |   ALN=  .1112620426   NK=  4.6142   NM=  2.15     NN=  5.093    R0=  2.808
+  | 
+  |COMET comments 
+  |1: soln ref.= JPL#75, data arc: 1835-08-21 to 1994-01-11
+  |2: k1=8.0, k2=5.0, phase coef.=0.03;
+  |*******************************************************************************
+  |
+  |
+  |*******************************************************************************
+  |Ephemeris / API_USER Mon Jan 12 12:19:38 2026 Pasadena, USA      / Horizons    
+  |*******************************************************************************
+  |Target body name: 1P/Halley                       {source: JPL#75}
+  |Center body name: Earth (399)                     {source: DE441}
+  |Center-site name: Gemini South Obs., Cerro Pachon
+  |*******************************************************************************
+  |Start time      : A.D. 2025-Nov-12 16:43:42.8120 UT      
+  |Stop  time      : A.D. 2025-Nov-12 19:30:22.8120 UT      
+  |Step-size       : 3 minutes
+  |*******************************************************************************
+  |Target pole/equ : undefined
+  |Target radii    : 5.5 km                                                       
+  |Center geodetic : 289.2634, -30.2406227, 2.71233  {E-lon(deg),Lat(deg),Alt(km)}
+  |Center cylindric: 289.2634,5517.21435,-3194.81213 {E-lon(deg),Dxy(km),Dz(km)}
+  |Center pole/equ : ITRF93                          {East-longitude positive}
+  |Center radii    : 6378.137, 6378.137, 6356.752 km {Equator_a, b, pole_c}       
+  |Target primary  : Sun
+  |Vis. interferer : MOON (R_eq= 1737.400) km        {source: DE441}
+  |Rel. light bend : Sun                             {source: DE441}
+  |Rel. lght bnd GM: 1.3271E+11 km^3/s^2                                          
+  |Small-body perts: Yes                             {source: SB441-N16}
+  |Atmos refraction: NO (AIRLESS)
+  |RA format       : HMS
+  |Time format     : CAL 
+  |Calendar mode   : Mixed Julian/Gregorian
+  |RTS-only print  : NO       
+  |EOP file        : eop.260109.p260407                                           
+  |EOP coverage    : DATA-BASED 1962-JAN-20 TO 2026-JAN-09. PREDICTS-> 2026-APR-06
+  |Units conversion: 1 au= 149597870.700 km, c= 299792.458 km/s, 1 day= 86400.0 s 
+  |Table cut-offs 1: Elevation (-90.0deg=NO ),Airmass (>38.000=NO), Daylight (NO )
+  |Table cut-offs 2: Solar elongation (  0.0,180.0=NO ),Local Hour Angle( 0.0=NO )
+  |Table cut-offs 3: RA/DEC angular rate (     0.0=NO )                           
+  |*******************************************************************************
+  |Initial IAU76/J2000 heliocentric ecliptic osculating elements (au, days, deg.):
+  |  EPOCH=  2439875.5 ! 1968-Jan-20.0000000 (TDB)    RMSW= n.a.                  
+  |   EC= .9679359956953212   QR= .5748638313743413   TP= 2446469.9736161465      
+  |   OM= 59.09894720612437   W= 112.2414314637764    IN= 162.1905300439129       
+  |  Equivalent ICRF heliocentric cartesian coordinates (au, au/d):
+  |   X=-1.331029360169393E+01  Y= 2.541249958785733E+01  Z= 2.637549316318327E+00
+  |  VX= 1.418949944126011E-03 VY=-1.422475975617656E-03 VZ= 4.131321199969281E-05
+  |Comet physical (GM= km^3/s^2; RAD= km):                                        
+  |   GM= n.a.                RAD= 5.5                                            
+  |   M1=  5.5      M2=  13.6     k1=  8.     k2=  5.      PHCOF=  .030           
+  |Comet non-gravitational force model (AMRAT=m^2/kg;A1-A3=au/d^2;DT=days;R0=au): 
+  |   AMRAT=  0.                                      DT=  0.                     
+  |   A1= 4.887055233121E-10  A2= 1.554720290005E-10  A3= 0.                      
+  | Standard model:                                                               
+  |   ALN=  .1112620426   NK=  4.6142   NM=  2.15     NN=  5.093    R0=  2.808    
+  |*****************************************************************************************************************
+  | Date__(UT)__HR:MN:SC.fff     R.A._________(ICRF)_________DEC  dRA*cosD d(DEC)/dt  a-mass mag_ex    T-mag   N-mag
+  |*****************************************************************************************************************
+  |$$SOE
+  | 2025-Nov-12 16:43:42.812 *m  08 21 29.548017 +02 30 44.49106  -1.38245  -0.85485    n.a.   n.a.   25.572  29.084
+  | 2025-Nov-12 16:46:42.812 *   08 21 29.543411 +02 30 44.44817  -1.38188  -0.85480    n.a.   n.a.   25.572  29.084
+  | 2025-Nov-12 16:49:42.812 *   08 21 29.538806 +02 30 44.40528  -1.38131  -0.85475    n.a.   n.a.   25.572  29.084
+  | 2025-Nov-12 16:52:42.812 *   08 21 29.534204 +02 30 44.36240  -1.38074  -0.85469    n.a.   n.a.   25.572  29.084
+  | 2025-Nov-12 16:55:42.812 *   08 21 29.529604 +02 30 44.31952  -1.38018  -0.85464    n.a.   n.a.   25.572  29.084
+  | 2025-Nov-12 16:58:42.812 *   08 21 29.525005 +02 30 44.27664  -1.37962  -0.85458    n.a.   n.a.   25.572  29.084
+  | 2025-Nov-12 17:01:42.812 *   08 21 29.520408 +02 30 44.23377  -1.37906  -0.85453    n.a.   n.a.   25.572  29.084
+  | 2025-Nov-12 17:04:42.812 *   08 21 29.515814 +02 30 44.19089  -1.37851  -0.85447    n.a.   n.a.   25.572  29.084
+  | 2025-Nov-12 17:07:42.812 *   08 21 29.511220 +02 30 44.14803  -1.37796  -0.85441    n.a.   n.a.   25.572  29.084
+  | 2025-Nov-12 17:10:42.812 *   08 21 29.506629 +02 30 44.10516  -1.37742  -0.85436    n.a.   n.a.   25.572  29.084
+  | 2025-Nov-12 17:13:42.812 *   08 21 29.502040 +02 30 44.06230  -1.37688  -0.85430    n.a.   n.a.   25.572  29.084
+  | 2025-Nov-12 17:16:42.812 *   08 21 29.497452 +02 30 44.01944  -1.37634  -0.85424    n.a.   n.a.   25.572  29.084
+  | 2025-Nov-12 17:19:42.812 *   08 21 29.492866 +02 30 43.97658  -1.37580  -0.85418    n.a.   n.a.   25.572  29.084
+  | 2025-Nov-12 17:22:42.812 *   08 21 29.488282 +02 30 43.93372  -1.37528  -0.85412    n.a.   n.a.   25.572  29.084
+  | 2025-Nov-12 17:25:42.812 *   08 21 29.483700 +02 30 43.89087  -1.37475  -0.85407    n.a.   n.a.   25.572  29.084
+  | 2025-Nov-12 17:28:42.812 *   08 21 29.479120 +02 30 43.84802  -1.37423  -0.85401    n.a.   n.a.   25.572  29.084
+  | 2025-Nov-12 17:31:42.812 *   08 21 29.474541 +02 30 43.80518  -1.37372  -0.85395    n.a.   n.a.   25.572  29.084
+  | 2025-Nov-12 17:34:42.812 *   08 21 29.469964 +02 30 43.76234  -1.37320  -0.85389    n.a.   n.a.   25.572  29.084
+  | 2025-Nov-12 17:37:42.812 *   08 21 29.465388 +02 30 43.71950  -1.37270  -0.85383    n.a.   n.a.   25.572  29.084
+  | 2025-Nov-12 17:40:42.812 *   08 21 29.460815 +02 30 43.67666  -1.37220  -0.85377    n.a.   n.a.   25.572  29.084
+  | 2025-Nov-12 17:43:42.812 *   08 21 29.456243 +02 30 43.63383  -1.37170  -0.85371    n.a.   n.a.   25.572  29.084
+  | 2025-Nov-12 17:46:42.812 *   08 21 29.451672 +02 30 43.59100  -1.37121  -0.85364    n.a.   n.a.   25.572  29.084
+  | 2025-Nov-12 17:49:42.812 *   08 21 29.447103 +02 30 43.54817  -1.37073  -0.85358    n.a.   n.a.   25.572  29.084
+  | 2025-Nov-12 17:52:42.812 *   08 21 29.442536 +02 30 43.50535  -1.37025  -0.85352    n.a.   n.a.   25.572  29.084
+  | 2025-Nov-12 17:55:42.812 *   08 21 29.437971 +02 30 43.46252  -1.36977  -0.85346    n.a.   n.a.   25.572  29.084
+  | 2025-Nov-12 17:58:42.812 *   08 21 29.433407 +02 30 43.41971  -1.36930  -0.85340    n.a.   n.a.   25.572  29.084
+  | 2025-Nov-12 18:01:42.812 *   08 21 29.428844 +02 30 43.37689  -1.36884  -0.85333    n.a.   n.a.   25.572  29.084
+  | 2025-Nov-12 18:04:42.812 *   08 21 29.424283 +02 30 43.33408  -1.36838  -0.85327    n.a.   n.a.   25.572  29.084
+  | 2025-Nov-12 18:07:42.812 *   08 21 29.419724 +02 30 43.29127  -1.36793  -0.85320    n.a.   n.a.   25.572  29.084
+  | 2025-Nov-12 18:10:42.812 *   08 21 29.415166 +02 30 43.24847  -1.36748  -0.85314    n.a.   n.a.   25.572  29.084
+  | 2025-Nov-12 18:13:42.812 *   08 21 29.410609 +02 30 43.20567  -1.36704  -0.85308    n.a.   n.a.   25.572  29.084
+  | 2025-Nov-12 18:16:42.812 *   08 21 29.406054 +02 30 43.16287  -1.36661  -0.85301    n.a.   n.a.   25.572  29.084
+  | 2025-Nov-12 18:19:42.812 *   08 21 29.401501 +02 30 43.12008  -1.36618  -0.85295    n.a.   n.a.   25.572  29.084
+  | 2025-Nov-12 18:22:42.812 *   08 21 29.396949 +02 30 43.07728  -1.36576  -0.85288    n.a.   n.a.   25.572  29.084
+  | 2025-Nov-12 18:25:42.812 *   08 21 29.392398 +02 30 43.03450  -1.36535  -0.85282    n.a.   n.a.   25.572  29.084
+  | 2025-Nov-12 18:28:42.812 *   08 21 29.387849 +02 30 42.99171  -1.36494  -0.85275    n.a.   n.a.   25.572  29.084
+  | 2025-Nov-12 18:31:42.812 *   08 21 29.383301 +02 30 42.94893  -1.36454  -0.85268    n.a.   n.a.   25.572  29.084
+  | 2025-Nov-12 18:34:42.812 *   08 21 29.378754 +02 30 42.90615  -1.36415  -0.85262    n.a.   n.a.   25.572  29.084
+  | 2025-Nov-12 18:37:42.812 *   08 21 29.374209 +02 30 42.86338  -1.36376  -0.85255    n.a.   n.a.   25.572  29.084
+  | 2025-Nov-12 18:40:42.812 *   08 21 29.369665 +02 30 42.82060  -1.36338  -0.85248    n.a.   n.a.   25.572  29.084
+  | 2025-Nov-12 18:43:42.812 *   08 21 29.365122 +02 30 42.77784  -1.36301  -0.85241    n.a.   n.a.   25.572  29.084
+  | 2025-Nov-12 18:46:42.812 *   08 21 29.360580 +02 30 42.73507  -1.36264  -0.85235    n.a.   n.a.   25.572  29.084
+  | 2025-Nov-12 18:49:42.812 *   08 21 29.356040 +02 30 42.69231  -1.36228  -0.85228    n.a.   n.a.   25.572  29.084
+  | 2025-Nov-12 18:52:42.812 *   08 21 29.351500 +02 30 42.64955  -1.36193  -0.85221    n.a.   n.a.   25.572  29.084
+  | 2025-Nov-12 18:55:42.812 *   08 21 29.346962 +02 30 42.60680  -1.36159  -0.85214    n.a.   n.a.   25.572  29.084
+  | 2025-Nov-12 18:58:42.812 *   08 21 29.342425 +02 30 42.56405  -1.36125  -0.85207    n.a.   n.a.   25.572  29.084
+  | 2025-Nov-12 19:01:42.812 *   08 21 29.337890 +02 30 42.52130  -1.36092  -0.85200    n.a.   n.a.   25.572  29.084
+  | 2025-Nov-12 19:04:42.812 *   08 21 29.333355 +02 30 42.47856  -1.36060  -0.85193    n.a.   n.a.   25.572  29.084
+  | 2025-Nov-12 19:07:42.812 *   08 21 29.328821 +02 30 42.43582  -1.36029  -0.85186    n.a.   n.a.   25.572  29.084
+  | 2025-Nov-12 19:10:42.812 *   08 21 29.324288 +02 30 42.39308  -1.35999  -0.85179    n.a.   n.a.   25.572  29.084
+  | 2025-Nov-12 19:13:42.812 *   08 21 29.319757 +02 30 42.35035  -1.35969  -0.85172    n.a.   n.a.   25.572  29.084
+  | 2025-Nov-12 19:16:42.812 *   08 21 29.315226 +02 30 42.30762  -1.35940  -0.85165    n.a.   n.a.   25.572  29.084
+  | 2025-Nov-12 19:19:42.812 *   08 21 29.310696 +02 30 42.26489  -1.35912  -0.85158    n.a.   n.a.   25.572  29.084
+  | 2025-Nov-12 19:22:42.812 *   08 21 29.306168 +02 30 42.22217  -1.35884  -0.85151    n.a.   n.a.   25.572  29.084
+  | 2025-Nov-12 19:25:42.812 *   08 21 29.301640 +02 30 42.17945  -1.35858  -0.85144    n.a.   n.a.   25.572  29.084
+  | 2025-Nov-12 19:28:42.812 *   08 21 29.297113 +02 30 42.13673  -1.35832  -0.85137    n.a.   n.a.   25.572  29.084
+  |$$EOE
+  |*****************************************************************************************************************
+  |Column meaning:
+  | 
+  |TIME
+  |
+  |  Times PRIOR to 1962 are UT1, a mean-solar time closely related to the
+  |prior but now-deprecated GMT. Times AFTER 1962 are in UTC, the current
+  |civil or "wall-clock" time-scale. UTC is kept within 0.9 seconds of UT1
+  |using integer leap-seconds for 1972 and later years.
+  |
+  |  Conversion from the internal Barycentric Dynamical Time (TDB) of solar
+  |system dynamics to the non-uniform civil UT time-scale requested for output
+  |has not been determined for UTC times after the next July or January 1st.
+  |Therefore, the last known leap-second is used as a constant over future
+  |intervals.
+  |
+  |  Time tags refer to the UT time-scale conversion from TDB on Earth
+  |regardless of observer location within the solar system, although clock
+  |rates may differ due to the local gravity field and no analog to "UT"
+  |may be defined for that location.
+  |
+  |  Any 'b' symbol in the 1st-column denotes a B.C. date. First-column blank
+  |(" ") denotes an A.D. date.
+  | 
+  |CALENDAR SYSTEM
+  |
+  |  Mixed calendar mode was active such that calendar dates after AD 1582-Oct-15
+  |(if any) are in the modern Gregorian system. Dates prior to 1582-Oct-5 (if any)
+  |are in the Julian calendar system, which is automatically extended for dates
+  |prior to its adoption on 45-Jan-1 BC.  The Julian calendar is useful for
+  |matching historical dates. The Gregorian calendar more accurately corresponds
+  |to the Earth's orbital motion and seasons. A "Gregorian-only" calendar mode is
+  |available if such physical events are the primary interest.
+  |
+  |  NOTE: "n.a." in output means quantity "not available" at the print-time.
+  | 
+  |SOLAR PRESENCE (OBSERVING SITE)
+  |  Time tag is followed by a blank, then a solar-presence condition code:
+  |
+  |       '*'  Daylight (refracted solar upper-limb on or above apparent horizon)
+  |       'C'  Civil twilight/dawn
+  |       'N'  Nautical twilight/dawn
+  |       'A'  Astronomical twilight/dawn
+  |       ' '  Night OR geocentric ephemeris
+  |
+  |LUNAR PRESENCE WITH TARGET RISE/TRANSIT/SET EVENT MARKER (OBSERVING SITE)
+  |  The solar-presence code column is immediately followed by another marker:
+  |
+  |       'm'  Refracted upper-limb of Moon on or above apparent horizon
+  |       ' '  Refracted upper-limb of Moon below apparent horizon OR geocentric
+  |
+  |  The lunar presence marker (an ongoing state) can be over-ridden by a target
+  |  event marker if an event has occurred since the last output step:
+  |
+  |       'r'  Rise          (target body on or went above cut-off RTS elevation)
+  |       'e'  Elevation max (target body maximum elevation angle has occurred)
+  |       't'  Transit       (target body at or passed through observer meridian)
+  |       's'  Set           (target body on or went below cut-off RTS elevation)
+  | 
+  |RTS MARKERS (TVH)
+  |  Rise and set are with respect to the reference ellipsoid true visual horizon
+  |defined by the elevation cut-off angle. Horizon dip and yellow-light refraction
+  |(Earth only) are considered. Accuracy is < or = to twice the requested search
+  |step-size.
+  | 
+  | 'R.A._________(ICRF)_________DEC' =
+  |  Astrometric right ascension and declination of the target center with
+  |respect to the observing site (coordinate origin) in the reference frame of
+  |the planetary ephemeris (ICRF). Compensated for down-leg light-time delay
+  |aberration.
+  |
+  |  Units: RA  in hours-minutes-seconds of time,    HH MM SS.ff{ffff}
+  |         DEC in degrees-minutes-seconds of arc,  sDD MN SC.f{ffff}
+  | 
+  | 'dRA*cosD d(DEC)/dt' =
+  |  The angular rate of change in apparent RA and DEC of the target. This is
+  |with respect to the non-inertial IAU76/80 Earth true equator and equinox
+  |of-date reference frame.  d(RA)/dt is multiplied by the cosine of declination
+  |to provide a linear rate in the plane-of-sky. Units: ARCSECONDS PER HOUR
+  | 
+  | 'a-mass mag_ex' =
+  |    RELATIVE optical airmass and visual magnitude extinction. Airmass is the
+  |ratio between the absolute optical airmass for the targets' refracted CENTER
+  |point to the absolute optical airmass at zenith. Also output is the estimated
+  |visual magnitude extinction due to the atmosphere, as seen by the observer.
+  |AVAILABLE ONLY FOR TOPOCENTRIC EARTH SITES WHEN THE TARGET IS ABOVE THE
+  |HORIZON.  Units: none (airmass) and magnitudes (extinction).
+  | 
+  | 'T-mag   N-mag' =
+  |   Comets' apparent visual total magnitude ("T-mag") and nuclear magnitude
+  |("N-mag") using the standard IAU model:
+  |
+  |   T-mag= M1 + 5*log10(delta) + k1*log10(r)
+  |   N-mag= M2 + 5*log10(delta) + k2*log10(r) + phcof*beta
+  |
+  |   Units: MAGNITUDES
+  |
+  |Computations by ...
+  |
+  |    Solar System Dynamics Group, Horizons On-Line Ephemeris System
+  |    4800 Oak Grove Drive, Jet Propulsion Laboratory
+  |    Pasadena, CA  91109   USA
+  |
+  |    General site: https://ssd.jpl.nasa.gov/
+  |    Mailing list: https://ssd.jpl.nasa.gov/email_list.html
+  |    System news : https://ssd.jpl.nasa.gov/horizons/news.html
+  |    User Guide  : https://ssd.jpl.nasa.gov/horizons/manual.html
+  |    Connect     : browser        https://ssd.jpl.nasa.gov/horizons/app.html#/x
+  |                  API            https://ssd-api.jpl.nasa.gov/doc/horizons.html
+  |                  command-line   telnet ssd.jpl.nasa.gov 6775
+  |                  e-mail/batch   https://ssd.jpl.nasa.gov/ftp/ssd/horizons_batch.txt
+  |                  scripts        https://ssd.jpl.nasa.gov/ftp/ssd/SCRIPTS
+  |    Author      : Jon.D.Giorgini@jpl.nasa.gov
+  |
+  |*****************************************************************************************************************
+  """.stripMargin,
+  Set(("format", "text"), ("MAKE_EPHEM", "YES"), ("CENTER", "T15"), ("COMMAND", "'NAME=1P;CAP'"), ("START_TIME", "'2025-May-02 00:00:00.000'"), ("STOP_TIME", "'2025-May-03 00:00:00.000'"), ("STEP_SIZE", "60m"), ("extra_prec", "YES"), ("time_digits", "FRACSEC"), ("QUANTITIES", "'1,3,8,9'")) ->
+  """
+  |API VERSION: 1.2
+  |API SOURCE: NASA/JPL Horizons API
+  |
+  |*******************************************************************************
+  |JPL/HORIZONS                      1P/Halley                2025-Nov-24 11:37:17
+  |Rec #:90000030        Soln.date: 2025-Nov-21_15:57:34   # obs: 8518 (1835-1994)
+  |
+  |IAU76/J2000 helio. ecliptic osc. elements (au, days, deg., period=Julian yrs):
+  |
+  |  EPOCH=  2439875.5 ! 1968-Jan-20.0000000 (TDB)    RMSW= n.a.
+  |  EC= .9679359956953212   QR= .5748638313743413   TP= 2446469.9736161465
+  |  OM= 59.09894720612437   W= 112.2414314637764    IN= 162.1905300439129
+  |  A= 17.92863504856929    MA= 274.3823371364693   ADIST= 35.28240626576424
+  |  PER= 75.915252807404    N= .012983244           ANGMOM= .018296559
+  |  DAN= 1.78543            DDN= .82795             L= 305.8544912
+  |  B= 16.4450919           MOID= .0745097          TP= 1986-Feb-08.4736161465
+  |
+  |Comet physical (GM= km^3/s^2; RAD= km):
+  |  GM= n.a.                RAD= 5.5
+  |  M1=  5.5      M2=  13.6     k1=  8.     k2=  5.      PHCOF=  .030
+  |Comet non-gravitational force model (AMRAT=m^2/kg;A1-A3=au/d^2;DT=days;R0=au):
+  |  AMRAT=  0.                                      DT=  0.
+  |  A1= 4.887055233121E-10  A2= 1.554720290005E-10  A3= 0.
+  |Standard model:
+  |  ALN=  .1112620426   NK=  4.6142   NM=  2.15     NN=  5.093    R0=  2.808
+  |
+  |COMET comments
+  |1: soln ref.= JPL#75, data arc: 1835-08-21 to 1994-01-11
+  |2: k1=8.0, k2=5.0, phase coef.=0.03;
+  |*******************************************************************************
+  |
+  |
+  |*******************************************************************************
+  |Ephemeris / API_USER Mon Nov 24 11:37:17 2025 Pasadena, USA      / Horizons
+  |*******************************************************************************
+  |Target body name: 1P/Halley                       {source: JPL#75}
+  |Center body name: Earth (399)                     {source: DE441}
+  |Center-site name: Gemini North Observatory, Maunakea
+  |*******************************************************************************
+  |Start time      : A.D. 2025-May-02 00:00:00.0000 UT
+  |Stop  time      : A.D. 2025-May-03 00:00:00.0000 UT
+  |Step-size       : 60 minutes
+  |*******************************************************************************
+  |Target pole/equ : undefined
+  |Target radii    : 5.5 km
+  |Center geodetic : 204.5309, 19.8238126, 4.24672   {E-lon(deg),Lat(deg),Alt(km)}
+  |Center cylindric: 204.5309,6006.47419,2150.79851  {E-lon(deg),Dxy(km),Dz(km)}
+  |Center pole/equ : ITRF93                          {East-longitude positive}
+  |Center radii    : 6378.137, 6378.137, 6356.752 km {Equator_a, b, pole_c}
+  |Target primary  : Sun
+  |Vis. interferer : MOON (R_eq= 1737.400) km        {source: DE441}
+  |Rel. light bend : Sun                             {source: DE441}
+  |Rel. lght bnd GM: 1.3271E+11 km^3/s^2
+  |Small-body perts: Yes                             {source: SB441-N16}
+  |Atmos refraction: NO (AIRLESS)
+  |RA format       : HMS
+  |Time format     : CAL
+  |Calendar mode   : Mixed Julian/Gregorian
+  |EOP file        : eop.251121.p260217
+  |EOP coverage    : DATA-BASED 1962-JAN-20 TO 2025-NOV-21. PREDICTS-> 2026-FEB-16
+  |Units conversion: 1 au= 149597870.700 km, c= 299792.458 km/s, 1 day= 86400.0 s
+  |Table cut-offs 1: Elevation (-90.0deg=NO ),Airmass (>38.000=NO), Daylight (NO )
+  |Table cut-offs 2: Solar elongation (  0.0,180.0=NO ),Local Hour Angle( 0.0=NO )
+  |Table cut-offs 3: RA/DEC angular rate (     0.0=NO )
+  |*******************************************************************************
+  |Initial IAU76/J2000 heliocentric ecliptic osculating elements (au, days, deg.):
+  |  EPOCH=  2439875.5 ! 1968-Jan-20.0000000 (TDB)    RMSW= n.a.
+  |  EC= .9679359956953212   QR= .5748638313743413   TP= 2446469.9736161465
+  |  OM= 59.09894720612437   W= 112.2414314637764    IN= 162.1905300439129
+  |  Equivalent ICRF heliocentric cartesian coordinates (au, au/d):
+  |  X=-1.331029360169393E+01  Y= 2.541249958785733E+01  Z= 2.637549316318327E+00
+  |  VX= 1.418949944126011E-03 VY=-1.422475975617656E-03 VZ= 4.131321199969281E-05
+  |Comet physical (GM= km^3/s^2; RAD= km):
+  |  GM= n.a.                RAD= 5.5
+  |  M1=  5.5      M2=  13.6     k1=  8.     k2=  5.      PHCOF=  .030
+  |Comet non-gravitational force model (AMRAT=m^2/kg;A1-A3=au/d^2;DT=days;R0=au):
+  |  AMRAT=  0.                                      DT=  0.
+  |  A1= 4.887055233121E-10  A2= 1.554720290005E-10  A3= 0.
+  |Standard model:
+  |  ALN=  .1112620426   NK=  4.6142   NM=  2.15     NN=  5.093    R0=  2.808
+  |*****************************************************************************************************************
+  |Date__(UT)__HR:MN:SC.fff     R.A._________(ICRF)_________DEC  dRA*cosD d(DEC)/dt  a-mass mag_ex    T-mag   N-mag
+  |*****************************************************************************************************************
+  |$$SOE
+  |2025-May-02 00:00:00.000 *m  08 09 46.797665 +03 21 19.54244  0.585974  1.072429   1.931  0.210   25.598  29.111
+  |2025-May-02 01:00:00.000 *m  08 09 46.836306 +03 21 20.61530  0.576317  1.071027   1.415  0.154   25.598  29.111
+  |2025-May-02 02:00:00.000 *m  08 09 46.874400 +03 21 21.68666  0.569751  1.069460   1.177  0.128   25.598  29.111
+  |2025-May-02 03:00:00.000 *m  08 09 46.912179 +03 21 22.75638  0.566918  1.067778   1.069  0.116   25.598  29.111
+  |2025-May-02 04:00:00.000 *m  08 09 46.949905 +03 21 23.82438  0.568205  1.066042   1.043  0.114   25.598  29.111
+  |2025-May-02 05:00:00.000 Cm  08 09 46.987858 +03 21 24.89065  0.573718  1.064313   1.090  0.119   25.598  29.111
+  |2025-May-02 06:00:00.000 Am  08 09 47.026316 +03 21 25.95524  0.583271  1.062656   1.227  0.134   25.598  29.111
+  |2025-May-02 07:00:00.000  m  08 09 47.065535 +03 21 27.01825  0.596403  1.061126   1.518  0.165   25.598  29.111
+  |2025-May-02 08:00:00.000  m  08 09 47.105732 +03 21 28.07985  0.612406  1.059774   2.179  0.237   25.598  29.111
+  |2025-May-02 09:00:00.000  m  08 09 47.147069 +03 21 29.14024  0.630376  1.058636   4.323  0.471   25.598  29.111
+  |2025-May-02 10:00:00.000     08 09 47.189642 +03 21 30.19964  0.649275  1.057733    n.a.   n.a.   25.598  29.111
+  |2025-May-02 11:00:00.000     08 09 47.233479 +03 21 31.25831  0.668001  1.057072    n.a.   n.a.   25.598  29.111
+  |2025-May-02 12:00:00.000     08 09 47.278529 +03 21 32.31647  0.685463  1.056642    n.a.   n.a.   25.599  29.111
+  |2025-May-02 13:00:00.000     08 09 47.324675 +03 21 33.37433  0.700657  1.056415    n.a.   n.a.   25.599  29.111
+  |2025-May-02 14:00:00.000     08 09 47.371736 +03 21 34.43209  0.712735  1.056353    n.a.   n.a.   25.599  29.111
+  |2025-May-02 15:00:00.000 A   08 09 47.419481 +03 21 35.48986  0.721062  1.056402    n.a.   n.a.   25.599  29.111
+  |2025-May-02 16:00:00.000 *   08 09 47.467645 +03 21 36.54773  0.725260  1.056503    n.a.   n.a.   25.599  29.111
+  |2025-May-02 17:00:00.000 *   08 09 47.515949 +03 21 37.60571  0.725233  1.056593    n.a.   n.a.   25.599  29.111
+  |2025-May-02 18:00:00.000 *   08 09 47.564114 +03 21 38.66374  0.721176  1.056609    n.a.   n.a.   25.599  29.111
+  |2025-May-02 19:00:00.000 *   08 09 47.611887 +03 21 39.72171  0.713560  1.056495    n.a.   n.a.   25.599  29.111
+  |2025-May-02 20:00:00.000 *   08 09 47.659051 +03 21 40.77946  0.703098  1.056201    n.a.   n.a.   25.599  29.111
+  |2025-May-02 21:00:00.000 *m  08 09 47.705446 +03 21 41.83679  0.690699  1.055691    n.a.   n.a.   25.599  29.111
+  |2025-May-02 22:00:00.000 *m  08 09 47.750978 +03 21 42.89347  0.677406  1.054945  12.398  1.350   25.599  29.111
+  |2025-May-02 23:00:00.000 *m  08 09 47.795623 +03 21 43.94925  0.664320  1.053955   3.214  0.350   25.599  29.111
+  |2025-May-03 00:00:00.000 *m  08 09 47.839432 +03 21 45.00389  0.652531  1.052735   1.882  0.205   25.599  29.111
+  |$$EOE
+  |*****************************************************************************************************************
+  |Column meaning:
+  |
+  |TIME
+  |
+  |  Times PRIOR to 1962 are UT1, a mean-solar time closely related to the
+  |prior but now-deprecated GMT. Times AFTER 1962 are in UTC, the current
+  |civil or "wall-clock" time-scale. UTC is kept within 0.9 seconds of UT1
+  |using integer leap-seconds for 1972 and later years.
+  |
+  |  Conversion from the internal Barycentric Dynamical Time (TDB) of solar
+  |system dynamics to the non-uniform civil UT time-scale requested for output
+  |has not been determined for UTC times after the next July or January 1st.
+  |Therefore, the last known leap-second is used as a constant over future
+  |intervals.
+  |
+  |  Time tags refer to the UT time-scale conversion from TDB on Earth
+  |regardless of observer location within the solar system, although clock
+  |rates may differ due to the local gravity field and no analog to "UT"
+  |may be defined for that location.
+  |
+  |  Any 'b' symbol in the 1st-column denotes a B.C. date. First-column blank
+  |(" ") denotes an A.D. date.
+  |
+  |CALENDAR SYSTEM
+  |
+  |  Mixed calendar mode was active such that calendar dates after AD 1582-Oct-15
+  |(if any) are in the modern Gregorian system. Dates prior to 1582-Oct-5 (if any)
+  |are in the Julian calendar system, which is automatically extended for dates
+  |prior to its adoption on 45-Jan-1 BC.  The Julian calendar is useful for
+  |matching historical dates. The Gregorian calendar more accurately corresponds
+  |to the Earth's orbital motion and seasons. A "Gregorian-only" calendar mode is
+  |available if such physical events are the primary interest.
+  |
+  |  NOTE: "n.a." in output means quantity "not available" at the print-time.
+  |
+  |SOLAR PRESENCE (OBSERVING SITE)
+  |  Time tag is followed by a blank, then a solar-presence symbol:
+  |
+  |      '*'  Daylight (refracted solar upper-limb on or above apparent horizon)
+  |      'C'  Civil twilight/dawn
+  |      'N'  Nautical twilight/dawn
+  |      'A'  Astronomical twilight/dawn
+  |      ' '  Night OR geocentric ephemeris
+  |
+  |LUNAR PRESENCE (OBSERVING SITE)
+  |  The solar-presence symbol is immediately followed by a lunar-presence symbol:
+  |
+  |      'm'  Refracted upper-limb of Moon on or above apparent horizon
+  |      ' '  Refracted upper-limb of Moon below apparent horizon OR geocentric
+  |            ephemeris
+  |
+  |'R.A._________(ICRF)_________DEC' =
+  |  Astrometric right ascension and declination of the target center with
+  |respect to the observing site (coordinate origin) in the reference frame of
+  |the planetary ephemeris (ICRF). Compensated for down-leg light-time delay
+  |aberration.
+  |
+  |  Units: RA  in hours-minutes-seconds of time,    HH MM SS.ff{ffff}
+  |        DEC in degrees-minutes-seconds of arc,  sDD MN SC.f{ffff}
+  |
+  |'dRA*cosD d(DEC)/dt' =
+  |  The angular rate of change in apparent RA and DEC of the target. This is
+  |with respect to the non-inertial IAU76/80 Earth true equator and equinox
+  |of-date reference frame.  d(RA)/dt is multiplied by the cosine of declination
+  |to provide a linear rate in the plane-of-sky. Units: ARCSECONDS PER HOUR
+  |
+  |'a-mass mag_ex' =
+  |    RELATIVE optical airmass and visual magnitude extinction. Airmass is the
+  |ratio between the absolute optical airmass for the targets' refracted CENTER
+  |point to the absolute optical airmass at zenith. Also output is the estimated
+  |visual magnitude extinction due to the atmosphere, as seen by the observer.
+  |AVAILABLE ONLY FOR TOPOCENTRIC EARTH SITES WHEN THE TARGET IS ABOVE THE
+  |HORIZON.  Units: none (airmass) and magnitudes (extinction).
+  |
+  |'T-mag   N-mag' =
+  |  Comets' apparent visual total magnitude ("T-mag") and nuclear magnitude
+  |("N-mag") using the standard IAU model:
+  |
+  |  T-mag= M1 + 5*log10(delta) + k1*log10(r)
+  |  N-mag= M2 + 5*log10(delta) + k2*log10(r) + phcof*beta
+  |
+  |  Units: MAGNITUDES
+  |
+  |Computations by ...
+  |
+  |    Solar System Dynamics Group, Horizons On-Line Ephemeris System
+  |    4800 Oak Grove Drive, Jet Propulsion Laboratory
+  |    Pasadena, CA  91109   USA
+  |
+  |    General site: https://ssd.jpl.nasa.gov/
+  |    Mailing list: https://ssd.jpl.nasa.gov/email_list.html
+  |    System news : https://ssd.jpl.nasa.gov/horizons/news.html
+  |    User Guide  : https://ssd.jpl.nasa.gov/horizons/manual.html
+  |    Connect     : browser        https://ssd.jpl.nasa.gov/horizons/app.html#/x
+  |                  API            https://ssd-api.jpl.nasa.gov/doc/horizons.html
+  |                  command-line   telnet ssd.jpl.nasa.gov 6775
+  |                  e-mail/batch   https://ssd.jpl.nasa.gov/ftp/ssd/horizons_batch.txt
+  |                  scripts        https://ssd.jpl.nasa.gov/ftp/ssd/SCRIPTS
+  |    Author      : Jon.D.Giorgini@jpl.nasa.gov
+  |
+  |*****************************************************************************************************************
+  |""".stripMargin
+  )
 
 }
