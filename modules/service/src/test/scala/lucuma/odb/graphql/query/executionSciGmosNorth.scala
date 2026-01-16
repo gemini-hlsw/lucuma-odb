@@ -31,6 +31,7 @@ import lucuma.core.util.Timestamp
 import lucuma.itc.IntegrationTime
 import lucuma.odb.json.all.transport.given
 import lucuma.odb.sequence.gmos.longslit.Science
+import lucuma.odb.util.Codecs.atom_id
 import lucuma.odb.util.Codecs.core_timestamp
 import lucuma.odb.util.Codecs.step_id
 import skunk.*
@@ -252,6 +253,18 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos:
       assertEquals(counts.get(StepType.Gcal), 2.some) // arc + flat
       assertEquals(counts.get(StepType.Science), 3.some)
 
+  // Adjust the timestamp of atom records precisely
+  def adjustAtomTime(a: Atom.Id, t: Timestamp): IO[Unit] =
+    val query: Command[(Atom.Id, Timestamp)] =
+      sql"""
+        UPDATE t_atom_record
+           SET c_created = $core_timestamp
+         WHERE c_atom_id = $atom_id
+      """.command.contramap { (a, t) => (t, a) }
+
+    withSession: session =>
+      session.execute(query)(a, t).void
+
   // Adjust the timestamp of step records precisely
   def adjustStepTime(s: Step.Id, t: Timestamp): IO[Unit] =
     val query: Command[(Step.Id, Timestamp)] =
@@ -274,14 +287,15 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos:
 
         v  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
         a  <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
+        _  <- adjustAtomTime(a, nw)
 
         s0 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthArc(0), ArcStep, gcalTelescopeConfig(0), ObserveClass.NightCal)
         _  <- addEndStepEvent(s0)
-        _  <- adjustStepTime(s0, nw)
+        _  <- adjustStepTime(s0, nw.plusMicrosOption(1).get)
 
         s1 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthFlat(0), FlatStep, gcalTelescopeConfig(0), ObserveClass.NightCal)
         _  <- addEndStepEvent(s1)
-        _  <- adjustStepTime(s1, nw.plusMicrosOption(1).get)
+        _  <- adjustStepTime(s1, nw.plusMicrosOption(2).get)
 
         longDelay = Science.CalValidityPeriod +| 2.microsecondTimeSpan
         timestamp = nw.plusMicrosOption(longDelay.toMicroseconds).get
@@ -333,14 +347,15 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos:
 
         v  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
         a  <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
+        _  <- adjustAtomTime(a, nw)
 
         s0 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthArc(0), ArcStep, gcalTelescopeConfig(0), ObserveClass.NightCal)
         _  <- addEndStepEvent(s0)
-        _  <- adjustStepTime(s0, nw)
+        _  <- adjustStepTime(s0, nw.plusMicrosOption(1).get)
 
         s1 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthFlat(0), FlatStep, gcalTelescopeConfig(0), ObserveClass.NightCal)
         _  <- addEndStepEvent(s1)
-        _  <- adjustStepTime(s1, nw.plusMicrosOption(1).get)
+        _  <- adjustStepTime(s1, nw.plusMicrosOption(2).get)
 
         longDelay = Science.CalValidityPeriod -| ScienceFoldTime -| ScienceTime
         timestamp = nw.plusMicrosOption(longDelay.toMicroseconds)
@@ -377,14 +392,15 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos:
 
         v  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
         a  <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
+        _  <- adjustAtomTime(a, nw)
 
         s0 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthArc(0), ArcStep, gcalTelescopeConfig(0), ObserveClass.NightCal)
         _  <- addEndStepEvent(s0)
-        _  <- adjustStepTime(s0, nw)
+        _  <- adjustStepTime(s0, nw.plusMicrosOption(1).get)
 
         s1 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthFlat(0), FlatStep, gcalTelescopeConfig(0), ObserveClass.NightCal)
         _  <- addEndStepEvent(s1)
-        _  <- adjustStepTime(s1, nw.plusMicrosOption(1).get)
+        _  <- adjustStepTime(s1, nw.plusMicrosOption(2).get)
 
         longDelay = Science.CalValidityPeriod -| ScienceFoldTime -| ScienceTime -| ScienceTime
         timestamp = nw.plusMicrosOption(longDelay.toMicroseconds)

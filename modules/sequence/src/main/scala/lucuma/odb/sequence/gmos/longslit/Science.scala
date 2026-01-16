@@ -56,6 +56,7 @@ import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
 import lucuma.itc.IntegrationTime
 import lucuma.odb.data.OdbError
+import lucuma.odb.sequence.data.AtomRecord
 import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.sequence.data.StepRecord
 import lucuma.odb.sequence.util.AtomBuilder
@@ -709,6 +710,12 @@ object Science:
         .headOption
         .getOrElse(pos)
 
+    override def recordAtom(atom: AtomRecord): SequenceGenerator[D] =
+      copy(
+        records = records.map(_.settle),
+        tracker = tracker.reset(atom)
+      )
+
     override def recordStep(step: StepRecord[D])(using Eq[D]): SequenceGenerator[D] =
       if step.isAcquisitionSequence then
         this
@@ -719,9 +726,9 @@ object Science:
         // (potentially) for the first step recorded, or when a new atom is started
         val (recordsʹ, posʹ) =
           tracker match
-            case IndexTracker.Zero =>
-              (records, advancePos(0, step))
-            case _                 =>
+            case IndexTracker.Reset(_) =>
+              (records, advancePos(pos, step))
+            case _                     =>
               if tracker.atomCount === trackerʹ.atomCount then (records, pos)
               else (records.map(_.settle), advancePos(pos+1, step))
 

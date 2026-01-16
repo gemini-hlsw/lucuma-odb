@@ -274,11 +274,12 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
 
         for
           future <- limit.traverse(lim => IO.fromOption(Generator.FutureLimit.from(lim).toOption)(new IllegalArgumentException("Specify a future limit from 0 to 100")))
-          enums              <- Enums.load(session)
-          tec                <- TimeEstimateCalculatorImplementation.fromSession(session, enums)
-          gen                = Generator.instantiate[IO](CommitHash.Zero, tec)
-          res                <- Services.asSuperUser(
-                                  gen.generate(pid, oid, future.getOrElse(Generator.FutureLimit.Default), when))
+          enums  <- Enums.load(session)
+          tec    <- TimeEstimateCalculatorImplementation.fromSession(session, enums)
+          gen     = Generator.instantiate[IO](CommitHash.Zero, tec)
+          res    <- Services.asSuperUser(
+                      gen.generate(pid, oid, future.getOrElse(Generator.FutureLimit.Default), when)
+                    )
         yield res
 
   /**
