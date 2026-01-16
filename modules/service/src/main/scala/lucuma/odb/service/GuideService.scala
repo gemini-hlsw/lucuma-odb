@@ -6,6 +6,7 @@ package lucuma.odb.service
 import cats.Order
 import cats.Order.*
 import cats.data.NonEmptyList
+import cats.data.NonEmptySet
 import cats.effect.Concurrent
 import cats.syntax.all.*
 import eu.timepit.refined.types.string.NonEmptyString
@@ -273,8 +274,8 @@ object GuideService {
   ) {
     val timeEstimate = digest.fullTimeEstimate.sum
     val setupTime    = digest.setup.full
-    val acqOffsets   = NonEmptyList.fromFoldable(digest.acquisition.telescopeConfigs).flatMap(_.asAcqOffsets)
-    val sciOffsets   = NonEmptyList.fromFoldable(digest.science.telescopeConfigs).flatMap(_.asSciOffsets)
+    val acqOffsets   = NonEmptySet.fromSet(digest.acquisition.telescopeConfigs).flatMap(_.asAcqOffsets)
+    val sciOffsets   = NonEmptySet.fromSet(digest.science.telescopeConfigs).flatMap(_.asSciOffsets)
 
     val (site, agsParams, centralWavelength): (Site, AgsParams, Wavelength) = params.observingMode match
       case mode: gmos.longslit.Config.GmosNorth =>

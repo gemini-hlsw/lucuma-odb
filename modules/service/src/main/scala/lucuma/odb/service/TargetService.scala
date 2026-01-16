@@ -11,6 +11,7 @@ import eu.timepit.refined.types.string.NonEmptyString
 import fs2.Stream
 import grackle.Problem
 import grackle.Result
+import grackle.ResultT
 import io.circe.Json
 import io.circe.syntax.*
 import lucuma.core.enums.ArcType
@@ -24,7 +25,7 @@ import lucuma.core.math.Arc.Partial
 import lucuma.core.math.Parallax
 import lucuma.core.math.ProperMotion
 import lucuma.core.math.RadialVelocity
-import lucuma.core.model.EphemerisKey
+import lucuma.core.model.Ephemeris
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.SourceProfile
@@ -35,6 +36,7 @@ import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.input.CatalogInfoInput
 import lucuma.odb.graphql.input.CloneTargetInput
+import lucuma.odb.graphql.input.NonsiderealInput
 import lucuma.odb.graphql.input.OpportunityInput
 import lucuma.odb.graphql.input.RegionInput
 import lucuma.odb.graphql.input.SiderealInput
@@ -45,6 +47,7 @@ import lucuma.odb.json.angle.query.given
 import lucuma.odb.json.sourceprofile.given
 import lucuma.odb.json.wavelength.query.given
 import lucuma.odb.service.Services.ServiceAccess
+import lucuma.odb.service.Services.SuperUserAccess
 import lucuma.odb.service.TargetService.UpdateTargetsResponse.SourceProfileUpdatesFailed
 import lucuma.odb.service.TargetService.UpdateTargetsResponse.TrackingSwitchFailed
 import lucuma.odb.util.Codecs.*
@@ -105,21 +108,37 @@ object TargetService {
         role: Option[CalibrationRole] = None
       )(using Transaction[F]): F[Result[Target.Id]] =
         input.foldWithId(OdbError.NotAuthorized(user.id).asFailureF): (input, pid) =>
-          val af = input.subtypeInfo match
-            case s: SiderealInput.Create  => Statements.insertSiderealFragment(pid, input.name, s, input.sourceProfile.asJson, disposition, role)
-            case n: EphemerisKey => Statements.insertNonsiderealFragment(pid, input.name, n, input.sourceProfile.asJson, disposition, role)
-            case OpportunityInput.Create(r) => Statements.insertOpportunityFragment(pid, input.name, r, input.sourceProfile.asJson, disposition, role)
-          session.prepareR(af.fragment.query(target_id)).use: ps =>
-            ps.unique(af.argument).map(Result.success)
-
+          val insertFragment: ResultT[F, AppliedFragment] = input.subtypeInfo match
+            case s: SiderealInput.Create  => Statements.insertSiderealFragment(pid, input.name, s, input.sourceProfile.asJson, disposition, role).pure
+            case OpportunityInput.Create(r) => Statements.insertOpportunityFragment(pid, input.name, r, input.sourceProfile.asJson, disposition, role).pure
+            case NonsiderealInput.Create.Horizons(k) => Statements.insertNonsiderealFragment(pid, input.name, k, input.sourceProfile.asJson, disposition, role).pure
+            case NonsiderealInput.Create.UserSupplied(elems) =>              
+              ResultT(Services.asSuperUser(trackingService.createUserSuppliedEphemeris(elems))).map: k =>
+                 Statements.insertNonsiderealFragment(pid, input.name, k, input.sourceProfile.asJson, disposition, role)
+          insertFragment
+            .flatMap: af =>
+              ResultT.liftF:
+                session.prepareR(af.fragment.query(target_id)).use: ps =>
+                  ps.unique(af.argument)
+            .value
+            
       override def updateTargets(checked: AccessControl.Checked[TargetPropertiesInput.Edit])(using Transaction[F]): F[Result[List[Target.Id]]] =
         checked.fold(Result(Nil).pure[F]): (props, which) =>
-          updateTargetsImpl(props, which).map:
+          Services.asSuperUser(updateTargetsImpl(props, which)).map:
             case UpdateTargetsResponse.Success(selected)                    => Result.success(selected)
             case UpdateTargetsResponse.SourceProfileUpdatesFailed(problems) => Result.Failure(problems.map(p => OdbError.UpdateFailed(Some(p.message)).asProblem))
             case UpdateTargetsResponse.TrackingSwitchFailed(s)              => OdbError.UpdateFailed(Some(s)).asFailure
 
-      private def updateTargetsImpl(input: TargetPropertiesInput.Edit, which: AppliedFragment)(using Transaction[F]): F[UpdateTargetsResponse] =
+      private def updateTargetsImpl(input: TargetPropertiesInput.Edit, which: AppliedFragment)(using Transaction[F], SuperUserAccess): F[UpdateTargetsResponse] =
+
+        // Updates to the user-supplied ephemeris, if any
+        val replaceEphemeris: F[Unit] = 
+          input
+            .subtypeInfo
+            .collect:
+              case NonsiderealInput.Edit.UserSupplied(k, elems) =>
+                trackingService.replaceUserSuppliedEphemeris(Ephemeris.UserSupplied(k, elems))
+            .sequence_
 
         // Updates that don't concern source profile
         val nonSourceProfileUpdates: Stream[F, Target.Id] = {
@@ -129,42 +148,44 @@ object TargetService {
           }
         }
 
-        input.sourceProfile match {
-          case None =>
+        replaceEphemeris >> {
+          input.sourceProfile match {
+            case None =>
 
-            // We're not updating the source profile, so we're basically done
-            nonSourceProfileUpdates.compile.toList.map(UpdateTargetsResponse.Success(_))
+              // We're not updating the source profile, so we're basically done
+              nonSourceProfileUpdates.compile.toList.map(UpdateTargetsResponse.Success(_))
 
-          case Some(fun) =>
+            case Some(fun) =>
 
-            // Here we must (embarrassingly) update each source profile individually, but we can
-            // save a little bit of overhaed by preparing the statements once and reusing them.
-            Stream.resource((
-              session.prepareR(sql"select c_source_profile from t_target where c_target_id = $target_id".query(jsonb)),
-              session.prepareR(sql"update t_target set c_source_profile = $jsonb where c_target_id = $target_id".command)
-            ).tupled).flatMap { (read, update) =>
-              nonSourceProfileUpdates.evalMap { tid =>
-                read.unique(tid).map(_.hcursor.as[SourceProfile]).flatMap {
-                  case Left(err) => Result.failure(err.getMessage).pure[F]
-                  case Right(sp) => fun(sp).map(_.asJson).traverse(update.execute(_, tid).as(tid))
+              // Here we must (embarrassingly) update each source profile individually, but we can
+              // save a little bit of overhaed by preparing the statements once and reusing them.
+              Stream.resource((
+                session.prepareR(sql"select c_source_profile from t_target where c_target_id = $target_id".query(jsonb)),
+                session.prepareR(sql"update t_target set c_source_profile = $jsonb where c_target_id = $target_id".command)
+              ).tupled).flatMap { (read, update) =>
+                nonSourceProfileUpdates.evalMap { tid =>
+                  read.unique(tid).map(_.hcursor.as[SourceProfile]).flatMap {
+                    case Left(err) => Result.failure(err.getMessage).pure[F]
+                    case Right(sp) => fun(sp).map(_.asJson).traverse(update.execute(_, tid).as(tid))
+                  }
                 }
-              }
-            } .compile.toList.map(_.sequence).flatMap { r =>
+              } .compile.toList.map(_.sequence).flatMap { r =>
 
-              // If any source profile updates failed then roll back.
-              r match {
-                case Result.Success(ids)      => UpdateTargetsResponse.Success(ids).pure[F]
-                case Result.Failure(ps)       => transaction.rollback.as(UpdateTargetsResponse.SourceProfileUpdatesFailed(ps))
-                case Result.Warning(ps, ids)  => transaction.rollback.as(UpdateTargetsResponse.SourceProfileUpdatesFailed(ps))
-                case Result.InternalError(th) => Concurrent[F].raiseError(th) // ok? or should we do something else here?
+                // If any source profile updates failed then roll back.
+                r match {
+                  case Result.Success(ids)      => UpdateTargetsResponse.Success(ids).pure[F]
+                  case Result.Failure(ps)       => transaction.rollback.as(UpdateTargetsResponse.SourceProfileUpdatesFailed(ps))
+                  case Result.Warning(ps, ids)  => transaction.rollback.as(UpdateTargetsResponse.SourceProfileUpdatesFailed(ps))
+                  case Result.InternalError(th) => Concurrent[F].raiseError(th) // ok? or should we do something else here?
+                }
+
               }
 
+            } recover {
+              case SqlState.CheckViolation(ex) if ex.constraintName == Some("ra_dec_epoch_all_defined") =>
+                UpdateTargetsResponse.TrackingSwitchFailed("Sidereal targets require RA, Dec, and Epoch to be defined.")
             }
-
-          } recover {
-            case SqlState.CheckViolation(ex) if ex.constraintName == Some("ra_dec_epoch_all_defined") =>
-              UpdateTargetsResponse.TrackingSwitchFailed("Sidereal targets require RA, Dec, and Epoch to be defined.")
-          }
+        }
 
       private def clone(targetId: Target.Id, pid: Program.Id): F[Target.Id] =
         val stmt = Statements.cloneTarget(pid, targetId)
@@ -174,7 +195,7 @@ object TargetService {
         input.foldWithId(OdbError.NotAuthorized(user.id).asFailureF): (input, pid) =>
           import CloneTargetResponse.*
           def update(tid: Target.Id): F[Option[UpdateTargetsResponse]] =
-            input.SET.traverse(updateTargetsImpl(_, sql"SELECT $target_id".apply(tid)))
+            input.SET.traverse(Services.asSuperUser(updateTargetsImpl(_, sql"SELECT $target_id".apply(tid))))
 
           def replaceIn(tid: Target.Id): F[Unit] =
             input.REPLACE_IN.traverse_ { which =>
@@ -300,7 +321,7 @@ object TargetService {
     def insertNonsiderealFragment(
       pid:           Program.Id,
       name:          NonEmptyString,
-      ek:            EphemerisKey,
+      ek:            Ephemeris.Key,
       sourceProfile: Json,
       disposition:   TargetDisposition,
       role:          Option[CalibrationRole]
@@ -333,7 +354,7 @@ object TargetService {
         name,
         NonEmptyString.from(ek.des).toOption.get, // we know this is never emptyek.des ~
         ek.keyType,
-        NonEmptyString.from(EphemerisKey.fromString.reverseGet(ek)).toOption.get, // we know this is never empty
+        NonEmptyString.from(Ephemeris.Key.fromString.reverseGet(ek)).toOption.get, // we know this is never empty
         sourceProfile,
         disposition,
         role
@@ -434,7 +455,7 @@ object TargetService {
     // When we update tracking, set the opposite tracking fields to null.
     // If this causes a constraint error it means that the user changed the target type but did not
     // specify every field. We can catch this case and report a useful error.
-    def subtypeInfoUpdates(tracking: SiderealInput.Edit | EphemerisKey | OpportunityInput.Edit): List[AppliedFragment] =
+    def subtypeInfoUpdates(tracking: SiderealInput.Edit | NonsiderealInput.Edit | OpportunityInput.Edit): List[AppliedFragment] =
 
       val NullOutNonsiderealFields =
         List(
@@ -484,12 +505,12 @@ object TargetService {
           NullOutNonsiderealFields ++
           NullOutOpportunityFields
 
-        case ek: EphemerisKey =>
+        case e: NonsiderealInput.Edit =>          
           void"c_type = 'nonsidereal'" ::
           List(
-            sql"c_nsid_des = $text".apply(ek.des),
-            sql"c_nsid_key_type = $ephemeris_key_type".apply(ek.keyType),
-            sql"c_nsid_key = $text".apply(EphemerisKey.fromString.reverseGet(ek)),
+            sql"c_nsid_des = $text".apply(e.key.des),
+            sql"c_nsid_key_type = $ephemeris_key_type".apply(e.key.keyType),
+            sql"c_nsid_key = $text".apply(Ephemeris.Key.fromString.reverseGet(e.key)),
           ) ++
           NullOutSiderealFields ++
           NullOutOpportunityFields
