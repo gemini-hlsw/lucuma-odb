@@ -558,3 +558,106 @@ class executionSciGmosNorthImaging extends ExecutionTestSupportForGmos:
         query    = gmosNorthScienceQuery(oid, 100.some),
         expected = expectedResult(g ++ i).asRight
       )
+
+  test("digest"):
+    val setup: IO[Observation.Id] =
+      for
+        p <- createProgram
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createObservation(p, t, Site.GN):
+          s"""{
+            gmosNorthImaging: {
+              variant: {
+                grouped: {
+                  offsets: {
+                    ${enumerated((0 until 4).toList.fproduct(identity) *)}
+                  }
+                  skyCount: 0
+                }
+              }
+              filters: [
+                { filter: G_PRIME },
+                { filter: I_PRIME },
+                { filter: Y       }
+              ]
+            }
+          }"""
+        _ <- runObscalcUpdate(p, o)
+      yield o
+
+    val expected: Json =
+      json"""
+        {
+          "observation" : {
+            "execution" : {
+              "digest" : {
+                "state" : "READY",
+                "value" : {
+                  "science" : {
+                    "atomCount" : 48,
+                    "telescopeConfigs" : [
+                      {
+                        "guiding" : "ENABLED",
+                        "offset" : {
+                          "p" : { "microarcseconds" : 0 },
+                          "q" : { "microarcseconds" : 0 }
+                        }
+                      },
+                      {
+                        "guiding" : "ENABLED",
+                        "offset" : {
+                          "p" : { "microarcseconds" : 1000000 },
+                          "q" : { "microarcseconds" : 1000000 }
+                        }
+                      },
+                      {
+                        "guiding" : "ENABLED",
+                        "offset" : {
+                          "p" : { "microarcseconds" : 2000000 },
+                          "q" : { "microarcseconds" : 2000000 }
+                        }
+                      },
+                      {
+                        "guiding" : "ENABLED",
+                        "offset" : {
+                          "p" : { "microarcseconds" : 3000000 },
+                          "q" : { "microarcseconds" : 3000000 }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
+      """
+
+    setup.flatMap: oid =>
+      expect(
+        user     = pi,
+        query    = s"""
+          query {
+            observation(observationId: "$oid") {
+              execution {
+                digest {
+                  state
+                  value {
+                    science {
+                      atomCount
+                      telescopeConfigs {
+                        guiding
+                        offset {
+                          p { microarcseconds }
+                          q { microarcseconds }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        """,
+        expected = expected.asRight
+      )
