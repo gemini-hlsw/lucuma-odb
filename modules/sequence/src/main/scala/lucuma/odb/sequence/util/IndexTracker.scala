@@ -38,6 +38,13 @@ object IndexTracker:
   ) extends IndexTracker:
 
     override def record[D](step: StepRecord[D]): IndexTracker =
-      if stepId === step.id then this
-      else if atomId === step.atomId then copy(stepCount = stepCount + 1, stepId = step.id)
-      else Recording(atomCount + 1, step.atomId, stepCount = 1, step.id)
+      println("record(" + step + ")")
+      if stepId === step.id then
+        println("record: same step id")
+        this
+      else if atomId === step.atomId then
+        println("record: same atom id")
+        copy(stepCount = stepCount + 1, stepId = step.id)
+      else
+        println("record: new atom id")
+        Recording(atomCount + 1, step.atomId, stepCount = 1, step.id)
