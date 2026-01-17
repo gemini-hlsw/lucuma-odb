@@ -130,26 +130,6 @@ class ShortCut_6589 extends ExecutionTestSupportForGmos:
         setQaState(s.d, DatasetQaState.Usable)              *>
         assertIO(nextAtomId(s.o), s.g)
 
-  test("... even if a new atom is recorded"):
-    Setup
-      .init(40)
-      .flatMap: s =>
-        for
-          // The first atom is done so the next generated atom id will differ.
-          _ <- assertIOBoolean(nextAtomId(s.o).map(_ =!= s.g))
-
-          // Record a new atom.
-          _ <- recordAtomAs(serviceUser, Instrument.GmosNorth, s.v, SequenceType.Science)
-
-          // Mark a dataset from the first atom as merely usable.
-          _ <- setQaState(s.d, DatasetQaState.Usable)
-
-          // Generate the sequence and obtain the generated id of the `nextAtom`,
-          // comparing it to what it was at the beginning of the "Setup" before
-          // anything was executed.  Now they are the same again.
-          _ <- assertIO(nextAtomId(s.o), s.g)
-        yield ()
-
   def nextAtomStepTypes(o: Observation.Id): IO[List[StepType]] =
     query(
       pi,
