@@ -8,20 +8,37 @@ import cats.effect.IO
 import cats.syntax.either.*
 import cats.syntax.functor.*
 import cats.syntax.option.*
+import cats.syntax.traverse.*
 import eu.timepit.refined.types.numeric.PosInt
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
+import lucuma.core.enums.DatasetQaState
+import lucuma.core.enums.GmosAmpCount
+import lucuma.core.enums.GmosAmpGain
+import lucuma.core.enums.GmosAmpReadMode
+import lucuma.core.enums.GmosDtax
 import lucuma.core.enums.GmosNorthFilter
+import lucuma.core.enums.GmosRoi
 import lucuma.core.enums.GmosSouthFilter
+import lucuma.core.enums.GmosXBinning
+import lucuma.core.enums.GmosYBinning
+import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.ObservingModeType
+import lucuma.core.enums.SequenceType
 import lucuma.core.enums.Site
+import lucuma.core.enums.StepGuideState
+import lucuma.core.math.Offset
 import lucuma.core.math.Wavelength
 import lucuma.core.model.ImageQuality
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
+import lucuma.core.model.sequence.StepConfig
+import lucuma.core.model.sequence.TelescopeConfig
+import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth
+import lucuma.core.model.sequence.gmos.GmosCcdMode
 import lucuma.core.syntax.string.*
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.Enumerated
@@ -29,6 +46,8 @@ import lucuma.core.util.TimeSpan
 import lucuma.itc.IntegrationTime
 import lucuma.itc.client.ImagingInput
 import lucuma.itc.client.InstrumentMode
+import lucuma.odb.json.all.transport.given
+import lucuma.odb.sequence.data.ProtoStep
 
 class executionSciGmosNorthImaging extends ExecutionTestSupportForGmos:
 
@@ -115,6 +134,35 @@ class executionSciGmosNorthImaging extends ExecutionTestSupportForGmos:
     offset:  (Int, Int),
     obsClass: ObserveClass
   ):
+
+    def toGmosNorthProtoStep(implicit ev: L =:= GmosNorthFilter): ProtoStep[GmosNorth] =
+      ProtoStep(
+        GmosNorth(
+          time.exposureTime,
+          GmosCcdMode(
+            GmosXBinning.Two,
+            GmosYBinning.Two,
+            GmosAmpCount.Twelve,
+            GmosAmpGain.Low,
+            GmosAmpReadMode.Slow
+          ),
+          GmosDtax.Zero,
+          GmosRoi.FullFrame,
+          none,
+          filter.asInstanceOf[GmosNorthFilter].some,
+          none
+        ),
+        StepConfig.Science,
+        TelescopeConfig(
+          Offset.signedMicroarcseconds.reverseGet((
+            offset._1.toLong * 1_000_000L,
+            offset._2.toLong * 1_000_000L
+          )),
+          StepGuideState.Enabled
+        ),
+        obsClass
+      )
+
     def withOffset(p: Int, q: Int): Step[L] =
       copy(offset = (p, q))
 
@@ -125,9 +173,7 @@ class executionSciGmosNorthImaging extends ExecutionTestSupportForGmos:
       json"""
         {
           "instrumentConfig" : {
-            "exposure" : {
-              "seconds" : ${Json.fromBigDecimal(time.exposureTime.toSeconds)}
-            },
+            "exposure" : { "seconds" : ${Json.fromBigDecimal(time.exposureTime.toSeconds)} },
             "readout" : {
               "xBin" : "TWO",
               "yBin" : "TWO"
@@ -140,17 +186,11 @@ class executionSciGmosNorthImaging extends ExecutionTestSupportForGmos:
               "nanometers" : ${Json.fromBigDecimal(wavelength(filter).toNanometers.value.value)}
             }
           },
-          "stepConfig" : {
-            "stepType" : "SCIENCE"
-          },
+          "stepConfig" : { "stepType" : "SCIENCE" },
           "telescopeConfig" : {
             "offset" : {
-              "p" : {
-                "arcseconds" : ${Json.fromBigDecimal(BigDecimal(s"${offset._1}.000000"))}
-              },
-              "q" : {
-                "arcseconds" : ${Json.fromBigDecimal(BigDecimal(s"${offset._1}.000000"))}
-              }
+              "p" : { "arcseconds" : ${Json.fromBigDecimal(BigDecimal(s"${offset._1}.000000"))} },
+              "q" : { "arcseconds" : ${Json.fromBigDecimal(BigDecimal(s"${offset._1}.000000"))} }
             },
             "guiding" : "ENABLED"
           },
@@ -660,4 +700,127 @@ class executionSciGmosNorthImaging extends ExecutionTestSupportForGmos:
           }
         """,
         expected = expected.asRight
+      )
+
+  test("execute first step"):
+    val setup: IO[Observation.Id] =
+      for
+        p <- createProgram
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createObservation(p, t, Site.GN):
+          s"""{
+            gmosNorthImaging: {
+              variant: {
+                grouped: { skyCount: 0 }
+              }
+              filters: [
+                { filter: G_PRIME },
+                { filter: I_PRIME },
+                { filter: Y       }
+              ]
+            }
+          }"""
+
+        v <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
+        a <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
+        s <- recordStepAs(serviceUser, a, Instrument.GmosNorth, Step(GmosNorthFilter.GPrime, Time120x06).toGmosNorthProtoStep)
+        _  <- addEndStepEvent(s)
+      yield o
+
+    val json: List[Json] = List(
+      List.fill( 5)(gnAtom(Step(GmosNorthFilter.GPrime, Time120x06))) ++
+      List.fill(12)(gnAtom(Step(GmosNorthFilter.IPrime, Time060x12))) ++
+      List.fill(30)(gnAtom(Step(GmosNorthFilter.Y,      Time030x30)))
+    ).flatten
+
+    setup.flatMap: oid =>
+      expect(
+        user     = pi,
+        query    = gmosNorthScienceQuery(oid, 100.some),
+        expected = expectedResult(json).asRight
+      )
+
+  test("execute first filter"):
+    val setup: IO[Observation.Id] =
+      for
+        p  <- createProgram
+        t  <- createTargetWithProfileAs(pi, p)
+        o  <- createObservation(p, t, Site.GN):
+          s"""{
+            gmosNorthImaging: {
+              variant: {
+                grouped: { skyCount: 0 }
+              }
+              filters: [
+                { filter: G_PRIME },
+                { filter: I_PRIME },
+                { filter: Y       }
+              ]
+            }
+          }"""
+
+        v  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
+        a  <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
+        _  <- (0 until 6).toList.traverse { _ =>
+                recordStepAs(serviceUser, a, Instrument.GmosNorth, Step(GmosNorthFilter.GPrime, Time120x06).toGmosNorthProtoStep)
+                  .flatTap(addEndStepEvent)
+              }.void
+      yield o
+
+    val json: List[Json] = List(
+      List.fill(12)(gnAtom(Step(GmosNorthFilter.IPrime, Time060x12))) ++
+      List.fill(30)(gnAtom(Step(GmosNorthFilter.Y,      Time030x30)))
+    ).flatten
+
+    setup.flatMap: oid =>
+      expect(
+        user     = pi,
+        query    = gmosNorthScienceQuery(oid, 100.some),
+        expected = expectedResult(json).asRight
+      )
+
+  test("repeat failed"):
+    val setup: IO[Observation.Id] =
+      for
+        p  <- createProgram
+        t  <- createTargetWithProfileAs(pi, p)
+        o  <- createObservation(p, t, Site.GN):
+          s"""{
+            gmosNorthImaging: {
+              variant: {
+                grouped: { skyCount: 0 }
+              }
+              filters: [
+                { filter: G_PRIME },
+                { filter: I_PRIME },
+                { filter: Y       }
+              ]
+            }
+          }"""
+
+        v  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
+        a  <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
+        s0 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, Step(GmosNorthFilter.GPrime, Time120x06).toGmosNorthProtoStep)
+        _  <- addEndStepEvent(s0)
+        d  <- recordDatasetAs(serviceUser, s0, "N20240905S1001.fits")
+        _  <- setQaState(d, DatasetQaState.Usable)
+        _  <- (0 until 5).toList.traverse { _ =>
+                recordStepAs(serviceUser, a, Instrument.GmosNorth, Step(GmosNorthFilter.GPrime, Time120x06).toGmosNorthProtoStep)
+                  .flatTap(addEndStepEvent)
+              }.void
+        s1 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, Step(GmosNorthFilter.IPrime, Time060x12).toGmosNorthProtoStep)
+        _  <- addEndStepEvent(s1)
+      yield o
+
+    val json: List[Json] = List(
+      List(gnAtom(Step(GmosNorthFilter.GPrime, Time120x06)))          ++
+      List.fill(11)(gnAtom(Step(GmosNorthFilter.IPrime, Time060x12))) ++
+      List.fill(30)(gnAtom(Step(GmosNorthFilter.Y,      Time030x30)))
+    ).flatten
+
+    setup.flatMap: oid =>
+      expect(
+        user     = pi,
+        query    = gmosNorthScienceQuery(oid, 100.some),
+        expected = expectedResult(json).asRight
       )

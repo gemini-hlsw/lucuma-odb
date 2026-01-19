@@ -12,6 +12,7 @@ import cats.syntax.functor.*
 import lucuma.core.enums.Breakpoint
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SmartGcalType
+import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.TelescopeConfig
 import monocle.Focus
@@ -36,6 +37,15 @@ case class ProtoStep[A](
     copy(breakpoint = Breakpoint.Enabled)
 
 object ProtoStep:
+
+  def fromStep[A](s: Step[A]): ProtoStep[A] =
+    ProtoStep(
+      s.instrumentConfig,
+      s.stepConfig,
+      s.telescopeConfig,
+      s.observeClass,
+      s.breakpoint
+    )
 
   def smartGcal[A](a: A, s: SmartGcalType, t: TelescopeConfig): ProtoStep[A] =
     ProtoStep(a, StepConfig.SmartGcal(s), t, ObserveClass.NightCal)

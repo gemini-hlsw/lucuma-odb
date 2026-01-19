@@ -85,6 +85,7 @@ import lucuma.odb.graphql.input.AllocationInput
 import lucuma.odb.graphql.input.TimeChargeCorrectionInput
 import lucuma.odb.json.offset.transport.given
 import lucuma.odb.json.stepconfig.given
+import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.service.EmailService
 import lucuma.odb.service.ObscalcService
 import lucuma.odb.service.Services
@@ -1973,6 +1974,14 @@ trait DatabaseOperations { this: OdbSuite =>
       json.hcursor.downFields(name, "stepRecord", "id").require[Step.Id]
     }
   }
+
+  def recordStepAs[D: io.circe.Encoder](
+    user:       User,
+    aid:        Atom.Id,
+    instrument: Instrument,
+    step:       ProtoStep[D]
+  ): IO[Step.Id] =
+    recordStepAs(user, aid, instrument, step.value, step.stepConfig, step.telescopeConfig, step.observeClass)
 
   def addStepEventAs(
     user:  User,

@@ -5,6 +5,7 @@ package lucuma.odb.sequence
 package gmos
 package imaging
 
+import cats.Eq
 import cats.Order
 import cats.Order.catsKernelOrderingForOrder
 import cats.data.NonEmptyList
@@ -48,6 +49,7 @@ import lucuma.odb.data.Itc.Result
 import lucuma.odb.data.OdbError
 import lucuma.odb.sequence.data.ProtoAtom
 import lucuma.odb.sequence.data.ProtoStep
+import lucuma.odb.sequence.data.StepRecord
 import lucuma.odb.sequence.data.TelescopeConfigGenerator
 import lucuma.odb.sequence.util.AtomBuilder
 
@@ -194,7 +196,19 @@ object Science:
       namespace:  UUID,
       protoAtoms: Stream[Pure, ProtoAtom[ProtoStep[D]]]
   ): SequenceGenerator[D] =
-    new SequenceGenerator.Base[D]:
+
+    case class ImagingGenerator(
+      recordedSteps: Map[ProtoStep[D], Int]
+    ) extends SequenceGenerator.Base[D]:
+
+      override def recordStep(step: StepRecord[D])(using Eq[D]): SequenceGenerator[D] =
+        if step.successfullyCompleted && step.isScience then
+          ImagingGenerator:
+            recordedSteps.updatedWith(step.protoStep): count =>
+              count.map(_ + 1).orElse(1.some)
+        else
+          this
+
       override def generate(when: Timestamp): Stream[Pure, Atom[D]] =
         val build = AtomBuilder.instantiate(estimator, static, namespace, SequenceType.Science)
 
@@ -204,6 +218,21 @@ object Science:
             build.build(protoAtom.description, idx.toInt, 0, protoAtom.steps).run(cs).value
           }
           .map(_._2)
+          .mapAccumulate(recordedSteps): (rec, nextAtom) =>
+            val (recʹ, optSteps) = nextAtom.steps.toList.mapAccumulate(rec): (rec, step) =>
+              val protoStep = ProtoStep.fromStep(step)
+              (
+                rec.updatedWith(protoStep): count =>
+                  count.map(_ - 1).orElse(none).filter(_ > 0),
+                Option.when(!rec.contains(protoStep))(step)
+              )
+            (
+              recʹ,
+              NonEmptyList.fromList(optSteps.flatten).map(steps => nextAtom.copy(steps = steps))
+            )
+          .collect { case (_, Some(atom)) => atom }
+
+    ImagingGenerator(Map.empty)
 
   object ScienceGenerator:
 
