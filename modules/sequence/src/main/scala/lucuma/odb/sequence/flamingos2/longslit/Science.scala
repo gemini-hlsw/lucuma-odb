@@ -43,6 +43,7 @@ import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
 import lucuma.itc.IntegrationTime
 import lucuma.odb.data.OdbError
+import lucuma.odb.sequence.data.AtomRecord
 import lucuma.odb.sequence.data.ProtoAtom
 import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.sequence.data.StepRecord
@@ -500,6 +501,11 @@ object Science:
     builder:       AtomBuilder[F2],
     goalCycles:    NonNegInt
   ) extends SequenceGenerator[F2]:
+
+    override def recordAtom(atom: AtomRecord): SequenceGenerator[F2] =
+      copy(
+        indices = indices.reset(atom)
+      )
 
     override def recordStep(step: StepRecord[F2])(using Eq[F2]): SequenceGenerator[F2] =
       step.sequenceType match

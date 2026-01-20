@@ -49,6 +49,7 @@ import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.data.StepExecutionState
 import lucuma.odb.sequence.TimeEstimateCalculator
+import lucuma.odb.sequence.data.AtomRecord
 import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.sequence.data.StepRecord
 import lucuma.odb.util.Codecs.*
@@ -130,6 +131,10 @@ trait SequenceService[F[_]]:
   def selectAtomDigests(
     which: List[Observation.Id]
   )(using Transaction[F], Services.ServiceAccess): Stream[F, (Observation.Id, Short, AtomDigest)]
+
+  def selectAtomRecords(
+    observationId: Observation.Id
+  )(using Services.ServiceAccess): Stream[F, AtomRecord]
 
 object SequenceService:
 
@@ -421,6 +426,11 @@ object SequenceService:
       )(using Transaction[F], Services.ServiceAccess): Stream[F, (Observation.Id, Short, AtomDigest)] =
         if which.isEmpty then Stream.empty
         else session.stream(Statements.selectAtomDigests(which))(which, 1024)
+
+      override def selectAtomRecords(
+        observationId: Observation.Id
+      )(using Services.ServiceAccess): Stream[F, AtomRecord] =
+        session.stream(Statements.SelectAtomRecords)(observationId, 1024)
 
   object Statements:
 
@@ -788,6 +798,15 @@ object SequenceService:
     val atom_digest_row: Codec[(Observation.Id, Short, AtomDigest)] =
       observation_id *: int2 *: atom_digest
 
+    val atom_record: Codec[AtomRecord] = (
+      atom_id              *:
+      visit_id             *:
+      sequence_type        *:
+      core_timestamp       *:
+      atom_execution_state *:
+      atom_id.opt
+    ).to[AtomRecord]
+
     val AtomDigestRowColumns: String =
       """
           c_observation_id,
@@ -818,3 +837,19 @@ object SequenceService:
           c_observation_id IN ${observation_id.list(which).values}
         ORDER BY c_observation_id, c_atom_index
       """.query(atom_digest_row)
+
+    val SelectAtomRecords: Query[Observation.Id, AtomRecord] =
+      sql"""
+        SELECT
+          c_atom_id,
+          c_visit_id,
+          c_sequence_type,
+          c_created,
+          c_execution_state,
+          c_generated_id
+        FROM
+          t_atom_record
+        WHERE
+          c_observation_id = $observation_id
+        ORDER BY c_observation_id, c_created
+      """.query(atom_record)

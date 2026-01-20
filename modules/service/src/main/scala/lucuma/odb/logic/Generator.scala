@@ -345,10 +345,10 @@ object Generator {
       type ProtoGmosSouth  = ProtoExecutionConfig[GmosSouthStatic, Atom[GmosSouthDynamic]]
 
       private def protoExecutionConfig[S, D](
-        ctx:      Context,
-        gen:      ExecutionConfigGenerator[S, D],
-        steps:    Stream[F, StepRecord[D]],
-        when:     Option[Timestamp]
+        ctx:   Context,
+        gen:   ExecutionConfigGenerator[S, D],
+        steps: Stream[F, StepRecord[D]],
+        when:  Option[Timestamp]
       )(using Eq[D], Services.ServiceAccess): EitherT[F, OdbError, (ProtoExecutionConfig[S, Atom[D]], ExecutionState)] =
         if ctx.params.declaredComplete then
           EitherT.pure:
@@ -356,11 +356,12 @@ object Generator {
         else
           val visits = services.visitService.selectAll(ctx.oid)
           val events = services.executionEventService.selectSequenceEvents(ctx.oid)
+          val atoms  = services.sequenceService.selectAtomRecords(ctx.oid)
           EitherT.liftF:
             services.transactionally:
               for
                 t <- when.fold(timeService.transactionTime)(_.pure[F])
-                p <- gen.executionConfig(visits, events, steps, t)
+                p <- gen.executionConfig(visits, events, steps, atoms, t)
               yield p
 
       private def requireImagingItc[A](
