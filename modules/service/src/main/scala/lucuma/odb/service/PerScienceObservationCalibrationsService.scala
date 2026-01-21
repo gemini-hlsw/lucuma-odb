@@ -10,6 +10,7 @@ import eu.timepit.refined.types.numeric.NonNegShort
 import eu.timepit.refined.types.string.NonEmptyString
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.Instrument
+import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.TelluricCalibrationOrder
 import lucuma.core.model.Group
@@ -360,19 +361,23 @@ object PerScienceObservationCalibrationsService:
       )(using Transaction[F], SuperUserAccess): F[(List[Observation.Id], List[Observation.Id])] =
         for
           // only include observations that are Defined or Ready
-          activeScienceObs <- onlyDefinedAndReady(scienceObs, _.id)
-          currentObsIds     = activeScienceObs.map(_.id).toSet
-          _                 <- info"Recalculating per science calibrations for $pid"
-          _                 <- debug"Program $pid has ${currentObsIds.size} science configurations"
-          _                 <- S.session.execute(sql"set constraints all deferred".command)
+          activeScienceObs     <- onlyDefinedAndReady(scienceObs, _.id)
+          currentObsIds         = activeScienceObs.map(_.id).toSet
+          _                    <- info"Recalculating per science calibrations for $pid"
+          _                    <- debug"Program $pid has ${currentObsIds.size} science configurations"
+          _                    <- S.session.execute(sql"set constraints all deferred".command)
           // Telluric groups with all observations
-          allObsInGroups    <- groupService.selectGroups(pid, obsFilter = void"true").map(telluricGroups).map(_.toMap)
+          allObsInGroups       <- groupService.selectGroups(pid, obsFilter = void"true").map(telluricGroups).map(_.toMap)
           // Collect telluric observation IDs from all groups
-          telluricObsSet    <- allObsInGroups.keys.toList
-                                 .flatTraverse(findAllTelluricObservations)
-                                 .map(_.toSet)
-          // Obervations to remove from telluric groups
-          toUnlink          = allObsInGroups.values.flatten.map(_._1).filterNot(a => currentObsIds.exists(_ === a)).toSet
+          telluricObsSet       <- allObsInGroups.keys.toList
+                                   .flatTraverse(findAllTelluricObservations)
+                                   .map(_.toSet)
+          // Get all observations in telluric groups (excluding telluric calibrations themselves)
+          allGroupObsIds        = allObsInGroups.values.flatten.map(_._1).filterNot(telluricObsSet.contains).toList
+          // Find observations that are Ongoing or Completed - these should stay in their groups
+          ongoingOrCompletedIds <- filterWorkflowStateIn(allGroupObsIds, identity, List(ObservationWorkflowState.Ongoing, ObservationWorkflowState.Completed), ready = false).map(_.toSet)
+          // Observations to remove from telluric groups (exclude active science obs AND Ongoing/Completed obs)
+          toUnlink              = allObsInGroups.values.flatten.map(_._1).filterNot(a => currentObsIds.exists(_ === a) || ongoingOrCompletedIds.exists(_ === a)).toSet
           // Query group locations
           groupLocations    <- Statements.queryGroupLocations(allObsInGroups.keys.toList)
           // Collect all observations to move with their target locations (only science obs, not calibrations)

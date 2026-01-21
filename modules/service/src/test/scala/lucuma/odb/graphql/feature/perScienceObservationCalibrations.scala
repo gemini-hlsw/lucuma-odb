@@ -15,9 +15,7 @@ import lucuma.catalog.telluric.TelluricStar
 import lucuma.catalog.telluric.TelluricTargetsClient
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.Flamingos2Fpu
-import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObservationWorkflowState
-import lucuma.core.enums.SequenceType
 import lucuma.core.enums.TelluricCalibrationOrder
 import lucuma.core.math.Coordinates
 import lucuma.core.math.Declination
@@ -331,7 +329,8 @@ class perScienceObservationCalibrations
             }
           }"""
     ).map { c =>
-      c.hcursor.downField("group").as[GroupInfo].isRight
+      val groupJson = c.hcursor.downField("group").focus
+      groupJson.exists(!_.isNull)
     }
 
   private def updateFlamingos2Fpu(oid: Observation.Id, fpu: Flamingos2Fpu): IO[Unit] =
@@ -1036,7 +1035,7 @@ class perScienceObservationCalibrations
         assert(!targetExists)
       }
 
-  test("Remove telluric group and unexecuted tellurics when science observation becomes Ongoing"):
+  test("Telluric group and tellurics are preserved when science observation becomes Ongoing"):
     for {
       pid                <- createProgramAs(pi)
       tid                <- createTargetWithProfileAs(pi, pid)
@@ -1048,33 +1047,22 @@ class perScienceObservationCalibrations
       groupId            =  obsBefore.groupId.get
       obsInGroup1        <- queryObservationsInGroup(groupId)
       telluricOid        =  obsInGroup1.find(_.calibrationRole.contains(CalibrationRole.Telluric)).get.id
-      telluricTgt        <- queryObservationWithTarget(telluricOid)
-      telluricTid        =  telluricTgt.targetId.get
-      // Record execution to make science observation Ongoing
-      vid                <- recordVisitAs(serviceUser, Instrument.Flamingos2, oid)
-      aid                <- recordAtomAs(serviceUser, Instrument.Flamingos2, vid, SequenceType.Science)
-      sid                <- recordStepAs(serviceUser, Instrument.Flamingos2, aid)
-      _                  <- addEndStepEvent(sid)
-      _                  <- runObscalcUpdate(pid, oid)
-      // Verify workflow state is Ongoing before recalculating
-      workflowState      <- queryObservationWorkflowState(pi, oid)
-      _                  =  assertEquals(workflowState, ObservationWorkflowState.Ongoing)
+      // Set science observation to Ongoing state and ensure obscalc is 'ready'
+      _                  <- setCalculatedWorkflowState(oid, ObservationWorkflowState.Ongoing)
       (added2, removed2) <- recalculateCalibrations(pid, when)
       groupExists        <- queryGroupExists(groupId)
       tellExists         <- queryObservationExists(telluricOid)
-      targetExists       <- queryTargetExists(telluricTid)
+      obsInGroup2        <- queryObservationsInGroup(groupId)
     } yield {
-      // Initial state: telluric group with science + telluric
       assertEquals(obsInGroup1.size, 2)
       assertEquals(added1.size, 1)
       assertEquals(removed1.size, 0)
-      // After science becomes Ongoing: group and unexecuted telluric removed
-      assert(!groupExists)
-      assert(!tellExists)
-      assert(!targetExists)
-      assertEquals(added2.size, 0)
-      assertEquals(removed2.size, 1)
-      assertEquals(removed2.headOption, telluricOid.some)
+      // After science becomes Ongoing the group remains as well
+      // as the exisiting telluric
+      // This was broken and the telluric obs and group would be deleted
+      assert(groupExists)
+      assert(tellExists)
+      assertEquals(obsInGroup2.size, 2)
     }
 
   test("Generate for defined and ready observations"):
