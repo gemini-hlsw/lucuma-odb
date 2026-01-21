@@ -27,8 +27,10 @@ import lucuma.catalog.votable.*
 import lucuma.core.enums.Flamingos2LyotWheel
 import lucuma.core.enums.GuideProbe
 import lucuma.core.enums.GuideSpeed
+import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.PortDisposition
 import lucuma.core.enums.Site
+import lucuma.core.enums.TrackType
 import lucuma.core.geom.ShapeExpression
 import lucuma.core.geom.gmos.candidatesArea
 import lucuma.core.geom.jts.interpreter.given
@@ -47,6 +49,7 @@ import lucuma.core.model.SiderealTracking
 import lucuma.core.model.Target
 import lucuma.core.model.Tracking
 import lucuma.core.model.User
+import lucuma.core.model.probes
 import lucuma.core.model.sequence.ExecutionDigest
 import lucuma.core.model.sequence.flamingos2.Flamingos2FpuMask
 import lucuma.core.util.TimeSpan
@@ -86,6 +89,7 @@ import scala.annotation.tailrec
 import scala.collection.immutable.SortedMap
 
 import Services.Syntax.*
+import lucuma.core.model.CompositeTracking
 
 trait GuideService[F[_]] {
   import GuideService.AvailabilityPeriod
@@ -182,7 +186,6 @@ object GuideService {
   private def guideStarNameError(name: String): OdbError =
     OdbError.InvalidArgument(s"Invalid guide target name '$name'".some)
 
-
   case class ObservationInfo(
     id:                  Observation.Id,
     programId:           Program.Id,
@@ -277,19 +280,44 @@ object GuideService {
     val acqOffsets   = NonEmptySet.fromSet(digest.acquisition.telescopeConfigs).flatMap(_.asAcqOffsets)
     val sciOffsets   = NonEmptySet.fromSet(digest.science.telescopeConfigs).flatMap(_.asSciOffsets)
 
-    val (site, agsParams, centralWavelength): (Site, AgsParams, Wavelength) = params.observingMode match
-      case mode: gmos.longslit.Config.GmosNorth =>
-        (Site.GN, AgsParams.GmosAgsParams(mode.fpu.asLeft.some, PortDisposition.Side), mode.centralWavelength)
-      case mode: gmos.longslit.Config.GmosSouth =>
-        (Site.GS, AgsParams.GmosAgsParams(mode.fpu.asRight.some, PortDisposition.Side), mode.centralWavelength)
-      case mode: gmos.imaging.Config.GmosNorth =>
-        // GMOS imaging doesn't use an FPU or central wavelength; use a default wavelength for AGS
-        (Site.GN, AgsParams.GmosAgsParams(none, PortDisposition.Side), Wavelength.fromIntNanometers(500).get)
-      case mode: gmos.imaging.Config.GmosSouth =>
-        // GMOS imaging doesn't use an FPU or central wavelength; use a default wavelength for AGS
-        (Site.GS, AgsParams.GmosAgsParams(none, PortDisposition.Side), Wavelength.fromIntNanometers(500).get)
-      case mode: flamingos2.longslit.Config     =>
-        (Site.GS, AgsParams.Flamingos2AgsParams(Flamingos2LyotWheel.F16, Flamingos2FpuMask.Builtin(mode.fpu), PortDisposition.Side), mode.filter.wavelength)
+    val (site, observingModeType, centralWavelength): (Site, ObservingModeType, Wavelength) =
+      params.observingMode match
+        case mode: gmos.longslit.Config.GmosNorth =>
+          (Site.GN, ObservingModeType.GmosNorthLongSlit, mode.centralWavelength)
+        case mode: gmos.longslit.Config.GmosSouth =>
+          (Site.GS, ObservingModeType.GmosSouthLongSlit, mode.centralWavelength)
+        case _: gmos.imaging.Config.GmosNorth =>
+          // GMOS imaging doesn't use an FPU or central wavelength; use a default wavelength for AGS
+          (Site.GN, ObservingModeType.GmosNorthImaging, Wavelength.fromIntNanometers(500).get)
+        case _: gmos.imaging.Config.GmosSouth =>
+          // GMOS imaging doesn't use an FPU or central wavelength; use a default wavelength for AGS
+          (Site.GS, ObservingModeType.GmosSouthImaging, Wavelength.fromIntNanometers(500).get)
+        case mode: flamingos2.longslit.Config =>
+          (Site.GS, ObservingModeType.Flamingos2LongSlit, mode.filter.wavelength)
+
+    def agsParamsFor(trackType: TrackType): Option[AgsParams] =
+      probes.guideProbe(observingModeType, trackType).flatMap: probe =>
+        (params.observingMode, probe) match
+          case (gmos.longslit.Config.GmosNorth(fpu = fpu), GuideProbe.GmosOIWFS) =>
+            AgsParams.GmosAgsParams(fpu.asLeft.some, PortDisposition.Side).some
+          case (gmos.longslit.Config.GmosNorth(fpu = fpu), GuideProbe.PWFS1) =>
+            AgsParams.GmosAgsParams(fpu.asLeft.some, PortDisposition.Side).withPWFS1.some
+          case (gmos.longslit.Config.GmosNorth(fpu = fpu), GuideProbe.PWFS2) =>
+            AgsParams.GmosAgsParams(fpu.asLeft.some, PortDisposition.Side).withPWFS2.some
+          case (gmos.longslit.Config.GmosSouth(fpu = fpu), GuideProbe.GmosOIWFS) =>
+            AgsParams.GmosAgsParams(fpu.asRight.some, PortDisposition.Side).some
+          case (gmos.longslit.Config.GmosSouth(fpu = fpu), GuideProbe.PWFS1) =>
+            AgsParams.GmosAgsParams(fpu.asRight.some, PortDisposition.Side).withPWFS1.some
+          case (gmos.longslit.Config.GmosSouth(fpu = fpu), GuideProbe.PWFS2) =>
+            AgsParams.GmosAgsParams(fpu.asRight.some, PortDisposition.Side).withPWFS2.some
+          case (flamingos2.longslit.Config(fpu = fpu), GuideProbe.GmosOIWFS) =>
+            AgsParams.Flamingos2AgsParams(Flamingos2LyotWheel.F16, Flamingos2FpuMask.Builtin(fpu), PortDisposition.Side).some
+          case (flamingos2.longslit.Config(fpu = fpu), GuideProbe.PWFS1) =>
+            AgsParams.Flamingos2AgsParams(Flamingos2LyotWheel.F16, Flamingos2FpuMask.Builtin(fpu), PortDisposition.Side).withPWFS1.some
+          case (flamingos2.longslit.Config(fpu = fpu), GuideProbe.PWFS2) =>
+            AgsParams.Flamingos2AgsParams(Flamingos2LyotWheel.F16, Flamingos2FpuMask.Builtin(fpu), PortDisposition.Side).withPWFS2.some
+          case _ =>
+            none
 
     def getScienceStartTime(obsTime: Timestamp): Timestamp = obsTime +| setupTime
     def getScienceDuration(obsDuration: TimeSpan, obsId: Observation.Id): Result[TimeSpan] =
@@ -590,20 +618,22 @@ object GuideService {
         blindOffset:   Option[Coordinates],
         angles:        NonEmptyList[Angle],
         candidates:    List[GuideStarCandidate],
+        trackType:     TrackType
       ): List[AgsAnalysis.Usable] =
-        Ags
-          .agsAnalysis(obsInfo.constraints,
-                       wavelength,
-                       baseCoords,
-                       scienceCoords,
-                       blindOffset,
-                       angles,
-                       genInfo.acqOffsets,
-                       genInfo.sciOffsets,
-                       genInfo.agsParams,
-                       candidates
-          )
-          .sortUsablePositions
+        genInfo.agsParamsFor(trackType).foldMap: params =>
+          Ags
+            .agsAnalysis(obsInfo.constraints,
+                        wavelength,
+                        baseCoords,
+                        scienceCoords,
+                        blindOffset,
+                        angles,
+                        genInfo.acqOffsets,
+                        genInfo.sciOffsets,
+                        params,
+                        candidates
+            )
+            .sortUsablePositions
 
       def chooseBestGuideStar(
         obsInfo:       ObservationInfo,
@@ -613,22 +643,24 @@ object GuideService {
         scienceCoords: List[Coordinates],
         blindOffset:   Option[Coordinates],
         angles:        NonEmptyList[Angle],
-        candidates:    NonEmptyList[GuideStarCandidate]
+        candidates:    NonEmptyList[GuideStarCandidate],
+        trackType:     TrackType
       ): Option[AgsAnalysis.Usable] =
-        Ags
-          .agsAnalysis(obsInfo.constraints,
-                       wavelength,
-                       baseCoords,
-                       scienceCoords,
-                       blindOffset,
-                       angles,
-                       genInfo.acqOffsets,
-                       genInfo.sciOffsets,
-                       genInfo.agsParams,
-                       candidates.toList
-          )
-          .sortUsablePositions
-          .headOption
+        genInfo.agsParamsFor(trackType).flatMap: params =>
+          Ags
+            .agsAnalysis(obsInfo.constraints,
+                        wavelength,
+                        baseCoords,
+                        scienceCoords,
+                        blindOffset,
+                        angles,
+                        genInfo.acqOffsets,
+                        genInfo.sciOffsets,
+                        params,
+                        candidates.toList
+            )
+            .sortUsablePositions
+            .headOption
 
       def buildAvailabilityAndCache(
         pid:             Program.Id,
@@ -743,6 +775,8 @@ object GuideService {
           // in the future than either the end time passed in, or a science candidate will be invalid
           endCutoff        = scienceCutoff.min(end)
           candidatesAt     = candidates.map(_.at(start.toInstant))
+          trackType        = CompositeTracking(asterismTracking).trackType
+          agsParams       <- genInfo.agsParamsFor(trackType).toRight(generalError(s"Unable to get AGS params for observation ${obsInfo.id}"))
           angleMap         = getAvailabilityMap(
                                candidatesAt,
                                start,
@@ -755,7 +789,7 @@ object GuideService {
                                obsInfo.availabilityAngles,
                                genInfo.acqOffsets,
                                genInfo.sciOffsets,
-                               genInfo.agsParams
+                               agsParams
                              )
           candidateCutoff  = angleMap.values.minOption.getOrElse(Timestamp.Max)
           finalEnd         = endCutoff.min(candidateCutoff)
@@ -873,7 +907,8 @@ object GuideService {
                               .toResult(generalError(s"No angles to test for guide target candidates for observation $oid.").asProblem)
                            )
           blindOffsetOpt <- ResultT.liftF(getBlindOffsetCoordinates(oid, obsTime.toInstant))
-          optUsable      = chooseBestGuideStar(obsInfo, genInfo.centralWavelength, genInfo, baseCoords, scienceCoords, blindOffsetOpt, angles, candidates)
+          trackType      = CompositeTracking(asterismTracking).trackType
+          optUsable      = chooseBestGuideStar(obsInfo, genInfo.centralWavelength, genInfo, baseCoords, scienceCoords, blindOffsetOpt, angles, candidates, trackType)
           tgts           = original.map(x => (x._2.id, x._1)).toList.toMap
           env            <- ResultT.fromResult(
                              optUsable
@@ -957,7 +992,8 @@ object GuideService {
                               .toResult(generalError(s"No angles to test for guide target candidates for observation $oid.").asProblem)
                            )
           blindOffsetOpt <- ResultT.liftF(getBlindOffsetCoordinates(oid, obsTime.toInstant))
-          usable         = processCandidates(obsInfo, genInfo.centralWavelength, genInfo, baseCoords, scienceCoords, blindOffsetOpt, angles, candidates)
+          trackType      = CompositeTracking(asterismTracking).trackType
+          usable         = processCandidates(obsInfo, genInfo.centralWavelength, genInfo, baseCoords, scienceCoords, blindOffsetOpt, angles, candidates, trackType)
         } yield usable.toGuideEnvironments(originals).toList).value
 
       override def getGuideAvailability(pid: Program.Id, oid: Observation.Id, period: TimestampInterval)(
