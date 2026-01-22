@@ -109,6 +109,10 @@ trait WorkflowStateQueries[F[_]: Monad: Services] {
   def excludeOngoingAndCompleted[A](obs: List[A], oid: A => Observation.Id): F[List[A]] =
     filterWorkflowStateNotIn(obs, oid, List(ObservationWorkflowState.Ongoing, ObservationWorkflowState.Completed))
 
+  def excludeFromDeletion[A](obs: List[A], oid: A => Observation.Id)(using Transaction[F]): F[List[A]] =
+    excludeOngoingAndCompleted(obs, oid).flatMap: filtered =>
+      filtered.filterA(a => visitService.hasVisits(oid(a)).map(!_))
+
   def onlyDefinedAndReady[A](obs: List[A], oid: A => Observation.Id): F[List[A]] =
     filterWorkflowStateIn(obs, oid, List(ObservationWorkflowState.Defined, ObservationWorkflowState.Ready), true)
 

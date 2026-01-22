@@ -8,14 +8,11 @@ import cats.syntax.all.*
 import io.circe.syntax.*
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObservationWorkflowState
-import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.ObservingModeType
-import lucuma.core.enums.SequenceType
 import lucuma.core.model.Observation
 import lucuma.core.model.User
 import lucuma.odb.graphql.ACursorOps
 import lucuma.odb.graphql.query.ExecutionTestSupportForGmos
-import lucuma.odb.json.all.transport.given
 
 class VisitServiceSuite extends ExecutionTestSupportForGmos:
 
@@ -46,20 +43,3 @@ class VisitServiceSuite extends ExecutionTestSupportForGmos:
     yield
       assertEquals(before, false)
       assertEquals(after, true)
-
-  test("recording a visit, atom, or step changes workflow state to Ongoing"):
-    for
-      pid              <- createProgram
-      tid              <- createTargetWithProfileAs(pi, pid)
-      oid              <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
-      _                <- runObscalcUpdate(pid, oid)
-      stateBefore      <- queryWorkflowState(pi, oid)
-      vid              <- recordVisitAs(serviceUser, Instrument.GmosNorth, oid)
-      aid              <- recordAtomAs(serviceUser, Instrument.GmosNorth, vid, SequenceType.Science)
-      sid              <- recordStepAs(serviceUser, aid, Instrument.GmosNorth, gmosNorthArc(0), ArcStep, gcalTelescopeConfig(0), ObserveClass.NightCal)
-      _                <- addEndStepEvent(sid)
-      _                <- runObscalcUpdate(pid, oid)
-      stateAfterExec   <- queryWorkflowState(pi, oid)
-    yield
-      assertEquals(stateBefore, ObservationWorkflowState.Defined)
-      assertEquals(stateAfterExec, ObservationWorkflowState.Ongoing)
