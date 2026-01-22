@@ -372,9 +372,9 @@ object PerScienceObservationCalibrationsService:
           telluricObsSet       <- allObsInGroups.keys.toList
                                    .flatTraverse(findAllTelluricObservations)
                                    .map(_.toSet)
-          // Get all observations in telluric groups (excluding telluric calibrations themselves)
+          // Get all observations in groups excluding telluric calibrations
           allGroupObsIds        = allObsInGroups.values.flatten.map(_._1).filterNot(telluricObsSet.contains).toList
-          // Find observations that are Ongoing or Completed - these should stay in their groups
+          // Find observations that are Ongoing or Completed - these should not be deleted
           ongoingOrCompletedIds <- filterWorkflowStateIn(allGroupObsIds, identity, List(ObservationWorkflowState.Ongoing, ObservationWorkflowState.Completed), ready = false).map(_.toSet)
           // Observations to remove from telluric groups (exclude active science obs AND Ongoing/Completed obs)
           toUnlink              = allObsInGroups.values.flatten.map(_._1).filterNot(a => currentObsIds.exists(_ === a) || ongoingOrCompletedIds.exists(_ === a)).toSet
