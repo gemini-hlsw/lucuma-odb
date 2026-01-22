@@ -3438,7 +3438,7 @@ input UserSuppliedEphemeris {
 }
 
 """
-Nonsidereal target parameters. 
+Nonsidereal target parameters.
 For the key, if specified, provide either (`keyType` and `des`) or `key`.
 """
 input NonsiderealInput {
@@ -18123,6 +18123,9 @@ input WhereCalculatedObservationWorkflow {
   "Matches the current state of the background calculation."
   calculationState: WhereOrderCalculationState
 
+  "Matches the current state of the background calculation."
+  state: WhereOrderCalculationState @deprecated(reason: "Use `calculationState` instead.")
+
   "Matchs the workflow state itself."
   workflowState: WhereOrderObservationWorkflowState
 
@@ -18173,6 +18176,10 @@ type ObservationWorkflow {
 
 type CalculatedObservationWorkflow {
   "The current state of the background calculation."
-  state: CalculationState!
+  calculationState: CalculationState!
+
+  "The current state of the background calculation."
+  state: CalculationState! @deprecated(reason: "Use `calculationState` instead.")
+
   value: ObservationWorkflow!
 }
