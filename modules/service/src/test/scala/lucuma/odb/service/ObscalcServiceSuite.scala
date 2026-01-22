@@ -9,6 +9,7 @@ import cats.syntax.option.*
 import eu.timepit.refined.types.numeric.NonNegInt
 import lucuma.core.enums.ChargeClass
 import lucuma.core.enums.ExecutionState
+import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.StepGuideState
@@ -318,3 +319,16 @@ class ObscalcServiceSuite extends ObscalcServiceSuiteSupport:
         calculateAndUpdate(lst.head) *> selectStates
 
     assertIO(res.map(_.values.toList.head), CalculationState.Retry)
+
+  test("insert visit sets state to pending"):
+    val states = for
+      _  <- cleanup
+      p  <- createProgram
+      o  <- createGmosNorthLongSlitObservationAs(pi, p, Nil)
+      _  <- runObscalcUpdate(p, o)
+      r0 <- selectStates
+      _  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
+      r1 <- selectStates
+    yield (r0(o), r1(o))
+
+    assertIO(states, (CalculationState.Ready, CalculationState.Pending))
