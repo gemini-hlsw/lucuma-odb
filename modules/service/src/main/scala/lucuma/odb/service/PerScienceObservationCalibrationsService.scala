@@ -10,6 +10,7 @@ import eu.timepit.refined.types.numeric.NonNegShort
 import eu.timepit.refined.types.string.NonEmptyString
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.Instrument
+import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.TelluricCalibrationOrder
 import lucuma.core.model.Group
@@ -238,8 +239,8 @@ object PerScienceObservationCalibrationsService:
       )(using Transaction[F], SuperUserAccess): F[List[Observation.Id]] =
         for
           allTelluricOids <- groupIds.flatTraverse(gid => findTelluricObservation(gid).map(_.toList))
-          // Filter ongoing and completed
-          toDelete        <- excludeOngoingAndCompleted(allTelluricOids, identity)
+          // Filter ongoing/completed and with visits
+          toDelete        <- excludeFromDeletion(allTelluricOids, identity)
           deleted         <- NonEmptyList.fromList(toDelete) match
                                case Some(nel) => observationService.deleteCalibrationObservations(nel).as(toDelete)
                                case None      => List.empty.pure[F]
@@ -269,7 +270,7 @@ object PerScienceObservationCalibrationsService:
       )(using Transaction[F], SuperUserAccess): F[(List[Observation.Id], List[Observation.Id])] =
         for {
           existing      <- findAllTelluricObservations(gid)
-          deletable     <- excludeOngoingAndCompleted(existing, identity)
+          deletable     <- excludeFromDeletion(existing, identity)
           duration      <- obsDuration(obs.id)
           requiredCount  = duration match
                              case Some(d) if d > MultiTelluricThreshold => 2
@@ -286,7 +287,7 @@ object PerScienceObservationCalibrationsService:
                                   (List.empty, List.empty).pure[F]
           // sync configuration on all deletable tellurics
           allTellurics  <- findAllTelluricObservations(gid)
-          toSync        <- excludeOngoingAndCompleted(allTellurics, identity)
+          toSync        <- excludeFromDeletion(allTellurics, identity)
           _             <- toSync.traverse_(tid => syncConfiguration(obs.id, tid))
         } yield (created, deleted)
 
@@ -360,50 +361,58 @@ object PerScienceObservationCalibrationsService:
       )(using Transaction[F], SuperUserAccess): F[(List[Observation.Id], List[Observation.Id])] =
         for
           // only include observations that are Defined or Ready
-          activeScienceObs <- onlyDefinedAndReady(scienceObs, _.id)
-          currentObsIds     = activeScienceObs.map(_.id).toSet
-          _                 <- info"Recalculating per science calibrations for $pid"
-          _                 <- debug"Program $pid has ${currentObsIds.size} science configurations"
-          _                 <- S.session.execute(sql"set constraints all deferred".command)
+          activeScienceObs     <- onlyDefinedAndReady(scienceObs, _.id)
+          currentObsIds         = activeScienceObs.map(_.id).toSet
+          _                    <- info"Recalculating per science calibrations for $pid"
+          _                    <- debug"Program $pid has ${currentObsIds.size} science configurations"
+          _                    <- S.session.execute(sql"set constraints all deferred".command)
           // Telluric groups with all observations
-          allObsInGroups    <- groupService.selectGroups(pid, obsFilter = void"true").map(telluricGroups).map(_.toMap)
+          allObsInGroups       <- groupService.selectGroups(pid, obsFilter = void"true").map(telluricGroups).map(_.toMap)
           // Collect telluric observation IDs from all groups
-          telluricObsSet    <- allObsInGroups.keys.toList
-                                 .flatTraverse(findAllTelluricObservations)
-                                 .map(_.toSet)
-          // Obervations to remove from telluric groups
-          toUnlink          = allObsInGroups.values.flatten.map(_._1).filterNot(a => currentObsIds.exists(_ === a)).toSet
+          telluricObsSet       <- allObsInGroups.keys.toList
+                                   .flatTraverse(findAllTelluricObservations)
+                                   .map(_.toSet)
+          // Get all observations in groups excluding telluric calibrations
+          allGroupObsIds        = allObsInGroups.values.flatten.map(_._1).filterNot(telluricObsSet.contains).toList
+          // Find observations that are Ongoing or Completed - these should not be deleted
+          ongoingOrCompletedIds <- filterWorkflowStateIn(allGroupObsIds, identity, List(ObservationWorkflowState.Ongoing, ObservationWorkflowState.Completed), ready = false).map(_.toSet)
+          // Observations to remove from telluric groups (exclude active science obs AND Ongoing/Completed obs)
+          toUnlink              = allObsInGroups.values.flatten
+                                    .map(_._1)
+                                    .filterNot(a =>
+                                        currentObsIds.exists(_ === a) || ongoingOrCompletedIds.exists(_ === a))
+                                    .toSet
           // Query group locations
-          groupLocations    <- Statements.queryGroupLocations(allObsInGroups.keys.toList)
+          groupLocations        <- Statements.queryGroupLocations(allObsInGroups.keys.toList)
           // Collect all observations to move with their target locations (only science obs, not calibrations)
-          _                 <- (info"Remove ${toUnlink.size} observations from their telluric groups on program $pid: $toUnlink").whenA(toUnlink.nonEmpty)
-          toMove            = observationsToMove(allObsInGroups, toUnlink, groupLocations, telluricObsSet)
+          _                     <- (info"Remove ${toUnlink.size} observations from their telluric groups on program $pid: $toUnlink").whenA(toUnlink.nonEmpty)
+          toMove                = observationsToMove(allObsInGroups, toUnlink, groupLocations, telluricObsSet)
           // Move all observations in a single database call
-          _                 <- (info"Move ${toMove.size} observations to telluric groups on program $pid: ${toMove.map(_._1)}").whenA(toMove.nonEmpty)
-          _                 <- Statements.moveObservations(toMove)
+          _                     <- (info"Move ${toMove.size} observations to telluric groups on program $pid: ${toMove.map(_._1)}").whenA(toMove.nonEmpty)
+          _                     <- Statements.moveObservations(toMove)
           // Compute which groups are now empty (all observations are being unlinked)
-          emptyGroupIds     = allObsInGroups.collect:
-                                case (gid, obsWithIndices) if obsWithIndices.forall((o, _) => toUnlink.exists(_ === o)) => gid
+          emptyGroupIds         = allObsInGroups.collect:
+                                    case (gid, obsWithIndices) if obsWithIndices.forall((o, _) => toUnlink.exists(_ === o)) => gid
           // Delete telluric calibration observations from empty groups
-          deleted           <- deleteTelluricObservationsFromGroups(emptyGroupIds.toList)
-          _                 <- (info"Deleted ${deleted.size} telluric observations on program $pid: $deleted").whenA(deleted.nonEmpty)
-          deletedSet        = deleted.toSet
+          deleted               <- deleteTelluricObservationsFromGroups(emptyGroupIds.toList)
+          _                     <- (info"Deleted ${deleted.size} telluric observations on program $pid: $deleted").whenA(deleted.nonEmpty)
+          deletedSet            = deleted.toSet
           // delete groups where all tellurics are gone
-          groupsToDelete    = emptyGroupIds.filter: gid =>
-                                allObsInGroups.get(gid).forall: obsWithIndices =>
-                                  obsWithIndices
-                                    .filter((oid, _) => telluricObsSet.contains(oid))
-                                    .forall((oid, _) => deletedSet.contains(oid))
+          groupsToDelete        = emptyGroupIds.filter: gid =>
+                                    allObsInGroups.get(gid).forall: obsWithIndices =>
+                                      obsWithIndices
+                                        .filter((oid, _) => telluricObsSet.contains(oid))
+                                        .forall((oid, _) => deletedSet.contains(oid))
           // Delete empty telluric groups using deleteSystemGroup
-          _                 <- (info"Remove ${groupsToDelete.size} empty telluric groups on program $pid: $groupsToDelete").whenA(groupsToDelete.nonEmpty)
-          _                 <- groupsToDelete.toList.traverse_(gid => groupService.deleteSystemGroup(pid, gid))
+          _                     <- (info"Remove ${groupsToDelete.size} empty telluric groups on program $pid: $groupsToDelete").whenA(groupsToDelete.nonEmpty)
+          _                     <- groupsToDelete.toList.traverse_(gid => groupService.deleteSystemGroup(pid, gid))
           // Reload tree for group creation/lookup
-          tree              <- groupService.selectGroups(pid)
+          tree                  <- groupService.selectGroups(pid)
           // Create/sync telluric for each science obs
-          results           <- activeScienceObs.traverse(obs => generateTelluricForScience(pid, tree, obs))
-          added              = results.flatMap(_._1)
-          allDeleted         = deleted ++ results.flatMap(_._2)
-          _                 <- (info"Added ${added.size} telluric observations on program $pid: $added").whenA(added.nonEmpty)
+          results               <- activeScienceObs.traverse(obs => generateTelluricForScience(pid, tree, obs))
+          added                 = results.flatMap(_._1)
+          allDeleted            = deleted ++ results.flatMap(_._2)
+          _                     <- (info"Added ${added.size} telluric observations on program $pid: $added").whenA(added.nonEmpty)
         yield (added, allDeleted)
 
       object Statements:
