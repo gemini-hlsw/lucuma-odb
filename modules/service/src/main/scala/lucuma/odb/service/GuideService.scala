@@ -39,6 +39,7 @@ import lucuma.core.math.Coordinates
 import lucuma.core.math.ProperMotion
 import lucuma.core.math.Wavelength
 import lucuma.core.model.AirMassBound
+import lucuma.core.model.CompositeTracking
 import lucuma.core.model.ConstraintSet
 import lucuma.core.model.ElevationRange
 import lucuma.core.model.HourAngleBound
@@ -89,7 +90,6 @@ import scala.annotation.tailrec
 import scala.collection.immutable.SortedMap
 
 import Services.Syntax.*
-import lucuma.core.model.CompositeTracking
 
 trait GuideService[F[_]] {
   import GuideService.AvailabilityPeriod
@@ -299,23 +299,23 @@ object GuideService {
       probes.guideProbe(observingModeType, trackType).flatMap: probe =>
         (params.observingMode, probe) match
           case (gmos.longslit.Config.GmosNorth(fpu = fpu), GuideProbe.GmosOIWFS) =>
-            AgsParams.GmosAgsParams(fpu.asLeft.some, PortDisposition.Side).some
+            AgsParams.GmosLongSlit(fpu.asLeft, PortDisposition.Side).some
           case (gmos.longslit.Config.GmosNorth(fpu = fpu), GuideProbe.PWFS1) =>
-            AgsParams.GmosAgsParams(fpu.asLeft.some, PortDisposition.Side).withPWFS1.some
+            AgsParams.GmosLongSlit(fpu.asLeft, PortDisposition.Side).withPWFS1.some
           case (gmos.longslit.Config.GmosNorth(fpu = fpu), GuideProbe.PWFS2) =>
-            AgsParams.GmosAgsParams(fpu.asLeft.some, PortDisposition.Side).withPWFS2.some
+            AgsParams.GmosLongSlit(fpu.asLeft, PortDisposition.Side).withPWFS2.some
           case (gmos.longslit.Config.GmosSouth(fpu = fpu), GuideProbe.GmosOIWFS) =>
-            AgsParams.GmosAgsParams(fpu.asRight.some, PortDisposition.Side).some
+            AgsParams.GmosLongSlit(fpu.asRight, PortDisposition.Side).some
           case (gmos.longslit.Config.GmosSouth(fpu = fpu), GuideProbe.PWFS1) =>
-            AgsParams.GmosAgsParams(fpu.asRight.some, PortDisposition.Side).withPWFS1.some
+            AgsParams.GmosLongSlit(fpu.asRight, PortDisposition.Side).withPWFS1.some
           case (gmos.longslit.Config.GmosSouth(fpu = fpu), GuideProbe.PWFS2) =>
-            AgsParams.GmosAgsParams(fpu.asRight.some, PortDisposition.Side).withPWFS2.some
+            AgsParams.GmosLongSlit(fpu.asRight, PortDisposition.Side).withPWFS2.some
           case (flamingos2.longslit.Config(fpu = fpu), GuideProbe.Flamingos2OIWFS) =>
-            AgsParams.Flamingos2AgsParams(Flamingos2LyotWheel.F16, Flamingos2FpuMask.Builtin(fpu), PortDisposition.Side).some
+            AgsParams.Flamingos2LongSlit(Flamingos2LyotWheel.F16, Flamingos2FpuMask.Builtin(fpu), PortDisposition.Side).some
           case (flamingos2.longslit.Config(fpu = fpu), GuideProbe.PWFS1) =>
-            AgsParams.Flamingos2AgsParams(Flamingos2LyotWheel.F16, Flamingos2FpuMask.Builtin(fpu), PortDisposition.Side).withPWFS1.some
+            AgsParams.Flamingos2LongSlit(Flamingos2LyotWheel.F16, Flamingos2FpuMask.Builtin(fpu), PortDisposition.Side).withPWFS1.some
           case (flamingos2.longslit.Config(fpu = fpu), GuideProbe.PWFS2) =>
-            AgsParams.Flamingos2AgsParams(Flamingos2LyotWheel.F16, Flamingos2FpuMask.Builtin(fpu), PortDisposition.Side).withPWFS2.some
+            AgsParams.Flamingos2LongSlit(Flamingos2LyotWheel.F16, Flamingos2FpuMask.Builtin(fpu), PortDisposition.Side).withPWFS2.some
           case _ =>
             none
 

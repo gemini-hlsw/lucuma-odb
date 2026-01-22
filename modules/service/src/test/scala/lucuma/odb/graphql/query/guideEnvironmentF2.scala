@@ -9,7 +9,6 @@ import cats.effect.kernel.Resource
 import cats.syntax.all.*
 import fs2.Stream
 import fs2.text.utf8
-import io.circe.Json
 import io.circe.literal.*
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
@@ -118,82 +117,7 @@ class guideEnvironmentF2 extends ExecutionTestSupportForFlamingos2
         """.asRight
       )
 
-  val pwfs2Result =
-    json"""
-    {
-      "observation": {
-        "title": "Nonsidereal Target",
-        "targetEnvironment": {
-          "guideEnvironment": {
-            "posAngle": {
-              "degrees": 350.000000
-            },
-            "guideTargets": [
-              {
-                "name": "Gaia DR3 3219118640218737920",
-                "probe": "PWFS2",
-                "sourceProfile": {
-                  "point": {
-                    "bandNormalized": {
-                      "brightnesses": [
-                        {
-                          "band": "GAIA"
-                        },
-                        {
-                          "band": "GAIA_RP"
-                        }
-                      ]
-                    }
-                  }
-                },
-                "sidereal": {
-                  "catalogInfo": {
-                    "name": "GAIA",
-                    "id": "3219118640218737920",
-                    "objectType": null
-                  },
-                  "epoch": "J2016.000",
-                  "ra": {
-                    "microseconds": 20760247957,
-                    "hms": "05:46:00.247957",
-                    "hours": 5.766735543611111111111111111111111,
-                    "degrees": 86.50103315416666666666666666666667
-                  },
-                  "dec": {
-                    "dms": "-00:08:26.290793",
-                    "degrees": 359.85936366861114,
-                    "microarcseconds": 1295493709207
-                  },
-                  "radialVelocity": {
-                    "metersPerSecond": 0,
-                    "centimetersPerSecond": 0,
-                    "kilometersPerSecond": 0
-                  },
-                  "properMotion": {
-                    "ra": {
-                      "microarcsecondsPerYear": 806,
-                      "milliarcsecondsPerYear": 0.806
-                    },
-                    "dec": {
-                      "microarcsecondsPerYear": -1093,
-                      "milliarcsecondsPerYear": -1.093
-                    }
-                  },
-                  "parallax": {
-                    "microarcseconds": 2371,
-                    "milliarcseconds": 2.371
-                  }
-                },
-                "nonsidereal": null
-              }
-            ]
-          }
-        }
-      }
-    }
-    """.asRight
-
-  test("nonsidereal target uses PWFS2 for guiding"):
+  test("nonsidereal target with PWFS2"):
     val setup: IO[Observation.Id] =
       for
         p   <- createProgramAs(pi)
