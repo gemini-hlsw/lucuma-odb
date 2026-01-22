@@ -325,4 +325,17 @@ class guideEnvironmentGMOS extends ExecutionTestSupportForGmos with GuideEnviron
     }
   }
 
+  test("nonsidereal target with PWFS2"):
+    val setup: IO[Observation.Id] =
+      for {
+        p   <- createProgramAs(pi)
+        eph  = createNonsiderealEphemeris
+        t   <- createNonsiderealTargetWithUserSuppliedEphemerisAs(pi, p, eph, name = "Nonsidereal Target")
+        o   <- createObservationAs(pi, p, List(t))
+        _   <- setObservationTimeAndDuration(pi, o, gaiaSuccess.some, fullTimeEstimate.some)
+      } yield o
+    setup.flatMap { oid =>
+      expect(pi, guideEnvironmentQuery(oid), expected = pwfs2Result)
+    }
+
 }
