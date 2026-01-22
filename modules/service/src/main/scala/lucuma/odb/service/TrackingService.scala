@@ -60,9 +60,9 @@ trait TrackingService[F[_]]:
   /**
    * Yield a mapping from each value in `keys` to a result containig either a tracking snapshot
    * or a pair containing the region and explicit base (if any) for observations containing opportunity
-   * targets; or a failure if tracking information is not available. Any returned snapshot is 
+   * targets; or a failure if tracking information is not available. Any returned snapshot is
    * guaranteed to be defined at all points on `interval`.
-   * 
+   *
    * This is the most general method; all other methods on this interface are defined in terms of
    * this operation.
    */
@@ -84,46 +84,46 @@ trait TrackingService[F[_]]:
 
   /** Single-target version of `getCoordinatesSnapshotOrRegion`. */
   def getTrackingSnapshotOrRegion(
-    oid: Observation.Id, 
+    oid: Observation.Id,
     interval: TimestampInterval,
     force: Boolean,
-  ): F[Result[Either[Snapshot[Tracking], (Region, Option[Coordinates])]]] 
+  ): F[Result[Either[Snapshot[Tracking], (Region, Option[Coordinates])]]]
 
-  /** 
+  /**
    * Convenience method that calls `getTrackingSnapshotOrRegion` that discards any resulting
    * region and turns it into a failure.
    */
   def getTrackingSnapshot(
-    oid: Observation.Id, 
+    oid: Observation.Id,
     interval: TimestampInterval,
     force: Boolean,
-  ): F[Result[Snapshot[Tracking]]] 
+  ): F[Result[Snapshot[Tracking]]]
 
   /** Single-target version of `getCoordinatesSnapshotOrRegion`. */
   def getCoordinatesSnapshotOrRegion(
-    oid: Observation.Id, 
+    oid: Observation.Id,
     t: Timestamp,
     force: Boolean,
-  ): F[Result[Either[Snapshot[Coordinates], (Region, Option[Coordinates])]]] 
+  ): F[Result[Either[Snapshot[Coordinates], (Region, Option[Coordinates])]]]
 
-  /** 
+  /**
    * Convenience method that calls `getCoordinatesSnapshotOrRegion` that discards any resulting
    * region and turns it into a failure.
    */
   def getCoordinatesSnapshot(
-    oid: Observation.Id, 
+    oid: Observation.Id,
     t: Timestamp,
     force: Boolean,
-  ): F[Result[Snapshot[Coordinates]]] 
+  ): F[Result[Snapshot[Coordinates]]]
 
   /** Create a new user-supplied ephemeris. */
   def createUserSuppliedEphemeris(
     elements: PerSite[List[Ephemeris.UserSupplied.Element]]
   )(using SuperUserAccess): F[Result[Ephemeris.Key.UserSupplied]]
 
-  /** 
+  /**
    * Replace a user-supplied ephemeris. Calling user must have edit permission for the
-   * associated program. 
+   * associated program.
    */
   def replaceUserSuppliedEphemeris(
     ephemeris: Ephemeris.UserSupplied
@@ -138,14 +138,14 @@ object TrackingService:
   /** Whitebox interface for testing, available by downcasting. */
   trait Whitebox[F[_]] extends TrackingService[F]:
     def getTrackingSnapshotEx(
-      oid: Observation.Id, 
+      oid: Observation.Id,
       interval: TimestampInterval,
       force: Boolean
-    ): F[Result[Snapshot[(Tracking, Int)]]] 
+    ): F[Result[Snapshot[(Tracking, Int)]]]
 
-  extension (interval: TimestampInterval) 
+  extension (interval: TimestampInterval)
 
-    private def days: Int = 
+    private def days: Int =
       interval.duration.toDays.toInt max 1 // always at least one day
 
     private def cadence: HorizonsClient.ElementsPerDay =
@@ -164,7 +164,7 @@ object TrackingService:
         .withHour(0)
         .withMinute(0)
         .withSecond(0)
-        .withNano(0)   
+        .withNano(0)
 
     def alignedStart: Timestamp =
       Timestamp.fromInstantTruncatedAndBounded:
@@ -174,7 +174,7 @@ object TrackingService:
       Timestamp.fromInstantTruncatedAndBounded:
         alignedZonedDateTime.plusDays(days).toInstant()
 
-    def expectedAlignedElements = 
+    def expectedAlignedElements =
       days * cadence
 
     def expectedInstants: List[Instant] =
@@ -203,14 +203,14 @@ object TrackingService:
 
   object Snapshot:
 
-    given Traverse[Snapshot] with 
+    given Traverse[Snapshot] with
       override def map[A, B](fa: Snapshot[A])(f: A => B): Snapshot[B] = fa.map(f)
       override def foldLeft[A, B](fa: Snapshot[A], b: B)(f: (B, A) => B): B = (fa.base :: fa.asterism.map(_._2)).foldLeft(b)(f)
       override def foldRight[A, B](fa: Snapshot[A], lb: cats.Eval[B])(f: (A, Eval[B]) => Eval[B]): Eval[B] = (fa.base :: fa.asterism.map(_._2)).foldRight(lb)(f)
       override def traverse[G[_]: Applicative, A, B](fa: Snapshot[A])(f: A => G[B]): G[Snapshot[B]] = fa.traverse(f)
-      
+
   def instantiate[F[_]: Monad: Temporal: Services](horizonsClient: HorizonsClient[F]): TrackingService[F] =
-    new Whitebox:      
+    new Whitebox:
 
       def getCoordinatesSnapshotOrRegion(
         keys: List[Observation.Id],
@@ -224,25 +224,25 @@ object TrackingService:
               .mapValues: res =>
                 res.flatMap:
                   case Left(ts) => ts.at(t).map(Left(_))
-                  case Right(r) => Result.success(Right(r))            
+                  case Right(r) => Result.success(Right(r))
               .toMap
 
       def getTrackingSnapshotOrRegion(
-        oid: Observation.Id, 
+        oid: Observation.Id,
         interval: TimestampInterval,
         force: Boolean,
       ): F[Result[Either[Snapshot[Tracking], (Region, Option[Coordinates])]]] =
         getTrackingSnapshotOrRegion(List(oid), interval, force).map(_(oid))
-      
+
       def getTrackingSnapshotOrRegionEx(
-        oid: Observation.Id, 
+        oid: Observation.Id,
         interval: TimestampInterval,
         force: Boolean,
       ): F[Result[Either[Snapshot[(Tracking, Int)], (Region, Option[Coordinates])]]] =
         getTrackingSnapshotOrRegionEx(List(oid), interval, force).map(_(oid))
 
       def getTrackingSnapshotEx(
-        oid: Observation.Id, 
+        oid: Observation.Id,
         interval: TimestampInterval,
         force: Boolean
       ): F[Result[Snapshot[(Tracking, Int)]]] =
@@ -253,7 +253,7 @@ object TrackingService:
               case Right(r) => OdbError.InvalidObservation(oid, Some(s"Tracking unavailable for $oid due to opportunity targets.")).asFailure
 
       def getTrackingSnapshot(
-        oid: Observation.Id, 
+        oid: Observation.Id,
         interval: TimestampInterval,
         force: Boolean,
       ): F[Result[Snapshot[Tracking]]] =
@@ -264,14 +264,14 @@ object TrackingService:
               case Right(r) => OdbError.InvalidObservation(oid, Some(s"Tracking unavailable for $oid due to opportunity targets.")).asFailure
 
       def getCoordinatesSnapshotOrRegion(
-        oid: Observation.Id, 
+        oid: Observation.Id,
         t: Timestamp,
         force: Boolean,
       ): F[Result[Either[Snapshot[Coordinates], (Region, Option[Coordinates])]]] =
         getCoordinatesSnapshotOrRegion(List(oid), t, force).map(_(oid))
 
       def getCoordinatesSnapshot(
-        oid: Observation.Id, 
+        oid: Observation.Id,
         t: Timestamp,
         force: Boolean,
       ): F[Result[Snapshot[Coordinates]]]  =
@@ -287,11 +287,11 @@ object TrackingService:
         force: Boolean,
       ): F[Map[Observation.Id, Result[Either[Snapshot[Tracking], (Region, Option[Coordinates])]]]] =
         getTrackingSnapshotOrRegionEx(keys, interval, force)
-          .map: m =>              
-            m.map: p =>           
-              p.map: r =>         
-                r.map: e =>       
-                  e.leftMap: s => 
+          .map: m =>
+            m.map: p =>
+              p.map: r =>
+                r.map: e =>
+                  e.leftMap: s =>
                     s.map(_._1)    // \o/
 
       def getTrackingSnapshotOrRegionEx(
@@ -305,8 +305,8 @@ object TrackingService:
               .getAsterisms(keys) // TODO: even though this is a bulk fetch it's still inefficient; we don't need all this information
               .flatMap: asterismMap =>
                 keys
-                  .traverse: 
-                    case oid => 
+                  .traverse:
+                    case oid =>
                       asterismMap
                         .get(oid)
                         .fold(OdbError.InvalidObservation(oid, Some(s"No targets are defined for $oid.")).asFailureF): ts =>
@@ -330,7 +330,7 @@ object TrackingService:
           .flatTap(storeEphemeris(_))
           .map(_.key)
           .value
-              
+
       def deleteUserSuppliedEphemeris(
         key: Ephemeris.Key.UserSupplied
       )(using SuperUserAccess): F[Result[Unit]] =
@@ -350,7 +350,7 @@ object TrackingService:
                     val a = list.collect { case (oid, _, Some(x)) => oid -> x } .toMap
                     val b = list.collect { case (oid, Some(x), _) => oid -> x } .toMap
                     (a, b)
-            
+
       private def mkTrackingEx(
         oid: Observation.Id,
         site: Option[Site],
@@ -359,9 +359,9 @@ object TrackingService:
         asterism: NonEmptyList[(Target.Id, Target)],
         force: Boolean
       ): F[Result[Either[Snapshot[(Tracking, Int)], (Region, Option[Coordinates])]]] =
-        asterism 
+        asterism
           .traverse: (tid, target) =>
-            val p = 
+            val p =
               target match
                 case Nonsidereal(_, key, _)      => mkEphemerisTrackingEx(tid, key, site, interval, force).map(eph => tid -> eph.asRight)
                 case Sidereal(_, tracking, _, _) => ResultT.success(tid -> tracking.asRight.tupleRight(0))
@@ -370,7 +370,7 @@ object TrackingService:
           .map(_.traverse(_.sequence)) // these are not the droids you are looking for
           .map:
             case Left(r)   => Right((r, explicitBase))
-            case Right(ts) => 
+            case Right(ts) =>
               val composite = (CompositeTracking(ts.map(_._2._1)), ts.foldMap(_._2._2))
               Left(Snapshot(oid, explicitBase.fold(composite)(b => (ConstantTracking.apply(b), 0)), ts))
           .value
@@ -381,13 +381,13 @@ object TrackingService:
           case Some(site) =>
             key match
               case k: Ephemeris.Key.Horizons     => mkHorizonsEphemerisTracking(k, site, interval, force)
-              case k: Ephemeris.Key.UserSupplied => mkUserSuppliedEphemerisTracking(k, site, interval)        
+              case k: Ephemeris.Key.UserSupplied => mkUserSuppliedEphemerisTracking(k, site, interval)
 
       private def mkHorizonsEphemerisTracking(key: Ephemeris.Key.Horizons, site: Site, interval: TimestampInterval, force: Boolean): ResultT[F, (EphemerisTracking, Int)] =
         val pre = if force then deleteEphemeris(key).as(Left(interval.expectedAlignedElements)) else loadHorizonsEphemeris(key, site, interval)
         pre.flatMap:
           case Right(eph) => ResultT.success((eph.toEphemerisTracking(site), 0))
-          case Left(misses) => 
+          case Left(misses) =>
             fetchHorizonsEphemeris(key, interval)
               .flatTap(storeEphemeris)
               .map(a => (a.toEphemerisTracking(site), misses))
@@ -401,7 +401,7 @@ object TrackingService:
           horizonsClient
             .alignedEphemeris(key, interval.start.toInstant, interval.days, interval.cadence)
             .map(Result.fromEither)
-          
+
       private def storeEphemeris[E <: Ephemeris.Element](eph: Ephemeris[E]): ResultT[F, Unit] =
         ResultT.liftF:
           Statements.StorableEphemerisElement
@@ -433,8 +433,8 @@ object TrackingService:
             pq.stream((key, site, interval), 1024)
               .compile
               .toList
-              .map: es =>                   
-                val instants = es.map(_._2.when).toSet  
+              .map: es =>
+                val instants = es.map(_._2.when).toSet
                 val misses   = interval.expectedInstants.count(i => !instants.contains(i))
                 if misses > 0 then
                   Left(misses)
@@ -465,7 +465,7 @@ object TrackingService:
               elements.flatMap: entry =>
                 Timestamp.fromInstant(entry.when).map: when =>
                   entry match
-                    case UserSupplied.Element(_, coordinates, velocity) => 
+                    case UserSupplied.Element(_, coordinates, velocity) =>
                       StorableEphemerisElement(
                         ephemeris.key,
                         site,
@@ -499,30 +499,30 @@ object TrackingService:
       """
         .query(observation_id *: instrument.opt *: right_ascension.opt *: declination.opt)
         .map:
-          case (oid, oinst, ora, odec) => 
+          case (oid, oinst, ora, odec) =>
 
             val osite: Option[Site] =
               oinst.flatMap: inst =>
                 metadata
                   .availability(inst)
                   .siteForRange(cats.collections.Range(when.start.toInstant, when.end.toInstant))
-            
+
             (oid, osite, (ora, odec).mapN(Coordinates.apply))
 
     def storeEphemeris[A <: NonEmptyList[StorableEphemerisElement]](entries: A): Command[entries.type] = {
 
       val enc: Encoder[StorableEphemerisElement] =
-        ( 
+        (
           ephemeris_key_type  *:
           varchar             *:
           site                *:
-          core_timestamp      *: 
-          right_ascension     *: 
-          declination         *: 
-          offset              *: 
-          air_mass.opt        *: 
-          core_extinction.opt *: 
-          float8.opt          *: 
+          core_timestamp      *:
+          right_ascension     *:
+          declination         *:
+          offset              *:
+          air_mass.opt        *:
+          core_extinction.opt *:
+          float8.opt          *:
           float8.opt
         ).contramap: e =>
           (
@@ -541,28 +541,28 @@ object TrackingService:
 
       sql"""
         INSERT INTO t_ephemeris (
-          c_key_type,  
-          c_des,       
-          c_site,      
-          c_when,      
-          c_ra,        
-          c_dec,       
-          c_dra,       
-          c_ddec,      
-          c_airmass,   
+          c_key_type,
+          c_des,
+          c_site,
+          c_when,
+          c_ra,
+          c_dec,
+          c_dra,
+          c_ddec,
+          c_airmass,
           c_extinction,
-          c_vmag,      
-          c_sb        
+          c_vmag,
+          c_sb
         ) VALUES ${enc.values.nel(entries)}
         ON CONFLICT (c_key_type, c_des, c_site, c_when) DO UPDATE SET
-          c_ra         = EXCLUDED.c_ra,        
-          c_dec        = EXCLUDED.c_dec,       
-          c_dra        = EXCLUDED.c_dra,       
-          c_ddec       = EXCLUDED.c_ddec,      
-          c_airmass    = EXCLUDED.c_airmass,   
+          c_ra         = EXCLUDED.c_ra,
+          c_dec        = EXCLUDED.c_dec,
+          c_dra        = EXCLUDED.c_dra,
+          c_ddec       = EXCLUDED.c_ddec,
+          c_airmass    = EXCLUDED.c_airmass,
           c_extinction = EXCLUDED.c_extinction,
-          c_vmag       = EXCLUDED.c_vmag,      
-          c_sb         = EXCLUDED.c_sb        
+          c_vmag       = EXCLUDED.c_vmag,
+          c_sb         = EXCLUDED.c_sb
       """.command
     }
 
@@ -570,14 +570,14 @@ object TrackingService:
       sql"""
         SELECT
           c_site,
-          c_when,      
-          c_ra,        
-          c_dec,       
-          c_dra,       
-          c_ddec,      
-          c_airmass,   
+          c_when,
+          c_ra,
+          c_dec,
+          c_dra,
+          c_ddec,
+          c_airmass,
           c_extinction,
-          c_vmag,      
+          c_vmag,
           c_sb
         FROM  t_ephemeris
         WHERE c_key_type = $ephemeris_key_type
@@ -590,13 +590,13 @@ object TrackingService:
           (key.keyType, key.des, site, interval.alignedStart, interval.alignedEnd)
         .query(
           site                *:
-          core_timestamp      *: 
-          right_ascension     *: 
-          declination         *: 
-          offset              *: 
-          air_mass.opt        *: 
-          core_extinction.opt *: 
-          numeric             *: 
+          core_timestamp      *:
+          right_ascension     *:
+          declination         *:
+          offset              *:
+          air_mass.opt        *:
+          core_extinction.opt *:
+          numeric             *:
           numeric.opt
       ).map: (site, ts, ra, dec, v, am, e, vm, sb) =>
         site ->
@@ -608,11 +608,11 @@ object TrackingService:
       sql"""
         SELECT
           c_site,
-          c_when,      
-          c_ra,        
-          c_dec,       
-          c_dra,       
-          c_ddec,
+          c_when,
+          c_ra,
+          c_dec,
+          c_dra,
+          c_ddec
         FROM  t_ephemeris
         WHERE c_key_type = $ephemeris_key_type
         AND   c_des = $varchar
@@ -623,9 +623,9 @@ object TrackingService:
           (key.keyType, key.des, interval.alignedStart, interval.alignedEnd)
         .query(
           site                *:
-          core_timestamp      *: 
-          right_ascension     *: 
-          declination         *: 
+          core_timestamp      *:
+          right_ascension     *:
+          declination         *:
           offset
       ).map: (site, ts, ra, dec, v) =>
         site -> Ephemeris.UserSupplied.Element(ts.toInstant, Coordinates(ra, dec), v)

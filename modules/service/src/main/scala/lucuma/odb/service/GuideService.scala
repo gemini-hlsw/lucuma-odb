@@ -310,7 +310,7 @@ object GuideService {
             AgsParams.GmosAgsParams(fpu.asRight.some, PortDisposition.Side).withPWFS1.some
           case (gmos.longslit.Config.GmosSouth(fpu = fpu), GuideProbe.PWFS2) =>
             AgsParams.GmosAgsParams(fpu.asRight.some, PortDisposition.Side).withPWFS2.some
-          case (flamingos2.longslit.Config(fpu = fpu), GuideProbe.GmosOIWFS) =>
+          case (flamingos2.longslit.Config(fpu = fpu), GuideProbe.Flamingos2OIWFS) =>
             AgsParams.Flamingos2AgsParams(Flamingos2LyotWheel.F16, Flamingos2FpuMask.Builtin(fpu), PortDisposition.Side).some
           case (flamingos2.longslit.Config(fpu = fpu), GuideProbe.PWFS1) =>
             AgsParams.Flamingos2AgsParams(Flamingos2LyotWheel.F16, Flamingos2FpuMask.Builtin(fpu), PortDisposition.Side).withPWFS1.some

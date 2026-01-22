@@ -10,12 +10,20 @@ import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.ags.GuideStarName
+import lucuma.core.data.PerSite
+import lucuma.core.math.Coordinates
+import lucuma.core.math.Declination
+import lucuma.core.math.Offset
+import lucuma.core.math.RightAscension
+import lucuma.core.model.Ephemeris
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
+
+import java.time.Instant
 
 trait GuideEnvironmentSuite extends ExecutionTestSupport:
 
@@ -573,3 +581,18 @@ trait GuideEnvironmentSuite extends ExecutionTestSupport:
     """.asRight
 
   def createObservationAs(user: User, pid: Program.Id, tids: List[Target.Id]): IO[Observation.Id]
+
+  // Create ephemeris at the same coordinates as the sidereal target
+  def createNonsiderealEphemeris: PerSite[List[Ephemeris.UserSupplied.Element]] =
+    val ra = RightAscension.fromDoubleDegrees(86.55474)
+    val dec = Declination.fromDoubleDegrees(-0.10137).getOrElse(Declination.Zero)
+    val coords = Coordinates(ra, dec)
+    val velocity = Offset.Zero
+
+    // entries ina a range of times that covers the observation time
+    val baseTime = Instant.parse("2023-08-29T00:00:00Z")
+    val elements =
+      (0 to 10).map { i =>
+        Ephemeris.UserSupplied.Element(baseTime.plusSeconds(i * 86400L), coords, velocity)
+      }.toList
+    PerSite(elements, elements)
