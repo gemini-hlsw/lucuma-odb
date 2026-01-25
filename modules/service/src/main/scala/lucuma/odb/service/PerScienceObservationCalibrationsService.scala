@@ -305,32 +305,34 @@ object PerScienceObservationCalibrationsService:
 
       private val MaxTelluricSN = SignalToNoise.fromInt(100).get
 
+      // After cloning we have the same etm as science, but we need a different one for tellurics
+      // https://app.shortcut.com/lucuma/story/6968/generate-telluric-standard-sequence
       private def createTelluricExposureTimeMode(
         scienceOid:  Observation.Id,
         telluricOid: Observation.Id
       )(using Transaction[F]): F[Unit] =
-        // After cloning we have the same etm as scienc, but we need a different one for tellurics
-        // https://app.shortcut.com/lucuma/story/6968/generate-telluric-standard-sequence
+        def telluricEtm(etm: ExposureTimeMode): ExposureTimeMode.SignalToNoiseMode =
+          val snValue = etm match
+            case ExposureTimeMode.SignalToNoiseMode(sn, _) =>
+              SignalToNoise.unsafeFromBigDecimalExact(
+                (sn.toBigDecimal * 2).min(MaxTelluricSN.toBigDecimal)
+              )
+            case _ =>
+              MaxTelluricSN
+          ExposureTimeMode.SignalToNoiseMode(snValue, etm.at)
+
         for {
-          scienceEtm <- S.exposureTimeModeService
-                           .select(List(scienceOid), ExposureTimeModeRole.Science)
+          allEtm     <- S.exposureTimeModeService
+                           .select(List(scienceOid, telluricOid), ExposureTimeModeRole.Science)
                            .map(_.view.mapValues(_.head).toMap)
-          _          <- scienceEtm.get(scienceOid).traverse_ : etm =>
-                          val wavelength = etm.at
-                          val snValue =
-                            etm match
-                              case ExposureTimeMode.SignalToNoiseMode(sn, _) =>
-                                SignalToNoise.unsafeFromBigDecimalExact(
-                                  (sn.toBigDecimal * 2).min(MaxTelluricSN.toBigDecimal)
-                                )
-                              case _ =>
-                                MaxTelluricSN
+          scienceEtm  = allEtm.get(scienceOid)
+          _          <- scienceEtm.traverse_ : etm =>
+                          val calibEtm   = telluricEtm(etm)
+                          val currentEtm = allEtm.get(telluricOid)
 
-                          val telluricEtm = ExposureTimeMode.SignalToNoiseMode(snValue, wavelength)
-
-                          // Delete the current one and replace it
-                          S.exposureTimeModeService.deleteMany(List(telluricOid), ExposureTimeModeRole.Science) *>
-                            S.exposureTimeModeService.insertOne(telluricOid, ExposureTimeModeRole.Science, telluricEtm)
+                          (S.exposureTimeModeService.deleteMany(List(telluricOid), ExposureTimeModeRole.Science) *>
+                            S.exposureTimeModeService.insertOne(telluricOid, ExposureTimeModeRole.Science, calibEtm))
+                              .unlessA(currentEtm.contains(calibEtm))
         } yield ()
 
       private def syncConfiguration(

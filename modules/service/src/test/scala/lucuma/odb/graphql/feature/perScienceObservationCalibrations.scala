@@ -1632,7 +1632,7 @@ class perScienceObservationCalibrations
       assertEquals(removed2.size, 0)
     }
 
-  test("telluric etm is sn S/N with a max of 100"):
+  test("telluric etm is sn with a max of 100"):
     for {
       pid          <- createProgramAs(pi)
       tid          <- createTargetWithProfileAs(pi, pid)
@@ -1649,15 +1649,14 @@ class perScienceObservationCalibrations
     } yield {
       assertEquals(scienceEtm.snValue, SignalToNoise.unsafeFromBigDecimalExact(75.0).some)
       assertEquals(scienceEtm.snWAt, Wavelength.fromIntNanometers(510))
-      // Science has S/N = 75, telluric would be 2 * 75 = 150 but max at 100
+      // Science has S/N = 75, telluric would be max(100, 2 * 75 = 150)
       assertEquals(telluricEtms.science.snValue, SignalToNoise.unsafeFromBigDecimalExact(100).some)
       assertEquals(telluricEtms.science.snWAt, scienceEtm.snWAt)
-      // Acquisition ETM is cloned from science observation (default S/N=10 at observing mode wavelength)
       assertEquals(telluricEtms.acquisition.snValue, SignalToNoise.unsafeFromBigDecimalExact(10).some)
       assertEquals(telluricEtms.acquisition.snWAt, Wavelength.fromIntNanometers(500))
     }
 
-  test("telluric S/N is 2x science"):
+  test("telluric sv is 2x science"):
     for {
       pid          <- createProgramAs(pi)
       tid          <- createTargetWithProfileAs(pi, pid)
@@ -1672,16 +1671,15 @@ class perScienceObservationCalibrations
       telluricOid  =  obsInGroup.find(_.calibrationRole.contains(CalibrationRole.Telluric)).get.id
       telluricEtms <- queryAllEtms(telluricOid)
     } yield {
-      // Science has S/N = 30, telluric is 60
+      // Science has sn = 30, telluric is 60
       assertEquals(scienceEtm.snValue, SignalToNoise.unsafeFromBigDecimalExact(30.0).some)
       assertEquals(scienceEtm.snWAt, Wavelength.fromIntNanometers(510))
-      // Only Science ETM is synced for tellurics
+      // Science etm is synced for tellurics
       assertEquals(telluricEtms.science.snValue, SignalToNoise.unsafeFromBigDecimalExact(60).some)
-      // Wavelength matches
       assertEquals(telluricEtms.science.snWAt, scienceEtm.snWAt)
     }
 
-  test("telluric gets S/N 100 when science is TxC"):
+  test("telluric gets sn 100 when science is txc"):
     for {
       pid          <- createProgramAs(pi)
       tid          <- createTargetWithProfileAs(pi, pid)
@@ -1699,13 +1697,12 @@ class perScienceObservationCalibrations
       assertEquals(scienceEtm.snValue, None)
       assert(scienceEtm.txcValue.isDefined)
       assertEquals(scienceEtm.txcWvAt, Wavelength.fromIntNanometers(1390))
-      // S/N of 100, only Science ETM is synced for tellurics
+      // Science etm is synced for tellurics
       assertEquals(telluricEtms.science.snValue, SignalToNoise.unsafeFromBigDecimalExact(100).some)
-      // Wavelength matches
       assertEquals(telluricEtms.science.snWAt, scienceEtm.txcWvAt)
     }
 
-  test("telluric ETM is updated when science ETM changes"):
+  test("telluric etm is updated when science etm changes"):
     val wavelength1 = Wavelength.fromIntNanometers(500).get
     val wavelength2 = Wavelength.fromIntNanometers(600).get
 
@@ -1721,21 +1718,19 @@ class perScienceObservationCalibrations
       obsInGroup1  <- queryObservationsInGroup(groupId)
       telluricOid  =  obsInGroup1.find(_.calibrationRole.contains(CalibrationRole.Telluric)).get.id
       telluricEtms1 <- queryAllEtms(telluricOid)
-      // Update science to higher S/N and different wavelength
+      // Update science to higher sn
       _            <- setScienceRequirements(oid, wavelength2, 60.0)
       _            <- runObscalcUpdate(pid, oid)
       _            <- recalculateCalibrations(pid, when)
       telluricEtms2 <- queryAllEtms(telluricOid)
     } yield {
-      // Only Science ETM is synced for tellurics
       assertEquals(telluricEtms1.science.snValue, SignalToNoise.unsafeFromBigDecimalExact(80).some)
       assertEquals(telluricEtms1.science.snWAt, wavelength1.some)
-      // science changes: S/N = 60 -> telluric = 100 wavelength = 600
       assertEquals(telluricEtms2.science.snValue, SignalToNoise.unsafeFromBigDecimalExact(100).some)
       assertEquals(telluricEtms2.science.snWAt, wavelength2.some)
     }
 
-  test("telluric ETM is updated when science changes from S/N to TxC"):
+  test("telluric etm is updated when science changes from sn to txc"):
     for {
       pid          <- createProgramAs(pi)
       tid          <- createTargetWithProfileAs(pi, pid)
@@ -1748,16 +1743,15 @@ class perScienceObservationCalibrations
       obsInGroup1  <- queryObservationsInGroup(groupId)
       telluricOid  =  obsInGroup1.find(_.calibrationRole.contains(CalibrationRole.Telluric)).get.id
       telluricEtms1 <- queryAllEtms(telluricOid)
-      // Change science from S/N to TxC
+      // science etm from sn to txc
       _            <- setScienceRequirementsTimeAndCount(oid, atNm = BigDecimal(1500))
       _            <- runObscalcUpdate(pid, oid)
       _            <- recalculateCalibrations(pid, when)
       telluricEtms2 <- queryAllEtms(telluricOid)
     } yield {
-      // Only Science ETM is synced for tellurics
       assertEquals(telluricEtms1.science.snValue, SignalToNoise.unsafeFromBigDecimalExact(80).some)
       assertEquals(telluricEtms1.science.snWAt, Wavelength.fromIntNanometers(510))
-      // After change to TxC: telluric = 100, wavelength = 1500
+      // Only Science ETM is synced for tellurics
       assertEquals(telluricEtms2.science.snValue, SignalToNoise.unsafeFromBigDecimalExact(100).some)
       assertEquals(telluricEtms2.science.snWAt, Wavelength.fromIntNanometers(1500))
     }
