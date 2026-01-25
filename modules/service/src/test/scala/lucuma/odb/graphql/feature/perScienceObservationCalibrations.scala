@@ -21,6 +21,7 @@ import lucuma.core.enums.TelluricCalibrationOrder
 import lucuma.core.math.Coordinates
 import lucuma.core.math.Declination
 import lucuma.core.math.RightAscension
+import lucuma.core.math.SignalToNoise
 import lucuma.core.math.Wavelength
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.Group
@@ -41,6 +42,7 @@ import lucuma.odb.graphql.query.ExecutionTestSupportForFlamingos2
 import lucuma.odb.graphql.query.ObservingModeSetupOperations
 import lucuma.odb.graphql.subscription.SubscriptionUtils
 import lucuma.odb.json.time.transport.given
+import lucuma.odb.json.wavelength.decoder.given
 import lucuma.odb.service.TelluricTargetsServiceSuiteSupport
 import lucuma.refined.*
 import org.http4s.client.UnexpectedStatus
@@ -160,12 +162,111 @@ class perScienceObservationCalibrations
   ) derives Decoder
 
   case class ObsWithTarget(
-    id: Observation.Id,
-    targetId: Option[lucuma.core.model.Target.Id],
+    id:         Observation.Id,
+    targetId:   Option[lucuma.core.model.Target.Id],
     targetName: Option[String],
-    targetRa: Option[String],
-    targetDec: Option[String]
+    targetRa:   Option[String],
+    targetDec:  Option[String]
   ) derives Decoder
+
+  case class ExposureTimeModeInfo(
+    snValue:  Option[SignalToNoise],
+    snWAt:    Option[Wavelength],
+    txcValue: Option[BigDecimal],
+    txcCount: Option[Int],
+    txcWvAt:  Option[Wavelength]
+  )
+
+  case class AllEtmInfo(
+    requirement: ExposureTimeModeInfo,
+    acquisition: ExposureTimeModeInfo,
+    science:     ExposureTimeModeInfo
+  )
+
+  private def queryExposureTimeMode(oid: Observation.Id): IO[ExposureTimeModeInfo] =
+    query(
+      serviceUser,
+      s"""query {
+            observation(observationId: "$oid") {
+              scienceRequirements {
+                exposureTimeMode {
+                  signalToNoise {
+                    value
+                    at { picometers }
+                  }
+                  timeAndCount {
+                    time { minutes }
+                    count
+                    at { picometers }
+                  }
+                }
+              }
+            }
+          }"""
+    ).map { c =>
+      val etm = c.hcursor
+        .downField("observation")
+        .downField("scienceRequirements")
+        .downField("exposureTimeMode")
+      val snValue = etm.downField("signalToNoise").downField("value").as[BigDecimal].toOption
+        .flatMap(v => SignalToNoise.FromBigDecimalExact.getOption(v))
+      val snWAt = etm.downField("signalToNoise").downField("at").as[Wavelength].toOption
+      val txcValue = etm.downField("timeAndCount").downField("time").downField("minutes").as[BigDecimal].toOption
+      val txcCount = etm.downField("timeAndCount").downField("count").as[Int].toOption
+      val txcWvAt = etm.downField("timeAndCount").downField("at").as[Wavelength].toOption
+      ExposureTimeModeInfo(snValue, snWAt, txcValue, txcCount, txcWvAt)
+    }
+
+  private def queryAllEtms(oid: Observation.Id): IO[AllEtmInfo] =
+    query(
+      serviceUser,
+      s"""query {
+            observation(observationId: "$oid") {
+              scienceRequirements {
+                exposureTimeMode {
+                  signalToNoise {
+                    value
+                    at { picometers }
+                  }
+                }
+              }
+              observingMode {
+                flamingos2LongSlit {
+                  acquisition {
+                    exposureTimeMode {
+                      signalToNoise {
+                        value
+                        at { picometers }
+                      }
+                    }
+                  }
+                  exposureTimeMode {
+                    signalToNoise {
+                      value
+                      at { picometers }
+                    }
+                  }
+                }
+              }
+            }
+          }"""
+    ).map { c =>
+      val obs = c.hcursor.downField("observation")
+      val reqEtm = obs.downField("scienceRequirements").downField("exposureTimeMode")
+      val f2 = obs.downField("observingMode").downField("flamingos2LongSlit")
+      val acqEtm = f2.downField("acquisition").downField("exposureTimeMode")
+      val sciEtm = f2.downField("exposureTimeMode")
+
+      def parseEtm(cursor: io.circe.ACursor): ExposureTimeModeInfo =
+        ExposureTimeModeInfo(
+          cursor.downField("signalToNoise").downField("value").as[BigDecimal].toOption
+            .flatMap(v => SignalToNoise.FromBigDecimalExact.getOption(v)),
+          cursor.downField("signalToNoise").downField("at").as[Wavelength].toOption,
+          None, None, None
+        )
+
+      AllEtmInfo(parseEtm(reqEtm), parseEtm(acqEtm), parseEtm(sciEtm))
+    }
 
   private def queryObservationsInGroup(gid: Group.Id): IO[List[ObsInfo]] =
     query(
@@ -363,7 +464,7 @@ class perScienceObservationCalibrations
       }"""
     ).void
 
-  private def setScienceRequirements(oid: Observation.Id, snAt: Wavelength = DefaultSnAt, snValue: Double = 75.0): IO[Unit] =
+  private def setScienceRequirements(oid: Observation.Id, snWAt: Wavelength = DefaultSnAt, snValue: Double = 75.0): IO[Unit] =
     query(
       pi,
       s"""mutation {
@@ -373,7 +474,7 @@ class perScienceObservationCalibrations
               exposureTimeMode: {
                 signalToNoise: {
                   value: $snValue,
-                  at: { nanometers: ${snAt.toNanometers} }
+                  at: { nanometers: ${snWAt.toNanometers} }
                 }
               },
               spectroscopy: {
@@ -382,6 +483,62 @@ class perScienceObservationCalibrations
                 wavelengthCoverage: { nanometers: 0.010 },
                 focalPlane: SINGLE_SLIT,
                 focalPlaneAngle: { arcseconds: 5 }
+              }
+            },
+            observingMode: {
+              flamingos2LongSlit: {
+                exposureTimeMode: {
+                  signalToNoise: {
+                    value: $snValue,
+                    at: { nanometers: ${snWAt.toNanometers} }
+                  }
+                }
+              }
+            }
+          }
+          WHERE: { id: { EQ: "$oid" } }
+        }) {
+          observations { id }
+        }
+      }"""
+    ).void
+
+  private def setScienceRequirementsTimeAndCount(
+    oid: Observation.Id,
+    atNm: BigDecimal = BigDecimal(1390),
+    timeMinutes: Int = 10,
+    count: Int = 6
+  ): IO[Unit] =
+    query(
+      pi,
+      s"""mutation {
+        updateObservations(input: {
+          SET: {
+            scienceRequirements: {
+              exposureTimeMode: {
+                timeAndCount: {
+                  time: { minutes: $timeMinutes },
+                  count: $count,
+                  at: { nanometers: $atNm }
+                }
+              },
+              spectroscopy: {
+                wavelength: { nanometers: 1390.000 },
+                resolution: 10,
+                wavelengthCoverage: { nanometers: 0.010 },
+                focalPlane: SINGLE_SLIT,
+                focalPlaneAngle: { arcseconds: 5 }
+              }
+            },
+            observingMode: {
+              flamingos2LongSlit: {
+                exposureTimeMode: {
+                  timeAndCount: {
+                    time: { minutes: $timeMinutes },
+                    count: $count,
+                    at: { nanometers: $atNm }
+                  }
+                }
               }
             }
           }
@@ -1473,4 +1630,134 @@ class perScienceObservationCalibrations
       // Original tellurics should be preserved (not deleted)
       assert(telluricOids1.subsetOf(telluricOids2))
       assertEquals(removed2.size, 0)
+    }
+
+  test("telluric etm is sn S/N with a max of 100"):
+    for {
+      pid          <- createProgramAs(pi)
+      tid          <- createTargetWithProfileAs(pi, pid)
+      oid          <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+      _            <- setScienceRequirements(oid, DefaultSnAt, 75.0)
+      _            <- runObscalcUpdate(pid, oid)
+      _            <- recalculateCalibrations(pid, when)
+      scienceEtm   <- queryExposureTimeMode(oid)
+      obs          <- queryObservation(oid)
+      groupId      =  obs.groupId.get
+      obsInGroup   <- queryObservationsInGroup(groupId)
+      telluricOid  =  obsInGroup.find(_.calibrationRole.contains(CalibrationRole.Telluric)).get.id
+      telluricEtms <- queryAllEtms(telluricOid)
+    } yield {
+      assertEquals(scienceEtm.snValue, SignalToNoise.unsafeFromBigDecimalExact(75.0).some)
+      assertEquals(scienceEtm.snWAt, Wavelength.fromIntNanometers(510))
+      // Science has S/N = 75, telluric would be 2 * 75 = 150 but max at 100
+      assertEquals(telluricEtms.science.snValue, SignalToNoise.unsafeFromBigDecimalExact(100).some)
+      assertEquals(telluricEtms.science.snWAt, scienceEtm.snWAt)
+      // Acquisition ETM is cloned from science observation (default S/N=10 at observing mode wavelength)
+      assertEquals(telluricEtms.acquisition.snValue, SignalToNoise.unsafeFromBigDecimalExact(10).some)
+      assertEquals(telluricEtms.acquisition.snWAt, Wavelength.fromIntNanometers(500))
+    }
+
+  test("telluric S/N is 2x science"):
+    for {
+      pid          <- createProgramAs(pi)
+      tid          <- createTargetWithProfileAs(pi, pid)
+      oid          <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+      _            <- setScienceRequirements(oid, DefaultSnAt, 30.0)
+      _            <- runObscalcUpdate(pid, oid)
+      _            <- recalculateCalibrations(pid, when)
+      scienceEtm   <- queryExposureTimeMode(oid)
+      obs          <- queryObservation(oid)
+      groupId      =  obs.groupId.get
+      obsInGroup   <- queryObservationsInGroup(groupId)
+      telluricOid  =  obsInGroup.find(_.calibrationRole.contains(CalibrationRole.Telluric)).get.id
+      telluricEtms <- queryAllEtms(telluricOid)
+    } yield {
+      // Science has S/N = 30, telluric is 60
+      assertEquals(scienceEtm.snValue, SignalToNoise.unsafeFromBigDecimalExact(30.0).some)
+      assertEquals(scienceEtm.snWAt, Wavelength.fromIntNanometers(510))
+      // Only Science ETM is synced for tellurics
+      assertEquals(telluricEtms.science.snValue, SignalToNoise.unsafeFromBigDecimalExact(60).some)
+      // Wavelength matches
+      assertEquals(telluricEtms.science.snWAt, scienceEtm.snWAt)
+    }
+
+  test("telluric gets S/N 100 when science is TxC"):
+    for {
+      pid          <- createProgramAs(pi)
+      tid          <- createTargetWithProfileAs(pi, pid)
+      oid          <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+      _            <- setScienceRequirementsTimeAndCount(oid)
+      _            <- runObscalcUpdate(pid, oid)
+      _            <- recalculateCalibrations(pid, when)
+      scienceEtm   <- queryExposureTimeMode(oid)
+      obs          <- queryObservation(oid)
+      groupId      =  obs.groupId.get
+      obsInGroup   <- queryObservationsInGroup(groupId)
+      telluricOid  =  obsInGroup.find(_.calibrationRole.contains(CalibrationRole.Telluric)).get.id
+      telluricEtms <- queryAllEtms(telluricOid)
+    } yield {
+      assertEquals(scienceEtm.snValue, None)
+      assert(scienceEtm.txcValue.isDefined)
+      assertEquals(scienceEtm.txcWvAt, Wavelength.fromIntNanometers(1390))
+      // S/N of 100, only Science ETM is synced for tellurics
+      assertEquals(telluricEtms.science.snValue, SignalToNoise.unsafeFromBigDecimalExact(100).some)
+      // Wavelength matches
+      assertEquals(telluricEtms.science.snWAt, scienceEtm.txcWvAt)
+    }
+
+  test("telluric ETM is updated when science ETM changes"):
+    val wavelength1 = Wavelength.fromIntNanometers(500).get
+    val wavelength2 = Wavelength.fromIntNanometers(600).get
+
+    for {
+      pid          <- createProgramAs(pi)
+      tid          <- createTargetWithProfileAs(pi, pid)
+      oid          <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+      _            <- setScienceRequirements(oid, wavelength1, 40.0)
+      _            <- runObscalcUpdate(pid, oid)
+      _            <- recalculateCalibrations(pid, when)
+      obs          <- queryObservation(oid)
+      groupId      =  obs.groupId.get
+      obsInGroup1  <- queryObservationsInGroup(groupId)
+      telluricOid  =  obsInGroup1.find(_.calibrationRole.contains(CalibrationRole.Telluric)).get.id
+      telluricEtms1 <- queryAllEtms(telluricOid)
+      // Update science to higher S/N and different wavelength
+      _            <- setScienceRequirements(oid, wavelength2, 60.0)
+      _            <- runObscalcUpdate(pid, oid)
+      _            <- recalculateCalibrations(pid, when)
+      telluricEtms2 <- queryAllEtms(telluricOid)
+    } yield {
+      // Only Science ETM is synced for tellurics
+      assertEquals(telluricEtms1.science.snValue, SignalToNoise.unsafeFromBigDecimalExact(80).some)
+      assertEquals(telluricEtms1.science.snWAt, wavelength1.some)
+      // science changes: S/N = 60 -> telluric = 100 wavelength = 600
+      assertEquals(telluricEtms2.science.snValue, SignalToNoise.unsafeFromBigDecimalExact(100).some)
+      assertEquals(telluricEtms2.science.snWAt, wavelength2.some)
+    }
+
+  test("telluric ETM is updated when science changes from S/N to TxC"):
+    for {
+      pid          <- createProgramAs(pi)
+      tid          <- createTargetWithProfileAs(pi, pid)
+      oid          <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+      _            <- setScienceRequirements(oid, DefaultSnAt, 40.0)
+      _            <- runObscalcUpdate(pid, oid)
+      _            <- recalculateCalibrations(pid, when)
+      obs          <- queryObservation(oid)
+      groupId      =  obs.groupId.get
+      obsInGroup1  <- queryObservationsInGroup(groupId)
+      telluricOid  =  obsInGroup1.find(_.calibrationRole.contains(CalibrationRole.Telluric)).get.id
+      telluricEtms1 <- queryAllEtms(telluricOid)
+      // Change science from S/N to TxC
+      _            <- setScienceRequirementsTimeAndCount(oid, atNm = BigDecimal(1500))
+      _            <- runObscalcUpdate(pid, oid)
+      _            <- recalculateCalibrations(pid, when)
+      telluricEtms2 <- queryAllEtms(telluricOid)
+    } yield {
+      // Only Science ETM is synced for tellurics
+      assertEquals(telluricEtms1.science.snValue, SignalToNoise.unsafeFromBigDecimalExact(80).some)
+      assertEquals(telluricEtms1.science.snWAt, Wavelength.fromIntNanometers(510))
+      // After change to TxC: telluric = 100, wavelength = 1500
+      assertEquals(telluricEtms2.science.snValue, SignalToNoise.unsafeFromBigDecimalExact(100).some)
+      assertEquals(telluricEtms2.science.snWAt, Wavelength.fromIntNanometers(1500))
     }
