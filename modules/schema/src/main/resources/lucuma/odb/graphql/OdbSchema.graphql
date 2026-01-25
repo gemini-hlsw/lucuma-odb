@@ -5314,10 +5314,12 @@ id to filter events to that program and/or observation.  Specify the old and
 new states to limit events to only those transitions.
 """
 input ObscalcUpdateInput {
-  programId:     ProgramId
-  observationId: ObservationId
-  oldState:      WhereOptionEqCalculationState
-  newState:      WhereOptionEqCalculationState
+  programId:            ProgramId
+  observationId:        ObservationId
+  oldCalculationState:  WhereOptionEqCalculationState
+  oldState:             WhereOptionEqCalculationState @deprecated(reason: "Use `oldCalculationState` instead.")
+  newCalculationState:  WhereOptionEqCalculationState
+  newState:             WhereOptionEqCalculationState @deprecated(reason: "Use `newCalculationState` instead.")
 }
 
 input WhereOrderCalculationState {
@@ -5406,12 +5408,22 @@ type ObscalcUpdate {
   """
   Old calculation state, if any.
   """
-  oldState: CalculationState
+  oldCalculationState: CalculationState
+
+  """
+  Old calculation state, if any.
+  """
+  oldState: CalculationState @deprecated(reason: "Use `oldCalculationState` instead.")
 
   """
   New calculation state, if any.
   """
-  newState: CalculationState
+  newCalculationState: CalculationState
+
+  """
+  New calculation state, if any.
+  """
+  newState: CalculationState @deprecated(reason: "Use `newCalculationState` instead.")
 
   """
   Id of the observation that was updated.

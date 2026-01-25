@@ -35,8 +35,8 @@ class obscalcUpdate extends ObscalcServiceSuiteSupport:
         query     = s"""
           subscription {
             obscalcUpdate {
-              oldState
-              newState
+              oldCalculationState
+              newCalculationState
               editType
               value {
                 title
@@ -48,8 +48,8 @@ class obscalcUpdate extends ObscalcServiceSuiteSupport:
         expected  = List(
           Json.obj(
             "obscalcUpdate" -> Json.obj(
-              "oldState" -> Json.Null,
-              "newState" -> CalculationState.Pending.asJson,
+              "oldCalculationState" -> Json.Null,
+              "newCalculationState" -> CalculationState.Pending.asJson,
               "editType" -> EditType.Created.tag.toUpperCase.asJson,
               "value" -> Json.obj(
                 "title" -> "V1647 Orionis".asJson  // Target title
@@ -73,8 +73,8 @@ class obscalcUpdate extends ObscalcServiceSuiteSupport:
         query     = s"""
           subscription {
             obscalcUpdate {
-              oldState
-              newState
+              oldCalculationState
+              newCalculationState
               editType
               value { id }
             }
@@ -84,8 +84,8 @@ class obscalcUpdate extends ObscalcServiceSuiteSupport:
         expected  = List(
           Json.obj(
             "obscalcUpdate" -> Json.obj(
-              "oldState" -> CalculationState.Pending.asJson,
-              "newState" -> CalculationState.Calculating.asJson,
+              "oldCalculationState" -> CalculationState.Pending.asJson,
+              "newCalculationState" -> CalculationState.Calculating.asJson,
               "editType" -> EditType.Updated.tag.toUpperCase.asJson,
               "value" -> Json.obj(
                 "id" -> oid.asJson
@@ -107,8 +107,8 @@ class obscalcUpdate extends ObscalcServiceSuiteSupport:
         query     = s"""
           subscription {
             obscalcUpdate {
-              oldState
-              newState
+              oldCalculationState
+              newCalculationState
               editType
               value { id }
             }
@@ -118,8 +118,8 @@ class obscalcUpdate extends ObscalcServiceSuiteSupport:
         expected  = List(
           Json.obj(
             "obscalcUpdate" -> Json.obj(
-              "oldState" -> CalculationState.Pending.asJson,
-              "newState" -> CalculationState.Pending.asJson,
+              "oldCalculationState" -> CalculationState.Pending.asJson,
+              "newCalculationState" -> CalculationState.Pending.asJson,
               "editType" -> EditType.Updated.tag.toUpperCase.asJson,
               "value" -> Json.obj(
                 "id" -> oid.asJson
@@ -142,8 +142,8 @@ class obscalcUpdate extends ObscalcServiceSuiteSupport:
         query     = s"""
           subscription {
             obscalcUpdate {
-              oldState
-              newState
+              oldCalculationState
+              newCalculationState
               editType
               value { id }
             }
@@ -153,8 +153,8 @@ class obscalcUpdate extends ObscalcServiceSuiteSupport:
         expected  = List(
           Json.obj(
             "obscalcUpdate" -> Json.obj(
-              "oldState" -> CalculationState.Pending.asJson,
-              "newState" -> CalculationState.Pending.asJson,
+              "oldCalculationState" -> CalculationState.Pending.asJson,
+              "newCalculationState" -> CalculationState.Pending.asJson,
               "editType" -> EditType.Updated.tag.toUpperCase.asJson,
               "value" -> Json.obj(
                 "id" -> oid.asJson
@@ -177,8 +177,8 @@ class obscalcUpdate extends ObscalcServiceSuiteSupport:
         query     = s"""
           subscription {
             obscalcUpdate {
-              oldState
-              newState
+              oldCalculationState
+              newCalculationState
               editType
               value { id }
             }
@@ -188,8 +188,8 @@ class obscalcUpdate extends ObscalcServiceSuiteSupport:
         expected  = List(
           Json.obj(
             "obscalcUpdate" -> Json.obj(
-              "oldState" -> CalculationState.Pending.asJson,
-              "newState" -> CalculationState.Pending.asJson,
+              "oldCalculationState" -> CalculationState.Pending.asJson,
+              "newCalculationState" -> CalculationState.Pending.asJson,
               "editType" -> EditType.Updated.tag.toUpperCase.asJson,
               "value" -> Json.obj(
                 "id" -> oid.asJson
@@ -198,7 +198,7 @@ class obscalcUpdate extends ObscalcServiceSuiteSupport:
           )
         )
       )
-    
+
   test("trigger for CfP instrument change"):
     val s = for {
       (pid, oid) <- setup
@@ -211,8 +211,8 @@ class obscalcUpdate extends ObscalcServiceSuiteSupport:
         query     = s"""
           subscription {
             obscalcUpdate {
-              oldState
-              newState
+              oldCalculationState
+              newCalculationState
               editType
               value { id }
             }
@@ -222,8 +222,8 @@ class obscalcUpdate extends ObscalcServiceSuiteSupport:
         expected  = List(
           Json.obj(
             "obscalcUpdate" -> Json.obj(
-              "oldState" -> CalculationState.Pending.asJson,
-              "newState" -> CalculationState.Pending.asJson,
+              "oldCalculationState" -> CalculationState.Pending.asJson,
+              "newCalculationState" -> CalculationState.Pending.asJson,
               "editType" -> EditType.Updated.tag.toUpperCase.asJson,
               "value" -> Json.obj(
                 "id" -> oid.asJson
@@ -232,7 +232,7 @@ class obscalcUpdate extends ObscalcServiceSuiteSupport:
           )
         )
       )
-    
+
   def deleteCalibrationObservation(oid: Observation.Id): IO[Unit] =
     withServices(pi): services =>
       services.transactionally {
@@ -250,8 +250,8 @@ class obscalcUpdate extends ObscalcServiceSuiteSupport:
         subscription {
           obscalcUpdate {
             observationId
-            oldState
-            newState
+            oldCalculationState
+            newCalculationState
             editType
             value { id }
           }
@@ -264,8 +264,8 @@ class obscalcUpdate extends ObscalcServiceSuiteSupport:
         Json.obj(
           "obscalcUpdate" -> Json.obj(
             "observationId" -> oid.asJson,
-            "oldState" -> CalculationState.Pending.asJson,
-            "newState" -> CalculationState.Pending.asJson,
+            "oldCalculationState" -> CalculationState.Pending.asJson,
+            "newCalculationState" -> CalculationState.Pending.asJson,
             "editType" -> EditType.Updated.tag.toUpperCase.asJson,
             "value" -> Json.Null
           )
@@ -275,8 +275,8 @@ class obscalcUpdate extends ObscalcServiceSuiteSupport:
         Json.obj(
           "obscalcUpdate" -> Json.obj(
             "observationId" -> oid.asJson,
-            "oldState" -> CalculationState.Pending.asJson,
-            "newState" -> Json.Null,
+            "oldCalculationState" -> CalculationState.Pending.asJson,
+            "newCalculationState" -> Json.Null,
             "editType" -> EditType.HardDelete.tag.toUpperCase.asJson,
             "value" -> Json.Null
           )
@@ -290,10 +290,10 @@ class obscalcUpdate extends ObscalcServiceSuiteSupport:
       query     = s"""
         subscription {
           obscalcUpdate(input: {
-            newState: { EQ: READY }
+            newCalculationState: { EQ: READY }
           }) {
-            oldState
-            newState
+            oldCalculationState
+            newCalculationState
             editType
           }
         }
@@ -303,8 +303,8 @@ class obscalcUpdate extends ObscalcServiceSuiteSupport:
         // Just one event -- when moving from calculating to ready
         Json.obj(
           "obscalcUpdate" -> Json.obj(
-            "oldState" -> CalculationState.Calculating.asJson,
-            "newState" -> CalculationState.Ready.asJson,
+            "oldCalculationState" -> CalculationState.Calculating.asJson,
+            "newCalculationState" -> CalculationState.Ready.asJson,
             "editType" -> EditType.Updated.tag.toUpperCase.asJson
           )
         )
@@ -346,8 +346,8 @@ class obscalcUpdate extends ObscalcServiceSuiteSupport:
         query     = s"""
           subscription {
             obscalcUpdate {
-              oldState
-              newState
+              oldCalculationState
+              newCalculationState
               editType
               value { id }
             }
@@ -357,8 +357,8 @@ class obscalcUpdate extends ObscalcServiceSuiteSupport:
         expected  = List(
           Json.obj(
             "obscalcUpdate" -> Json.obj(
-              "oldState" -> CalculationState.Pending.asJson,
-              "newState" -> CalculationState.Pending.asJson,
+              "oldCalculationState" -> CalculationState.Pending.asJson,
+              "newCalculationState" -> CalculationState.Pending.asJson,
               "editType" -> EditType.Updated.tag.toUpperCase.asJson,
               "value" -> Json.obj(
                 "id" -> oid.asJson
@@ -368,3 +368,35 @@ class obscalcUpdate extends ObscalcServiceSuiteSupport:
         )
       )
 
+  test("trigger new calculationState field names"):
+    setup.flatMap: (_, oid) =>
+      subscriptionExpect(
+        user      = pi,
+        query     = s"""
+          subscription {
+            obscalcUpdate {
+              oldState
+              oldCalculationState
+              newState
+              newCalculationState
+              editType
+              value { id }
+            }
+          }
+        """,
+        mutations = load.asRight,
+        expected  = List(
+          Json.obj(
+            "obscalcUpdate" -> Json.obj(
+              "oldState" -> CalculationState.Pending.asJson,
+              "oldCalculationState" -> CalculationState.Pending.asJson,
+              "newState" -> CalculationState.Calculating.asJson,
+              "newCalculationState" -> CalculationState.Calculating.asJson,
+              "editType" -> EditType.Updated.tag.toUpperCase.asJson,
+              "value" -> Json.obj(
+                "id" -> oid.asJson
+              )
+            )
+          )
+        )
+      )
