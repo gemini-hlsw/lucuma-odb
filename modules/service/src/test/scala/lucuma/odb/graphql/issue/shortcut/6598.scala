@@ -188,7 +188,7 @@ class ShortCut_6598 extends ExecutionTestSupportForGmos:
       // Run workflow
       _   <- runObscalcUpdate(pid, o1)
       // Recalculate calibrations
-      _   <- recalculateCalibrations(pid, when).flatMap(_._1.traverse(runObscalcUpdate(pid, _)))
+      _   <- recalculateCalibrations(pid, when, o1).flatMap(_._1.traverse(runObscalcUpdate(pid, _)))
       // First pass we get 1 specphoto + 1 telluric
       _   <- countCalibrations(pid).assertEquals(CalibrationCounts(1, 1, 0, 0))
 
@@ -197,7 +197,8 @@ class ShortCut_6598 extends ExecutionTestSupportForGmos:
       o2  <- cloneObservationAs(pi, o1)
       // Run workflow
       _   <- runObscalcUpdate(pid, o2)
-      _   <- recalculateCalibrations(pid, when).flatMap(_._1.traverse(runObscalcUpdate(pid, _)))
+      _   <- recalculateCalibrations(pid, when, o1).flatMap(_._1.traverse(runObscalcUpdate(pid, _)))
+      _   <- recalculateCalibrations(pid, when, o2).flatMap(_._1.traverse(runObscalcUpdate(pid, _)))
       // Here we have the same 1 specphoto + 1 telluric, two obs one config
       _   <- countCalibrations(pid).assertEquals(CalibrationCounts(1, 1, 0, 0))
 
@@ -205,7 +206,8 @@ class ShortCut_6598 extends ExecutionTestSupportForGmos:
       _   <- IO.println("Step 3: Updating read mode...")
       _   <- updateGmosReadMode(o2, GmosAmpReadMode.Fast, GmosAmpGain.High)
       // Recalculate calibrations - we should now have more sets due to different read modes
-      _   <- recalculateCalibrations(pid, when).flatMap(_._1.traverse(runObscalcUpdate(pid, _)))
+      _   <- recalculateCalibrations(pid, when, o1).flatMap(_._1.traverse(runObscalcUpdate(pid, _)))
+      _   <- recalculateCalibrations(pid, when, o2).flatMap(_._1.traverse(runObscalcUpdate(pid, _)))
       // Verify calibrations increased (should have 2 calibrations for each readmode configurations)
       _   <- countCalibrations(pid).assertEquals(CalibrationCounts(2, 2, 0, 0))
 
@@ -214,7 +216,8 @@ class ShortCut_6598 extends ExecutionTestSupportForGmos:
       _   <- deleteMultipleObservations(List(o1, o2))
       // we deleted science but before running calibrations they are stil present
       _   <- countCalibrations(pid).assertEquals(CalibrationCounts(2, 2, 0, 0))
-      _   <- recalculateCalibrations(pid, when)
+      _   <- recalculateCalibrations(pid, when, o1)
+      _   <- recalculateCalibrations(pid, when, o2)
       // No calibrations now
       _   <- countCalibrations(pid).assertEquals(CalibrationCounts(0, 0, 0, 0))
 
@@ -223,14 +226,16 @@ class ShortCut_6598 extends ExecutionTestSupportForGmos:
       _   <- undeleteMultipleObservations(List(o1, o2))
       // Stil at 0
       _   <- countCalibrations(pid).assertEquals(CalibrationCounts(0, 0, 0, 0))
-      _   <- recalculateCalibrations(pid, when).flatMap(_._1.traverse(runObscalcUpdate(pid, _)))
+      _   <- recalculateCalibrations(pid, when, o1).flatMap(_._1.traverse(runObscalcUpdate(pid, _)))
+      _   <- recalculateCalibrations(pid, when, o2).flatMap(_._1.traverse(runObscalcUpdate(pid, _)))
       // Calibs restored
       _   <- countCalibrations(pid).assertEquals(CalibrationCounts(2, 2, 0, 0))
 
       // Step 6: Change the status of one science observation to "Inactive"
       _   <- IO.println("Step 6: Setting first observation inactive...")
       _   <- setObservationWorkflowState(pi, o1, ObservationWorkflowState.Inactive)
-      _   <- recalculateCalibrations(pid, when)
+      _   <- recalculateCalibrations(pid, when, o1)
+      _   <- recalculateCalibrations(pid, when, o2)
       // Calibs restored, given only one science config it should have 1 specphoto + 1 twilight
       // With the bug we would unteragetd calibratoins observations as a shared target was deleted
       // on the inactivated observation

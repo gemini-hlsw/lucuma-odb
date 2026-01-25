@@ -159,7 +159,8 @@ object CMain extends MainParams {
                     _ <- calibrationsService
                           .recalculateCalibrations(
                             elem.programId,
-                            LocalDateTime.of(t, LocalTime.MIDNIGHT).toInstant(ZoneOffset.UTC)
+                            LocalDateTime.of(t, LocalTime.MIDNIGHT).toInstant(ZoneOffset.UTC),
+                            elem.observationId
                           ).whenA(!i &&
                                   elem.newState.exists(_ === CalculationState.Ready) &&
                                   elem.oldState =!= elem.newState &&

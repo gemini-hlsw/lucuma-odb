@@ -51,17 +51,22 @@ trait CalibrationsService[F[_]] {
     *
     * @param pid Program.Id
     * @param referenceInstant time used to calculate targets
+    * @param oid obsid that triggered the recalculation
     * @return list of added and removed calibration observations
     */
   def recalculateCalibrations(
-    pid: Program.Id,
-    referenceInstant: Instant
+    pid:              Program.Id,
+    referenceInstant: Instant,
+    oid:              Observation.Id
   )(using Transaction[F], SuperUserAccess): F[(List[Observation.Id], List[Observation.Id])]
 
   /**
     * Returns the calibration targets for a given role adjusted to a reference instant
     */
-  def calibrationTargets(roles: List[CalibrationRole], referenceInstant: Instant): F[List[(Target.Id, String, CalibrationRole, Coordinates)]]
+  def calibrationTargets(
+    roles: List[CalibrationRole],
+    referenceInstant: Instant
+  ): F[List[(Target.Id, String, CalibrationRole, Coordinates)]]
 
   def recalculateCalibrationTarget(
     pid: Program.Id,
@@ -121,12 +126,16 @@ object CalibrationsService extends CalibrationObservations {
           session.execute(Statements.selectCalibrationTargets(roles))(roles)
             .map(targetCoordinates(referenceInstant))
 
-      def recalculateCalibrations(pid: Program.Id, referenceInstant: Instant)(using Transaction[F], SuperUserAccess): F[(List[Observation.Id], List[Observation.Id])] =
+      def recalculateCalibrations(
+        pid: Program.Id,
+        referenceInstant: Instant,
+        oid: Observation.Id
+      )(using Transaction[F], SuperUserAccess): F[(List[Observation.Id], List[Observation.Id])] =
         val perObsService = PerScienceObservationCalibrationsService.instantiate
         val sharedService = PerProgramPerConfigCalibrationsService.instantiate
 
         for {
-          _                <- info"=== Recalculating calibrations for program ID: $pid, reference instant $referenceInstant ==="
+          _                <- info"=== Recalculating calibrations for program ID: $pid, reference instant $referenceInstant, oid: $oid ==="
           // Read calibration targets (shared resource)
           calibTargets     <- calibrationTargets(PerProgramPerConfigCalibrationTypes, referenceInstant)
           // Get all science and calibration observations (regardless of workflow state)
@@ -140,8 +149,8 @@ object CalibrationsService extends CalibrationObservations {
           perObs           = allSci.collect(ObsExtract.perObsFilter).map(_.map(_.toConfigSubset))
           perProgram       = allSci.collect(ObsExtract.perProgramFilter)
           _                <- (info"Program $pid has ${perObs.length} science observations with per obs calibrations: ${perObs.map(_.id)}").whenA(perObs.nonEmpty)
-          // Handle per-science-observation calibs
-          (f2Added, f2Removed)     <- perObsService.generateCalibrations(pid, perObs)
+          // Handle per-science-observation calibs (pass changedObsId for targeted processing)
+          (f2Added, f2Removed)     <- perObsService.generateCalibrations(pid, perObs, oid)
           _                <- (info"Program ID: $pid has ${perProgram.length} science observations for per program calibrations: ${perProgram.map(_.id)}").whenA(perProgram.nonEmpty)
           // Handle per--config calib
           (gmosAdded, gmosRemoved) <- sharedService.generateCalibrations(pid, perProgram, allCalibs, calibTargets, referenceInstant)
