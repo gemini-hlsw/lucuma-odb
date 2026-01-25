@@ -16,16 +16,17 @@ trait CalculatedValueCodec:
   given [A: Encoder]: Encoder[CalculatedValue[A]] with
     def apply(c: CalculatedValue[A]): Json =
       Json.obj(
-        "state" -> c.state.asJson,
-        "value" -> c.value.asJson
+        "calculationState" -> c.state.asJson,
+        "state"            -> c.state.asJson,
+        "value"            -> c.value.asJson
       )
 
   given [A: Decoder]: Decoder[CalculatedValue[A]] with
     def apply(c: HCursor): Decoder.Result[CalculatedValue[A]] =
       for
-        p <- c.downField("state").as[CalculationState]
+        p <- c.downField("calculationState").as[CalculationState]
+             .orElse(c.downField("state").as[CalculationState])
         v <- c.downField("value").as[A]
       yield CalculatedValue(p, v)
 
 object calculatedValue extends CalculatedValueCodec
-

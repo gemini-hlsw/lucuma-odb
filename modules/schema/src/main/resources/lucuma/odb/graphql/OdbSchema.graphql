@@ -337,7 +337,11 @@ A BandedTime that is automatically updated by a background process.
 """
 type CalculatedBandedTime {
   "The current state of the background calculation."
-  state: CalculationState!
+  calculationState: CalculationState!
+
+  "The current state of the background calculation."
+  state: CalculationState! @deprecated(reason: "Use `calculationState` instead.")
+
   value: BandedTime
 }
 
@@ -738,7 +742,11 @@ A CategorizedTimeRange that is automatically updated by a background process.
 """
 type CalculatedCategorizedTimeRange {
   "The current state of the background calculation."
-  state: CalculationState!
+  calculationState: CalculationState!
+
+  "The current state of the background calculation."
+  state: CalculationState! @deprecated(reason: "Use `calculationState` instead.")
+
   value: CategorizedTimeRange
 }
 
@@ -7573,7 +7581,10 @@ Wraps an ExecutionDigest with the background calculation state.
 type CalculatedExecutionDigest {
 
   "Background calculation state."
-  state: CalculationState!
+  calculationState: CalculationState!
+
+  "Background calculation state."
+  state: CalculationState! @deprecated(reason: "Use `calculationState` instead.")
 
   "The current execution digest itself."
   value: ExecutionDigest

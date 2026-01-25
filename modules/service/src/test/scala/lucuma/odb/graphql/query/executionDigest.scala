@@ -103,7 +103,7 @@ class executionDigest extends ExecutionTestSupportForGmos {
         observation(observationId: "$oid") {
           execution {
             digest {
-              state
+              calculationState
               value {
                 setup {
                   full { seconds }
@@ -138,7 +138,7 @@ class executionDigest extends ExecutionTestSupportForGmos {
         "observation": {
           "execution": {
             "digest": {
-              "state": "READY",
+              "calculationState": "READY",
               "value": {
                 "setup" : {
                   "full" : {
@@ -231,6 +231,42 @@ class executionDigest extends ExecutionTestSupportForGmos {
         expected = successDigestResult.asRight
       )
 
+  test("digest - deprecated state field still works"):
+    val setup: IO[Observation.Id] =
+      for
+        p <- createProgram
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+        _ <- runObscalcUpdate(p, o)
+      yield o
+
+    setup.flatMap: oid =>
+      expect(
+        user     = pi,
+        query    = s"""
+          query {
+            observation(observationId: "$oid") {
+              execution {
+                digest {
+                  state
+                }
+              }
+            }
+          }
+        """,
+        expected = json"""
+          {
+            "observation": {
+              "execution": {
+                "digest": {
+                  "state": "READY"
+                }
+              }
+            }
+          }
+        """.asRight
+      )
+
   test("digest - point emission lines"):
     val setup: IO[Observation.Id] =
       for
@@ -286,7 +322,7 @@ class executionDigest extends ExecutionTestSupportForGmos {
                      id
                      execution {
                        digest {
-                         state
+                         calculationState
                          value {
                            setup {
                              full { seconds }
@@ -311,7 +347,7 @@ class executionDigest extends ExecutionTestSupportForGmos {
                         "id": $oid,
                         "execution": {
                           "digest": {
-                            "state": "READY",
+                            "calculationState": "READY",
                             "value": null
                           }
                         }
@@ -346,7 +382,7 @@ class executionDigest extends ExecutionTestSupportForGmos {
                      id
                      execution {
                        digest {
-                         state
+                         calculationState
                          value {
                            setup {
                              full { seconds }
@@ -370,7 +406,7 @@ class executionDigest extends ExecutionTestSupportForGmos {
                       "id": $oid,
                       "execution": {
                         "digest": {
-                          "state": "READY",
+                          "calculationState": "READY",
                           "value": null
                         }
                       }
@@ -676,7 +712,7 @@ class executionDigest extends ExecutionTestSupportForGmos {
               "observation": {
                 "execution": {
                   "digest": {
-                    "state": "READY",
+                    "calculationState": "READY",
                     "value": {
                       "setup" : {
                         "full" : {
