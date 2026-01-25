@@ -329,6 +329,9 @@ object PerScienceObservationCalibrationsService:
           _          <- scienceEtm.traverse_ : etm =>
                           val calibEtm   = telluricEtm(etm)
                           val currentEtm = allEtm.get(telluricOid)
+                          pprint.pprintln(s" $scienceOid $telluricOid")
+                          pprint.pprintln(scienceEtm)
+                          pprint.pprintln(telluricEtm)
 
                           (S.exposureTimeModeService.deleteMany(List(telluricOid), ExposureTimeModeRole.Science) *>
                             S.exposureTimeModeService.insertOne(telluricOid, ExposureTimeModeRole.Science, calibEtm))
