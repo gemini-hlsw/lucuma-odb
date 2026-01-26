@@ -17,17 +17,18 @@ import lucuma.odb.graphql.binding.ObservationWorkflowStateBinding
 object WhereCalculatedObservationWorkflow:
 
   def binding(path: Path): Matcher[Predicate] =
-    val WhereCalculationState = WhereOrder.binding(path / "state", CalculationStateBinding)
+    val WhereCalculationState = WhereOrder.binding(path / "calculationState", CalculationStateBinding)
     val WhereWorkflowState    = WhereOrder.binding(path / "value" / "state", ObservationWorkflowStateBinding)
 
     ObjectFieldsBinding.rmap:
       case List(
         BooleanBinding.Option("IS_NULL", rIsNull),
         WhereCalculationState.Option("calculationState", rCalc),
+        WhereCalculationState.Option("state", rState),
         WhereWorkflowState.Option("workflowState", rWork)
-      ) => (rIsNull, rCalc, rWork).parMapN: (isNull, calc, work) =>
+      ) => (rIsNull, rCalc, rState, rWork).parMapN: (isNull, calc, state, work) =>
         and(List(
           isNull.map(IsNull(path / "synthetic_id", _)),
-          calc,
+          calc.orElse(state),
           work
         ).flatten)

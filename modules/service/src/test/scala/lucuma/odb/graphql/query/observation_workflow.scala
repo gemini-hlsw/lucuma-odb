@@ -65,6 +65,7 @@ class observation_workflow
           matches {
             workflow {
               state
+              calculationState
               value {
                 state
                 validTransitions
@@ -85,6 +86,7 @@ class observation_workflow
         {
           "workflow": {
             "state": ${wf.state},
+            "calculationState": ${wf.state},
             "value": {
               "state": ${wf.value.state},
               "validTransitions": ${wf.value.validTransitions},
@@ -1170,6 +1172,7 @@ class observation_workflow
       _       <- matches("workflowState: { EQ: UNDEFINED }", List(pending, invalid))
       _       <- matches("calculationState: { EQ: READY }", List(ongoing, invalid))
       _       <- matches("calculationState: { LT: READY }", List(pending))
+      _       <- matches("state: { EQ: READY }", List(ongoing, invalid)) // deprecated
       _       <- matches("IS_NULL: false", List(pending, ongoing, invalid))
     yield ()
 
