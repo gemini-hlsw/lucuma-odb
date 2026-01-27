@@ -10,19 +10,14 @@ import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.PosInt
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObservationWorkflowState
-import lucuma.core.enums.ObserveClass
-import lucuma.core.enums.SequenceType
-import lucuma.core.enums.StepGuideState
 import lucuma.core.model.ConfigurationRequest
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
-import lucuma.core.model.sequence.StepConfig
 import lucuma.core.syntax.timespan.*
 import lucuma.itc.IntegrationTime
 import lucuma.odb.data.OdbError
 import lucuma.odb.graphql.query.ExecutionTestSupportForGmos
 import lucuma.odb.graphql.query.ObservingModeSetupOperations
-import lucuma.odb.json.all.transport.given
 
 class setObservationWorkflowState
   extends ExecutionTestSupportForGmos
@@ -160,17 +155,14 @@ class setObservationWorkflowState
   // (see executionState.scala)
   test("[Sidereal]    Ongoing    <-> Inactive, Completed"):
     for
-      p <- createProgram
-      t <- createTargetWithProfileAs(pi, p)
-      o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+      p  <- createProgram
+      t  <- createTargetWithProfileAs(pi, p)
+      o  <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
       v  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
-      a  <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
-      s0 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthArc(0), ArcStep, telescopeConfig(0, 0, StepGuideState.Disabled), ObserveClass.NightCal)
-      _  <- addEndStepEvent(s0)
-      s1 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthFlat(0), FlatStep, telescopeConfig(0, 0, StepGuideState.Disabled), ObserveClass.NightCal)
-      _  <- addEndStepEvent(s1)
-      s2 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, telescopeConfig(0, 0, StepGuideState.Enabled), ObserveClass.Science)
-      _  <- addEndStepEvent(s2)
+      s  <- firstScienceAtomStepIds(serviceUser, o)
+      _  <- addEndStepEvent(s(0), v)
+      _  <- addEndStepEvent(s(1), v)
+      _  <- addEndStepEvent(s(2), v)
       _  <- runObscalcUpdate(p, o)
       _  <- assertIO(queryObservationWorkflowState(o), Ongoing)
       _  <- testTransitions(p, o, Ongoing, Inactive, Completed)
@@ -182,28 +174,12 @@ class setObservationWorkflowState
       p <- createProgram
       t <- createTargetWithProfileAs(pi, p)
       o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
-      v  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
-
-      a0 <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
-      s0 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthArc(0), ArcStep, telescopeConfig(0, 0, StepGuideState.Disabled), ObserveClass.NightCal)
-      _  <- addEndStepEvent(s0)
-      s1 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthFlat(0), FlatStep, telescopeConfig(0, 0, StepGuideState.Disabled), ObserveClass.NightCal)
-      _  <- addEndStepEvent(s1)
-      s2 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, telescopeConfig(0, 0, StepGuideState.Enabled), ObserveClass.Science)
-      _  <- addEndStepEvent(s2)
-
-      a1 <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
-      s3 <- recordStepAs(serviceUser, a1, Instrument.GmosNorth, gmosNorthArc(5), ArcStep, telescopeConfig(0, 15, StepGuideState.Disabled), ObserveClass.NightCal)
-      _  <- addEndStepEvent(s3)
-      s4 <- recordStepAs(serviceUser, a1, Instrument.GmosNorth, gmosNorthFlat(5), FlatStep, telescopeConfig(0, 15, StepGuideState.Disabled), ObserveClass.NightCal)
-      _  <- addEndStepEvent(s4)
-      s5 <- recordStepAs(serviceUser, a1, Instrument.GmosNorth, gmosNorthScience(5), StepConfig.Science, telescopeConfig(0, 15, StepGuideState.Enabled), ObserveClass.Science)
-      _  <- addEndStepEvent(s5)
-
-      _  <- runObscalcUpdate(p, o)
-      _  <- assertIO(queryObservationWorkflowState(o), Completed)
-      _  <- testTransitions(p, o, Completed)
-
+      v <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
+      s <- scienceStepIds(serviceUser, o)
+      _ <- s.traverse(sid => addEndStepEvent(sid, v))
+      _ <- runObscalcUpdate(p, o)
+      _ <- assertIO(queryObservationWorkflowState(o), Completed)
+      _ <- testTransitions(p, o, Completed)
     yield ()
 
   test("[Sidereal]    Completed  <-> Ongoing, if explicitly declared complete"):
@@ -211,20 +187,15 @@ class setObservationWorkflowState
       p <- createProgram
       t <- createTargetWithProfileAs(pi, p)
       o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
-      v  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
-      a  <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
-      s0 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthArc(0), ArcStep, telescopeConfig(0, 0, StepGuideState.Disabled), ObserveClass.NightCal)
-      _  <- addEndStepEvent(s0)
-      s1 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthFlat(0), FlatStep, telescopeConfig(0, 0, StepGuideState.Disabled), ObserveClass.NightCal)
-      _  <- addEndStepEvent(s1)
-      s2 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, telescopeConfig(0, 0, StepGuideState.Enabled), ObserveClass.Science)
-      _  <- addEndStepEvent(s2)
-      _  <- runObscalcUpdate(p, o)
-      _  <- assertIO(queryObservationWorkflowState(o), Ongoing)
-      _  <- setObservationWorkflowState(pi, o, Completed)
-      _  <- runObscalcUpdate(p, o)
-      _  <- assertIO(queryObservationWorkflowState(o), Completed)
-      _  <- testTransitions(p, o, Completed, Ongoing)
+      v <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
+      s <- firstScienceAtomStepIds(serviceUser, o)
+      _ <- s.traverse(sid => addEndStepEvent(sid, v))
+      _ <- runObscalcUpdate(p, o)
+      _ <- assertIO(queryObservationWorkflowState(o), Ongoing)
+      _ <- setObservationWorkflowState(pi, o, Completed)
+      _ <- runObscalcUpdate(p, o)
+      _ <- assertIO(queryObservationWorkflowState(o), Completed)
+      _ <- testTransitions(p, o, Completed, Ongoing)
     yield ()
 
   test("[Eng]         Defined    <-> Inactive, Ready"):
@@ -243,17 +214,12 @@ class setObservationWorkflowState
       _ <- setProgramReference(staff, p, """engineering: { semester: "2025B", instrument: GMOS_SOUTH }""")
       t <- createTargetWithProfileAs(pi, p)
       o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
-      v  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
-      a  <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
-      s0 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthArc(0), ArcStep, telescopeConfig(0, 0, StepGuideState.Disabled), ObserveClass.NightCal)
-      _  <- addEndStepEvent(s0)
-      s1 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthFlat(0), FlatStep, telescopeConfig(0, 0, StepGuideState.Disabled), ObserveClass.NightCal)
-      _  <- addEndStepEvent(s1)
-      s2 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, telescopeConfig(0, 0, StepGuideState.Enabled), ObserveClass.Science)
-      _  <- addEndStepEvent(s2)
-      _  <- runObscalcUpdate(p, o)
-      _  <- assertIO(queryObservationWorkflowState(o), Ongoing)
-      _  <- testTransitions(p, o, Ongoing, Inactive, Completed)
+      v <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
+      s <- firstScienceAtomStepIds(serviceUser, o)
+      _ <- s.traverse(sid => addEndStepEvent(sid, v))
+      _ <- runObscalcUpdate(p, o)
+      _ <- assertIO(queryObservationWorkflowState(o), Ongoing)
+      _ <- testTransitions(p, o, Ongoing, Inactive, Completed)
     yield ()
 
   test("[Eng]         Completed  <->"):
@@ -262,24 +228,12 @@ class setObservationWorkflowState
       _ <- setProgramReference(staff, p, """engineering: { semester: "2025B", instrument: GMOS_SOUTH }""")
       t <- createTargetWithProfileAs(pi, p)
       o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
-      v  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
-      a0 <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
-      s0 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthArc(0), ArcStep, telescopeConfig(0, 0, StepGuideState.Disabled), ObserveClass.NightCal)
-      _  <- addEndStepEvent(s0)
-      s1 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthFlat(0), FlatStep, telescopeConfig(0, 0, StepGuideState.Disabled), ObserveClass.NightCal)
-      _  <- addEndStepEvent(s1)
-      s2 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, telescopeConfig(0, 0, StepGuideState.Enabled), ObserveClass.Science)
-      _  <- addEndStepEvent(s2)
-      a1 <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
-      s3 <- recordStepAs(serviceUser, a1, Instrument.GmosNorth, gmosNorthArc(5), ArcStep, telescopeConfig(0, 15, StepGuideState.Disabled), ObserveClass.NightCal)
-      _  <- addEndStepEvent(s3)
-      s4 <- recordStepAs(serviceUser, a1, Instrument.GmosNorth, gmosNorthFlat(5), FlatStep, telescopeConfig(0, 15, StepGuideState.Disabled), ObserveClass.NightCal)
-      _  <- addEndStepEvent(s4)
-      s5 <- recordStepAs(serviceUser, a1, Instrument.GmosNorth, gmosNorthScience(5), StepConfig.Science, telescopeConfig(0, 15, StepGuideState.Enabled), ObserveClass.Science)
-      _  <- addEndStepEvent(s5)
-      _  <- runObscalcUpdate(p, o)
-      _  <- assertIO(queryObservationWorkflowState(o), Completed)
-      _  <- testTransitions(p, o, Completed)
+      v <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
+      s <- scienceStepIds(serviceUser, o)
+      _ <- s.traverse(sid => addEndStepEvent(sid, v))
+      _ <- runObscalcUpdate(p, o)
+      _ <- assertIO(queryObservationWorkflowState(o), Completed)
+      _ <- testTransitions(p, o, Completed)
     yield ()
 
 }

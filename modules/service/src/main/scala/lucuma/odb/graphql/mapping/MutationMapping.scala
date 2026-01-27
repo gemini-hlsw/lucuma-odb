@@ -24,6 +24,7 @@ import grackle.ResultT
 import grackle.Term
 import grackle.TypeRef
 import grackle.skunk.SkunkMapping
+import grackle.syntax.*
 import io.circe.Json
 import io.circe.syntax.*
 import lucuma.catalog.clients.GaiaClient
@@ -41,9 +42,7 @@ import lucuma.core.model.ProgramUser
 import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.core.model.Visit
-import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.Dataset
-import lucuma.core.model.sequence.Step
 import lucuma.itc.client.ItcClient
 import lucuma.odb.Config
 import lucuma.odb.data.OdbError
@@ -94,13 +93,9 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
       DeleteProgramUser,
       DeleteProposal,
       LinkUser,
-      RecordAtom,
       RecordDataset,
-      RecordFlamingos2Step,
       RecordFlamingos2Visit,
-      RecordGmosNorthStep,
       RecordGmosNorthVisit,
-      RecordGmosSouthStep,
       RecordGmosSouthVisit,
       RedeemUserInvitation,
       ResetAcquisition,
@@ -345,14 +340,19 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
 
   private lazy val ResetAcquisition: MutationField =
     MutationField("resetAcquisition", ResetAcquisitionInput.Binding): (input, child) =>
-      services.useTransactionally:
+      services.useNonTransactionally:
         selectForUpdate(input).flatMap: res =>
           res.flatTraverse: checked =>
             if checked.isEmpty then
               OdbError.NotAuthorized(user.id).asFailureF
             else
-              observationService.resetAcquisition(checked).nestMap: oid =>
-                Filter(Predicates.resetAcquisitionResult.observation.id.eql(oid), child)
+              checked.foldWithId(OdbError.InvalidArgument().asFailureF): (_, oid) =>
+                Services.asSuperUser:
+                  generator
+                    .resetAcquisition(oid)
+                    .map(_.fold(_.asFailure, _ => oid.success))
+                    .nestMap: oid =>
+                      Filter(Predicates.resetAcquisitionResult.observation.id.eql(oid), child)
 
   private lazy val CloneTarget: MutationField =
     MutationField("cloneTarget", CloneTargetInput.Binding): (input, child) =>
@@ -528,75 +528,17 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
       executionEventService.insertStepEvent(input)
     }
 
-  private def recordAtom(
-    response:  F[Result[Atom.Id]],
-    predicate: LeafPredicates[Atom.Id],
-    child:     Query
-  ): F[Result[Query]] =
-    response.nestMap: aid =>
-      Unique(Filter(predicate.eql(aid), child))
-
-  private lazy val RecordAtom: MutationField =
-    MutationField("recordAtom", RecordAtomInput.Binding): (input, child) =>
-      services.useTransactionally:
-        requireServiceAccess:
-          recordAtom(
-            sequenceService.insertAtomRecord(input.visitId, input.instrument, input.sequenceType, input.generatedId, input.idempotencyKey),
-            Predicates.atomRecord.id,
-            child
-          )
-
-  private def recordStep(
-    action:    F[Result[Step.Id]],
-    predicate: LeafPredicates[Step.Id],
-    child:     Query
-  ): F[Result[Query]] =
-    action.nestMap: sid =>
-      Unique(Filter(predicate.eql(sid), child))
-
-  private lazy val RecordFlamingos2Step: MutationField =
-    MutationField("recordFlamingos2Step", RecordStepInput.Flamingos2Binding): (input, child) =>
-      services.useTransactionally:
-        requireServiceAccess:
-          recordStep(
-            sequenceService.insertFlamingos2StepRecord(input.atomId, input.instrument, input.stepConfig, input.telescopeConfig, input.observeClass, input.generatedId, input.idempotencyKey, timeEstimateCalculator.flamingos2),
-            Predicates.flamingos2Step.id,
-            child
-          )
-
-  private lazy val RecordGmosNorthStep: MutationField =
-    MutationField("recordGmosNorthStep", RecordStepInput.GmosNorthBinding): (input, child) =>
-      services.useTransactionally:
-        requireServiceAccess:
-          recordStep(
-            sequenceService.insertGmosNorthStepRecord(input.atomId, input.instrument, input.stepConfig, input.telescopeConfig, input.observeClass, input.generatedId, input.idempotencyKey, timeEstimateCalculator.gmosNorth),
-            Predicates.gmosNorthStep.id,
-            child
-          )
-
-  private lazy val RecordGmosSouthStep: MutationField =
-    MutationField("recordGmosSouthStep", RecordStepInput.GmosSouthBinding): (input, child) =>
-      services.useTransactionally:
-        requireServiceAccess:
-          recordStep(
-            sequenceService.insertGmosSouthStepRecord(input.atomId, input.instrument, input.stepConfig, input.telescopeConfig, input.observeClass, input.generatedId, input.idempotencyKey, timeEstimateCalculator.gmosSouth),
-            Predicates.gmosSouthStep.id,
-            child
-          )
-
-
-  @annotation.nowarn("msg=unused implicit parameter")
   private def recordVisit(
     response:  F[Result[Visit.Id]],
     predicate: LeafPredicates[Visit.Id],
     child:     Query
-  )(using Transaction[F]): F[Result[Query]] =
+  ): F[Result[Query]] =
     ResultT(response).map(vid => Unique(Filter(predicate.eql(vid), child))).value
 
 
   private lazy val RecordFlamingos2Visit: MutationField =
     MutationField("recordFlamingos2Visit", RecordVisitInput.Flamingos2Binding): (input, child) =>
-      services.useTransactionally:
+      services.useNonTransactionally:
         requireServiceAccess:
           recordVisit(
             visitService.recordFlamingos2(input),
@@ -606,7 +548,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
 
   private lazy val RecordGmosNorthVisit: MutationField =
     MutationField("recordGmosNorthVisit", RecordVisitInput.GmosNorthBinding): (input, child) =>
-      services.useTransactionally:
+      services.useNonTransactionally:
         requireServiceAccess:
           recordVisit(
             visitService.recordGmosNorth(input),
@@ -616,7 +558,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
 
   private lazy val RecordGmosSouthVisit: MutationField =
     MutationField("recordGmosSouthVisit", RecordVisitInput.GmosSouthBinding): (input, child) =>
-      services.useTransactionally:
+      services.useNonTransactionally:
         requireServiceAccess:
           recordVisit(
             visitService.recordGmosSouth(input),
@@ -665,8 +607,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
     MutationField.encodable("setObservationWorkflowState", SetObservationWorkflowStateInput.Binding): input =>
       services.useNonTransactionally:
         selectForUpdate(input).flatMap: res =>
-          res.flatTraverse: checked =>
-            observationWorkflowService.setWorkflowState(checked, commitHash, itcClient, timeEstimateCalculator)
+          res.flatTraverse(observationWorkflowService.setWorkflowState)
 
   private lazy val SetProgramReference =
     MutationField("setProgramReference", SetProgramReferenceInput.Binding): (input, child) =>

@@ -23,8 +23,7 @@ object AddDatasetEventInput:
       case List(
         DatasetIdBinding("datasetId", rDatasetId),
         DatasetStageBinding("datasetStage", rDatasetStage),
-        ClientIdBinding.Option("clientId", rCid),
         IdempotencyKeyBinding.Option("idempotencyKey", rIdm)
       ) =>
-        (rDatasetId, rDatasetStage, rCid, rIdm).parMapN: (did, stage, cid, idm) =>
-          AddDatasetEventInput(did, stage, idm orElse cid.map(c => IdempotencyKey(c.toUuid)))
+        (rDatasetId, rDatasetStage, rIdm).parMapN: (did, stage, idm) =>
+          AddDatasetEventInput(did, stage, idm)

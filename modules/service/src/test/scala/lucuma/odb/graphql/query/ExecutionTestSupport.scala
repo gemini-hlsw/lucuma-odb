@@ -21,18 +21,14 @@ import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.User
+import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Dataset
-import lucuma.core.model.sequence.InstrumentExecutionConfig
 import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.syntax.string.*
-import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
-import lucuma.odb.data.OdbError
 import lucuma.odb.graphql.enums.Enums
-import lucuma.odb.logic.Generator
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
-import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.Services
 import lucuma.odb.service.UserService
 import lucuma.odb.util.Codecs.*
@@ -41,7 +37,7 @@ import skunk.implicits.*
 
 import java.time.Instant
 
-trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
+trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations with GenerationTestSupport {
 
   val pi: User          = TestUsers.Standard.pi(1, 30)
   val pi2: User         = TestUsers.Standard.pi(2, 32)
@@ -189,11 +185,12 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
       }
     """
 
-  def addEndStepEvent(sid: Step.Id): IO[Unit] = {
+  def addEndStepEvent(sid: Step.Id, vid: Visit.Id): IO[Unit] = {
     val q = s"""
       mutation {
         addStepEvent(input: {
-          stepId: "$sid",
+          stepId: "$sid"
+          visitId: "$vid"
           stepStage: END_STEP
         }) {
           event {
@@ -255,81 +252,10 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
       .map(Timestamp.fromInstantTruncated)
       .flatMap(t => IO.fromOption(t)(new RuntimeException("oddly, timestamp of now is out of range")))
 
-  /**
-   * Generates the sequence for the given observation.
-   *
-   * @param limit the future limit, which must be in the range [0, 100]
-   * @param when the timestamp to pass the generator. in other words generate as
-   *             if asked at this time
-   */
-  def generate(
-    pid:      Program.Id,
-    oid:      Observation.Id,
-    limit:    Option[Int]       = None,  // [0, 100]
-    when:     Option[Timestamp] = None
-  ): IO[Either[OdbError, InstrumentExecutionConfig]] =
+  def timeEstimateCalculator: IO[TimeEstimateCalculatorImplementation.ForInstrumentMode] =
     withSession: session =>
-      servicesFor(serviceUser).map(_(session)).use: s =>
-        given Services[IO] = s
-
-        for
-          future <- limit.traverse(lim => IO.fromOption(Generator.FutureLimit.from(lim).toOption)(new IllegalArgumentException("Specify a future limit from 0 to 100")))
-          enums  <- Enums.load(session)
-          tec    <- TimeEstimateCalculatorImplementation.fromSession(session, enums)
-          gen     = Generator.instantiate[IO](CommitHash.Zero, tec)
-          res    <- Services.asSuperUser(
-                      gen.generate(pid, oid, future.getOrElse(Generator.FutureLimit.Default), when)
-                    )
-        yield res
-
-  /**
-   * Generates the sequence but fails if it produces an error.
-   *
-   * @param limit the future limit, which must be in the range [0, 100]
-   * @param when the timestamp to pass the generator. in other words generate as
-   *             if asked at this time
-   */
-  def generateOrFail(
-    pid:      Program.Id,
-    oid:      Observation.Id,
-    limit:    Option[Int]       = None,  // [0, 100]
-    when:     Option[Timestamp] = None
-  ): IO[InstrumentExecutionConfig] =
-    generate(pid, oid, limit, when).flatMap: res =>
-      IO.fromEither(res.leftMap(e => new RuntimeException(s"Failed to generate the sequence: ${e.message}")))
-
-  /**
-   * Generates the sequence as if requested after the specified amount of time
-   * has passed.
-   *
-   * @param time amount of time (from now) to use as a timestamp for sequence
-   *             generation; does not delay the computation in any way
-   */
-  def generateAfter(
-    pid:  Program.Id,
-    oid:  Observation.Id,
-    time: TimeSpan
-  ): IO[Either[OdbError, InstrumentExecutionConfig]] =
-    for {
-      now  <- timestampNow
-      when <- IO.fromOption(now.plusMicrosOption(time.toMicroseconds))(new IllegalArgumentException(s"$time is too big"))
-      res  <- generate(pid, oid, when = when.some)
-    } yield res
-
-  /**
-   * Generates the sequence as if requested after the specified amount of time
-   * has passed, fails if the sequence cannot be generated.
-   *
-   * @param time amount of time (from now) to use as a timestamp for sequence
-   *             generation; does not delay the computation in any way
-   */
-  def generateAfterOrFail(
-    pid:  Program.Id,
-    oid:  Observation.Id,
-    time: TimeSpan
-  ): IO[InstrumentExecutionConfig] =
-    generateAfter(pid, oid, time).flatMap: res =>
-      IO.fromEither(res.leftMap(e => new RuntimeException(s"Failed to generate the sequence: ${e.message}")))
+      Enums.load(session).flatMap: enums =>
+        TimeEstimateCalculatorImplementation.fromSession(session, enums)
 
   /**
    * @return list of added and removed calibration observations

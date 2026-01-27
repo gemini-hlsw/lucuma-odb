@@ -16,25 +16,7 @@ import lucuma.odb.graphql.query.DatasetSetupOperations
 import scala.concurrent.duration.*
 
 
-class datasetEdit extends OdbSuite with SubscriptionUtils with DatasetSetupOperations:
-
-  object Group1 {
-    val pi       = TestUsers.Standard.pi(11, 110)
-    val service  = TestUsers.service(13)
-    val staff    = TestUsers.Standard.staff(14, 114)
-  }
-
-  object Group2 {
-    val pi       = TestUsers.Standard.pi(21, 210)
-    val service  = TestUsers.service(23)
-    val staff    = TestUsers.Standard.staff(24, 214)
-  }
-
-  def validUsers =
-    List(
-      Group1.pi, Group1.service, Group1.staff,
-      Group2.pi, Group2.service, Group2.staff
-    )
+class datasetEdit extends OdbSuite with SubscriptionUtils with DatasetSetupOperations with query.ExecutionTestSupportForGmos:
 
   val allEventsSubcription = """
     subscription {
@@ -49,8 +31,6 @@ class datasetEdit extends OdbSuite with SubscriptionUtils with DatasetSetupOpera
   """
 
   test("trigger for my own new datasets"):
-    import Group1._
-
     val allEvents = List(
       json"""{ "datasetEdit":  { "editType": "CREATED", "value":  { "filename": "N18630101S0001.fits", "isWritten": false } } }""",
       json"""{ "datasetEdit":  { "editType": "UPDATED", "value":  { "filename": "N18630101S0001.fits", "isWritten": false } } }"""
@@ -60,7 +40,7 @@ class datasetEdit extends OdbSuite with SubscriptionUtils with DatasetSetupOpera
       user      = pi,
       query     = allEventsSubcription,
       mutations = Right(
-        recordDatasets(ObservingModeType.GmosNorthLongSlit, pi, service, 0, 1, 1).flatTap {
+        recordDatasets(ObservingModeType.GmosNorthLongSlit, pi, serviceUser, 0, 1, 1).flatTap {
           case (_, List((_, did))) => updateDatasets(staff, DatasetQaState.Pass, did)
           case _                   => sys.error("Expected a single step.")
         } >> IO.sleep(1.second)
@@ -69,8 +49,6 @@ class datasetEdit extends OdbSuite with SubscriptionUtils with DatasetSetupOpera
     )
 
   test("only care about complete datasets"):
-    import Group1._
-
     val allEvents = List(
       json"""{ "datasetEdit":  { "editType": "UPDATED", "value":  { "filename": "N18630101S0002.fits", "isWritten": true } } }"""
     )
@@ -91,11 +69,11 @@ class datasetEdit extends OdbSuite with SubscriptionUtils with DatasetSetupOpera
       user      = pi,
       query     = subcription,
       mutations = Right(
-        recordDatasets(ObservingModeType.GmosNorthLongSlit, pi, service, 1, 1, 1).flatTap {
+        recordDatasets(ObservingModeType.GmosNorthLongSlit, pi, serviceUser, 1, 1, 1).flatTap {
           case (_, List((_, List(did)))) =>
             updateDatasets(staff, DatasetQaState.Pass, List(did))     *>
-            addDatasetEventAs(service, did, DatasetStage.StartExpose) *>
-            addDatasetEventAs(service, did, DatasetStage.EndWrite)
+            addDatasetEventAs(serviceUser, did, DatasetStage.StartExpose) *>
+            addDatasetEventAs(serviceUser, did, DatasetStage.EndWrite)
           case _                         =>
             sys.error("Expected a single dataset.")
         } >>
@@ -105,8 +83,6 @@ class datasetEdit extends OdbSuite with SubscriptionUtils with DatasetSetupOpera
     )
 
   test("only care about one observation"):
-    import Group1._
-
     val allEvents = List(
       json"""{ "datasetEdit":  { "editType": "UPDATED", "value":  { "filename": "N18630101S0003.fits", "isWritten": false } } }"""
     )
@@ -123,14 +99,14 @@ class datasetEdit extends OdbSuite with SubscriptionUtils with DatasetSetupOpera
       }
     """
 
-    recordDatasets(ObservingModeType.GmosNorthLongSlit, pi, service, 2, 1, 1).flatTap {
+    recordDatasets(ObservingModeType.GmosNorthLongSlit, pi, serviceUser, 2, 1, 1).flatTap {
       case (oid, List((_, List(did)))) =>
 
         subscriptionExpect(
           user      = pi,
           query     = subcription(oid),
           mutations = Right(
-            recordDatasets(ObservingModeType.GmosNorthLongSlit, pi, service, 3, 1, 1) *>
+            recordDatasets(ObservingModeType.GmosNorthLongSlit, pi, serviceUser, 3, 1, 1) *>
             updateDatasets(staff, DatasetQaState.Pass, List(did)) >> IO.sleep(1.second)
           ),
           expected  = allEvents
@@ -141,8 +117,6 @@ class datasetEdit extends OdbSuite with SubscriptionUtils with DatasetSetupOpera
     }
 
   test("only care about one dataset"):
-    import Group1._
-
     val allEvents = List(
       json"""{ "datasetEdit":  { "editType": "UPDATED", "value":  { "filename": "N18630101S0005.fits", "isWritten": false } } }"""
     )
@@ -159,7 +133,7 @@ class datasetEdit extends OdbSuite with SubscriptionUtils with DatasetSetupOpera
       }
     """
 
-    recordDatasets(ObservingModeType.GmosNorthLongSlit, pi, service, 4, 1, 2).flatTap {
+    recordDatasets(ObservingModeType.GmosNorthLongSlit, pi, serviceUser, 4, 1, 2).flatTap {
       case (oid, List((_, List(did0, did1)))) =>
 
         subscriptionExpect(
@@ -176,8 +150,6 @@ class datasetEdit extends OdbSuite with SubscriptionUtils with DatasetSetupOpera
     }
 
   test("ignore datasets in programs that aren't visible"):
-    import Group1._
-
     val allEvents = List(
       json"""{ "datasetEdit":  { "editType": "CREATED", "value":  { "filename": "N18630101S0007.fits", "isWritten": false } } }"""
     )
@@ -186,8 +158,8 @@ class datasetEdit extends OdbSuite with SubscriptionUtils with DatasetSetupOpera
       user      = pi,
       query     = allEventsSubcription,
       mutations = Right(
-        recordDatasets(ObservingModeType.GmosNorthLongSlit, pi, service, 6, 1, 1) *>
-        recordDatasets(ObservingModeType.GmosNorthLongSlit, Group2.pi, service, 7, 1, 1).flatTap {
+        recordDatasets(ObservingModeType.GmosNorthLongSlit, pi, serviceUser, 6, 1, 1) *>
+        recordDatasets(ObservingModeType.GmosNorthLongSlit, pi2, serviceUser, 7, 1, 1).flatTap {
           case (_, List((_, did))) => updateDatasets(staff, DatasetQaState.Pass, did)
           case _                   => sys.error("Expected a single step.")
         } >> IO.sleep(1.second)
@@ -196,8 +168,6 @@ class datasetEdit extends OdbSuite with SubscriptionUtils with DatasetSetupOpera
     )
 
   test("datasetId in result works"):
-    import Group1._
-
     def allEvents(did: Dataset.Id) = List(
       json"""{ "datasetEdit":  { "datasetId": $did }}"""
     )
@@ -210,7 +180,7 @@ class datasetEdit extends OdbSuite with SubscriptionUtils with DatasetSetupOpera
       }
     """
 
-    recordDatasets(ObservingModeType.GmosNorthLongSlit, pi, service, 8, 1, 1).flatTap {
+    recordDatasets(ObservingModeType.GmosNorthLongSlit, pi, serviceUser, 8, 1, 1).flatTap {
       case (oid, List((_, List(did)))) =>
 
         subscriptionExpect(
