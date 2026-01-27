@@ -6,6 +6,7 @@ package lucuma.odb.service
 import cats.Applicative
 import cats.Order.catsKernelOrderingForOrder
 import cats.data.EitherT
+import cats.data.NonEmptyList
 import cats.data.OptionT
 import cats.effect.Concurrent
 import cats.effect.std.UUIDGen
@@ -16,6 +17,7 @@ import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import cats.syntax.option.*
 import cats.syntax.traverse.*
+import eu.timepit.refined.types.string.NonEmptyString
 import fs2.Pipe
 import fs2.Stream
 import grackle.Result
@@ -54,9 +56,12 @@ import lucuma.odb.sequence.data.AtomRecord
 import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.sequence.data.StepRecord
 import lucuma.odb.util.Codecs.*
+import lucuma.odb.util.Flamingos2Codecs.*
+import lucuma.odb.util.GmosCodecs.*
 import skunk.*
 import skunk.codec.numeric.int2
 import skunk.codec.numeric.int4
+import skunk.codec.text.text
 import skunk.implicits.*
 
 import Services.Syntax.*
@@ -139,25 +144,47 @@ trait SequenceService[F[_]]:
   )(using Services.ServiceAccess): Stream[F, AtomRecord]
 
   def insertFlamingos2Sequence(
-    observationId:  Observation.Id,
-    sequenceType:   SequenceType,
-    visitId:        Option[Visit.Id],
-    sequence:       Stream[F, Atom[Flamingos2DynamicConfig]]
+    observationId: Observation.Id,
+    sequenceType:  SequenceType,
+    visitId:       Option[Visit.Id],
+    sequence:      Stream[F, Atom[Flamingos2DynamicConfig]]
   )(using Transaction[F], Services.ServiceAccess): F[Unit]
 
   def insertGmosNorthSequence(
-    observationId:  Observation.Id,
-    sequenceType:   SequenceType,
-    visitId:        Option[Visit.Id],
-    sequence:       Stream[F, Atom[GmosNorth]]
+    observationId: Observation.Id,
+    sequenceType:  SequenceType,
+    visitId:       Option[Visit.Id],
+    sequence:      Stream[F, Atom[GmosNorth]]
   )(using Transaction[F], Services.ServiceAccess): F[Unit]
 
   def insertGmosSouthSequence(
-    observationId:  Observation.Id,
-    sequenceType:   SequenceType,
-    visitId:        Option[Visit.Id],
-    sequence:       Stream[F, Atom[GmosSouth]]
+    observationId: Observation.Id,
+    sequenceType:  SequenceType,
+    visitId:       Option[Visit.Id],
+    sequence:      Stream[F, Atom[GmosSouth]]
   )(using Transaction[F], Services.ServiceAccess): F[Unit]
+
+  def streamFlamingos2Sequence(
+    observationId: Observation.Id,
+    sequenceType:  SequenceType,
+    static:        Flamingos2StaticConfig,
+    estimator:     TimeEstimateCalculator[Flamingos2StaticConfig, Flamingos2DynamicConfig]
+  )(using Transaction[F], Services.ServiceAccess): Stream[F, Atom[Flamingos2DynamicConfig]]
+
+  def streamGmosNorthSequence(
+    observationId: Observation.Id,
+    sequenceType:  SequenceType,
+    static:        GmosNorthStatic,
+    estimator:     TimeEstimateCalculator[GmosNorthStatic, GmosNorth]
+  )(using Transaction[F], Services.ServiceAccess): Stream[F, Atom[GmosNorth]]
+
+  def streamGmosSouthSequence(
+    observationId: Observation.Id,
+    sequenceType:  SequenceType,
+    static:        GmosSouthStatic,
+    estimator:     TimeEstimateCalculator[GmosSouthStatic, GmosSouth]
+  )(using Transaction[F], Services.ServiceAccess): Stream[F, Atom[GmosSouth]]
+
 
 object SequenceService:
 
@@ -513,7 +540,7 @@ object SequenceService:
           atomStream
             .zipWithIndex
             .map { case (atom, idx) =>
-              (atom.id, instrument, idx.toInt, observationId, sequenceType, visitId)
+              (atom.id, instrument, idx.toInt, atom.description.map(_.value), observationId, sequenceType, visitId)
             }
             .through(session.pipe(Statements.insertAtom))
             .drain
@@ -554,6 +581,81 @@ object SequenceService:
           .compile
           .drain
 
+      extension [D](p: ProtoStep[D])
+        def toStep(sid: Step.Id, estimate: StepEstimate): Step[D] =
+          Step(sid, p.value, p.stepConfig, p.telescopeConfig, estimate, p.observeClass, p.breakpoint)
+
+      // Turns a stream of ProtoStep into an atom by running the time estimation
+      // and grouping the steps by atom id.
+      private def atomPipe[S, D](
+        static:    S,
+        estimator: TimeEstimateCalculator[S, D]
+      ): Pipe[F, (Atom.Id, Option[String], Step.Id, ProtoStep[D]), Atom[D]] =
+        _.mapAccumulate(TimeEstimateCalculator.Last.empty[D]) {
+          case (last, (aid, desc, sid, protoStep)) =>
+            val (lastʹ, estimate) = estimator.estimateOne(static, protoStep).run(last).value
+            (lastʹ, (aid, desc, protoStep.toStep(sid, estimate)))
+        }
+        .map(_._2)
+        .groupAdjacentBy(_._1)
+        .map: (aid, chunk) =>
+          Atom(
+            aid,
+            chunk.head.flatMap(_._2).flatMap(NonEmptyString.from(_).toOption),
+            NonEmptyList.fromListUnsafe(chunk.map(_._3).toList)
+          )
+
+      override def streamFlamingos2Sequence(
+        observationId: Observation.Id,
+        sequenceType:  SequenceType,
+        static:        Flamingos2StaticConfig,
+        estimator:     TimeEstimateCalculator[Flamingos2StaticConfig, Flamingos2DynamicConfig]
+      )(using Transaction[F], Services.ServiceAccess): Stream[F, Atom[Flamingos2DynamicConfig]] =
+
+        val query = Statements.selectSequence(
+          "t_flamingos_2_dynamic",
+          Flamingos2SequenceService.Statements.Flamingos2DynamicColumns,
+          flamingos_2_dynamic
+        )
+
+        session
+          .stream(query)((Instrument.Flamingos2, observationId, sequenceType), 256)
+          .through(atomPipe(static, estimator))
+
+      override def streamGmosNorthSequence(
+        observationId: Observation.Id,
+        sequenceType:  SequenceType,
+        static:        GmosNorthStatic,
+        estimator:     TimeEstimateCalculator[GmosNorthStatic, GmosNorth]
+      )(using Transaction[F], Services.ServiceAccess): Stream[F, Atom[GmosNorth]] =
+
+        val query = Statements.selectSequence(
+          "t_gmos_north_dynamic",
+          GmosSequenceService.Statements.GmosDynamicColumns,
+          gmos_north_dynamic
+        )
+
+        session
+          .stream(query)((Instrument.GmosNorth, observationId, sequenceType), 256)
+          .through(atomPipe(static, estimator))
+
+      override def streamGmosSouthSequence(
+        observationId: Observation.Id,
+        sequenceType:  SequenceType,
+        static:        GmosSouthStatic,
+        estimator:     TimeEstimateCalculator[GmosSouthStatic, GmosSouth]
+      )(using Transaction[F], Services.ServiceAccess): Stream[F, Atom[GmosSouth]] =
+
+        val query = Statements.selectSequence(
+          "t_gmos_south_dynamic",
+          GmosSequenceService.Statements.GmosDynamicColumns,
+          gmos_south_dynamic
+        )
+
+        session
+          .stream(query)((Instrument.GmosSouth, observationId, sequenceType), 256)
+          .through(atomPipe(static, estimator))
+
   object Statements:
 
     val SelectObservationId: Query[(Atom.Id, Instrument), Observation.Id] =
@@ -567,6 +669,7 @@ object SequenceService:
       Atom.Id,
       Instrument,
       Int,
+      Option[String],
       Observation.Id,
       SequenceType,
       Option[Visit.Id]
@@ -576,6 +679,7 @@ object SequenceService:
           c_atom_id,
           c_instrument,
           c_atom_index,
+          c_description,
           c_observation_id,
           c_sequence_type,
           c_visit_id
@@ -583,6 +687,7 @@ object SequenceService:
           $atom_id,
           $instrument,
           $int4,
+          ${text.opt},
           $observation_id,
           $sequence_type,
           ${visit_id.opt}
@@ -637,7 +742,8 @@ object SequenceService:
           c_time_estimate,
           c_offset_p,
           c_offset_q,
-          c_guide_state
+          c_guide_state,
+          c_breakpoint
         ) SELECT
           $step_id,
           $atom_id,
@@ -646,7 +752,8 @@ object SequenceService:
           $int4,
           $obs_class,
           $time_span,
-          $telescope_config
+          $telescope_config,
+          $breakpoint
       """.command.contramap { (step, aid, inst, idx) => (
         step.id,
         aid,
@@ -655,7 +762,8 @@ object SequenceService:
         idx,
         step.observeClass,
         step.estimate.total,
-        step.telescopeConfig
+        step.telescopeConfig,
+        step.breakpoint
       )}
 
     val InsertStepRecord: Query[(
@@ -1038,3 +1146,56 @@ object SequenceService:
           c_observation_id = $observation_id
         ORDER BY c_observation_id, c_created
       """.query(atom_record)
+
+    def selectSequence[D](
+      instrumentTable:   String,
+      instrumentColumns: List[String],
+      instrumentDecoder: Decoder[D]
+    ): Query[(Instrument, Observation.Id, SequenceType), (Atom.Id, Option[String], Step.Id, ProtoStep[D])] =
+
+      val proto_step = (
+        instrumentDecoder *:
+        step_config       *:
+        telescope_config  *:
+        obs_class         *:
+        breakpoint
+      ).to[ProtoStep[D]]
+
+      sql"""
+        SELECT
+          a.c_atom_id,
+          a.c_description,
+          s.c_step_id,
+          #${encodeColumns("i".some, instrumentColumns)},
+          s.c_step_type,
+          #${encodeColumns("g".some, StepConfigGcalColumns)},
+          #${encodeColumns("r".some, StepConfigSmartGcalColumns)},
+          s.c_offset_p,
+          s.c_offset_q,
+          s.c_guide_state,
+          s.c_observe_class,
+          s.c_breakpoint
+
+        FROM t_atom a
+
+        JOIN t_step s
+          ON s.c_atom_id = a.c_atom_id
+
+        JOIN #${instrumentTable} i
+          ON i.c_step_id = s.c_step_id
+
+        LEFT JOIN t_step_config_gcal g
+          ON g.c_step_id = s.c_step_id
+
+        LEFT JOIN t_step_config_smart_gcal r
+          ON r.c_step_id = s.c_step_id
+
+        WHERE
+          a.c_instrument     = $instrument      AND
+          a.c_observation_id = $observation_id  AND
+          a.c_sequence_type  = $sequence_type   AND
+          (s.c_execution_state = 'not_started' OR s.c_execution_state = 'ongoing')
+        ORDER BY
+          a.c_atom_index,
+          s.c_step_index
+      """.query(atom_id *: text.opt *: step_id *: proto_step)
