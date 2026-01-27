@@ -8,11 +8,18 @@ CREATE TABLE t_atom (
   c_observation_id  d_observation_id NOT NULL,
   c_sequence_type   e_sequence_type  NOT NULL,
   c_visit_id        d_visit_id       REFERENCES t_visit(c_visit_id) ON DELETE CASCADE,
-  c_execution_state d_tag            NOT NULL REFERENCES t_atom_execution_state(c_tag) DEFAULT ('not_started'::character varying)::d_tag
+  c_execution_state d_tag            NOT NULL REFERENCES t_atom_execution_state(c_tag) DEFAULT ('not_started'::character varying)::d_tag,
+
+  c_description     text
 );
 
 ALTER TABLE ONLY t_atom
   ADD CONSTRAINT t_atom_c_observation_id_c_instrument_fkey FOREIGN KEY (c_observation_id, c_instrument) REFERENCES t_observation(c_observation_id, c_instrument) ON DELETE CASCADE;
+
+CREATE TYPE e_breakpoint AS enum(
+  'enabled',
+  'disabled'
+);
 
 CREATE TABLE t_step (
   c_step_id          d_step_id     PRIMARY KEY,
@@ -30,6 +37,8 @@ CREATE TABLE t_step (
   c_offset_p         d_angle_µas   NOT NULL DEFAULT 0,
   c_offset_q         d_angle_µas   NOT NULL DEFAULT 0,
   c_guide_state      e_guide_state NOT NULL DEFAULT 'enabled'::e_guide_state,
+
+  c_breakpoint       e_breakpoint  NOT NULL DEFAULT 'disabled'::e_breakpoint,
 
   c_completed        timestamp without time zone,
   c_first_event_time timestamp without time zone,

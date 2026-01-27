@@ -43,11 +43,14 @@ import lucuma.core.model.User
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.StepConfig.Gcal
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth
+import lucuma.core.model.sequence.gmos.DynamicConfig.GmosSouth
 import lucuma.core.model.sequence.gmos.GmosCcdMode
 import lucuma.core.model.sequence.gmos.GmosFpuMask
 import lucuma.core.model.sequence.gmos.GmosGratingConfig
+import lucuma.core.model.sequence.gmos.StaticConfig
 import lucuma.core.syntax.string.*
 import lucuma.core.util.TimeSpan
+import lucuma.odb.sequence.TimeEstimateCalculator
 import lucuma.odb.service.Services
 import lucuma.odb.smartgcal.data.Gmos
 import lucuma.odb.smartgcal.data.SmartGcalValue
@@ -162,6 +165,12 @@ trait ExecutionTestSupportForGmos extends ExecutionTestSupport:
           Services.asSuperUser:
             services.smartGcalService.insertGmosNorth(i, r)
   }
+
+  def gmosNorthTimeEstimateCalculator: IO[TimeEstimateCalculator[StaticConfig.GmosNorth, GmosNorth]] =
+    timeEstimateCalculator.map(_.gmosNorth)
+
+  def gmosSouthTimeEstimateCalculator: IO[TimeEstimateCalculator[StaticConfig.GmosSouth, GmosSouth]] =
+    timeEstimateCalculator.map(_.gmosSouth)
 
   val GmosAtomQuery: String =
     s"""
