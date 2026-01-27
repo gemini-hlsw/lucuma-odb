@@ -194,13 +194,7 @@ trait AccessControl[F[_]] extends Predicates[F] {
     Services.asSuperUser:
       writableOids(includeDeleted, WHERE, includeCalibrations)
         .flatTraverse: which =>
-          observationWorkflowService.filterState(
-            which,
-            allowedStates,
-            commitHash,
-            itcClient,
-            timeEstimateCalculator
-          )
+          observationWorkflowService.filterState(which, allowedStates)
 
   /**
    * Select and return the ids of observations that are clonable by the current user and meet
@@ -299,13 +293,7 @@ trait AccessControl[F[_]] extends Predicates[F] {
           WHERE.getOrElse(True)
         ))
       ).flatTraverse: which =>
-        observationWorkflowService.filterTargets(
-          which,
-          allowedStates,
-          commitHash,
-          itcClient,
-          timeEstimateCalculator
-        )
+        observationWorkflowService.filterTargets(which, allowedStates)
 
   /**
    * Given an operation that defines a set of targets and a proposed edit, select and filter this
@@ -723,7 +711,7 @@ trait AccessControl[F[_]] extends Predicates[F] {
   def selectForUpdate(input: SetObservationWorkflowStateInput)(using Services[F], NoTransaction[F]): F[Result[CheckedWithId[(ObservationWorkflow, ObservationWorkflowState), Observation.Id]]] =
     verifyWritable(input.observationId) >>
     Services.asSuperUser:
-      observationWorkflowService.getWorkflows(List(input.observationId), commitHash, itcClient, timeEstimateCalculator)
+      observationWorkflowService.getWorkflows(List(input.observationId))
         .map: res =>
           res.map(_(input.observationId)).flatMap: w =>
             if w.state === input.state || w.validTransitions.contains(input.state)

@@ -33,7 +33,6 @@ import lucuma.core.syntax.string.*
 import lucuma.core.util.DateInterval
 import lucuma.core.util.Enumerated
 import lucuma.core.util.Timestamp
-import lucuma.itc.client.ItcClient
 import lucuma.odb.data.Itc
 import lucuma.odb.data.ObservationValidationMap
 import lucuma.odb.data.OdbError
@@ -41,11 +40,8 @@ import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.data.Tag
 import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.graphql.mapping.AccessControl
-import lucuma.odb.logic.Generator
-import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.sequence.data.MissingParamSet
-import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.GeneratorParamsService.Error as GenParamsError
 import lucuma.odb.service.Services.SuperUserAccess
 import lucuma.odb.syntax.instrument.*
@@ -61,24 +57,15 @@ import Services.Syntax.*
 sealed trait ObservationWorkflowService[F[_]] {
 
   def getWorkflows(
-    oids: List[Observation.Id],
-    commitHash: CommitHash,
-    itcClient: ItcClient[F],
-    ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode
+    oids: List[Observation.Id]
   )(using NoTransaction[F], SuperUserAccess): F[Result[Map[Observation.Id, ObservationWorkflow]]]
 
   def getWorkflow(
-    oid: Observation.Id,
-    commitHash: CommitHash,
-    itcClient: ItcClient[F],
-    ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode
+    oid: Observation.Id
   )(using NoTransaction[F], SuperUserAccess): F[Result[ObservationWorkflow]]
 
   def getWorkflows(
-    pid: Program.Id,
-    commitHash: CommitHash,
-    itcClient: ItcClient[F],
-    ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode
+    pid: Program.Id
   )(using NoTransaction[F], SuperUserAccess): F[Result[Map[Observation.Id, ObservationWorkflow]]]
 
   /**
@@ -95,34 +82,22 @@ sealed trait ObservationWorkflowService[F[_]] {
   )(using Transaction[F]): F[Result[ObservationWorkflow]]
 
   def setWorkflowState(
-    input: AccessControl.CheckedWithId[(ObservationWorkflow, ObservationWorkflowState), Observation.Id],
-    commitHash: CommitHash,
-    itcClient: ItcClient[F],
-    ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode
+    input: AccessControl.CheckedWithId[(ObservationWorkflow, ObservationWorkflowState), Observation.Id]
   )(using NoTransaction[F]): F[Result[ObservationWorkflow]]
 
   def filterState(
     oids: List[Observation.Id],
-    states: Set[ObservationWorkflowState],
-    commitHash: CommitHash,
-    itcClient: ItcClient[F],
-    ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode
+    states: Set[ObservationWorkflowState]
   )(using NoTransaction[F], SuperUserAccess): F[Result[List[Observation.Id]]]
 
   def filterState(
     which: AppliedFragment,
-    states: Set[ObservationWorkflowState],
-    commitHash: CommitHash,
-    itcClient: ItcClient[F],
-    ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode
+    states: Set[ObservationWorkflowState]
   )(using NoTransaction[F], SuperUserAccess): F[Result[List[Observation.Id]]]
 
   def filterTargets(
     which: AppliedFragment,
-    states: Set[ObservationWorkflowState],
-    commitHash: CommitHash,
-    itcClient: ItcClient[F],
-    ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode
+    states: Set[ObservationWorkflowState]
   )(using NoTransaction[F], SuperUserAccess): F[Result[List[Target.Id]]]
 
 }
@@ -368,28 +343,19 @@ object ObservationWorkflowService {
                 }
             .toMap
 
-      // Computes the observation execution state if not cached
       private def executionStates(
-        infos:      Map[Observation.Id, ObservationValidationInfo],
-        itcResults: Map[Observation.Id, Itc],
-        commitHash: CommitHash,
-        ptc:        TimeEstimateCalculatorImplementation.ForInstrumentMode
-      )(using NoTransaction[F], SuperUserAccess): F[Map[Observation.Id, ExecutionState]] =
-        Generator.instantiate(commitHash, ptc)
-          .executionStates:
-            infos
-              .toList
-              .flatMap: (oid, info) =>
-                (itcResults.get(oid), info.generatorParams.flatMap(_.toOption)).mapN: (itc, gps) =>
-                  oid -> (info.pid, itc, gps)
-              .toMap
-          .map: result =>
-            result
-              .view
-              .mapValues(_.workflowExecutionState)
-              .collect[(Observation.Id, ExecutionState)]:
-                case (oid, Some(es)) => oid -> es
-              .toMap
+        infos: Map[Observation.Id, ObservationValidationInfo]
+      )(using NoTransaction[F], SuperUserAccess): Map[Observation.Id, ExecutionState] =
+        infos
+          .view
+          .mapValues[Option[ExecutionState]]: info =>
+            info
+              .generatorParams
+              .flatMap(_.toOption)
+              .flatMap(_.executionState.workflowExecutionState)
+          .collect[(Observation.Id, ExecutionState)]:
+            case (oid, Some(es)) => oid -> es
+          .toMap
 
       // Compute the observation status, as well as a list of legal transitions,
       private def workflowStateAndTransitions(
@@ -468,9 +434,9 @@ object ObservationWorkflowService {
 
         val generatorValidator: Validator = info =>
           info.generatorParams.foldMap:
-            case Left(error)                                    => ObservationValidationMap.singleton(error.toObsValidation)
-            case Right(GeneratorParams(Left(m), _, _, _, _, _)) => ObservationValidationMap.singleton(m.toObsValidation)
-            case Right(ps)                                      => ObservationValidationMap.empty
+            case Left(error)                                       => ObservationValidationMap.singleton(error.toObsValidation)
+            case Right(GeneratorParams(Left(m), _, _, _, _, _, _)) => ObservationValidationMap.singleton(m.toObsValidation)
+            case Right(ps)                                         => ObservationValidationMap.empty
 
         val cfpInstrumentValidator: Validator = info =>
           info.cfpInfo.foldMap: cfp =>
@@ -559,10 +525,7 @@ object ObservationWorkflowService {
           .map(_.toMap)
 
       override def getWorkflows(
-        oids: List[Observation.Id],
-        commitHash: CommitHash,
-        itcClient: ItcClient[F],
-        ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode
+        oids: List[Observation.Id]
       )(using NoTransaction[F], SuperUserAccess): F[Result[Map[Observation.Id, ObservationWorkflow]]] =
 
         // Data obtained from the database, requiring a transaction.
@@ -574,26 +537,23 @@ object ObservationWorkflowService {
           services.transactionally:
             (
               for
-                infos  <- ResultT.liftF(lookupObsDefinitions(oids))               // Map[Observation.Id, ObsDefinition]
-                itcRes <- ResultT.liftF(lookupCachedItcResults(infos)) // Map[Observation.Id, ItcService.AsterismResults]
-                errs   <- validateObsDefinition(infos, itcRes.keySet.apply)       // Map[Observation.Id, ObservationValidationMap]
+                infos  <- ResultT.liftF(lookupObsDefinitions(oids))         // Map[Observation.Id, ObsDefinition]
+                itcRes <- ResultT.liftF(lookupCachedItcResults(infos))      // Map[Observation.Id, ItcService.AsterismResults]
+                errs   <- validateObsDefinition(infos, itcRes.keySet.apply) // Map[Observation.Id, ObservationValidationMap]
               yield (infos, errs, itcRes)
             ).value
 
         (for
           (infos, errs, itcRes) <- ResultT(select)
           errorFree              = infos.view.filterKeys(oid => errs.get(oid).forall(_.isEmpty)).toMap
-          execs                 <- ResultT.liftF(executionStates(errorFree, itcRes, commitHash, ptc))
+          execs                  = executionStates(errorFree)
           workflows             <- ResultT.fromResult(computeWorkflows(infos, errs, execs))
         yield workflows).value
 
       override def getWorkflow(
-        oid: Observation.Id,
-        commitHash: CommitHash,
-        itcClient: ItcClient[F],
-        ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode
+        oid: Observation.Id
       )(using NoTransaction[F], SuperUserAccess): F[Result[ObservationWorkflow]] =
-        getWorkflows(List(oid), commitHash, itcClient, ptc).map: result =>
+        getWorkflows(List(oid)).map: result =>
           result.flatMap: map =>
             map.get(oid) match
               case Some(wf) => Result(wf)
@@ -614,22 +574,16 @@ object ObservationWorkflowService {
         yield res).value
 
       override def getWorkflows(
-        pid: Program.Id,
-        commitHash: CommitHash,
-        itcClient: ItcClient[F],
-        ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode
+        pid: Program.Id
       )(using NoTransaction[F], SuperUserAccess): F[Result[Map[Observation.Id, ObservationWorkflow]]] =
         services
           .transactionally:
             session.prepareR(Statements.selectObservationIds).use: pq =>
               pq.stream(pid, 1024).compile.toList
-          .flatMap(getWorkflows(_, commitHash, itcClient, ptc))
+          .flatMap(getWorkflows)
 
       override def setWorkflowState(
-        input: AccessControl.CheckedWithId[(ObservationWorkflow, ObservationWorkflowState), Observation.Id],
-        commitHash: CommitHash,
-        itcClient: ItcClient[F],
-        ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode
+        input: AccessControl.CheckedWithId[(ObservationWorkflow, ObservationWorkflowState), Observation.Id]
       )(using NoTransaction[F]): F[Result[ObservationWorkflow]] =
         input.foldWithId(OdbError.InvalidArgument().asFailureF):
           case ((w, state), oid) =>
@@ -662,12 +616,9 @@ object ObservationWorkflowService {
 
       override def filterState(
         oids: List[Observation.Id],
-        states: Set[ObservationWorkflowState],
-        commitHash: CommitHash,
-        itcClient: ItcClient[F],
-        ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode
+        states: Set[ObservationWorkflowState]
       )(using NoTransaction[F], SuperUserAccess): F[Result[List[Observation.Id]]] =
-        getWorkflows(oids, commitHash, itcClient, ptc)
+        getWorkflows(oids)
           .map: res =>
             res.flatMap: wfs =>
               oids.foldLeft(Result(Nil)): (r, oid) =>
@@ -683,17 +634,14 @@ object ObservationWorkflowService {
 
       override def filterState(
         which: AppliedFragment,
-        states: Set[ObservationWorkflowState],
-        commitHash: CommitHash,
-        itcClient: ItcClient[F],
-        ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode
+        states: Set[ObservationWorkflowState]
       )(using NoTransaction[F], SuperUserAccess): F[Result[List[Observation.Id]]] =
         services
           .transactionally:
             session.prepareR(which.fragment.query(observation_id)).use: pq =>
               pq.stream(which.argument, chunkSize = 1024).compile.toList
           .flatMap: oids =>
-            filterState(oids, states, commitHash, itcClient, ptc)
+            filterState(oids, states)
 
       private def getObservationsForTargets(whichTargets: AppliedFragment)(using NoTransaction[F]): F[Map[Target.Id, List[Observation.Id]]] =
         services.transactionally:
@@ -704,14 +652,11 @@ object ObservationWorkflowService {
 
       override def filterTargets(
         which: AppliedFragment,
-        states: Set[ObservationWorkflowState],
-        commitHash: CommitHash,
-        itcClient: ItcClient[F],
-        ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode
+        states: Set[ObservationWorkflowState]
       )(using NoTransaction[F], SuperUserAccess): F[Result[List[Target.Id]]] =
         getObservationsForTargets(which)
           .flatMap: map =>
-            getWorkflows(map.values.toList.flatten, commitHash, itcClient, ptc)
+            getWorkflows(map.values.toList.flatten)
               .map: res =>
                 res.flatMap: wfs =>
                   map.toList.foldLeft(Result(Nil)):

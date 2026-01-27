@@ -14,20 +14,14 @@ import lucuma.core.enums.DatasetQaState
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.StepStage
 import lucuma.core.model.Observation
+import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Step
 import lucuma.odb.data.StepExecutionState
 
-class executionStepRecords extends OdbSuite with ExecutionQuerySetupOperations {
+class executionStepRecords extends OdbSuite with ExecutionTestSupportForGmos with ExecutionQuerySetupOperations {
   import ExecutionQuerySetupOperations.ObservationNode
 
-  val pi      = TestUsers.Standard.pi(1, 30)
-  val pi2     = TestUsers.Standard.pi(2, 32)
-  val service = TestUsers.service(3)
-  val staff   = TestUsers.Standard.staff(4, 44)
-
-  val mode    = ObservingModeType.GmosNorthLongSlit
-
-  val validUsers = List(pi, pi2, service, staff).toList
+  val mode = ObservingModeType.GmosNorthLongSlit
 
   def qaQuery(on: ObservationNode): String =
     s"""
@@ -71,16 +65,15 @@ class executionStepRecords extends OdbSuite with ExecutionQuerySetupOperations {
       }
       """.asRight
 
-
   test("qaState - unset") {
-    recordAll(pi, service, mode, offset = 0, datasetCount = 2).flatMap { on =>
+    recordAll(pi, serviceUser, mode, offset = 0, datasetCount = 2).flatMap { on =>
       expect(pi, qaQuery(on), qaExpected(none))
     }
   }
 
   test("qaState - one set") {
     for {
-      on <- recordAll(pi, service, mode, offset = 10, datasetCount = 2)
+      on <- recordAll(pi, serviceUser, mode, offset = 10, datasetCount = 2)
       _  <- setQaState(staff, DatasetQaState.Usable, s"${DatasetFilenamePrefix}0011.fits")
       _  <- expect(pi, qaQuery(on), qaExpected(DatasetQaState.Usable.some))
     } yield ()
@@ -88,7 +81,7 @@ class executionStepRecords extends OdbSuite with ExecutionQuerySetupOperations {
 
   test("qaState - two set") {
     for {
-      on <- recordAll(pi, service, mode, offset = 20, datasetCount = 2)
+      on <- recordAll(pi, serviceUser, mode, offset = 20, datasetCount = 2)
       _  <- setQaState(staff, DatasetQaState.Pass,   s"${DatasetFilenamePrefix}0021.fits")
       _  <- setQaState(staff, DatasetQaState.Usable, s"${DatasetFilenamePrefix}0022.fits")
       _  <- expect(pi, qaQuery(on), qaExpected(DatasetQaState.Usable.some))
@@ -122,7 +115,7 @@ class executionStepRecords extends OdbSuite with ExecutionQuerySetupOperations {
       """.asRight
 
     for {
-      on <- recordAll(pi, service, mode, offset = 30, stepCount = 2, datasetCount = 2)
+      on <- recordAll(pi, serviceUser, mode, offset = 30, stepCount = 2, datasetCount = 2)
       _  <- setQaState(staff, DatasetQaState.Pass,   s"${DatasetFilenamePrefix}0031.fits")
       _  <- setQaState(staff, DatasetQaState.Usable, s"${DatasetFilenamePrefix}0032.fits")
       _  <- setQaState(staff, DatasetQaState.Fail,   s"${DatasetFilenamePrefix}0033.fits")
@@ -186,19 +179,19 @@ class executionStepRecords extends OdbSuite with ExecutionQuerySetupOperations {
 
 
     for {
-      on <- recordAll(pi, service, mode, offset=40)
+      on <- recordAll(pi, serviceUser, mode, offset=40)
       _  <- expect(pi, query(on), expected(on))
     } yield ()
   }
 
-  def noEventSetup: IO[(Observation.Id, Step.Id)] =
-    for {
+  def noEventSetup: IO[(Observation.Id, Step.Id, Visit.Id)] =
+    for
       pid <- createProgramAs(pi)
-      oid <- createObservationAs(pi, pid, mode.some)
-      vid <- recordVisitAs(service, mode.instrument, oid)
-      aid <- recordAtomAs(service, mode.instrument, vid)
-      sid <- recordStepAs(service, mode.instrument, aid)
-    } yield (oid, sid)
+      tid <- createTargetWithProfileAs(pi, pid)
+      oid <- createObservationAs(pi, pid, mode.some, tid)
+      vid <- recordVisitAs(serviceUser, mode.instrument, oid)
+      sid <- firstScienceStepId(serviceUser, oid)
+    yield (oid, sid, vid)
 
   test("empty interval in step") {
     def query(oid: Observation.Id): String =
@@ -228,27 +221,17 @@ class executionStepRecords extends OdbSuite with ExecutionQuerySetupOperations {
         "observation": {
           "execution": {
             "atomRecords": {
-              "matches": [
-                {
-                  "steps": {
-                    "matches": [
-                      {
-                        "interval": null
-                      }
-                    ]
-                  }
-                }
-              ]
+              "matches": []
             }
           }
         }
       }
     """.asRight
 
-    // Set up visit and record the atom and steps, but no events
+    // Set up visit, but no events
     for {
-      (o, _) <- noEventSetup
-      _      <- expect(pi, query(o), expected)
+      (o, _, _) <- noEventSetup
+      _         <- expect(pi, query(o), expected)
     } yield ()
   }
 
@@ -285,56 +268,48 @@ class executionStepRecords extends OdbSuite with ExecutionQuerySetupOperations {
         .liftTo[IO]
     }
 
-  test("execution state - not started") {
-    val res = for {
-      (o, _) <- noEventSetup
-      es     <- executionState(o)
-    } yield es
-    assertIO(res, StepExecutionState.NotStarted)
-  }
-
   test("execution state - ongoing") {
     val res = for {
-      (o, s) <- noEventSetup
-      _      <- addStepEventAs(service, s, StepStage.StartStep)
-      es     <- executionState(o)
+      (o, s, v) <- noEventSetup
+      _         <- addStepEventAs(serviceUser, s, v, StepStage.StartStep)
+      es        <- executionState(o)
     } yield es
     assertIO(res, StepExecutionState.Ongoing)
   }
 
   test("execution state - abort") {
     val res = for {
-      (o, s) <- noEventSetup
-      _      <- addStepEventAs(service, s, StepStage.StartStep)
-      _      <- addStepEventAs(service, s, StepStage.Abort)
-      es     <- executionState(o)
+      (o, s, v) <- noEventSetup
+      _         <- addStepEventAs(serviceUser, s, v, StepStage.StartStep)
+      _         <- addStepEventAs(serviceUser, s, v, StepStage.Abort)
+      es        <- executionState(o)
     } yield es
     assertIO(res, StepExecutionState.Aborted)
   }
 
   test("execution state - completed") {
     val res = for {
-      (o, s) <- noEventSetup
-      _      <- addStepEventAs(service, s, StepStage.StartStep)
-      _      <- addStepEventAs(service, s, StepStage.EndStep)
-      es     <- executionState(o)
+      (o, s, v) <- noEventSetup
+      _         <- addStepEventAs(serviceUser, s, v, StepStage.StartStep)
+      _         <- addStepEventAs(serviceUser, s, v, StepStage.EndStep)
+      es        <- executionState(o)
     } yield es
     assertIO(res, StepExecutionState.Completed)
   }
 
   test("execution state - stopped") {
     val res = for {
-      (o, s) <- noEventSetup
-      _      <- addStepEventAs(service, s, StepStage.StartStep)
-      _      <- addStepEventAs(service, s, StepStage.Stop)
-      es     <- executionState(o)
+      (o, s, v) <- noEventSetup
+      _         <- addStepEventAs(serviceUser, s, v, StepStage.StartStep)
+      _         <- addStepEventAs(serviceUser, s, v, StepStage.Stop)
+      es        <- executionState(o)
     } yield es
     assertIO(res, StepExecutionState.Stopped)
   }
 
   test("telescopeConfig mapping works") {
     for
-      on <- recordAll(pi, service, mode, offset = 500)
+      on <- recordAll(pi, serviceUser, mode, offset = 500, atomCount = 2, stepCount = 5)
       _  <- expect(
               pi,
               s"""
@@ -345,6 +320,7 @@ class executionStepRecords extends OdbSuite with ExecutionQuerySetupOperations {
                         matches {
                           steps {
                             matches {
+                              index
                               telescopeConfig {
                                 offset { q { arcseconds } }
                               }
@@ -366,8 +342,69 @@ class executionStepRecords extends OdbSuite with ExecutionQuerySetupOperations {
                             "steps": {
                               "matches": [
                                 {
+                                  "index": 1,
                                   "telescopeConfig": {
-                                    "offset": { "q": { "arcseconds": 10 } }
+                                    "offset": { "q": { "arcseconds": 0 } }
+                                  }
+                                },
+                                {
+                                  "index": 2,
+                                  "telescopeConfig": {
+                                    "offset": { "q": { "arcseconds": 0 } }
+                                  }
+                                },
+                                {
+                                  "index": 3,
+                                  "telescopeConfig": {
+                                    "offset": { "q": { "arcseconds": 0 } }
+                                  }
+                                },
+                                {
+                                  "index": 4,
+                                  "telescopeConfig": {
+                                    "offset": { "q": { "arcseconds": 15 } }
+                                  }
+                                },
+                                {
+                                  "index": 5,
+                                  "telescopeConfig": {
+                                    "offset": { "q": { "arcseconds": -15 } }
+                                  }
+                                }
+                              ]
+                            }
+                          },
+                          {
+                            "steps": {
+                              "matches": [
+                                {
+                                  "index": 6,
+                                  "telescopeConfig": {
+                                    "offset": { "q": { "arcseconds": 0 } }
+                                  }
+                                },
+                                {
+                                  "index": 7,
+                                  "telescopeConfig": {
+                                    "offset": { "q": { "arcseconds": 0 } }
+                                  }
+                                },
+                                {
+                                  "index": 8,
+                                  "telescopeConfig": {
+                                    "offset": { "q": { "arcseconds": 0 } }
+                                  }
+                                },
+                                {
+                                  "index": 9,
+                                  "telescopeConfig": {
+                                    "offset": { "q": { "arcseconds": 15 } }
+                                  }
+                                },
+                                {
+                                  "index": 10,
+                                  "telescopeConfig": {
+                                    "offset": { "q": { "arcseconds": -15 } }
                                   }
                                 }
                               ]

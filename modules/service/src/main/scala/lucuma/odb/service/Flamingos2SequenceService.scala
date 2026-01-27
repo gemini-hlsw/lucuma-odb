@@ -6,13 +6,11 @@ package lucuma.odb.service
 import cats.effect.Concurrent
 import cats.syntax.functor.*
 import cats.syntax.option.*
-import fs2.Stream
 import lucuma.core.model.Observation
 import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig
 import lucuma.core.model.sequence.flamingos2.Flamingos2StaticConfig
-import lucuma.odb.sequence.data.StepRecord
 import lucuma.odb.util.Codecs.observation_id
 import lucuma.odb.util.Codecs.step_id
 import lucuma.odb.util.Codecs.visit_id
@@ -45,9 +43,9 @@ trait Flamingos2SequenceService[F[_]]:
     visitId: Visit.Id
   )(using Transaction[F]): F[Option[Flamingos2StaticConfig]]
 
-  def selectStepRecords(
+  def selectLatestVisitStatic(
     observationId: Observation.Id
-  ): Stream[F, StepRecord[Flamingos2DynamicConfig]]
+  )(using Transaction[F]): F[Option[Flamingos2StaticConfig]]
 
 object Flamingos2SequenceService:
 
@@ -66,7 +64,12 @@ object Flamingos2SequenceService:
       )(using Transaction[F]): F[Option[Flamingos2StaticConfig]] =
         session.option(Statements.SelectStatic)(visitId)
 
-      def selectDynamicForStep(
+      override def selectLatestVisitStatic(
+        observationId: Observation.Id
+      )(using Transaction[F]): F[Option[Flamingos2StaticConfig]] =
+        session.option(Statements.SelectLatestVisitStatic)(observationId)
+
+      override def selectDynamicForStep(
         stepId: Step.Id
       )(using Transaction[F]): F[Option[Flamingos2DynamicConfig]] =
         session.option(Statements.SelectDynamicForStep)(stepId)
@@ -81,18 +84,6 @@ object Flamingos2SequenceService:
           visitId,
           static
         )
-
-      override def selectStepRecords(
-        observationId: Observation.Id
-      ): Stream[F, StepRecord[Flamingos2DynamicConfig]] =
-        session.stream(
-          SequenceService.Statements.selectStepRecord(
-            "t_flamingos_2_dynamic",
-            "f2",
-            Statements.Flamingos2DynamicColumns,
-            flamingos_2_dynamic
-          )
-        )(observationId, 1024)
 
   object Statements:
 
@@ -142,6 +133,18 @@ object Flamingos2SequenceService:
           c_use_eoffsetting
         FROM t_flamingos_2_static
         WHERE c_visit_id = $visit_id
+      """.query(flamingos_2_static)
+
+    val SelectLatestVisitStatic: Query[Observation.Id, Flamingos2StaticConfig] =
+      sql"""
+        SELECT
+          c_mos_pre_imaging,
+          c_use_eoffsetting
+        FROM t_flamingos_2_static f
+        JOIN t_visit v ON v.c_visit_id = f.c_visit_id
+        WHERE v.c_observation_id = $observation_id
+        ORDER BY v.c_created DESC
+        LIMIT 1
       """.query(flamingos_2_static)
 
     val SelectDynamicForStep: Query[Step.Id, Flamingos2DynamicConfig] =

@@ -36,15 +36,16 @@ class datasetChronicleEntries extends OdbSuite with DatasetSetupOperations with 
   val mode = ObservingModeType.GmosNorthLongSlit
 
   def setInterval(did: Dataset.Id, interval: TimestampInterval): IO[Unit] =
-    withSession: s =>
-      s.execute(
-        sql"""
-          UPDATE t_dataset
-             SET c_start_time = $core_timestamp,
-                 c_end_time   = $core_timestamp
-           WHERE c_dataset_id = $dataset_id
-        """.command
-      )(interval.start, interval.end, did)
+    withServices(serviceUser): srv =>
+      srv.transactionally:
+        srv.session.execute(
+          sql"""
+            UPDATE t_dataset
+               SET c_start_time = $core_timestamp,
+                   c_end_time   = $core_timestamp
+             WHERE c_dataset_id = $dataset_id
+          """.command
+        )(interval.start, interval.end, did)
     .void
 
   test("Basic DatasetChronicleEntry Mapping"):
@@ -62,9 +63,9 @@ class datasetChronicleEntries extends OdbSuite with DatasetSetupOperations with 
       ref <- fetchProgramReference(pi, pid)
 
       vid <- recordVisitAs(serviceUser, mode.instrument, oid)
-      aid <- recordAtomAs(serviceUser, mode.instrument, vid)
-      sid <- recordStepAs(serviceUser, mode.instrument, aid)
-      did <- recordDatasetAs(serviceUser, sid, "N18630703S0001.fits")
+      sid <- firstScienceStepId(serviceUser, oid)
+      _   <- addEndStepEvent(sid, vid)
+      did <- recordDatasetAs(serviceUser, sid, vid, "N18630703S0001.fits")
       t0   = Timestamp.FromString.getOption("2025-07-30T23:00:00Z").get
       t1   = Timestamp.FromString.getOption("2025-07-30T23:00:10Z").get
       _   <- setInterval(did, TimestampInterval.between(t0, t1))
@@ -185,9 +186,9 @@ class datasetChronicleEntries extends OdbSuite with DatasetSetupOperations with 
       tid <- createTargetWithProfileAs(pi, pid)
       oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
       vid <- recordVisitAs(serviceUser, mode.instrument, oid)
-      aid <- recordAtomAs(serviceUser, mode.instrument, vid)
-      sid <- recordStepAs(serviceUser, mode.instrument, aid)
-      did <- recordDatasetAs(serviceUser, sid, "N18630703S0002.fits")
+      sid <- firstScienceStepId(serviceUser, oid)
+      _   <- addEndStepEvent(sid, vid)
+      did <- recordDatasetAs(serviceUser, sid, vid, "N18630703S0002.fits")
       _   <- expect(
         staff,
         s"""
@@ -290,9 +291,9 @@ class datasetChronicleEntries extends OdbSuite with DatasetSetupOperations with 
       ref <- fetchProgramReference(pi, pid)
 
       vid <- recordVisitAs(serviceUser, mode.instrument, oid)
-      aid <- recordAtomAs(serviceUser, mode.instrument, vid)
-      sid <- recordStepAs(serviceUser, mode.instrument, aid)
-      did <- recordDatasetAs(serviceUser, sid, f"N18630703S$index%04d.fits")
+      sid <- firstScienceStepId(serviceUser, oid)
+      _   <- addEndStepEvent(sid, vid)
+      did <- recordDatasetAs(serviceUser, sid, vid, f"N18630703S$index%04d.fits")
       t0   = Timestamp.FromString.getOption("2025-07-30T23:00:00Z").get
       t1   = Timestamp.FromString.getOption("2025-07-30T23:00:10Z").get
       _   <- setInterval(did, TimestampInterval.between(t0, t1))
