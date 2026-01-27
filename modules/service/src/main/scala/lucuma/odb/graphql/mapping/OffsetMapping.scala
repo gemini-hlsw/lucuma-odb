@@ -28,9 +28,9 @@ trait OffsetMapping[F[_]] extends EnumeratedOffsetView[F]
           SqlField(s"synthetic_id$idx", ref, key = true, hidden = true)
       ) ++ List(
         SqlField("value", valueColumn, hidden = true),
-        FieldRef[Angle]("value").as("microarcseconds", _.toMicroarcseconds),
-        FieldRef[Angle]("value").as("milliarcseconds", a => BigDecimal(a.toMicroarcseconds) /     1_000L),
-        FieldRef[Angle]("value").as("arcseconds",      a => BigDecimal(a.toMicroarcseconds) / 1_000_000L)
+        FieldRef[Angle]("value").as("microarcseconds", a => Angle.signedMicroarcseconds.get(a)),
+        FieldRef[Angle]("value").as("milliarcseconds", a => BigDecimal(Angle.signedMicroarcseconds.get(a)) /     1_000L),
+        FieldRef[Angle]("value").as("arcseconds",      a => BigDecimal(Angle.signedMicroarcseconds.get(a)) / 1_000_000L)
       )*
     )
 

@@ -4,22 +4,159 @@
 package lucuma.odb.graphql
 package mutation
 
+import cats.data.NonEmptySet
 import cats.effect.IO
 import cats.syntax.all.*
+import eu.timepit.refined.types.numeric.PosInt
+import eu.timepit.refined.types.numeric.PosLong
 import io.circe.Json
 import io.circe.literal.*
+import lucuma.core.enums.Flamingos2Disperser
+import lucuma.core.enums.Flamingos2Filter
+import lucuma.core.enums.Flamingos2Fpu
+import lucuma.core.enums.GcalArc
+import lucuma.core.enums.GcalBaselineType
+import lucuma.core.enums.GcalContinuum
+import lucuma.core.enums.GcalDiffuser
+import lucuma.core.enums.GcalFilter
+import lucuma.core.enums.GcalShutter
+import lucuma.core.enums.GmosAmpGain
+import lucuma.core.enums.GmosGratingOrder
+import lucuma.core.enums.GmosNorthFilter
+import lucuma.core.enums.GmosNorthFpu
+import lucuma.core.enums.GmosNorthGrating
+import lucuma.core.enums.GmosSouthFilter
+import lucuma.core.enums.GmosSouthFpu
+import lucuma.core.enums.GmosSouthGrating
+import lucuma.core.enums.GmosXBinning
+import lucuma.core.enums.GmosYBinning
 import lucuma.core.enums.ObservingModeType
+import lucuma.core.math.BoundedInterval
+import lucuma.core.math.Wavelength
 import lucuma.core.model.Observation
 import lucuma.core.model.User
 import lucuma.core.model.Visit
+import lucuma.core.model.sequence.StepConfig.Gcal
 import lucuma.core.util.IdempotencyKey
+import lucuma.core.util.TimeSpan
 import lucuma.odb.data.OdbError
+import lucuma.odb.service.Services
+import lucuma.odb.smartgcal.data.Flamingos2
+import lucuma.odb.smartgcal.data.Gmos
+import lucuma.odb.smartgcal.data.SmartGcalValue
+import lucuma.odb.smartgcal.data.SmartGcalValue.LegacyInstrumentConfig
+import skunk.Session
+
 
 class recordVisit extends OdbSuite:
 
   val service: User = TestUsers.service(nextId)
 
   override lazy val validUsers: List[User] = List(service)
+
+  val gn_key_0_50: Gmos.TableKey[GmosNorthGrating, GmosNorthFilter, GmosNorthFpu] =
+    Gmos.TableKey(
+      Gmos.GratingConfigKey(
+        GmosNorthGrating.R831_G5302,
+        GmosGratingOrder.One,
+        BoundedInterval.unsafeOpenUpper(Wavelength.Min, Wavelength.Max)
+      ).some,
+      GmosNorthFilter.RPrime.some,
+      GmosNorthFpu.LongSlit_0_50.some,
+      GmosXBinning.One,
+      GmosYBinning.Two,
+      GmosAmpGain.Low
+    )
+
+  val gs_key_0_50: Gmos.TableKey[GmosSouthGrating, GmosSouthFilter, GmosSouthFpu] =
+    Gmos.TableKey(
+      Gmos.GratingConfigKey(
+        GmosSouthGrating.B1200_G5321,
+        GmosGratingOrder.One,
+        BoundedInterval.unsafeOpenUpper(Wavelength.Min, Wavelength.Max)
+      ).some,
+      GmosSouthFilter.RPrime.some,
+      GmosSouthFpu.LongSlit_0_50.some,
+      GmosXBinning.One,
+      GmosYBinning.Two,
+      GmosAmpGain.Low
+    )
+
+  val f2_key_HK: Flamingos2.TableKey =
+    Flamingos2.TableKey(
+      Flamingos2Disperser.R1200HK.some,
+      Flamingos2Filter.Y,
+      Flamingos2Fpu.LongSlit2.some
+    )
+
+  val flat =
+    SmartGcalValue(
+      Gcal(
+        Gcal.Lamp.fromContinuum(GcalContinuum.QuartzHalogen5W),
+        GcalFilter.Gmos,
+        GcalDiffuser.Ir,
+        GcalShutter.Open
+      ),
+      GcalBaselineType.Night,
+      PosInt.unsafeFrom(1),
+      LegacyInstrumentConfig(
+        TimeSpan.unsafeFromMicroseconds(1_000_000L)
+      )
+    )
+
+  val arc =
+    SmartGcalValue(
+      Gcal(
+        Gcal.Lamp.fromArcs(NonEmptySet.one(GcalArc.CuArArc)),
+        GcalFilter.None,
+        GcalDiffuser.Visible,
+        GcalShutter.Closed
+      ),
+      GcalBaselineType.Day,
+      PosInt.unsafeFrom(1),
+      LegacyInstrumentConfig(
+        TimeSpan.unsafeFromMicroseconds(1_000_000L)
+      )
+    )
+
+  private val Line1: PosLong =
+    PosLong.unsafeFrom(1)
+
+  override def dbInitialization: Option[Session[IO] => IO[Unit]] = Some: s =>
+    val gn_rows: List[Gmos.TableRow.North] =
+      List(
+        Gmos.TableRow(Line1, gn_key_0_50, flat),
+        Gmos.TableRow(Line1, gn_key_0_50, arc),
+      )
+
+    val gs_rows: List[Gmos.TableRow.South] =
+      List(
+        Gmos.TableRow(Line1, gs_key_0_50, flat),
+        Gmos.TableRow(Line1, gs_key_0_50, arc)
+      )
+
+    val f2_rows: List[Flamingos2.TableRow] =
+      List(
+        Flamingos2.TableRow(Line1, f2_key_HK, flat),
+        Flamingos2.TableRow(Line1, f2_key_HK, arc)
+      )
+
+    servicesFor(service /* doesn't matter*/).map(_(s)).use: services =>
+      services.transactionally:
+
+        val f2 = f2_rows.zipWithIndex.traverse_ : (r, i) =>
+          Services.asSuperUser:
+            services.smartGcalService.insertFlamingos2(i, r)
+
+        val north = gn_rows.zipWithIndex.traverse_ : (r, i) =>
+          Services.asSuperUser:
+            services.smartGcalService.insertGmosNorth(i, r)
+
+        val south = gs_rows.zipWithIndex.traverse_ : (r, i) =>
+          Services.asSuperUser:
+            services.smartGcalService.insertGmosSouth(i, r)
+
+        f2 *> north *> south
 
   private def recordVisitTest(
     mode:     ObservingModeType,
@@ -29,7 +166,8 @@ class recordVisit extends OdbSuite:
   ): IO[Unit] =
     for
       pid <- createProgramAs(user)
-      oid <- createObservationAs(user, pid, mode.some)
+      tid <- createTargetWithProfileAs(user, pid)
+      oid <- createObservationAs(user, pid, mode.some, tid)
       _   <- expectSuccessOrOdbError(user, query(oid), expected.leftMap: f =>
         case OdbError.InvalidObservation(_, Some(d)) if d === f(oid) => ()
       ) 
@@ -82,7 +220,8 @@ class recordVisit extends OdbSuite:
     val setup =
       for
         pid <- createProgramAs(service)
-        oid <- createObservationAs(service, pid, ObservingModeType.GmosNorthLongSlit.some)
+        tid <- createTargetWithProfileAs(service, pid)
+        oid <- createObservationAs(service, pid, ObservingModeType.GmosNorthLongSlit.some, tid)
       yield oid
 
     def recordVisit(oid: Observation.Id): IO[(Visit.Id, IdempotencyKey)] =
@@ -125,7 +264,8 @@ class recordVisit extends OdbSuite:
     val setup =
       for
         pid <- createProgramAs(service)
-        oid <- createObservationAs(service, pid, ObservingModeType.GmosNorthLongSlit.some)
+        tid <- createTargetWithProfileAs(service, pid)
+        oid <- createObservationAs(service, pid, ObservingModeType.GmosNorthLongSlit.some, tid)
       yield oid
 
     def recordSlew(oid: Observation.Id): IO[Visit.Id] =

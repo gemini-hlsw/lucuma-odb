@@ -5,12 +5,14 @@ package lucuma.odb.graphql.input
 
 import cats.syntax.parallel.*
 import lucuma.core.enums.AtomStage
+import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Atom
 import lucuma.core.util.IdempotencyKey
 import lucuma.odb.graphql.binding.*
 
 case class AddAtomEventInput(
   atomId:         Atom.Id,
+  visitId:        Visit.Id,
   atomStage:      AtomStage,
   idempotencyKey: Option[IdempotencyKey]
 )
@@ -21,9 +23,9 @@ object AddAtomEventInput:
     ObjectFieldsBinding.rmap:
       case List(
         AtomIdBinding("atomId", rAtomId),
+        VisitIdBinding("visitId", rVisitId),
         AtomStageBinding("atomStage", rAtomStage),
-        ClientIdBinding.Option("clientId", rCid),
         IdempotencyKeyBinding.Option("idempotencyKey", rIdm)
       ) =>
-        (rAtomId, rAtomStage, rCid, rIdm).parMapN: (aid, stage, cid, idm) =>
-          AddAtomEventInput(aid, stage, idm orElse cid.map(c => IdempotencyKey(c.toUuid)))
+        (rAtomId, rVisitId, rAtomStage, rIdm).parMapN: (aid, vid, stage, idm) =>
+          AddAtomEventInput(aid, vid, stage, idm)

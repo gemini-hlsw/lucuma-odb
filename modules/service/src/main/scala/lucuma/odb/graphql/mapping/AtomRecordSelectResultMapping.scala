@@ -6,23 +6,25 @@ package mapping
 
 import grackle.Path
 
-import table.AtomRecordTable
+import table.AtomRecordView
 import table.ObservationView
+import table.VisitAtomView
 import table.VisitTable
 
 trait AtomRecordSelectResultMapping[F[_]]
-  extends AtomRecordTable[F]
+  extends AtomRecordView[F]
      with ObservationView[F]
      with ResultMapping[F]
+     with VisitAtomView[F]
      with VisitTable[F] {
 
   lazy val AtomRecordSelectResultMappings: List[TypeMapping] = {
 
     def fromExecutionAtPath(path: Path): ObjectMapping =
-      nestedSelectResultMappingAtPath(path, ObservationView.Id, Join(ObservationView.Id, AtomRecordTable.ObservationId))
+      nestedSelectResultMappingAtPath(path, ObservationView.Id, Join(ObservationView.Id, AtomRecordView.ObservationId))
 
     def fromVisitAtPath(path: Path): ObjectMapping =
-      nestedSelectResultMappingAtPath(path, VisitTable.Id, Join(VisitTable.Id, AtomRecordTable.VisitId))
+     nestedSelectResultMappingAtPath(path, VisitTable.Id, Join(VisitTable.Id, VisitAtomView.VisitId), Join(VisitAtomView.AtomId, AtomRecordView.Id))
 
     List(
       fromExecutionAtPath(ExecutionType / "atomRecords"),
