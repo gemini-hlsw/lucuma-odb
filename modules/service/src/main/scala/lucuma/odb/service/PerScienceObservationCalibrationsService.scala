@@ -13,6 +13,8 @@ import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.TelluricCalibrationOrder
+import lucuma.core.math.SignalToNoise
+import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.Group
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
@@ -301,6 +303,38 @@ object PerScienceObservationCalibrationsService:
           result <- syncTelluricObservation(pid, obs, gid)
         yield result
 
+      private val MaxTelluricSN = SignalToNoise.fromInt(100).get
+
+      // After cloning we have the same etm as science, but we need a different one for tellurics
+      // https://app.shortcut.com/lucuma/story/6968/generate-telluric-standard-sequence
+      private def createTelluricExposureTimeMode(
+        scienceOid:  Observation.Id,
+        telluricOid: Observation.Id
+      )(using Transaction[F]): F[Unit] =
+        def telluricEtm(etm: ExposureTimeMode): ExposureTimeMode.SignalToNoiseMode =
+          val snValue = etm match
+            case ExposureTimeMode.SignalToNoiseMode(sn, _) =>
+              SignalToNoise.unsafeFromBigDecimalExact(
+                (sn.toBigDecimal * 2).min(MaxTelluricSN.toBigDecimal)
+              )
+            case _ =>
+              MaxTelluricSN
+          ExposureTimeMode.SignalToNoiseMode(snValue, etm.at)
+
+        for {
+          allEtm     <- S.exposureTimeModeService
+                           .select(List(scienceOid, telluricOid), ExposureTimeModeRole.Science)
+                           .map(_.view.mapValues(_.head).toMap)
+          scienceEtm  = allEtm.get(scienceOid)
+          _          <- scienceEtm.traverse_ : etm =>
+                          val calibEtm   = telluricEtm(etm)
+                          val currentEtm = allEtm.get(telluricOid)
+
+                          (S.exposureTimeModeService.deleteMany(List(telluricOid), ExposureTimeModeRole.Science) *>
+                            S.exposureTimeModeService.insertOne(telluricOid, ExposureTimeModeRole.Science, calibEtm))
+                              .unlessA(currentEtm.contains(calibEtm))
+        } yield ()
+
       private def syncConfiguration(
         sourceOid: Observation.Id,
         targetOid: Observation.Id
@@ -345,7 +379,7 @@ object PerScienceObservationCalibrationsService:
         def cloneSourceMode(sm: Option[ObservingModeType]): F[Unit] =
           sm.traverse(mode => obsModeService.clone(mode, sourceOid, targetOid)).void
 
-        for
+        for {
           modes    <- readObservingModes
           (sm, tm) <- extractModes(modes)
           _        <- syncObservationProperties
@@ -353,7 +387,8 @@ object PerScienceObservationCalibrationsService:
           _        <- deleteAllExposureTimeModes(sm)
           _        <- updateTargetModeType(sm)
           _        <- cloneSourceMode(sm)
-        yield ()
+          _        <- createTelluricExposureTimeMode(sourceOid, targetOid)
+        } yield ()
 
       override def generateCalibrations(
         pid:        Program.Id,
