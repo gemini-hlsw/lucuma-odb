@@ -255,6 +255,11 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
       .map(Timestamp.fromInstantTruncated)
       .flatMap(t => IO.fromOption(t)(new RuntimeException("oddly, timestamp of now is out of range")))
 
+  def timeEstimateCalculator: IO[TimeEstimateCalculatorImplementation.ForInstrumentMode] =
+    withSession: session =>
+      Enums.load(session).flatMap: enums =>
+        TimeEstimateCalculatorImplementation.fromSession(session, enums)
+
   /**
    * Generates the sequence for the given observation.
    *

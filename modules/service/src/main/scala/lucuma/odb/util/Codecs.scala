@@ -218,6 +218,9 @@ trait Codecs {
   val blind_offset_type: Codec[BlindOffsetType] =
     enumerated(Type("e_blind_offset_type"))
 
+  val breakpoint: Codec[Breakpoint] =
+    enumerated(Type("e_breakpoint"))
+
   val catalog_name: Codec[CatalogName] =
     enumerated(Type("e_catalog_name"))
 
