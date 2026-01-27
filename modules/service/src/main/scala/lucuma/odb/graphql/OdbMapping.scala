@@ -235,8 +235,6 @@ object OdbMapping {
           with QueryMapping[F]
           with RadialVelocityMapping[F]
           with RecordDatasetResultMapping[F]
-          with RecordAtomResultMapping[F]
-          with RecordStepResultMapping[F]
           with RecordVisitResultMapping[F]
           with RedeemUserInvitationResultMapping[F]
           with RegionMapping[F]
@@ -474,13 +472,9 @@ object OdbMapping {
                 QueryMapping,
                 QueueMapping,
                 RadialVelocityMapping,
-                RecordAtomResultMapping,
                 RecordDatasetResultMapping,
-                RecordFlamingos2StepResultMapping,
                 RecordFlamingos2VisitResultMapping,
-                RecordGmosNorthStepResultMapping,
                 RecordGmosNorthVisitResultMapping,
-                RecordGmosSouthStepResultMapping,
                 RecordGmosSouthVisitResultMapping,
                 RedeemUserInvitationResultMapping,
                 ResetAcquisitionResultMapping,

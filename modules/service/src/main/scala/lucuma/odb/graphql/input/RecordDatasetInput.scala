@@ -6,6 +6,7 @@ package lucuma.odb.graphql.input
 import cats.syntax.parallel.*
 import eu.timepit.refined.types.string.NonEmptyString
 import lucuma.core.enums.DatasetQaState
+import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.Step
 import lucuma.core.util.IdempotencyKey
@@ -13,6 +14,7 @@ import lucuma.odb.graphql.binding.*
 
 case class RecordDatasetInput(
   stepId:         Step.Id,
+  visitId:        Visit.Id,
   filename:       Dataset.Filename,
   qaState:        Option[DatasetQaState],
   comment:        Option[NonEmptyString],
@@ -25,11 +27,12 @@ object RecordDatasetInput:
     ObjectFieldsBinding.rmap:
       case List(
         StepIdBinding("stepId", rStepId),
+        VisitIdBinding("visitId", rVisitId),
         DatasetFilenameBinding("filename", rFilename),
         DatasetQaStateBinding.Option("qaState", rQaState),
         NonEmptyStringBinding.Option("comment", rComment),
         IdempotencyKeyBinding.Option("idempotencyKey", rIdm)
       ) =>
-        (rStepId, rFilename, rQaState, rComment, rIdm).parMapN:
-          (sid, filename, qaState, comment, idm) =>
-            RecordDatasetInput(sid, filename, qaState, comment, idm)
+        (rStepId, rVisitId, rFilename, rQaState, rComment, rIdm).parMapN:
+          (sid, vid, filename, qaState, comment, idm) =>
+            RecordDatasetInput(sid, vid, filename, qaState, comment, idm)

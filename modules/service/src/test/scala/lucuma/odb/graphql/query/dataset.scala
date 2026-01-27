@@ -14,16 +14,10 @@ import lucuma.core.model.Observation
 import lucuma.core.model.sequence.Dataset
 import lucuma.core.util.TimestampInterval
 
-class dataset extends OdbSuite with DatasetSetupOperations {
-
-  val pi      = TestUsers.Standard.pi(1, 30)
-  val pi2     = TestUsers.Standard.pi(2, 32)
-  val service = TestUsers.service(3)
-
-  val validUsers = List(pi, pi2, service).toList
+class dataset extends OdbSuite with DatasetSetupOperations with ExecutionTestSupportForGmos {
 
   test("pi can select thier own dataset") {
-    recordDatasets(ObservingModeType.GmosNorthLongSlit, pi, service, 0, 1, 1).flatMap {
+    recordDatasets(ObservingModeType.GmosNorthLongSlit, pi, serviceUser, 0, 1, 1).flatMap {
       case (oid, List((_, List(did)))) =>
         val q = s"""
           query {
@@ -49,7 +43,7 @@ class dataset extends OdbSuite with DatasetSetupOperations {
   }
 
   test("empty interval when not complete") {
-    recordDatasets(ObservingModeType.GmosNorthLongSlit, pi, service, 100, 1, 1).flatMap {
+    recordDatasets(ObservingModeType.GmosNorthLongSlit, pi, serviceUser, 100, 1, 1).flatMap {
       case (oid, List((_, List(did)))) =>
         val q = s"""
           query {
@@ -78,10 +72,10 @@ class dataset extends OdbSuite with DatasetSetupOperations {
 
   test("dataset interval") {
     val f = for {
-      ds <- recordDatasets(ObservingModeType.GmosNorthLongSlit, pi, service, 200, 1, 1)
+      ds <- recordDatasets(ObservingModeType.GmosNorthLongSlit, pi, serviceUser, 200, 1, 1)
       (_, List((_, List(did)))) = ds
-      s  <- addDatasetEventAs(service, did, DatasetStage.StartExpose)
-      e  <- addDatasetEventAs(service, did, DatasetStage.EndWrite)
+      s  <- addDatasetEventAs(serviceUser, did, DatasetStage.StartExpose)
+      e  <- addDatasetEventAs(serviceUser, did, DatasetStage.EndWrite)
     } yield (did, TimestampInterval.between(s.received, e.received))
 
     f.flatMap { (did, inv) =>
@@ -116,7 +110,7 @@ class dataset extends OdbSuite with DatasetSetupOperations {
   }
 
   test("pi cannot select someone else's dataset") {
-    recordDatasets(ObservingModeType.GmosNorthLongSlit, pi, service, 300, 1, 1).flatMap {
+    recordDatasets(ObservingModeType.GmosNorthLongSlit, pi, serviceUser, 300, 1, 1).flatMap {
       case (oid, List((_, List(did)))) =>
         val q = s"""
           query {
@@ -150,11 +144,11 @@ class dataset extends OdbSuite with DatasetSetupOperations {
         json.hcursor.downFields("dataset", "isWritten").require[Boolean]
 
     val res = for
-      ds <- recordDatasets(ObservingModeType.GmosNorthLongSlit, pi, service, 400, 1, 1)
+      ds <- recordDatasets(ObservingModeType.GmosNorthLongSlit, pi, serviceUser, 400, 1, 1)
       (_, List((_, List(did)))) = ds
-      s  <- addDatasetEventAs(service, did, DatasetStage.StartExpose)
+      s  <- addDatasetEventAs(serviceUser, did, DatasetStage.StartExpose)
       w0 <- isWritten(did)
-      e  <- addDatasetEventAs(service, did, DatasetStage.EndWrite)
+      e  <- addDatasetEventAs(serviceUser, did, DatasetStage.EndWrite)
       w1 <- isWritten(did)
     yield (w0, w1)
 

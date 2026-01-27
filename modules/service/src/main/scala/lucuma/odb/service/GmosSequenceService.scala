@@ -9,13 +9,11 @@ package lucuma.odb.service
 import cats.effect.Concurrent
 import cats.syntax.functor.*
 import cats.syntax.option.*
-import fs2.Stream
 import lucuma.core.model.Observation
 import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.gmos.DynamicConfig
 import lucuma.core.model.sequence.gmos.StaticConfig
-import lucuma.odb.sequence.data.StepRecord
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.GmosCodecs.*
 import skunk.*
@@ -25,14 +23,6 @@ import skunk.implicits.*
 import Services.Syntax.*
 
 trait GmosSequenceService[F[_]] {
-
-  def selectGmosNorthStepRecords(
-    observationId: Observation.Id
-  ): Stream[F, StepRecord[DynamicConfig.GmosNorth]]
-
-  def selectGmosSouthStepRecords(
-    observationId: Observation.Id
-  ): Stream[F, StepRecord[DynamicConfig.GmosSouth]]
 
   def insertGmosNorthDynamic(
     stepId:  Step.Id,
@@ -44,6 +34,10 @@ trait GmosSequenceService[F[_]] {
    */
   def selectGmosNorthStatic(
     visitId: Visit.Id
+  )(using Transaction[F]): F[Option[StaticConfig.GmosNorth]]
+
+  def selectLatestVisitGmosNorthStatic(
+    observationId: Observation.Id
   )(using Transaction[F]): F[Option[StaticConfig.GmosNorth]]
 
   /**
@@ -69,6 +63,10 @@ trait GmosSequenceService[F[_]] {
    */
   def selectGmosSouthStatic(
     visitId: Visit.Id
+  )(using Transaction[F]): F[Option[StaticConfig.GmosSouth]]
+
+  def selectLatestVisitGmosSouthStatic(
+    observationId: Observation.Id
   )(using Transaction[F]): F[Option[StaticConfig.GmosSouth]]
 
   /**
@@ -103,37 +101,10 @@ object GmosSequenceService {
       )(using Transaction[F]): F[Option[StaticConfig.GmosNorth]] =
         session.option(Statements.SelectGmosNorthStatic)(visitId)
 
-      private def selectGmosStepRecords[A](
-        observationId: Observation.Id,
-        site:          String,
-        decoderA:      Decoder[A]
-      ): Stream[F, StepRecord[A]] =
-        session.stream(
-          SequenceService.Statements.selectStepRecord(
-            s"t_gmos_${site}_dynamic",
-            s"gmos$site",
-            Statements.GmosDynamicColumns,
-            decoderA
-          )
-        )(observationId, 1024)
-
-      override def selectGmosNorthStepRecords(
+      override def selectLatestVisitGmosNorthStatic(
         observationId: Observation.Id
-      ): Stream[F, StepRecord[DynamicConfig.GmosNorth]] =
-        selectGmosStepRecords(
-          observationId,
-          "north",
-          gmos_north_dynamic
-        )
-
-      override def selectGmosSouthStepRecords(
-        observationId: Observation.Id
-      ): Stream[F, StepRecord[DynamicConfig.GmosSouth]] =
-        selectGmosStepRecords(
-          observationId,
-          "south",
-          gmos_south_dynamic
-        )
+      )(using Transaction[F]): F[Option[StaticConfig.GmosNorth]] =
+        session.option(Statements.selectLastestVisitStatic("north", gmos_north_static))(observationId)
 
       override def selectGmosNorthDynamicForStep(
         stepId: Step.Id
@@ -161,6 +132,11 @@ object GmosSequenceService {
         visitId: Visit.Id
       )(using Transaction[F]): F[Option[StaticConfig.GmosSouth]] =
         session.option(Statements.SelectGmosSouthStatic)(visitId)
+
+      override def selectLatestVisitGmosSouthStatic(
+        observationId: Observation.Id
+      )(using Transaction[F]): F[Option[StaticConfig.GmosSouth]] =
+        session.option(Statements.selectLastestVisitStatic("south", gmos_south_static))(observationId)
 
       override def selectGmosSouthDynamicForStep(
         stepId: Step.Id
@@ -248,6 +224,17 @@ object GmosSequenceService {
 
     val SelectGmosSouthStatic: Query[Visit.Id, StaticConfig.GmosSouth] =
       selectStatic("south", gmos_south_static)
+
+    def selectLastestVisitStatic[A](site: String, decoderA: Decoder[A]): Query[Observation.Id, A] =
+      sql"""
+        SELECT
+          #${encodeColumns("g".some, GmosStaticColumns)}
+        FROM t_gmos_#${site}_static g
+        JOIN t_visit v ON v.c_visit_id = g.c_visit_id
+        WHERE v.c_observation_id = $observation_id
+        ORDER BY v.c_created DESC
+        LIMIT 1
+      """.query(decoderA)
 
     def insertStatic[A](site: String, encoderA: Encoder[A]): Query[(Observation.Id, Option[Visit.Id], A), Long] =
       sql"""

@@ -23,8 +23,7 @@ object AddSequenceEventInput:
       case List(
         VisitIdBinding("visitId", rVisitId),
         SequenceCommandBinding("command", rCommand),
-        ClientIdBinding.Option("clientId", rCid),
         IdempotencyKeyBinding.Option("idempotencyKey", rIdm)
       ) =>
-        (rVisitId, rCommand, rCid, rIdm).parMapN: (vid, cmd, cid, idm) =>
-          AddSequenceEventInput(vid, cmd, idm orElse cid.map(c => IdempotencyKey(c.toUuid)))
+        (rVisitId, rCommand, rIdm).parMapN: (vid, cmd, idm) =>
+          AddSequenceEventInput(vid, cmd, idm)
