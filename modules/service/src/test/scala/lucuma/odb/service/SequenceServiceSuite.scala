@@ -53,16 +53,13 @@ class SequenceServiceSuite extends ExecutionTestSupportForGmos:
   private def readSequence(
     o: Observation.Id
   ): IO[List[Atom[GmosNorth]]] =
-    for
-      t <- gmosNorthTimeEstimateCalculator
-      s <- withServices(serviceUser): services =>
-        services
-          .transactionally:
-            sequenceService
-              .streamGmosNorthSequence(o, SequenceType.Science, GmosNorthStatic, t)
-              .compile
-              .toList
-    yield s
+    withServices(serviceUser): services =>
+      services
+        .transactionally:
+          sequenceService
+            .streamGmosNorthSequence(o, SequenceType.Science, GmosNorthStatic)
+            .compile
+            .toList
 
   test("exercise serialization"):
     val res = for
@@ -70,7 +67,6 @@ class SequenceServiceSuite extends ExecutionTestSupportForGmos:
       t  <- createTargetWithProfileAs(pi, p)
       o  <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
 
-      // Generate the Sequence
       sn <- generateSequence(p, o)
       b  <- IO.realTimeInstant
       _  <- writeSequence(o, sn)

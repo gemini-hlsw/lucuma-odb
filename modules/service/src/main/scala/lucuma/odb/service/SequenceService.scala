@@ -51,6 +51,7 @@ import lucuma.odb.data.AtomExecutionState
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.data.StepExecutionState
+import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.TimeEstimateCalculator
 import lucuma.odb.sequence.data.AtomRecord
 import lucuma.odb.sequence.data.ProtoStep
@@ -167,22 +168,19 @@ trait SequenceService[F[_]]:
   def streamFlamingos2Sequence(
     observationId: Observation.Id,
     sequenceType:  SequenceType,
-    static:        Flamingos2StaticConfig,
-    estimator:     TimeEstimateCalculator[Flamingos2StaticConfig, Flamingos2DynamicConfig]
+    static:        Flamingos2StaticConfig
   )(using Transaction[F], Services.ServiceAccess): Stream[F, Atom[Flamingos2DynamicConfig]]
 
   def streamGmosNorthSequence(
     observationId: Observation.Id,
     sequenceType:  SequenceType,
-    static:        GmosNorthStatic,
-    estimator:     TimeEstimateCalculator[GmosNorthStatic, GmosNorth]
+    static:        GmosNorthStatic
   )(using Transaction[F], Services.ServiceAccess): Stream[F, Atom[GmosNorth]]
 
   def streamGmosSouthSequence(
     observationId: Observation.Id,
     sequenceType:  SequenceType,
-    static:        GmosSouthStatic,
-    estimator:     TimeEstimateCalculator[GmosSouthStatic, GmosSouth]
+    static:        GmosSouthStatic
   )(using Transaction[F], Services.ServiceAccess): Stream[F, Atom[GmosSouth]]
 
 
@@ -213,7 +211,9 @@ object SequenceService:
     ) extends InsertStepResponse
 
 
-  def instantiate[F[_]: Concurrent: UUIDGen](using Services[F]): SequenceService[F] =
+  def instantiate[F[_]: Concurrent: UUIDGen](
+    estimator: TimeEstimateCalculatorImplementation.ForInstrumentMode
+  )(using Services[F]): SequenceService[F] =
     new SequenceService[F]:
 
       /**
@@ -608,8 +608,7 @@ object SequenceService:
       override def streamFlamingos2Sequence(
         observationId: Observation.Id,
         sequenceType:  SequenceType,
-        static:        Flamingos2StaticConfig,
-        estimator:     TimeEstimateCalculator[Flamingos2StaticConfig, Flamingos2DynamicConfig]
+        static:        Flamingos2StaticConfig
       )(using Transaction[F], Services.ServiceAccess): Stream[F, Atom[Flamingos2DynamicConfig]] =
 
         val query = Statements.selectSequence(
@@ -620,13 +619,12 @@ object SequenceService:
 
         session
           .stream(query)((Instrument.Flamingos2, observationId, sequenceType), 256)
-          .through(atomPipe(static, estimator))
+          .through(atomPipe(static, estimator.flamingos2))
 
       override def streamGmosNorthSequence(
         observationId: Observation.Id,
         sequenceType:  SequenceType,
-        static:        GmosNorthStatic,
-        estimator:     TimeEstimateCalculator[GmosNorthStatic, GmosNorth]
+        static:        GmosNorthStatic
       )(using Transaction[F], Services.ServiceAccess): Stream[F, Atom[GmosNorth]] =
 
         val query = Statements.selectSequence(
@@ -637,13 +635,12 @@ object SequenceService:
 
         session
           .stream(query)((Instrument.GmosNorth, observationId, sequenceType), 256)
-          .through(atomPipe(static, estimator))
+          .through(atomPipe(static, estimator.gmosNorth))
 
       override def streamGmosSouthSequence(
         observationId: Observation.Id,
         sequenceType:  SequenceType,
-        static:        GmosSouthStatic,
-        estimator:     TimeEstimateCalculator[GmosSouthStatic, GmosSouth]
+        static:        GmosSouthStatic
       )(using Transaction[F], Services.ServiceAccess): Stream[F, Atom[GmosSouth]] =
 
         val query = Statements.selectSequence(
@@ -654,7 +651,7 @@ object SequenceService:
 
         session
           .stream(query)((Instrument.GmosSouth, observationId, sequenceType), 256)
-          .through(atomPipe(static, estimator))
+          .through(atomPipe(static, estimator.gmosSouth))
 
   object Statements:
 
