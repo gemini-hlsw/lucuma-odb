@@ -341,7 +341,6 @@ object Services:
       lazy val programNoteService = ProgramNoteService.instantiate
       lazy val programUserService = ProgramUserService.instantiate
       lazy val smartGcalService = SmartGcalService.instantiate
-      lazy val sequenceService = SequenceService.instantiate
       lazy val targetService = TargetService.instantiate
       lazy val timeAccountingService = TimeAccountingService.instantiate
       lazy val timeService = TimeService.instantiate
@@ -358,14 +357,15 @@ object Services:
       // available, so we require them here instead of demanding them before constructing a
       // `Services` instance.
       lazy val attachmentFileService = AttachmentFileService.instantiate(s3FileService)
-      lazy val itcService = ItcService.instantiate(itcClient)
+      lazy val emailService = EmailService.fromConfigAndClient(emailConfig, httpClient)
       lazy val generator = Generator.instantiate(commitHash, tc)
       lazy val guideService = GuideService.instantiate(gaiaClient)
-      lazy val emailService = EmailService.fromConfigAndClient(emailConfig, httpClient)
+      lazy val itcService = ItcService.instantiate(itcClient)
       lazy val proposalService = ProposalService.instantiate(emailConfig)
-      lazy val userInvitationService = UserInvitationService.instantiate(emailConfig)
+      lazy val sequenceService = SequenceService.instantiate(tc)
       lazy val trackingService = TrackingService.instantiate(horizonsClient)
       lazy val telluricTargetsService: TelluricTargetsService[F] = TelluricTargetsService.instantiate(telluricClient0, hminCache0)
+      lazy val userInvitationService = UserInvitationService.instantiate(emailConfig)
 
   /**
    * This adds syntax to access the members of `Services` and the current `Transaction` when they
