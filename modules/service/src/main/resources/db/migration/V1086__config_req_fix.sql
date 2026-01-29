@@ -1,5 +1,3 @@
-
-
 -- This constraint was unnamed before but I looked its name up in the system table.
 -- Seems to be deterministic, luckily.
 ALTER TABLE t_configuration_request
