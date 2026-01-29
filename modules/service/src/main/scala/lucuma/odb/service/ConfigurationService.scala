@@ -185,13 +185,15 @@ object ConfigurationService {
 
     @annotation.nowarn("msg=unused implicit parameter")
     private def canonicalizeRequest(input: CreateConfigurationRequestInput, cfg: Configuration)(using Transaction[F]): ResultT[F, ConfigurationRequest] =
-      ResultT.liftF:
+      ResultT:
         session.prepareR(Statements.InsertRequest).use: pq =>
           pq.option(input, cfg).flatMap:
-            case Some(req) => req.pure[F]
+            case Some(req) => Result(req).pure[F]
             case None      =>
-              session.prepareR(Statements.SelectRequest).use: pq =>
-                pq.unique(input.oid, cfg)
+              session.prepareR(Statements.SelectRequest).use: pq => 
+                pq.option(input.oid, cfg).map:
+                  case Some(r) => Result(r)
+                  case None => Result.internalError(s"Failed to insert a configuration request for ${input.oid}, likely due to an incorrect unique index.")
 
     def selectRequests(oid: Observation.Id)(using Transaction[F]): ResultT[F, List[ConfigurationRequest]] =
       selectAllRequestsForProgram(oid).flatMap: crs =>
