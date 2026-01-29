@@ -45,6 +45,10 @@ trait Flamingos2SequenceService[F[_]]:
     visitId: Visit.Id
   )(using Transaction[F]): F[Option[Flamingos2StaticConfig]]
 
+  def selectLatestVisitStatic(
+    observationId: Observation.Id
+  )(using Transaction[F]): F[Option[Flamingos2StaticConfig]]
+
   def selectStepRecords(
     observationId: Observation.Id
   ): Stream[F, StepRecord[Flamingos2DynamicConfig]]
@@ -66,7 +70,12 @@ object Flamingos2SequenceService:
       )(using Transaction[F]): F[Option[Flamingos2StaticConfig]] =
         session.option(Statements.SelectStatic)(visitId)
 
-      def selectDynamicForStep(
+      override def selectLatestVisitStatic(
+        observationId: Observation.Id
+      )(using Transaction[F]): F[Option[Flamingos2StaticConfig]] =
+        session.option(Statements.SelectLatestVisitStatic)(observationId)
+
+      override def selectDynamicForStep(
         stepId: Step.Id
       )(using Transaction[F]): F[Option[Flamingos2DynamicConfig]] =
         session.option(Statements.SelectDynamicForStep)(stepId)
@@ -142,6 +151,18 @@ object Flamingos2SequenceService:
           c_use_eoffsetting
         FROM t_flamingos_2_static
         WHERE c_visit_id = $visit_id
+      """.query(flamingos_2_static)
+
+    val SelectLatestVisitStatic: Query[Observation.Id, Flamingos2StaticConfig] =
+      sql"""
+        SELECT
+          c_mos_pre_imaging,
+          c_use_eoffsetting
+        FROM t_flamingos_2_static f
+        JOIN t_visit v ON v.c_visit_id = f.c_visit_id
+        WHERE v.c_observation_id = $observation_id
+        ORDER BY v.c_created DESC
+        LIMIT 1
       """.query(flamingos_2_static)
 
     val SelectDynamicForStep: Query[Step.Id, Flamingos2DynamicConfig] =

@@ -147,41 +147,35 @@ trait SequenceService[F[_]]:
   def insertFlamingos2Sequence(
     observationId: Observation.Id,
     sequenceType:  SequenceType,
-    visitId:       Option[Visit.Id],
     sequence:      Stream[F, Atom[Flamingos2DynamicConfig]]
   )(using Transaction[F], Services.ServiceAccess): F[Unit]
 
   def insertGmosNorthSequence(
     observationId: Observation.Id,
     sequenceType:  SequenceType,
-    visitId:       Option[Visit.Id],
     sequence:      Stream[F, Atom[GmosNorth]]
   )(using Transaction[F], Services.ServiceAccess): F[Unit]
 
   def insertGmosSouthSequence(
     observationId: Observation.Id,
     sequenceType:  SequenceType,
-    visitId:       Option[Visit.Id],
     sequence:      Stream[F, Atom[GmosSouth]]
   )(using Transaction[F], Services.ServiceAccess): F[Unit]
 
   def streamFlamingos2Sequence(
     observationId: Observation.Id,
-    sequenceType:  SequenceType,
-    static:        Flamingos2StaticConfig
-  )(using Transaction[F], Services.ServiceAccess): Stream[F, Atom[Flamingos2DynamicConfig]]
+    sequenceType:  SequenceType
+  )(using Transaction[F], Services.ServiceAccess): F[Option[Stream[F, Atom[Flamingos2DynamicConfig]]]]
 
   def streamGmosNorthSequence(
     observationId: Observation.Id,
-    sequenceType:  SequenceType,
-    static:        GmosNorthStatic
-  )(using Transaction[F], Services.ServiceAccess): Stream[F, Atom[GmosNorth]]
+    sequenceType:  SequenceType
+  )(using Transaction[F], Services.ServiceAccess): F[Option[Stream[F, Atom[GmosNorth]]]]
 
   def streamGmosSouthSequence(
     observationId: Observation.Id,
-    sequenceType:  SequenceType,
-    static:        GmosSouthStatic
-  )(using Transaction[F], Services.ServiceAccess): Stream[F, Atom[GmosSouth]]
+    sequenceType:  SequenceType
+  )(using Transaction[F], Services.ServiceAccess): F[Option[Stream[F, Atom[GmosSouth]]]]
 
 
 object SequenceService:
@@ -485,14 +479,12 @@ object SequenceService:
       override def insertFlamingos2Sequence(
         observationId:  Observation.Id,
         sequenceType:   SequenceType,
-        visitId:        Option[Visit.Id],
         sequence:       Stream[F, Atom[Flamingos2DynamicConfig]]
       )(using Transaction[F], Services.ServiceAccess): F[Unit] =
         insertSequence(
           Instrument.Flamingos2,
           observationId,
           sequenceType,
-          visitId,
           sequence,
           Flamingos2SequenceService.Statements.InsertDynamic
         )
@@ -500,14 +492,12 @@ object SequenceService:
       override def insertGmosNorthSequence(
         observationId:  Observation.Id,
         sequenceType:   SequenceType,
-        visitId:        Option[Visit.Id],
         sequence:       Stream[F, Atom[GmosNorth]]
       )(using Transaction[F], Services.ServiceAccess): F[Unit] =
         insertSequence(
           Instrument.GmosNorth,
           observationId,
           sequenceType,
-          visitId,
           sequence,
           GmosSequenceService.Statements.InsertGmosNorthDynamic
         )
@@ -515,14 +505,12 @@ object SequenceService:
       override def insertGmosSouthSequence(
         observationId:  Observation.Id,
         sequenceType:   SequenceType,
-        visitId:        Option[Visit.Id],
         sequence:       Stream[F, Atom[GmosSouth]]
       )(using Transaction[F], Services.ServiceAccess): F[Unit] =
         insertSequence(
           Instrument.GmosSouth,
           observationId,
           sequenceType,
-          visitId,
           sequence,
           GmosSequenceService.Statements.InsertGmosSouthDynamic
         )
@@ -531,7 +519,6 @@ object SequenceService:
         instrument:       Instrument,
         observationId:    Observation.Id,
         sequenceType:     SequenceType,
-        visitId:          Option[Visit.Id],
         sequence:         Stream[F, Atom[D]],
         insertInstConfig: Command[(Step.Id, D)]
       )(using Services.ServiceAccess): F[Unit] =
@@ -540,7 +527,7 @@ object SequenceService:
           atomStream
             .zipWithIndex
             .map { case (atom, idx) =>
-              (atom.id, instrument, idx.toInt, atom.description.map(_.value), observationId, sequenceType, visitId)
+              (atom.id, instrument, idx.toInt, atom.description.map(_.value), observationId, sequenceType)
             }
             .through(session.pipe(Statements.insertAtom))
             .drain
@@ -607,9 +594,8 @@ object SequenceService:
 
       override def streamFlamingos2Sequence(
         observationId: Observation.Id,
-        sequenceType:  SequenceType,
-        static:        Flamingos2StaticConfig
-      )(using Transaction[F], Services.ServiceAccess): Stream[F, Atom[Flamingos2DynamicConfig]] =
+        sequenceType:  SequenceType
+      )(using Transaction[F], Services.ServiceAccess): F[Option[Stream[F, Atom[Flamingos2DynamicConfig]]]] =
 
         val query = Statements.selectSequence(
           "t_flamingos_2_dynamic",
@@ -617,15 +603,17 @@ object SequenceService:
           flamingos_2_dynamic
         )
 
-        session
-          .stream(query)((Instrument.Flamingos2, observationId, sequenceType), 256)
-          .through(atomPipe(static, estimator.flamingos2))
+        OptionT(flamingos2SequenceService.selectLatestVisitStatic(observationId))
+          .map: static =>
+            session
+              .stream(query)((Instrument.Flamingos2, observationId, sequenceType), 256)
+              .through(atomPipe(static, estimator.flamingos2))
+          .value
 
       override def streamGmosNorthSequence(
         observationId: Observation.Id,
-        sequenceType:  SequenceType,
-        static:        GmosNorthStatic
-      )(using Transaction[F], Services.ServiceAccess): Stream[F, Atom[GmosNorth]] =
+        sequenceType:  SequenceType
+      )(using Transaction[F], Services.ServiceAccess): F[Option[Stream[F, Atom[GmosNorth]]]] =
 
         val query = Statements.selectSequence(
           "t_gmos_north_dynamic",
@@ -633,15 +621,17 @@ object SequenceService:
           gmos_north_dynamic
         )
 
-        session
-          .stream(query)((Instrument.GmosNorth, observationId, sequenceType), 256)
-          .through(atomPipe(static, estimator.gmosNorth))
+        OptionT(gmosSequenceService.selectLatestVisitGmosNorthStatic(observationId))
+          .map: static =>
+            session
+              .stream(query)((Instrument.GmosNorth, observationId, sequenceType), 256)
+              .through(atomPipe(static, estimator.gmosNorth))
+          .value
 
       override def streamGmosSouthSequence(
         observationId: Observation.Id,
-        sequenceType:  SequenceType,
-        static:        GmosSouthStatic
-      )(using Transaction[F], Services.ServiceAccess): Stream[F, Atom[GmosSouth]] =
+        sequenceType:  SequenceType
+      )(using Transaction[F], Services.ServiceAccess): F[Option[Stream[F, Atom[GmosSouth]]]] =
 
         val query = Statements.selectSequence(
           "t_gmos_south_dynamic",
@@ -649,9 +639,12 @@ object SequenceService:
           gmos_south_dynamic
         )
 
-        session
-          .stream(query)((Instrument.GmosSouth, observationId, sequenceType), 256)
-          .through(atomPipe(static, estimator.gmosSouth))
+        OptionT(gmosSequenceService.selectLatestVisitGmosSouthStatic(observationId))
+          .map: static =>
+            session
+              .stream(query)((Instrument.GmosSouth, observationId, sequenceType), 256)
+              .through(atomPipe(static, estimator.gmosSouth))
+          .value
 
   object Statements:
 
@@ -668,8 +661,7 @@ object SequenceService:
       Int,
       Option[String],
       Observation.Id,
-      SequenceType,
-      Option[Visit.Id]
+      SequenceType
     )] =
       sql"""
         INSERT INTO t_atom (
@@ -678,16 +670,14 @@ object SequenceService:
           c_atom_index,
           c_description,
           c_observation_id,
-          c_sequence_type,
-          c_visit_id
+          c_sequence_type
         ) SELECT
           $atom_id,
           $instrument,
           $int4,
           ${text.opt},
           $observation_id,
-          $sequence_type,
-          ${visit_id.opt}
+          $sequence_type
       """.command
 
     val InsertAtomRecord: Query[(
