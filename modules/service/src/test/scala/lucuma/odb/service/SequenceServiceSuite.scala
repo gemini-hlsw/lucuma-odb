@@ -4,9 +4,10 @@
 package lucuma.odb.service
 
 import cats.effect.IO
-import cats.syntax.option.*
+import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.PosInt
 import fs2.Stream
+import lucuma.core.enums.Instrument
 import lucuma.core.enums.SequenceType
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
@@ -48,7 +49,7 @@ class SequenceServiceSuite extends ExecutionTestSupportForGmos:
       services
         .transactionally:
           sequenceService
-            .insertGmosNorthSequence(o, SequenceType.Science, none, Stream.emits(s))
+            .insertGmosNorthSequence(o, SequenceType.Science, Stream.emits(s))
 
   private def readSequence(
     o: Observation.Id
@@ -57,15 +58,15 @@ class SequenceServiceSuite extends ExecutionTestSupportForGmos:
       services
         .transactionally:
           sequenceService
-            .streamGmosNorthSequence(o, SequenceType.Science, GmosNorthStatic)
-            .compile
-            .toList
+            .streamGmosNorthSequence(o, SequenceType.Science)
+            .flatMap(_.toList.flatTraverse(_.compile.toList))
 
   test("exercise serialization"):
     val res = for
       p  <- createProgram
       t  <- createTargetWithProfileAs(pi, p)
       o  <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+      _  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
 
       sn <- generateSequence(p, o)
       b  <- IO.realTimeInstant
