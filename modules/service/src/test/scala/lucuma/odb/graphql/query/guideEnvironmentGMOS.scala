@@ -338,4 +338,54 @@ class guideEnvironmentGMOS extends ExecutionTestSupportForGmos with GuideEnviron
       expect(pi, guideEnvironmentQuery(oid), expected = pwfs2Result)
     }
 
+  test("GMOS North Imaging with oiwfs"):
+    val setup: IO[Observation.Id] =
+      for {
+        p <- createProgramAs(pi)
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createGmosNorthImagingObservationAs(pi, p, t)
+        _ <- setObservationTimeAndDuration(pi, o, gaiaSuccess.some, fullTimeEstimate.some)
+      } yield o
+    setup.flatMap { oid =>
+      expect(pi, guideEnvironmentQuery(oid), expected = gmosImagingOIWFSResult)
+    }
+
+  test("GMOS South Imaging with oiwfs"):
+    val setup: IO[Observation.Id] =
+      for {
+        p <- createProgramAs(pi)
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createGmosSouthImagingObservationAs(pi, p, t)
+        _ <- setObservationTimeAndDuration(pi, o, gaiaSuccess.some, fullTimeEstimate.some)
+      } yield o
+    setup.flatMap { oid =>
+      expect(pi, guideEnvironmentQuery(oid), expected = gmosImagingOIWFSResult)
+    }
+
+  test("GMOS North Imaging with pwfs2"):
+    val setup: IO[Observation.Id] =
+      for {
+        p   <- createProgramAs(pi)
+        eph  = createNonsiderealEphemeris
+        t   <- createNonsiderealTargetWithUserSuppliedEphemerisAs(pi, p, eph, name = "Nonsidereal Target")
+        o   <- createGmosNorthImagingObservationAs(pi, p, t)
+        _   <- setObservationTimeAndDuration(pi, o, gaiaSuccess.some, fullTimeEstimate.some)
+      } yield o
+    setup.flatMap { oid =>
+      expect(pi, guideEnvironmentQuery(oid), expected = pwfs2ImagingResult)
+    }
+
+  test("GMOS South Imaging with pwfs2"):
+    val setup: IO[Observation.Id] =
+      for {
+        p   <- createProgramAs(pi)
+        eph  = createNonsiderealEphemeris
+        t   <- createNonsiderealTargetWithUserSuppliedEphemerisAs(pi, p, eph, name = "Nonsidereal Target")
+        o   <- createGmosSouthImagingObservationAs(pi, p, t)
+        _   <- setObservationTimeAndDuration(pi, o, gaiaSuccess.some, fullTimeEstimate.some)
+      } yield o
+    setup.flatMap { oid =>
+      expect(pi, guideEnvironmentQuery(oid), expected = pwfs2ImagingResult)
+    }
+
 }
