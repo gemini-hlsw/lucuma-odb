@@ -21,6 +21,7 @@ import io.circe.refined.given
 import io.circe.syntax.*
 import lucuma.ags
 import lucuma.ags.*
+import lucuma.ags.DefaultAreaBuffer
 import lucuma.ags.syntax.*
 import lucuma.catalog.clients.GaiaClient
 import lucuma.catalog.votable.*
@@ -467,7 +468,8 @@ object GuideService {
             CoordinatesRangeQueryByADQL(
               NonEmptyList.of(a, b),
               shapeConstraint,
-              brightnessConstraints.some
+              brightnessConstraints.some,
+              areaBuffer = DefaultAreaBuffer
             )
           }
           .toResult(
@@ -478,8 +480,11 @@ object GuideService {
         query: ADQLQuery
       ): F[Result[List[(Target.Sidereal, GuideStarCandidate)]]] =
         Trace[F].span("callGaia"):
-          val MaxTargets                     = 100
-          given ADQLInterpreter          = ADQLInterpreter.nTarget(MaxTargets)
+
+          val MaxTargets = 1000
+
+          given ADQLInterpreter = ADQLInterpreter.nTarget(MaxTargets)
+
           gaiaClient
             .query(query)
             .map:
