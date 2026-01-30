@@ -4,7 +4,6 @@
 package lucuma.odb.service
 
 import cats.effect.IO
-import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.PosInt
 import fs2.Stream
 import lucuma.core.enums.Instrument
@@ -17,7 +16,6 @@ import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth
 import lucuma.core.syntax.timespan.*
 import lucuma.itc.IntegrationTime
 import lucuma.odb.graphql.query.ExecutionTestSupportForGmos
-import lucuma.odb.sequence.gmos.InitialConfigs.GmosNorthStatic
 import lucuma.odb.service.Services.Syntax.*
 
 class SequenceServiceSuite extends ExecutionTestSupportForGmos:
@@ -58,8 +56,8 @@ class SequenceServiceSuite extends ExecutionTestSupportForGmos:
       services
         .transactionally:
           sequenceService
-            .streamGmosNorthSequence(o, SequenceType.Science)
-            .flatMap(_.toList.flatTraverse(_.compile.toList))
+            .selectGmosNorthExecutionConfig(o)
+              .map(_.flatMap(_.science).toList.flatMap(s => s.nextAtom :: s.possibleFuture))
 
   test("exercise serialization"):
     val res = for
@@ -75,9 +73,11 @@ class SequenceServiceSuite extends ExecutionTestSupportForGmos:
       so <- readSequence(o)
       e1 <- IO.realTimeInstant
 
-//      _  <- IO.println(s"WRITE TIME: ${java.time.Duration.between(b,  e0)}")
-//      _  <- IO.println(s"READ TIME.: ${java.time.Duration.between(e0, e1)}")
-//      _  <- IO.println(s"SEQUENCE..: ${so.mkString("\n")}")
+      _  <- IO.println(s"WRITE TIME: ${java.time.Duration.between(b,  e0)}")
+      _  <- IO.println(s"READ TIME.: ${java.time.Duration.between(e0, e1)}")
+//      _  <- IO.println(s"SEQUENCE.n: ${sn.mkString("\n")}")
+//      _  <- IO.println("----")
+//      _  <- IO.println(s"SEQUENCE.o: ${so.mkString("\n")}")
     yield (sn, so)
 
     assertIOBoolean(res.map((in, out) => in == out))
