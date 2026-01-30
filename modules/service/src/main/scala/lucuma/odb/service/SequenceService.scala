@@ -33,6 +33,8 @@ import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.AtomDigest
 import lucuma.core.model.sequence.CategorizedTime
+import lucuma.core.model.sequence.ExecutionConfig
+import lucuma.core.model.sequence.ExecutionSequence
 import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.StepEstimate
@@ -162,21 +164,17 @@ trait SequenceService[F[_]]:
     sequence:      Stream[F, Atom[GmosSouth]]
   )(using Transaction[F], Services.ServiceAccess): F[Unit]
 
-  def streamFlamingos2Sequence(
-    observationId: Observation.Id,
-    sequenceType:  SequenceType
-  )(using Transaction[F], Services.ServiceAccess): F[Option[Stream[F, Atom[Flamingos2DynamicConfig]]]]
+  def selectFlamingos2ExecutionConfig(
+    observationId: Observation.Id
+  )(using Transaction[F], Services.ServiceAccess): F[Option[ExecutionConfig[Flamingos2StaticConfig, Flamingos2DynamicConfig]]]
 
-  def streamGmosNorthSequence(
-    observationId: Observation.Id,
-    sequenceType:  SequenceType
-  )(using Transaction[F], Services.ServiceAccess): F[Option[Stream[F, Atom[GmosNorth]]]]
+  def selectGmosNorthExecutionConfig(
+    observationId: Observation.Id
+  )(using Transaction[F], Services.ServiceAccess): F[Option[ExecutionConfig[GmosNorthStatic, GmosNorth]]]
 
-  def streamGmosSouthSequence(
-    observationId: Observation.Id,
-    sequenceType:  SequenceType
-  )(using Transaction[F], Services.ServiceAccess): F[Option[Stream[F, Atom[GmosSouth]]]]
-
+  def selectGmosSouthExecutionConfig(
+    observationId: Observation.Id
+  )(using Transaction[F], Services.ServiceAccess): F[Option[ExecutionConfig[GmosSouthStatic, GmosSouth]]]
 
 object SequenceService:
 
@@ -592,59 +590,64 @@ object SequenceService:
             NonEmptyList.fromListUnsafe(chunk.map(_._3).toList)
           )
 
-      override def streamFlamingos2Sequence(
+      private def selectExecutionConfig[S, D](
+        instrument:    Instrument,
         observationId: Observation.Id,
-        sequenceType:  SequenceType
-      )(using Transaction[F], Services.ServiceAccess): F[Option[Stream[F, Atom[Flamingos2DynamicConfig]]]] =
+        query:         Query[(Instrument, Observation.Id, SequenceType), (Atom.Id, Option[String], Step.Id, ProtoStep[D])],
+        estimator:     TimeEstimateCalculator[S, D],
+        lookupStatic:  Observation.Id => F[Option[S]]
+      )(using Services.ServiceAccess): F[Option[ExecutionConfig[S, D]]] =
 
-        val query = Statements.selectSequence(
-          "t_flamingos_2_dynamic",
-          Flamingos2SequenceService.Statements.Flamingos2DynamicColumns,
-          flamingos_2_dynamic
+        def stream(sequenceType: SequenceType, static: S): Stream[F, Atom[D]] =
+          session
+            .stream(query)((instrument, observationId, sequenceType), 256)
+            .through(atomPipe(static, estimator))
+
+        lookupStatic(observationId).flatMap:
+          _.traverse: static =>
+            val acq = stream(SequenceType.Acquisition, static)
+            val sci = stream(SequenceType.Science,     static)
+            for
+              a <- acq.compile.toList
+              s <- sci.compile.toList
+            yield ExecutionConfig(
+              static,
+              a.headOption.map(nextAtom => ExecutionSequence(nextAtom, a.tail, false)),
+              s.headOption.map(nextAtom => ExecutionSequence(nextAtom, s.tail, false))
+            )
+
+      override def selectFlamingos2ExecutionConfig(
+        observationId: Observation.Id
+      )(using Transaction[F], Services.ServiceAccess): F[Option[ExecutionConfig[Flamingos2StaticConfig, Flamingos2DynamicConfig]]] =
+        selectExecutionConfig(
+          Instrument.Flamingos2,
+          observationId,
+          Statements.SelectFlamingos2Sequence,
+          estimator.flamingos2,
+          flamingos2SequenceService.selectLatestVisitStatic
         )
 
-        OptionT(flamingos2SequenceService.selectLatestVisitStatic(observationId))
-          .map: static =>
-            session
-              .stream(query)((Instrument.Flamingos2, observationId, sequenceType), 256)
-              .through(atomPipe(static, estimator.flamingos2))
-          .value
-
-      override def streamGmosNorthSequence(
-        observationId: Observation.Id,
-        sequenceType:  SequenceType
-      )(using Transaction[F], Services.ServiceAccess): F[Option[Stream[F, Atom[GmosNorth]]]] =
-
-        val query = Statements.selectSequence(
-          "t_gmos_north_dynamic",
-          GmosSequenceService.Statements.GmosDynamicColumns,
-          gmos_north_dynamic
+      override def selectGmosNorthExecutionConfig(
+        observationId: Observation.Id
+      )(using Transaction[F], Services.ServiceAccess): F[Option[ExecutionConfig[GmosNorthStatic, GmosNorth]]] =
+        selectExecutionConfig(
+          Instrument.GmosNorth,
+          observationId,
+          Statements.SelectGmosNorthSequence,
+          estimator.gmosNorth,
+          gmosSequenceService.selectLatestVisitGmosNorthStatic
         )
 
-        OptionT(gmosSequenceService.selectLatestVisitGmosNorthStatic(observationId))
-          .map: static =>
-            session
-              .stream(query)((Instrument.GmosNorth, observationId, sequenceType), 256)
-              .through(atomPipe(static, estimator.gmosNorth))
-          .value
-
-      override def streamGmosSouthSequence(
-        observationId: Observation.Id,
-        sequenceType:  SequenceType
-      )(using Transaction[F], Services.ServiceAccess): F[Option[Stream[F, Atom[GmosSouth]]]] =
-
-        val query = Statements.selectSequence(
-          "t_gmos_south_dynamic",
-          GmosSequenceService.Statements.GmosDynamicColumns,
-          gmos_south_dynamic
+      override def selectGmosSouthExecutionConfig(
+        observationId: Observation.Id
+      )(using Transaction[F], Services.ServiceAccess): F[Option[ExecutionConfig[GmosSouthStatic, GmosSouth]]] =
+        selectExecutionConfig(
+          Instrument.GmosSouth,
+          observationId,
+          Statements.SelectGmosSouthSequence,
+          estimator.gmosSouth,
+          gmosSequenceService.selectLatestVisitGmosSouthStatic
         )
-
-        OptionT(gmosSequenceService.selectLatestVisitGmosSouthStatic(observationId))
-          .map: static =>
-            session
-              .stream(query)((Instrument.GmosSouth, observationId, sequenceType), 256)
-              .through(atomPipe(static, estimator.gmosSouth))
-          .value
 
   object Statements:
 
@@ -1186,3 +1189,24 @@ object SequenceService:
           a.c_atom_index,
           s.c_step_index
       """.query(atom_id *: text.opt *: step_id *: proto_step)
+
+    val SelectFlamingos2Sequence: Query[(Instrument, Observation.Id, SequenceType), (Atom.Id, Option[String], Step.Id, ProtoStep[Flamingos2DynamicConfig])] =
+      selectSequence(
+        "t_flamingos_2_dynamic",
+        Flamingos2SequenceService.Statements.Flamingos2DynamicColumns,
+        flamingos_2_dynamic
+      )
+
+    val SelectGmosNorthSequence: Query[(Instrument, Observation.Id, SequenceType), (Atom.Id, Option[String], Step.Id, ProtoStep[GmosNorth])] =
+      Statements.selectSequence(
+        "t_gmos_north_dynamic",
+        GmosSequenceService.Statements.GmosDynamicColumns,
+        gmos_north_dynamic
+      )
+
+    val SelectGmosSouthSequence: Query[(Instrument, Observation.Id, SequenceType), (Atom.Id, Option[String], Step.Id, ProtoStep[GmosSouth])] =
+      Statements.selectSequence(
+        "t_gmos_south_dynamic",
+        GmosSequenceService.Statements.GmosDynamicColumns,
+        gmos_south_dynamic
+      )

@@ -391,7 +391,7 @@ object Generator {
 
         val itc = requireSpectroscopyItc(ctx.oid, ctx.itcRes)
         val gen = LongSlit.instantiate(ctx.oid, calculator.flamingos2, ctx.namespace, exp.flamingos2, config, itc, ctx.params.acqResetTime)
-        val srs = services.flamingos2SequenceService.selectStepRecords(ctx.oid)
+        val srs = flamingos2SequenceService.selectStepRecords(ctx.oid)
 
         for
           g <- EitherT(gen)
@@ -407,7 +407,7 @@ object Generator {
 
         val itc = requireImagingItc("GMOS North Imaging", ctx.oid, ctx.itcRes, Itc.gmosNorthImaging.getOption)
         val gen = Imaging.gmosNorth(calculator.gmosNorth, ctx.namespace, config, itc)
-        val srs = services.gmosSequenceService.selectGmosNorthStepRecords(ctx.oid)
+        val srs = gmosSequenceService.selectGmosNorthStepRecords(ctx.oid)
 
         for
           g <- EitherT(gen)
@@ -423,7 +423,7 @@ object Generator {
 
         val itc = requireSpectroscopyItc(ctx.oid, ctx.itcRes)
         val gen = LongSlit.gmosNorth(ctx.oid, calculator.gmosNorth, ctx.namespace, exp.gmosNorth, config, itc, role, ctx.params.acqResetTime)
-        val srs = services.gmosSequenceService.selectGmosNorthStepRecords(ctx.oid)
+        val srs = gmosSequenceService.selectGmosNorthStepRecords(ctx.oid)
 
         for
           g <- EitherT(gen)
@@ -523,6 +523,34 @@ object Generator {
           case GeneratorParams(_, _, config: gmos.longslit.Config.GmosSouth, role, _, _) =>
             gmosSouthLongSlit(ctx, config, role, when).map((p, _) => p.science.map(AtomDigest.fromAtom))
         )
+
+     /*
+     private def streamFromDatabase[D](
+       oid: Observation.Id
+     )(
+       f: SequenceType => F[Option[Stream[F, Atom[D]]]]
+     )(using NoTransaction[F], Services.ServiceAccess): F[Option[InstrumentExecutionConfig]] =
+       services.transactionally:
+         for
+           a <- f(SequenceType.Acquisition)
+           s <- f(SequenceType.Science)
+
+       science.flatMap: s =>
+         sequenceService.stre
+
+
+     private def streamFromDatabase(
+       oid: Observation.Id,
+       ins: Instrument
+     )(using Services.ServiceAccess): F[Option[InstrumentExecutionConfig]] =
+       services.transactionally:
+         instrument match
+           case Instrument.Flamingos2 =>
+           case Instrument.GmosNorth  =>
+           case Instrument.GmosSouth  =>
+             sequenceService.streamGmosSouthSequence(oid, SequenceType.Science)
+                // F[Option[Stream[F, Atom[GmosSouth]]]]
+      */
 
       override def generate(
         pid:  Program.Id,
