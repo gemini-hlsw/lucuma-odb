@@ -10,7 +10,7 @@ import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.ScienceBand
 import lucuma.core.util.Timestamp
 import lucuma.odb.sequence.ObservingMode
-import lucuma.odb.sequence.ObservingMode.given
+import lucuma.odb.sequence.ObservingMode.Instances.given
 import lucuma.odb.sequence.syntax.all.*
 import lucuma.odb.sequence.util.HashBytes
 
