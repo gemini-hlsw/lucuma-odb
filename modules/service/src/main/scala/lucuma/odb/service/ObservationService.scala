@@ -117,6 +117,10 @@ sealed trait ObservationService[F[_]] {
     pid: Program.Id
   )(using Transaction[F]): F[Map[Observation.Id, Option[ScienceBand]]]
 
+  def selectInstrument(
+    oid: Observation.Id
+  )(using Transaction[F]): F[Option[Instrument]]
+
 }
 
 object ObservationService {
@@ -594,6 +598,11 @@ object ObservationService {
         session
           .execute(Statements.SelectBands)(pid)
           .map(_.toMap)
+
+      override def selectInstrument(
+        oid: Observation.Id
+      )(using Transaction[F]): F[Option[Instrument]] =
+        session.option(Statements.SelectInstrument)(oid)
 
     }
 
@@ -1202,6 +1211,13 @@ object ObservationService {
         FROM t_observation
         WHERE c_program_id = $program_id AND c_existence = 'present'
       """.query(observation_id *: science_band.opt)
+
+    val SelectInstrument: Query[Observation.Id, Instrument] =
+      sql"""
+        SELECT c_instrument
+          FROM t_observation
+         WHERE c_observation_id = $observation_id
+      """.query(instrument)
 
   }
 
