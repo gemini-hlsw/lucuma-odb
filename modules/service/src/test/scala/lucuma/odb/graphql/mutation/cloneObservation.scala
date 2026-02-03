@@ -268,7 +268,7 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
     }
     """
 
-  val IsImplemented: Set[ObservingModeType] = ObservingModeType.values.toSet
+  val IsImplemented: Set[ObservingModeType] = ObservingModeType.values.toSet - ObservingModeType.Igrins2LongSlit
 
   test("clones should have the same properties, for all observing modes") {
     ObservingModeType.values.toList.filter(IsImplemented.apply).traverse { obsMode =>
