@@ -16,6 +16,7 @@ import fs2.aws.s3.models.Models.FileKey
 import fs2.io.net.Network
 import lucuma.catalog.clients.GaiaClient
 import lucuma.catalog.clients.SimbadClient
+import lucuma.catalog.simbad.SEDDataLoader
 import lucuma.catalog.telluric.TelluricTargetsClient
 import lucuma.core.data.EmailAddress
 import lucuma.core.model.Program
@@ -90,8 +91,11 @@ case class Config(
   // Telluric client resource
   def telluricClient[F[_]: Async: Network: Logger]: Resource[F, TelluricTargetsClient[F]] =
     httpClientResource[F].evalMap: httpClient =>
-      val simbadClient = SimbadClient.build(httpClient)
-      TelluricTargetsClient.build(telluric.root, httpClient, simbadClient)
+      for {
+        sedMatcher   <- SEDDataLoader.loadMatcher[F]
+        simbadClient  = SimbadClient.build(httpClient, sedMatcher)
+        result       <- TelluricTargetsClient.build(telluric.root, httpClient, simbadClient)
+      } yield result
 
   // SSO Client resource (has to be a resource because it owns an HTTP client).
   def ssoClient[F[_]: Async: Trace: Network: Logger]: Resource[F, SsoClient[F, User]] =
