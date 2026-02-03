@@ -200,7 +200,8 @@ class observation_configurationRequests
           case ObservingModeType.Igrins2LongSlit    => IO.raiseError(new RuntimeException("Igrins2 not yet supported"))
     yield oid
 
-  Enumerated[ObservingModeType].all.foreach { mode =>
+  // FIXME: Enable for ig2
+  Enumerated[ObservingModeType].all.filterNot(_ == ObservingModeType.Igrins2LongSlit).foreach { mode =>
     List(false, true).foreach { too =>
 
       val prefix = s"[$mode, ${if too then "opportunity" else "sidereal"}]"
@@ -289,9 +290,3 @@ class observation_configurationRequests
   }
 
 }
-
-
-
-
-
-
