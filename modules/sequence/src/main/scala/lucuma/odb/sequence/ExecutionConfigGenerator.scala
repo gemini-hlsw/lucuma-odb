@@ -6,15 +6,15 @@ package lucuma.odb.sequence
 import cats.Eq
 import cats.effect.Concurrent
 import cats.syntax.all.*
+import fs2.Pure
 import fs2.Stream
 import lucuma.core.enums.ExecutionState
 import lucuma.core.model.ExecutionEvent.SequenceEvent
-import lucuma.core.model.sequence.Atom
 import lucuma.core.util.Timestamp
 import lucuma.odb.data.OneOf4
 import lucuma.odb.sequence.data.AtomRecord
-import lucuma.odb.sequence.data.ProtoExecutionConfig
 import lucuma.odb.sequence.data.StepRecord
+import lucuma.odb.sequence.data.StreamingExecutionConfig
 import lucuma.odb.sequence.data.VisitRecord
 import lucuma.odb.sequence.util.merge4ByTimestamp
 
@@ -28,6 +28,13 @@ case class ExecutionConfigGenerator[S, D](
   acquisition: SequenceGenerator[D],
   science:     SequenceGenerator[D]
 ):
+
+  def streamingExecutionConfig[F[_]]: StreamingExecutionConfig[F, S, D] =
+    StreamingExecutionConfig(
+      static,
+      acquisition.generate(Timestamp.Min).covary[F],
+      science.generate(Timestamp.Min).covary[F]
+    )
 
   /**
    * Given the observation's stream of past visits and steps, produces the
@@ -44,7 +51,7 @@ case class ExecutionConfigGenerator[S, D](
     steps:  Stream[F, StepRecord[D]],
     atoms:  Stream[F, AtomRecord],
     when:   Timestamp
-  )(using Eq[D]): F[(ProtoExecutionConfig[S, Atom[D]], ExecutionState)] =
+  )(using Eq[D]): F[(StreamingExecutionConfig[Pure, S, D], ExecutionState)] =
     merge4ByTimestamp(visits, events, steps, atoms)(_.created, _.received, _.created, _.created)
       .fold((acquisition, science, ExecutionState.NotStarted)):
         case ((a, s, _), OneOf4.First(visit))  => (a.recordVisit(visit), s.recordVisit(visit), ExecutionState.Ongoing)
@@ -54,4 +61,4 @@ case class ExecutionConfigGenerator[S, D](
       .compile
       .onlyOrError
       .map: (a, s, e) =>
-        (ProtoExecutionConfig(static, a.generate(when), s.generate(when)), e)
+        (StreamingExecutionConfig(static, a.generate(when), s.generate(when)), e)

@@ -44,8 +44,8 @@ import lucuma.odb.data.Md5Hash
 import lucuma.odb.data.OdbError
 import lucuma.odb.sequence.ExecutionConfigGenerator
 import lucuma.odb.sequence.data.GeneratorParams
-import lucuma.odb.sequence.data.ProtoExecutionConfig
 import lucuma.odb.sequence.data.StepRecord
+import lucuma.odb.sequence.data.StreamingExecutionConfig
 import lucuma.odb.sequence.flamingos2
 import lucuma.odb.sequence.gmos
 import lucuma.odb.sequence.gmos.longslit.LongSlit
@@ -340,19 +340,19 @@ object Generator {
       )(using NoTransaction[F], Services.ServiceAccess): EitherT[F, OdbError, ExecutionDigest] =
         calcDigestFromContext(ctx, when).flatTap(ctx.cache)
 
-      type ProtoFlamingos2 = ProtoExecutionConfig[Flamingos2StaticConfig,  Atom[Flamingos2DynamicConfig]]
-      type ProtoGmosNorth  = ProtoExecutionConfig[GmosNorthStatic, Atom[GmosNorthDynamic]]
-      type ProtoGmosSouth  = ProtoExecutionConfig[GmosSouthStatic, Atom[GmosSouthDynamic]]
+      type ProtoFlamingos2 = StreamingExecutionConfig[Pure, Flamingos2StaticConfig,  Flamingos2DynamicConfig]
+      type ProtoGmosNorth  = StreamingExecutionConfig[Pure, GmosNorthStatic,         GmosNorthDynamic]
+      type ProtoGmosSouth  = StreamingExecutionConfig[Pure, GmosSouthStatic,         GmosSouthDynamic]
 
       private def protoExecutionConfig[S, D](
         ctx:   Context,
         gen:   ExecutionConfigGenerator[S, D],
         steps: Stream[F, StepRecord[D]],
         when:  Option[Timestamp]
-      )(using Eq[D], Services.ServiceAccess): EitherT[F, OdbError, (ProtoExecutionConfig[S, Atom[D]], ExecutionState)] =
+      )(using Eq[D], Services.ServiceAccess): EitherT[F, OdbError, (StreamingExecutionConfig[Pure, S, D], ExecutionState)] =
         if ctx.params.declaredComplete then
           EitherT.pure:
-            (ProtoExecutionConfig(gen.static, Stream.empty, Stream.empty), ExecutionState.DeclaredComplete)
+            (StreamingExecutionConfig(gen.static, Stream.empty, Stream.empty), ExecutionState.DeclaredComplete)
         else
           val visits = services.visitService.selectAll(ctx.oid)
           val events = services.executionEventService.selectSequenceEvents(ctx.oid)
@@ -524,44 +524,20 @@ object Generator {
             gmosSouthLongSlit(ctx, config, role, when).map((p, _) => p.science.map(AtomDigest.fromAtom))
         )
 
-     /*
-     private def streamFromDatabase[D](
-       oid: Observation.Id
-     )(
-       f: SequenceType => F[Option[Stream[F, Atom[D]]]]
-     )(using NoTransaction[F], Services.ServiceAccess): F[Option[InstrumentExecutionConfig]] =
-       services.transactionally:
-         for
-           a <- f(SequenceType.Acquisition)
-           s <- f(SequenceType.Science)
-
-       science.flatMap: s =>
-         sequenceService.stre
-
-
-     private def streamFromDatabase(
-       oid: Observation.Id,
-       ins: Instrument
-     )(using Services.ServiceAccess): F[Option[InstrumentExecutionConfig]] =
-       services.transactionally:
-         instrument match
-           case Instrument.Flamingos2 =>
-           case Instrument.GmosNorth  =>
-           case Instrument.GmosSouth  =>
-             sequenceService.streamGmosSouthSequence(oid, SequenceType.Science)
-                // F[Option[Stream[F, Atom[GmosSouth]]]]
-      */
-
       override def generate(
         pid:  Program.Id,
         oid:  Observation.Id,
         lim:  FutureLimit = FutureLimit.Default,
         when: Option[Timestamp] = None
       )(using NoTransaction[F], Services.ServiceAccess): F[Either[OdbError, InstrumentExecutionConfig]] =
-        (for {
-          c <- Context.lookup(pid, oid)
-          x <- calcExecutionConfigFromContext(c, lim, when)
-        } yield x).value
+        cats.data.OptionT(
+          services.transactionally:
+            sequenceService.selectInstrumentExecutionConfig(oid)
+        ).map(_.asRight[OdbError]).getOrElseF:
+          (for {
+            c <- Context.lookup(pid, oid)
+            x <- calcExecutionConfigFromContext(c, lim, when)
+          } yield x).value
 
       private def calcExecutionConfigFromContext(
         ctx:      Context,
@@ -591,7 +567,7 @@ object Generator {
 
       private def executionDigest[S, D](
         oid:       Observation.Id,
-        proto:     ProtoExecutionConfig[S, Atom[D]],
+        proto:     StreamingExecutionConfig[Pure, S, D],
         execState: ExecutionState,
         setupTime: SetupTime
       ): Either[OdbError, ExecutionDigest] =
@@ -618,7 +594,7 @@ object Generator {
         end if
 
       private def executionConfig[S, D](
-        proto:       ProtoExecutionConfig[S, Atom[D]],
+        proto:       StreamingExecutionConfig[Pure, S, D],
         futureLimit: FutureLimit
       ): ExecutionConfig[S, D] =
         def executionSequence(s: Stream[Pure, Atom[D]]): Option[ExecutionSequence[D]] =

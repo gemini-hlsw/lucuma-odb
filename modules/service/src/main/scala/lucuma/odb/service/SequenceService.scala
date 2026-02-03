@@ -35,6 +35,7 @@ import lucuma.core.model.sequence.AtomDigest
 import lucuma.core.model.sequence.CategorizedTime
 import lucuma.core.model.sequence.ExecutionConfig
 import lucuma.core.model.sequence.ExecutionSequence
+import lucuma.core.model.sequence.InstrumentExecutionConfig
 import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.StepEstimate
@@ -58,6 +59,7 @@ import lucuma.odb.sequence.TimeEstimateCalculator
 import lucuma.odb.sequence.data.AtomRecord
 import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.sequence.data.StepRecord
+import lucuma.odb.sequence.data.StreamingExecutionConfig
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.Flamingos2Codecs.*
 import lucuma.odb.util.GmosCodecs.*
@@ -164,6 +166,20 @@ trait SequenceService[F[_]]:
     sequence:      Stream[F, Atom[GmosSouth]]
   )(using Transaction[F], Services.ServiceAccess): F[Unit]
 
+
+  def streamingFlamingos2ExecutionConfig(
+    observationId: Observation.Id
+  )(using Transaction[F], Services.ServiceAccess): F[Option[StreamingExecutionConfig[F, Flamingos2StaticConfig, Flamingos2DynamicConfig]]]
+
+  def streamingGmosNorthExecutionConfig(
+    observationId: Observation.Id
+  )(using Transaction[F], Services.ServiceAccess): F[Option[StreamingExecutionConfig[F, GmosNorthStatic, GmosNorth]]]
+
+  def streamingGmosSouthExecutionConfig(
+    observationId: Observation.Id
+  )(using Transaction[F], Services.ServiceAccess): F[Option[StreamingExecutionConfig[F, GmosSouthStatic, GmosSouth]]]
+
+
   def selectFlamingos2ExecutionConfig(
     observationId: Observation.Id
   )(using Transaction[F], Services.ServiceAccess): F[Option[ExecutionConfig[Flamingos2StaticConfig, Flamingos2DynamicConfig]]]
@@ -175,6 +191,10 @@ trait SequenceService[F[_]]:
   def selectGmosSouthExecutionConfig(
     observationId: Observation.Id
   )(using Transaction[F], Services.ServiceAccess): F[Option[ExecutionConfig[GmosSouthStatic, GmosSouth]]]
+
+  def selectInstrumentExecutionConfig(
+    observationId: Observation.Id
+  )(using Transaction[F], Services.ServiceAccess): F[Option[InstrumentExecutionConfig]]
 
 object SequenceService:
 
@@ -590,64 +610,104 @@ object SequenceService:
             NonEmptyList.fromListUnsafe(chunk.map(_._3).toList)
           )
 
-      private def selectExecutionConfig[S, D](
+      private def streamingExecutionConfig[S, D](
         instrument:    Instrument,
         observationId: Observation.Id,
         query:         Query[(Instrument, Observation.Id, SequenceType), (Atom.Id, Option[String], Step.Id, ProtoStep[D])],
         estimator:     TimeEstimateCalculator[S, D],
         lookupStatic:  Observation.Id => F[Option[S]]
-      )(using Services.ServiceAccess): F[Option[ExecutionConfig[S, D]]] =
+      )(using Services.ServiceAccess): OptionT[F, StreamingExecutionConfig[F, S, D]] =
 
         def stream(sequenceType: SequenceType, static: S): Stream[F, Atom[D]] =
           session
             .stream(query)((instrument, observationId, sequenceType), 256)
             .through(atomPipe(static, estimator))
 
-        lookupStatic(observationId).flatMap:
-          _.traverse: static =>
-            val acq = stream(SequenceType.Acquisition, static)
-            val sci = stream(SequenceType.Science,     static)
-            for
-              a <- acq.compile.toList
-              s <- sci.compile.toList
-            yield ExecutionConfig(
+        OptionT(lookupStatic(observationId))
+          .map: static =>
+            StreamingExecutionConfig(
               static,
-              a.headOption.map(nextAtom => ExecutionSequence(nextAtom, a.tail, false)),
-              s.headOption.map(nextAtom => ExecutionSequence(nextAtom, s.tail, false))
+              stream(SequenceType.Acquisition, static),
+              stream(SequenceType.Science,     static)
             )
 
-      override def selectFlamingos2ExecutionConfig(
+      override def streamingFlamingos2ExecutionConfig(
         observationId: Observation.Id
-      )(using Transaction[F], Services.ServiceAccess): F[Option[ExecutionConfig[Flamingos2StaticConfig, Flamingos2DynamicConfig]]] =
-        selectExecutionConfig(
+      )(using Transaction[F], Services.ServiceAccess): F[Option[StreamingExecutionConfig[F, Flamingos2StaticConfig, Flamingos2DynamicConfig]]] =
+        streamingExecutionConfig(
           Instrument.Flamingos2,
           observationId,
           Statements.SelectFlamingos2Sequence,
           estimator.flamingos2,
           flamingos2SequenceService.selectLatestVisitStatic
-        )
+        ).value
 
-      override def selectGmosNorthExecutionConfig(
+      override def streamingGmosNorthExecutionConfig(
         observationId: Observation.Id
-      )(using Transaction[F], Services.ServiceAccess): F[Option[ExecutionConfig[GmosNorthStatic, GmosNorth]]] =
-        selectExecutionConfig(
+      )(using Transaction[F], Services.ServiceAccess): F[Option[StreamingExecutionConfig[F, GmosNorthStatic, GmosNorth]]] =
+        streamingExecutionConfig(
           Instrument.GmosNorth,
           observationId,
           Statements.SelectGmosNorthSequence,
           estimator.gmosNorth,
           gmosSequenceService.selectLatestVisitGmosNorthStatic
-        )
+        ).value
 
-      override def selectGmosSouthExecutionConfig(
+      override def streamingGmosSouthExecutionConfig(
         observationId: Observation.Id
-      )(using Transaction[F], Services.ServiceAccess): F[Option[ExecutionConfig[GmosSouthStatic, GmosSouth]]] =
-        selectExecutionConfig(
+      )(using Transaction[F], Services.ServiceAccess): F[Option[StreamingExecutionConfig[F, GmosSouthStatic, GmosSouth]]] =
+        streamingExecutionConfig(
           Instrument.GmosSouth,
           observationId,
           Statements.SelectGmosSouthSequence,
           estimator.gmosSouth,
           gmosSequenceService.selectLatestVisitGmosSouthStatic
-        )
+        ).value
+
+      private def toExecutionConfig[S, D](
+        sec: F[Option[StreamingExecutionConfig[F, S, D]]]
+      ): F[Option[ExecutionConfig[S, D]]] =
+        OptionT(sec)
+          .semiflatMap: sec =>
+            for
+              a <- sec.acquisition.compile.toList
+              s <- sec.science.compile.toList
+            yield ExecutionConfig(
+              sec.static,
+              a.headOption.map(nextAtom => ExecutionSequence(nextAtom, a.tail, false)),
+              s.headOption.map(nextAtom => ExecutionSequence(nextAtom, s.tail, false))
+            )
+          .value
+
+      override def selectFlamingos2ExecutionConfig(
+        observationId: Observation.Id
+      )(using Transaction[F], Services.ServiceAccess): F[Option[ExecutionConfig[Flamingos2StaticConfig, Flamingos2DynamicConfig]]] =
+        toExecutionConfig(streamingFlamingos2ExecutionConfig(observationId))
+
+      override def selectGmosNorthExecutionConfig(
+        observationId: Observation.Id
+      )(using Transaction[F], Services.ServiceAccess): F[Option[ExecutionConfig[GmosNorthStatic, GmosNorth]]] =
+        toExecutionConfig(streamingGmosNorthExecutionConfig(observationId))
+
+      override def selectGmosSouthExecutionConfig(
+        observationId: Observation.Id
+      )(using Transaction[F], Services.ServiceAccess): F[Option[ExecutionConfig[GmosSouthStatic, GmosSouth]]] =
+        toExecutionConfig(streamingGmosSouthExecutionConfig(observationId))
+
+      override def selectInstrumentExecutionConfig(
+        observationId: Observation.Id
+      )(using Transaction[F], Services.ServiceAccess): F[Option[InstrumentExecutionConfig]] =
+        OptionT(observationService.selectInstrument(observationId))
+          .flatMap:
+            case Instrument.Flamingos2 =>
+              OptionT(selectFlamingos2ExecutionConfig(observationId)).map(InstrumentExecutionConfig.Flamingos2.apply)
+            case Instrument.GmosNorth  =>
+              OptionT(selectGmosNorthExecutionConfig(observationId)).map(InstrumentExecutionConfig.GmosNorth.apply)
+            case Instrument.GmosSouth  =>
+              OptionT(selectGmosSouthExecutionConfig(observationId)).map(InstrumentExecutionConfig.GmosSouth.apply)
+            case _                     =>
+              OptionT.none
+          .value
 
   object Statements:
 
