@@ -10,6 +10,7 @@ import cats.syntax.functor.*
 import cats.syntax.functorFilter.*
 import cats.syntax.option.*
 import cats.syntax.traverse.*
+import cats.syntax.applicative.*
 import grackle.Result
 import grackle.syntax.*
 import lucuma.core.enums.ObservingModeType
@@ -102,6 +103,9 @@ object ObservingModeServices:
               .selectSouth(oids)
               .map(_.widen[ObservingMode])
 
+          case (Igrins2LongSlit, oids) =>
+            Map.empty.pure[F]
+
         }.map(_.fold(Map.empty[Observation.Id, ObservingMode])(_ ++ _))
 
       override def create(
@@ -135,6 +139,8 @@ object ObservingModeServices:
             case ObservingModeType.GmosNorthLongSlit  => gmosLongSlitService.deleteNorth(which)
             case ObservingModeType.GmosSouthImaging   => gmosImagingService.deleteSouth(which)
             case ObservingModeType.GmosSouthLongSlit  => gmosLongSlitService.deleteSouth(which)
+            // FIXME
+            case ObservingModeType.Igrins2LongSlit    => ().pure[F]
 
         deleteExposureTimeModes *> deleteObservingMode
 
@@ -173,6 +179,8 @@ object ObservingModeServices:
             case ObservingModeType.GmosNorthImaging   => gmosImagingService.cloneNorth(origOid, newOid, etms)
             case ObservingModeType.GmosSouthLongSlit  => gmosLongSlitService.cloneSouth(origOid, newOid)
             case ObservingModeType.GmosSouthImaging   => gmosImagingService.cloneSouth(origOid, newOid, etms)
+            // FIXME
+            case ObservingModeType.Igrins2LongSlit    => ().pure[F]
 
         exposureTimeModeService
           .clone(origOid, newOid)

@@ -827,6 +827,9 @@ trait DatabaseOperations { this: OdbSuite =>
               focalPlaneAngle: { microarcseconds: 0 }
             }
           }"""
+      case ObservingModeType.Igrins2LongSlit =>
+        // FIXME
+        "{}"
 
   private def observingModeObject(observingMode: ObservingModeType): String =
     observingMode match
@@ -882,6 +885,9 @@ trait DatabaseOperations { this: OdbSuite =>
             centralWavelength: { nanometers: 500 }
           }
         }"""
+      case ObservingModeType.Igrins2LongSlit =>
+        // FIXME
+        "{}"
 
   private def observingModeWithSpatialOffsets(observingMode: ObservingModeType, offsets: Option[String]): String =
     observingMode match
