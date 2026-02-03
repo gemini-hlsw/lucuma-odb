@@ -6789,6 +6789,11 @@ enum ObservingModeType {
   ObservingModeType GmosSouthImaging
   """
   GMOS_SOUTH_IMAGING
+
+  """
+  ObservingModeType Igrins2LongSlit
+  """
+  IGRINS_2_LONG_SLIT
 }
 
 type ConstraintSet {
