@@ -1,6 +1,7 @@
 
 """
 This file is generated. Do not manually modify it.
+
 It is generated from the following source files:
   - ObservationDB.graphql
   - itc_base.graphql
@@ -282,7 +283,10 @@ type BandedTime {
 """A BandedTime that is automatically updated by a background process."""
 type CalculatedBandedTime {
   """The current state of the background calculation."""
-  state: CalculationState!
+  calculationState: CalculationState!
+
+  """The current state of the background calculation."""
+  state: CalculationState! @deprecated(reason: "Use `calculationState` instead.")
   value: BandedTime
 }
 
@@ -505,7 +509,10 @@ A CategorizedTimeRange that is automatically updated by a background process.
 """
 type CalculatedCategorizedTimeRange {
   """The current state of the background calculation."""
-  state: CalculationState!
+  calculationState: CalculationState!
+
+  """The current state of the background calculation."""
+  state: CalculationState! @deprecated(reason: "Use `calculationState` instead.")
   value: CategorizedTimeRange
 }
 
@@ -1647,15 +1654,15 @@ will be defined.  All others will be `null`.  The `generatorType` corresponds to
 the entry (if any) that is defined.  If the generator type of `NONE`, then none
 of the entries will be defined.
 """
-type OffsetGenerator {
-  generatorType: OffsetGeneratorType!
-  enumerated: EnumeratedOffsetGenerator
-  random: RandomOffsetGenerator
-  spiral: SpiralOffsetGenerator
-  uniform: UniformOffsetGenerator
+type TelescopeConfigGenerator {
+  generatorType: TelescopeConfigGeneratorType!
+  enumerated: EnumeratedTelescopeConfigGenerator
+  random: RandomTelescopeConfigGenerator
+  spiral: SpiralTelescopeConfigGenerator
+  uniform: UniformTelescopeConfigGenerator
 }
 
-enum OffsetGeneratorType {
+enum TelescopeConfigGeneratorType {
   NONE
   ENUMERATED
   RANDOM
@@ -1666,25 +1673,27 @@ enum OffsetGeneratorType {
 """
 In the `ENUMERATED` option offsets are explicitly specified instead of calculated.
 """
-type EnumeratedOffsetGenerator {
+type EnumeratedTelescopeConfigGenerator {
   values: [TelescopeConfig!]!
 }
 
-type RandomOffsetGenerator {
+type RandomTelescopeConfigGenerator {
   size: Angle!
   center: Offset!
+  seed: Long!
 }
 
-type SpiralOffsetGenerator {
+type SpiralTelescopeConfigGenerator {
   size: Angle!
   center: Offset!
+  seed: Long!
 }
 
 """
 Defines a region of the sky using two corners.  Exposures are
 then distributed across this region as evenly as possible.
 """
-type UniformOffsetGenerator {
+type UniformTelescopeConfigGenerator {
   cornerA: Offset!
   cornerB: Offset!
 }
@@ -2239,10 +2248,16 @@ type ObscalcUpdate {
   editType: EditType!
 
   """Old calculation state, if any."""
-  oldState: CalculationState
+  oldCalculationState: CalculationState
+
+  """Old calculation state, if any."""
+  oldState: CalculationState @deprecated(reason: "Use `oldCalculationState` instead.")
 
   """New calculation state, if any."""
-  newState: CalculationState
+  newCalculationState: CalculationState
+
+  """New calculation state, if any."""
+  newState: CalculationState @deprecated(reason: "Use `newCalculationState` instead.")
 
   """Id of the observation that was updated."""
   observationId: ObservationId!
@@ -2351,7 +2366,7 @@ enum TimeAccountingCategory {
 }
 
 """Un-normalized SED input parameters.  Define one value only."""
-input UnnormalizedSedInput {
+input UnnormalizedSedInput @oneOf {
   stellarLibrary: StellarLibrarySpectrum
   coolStar: CoolStarTemperature
   galaxy: GalaxySpectrum
@@ -2830,6 +2845,9 @@ enum CatalogName {
 
   """CatalogName Gaia"""
   GAIA
+
+  """CatalogName Telluric"""
+  TELLURIC
 }
 
 """Who is charged for time, if anyone."""
@@ -2881,6 +2899,9 @@ enum ObservingModeType {
 
   """ObservingModeType GmosSouthImaging"""
   GMOS_SOUTH_IMAGING
+
+  """ObservingModeType Igrins2LongSlit"""
+  IGRINS_2_LONG_SLIT
 }
 
 type ConstraintSet {
@@ -3466,7 +3487,10 @@ type ExecutionDigest {
 """Wraps an ExecutionDigest with the background calculation state."""
 type CalculatedExecutionDigest {
   """Background calculation state."""
-  state: CalculationState!
+  calculationState: CalculationState!
+
+  """Background calculation state."""
+  state: CalculationState! @deprecated(reason: "Use `calculationState` instead.")
 
   """The current execution digest itself."""
   value: ExecutionDigest
@@ -4425,6 +4449,104 @@ type GmosNorthLongSlit {
   initialCentralWavelength: Wavelength!
 }
 
+"""
+Wavength observation order, either decreasing or increasing by wavelength.
+"""
+enum WavelengthOrder {
+  DECREASING
+  INCREASING
+}
+
+"""
+The available GMOS imaging categories.  Each category will produce a distinct
+sequence.
+"""
+enum GmosImagingVariantType {
+  GROUPED
+  INTERLEAVED
+  PRE_IMAGING
+}
+
+"""
+The specific imaging sub-type, one of which will be defined and the remaining
+options null.
+"""
+type GmosImagingVariant {
+  variantType: GmosImagingVariantType!
+
+  """
+  Grouped mode collects all datasets for each filter before changing filters.
+  """
+  grouped: GmosGroupedImagingVariant
+
+  """Interleaved mode cycles through all filters repeatedly."""
+  interleaved: GmosInterleavedImagingVariant
+
+  """PreImaging mode is used for MOS mask creation."""
+  preImaging: GmosPreImagingVariant
+}
+
+"""
+When doing "grouped" filter imaging, datasets associated with a particular
+filter are collected consecutively before moving on to other filters (if any).
+Sky datasets may be collected before and after each group of object datasets.
+"""
+type GmosGroupedImagingVariant {
+  """
+  Whether the filters should appear in the sequence in increasing or decreasing
+  order by their wavelength.
+  """
+  order: WavelengthOrder!
+
+  """
+  Offset generator for the science object datasets. The same offset sequence is
+  created for each filter using the specified generator.
+  """
+  offsets: TelescopeConfigGenerator!
+
+  """
+  Number of sky positions to collect before and after object datasets. For
+  example, if set to 2 there will be two sky positions before a group of object
+  exposures and two more after using the same filter as the object datasets.
+  """
+  skyCount: NonNegInt!
+
+  """Offset generator to use for the sky datasets."""
+  skyOffsets: TelescopeConfigGenerator!
+}
+
+"""
+When doing "interleaved" filter imaging, the sequence repeatedly alternates
+through the set of filters in use.
+"""
+type GmosInterleavedImagingVariant {
+  """
+  Offset generator for the science object datasets. The offset pattern is
+  applied to the sequence of science datasets as a whole.
+  """
+  offsets: TelescopeConfigGenerator!
+
+  """
+  Number of sky positions to collect, per filter, before and after a series of
+  object datasets.  For example, if set to 2 and 2 filters are in use, there
+  would be 4 sky positions before (2 per filter) and 4 after (2 per filter).
+  """
+  skyCount: NonNegInt!
+
+  """Offset generator to use for the sky datasets."""
+  skyOffsets: TelescopeConfigGenerator!
+}
+
+"""
+A special imaging case, MOS pre-imaging is defined by an offset region.
+"""
+type GmosPreImagingVariant {
+  offset1: Offset!
+  offset2: Offset!
+  offset3: Offset!
+  offset4: Offset!
+}
+
 """Imaging filters combine an actual filter with an exposure time mode."""
 type GmosNorthImagingFilter {
   filter: GmosNorthFilter!
@@ -4433,37 +4555,19 @@ type GmosNorthImagingFilter {
 
 """GMOS North Imaging mode"""
 type GmosNorthImaging {
-  """GMOS North Filters for imaging mode (multiple filters allowed)"""
+  """Details specific to the type of imaging being performed."""
+  variant: GmosImagingVariant!
+
+  """
+  The filters (at least one is required) to be used for data collection. How
+  they are used depends on the imaging variant configuration.
+  """
   filters: [GmosNorthImagingFilter!]!
 
   """
-  Initial GMOS North Filters that were used when creating the imaging mode
+  Initial GMOS North Filters that were used when creating the imaging mode.
   """
   initialFilters: [GmosNorthImagingFilter!]!
-
-  """Spatial offsets"""
-  offsets: [Offset!]!
-
-  """Temporary, WIP -- will be moved."""
-  objectOffsetGenerator: OffsetGenerator
-
-  """Temporary, WIP -- will be moved."""
-  skyOffsetGenerator: OffsetGenerator
-
-  """
-  MultipleFiltersMode, either explicitly specified in explicitMultipleFiltersMode or else taken
-  from the defaultMultipleFiltersMode.
-  """
-  multipleFiltersMode: MultipleFiltersMode!
-
-  """Default MultipleFiltersMode (GROUPED)."""
-  defaultMultipleFiltersMode: MultipleFiltersMode!
-
-  """
-  Optional explictly specified MultipleFiltersMode. If set it overrides the
-  default.
-  """
-  explicitMultipleFiltersMode: MultipleFiltersMode
 
   """
   GMOS Binning, either explicitly specified in explicitBin or else taken
@@ -4926,37 +5030,19 @@ type GmosSouthLongSlit {
 
 """GMOS South Imaging mode"""
 type GmosSouthImaging {
-  """GMOS South Filters for imaging mode (multiple filters allowed)"""
+  """Details specific to the type of imaging being performed."""
+  variant: GmosImagingVariant!
+
+  """
+  The filters (at least one is required) to be used for data collection. How
+  they are used depends on the imaging variant configuration.
+  """
   filters: [GmosSouthImagingFilter!]!
 
   """
-  Initial GMOS South Filters that were used when creating the imaging mode
+  Initial GMOS North Filters that were used when creating the imaging mode.
   """
   initialFilters: [GmosSouthImagingFilter!]!
-
-  """Spatial offsets"""
-  offsets: [Offset!]!
-
-  """Temporary, WIP -- will be moved."""
-  objectOffsetGenerator: OffsetGenerator
-
-  """Temporary, WIP -- will be moved."""
-  skyOffsetGenerator: OffsetGenerator
-
-  """
-  MultipleFiltersMode, either explicitly specified in explicitMultipleFiltersMode or else taken
-  from the defaultMultipleFiltersMode.
-  """
-  multipleFiltersMode: MultipleFiltersMode!
-
-  """Default MultipleFiltersMode (GROUPED)."""
-  defaultMultipleFiltersMode: MultipleFiltersMode!
-
-  """
-  Optional explictly specified MultipleFiltersMode. If set it overrides the
-  default.
-  """
-  explicitMultipleFiltersMode: MultipleFiltersMode
 
   """
   GMOS Binning, either explicitly specified in explicitBin or else taken
@@ -5412,19 +5498,86 @@ type ImagingConfigOptionGmosSouth {
 """An 'Int` in the range 0 to 100"""
 scalar IntPercent
 
+"""An ITC result for a single target."""
+type ItcResult {
+  targetId: TargetId!
+  exposureTime: TimeSpan!
+  exposureCount: NonNegInt!
+  signalToNoiseAt: SignalToNoiseAt
+}
+
+"""A discriminator for the types of ITC results."""
+enum ItcType {
+  SPECTROSCOPY
+  GMOS_NORTH_IMAGING
+  GMOS_SOUTH_IMAGING
+}
+
 """
-Contains the result of calling the ITC for a particular observation.  Since
-the observation may contain multiple targets, there may be multiple results.
-The "result" field contains the selected, representative, result for all
-targets.  If there are multiple successful results, this will be the one that
-prescribes the longest observation. If there is a mix of failures and
-successes, the overall "result" will be a failure. The "all" field contains
-results for all targets regardless.
+Contains the result of calling the ITC for all targets, but a single instrument
+configuration.  Since the observation may contain multiple targets, there may
+be multiple results. The "result" field contains the selected, representative,
+result for all targets.  If there are multiple successful results, this will
+be the one that prescribes the longest observation. If there is a mix of
+failures and successes, the overall "result" will be a failure. The "all" field
+contains results for all targets regardless.
 """
 type ItcResultSet {
   selected: ItcResult!
   all: [ItcResult!]
   index: NonNegInt!
+}
+
+"""
+Combines a GMOS North filter with an `ItcResultSet`. In other words, ITC
+results for all targets but a single filter.
+"""
+type ItcGmosNorthImagingResultSet {
+  filter: GmosNorthFilter!
+  results: ItcResultSet!
+}
+
+"""
+Combines a GMOS South filter with an `ItcResultSet`. In other words, ITC
+results for all targets but a single filter.
+"""
+type ItcGmosSouthImagingResultSet {
+  filter: GmosSouthFilter!
+  results: ItcResultSet!
+}
+
+"""
+ITC results for a particular observation, including relevant instrument
+configurations and targets.  There are specific instances for each `ItcType`.
+"""
+interface Itc {
+  """The type of the Itc results."""
+  itcType: ItcType!
+}
+
+"""
+GMOS North imaging ITC results.  Here each filter is paired with its result
+set.
+"""
+type ItcGmosNorthImaging implements Itc {
+  itcType: ItcType!
+  gmosNorthImagingScience: [ItcGmosNorthImagingResultSet!]!
+}
+
+"""
+GMOS South imaging ITC results.  Here each filter is paired with its result
+set.
+"""
+type ItcGmosSouthImaging implements Itc {
+  itcType: ItcType!
+  gmosSouthImagingScience: [ItcGmosSouthImagingResultSet!]!
+}
+
+"""ITC results for spectroscopy observations."""
+type ItcSpectroscopy implements Itc {
+  itcType: ItcType!
+  acquisition: ItcResultSet!
+  spectroscopyScience: ItcResultSet!
 }
 
 """Calculated signal to noise at a specific wavelength"""
@@ -5437,14 +5590,6 @@ type SignalToNoiseAt {
 
   """Wavelength sn was calculated at"""
   wavelength: Wavelength!
-}
-
-"""A single ITC call result."""
-type ItcResult {
-  targetId: TargetId!
-  exposureTime: TimeSpan!
-  exposureCount: NonNegInt!
-  signalToNoiseAt: SignalToNoiseAt
 }
 
 type LineFluxIntegrated {
@@ -5746,14 +5891,6 @@ type ConfigurationRequest {
   applicableObservations: [ObservationId!]!
 }
 
-type Itc {
-  """The ITC result for the science part of the sequence"""
-  science: ItcResultSet!
-
-  """The ITC result for the acquisition part of the sequence"""
-  acquisition: ItcResultSet!
-}
-
 """ObservationId id formatted as `o-[1-9a-f][0-9a-f]*`"""
 scalar ObservationId
 
@@ -5777,15 +5914,6 @@ type ConfigurationRequestSelectResult {
 
   """`true` when there were additional matches that were not returned."""
   hasMore: Boolean!
-}
-
-"""How sequences are generated when multiple filters are specified."""
-enum MultipleFiltersMode {
-  """Grouped filters"""
-  GROUPED
-
-  """Interleaved filters"""
-  INTERLEAVED
 }
 
 """
@@ -6458,8 +6586,8 @@ type SequenceDigest {
   """Time estimate for the whole sequence."""
   timeEstimate: CategorizedTime!
 
-  """Unique offsets that occur in the sequence."""
-  offsets: [Offset!]!
+  """TelescopeConfig (offset + guiding) for each step."""
+  telescopeConfigs: [TelescopeConfig!]!
 
   """
   Total count of anticipated atoms, including the 'nextAtom', 'possibleFuture'
@@ -8216,7 +8344,10 @@ type ObservationWorkflow {
 
 type CalculatedObservationWorkflow {
   """The current state of the background calculation."""
-  state: CalculationState!
+  calculationState: CalculationState!
+
+  """The current state of the background calculation."""
+  state: CalculationState! @deprecated(reason: "Use `calculationState` instead.")
   value: ObservationWorkflow!
 }
 
