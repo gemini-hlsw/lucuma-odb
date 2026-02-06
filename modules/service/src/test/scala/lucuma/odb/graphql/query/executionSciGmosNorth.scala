@@ -19,7 +19,6 @@ import lucuma.core.enums.SequenceType
 import lucuma.core.enums.StepType
 import lucuma.core.math.Angle
 import lucuma.core.model.Observation
-import lucuma.core.model.Program
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.InstrumentExecutionConfig
 import lucuma.core.model.sequence.Step
@@ -191,7 +190,7 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos:
         _  <- addEndStepEvent(s0)
         s1 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthFlat(0), FlatStep, gcalTelescopeConfig(0), ObserveClass.NightCal)
         _  <- addEndStepEvent(s1)
-        ic <- generateAfterOrFail(p, o, Science.CalValidityPeriod +| 1.secondTimeSpan)
+        ic <- generateAfterOrFail(o)
       yield ic
 
     import lucuma.odb.testsyntax.execution.*
@@ -234,7 +233,7 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos:
         _  <- addEndStepEvent(s1)
         s2 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, sciTelescopeConfig(0), ObserveClass.Science)
         _  <- addEndStepEvent(s2)
-        ic <- generateAfterOrFail(p, o, Science.CalValidityPeriod +| 1.secondTimeSpan)
+        ic <- generateAfterOrFail(o)
       yield ic
 
     import lucuma.odb.testsyntax.execution.*
@@ -304,7 +303,7 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos:
         _  <- addEndStepEvent(s2)
         _  <- adjustStepTime(s2, timestamp)
 
-        ic <- generateOrFail(p, o, when = timestamp.plusMicrosOption(1))
+        ic <- generateOrFail(o)
       yield ic
 
     import lucuma.odb.testsyntax.execution.*
@@ -360,7 +359,7 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos:
         longDelay = Science.CalValidityPeriod -| ScienceFoldTime -| ScienceTime
         timestamp = nw.plusMicrosOption(longDelay.toMicroseconds)
 
-        ic <- generateOrFail(p, o, when = timestamp)
+        ic <- generateOrFail(o)
       yield ic
 
     import lucuma.odb.testsyntax.execution.*
@@ -405,7 +404,7 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos:
         longDelay = Science.CalValidityPeriod -| ScienceFoldTime -| ScienceTime -| ScienceTime
         timestamp = nw.plusMicrosOption(longDelay.toMicroseconds)
 
-        ic <- generateOrFail(p, o, when = timestamp)
+        ic <- generateOrFail(o)
       yield ic
 
     import lucuma.odb.testsyntax.execution.*
@@ -446,7 +445,7 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos:
         s2 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthScience(5), StepConfig.Science, sciTelescopeConfig(0), ObserveClass.Science)
         _  <- addEndStepEvent(s2)
 
-        ic <- generateOrFail(p, o)
+        ic <- generateOrFail(o)
       yield ic
 
     import lucuma.odb.testsyntax.execution.*
@@ -646,9 +645,9 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos:
           ).asRight
       )
 
-  def nextAtomId(p: Program.Id, o: Observation.Id): IO[Atom.Id] =
+  def nextAtomId(o: Observation.Id): IO[Atom.Id] =
     import lucuma.odb.testsyntax.execution.*
-    generateOrFail(p, o, 5.some).map(_.gmosNorthScience.nextAtom.id)
+    generateOrFail(o, 5.some).map(_.gmosNorthScience.nextAtom.id)
 
   test("nextAtom id doesn't change while executing"):
     val setup: IO[(List[Atom.Id], List[Atom.Id])] =
@@ -657,7 +656,7 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos:
         t <- createTargetWithProfileAs(pi, p)
         o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
 
-        x0 <- nextAtomId(p, o)
+        x0 <- nextAtomId(o)
 
         v  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
 
@@ -665,33 +664,33 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos:
         s0 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthArc(0), ArcStep, gcalTelescopeConfig(0), ObserveClass.NightCal)
         _  <- addEndStepEvent(s0)
 
-        x1 <- nextAtomId(p, o)
+        x1 <- nextAtomId(o)
 
         s1 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthFlat(0), FlatStep, gcalTelescopeConfig(0), ObserveClass.NightCal)
         _  <- addEndStepEvent(s1)
 
-        x2 <- nextAtomId(p, o)
+        x2 <- nextAtomId(o)
 
         s2 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, sciTelescopeConfig(0), ObserveClass.Science)
         _  <- addEndStepEvent(s2)
 
-        x3 <- nextAtomId(p, o)
+        x3 <- nextAtomId(o)
 
         s3 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, sciTelescopeConfig(15), ObserveClass.Science)
         _  <- addEndStepEvent(s3)
 
-        x4 <- nextAtomId(p, o)
+        x4 <- nextAtomId(o)
 
         s4 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, sciTelescopeConfig(-15), ObserveClass.Science)
         _  <- addEndStepEvent(s4)
 
-        x5 <- nextAtomId(p, o)
+        x5 <- nextAtomId(o)
 
         a1 <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
         s5 <- recordStepAs(serviceUser, a1, Instrument.GmosNorth, gmosNorthArc(5), ArcStep, gcalTelescopeConfig(0), ObserveClass.NightCal)
         _  <- addEndStepEvent(s5)
 
-        x6 <- nextAtomId(p, o)
+        x6 <- nextAtomId(o)
       yield (List(x0, x1, x2, x3, x4), List(x5, x6))
 
     setup.map: (firstAtomIds, secondAtomIds) =>
@@ -1181,9 +1180,9 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos:
           """.asRight
       )
 
-  def firstAcquisitionStepId(p: Program.Id, o: Observation.Id): IO[Step.Id] =
+  def firstAcquisitionStepId(o: Observation.Id): IO[Step.Id] =
     import lucuma.odb.testsyntax.execution.*
-    generateOrFail(p, o, 5.some).map(_.gmosNorthAcquisition.nextAtom.steps.head.id)
+    generateOrFail(o, 5.some).map(_.gmosNorthAcquisition.nextAtom.steps.head.id)
 
   test("acquisition step ids do not change while executing science"):
     val execSci: IO[Set[Step.Id]] =
@@ -1193,46 +1192,46 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos:
         o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
         v <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
 
-        x0 <- firstAcquisitionStepId(p, o)
+        x0 <- firstAcquisitionStepId(o)
 
         a0 <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
         s0 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthArc(0), ArcStep, gcalTelescopeConfig(0), ObserveClass.NightCal)
         _  <- addEndStepEvent(s0)
 
-        x1 <- firstAcquisitionStepId(p, o)
+        x1 <- firstAcquisitionStepId(o)
 
         s1 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthFlat(0), FlatStep, gcalTelescopeConfig(0), ObserveClass.NightCal)
         _  <- addEndStepEvent(s1)
 
-        x2 <- firstAcquisitionStepId(p, o)
+        x2 <- firstAcquisitionStepId(o)
 
         s2 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, sciTelescopeConfig(0), ObserveClass.Science)
         _  <- addEndStepEvent(s2)
 
-        x3 <- firstAcquisitionStepId(p, o)
+        x3 <- firstAcquisitionStepId(o)
 
         s3 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, sciTelescopeConfig(15), ObserveClass.Science)
         _  <- addEndStepEvent(s3)
 
-        x4 <- firstAcquisitionStepId(p, o)
+        x4 <- firstAcquisitionStepId(o)
 
         s4 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, sciTelescopeConfig(-15), ObserveClass.Science)
         _  <- addEndStepEvent(s4)
 
-        x5 <- firstAcquisitionStepId(p, o)
+        x5 <- firstAcquisitionStepId(o)
 
         a1 <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
         s5 <- recordStepAs(serviceUser, a1, Instrument.GmosNorth, gmosNorthArc(5), ArcStep, gcalTelescopeConfig(0), ObserveClass.NightCal)
         _  <- addEndStepEvent(s5)
 
-        x5 <- firstAcquisitionStepId(p, o)
+        x5 <- firstAcquisitionStepId(o)
       yield Set(x0, x1, x2, x3, x4, x5)
 
     assertIO(execSci.map(_.size), 1)
 
-  def nextAtomStepIds(p: Program.Id, o: Observation.Id): IO[NonEmptyList[Step.Id]] =
+  def nextAtomStepIds(o: Observation.Id): IO[NonEmptyList[Step.Id]] =
     import lucuma.odb.testsyntax.execution.*
-    generateOrFail(p, o, 5.some).map(_.gmosNorthScience.nextAtom.steps.map(_.id))
+    generateOrFail(o, 5.some).map(_.gmosNorthScience.nextAtom.steps.map(_.id))
 
   test("nextAtom step ids don't change while executing"):
     val setup: IO[(List[NonEmptyList[Step.Id]], List[NonEmptyList[Step.Id]])] =
@@ -1243,41 +1242,41 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos:
 
         v  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
 
-        x0 <- nextAtomStepIds(p, o)
+        x0 <- nextAtomStepIds(o)
 
         a0 <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
         s0 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthArc(0), ArcStep, gcalTelescopeConfig(0), ObserveClass.NightCal)
         _  <- addEndStepEvent(s0)
 
-        x1 <- nextAtomStepIds(p, o)
+        x1 <- nextAtomStepIds(o)
 
         s1 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthFlat(0), FlatStep, gcalTelescopeConfig(0), ObserveClass.NightCal)
         _  <- addEndStepEvent(s1)
 
-        x2 <- nextAtomStepIds(p, o)
+        x2 <- nextAtomStepIds(o)
 
         s2 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, sciTelescopeConfig(0), ObserveClass.Science)
         _  <- addEndStepEvent(s2)
 
-        x3 <- nextAtomStepIds(p, o)
+        x3 <- nextAtomStepIds(o)
 
         s3 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, sciTelescopeConfig(15), ObserveClass.Science)
         _  <- addEndStepEvent(s3)
 
-        x4 <- nextAtomStepIds(p, o)
+        x4 <- nextAtomStepIds(o)
 
         s4 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, sciTelescopeConfig(-15), ObserveClass.Science)
         _  <- addEndStepEvent(s4)
 
         // Next atom
 
-        x5 <- nextAtomStepIds(p, o)
+        x5 <- nextAtomStepIds(o)
 
         a1 <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
         s5 <- recordStepAs(serviceUser, a1, Instrument.GmosNorth, gmosNorthArc(5), ArcStep, gcalTelescopeConfig(0), ObserveClass.NightCal)
         _  <- addEndStepEvent(s5)
 
-        x6 <- nextAtomStepIds(p, o)
+        x6 <- nextAtomStepIds(o)
 
       yield (List(x0, x1, x2, x3, x4), List(x5, x6))
 

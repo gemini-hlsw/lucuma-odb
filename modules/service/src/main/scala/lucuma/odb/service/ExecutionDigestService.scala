@@ -26,7 +26,7 @@ import org.typelevel.log4cats.Logger
 import skunk.*
 import skunk.implicits.*
 
-sealed trait ExecutionDigestService[F[_]] {
+sealed trait ExecutionDigestService[F[_]]:
 
   def selectOne(
     observationId: Observation.Id,
@@ -42,18 +42,16 @@ sealed trait ExecutionDigestService[F[_]] {
   )(using Transaction[F]): F[Map[Observation.Id, (Md5Hash, ExecutionDigest)]]
 
   def insertOrUpdate(
-    programId:      Program.Id,
-    observationId:  Observation.Id,
-    hash:           Md5Hash,
-    digest:         ExecutionDigest
+    observationId: Observation.Id,
+    hash:          Md5Hash,
+    digest:        ExecutionDigest
   )(using Transaction[F]): F[Unit]
 
-}
 
-object ExecutionDigestService {
+object ExecutionDigestService:
 
   def instantiate[F[_]: Concurrent: Logger](using Services[F]): ExecutionDigestService[F] =
-    new ExecutionDigestService[F] {
+    new ExecutionDigestService[F]:
 
       override def selectOne(
         oid:  Observation.Id,
@@ -97,7 +95,6 @@ object ExecutionDigestService {
           .map(_.map { case (oid, hash, digest) => oid -> (hash, digest) }.toMap)
 
       override def insertOrUpdate(
-        pid:    Program.Id,
         oid:    Observation.Id,
         hash:   Md5Hash,
         digest: ExecutionDigest
@@ -105,7 +102,6 @@ object ExecutionDigestService {
         val acqConfigs = digest.acquisition.telescopeConfigs.toList
         val sciConfigs = digest.science.telescopeConfigs.toList
         session.execute(Statements.InsertOrUpdateExecutionDigest)(
-          pid,
           oid,
           hash,
           digest.setup.full,
@@ -145,37 +141,35 @@ object ExecutionDigestService {
         .void
         .recoverWith:
           case SqlState.ForeignKeyViolation(ex) =>
-            Logger[F].info(ex)(s"Failed to insert or update execution digest for program $pid, observation $oid. Probably due to a deleted calibration observation.")
+            Logger[F].info(ex)(s"Failed to insert or update execution digest for observation $oid. Probably due to a deleted calibration observation.")
 
-    }
+  object Statements:
 
-  object Statements {
-
-    private val DigestColumns: String =
-      """
-        c_full_setup_time,
-        c_reacq_setup_time,
-        c_acq_obs_class,
-        c_acq_non_charged_time,
-        c_acq_program_time,
-        c_acq_offsets,
-        c_acq_offset_guide_states,
-        c_acq_atom_count,
-        c_acq_execution_state,
-        c_sci_obs_class,
-        c_sci_non_charged_time,
-        c_sci_program_time,
-        c_sci_offsets,
-        c_sci_offset_guide_states,
-        c_sci_atom_count,
-        c_sci_execution_state
-      """
+    private val DigestColumns: List[String] =
+      List(
+        "c_full_setup_time",
+        "c_reacq_setup_time",
+        "c_acq_obs_class",
+        "c_acq_non_charged_time",
+        "c_acq_program_time",
+        "c_acq_offsets",
+        "c_acq_offset_guide_states",
+        "c_acq_atom_count",
+        "c_acq_execution_state",
+        "c_sci_obs_class",
+        "c_sci_non_charged_time",
+        "c_sci_program_time",
+        "c_sci_offsets",
+        "c_sci_offset_guide_states",
+        "c_sci_atom_count",
+        "c_sci_execution_state"
+      )
 
     val SelectOneExecutionDigest: Query[Observation.Id, (Md5Hash, ExecutionDigest)] =
       sql"""
         SELECT
           c_hash,
-          #$DigestColumns
+          #${DigestColumns.mkString(",\n")}
         FROM t_execution_digest
         WHERE c_observation_id = $observation_id
       """.query(md5_hash *: execution_digest)
@@ -183,12 +177,13 @@ object ExecutionDigestService {
     val SelectAllExecutionDigest: Query[Program.Id, (Observation.Id, Md5Hash, ExecutionDigest)] =
       sql"""
         SELECT
-          c_observation_id,
-          c_hash,
-          #$DigestColumns
-        FROM t_execution_digest
+          e.c_observation_id,
+          e.c_hash,
+          #${DigestColumns.map(c => s"e.$c").mkString(",\n")}
+        FROM t_execution_digest e
+        JOIN t_observation o ON o.c_observation_id = e.c_observation_id
         WHERE
-          c_program_id = $program_id
+          o.c_program_id = $program_id
       """.query(observation_id *: md5_hash *: execution_digest)
 
     def selectManyExecutionDigest[A <: NonEmptyList[Observation.Id]](enc: Encoder[A]): Query[A, (Observation.Id, Md5Hash, ExecutionDigest)] =
@@ -196,14 +191,13 @@ object ExecutionDigestService {
         SELECT
           c_observation_id,
           c_hash,
-          #$DigestColumns
+          #${DigestColumns.mkString(",\n")}
         FROM t_execution_digest
         WHERE
           c_observation_id in ($enc)
       """.query(observation_id *: md5_hash *: execution_digest)
 
     val InsertOrUpdateExecutionDigest: Command[(
-      Program.Id,
       Observation.Id,
       Md5Hash,
       TimeSpan,
@@ -242,7 +236,6 @@ object ExecutionDigestService {
     )] =
       sql"""
         INSERT INTO t_execution_digest (
-          c_program_id,
           c_observation_id,
           c_hash,
           c_full_setup_time,
@@ -262,7 +255,6 @@ object ExecutionDigestService {
           c_sci_atom_count,
           c_sci_execution_state
         ) SELECT
-          $program_id,
           $observation_id,
           $md5_hash,
           $time_span,
@@ -300,7 +292,3 @@ object ExecutionDigestService {
               c_sci_atom_count          = $int4_nonneg,
               c_sci_execution_state     = $execution_state
       """.command
-
-  }
-
-}

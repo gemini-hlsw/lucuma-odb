@@ -21,6 +21,7 @@ import cats.syntax.functorFilter.*
 import cats.syntax.option.*
 import cats.syntax.traverse.*
 import lucuma.core.enums.CalibrationRole
+import lucuma.core.enums.ExecutionState
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.ScienceBand
 import lucuma.core.math.RadialVelocity
@@ -62,6 +63,10 @@ enum ObservationSelection derives Order:
   case Calibration
 
 trait GeneratorParamsService[F[_]] {
+
+  def selectExecutionState(
+    observationId: Observation.Id
+  )(using Transaction[F]): F[Option[ExecutionState]]
 
   def selectOne(
     programId:     Program.Id,
@@ -116,6 +121,11 @@ object GeneratorParamsService {
 
       val customSedIdOptional = SourceProfile.unnormalizedSED.some.andThen(UnnormalizedSED.userDefinedAttachment).andThen(UnnormalizedSED.UserDefinedAttachment.attachmentId)
 
+      override def selectExecutionState(
+        observationId: Observation.Id
+      )(using Transaction[F]): F[Option[ExecutionState]] =
+        session.option(Statements.SelectExecutionState)(observationId)
+
       override def selectOne(
         pid: Program.Id,
         oid: Observation.Id
@@ -144,7 +154,7 @@ object GeneratorParamsService {
       )(using Transaction[F]): F[Map[Observation.Id, Either[Error, GeneratorParams]]] =
         for
           paramsRows <- params
-          oms         = paramsRows.collect { case ParamsRow(oid, _, _, _, Some(om), _, _, _, _, _, _, _, _, _, _) => (oid, om) }.distinct
+          oms         = paramsRows.collect { case ParamsRow(oid, _, _, _, Some(om), _, _, _, _, _, _, _, _, _, _, _) => (oid, om) }.distinct
           m          <- Services.asSuperUser(observingModeServices.selectObservingMode(oms))
         yield
           NonEmptyList.fromList(paramsRows).fold(Map.empty): paramsRowsNel =>
@@ -249,7 +259,7 @@ object GeneratorParamsService {
             .leftMap(MissingParamSet.fromParams)
             .toEither
 
-          GeneratorParams(itcInput, obsParams.scienceBand, obsMode, obsParams.calibrationRole, obsParams.declaredComplete, obsParams.acqResetTime)
+          GeneratorParams(itcInput, obsParams.scienceBand, obsMode, obsParams.calibrationRole, obsParams.declaredComplete, obsParams.executionState, obsParams.acqResetTime)
 
         observingMode(obsParams.targets, config).map:
           case gn @ gmos.longslit.Config.GmosNorth(g, f, u, c, a) =>
@@ -321,7 +331,7 @@ object GeneratorParamsService {
                 .leftMap(MissingParamSet.fromParams)
                 .toEither
 
-            GeneratorParams(itcInput, obsParams.scienceBand, gn, obsParams.calibrationRole, obsParams.declaredComplete, none)
+            GeneratorParams(itcInput, obsParams.scienceBand, gn, obsParams.calibrationRole, obsParams.declaredComplete, obsParams.executionState, none)
 
           case gs @ gmos.imaging.Config.GmosSouth(_, fs, _) =>
             // An input per filter.
@@ -340,7 +350,7 @@ object GeneratorParamsService {
                 .leftMap(MissingParamSet.fromParams)
                 .toEither
 
-            GeneratorParams(itcInput, obsParams.scienceBand, gs, obsParams.calibrationRole, obsParams.declaredComplete, none)
+            GeneratorParams(itcInput, obsParams.scienceBand, gs, obsParams.calibrationRole, obsParams.declaredComplete, obsParams.executionState, none)
 
       private def itcTargetParams(targetParams: TargetParams): ValidatedNel[MissingParam, ItcInput.TargetDefinition] = {
         // If emission line, SED not required, otherwhise must be defined
@@ -391,6 +401,7 @@ object GeneratorParamsService {
     radialVelocity:      Option[RadialVelocity],
     sourceProfile:       Option[SourceProfile],
     declaredComplete:    Boolean,
+    executionState:      ExecutionState,
     acqResetTime:        Option[Timestamp],
     customSedTimestamp:  Option[Timestamp] = none
   )
@@ -412,6 +423,7 @@ object GeneratorParamsService {
     blindOffset:      Option[TargetParams],
     targets:          NonEmptyList[TargetParams],
     declaredComplete: Boolean,
+    executionState:   ExecutionState,
     acqResetTime:     Option[Timestamp]
   )
 
@@ -429,6 +441,7 @@ object GeneratorParamsService {
           oParams.map: r =>
             TargetParams(r.targetId, r.radialVelocity, r.sourceProfile, r.customSedTimestamp),
           oParams.head.declaredComplete,
+          oParams.head.executionState,
           oParams.head.acqResetTime
         )
       .toMap
@@ -437,6 +450,11 @@ object GeneratorParamsService {
 
 
   object Statements {
+
+    val SelectExecutionState: Query[Observation.Id, ExecutionState] =
+      sql"""
+        SELECT c_execution_state FROM v_generator_params WHERE c_observation_id = $observation_id
+      """.query(execution_state)
 
     import ProgramUserService.Statements.existsUserReadAccess
 
@@ -459,9 +477,10 @@ object GeneratorParamsService {
        radial_velocity.opt     *:
        source_profile.opt      *:
        bool                    *:
+       execution_state         *:
        core_timestamp.opt
-      ).map( (oid, role, cs, etm, om, sb, btid, brv, bsp, tid, rv, sp, dc, art) =>
-        ParamsRow(oid, role, cs, etm, om, sb, btid, brv, bsp, tid, rv, sp, dc, art, None))
+      ).map( (oid, role, cs, etm, om, sb, btid, brv, bsp, tid, rv, sp, dc, es, art) =>
+        ParamsRow(oid, role, cs, etm, om, sb, btid, brv, bsp, tid, rv, sp, dc, es, art, None))
 
     private def ParamColumns(tab: String): String =
       s"""
@@ -489,6 +508,7 @@ object GeneratorParamsService {
         $tab.c_sid_rv,
         $tab.c_source_profile,
         $tab.c_declared_complete,
+        $tab.c_execution_state,
         $tab.c_acq_reset_time
       """
 

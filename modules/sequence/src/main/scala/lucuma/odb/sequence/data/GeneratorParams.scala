@@ -7,6 +7,7 @@ package data
 import cats.Eq
 import cats.syntax.either.*
 import lucuma.core.enums.CalibrationRole
+import lucuma.core.enums.ExecutionState
 import lucuma.core.enums.ScienceBand
 import lucuma.core.util.Timestamp
 import lucuma.odb.sequence.ObservingMode
@@ -20,6 +21,7 @@ case class GeneratorParams(
   observingMode:    ObservingMode,
   calibrationRole:  Option[CalibrationRole],
   declaredComplete: Boolean,
+  executionState:   ExecutionState,
   acqResetTime:     Option[Timestamp]
 )
 
@@ -33,6 +35,7 @@ object GeneratorParams:
         a.observingMode,
         a.calibrationRole,
         a.declaredComplete,
+        a.executionState,
         a.acqResetTime
       )
 
@@ -44,5 +47,6 @@ object GeneratorParams:
         a.observingMode.hashBytes,
         a.calibrationRole.hashBytes,
         a.declaredComplete.hashBytes,
+        a.executionState.hashBytes,
         a.acqResetTime.hashBytes
       )

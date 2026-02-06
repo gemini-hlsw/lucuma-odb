@@ -26,7 +26,6 @@ import lucuma.core.model.sequence.InstrumentExecutionConfig
 import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.syntax.string.*
-import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.odb.data.OdbError
 import lucuma.odb.graphql.enums.Enums
@@ -268,10 +267,8 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
    *             if asked at this time
    */
   def generate(
-    pid:      Program.Id,
-    oid:      Observation.Id,
-    limit:    Option[Int]       = None,  // [0, 100]
-    when:     Option[Timestamp] = None
+    oid:   Observation.Id,
+    limit: Option[Int] = None,  // [0, 100]
   ): IO[Either[OdbError, InstrumentExecutionConfig]] =
     withSession: session =>
       servicesFor(serviceUser).map(_(session)).use: s =>
@@ -283,7 +280,7 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
           tec    <- TimeEstimateCalculatorImplementation.fromSession(session, enums)
           gen     = Generator.instantiate[IO](CommitHash.Zero, tec)
           res    <- Services.asSuperUser(
-                      gen.generate(pid, oid, future.getOrElse(Generator.FutureLimit.Default), when)
+                      gen.generate(oid, future.getOrElse(Generator.FutureLimit.Default))
                     )
         yield res
 
@@ -295,12 +292,10 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
    *             if asked at this time
    */
   def generateOrFail(
-    pid:      Program.Id,
-    oid:      Observation.Id,
-    limit:    Option[Int]       = None,  // [0, 100]
-    when:     Option[Timestamp] = None
+    oid:   Observation.Id,
+    limit: Option[Int] = None
   ): IO[InstrumentExecutionConfig] =
-    generate(pid, oid, limit, when).flatMap: res =>
+    generate(oid, limit).flatMap: res =>
       IO.fromEither(res.leftMap(e => new RuntimeException(s"Failed to generate the sequence: ${e.message}")))
 
   /**
@@ -311,15 +306,10 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
    *             generation; does not delay the computation in any way
    */
   def generateAfter(
-    pid:  Program.Id,
-    oid:  Observation.Id,
-    time: TimeSpan
+    oid:  Observation.Id
   ): IO[Either[OdbError, InstrumentExecutionConfig]] =
-    for {
-      now  <- timestampNow
-      when <- IO.fromOption(now.plusMicrosOption(time.toMicroseconds))(new IllegalArgumentException(s"$time is too big"))
-      res  <- generate(pid, oid, when = when.some)
-    } yield res
+    // TODO: DESTROY
+    generate(oid)
 
   /**
    * Generates the sequence as if requested after the specified amount of time
@@ -329,11 +319,10 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
    *             generation; does not delay the computation in any way
    */
   def generateAfterOrFail(
-    pid:  Program.Id,
-    oid:  Observation.Id,
-    time: TimeSpan
+    oid: Observation.Id
   ): IO[InstrumentExecutionConfig] =
-    generateAfter(pid, oid, time).flatMap: res =>
+    // TODO: DESTROY
+    generateAfter(oid).flatMap: res =>
       IO.fromEither(res.leftMap(e => new RuntimeException(s"Failed to generate the sequence: ${e.message}")))
 
   /**

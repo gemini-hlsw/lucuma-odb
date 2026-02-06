@@ -29,7 +29,7 @@ class ShortCut_3219 extends ExecutionTestSupportForGmos {
         p  <- createProgram
         t  <- createTargetWithProfileAs(pi, p)
         o  <- createGmosNorthLongSlitObservationAs(serviceUser, p, List(t))
-        gn <- generateOrFail(p, o, 20.some).map(_.gmosNorthScience)
+        gn <- generateOrFail(o, 20.some).map(_.gmosNorthScience)
       } yield gn.nextAtom.id :: gn.possibleFuture.map(_.id)
 
     assertIOBoolean(aids.map(lst => lst.size === lst.distinct.size))
