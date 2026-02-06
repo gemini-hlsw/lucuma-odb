@@ -196,6 +196,8 @@ object Generator:
               EitherT(streaming.gmosSouthImaging(ctx)).flatMap(digest(_, calculator.gmosSouth.estimateSetup))
             case ObservingModeType.GmosSouthLongSlit  =>
               EitherT(streaming.gmosSouthLongSlit(ctx)).flatMap(digest(_, calculator.gmosSouth.estimateSetup))
+            case ObservingModeType.Igrins2LongSlit    =>
+              EitherT.leftT(OdbError.InvalidObservation(ctx.oid, s"IGRINS2 is not yet supported".some))
 
       private def calculateDigest(
         ctx: GeneratorContext
@@ -222,6 +224,8 @@ object Generator:
             EitherT(streaming.gmosSouthImaging(ctx)).map(_.science.map(AtomDigest.fromAtom))
           case ObservingModeType.GmosSouthLongSlit  =>
             EitherT(streaming.gmosSouthLongSlit(ctx)).map(_.science.map(AtomDigest.fromAtom))
+          case ObservingModeType.Igrins2LongSlit    =>
+            EitherT.leftT(OdbError.InvalidObservation(ctx.oid, s"IGRINS2 is not yet supported".some))
 
         (checkSequence *> atomDigests).value
 
@@ -290,6 +294,9 @@ object Generator:
               EitherT(streaming.gmosSouthLongSlit(ctx))
                 .flatMap(s => EitherT.liftF(executionConfig(s)))
                 .map(InstrumentExecutionConfig.GmosSouth.apply)
+
+            case ObservingModeType.Igrins2LongSlit    =>
+              EitherT.leftT(OdbError.InvalidObservation(ctx.oid, s"IGRINS2 is not yet supported".some))
 
         (for
           ctx <- EitherT(GeneratorContext.lookup(oid, commitHash))
