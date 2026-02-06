@@ -521,9 +521,9 @@ class ShortCut_7591 extends ExecutionTestSupportForGmos:
         ).asRight
       )
 
-  def nextAtomId(p: Program.Id, o: Observation.Id): IO[Atom.Id] =
+  def nextAtomId(o: Observation.Id): IO[Atom.Id] =
     import lucuma.odb.testsyntax.execution.*
-    generateOrFail(p, o, 5.some).map: e =>
+    generateOrFail(o, 5.some).map: e =>
       e.gmosNorthScience.nextAtom.id
 
   test("atom ids"):
@@ -552,21 +552,21 @@ class ShortCut_7591 extends ExecutionTestSupportForGmos:
         s4 <- recordStepAs(serviceUser, a1, Instrument.GmosNorth, gmosNorthAcq(0), StepConfig.Science, sciTelescopeConfig(0), ObserveClass.Science)
 
         // Now start on the science again and do the calibrations
-        x0 <- nextAtomId(p, o)
+        x0 <- nextAtomId(o)
         a2 <- recordAtomAs(serviceUser, Instrument.GmosNorth, v1, SequenceType.Science)
-        x1 <- nextAtomId(p, o)
+        x1 <- nextAtomId(o)
         s5 <- recordStepAs(serviceUser, a2, Instrument.GmosNorth, gmosNorthScience(1), StepConfig.Science, sciTelescopeConfig(3), ObserveClass.Science)
-        x2 <- nextAtomId(p, o)
+        x2 <- nextAtomId(o)
         _  <- addEndStepEvent(s5)
-        x3 <- nextAtomId(p, o)
+        x3 <- nextAtomId(o)
         s6 <- recordStepAs(serviceUser, a2, Instrument.GmosNorth, gmosNorthArc(1), ArcStep, gcalTelescopeConfig(1), ObserveClass.NightCal)
-        x4 <- nextAtomId(p, o)
+        x4 <- nextAtomId(o)
         _  <- addEndStepEvent(s6)
-        x5 <- nextAtomId(p, o)
+        x5 <- nextAtomId(o)
         s7 <- recordStepAs(serviceUser, a2, Instrument.GmosNorth, gmosNorthFlat(1), FlatStep, gcalTelescopeConfig(1), ObserveClass.NightCal)
-        x6 <- nextAtomId(p, o)
+        x6 <- nextAtomId(o)
         _  <- addEndStepEvent(s7)
-        x7 <- nextAtomId(p, o)  // gets a new atom id because we finished the last atom
+        x7 <- nextAtomId(o)  // gets a new atom id because we finished the last atom
       yield List(x0, x1, x2, x3, x4, x5, x6, x7)
 
     assertIOBoolean:

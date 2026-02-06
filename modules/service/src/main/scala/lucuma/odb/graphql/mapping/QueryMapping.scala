@@ -154,7 +154,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
           if ok then ().success
           else OdbError.NotAuthorized(user.id, s"User not authorized to view program $pid".some).asFailure
 
-    def gatherArgs: F[Result[(Program.Id, Observation.Id, FutureLimit)]] =
+    def gatherArgs: F[Result[(Observation.Id, FutureLimit)]] =
       services.useTransactionally:
         Services.asSuperUser:
           (for
@@ -164,18 +164,18 @@ trait QueryMapping[F[_]] extends Predicates[F] {
             oid        <- ResultT(observationService.resolveOid(oidParam, refParam))
             pid        <- ResultT(observationService.selectProgram(oid))
             _          <- checkAccess(pid)
-          yield (pid, oid, limitParam.getOrElse(FutureLimit.Default))).value
+          yield (oid, limitParam.getOrElse(FutureLimit.Default))).value
 
-    def generate(pid: Program.Id, oid: Observation.Id, limit: FutureLimit): F[Result[Json]] =
+    def generate(oid: Observation.Id, limit: FutureLimit): F[Result[Json]] =
       services.useNonTransactionally:
         Services.asSuperUser:
           generator
-            .generate(pid, oid, limit)
+            .generate(oid, limit)
             .map(_.bimap(_.asWarning(Json.Null), _.asJson.success).merge)
 
     (for
-      (p, o, l) <- ResultT(gatherArgs)
-      r         <- ResultT(generate(p, o, l))
+      (o, l) <- ResultT(gatherArgs)
+      r      <- ResultT(generate(o, l))
     yield r).value
 
   private val goaDataDownloadAccess: (Path, Env) => F[Result[Json]] = (_, e) =>

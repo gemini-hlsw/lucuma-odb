@@ -567,7 +567,7 @@ class executionDigest extends ExecutionTestSupportForGmos {
 
   test("clear execution digest"):
 
-    val setup: IO[(Program.Id, Observation.Id, Step.Id)] =
+    val setup: IO[(Observation.Id, Step.Id)] =
       import lucuma.odb.json.all.transport.given
 
       for
@@ -577,14 +577,14 @@ class executionDigest extends ExecutionTestSupportForGmos {
         v <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
         a <- recordAtomAs(serviceUser, Instrument.GmosNorth, v)
         s <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, telescopeConfig(0, 0, StepGuideState.Enabled))
-      yield (p, o, s)
+      yield (o, s)
 
     val isEmpty = setup.flatMap:
-      case (p, o, s) =>
+      case (o, s) =>
         withServices(pi): services =>
           services.session.transaction.use: xa =>
             for
-              _ <- services.executionDigestService.insertOrUpdate(p, o, Md5Hash.Zero, ExecutionDigest.Zero)(using xa)
+              _ <- services.executionDigestService.insertOrUpdate(o, Md5Hash.Zero, ExecutionDigest.Zero)(using xa)
               _ <- services.executionEventService.insertStepEvent(AddStepEventInput(s, StepStage.EndStep, None))(using xa, ().asInstanceOf) // shhh
               d <- services.executionDigestService.selectOne(o, Md5Hash.Zero)(using xa)
             yield d.isEmpty
@@ -780,13 +780,12 @@ class executionDigest extends ExecutionTestSupportForGmos {
 
   // This simulates a deleted calibration observation and checks that the foreign key violation is caught
   test("insertOrUpdate with non-existent observation should not fail"):
-    createProgramAs(pi).flatMap: pid =>
+    createProgramAs(pi).flatMap: _ =>
       withServices(pi): services =>
         Services.asSuperUser:
           services.session.transaction.use: xa =>
             services.executionDigestService
               .insertOrUpdate(
-                pid,
                 Observation.Id.fromLong(Long.MaxValue).get,
                 Md5Hash.Zero,
                 ExecutionDigest.Zero
