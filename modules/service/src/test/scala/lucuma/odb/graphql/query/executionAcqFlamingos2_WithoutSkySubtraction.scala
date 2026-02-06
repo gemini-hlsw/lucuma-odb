@@ -16,7 +16,6 @@ import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SequenceType
 import lucuma.core.model.Observation
-import lucuma.core.model.Program
 import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.syntax.timespan.*
@@ -324,9 +323,9 @@ class executionAcqFlamingos2_WithoutSkySubtraction extends ExecutionTestSupportF
           """.asRight
       )
 
-  def nextAtomStepIds(p: Program.Id, o: Observation.Id): IO[NonEmptyList[Step.Id]] =
+  def nextAtomStepIds(o: Observation.Id): IO[NonEmptyList[Step.Id]] =
     import lucuma.odb.testsyntax.execution.*
-    generateOrFail(p, o, 5.some).map(_.flamingos2Acquisition.nextAtom.steps.map(_.id))
+    generateOrFail(o, 5.some).map(_.flamingos2Acquisition.nextAtom.steps.map(_.id))
 
   test("nextAtom step ids don't change while executing"):
     val execAcq: IO[List[NonEmptyList[Step.Id]]] =
@@ -336,19 +335,19 @@ class executionAcqFlamingos2_WithoutSkySubtraction extends ExecutionTestSupportF
         o  <- createFlamingos2LongSlitObservationAs(pi, p, List(t))
         v  <- recordVisitAs(serviceUser, Instrument.Flamingos2, o)
 
-        x0 <- nextAtomStepIds(p, o)
+        x0 <- nextAtomStepIds(o)
 
         // First atom with 3 steps.
         a0 <- recordAtomAs(serviceUser, Instrument.Flamingos2, v, SequenceType.Acquisition)
         s0 <- recordStepAs(serviceUser, a0, Instrument.Flamingos2, Flamingos2AcqImage.copy(exposure = ExposureTime), StepConfig.Science, acqTelescopeConfig(0), ObserveClass.Acquisition)
         _  <- addEndStepEvent(s0)
 
-        x1 <- nextAtomStepIds(p, o)
+        x1 <- nextAtomStepIds(o)
 
         s1 <- recordStepAs(serviceUser, a0, Instrument.Flamingos2, Flamingos2AcqSlit.copy(exposure = 10.secTimeSpan), StepConfig.Science, acqTelescopeConfig(10), ObserveClass.Acquisition)
         _  <- addEndStepEvent(s1)
 
-        x2 <- nextAtomStepIds(p, o)
+        x2 <- nextAtomStepIds(o)
       yield List(x0, x1, x2)
 
     execAcq.map: ids =>

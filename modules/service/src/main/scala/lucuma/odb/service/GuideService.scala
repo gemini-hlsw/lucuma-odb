@@ -67,7 +67,6 @@ import lucuma.odb.graphql.input.SetGuideTargetNameInput
 import lucuma.odb.graphql.mapping.AccessControl
 import lucuma.odb.json.all.query.given
 import lucuma.odb.json.target
-import lucuma.odb.logic.Generator
 import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.sequence.flamingos2
 import lucuma.odb.sequence.gmos
@@ -608,12 +607,11 @@ object GuideService {
             GuideEnvironment(usable.posAngle, List(GuideTarget(usable.guideProbe, target)))
 
       def getGeneratorInfo(
-        pid: Program.Id,
         oid: Observation.Id
       ): F[Result[GeneratorInfo]] =
         Services.asSuperUser:
           generator
-            .digestWithParamsAndHash(pid, oid)
+            .digestWithParamsAndHash(oid)
             .map:
               case Right((d, p, h)) => GeneratorInfo(d, p, h).success
               case Left(ge)         => generatorError(ge).asFailure
@@ -949,7 +947,7 @@ object GuideService {
             obsTime         <- ResultT.fromResult(obsInfo.obsTime)
             obsDuration     <- ResultT.fromResult(obsInfo.obsDuration)
             asterism        <- ResultT(getAsterism(pid, oid))
-            genInfo         <- ResultT(getGeneratorInfo(pid, oid))
+            genInfo         <- ResultT(getGeneratorInfo(oid))
             scienceDuration <- ResultT.fromResult(genInfo.getScienceDuration(obsDuration, oid))
             scienceStart     = genInfo.getScienceStartTime(obsTime)
             oGSName          = obsInfo.validGuideStarName(genInfo.hash)
@@ -961,7 +959,7 @@ object GuideService {
       ): F[Result[Option[NonEmptyString]]] =
         (for {
           obsInfo    <- ResultT(getObservationInfo(oid))
-          genInfo    <- ResultT.liftF(getGeneratorInfo(pid, oid)).map(_.toOption)
+          genInfo    <- ResultT.liftF(getGeneratorInfo(oid)).map(_.toOption)
           oGSName    <- ResultT.pure(
                           genInfo.flatMap{ gi =>
                             obsInfo.validGuideStarName(gi.hash)
@@ -975,7 +973,7 @@ object GuideService {
       ): F[Result[List[GuideEnvironment]]] =
         (for {
           obsInfo       <- ResultT(getObservationInfo(oid))
-          genInfo       <- ResultT(getGeneratorInfo(pid, oid))
+          genInfo       <- ResultT(getGeneratorInfo(oid))
 
           tracking      <- ResultT(trackingService.getTrackingSnapshot(oid, TimestampInterval.empty(obsTime), false))
           baseTracking     = tracking.base // use explicit base if defined
@@ -1030,7 +1028,7 @@ object GuideService {
                               ).asFailure
                             )
             obsInfo       <- ResultT(getObservationInfo(oid))
-            genInfo       <- ResultT(getGeneratorInfo(pid, oid))
+            genInfo       <- ResultT(getGeneratorInfo(oid))
             blindOffset   <- ResultT.liftF(getBlindOffsetCoordinates(oid, period.start.toInstant))
             newHash        = obsInfo.availabilityHash(genInfo.hash)
             currentAvail  <- ResultT.liftF(getFromCacheOrEmpty(pid, oid, newHash))
@@ -1052,7 +1050,7 @@ object GuideService {
             gsn    <- ResultT.fromResult(
                         GuideStarName.from(name.value).toOption.toResult(guideStarNameError(name.value).asProblem)
                       )
-            genInfo  <- ResultT(getGeneratorInfo(obsInfo.programId, obsInfo.id))
+            genInfo  <- ResultT(getGeneratorInfo(obsInfo.id))
             hash      = obsInfo.newGuideStarHash(genInfo.hash)
             result   <- ResultT(updateGuideTargetName(obsInfo.programId, obsInfo.id, gsn.some, hash.some))
           } yield result).value

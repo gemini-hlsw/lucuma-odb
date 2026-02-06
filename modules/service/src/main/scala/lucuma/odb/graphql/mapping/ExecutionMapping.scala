@@ -19,6 +19,7 @@ import grackle.TypeRef
 import grackle.syntax.*
 import io.circe.Json
 import io.circe.syntax.*
+import lucuma.core.enums.ExecutionState
 import lucuma.core.model.ExecutionEvent
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
@@ -123,11 +124,11 @@ trait ExecutionMapping[F[_]] extends ObservationEffectHandler[F]
       env.getR[Generator.FutureLimit](FutureLimitParam)
 
     val calculate: (Program.Id, Observation.Id, Generator.FutureLimit) => F[Result[Json]] =
-      (pid, oid, futureLimit) =>
+      (_, oid, futureLimit) =>
         services.use: s =>
           Services.asSuperUser:
             s.generator
-             .generate(pid, oid, futureLimit)
+             .generate(oid, futureLimit)
              .map(_.bimap(_.asWarning(Json.Null), _.asJson.success).merge)
 
     // Scans the top-level query and its descendents for environment entries,
@@ -143,12 +144,11 @@ trait ExecutionMapping[F[_]] extends ObservationEffectHandler[F]
 
   private lazy val executionStateHandler: EffectHandler[F] =
     val calculate: (Program.Id, Observation.Id, Unit) => F[Result[Json]] =
-      (pid, oid, _) => {
-        services.use: s =>
-          Services.asSuperUser:
-            s.generator
-             .executionState(pid, oid)
-             .map(_.asJson.success)
+      (_, oid, _) => {
+        services.useTransactionally:
+          generatorParamsService
+           .selectExecutionState(oid)
+           .map(_.getOrElse(ExecutionState.NotDefined).asJson.success)
       }
 
     effectHandler(_ => ().success, calculate)

@@ -43,7 +43,7 @@ import skunk.implicits.*
 
 import Services.Syntax.*
 
-trait ExecutionEventService[F[_]] {
+trait ExecutionEventService[F[_]]:
 
   def atomRange(
     atomId: Atom.Id
@@ -81,12 +81,10 @@ trait ExecutionEventService[F[_]] {
     oid: Observation.Id
   ): Stream[F, SequenceEvent]
 
-}
-
-object ExecutionEventService {
+object ExecutionEventService:
 
   def instantiate[F[_]: Concurrent](using Services[F]): ExecutionEventService[F] =
-    new ExecutionEventService[F] {
+    new ExecutionEventService[F]:
 
       override def atomRange(
         atomId: Atom.Id
@@ -250,9 +248,7 @@ object ExecutionEventService {
       ): Stream[F, SequenceEvent] =
         session.stream(Statements.SelectSequenceEvents)(oid, 256)
 
-    }
-
-  object Statements {
+  object Statements:
 
     private val timestamp_interval: Decoder[TimestampInterval] =
       (core_timestamp *: core_timestamp).map { (min, max) =>
@@ -501,7 +497,3 @@ object ExecutionEventService {
         idempotency_key.opt *:
         sequence_command
       ).to[ExecutionEvent.SequenceEvent])
-
-  }
-
-}

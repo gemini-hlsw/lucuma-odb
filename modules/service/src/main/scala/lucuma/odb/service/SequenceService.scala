@@ -33,9 +33,6 @@ import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.AtomDigest
 import lucuma.core.model.sequence.CategorizedTime
-import lucuma.core.model.sequence.ExecutionConfig
-import lucuma.core.model.sequence.ExecutionSequence
-import lucuma.core.model.sequence.InstrumentExecutionConfig
 import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.StepEstimate
@@ -179,22 +176,6 @@ trait SequenceService[F[_]]:
     observationId: Observation.Id
   )(using Transaction[F], Services.ServiceAccess): F[Option[StreamingExecutionConfig[F, GmosSouthStatic, GmosSouth]]]
 
-
-  def selectFlamingos2ExecutionConfig(
-    observationId: Observation.Id
-  )(using Transaction[F], Services.ServiceAccess): F[Option[ExecutionConfig[Flamingos2StaticConfig, Flamingos2DynamicConfig]]]
-
-  def selectGmosNorthExecutionConfig(
-    observationId: Observation.Id
-  )(using Transaction[F], Services.ServiceAccess): F[Option[ExecutionConfig[GmosNorthStatic, GmosNorth]]]
-
-  def selectGmosSouthExecutionConfig(
-    observationId: Observation.Id
-  )(using Transaction[F], Services.ServiceAccess): F[Option[ExecutionConfig[GmosSouthStatic, GmosSouth]]]
-
-  def selectInstrumentExecutionConfig(
-    observationId: Observation.Id
-  )(using Transaction[F], Services.ServiceAccess): F[Option[InstrumentExecutionConfig]]
 
 object SequenceService:
 
@@ -663,51 +644,6 @@ object SequenceService:
           estimator.gmosSouth,
           gmosSequenceService.selectLatestVisitGmosSouthStatic
         ).value
-
-      private def toExecutionConfig[S, D](
-        sec: F[Option[StreamingExecutionConfig[F, S, D]]]
-      ): F[Option[ExecutionConfig[S, D]]] =
-        OptionT(sec)
-          .semiflatMap: sec =>
-            for
-              a <- sec.acquisition.compile.toList
-              s <- sec.science.compile.toList
-            yield ExecutionConfig(
-              sec.static,
-              a.headOption.map(nextAtom => ExecutionSequence(nextAtom, a.tail, false)),
-              s.headOption.map(nextAtom => ExecutionSequence(nextAtom, s.tail, false))
-            )
-          .value
-
-      override def selectFlamingos2ExecutionConfig(
-        observationId: Observation.Id
-      )(using Transaction[F], Services.ServiceAccess): F[Option[ExecutionConfig[Flamingos2StaticConfig, Flamingos2DynamicConfig]]] =
-        toExecutionConfig(streamingFlamingos2ExecutionConfig(observationId))
-
-      override def selectGmosNorthExecutionConfig(
-        observationId: Observation.Id
-      )(using Transaction[F], Services.ServiceAccess): F[Option[ExecutionConfig[GmosNorthStatic, GmosNorth]]] =
-        toExecutionConfig(streamingGmosNorthExecutionConfig(observationId))
-
-      override def selectGmosSouthExecutionConfig(
-        observationId: Observation.Id
-      )(using Transaction[F], Services.ServiceAccess): F[Option[ExecutionConfig[GmosSouthStatic, GmosSouth]]] =
-        toExecutionConfig(streamingGmosSouthExecutionConfig(observationId))
-
-      override def selectInstrumentExecutionConfig(
-        observationId: Observation.Id
-      )(using Transaction[F], Services.ServiceAccess): F[Option[InstrumentExecutionConfig]] =
-        OptionT(observationService.selectInstrument(observationId))
-          .flatMap:
-            case Instrument.Flamingos2 =>
-              OptionT(selectFlamingos2ExecutionConfig(observationId)).map(InstrumentExecutionConfig.Flamingos2.apply)
-            case Instrument.GmosNorth  =>
-              OptionT(selectGmosNorthExecutionConfig(observationId)).map(InstrumentExecutionConfig.GmosNorth.apply)
-            case Instrument.GmosSouth  =>
-              OptionT(selectGmosSouthExecutionConfig(observationId)).map(InstrumentExecutionConfig.GmosSouth.apply)
-            case _                     =>
-              OptionT.none
-          .value
 
   object Statements:
 

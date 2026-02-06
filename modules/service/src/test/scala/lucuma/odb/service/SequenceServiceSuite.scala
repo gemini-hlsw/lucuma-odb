@@ -4,12 +4,12 @@
 package lucuma.odb.service
 
 import cats.effect.IO
+import cats.syntax.traverse.*
 import eu.timepit.refined.types.numeric.PosInt
 import fs2.Stream
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.SequenceType
 import lucuma.core.model.Observation
-import lucuma.core.model.Program
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.InstrumentExecutionConfig
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth
@@ -27,11 +27,10 @@ class SequenceServiceSuite extends ExecutionTestSupportForGmos:
     )
 
   private def generateSequence(
-    p: Program.Id,
     o: Observation.Id
   ): IO[List[Atom[GmosNorth]]] =
     withServices(serviceUser): services =>
-      services.generator.generate(p, o).map: e =>
+      services.generator.generate(o).map: e =>
         val g =
           e.toOption
            .flatMap: iec =>
@@ -56,8 +55,9 @@ class SequenceServiceSuite extends ExecutionTestSupportForGmos:
       services
         .transactionally:
           sequenceService
-            .selectGmosNorthExecutionConfig(o)
-              .map(_.flatMap(_.science).toList.flatMap(s => s.nextAtom :: s.possibleFuture))
+            .streamingGmosNorthExecutionConfig(o)
+            .map(_.traverse(_.science))
+            .flatMap(_.collect { case Some(a) => a }.compile.toList)
 
   test("exercise serialization"):
     val res = for
@@ -66,7 +66,7 @@ class SequenceServiceSuite extends ExecutionTestSupportForGmos:
       o  <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
       _  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
 
-      sn <- generateSequence(p, o)
+      sn <- generateSequence(o)
       b  <- IO.realTimeInstant
       _  <- writeSequence(o, sn)
       e0 <- IO.realTimeInstant

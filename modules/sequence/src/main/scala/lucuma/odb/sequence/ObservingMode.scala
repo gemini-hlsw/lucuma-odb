@@ -7,6 +7,7 @@ import cats.Eq
 import cats.syntax.eq.*
 import cats.syntax.option.*
 import lucuma.core.enums.Instrument
+import lucuma.core.enums.ObservingModeType
 import lucuma.odb.sequence.flamingos2.longslit.Config as Flamingos2LongSlit
 import lucuma.odb.sequence.gmos.imaging.Config.GmosNorth as GmosNorthImaging
 import lucuma.odb.sequence.gmos.imaging.Config.GmosSouth as GmosSouthImaging
@@ -66,6 +67,14 @@ object ObservingMode:
           case _: GmosNorthLongSlit  => GmosNorthLongSlitName
           case _: GmosSouthImaging   => GmosSouthImagingName
           case _: GmosSouthLongSlit  => GmosSouthLongSlitName
+
+      def modeType: ObservingModeType =
+        m match
+          case _: Flamingos2LongSlit => ObservingModeType.Flamingos2LongSlit
+          case _: GmosNorthImaging   => ObservingModeType.GmosNorthImaging
+          case _: GmosNorthLongSlit  => ObservingModeType.GmosNorthLongSlit
+          case _: GmosSouthImaging   => ObservingModeType.GmosSouthImaging
+          case _: GmosSouthLongSlit  => ObservingModeType.GmosSouthLongSlit
 
       def asFlamingos2LongSlit: Option[Flamingos2LongSlit] =
         m match

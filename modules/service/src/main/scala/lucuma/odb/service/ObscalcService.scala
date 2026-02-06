@@ -17,7 +17,6 @@ import cats.syntax.foldable.*
 import cats.syntax.functor.*
 import cats.syntax.option.*
 import cats.syntax.traverse.*
-import fs2.Pure
 import fs2.Stream
 import grackle.Result
 import grackle.syntax.*
@@ -36,7 +35,6 @@ import lucuma.odb.data.Itc
 import lucuma.odb.data.Obscalc
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
-import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.service.Services.ServiceAccess
 import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.util.Codecs.*
@@ -245,17 +243,7 @@ object ObscalcService:
 
       private def calculateWithAtomDigests(
         pending: Obscalc.PendingCalc
-      )(using ServiceAccess): F[(Obscalc.Result, Stream[Pure, AtomDigest])] =
-
-        def sequenceUnavailable(msg: String): OdbError =
-          OdbError.SequenceUnavailable(pending.observationId, s"Could not generate a sequence for ${pending.observationId}: $msg".some)
-
-        val params: EitherT[F, OdbError, GeneratorParams] =
-          EitherT:
-            services.transactionally:
-              generatorParamsService
-                .selectOne(pending.programId, pending.observationId)
-                .map(_.leftMap(e => sequenceUnavailable(e.format)))
+      )(using ServiceAccess): F[(Obscalc.Result, Stream[F, AtomDigest])] =
 
         def workflow(
           itc: Option[Itc],
@@ -272,16 +260,14 @@ object ObscalcService:
 
         val gen = generator
 
-        def digest(itcResult: Either[OdbError, Itc]): F[Either[OdbError, (ExecutionDigest, Stream[Pure, AtomDigest])]] =
+        def digest(itcResult: Either[OdbError, Itc]): F[Either[OdbError, (ExecutionDigest, Stream[F, AtomDigest])]] =
           Logger[F].info(s"${pending.observationId}: calculating digest") *>
-          ((for
-            p <- params
-            d <- EitherT(gen.calculateDigest(pending.programId, pending.observationId, itcResult, p))
-            a <- EitherT(gen.calculateScienceAtomDigests(pending.programId, pending.observationId, itcResult, p))
-          yield (d, a)).value).flatTap: da =>
-            Logger[F].info(s"${pending.observationId}: finished calculting digest: $da")
+          EitherT(gen.obscalc(pending.observationId, itcResult))
+            .flatTap: da =>
+              EitherT.liftF(Logger[F].info(s"${pending.observationId}: finished calculting digest: $da"))
+            .value
 
-        val result: F[(Obscalc.Result, Stream[Pure, AtomDigest])] =
+        val result: F[(Obscalc.Result, Stream[F, AtomDigest])] =
           for
             r <- itcService.lookup(pending.programId, pending.observationId)
             _ <- Logger[F].info(s"${pending.observationId}: itc lookup: $r")

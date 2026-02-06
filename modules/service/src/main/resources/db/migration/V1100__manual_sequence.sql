@@ -1,3 +1,10 @@
+-- Drop the program id from the execution digest.
+ALTER TABLE t_execution_digest
+  DROP COLUMN c_program_id;
+
+-- Add an index on observation id
+CREATE INDEX execution_digest_observation_id_index ON t_execution_digest (c_observation_id);
+
 CREATE TABLE t_atom (
   c_atom_id         d_atom_id        PRIMARY KEY,
   c_instrument      d_tag            NOT NULL,
@@ -15,6 +22,9 @@ CREATE TABLE t_atom (
 
 ALTER TABLE ONLY t_atom
   ADD CONSTRAINT t_atom_c_observation_id_c_instrument_fkey FOREIGN KEY (c_observation_id, c_instrument) REFERENCES t_observation(c_observation_id, c_instrument) ON DELETE CASCADE;
+
+CREATE INDEX atom_observation_id_exeuction_stateindex ON t_atom (c_observation_id, c_execution_state);
+
 
 CREATE TYPE e_breakpoint AS enum(
   'enabled',
@@ -69,3 +79,68 @@ ALTER TABLE t_gmos_south_dynamic
 
 ALTER TABLE t_flamingos_2_dynamic
   DROP CONSTRAINT t_flamingos_2_dynamic_c_step_id_c_instrument_fkey;
+
+-- Add execution state to the generator params
+CREATE OR REPLACE VIEW v_generator_params AS
+SELECT
+  o.c_program_id,
+  o.c_observation_id,
+  o.c_calibration_role,
+  o.c_image_quality,
+  o.c_cloud_extinction,
+  o.c_sky_background,
+  o.c_water_vapor,
+  o.c_air_mass_min,
+  o.c_air_mass_max,
+  o.c_hour_angle_min,
+  o.c_hour_angle_max,
+  e.c_exposure_time_mode,
+  e.c_signal_to_noise,
+  e.c_signal_to_noise_at,
+  e.c_exposure_time,
+  e.c_exposure_count,
+  o.c_observing_mode_type,
+  o.c_science_band,
+  o.c_declared_complete,
+  CASE
+    WHEN o.c_declared_complete
+      THEN 'complete'::e_execution_state
+
+    WHEN NOT EXISTS (
+      SELECT 1 FROM t_execution_event v WHERE v.c_observation_id = o.c_observation_id
+    ) THEN 'not_started'::e_execution_state
+
+    WHEN EXISTS (
+      SELECT 1 FROM t_atom a
+        WHERE a.c_observation_id = o.c_observation_id
+          AND a.c_execution_state IN ('not_started', 'ongoing')
+    ) THEN 'ongoing'::e_execution_state
+
+    ELSE 'complete'::e_execution_state
+  END AS c_execution_state,
+  o.c_acq_reset_time,
+  o.c_blind_offset_target_id,
+  b.c_sid_rv AS c_blind_rv,
+  b.c_source_profile AS c_blind_source_profile,
+  t.c_target_id,
+  t.c_sid_rv,
+  t.c_source_profile
+FROM
+  t_observation o
+LEFT JOIN t_target b ON c_target_id = o.c_blind_offset_target_id
+LEFT JOIN LATERAL (
+  SELECT t.c_target_id,
+         t.c_sid_rv,
+         t.c_source_profile
+    FROM t_asterism_target a
+    INNER JOIN t_target t
+      ON a.c_target_id = t.c_target_id
+     AND t.c_existence = 'present'
+   WHERE a.c_observation_id = o.c_observation_id
+) t ON TRUE
+LEFT JOIN t_exposure_time_mode e
+  ON e.c_observation_id = o.c_observation_id
+ AND e.c_role = 'requirement'
+ORDER BY
+  o.c_observation_id,
+  t.c_target_id;
