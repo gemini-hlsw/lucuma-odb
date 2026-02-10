@@ -585,18 +585,17 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
           )
 
 
-  @annotation.nowarn("msg=unused implicit parameter")
   private def recordVisit(
     response:  F[Result[Visit.Id]],
     predicate: LeafPredicates[Visit.Id],
     child:     Query
-  )(using Transaction[F]): F[Result[Query]] =
+  ): F[Result[Query]] =
     ResultT(response).map(vid => Unique(Filter(predicate.eql(vid), child))).value
 
 
   private lazy val RecordFlamingos2Visit: MutationField =
     MutationField("recordFlamingos2Visit", RecordVisitInput.Flamingos2Binding): (input, child) =>
-      services.useTransactionally:
+      services.useNonTransactionally:
         requireServiceAccess:
           recordVisit(
             visitService.recordFlamingos2(input),
@@ -606,7 +605,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
 
   private lazy val RecordGmosNorthVisit: MutationField =
     MutationField("recordGmosNorthVisit", RecordVisitInput.GmosNorthBinding): (input, child) =>
-      services.useTransactionally:
+      services.useNonTransactionally:
         requireServiceAccess:
           recordVisit(
             visitService.recordGmosNorth(input),
@@ -616,7 +615,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
 
   private lazy val RecordGmosSouthVisit: MutationField =
     MutationField("recordGmosSouthVisit", RecordVisitInput.GmosSouthBinding): (input, child) =>
-      services.useTransactionally:
+      services.useNonTransactionally:
         requireServiceAccess:
           recordVisit(
             visitService.recordGmosSouth(input),

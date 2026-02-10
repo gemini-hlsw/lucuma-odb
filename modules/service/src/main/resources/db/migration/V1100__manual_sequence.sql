@@ -81,6 +81,7 @@ ALTER TABLE t_flamingos_2_dynamic
   DROP CONSTRAINT t_flamingos_2_dynamic_c_step_id_c_instrument_fkey;
 
 -- Add execution state to the generator params
+DROP VIEW v_generator_params;
 CREATE OR REPLACE VIEW v_generator_params AS
 SELECT
   o.c_program_id,
@@ -104,7 +105,7 @@ SELECT
   o.c_declared_complete,
   CASE
     WHEN o.c_declared_complete
-      THEN 'complete'::e_execution_state
+      THEN 'completed'::e_execution_state
 
     WHEN NOT EXISTS (
       SELECT 1 FROM t_execution_event v WHERE v.c_observation_id = o.c_observation_id
@@ -116,7 +117,7 @@ SELECT
           AND a.c_execution_state IN ('not_started', 'ongoing')
     ) THEN 'ongoing'::e_execution_state
 
-    ELSE 'complete'::e_execution_state
+    ELSE 'completed'::e_execution_state
   END AS c_execution_state,
   o.c_acq_reset_time,
   o.c_blind_offset_target_id,
@@ -144,3 +145,11 @@ LEFT JOIN t_exposure_time_mode e
 ORDER BY
   o.c_observation_id,
   t.c_target_id;
+
+-- Sequence serialization coordination
+
+CREATE TABLE t_sequence_materialization (
+  c_observation_id d_observation_id PRIMARY KEY,
+  c_created_at     timestamp        NOT NULL,
+  c_updated_at     timestamp        NOT NULL
+);
