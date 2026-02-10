@@ -61,6 +61,7 @@ import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.Flamingos2Codecs.*
 import lucuma.odb.util.GmosCodecs.*
 import skunk.*
+import skunk.codec.boolean.bool
 import skunk.codec.numeric.int2
 import skunk.codec.numeric.int4
 import skunk.codec.text.text
@@ -145,10 +146,19 @@ trait SequenceService[F[_]]:
     observationId: Observation.Id
   )(using Services.ServiceAccess): Stream[F, AtomRecord]
 
+  def isMaterialized(
+    observationId: Observation.Id
+  )(using Transaction[F]): F[Boolean]
+
   def insertFlamingos2Sequence(
     observationId: Observation.Id,
     sequenceType:  SequenceType,
     sequence:      Stream[F, Atom[Flamingos2DynamicConfig]]
+  )(using Transaction[F], Services.ServiceAccess): F[Unit]
+
+  def materializeFlamingos2ExecutionConfig(
+    observationId: Observation.Id,
+    stream:        StreamingExecutionConfig[F, Flamingos2StaticConfig, Flamingos2DynamicConfig]
   )(using Transaction[F], Services.ServiceAccess): F[Unit]
 
   def insertGmosNorthSequence(
@@ -157,24 +167,34 @@ trait SequenceService[F[_]]:
     sequence:      Stream[F, Atom[GmosNorth]]
   )(using Transaction[F], Services.ServiceAccess): F[Unit]
 
+  def materializeGmosNorthExecutionConfig(
+    observationId: Observation.Id,
+    stream:        StreamingExecutionConfig[F, GmosNorthStatic, GmosNorth]
+  )(using Transaction[F], Services.ServiceAccess): F[Unit]
+
   def insertGmosSouthSequence(
     observationId: Observation.Id,
     sequenceType:  SequenceType,
     sequence:      Stream[F, Atom[GmosSouth]]
   )(using Transaction[F], Services.ServiceAccess): F[Unit]
 
+  def materializeGmosSouthExecutionConfig(
+    observationId: Observation.Id,
+    stream:        StreamingExecutionConfig[F, GmosSouthStatic, GmosSouth]
+  )(using Transaction[F], Services.ServiceAccess): F[Unit]
 
-  def streamingFlamingos2ExecutionConfig(
-    observationId: Observation.Id
-  )(using Transaction[F], Services.ServiceAccess): F[Option[StreamingExecutionConfig[F, Flamingos2StaticConfig, Flamingos2DynamicConfig]]]
 
-  def streamingGmosNorthExecutionConfig(
+  def selectFlamingos2ExecutionConfig(
     observationId: Observation.Id
-  )(using Transaction[F], Services.ServiceAccess): F[Option[StreamingExecutionConfig[F, GmosNorthStatic, GmosNorth]]]
+  )(using Transaction[F]): F[Option[StreamingExecutionConfig[F, Flamingos2StaticConfig, Flamingos2DynamicConfig]]]
 
-  def streamingGmosSouthExecutionConfig(
+  def selectGmosNorthExecutionConfig(
     observationId: Observation.Id
-  )(using Transaction[F], Services.ServiceAccess): F[Option[StreamingExecutionConfig[F, GmosSouthStatic, GmosSouth]]]
+  )(using Transaction[F]): F[Option[StreamingExecutionConfig[F, GmosNorthStatic, GmosNorth]]]
+
+  def selectGmosSouthExecutionConfig(
+    observationId: Observation.Id
+  )(using Transaction[F]): F[Option[StreamingExecutionConfig[F, GmosSouthStatic, GmosSouth]]]
 
 
 object SequenceService:
@@ -591,13 +611,54 @@ object SequenceService:
             NonEmptyList.fromListUnsafe(chunk.map(_._3).toList)
           )
 
+      override def isMaterialized(
+        observationId: Observation.Id
+      )(using Transaction[F]): F[Boolean] =
+        session.unique(Statements.IsMaterialized)(observationId)
+
+      private def materializeExecutionConfig[S, D](
+        observationId: Observation.Id,
+        stream:        StreamingExecutionConfig[F, S, D]
+      )(
+        insert: (Observation.Id, SequenceType, Stream[F, Atom[D]]) => F[Unit]
+      )(using Services.ServiceAccess): F[Unit] =
+
+        val markMaterialized: F[Boolean] =
+          session
+            .option(Statements.MarkMaterialization)(observationId)
+            .map(_.isDefined) // if a row is returned, then the observation was marked
+
+        val doMaterialize: F[Unit] =
+          insert(observationId, SequenceType.Acquisition, stream.acquisition) *>
+          insert(observationId, SequenceType.Science, stream.science)
+
+        markMaterialized.ifM(doMaterialize, Applicative[F].unit)
+
+      override def materializeFlamingos2ExecutionConfig(
+        observationId: Observation.Id,
+        stream:        StreamingExecutionConfig[F, Flamingos2StaticConfig, Flamingos2DynamicConfig]
+      )(using Transaction[F], Services.ServiceAccess): F[Unit] =
+        materializeExecutionConfig(observationId, stream)(insertFlamingos2Sequence)
+
+      override def materializeGmosNorthExecutionConfig(
+        observationId: Observation.Id,
+        stream:        StreamingExecutionConfig[F, GmosNorthStatic, GmosNorth]
+      )(using Transaction[F], Services.ServiceAccess): F[Unit] =
+        materializeExecutionConfig(observationId, stream)(insertGmosNorthSequence)
+
+      override def materializeGmosSouthExecutionConfig(
+        observationId: Observation.Id,
+        stream:        StreamingExecutionConfig[F, GmosSouthStatic, GmosSouth]
+      )(using Transaction[F], Services.ServiceAccess): F[Unit] =
+        materializeExecutionConfig(observationId, stream)(insertGmosSouthSequence)
+
       private def streamingExecutionConfig[S, D](
         instrument:    Instrument,
         observationId: Observation.Id,
         query:         Query[(Instrument, Observation.Id, SequenceType), (Atom.Id, Option[String], Step.Id, ProtoStep[D])],
         estimator:     TimeEstimateCalculator[S, D],
         lookupStatic:  Observation.Id => F[Option[S]]
-      )(using Services.ServiceAccess): OptionT[F, StreamingExecutionConfig[F, S, D]] =
+      ): OptionT[F, StreamingExecutionConfig[F, S, D]] =
 
         def stream(sequenceType: SequenceType, static: S): Stream[F, Atom[D]] =
           session
@@ -612,9 +673,9 @@ object SequenceService:
               stream(SequenceType.Science,     static)
             )
 
-      override def streamingFlamingos2ExecutionConfig(
+      override def selectFlamingos2ExecutionConfig(
         observationId: Observation.Id
-      )(using Transaction[F], Services.ServiceAccess): F[Option[StreamingExecutionConfig[F, Flamingos2StaticConfig, Flamingos2DynamicConfig]]] =
+      )(using Transaction[F]): F[Option[StreamingExecutionConfig[F, Flamingos2StaticConfig, Flamingos2DynamicConfig]]] =
         streamingExecutionConfig(
           Instrument.Flamingos2,
           observationId,
@@ -623,9 +684,9 @@ object SequenceService:
           flamingos2SequenceService.selectLatestVisitStatic
         ).value
 
-      override def streamingGmosNorthExecutionConfig(
+      override def selectGmosNorthExecutionConfig(
         observationId: Observation.Id
-      )(using Transaction[F], Services.ServiceAccess): F[Option[StreamingExecutionConfig[F, GmosNorthStatic, GmosNorth]]] =
+      )(using Transaction[F]): F[Option[StreamingExecutionConfig[F, GmosNorthStatic, GmosNorth]]] =
         streamingExecutionConfig(
           Instrument.GmosNorth,
           observationId,
@@ -634,9 +695,9 @@ object SequenceService:
           gmosSequenceService.selectLatestVisitGmosNorthStatic
         ).value
 
-      override def streamingGmosSouthExecutionConfig(
+      override def selectGmosSouthExecutionConfig(
         observationId: Observation.Id
-      )(using Transaction[F], Services.ServiceAccess): F[Option[StreamingExecutionConfig[F, GmosSouthStatic, GmosSouth]]] =
+      )(using Transaction[F]): F[Option[StreamingExecutionConfig[F, GmosSouthStatic, GmosSouth]]] =
         streamingExecutionConfig(
           Instrument.GmosSouth,
           observationId,
@@ -1206,3 +1267,20 @@ object SequenceService:
         GmosSequenceService.Statements.GmosDynamicColumns,
         gmos_south_dynamic
       )
+
+    val IsMaterialized: Query[Observation.Id, Boolean] =
+      sql"""
+        SELECT EXISTS (
+          SELECT 1
+          FROM   t_sequence_materialization
+          WHERE  c_observation_id = $observation_id
+        )
+      """.query(bool)
+
+    val MarkMaterialization: Query[Observation.Id, Observation.Id] =
+      sql"""
+        INSERT INTO t_sequence_materialization (c_observation_id, c_created_at, c_updated_at)
+        VALUES ($observation_id, now(), now())
+        ON CONFLICT DO NOTHING
+        RETURNING c_observation_id
+      """.query(observation_id)

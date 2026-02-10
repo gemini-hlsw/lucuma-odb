@@ -15,8 +15,8 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.api.RefinedTypeOps
 import eu.timepit.refined.numeric.Interval
 import fs2.Stream
-import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.ExecutionState
+import lucuma.core.enums.ObservingModeType
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.AtomDigest
@@ -50,7 +50,7 @@ sealed trait Generator[F[_]]:
    */
   def digest(
     observationId: Observation.Id
-  )(using NoTransaction[F], Services.ServiceAccess): F[Either[OdbError, ExecutionDigest]]
+  )(using NoTransaction[F]): F[Either[OdbError, ExecutionDigest]]
 
   /**
    * The same is `digest`, but it also returns the GeneratorParms and the hash used
@@ -60,7 +60,7 @@ sealed trait Generator[F[_]]:
    */
   def digestWithParamsAndHash(
     observationId: Observation.Id
-  )(using NoTransaction[F], Services.ServiceAccess): F[Either[OdbError, (ExecutionDigest, GeneratorParams, Md5Hash)]]
+  )(using NoTransaction[F]): F[Either[OdbError, (ExecutionDigest, GeneratorParams, Md5Hash)]]
 
   /**
    * Calculates the ExecutionDigest and AtomDigests (for the obscalc service).
@@ -75,9 +75,7 @@ sealed trait Generator[F[_]]:
 
   /**
    * Generates the execution config if the observation is found and defined
-   * well enough to perform the calculation.  Because the sequences that are
-   * generated may differ depending on when requested, a 'when' parameter option
-   * is provided.  By default this will be "now".
+   * well enough to perform the calculation.
    *
    * @param futureLimit cap to place on the number of atoms that map appear in
    *                    the possibleFuture
@@ -85,7 +83,17 @@ sealed trait Generator[F[_]]:
   def generate(
     observationId: Observation.Id,
     futureLimit:   FutureLimit = FutureLimit.Default
-  )(using NoTransaction[F], Services.ServiceAccess): F[Either[OdbError, InstrumentExecutionConfig]]
+  )(using NoTransaction[F]): F[Either[OdbError, InstrumentExecutionConfig]]
+
+  def materialize(
+    observationId: Observation.Id
+  )(using NoTransaction[F], Services.ServiceAccess): F[Either[OdbError, Unit]]
+
+  def materializeAndThen[A](
+    oid:  Observation.Id
+  )(
+    f: Transaction[F] ?=> F[Either[OdbError, A]]
+  )(using NoTransaction[F], Services.ServiceAccess): F[Either[OdbError, A]]
 
 object Generator:
 
@@ -117,36 +125,48 @@ object Generator:
       val streaming = GeneratorStreaming.instantiate(commitHash, calculator)
 
       object ExecutionDigestCache:
-        def lookupOne(ctx: GeneratorContext)(using NoTransaction[F]): EitherT[F, OdbError, Option[ExecutionDigest]] =
-          EitherT.right:
-            services.transactionally:
-              executionDigestService.selectOne(ctx.oid, ctx.hash)
+        def lookupOne(ctx: GeneratorContext)(using Transaction[F]): EitherT[F, OdbError, Option[ExecutionDigest]] =
+          EitherT.right(executionDigestService.selectOne(ctx.oid, ctx.hash))
 
         def lookupMany(contexts: List[GeneratorContext])(using Transaction[F]): F[Map[Observation.Id, ExecutionDigest]] =
           executionDigestService.selectMany(contexts.map(c => (c.oid, c.hash)))
 
-        def store(ctx: GeneratorContext, digest: ExecutionDigest)(using NoTransaction[F]): EitherT[F, OdbError, Unit] =
-          EitherT.right:
-            services.transactionally:
-              executionDigestService.insertOrUpdate(ctx.oid, ctx.hash, digest)
+        def store(ctx: GeneratorContext, digest: ExecutionDigest)(using Transaction[F]): EitherT[F, OdbError, Unit] =
+          EitherT.right(executionDigestService.insertOrUpdate(ctx.oid, ctx.hash, digest))
+
+      private def transactionallyEitherT[A](
+        fa: (Transaction[F], Services[F]) ?=> EitherT[F, OdbError, A]
+      )(using NoTransaction[F]): EitherT[F, OdbError, A] =
+        EitherT(services.transactionally { val x = fa; x.value})
+
+      private def transactionallyWithContext[A](
+        oid:        Observation.Id,
+        commitHash: CommitHash,
+        itcResult:  Option[Either[OdbError, Itc]] = None
+      )(
+        f: GeneratorContext => Transaction[F] ?=> EitherT[F, OdbError, A]
+      )(using NoTransaction[F], Services[F]): F[Either[OdbError, A]] =
+        EitherT(GeneratorContext.lookup(oid, commitHash, itcResult))
+          .flatMap(ctx => transactionallyEitherT(f(ctx)))
+          .value
 
       override def digest(
         oid: Observation.Id
-      )(using NoTransaction[F], Services.ServiceAccess): F[Either[OdbError, ExecutionDigest]] =
+      )(using NoTransaction[F]): F[Either[OdbError, ExecutionDigest]] =
         digestWithParamsAndHash(oid).map(_.map(_._1))
 
       override def digestWithParamsAndHash(
         oid: Observation.Id
-      )(using NoTransaction[F], Services.ServiceAccess): F[Either[OdbError, (ExecutionDigest, GeneratorParams, Md5Hash)]] =
-        (for
-          ctx <- EitherT(GeneratorContext.lookup(oid, commitHash))
-          d0  <- ExecutionDigestCache.lookupOne(ctx)
-          d1  <- d0.fold(calcDigestThenCache(ctx))(d => EitherT.pure(d))
-        yield (d1, ctx.params, ctx.hash)).value
+      )(using NoTransaction[F]): F[Either[OdbError, (ExecutionDigest, GeneratorParams, Md5Hash)]] =
+        transactionallyWithContext(oid, commitHash): ctx =>
+          for
+            d0  <- ExecutionDigestCache.lookupOne(ctx)
+            d1  <- d0.fold(calcDigestThenCache(ctx))(d => EitherT.pure(d))
+          yield (d1, ctx.params, ctx.hash)
 
       private def calcDigestThenCache(
         ctx: GeneratorContext
-      )(using NoTransaction[F], Services.ServiceAccess): EitherT[F, OdbError, ExecutionDigest] =
+      )(using Transaction[F]): EitherT[F, OdbError, ExecutionDigest] =
         for
           d <- calcDigestFromContext(ctx)
           _ <- ExecutionDigestCache.store(ctx, d)
@@ -154,7 +174,7 @@ object Generator:
 
       private def calcDigestFromContext(
         ctx: GeneratorContext
-      )(using NoTransaction[F], Services.ServiceAccess): EitherT[F, OdbError, ExecutionDigest] =
+      )(using Transaction[F]): EitherT[F, OdbError, ExecutionDigest] =
 
         def digest[S, D](
           stream: StreamingExecutionConfig[F, S, D],
@@ -187,26 +207,21 @@ object Generator:
         else
           ctx.params.observingMode.modeType match
             case ObservingModeType.Flamingos2LongSlit =>
-              EitherT(streaming.flamingos2LongSlit(ctx)).flatMap(digest(_, calculator.flamingos2.estimateSetup))
+              EitherT(streaming.selectOrGenerateFlamingos2LongSlit(ctx)).flatMap(digest(_, calculator.flamingos2.estimateSetup))
             case ObservingModeType.GmosNorthImaging   =>
-              EitherT(streaming.gmosNorthImaging(ctx)).flatMap(digest(_, calculator.gmosNorth.estimateSetup))
+              EitherT(streaming.selectOrGenerateGmosNorthImaging(ctx)).flatMap(digest(_, calculator.gmosNorth.estimateSetup))
             case ObservingModeType.GmosNorthLongSlit  =>
-              EitherT(streaming.gmosNorthLongSlit(ctx)).flatMap(digest(_, calculator.gmosNorth.estimateSetup))
+              EitherT(streaming.selectOrGenerateGmosNorthLongSlit(ctx)).flatMap(digest(_, calculator.gmosNorth.estimateSetup))
             case ObservingModeType.GmosSouthImaging   =>
-              EitherT(streaming.gmosSouthImaging(ctx)).flatMap(digest(_, calculator.gmosSouth.estimateSetup))
+              EitherT(streaming.selectOrGenerateGmosSouthImaging(ctx)).flatMap(digest(_, calculator.gmosSouth.estimateSetup))
             case ObservingModeType.GmosSouthLongSlit  =>
-              EitherT(streaming.gmosSouthLongSlit(ctx)).flatMap(digest(_, calculator.gmosSouth.estimateSetup))
+              EitherT(streaming.selectOrGenerateGmosSouthLongSlit(ctx)).flatMap(digest(_, calculator.gmosSouth.estimateSetup))
             case ObservingModeType.Igrins2LongSlit    =>
               EitherT.leftT(OdbError.InvalidObservation(ctx.oid, s"IGRINS2 is not yet supported".some))
 
-      private def calculateDigest(
-        ctx: GeneratorContext
-      )(using NoTransaction[F], Services.ServiceAccess): F[Either[OdbError, ExecutionDigest]] =
-        calcDigestThenCache(ctx).value
-
       private def calculateScienceAtomDigests(
         ctx: GeneratorContext
-      )(using NoTransaction[F], Services.ServiceAccess): F[Either[OdbError, Stream[F, AtomDigest]]] =
+      )(using Transaction[F]): EitherT[F, OdbError, Stream[F, AtomDigest]] =
 
         val checkSequence =
           EitherT
@@ -215,34 +230,34 @@ object Generator:
 
         val atomDigests = ctx.params.observingMode.modeType match
           case ObservingModeType.Flamingos2LongSlit =>
-            EitherT(streaming.flamingos2LongSlit(ctx)).map(_.science.map(AtomDigest.fromAtom))
+            EitherT(streaming.selectOrGenerateFlamingos2LongSlit(ctx)).map(_.science.map(AtomDigest.fromAtom))
           case ObservingModeType.GmosNorthImaging   =>
-            EitherT(streaming.gmosNorthImaging(ctx)).map(_.science.map(AtomDigest.fromAtom))
+            EitherT(streaming.selectOrGenerateGmosNorthImaging(ctx)).map(_.science.map(AtomDigest.fromAtom))
           case ObservingModeType.GmosNorthLongSlit  =>
-            EitherT(streaming.gmosNorthLongSlit(ctx)).map(_.science.map(AtomDigest.fromAtom))
+            EitherT(streaming.selectOrGenerateGmosNorthLongSlit(ctx)).map(_.science.map(AtomDigest.fromAtom))
           case ObservingModeType.GmosSouthImaging   =>
-            EitherT(streaming.gmosSouthImaging(ctx)).map(_.science.map(AtomDigest.fromAtom))
+            EitherT(streaming.selectOrGenerateGmosSouthImaging(ctx)).map(_.science.map(AtomDigest.fromAtom))
           case ObservingModeType.GmosSouthLongSlit  =>
-            EitherT(streaming.gmosSouthLongSlit(ctx)).map(_.science.map(AtomDigest.fromAtom))
+            EitherT(streaming.selectOrGenerateGmosSouthLongSlit(ctx)).map(_.science.map(AtomDigest.fromAtom))
           case ObservingModeType.Igrins2LongSlit    =>
             EitherT.leftT(OdbError.InvalidObservation(ctx.oid, s"IGRINS2 is not yet supported".some))
 
-        (checkSequence *> atomDigests).value
+        checkSequence *> atomDigests
 
       override def obscalc(
         observationId: Observation.Id,
         itcResult:     Either[OdbError, Itc]
       )(using NoTransaction[F], Services.ServiceAccess): F[Either[OdbError, (ExecutionDigest, Stream[F, AtomDigest])]] =
-        (for
-          c <- EitherT(GeneratorContext.lookup(observationId, commitHash, itcResult.some))
-          d <- EitherT(calculateDigest(c))
-          a <- EitherT(calculateScienceAtomDigests(c))
-        yield (d, a)).value
+        transactionallyWithContext(observationId, commitHash, itcResult.some): ctx =>
+          for
+            d <- calcDigestThenCache(ctx)
+            a <- calculateScienceAtomDigests(ctx)
+          yield (d, a)
 
       override def generate(
         oid:  Observation.Id,
         lim:  FutureLimit = FutureLimit.Default
-      )(using NoTransaction[F], Services.ServiceAccess): F[Either[OdbError, InstrumentExecutionConfig]] =
+      )(using NoTransaction[F]): F[Either[OdbError, InstrumentExecutionConfig]] =
 
         def executionConfig[S, D](
           stream: StreamingExecutionConfig[F, S, D],
@@ -267,38 +282,112 @@ object Generator:
 
         def instrumentExecutionConfig(
           ctx: GeneratorContext
-        ): EitherT[F, OdbError, InstrumentExecutionConfig] =
+        )(using Transaction[F]): EitherT[F, OdbError, InstrumentExecutionConfig] =
           ctx.params.observingMode.modeType match
 
             case ObservingModeType.Flamingos2LongSlit =>
-              EitherT(streaming.flamingos2LongSlit(ctx))
+              EitherT(streaming.selectOrGenerateFlamingos2LongSlit(ctx))
                 .flatMap(s => EitherT.liftF(executionConfig(s)))
                 .map(InstrumentExecutionConfig.Flamingos2.apply)
 
             case ObservingModeType.GmosNorthImaging   =>
-              EitherT(streaming.gmosNorthImaging(ctx))
+              EitherT(streaming.selectOrGenerateGmosNorthImaging(ctx))
                 .flatMap(s => EitherT.liftF(executionConfig(s)))
                 .map(InstrumentExecutionConfig.GmosNorth.apply)
 
             case ObservingModeType.GmosNorthLongSlit  =>
-              EitherT(streaming.gmosNorthLongSlit(ctx))
+              EitherT(streaming.selectOrGenerateGmosNorthLongSlit(ctx))
                 .flatMap(s => EitherT.liftF(executionConfig(s)))
                 .map(InstrumentExecutionConfig.GmosNorth.apply)
 
             case ObservingModeType.GmosSouthImaging   =>
-              EitherT(streaming.gmosSouthImaging(ctx))
+              EitherT(streaming.selectOrGenerateGmosSouthImaging(ctx))
                 .flatMap(s => EitherT.liftF(executionConfig(s)))
                 .map(InstrumentExecutionConfig.GmosSouth.apply)
 
             case ObservingModeType.GmosSouthLongSlit  =>
-              EitherT(streaming.gmosSouthLongSlit(ctx))
+              EitherT(streaming.selectOrGenerateGmosSouthLongSlit(ctx))
                 .flatMap(s => EitherT.liftF(executionConfig(s)))
                 .map(InstrumentExecutionConfig.GmosSouth.apply)
 
             case ObservingModeType.Igrins2LongSlit    =>
               EitherT.leftT(OdbError.InvalidObservation(ctx.oid, s"IGRINS2 is not yet supported".some))
 
-        (for
-          ctx <- EitherT(GeneratorContext.lookup(oid, commitHash))
-          iec <- instrumentExecutionConfig(ctx)
-        yield iec).value
+        transactionallyWithContext(oid, commitHash): ctx =>
+          instrumentExecutionConfig(ctx)
+
+      override def materializeAndThen[A](
+        oid:  Observation.Id
+      )(
+        f: Transaction[F] ?=> F[Either[OdbError, A]]
+      )(using NoTransaction[F], Services.ServiceAccess): F[Either[OdbError, A]] =
+
+        def materializeExecutionConfig(
+          ctx: GeneratorContext
+        )(using Transaction[F]): EitherT[F, OdbError, Unit] =
+          ctx.params.observingMode.modeType match
+
+            case ObservingModeType.Flamingos2LongSlit =>
+              EitherT(streaming.generateFlamingos2LongSlit(ctx))
+                .flatMap(s => EitherT.liftF(sequenceService.materializeFlamingos2ExecutionConfig(oid, s)))
+
+            case ObservingModeType.GmosNorthImaging =>
+              EitherT(streaming.generateGmosNorthImaging(ctx))
+                .flatMap(s => EitherT.liftF(sequenceService.materializeGmosNorthExecutionConfig(oid, s)))
+
+            case ObservingModeType.GmosNorthLongSlit =>
+              EitherT(streaming.generateGmosNorthLongSlit(ctx))
+                .flatMap(s => EitherT.liftF(sequenceService.materializeGmosNorthExecutionConfig(oid, s)))
+
+            case ObservingModeType.GmosSouthImaging =>
+              EitherT(streaming.generateGmosSouthImaging(ctx))
+                .flatMap(s => EitherT.liftF(sequenceService.materializeGmosSouthExecutionConfig(oid, s)))
+
+            case ObservingModeType.GmosSouthLongSlit =>
+              EitherT(streaming.generateGmosSouthLongSlit(ctx))
+                .flatMap(s => EitherT.liftF(sequenceService.materializeGmosSouthExecutionConfig(oid, s)))
+
+            case ObservingModeType.Igrins2LongSlit    =>
+              EitherT.leftT(OdbError.InvalidObservation(ctx.oid, s"IGRINS2 is not yet supported".some))
+
+        transactionallyWithContext(oid, commitHash): ctx =>
+          materializeExecutionConfig(ctx) *> EitherT(f)
+
+
+      override def materialize(
+        oid:  Observation.Id,
+      )(using NoTransaction[F], Services.ServiceAccess): F[Either[OdbError, Unit]] =
+        materializeAndThen(oid)(().asRight[OdbError].pure[F])
+
+/*
+        def materializeExecutionConfig(
+          ctx: GeneratorContext
+        )(using Transaction[F]): EitherT[F, OdbError, Unit] =
+          ctx.params.observingMode.modeType match
+
+            case ObservingModeType.Flamingos2LongSlit =>
+              EitherT(streaming.generateFlamingos2LongSlit(ctx))
+                .flatMap(s => EitherT.liftF(sequenceService.materializeFlamingos2ExecutionConfig(oid, s)))
+
+            case ObservingModeType.GmosNorthImaging =>
+              EitherT(streaming.generateGmosNorthImaging(ctx))
+                .flatMap(s => EitherT.liftF(sequenceService.materializeGmosNorthExecutionConfig(oid, s)))
+
+            case ObservingModeType.GmosNorthLongSlit =>
+              EitherT(streaming.generateGmosNorthLongSlit(ctx))
+                .flatMap(s => EitherT.liftF(sequenceService.materializeGmosNorthExecutionConfig(oid, s)))
+
+            case ObservingModeType.GmosSouthImaging =>
+              EitherT(streaming.generateGmosSouthImaging(ctx))
+                .flatMap(s => EitherT.liftF(sequenceService.materializeGmosSouthExecutionConfig(oid, s)))
+
+            case ObservingModeType.GmosSouthLongSlit =>
+              EitherT(streaming.generateGmosSouthLongSlit(ctx))
+                .flatMap(s => EitherT.liftF(sequenceService.materializeGmosSouthExecutionConfig(oid, s)))
+
+            case ObservingModeType.Igrins2LongSlit    =>
+              EitherT.leftT(OdbError.InvalidObservation(ctx.oid, s"IGRINS2 is not yet supported".some))
+
+        transactionallyWithContext(oid, commitHash): ctx =>
+          materializeExecutionConfig(ctx)
+*/

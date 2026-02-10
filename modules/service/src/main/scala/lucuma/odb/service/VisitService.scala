@@ -3,11 +3,11 @@
 
 package lucuma.odb.service
 
+import cats.data.EitherT
 import cats.effect.Concurrent
 import cats.syntax.all.*
 import fs2.Stream
 import grackle.Result
-import grackle.ResultT
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.Site
@@ -19,7 +19,7 @@ import lucuma.core.model.sequence.gmos.StaticConfig.GmosNorth
 import lucuma.core.model.sequence.gmos.StaticConfig.GmosSouth
 import lucuma.core.util.IdempotencyKey
 import lucuma.odb.data.OdbError
-import lucuma.odb.data.OdbErrorExtensions.*
+import lucuma.odb.data.ResultExtensions.*
 import lucuma.odb.graphql.input.RecordVisitInput
 import lucuma.odb.sequence.data.VisitRecord
 import lucuma.odb.syntax.instrument.*
@@ -56,15 +56,15 @@ trait VisitService[F[_]]:
 
   def recordFlamingos2(
     input: RecordVisitInput[Flamingos2StaticConfig]
-  )(using Transaction[F], Services.ServiceAccess): F[Result[Visit.Id]]
+  )(using NoTransaction[F], Services.ServiceAccess): F[Result[Visit.Id]]
 
   def recordGmosNorth(
     input: RecordVisitInput[GmosNorth]
-  )(using Transaction[F], Services.ServiceAccess): F[Result[Visit.Id]]
+  )(using NoTransaction[F], Services.ServiceAccess): F[Result[Visit.Id]]
 
   def recordGmosSouth(
     input: RecordVisitInput[GmosSouth]
-  )(using Transaction[F], Services.ServiceAccess): F[Result[Visit.Id]]
+  )(using NoTransaction[F], Services.ServiceAccess): F[Result[Visit.Id]]
 
 
 object VisitService:
@@ -110,96 +110,105 @@ object VisitService:
 
       private def obsDescription(
         observationId: Observation.Id
-      ): ResultT[F, ObsDescription] =
-        ResultT:
+      ): EitherT[F, OdbError, ObsDescription] =
+        EitherT:
           session.option(Statements.SelectObsDescription)(observationId).map: od =>
-            Result.fromOption(od, OdbError.InvalidObservation(observationId, s"Observation '$observationId' not found or is not associated with any instrument.".some).asProblem)
+            Either.fromOption(od, OdbError.InvalidObservation(observationId, s"Observation '$observationId' not found or is not associated with any instrument.".some))
 
       private def lookupOrInsertImpl(
         observationId:  Observation.Id,
         idempotencyKey: Option[IdempotencyKey]
-      )(using Transaction[F], Services.ServiceAccess): F[Result[VisitRecord]] =
+      )(using Transaction[F], Services.ServiceAccess): EitherT[F, OdbError, VisitRecord] =
 
-        def obsNight(site: Site): ResultT[F, ObservingNight] =
-          ResultT.liftF(timeService.currentObservingNight(site))
+        def lookupVisit(desc:  ObsDescription, night: ObservingNight): F[Option[VisitRecord]] =
+          if desc.isChargeable then
+            session
+              .option(Statements.SelectChargeableVisit)(night)
+              .map: o =>
+                o.collect:
+                  case vr if vr.observationId === observationId => vr
+          else
+            session
+              .option(Statements.SelectLastVisit)(night, observationId)
 
-        // Application transaction advisory lock on visit creation. The idea is
-        // to prevent two callers (Observe and Navigate) from doing a lookup
-        // simultaneously and coming to the conclusion to each create a new
-        // visit.
-        val lockVisitCreation: ResultT[F, Unit] =
-          ResultT.liftF:
-            session.unique(Statements.LockCreation)(Statements.VisitCreationLockId)
+        def insertNewVisit(desc: ObsDescription): F[VisitRecord] =
+          session.unique(Statements.InsertVisit)(observationId, desc, idempotencyKey)
 
-        def lookupVisit(desc:  ObsDescription, night: ObservingNight): ResultT[F, Option[VisitRecord]] =
-          ResultT.liftF:
-            if desc.isChargeable then
-              session
-                .option(Statements.SelectChargeableVisit)(night)
-                .map: o =>
-                  o.collect:
-                    case vr if vr.observationId === observationId => vr
-            else
-              session
-                .option(Statements.SelectLastVisit)(night, observationId)
-
-        def insertNewVisit(desc: ObsDescription): ResultT[F, VisitRecord] =
-           ResultT.liftF:
-             session.unique(Statements.InsertVisit)(observationId, desc, idempotencyKey)
-
-        (for
-          d  <- obsDescription(observationId)
-          n  <- obsNight(d.site)
-          _  <- lockVisitCreation
-          v  <- lookupVisit(d, n)
-          vʹ <- v.fold(insertNewVisit(d))(ResultT.pure)
-        yield vʹ).value
+        obsDescription(observationId)
+          .semiflatMap: d =>
+            for
+              n  <- timeService.currentObservingNight(d.site)
+              // Application transaction advisory lock on visit creation. The idea is
+              // to prevent two callers (Observe and Navigate) from doing a lookup
+              // simultaneously and coming to the conclusion to each create a new
+              // visit.
+              _  <- session.unique(Statements.LockCreation)(Statements.VisitCreationLockId)
+              v  <- lookupVisit(d, n)
+              vʹ <- v.fold(insertNewVisit(d))(Concurrent[F].pure)
+            yield vʹ
 
       override def lookupOrInsert(
         observationId:  Observation.Id,
         idempotencyKey: Option[IdempotencyKey]
       )(using Transaction[F], Services.ServiceAccess): F[Result[Visit.Id]] =
-        lookupOrInsertImpl(observationId, idempotencyKey).map(_.map(_.visitId))
+        lookupOrInsertImpl(observationId, idempotencyKey)
+          .map(_.visitId)
+          .value
+          .map(Result.fromEitherOdbError)
 
       private def insertWithStaticConfig[A](
         observationId:  Observation.Id,
         static:         A,
         idempotencyKey: Option[IdempotencyKey],
         instrument:     Instrument,
-        lookupStatic:   Visit.Id                              => F[Option[A]],
-        insertStatic:   (Observation.Id, Option[Visit.Id], A) => F[Long]
-      )(using Transaction[F], Services.ServiceAccess): F[Result[Visit.Id]] =
+        lookupStatic:   Visit.Id => Transaction[F] ?=> F[Option[A]],
+        insertStatic:   (Observation.Id, Option[Visit.Id], A) => (Transaction[F], Services.ServiceAccess) ?=> F[Long]
+      )(using Transaction[F], Services.ServiceAccess): F[Either[OdbError, Visit.Id]] =
 
-        val insertNewVisit: ResultT[F, Visit.Id] =
+        val insertNewVisit: EitherT[F, OdbError, Visit.Id] =
           for
             d <- obsDescription(observationId)
-            v <- ResultT.liftF(session.unique(Statements.InsertVisit)(observationId, d, idempotencyKey))
+            v <- EitherT.liftF(session.unique(Statements.InsertVisit)(observationId, d, idempotencyKey))
           yield v.visitId
 
-        def insertStaticForVisit(v: Visit.Id): ResultT[F, Unit] =
-          ResultT.liftF(insertStatic(observationId, v.some, static)).void
+        def insertStaticForVisit(v: Visit.Id): EitherT[F, OdbError, Unit] =
+          EitherT.liftF(insertStatic(observationId, v.some, static).void)
 
-        val update = (for
-          v0 <- ResultT(lookupOrInsertImpl(observationId, idempotencyKey))
-          os <- ResultT.liftF(lookupStatic(v0.visitId))
+        val update = for
+          v0 <- lookupOrInsertImpl(observationId, idempotencyKey)
+          os <- EitherT.liftF(lookupStatic(v0.visitId))
           v1 <- os.fold(insertStaticForVisit(v0.visitId).as(v0.visitId)): _ =>
                   val sameKey = (v0.idempotencyKey, idempotencyKey).tupled.exists(_ === _)
                   if sameKey then
-                    ResultT.pure(v0.visitId)  // was previously done
+                    EitherT.pure[F, OdbError](v0.visitId)
                   else
                     insertNewVisit.flatMap: v =>
                       insertStaticForVisit(v).as(v)
-        yield v1).value
+        yield v1
 
         update
+          .value
           .recover:
             case SqlState.ForeignKeyViolation(_) =>
-              OdbError.InvalidObservation(observationId, Some(s"Observation '$observationId' not found or is not a ${instrument.longName} observation")).asFailure
+              OdbError.InvalidObservation(observationId, s"Observation '$observationId' not found or is not a ${instrument.longName} observation".some).asLeft[Visit.Id]
+
+      private def materializeAndRecord[A](
+        observationId:  Observation.Id,
+        static:         A,
+        idempotencyKey: Option[IdempotencyKey],
+        instrument:     Instrument,
+        lookupStatic:   Visit.Id => Transaction[F] ?=> F[Option[A]],
+        insertStatic:   (Observation.Id, Option[Visit.Id], A) => (Transaction[F], Services.ServiceAccess) ?=> F[Long]
+      )(using NoTransaction[F], Services.ServiceAccess): F[Result[Visit.Id]] =
+        generator
+          .materializeAndThen(observationId):
+            insertWithStaticConfig(observationId, static, idempotencyKey, instrument, lookupStatic, insertStatic)
+          .map(Result.fromEitherOdbError)
 
       def recordFlamingos2(
         input: RecordVisitInput[Flamingos2StaticConfig]
-      )(using Transaction[F], Services.ServiceAccess): F[Result[Visit.Id]] =
-        insertWithStaticConfig(
+      )(using NoTransaction[F], Services.ServiceAccess): F[Result[Visit.Id]] =
+        materializeAndRecord(
           input.observationId,
           input.static,
           input.idempotencyKey,
@@ -210,8 +219,8 @@ object VisitService:
 
       override def recordGmosNorth(
         input: RecordVisitInput[GmosNorth]
-      )(using Transaction[F], Services.ServiceAccess): F[Result[Visit.Id]] =
-        insertWithStaticConfig(
+      )(using NoTransaction[F], Services.ServiceAccess): F[Result[Visit.Id]] =
+        materializeAndRecord(
           input.observationId,
           input.static,
           input.idempotencyKey,
@@ -222,8 +231,8 @@ object VisitService:
 
       override def recordGmosSouth(
         input: RecordVisitInput[GmosSouth]
-      )(using Transaction[F], Services.ServiceAccess): F[Result[Visit.Id]] =
-        insertWithStaticConfig(
+      )(using NoTransaction[F], Services.ServiceAccess): F[Result[Visit.Id]] =
+        materializeAndRecord(
           input.observationId,
           input.static,
           input.idempotencyKey,

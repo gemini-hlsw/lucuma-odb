@@ -8,7 +8,6 @@ import cats.syntax.traverse.*
 import eu.timepit.refined.types.numeric.PosInt
 import fs2.Stream
 import lucuma.core.enums.Instrument
-import lucuma.core.enums.SequenceType
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.InstrumentExecutionConfig
@@ -38,16 +37,6 @@ class SequenceServiceSuite extends ExecutionTestSupportForGmos:
            .get.executionConfig.science.get
         g.nextAtom :: g.possibleFuture
 
-  private def writeSequence(
-    o: Observation.Id,
-    s: List[Atom[GmosNorth]]
-  ): IO[Unit] =
-    withServices(serviceUser): services =>
-      services
-        .transactionally:
-          sequenceService
-            .insertGmosNorthSequence(o, SequenceType.Science, Stream.emits(s))
-
   private def readSequence(
     o: Observation.Id
   ): IO[List[Atom[GmosNorth]]] =
@@ -55,7 +44,7 @@ class SequenceServiceSuite extends ExecutionTestSupportForGmos:
       services
         .transactionally:
           sequenceService
-            .streamingGmosNorthExecutionConfig(o)
+            .selectGmosNorthExecutionConfig(o)
             .map(_.traverse(_.science))
             .flatMap(_.collect { case Some(a) => a }.compile.toList)
 
@@ -64,17 +53,20 @@ class SequenceServiceSuite extends ExecutionTestSupportForGmos:
       p  <- createProgram
       t  <- createTargetWithProfileAs(pi, p)
       o  <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
-      _  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
-
       sn <- generateSequence(o)
+
       b  <- IO.realTimeInstant
-      _  <- writeSequence(o, sn)
+      _  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
       e0 <- IO.realTimeInstant
-      so <- readSequence(o)
+      _  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
       e1 <- IO.realTimeInstant
 
-      _  <- IO.println(s"WRITE TIME: ${java.time.Duration.between(b,  e0)}")
-      _  <- IO.println(s"READ TIME.: ${java.time.Duration.between(e0, e1)}")
+      so <- readSequence(o)
+      e2 <- IO.realTimeInstant
+
+//      _  <- IO.println(s"WRITE TIME: ${java.time.Duration.between(b,  e0)}")
+//      _  <- IO.println(s"NEW VISIT.: ${java.time.Duration.between(e0, e1)}")
+//      _  <- IO.println(s"READ TIME.: ${java.time.Duration.between(e1, e2)}")
 //      _  <- IO.println(s"SEQUENCE.n: ${sn.mkString("\n")}")
 //      _  <- IO.println("----")
 //      _  <- IO.println(s"SEQUENCE.o: ${so.mkString("\n")}")
