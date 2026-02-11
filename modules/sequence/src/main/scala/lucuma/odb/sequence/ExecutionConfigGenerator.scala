@@ -4,7 +4,6 @@
 package lucuma.odb.sequence
 
 import fs2.Pure
-import lucuma.core.util.Timestamp
 import lucuma.odb.sequence.data.StreamingExecutionConfig
 
 /**
@@ -21,6 +20,6 @@ case class ExecutionConfigGenerator[S, D](
   def streamingExecutionConfig: StreamingExecutionConfig[Pure, S, D] =
     StreamingExecutionConfig(
       static,
-      acquisition.generate(Timestamp.Min),
-      science.generate(Timestamp.Min)
+      acquisition.generate,
+      science.generate
     )

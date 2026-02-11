@@ -91,7 +91,6 @@ object Science:
     (o.p.toAngle.toMicroarcseconds === 0) &&
     (Angle.signedDecimalArcseconds.get(o.q.toAngle).abs <= (Angle.signedDecimalArcseconds.get(SlitLength) / 2))
 
-  private val Zero: NonNegInt = NonNegInt.unsafeFrom(0)
   private val Two: NonZeroInt = NonZeroInt.unsafeFrom(2)
 
   extension (start: Timestamp)
@@ -439,56 +438,6 @@ object Science:
         stop    = false
       )
 
-    // Completes the current ABBA cycle or calibration set, returning the updated
-    // SequenceRecord and the atom comprising the remaining steps.
-    private def completeCurrentAtom(
-      when:      Timestamp,
-      estimate:  NonEmptyList[ProtoStep[F2]] => TimeSpan
-    ): (SequenceRecord, Option[ProtoAtom[ProtoStep[F2]]]) =
-      NonEmptyList
-        .fromList(current.remaining(steps))
-        .fold((this, none[ProtoAtom[ProtoStep[F2]]])): nel =>
-          val time         = estimate(nel)
-          val curAtomTime  = TimestampInterval.between(when, when +| time)
-          val blockTimeʹ   = span(block, curAtomTime.some)
-
-          val (pendingʹ, completedCyclesʹ, atom) = current match
-            case abba: AtomTracker.Abba         =>
-              val p = span(pending, span(abba.interval, curAtomTime.some))
-              (p, completedCycles + 1, ProtoAtom(AbbaCycleTitle.some, nel))
-
-            case AtomTracker.Calibrations(_, _) =>
-              (none, completedCycles, ProtoAtom(NighttimeCalTitle.some, nel))
-
-          copy(
-            block           = blockTimeʹ,
-            pending         = pendingʹ,
-            completedCycles = completedCyclesʹ
-          ) -> atom.some
-
-    // Completes the current science block, returning what will be the total
-    // completed cycle count if the associated atoms are executed.
-    def complete(
-      when:          Timestamp,
-      estimate:      NonEmptyList[ProtoStep[F2]] => TimeSpan,
-      cycleEstimate: TimeSpan,
-      goalCycles:    NonNegInt
-    ): (Int, List[ProtoAtom[ProtoStep[F2]]]) =
-      val (stateʹ, curAtom) = completeCurrentAtom(when, estimate)
-      val remainingCycles   =
-        if stop then Zero
-        else NonNegInt.from(goalCycles.value - stateʹ.completedCycles).toOption.getOrElse(Zero)
-
-      val (c, as) = remainingAtomsInBlock(
-        steps,
-        stateʹ.block.map(_.end).getOrElse(when),
-        stateʹ.block.map(_.start),
-        stateʹ.pending,
-        cycleEstimate,
-        remainingCycles
-      )
-      (c + stateʹ.completedCycles, curAtom.fold(as)(_ :: as))
-
   end SequenceRecord
 
   case class Generator(
@@ -526,21 +475,12 @@ object Science:
         case SequenceCommand.Stop => copy(seqRecord = seqRecord.endBlockEarly)
         case _                    => this
 
-    override def generate(when: Timestamp): Stream[Pure, Atom[F2]] =
-
-      // Complete the current science block.
-      val (completedCount, curBlockAtoms) = seqRecord.complete(
-        when,
-        estimate(_, calcState),
-        cycleEstimate,
-        goalCycles
-      )
+    override def generate: Stream[Pure, Atom[F2]] =
 
       // Add future blocks until we've completed all the cycles.
       val future =
-        Stream.emits(curBlockAtoms) ++
         Stream
-          .unfold(completedCount): c =>
+          .unfold(0): c =>
             PosInt.from(goalCycles.value - c).toOption.map: remainingCycles =>
               val (cycles, atoms) = remainingAtomsInEmptyBlock(steps, cycleEstimate, remainingCycles)
 
