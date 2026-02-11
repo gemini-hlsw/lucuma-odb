@@ -5,10 +5,8 @@ package lucuma.odb.sequence
 package flamingos2
 package longslit
 
-import cats.Eq
 import cats.Order.catsKernelOrderingForOrder
 import cats.data.NonEmptyList
-import cats.data.State
 import cats.syntax.option.*
 import cats.syntax.order.*
 import eu.timepit.refined.*
@@ -33,13 +31,10 @@ import lucuma.core.model.sequence.flamingos2.Flamingos2StaticConfig
 import lucuma.core.optics.syntax.lens.*
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
-import lucuma.core.util.Timestamp
 import lucuma.itc.IntegrationTime
 import lucuma.odb.data.OdbError
 import lucuma.odb.sequence.data.ProtoStep
-import lucuma.odb.sequence.data.StepRecord
 import lucuma.odb.sequence.util.AtomBuilder
-import lucuma.odb.sequence.util.IndexTracker
 
 import java.util.UUID
 
@@ -101,71 +96,16 @@ object Acquisition:
           s4 <- scienceStep( 0.arcsec,  0.arcsec, ObserveClass.Acquisition)
         yield Steps(s0, s1, s2, s3, s4)
 
-  private sealed trait AcquisitionState extends SequenceGenerator.Base[F2]:
+  private class Generator(
+    builder:   AtomBuilder[F2],
+    steps:     Steps
+  ) extends SequenceGenerator[F2]:
 
-    def builder: AtomBuilder[F2]
-    def recordCompleted(step: StepRecord[F2]): AcquisitionState
-    def calcState: TimeEstimateCalculator.Last[F2]
-    def tracker: IndexTracker
-
-    def updateTracker(calcState: TimeEstimateCalculator.Last[F2], tracker: IndexTracker): AcquisitionState
-
-    override def recordStep(step: StepRecord[F2])(using Eq[F2]): SequenceGenerator[F2] =
-      if step.isScienceSequence then this
-      else
-        val a = updateTracker(calcState.next(step.protoStep), tracker.record(step))
-        if step.successfullyCompleted then a.recordCompleted(step) else a
-
-  private object AcquisitionState:
-
-    def initialAcq(
-      builder: AtomBuilder[F2],
-      steps:   NonEmptyList[ProtoStep[F2]],
-      aix:     Int,
-      six:     Int
-    ): State[TimeEstimateCalculator.Last[F2], Atom[F2]] =
-      builder.build(NonEmptyString.unapply("Initial Acquisition"), aix, six, steps)
-
-    def fineAdjustments(
-      builder: AtomBuilder[F2],
-      slit:    ProtoStep[F2],
-      aix:     Int
-    ): State[TimeEstimateCalculator.Last[F2], Atom[F2]] =
-      builder.build(NonEmptyString.unapply("Fine Adjustments"), aix, 1, NonEmptyList.one(slit))
-
-    def gen(
-      builder:   AtomBuilder[F2],
-      init:      Option[NonEmptyList[ProtoStep[F2]]],
-      slit:      ProtoStep[F2],
-      calcState: TimeEstimateCalculator.Last[F2],
-      track:     IndexTracker
-    ): Stream[Pure, Atom[F2]] =
+    override val generate: Stream[Pure, Atom[F2]] =
       (for
-        a0 <- init.fold(fineAdjustments(builder, slit, track.atomCount)): nel =>
-                initialAcq(builder, nel, track.atomCount, track.stepCount)
-        a1 <- fineAdjustments(builder, slit, track.atomCount+1)
-      yield Stream(a0, a1)).runA(calcState).value
-
-    case class Init(lastReset: Option[Timestamp], tracker: IndexTracker, builder: AtomBuilder[F2], steps: Steps) extends SequenceGenerator.Base[F2]:
-      override def generate: Stream[Pure, Atom[F2]] =
-        gen(builder, steps.initialAtom.some, steps.slit, TimeEstimateCalculator.Last.empty[F2], tracker)
-
-      override def recordStep(step: StepRecord[F2])(using Eq[F2]): SequenceGenerator[F2] =
-        if step.isScienceSequence then this
-        else if lastReset.exists(_ > step.created) then copy(tracker = tracker.record(step))
-        else Matching(steps.initialAtom.toList, steps.slit, TimeEstimateCalculator.Last.empty[F2], tracker, builder).recordStep(step)
-
-    case class Matching(remaining: List[ProtoStep[F2]], slit: ProtoStep[F2], calcState: TimeEstimateCalculator.Last[F2], tracker: IndexTracker, builder: AtomBuilder[F2]) extends AcquisitionState:
-      override def generate: Stream[Pure, Atom[F2]] =
-        gen(builder, NonEmptyList.fromList(remaining), slit, calcState, tracker)
-
-      override def updateTracker(calcState: TimeEstimateCalculator.Last[F2], tracker: IndexTracker): AcquisitionState =
-        copy(calcState = calcState, tracker = tracker)
-
-      override def recordCompleted(step: StepRecord[F2]): AcquisitionState =
-        remaining match
-          case Nil    => this
-          case h :: t => if h.matches(step) then copy(remaining = t) else this
+        a0 <- builder.build(NonEmptyString.unapply("Initial Acquisition"), 0, 0, steps.initialAtom)
+        a1 <- builder.build(NonEmptyString.unapply("Fine Adjustments"),    1, 0, steps.repeatingAtom)
+      yield Stream(a0, a1)).runA(TimeEstimateCalculator.Last.empty[F2]).value
 
   def instantiate(
     observationId: Observation.Id,
@@ -173,15 +113,15 @@ object Acquisition:
     static:        Flamingos2StaticConfig,
     namespace:     UUID,
     config:        Config,
-    time:          Either[OdbError, IntegrationTime],
-    lastReset:     Option[Timestamp]
+    time:          Either[OdbError, IntegrationTime]
   ): Either[OdbError, SequenceGenerator[F2]] =
     time
-      .filterOrElse(_.exposureTime.toNonNegMicroseconds.value > 0, OdbError.SequenceUnavailable(observationId, s"Could not generate a sequence for $observationId: Flamingos 2 Long Slit requires a positive exposure time.".some))
+      .filterOrElse(
+        _.exposureTime.toNonNegMicroseconds.value > 0,
+        OdbError.SequenceUnavailable(observationId, s"Could not generate a sequence for $observationId: Flamingos 2 Long Slit requires a positive exposure time.".some)
+      )
       .map: t =>
-        AcquisitionState.Init(
-          lastReset,
-          IndexTracker.Zero,
+        new Generator(
           AtomBuilder.instantiate(
             estimator,
             static,

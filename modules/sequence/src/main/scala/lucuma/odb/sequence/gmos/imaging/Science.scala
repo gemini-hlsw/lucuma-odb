@@ -5,7 +5,6 @@ package lucuma.odb.sequence
 package gmos
 package imaging
 
-import cats.Eq
 import cats.Order
 import cats.Order.catsKernelOrderingForOrder
 import cats.data.NonEmptyList
@@ -48,7 +47,6 @@ import lucuma.odb.data.Itc.Result
 import lucuma.odb.data.OdbError
 import lucuma.odb.sequence.data.ProtoAtom
 import lucuma.odb.sequence.data.ProtoStep
-import lucuma.odb.sequence.data.StepRecord
 import lucuma.odb.sequence.data.TelescopeConfigGenerator
 import lucuma.odb.sequence.util.AtomBuilder
 
@@ -198,15 +196,7 @@ object Science:
 
     case class ImagingGenerator(
       recordedSteps: Map[ProtoStep[D], Int]
-    ) extends SequenceGenerator.Base[D]:
-
-      override def recordStep(step: StepRecord[D])(using Eq[D]): SequenceGenerator[D] =
-        if step.successfullyCompleted && step.isScience then
-          ImagingGenerator:
-            recordedSteps.updatedWith(step.protoStep): count =>
-              count.map(_ + 1).orElse(1.some)
-        else
-          this
+    ) extends SequenceGenerator[D]:
 
       override def generate: Stream[Pure, Atom[D]] =
         val build = AtomBuilder.instantiate(estimator, static, namespace, SequenceType.Science)
