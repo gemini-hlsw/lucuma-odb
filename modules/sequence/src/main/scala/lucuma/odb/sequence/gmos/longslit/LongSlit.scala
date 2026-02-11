@@ -7,6 +7,7 @@ package longslit
 
 import cats.Monad
 import cats.data.EitherT
+import fs2.Pure
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.gmos.DynamicConfig
@@ -14,6 +15,7 @@ import lucuma.core.model.sequence.gmos.StaticConfig
 import lucuma.core.util.Timestamp
 import lucuma.odb.data.Itc.Spectroscopy
 import lucuma.odb.data.OdbError
+import lucuma.odb.sequence.data.StreamingExecutionConfig
 
 import java.util.UUID
 
@@ -23,11 +25,11 @@ object LongSlit:
     static:      S,
     acquisition: Either[OdbError, SequenceGenerator[D]],
     science:     F[Either[OdbError, SequenceGenerator[D]]]
-  ): F[Either[OdbError, ExecutionConfigGenerator[S, D]]] =
+  ): F[Either[OdbError, StreamingExecutionConfig[Pure, S, D]]] =
     (for
       a <- EitherT.fromEither(acquisition)
       s <- EitherT(science)
-    yield ExecutionConfigGenerator(static, a, s)).value
+    yield StreamingExecutionConfig(static, a.generate, s.generate)).value
 
   def gmosNorth[F[_]: Monad](
     observationId:  Observation.Id,
@@ -38,7 +40,7 @@ object LongSlit:
     itc:            Either[OdbError, Spectroscopy],
     calRole:        Option[CalibrationRole],
     lastAcqReset:   Option[Timestamp]
-  ): F[Either[OdbError, ExecutionConfigGenerator[StaticConfig.GmosNorth, DynamicConfig.GmosNorth]]] =
+  ): F[Either[OdbError, StreamingExecutionConfig[Pure, StaticConfig.GmosNorth, DynamicConfig.GmosNorth]]] =
     val static = InitialConfigs.GmosNorthStatic
     instantiate(
       static,
@@ -55,7 +57,7 @@ object LongSlit:
     itc:            Either[OdbError, Spectroscopy],
     calRole:        Option[CalibrationRole],
     lastAcqReset:   Option[Timestamp]
-  ): F[Either[OdbError, ExecutionConfigGenerator[StaticConfig.GmosSouth, DynamicConfig.GmosSouth]]] =
+  ): F[Either[OdbError, StreamingExecutionConfig[Pure, StaticConfig.GmosSouth, DynamicConfig.GmosSouth]]] =
     val static = InitialConfigs.GmosSouthStatic
     instantiate(
       static,
