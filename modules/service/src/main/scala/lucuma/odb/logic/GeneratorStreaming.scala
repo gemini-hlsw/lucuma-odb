@@ -42,8 +42,6 @@ sealed trait GeneratorStreaming[F[_]]:
     context: GeneratorContext
   )(using Transaction[F]): F[Either[OdbError, StreamingExecutionConfig[F, Flamingos2Static, Flamingos2Dynamic]]]
 
-  // TODO: can we remove the effect?  I don't think we need it:
-  //  Either[OdbError, StreamingExecutionConfig[Pure, Flamingos2Static, Flamingos2Dynamic]]
   def generateFlamingos2LongSlit(
     context: GeneratorContext
   ): F[Either[OdbError, StreamingExecutionConfig[F, Flamingos2Static, Flamingos2Dynamic]]]
