@@ -1869,6 +1869,11 @@ type GmosNorthAtom {
   steps: [GmosNorthStep!]!
 }
 
+input GmosNorthAtomInput {
+  description: NonEmptyString
+  steps: [GmosNorthStepInput!]!
+}
+
 """
 GmosNorth Detector type
 """
@@ -2318,6 +2323,14 @@ type GmosNorthStep {
   observeClass: ObserveClass!
 }
 
+input GmosNorthStepInput {
+  instrumentConfig: GmosNorthDynamicInput!
+  breakpoint: Breakpoint
+  stepConfig: StepConfigInput!
+  telescopeConfig: TelescopeConfigInput
+  observeClass: ObserveClass!
+}
+
 """
 GmosSouth atom, a collection of steps that should be executed in their entirety
 """
@@ -2342,6 +2355,11 @@ type GmosSouthAtom {
   Individual steps that comprise the atom
   """
   steps: [GmosSouthStep!]!
+}
+
+input GmosSouthAtomInput {
+  description: NonEmptyString
+  steps: [GmosSouthStepInput!]!
 }
 
 """
@@ -2822,6 +2840,14 @@ type GmosSouthStep {
   observeClass: ObserveClass!
 }
 
+input GmosSouthStepInput {
+  instrumentConfig: GmosSouthDynamicInput!
+  breakpoint: Breakpoint
+  stepConfig: StepConfigInput!
+  telescopeConfig: TelescopeConfigInput
+  observeClass: ObserveClass!
+}
+
 input CloneGroupInput {
   groupId: GroupId!
   SET: GroupPropertiesInput
@@ -3182,7 +3208,7 @@ type Mutation {
   recordAtom(
     "Atom configuration parameters"
     input: RecordAtomInput!
-  ): RecordAtomResult!
+  ): RecordAtomResult! @deprecated(reason: "Atoms are now written to the database before execution begins.")
 
   """
   Records a new dataset.  This dataset may be subsequently referenced by dataset events.
@@ -3200,7 +3226,7 @@ type Mutation {
   recordFlamingos2Step(
     "Flamingos 2 step configuration parameters"
     input: RecordFlamingos2StepInput!
-  ): RecordFlamingos2StepResult!
+  ): RecordFlamingos2StepResult! @deprecated(reason: "Steps are now written to the database before execution begins.")
 
   """
   Record a new Flamingos 2 visit
@@ -3216,7 +3242,7 @@ type Mutation {
   recordGmosNorthStep(
     "GMOS North step configuration parameters"
     input: RecordGmosNorthStepInput!
-  ): RecordGmosNorthStepResult!
+  ): RecordGmosNorthStepResult! @deprecated(reason: "Steps are now written to the database before execution begins.")
 
   """
   Record a new GMOS North visit
@@ -3232,7 +3258,7 @@ type Mutation {
   recordGmosSouthStep(
     "GmosSouth step configuration parameters"
     input: RecordGmosSouthStepInput!
-  ): RecordGmosSouthStepResult!
+  ): RecordGmosSouthStepResult! @deprecated(reason: "Steps are now written to the database before execution begins.")
 
   """
   Record a new GMOS South visit
@@ -7773,6 +7799,11 @@ type Flamingos2Atom {
   steps: [Flamingos2Step!]!
 }
 
+input Flamingos2AtomInput {
+  description: NonEmptyString
+  steps: [Flamingos2StepInput!]!
+}
+
 """
 Flmaingos 2 step with potential breakpoint
 """
@@ -7808,6 +7839,14 @@ type Flamingos2Step {
   """
   Observe class for this step
   """
+  observeClass: ObserveClass!
+}
+
+input Flamingos2StepInput {
+  instrumentConfig: Flamingos2DynamicInput!
+  breakpoint: Breakpoint
+  stepConfig: StepConfigInput!
+  telescopeConfig: TelescopeConfigInput
   observeClass: ObserveClass!
 }
 
