@@ -143,7 +143,7 @@ object GeneratorStreaming:
         (for
           cfg <- extractMode(ObservingMode.Flamingos2LongSlitName, context)(_.asFlamingos2LongSlit)
           itc  = requireSpectroscopyItc(context.oid, context.itcRes)
-          gen <- EitherT(LongSlit.instantiate(context.oid, calculator.flamingos2, context.namespace, exp.flamingos2, cfg, itc, context.params.acqResetTime))
+          gen <- EitherT(LongSlit.instantiate(context.oid, calculator.flamingos2, context.namespace, exp.flamingos2, cfg, itc))
         yield gen.covary[F]).value
 
 
@@ -178,8 +178,7 @@ object GeneratorStreaming:
           cfg <- extractMode(ObservingMode.GmosNorthLongSlitName, context)(_.asGmosNorthLongSlit)
           itc  = requireSpectroscopyItc(context.oid, context.itcRes)
           rol  = context.params.calibrationRole
-          rst  = context.params.acqResetTime
-          gen <- EitherT(LongSlit.gmosNorth(context.oid, calculator.gmosNorth, context.namespace, exp.gmosNorth, cfg, itc, rol, rst))
+          gen <- EitherT(LongSlit.gmosNorth(context.oid, calculator.gmosNorth, context.namespace, exp.gmosNorth, cfg, itc, rol))
         yield gen.covary[F]).value
 
 
@@ -214,6 +213,5 @@ object GeneratorStreaming:
           cfg <- extractMode(ObservingMode.GmosSouthLongSlitName, context)(_.asGmosSouthLongSlit)
           itc  = requireSpectroscopyItc(context.oid, context.itcRes)
           rol  = context.params.calibrationRole
-          rst  = context.params.acqResetTime
-          gen <- EitherT(LongSlit.gmosSouth(context.oid, calculator.gmosSouth, context.namespace, exp.gmosSouth, cfg, itc, rol, rst))
+          gen <- EitherT(LongSlit.gmosSouth(context.oid, calculator.gmosSouth, context.namespace, exp.gmosSouth, cfg, itc, rol))
         yield gen.covary[F]).value

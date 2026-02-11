@@ -8,12 +8,10 @@ package longslit
 import cats.Comparison.*
 import cats.Eq
 import cats.Monad
-import cats.Order.catsKernelOrderingForOrder
 import cats.data.EitherT
 import cats.data.NonEmptyList
 import cats.data.NonEmptyVector
 import cats.data.State
-import cats.syntax.apply.*
 import cats.syntax.either.*
 import cats.syntax.foldable.*
 import cats.syntax.functor.*
@@ -42,7 +40,6 @@ import lucuma.core.math.Wavelength
 import lucuma.core.math.WavelengthDither
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.Atom
-import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosSouth
@@ -53,18 +50,14 @@ import lucuma.core.optics.syntax.optional.*
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
-import lucuma.core.util.TimestampInterval
 import lucuma.itc.IntegrationTime
 import lucuma.odb.data.OdbError
-import lucuma.odb.sequence.data.AtomRecord
 import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.sequence.data.StepRecord
 import lucuma.odb.sequence.util.AtomBuilder
-import lucuma.odb.sequence.util.IndexTracker
 import monocle.Lens
 
 import java.util.UUID
-import scala.collection.immutable.SortedMap
 
 
 /**
@@ -112,8 +105,6 @@ object Science:
 
     def minusCalValidityPeriod: Timestamp =
       t -| CalValidityPeriod
-
-  private val Zero: NonNegInt = NonNegInt.MinValue
 
   // Lens from the step to its telescope offset in q.
   private def protoStepOffset[D]: Lens[ProtoStep[D], Offset] =
@@ -384,142 +375,6 @@ object Science:
     def init[D](definition: StepDefinition[D]): Dither[D] =
       Dither(definition, definition.goal.requirement)
 
-
-  /**
-   * The RecordWindow represents a subset (typically equal to the entire set) of
-   * recorded steps for a block.  The time range covered by the steps is always
-   * less than or equal to the calibration validity period.  We break the entire
-   * collection of steps for a block into windows and use them to find datasets
-   * which have all their required calibrations and to compute which
-   * calibrations are missing otherwise.
-   *
-   * Usually there will be one window per block, but we should be able to handle
-   * the case where datasets are added after long delays.
-   */
-  trait RecordWindow[D]:
-    def missingCalCounts: Map[ProtoStep[D], NonNegInt]
-    def missingCals: List[ProtoStep[D]]
-    def pendingScience: Map[Step.Id, Offset.Q]
-    def calibratedScience: Map[Step.Id, Offset.Q]
-
-  object RecordWindow:
-    def apply[D](
-      definition: StepDefinition[D],
-      steps:      SortedMap[Timestamp, StepRecord[D]]
-    ): RecordWindow[D] =
-      new RecordWindow[D]:
-        // How many of each calibration are missing from the window
-        lazy val missingCalCounts: Map[ProtoStep[D], NonNegInt] =
-          steps
-            .values
-            .filter(s => s.successfullyCompleted && s.isGcal)
-            .foldLeft(definition.allCalsCounts): (cals, step) =>
-              // Count a calibration regardless of its offset.
-              cals.updatedWith(step.protoStep.withZeroOffset)(_.flatMap(n => NonNegInt.unapply(n.value - 1)))
-
-        // List, in order, of missing calibrations for this window.
-        lazy val missingCals: List[ProtoStep[D]] =
-          // Filter the ordered list of arcs + flats, removing still valid ones
-          definition
-            .allCals
-            .foldLeft((List.empty[ProtoStep[D]], missingCalCounts)):
-              case ((res, remaining), calStep) =>
-                NonNegInt
-                  .unapply(remaining.getOrElse(calStep, Zero).value - 1)
-                  .fold((res, remaining)): n =>
-                    (calStep :: res, remaining.updated(calStep, n))
-            ._1
-            .reverse
-
-        // Science datasets that are completed.
-        lazy val pendingScience: Map[Step.Id, Offset.Q] =
-          steps
-            .values
-            .collect:
-              case s if s.successfullyCompleted && s.isScience => (s.id, s.q)
-            .toMap
-
-        // Science datasets that have calibrations
-        lazy val calibratedScience: Map[Step.Id, Offset.Q] =
-          if missingCalCounts.values.exists(_.value > 0) then Map.empty
-          else pendingScience
-
-  end RecordWindow
-
-  /**
-   * DitherRecord tracks completion data for a given dither position, and all
-   * the associated steps that have been executed.
-   */
-  case class DitherRecord[D](
-    dither: Dither[D],
-    steps:  SortedMap[Timestamp, StepRecord[D]],
-  ):
-    /** Time of the first step in this block, if any. */
-    val startTime: Option[Timestamp] =
-      steps.headOption.map(_._2.created)
-
-    /** Time of the last step in this block, if any. */
-    val endTime: Option[Timestamp] =
-      steps.lastOption.map(_._2.created)
-
-    /** Interval from start to end of this block. */
-    val interval: Option[TimestampInterval] =
-      (startTime, endTime).mapN(TimestampInterval.between)
-
-    /** All the (cal validity time) windows included in this record. */
-    def windows: Stream[Pure, RecordWindow[D]] =
-      endTime.fold(Stream.empty): last =>
-        Stream
-          .emits[Pure, Timestamp](steps.keys.toList)
-          .fproduct(_.plusCalValidityPeriod min last)
-          .takeThrough((_, e) => e < last)
-          .map: (s, e) =>
-            RecordWindow(dither.definition, steps.rangeFrom(s).rangeTo(e))
-
-    /**
-     * A window which ends at the specified time but begins one cal validity
-     * period earlier.
-     */
-    def windowEndingAt(timestamp: Timestamp): RecordWindow[D] =
-      RecordWindow(
-        dither.definition,
-        steps.rangeFrom(timestamp.minusCalValidityPeriod).rangeTo(timestamp)
-      )
-
-    /**
-     * All the calibrated science steps in this record.  We compute this window
-     * by window.  In one window the science step may be missing cals but in
-     * another it may have them.
-     */
-    lazy val calibratedScience: Map[Step.Id, Offset.Q] =
-      windows
-        .fold(Map.empty[Step.Id, Offset.Q])((m, w) => m ++ w.calibratedScience)
-        .compile
-        .toList
-        .head
-
-    /**
-     * Marks the end of the record lifetime, books the calibrated science steps
-     * and resets.
-     */
-    def settle: DitherRecord[D] =
-      if steps.isEmpty then this
-      else copy(
-        dither = dither.complete(calibratedScience.toList.groupMapReduce(_._2)(_ => 1)(_ + _)),
-        steps  = SortedMap.empty
-      )
-
-    /** Records the next step. */
-    def record(step: StepRecord[D])(using Eq[D]): DitherRecord[D] =
-      if !dither.matches(step) then this
-      else copy(steps = steps + (step.created -> step))
-
-  end DitherRecord
-
-  object DitherRecord:
-    def init[D](definition: StepDefinition[D]): DitherRecord[D] =
-      DitherRecord(Dither.init(definition), SortedMap.empty)
-
   /**
    * The science generator keeps up with an ordered list of block records, and
    * works to compute the number of valid science steps have been obtained for
@@ -530,100 +385,28 @@ object Science:
   private case class ScienceGenerator[S, D](
     estimator:   TimeEstimateCalculator[S, D],
     static:      S,
-    lastSteps:   TimeEstimateCalculator.Last[D],
     atomBuilder: AtomBuilder[D],
     expMicroSec: PosLong,
-    expCount:    PosInt,
-    records:     NonEmptyVector[DitherRecord[D]],
-    tracker:     IndexTracker,
-    pos:         Int
-  ) extends SequenceGenerator.Base[D]:
+    dithers:     NonEmptyVector[Dither[D]]
+  ) extends SequenceGenerator[D]:
 
     val sci            = SciencePeriod.toMicroseconds
     val time           = sci min expMicroSec.value
     val maxExpPerBlock = PosInt.unsafeFrom((sci / time).toInt)
-
-    val length: Int = records.length
+    val length: Int    = dithers.length
 
     override def generate: Stream[Pure, Atom[D]] =
-      val (aix, six) = tracker.toTuple
-
-      // The first atom will have any unfinished steps from the current atom, so
-      // it is handled separately.
-      val rec         = records.getUnsafe(pos)
-      val dither      = rec.dither
-      val (dʹ, steps) = dither.generateFullBlock(maxExpPerBlock)
-      val (cs, atom0) = atomBuilder.buildOption(dither.desc.some, aix, six, steps).run(lastSteps).value
-      val dithers     = records.map(_.dither).updatedUnsafe(pos, dʹ)
-
       Stream
-        .iterate((pos + 1) % length)(pos => (pos + 1) % length)
-        .mapAccumulate((dithers, aix + 1, cs)) { case ((ds, aix, cs), pos) =>
+        .iterate(0)(pos => (pos + 1) % length)
+        .mapAccumulate((dithers, 0, TimeEstimateCalculator.Last.empty[D])) { case ((ds, aix, cs), pos) =>
           val dither      = ds.getUnsafe(pos)
           val (dʹ, steps) = dither.generateFullBlock(maxExpPerBlock)
           val (csʹ, atom) = atomBuilder.buildOption(dither.desc.some, aix, 0, steps).run(cs).value
           val dsʹ         = ds.updatedUnsafe(pos, dʹ)
           ((dsʹ, aix + 1, csʹ), atom)
         }
-        .cons1((dithers, 0, TimeEstimateCalculator.Last.empty), atom0) // put the first atom back
         .takeThrough { case ((ds, _, _), _) => ds.foldMap(_.remaining.total.value) > 0 }
-        .collect { case (_, Some(atom)) => atom }
-    end generate
-
-    // Advances the block index we're working on, setting it to the first block
-    // from 'start' that matches the step.
-    private def advancePos(start: Int, step: StepRecord[D])(using Eq[D]): Int =
-      Stream
-        .iterate(start%length)(p => (p + 1) % length)
-        .take(length)
-        .dropWhile(p => !records.getUnsafe(p).dither.matches(step))
-        .head
-        .compile
-        .toList
-        .headOption
-        .getOrElse(pos)
-
-    override def recordAtom(atom: AtomRecord): SequenceGenerator[D] =
-      copy(
-        records = records.map(_.settle),
-        tracker = tracker.reset(atom)
-      )
-
-    override def recordStep(step: StepRecord[D])(using Eq[D]): SequenceGenerator[D] =
-      if step.isAcquisitionSequence then
-        this
-      else
-        val trackerʹ = tracker.record(step)
-
-        // Advance the block we're focusing upon, if necessary.  This will happen
-        // (potentially) for the first step recorded, or when a new atom is started
-        val (recordsʹ, posʹ) =
-          tracker match
-            case IndexTracker.Reset(_) =>
-              (records, advancePos(pos, step))
-            case _                     =>
-              if tracker.atomCount === trackerʹ.atomCount then (records, pos)
-              else (records.map(_.settle), advancePos(pos+1, step))
-
-        val recordsʹʹ =
-          step.stepConfig.stepType match
-            case StepType.Bias | StepType.Dark | StepType.SmartGcal =>
-              // GMOS Longslit doesn't use biases or darks, and smart gcal has
-              // been expanded so ignore these.
-              recordsʹ
-            case StepType.Gcal | StepType.Science                   =>
-              // Record the step at the current index, settle all others
-              recordsʹ.zipWithIndex.map: (rec, idx) =>
-                if posʹ === idx then rec.record(step) else rec.settle
-
-        copy(
-          lastSteps = lastSteps.next(step.protoStep),
-          records   = recordsʹʹ,
-          tracker   = trackerʹ,
-          pos       = posʹ
-        )
-
-    end recordStep
+        .collect { case (_, Some(atom)) => atom}
 
   end ScienceGenerator
 
@@ -697,13 +480,9 @@ object Science:
       yield ScienceGenerator(
         estimator,
         static,
-        TimeEstimateCalculator.Last.empty[D],
         AtomBuilder.instantiate(estimator, static, namespace, SequenceType.Science),
         μs,
-        n,
-        defs.map(DitherRecord.init).toNev,
-        IndexTracker.Zero,
-        0
+        defs.map(Dither.init).toNev
       )
 
       result.widen[SequenceGenerator[D]].value
