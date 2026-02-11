@@ -3,6 +3,7 @@
 
 package lucuma.odb.sequence.data
 
+import fs2.Pure
 import fs2.Stream
 import lucuma.core.model.sequence.Atom
 
@@ -21,3 +22,13 @@ case class StreamingExecutionConfig[F[_], S, D](
     acquisition: Stream[F, Atom[D]],
     science:     Stream[F, Atom[D]]
 )
+
+object StreamingExecutionConfig:
+
+  extension [S, D](self: StreamingExecutionConfig[Pure, S, D])
+    def covary[F[_]]: StreamingExecutionConfig[F, S, D] =
+      StreamingExecutionConfig[F, S, D](
+        self.static,
+        self.acquisition.covary[F],
+        self.science.covary[F]
+      )
