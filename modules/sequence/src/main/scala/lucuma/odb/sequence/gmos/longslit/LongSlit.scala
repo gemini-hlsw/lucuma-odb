@@ -12,7 +12,6 @@ import lucuma.core.enums.CalibrationRole
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.gmos.DynamicConfig
 import lucuma.core.model.sequence.gmos.StaticConfig
-import lucuma.core.util.Timestamp
 import lucuma.odb.data.Itc.Spectroscopy
 import lucuma.odb.data.OdbError
 import lucuma.odb.sequence.data.StreamingExecutionConfig
@@ -38,13 +37,12 @@ object LongSlit:
     expander:       SmartGcalExpander[F, DynamicConfig.GmosNorth],
     config:         Config.GmosNorth,
     itc:            Either[OdbError, Spectroscopy],
-    calRole:        Option[CalibrationRole],
-    lastAcqReset:   Option[Timestamp]
+    calRole:        Option[CalibrationRole]
   ): F[Either[OdbError, StreamingExecutionConfig[Pure, StaticConfig.GmosNorth, DynamicConfig.GmosNorth]]] =
     val static = InitialConfigs.GmosNorthStatic
     instantiate(
       static,
-      Acquisition.gmosNorth(observationId, estimator, static, namespace, config, itc.map(_.acquisition.focus.value), calRole, lastAcqReset),
+      Acquisition.gmosNorth(observationId, estimator, static, namespace, config, itc.map(_.acquisition.focus.value), calRole),
       Science.gmosNorth(observationId, estimator, static, namespace, expander, config, itc.map(_.science.focus.value), calRole)
     )
 
@@ -55,13 +53,12 @@ object LongSlit:
     expander:       SmartGcalExpander[F, DynamicConfig.GmosSouth],
     config:         Config.GmosSouth,
     itc:            Either[OdbError, Spectroscopy],
-    calRole:        Option[CalibrationRole],
-    lastAcqReset:   Option[Timestamp]
+    calRole:        Option[CalibrationRole]
   ): F[Either[OdbError, StreamingExecutionConfig[Pure, StaticConfig.GmosSouth, DynamicConfig.GmosSouth]]] =
     val static = InitialConfigs.GmosSouthStatic
     instantiate(
       static,
-      Acquisition.gmosSouth(observationId, estimator, static, namespace, config, itc.map(_.acquisition.focus.value), calRole, lastAcqReset),
+      Acquisition.gmosSouth(observationId, estimator, static, namespace, config, itc.map(_.acquisition.focus.value), calRole),
       Science.gmosSouth(observationId, estimator, static, namespace, expander, config, itc.map(_.science.focus.value), calRole)
     )
 
