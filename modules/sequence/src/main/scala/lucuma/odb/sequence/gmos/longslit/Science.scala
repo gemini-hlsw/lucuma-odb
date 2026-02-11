@@ -514,132 +514,6 @@ object Science:
       if !dither.matches(step) then this
       else copy(steps = steps + (step.created -> step))
 
-    /**
-     * How much time is left in the current iteration of this block at time
-     * `timestamp`.
-     */
-    def remainingTimeAt(timestamp: Timestamp): TimeSpan =
-      val limit = startTime.map(_.plusCalValidityPeriod).getOrElse(Timestamp.Min)
-      val start = endTime.map(_ max timestamp).getOrElse(Timestamp.Max)
-      Option.when(start <= limit)(TimeSpan.between(start, limit)).getOrElse(TimeSpan.Zero)
-
-    /**
-     * Generates the remaining steps for this block as if requested at the given
-     * timestamp.  The answer will differ depending on the timestamp because
-     * calibrations expire and have to be repeated.
-     *
-     * @param timestamp reference time for the computation
-     * @param static static config of the observation (required for step time
-     *               estimates)
-     * @param estimator step time estimator
-     * @param lastSteps state of the previous steps required for an accurate
-     *                  estimation
-     * @param blockSize caps the number of steps that may be produced
-     * @tparam S static configration type
-     * @return a `Dither` updated to account for the steps that were generated
-     *         and the list of steps themselves
-     */
-    def generateBlockRemainder[S](
-      timestamp: Timestamp,
-      static:    S,
-      estimator: TimeEstimateCalculator[S, D],
-      lastSteps: TimeEstimateCalculator.Last[D],
-      blockSize: PosInt
-    ): (Dither[D], List[ProtoStep[D]]) =
-
-      // What calibrations are missing in the last window?
-      val window      = windowEndingAt(timestamp)
-      val missingCals = window.missingCals
-
-      // Which pending science in the last window can be completed by adding
-      // missing calibrations? Previous windows may have uncalibrated science,
-      // but those would be lost since we won't get the calibration in time.
-      val uncalibratedScience =
-        if missingCals.isEmpty then Map.empty[Step.Id, Offset.Q]
-        else window.pendingScience -- calibratedScience.keys
-
-      // How many, at a maximum, ignoring time, science steps could you do to
-      // finish out the block?
-      val currentCount = (calibratedScience ++ uncalibratedScience).size
-      val maxRemaining = ((dither.remaining.total.value min blockSize.value) - currentCount) max 0
-
-      // N.B., for simplicity sake, we'll proceed as if there were no offset
-      // costs. They are small (~7 secs) and infrequent and the time limits are
-      // not hard and fast anyway.
-
-      // How long do we have left to fill with science?  Adjust lastSteps as
-      // though one or more science steps have just happened.  If there were an
-      // offset cost, it would be swamped by the science fold move anyway.
-      val lastStepsʹ    = lastSteps.next(dither.definition.science)
-      val calTime       = estimator.estimateTotal(static, missingCals).runA(lastStepsʹ).value
-      val remainingTime = remainingTimeAt(timestamp) -| calTime
-
-      // How long would the first science step take?  It may be different from
-      // remaining steps if there is a science fold move to make.
-      val firstStepTime = estimator.estimateOne(static, dither.definition.science).runA(lastSteps).value.total
-
-      // First account for the science that will be added by what has been
-      // observed so far.
-      val ditherʹ = dither.complete((calibratedScience ++ uncalibratedScience)
-                          .toList
-                          .groupMapReduce(_._2)(_ => 1)(_ + _))
-
-      if remainingTime < firstStepTime then
-        // No time left for more science.  If there are some calibrations we
-        // could add to save the last science though, add them.
-        val lastCals = if uncalibratedScience.sizeIs == 0 then Nil
-                       else missingCals.map(protoStepQ.replace(lastSteps.offset.q))
-        (ditherʹ, lastCals)
-      else
-        // Okay, there's time for at least one more step.
-        val remainingTimeʹ = remainingTime -| firstStepTime
-
-        // How long would each subsequent science step take? This could be less
-        // than the first step time because there's no need to move the science
-        // fold.
-        val otherStepTime  = estimator.estimateStep(static, lastStepsʹ, dither.definition.science).total
-
-        // How many new science steps should we add then?  Do not go over the
-        // max for the block or for the observation as a whole.
-        val otherStepCount = (remainingTimeʹ.toMicroseconds / otherStepTime.toMicroseconds).toInt
-        val newCount       = maxRemaining min (1 + otherStepCount)
-
-        val (qs, remainingʹ) = ditherʹ.remaining.take(newCount)
-
-        val lastQ = if currentCount === 0 then qs.headOption // use the first science offset pos
-                    else lastSteps.offset.q.some // use the last step's offset position
-
-        // Remaining.take will have no context about the past but we want to
-        // avoid extra offsetting.  So, move any block of consecutive qs that
-        // match the last spatial offset to the front.
-        val qsʹ = lastQ.fold(qs): q =>
-          val (initial, last) = qs.partition(_ === q)
-          initial ++ last
-
-        // Set the spatial offset in the science steps that we produce.
-        val scienceSteps   =
-          List
-            .fill(newCount)(dither.definition.science)
-            .zip(qsʹ)
-            .map((s, q) => protoStepQ.replace(q)(s))
-
-        // Order the steps according to whether we've just done any science.
-        // We want to avoid switching the science fold more than necessary.
-        val steps =
-          if currentCount == 0 then
-            val q = lastQ.getOrElse(Offset.Zero.q)
-            missingCals.map(protoStepQ.replace(q)) ++ scienceSteps
-          else
-            val q = qsʹ.lastOption.orElse(lastQ).getOrElse(Offset.Zero.q)
-            scienceSteps ++ missingCals.map(protoStepQ.replace(q))
-
-        // Update the `Dither` will a remaining from which `newCount` steps
-        // have been removed.
-        (dither.copy(remaining = remainingʹ), steps)
-      end if
-
-    end generateBlockRemainder
-
   end DitherRecord
 
   object DitherRecord:
@@ -671,15 +545,14 @@ object Science:
 
     val length: Int = records.length
 
-    override def generate(timestamp: Timestamp): Stream[Pure, Atom[D]] =
+    override def generate: Stream[Pure, Atom[D]] =
       val (aix, six) = tracker.toTuple
 
       // The first atom will have any unfinished steps from the current atom, so
       // it is handled separately.
       val rec         = records.getUnsafe(pos)
       val dither      = rec.dither
-      val (dʹ, steps) = if rec.steps.isEmpty then dither.generateFullBlock(maxExpPerBlock)
-                        else rec.generateBlockRemainder(timestamp, static, estimator, lastSteps, maxExpPerBlock)
+      val (dʹ, steps) = dither.generateFullBlock(maxExpPerBlock)
       val (cs, atom0) = atomBuilder.buildOption(dither.desc.some, aix, six, steps).run(lastSteps).value
       val dithers     = records.map(_.dither).updatedUnsafe(pos, dʹ)
 

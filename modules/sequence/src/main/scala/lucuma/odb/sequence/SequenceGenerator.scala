@@ -8,7 +8,6 @@ import fs2.Pure
 import fs2.Stream
 import lucuma.core.model.ExecutionEvent.SequenceEvent
 import lucuma.core.model.sequence.Atom
-import lucuma.core.util.Timestamp
 import lucuma.odb.sequence.data.AtomRecord
 import lucuma.odb.sequence.data.StepRecord
 import lucuma.odb.sequence.data.VisitRecord
@@ -23,7 +22,7 @@ trait SequenceGenerator[D]:
   /**
    * Atoms and their steps for this sequence.
    */
-  def generate(when: Timestamp): Stream[Pure, Atom[D]]
+  def generate: Stream[Pure, Atom[D]]
 
   def recordAtom(atom: AtomRecord): SequenceGenerator[D]
 
@@ -55,5 +54,5 @@ object SequenceGenerator:
   /** A degenerate implementation that produces no atoms. */
   def empty[D]: SequenceGenerator[D] =
     new Base[D]:
-      override def generate(when:  Timestamp): Stream[Pure, Atom[D]] =
+      override val generate: Stream[Pure, Atom[D]] =
         Stream.empty
