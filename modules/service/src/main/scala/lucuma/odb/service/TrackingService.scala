@@ -486,7 +486,7 @@ object TrackingService:
                         velocity,
                         airmass.filterNot(_.value.value > AirMassBound.Max.value.value.value.value), // Horizons returns airmasses > 3
                         extinction.filterNot(Extinction.FromMilliVegaMagnitude.reverseGet(_) >= 1), // also extinctions > 1
-                        Some(visualMagnitude),
+                        visualMagnitude,
                         surfaceBrightness,
                       )
           .combineAll
@@ -596,12 +596,12 @@ object TrackingService:
           offset              *:
           air_mass.opt        *:
           core_extinction.opt *:
-          numeric             *:
+          numeric.opt         *:
           numeric.opt
       ).map: (site, ts, ra, dec, v, am, e, vm, sb) =>
         site ->
           Ephemeris.Horizons.Element(
-            ts.toInstant, Coordinates(ra, dec), v, am, e, vm.toDouble, sb.map(_.toDouble)
+            ts.toInstant, Coordinates(ra, dec), v, am, e, vm.map(_.toDouble), sb.map(_.toDouble)
           )
 
     val SelectUserSuppliedEphemerisEntries: Query[(Ephemeris.Key.UserSupplied, TimestampInterval), (Site, Ephemeris.UserSupplied.Element)] =
