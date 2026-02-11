@@ -147,7 +147,7 @@ object Acquisition:
       yield Stream(a0, a1)).runA(calcState).value
 
     case class Init(lastReset: Option[Timestamp], tracker: IndexTracker, builder: AtomBuilder[F2], steps: Steps) extends SequenceGenerator.Base[F2]:
-      override def generate(ignore: Timestamp): Stream[Pure, Atom[F2]] =
+      override def generate: Stream[Pure, Atom[F2]] =
         gen(builder, steps.initialAtom.some, steps.slit, TimeEstimateCalculator.Last.empty[F2], tracker)
 
       override def recordStep(step: StepRecord[F2])(using Eq[F2]): SequenceGenerator[F2] =
@@ -156,7 +156,7 @@ object Acquisition:
         else Matching(steps.initialAtom.toList, steps.slit, TimeEstimateCalculator.Last.empty[F2], tracker, builder).recordStep(step)
 
     case class Matching(remaining: List[ProtoStep[F2]], slit: ProtoStep[F2], calcState: TimeEstimateCalculator.Last[F2], tracker: IndexTracker, builder: AtomBuilder[F2]) extends AcquisitionState:
-      override def generate(ignore: Timestamp): Stream[Pure, Atom[F2]] =
+      override def generate: Stream[Pure, Atom[F2]] =
         gen(builder, NonEmptyList.fromList(remaining), slit, calcState, tracker)
 
       override def updateTracker(calcState: TimeEstimateCalculator.Last[F2], tracker: IndexTracker): AcquisitionState =

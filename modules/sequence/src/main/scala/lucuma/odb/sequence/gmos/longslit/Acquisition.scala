@@ -187,7 +187,7 @@ object Acquisition:
 
     case class Init[D](lastReset: Option[Timestamp], tracker: IndexTracker, builder: AtomBuilder[D], steps: Steps[D]) extends SequenceGenerator.Base[D]:
 
-      override def generate(ignore: Timestamp): Stream[Pure, Atom[D]] =
+      override def generate: Stream[Pure, Atom[D]] =
         gen(builder, steps.initialAtom.some, steps.slit, TimeEstimateCalculator.Last.empty[D], tracker)
 
       override def recordStep(step: StepRecord[D])(using Eq[D]): SequenceGenerator[D] =
@@ -199,7 +199,7 @@ object Acquisition:
 
     case class ExpectCcd2[D](calcState: TimeEstimateCalculator.Last[D], tracker: IndexTracker, builder: AtomBuilder[D], steps: Steps[D]) extends AcquisitionState[D]:
 
-      override def generate(ignore: Timestamp): Stream[Pure, Atom[D]] =
+      override def generate: Stream[Pure, Atom[D]] =
         gen(builder, steps.initialAtom.some, steps.slit, calcState, tracker)
 
       override def updateTracker(calcState: TimeEstimateCalculator.Last[D], tracker: IndexTracker): AcquisitionState[D] =
@@ -213,7 +213,7 @@ object Acquisition:
 
     case class ExpectP10[D](calcState: TimeEstimateCalculator.Last[D], tracker: IndexTracker, builder: AtomBuilder[D], steps: Steps[D]) extends AcquisitionState[D]:
 
-      override def generate(ignore: Timestamp): Stream[Pure, Atom[D]] =
+      override def generate: Stream[Pure, Atom[D]] =
         gen(builder, NonEmptyList.of(steps.p10, steps.slit.withBreakpoint).some, steps.slit, calcState, tracker)
 
       override def updateTracker(calcState: TimeEstimateCalculator.Last[D], tracker: IndexTracker): AcquisitionState[D] =
@@ -227,7 +227,7 @@ object Acquisition:
 
     case class ExpectSlit[D](calcState: TimeEstimateCalculator.Last[D], tracker: IndexTracker, builder: AtomBuilder[D], steps: Steps[D], initialAtom: Boolean) extends AcquisitionState[D]:
 
-      override def generate(ignore: Timestamp): Stream[Pure, Atom[D]] =
+      override def generate: Stream[Pure, Atom[D]] =
         gen(builder, Option.when(initialAtom)(NonEmptyList.one(steps.slit.withBreakpoint)), steps.slit, calcState, tracker)
 
       override def updateTracker(calcState: TimeEstimateCalculator.Last[D], tracker: IndexTracker): AcquisitionState[D] =

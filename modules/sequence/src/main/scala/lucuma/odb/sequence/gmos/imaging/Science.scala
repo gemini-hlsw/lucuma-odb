@@ -41,7 +41,6 @@ import lucuma.core.model.sequence.gmos.GmosFpuMask
 import lucuma.core.model.sequence.gmos.StaticConfig
 import lucuma.core.optics.syntax.lens.*
 import lucuma.core.util.TimeSpan
-import lucuma.core.util.Timestamp
 import lucuma.itc.IntegrationTime
 import lucuma.odb.data.Itc.GmosNorthImaging
 import lucuma.odb.data.Itc.GmosSouthImaging
@@ -209,7 +208,7 @@ object Science:
         else
           this
 
-      override def generate(when: Timestamp): Stream[Pure, Atom[D]] =
+      override def generate: Stream[Pure, Atom[D]] =
         val build = AtomBuilder.instantiate(estimator, static, namespace, SequenceType.Science)
 
         protoAtoms
