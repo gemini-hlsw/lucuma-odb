@@ -29,11 +29,11 @@ case class ExecutionConfigGenerator[S, D](
   science:     SequenceGenerator[D]
 ):
 
-  def streamingExecutionConfig[F[_]]: StreamingExecutionConfig[F, S, D] =
+  def streamingExecutionConfig: StreamingExecutionConfig[Pure, S, D] =
     StreamingExecutionConfig(
       static,
-      acquisition.generate(Timestamp.Min).covary[F],
-      science.generate(Timestamp.Min).covary[F]
+      acquisition.generate(Timestamp.Min),
+      science.generate(Timestamp.Min)
     )
 
   /**

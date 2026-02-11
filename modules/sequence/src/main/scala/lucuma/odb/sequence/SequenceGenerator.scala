@@ -14,21 +14,14 @@ import lucuma.odb.sequence.data.StepRecord
 import lucuma.odb.sequence.data.VisitRecord
 
 /**
- * A sequence generator.  Record past steps and vists in order until all have
- * been accounted for and then `generate` the remaining sequence.
+ * A sequence generator.
  *
  * @tparam D dynamic instrument config type
  */
 trait SequenceGenerator[D]:
 
   /**
-   * Remaining atoms and their steps for this sequence, if it were being
-   * generated at timestamp 'when'.  The sequence may change depending on when
-   * it is generated because, for example, past calibrations eventually expire
-   * and need to be repeated.
-   *
-   * @param when referential time at which the sequence will be generated; does
-   *             not delay the calculation in anyway
+   * Atoms and their steps for this sequence.
    */
   def generate(when: Timestamp): Stream[Pure, Atom[D]]
 
