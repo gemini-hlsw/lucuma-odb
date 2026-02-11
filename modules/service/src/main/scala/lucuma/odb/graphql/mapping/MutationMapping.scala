@@ -41,9 +41,7 @@ import lucuma.core.model.ProgramUser
 import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.core.model.Visit
-import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.Dataset
-import lucuma.core.model.sequence.Step
 import lucuma.itc.client.ItcClient
 import lucuma.odb.Config
 import lucuma.odb.data.OdbError
@@ -94,13 +92,9 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
       DeleteProgramUser,
       DeleteProposal,
       LinkUser,
-      RecordAtom,
       RecordDataset,
-      RecordFlamingos2Step,
       RecordFlamingos2Visit,
-      RecordGmosNorthStep,
       RecordGmosNorthVisit,
-      RecordGmosSouthStep,
       RecordGmosSouthVisit,
       RedeemUserInvitation,
       ResetAcquisition,
@@ -528,6 +522,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
       executionEventService.insertStepEvent(input)
     }
 
+  /*
   private def recordAtom(
     response:  F[Result[Atom.Id]],
     predicate: LeafPredicates[Atom.Id],
@@ -583,7 +578,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
             Predicates.gmosSouthStep.id,
             child
           )
-
+  */
 
   private def recordVisit(
     response:  F[Result[Visit.Id]],
