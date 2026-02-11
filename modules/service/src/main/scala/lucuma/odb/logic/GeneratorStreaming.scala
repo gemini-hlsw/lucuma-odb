@@ -144,7 +144,7 @@ object GeneratorStreaming:
           cfg <- extractMode(ObservingMode.Flamingos2LongSlitName, context)(_.asFlamingos2LongSlit)
           itc  = requireSpectroscopyItc(context.oid, context.itcRes)
           gen <- EitherT(LongSlit.instantiate(context.oid, calculator.flamingos2, context.namespace, exp.flamingos2, cfg, itc, context.params.acqResetTime))
-        yield gen.streamingExecutionConfig.covary[F]).value
+        yield gen.covary[F]).value
 
 
       override def selectOrGenerateGmosNorthImaging(
@@ -161,7 +161,7 @@ object GeneratorStreaming:
           cfg <- extractMode(ObservingMode.GmosNorthImagingName, context)(_.asGmosNorthImaging)
           itc  = requireImagingItc(ObservingMode.GmosNorthImagingName, context.oid, context.itcRes, Itc.gmosNorthImaging.getOption)
           gen <- EitherT(Imaging.gmosNorth(calculator.gmosNorth, context.namespace, cfg, itc))
-        yield gen.streamingExecutionConfig.covary[F]).value
+        yield gen.covary[F]).value
 
 
       override def selectOrGenerateGmosNorthLongSlit(
@@ -180,7 +180,7 @@ object GeneratorStreaming:
           rol  = context.params.calibrationRole
           rst  = context.params.acqResetTime
           gen <- EitherT(LongSlit.gmosNorth(context.oid, calculator.gmosNorth, context.namespace, exp.gmosNorth, cfg, itc, rol, rst))
-        yield gen.streamingExecutionConfig.covary[F]).value
+        yield gen.covary[F]).value
 
 
       override def selectOrGenerateGmosSouthImaging(
@@ -197,7 +197,7 @@ object GeneratorStreaming:
           cfg <- extractMode(ObservingMode.GmosSouthImagingName, context)(_.asGmosSouthImaging)
           itc  = requireImagingItc(ObservingMode.GmosSouthImagingName, context.oid, context.itcRes, Itc.gmosSouthImaging.getOption)
           gen <- EitherT(Imaging.gmosSouth(calculator.gmosSouth, context.namespace, cfg, itc))
-        yield gen.streamingExecutionConfig.covary[F]).value
+        yield gen.covary[F]).value
 
 
       override def selectOrGenerateGmosSouthLongSlit(
@@ -216,4 +216,4 @@ object GeneratorStreaming:
           rol  = context.params.calibrationRole
           rst  = context.params.acqResetTime
           gen <- EitherT(LongSlit.gmosSouth(context.oid, calculator.gmosSouth, context.namespace, exp.gmosSouth, cfg, itc, rol, rst))
-        yield gen.streamingExecutionConfig.covary[F]).value
+        yield gen.covary[F]).value
