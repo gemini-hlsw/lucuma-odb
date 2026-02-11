@@ -3204,12 +3204,6 @@ type Mutation {
   """
   linkUser(input: LinkUserInput!): LinkUserResult!
 
-  "Record a new atom"
-  recordAtom(
-    "Atom configuration parameters"
-    input: RecordAtomInput!
-  ): RecordAtomResult! @deprecated(reason: "Atoms are now written to the database before execution begins.")
-
   """
   Records a new dataset.  This dataset may be subsequently referenced by dataset events.
   """
@@ -3221,14 +3215,6 @@ type Mutation {
   ): RecordDatasetResult!
 
   """
-  Record a new Flamingos 2 step.
-  """
-  recordFlamingos2Step(
-    "Flamingos 2 step configuration parameters"
-    input: RecordFlamingos2StepInput!
-  ): RecordFlamingos2StepResult! @deprecated(reason: "Steps are now written to the database before execution begins.")
-
-  """
   Record a new Flamingos 2 visit
   """
   recordFlamingos2Visit(
@@ -3237,12 +3223,6 @@ type Mutation {
     """
     input: RecordFlamingos2VisitInput!
   ): RecordFlamingos2VisitResult!
-
-  "Record a new GMOS North step"
-  recordGmosNorthStep(
-    "GMOS North step configuration parameters"
-    input: RecordGmosNorthStepInput!
-  ): RecordGmosNorthStepResult! @deprecated(reason: "Steps are now written to the database before execution begins.")
 
   """
   Record a new GMOS North visit
@@ -3253,12 +3233,6 @@ type Mutation {
     """
     input: RecordGmosNorthVisitInput!
   ): RecordGmosNorthVisitResult!
-
-  "Record a new GMOS South step"
-  recordGmosSouthStep(
-    "GmosSouth step configuration parameters"
-    input: RecordGmosSouthStepInput!
-  ): RecordGmosSouthStepResult! @deprecated(reason: "Steps are now written to the database before execution begins.")
 
   """
   Record a new GMOS South visit

@@ -6,13 +6,11 @@ package lucuma.odb.service
 import cats.effect.Concurrent
 import cats.syntax.functor.*
 import cats.syntax.option.*
-import fs2.Stream
 import lucuma.core.model.Observation
 import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig
 import lucuma.core.model.sequence.flamingos2.Flamingos2StaticConfig
-import lucuma.odb.sequence.data.StepRecord
 import lucuma.odb.util.Codecs.observation_id
 import lucuma.odb.util.Codecs.step_id
 import lucuma.odb.util.Codecs.visit_id
@@ -48,10 +46,6 @@ trait Flamingos2SequenceService[F[_]]:
   def selectLatestVisitStatic(
     observationId: Observation.Id
   )(using Transaction[F]): F[Option[Flamingos2StaticConfig]]
-
-  def selectStepRecords(
-    observationId: Observation.Id
-  ): Stream[F, StepRecord[Flamingos2DynamicConfig]]
 
 object Flamingos2SequenceService:
 
@@ -90,18 +84,6 @@ object Flamingos2SequenceService:
           visitId,
           static
         )
-
-      override def selectStepRecords(
-        observationId: Observation.Id
-      ): Stream[F, StepRecord[Flamingos2DynamicConfig]] =
-        session.stream(
-          SequenceService.Statements.selectStepRecord(
-            "t_flamingos_2_dynamic",
-            "f2",
-            Statements.Flamingos2DynamicColumns,
-            flamingos_2_dynamic
-          )
-        )(observationId, 1024)
 
   object Statements:
 
