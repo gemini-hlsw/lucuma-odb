@@ -9,13 +9,11 @@ package lucuma.odb.service
 import cats.effect.Concurrent
 import cats.syntax.functor.*
 import cats.syntax.option.*
-import fs2.Stream
 import lucuma.core.model.Observation
 import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.gmos.DynamicConfig
 import lucuma.core.model.sequence.gmos.StaticConfig
-import lucuma.odb.sequence.data.StepRecord
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.GmosCodecs.*
 import skunk.*
@@ -25,14 +23,6 @@ import skunk.implicits.*
 import Services.Syntax.*
 
 trait GmosSequenceService[F[_]] {
-
-  def selectGmosNorthStepRecords(
-    observationId: Observation.Id
-  ): Stream[F, StepRecord[DynamicConfig.GmosNorth]]
-
-  def selectGmosSouthStepRecords(
-    observationId: Observation.Id
-  ): Stream[F, StepRecord[DynamicConfig.GmosSouth]]
 
   def insertGmosNorthDynamic(
     stepId:  Step.Id,
@@ -115,38 +105,6 @@ object GmosSequenceService {
         observationId: Observation.Id
       )(using Transaction[F]): F[Option[StaticConfig.GmosNorth]] =
         session.option(Statements.selectLastestVisitStatic("north", gmos_north_static))(observationId)
-
-      private def selectGmosStepRecords[A](
-        observationId: Observation.Id,
-        site:          String,
-        decoderA:      Decoder[A]
-      ): Stream[F, StepRecord[A]] =
-        session.stream(
-          SequenceService.Statements.selectStepRecord(
-            s"t_gmos_${site}_dynamic",
-            s"gmos$site",
-            Statements.GmosDynamicColumns,
-            decoderA
-          )
-        )(observationId, 1024)
-
-      override def selectGmosNorthStepRecords(
-        observationId: Observation.Id
-      ): Stream[F, StepRecord[DynamicConfig.GmosNorth]] =
-        selectGmosStepRecords(
-          observationId,
-          "north",
-          gmos_north_dynamic
-        )
-
-      override def selectGmosSouthStepRecords(
-        observationId: Observation.Id
-      ): Stream[F, StepRecord[DynamicConfig.GmosSouth]] =
-        selectGmosStepRecords(
-          observationId,
-          "south",
-          gmos_south_dynamic
-        )
 
       override def selectGmosNorthDynamicForStep(
         stepId: Step.Id
