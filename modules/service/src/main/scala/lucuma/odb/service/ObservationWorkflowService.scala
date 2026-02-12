@@ -633,26 +633,27 @@ object ObservationWorkflowService {
       )(using NoTransaction[F]): F[Result[ObservationWorkflow]] =
         input.foldWithId(OdbError.InvalidArgument().asFailureF):
           case ((w, state), oid) =>
-            if w.state === state then ResultT.success(w)
-            else ResultT:
-              // If we're transitioning to or from a UserState, just update that column
-              if w.state.isUserState || state.isUserState then
-                services.transactionally:
-                  session.prepareR(Statements.UpdateUserState).use: pc =>
-                    pc.execute(state.asUserState, oid)
-                      .as(Result(w.copy(state = state)))
-              else // we must be declaring completion (or revoking that declaration)
-                import ObservationWorkflowState.*
-                (w.state, state) match
-                  case (Ongoing, Completed) | (Completed, Ongoing) =>
-                    services.transactionally:
-                      session.prepareR(Statements.UpdateDeclaredCompletion).use: pc =>
-                        pc.execute(state === Completed, oid)
-                          .as(Result(w.copy(state = state)))
-                  case _ =>
-                    // This should never happen but I want to check for it anyway.
-                    Result.internalError(s"Transition from ${w.state} to $state was not expected.").pure[F]
-          .value
+            (
+              if w.state === state then ResultT.success(w)
+              else ResultT:
+                // If we're transitioning to or from a UserState, just update that column
+                if w.state.isUserState || state.isUserState then
+                  services.transactionally:
+                    session.prepareR(Statements.UpdateUserState).use: pc =>
+                      pc.execute(state.asUserState, oid)
+                        .as(Result(w.copy(state = state)))
+                else // we must be declaring completion (or revoking that declaration)
+                  import ObservationWorkflowState.*
+                  (w.state, state) match
+                    case (Ongoing, Completed) | (Completed, Ongoing) =>
+                      services.transactionally:
+                        session.prepareR(Statements.UpdateDeclaredCompletion).use: pc =>
+                          pc.execute(state === Completed, oid)
+                            .as(Result(w.copy(state = state)))
+                    case _ =>
+                      // This should never happen but I want to check for it anyway.
+                      Result.internalError(s"Transition from ${w.state} to $state was not expected.").pure[F]
+            ).value
 
       extension (wf: ObservationWorkflow) def isCompatibleWith(states: Set[ObservationWorkflowState]): Boolean =
         // An allowed transition from ongoing to completed [via declared completion] shouldn't prevent editing,
@@ -675,7 +676,7 @@ object ObservationWorkflowService {
                   case Some(wf) =>
                     if wf.isCompatibleWith(states) then r.map(oid :: _)
                     else r.withProblems:
-                      val prefix = s"Observation $oid is ineligibile for this operation due to its workflow state (${wf.state}"
+                      val prefix = s"Observation $oid is ineligible for this operation due to its workflow state (${wf.state}"
                       val suffix = if wf.validTransitions.isEmpty then ")." else s" with allowed transition to ${wf.validTransitions.mkString("/")})."
                       OdbError.InvalidObservation(oid, (prefix + suffix).some)
                         .asProblemNec

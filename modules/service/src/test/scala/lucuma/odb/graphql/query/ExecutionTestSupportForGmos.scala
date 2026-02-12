@@ -30,6 +30,9 @@ import lucuma.core.enums.GmosNorthGrating
 import lucuma.core.enums.GmosRoi
 import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
+import lucuma.core.enums.Instrument
+import lucuma.core.enums.ObserveClass
+import lucuma.core.enums.SequenceType
 import lucuma.core.enums.StepGuideState
 import lucuma.core.math.BoundedInterval
 import lucuma.core.math.Wavelength
@@ -455,3 +458,17 @@ trait ExecutionTestSupportForGmos extends ExecutionTestSupport:
         .as[Observation.Id]
         .getOrElse(sys.error("Could not create observation"))
     }
+  
+  val createOngoingGmosNorthObservation: IO[Observation.Id] =
+    // importing at the top level breaks other tests in a never-ending cycle of despair.
+    import lucuma.odb.json.all.transport.given
+    for
+      p <- createProgramAs(pi)
+      t <- createTargetWithProfileAs(pi, p)
+      o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+      v <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
+      a <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
+      s <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthArc(0), ArcStep, gcalTelescopeConfig(0), ObserveClass.NightCal)
+      _ <- addEndStepEvent(s)
+      _ <- runObscalcUpdate(p, o)
+    yield o
