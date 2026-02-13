@@ -567,7 +567,7 @@ class executionDigest extends ExecutionTestSupportForGmos {
 
   test("clear execution digest"):
 
-    val setup: IO[(Observation.Id, Step.Id)] =
+    val setup: IO[(Observation.Id, Visit.Id, Step.Id)] =
       import lucuma.odb.json.all.transport.given
 
       for
@@ -577,15 +577,15 @@ class executionDigest extends ExecutionTestSupportForGmos {
         v <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
         a <- recordAtomAs(serviceUser, Instrument.GmosNorth, v)
         s <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, telescopeConfig(0, 0, StepGuideState.Enabled))
-      yield (o, s)
+      yield (o, v, s)
 
     val isEmpty = setup.flatMap:
-      case (o, s) =>
+      case (o, v, s) =>
         withServices(pi): services =>
           services.session.transaction.use: xa =>
             for
               _ <- services.executionDigestService.insertOrUpdate(o, Md5Hash.Zero, ExecutionDigest.Zero)(using xa)
-              _ <- services.executionEventService.insertStepEvent(AddStepEventInput(s, StepStage.EndStep, None))(using xa, ().asInstanceOf) // shhh
+              _ <- services.executionEventService.insertStepEvent(AddStepEventInput(s, v, StepStage.EndStep, None))(using xa, ().asInstanceOf) // shhh
               d <- services.executionDigestService.selectOne(o, Md5Hash.Zero)(using xa)
             yield d.isEmpty
 
