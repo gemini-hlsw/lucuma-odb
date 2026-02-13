@@ -4,15 +4,15 @@
 package lucuma.odb.graphql
 package mapping
 
-import table.AtomRecordTable
-import table.StepRecordView
+import table.AtomTable
+import table.StepView
 
 trait StepRecordSelectResultMapping[F[_]]
-  extends AtomRecordTable[F[_]]
+  extends AtomTable[F[_]]
      with ResultMapping[F]
-     with StepRecordView[F] {
+     with StepView[F] {
 
   lazy val StepRecordSelectResultMapping: TypeMapping =
-    nestedSelectResultMapping(StepRecordSelectResultType, AtomRecordTable.Id, Join(AtomRecordTable.Id, StepRecordView.AtomId))
+    nestedSelectResultMapping(StepRecordSelectResultType, AtomTable.Id, Join(AtomTable.Id, StepView.AtomId))
 
 }

@@ -30,13 +30,6 @@ trait AtomBuilder[D]:
     steps: NonEmptyList[ProtoStep[D]],
   ): State[TimeEstimateCalculator.Last[D], Atom[D]]
 
-  def build(
-    desc:    String,
-    tracker: IndexTracker,
-    steps:   NonEmptyList[ProtoStep[D]]
-  ): State[TimeEstimateCalculator.Last[D], Atom[D]] =
-    build(NonEmptyString.from(desc).toOption, tracker.atomCount, tracker.stepCount, steps)
-
   def buildOption(
     desc:  Option[NonEmptyString],
     aix:   Int,
@@ -46,13 +39,6 @@ trait AtomBuilder[D]:
     NonEmptyList.fromList(steps) match
       case None      => State.pure(None)
       case Some(nel) => build(desc, aix, six, nel).map(_.some)
-
-  def buildOption(
-    desc:    String,
-    tracker: IndexTracker,
-    steps:   List[ProtoStep[D]]
-  ): State[TimeEstimateCalculator.Last[D], Option[Atom[D]]] =
-    buildOption(NonEmptyString.from(desc).toOption, tracker.atomCount, tracker.stepCount, steps)
 
 object AtomBuilder:
 

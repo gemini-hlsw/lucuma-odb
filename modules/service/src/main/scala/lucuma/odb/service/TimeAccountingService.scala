@@ -370,8 +370,8 @@ object TimeAccountingService {
         SELECT
           COALESCE(MIN(s.c_observe_class), 'science'::e_obs_class)
         FROM
-          t_step_record s
-        INNER JOIN t_atom_record a USING (c_atom_id)
+          t_step s
+        INNER JOIN t_atom a USING (c_atom_id)
         WHERE
           a.c_observation_id = $observation_id
       """.query(obs_class)
@@ -386,7 +386,7 @@ object TimeAccountingService {
           e.c_step_id
         FROM
           t_execution_event e
-        LEFT JOIN t_step_record s USING (c_step_id)
+        LEFT JOIN t_step s USING (c_step_id)
         WHERE
           e.c_visit_id = $visit_id
         ORDER BY

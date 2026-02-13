@@ -9,7 +9,7 @@ import grackle.Path
 import table.DatasetTable
 import table.ObservationView
 import table.ExecutionEventTable
-import table.StepRecordView
+import table.StepView
 import table.VisitTable
 
 trait ExecutionEventSelectResultMapping[F[_]]
@@ -17,7 +17,7 @@ trait ExecutionEventSelectResultMapping[F[_]]
      with DatasetTable[F]
      with ObservationView[F]
      with ResultMapping[F]
-     with StepRecordView[F]
+     with StepView[F]
      with VisitTable[F] {
 
   lazy val ExecutionEventSelectResultMapping: List[TypeMapping] = {
@@ -32,7 +32,7 @@ trait ExecutionEventSelectResultMapping[F[_]]
       topLevelSelectResultMappingAtPath(path)
 
     def fromStepRecordAtPath(path: Path): ObjectMapping =
-      nestedSelectResultMappingAtPath(path, StepRecordView.Id, Join(StepRecordView.Id, ExecutionEventTable.StepId))
+      nestedSelectResultMappingAtPath(path, StepView.Id, Join(StepView.Id, ExecutionEventTable.StepId))
 
     def fromVisitAtPath(path: Path): ObjectMapping =
       nestedSelectResultMappingAtPath(path, VisitTable.Id,      Join(VisitTable.Id,      ExecutionEventTable.VisitId))

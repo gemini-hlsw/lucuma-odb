@@ -262,7 +262,7 @@ object ExecutionEventService:
           MAX(e.c_received)
         FROM
           t_execution_event e
-        INNER JOIN t_step_record s ON
+        INNER JOIN t_step s ON
           s.c_step_id = e.c_step_id
         WHERE
           s.c_atom_id = $atom_id
@@ -310,7 +310,7 @@ object ExecutionEventService:
           $atom_stage,
           ${idempotency_key.opt}
         FROM
-          t_atom_record a
+          t_atom a
         INNER JOIN
           t_observation o ON o.c_observation_id = a.c_observation_id
         WHERE
@@ -353,7 +353,7 @@ object ExecutionEventService:
         INNER JOIN
           t_observation o ON o.c_observation_id = d.c_observation_id
         INNER JOIN
-          t_step_record s ON s.c_step_id = d.c_step_id
+          t_step s ON s.c_step_id = d.c_step_id
         WHERE
           d.c_dataset_id = $dataset_id
         ON CONFLICT (c_idempotency_key) DO UPDATE
@@ -454,9 +454,9 @@ object ExecutionEventService:
           $step_stage,
           ${idempotency_key.opt}
         FROM
-          t_step_record s
+          t_step s
         INNER JOIN
-          t_atom_record a ON a.c_atom_id = s.c_atom_id
+          t_atom a ON a.c_atom_id = s.c_atom_id
         INNER JOIN
           t_observation o ON o.c_observation_id = a.c_observation_id
         WHERE

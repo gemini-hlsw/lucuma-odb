@@ -4,13 +4,13 @@
 package lucuma.odb.graphql
 package mapping
 
-import table.AtomRecordTable
+import table.AtomTable
 
-trait RecordAtomResultMapping[F[_]] extends AtomRecordTable[F] {
+trait RecordAtomResultMapping[F[_]] extends AtomTable[F] {
 
   lazy val RecordAtomResultMapping: ObjectMapping =
     ObjectMapping(RecordAtomResultType)(
-      SqlField("id", AtomRecordTable.Id, key = true, hidden = true),
+      SqlField("id", AtomTable.Id, key = true, hidden = true),
       SqlObject("atomRecord")
     )
 

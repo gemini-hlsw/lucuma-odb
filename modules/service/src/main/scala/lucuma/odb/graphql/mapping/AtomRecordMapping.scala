@@ -17,30 +17,27 @@ import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.service.Services
 import lucuma.odb.service.Services.Syntax.*
 
-import table.AtomRecordTable
-import table.StepRecordView
+import table.AtomTable
+import table.StepView
 import table.VisitTable
 
-trait AtomRecordMapping[F[_]] extends AtomRecordTable[F]
+trait AtomRecordMapping[F[_]] extends AtomTable[F]
                                  with EventRangeEffectHandler[F]
                                  with Predicates[F]
                                  with SelectSubquery
-                                 with StepRecordView[F]
+                                 with StepView[F]
                                  with VisitTable[F] {
   def user: User
   def services: Resource[F, Services[F]]
 
   lazy val AtomRecordMapping: ObjectMapping =
     ObjectMapping(AtomRecordType)(
-      SqlField("id",             AtomRecordTable.Id, key = true),
-      SqlField("instrument",     AtomRecordTable.Instrument),
-      SqlObject("visit",         Join(AtomRecordTable.VisitId, VisitTable.Id)),
-      SqlField("created",        AtomRecordTable.Created),
-      SqlField("executionState", AtomRecordTable.ExecutionState),
+      SqlField("id",             AtomTable.Id, key = true),
+      SqlField("instrument",     AtomTable.Instrument),
+      SqlObject("visit",         Join(AtomTable.VisitId, VisitTable.Id)),
+      SqlField("executionState", AtomTable.ExecutionState),
       EffectField("interval",    intervalHandler, List("id")),
-      SqlField("sequenceType",   AtomRecordTable.SequenceType),
-      SqlField("generatedId",    AtomRecordTable.GeneratedId),
-      SqlField("idempotencyKey", AtomRecordTable.IdempotencyKey),
+      SqlField("sequenceType",   AtomTable.SequenceType),
       SqlObject("steps")
     )
 
