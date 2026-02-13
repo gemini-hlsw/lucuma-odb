@@ -10,7 +10,6 @@ import cats.data.OptionT
 import cats.effect.Concurrent
 import cats.syntax.apply.*
 import cats.syntax.either.*
-import cats.syntax.eq.*
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import cats.syntax.option.*
@@ -188,8 +187,7 @@ object SequenceService:
           case StepStage.Abort   => StepExecutionState.Aborted
           case StepStage.Stop    => StepExecutionState.Stopped
           case _                 => StepExecutionState.Ongoing
-        val completedTime = Option.when(stage === StepStage.EndStep)(time)
-        session.execute(Statements.SetStepExecutionState)(state, completedTime, stepId).void
+        session.execute(Statements.SetStepExecutionState)(state, stepId).void
 
       override def insertAtomDigests(
         observationId: Observation.Id,
@@ -554,11 +552,10 @@ object SequenceService:
         )
       }
 
-    val SetStepExecutionState: Command[(StepExecutionState, Option[Timestamp], Step.Id)] =
+    val SetStepExecutionState: Command[(StepExecutionState, Step.Id)] =
       sql"""
         UPDATE t_step s
-           SET c_execution_state = $step_execution_state,
-               c_completed       = ${core_timestamp.opt}
+           SET c_execution_state = $step_execution_state
           FROM t_step_execution_state e
          WHERE s.c_execution_state = e.c_tag
            AND e.c_terminal = FALSE

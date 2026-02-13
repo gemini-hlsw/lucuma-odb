@@ -142,6 +142,47 @@ FROM t_step_record r;
 ALTER TABLE ONLY t_step
   ADD CONSTRAINT t_atom_c_atom_id_c_instrument_fkey FOREIGN KEY (c_atom_id, c_instrument) REFERENCES t_atom(c_atom_id, c_instrument) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED;
 
+-- Update the step view
+DROP VIEW v_step_record;
+
+CREATE VIEW v_step AS
+SELECT
+  s.c_step_id,
+  s.c_atom_id,
+  a.c_visit_id,
+  s.c_step_index,
+  s.c_instrument,
+  s.c_step_type,
+  s.c_observe_class,
+  s.c_execution_state,
+  s.c_time_estimate,
+  s.c_breakpoint,
+  s.c_first_event_time,
+  s.c_last_event_time,
+  g.c_gcal_continuum,
+  g.c_gcal_ar_arc,
+  g.c_gcal_cuar_arc,
+  g.c_gcal_thar_arc,
+  g.c_gcal_xe_arc,
+  g.c_gcal_filter,
+  g.c_gcal_diffuser,
+  g.c_gcal_shutter,
+  m.c_smart_gcal_type,
+  s.c_offset_p,
+  s.c_offset_q,
+  s.c_guide_state,
+  (SELECT MAX(c_qa_state) FROM t_dataset d WHERE d.c_step_id = s.c_step_id) AS c_qa_state
+FROM
+  t_step s
+LEFT JOIN t_step_config_gcal g
+  ON g.c_step_id = s.c_step_id
+LEFT JOIN t_step_config_smart_gcal m
+  ON m.c_step_id = s.c_step_id
+INNER JOIN t_atom a
+  ON a.c_atom_id = s.c_atom_id
+ORDER BY
+  s.c_step_id;
+
 -- Sequence serialization coordination
 CREATE TABLE t_sequence_materialization (
   c_observation_id d_observation_id PRIMARY KEY,
@@ -164,13 +205,62 @@ GROUP BY a.c_observation_id;
 
 -- When a new step is completed (or uncompleted if that ever happens), we need
 -- to poke obscalc.
+DROP TRIGGER  step_record_invalidate_trigger ON t_step_record;
+DROP FUNCTION step_record_invalidate;
+
+CREATE OR REPLACE FUNCTION step_obscalc_invalidate()
+  RETURNS TRIGGER AS $$
+DECLARE
+  observation_id d_observation_id;
+BEGIN
+   SELECT c_observation_id INTO observation_id
+   FROM t_atom
+   WHERE c_atom_id = NEW.c_atom_id;
+
+   CALL invalidate_obscalc(observation_id);
+
+   RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
 CREATE TRIGGER step_obscalc_invalidate_trigger
 AFTER UPDATE ON t_step FOR EACH ROW WHEN (
   OLD.c_execution_state IS DISTINCT FROM NEW.c_execution_state AND (
     OLD.c_execution_state = 'completed' OR
     NEW.c_execution_state = 'completed'
   )
-) EXECUTE FUNCTION step_record_invalidate();
+) EXECUTE FUNCTION step_obscalc_invalidate();
+
+-- Deletes the observation's execution digest when one of its steps is marked
+-- complete.
+DROP TRIGGER delete_execution_digest_trigger ON t_step_record;
+DROP FUNCTION delete_execution_digest;
+
+CREATE OR REPLACE FUNCTION delete_execution_digest()
+  RETURNS TRIGGER AS $$
+BEGIN
+   DELETE FROM t_execution_digest
+     WHERE (c_program_id, c_observation_id) IN (
+       SELECT DISTINCT
+         o.c_program_id, o.c_observation_id
+       FROM t_observation o
+         JOIN t_atom a ON a.c_observation_id = o.c_observation_id
+         WHERE a.c_atom_id = OLD.c_atom_id
+     );
+   RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Triggers the deletion of an observation's execution digest when a step is
+-- marked complete (or marked incomplete having previously been marked complete).
+CREATE TRIGGER delete_execution_digest_trigger
+AFTER UPDATE ON t_step FOR EACH ROW
+WHEN (
+  OLD.c_execution_state IS DISTINCT FROM NEW.c_execution_state AND (
+    OLD.c_execution_state = 'completed' OR
+    NEW.c_execution_state = 'completed'
+  )
+) EXECUTE PROCEDURE delete_execution_digest();
 
 -- Transfer the FK constraints.
 ALTER TABLE t_dataset

@@ -272,9 +272,6 @@ type AtomRecord {
   "Visit in which this atom was executed."
   visit: Visit!
 
-  "Created by Observe at this time."
-  created: Timestamp!
-
   """
   The execution state of this atom, according to events received (if any) from
   Observe.
@@ -299,15 +296,6 @@ type AtomRecord {
     LIMIT: NonNegInt
   ): StepRecordSelectResult!
 
-  "Atom ID from the generated atom, if any, that produced this atom record."
-  generatedId: AtomId
-
-  """
-  Idempotency key, if any.  The IdempotencyKey may be provided by clients when
-  the atom is created and is used to enable problem-free retry in the case of
-  failure.
-  """
-  idempotencyKey: IdempotencyKey
 }
 
 "AtomRecord query results, limited to a maximum of 1000 entries."
@@ -14108,9 +14096,6 @@ type StepRecord {
   "The atom in which the step was executed."
   atom: AtomRecord!
 
-  "The step was created by Observe at this time."
-  created: Timestamp!
-
   """
   The execution state of this step, according to events received (if any) from
   Observe.
@@ -14165,16 +14150,6 @@ type StepRecord {
     "Limits the result to at most this number of matches (but never more than 1000)."
     LIMIT: NonNegInt
   ): ExecutionEventSelectResult!
-
-  "Step ID of the generated step, if any, that produced this step record."
-  generatedId: StepId
-
-  """
-  Idempotency key, if any.  The IdempotencyKey may be provided by clients when
-  the step is created and is used to enable problem-free retry in the case of
-  failure.
-  """
-  idempotencyKey: IdempotencyKey
 
   """
   Flamingos 2 instrument configuration for this step, if any.  This will be null
