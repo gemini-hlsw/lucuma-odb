@@ -78,6 +78,38 @@ ALTER TABLE ONLY t_atom
 
 CREATE INDEX atom_observation_id_exeuction_state_index ON t_atom (c_observation_id, c_execution_state);
 
+-- The visit id is assigned in t_atom when events arrive from Observe.  We check
+-- here to make sure the visit is compatible (same observation) and that the
+-- visit isn't being changed once initially set.
+CREATE OR REPLACE FUNCTION validate_atom_visit()
+RETURNS TRIGGER AS $$
+DECLARE
+  observation_id d_observation_id;
+BEGIN
+  -- Make sure the visit applies to the same observation as the atom.
+  IF NEW.c_visit_id IS NOT NULL THEN
+    SELECT v.c_observation_id INTO observation_id FROM t_visit v WHERE v.c_visit_id = NEW.c_visit_id;
+    IF NEW.c_observation_id IS DISTINCT FROM observation_id THEN
+      RAISE EXCEPTION 'atom % and visit % cannot have distinct observation ids (% and % respectively)', NEW.c_atom_id, NEW.c_visit_id, NEW.c_observation_id, observation_id
+        USING ERRCODE = 'check_violation';
+    END IF;
+  END IF;
+
+  -- Don't allow the visit to change.
+  IF OLD.c_visit_id IS NOT NULL AND NEW.c_visit_id IS DISTINCT FROM OLD.c_visit_id THEN
+    RAISE EXCEPTION 'c_visit_id is write-once: cannot change from % to %', OLD.c_visit_id, NEW.c_visit_id
+    USING ERRCODE = 'check_violation';
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER validate_atom_visit_trigger
+BEFORE UPDATE OF c_visit_id ON t_atom
+FOR EACH ROW
+EXECUTE FUNCTION validate_atom_visit();
+
+-- Add a breakpoint enum.  We can now store breakpoints.
 CREATE TYPE e_breakpoint AS enum(
   'enabled',
   'disabled'
@@ -306,6 +338,46 @@ ALTER TABLE t_gmos_south_dynamic
 
 ALTER TABLE t_gmos_south_dynamic
   ADD CONSTRAINT t_gmos_south_dynamic_c_step_id_c_instrument_fkey FOREIGN KEY (c_step_id, c_instrument) REFERENCES t_step(c_step_id, c_instrument);
+
+-- Rework the dataset visit assignment.  Before we knew that the visit existed
+-- because datasets referred to steps that referred to atoms that referred to
+-- visits and each layer had to exist and be assigned.  Now atoms and steps are
+-- written before the visit is applied so the visit could in theory be null at
+-- the time a new dataset is added.  We'll reject that.
+
+DROP TRIGGER set_datatset_visit_trigger ON t_dataset;
+DROP FUNCTION set_dataset_visit;
+
+DROP TRIGGER check_dataset_visit_immutable_trigger ON t_dataset;
+DROP FUNCTION check_dataset_visit_immutable;
+
+CREATE FUNCTION set_dataset_visit()
+RETURNS TRIGGER AS $$
+DECLARE
+  visit_id d_visit_id;
+BEGIN
+  SELECT a.c_visit_id INTO visit_id FROM t_step s JOIN t_atom a ON a.c_atom_id = s.c_atom_id WHERE s.c_step_id = NEW.c_step_id;
+
+  IF visit_id IS NULL THEN
+    RAISE EXCEPTION
+       USING
+         ERRCODE = 'check_violation',
+         MESSAGE = format(
+           'Cannot insert dataset for step %s: atom has no visit assigned',
+           NEW.c_step_id
+         );
+  END IF;
+
+  NEW.c_visit_id := visit_id;
+  RETURN NEW;
+
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER set_datatset_visit_trigger
+BEFORE INSERT ON t_dataset
+FOR EACH ROW
+EXECUTE FUNCTION set_dataset_visit();
 
 -- Add execution state to the generator params
 DROP VIEW v_generator_params;

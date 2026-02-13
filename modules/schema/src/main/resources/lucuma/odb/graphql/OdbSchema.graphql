@@ -25,8 +25,8 @@ scalar EmailAddress @specifiedBy(url: "https://html.spec.whatwg.org/multipage/in
 "AtomEvent creation parameters."
 input AddAtomEventInput {
   atomId: AtomId!
+  visitId: VisitId!
   atomStage: AtomStage!
-  clientId: ClientId @deprecated(reason: "Use idempotencyKey instead")
 
   """
   Idempotency key, if any.  The IdempotencyKey may be provided by clients when
@@ -49,8 +49,6 @@ input AddDatasetEventInput {
 
   "Dataset execution stage."
   datasetStage: DatasetStage!
-
-  clientId: ClientId @deprecated(reason: "Use idempotencyKey instead")
 
   """
   Idempotency key, if any.  The IdempotencyKey may be provided by clients when
@@ -121,9 +119,8 @@ type AddSlewEventResult {
 "StepEvent creation parameters."
 input AddStepEventInput {
   stepId: StepId!
+  visitId: VisitId!
   stepStage: StepStage!
-
-  clientId: ClientId @deprecated(reason: "Use idempotencyKey instead")
 
   """
   Idempotency key, if any.  The IdempotencyKey may be provided by clients when
@@ -4512,29 +4509,6 @@ input RadialVelocityInput @oneOf {
   kilometersPerSecond: BigDecimal
 }
 
-"""
-Input parameters for creating a new atom record.
-"""
-input RecordAtomInput {
-  visitId: VisitId!
-  instrument: Instrument!
-  sequenceType: SequenceType!
-  generatedId: AtomId
-
-  """
-  Idempotency key, if any.  The IdempotencyKey may be provided by clients when
-  the atom is created and is used to enable problem-free retry in the case of
-  failure.
-  """
-  idempotencyKey: IdempotencyKey
-}
-
-"The result of recording an atom."
-type RecordAtomResult {
-  "The newly added atom record itself."
-  atomRecord: AtomRecord!
-}
-
 "Dataset creation parameters."
 input RecordDatasetInput {
   "Corresponding Step id."
@@ -4563,33 +4537,6 @@ type RecordDatasetResult {
   dataset: Dataset!
 }
 
-"Input parameters for creating a new GmosNorth StepRecord"
-input RecordGmosNorthStepInput {
-  atomId: AtomId!
-  gmosNorth: GmosNorthDynamicInput!
-  stepConfig: StepConfigInput!
-  telescopeConfig: TelescopeConfigInput
-  observeClass: ObserveClass!
-  generatedId: StepId
-
-  """
-  Idempotency key, if any.  The IdempotencyKey may be provided by clients when
-  the step is created and is used to enable problem-free retry in the case of
-  failure.
-  """
-  idempotencyKey: IdempotencyKey
-}
-
-"""
-The result of recording a GmosNorth step.
-"""
-type RecordGmosNorthStepResult {
-  """
-  The newly added step record itself.
-  """
-  stepRecord: StepRecord!
-}
-
 """
 Input parameters for creating a new GmosNorthVisit
 """
@@ -4613,35 +4560,6 @@ type RecordGmosNorthVisitResult {
   The newly added visit record itself.
   """
   visit: Visit!
-}
-
-"""
-Input parameters for creating a new GmosSouth StepRecord
-"""
-input RecordGmosSouthStepInput {
-  atomId: AtomId!
-  gmosSouth: GmosSouthDynamicInput!
-  stepConfig: StepConfigInput!
-  telescopeConfig: TelescopeConfigInput
-  observeClass: ObserveClass!
-  generatedId: StepId
-
-  """
-  Idempotency key, if any.  The IdempotencyKey may be provided by clients when
-  the step is created and is used to enable problem-free retry in the case of
-  failure.
-  """
-  idempotencyKey: IdempotencyKey
-}
-
-"""
-The result of recording a GmosSouth step.
-"""
-type RecordGmosSouthStepResult {
-  """
-  The newly added step record itself.
-  """
-  stepRecord: StepRecord!
 }
 
 """
@@ -7679,35 +7597,6 @@ input Flamingos2StaticInput {
   """
   useElectronicOffsetting: Boolean
 
-}
-
-"""
-Input parameters for creating a new Flamingos 2 StepRecord
-"""
-input RecordFlamingos2StepInput {
-  atomId: AtomId!
-  flamingos2: Flamingos2DynamicInput!
-  stepConfig: StepConfigInput!
-  telescopeConfig: TelescopeConfigInput
-  observeClass: ObserveClass!
-  generatedId: StepId
-
-  """
-  Idempotency key, if any.  The IdempotencyKey may be provided by clients when
-  the step is created and is used to enable problem-free retry in the case of
-  failure.
-  """
-  idempotencyKey: IdempotencyKey
-}
-
-"""
-The result of recording a Flamingos 2 step.
-"""
-type RecordFlamingos2StepResult {
-  """
-  The newly added step record itself.
-  """
-  stepRecord: StepRecord!
 }
 
 """
