@@ -6,7 +6,6 @@ package gmos
 package longslit
 
 import cats.Comparison.*
-import cats.Eq
 import cats.Monad
 import cats.data.EitherT
 import cats.data.NonEmptyList
@@ -34,7 +33,6 @@ import lucuma.core.enums.GmosSouthGrating
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SequenceType
 import lucuma.core.enums.StepGuideState
-import lucuma.core.enums.StepType
 import lucuma.core.math.Offset
 import lucuma.core.math.Wavelength
 import lucuma.core.math.WavelengthDither
@@ -53,7 +51,6 @@ import lucuma.core.util.Timestamp
 import lucuma.itc.IntegrationTime
 import lucuma.odb.data.OdbError
 import lucuma.odb.sequence.data.ProtoStep
-import lucuma.odb.sequence.data.StepRecord
 import lucuma.odb.sequence.util.AtomBuilder
 import monocle.Lens
 
@@ -113,22 +110,12 @@ object Science:
   private def protoStepQ[D]: Lens[ProtoStep[D], Offset.Q] =
     protoStepOffset andThen Offset.q
 
-  private def stepRecordOffset[D]: Lens[StepRecord[D], Offset] =
-    StepRecord.telescopeConfig[D] andThen TelescopeConfig.offset
-
   extension [D](p: ProtoStep[D])
     def q: Offset.Q =
       protoStepQ.get(p)
 
     def withZeroOffset: ProtoStep[D] =
       protoStepOffset.replace(Offset.Zero)(p)
-
-  extension [D](r: StepRecord[D])
-    def q: Offset.Q =
-      stepRecordOffset.get(r).q
-
-    def withZeroOffset: StepRecord[D] =
-      stepRecordOffset.replace(Offset.Zero)(r)
 
   /**
    * Science exposure count goals for a given wavelength dither.
@@ -338,18 +325,6 @@ object Science:
     /** Decreases the remaining count for each offset in the map. */
     def complete(m: Map[Offset.Q, Int]): Dither[D] =
       copy(remaining = remaining.decrementAll(m))
-
-    def matches(step: StepRecord[D])(using Eq[D]): Boolean =
-      step.isScienceSequence         && {
-        val step0 = step.withZeroOffset  // ignore offset when considering a match
-        step0.stepConfig.stepType match
-          case StepType.Bias |
-               StepType.Dark |
-               StepType.SmartGcal => false
-          case StepType.Gcal      => definition.arcs.exists(_.matches(step0)) ||
-                                     definition.flats.exists(_.matches(step0))
-          case StepType.Science   => definition.science.matches(step0)
-      }
 
     /**
      * Generates a full wavelength block.

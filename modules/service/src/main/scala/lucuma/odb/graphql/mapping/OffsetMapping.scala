@@ -10,12 +10,12 @@ import lucuma.core.math.Angle
 import table.EnumeratedOffsetView
 import table.GmosImagingView
 import table.TelescopeConfigGeneratorView
-import table.StepRecordView
+import table.StepView
 
 trait OffsetMapping[F[_]] extends EnumeratedOffsetView[F]
                              with GmosImagingView[F]
                              with TelescopeConfigGeneratorView[F]
-                             with StepRecordView[F]:
+                             with StepView[F]:
 
   private def offsetComponentMappingAtPath(
     path:        Path,
@@ -89,7 +89,7 @@ trait OffsetMapping[F[_]] extends EnumeratedOffsetView[F]
       offsetComponentMappingAtPath(SpiralPath / "p", TelescopeConfigGeneratorView.CenterOffsetP, TelescopeConfigGeneratorView.Spiral.ObservationId, TelescopeConfigGeneratorView.Spiral.Role),
       offsetComponentMappingAtPath(SpiralPath / "q", TelescopeConfigGeneratorView.CenterOffsetQ, TelescopeConfigGeneratorView.Spiral.ObservationId, TelescopeConfigGeneratorView.Spiral.Role),
 
-      offsetMappingAtPath(StepRecordPath, StepRecordView.Id),
-      offsetComponentMappingAtPath(StepRecordPath / "p", StepRecordView.OffsetP, StepRecordView.Id),
-      offsetComponentMappingAtPath(StepRecordPath / "q", StepRecordView.OffsetQ, StepRecordView.Id)
+      offsetMappingAtPath(StepRecordPath, StepView.Id),
+      offsetComponentMappingAtPath(StepRecordPath / "p", StepView.OffsetP, StepView.Id),
+      offsetComponentMappingAtPath(StepRecordPath / "q", StepView.OffsetQ, StepView.Id)
     )

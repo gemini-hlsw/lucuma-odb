@@ -7,7 +7,6 @@ import cats.Applicative
 import cats.Eq
 import cats.Eval
 import cats.Traverse
-import cats.syntax.eq.*
 import cats.syntax.functor.*
 import lucuma.core.enums.Breakpoint
 import lucuma.core.enums.ObserveClass
@@ -25,10 +24,6 @@ case class ProtoStep[A](
   observeClass:    ObserveClass,
   breakpoint:      Breakpoint = Breakpoint.Disabled
 ):
-  def matches(step: StepRecord[A])(using Eq[A]): Boolean =
-    value           === step.instrumentConfig &&
-    stepConfig      === step.stepConfig       &&
-    telescopeConfig === step.telescopeConfig
 
   def withoutBreakpoint: ProtoStep[A] =
     copy(breakpoint = Breakpoint.Disabled)

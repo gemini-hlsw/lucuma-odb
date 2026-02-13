@@ -7,9 +7,9 @@ package mapping
 import grackle.Path
 
 import table.EnumeratedOffsetView
-import table.StepRecordView
+import table.StepView
 
-trait TelescopeConfigMapping[F[_]] extends EnumeratedOffsetView[F] with StepRecordView[F]:
+trait TelescopeConfigMapping[F[_]] extends EnumeratedOffsetView[F] with StepView[F]:
 
   private def telescopeConfigMappingAtPath(
     path:          Path,
@@ -38,7 +38,7 @@ trait TelescopeConfigMapping[F[_]] extends EnumeratedOffsetView[F] with StepReco
 
       telescopeConfigMappingAtPath(
         StepRecordType / "telescopeConfig",
-        StepRecordView.GuideState,
-        "id" -> StepRecordView.Id
+        StepView.GuideState,
+        "id" -> StepView.Id
       )
     )
