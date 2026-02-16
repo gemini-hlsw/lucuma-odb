@@ -12,53 +12,63 @@ import io.circe.literal.*
 import lucuma.core.enums.AtomStage
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.StepStage
-import lucuma.core.model.Client
 import lucuma.core.model.ExecutionEvent
 import lucuma.core.model.Observation
 import lucuma.core.model.User
+import lucuma.core.model.Visit
+import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.Step
 import lucuma.core.util.IdempotencyKey
 import lucuma.odb.data.AtomExecutionState
 import lucuma.odb.data.StepExecutionState
 
 
-class addStepEvent extends OdbSuite with ExecutionState {
+class addStepEvent extends OdbSuite with ExecutionState with query.ExecutionTestSupportForGmos:
 
-  val service: User = TestUsers.service(nextId)
+  case class Setup(
+    oid:  Observation.Id,
+    vid:  Visit.Id,
+    aids: List[Atom.Id],
+    sids: Map[Atom.Id, List[Step.Id]]
+  ):
+    def aid0: Atom.Id = aids(0)
+    def aid1: Atom.Id = aids(1)
+    def aid2: Atom.Id = aids(2)
+    def sid0: Step.Id = sids(aid0)(0)
+    def sid1: Step.Id = sids(aid0)(1)
+    def sid2: Step.Id = sids(aid0)(2)
 
-  override lazy val validUsers: List[User] = List(service)
-
-  private def recordStep(
+  private def setup(
     mode: ObservingModeType,
     user: User
-  ):IO[(Observation.Id, Step.Id)] =
-    for {
-      pid <- createProgramAs(user)
-      oid <- createObservationAs(user, pid, mode.some)
-      vid <- recordVisitAs(user, mode.instrument, oid)
-      aid <- recordAtomAs(user, mode.instrument, vid)
-      sid <- recordStepAs(user, mode.instrument, aid)
-    } yield (oid, sid)
+  ):IO[Setup] =
+    for
+      pid  <- createProgramAs(user)
+      tid  <- createTargetWithProfileAs(user, pid)
+      oid  <- createObservationAs(user, pid, mode.some, tid)
+      vid  <- recordVisitAs(user, mode.instrument, oid)
+      aids <- selectGmosNorthScienceAtomIds(oid)
+      sids <- selectGmosNorthScienceStepIds(oid)
+    yield Setup(oid, vid, aids, sids)
 
   private def addStepEventTest(
     mode:     ObservingModeType,
     user:     User,
-    query:    Step.Id => String,
-    expected: (Observation.Id, Step.Id) => Either[String, Json]
+    query:    Setup => String,
+    expected: Setup => Either[String, Json]
   ): IO[Unit] =
-    for {
-      ids <- recordStep(mode, user)
-      (oid, sid) = ids
-      _   <- expect(user, query(sid), expected(oid, sid).leftMap(s => List(s)))
-    } yield ()
+    for
+      su <- setup(mode, user)
+      _  <- expect(user, query(su), expected(su).leftMap(s => List(s)))
+    yield ()
 
-
-  test("addStepEvent") {
-    def query(sid: Step.Id): String =
+  test("addStepEvent"):
+    def query(su: Setup): String =
       s"""
         mutation {
           addStepEvent(input: {
-            stepId:    "$sid",
+            stepId:    "${su.sid0}"
+            visitId:   "${su.vid}"
             stepStage: START_STEP
           }) {
             event {
@@ -76,32 +86,32 @@ class addStepEvent extends OdbSuite with ExecutionState {
 
     addStepEventTest(
       ObservingModeType.GmosNorthLongSlit,
-      service,
-      sid => query(sid),
-      (oid, sid) => json"""
+      serviceUser,
+      su => query(su),
+      su => json"""
       {
         "addStepEvent": {
           "event": {
             "step": {
-               "id": $sid
+               "id": ${su.sid0}
             },
             "stepStage": "START_STEP",
             "observation": {
-              "id": $oid
+              "id": ${su.oid}
             }
           }
         }
       }
       """.asRight
     )
-  }
 
-  test("addStepEvent - unknown step") {
-    def query: String =
+  test("addStepEvent - unknown step"):
+    def query(vid: Visit.Id): String =
       s"""
         mutation {
           addStepEvent(input: {
-            stepId:    "s-cfebc981-db7e-4c35-964d-6b19aa5ed2d7",
+            stepId:    "s-cfebc981-db7e-4c35-964d-6b19aa5ed2d7"
+            visitId:   "$vid"
             stepStage: START_STEP
           }) {
             event {
@@ -115,97 +125,67 @@ class addStepEvent extends OdbSuite with ExecutionState {
 
     addStepEventTest(
       ObservingModeType.GmosNorthLongSlit,
-      service,
-      _ => query,
-      (_, _) => s"Step 's-cfebc981-db7e-4c35-964d-6b19aa5ed2d7' not found".asLeft
+      serviceUser,
+      su => query(su.vid),
+      _  => s"Step 's-cfebc981-db7e-4c35-964d-6b19aa5ed2d7' not found".asLeft
     )
-  }
 
-  test("addStepEvent - once terminal, state doesn't change") {
-    val user = service
-    val mode = ObservingModeType.GmosNorthLongSlit
-
+  test("addStepEvent - once terminal, state doesn't change"):
     import StepExecutionState.*
 
-    for {
-      pid <- createProgramAs(user)
-      oid <- createObservationAs(user, pid, mode.some)
-      vid <- recordVisitAs(user, mode.instrument, oid)
-      aid <- recordAtomAs(user, mode.instrument, vid)
-      sid <- recordStepAs(user, mode.instrument, aid)
-      _   <- addAtomEventAs(user, aid, vid, AtomStage.StartAtom)
-      _   <- addStepEventAs(user, sid, vid, StepStage.StartStep)
-      _   <- addStepEventAs(user, sid, vid, StepStage.Abort)
-      _   <- addStepEventAs(user, sid, vid, StepStage.EndStep) // won't change state
-      res <- stepExecutionState(user, oid)
-    } yield assertEquals(res, List(Aborted))
-  }
+    for
+      su  <- setup(ObservingModeType.GmosNorthLongSlit, serviceUser)
+      _   <- addAtomEventAs(serviceUser, su.aid0, su.vid, AtomStage.StartAtom)
+      _   <- addStepEventAs(serviceUser, su.sid0, su.vid, StepStage.StartStep)
+      _   <- addStepEventAs(serviceUser, su.sid0, su.vid, StepStage.Abort)
+      _   <- addStepEventAs(serviceUser, su.sid0, su.vid, StepStage.EndStep) // won't change state
+      res <- stepExecutionState(serviceUser, su.oid)
+    yield assertEquals(res, List(Aborted))
 
-  test("addStepEvent - abandon step") {
-    val user = service
-    val mode = ObservingModeType.GmosNorthLongSlit
-
+  test("addStepEvent - abandon step"):
     import StepExecutionState.*
 
-    for {
-      pid  <- createProgramAs(user)
-      oid  <- createObservationAs(user, pid, mode.some)
-      vid  <- recordVisitAs(user, mode.instrument, oid)
-      aid0 <- recordAtomAs(user, mode.instrument, vid)
-      sid0 <- recordStepAs(user, mode.instrument, aid0)
-      sid1 <- recordStepAs(user, mode.instrument, aid0)
-      sid2 <- recordStepAs(user, mode.instrument, aid0)
-      _    <- addAtomEventAs(user, aid0, vid, AtomStage.StartAtom)
-      _    <- addStepEventAs(user, sid0, vid, StepStage.StartStep)
-      _    <- addStepEventAs(user, sid1, vid, StepStage.StartStep)
-      _    <- addStepEventAs(user, sid1, vid, StepStage.EndStep)
-      _    <- addStepEventAs(user, sid2, vid, StepStage.StartStep)
-      res  <- stepExecutionState(user, oid)
-    } yield assertEquals(res, List(Abandoned, Completed, Ongoing))
-  }
+    for
+      su   <- setup(ObservingModeType.GmosNorthLongSlit, serviceUser)
+      _    <- addAtomEventAs(serviceUser, su.aid0, su.vid, AtomStage.StartAtom)
+      _    <- addStepEventAs(serviceUser, su.sid0, su.vid, StepStage.StartStep)
+      _    <- addStepEventAs(serviceUser, su.sid1, su.vid, StepStage.StartStep)
+      _    <- addStepEventAs(serviceUser, su.sid1, su.vid, StepStage.EndStep)
+      _    <- addStepEventAs(serviceUser, su.sid2, su.vid, StepStage.StartStep)
+      res  <- stepExecutionState(serviceUser, su.oid)
+    yield assertEquals(res, List(Abandoned, Completed, Ongoing))
 
-  test("addStepEvent - abandon atom") {
-    val user = service
-    val mode = ObservingModeType.GmosNorthLongSlit
-
-    for {
-      pid  <- createProgramAs(user)
-      oid  <- createObservationAs(user, pid, mode.some)
-      vid  <- recordVisitAs(user, mode.instrument, oid)
-      aid0 <- recordAtomAs(user, mode.instrument, vid)
-      sid0 <- recordStepAs(user, mode.instrument, aid0)
-      aid1 <- recordAtomAs(user, mode.instrument, vid)
-      sid1 <- recordStepAs(user, mode.instrument, aid1)
-      _    <- addAtomEventAs(user, aid0, vid, AtomStage.StartAtom)
-      _    <- addStepEventAs(user, sid0, vid, StepStage.StartStep)
-      _    <- addStepEventAs(user, sid1, vid, StepStage.StartStep)
-      resA <- atomExecutionState(user, oid)
-      resS <- stepExecutionState(user, oid)
-    } yield {
-      assertEquals(resA, List(AtomExecutionState.Completed, AtomExecutionState.Ongoing))
+  test("addStepEvent - abandon atom"):
+    for
+      su   <- setup(ObservingModeType.GmosNorthLongSlit, serviceUser)
+      sid1  = su.sids(su.aid1)(0)
+      _    <- addAtomEventAs(serviceUser, su.aid0, su.vid, AtomStage.StartAtom)
+      _    <- addStepEventAs(serviceUser, su.sid0, su.vid, StepStage.StartStep)
+      _    <- addStepEventAs(serviceUser, sid1, su.vid, StepStage.StartStep)
+      resA <- atomExecutionState(serviceUser, su.oid)
+      resS <- stepExecutionState(serviceUser, su.oid)
+    yield
+      assertEquals(resA, List(AtomExecutionState.Abandoned, AtomExecutionState.Ongoing))
       assertEquals(resS, List(StepExecutionState.Abandoned, StepExecutionState.Ongoing))
-    }
-  }
 
   def addWithIdempotencyKey(
     sid: Step.Id,
-    idm: Option[IdempotencyKey] = None,
-    cid: Option[Client.Id]      = None
-  ): IO[(ExecutionEvent.Id, Option[IdempotencyKey], Option[Client.Id])] =
+    vid: Visit.Id,
+    idm: Option[IdempotencyKey] = None
+  ): IO[(ExecutionEvent.Id, Option[IdempotencyKey])] =
     query(
-      service,
+      serviceUser,
       s"""
         mutation {
           addStepEvent(input: {
             stepId:    "$sid"
+            visitId:   "$vid"
             stepStage: START_STEP
             ${idm.fold("")(idm => s"idempotencyKey: \"$idm\"")}
-            ${cid.fold("")(cid => s"clientId: \"$cid\"")}
           }) {
             event {
               id
               idempotencyKey
-              clientId
             }
           }
         }
@@ -215,25 +195,17 @@ class addStepEvent extends OdbSuite with ExecutionState {
       (for
         e <- cur.downField("id").as[ExecutionEvent.Id]
         n <- cur.downField("idempotencyKey").as[Option[IdempotencyKey]]
-        d <- cur.downField("clientId").as[Option[Client.Id]]
-      yield (e, n, d)).leftMap(f => new RuntimeException(f.message)).liftTo[IO]
+      yield (e, n)).leftMap(f => new RuntimeException(f.message)).liftTo[IO]
 
-  test("addStepEvent - client id"):
-    val cid  = Client.Id.parse("c-530c979f-de98-472f-9c23-a3442f2a9f7f")
-
-    recordStep(ObservingModeType.GmosNorthLongSlit, service).flatMap: (_, sid) =>
-      assertIO(addWithIdempotencyKey(sid, cid = cid).map(_._3), cid)
-
-  test("addSlewEvent - idempotency key"):
+  test("addStepEvent - idempotency key"):
     val idm = IdempotencyKey.FromString.getOption("b9bac66c-4e12-4b1d-b646-47c2c3a97792")
 
-    recordStep(ObservingModeType.GmosNorthLongSlit, service).flatMap: (_, sid) =>
-      assertIO(addWithIdempotencyKey(sid, idm = idm).map(_._2), idm)
+    setup(ObservingModeType.GmosNorthLongSlit, serviceUser).flatMap: su =>
+      assertIO(addWithIdempotencyKey(su.sid0, su.vid, idm = idm).map(_._2), idm)
 
   test("addStepEvent - duplicate idempotency key"):
     val idm = IdempotencyKey.FromString.getOption("b7044cd8-38b5-4592-8d99-91d2c512041d")
 
-    recordStep(ObservingModeType.GmosNorthLongSlit, service).flatMap: (_, sid) =>
-      addWithIdempotencyKey(sid, idm = idm).flatMap: (eid, _, _) =>
-        assertIO(addWithIdempotencyKey(sid, idm = idm).map(_._1), eid)
-}
+    setup(ObservingModeType.GmosNorthLongSlit, serviceUser).flatMap: su =>
+      addWithIdempotencyKey(su.sid0, su.vid, idm = idm).flatMap: (eid, _) =>
+        assertIO(addWithIdempotencyKey(su.sid0, su.vid, idm = idm).map(_._1), eid)

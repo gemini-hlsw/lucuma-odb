@@ -339,12 +339,11 @@ CREATE OR REPLACE FUNCTION delete_execution_digest()
   RETURNS TRIGGER AS $$
 BEGIN
    DELETE FROM t_execution_digest
-     WHERE (c_program_id, c_observation_id) IN (
-       SELECT DISTINCT
-         o.c_program_id, o.c_observation_id
+     WHERE c_observation_id IN (
+       SELECT DISTINCT o.c_observation_id
        FROM t_observation o
-         JOIN t_atom a ON a.c_observation_id = o.c_observation_id
-         WHERE a.c_atom_id = OLD.c_atom_id
+       JOIN t_atom a ON a.c_observation_id = o.c_observation_id
+       WHERE a.c_atom_id = OLD.c_atom_id
      );
    RETURN NEW;
 END;
