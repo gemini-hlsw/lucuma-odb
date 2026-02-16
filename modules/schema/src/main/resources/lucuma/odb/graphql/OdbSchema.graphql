@@ -263,6 +263,12 @@ type AtomRecord {
   "Atom ID."
   id: AtomId!
 
+  "Atom index."
+  index: NonNegInt!
+
+  "Description, if any."
+  description: NonEmptyString
+
   "The instrument associated with this atom."
   instrument: Instrument!
 
@@ -13994,10 +14000,9 @@ type StepRecord {
   """
   Time interval during which this step executed.  This measures the range of
   time from the first event to the last, whether or not the step ever
-  actually completed.  A 'null' result means there are no events associated
-  with this step.
+  actually completed.
   """
-  interval: TimestampInterval
+  interval: TimestampInterval!
 
   """
   The step configuration, apart from instrument details found in the

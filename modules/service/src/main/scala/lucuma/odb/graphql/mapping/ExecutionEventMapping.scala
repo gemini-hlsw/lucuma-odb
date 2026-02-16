@@ -16,18 +16,18 @@ import lucuma.core.model.Client
 
 import java.util.UUID
 
-import table.AtomTable
+import table.AtomRecordView
 import table.DatasetTable
 import table.ExecutionEventTable
 import table.ObservationView
-import table.StepView
+import table.StepRecordView
 import table.VisitTable
 
 trait ExecutionEventMapping[F[_]] extends ExecutionEventTable[F]
-                                     with AtomTable[F]
+                                     with AtomRecordView[F]
                                      with DatasetTable[F]
                                      with ObservationView[F]
-                                     with StepView[F]
+                                     with StepRecordView[F]
                                      with VisitTable[F] {
 
   lazy val ExecutionEventMapping: ObjectMapping =
@@ -95,21 +95,21 @@ trait ExecutionEventMapping[F[_]] extends ExecutionEventTable[F]
 
   lazy val AtomEventMapping: ObjectMapping =
     ObjectMapping(AtomEventType)(
-      SqlObject("atom",     Join(ExecutionEventTable.AtomId, AtomTable.Id)),
+      SqlObject("atom",     Join(ExecutionEventTable.AtomId, AtomRecordView.Id)),
       SqlField("atomStage", ExecutionEventTable.AtomStage)
     )
 
   lazy val StepEventMapping: ObjectMapping =
   ObjectMapping(StepEventType)(
-      SqlObject("atom",     Join(ExecutionEventTable.AtomId, AtomTable.Id)),
-      SqlObject("step",     Join(ExecutionEventTable.StepId, StepView.Id)),
+      SqlObject("atom",     Join(ExecutionEventTable.AtomId, AtomRecordView.Id)),
+      SqlObject("step",     Join(ExecutionEventTable.StepId, StepRecordView.Id)),
       SqlField("stepStage", ExecutionEventTable.StepStage)
     )
 
   lazy val DatasetEventMapping: ObjectMapping =
     ObjectMapping(DatasetEventType)(
-      SqlObject("atom",        Join(ExecutionEventTable.AtomId, AtomTable.Id)),
-      SqlObject("step",        Join(ExecutionEventTable.StepId, StepView.Id)),
+      SqlObject("atom",        Join(ExecutionEventTable.AtomId, AtomRecordView.Id)),
+      SqlObject("step",        Join(ExecutionEventTable.StepId, StepRecordView.Id)),
       SqlObject("dataset",     Join(ExecutionEventTable.DatasetId, DatasetTable.Id)),
       SqlField("datasetStage", ExecutionEventTable.DatasetStage)
     )

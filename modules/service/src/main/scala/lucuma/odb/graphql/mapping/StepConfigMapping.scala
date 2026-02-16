@@ -15,14 +15,14 @@ import grackle.syntax.*
 import lucuma.core.enums.GcalArc
 import lucuma.core.enums.StepType
 
-import table.StepView
+import table.StepRecordView
 
-trait StepConfigMapping[F[_]] extends StepView[F] {
+trait StepConfigMapping[F[_]] extends StepRecordView[F] {
 
   lazy val StepConfigMapping: ObjectMapping =
     SqlInterfaceMapping(StepRecordType / "stepConfig" % StepConfigType, stepConfigDiscriminator)(
-      SqlField("id",       StepView.Id,       key = true, hidden = true),
-      SqlField("stepType", StepView.StepType, discriminator = true)
+      SqlField("id",       StepRecordView.Id,       key = true, hidden = true),
+      SqlField("stepType", StepRecordView.StepType, discriminator = true)
     )
 
   private lazy val stepConfigDiscriminator: SqlDiscriminator =
@@ -52,12 +52,12 @@ trait StepConfigMapping[F[_]] extends StepView[F] {
 
   lazy val StepConfigBiasMapping: ObjectMapping =
     ObjectMapping(StepRecordType / "stepConfig" % BiasType)(
-      SqlField("id", StepView.Id, key = true, hidden = true)
+      SqlField("id", StepRecordView.Id, key = true, hidden = true)
     )
 
   lazy val StepConfigDarkMapping: ObjectMapping =
     ObjectMapping(StepRecordType / "stepConfig" % DarkType)(
-      SqlField("id", StepView.Id, key = true, hidden = true)
+      SqlField("id", StepRecordView.Id, key = true, hidden = true)
     )
 
   lazy val StepConfigGcalMapping: ObjectMapping = {
@@ -65,12 +65,12 @@ trait StepConfigMapping[F[_]] extends StepView[F] {
       c.fieldAs[Boolean](n).map(b => Option.when(b)(a))
 
     ObjectMapping(StepRecordType / "stepConfig" % GcalType)(
-      SqlField("id", StepView.Id, key = true, hidden = true),
-      SqlField("continuum", StepView.Gcal.Continuum),
-      SqlField("arArc",     StepView.Gcal.ArArc,   hidden = true),
-      SqlField("cuarArc",   StepView.Gcal.CuarArc, hidden = true),
-      SqlField("tharArc",   StepView.Gcal.TharArc, hidden = true),
-      SqlField("xeArc",     StepView.Gcal.XeArc,   hidden = true),
+      SqlField("id", StepRecordView.Id, key = true, hidden = true),
+      SqlField("continuum", StepRecordView.Gcal.Continuum),
+      SqlField("arArc",     StepRecordView.Gcal.ArArc,   hidden = true),
+      SqlField("cuarArc",   StepRecordView.Gcal.CuarArc, hidden = true),
+      SqlField("tharArc",   StepRecordView.Gcal.TharArc, hidden = true),
+      SqlField("xeArc",     StepRecordView.Gcal.XeArc,   hidden = true),
       CursorField(
         "arcs",
         cursor =>
@@ -82,21 +82,21 @@ trait StepConfigMapping[F[_]] extends StepView[F] {
           } yield List(ar, cuar, thar, xe).flattenOption,
         List("arArc", "cuarArc", "tharArc", "xeArc")
       ),
-      SqlField("filter",    StepView.Gcal.Filter),
-      SqlField("diffuser",  StepView.Gcal.Diffuser),
-      SqlField("shutter",   StepView.Gcal.Shutter)
+      SqlField("filter",    StepRecordView.Gcal.Filter),
+      SqlField("diffuser",  StepRecordView.Gcal.Diffuser),
+      SqlField("shutter",   StepRecordView.Gcal.Shutter)
     )
   }
 
   lazy val StepConfigScienceMapping: ObjectMapping =
     ObjectMapping(StepRecordType / "stepConfig" % ScienceType)(
-      SqlField("id", StepView.Id, key = true, hidden = true)
+      SqlField("id", StepRecordView.Id, key = true, hidden = true)
     )
 
   lazy val StepConfigSmartGcalMapping: ObjectMapping =
     ObjectMapping(StepRecordType / "stepConfig" % SmartGcalType)(
-      SqlField("id", StepView.Id, key = true, hidden = true),
-      SqlField("smartGcalType", StepView.SmartGcal.Type)
+      SqlField("id", StepRecordView.Id, key = true, hidden = true),
+      SqlField("smartGcalType", StepRecordView.SmartGcal.Type)
     )
 
 }

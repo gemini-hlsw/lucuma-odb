@@ -40,6 +40,9 @@ import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.User
+import lucuma.core.model.sequence.Atom
+import lucuma.core.model.sequence.InstrumentExecutionConfig
+import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.StepConfig.Gcal
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth
@@ -49,7 +52,9 @@ import lucuma.core.model.sequence.gmos.GmosFpuMask
 import lucuma.core.model.sequence.gmos.GmosGratingConfig
 import lucuma.core.model.sequence.gmos.StaticConfig
 import lucuma.core.syntax.string.*
+import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
+import lucuma.itc.IntegrationTime
 import lucuma.odb.sequence.TimeEstimateCalculator
 import lucuma.odb.service.Services
 import lucuma.odb.smartgcal.data.Gmos
@@ -58,6 +63,12 @@ import lucuma.odb.smartgcal.data.SmartGcalValue.LegacyInstrumentConfig
 import skunk.Session
 
 trait ExecutionTestSupportForGmos extends ExecutionTestSupport:
+
+  override def fakeItcSpectroscopyResult: IntegrationTime =
+    IntegrationTime(
+      20.minTimeSpan,
+      PosInt.unsafeFrom(10)
+    )
 
   val gn_key_0_50: Gmos.TableKey[GmosNorthGrating, GmosNorthFilter, GmosNorthFpu] =
     Gmos.TableKey(
@@ -467,7 +478,7 @@ trait ExecutionTestSupportForGmos extends ExecutionTestSupport:
         .as[Observation.Id]
         .getOrElse(sys.error("Could not create observation"))
     }
-  
+
   val createOngoingGmosNorthObservation: IO[Observation.Id] =
     // importing at the top level breaks other tests in a never-ending cycle of despair.
     import lucuma.odb.json.all.transport.given

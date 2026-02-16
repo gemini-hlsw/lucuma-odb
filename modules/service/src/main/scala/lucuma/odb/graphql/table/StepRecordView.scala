@@ -7,12 +7,12 @@ import lucuma.odb.graphql.BaseMapping
 import lucuma.odb.util.Codecs.*
 import skunk.codec.boolean.bool
 
-trait StepView[F[_]] extends BaseMapping[F]:
+trait StepRecordView[F[_]] extends BaseMapping[F]:
 
-  object StepView extends TableDef("v_step"):
+  object StepRecordView extends TableDef("v_step_record"):
     val Id: ColumnRef             = col("c_step_id",          step_id)
     val AtomId: ColumnRef         = col("c_atom_id",          atom_id)
-    val VisitId: ColumnRef        = col("c_visit_id",         visit_id.opt)
+    val VisitId: ColumnRef        = col("c_visit_id",         visit_id)
     val StepIndex: ColumnRef      = col("c_step_index",       int4_pos)
     val Instrument: ColumnRef     = col("c_instrument",       instrument)
     val StepType: ColumnRef       = col("c_step_type",        step_type)
@@ -20,8 +20,8 @@ trait StepView[F[_]] extends BaseMapping[F]:
     val ExecutionState: ColumnRef = col("c_execution_state",  step_execution_state)
     val TimeEstimate: ColumnRef   = col("c_time_estimate",    time_span)
     val Breakpoint: ColumnRef     = col("c_breakpoint",       breakpoint)
-    val FirstEvent: ColumnRef     = col("c_first_event_time", core_timestamp.opt)
-    val LastEvent:  ColumnRef     = col("c_last_event_time",  core_timestamp.opt)
+    val FirstEventTime: ColumnRef = col("c_first_event_time", core_timestamp)
+    val LastEventTime:  ColumnRef = col("c_last_event_time",  core_timestamp)
     val OffsetP: ColumnRef        = col("c_offset_p",         angle_µas)
     val OffsetQ: ColumnRef        = col("c_offset_q",         angle_µas)
     val GuideState: ColumnRef     = col("c_guide_state",      guide_state)

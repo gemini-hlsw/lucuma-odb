@@ -7,9 +7,10 @@ package predicate
 import grackle.Path
 import lucuma.core.model.sequence.Atom
 import lucuma.core.util.Timestamp
+import lucuma.odb.data.AtomExecutionState
 
-class AtomRecordPredicates(path: Path) {
-  lazy val id      = LeafPredicates[Atom.Id](path / "id")
-  lazy val created = LeafPredicates[Timestamp](path / "created")
-  lazy val visit   = new VisitPredicates(path / "visit")
-}
+class AtomRecordPredicates(path: Path):
+  lazy val id             = LeafPredicates[Atom.Id](path / "id")
+  lazy val firstEventTime = LeafPredicates[Timestamp](path / "_firstEventTime")
+  lazy val visit          = new VisitPredicates(path / "visit")
+  lazy val execution      = LeafPredicates[AtomExecutionState](path / "executionState")

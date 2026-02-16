@@ -522,64 +522,6 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
       executionEventService.insertStepEvent(input)
     }
 
-  /*
-  private def recordAtom(
-    response:  F[Result[Atom.Id]],
-    predicate: LeafPredicates[Atom.Id],
-    child:     Query
-  ): F[Result[Query]] =
-    response.nestMap: aid =>
-      Unique(Filter(predicate.eql(aid), child))
-
-  private lazy val RecordAtom: MutationField =
-    MutationField("recordAtom", RecordAtomInput.Binding): (input, child) =>
-      services.useTransactionally:
-        requireServiceAccess:
-          recordAtom(
-            sequenceService.insertAtomRecord(input.visitId, input.instrument, input.sequenceType, input.generatedId, input.idempotencyKey),
-            Predicates.atomRecord.id,
-            child
-          )
-
-  private def recordStep(
-    action:    F[Result[Step.Id]],
-    predicate: LeafPredicates[Step.Id],
-    child:     Query
-  ): F[Result[Query]] =
-    action.nestMap: sid =>
-      Unique(Filter(predicate.eql(sid), child))
-
-  private lazy val RecordFlamingos2Step: MutationField =
-    MutationField("recordFlamingos2Step", RecordStepInput.Flamingos2Binding): (input, child) =>
-      services.useTransactionally:
-        requireServiceAccess:
-          recordStep(
-            sequenceService.insertFlamingos2StepRecord(input.atomId, input.instrument, input.stepConfig, input.telescopeConfig, input.observeClass, input.generatedId, input.idempotencyKey, timeEstimateCalculator.flamingos2),
-            Predicates.flamingos2Step.id,
-            child
-          )
-
-  private lazy val RecordGmosNorthStep: MutationField =
-    MutationField("recordGmosNorthStep", RecordStepInput.GmosNorthBinding): (input, child) =>
-      services.useTransactionally:
-        requireServiceAccess:
-          recordStep(
-            sequenceService.insertGmosNorthStepRecord(input.atomId, input.instrument, input.stepConfig, input.telescopeConfig, input.observeClass, input.generatedId, input.idempotencyKey, timeEstimateCalculator.gmosNorth),
-            Predicates.gmosNorthStep.id,
-            child
-          )
-
-  private lazy val RecordGmosSouthStep: MutationField =
-    MutationField("recordGmosSouthStep", RecordStepInput.GmosSouthBinding): (input, child) =>
-      services.useTransactionally:
-        requireServiceAccess:
-          recordStep(
-            sequenceService.insertGmosSouthStepRecord(input.atomId, input.instrument, input.stepConfig, input.telescopeConfig, input.observeClass, input.generatedId, input.idempotencyKey, timeEstimateCalculator.gmosSouth),
-            Predicates.gmosSouthStep.id,
-            child
-          )
-  */
-
   private def recordVisit(
     response:  F[Result[Visit.Id]],
     predicate: LeafPredicates[Visit.Id],

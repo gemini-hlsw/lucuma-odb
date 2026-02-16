@@ -1992,12 +1992,14 @@ trait DatabaseOperations { this: OdbSuite =>
   def addStepEventAs(
     user:  User,
     sid:   Step.Id,
+    vid:   Visit.Id,
     stage: StepStage
   ): IO[StepEvent] = {
     val q = s"""
       mutation {
         addStepEvent(input: {
           stepId:    "$sid",
+          visitId:   "$vid",
           stepStage: ${stage.tag.toUpperCase}
         }) {
           event {
@@ -2027,6 +2029,7 @@ trait DatabaseOperations { this: OdbSuite =>
   def addAtomEventAs(
     user:           User,
     aid:            Atom.Id,
+    vid:            Visit.Id,
     stage:          AtomStage,
     idempotencyKey: Option[IdempotencyKey] = None,
     clientId:       Option[Client.Id]      = None
@@ -2035,6 +2038,7 @@ trait DatabaseOperations { this: OdbSuite =>
       mutation {
         addAtomEvent(input: {
           atomId:    "$aid",
+          visitId:   "$vid",
           atomStage: ${stage.tag.toScreamingSnakeCase}
           ${idempotencyKey.fold("")(idm => s"idempotencyKey: \"$idm\"")}
           ${clientId.fold("")(cid => s"clientId: \"$cid\"")}

@@ -220,7 +220,7 @@ object DatasetService {
         SELECT s.c_atom_id,
                d.c_dataset_id
           FROM t_dataset d
-    INNER JOIN t_step_record s
+    INNER JOIN t_step s
             ON s.c_step_id = d.c_step_id
          WHERE (d.c_qa_state = 'Fail' OR d.c_qa_state = 'Usable')
            AND d.c_visit_id = $visit_id

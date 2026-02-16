@@ -14,62 +14,73 @@ import lucuma.core.enums.AtomStage
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.SequenceCommand
 import lucuma.core.enums.StepStage
-import lucuma.core.model.Client
 import lucuma.core.model.Observation
 import lucuma.core.model.User
+import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Atom
+import lucuma.core.model.sequence.Step
 import lucuma.core.syntax.string.*
 import lucuma.core.util.IdempotencyKey
 import lucuma.odb.data.AtomExecutionState
 import lucuma.odb.data.StepExecutionState
 
-class addAtomEvent extends OdbSuite with ExecutionState:
+class addAtomEvent extends OdbSuite with ExecutionState with query.ExecutionTestSupportForGmos:
 
-  val service: User = TestUsers.service(nextId)
+  case class Setup(
+    oid: Observation.Id,
+    vid: Visit.Id,
+    aids: List[Atom.Id],
+    sids: Map[Atom.Id, List[Step.Id]]
+  ):
+    def aid0: Atom.Id = aids(0)
+    def aid1: Atom.Id = aids(1)
+    def aid2: Atom.Id = aids(2)
+    def sid0: Step.Id = sids(aid0)(0)
+    def sid1: Step.Id = sids(aid0)(1)
 
-  override lazy val validUsers: List[User] = List(service)
-
-  private def recordAtom(
+  private def setup(
     mode: ObservingModeType,
     user: User
-  ):IO[(Observation.Id, Atom.Id)] =
+  ):IO[Setup] =
     for
-      pid <- createProgramAs(user)
-      oid <- createObservationAs(user, pid, mode.some)
-      vid <- recordVisitAs(user, mode.instrument, oid)
-      aid <- recordAtomAs(user, mode.instrument, vid)
-    yield (oid, aid)
+      pid  <- createProgramAs(user)
+      tid  <- createTargetWithProfileAs(user, pid)
+      oid  <- createObservationAs(user, pid, mode.some, tid)
+      vid  <- recordVisitAs(user, mode.instrument, oid)
+      aids <- selectGmosNorthScienceAtomIds(oid)
+      sids <- selectGmosNorthScienceStepIds(oid)
+    yield Setup(oid, vid, aids, sids)
 
   private def addAtomEventTest(
     mode:     ObservingModeType,
     user:     User,
-    query:    Atom.Id => String,
-    expected: (Observation.Id, Atom.Id) => Either[String, Json]
+    query:    (Atom.Id, Visit.Id) => String,
+    expected: (Observation.Id, Atom.Id, Visit.Id) => Either[String, Json]
   ): IO[Unit] =
     for
-      ids <- recordAtom(mode, user)
-      (oid, aid) = ids
-      _   <- expect(user, query(aid), expected(oid, aid).leftMap(s => List(s)))
+      ids <- setup(mode, user)
+      _   <- expect(user, query(ids.aid0, ids.vid), expected(ids.oid, ids.aid0, ids.vid).leftMap(s => List(s)))
     yield ()
 
   private def addAtomEventQuery(
     aid:   Atom.Id,
+    vid:   Visit.Id,
     stage: AtomStage
   ): String =
     s"""
       mutation {
         addAtomEvent(input: {
           atomId:    "$aid",
+          visitId:   "$vid",
           atomStage: ${stage.tag.toScreamingSnakeCase}
         }) {
           event {
             atom {
               id
+              visit { id }
             }
             atomStage
-            observation {
-              id
-            }
+            observation { id }
           }
         }
       }
@@ -78,14 +89,15 @@ class addAtomEvent extends OdbSuite with ExecutionState:
   test("addAtomEvent"):
     addAtomEventTest(
       ObservingModeType.GmosNorthLongSlit,
-      service,
-      aid => addAtomEventQuery(aid, AtomStage.StartAtom),
-      (oid, aid) => json"""
+      serviceUser,
+      (aid, vid) => addAtomEventQuery(aid, vid, AtomStage.StartAtom),
+      (oid, aid, vid) => json"""
       {
         "addAtomEvent": {
           "event": {
             "atom": {
-               "id": $aid
+               "id": $aid,
+               "visit": { "id" : $vid }
             },
             "atomStage": "START_ATOM",
             "observation": {
@@ -100,152 +112,98 @@ class addAtomEvent extends OdbSuite with ExecutionState:
   test("addAtomEvent - unknown atom"):
     addAtomEventTest(
       ObservingModeType.GmosNorthLongSlit,
-      service,
-      _ => addAtomEventQuery(Atom.Id.parse("a-cfebc981-db7e-4c35-964d-6b19aa5ed2d7").get, AtomStage.StartAtom),
-      (_, _) => s"Atom 'a-cfebc981-db7e-4c35-964d-6b19aa5ed2d7' not found".asLeft
+      serviceUser,
+      (_, vid) => addAtomEventQuery(Atom.Id.parse("a-cfebc981-db7e-4c35-964d-6b19aa5ed2d7").get, vid, AtomStage.StartAtom),
+      (_, _, _) => s"Atom 'a-cfebc981-db7e-4c35-964d-6b19aa5ed2d7' not found".asLeft
     )
 
   test("addAtomEvent - abandon atom"):
-    val user = service
-    val mode = ObservingModeType.GmosNorthLongSlit
+    val user = serviceUser
 
     import AtomExecutionState.*
 
     for
-      pid  <- createProgramAs(user)
-      oid  <- createObservationAs(user, pid, mode.some)
-      vid  <- recordVisitAs(user, mode.instrument, oid)
-      aid0 <- recordAtomAs(user, mode.instrument, vid)
-      aid1 <- recordAtomAs(user, mode.instrument, vid)
-      aid2 <- recordAtomAs(user, mode.instrument, vid)
-      _    <- addAtomEventAs(user, aid0, AtomStage.StartAtom) // 0 -> Ongoing
-      _    <- addAtomEventAs(user, aid1, AtomStage.StartAtom) // 0 -> Completed, 1 -> Ongoing
-      _    <- addAtomEventAs(user, aid1, AtomStage.EndAtom)   // 0 -> Completed, 1 -> Completed
-      _    <- addAtomEventAs(user, aid2, AtomStage.StartAtom) // 0 -> Completed, 1 -> Completed, 2 -> Ongoing
-      res  <- atomExecutionState(user, oid)
-    yield assertEquals(res, List(Completed, Completed, Ongoing))
+      ids <- setup(ObservingModeType.GmosNorthLongSlit, user)
+      _   <- addAtomEventAs(user, ids.aid0, ids.vid, AtomStage.StartAtom) // 0 -> Ongoing
+      _   <- addAtomEventAs(user, ids.aid1, ids.vid, AtomStage.StartAtom) // 0 -> Completed, 1 -> Ongoing
+      _   <- addAtomEventAs(user, ids.aid1, ids.vid, AtomStage.EndAtom)   // 0 -> Completed, 1 -> Completed
+      _   <- addAtomEventAs(user, ids.aid2, ids.vid, AtomStage.StartAtom) // 0 -> Completed, 1 -> Completed, 2 -> Ongoing
+      res <- atomExecutionState(user, ids.oid)
+    yield assertEquals(res, List(Abandoned, Completed, Ongoing))
 
   test("start step starts atom without atom events"):
-    val user = service
-    val mode = ObservingModeType.GmosNorthLongSlit
-
     import AtomExecutionState.*
-
     for
-      pid <- createProgramAs(user)
-      oid <- createObservationAs(user, pid, mode.some)
-      vid <- recordVisitAs(user, mode.instrument, oid)
-      aid <- recordAtomAs(user, mode.instrument, vid)
-      sid <- recordStepAs(user, mode.instrument, aid)
-      _   <- addStepEventAs(user, sid, StepStage.StartStep)
-      res <- atomExecutionState(user, oid)
+      ids <- setup(ObservingModeType.GmosNorthLongSlit, serviceUser)
+      _   <- addStepEventAs(serviceUser, ids.sid0, ids.vid, StepStage.StartStep)
+      res <- atomExecutionState(serviceUser, ids.oid)
     yield assertEquals(res, List(Ongoing))
 
   test("start step re-starts completed atom"):
-    val user = service
-    val mode = ObservingModeType.GmosNorthLongSlit
+    val user = serviceUser
 
     import AtomExecutionState.*
 
     for
-      pid  <- createProgramAs(user)
-      oid  <- createObservationAs(user, pid, mode.some)
-      vid  <- recordVisitAs(user, mode.instrument, oid)
-      aid  <- recordAtomAs(user, mode.instrument, vid)
-      sid0 <- recordStepAs(user, mode.instrument, aid)
-      _    <- addStepEventAs(user, sid0, StepStage.StartStep)
-      _    <- addAtomEventAs(user, aid, AtomStage.EndAtom)
-      res0 <- atomExecutionState(user, oid)
-      sid1 <- recordStepAs(user, mode.instrument, aid)
-      _    <- addStepEventAs(user, sid1, StepStage.StartStep)
-      res1 <- atomExecutionState(user, oid)
+      ids  <- setup(ObservingModeType.GmosNorthLongSlit, user)
+      _    <- addStepEventAs(user, ids.sid0, ids.vid, StepStage.StartStep)
+      _    <- addAtomEventAs(user, ids.aid0, ids.vid, AtomStage.EndAtom)
+      res0 <- atomExecutionState(user, ids.oid)
+      _    <- addStepEventAs(user, ids.sid1, ids.vid, StepStage.StartStep)
+      res1 <- atomExecutionState(user, ids.oid)
     yield
       assertEquals(res0, List(Completed))
       assertEquals(res1, List(Ongoing))
 
   test("terminal sequence events complete atoms"):
-    val user = service
-    val mode = ObservingModeType.GmosNorthLongSlit
+    val user = serviceUser
 
     import AtomExecutionState.*
 
     for
-      pid <- createProgramAs(user)
-      oid <- createObservationAs(user, pid, mode.some)
-      vid <- recordVisitAs(user, mode.instrument, oid)
-      aid <- recordAtomAs(user, mode.instrument, vid)
-      sid <- recordStepAs(user, mode.instrument, aid)
-      _   <- addStepEventAs(user, sid, StepStage.StartStep)
-      _   <- addSequenceEventAs(user, vid, SequenceCommand.Stop)
-      res <- atomExecutionState(user, oid)
+      ids <- setup(ObservingModeType.GmosNorthLongSlit, user)
+      _   <- addStepEventAs(user, ids.sid0, ids.vid, StepStage.StartStep)
+      _   <- addSequenceEventAs(user, ids.vid, SequenceCommand.Stop)
+      res <- atomExecutionState(user, ids.oid)
     yield
-      assertEquals(res, List(Completed))
+      assertEquals(res, List(Abandoned))
 
   test("addAtomEvent - abandon step"):
-    val user = service
-    val mode = ObservingModeType.GmosNorthLongSlit
+    val user = serviceUser
 
     for
-      pid  <- createProgramAs(user)
-      oid  <- createObservationAs(user, pid, mode.some)
-      vid  <- recordVisitAs(user, mode.instrument, oid)
-      aid0 <- recordAtomAs(user, mode.instrument, vid)
-      sid0 <- recordStepAs(user, mode.instrument, aid0)
-      aid1 <- recordAtomAs(user, mode.instrument, vid)
-      _    <- addAtomEventAs(user, aid0, AtomStage.StartAtom)
-      _    <- addStepEventAs(user, sid0, StepStage.StartStep)
-      _    <- addAtomEventAs(user, aid1, AtomStage.StartAtom)
-      resA <- atomExecutionState(user, oid)
-      resS <- stepExecutionState(user, oid)
+      ids  <- setup(ObservingModeType.GmosNorthLongSlit, user)
+      _    <- addAtomEventAs(user, ids.aid0, ids.vid, AtomStage.StartAtom)
+      _    <- addStepEventAs(user, ids.sid0, ids.vid, StepStage.StartStep)
+      _    <- addAtomEventAs(user, ids.aid1, ids.vid, AtomStage.StartAtom)
+      resA <- atomExecutionState(user, ids.oid)
+      resS <- stepExecutionState(user, ids.oid)
     yield
-      assertEquals(resA, List(AtomExecutionState.Completed, AtomExecutionState.Ongoing))
+      assertEquals(resA, List(AtomExecutionState.Abandoned, AtomExecutionState.Ongoing))
       assertEquals(resS, List(StepExecutionState.Abandoned))
 
-  test("addAtomEvent - client id"):
-    val user = service
-    val mode = ObservingModeType.GmosNorthLongSlit
-    val cid  = Client.Id.parse("c-530c979f-de98-472f-9c23-a3442f2a9f7f")
-
-    for
-      pid <- createProgramAs(user)
-      oid <- createObservationAs(user, pid, mode.some)
-      vid <- recordVisitAs(user, mode.instrument, oid)
-      aid <- recordAtomAs(user, mode.instrument, vid)
-      sid <- recordStepAs(user, mode.instrument, aid)
-      evt <- addAtomEventAs(user, aid, AtomStage.StartAtom, clientId = cid)
-    yield assertEquals(evt.idempotencyKey.map(k => Client.Id.fromUuid(k.value)), cid)
-
   test("addAtomEvent - idempotency key"):
-    val user = service
-    val mode = ObservingModeType.GmosNorthLongSlit
+    val user = serviceUser
     val idm  = IdempotencyKey.FromString.getOption("530c979f-de98-472f-9c23-a3442f2a9f7f")
 
     for
-      pid <- createProgramAs(user)
-      oid <- createObservationAs(user, pid, mode.some)
-      vid <- recordVisitAs(user, mode.instrument, oid)
-      aid <- recordAtomAs(user, mode.instrument, vid)
-      sid <- recordStepAs(user, mode.instrument, aid)
-      evt <- addAtomEventAs(user, aid, AtomStage.StartAtom, idempotencyKey = idm)
+      ids <- setup(ObservingModeType.GmosNorthLongSlit, user)
+      evt <- addAtomEventAs(user, ids.aid0, ids.vid, AtomStage.StartAtom, idempotencyKey = idm)
     yield assertEquals(evt.idempotencyKey, idm)
 
   test("addAtomEvent - duplicate idempotency key"):
-    val user = service
-    val mode = ObservingModeType.GmosNorthLongSlit
+    val user = serviceUser
     val idm  = IdempotencyKey.FromString.getOption("b7044cd8-38b5-4592-8d99-91d2c512041d")
 
     for
-      pid <- createProgramAs(user)
-      oid <- createObservationAs(user, pid, mode.some)
-      vid <- recordVisitAs(user, mode.instrument, oid)
-      aid <- recordAtomAs(user, mode.instrument, vid)
-      sid <- recordStepAs(user, mode.instrument, aid)
-      evt <- addAtomEventAs(user, aid, AtomStage.StartAtom, idempotencyKey = idm)
+      ids <- setup(ObservingModeType.GmosNorthLongSlit, user)
+      evt <- addAtomEventAs(user, ids.aid0, ids.vid, AtomStage.StartAtom, idempotencyKey = idm)
       _   <- expect(user,
         s"""
           mutation {
             addAtomEvent(input: {
-              atomId: "$aid"
+              atomId: "${ids.aid0}"
+              visitId: "${ids.vid}"
               atomStage: START_ATOM
               idempotencyKey: "${idm.get}"
             }) {

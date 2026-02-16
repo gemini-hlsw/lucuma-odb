@@ -20,14 +20,14 @@ import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.json.time.query.given
 import lucuma.odb.service.Services
 
-import table.AtomTable
+import table.AtomRecordView
 import table.Flamingos2DynamicView
 import table.GmosDynamicTables
-import table.StepView
+import table.StepRecordView
 import table.VisitTable
 
-trait StepRecordMapping[F[_]] extends StepView[F]
-                                 with AtomTable[F]
+trait StepRecordMapping[F[_]] extends StepRecordView[F]
+                                 with AtomRecordView[F]
                                  with EventRangeEffectHandler[F]
                                  with KeyValueEffectHandler[F]
                                  with Flamingos2DynamicView[F]
@@ -40,13 +40,13 @@ trait StepRecordMapping[F[_]] extends StepView[F]
 
   lazy val StepRecordMapping: ObjectMapping =
     ObjectMapping(StepRecordType)(
-      SqlField("id",              StepView.Id, key = true),
-      SqlField("index",           StepView.StepIndex),
-      SqlField("instrument",      StepView.Instrument, discriminator = true),
-      SqlObject("atom",           Join(StepView.AtomId, AtomTable.Id)),
-      SqlField("executionState",  StepView.ExecutionState),
-      SqlField("_firstEventTime", StepView.FirstEvent, hidden = true),
-      SqlField("_lastEventTime",  StepView.LastEvent, hidden = true),
+      SqlField("id",              StepRecordView.Id, key = true),
+      SqlField("index",           StepRecordView.StepIndex),
+      SqlField("instrument",      StepRecordView.Instrument, discriminator = true),
+      SqlObject("atom",           Join(StepRecordView.AtomId, AtomRecordView.Id)),
+      SqlField("executionState",  StepRecordView.ExecutionState),
+      SqlField("_firstEventTime", StepRecordView.FirstEventTime, hidden = true),
+      SqlField("_lastEventTime",  StepRecordView.LastEventTime, hidden = true),
       CursorFieldJson("interval", c =>
         for
           f <- c.fieldAs[Option[Timestamp]]("_firstEventTime")
@@ -56,14 +56,14 @@ trait StepRecordMapping[F[_]] extends StepView[F]
       ),
       SqlObject("stepConfig"),
       SqlObject("telescopeConfig"),
-      SqlField("observeClass",    StepView.ObserveClass),
+      SqlField("observeClass",    StepRecordView.ObserveClass),
       SqlObject("estimate"),
-      SqlField("qaState",         StepView.QaState),
+      SqlField("qaState",         StepRecordView.QaState),
       SqlObject("datasets"),
       SqlObject("events"),
-      SqlObject("flamingos2",     Join(StepView.Id, Flamingos2DynamicView.Id)),
-      SqlObject("gmosNorth",      Join(StepView.Id, GmosNorthDynamicTable.Id)),
-      SqlObject("gmosSouth",      Join(StepView.Id, GmosSouthDynamicTable.Id))
+      SqlObject("flamingos2",     Join(StepRecordView.Id, Flamingos2DynamicView.Id)),
+      SqlObject("gmosNorth",      Join(StepRecordView.Id, GmosNorthDynamicTable.Id)),
+      SqlObject("gmosSouth",      Join(StepRecordView.Id, GmosSouthDynamicTable.Id))
     )
 
   lazy val StepRecordElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] = {

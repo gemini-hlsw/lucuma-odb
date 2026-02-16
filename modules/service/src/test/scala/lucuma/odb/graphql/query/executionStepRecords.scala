@@ -14,6 +14,7 @@ import lucuma.core.enums.DatasetQaState
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.StepStage
 import lucuma.core.model.Observation
+import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Step
 import lucuma.odb.data.StepExecutionState
 
@@ -191,14 +192,14 @@ class executionStepRecords extends OdbSuite with ExecutionQuerySetupOperations {
     } yield ()
   }
 
-  def noEventSetup: IO[(Observation.Id, Step.Id)] =
+  def noEventSetup: IO[(Observation.Id, Step.Id, Visit.Id)] =
     for {
       pid <- createProgramAs(pi)
       oid <- createObservationAs(pi, pid, mode.some)
       vid <- recordVisitAs(service, mode.instrument, oid)
       aid <- recordAtomAs(service, mode.instrument, vid)
       sid <- recordStepAs(service, mode.instrument, aid)
-    } yield (oid, sid)
+    } yield (oid, sid, vid)
 
   test("empty interval in step") {
     def query(oid: Observation.Id): String =
@@ -247,8 +248,8 @@ class executionStepRecords extends OdbSuite with ExecutionQuerySetupOperations {
 
     // Set up visit and record the atom and steps, but no events
     for {
-      (o, _) <- noEventSetup
-      _      <- expect(pi, query(o), expected)
+      (o, _, _) <- noEventSetup
+      _         <- expect(pi, query(o), expected)
     } yield ()
   }
 
@@ -287,47 +288,47 @@ class executionStepRecords extends OdbSuite with ExecutionQuerySetupOperations {
 
   test("execution state - not started") {
     val res = for {
-      (o, _) <- noEventSetup
-      es     <- executionState(o)
+      (o, _, _) <- noEventSetup
+      es        <- executionState(o)
     } yield es
     assertIO(res, StepExecutionState.NotStarted)
   }
 
   test("execution state - ongoing") {
     val res = for {
-      (o, s) <- noEventSetup
-      _      <- addStepEventAs(service, s, StepStage.StartStep)
-      es     <- executionState(o)
+      (o, s, v) <- noEventSetup
+      _         <- addStepEventAs(service, s, v, StepStage.StartStep)
+      es        <- executionState(o)
     } yield es
     assertIO(res, StepExecutionState.Ongoing)
   }
 
   test("execution state - abort") {
     val res = for {
-      (o, s) <- noEventSetup
-      _      <- addStepEventAs(service, s, StepStage.StartStep)
-      _      <- addStepEventAs(service, s, StepStage.Abort)
-      es     <- executionState(o)
+      (o, s, v) <- noEventSetup
+      _         <- addStepEventAs(service, s, v, StepStage.StartStep)
+      _         <- addStepEventAs(service, s, v, StepStage.Abort)
+      es        <- executionState(o)
     } yield es
     assertIO(res, StepExecutionState.Aborted)
   }
 
   test("execution state - completed") {
     val res = for {
-      (o, s) <- noEventSetup
-      _      <- addStepEventAs(service, s, StepStage.StartStep)
-      _      <- addStepEventAs(service, s, StepStage.EndStep)
-      es     <- executionState(o)
+      (o, s, v) <- noEventSetup
+      _         <- addStepEventAs(service, s, v, StepStage.StartStep)
+      _         <- addStepEventAs(service, s, v, StepStage.EndStep)
+      es        <- executionState(o)
     } yield es
     assertIO(res, StepExecutionState.Completed)
   }
 
   test("execution state - stopped") {
     val res = for {
-      (o, s) <- noEventSetup
-      _      <- addStepEventAs(service, s, StepStage.StartStep)
-      _      <- addStepEventAs(service, s, StepStage.Stop)
-      es     <- executionState(o)
+      (o, s, v) <- noEventSetup
+      _         <- addStepEventAs(service, s, v, StepStage.StartStep)
+      _         <- addStepEventAs(service, s, v, StepStage.Stop)
+      es        <- executionState(o)
     } yield es
     assertIO(res, StepExecutionState.Stopped)
   }

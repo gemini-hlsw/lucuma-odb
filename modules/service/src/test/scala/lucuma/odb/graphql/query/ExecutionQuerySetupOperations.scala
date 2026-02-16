@@ -64,6 +64,7 @@ trait ExecutionQuerySetupOperations extends DatabaseOperations { this: OdbSuite 
     setup:   Setup,
     user:    User,
     aid:     Atom.Id,
+    vid:     Visit.Id,
     atom:    Int,
     step:    Int
   ): IO[StepNode] = {
@@ -81,9 +82,9 @@ trait ExecutionQuerySetupOperations extends DatabaseOperations { this: OdbSuite 
     )
     for {
       sid <- recordStepAs(user, mode.instrument, aid)
-      es0 <- stages0.traverse { stage => addStepEventAs(user, sid, stage) }
+      es0 <- stages0.traverse { stage => addStepEventAs(user, sid, vid, stage) }
       ds  <- (0 until setup.datasetCount).toList.traverse { d => recordDataset(setup, user, sid, atom, step, d) }
-      es1 <- stages1.traverse { stage => addStepEventAs(user, sid, stage) }
+      es1 <- stages1.traverse { stage => addStepEventAs(user, sid, vid, stage) }
     } yield StepNode(sid, ds, es0 ::: es1)
   }
 
@@ -96,7 +97,7 @@ trait ExecutionQuerySetupOperations extends DatabaseOperations { this: OdbSuite 
   ): IO[AtomNode] =
     for {
       aid <- recordAtomAs(user, mode.instrument, vid)
-      ss  <- (0 until setup.stepCount).toList.traverse { s => recordStep(mode, setup, user, aid, atom, s) }
+      ss  <- (0 until setup.stepCount).toList.traverse { s => recordStep(mode, setup, user, aid, vid, atom, s) }
     } yield AtomNode(aid, ss)
 
   def recordVisit(

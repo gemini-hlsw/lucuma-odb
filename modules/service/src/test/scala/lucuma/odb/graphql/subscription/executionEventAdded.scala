@@ -101,8 +101,8 @@ class executionEventAdded extends OdbSuite with SubscriptionUtils:
               addSlewEventAs(service, oid, SlewStage.StartSlew)       >>
               addSlewEventAs(service, oid, SlewStage.EndSlew)         >>
               addSequenceEventAs(service, vid, SequenceCommand.Start) >>
-              addAtomEventAs(service, aid, AtomStage.StartAtom)       >>
-              addStepEventAs(service, sid, StepStage.StartStep)
+              addAtomEventAs(service, aid, vid, AtomStage.StartAtom)  >>
+              addStepEventAs(service, sid, vid, StepStage.StartStep)
         ),
         expected = List.fill(2)(eventJson(pid, oid, vid, ExecutionEventType.Slew))
       )
@@ -124,8 +124,8 @@ class executionEventAdded extends OdbSuite with SubscriptionUtils:
               addSlewEventAs(service, oid, SlewStage.StartSlew)       >>
               addSlewEventAs(service, oid, SlewStage.EndSlew)         >>
               addSequenceEventAs(service, vid, SequenceCommand.Start) >>
-              addAtomEventAs(service, aid, AtomStage.StartAtom)       >>
-              addStepEventAs(service, sid, StepStage.StartStep)
+              addAtomEventAs(service, aid, vid, AtomStage.StartAtom)  >>
+              addStepEventAs(service, sid, vid, StepStage.StartStep)
         ),
         expected = List(
           eventJson(pid, oid, vid, ExecutionEventType.Sequence),
@@ -152,8 +152,8 @@ class executionEventAdded extends OdbSuite with SubscriptionUtils:
                 addSlewEventAs(service, oid, SlewStage.StartSlew)         >>
                 addSlewEventAs(service, oid, SlewStage.EndSlew)           >>
                 addSequenceEventAs(service, vid, SequenceCommand.Start)   >>
-                addAtomEventAs(service, aid, AtomStage.StartAtom)         >>
-                addStepEventAs(service, sid, StepStage.StartStep)         >>
+                addAtomEventAs(service, aid, vid, AtomStage.StartAtom)    >>
+                addStepEventAs(service, sid, vid, StepStage.StartStep)         >>
                 addDatasetEventAs(service, did, DatasetStage.StartExpose) >>
                 addDatasetEventAs(service, did, DatasetStage.EndExpose)
         ),
@@ -182,8 +182,8 @@ class executionEventAdded extends OdbSuite with SubscriptionUtils:
                 addSlewEventAs(service, oid, SlewStage.StartSlew)         >>
                 addSlewEventAs(service, oid, SlewStage.EndSlew)           >>
                 addSequenceEventAs(service, vid, SequenceCommand.Start)   >>
-                addAtomEventAs(service, aid, AtomStage.StartAtom)         >>
-                addStepEventAs(service, sid, StepStage.StartStep)         >>
+                addAtomEventAs(service, aid, vid, AtomStage.StartAtom)    >>
+                addStepEventAs(service, sid, vid, StepStage.StartStep)         >>
                 addDatasetEventAs(service, did, DatasetStage.StartExpose) >>
                 addDatasetEventAs(service, did, DatasetStage.EndExpose)
         ),

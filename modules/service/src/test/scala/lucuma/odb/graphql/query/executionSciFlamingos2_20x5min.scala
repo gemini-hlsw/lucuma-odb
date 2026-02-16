@@ -75,7 +75,7 @@ class executionSciFlamingos2_20x5min extends ExecutionTestSupportForFlamingos2:
   def adjustStepTime(s: Step.Id, start: Timestamp, end: Timestamp): IO[Unit] =
     val query: Command[(Step.Id, Timestamp, Timestamp)] =
       sql"""
-        UPDATE t_step_record
+        UPDATE t_step
            SET c_first_event_time = $core_timestamp,
                c_last_event_time  = $core_timestamp
          WHERE c_step_id = $step_id

@@ -15,7 +15,7 @@ import lucuma.odb.graphql.table.GroupView
 import lucuma.odb.graphql.table.ObservationView
 import lucuma.odb.graphql.table.ProgramTable
 import lucuma.odb.graphql.table.ProposalView
-import lucuma.odb.graphql.table.StepView
+import lucuma.odb.graphql.table.StepRecordView
 import lucuma.odb.graphql.table.TimeChargeCorrectionTable
 import lucuma.odb.graphql.table.TimeChargeDiscountTable
 import lucuma.odb.graphql.table.TimingWindowView
@@ -29,7 +29,7 @@ trait TimeSpanMapping[F[_]] extends AllocationTable[F]
                                with ProposalView[F]
                                with ObservationView[F]
                                with GroupView[F]
-                               with StepView[F]
+                               with StepRecordView[F]
                                with TimeChargeCorrectionTable[F]
                                with TimeChargeDiscountTable[F]
                                with TimingWindowView[F]
@@ -45,7 +45,7 @@ trait TimeSpanMapping[F[_]] extends AllocationTable[F]
       timeSpanMappingAtPath(GroupType / "maximumInterval", GroupView.MaxInterval)(GroupView.MaxIntervalId),
       timeSpanMappingAtPath(GroupType / "minimumInterval", GroupView.MinInterval)(GroupView.MinIntervalId),
       timeSpanMappingAtPath(LargeProgramType / "totalTime", ProposalView.LargeProgram.TotalTime)(ProposalView.ProgramId),
-      timeSpanMappingAtPath(StepRecordType / "estimate", StepView.TimeEstimate)(StepView.Id),
+      timeSpanMappingAtPath(StepRecordType / "estimate", StepRecordView.TimeEstimate)(StepRecordView.Id),
       timeSpanMappingAtPath(StepRecordType / "flamingos2" / "exposure", Flamingos2DynamicView.ExposureTime)(Flamingos2DynamicView.Id),
       timeSpanMappingAtPath(StepRecordType / "gmosNorth" / "exposure", GmosNorthDynamicTable.ExposureTime)(GmosNorthDynamicTable.Id),
       timeSpanMappingAtPath(StepRecordType / "gmosSouth" / "exposure", GmosSouthDynamicTable.ExposureTime)(GmosSouthDynamicTable.Id),

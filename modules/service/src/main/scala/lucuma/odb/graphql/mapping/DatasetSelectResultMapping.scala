@@ -6,18 +6,18 @@ package mapping
 
 import grackle.Path
 
-import table.AtomTable
+import table.AtomRecordView
 import table.DatasetTable
 import table.ObservationView
-import table.StepView
+import table.StepRecordView
 import table.VisitTable
 
 trait DatasetSelectResultMapping[F[_]]
   extends DatasetTable[F]
-     with AtomTable[F]
+     with AtomRecordView[F]
      with ObservationView[F]
      with ResultMapping[F]
-     with StepView[F]
+     with StepRecordView[F]
      with VisitTable[F] {
 
   lazy val DatasetSelectResultMappings: List[TypeMapping] = {
@@ -26,7 +26,7 @@ trait DatasetSelectResultMapping[F[_]]
       nestedSelectResultMappingAtPath(path, ObservationView.Id, Join(ObservationView.Id, DatasetTable.ObservationId))
 
     def fromStepRecordAtPath(path: Path): ObjectMapping =
-      nestedSelectResultMappingAtPath(path, StepView.Id, Join(StepView.Id, DatasetTable.StepId))
+      nestedSelectResultMappingAtPath(path, StepRecordView.Id, Join(StepRecordView.Id, DatasetTable.StepId))
 
     def fromVisitAtPath(path: Path): ObjectMapping =
       nestedSelectResultMappingAtPath(path, VisitTable.Id, Join(VisitTable.Id, DatasetTable.VisitId))
