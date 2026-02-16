@@ -96,7 +96,7 @@ trait ExecutionMapping[F[_]] extends ObservationEffectHandler[F]
       TimestampBinding.Option("OFFSET", rOFFSET),
       NonNegIntBinding.Option("LIMIT", rLIMIT)
     )) =>
-      selectWithOffsetAndLimit(rOFFSET, rLIMIT, AtomRecordType, "created", Predicates.atomRecord.created, Predicates.atomRecord.visit.observation.program)
+      selectWithOffsetAndLimit(rOFFSET, rLIMIT, AtomRecordType, "_firstEventTime", Predicates.atomRecord.firstEventTime, Predicates.atomRecord.visit.observation.program)
 
     case (ExecutionType, "datasets", List(
       DatasetIdBinding.Option("OFFSET", rOFFSET),

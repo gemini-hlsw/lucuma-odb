@@ -268,7 +268,7 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos:
   def adjustStepTime(s: Step.Id, t: Timestamp): IO[Unit] =
     val query: Command[(Step.Id, Timestamp)] =
       sql"""
-        UPDATE t_step_record
+        UPDATE t_step
            SET c_created = $core_timestamp
          WHERE c_step_id = $step_id
       """.command.contramap { (s, t) => (t, s) }

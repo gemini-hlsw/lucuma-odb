@@ -303,7 +303,6 @@ trait BaseMapping[F[_]]
   lazy val QueueType                               = schema.ref("Queue")
   lazy val RadialVelocityType                      = schema.ref("RadialVelocity")
   lazy val RandomTelescopeConfigGeneratorType      = schema.ref("RandomTelescopeConfigGenerator")
-  lazy val RecordAtomResultType                    = schema.ref("RecordAtomResult")
   lazy val RecordDatasetResultType                 = schema.ref("RecordDatasetResult")
   lazy val RecordFlamingos2StepResultType          = schema.ref("RecordFlamingos2StepResult")
   lazy val RecordFlamingos2VisitResultType         = schema.ref("RecordFlamingos2VisitResult")

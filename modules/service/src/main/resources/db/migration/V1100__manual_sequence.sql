@@ -5,6 +5,10 @@ ALTER TABLE t_execution_digest
 -- Add an index on observation id
 CREATE INDEX execution_digest_observation_id_index ON t_execution_digest (c_observation_id);
 
+-- Create an atom table.  This will store both executed and future atoms, but
+-- only when the first visit for an observation is created.  Before then we
+-- continue generating the sequence on the fly and nothing is written to the
+-- database.
 CREATE TABLE t_atom (
   c_atom_id          d_atom_id        PRIMARY KEY,
   c_instrument       d_tag            NOT NULL,
@@ -13,10 +17,10 @@ CREATE TABLE t_atom (
   UNIQUE (c_atom_id, c_instrument),
 
   c_observation_id   d_observation_id NOT NULL,
-
-  UNIQUE (c_observation_id, c_atom_index),
-
   c_sequence_type    e_sequence_type  NOT NULL,
+
+  UNIQUE (c_observation_id, c_sequence_type, c_atom_index),
+
   c_visit_id         d_visit_id       REFERENCES t_visit(c_visit_id) ON DELETE CASCADE,
 
   c_description      text,
@@ -26,6 +30,17 @@ CREATE TABLE t_atom (
   c_last_event_time  timestamp without time zone
 
 );
+
+-- Create a view on the atom table.  This will correspond to the old atom record
+-- table in that it only contains executed atoms.
+CREATE VIEW v_atom_record AS
+SELECT a.*
+  FROM t_atom a
+ WHERE c_visit_id         IS NOT NULL
+   AND c_first_event_time IS NOT NULL
+   AND c_last_event_time  IS NOT NULL
+   AND c_execution_state != 'not_started'
+ORDER BY a.c_atom_id;
 
 -- Copy the old t_atom_record data over to t_atom.
 INSERT INTO t_atom (
@@ -109,6 +124,28 @@ BEFORE UPDATE OF c_visit_id ON t_atom
 FOR EACH ROW
 EXECUTE FUNCTION validate_atom_visit();
 
+
+-- A trigger to keep the first/last event data accurate.
+CREATE OR REPLACE FUNCTION update_atom_event_times()
+  RETURNS TRIGGER AS $$
+BEGIN
+
+  UPDATE t_atom
+     SET c_first_event_time = least(coalesce(c_first_event_time, NEW.c_received), NEW.c_received),
+         c_last_event_time  = greatest(coalesce(c_last_event_time, NEW.c_received), NEW.c_received)
+   WHERE c_atom_id = NEW.c_atom_id;
+
+  RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER update_atom_event_times_trigger
+  AFTER INSERT ON t_execution_event
+  FOR EACH ROW
+  WHEN (NEW.c_atom_id IS NOT NULL)
+    EXECUTE PROCEDURE update_atom_event_times();
+
+
 -- Add a breakpoint enum.  We can now store breakpoints.
 CREATE TYPE e_breakpoint AS enum(
   'enabled',
@@ -177,7 +214,9 @@ ALTER TABLE ONLY t_step
 -- Update the step view
 DROP VIEW v_step_record;
 
-CREATE VIEW v_step AS
+-- Create a view on the step table.  This will correspond to the old step record
+-- table in that it only contains executed atoms.
+CREATE VIEW v_step_record AS
 SELECT
   s.c_step_id,
   s.c_atom_id,
@@ -212,8 +251,36 @@ LEFT JOIN t_step_config_smart_gcal m
   ON m.c_step_id = s.c_step_id
 INNER JOIN t_atom a
   ON a.c_atom_id = s.c_atom_id
+WHERE a.c_visit_id         IS NOT NULL
+  AND s.c_first_event_time IS NOT NULL
+  AND s.c_last_event_time  IS NOT NULL
+  AND s.c_execution_state != 'not_started'
 ORDER BY
   s.c_step_id;
+
+
+-- A trigger to keep the first/last event data accurate.
+DROP TRIGGER update_step_record_event_times_trigger ON t_execution_event;
+DROP FUNCTION update_step_record_event_times;
+
+CREATE OR REPLACE FUNCTION update_step_event_times()
+  RETURNS TRIGGER AS $$
+BEGIN
+
+  UPDATE t_step
+     SET c_first_event_time = least(coalesce(c_first_event_time, NEW.c_received), NEW.c_received),
+         c_last_event_time  = greatest(coalesce(c_last_event_time, NEW.c_received), NEW.c_received)
+   WHERE c_step_id = NEW.c_step_id;
+
+  RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER update_step_event_times_trigger
+  AFTER INSERT ON t_execution_event
+  FOR EACH ROW
+  WHEN (NEW.c_step_id IS NOT NULL)
+    EXECUTE PROCEDURE update_step_event_times();
 
 -- Sequence serialization coordination
 CREATE TABLE t_sequence_materialization (
@@ -313,31 +380,31 @@ ALTER TABLE t_step_config_gcal
   DROP CONSTRAINT t_step_config_gcal_c_step_id_c_step_type_fkey;
 
 ALTER TABLE t_step_config_gcal
-  ADD CONSTRAINT t_step_config_gcal_c_step_id_c_step_type_fkey FOREIGN KEY (c_step_id, c_step_type) REFERENCES t_step(c_step_id, c_step_type);
+  ADD CONSTRAINT t_step_config_gcal_c_step_id_c_step_type_fkey FOREIGN KEY (c_step_id, c_step_type) REFERENCES t_step(c_step_id, c_step_type) DEFERRABLE INITIALLY DEFERRED;
 
 ALTER TABLE t_step_config_smart_gcal
   DROP CONSTRAINT t_step_config_smart_gcal_c_step_id_c_step_type_fkey;
 
 ALTER TABLE t_step_config_smart_gcal
-  ADD CONSTRAINT t_step_config_smart_gcal_c_step_id_c_step_type_fkey FOREIGN KEY (c_step_id, c_step_type) REFERENCES t_step(c_step_id, c_step_type);
+  ADD CONSTRAINT t_step_config_smart_gcal_c_step_id_c_step_type_fkey FOREIGN KEY (c_step_id, c_step_type) REFERENCES t_step(c_step_id, c_step_type) DEFERRABLE INITIALLY DEFERRED;
 
 ALTER TABLE t_flamingos_2_dynamic
   DROP CONSTRAINT t_flamingos_2_dynamic_c_step_id_c_instrument_fkey;
 
 ALTER TABLE t_flamingos_2_dynamic
-  ADD CONSTRAINT t_flamingos_2_dynamic_c_step_id_c_instrument_fkey FOREIGN KEY (c_step_id, c_instrument) REFERENCES t_step(c_step_id, c_instrument);
+  ADD CONSTRAINT t_flamingos_2_dynamic_c_step_id_c_instrument_fkey FOREIGN KEY (c_step_id, c_instrument) REFERENCES t_step(c_step_id, c_instrument) DEFERRABLE INITIALLY DEFERRED;
 
 ALTER TABLE t_gmos_north_dynamic
   DROP CONSTRAINT t_gmos_north_dynamic_c_step_id_c_instrument_fkey;
 
 ALTER TABLE t_gmos_north_dynamic
-  ADD CONSTRAINT t_gmos_north_dynamic_c_step_id_c_instrument_fkey FOREIGN KEY (c_step_id, c_instrument) REFERENCES t_step(c_step_id, c_instrument);
+  ADD CONSTRAINT t_gmos_north_dynamic_c_step_id_c_instrument_fkey FOREIGN KEY (c_step_id, c_instrument) REFERENCES t_step(c_step_id, c_instrument) DEFERRABLE INITIALLY DEFERRED;
 
 ALTER TABLE t_gmos_south_dynamic
   DROP CONSTRAINT t_gmos_south_dynamic_c_step_id_c_instrument_fkey;
 
 ALTER TABLE t_gmos_south_dynamic
-  ADD CONSTRAINT t_gmos_south_dynamic_c_step_id_c_instrument_fkey FOREIGN KEY (c_step_id, c_instrument) REFERENCES t_step(c_step_id, c_instrument);
+  ADD CONSTRAINT t_gmos_south_dynamic_c_step_id_c_instrument_fkey FOREIGN KEY (c_step_id, c_instrument) REFERENCES t_step(c_step_id, c_instrument) DEFERRABLE INITIALLY DEFERRED;
 
 -- Rework the dataset visit assignment.  Before we knew that the visit existed
 -- because datasets referred to steps that referred to atoms that referred to

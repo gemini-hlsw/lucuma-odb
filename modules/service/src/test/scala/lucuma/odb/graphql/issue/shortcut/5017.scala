@@ -50,32 +50,32 @@ class ShortCut_5017 extends ExecutionTestSupportForGmos:
         _ <- stages.traverse_(addDatasetEventAs(serviceUser, d, _).void)
       yield d
 
-    def executeStep(c: AtomicCell[IO, Int], s: Step.Id): IO[Dataset.Id] =
+    def executeStep(c: AtomicCell[IO, Int], s: Step.Id, v: Visit.Id): IO[Dataset.Id] =
       for
-        _ <- addStepEventAs(serviceUser, s, StepStage.StartStep)
-        _ <- addStepEventAs(serviceUser, s, StepStage.StartConfigure)
-        _ <- addStepEventAs(serviceUser, s, StepStage.EndConfigure)
-        _ <- addStepEventAs(serviceUser, s, StepStage.StartObserve)
+        _ <- addStepEventAs(serviceUser, s, v, StepStage.StartStep)
+        _ <- addStepEventAs(serviceUser, s, v, StepStage.StartConfigure)
+        _ <- addStepEventAs(serviceUser, s, v, StepStage.EndConfigure)
+        _ <- addStepEventAs(serviceUser, s, v, StepStage.StartObserve)
         d <- recordDatasetAndEvents(c, s)
-        _ <- addStepEventAs(serviceUser, s, StepStage.EndObserve)
-        _ <- addStepEventAs(serviceUser, s, StepStage.EndStep)
+        _ <- addStepEventAs(serviceUser, s, v, StepStage.EndObserve)
+        _ <- addStepEventAs(serviceUser, s, v, StepStage.EndStep)
       yield d
 
     // Execute an arc, a flat and one science step
-    def recordAndExecuteScienceStep(c: AtomicCell[IO, Int], a: Atom.Id, ditherNm: Int, q: Int): IO[(Step.Id, Dataset.Id)] =
+    def recordAndExecuteScienceStep(c: AtomicCell[IO, Int], a: Atom.Id, v: Visit.Id, ditherNm: Int, q: Int): IO[(Step.Id, Dataset.Id)] =
       for
         s <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthScience(ditherNm), StepConfig.Science, sciTelescopeConfig(q), ObserveClass.Science)
-        d <- executeStep(c, s)
+        d <- executeStep(c, s, v)
       yield (s, d)
 
     def executeAtom(c: AtomicCell[IO, Int], v: Visit.Id, ditherNm: Int, q0: Int, qs: Int*): IO[(Atom.Id, List[(Step.Id, Dataset.Id)])] =
       for
         a  <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
         sa <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthArc(ditherNm), ArcStep, gcalTelescopeConfig(q0), ObserveClass.NightCal)
-        da <- executeStep(c, sa)
+        da <- executeStep(c, sa, v)
         sf <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthFlat(ditherNm), FlatStep, gcalTelescopeConfig(q0), ObserveClass.NightCal)
-        df <- executeStep(c, sf)
-        ss <- (q0 :: qs.toList).traverse(q => recordAndExecuteScienceStep(c, a, ditherNm, q))
+        df <- executeStep(c, sf, v)
+        ss <- (q0 :: qs.toList).traverse(q => recordAndExecuteScienceStep(c, a, v, ditherNm, q))
       yield (a, (sa, da) :: (sf, df) :: ss)
 
     val setup: IO[(Program.Id, Observation.Id, (Atom.Id, List[(Step.Id, Dataset.Id)]))] =

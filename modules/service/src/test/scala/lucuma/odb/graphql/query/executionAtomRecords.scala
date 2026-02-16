@@ -19,6 +19,7 @@ import lucuma.core.enums.SequenceType.Science
 import lucuma.core.enums.StepGuideState
 import lucuma.core.model.Observation
 import lucuma.core.model.User
+import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.Step
@@ -34,13 +35,13 @@ class executionAtomRecords extends OdbSuite with ExecutionQuerySetupOperations
 
   val mode    = ObservingModeType.GmosNorthLongSlit
 
-  def noEventSetup: IO[(Observation.Id, Atom.Id)] =
+  def noEventSetup: IO[(Observation.Id, Visit.Id, Atom.Id)] =
     for {
       pid <- createProgramAs(pi)
       oid <- createObservationAs(pi, pid, mode.some)
       vid <- recordVisitAs(serviceUser, mode.instrument, oid)
       aid <- recordAtomAs(serviceUser, mode.instrument, vid)
-    } yield (oid, aid)
+    } yield (oid, vid, aid)
 
   test("observation -> execution -> atomRecords") {
     recordAll(pi, serviceUser, mode, offset = 0, atomCount = 2).flatMap { on =>
@@ -496,27 +497,27 @@ class executionAtomRecords extends OdbSuite with ExecutionQuerySetupOperations
 
   test("execution state - not started") {
     val res = for {
-      (o, _) <- noEventSetup
-      es     <- executionState(o)
+      (o, _, _) <- noEventSetup
+      es        <- executionState(o)
     } yield es
     assertIO(res, AtomExecutionState.NotStarted)
   }
 
   test("execution state - ongoing") {
     val res = for {
-      (o, a) <- noEventSetup
-      _      <- addAtomEventAs(serviceUser, a, AtomStage.StartAtom)
-      es     <- executionState(o)
+      (o, v, a) <- noEventSetup
+      _         <- addAtomEventAs(serviceUser, a, v, AtomStage.StartAtom)
+      es        <- executionState(o)
     } yield es
     assertIO(res, AtomExecutionState.Ongoing)
   }
 
   test("execution state - completed") {
     val res = for {
-      (o, a) <- noEventSetup
-      _      <- addAtomEventAs(serviceUser, a, AtomStage.StartAtom)
-      _      <- addAtomEventAs(serviceUser, a, AtomStage.EndAtom)
-      es     <- executionState(o)
+      (o, v, a) <- noEventSetup
+      _         <- addAtomEventAs(serviceUser, a, v, AtomStage.StartAtom)
+      _         <- addAtomEventAs(serviceUser, a, v, AtomStage.EndAtom)
+      es        <- executionState(o)
     } yield es
     assertIO(res, AtomExecutionState.Completed)
   }

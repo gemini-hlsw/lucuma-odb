@@ -18,31 +18,31 @@ import lucuma.odb.graphql.binding.NonNegIntBinding
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.json.time.query.given
 
-import table.AtomTable
+import table.AtomRecordView
 import table.DatasetReferenceView
 import table.DatasetTable
 import table.ObservationView
-import table.StepView
+import table.StepRecordView
 import table.VisitTable
 
 trait DatasetMapping[F[_]] extends DatasetTable[F]
                               with DatasetReferenceView[F]
-                              with AtomTable[F]
+                              with AtomRecordView[F]
                               with ObservationView[F]
                               with Predicates[F]
                               with SelectSubquery
-                              with StepView[F]
+                              with StepRecordView[F]
                               with VisitTable[F] {
   def user: User
 
   lazy val DatasetMapping: ObjectMapping =
     ObjectMapping(DatasetType)(
       SqlField("id",             DatasetTable.Id,   key = true),
-      SqlObject("step",          Join(DatasetTable.StepId, StepView.Id)),
+      SqlObject("step",          Join(DatasetTable.StepId, StepRecordView.Id)),
       SqlField("index",          DatasetTable.ExposureIndex),
       SqlObject("reference",     Join(DatasetTable.Id, DatasetReferenceView.Id)),
       SqlObject("observation",   Join(DatasetTable.ObservationId, ObservationView.Id)),
-      SqlObject("visit",         Join(DatasetTable.StepId, StepView.Id), Join(StepView.AtomId, AtomTable.Id), Join(AtomTable.VisitId, VisitTable.Id)),
+      SqlObject("visit",         Join(DatasetTable.StepId, StepRecordView.Id), Join(StepRecordView.AtomId, AtomRecordView.Id), Join(AtomRecordView.VisitId, VisitTable.Id)),
       SqlObject("events"),
       SqlField("filename",       DatasetTable.File.Name),
       SqlField("qaState",        DatasetTable.QaState),

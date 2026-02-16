@@ -613,8 +613,7 @@ object SequenceService:
       sql"""
         UPDATE t_step s
            SET c_execution_state = '#${StepExecutionState.Abandoned.tag}'
-          FROM t_atom a
-          JOIN t_step_execution_state e ON s.c_execution_state = e.c_tag
+          FROM t_atom a, t_step_execution_state e
          WHERE a.c_observation_id = $observation_id
            AND s.c_atom_id = a.c_atom_id
            AND a.c_execution_state = '#${StepExecutionState.Abandoned.tag}'
@@ -781,7 +780,7 @@ object SequenceService:
 
     val MarkMaterialization: Query[Observation.Id, Observation.Id] =
       sql"""
-        INSERT INTO t_sequence_materialization (c_observation_id, c_created_at, c_updated_at)
+        INSERT INTO t_sequence_materialization (c_observation_id, c_created, c_updated)
         VALUES ($observation_id, now(), now())
         ON CONFLICT DO NOTHING
         RETURNING c_observation_id

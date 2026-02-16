@@ -126,8 +126,8 @@ class ShortCut_6589 extends ExecutionTestSupportForGmos:
     Setup
       .init(30)
       .flatMap: s =>
-        addAtomEventAs(serviceUser, s.a, AtomStage.EndAtom) *>
-        setQaState(s.d, DatasetQaState.Usable)              *>
+        addAtomEventAs(serviceUser, s.a, s.v, AtomStage.EndAtom) *>
+        setQaState(s.d, DatasetQaState.Usable)                   *>
         assertIO(nextAtomId(s.o), s.g)
 
   def nextAtomStepTypes(o: Observation.Id): IO[List[StepType]] =

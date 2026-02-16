@@ -201,15 +201,24 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       image,
       env = env,
       exposedPorts = Seq(POSTGRESQL_PORT),
+      command = Seq(
+        "postgres",
+        "-c", "log_min_error_statement=error",
+        "-c", "log_error_verbosity=verbose",
+        "-c", "log_statement=none"
+      ),
       waitStrategy = Wait
         .forLogMessage(".*database system is ready to accept connections.*", 1)
         .withStartupTimeout(java.time.Duration.ofSeconds(15))
     )
-    if (debug) {
-      dbContainer.container.withLogConsumer { f =>
-        jlogger.debug(s"${AnsiColors.CYAN}${f.getUtf8String().trim()}${AnsiColors.Reset}")
-      }: Unit
-    }
+    dbContainer.container.withLogConsumer { f =>
+      jlogger.error(s"${AnsiColors.RED}${f.getUtf8String().trim()}${AnsiColors.Reset}")
+    }: Unit
+//    if (debug) {
+//      dbContainer.container.withLogConsumer { f =>
+//        jlogger.debug(s"${AnsiColors.CYAN}${f.getUtf8String().trim()}${AnsiColors.Reset}")
+//      }: Unit
+//    }
     new GenericContainer.Def(dbContainer) {}
 
   given LoggerFactory[IO] =
