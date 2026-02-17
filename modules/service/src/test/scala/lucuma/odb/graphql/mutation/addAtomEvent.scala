@@ -24,7 +24,7 @@ import lucuma.core.syntax.string.*
 import lucuma.core.util.IdempotencyKey
 import lucuma.odb.data.AtomExecutionState
 
-class addAtomEvent extends OdbSuite(debug = true) with ExecutionState with query.ExecutionTestSupportForGmos:
+class addAtomEvent extends OdbSuite with ExecutionState with query.ExecutionTestSupportForGmos:
 
   case class Setup(
     oid:  Observation.Id,

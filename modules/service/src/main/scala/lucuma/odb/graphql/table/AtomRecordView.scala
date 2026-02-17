@@ -10,7 +10,7 @@ trait AtomRecordView[F[_]] extends BaseMapping[F]:
   object AtomRecordView extends TableDef("v_atom_record"):
     val Id: ColumnRef             = col("c_atom_id",          atom_id)
     val Instrument: ColumnRef     = col("c_instrument",       instrument)
-    val AtomIndex: ColumnRef      = col("c_atom_index",       int4_nonneg)
+    val AtomIndex: ColumnRef      = col("c_atom_index",       int4_pos)
     val ObservationId: ColumnRef  = col("c_observation_id",   observation_id)
     val SequenceType: ColumnRef   = col("c_sequence_type",    sequence_type)
     val VisitId: ColumnRef        = col("c_visit_id",         visit_id)

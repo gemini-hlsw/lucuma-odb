@@ -14,6 +14,7 @@ import io.circe.Json
 import io.circe.literal.*
 import lucuma.core.enums.DatasetStage
 import lucuma.core.enums.ObservingModeType
+import lucuma.core.enums.StepStage
 import lucuma.core.model.ExecutionEvent
 import lucuma.core.model.Observation
 import lucuma.core.model.User
@@ -23,26 +24,27 @@ import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
 
 
-class addDatasetEvent extends OdbSuite {
+class addDatasetEvent extends OdbSuite with query.ExecutionTestSupportForGmos:
 
   val mode: ObservingModeType = ObservingModeType.GmosNorthLongSlit
-  val service: User = TestUsers.service(nextId)
-
-  override lazy val validUsers: List[User] = List(service)
 
   private def recordDataset(
     mode: ObservingModeType,
     user: User,
     file: String
   ):IO[(Observation.Id, Dataset.Id)] =
-    for {
-      pid <- createProgramAs(user)
-      oid <- createObservationAs(user, pid, mode.some)
-      vid <- recordVisitAs(user, mode.instrument, oid)
-      aid <- recordAtomAs(user, mode.instrument, vid)
-      sid <- recordStepAs(user, mode.instrument, aid)
-      did <- recordDatasetAs(user, sid, file)
-    } yield (oid, did)
+    for
+      pid  <- createProgramAs(user)
+      tid  <- createTargetWithProfileAs(user, pid)
+      oid  <- createObservationAs(user, pid, mode.some, tid)
+      vid  <- recordVisitAs(user, mode.instrument, oid)
+      aids <- selectGmosNorthScienceAtomIds(oid)
+      sids <- selectGmosNorthScienceStepIds(oid)
+      aid0  = aids(0)
+      sid0  = sids(aid0)(0)
+      _    <- addStepEventAs(user, sid0, vid, StepStage.EndStep)
+      did  <- recordDatasetAs(user, sid0, file)
+    yield (oid, did)
 
   private def addDatasetEventTest(
     mode:     ObservingModeType,
@@ -51,13 +53,13 @@ class addDatasetEvent extends OdbSuite {
     query:    Dataset.Id => String,
     expected: (Observation.Id, Dataset.Id) => Either[String, Json]
   ): IO[Unit] =
-    for {
+    for
       ids <- recordDataset(mode, user, file)
       (oid, did) = ids
       _   <- expect(user, query(did), expected(oid, did).leftMap(s => List(s)))
-    } yield ()
+    yield ()
 
-  test("addDatasetEvent") {
+  test("addDatasetEvent"):
     def query(did: Dataset.Id): String =
       s"""
         mutation {
@@ -80,7 +82,7 @@ class addDatasetEvent extends OdbSuite {
 
     addDatasetEventTest(
       mode,
-      service,
+      serviceUser,
       "N18630101S0001.fits",
       did => query(did),
       (oid, did) => json"""
@@ -100,9 +102,7 @@ class addDatasetEvent extends OdbSuite {
       """.asRight
     )
 
-  }
-
-  test("addDatasetEvent - with filename") {
+  test("addDatasetEvent - with filename"):
     def query(did: Dataset.Id): String =
       s"""
         mutation {
@@ -125,7 +125,7 @@ class addDatasetEvent extends OdbSuite {
 
     addDatasetEventTest(
       mode,
-      service,
+      serviceUser,
       "N18630101S0002.fits",
       did => query(did),
       (oid, did) => json"""
@@ -145,9 +145,7 @@ class addDatasetEvent extends OdbSuite {
       """.asRight
     )
 
-  }
-
-  test("addDatasetEvent - unknown dataset") {
+  test("addDatasetEvent - unknown dataset"):
     val query: String =
       s"""
         mutation {
@@ -166,17 +164,15 @@ class addDatasetEvent extends OdbSuite {
 
     addDatasetEventTest(
       mode,
-      service,
+      serviceUser,
       "N18630101S0003.fits",
       _ => query,
       (_, _) => s"Dataset 'd-1863' not found".asLeft
     )
 
-  }
-
   private def addEvent(did: Dataset.Id, stage: DatasetStage): IO[Timestamp] =
     query(
-      service,
+      serviceUser,
       s"""
         mutation {
           addDatasetEvent(input: {
@@ -189,13 +185,12 @@ class addDatasetEvent extends OdbSuite {
           }
         }
       """
-    ).map { json =>
+    ).map: json =>
       json.hcursor.downFields("addDatasetEvent", "event", "received").require[Timestamp]
-    }
 
   private def timestamps(did: Dataset.Id): IO[Option[TimestampInterval]] =
     query(
-      service,
+      serviceUser,
       s"""
         query {
           dataset(datasetId: "$did") {
@@ -206,14 +201,13 @@ class addDatasetEvent extends OdbSuite {
           }
         }
       """
-    ).map { json =>
+    ).map: json =>
       val d = json.hcursor.downFields("dataset", "interval").success.filter(!_.value.isNull)
       val s = d.flatMap(_.downField("start").require[Option[Timestamp]])
       val e = d.flatMap(_.downField("end").require[Option[Timestamp]])
       (s, e).mapN { (start, end) => TimestampInterval.between(start, end) }
-    }
 
-  private def timeTest(file: String, stages: DatasetStage*): IO[Unit] = {
+  private def timeTest(file: String, stages: DatasetStage*): IO[Unit] =
     def expected(times: List[Timestamp]): (Option[Timestamp], Option[Timestamp]) =
       times.zip(stages).foldLeft((Option.empty[Timestamp], Option.empty[Timestamp])) { case ((start, end), (time, stage)) =>
         if (stage === DatasetStage.StartExpose) (time.some, none)
@@ -221,41 +215,35 @@ class addDatasetEvent extends OdbSuite {
         else (start, end)
       }
 
-    for {
-      ids <- recordDataset(mode, service, file)
+    for
+      ids <- recordDataset(mode, serviceUser, file)
       (oid, did) = ids
       es  <- stages.toList.traverse(addEvent(did, _))
       ex   = expected(es).mapN { (s, e) => TimestampInterval.between(s, e) }
       ts  <- timestamps(did)
-    } yield assertEquals(ts, ex)
-  }
+    yield assertEquals(ts, ex)
 
-  test("addDatasetEvent - no start time") {
+  test("addDatasetEvent - no start time"):
     timeTest("N18630101S0004.fits", DatasetStage.StartWrite)
-  }
 
-  test("addDatasetEvent - start") {
+  test("addDatasetEvent - start"):
     timeTest("N18630101S0005.fits", DatasetStage.StartExpose)
-  }
 
-  test("addDatasetEvent - start, end") {
+  test("addDatasetEvent - start, end"):
     timeTest("N18630101S0006.fits", DatasetStage.StartExpose, DatasetStage.EndWrite)
-  }
 
-  test("addDatasetEvent - end, no start") {
+  test("addDatasetEvent - end, no start"):
     timeTest("N18630101S0007.fits", DatasetStage.EndWrite)
-  }
 
-  test("addDatasetEvent - start, end, start") {
+  test("addDatasetEvent - start, end, start"):
     timeTest("N18630101S0008.fits", DatasetStage.StartExpose, DatasetStage.EndWrite, DatasetStage.StartExpose)
-  }
 
   def addWithIdempotencyKey(
     did: Dataset.Id,
     idm: Option[IdempotencyKey] = None
   ): IO[(ExecutionEvent.Id, Option[IdempotencyKey])] =
       query(
-        service,
+        serviceUser,
         s"""
           mutation {
             addDatasetEvent(input: {
@@ -280,14 +268,12 @@ class addDatasetEvent extends OdbSuite {
   test("addDatasetEvent - idempotency key"):
     val idm = IdempotencyKey.FromString.getOption("b9bac66c-4e12-4b1d-b646-47c2c3a97792")
 
-    recordDataset(mode, service, "N18630101S0010.fits").flatMap: (_, did) =>
+    recordDataset(mode, serviceUser, "N18630101S0010.fits").flatMap: (_, did) =>
       assertIO(addWithIdempotencyKey(did, idm = idm).map(_._2), idm)
 
   test("addDatasetEvent - duplicate idempotency key"):
     val idm = IdempotencyKey.FromString.getOption("b7044cd8-38b5-4592-8d99-91d2c512041d")
 
-    recordDataset(mode, service, "N18630101S0011.fits").flatMap: (_, did) =>
+    recordDataset(mode, serviceUser, "N18630101S0011.fits").flatMap: (_, did) =>
       addWithIdempotencyKey(did, idm = idm).flatMap: (eid, _) =>
         assertIO(addWithIdempotencyKey(did, idm = idm).map(_._1), eid)
-
-}

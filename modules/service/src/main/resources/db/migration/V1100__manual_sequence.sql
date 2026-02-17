@@ -12,7 +12,7 @@ CREATE INDEX execution_digest_observation_id_index ON t_execution_digest (c_obse
 CREATE TABLE t_atom (
   c_atom_id          d_atom_id        PRIMARY KEY,
   c_instrument       d_tag            NOT NULL,
-  c_atom_index       integer          NOT NULL,
+  c_atom_index       integer          NOT NULL CHECK (c_atom_index > 0),
 
   UNIQUE (c_atom_id, c_instrument),
 
@@ -58,7 +58,7 @@ FROM (
     ROW_NUMBER() OVER (
       PARTITION BY r.c_observation_id
       ORDER BY r.c_created, r.c_atom_id
-    ) - 1 AS c_atom_index,
+    ) AS c_atom_index,
     r.c_sequence_type,
     r.c_visit_id
   FROM t_atom_record r
@@ -139,7 +139,7 @@ CREATE TABLE t_step (
   c_atom_id          d_atom_id     NOT NULL REFERENCES t_atom(c_atom_id) DEFERRABLE INITIALLY DEFERRED,
   c_instrument       d_tag         NOT NULL,
   c_step_type        e_step_type   NOT NULL,
-  c_step_index       integer       NOT NULL,
+  c_step_index       integer       NOT NULL CHECK (c_step_index > 0),
 
   UNIQUE (c_step_id, c_instrument),
   UNIQUE (c_step_id, c_step_type),
@@ -409,11 +409,17 @@ ALTER TABLE t_gmos_south_dynamic
 ALTER TABLE t_gmos_south_dynamic
   ADD CONSTRAINT t_gmos_south_dynamic_c_step_id_c_instrument_fkey FOREIGN KEY (c_step_id, c_instrument) REFERENCES t_step(c_step_id, c_instrument) DEFERRABLE INITIALLY DEFERRED;
 
--- Rework the dataset visit assignment.  Before we knew that the visit existed
--- because datasets referred to steps that referred to atoms that referred to
--- visits and each layer had to exist and be assigned.  Now atoms and steps are
--- written before the visit is applied so the visit could in theory be null at
--- the time a new dataset is added.  We'll reject that.
+-- Rework the dataset visit, obs id, index assignment.  Before we knew that the
+-- visit existed because datasets referred to steps that referred to atoms that
+-- referred to visits and each layer had to exist and be assigned.  Now atoms
+-- and steps are written before the visit is applied so the visit could in
+-- theory be null at the time a new dataset is added.  We'll reject that.
+
+DROP TRIGGER set_datatset_observation_trigger ON t_dataset;
+DROP FUNCTION set_dataset_observation;
+
+DROP TRIGGER set_initial_observation_reference_in_dataset_trigger ON t_dataset;
+DROP FUNCTION set_initial_observation_reference_in_dataset;
 
 DROP TRIGGER set_datatset_visit_trigger ON t_dataset;
 DROP FUNCTION set_dataset_visit;
@@ -421,12 +427,25 @@ DROP FUNCTION set_dataset_visit;
 DROP TRIGGER check_dataset_visit_immutable_trigger ON t_dataset;
 DROP FUNCTION check_dataset_visit_immutable;
 
-CREATE FUNCTION set_dataset_visit()
+CREATE FUNCTION initialize_dataset_before_insert()
 RETURNS TRIGGER AS $$
 DECLARE
-  visit_id d_visit_id;
+  visit_id       d_visit_id;
+  observation_id d_observation_id;
+  step_index     int4;
 BEGIN
-  SELECT a.c_visit_id INTO visit_id FROM t_step s JOIN t_atom a ON a.c_atom_id = s.c_atom_id WHERE s.c_step_id = NEW.c_step_id;
+
+  SELECT
+    a.c_visit_id,
+    a.c_observation_id,
+    s.c_step_index
+  INTO
+    visit_id,
+    observation_id,
+    step_index
+  FROM t_step s
+  JOIN t_atom a ON a.c_atom_id = s.c_atom_id
+  WHERE s.c_step_id = NEW.c_step_id;
 
   IF visit_id IS NULL THEN
     RAISE EXCEPTION
@@ -438,16 +457,19 @@ BEGIN
          );
   END IF;
 
-  NEW.c_visit_id := visit_id;
+  NEW.c_visit_id       := visit_id;
+  NEW.c_observation_id := observation_id;
+  NEW.c_step_index     := step_index;
+
   RETURN NEW;
 
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE TRIGGER set_datatset_visit_trigger
+CREATE TRIGGER initialize_dataset_before_insert_trigger
 BEFORE INSERT ON t_dataset
 FOR EACH ROW
-EXECUTE FUNCTION set_dataset_visit();
+EXECUTE FUNCTION initialize_dataset_before_insert();
 
 -- Add execution state to the generator params
 DROP VIEW v_generator_params;

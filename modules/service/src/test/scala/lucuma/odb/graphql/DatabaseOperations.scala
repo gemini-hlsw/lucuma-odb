@@ -2065,7 +2065,7 @@ trait DatabaseOperations { this: OdbSuite =>
     user:     User,
     sid:      Step.Id,
     filename: String
-  ): IO[Dataset.Id] = {
+  ): IO[Dataset.Id] =
     val q = s"""
       mutation {
         recordDataset(input: {
@@ -2079,10 +2079,8 @@ trait DatabaseOperations { this: OdbSuite =>
       }
     """
 
-    query(user = user, query = q).map { json =>
+    query(user = user, query = q).map: json =>
       json.hcursor.downFields("recordDataset", "dataset", "id").require[Dataset.Id]
-    }
-  }
 
   def addDatasetEventAs(
     user:  User,
