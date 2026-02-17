@@ -22,4 +22,5 @@ enum AtomExecutionState(val tag: String) derives Enumerated:
   case Completed   extends AtomExecutionState("completed")
 
   /** The atom execution was abandoned. */
+  @deprecated
   case Abandoned  extends AtomExecutionState("abandoned")

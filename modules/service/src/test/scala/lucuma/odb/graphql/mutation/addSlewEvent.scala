@@ -16,7 +16,6 @@ import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.SequenceCommand
 import lucuma.core.enums.Site
 import lucuma.core.enums.SlewStage
-import lucuma.core.model.Client
 import lucuma.core.model.ExecutionEvent
 import lucuma.core.model.Observation
 import lucuma.core.model.ObservingNight
@@ -226,9 +225,8 @@ class addSlewEvent extends OdbSuite:
 
   def addWithIdempotencyKey(
     oid: Observation.Id,
-    idm: Option[IdempotencyKey] = None,
-    cid: Option[Client.Id]      = None
-  ): IO[(ExecutionEvent.Id, Option[IdempotencyKey], Option[Client.Id])] =
+    idm: Option[IdempotencyKey] = None
+  ): IO[(ExecutionEvent.Id, Option[IdempotencyKey])] =
     query(
       service,
       s"""
@@ -237,12 +235,10 @@ class addSlewEvent extends OdbSuite:
             observationId: "$oid",
             slewStage: START_SLEW,
             ${idm.fold("")(idm => s"idempotencyKey: \"$idm\"")}
-            ${cid.fold("")(cid => s"clientId: \"$cid\"")}
           }) {
             event {
               id
               idempotencyKey
-              clientId
             }
           }
         }
@@ -251,14 +247,7 @@ class addSlewEvent extends OdbSuite:
         (for
           e <- cur.downField("id").as[ExecutionEvent.Id]
           n <- cur.downField("idempotencyKey").as[Option[IdempotencyKey]]
-          d <- cur.downField("clientId").as[Option[Client.Id]]
-        yield (e, n, d)).leftMap(f => new RuntimeException(f.message)).liftTo[IO]
-
-  test("addSlewEvent - client id"):
-    val cid = Client.Id.parse("c-530c979f-de98-472f-9c23-a3442f2a9f7f")
-
-    createObservation(ObservingModeType.GmosNorthLongSlit, pi).flatMap: oid =>
-      assertIO(addWithIdempotencyKey(oid, cid = cid).map(_._3), cid)
+        yield (e, n)).leftMap(f => new RuntimeException(f.message)).liftTo[IO]
 
   test("addSlewEvent - idempotency key"):
     val idm = IdempotencyKey.FromString.getOption("b9bac66c-4e12-4b1d-b646-47c2c3a97792")
@@ -270,5 +259,5 @@ class addSlewEvent extends OdbSuite:
     val idm = IdempotencyKey.FromString.getOption("b7044cd8-38b5-4592-8d99-91d2c512041d")
 
     createObservation(ObservingModeType.GmosNorthLongSlit, pi).flatMap: oid =>
-      addWithIdempotencyKey(oid, idm = idm).flatMap: (eid, _, _) =>
+      addWithIdempotencyKey(oid, idm = idm).flatMap: (eid, _) =>
         assertIO(addWithIdempotencyKey(oid, idm = idm).map(_._1), eid)

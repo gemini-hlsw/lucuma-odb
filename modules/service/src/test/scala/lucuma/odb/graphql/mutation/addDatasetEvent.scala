@@ -14,7 +14,6 @@ import io.circe.Json
 import io.circe.literal.*
 import lucuma.core.enums.DatasetStage
 import lucuma.core.enums.ObservingModeType
-import lucuma.core.model.Client
 import lucuma.core.model.ExecutionEvent
 import lucuma.core.model.Observation
 import lucuma.core.model.User
@@ -253,9 +252,8 @@ class addDatasetEvent extends OdbSuite {
 
   def addWithIdempotencyKey(
     did: Dataset.Id,
-    idm: Option[IdempotencyKey] = None,
-    cid: Option[Client.Id]      = None
-  ): IO[(ExecutionEvent.Id, Option[IdempotencyKey], Option[Client.Id])] =
+    idm: Option[IdempotencyKey] = None
+  ): IO[(ExecutionEvent.Id, Option[IdempotencyKey])] =
       query(
         service,
         s"""
@@ -264,12 +262,10 @@ class addDatasetEvent extends OdbSuite {
               datasetId: "$did"
               datasetStage: START_WRITE
               ${idm.fold("")(idm => s"idempotencyKey: \"$idm\"")}
-              ${cid.fold("")(cid => s"clientId: \"$cid\"")}
             }) {
               event {
                 id
                 idempotencyKey
-                clientId
               }
             }
           }
@@ -279,14 +275,7 @@ class addDatasetEvent extends OdbSuite {
         (for
           e <- cur.downField("id").as[ExecutionEvent.Id]
           n <- cur.downField("idempotencyKey").as[Option[IdempotencyKey]]
-          d <- cur.downField("clientId").as[Option[Client.Id]]
-        yield (e, n, d)).leftMap(f => new RuntimeException(f.message)).liftTo[IO]
-
-  test("addDatasetEvent - client id"):
-    val cid  = Client.Id.parse("c-530c979f-de98-472f-9c23-a3442f2a9f7f")
-
-    recordDataset(mode, service, "N18630101S0009.fits").flatMap: (_, did) =>
-      assertIO(addWithIdempotencyKey(did, cid = cid).map(_._3), cid)
+        yield (e, n)).leftMap(f => new RuntimeException(f.message)).liftTo[IO]
 
   test("addDatasetEvent - idempotency key"):
     val idm = IdempotencyKey.FromString.getOption("b9bac66c-4e12-4b1d-b646-47c2c3a97792")
@@ -298,7 +287,7 @@ class addDatasetEvent extends OdbSuite {
     val idm = IdempotencyKey.FromString.getOption("b7044cd8-38b5-4592-8d99-91d2c512041d")
 
     recordDataset(mode, service, "N18630101S0011.fits").flatMap: (_, did) =>
-      addWithIdempotencyKey(did, idm = idm).flatMap: (eid, _, _) =>
+      addWithIdempotencyKey(did, idm = idm).flatMap: (eid, _) =>
         assertIO(addWithIdempotencyKey(did, idm = idm).map(_._1), eid)
 
 }

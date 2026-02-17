@@ -13,7 +13,6 @@ import lucuma.core.enums.AtomStage
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.SequenceCommand
 import lucuma.core.enums.StepStage
-import lucuma.core.model.Client
 import lucuma.core.model.ExecutionEvent
 import lucuma.core.model.Observation
 import lucuma.core.model.User
@@ -151,9 +150,8 @@ class addSequenceEvent extends OdbSuite with ExecutionState {
 
   def addWithIdempotencyKey(
     vid: Visit.Id,
-    idm: Option[IdempotencyKey] = None,
-    cid: Option[Client.Id]      = None
-  ): IO[(ExecutionEvent.Id, Option[IdempotencyKey], Option[Client.Id])] =
+    idm: Option[IdempotencyKey] = None
+  ): IO[(ExecutionEvent.Id, Option[IdempotencyKey])] =
     query(
       service,
       s"""
@@ -162,12 +160,10 @@ class addSequenceEvent extends OdbSuite with ExecutionState {
             visitId: "$vid"
             command: START
             ${idm.fold("")(idm => s"idempotencyKey: \"$idm\"")}
-            ${cid.fold("")(cid => s"clientId: \"$cid\"")}
           }) {
             event {
               id
               idempotencyKey
-              clientId
             }
           }
         }
@@ -177,14 +173,7 @@ class addSequenceEvent extends OdbSuite with ExecutionState {
       (for
         e <- cur.downField("id").as[ExecutionEvent.Id]
         n <- cur.downField("idempotencyKey").as[Option[IdempotencyKey]]
-        d <- cur.downField("clientId").as[Option[Client.Id]]
-      yield (e, n, d)).leftMap(f => new RuntimeException(f.message)).liftTo[IO]
-
-  test("addSequenceEvent - client id"):
-    val cid = Client.Id.parse("c-530c979f-de98-472f-9c23-a3442f2a9f7f")
-
-    recordVisit(ObservingModeType.GmosNorthLongSlit, service).flatMap: (_, vid) =>
-      assertIO(addWithIdempotencyKey(vid, cid = cid).map(_._3), cid)
+      yield (e, n)).leftMap(f => new RuntimeException(f.message)).liftTo[IO]
 
   test("addSequenceEvent - idempotency key"):
     val idm = IdempotencyKey.FromString.getOption("b9bac66c-4e12-4b1d-b646-47c2c3a97792")
@@ -196,7 +185,7 @@ class addSequenceEvent extends OdbSuite with ExecutionState {
     val idm = IdempotencyKey.FromString.getOption("b7044cd8-38b5-4592-8d99-91d2c512041d")
 
     recordVisit(ObservingModeType.GmosNorthLongSlit, service).flatMap: (_, vid) =>
-      addWithIdempotencyKey(vid, idm = idm).flatMap: (eid, _, _) =>
+      addWithIdempotencyKey(vid, idm = idm).flatMap: (eid, _) =>
         assertIO(addWithIdempotencyKey(vid, idm = idm).map(_._1), eid)
 
 }
