@@ -248,7 +248,7 @@ object SequenceService:
           atomStream
             .zipWithIndex
             .map { case (atom, idx) =>
-              (atom.id, instrument, idx.toInt, atom.description.map(_.value), observationId, sequenceType)
+              (atom.id, instrument, idx.toInt + 1, atom.description.map(_.value), observationId, sequenceType)
             }
             .through(session.pipe(Statements.insertAtom))
             .drain
@@ -258,7 +258,7 @@ object SequenceService:
             .flatMap: atom =>
               Stream.emits(
                 atom.steps.toList.zipWithIndex.tupleLeft(atom.id).map { case (aid, (step, idx)) =>
-                  (step, aid, instrument, idx)
+                  (step, aid, instrument, idx + 1)
                 }
               )
             .through(session.pipe(Statements.insertStep[D]))

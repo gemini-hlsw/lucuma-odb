@@ -21,36 +21,32 @@ import lucuma.core.util.IdempotencyKey
 import lucuma.odb.data.AtomExecutionState
 import lucuma.odb.data.StepExecutionState
 
-class addSequenceEvent extends OdbSuite with ExecutionState {
-
-  val service: User = TestUsers.service(nextId)
-
-  override lazy val validUsers: List[User] = List(service)
+class addSequenceEvent extends OdbSuite with ExecutionState with query.ExecutionTestSupportForGmos:
 
   private def recordVisit(
     mode: ObservingModeType,
     user: User
   ):IO[(Observation.Id, Visit.Id)] =
-    for {
+    for
       pid <- createProgramAs(user)
-      oid <- createObservationAs(user, pid, mode.some)
+      tid  <- createTargetWithProfileAs(user, pid)
+      oid <- createObservationAs(user, pid, mode.some, tid)
       vid <- recordVisitAs(user, mode.instrument, oid)
-    } yield (oid, vid)
+    yield (oid, vid)
 
   private def addSequenceEventTest(
     mode:     ObservingModeType,
     user:     User,
     query:    Visit.Id => String,
     expected: (Observation.Id, Visit.Id) => Either[String, Json]
-  ): IO[Unit] = {
-    for {
+  ): IO[Unit] =
+    for
       ids <- recordVisit(mode, user)
       (oid, vid) = ids
       _   <- expect(user, query(vid), expected(oid, vid).leftMap(s => List(s)))
-    } yield ()
-}
+    yield ()
 
-  test("addSequenceEvent") {
+  test("addSequenceEvent"):
     def query(vid: Visit.Id): String =
       s"""
         mutation {
@@ -72,7 +68,7 @@ class addSequenceEvent extends OdbSuite with ExecutionState {
 
     addSequenceEventTest(
       ObservingModeType.GmosNorthLongSlit,
-      service,
+      serviceUser,
       vid => query(vid),
       (oid, vid) => json"""
       {
@@ -90,9 +86,7 @@ class addSequenceEvent extends OdbSuite with ExecutionState {
       """.asRight
     )
 
-  }
-
-  test("addSequenceEvent - unknown visit") {
+  test("addSequenceEvent - unknown visit"):
     def query: String =
       s"""
         mutation {
@@ -114,25 +108,26 @@ class addSequenceEvent extends OdbSuite with ExecutionState {
 
     addSequenceEventTest(
       ObservingModeType.GmosNorthLongSlit,
-      service,
+      serviceUser,
       _ => query,
       (_, _) => s"Visit 'v-42' not found".asLeft
     )
 
-  }
-
-  test("addSequenceEvent - abandon atoms and steps") {
-    val user = service
+  test("addSequenceEvent - abandon atoms and steps"):
+    val user = serviceUser
     val mode = ObservingModeType.GmosNorthLongSlit
 
-    for {
+    for
       pid  <- createProgramAs(user)
-      oid  <- createObservationAs(user, pid, mode.some)
+      tid  <- createTargetWithProfileAs(user, pid)
+      oid  <- createObservationAs(user, pid, mode.some, tid)
       vid  <- recordVisitAs(user, mode.instrument, oid)
-      aid0 <- recordAtomAs(user, mode.instrument, vid)
-      sid0 <- recordStepAs(user, mode.instrument, aid0)
-      aid1 <- recordAtomAs(user, mode.instrument, vid)
-      sid1 <- recordStepAs(user, mode.instrument, aid1)
+      aids <- selectGmosNorthScienceAtomIds(oid)
+      sids <- selectGmosNorthScienceStepIds(oid)
+      aid0  = aids(0)
+      sid0  = sids(aid0)(0)
+      aid1  = aids(1)
+      sid1  = sids(aid1)(0)
       _    <- addAtomEventAs(user, aid0, vid, AtomStage.StartAtom)
       _    <- addStepEventAs(user, sid0, vid, StepStage.StartStep)
       _    <- addStepEventAs(user, sid0, vid, StepStage.EndStep)
@@ -142,18 +137,16 @@ class addSequenceEvent extends OdbSuite with ExecutionState {
       _    <- addSequenceEventAs(user, vid, SequenceCommand.Abort)
       resA <- atomExecutionState(user, oid)
       resS <- stepExecutionState(user, oid)
-    } yield {
+    yield
       assertEquals(resA, List(AtomExecutionState.Completed, AtomExecutionState.Completed))
       assertEquals(resS, List(StepExecutionState.Completed, StepExecutionState.Abandoned))
-    }
-  }
 
   def addWithIdempotencyKey(
     vid: Visit.Id,
     idm: Option[IdempotencyKey] = None
   ): IO[(ExecutionEvent.Id, Option[IdempotencyKey])] =
     query(
-      service,
+      serviceUser,
       s"""
         mutation {
           addSequenceEvent(input: {
@@ -178,14 +171,12 @@ class addSequenceEvent extends OdbSuite with ExecutionState {
   test("addSequenceEvent - idempotency key"):
     val idm = IdempotencyKey.FromString.getOption("b9bac66c-4e12-4b1d-b646-47c2c3a97792")
 
-    recordVisit(ObservingModeType.GmosNorthLongSlit, service).flatMap: (_, vid) =>
+    recordVisit(ObservingModeType.GmosNorthLongSlit, serviceUser).flatMap: (_, vid) =>
       assertIO(addWithIdempotencyKey(vid, idm = idm).map(_._2), idm)
 
   test("addSequenceEvent - duplicate idempotency key"):
     val idm = IdempotencyKey.FromString.getOption("b7044cd8-38b5-4592-8d99-91d2c512041d")
 
-    recordVisit(ObservingModeType.GmosNorthLongSlit, service).flatMap: (_, vid) =>
+    recordVisit(ObservingModeType.GmosNorthLongSlit, serviceUser).flatMap: (_, vid) =>
       addWithIdempotencyKey(vid, idm = idm).flatMap: (eid, _) =>
         assertIO(addWithIdempotencyKey(vid, idm = idm).map(_._1), eid)
-
-}

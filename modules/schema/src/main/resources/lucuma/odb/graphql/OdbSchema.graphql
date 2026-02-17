@@ -258,7 +258,7 @@ type AtomRecord {
   id: AtomId!
 
   "Atom index."
-  index: NonNegInt!
+  index: PosInt!
 
   "Description, if any."
   description: NonEmptyString

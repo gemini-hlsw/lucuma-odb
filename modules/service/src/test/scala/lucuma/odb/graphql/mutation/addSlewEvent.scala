@@ -24,12 +24,7 @@ import lucuma.core.model.Visit
 import lucuma.core.util.IdempotencyKey
 import lucuma.core.util.Timestamp
 
-class addSlewEvent extends OdbSuite:
-
-  val pi: User      = TestUsers.Standard.pi(nextId, nextId)
-  val service: User = TestUsers.service(nextId)
-
-  override lazy val validUsers: List[User] = List(pi, service)
+class addSlewEvent extends OdbSuite with query.ExecutionTestSupportForGmos:
 
   private def createObservation(
     mode: ObservingModeType,
@@ -37,7 +32,8 @@ class addSlewEvent extends OdbSuite:
   ):IO[Observation.Id] =
     for
       pid <- createProgramAs(user)
-      oid <- createObservationAs(user, pid, mode.some)
+      tid <- createTargetWithProfileAs(user, pid)
+      oid <- createObservationAs(user, pid, mode.some, tid)
     yield oid
 
   private def addSlewEventTest(
@@ -74,7 +70,7 @@ class addSlewEvent extends OdbSuite:
 
     addSlewEventTest(
       ObservingModeType.GmosNorthLongSlit,
-      service,
+      serviceUser,
       oid => query(oid),
       oid => json"""
       {
@@ -110,7 +106,7 @@ class addSlewEvent extends OdbSuite:
 
     addSlewEventTest(
       ObservingModeType.GmosNorthLongSlit,
-      service,
+      serviceUser,
       _ => query,
       _ => s"Observation 'o-42' not found or is not associated with any instrument.".asLeft
     )
@@ -120,7 +116,7 @@ class addSlewEvent extends OdbSuite:
       pid <- createProgramAs(pi)
       oid <- createObservationAs(pi, pid)
       _   <- interceptGraphQL(s"Observation '$oid' not found or is not associated with any instrument."):
-               addSlewEventAs(service, oid, SlewStage.StartSlew)
+               addSlewEventAs(serviceUser, oid, SlewStage.StartSlew)
     yield ()
 
   def visits(o: Observation.Id): IO[List[(Visit.Id, ObservingNight)]] =
@@ -168,10 +164,10 @@ class addSlewEvent extends OdbSuite:
     assertIOBoolean:
       for
         o  <- createObservation(ObservingModeType.GmosNorthLongSlit, pi)
-        _  <- addSlewEventAs(service, o, SlewStage.StartSlew)
-        v  <- recordVisitAs(service, Instrument.GmosNorth, o)
-        _  <- addSlewEventAs(service, o, SlewStage.EndSlew)
-        _  <- addSequenceEventAs(service, v, SequenceCommand.Start)
+        _  <- addSlewEventAs(serviceUser, o, SlewStage.StartSlew)
+        v  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
+        _  <- addSlewEventAs(serviceUser, o, SlewStage.EndSlew)
+        _  <- addSequenceEventAs(serviceUser, v, SequenceCommand.Start)
         vs <- visits(o)
       yield checkVisits(vs)
 
@@ -179,16 +175,16 @@ class addSlewEvent extends OdbSuite:
     assertIOBoolean:
       for
         o  <- createObservation(ObservingModeType.GmosNorthLongSlit, pi)
-        v  <- recordVisitAs(service, Instrument.GmosNorth, o)
-        _  <- addSlewEventAs(service, o, SlewStage.StartSlew)
-        _  <- addSlewEventAs(service, o, SlewStage.EndSlew)
-        _  <- addSequenceEventAs(service, v, SequenceCommand.Start)
+        v  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
+        _  <- addSlewEventAs(serviceUser, o, SlewStage.StartSlew)
+        _  <- addSlewEventAs(serviceUser, o, SlewStage.EndSlew)
+        _  <- addSequenceEventAs(serviceUser, v, SequenceCommand.Start)
         vs <- visits(o)
       yield checkVisits(vs)
 
   test("no static"):
     createObservation(ObservingModeType.GmosNorthLongSlit, pi).flatMap: o =>
-      addSlewEventAs(service, o, SlewStage.StartSlew) *>
+      addSlewEventAs(serviceUser, o, SlewStage.StartSlew) *>
       expect(
         user     = pi,
         query    = s"""
@@ -228,7 +224,7 @@ class addSlewEvent extends OdbSuite:
     idm: Option[IdempotencyKey] = None
   ): IO[(ExecutionEvent.Id, Option[IdempotencyKey])] =
     query(
-      service,
+      serviceUser,
       s"""
         mutation {
           addSlewEvent(input: {

@@ -115,35 +115,15 @@ object ExecutionEventService:
             .recoverWith:
               case SqlState.ForeignKeyViolation(_)                                        =>
                 invalidAtom.asFailureF
-/*
-        val atomsQuery: Query[Observation.Id, (Atom.Id, Option[Visit.Id], lucuma.odb.data.AtomExecutionState, Option[Timestamp], Option[Timestamp])] =
-          sql"""
-            SELECT
-              c_atom_id,
-              c_visit_id,
-              c_execution_state,
-              c_first_event_time,
-              c_last_event_time
-            FROM t_atom
-            WHERE c_observation_id = $observation_id AND c_sequence_type = 'science'
-            ORDER BY c_observation_id, c_atom_index
-          """.query(atom_id *: visit_id.opt *: atom_execution_state *: core_timestamp.opt *: core_timestamp.opt)
 
-        def dumpAtoms(oid: Observation.Id): F[List[(Atom.Id, Option[Visit.Id], lucuma.odb.data.AtomExecutionState, Option[Timestamp], Option[Timestamp])]] =
-          session.execute(atomsQuery)(oid)
-*/
         ResultT(insert)
           .flatMap: (eid, _, wasInserted) =>
             if wasInserted then
               ResultT.liftF:
                 for
                   _ <- services.sequenceService.setAtomVisit(input.atomId, input.visitId)
-//                  x <- dumpAtoms(oid)
                   _ <- timeAccountingService.update(input.visitId)
-                yield {
-//                  println(x.mkString("---\n", "\n", "\n"))
-                  eid
-                }
+                yield eid
             else
               ResultT.pure(eid)
           .value
