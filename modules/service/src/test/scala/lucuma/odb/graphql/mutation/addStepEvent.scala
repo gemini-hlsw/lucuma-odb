@@ -165,7 +165,7 @@ class addStepEvent extends OdbSuite with ExecutionState with query.ExecutionTest
       resA <- atomExecutionState(serviceUser, su.oid)
       resS <- stepExecutionState(serviceUser, su.oid)
     yield
-      assertEquals(resA, List(AtomExecutionState.Abandoned, AtomExecutionState.Ongoing))
+      assertEquals(resA, List(AtomExecutionState.Completed, AtomExecutionState.Ongoing))
       assertEquals(resS, List(StepExecutionState.Abandoned, StepExecutionState.Ongoing))
 
   def addWithIdempotencyKey(

@@ -133,14 +133,12 @@ object ExecutionEventService:
           session.execute(atomsQuery)(oid)
 */
         ResultT(insert)
-          .flatMap: (eid, oid, wasInserted) =>
+          .flatMap: (eid, _, wasInserted) =>
             if wasInserted then
               ResultT.liftF:
                 for
                   _ <- services.sequenceService.setAtomVisit(input.atomId, input.visitId)
-                  _ <- services.sequenceService.setAtomExecutionState(input.atomId, input.atomStage)
 //                  x <- dumpAtoms(oid)
-                  _ <- services.sequenceService.abandonOngoingStepsExcept(oid, input.atomId, none)
                   _ <- timeAccountingService.update(input.visitId)
                 yield {
 //                  println(x.mkString("---\n", "\n", "\n"))
@@ -183,7 +181,7 @@ object ExecutionEventService:
             case _                        => ().pure
 
         ResultT(insert)
-          .flatMap: (eid, time, oid, vid, aid, sid, wasInserted) =>
+          .flatMap: (eid, time, oid, vid, _, sid, wasInserted) =>
             if wasInserted then
               // A note about the visit id.  Datasets have a visit id which is
               // NOT NULL.  They are assigned via a BEFORE trigger on t_dataset.
@@ -192,8 +190,8 @@ object ExecutionEventService:
               // time we're getting events for a dataset, we know the associated
               // atom has a visit.
               ResultT.liftF:
-                services.sequenceService.abandonOngoingStepsExcept(oid, aid, sid.some) *>
-                setDatasetTime(time)                                                   *>
+                services.sequenceService.abandonStepsInOngoingAtomsExceptStep(oid, sid) *>
+                setDatasetTime(time)                                                    *>
                 timeAccountingService.update(vid).as(eid)
             else
               ResultT.pure(eid)
@@ -219,7 +217,7 @@ object ExecutionEventService:
             if wasInserted then
               ResultT.liftF:
                 for
-                  _ <- services.sequenceService.abandonOngoingAtoms(oid).whenA(input.command.isTerminal)
+                  _ <- services.sequenceService.abandonStepsInOngoingAtoms(oid).whenA(input.command.isTerminal)
                   _ <- timeAccountingService.update(input.visitId)
                 yield eid
             else
@@ -249,7 +247,7 @@ object ExecutionEventService:
         def invalidStep: OdbError.InvalidStep =
           OdbError.InvalidStep(input.stepId, Some(s"Step '${input.stepId}' not found"))
 
-        val insert: F[Result[(Id, Timestamp, Observation.Id, Atom.Id, Boolean)]] =
+        val insert: F[Result[(Id, Observation.Id, Atom.Id, Boolean)]] =
           session
             .option(Statements.InsertStepEvent)(input)
             .map(_.toResult(invalidStep.asProblem))
@@ -258,13 +256,12 @@ object ExecutionEventService:
                 invalidStep.asFailureF
 
         ResultT(insert)
-          .flatMap: (eid, time, oid, aid, wasInserted) =>
+          .flatMap: (eid, oid, aid, wasInserted) =>
             if wasInserted then
               for
                 _ <- ResultT.liftF(services.sequenceService.setAtomVisit(aid, input.visitId))
-                _ <- ResultT.liftF(services.sequenceService.setAtomExecutionState(aid, AtomStage.StartAtom))
-                _ <- ResultT.liftF(services.sequenceService.setStepExecutionState(input.stepId, input.stepStage, time))
-                _ <- ResultT.liftF(services.sequenceService.abandonOngoingStepsExcept(oid, aid, input.stepId.some))
+                _ <- ResultT.liftF(services.sequenceService.setStepExecutionState(input.stepId, input.stepStage))
+                _ <- ResultT.liftF(services.sequenceService.abandonStepsInOngoingAtomsExceptStep(oid, input.stepId))
                 _ <- ResultT.liftF(timeAccountingService.update(input.visitId))
               yield eid
             else
@@ -459,7 +456,7 @@ object ExecutionEventService:
       """.query(execution_event_id *: bool)
          .contramap((v, in) => (v, in.slewStage, in.idempotencyKey, v))
 
-    val InsertStepEvent: Query[AddStepEventInput, (Id,  Timestamp, Observation.Id, Atom.Id, Boolean)] =
+    val InsertStepEvent: Query[AddStepEventInput, (Id,  Observation.Id, Atom.Id, Boolean)] =
       sql"""
         INSERT INTO t_execution_event (
           c_event_type,
@@ -492,11 +489,10 @@ object ExecutionEventService:
           SET c_idempotency_key = EXCLUDED.c_idempotency_key
         RETURNING
           c_execution_event_id,
-          c_received,
           c_observation_id,
           c_atom_id,
           xmax = 0 AS inserted
-      """.query(execution_event_id *: core_timestamp *: observation_id *: atom_id *: bool)
+      """.query(execution_event_id *: observation_id *: atom_id *: bool)
          .contramap(in => (in.visitId, in.stepId, in.stepStage, in.idempotencyKey, in.stepId))
 
     val SelectSequenceEvents: Query[Observation.Id, ExecutionEvent.SequenceEvent] =

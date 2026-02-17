@@ -22,8 +22,7 @@ object AddSlewEventInput:
       case List(
         ObservationIdBinding("observationId", rObsId),
         SlewStageBinding("slewStage", rStage),
-        ClientIdBinding.Option("clientId", rCid),
         IdempotencyKeyBinding.Option("idempotencyKey", rIdm)
       ) =>
-        (rObsId, rStage, rCid, rIdm).parMapN: (oid, stg, cid, idm) =>
-          AddSlewEventInput(oid, stg, idm orElse cid.map(c => IdempotencyKey(c.toUuid)))
+        (rObsId, rStage, rIdm).parMapN: (oid, stg, idm) =>
+          AddSlewEventInput(oid, stg, idm)

@@ -79,8 +79,6 @@ input AddSequenceEventInput {
   visitId: VisitId!
   command: SequenceCommand!
 
-  clientId: ClientId @deprecated(reason: "Use idempotencyKey instead")
-
   """
   Idempotency key, if any.  The IdempotencyKey may be provided by clients when
   the event is created and is used to enable problem-free retry in the case of
@@ -99,8 +97,6 @@ type AddSequenceEventResult {
 input AddSlewEventInput {
   observationId: ObservationId!
   slewStage: SlewStage!
-
-  clientId: ClientId @deprecated(reason: "Use idempotencyKey instead")
 
   """
   Idempotency key, if any.  The IdempotencyKey may be provided by clients when
@@ -221,8 +217,6 @@ type AtomEvent implements ExecutionEvent {
 
   "Atom execution stage."
   atomStage: AtomStage!
-
-  clientId: ClientId @deprecated(reason: "Use idempotencyKey instead")
 
   """
   Idempotency key, if any.  The IdempotencyKey may be provided by clients when
@@ -3019,7 +3013,7 @@ type Mutation {
     identifies the stage through which the atom execution is passing.
     """
     input: AddAtomEventInput!
-  ): AddAtomEventResult!
+  ): AddAtomEventResult! @deprecated(reason: "Atom execution state is determined by the collection of steps it contains.")
 
   """
   Adds a new dataset event associated with the given visit.  The
@@ -7110,8 +7104,6 @@ type DatasetEvent implements ExecutionEvent {
   "The associated dataset."
   dataset: Dataset!
 
-  clientId: ClientId @deprecated(reason: "Use idempotencyKey instead")
-
   """
   Idempotency key, if any.  The IdempotencyKey may be provided by clients when
   the event is created and is used to enable problem-free retry in the case of
@@ -7444,8 +7436,6 @@ interface ExecutionEvent {
 
   "Event type."
   eventType: ExecutionEventType!
-
-  clientId: ClientId @deprecated(reason: "Use idempotencyKey instead")
 
   """
   Idempotency key, if any.  The IdempotencyKey may be provided by clients when
@@ -12677,8 +12667,6 @@ type SequenceEvent implements ExecutionEvent {
   "Sequence event data."
   command: SequenceCommand!
 
-  clientId: ClientId @deprecated(reason: "Use idempotencyKey instead")
-
   """
   Idempotency key, if any.  The IdempotencyKey may be provided by clients when
   the event is created and is used to enable problem-free retry in the case of
@@ -12825,8 +12813,6 @@ type SlewEvent implements ExecutionEvent {
 
   "Slew event data."
   slewStage: SlewStage!
-
-  clientId: ClientId @deprecated(reason: "Use idempotencyKey instead")
 
   """
   Idempotency key, if any.  The IdempotencyKey may be provided by clients when
@@ -13768,8 +13754,6 @@ type StepEvent implements ExecutionEvent {
 
   "Step execution stage."
   stepStage: StepStage!
-
-  clientId: ClientId @deprecated(reason: "Use idempotencyKey instead")
 
   """
   Idempotency key, if any.  The IdempotencyKey may be provided by clients when

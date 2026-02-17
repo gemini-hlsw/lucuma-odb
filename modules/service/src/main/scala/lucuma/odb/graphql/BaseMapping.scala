@@ -58,7 +58,6 @@ trait BaseMapping[F[_]]
   lazy val ChargeClassType                         = schema.ref("ChargeClass")
   lazy val ChronicleIdType                         = schema.ref("ChronicleId")
   lazy val ClassicalType                           = schema.ref("Classical")
-  lazy val ClientIdType                            = schema.ref("ClientId")
   lazy val CloneGroupResultType                    = schema.ref("CloneGroupResult")
   lazy val CloneObservationResultType              = schema.ref("CloneObservationResult")
   lazy val CloneTargetResultType                   = schema.ref("CloneTargetResult")

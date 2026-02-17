@@ -20,7 +20,6 @@ import lucuma.core.math.Epoch
 import lucuma.core.math.SignalToNoise
 import lucuma.core.model.Attachment
 import lucuma.core.model.CallForProposals
-import lucuma.core.model.Client
 import lucuma.core.model.CloudExtinction
 import lucuma.core.model.ConfigurationRequest
 import lucuma.core.model.ExecutionEvent
@@ -86,7 +85,6 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[CatalogName](CatalogNameType),
       LeafMapping[ChargeClass](ChargeClassType),
       LeafMapping[Long](ChronicleIdType),
-      LeafMapping[Client.Id](ClientIdType),
       LeafMapping[CloudExtinction.Preset](CloudExtinctionPresetType),
       LeafMapping[ConfigurationRequest.Id](ConfigurationRequestIdType),
       LeafMapping[ConfigurationRequestStatus](ConfigurationRequestStatusType),

@@ -25,22 +25,10 @@ CREATE TABLE t_atom (
 
   c_description      text,
 
-  c_execution_state  d_tag            NOT NULL REFERENCES t_atom_execution_state(c_tag) DEFAULT ('not_started'::character varying)::d_tag,
   c_first_event_time timestamp without time zone,
   c_last_event_time  timestamp without time zone
 
 );
-
--- Create a view on the atom table.  This will correspond to the old atom record
--- table in that it only contains executed atoms.
-CREATE VIEW v_atom_record AS
-SELECT a.*
-  FROM t_atom a
- WHERE c_visit_id         IS NOT NULL
-   AND c_first_event_time IS NOT NULL
-   AND c_last_event_time  IS NOT NULL
-   AND c_execution_state != 'not_started'
-ORDER BY a.c_atom_id;
 
 -- Copy the old t_atom_record data over to t_atom.
 INSERT INTO t_atom (
@@ -50,7 +38,6 @@ INSERT INTO t_atom (
   c_observation_id,
   c_sequence_type,
   c_visit_id,
-  c_execution_state,
   c_first_event_time,
   c_last_event_time
 )
@@ -61,7 +48,6 @@ SELECT
   r2.c_observation_id,
   r2.c_sequence_type,
   r2.c_visit_id,
-  r2.c_execution_state,
   MIN(e.c_received) AS c_first_event_time,
   MAX(e.c_received) AS c_last_event_time
 FROM (
@@ -74,8 +60,7 @@ FROM (
       ORDER BY r.c_created, r.c_atom_id
     ) - 1 AS c_atom_index,
     r.c_sequence_type,
-    r.c_visit_id,
-    r.c_execution_state
+    r.c_visit_id
   FROM t_atom_record r
 ) r2 -- for atom index calculation
 LEFT JOIN t_execution_event e ON e.c_atom_id = r2.c_atom_id
@@ -85,13 +70,10 @@ GROUP BY -- for MIN/MAX aggregation
   r2.c_atom_index,
   r2.c_observation_id,
   r2.c_sequence_type,
-  r2.c_visit_id,
-  r2.c_execution_state;
+  r2.c_visit_id;
 
 ALTER TABLE ONLY t_atom
   ADD CONSTRAINT t_atom_c_observation_id_c_instrument_fkey FOREIGN KEY (c_observation_id, c_instrument) REFERENCES t_observation(c_observation_id, c_instrument) ON DELETE CASCADE;
-
-CREATE INDEX atom_observation_id_exeuction_state_index ON t_atom (c_observation_id, c_execution_state);
 
 -- The visit id is assigned in t_atom when events arrive from Observe.  We check
 -- here to make sure the visit is compatible (same observation) and that the
@@ -211,7 +193,29 @@ FROM t_step_record r;
 ALTER TABLE ONLY t_step
   ADD CONSTRAINT t_atom_c_atom_id_c_instrument_fkey FOREIGN KEY (c_atom_id, c_instrument) REFERENCES t_atom(c_atom_id, c_instrument) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED;
 
--- Update the step view
+-- Create a view on the atom table.  This will correspond to the old atom record
+-- table in that it only contains executed atoms.
+CREATE VIEW v_atom_record AS
+SELECT
+  a.*,
+  COALESCE(s.c_execution_state, 'completed')::d_tag AS c_execution_state
+FROM t_atom a
+LEFT JOIN (
+  SELECT
+    c_atom_id,
+    CASE
+      WHEN bool_and(c_execution_state IN ('completed', 'abandoned')) THEN 'completed'
+      WHEN bool_and(c_execution_state = 'not_started')               THEN 'not_started'
+      ELSE 'ongoing'
+    END::d_tag AS c_execution_state
+  FROM t_step
+  GROUP BY c_atom_id
+) s ON s.c_atom_id = a.c_atom_id
+WHERE a.c_visit_id         IS NOT NULL
+  AND a.c_first_event_time IS NOT NULL
+  AND a.c_last_event_time  IS NOT NULL;
+
+-- Update the step record view
 DROP VIEW v_step_record;
 
 -- Create a view on the step table.  This will correspond to the old step record
@@ -477,7 +481,7 @@ SELECT
     ) THEN 'not_started'::e_execution_state
 
     WHEN EXISTS (
-      SELECT 1 FROM t_atom a
+      SELECT 1 FROM v_atom_record a
         WHERE a.c_observation_id = o.c_observation_id
           AND a.c_execution_state IN ('not_started', 'ongoing')
     ) THEN 'ongoing'::e_execution_state

@@ -38,7 +38,6 @@ import lucuma.core.enums.TimeAccountingCategory
 import lucuma.core.math.Angle
 import lucuma.core.math.Coordinates
 import lucuma.core.model.CallForProposals
-import lucuma.core.model.Client
 import lucuma.core.model.ConfigurationRequest
 import lucuma.core.model.Ephemeris
 import lucuma.core.model.ExecutionEvent
@@ -2031,8 +2030,7 @@ trait DatabaseOperations { this: OdbSuite =>
     aid:            Atom.Id,
     vid:            Visit.Id,
     stage:          AtomStage,
-    idempotencyKey: Option[IdempotencyKey] = None,
-    clientId:       Option[Client.Id]      = None
+    idempotencyKey: Option[IdempotencyKey] = None
   ): IO[AtomEvent] =
     val q = s"""
       mutation {
@@ -2041,7 +2039,6 @@ trait DatabaseOperations { this: OdbSuite =>
           visitId:   "$vid",
           atomStage: ${stage.tag.toScreamingSnakeCase}
           ${idempotencyKey.fold("")(idm => s"idempotencyKey: \"$idm\"")}
-          ${clientId.fold("")(cid => s"clientId: \"$cid\"")}
         }) {
           event {
             id
@@ -2049,7 +2046,6 @@ trait DatabaseOperations { this: OdbSuite =>
             observation { id }
             visit { id }
             idempotencyKey
-            clientId
           }
         }
       }
@@ -2062,10 +2058,7 @@ trait DatabaseOperations { this: OdbSuite =>
         o <- c.downFields("observation", "id").as[Observation.Id]
         v <- c.downFields("visit", "id").as[Visit.Id]
         n <- c.downField("idempotencyKey").as[Option[IdempotencyKey]]
-        x <- c.downField("clientId").as[Option[Client.Id]]
-      yield
-        assertEquals(n, x.map(c => IdempotencyKey(c.toUuid)))
-        AtomEvent(i, r, o, v, n, aid, stage)
+      yield AtomEvent(i, r, o, v, n, aid, stage)
       e.fold(f => throw new RuntimeException(f.message), identity)
 
   def recordDatasetAs(
