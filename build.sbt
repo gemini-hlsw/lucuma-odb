@@ -12,9 +12,9 @@ val catsVersion                = "2.13.0"
 val circeVersion               = "0.14.15"
 val circeRefinedVersion        = "0.15.1"
 val cirisVersion               = "3.12.0"
-val clueVersion                = "0.51.2"
+val clueVersion                = "0.51.3"
 val declineVersion             = "2.5.0"
-val dropwizardVersion          = "4.2.37"
+val dropwizardVersion          = "4.2.38"
 val flywayVersion              = "9.22.3"
 val fs2AwsVersion              = "6.2.0"
 val fs2Version                 = "3.12.2"
@@ -27,9 +27,9 @@ val jmhVersion                 = "1.37"
 val jwtVersion                 = "11.0.3"
 val keySemaphoreVersion        = "0.3.0-M1"
 val kittensVersion             = "3.5.0"
-val logbackVersion             = "1.5.24"
+val logbackVersion             = "1.5.26"
 val log4catsVersion            = "2.7.1"
-val lucumaCoreVersion          = "0.165.0"
+val lucumaCoreVersion          = "0.174.0"
 val lucumaGraphQLRoutesVersion = "0.11.7"
 val monocleVersion             = "3.3.0"
 val munitVersion               = "1.2.1"
@@ -40,17 +40,17 @@ val scalacheckEffectMunitVersion = "1.0.4"
 val natchezHttp4sVersion       = "0.6.1"
 val natchezVersion             = "0.3.7"
 val paigesVersion              = "0.4.4"
-val postgresVersion            = "42.7.8"
+val postgresVersion            = "42.7.9"
 val pprintVersion              = "0.9.6"
 val redis4CatsVersion          = "2.0.1"
 val refinedVersion             = "0.11.3"
 val skunkVersion               = "0.6.4"
 val spireVersion               = "0.18.0"
 val slf4jVersion               = "2.0.17"
-val testcontainersScalaVersion = "0.43.0" // check test output if you attempt to update this
+val testcontainersScalaVersion = "0.44.1" // check test output if you attempt to update this
 val weaverVersion              = "0.8.4"
 
-ThisBuild / tlBaseVersion      := "0.54"
+ThisBuild / tlBaseVersion      := "0.55"
 ThisBuild / scalaVersion       := "3.7.4"
 ThisBuild / crossScalaVersions := Seq("3.7.4")
 ThisBuild / scalacOptions     ++= Seq("-Xmax-inlines", "50") // Hash derivation fails with default of 32
@@ -619,7 +619,7 @@ lazy val itcLegacyTests = project
 lazy val schema =
   crossProject(JVMPlatform, JSPlatform)
     .crossType(CrossType.Pure)
-    .dependsOn(ssoFrontendClient)
+    .dependsOn(itcModel, ssoFrontendClient)
     .in(file("modules/schema"))
     .settings(
       name := "lucuma-odb-schema",

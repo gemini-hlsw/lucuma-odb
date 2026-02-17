@@ -12,7 +12,7 @@ import io.circe.syntax.*
 import lucuma.core.model.User
 
 class updateObservationsTimes extends OdbSuite
-                            with UpdateConstraintSetOps {
+                            with UpdateObservationsOps {
 
   val pi: User    = TestUsers.Standard.pi(nextId, nextId)
   val pi2: User   = TestUsers.Standard.pi(nextId, nextId)

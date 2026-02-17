@@ -10,12 +10,20 @@ import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.ags.GuideStarName
+import lucuma.core.data.PerSite
+import lucuma.core.math.Coordinates
+import lucuma.core.math.Declination
+import lucuma.core.math.Offset
+import lucuma.core.math.RightAscension
+import lucuma.core.model.Ephemeris
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
+
+import java.time.Instant
 
 trait GuideEnvironmentSuite extends ExecutionTestSupport:
 
@@ -572,4 +580,244 @@ trait GuideEnvironmentSuite extends ExecutionTestSupport:
     }
     """.asRight
 
+  val gmosImagingOIWFSResult  =
+    json"""
+    {
+      "observation": {
+        "title": "V1647 Orionis",
+        "targetEnvironment": {
+          "guideEnvironment": {
+            "posAngle": {
+              "degrees": 200.000000
+            },
+            "guideTargets": [
+              {
+                "name": "Gaia DR3 3219118090462918016",
+                "probe": "GMOS_OIWFS",
+                "sourceProfile": {
+                  "point": {
+                    "bandNormalized": {
+                      "brightnesses": [
+                        {
+                          "band": "GAIA"
+                        },
+                        {
+                          "band": "GAIA_RP"
+                        }
+                      ]
+                    }
+                  }
+                },
+                "sidereal": {
+                  "catalogInfo": {
+                    "name": "GAIA",
+                    "id": "3219118090462918016",
+                    "objectType": null
+                  },
+                  "epoch": "J2016.000",
+                  "ra": {
+                    "microseconds": 20782433789,
+                    "hms": "05:46:22.433789",
+                    "hours": 5.772898274722222222222222222222222,
+                    "degrees": 86.59347412083333333333333333333333
+                  },
+                  "dec": {
+                    "dms": "-00:08:52.645460",
+                    "degrees": 359.8520429277778,
+                    "microarcseconds": 1295467354540
+                  },
+                  "radialVelocity": {
+                    "metersPerSecond": 10090.042000,
+                    "centimetersPerSecond": 1009004,
+                    "kilometersPerSecond": 10.090042
+                  },
+                  "properMotion": {
+                    "ra": {
+                      "microarcsecondsPerYear": 438,
+                      "milliarcsecondsPerYear": 0.438
+                    },
+                    "dec": {
+                      "microarcsecondsPerYear": -741,
+                      "milliarcsecondsPerYear": -0.741
+                    }
+                  },
+                  "parallax": {
+                    "microarcseconds": 2432,
+                    "milliarcseconds": 2.432
+                  }
+                },
+                "nonsidereal": null
+              }
+            ]
+          }
+        }
+      }
+    }
+    """.asRight
+
   def createObservationAs(user: User, pid: Program.Id, tids: List[Target.Id]): IO[Observation.Id]
+
+  // Create ephemeris at the same coordinates as the sidereal target
+  def createNonsiderealEphemeris: PerSite[List[Ephemeris.UserSupplied.Element]] =
+    val ra = RightAscension.fromDoubleDegrees(86.55474)
+    val dec = Declination.fromDoubleDegrees(-0.10137).getOrElse(Declination.Zero)
+    val coords = Coordinates(ra, dec)
+    val velocity = Offset.Zero
+
+    // entries ina a range of times that covers the observation time
+    val baseTime = Instant.parse("2023-08-29T00:00:00Z")
+    val elements =
+      (0 to 10).map { i =>
+        Ephemeris.UserSupplied.Element(baseTime.plusSeconds(i * 86400L), coords, velocity)
+      }.toList
+    PerSite(elements, elements)
+
+  val pwfs2Result: Either[List[String], Json] =
+    json"""
+    {
+      "observation": {
+        "title": "Nonsidereal Target",
+        "targetEnvironment": {
+          "guideEnvironment": {
+            "posAngle": {
+              "degrees": 350.000000
+            },
+            "guideTargets": [
+              {
+                "name": "Gaia DR3 3219118640218737920",
+                "probe": "PWFS2",
+                "sourceProfile": {
+                  "point": {
+                    "bandNormalized": {
+                      "brightnesses": [
+                        {
+                          "band": "GAIA"
+                        },
+                        {
+                          "band": "GAIA_RP"
+                        }
+                      ]
+                    }
+                  }
+                },
+                "sidereal": {
+                  "catalogInfo": {
+                    "name": "GAIA",
+                    "id": "3219118640218737920",
+                    "objectType": null
+                  },
+                  "epoch": "J2016.000",
+                  "ra": {
+                    "microseconds": 20760247957,
+                    "hms": "05:46:00.247957",
+                    "hours": 5.766735543611111111111111111111111,
+                    "degrees": 86.50103315416666666666666666666667
+                  },
+                  "dec": {
+                    "dms": "-00:08:26.290793",
+                    "degrees": 359.85936366861114,
+                    "microarcseconds": 1295493709207
+                  },
+                  "radialVelocity": {
+                    "metersPerSecond": 0,
+                    "centimetersPerSecond": 0,
+                    "kilometersPerSecond": 0
+                  },
+                  "properMotion": {
+                    "ra": {
+                      "microarcsecondsPerYear": 806,
+                      "milliarcsecondsPerYear": 0.806
+                    },
+                    "dec": {
+                      "microarcsecondsPerYear": -1093,
+                      "milliarcsecondsPerYear": -1.093
+                    }
+                  },
+                  "parallax": {
+                    "microarcseconds": 2371,
+                    "milliarcseconds": 2.371
+                  }
+                },
+                "nonsidereal": null
+              }
+            ]
+          }
+        }
+      }
+    }
+    """.asRight
+
+  val pwfs2ImagingResult =
+    json"""
+    {
+      "observation": {
+        "title": "Nonsidereal Target",
+        "targetEnvironment": {
+          "guideEnvironment": {
+            "posAngle": {
+              "degrees": 210.000000
+            },
+            "guideTargets": [
+              {
+                "name": "Gaia DR3 3219118640218737920",
+                "probe": "PWFS2",
+                "sourceProfile": {
+                  "point": {
+                    "bandNormalized": {
+                      "brightnesses": [
+                        {
+                          "band": "GAIA"
+                        },
+                        {
+                          "band": "GAIA_RP"
+                        }
+                      ]
+                    }
+                  }
+                },
+                "sidereal": {
+                  "catalogInfo": {
+                    "name": "GAIA",
+                    "id": "3219118640218737920",
+                    "objectType": null
+                  },
+                  "epoch": "J2016.000",
+                  "ra": {
+                    "microseconds": 20760247957,
+                    "hms": "05:46:00.247957",
+                    "hours": 5.766735543611111111111111111111111,
+                    "degrees": 86.50103315416666666666666666666667
+                  },
+                  "dec": {
+                    "dms": "-00:08:26.290793",
+                    "degrees": 359.85936366861114,
+                    "microarcseconds": 1295493709207
+                  },
+                  "radialVelocity": {
+                    "metersPerSecond": 0,
+                    "centimetersPerSecond": 0,
+                    "kilometersPerSecond": 0
+                  },
+                  "properMotion": {
+                    "ra": {
+                      "microarcsecondsPerYear": 806,
+                      "milliarcsecondsPerYear": 0.806
+                    },
+                    "dec": {
+                      "microarcsecondsPerYear": -1093,
+                      "milliarcsecondsPerYear": -1.093
+                    }
+                  },
+                  "parallax": {
+                    "microarcseconds": 2371,
+                    "milliarcseconds": 2.371
+                  }
+                },
+                "nonsidereal": null
+              }
+            ]
+          }
+        }
+      }
+    }
+    """.asRight

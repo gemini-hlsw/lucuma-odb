@@ -6,172 +6,133 @@ package lucuma.odb.graphql.input
 import cats.data.NonEmptyList
 import cats.syntax.all.*
 import grackle.Result
-import grackle.syntax.*
 import lucuma.core.enums.*
 import lucuma.core.enums.GmosBinning
-import lucuma.core.math.Offset
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
-import lucuma.odb.format.spatialOffsets.*
 import lucuma.odb.graphql.binding.*
 
 object GmosImagingInput:
 
+  private object FilterCheck:
+    val AtLeastOne: OdbError =
+      OdbError.InvalidArgument("At least one filter must be specified for GMOS imaging observations.".some)
+
+    def notEmpty[L](filters: Result[List[L]]): Result[NonEmptyList[L]] =
+      filters.flatMap: fs =>
+        Result.fromOption(NonEmptyList.fromList(fs), AtLeastOne.asProblem)
+
+    def notEmptyIfPresent[L](filters: Result[Option[List[L]]]): Result[Option[NonEmptyList[L]]] =
+      filters.flatMap(_.traverse(fs => Result.fromOption(NonEmptyList.fromList(fs), AtLeastOne.asProblem)))
+
   // Create ---------------------------------------------------------------------
 
-  case class Create[F](
-    filters: NonEmptyList[GmosImagingFilterInput[F]],
+  case class Create[L](
+    variant: GmosImagingVariantInput,
+    filters: NonEmptyList[L],
     common:  Create.Common
   )
 
   object Create:
 
-    type North = Create[GmosNorthFilter]
-    type South = Create[GmosSouthFilter]
+    type North = Create[GmosImagingFilterInput[GmosNorthFilter]]
+    type South = Create[GmosImagingFilterInput[GmosSouthFilter]]
 
     case class Common(
-      objectOffsetGenerator:       Option[OffsetGeneratorInput],
-      skyOffsetGenerator:          Option[OffsetGeneratorInput],
-      explicitMultipleFiltersMode: Option[MultipleFiltersMode],
-      explicitBin:                 Option[GmosBinning],
-      explicitAmpReadMode:         Option[GmosAmpReadMode],
-      explicitAmpGain:             Option[GmosAmpGain],
-      explicitRoi:                 Option[GmosRoi],
-      offsets:                     List[Offset]
-    ):
-      // Formatted to store in a text column in the database
-      val formattedOffsets: String =
-        if (offsets.isEmpty) "" else OffsetsFormat.reverseGet(offsets)
+      explicitBin:         Option[GmosBinning],
+      explicitAmpReadMode: Option[GmosAmpReadMode],
+      explicitAmpGain:     Option[GmosAmpGain],
+      explicitRoi:         Option[GmosRoi]
+    )
 
-    private def binding[F](
-      FilterBinding: Matcher[GmosImagingFilterInput[F]]
-    ): Matcher[Create[F]] =
+    private def binding[L](
+      FilterBinding: Matcher[L]
+    ): Matcher[Create[L]] =
       ObjectFieldsBinding.rmap:
         case List(
+          GmosImagingVariantInput.Binding("variant", rVariant),
           FilterBinding.List("filters", rFilters),
-          OffsetInput.Binding.List.Option("offsets", rOffsets),
-          OffsetGeneratorInput.Binding.Option("objectOffsetGenerator", rObjectOffsetGenerator),
-          OffsetGeneratorInput.Binding.Option("skyOffsetGenerator", rSkyOffsetGenerator),
-          MultipleFiltersModeBinding.Option("explicitMultipleFiltersMode", rExplicitMultipleFiltersMode),
           GmosBinningBinding.Option("explicitBin", rExplicitBin),
           GmosAmpReadModeBinding.Option("explicitAmpReadMode", rExplicitAmpReadMode),
           GmosAmpGainBinding.Option("explicitAmpGain", rExplicitAmpGain),
           GmosRoiBinding.Option("explicitRoi", rExplicitRoi),
         ) => (
-          rFilters,
-          rOffsets,
-          rObjectOffsetGenerator,
-          rSkyOffsetGenerator,
-          rExplicitMultipleFiltersMode,
+          rVariant,
+          FilterCheck.notEmpty(rFilters),
           rExplicitBin,
           rExplicitAmpReadMode,
           rExplicitAmpGain,
           rExplicitRoi,
-        ).parTupled.flatMap:
-          case (filters, offsets, obj, sky, exMfn, exBin, exAmpReadMode, exAmpGain, exRoi) =>
-            NonEmptyList.fromList(filters).fold(
-              OdbError.InvalidArgument("At least one filter must be specified for GMOS imaging observations.".some).asFailure
-            ): filters =>
-              Result(
-                Create(
-                  filters,
-                  Common(obj, sky, exMfn, exBin, exAmpReadMode, exAmpGain, exRoi, offsets.orEmpty)
-                )
-              )
+        ).parMapN: (variant, filters, exBin, exAmpReadMode, exAmpGain, exRoi) =>
+          Create(variant, filters, Common(exBin, exAmpReadMode, exAmpGain, exRoi))
 
-    val NorthBinding: Matcher[Create[GmosNorthFilter]] =
+    val NorthBinding: Matcher[North] =
       binding(GmosImagingFilterInput.NorthBinding)
 
 
-    val SouthBinding: Matcher[Create[GmosSouthFilter]] =
+    val SouthBinding: Matcher[South] =
       binding(GmosImagingFilterInput.SouthBinding)
 
   end Create
 
   // Edit ---------------------------------------------------------------------
 
-  case class Edit[F](
-    filters: Option[NonEmptyList[GmosImagingFilterInput[F]]],
+  case class Edit[L](
+    variant: Option[GmosImagingVariantInput],
+    filters: Option[NonEmptyList[L]],
     common:  Edit.Common
   ):
-    def toCreate: Result[Create[F]] =
-      filters.fold(
-        OdbError.InvalidArgument("At least one filter must be specified for GMOS imaging observations.".some).asFailure
-      )(fs => Create(fs, common.toCreate).success)
+    def toCreate: Result[Create[L]] =
+      for
+        v  <- Result.fromOption(variant, OdbError.InvalidArgument("An imaging variant must be suplied for GMOS imaging observations".some).asProblem)
+        fs <- Result.fromOption(filters, OdbError.InvalidArgument("At least one filter must be specified for GMOS imaging observations".some).asProblem)
+      yield Create(v, fs, common.toCreate)
 
   object Edit:
 
-    type North = Edit[GmosNorthFilter]
-    type South = Edit[GmosSouthFilter]
+    type North = Edit[GmosImagingFilterInput[GmosNorthFilter]]
+    type South = Edit[GmosImagingFilterInput[GmosSouthFilter]]
 
     case class Common(
-      objectOffsetGenerator:       Nullable[OffsetGeneratorInput],
-      skyOffsetGenerator:          Nullable[OffsetGeneratorInput],
-      explicitMultipleFiltersMode: Nullable[MultipleFiltersMode],
-      explicitBin:                 Nullable[GmosBinning],
-      explicitAmpReadMode:         Nullable[GmosAmpReadMode],
-      explicitAmpGain:             Nullable[GmosAmpGain],
-      explicitRoi:                 Nullable[GmosRoi],
-      offsets:                     List[Offset]
+      explicitBin:         Nullable[GmosBinning],
+      explicitAmpReadMode: Nullable[GmosAmpReadMode],
+      explicitAmpGain:     Nullable[GmosAmpGain],
+      explicitRoi:         Nullable[GmosRoi]
     ):
-      // Formatted to store in a text column in the database
-      val formattedOffsets: String =
-        if (offsets.isEmpty) "" else OffsetsFormat.reverseGet(offsets)
-
       def toCreate: Create.Common =
         Create.Common(
-          objectOffsetGenerator       = objectOffsetGenerator.toOption,
-          skyOffsetGenerator          = skyOffsetGenerator.toOption,
-          explicitMultipleFiltersMode = explicitMultipleFiltersMode.toOption,
-          explicitBin                 = explicitBin.toOption,
-          explicitAmpReadMode         = explicitAmpReadMode.toOption,
-          explicitAmpGain             = explicitAmpGain.toOption,
-          explicitRoi                 = explicitRoi.toOption,
-          offsets                     = offsets
+          explicitBin         = explicitBin.toOption,
+          explicitAmpReadMode = explicitAmpReadMode.toOption,
+          explicitAmpGain     = explicitAmpGain.toOption,
+          explicitRoi         = explicitRoi.toOption
         )
 
-    private def binding[F](
-      FilterBinding: Matcher[GmosImagingFilterInput[F]]
-    ): Matcher[Edit[F]] =
+    private def binding[L](
+      FilterBinding: Matcher[GmosImagingFilterInput[L]]
+    ): Matcher[Edit[GmosImagingFilterInput[L]]] =
       ObjectFieldsBinding.rmap:
         case List(
+          GmosImagingVariantInput.Binding.Option("variant", rVariant),
           FilterBinding.List.Option("filters", rFilters),
-          OffsetInput.Binding.List.Option("offsets", rOffsets),
-          OffsetGeneratorInput.Binding.Nullable("objectOffsetGenerator", rObjectOffsetGenerator),
-          OffsetGeneratorInput.Binding.Nullable("skyOffsetGenerator", rSkyOffsetGenerator),
-          MultipleFiltersModeBinding.Nullable("explicitMultipleFiltersMode", rExplicitMultipleFiltersMode),
           GmosBinningBinding.Nullable("explicitBin", rExplicitBin),
           GmosAmpReadModeBinding.Nullable("explicitAmpReadMode", rExplicitAmpReadMode),
           GmosAmpGainBinding.Nullable("explicitAmpGain", rExplicitAmpGain),
-          GmosRoiBinding.Nullable("explicitRoi", rExplicitRoi),
+          GmosRoiBinding.Nullable("explicitRoi", rExplicitRoi)
         ) => (
-          rFilters,
-          rOffsets,
-          rObjectOffsetGenerator,
-          rSkyOffsetGenerator,
-          rExplicitMultipleFiltersMode,
+          rVariant,
+          FilterCheck.notEmptyIfPresent(rFilters),
           rExplicitBin,
           rExplicitAmpReadMode,
           rExplicitAmpGain,
           rExplicitRoi,
-        ).parTupled.flatMap:
-          case (filters, offsets, obj, sky, exMfm, exBin, exAmpReadMode, exAmpGain, exRoi) =>
-            filters
-              .traverse: fs =>
-                NonEmptyList.fromList(fs).fold(
-                  OdbError.InvalidArgument("At least one filter must be specified for GMOS imaging observations.".some).asFailure
-                )(_.success)
-              .map: fsUpdate =>
-                Edit(
-                  fsUpdate,
-                  Common(obj, sky, exMfm, exBin, exAmpReadMode, exAmpGain, exRoi, offsets.orEmpty)
-                )
+        ).parMapN: (variant, filters, exBin, exAmpReadMode, exAmpGain, exRoi) =>
+          Edit(variant, filters, Common(exBin, exAmpReadMode, exAmpGain, exRoi))
 
-    val NorthBinding: Matcher[Edit[GmosNorthFilter]] =
+    val NorthBinding: Matcher[North] =
       binding(GmosImagingFilterInput.NorthBinding)
 
-    val SouthBinding: Matcher[Edit[GmosSouthFilter]] =
+    val SouthBinding: Matcher[South] =
       binding(GmosImagingFilterInput.SouthBinding)
 
   end Edit

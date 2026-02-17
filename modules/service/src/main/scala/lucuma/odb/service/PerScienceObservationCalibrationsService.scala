@@ -4,14 +4,17 @@
 package lucuma.odb.service
 
 import cats.data.NonEmptyList
-import cats.data.OptionT
 import cats.effect.Concurrent
 import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.NonNegShort
 import eu.timepit.refined.types.string.NonEmptyString
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.Instrument
+import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.ObservingModeType
+import lucuma.core.enums.TelluricCalibrationOrder
+import lucuma.core.math.SignalToNoise
+import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.Group
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
@@ -53,6 +56,8 @@ object PerScienceObservationCalibrationsService:
       val obsModeService = S.observingModeServices
       val telluricTargets = S.telluricTargetsService
       val obscalcService = S.obscalcService
+
+      private val MultiTelluricThreshold: TimeSpan = TimeSpan.fromHours(1.5).get
 
       private def groupNameForObservation(
         config:          CalibrationConfigSubset,
@@ -131,6 +136,11 @@ object PerScienceObservationCalibrationsService:
           .prepareR(Statements.selectTelluricObservation)
           .use(_.option((gid, CalibrationRole.Telluric)))
 
+      private def findAllTelluricObservations(gid: Group.Id): F[List[Observation.Id]] =
+        S.session
+          .prepareR(Statements.selectTelluricObservations)
+          .use(_.stream((gid, CalibrationRole.Telluric), 10).compile.toList)
+
       private def obsDuration(
         scienceOid: Observation.Id
       )(using Transaction[F]): F[Option[TimeSpan]] =
@@ -138,70 +148,101 @@ object PerScienceObservationCalibrationsService:
           _.flatMap(_.value.toOption)
             .map(d => d.science.timeEstimate.sum |+| d.science.timeEstimate.nonCharged)
 
-      private def createTelluricObservation(
+      private def insertTelluricObservation(
+        pid:             Program.Id,
+        telluricGroupId: Group.Id,
+        telluricIndex:   NonNegShort
+      )(using Transaction[F], SuperUserAccess): F[Observation.Id] =
+        // Minimal input to create the telluric obs
+        val targetEnvironment = TargetEnvironmentInput.Create(
+          explicitBase = none,
+          asterism = none, // We resolve the target later
+          useBlindOffset = false.some,
+          blindOffsetTarget = none,
+          blindOffsetType = BlindOffsetType.Manual
+        )
+
+        val obsInput = ObservationPropertiesInput.Create(
+          subtitle = none,
+          scienceBand = none,
+          posAngleConstraint = PosAngleConstraintInput(
+            mode = PosAngleConstraintMode.AverageParallactic.some,
+            angle = none
+          ).some,
+          targetEnvironment = targetEnvironment.some,
+          constraintSet = none,
+          timingWindows = none,
+          attachments = none,
+          scienceRequirements = none,
+          observingMode = none,
+          existence = Existence.Present.some,
+          group = telluricGroupId.some,
+          groupIndex = telluricIndex.some,
+          observerNotes = none
+        )
+        observationService
+          .createObservation(
+            AccessControl.unchecked(obsInput, pid, program_id),
+            calibrationRole = CalibrationRole.Telluric.some
+          ).orError
+
+      private def createTelluricObs(
+        pid:             Program.Id,
+        scienceOid:      Observation.Id,
+        telluricGroupId: Group.Id,
+        telluricIndex:   NonNegShort,
+        duration:        TimeSpan,
+        order:           TelluricCalibrationOrder
+      )(using Transaction[F], SuperUserAccess): F[Observation.Id] =
+        for {
+          telluricId <- insertTelluricObservation(pid, telluricGroupId, telluricIndex)
+          _          <- telluricTargets.requestTelluricTarget(pid, telluricId, scienceOid, duration, order)
+          _          <- syncConfiguration(scienceOid, telluricId)
+        } yield telluricId
+
+      private def createTelluricCalibrations(
         pid:             Program.Id,
         scienceOid:      Observation.Id,
         telluricGroupId: Group.Id
-      )(using Transaction[F], SuperUserAccess): F[Option[Observation.Id]] =
+      )(using Transaction[F], SuperUserAccess): F[List[Observation.Id]] =
         def obsGroupIndex(scienceOid: Observation.Id): F[NonNegShort] =
           S.session
             .prepareR(Statements.selectScienceObservationIndex)
             .use(_.unique(scienceOid))
 
-        def insertTelluricObservation(
-          pid:             Program.Id,
-          telluricGroupId: Group.Id,
-          telluricIndex:   NonNegShort
-        ): F[Observation.Id] =
-          // Minimal input to create the telluric obs
-          val targetEnvironment = TargetEnvironmentInput.Create(
-            explicitBase = none,
-            asterism = none, // We resolve the target later
-            useBlindOffset = false.some,
-            blindOffsetTarget = none,
-            blindOffsetType = BlindOffsetType.Manual
-          )
+        for
+          duration <- obsDuration(scienceOid)
+          created  <- duration match
+            case Some(d) if d > MultiTelluricThreshold =>
+              // Over 1.5h: 1 telluric before and 1 after
+              for {
+                sciIdx <- obsGroupIndex(scienceOid)
+                bIdx   = NonNegShort.unsafeFrom(sciIdx.value.toShort)
+                c1     <- createTelluricObs(pid, scienceOid, telluricGroupId, bIdx, d, TelluricCalibrationOrder.Before)
+                aftIdx = NonNegShort.unsafeFrom((sciIdx.value + 2).toShort)
+                c2     <- createTelluricObs(pid, scienceOid, telluricGroupId, aftIdx, d, TelluricCalibrationOrder.After)
+              } yield List(c1, c2)
 
-          val obsInput = ObservationPropertiesInput.Create(
-            subtitle = none,
-            scienceBand = none,
-            posAngleConstraint = PosAngleConstraintInput(
-              mode = PosAngleConstraintMode.AverageParallactic.some,
-              angle = none
-            ).some,
-            targetEnvironment = targetEnvironment.some,
-            constraintSet = none,
-            timingWindows = none,
-            attachments = none,
-            scienceRequirements = none,
-            observingMode = none,
-            existence = Existence.Present.some,
-            group = telluricGroupId.some,
-            groupIndex = telluricIndex.some,
-            observerNotes = none
-          )
-          observationService
-            .createObservation(
-              AccessControl.unchecked(obsInput, pid, program_id),
-              calibrationRole = CalibrationRole.Telluric.some
-            ).orError
+            case Some(d) =>
+              // Less than 1.5h: one telluric after science
+              for {
+                sciIdx <- obsGroupIndex(scienceOid)
+                aftIdx = NonNegShort.unsafeFrom((sciIdx.value + 1).toShort)
+                cal    <- createTelluricObs(pid, scienceOid, telluricGroupId, aftIdx, d, TelluricCalibrationOrder.After)
+              } yield List(cal)
 
-        (for
-          duration      <- OptionT(obsDuration(scienceOid))
-          scienceIndex  <- OptionT.liftF(obsGroupIndex(scienceOid))
-          telluricIndex  = NonNegShort.unsafeFrom((scienceIndex.value + 1).toShort)
-          telluricId    <- OptionT.liftF(insertTelluricObservation(pid, telluricGroupId, telluricIndex))
-          _             <- OptionT.liftF(telluricTargets.requestTelluricTarget(pid, telluricId, scienceOid, duration))
-          _             <- OptionT.liftF(syncConfiguration(scienceOid, telluricId))
-        yield telluricId).value
+            case None =>
+              // No duration available, skip
+              List.empty[Observation.Id].pure[F]
+        yield created
 
       private def deleteTelluricObservationsFromGroups(
         groupIds: List[Group.Id]
       )(using Transaction[F], SuperUserAccess): F[List[Observation.Id]] =
         for
           allTelluricOids <- groupIds.flatTraverse(gid => findTelluricObservation(gid).map(_.toList))
-          // Filter ongoing and completed
-          toDelete        <- excludeOngoingAndCompleted(allTelluricOids, identity)
+          // Filter ongoing/completed and with visits
+          toDelete        <- excludeFromDeletion(allTelluricOids, identity)
           deleted         <- NonEmptyList.fromList(toDelete) match
                                case Some(nel) => observationService.deleteCalibrationObservations(nel).as(toDelete)
                                case None      => List.empty.pure[F]
@@ -228,22 +269,71 @@ object PerScienceObservationCalibrationsService:
         pid: Program.Id,
         obs: ObsExtract[CalibrationConfigSubset],
         gid: Group.Id
-      )(using Transaction[F], SuperUserAccess): F[Option[Observation.Id]] =
-        findTelluricObservation(gid).flatMap:
-          case Some(telluricId) =>
-            syncConfiguration(obs.id, telluricId).as(none[Observation.Id])
-          case None             =>
-            createTelluricObservation(pid, obs.id, gid)
+      )(using Transaction[F], SuperUserAccess): F[(List[Observation.Id], List[Observation.Id])] =
+        for {
+          existing      <- findAllTelluricObservations(gid)
+          deletable     <- excludeFromDeletion(existing, identity)
+          duration      <- obsDuration(obs.id)
+          requiredCount  = duration match
+                             case Some(d) if d > MultiTelluricThreshold => 2
+                             case Some(_)                               => 1
+                             case None                                  => 0
+          // Delete/recreate if count changes
+          (created, deleted) <- if (existing.size != requiredCount)
+                                  for
+                                    _ <- NonEmptyList.fromList(deletable)
+                                          .traverse_(observationService.deleteCalibrationObservations)
+                                    c <- createTelluricCalibrations(pid, obs.id, gid)
+                                  yield (c, deletable)
+                                else
+                                  (List.empty, List.empty).pure[F]
+          // sync configuration on all deletable tellurics
+          allTellurics  <- findAllTelluricObservations(gid)
+          toSync        <- excludeFromDeletion(allTellurics, identity)
+          _             <- toSync.traverse_(tid => syncConfiguration(obs.id, tid))
+        } yield (created, deleted)
 
       private def generateTelluricForScience(
         pid:  Program.Id,
         tree: GroupTree,
         obs:  ObsExtract[CalibrationConfigSubset]
-      )(using Transaction[F], SuperUserAccess): F[Option[Observation.Id]] =
+      )(using Transaction[F], SuperUserAccess): F[(List[Observation.Id], List[Observation.Id])] =
         for
-          gid <- readTelluricGroup(pid, tree, obs)
-          tid <- syncTelluricObservation(pid, obs, gid)
-        yield tid
+          gid    <- readTelluricGroup(pid, tree, obs)
+          result <- syncTelluricObservation(pid, obs, gid)
+        yield result
+
+      private val MaxTelluricSN = SignalToNoise.fromInt(100).get
+
+      // After cloning we have the same etm as science, but we need a different one for tellurics
+      // https://app.shortcut.com/lucuma/story/6968/generate-telluric-standard-sequence
+      private def createTelluricExposureTimeMode(
+        scienceOid:  Observation.Id,
+        telluricOid: Observation.Id
+      )(using Transaction[F]): F[Unit] =
+        def telluricEtm(etm: ExposureTimeMode): ExposureTimeMode.SignalToNoiseMode =
+          val snValue = etm match
+            case ExposureTimeMode.SignalToNoiseMode(sn, _) =>
+              SignalToNoise.unsafeFromBigDecimalExact(
+                (sn.toBigDecimal * 2).min(MaxTelluricSN.toBigDecimal)
+              )
+            case _ =>
+              MaxTelluricSN
+          ExposureTimeMode.SignalToNoiseMode(snValue, etm.at)
+
+        for {
+          allEtm     <- S.exposureTimeModeService
+                           .select(List(scienceOid, telluricOid), ExposureTimeModeRole.Science)
+                           .map(_.view.mapValues(_.head).toMap)
+          scienceEtm  = allEtm.get(scienceOid)
+          _          <- scienceEtm.traverse_ : etm =>
+                          val calibEtm   = telluricEtm(etm)
+                          val currentEtm = allEtm.get(telluricOid)
+
+                          (S.exposureTimeModeService.deleteMany(List(telluricOid), ExposureTimeModeRole.Science) *>
+                            S.exposureTimeModeService.insertOne(telluricOid, ExposureTimeModeRole.Science, calibEtm))
+                              .unlessA(currentEtm.contains(calibEtm))
+        } yield ()
 
       private def syncConfiguration(
         sourceOid: Observation.Id,
@@ -289,7 +379,7 @@ object PerScienceObservationCalibrationsService:
         def cloneSourceMode(sm: Option[ObservingModeType]): F[Unit] =
           sm.traverse(mode => obsModeService.clone(mode, sourceOid, targetOid)).void
 
-        for
+        for {
           modes    <- readObservingModes
           (sm, tm) <- extractModes(modes)
           _        <- syncObservationProperties
@@ -297,7 +387,8 @@ object PerScienceObservationCalibrationsService:
           _        <- deleteAllExposureTimeModes(sm)
           _        <- updateTargetModeType(sm)
           _        <- cloneSourceMode(sm)
-        yield ()
+          _        <- createTelluricExposureTimeMode(sourceOid, targetOid)
+        } yield ()
 
       override def generateCalibrations(
         pid:        Program.Id,
@@ -305,42 +396,59 @@ object PerScienceObservationCalibrationsService:
       )(using Transaction[F], SuperUserAccess): F[(List[Observation.Id], List[Observation.Id])] =
         for
           // only include observations that are Defined or Ready
-          activeScienceObs <- onlyDefinedAndReady(scienceObs, _.id)
-          currentObsIds     = activeScienceObs.map(_.id).toSet
-          _                 <- info"Recalculating per science calibrations for $pid"
-          _                 <- debug"Program $pid has ${currentObsIds.size} science configurations"
-          _                 <- S.session.execute(sql"set constraints all deferred".command)
+          activeScienceObs     <- onlyDefinedAndReady(scienceObs, _.id)
+          currentObsIds         = activeScienceObs.map(_.id).toSet
+          _                    <- info"Recalculating per science calibrations for $pid"
+          _                    <- debug"Program $pid has ${currentObsIds.size} science configurations"
+          _                    <- S.session.execute(sql"set constraints all deferred".command)
           // Telluric groups with all observations
-          allObsInGroups    <- groupService.selectGroups(pid, obsFilter = void"true").map(telluricGroups).map(_.toMap)
+          allObsInGroups       <- groupService.selectGroups(pid, obsFilter = void"true").map(telluricGroups).map(_.toMap)
           // Collect telluric observation IDs from all groups
-          telluricObsSet    <- allObsInGroups.keys.toList
-                                 .flatTraverse(gid => findTelluricObservation(gid).map(_.toList))
-                                 .map(_.toSet)
-          // Obervations to remove from telluric groups
-          toUnlink          = allObsInGroups.values.flatten.map(_._1).filterNot(a => currentObsIds.exists(_ === a)).toSet
+          telluricObsSet       <- allObsInGroups.keys.toList
+                                   .flatTraverse(findAllTelluricObservations)
+                                   .map(_.toSet)
+          // Get all observations in groups excluding telluric calibrations
+          allGroupObsIds        = allObsInGroups.values.flatten.map(_._1).filterNot(telluricObsSet.contains).toList
+          // Find observations that are Ongoing or Completed - these should not be deleted
+          ongoingOrCompletedIds <- filterWorkflowStateIn(allGroupObsIds, identity, List(ObservationWorkflowState.Ongoing, ObservationWorkflowState.Completed), ready = false).map(_.toSet)
+          // Observations to remove from telluric groups (exclude active science obs AND Ongoing/Completed obs)
+          toUnlink              = allObsInGroups.values.flatten
+                                    .map(_._1)
+                                    .filterNot(a =>
+                                        currentObsIds.exists(_ === a) || ongoingOrCompletedIds.exists(_ === a))
+                                    .toSet
           // Query group locations
-          groupLocations    <- Statements.queryGroupLocations(allObsInGroups.keys.toList)
+          groupLocations        <- Statements.queryGroupLocations(allObsInGroups.keys.toList)
           // Collect all observations to move with their target locations (only science obs, not calibrations)
-          _                 <- (info"Remove ${toUnlink.size} observations from their telluric groups on program $pid: $toUnlink").whenA(toUnlink.nonEmpty)
-          toMove            = observationsToMove(allObsInGroups, toUnlink, groupLocations, telluricObsSet)
+          _                     <- (info"Remove ${toUnlink.size} observations from their telluric groups on program $pid: $toUnlink").whenA(toUnlink.nonEmpty)
+          toMove                = observationsToMove(allObsInGroups, toUnlink, groupLocations, telluricObsSet)
           // Move all observations in a single database call
-          _                 <- (info"Move ${toMove.size} observations to telluric groups on program $pid: ${toMove.map(_._1)}").whenA(toMove.nonEmpty)
-          _                 <- Statements.moveObservations(toMove)
+          _                     <- (info"Move ${toMove.size} observations to telluric groups on program $pid: ${toMove.map(_._1)}").whenA(toMove.nonEmpty)
+          _                     <- Statements.moveObservations(toMove)
           // Compute which groups are now empty (all observations are being unlinked)
-          emptyGroupIds     = allObsInGroups.collect:
-                                case (gid, obsWithIndices) if obsWithIndices.forall((o, _) => toUnlink.exists(_ === o)) => gid
+          emptyGroupIds         = allObsInGroups.collect:
+                                    case (gid, obsWithIndices) if obsWithIndices.forall((o, _) => toUnlink.exists(_ === o)) => gid
           // Delete telluric calibration observations from empty groups
-          deleted           <- deleteTelluricObservationsFromGroups(emptyGroupIds.toList)
-          _                 <- (info"Deleted ${toMove.size} observations to telluric groups on program $pid: $deleted").whenA(toMove.nonEmpty)
+          deleted               <- deleteTelluricObservationsFromGroups(emptyGroupIds.toList)
+          _                     <- (info"Deleted ${deleted.size} telluric observations on program $pid: $deleted").whenA(deleted.nonEmpty)
+          deletedSet            = deleted.toSet
+          // delete groups where all tellurics are gone
+          groupsToDelete        = emptyGroupIds.filter: gid =>
+                                    allObsInGroups.get(gid).forall: obsWithIndices =>
+                                      obsWithIndices
+                                        .filter((oid, _) => telluricObsSet.contains(oid))
+                                        .forall((oid, _) => deletedSet.contains(oid))
           // Delete empty telluric groups using deleteSystemGroup
-          _                 <- (info"Remove ${emptyGroupIds.size} empty telluric groups on program $pid: $emptyGroupIds").whenA(toMove.nonEmpty)
-          _                 <- emptyGroupIds.toList.traverse_(gid => groupService.deleteSystemGroup(pid, gid))
+          _                     <- (info"Remove ${groupsToDelete.size} empty telluric groups on program $pid: $groupsToDelete").whenA(groupsToDelete.nonEmpty)
+          _                     <- groupsToDelete.toList.traverse_(gid => groupService.deleteSystemGroup(pid, gid))
           // Reload tree for group creation/lookup
-          tree              <- groupService.selectGroups(pid)
+          tree                  <- groupService.selectGroups(pid)
           // Create/sync telluric for each science obs
-          added             <- activeScienceObs.traverse(obs => generateTelluricForScience(pid, tree, obs))
-          _                 <- (info"Added ${added.size} telluric observation on program $pid: $added").whenA(toMove.nonEmpty)
-        yield (added.flatten, deleted)
+          results               <- activeScienceObs.traverse(obs => generateTelluricForScience(pid, tree, obs))
+          added                 = results.flatMap(_._1)
+          allDeleted            = deleted ++ results.flatMap(_._2)
+          _                     <- (info"Added ${added.size} telluric observations on program $pid: $added").whenA(added.nonEmpty)
+        yield (added, allDeleted)
 
       object Statements:
 
@@ -351,6 +459,15 @@ object PerScienceObservationCalibrationsService:
             WHERE  c_group_id         = $group_id
               AND  c_calibration_role = $calibration_role
             LIMIT 1
+          """.query(observation_id)
+
+        val selectTelluricObservations: Query[(Group.Id, CalibrationRole), Observation.Id] =
+          sql"""
+            SELECT c_observation_id
+            FROM   t_observation
+            WHERE  c_group_id         = $group_id
+              AND  c_calibration_role = $calibration_role
+            ORDER BY c_group_index
           """.query(observation_id)
 
         def selectObservingModeTypes(

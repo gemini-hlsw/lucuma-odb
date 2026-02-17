@@ -11,11 +11,12 @@ import lucuma.core.enums.ExecutionState
 import lucuma.core.model.ExecutionEvent.SequenceEvent
 import lucuma.core.model.sequence.Atom
 import lucuma.core.util.Timestamp
-import lucuma.odb.data.OneOf3
+import lucuma.odb.data.OneOf4
+import lucuma.odb.sequence.data.AtomRecord
 import lucuma.odb.sequence.data.ProtoExecutionConfig
 import lucuma.odb.sequence.data.StepRecord
 import lucuma.odb.sequence.data.VisitRecord
-import lucuma.odb.sequence.util.merge3ByTimestamp
+import lucuma.odb.sequence.util.merge4ByTimestamp
 
 /**
  * Combines the static configuration with generators for the acquisition and
@@ -41,13 +42,15 @@ case class ExecutionConfigGenerator[S, D](
     visits: Stream[F, VisitRecord],
     events: Stream[F, SequenceEvent],
     steps:  Stream[F, StepRecord[D]],
+    atoms:  Stream[F, AtomRecord],
     when:   Timestamp
   )(using Eq[D]): F[(ProtoExecutionConfig[S, Atom[D]], ExecutionState)] =
-    merge3ByTimestamp(visits, events, steps)(_.created, _.received, _.created)
+    merge4ByTimestamp(visits, events, steps, atoms)(_.created, _.received, _.created, _.created)
       .fold((acquisition, science, ExecutionState.NotStarted)):
-        case ((a, s, _), OneOf3.First(visit))  => (a.recordVisit(visit), s.recordVisit(visit), ExecutionState.Ongoing)
-        case ((a, s, _), OneOf3.Second(event)) => (a.recordSequenceEvent(event), s.recordSequenceEvent(event), ExecutionState.Ongoing)
-        case ((a, s, _), OneOf3.Third(step))   => (a.recordStep(step), s.recordStep(step), ExecutionState.Ongoing)
+        case ((a, s, _), OneOf4.First(visit))  => (a.recordVisit(visit), s.recordVisit(visit), ExecutionState.Ongoing)
+        case ((a, s, _), OneOf4.Second(event)) => (a.recordSequenceEvent(event), s.recordSequenceEvent(event), ExecutionState.Ongoing)
+        case ((a, s, _), OneOf4.Third(step))   => (a.recordStep(step), s.recordStep(step), ExecutionState.Ongoing)
+        case ((a, s, _), OneOf4.Fourth(atom))  => (a.recordAtom(atom), s.recordAtom(atom), ExecutionState.Ongoing)
       .compile
       .onlyOrError
       .map: (a, s, e) =>

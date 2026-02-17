@@ -43,6 +43,7 @@ import io.circe.syntax.*
 import io.laserdisc.pure.s3.tagless.S3AsyncClientOp
 import lucuma.catalog.clients.GaiaClient
 import lucuma.catalog.clients.SimbadClient
+import lucuma.catalog.simbad.SEDDataLoader
 import lucuma.catalog.telluric.TelluricTargetsClient
 import lucuma.catalog.votable.CatalogAdapter
 import lucuma.core.data.EmailAddress
@@ -372,11 +373,14 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       exploreUrl        = uri"https://explore.gemini.edu/"
     )
 
-  val simbadClient: SimbadClient[IO] =
-    SimbadClient.build[IO](httpClient)
+  val simbadClient: IO[SimbadClient[IO]] =
+    SEDDataLoader.loadMatcher[IO].map: matcher =>
+      SimbadClient.build[IO](httpClient, matcher)
 
   protected def telluricClient: IO[TelluricTargetsClient[IO]] =
-    TelluricTargetsClient.build[IO](uri"https://telluric-targets.gpp.gemini.edu/", httpClient, simbadClient)
+    simbadClient.flatMap: sc =>
+      TelluricTargetsClient
+        .build[IO](uri"https://telluric-targets.gpp.gemini.edu/", httpClient, sc)
 
   // These are overriden in OdbSuiteWithS3 for tests that need it.
   protected def s3ClientOpsResource: Resource[IO, S3AsyncClientOp[IO]] =

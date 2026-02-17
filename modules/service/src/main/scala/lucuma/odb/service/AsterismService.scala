@@ -18,7 +18,7 @@ import lucuma.core.math.ProperMotion
 import lucuma.core.math.Region
 import lucuma.core.math.RightAscension
 import lucuma.core.model.CatalogInfo
-import lucuma.core.model.EphemerisKey
+import lucuma.core.model.Ephemeris
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.SiderealTracking
@@ -436,7 +436,7 @@ object AsterismService {
             .orElse(
               (oDes, oEphemKeyType, oSourceProfile)
                 .mapN((des, keyType, sourceProfile) =>
-                  EphemerisKey.fromTypeAndDes
+                  Ephemeris.Key.fromTypeAndDes
                     .getOption((keyType, des))
                     .map(key => (id, Target.Nonsidereal(name, key, sourceProfile)))
                 )

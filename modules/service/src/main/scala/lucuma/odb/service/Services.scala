@@ -10,7 +10,6 @@ import cats.Parallel
 import cats.effect.Async
 import cats.effect.MonadCancelThrow
 import cats.effect.Resource
-import cats.effect.Temporal
 import cats.effect.std.UUIDGen
 import cats.syntax.all.*
 import grackle.Mapping
@@ -168,8 +167,8 @@ trait Services[F[_]]:
   /** The `ObservingModeServices`. */
   def observingModeServices: ObservingModeServices[F]
 
-  /** The `OffsetGeneratorService`. */
-  def offsetGeneratorService: OffsetGeneratorService[F]
+  /** The `TelescopeConfigGeneratorService`. */
+  def telescopeConfigGeneratorService: TelescopeConfigGeneratorService[F]
 
   /** The `PartnerSplitsService`. */
   def partnerSplitsService: PartnerSplitsService[F]
@@ -267,7 +266,7 @@ object Services:
     telluricClient0: TelluricTargetsClient[F],
     hminCache0: HminBrightnessCache = HminBrightnessCache.Empty,
   )(s: Session[F])(
-    using tf: Trace[F], uf: UUIDGen[F], cf: Temporal[F], par: Parallel[F], log: Logger[F], lf: LoggerFactory[F], as: Async[F]
+    using tf: Trace[F], uf: UUIDGen[F], ay: Async[F], pf: Parallel[F],  log: Logger[F], lf: LoggerFactory[F]
   ): Services[F[_]] =
     new Services[F]:
 
@@ -337,7 +336,7 @@ object Services:
       lazy val obsAttachmentAssignmentService = ObsAttachmentAssignmentService.instantiate
       lazy val observationService = ObservationService.instantiate
       lazy val observingModeServices = ObservingModeServices.instantiate
-      lazy val offsetGeneratorService = OffsetGeneratorService.instantiate
+      lazy val telescopeConfigGeneratorService = TelescopeConfigGeneratorService.instantiate
       lazy val partnerSplitsService = PartnerSplitsService.instantiate
       lazy val programNoteService = ProgramNoteService.instantiate
       lazy val programUserService = ProgramUserService.instantiate
@@ -401,7 +400,7 @@ object Services:
     def observationService[F[_]](using Services[F]): ObservationService[F] = summon[Services[F]].observationService
     def observationWorkflowService[F[_]](using Services[F]): ObservationWorkflowService[F] = summon[Services[F]].observationWorkflowService
     def observingModeServices[F[_]](using Services[F]): ObservingModeServices[F] = summon[Services[F]].observingModeServices
-    def offsetGeneratorService[F[_]](using Services[F]): OffsetGeneratorService[F] = summon[Services[F]].offsetGeneratorService
+    def offsetGeneratorService[F[_]](using Services[F]): TelescopeConfigGeneratorService[F] = summon[Services[F]].telescopeConfigGeneratorService
     def partnerSplitsService[F[_]](using Services[F]): PartnerSplitsService[F] = summon[Services[F]].partnerSplitsService
     def programNoteService[F[_]](using Services[F]): ProgramNoteService[F] = summon[Services[F]].programNoteService
     def programService[F[_]](using Services[F]): ProgramService[F] = summon[Services[F]].programService

@@ -147,8 +147,8 @@ trait SubscriptionMapping[F[_]] extends Predicates[F] {
           e.canRead(user)                                              &&
           input.flatMap(_.programId).forall(_ === e.programId)         &&
           input.flatMap(_.observationId).forall(_ === e.observationId) &&
-          input.flatMap(_.oldState).forall(_.matches(e.oldState))      &&
-          input.flatMap(_.newState).forall(_.matches(e.newState))
+          input.flatMap(_.oldCalculationState).forall(_.matches(e.oldState)) &&
+          input.flatMap(_.newCalculationState).forall(_.matches(e.newState))
         .map: e =>
           Result(
             Environment(
@@ -330,4 +330,3 @@ trait SubscriptionMapping[F[_]] extends Predicates[F] {
     }
 
 }
-

@@ -26,7 +26,7 @@ import lucuma.core.model.User
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.syntax.timespan.*
 import lucuma.itc.IntegrationTime
-import lucuma.odb.graphql.mutation.UpdateConstraintSetOps
+import lucuma.odb.graphql.mutation.UpdateObservationsOps
 import lucuma.odb.graphql.query.ExecutionTestSupportForGmos
 import lucuma.odb.graphql.query.ObservingModeSetupOperations
 import lucuma.odb.json.all.transport.given
@@ -35,7 +35,7 @@ import lucuma.odb.json.all.transport.given
 class ShortCut_4596 extends OdbSuite
   with ExecutionTestSupportForGmos
   with ObservingModeSetupOperations
-  with UpdateConstraintSetOps {
+  with UpdateObservationsOps {
 
   val guideTargetName: String = GuideStarName.gaiaSourceId.reverseGet(1L).value.value
 
@@ -207,7 +207,7 @@ class ShortCut_4596 extends OdbSuite
         oids = List(ongoing, undefined),
         expected = Ior.Both(
           List(
-            s"Observation $ongoing is ineligibile for this operation due to its workflow state (Ongoing with allowed transition to Inactive/Completed)."
+            s"Observation $ongoing is ineligible for this operation due to its workflow state (Ongoing with allowed transition to Inactive/Completed)."
           ),
           json"""
           {
@@ -237,7 +237,7 @@ class ShortCut_4596 extends OdbSuite
         oids = List(inactive, undefined),
         expected = Ior.Both(
           List(
-            s"Observation $inactive is ineligibile for this operation due to its workflow state (Inactive with allowed transition to Ongoing)."
+            s"Observation $inactive is ineligible for this operation due to its workflow state (Inactive with allowed transition to Ongoing)."
           ),
           json"""
           {
@@ -266,7 +266,7 @@ class ShortCut_4596 extends OdbSuite
         oids = List(completed, undefined),
         expected = Ior.Both(
           List(
-            s"Observation $completed is ineligibile for this operation due to its workflow state (Completed)."
+            s"Observation $completed is ineligible for this operation due to its workflow state (Completed)."
           ),
           json"""
           {
@@ -333,7 +333,7 @@ class ShortCut_4596 extends OdbSuite
     setup.flatMap: (oid, tid) =>
       tryUpdateAsterismsAs(pi, oid, tid,
         Ior.Both(
-          List(s"Observation $oid is ineligibile for this operation due to its workflow state (Ongoing with allowed transition to Inactive/Completed)."),
+          List(s"Observation $oid is ineligible for this operation due to its workflow state (Ongoing with allowed transition to Inactive/Completed)."),
           json"""
             {
               "updateAsterisms": {
@@ -354,7 +354,7 @@ class ShortCut_4596 extends OdbSuite
     setup.flatMap: (oid, tid) =>
       tryUpdateAsterismsAs(pi, oid, tid,
         Ior.Both(
-          List(s"Observation $oid is ineligibile for this operation due to its workflow state (Completed)."),
+          List(s"Observation $oid is ineligible for this operation due to its workflow state (Completed)."),
           json"""
             {
               "updateAsterisms": {
@@ -459,7 +459,7 @@ class ShortCut_4596 extends OdbSuite
             }
           """,
           expected = Ior.Left(List(
-            s"Observation $oid is ineligibile for this operation due to its workflow state (Ongoing with allowed transition to Inactive/Completed)."
+            s"Observation $oid is ineligible for this operation due to its workflow state (Ongoing with allowed transition to Inactive/Completed)."
           ))
         )
 
@@ -504,7 +504,7 @@ class ShortCut_4596 extends OdbSuite
           expected =
             Ior.Both(
               List(
-                s"Observation $oid is ineligibile for this operation due to its workflow state (Ongoing with allowed transition to Inactive/Completed)."
+                s"Observation $oid is ineligible for this operation due to its workflow state (Ongoing with allowed transition to Inactive/Completed)."
               ),
               json"""
                 {

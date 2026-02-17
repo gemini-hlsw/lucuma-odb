@@ -70,14 +70,13 @@ import lucuma.odb.data.Extinction
 import lucuma.odb.data.Md5Hash
 import lucuma.odb.data.ObservingModeRowVersion
 import lucuma.odb.data.OdbError
-import lucuma.odb.data.OffsetGeneratorRole
 import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.data.StepExecutionState
 import lucuma.odb.data.Tag
+import lucuma.odb.data.TelescopeConfigGeneratorRole
 import lucuma.odb.data.TimeCharge.DiscountDiscriminator
 import lucuma.odb.data.TimingWindowEndTypeEnum
 import lucuma.odb.data.UserType
-import lucuma.odb.sequence.data.OffsetGeneratorType
 import lucuma.odb.service.ObservationWorkflowService
 import lucuma.odb.syntax.exposureTimeMode.*
 import monocle.Prism
@@ -407,10 +406,10 @@ trait Codecs {
   val observation_id: Codec[Observation.Id] =
     gid[Observation.Id]
 
-  val offset_generator_role: Codec[OffsetGeneratorRole] =
+  val offset_generator_role: Codec[TelescopeConfigGeneratorRole] =
     enumerated(Type("e_offset_generator_role"))
 
-  val offset_generator_type: Codec[OffsetGeneratorType] =
+  val telescope_config_generator_type: Codec[TelescopeConfigGeneratorType] =
     enumerated(Type("e_offset_generator_type"))
 
   val configuration_request_id: Codec[ConfigurationRequest.Id] =
@@ -660,6 +659,9 @@ trait Codecs {
   val _calibration_role: Codec[List[CalibrationRole]] =
     _enumerated[CalibrationRole](Type("_e_calibration_role", List(Type("e_calibration_role"))))
 
+  val telluric_calibration_order: Codec[TelluricCalibrationOrder] =
+    enumerated(Type("e_telluric_calibration_order"))
+
   val target_disposition: Codec[TargetDisposition] =
     enumerated(Type("e_target_disposition"))
 
@@ -707,6 +709,9 @@ trait Codecs {
 
   val water_vapor: Codec[WaterVapor] =
     enumerated[WaterVapor](Type.varchar)
+
+  val wavelength_order: Codec[WavelengthOrder] =
+    enumerated[WavelengthOrder](Type("e_wavelength_order"))
 
   val wavelength_pm: Codec[Wavelength] =
     int4.eimap(

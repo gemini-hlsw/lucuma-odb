@@ -19,7 +19,7 @@ trait Flamingos2InitialDynamicConfig:
    * serve as the initial state in state computations that produce sequence
    * steps.
    */
-  val initialConfig: Flamingos2DynamicConfig =
+  val initialDynamicConfig: Flamingos2DynamicConfig =
     Flamingos2DynamicConfig(
       exposure    = TimeSpan.Min,
       disperser   = none,

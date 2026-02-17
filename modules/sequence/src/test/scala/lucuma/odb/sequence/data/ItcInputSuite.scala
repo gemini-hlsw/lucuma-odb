@@ -4,81 +4,26 @@
 package lucuma.odb.sequence
 package data
 
-import cats.data.NonEmptyList
-import lucuma.core.enums.SequenceType
-import lucuma.core.model.Target
-import lucuma.core.util.Timestamp
-import lucuma.itc.client.ImagingParameters
-import lucuma.itc.client.InstrumentMode
-import lucuma.itc.client.SpectroscopyParameters
+import cats.syntax.eq.*
+import cats.syntax.functor.*
 import lucuma.itc.client.TargetInput
-import lucuma.itc.client.arb.ArbInstrumentMode.given
-import lucuma.itc.client.arb.ArbIntegrationTimeInput.given
-import lucuma.itc.client.arb.ArbTargetInput.given
-import munit.FunSuite
-import org.scalacheck.Arbitrary.arbitrary
+import lucuma.odb.sequence.data.arb.ArbItcInput.given
+import munit.ScalaCheckSuite
+import org.scalacheck.Prop.*
 
-class ItcInputSuite extends FunSuite:
+class ItcInputSuite extends ScalaCheckSuite:
 
-  private def createItcInput(
-    targets: NonEmptyList[(Target.Id, TargetInput, Option[Timestamp])],
-    blindOffsetTarget: Option[(Target.Id, TargetInput, Option[Timestamp])]
-  ): ItcInput =
-    val mode = arbitrary[InstrumentMode].sample.get
-    ItcInput(
-      arbitrary[ImagingParameters].sample.get.copy(mode = mode),
-      arbitrary[SpectroscopyParameters].sample.get.copy(mode = mode),
-      targets,
-      blindOffsetTarget
-    )
+  property("acquisition sequence uses blind offset target when available, science sequence never uses blind offset"):
+    forAll { (itcInput: ItcInput.Spectroscopy) =>
+      val acq = itcInput.acquisitionInput
+      val sci = itcInput.scienceInput
 
-  test("acquisition sequence uses blind offset target when available"):
-    val regularTarget = (Target.Id.fromLong(1L).get, arbitrary[TargetInput].sample.get, None)
-    val blindOffsetTarget = (Target.Id.fromLong(2L).get, arbitrary[TargetInput].sample.get, None)
+      // Acquisition should use blind offset target only.
+      val bot = itcInput.blindOffset.map(_._2)
+      assertEquals(acq.asterism.length, bot.as(1).getOrElse(itcInput.targets.length))
+      assertEquals(acq.asterism.head,   bot.getOrElse(itcInput.targets.head._2))
 
-    val itcInput = createItcInput(
-      NonEmptyList.one(regularTarget),
-      Some(blindOffsetTarget)
-    )
-
-    val acquisitionInput = itcInput.imagingInput(SequenceType.Acquisition)
-    val scienceInput = itcInput.spectroscopyInput(SequenceType.Science)
-
-    // Acquisition should use blind offset target only
-    assertEquals(acquisitionInput.asterism.length, 1)
-    assertEquals(acquisitionInput.asterism.head, blindOffsetTarget._2)
-
-    // Science should use regular targets only
-    assertEquals(scienceInput.asterism.length, 1)
-    assertEquals(scienceInput.asterism.head, regularTarget._2)
-
-  test("both sequences use regular targets when no blind offset exists"):
-    val regularTargets = NonEmptyList.of(
-      (Target.Id.fromLong(1L).get, arbitrary[TargetInput].sample.get, None),
-      (Target.Id.fromLong(2L).get, arbitrary[TargetInput].sample.get, None)
-    )
-
-    val itcInput = createItcInput(regularTargets, None)
-
-    val acquisitionInput = itcInput.imagingInput(SequenceType.Acquisition)
-    val scienceInput = itcInput.spectroscopyInput(SequenceType.Science)
-
-    // Both should use all regular targets when no blind offset
-    assertEquals(acquisitionInput.asterism.length, 2)
-    assertEquals(scienceInput.asterism.length, 2)
-    assertEquals(acquisitionInput.asterism, scienceInput.asterism)
-
-  test("science sequence ignores blind offset target"):
-    val regularTarget = (Target.Id.fromLong(1L).get, arbitrary[TargetInput].sample.get, None)
-    val blindOffsetTarget = (Target.Id.fromLong(2L).get, arbitrary[TargetInput].sample.get, None)
-
-    val itcInput = createItcInput(
-      NonEmptyList.one(regularTarget),
-      Some(blindOffsetTarget)
-    )
-
-    val scienceInput = itcInput.spectroscopyInput(SequenceType.Science)
-
-    // Science sequence should always use regular targets, never blind offset
-    assertEquals(scienceInput.asterism.length, 1)
-    assertEquals(scienceInput.asterism.head, regularTarget._2)
+      // Science should use regular targets only
+      assert(sci.asterism.length === itcInput.targets.size)
+      assert(sci.asterism.head === itcInput.targets.head._2)
+    }

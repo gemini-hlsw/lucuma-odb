@@ -9,6 +9,7 @@ import fs2.Stream
 import lucuma.core.model.ExecutionEvent.SequenceEvent
 import lucuma.core.model.sequence.Atom
 import lucuma.core.util.Timestamp
+import lucuma.odb.sequence.data.AtomRecord
 import lucuma.odb.sequence.data.StepRecord
 import lucuma.odb.sequence.data.VisitRecord
 
@@ -31,6 +32,8 @@ trait SequenceGenerator[D]:
    */
   def generate(when: Timestamp): Stream[Pure, Atom[D]]
 
+  def recordAtom(atom: AtomRecord): SequenceGenerator[D]
+
   /**
    * Records a step and returns an updated generator.
    */
@@ -44,6 +47,9 @@ trait SequenceGenerator[D]:
 object SequenceGenerator:
 
   abstract class Base[D] extends SequenceGenerator[D]:
+    override def recordAtom(atom: AtomRecord): SequenceGenerator[D] =
+      this
+
     override def recordStep(step:  StepRecord[D])(using Eq[D]): SequenceGenerator[D] =
       this
 

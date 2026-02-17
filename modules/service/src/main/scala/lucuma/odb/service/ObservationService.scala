@@ -41,6 +41,7 @@ import lucuma.core.model.Program
 import lucuma.core.model.StandardRole.*
 import lucuma.core.model.Target
 import lucuma.core.syntax.string.*
+import lucuma.odb.data.BlindOffsetType
 import lucuma.odb.data.Existence
 import lucuma.odb.data.ExposureTimeModeRole
 import lucuma.odb.data.ExposureTimeModeType
@@ -291,13 +292,13 @@ object ObservationService {
         )
 
         def doDelete: F[Result[Unit]] =
-          val enc = observation_id.nel(oids)          
+          val enc = observation_id.nel(oids)
           session
             .prepareR(Statements.deleteCalibrationObservations(enc))
             .use: pq =>
               pq.stream(oids, 1024).compile.toList.flatMap: deleted =>
                 if oids.toList.sorted === deleted.sorted then Result.unit.pure[F]
-                else 
+                else
                   transaction.rollback >>
                   OdbError.InvalidObservationList(oids, s"One or more specified observations are not calibrations.".some).asFailureF
 
@@ -475,6 +476,8 @@ object ObservationService {
               r <- updates.value.recoverWith {
                     case SqlState.CheckViolation(ex) =>
                       OdbError.InvalidArgument(Some(constraintViolationMessage(ex))).asFailureF
+                    case SqlState.RaiseException(ex) =>
+                      OdbError.UpdateFailed(ex.message.some).asFailureF
                   }
               _ <- transaction.rollback.unlessA(r.hasValue) // rollback if something failed
             } yield r
@@ -640,6 +643,7 @@ object ObservationService {
           SET.observingMode.flatMap(_.observingModeType).map(_.instrument),
           SET.observerNotes,
           SET.targetEnvironment.flatMap(_.useBlindOffset).getOrElse(false),
+          SET.targetEnvironment.map(_.blindOffsetType).getOrElse(BlindOffsetType.Manual),
           calibrationRole
         )
       }
@@ -660,6 +664,7 @@ object ObservationService {
       instrument:          Option[Instrument],
       observerNotes:       Option[NonEmptyString],
       useBlindOffset:      Boolean,
+      blindOffsetType:     BlindOffsetType,
       calibrationRole:     Option[CalibrationRole]
     ): AppliedFragment = {
 
@@ -703,6 +708,7 @@ object ObservationService {
            instrument                                                                                                             ,
            observerNotes                                                                                                          ,
            useBlindOffset                                                                                                         ,
+           blindOffsetType                                                                                                        ,
            calibrationRole                                                                                                        ,
         )
       }
@@ -748,6 +754,7 @@ object ObservationService {
       Option[Instrument]               ,
       Option[NonEmptyString]           ,
       Boolean                          ,
+      BlindOffsetType                  ,
       Option[CalibrationRole]          ,
     )] =
       sql"""
@@ -784,6 +791,7 @@ object ObservationService {
           c_instrument,
           c_observer_notes,
           c_use_blind_offset,
+          c_blind_offset_type,
           c_calibration_role
         )
         SELECT
@@ -819,6 +827,7 @@ object ObservationService {
           ${instrument.opt},
           ${text_nonempty.opt},
           $bool,
+          $blind_offset_type,
           ${calibration_role.opt}
       """
 

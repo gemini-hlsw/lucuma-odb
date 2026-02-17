@@ -45,6 +45,10 @@ trait VisitService[F[_]]:
     observationId: Observation.Id
   )(using Services.ServiceAccess): Stream[F, VisitRecord]
 
+  def hasVisits(
+    observationId: Observation.Id
+  )(using Transaction[F]): F[Boolean]
+
   def lookupOrInsert(
     observationId:  Observation.Id,
     idempotencyKey: Option[IdempotencyKey]
@@ -98,6 +102,11 @@ object VisitService:
         observationId: Observation.Id
       )(using Services.ServiceAccess): Stream[F, VisitRecord] =
         session.stream(VisitService.Statements.SelectAllVisit)(observationId, 1024)
+
+      override def hasVisits(
+        observationId: Observation.Id
+      )(using Transaction[F]): F[Boolean] =
+        session.unique(Statements.HasVisits)(observationId)
 
       private def obsDescription(
         observationId: Observation.Id
@@ -273,6 +282,15 @@ object VisitService:
         FROM t_visit
         WHERE c_observation_id = $observation_id
       """.query(visit_record)
+
+    val HasVisits: Query[Observation.Id, Boolean] =
+      sql"""
+        SELECT EXISTS (
+          SELECT 1
+          FROM t_visit
+          WHERE c_observation_id = $observation_id
+        )
+      """.query(bool)
 
     val SelectChargeableVisit: Query[ObservingNight, VisitRecord] =
       sql"""

@@ -4,7 +4,7 @@
 package lucuma.odb.service
 
 import cats.data.NonEmptyList
-import cats.effect.Concurrent
+import cats.effect.Async
 import cats.implicits.*
 import grackle.Result
 import grackle.ResultT
@@ -34,6 +34,7 @@ import lucuma.core.util.DateInterval
 import lucuma.core.util.Enumerated
 import lucuma.core.util.Timestamp
 import lucuma.itc.client.ItcClient
+import lucuma.odb.data.Itc
 import lucuma.odb.data.ObservationValidationMap
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
@@ -89,7 +90,7 @@ sealed trait ObservationWorkflowService[F[_]] {
    */
   def getCalculatedWorkflow(
     oid:  Observation.Id,
-    itc:  Option[ItcService.AsterismResults],
+    itc:  Option[Itc],
     exec: Option[CoreExecutionState]
   )(using Transaction[F]): F[Result[ObservationWorkflow]]
 
@@ -237,7 +238,7 @@ object ObservationWorkflowService {
       case _                             => ObservationValidation.configuration(ge.format)
 
   /* Construct an instance. */
-  def instantiate[F[_]: Concurrent](using Services[F]): ObservationWorkflowService[F] =
+  def instantiate[F[_]: Async](using Services[F]): ObservationWorkflowService[F] =
     new ObservationWorkflowService[F] {
 
       // Make the enums available in a stable and implicit way
@@ -341,7 +342,7 @@ object ObservationWorkflowService {
 
       private def lookupCachedItcResults(
         input:      Map[Observation.Id, ObservationValidationInfo],
-      )(using Transaction[F], SuperUserAccess): F[Map[Observation.Id, ItcService.AsterismResults]] =
+      )(using Transaction[F], SuperUserAccess): F[Map[Observation.Id, Itc]] =
         itcService
           .selectAll:
             input
@@ -370,7 +371,7 @@ object ObservationWorkflowService {
       // Computes the observation execution state if not cached
       private def executionStates(
         infos:      Map[Observation.Id, ObservationValidationInfo],
-        itcResults: Map[Observation.Id, ItcService.AsterismResults],
+        itcResults: Map[Observation.Id, Itc],
         commitHash: CommitHash,
         ptc:        TimeEstimateCalculatorImplementation.ForInstrumentMode
       )(using NoTransaction[F], SuperUserAccess): F[Map[Observation.Id, ExecutionState]] =
@@ -568,7 +569,7 @@ object ObservationWorkflowService {
         val select: F[Result[(
           Map[Observation.Id, ObservationValidationInfo],
           Map[Observation.Id, ObservationValidationMap],
-          Map[Observation.Id, ItcService.AsterismResults]
+          Map[Observation.Id, Itc]
         )]] =
           services.transactionally:
             (
@@ -600,7 +601,7 @@ object ObservationWorkflowService {
 
       override def getCalculatedWorkflow(
         oid:  Observation.Id,
-        itc:  Option[ItcService.AsterismResults],
+        itc:  Option[Itc],
         exec: Option[CoreExecutionState]
       )(using Transaction[F]): F[Result[ObservationWorkflow]] =
         (for
@@ -632,26 +633,27 @@ object ObservationWorkflowService {
       )(using NoTransaction[F]): F[Result[ObservationWorkflow]] =
         input.foldWithId(OdbError.InvalidArgument().asFailureF):
           case ((w, state), oid) =>
-            if w.state === state then ResultT.success(w)
-            else ResultT:
-              // If we're transitioning to or from a UserState, just update that column
-              if w.state.isUserState || state.isUserState then
-                services.transactionally:
-                  session.prepareR(Statements.UpdateUserState).use: pc =>
-                    pc.execute(state.asUserState, oid)
-                      .as(Result(w.copy(state = state)))
-              else // we must be declaring completion (or revoking that declaration)
-                import ObservationWorkflowState.*
-                (w.state, state) match
-                  case (Ongoing, Completed) | (Completed, Ongoing) =>
-                    services.transactionally:
-                      session.prepareR(Statements.UpdateDeclaredCompletion).use: pc =>
-                        pc.execute(state === Completed, oid)
-                          .as(Result(w.copy(state = state)))
-                  case _ =>
-                    // This should never happen but I want to check for it anyway.
-                    Result.internalError(s"Transition from ${w.state} to $state was not expected.").pure[F]
-          .value
+            (
+              if w.state === state then ResultT.success(w)
+              else ResultT:
+                // If we're transitioning to or from a UserState, just update that column
+                if w.state.isUserState || state.isUserState then
+                  services.transactionally:
+                    session.prepareR(Statements.UpdateUserState).use: pc =>
+                      pc.execute(state.asUserState, oid)
+                        .as(Result(w.copy(state = state)))
+                else // we must be declaring completion (or revoking that declaration)
+                  import ObservationWorkflowState.*
+                  (w.state, state) match
+                    case (Ongoing, Completed) | (Completed, Ongoing) =>
+                      services.transactionally:
+                        session.prepareR(Statements.UpdateDeclaredCompletion).use: pc =>
+                          pc.execute(state === Completed, oid)
+                            .as(Result(w.copy(state = state)))
+                    case _ =>
+                      // This should never happen but I want to check for it anyway.
+                      Result.internalError(s"Transition from ${w.state} to $state was not expected.").pure[F]
+            ).value
 
       extension (wf: ObservationWorkflow) def isCompatibleWith(states: Set[ObservationWorkflowState]): Boolean =
         // An allowed transition from ongoing to completed [via declared completion] shouldn't prevent editing,
@@ -674,7 +676,7 @@ object ObservationWorkflowService {
                   case Some(wf) =>
                     if wf.isCompatibleWith(states) then r.map(oid :: _)
                     else r.withProblems:
-                      val prefix = s"Observation $oid is ineligibile for this operation due to its workflow state (${wf.state}"
+                      val prefix = s"Observation $oid is ineligible for this operation due to its workflow state (${wf.state}"
                       val suffix = if wf.validTransitions.isEmpty then ")." else s" with allowed transition to ${wf.validTransitions.mkString("/")})."
                       OdbError.InvalidObservation(oid, (prefix + suffix).some)
                         .asProblemNec

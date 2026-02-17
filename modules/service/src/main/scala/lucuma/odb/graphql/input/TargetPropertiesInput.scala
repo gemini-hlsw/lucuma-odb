@@ -7,7 +7,6 @@ package input
 import cats.syntax.all.*
 import eu.timepit.refined.types.string.NonEmptyString
 import grackle.Result
-import lucuma.core.model.EphemerisKey
 import lucuma.core.model.SourceProfile
 import lucuma.odb.data.Existence
 import lucuma.odb.graphql.binding.*
@@ -17,14 +16,14 @@ object TargetPropertiesInput {
 
   final case class Create(
     name: NonEmptyString,
-    subtypeInfo: SiderealInput.Create | EphemerisKey | OpportunityInput.Create,
+    subtypeInfo: SiderealInput.Create | NonsiderealInput.Create | OpportunityInput.Create,
     sourceProfile: SourceProfile,
     existence: Existence
   )
 
   final case class Edit(
     name: Option[NonEmptyString],
-    subtypeInfo: Option[SiderealInput.Edit | EphemerisKey | OpportunityInput.Edit],
+    subtypeInfo: Option[SiderealInput.Edit | NonsiderealInput.Edit | OpportunityInput.Edit],
     sourceProfile: Option[SourceProfile => Result[SourceProfile]],
     existence: Option[Existence]
   )
@@ -34,7 +33,7 @@ object TargetPropertiesInput {
       case List(
         NonEmptyStringBinding.NonNullable("name", rName),
         SiderealInput.EditBinding.Option("sidereal", rSidereal),
-        NonsiderealInput.Binding.Option("nonsidereal", rNonsidereal),
+        NonsiderealInput.EditBinding.Option("nonsidereal", rNonsidereal),
         OpportunityInput.EditBinding.Option("opportunity", rOpportunity),
         SourceProfileInput.EditBinding.Option("sourceProfile", rSourceProfile),
         ExistenceBinding.Option("existence", rExistence)
@@ -55,7 +54,7 @@ object TargetPropertiesInput {
       case List(
         NonEmptyStringBinding.Option("name", rName),
         SiderealInput.CreateBinding.Option("sidereal", rSidereal),
-        NonsiderealInput.Binding.Option("nonsidereal", rNonsidereal),
+        NonsiderealInput.CreateBinding.Option("nonsidereal", rNonsidereal),
         OpportunityInput.CreateBinding.Option("opportunity", rOpportunity),
         SourceProfileInput.CreateBinding.Option("sourceProfile", rSourceProfile),
         ExistenceBinding.Option("existence", rExistence)

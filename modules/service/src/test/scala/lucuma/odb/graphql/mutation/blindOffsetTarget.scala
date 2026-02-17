@@ -273,6 +273,31 @@ class blindOffsetTarget extends OdbSuite:
       )
     } yield () 
 
+  test("create observation with empty automatic blind offset target"):
+    for {
+      pid <- createProgramAs(pi)
+      _ <- expect(
+        user = pi,
+        query = s"""
+          mutation {
+            createObservation(input: {
+              programId: ${pid.asJson}
+              SET: {
+                targetEnvironment: {
+                  useBlindOffset: true
+                  blindOffsetTarget: null
+                  blindOffsetType: AUTOMATIC
+                }
+              }
+            }) {
+              observation $blindOffsetFields
+            }
+          }
+        """,
+        expected = expectedResults("createObservation", "observation", NoTargetTitle, true, none, BlindOffsetType.Automatic)
+      )
+    } yield () 
+
   test("create observation with blind offset target and non-blind offset target"):
     for {
       pid <- createProgramAs(pi)
@@ -422,7 +447,36 @@ class blindOffsetTarget extends OdbSuite:
       _ <- expectAsterismTargetsAs(pi, oid) // blind offset targets are not in the asterism
     } yield ()
 
-  test("update observation to replace blind offset target"):
+  test("update observation to initialize automatic blind offset target"):
+    for {
+      pid <- createProgramAs(pi)
+      oid <- createObservationAs(pi, pid)
+      _ <- expect(
+        user = pi,
+        query = s"""
+          mutation {
+            updateObservations(input: {
+              SET: {
+                targetEnvironment: {
+                  useBlindOffset: true
+                  blindOffsetTarget: null
+                  blindOffsetType: AUTOMATIC
+                }
+              }
+              WHERE: {
+                id: { EQ: ${oid.asJson} }
+              }
+            }) {
+              $observationsFields
+            }
+          }
+        """,
+        expected = expectedListResults("updateObservations", "observations", NoTargetTitle, true, none, BlindOffsetType.Automatic)
+      )
+      _ <- expectAsterismTargetsAs(pi, oid) // blind offset targets are not in the asterism
+    } yield ()
+
+  test("update observation to replace manual blind offset target with another manual one"):
     for {
       pid <- createProgramAs(pi)
       oid <- createObservationAs(pi, pid)
@@ -470,6 +524,213 @@ class blindOffsetTarget extends OdbSuite:
       )
       _ <- expectTargetNotFoundAs(pi, tid)
       _ <- getBlindOffsetId(pi, oid)
+    } yield ()
+
+  test("update observation to replace manual blind offset target with automatic blind offset target"):
+    for {
+      pid <- createProgramAs(pi)
+      oid <- createObservationAs(pi, pid)
+      _ <- expect(
+        user = pi,
+        query = s"""
+          mutation {
+            updateObservations(input: {
+              SET: {
+                targetEnvironment: {
+                  ${blindOffsetTargetInput(blindOffsetInput("Original Target", "12.345", "45.678"))}
+                  blindOffsetType: MANUAL
+                }
+              }
+              WHERE: {
+                id: { EQ: ${oid.asJson} }
+              }
+            }) {
+              $observationsFields
+            }
+          }
+        """,
+        expected = expectedListResults("updateObservations", "observations", NoTargetTitle, true, "Original Target".some, BlindOffsetType.Manual)
+      )
+      tid <- getBlindOffsetId(pi, oid)
+      _   <- expectTargetExistenceAs(pi, tid, shouldBePresent = true)
+      _ <- expect(
+        user = pi,
+        query = s"""
+          mutation {
+            updateObservations(input: {
+              SET: {
+                targetEnvironment: {
+                  ${blindOffsetTargetInput(blindOffsetInput("Replacement Target", "99.999", "-88.888"))}
+                  blindOffsetType: AUTOMATIC
+                }
+              }
+              WHERE: {
+                id: { EQ: ${oid.asJson} }
+              }
+            }) {
+              $observationsFields
+            }
+          }
+        """,
+        expected = expectedListResults("updateObservations", "observations", NoTargetTitle, true, "Replacement Target".some, BlindOffsetType.Automatic)
+      )
+      _ <- expectTargetNotFoundAs(pi, tid)
+      _ <- getBlindOffsetId(pi, oid)
+    } yield ()
+
+  test("update observation to replace automatic blind offset target with manual blind offset target"):
+    for {
+      pid <- createProgramAs(pi)
+      oid <- createObservationAs(pi, pid)
+      _ <- expect(
+        user = pi,
+        query = s"""
+          mutation {
+            updateObservations(input: {
+              SET: {
+                targetEnvironment: {
+                  ${blindOffsetTargetInput(blindOffsetInput("Original Target", "12.345", "45.678"))}
+                  blindOffsetType: AUTOMATIC
+                }
+              }
+              WHERE: {
+                id: { EQ: ${oid.asJson} }
+              }
+            }) {
+              $observationsFields
+            }
+          }
+        """,
+        expected = expectedListResults("updateObservations", "observations", NoTargetTitle, true, "Original Target".some, BlindOffsetType.Automatic)
+      )
+      tid <- getBlindOffsetId(pi, oid)
+      _   <- expectTargetExistenceAs(pi, tid, shouldBePresent = true)
+      _ <- expect(
+        user = pi,
+        query = s"""
+          mutation {
+            updateObservations(input: {
+              SET: {
+                targetEnvironment: {
+                  ${blindOffsetTargetInput(blindOffsetInput("Replacement Target", "99.999", "-88.888"))}
+                }
+              }
+              WHERE: {
+                id: { EQ: ${oid.asJson} }
+              }
+            }) {
+              $observationsFields
+            }
+          }
+        """,
+        expected = expectedListResults("updateObservations", "observations", NoTargetTitle, true, "Replacement Target".some, BlindOffsetType.Manual)
+      )
+      _ <- expectTargetNotFoundAs(pi, tid)
+      _ <- getBlindOffsetId(pi, oid)
+    } yield ()
+
+  test("update observation to replace manual blind offset target with empty automatic blind offset target"):
+    for {
+      pid <- createProgramAs(pi)
+      oid <- createObservationAs(pi, pid)
+      _ <- expect(
+        user = pi,
+        query = s"""
+          mutation {
+            updateObservations(input: {
+              SET: {
+                targetEnvironment: {
+                  ${blindOffsetTargetInput(blindOffsetInput("Original Target", "12.345", "45.678"))}
+                  blindOffsetType: MANUAL
+                }
+              }
+              WHERE: {
+                id: { EQ: ${oid.asJson} }
+              }
+            }) {
+              $observationsFields
+            }
+          }
+        """,
+        expected = expectedListResults("updateObservations", "observations", NoTargetTitle, true, "Original Target".some, BlindOffsetType.Manual)
+      )
+      tid <- getBlindOffsetId(pi, oid)
+      _   <- expectTargetExistenceAs(pi, tid, shouldBePresent = true)
+      _ <- expect(
+        user = pi,
+        query = s"""
+          mutation {
+            updateObservations(input: {
+              SET: {
+                targetEnvironment: {
+                  useBlindOffset: true
+                  blindOffsetTarget: null
+                  blindOffsetType: AUTOMATIC
+                }
+              }
+              WHERE: {
+                id: { EQ: ${oid.asJson} }
+              }
+            }) {
+              $observationsFields
+            }
+          }
+        """,
+        expected = expectedListResults("updateObservations", "observations", NoTargetTitle, true, none, BlindOffsetType.Automatic)
+      )
+      _ <- expectTargetNotFoundAs(pi, tid)
+    } yield ()
+
+  test("update observation to replace automatic blind offset target with empty automatic blind offset target"):
+    for {
+      pid <- createProgramAs(pi)
+      oid <- createObservationAs(pi, pid)
+      _ <- expect(
+        user = pi,
+        query = s"""
+          mutation {
+            updateObservations(input: {
+              SET: {
+                targetEnvironment: {
+                  ${blindOffsetTargetInput(blindOffsetInput("Original Target", "12.345", "45.678"))}
+                  blindOffsetType: AUTOMATIC
+                }
+              }
+              WHERE: {
+                id: { EQ: ${oid.asJson} }
+              }
+            }) {
+              $observationsFields
+            }
+          }
+        """,
+        expected = expectedListResults("updateObservations", "observations", NoTargetTitle, true, "Original Target".some, BlindOffsetType.Automatic)
+      )
+      tid <- getBlindOffsetId(pi, oid)
+      _   <- expectTargetExistenceAs(pi, tid, shouldBePresent = true)
+      _ <- expect(
+        user = pi,
+        query = s"""
+          mutation {
+            updateObservations(input: {
+              SET: {
+                targetEnvironment: {
+                  useBlindOffset: true
+                  blindOffsetTarget: null
+                  blindOffsetType: AUTOMATIC
+                }
+              }
+              WHERE: {
+                id: { EQ: ${oid.asJson} }
+              }
+            }) {
+              $observationsFields
+            }
+          }
+        """,
+        expected = expectedListResults("updateObservations", "observations", NoTargetTitle, true, none, BlindOffsetType.Automatic)
+      )
+      _ <- expectTargetNotFoundAs(pi, tid)
     } yield ()
 
   test("update observation to remove blind offset target"):
