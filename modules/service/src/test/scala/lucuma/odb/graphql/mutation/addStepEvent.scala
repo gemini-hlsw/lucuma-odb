@@ -21,16 +21,16 @@ import lucuma.core.model.sequence.Step
 import lucuma.core.util.IdempotencyKey
 import lucuma.odb.data.AtomExecutionState
 import lucuma.odb.data.StepExecutionState
-
+import scala.collection.immutable.ListMap
 
 class addStepEvent extends OdbSuite with ExecutionState with query.ExecutionTestSupportForGmos:
 
   case class Setup(
     oid:  Observation.Id,
     vid:  Visit.Id,
-    aids: List[Atom.Id],
-    sids: Map[Atom.Id, List[Step.Id]]
+    sids: ListMap[Atom.Id, List[Step.Id]]
   ):
+    def aids: List[Atom.Id] = sids.keys.toList
     def aid0: Atom.Id = aids(0)
     def aid1: Atom.Id = aids(1)
     def aid2: Atom.Id = aids(2)
@@ -47,9 +47,8 @@ class addStepEvent extends OdbSuite with ExecutionState with query.ExecutionTest
       tid  <- createTargetWithProfileAs(user, pid)
       oid  <- createObservationAs(user, pid, mode.some, tid)
       vid  <- recordVisitAs(user, mode.instrument, oid)
-      aids <- selectGmosNorthScienceAtomIds(oid)
-      sids <- selectGmosNorthScienceStepIds(oid)
-    yield Setup(oid, vid, aids, sids)
+      sids <- scienceSequenceIds(user, oid)
+    yield Setup(oid, vid, sids)
 
   private def addStepEventTest(
     mode:     ObservingModeType,

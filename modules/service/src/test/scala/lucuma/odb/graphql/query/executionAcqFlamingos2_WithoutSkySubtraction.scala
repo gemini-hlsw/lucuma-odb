@@ -6,7 +6,6 @@ package lucuma.odb.graphql.query
 import cats.data.NonEmptyList
 import cats.effect.IO
 import cats.syntax.either.*
-import cats.syntax.option.*
 import eu.timepit.refined.types.numeric.PosInt
 import io.circe.Json
 import io.circe.literal.*
@@ -324,8 +323,7 @@ class executionAcqFlamingos2_WithoutSkySubtraction extends ExecutionTestSupportF
       )
 
   def nextAtomStepIds(o: Observation.Id): IO[NonEmptyList[Step.Id]] =
-    import lucuma.odb.testsyntax.execution.*
-    generateOrFail(o, 5.some).map(_.flamingos2Acquisition.nextAtom.steps.map(_.id))
+    scienceSequenceIds(serviceUser, o).map(m => NonEmptyList.fromListUnsafe(m.head._2))
 
   test("nextAtom step ids don't change while executing"):
     val execAcq: IO[List[NonEmptyList[Step.Id]]] =

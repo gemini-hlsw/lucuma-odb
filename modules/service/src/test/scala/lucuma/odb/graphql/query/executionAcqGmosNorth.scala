@@ -369,8 +369,7 @@ class executionAcqGmosNorth extends ExecutionTestSupportForGmos:
       )
 
   def firstScienceStepId(o: Observation.Id): IO[Step.Id] =
-    import lucuma.odb.testsyntax.execution.*
-    generateOrFail(o, 5.some).map(_.gmosNorthScience.nextAtom.steps.head.id)
+    scienceSequenceIds(serviceUser, o).map(_.head._2.head)
 
   test("science step ids do not change while executing acquisition"):
     val execAcq: IO[Set[Step.Id]] =
@@ -410,8 +409,7 @@ class executionAcqGmosNorth extends ExecutionTestSupportForGmos:
     assertIO(execAcq.map(_.size), 1)
 
   def nextAtomStepIds(o: Observation.Id): IO[NonEmptyList[Step.Id]] =
-    import lucuma.odb.testsyntax.execution.*
-    generateOrFail(o, 5.some).map(_.gmosNorthAcquisition.nextAtom.steps.map(_.id))
+    scienceSequenceIds(serviceUser, o).map(m => NonEmptyList.fromListUnsafe(m.head._2))
 
   test("nextAtom step ids don't change while executing"):
     val execAcq: IO[List[NonEmptyList[Step.Id]]] =

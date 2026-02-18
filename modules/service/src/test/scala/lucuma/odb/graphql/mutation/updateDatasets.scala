@@ -13,19 +13,12 @@ import lucuma.core.enums.DatasetQaState
 import lucuma.core.enums.ObservingModeType
 import lucuma.odb.data.OdbError
 
-class updateDatasets extends OdbSuite with query.DatasetSetupOperations {
+class updateDatasets extends OdbSuite with query.DatasetSetupOperations with query.ExecutionTestSupportForGmos:
 
-  val pi      = TestUsers.Standard.pi(1, 30)
-  val pi2     = TestUsers.Standard.pi(2, 32)
-  val service = TestUsers.service(3)
-  val staff   = TestUsers.Standard.staff(4, 44)
-
-  val mode    = ObservingModeType.GmosNorthLongSlit
-
-  val validUsers = List(pi, pi2, service, staff)
+  val mode = ObservingModeType.GmosNorthLongSlit
 
   test("updateDatasets") {
-    recordDatasets(mode, pi, service, 0, 2, 3).flatMap {
+    recordDatasets(mode, pi, serviceUser, 0, 2, 3).flatMap {
       case (_, _) =>
         val q = s"""
           mutation {
@@ -66,7 +59,7 @@ class updateDatasets extends OdbSuite with query.DatasetSetupOperations {
   }
 
   test("updateDatasets - where comment") {
-    recordDatasets(mode, pi, service, 6, 2, 3).flatMap {
+    recordDatasets(mode, pi, serviceUser, 6, 2, 3).flatMap {
       case (_, _) =>
         val init = query(staff, s"""
           mutation {
@@ -154,7 +147,7 @@ class updateDatasets extends OdbSuite with query.DatasetSetupOperations {
   }
 
   test("updateDatasets - subset select") {
-    recordDatasets(mode, pi, service, 17, 2, 3).flatMap {
+    recordDatasets(mode, pi, serviceUser, 17, 2, 3).flatMap {
       case (_, _) =>
         val q = s"""
           mutation {
@@ -214,7 +207,7 @@ class updateDatasets extends OdbSuite with query.DatasetSetupOperations {
         }
       """
       expectOdbError(pi, q, {
-        case OdbError.NotAuthorized(pi.id, _) => () // expected
+        case OdbError.NotAuthorized(_, _) => () // expected
       })
   }
 
@@ -260,10 +253,10 @@ class updateDatasets extends OdbSuite with query.DatasetSetupOperations {
     for
       pid <- createProgramAs(pi)
       oid <- createObservationAs(pi, pid, mode.some)
-      vid <- recordVisitAs(service, mode.instrument, oid)
-      aid <- recordAtomAs(service, mode.instrument, vid)
-      sid <- recordStepAs(service, mode.instrument, aid)
-      did <- recordDatasetAs(service, sid, "N18630703S0001.fits")
+      vid <- recordVisitAs(serviceUser, mode.instrument, oid)
+      aid <- recordAtomAs(serviceUser, mode.instrument, vid)
+      sid <- recordStepAs(serviceUser, mode.instrument, aid)
+      did <- recordDatasetAs(serviceUser, sid, "N18630703S0001.fits")
       _   <- updateDatasets(staff, DatasetQaState.Pass, List(did))
       _   <- assertIO(chronDatasetUpdates(did).map(_.drop(1)), List(
           json"""
@@ -307,5 +300,3 @@ class updateDatasets extends OdbSuite with query.DatasetSetupOperations {
           """
       ))
     yield ()
-
-}
