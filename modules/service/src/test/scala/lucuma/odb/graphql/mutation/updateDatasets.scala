@@ -255,7 +255,7 @@ class updateDatasets extends OdbSuite with query.DatasetSetupOperations with que
       tid <- createTargetWithProfileAs(pi, pid)
       oid <- createObservationAs(pi, pid, mode.some, tid)
       vid <- recordVisitAs(serviceUser, mode.instrument, oid)
-      sid <- scienceSequenceIds(serviceUser, oid).map(_.head._2.head)
+      sid <- firstScienceStepId(serviceUser, oid)
       did <- recordDatasetAs(serviceUser, sid, vid, "N18630703S0001.fits")
       _   <- updateDatasets(staff, DatasetQaState.Pass, List(did))
       _   <- assertIO(chronDatasetUpdates(did).map(_.drop(1)), List(
