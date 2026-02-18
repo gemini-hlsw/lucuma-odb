@@ -64,7 +64,7 @@ class datasetChronicleEntries extends OdbSuite with DatasetSetupOperations with 
       vid <- recordVisitAs(serviceUser, mode.instrument, oid)
       aid <- recordAtomAs(serviceUser, mode.instrument, vid)
       sid <- recordStepAs(serviceUser, mode.instrument, aid)
-      did <- recordDatasetAs(serviceUser, sid, "N18630703S0001.fits")
+      did <- recordDatasetAs(serviceUser, sid, vid, "N18630703S0001.fits")
       t0   = Timestamp.FromString.getOption("2025-07-30T23:00:00Z").get
       t1   = Timestamp.FromString.getOption("2025-07-30T23:00:10Z").get
       _   <- setInterval(did, TimestampInterval.between(t0, t1))
@@ -187,7 +187,7 @@ class datasetChronicleEntries extends OdbSuite with DatasetSetupOperations with 
       vid <- recordVisitAs(serviceUser, mode.instrument, oid)
       aid <- recordAtomAs(serviceUser, mode.instrument, vid)
       sid <- recordStepAs(serviceUser, mode.instrument, aid)
-      did <- recordDatasetAs(serviceUser, sid, "N18630703S0002.fits")
+      did <- recordDatasetAs(serviceUser, sid, vid, "N18630703S0002.fits")
       _   <- expect(
         staff,
         s"""
@@ -292,7 +292,7 @@ class datasetChronicleEntries extends OdbSuite with DatasetSetupOperations with 
       vid <- recordVisitAs(serviceUser, mode.instrument, oid)
       aid <- recordAtomAs(serviceUser, mode.instrument, vid)
       sid <- recordStepAs(serviceUser, mode.instrument, aid)
-      did <- recordDatasetAs(serviceUser, sid, f"N18630703S$index%04d.fits")
+      did <- recordDatasetAs(serviceUser, sid, vid, f"N18630703S$index%04d.fits")
       t0   = Timestamp.FromString.getOption("2025-07-30T23:00:00Z").get
       t1   = Timestamp.FromString.getOption("2025-07-30T23:00:10Z").get
       _   <- setInterval(did, TimestampInterval.between(t0, t1))

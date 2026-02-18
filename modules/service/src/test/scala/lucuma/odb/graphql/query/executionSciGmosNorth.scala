@@ -290,7 +290,7 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos:
         s2 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, sciTelescopeConfig(0), ObserveClass.Science)
         _  <- addEndStepEvent(s2)
 
-        d  <- recordDatasetAs(serviceUser, s1, "N20240905S1000.fits")
+        d  <- recordDatasetAs(serviceUser, s1, v, "N20240905S1000.fits")
         _  <- setQaState(d, DatasetQaState.Usable)
       yield o
 
@@ -356,7 +356,7 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos:
         s7 <- recordStepAs(serviceUser, a1, Instrument.GmosNorth, gmosNorthScience(5), StepConfig.Science, sciTelescopeConfig(0), ObserveClass.Science)
         _  <- addEndStepEvent(s7)
 
-        d  <- recordDatasetAs(serviceUser, s2, "N20240905S1001.fits")
+        d  <- recordDatasetAs(serviceUser, s2, v, "N20240905S1001.fits")
         _  <- setQaState(d, DatasetQaState.Usable)
       yield o
 

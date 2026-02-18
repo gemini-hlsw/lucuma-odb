@@ -84,7 +84,7 @@ class ShortCut_6589 extends ExecutionTestSupportForGmos:
         s3 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthScience(45), StepConfig.Science, sciTelescopeConfig(-15), ObserveClass.Science)
         _  <- addEndStepEvent(s3)
 
-        d  <- recordDatasetAs(serviceUser, s2, f"N20240905S1$i%03d.fits")
+        d  <- recordDatasetAs(serviceUser, s2, v, f"N20240905S1$i%03d.fits")
       yield Setup(p, o, v, g, a, d)
 
   def nextAtomId(o: Observation.Id): IO[Option[Atom.Id]] =

@@ -1085,11 +1085,11 @@ class reference extends OdbSuite {
       vid  <- recordVisitAs(service, mode.instrument, oid)
       aid  <- recordAtomAs(service, mode.instrument, vid)
       sid0 <- recordStepAs(service, mode.instrument, aid)
-      did0 <- recordDatasetAs(service, sid0, "N18630101S0010.fits")
-      did1 <- recordDatasetAs(service, sid0, "N18630101S0011.fits")
+      did0 <- recordDatasetAs(service, sid0, vid, "N18630101S0010.fits")
+      did1 <- recordDatasetAs(service, sid0, vid, "N18630101S0011.fits")
       sid1 <- recordStepAs(service, mode.instrument, aid)
-      did2 <- recordDatasetAs(service, sid1, "N18630101S0012.fits")
-      did3 <- recordDatasetAs(service, sid1, "N18630101S0013.fits")
+      did2 <- recordDatasetAs(service, sid1, vid, "N18630101S0012.fits")
+      did3 <- recordDatasetAs(service, sid1, vid, "N18630101S0013.fits")
       _    <- expectDatasetReference(pi, did0, DatasetReference(oRef, 1.posInt, 1.posInt))
       _    <- expectDatasetReference(pi, did1, DatasetReference(oRef, 1.posInt, 2.posInt))
       _    <- expectDatasetReference(pi, did2, DatasetReference(oRef, 2.posInt, 1.posInt))
@@ -1105,7 +1105,7 @@ class reference extends OdbSuite {
       vid <- recordVisitAs(service, mode.instrument, oid)
       aid <- recordAtomAs(service, mode.instrument, vid)
       sid <- recordStepAs(service, mode.instrument, aid)
-      did <- recordDatasetAs(service, sid, "N18630101S0006.fits")
+      did <- recordDatasetAs(service, sid, vid, "N18630101S0006.fits")
       _   <- expect(pi,
                s"""query { dataset(datasetId: "$did") { reference { label } } }""",
                json"""{ "dataset": { "reference": null } }""".asRight

@@ -33,6 +33,7 @@ trait ExecutionQuerySetupOperations extends DatabaseOperations { this: OdbSuite 
     setup:   Setup,
     user:    User,
     sid:     Step.Id,
+    vid:     Visit.Id,
     atom:    Int,
     step:    Int,
     dataset: Int
@@ -54,7 +55,7 @@ trait ExecutionQuerySetupOperations extends DatabaseOperations { this: OdbSuite 
     )
 
     for {
-      did <- recordDatasetAs(user, sid, f"$DatasetFilenamePrefix$idx%04d.fits")
+      did <- recordDatasetAs(user, sid, vid, f"$DatasetFilenamePrefix$idx%04d.fits")
       es  <- stages.traverse { stage => addDatasetEventAs(user, did, stage) }
     } yield DatasetNode(did, es)
   }
@@ -83,7 +84,7 @@ trait ExecutionQuerySetupOperations extends DatabaseOperations { this: OdbSuite 
     for {
       sid <- recordStepAs(user, mode.instrument, aid)
       es0 <- stages0.traverse { stage => addStepEventAs(user, sid, vid, stage) }
-      ds  <- (0 until setup.datasetCount).toList.traverse { d => recordDataset(setup, user, sid, atom, step, d) }
+      ds  <- (0 until setup.datasetCount).toList.traverse { d => recordDataset(setup, user, sid, vid, atom, step, d) }
       es1 <- stages1.traverse { stage => addStepEventAs(user, sid, vid, stage) }
     } yield StepNode(sid, ds, es0 ::: es1)
   }

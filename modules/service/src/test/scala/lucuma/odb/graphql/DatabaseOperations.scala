@@ -2253,12 +2253,14 @@ trait DatabaseOperations { this: OdbSuite =>
   def recordDatasetAs(
     user:     User,
     sid:      Step.Id,
+    vid:      Visit.Id,
     filename: String
   ): IO[Dataset.Id] =
     val q = s"""
       mutation {
         recordDataset(input: {
-          stepId: ${sid.asJson},
+          stepId: ${sid.asJson}
+          visitId: ${vid.asJson}
           filename: "$filename"
         }) {
           dataset {

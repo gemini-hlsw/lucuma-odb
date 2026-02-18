@@ -252,11 +252,11 @@ class updateDatasets extends OdbSuite with query.DatasetSetupOperations with que
   test("chronicle auditing"):
     for
       pid <- createProgramAs(pi)
-      oid <- createObservationAs(pi, pid, mode.some)
+      tid <- createTargetWithProfileAs(pi, pid)
+      oid <- createObservationAs(pi, pid, mode.some, tid)
       vid <- recordVisitAs(serviceUser, mode.instrument, oid)
-      aid <- recordAtomAs(serviceUser, mode.instrument, vid)
-      sid <- recordStepAs(serviceUser, mode.instrument, aid)
-      did <- recordDatasetAs(serviceUser, sid, "N18630703S0001.fits")
+      sid <- scienceSequenceIds(serviceUser, oid).map(_.head._2.head)
+      did <- recordDatasetAs(serviceUser, sid, vid, "N18630703S0001.fits")
       _   <- updateDatasets(staff, DatasetQaState.Pass, List(did))
       _   <- assertIO(chronDatasetUpdates(did).map(_.drop(1)), List(
           json"""

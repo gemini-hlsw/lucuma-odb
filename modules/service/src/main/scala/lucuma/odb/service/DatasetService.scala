@@ -96,7 +96,11 @@ object DatasetService {
               case SqlState.NotNullViolation(ex) if ex.getMessage.contains("c_observation_id") => stepNotFound
             }
 
-        ResultT(insert).value
+        val did = for
+          _ <- ResultT(sequenceService.setStepVisit(input.stepId, input.visitId))
+          d <- ResultT(insert)
+        yield d
+        did.value
       }
 
       override def updateDatasets(

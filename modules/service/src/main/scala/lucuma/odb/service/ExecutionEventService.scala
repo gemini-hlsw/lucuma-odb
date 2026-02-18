@@ -119,11 +119,10 @@ object ExecutionEventService:
         ResultT(insert)
           .flatMap: (eid, _, wasInserted) =>
             if wasInserted then
-              ResultT.liftF:
-                for
-                  _ <- services.sequenceService.setAtomVisit(input.atomId, input.visitId)
-                  _ <- timeAccountingService.update(input.visitId)
-                yield eid
+              for
+                _ <- ResultT(services.sequenceService.setAtomVisit(input.atomId, input.visitId))
+                _ <- ResultT.liftF(timeAccountingService.update(input.visitId))
+              yield eid
             else
               ResultT.pure(eid)
           .value
@@ -239,7 +238,7 @@ object ExecutionEventService:
           .flatMap: (eid, oid, aid, wasInserted) =>
             if wasInserted then
               for
-                _ <- ResultT.liftF(services.sequenceService.setAtomVisit(aid, input.visitId))
+                _ <- ResultT(services.sequenceService.setAtomVisit(aid, input.visitId))
                 _ <- ResultT.liftF(services.sequenceService.setStepExecutionState(input.stepId, input.stepStage))
                 _ <- ResultT.liftF(services.sequenceService.abandonStepsInOngoingAtomsExceptStep(oid, input.stepId))
                 _ <- ResultT.liftF(timeAccountingService.update(input.visitId))

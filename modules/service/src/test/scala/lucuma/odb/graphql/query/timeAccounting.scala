@@ -263,14 +263,15 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
   def recordStep(
     user:         User,
     mode:         ObservingModeType,
+    vid:          Visit.Id,
     aid:          Atom.Id,
     datasetCount: Int,
     idx:          Int
   ): IO[StepNode] =
-    for {
+    for
       sid  <- recordStepAs(user, mode.instrument, aid)
-      dids <- (0 until datasetCount).toList.traverse { d => recordDatasetAs(user, sid, f"N18630101S${idx+d+1}%04d.fits") }
-    } yield StepNode(sid, dids)
+      dids <- (0 until datasetCount).toList.traverse { d => recordDatasetAs(user, sid, vid, f"N18630101S${idx+d+1}%04d.fits") }
+    yield StepNode(sid, dids)
 
   def recordAtom(
     user:         User,
@@ -283,7 +284,7 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
 
     for {
       aid   <- recordAtomAs(user, mode.instrument, vid)
-      steps <- (0 until stepCount).toList.traverse { s => recordStep(user, mode, aid, datasetCount, idx + s * datasetCount) }
+      steps <- (0 until stepCount).toList.traverse { s => recordStep(user, mode, vid, aid, datasetCount, idx + s * datasetCount) }
     } yield AtomNode(aid, steps)
 
   def setVisitTime(

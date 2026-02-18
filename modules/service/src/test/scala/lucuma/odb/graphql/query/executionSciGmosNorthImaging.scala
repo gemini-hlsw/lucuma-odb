@@ -802,7 +802,7 @@ class executionSciGmosNorthImaging extends ExecutionTestSupportForGmos:
         a  <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
         s0 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, Step(GmosNorthFilter.GPrime, Time120x06).toGmosNorthProtoStep)
         _  <- addEndStepEvent(s0)
-        d  <- recordDatasetAs(serviceUser, s0, "N20240905S1001.fits")
+        d  <- recordDatasetAs(serviceUser, s0, v, "N20240905S1001.fits")
         _  <- setQaState(d, DatasetQaState.Usable)
         _  <- (0 until 5).toList.traverse { _ =>
                 recordStepAs(serviceUser, a, Instrument.GmosNorth, Step(GmosNorthFilter.GPrime, Time120x06).toGmosNorthProtoStep)
