@@ -368,9 +368,6 @@ class executionAcqGmosNorth extends ExecutionTestSupportForGmos:
           """.asRight
       )
 
-  def firstScienceStepId(o: Observation.Id): IO[Step.Id] =
-    scienceSequenceIds(serviceUser, o).map(_.head._2.head)
-
   test("science step ids do not change while executing acquisition"):
     val execAcq: IO[Set[Step.Id]] =
       for
@@ -379,31 +376,31 @@ class executionAcqGmosNorth extends ExecutionTestSupportForGmos:
         o  <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
         v  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
 
-        x0 <- firstScienceStepId(o)
+        x0 <- firstScienceStepId(serviceUser, o)
 
         // First atom with 3 steps.
         a0 <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Acquisition)
         s0 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthAcq(0), StepConfig.Science, acqTelescopeConfig(0), ObserveClass.Acquisition)
         _  <- addEndStepEvent(s0)
 
-        x1 <- firstScienceStepId(o)
+        x1 <- firstScienceStepId(serviceUser, o)
 
         s1 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthAcq(1), StepConfig.Science, acqTelescopeConfig(10), ObserveClass.Acquisition)
         _  <- addEndStepEvent(s1)
 
-        x1 <- firstScienceStepId(o)
+        x1 <- firstScienceStepId(serviceUser, o)
 
         s2 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthAcq(2), StepConfig.Science, acqTelescopeConfig(0), ObserveClass.Acquisition)
         _  <- addEndStepEvent(s2)
 
-        x2 <- firstScienceStepId(o)
+        x2 <- firstScienceStepId(serviceUser, o)
 
         // Second atom with just the last acq step
         a1 <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Acquisition)
         s3 <- recordStepAs(serviceUser, a1, Instrument.GmosNorth, gmosNorthAcq(2), StepConfig.Science, acqTelescopeConfig(0), ObserveClass.Acquisition)
         _  <- addEndStepEvent(s3)
 
-        x3 <- firstScienceStepId(o)
+        x3 <- firstScienceStepId(serviceUser, o)
       yield Set(x0, x1, x2, x3)
 
     assertIO(execAcq.map(_.size), 1)
