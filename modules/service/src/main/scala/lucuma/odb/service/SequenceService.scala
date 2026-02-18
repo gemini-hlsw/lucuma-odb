@@ -3,6 +3,7 @@
 
 package lucuma.odb.service
 
+import cats.syntax.applicativeError.*
 import cats.Applicative
 import cats.Order.catsKernelOrderingForOrder
 import cats.data.NonEmptyList
@@ -16,6 +17,8 @@ import cats.syntax.option.*
 import eu.timepit.refined.types.string.NonEmptyString
 import fs2.Pipe
 import fs2.Stream
+import grackle.Result
+import grackle.syntax.*
 import lucuma.core.enums.ChargeClass
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObserveClass
@@ -39,6 +42,8 @@ import lucuma.core.model.sequence.gmos.StaticConfig.GmosNorth as GmosNorthStatic
 import lucuma.core.model.sequence.gmos.StaticConfig.GmosSouth as GmosSouthStatic
 import lucuma.core.util.TimeSpan
 import lucuma.odb.data.AtomExecutionState
+import lucuma.odb.data.OdbError
+import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.data.StepExecutionState
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.TimeEstimateCalculator
@@ -76,7 +81,12 @@ trait SequenceService[F[_]]:
   def setAtomVisit(
     atomId:  Atom.Id,
     visitId: Visit.Id
-  )(using Transaction[F], Services.ServiceAccess): F[Unit]
+  )(using Transaction[F], Services.ServiceAccess): F[Result[Unit]]
+
+  def setStepVisit(
+    stepId:  Step.Id,
+    visitId: Visit.Id
+  )(using Transaction[F], Services.ServiceAccess): F[Result[Unit]]
 
   def insertAtomDigests(
     observationId: Observation.Id,
@@ -169,8 +179,30 @@ object SequenceService:
       override def setAtomVisit(
         atomId:  Atom.Id,
         visitId: Visit.Id
-      )(using Transaction[F], Services.ServiceAccess): F[Unit] =
-        session.execute(Statements.SetAtomVisitId)(visitId, atomId).void
+      )(using Transaction[F], Services.ServiceAccess): F[Result[Unit]] =
+        def invalidVisit: OdbError.InvalidVisit =
+          OdbError.InvalidVisit(visitId, Some(s"Visit '$visitId' cannot be assigned to atom '$atomId'."))
+
+        session
+          .execute(Statements.SetAtomVisitId)(visitId, atomId).void
+          .map(_.success)
+          .recoverWith:
+            case SqlState.ForeignKeyViolation(_)                                        =>
+              invalidVisit.asFailureF
+
+      override def setStepVisit(
+        stepId:  Step.Id,
+        visitId: Visit.Id
+      )(using Transaction[F], Services.ServiceAccess): F[Result[Unit]] =
+        def invalidVisit: OdbError.InvalidVisit =
+          OdbError.InvalidVisit(visitId, Some(s"Visit '$visitId' cannot be assigned to step '$stepId'."))
+
+        session
+          .execute(Statements.SetStepVisitId)(visitId, stepId).void
+          .map(_.success)
+          .recoverWith:
+            case SqlState.CheckViolation(_) =>
+              invalidVisit.asFailureF
 
       override def insertAtomDigests(
         observationId: Observation.Id,
@@ -541,7 +573,16 @@ object SequenceService:
       sql"""
         UPDATE t_atom a
            SET c_visit_id = $visit_id
-         WHERE c_atom_id  = $atom_id
+         WHERE a.c_atom_id  = $atom_id
+      """.command
+
+    val SetStepVisitId: Command[(Visit.Id, Step.Id)] =
+      sql"""
+        UPDATE t_atom a
+           SET c_visit_id = $visit_id
+          FROM t_step s
+         WHERE s.c_step_id = $step_id
+           AND a.c_atom_id = s.c_atom_id
       """.command
 
     val SetStepExecutionState: Command[(StepExecutionState, Step.Id)] =

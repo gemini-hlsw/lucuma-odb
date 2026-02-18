@@ -327,7 +327,7 @@ class executionAcqGmosNorth extends ExecutionTestSupportForGmos:
         _  <- addEndStepEvent(s1)
 
         // Fail the second step
-        d  <- recordDatasetAs(serviceUser, s1, "N20240905S1000.fits")
+        d  <- recordDatasetAs(serviceUser, s1, v, "N20240905S1000.fits")
         _  <- setQaState(d, DatasetQaState.Usable)
 
         // We'll have to repeat the second step (index 1)

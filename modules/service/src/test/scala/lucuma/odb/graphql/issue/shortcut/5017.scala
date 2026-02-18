@@ -37,7 +37,7 @@ class ShortCut_5017 extends ExecutionTestSupportForGmos:
 
   test("Digest updates after dataset QA"):
 
-    def recordDatasetAndEvents(c: AtomicCell[IO, Int], s: Step.Id): IO[Dataset.Id] =
+    def recordDatasetAndEvents(c: AtomicCell[IO, Int], s: Step.Id, v: Visit.Id): IO[Dataset.Id] =
       val stages = List(
         DatasetStage.StartExpose,  DatasetStage.EndExpose,
         DatasetStage.StartReadout, DatasetStage.EndReadout,
@@ -46,7 +46,7 @@ class ShortCut_5017 extends ExecutionTestSupportForGmos:
 
       for
         i <- c.updateAndGet(_ + 1)
-        d <- recordDatasetAs(serviceUser, s, f"N20250313S$i%04d.fits")
+        d <- recordDatasetAs(serviceUser, s, v, f"N20250313S$i%04d.fits")
         _ <- stages.traverse_(addDatasetEventAs(serviceUser, d, _).void)
       yield d
 
@@ -56,7 +56,7 @@ class ShortCut_5017 extends ExecutionTestSupportForGmos:
         _ <- addStepEventAs(serviceUser, s, v, StepStage.StartConfigure)
         _ <- addStepEventAs(serviceUser, s, v, StepStage.EndConfigure)
         _ <- addStepEventAs(serviceUser, s, v, StepStage.StartObserve)
-        d <- recordDatasetAndEvents(c, s)
+        d <- recordDatasetAndEvents(c, s, v)
         _ <- addStepEventAs(serviceUser, s, v, StepStage.EndObserve)
         _ <- addStepEventAs(serviceUser, s, v, StepStage.EndStep)
       yield d

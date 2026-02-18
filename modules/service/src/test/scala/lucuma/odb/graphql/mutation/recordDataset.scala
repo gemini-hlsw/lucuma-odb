@@ -240,7 +240,7 @@ class recordDataset extends OdbSuite {
 
   test("chronicle auditing"):
     setup(ObservingModeType.GmosNorthLongSlit, service).flatMap: (_, oid, vid, _, sid) =>
-      recordDatasetAs(service, sid, "N18630101S0004.fits").flatMap: did =>
+      recordDatasetAs(service, sid, vid, "N18630101S0004.fits").flatMap: did =>
         assertIO(chronDatasetUpdates(did), List(
           json"""
             {

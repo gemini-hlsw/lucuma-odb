@@ -42,7 +42,7 @@ class addDatasetEvent extends OdbSuite with query.ExecutionTestSupportForGmos:
       aid0  = sids.head._1
       sid0  = sids.head._2.apply(0)
       _    <- addStepEventAs(user, sid0, vid, StepStage.EndStep)
-      did  <- recordDatasetAs(user, sid0, file)
+      did  <- recordDatasetAs(user, sid0, vid, file)
     yield (oid, did)
 
   private def addDatasetEventTest(

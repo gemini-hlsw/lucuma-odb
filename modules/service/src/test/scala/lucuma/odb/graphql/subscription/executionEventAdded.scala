@@ -148,7 +148,7 @@ class executionEventAdded extends OdbSuite with SubscriptionUtils:
         mutations = Right(
           recordAtomAs(service, mode.instrument, vid).flatMap: aid =>
             recordStepAs(service, mode.instrument, aid).flatMap: sid =>
-              recordDatasetAs(service, sid, "N20250103S0001.fits").flatMap: did =>
+              recordDatasetAs(service, sid, vid, "N20250103S0001.fits").flatMap: did =>
                 addSlewEventAs(service, oid, SlewStage.StartSlew)         >>
                 addSlewEventAs(service, oid, SlewStage.EndSlew)           >>
                 addSequenceEventAs(service, vid, SequenceCommand.Start)   >>
@@ -178,7 +178,7 @@ class executionEventAdded extends OdbSuite with SubscriptionUtils:
         mutations = Right(
           recordAtomAs(service, mode.instrument, vid).flatMap: aid =>
             recordStepAs(service, mode.instrument, aid).flatMap: sid =>
-              recordDatasetAs(service, sid, "N20250103S0002.fits").flatMap: did =>
+              recordDatasetAs(service, sid, vid, "N20250103S0002.fits").flatMap: did =>
                 addSlewEventAs(service, oid, SlewStage.StartSlew)         >>
                 addSlewEventAs(service, oid, SlewStage.EndSlew)           >>
                 addSequenceEventAs(service, vid, SequenceCommand.Start)   >>

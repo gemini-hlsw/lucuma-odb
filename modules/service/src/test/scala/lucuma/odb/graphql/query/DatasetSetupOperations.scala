@@ -34,7 +34,7 @@ trait DatasetSetupOperations extends DatabaseOperations with query.GenerationTes
       _   <- addStepEventAs(service, sid, vid, StepStage.StartStep)
       ids <- (0 until stepCount).toList.traverse { x =>
         (0 until datasetsPerStep).toList.traverse { y =>
-          recordDatasetAs(service, sid, f"N18630101S${offset + x * datasetsPerStep + y + 1}%04d.fits")
+          recordDatasetAs(service, sid, vid, f"N18630101S${offset + x * datasetsPerStep + y + 1}%04d.fits")
         }.tupleLeft(sid)
       }
     yield (oid, ids)

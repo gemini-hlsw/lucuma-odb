@@ -4514,6 +4514,9 @@ input RecordDatasetInput {
   "Corresponding Step id."
   stepId: StepId!
 
+  "Visit associated with the dataset."
+  visitId: VisitId!
+
   "Dataset filename."
   filename: DatasetFilename!
 
