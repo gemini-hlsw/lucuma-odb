@@ -21,6 +21,7 @@ import lucuma.core.model.sequence.Step
 import lucuma.core.util.IdempotencyKey
 import lucuma.odb.data.AtomExecutionState
 import lucuma.odb.data.StepExecutionState
+
 import scala.collection.immutable.ListMap
 
 class addStepEvent extends OdbSuite with ExecutionState with query.ExecutionTestSupportForGmos:
