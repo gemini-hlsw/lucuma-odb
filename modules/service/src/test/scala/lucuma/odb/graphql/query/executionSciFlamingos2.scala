@@ -62,7 +62,7 @@ class executionSciFlamingos2 extends ExecutionTestSupportForFlamingos2:
         v <- recordVisitAs(serviceUser, Instrument.Flamingos2, o)
         a <- recordAtomAs(serviceUser, Instrument.Flamingos2, v, SequenceType.Science)
         s <- recordStepAs(serviceUser, a, Instrument.Flamingos2, flamingos2Science(ExposureTime), StepConfig.Science, sciTelescopeConfig(15), ObserveClass.Science)
-        _ <- addEndStepEvent(s)
+        _ <- addEndStepEvent(s, v)
       yield o
 
     setup.flatMap: oid =>
@@ -92,13 +92,13 @@ class executionSciFlamingos2 extends ExecutionTestSupportForFlamingos2:
         v  <- recordVisitAs(serviceUser, Instrument.Flamingos2, o)
         a  <- recordAtomAs(serviceUser, Instrument.Flamingos2, v, SequenceType.Science)
         s0 <- recordStepAs(serviceUser, a, Instrument.Flamingos2, flamingos2Science(ExposureTime), StepConfig.Science, sciTelescopeConfig(15), ObserveClass.Science)
-        _  <- addEndStepEvent(s0)
+        _  <- addEndStepEvent(s0, v)
         s1 <- recordStepAs(serviceUser, a, Instrument.Flamingos2, flamingos2Science(ExposureTime), StepConfig.Science, sciTelescopeConfig(-15), ObserveClass.Science)
-        _  <- addEndStepEvent(s1)
+        _  <- addEndStepEvent(s1, v)
         s2 <- recordStepAs(serviceUser, a, Instrument.Flamingos2, flamingos2Science(ExposureTime), StepConfig.Science, sciTelescopeConfig(-15), ObserveClass.Science)
-        _  <- addEndStepEvent(s2)
+        _  <- addEndStepEvent(s2, v)
         s3 <- recordStepAs(serviceUser, a, Instrument.Flamingos2, flamingos2Science(ExposureTime), StepConfig.Science, sciTelescopeConfig(15), ObserveClass.Science)
-        _  <- addEndStepEvent(s3)
+        _  <- addEndStepEvent(s3, v)
       yield o
 
     setup.flatMap: oid =>
@@ -128,17 +128,17 @@ class executionSciFlamingos2 extends ExecutionTestSupportForFlamingos2:
         v  <- recordVisitAs(serviceUser, Instrument.Flamingos2, o)
         a  <- recordAtomAs(serviceUser, Instrument.Flamingos2, v, SequenceType.Science)
         s0 <- recordStepAs(serviceUser, a, Instrument.Flamingos2, flamingos2Science(ExposureTime), StepConfig.Science, sciTelescopeConfig(15), ObserveClass.Science)
-        _  <- addEndStepEvent(s0)
+        _  <- addEndStepEvent(s0, v)
         s1 <- recordStepAs(serviceUser, a, Instrument.Flamingos2, flamingos2Science(ExposureTime), StepConfig.Science, sciTelescopeConfig(-15), ObserveClass.Science)
-        _  <- addEndStepEvent(s1)
+        _  <- addEndStepEvent(s1, v)
         s2 <- recordStepAs(serviceUser, a, Instrument.Flamingos2, flamingos2Science(ExposureTime), StepConfig.Science, sciTelescopeConfig(-15), ObserveClass.Science)
-        _  <- addEndStepEvent(s2)
+        _  <- addEndStepEvent(s2, v)
         s3 <- recordStepAs(serviceUser, a, Instrument.Flamingos2, flamingos2Science(ExposureTime), StepConfig.Science, sciTelescopeConfig(15), ObserveClass.Science)
-        _  <- addEndStepEvent(s3)
+        _  <- addEndStepEvent(s3, v)
         s4 <- recordStepAs(serviceUser, a, Instrument.Flamingos2, Flamingos2Arc, Flamingos2ArcStep, gcalTelescopeConfig(15), ObserveClass.NightCal)
-        _  <- addEndStepEvent(s4)
+        _  <- addEndStepEvent(s4, v)
         s5 <- recordStepAs(serviceUser, a, Instrument.Flamingos2, Flamingos2Flat, Flamingos2FlatStep, gcalTelescopeConfig(15), ObserveClass.NightCal)
-        _  <- addEndStepEvent(s5)
+        _  <- addEndStepEvent(s5, v)
       yield o
 
     setup.flatMap: oid =>
@@ -164,17 +164,17 @@ class executionSciFlamingos2 extends ExecutionTestSupportForFlamingos2:
         v  <- recordVisitAs(serviceUser, Instrument.Flamingos2, o)
         a  <- recordAtomAs(serviceUser, Instrument.Flamingos2, v, SequenceType.Science)
         s0 <- recordStepAs(serviceUser, a, Instrument.Flamingos2, flamingos2Science(ExposureTime), StepConfig.Science, sciTelescopeConfig(15), ObserveClass.Science)
-        _  <- addEndStepEvent(s0)
+        _  <- addEndStepEvent(s0, v)
         s1 <- recordStepAs(serviceUser, a, Instrument.Flamingos2, flamingos2Science(ExposureTime), StepConfig.Science, sciTelescopeConfig(-15), ObserveClass.Science)
-        _  <- addEndStepEvent(s1)
+        _  <- addEndStepEvent(s1, v)
         d  <- recordDatasetAs(serviceUser, s1, v, "N20240905S1000.fits")
         _  <- setQaState(d, DatasetQaState.Usable)
         s2 <- recordStepAs(serviceUser, a, Instrument.Flamingos2, flamingos2Science(ExposureTime), StepConfig.Science, sciTelescopeConfig(-15), ObserveClass.Science)
-        _  <- addEndStepEvent(s2)
+        _  <- addEndStepEvent(s2, v)
         s3 <- recordStepAs(serviceUser, a, Instrument.Flamingos2, flamingos2Science(ExposureTime), StepConfig.Science, sciTelescopeConfig(-15), ObserveClass.Science)
-        _  <- addEndStepEvent(s3)
+        _  <- addEndStepEvent(s3, v)
         s4 <- recordStepAs(serviceUser, a, Instrument.Flamingos2, flamingos2Science(ExposureTime), StepConfig.Science, sciTelescopeConfig(15), ObserveClass.Science)
-        _  <- addEndStepEvent(s4)
+        _  <- addEndStepEvent(s4, v)
       yield o
 
     setup.flatMap: oid =>
@@ -204,15 +204,15 @@ class executionSciFlamingos2 extends ExecutionTestSupportForFlamingos2:
         v  <- recordVisitAs(serviceUser, Instrument.Flamingos2, o)
         a  <- recordAtomAs(serviceUser, Instrument.Flamingos2, v, SequenceType.Science)
         s0 <- recordStepAs(serviceUser, a, Instrument.Flamingos2, flamingos2Science(ExposureTime), StepConfig.Science, sciTelescopeConfig(15), ObserveClass.Science)
-        _  <- addEndStepEvent(s0)
+        _  <- addEndStepEvent(s0, v)
         s1 <- recordStepAs(serviceUser, a, Instrument.Flamingos2, flamingos2Science(ExposureTime), StepConfig.Science, sciTelescopeConfig(-15), ObserveClass.Science)
-        _  <- addEndStepEvent(s1)
+        _  <- addEndStepEvent(s1, v)
         d  <- recordDatasetAs(serviceUser, s1, v, "N20240905S1001.fits")
         _  <- setQaState(d, DatasetQaState.Usable)
         s2 <- recordStepAs(serviceUser, a, Instrument.Flamingos2, flamingos2Science(ExposureTime), StepConfig.Science, sciTelescopeConfig(-15), ObserveClass.Science)
-        _  <- addEndStepEvent(s2)
+        _  <- addEndStepEvent(s2, v)
         s3 <- recordStepAs(serviceUser, a, Instrument.Flamingos2, flamingos2Science(ExposureTime), StepConfig.Science, sciTelescopeConfig(15), ObserveClass.Science)
-        _  <- addEndStepEvent(s3)
+        _  <- addEndStepEvent(s3, v)
       yield o
 
     setup.flatMap: oid =>

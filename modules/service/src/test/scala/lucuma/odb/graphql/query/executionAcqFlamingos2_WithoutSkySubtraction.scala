@@ -115,7 +115,7 @@ class executionAcqFlamingos2_WithoutSkySubtraction extends ExecutionTestSupportF
         // Record the first atom and one of its steps
         a  <- recordAtomAs(serviceUser, Instrument.Flamingos2, v, SequenceType.Acquisition)
         s0 <- recordStepAs(serviceUser, a, Instrument.Flamingos2, Flamingos2AcqImage.copy(exposure = ExposureTime), StepConfig.Science, acqTelescopeConfig(0), ObserveClass.Acquisition)
-        _  <- addEndStepEvent(s0)
+        _  <- addEndStepEvent(s0, v)
         _  <- resetAcquisitionAs(serviceUser, o)
       yield o
 
@@ -137,11 +137,11 @@ class executionAcqFlamingos2_WithoutSkySubtraction extends ExecutionTestSupportF
         // Record the first atom with 3 steps
         a  <- recordAtomAs(serviceUser, Instrument.Flamingos2, v, SequenceType.Acquisition)
         s0 <- recordStepAs(serviceUser, a, Instrument.Flamingos2, Flamingos2AcqImage.copy(exposure = ExposureTime), StepConfig.Science, acqTelescopeConfig(0), ObserveClass.Acquisition)
-        _  <- addEndStepEvent(s0)
+        _  <- addEndStepEvent(s0, v)
         s1 <- recordStepAs(serviceUser, a, Instrument.Flamingos2, Flamingos2AcqSlit.copy(exposure = 10.secTimeSpan), StepConfig.Science, acqTelescopeConfig(10), ObserveClass.Acquisition)
-        _  <- addEndStepEvent(s1)
+        _  <- addEndStepEvent(s1, v)
         s2 <- recordStepAs(serviceUser, a, Instrument.Flamingos2, Flamingos2AcqSlit.copy(exposure = ExposureTime), StepConfig.Science, acqTelescopeConfig(0), ObserveClass.Acquisition)
-        _  <- addEndStepEvent(s2)
+        _  <- addEndStepEvent(s2, v)
 
         // Now the last acquisition step should be generated as the nextAtom
       yield o
@@ -164,7 +164,7 @@ class executionAcqFlamingos2_WithoutSkySubtraction extends ExecutionTestSupportF
         // Record the first atom and one of its steps
         a  <- recordAtomAs(serviceUser, Instrument.Flamingos2, v, SequenceType.Acquisition)
         s0 <- recordStepAs(serviceUser, a, Instrument.Flamingos2, Flamingos2AcqImage.copy(exposure = ExposureTime), StepConfig.Science, acqTelescopeConfig(0), ObserveClass.Acquisition)
-        _  <- addEndStepEvent(s0)
+        _  <- addEndStepEvent(s0, v)
       yield o
 
     setup.flatMap: oid =>
@@ -213,16 +213,16 @@ class executionAcqFlamingos2_WithoutSkySubtraction extends ExecutionTestSupportF
         // First atom with 3 steps.
         a0 <- recordAtomAs(serviceUser, Instrument.Flamingos2, v, SequenceType.Acquisition)
         s0 <- recordStepAs(serviceUser, a0, Instrument.Flamingos2, Flamingos2AcqImage.copy(exposure = ExposureTime), StepConfig.Science, acqTelescopeConfig(0), ObserveClass.Acquisition)
-        _  <- addEndStepEvent(s0)
+        _  <- addEndStepEvent(s0, v)
         s1 <- recordStepAs(serviceUser, a0, Instrument.Flamingos2, Flamingos2AcqSlit.copy(exposure = 10.secTimeSpan), StepConfig.Science, acqTelescopeConfig(10), ObserveClass.Acquisition)
-        _  <- addEndStepEvent(s1)
+        _  <- addEndStepEvent(s1, v)
         s2 <- recordStepAs(serviceUser, a0, Instrument.Flamingos2, Flamingos2AcqSlit.copy(exposure = ExposureTime), StepConfig.Science, acqTelescopeConfig(0), ObserveClass.Acquisition)
-        _  <- addEndStepEvent(s2)
+        _  <- addEndStepEvent(s2, v)
 
         // Second atom with just the last acq step
         a1 <- recordAtomAs(serviceUser, Instrument.Flamingos2, v, SequenceType.Acquisition)
         s3 <- recordStepAs(serviceUser, a1, Instrument.Flamingos2, Flamingos2AcqSlit.copy(exposure = ExposureTime), StepConfig.Science, acqTelescopeConfig(0), ObserveClass.Acquisition)
-        _  <- addEndStepEvent(s3)
+        _  <- addEndStepEvent(s3, v)
 
         // Now we should expect to generate (again) the last acq step
       yield o
@@ -245,14 +245,14 @@ class executionAcqFlamingos2_WithoutSkySubtraction extends ExecutionTestSupportF
         // Acquisition Sequence
         a0 <- recordAtomAs(serviceUser, Instrument.Flamingos2, v, SequenceType.Acquisition)
         s0 <- recordStepAs(serviceUser, a0, Instrument.Flamingos2, Flamingos2AcqImage.copy(exposure = ExposureTime), StepConfig.Science, acqTelescopeConfig(0), ObserveClass.Acquisition)
-        _  <- addEndStepEvent(s0)
+        _  <- addEndStepEvent(s0, v)
         s1 <- recordStepAs(serviceUser, a0, Instrument.Flamingos2, Flamingos2AcqSlit.copy(exposure = 10.secTimeSpan), StepConfig.Science, acqTelescopeConfig(10), ObserveClass.Acquisition)
-        _  <- addEndStepEvent(s1)
+        _  <- addEndStepEvent(s1, v)
         s2 <- recordStepAs(serviceUser, a0, Instrument.Flamingos2, Flamingos2AcqSlit.copy(exposure = ExposureTime), StepConfig.Science, acqTelescopeConfig(0), ObserveClass.Acquisition)
-        _  <- addEndStepEvent(s2)
+        _  <- addEndStepEvent(s2, v)
         a1 <- recordAtomAs(serviceUser, Instrument.Flamingos2, v, SequenceType.Acquisition)
         s3 <- recordStepAs(serviceUser, a1, Instrument.Flamingos2, Flamingos2AcqSlit.copy(exposure = ExposureTime), StepConfig.Science, acqTelescopeConfig(0), ObserveClass.Acquisition)
-        _  <- addEndStepEvent(s3)
+        _  <- addEndStepEvent(s3, v)
 
         // Reset acquisition to take it from the top.
         _  <- resetAcquisitionAs(serviceUser, o)
@@ -276,9 +276,9 @@ class executionAcqFlamingos2_WithoutSkySubtraction extends ExecutionTestSupportF
         // Record the first atom and two of its steps
         a  <- recordAtomAs(serviceUser, Instrument.Flamingos2, v, SequenceType.Acquisition)
         s0 <- recordStepAs(serviceUser, a, Instrument.Flamingos2, Flamingos2AcqImage.copy(exposure = ExposureTime), StepConfig.Science, acqTelescopeConfig(0), ObserveClass.Acquisition)
-        _  <- addEndStepEvent(s0)
+        _  <- addEndStepEvent(s0, v)
         s1 <- recordStepAs(serviceUser, a, Instrument.Flamingos2, Flamingos2AcqSlit.copy(exposure = 10.secTimeSpan), StepConfig.Science, acqTelescopeConfig(10), ObserveClass.Acquisition)
-        _  <- addEndStepEvent(s1)
+        _  <- addEndStepEvent(s1, v)
 
         // Fail the second step
         d  <- recordDatasetAs(serviceUser, s1, v, "N20240905S1000.fits")
@@ -338,12 +338,12 @@ class executionAcqFlamingos2_WithoutSkySubtraction extends ExecutionTestSupportF
         // First atom with 3 steps.
         a0 <- recordAtomAs(serviceUser, Instrument.Flamingos2, v, SequenceType.Acquisition)
         s0 <- recordStepAs(serviceUser, a0, Instrument.Flamingos2, Flamingos2AcqImage.copy(exposure = ExposureTime), StepConfig.Science, acqTelescopeConfig(0), ObserveClass.Acquisition)
-        _  <- addEndStepEvent(s0)
+        _  <- addEndStepEvent(s0, v)
 
         x1 <- nextAtomStepIds(o)
 
         s1 <- recordStepAs(serviceUser, a0, Instrument.Flamingos2, Flamingos2AcqSlit.copy(exposure = 10.secTimeSpan), StepConfig.Science, acqTelescopeConfig(10), ObserveClass.Acquisition)
-        _  <- addEndStepEvent(s1)
+        _  <- addEndStepEvent(s1, v)
 
         x2 <- nextAtomStepIds(o)
       yield List(x0, x1, x2)

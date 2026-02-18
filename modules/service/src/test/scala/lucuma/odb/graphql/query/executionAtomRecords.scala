@@ -559,7 +559,7 @@ class executionAtomRecords extends OdbSuite with ExecutionQuerySetupOperations
       ga0 <- generatedNextAtomId(pi, oid, Acquisition)
       aid <- recordAtomAs(serviceUser, mode.instrument, vid, sequenceType = Acquisition)
       sid <- recordStepAs(serviceUser, aid, mode.instrument, gmosNorthScience(0), StepConfig.Science, telescopeConfig(0, 0, StepGuideState.Enabled))
-      _   <- addEndStepEvent(sid)
+      _   <- addEndStepEvent(sid, vid)
       ga1 <- generatedNextAtomId(pi, oid, Acquisition)
     } yield assertEquals(ga0, ga1)
   }
@@ -573,7 +573,7 @@ class executionAtomRecords extends OdbSuite with ExecutionQuerySetupOperations
       ga0 <- generatedNextAtomId(pi, oid, Science)
       aid <- recordAtomAs(serviceUser, mode.instrument, vid, sequenceType = Acquisition)
       sid <- recordStepAs(serviceUser, aid, mode.instrument, gmosNorthScience(0), StepConfig.Science, telescopeConfig(0, 0, StepGuideState.Enabled))
-      _   <- addEndStepEvent(sid)
+      _   <- addEndStepEvent(sid, vid)
       ga1 <- generatedNextAtomId(pi, oid, Science)
     } yield assertEquals(ga0, ga1)
   }

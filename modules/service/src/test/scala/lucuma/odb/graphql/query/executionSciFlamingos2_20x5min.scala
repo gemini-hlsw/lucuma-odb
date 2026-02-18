@@ -15,6 +15,7 @@ import lucuma.core.enums.SequenceCommand
 import lucuma.core.enums.SequenceType
 import lucuma.core.enums.StepGuideState.Enabled
 import lucuma.core.model.Observation
+import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.StepConfig
@@ -84,29 +85,29 @@ class executionSciFlamingos2_20x5min extends ExecutionTestSupportForFlamingos2:
     withSession: session =>
       session.execute(query)(s, start, end).void
 
-  private def recordAbba(a: Atom.Id, rt: Timestamp): IO[Unit] =
+  private def recordAbba(a: Atom.Id, v: Visit.Id, rt: Timestamp): IO[Unit] =
     for
       a0 <- recordStepAs(serviceUser, a, Instrument.Flamingos2, flamingos2Science(ExposureTime), StepConfig.Science, sciTelescopeConfig(15), ObserveClass.Science)
-      _  <- addEndStepEvent(a0)
+      _  <- addEndStepEvent(a0, v)
       _  <- adjustStepTime(a0, rt,                   rt +|  5.minTimeSpan)
       b0 <- recordStepAs(serviceUser, a, Instrument.Flamingos2, flamingos2Science(ExposureTime), StepConfig.Science, sciTelescopeConfig(-15), ObserveClass.Science)
-      _  <- addEndStepEvent(b0)
+      _  <- addEndStepEvent(b0, v)
       _  <- adjustStepTime(b0, rt +|  5.minTimeSpan, rt +| 10.minTimeSpan)
       b1 <- recordStepAs(serviceUser, a, Instrument.Flamingos2, flamingos2Science(ExposureTime), StepConfig.Science, sciTelescopeConfig(-15), ObserveClass.Science)
-      _  <- addEndStepEvent(b1)
+      _  <- addEndStepEvent(b1, v)
       _  <- adjustStepTime(b1, rt +| 10.minTimeSpan, rt +| 15.minTimeSpan)
       a1 <- recordStepAs(serviceUser, a, Instrument.Flamingos2, flamingos2Science(ExposureTime), StepConfig.Science, sciTelescopeConfig(15), ObserveClass.Science)
-      _  <- addEndStepEvent(a1)
+      _  <- addEndStepEvent(a1, v)
       _  <- adjustStepTime(a1, rt +| 15.minTimeSpan, rt +| 20.minTimeSpan)
     yield ()
 
-  private def recordCals(a: Atom.Id, rt: Timestamp): IO[Unit] =
+  private def recordCals(a: Atom.Id, v: Visit.Id, rt: Timestamp): IO[Unit] =
     for
       f <- recordStepAs(serviceUser, a, Instrument.Flamingos2, Flamingos2Flat, Flamingos2FlatStep, gcalTelescopeConfig(15), ObserveClass.NightCal)
-      _ <- addEndStepEvent(f)
+      _ <- addEndStepEvent(f, v)
       _ <- adjustStepTime(f, rt, rt +| 15.secTimeSpan)
       r <- recordStepAs(serviceUser, a, Instrument.Flamingos2, Flamingos2Arc, Flamingos2ArcStep, gcalTelescopeConfig(15), ObserveClass.NightCal)
-      _ <- addEndStepEvent(r)
+      _ <- addEndStepEvent(r, v)
       _ <- adjustStepTime(r, rt +| 15.secTimeSpan, rt +| (15 + 32).secTimeSpan)
     yield ()
 
@@ -119,7 +120,7 @@ class executionSciFlamingos2_20x5min extends ExecutionTestSupportForFlamingos2:
         v  <- recordVisitAs(serviceUser, Instrument.Flamingos2, o)
         a  <- recordAtomAs(serviceUser, Instrument.Flamingos2, v, SequenceType.Science)
         rt <- Clock[IO].realTimeInstant.map(Timestamp.unsafeFromInstantTruncated)
-        _  <- recordAbba(a, rt)
+        _  <- recordAbba(a, v, rt)
       yield o
 
     setup.flatMap: oid =>
@@ -155,8 +156,8 @@ class executionSciFlamingos2_20x5min extends ExecutionTestSupportForFlamingos2:
         v  <- recordVisitAs(serviceUser, Instrument.Flamingos2, o)
         a  <- recordAtomAs(serviceUser, Instrument.Flamingos2, v, SequenceType.Science)
         rt <- Clock[IO].realTimeInstant.map(Timestamp.unsafeFromInstantTruncated)
-        _  <- recordAbba(a, rt)
-        _  <- recordAbba(a, rt +| 20.minTimeSpan)
+        _  <- recordAbba(a, v, rt)
+        _  <- recordAbba(a, v, rt +| 20.minTimeSpan)
       yield o
 
     setup.flatMap: oid =>
@@ -191,9 +192,9 @@ class executionSciFlamingos2_20x5min extends ExecutionTestSupportForFlamingos2:
         v  <- recordVisitAs(serviceUser, Instrument.Flamingos2, o)
         a  <- recordAtomAs(serviceUser, Instrument.Flamingos2, v, SequenceType.Science)
         rt <- Clock[IO].realTimeInstant.map(Timestamp.unsafeFromInstantTruncated)
-        _  <- recordAbba(a, rt)
-        _  <- recordAbba(a, rt +| 20.minTimeSpan)
-        _  <- recordAbba(a, rt +| 40.minTimeSpan)
+        _  <- recordAbba(a, v, rt)
+        _  <- recordAbba(a, v, rt +| 20.minTimeSpan)
+        _  <- recordAbba(a, v, rt +| 40.minTimeSpan)
       yield o
 
     setup.flatMap: oid =>
@@ -227,10 +228,10 @@ class executionSciFlamingos2_20x5min extends ExecutionTestSupportForFlamingos2:
         v  <- recordVisitAs(serviceUser, Instrument.Flamingos2, o)
         a  <- recordAtomAs(serviceUser, Instrument.Flamingos2, v, SequenceType.Science)
         rt <- Clock[IO].realTimeInstant.map(Timestamp.unsafeFromInstantTruncated)
-        _  <- recordAbba(a, rt)
-        _  <- recordAbba(a, rt +| 20.minTimeSpan)
-        _  <- recordAbba(a, rt +| 40.minTimeSpan)
-        _  <- recordCals(a, rt +| 60.minTimeSpan)
+        _  <- recordAbba(a, v, rt)
+        _  <- recordAbba(a, v, rt +| 20.minTimeSpan)
+        _  <- recordAbba(a, v, rt +| 40.minTimeSpan)
+        _  <- recordCals(a, v, rt +| 60.minTimeSpan)
       yield o
 
     setup.flatMap: oid =>
@@ -263,11 +264,11 @@ class executionSciFlamingos2_20x5min extends ExecutionTestSupportForFlamingos2:
         v  <- recordVisitAs(serviceUser, Instrument.Flamingos2, o)
         a  <- recordAtomAs(serviceUser, Instrument.Flamingos2, v, SequenceType.Science)
         rt <- Clock[IO].realTimeInstant.map(Timestamp.unsafeFromInstantTruncated)
-        _  <- recordAbba(a, rt)
-        _  <- recordAbba(a, rt +| 20.minTimeSpan)
-        _  <- recordAbba(a, rt +| 40.minTimeSpan)
-        _  <- recordCals(a, rt +| 60.minTimeSpan)
-        _  <- recordAbba(a, rt +| (60 + 15 + 32).minTimeSpan)
+        _  <- recordAbba(a, v, rt)
+        _  <- recordAbba(a, v, rt +| 20.minTimeSpan)
+        _  <- recordAbba(a, v, rt +| 40.minTimeSpan)
+        _  <- recordCals(a, v, rt +| 60.minTimeSpan)
+        _  <- recordAbba(a, v, rt +| (60 + 15 + 32).minTimeSpan)
       yield o
 
     setup.flatMap: oid =>
@@ -299,12 +300,12 @@ class executionSciFlamingos2_20x5min extends ExecutionTestSupportForFlamingos2:
         v  <- recordVisitAs(serviceUser, Instrument.Flamingos2, o)
         a  <- recordAtomAs(serviceUser, Instrument.Flamingos2, v, SequenceType.Science)
         rt <- Clock[IO].realTimeInstant.map(Timestamp.unsafeFromInstantTruncated)
-        _  <- recordAbba(a, rt)
-        _  <- recordAbba(a, rt +| 20.minTimeSpan)
-        _  <- recordAbba(a, rt +| 40.minTimeSpan)
-        _  <- recordCals(a, rt +| 60.minTimeSpan)
-        _  <- recordAbba(a, rt +| (60 + 15 + 32).minTimeSpan)
-        _  <- recordAbba(a, rt +| (80 + 15 + 32).minTimeSpan)
+        _  <- recordAbba(a, v, rt)
+        _  <- recordAbba(a, v, rt +| 20.minTimeSpan)
+        _  <- recordAbba(a, v, rt +| 40.minTimeSpan)
+        _  <- recordCals(a, v, rt +| 60.minTimeSpan)
+        _  <- recordAbba(a, v, rt +| (60 + 15 + 32).minTimeSpan)
+        _  <- recordAbba(a, v, rt +| (80 + 15 + 32).minTimeSpan)
       yield o
 
     setup.flatMap: oid =>
@@ -334,13 +335,13 @@ class executionSciFlamingos2_20x5min extends ExecutionTestSupportForFlamingos2:
         v  <- recordVisitAs(serviceUser, Instrument.Flamingos2, o)
         a  <- recordAtomAs(serviceUser, Instrument.Flamingos2, v, SequenceType.Science)
         rt <- Clock[IO].realTimeInstant.map(Timestamp.unsafeFromInstantTruncated)
-        _  <- recordAbba(a, rt)
-        _  <- recordAbba(a, rt +| 20.minTimeSpan)
-        _  <- recordAbba(a, rt +| 40.minTimeSpan)
-        _  <- recordCals(a, rt +| 60.minTimeSpan)
-        _  <- recordAbba(a, rt +| ( 60 + 15 + 32).minTimeSpan)
-        _  <- recordAbba(a, rt +| ( 80 + 15 + 32).minTimeSpan)
-        _  <- recordCals(a, rt +| (100 + 15 + 32).minTimeSpan)
+        _  <- recordAbba(a, v, rt)
+        _  <- recordAbba(a, v, rt +| 20.minTimeSpan)
+        _  <- recordAbba(a, v, rt +| 40.minTimeSpan)
+        _  <- recordCals(a, v, rt +| 60.minTimeSpan)
+        _  <- recordAbba(a, v, rt +| ( 60 + 15 + 32).minTimeSpan)
+        _  <- recordAbba(a, v, rt +| ( 80 + 15 + 32).minTimeSpan)
+        _  <- recordCals(a, v, rt +| (100 + 15 + 32).minTimeSpan)
       yield o
 
     setup.flatMap: oid =>
@@ -366,7 +367,7 @@ class executionSciFlamingos2_20x5min extends ExecutionTestSupportForFlamingos2:
         v <- recordVisitAs(serviceUser, Instrument.Flamingos2, o)
         a <- recordAtomAs(serviceUser, Instrument.Flamingos2, v, SequenceType.Science)
         s <- recordStepAs(serviceUser, a, Instrument.Flamingos2, flamingos2Science(ExposureTime), StepConfig.Science, sciTelescopeConfig(15), ObserveClass.Science)
-        _ <- addEndStepEvent(s)
+        _ <- addEndStepEvent(s, v)
         _ <- addSequenceEventAs(serviceUser, v, SequenceCommand.Stop)
       yield o
 

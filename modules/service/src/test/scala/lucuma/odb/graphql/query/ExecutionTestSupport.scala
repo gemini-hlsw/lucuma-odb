@@ -21,6 +21,7 @@ import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.User
+import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.TelescopeConfig
@@ -184,11 +185,12 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations wi
       }
     """
 
-  def addEndStepEvent(sid: Step.Id): IO[Unit] = {
+  def addEndStepEvent(sid: Step.Id, vid: Visit.Id): IO[Unit] = {
     val q = s"""
       mutation {
         addStepEvent(input: {
-          stepId: "$sid",
+          stepId: "$sid"
+          visitId: "$vid"
           stepStage: END_STEP
         }) {
           event {

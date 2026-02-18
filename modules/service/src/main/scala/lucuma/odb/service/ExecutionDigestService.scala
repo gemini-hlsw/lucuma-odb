@@ -120,6 +120,7 @@ object ExecutionDigestService:
           sciConfigs.map(_.guiding),
           digest.science.atomCount,
           digest.science.executionState,
+          oid,
           hash,
           digest.setup.full,
           digest.setup.reacquisition,
@@ -216,6 +217,7 @@ object ExecutionDigestService:
       List[StepGuideState],
       NonNegInt,
       ExecutionState,
+      Observation.Id,
       Md5Hash,
       TimeSpan,
       TimeSpan,
@@ -236,6 +238,7 @@ object ExecutionDigestService:
     )] =
       sql"""
         INSERT INTO t_execution_digest (
+          c_program_id,
           c_observation_id,
           c_hash,
           c_full_setup_time,
@@ -255,6 +258,7 @@ object ExecutionDigestService:
           c_sci_atom_count,
           c_sci_execution_state
         ) SELECT
+          o.c_program_id,
           $observation_id,
           $md5_hash,
           $time_span,
@@ -273,6 +277,8 @@ object ExecutionDigestService:
           $_guide_state,
           $int4_nonneg,
           $execution_state
+        FROM t_observation o
+        WHERE o.c_observation_id = $observation_id
         ON CONFLICT ON CONSTRAINT t_execution_digest_pkey DO UPDATE
           SET c_hash                    = $md5_hash,
               c_full_setup_time         = $time_span,

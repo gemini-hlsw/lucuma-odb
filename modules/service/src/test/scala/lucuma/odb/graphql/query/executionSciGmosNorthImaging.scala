@@ -724,7 +724,7 @@ class executionSciGmosNorthImaging extends ExecutionTestSupportForGmos:
         v <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
         a <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
         s <- recordStepAs(serviceUser, a, Instrument.GmosNorth, Step(GmosNorthFilter.GPrime, Time120x06).toGmosNorthProtoStep)
-        _  <- addEndStepEvent(s)
+        _  <- addEndStepEvent(s, v)
       yield o
 
     val json: List[Json] = List(
@@ -763,7 +763,7 @@ class executionSciGmosNorthImaging extends ExecutionTestSupportForGmos:
         a  <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
         _  <- (0 until 6).toList.traverse { _ =>
                 recordStepAs(serviceUser, a, Instrument.GmosNorth, Step(GmosNorthFilter.GPrime, Time120x06).toGmosNorthProtoStep)
-                  .flatTap(addEndStepEvent)
+                  .flatTap(addEndStepEvent(_, v))
               }.void
       yield o
 
@@ -801,15 +801,15 @@ class executionSciGmosNorthImaging extends ExecutionTestSupportForGmos:
         v  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
         a  <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
         s0 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, Step(GmosNorthFilter.GPrime, Time120x06).toGmosNorthProtoStep)
-        _  <- addEndStepEvent(s0)
+        _  <- addEndStepEvent(s0, v)
         d  <- recordDatasetAs(serviceUser, s0, v, "N20240905S1001.fits")
         _  <- setQaState(d, DatasetQaState.Usable)
         _  <- (0 until 5).toList.traverse { _ =>
                 recordStepAs(serviceUser, a, Instrument.GmosNorth, Step(GmosNorthFilter.GPrime, Time120x06).toGmosNorthProtoStep)
-                  .flatTap(addEndStepEvent)
+                  .flatTap(addEndStepEvent(_, v))
               }.void
         s1 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, Step(GmosNorthFilter.IPrime, Time060x12).toGmosNorthProtoStep)
-        _  <- addEndStepEvent(s1)
+        _  <- addEndStepEvent(s1, v)
       yield o
 
     val json: List[Json] = List(
