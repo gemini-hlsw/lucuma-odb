@@ -26,7 +26,6 @@ import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Dataset
-import lucuma.core.util.Timestamp
 import lucuma.itc.client.ItcClient
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
@@ -34,7 +33,7 @@ import lucuma.odb.graphql.binding.BooleanBinding
 import lucuma.odb.graphql.binding.DatasetIdBinding
 import lucuma.odb.graphql.binding.ExecutionEventIdBinding
 import lucuma.odb.graphql.binding.NonNegIntBinding
-import lucuma.odb.graphql.binding.TimestampBinding
+import lucuma.odb.graphql.binding.PosIntBinding
 import lucuma.odb.graphql.binding.VisitIdBinding
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.graphql.table.ObscalcTable
@@ -93,10 +92,10 @@ trait ExecutionMapping[F[_]] extends ObservationEffectHandler[F]
       }
 
     case (ExecutionType, "atomRecords", List(
-      TimestampBinding.Option("OFFSET", rOFFSET),
+      PosIntBinding.Option("OFFSET", rOFFSET),
       NonNegIntBinding.Option("LIMIT", rLIMIT)
     )) =>
-      selectWithOffsetAndLimit(rOFFSET, rLIMIT, AtomRecordType, "_firstEventTime", Predicates.atomRecord.firstEventTime, Predicates.atomRecord.visit.observation.program)
+      selectWithOffsetAndLimit(rOFFSET, rLIMIT, AtomRecordType, "index", Predicates.atomRecord.index, Predicates.atomRecord.visit.observation.program)
 
     case (ExecutionType, "datasets", List(
       DatasetIdBinding.Option("OFFSET", rOFFSET),

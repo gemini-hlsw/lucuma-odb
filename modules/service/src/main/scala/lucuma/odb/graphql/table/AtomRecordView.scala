@@ -16,5 +16,5 @@ trait AtomRecordView[F[_]] extends BaseMapping[F]:
     val VisitId: ColumnRef        = col("c_visit_id",         visit_id)
     val Description: ColumnRef    = col("c_description",      text_nonempty.opt)
     val ExecutionState: ColumnRef = col("c_execution_state",  atom_execution_state)
-    val FirstEventTime: ColumnRef = col("c_first_event_time", core_timestamp)
-    val LastEventTime:  ColumnRef = col("c_last_event_time",  core_timestamp)
+    val FirstEventTime: ColumnRef = col("c_first_event_time", core_timestamp.opt)
+    val LastEventTime:  ColumnRef = col("c_last_event_time",  core_timestamp.opt)

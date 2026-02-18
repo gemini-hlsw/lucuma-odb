@@ -22,7 +22,9 @@ import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.Step
 import lucuma.core.syntax.string.*
 
-trait ExecutionQuerySetupOperations extends DatabaseOperations { this: OdbSuite =>
+import scala.collection.immutable.ListMap
+
+trait ExecutionQuerySetupOperations extends DatabaseOperations with GenerationTestSupport { this: OdbSuite =>
 
   import ExecutionQuerySetupOperations.*
 
@@ -37,7 +39,7 @@ trait ExecutionQuerySetupOperations extends DatabaseOperations { this: OdbSuite 
     atom:    Int,
     step:    Int,
     dataset: Int
-  ): IO[DatasetNode] = {
+  ): IO[DatasetNode] =
 
     val idx = setup.offset                                                     +
                atom * (setup.stepCount * setup.datasetCount)                   +
@@ -54,21 +56,20 @@ trait ExecutionQuerySetupOperations extends DatabaseOperations { this: OdbSuite 
       DatasetStage.EndWrite
     )
 
-    for {
+    for
       did <- recordDatasetAs(user, sid, vid, f"$DatasetFilenamePrefix$idx%04d.fits")
       es  <- stages.traverse { stage => addDatasetEventAs(user, did, stage) }
-    } yield DatasetNode(did, es)
-  }
+    yield DatasetNode(did, es)
 
   def recordStep(
-    mode:    ObservingModeType,
     setup:   Setup,
     user:    User,
     aid:     Atom.Id,
     vid:     Visit.Id,
     atom:    Int,
-    step:    Int
-  ): IO[StepNode] = {
+    step:    Int,
+    ids:     ListMap[Atom.Id, List[Step.Id]]
+  ): IO[StepNode] =
 
     val stages0 = List(
       StepStage.StartStep,
@@ -81,38 +82,41 @@ trait ExecutionQuerySetupOperations extends DatabaseOperations { this: OdbSuite 
       StepStage.EndObserve,
       StepStage.EndStep
     )
-    for {
-      sid <- recordStepAs(user, mode.instrument, aid)
+
+    val sid = ids(aid)(step)
+    for
       es0 <- stages0.traverse { stage => addStepEventAs(user, sid, vid, stage) }
       ds  <- (0 until setup.datasetCount).toList.traverse { d => recordDataset(setup, user, sid, vid, atom, step, d) }
       es1 <- stages1.traverse { stage => addStepEventAs(user, sid, vid, stage) }
-    } yield StepNode(sid, ds, es0 ::: es1)
-  }
+    yield StepNode(sid, ds, es0 ::: es1)
 
   def recordAtom(
-    mode:    ObservingModeType,
-    setup:   Setup,
-    user:    User,
-    vid:     Visit.Id,
-    atom:    Int
+    setup: Setup,
+    user:  User,
+    vid:   Visit.Id,
+    atom:  Int,
+    ids:   ListMap[Atom.Id, List[Step.Id]]
   ): IO[AtomNode] =
-    for {
-      aid <- recordAtomAs(user, mode.instrument, vid)
-      ss  <- (0 until setup.stepCount).toList.traverse { s => recordStep(mode, setup, user, aid, vid, atom, s) }
-    } yield AtomNode(aid, ss)
+    val aid = ids.toList(atom)._1
+    (0 until setup.stepCount)
+      .toList
+      .traverse: s =>
+        recordStep(setup, user, aid, vid, atom, s, ids)
+      .map(steps => AtomNode(aid, steps))
 
   def recordVisit(
-    mode:    ObservingModeType,
-    setup:   Setup,
-    user:    User,
-    oid:     Observation.Id
+    mode:  ObservingModeType,
+    setup: Setup,
+    user:  User,
+    oid:   Observation.Id
   ): IO[VisitNode] =
-    for {
+    for
       vid <- recordVisitAs(user, mode.instrument, oid)
+      ids <- scienceSequenceIds(user, oid)
       e0  <- addSequenceEventAs(user, vid, SequenceCommand.Start)
-      as  <- (0 until setup.atomCount).toList.traverse { a => recordAtom(mode, setup, user, vid, a) }
+      as  <- (0 until setup.atomCount).toList.traverse { a => recordAtom(setup, user, vid, a, ids) }
       e1  <- addSequenceEventAs(user, vid, SequenceCommand.Stop)
-    } yield VisitNode(vid, as, List(e0, e1))
+    yield VisitNode(vid, as, List(e0, e1))
 
   def recordAll(
     user: User,
@@ -122,20 +126,20 @@ trait ExecutionQuerySetupOperations extends DatabaseOperations { this: OdbSuite 
     atomCount: Int    = 1,
     stepCount: Int    = 1,
     datasetCount: Int = 1
-  ): IO[ObservationNode] = {
+  ): IO[ObservationNode] =
     val setup = Setup(offset, atomCount, stepCount, datasetCount)
-    for {
+    for
       pid <- createProgramAs(user)
-      oid <- createObservationAs(user, pid, mode.some)
+      tid <- createTargetWithProfileAs(user, pid)
+      oid <- createObservationAs(user, pid, mode.some, tid)
       v   <- recordVisit(mode, setup, serviceUser, oid)
-    } yield ObservationNode(oid, v)
-  }
+    yield ObservationNode(oid, v)
 
   def setQaState(
     user:    User,
     qaState: DatasetQaState,
     like:    String
-  ): IO[Unit] = {
+  ): IO[Unit] =
 
     val q = s"""
       mutation {
@@ -157,41 +161,34 @@ trait ExecutionQuerySetupOperations extends DatabaseOperations { this: OdbSuite 
     """
 
     query(user, q).void
-  }
 
 }
 
-object ExecutionQuerySetupOperations {
+object ExecutionQuerySetupOperations:
 
-  trait Node {
+  trait Node:
     def allDatasets: List[Dataset.Id]
     def allEvents: List[ExecutionEvent]
-  }
 
-  case class DatasetNode(id: Dataset.Id, events: List[ExecutionEvent]) extends Node {
+  case class DatasetNode(id: Dataset.Id, events: List[ExecutionEvent]) extends Node:
     def allDatasets = List(id)
     def allEvents   = events
-  }
 
-  case class StepNode(id: Step.Id, datasets: List[DatasetNode], events: List[ExecutionEvent]) extends Node{
+  case class StepNode(id: Step.Id, datasets: List[DatasetNode], events: List[ExecutionEvent]) extends Node:
     def allDatasets = datasets.map(_.id).sorted
     def allEvents   = (datasets.flatMap(_.allEvents) ::: events).sortBy(_.id)
-  }
 
-  case class AtomNode(id: Atom.Id, steps: List[StepNode]) extends Node {
+  case class AtomNode(id: Atom.Id, steps: List[StepNode]) extends Node:
     def allDatasets = steps.flatMap(_.allDatasets).sorted
     def allEvents   = steps.flatMap(_.allEvents).sortBy(_.id)
-  }
 
-  case class VisitNode(id: Visit.Id, atoms: List[AtomNode], events: List[ExecutionEvent]) extends Node {
+  case class VisitNode(id: Visit.Id, atoms: List[AtomNode], events: List[ExecutionEvent]) extends Node:
     def allDatasets = atoms.flatMap(_.allDatasets).sorted
     def allEvents   = (atoms.flatMap(_.allEvents) ::: events).sortBy(_.id)
-  }
 
-  case class ObservationNode(id: Observation.Id, visit: VisitNode) extends Node {
+  case class ObservationNode(id: Observation.Id, visit: VisitNode) extends Node:
     def allDatasets = visit.allDatasets.sorted
     def allEvents   = visit.allEvents.sortBy(_.id)
-  }
 
   case class Setup(
     offset: Int,
@@ -199,5 +196,3 @@ object ExecutionQuerySetupOperations {
     stepCount: Int,
     datasetCount: Int
   )
-
-}

@@ -284,10 +284,9 @@ type AtomRecord {
   "Recorded steps associated with this atom."
   steps(
     """
-    Starts the result set at (or after if not existent) the given step creation
-    time.
+    Starts the result set at (or after if not existent) the given step index.
     """
-    OFFSET: Timestamp
+    OFFSET: PosInt
 
     "Limits the result to at most this number of matches (but never more than 1000)."
     LIMIT: NonNegInt
@@ -7354,8 +7353,8 @@ type Execution {
 
   "Executed (or at least partially executed) atom records, across all visits."
   atomRecords(
-    "Starts the result set at the given atom creation time."
-    OFFSET: Timestamp
+    "Starts the result set at the given atom index."
+    OFFSET: PosInt
 
     "Limits the result to at most this number of matches (but never more than 1000)."
     LIMIT: NonNegInt
@@ -13989,7 +13988,7 @@ type StepRecord {
   time from the first event to the last, whether or not the step ever
   actually completed.
   """
-  interval: TimestampInterval!
+  interval: TimestampInterval
 
   """
   The step configuration, apart from instrument details found in the
@@ -14815,7 +14814,7 @@ type Visit {
   "Executed (or at least partially executed) atom records for this visit."
   atomRecords(
     "Starts the result set at the given atom creation time."
-    OFFSET: Timestamp
+    OFFSET: PosInt
 
     "Limits the result to at most this number of matches (but never more than 1000)."
     LIMIT: NonNegInt

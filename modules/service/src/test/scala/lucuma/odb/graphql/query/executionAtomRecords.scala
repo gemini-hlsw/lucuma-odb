@@ -38,7 +38,8 @@ class executionAtomRecords extends OdbSuite with ExecutionQuerySetupOperations
   def noEventSetup: IO[(Observation.Id, Visit.Id, Atom.Id)] =
     for {
       pid <- createProgramAs(pi)
-      oid <- createObservationAs(pi, pid, mode.some)
+      tid <- createTargetWithProfileAs(pi, pid)
+      oid <- createObservationAs(pi, pid, mode.some, tid)
       vid <- recordVisitAs(serviceUser, mode.instrument, oid)
       aid <- recordAtomAs(serviceUser, mode.instrument, vid)
     } yield (oid, vid, aid)
