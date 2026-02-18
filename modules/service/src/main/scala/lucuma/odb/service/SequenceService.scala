@@ -3,12 +3,12 @@
 
 package lucuma.odb.service
 
-import cats.syntax.applicativeError.*
 import cats.Applicative
 import cats.Order.catsKernelOrderingForOrder
 import cats.data.NonEmptyList
 import cats.data.OptionT
 import cats.effect.Concurrent
+import cats.syntax.applicativeError.*
 import cats.syntax.apply.*
 import cats.syntax.either.*
 import cats.syntax.flatMap.*

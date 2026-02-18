@@ -17,6 +17,7 @@ import lucuma.odb.logic.Generator
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.Services
+
 import scala.collection.immutable.ListMap
 
 trait GenerationTestSupport extends OdbSuite:
