@@ -9,6 +9,7 @@ import cats.syntax.all.*
 import lucuma.core.model.Observation
 import lucuma.core.model.User
 import lucuma.core.model.sequence.Atom
+import lucuma.core.model.sequence.ExecutionConfig
 import lucuma.core.model.sequence.InstrumentExecutionConfig
 import lucuma.core.model.sequence.Step
 import lucuma.odb.data.OdbError
@@ -88,17 +89,34 @@ trait GenerationTestSupport extends OdbSuite:
       case gs @ InstrumentExecutionConfig.GmosSouth(_) => gs.pure
       case i                                           => IO.raiseError(new RuntimeException(s"Expected GMOS North, but got ${i.instrument.longName}"))
 
-  def scienceSequenceIds(
+  private def executionConfig(
     user: User,
     oid:  Observation.Id
-  ): IO[ListMap[Atom.Id, List[Step.Id]]] =
-    val e = generateOrFailAs(user, oid).map:
+  ): IO[ExecutionConfig[?, ?]] =
+    generateOrFailAs(user, oid).map:
       case InstrumentExecutionConfig.Flamingos2(e) => e
       case InstrumentExecutionConfig.GmosNorth(e)  => e
       case InstrumentExecutionConfig.GmosSouth(e)  => e
       case InstrumentExecutionConfig.Igrins2(e)    => e
 
-    e.map: ec =>
+  def acquisitionSequenceIds(
+    user: User,
+    oid:  Observation.Id
+  ): IO[ListMap[Atom.Id, List[Step.Id]]] =
+    executionConfig(user, oid).map: ec =>
+      ListMap.from:
+        ec
+          .acquisition
+          .toList
+          .flatMap: s =>
+            (s.nextAtom :: s.possibleFuture).map: a =>
+              a.id -> a.steps.toList.map(_.id)
+
+  def scienceSequenceIds(
+    user: User,
+    oid:  Observation.Id
+  ): IO[ListMap[Atom.Id, List[Step.Id]]] =
+    executionConfig(user, oid).map: ec =>
       ListMap.from:
         ec
           .science
@@ -118,6 +136,12 @@ trait GenerationTestSupport extends OdbSuite:
     oid:  Observation.Id
   ): IO[List[Step.Id]] =
     scienceSequenceIds(user, oid).map(_.head._2)
+
+  def firstScienceAtomId(
+    user: User,
+    oid:  Observation.Id
+  ): IO[Atom.Id] =
+    scienceAtomIds(user, oid).map(_.head)
 
   def firstScienceStepId(
     user: User,
