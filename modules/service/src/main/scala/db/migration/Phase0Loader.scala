@@ -5,7 +5,7 @@ package db.migration
 
 import cats.effect.IO
 import cats.effect.Resource
-import cats.syntax.foldable.*
+import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.PosInt
 import fs2.Pipe
 import fs2.Stream
@@ -37,7 +37,7 @@ class Phase0Loader[A, B <: ConfigurationRow](
   val instrument: Instrument,
   val pipe:       Pipe[IO, Byte, (A, PosInt)],
   val row:    A => B,
-  val instTable:  Phase0Table[A]
+  val instTable:  Option[Phase0Table[A]]
 ) {
 
   def load(bc: BaseConnection, mode: ConfigModeVariant, is: IO[InputStream]): IO[Unit] = {
@@ -63,7 +63,7 @@ class Phase0Loader[A, B <: ConfigurationRow](
             case i: ImagingRow =>
               (Phase0Table.Imaging.stdinLine(i, idx))
           },
-          instTable.stdinLine(a, idx)
+          instTable.foldMap(_.stdinLine(a, idx))
         )}
 
     val loader = mode match {
@@ -79,12 +79,12 @@ class Phase0Loader[A, B <: ConfigurationRow](
     // 3. Bulk copy in to the spectroscopy table.
     // 4. Bulk copy in to the instrument table.
     for {
-      _  <- IO.println(s"Loading Phase 0 table for $instrument $mode ${instTable.name}")
+      _  <- IO.println(s"Loading Phase 0 table for $instrument $mode ${instTable.fold("n/a")(_.name)}")
       p0 <- rows.compile.last.map(_.map(_._1))
-      _  <- bc.ioUpdate(instTable.truncate)
+      _  <- instTable.foldMap(it => bc.ioUpdate(it.truncate))
       _  <- bc.ioUpdate(loader.deleteFrom(instrument))
       _  <- bc.ioCopyIn(loader.copyFromStdin, toInputStream(rows.map(_._1)))
-      _  <- bc.ioCopyIn(instTable.copyFromStdin, toInputStream(rows.map(_._2)))
+      _  <- instTable.foldMap(it => bc.ioCopyIn(it.copyFromStdin, toInputStream(rows.map(_._2))))
     } yield ()
 
   }
@@ -96,16 +96,17 @@ object Phase0Loader {
   def spectroscopyLoadAll(bc: BaseConnection, fileName: String, is: IO[InputStream]): IO[Unit] =
     val rdr = FileReader[IO](fileName)
     List(
-      new Phase0Loader[GmosSpectroscopyRow.GmosNorth, SpectroscopyRow](Instrument.GmosNorth, rdr.gmosNorthSpectroscopy, _.spec, Phase0Table.SpectroscopyGmosNorth),
-      new Phase0Loader[GmosSpectroscopyRow.GmosSouth, SpectroscopyRow](Instrument.GmosSouth, rdr.gmosSouthSpectroscopy, _.spec, Phase0Table.SpectroscopyGmosSouth),
-      new Phase0Loader[Flamingos2SpectroscopyRow, SpectroscopyRow](Instrument.Flamingos2, rdr.flamingos2Spectroscopy, _.spec, Phase0Table.SpectroscopyFlamingos2)
+      new Phase0Loader[GmosSpectroscopyRow.GmosNorth, SpectroscopyRow](Instrument.GmosNorth, rdr.gmosNorthSpectroscopy, _.spec, Phase0Table.SpectroscopyGmosNorth.some),
+      new Phase0Loader[GmosSpectroscopyRow.GmosSouth, SpectroscopyRow](Instrument.GmosSouth, rdr.gmosSouthSpectroscopy, _.spec, Phase0Table.SpectroscopyGmosSouth.some),
+      new Phase0Loader[Flamingos2SpectroscopyRow, SpectroscopyRow](Instrument.Flamingos2, rdr.flamingos2Spectroscopy, _.spec, Phase0Table.SpectroscopyFlamingos2.some),
+      new Phase0Loader[SpectroscopyRow, SpectroscopyRow](Instrument.Igrins2, rdr.igrins2Spectroscopy, identity, none)
     ).traverse_(_.load(bc, ConfigModeVariant.Spectroscopy, is))
 
   def imagingLoadAll(bc: BaseConnection, fileName: String, is: IO[InputStream]): IO[Unit] =
     val rdr = FileReader[IO](fileName)
     List(
-      new Phase0Loader[GmosImagingRow.GmosNorth, ImagingRow](Instrument.GmosNorth, rdr.gmosNorthImaging, _.img, Phase0Table.ImagingGmosNorth),
-      new Phase0Loader[GmosImagingRow.GmosSouth, ImagingRow](Instrument.GmosSouth, rdr.gmosSouthImaging, _.img, Phase0Table.ImagingGmosSouth),
+      new Phase0Loader[GmosImagingRow.GmosNorth, ImagingRow](Instrument.GmosNorth, rdr.gmosNorthImaging, _.img, Phase0Table.ImagingGmosNorth.some),
+      new Phase0Loader[GmosImagingRow.GmosSouth, ImagingRow](Instrument.GmosSouth, rdr.gmosSouthImaging, _.img, Phase0Table.ImagingGmosSouth.some),
     ).traverse_(_.load(bc, ConfigModeVariant.Imaging, is))
 
 }
