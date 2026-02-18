@@ -78,11 +78,11 @@ class executionState extends ExecutionTestSupportForGmos {
         v  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
         a  <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
         s0 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthArc(0), ArcStep, telescopeConfig(0, 0, StepGuideState.Disabled), ObserveClass.NightCal)
-        _  <- addEndStepEvent(s0)
+        _  <- addEndStepEvent(s0, v)
         s1 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthFlat(0), FlatStep, telescopeConfig(0, 0, StepGuideState.Disabled), ObserveClass.NightCal)
-        _  <- addEndStepEvent(s1)
+        _  <- addEndStepEvent(s1, v)
         s2 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, telescopeConfig(0, 0, StepGuideState.Enabled), ObserveClass.Science)
-        _  <- addEndStepEvent(s2)
+        _  <- addEndStepEvent(s2, v)
       yield o
 
     setup.flatMap: oid =>
@@ -103,18 +103,18 @@ class executionState extends ExecutionTestSupportForGmos {
         v  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
         a0  <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
         s0 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthArc(0), ArcStep, telescopeConfig(0, 0, StepGuideState.Disabled), ObserveClass.NightCal)
-        _  <- addEndStepEvent(s0)
+        _  <- addEndStepEvent(s0, v)
         s1 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthFlat(0), FlatStep, telescopeConfig(0, 0, StepGuideState.Disabled), ObserveClass.NightCal)
-        _  <- addEndStepEvent(s1)
+        _  <- addEndStepEvent(s1, v)
         s2 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, telescopeConfig(0, 0, StepGuideState.Enabled), ObserveClass.Science)
-        _  <- addEndStepEvent(s2)
+        _  <- addEndStepEvent(s2, v)
         a1  <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
         s3 <- recordStepAs(serviceUser, a1, Instrument.GmosNorth, gmosNorthArc(5), ArcStep, telescopeConfig(0, 15, StepGuideState.Disabled), ObserveClass.NightCal)
-        _  <- addEndStepEvent(s3)
+        _  <- addEndStepEvent(s3, v)
         s4 <- recordStepAs(serviceUser, a1, Instrument.GmosNorth, gmosNorthFlat(5), FlatStep, telescopeConfig(0, 15, StepGuideState.Disabled), ObserveClass.NightCal)
-        _  <- addEndStepEvent(s4)
+        _  <- addEndStepEvent(s4, v)
         s5 <- recordStepAs(serviceUser, a1, Instrument.GmosNorth, gmosNorthScience(5), StepConfig.Science, telescopeConfig(0, 15, StepGuideState.Enabled), ObserveClass.Science)
-        _  <- addEndStepEvent(s5)
+        _  <- addEndStepEvent(s5, v)
       yield o
 
     setup.flatMap: oid =>

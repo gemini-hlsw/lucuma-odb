@@ -338,13 +338,13 @@ class ShortCut_7591 extends ExecutionTestSupportForGmos:
         v0 <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
         a0 <- recordAtomAs(serviceUser, Instrument.GmosNorth, v0, SequenceType.Science)
         s0 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthArc(1), ArcStep, gcalTelescopeConfig(1), ObserveClass.NightCal)
-        _  <- addEndStepEvent(s0)
+        _  <- addEndStepEvent(s0, v0)
         s1 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthFlat(1), FlatStep, gcalTelescopeConfig(1), ObserveClass.NightCal)
-        _  <- addEndStepEvent(s1)
+        _  <- addEndStepEvent(s1, v0)
         s2 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthScience(1), StepConfig.Science, sciTelescopeConfig(1), ObserveClass.Science)
-        _  <- addEndStepEvent(s2)
+        _  <- addEndStepEvent(s2, v0)
         s3 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthScience(1), StepConfig.Science, sciTelescopeConfig(2), ObserveClass.Science)
-        _  <- addEndStepEvent(s3)
+        _  <- addEndStepEvent(s3, v0)
       yield o
 
     setup.flatMap: oid =>
@@ -376,13 +376,13 @@ class ShortCut_7591 extends ExecutionTestSupportForGmos:
         v0 <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
         a0 <- recordAtomAs(serviceUser, Instrument.GmosNorth, v0, SequenceType.Science)
         s0 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthArc(1), ArcStep, gcalTelescopeConfig(1), ObserveClass.NightCal)
-        _  <- addEndStepEvent(s0)
+        _  <- addEndStepEvent(s0, v0)
         s1 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthFlat(1), FlatStep, gcalTelescopeConfig(1), ObserveClass.NightCal)
-        _  <- addEndStepEvent(s1)
+        _  <- addEndStepEvent(s1, v0)
         s2 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthScience(1), StepConfig.Science, sciTelescopeConfig(1), ObserveClass.Science)
-        _  <- addEndStepEvent(s2)
+        _  <- addEndStepEvent(s2, v0)
         s3 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthScience(1), StepConfig.Science, sciTelescopeConfig(2), ObserveClass.Science)
-        _  <- addEndStepEvent(s3)
+        _  <- addEndStepEvent(s3, v0)
 
         // Second night -- just do any acquisition step to switch the context.
         // We don't care about the acquisition details.
@@ -393,7 +393,7 @@ class ShortCut_7591 extends ExecutionTestSupportForGmos:
         // Now start on the science again.
         a2 <- recordAtomAs(serviceUser, Instrument.GmosNorth, v1, SequenceType.Science)
         s5 <- recordStepAs(serviceUser, a2, Instrument.GmosNorth, gmosNorthScience(1), StepConfig.Science, sciTelescopeConfig(3), ObserveClass.Science)
-        _  <- addEndStepEvent(s5)
+        _  <- addEndStepEvent(s5, v1)
       yield o
 
     setup.flatMap: oid =>
@@ -426,13 +426,13 @@ class ShortCut_7591 extends ExecutionTestSupportForGmos:
         v0 <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
         a0 <- recordAtomAs(serviceUser, Instrument.GmosNorth, v0, SequenceType.Science)
         s0 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthArc(1), ArcStep, gcalTelescopeConfig(1), ObserveClass.NightCal)
-        _  <- addEndStepEvent(s0)
+        _  <- addEndStepEvent(s0, v0)
         s1 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthFlat(1), FlatStep, gcalTelescopeConfig(1), ObserveClass.NightCal)
-        _  <- addEndStepEvent(s1)
+        _  <- addEndStepEvent(s1, v0)
         s2 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthScience(1), StepConfig.Science, sciTelescopeConfig(1), ObserveClass.Science)
-        _  <- addEndStepEvent(s2)
+        _  <- addEndStepEvent(s2, v0)
         s3 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthScience(1), StepConfig.Science, sciTelescopeConfig(2), ObserveClass.Science)
-        _  <- addEndStepEvent(s3)
+        _  <- addEndStepEvent(s3, v0)
 
         // Second night -- just do any acquisition step to switch the context.
         // We don't care about the acquisition details.
@@ -443,11 +443,11 @@ class ShortCut_7591 extends ExecutionTestSupportForGmos:
         // Now start on the science again and do the calibrations
         a2 <- recordAtomAs(serviceUser, Instrument.GmosNorth, v1, SequenceType.Science)
         s5 <- recordStepAs(serviceUser, a2, Instrument.GmosNorth, gmosNorthScience(1), StepConfig.Science, sciTelescopeConfig(3), ObserveClass.Science)
-        _  <- addEndStepEvent(s5)
+        _  <- addEndStepEvent(s5, v1)
         s6 <- recordStepAs(serviceUser, a2, Instrument.GmosNorth, gmosNorthArc(1), ArcStep, gcalTelescopeConfig(1), ObserveClass.NightCal)
-        _  <- addEndStepEvent(s6)
+        _  <- addEndStepEvent(s6, v1)
         s7 <- recordStepAs(serviceUser, a2, Instrument.GmosNorth, gmosNorthFlat(1), FlatStep, gcalTelescopeConfig(1), ObserveClass.NightCal)
-        _  <- addEndStepEvent(s7)
+        _  <- addEndStepEvent(s7, v1)
 
       yield o
 
@@ -477,13 +477,13 @@ class ShortCut_7591 extends ExecutionTestSupportForGmos:
         v0 <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
         a0 <- recordAtomAs(serviceUser, Instrument.GmosNorth, v0, SequenceType.Science)
         s0 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthArc(1), ArcStep, gcalTelescopeConfig(1), ObserveClass.NightCal)
-        _  <- addEndStepEvent(s0)
+        _  <- addEndStepEvent(s0, v0)
         s1 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthFlat(1), FlatStep, gcalTelescopeConfig(1), ObserveClass.NightCal)
-        _  <- addEndStepEvent(s1)
+        _  <- addEndStepEvent(s1, v0)
         s2 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthScience(1), StepConfig.Science, sciTelescopeConfig(1), ObserveClass.Science)
-        _  <- addEndStepEvent(s2)
+        _  <- addEndStepEvent(s2, v0)
         s3 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthScience(1), StepConfig.Science, sciTelescopeConfig(2), ObserveClass.Science)
-        _  <- addEndStepEvent(s3)
+        _  <- addEndStepEvent(s3, v0)
 
         // Second night -- just do any acquisition step to switch the context.
         // We don't care about the acquisition details.
@@ -494,17 +494,17 @@ class ShortCut_7591 extends ExecutionTestSupportForGmos:
         // Now start on the science again and do the calibrations
         a2 <- recordAtomAs(serviceUser, Instrument.GmosNorth, v1, SequenceType.Science)
         s5 <- recordStepAs(serviceUser, a2, Instrument.GmosNorth, gmosNorthScience(1), StepConfig.Science, sciTelescopeConfig(3), ObserveClass.Science)
-        _  <- addEndStepEvent(s5)
+        _  <- addEndStepEvent(s5, v1)
         s6 <- recordStepAs(serviceUser, a2, Instrument.GmosNorth, gmosNorthArc(1), ArcStep, gcalTelescopeConfig(1), ObserveClass.NightCal)
-        _  <- addEndStepEvent(s6)
+        _  <- addEndStepEvent(s6, v1)
         s7 <- recordStepAs(serviceUser, a2, Instrument.GmosNorth, gmosNorthFlat(1), FlatStep, gcalTelescopeConfig(1), ObserveClass.NightCal)
-        _  <- addEndStepEvent(s7)
+        _  <- addEndStepEvent(s7, v1)
 
         a3 <- recordAtomAs(serviceUser, Instrument.GmosNorth, v1, SequenceType.Science)
         s8 <- recordStepAs(serviceUser, a3, Instrument.GmosNorth, gmosNorthArc(2), ArcStep, gcalTelescopeConfig(1), ObserveClass.NightCal)
-        _  <- addEndStepEvent(s8)
+        _  <- addEndStepEvent(s8, v1)
         s9 <- recordStepAs(serviceUser, a3, Instrument.GmosNorth, gmosNorthFlat(2), FlatStep, gcalTelescopeConfig(1), ObserveClass.NightCal)
-        _  <- addEndStepEvent(s9)
+        _  <- addEndStepEvent(s9, v1)
 
       yield o
 
@@ -535,13 +535,13 @@ class ShortCut_7591 extends ExecutionTestSupportForGmos:
         v0 <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
         a0 <- recordAtomAs(serviceUser, Instrument.GmosNorth, v0, SequenceType.Science)
         s0 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthArc(1), ArcStep, gcalTelescopeConfig(1), ObserveClass.NightCal)
-        _  <- addEndStepEvent(s0)
+        _  <- addEndStepEvent(s0, v0)
         s1 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthFlat(1), FlatStep, gcalTelescopeConfig(1), ObserveClass.NightCal)
-        _  <- addEndStepEvent(s1)
+        _  <- addEndStepEvent(s1, v0)
         s2 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthScience(1), StepConfig.Science, sciTelescopeConfig(1), ObserveClass.Science)
-        _  <- addEndStepEvent(s2)
+        _  <- addEndStepEvent(s2, v0)
         s3 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthScience(1), StepConfig.Science, sciTelescopeConfig(2), ObserveClass.Science)
-        _  <- addEndStepEvent(s3)
+        _  <- addEndStepEvent(s3, v0)
 
         // Second night -- just do any acquisition step to switch the context.
         // We don't care about the acquisition details.
@@ -555,15 +555,15 @@ class ShortCut_7591 extends ExecutionTestSupportForGmos:
         x1 <- nextAtomId(o)
         s5 <- recordStepAs(serviceUser, a2, Instrument.GmosNorth, gmosNorthScience(1), StepConfig.Science, sciTelescopeConfig(3), ObserveClass.Science)
         x2 <- nextAtomId(o)
-        _  <- addEndStepEvent(s5)
+        _  <- addEndStepEvent(s5, v1)
         x3 <- nextAtomId(o)
         s6 <- recordStepAs(serviceUser, a2, Instrument.GmosNorth, gmosNorthArc(1), ArcStep, gcalTelescopeConfig(1), ObserveClass.NightCal)
         x4 <- nextAtomId(o)
-        _  <- addEndStepEvent(s6)
+        _  <- addEndStepEvent(s6, v1)
         x5 <- nextAtomId(o)
         s7 <- recordStepAs(serviceUser, a2, Instrument.GmosNorth, gmosNorthFlat(1), FlatStep, gcalTelescopeConfig(1), ObserveClass.NightCal)
         x6 <- nextAtomId(o)
-        _  <- addEndStepEvent(s7)
+        _  <- addEndStepEvent(s7, v1)
         x7 <- nextAtomId(o)  // gets a new atom id because we finished the last atom
       yield List(x0, x1, x2, x3, x4, x5, x6, x7)
 

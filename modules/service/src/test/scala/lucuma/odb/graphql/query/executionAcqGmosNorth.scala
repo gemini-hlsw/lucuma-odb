@@ -122,7 +122,7 @@ class executionAcqGmosNorth extends ExecutionTestSupportForGmos:
         // Record the first atom and one of its steps
         a  <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Acquisition)
         s0 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthAcq(0), StepConfig.Science, acqTelescopeConfig(0), ObserveClass.Acquisition)
-        _  <- addEndStepEvent(s0)
+        _  <- addEndStepEvent(s0, v)
         _  <- resetAcquisitionAs(serviceUser, o)
       yield o
 
@@ -144,11 +144,11 @@ class executionAcqGmosNorth extends ExecutionTestSupportForGmos:
         // Record the first atom with 3 steps
         a  <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Acquisition)
         s0 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthAcq(0), StepConfig.Science, acqTelescopeConfig(0), ObserveClass.Acquisition)
-        _  <- addEndStepEvent(s0)
+        _  <- addEndStepEvent(s0, v)
         s1 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthAcq(1), StepConfig.Science, acqTelescopeConfig(10), ObserveClass.Acquisition)
-        _  <- addEndStepEvent(s1)
+        _  <- addEndStepEvent(s1, v)
         s2 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthAcq(2), StepConfig.Science, acqTelescopeConfig(0), ObserveClass.Acquisition)
-        _  <- addEndStepEvent(s2)
+        _  <- addEndStepEvent(s2, v)
 
         // Now the last acquisition step should be generated as the nextAtom
       yield o
@@ -171,7 +171,7 @@ class executionAcqGmosNorth extends ExecutionTestSupportForGmos:
         // Record the first atom and one of its steps
         a  <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Acquisition)
         s0 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthAcq(0), StepConfig.Science, acqTelescopeConfig(0), ObserveClass.Acquisition)
-        _  <- addEndStepEvent(s0)
+        _  <- addEndStepEvent(s0, v)
       yield o
 
     setup.flatMap: oid =>
@@ -220,16 +220,16 @@ class executionAcqGmosNorth extends ExecutionTestSupportForGmos:
         // First atom with 3 steps.
         a0 <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Acquisition)
         s0 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthAcq(0), StepConfig.Science, acqTelescopeConfig(0), ObserveClass.Acquisition)
-        _  <- addEndStepEvent(s0)
+        _  <- addEndStepEvent(s0, v)
         s1 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthAcq(1), StepConfig.Science, acqTelescopeConfig(10), ObserveClass.Acquisition)
-        _  <- addEndStepEvent(s1)
+        _  <- addEndStepEvent(s1, v)
         s2 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthAcq(2), StepConfig.Science, acqTelescopeConfig(0), ObserveClass.Acquisition)
-        _  <- addEndStepEvent(s2)
+        _  <- addEndStepEvent(s2, v)
 
         // Second atom with just the last acq step
         a1 <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Acquisition)
         s3 <- recordStepAs(serviceUser, a1, Instrument.GmosNorth, gmosNorthAcq(2), StepConfig.Science, acqTelescopeConfig(0), ObserveClass.Acquisition)
-        _  <- addEndStepEvent(s3)
+        _  <- addEndStepEvent(s3, v)
 
         // Now we should expect to generate (again) the last acq step
       yield o
@@ -252,19 +252,19 @@ class executionAcqGmosNorth extends ExecutionTestSupportForGmos:
         // Acquisition Sequence
         a0 <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Acquisition)
         s0 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthAcq(0), StepConfig.Science, acqTelescopeConfig(0), ObserveClass.Acquisition)
-        _  <- addEndStepEvent(s0)
+        _  <- addEndStepEvent(s0, v)
         s1 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthAcq(1), StepConfig.Science, acqTelescopeConfig(10), ObserveClass.Acquisition)
-        _  <- addEndStepEvent(s1)
+        _  <- addEndStepEvent(s1, v)
         s2 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthAcq(2), StepConfig.Science, acqTelescopeConfig(0), ObserveClass.Acquisition)
-        _  <- addEndStepEvent(s2)
+        _  <- addEndStepEvent(s2, v)
         a1 <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Acquisition)
         s3 <- recordStepAs(serviceUser, a1, Instrument.GmosNorth, gmosNorthAcq(2), StepConfig.Science, acqTelescopeConfig(0), ObserveClass.Acquisition)
-        _  <- addEndStepEvent(s3)
+        _  <- addEndStepEvent(s3, v)
 
         // Do a science step
         a2 <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
         s4 <- recordStepAs(serviceUser, a2, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, acqTelescopeConfig(0), ObserveClass.Science)
-        _  <- addEndStepEvent(s4)
+        _  <- addEndStepEvent(s4, v)
 
         // Reset acquisition to take it from the top.
         _  <- resetAcquisitionAs(serviceUser, o)
@@ -288,14 +288,14 @@ class executionAcqGmosNorth extends ExecutionTestSupportForGmos:
         // Acquisition Sequence
         a0 <- recordAtomAs(serviceUser, Instrument.GmosNorth, v0, SequenceType.Acquisition)
         s0 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthAcq(0), StepConfig.Science, acqTelescopeConfig(0), ObserveClass.Acquisition)
-        _  <- addEndStepEvent(s0)
+        _  <- addEndStepEvent(s0, v0)
         s1 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthAcq(1), StepConfig.Science, acqTelescopeConfig(10), ObserveClass.Acquisition)
-        _  <- addEndStepEvent(s1)
+        _  <- addEndStepEvent(s1, v0)
         s2 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthAcq(2), StepConfig.Science, acqTelescopeConfig(0), ObserveClass.Acquisition)
-        _  <- addEndStepEvent(s2)
+        _  <- addEndStepEvent(s2, v0)
         a1 <- recordAtomAs(serviceUser, Instrument.GmosNorth, v0, SequenceType.Acquisition)
         s3 <- recordStepAs(serviceUser, a1, Instrument.GmosNorth, gmosNorthAcq(2), StepConfig.Science, acqTelescopeConfig(0), ObserveClass.Acquisition)
-        _  <- addEndStepEvent(s3)
+        _  <- addEndStepEvent(s3, v0)
 
         // Record a new visit, but don't execute anything
         _  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
@@ -322,9 +322,9 @@ class executionAcqGmosNorth extends ExecutionTestSupportForGmos:
         // Record the first atom and two of its steps
         a  <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Acquisition)
         s0 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthAcq(0), StepConfig.Science, acqTelescopeConfig(0), ObserveClass.Acquisition)
-        _  <- addEndStepEvent(s0)
+        _  <- addEndStepEvent(s0, v)
         s1 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthAcq(1), StepConfig.Science, acqTelescopeConfig(10), ObserveClass.Acquisition)
-        _  <- addEndStepEvent(s1)
+        _  <- addEndStepEvent(s1, v)
 
         // Fail the second step
         d  <- recordDatasetAs(serviceUser, s1, v, "N20240905S1000.fits")
@@ -381,24 +381,24 @@ class executionAcqGmosNorth extends ExecutionTestSupportForGmos:
         // First atom with 3 steps.
         a0 <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Acquisition)
         s0 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthAcq(0), StepConfig.Science, acqTelescopeConfig(0), ObserveClass.Acquisition)
-        _  <- addEndStepEvent(s0)
+        _  <- addEndStepEvent(s0, v)
 
         x1 <- firstScienceStepId(serviceUser, o)
 
         s1 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthAcq(1), StepConfig.Science, acqTelescopeConfig(10), ObserveClass.Acquisition)
-        _  <- addEndStepEvent(s1)
+        _  <- addEndStepEvent(s1, v)
 
         x1 <- firstScienceStepId(serviceUser, o)
 
         s2 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthAcq(2), StepConfig.Science, acqTelescopeConfig(0), ObserveClass.Acquisition)
-        _  <- addEndStepEvent(s2)
+        _  <- addEndStepEvent(s2, v)
 
         x2 <- firstScienceStepId(serviceUser, o)
 
         // Second atom with just the last acq step
         a1 <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Acquisition)
         s3 <- recordStepAs(serviceUser, a1, Instrument.GmosNorth, gmosNorthAcq(2), StepConfig.Science, acqTelescopeConfig(0), ObserveClass.Acquisition)
-        _  <- addEndStepEvent(s3)
+        _  <- addEndStepEvent(s3, v)
 
         x3 <- firstScienceStepId(serviceUser, o)
       yield Set(x0, x1, x2, x3)
@@ -406,7 +406,7 @@ class executionAcqGmosNorth extends ExecutionTestSupportForGmos:
     assertIO(execAcq.map(_.size), 1)
 
   def nextAtomStepIds(o: Observation.Id): IO[NonEmptyList[Step.Id]] =
-    scienceSequenceIds(serviceUser, o).map(m => NonEmptyList.fromListUnsafe(m.head._2))
+    firstScienceAtomStepIds(serviceUser, o).map(NonEmptyList.fromListUnsafe)
 
   test("nextAtom step ids don't change while executing"):
     val execAcq: IO[List[NonEmptyList[Step.Id]]] =
@@ -421,12 +421,12 @@ class executionAcqGmosNorth extends ExecutionTestSupportForGmos:
         // First atom with 3 steps.
         a0 <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Acquisition)
         s0 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthAcq(0), StepConfig.Science, acqTelescopeConfig(0), ObserveClass.Acquisition)
-        _  <- addEndStepEvent(s0)
+        _  <- addEndStepEvent(s0, v)
 
         x1 <- nextAtomStepIds(o)
 
         s1 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthAcq(1), StepConfig.Science, acqTelescopeConfig(10), ObserveClass.Acquisition)
-        _  <- addEndStepEvent(s1)
+        _  <- addEndStepEvent(s1, v)
 
         x2 <- nextAtomStepIds(o)
       yield List(x0, x1, x2)

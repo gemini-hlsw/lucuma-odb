@@ -481,6 +481,6 @@ trait ExecutionTestSupportForGmos extends ExecutionTestSupport:
       o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
       v <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
       s <- firstScienceStepId(serviceUser, o)
-      _ <- addEndStepEvent(s)
+      _ <- addEndStepEvent(s, v)
       _ <- runObscalcUpdate(p, o)
     yield o

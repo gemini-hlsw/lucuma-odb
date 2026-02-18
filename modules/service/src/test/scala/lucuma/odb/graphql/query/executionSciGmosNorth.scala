@@ -155,11 +155,11 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos:
         v  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
         a  <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
         s0 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthArc(0), ArcStep, gcalTelescopeConfig(0), ObserveClass.NightCal)
-        _  <- addEndStepEvent(s0)
+        _  <- addEndStepEvent(s0, v)
         s1 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthFlat(0), FlatStep, gcalTelescopeConfig(0), ObserveClass.NightCal)
-        _  <- addEndStepEvent(s1)
+        _  <- addEndStepEvent(s1, v)
         s2 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, sciTelescopeConfig(0), ObserveClass.Science)
-        _  <- addEndStepEvent(s2)
+        _  <- addEndStepEvent(s2, v)
       yield o
 
     setup.flatMap: oid =>
@@ -181,13 +181,13 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos:
 
         // We'll add steps for the second block 5 nm
         s0 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthArc(5), ArcStep, gcalTelescopeConfig(0), ObserveClass.NightCal)
-        _  <- addEndStepEvent(s0)
+        _  <- addEndStepEvent(s0, v)
 
         s1 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthFlat(5), FlatStep, gcalTelescopeConfig(0), ObserveClass.NightCal)
-        _  <- addEndStepEvent(s1)
+        _  <- addEndStepEvent(s1, v)
 
         s2 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthScience(5), StepConfig.Science, sciTelescopeConfig(0), ObserveClass.Science)
-        _  <- addEndStepEvent(s2)
+        _  <- addEndStepEvent(s2, v)
 
         ic <- generateOrFailAs(serviceUser, o)
       yield ic
@@ -224,11 +224,11 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos:
         a  <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
 
         s0 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthFlat(0), FlatStep, gcalTelescopeConfig(0), ObserveClass.NightCal)
-        _  <- addEndStepEvent(s0)
+        _  <- addEndStepEvent(s0, v)
         s1 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, sciTelescopeConfig(0), ObserveClass.Science)
-        _  <- addEndStepEvent(s1)
+        _  <- addEndStepEvent(s1, v)
         s2 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthArc(0), ArcStep, gcalTelescopeConfig(0), ObserveClass.NightCal)
-        _  <- addEndStepEvent(s2)
+        _  <- addEndStepEvent(s2, v)
       yield o
 
     setup.flatMap: oid =>
@@ -249,22 +249,22 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos:
         a  <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
 
         s0 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthFlat(0), FlatStep, gcalTelescopeConfig(0), ObserveClass.NightCal)
-        _  <- addEndStepEvent(s0)
+        _  <- addEndStepEvent(s0, v)
 
         x0 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthArc(8), ArcStep, gcalTelescopeConfig(0), ObserveClass.NightCal)
-        _  <- addEndStepEvent(x0)
+        _  <- addEndStepEvent(x0, v)
 
         s1 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, sciTelescopeConfig(0), ObserveClass.Science)
-        _  <- addEndStepEvent(s1)
+        _  <- addEndStepEvent(s1, v)
 
         x1 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthScience(8), StepConfig.Science, sciTelescopeConfig(10), ObserveClass.Science)
-        _  <- addEndStepEvent(x1)
+        _  <- addEndStepEvent(x1, v)
 
         s2 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthArc(0), ArcStep, gcalTelescopeConfig(0), ObserveClass.NightCal)
-        _  <- addEndStepEvent(s2)
+        _  <- addEndStepEvent(s2, v)
 
         x2 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthFlat(8), FlatStep, gcalTelescopeConfig(0), ObserveClass.NightCal)
-        _  <- addEndStepEvent(x2)
+        _  <- addEndStepEvent(x2, v)
       yield o
 
     setup.flatMap: oid =>
@@ -284,11 +284,11 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos:
         v  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
         a  <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
         s0 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthArc(0), ArcStep, gcalTelescopeConfig(0), ObserveClass.NightCal)
-        _  <- addEndStepEvent(s0)
+        _  <- addEndStepEvent(s0, v)
         s1 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthFlat(0), FlatStep, gcalTelescopeConfig(0), ObserveClass.NightCal)
-        _  <- addEndStepEvent(s1)
+        _  <- addEndStepEvent(s1, v)
         s2 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, sciTelescopeConfig(0), ObserveClass.Science)
-        _  <- addEndStepEvent(s2)
+        _  <- addEndStepEvent(s2, v)
 
         d  <- recordDatasetAs(serviceUser, s1, v, "N20240905S1000.fits")
         _  <- setQaState(d, DatasetQaState.Usable)
@@ -338,23 +338,23 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos:
 
         a0 <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
         s0 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthArc(0), ArcStep, gcalTelescopeConfig(0), ObserveClass.NightCal)
-        _  <- addEndStepEvent(s0)
+        _  <- addEndStepEvent(s0, v)
         s1 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthFlat(0), FlatStep, gcalTelescopeConfig(0), ObserveClass.NightCal)
-        _  <- addEndStepEvent(s1)
+        _  <- addEndStepEvent(s1, v)
         s2 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, sciTelescopeConfig(0), ObserveClass.Science)
-        _  <- addEndStepEvent(s2)
+        _  <- addEndStepEvent(s2, v)
         s3 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, sciTelescopeConfig(15), ObserveClass.Science)
-        _  <- addEndStepEvent(s3)
+        _  <- addEndStepEvent(s3, v)
         s4 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, sciTelescopeConfig(-15), ObserveClass.Science)
-        _  <- addEndStepEvent(s4)
+        _  <- addEndStepEvent(s4, v)
 
         a1 <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
         s5 <- recordStepAs(serviceUser, a1, Instrument.GmosNorth, gmosNorthArc(5), ArcStep, gcalTelescopeConfig(0), ObserveClass.NightCal)
-        _  <- addEndStepEvent(s5)
+        _  <- addEndStepEvent(s5, v)
         s6 <- recordStepAs(serviceUser, a1, Instrument.GmosNorth, gmosNorthFlat(5), FlatStep, gcalTelescopeConfig(0), ObserveClass.NightCal)
-        _  <- addEndStepEvent(s6)
+        _  <- addEndStepEvent(s6, v)
         s7 <- recordStepAs(serviceUser, a1, Instrument.GmosNorth, gmosNorthScience(5), StepConfig.Science, sciTelescopeConfig(0), ObserveClass.Science)
-        _  <- addEndStepEvent(s7)
+        _  <- addEndStepEvent(s7, v)
 
         d  <- recordDatasetAs(serviceUser, s2, v, "N20240905S1001.fits")
         _  <- setQaState(d, DatasetQaState.Usable)
@@ -406,33 +406,33 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos:
 
         a0 <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
         s0 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthArc(0), ArcStep, gcalTelescopeConfig(0), ObserveClass.NightCal)
-        _  <- addEndStepEvent(s0)
+        _  <- addEndStepEvent(s0, v)
 
         x1 <- nextAtomId(o)
 
         s1 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthFlat(0), FlatStep, gcalTelescopeConfig(0), ObserveClass.NightCal)
-        _  <- addEndStepEvent(s1)
+        _  <- addEndStepEvent(s1, v)
 
         x2 <- nextAtomId(o)
 
         s2 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, sciTelescopeConfig(0), ObserveClass.Science)
-        _  <- addEndStepEvent(s2)
+        _  <- addEndStepEvent(s2, v)
 
         x3 <- nextAtomId(o)
 
         s3 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, sciTelescopeConfig(15), ObserveClass.Science)
-        _  <- addEndStepEvent(s3)
+        _  <- addEndStepEvent(s3, v)
 
         x4 <- nextAtomId(o)
 
         s4 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, sciTelescopeConfig(-15), ObserveClass.Science)
-        _  <- addEndStepEvent(s4)
+        _  <- addEndStepEvent(s4, v)
 
         x5 <- nextAtomId(o)
 
         a1 <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
         s5 <- recordStepAs(serviceUser, a1, Instrument.GmosNorth, gmosNorthArc(5), ArcStep, gcalTelescopeConfig(0), ObserveClass.NightCal)
-        _  <- addEndStepEvent(s5)
+        _  <- addEndStepEvent(s5, v)
 
         x6 <- nextAtomId(o)
       yield (List(x0, x1, x2, x3, x4), List(x5, x6))
@@ -813,13 +813,13 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos:
         a0 <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
 
         s0 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthArc(5), ArcStep, gcalTelescopeConfig(0), ObserveClass.NightCal)
-        _  <- addEndStepEvent(s0)
+        _  <- addEndStepEvent(s0, v)
 
         s1 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthFlat(5), FlatStep, gcalTelescopeConfig(0), ObserveClass.NightCal)
-        _  <- addEndStepEvent(s1)
+        _  <- addEndStepEvent(s1, v)
 
         s2 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthScience(5), StepConfig.Science, sciTelescopeConfig(0), ObserveClass.Science)
-        _  <- addEndStepEvent(s2)
+        _  <- addEndStepEvent(s2, v)
       yield o
 
     def telescopeConfigJson(arcsec: Int): Json =
@@ -940,33 +940,33 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos:
 
         a0 <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
         s0 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthArc(0), ArcStep, gcalTelescopeConfig(0), ObserveClass.NightCal)
-        _  <- addEndStepEvent(s0)
+        _  <- addEndStepEvent(s0, v)
 
         x1 <- firstAcquisitionStepId(o)
 
         s1 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthFlat(0), FlatStep, gcalTelescopeConfig(0), ObserveClass.NightCal)
-        _  <- addEndStepEvent(s1)
+        _  <- addEndStepEvent(s1, v)
 
         x2 <- firstAcquisitionStepId(o)
 
         s2 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, sciTelescopeConfig(0), ObserveClass.Science)
-        _  <- addEndStepEvent(s2)
+        _  <- addEndStepEvent(s2, v)
 
         x3 <- firstAcquisitionStepId(o)
 
         s3 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, sciTelescopeConfig(15), ObserveClass.Science)
-        _  <- addEndStepEvent(s3)
+        _  <- addEndStepEvent(s3, v)
 
         x4 <- firstAcquisitionStepId(o)
 
         s4 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, sciTelescopeConfig(-15), ObserveClass.Science)
-        _  <- addEndStepEvent(s4)
+        _  <- addEndStepEvent(s4, v)
 
         x5 <- firstAcquisitionStepId(o)
 
         a1 <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
         s5 <- recordStepAs(serviceUser, a1, Instrument.GmosNorth, gmosNorthArc(5), ArcStep, gcalTelescopeConfig(0), ObserveClass.NightCal)
-        _  <- addEndStepEvent(s5)
+        _  <- addEndStepEvent(s5, v)
 
         x5 <- firstAcquisitionStepId(o)
       yield Set(x0, x1, x2, x3, x4, x5)
@@ -974,8 +974,7 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos:
     assertIO(execSci.map(_.size), 1)
 
   def nextAtomStepIds(o: Observation.Id): IO[NonEmptyList[Step.Id]] =
-    import lucuma.odb.testsyntax.execution.*
-    generateOrFailAs(serviceUser, o, 5.some).map(_.gmosNorthScience.nextAtom.steps.map(_.id))
+   firstScienceAtomStepIds(serviceUser, o).map(NonEmptyList.fromListUnsafe)
 
   test("nextAtom step ids don't change while executing"):
     val setup: IO[(List[NonEmptyList[Step.Id]], List[NonEmptyList[Step.Id]])] =
@@ -990,27 +989,27 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos:
 
         a0 <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
         s0 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthArc(0), ArcStep, gcalTelescopeConfig(0), ObserveClass.NightCal)
-        _  <- addEndStepEvent(s0)
+        _  <- addEndStepEvent(s0, v)
 
         x1 <- nextAtomStepIds(o)
 
         s1 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthFlat(0), FlatStep, gcalTelescopeConfig(0), ObserveClass.NightCal)
-        _  <- addEndStepEvent(s1)
+        _  <- addEndStepEvent(s1, v)
 
         x2 <- nextAtomStepIds(o)
 
         s2 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, sciTelescopeConfig(0), ObserveClass.Science)
-        _  <- addEndStepEvent(s2)
+        _  <- addEndStepEvent(s2, v)
 
         x3 <- nextAtomStepIds(o)
 
         s3 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, sciTelescopeConfig(15), ObserveClass.Science)
-        _  <- addEndStepEvent(s3)
+        _  <- addEndStepEvent(s3, v)
 
         x4 <- nextAtomStepIds(o)
 
         s4 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, sciTelescopeConfig(-15), ObserveClass.Science)
-        _  <- addEndStepEvent(s4)
+        _  <- addEndStepEvent(s4, v)
 
         // Next atom
 
@@ -1018,7 +1017,7 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos:
 
         a1 <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
         s5 <- recordStepAs(serviceUser, a1, Instrument.GmosNorth, gmosNorthArc(5), ArcStep, gcalTelescopeConfig(0), ObserveClass.NightCal)
-        _  <- addEndStepEvent(s5)
+        _  <- addEndStepEvent(s5, v)
 
         x6 <- nextAtomStepIds(o)
 

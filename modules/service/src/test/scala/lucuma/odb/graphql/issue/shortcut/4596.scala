@@ -16,20 +16,15 @@ import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.ObservationWorkflowState.Completed
 import lucuma.core.enums.ObservationWorkflowState.Ongoing
-import lucuma.core.enums.ObserveClass
-import lucuma.core.enums.SequenceType
-import lucuma.core.enums.StepGuideState
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.User
-import lucuma.core.model.sequence.StepConfig
 import lucuma.core.syntax.timespan.*
 import lucuma.itc.IntegrationTime
 import lucuma.odb.graphql.mutation.UpdateObservationsOps
 import lucuma.odb.graphql.query.ExecutionTestSupportForGmos
 import lucuma.odb.graphql.query.ObservingModeSetupOperations
-import lucuma.odb.json.all.transport.given
 
 //https://app.shortcut.com/lucuma/story/4596/api-should-prevent-editing-of-observations-for-which-execution-has-started
 class ShortCut_4596 extends OdbSuite
@@ -65,15 +60,14 @@ class ShortCut_4596 extends OdbSuite
 
   def createExecutedObservationWithTarget(p: Program.Id, state: ObservationWorkflowState): IO[(Observation.Id, Target.Id)] =
     for
-      t <- createTargetWithProfileAs(pi, p)
-      o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+      t  <- createTargetWithProfileAs(pi, p)
+      o  <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
       v  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
-      a  <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
-      s0 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthArc(0), ArcStep, telescopeConfig(0, 0, StepGuideState.Disabled), ObserveClass.NightCal)
-      _  <- addEndStepEvent(s0)
-      s1 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthFlat(0), FlatStep, telescopeConfig(0, 0, StepGuideState.Disabled), ObserveClass.NightCal)
-      _  <- addEndStepEvent(s1)
-      _  <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, telescopeConfig(0, 0, StepGuideState.Enabled), ObserveClass.Science).flatMap(addEndStepEvent).whenA(state === Completed)
+      s  <- scienceSequenceIds(serviceUser, o)
+      steps = s.head._2
+      _  <- addEndStepEvent(steps(0), v)
+      _  <- addEndStepEvent(steps(1), v)
+      _  <- addEndStepEvent(steps(2), v).whenA(state === Completed)
       _  <- computeItcResultAs(pi,o)
       _  <- runObscalcUpdateAs(serviceUser, p, o)
       _  <- assertIO(queryObservationWorkflowState(o), state)

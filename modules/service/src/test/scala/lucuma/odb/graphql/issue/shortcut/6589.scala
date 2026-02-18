@@ -76,13 +76,13 @@ class ShortCut_6589 extends ExecutionTestSupportForGmos:
         v  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
         a  <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
         s0 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthArc(45), ArcStep, gcalTelescopeConfig(15), ObserveClass.NightCal)
-        _  <- addEndStepEvent(s0)
+        _  <- addEndStepEvent(s0, v)
         s1 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthFlat(45), FlatStep, gcalTelescopeConfig(15), ObserveClass.NightCal)
-        _  <- addEndStepEvent(s1)
+        _  <- addEndStepEvent(s1, v)
         s2 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthScience(45), StepConfig.Science, sciTelescopeConfig(15), ObserveClass.Science)
-        _  <- addEndStepEvent(s2)
+        _  <- addEndStepEvent(s2, v)
         s3 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthScience(45), StepConfig.Science, sciTelescopeConfig(-15), ObserveClass.Science)
-        _  <- addEndStepEvent(s3)
+        _  <- addEndStepEvent(s3, v)
 
         d  <- recordDatasetAs(serviceUser, s2, v, f"N20240905S1$i%03d.fits")
       yield Setup(p, o, v, g, a, d)
@@ -169,7 +169,7 @@ class ShortCut_6589 extends ExecutionTestSupportForGmos:
           // re-execute the failed step, but put it in a new atom
           a <- recordAtomAs(serviceUser, Instrument.GmosNorth, setup.v, SequenceType.Science)
           s <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthScience(45), StepConfig.Science, sciTelescopeConfig(15), ObserveClass.Science)
-          _ <- addEndStepEvent(s)
+          _ <- addEndStepEvent(s, setup.v)
           // now we think we need an arc and a flat to make this step valid
           _ <- assertIO(nextAtomStepTypes(setup.o), List(StepType.Gcal, StepType.Gcal))
         yield ()
@@ -184,12 +184,12 @@ class ShortCut_6589 extends ExecutionTestSupportForGmos:
           // re-execute the failed step, but put it in a new atom
           a0 <- recordAtomAs(serviceUser, Instrument.GmosNorth, setup.v, SequenceType.Science)
           s0 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthScience(45), StepConfig.Science, sciTelescopeConfig(15), ObserveClass.Science)
-          _  <- addEndStepEvent(s0)
+          _  <- addEndStepEvent(s0, setup.v)
 
           // Make yet another atom and do the arc in that one.
           a1 <- recordAtomAs(serviceUser, Instrument.GmosNorth, setup.v, SequenceType.Science)
           s1 <- recordStepAs(serviceUser, a1, Instrument.GmosNorth, gmosNorthArc(45), ArcStep, gcalTelescopeConfig(15), ObserveClass.NightCal)
-          _  <- addEndStepEvent(s1)
+          _  <- addEndStepEvent(s1, setup.v)
 
           // now we think we need a flat and the original missing science step
           _ <- assertIO(nextAtomStepTypes(setup.o), List(StepType.Gcal, StepType.Science))
