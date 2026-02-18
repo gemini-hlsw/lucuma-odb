@@ -49,7 +49,8 @@ class executionEvents extends OdbSuite with ExecutionQuerySetupOperations {
       e0  <- addSlewEventAs(user, oid, SlewStage.StartSlew)
       e1  <- addSlewEventAs(user, oid, SlewStage.EndSlew)
       e2  <- addSequenceEventAs(user, vid, SequenceCommand.Start)
-      as  <- (0 until setup.atomCount).toList.traverse { a => recordAtom(mode, setup, user, vid, a) }
+      ids <- scienceSequenceIds(user, oid)
+      as  <- (0 until setup.atomCount).toList.traverse { a => recordAtom(setup, user, vid, a, ids) }
       e3  <- addSequenceEventAs(user, vid, SequenceCommand.Stop)
     } yield VisitNode(vid, as, List(e0, e1, e2, e3))
 

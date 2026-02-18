@@ -6,6 +6,7 @@ package mapping
 
 import cats.effect.Resource
 import cats.syntax.apply.*
+import eu.timepit.refined.cats.given
 import grackle.Query.Binding
 import grackle.QueryCompiler.Elab
 import grackle.TypeRef
@@ -14,7 +15,7 @@ import lucuma.core.model.User
 import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
 import lucuma.odb.graphql.binding.NonNegIntBinding
-import lucuma.odb.graphql.binding.TimestampBinding
+import lucuma.odb.graphql.binding.PosIntBinding
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.json.time.query.given
 import lucuma.odb.service.Services
@@ -58,9 +59,9 @@ trait AtomRecordMapping[F[_]] extends AtomRecordView[F]
   lazy val AtomRecordElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] = {
 
     case (AtomRecordType, "steps", List(
-      TimestampBinding.Option("OFFSET", rOFFSET),
+      PosIntBinding.Option("OFFSET", rOFFSET),
       NonNegIntBinding.Option("LIMIT", rLIMIT)
     )) =>
-      selectWithOffsetAndLimit(rOFFSET, rLIMIT, StepRecordType, "_firstEventTime", Predicates.stepRecord.firstEventTime, Predicates.stepRecord.atomRecord.visit.observation.program)
+      selectWithOffsetAndLimit(rOFFSET, rLIMIT, StepRecordType, "index", Predicates.stepRecord.index, Predicates.stepRecord.atomRecord.visit.observation.program)
 
   }

@@ -3,13 +3,13 @@
 
 package lucuma.odb.graphql.predicate
 
+import eu.timepit.refined.types.numeric.PosInt
 import grackle.Path
 import lucuma.core.model.sequence.Atom
-import lucuma.core.util.Timestamp
 import lucuma.odb.data.StepExecutionState
 
 class StepRecordPredicates(path: Path):
-  lazy val id             = LeafPredicates[Atom.Id](path / "id")
-  lazy val firstEventTime = LeafPredicates[Timestamp](path / "_firstEventTime")
-  lazy val atomRecord     = new AtomRecordPredicates(path / "atom")
-  lazy val execution      = LeafPredicates[StepExecutionState](path / "executionState")
+  lazy val id         = LeafPredicates[Atom.Id](path / "id")
+  lazy val index      = LeafPredicates[PosInt](path / "index")
+  lazy val atomRecord = new AtomRecordPredicates(path / "atom")
+  lazy val execution  = LeafPredicates[StepExecutionState](path / "executionState")
