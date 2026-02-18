@@ -522,9 +522,7 @@ class ShortCut_7591 extends ExecutionTestSupportForGmos:
       )
 
   def nextAtomId(o: Observation.Id): IO[Atom.Id] =
-    import lucuma.odb.testsyntax.execution.*
-    generateOrFail(o, 5.some).map: e =>
-      e.gmosNorthScience.nextAtom.id
+    scienceAtomIds(serviceUser, o).map(_.head)
 
   test("atom ids"):
     val setup: IO[List[Atom.Id]] =

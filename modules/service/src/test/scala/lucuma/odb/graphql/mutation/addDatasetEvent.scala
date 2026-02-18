@@ -38,10 +38,9 @@ class addDatasetEvent extends OdbSuite with query.ExecutionTestSupportForGmos:
       tid  <- createTargetWithProfileAs(user, pid)
       oid  <- createObservationAs(user, pid, mode.some, tid)
       vid  <- recordVisitAs(user, mode.instrument, oid)
-      aids <- selectGmosNorthScienceAtomIds(oid)
-      sids <- selectGmosNorthScienceStepIds(oid)
-      aid0  = aids(0)
-      sid0  = sids(aid0)(0)
+      sids <- scienceSequenceIds(user, oid)
+      aid0  = sids.head._1
+      sid0  = sids.head._2.apply(0)
       _    <- addStepEventAs(user, sid0, vid, StepStage.EndStep)
       did  <- recordDatasetAs(user, sid0, file)
     yield (oid, did)

@@ -6,16 +6,13 @@ package issue.shortcut
 
 import cats.effect.IO
 import cats.syntax.eq.*
-import cats.syntax.option.*
 import eu.timepit.refined.types.numeric.PosInt
 import lucuma.core.model.sequence.Atom
 import lucuma.core.syntax.timespan.*
 import lucuma.itc.IntegrationTime
 import lucuma.odb.graphql.query.ExecutionTestSupportForGmos
 
-class ShortCut_3219 extends ExecutionTestSupportForGmos {
-
-  import lucuma.odb.testsyntax.execution.*
+class ShortCut_3219 extends ExecutionTestSupportForGmos:
 
   override def fakeItcSpectroscopyResult: IntegrationTime =
     IntegrationTime(
@@ -23,15 +20,13 @@ class ShortCut_3219 extends ExecutionTestSupportForGmos {
       PosInt.unsafeFrom(40)
     )
 
-  test("no duplicated atom ids") {
+  test("no duplicated atom ids"):
     val aids: IO[List[Atom.Id]] =
-      for {
-        p  <- createProgram
-        t  <- createTargetWithProfileAs(pi, p)
-        o  <- createGmosNorthLongSlitObservationAs(serviceUser, p, List(t))
-        gn <- generateOrFail(o, 20.some).map(_.gmosNorthScience)
-      } yield gn.nextAtom.id :: gn.possibleFuture.map(_.id)
+      for
+        p <- createProgram
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createGmosNorthLongSlitObservationAs(serviceUser, p, List(t))
+        s <- scienceSequenceIds(serviceUser, o)
+      yield s.keys.toList
 
     assertIOBoolean(aids.map(lst => lst.size === lst.distinct.size))
-  }
-}

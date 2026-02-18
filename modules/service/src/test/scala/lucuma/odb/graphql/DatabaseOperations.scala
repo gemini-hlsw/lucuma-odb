@@ -288,7 +288,196 @@ trait DatabaseOperations { this: OdbSuite =>
           ).pure
         .map(_._1)
 
+  def createTargetWithProfileAs(
+    user:     User,
+    pid:      Program.Id,
+    profile:  String = PointBandNormalizedProfile
+  ): IO[Target.Id] =
+    query(
+      user  = user,
+      query =
+      s"""
+        mutation {
+          createTarget(input: {
+            programId: ${pid.asJson},
+            SET: {
+              name: "V1647 Orionis"
+              sidereal: {
+                ra: { hms: "05:46:13.137" },
+                dec: { dms: "-00:06:04.89" },
+                epoch: "J2000.0",
+                properMotion: {
+                  ra: {
+                    milliarcsecondsPerYear: 0.918
+                  },
+                  dec: {
+                    milliarcsecondsPerYear: -1.057
+                  },
+                },
+                radialVelocity: {
+                  kilometersPerSecond: 27.58
+                },
+                parallax: {
+                  milliarcseconds: 2.422
+                }
+              },
+              $profile
+            }
+          }) {
+            target {
+              id
+            }
+          }
+        }
+      """
+    ).map(
+      _.hcursor.downFields("createTarget", "target", "id").require[Target.Id]
+    )
 
+  val PointBandNormalizedProfile: String = """
+    sourceProfile: {
+      point: {
+        bandNormalized: {
+          sed: {
+            stellarLibrary: O5_V
+          },
+          brightnesses: [
+            {
+              band: J,
+              value: 14.74,
+              units: VEGA_MAGNITUDE
+            },
+            {
+              band: V,
+              value: 18.1,
+              units: VEGA_MAGNITUDE
+            }
+          ]
+        }
+      }
+    }
+  """
+
+  val PointEmissionLinesProfile: String = """
+    sourceProfile: {
+      point: {
+        emissionLines: {
+          lines: [
+            {
+              wavelength: {micrometers: 0.5 },
+              lineWidth: 801,
+              lineFlux: {
+                value: 1e-12,
+                units: ERG_PER_S_PER_CM_SQUARED
+              }
+            },
+            {
+              wavelength: {micrometers: 0.65 },
+              lineWidth: 850,
+              lineFlux: {
+                value: 1e-13,
+                units: ERG_PER_S_PER_CM_SQUARED
+              }
+            }
+          ],
+          fluxDensityContinuum: {
+            value: 1e-15,
+            units: ERG_PER_S_PER_CM_SQUARED_PER_A
+          }
+        }
+      }
+    }
+  """
+
+  val PointEmissionLinesProfileNoLines: String = """
+    sourceProfile: {
+      point: {
+        emissionLines: {
+          lines: [
+          ],
+          fluxDensityContinuum: {
+            value: 1e-15,
+            units: ERG_PER_S_PER_CM_SQUARED_PER_A
+          }
+        }
+      }
+    }
+  """
+
+  val UniformEmissionLinesProfile: String = """
+    sourceProfile: {
+      uniform: {
+        emissionLines: {
+          lines: [
+            {
+              wavelength: {micrometers: 0.5 },
+              lineWidth: 801,
+              lineFlux: {
+                value: 1e-12,
+                units: ERG_PER_S_PER_CM_SQUARED_PER_ARCSEC_SQUARED
+              }
+            },
+            {
+              wavelength: {micrometers: 0.65 },
+              lineWidth: 850,
+              lineFlux: {
+                value: 1e-13,
+                units:ERG_PER_S_PER_CM_SQUARED_PER_ARCSEC_SQUARED
+              }
+            }
+          ],
+          fluxDensityContinuum: {
+            value: 1e-15,
+            units: ERG_PER_S_PER_CM_SQUARED_PER_A_PER_ARCSEC_SQUARED
+          }
+        }
+      }
+    }
+  """
+
+  val UniformEmissionLinesProfileNoLines: String = """
+    sourceProfile: {
+      uniform: {
+        emissionLines: {
+          lines: [
+          ],
+          fluxDensityContinuum: {
+            value: 1e-15,
+            units: ERG_PER_S_PER_CM_SQUARED_PER_A_PER_ARCSEC_SQUARED
+          }
+        }
+      }
+    }
+  """
+
+  def gaussianBandNormalizedProfile(fwhm: Angle): String = s"""
+    sourceProfile: {
+      gaussian: {
+        fwhm: {
+          microarcseconds: ${fwhm.toMicroarcseconds}
+        },
+        spectralDefinition: {
+          bandNormalized: {
+            sed: {
+              stellarLibrary: O5_V
+            },
+            brightnesses: [
+              {
+                band: J,
+                value: 14.74,
+                units: VEGA_MAGNITUDE
+              },
+              {
+                band: V,
+                value: 18.1,
+                units: VEGA_MAGNITUDE
+              }
+            ]
+          }
+        }
+      }
+    }
+  """
 
   def fetchPid(user: User, pro: ProposalReference): IO[Program.Id] =
     query(user, s"""

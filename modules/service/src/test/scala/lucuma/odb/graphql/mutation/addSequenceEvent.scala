@@ -122,8 +122,8 @@ class addSequenceEvent extends OdbSuite with ExecutionState with query.Execution
       tid  <- createTargetWithProfileAs(user, pid)
       oid  <- createObservationAs(user, pid, mode.some, tid)
       vid  <- recordVisitAs(user, mode.instrument, oid)
-      aids <- selectGmosNorthScienceAtomIds(oid)
-      sids <- selectGmosNorthScienceStepIds(oid)
+      sids <- scienceSequenceIds(user, oid)
+      aids  = sids.keys.toList
       aid0  = aids(0)
       sid0  = sids(aid0)(0)
       aid1  = aids(1)
