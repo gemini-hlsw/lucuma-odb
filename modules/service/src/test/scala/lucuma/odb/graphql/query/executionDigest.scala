@@ -15,17 +15,13 @@ import io.circe.syntax.*
 import lucuma.core.enums.ExecutionState
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObservationWorkflowState
-import lucuma.core.enums.ObserveClass
-import lucuma.core.enums.SequenceType
-import lucuma.core.enums.StepGuideState
+import lucuma.core.enums.SequenceCommand
 import lucuma.core.enums.StepStage
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Visit
 import lucuma.core.model.sequence.ExecutionDigest
 import lucuma.core.model.sequence.Step
-import lucuma.core.model.sequence.StepConfig
-import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth
 import lucuma.core.syntax.string.*
 import lucuma.core.syntax.timespan.*
 import lucuma.itc.IntegrationTime
@@ -568,15 +564,12 @@ class executionDigest extends ExecutionTestSupportForGmos {
   test("clear execution digest"):
 
     val setup: IO[(Observation.Id, Visit.Id, Step.Id)] =
-      import lucuma.odb.json.all.transport.given
-
       for
         p <- createProgram
         t <- createTargetWithProfileAs(pi, p)
         o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
         v <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
-        a <- recordAtomAs(serviceUser, Instrument.GmosNorth, v)
-        s <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, telescopeConfig(0, 0, StepGuideState.Enabled))
+        s <- firstScienceStepId(serviceUser, o)
       yield (o, v, s)
 
     val isEmpty = setup.flatMap:
@@ -618,8 +611,7 @@ class executionDigest extends ExecutionTestSupportForGmos {
       }
     """
 
-  import lucuma.odb.json.all.transport.given
-
+  // No events -> NOT_STARTED
   test("executionState - NOT_STARTED"):
     val setup: IO[Observation.Id] =
       for
@@ -636,6 +628,7 @@ class executionDigest extends ExecutionTestSupportForGmos {
         expected = expectedExecutionState(ExecutionState.NotStarted).asRight
       )
 
+  // Atoms with no events -> ONGOING
   test("executionState - ONGOING"):
     val setup: IO[Observation.Id] =
       for
@@ -643,9 +636,30 @@ class executionDigest extends ExecutionTestSupportForGmos {
         t <- createTargetWithProfileAs(pi, p)
         o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
         v <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
-        // We now need to record at least a single step to count as ONGOING
-        a <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
-        _ <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthArc(0), ArcStep, telescopeConfig(0, 0, StepGuideState.Disabled), ObserveClass.NightCal)
+        // We now need to record at least a single event
+        _ <- addSequenceEventAs(serviceUser, v, SequenceCommand.Start)
+        _ <- runObscalcUpdate(p, o)
+      yield o
+
+    setup.flatMap: oid =>
+      expect(
+        user     = pi,
+        query    = executionStateQuery(oid),
+        expected = expectedExecutionState(ExecutionState.Ongoing).asRight
+      )
+
+  // Some atoms are not complete -> ONGOING
+  test("executionState - ONGOING"):
+    val setup: IO[Observation.Id] =
+      for
+        p <- createProgram
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+        v <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
+        // We now need to record at least a single event
+        i <- scienceSequenceIds(serviceUser, o)
+        // complete just the first atom
+        _ <- i.head._2.traverse(sid => addEndStepEvent(sid, v))
         _ <- runObscalcUpdate(p, o)
       yield o
 
@@ -659,20 +673,17 @@ class executionDigest extends ExecutionTestSupportForGmos {
   test("executionState - DECLARED_COMPLETE"):
     val setup: IO[Observation.Id] =
       for
-        p <- createProgram
-        t <- createTargetWithProfileAs(pi, p)
-        o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+        p  <- createProgram
+        t  <- createTargetWithProfileAs(pi, p)
+        o  <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
         v  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
-        a  <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
-        s0 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthArc(0), ArcStep, telescopeConfig(0, 0, StepGuideState.Disabled), ObserveClass.NightCal)
-        _  <- addEndStepEvent(s0, v)
-        s1 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthFlat(0), FlatStep, telescopeConfig(0, 0, StepGuideState.Disabled), ObserveClass.NightCal)
-        _  <- addEndStepEvent(s1, v)
-        s2 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, telescopeConfig(0, 0, StepGuideState.Enabled), ObserveClass.Science)
-        _  <- addEndStepEvent(s2, v)
+        id <- firstScienceAtomStepIds(serviceUser, o)
+        _  <- addEndStepEvent(id(0), v)
+        _  <- addEndStepEvent(id(1), v)
+        _  <- addEndStepEvent(id(2), v)
         _  <- computeItcResultAs(pi, o)
         _  <- setObservationWorkflowState(pi, o, ObservationWorkflowState.Completed)
-        _ <- runObscalcUpdate(p, o)
+        _  <- runObscalcUpdate(p, o)
       yield o
 
     setup.flatMap: oid =>
@@ -690,16 +701,13 @@ class executionDigest extends ExecutionTestSupportForGmos {
         t <- createTargetWithProfileAs(pi, p)
         o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
         v  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
-        a  <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
-        s0 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthArc(0), ArcStep, telescopeConfig(0, 0, StepGuideState.Disabled), ObserveClass.NightCal)
-        _  <- addEndStepEvent(s0, v)
-        s1 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthFlat(0), FlatStep, telescopeConfig(0, 0, StepGuideState.Disabled), ObserveClass.NightCal)
-        _  <- addEndStepEvent(s1, v)
-        s2 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, telescopeConfig(0, 0, StepGuideState.Enabled), ObserveClass.Science)
-        _  <- addEndStepEvent(s2, v)
+        id <- firstScienceAtomStepIds(serviceUser, o)
+        _  <- addEndStepEvent(id(0), v)
+        _  <- addEndStepEvent(id(1), v)
+        _  <- addEndStepEvent(id(2), v)
         _  <- computeItcResultAs(pi, o)
         _  <- setObservationWorkflowState(pi, o, ObservationWorkflowState.Completed)
-        _ <- runObscalcUpdate(p, o)
+        _  <- runObscalcUpdate(p, o)
       yield (p, o)
 
     setup.flatMap: (_, oid) =>
@@ -746,28 +754,16 @@ class executionDigest extends ExecutionTestSupportForGmos {
           """.asRight
         )
 
+  // Complete all the atoms -> COMPLETED
   test("executionState - COMPLETED"):
-    def atom(v: Visit.Id, ditherNm: Int, q0: Int, qs: Int*): IO[Unit] =
-      for
-        a <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
-        c <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthArc(ditherNm), ArcStep, gcalTelescopeConfig(q0), ObserveClass.NightCal)
-        _ <- addEndStepEvent(c, v)
-        f <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthFlat(ditherNm), FlatStep, gcalTelescopeConfig(q0), ObserveClass.NightCal)
-        _ <- addEndStepEvent(f, v)
-        s <- (q0 :: qs.toList).traverse(q => recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthScience(ditherNm), StepConfig.Science, sciTelescopeConfig(q), ObserveClass.Science))
-        _ <- s.traverse(addEndStepEvent(_, v))
-      yield ()
-
     val setup: IO[Observation.Id] =
       for
         p <- createProgram
         t <- createTargetWithProfileAs(pi, p)
         o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
         v <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
-        _ <- atom(v,  0, 0, 15, -15)
-        _ <- atom(v,  5, 0, 15, -15)
-        _ <- atom(v, -5, 0, 15, -15)
-        _ <- atom(v,  0, 0)
+        i <- scienceStepIds(serviceUser, o)
+        _ <- i.traverse(sid => addEndStepEvent(sid, v))
         _ <- runObscalcUpdate(p, o)
       yield o
 

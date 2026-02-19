@@ -131,6 +131,12 @@ trait GenerationTestSupport extends OdbSuite:
   ): IO[List[Atom.Id]] =
     scienceSequenceIds(user, oid).map(_.keys.toList)
 
+  def scienceStepIds(
+    user: User,
+    oid:  Observation.Id
+  ): IO[List[Step.Id]] =
+    scienceSequenceIds(user, oid).map(_.values.toList.flatten)
+
   def firstScienceAtomStepIds(
     user: User,
     oid:  Observation.Id
