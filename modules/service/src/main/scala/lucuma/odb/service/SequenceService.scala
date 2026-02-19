@@ -101,6 +101,16 @@ trait SequenceService[F[_]]:
     observationId: Observation.Id
   )(using Transaction[F]): F[Boolean]
 
+  def abandonAndDeleteUnexecuted(
+    observationId: Observation.Id,
+    sequenceType:  SequenceType
+  )(using Transaction[F], Services.ServiceAccess): F[Unit]
+
+//  def resetFlamingos2Acquisition(
+//    observationId: Observation.Id,
+//    sequence:      Stream[F, Atom[Flamingos2DynamicConfig]]
+//  )(using Transaction[F], Services.ServiceAccess): F[Unit]
+
   def insertFlamingos2Sequence(
     observationId: Observation.Id,
     sequenceType:  SequenceType,
@@ -228,6 +238,21 @@ object SequenceService:
       )(using Transaction[F], Services.ServiceAccess): Stream[F, (Observation.Id, Short, AtomDigest)] =
         if which.isEmpty then Stream.empty
         else session.stream(Statements.selectAtomDigests(which))(which, 1024)
+
+      override def abandonAndDeleteUnexecuted(
+        observationId: Observation.Id,
+        sequenceType:  SequenceType
+      )(using Transaction[F], Services.ServiceAccess): F[Unit] =
+        session.execute(Statements.AbandonAndDeleteUnexecuted)(observationId, sequenceType).void
+
+//      override def resetFlamingos2Acquisition(
+//        observationId: Observation.Id,
+//        sequence:      Stream[F, Atom[Flamingos2DynamicConfig]]
+//      )(using Transaction[F], Services.ServiceAccess): F[Unit] =
+//        for
+//          _ <- abandonAndDeleteUnexecuted(observationId, SequenceType.Acquisition)
+//          _ <-
+//        yield ()
 
       override def insertFlamingos2Sequence(
         observationId:  Observation.Id,
@@ -441,6 +466,28 @@ object SequenceService:
         ).value
 
   object Statements:
+
+    val AbandonAndDeleteUnexecuted: Command[(Observation.Id, SequenceType)] =
+      sql"""
+        WITH abandoned AS (
+          UPDATE t_step s
+             SET c_execution_state = '#${StepExecutionState.Abandoned.tag}'
+            FROM v_atom_record a
+           WHERE s.c_atom_id = a.c_atom_id
+             AND a.c_observation_id = $observation_id
+             AND a.c_sequence_type = $sequence_type
+             AND a.c_execution_state <> '#${AtomExecutionState.NotStarted.tag}'
+             AND s.c_execution_state IN ('#${StepExecutionState.NotStarted.tag}', '#${StepExecutionState.Ongoing.tag}')
+        )
+        DELETE FROM t_atom t
+        WHERE t.c_atom_id IN (
+          SELECT a.c_atom_id
+            FROM v_atom_record a
+           WHERE a.c_observation_id = $observation_id
+             AND a.c_sequence_type = $sequence_type
+            AND a.c_execution_state = '#${AtomExecutionState.NotStarted.tag}'
+        );
+      """.command.contramap((o, s) => (o, s, o, s))
 
     val insertAtom: Command[(
       Atom.Id,
