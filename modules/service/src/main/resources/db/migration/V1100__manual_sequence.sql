@@ -335,13 +335,10 @@ DROP FUNCTION delete_execution_digest;
 CREATE OR REPLACE FUNCTION delete_execution_digest()
   RETURNS TRIGGER AS $$
 BEGIN
-   DELETE FROM t_execution_digest
-     WHERE c_observation_id IN (
-       SELECT DISTINCT o.c_observation_id
-       FROM t_observation o
-       JOIN t_atom a ON a.c_observation_id = o.c_observation_id
-       WHERE a.c_atom_id = OLD.c_atom_id
-     );
+  DELETE FROM t_execution_digest d
+   USING t_atom a
+   WHERE a.c_atom_id = OLD.c_atom_id
+     AND d.c_observation_id = a.c_observation_id;
    RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
@@ -488,13 +485,23 @@ SELECT
   o.c_science_band,
   o.c_declared_complete,
   CASE
+    -- The observation is explicitly marked complete -> completed.
     WHEN o.c_declared_complete
       THEN 'completed'::e_execution_state
 
+    -- No events have been fired at all -> not_started
     WHEN NOT EXISTS (
       SELECT 1 FROM t_execution_event v WHERE v.c_observation_id = o.c_observation_id
     ) THEN 'not_started'::e_execution_state
 
+    -- Some atoms have no associated events -> ongoing
+    WHEN EXISTS (
+      SELECT 1 FROM t_atom a WHERE a.c_observation_id = o.c_observation_id AND NOT EXISTS (
+        SELECT 1 FROM t_execution_event e WHERE e.c_atom_id = a.c_atom_id
+      )
+    ) THEN 'ongoing'::e_execution_state
+
+    -- At least one atom not completed -> ongoing
     WHEN EXISTS (
       SELECT 1 FROM v_atom_record a
         WHERE a.c_observation_id = o.c_observation_id

@@ -12,11 +12,11 @@ import cats.syntax.traverse.*
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
-import lucuma.core.enums.StepStage
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.SequenceType
 import lucuma.core.enums.SequenceType.Acquisition
 import lucuma.core.enums.SequenceType.Science
+import lucuma.core.enums.StepStage
 import lucuma.core.model.Observation
 import lucuma.core.model.User
 import lucuma.core.model.Visit
