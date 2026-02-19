@@ -11,17 +11,12 @@ import eu.timepit.refined.types.numeric.PosInt
 import io.circe.Json
 import io.circe.literal.*
 import lucuma.core.enums.Breakpoint
-import lucuma.core.enums.DatasetQaState
 import lucuma.core.enums.Instrument
-import lucuma.core.enums.ObserveClass
-import lucuma.core.enums.SequenceType
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.Step
-import lucuma.core.model.sequence.StepConfig
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
 import lucuma.itc.IntegrationTime
-import lucuma.odb.json.all.transport.given
 
 class executionAcqFlamingos2_WithoutSkySubtraction extends ExecutionTestSupportForFlamingos2:
 
@@ -233,10 +228,6 @@ class executionAcqFlamingos2_WithoutSkySubtraction extends ExecutionTestSupportF
         x2 <- nextAtomStepIds(o)
       yield List(x0, x1, x2)
 
-    (execAcq.flatTap: ids =>
-      IO.println(s"x0 = ${ids(0).toList.mkString(", ")}") *>
-      IO.println(s"x1 = ${ids(1).toList.mkString(", ")}") *>
-      IO.println(s"x2 = ${ids(2).toList.mkString(", ")}")) *>
     execAcq.map: ids =>
       ids.zip(ids.tail).foreach: (before, after) =>
         assertEquals(before.tail, after.toList, s"before: $before, after: $after")
