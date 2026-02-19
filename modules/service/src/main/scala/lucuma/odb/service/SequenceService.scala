@@ -615,14 +615,24 @@ object SequenceService:
     // in this atom *except the given one* as also abandoned.
     val AbandonStepsInOngoingAtomsExceptStep: Command[(Observation.Id, Step.Id)] =
       sql"""
-        WITH current_atom AS (SELECT c_atom_id FROM t_step WHERE c_step_id = $step_id)
+        WITH current_atom AS (
+          SELECT a.c_atom_id,
+                 a.c_sequence_type
+            FROM t_step s
+            JOIN t_atom a ON a.c_atom_id = s.c_atom_id
+           WHERE s.c_step_id = $step_id
+        )
         UPDATE t_step s
            SET c_execution_state = '#${StepExecutionState.Abandoned.tag}'
           FROM v_atom_record a, t_step_execution_state e
           CROSS JOIN current_atom ca
          WHERE a.c_observation_id = $observation_id
            AND s.c_atom_id = a.c_atom_id
+           -- Only atoms in the same sequence
+           AND a.c_sequence_type = ca.c_sequence_type
+           -- Only ongoing atoms
            AND a.c_execution_state = '#${AtomExecutionState.Ongoing.tag}'
+           -- Only non-terminal steps
            AND s.c_execution_state = e.c_tag
            AND e.c_terminal = FALSE
            AND (

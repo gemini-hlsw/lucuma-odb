@@ -99,10 +99,7 @@ trait GenerationTestSupport extends OdbSuite:
       case InstrumentExecutionConfig.GmosSouth(e)  => e
       case InstrumentExecutionConfig.Igrins2(e)    => e
 
-  def acquisitionSequenceIds(
-    user: User,
-    oid:  Observation.Id
-  ): IO[ListMap[Atom.Id, List[Step.Id]]] =
+  def acquisitionSequenceIds(user: User, oid:  Observation.Id): IO[ListMap[Atom.Id, List[Step.Id]]] =
     executionConfig(user, oid).map: ec =>
       ListMap.from:
         ec
@@ -112,10 +109,7 @@ trait GenerationTestSupport extends OdbSuite:
             (s.nextAtom :: s.possibleFuture).map: a =>
               a.id -> a.steps.toList.map(_.id)
 
-  def scienceSequenceIds(
-    user: User,
-    oid:  Observation.Id
-  ): IO[ListMap[Atom.Id, List[Step.Id]]] =
+  def scienceSequenceIds(user: User, oid:  Observation.Id): IO[ListMap[Atom.Id, List[Step.Id]]] =
     executionConfig(user, oid).map: ec =>
       ListMap.from:
         ec
@@ -125,32 +119,32 @@ trait GenerationTestSupport extends OdbSuite:
             (s.nextAtom :: s.possibleFuture).map: a =>
               a.id -> a.steps.toList.map(_.id)
 
-  def scienceAtomIds(
-    user: User,
-    oid:  Observation.Id
-  ): IO[List[Atom.Id]] =
+  def acquisitionAtomIds(user: User, oid:  Observation.Id): IO[List[Atom.Id]] =
+    acquisitionSequenceIds(user, oid).map(_.keys.toList)
+
+  def scienceAtomIds(user: User, oid:  Observation.Id): IO[List[Atom.Id]] =
     scienceSequenceIds(user, oid).map(_.keys.toList)
 
-  def scienceStepIds(
-    user: User,
-    oid:  Observation.Id
-  ): IO[List[Step.Id]] =
+  def acquisitionStepIds(user: User, oid:  Observation.Id): IO[List[Step.Id]] =
+    acquisitionSequenceIds(user, oid).map(_.values.toList.flatten)
+
+  def scienceStepIds(user: User, oid:  Observation.Id): IO[List[Step.Id]] =
     scienceSequenceIds(user, oid).map(_.values.toList.flatten)
 
-  def firstScienceAtomStepIds(
-    user: User,
-    oid:  Observation.Id
-  ): IO[List[Step.Id]] =
+  def firstAcquisitionAtomStepIds(user: User, oid:  Observation.Id): IO[List[Step.Id]] =
+    acquisitionSequenceIds(user, oid).map(_.head._2)
+
+  def firstScienceAtomStepIds(user: User, oid:  Observation.Id): IO[List[Step.Id]] =
     scienceSequenceIds(user, oid).map(_.head._2)
 
-  def firstScienceAtomId(
-    user: User,
-    oid:  Observation.Id
-  ): IO[Atom.Id] =
+  def firstAcquisitionAtomId(user: User, oid:  Observation.Id): IO[Atom.Id] =
+    acquisitionAtomIds(user, oid).map(_.head)
+
+  def firstScienceAtomId(user: User, oid:  Observation.Id): IO[Atom.Id] =
     scienceAtomIds(user, oid).map(_.head)
 
-  def firstScienceStepId(
-    user: User,
-    oid:  Observation.Id
-  ): IO[Step.Id] =
+  def firstAcquisitionStepId(user: User, oid:  Observation.Id): IO[Step.Id] =
+    firstAcquisitionAtomStepIds(user, oid).map(_.head)
+
+  def firstScienceStepId(user: User, oid:  Observation.Id): IO[Step.Id] =
     firstScienceAtomStepIds(user, oid).map(_.head)
