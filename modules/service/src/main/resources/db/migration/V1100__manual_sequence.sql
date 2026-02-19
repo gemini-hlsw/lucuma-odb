@@ -129,7 +129,7 @@ CREATE TYPE e_breakpoint AS enum(
 
 CREATE TABLE t_step (
   c_step_id          d_step_id     PRIMARY KEY,
-  c_atom_id          d_atom_id     NOT NULL REFERENCES t_atom(c_atom_id) DEFERRABLE INITIALLY DEFERRED,
+  c_atom_id          d_atom_id     NOT NULL REFERENCES t_atom(c_atom_id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED,
   c_instrument       d_tag         NOT NULL,
   c_step_type        e_step_type   NOT NULL,
   c_step_index       integer       NOT NULL CHECK (c_step_index > 0),
@@ -373,31 +373,31 @@ ALTER TABLE t_step_config_gcal
   DROP CONSTRAINT t_step_config_gcal_c_step_id_c_step_type_fkey;
 
 ALTER TABLE t_step_config_gcal
-  ADD CONSTRAINT t_step_config_gcal_c_step_id_c_step_type_fkey FOREIGN KEY (c_step_id, c_step_type) REFERENCES t_step(c_step_id, c_step_type) DEFERRABLE INITIALLY DEFERRED;
+  ADD CONSTRAINT t_step_config_gcal_c_step_id_c_step_type_fkey FOREIGN KEY (c_step_id, c_step_type) REFERENCES t_step(c_step_id, c_step_type) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED;
 
 ALTER TABLE t_step_config_smart_gcal
   DROP CONSTRAINT t_step_config_smart_gcal_c_step_id_c_step_type_fkey;
 
 ALTER TABLE t_step_config_smart_gcal
-  ADD CONSTRAINT t_step_config_smart_gcal_c_step_id_c_step_type_fkey FOREIGN KEY (c_step_id, c_step_type) REFERENCES t_step(c_step_id, c_step_type) DEFERRABLE INITIALLY DEFERRED;
+  ADD CONSTRAINT t_step_config_smart_gcal_c_step_id_c_step_type_fkey FOREIGN KEY (c_step_id, c_step_type) REFERENCES t_step(c_step_id, c_step_type) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED;
 
 ALTER TABLE t_flamingos_2_dynamic
   DROP CONSTRAINT t_flamingos_2_dynamic_c_step_id_c_instrument_fkey;
 
 ALTER TABLE t_flamingos_2_dynamic
-  ADD CONSTRAINT t_flamingos_2_dynamic_c_step_id_c_instrument_fkey FOREIGN KEY (c_step_id, c_instrument) REFERENCES t_step(c_step_id, c_instrument) DEFERRABLE INITIALLY DEFERRED;
+  ADD CONSTRAINT t_flamingos_2_dynamic_c_step_id_c_instrument_fkey FOREIGN KEY (c_step_id, c_instrument) REFERENCES t_step(c_step_id, c_instrument) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED;
 
 ALTER TABLE t_gmos_north_dynamic
   DROP CONSTRAINT t_gmos_north_dynamic_c_step_id_c_instrument_fkey;
 
 ALTER TABLE t_gmos_north_dynamic
-  ADD CONSTRAINT t_gmos_north_dynamic_c_step_id_c_instrument_fkey FOREIGN KEY (c_step_id, c_instrument) REFERENCES t_step(c_step_id, c_instrument) DEFERRABLE INITIALLY DEFERRED;
+  ADD CONSTRAINT t_gmos_north_dynamic_c_step_id_c_instrument_fkey FOREIGN KEY (c_step_id, c_instrument) REFERENCES t_step(c_step_id, c_instrument) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED;
 
 ALTER TABLE t_gmos_south_dynamic
   DROP CONSTRAINT t_gmos_south_dynamic_c_step_id_c_instrument_fkey;
 
 ALTER TABLE t_gmos_south_dynamic
-  ADD CONSTRAINT t_gmos_south_dynamic_c_step_id_c_instrument_fkey FOREIGN KEY (c_step_id, c_instrument) REFERENCES t_step(c_step_id, c_instrument) DEFERRABLE INITIALLY DEFERRED;
+  ADD CONSTRAINT t_gmos_south_dynamic_c_step_id_c_instrument_fkey FOREIGN KEY (c_step_id, c_instrument) REFERENCES t_step(c_step_id, c_instrument) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED;
 
 -- Rework the dataset visit, obs id, index assignment.  Before we knew that the
 -- visit existed because datasets referred to steps that referred to atoms that
