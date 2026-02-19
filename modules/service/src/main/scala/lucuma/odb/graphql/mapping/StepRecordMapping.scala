@@ -5,7 +5,6 @@ package lucuma.odb.graphql
 package mapping
 
 import cats.effect.Resource
-import cats.syntax.apply.*
 import grackle.Query.Binding
 import grackle.QueryCompiler.Elab
 import grackle.TypeRef
@@ -49,9 +48,9 @@ trait StepRecordMapping[F[_]] extends StepRecordView[F]
       SqlField("_lastEventTime",  StepRecordView.LastEventTime, hidden = true),
       CursorFieldJson("interval", c =>
         for
-          f <- c.fieldAs[Option[Timestamp]]("_firstEventTime")
-          l <- c.fieldAs[Option[Timestamp]]("_lastEventTime")
-        yield (f, l).mapN((first, last) => TimestampInterval.between(first, last)).asJson,
+          f <- c.fieldAs[Timestamp]("_firstEventTime")
+          l <- c.fieldAs[Timestamp]("_lastEventTime")
+        yield TimestampInterval.between(f, l).asJson,
         List("_firstEventTime", "_lastEventTime")
       ),
       SqlObject("stepConfig"),

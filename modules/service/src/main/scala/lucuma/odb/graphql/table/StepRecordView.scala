@@ -20,8 +20,13 @@ trait StepRecordView[F[_]] extends BaseMapping[F]:
     val ExecutionState: ColumnRef = col("c_execution_state",  step_execution_state)
     val TimeEstimate: ColumnRef   = col("c_time_estimate",    time_span)
     val Breakpoint: ColumnRef     = col("c_breakpoint",       breakpoint)
-    val FirstEventTime: ColumnRef = col("c_first_event_time", core_timestamp.opt)
-    val LastEventTime:  ColumnRef = col("c_last_event_time",  core_timestamp.opt)
+
+    // The t_step table from which the view is derived has optional first and
+    // last event times.  The view, though, filters out any rows without
+    // timestamps.
+    val FirstEventTime: ColumnRef = col("c_first_event_time", core_timestamp)
+    val LastEventTime:  ColumnRef = col("c_last_event_time",  core_timestamp)
+
     val OffsetP: ColumnRef        = col("c_offset_p",         angle_µas)
     val OffsetQ: ColumnRef        = col("c_offset_q",         angle_µas)
     val GuideState: ColumnRef     = col("c_guide_state",      guide_state)

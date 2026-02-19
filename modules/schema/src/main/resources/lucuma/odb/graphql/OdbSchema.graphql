@@ -281,12 +281,12 @@ type AtomRecord {
   "Sequence type."
   sequenceType: SequenceType!
 
-  "Recorded steps associated with this atom."
+  "Recorded steps associated with this atom, ordered by last event time."
   steps(
     """
-    Starts the result set at (or after if not existent) the given step index.
+    Starts the result set at (or after if not existent) the given last event time.
     """
-    OFFSET: PosInt
+    OFFSET: Timestamp
 
     "Limits the result to at most this number of matches (but never more than 1000)."
     LIMIT: NonNegInt
@@ -7351,10 +7351,13 @@ type Execution {
   """
   executionState: ExecutionState!
 
-  "Executed (or at least partially executed) atom records, across all visits."
+  """
+  Executed (or at least partially executed) atom records, across all visits,
+  ordered by last associated event time.
+  """
   atomRecords(
-    "Starts the result set at the given atom index."
-    OFFSET: PosInt
+    "Starts the result set at the given event time."
+    OFFSET: Timestamp
 
     "Limits the result to at most this number of matches (but never more than 1000)."
     LIMIT: NonNegInt
@@ -14813,8 +14816,8 @@ type Visit {
 
   "Executed (or at least partially executed) atom records for this visit."
   atomRecords(
-    "Starts the result set at the given atom creation time."
-    OFFSET: PosInt
+    "Starts the result set at the given event time."
+    OFFSET: Timestamp
 
     "Limits the result to at most this number of matches (but never more than 1000)."
     LIMIT: NonNegInt
