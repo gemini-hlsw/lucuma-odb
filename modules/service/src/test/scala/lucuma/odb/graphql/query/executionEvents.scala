@@ -25,18 +25,12 @@ import lucuma.core.model.User
 import lucuma.core.model.Visit
 import lucuma.core.util.Timestamp
 
-class executionEvents extends OdbSuite with ExecutionQuerySetupOperations {
+class executionEvents extends OdbSuite with ExecutionQuerySetupOperations with ExecutionTestSupportForGmos:
 
   import ExecutionQuerySetupOperations.Setup
   import ExecutionQuerySetupOperations.VisitNode
 
-  val pi      = TestUsers.Standard.pi(1, 30)
-  val pi2     = TestUsers.Standard.pi(2, 32)
-  val service = TestUsers.service(3)
-
-  val mode    = ObservingModeType.GmosNorthLongSlit
-
-  val validUsers = List(pi, pi2, service).toList
+  val mode = ObservingModeType.GmosNorthLongSlit
 
   override def recordVisit(
     mode:    ObservingModeType,
@@ -44,7 +38,7 @@ class executionEvents extends OdbSuite with ExecutionQuerySetupOperations {
     user:    User,
     oid:     Observation.Id
   ): IO[VisitNode] =
-    for {
+    for
       vid <- recordVisitAs(user, mode.instrument, oid)
       e0  <- addSlewEventAs(user, oid, SlewStage.StartSlew)
       e1  <- addSlewEventAs(user, oid, SlewStage.EndSlew)
@@ -52,11 +46,11 @@ class executionEvents extends OdbSuite with ExecutionQuerySetupOperations {
       ids <- scienceSequenceIds(user, oid)
       as  <- (0 until setup.atomCount).toList.traverse { a => recordAtom(setup, user, vid, a, ids) }
       e3  <- addSequenceEventAs(user, vid, SequenceCommand.Stop)
-    } yield VisitNode(vid, as, List(e0, e1, e2, e3))
+    yield VisitNode(vid, as, List(e0, e1, e2, e3))
 
 
   test("observation -> execution -> events") {
-    recordAll(pi, service, mode, offset = 0, atomCount = 2, stepCount = 3, datasetCount = 2).flatMap { on =>
+    recordAll(pi, serviceUser, mode, offset = 0, atomCount = 2, stepCount = 3, datasetCount = 2).flatMap { on =>
       val q = s"""
         query {
           observation(observationId: "${on.id}") {
@@ -90,7 +84,7 @@ class executionEvents extends OdbSuite with ExecutionQuerySetupOperations {
   }
 
   test("observation -> execution -> events (visit, observation)") {
-    recordAll(pi, service, mode, offset = 100).flatMap { on =>
+    recordAll(pi, serviceUser, mode, offset = 100).flatMap { on =>
       val q = s"""
         query {
           observation(observationId: "${on.id}") {
@@ -136,7 +130,7 @@ class executionEvents extends OdbSuite with ExecutionQuerySetupOperations {
   }
 
   test("query -> events (no WHERE, only visible to pi2)") {
-    recordAll(pi2, service, mode, offset = 200, stepCount = 2).flatMap { on =>
+    recordAll(pi2, serviceUser, mode, offset = 200, stepCount = 2).flatMap { on =>
       val q = s"""
         query {
           events {
@@ -162,7 +156,7 @@ class executionEvents extends OdbSuite with ExecutionQuerySetupOperations {
   }
 
   test("query -> events (WHERE observation id)") {
-    recordAll(pi, service, mode, offset = 300, stepCount = 2).flatMap { on =>
+    recordAll(pi, serviceUser, mode, offset = 300, stepCount = 2).flatMap { on =>
       val q = s"""
         query {
           events(
@@ -194,7 +188,7 @@ class executionEvents extends OdbSuite with ExecutionQuerySetupOperations {
   }
 
   test("query -> events (WHERE observation id + eventType SEQUENCE)") {
-    recordAll(pi, service, mode, offset = 400, stepCount = 2).flatMap { on =>
+    recordAll(pi, serviceUser, mode, offset = 400, stepCount = 2).flatMap { on =>
       val q = s"""
         query {
           events(
@@ -230,7 +224,7 @@ class executionEvents extends OdbSuite with ExecutionQuerySetupOperations {
   }
 
   test("query -> events (WHERE observation id + eventType SLEW)") {
-    recordAll(pi, service, mode, offset = 450, stepCount = 2).flatMap { on =>
+    recordAll(pi, serviceUser, mode, offset = 450, stepCount = 2).flatMap { on =>
       val q = s"""
         query {
           events(
@@ -266,7 +260,7 @@ class executionEvents extends OdbSuite with ExecutionQuerySetupOperations {
   }
 
   test("query -> events (WHERE observation id + received)") {
-    recordAll(pi, service, mode, offset = 500).flatMap { on =>
+    recordAll(pi, serviceUser, mode, offset = 500).flatMap { on =>
       val start: Timestamp = on.allEvents.head.received
       val end: Timestamp   = on.allEvents.last.received
 
@@ -306,7 +300,7 @@ class executionEvents extends OdbSuite with ExecutionQuerySetupOperations {
   }
 
   test("query -> events (WHERE visitId)") {
-    recordAll(pi, service, mode, offset = 600).flatMap { on =>
+    recordAll(pi, serviceUser, mode, offset = 600).flatMap { on =>
       val q = s"""
         query {
           events(
@@ -339,7 +333,7 @@ class executionEvents extends OdbSuite with ExecutionQuerySetupOperations {
   }
 
   test("query -> events (WHERE id)") {
-    recordAll(pi, service, mode, offset = 700).flatMap { on =>
+    recordAll(pi, serviceUser, mode, offset = 700).flatMap { on =>
       val q = s"""
         query {
           events(
@@ -372,7 +366,7 @@ class executionEvents extends OdbSuite with ExecutionQuerySetupOperations {
   }
 
   test("query -> events (WHERE observation id + sequenceEvent command)") {
-    recordAll(pi, service, mode, offset = 800, stepCount = 2).flatMap { on =>
+    recordAll(pi, serviceUser, mode, offset = 800, stepCount = 2).flatMap { on =>
       val q = s"""
         query {
           events(
@@ -408,7 +402,7 @@ class executionEvents extends OdbSuite with ExecutionQuerySetupOperations {
   }
 
   test("query -> events (WHERE observation id + stepEvent stepId)") {
-    recordAll(pi, service, mode, offset = 900, stepCount = 2).flatMap { on =>
+    recordAll(pi, serviceUser, mode, offset = 900, stepCount = 2).flatMap { on =>
       val sid = on.visit.atoms.head.steps.head.id
 
       val q = s"""
@@ -461,7 +455,7 @@ class executionEvents extends OdbSuite with ExecutionQuerySetupOperations {
   }
 
   test("query -> events (WHERE observation + stepEvent stepStage)") {
-    recordAll(pi, service, mode, offset = 1000, stepCount = 2).flatMap { on =>
+    recordAll(pi, serviceUser, mode, offset = 1000, stepCount = 2).flatMap { on =>
       val q = s"""
         query {
           events(
@@ -497,7 +491,7 @@ class executionEvents extends OdbSuite with ExecutionQuerySetupOperations {
   }
 
   test("query -> events (WHERE datasetId)") {
-    recordAll(pi, service, mode, offset = 1100, stepCount = 2).flatMap { on =>
+    recordAll(pi, serviceUser, mode, offset = 1100, stepCount = 2).flatMap { on =>
       val dids = on.visit.atoms.head.steps.head.allDatasets
       val q = s"""
         query {
@@ -532,7 +526,7 @@ class executionEvents extends OdbSuite with ExecutionQuerySetupOperations {
   }
 
   test("query -> events (WHERE observation id + datasetStage)") {
-    recordAll(pi, service, mode, offset = 1200, stepCount = 2).flatMap { on =>
+    recordAll(pi, serviceUser, mode, offset = 1200, stepCount = 2).flatMap { on =>
       val q = s"""
         query {
           events(
@@ -568,7 +562,7 @@ class executionEvents extends OdbSuite with ExecutionQuerySetupOperations {
   }
 
   test("query -> events (WHERE observation id + slewEvent slewStage)") {
-    recordAll(pi, service, mode, offset = 1300, stepCount = 2).flatMap { on =>
+    recordAll(pi, serviceUser, mode, offset = 1300, stepCount = 2).flatMap { on =>
       val q = s"""
         query {
           events(
@@ -602,5 +596,3 @@ class executionEvents extends OdbSuite with ExecutionQuerySetupOperations {
       expect(pi, q, e)
     }
   }
-
-}
