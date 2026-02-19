@@ -11,18 +11,12 @@ import io.circe.syntax.*
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.model.sequence.Dataset
 
-class executionDatasets extends OdbSuite with ExecutionQuerySetupOperations {
+class executionDatasets extends OdbSuite with ExecutionQuerySetupOperations with ExecutionTestSupportForGmos:
 
-  val pi      = TestUsers.Standard.pi(1, 30)
-  val pi2     = TestUsers.Standard.pi(2, 32)
-  val service = TestUsers.service(3)
-
-  val mode    = ObservingModeType.GmosSouthLongSlit
-
-  val validUsers = List(pi, pi2, service).toList
+  val mode = ObservingModeType.GmosSouthLongSlit
 
   test("observation -> execution -> datasets") {
-    recordAll(pi, service, mode, offset = 0, atomCount = 2, stepCount = 3, datasetCount = 2).flatMap { on =>
+    recordAll(pi, serviceUser, mode, offset = 0, atomCount = 2, stepCount = 3, datasetCount = 2).flatMap { on =>
       val q = s"""
         query {
           observation(observationId: "${on.id}") {
@@ -56,7 +50,7 @@ class executionDatasets extends OdbSuite with ExecutionQuerySetupOperations {
   }
 
   test("observation -> execution -> datasets -> events") {
-    recordAll(pi, service, mode, offset = 100, stepCount = 2, datasetCount = 2).flatMap { on =>
+    recordAll(pi, serviceUser, mode, offset = 100, stepCount = 2, datasetCount = 2).flatMap { on =>
       val q = s"""
         query {
           observation(observationId: "${on.id}") {
@@ -97,7 +91,7 @@ class executionDatasets extends OdbSuite with ExecutionQuerySetupOperations {
   }
 
   test("observation -> execution -> datasets -> observation") {
-    recordAll(pi, service, mode, offset = 200).flatMap { on =>
+    recordAll(pi, serviceUser, mode, offset = 200).flatMap { on =>
       val q = s"""
         query {
           observation(observationId: "${on.id}") {
@@ -133,7 +127,7 @@ class executionDatasets extends OdbSuite with ExecutionQuerySetupOperations {
   }
 
   test("observation -> execution -> datasets -> visit") {
-    recordAll(pi, service, mode, offset = 300).flatMap { on =>
+    recordAll(pi, serviceUser, mode, offset = 300).flatMap { on =>
       val q = s"""
         query {
           observation(observationId: "${on.id}") {
@@ -171,4 +165,3 @@ class executionDatasets extends OdbSuite with ExecutionQuerySetupOperations {
       expect(pi, q, e)
     }
   }
-}
