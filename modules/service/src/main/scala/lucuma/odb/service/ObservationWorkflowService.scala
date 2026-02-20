@@ -434,9 +434,9 @@ object ObservationWorkflowService {
 
         val generatorValidator: Validator = info =>
           info.generatorParams.foldMap:
-            case Left(error)                                       => ObservationValidationMap.singleton(error.toObsValidation)
-            case Right(GeneratorParams(Left(m), _, _, _, _, _, _)) => ObservationValidationMap.singleton(m.toObsValidation)
-            case Right(ps)                                         => ObservationValidationMap.empty
+            case Left(error)                                          => ObservationValidationMap.singleton(error.toObsValidation)
+            case Right(GeneratorParams(Left(m), _, _, _, _, _, _, _)) => ObservationValidationMap.singleton(m.toObsValidation)
+            case Right(ps)                                            => ObservationValidationMap.empty
 
         val cfpInstrumentValidator: Validator = info =>
           info.cfpInfo.foldMap: cfp =>

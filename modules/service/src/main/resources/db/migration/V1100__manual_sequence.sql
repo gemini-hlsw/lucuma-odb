@@ -5,23 +5,47 @@
 CREATE TABLE t_atom (
   c_atom_id          d_atom_id        PRIMARY KEY,
   c_instrument       d_tag            NOT NULL,
-  c_atom_index       integer          NOT NULL CHECK (c_atom_index > 0),
+
+  -- The atom index is used to sort *unexecuted* atoms.  Once an atom has events,
+  -- the event times determine order.  In other words, executed atoms are ordered
+  -- according to when they were actually executed. To-be executed atoms are
+  -- ordered according to the atom index.
+  c_atom_index       integer          NOT NULL,
 
   UNIQUE (c_atom_id, c_instrument),
 
   c_observation_id   d_observation_id NOT NULL,
   c_sequence_type    e_sequence_type  NOT NULL,
 
-  UNIQUE (c_observation_id, c_sequence_type, c_atom_index),
-
   c_visit_id         d_visit_id       REFERENCES t_visit(c_visit_id) ON DELETE CASCADE,
 
   c_description      text,
 
   c_first_event_time timestamp without time zone,
-  c_last_event_time  timestamp without time zone
+  c_last_event_time  timestamp without time zone,
+
+  -- Both event times NULL or neither NULL.
+  CONSTRAINT t_atom_event_time_null_chk CHECK (
+    (c_first_event_time IS NULL) = (c_last_event_time IS NULL)
+  ),
+
+  -- First before last.
+  CONSTRAINT t_atom_event_time_order_chk CHECK (
+    (c_first_event_time IS NULL) OR
+    c_first_event_time <= c_last_event_time
+  )
 
 );
+
+-- Unexecuted atom indices should be unique among an observation's sequence's
+-- atoms.  Once executed, the atom index is no longer relevant.
+CREATE UNIQUE INDEX i_atom_index_partial_unique
+  ON t_atom (
+    c_observation_id,
+    c_sequence_type,
+    c_atom_index
+  )
+  WHERE c_last_event_time IS NULL;
 
 -- Copy the old t_atom_record data over to t_atom.
 INSERT INTO t_atom (
@@ -132,11 +156,15 @@ CREATE TABLE t_step (
   c_atom_id          d_atom_id     NOT NULL REFERENCES t_atom(c_atom_id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED,
   c_instrument       d_tag         NOT NULL,
   c_step_type        e_step_type   NOT NULL,
-  c_step_index       integer       NOT NULL CHECK (c_step_index > 0),
+
+  -- The step index is used to sort *unexecuted* steps inside of an atom.  Once
+  -- a step has events, the event times determine order.  In other words,
+  -- executed steps are ordered according to when they were actually executed.
+  -- To-be executed steps are ordered according to the step index.
+  c_step_index       integer       NOT NULL,
 
   UNIQUE (c_step_id, c_instrument),
   UNIQUE (c_step_id, c_step_type),
-  UNIQUE (c_atom_id, c_step_index),
 
   c_observe_class    e_obs_class   NOT NULL,
   c_time_estimate    interval      NOT NULL DEFAULT '00:00:00'::interval,
@@ -148,8 +176,29 @@ CREATE TABLE t_step (
   c_breakpoint       e_breakpoint  NOT NULL DEFAULT 'disabled'::e_breakpoint,
 
   c_first_event_time timestamp without time zone,
-  c_last_event_time  timestamp without time zone
+  c_last_event_time  timestamp without time zone,
+
+  -- Both event times NULL or neither NULL.
+  CONSTRAINT t_step_event_time_null_chk CHECK (
+    (c_first_event_time IS NULL) = (c_last_event_time IS NULL)
+  ),
+
+  -- First before last.
+  CONSTRAINT t_step_event_time_order_chk CHECK (
+    (c_first_event_time IS NULL) OR
+    c_first_event_time <= c_last_event_time
+  )
+
 );
+
+-- Unexecuted step indices should be unique among an observation's atom's
+-- steps.  Once executed, the step index is no longer relevant.
+CREATE UNIQUE INDEX i_step_index_partial_unique
+  ON t_step (
+    c_atom_id,
+    c_step_index
+  )
+  WHERE c_last_event_time IS NULL;
 
 -- Copy the old t_step_record data over to t_step.
 INSERT INTO t_step (
@@ -205,7 +254,6 @@ LEFT JOIN (
   GROUP BY c_atom_id
 ) s ON s.c_atom_id = a.c_atom_id
 WHERE a.c_visit_id         IS NOT NULL
-  AND a.c_first_event_time IS NOT NULL
   AND a.c_last_event_time  IS NOT NULL;
 
 -- Update the step record view
@@ -461,9 +509,38 @@ BEFORE INSERT ON t_dataset
 FOR EACH ROW
 EXECUTE FUNCTION initialize_dataset_before_insert();
 
--- Add execution state to the generator params
+-- We'll recreate generator params to have execution state and executed
+-- acquisition and science atom counts.
 DROP VIEW v_generator_params;
-CREATE OR REPLACE VIEW v_generator_params AS
+
+-- We aren't going to use acquisition reset time anymore.  Instead a reset
+-- acquisition sequence means rewriting atoms and steps.
+DROP VIEW v_observation;
+ALTER TABLE t_observation
+  DROP COLUMN  c_acq_reset_time;
+
+-- Update the observation view (copied from V1049) to remove the acq reset column.
+CREATE VIEW v_observation AS
+  SELECT o.*,
+  CASE WHEN o.c_explicit_ra              IS NOT NULL THEN o.c_observation_id END AS c_explicit_base_id,
+  CASE WHEN o.c_air_mass_min             IS NOT NULL THEN o.c_observation_id END AS c_air_mass_id,
+  CASE WHEN o.c_hour_angle_min           IS NOT NULL THEN o.c_observation_id END AS c_hour_angle_id,
+  CASE WHEN o.c_observing_mode_type      IS NOT NULL THEN o.c_observation_id END AS c_observing_mode_id,
+  CASE WHEN o.c_spec_wavelength          IS NOT NULL THEN o.c_observation_id END AS c_spec_wavelength_id,
+
+  CASE WHEN o.c_spec_wavelength_coverage IS NOT NULL THEN o.c_observation_id END AS c_spec_wavelength_coverage_id,
+  CASE WHEN o.c_spec_focal_plane_angle   IS NOT NULL THEN o.c_observation_id END AS c_spec_focal_plane_angle_id,
+  CASE WHEN o.c_img_minimum_fov          IS NOT NULL THEN o.c_observation_id END AS c_img_minimum_fov_id,
+  CASE WHEN o.c_observation_duration     IS NOT NULL THEN o.c_observation_id END AS c_observation_duration_id,
+  CASE WHEN o.c_science_mode = 'imaging'::d_tag      THEN o.c_observation_id END AS c_imaging_mode_id,
+  CASE WHEN o.c_science_mode = 'spectroscopy'::d_tag THEN o.c_observation_id END AS c_spectroscopy_mode_id,
+  c.c_active_start::timestamp + (c.c_active_end::timestamp - c.c_active_start::timestamp) * 0.5 AS c_reference_time
+  FROM t_observation o
+  LEFT JOIN t_proposal p on p.c_program_id = o.c_program_id
+  LEFT JOIN t_cfp c on p.c_cfp_id = c.c_cfp_id;
+
+-- Recreate generator params with the new execution state and acq/sci count.
+CREATE VIEW v_generator_params AS
 SELECT
   o.c_program_id,
   o.c_observation_id,
@@ -510,7 +587,8 @@ SELECT
 
     ELSE 'completed'::e_execution_state
   END AS c_execution_state,
-  o.c_acq_reset_time,
+  COALESCE(acq.c_execution_count, 0) AS c_execution_acq_count,
+  COALESCE(sci.c_execution_count, 0) AS c_execution_sci_count,
   o.c_blind_offset_target_id,
   b.c_sid_rv AS c_blind_rv,
   b.c_source_profile AS c_blind_source_profile,
@@ -533,6 +611,24 @@ LEFT JOIN LATERAL (
 LEFT JOIN t_exposure_time_mode e
   ON e.c_observation_id = o.c_observation_id
  AND e.c_role = 'requirement'
+LEFT JOIN (
+  SELECT
+    c_observation_id,
+    COUNT(*) AS c_execution_count
+  FROM t_atom
+  WHERE c_last_event_time IS NOT NULL
+    AND c_sequence_type = 'acquisition'
+  GROUP BY c_observation_id
+) acq ON acq.c_observation_id = o.c_observation_id
+LEFT JOIN (
+  SELECT
+    c_observation_id,
+    COUNT(*) AS c_execution_count
+  FROM t_atom
+  WHERE c_last_event_time IS NOT NULL
+    AND c_sequence_type = 'science'
+  GROUP BY c_observation_id
+) sci ON sci.c_observation_id = o.c_observation_id
 ORDER BY
   o.c_observation_id,
   t.c_target_id;

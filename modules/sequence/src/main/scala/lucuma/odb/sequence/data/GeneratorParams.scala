@@ -9,7 +9,6 @@ import cats.syntax.either.*
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.ExecutionState
 import lucuma.core.enums.ScienceBand
-import lucuma.core.util.Timestamp
 import lucuma.odb.sequence.ObservingMode
 import lucuma.odb.sequence.ObservingMode.Instances.given
 import lucuma.odb.sequence.syntax.all.*
@@ -22,7 +21,8 @@ case class GeneratorParams(
   calibrationRole:  Option[CalibrationRole],
   declaredComplete: Boolean,
   executionState:   ExecutionState,
-  acqResetTime:     Option[Timestamp]
+  executedAcqCount: Long,
+  executedSciCount: Long
 )
 
 object GeneratorParams:
@@ -36,7 +36,8 @@ object GeneratorParams:
         a.calibrationRole,
         a.declaredComplete,
         a.executionState,
-        a.acqResetTime
+        a.executedAcqCount,
+        a.executedSciCount
       )
 
   given HashBytes[GeneratorParams] with
@@ -48,5 +49,6 @@ object GeneratorParams:
         a.calibrationRole.hashBytes,
         a.declaredComplete.hashBytes,
         a.executionState.hashBytes,
-        a.acqResetTime.hashBytes
+        a.executedAcqCount.hashBytes,
+        a.executedSciCount.hashBytes
       )

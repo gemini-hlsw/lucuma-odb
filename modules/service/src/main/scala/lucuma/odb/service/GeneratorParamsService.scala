@@ -52,6 +52,7 @@ import lucuma.odb.util.Codecs.*
 import skunk.*
 import skunk.circe.codec.json.*
 import skunk.codec.boolean.bool
+import skunk.codec.numeric.int8
 import skunk.implicits.*
 
 import GeneratorParamsService.Error
@@ -154,7 +155,7 @@ object GeneratorParamsService {
       )(using Transaction[F]): F[Map[Observation.Id, Either[Error, GeneratorParams]]] =
         for
           paramsRows <- params
-          oms         = paramsRows.collect { case ParamsRow(oid, _, _, _, Some(om), _, _, _, _, _, _, _, _, _, _, _) => (oid, om) }.distinct
+          oms         = paramsRows.collect { case ParamsRow(oid, _, _, _, Some(om), _, _, _, _, _, _, _, _, _, _, _, _) => (oid, om) }.distinct
           m          <- Services.asSuperUser(observingModeServices.selectObservingMode(oms))
         yield
           NonEmptyList.fromList(paramsRows).fold(Map.empty): paramsRowsNel =>
@@ -259,7 +260,7 @@ object GeneratorParamsService {
             .leftMap(MissingParamSet.fromParams)
             .toEither
 
-          GeneratorParams(itcInput, obsParams.scienceBand, obsMode, obsParams.calibrationRole, obsParams.declaredComplete, obsParams.executionState, obsParams.acqResetTime)
+          GeneratorParams(itcInput, obsParams.scienceBand, obsMode, obsParams.calibrationRole, obsParams.declaredComplete, obsParams.executionState, obsParams.executionAcqCount, obsParams.executionSciCount)
 
         observingMode(obsParams.targets, config).map:
           case gn @ gmos.longslit.Config.GmosNorth(g, f, u, c, a) =>
@@ -331,7 +332,7 @@ object GeneratorParamsService {
                 .leftMap(MissingParamSet.fromParams)
                 .toEither
 
-            GeneratorParams(itcInput, obsParams.scienceBand, gn, obsParams.calibrationRole, obsParams.declaredComplete, obsParams.executionState, none)
+            GeneratorParams(itcInput, obsParams.scienceBand, gn, obsParams.calibrationRole, obsParams.declaredComplete, obsParams.executionState, obsParams.executionAcqCount, obsParams.executionSciCount)
 
           case gs @ gmos.imaging.Config.GmosSouth(_, fs, _) =>
             // An input per filter.
@@ -350,7 +351,7 @@ object GeneratorParamsService {
                 .leftMap(MissingParamSet.fromParams)
                 .toEither
 
-            GeneratorParams(itcInput, obsParams.scienceBand, gs, obsParams.calibrationRole, obsParams.declaredComplete, obsParams.executionState, none)
+            GeneratorParams(itcInput, obsParams.scienceBand, gs, obsParams.calibrationRole, obsParams.declaredComplete, obsParams.executionState, obsParams.executionAcqCount, obsParams.executionSciCount)
 
       private def itcTargetParams(targetParams: TargetParams): ValidatedNel[MissingParam, ItcInput.TargetDefinition] = {
         // If emission line, SED not required, otherwhise must be defined
@@ -402,7 +403,8 @@ object GeneratorParamsService {
     sourceProfile:       Option[SourceProfile],
     declaredComplete:    Boolean,
     executionState:      ExecutionState,
-    acqResetTime:        Option[Timestamp],
+    executionAcqCount:   Long,
+    executionSciCount:   Long,
     customSedTimestamp:  Option[Timestamp] = none
   )
 
@@ -414,17 +416,18 @@ object GeneratorParamsService {
   )
 
   case class ObsParams(
-    observationId:    Observation.Id,
-    calibrationRole:  Option[CalibrationRole],
-    constraints:      ConstraintSet,
-    exposureTimeMode: Option[ExposureTimeMode],
-    observingMode:    Option[ObservingModeType],
-    scienceBand:      Option[ScienceBand],
-    blindOffset:      Option[TargetParams],
-    targets:          NonEmptyList[TargetParams],
-    declaredComplete: Boolean,
-    executionState:   ExecutionState,
-    acqResetTime:     Option[Timestamp]
+    observationId:     Observation.Id,
+    calibrationRole:   Option[CalibrationRole],
+    constraints:       ConstraintSet,
+    exposureTimeMode:  Option[ExposureTimeMode],
+    observingMode:     Option[ObservingModeType],
+    scienceBand:       Option[ScienceBand],
+    blindOffset:       Option[TargetParams],
+    targets:           NonEmptyList[TargetParams],
+    declaredComplete:  Boolean,
+    executionState:    ExecutionState,
+    executionAcqCount: Long,
+    executionSciCount: Long
   )
 
   object ObsParams {
@@ -442,7 +445,8 @@ object GeneratorParamsService {
             TargetParams(r.targetId, r.radialVelocity, r.sourceProfile, r.customSedTimestamp),
           oParams.head.declaredComplete,
           oParams.head.executionState,
-          oParams.head.acqResetTime
+          oParams.head.executionAcqCount,
+          oParams.head.executionSciCount
         )
       .toMap
   }
@@ -478,9 +482,10 @@ object GeneratorParamsService {
        source_profile.opt      *:
        bool                    *:
        execution_state         *:
-       core_timestamp.opt
-      ).map( (oid, role, cs, etm, om, sb, btid, brv, bsp, tid, rv, sp, dc, es, art) =>
-        ParamsRow(oid, role, cs, etm, om, sb, btid, brv, bsp, tid, rv, sp, dc, es, art, None))
+       int8                    *:
+       int8
+      ).map( (oid, role, cs, etm, om, sb, btid, brv, bsp, tid, rv, sp, dc, es, eac, esc) =>
+        ParamsRow(oid, role, cs, etm, om, sb, btid, brv, bsp, tid, rv, sp, dc, es, eac, esc, None))
 
     private def ParamColumns(tab: String): String =
       s"""
@@ -509,7 +514,8 @@ object GeneratorParamsService {
         $tab.c_source_profile,
         $tab.c_declared_complete,
         $tab.c_execution_state,
-        $tab.c_acq_reset_time
+        $tab.c_execution_acq_count,
+        $tab.c_execution_sci_count
       """
 
     def selectManyParams(
