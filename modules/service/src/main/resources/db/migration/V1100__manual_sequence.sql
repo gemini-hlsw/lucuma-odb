@@ -1,3 +1,12 @@
+-- Add some indices on t_execution_event, since it figures prominently
+CREATE INDEX ON t_execution_event (c_atom_id)
+WHERE c_atom_id IS NOT NULL;
+
+CREATE INDEX ON t_execution_event (c_step_id)
+WHERE c_step_id IS NOT NULL;
+
+CREATE INDEX ON t_execution_event (c_observation_id);
+
 -- Create an atom table.  This will store both executed and future atoms, but
 -- only when the first visit for an observation is created.  Before then we
 -- continue generating the sequence on the fly and nothing is written to the
@@ -91,6 +100,9 @@ GROUP BY -- for MIN/MAX aggregation
 
 ALTER TABLE ONLY t_atom
   ADD CONSTRAINT t_atom_c_observation_id_c_instrument_fkey FOREIGN KEY (c_observation_id, c_instrument) REFERENCES t_observation(c_observation_id, c_instrument) ON DELETE CASCADE;
+
+CREATE INDEX ON t_atom (c_observation_id);
+CREATE INDEX ON t_atom (c_observation_id) WHERE c_last_event_time IS NOT NULL;
 
 -- The visit id is assigned in t_atom when events arrive from Observe.  We check
 -- here to make sure the visit is compatible (same observation) and that the
@@ -234,6 +246,8 @@ FROM t_step_record r;
 
 ALTER TABLE ONLY t_step
   ADD CONSTRAINT t_atom_c_atom_id_c_instrument_fkey FOREIGN KEY (c_atom_id, c_instrument) REFERENCES t_atom(c_atom_id, c_instrument) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED;
+
+CREATE INDEX ON t_step (c_atom_id);
 
 -- Create a view on the atom table.  This will correspond to the old atom record
 -- table in that it only contains executed atoms.
@@ -587,8 +601,8 @@ SELECT
 
     ELSE 'completed'::e_execution_state
   END AS c_execution_state,
-  COALESCE(acq.c_execution_count, 0) AS c_execution_acq_count,
-  COALESCE(sci.c_execution_count, 0) AS c_execution_sci_count,
+  COALESCE(a_counts.c_acq_count, 0) AS c_execution_acq_count,
+  COALESCE(a_counts.c_sci_count, 0) AS c_execution_sci_count,
   o.c_blind_offset_target_id,
   b.c_sid_rv AS c_blind_rv,
   b.c_source_profile AS c_blind_source_profile,
@@ -614,21 +628,12 @@ LEFT JOIN t_exposure_time_mode e
 LEFT JOIN (
   SELECT
     c_observation_id,
-    COUNT(*) AS c_execution_count
+    COUNT(*) FILTER (WHERE c_sequence_type = 'acquisition') AS c_acq_count,
+    COUNT(*) FILTER (WHERE c_sequence_type = 'science')     AS c_sci_count
   FROM t_atom
   WHERE c_last_event_time IS NOT NULL
-    AND c_sequence_type = 'acquisition'
   GROUP BY c_observation_id
-) acq ON acq.c_observation_id = o.c_observation_id
-LEFT JOIN (
-  SELECT
-    c_observation_id,
-    COUNT(*) AS c_execution_count
-  FROM t_atom
-  WHERE c_last_event_time IS NOT NULL
-    AND c_sequence_type = 'science'
-  GROUP BY c_observation_id
-) sci ON sci.c_observation_id = o.c_observation_id
+) a_counts ON a_counts.c_observation_id = o.c_observation_id
 ORDER BY
   o.c_observation_id,
   t.c_target_id;
