@@ -3,30 +3,25 @@
 
 package lucuma.odb.graphql.query
 
-import cats.data.NonEmptyList
 import cats.effect.IO
 import cats.syntax.either.*
 import cats.syntax.option.*
+import cats.syntax.traverse.*
 import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
-import lucuma.core.enums.DatasetQaState
 import lucuma.core.enums.Instrument
-import lucuma.core.enums.ObserveClass
-import lucuma.core.enums.SequenceType
 import lucuma.core.enums.StepType
 import lucuma.core.math.Angle
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.InstrumentExecutionConfig
 import lucuma.core.model.sequence.Step
-import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.gmos.DynamicConfig
 import lucuma.core.syntax.timespan.*
 import lucuma.itc.IntegrationTime
-import lucuma.odb.json.all.transport.given
 
 class executionSciGmosNorth extends ExecutionTestSupportForGmos:
 
@@ -69,10 +64,10 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos:
   test("simple generation with blind offset target uses regular targets for science sequence"):
     val setup: IO[Observation.Id] =
       for
-        p <- createProgram
-        t <- createTargetWithProfileAs(pi, p)
+        p  <- createProgram
+        t  <- createTargetWithProfileAs(pi, p)
         bt <- createTargetWithProfileAs(pi, p)
-        o <- createObservationWithBlindOffset(pi, p, List(t))
+        o  <- createObservationWithBlindOffset(pi, p, List(t))
       yield o
 
     setup.flatMap: oid =>
@@ -153,13 +148,9 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos:
         o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
 
         v  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
-        a  <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
-        s0 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthArc(0), ArcStep, gcalTelescopeConfig(0), ObserveClass.NightCal)
-        _  <- addEndStepEvent(s0, v)
-        s1 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthFlat(0), FlatStep, gcalTelescopeConfig(0), ObserveClass.NightCal)
-        _  <- addEndStepEvent(s1, v)
-        s2 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, sciTelescopeConfig(0), ObserveClass.Science)
-        _  <- addEndStepEvent(s2, v)
+        ss <- firstScienceAtomStepIds(serviceUser, o)
+       // Arc, flat, one science
+        _  <- ss.take(3).traverse(sid => addEndStepEvent(sid, v))
       yield o
 
     setup.flatMap: oid =>
@@ -177,18 +168,12 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos:
         o  <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
 
         v  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
-        a  <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
 
-        // We'll add steps for the second block 5 nm
-        s0 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthArc(5), ArcStep, gcalTelescopeConfig(0), ObserveClass.NightCal)
-        _  <- addEndStepEvent(s0, v)
-
-        s1 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthFlat(5), FlatStep, gcalTelescopeConfig(0), ObserveClass.NightCal)
-        _  <- addEndStepEvent(s1, v)
-
-        s2 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthScience(5), StepConfig.Science, sciTelescopeConfig(0), ObserveClass.Science)
-        _  <- addEndStepEvent(s2, v)
-
+        // We do the whole second block, 5 nm wavelength dither
+        is <- scienceSequenceIds(serviceUser, o)
+        ss  = is.tail.head._2  // second atom steps
+       // Arc, flat, one science
+        _  <- ss.traverse(sid => addEndStepEvent(sid, v))
         ic <- generateOrFailAs(serviceUser, o)
       yield ic
 
@@ -198,9 +183,8 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos:
       assertEquals(
         gn.nextAtom.description.get :: gn.possibleFuture.map(_.description.get),
         List(
-           5.description,
-          -5.description,
            0.description,
+          -5.description,
            0.description
         )
       )
@@ -210,7 +194,7 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos:
 
       assertEquals(
         scienceCount(gn.nextAtom) :: gn.possibleFuture.map(scienceCount),
-        List(2, 3, 3, 1)
+        List(3, 3, 1)
       )
 
   test("order doesn't matter"):
@@ -221,14 +205,8 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos:
         o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
 
         v  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
-        a  <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
-
-        s0 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthFlat(0), FlatStep, gcalTelescopeConfig(0), ObserveClass.NightCal)
-        _  <- addEndStepEvent(s0, v)
-        s1 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, sciTelescopeConfig(0), ObserveClass.Science)
-        _  <- addEndStepEvent(s1, v)
-        s2 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthArc(0), ArcStep, gcalTelescopeConfig(0), ObserveClass.NightCal)
-        _  <- addEndStepEvent(s2, v)
+        is <- firstScienceAtomStepIds(serviceUser, o)
+        _  <- List(is(2), is(0), is(1)).traverse(sid => addEndStepEvent(sid, v))
       yield o
 
     setup.flatMap: oid =>
@@ -237,161 +215,6 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos:
         query    = gmosNorthScienceQuery(oid),
         expected = ExpectedAfterCalsAndOneScience.asRight
       )
-
-  test("irrelevant steps may be inserted"):
-    val setup: IO[Observation.Id] =
-      for
-        p <- createProgram
-        t <- createTargetWithProfileAs(pi, p)
-        o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
-
-        v  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
-        a  <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
-
-        s0 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthFlat(0), FlatStep, gcalTelescopeConfig(0), ObserveClass.NightCal)
-        _  <- addEndStepEvent(s0, v)
-
-        x0 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthArc(8), ArcStep, gcalTelescopeConfig(0), ObserveClass.NightCal)
-        _  <- addEndStepEvent(x0, v)
-
-        s1 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, sciTelescopeConfig(0), ObserveClass.Science)
-        _  <- addEndStepEvent(s1, v)
-
-        x1 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthScience(8), StepConfig.Science, sciTelescopeConfig(10), ObserveClass.Science)
-        _  <- addEndStepEvent(x1, v)
-
-        s2 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthArc(0), ArcStep, gcalTelescopeConfig(0), ObserveClass.NightCal)
-        _  <- addEndStepEvent(s2, v)
-
-        x2 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthFlat(8), FlatStep, gcalTelescopeConfig(0), ObserveClass.NightCal)
-        _  <- addEndStepEvent(x2, v)
-      yield o
-
-    setup.flatMap: oid =>
-      expect(
-        user     = pi,
-        query    = gmosNorthScienceQuery(oid),
-        expected = ExpectedAfterCalsAndOneScience.asRight
-      )
-
-  test("execute arc, flat, one science, fail the flat"):
-    val setup: IO[Observation.Id] =
-      for
-        p <- createProgram
-        t <- createTargetWithProfileAs(pi, p)
-        o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
-
-        v  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
-        a  <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
-        s0 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthArc(0), ArcStep, gcalTelescopeConfig(0), ObserveClass.NightCal)
-        _  <- addEndStepEvent(s0, v)
-        s1 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthFlat(0), FlatStep, gcalTelescopeConfig(0), ObserveClass.NightCal)
-        _  <- addEndStepEvent(s1, v)
-        s2 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, sciTelescopeConfig(0), ObserveClass.Science)
-        _  <- addEndStepEvent(s2, v)
-
-        d  <- recordDatasetAs(serviceUser, s1, v, "N20240905S1000.fits")
-        _  <- setQaState(d, DatasetQaState.Usable)
-      yield o
-
-    // since the atom is still in progress, finish out the science datasets to
-    // avoid moving the science fold.  then add the failed flat
-
-    setup.flatMap: oid =>
-      expect(
-        user     = pi,
-        query    = gmosNorthScienceQuery(oid),
-        expected =
-          Json.obj(
-            "executionConfig" -> Json.obj(
-              "gmosNorth" -> Json.obj(
-                "science" -> Json.obj(
-                  "nextAtom" ->
-                    gmosNorthExpectedScienceAtom(
-                      ditherNm = 0,
-                      List(
-                        gmosNorthExpectedScience(ditherNm = 0, p = 0, q =  15),
-                        gmosNorthExpectedScience(ditherNm = 0, p = 0, q = -15),
-                        gmosNorthExpectedFlat(ditherNm = 0, p = 0, q = -15)
-                      )
-                    ),
-                  "possibleFuture" -> List(
-                    gmosNorthExpectedScienceAtom(ditherNm =  5, 0, 15, -15),
-                    gmosNorthExpectedScienceAtom(ditherNm = -5, 0, 15, -15),
-                    gmosNorthExpectedScienceAtom(ditherNm =  0, 0)
-                  ).asJson,
-                  "hasMore" -> false.asJson
-                )
-              )
-            )
-          ).asRight
-      )
-
-  test("execute the first atom, a step of the second, then fail a science dataset from the first"):
-    val setup: IO[Observation.Id] =
-      for
-        p <- createProgram
-        t <- createTargetWithProfileAs(pi, p)
-        o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
-
-        v  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
-
-        a0 <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
-        s0 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthArc(0), ArcStep, gcalTelescopeConfig(0), ObserveClass.NightCal)
-        _  <- addEndStepEvent(s0, v)
-        s1 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthFlat(0), FlatStep, gcalTelescopeConfig(0), ObserveClass.NightCal)
-        _  <- addEndStepEvent(s1, v)
-        s2 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, sciTelescopeConfig(0), ObserveClass.Science)
-        _  <- addEndStepEvent(s2, v)
-        s3 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, sciTelescopeConfig(15), ObserveClass.Science)
-        _  <- addEndStepEvent(s3, v)
-        s4 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, sciTelescopeConfig(-15), ObserveClass.Science)
-        _  <- addEndStepEvent(s4, v)
-
-        a1 <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
-        s5 <- recordStepAs(serviceUser, a1, Instrument.GmosNorth, gmosNorthArc(5), ArcStep, gcalTelescopeConfig(0), ObserveClass.NightCal)
-        _  <- addEndStepEvent(s5, v)
-        s6 <- recordStepAs(serviceUser, a1, Instrument.GmosNorth, gmosNorthFlat(5), FlatStep, gcalTelescopeConfig(0), ObserveClass.NightCal)
-        _  <- addEndStepEvent(s6, v)
-        s7 <- recordStepAs(serviceUser, a1, Instrument.GmosNorth, gmosNorthScience(5), StepConfig.Science, sciTelescopeConfig(0), ObserveClass.Science)
-        _  <- addEndStepEvent(s7, v)
-
-        d  <- recordDatasetAs(serviceUser, s2, v, "N20240905S1001.fits")
-        _  <- setQaState(d, DatasetQaState.Usable)
-      yield o
-
-    // since the atom is done, redo the failed step at the end
-    setup.flatMap: oid =>
-      expect(
-        user     = pi,
-        query    = gmosNorthScienceQuery(oid),
-        expected =
-          Json.obj(
-            "executionConfig" -> Json.obj(
-              "gmosNorth" -> Json.obj(
-                "science" -> Json.obj(
-                  "nextAtom" ->
-                    gmosNorthExpectedScienceAtom(
-                      ditherNm = 5,
-                      List(
-                        gmosNorthExpectedScience(ditherNm = 5, p = 0, q =  15),
-                        gmosNorthExpectedScience(ditherNm = 5, p = 0, q = -15),
-                      )
-                    ),
-                  "possibleFuture" -> List(
-                    gmosNorthExpectedScienceAtom(ditherNm = -5, 0, 15, -15),
-                    gmosNorthExpectedScienceAtom(ditherNm =  0, 0, 0)  // 1 left over, 1 to make up failure
-                  ).asJson,
-                  "hasMore" -> false.asJson
-                )
-              )
-            )
-          ).asRight
-      )
-
-  def nextAtomId(o: Observation.Id): IO[Atom.Id] =
-    import lucuma.odb.testsyntax.execution.*
-    generateOrFailAs(serviceUser, o, 5.some).map(_.gmosNorthScience.nextAtom.id)
 
   test("nextAtom id doesn't change while executing"):
     val setup: IO[(List[Atom.Id], List[Atom.Id])] =
@@ -400,41 +223,30 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos:
         t <- createTargetWithProfileAs(pi, p)
         o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
 
-        x0 <- nextAtomId(o)
+        x0 <- firstScienceAtomId(serviceUser, o)
+        ss <- firstScienceAtomStepIds(serviceUser, o)
 
         v  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
 
-        a0 <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
-        s0 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthArc(0), ArcStep, gcalTelescopeConfig(0), ObserveClass.NightCal)
-        _  <- addEndStepEvent(s0, v)
+        // First atom
+        _  <- addEndStepEvent(ss(0), v)
+        x1 <- firstScienceAtomId(serviceUser, o)
+        _  <- addEndStepEvent(ss(1), v)
+        x2 <- firstScienceAtomId(serviceUser, o)
+        _  <- addEndStepEvent(ss(2), v)
+        x3 <- firstScienceAtomId(serviceUser, o)
+        _  <- addEndStepEvent(ss(3), v)
+        x4 <- firstScienceAtomId(serviceUser, o)
+        _  <- addEndStepEvent(ss(4), v)
 
-        x1 <- nextAtomId(o)
+        // We finished the first atom, so we expect a new first science atom here
+        x5 <- firstScienceAtomId(serviceUser, o)
 
-        s1 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthFlat(0), FlatStep, gcalTelescopeConfig(0), ObserveClass.NightCal)
-        _  <- addEndStepEvent(s1, v)
+        // Second atom, first step
+        ssʹ <- firstScienceAtomStepIds(serviceUser, o)
+        _   <- addEndStepEvent(ssʹ(0), v)
 
-        x2 <- nextAtomId(o)
-
-        s2 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, sciTelescopeConfig(0), ObserveClass.Science)
-        _  <- addEndStepEvent(s2, v)
-
-        x3 <- nextAtomId(o)
-
-        s3 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, sciTelescopeConfig(15), ObserveClass.Science)
-        _  <- addEndStepEvent(s3, v)
-
-        x4 <- nextAtomId(o)
-
-        s4 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, sciTelescopeConfig(-15), ObserveClass.Science)
-        _  <- addEndStepEvent(s4, v)
-
-        x5 <- nextAtomId(o)
-
-        a1 <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
-        s5 <- recordStepAs(serviceUser, a1, Instrument.GmosNorth, gmosNorthArc(5), ArcStep, gcalTelescopeConfig(0), ObserveClass.NightCal)
-        _  <- addEndStepEvent(s5, v)
-
-        x6 <- nextAtomId(o)
+        x6 <- firstScienceAtomId(serviceUser, o)
       yield (List(x0, x1, x2, x3, x4), List(x5, x6))
 
     setup.map: (firstAtomIds, secondAtomIds) =>
@@ -809,17 +621,8 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos:
           """
         )
         v  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
-
-        a0 <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
-
-        s0 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthArc(5), ArcStep, gcalTelescopeConfig(0), ObserveClass.NightCal)
-        _  <- addEndStepEvent(s0, v)
-
-        s1 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthFlat(5), FlatStep, gcalTelescopeConfig(0), ObserveClass.NightCal)
-        _  <- addEndStepEvent(s1, v)
-
-        s2 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthScience(5), StepConfig.Science, sciTelescopeConfig(0), ObserveClass.Science)
-        _  <- addEndStepEvent(s2, v)
+        ss <- firstScienceAtomStepIds(serviceUser, o)
+        _  <- ss.take(3).traverse(sid => addEndStepEvent(sid, v))
       yield o
 
     def telescopeConfigJson(arcsec: Int): Json =
@@ -924,10 +727,6 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos:
           """.asRight
       )
 
-  def firstAcquisitionStepId(o: Observation.Id): IO[Step.Id] =
-    import lucuma.odb.testsyntax.execution.*
-    generateOrFailAs(serviceUser, o, 5.some).map(_.gmosNorthAcquisition.nextAtom.steps.head.id)
-
   test("acquisition step ids do not change while executing science"):
     val execSci: IO[Set[Step.Id]] =
       for
@@ -936,97 +735,24 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos:
         o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
         v <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
 
-        x0 <- firstAcquisitionStepId(o)
+        ss <- firstScienceAtomStepIds(serviceUser, o)
+        x0 <- firstAcquisitionStepId(serviceUser, o)
 
-        a0 <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
-        s0 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthArc(0), ArcStep, gcalTelescopeConfig(0), ObserveClass.NightCal)
-        _  <- addEndStepEvent(s0, v)
+        _  <- addEndStepEvent(ss(0), v)
+        x1 <- firstAcquisitionStepId(serviceUser, o)
+        _  <- addEndStepEvent(ss(1), v)
+        x2 <- firstAcquisitionStepId(serviceUser, o)
+        _  <- addEndStepEvent(ss(2), v)
+        x3 <- firstAcquisitionStepId(serviceUser, o)
+        _  <- addEndStepEvent(ss(3), v)
+        x4 <- firstAcquisitionStepId(serviceUser, o)
+        _  <- addEndStepEvent(ss(4), v)
+        x5 <- firstAcquisitionStepId(serviceUser, o)
 
-        x1 <- firstAcquisitionStepId(o)
+        ssʹ <- firstScienceAtomStepIds(serviceUser, o)
+        _  <- addEndStepEvent(ssʹ(0), v)
 
-        s1 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthFlat(0), FlatStep, gcalTelescopeConfig(0), ObserveClass.NightCal)
-        _  <- addEndStepEvent(s1, v)
-
-        x2 <- firstAcquisitionStepId(o)
-
-        s2 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, sciTelescopeConfig(0), ObserveClass.Science)
-        _  <- addEndStepEvent(s2, v)
-
-        x3 <- firstAcquisitionStepId(o)
-
-        s3 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, sciTelescopeConfig(15), ObserveClass.Science)
-        _  <- addEndStepEvent(s3, v)
-
-        x4 <- firstAcquisitionStepId(o)
-
-        s4 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, sciTelescopeConfig(-15), ObserveClass.Science)
-        _  <- addEndStepEvent(s4, v)
-
-        x5 <- firstAcquisitionStepId(o)
-
-        a1 <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
-        s5 <- recordStepAs(serviceUser, a1, Instrument.GmosNorth, gmosNorthArc(5), ArcStep, gcalTelescopeConfig(0), ObserveClass.NightCal)
-        _  <- addEndStepEvent(s5, v)
-
-        x5 <- firstAcquisitionStepId(o)
+        x5 <- firstAcquisitionStepId(serviceUser, o)
       yield Set(x0, x1, x2, x3, x4, x5)
 
     assertIO(execSci.map(_.size), 1)
-
-  def nextAtomStepIds(o: Observation.Id): IO[NonEmptyList[Step.Id]] =
-   firstScienceAtomStepIds(serviceUser, o).map(NonEmptyList.fromListUnsafe)
-
-  test("nextAtom step ids don't change while executing"):
-    val setup: IO[(List[NonEmptyList[Step.Id]], List[NonEmptyList[Step.Id]])] =
-      for
-        p  <- createProgram
-        t  <- createTargetWithProfileAs(pi, p)
-        o  <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
-
-        v  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
-
-        x0 <- nextAtomStepIds(o)
-
-        a0 <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
-        s0 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthArc(0), ArcStep, gcalTelescopeConfig(0), ObserveClass.NightCal)
-        _  <- addEndStepEvent(s0, v)
-
-        x1 <- nextAtomStepIds(o)
-
-        s1 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthFlat(0), FlatStep, gcalTelescopeConfig(0), ObserveClass.NightCal)
-        _  <- addEndStepEvent(s1, v)
-
-        x2 <- nextAtomStepIds(o)
-
-        s2 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, sciTelescopeConfig(0), ObserveClass.Science)
-        _  <- addEndStepEvent(s2, v)
-
-        x3 <- nextAtomStepIds(o)
-
-        s3 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, sciTelescopeConfig(15), ObserveClass.Science)
-        _  <- addEndStepEvent(s3, v)
-
-        x4 <- nextAtomStepIds(o)
-
-        s4 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, sciTelescopeConfig(-15), ObserveClass.Science)
-        _  <- addEndStepEvent(s4, v)
-
-        // Next atom
-
-        x5 <- nextAtomStepIds(o)
-
-        a1 <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
-        s5 <- recordStepAs(serviceUser, a1, Instrument.GmosNorth, gmosNorthArc(5), ArcStep, gcalTelescopeConfig(0), ObserveClass.NightCal)
-        _  <- addEndStepEvent(s5, v)
-
-        x6 <- nextAtomStepIds(o)
-
-      yield (List(x0, x1, x2, x3, x4), List(x5, x6))
-
-    setup.map: (atom0Ids, atom1Ids) =>
-      def checkAtom(atom: String, ids: List[NonEmptyList[Step.Id]]): Unit =
-        ids.zip(ids.tail).foreach: (before, after) =>
-          assertEquals(before.tail, after.toList, s"atom $atom, before: $before, after: $after")
-
-      checkAtom("Atom 0", atom0Ids)
-      checkAtom("Atom 1", atom1Ids)

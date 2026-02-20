@@ -587,15 +587,20 @@ SELECT
 
     -- Some atoms have no associated events -> ongoing
     WHEN EXISTS (
-      SELECT 1 FROM t_atom a WHERE a.c_observation_id = o.c_observation_id AND NOT EXISTS (
-        SELECT 1 FROM t_execution_event e WHERE e.c_atom_id = a.c_atom_id
-      )
+      SELECT 1
+        FROM t_atom a
+       WHERE a.c_observation_id = o.c_observation_id
+         AND a.c_sequence_type = 'science'
+         AND NOT EXISTS (
+           SELECT 1 FROM t_execution_event e WHERE e.c_atom_id = a.c_atom_id
+         )
     ) THEN 'ongoing'::e_execution_state
 
     -- At least one atom not completed -> ongoing
     WHEN EXISTS (
       SELECT 1 FROM v_atom_record a
         WHERE a.c_observation_id = o.c_observation_id
+          AND a.c_sequence_type  = 'science'
           AND a.c_execution_state IN ('not_started', 'ongoing')
     ) THEN 'ongoing'::e_execution_state
 
