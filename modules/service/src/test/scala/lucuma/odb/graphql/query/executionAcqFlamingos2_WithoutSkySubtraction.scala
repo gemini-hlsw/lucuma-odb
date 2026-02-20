@@ -12,7 +12,9 @@ import io.circe.Json
 import io.circe.literal.*
 import lucuma.core.enums.Breakpoint
 import lucuma.core.enums.Instrument
+import lucuma.core.enums.StepStage
 import lucuma.core.model.Observation
+import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.Step
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
@@ -100,7 +102,7 @@ class executionAcqFlamingos2_WithoutSkySubtraction extends ExecutionTestSupportF
         o  <- createFlamingos2LongSlitObservationAs(pi, p, List(t))
         v  <- recordVisitAs(serviceUser, Instrument.Flamingos2, o)
 
-        // Record the first atom and one of its steps
+        // Execute the first step.
         s  <- firstAcquisitionStepId(serviceUser, o)
         _  <- addEndStepEvent(s, v)
         _  <- resetAcquisitionAs(serviceUser, o)
@@ -112,6 +114,46 @@ class executionAcqFlamingos2_WithoutSkySubtraction extends ExecutionTestSupportF
         query    = flamingos2AcquisitionQuery(oid),
         expected = InitialAcquisition.asRight
       )
+
+  test("start first step only, reset"):
+    val setup: IO[Observation.Id] =
+      for
+        p  <- createProgram
+        t  <- createTargetWithProfileAs(pi, p)
+        o  <- createFlamingos2LongSlitObservationAs(pi, p, List(t))
+        v  <- recordVisitAs(serviceUser, Instrument.Flamingos2, o)
+
+        // Start the first step.
+        s  <- firstAcquisitionStepId(serviceUser, o)
+        _  <- addStepEventAs(serviceUser, s, v, StepStage.StartStep)
+        _  <- resetAcquisitionAs(serviceUser, o)
+      yield o
+
+    setup.flatMap: oid =>
+      expect(
+        user     = pi,
+        query    = flamingos2AcquisitionQuery(oid),
+        expected = InitialAcquisition.asRight
+      )
+
+  test("ids change after reset"):
+    val setup: IO[(Set[Atom.Id], Set[Atom.Id])] =
+      for
+        p  <- createProgram
+        t  <- createTargetWithProfileAs(pi, p)
+        o  <- createFlamingos2LongSlitObservationAs(pi, p, List(t))
+        v  <- recordVisitAs(serviceUser, Instrument.Flamingos2, o)
+
+        // Start the first step.
+        i0 <- acquisitionSequenceIds(serviceUser, o)
+        _  <- addStepEventAs(serviceUser, i0.head._2.head, v, StepStage.StartStep)
+        _  <- resetAcquisitionAs(serviceUser, o)
+        i1 <- acquisitionSequenceIds(serviceUser, o)
+      yield (i0.keySet, i1.keySet)
+
+    assertIOBoolean:
+      setup.map: (before, after) =>
+        before.intersect(after).isEmpty
 
   test("execute first atom"):
     val setup: IO[Observation.Id] =
@@ -175,6 +217,35 @@ class executionAcqFlamingos2_WithoutSkySubtraction extends ExecutionTestSupportF
                     ],
                     "hasMore": false
                   }
+                }
+              }
+            }
+          """.asRight
+      )
+
+  test("execute acquisition"):
+    val setup: IO[Observation.Id] =
+      for
+        p  <- createProgram
+        t  <- createTargetWithProfileAs(pi, p)
+        o  <- createFlamingos2LongSlitObservationAs(pi, p, List(t))
+        v  <- recordVisitAs(serviceUser, Instrument.Flamingos2, o)
+
+        // Acquisition Sequence
+        i  <- acquisitionStepIds(serviceUser, o)
+        _  <- i.traverse(sid => addEndStepEvent(sid, v))
+      yield o
+
+    setup.flatMap: oid =>
+      expect(
+        user     = pi,
+        query    = flamingos2AcquisitionQuery(oid),
+        expected =
+          json"""
+            {
+              "executionConfig": {
+                "flamingos2": {
+                  "acquisition": null
                 }
               }
             }

@@ -106,10 +106,20 @@ trait SequenceService[F[_]]:
     sequenceType:  SequenceType
   )(using Transaction[F], Services.ServiceAccess): F[Unit]
 
-//  def resetFlamingos2Acquisition(
-//    observationId: Observation.Id,
-//    sequence:      Stream[F, Atom[Flamingos2DynamicConfig]]
-//  )(using Transaction[F], Services.ServiceAccess): F[Unit]
+  def resetFlamingos2Acquisition(
+    observationId: Observation.Id,
+    sequence:      Stream[F, Atom[Flamingos2DynamicConfig]]
+  )(using Transaction[F], Services.ServiceAccess): F[Unit]
+
+  def resetGmosNorthAcquisition(
+    observationId: Observation.Id,
+    sequence:      Stream[F, Atom[GmosNorth]]
+  )(using Transaction[F], Services.ServiceAccess): F[Unit]
+
+  def resetGmosSouthAcquisition(
+    observationId: Observation.Id,
+    sequence:      Stream[F, Atom[GmosSouth]]
+  )(using Transaction[F], Services.ServiceAccess): F[Unit]
 
   def insertFlamingos2Sequence(
     observationId: Observation.Id,
@@ -245,15 +255,6 @@ object SequenceService:
       )(using Transaction[F], Services.ServiceAccess): F[Unit] =
         session.execute(Statements.AbandonAndDeleteUnexecuted)(observationId, sequenceType).void
 
-//      override def resetFlamingos2Acquisition(
-//        observationId: Observation.Id,
-//        sequence:      Stream[F, Atom[Flamingos2DynamicConfig]]
-//      )(using Transaction[F], Services.ServiceAccess): F[Unit] =
-//        for
-//          _ <- abandonAndDeleteUnexecuted(observationId, SequenceType.Acquisition)
-//          _ <-
-//        yield ()
-
       override def insertFlamingos2Sequence(
         observationId:  Observation.Id,
         sequenceType:   SequenceType,
@@ -305,7 +306,7 @@ object SequenceService:
           atomStream
             .zipWithIndex
             .map { case (atom, idx) =>
-              (atom.id, instrument, idx.toInt + 1, atom.description.map(_.value), observationId, sequenceType)
+              (atom.id, instrument, idx.toInt, atom.description.map(_.value), observationId, sequenceType)
             }
             .through(session.pipe(Statements.insertAtom))
             .drain
@@ -315,7 +316,7 @@ object SequenceService:
             .flatMap: atom =>
               Stream.emits(
                 atom.steps.toList.zipWithIndex.tupleLeft(atom.id).map { case (aid, (step, idx)) =>
-                  (step, aid, instrument, idx + 1)
+                  (step, aid, instrument, idx)
                 }
               )
             .through(session.pipe(Statements.insertStep[D]))
@@ -374,6 +375,56 @@ object SequenceService:
         observationId: Observation.Id
       )(using Transaction[F]): F[Boolean] =
         session.unique(Statements.IsMaterialized)(observationId)
+
+      /*
+      private def acquisitionAtoms(observationId: Observation.Id): F[Unit] =
+        val q = sql"""
+          SELECT
+            c_atom_id,
+            c_atom_index,
+            c_first_event_time
+          FROM
+            t_atom
+          WHERE c_observation_id = $observation_id
+            AND c_sequence_type  = $sequence_type
+          ORDER BY c_last_event_time, c_atom_index NULLS LAST
+        """.query(atom_id *: skunk.codec.numeric.int4 *: core_timestamp.opt)
+
+        session
+          .execute(q)(observationId, SequenceType.Acquisition)
+          .map: lst =>
+            println(lst.mkString("---\n", "\n", "\n"))
+       */
+
+      private def resetAcquisition[D](
+        observationId: Observation.Id,
+        stream:        Stream[F, Atom[D]]
+      )(
+        insert: (Observation.Id, SequenceType, Stream[F, Atom[D]]) => F[Unit]
+      )(using Transaction[F], Services.ServiceAccess): F[Unit] =
+        val reset = for
+          _ <- abandonAndDeleteUnexecuted(observationId, SequenceType.Acquisition)
+          _ <- insert(observationId, SequenceType.Acquisition, stream)
+        yield ()
+        isMaterialized(observationId).ifM(reset, Applicative[F].unit)
+
+      override def resetFlamingos2Acquisition(
+        observationId: Observation.Id,
+        stream:      Stream[F, Atom[Flamingos2DynamicConfig]]
+      )(using Transaction[F], Services.ServiceAccess): F[Unit] =
+        resetAcquisition(observationId, stream)(insertFlamingos2Sequence)
+
+      override def resetGmosNorthAcquisition(
+        observationId: Observation.Id,
+        stream:      Stream[F, Atom[GmosNorth]]
+      )(using Transaction[F], Services.ServiceAccess): F[Unit] =
+        resetAcquisition(observationId, stream)(insertGmosNorthSequence)
+
+      override def resetGmosSouthAcquisition(
+        observationId: Observation.Id,
+        stream:      Stream[F, Atom[GmosSouth]]
+      )(using Transaction[F], Services.ServiceAccess): F[Unit] =
+        resetAcquisition(observationId, stream)(insertGmosSouthSequence)
 
       private def materializeExecutionConfig[S, D](
         observationId: Observation.Id,
@@ -474,19 +525,15 @@ object SequenceService:
              SET c_execution_state = '#${StepExecutionState.Abandoned.tag}'
             FROM v_atom_record a
            WHERE s.c_atom_id = a.c_atom_id
-             AND a.c_observation_id = $observation_id
-             AND a.c_sequence_type = $sequence_type
-             AND a.c_execution_state <> '#${AtomExecutionState.NotStarted.tag}'
+             AND a.c_observation_id   = $observation_id
+             AND a.c_sequence_type    = $sequence_type
+             AND a.c_last_event_time IS NOT NULL
              AND s.c_execution_state IN ('#${StepExecutionState.NotStarted.tag}', '#${StepExecutionState.Ongoing.tag}')
         )
-        DELETE FROM t_atom t
-        WHERE t.c_atom_id IN (
-          SELECT a.c_atom_id
-            FROM v_atom_record a
-           WHERE a.c_observation_id = $observation_id
-             AND a.c_sequence_type = $sequence_type
-            AND a.c_execution_state = '#${AtomExecutionState.NotStarted.tag}'
-        );
+        DELETE FROM t_atom a
+        WHERE a.c_observation_id = $observation_id
+          AND a.c_sequence_type  = $sequence_type
+          AND a.c_last_event_time IS NULL
       """.command.contramap((o, s) => (o, s, o, s))
 
     val insertAtom: Command[(

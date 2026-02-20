@@ -24,6 +24,7 @@ import grackle.ResultT
 import grackle.Term
 import grackle.TypeRef
 import grackle.skunk.SkunkMapping
+import grackle.syntax.*
 import io.circe.Json
 import io.circe.syntax.*
 import lucuma.catalog.clients.GaiaClient
@@ -339,14 +340,19 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
 
   private lazy val ResetAcquisition: MutationField =
     MutationField("resetAcquisition", ResetAcquisitionInput.Binding): (input, child) =>
-      services.useTransactionally:
+      services.useNonTransactionally:
         selectForUpdate(input).flatMap: res =>
           res.flatTraverse: checked =>
             if checked.isEmpty then
               OdbError.NotAuthorized(user.id).asFailureF
             else
-              observationService.resetAcquisition(checked).nestMap: oid =>
-                Filter(Predicates.resetAcquisitionResult.observation.id.eql(oid), child)
+              checked.foldWithId(OdbError.InvalidArgument().asFailureF): (_, oid) =>
+                Services.asSuperUser:
+                  generator
+                    .resetAcquisition(oid)
+                    .map(_.fold(_.asFailure, _ => oid.success))
+                    .nestMap: oid =>
+                      Filter(Predicates.resetAcquisitionResult.observation.id.eql(oid), child)
 
   private lazy val CloneTarget: MutationField =
     MutationField("cloneTarget", CloneTargetInput.Binding): (input, child) =>

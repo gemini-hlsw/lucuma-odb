@@ -109,10 +109,6 @@ sealed trait ObservationService[F[_]] {
     oids: NonEmptyList[Observation.Id]
   )(using Transaction[F], ServiceAccess): F[Result[Unit]]
 
-  def resetAcquisition(
-    input: AccessControl.CheckedWithId[Unit, Observation.Id]
-  )(using Transaction[F]): F[Result[Observation.Id]]
-
   def selectBands(
     pid: Program.Id
   )(using Transaction[F]): F[Map[Observation.Id, Option[ScienceBand]]]
@@ -585,12 +581,6 @@ object ObservationService {
                 asterismService
                   .setAsterism(pid, NonEmptyList.of(newOid), oSET.fold(Nullable.Absent)(_.asterism))
                   .map(_.as(CloneIds(origOid, newOid)))
-
-      override def resetAcquisition(
-        input: AccessControl.CheckedWithId[Unit, Observation.Id]
-      )(using Transaction[F]): F[Result[Observation.Id]] =
-        input.foldWithId(OdbError.InvalidArgument().asFailureF): (_, oid) =>
-          session.execute(Statements.ResetAcquisition)(oid).as(oid.success)
 
       override def selectBands(
         pid: Program.Id
@@ -1195,13 +1185,6 @@ object ObservationService {
         AND c_observation_id IN ($enc)
         RETURNING c_observation_id
       """.query(observation_id)
-
-    val ResetAcquisition: Command[Observation.Id] =
-      sql"""
-        UPDATE t_observation
-           SET c_acq_reset_time = now()
-         WHERE c_observation_id = $observation_id
-      """.command
 
     val SelectBands: Query[Program.Id, (Observation.Id, Option[ScienceBand])] =
       sql"""
