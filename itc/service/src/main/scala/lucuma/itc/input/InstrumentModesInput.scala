@@ -20,14 +20,17 @@ object InstrumentModesInput:
             GmosSImagingInput.binding.Option("gmosSImaging", gmosSImaging),
             Flamingos2SpectroscopyInput.binding
               .Option("flamingos2Spectroscopy", flamingos2Spectroscopy),
-            Flamingos2ImagingInput.binding.Option("flamingos2Imaging", flamingos2Imaging)
+            Flamingos2ImagingInput.binding.Option("flamingos2Imaging", flamingos2Imaging),
+            Igrins2SpectroscopyInput.binding
+              .Option("igrins2Spectroscopy", igrins2Spectroscopy)
           ) =>
         (gmosNSpectroscopy,
          gmosSSpectroscopy,
          gmosNImaging,
          gmosSImaging,
          flamingos2Spectroscopy,
-         flamingos2Imaging
+         flamingos2Imaging,
+         igrins2Spectroscopy
         ).parTupled
           .flatMap {
             case (gmosNSpectroscopy,
@@ -35,7 +38,8 @@ object InstrumentModesInput:
                   gmosNImaging,
                   gmosSImaging,
                   flamingos2Spectroscopy,
-                  flamingos2Imaging
+                  flamingos2Imaging,
+                  igrins2Spectroscopy
                 )      =>
               oneOrFail(
                 gmosNSpectroscopy      -> "gmosNSpectroscopy",
@@ -43,6 +47,7 @@ object InstrumentModesInput:
                 gmosNImaging           -> "gmosNImaging",
                 gmosSImaging           -> "gmosSImaging",
                 flamingos2Spectroscopy -> "flamingos2Spectroscopy",
-                flamingos2Imaging      -> "flamingos2Imaging"
+                flamingos2Imaging      -> "flamingos2Imaging",
+                igrins2Spectroscopy    -> "igrins2Spectroscopy"
               )
           }

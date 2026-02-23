@@ -78,7 +78,10 @@ object AsterismSpectroscopyTimeRequest:
             ) =>
           Result.success:
             ObservingMode.SpectroscopyMode.Flamingos2(disperser, filter, fpu)
-        case _ =>
+        case Igrins2SpectroscopyInput(_) =>
+          Result.success:
+            ObservingMode.SpectroscopyMode.Igrins2()
+        case _                           =>
           Result.failure("Invalid spectroscopy mode")
 
     (asterism.targetInputsToData, modeResult, constraints.create).parMapN:
