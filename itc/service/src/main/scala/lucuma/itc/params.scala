@@ -35,7 +35,7 @@ case class Flamingos2SpectroscopyParams(
 ) extends SpectroscopyParams derives Encoder.AsObject
 
 case class Igrins2SpectroscopyParams(
-  _placeholder: Option[Boolean] = None
+  _placeholder: Boolean = false
 ) extends SpectroscopyParams derives Encoder.AsObject
 
 sealed trait ImagingParams

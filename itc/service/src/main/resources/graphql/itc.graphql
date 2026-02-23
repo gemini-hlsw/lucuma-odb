@@ -8422,7 +8422,7 @@ input Flamingos2ImagingInput {
 }
 
 input Igrins2SpectroscopyInput {
-  _placeholder: Boolean
+  _placeholder: Boolean! = false
 }
 
 type GmosSSpectroscopyParams {
