@@ -17,18 +17,12 @@ import lucuma.core.model.sequence.Dataset
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.TimestampInterval
 
-class executionVisits extends OdbSuite with ExecutionQuerySetupOperations {
+class executionVisits extends OdbSuite with ExecutionQuerySetupOperations with ExecutionTestSupportForGmos {
 
-  val pi      = TestUsers.Standard.pi(1, 30)
-  val pi2     = TestUsers.Standard.pi(2, 32)
-  val service = TestUsers.service(3)
-
-  val mode    = ObservingModeType.GmosNorthLongSlit
-
-  val validUsers = List(pi, pi2, service).toList
+  val mode = ObservingModeType.GmosNorthLongSlit
 
   test("observation -> execution -> visits") {
-    recordAll(pi, service, mode, offset = 0).flatMap { on =>
+    recordAll(pi, serviceUser, mode, offset = 0).flatMap { on =>
       val q = s"""
         query {
           observation(observationId: "${on.id}") {
@@ -62,7 +56,7 @@ class executionVisits extends OdbSuite with ExecutionQuerySetupOperations {
   }
 
   test("observation -> execution -> visits -> datasets") {
-    recordAll(pi, service, mode, offset = 100, stepCount = 2).flatMap { on =>
+    recordAll(pi, serviceUser, mode, offset = 100, stepCount = 2).flatMap { on =>
       val q = s"""
         query {
           observation(observationId: "${on.id}") {
@@ -105,7 +99,7 @@ class executionVisits extends OdbSuite with ExecutionQuerySetupOperations {
   }
 
   test("observation -> execution -> visits -> events") {
-    recordAll(pi, service, mode, offset = 200).flatMap { on =>
+    recordAll(pi, serviceUser, mode, offset = 200).flatMap { on =>
       val q = s"""
         query {
           observation(observationId: "${on.id}") {
@@ -148,7 +142,7 @@ class executionVisits extends OdbSuite with ExecutionQuerySetupOperations {
   }
 
   test("observation -> execution -> visits -> atomRecords") {
-    recordAll(pi, service, mode, offset = 300, atomCount = 2).flatMap { on =>
+    recordAll(pi, serviceUser, mode, offset = 300, atomCount = 2).flatMap { on =>
       val q = s"""
         query {
           observation(observationId: "${on.id}") {
@@ -195,7 +189,7 @@ class executionVisits extends OdbSuite with ExecutionQuerySetupOperations {
     offset:       Int,
     matchesQuery: String
   ): IO[Unit] =
-    recordAll(pi, service, mode, offset = offset).flatMap { on =>
+    recordAll(pi, serviceUser, mode, offset = offset).flatMap { on =>
       val q = s"""
         query {
           observation(observationId: "${on.id}") {
@@ -251,7 +245,7 @@ class executionVisits extends OdbSuite with ExecutionQuerySetupOperations {
   }
 
   test("observation -> execution -> visits -> interval") {
-    recordAll(pi, service, mode, offset = 550, atomCount = 2).flatMap { on =>
+    recordAll(pi, serviceUser, mode, offset = 550, atomCount = 2).flatMap { on =>
       val q = s"""
         query {
           observation(observationId: "${on.id}") {
@@ -340,13 +334,12 @@ class executionVisits extends OdbSuite with ExecutionQuerySetupOperations {
     """.asRight
 
     // Set up visit and record the atom and steps, but no events
-    for {
+    for
       pid <- createProgramAs(pi)
-      oid <- createObservationAs(pi, pid, mode.some)
-      vid <- recordVisitAs(service, mode.instrument, oid)
-      aid <- recordAtomAs(service, mode.instrument, vid)
-      sid <- recordStepAs(service, mode.instrument, aid)
+      tid <- createTargetWithProfileAs(pi, pid)
+      oid <- createObservationAs(pi, pid, mode.some, tid)
+      vid <- recordVisitAs(serviceUser, mode.instrument, oid)
       _   <- expect(pi, query(oid), expected)
-    } yield ()
+    yield ()
   }
 }

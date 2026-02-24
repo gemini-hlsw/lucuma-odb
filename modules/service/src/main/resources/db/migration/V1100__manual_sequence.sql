@@ -237,10 +237,10 @@ SELECT
   a.c_sequence_type,
   a.c_description,
 
-  MIN(se.c_visit_id)         AS c_visit_id,
-  MIN(se.c_execution_order)  AS c_execution_order,
-  MIN(se.c_first_event_time) AS c_first_event_time,
-  MAX(se.c_last_event_time)  AS c_last_event_time,
+  MIN(se.c_visit_id)::d_visit_id AS c_visit_id,
+  MIN(se.c_execution_order)      AS c_execution_order,
+  MIN(se.c_first_event_time)     AS c_first_event_time,
+  MAX(se.c_last_event_time)      AS c_last_event_time,
   CASE
     WHEN bool_and(se.c_execution_state IN ('completed', 'abandoned')) THEN 'completed'
     WHEN bool_and(se.c_execution_state = 'not_started')               THEN 'not_started'
