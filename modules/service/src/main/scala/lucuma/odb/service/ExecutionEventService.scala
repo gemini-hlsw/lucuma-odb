@@ -119,10 +119,7 @@ object ExecutionEventService:
         ResultT(insert)
           .flatMap: (eid, _, wasInserted) =>
             if wasInserted then
-              for
-                _ <- ResultT(services.sequenceService.setAtomVisit(input.atomId, input.visitId))
-                _ <- ResultT.liftF(timeAccountingService.update(input.visitId))
-              yield eid
+              ResultT.liftF(timeAccountingService.update(input.visitId)).as(eid)
             else
               ResultT.pure(eid)
           .value
@@ -235,11 +232,9 @@ object ExecutionEventService:
                 invalidStep.asFailureF
 
         ResultT(insert)
-          .flatMap: (eid, oid, aid, wasInserted) =>
+          .flatMap: (eid, oid, _, wasInserted) =>
             if wasInserted then
               for
-                _ <- ResultT(services.sequenceService.setAtomVisit(aid, input.visitId))
-                _ <- ResultT.liftF(services.sequenceService.setStepExecutionState(input.stepId, input.stepStage))
                 _ <- ResultT.liftF(services.sequenceService.abandonStepsInOngoingAtomsExceptStep(oid, input.stepId))
                 _ <- ResultT.liftF(timeAccountingService.update(input.visitId))
               yield eid

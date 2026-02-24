@@ -40,7 +40,7 @@ trait StepRecordMapping[F[_]] extends StepRecordView[F]
   lazy val StepRecordMapping: ObjectMapping =
     ObjectMapping(StepRecordType)(
       SqlField("id",              StepRecordView.Id, key = true),
-      SqlField("index",           StepRecordView.StepIndex),
+      SqlField("index",           StepRecordView.ExecutionOrder),
       SqlField("instrument",      StepRecordView.Instrument, discriminator = true),
       SqlObject("atom",           Join(StepRecordView.AtomId, AtomRecordView.Id)),
       SqlField("executionState",  StepRecordView.ExecutionState),

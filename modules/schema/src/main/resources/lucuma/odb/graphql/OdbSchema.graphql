@@ -257,7 +257,7 @@ type AtomRecord {
   "Atom ID."
   id: AtomId!
 
-  "Atom index."
+  "Atom execution order -- the index of its first executed step."
   index: PosInt!
 
   "Description, if any."
@@ -284,9 +284,9 @@ type AtomRecord {
   "Recorded steps associated with this atom, ordered by last event time."
   steps(
     """
-    Starts the result set at (or after if not existent) the given last event time.
+    Starts the result set at this index.
     """
-    OFFSET: Timestamp
+    OFFSET: PosInt
 
     "Limits the result to at most this number of matches (but never more than 1000)."
     LIMIT: NonNegInt
@@ -7356,8 +7356,11 @@ type Execution {
   ordered by last associated event time.
   """
   atomRecords(
-    "Starts the result set at the given event time."
-    OFFSET: Timestamp
+    """
+    Starts the result set at the given step index -- atom indices are the index
+    of the first contained step.
+    """
+    OFFSET: PosInt
 
     "Limits the result to at most this number of matches (but never more than 1000)."
     LIMIT: NonNegInt
@@ -14816,8 +14819,11 @@ type Visit {
 
   "Executed (or at least partially executed) atom records for this visit."
   atomRecords(
-    "Starts the result set at the given event time."
-    OFFSET: Timestamp
+    """
+    Starts the result set at the given step index.  The atom record index is the
+    index of its first contained step.
+    """
+    OFFSET: PosInt
 
     "Limits the result to at most this number of matches (but never more than 1000)."
     LIMIT: NonNegInt

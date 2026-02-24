@@ -5,6 +5,7 @@ package lucuma.odb.graphql
 package mapping
 
 import cats.effect.Resource
+import eu.timepit.refined.cats.given
 import grackle.Query.Binding
 import grackle.QueryCompiler.Elab
 import grackle.TypeRef
@@ -13,7 +14,7 @@ import lucuma.core.model.User
 import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
 import lucuma.odb.graphql.binding.NonNegIntBinding
-import lucuma.odb.graphql.binding.TimestampBinding
+import lucuma.odb.graphql.binding.PosIntBinding
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.json.time.query.given
 import lucuma.odb.service.Services
@@ -34,7 +35,7 @@ trait AtomRecordMapping[F[_]] extends AtomRecordView[F]
   lazy val AtomRecordMapping: ObjectMapping =
     ObjectMapping(AtomRecordType)(
       SqlField("id",              AtomRecordView.Id, key = true),
-      SqlField("index",           AtomRecordView.AtomIndex),
+      SqlField("index",           AtomRecordView.ExecutionOrder),
       SqlField("description",     AtomRecordView.Description),
       SqlField("instrument",      AtomRecordView.Instrument),
       SqlObject("visit",          Join(AtomRecordView.VisitId, VisitTable.Id)),
@@ -57,9 +58,9 @@ trait AtomRecordMapping[F[_]] extends AtomRecordView[F]
   lazy val AtomRecordElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] = {
 
     case (AtomRecordType, "steps", List(
-      TimestampBinding.Option("OFFSET", rOFFSET),
+      PosIntBinding.Option("OFFSET", rOFFSET),
       NonNegIntBinding.Option("LIMIT", rLIMIT)
     )) =>
-      selectWithOffsetAndLimit(rOFFSET, rLIMIT, StepRecordType, "_lastEventTime", Predicates.stepRecord.lastEventTime, Predicates.stepRecord.atomRecord.visit.observation.program)
+      selectWithOffsetAndLimit(rOFFSET, rLIMIT, StepRecordType, "index", Predicates.stepRecord.index, Predicates.stepRecord.atomRecord.visit.observation.program)
 
   }

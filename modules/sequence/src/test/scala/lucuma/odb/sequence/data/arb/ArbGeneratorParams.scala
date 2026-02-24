@@ -41,9 +41,8 @@ trait ArbGeneratorParams:
       rol <- arbitrary[Option[CalibrationRole]]
       dc  <- arbitrary[Boolean]
       es  <- arbitrary[ExecutionState]
-      acq <- arbitrary[Long]
-      sci <- arbitrary[Long]
-    yield GeneratorParams(Either.right(itc), bnd, cfg, rol, dc, es, acq, sci)
+      sc  <- arbitrary[Long]
+    yield GeneratorParams(Either.right(itc), bnd, cfg, rol, dc, es, sc)
 
   val genGmosSouthLongSlit: Gen[GeneratorParams] =
     for
@@ -54,9 +53,8 @@ trait ArbGeneratorParams:
       rol <- arbitrary[Option[CalibrationRole]]
       dc  <- arbitrary[Boolean]
       es  <- arbitrary[ExecutionState]
-      acq <- arbitrary[Long]
-      sci <- arbitrary[Long]
-    yield GeneratorParams(Either.right(itc), bnd, cfg, rol, dc, es, acq, sci)
+      sc  <- arbitrary[Long]
+    yield GeneratorParams(Either.right(itc), bnd, cfg, rol, dc, es, sc)
 
   given Arbitrary[GeneratorParams] =
     Arbitrary:

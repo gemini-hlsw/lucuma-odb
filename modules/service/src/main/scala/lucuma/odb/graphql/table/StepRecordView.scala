@@ -13,7 +13,6 @@ trait StepRecordView[F[_]] extends BaseMapping[F]:
     val Id: ColumnRef             = col("c_step_id",          step_id)
     val AtomId: ColumnRef         = col("c_atom_id",          atom_id)
     val VisitId: ColumnRef        = col("c_visit_id",         visit_id)
-    val StepIndex: ColumnRef      = col("c_step_index",       int4_pos)
     val Instrument: ColumnRef     = col("c_instrument",       instrument)
     val StepType: ColumnRef       = col("c_step_type",        step_type)
     val ObserveClass: ColumnRef   = col("c_observe_class",    obs_class)
@@ -24,6 +23,9 @@ trait StepRecordView[F[_]] extends BaseMapping[F]:
     // The t_step table from which the view is derived has optional first and
     // last event times.  The view, though, filters out any rows without
     // timestamps.
+    val ObservationId:  ColumnRef = col("c_observation_id",   observation_id)
+    val SequenceType:   ColumnRef = col("c_sequence_type",    sequence_type)
+    val ExecutionOrder: ColumnRef = col("c_execution_order",  int4_pos)
     val FirstEventTime: ColumnRef = col("c_first_event_time", core_timestamp)
     val LastEventTime:  ColumnRef = col("c_last_event_time",  core_timestamp)
 

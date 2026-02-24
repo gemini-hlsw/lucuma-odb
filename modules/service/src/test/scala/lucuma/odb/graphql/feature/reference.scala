@@ -26,14 +26,7 @@ import lucuma.core.model.sequence.DatasetReference
 import lucuma.core.syntax.string.*
 
 
-class reference extends OdbSuite {
-
-  val pi       = TestUsers.Standard.pi(1, 101)
-  val guest    = TestUsers.guest(2)
-  val service  = TestUsers.service(3)
-  val staff    = TestUsers.Standard.staff(4, 104)
-
-  val validUsers = List(pi, guest, service, staff)
+class reference extends OdbSuite with query.ExecutionTestSupportForGmos {
 
   // Unsafe convenience for testing.
   extension (s: String) {
@@ -1072,46 +1065,46 @@ class reference extends OdbSuite {
       """.asRight
     )
 
-  test("dataset reference") {
+  test("dataset reference"):
     extension (self: Int) {
       def posInt: PosInt = PosInt.unsafeFrom(self)
     }
     val mode = ObservingModeType.GmosNorthLongSlit
-    for {
+    for
       pid  <- createProgramAs(pi)
-      oid  <- createObservationAs(pi, pid, mode.some)
+      tid  <- createTargetWithProfileAs(pi, pid)
+      oid  <- createObservationAs(pi, pid, mode.some, tid)
       pRef <- setProgramReference(staff, pid, """calibration: { semester: "2025B", instrument: GMOS_NORTH }""")
       oRef  = ObservationReference(pRef.get, PosInt.unsafeFrom(1))
-      vid  <- recordVisitAs(service, mode.instrument, oid)
-      aid  <- recordAtomAs(service, mode.instrument, vid)
-      sid0 <- recordStepAs(service, mode.instrument, aid)
-      did0 <- recordDatasetAs(service, sid0, vid, "N18630101S0010.fits")
-      did1 <- recordDatasetAs(service, sid0, vid, "N18630101S0011.fits")
-      sid1 <- recordStepAs(service, mode.instrument, aid)
-      did2 <- recordDatasetAs(service, sid1, vid, "N18630101S0012.fits")
-      did3 <- recordDatasetAs(service, sid1, vid, "N18630101S0013.fits")
+      vid  <- recordVisitAs(serviceUser, mode.instrument, oid)
+      ss   <- firstScienceAtomStepIds(serviceUser, oid)
+      _    <- addEndStepEvent(ss(0), vid)
+      did0 <- recordDatasetAs(serviceUser, ss(0), vid, "N18630101S0010.fits")
+      did1 <- recordDatasetAs(serviceUser, ss(0), vid, "N18630101S0011.fits")
+      _    <- addEndStepEvent(ss(1), vid)
+      did2 <- recordDatasetAs(serviceUser, ss(1), vid, "N18630101S0012.fits")
+      did3 <- recordDatasetAs(serviceUser, ss(1), vid, "N18630101S0013.fits")
       _    <- expectDatasetReference(pi, did0, DatasetReference(oRef, 1.posInt, 1.posInt))
       _    <- expectDatasetReference(pi, did1, DatasetReference(oRef, 1.posInt, 2.posInt))
       _    <- expectDatasetReference(pi, did2, DatasetReference(oRef, 2.posInt, 1.posInt))
       _    <- expectDatasetReference(pi, did3, DatasetReference(oRef, 2.posInt, 2.posInt))
-    } yield ()
-  }
+    yield ()
 
-  test("no dataset reference") {
+  test("no dataset reference"):
     val mode = ObservingModeType.GmosNorthLongSlit
-    for {
+    for
       pid <- createProgramAs(pi)
-      oid <- createObservationAs(pi, pid, mode.some)
-      vid <- recordVisitAs(service, mode.instrument, oid)
-      aid <- recordAtomAs(service, mode.instrument, vid)
-      sid <- recordStepAs(service, mode.instrument, aid)
-      did <- recordDatasetAs(service, sid, vid, "N18630101S0006.fits")
+      tid  <- createTargetWithProfileAs(pi, pid)
+      oid <- createObservationAs(pi, pid, mode.some, tid)
+      vid <- recordVisitAs(serviceUser, mode.instrument, oid)
+      sid <- firstScienceStepId(serviceUser, oid)
+      _   <- addEndStepEvent(sid, vid)
+      did <- recordDatasetAs(serviceUser, sid, vid, "N18630101S0006.fits")
       _   <- expect(pi,
                s"""query { dataset(datasetId: "$did") { reference { label } } }""",
                json"""{ "dataset": { "reference": null } }""".asRight
              )
-    } yield ()
-  }
+    yield ()
 
   test("lookup via dataset ref") {
     expect(

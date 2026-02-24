@@ -8,7 +8,6 @@ import cats.Order.catsKernelOrderingForOrder
 import cats.data.NonEmptyList
 import cats.data.OptionT
 import cats.effect.Concurrent
-import cats.syntax.applicativeError.*
 import cats.syntax.apply.*
 import cats.syntax.either.*
 import cats.syntax.flatMap.*
@@ -17,16 +16,12 @@ import cats.syntax.option.*
 import eu.timepit.refined.types.string.NonEmptyString
 import fs2.Pipe
 import fs2.Stream
-import grackle.Result
-import grackle.syntax.*
 import lucuma.core.enums.ChargeClass
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SequenceType
-import lucuma.core.enums.StepStage
 import lucuma.core.enums.StepType
 import lucuma.core.model.Observation
-import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.AtomDigest
 import lucuma.core.model.sequence.CategorizedTime
@@ -42,8 +37,6 @@ import lucuma.core.model.sequence.gmos.StaticConfig.GmosNorth as GmosNorthStatic
 import lucuma.core.model.sequence.gmos.StaticConfig.GmosSouth as GmosSouthStatic
 import lucuma.core.util.TimeSpan
 import lucuma.odb.data.AtomExecutionState
-import lucuma.odb.data.OdbError
-import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.data.StepExecutionState
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.TimeEstimateCalculator
@@ -63,11 +56,6 @@ import Services.Syntax.*
 
 trait SequenceService[F[_]]:
 
-  def setStepExecutionState(
-    stepId: Step.Id,
-    stage:  StepStage
-  )(using Transaction[F], Services.ServiceAccess): F[Unit]
-
   /** Marks ongoing non-terminal steps abandoned. */
   def abandonStepsInOngoingAtoms(
     observationId: Observation.Id
@@ -77,16 +65,6 @@ trait SequenceService[F[_]]:
     observationId: Observation.Id,
     stepId:        Step.Id
   )(using Transaction[F], Services.ServiceAccess): F[Unit]
-
-  def setAtomVisit(
-    atomId:  Atom.Id,
-    visitId: Visit.Id
-  )(using Transaction[F], Services.ServiceAccess): F[Result[Unit]]
-
-  def setStepVisit(
-    stepId:  Step.Id,
-    visitId: Visit.Id
-  )(using Transaction[F], Services.ServiceAccess): F[Result[Unit]]
 
   def insertAtomDigests(
     observationId: Observation.Id,
@@ -174,17 +152,6 @@ object SequenceService:
   )(using Services[F]): SequenceService[F] =
     new SequenceService[F]:
 
-      override def setStepExecutionState(
-        stepId: Step.Id,
-        stage:  StepStage
-      )(using Transaction[F], Services.ServiceAccess): F[Unit] =
-        val state = stage match
-          case StepStage.EndStep => StepExecutionState.Completed
-          case StepStage.Abort   => StepExecutionState.Aborted
-          case StepStage.Stop    => StepExecutionState.Stopped
-          case _                 => StepExecutionState.Ongoing
-        session.execute(Statements.SetStepExecutionState)(state, stepId).void
-
       override def abandonStepsInOngoingAtoms(
         observationId: Observation.Id
       )(using Transaction[F], Services.ServiceAccess): F[Unit] =
@@ -195,34 +162,6 @@ object SequenceService:
         stepId:        Step.Id
       )(using Transaction[F], Services.ServiceAccess): F[Unit] =
         session.execute(Statements.AbandonStepsInOngoingAtomsExceptStep)(observationId, stepId).void
-
-      override def setAtomVisit(
-        atomId:  Atom.Id,
-        visitId: Visit.Id
-      )(using Transaction[F], Services.ServiceAccess): F[Result[Unit]] =
-        def invalidVisit: OdbError.InvalidVisit =
-          OdbError.InvalidVisit(visitId, Some(s"Visit '$visitId' cannot be assigned to atom '$atomId'."))
-
-        session
-          .execute(Statements.SetAtomVisitId)(visitId, atomId).void
-          .map(_.success)
-          .recoverWith:
-            case SqlState.ForeignKeyViolation(_)                                        =>
-              invalidVisit.asFailureF
-
-      override def setStepVisit(
-        stepId:  Step.Id,
-        visitId: Visit.Id
-      )(using Transaction[F], Services.ServiceAccess): F[Result[Unit]] =
-        def invalidVisit: OdbError.InvalidVisit =
-          OdbError.InvalidVisit(visitId, Some(s"Visit '$visitId' cannot be assigned to step '$stepId'."))
-
-        session
-          .execute(Statements.SetStepVisitId)(visitId, stepId).void
-          .map(_.success)
-          .recoverWith:
-            case SqlState.CheckViolation(_) =>
-              invalidVisit.asFailureF
 
       override def insertAtomDigests(
         observationId: Observation.Id,
@@ -306,7 +245,7 @@ object SequenceService:
           atomStream
             .zipWithIndex
             .map { case (atom, idx) =>
-              (atom.id, instrument, idx.toInt, atom.description.map(_.value), observationId, sequenceType)
+              (atom.id, observationId, sequenceType, instrument, idx.toInt, atom.description.map(_.value))
             }
             .through(session.pipe(Statements.insertAtom))
             .drain
@@ -520,45 +459,56 @@ object SequenceService:
 
     val AbandonAndDeleteUnexecuted: Command[(Observation.Id, SequenceType)] =
       sql"""
-        WITH abandoned AS (
-          UPDATE t_step s
+        WITH abandoned_steps AS (
+          UPDATE t_step_execution s
              SET c_execution_state = '#${StepExecutionState.Abandoned.tag}'
-            FROM v_atom_record a
-           WHERE s.c_atom_id = a.c_atom_id
-             AND a.c_observation_id   = $observation_id
-             AND a.c_sequence_type    = $sequence_type
-             AND a.c_last_event_time IS NOT NULL
+           WHERE s.c_observation_id   = $observation_id
+             AND s.c_sequence_type    = $sequence_type
              AND s.c_execution_state IN ('#${StepExecutionState.NotStarted.tag}', '#${StepExecutionState.Ongoing.tag}')
+        ),
+
+        deleted_steps AS (
+          DELETE FROM t_step s
+          USING t_atom a
+          WHERE s.c_atom_id = a.c_atom_id
+            AND a.c_observation_id = $observation_id
+            AND a.c_sequence_type  = $sequence_type
+            AND NOT EXISTS (
+              SELECT 1 FROM t_step_execution e WHERE e.c_step_id = s.c_step_id
+            )
         )
+
         DELETE FROM t_atom a
         WHERE a.c_observation_id = $observation_id
           AND a.c_sequence_type  = $sequence_type
-          AND a.c_last_event_time IS NULL
-      """.command.contramap((o, s) => (o, s, o, s))
+          AND NOT EXISTS (
+            SELECT 1 FROM t_step_execution e WHERE e.c_atom_id = a.c_atom_id
+          )
+      """.command.contramap((o, s) => (o, s, o, s, o, s))
 
     val insertAtom: Command[(
       Atom.Id,
+      Observation.Id,
+      SequenceType,
       Instrument,
       Int,
-      Option[String],
-      Observation.Id,
-      SequenceType
+      Option[String]
     )] =
       sql"""
         INSERT INTO t_atom (
           c_atom_id,
+          c_observation_id,
+          c_sequence_type,
           c_instrument,
           c_atom_index,
-          c_description,
-          c_observation_id,
-          c_sequence_type
+          c_description
         ) SELECT
           $atom_id,
+          $observation_id,
+          $sequence_type,
           $instrument,
           $int4,
-          ${text.opt},
-          $observation_id,
-          $sequence_type
+          ${text.opt}
       """.command
 
     def insertStep[D]: Command[(
@@ -661,40 +611,12 @@ object SequenceService:
         )
       }
 
-    // There is a trigger that will enforce the rule that the visit id can only
-    // be set once and is thereafter immutable.
-    val SetAtomVisitId: Command[(Visit.Id, Atom.Id)] =
-      sql"""
-        UPDATE t_atom a
-           SET c_visit_id = $visit_id
-         WHERE a.c_atom_id  = $atom_id
-      """.command
-
-    val SetStepVisitId: Command[(Visit.Id, Step.Id)] =
-      sql"""
-        UPDATE t_atom a
-           SET c_visit_id = $visit_id
-          FROM t_step s
-         WHERE s.c_step_id = $step_id
-           AND a.c_atom_id = s.c_atom_id
-      """.command
-
-    val SetStepExecutionState: Command[(StepExecutionState, Step.Id)] =
-      sql"""
-        UPDATE t_step s
-           SET c_execution_state = $step_execution_state
-          FROM t_step_execution_state e
-         WHERE s.c_execution_state = e.c_tag
-           AND e.c_terminal = FALSE
-           AND s.c_step_id = $step_id
-      """.command
-
     // Intended for terminal sequence events.  Set any not_started or ongoing
     // steps *in ongoing atoms* as abandoned.  We won't touch atoms in which
     // no steps have even been started.
     val AbandonStepsInOngoingAtoms: Command[Observation.Id] =
       sql"""
-        UPDATE t_step s
+        UPDATE t_step_execution s
            SET c_execution_state = '#${StepExecutionState.Abandoned.tag}'
           FROM v_atom_record a, t_step_execution_state e
          WHERE a.c_observation_id = $observation_id
@@ -716,7 +638,7 @@ object SequenceService:
             JOIN t_atom a ON a.c_atom_id = s.c_atom_id
            WHERE s.c_step_id = $step_id
         )
-        UPDATE t_step s
+        UPDATE t_step_execution s
            SET c_execution_state = '#${StepExecutionState.Abandoned.tag}'
           FROM v_atom_record a, t_step_execution_state e
           CROSS JOIN current_atom ca
@@ -839,6 +761,8 @@ object SequenceService:
         JOIN t_step s
           ON s.c_atom_id = a.c_atom_id
 
+        LEFT JOIN t_step_execution se ON se.c_step_id = s.c_step_id
+
         JOIN #${instrumentTable} i
           ON i.c_step_id = s.c_step_id
 
@@ -852,7 +776,7 @@ object SequenceService:
           a.c_instrument     = $instrument      AND
           a.c_observation_id = $observation_id  AND
           a.c_sequence_type  = $sequence_type   AND
-          (s.c_execution_state = 'not_started' OR s.c_execution_state = 'ongoing')
+          (se.c_step_id IS NULL OR se.c_execution_state IN ( 'not_started', 'ongoing' ))
         ORDER BY
           a.c_atom_index,
           s.c_step_index

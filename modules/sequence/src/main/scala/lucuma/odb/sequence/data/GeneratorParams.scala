@@ -21,8 +21,7 @@ case class GeneratorParams(
   calibrationRole:  Option[CalibrationRole],
   declaredComplete: Boolean,
   executionState:   ExecutionState,
-  executedAcqCount: Long,
-  executedSciCount: Long
+  stepCount:        Long
 )
 
 object GeneratorParams:
@@ -36,8 +35,7 @@ object GeneratorParams:
         a.calibrationRole,
         a.declaredComplete,
         a.executionState,
-        a.executedAcqCount,
-        a.executedSciCount
+        a.stepCount
       )
 
   given HashBytes[GeneratorParams] with
@@ -49,6 +47,5 @@ object GeneratorParams:
         a.calibrationRole.hashBytes,
         a.declaredComplete.hashBytes,
         a.executionState.hashBytes,
-        a.executedAcqCount.hashBytes,
-        a.executedSciCount.hashBytes
+        a.stepCount.hashBytes
       )

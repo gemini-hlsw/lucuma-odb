@@ -8,6 +8,7 @@ import cats.effect.Concurrent
 import cats.syntax.applicativeError.*
 import cats.syntax.foldable.*
 import cats.syntax.functor.*
+import cats.syntax.option.*
 import cats.syntax.traverse.*
 import grackle.Result
 import grackle.ResultT
@@ -83,24 +84,26 @@ object DatasetService {
         input: RecordDatasetInput
       )(using Transaction[F], Services.ServiceAccess): F[Result[Dataset.Id]] = {
 
+        def filenameDuplicated: Result[Dataset.Id] =
+          OdbError.InvalidFilename(input.filename, s"The filename '${input.filename.format}' is already assigned".some).asFailure
+
         def stepNotFound: Result[Dataset.Id] =
-          OdbError.InvalidStep(input.stepId, Some(s"Step id '${input.stepId}' not found")).asFailure
+          OdbError.InvalidStep(input.stepId, s"Step id '${input.stepId}' not found".some).asFailure
+
+        def stepNotExecuted: Result[Dataset.Id] =
+          OdbError.InvalidStep(input.stepId, s"Step id '${input.stepId}' has not been started".some).asFailure
 
         val insert: F[Result[Dataset.Id]] =
           session
             .unique(Statements.InsertDataset)(input)
             .map(_.success)
-            .recover {
-              case SqlState.UniqueViolation(_)     => OdbError.InvalidFilename(input.filename, Some(s"The filename '${input.filename.format}' is already assigned")).asFailure
+            .recover:
+              case SqlState.UniqueViolation(_)     => filenameDuplicated
               case SqlState.ForeignKeyViolation(_) => stepNotFound
+              case SqlState.CheckViolation(_)      => stepNotExecuted
               case SqlState.NotNullViolation(ex) if ex.getMessage.contains("c_observation_id") => stepNotFound
-            }
 
-        val did = for
-          _ <- ResultT(sequenceService.setStepVisit(input.stepId, input.visitId))
-          d <- ResultT(insert)
-        yield d
-        did.value
+        ResultT(insert).value
       }
 
       override def updateDatasets(

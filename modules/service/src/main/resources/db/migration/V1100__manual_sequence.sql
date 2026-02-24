@@ -7,13 +7,29 @@ WHERE c_step_id IS NOT NULL;
 
 CREATE INDEX ON t_execution_event (c_observation_id);
 
--- Create an atom table.  This will store both executed and future atoms, but
--- only when the first visit for an observation is created.  Before then we
--- continue generating the sequence on the fly and nothing is written to the
--- database.
+-- Create an atom table.  This will store atoms, both executed and unexecuted.
+-- There will be a separate t_atom_execution table to house execution-related
+-- fields like the associated visit, execution order and event time range.
+-- Only atoms for which an event exists will have entries in t_atom_execution.
 CREATE TABLE t_atom (
   c_atom_id          d_atom_id        PRIMARY KEY,
+  c_observation_id   d_observation_id NOT NULL,
+  c_sequence_type    e_sequence_type  NOT NULL,
   c_instrument       d_tag            NOT NULL,
+
+  -- Steps will have a FK reference to t_atom (id, inst) so that they too have
+  -- a consistent instrument.
+  UNIQUE (c_atom_id, c_instrument),
+
+  -- Executed steps will have a FK reference to t_atom (id, obs, seq type) so
+  -- that they remain consistent.
+  UNIQUE (c_atom_id, c_observation_id, c_sequence_type),
+
+  -- The observation instrument shoufld not be changed without deleting any
+  -- associated atoms.  We don't want more than one instrument per observation.
+  CONSTRAINT t_atom_c_observation_id_c_instrument_fkey
+    FOREIGN KEY (c_observation_id, c_instrument)
+    REFERENCES t_observation(c_observation_id, c_instrument) ON DELETE CASCADE,
 
   -- The atom index is used to sort *unexecuted* atoms.  Once an atom has events,
   -- the event times determine order.  In other words, executed atoms are ordered
@@ -21,40 +37,14 @@ CREATE TABLE t_atom (
   -- ordered according to the atom index.
   c_atom_index       integer          NOT NULL,
 
-  UNIQUE (c_atom_id, c_instrument),
-
-  c_observation_id   d_observation_id NOT NULL,
-  c_sequence_type    e_sequence_type  NOT NULL,
-
-  c_visit_id         d_visit_id       REFERENCES t_visit(c_visit_id) ON DELETE CASCADE,
-
-  c_description      text,
-
-  c_first_event_time timestamp without time zone,
-  c_last_event_time  timestamp without time zone,
-
-  -- Both event times NULL or neither NULL.
-  CONSTRAINT t_atom_event_time_null_chk CHECK (
-    (c_first_event_time IS NULL) = (c_last_event_time IS NULL)
-  ),
-
-  -- First before last.
-  CONSTRAINT t_atom_event_time_order_chk CHECK (
-    (c_first_event_time IS NULL) OR
-    c_first_event_time <= c_last_event_time
-  )
+  -- Descriptive text to indicate how the steps are related for human consumption.
+  c_description      text
 
 );
 
--- Unexecuted atom indices should be unique among an observation's sequence's
--- atoms.  Once executed, the atom index is no longer relevant.
-CREATE UNIQUE INDEX i_atom_index_partial_unique
-  ON t_atom (
-    c_observation_id,
-    c_sequence_type,
-    c_atom_index
-  )
-  WHERE c_last_event_time IS NULL;
+-- Generator params computes the execution state and needs to check the
+-- steps associated with an observation and sequence.
+CREATE INDEX ON t_atom (c_observation_id, c_sequence_type);
 
 -- Copy the old t_atom_record data over to t_atom.
 INSERT INTO t_atom (
@@ -62,100 +52,15 @@ INSERT INTO t_atom (
   c_instrument,
   c_atom_index,
   c_observation_id,
-  c_sequence_type,
-  c_visit_id,
-  c_first_event_time,
-  c_last_event_time
+  c_sequence_type
 )
 SELECT
-  r2.c_atom_id,
-  r2.c_instrument,
-  r2.c_atom_index,
-  r2.c_observation_id,
-  r2.c_sequence_type,
-  r2.c_visit_id,
-  MIN(e.c_received) AS c_first_event_time,
-  MAX(e.c_received) AS c_last_event_time
-FROM (
-  SELECT
-    r.c_atom_id,
-    r.c_instrument,
-    r.c_observation_id,
-    ROW_NUMBER() OVER (
-      PARTITION BY r.c_observation_id
-      ORDER BY r.c_created, r.c_atom_id
-    ) AS c_atom_index,
-    r.c_sequence_type,
-    r.c_visit_id
-  FROM t_atom_record r
-) r2 -- for atom index calculation
-LEFT JOIN t_execution_event e ON e.c_atom_id = r2.c_atom_id
-GROUP BY -- for MIN/MAX aggregation
-  r2.c_atom_id,
-  r2.c_instrument,
-  r2.c_atom_index,
-  r2.c_observation_id,
-  r2.c_sequence_type,
-  r2.c_visit_id;
-
-ALTER TABLE ONLY t_atom
-  ADD CONSTRAINT t_atom_c_observation_id_c_instrument_fkey FOREIGN KEY (c_observation_id, c_instrument) REFERENCES t_observation(c_observation_id, c_instrument) ON DELETE CASCADE;
-
-CREATE INDEX ON t_atom (c_observation_id);
-CREATE INDEX ON t_atom (c_observation_id) WHERE c_last_event_time IS NOT NULL;
-
--- The visit id is assigned in t_atom when events arrive from Observe.  We check
--- here to make sure the visit is compatible (same observation) and that the
--- visit isn't being changed once initially set.
-CREATE OR REPLACE FUNCTION validate_atom_visit()
-RETURNS TRIGGER AS $$
-DECLARE
-  observation_id d_observation_id;
-BEGIN
-  -- Make sure the visit applies to the same observation as the atom.
-  IF NEW.c_visit_id IS NOT NULL THEN
-    SELECT v.c_observation_id INTO observation_id FROM t_visit v WHERE v.c_visit_id = NEW.c_visit_id;
-    IF NEW.c_observation_id IS DISTINCT FROM observation_id THEN
-      RAISE EXCEPTION 'atom % and visit % cannot have distinct observation ids (% and % respectively)', NEW.c_atom_id, NEW.c_visit_id, NEW.c_observation_id, observation_id
-        USING ERRCODE = 'check_violation';
-    END IF;
-  END IF;
-
-  -- Don't allow the visit to change.
-  IF OLD.c_visit_id IS NOT NULL AND NEW.c_visit_id IS DISTINCT FROM OLD.c_visit_id THEN
-    RAISE EXCEPTION 'c_visit_id is write-once: cannot change from % to %', OLD.c_visit_id, NEW.c_visit_id
-    USING ERRCODE = 'check_violation';
-  END IF;
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER validate_atom_visit_trigger
-BEFORE UPDATE OF c_visit_id ON t_atom
-FOR EACH ROW
-EXECUTE FUNCTION validate_atom_visit();
-
-
--- A trigger to keep the first/last event data accurate.
-CREATE OR REPLACE FUNCTION update_atom_event_times()
-  RETURNS TRIGGER AS $$
-BEGIN
-
-  UPDATE t_atom
-     SET c_first_event_time = least(coalesce(c_first_event_time, NEW.c_received), NEW.c_received),
-         c_last_event_time  = greatest(coalesce(c_last_event_time, NEW.c_received), NEW.c_received)
-   WHERE c_atom_id = NEW.c_atom_id;
-
-  RETURN NULL;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER update_atom_event_times_trigger
-  AFTER INSERT ON t_execution_event
-  FOR EACH ROW
-  WHEN (NEW.c_atom_id IS NOT NULL)
-    EXECUTE PROCEDURE update_atom_event_times();
-
+  r.c_atom_id,
+  r.c_instrument,
+  0 as c_atom_index, -- not relevant once execution starts
+  r.c_observation_id,
+  r.c_sequence_type
+FROM t_atom_record r;
 
 -- Add a breakpoint enum.  We can now store breakpoints.
 CREATE TYPE e_breakpoint AS enum(
@@ -164,10 +69,10 @@ CREATE TYPE e_breakpoint AS enum(
 );
 
 CREATE TABLE t_step (
-  c_step_id          d_step_id     PRIMARY KEY,
-  c_atom_id          d_atom_id     NOT NULL REFERENCES t_atom(c_atom_id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED,
-  c_instrument       d_tag         NOT NULL,
-  c_step_type        e_step_type   NOT NULL,
+  c_step_id          d_step_id        PRIMARY KEY,
+  c_atom_id          d_atom_id        NOT NULL,
+  c_instrument       d_tag            NOT NULL,
+  c_step_type        e_step_type      NOT NULL,
 
   -- The step index is used to sort *unexecuted* steps inside of an atom.  Once
   -- a step has events, the event times determine order.  In other words,
@@ -175,42 +80,67 @@ CREATE TABLE t_step (
   -- To-be executed steps are ordered according to the step index.
   c_step_index       integer       NOT NULL,
 
-  UNIQUE (c_step_id, c_instrument),
-  UNIQUE (c_step_id, c_step_type),
-
   c_observe_class    e_obs_class   NOT NULL,
   c_time_estimate    interval      NOT NULL DEFAULT '00:00:00'::interval,
-  c_execution_state  d_tag         NOT NULL REFERENCES t_step_execution_state(c_tag) DEFAULT ('not_started'::character varying)::d_tag,
   c_offset_p         d_angle_µas   NOT NULL DEFAULT 0,
   c_offset_q         d_angle_µas   NOT NULL DEFAULT 0,
   c_guide_state      e_guide_state NOT NULL DEFAULT 'enabled'::e_guide_state,
 
   c_breakpoint       e_breakpoint  NOT NULL DEFAULT 'disabled'::e_breakpoint,
 
-  c_first_event_time timestamp without time zone,
-  c_last_event_time  timestamp without time zone,
+  -- For FK references from t_step_config, t_gmos_north_dynamic etc.
+  UNIQUE (c_step_id, c_instrument),
+  UNIQUE (c_step_id, c_step_type),
 
-  -- Both event times NULL or neither NULL.
-  CONSTRAINT t_step_event_time_null_chk CHECK (
-    (c_first_event_time IS NULL) = (c_last_event_time IS NULL)
-  ),
+  -- For FK reference from t_step_execution
+  UNIQUE (c_step_id, c_atom_id),
 
-  -- First before last.
-  CONSTRAINT t_step_event_time_order_chk CHECK (
-    (c_first_event_time IS NULL) OR
-    c_first_event_time <= c_last_event_time
-  )
+  CONSTRAINT t_atom_c_atom_id_c_instrument_fkey
+    FOREIGN KEY (c_atom_id, c_instrument)
+    REFERENCES t_atom(c_atom_id, c_instrument) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED
 
 );
 
--- Unexecuted step indices should be unique among an observation's atom's
--- steps.  Once executed, the step index is no longer relevant.
-CREATE UNIQUE INDEX i_step_index_partial_unique
-  ON t_step (
-    c_atom_id,
-    c_step_index
-  )
-  WHERE c_last_event_time IS NULL;
+CREATE TABLE t_step_execution (
+  c_step_id          d_step_id        PRIMARY KEY,
+  c_atom_id          d_atom_id        NOT NULL,
+
+  c_observation_id   d_observation_id NOT NULL REFERENCES t_observation(c_observation_id),
+  c_sequence_type    e_sequence_type  NOT NULL,
+  c_visit_id         d_visit_id       NOT NULL REFERENCES t_visit(c_visit_id),
+
+  -- Execution order determined when the first associated event is added.
+  c_execution_order  integer          NOT NULL,
+  c_execution_state  d_tag            NOT NULL REFERENCES t_step_execution_state(c_tag) DEFAULT ('not_started'::character varying)::d_tag,
+  c_first_event_time timestamp        NOT NULL,
+  c_last_event_time  timestamp        NOT NULL,
+
+  CHECK (c_first_event_time <= c_last_event_time),
+
+  -- Here we do not cascade deletes.  Entries in t_step_execution should not be
+  -- deleteable.  We want deletion of t_step to fail if there is an exisiting
+  -- t_step_execution.
+  CONSTRAINT t_step_c_step_id_c_atom_id_fkey
+    FOREIGN KEY (c_step_id, c_atom_id)
+    REFERENCES t_step(c_step_id, c_atom_id),
+
+  -- We duplicated observation id and sequence type in this table so that we
+  -- can enforce the execution order uniqueness constraint:
+  UNIQUE (
+    c_observation_id,
+    c_sequence_type,
+    c_execution_order
+  ),
+
+  CONSTRAINT t_atom_c_atom_id_c_observation_id_c_sequence_type_fkey
+  FOREIGN KEY (c_atom_id, c_observation_id, c_sequence_type)
+    REFERENCES t_atom(c_atom_id, c_observation_id, c_sequence_type)
+    ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED
+
+);
+
+-- We often need to know all the steps associated with an atom.
+CREATE INDEX ON t_step_execution (c_atom_id);
 
 -- Copy the old t_step_record data over to t_step.
 INSERT INTO t_step (
@@ -221,12 +151,9 @@ INSERT INTO t_step (
   c_step_index,
   c_observe_class,
   c_time_estimate,
-  c_execution_state,
   c_offset_p,
   c_offset_q,
-  c_guide_state,
-  c_first_event_time,
-  c_last_event_time
+  c_guide_state
 )
 SELECT
   r.c_step_id,
@@ -236,59 +163,238 @@ SELECT
   r.c_step_index,
   r.c_observe_class,
   r.c_time_estimate,
-  r.c_execution_state,
   r.c_offset_p,
   r.c_offset_q,
-  r.c_guide_state,
-  r.c_first_event_time,
-  r.c_last_event_time
+  r.c_guide_state
 FROM t_step_record r;
 
-ALTER TABLE ONLY t_step
-  ADD CONSTRAINT t_atom_c_atom_id_c_instrument_fkey FOREIGN KEY (c_atom_id, c_instrument) REFERENCES t_atom(c_atom_id, c_instrument) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED;
+-- Copy the old t_step_record data over to t_step_execution.
+INSERT INTO t_step_execution (
+  c_step_id,
+  c_atom_id,
+  c_observation_id,
+  c_sequence_type,
+  c_visit_id,
+  c_execution_order,
+  c_execution_state,
+  c_first_event_time,
+  c_last_event_time
+)
+SELECT
+  r2.c_step_id,
+  r2.c_atom_id,
+  r2.c_observation_id,
+  r2.c_sequence_type,
+  r2.c_visit_id,
+  r2.c_execution_order,
+  r2.c_execution_state,
+  r2.c_first_event_time,
+  r2.c_last_event_time
+FROM (
+  SELECT
+    r.c_step_id,
+    r.c_atom_id,
+    a.c_observation_id,
+    a.c_sequence_type,
+    a.c_visit_id,
+    ROW_NUMBER() OVER (
+      PARTITION BY a.c_observation_id
+      ORDER BY r.c_created, r.c_step_id
+    ) AS c_execution_order,
+    r.c_execution_state,
+    r.c_first_event_time,
+    r.c_last_event_time
+  FROM t_step_record r
+  JOIN t_atom_record a ON a.c_atom_id = r.c_atom_id
+) r2;
 
-CREATE INDEX ON t_step (c_atom_id);
+-- Ensure that the visit and execution order are never changed.
+CREATE OR REPLACE FUNCTION validate_step_execution_update()
+RETURNS TRIGGER AS $$
+BEGIN
+
+  -- Don't allow the execution order to change.
+  IF OLD.c_execution_order IS DISTINCT FROM NEW.c_execution_order THEN
+    RAISE EXCEPTION 'c_execution_order is write-once in t_step_execution: cannot change from % to %', OLD.c_execution_order, NEW.c_execution_order
+    USING ERRCODE = 'check_violation';
+  END IF;
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER validate_step_execution_update_trigger
+BEFORE UPDATE ON t_step_execution
+FOR EACH ROW
+EXECUTE FUNCTION validate_step_execution_update();
 
 -- Create a view on the atom table.  This will correspond to the old atom record
 -- table in that it only contains executed atoms.
 CREATE VIEW v_atom_record AS
 SELECT
-  a.*,
-  COALESCE(s.c_execution_state, 'completed')::d_tag AS c_execution_state
+  a.c_atom_id,
+  a.c_observation_id,
+  a.c_sequence_type,
+  a.c_description,
+
+  MIN(se.c_visit_id)         AS c_visit_id,
+  MIN(se.c_execution_order)  AS c_execution_order,
+  MIN(se.c_first_event_time) AS c_first_event_time,
+  MAX(se.c_last_event_time)  AS c_last_event_time,
+  CASE
+    WHEN bool_and(se.c_execution_state IN ('completed', 'abandoned')) THEN 'completed'
+    WHEN bool_and(se.c_execution_state = 'not_started')               THEN 'not_started'
+    ELSE 'ongoing'
+  END::d_tag AS c_execution_state
+
 FROM t_atom a
-LEFT JOIN (
+JOIN t_step_execution se ON se.c_atom_id = a.c_atom_id
+GROUP BY
+  a.c_atom_id,
+  a.c_observation_id,
+  a.c_sequence_type,
+  a.c_description;
+
+CREATE TABLE t_step_stage_execution_state (
+  c_step_stage      e_step_stage PRIMARY KEY,
+  c_execution_state d_tag        NOT NULL REFERENCES t_step_execution_state(c_tag)
+);
+
+INSERT INTO t_step_stage_execution_state (
+  c_step_stage,
+  c_execution_state
+) VALUES
+  ('abort',    'aborted'),
+  ('end_step', 'completed'),
+  ('stop',     'stopped') ;
+
+-- A trigger to insert / update the atom execution information.
+CREATE OR REPLACE FUNCTION update_step_execution_information()
+  RETURNS TRIGGER AS $$
+DECLARE
+  sequence_type   e_sequence_type;
+  existing_visit  d_visit_id;
+  visit_count     integer;
+  execution_state d_tag;
+BEGIN
+  SELECT c_sequence_type INTO sequence_type  FROM t_atom WHERE c_atom_id = NEW.c_atom_id;
+
+  PERFORM pg_advisory_xact_lock(
+    hashtextextended(
+      NEW.c_observation_id::text || ':' || sequence_type::text,
+      0
+    )
+  );
+
   SELECT
+    MIN(c_visit_id),
+    COUNT(DISTINCT c_visit_id)
+  INTO
+    existing_visit,
+    visit_count
+  FROM t_step_execution
+  WHERE c_atom_id = NEW.c_atom_id;
+
+  IF visit_count > 1 THEN
+    RAISE EXCEPTION
+      'Atom % has multiple visits',
+      NEW.c_atom_id
+    USING ERRCODE = 'check_violation';
+  END IF;
+
+  IF existing_visit IS NOT NULL AND existing_visit IS DISTINCT FROM NEW.c_visit_id THEN
+    RAISE EXCEPTION
+      'Atom % is executed in visit %, cannot execute step in visit %',
+      NEW.c_atom_id,
+      existing_visit,
+      NEW.c_visit_id
+    USING ERRCODE = 'check_violation';
+  END IF;
+
+  SELECT s.c_execution_state
+    INTO execution_state
+    FROM t_step_stage_execution_state s
+   WHERE s.c_step_stage = NEW.c_step_stage;
+
+  INSERT INTO t_step_execution (
+    c_step_id,
     c_atom_id,
-    CASE
-      WHEN bool_and(c_execution_state IN ('completed', 'abandoned')) THEN 'completed'
-      WHEN bool_and(c_execution_state = 'not_started')               THEN 'not_started'
-      ELSE 'ongoing'
-    END::d_tag AS c_execution_state
-  FROM t_step
-  GROUP BY c_atom_id
-) s ON s.c_atom_id = a.c_atom_id
-WHERE a.c_visit_id         IS NOT NULL
-  AND a.c_last_event_time  IS NOT NULL;
+    c_observation_id,
+    c_sequence_type,
+    c_visit_id,
+    c_execution_order,
+    c_execution_state,
+    c_first_event_time,
+    c_last_event_time
+  )
+  VALUES (
+    NEW.c_step_id,
+    NEW.c_atom_id,
+    NEW.c_observation_id,
+    sequence_type,
+    NEW.c_visit_id,
+    (
+      SELECT COALESCE(MAX(c_execution_order), 0) + 1
+      FROM t_step_execution
+      WHERE c_observation_id = NEW.c_observation_id
+        AND c_sequence_type  = sequence_type
+    ),
+    COALESCE(execution_state, 'ongoing'),
+    NEW.c_received,
+    NEW.c_received
+  )
+  ON CONFLICT (c_step_id) DO UPDATE
+  SET
+    c_first_event_time = least(t_step_execution.c_first_event_time,   NEW.c_received),
+    c_last_event_time  = greatest(t_step_execution.c_last_event_time, NEW.c_received),
+    c_execution_state  =
+      CASE
+        -- If we're in a terminal execution state, we stay there.
+        WHEN EXISTS (
+          SELECT 1 FROM t_step_execution_state s WHERE s.c_tag = t_step_execution.c_execution_state AND s.c_terminal
+        )
+        THEN t_step_execution.c_execution_state
+
+        -- If we are transitioning to a terminal state, go ahead
+        WHEN execution_state IS NOT NULL AND EXISTS (
+          SELECT 1 FROM t_step_execution_state s WHERE s.c_tag = execution_state AND s.c_terminal
+        )
+        THEN execution_state
+
+        -- Leave it in ongoing
+        ELSE t_step_execution.c_execution_state
+      END;
+  RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER update_step_execution_information_trigger
+  AFTER INSERT ON t_execution_event
+  FOR EACH ROW
+  WHEN (NEW.c_step_id IS NOT NULL AND NEW.c_atom_id IS NOT NULL)
+    EXECUTE PROCEDURE update_step_execution_information();
+
 
 -- Update the step record view
 DROP VIEW v_step_record;
 
 -- Create a view on the step table.  This will correspond to the old step record
--- table in that it only contains executed atoms.
+-- table in that it only contains executed atoms.  It pulls in all the step-
+-- specific data and aggregates the dataset QA state.
 CREATE VIEW v_step_record AS
 SELECT
   s.c_step_id,
   s.c_atom_id,
-  a.c_visit_id,
-  s.c_step_index,
-  s.c_instrument,
-  s.c_step_type,
-  s.c_observe_class,
+  s.c_visit_id,
+  s.c_execution_order,
   s.c_execution_state,
-  s.c_time_estimate,
-  s.c_breakpoint,
   s.c_first_event_time,
   s.c_last_event_time,
+  r.c_instrument,
+  r.c_step_type,
+  r.c_observe_class,
+  r.c_time_estimate,
+  r.c_breakpoint,
   g.c_gcal_continuum,
   g.c_gcal_ar_arc,
   g.c_gcal_cuar_arc,
@@ -298,48 +404,19 @@ SELECT
   g.c_gcal_diffuser,
   g.c_gcal_shutter,
   m.c_smart_gcal_type,
-  s.c_offset_p,
-  s.c_offset_q,
-  s.c_guide_state,
+  r.c_offset_p,
+  r.c_offset_q,
+  r.c_guide_state,
   (SELECT MAX(c_qa_state) FROM t_dataset d WHERE d.c_step_id = s.c_step_id) AS c_qa_state
 FROM
-  t_step s
-LEFT JOIN t_step_config_gcal g
-  ON g.c_step_id = s.c_step_id
-LEFT JOIN t_step_config_smart_gcal m
-  ON m.c_step_id = s.c_step_id
-INNER JOIN t_atom a
-  ON a.c_atom_id = s.c_atom_id
-WHERE a.c_visit_id         IS NOT NULL
-  AND s.c_first_event_time IS NOT NULL
-  AND s.c_last_event_time  IS NOT NULL
-  AND s.c_execution_state != 'not_started'
-ORDER BY
-  s.c_step_id;
+  t_step_execution s
+JOIN t_step r ON r.c_step_id = s.c_step_id
+LEFT JOIN t_step_config_gcal g ON g.c_step_id = s.c_step_id
+LEFT JOIN t_step_config_smart_gcal m ON m.c_step_id = s.c_step_id;
 
-
--- A trigger to keep the first/last event data accurate.
+-- These are no longer used as we'll delete t_step_record.
 DROP TRIGGER update_step_record_event_times_trigger ON t_execution_event;
 DROP FUNCTION update_step_record_event_times;
-
-CREATE OR REPLACE FUNCTION update_step_event_times()
-  RETURNS TRIGGER AS $$
-BEGIN
-
-  UPDATE t_step
-     SET c_first_event_time = least(coalesce(c_first_event_time, NEW.c_received), NEW.c_received),
-         c_last_event_time  = greatest(coalesce(c_last_event_time, NEW.c_received), NEW.c_received)
-   WHERE c_step_id = NEW.c_step_id;
-
-  RETURN NULL;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER update_step_event_times_trigger
-  AFTER INSERT ON t_execution_event
-  FOR EACH ROW
-  WHEN (NEW.c_step_id IS NOT NULL)
-    EXECUTE PROCEDURE update_step_event_times();
 
 -- Sequence serialization coordination
 CREATE TABLE t_sequence_materialization (
@@ -348,18 +425,18 @@ CREATE TABLE t_sequence_materialization (
   c_updated        timestamp        NOT NULL
 );
 
--- We'll say that every observation with an atom has been materialized.
+-- We'll say that every observation with an executed step has been materialized.
 INSERT INTO t_sequence_materialization (
   c_observation_id,
   c_created,
   c_updated
 )
 SELECT
-  a.c_observation_id,
-  MIN(a.c_first_event_time) AS c_created,
-  MIN(a.c_first_event_time) AS c_updated
-FROM t_atom a
-GROUP BY a.c_observation_id;
+  s.c_observation_id,
+  MIN(s.c_first_event_time) AS c_created,
+  MIN(s.c_first_event_time)  AS c_updated
+FROM t_step_execution s
+GROUP BY s.c_observation_id;
 
 -- When a new step is completed (or uncompleted if that ever happens), we need
 -- to poke obscalc.
@@ -382,7 +459,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 CREATE TRIGGER step_obscalc_invalidate_trigger
-AFTER UPDATE ON t_step FOR EACH ROW WHEN (
+AFTER UPDATE ON t_step_execution FOR EACH ROW WHEN (
   OLD.c_execution_state IS DISTINCT FROM NEW.c_execution_state AND (
     OLD.c_execution_state = 'completed' OR
     NEW.c_execution_state = 'completed'
@@ -408,7 +485,7 @@ $$ LANGUAGE plpgsql;
 -- Triggers the deletion of an observation's execution digest when a step is
 -- marked complete (or marked incomplete having previously been marked complete).
 CREATE TRIGGER delete_execution_digest_trigger
-AFTER UPDATE ON t_step FOR EACH ROW
+AFTER UPDATE ON t_step_execution FOR EACH ROW
 WHEN (
   OLD.c_execution_state IS DISTINCT FROM NEW.c_execution_state AND (
     OLD.c_execution_state = 'completed' OR
@@ -484,34 +561,38 @@ RETURNS TRIGGER AS $$
 DECLARE
   visit_id       d_visit_id;
   observation_id d_observation_id;
-  step_index     int4;
+  exec_order     integer;
+  obs_ref        varchar;
 BEGIN
 
   SELECT
-    a.c_visit_id,
-    a.c_observation_id,
-    s.c_step_index
+    e.c_visit_id,
+    e.c_observation_id,
+    e.c_execution_order,
+    o.c_observation_reference
   INTO
     visit_id,
     observation_id,
-    step_index
-  FROM t_step s
-  JOIN t_atom a ON a.c_atom_id = s.c_atom_id
-  WHERE s.c_step_id = NEW.c_step_id;
+    exec_order,
+    obs_ref
+  FROM t_step_execution e
+  JOIN t_observation o ON o.c_observation_id = e.c_observation_id
+  WHERE e.c_step_id = NEW.c_step_id;
 
   IF visit_id IS NULL THEN
     RAISE EXCEPTION
-       USING
-         ERRCODE = 'check_violation',
-         MESSAGE = format(
-           'Cannot insert dataset for step %s: atom has no visit assigned',
-           NEW.c_step_id
-         );
+      'Cannot insert dataset for unexecuted step %',
+      NEW.c_step_id
+    USING
+      ERRCODE = 'check_violation',
+      DETAIL  = 'A row must exist in t_step_execution before datasets may be added.',
+      HINT    = 'Ensure the step has execution events before inserting datasets.';
   END IF;
 
-  NEW.c_visit_id       := visit_id;
-  NEW.c_observation_id := observation_id;
-  NEW.c_step_index     := step_index;
+  NEW.c_visit_id              := visit_id;
+  NEW.c_observation_id        := observation_id;
+  NEW.c_step_index            := exec_order;
+  NEW.c_observation_reference := obs_ref;
 
   RETURN NEW;
 
@@ -606,8 +687,7 @@ SELECT
 
     ELSE 'completed'::e_execution_state
   END AS c_execution_state,
-  COALESCE(a_counts.c_acq_count, 0) AS c_execution_acq_count,
-  COALESCE(a_counts.c_sci_count, 0) AS c_execution_sci_count,
+  COALESCE(s_counts.c_step_count, 0) AS c_step_count,
   o.c_blind_offset_target_id,
   b.c_sid_rv AS c_blind_rv,
   b.c_source_profile AS c_blind_source_profile,
@@ -633,12 +713,10 @@ LEFT JOIN t_exposure_time_mode e
 LEFT JOIN (
   SELECT
     c_observation_id,
-    COUNT(*) FILTER (WHERE c_sequence_type = 'acquisition') AS c_acq_count,
-    COUNT(*) FILTER (WHERE c_sequence_type = 'science')     AS c_sci_count
-  FROM t_atom
-  WHERE c_last_event_time IS NOT NULL
+    COUNT(*) AS c_step_count
+  FROM t_step_execution
   GROUP BY c_observation_id
-) a_counts ON a_counts.c_observation_id = o.c_observation_id
+) s_counts ON s_counts.c_observation_id = o.c_observation_id
 ORDER BY
   o.c_observation_id,
   t.c_target_id;
