@@ -10,7 +10,6 @@ import cats.syntax.eq.*
 import cats.syntax.option.*
 import io.circe.Json
 import io.circe.literal.*
-import io.circe.syntax.*
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
@@ -21,44 +20,44 @@ import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.Step
 import lucuma.core.util.IdempotencyKey
 
-class recordDataset extends OdbSuite {
-
-  val service: User = TestUsers.service(nextId)
-
-  override lazy val validUsers: List[User] = List(service)
+class recordDataset extends OdbSuite with query.ExecutionTestSupportForGmos {
 
   private def setup(
     mode: ObservingModeType,
     user: User
   ): IO[(Program.Id, Observation.Id, Visit.Id, Atom.Id, Step.Id)] =
-    for {
+    for
       pid <- createProgramAs(user)
-      oid <- createObservationAs(user, pid, mode.some)
+      tid <- createTargetWithProfileAs(user, pid)
+      oid <- createObservationAs(user, pid, mode.some, tid)
       vid <- recordVisitAs(user, mode.instrument, oid)
-      aid <- recordAtomAs(user, mode.instrument, vid)
-      sid <- recordStepAs(user, mode.instrument, aid)
-    } yield (pid, oid, vid, aid, sid)
+      ids <- scienceSequenceIds(user, oid).map(_.head)
+      aid  = ids._1
+      sid  = ids._2.head
+      _   <- addEndStepEvent(sid, vid)
+    yield (pid, oid, vid, aid, sid)
 
   private def recordDatasetTest(
     mode:     ObservingModeType,
     user:     User,
-    query:    Step.Id => String,
+    query:    (Step.Id, Visit.Id) => String,
     expected: (Observation.Id, Step.Id) => Either[String, Json]
   ): IO[Unit] =
     for {
       ids <- setup(mode, user)
-      (_, oid, _, _, sid) = ids
-      _   <- expect(user, query(sid), expected(oid, sid).leftMap(msg => List(msg)))
+      (_, oid, vid, _, sid) = ids
+      _   <- expect(user, query(sid, vid), expected(oid, sid).leftMap(msg => List(msg)))
     } yield ()
 
   test("recordDataset") {
     recordDatasetTest(
       ObservingModeType.GmosNorthLongSlit,
-      service,
-      sid => s"""
+      serviceUser,
+      (sid, vid) => s"""
         mutation {
           recordDataset(input: {
-            stepId: ${sid.asJson},
+            stepId: "$sid"
+            visitId: "$vid"
             filename: "N18630101S0001.fits"
           }) {
             dataset {
@@ -102,12 +101,13 @@ class recordDataset extends OdbSuite {
   test("recordDataset - init QA state") {
     recordDatasetTest(
       ObservingModeType.GmosNorthLongSlit,
-      service,
-      sid => s"""
+      serviceUser,
+      (sid, vid) => s"""
         mutation {
           recordDataset(input: {
-            stepId: ${sid.asJson},
-            filename: "N18630101S0002.fits",
+            stepId: "$sid"
+            visitId: "$vid"
+            filename: "N18630101S0002.fits"
             qaState: USABLE
           }) {
             dataset {
@@ -151,12 +151,13 @@ class recordDataset extends OdbSuite {
   test("recordDataset - init comment") {
     recordDatasetTest(
       ObservingModeType.GmosNorthLongSlit,
-      service,
-      sid => s"""
+      serviceUser,
+      (sid, vid) => s"""
         mutation {
           recordDataset(input: {
-            stepId: ${sid.asJson},
-            filename: "N18630101S0003.fits",
+            stepId: "$sid"
+            visitId: "$vid"
+            filename: "N18630101S0003.fits"
             comment: "such data"
           }) {
             dataset {
@@ -200,12 +201,13 @@ class recordDataset extends OdbSuite {
   test("recordDataset - reused filename") {
     recordDatasetTest(
       ObservingModeType.GmosNorthLongSlit,
-      service,
-      sid => s"""
+      serviceUser,
+      (sid, vid) => s"""
         mutation {
           recordDataset(input: {
-            stepId: ${sid.asJson},
-            filename: "N18630101S0002.fits",
+            stepId: "$sid"
+            visitId: "$vid"
+            filename: "N18630101S0002.fits"
             qaState: USABLE
           }) {
             dataset {
@@ -221,11 +223,12 @@ class recordDataset extends OdbSuite {
   test("recordDataset - unkown step id") {
     recordDatasetTest(
       ObservingModeType.GmosNorthLongSlit,
-      service,
-      _ => s"""
+      serviceUser,
+      (_, vid) => s"""
         mutation {
           recordDataset(input: {
-            stepId: "s-d506e5d9-e5d1-4fcc-964c-90afedabc9e8",
+            stepId: "s-d506e5d9-e5d1-4fcc-964c-90afedabc9e8"
+            visitId: "$vid"
             filename: "N18630101S0003.fits"
           }) {
             dataset {
@@ -239,12 +242,12 @@ class recordDataset extends OdbSuite {
   }
 
   test("chronicle auditing"):
-    setup(ObservingModeType.GmosNorthLongSlit, service).flatMap: (_, oid, vid, _, sid) =>
-      recordDatasetAs(service, sid, vid, "N18630101S0004.fits").flatMap: did =>
+    setup(ObservingModeType.GmosNorthLongSlit, serviceUser).flatMap: (_, oid, vid, _, sid) =>
+      recordDatasetAs(serviceUser, sid, vid, "N18630101S0004.fits").flatMap: did =>
         assertIO(chronDatasetUpdates(did), List(
           json"""
             {
-              "c_user"                      : ${service.id},
+              "c_user"                      : ${serviceUser.id},
               "c_operation"                 : "INSERT",
               "c_dataset_id"                : $did,
               "c_mod_dataset_id"            : true,
@@ -286,13 +289,14 @@ class recordDataset extends OdbSuite {
   test("recordDataset - idempotencyKey"):
     val idm = IdempotencyKey.FromString.getOption("7304956b-45ab-45b6-8db1-ae6f743b519c").get
 
-    def recordDataset(sid: Step.Id): IO[(Dataset.Id, IdempotencyKey)] =
+    def recordDataset(sid: Step.Id, vid: Visit.Id): IO[(Dataset.Id, IdempotencyKey)] =
       query(
-        user  = service,
+        user  = serviceUser,
         query = s"""
           mutation {
             recordDataset(input: {
               stepId: "$sid"
+              visitId: "$vid"
               filename: "N18630101S0006.fits"
               idempotencyKey: "${IdempotencyKey.FromString.reverseGet(idm)}"
             }) {
@@ -312,9 +316,9 @@ class recordDataset extends OdbSuite {
 
     assertIOBoolean:
       for
-        (_, _, _, _, s) <- setup(ObservingModeType.GmosNorthLongSlit, service)
-        (d0, k0)        <- recordDataset(s)
-        (d1, k1)        <- recordDataset(s)
+        (_, _, v, _, s) <- setup(ObservingModeType.GmosNorthLongSlit, serviceUser)
+        (d0, k0)        <- recordDataset(s, v)
+        (d1, k1)        <- recordDataset(s, v)
       yield (d0 === d1) && (k0 === idm) && (k1 === idm)
 
 }

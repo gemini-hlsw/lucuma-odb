@@ -559,12 +559,32 @@ DROP FUNCTION check_dataset_visit_immutable;
 CREATE FUNCTION initialize_dataset_before_insert()
 RETURNS TRIGGER AS $$
 DECLARE
+  step_id        d_step_id;
   visit_id       d_visit_id;
   observation_id d_observation_id;
   exec_order     integer;
   obs_ref        varchar;
 BEGIN
 
+  -- Make sure the step even exists.  This will be a FK violation anyway but we
+  -- otherwise wouldn't catch it before trying to do the visit lookup below
+  -- and we'll report a misleading error.
+  SELECT c_step_id INTO step_id FROM t_step WHERE c_step_id = NEW.c_step_id;
+
+  IF step_id IS NULL THEN
+    RAISE EXCEPTION
+      'Step % not found in t_step table',
+      NEW.c_step_id
+    USING
+      ERRCODE = 'foreign_key_violation',
+      DETAIL  = 'A row must exist in t_step before datasets may be added.',
+      HINT    = 'Ensure the step has associated execution events before inserting datasets.';
+  END IF;
+
+
+  -- Lookup the visit, observation id, execution sequence order and observation
+  -- reference.  This assumes that the step has an entry in t_step_execution.
+  -- If not, we'll raise a check violation and bail.
   SELECT
     e.c_visit_id,
     e.c_observation_id,
