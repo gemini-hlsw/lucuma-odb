@@ -315,26 +315,6 @@ object SequenceService:
       )(using Transaction[F]): F[Boolean] =
         session.unique(Statements.IsMaterialized)(observationId)
 
-      /*
-      private def acquisitionAtoms(observationId: Observation.Id): F[Unit] =
-        val q = sql"""
-          SELECT
-            c_atom_id,
-            c_atom_index,
-            c_first_event_time
-          FROM
-            t_atom
-          WHERE c_observation_id = $observation_id
-            AND c_sequence_type  = $sequence_type
-          ORDER BY c_last_event_time, c_atom_index NULLS LAST
-        """.query(atom_id *: skunk.codec.numeric.int4 *: core_timestamp.opt)
-
-        session
-          .execute(q)(observationId, SequenceType.Acquisition)
-          .map: lst =>
-            println(lst.mkString("---\n", "\n", "\n"))
-       */
-
       private def resetAcquisition[D](
         observationId: Observation.Id,
         stream:        Stream[F, Atom[D]]

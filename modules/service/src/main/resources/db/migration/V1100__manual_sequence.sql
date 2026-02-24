@@ -268,7 +268,8 @@ INSERT INTO t_step_stage_execution_state (
   ('end_step', 'completed'),
   ('stop',     'stopped') ;
 
--- A trigger to insert / update the atom execution information.
+-- A trigger to insert / update the step execution information when a new
+-- step or dataset event arrives.
 CREATE OR REPLACE FUNCTION update_step_execution_information()
   RETURNS TRIGGER AS $$
 DECLARE
@@ -277,7 +278,7 @@ DECLARE
   visit_count     integer;
   execution_state d_tag;
 BEGIN
-  SELECT c_sequence_type INTO sequence_type  FROM t_atom WHERE c_atom_id = NEW.c_atom_id;
+  SELECT c_sequence_type INTO sequence_type FROM t_atom WHERE c_atom_id = NEW.c_atom_id;
 
   PERFORM pg_advisory_xact_lock(
     hashtextextended(
@@ -295,6 +296,8 @@ BEGIN
   FROM t_step_execution
   WHERE c_atom_id = NEW.c_atom_id;
 
+  -- The entire atom must be executed in the same visit.  If we detect that
+  -- the atom has multiple visits then the data is corrupt and we fail immediately.
   IF visit_count > 1 THEN
     RAISE EXCEPTION
       'Atom % has multiple visits',
@@ -302,6 +305,7 @@ BEGIN
     USING ERRCODE = 'check_violation';
   END IF;
 
+  -- Don't allow an atom to be split across visits.
   IF existing_visit IS NOT NULL AND existing_visit IS DISTINCT FROM NEW.c_visit_id THEN
     RAISE EXCEPTION
       'Atom % is executed in visit %, cannot execute step in visit %',
