@@ -4,8 +4,11 @@
 package lucuma.odb.graphql
 package input
 
+import cats.Eq
+import cats.derived.*
 import cats.syntax.functor.*
 import cats.syntax.parallel.*
+import cats.syntax.partialOrder.*
 import grackle.Result
 import lucuma.core.enums.Flamingos2Decker
 import lucuma.core.enums.Flamingos2Disperser
@@ -16,6 +19,7 @@ import lucuma.core.enums.Flamingos2ReadoutMode
 import lucuma.core.enums.Flamingos2Reads
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.math.Offset
+import lucuma.core.model.Access
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.TelluricType
 import lucuma.odb.data.Nullable
@@ -167,7 +171,11 @@ object Flamingos2LongSlitInput:
     explicitOffsets: Nullable[List[Offset]],
     telluricType: Option[TelluricType],
     acquisition: Option[Acquisition]
-  ):
+  ) derives Eq:
+    def limitToPreExecution(access: Access): Boolean =
+      // Staff can edit the acquisition info for ongoing observations
+      access <= Access.Pi || 
+        copy(acquisition = None) =!= Edit.AllUndefined
 
     val observingModeType: ObservingModeType =
       ObservingModeType.Flamingos2LongSlit
@@ -289,3 +297,6 @@ object Flamingos2LongSlitInput:
                 acquisition
               ))
       }
+
+    private val AllUndefined: Edit = 
+      Edit(None, None, None, None, Nullable.Absent, Nullable.Absent, Nullable.Absent, Nullable.Absent, Nullable.Absent, None, None)

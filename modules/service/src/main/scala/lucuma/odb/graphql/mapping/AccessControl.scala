@@ -351,23 +351,24 @@ trait AccessControl[F[_]] extends Predicates[F] {
       // Which workflow states would permit the proposed update (also taking user into account)?
       val allowedStates: Set[ObservationWorkflowState] =
         val SET = input.SET
+        val access = user.role.access
         if
-          (SET.posAngleConstraint.isDefined && user.role.access <= Access.Pi) || // staff are allowed to do this
+          (SET.posAngleConstraint.isDefined && access <= Access.Pi) || // staff are allowed to do this
           SET.subtitle.isDefined            ||
           SET.scienceBand.isDefined         ||
-          (SET.targetEnvironment.isDefined && user.role.access <= Access.Pi)   ||
-          SET.targetEnvironment.exists(edit => edit.asterism.isDefined || edit.explicitBase.isDefined) || // for staff
+          SET.targetEnvironment.exists(_.limitToPreExecution(access)) ||
           SET.constraintSet.isDefined       ||
           SET.timingWindows.isDefined       ||
           SET.attachments.isDefined         ||
           SET.scienceRequirements.isDefined ||
-          SET.observingMode.isDefined       ||
+          SET.observingMode.exists(_.limitToPreExecution(access)) ||
           SET.existence.isDefined           ||
           SET.observerNotes.isDefined
         then ObservationWorkflowState.preExecutionSet // ok prior to execution
         else if 
-          // staff can edit blind offsets for ongoing observations
-          SET.targetEnvironment.isDefined
+          // staff can edit blind offsets for ongoing observations and some acquisition info
+          SET.targetEnvironment.isDefined ||
+            SET.observingMode.isDefined
         then ObservationWorkflowState.allButComplete
         else ObservationWorkflowState.fullSet         // always ok
 

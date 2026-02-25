@@ -8469,8 +8469,9 @@ input Flamingos2LongSlitInput {
 
   """
   The telluricType field must be either specified or skipped altogether. It cannot be unset with a null value.
+  On create the default is HOT.
   """
-  telluricType: TelluricTypeInput = { tag: HOT }
+  telluricType: TelluricTypeInput
 
   """
   Acquisition properties that, when set, override default values.
