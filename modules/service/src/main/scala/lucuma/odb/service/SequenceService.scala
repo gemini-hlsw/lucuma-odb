@@ -36,7 +36,6 @@ import lucuma.core.model.sequence.gmos.DynamicConfig.GmosSouth
 import lucuma.core.model.sequence.gmos.StaticConfig.GmosNorth as GmosNorthStatic
 import lucuma.core.model.sequence.gmos.StaticConfig.GmosSouth as GmosSouthStatic
 import lucuma.core.util.TimeSpan
-import lucuma.odb.data.AtomExecutionState
 import lucuma.odb.data.StepExecutionState
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.TimeEstimateCalculator
@@ -55,16 +54,6 @@ import skunk.implicits.*
 import Services.Syntax.*
 
 trait SequenceService[F[_]]:
-
-  /** Marks ongoing non-terminal steps abandoned. */
-  def abandonStepsInOngoingAtoms(
-    observationId: Observation.Id
-  )(using Transaction[F], Services.ServiceAccess): F[Unit]
-
-  def abandonStepsInOngoingAtomsExceptStep(
-    observationId: Observation.Id,
-    stepId:        Step.Id
-  )(using Transaction[F], Services.ServiceAccess): F[Unit]
 
   def insertAtomDigests(
     observationId: Observation.Id,
@@ -151,17 +140,6 @@ object SequenceService:
     estimator: TimeEstimateCalculatorImplementation.ForInstrumentMode
   )(using Services[F]): SequenceService[F] =
     new SequenceService[F]:
-
-      override def abandonStepsInOngoingAtoms(
-        observationId: Observation.Id
-      )(using Transaction[F], Services.ServiceAccess): F[Unit] =
-        session.execute(Statements.AbandonStepsInOngoingAtoms)(observationId).void
-
-      override def abandonStepsInOngoingAtomsExceptStep(
-        observationId: Observation.Id,
-        stepId:        Step.Id
-      )(using Transaction[F], Services.ServiceAccess): F[Unit] =
-        session.execute(Statements.AbandonStepsInOngoingAtomsExceptStep)(observationId, stepId).void
 
       override def insertAtomDigests(
         observationId: Observation.Id,
@@ -590,59 +568,6 @@ object SequenceService:
          StepConfig.smartGcal.getOption(stepConfig)
         )
       }
-
-    // Intended for terminal sequence events.  Set any not_started or ongoing
-    // steps *in ongoing atoms* as abandoned.  We won't touch atoms in which
-    // no steps have even been started.
-    val AbandonStepsInOngoingAtoms: Command[Observation.Id] =
-      sql"""
-        UPDATE t_step_execution s
-           SET c_execution_state = '#${StepExecutionState.Abandoned.tag}'
-          FROM v_atom_record a, t_step_execution_state e
-         WHERE a.c_observation_id = $observation_id
-           AND s.c_atom_id = a.c_atom_id
-           AND a.c_execution_state = '#${AtomExecutionState.Ongoing.tag}'
-           AND s.c_execution_state = e.c_tag
-           AND e.c_terminal = FALSE
-      """.command
-
-    // Intended for step events.  Set any not_started or ongoing steps in
-    // ongoing atoms *except this one* as abandoned.  Set any ongoing steps
-    // in this atom *except the given one* as also abandoned.
-    val AbandonStepsInOngoingAtomsExceptStep: Command[(Observation.Id, Step.Id)] =
-      sql"""
-        WITH current_atom AS (
-          SELECT a.c_atom_id,
-                 a.c_sequence_type
-            FROM t_step s
-            JOIN t_atom a ON a.c_atom_id = s.c_atom_id
-           WHERE s.c_step_id = $step_id
-        )
-        UPDATE t_step_execution s
-           SET c_execution_state = '#${StepExecutionState.Abandoned.tag}'
-          FROM v_atom_record a, t_step_execution_state e
-          CROSS JOIN current_atom ca
-         WHERE a.c_observation_id = $observation_id
-           AND s.c_atom_id = a.c_atom_id
-           -- Only atoms in the same sequence
-           AND a.c_sequence_type = ca.c_sequence_type
-           -- Only ongoing atoms
-           AND a.c_execution_state = '#${AtomExecutionState.Ongoing.tag}'
-           -- Only non-terminal steps
-           AND s.c_execution_state = e.c_tag
-           AND e.c_terminal = FALSE
-           AND (
-             -- Different atom: abandon everything non-terminal
-             s.c_atom_id <> ca.c_atom_id
-             OR
-             -- Same atom: abandon only other ongoing steps
-             (
-               s.c_atom_id = ca.c_atom_id
-               AND s.c_step_id <> $step_id
-               AND s.c_execution_state = 'ongoing'
-             )
-           )
-      """.command.contramap((o, s) => (s, o, s))
 
     val DeleteAtomDigests: Command[Observation.Id] =
       sql"""
