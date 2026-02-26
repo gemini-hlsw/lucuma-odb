@@ -12,7 +12,7 @@ import lucuma.core.enums.ObservingModeType
 import lucuma.odb.data.OdbError
 import lucuma.odb.graphql.query.ExecutionQuerySetupOperations
 import lucuma.odb.graphql.query.ExecutionTestSupportForGmos
-import lucuma.odb.service.ObservationService
+import grackle.Result
 
 class updateObservations_deletion extends OdbSuite with UpdateObservationsOps with ExecutionTestSupportForGmos with ExecutionQuerySetupOperations:
 
@@ -54,7 +54,7 @@ class updateObservations_deletion extends OdbSuite with UpdateObservationsOps wi
   //🔥             foreign key constraint "t_chron_asterism_target_update_c_user_fkey".
   //🔥     Detail: Key (c_user)=() is not present in table "t_user".
 
-  test("existence: cannot hard-delete calibration observation with visits".ignore):
+  test("existence: cannot hard-delete calibration observation with visits"):
     for
       pid <- createProgramAs(serviceUser)
       tid <- createTargetAs(serviceUser, pid)
@@ -63,16 +63,17 @@ class updateObservations_deletion extends OdbSuite with UpdateObservationsOps wi
       vid <- recordVisitAs(serviceUser, lucuma.core.enums.Instrument.GmosNorth, oid)
       _   <- addSequenceEventAs(serviceUser, vid, lucuma.core.enums.SequenceCommand.Start)
       res <- withServices(serviceUser) { services =>
-               services.session.transaction.use { xa =>
-                 services.observationService.deleteCalibrationObservations(NonEmptyList.one(oid))(using xa)
-               }
-             }.attempt
+              services.transactionally:
+                 services.observationService.deleteCalibrationObservations(NonEmptyList.one(oid))
+             }
       _   <- res match
-               case Left(ex) if ex.getMessage.contains("Cannot delete observation") && ex.getMessage.contains("visit") =>
-                 IO.unit
-               case Left(ex) =>
-                 IO.raiseError(new AssertionError(s"Expected deletion to fail with visit constraint, but got: ${ex.getMessage}"))
-               case Right(_) =>
-                 IO.raiseError(new AssertionError("Expected deletion to fail, but it succeeded"))
+              case Result.Failure(ps) =>
+                val msg = ps.map(_.message).head
+                  if msg.contains("Cannot delete observation") && msg.contains("visit") then
+                    IO.unit
+                  else
+                    IO.raiseError(new AssertionError(s"Expected deletion to fail with visit constraint, but got: $msg"))
+              case r =>
+                IO.raiseError(new AssertionError(s"Expected deletion to fail, but it succeeded ($r)"))
     yield ()
 

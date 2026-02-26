@@ -302,19 +302,23 @@ object ObservationService {
                   transaction.rollback >>
                   OdbError.InvalidObservationList(oids, s"One or more specified observations are not calibrations.".some).asFailureF
 
-        // delete asterisms and observations
-        for {
-          _    <- oids.traverse { o =>
-                    // set the existence to deleted, so it gets removed from groups too
-                    updateObservations:
-                      Services.asSuperUser:
-                        AccessControl.unchecked(existenceOff, List(o), observation_id)
-                  }
+        // delete asterisms and observations. need to do this in ResultT so we stop on failure
+        val rt = for {
+          _    <-           
+            ResultT:
+              oids.traverse { o =>
+                // set the existence to deleted, so it gets removed from groups too
+                updateObservations:
+                  Services.asSuperUser:
+                    AccessControl.unchecked(existenceOff, List(o), observation_id)
+              }.map(_.sequence)
                   // Delete asterism_target entries for these observations
-          _    <- session.executeCommand(Statements.deleteAsterismsForObservations(oids))
+          _    <- ResultT.liftF(session.executeCommand(Statements.deleteAsterismsForObservations(oids)))
                   // Delete the observations themselves
-          r    <- doDelete
+          r    <- ResultT(doDelete)
         } yield r
+        rt.value
+
 
       }
 
