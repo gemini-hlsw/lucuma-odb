@@ -342,8 +342,7 @@ CREATE TRIGGER update_execution_information_for_step_event_trigger
     EXECUTE PROCEDURE update_execution_information_for_step_event();
 
 
--- A trigger to insert / update the step execution information when a new
--- sequence event arrives.
+-- A trigger to update the step execution state when an abort event arrives.
 CREATE OR REPLACE FUNCTION update_execution_information_for_sequence_event()
   RETURNS TRIGGER AS $$
 BEGIN
