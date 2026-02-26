@@ -233,9 +233,6 @@ trait Codecs {
   val charge_class: Codec[ChargeClass] =
     enumerated(Type("e_charge_class"))
 
-  val client_id: Codec[Client.Id] =
-    uid[Client.Id]
-
   val cloud_extinction_preset: Codec[CloudExtinction.Preset] =
     enumerated[CloudExtinction.Preset](Type.varchar)
 

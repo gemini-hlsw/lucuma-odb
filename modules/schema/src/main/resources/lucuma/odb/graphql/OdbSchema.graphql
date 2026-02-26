@@ -281,7 +281,7 @@ type AtomRecord {
   "Sequence type."
   sequenceType: SequenceType!
 
-  "Recorded steps associated with this atom, ordered by last event time."
+  "Recorded steps associated with this atom, ordered by execution order."
   steps(
     """
     Starts the result set at this index.
@@ -751,9 +751,6 @@ Result of the program user role update, which is the updated program user itself
 type ChangeProgramUserRoleResult {
   programUser: ProgramUser!
 }
-
-"@deprecated: use IdempotencyKey (UUID) instead"
-scalar ClientId
 
 """
 Describes an observation clone operation, making any edits in the `SET`
@@ -1853,11 +1850,6 @@ type GmosNorthAtom {
   steps: [GmosNorthStep!]!
 }
 
-input GmosNorthAtomInput {
-  description: NonEmptyString
-  steps: [GmosNorthStepInput!]!
-}
-
 """
 GmosNorth Detector type
 """
@@ -2307,14 +2299,6 @@ type GmosNorthStep {
   observeClass: ObserveClass!
 }
 
-input GmosNorthStepInput {
-  instrumentConfig: GmosNorthDynamicInput!
-  breakpoint: Breakpoint
-  stepConfig: StepConfigInput!
-  telescopeConfig: TelescopeConfigInput
-  observeClass: ObserveClass!
-}
-
 """
 GmosSouth atom, a collection of steps that should be executed in their entirety
 """
@@ -2339,11 +2323,6 @@ type GmosSouthAtom {
   Individual steps that comprise the atom
   """
   steps: [GmosSouthStep!]!
-}
-
-input GmosSouthAtomInput {
-  description: NonEmptyString
-  steps: [GmosSouthStepInput!]!
 }
 
 """
@@ -2821,14 +2800,6 @@ type GmosSouthStep {
   """
   Observe class for this step
   """
-  observeClass: ObserveClass!
-}
-
-input GmosSouthStepInput {
-  instrumentConfig: GmosSouthDynamicInput!
-  breakpoint: Breakpoint
-  stepConfig: StepConfigInput!
-  telescopeConfig: TelescopeConfigInput
   observeClass: ObserveClass!
 }
 
@@ -7353,12 +7324,12 @@ type Execution {
 
   """
   Executed (or at least partially executed) atom records, across all visits,
-  ordered by last associated event time.
+  ordered by execution order of the first contained step.
   """
   atomRecords(
     """
-    Starts the result set at the given step index -- atom indices are the index
-    of the first contained step.
+    Starts the result set at the given step (execution) index -- atom indices
+    are the index of the first contained step.
     """
     OFFSET: PosInt
 
@@ -7654,11 +7625,6 @@ type Flamingos2Atom {
   steps: [Flamingos2Step!]!
 }
 
-input Flamingos2AtomInput {
-  description: NonEmptyString
-  steps: [Flamingos2StepInput!]!
-}
-
 """
 Flmaingos 2 step with potential breakpoint
 """
@@ -7694,14 +7660,6 @@ type Flamingos2Step {
   """
   Observe class for this step
   """
-  observeClass: ObserveClass!
-}
-
-input Flamingos2StepInput {
-  instrumentConfig: Flamingos2DynamicInput!
-  breakpoint: Breakpoint
-  stepConfig: StepConfigInput!
-  telescopeConfig: TelescopeConfigInput
   observeClass: ObserveClass!
 }
 
