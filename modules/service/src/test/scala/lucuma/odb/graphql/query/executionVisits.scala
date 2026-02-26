@@ -12,6 +12,7 @@ import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.model.Observation
+import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.Dataset
 import lucuma.core.util.TimeSpan
@@ -342,4 +343,76 @@ class executionVisits extends OdbSuite with ExecutionQuerySetupOperations with E
       _   <- expect(pi, query(oid), expected)
     yield ()
   }
+
+  test("atom split across visits"):
+    def query(oid: Observation.Id): String =
+      s"""
+        query {
+          observation(observationId: "$oid") {
+            execution {
+              visits {
+                matches {
+                  id
+                  atomRecords {
+                    matches {
+                      id
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      """
+
+    def expected(aid: Atom.Id, vid0: Visit.Id, vid1: Visit.Id): Either[List[String], Json] =
+      json"""
+        {
+          "observation": {
+            "execution": {
+              "visits": {
+                "matches": [
+                  {
+                    "id": ${vid0.asJson},
+                    "atomRecords": {
+                      "matches": [
+                        {
+                          "id": ${aid.asJson}
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "id": ${vid1.asJson},
+                    "atomRecords": {
+                      "matches": [
+                        {
+                          "id": ${aid.asJson}
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
+      """.asRight
+
+    for
+      pid  <- createProgramAs(pi)
+      tid  <- createTargetWithProfileAs(pi, pid)
+      oid  <- createObservationAs(pi, pid, mode.some, tid)
+
+      ids  <- scienceSequenceIds(serviceUser, oid).map(_.head)
+      aid   = ids._1
+      sids  = ids._2
+
+      vid0 <- recordVisitAs(serviceUser, mode.instrument, oid)
+      _    <- addEndStepEvent(sids(0), vid0)
+      vid1 <- recordVisitAs(serviceUser, mode.instrument, oid)
+      _    <- addEndStepEvent(sids(1), vid1)
+
+      _    <- expect(pi, query(oid), expected(aid, vid0, vid1))
+    yield ()
 }

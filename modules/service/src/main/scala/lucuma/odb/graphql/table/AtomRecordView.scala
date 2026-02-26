@@ -12,7 +12,6 @@ trait AtomRecordView[F[_]] extends BaseMapping[F]:
     val Instrument: ColumnRef     = col("c_instrument",       instrument)
     val ObservationId: ColumnRef  = col("c_observation_id",   observation_id)
     val SequenceType: ColumnRef   = col("c_sequence_type",    sequence_type)
-    val VisitId: ColumnRef        = col("c_visit_id",         visit_id)
     val Description: ColumnRef    = col("c_description",      text_nonempty.opt)
     val ExecutionState: ColumnRef = col("c_execution_state",  atom_execution_state)
 

@@ -6,6 +6,7 @@ package issue.shortcut
 
 import cats.effect.IO
 import cats.syntax.either.*
+import cats.syntax.eq.*
 import cats.syntax.option.*
 import cats.syntax.traverse.*
 import eu.timepit.refined.types.numeric.PosInt
@@ -30,6 +31,7 @@ import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.User
+import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth
 import lucuma.core.model.sequence.gmos.GmosCcdMode
 import lucuma.core.model.sequence.gmos.GmosFpuMask
@@ -39,6 +41,9 @@ import lucuma.itc.IntegrationTime
 import lucuma.odb.graphql.query.ExecutionTestSupportForGmos
 import lucuma.odb.graphql.query.ObservingModeSetupOperations
 
+// N.B. The nature of this test changes drastically when we record steps in
+// the database and no longer try to manage calibrations etc.  I'll leave it
+// here but it no longer represents the original short cut issue.
 
 class ShortCut_7591 extends ExecutionTestSupportForGmos:
 
@@ -364,7 +369,6 @@ class ShortCut_7591 extends ExecutionTestSupportForGmos:
         // First night
         v0 <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
         s0 <- firstScienceAtomStepIds(serviceUser, o)
-        _  <- IO.println(s"First science atom: ${s0.mkString(", ")}")
         _  <- s0.take(4).traverse(sid => addEndStepEvent(sid, v0))
 
         // Second night -- just do any acquisition step to switch the context.
@@ -373,9 +377,9 @@ class ShortCut_7591 extends ExecutionTestSupportForGmos:
         s1 <- firstAcquisitionStepId(serviceUser, o)
         _  <- addEndStepEvent(s1, v1)
 
-        // Now start on the science again.
+        // Now start on the science again, finishing up the last step of the
+        // first atom in a new visit.
         s2 <- firstScienceStepId(serviceUser, o)
-        _  <- IO.println(s"Step id: ${s2}")
         _  <- addEndStepEvent(s2, v1)
       yield o
 
@@ -384,48 +388,13 @@ class ShortCut_7591 extends ExecutionTestSupportForGmos:
         user     = pi,
         query    = gmosNorthScienceQuery(oid),
         expected = executionConfig(
-          atom(541,
-            arc(seconds = 1, wavelength = 541, q = 3),
-            flat(seconds = 1, wavelength = 541, q = 3)
-          ),
-          atom(542,
-            arc(seconds = 1, wavelength = 542, q = 1),
-            flat(seconds = 1, wavelength = 542, q = 1),
-            science(seconds = 6, wavelength = 542, q = 1),
-            science(seconds = 6, wavelength = 542, q = 2),
-            science(seconds = 6, wavelength = 542, q = 3)
-          )
-        ).asRight
-      )
-  /*
-  test("sequence after all 541 nm datasets and calibrations"):
-    val setup: IO[Observation.Id] =
-      for
-        p <- createProgram
-        t <- createTargetWithProfile(p)
-        o <- createGmosNorthLongSlitObservation(p, t)
-
-        // First night
-        v0 <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
-        s0 <- firstScienceAtomStepIds(serviceUser, o)
-        _  <- s0.take(4).traverse(sid => addEndStepEvent(sid, v0))
-
-        // Second night -- just do any acquisition step to switch the context.
-        // We don't care about the acquisition details.
-        v1 <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
-        s1 <- firstAcquisitionStepId(serviceUser, o)
-        _  <- addEndStepEvent(s1, v1)
-
-        // Now start on the science again and do the calibrations
-        s2 <- firstScienceAtomStepIds(serviceUser, o)
-        _  <- s0.take(3).traverse(sid => addEndStepEvent(sid, v1))
-      yield o
-
-    setup.flatMap: oid =>
-      expect(
-        user     = pi,
-        query    = gmosNorthScienceQuery(oid),
-        expected = executionConfig(
+          // Before switching to manual sequences, we'd insert an arc and flat
+          // here to match the missing science step.  Now that would be up to
+          // the user.
+          //atom(541,
+          //  arc(seconds = 1, wavelength = 541, q = 3),
+          //  flat(seconds = 1, wavelength = 541, q = 3)
+          //),
           atom(542,
             arc(seconds = 1, wavelength = 542, q = 1),
             flat(seconds = 1, wavelength = 542, q = 1),
@@ -445,36 +414,13 @@ class ShortCut_7591 extends ExecutionTestSupportForGmos:
 
         // First night
         v0 <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
-        a0 <- recordAtomAs(serviceUser, Instrument.GmosNorth, v0, SequenceType.Science)
-        s0 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthArc(1), ArcStep, gcalTelescopeConfig(1), ObserveClass.NightCal)
-        _  <- addEndStepEvent(s0, v0)
-        s1 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthFlat(1), FlatStep, gcalTelescopeConfig(1), ObserveClass.NightCal)
-        _  <- addEndStepEvent(s1, v0)
-        s2 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthScience(1), StepConfig.Science, sciTelescopeConfig(1), ObserveClass.Science)
-        _  <- addEndStepEvent(s2, v0)
-        s3 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthScience(1), StepConfig.Science, sciTelescopeConfig(2), ObserveClass.Science)
-        _  <- addEndStepEvent(s3, v0)
+        s0 <- firstScienceAtomStepIds(serviceUser, o)
+        _  <- s0.traverse(sid => addEndStepEvent(sid, v0))
 
-        // Second night -- just do any acquisition step to switch the context.
-        // We don't care about the acquisition details.
+        // Second night
         v1 <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
-        a1 <- recordAtomAs(serviceUser, Instrument.GmosNorth, v1, SequenceType.Acquisition)
-        s4 <- recordStepAs(serviceUser, a1, Instrument.GmosNorth, gmosNorthAcq(0), StepConfig.Science, sciTelescopeConfig(0), ObserveClass.Science)
-
-        // Now start on the science again and do the calibrations
-        a2 <- recordAtomAs(serviceUser, Instrument.GmosNorth, v1, SequenceType.Science)
-        s5 <- recordStepAs(serviceUser, a2, Instrument.GmosNorth, gmosNorthScience(1), StepConfig.Science, sciTelescopeConfig(3), ObserveClass.Science)
-        _  <- addEndStepEvent(s5, v1)
-        s6 <- recordStepAs(serviceUser, a2, Instrument.GmosNorth, gmosNorthArc(1), ArcStep, gcalTelescopeConfig(1), ObserveClass.NightCal)
-        _  <- addEndStepEvent(s6, v1)
-        s7 <- recordStepAs(serviceUser, a2, Instrument.GmosNorth, gmosNorthFlat(1), FlatStep, gcalTelescopeConfig(1), ObserveClass.NightCal)
-        _  <- addEndStepEvent(s7, v1)
-
-        a3 <- recordAtomAs(serviceUser, Instrument.GmosNorth, v1, SequenceType.Science)
-        s8 <- recordStepAs(serviceUser, a3, Instrument.GmosNorth, gmosNorthArc(2), ArcStep, gcalTelescopeConfig(1), ObserveClass.NightCal)
-        _  <- addEndStepEvent(s8, v1)
-        s9 <- recordStepAs(serviceUser, a3, Instrument.GmosNorth, gmosNorthFlat(2), FlatStep, gcalTelescopeConfig(1), ObserveClass.NightCal)
-        _  <- addEndStepEvent(s9, v1)
+        s1 <- firstScienceAtomStepIds(serviceUser, o)
+        _  <- s1.take(2).traverse(sid => addEndStepEvent(sid, v1))
 
       yield o
 
@@ -495,7 +441,7 @@ class ShortCut_7591 extends ExecutionTestSupportForGmos:
     scienceAtomIds(serviceUser, o).map(_.head)
 
   test("atom ids"):
-    val setup: IO[List[Atom.Id]] =
+    val setup: IO[(Atom.Id, Atom.Id, Atom.Id)] =
       for
         p <- createProgram
         t <- createTargetWithProfile(p)
@@ -503,41 +449,24 @@ class ShortCut_7591 extends ExecutionTestSupportForGmos:
 
         // First night
         v0 <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
-        a0 <- recordAtomAs(serviceUser, Instrument.GmosNorth, v0, SequenceType.Science)
-        s0 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthArc(1), ArcStep, gcalTelescopeConfig(1), ObserveClass.NightCal)
-        _  <- addEndStepEvent(s0, v0)
-        s1 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthFlat(1), FlatStep, gcalTelescopeConfig(1), ObserveClass.NightCal)
-        _  <- addEndStepEvent(s1, v0)
-        s2 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthScience(1), StepConfig.Science, sciTelescopeConfig(1), ObserveClass.Science)
-        _  <- addEndStepEvent(s2, v0)
-        s3 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthScience(1), StepConfig.Science, sciTelescopeConfig(2), ObserveClass.Science)
-        _  <- addEndStepEvent(s3, v0)
+        id <- scienceSequenceIds(serviceUser, o)
 
-        // Second night -- just do any acquisition step to switch the context.
-        // We don't care about the acquisition details.
+        a0  = id.head._1 // first atom id
+
+        // Execute all but the last step of the first atom.
+        _  <- id.head._2.take(4).traverse(sid => addEndStepEvent(sid, v0))
+
+        // Second night
         v1 <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
-        a1 <- recordAtomAs(serviceUser, Instrument.GmosNorth, v1, SequenceType.Acquisition)
-        s4 <- recordStepAs(serviceUser, a1, Instrument.GmosNorth, gmosNorthAcq(0), StepConfig.Science, sciTelescopeConfig(0), ObserveClass.Science)
 
-        // Now start on the science again and do the calibrations
-        x0 <- nextAtomId(o)
-        a2 <- recordAtomAs(serviceUser, Instrument.GmosNorth, v1, SequenceType.Science)
-        x1 <- nextAtomId(o)
-        s5 <- recordStepAs(serviceUser, a2, Instrument.GmosNorth, gmosNorthScience(1), StepConfig.Science, sciTelescopeConfig(3), ObserveClass.Science)
-        x2 <- nextAtomId(o)
-        _  <- addEndStepEvent(s5, v1)
-        x3 <- nextAtomId(o)
-        s6 <- recordStepAs(serviceUser, a2, Instrument.GmosNorth, gmosNorthArc(1), ArcStep, gcalTelescopeConfig(1), ObserveClass.NightCal)
-        x4 <- nextAtomId(o)
-        _  <- addEndStepEvent(s6, v1)
-        x5 <- nextAtomId(o)
-        s7 <- recordStepAs(serviceUser, a2, Instrument.GmosNorth, gmosNorthFlat(1), FlatStep, gcalTelescopeConfig(1), ObserveClass.NightCal)
-        x6 <- nextAtomId(o)
-        _  <- addEndStepEvent(s7, v1)
-        x7 <- nextAtomId(o)  // gets a new atom id because we finished the last atom
-      yield List(x0, x1, x2, x3, x4, x5, x6, x7)
+        // Now finish the first atom
+        a1 <- nextAtomId(o)
+        _  <- addEndStepEvent(id.head._2.last, v1)
+
+        // Starting a new atom
+        a2 <- nextAtomId(o)
+      yield (a0, a1, a2)
 
     assertIOBoolean:
-      setup.map: lst =>
-        lst.init.distinct.sizeIs == 1 && lst.last != lst.head
-  */
+      setup.map: (a0, a1, a2) =>
+        (a0 === a1) && (a0 =!= a2)

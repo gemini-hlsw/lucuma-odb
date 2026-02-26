@@ -42,7 +42,7 @@ trait DatasetMapping[F[_]] extends DatasetTable[F]
       SqlField("index",          DatasetTable.ExposureIndex),
       SqlObject("reference",     Join(DatasetTable.Id, DatasetReferenceView.Id)),
       SqlObject("observation",   Join(DatasetTable.ObservationId, ObservationView.Id)),
-      SqlObject("visit",         Join(DatasetTable.StepId, StepRecordView.Id), Join(StepRecordView.AtomId, AtomRecordView.Id), Join(AtomRecordView.VisitId, VisitTable.Id)),
+      SqlObject("visit",         Join(DatasetTable.StepId, StepRecordView.Id), Join(StepRecordView.VisitId, VisitTable.Id)),
       SqlObject("events"),
       SqlField("filename",       DatasetTable.File.Name),
       SqlField("qaState",        DatasetTable.QaState),

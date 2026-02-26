@@ -266,8 +266,8 @@ type AtomRecord {
   "The instrument associated with this atom."
   instrument: Instrument!
 
-  "Visit in which this atom was executed."
-  visit: Visit!
+  "Observation containing this atom."
+  observation: Observation!
 
   """
   The execution state of this atom, according to events received (if any) from

@@ -21,13 +21,17 @@ import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.service.Services
 import lucuma.odb.service.Services.Syntax.*
 
+import table.AtomRecordView
 import table.ExecutionEventTable
 import table.Flamingos2StaticTable
 import table.GmosStaticTables
 import table.ObservationView
+import table.VisitAtomView
 import table.VisitTable
 
 trait VisitMapping[F[_]] extends VisitTable[F]
+                            with VisitAtomView[F]
+                            with AtomRecordView[F]
                             with EventRangeEffectHandler[F]
                             with ExecutionEventTable[F]
                             with Flamingos2StaticTable[F]
@@ -63,7 +67,7 @@ trait VisitMapping[F[_]] extends VisitTable[F]
       PosIntBinding.Option("OFFSET", rOFFSET),
       NonNegIntBinding.Option("LIMIT", rLIMIT)
     )) =>
-      selectWithOffsetAndLimit(rOFFSET, rLIMIT, AtomRecordType, "index", Predicates.atomRecord.index, Predicates.atomRecord.visit.observation.program)
+      selectWithOffsetAndLimit(rOFFSET, rLIMIT, AtomRecordType, "index", Predicates.atomRecord.index, Predicates.atomRecord.observation.program)
 
     case (VisitType, "datasets", List(
       DatasetIdBinding.Option("OFFSET", rOFFSET),

@@ -20,11 +20,13 @@ import lucuma.odb.json.time.query.given
 import lucuma.odb.service.Services
 
 import table.AtomRecordView
+import table.ObservationView
 import table.StepRecordView
 import table.VisitTable
 
 trait AtomRecordMapping[F[_]] extends AtomRecordView[F]
                                  with EventRangeEffectHandler[F]
+                                 with ObservationView[F]
                                  with Predicates[F]
                                  with SelectSubquery
                                  with StepRecordView[F]
@@ -36,9 +38,9 @@ trait AtomRecordMapping[F[_]] extends AtomRecordView[F]
     ObjectMapping(AtomRecordType)(
       SqlField("id",              AtomRecordView.Id, key = true),
       SqlField("index",           AtomRecordView.ExecutionOrder),
+      SqlObject("observation",    Join(AtomRecordView.ObservationId, ObservationView.Id)),
       SqlField("description",     AtomRecordView.Description),
       SqlField("instrument",      AtomRecordView.Instrument),
-      SqlObject("visit",          Join(AtomRecordView.VisitId, VisitTable.Id)),
       SqlField("executionState",  AtomRecordView.ExecutionState),
       SqlField("_firstEventTime", AtomRecordView.FirstEventTime, hidden = true),
       SqlField("_lastEventTime",  AtomRecordView.LastEventTime, hidden = true),
@@ -61,6 +63,6 @@ trait AtomRecordMapping[F[_]] extends AtomRecordView[F]
       PosIntBinding.Option("OFFSET", rOFFSET),
       NonNegIntBinding.Option("LIMIT", rLIMIT)
     )) =>
-      selectWithOffsetAndLimit(rOFFSET, rLIMIT, StepRecordType, "index", Predicates.stepRecord.index, Predicates.stepRecord.atomRecord.visit.observation.program)
+      selectWithOffsetAndLimit(rOFFSET, rLIMIT, StepRecordType, "index", Predicates.stepRecord.index, Predicates.stepRecord.atomRecord.observation.program)
 
   }

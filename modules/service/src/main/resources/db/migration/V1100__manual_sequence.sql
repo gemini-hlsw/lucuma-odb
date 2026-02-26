@@ -99,6 +99,8 @@ CREATE TABLE t_step (
 
 );
 
+CREATE INDEX ON t_step (c_step_id) INCLUDE (c_atom_id);
+
 CREATE TABLE t_step_execution (
   c_step_id          d_step_id  PRIMARY KEY REFERENCES t_step(c_step_id),
   c_visit_id         d_visit_id NOT NULL REFERENCES t_visit(c_visit_id),
@@ -112,6 +114,8 @@ CREATE TABLE t_step_execution (
   CHECK (c_first_event_time <= c_last_event_time)
 
 );
+
+CREATE INDEX ON t_step_execution (c_visit_id, c_step_id);
 
 -- Copy the old t_step_record data over to t_step.
 INSERT INTO t_step (
@@ -752,3 +756,18 @@ LEFT JOIN (
 ORDER BY
   o.c_observation_id,
   t.c_target_id;
+
+-- Executed steps are tied to visits, but an atom contains multiple steps and
+-- thus may be spread across multiple visits.  Presumably a user will avoid
+-- this via manual edits but we will do nothing to enforce that all the atoms
+-- steps happen in the same visit.  Now, we would like to see all the atoms
+-- associated with a visit and for that we need a view for Grackle.
+CREATE VIEW v_visit_atom AS
+SELECT
+  se.c_visit_id,
+  s.c_atom_id
+FROM t_step_execution se
+JOIN t_step s ON s.c_step_id = se.c_step_id
+GROUP BY
+  se.c_visit_id,
+  s.c_atom_id;

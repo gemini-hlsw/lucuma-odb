@@ -95,7 +95,7 @@ trait ExecutionMapping[F[_]] extends ObservationEffectHandler[F]
       PosIntBinding.Option("OFFSET", rOFFSET),
       NonNegIntBinding.Option("LIMIT", rLIMIT)
     )) =>
-      selectWithOffsetAndLimit(rOFFSET, rLIMIT, AtomRecordType, "index", Predicates.atomRecord.index, Predicates.atomRecord.visit.observation.program)
+      selectWithOffsetAndLimit(rOFFSET, rLIMIT, AtomRecordType, "index", Predicates.atomRecord.index, Predicates.atomRecord.observation.program)
 
     case (ExecutionType, "datasets", List(
       DatasetIdBinding.Option("OFFSET", rOFFSET),

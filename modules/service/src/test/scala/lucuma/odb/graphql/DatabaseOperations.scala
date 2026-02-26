@@ -25,13 +25,11 @@ import lucuma.core.enums.EmailStatus
 import lucuma.core.enums.Gender
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObservationWorkflowState
-import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.Partner
 import lucuma.core.enums.ProgramUserRole
 import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.SequenceCommand
-import lucuma.core.enums.SequenceType
 import lucuma.core.enums.SlewStage
 import lucuma.core.enums.StepStage
 import lucuma.core.enums.TimeAccountingCategory
@@ -66,8 +64,6 @@ import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.Step
-import lucuma.core.model.sequence.StepConfig
-import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.syntax.string.*
 import lucuma.core.util.CalculationState
 import lucuma.core.util.DateInterval
@@ -82,9 +78,6 @@ import lucuma.odb.data.Obscalc
 import lucuma.odb.data.OdbError
 import lucuma.odb.graphql.input.AllocationInput
 import lucuma.odb.graphql.input.TimeChargeCorrectionInput
-import lucuma.odb.json.offset.transport.given
-import lucuma.odb.json.stepconfig.given
-import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.service.EmailService
 import lucuma.odb.service.ObscalcService
 import lucuma.odb.service.Services
@@ -2045,137 +2038,6 @@ trait DatabaseOperations { this: OdbSuite =>
       yield SlewEvent(i, r, oid, v, n, stg)
       e.fold(f => throw new RuntimeException(f.message), identity)
   }
-
-  def recordAtomAs(user: User, instrument: Instrument, vid: Visit.Id, sequenceType: SequenceType = SequenceType.Science): IO[Atom.Id] =
-    query(
-      user = user,
-      query =
-        s"""
-          mutation {
-            recordAtom(input: {
-              visitId: ${vid.asJson},
-              instrument: ${instrument.tag.toScreamingSnakeCase},
-              sequenceType: ${sequenceType.tag.toScreamingSnakeCase}
-            }) {
-              atomRecord {
-                id
-              }
-            }
-          }
-        """
-    ).map { json =>
-      json.hcursor.downFields("recordAtom", "atomRecord", "id").require[Atom.Id]
-    }
-
-  def recordStepAs(user: User, instrument: Instrument, aid: Atom.Id): IO[Step.Id] =
-    recordStepAs(user, aid, instrument, dynamicConfig(instrument), stepConfigScienceInput, telescopeConfigInput)
-
-  def recordStepAs(
-    user:                 User,
-    aid:                  Atom.Id,
-    instrument:           Instrument,
-    instrumentInput:      String,
-    stepConfigInput:      String,
-    telescopeConfigInput: String
-  ): IO[Step.Id] = {
-
-    val name = s"record${instrument.tag}Step"
-
-    val q = s"""
-      mutation {
-        $name(input: {
-          atomId: ${aid.asJson},
-          $instrumentInput,
-          $stepConfigInput,
-          $telescopeConfigInput,
-          observeClass: ${ObserveClass.Science.tag.toScreamingSnakeCase}
-        }) {
-          stepRecord {
-            id
-          }
-        }
-      }
-    """
-
-    query(
-      user  = user,
-      query = q,
-    ).map { json =>
-      json.hcursor.downFields(name, "stepRecord", "id").require[Step.Id]
-    }
-
-  }
-
-  def recordStepAs[D: io.circe.Encoder](
-    user:            User,
-    aid:             Atom.Id,
-    instrument:      Instrument,
-    instrumentInput: D,
-    stepConfig:      StepConfig,
-    telescopeConfig: TelescopeConfig,
-    observeClass:    ObserveClass = ObserveClass.Science
-  ): IO[Step.Id] = {
-
-    val name = s"record${instrument.tag}Step"
-
-    def step = stepConfig.asJson.mapObject(_.remove("stepType"))
-
-    // HACK: to make it easy to write test cases we take the instrument dynamic
-    // config scala object and turn it into JSON, relying on the fact that the
-    // input is explicitly structured to be equivalent to the output.  There's
-    // just one problem, the `centralWavelength` is a computed value that
-    // appears only in the output.  So, we prune `centralWavelength` from the
-    // JSON here.
-    val instJson = instrumentInput
-                     .asJson
-                     .hcursor
-                     .downField("centralWavelength")
-                     .delete
-                     .top
-                     .fold(instrumentInput.asJson)(_.asJson)
-
-    val vars = Json.obj(
-      "input" -> Json.obj(
-        "atomId" -> aid.asJson,
-        instrument.fieldName -> instJson,
-        "stepConfig" -> (stepConfig match {
-          case StepConfig.Bias          => Json.obj("bias"      -> true.asJson)
-          case StepConfig.Dark          => Json.obj("dark"      -> true.asJson)
-          case StepConfig.Gcal(_,_,_,_) => Json.obj("gcal"      -> step)
-          case StepConfig.Science       => Json.obj("science"   -> true.asJson)
-          case StepConfig.SmartGcal(_)  => Json.obj("smartGcal" -> step)
-        }),
-        "telescopeConfig" -> telescopeConfig.asJson,
-        "observeClass" -> observeClass.asJson
-      )
-    )
-
-    val q = s"""
-      mutation RecordStep($$input: ${name.capitalize}Input!) {
-        $name(input: $$input) {
-          stepRecord {
-            id
-          }
-        }
-      }
-    """
-
-    query(
-      user      = user,
-      query     = q,
-      variables = vars.asObject
-    ).map { json =>
-      json.hcursor.downFields(name, "stepRecord", "id").require[Step.Id]
-    }
-  }
-
-  def recordStepAs[D: io.circe.Encoder](
-    user:       User,
-    aid:        Atom.Id,
-    instrument: Instrument,
-    step:       ProtoStep[D]
-  ): IO[Step.Id] =
-    recordStepAs(user, aid, instrument, step.value, step.stepConfig, step.telescopeConfig, step.observeClass)
 
   def addStepEventAs(
     user:  User,
