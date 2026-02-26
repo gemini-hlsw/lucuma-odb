@@ -18,20 +18,15 @@ CREATE TABLE t_atom (
   -- a consistent instrument.
   UNIQUE (c_atom_id, c_instrument),
 
-  -- Executed steps will have a FK reference to t_atom (id, obs, seq type) so
-  -- that they remain consistent.
-  UNIQUE (c_atom_id, c_observation_id, c_sequence_type),
-
   -- The observation instrument shoufld not be changed without deleting any
   -- associated atoms.  We don't want more than one instrument per observation.
   CONSTRAINT t_atom_c_observation_id_c_instrument_fkey
     FOREIGN KEY (c_observation_id, c_instrument)
     REFERENCES t_observation(c_observation_id, c_instrument) ON DELETE CASCADE,
 
-  -- The atom index is used to sort *unexecuted* atoms.  Once an atom has events,
-  -- the event times determine order.  In other words, executed atoms are ordered
-  -- according to when they were actually executed. To-be executed atoms are
-  -- ordered according to the atom index.
+  -- The atom index is used to sort *unexecuted* atoms.  Once there are executed
+  -- (or executing) steps associated with an atom, the step execution order
+  -- determines the atom execution order.
   c_atom_index       integer          NOT NULL,
 
   -- Descriptive text to indicate how the steps are related for human consumption.
@@ -73,9 +68,9 @@ CREATE TABLE t_step (
   c_step_type        e_step_type      NOT NULL,
 
   -- The step index is used to sort *unexecuted* steps inside of an atom.  Once
-  -- a step has events, the event times determine order.  In other words,
-  -- executed steps are ordered according to when they were actually executed.
-  -- To-be executed steps are ordered according to the step index.
+  -- a step receives its first event, an execution order is set in stone.  In
+  -- other words, executed steps are ordered according to when they started
+  -- executing. To-be executed steps are ordered according to the step index.
   c_step_index       integer       NOT NULL,
 
   c_observe_class    e_obs_class   NOT NULL,
@@ -89,9 +84,6 @@ CREATE TABLE t_step (
   -- For FK references from t_step_config, t_gmos_north_dynamic etc.
   UNIQUE (c_step_id, c_instrument),
   UNIQUE (c_step_id, c_step_type),
-
-  -- For FK reference from t_step_execution
-  UNIQUE (c_step_id, c_atom_id),
 
   CONSTRAINT t_atom_c_atom_id_c_instrument_fkey
     FOREIGN KEY (c_atom_id, c_instrument)
@@ -174,7 +166,7 @@ FROM (
   JOIN t_atom_record a ON a.c_atom_id = r.c_atom_id
 ) r2;
 
--- Ensure that the execution order is never changed.
+-- Ensure that the visit and execution order are never changed.
 CREATE OR REPLACE FUNCTION validate_step_execution_update()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -203,7 +195,7 @@ FOR EACH ROW
 EXECUTE FUNCTION validate_step_execution_update();
 
 -- Create a view on the atom table.  This will correspond to the old atom record
--- table in that it only contains executed atoms.
+-- table in that it only contains (at least partially) executed atoms.
 CREATE VIEW v_atom_record AS
 SELECT
   a.c_atom_id,
@@ -216,19 +208,26 @@ SELECT
   MAX(se.c_last_event_time)      AS c_last_event_time,
 
   CASE
-    WHEN bool_and(se.c_execution_state IN ('completed', 'abandoned')) THEN 'completed'
-    WHEN bool_and(se.c_execution_state = 'not_started')               THEN 'not_started'
+    WHEN bool_and(
+      COALESCE(se.c_execution_state, 'not_started') IN ('completed', 'abandoned')
+    ) THEN 'completed'
+
+    WHEN bool_and(
+      COALESCE(se.c_execution_state, 'not_started') = 'not_started'
+    ) THEN 'not_started'
+
     ELSE 'ongoing'
   END::d_tag AS c_execution_state
 
 FROM t_atom a
-JOIN t_step s            ON s.c_atom_id = a.c_atom_id
-JOIN t_step_execution se ON se.c_step_id = s.c_step_id
+JOIN t_step s ON s.c_atom_id = a.c_atom_id
+LEFT JOIN t_step_execution se ON se.c_step_id = s.c_step_id
 GROUP BY
   a.c_atom_id,
   a.c_observation_id,
   a.c_sequence_type,
-  a.c_description;
+  a.c_description
+HAVING bool_or(se.c_step_id IS NOT NULL);
 
 -- A partial mapping from step stage to execution state.  When a step event
 -- arrives it carries a step stage and we use this mapping to figure the

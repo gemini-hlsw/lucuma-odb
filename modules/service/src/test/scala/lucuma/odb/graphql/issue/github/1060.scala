@@ -37,6 +37,9 @@ class GitHub_1060 extends OdbSuite with ExecutionQuerySetupOperations {
 
   // Not sure how to recreate this test, until manual edits are allowed.
   // For now, we execute what is generated.
+  test("placeholder needed since the only test is .ignored"):
+    true
+
   test("GitHub_1060".ignore) {
     recordAll(pi, service, mode, offset = 0, datasetCount = 2).flatMap { on =>
       expect(pi, s"""
