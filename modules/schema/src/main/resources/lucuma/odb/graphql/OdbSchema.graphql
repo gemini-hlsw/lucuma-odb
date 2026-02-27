@@ -22,26 +22,6 @@ Email address, matching ^\w+@[a-zA-Z_]+?\.[a-zA-Z]{2,3}$
 """
 scalar EmailAddress @specifiedBy(url: "https://html.spec.whatwg.org/multipage/input.html#valid-e-mail-address")
 
-"AtomEvent creation parameters."
-input AddAtomEventInput {
-  atomId: AtomId!
-  visitId: VisitId!
-  atomStage: AtomStage!
-
-  """
-  Idempotency key, if any.  The IdempotencyKey may be provided by clients when
-  the event is created and is used to enable problem-free retry in the case of
-  failure.
-  """
-  idempotencyKey: IdempotencyKey
-}
-
-"The result of adding a atom event."
-type AddAtomEventResult {
-  "The new atom event that was added."
-  event: AtomEvent!
-}
-
 "DatasetEvent creation parameters."
 input AddDatasetEventInput {
   "Dataset id"
@@ -1260,7 +1240,7 @@ enum ExecutionEventType {
   "Slew event type."
   SLEW
 
-  "Atom-level event type."
+  "Atom-level event type. NOTE: this is no longer used."
   ATOM
 
   "Step-level event type."
@@ -2974,19 +2954,6 @@ type Mutation {
   service users.
   """
   addConditionsEntry(input: ConditionsEntryInput): AddConditionsEntryResult!
-
-  """
-  Adds a new atom event.
-  """
-  addAtomEvent(
-    """
-    Describes the atom event to add.  All events are associated with a
-    particular visit (see 'record{InstrumentName}Visit').  Atom events are
-    further associated with an an observation id and an atom id. Each atom event
-    identifies the stage through which the atom execution is passing.
-    """
-    input: AddAtomEventInput!
-  ): AddAtomEventResult! @deprecated(reason: "Atom execution state is determined by the collection of steps it contains.")
 
   """
   Adds a new dataset event associated with the given visit.  The

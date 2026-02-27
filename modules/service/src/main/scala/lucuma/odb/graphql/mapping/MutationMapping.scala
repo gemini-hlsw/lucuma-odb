@@ -70,7 +70,6 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
   private lazy val mutationFields: List[MutationField] =
     List(
       AddConditionsEntry,
-      AddAtomEvent,
       AddDatasetEvent,
       AddProgramUser,
       AddSequenceEvent,
@@ -502,11 +501,6 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
         requireServiceAccess:
           insert(input).nestMap: eid =>
             Unique(Filter(pred.id.eql(eid), child))
-
-  private lazy val AddAtomEvent: MutationField =
-    addEvent("addAtomEvent", AddAtomEventInput.Binding, Predicates.atomEvent) { input =>
-      executionEventService.insertAtomEvent(input)
-    }
 
   private lazy val AddDatasetEvent: MutationField =
     addEvent("addDatasetEvent", AddDatasetEventInput.Binding, Predicates.datasetEvent) { input =>

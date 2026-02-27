@@ -9,7 +9,6 @@ import cats.syntax.either.*
 import cats.syntax.option.*
 import io.circe.Json
 import io.circe.literal.*
-import lucuma.core.enums.AtomStage
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.StepStage
 import lucuma.core.model.ExecutionEvent
@@ -135,7 +134,6 @@ class addStepEvent extends OdbSuite with ExecutionState with query.ExecutionTest
 
     for
       su  <- setup(ObservingModeType.GmosNorthLongSlit, serviceUser)
-      _   <- addAtomEventAs(serviceUser, su.aid0, su.vid, AtomStage.StartAtom)
       _   <- addStepEventAs(serviceUser, su.sid0, su.vid, StepStage.StartStep)
       _   <- addStepEventAs(serviceUser, su.sid0, su.vid, StepStage.Abort)
       _   <- addStepEventAs(serviceUser, su.sid0, su.vid, StepStage.EndStep) // won't change state
@@ -147,7 +145,6 @@ class addStepEvent extends OdbSuite with ExecutionState with query.ExecutionTest
 
     for
       su   <- setup(ObservingModeType.GmosNorthLongSlit, serviceUser)
-      _    <- addAtomEventAs(serviceUser, su.aid0, su.vid, AtomStage.StartAtom)
       _    <- addStepEventAs(serviceUser, su.sid0, su.vid, StepStage.StartStep)
       _    <- addStepEventAs(serviceUser, su.sid1, su.vid, StepStage.StartStep)
       _    <- addStepEventAs(serviceUser, su.sid1, su.vid, StepStage.EndStep)
@@ -159,7 +156,6 @@ class addStepEvent extends OdbSuite with ExecutionState with query.ExecutionTest
     for
       su   <- setup(ObservingModeType.GmosNorthLongSlit, serviceUser)
       sid1  = su.sids(su.aid1)(0)
-      _    <- addAtomEventAs(serviceUser, su.aid0, su.vid, AtomStage.StartAtom)
       _    <- addStepEventAs(serviceUser, su.sid0, su.vid, StepStage.StartStep)
       _    <- addStepEventAs(serviceUser, sid1, su.vid, StepStage.StartStep)
       resA <- atomExecutionState(serviceUser, su.oid)
