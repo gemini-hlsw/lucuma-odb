@@ -174,6 +174,8 @@ FROM (
     r.c_last_event_time
   FROM t_step_record r
   JOIN t_atom_record a ON a.c_atom_id = r.c_atom_id
+  WHERE r.c_first_event_time IS NOT NULL
+    AND r.c_last_event_time  IS NOT NULL
 ) r2;
 
 -- Ensure that the visit and execution order are never changed.
@@ -845,7 +847,7 @@ ORDER BY
 
 -- Executed steps are tied to visits, but an atom contains multiple steps and
 -- thus may be spread across multiple visits.  Presumably a user will avoid
--- this via manual edits but we will do nothing to enforce that all the atoms
+-- this via manual edits but we will do nothing to enforce that all the atoms'
 -- steps happen in the same visit.  Now, we would like to see all the atoms
 -- associated with a visit and for that we need a view for Grackle.
 CREATE VIEW v_visit_atom AS
@@ -857,3 +859,8 @@ JOIN t_step s ON s.c_step_id = se.c_step_id
 GROUP BY
   se.c_visit_id,
   s.c_atom_id;
+
+-- The old atom and step record tables can be dropped now.  We'll keep them
+-- for a bit, just in case.
+-- DROP TABLE t_step_record;
+-- DROP TABLE t_atom_record;
