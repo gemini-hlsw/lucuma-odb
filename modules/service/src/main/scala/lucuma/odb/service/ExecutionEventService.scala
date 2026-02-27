@@ -15,7 +15,6 @@ import fs2.Stream
 import grackle.Result
 import grackle.ResultT
 import grackle.syntax.*
-import lucuma.core.enums.AtomStage
 import lucuma.core.enums.DatasetStage
 import lucuma.core.enums.SequenceCommand
 import lucuma.core.enums.SlewStage
@@ -31,7 +30,6 @@ import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
-import lucuma.odb.graphql.input.AddAtomEventInput
 import lucuma.odb.graphql.input.AddDatasetEventInput
 import lucuma.odb.graphql.input.AddSequenceEventInput
 import lucuma.odb.graphql.input.AddSlewEventInput
@@ -56,10 +54,6 @@ trait ExecutionEventService[F[_]]:
   def visitRange(
     visitId: Visit.Id
   )(using Transaction[F]): F[Option[TimestampInterval]]
-
-  def insertAtomEvent(
-    input: AddAtomEventInput
-  )(using Transaction[F], Services.ServiceAccess): F[Result[ExecutionEvent.Id]]
 
   def insertDatasetEvent(
     input: AddDatasetEventInput
@@ -100,29 +94,6 @@ object ExecutionEventService:
         visitId: Visit.Id
       )(using Transaction[F]): F[Option[TimestampInterval]] =
         session.unique(Statements.SelectVisitRange)(visitId)
-
-      override def insertAtomEvent(
-        input: AddAtomEventInput
-      )(using Transaction[F], Services.ServiceAccess): F[Result[ExecutionEvent.Id]] =
-
-        def invalidAtom: OdbError.InvalidAtom =
-          OdbError.InvalidAtom(input.atomId, Some(s"Atom '${input.atomId}' not found"))
-
-        val insert: F[Result[(Id, Observation.Id, Boolean)]] =
-          session
-            .option(Statements.InsertAtomEvent)(input)
-            .map(_.toResult(invalidAtom.asProblem))
-            .recoverWith:
-              case SqlState.ForeignKeyViolation(_)                                        =>
-                invalidAtom.asFailureF
-
-        ResultT(insert)
-          .flatMap: (eid, _, wasInserted) =>
-            if wasInserted then
-              ResultT.liftF(timeAccountingService.update(input.visitId)).as(eid)
-            else
-              ResultT.pure(eid)
-          .value
 
       override def insertDatasetEvent(
         input: AddDatasetEventInput
@@ -282,40 +253,6 @@ object ExecutionEventService:
         WHERE
           c_visit_id = $visit_id
       """.query(timestamp_interval.opt)
-
-    val InsertAtomEvent: Query[AddAtomEventInput, (Id, Observation.Id, Boolean)] =
-      sql"""
-        INSERT INTO t_execution_event (
-          c_event_type,
-          c_program_id,
-          c_observation_id,
-          c_visit_id,
-          c_atom_id,
-          c_atom_stage,
-          c_idempotency_key
-        )
-        SELECT
-          'atom' :: e_execution_event_type,
-          o.c_program_id,
-          a.c_observation_id,
-          $visit_id,
-          $atom_id,
-          $atom_stage,
-          ${idempotency_key.opt}
-        FROM
-          t_atom a
-        INNER JOIN
-          t_observation o ON o.c_observation_id = a.c_observation_id
-        WHERE
-          a.c_atom_id = $atom_id
-        ON CONFLICT (c_idempotency_key) DO UPDATE
-          SET c_idempotency_key = EXCLUDED.c_idempotency_key
-        RETURNING
-          c_execution_event_id,
-          c_observation_id,
-          xmax = 0 AS inserted
-      """.query(execution_event_id *: observation_id *: bool)
-         .contramap(in => (in.visitId, in.atomId, in.atomStage, in.idempotencyKey, in.atomId))
 
     val InsertDatasetEvent: Query[AddDatasetEventInput, (Id, Timestamp, Visit.Id, Boolean)] =
       sql"""

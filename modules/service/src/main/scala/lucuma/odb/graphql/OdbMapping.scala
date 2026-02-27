@@ -108,8 +108,6 @@ object OdbMapping {
   ): Mapping[F] =
         new SkunkMapping[F](database, monitor0)
           with BaseMapping[F]
-          with ArcMapping[F]
-          with AddAtomEventResultMapping[F]
           with AddConditionsEntryResultMapping[F]
           with AddDatasetEventResultMapping[F]
           with AddProgramUserResultMapping[F]
@@ -120,6 +118,7 @@ object OdbMapping {
           with AirMassRangeMapping[F]
           with AllocationMapping[F]
           with AngleMapping[F]
+          with ArcMapping[F]
           with AsterismGroupMapping[F]
           with AsterismGroupSelectResultMapping[F]
           with AtomRecordMapping[F]
@@ -353,7 +352,6 @@ object OdbMapping {
           override val typeMappings: TypeMappings =
             mkTypeMappings(
               List[TypeMapping](
-                AddAtomEventResultMapping,
                 AddConditionsEntryResultMapping,
                 AddDatasetEventResultMapping,
                 AddProgramUserResultMapping,
