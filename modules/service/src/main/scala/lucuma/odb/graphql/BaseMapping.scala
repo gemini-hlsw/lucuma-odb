@@ -15,7 +15,6 @@ trait BaseMapping[F[_]]
      with CirceMappingLike[F] {
 
   // TODO: auto-generate this
-  lazy val AddAtomEventResultType                  = schema.ref("AddAtomEventResult")
   lazy val AddConditionsEntryResultType            = schema.ref("AddConditionsEntryResult")
   lazy val AddDatasetEventResultType               = schema.ref("AddDatasetEventResult")
   lazy val AddProgramUserResultType                = schema.ref("AddProgramUserResult")

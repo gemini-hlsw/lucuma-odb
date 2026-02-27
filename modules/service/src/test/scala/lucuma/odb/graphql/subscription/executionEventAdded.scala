@@ -9,7 +9,6 @@ import cats.syntax.option.*
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
-import lucuma.core.enums.AtomStage
 import lucuma.core.enums.DatasetStage
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.SequenceCommand
@@ -18,7 +17,6 @@ import lucuma.core.enums.StepStage
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Visit
-import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.Step
 import lucuma.odb.data.ExecutionEventType
 
@@ -26,16 +24,14 @@ class executionEventAdded extends OdbSuite with SubscriptionUtils with query.Exe
 
   val mode = ObservingModeType.GmosNorthLongSlit
 
-  val initialize: IO[(Program.Id, Observation.Id, Visit.Id, Atom.Id, Step.Id)] =
+  val initialize: IO[(Program.Id, Observation.Id, Visit.Id, Step.Id)] =
     for
       pid <- createProgramAs(pi)
       tid <- createTargetWithProfileAs(pi, pid)
       oid <- createObservationAs(pi, pid, mode.some, tid)
       vid <- recordVisitAs(serviceUser, mode.instrument, oid)
-      ids <- scienceSequenceIds(serviceUser, oid)
-      aid  = ids.head._1
-      sid  = ids.head._2.head
-    yield (pid, oid, vid, aid, sid)
+      sid <- firstScienceStepId(serviceUser, oid)
+    yield (pid, oid, vid, sid)
 
   val fieldSelection: String = """
     value {
@@ -69,7 +65,7 @@ class executionEventAdded extends OdbSuite with SubscriptionUtils with query.Exe
     """
 
   test("trigger for any event"):
-    initialize.flatMap: (pid, oid, vid, _, _) =>
+    initialize.flatMap: (pid, oid, vid, _) =>
       subscriptionExpect(
         user  = pi,
         query = s"""
@@ -88,7 +84,7 @@ class executionEventAdded extends OdbSuite with SubscriptionUtils with query.Exe
       )
 
   test("trigger only for one event type"):
-    initialize.flatMap: (pid, oid, vid, aid, sid) =>
+    initialize.flatMap: (pid, oid, vid, sid) =>
       subscriptionExpect(
         user  = pi,
         query = s"""
@@ -102,14 +98,13 @@ class executionEventAdded extends OdbSuite with SubscriptionUtils with query.Exe
           addSlewEventAs(serviceUser, oid, SlewStage.StartSlew)       >>
           addSlewEventAs(serviceUser, oid, SlewStage.EndSlew)         >>
           addSequenceEventAs(serviceUser, vid, SequenceCommand.Start) >>
-          addAtomEventAs(serviceUser, aid, vid, AtomStage.StartAtom)  >>
           addStepEventAs(serviceUser, sid, vid, StepStage.StartStep)
         ),
         expected = List.fill(2)(eventJson(pid, oid, vid, ExecutionEventType.Slew))
       )
 
   test("trigger anything but one event type"):
-    initialize.flatMap: (pid, oid, vid, aid, sid) =>
+    initialize.flatMap: (pid, oid, vid, sid) =>
       subscriptionExpect(
         user  = pi,
         query = s"""
@@ -123,18 +118,16 @@ class executionEventAdded extends OdbSuite with SubscriptionUtils with query.Exe
           addSlewEventAs(serviceUser, oid, SlewStage.StartSlew)       >>
           addSlewEventAs(serviceUser, oid, SlewStage.EndSlew)         >>
           addSequenceEventAs(serviceUser, vid, SequenceCommand.Start) >>
-          addAtomEventAs(serviceUser, aid, vid, AtomStage.StartAtom)  >>
           addStepEventAs(serviceUser, sid, vid, StepStage.StartStep)
         ),
         expected = List(
           eventJson(pid, oid, vid, ExecutionEventType.Sequence),
-          eventJson(pid, oid, vid, ExecutionEventType.Atom),
           eventJson(pid, oid, vid, ExecutionEventType.Step)
         )
       )
 
   test("trigger some event types"):
-    initialize.flatMap: (pid, oid, vid, aid, sid) =>
+    initialize.flatMap: (pid, oid, vid, sid) =>
       subscriptionExpect(
         user  = pi,
         query = s"""
@@ -148,7 +141,6 @@ class executionEventAdded extends OdbSuite with SubscriptionUtils with query.Exe
           addSlewEventAs(serviceUser, oid, SlewStage.StartSlew)         >>
           addSlewEventAs(serviceUser, oid, SlewStage.EndSlew)           >>
           addSequenceEventAs(serviceUser, vid, SequenceCommand.Start)   >>
-          addAtomEventAs(serviceUser, aid, vid, AtomStage.StartAtom)    >>
           addStepEventAs(serviceUser, sid, vid, StepStage.StartStep)    >>
           recordDatasetAs(serviceUser, sid, vid, "N20250103S0001.fits").flatMap: did =>
             addDatasetEventAs(serviceUser, did, DatasetStage.StartExpose) >>
@@ -162,7 +154,7 @@ class executionEventAdded extends OdbSuite with SubscriptionUtils with query.Exe
       )
 
   test("trigger not some event types"):
-    initialize.flatMap: (pid, oid, vid, aid, sid) =>
+    initialize.flatMap: (pid, oid, vid, sid) =>
       subscriptionExpect(
         user  = pi,
         query = s"""
@@ -176,14 +168,12 @@ class executionEventAdded extends OdbSuite with SubscriptionUtils with query.Exe
           addSlewEventAs(serviceUser, oid, SlewStage.StartSlew)         >>
           addSlewEventAs(serviceUser, oid, SlewStage.EndSlew)           >>
           addSequenceEventAs(serviceUser, vid, SequenceCommand.Start)   >>
-          addAtomEventAs(serviceUser, aid, vid, AtomStage.StartAtom)    >>
           addStepEventAs(serviceUser, sid, vid, StepStage.StartStep)    >>
           recordDatasetAs(serviceUser, sid, vid, "N20250103S0002.fits").flatMap: did =>
             addDatasetEventAs(serviceUser, did, DatasetStage.StartExpose) >>
             addDatasetEventAs(serviceUser, did, DatasetStage.EndExpose)
         ),
         expected = List(
-          eventJson(pid, oid, vid, ExecutionEventType.Sequence),
-          eventJson(pid, oid, vid, ExecutionEventType.Atom)
+          eventJson(pid, oid, vid, ExecutionEventType.Sequence)
         )
       )

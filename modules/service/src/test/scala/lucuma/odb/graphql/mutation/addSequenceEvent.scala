@@ -9,7 +9,6 @@ import cats.syntax.either.*
 import cats.syntax.option.*
 import io.circe.Json
 import io.circe.literal.*
-import lucuma.core.enums.AtomStage
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.SequenceCommand
 import lucuma.core.enums.StepStage
@@ -128,11 +127,8 @@ class addSequenceEvent extends OdbSuite with ExecutionState with query.Execution
       sid0  = sids(aid0)(0)
       aid1  = aids(1)
       sid1  = sids(aid1)(0)
-      _    <- addAtomEventAs(user, aid0, vid, AtomStage.StartAtom)
       _    <- addStepEventAs(user, sid0, vid, StepStage.StartStep)
       _    <- addStepEventAs(user, sid0, vid, StepStage.EndStep)
-      _    <- addAtomEventAs(user, aid0, vid, AtomStage.EndAtom)
-      _    <- addAtomEventAs(user, aid0, vid, AtomStage.StartAtom)
       _    <- addStepEventAs(user, sid1, vid, StepStage.StartStep)
       _    <- addSequenceEventAs(user, vid, SequenceCommand.Abort)
       resA <- atomExecutionState(user, oid)
