@@ -18,7 +18,7 @@ CREATE TABLE t_atom (
   -- a consistent instrument.
   UNIQUE (c_atom_id, c_instrument),
 
-  -- The observation instrument shoufld not be changed without deleting any
+  -- The observation instrument should not be changed without deleting any
   -- associated atoms.  We don't want more than one instrument per observation.
   CONSTRAINT t_atom_c_observation_id_c_instrument_fkey
     FOREIGN KEY (c_observation_id, c_instrument)
@@ -41,19 +41,18 @@ CREATE INDEX ON t_atom (c_observation_id, c_sequence_type, c_atom_id);
 -- Copy the old t_atom_record data over to t_atom.
 INSERT INTO t_atom (
   c_atom_id,
-  c_instrument,
-  c_atom_index,
   c_observation_id,
-  c_sequence_type
+  c_sequence_type,
+  c_instrument,
+  c_atom_index
 )
 SELECT
   r.c_atom_id,
-  r.c_instrument,
-  0 as c_atom_index, -- not relevant once execution starts
   r.c_observation_id,
-  r.c_sequence_type
+  r.c_sequence_type,
+  r.c_instrument,
+  0 as c_atom_index -- not relevant once execution starts
 FROM t_atom_record r;
-
 
 -- Add a breakpoint enum.  We can now store breakpoints.
 CREATE TYPE e_breakpoint AS enum(
@@ -61,6 +60,9 @@ CREATE TYPE e_breakpoint AS enum(
   'disabled'
 );
 
+-- Create a step table to hold steps, both executing and pending. Execution
+-- information is relegated to a t_step_execution table, where an entry is added
+-- only when a step event (or dataset event) is received.
 CREATE TABLE t_step (
   c_step_id          d_step_id        PRIMARY KEY,
   c_atom_id          d_atom_id        NOT NULL,
@@ -85,6 +87,9 @@ CREATE TABLE t_step (
   UNIQUE (c_step_id, c_instrument),
   UNIQUE (c_step_id, c_step_type),
 
+  -- We'll reference the atom and instrument, ensuring we don't mix in steps for
+  -- different instruments.  We'll cascade deletes, but note that
+  -- t_step_execution will prevent deletion of steps with execution information.
   CONSTRAINT t_atom_c_atom_id_c_instrument_fkey
     FOREIGN KEY (c_atom_id, c_instrument)
     REFERENCES t_atom(c_atom_id, c_instrument) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED
@@ -93,6 +98,8 @@ CREATE TABLE t_step (
 
 CREATE INDEX ON t_step (c_atom_id);
 
+-- Step execution information, which exists once the first step (or dataset)
+-- event associated with the step arrives.
 CREATE TABLE t_step_execution (
   c_step_id          d_step_id  PRIMARY KEY REFERENCES t_step(c_step_id),
   c_visit_id         d_visit_id NOT NULL REFERENCES t_visit(c_visit_id),
@@ -199,6 +206,12 @@ EXECUTE FUNCTION validate_step_execution_update();
 
 -- Create a view on the atom table.  This will correspond to the old atom record
 -- table in that it only contains (at least partially) executed atoms.
+-- NOTE: We'll LEFT JOIN on t_step_execution because for the purpose of
+-- calculating the atom completion state we need to consider unexecuted steps
+-- as well.  Otherwise a single completed step would make the atom as a whole
+-- completed.  But, we don't want include atom rows for which there are NO
+-- executed steps so we add "HAVING bool_or(se.c_step_id IS NOT NULL)" to filter
+-- out atoms with no executed/executing steps.
 CREATE VIEW v_atom_record AS
 SELECT
   a.c_atom_id,
@@ -215,6 +228,8 @@ SELECT
       COALESCE(se.c_execution_state, 'not_started') IN ('completed', 'abandoned')
     ) THEN 'completed'
 
+    -- Step execution rows are born 'ongoing' so this will likely never
+    -- be the case in reality.
     WHEN bool_and(
       COALESCE(se.c_execution_state, 'not_started') = 'not_started'
     ) THEN 'not_started'
@@ -249,6 +264,10 @@ INSERT INTO t_step_stage_execution_state (
   ('end_step', 'completed'),
   ('stop',     'stopped') ;
 
+-- There are a few functions that scan atoms, steps, and step execution
+-- updating step execution state, etc.  Because these are multi-step processes
+-- and we look up information and then take decisions based on what is found,
+-- we'll hold an observation-scoped advisory transaction lock.
 CREATE OR REPLACE FUNCTION lock_step_state_updates(
   p_observation_id d_observation_id
 )
@@ -280,8 +299,8 @@ BEGIN
   FROM t_atom
   WHERE c_atom_id = NEW.c_atom_id;
 
-  -- What is the execution state according to the step stage (for step events,
-  -- otherwise this is NULL)?  Also null for non-terminal step stages.
+  -- What is the execution state according to the step stage? (For step events,
+  -- otherwise this is NULL.  Also null for non-terminal step stages.)
   SELECT s.c_execution_state
   INTO step_stage_state
   FROM t_step_stage_execution_state s
@@ -301,7 +320,7 @@ BEGIN
   VALUES (
     NEW.c_step_id,
     NEW.c_visit_id,
-    COALESCE(step_stage_state, 'ongoing'),
+    COALESCE(step_stage_state, 'ongoing'), -- born ongoing
     (
       SELECT COALESCE(MAX(c_execution_order), 0) + 1
         FROM t_step_execution se
@@ -546,7 +565,7 @@ BEGIN
   SELECT a.c_observation_id INTO STRICT obs_id
     FROM t_step s
     JOIN t_atom a ON a.c_atom_id = s.c_atom_id
-   WHERE s.c_step_id = OLD.c_step_id;
+   WHERE s.c_step_id = NEW.c_step_id;
 
   DELETE FROM t_execution_digest WHERE c_observation_id = obs_id;
 
@@ -556,16 +575,22 @@ $$ LANGUAGE plpgsql;
 
 -- Triggers the deletion of an observation's execution digest when a step is
 -- marked complete (or marked incomplete having previously been marked complete).
-CREATE TRIGGER delete_execution_digest_trigger
+CREATE TRIGGER delete_execution_digest_on_update_trigger
 AFTER UPDATE ON t_step_execution FOR EACH ROW
 WHEN (
   OLD.c_execution_state IS DISTINCT FROM NEW.c_execution_state AND (
     OLD.c_execution_state = 'completed' OR
     NEW.c_execution_state = 'completed'
   )
-) EXECUTE PROCEDURE delete_execution_digest();
+) EXECUTE FUNCTION delete_execution_digest();
 
--- Transfer the FK constraints.
+CREATE TRIGGER delete_execution_digest_on_insert_trigger
+AFTER INSERT ON t_step_execution FOR EACH ROW
+WHEN (NEW.c_execution_state = 'completed')
+EXECUTE FUNCTION delete_execution_digest();
+
+-- Transfer the FK constraints from t_atom_record to t_atom and from
+-- t_step_record to t_step.
 ALTER TABLE t_dataset
   DROP CONSTRAINT t_dataset_c_step_id_fkey;
 
