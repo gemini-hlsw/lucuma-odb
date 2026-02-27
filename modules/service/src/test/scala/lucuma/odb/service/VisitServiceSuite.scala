@@ -11,9 +11,10 @@ import lucuma.odb.graphql.query.ExecutionTestSupportForGmos
 class VisitServiceSuite extends ExecutionTestSupportForGmos:
 
   test("hasVisits"):
-    for {
+    for
       pid    <- createProgramAs(serviceUser)
-      oid    <- createObservationAs(serviceUser, pid, ObservingModeType.GmosNorthLongSlit.some)
+      tid    <- createTargetWithProfileAs(serviceUser, pid)
+      oid    <- createObservationAs(serviceUser, pid, ObservingModeType.GmosNorthLongSlit.some, tid)
       before <- withServices(serviceUser): services =>
                   services.transactionally:
                     services.visitService.hasVisits(oid)
@@ -21,7 +22,4 @@ class VisitServiceSuite extends ExecutionTestSupportForGmos:
       after  <- withServices(serviceUser): services =>
                   services.transactionally:
                     services.visitService.hasVisits(oid)
-    } yield {
-      assert(!before)
-      assert(after)
-    }
+    yield assert(!before && after, s"before = $before, after = $after")

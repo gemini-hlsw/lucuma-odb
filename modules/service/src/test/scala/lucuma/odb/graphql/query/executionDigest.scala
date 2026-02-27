@@ -561,7 +561,7 @@ class executionDigest extends ExecutionTestSupportForGmos {
         )
       )
 
-  test("clear execution digest"):
+  test("clear execution digest when born completed"):
 
     val setup: IO[(Observation.Id, Visit.Id, Step.Id)] =
       for
@@ -584,6 +584,30 @@ class executionDigest extends ExecutionTestSupportForGmos {
 
     assertIOBoolean(isEmpty, "The execution digest should be removed")
 
+  test("clear execution digest when transitioning to completed"):
+
+    val setup: IO[(Observation.Id, Visit.Id, Step.Id)] =
+      for
+        p <- createProgram
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+        v <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
+        s <- firstScienceStepId(serviceUser, o)
+      yield (o, v, s)
+
+    val isEmpty = setup.flatMap:
+      case (o, v, s) =>
+        withServices(pi): services =>
+          services.session.transaction.use: xa =>
+            for
+              _  <- services.executionDigestService.insertOrUpdate(o, Md5Hash.Zero, ExecutionDigest.Zero)(using xa)
+              _  <- services.executionEventService.insertStepEvent(AddStepEventInput(s, v, StepStage.StartStep, None))(using xa, ().asInstanceOf) // shhh
+              d0 <- services.executionDigestService.selectOne(o, Md5Hash.Zero)(using xa)
+              _  <- services.executionEventService.insertStepEvent(AddStepEventInput(s, v, StepStage.EndStep, None))(using xa, ().asInstanceOf) // shhh
+              d1 <- services.executionDigestService.selectOne(o, Md5Hash.Zero)(using xa)
+            yield d0.isDefined && d1.isEmpty
+
+    assertIOBoolean(isEmpty, "The execution digest should be removed")
 
   def executionStateQuery(oid: Observation.Id): String =
     s"""

@@ -13,11 +13,15 @@ import lucuma.catalog.clients.SimbadClientMock
 import lucuma.catalog.clients.TelluricTargetsClientMock
 import lucuma.catalog.telluric.TelluricStar
 import lucuma.catalog.telluric.TelluricTargetsClient
+import lucuma.core.enums.Band
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.Flamingos2Fpu
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.TelluricCalibrationOrder
+import lucuma.core.math.BrightnessUnits.BrightnessMeasure
+import lucuma.core.math.BrightnessUnits.Integrated
+import lucuma.core.math.BrightnessValue
 import lucuma.core.math.Coordinates
 import lucuma.core.math.Declination
 import lucuma.core.math.RightAscension
@@ -89,6 +93,10 @@ class perScienceObservationCalibrations
     order = TelluricCalibrationOrder.After
   )
 
+  val mockBrightnesses = SortedMap[Band, BrightnessMeasure[Integrated]](
+    Band.J -> Band.J.defaultUnits[Integrated].withValueTagged(BrightnessValue.unsafeFrom(14.74))
+  )
+
   val mockTarget = Target.Sidereal(
     name = "HIP 12345".refined,
     tracking = SiderealTracking(
@@ -99,7 +107,7 @@ class perScienceObservationCalibrations
       parallax = None
     ),
     sourceProfile = SourceProfile.Point(
-      SpectralDefinition.BandNormalized(None, SortedMap.empty)
+      SpectralDefinition.BandNormalized(None, mockBrightnesses)
     ),
     catalogInfo = None
   )
@@ -1557,6 +1565,7 @@ class perScienceObservationCalibrations
       oid                <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
       _                  <- runObscalcUpdate(pid, oid)
       (added1, removed1) <- recalculateCalibrations(pid, when)
+      _                  <- sleep >> resolveTelluricTargets
       obsBefore          <- queryObservation(oid)
       groupId            =  obsBefore.groupId.get
       obsInGroup1        <- queryObservationsInGroup(groupId)
@@ -1582,6 +1591,7 @@ class perScienceObservationCalibrations
       oid                <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
       _                  <- runObscalcUpdate(pid, oid)
       (added1, removed1) <- recalculateCalibrations(pid, when)
+      _                  <- sleep >> resolveTelluricTargets
       obs1               <- queryObservation(oid)
       groupId            =  obs1.groupId.get
       obsInGroup1        <- queryObservationsInGroup(groupId)
@@ -1608,6 +1618,7 @@ class perScienceObservationCalibrations
       _                    <- setExposureTime(oid, 120)
       _                    <- runObscalcUpdate(pid, oid)
       (added1, removed1)   <- recalculateCalibrations(pid, when)
+      _                    <- sleep >> resolveTelluricTargets
       obs1                 <- queryObservation(oid)
       groupId              =  obs1.groupId.get
       obsInGroup1          <- queryObservationsInGroup(groupId)
