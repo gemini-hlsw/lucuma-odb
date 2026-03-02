@@ -2023,6 +2023,15 @@ type SystemVerification implements ProposalType {
   minPercentTime: IntPercent!
 }
 
+"""
+The GraphQL specification requires that types and inputs have fields, even when
+there is no useful data to include.  This enumeration provides a placeholder
+value for an ignored field to satisfy the specification.
+"""
+enum Ignore {
+  IGNORE
+}
+
 """Radial velocity, choose one of the available units"""
 input RadialVelocityInput @oneOf {
   centimetersPerSecond: Long
@@ -8465,7 +8474,7 @@ input Flamingos2ImagingInput {
 }
 
 input Igrins2SpectroscopyInput {
-  _placeholder: Boolean! = false
+  ignore: Ignore
 }
 
 type GmosSSpectroscopyParams {
@@ -8514,7 +8523,7 @@ type Flamingos2SpectroscopyParams {
 }
 
 type Igrins2SpectroscopyParams {
-  _placeholder: Boolean
+  ignore: Ignore
 }
 
 union SpectroscopyParams = GmosNSpectroscopyParams | GmosSSpectroscopyParams | Flamingos2SpectroscopyParams | Igrins2SpectroscopyParams

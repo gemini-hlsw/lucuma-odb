@@ -84,11 +84,11 @@ object AsterismGraphRequest:
           ObservingMode.SpectroscopyMode
             .GmosSouth(centralWavelength, grating, GmosSouthFpuParam(fpu), filter, ccdMode, roi)
         )
-      case Igrins2SpectroscopyInput(_) =>
+      case Igrins2SpectroscopyInput() =>
         Result(
           ObservingMode.SpectroscopyMode.Igrins2()
         )
-      case _                           =>
+      case _                          =>
         Result.failure("Invalid spectroscopy mode")
     }
 

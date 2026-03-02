@@ -122,7 +122,7 @@ input Flamingos2ImagingInput {
 }
 
 input Igrins2SpectroscopyInput {
-  _placeholder: Boolean! = false
+  ignore: Ignore
 }
 
 type GmosSSpectroscopyParams {
@@ -171,7 +171,7 @@ type Flamingos2SpectroscopyParams {
 }
 
 type Igrins2SpectroscopyParams {
-  _placeholder: Boolean
+  ignore: Ignore
 }
 
 union SpectroscopyParams = GmosNSpectroscopyParams | GmosSSpectroscopyParams | Flamingos2SpectroscopyParams | Igrins2SpectroscopyParams

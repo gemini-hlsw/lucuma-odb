@@ -3,16 +3,15 @@
 
 package lucuma.itc.input
 
+import cats.syntax.functor.*
 import lucuma.odb.graphql.binding.*
 
-case class Igrins2SpectroscopyInput(
-  _placeholder: Boolean = false
-) extends InstrumentModesInput
+case class Igrins2SpectroscopyInput() extends InstrumentModesInput
 
 object Igrins2SpectroscopyInput:
   val binding: Matcher[Igrins2SpectroscopyInput] =
     ObjectFieldsBinding.rmap:
       case List(
-            BooleanBinding.Option("_placeholder", placeholder)
+            EnumBinding.Option("ignore", rIgnore)
           ) =>
-        placeholder.map(p => Igrins2SpectroscopyInput(p.getOrElse(false)))
+        rIgnore.as(Igrins2SpectroscopyInput())
