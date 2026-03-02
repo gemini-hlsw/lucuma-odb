@@ -1,7 +1,6 @@
 
 """
 This file is generated. Do not manually modify it.
-
 It is generated from the following source files:
   - ObservationDB.graphql
   - itc_base.graphql
@@ -2022,6 +2021,15 @@ type SystemVerification implements ProposalType {
   successful.
   """
   minPercentTime: IntPercent!
+}
+
+"""
+The GraphQL specification requires that types and inputs have fields, even when
+there is no useful data to include.  This enumeration provides a placeholder
+value for an ignored field to satisfy the specification.
+"""
+enum Ignore {
+  IGNORE
 }
 
 """Radial velocity, choose one of the available units"""
@@ -8465,6 +8473,10 @@ input Flamingos2ImagingInput {
   filter: Flamingos2Filter!
 }
 
+input Igrins2SpectroscopyInput {
+  ignore: Ignore
+}
+
 type GmosSSpectroscopyParams {
   """Wavelength in appropriate units"""
   centralWavelength: Wavelength!
@@ -8510,7 +8522,11 @@ type Flamingos2SpectroscopyParams {
   filter: Flamingos2Filter
 }
 
-union SpectroscopyParams = GmosNSpectroscopyParams | GmosSSpectroscopyParams | Flamingos2SpectroscopyParams
+type Igrins2SpectroscopyParams {
+  ignore: Ignore
+}
+
+union SpectroscopyParams = GmosNSpectroscopyParams | GmosSSpectroscopyParams | Flamingos2SpectroscopyParams | Igrins2SpectroscopyParams
 
 type GmosSImagingParams {
   """Gmos South filter"""
@@ -8548,6 +8564,9 @@ input InstrumentModesInput @oneOf {
 
   """Flamingos2 Imaging"""
   flamingos2Imaging: Flamingos2ImagingInput
+
+  """IGRINS2 Spectroscopy"""
+  igrins2Spectroscopy: Igrins2SpectroscopyInput
 }
 
 """Image quality input - specify either preset or exact arcsec value"""

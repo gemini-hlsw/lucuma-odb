@@ -223,6 +223,9 @@ private[legacy] object codecs:
         )
     }
 
+  private val encodeIgrins2Spectroscopy: Encoder[ObservingMode.SpectroscopyMode.Igrins2] = _ =>
+    Json.obj()
+
   private given Encoder[ItcInstrumentDetails] = (a: ItcInstrumentDetails) =>
     a.mode match
       case a: ObservingMode.SpectroscopyMode.GmosNorth  =>
@@ -231,6 +234,8 @@ private[legacy] object codecs:
         Json.obj("GmosParameters" -> encodeGmosSouthSpectroscopy(a))
       case a: ObservingMode.SpectroscopyMode.Flamingos2 =>
         Json.obj("Flamingos2Parameters" -> encodeF2Spectroscopy(a))
+      case a: ObservingMode.SpectroscopyMode.Igrins2    =>
+        Json.obj("Igrins2Parameters" -> encodeIgrins2Spectroscopy(a))
       case a: ObservingMode.ImagingMode.Flamingos2      =>
         Json.obj("Flamingos2Parameters" -> encodeF2Imaging(a))
       case a: ObservingMode.ImagingMode.GmosNorth       =>

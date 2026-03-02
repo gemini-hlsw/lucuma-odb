@@ -22,7 +22,7 @@ import java.lang.reflect.Method
  * that may not be compatible. Instead we pass back and forth json encoded version of the params
  * essentially the same as if ITC were a server accepting json and responding json
  */
-case class LocalItc[F[_]: Sync](classLoader: ClassLoader):
+case class LocalItc[F[_]: {Sync as F}](classLoader: ClassLoader):
   // We need to keep a single reference to the reflected method
   private val calculateGraphsMethod: Method = classLoader
     .loadClass("edu.gemini.itc.web.servlets.ItcCalculation")
@@ -52,7 +52,7 @@ case class LocalItc[F[_]: Sync](classLoader: ClassLoader):
    * essentially the same as if ITC were a server accepting json and responding json
    */
   def calculateGraphs(jsonParams: String): F[Either[List[String], GraphsRemoteResult]] =
-    Sync[F].blocking:
+    F.blocking:
       val res = calculateGraphsMethod
         .invoke(null, jsonParams) // null as it is a static method
         .asInstanceOf[String]
@@ -102,7 +102,7 @@ case class LocalItc[F[_]: Sync](classLoader: ClassLoader):
   def calculateSignalToNoise(
     jsonParams: String
   ): F[Either[List[String], IntegrationTimeRemoteResult]] =
-    Sync[F].blocking:
+    F.blocking:
       val res = calculateSignalToNoiseMethod
         .invoke(null, jsonParams) // null as it is a static method
         .asInstanceOf[String]
