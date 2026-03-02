@@ -45,11 +45,8 @@ case class FLocalItc[F[_]: {Async as F, Trace as T}](itcLocal: LocalItc[F]):
         ) *>
           (F.cede *> itcLocal.calculateIntegrationTime(jsonParams).guarantee(F.cede)).flatMap {
             case Right(result) =>
-              println("==rcrcrccrrcrcrc====")
-              pprint.pprintln(result)
               F.pure(result)
             case Left(msg)     =>
-              pprint.pprintln(msg)
               msg match {
                 case TooBright :: HalfWell(v) :: Nil =>
                   F.raiseError(SourceTooBright(BigDecimal(v)))
@@ -67,10 +64,8 @@ case class FLocalItc[F[_]: {Async as F, Trace as T}](itcLocal: LocalItc[F]):
         ) *>
           (F.cede *> itcLocal.calculateSignalToNoise(jsonParams).guarantee(F.cede)).flatMap {
             case Right(result) =>
-              pprint.pprintln(result)
               result.pure[F]
             case Left(msg)     =>
-              pprint.pprintln(msg)
               msg match {
                 case TooBright :: HalfWell(v) :: Nil =>
                   F.raiseError(SourceTooBright(BigDecimal(v)))
