@@ -9,9 +9,11 @@ import cats.data.State
 import cats.syntax.option.*
 import cats.syntax.traverse.*
 import eu.timepit.refined.types.string.NonEmptyString
+import fs2.Stream
 import lucuma.core.enums.SequenceType
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.Step
+import lucuma.odb.sequence.data.ProtoAtom
 import lucuma.odb.sequence.data.ProtoStep
 
 import java.util.UUID
@@ -39,6 +41,15 @@ trait AtomBuilder[D]:
     NonEmptyList.fromList(steps) match
       case None      => State.pure(None)
       case Some(nel) => build(desc, aix, six, nel).map(_.some)
+
+  def buildStream[F[_]](
+    s: Stream[F, ProtoAtom[ProtoStep[D]]]
+  ): Stream[F, Atom[D]] =
+    s.zipWithIndex
+     .mapAccumulate(TimeEstimateCalculator.Last.empty[D]) { case (state, (protoAtom, idx)) =>
+       build(protoAtom.description, idx.toInt, 0, protoAtom.steps).run(state).value
+     }
+     .map(_._2)
 
 object AtomBuilder:
 
@@ -80,3 +91,4 @@ object AtomBuilder:
               )
             }
           )
+
