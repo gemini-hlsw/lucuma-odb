@@ -66,6 +66,59 @@ FROM
 INNER JOIN t_observation o
   ON m.c_observation_id = o.c_observation_id;
 
+-- Update check_etm_consistent to handle igrins_2_long_slit (science ETM only, no acquisition)
+CREATE OR REPLACE FUNCTION check_etm_consistent()
+RETURNS TRIGGER AS $$
+DECLARE
+  obs_id   d_observation_id;
+  obs_mode e_observing_mode_type;
+  acq_count INTEGER;
+  sci_count INTEGER;
+BEGIN
+
+  obs_id := COALESCE(NEW.c_observation_id, OLD.c_observation_id);
+
+  SELECT c_observing_mode_type INTO obs_mode
+    FROM t_observation
+   WHERE c_observation_id = obs_id;
+
+  SELECT
+    COUNT(*) FILTER (WHERE c_role = 'acquisition'),
+    COUNT(*) FILTER (WHERE c_role = 'science')
+  INTO acq_count, sci_count
+  FROM t_exposure_time_mode
+  WHERE c_observation_id = obs_id;
+
+  IF obs_mode IS NULL THEN
+
+    IF acq_count <> 0 OR sci_count <> 0 THEN
+      RAISE EXCEPTION 'Observation % with mode % should not have acquisition nor science exposure time modes', obs_id, obs_mode;
+    END IF;
+
+  ELSE
+
+    CASE
+      WHEN obs_mode IN ('flamingos_2_long_slit', 'gmos_north_long_slit', 'gmos_south_long_slit', 'igrins_2_long_slit') THEN
+        IF acq_count <> 1 THEN
+          RAISE EXCEPTION 'Observation % with mode % must have an acquisition exposure time mode', obs_id, obs_mode;
+        END IF;
+
+        IF sci_count <> 1 THEN
+          RAISE EXCEPTION 'Observation % with mode % must have exactly one science exposure time mode', obs_id, obs_mode;
+        END IF;
+
+      WHEN obs_mode IN ('gmos_north_imaging', 'gmos_south_imaging') THEN
+        NULL;
+
+      ELSE
+        RAISE EXCEPTION 'Unknown observing mode % for observation %', obs_mode, obs_id;
+    END CASE;
+  END IF;
+
+  RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
 -- Update v_observing_mode_group to include IGRINS-2
 CREATE OR REPLACE VIEW v_observing_mode_group AS
 -- GMOS-N LongSlit
