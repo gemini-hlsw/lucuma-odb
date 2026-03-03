@@ -19,8 +19,8 @@ case class Config(
 ) derives Eq:
 
   def hashBytes: Array[Byte] =
-    val bao: ByteArrayOutputStream = new ByteArrayOutputStream(256)
-    val out: DataOutputStream      = new DataOutputStream(bao)
+    val bao = new ByteArrayOutputStream(256)
+    val out = new DataOutputStream(bao)
 
     out.write(scienceExposureTimeMode.hashBytes)
     out.writeChars(offsetMode.tag)
