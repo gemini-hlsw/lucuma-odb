@@ -64,13 +64,9 @@ trait SequenceService[F[_]]:
   )(using Transaction[F], Services.ServiceAccess): Stream[F, (Observation.Id, Short, AtomDigest)]
 
   def isMaterialized(
-    observationId: Observation.Id
-  )(using Transaction[F]): F[Boolean]
-
-  def abandonAndDeleteUnexecuted(
     observationId: Observation.Id,
     sequenceType:  SequenceType
-  )(using Transaction[F], Services.ServiceAccess): F[Unit]
+  )(using Transaction[F]): F[Boolean]
 
   def resetFlamingos2Acquisition(
     observationId: Observation.Id,
@@ -165,10 +161,14 @@ object SequenceService:
         if which.isEmpty then Stream.empty
         else session.stream(Statements.selectAtomDigests(which))(which, 1024)
 
-      override def abandonAndDeleteUnexecuted(
+      /**
+       * Marks ongoing steps as abandoned and deletes any steps that are
+       * `not_started`.
+       */
+      private def abandonAndDeleteUnexecuted(
         observationId: Observation.Id,
         sequenceType:  SequenceType
-      )(using Transaction[F], Services.ServiceAccess): F[Unit] =
+      ): F[Unit] =
         session.execute(Statements.AbandonAndDeleteUnexecuted)(observationId, sequenceType).void
 
       override def insertFlamingos2Sequence(
@@ -288,9 +288,35 @@ object SequenceService:
           )
 
       override def isMaterialized(
-        observationId: Observation.Id
+        observationId: Observation.Id,
+        sequenceType:  SequenceType
       )(using Transaction[F]): F[Boolean] =
-        session.unique(Statements.IsMaterialized)(observationId)
+        session.unique(Statements.IsMaterialized)(observationId, sequenceType)
+
+      /**
+       * Marks the sequence as materialized, or if already materialized does
+       * nothing.
+       *
+       * @return `true` if a new row was inserted, `false` if nothing changed
+       */
+      private def markMaterializedOrDoNothing(
+        observationId: Observation.Id,
+        sequenceType:  SequenceType
+      ): F[Boolean] =
+        session.unique(Statements.MarkMaterializedOrDoNothing)(observationId, sequenceType)
+
+      /**
+       * Marks the sequence as materialized, or updates the timestamp of the
+       * last materialization.
+       *
+       * @return `true` if a new row was inserted, `false` if an existing row
+       *         was updated
+       */
+      private def markMaterializedOrUpdate(
+        observationId: Observation.Id,
+        sequenceType:  SequenceType
+      ): F[Boolean] =
+        session.unique(Statements.MarkMaterializedOrUpdate)(observationId, sequenceType)
 
       private def resetAcquisition[D](
         observationId: Observation.Id,
@@ -299,10 +325,15 @@ object SequenceService:
         insert: (Observation.Id, SequenceType, Stream[F, Atom[D]]) => F[Unit]
       )(using Transaction[F], Services.ServiceAccess): F[Unit] =
         val reset = for
+          _ <- markMaterializedOrUpdate(observationId, SequenceType.Acquisition)
           _ <- abandonAndDeleteUnexecuted(observationId, SequenceType.Acquisition)
           _ <- insert(observationId, SequenceType.Acquisition, stream)
         yield ()
-        isMaterialized(observationId).ifM(reset, Applicative[F].unit)
+
+        isMaterialized(observationId, SequenceType.Acquisition).ifM(
+          reset,
+          Applicative[F].unit
+        )
 
       override def resetFlamingos2Acquisition(
         observationId: Observation.Id,
@@ -329,16 +360,14 @@ object SequenceService:
         insert: (Observation.Id, SequenceType, Stream[F, Atom[D]]) => F[Unit]
       )(using Services.ServiceAccess): F[Unit] =
 
-        val markMaterialized: F[Boolean] =
-          session
-            .option(Statements.MarkMaterialization)(observationId)
-            .map(_.isDefined) // if a row is returned, then the observation was marked
+        def materialize(sequenceType: SequenceType, s: Stream[F, Atom[D]]): F[Unit] =
+          markMaterializedOrDoNothing(observationId, sequenceType).ifM(
+            insert(observationId, sequenceType, s),
+            Applicative[F].unit
+          )
 
-        val doMaterialize: F[Unit] =
-          insert(observationId, SequenceType.Acquisition, stream.acquisition) *>
-          insert(observationId, SequenceType.Science, stream.science)
-
-        markMaterialized.ifM(doMaterialize, Applicative[F].unit)
+        materialize(SequenceType.Acquisition, stream.acquisition) *>
+        materialize(SequenceType.Science, stream.science)
 
       override def materializeFlamingos2ExecutionConfig(
         observationId: Observation.Id,
@@ -683,19 +712,42 @@ object SequenceService:
         gmos_south_dynamic
       )
 
-    val IsMaterialized: Query[Observation.Id, Boolean] =
+    val IsMaterialized: Query[(Observation.Id, SequenceType), Boolean] =
       sql"""
         SELECT EXISTS (
           SELECT 1
           FROM   t_sequence_materialization
           WHERE  c_observation_id = $observation_id
+            AND  c_sequence_type  = $sequence_type
         )
       """.query(bool)
 
-    val MarkMaterialization: Query[Observation.Id, Observation.Id] =
+    val MarkMaterializedOrDoNothing: Query[(Observation.Id, SequenceType), Boolean] =
       sql"""
-        INSERT INTO t_sequence_materialization (c_observation_id, c_created, c_updated)
-        VALUES ($observation_id, now(), now())
-        ON CONFLICT DO NOTHING
-        RETURNING c_observation_id
-      """.query(observation_id)
+        WITH ins AS (
+          INSERT INTO t_sequence_materialization (
+            c_observation_id,
+            c_sequence_type,
+            c_created,
+            c_updated
+          )
+          VALUES ($observation_id, $sequence_type, now(), now())
+          ON CONFLICT DO NOTHING
+          RETURNING 1
+        )
+        SELECT EXISTS (SELECT 1 FROM ins) AS inserted
+      """.query(bool)
+
+    val MarkMaterializedOrUpdate: Query[(Observation.Id, SequenceType), Boolean] =
+      sql"""
+        INSERT INTO t_sequence_materialization (
+          c_observation_id,
+          c_sequence_type,
+          c_created,
+          c_updated
+        )
+        VALUES ($observation_id, $sequence_type, now(), now())
+        ON CONFLICT (c_observation_id, c_sequence_type)
+        DO UPDATE SET c_updated = now()
+        RETURNING (xmax = 0) AS inserted
+      """.query(bool)
