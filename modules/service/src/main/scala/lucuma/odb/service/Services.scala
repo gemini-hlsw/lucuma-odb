@@ -149,6 +149,9 @@ trait Services[F[_]]:
   /** The `Flamingos2SequenceService` */
   def flamingos2SequenceService: Flamingos2SequenceService[F]
 
+  /** The `Igrins2LongSlitService`. */
+  def igrins2LongSlitService: Igrins2LongSlitService[F]
+
   /** The `GmosSequenceService` */
   def gmosSequenceService: GmosSequenceService[F]
 
@@ -330,6 +333,7 @@ object Services:
       lazy val generatorParamsService = GeneratorParamsService.instantiate
       lazy val flamingos2LongSlitService = Flamingos2LongSlitService.instantiate
       lazy val flamingos2SequenceService = Flamingos2SequenceService.instantiate
+      lazy val igrins2LongSlitService = Igrins2LongSlitService.instantiate
       lazy val gmosLongSlitService = GmosLongSlitService.instantiate
       lazy val gmosImagingService = GmosImagingService.instantiate
       lazy val gmosSequenceService = GmosSequenceService.instantiate
@@ -394,6 +398,7 @@ object Services:
     def gmosImagingService[F[_]](using Services[F]): GmosImagingService[F] = summon[Services[F]].gmosImagingService
     def flamingos2LongSlitService[F[_]](using Services[F]): Flamingos2LongSlitService[F] = summon[Services[F]].flamingos2LongSlitService
     def flamingos2SequenceService[F[_]](using Services[F]): Flamingos2SequenceService[F] = summon[Services[F]].flamingos2SequenceService
+    def igrins2LongSlitService[F[_]](using Services[F]): Igrins2LongSlitService[F] = summon[Services[F]].igrins2LongSlitService
     def gmosSequenceService[F[_]](using Services[F]): GmosSequenceService[F] = summon[Services[F]].gmosSequenceService
     def groupService[F[_]](using Services[F]): GroupService[F] = summon[Services[F]].groupService
     def obsAttachmentAssignmentService[F[_]](using Services[F]): ObsAttachmentAssignmentService[F] = summon[Services[F]].obsAttachmentAssignmentService

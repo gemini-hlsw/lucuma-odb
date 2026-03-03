@@ -7,6 +7,7 @@ import cats.Eq
 import cats.derived.*
 import lucuma.core.enums.Igrins2OffsetMode
 import lucuma.core.model.ExposureTimeMode
+import lucuma.odb.sequence.syntax.all.*
 
 import java.io.ByteArrayOutputStream
 import java.io.DataOutputStream

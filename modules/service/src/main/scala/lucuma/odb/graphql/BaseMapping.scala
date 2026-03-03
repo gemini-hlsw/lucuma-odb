@@ -224,6 +224,8 @@ trait BaseMapping[F[_]]
   lazy val HasUnspecifiedPartnerType               = schema.ref("HasUnspecifiedPartner")
   lazy val HmsStringType                           = schema.ref("HmsString")
   lazy val HourAngleRangeType                      = schema.ref("HourAngleRange")
+  lazy val Igrins2LongSlitType                     = schema.ref("Igrins2LongSlit")
+  lazy val Igrins2OffsetModeType                   = schema.ref("Igrins2OffsetMode")
   lazy val IdempotencyKeyType                      = schema.ref("IdempotencyKey")
   lazy val ImageQualityPresetType                  = schema.ref("ImageQualityPreset")
   lazy val ImagingConfigOptionGmosNorthType        = schema.ref("ImagingConfigOptionGmosNorth")

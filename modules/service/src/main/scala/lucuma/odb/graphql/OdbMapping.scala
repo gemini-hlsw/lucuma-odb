@@ -178,6 +178,7 @@ object OdbMapping {
           with Flamingos2DynamicMapping[F]
           with Flamingos2FpuMaskMapping[F]
           with Flamingos2LongSlitMapping[F]
+          with Igrins2LongSlitMapping[F]
           with Flamingos2StaticMapping[F]
           with FilterTypeMetaMapping[F]
           with GmosCcdModeMapping[F]
@@ -417,6 +418,7 @@ object OdbMapping {
                 Flamingos2LongSlitAcquisitionMapping,
                 Flamingos2LongSlitMapping,
                 Flamingos2StaticMapping,
+                Igrins2LongSlitMapping,
                 GmosNorthImagingFilterMapping,
                 GmosNorthLongSlitAcquisitionMapping,
                 GmosNorthLongSlitMapping,
@@ -598,6 +600,7 @@ object OdbMapping {
                 EnumeratedOffsetElaborator,
                 ExecutionElaborator,
                 Flamingos2LongSlitElaborator,
+                Igrins2LongSlitElaborator,
                 GmosNorthImagingElaborator,
                 GmosNorthLongSlitElaborator,
                 GmosSouthImagingElaborator,
