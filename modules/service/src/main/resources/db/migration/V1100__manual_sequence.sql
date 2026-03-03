@@ -504,7 +504,11 @@ DROP FUNCTION update_step_record_event_times;
 
 -- Sequence serialization coordination
 CREATE TABLE t_sequence_materialization (
-  c_observation_id d_observation_id PRIMARY KEY,
+  c_observation_id d_observation_id NOT NULL REFERENCES t_observation(c_observation_id),
+  c_sequence_type  e_sequence_type  NOT NULL,
+
+  CONSTRAINT t_sequence_materialization_pkey PRIMARY KEY (c_observation_id, c_sequence_type),
+
   c_created        timestamp        NOT NULL,
   c_updated        timestamp        NOT NULL
 );
@@ -512,17 +516,19 @@ CREATE TABLE t_sequence_materialization (
 -- We'll say that every observation with an executed step has been materialized.
 INSERT INTO t_sequence_materialization (
   c_observation_id,
+  c_sequence_type,
   c_created,
   c_updated
 )
 SELECT
   a.c_observation_id,
+  a.c_sequence_type,
   MIN(se.c_first_event_time) AS c_created,
   MIN(se.c_first_event_time) AS c_updated
 FROM t_step_execution se
 JOIN t_step s ON s.c_step_id = se.c_step_id
 JOIN t_atom a ON a.c_atom_id = s.c_atom_id
-GROUP BY a.c_observation_id;
+GROUP BY (a.c_observation_id, a.c_sequence_type);
 
 -- When a new step is completed (or uncompleted if that ever happens), we need
 -- to poke obscalc.
