@@ -19,8 +19,9 @@ object SmartIgrins2Loader:
   import SmartGcalTable.Col
 
   given Encoder[SmartGcalValue.LegacyInstrumentConfig] =
-    interval.contramap[SmartGcalValue.LegacyInstrumentConfig]:
-      _.exposureTime.toDuration
+    interval.contramap[SmartGcalValue.LegacyInstrumentConfig] { v =>
+      v.exposureTime.toDuration
+    }
 
   given Encoder[SmartGcalValue.Legacy] =
     SmartGcalTable.valueEncoder
@@ -29,10 +30,10 @@ object SmartIgrins2Loader:
     (
       int8_pos *:
       v
-    ).contramap[TableRow]: r => (
+    ).contramap[TableRow] { r => (
       r.line ,
       r.value
-    )
+    )}
 
   private val allCols: NonEmptyList[Col] =
     NonEmptyList.of(

@@ -2,5 +2,5 @@
 Mode,Calibration Lamps,Calibration Shutter,Calibration Filter,Calibration Diffuser,Calibration Observe,Calibration Exposure Time,Calibration Coadds,Calibration Basecal
 # 2024-Mar-05, hsuh
 #
-Spectroscopy,IR grey body - high,Closed,ND2.0,visible,10,30,1,Day
-Spectroscopy,Quartz Halogen,Closed,ND2.0,visible,10,30,1,Day
+Spectroscopy,IR grey body - high,Closed,ND2.0,Visible,10,30,1,Day
+Spectroscopy,Quartz Halogen,Closed,ND2.0,Visible,10,30,1,Day
