@@ -67,11 +67,11 @@ class SmartGcalLoader[A](
       _ <- bc.ioUpdate(SmartGcalTable.Gcal.addFkeyConstraints)
 
       // Insert into instrument table
-      _ <- bc.ioUpdate(inst.dropIndex)
+      _ <- inst.dropIndex.traverse_(bc.ioUpdate)
       _ <- bc.ioUpdate(inst.dropFkeyConstraints)
       _ <- bc.ioUpdate(inst.insertFromTemp(temp.name))
       _ <- bc.ioUpdate(inst.addFkeyConstraints)
-      _ <- bc.ioUpdate(inst.createIndex)
+      _ <- inst.createIndex.traverse_(bc.ioUpdate)
 
     } yield ()
   }

@@ -15,12 +15,14 @@ import lucuma.core.model.sequence.StepConfig.Gcal
 import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosSouth
+import lucuma.core.model.sequence.igrins2.Igrins2DynamicConfig
 import lucuma.odb.sequence.SmartGcalExpander
 import lucuma.odb.sequence.data.ProtoAtom
 import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.service.SmartGcalService
 import lucuma.odb.smartgcal.data.Flamingos2
 import lucuma.odb.smartgcal.data.Gmos
+import lucuma.odb.smartgcal.data.Igrins2
 
 object SmartGcalImplementation {
 
@@ -112,6 +114,13 @@ object SmartGcalImplementation {
         Gmos.SearchKey.South.fromDynamicConfig,
         _.format,
         service.selectGmosSouth
+      )
+
+    val igrins2: SmartGcalExpander[F, Igrins2DynamicConfig] =
+      new Expander[F, Igrins2.TableKey.type, Igrins2DynamicConfig](
+        _ => Igrins2.TableKey,
+        _.format,
+        service.selectIgrins2
       )
   }
 
