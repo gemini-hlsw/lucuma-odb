@@ -547,7 +547,7 @@ object SmartGcalService {
         whereSmartGcalType(sgt),
       )
 
-      selectGcal("t_smart_igrins_2", where)
+      selectGcal("t_smart_igrins2", where)
     }
 
     val InsertIgrins2: Fragment[(
@@ -557,7 +557,7 @@ object SmartGcalService {
       TimeSpan
     )] =
       sql"""
-        INSERT INTO t_smart_igrins_2 (
+        INSERT INTO t_smart_igrins2 (
           c_instrument,
           c_gcal_id,
           c_step_order,
