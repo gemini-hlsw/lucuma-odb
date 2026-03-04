@@ -266,13 +266,16 @@ class observation_configurationRequests
           _    <- expectRequests(pi, oid, List(mid))
         yield ()
 
-      test(s"$prefix request should apply after compatible mutation"):
+      test(s"$prefix request should not apply after incompatible mutation"):
         for
           oid  <- setup(too, mode)
           _    <- baseMutation(pi, oid, mode)
           mid  <- createConfigurationRequestAs(pi, oid)
           _    <- incompatibleMutation(pi, oid, mode)
-          _    <- expectRequests(pi, oid, Nil)
+          expected = mode match
+            case ObservingModeType.Igrins2LongSlit => List(mid)
+            case _                                 => Nil
+          _    <- expectRequests(pi, oid, expected)
         yield ()
 
       test(s"$prefix request should not apply for narrower conditions"):
