@@ -253,6 +253,25 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
             }
           }
         }
+        igrins2LongSlit {
+          offsetMode
+          explicitOffsetMode
+          defaultOffsetMode
+          saveSVCImages
+          explicitSaveSVCImages
+          defaultSaveSVCImages
+          exposureTimeMode {
+            signalToNoise {
+              value
+              at { nanometers }
+            }
+            timeAndCount {
+              time { seconds }
+              count
+              at { nanometers }
+            }
+          }
+        }
       }
       targetEnvironment {
         useBlindOffset
@@ -1584,5 +1603,202 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
             val a = json.hcursor.downFields("cloneObservation", "originalObservation").require[Json]
             val b = json.hcursor.downFields("cloneObservation", "newObservation").require[Json]
             assertEquals(a, b)
+
+  private def createIgrins2Observation(pid: Program.Id, tid: Target.Id): IO[Observation.Id] =
+    query(
+      user = pi,
+      query = s"""
+        mutation {
+          createObservation(input: {
+            programId: ${pid.asJson}
+            SET: {
+              targetEnvironment: {
+                asterism: [${tid.asJson}]
+              }
+              scienceRequirements: {
+                spectroscopy: {
+                  wavelength: { nanometers: 1700 }
+                  resolution: 45000
+                  wavelengthCoverage: { nanometers: 900 }
+                  focalPlane: SINGLE_SLIT
+                  focalPlaneAngle: { microarcseconds: 0 }
+                }
+                exposureTimeMode: {
+                  signalToNoise: {
+                    value: 100.0
+                    at: { nanometers: 2200 }
+                  }
+                }
+              }
+              observingMode: {
+                igrins2LongSlit: {
+                  exposureTimeMode: {
+                    signalToNoise: {
+                      value: 50.0
+                      at: { nanometers: 2200 }
+                    }
+                  }
+                }
+              }
+            }
+          }) {
+            observation { id }
+          }
+        }
+      """
+    ).map(_.hcursor.downFields("createObservation", "observation", "id").require[Observation.Id])
+
+  test("clone IGRINS2 long slit observation preserves defaults"):
+    for {
+      pid <- createProgramAs(pi)
+      tid <- createTargetAs(pi, pid)
+      oid <- createIgrins2Observation(pid, tid)
+      _   <- expect(
+              user = pi,
+              query = s"""
+                mutation {
+                  cloneObservation(input: {
+                    observationId: "$oid"
+                  }) {
+                    originalObservation {
+                      observingMode {
+                        igrins2LongSlit {
+                          offsetMode
+                          explicitOffsetMode
+                          saveSVCImages
+                          explicitSaveSVCImages
+                        }
+                      }
+                    }
+                    newObservation {
+                      observingMode {
+                        igrins2LongSlit {
+                          offsetMode
+                          explicitOffsetMode
+                          saveSVCImages
+                          explicitSaveSVCImages
+                        }
+                      }
+                    }
+                  }
+                }
+              """,
+              expected = Right(
+                json"""
+                  {
+                    "cloneObservation": {
+                      "originalObservation": {
+                        "observingMode": {
+                          "igrins2LongSlit": {
+                            "offsetMode": "NOD_ALONG_SLIT",
+                            "explicitOffsetMode": null,
+                            "saveSVCImages": false,
+                            "explicitSaveSVCImages": null
+                          }
+                        }
+                      },
+                      "newObservation": {
+                        "observingMode": {
+                          "igrins2LongSlit": {
+                            "offsetMode": "NOD_ALONG_SLIT",
+                            "explicitOffsetMode": null,
+                            "saveSVCImages": false,
+                            "explicitSaveSVCImages": null
+                          }
+                        }
+                      }
+                    }
+                  }
+                """
+              )
+            )
+    } yield ()
+
+  test("clone IGRINS2 long slit observation preserves explicit overrides"):
+    for {
+      pid <- createProgramAs(pi)
+      tid <- createTargetAs(pi, pid)
+      oid <- createIgrins2Observation(pid, tid)
+      _   <- query(
+                user = pi,
+                query = s"""
+                  mutation {
+                    updateObservations(input: {
+                      SET: {
+                        observingMode: {
+                          igrins2LongSlit: {
+                            explicitOffsetMode: NOD_TO_SKY
+                            explicitSaveSVCImages: true
+                          }
+                        }
+                      }
+                      WHERE: {
+                        id: { EQ: ${oid.asJson} }
+                      }
+                    }) {
+                      observations { id }
+                    }
+                  }
+                """)
+      _   <- expect(
+              user = pi,
+              query = s"""
+                mutation {
+                  cloneObservation(input: {
+                    observationId: "$oid"
+                  }) {
+                    originalObservation {
+                      observingMode {
+                        igrins2LongSlit {
+                          offsetMode
+                          explicitOffsetMode
+                          saveSVCImages
+                          explicitSaveSVCImages
+                        }
+                      }
+                    }
+                    newObservation {
+                      observingMode {
+                        igrins2LongSlit {
+                          offsetMode
+                          explicitOffsetMode
+                          saveSVCImages
+                          explicitSaveSVCImages
+                        }
+                      }
+                    }
+                  }
+                }
+              """,
+              expected = Right(
+                json"""
+                  {
+                    "cloneObservation": {
+                      "originalObservation": {
+                        "observingMode": {
+                          "igrins2LongSlit": {
+                            "offsetMode": "NOD_TO_SKY",
+                            "explicitOffsetMode": "NOD_TO_SKY",
+                            "saveSVCImages": true,
+                            "explicitSaveSVCImages": true
+                          }
+                        }
+                      },
+                      "newObservation": {
+                        "observingMode": {
+                          "igrins2LongSlit": {
+                            "offsetMode": "NOD_TO_SKY",
+                            "explicitOffsetMode": "NOD_TO_SKY",
+                            "saveSVCImages": true,
+                            "explicitSaveSVCImages": true
+                          }
+                        }
+                      }
+                    }
+                  }
+                """
+              )
+            )
+    } yield ()
 
 }

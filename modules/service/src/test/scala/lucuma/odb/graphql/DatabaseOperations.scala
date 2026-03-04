@@ -1077,6 +1077,12 @@ trait DatabaseOperations { this: OdbSuite =>
       case ObservingModeType.Igrins2LongSlit =>
         """{
           igrins2LongSlit: {
+            exposureTimeMode: {
+              signalToNoise: {
+                value: 50.0
+                at: { nanometers: 2200 }
+              }
+            }
           }
         }"""
 
@@ -1118,6 +1124,17 @@ trait DatabaseOperations { this: OdbSuite =>
             filter: Y
             fpu: LONG_SLIT_2
             $offsetsField
+          }
+        }"""
+      case ObservingModeType.Igrins2LongSlit =>
+        """{
+          igrins2LongSlit: {
+            exposureTimeMode: {
+              signalToNoise: {
+                value: 50.0
+                at: { nanometers: 2200 }
+              }
+            }
           }
         }"""
       case _ => ""
