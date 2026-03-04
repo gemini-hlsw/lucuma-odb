@@ -71,13 +71,12 @@ class FileReader[F[_]](fileName: String)(using ApplicativeError[F, Throwable]) {
     read(Instrument.Flamingos2, Flamingos2SpectroscopyRow.flamingos2)
       .andThen(_.filter(_._1.spec.fpuOption === FpuOption.Singleslit)) // for now only single slit
 
+  val igrins2Spectroscopy: Pipe[F, Byte, (SpectroscopyRow, PosInt)] = 
+    read(Instrument.Igrins2, SpectroscopyRow.rows)
+
   val gmosNorthImaging: Pipe[F, Byte, (GmosImagingRow.GmosNorth, PosInt)] =
     read(Instrument.GmosNorth, GmosImagingRow.gmosNorth)
 
   val gmosSouthImaging: Pipe[F, Byte, (GmosImagingRow.GmosSouth, PosInt)] =
     read(Instrument.GmosSouth, GmosImagingRow.gmosSouth)
-
-  val igrins2Spectroscopy: Pipe[F, Byte, (SpectroscopyRow, PosInt)] =
-    read(Instrument.Igrins2, SpectroscopyRow.rows)
-
 }

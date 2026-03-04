@@ -19,9 +19,8 @@ object SmartIgrins2Loader:
   import SmartGcalTable.Col
 
   given Encoder[SmartGcalValue.LegacyInstrumentConfig] =
-    interval.contramap[SmartGcalValue.LegacyInstrumentConfig] { v =>
-      v.exposureTime.toDuration
-    }
+    interval.contramap[SmartGcalValue.LegacyInstrumentConfig]:
+      _.exposureTime.toDuration
 
   given Encoder[SmartGcalValue.Legacy] =
     SmartGcalTable.valueEncoder
@@ -30,10 +29,8 @@ object SmartIgrins2Loader:
     (
       int8_pos *:
       v
-    ).contramap[TableRow] { r => (
-      r.line ,
-      r.value
-    )}
+    ).contramap[TableRow]:
+      r => (r.line , r.value)
 
   private val allCols: NonEmptyList[Col] =
     NonEmptyList.of(
@@ -49,12 +46,12 @@ object SmartIgrins2Loader:
     )
 
   // We can't use forInstrument as igrins2 has no search columns
-  val tmpS: SmartGcalTable.Temp = SmartGcalTable.Temp(Igrins2, allCols)
-  val instS: SmartGcalTable.Inst = SmartGcalTable.Inst(Igrins2, instCols)
+  val tmp  = SmartGcalTable.Temp(Igrins2, allCols)
+  val inst = SmartGcalTable.Inst(Igrins2, instCols)
 
   object Ig2 extends SmartGcalLoader(
-    tmpS,
-    instS,
-    pipe    = filename => FileReader.igrins2[IO](filename) andThen FileEntry.tableRows[IO],
+    temp    = tmp,
+    inst    = inst,
+    pipe    = FileReader.igrins2[IO](_).andThen(FileEntry.tableRows[IO]),
     encoder = encoder
   )
