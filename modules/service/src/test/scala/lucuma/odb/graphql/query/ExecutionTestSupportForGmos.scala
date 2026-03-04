@@ -96,6 +96,20 @@ trait ExecutionTestSupportForGmos extends ExecutionTestSupport:
       GmosAmpGain.Low
     )
 
+  val gs_key_0_50_R600: Gmos.TableKey[GmosSouthGrating, GmosSouthFilter, GmosSouthFpu] =
+    Gmos.TableKey(
+      Gmos.GratingConfigKey(
+        GmosSouthGrating.R600_G5324,
+        GmosGratingOrder.One,
+        BoundedInterval.unsafeOpenUpper(Wavelength.Min, Wavelength.Max)
+      ).some,
+      GmosSouthFilter.RPrime.some,
+      GmosSouthFpu.LongSlit_0_50.some,
+      GmosXBinning.One,
+      GmosYBinning.Two,
+      GmosAmpGain.Low
+    )
+
   val gn_key_0_75: Gmos.TableKey[GmosNorthGrating, GmosNorthFilter, GmosNorthFpu] =
     Gmos.TableKey(
       Gmos.GratingConfigKey(
@@ -139,20 +153,6 @@ trait ExecutionTestSupportForGmos extends ExecutionTestSupport:
       GmosAmpGain.Low
     )
 
-  val gs_key_0_50: Gmos.TableKey[GmosSouthGrating, GmosSouthFilter, GmosSouthFpu] =
-    Gmos.TableKey(
-      Gmos.GratingConfigKey(
-        GmosSouthGrating.R600_G5324,
-        GmosGratingOrder.One,
-        BoundedInterval.unsafeOpenUpper(Wavelength.Min, Wavelength.Max)
-      ).some,
-      GmosSouthFilter.RPrime.some,
-      GmosSouthFpu.LongSlit_0_50.some,
-      GmosXBinning.One,
-      GmosYBinning.Two,
-      GmosAmpGain.Low
-    )
-
   val gmos_flat =
     SmartGcalValue(
       Gcal(
@@ -169,7 +169,6 @@ trait ExecutionTestSupportForGmos extends ExecutionTestSupport:
     )
 
   val gmos_arc =
-  val arc =
     SmartGcalValue(
       Gcal(
         Gcal.Lamp.fromArcs(NonEmptySet.one(GcalArc.CuArArc)),
@@ -199,8 +198,10 @@ trait ExecutionTestSupportForGmos extends ExecutionTestSupport:
 
     val rowsSouth: List[Gmos.TableRow.South] =
       List(
-        Gmos.TableRow(PosLong.unsafeFrom(1), gs_key_0_50, gmos_flat),
-        Gmos.TableRow(PosLong.unsafeFrom(1), gs_key_0_50, gmos_arc)
+        Gmos.TableRow(PosLong.unsafeFrom(1), gs_key_0_50,      gmos_flat),
+        Gmos.TableRow(PosLong.unsafeFrom(1), gs_key_0_50,      gmos_arc),
+        Gmos.TableRow(PosLong.unsafeFrom(1), gs_key_0_50_R600, gmos_flat),
+        Gmos.TableRow(PosLong.unsafeFrom(1), gs_key_0_50_R600, gmos_arc)
       )
 
     val north = servicesFor(pi /* doesn't matter*/).map(_(s)).use: services =>
@@ -546,8 +547,6 @@ trait ExecutionTestSupportForGmos extends ExecutionTestSupport:
     yield o
 
   val createOngoingGmosSouthObservation: IO[Observation.Id] =
-    // importing at the top level breaks other tests in a never-ending cycle of despair.
-    import lucuma.odb.json.all.transport.given
     for
       p <- createProgramAs(pi)
       t <- createTargetWithProfileAs(pi, p)
