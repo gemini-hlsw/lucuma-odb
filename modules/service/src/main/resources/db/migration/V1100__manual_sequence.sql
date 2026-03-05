@@ -336,6 +336,7 @@ BEGIN
   )
   ON CONFLICT (c_step_id) DO UPDATE
   SET
+    c_visit_id         = NEW.c_visit_id, -- we include the visit in order to fail (in validate_step_execution_update()) if it has changed
     c_first_event_time = least(t_step_execution.c_first_event_time,   NEW.c_received),
     c_last_event_time  = greatest(t_step_execution.c_last_event_time, NEW.c_received),
     c_execution_state  =
