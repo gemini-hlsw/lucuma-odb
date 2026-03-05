@@ -329,7 +329,6 @@ BEGIN
         JOIN t_step s ON s.c_step_id = se.c_step_id
         JOIN t_atom a ON a.c_atom_id = s.c_atom_id
        WHERE a.c_observation_id = NEW.c_observation_id
-         AND a.c_sequence_type  = sequence_type
     ),
     NEW.c_received,
     NEW.c_received

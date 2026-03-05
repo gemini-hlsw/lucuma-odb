@@ -11,6 +11,7 @@ import cats.syntax.option.*
 import io.circe.Json
 import io.circe.literal.*
 import lucuma.core.enums.ObservingModeType
+import lucuma.core.enums.StepStage
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.User
@@ -321,4 +322,54 @@ class recordDataset extends OdbSuite with query.ExecutionTestSupportForGmos {
         (d1, k1)        <- recordDataset(s, v)
       yield (d0 === d1) && (k0 === idm) && (k1 === idm)
 
+  /*
+  private def ref(did: Dataset.Id): IO[DatasetReference] =
+    query(
+      user  = pi,
+      query = s"""
+        query { dataset(datasetId: "$did") { reference { label } } }
+      """
+    ).map: json =>
+      json.hcursor.downFields("dataset", "reference", "label").require[DatasetReference]
+  */
+
+  test("recordDataset - two datasets, same step"):
+    assertIOBoolean:
+      for
+        cfp <- createCallForProposalsAs(staff)
+        pid <- createProgramWithUsPi(pi)
+        _   <- addProposal(pi, pid, cfp.some, None)
+        _   <- addPartnerSplits(pi, pid)
+        _   <- addCoisAs(pi, pid)
+        _   <- setProposalStatus(staff, pid, "ACCEPTED")
+
+        tid <- createTargetWithProfileAs(pi, pid)
+        oid <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid)
+        vid <- recordVisitAs(serviceUser, ObservingModeType.GmosNorthLongSlit.instrument, oid)
+
+        acq <- firstAcquisitionAtomStepIds(serviceUser, oid)
+        sci <- firstScienceAtomStepIds(serviceUser, oid)
+
+        _   <- addStepEventAs(serviceUser, acq(0), vid, StepStage.StartStep)
+        d0  <- recordDatasetAs(serviceUser, acq(0), vid, "N18630703S0001.fits")
+        _   <- addStepEventAs(serviceUser, acq(0), vid, StepStage.EndStep)
+
+        _   <- addStepEventAs(serviceUser, sci(0), vid, StepStage.StartStep)
+        d1  <- recordDatasetAs(serviceUser, sci(0), vid, "N18630703S0002.fits")
+        _   <- addStepEventAs(serviceUser, sci(0), vid, StepStage.EndStep)
+
+        _   <- addStepEventAs(serviceUser, sci(1), vid, StepStage.StartStep)
+        d2  <- recordDatasetAs(serviceUser, sci(1), vid, "N18630703S0003.fits")
+        _   <- addStepEventAs(serviceUser, sci(1), vid, StepStage.EndStep)
+
+        //r0  <- ref(d0)
+        //_   <- IO.println(s"Reference 0: ${r0.label}")
+
+        //r1  <- ref(d1)
+        //_   <- IO.println(s"Reference 1: ${r1.label}")
+
+        //r2  <- ref(d2)
+        //_   <- IO.println(s"Reference 2: ${r2.label}")
+
+      yield List(d0, d1, d2).distinct.sizeIs.==(3) // basically just checking that no operations fail
 }
