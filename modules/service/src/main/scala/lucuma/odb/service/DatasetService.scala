@@ -84,8 +84,8 @@ object DatasetService {
         input: RecordDatasetInput
       )(using Transaction[F], Services.ServiceAccess): F[Result[Dataset.Id]] = {
 
-        def filenameDuplicated: Result[Dataset.Id] =
-          OdbError.InvalidFilename(input.filename, s"The filename '${input.filename.format}' is already assigned".some).asFailure
+        def filenameDuplicated(detail: Option[String]): Result[Dataset.Id] =
+          OdbError.InvalidFilename(input.filename, s"The filename '${input.filename.format}' is already assigned${detail.map(d => s": $d").getOrElse("")}".some).asFailure
 
         def stepNotFound: Result[Dataset.Id] =
           OdbError.InvalidStep(input.stepId, s"Step id '${input.stepId}' not found".some).asFailure
@@ -98,7 +98,11 @@ object DatasetService {
             .unique(Statements.InsertDataset)(input)
             .map(_.success)
             .recover:
-              case SqlState.UniqueViolation(_)     => filenameDuplicated
+              case SqlState.UniqueViolation(ex)    =>
+                val Ansi    = "\u001B\\[[;\\d]*m".r
+                val clean   = Ansi.replaceAllIn(ex.getMessage, "")
+                val Detail  = """.*Detail:\s*(.*)""".r
+                filenameDuplicated(clean.linesIterator.collectFirst { case Detail(d) => d })
               case SqlState.ForeignKeyViolation(_) => stepNotFound
               case SqlState.CheckViolation(_)      => stepNotExecuted
               case SqlState.NotNullViolation(ex) if ex.getMessage.contains("c_observation_id") => stepNotFound

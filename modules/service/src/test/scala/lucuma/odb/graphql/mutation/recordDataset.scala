@@ -216,7 +216,7 @@ class recordDataset extends OdbSuite with query.ExecutionTestSupportForGmos {
           }
         }
       """,
-      (_, _) => "The filename 'N18630101S0002.fits' is already assigned".asLeft
+      (_, _) => "The filename 'N18630101S0002.fits' is already assigned: Key (c_file_site, c_file_date, c_file_index)=(gn, 1863-01-01, 2)".asLeft
     )
   }
 

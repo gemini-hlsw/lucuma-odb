@@ -9,6 +9,7 @@ import cats.syntax.either.*
 import cats.syntax.option.*
 import io.circe.Json
 import io.circe.literal.*
+import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.StepStage
 import lucuma.core.model.ExecutionEvent
@@ -207,3 +208,26 @@ class addStepEvent extends OdbSuite with ExecutionState with query.ExecutionTest
     setup(ObservingModeType.GmosNorthLongSlit, serviceUser).flatMap: su =>
       addWithIdempotencyKey(su.sid0, su.vid, idm = idm).flatMap: (eid, _) =>
         assertIO(addWithIdempotencyKey(su.sid0, su.vid, idm = idm).map(_._1), eid)
+
+  test("addStepEvent - cannot split step across visits"):
+    def query(sid: Step.Id, vid: Visit.Id): String =
+      s"""
+        mutation {
+          addStepEvent(input: {
+            stepId:    "$sid"
+            visitId:   "$vid"
+            stepStage: END_STEP
+          }) { event { step { id } } }
+        }
+      """
+
+    for
+      su   <- setup(ObservingModeType.GmosNorthLongSlit, serviceUser)
+      _    <- addStepEventAs(serviceUser, su.sid0, su.vid, StepStage.StartStep)
+      v    <- recordVisitAs(serviceUser, Instrument.GmosNorth, su.oid)
+      _    <- expect(
+        serviceUser,
+        query(su.sid0, v),
+        List(s"Part of the step '${su.sid0}' was executed in a visit other than '$v'").asLeft
+      )
+    yield ()
