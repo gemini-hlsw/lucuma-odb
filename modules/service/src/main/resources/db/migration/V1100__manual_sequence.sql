@@ -408,6 +408,30 @@ CREATE TRIGGER update_execution_information_for_sequence_event_trigger
   WHEN (NEW.c_sequence_command IS NOT NULL)
     EXECUTE PROCEDURE update_execution_information_for_sequence_event();
 
+-- Abandon ongoing steps (in both sequence types) when a new visit is recorded.
+-- Ideally they'd be abandoned when the previous visit *ends* but we don't have
+-- a great way to detect that.
+CREATE OR REPLACE FUNCTION update_execution_information_for_visit()
+  RETURNS TRIGGER AS $$
+BEGIN
+
+  UPDATE t_step_execution se
+  SET c_execution_state = 'abandoned'
+  FROM t_step s
+  JOIN t_atom a ON a.c_atom_id = s.c_atom_id
+  WHERE a.c_observation_id   = NEW.c_observation_id
+    AND se.c_execution_state = 'ongoing'
+    AND se.c_visit_id       <> NEW.c_visit_id;
+
+  RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER update_execution_information_for_visit_trigger
+  AFTER INSERT ON t_visit
+  FOR EACH ROW
+  EXECUTE PROCEDURE update_execution_information_for_visit();
+
 -- A function to mark ongoing steps as abandoned and remove unexecuted atoms and
 -- steps
 CREATE OR REPLACE PROCEDURE abandon_ongoing_and_delete_unexecuted_steps(
