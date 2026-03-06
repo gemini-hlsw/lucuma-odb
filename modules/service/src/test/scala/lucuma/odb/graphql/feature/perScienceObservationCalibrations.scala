@@ -723,7 +723,7 @@ class perScienceObservationCalibrations
       groupId   =  obs.groupId.get
       groupInfo <- queryGroup(groupId)
     } yield {
-      assertEquals(groupInfo.ordered, true)
+      assertEquals(groupInfo.ordered, false)
       assertEquals(groupInfo.minimumRequired, None) // all observations
       assertEquals(groupInfo.maximumInterval, TimeSpan.Zero.some)
     }

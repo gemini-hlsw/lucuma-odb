@@ -97,7 +97,7 @@ object PerScienceObservationCalibrationsService:
               name = groupNameForObservation(config, CalibrationRole.Telluric, oid).some,
               description = none,
               minimumRequired = none,
-              ordered = true,
+              ordered = false,
               minimumInterval = none,
               maximumInterval = TimeSpan.Zero.some,
               parentGroupId = parentGroupId,
