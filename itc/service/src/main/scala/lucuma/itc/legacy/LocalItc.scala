@@ -5,9 +5,9 @@ package lucuma.itc.legacy
 
 import cats.effect.Sync
 import cats.syntax.all.*
+import io.circe.Json
 import io.circe.parser.decode
 import io.circe.parser.parse
-import io.circe.Json
 import lucuma.itc.legacy
 import lucuma.itc.legacy.codecs.given
 
