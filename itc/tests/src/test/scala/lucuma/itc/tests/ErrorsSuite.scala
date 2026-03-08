@@ -7,6 +7,7 @@ import cats.kernel.laws.discipline.EqTests
 import io.circe.testing.ArbitraryInstances
 import io.circe.testing.CodecTests
 import lucuma.itc.arb.ArbError.given
+import lucuma.odb.json.wavelength.query.given
 
 class ErrorsSuite extends munit.DisciplineSuite with ArbitraryInstances:
   checkAll("Error", EqTests[Error].eqv)

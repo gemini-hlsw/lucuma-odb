@@ -7,8 +7,10 @@ import buildinfo.BuildInfo
 import cats.effect.Async
 import cats.effect.kernel.syntax.all.*
 import cats.syntax.all.*
+import lucuma.core.math.Wavelength
 import lucuma.itc.SourceTooBright
 import lucuma.itc.UpstreamException
+import lucuma.itc.WavelengthOutOfRange
 import lucuma.itc.legacy
 import natchez.Trace
 
@@ -21,7 +23,10 @@ case class FLocalItc[F[_]: {Async as F, Trace as T}](itcLocal: LocalItc[F]):
     """This target is too bright for this configuration."""
   val HalfWell  = """The detector well is half filled in (\d*\.?\d*) seconds.""".r
 
-  def calculateGraphs(jsonParams: String): F[GraphsRemoteResult] =
+  def calculateGraphs(
+    jsonParams:   String,
+    atWavelength: Wavelength
+  ): F[GraphsRemoteResult] =
     T.span("call_legacy graphs"):
       T.put("method"       -> "calculateGraphs",
             "params.json"  -> jsonParams,
@@ -32,11 +37,16 @@ case class FLocalItc[F[_]: {Async as F, Trace as T}](itcLocal: LocalItc[F]):
           case Left(msg)     =>
             msg match {
               case TooBright :: HalfWell(v) :: Nil => F.raiseError(SourceTooBright(BigDecimal(v)))
+              case List(LocalItc.OutOfRangeMsg)    =>
+                F.raiseError(WavelengthOutOfRange(atWavelength))
               case _                               => F.raiseError(new UpstreamException(msg))
             }
         }
 
-  def calculateIntegrationTime(jsonParams: String): F[IntegrationTimeRemoteResult] =
+  def calculateIntegrationTime(
+    jsonParams:   String,
+    atWavelength: Wavelength
+  ): F[IntegrationTimeRemoteResult] =
     F.delay(pprint.pprintln(jsonParams)) *>
       T.span("call_legacy integration_time"):
         T.put("method"       -> "calculateIntegrationTime",
@@ -50,12 +60,17 @@ case class FLocalItc[F[_]: {Async as F, Trace as T}](itcLocal: LocalItc[F]):
               msg match {
                 case TooBright :: HalfWell(v) :: Nil =>
                   F.raiseError(SourceTooBright(BigDecimal(v)))
+                case List(LocalItc.OutOfRangeMsg)    =>
+                  F.raiseError(WavelengthOutOfRange(atWavelength))
                 case _                               =>
                   F.raiseError(new UpstreamException(msg))
               }
           }
 
-  def calculateSignalToNoise(jsonParams: String): F[IntegrationTimeRemoteResult] =
+  def calculateSignalToNoise(
+    jsonParams:   String,
+    atWavelength: Wavelength
+  ): F[IntegrationTimeRemoteResult] =
     F.delay(pprint.pprintln(jsonParams)) *>
       T.span("call_legacy signal_to_noise"):
         T.put("method"       -> "calculateSignalToNoise",
@@ -69,6 +84,8 @@ case class FLocalItc[F[_]: {Async as F, Trace as T}](itcLocal: LocalItc[F]):
               msg match {
                 case TooBright :: HalfWell(v) :: Nil =>
                   F.raiseError(SourceTooBright(BigDecimal(v)))
+                case List(LocalItc.OutOfRangeMsg)    =>
+                  F.raiseError(WavelengthOutOfRange(atWavelength))
                 case _                               =>
                   F.raiseError(new UpstreamException(msg))
               }
