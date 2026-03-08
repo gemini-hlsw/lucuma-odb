@@ -86,20 +86,20 @@ trait ExecutionEventMapping[F[_]] extends ExecutionEventTable[F]
 
   lazy val AtomEventMapping: ObjectMapping =
     ObjectMapping(AtomEventType)(
-      SqlObject("atom",     Join(ExecutionEventTable.AtomId, AtomRecordView.Id)),
+      SqlObject("atom",     Join(ExecutionEventTable.AtomId, AtomRecordView.AtomId)),
       SqlField("atomStage", ExecutionEventTable.AtomStage)
     )
 
   lazy val StepEventMapping: ObjectMapping =
   ObjectMapping(StepEventType)(
-      SqlObject("atom",     Join(ExecutionEventTable.AtomId, AtomRecordView.Id)),
+      SqlObject("atom",     Join(ExecutionEventTable.AtomId, AtomRecordView.AtomId)),
       SqlObject("step",     Join(ExecutionEventTable.StepId, StepRecordView.Id)),
       SqlField("stepStage", ExecutionEventTable.StepStage)
     )
 
   lazy val DatasetEventMapping: ObjectMapping =
     ObjectMapping(DatasetEventType)(
-      SqlObject("atom",        Join(ExecutionEventTable.AtomId, AtomRecordView.Id)),
+      SqlObject("atom",        Join(ExecutionEventTable.AtomId, AtomRecordView.AtomId)),
       SqlObject("step",        Join(ExecutionEventTable.StepId, StepRecordView.Id)),
       SqlObject("dataset",     Join(ExecutionEventTable.DatasetId, DatasetTable.Id)),
       SqlField("datasetStage", ExecutionEventTable.DatasetStage)

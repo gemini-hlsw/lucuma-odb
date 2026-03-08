@@ -235,10 +235,13 @@ enum AtomStage {
   START_ATOM
 }
 
-"An atom as recorded by Observe."
+"The portion of an atom that executed in a particular visit."
 type AtomRecord {
   "Atom ID."
   id: AtomId!
+
+  "Visit in which this atom executed."
+  visit: Visit!
 
   "Atom execution order -- the index of its first executed step."
   index: PosInt!

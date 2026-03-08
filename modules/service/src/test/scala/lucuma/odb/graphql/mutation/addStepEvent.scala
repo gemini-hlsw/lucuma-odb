@@ -162,9 +162,9 @@ class addStepEvent extends OdbSuite with ExecutionState with query.ExecutionTest
       resA <- atomExecutionState(serviceUser, su.oid)
       resS <- stepExecutionState(serviceUser, su.oid)
     yield
-      // Before we would abandon the first atom altogether.  Now we'll let the
-      // user decide whether to salvage any steps from that atom.
-      assertEquals(resA, List(AtomExecutionState.Ongoing, AtomExecutionState.Ongoing))
+      // The first atom record contains a single step that was abandoned, so it
+      // is considered complete.
+      assertEquals(resA, List(AtomExecutionState.Completed, AtomExecutionState.Ongoing))
       assertEquals(resS, List(StepExecutionState.Abandoned, StepExecutionState.Ongoing))
 
   def addWithIdempotencyKey(

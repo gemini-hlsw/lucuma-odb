@@ -6,11 +6,13 @@ package lucuma.odb.graphql.table
 import lucuma.odb.graphql.BaseMapping
 import lucuma.odb.util.Codecs.*
 import skunk.codec.boolean.bool
+import skunk.codec.text.text
 
 trait StepRecordView[F[_]] extends BaseMapping[F]:
 
   object StepRecordView extends TableDef("v_step_record"):
     val Id: ColumnRef             = col("c_step_id",          step_id)
+    val AtomVisitId: ColumnRef    = col("c_atom_visit_id",    text)
     val AtomId: ColumnRef         = col("c_atom_id",          atom_id)
     val VisitId: ColumnRef        = col("c_visit_id",         visit_id)
     val Instrument: ColumnRef     = col("c_instrument",       instrument)
