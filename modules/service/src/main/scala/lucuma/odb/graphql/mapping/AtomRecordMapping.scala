@@ -36,7 +36,9 @@ trait AtomRecordMapping[F[_]] extends AtomRecordView[F]
 
   lazy val AtomRecordMapping: ObjectMapping =
     ObjectMapping(AtomRecordType)(
-      SqlField("id",              AtomRecordView.Id, key = true),
+      SqlField("_key",            AtomRecordView.Id, key = true, hidden = true),
+      SqlField("id",              AtomRecordView.AtomId),
+      SqlObject("visit",          Join(AtomRecordView.VisitId, VisitTable.Id)),
       SqlField("index",           AtomRecordView.ExecutionOrder),
       SqlObject("observation",    Join(AtomRecordView.ObservationId, ObservationView.Id)),
       SqlField("description",     AtomRecordView.Description),

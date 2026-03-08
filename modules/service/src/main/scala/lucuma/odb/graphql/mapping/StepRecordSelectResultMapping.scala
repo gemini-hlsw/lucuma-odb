@@ -10,9 +10,11 @@ import table.StepRecordView
 trait StepRecordSelectResultMapping[F[_]]
   extends AtomRecordView[F[_]]
      with ResultMapping[F]
-     with StepRecordView[F] {
+     with StepRecordView[F]:
 
   lazy val StepRecordSelectResultMapping: TypeMapping =
-    nestedSelectResultMapping(StepRecordSelectResultType, AtomRecordView.Id, Join(AtomRecordView.Id, StepRecordView.AtomId))
-
-}
+    nestedSelectResultMapping(
+      StepRecordSelectResultType,
+      AtomRecordView.Id,
+      Join(AtomRecordView.Id, StepRecordView.AtomVisitId)
+    )

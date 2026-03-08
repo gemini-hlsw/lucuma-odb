@@ -114,7 +114,7 @@ CREATE TABLE t_step_execution (
 
 );
 
-CREATE INDEX ON t_step_execution (c_visit_id, c_step_id);
+CREATE INDEX ON t_step_execution (c_step_id, c_visit_id);
 
 -- Help finding ongoing observations.
 CREATE INDEX ON t_step_execution (c_execution_state) WHERE c_execution_state = 'ongoing';
@@ -207,16 +207,13 @@ FOR EACH ROW
 EXECUTE FUNCTION validate_step_execution_update();
 
 -- Create a view on the atom table.  This will correspond to the old atom record
--- table in that it only contains (at least partially) executed atoms.
--- NOTE: We'll LEFT JOIN on t_step_execution because for the purpose of
--- calculating the atom completion state we need to consider unexecuted steps
--- as well.  Otherwise a single completed step would make the atom as a whole
--- completed.  But, we don't want include atom rows for which there are NO
--- executed steps so we add "HAVING bool_or(se.c_step_id IS NOT NULL)" to filter
--- out atoms with no executed/executing steps.
+-- table in that it only contains (at least partially) executed atoms.  There
+-- may be multiple atom records (one per visit) for each atom.
 CREATE VIEW v_atom_record AS
 SELECT
+  (a.c_atom_id::text || se.c_visit_id::text) AS c_atom_visit_id,
   a.c_atom_id,
+  se.c_visit_id,
   a.c_observation_id,
   a.c_sequence_type,
   a.c_description,
@@ -226,28 +223,19 @@ SELECT
   MAX(se.c_last_event_time)      AS c_last_event_time,
 
   CASE
-    WHEN bool_and(
-      COALESCE(se.c_execution_state, 'not_started') IN ('completed', 'abandoned')
-    ) THEN 'completed'
-
-    -- Step execution rows are born 'ongoing' so this will likely never
-    -- be the case in reality.
-    WHEN bool_and(
-      COALESCE(se.c_execution_state, 'not_started') = 'not_started'
-    ) THEN 'not_started'
-
+    WHEN bool_and(se.c_execution_state IN ('completed', 'abandoned')) THEN 'completed'
     ELSE 'ongoing'
   END::d_tag AS c_execution_state
 
 FROM t_atom a
 JOIN t_step s ON s.c_atom_id = a.c_atom_id
-LEFT JOIN t_step_execution se ON se.c_step_id = s.c_step_id
+JOIN t_step_execution se ON se.c_step_id = s.c_step_id
 GROUP BY
   a.c_atom_id,
+  se.c_visit_id,
   a.c_observation_id,
   a.c_sequence_type,
-  a.c_description
-HAVING bool_or(se.c_step_id IS NOT NULL);
+  a.c_description;
 
 -- A partial mapping from step stage to execution state.  When a step event
 -- arrives it carries a step stage and we use this mapping to figure the
@@ -490,6 +478,7 @@ DROP VIEW v_step_record;
 -- specific data and aggregates the dataset QA state.
 CREATE VIEW v_step_record AS
 SELECT
+  (s.c_atom_id::text || se.c_visit_id::text) AS c_atom_visit_id,
   se.c_step_id,
   s.c_atom_id,
   se.c_visit_id,
@@ -818,23 +807,15 @@ SELECT
       SELECT 1 FROM t_execution_event v WHERE v.c_observation_id = o.c_observation_id
     ) THEN 'not_started'::e_execution_state
 
-    -- Some atoms have no associated events -> ongoing
+    -- At least one step not completed -> ongoing
     WHEN EXISTS (
       SELECT 1
-        FROM t_atom a
-       WHERE a.c_observation_id = o.c_observation_id
-         AND a.c_sequence_type = 'science'
-         AND NOT EXISTS (
-           SELECT 1 FROM t_execution_event e WHERE e.c_atom_id = a.c_atom_id
-         )
-    ) THEN 'ongoing'::e_execution_state
-
-    -- At least one atom not completed -> ongoing
-    WHEN EXISTS (
-      SELECT 1 FROM v_atom_record a
-        WHERE a.c_observation_id = o.c_observation_id
-          AND a.c_sequence_type  = 'science'
-          AND a.c_execution_state IN ('not_started', 'ongoing')
+      FROM t_step s
+      JOIN t_atom a ON a.c_atom_id = s.c_atom_id
+      LEFT JOIN t_step_execution se ON se.c_step_id = s.c_step_id
+      WHERE a.c_observation_id = o.c_observation_id
+        AND a.c_sequence_type = 'science'
+        AND COALESCE(se.c_execution_state, 'not_started') NOT IN ('completed', 'abandoned')
     ) THEN 'ongoing'::e_execution_state
 
     ELSE 'completed'::e_execution_state
@@ -874,21 +855,6 @@ LEFT JOIN (
 ORDER BY
   o.c_observation_id,
   t.c_target_id;
-
--- Executed steps are tied to visits, but an atom contains multiple steps and
--- thus may be spread across multiple visits.  Presumably a user will avoid
--- this via manual edits but we will do nothing to enforce that all the atoms'
--- steps happen in the same visit.  Now, we would like to see all the atoms
--- associated with a visit and for that we need a view for Grackle.
-CREATE VIEW v_visit_atom AS
-SELECT
-  se.c_visit_id,
-  s.c_atom_id
-FROM t_step_execution se
-JOIN t_step s ON s.c_step_id = se.c_step_id
-GROUP BY
-  se.c_visit_id,
-  s.c_atom_id;
 
 -- The old atom and step record tables can be dropped now.  We'll keep them
 -- for a bit, just in case.
