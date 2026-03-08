@@ -42,7 +42,7 @@ trait StepRecordMapping[F[_]] extends StepRecordView[F]
       SqlField("id",              StepRecordView.Id, key = true),
       SqlField("index",           StepRecordView.ExecutionOrder),
       SqlField("instrument",      StepRecordView.Instrument, discriminator = true),
-      SqlObject("atom",           Join(StepRecordView.AtomId, AtomRecordView.Id)),
+      SqlObject("atom",           Join(StepRecordView.AtomId, AtomRecordView.AtomId)),
       SqlField("executionState",  StepRecordView.ExecutionState),
       SqlField("_firstEventTime", StepRecordView.FirstEventTime, hidden = true),
       SqlField("_lastEventTime",  StepRecordView.LastEventTime, hidden = true),
