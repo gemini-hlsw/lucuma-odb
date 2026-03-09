@@ -98,15 +98,29 @@ CREATE TABLE t_step (
 
 CREATE INDEX ON t_step (c_atom_id);
 
+-- We'll keep up with a step execution order counter in t_observation.  Each
+-- executed (or executing) step gets a unique order.
+ALTER TABLE t_observation
+ADD COLUMN c_step_execution_order integer NOT NULL DEFAULT 0;
+
 -- Step execution information, which exists once the first step (or dataset)
 -- event associated with the step arrives.
 CREATE TABLE t_step_execution (
   c_step_id          d_step_id  PRIMARY KEY REFERENCES t_step(c_step_id),
+
+  -- denormalize these columns for efficiency and constraint checking
+  c_observation_id   d_observation_id NOT NULL REFERENCES t_observation(c_observation_id),
+  c_sequence_type    e_sequence_type  NOT NULL,
+
   c_visit_id         d_visit_id NOT NULL REFERENCES t_visit(c_visit_id),
   c_execution_state  d_tag      NOT NULL REFERENCES t_step_execution_state(c_tag) DEFAULT ('not_started'::character varying)::d_tag,
 
   -- Execution order determined when the first associated event is added.
   c_execution_order  integer   NOT NULL,
+
+  -- Each executed step is uniquely ordered
+  UNIQUE (c_observation_id, c_execution_order),
+
   c_first_event_time timestamp NOT NULL,
   c_last_event_time  timestamp NOT NULL,
 
@@ -114,10 +128,12 @@ CREATE TABLE t_step_execution (
 
 );
 
-CREATE INDEX ON t_step_execution (c_step_id, c_visit_id);
+CREATE INDEX ON t_step_execution (c_observation_id);
 
--- Help finding ongoing observations.
-CREATE INDEX ON t_step_execution (c_execution_state) WHERE c_execution_state = 'ongoing';
+-- One ongoing step at a time.
+CREATE UNIQUE INDEX one_ongoing_step_per_observation
+ON t_step_execution (c_observation_id)
+WHERE c_execution_state = 'ongoing';
 
 -- Copy the old t_step_record data over to t_step.
 INSERT INTO t_step (
@@ -148,6 +164,8 @@ FROM t_step_record r;
 -- Copy the old t_step_record data over to t_step_execution.
 INSERT INTO t_step_execution (
   c_step_id,
+  c_observation_id,
+  c_sequence_type,
   c_visit_id,
   c_execution_state,
   c_execution_order,
@@ -156,6 +174,8 @@ INSERT INTO t_step_execution (
 )
 SELECT
   r2.c_step_id,
+  r2.c_observation_id,
+  r2.c_sequence_type,
   r2.c_visit_id,
   r2.c_execution_state,
   r2.c_execution_order,
@@ -164,8 +184,10 @@ SELECT
 FROM (
   SELECT
     r.c_step_id,
-    r.c_execution_state,
+    a.c_observation_id,
+    a.c_sequence_type,
     a.c_visit_id,
+    r.c_execution_state,
     ROW_NUMBER() OVER (
       PARTITION BY a.c_observation_id
       ORDER BY r.c_created, r.c_step_id
@@ -177,6 +199,18 @@ FROM (
   WHERE r.c_first_event_time IS NOT NULL
     AND r.c_last_event_time  IS NOT NULL
 ) r2;
+
+-- Set the new execution order field in t_observation.
+UPDATE t_observation o
+   SET c_step_execution_order = COALESCE(m.max_order, 0)
+  FROM (
+    SELECT
+      c_observation_id,
+      MAX(c_execution_order) AS max_order
+    FROM t_step_execution
+    GROUP BY c_observation_id
+  ) m
+ WHERE o.c_observation_id = m.c_observation_id;
 
 -- Ensure that the visit and execution order are never changed.
 CREATE OR REPLACE FUNCTION validate_step_execution_update()
@@ -254,24 +288,6 @@ INSERT INTO t_step_stage_execution_state (
   ('end_step', 'completed'),
   ('stop',     'stopped') ;
 
--- There are a few functions that scan atoms, steps, and step execution
--- updating step execution state, etc.  Because these are multi-step processes
--- and we look up information and then take decisions based on what is found,
--- we'll hold an observation-scoped advisory transaction lock.
-CREATE OR REPLACE FUNCTION lock_step_state_updates(
-  p_observation_id d_observation_id
-)
-RETURNS void AS $$
-BEGIN
-  PERFORM pg_advisory_xact_lock(
-    hashtextextended(
-        p_observation_id::text || ':step_state_updates',
-        0
-      )
-    );
-END;
-$$ LANGUAGE plpgsql STRICT;
-
 -- A trigger to insert / update the step execution information when a new
 -- step or dataset event arrives.
 CREATE OR REPLACE FUNCTION update_execution_information_for_step_event()
@@ -279,9 +295,7 @@ CREATE OR REPLACE FUNCTION update_execution_information_for_step_event()
 DECLARE
   sequence_type    e_sequence_type;
   step_stage_state d_tag;
-  current_state    d_tag;
-  next_state       d_tag;
-  next_order       integer;
+  new_order        integer;
 BEGIN
 
   -- What is the sequence type we're working with?
@@ -296,64 +310,72 @@ BEGIN
   FROM t_step_stage_execution_state s
   WHERE s.c_step_stage = NEW.c_step_stage;
 
-  -- We'll first lock for step execution state updates.
-  PERFORM lock_step_state_updates(NEW.c_observation_id);
+  PERFORM 1 FROM t_observation WHERE c_observation_id = NEW.c_observation_id FOR UPDATE;
 
-  INSERT INTO t_step_execution (
-    c_step_id,
-    c_visit_id,
-    c_execution_state,
-    c_execution_order,
-    c_first_event_time,
-    c_last_event_time
-  )
-  VALUES (
-    NEW.c_step_id,
-    NEW.c_visit_id,
-    COALESCE(step_stage_state, 'ongoing'), -- born ongoing
-    (
-      SELECT COALESCE(MAX(c_execution_order), 0) + 1
-        FROM t_step_execution se
-        JOIN t_step s ON s.c_step_id = se.c_step_id
-        JOIN t_atom a ON a.c_atom_id = s.c_atom_id
-       WHERE a.c_observation_id = NEW.c_observation_id
-    ),
-    NEW.c_received,
-    NEW.c_received
-  )
-  ON CONFLICT (c_step_id) DO UPDATE
-  SET
-    c_visit_id         = NEW.c_visit_id, -- we include the visit in order to fail (in validate_step_execution_update()) if it has changed
-    c_first_event_time = least(t_step_execution.c_first_event_time,   NEW.c_received),
-    c_last_event_time  = greatest(t_step_execution.c_last_event_time, NEW.c_received),
-    c_execution_state  =
-      CASE
-        -- If we're in a terminal execution state, we stay there.
-        WHEN EXISTS (
-          SELECT 1 FROM t_step_execution_state s WHERE s.c_tag = t_step_execution.c_execution_state AND s.c_terminal
-        )
-        THEN t_step_execution.c_execution_state
-
-        -- If we are transitioning to a terminal state, go ahead
-        WHEN step_stage_state IS NOT NULL AND EXISTS (
-          SELECT 1 FROM t_step_execution_state s WHERE s.c_tag = step_stage_state AND s.c_terminal
-        )
-        THEN step_stage_state
-
-        -- Leave it in ongoing
-        ELSE t_step_execution.c_execution_state
-      END;
-
-  -- Abandon 'ongoing' steps in this sequence other than this one.
+  -- Ensure only one ongoing step in this observation.
   UPDATE t_step_execution se
-  SET c_execution_state = 'abandoned'
-  FROM t_step s
-  JOIN t_atom a ON a.c_atom_id = s.c_atom_id
-  WHERE s.c_step_id          = se.c_step_id
-    AND a.c_observation_id   = NEW.c_observation_id
-    AND a.c_sequence_type    = sequence_type
-    AND se.c_step_id        <> NEW.c_step_id
-    AND se.c_execution_state = 'ongoing';
+     SET c_execution_state = 'abandoned'
+   WHERE c_observation_id = NEW.c_observation_id
+     AND c_step_id       <> NEW.c_step_id
+     AND c_execution_state = 'ongoing';
+
+  IF NOT EXISTS (
+    SELECT 1 FROM t_step_execution WHERE c_step_id = NEW.c_step_id
+  ) THEN
+
+    UPDATE t_observation
+       SET c_step_execution_order = c_step_execution_order + 1
+     WHERE c_observation_id = NEW.c_observation_id
+    RETURNING c_step_execution_order INTO new_order;
+
+    INSERT INTO t_step_execution (
+      c_step_id,
+      c_observation_id,
+      c_sequence_type,
+      c_visit_id,
+      c_execution_state,
+      c_execution_order,
+      c_first_event_time,
+      c_last_event_time
+    )
+    VALUES (
+      NEW.c_step_id,
+      NEW.c_observation_id,
+      sequence_type,
+      NEW.c_visit_id,
+      COALESCE(step_stage_state, 'ongoing'), -- born ongoing
+      new_order,
+      NEW.c_received,
+      NEW.c_received
+    );
+
+  ELSE
+
+    UPDATE t_step_execution
+    SET
+      c_visit_id         = NEW.c_visit_id, -- we include the visit in order to fail (in validate_step_execution_update()) if it has changed
+      c_first_event_time = least(t_step_execution.c_first_event_time,   NEW.c_received),
+      c_last_event_time  = greatest(t_step_execution.c_last_event_time, NEW.c_received),
+      c_execution_state  =
+        CASE
+          -- If we're in a terminal execution state, we stay there.
+          WHEN EXISTS (
+           SELECT 1 FROM t_step_execution_state s WHERE s.c_tag = t_step_execution.c_execution_state AND s.c_terminal
+          )
+          THEN t_step_execution.c_execution_state
+
+          -- If we are transitioning to a terminal state, go ahead
+          WHEN step_stage_state IS NOT NULL AND EXISTS (
+            SELECT 1 FROM t_step_execution_state s WHERE s.c_tag = step_stage_state AND s.c_terminal
+          )
+          THEN step_stage_state
+
+          -- Leave it in ongoing
+          ELSE t_step_execution.c_execution_state
+        END
+    WHERE c_step_id = NEW.c_step_id;
+
+  END IF;
 
   RETURN NULL;
 END;
@@ -373,15 +395,12 @@ BEGIN
 
   IF NEW.c_sequence_command = 'abort' THEN
 
-    PERFORM lock_step_state_updates(NEW.c_observation_id);
+    PERFORM 1 FROM t_observation WHERE c_observation_id = NEW.c_observation_id FOR UPDATE;
 
     UPDATE t_step_execution se
     SET c_execution_state = 'abandoned'
-    FROM t_step s
-    JOIN t_atom a ON a.c_atom_id = s.c_atom_id
-    WHERE s.c_step_id            = se.c_step_id
-      AND a.c_observation_id     = NEW.c_observation_id
-      AND se.c_execution_state   = 'ongoing';
+    WHERE se.c_observation_id = NEW.c_observation_id
+      AND se.c_execution_state = 'ongoing';
 
   END IF;
 
@@ -402,13 +421,12 @@ CREATE OR REPLACE FUNCTION update_execution_information_for_visit()
   RETURNS TRIGGER AS $$
 BEGIN
 
+  PERFORM 1 FROM t_observation WHERE c_observation_id = NEW.c_observation_id FOR UPDATE;
+
   UPDATE t_step_execution se
   SET c_execution_state = 'abandoned'
-  FROM t_step s
-  JOIN t_atom a ON a.c_atom_id = s.c_atom_id
-  WHERE a.c_observation_id   = NEW.c_observation_id
-    AND se.c_execution_state = 'ongoing'
-    AND se.c_visit_id       <> NEW.c_visit_id;
+  WHERE se.c_execution_state = 'ongoing'
+    AND se.c_visit_id <> NEW.c_visit_id;
 
   RETURN NULL;
 END;
@@ -427,44 +445,35 @@ CREATE OR REPLACE PROCEDURE abandon_ongoing_and_delete_unexecuted_steps(
 ) AS $$
 BEGIN
 
-  PERFORM lock_step_state_updates(p_observation_id);
+  PERFORM 1 FROM t_observation WHERE c_observation_id = p_observation_id FOR UPDATE;
 
   -- Abandon ongoing steps.
-  WITH abandoned_steps AS (
-    UPDATE t_step_execution se
-       SET c_execution_state = 'abandoned'
-     WHERE se.c_execution_state = 'ongoing'
-       AND EXISTS (
-         SELECT 1
-           FROM t_step s
-           JOIN t_atom a ON a.c_atom_id = s.c_atom_id
-          WHERE s.c_step_id = se.c_step_id
-            AND a.c_observation_id = p_observation_id
-            AND a.c_sequence_type  = p_sequence_type
-       )
-  ),
+  UPDATE t_step_execution se
+     SET c_execution_state = 'abandoned'
+   WHERE se.c_execution_state = 'ongoing'
+     AND se.c_observation_id = p_observation_id
+     AND se.c_sequence_type  = p_sequence_type;
 
   -- Delete steps that have no execution information (i.e., unexecuted steps)
-  deleted_steps AS (
-    DELETE FROM t_step s
-    USING t_atom a
-    WHERE s.c_atom_id = a.c_atom_id
-      AND a.c_observation_id = p_observation_id
-      AND a.c_sequence_type  = p_sequence_type
-      AND NOT EXISTS (
-        SELECT 1 FROM t_step_execution se WHERE se.c_step_id = s.c_step_id
-      )
-  )
+  DELETE FROM t_step s
+  USING t_atom a
+  WHERE s.c_atom_id = a.c_atom_id
+    AND a.c_observation_id = p_observation_id
+    AND a.c_sequence_type  = p_sequence_type
+    AND NOT EXISTS (
+      SELECT 1 FROM t_step_execution se WHERE se.c_step_id = s.c_step_id
+    );
 
-  -- Delete atoms with no executed steps.
+  -- Delete atoms with no (executed) steps -- all unexecuted steps have been deleted
+  -- so only executed steps remain.
   DELETE FROM t_atom a
   WHERE a.c_observation_id = p_observation_id
     AND a.c_sequence_type  = p_sequence_type
     AND NOT EXISTS (
       SELECT 1
-      FROM t_step s
-      JOIN t_step_execution se ON se.c_step_id = s.c_step_id
-      WHERE s.c_atom_id = a.c_atom_id
+        FROM t_step s
+        JOIN t_step_execution se USING (c_step_id)
+       WHERE s.c_atom_id = a.c_atom_id
     );
 
 END;
@@ -705,7 +714,7 @@ BEGIN
   -- If not, we'll raise a check violation and bail.
   SELECT
     se.c_visit_id,
-    o.c_observation_id,
+    se.c_observation_id,
     se.c_execution_order,
     o.c_observation_reference
   INTO
@@ -714,9 +723,7 @@ BEGIN
     exec_order,
     obs_ref
   FROM t_step_execution se
-  JOIN t_step s            ON s.c_step_id        = se.c_step_id
-  JOIN t_atom a            ON a.c_atom_id        = s.c_atom_id
-  JOIN t_observation o     ON o.c_observation_id = a.c_observation_id
+  JOIN t_observation o ON o.c_observation_id = se.c_observation_id
   WHERE se.c_step_id = NEW.c_step_id
     AND se.c_execution_order IS NOT NULL;
 
@@ -744,119 +751,3 @@ CREATE TRIGGER initialize_dataset_before_insert_trigger
 BEFORE INSERT ON t_dataset
 FOR EACH ROW
 EXECUTE FUNCTION initialize_dataset_before_insert();
-
--- We'll recreate generator params to have execution state and executed
--- acquisition and science atom counts.
-DROP VIEW v_generator_params;
-
--- We aren't going to use acquisition reset time anymore.  Instead a reset
--- acquisition sequence means rewriting atoms and steps.
-DROP VIEW v_observation;
-ALTER TABLE t_observation
-  DROP COLUMN  c_acq_reset_time;
-
--- Update the observation view (copied from V1049) to remove the acq reset column.
-CREATE VIEW v_observation AS
-  SELECT o.*,
-  CASE WHEN o.c_explicit_ra              IS NOT NULL THEN o.c_observation_id END AS c_explicit_base_id,
-  CASE WHEN o.c_air_mass_min             IS NOT NULL THEN o.c_observation_id END AS c_air_mass_id,
-  CASE WHEN o.c_hour_angle_min           IS NOT NULL THEN o.c_observation_id END AS c_hour_angle_id,
-  CASE WHEN o.c_observing_mode_type      IS NOT NULL THEN o.c_observation_id END AS c_observing_mode_id,
-  CASE WHEN o.c_spec_wavelength          IS NOT NULL THEN o.c_observation_id END AS c_spec_wavelength_id,
-
-  CASE WHEN o.c_spec_wavelength_coverage IS NOT NULL THEN o.c_observation_id END AS c_spec_wavelength_coverage_id,
-  CASE WHEN o.c_spec_focal_plane_angle   IS NOT NULL THEN o.c_observation_id END AS c_spec_focal_plane_angle_id,
-  CASE WHEN o.c_img_minimum_fov          IS NOT NULL THEN o.c_observation_id END AS c_img_minimum_fov_id,
-  CASE WHEN o.c_observation_duration     IS NOT NULL THEN o.c_observation_id END AS c_observation_duration_id,
-  CASE WHEN o.c_science_mode = 'imaging'::d_tag      THEN o.c_observation_id END AS c_imaging_mode_id,
-  CASE WHEN o.c_science_mode = 'spectroscopy'::d_tag THEN o.c_observation_id END AS c_spectroscopy_mode_id,
-  c.c_active_start::timestamp + (c.c_active_end::timestamp - c.c_active_start::timestamp) * 0.5 AS c_reference_time
-  FROM t_observation o
-  LEFT JOIN t_proposal p on p.c_program_id = o.c_program_id
-  LEFT JOIN t_cfp c on p.c_cfp_id = c.c_cfp_id;
-
--- Recreate generator params with the new execution state and atom count.
-CREATE VIEW v_generator_params AS
-SELECT
-  o.c_program_id,
-  o.c_observation_id,
-  o.c_calibration_role,
-  o.c_image_quality,
-  o.c_cloud_extinction,
-  o.c_sky_background,
-  o.c_water_vapor,
-  o.c_air_mass_min,
-  o.c_air_mass_max,
-  o.c_hour_angle_min,
-  o.c_hour_angle_max,
-  e.c_exposure_time_mode,
-  e.c_signal_to_noise,
-  e.c_signal_to_noise_at,
-  e.c_exposure_time,
-  e.c_exposure_count,
-  o.c_observing_mode_type,
-  o.c_science_band,
-  o.c_declared_complete,
-  CASE
-    -- The observation is explicitly marked complete -> completed.
-    WHEN o.c_declared_complete
-      THEN 'completed'::e_execution_state
-
-    -- No events have been fired at all -> not_started
-    WHEN NOT EXISTS (
-      SELECT 1 FROM t_execution_event v WHERE v.c_observation_id = o.c_observation_id
-    ) THEN 'not_started'::e_execution_state
-
-    -- At least one step not completed -> ongoing
-    WHEN EXISTS (
-      SELECT 1
-      FROM t_step s
-      JOIN t_atom a ON a.c_atom_id = s.c_atom_id
-      LEFT JOIN t_step_execution se ON se.c_step_id = s.c_step_id
-      WHERE a.c_observation_id = o.c_observation_id
-        AND a.c_sequence_type = 'science'
-        AND COALESCE(se.c_execution_state, 'not_started') NOT IN ('completed', 'abandoned')
-    ) THEN 'ongoing'::e_execution_state
-
-    ELSE 'completed'::e_execution_state
-  END AS c_execution_state,
-  COALESCE(s_counts.c_step_count, 0) AS c_step_count,
-  o.c_blind_offset_target_id,
-  b.c_sid_rv AS c_blind_rv,
-  b.c_source_profile AS c_blind_source_profile,
-  t.c_target_id,
-  t.c_sid_rv,
-  t.c_source_profile
-FROM
-  t_observation o
-LEFT JOIN t_target b ON c_target_id = o.c_blind_offset_target_id
-LEFT JOIN LATERAL (
-  SELECT t.c_target_id,
-         t.c_sid_rv,
-         t.c_source_profile
-    FROM t_asterism_target a
-    INNER JOIN t_target t
-      ON a.c_target_id = t.c_target_id
-     AND t.c_existence = 'present'
-   WHERE a.c_observation_id = o.c_observation_id
-) t ON TRUE
-LEFT JOIN t_exposure_time_mode e
-  ON e.c_observation_id = o.c_observation_id
- AND e.c_role = 'requirement'
-LEFT JOIN (
-  SELECT
-    a.c_observation_id,
-    COUNT(*) AS c_step_count
-  FROM t_step_execution se
-  JOIN t_step s ON s.c_step_id = se.c_step_id
-  JOIN t_atom a ON a.c_atom_id = s.c_atom_id
-  GROUP BY a.c_observation_id
-) s_counts ON s_counts.c_observation_id = o.c_observation_id
-ORDER BY
-  o.c_observation_id,
-  t.c_target_id;
-
--- The old atom and step record tables can be dropped now.  We'll keep them
--- for a bit, just in case.
--- DROP TABLE t_step_record;
--- DROP TABLE t_atom_record;
