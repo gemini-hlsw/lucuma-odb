@@ -8,6 +8,7 @@ import cats.syntax.all.*
 import io.circe.Json
 import io.circe.parser.decode
 import io.circe.parser.parse
+import lucuma.itc.Error
 import lucuma.itc.legacy
 import lucuma.itc.legacy.codecs.given
 
@@ -25,8 +26,7 @@ import java.lang.reflect.Method
  * essentially the same as if ITC were a server accepting json and responding json
  */
 object LocalItc:
-  val OutOfRangeMsg: String =
-    "The requested wavelength falls outside the instrument's wavelength coverage."
+  val OutOfRangeMsg: String = Error.WavelengthAtOutOfRangeMessage
 
 case class LocalItc[F[_]: {Sync as F}](classLoader: ClassLoader):
 

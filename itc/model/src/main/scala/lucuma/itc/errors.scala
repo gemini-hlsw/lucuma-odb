@@ -25,11 +25,14 @@ enum Error(val code: ErrorCode, val message: String):
   case WavelengthAtOutOfRange(wavelength: Wavelength)
       extends Error(
         ErrorCode.WavelengthAtOutOfRange,
-        "The requested wavelength falls outside the instrument's wavelength coverage."
+        Error.WavelengthAtOutOfRangeMessage
       )
   case General(override val message: String) extends Error(ErrorCode.General, message)
 
 object Error:
+  val WavelengthAtOutOfRangeMessage: String =
+    "The requested wavelength falls outside the instrument's wavelength coverage."
+
   given Eq[Error] = Eq.instance:
     case (SourceTooBright(hw1), SourceTooBright(hw2))             => hw1 === hw2
     case (WavelengthAtOutOfRange(w1), WavelengthAtOutOfRange(w2)) => w1 === w2

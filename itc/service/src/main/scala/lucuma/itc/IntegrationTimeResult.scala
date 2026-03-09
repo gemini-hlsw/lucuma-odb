@@ -22,8 +22,7 @@ case class SourceTooBright(wellHalfFilledSeconds: BigDecimal) extends Integratio
 }
 
 case class WavelengthOutOfRange(wavelength: Wavelength) extends IntegrationTimeError {
-  val message: String =
-    "The requested wavelength falls outside the instrument's wavelength coverage."
+  val message: String = Error.WavelengthAtOutOfRangeMessage
 }
 
 /** Generic calculation error */
