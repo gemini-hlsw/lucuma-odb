@@ -321,7 +321,13 @@ object GeneratorParamsService {
               MissingParamSet
                 .fromParams(NonEmptyList.one(MissingParam.MissingObservationParam("IGRINS-2 ITC integration")))
                 .asLeft[ItcInput]
-            GeneratorParams(itcInput, obsParams.scienceBand, ig, obsParams.calibrationRole, obsParams.declaredComplete, obsParams.executionState, obsParams.stepCount)
+            spectroscopyGeneratorParams(
+              obsMode = ig,
+              acqEtm  = ig.scienceExposureTimeMode,
+              acqMode = InstrumentMode.Igrins2Spectroscopy(),
+              sciEtm  = ig.scienceExposureTimeMode,
+              sciMode = InstrumentMode.Igrins2Spectroscopy()
+            )
 
           case gn @ gmos.imaging.Config.GmosNorth(_, fs, _) =>
             // An input per filter.

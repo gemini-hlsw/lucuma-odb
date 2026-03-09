@@ -333,4 +333,3 @@ trait ExecutionTestSupportForFlamingos2 extends ExecutionTestSupport:
       _ <- addEndStepEvent(s, v)
       _ <- runObscalcUpdate(p, o)
     yield o
-

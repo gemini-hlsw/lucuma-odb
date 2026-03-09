@@ -12,6 +12,7 @@ import lucuma.core.model.sequence.ConfigChangeEstimate
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig
 import lucuma.core.model.sequence.gmos.DynamicConfig
+import lucuma.core.model.sequence.igrins2.Igrins2DynamicConfig
 import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.sequence.TimeEstimateCalculator
 import lucuma.odb.sequence.data.ProtoStep
@@ -74,6 +75,11 @@ object ConfigChangeEstimator:
             check(enums.TimeEstimate.GmosSouthFpu, past, present)(_.fpu),
             check(enums.TimeEstimate.GmosSouthDisperser, past, present)(_.gratingConfig.map(_.grating))
           )
+
+    lazy val igrins2: ConfigChangeEstimator[Igrins2DynamicConfig] =
+      new ForInstrument[Igrins2DynamicConfig]:
+        override def instrumentChecks(past: TimeEstimateCalculator.Last[Igrins2DynamicConfig], present: ProtoStep[Igrins2DynamicConfig]): List[Option[ConfigChangeEstimate]] =
+          Nil
 
     private def gcal[D](past: TimeEstimateCalculator.Last[D], present: ProtoStep[D]): List[ConfigChangeEstimate] =
       val scienceFold = Option.unless(past.step.exists(_.stepConfig.usesGcalUnit) === present.stepConfig.usesGcalUnit)(

@@ -45,7 +45,7 @@ object ObservingMode:
         case (a: GmosNorthImaging,   b: GmosNorthImaging)   => a === b
         case (a: GmosSouthImaging,   b: GmosSouthImaging)   => a === b
         case (a: Igrins2LongSlit,    b: Igrins2LongSlit)    => a === b
-        case _                                               => false
+        case _                                              => false
 
     given HashBytes[ObservingMode] =
       case f2:  Flamingos2LongSlit => f2.hashBytes

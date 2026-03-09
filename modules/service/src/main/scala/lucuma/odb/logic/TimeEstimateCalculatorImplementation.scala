@@ -11,6 +11,8 @@ import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig
 import lucuma.core.model.sequence.flamingos2.Flamingos2StaticConfig
 import lucuma.core.model.sequence.gmos.DynamicConfig
 import lucuma.core.model.sequence.gmos.StaticConfig
+import lucuma.core.model.sequence.igrins2.Igrins2DynamicConfig
+import lucuma.core.model.sequence.igrins2.Igrins2StaticConfig
 import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.sequence.TimeEstimateCalculator
 import lucuma.odb.sequence.data.ProtoStep
@@ -71,4 +73,14 @@ object TimeEstimateCalculatorImplementation:
         ),
         cce.gmosSouth,
         de.gmosSouth
+      )
+
+    lazy val igrins2: TimeEstimateCalculator[Igrins2StaticConfig, Igrins2DynamicConfig] =
+      fromEstimators(
+        SetupTime(
+          ctx.enums.TimeEstimate.Flamingos2LongslitSetup.time,
+          ctx.enums.TimeEstimate.Flamingos2Reacquisition.time
+        ),
+        cce.igrins2,
+        de.igrins2
       )

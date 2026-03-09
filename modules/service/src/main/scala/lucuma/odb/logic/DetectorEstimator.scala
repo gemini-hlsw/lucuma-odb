@@ -14,6 +14,8 @@ import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig
 import lucuma.core.model.sequence.flamingos2.Flamingos2StaticConfig
 import lucuma.core.model.sequence.gmos.DynamicConfig
 import lucuma.core.model.sequence.gmos.StaticConfig
+import lucuma.core.model.sequence.igrins2.Igrins2DynamicConfig
+import lucuma.core.model.sequence.igrins2.Igrins2StaticConfig
 import lucuma.odb.sequence.data.ProtoStep
 
 /**
@@ -102,6 +104,19 @@ object DetectorEstimator {
         )
       )
 
+    lazy val igrins2: DetectorEstimator[Igrins2StaticConfig, Igrins2DynamicConfig] =
+      (_: Igrins2StaticConfig, step: ProtoStep[Igrins2DynamicConfig]) => List(
+        DetectorEstimate(
+          "IGRINS-2",
+          "IGRINS-2 H2RG Detectors",
+          DatasetEstimate(
+            step.value.exposure,
+            step.value.readoutTime,
+            ctx.enums.TimeEstimate.Flamingos2Write.time
+          ),
+          NonNegInt.unsafeFrom(1)
+        )
+      )
 
   }
 
