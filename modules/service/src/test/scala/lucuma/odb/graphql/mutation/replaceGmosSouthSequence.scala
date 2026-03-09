@@ -9,15 +9,15 @@ import cats.syntax.either.*
 import cats.syntax.eq.*
 import io.circe.Json
 import io.circe.literal.*
-import lucuma.core.enums.GmosNorthFilter
+import lucuma.core.enums.GmosSouthFilter
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.SequenceType
 import lucuma.core.model.Observation
 import lucuma.core.syntax.string.*
 
-class replaceGmosNorthSequence extends query.ExecutionTestSupportForGmos with ReplaceSequenceOps:
+class replaceGmosSouthSequence extends query.ExecutionTestSupportForGmos with ReplaceSequenceOps:
 
-  def stepInput(filter: GmosNorthFilter): String =
+  def stepInput(filter: GmosSouthFilter): String =
     s"""
           {
             instrumentConfig: {
@@ -34,7 +34,7 @@ class replaceGmosNorthSequence extends query.ExecutionTestSupportForGmos with Re
               dtax: ZERO
               roi: FULL_FRAME
               gratingConfig: {
-                grating: R831_G5302
+                grating: R600_G5324
                 order: ZERO
                 wavelength: {
                   nanometers: 500.0
@@ -57,16 +57,16 @@ class replaceGmosNorthSequence extends query.ExecutionTestSupportForGmos with Re
       for
         p <- createProgram
         t <- createTargetWithProfileAs(pi, p)
-        o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+        o <- createGmosSouthLongSlitObservationAs(pi, p, List(t))
       yield o
 
     setup.flatMap: oid =>
-      val inputString = input(oid, SequenceType.Science, atomInput("Foo", stepInput(GmosNorthFilter.GPrime)))
+      val inputString = input(oid, SequenceType.Science, atomInput("Foo", stepInput(GmosSouthFilter.GPrime)))
       expect(
         user     = pi,
         query    = s"""
           mutation {
-            replaceGmosNorthSequence(input: $inputString) {
+            replaceGmosSouthSequence(input: $inputString) {
               sequence {
                 description
                 steps {
@@ -80,7 +80,7 @@ class replaceGmosNorthSequence extends query.ExecutionTestSupportForGmos with Re
         """,
         expected = json"""
           {
-            "replaceGmosNorthSequence": {
+            "replaceGmosSouthSequence": {
               "sequence": [
                 {
                   "description": "Foo",
@@ -101,14 +101,14 @@ class replaceGmosNorthSequence extends query.ExecutionTestSupportForGmos with Re
       for
         p <- createProgram
         t <- createTargetWithProfileAs(pi, p)
-        o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+        o <- createGmosSouthLongSlitObservationAs(pi, p, List(t))
       yield o
 
     assertIOBoolean:
       for
         o  <- setup
-        in  = input(o, SequenceType.Science, atomInput("Foo", stepInput(GmosNorthFilter.GPrime)))
-        i0 <- query(pi, mutation(Instrument.GmosNorth, in)).map(mutationOutput(Instrument.GmosNorth, _))
+        in  = input(o, SequenceType.Science, atomInput("Foo", stepInput(GmosSouthFilter.GPrime)))
+        i0 <- query(pi, mutation(Instrument.GmosSouth, in)).map(mutationOutput(Instrument.GmosSouth, _))
         i1 <- scienceSequenceIds(pi, o).map(_.toList)
       yield i0 === i1
 
@@ -117,14 +117,14 @@ class replaceGmosNorthSequence extends query.ExecutionTestSupportForGmos with Re
       for
         p <- createProgram
         t <- createTargetWithProfileAs(pi, p)
-        o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
-        _ <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
+        o <- createGmosSouthLongSlitObservationAs(pi, p, List(t))
+        _ <- recordVisitAs(serviceUser, Instrument.GmosSouth, o)
       yield o
 
     assertIOBoolean:
       for
         o  <- setup
-        in  = input(o, SequenceType.Science, atomInput("Foo", stepInput(GmosNorthFilter.GPrime)))
-        i0 <- query(pi, mutation(Instrument.GmosNorth, in)).map(mutationOutput(Instrument.GmosNorth, _))
+        in  = input(o, SequenceType.Science, atomInput("Foo", stepInput(GmosSouthFilter.GPrime)))
+        i0 <- query(pi, mutation(Instrument.GmosSouth, in)).map(mutationOutput(Instrument.GmosSouth, _))
         i1 <- scienceSequenceIds(pi, o).map(_.toList)
       yield i0 === i1

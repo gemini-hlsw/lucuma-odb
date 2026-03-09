@@ -17,7 +17,7 @@ import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.Step
 import lucuma.core.syntax.string.*
 
-class replaceFlamingos2Sequence extends query.ExecutionTestSupportForFlamingos2:
+class replaceFlamingos2Sequence extends query.ExecutionTestSupportForFlamingos2 with ReplaceSequenceOps:
   def stepInput(filter: Flamingos2Filter): String =
     s"""
           {
@@ -37,27 +37,6 @@ class replaceFlamingos2Sequence extends query.ExecutionTestSupportForFlamingos2:
             }
             observeClass: SCIENCE
           }
-    """
-
-  def atomInput(description: String, steps: String*): String =
-    s"""
-        {
-          description: "$description"
-          steps: ${steps.mkString("[\n", ",\n", "]\n")}
-        }
-    """
-
-  def input(
-    oid:          Observation.Id,
-    sequenceType: SequenceType,
-    atoms:        String*
-  ): String =
-    s"""
-      {
-        observationId: "$oid"
-        sequenceType:  ${sequenceType.tag.toScreamingSnakeCase}
-        sequence: ${atoms.mkString("[\n", ",\n", "]\n")}
-      }
     """
 
   test("Simple one atom, one step"):
@@ -104,37 +83,6 @@ class replaceFlamingos2Sequence extends query.ExecutionTestSupportForFlamingos2:
         """.asRight
       )
 
-  def mutation(input: String): String =
-    s"""
-      mutation {
-        replaceFlamingos2Sequence(input: $input) {
-          sequence {
-            id
-            steps { id }
-          }
-        }
-      }
-    """
-
-  def mutationOutput(json: Json): List[(Atom.Id, List[Step.Id])] =
-    json
-      .hcursor
-      .downFields("replaceFlamingos2Sequence", "sequence")
-      .values
-      .toList
-      .flatMap(_.toList)
-      .map: atomJson =>
-        val c       = atomJson.hcursor
-        val atomId  = c.downField("id").require[Atom.Id]
-        val stepIds =
-          c.downField("steps")
-            .values
-            .toList
-            .flatMap(_.toList)
-            .map(_.hcursor.downField("id").require[Step.Id])
-        (atomId, stepIds)
-
-
   test("Matches execution config (before first visit)"):
     val setup: IO[Observation.Id] =
       for
@@ -147,7 +95,7 @@ class replaceFlamingos2Sequence extends query.ExecutionTestSupportForFlamingos2:
       for
         o  <- setup
         in  = input(o, SequenceType.Science, atomInput("Foo", stepInput(Flamingos2Filter.J)))
-        i0 <- query(pi, mutation(in)).map(mutationOutput)
+        i0 <- query(pi, mutation(Instrument.Flamingos2, in)).map(mutationOutput(Instrument.Flamingos2, _))
         i1 <- scienceSequenceIds(pi, o).map(_.toList)
       yield i0 === i1
 
@@ -164,7 +112,7 @@ class replaceFlamingos2Sequence extends query.ExecutionTestSupportForFlamingos2:
       for
         o  <- setup
         in  = input(o, SequenceType.Science, atomInput("Foo", stepInput(Flamingos2Filter.J)))
-        i0 <- query(pi, mutation(in)).map(mutationOutput)
+        i0 <- query(pi, mutation(Instrument.Flamingos2, in)).map(mutationOutput(Instrument.Flamingos2, _))
         i1 <- scienceSequenceIds(pi, o).map(_.toList)
       yield i0 === i1
 
@@ -184,7 +132,7 @@ class replaceFlamingos2Sequence extends query.ExecutionTestSupportForFlamingos2:
       in  = input(o, SequenceType.Science, atomInput("Foo", stepInput(Flamingos2Filter.J)))
       _  <- expect(
         pi,
-        mutation(in),
+        mutation(Instrument.Flamingos2, in),
         List(
           s"Observation $o is ineligible for this operation due to its workflow state (Ongoing with allowed transition to Inactive/Completed).",
           "User cannot replace the sequence in the current observation workflow state."
@@ -207,8 +155,8 @@ class replaceFlamingos2Sequence extends query.ExecutionTestSupportForFlamingos2:
       for
         o  <- setup
         in  = input(o, SequenceType.Science, atomInput("Foo", stepInput(Flamingos2Filter.J)))
-        r  <- query(staff, mutation(in))
-      yield mutationOutput(r).nonEmpty
+        r  <- query(staff, mutation(Instrument.Flamingos2, in))
+      yield mutationOutput(Instrument.Flamingos2, r).nonEmpty
 
   test("Can't add too many atoms"):
     val setup: IO[Observation.Id] =
@@ -221,7 +169,7 @@ class replaceFlamingos2Sequence extends query.ExecutionTestSupportForFlamingos2:
     for
       o  <- setup
       in  = input(o, SequenceType.Science, List.fill(1001)(atomInput("Foo", stepInput(Flamingos2Filter.J)))*)
-      _  <- expect(pi, mutation(in), List(
+      _  <- expect(pi, mutation(Instrument.Flamingos2, in), List(
         "Execution sequences containing over 1000 atoms are not supported."
       ).asLeft)
     yield ()

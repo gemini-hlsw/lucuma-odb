@@ -89,7 +89,7 @@ trait GmosSequenceService[F[_]]:
 
 object GmosSequenceService:
 
-  // Extract the mos-preimaing setting from the imaging variant
+  // Extract the mos-preimaging setting from the imaging variant
   private def mosPreImaging(v: Option[GmosImagingVariantType]): MosPreImaging =
     v.filter(_ === GmosImagingVariantType.PreImaging)
      .as(MosPreImaging.IsMosPreImaging)
@@ -254,17 +254,6 @@ object GmosSequenceService:
 
     val SelectGmosSouthStatic: Query[Visit.Id, StaticConfig.GmosSouth] =
       selectStatic("south", gmos_south_static)
-
-    def selectLastestVisitStatic[A](site: String, decoderA: Decoder[A]): Query[Observation.Id, A] =
-      sql"""
-        SELECT
-          #${encodeColumns("g".some, GmosStaticColumns)}
-        FROM t_gmos_#${site}_static g
-        JOIN t_visit v ON v.c_visit_id = g.c_visit_id
-        WHERE v.c_observation_id = $observation_id
-        ORDER BY v.c_created DESC
-        LIMIT 1
-      """.query(decoderA)
 
     def selectStaticParams(site: String): Query[Observation.Id, (ObservingModeType, Option[GmosImagingVariantType])] =
       sql"""

@@ -3154,7 +3154,8 @@ type Mutation {
 
   """
   Replaces the remaining steps in an execution sequence with the provided
-  sequence.
+  sequence.  Previously executed (or even partially executed) steps are not
+  deleted.  Any ongoing steps are abandoned.
   """
   replaceFlamingos2Sequence(
     input: ReplaceFlamingos2SequenceInput!
@@ -3172,7 +3173,8 @@ type Mutation {
 
   """
   Replaces the remaining steps in an execution sequence with the provided
-  sequence.
+  sequence.  Previously executed (or even partially executed) steps are not
+  deleted.  Any ongoing steps are abandoned.
   """
   replaceGmosNorthSequence(
     input: ReplaceGmosNorthSequenceInput!
@@ -3190,7 +3192,8 @@ type Mutation {
 
   """
   Replaces the remaining steps in an execution sequence with the provided
-  sequence.
+  sequence.  Previously executed (or even partially executed) steps are not
+  deleted.  Any ongoing steps are abandoned.
   """
   replaceGmosSouthSequence(
     input: ReplaceGmosSouthSequenceInput!
@@ -18084,41 +18087,86 @@ input GmosSouthAtomInput {
   steps: [GmosSouthStepInput!]!
 }
 
+"""
+Replace Flamingos 2 sequence input.  Select the observation using one of the
+observation ID or the observation reference.  If both are provided, they must
+refer to the same observation.
+"""
 input ReplaceFlamingos2SequenceInput {
   observationId: ObservationId
   observationReference: ObservationReferenceLabel
 
+  "Specifies which sequence should be replaced."
   sequenceType: SequenceType!
 
+  """
+  The new sequence.  Any unexecuted steps are deleted and replaced with the
+  provided sequence.  Steps that were previously executed, or for which at least
+  one execution event was received, are preserved.
+  """
   sequence: [Flamingos2AtomInput!]
 }
 
+"""
+The result of a replace sequence mutation, consisting of the newly inserted
+sequence.
+"""
 type ReplaceFlamingos2SequenceResult {
   sequence: [Flamingos2Atom!]!
 }
 
+"""
+Replace GMOS North sequence input.  Select the observation using one of the
+observation ID or the observation reference.  If both are provided, they must
+refer to the same observation.
+"""
 input ReplaceGmosNorthSequenceInput {
   observationId: ObservationId
   observationReference: ObservationReferenceLabel
 
+  "Specifies which sequence should be replaced."
   sequenceType: SequenceType!
 
+  """
+  The new sequence.  Any unexecuted steps are deleted and replaced with the
+  provided sequence.  Steps that were previously executed, or for which at least
+  one execution event was received, are preserved.
+  """
   sequence: [GmosNorthAtomInput!]
 }
 
+"""
+The result of a replace sequence mutation, consisting of the newly inserted
+sequence.
+"""
 type ReplaceGmosNorthSequenceResult {
   sequence: [GmosNorthAtom!]!
 }
 
+"""
+Replace GMOS South sequence input.  Select the observation using one of the
+observation ID or the observation reference.  If both are provided, they must
+refer to the same observation.
+"""
 input ReplaceGmosSouthSequenceInput {
   observationId: ObservationId
   observationReference: ObservationReferenceLabel
 
+  "Specifies which sequence should be replaced."
   sequenceType: SequenceType!
 
+  """
+  The new sequence.  Any unexecuted steps are deleted and replaced with the
+  provided sequence.  Steps that were previously executed, or for which at least
+  one execution event was received, are preserved.
+  """
   sequence: [GmosSouthAtomInput!]
 }
 
+"""
+The result of a replace sequence mutation, consisting of the newly inserted
+sequence.
+"""
 type ReplaceGmosSouthSequenceResult {
   sequence: [GmosSouthAtom!]!
 }
