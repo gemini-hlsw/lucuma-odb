@@ -484,5 +484,5 @@ class recordVisit extends OdbSuite with query.GenerationTestSupport with Executi
         e0  <- stepExecutionState(service, oid)
         _   <- recordVisitAs(service, Instrument.GmosNorth, oid)
         e1  <- stepExecutionState(service, oid)
-      yield e0.forall(_ === StepExecutionState.Ongoing) &&
+      yield (e0 === List(StepExecutionState.Abandoned, StepExecutionState.Ongoing)) &&
             e1.forall(_ === StepExecutionState.Abandoned)
