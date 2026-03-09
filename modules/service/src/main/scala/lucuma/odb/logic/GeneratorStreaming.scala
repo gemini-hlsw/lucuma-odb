@@ -280,5 +280,5 @@ object GeneratorStreaming:
         (for
           cfg <- extractMode(ObservingMode.Igrins2LongSlitName, context)(_.asIgrins2LongSlit)
           itc  = requireSpectroscopyItc(context.oid, context.itcRes)
-          gen <- EitherT(Ig2LongSlit.instantiate(context.oid, calculator.igrins2, context.namespace, cfg, itc.map(_.science.focus.value)))
+          gen <- EitherT(Ig2LongSlit.instantiate(calculator.igrins2, context.namespace, cfg, itc.map(_.science.focus.value)))
         yield gen.covary[F]).value

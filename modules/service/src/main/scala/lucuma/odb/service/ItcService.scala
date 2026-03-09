@@ -292,8 +292,8 @@ object ItcService {
             go(lucuma.odb.sequence.flamingos2.MinAcquisitionExposureTime,
                lucuma.odb.sequence.flamingos2.MaxAcquisitionExposureTime)
           case InstrumentMode.Igrins2Spectroscopy()  =>
-            go(lucuma.odb.sequence.flamingos2.MinAcquisitionExposureTime,
-               lucuma.odb.sequence.flamingos2.MaxAcquisitionExposureTime)
+            go(lucuma.odb.sequence.igrins2.MinAcquisitionExposureTime,
+               lucuma.odb.sequence.igrins2.MaxAcquisitionExposureTime)
           case m                                                      =>
             EitherT.leftT:
               OdbError.InvalidObservation(oid, s"Acquisition is not supported for ${m.displayName}".some)

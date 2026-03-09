@@ -78,8 +78,8 @@ object TimeEstimateCalculatorImplementation:
     lazy val igrins2: TimeEstimateCalculator[Igrins2StaticConfig, Igrins2DynamicConfig] =
       fromEstimators(
         SetupTime(
-          ctx.enums.TimeEstimate.Flamingos2LongslitSetup.time,
-          ctx.enums.TimeEstimate.Flamingos2Reacquisition.time
+          ctx.enums.TimeEstimate.Igrins2LongslitSetup.time,
+          ctx.enums.TimeEstimate.Igrins2Reacquisition.time
         ),
         cce.igrins2,
         de.igrins2

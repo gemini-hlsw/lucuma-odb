@@ -5,12 +5,10 @@ package lucuma.odb.sequence
 package igrins2.longslit
 
 import cats.Monad
-import cats.syntax.option.*
 import eu.timepit.refined.types.string.NonEmptyString
 import fs2.Pure
 import fs2.Stream
 import lucuma.core.math.Offset
-import lucuma.core.model.Observation
 import lucuma.core.model.sequence.igrins2.Igrins2DynamicConfig
 import lucuma.core.model.sequence.igrins2.Igrins2SVCImages
 import lucuma.core.model.sequence.igrins2.Igrins2StaticConfig
@@ -35,25 +33,17 @@ object LongSlit:
     )
 
   def instantiate[F[_]: Monad](
-    observationId: Observation.Id,
-    estimator:     TimeEstimateCalculator[Igrins2StaticConfig, Igrins2DynamicConfig],
-    namespace:     UUID,
-    config:        Config,
-    itc:           Either[OdbError, IntegrationTime]
+    estimator: TimeEstimateCalculator[Igrins2StaticConfig, Igrins2DynamicConfig],
+    namespace: UUID,
+    config:    Config,
+    itc:       Either[OdbError, IntegrationTime]
   ): F[Either[OdbError, StreamingExecutionConfig[Pure, Igrins2StaticConfig, Igrins2DynamicConfig]]] =
 
     val static = staticConfig(config)
 
     val science: Either[OdbError, SequenceGenerator[Igrins2DynamicConfig]] =
-      itc.flatMap: time =>
-        Either.cond(
-          time.exposureTime.toNonNegMicroseconds.value > 0,
-          Science.generator(estimator, static, namespace, time),
-          OdbError.SequenceUnavailable(
-            observationId,
-            s"IGRINS-2 Long Slit requires a positive exposure time.".some
-          )
-        )
+      itc.map: time =>
+        Science.generator(estimator, static, namespace, time)
 
     Monad[F].pure:
       science.map: gen =>

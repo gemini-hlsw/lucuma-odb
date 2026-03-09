@@ -112,7 +112,7 @@ object DetectorEstimator {
           DatasetEstimate(
             step.value.exposure,
             step.value.readoutTime,
-            ctx.enums.TimeEstimate.Flamingos2Write.time
+            ctx.enums.TimeEstimate.Igrins2Write.time
           ),
           NonNegInt.unsafeFrom(1)
         )

@@ -317,10 +317,6 @@ object GeneratorParamsService {
             )
 
           case ig: igrins2.longslit.Config =>
-            val itcInput =
-              MissingParamSet
-                .fromParams(NonEmptyList.one(MissingParam.MissingObservationParam("IGRINS-2 ITC integration")))
-                .asLeft[ItcInput]
             spectroscopyGeneratorParams(
               obsMode = ig,
               acqEtm  = ig.scienceExposureTimeMode,

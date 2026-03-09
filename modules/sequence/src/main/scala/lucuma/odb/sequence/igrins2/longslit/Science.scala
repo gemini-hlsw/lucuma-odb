@@ -17,9 +17,9 @@ import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.model.sequence.igrins2.{Igrins2DynamicConfig => IG2}
 
-import lucuma.core.optics.syntax.lens.*
+import lucuma.core.model.sequence.igrins2.DefaultExposureTime
 import lucuma.core.model.sequence.igrins2.Igrins2StaticConfig
-import lucuma.core.syntax.timespan.*
+import lucuma.core.optics.syntax.lens.*
 import lucuma.itc.IntegrationTime
 import lucuma.odb.sequence.data.ProtoAtom
 import lucuma.odb.sequence.data.ProtoStep
@@ -30,7 +30,7 @@ import java.util.UUID
 object Science extends SequenceState[IG2]:
 
   override def initialDynamicConfig: IG2 =
-    IG2(60.secTimeSpan)
+    IG2(DefaultExposureTime)
 
   def generator(
     estimator: TimeEstimateCalculator[Igrins2StaticConfig, IG2],
