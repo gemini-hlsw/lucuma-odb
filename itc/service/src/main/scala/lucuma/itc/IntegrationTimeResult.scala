@@ -4,6 +4,7 @@
 package lucuma.itc
 
 import io.circe.Encoder
+import lucuma.core.math.Wavelength
 
 sealed trait IntegrationTimeError extends RuntimeException {
   def message: String
@@ -18,6 +19,10 @@ object IntegrationTimeError {
 case class SourceTooBright(wellHalfFilledSeconds: BigDecimal) extends IntegrationTimeError
     derives Encoder.AsObject {
   val message: String = f"Source too bright, well half filled in $wellHalfFilledSeconds%.2f seconds"
+}
+
+case class WavelengthOutOfRange(wavelength: Wavelength) extends IntegrationTimeError {
+  val message: String = Error.WavelengthAtOutOfRangeMessage
 }
 
 /** Generic calculation error */

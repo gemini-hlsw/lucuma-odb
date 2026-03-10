@@ -336,6 +336,7 @@ class customSedSuite extends GraphQLSuite {
                 "targetIndex" : 0,
                 "error" : {
                   "wellHalfFilledSeconds" : null,
+                  "wavelength" : null,
                   "errorCode" : "GENERAL",
                   "message" : "Error calculating ITC: Custom SED file for id [a-999] is empty."
                 }
@@ -456,6 +457,7 @@ class customSedSuite extends GraphQLSuite {
                 "targetIndex" : 0,
                 "error" : {
                   "wellHalfFilledSeconds" : null,
+                  "wavelength" : null,
                   "errorCode" : "GENERAL",
                   "message" : "Error calculating ITC: Invalid wavelength in custom SED: [someText].Invalid density in custom SED: [someOtherText]."
                 }

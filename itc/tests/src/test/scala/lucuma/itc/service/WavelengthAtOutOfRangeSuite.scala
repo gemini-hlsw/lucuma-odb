@@ -5,9 +5,9 @@ package lucuma.itc.service
 
 import io.circe.literal.*
 
-class errorChannelSuite extends FailingCalculationSuite:
+class WavelengthAtOutOfRangeErrorSuite extends WavelengthAtOutOfRangeSuite:
 
-  test("Test error channel") {
+  test("igrins2 spectroscopy at 1800nm returns wavelength_at_out_of_range error"):
     query(
       """
         query {
@@ -15,7 +15,7 @@ class errorChannelSuite extends FailingCalculationSuite:
             exposureTimeMode: {
               signalToNoise: {
                 value: 2,
-                at: { nanometers: 60 }
+                at: { nanometers: 1800 }
               }
             },
             asterism: [
@@ -24,7 +24,7 @@ class errorChannelSuite extends FailingCalculationSuite:
                   point: {
                     bandNormalized: {
                       sed: {
-                        stellarLibrary: O5_V
+                        planet: JUPITER
                       }
                       brightnesses: [ {
                         band: R
@@ -60,29 +60,12 @@ class errorChannelSuite extends FailingCalculationSuite:
               }
             },
             mode: {
-              gmosNSpectroscopy: {
-                centralWavelength: {
-                  nanometers: 60
-                },
-                filter: GG455,
-                fpu: {
-                  builtin: LONG_SLIT_0_25
-                },
-                grating: B1200_G5301
-              }
+              igrins2Spectroscopy: {}
             }
           }) {
             mode {
               ... on SpectroscopyMode {
                 instrument
-                params {
-                  ... on GmosNSpectroscopyParams {
-                    grating
-                    centralWavelength {
-                      nanometers
-                    }
-                  }
-                }
               }
             }
             brightest {
@@ -99,27 +82,26 @@ class errorChannelSuite extends FailingCalculationSuite:
       json"""
         {
           "errors": [{
-            "message": "Error calculating ITC: A calculation error",
+            "message": "The requested wavelength falls outside the instrument's wavelength coverage.",
             "extensions": {
               "targetIndex": 0,
               "error": {
                 "wellHalfFilledSeconds": null,
-                "wavelength": null,
-                "errorCode": "GENERAL",
-                "message": "Error calculating ITC: A calculation error"
+                "wavelength": {
+                  "picometers": 1800000,
+                  "angstroms": 18000.0,
+                  "nanometers": 1800.000,
+                  "micrometers": 1.800000
+                },
+                "errorCode": "WAVELENGTH_AT_OUT_OF_RANGE",
+                "message": "The requested wavelength falls outside the instrument's wavelength coverage."
               }
             }
           }],
           "data": {
             "spectroscopy" : {
               "mode" : {
-                "instrument" : "GMOS_NORTH",
-                "params" : {
-                  "grating" : "B1200_G5301",
-                  "centralWavelength" : {
-                    "nanometers" : 60.000
-                  }
-                }
+                "instrument" : "IGRINS2"
               },
               "brightest" : null
             }
@@ -127,4 +109,3 @@ class errorChannelSuite extends FailingCalculationSuite:
         }
         """
     )
-  }
