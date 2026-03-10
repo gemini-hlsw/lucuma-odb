@@ -7,6 +7,30 @@ WHERE c_step_id IS NOT NULL;
 
 CREATE INDEX ON t_execution_event (c_observation_id);
 
+-- A mapping from step stage to execution state.  When a step event arrives it
+-- carries a step stage and we use this mapping to figure the corresponding step
+-- execution state.  The mapping is currently complete.  Any new entries not
+-- present would be assumed 'ongoing'.
+CREATE TABLE t_step_stage_execution_state (
+  c_step_stage      e_step_stage PRIMARY KEY,
+  c_execution_state d_tag        NOT NULL REFERENCES t_step_execution_state(c_tag)
+);
+
+INSERT INTO t_step_stage_execution_state (
+  c_step_stage,
+  c_execution_state
+) VALUES
+  ('abort',           'aborted'),
+  ('continue',        'ongoing'),
+  ('end_configure',   'ongoing'),
+  ('end_observe',     'ongoing'),
+  ('end_step',      'completed'),
+  ('pause',           'ongoing'),
+  ('start_configure', 'ongoing'),
+  ('start_observe',   'ongoing'),
+  ('start_step',      'ongoing'),
+  ('stop',            'stopped');
+
 -- Create an atom table.  This will store atoms, both executed and unexecuted.
 CREATE TABLE t_atom (
   c_atom_id          d_atom_id        PRIMARY KEY,
@@ -260,36 +284,20 @@ SELECT
   MAX(se.c_last_event_time)      AS c_last_event_time,
 
   CASE
-    WHEN bool_and(se.c_execution_state IN ('completed', 'abandoned')) THEN 'completed'
+    WHEN bool_and(es.c_terminal) THEN 'completed'
     ELSE 'ongoing'
   END::d_tag AS c_execution_state
 
 FROM t_atom a
-JOIN t_step s ON s.c_atom_id = a.c_atom_id
-JOIN t_step_execution se ON se.c_step_id = s.c_step_id
+JOIN t_step s                  ON s.c_atom_id  = a.c_atom_id
+JOIN t_step_execution se       ON se.c_step_id = s.c_step_id
+JOIN t_step_execution_state es ON es.c_tag     = se.c_execution_state
 GROUP BY
   a.c_atom_id,
   se.c_visit_id,
   a.c_observation_id,
   a.c_sequence_type,
   a.c_description;
-
--- A partial mapping from step stage to execution state.  When a step event
--- arrives it carries a step stage and we use this mapping to figure the
--- corresponding step execution state.  Entries not present in this mapping are
--- assumed to be 'ongoing'.
-CREATE TABLE t_step_stage_execution_state (
-  c_step_stage      e_step_stage PRIMARY KEY,
-  c_execution_state d_tag        NOT NULL REFERENCES t_step_execution_state(c_tag)
-);
-
-INSERT INTO t_step_stage_execution_state (
-  c_step_stage,
-  c_execution_state
-) VALUES
-  ('abort',    'aborted'),
-  ('end_step', 'completed'),
-  ('stop',     'stopped') ;
 
 -- A trigger to insert / update the step execution information when a new
 -- step or dataset event arrives.
@@ -307,7 +315,7 @@ BEGIN
   WHERE c_atom_id = NEW.c_atom_id;
 
   -- What is the execution state according to the step stage? (For step events,
-  -- otherwise this is NULL.  Also null for non-terminal step stages.)
+  -- otherwise this is NULL.)
   SELECT s.c_execution_state
   INTO step_stage_state
   FROM t_step_stage_execution_state s
@@ -354,29 +362,26 @@ BEGIN
 
   ELSE
 
-    UPDATE t_step_execution
+    UPDATE t_step_execution e
     SET
       c_visit_id         = NEW.c_visit_id, -- we include the visit in order to fail (in validate_step_execution_update()) if it has changed
-      c_first_event_time = least(t_step_execution.c_first_event_time,   NEW.c_received),
-      c_last_event_time  = greatest(t_step_execution.c_last_event_time, NEW.c_received),
+      c_first_event_time = least(e.c_first_event_time,   NEW.c_received),
+      c_last_event_time  = greatest(e.c_last_event_time, NEW.c_received),
       c_execution_state  =
         CASE
-          -- If we're in a terminal execution state, we stay there.
-          WHEN EXISTS (
-           SELECT 1 FROM t_step_execution_state s WHERE s.c_tag = t_step_execution.c_execution_state AND s.c_terminal
-          )
-          THEN t_step_execution.c_execution_state
+          -- If cur state (cs) in a terminal execution state, we stay there.
+          WHEN cs.c_terminal THEN e.c_execution_state
 
-          -- If we are transitioning to a terminal state, go ahead
-          WHEN step_stage_state IS NOT NULL AND EXISTS (
-            SELECT 1 FROM t_step_execution_state s WHERE s.c_tag = step_stage_state AND s.c_terminal
-          )
-          THEN step_stage_state
+          -- If new state (ns) is a terminal state, go ahead
+          WHEN ns.c_terminal THEN step_stage_state
 
-          -- Leave it in ongoing
-          ELSE t_step_execution.c_execution_state
+          -- Otherwise we're executing
+          ELSE 'ongoing'
         END
-    WHERE c_step_id = NEW.c_step_id;
+    FROM t_step_execution_state cs
+    LEFT JOIN t_step_execution_state ns ON ns.c_tag = step_stage_state
+    WHERE e.c_step_id = NEW.c_step_id
+      AND cs.c_tag    = e.c_execution_state;
 
   END IF;
 
