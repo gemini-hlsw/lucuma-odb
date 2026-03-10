@@ -10,6 +10,7 @@ import cats.data.NonEmptyList
 import cats.syntax.either.*
 import cats.syntax.option.*
 import cats.syntax.order.*
+import cats.syntax.traverse.*
 import eu.timepit.refined.*
 import eu.timepit.refined.types.string.NonEmptyString
 import fs2.Pure
@@ -50,6 +51,8 @@ object Acquisition:
     SignalToNoise.FromBigDecimalExact.getOption(10).get
 
   val MaxExpTimeLastStep = 360.secondTimeSpan
+
+  val RepeatingAtomCount: Int = 10
 
   def filter[L](acqFilters: NonEmptyList[L], λ: Wavelength, wavelength: L => Wavelength): L =
     acqFilters.toList.minBy(filter => λ.diff(wavelength(filter)).abs)
@@ -129,8 +132,9 @@ object Acquisition:
     override val generate: Stream[Pure, Atom[D]] =
       (for
         a0 <- builder.build(NonEmptyString.unapply("Initial Acquisition"), 0, 0, steps.initialAtom)
-        a1 <- builder.build(NonEmptyString.unapply("Fine Adjustments"),    1, 0, steps.repeatingAtom)
-      yield Stream(a0, a1)).runA(TimeEstimateCalculator.Last.empty[D]).value
+        as <- (1 to RepeatingAtomCount).toList.traverse: aix =>
+                builder.build(NonEmptyString.unapply("Fine Adjustments"), aix, 0, steps.repeatingAtom)
+      yield Stream.emits(a0 :: as)).runA(TimeEstimateCalculator.Last.empty[D]).value
 
   private def instantiate[D, G, L, U](
     oid:         Observation.Id,

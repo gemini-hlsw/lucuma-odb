@@ -54,6 +54,7 @@ import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
 import lucuma.itc.IntegrationTime
 import lucuma.odb.sequence.TimeEstimateCalculator
+import lucuma.odb.sequence.gmos.longslit.Acquisition.RepeatingAtomCount
 import lucuma.odb.service.Services
 import lucuma.odb.smartgcal.data.Gmos
 import lucuma.odb.smartgcal.data.SmartGcalValue
@@ -330,6 +331,23 @@ trait ExecutionTestSupportForGmos extends ExecutionTestSupport:
       case 1 => gmosNorthAcq1(roi)
       case 2 => gmosNorthAcq2(roi)
       case _ => sys.error("Only 3 steps in a GMOS North Acq")
+
+  def fineAcquisitionAdjustmentsList(n: Int): Json =
+    List
+      .fill(n):
+        json"""
+          {
+            "description": "Fine Adjustments",
+            "observeClass": "ACQUISITION",
+            "steps": [
+              ${gmosNorthExpectedAcq(2, 0)}
+            ]
+          }
+        """
+      .asJson
+
+  lazy val AllAcquisitionAdjustmentsList: Json =
+    fineAcquisitionAdjustmentsList(RepeatingAtomCount)
 
   val FlatStep: StepConfig.Gcal =
     StepConfig.Gcal(Gcal.Lamp.fromContinuum(GcalContinuum.QuartzHalogen5W), GcalFilter.Gmos, GcalDiffuser.Ir, GcalShutter.Open)
