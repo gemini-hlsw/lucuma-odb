@@ -187,7 +187,10 @@ FROM (
     a.c_observation_id,
     a.c_sequence_type,
     a.c_visit_id,
-    r.c_execution_state,
+    CASE
+      WHEN r.c_execution_state = 'ongoing' THEN 'abandoned'
+      ELSE r.c_execution_state
+    END AS c_execution_state,
     ROW_NUMBER() OVER (
       PARTITION BY a.c_observation_id
       ORDER BY r.c_created, r.c_step_id
@@ -588,16 +591,9 @@ DROP FUNCTION delete_execution_digest;
 
 CREATE OR REPLACE FUNCTION delete_execution_digest()
   RETURNS TRIGGER AS $$
-DECLARE
-  obs_id d_observation_id;
 BEGIN
 
-  SELECT a.c_observation_id INTO STRICT obs_id
-    FROM t_step s
-    JOIN t_atom a ON a.c_atom_id = s.c_atom_id
-   WHERE s.c_step_id = NEW.c_step_id;
-
-  DELETE FROM t_execution_digest WHERE c_observation_id = obs_id;
+  DELETE FROM t_execution_digest WHERE c_observation_id = NEW.c_observation_id;
 
   RETURN NEW;
 END;
