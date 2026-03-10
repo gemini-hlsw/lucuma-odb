@@ -407,6 +407,7 @@ type TargetError {
   errorCode: String!
   message: String!
   wellHalfFilledSeconds: Float
+  wavelength: Wavelength
 }
 
 interface ITCObservingMode {
