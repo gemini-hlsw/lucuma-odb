@@ -107,7 +107,7 @@ object Acquisition:
     override val generate: Stream[Pure, Atom[F2]] =
       (for
         a0 <- builder.build(NonEmptyString.unapply("Initial Acquisition"), 0, 0, steps.initialAtom)
-        as <- (1 to 10).toList.traverse: aix =>
+        as <- (1 to RepeatingAtomCount).toList.traverse: aix =>
                 builder.build(NonEmptyString.unapply("Fine Adjustments"), aix, 0, steps.repeatingAtom)
       yield Stream.emits(a0 :: as)).runA(TimeEstimateCalculator.Last.empty[F2]).value
 

@@ -29,6 +29,7 @@ import lucuma.core.util.Timestamp
 import lucuma.odb.data.Obscalc
 import lucuma.odb.data.OdbError
 import lucuma.odb.graphql.query.ExecutionTestSupportForGmos
+import lucuma.odb.sequence.gmos.longslit.Acquisition.RepeatingAtomCount
 import lucuma.odb.service.Services.ServiceAccess
 import lucuma.odb.util.Codecs.calculation_state
 import lucuma.odb.util.Codecs.core_timestamp
@@ -191,12 +192,12 @@ class ObscalcServiceSuite extends ObscalcServiceSuiteSupport:
           ),
           SequenceDigest(
             ObserveClass.Acquisition,
-            CategorizedTime(ChargeClass.Program -> TimeSpan.unsafeFromMicroseconds(219362500L)),
+            CategorizedTime(ChargeClass.Program -> TimeSpan.unsafeFromMicroseconds(617162500L)),
             SortedSet.from(List(
               TelescopeConfig(Offset.Zero, StepGuideState.Enabled),
               TelescopeConfig(Offset.microarcseconds.reverseGet(10000000L, 0L), StepGuideState.Enabled)
             )),
-            NonNegInt.unsafeFrom(2),
+            NonNegInt.unsafeFrom(1 + RepeatingAtomCount),
             ExecutionState.NotStarted
           ),
           SequenceDigest(
