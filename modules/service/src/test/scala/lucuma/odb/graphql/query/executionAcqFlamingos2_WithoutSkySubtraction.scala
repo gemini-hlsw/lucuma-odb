@@ -10,6 +10,7 @@ import cats.syntax.traverse.*
 import eu.timepit.refined.types.numeric.PosInt
 import io.circe.Json
 import io.circe.literal.*
+import io.circe.syntax.*
 import lucuma.core.enums.Breakpoint
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.StepStage
@@ -19,6 +20,7 @@ import lucuma.core.model.sequence.Step
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
 import lucuma.itc.IntegrationTime
+import lucuma.odb.sequence.flamingos2.longslit.Acquisition.RepeatingAtomCount
 
 class executionAcqFlamingos2_WithoutSkySubtraction extends ExecutionTestSupportForFlamingos2:
 
@@ -26,6 +28,20 @@ class executionAcqFlamingos2_WithoutSkySubtraction extends ExecutionTestSupportF
 
   override def fakeItcImagingResult: IntegrationTime =
     IntegrationTime(ExposureTime, PosInt.unsafeFrom(1))
+
+  def fineAdjustmentsList(n: Int): Json =
+    List
+      .fill(n):
+        json"""
+          {
+            "description": "Fine Adjustments",
+            "observeClass": "ACQUISITION",
+            "steps": [
+              ${flamingos2ExpectedAcq(Flamingos2AcqSlit, ExposureTime, 0, 0)}
+            ]
+          }
+        """
+      .asJson
 
   val InitialAcquisition: Json =
     json"""
@@ -42,15 +58,7 @@ class executionAcqFlamingos2_WithoutSkySubtraction extends ExecutionTestSupportF
                   ${flamingos2ExpectedAcq(Flamingos2AcqSlit,  ExposureTime,    0,  0, Breakpoint.Enabled)}
                 ]
               },
-              "possibleFuture": [
-                {
-                  "description": "Fine Adjustments",
-                  "observeClass": "ACQUISITION",
-                  "steps": [
-                    ${flamingos2ExpectedAcq(Flamingos2AcqSlit, ExposureTime, 0, 0)}
-                  ]
-                }
-              ],
+              "possibleFuture": ${fineAdjustmentsList(RepeatingAtomCount)},
               "hasMore": false
             }
           }
@@ -58,7 +66,7 @@ class executionAcqFlamingos2_WithoutSkySubtraction extends ExecutionTestSupportF
       }
     """
 
-  val FineAdjustments: Json =
+  def fineAdjustments(remaining: Int): Json =
     json"""
       {
         "executionConfig": {
@@ -71,7 +79,7 @@ class executionAcqFlamingos2_WithoutSkySubtraction extends ExecutionTestSupportF
                   ${flamingos2ExpectedAcq(Flamingos2AcqSlit, ExposureTime, 0, 0)}
                 ]
               },
-              "possibleFuture": [],
+              "possibleFuture": ${fineAdjustmentsList(remaining - 1)},
               "hasMore": false
             }
           }
@@ -172,7 +180,7 @@ class executionAcqFlamingos2_WithoutSkySubtraction extends ExecutionTestSupportF
       expect(
         user     = pi,
         query    = flamingos2AcquisitionQuery(oid),
-        expected = FineAdjustments.asRight
+        expected = fineAdjustments(RepeatingAtomCount).asRight
       )
 
   test("execute first step only"):
@@ -206,15 +214,7 @@ class executionAcqFlamingos2_WithoutSkySubtraction extends ExecutionTestSupportF
                         ${flamingos2ExpectedAcq(Flamingos2AcqSlit,  ExposureTime,    0,  0, Breakpoint.Enabled)}
                       ]
                     },
-                    "possibleFuture": [
-                      {
-                        "description": "Fine Adjustments",
-                        "observeClass": "ACQUISITION",
-                        "steps": [
-                          ${flamingos2ExpectedAcq(Flamingos2AcqSlit,  ExposureTime, 0,  0)}
-                        ]
-                      }
-                    ],
+                    "possibleFuture": ${fineAdjustmentsList(RepeatingAtomCount)},
                     "hasMore": false
                   }
                 }

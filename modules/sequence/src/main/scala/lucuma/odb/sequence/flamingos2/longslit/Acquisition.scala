@@ -9,6 +9,7 @@ import cats.Order.catsKernelOrderingForOrder
 import cats.data.NonEmptyList
 import cats.syntax.option.*
 import cats.syntax.order.*
+import cats.syntax.traverse.*
 import eu.timepit.refined.*
 import eu.timepit.refined.types.string.NonEmptyString
 import fs2.Pure
@@ -42,6 +43,8 @@ import java.util.UUID
  * Flamingos 2 long slit acquisition.
  */
 object Acquisition:
+
+  val RepeatingAtomCount: Int = 10
 
   val SkySubtractionLimit: TimeSpan = 2.secondTimeSpan
 
@@ -104,8 +107,9 @@ object Acquisition:
     override val generate: Stream[Pure, Atom[F2]] =
       (for
         a0 <- builder.build(NonEmptyString.unapply("Initial Acquisition"), 0, 0, steps.initialAtom)
-        a1 <- builder.build(NonEmptyString.unapply("Fine Adjustments"),    1, 0, steps.repeatingAtom)
-      yield Stream(a0, a1)).runA(TimeEstimateCalculator.Last.empty[F2]).value
+        as <- (1 to 10).toList.traverse: aix =>
+                builder.build(NonEmptyString.unapply("Fine Adjustments"), aix, 0, steps.repeatingAtom)
+      yield Stream.emits(a0 :: as)).runA(TimeEstimateCalculator.Last.empty[F2]).value
 
   def instantiate(
     observationId: Observation.Id,
