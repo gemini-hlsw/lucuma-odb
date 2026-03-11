@@ -272,10 +272,6 @@ object InstrumentMode {
         case (x0: GmosSouthImaging, y0: GmosSouthImaging)             => x0 === y0
         case (x0: Flamingos2Spectroscopy, y0: Flamingos2Spectroscopy) => x0 === y0
         case (x0: Flamingos2Imaging, y0: Flamingos2Imaging)           => x0 === y0
-<<<<<<< HEAD
-        case (x0: Igrins2Spectroscopy, y0: Igrins2Spectroscopy)       => x0 === y0
-=======
-        case (_: Igrins2Spectroscopy, _: Igrins2Spectroscopy)         => true
->>>>>>> 3f43471bc (Add a simulated sequence for igrins 2)
+        case (Igrins2Spectroscopy, Igrins2Spectroscopy)               => true
         case _                                                        => false
 }

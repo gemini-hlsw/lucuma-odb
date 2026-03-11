@@ -7400,6 +7400,12 @@ type ExecutionConfig {
   `GMOS_SOUTH`.
   """
   gmosSouth: GmosSouthExecutionConfig
+
+  """
+  IGRINS-2 execution config.  This will be null unless the `instrument` is
+  `IGRINS2`.
+  """
+  igrins2: Igrins2ExecutionConfig
 }
 
 """
@@ -8419,6 +8425,131 @@ input Igrins2LongSlitInput {
   """
   explicitSaveSVCImages: Boolean
 
+}
+
+"""
+IGRINS-2 Execution Config
+"""
+type Igrins2ExecutionConfig {
+  """
+  IGRINS-2 static configuration
+  """
+  static: Igrins2Static!
+
+  """
+  IGRINS-2 science execution sequence.  IGRINS-2 has no acquisition sequence.
+  """
+  science: Igrins2ExecutionSequence
+}
+
+"""
+Next atom to execute and potential future atoms.
+"""
+type Igrins2ExecutionSequence {
+  """
+  Next atom to execute.
+  """
+  nextAtom: Igrins2Atom!
+
+  """
+  (Prefix of the) remaining atoms to execute, if any.
+  """
+  possibleFuture: [Igrins2Atom!]!
+
+  """
+  Whether there are more anticipated atoms than those that appear in
+  'possibleFuture'.
+  """
+  hasMore: Boolean!
+}
+
+"""
+IGRINS-2 atom, a collection of steps that should be executed in their entirety
+"""
+type Igrins2Atom {
+  """
+  Atom id
+  """
+  id: AtomId!
+
+  """
+  Optional description of the atom.
+  """
+  description: String
+
+  """
+  Observe class for this atom as a whole (combined observe class for each of
+  its steps).
+  """
+  observeClass: ObserveClass!
+
+  """
+  Individual steps that comprise the atom
+  """
+  steps: [Igrins2Step!]!
+}
+
+"""
+IGRINS-2 step with potential breakpoint
+"""
+type Igrins2Step {
+  """
+  Instrument configuration for this step
+  """
+  instrumentConfig: Igrins2Dynamic!
+
+  """
+  Step id
+  """
+  id: StepId!
+
+  """
+  Whether to pause before the execution of this step
+  """
+  breakpoint: Breakpoint!
+
+  """
+  The sequence step itself
+  """
+  stepConfig: StepConfig!
+
+  "The telescope configuration at this step."
+  telescopeConfig: TelescopeConfig!
+
+  """
+  Time estimate for this step's execution
+  """
+  estimate: StepEstimate!
+
+  """
+  Observe class for this step
+  """
+  observeClass: ObserveClass!
+}
+
+"""
+IGRINS-2 unchanging (over the course of the sequence) configuration values
+"""
+type Igrins2Static {
+  """
+  Whether to save SVC images
+  """
+  saveSVCImages: Boolean!
+
+  """
+  IGRINS-2 offset mode
+  """
+  offsetMode: Igrins2OffsetMode!
+}
+
+"""
+IGRINS-2 dynamic step configuration
+"""
+type Igrins2Dynamic {
+  """
+  IGRINS-2 exposure time
+  """
+  exposure: TimeSpan!
 }
 
 """
