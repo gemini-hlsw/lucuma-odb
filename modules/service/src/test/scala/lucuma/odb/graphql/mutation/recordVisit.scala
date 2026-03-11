@@ -30,7 +30,9 @@ import lucuma.core.enums.GmosSouthFpu
 import lucuma.core.enums.GmosSouthGrating
 import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
+import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObservingModeType
+import lucuma.core.enums.StepStage
 import lucuma.core.math.BoundedInterval
 import lucuma.core.math.Wavelength
 import lucuma.core.model.Observation
@@ -40,6 +42,7 @@ import lucuma.core.model.sequence.StepConfig.Gcal
 import lucuma.core.util.IdempotencyKey
 import lucuma.core.util.TimeSpan
 import lucuma.odb.data.OdbError
+import lucuma.odb.data.StepExecutionState
 import lucuma.odb.service.Services
 import lucuma.odb.smartgcal.data.Flamingos2
 import lucuma.odb.smartgcal.data.Gmos
@@ -48,7 +51,7 @@ import lucuma.odb.smartgcal.data.SmartGcalValue.LegacyInstrumentConfig
 import skunk.Session
 
 
-class recordVisit extends OdbSuite:
+class recordVisit extends OdbSuite with query.GenerationTestSupport with ExecutionState:
 
   val service: User = TestUsers.service(nextId)
 
@@ -466,3 +469,20 @@ class recordVisit extends OdbSuite:
       }
       """.asRight
     )
+
+  test("recordGmosNorthVisit - abandon steps"):
+    assertIOBoolean:
+      for
+        pid <- createProgramAs(service)
+        tid <- createTargetWithProfileAs(service, pid)
+        oid <- createObservationAs(service, pid, ObservingModeType.GmosNorthLongSlit.some, tid)
+        sa  <- firstAcquisitionAtomStepIds(service, oid)
+        ss  <- firstScienceAtomStepIds(service, oid)
+        v0  <- recordVisitAs(service, Instrument.GmosNorth, oid)
+        _   <- addStepEventAs(service, sa(0), v0, StepStage.StartStep)
+        _   <- addStepEventAs(service, ss(0), v0, StepStage.StartStep)
+        e0  <- stepExecutionState(service, oid)
+        _   <- recordVisitAs(service, Instrument.GmosNorth, oid)
+        e1  <- stepExecutionState(service, oid)
+      yield (e0 === List(StepExecutionState.Abandoned, StepExecutionState.Ongoing)) &&
+            e1.forall(_ === StepExecutionState.Abandoned)

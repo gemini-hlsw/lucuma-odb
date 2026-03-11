@@ -130,6 +130,29 @@ class WiringSuite extends ClientSuite:
       ).asRight
     )
 
+  test("ItcClient igrins2 spectroscopy basic wiring and sanity check"):
+    spectroscopy(
+      WiringSuite.Igrins2SpectroscopyInputData,
+      ClientCalculationResult(
+        ItcVersions(
+          versionDateTimeFormatter.format(Instant.ofEpochMilli(buildinfo.BuildInfo.buildDateTime)),
+          BuildInfo.ocslibHash.some
+        ),
+        AsterismIntegrationTimeOutcomes:
+          NonEmptyChain:
+            TargetIntegrationTimeOutcome:
+              TargetIntegrationTime(
+                Zipper.fromNel(NonEmptyList.one(selected)),
+                Band.R.asLeft,
+                SignalToNoiseAt(atWavelength,
+                                SingleSN(SignalToNoise.unsafeFromBigDecimalExact(101.0)),
+                                TotalSN(SignalToNoise.unsafeFromBigDecimalExact(102.0))
+                ).some,
+                List.empty
+              ).asRight
+      ).asRight
+    )
+
   test("ItcClient imaging basic wiring and sanity check"):
     imaging(
       WiringSuite.GmosImagingInputData,
@@ -510,6 +533,41 @@ object WiringSuite:
           Flamingos2Filter.J,
           Flamingos2Fpu.LongSlit2
         )
+      ),
+      NonEmptyList.of(
+        TargetInput(
+          SourceProfile.Point(
+            BandNormalized[Integrated](
+              Galaxy(Spiral).some,
+              SortedMap(
+                Band.R ->
+                  Measure(
+                    BrightnessValue.unsafeFrom(BigDecimal(10.0)),
+                    TaggedUnit[VegaMagnitude, Brightness[Integrated]].unit
+                  ).tag
+              )
+            )
+          ),
+          RadialVelocity.fromMetersPerSecond.getOption(1.0).get
+        )
+      )
+    )
+
+  val Igrins2SpectroscopyInputData: SpectroscopyInput =
+    SpectroscopyInput(
+      SpectroscopyParameters(
+        ExposureTimeMode.SignalToNoiseMode(
+          SignalToNoise.unsafeFromBigDecimalExact(BigDecimal(1)),
+          atWavelength
+        ),
+        ItcConstraintsInput(
+          ImageQualityInput.preset(ImageQuality.Preset.PointOne),
+          CloudExtinctionInput.preset(CloudExtinction.Preset.PointOne),
+          skyBackground = SkyBackground.Darkest,
+          waterVapor = WaterVapor.VeryDry,
+          elevationRange = ElevationRange.ByAirMass.Default
+        ),
+        InstrumentMode.Igrins2Spectroscopy()
       ),
       NonEmptyList.of(
         TargetInput(

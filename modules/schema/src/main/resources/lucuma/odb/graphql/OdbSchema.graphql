@@ -235,10 +235,13 @@ enum AtomStage {
   START_ATOM
 }
 
-"An atom as recorded by Observe."
+"The portion of an atom that executed in a particular visit."
 type AtomRecord {
   "Atom ID."
   id: AtomId!
+
+  "Visit in which this atom executed."
+  visit: Visit!
 
   "Atom execution order -- the index of its first executed step."
   index: PosInt!
@@ -3150,6 +3153,15 @@ type Mutation {
   ): RecordFlamingos2VisitResult!
 
   """
+  Replaces the remaining steps in an execution sequence with the provided
+  sequence.  Previously executed (or even partially executed) steps are not
+  deleted.  Any ongoing steps are abandoned.
+  """
+  replaceFlamingos2Sequence(
+    input: ReplaceFlamingos2SequenceInput!
+  ): ReplaceFlamingos2SequenceResult!
+
+  """
   Record a new GMOS North visit
   """
   recordGmosNorthVisit(
@@ -3160,6 +3172,15 @@ type Mutation {
   ): RecordGmosNorthVisitResult!
 
   """
+  Replaces the remaining steps in an execution sequence with the provided
+  sequence.  Previously executed (or even partially executed) steps are not
+  deleted.  Any ongoing steps are abandoned.
+  """
+  replaceGmosNorthSequence(
+    input: ReplaceGmosNorthSequenceInput!
+  ): ReplaceGmosNorthSequenceResult!
+
+  """
   Record a new GMOS South visit
   """
   recordGmosSouthVisit(
@@ -3168,6 +3189,15 @@ type Mutation {
     """
     input: RecordGmosSouthVisitInput!
   ): RecordGmosSouthVisitResult!
+
+  """
+  Replaces the remaining steps in an execution sequence with the provided
+  sequence.  Previously executed (or even partially executed) steps are not
+  deleted.  Any ongoing steps are abandoned.
+  """
+  replaceGmosSouthSequence(
+    input: ReplaceGmosSouthSequenceInput!
+  ): ReplaceGmosSouthSequenceResult!
 
   """
   Resets the acquisition sequence to start from the initial step regardless of
@@ -8296,8 +8326,9 @@ input Flamingos2LongSlitInput {
 
   """
   The telluricType field must be either specified or skipped altogether. It cannot be unset with a null value.
+  On create the default is HOT.
   """
-  telluricType: TelluricTypeInput = { tag: HOT }
+  telluricType: TelluricTypeInput
 
   """
   Acquisition properties that, when set, override default values.
@@ -18110,4 +18141,127 @@ type CalculatedObservationWorkflow {
   state: CalculationState! @deprecated(reason: "Use `calculationState` instead.")
 
   value: ObservationWorkflow!
+}
+
+input Flamingos2StepInput {
+  instrumentConfig: Flamingos2DynamicInput!
+  breakpoint: Breakpoint
+  stepConfig: StepConfigInput!
+  telescopeConfig: TelescopeConfigInput
+  observeClass: ObserveClass!
+}
+
+input GmosNorthStepInput {
+  instrumentConfig: GmosNorthDynamicInput!
+  breakpoint: Breakpoint
+  stepConfig: StepConfigInput!
+  telescopeConfig: TelescopeConfigInput
+  observeClass: ObserveClass!
+}
+
+input GmosSouthStepInput {
+  instrumentConfig: GmosSouthDynamicInput!
+  breakpoint: Breakpoint
+  stepConfig: StepConfigInput!
+  telescopeConfig: TelescopeConfigInput
+  observeClass: ObserveClass!
+}
+
+input Flamingos2AtomInput {
+  description: NonEmptyString
+  steps: [Flamingos2StepInput!]!
+}
+
+input GmosNorthAtomInput {
+  description: NonEmptyString
+  steps: [GmosNorthStepInput!]!
+}
+
+input GmosSouthAtomInput {
+  description: NonEmptyString
+  steps: [GmosSouthStepInput!]!
+}
+
+"""
+Replace Flamingos 2 sequence input.  Select the observation using one of the
+observation ID or the observation reference.  If both are provided, they must
+refer to the same observation.
+"""
+input ReplaceFlamingos2SequenceInput {
+  observationId: ObservationId
+  observationReference: ObservationReferenceLabel
+
+  "Specifies which sequence should be replaced."
+  sequenceType: SequenceType!
+
+  """
+  The new sequence.  Any unexecuted steps are deleted and replaced with the
+  provided sequence.  Steps that were previously executed, or for which at least
+  one execution event was received, are preserved.
+  """
+  sequence: [Flamingos2AtomInput!]
+}
+
+"""
+The result of a replace sequence mutation, consisting of the newly inserted
+sequence.
+"""
+type ReplaceFlamingos2SequenceResult {
+  sequence: [Flamingos2Atom!]!
+}
+
+"""
+Replace GMOS North sequence input.  Select the observation using one of the
+observation ID or the observation reference.  If both are provided, they must
+refer to the same observation.
+"""
+input ReplaceGmosNorthSequenceInput {
+  observationId: ObservationId
+  observationReference: ObservationReferenceLabel
+
+  "Specifies which sequence should be replaced."
+  sequenceType: SequenceType!
+
+  """
+  The new sequence.  Any unexecuted steps are deleted and replaced with the
+  provided sequence.  Steps that were previously executed, or for which at least
+  one execution event was received, are preserved.
+  """
+  sequence: [GmosNorthAtomInput!]
+}
+
+"""
+The result of a replace sequence mutation, consisting of the newly inserted
+sequence.
+"""
+type ReplaceGmosNorthSequenceResult {
+  sequence: [GmosNorthAtom!]!
+}
+
+"""
+Replace GMOS South sequence input.  Select the observation using one of the
+observation ID or the observation reference.  If both are provided, they must
+refer to the same observation.
+"""
+input ReplaceGmosSouthSequenceInput {
+  observationId: ObservationId
+  observationReference: ObservationReferenceLabel
+
+  "Specifies which sequence should be replaced."
+  sequenceType: SequenceType!
+
+  """
+  The new sequence.  Any unexecuted steps are deleted and replaced with the
+  provided sequence.  Steps that were previously executed, or for which at least
+  one execution event was received, are preserved.
+  """
+  sequence: [GmosSouthAtomInput!]
+}
+
+"""
+The result of a replace sequence mutation, consisting of the newly inserted
+sequence.
+"""
+type ReplaceGmosSouthSequenceResult {
+  sequence: [GmosSouthAtom!]!
 }

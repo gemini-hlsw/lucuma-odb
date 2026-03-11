@@ -324,10 +324,10 @@ class ShortCut_7591 extends ExecutionTestSupportForGmos:
     )
 
   override def gmosNorthArc(ditherNm: Int): GmosNorth =
-    gmosNorthScience(ditherNm).copy(exposure = arc.instrumentConfig.exposureTime)
+    gmosNorthScience(ditherNm).copy(exposure = gmos_arc.instrumentConfig.exposureTime)
 
   override def gmosNorthFlat(ditherNm: Int): GmosNorth =
-    gmosNorthScience(ditherNm).copy(exposure = flat.instrumentConfig.exposureTime)
+    gmosNorthScience(ditherNm).copy(exposure = gmos_flat.instrumentConfig.exposureTime)
 
   test("sequence after stopping"):
     val setup: IO[Observation.Id] =

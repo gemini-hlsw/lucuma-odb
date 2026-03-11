@@ -186,7 +186,7 @@ object ExecutionEventService:
       )(using Transaction[F], Services.ServiceAccess): F[Result[ExecutionEvent.Id]] =
 
         def invalidVisit: OdbError.InvalidVisit =
-          OdbError.InvalidVisit(input.visitId, Some(s"Part of the atom containing step '${input.stepId}' was executed in a visit other than '${input.visitId}'"))
+          OdbError.InvalidVisit(input.visitId, Some(s"Part of the step '${input.stepId}' was executed in a visit other than '${input.visitId}'"))
 
         def invalidStep: OdbError.InvalidStep =
           OdbError.InvalidStep(input.stepId, Some(s"Step '${input.stepId}' not found"))

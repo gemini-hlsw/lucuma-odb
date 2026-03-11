@@ -7,12 +7,14 @@ package input
 
 import cats.syntax.functor.*
 import cats.syntax.parallel.*
+import cats.syntax.partialOrder.*
 import cats.syntax.traverse.*
 import grackle.Result
 import lucuma.core.enums.ObservingModeType
+import lucuma.core.model.Access
 import lucuma.odb.graphql.binding.*
 
-object ObservingModeInput {
+object ObservingModeInput:
 
   final case class Create(
     gmosNorthLongSlit: Option[GmosLongSlitInput.Create.North],
@@ -21,7 +23,7 @@ object ObservingModeInput {
     gmosSouthImaging: Option[GmosImagingInput.Create.South],
     flamingos2LongSlit: Option[Flamingos2LongSlitInput.Create],
     igrins2LongSlit: Option[Igrins2LongSlitInput.Create]
-  ) {
+  ):
 
     def observingModeType: Option[ObservingModeType] =
       gmosNorthLongSlit
@@ -32,9 +34,7 @@ object ObservingModeInput {
         .orElse(flamingos2LongSlit.map(_.observingModeType))
         .orElse(igrins2LongSlit.map(_.observingModeType))
 
-  }
-
-  object Create {
+  object Create:
 
     val Binding: Matcher[Create] =
       ObjectFieldsBinding.rmap {
@@ -60,8 +60,6 @@ object ObservingModeInput {
           }
       }
 
-  }
-
   final case class Edit(
     gmosNorthLongSlit: Option[GmosLongSlitInput.Edit.North],
     gmosSouthLongSlit: Option[GmosLongSlitInput.Edit.South],
@@ -69,7 +67,16 @@ object ObservingModeInput {
     gmosSouthImaging: Option[GmosImagingInput.Edit.South],
     flamingos2LongSlit: Option[Flamingos2LongSlitInput.Edit],
     igrins2LongSlit: Option[Igrins2LongSlitInput.Edit]
-  ) {
+  ):
+
+    def limitToPreExecution(access: Access): Boolean =
+      access <= Access.Pi ||
+        gmosNorthLongSlit.exists(_.limitToPreExecution(access)) ||
+        gmosSouthLongSlit.exists(_.limitToPreExecution(access)) ||
+        gmosNorthImaging.isDefined ||
+        gmosSouthImaging.isDefined ||
+        flamingos2LongSlit.exists(_.limitToPreExecution(access)) ||
+        igrins2LongSlit.isDefined
 
     def observingModeType: Option[ObservingModeType] =
       gmosNorthLongSlit.map(_.observingModeType)
@@ -88,9 +95,7 @@ object ObservingModeInput {
        igrins2LongSlit.traverse(_.toCreate)
       ).parMapN(Create.apply)
 
-  }
-
-  object Edit {
+  object Edit:
 
     val Binding: Matcher[Edit] =
       ObjectFieldsBinding.rmap {
@@ -115,5 +120,3 @@ object ObservingModeInput {
           }
       }
 
-  }
-}

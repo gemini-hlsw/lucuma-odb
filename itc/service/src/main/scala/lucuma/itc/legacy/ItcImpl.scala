@@ -75,7 +75,7 @@ object ItcImpl {
           observingMode match
             case s @ (SpectroscopyMode.GmosNorth(_, _, _, _, _, _) |
                 SpectroscopyMode.GmosSouth(_, _, _, _, _, _) |
-                SpectroscopyMode.Flamingos2(_, _, _)) =>
+                SpectroscopyMode.Flamingos2(_, _, _) | SpectroscopyMode.Igrins2()) =>
               spectroscopyIntegrationTime(target, atWavelength, s, constraints, signalToNoise)
             case i @ (
                   ObservingMode.ImagingMode.GmosNorth(_, _) |
@@ -96,7 +96,7 @@ object ItcImpl {
           observingMode match
             case s @ (SpectroscopyMode.GmosNorth(_, _, _, _, _, _) |
                 SpectroscopyMode.GmosSouth(_, _, _, _, _, _) |
-                SpectroscopyMode.Flamingos2(_, _, _)) =>
+                SpectroscopyMode.Flamingos2(_, _, _) | SpectroscopyMode.Igrins2()) =>
               spectroscopyGraphs(
                 target,
                 atWavelength,
@@ -136,7 +136,7 @@ object ItcImpl {
           _      <- T.put("params.science_mode" -> "spectroscopy")
           _      <- L.info("spectroscopy graph request:")
           _      <- L.info(request.noSpaces) // Request to the legacy itc
-          r      <- itcLocal.calculateGraphs(request.noSpaces)
+          r      <- itcLocal.calculateGraphs(request.noSpaces, atWavelength)
           result <- T.span("convert graphs_result"):
                       TargetGraphsCalcResult
                         .fromLegacy(r.ccds, r.groups, atWavelength, bandOrLine)
@@ -173,7 +173,7 @@ object ItcImpl {
           _      <- T.put("params.science_mode" -> "spectroscopy")
           _      <- L.info(request.noSpaces) // Request to the legacy itc
           _      <- L.info("spectroscopy time request:")
-          a      <- itcLocal.calculateIntegrationTime(request.noSpaces)
+          a      <- itcLocal.calculateIntegrationTime(request.noSpaces, atWavelength)
           result <- T.span("convert integration_time_result"):
                       convertIntegrationTimeRemoteResult(a, bandOrLine)
         yield result
@@ -239,7 +239,7 @@ object ItcImpl {
           _ <- L.info(
                  s"Spectroscopy: Signal to noise mode ${request.noSpaces}"
                ) // Request to the legacy itc
-          a <- itcLocal.calculateSignalToNoise(request.noSpaces)
+          a <- itcLocal.calculateSignalToNoise(request.noSpaces, atWavelength)
         yield TargetIntegrationTime(
           Zipper.one(IntegrationTime(exposureTime, exposureCount)),
           bandOrLine,
@@ -259,7 +259,8 @@ object ItcImpl {
           observingMode match
             case s @ (ObservingMode.SpectroscopyMode.GmosNorth(_, _, _, _, _, _) |
                 ObservingMode.SpectroscopyMode.GmosSouth(_, _, _, _, _, _) |
-                ObservingMode.SpectroscopyMode.Flamingos2(_, _, _)) =>
+                ObservingMode.SpectroscopyMode.Flamingos2(_, _, _) |
+                ObservingMode.SpectroscopyMode.Igrins2()) =>
               spectroscopySignalToNoise(target,
                                         atWavelength,
                                         s,
@@ -309,7 +310,7 @@ object ItcImpl {
           _            <- T.put("params.science_mode" -> "imaging")
           // Request to the legacy itc
           _            <- L.info(s"Imaging: Signal to noise mode ${request.noSpaces}")
-          remoteResult <- itcLocal.calculateIntegrationTime(request.noSpaces)
+          remoteResult <- itcLocal.calculateIntegrationTime(request.noSpaces, atWavelength)
           result       <- T.span("convert integration_time_result"):
                             convertIntegrationTimeRemoteResult(remoteResult, bandOrLine)
         yield result
@@ -346,7 +347,7 @@ object ItcImpl {
           _            <- T.put("params.exposure_count" -> exposureCount.value)
           // Request to the legacy itc
           _            <- L.info(s"Imaging: time and count mode ${request.noSpaces}")
-          remoteResult <- itcLocal.calculateIntegrationTime(request.noSpaces)
+          remoteResult <- itcLocal.calculateIntegrationTime(request.noSpaces, atWavelength)
           result       <- T.span("convert integration_time_result"):
                             convertIntegrationTimeRemoteResult(remoteResult, bandOrLine)
         } yield result

@@ -18,9 +18,9 @@ import lucuma.core.model.sequence.Atom
  * @tparam A step type
  */
 case class StreamingExecutionConfig[F[_], S, D](
-    static:      S,
-    acquisition: Stream[F, Atom[D]],
-    science:     Stream[F, Atom[D]]
+  static:      S,
+  acquisition: Stream[F, Atom[D]],
+  science:     Stream[F, Atom[D]]
 )
 
 object StreamingExecutionConfig:

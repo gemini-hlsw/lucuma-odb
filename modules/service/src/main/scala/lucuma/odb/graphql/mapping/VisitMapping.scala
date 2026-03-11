@@ -26,11 +26,9 @@ import table.ExecutionEventTable
 import table.Flamingos2StaticTable
 import table.GmosStaticTables
 import table.ObservationView
-import table.VisitAtomView
 import table.VisitTable
 
 trait VisitMapping[F[_]] extends VisitTable[F]
-                            with VisitAtomView[F]
                             with AtomRecordView[F]
                             with EventRangeEffectHandler[F]
                             with ExecutionEventTable[F]

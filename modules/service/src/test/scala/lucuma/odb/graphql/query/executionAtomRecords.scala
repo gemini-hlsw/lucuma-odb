@@ -555,4 +555,74 @@ class executionAtomRecords extends OdbSuite with ExecutionQuerySetupOperations
       _   <- addEndStepEvent(sid, vid)
       ga1 <- generatedNextAtomId(pi, oid, Science)
     yield assertEquals(ga0, ga1)
- }
+
+  test("split atoms"):
+    for
+      pid <- createProgramAs(pi)
+      tid <- createTargetWithProfileAs(pi, pid)
+      oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
+      ids <- scienceSequenceIds(serviceUser, oid).map(_.head)
+      (aid, ss)  = ids
+
+      // execute first step in one visit, second in another
+      v0  <- recordVisitAs(serviceUser, mode.instrument, oid)
+      _   <- addEndStepEvent(ss(0), v0)
+      v1  <- recordVisitAs(serviceUser, mode.instrument, oid)
+      _   <- addEndStepEvent(ss(1), v1)
+
+      _   <- expect(
+        user  = serviceUser,
+        query = s"""
+          query {
+            observation(observationId: "$oid") {
+              execution {
+                atomRecords {
+                  matches {
+                    id
+                    steps {
+                      matches {
+                        id
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        """,
+        expected = json"""
+          {
+            "observation": {
+              "execution": {
+                "atomRecords": {
+                  "matches": [
+                    {
+                      "id": ${aid.asJson},
+                      "steps": {
+                        "matches": [
+                          {
+                            "id": ${ss(0).asJson}
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "id": ${aid.asJson},
+                      "steps": {
+                        "matches": [
+                          {
+                            "id": ${ss(1).asJson}
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        """.asRight
+      )
+    yield ()
+
+}

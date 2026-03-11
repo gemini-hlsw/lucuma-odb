@@ -5,27 +5,18 @@ package lucuma.odb.graphql.input
 
 import cats.syntax.parallel.*
 import lucuma.core.enums.Breakpoint
-import lucuma.core.enums.ObserveClass
-import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosSouth
 import lucuma.odb.graphql.binding.*
-
-case class StepInput[D](
-  instrument:      D,
-  breakpoint:      Breakpoint,
-  stepConfig:      StepConfig,
-  telescopeConfig: TelescopeConfig,
-  observeClass:    ObserveClass
-)
+import lucuma.odb.sequence.data.ProtoStep
 
 object StepInput:
 
   private def binding[D](
     instrumentMatcher: Matcher[D]
-  ): Matcher[StepInput[D]] =
+  ): Matcher[ProtoStep[D]] =
     ObjectFieldsBinding.rmap:
       case List(
         instrumentMatcher("instrumentConfig", rInstrument),
@@ -35,13 +26,19 @@ object StepInput:
         ObserveClassBinding("observeClass", rObserveClass),
       ) => (rInstrument, rBreakpoint, rStepConfig, rTelescopeConfig, rObserveClass).parMapN:
         (instrument, breakpoint, step, telescope, oclass) =>
-          StepInput(instrument, breakpoint.getOrElse(Breakpoint.Disabled), step, telescope.getOrElse(TelescopeConfig.Default), oclass)
+          ProtoStep(
+            instrument,
+            step,
+            telescope.getOrElse(TelescopeConfig.Default),
+            oclass,
+            breakpoint.getOrElse(Breakpoint.Disabled)
+          )
 
-  val Flamingos2Binding: Matcher[StepInput[Flamingos2DynamicConfig]] =
+  val Flamingos2Binding: Matcher[ProtoStep[Flamingos2DynamicConfig]] =
     binding(Flamingos2DynamicInput.Binding)
 
-  val GmosNorthBinding: Matcher[StepInput[GmosNorth]] =
+  val GmosNorthBinding: Matcher[ProtoStep[GmosNorth]] =
     binding(GmosNorthDynamicInput.Binding)
 
-  val GmosSouthBinding: Matcher[StepInput[GmosSouth]] =
+  val GmosSouthBinding: Matcher[ProtoStep[GmosSouth]] =
     binding(GmosSouthDynamicInput.Binding)

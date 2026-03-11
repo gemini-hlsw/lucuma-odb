@@ -134,11 +134,10 @@ class addSequenceEvent extends OdbSuite with ExecutionState with query.Execution
       resA <- atomExecutionState(user, oid)
       resS <- stepExecutionState(user, oid)
     yield
-      // Before this would complete both atoms.  Now we aren't trying to
-      // manage the atom execution state on abort, beyond aborting ongoing
-      // steps themselves.  If the user wants to remove unexecuted steps
-      // manually they may do so.
-      assertEquals(resA, List(AtomExecutionState.Ongoing, AtomExecutionState.Ongoing))
+      // The atom record is only the slice of the atom that executes in a given
+      // visit.  Since there are no more steps for this visit both atom records
+      // are completed.
+      assertEquals(resA, List(AtomExecutionState.Completed, AtomExecutionState.Completed))
       assertEquals(resS, List(StepExecutionState.Completed, StepExecutionState.Abandoned))
 
   def addWithIdempotencyKey(

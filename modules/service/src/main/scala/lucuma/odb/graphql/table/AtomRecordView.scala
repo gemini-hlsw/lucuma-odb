@@ -5,10 +5,13 @@ package lucuma.odb.graphql.table
 
 import lucuma.odb.graphql.BaseMapping
 import lucuma.odb.util.Codecs.*
+import skunk.codec.text.text
 
 trait AtomRecordView[F[_]] extends BaseMapping[F]:
   object AtomRecordView extends TableDef("v_atom_record"):
-    val Id: ColumnRef             = col("c_atom_id",          atom_id)
+    val Id: ColumnRef             = col("c_atom_visit_id",    text)
+    val AtomId: ColumnRef         = col("c_atom_id",          atom_id)
+    val VisitId: ColumnRef        = col("c_visit_id",         visit_id)
     val Instrument: ColumnRef     = col("c_instrument",       instrument)
     val ObservationId: ColumnRef  = col("c_observation_id",   observation_id)
     val SequenceType: ColumnRef   = col("c_sequence_type",    sequence_type)

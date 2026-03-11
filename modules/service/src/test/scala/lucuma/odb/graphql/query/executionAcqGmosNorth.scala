@@ -19,6 +19,7 @@ import lucuma.core.model.Observation
 import lucuma.core.model.sequence.Step
 import lucuma.itc.IntegrationTime
 import lucuma.itc.client.ImagingInput
+import lucuma.odb.sequence.gmos.longslit.Acquisition.RepeatingAtomCount
 
 class executionAcqGmosNorth extends ExecutionTestSupportForGmos:
 
@@ -44,15 +45,7 @@ class executionAcqGmosNorth extends ExecutionTestSupportForGmos:
                   ${gmosNorthExpectedAcq(2,  0, roi = roi, Breakpoint.Enabled)}
                 ]
               },
-              "possibleFuture": [
-                {
-                  "description": "Fine Adjustments",
-                  "observeClass": "ACQUISITION",
-                  "steps": [
-                    ${gmosNorthExpectedAcq(2, 0, roi = roi)}
-                  ]
-                }
-              ],
+              "possibleFuture": $AllAcquisitionAdjustmentsList,
               "hasMore": false
             }
           }
@@ -75,15 +68,7 @@ class executionAcqGmosNorth extends ExecutionTestSupportForGmos:
                   ${gmosNorthExpectedAcq(2, 0, roi = roi, Breakpoint.Disabled)}
                 ]
               },
-              "possibleFuture": [
-                {
-                  "description": "Fine Adjustments",
-                  "observeClass": "ACQUISITION",
-                  "steps": [
-                    ${gmosNorthExpectedAcq(2, 0, roi = roi, Breakpoint.Disabled)}
-                  ]
-                }
-              ],
+              "possibleFuture": ${fineAcquisitionAdjustmentsList(RepeatingAtomCount - 1)},
               "hasMore": false
             }
           }
@@ -158,15 +143,7 @@ class executionAcqGmosNorth extends ExecutionTestSupportForGmos:
                         ${gmosNorthExpectedAcq(2,  0, roi = Ccd2, breakpoint = Breakpoint.Enabled)}
                       ]
                     },
-                    "possibleFuture": [
-                      {
-                        "description": "Fine Adjustments",
-                        "observeClass": "ACQUISITION",
-                        "steps": [
-                          ${gmosNorthExpectedAcq(2, 0, roi = Ccd2, breakpoint = Breakpoint.Disabled)}
-                        ]
-                      }
-                    ],
+                    "possibleFuture": $AllAcquisitionAdjustmentsList,
                     "hasMore": false
                   }
                 }
