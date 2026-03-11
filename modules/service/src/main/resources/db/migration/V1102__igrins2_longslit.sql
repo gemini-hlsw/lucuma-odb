@@ -18,8 +18,7 @@ CREATE OR REPLACE FUNCTION format_igrins_2_long_slit_mode_group(
 ) RETURNS text AS $$
 DECLARE
 BEGIN
-  -- Concat all the fields together into a text value.  Here we use the default
-  -- value when an explicit override is not present.
+  -- Concat all the fields together into a text value.
   RETURN concat_ws(
     ':',
     program_id::text,
@@ -57,7 +56,6 @@ CREATE TABLE t_igrins_2_long_slit (
   FOREIGN KEY (c_observation_id, c_instrument, c_observing_mode_type) REFERENCES t_observation(c_observation_id, c_instrument, c_observing_mode_type) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED
 );
 
--- View of igrins_2_long_slit observing modes
 CREATE OR REPLACE VIEW v_igrins_2_long_slit AS
 SELECT
   m.*
@@ -66,7 +64,7 @@ FROM
 INNER JOIN t_observation o
   ON m.c_observation_id = o.c_observation_id;
 
--- Update check_etm_consistent to handle igrins_2_long_slit (science ETM only, no acquisition)
+-- Update check_etm_consistent to handle igrins_2_long_slit (science ETM only, no acquisition required)
 CREATE OR REPLACE FUNCTION check_etm_consistent()
 RETURNS TRIGGER AS $$
 DECLARE
@@ -98,11 +96,16 @@ BEGIN
   ELSE
 
     CASE
-      WHEN obs_mode IN ('flamingos_2_long_slit', 'gmos_north_long_slit', 'gmos_south_long_slit', 'igrins_2_long_slit') THEN
+      WHEN obs_mode IN ('flamingos_2_long_slit', 'gmos_north_long_slit', 'gmos_south_long_slit') THEN
         IF acq_count <> 1 THEN
           RAISE EXCEPTION 'Observation % with mode % must have an acquisition exposure time mode', obs_id, obs_mode;
         END IF;
 
+        IF sci_count <> 1 THEN
+          RAISE EXCEPTION 'Observation % with mode % must have exactly one science exposure time mode', obs_id, obs_mode;
+        END IF;
+
+      WHEN obs_mode = 'igrins_2_long_slit' THEN
         IF sci_count <> 1 THEN
           RAISE EXCEPTION 'Observation % with mode % must have exactly one science exposure time mode', obs_id, obs_mode;
         END IF;

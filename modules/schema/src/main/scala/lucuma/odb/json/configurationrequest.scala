@@ -69,30 +69,36 @@ object configurationrequest:
     val DecodeFlamingos2LongSlit: Decoder[Flamingos2LongSlit] = hc =>
       hc.downField("disperser").as[Flamingos2Disperser].map(Flamingos2LongSlit(_))
 
+    val DecodeIgrins2LongSlit: Decoder[Igrins2LongSlit.type] =
+      hc => if hc.value.isNull then Left(DecodingFailure("null", hc.history))
+            else Right(Igrins2LongSlit)
+
     given Decoder[ObservingMode] = hc =>
       hc.downField("gmosNorthLongSlit").as(using DecodeGmosNorthLongSlit) orElse
       hc.downField("gmosSouthLongSlit").as(using DecodeGmosSouthLongSlit) orElse
       hc.downField("gmosNorthImaging").as(using DecodeGmosNorthImaging) orElse
       hc.downField("gmosSouthImaging").as(using DecodeGmosSouthImaging) orElse
       hc.downField("flamingos2LongSlit").as(using DecodeFlamingos2LongSlit) orElse
+      hc.downField("igrins2LongSlit").as(using DecodeIgrins2LongSlit) orElse
       hc.downField("mode").as[String].flatMap:
         case "IGRINS_2_LONG_SLIT" => Right(Igrins2LongSlit)
-        case _                    => Left(DecodingFailure(s"couldn't decode mode: ${hc.top}", Nil))
+        case other => Left(DecodingFailure(s"Unknown mode: $other", Nil))
 
     given Encoder[ObservingMode] = m =>
       Json.obj(
-        "gmosNorthLongSlit" -> Json.Null,
-        "gmosSouthLongSlit" -> Json.Null,
-        "gmosNorthImaging" -> Json.Null,
-        "gmosSouthImaging" -> Json.Null,
-        "flamingos2LongSlit" -> Json.Null,
+        "gmosNorthLongSlit" -> Json.Null,  // one of these will be replaced below
+        "gmosSouthLongSlit" -> Json.Null,  // one of these will be replaced below
+        "gmosNorthImaging" -> Json.Null,   // one of these will be replaced below
+        "gmosSouthImaging" -> Json.Null,   // one of these will be replaced below
+        "flamingos2LongSlit" -> Json.Null, // one of these will be replaced below
+        "igrins2LongSlit" -> Json.Null,    // one of these will be replaced below
         m match
-          case GmosNorthLongSlit(grating)    => "gmosNorthLongSlit" -> Json.obj("grating" -> grating.asJson)
-          case GmosSouthLongSlit(grating)    => "gmosSouthLongSlit" -> Json.obj("grating" -> grating.asJson)
-          case GmosNorthImaging(filter)      => "gmosNorthImaging" -> Json.obj("filter" -> filter.asJson)
-          case GmosSouthImaging(filter)      => "gmosSouthImaging" -> Json.obj("filter" -> filter.asJson)
+          case GmosNorthLongSlit(grating)    => "gmosNorthLongSlit"  -> Json.obj("grating" -> grating.asJson)
+          case GmosSouthLongSlit(grating)    => "gmosSouthLongSlit"  -> Json.obj("grating" -> grating.asJson)
+          case GmosNorthImaging(filter)      => "gmosNorthImaging"   -> Json.obj("filter" -> filter.asJson)
+          case GmosSouthImaging(filter)      => "gmosSouthImaging"   -> Json.obj("filter" -> filter.asJson)
           case Flamingos2LongSlit(disperser) => "flamingos2LongSlit" -> Json.obj("disperser" -> disperser.asJson)
-          case Igrins2LongSlit               => "mode" -> Json.fromString("IGRINS_2_LONG_SLIT")
+          case Igrins2LongSlit               => "igrins2LongSlit"    -> Json.obj()
       )
 
     given Encoder[Either[Coordinates, Region]] = e =>

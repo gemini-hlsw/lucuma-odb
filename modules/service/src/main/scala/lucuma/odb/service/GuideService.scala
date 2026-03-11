@@ -293,6 +293,7 @@ object GuideService {
         case mode: flamingos2.longslit.Config =>
           (Site.GS, ObservingModeType.Flamingos2LongSlit, mode.filter.wavelength)
         case _: igrins2.longslit.Config =>
+          // TODO Verify what wavelength to use for ags
           (Site.GS, ObservingModeType.Igrins2LongSlit, Wavelength.fromIntNanometers(1700).get)
 
     def agsParamsFor(trackType: TrackType): Option[AgsParams] =
