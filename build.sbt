@@ -4,7 +4,7 @@ import NativePackagerHelper._
 val awsJavaSdkVersion          = "1.12.792"
 val boopickleVersion           = "1.5.0"
 val bouncycastleVersion        = "1.70"
-val catsEffectVersion          = "3.6.3"
+val catsEffectVersion          = "3.7.0"
 val catsParseVersion           = "1.1.0"
 val catsScalacheckVersion      = "0.3.2"
 val catsTimeVersion            = "0.6.0"
