@@ -83,6 +83,39 @@ class replaceFlamingos2Sequence extends query.ExecutionTestSupportForFlamingos2 
         """.asRight
       )
 
+  test("Empty"):
+    val setup: IO[Observation.Id] =
+      for
+        p <- createProgram
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createFlamingos2LongSlitObservationAs(pi, p, List(t))
+      yield o
+
+    setup.flatMap: oid =>
+      expect(
+        user     = pi,
+        query    = s"""
+          mutation {
+            replaceFlamingos2Sequence(input: {
+              observationId: "$oid"
+              sequenceType: SCIENCE
+              sequence: []
+            }) {
+              sequence {
+                description
+              }
+            }
+          }
+        """,
+        expected = json"""
+          {
+            "replaceFlamingos2Sequence": {
+              "sequence": []
+            }
+          }
+        """.asRight
+      )
+
   test("Matches execution config (before first visit)"):
     val setup: IO[Observation.Id] =
       for
