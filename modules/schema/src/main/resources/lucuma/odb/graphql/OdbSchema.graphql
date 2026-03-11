@@ -11221,6 +11221,7 @@ type ConfigurationObservingMode {
   gmosNorthImaging: ConfigurationGmosNorthImaging
   gmosSouthImaging: ConfigurationGmosSouthImaging
   flamingos2LongSlit: ConfigurationFlamingos2LongSlit
+  igrins2LongSlit: ConfigurationIgrins2LongSlit
 }
 
 type ConfigurationGmosNorthLongSlit {
@@ -11241,6 +11242,10 @@ type ConfigurationGmosSouthImaging {
 
 type ConfigurationFlamingos2LongSlit {
   disperser: Flamingos2Disperser!
+}
+
+type ConfigurationIgrins2LongSlit {
+  ignore: Ignore
 }
 
 scalar ConfigurationRequestId

@@ -266,7 +266,7 @@ class observation_configurationRequests
           _    <- expectRequests(pi, oid, List(mid))
         yield ()
 
-      test(s"$prefix request should not apply after incompatible mutation"):
+      test(s"$prefix request should apply after compatible mutation"):
         for
           oid  <- setup(too, mode)
           _    <- baseMutation(pi, oid, mode)
