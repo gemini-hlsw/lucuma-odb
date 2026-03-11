@@ -136,6 +136,27 @@ sealed trait ExposureTimeModeService[F[_]]:
     which:               List[Observation.Id]
   )(using Transaction[F]): F[Result[Map[Observation.Id, (ExposureTimeModeId, ExposureTimeModeId)]]]
 
+  /**
+   * Computes and inserts the science exposure time mode entry for modes which have
+   * a single science exposure time mode and no acquisition exposure time mode.
+   *
+   * Explicit values may be provided. If not, then if a new requirement ETM is
+   * being added or updated, we base the science ETMs on that.
+   * If not, then we base them on the existing requirement ETM (if any).
+   * Otherwise, an error result.
+   *
+   * This is a convenience for modes (like IGRINS2 long slit) that have a
+   * single exposure time mode for all of their science steps.
+   *
+   * @return map of science exposure time mode
+   */
+  def insertScienceOnlyWithDefaults(
+    observingModeName: String,
+    explicitScience:   Option[ExposureTimeMode],
+    newRequirement:    Option[ExposureTimeMode],
+    which:             List[Observation.Id]
+  )(using Transaction[F]): F[Result[Map[Observation.Id, ExposureTimeModeId]]]
+
 object ExposureTimeModeService:
 
   def instantiate[F[_]: Concurrent](using Services[F]): ExposureTimeModeService[F] =
@@ -219,6 +240,19 @@ object ExposureTimeModeService:
           r <- ResultT(resolve[Unit](observingModeName, explicitAcquisition, NonEmptyList.one(((), explicitScience)), newRequirement, which))
           m <- ResultT.liftF(insertResolvedAcquisitionAndScience(r))
         yield m.view.mapValues((acq, sci) => (acq, sci.head._2)).toMap).value
+
+      override def insertScienceOnlyWithDefaults(
+        observingModeName: String,
+        explicitScience:   Option[ExposureTimeMode],
+        newRequirement:    Option[ExposureTimeMode],
+        which:             List[Observation.Id]
+      )(using Transaction[F]): F[Result[Map[Observation.Id, ExposureTimeModeId]]] =
+        (for {
+          r <- ResultT(resolve(observingModeName, None, NonEmptyList.one(((), explicitScience)), newRequirement, which))
+          m <- ResultT.liftF(insertResolvedScienceOnly(r.collect:
+                  case (oid, (_, sci)) => oid -> sci
+               ))
+        } yield m.view.mapValues(_.head._2).toMap).value
 
       override def resolve[A](
         observingModeName:   String,

@@ -12,8 +12,6 @@ import lucuma.core.enums.Igrins2OffsetMode
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.Observation
 import lucuma.odb.data.ExposureTimeModeRole
-import lucuma.odb.data.OdbError
-import lucuma.odb.data.OdbErrorExtensions.asFailureF
 import lucuma.odb.graphql.input.Igrins2LongSlitInput
 import lucuma.odb.sequence.igrins2.longslit.Config
 import lucuma.odb.util.Codecs.*
@@ -81,20 +79,9 @@ object Igrins2LongSlitService:
         req:   Option[ExposureTimeMode],
         which: List[Observation.Id]
       )(using Transaction[F]): F[Result[Unit]] =
-        exposureTimeModeService.selectRequirement(which).flatMap: curReqs =>
-          val resolved = which.flatMap: oid =>
-            (input.exposureTimeMode orElse req orElse curReqs.get(oid)).map(oid -> _)
-          val missing = which.toSet -- resolved.map(_._1).toSet
-          if missing.nonEmpty then
-            OdbError.InvalidArgument(s"$name requires a science exposure time mode.".some).asFailureF
-          else
-            resolved
-              .groupMap(_._2)(_._1)
-              .toList
-              .traverse_ { (etm, oids) =>
-                exposureTimeModeService.insertMany(oids, ExposureTimeModeRole.Science, etm)
-              }
-              .map(Result.apply)
+        exposureTimeModeService
+          .insertScienceOnlyWithDefaults(name, input.exposureTimeMode, req, which)
+          .map(_.void)
 
       override def insert(
         input: Igrins2LongSlitInput.Create,
