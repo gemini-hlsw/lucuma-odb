@@ -54,6 +54,7 @@ import lucuma.odb.graphql.predicate.DatasetPredicates
 import lucuma.odb.graphql.predicate.ExecutionEventPredicates
 import lucuma.odb.graphql.predicate.LeafPredicates
 import lucuma.odb.instances.given
+import lucuma.odb.json.all.query.given
 import lucuma.odb.service.NoTransaction
 import lucuma.odb.service.Services
 import lucuma.odb.service.Services.SuperUserAccess
@@ -97,6 +98,9 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
       RecordGmosNorthVisit,
       RecordGmosSouthVisit,
       RedeemUserInvitation,
+      ReplaceFlamingos2Sequence,
+      ReplaceGmosNorthSequence,
+      ReplaceGmosSouthSequence,
       ResetAcquisition,
       RevokeUserInvitation,
       SetAllocations,
@@ -460,6 +464,42 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
         requireStaffAccess:
           proposalService.deleteProposal(input).nestMap: b =>
             Json.obj("result" -> b.asJson)
+
+  private lazy val ReplaceFlamingos2Sequence =
+    MutationField.json("replaceFlamingos2Sequence", ReplaceSequenceInput.ReplaceFlamingos2Binding): input =>
+      services
+        .useNonTransactionally(selectForUpdate(input))
+        .flatMap: res =>
+          res.flatTraverse: checked =>
+            services.useTransactionally:
+              sequenceService
+                .replaceFlamingos2Sequence(checked)
+                .nestMap: s =>
+                  Json.obj("sequence" -> s.compile.toList.asJson)
+
+  private lazy val ReplaceGmosNorthSequence =
+    MutationField.json("replaceGmosNorthSequence", ReplaceSequenceInput.ReplaceGmosNorthBinding): input =>
+      services
+        .useNonTransactionally(selectForUpdate(input))
+        .flatMap: res =>
+          res.flatTraverse: checked =>
+            services.useTransactionally:
+              sequenceService
+                .replaceGmosNorthSequence(checked)
+                .nestMap: s =>
+                  Json.obj("sequence" -> s.compile.toList.asJson)
+
+  private lazy val ReplaceGmosSouthSequence =
+    MutationField.json("replaceGmosSouthSequence", ReplaceSequenceInput.ReplaceGmosSouthBinding): input =>
+      services
+        .useNonTransactionally(selectForUpdate(input))
+        .flatMap: res =>
+          res.flatTraverse: checked =>
+            services.useTransactionally:
+              sequenceService
+                .replaceGmosSouthSequence(checked)
+                .nestMap: s =>
+                  Json.obj("sequence" -> s.compile.toList.asJson)
 
   private lazy val LinkUser =
     MutationField("linkUser", LinkUserInput.Binding): (input, child) =>

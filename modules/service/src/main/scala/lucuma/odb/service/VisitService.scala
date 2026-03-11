@@ -213,7 +213,7 @@ object VisitService:
           input.static,
           input.idempotencyKey,
           Instrument.Flamingos2,
-          flamingos2SequenceService.selectStatic,
+          flamingos2SequenceService.selectStaticForVisit,
           flamingos2SequenceService.insertStatic
         )
 
@@ -225,7 +225,7 @@ object VisitService:
           input.static,
           input.idempotencyKey,
           Instrument.GmosNorth,
-          gmosSequenceService.selectGmosNorthStatic,
+          gmosSequenceService.selectGmosNorthStaticForVisit,
           gmosSequenceService.insertGmosNorthStatic
         )
 
@@ -237,7 +237,7 @@ object VisitService:
           input.static,
           input.idempotencyKey,
           Instrument.GmosSouth,
-          gmosSequenceService.selectGmosSouthStatic,
+          gmosSequenceService.selectGmosSouthStaticForVisit,
           gmosSequenceService.insertGmosSouthStatic
         )
 

@@ -4,19 +4,21 @@
 package lucuma.odb.service
 
 import cats.effect.Concurrent
-import cats.syntax.functor.*
-import cats.syntax.option.*
+import cats.syntax.all.*
+import lucuma.core.enums.ObservingModeType
 import lucuma.core.model.Observation
 import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig
 import lucuma.core.model.sequence.flamingos2.Flamingos2StaticConfig
 import lucuma.odb.util.Codecs.observation_id
+import lucuma.odb.util.Codecs.observing_mode_type
 import lucuma.odb.util.Codecs.step_id
 import lucuma.odb.util.Codecs.visit_id
 import lucuma.odb.util.Flamingos2Codecs.flamingos_2_dynamic
 import lucuma.odb.util.Flamingos2Codecs.flamingos_2_static
 import skunk.*
+import skunk.codec.boolean.bool
 import skunk.codec.numeric.int8
 import skunk.implicits.*
 
@@ -39,11 +41,11 @@ trait Flamingos2SequenceService[F[_]]:
     stepId: Step.Id
   )(using Transaction[F]): F[Option[Flamingos2DynamicConfig]]
 
-  def selectStatic(
+  def selectStaticForVisit(
     visitId: Visit.Id
   )(using Transaction[F]): F[Option[Flamingos2StaticConfig]]
 
-  def selectLatestVisitStatic(
+  def selectStatic(
     observationId: Observation.Id
   )(using Transaction[F]): F[Option[Flamingos2StaticConfig]]
 
@@ -59,15 +61,17 @@ object Flamingos2SequenceService:
       )(using Transaction[F], Services.ServiceAccess): F[Unit] =
         session.execute(Statements.InsertDynamic)(stepId, dynamic).void
 
-      override def selectStatic(
+      override def selectStaticForVisit(
         visitId: Visit.Id
       )(using Transaction[F]): F[Option[Flamingos2StaticConfig]] =
-        session.option(Statements.SelectStatic)(visitId)
+        session.option(Statements.SelectStaticByVisit)(visitId)
 
-      override def selectLatestVisitStatic(
+      override def selectStatic(
         observationId: Observation.Id
       )(using Transaction[F]): F[Option[Flamingos2StaticConfig]] =
-        session.option(Statements.SelectLatestVisitStatic)(observationId)
+        session
+          .option(Statements.SelectIsLongSlit)(observationId)
+          .map(_.as(lucuma.odb.sequence.flamingos2.longslit.LongSlit.Static))
 
       override def selectDynamicForStep(
         stepId: Step.Id
@@ -126,7 +130,7 @@ object Flamingos2SequenceService:
         RETURNING c_static_id
       """.query(int8)
 
-    val SelectStatic: Query[Visit.Id, Flamingos2StaticConfig] =
+    val SelectStaticByVisit: Query[Visit.Id, Flamingos2StaticConfig] =
       sql"""
         SELECT
           c_mos_pre_imaging,
@@ -135,17 +139,15 @@ object Flamingos2SequenceService:
         WHERE c_visit_id = $visit_id
       """.query(flamingos_2_static)
 
-    val SelectLatestVisitStatic: Query[Observation.Id, Flamingos2StaticConfig] =
+    val SelectIsLongSlit: Query[Observation.Id, Boolean] =
       sql"""
-        SELECT
-          c_mos_pre_imaging,
-          c_use_eoffsetting
-        FROM t_flamingos_2_static f
-        JOIN t_visit v ON v.c_visit_id = f.c_visit_id
-        WHERE v.c_observation_id = $observation_id
-        ORDER BY v.c_created DESC
-        LIMIT 1
-      """.query(flamingos_2_static)
+        SELECT EXISTS (
+          SELECT 1
+          FROM t_observation
+          WHERE c_observation_id      = $observation_id
+            AND c_observing_mode_type = $observing_mode_type
+        )
+      """.query(bool).contramap(o => (o, ObservingModeType.Flamingos2LongSlit))
 
     val SelectDynamicForStep: Query[Step.Id, Flamingos2DynamicConfig] =
       sql"""
