@@ -47,6 +47,7 @@ object StartupDiagnostics:
           checkPostgresEnum(atom_stage),
           checkPostgresEnum(attachment_type),
           checkPostgresEnum(blind_offset_type),
+          checkPostgresEnum(breakpoint),
           checkPostgresEnum(calculation_state),
           checkPostgresEnum(calibration_role),
           checkPostgresEnum(catalog_name),

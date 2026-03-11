@@ -78,15 +78,7 @@ class executionGmosNorthWithBlindOffset extends ExecutionTestSupportForGmos:
                   ${gmosNorthExpectedAcq(2,  0, breakpoint = Breakpoint.Enabled)}
                 ]
               },
-              "possibleFuture": [
-                {
-                  "description": "Fine Adjustments",
-                  "observeClass": "ACQUISITION",
-                  "steps": [
-                    ${gmosNorthExpectedAcq(2, 0)}
-                  ]
-                }
-              ],
+              "possibleFuture": $AllAcquisitionAdjustmentsList,
               "hasMore": false
             }
           }
@@ -128,15 +120,7 @@ class executionGmosNorthWithoutBlindOffset extends ExecutionTestSupportForGmos:
                   ${gmosNorthExpectedAcq(2, 0, breakpoint = Breakpoint.Enabled)}
                 ]
               },
-              "possibleFuture": [
-                {
-                  "description": "Fine Adjustments",
-                  "observeClass": "ACQUISITION",
-                  "steps": [
-                    ${gmosNorthExpectedAcq(2, 0)}
-                  ]
-                }
-              ],
+              "possibleFuture": $AllAcquisitionAdjustmentsList,
               "hasMore": false
             }
           }

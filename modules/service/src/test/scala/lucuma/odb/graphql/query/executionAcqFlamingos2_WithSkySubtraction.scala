@@ -8,11 +8,13 @@ import cats.syntax.either.*
 import eu.timepit.refined.types.numeric.PosInt
 import io.circe.Json
 import io.circe.literal.*
+import io.circe.syntax.*
 import lucuma.core.enums.Breakpoint
 import lucuma.core.model.Observation
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
 import lucuma.itc.IntegrationTime
+import lucuma.odb.sequence.flamingos2.longslit.Acquisition.RepeatingAtomCount
 
 class executionAcqFlamingos2_WithSkySubtraction extends ExecutionTestSupportForFlamingos2:
 
@@ -38,15 +40,20 @@ class executionAcqFlamingos2_WithSkySubtraction extends ExecutionTestSupportForF
                   ${flamingos2ExpectedAcq(Flamingos2AcqSlit,  ExposureTime,    0,  0, Breakpoint.Enabled)}
                 ]
               },
-              "possibleFuture": [
-                {
-                  "description": "Fine Adjustments",
-                  "observeClass": "ACQUISITION",
-                  "steps": [
-                    ${flamingos2ExpectedAcq(Flamingos2AcqSlit, ExposureTime, 0, 0)}
-                  ]
-                }
-              ],
+              "possibleFuture": ${
+                List
+                  .fill(RepeatingAtomCount):
+                    json"""
+                      {
+                        "description": "Fine Adjustments",
+                        "observeClass": "ACQUISITION",
+                        "steps": [
+                          ${flamingos2ExpectedAcq(Flamingos2AcqSlit, ExposureTime, 0, 0)}
+                        ]
+                      }
+                    """
+                  .asJson
+              },
               "hasMore": false
             }
           }

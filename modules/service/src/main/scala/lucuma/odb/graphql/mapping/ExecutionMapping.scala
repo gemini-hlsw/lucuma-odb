@@ -19,13 +19,13 @@ import grackle.TypeRef
 import grackle.syntax.*
 import io.circe.Json
 import io.circe.syntax.*
+import lucuma.core.enums.ExecutionState
 import lucuma.core.model.ExecutionEvent
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Dataset
-import lucuma.core.util.Timestamp
 import lucuma.itc.client.ItcClient
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
@@ -33,7 +33,7 @@ import lucuma.odb.graphql.binding.BooleanBinding
 import lucuma.odb.graphql.binding.DatasetIdBinding
 import lucuma.odb.graphql.binding.ExecutionEventIdBinding
 import lucuma.odb.graphql.binding.NonNegIntBinding
-import lucuma.odb.graphql.binding.TimestampBinding
+import lucuma.odb.graphql.binding.PosIntBinding
 import lucuma.odb.graphql.binding.VisitIdBinding
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.graphql.table.ObscalcTable
@@ -92,10 +92,10 @@ trait ExecutionMapping[F[_]] extends ObservationEffectHandler[F]
       }
 
     case (ExecutionType, "atomRecords", List(
-      TimestampBinding.Option("OFFSET", rOFFSET),
+      PosIntBinding.Option("OFFSET", rOFFSET),
       NonNegIntBinding.Option("LIMIT", rLIMIT)
     )) =>
-      selectWithOffsetAndLimit(rOFFSET, rLIMIT, AtomRecordType, "created", Predicates.atomRecord.created, Predicates.atomRecord.visit.observation.program)
+      selectWithOffsetAndLimit(rOFFSET, rLIMIT, AtomRecordType, "index", Predicates.atomRecord.index, Predicates.atomRecord.observation.program)
 
     case (ExecutionType, "datasets", List(
       DatasetIdBinding.Option("OFFSET", rOFFSET),
@@ -123,11 +123,11 @@ trait ExecutionMapping[F[_]] extends ObservationEffectHandler[F]
       env.getR[Generator.FutureLimit](FutureLimitParam)
 
     val calculate: (Program.Id, Observation.Id, Generator.FutureLimit) => F[Result[Json]] =
-      (pid, oid, futureLimit) =>
+      (_, oid, futureLimit) =>
         services.use: s =>
           Services.asSuperUser:
             s.generator
-             .generate(pid, oid, futureLimit)
+             .generate(oid, futureLimit)
              .map(_.bimap(_.asWarning(Json.Null), _.asJson.success).merge)
 
     // Scans the top-level query and its descendents for environment entries,
@@ -143,12 +143,11 @@ trait ExecutionMapping[F[_]] extends ObservationEffectHandler[F]
 
   private lazy val executionStateHandler: EffectHandler[F] =
     val calculate: (Program.Id, Observation.Id, Unit) => F[Result[Json]] =
-      (pid, oid, _) => {
-        services.use: s =>
-          Services.asSuperUser:
-            s.generator
-             .executionState(pid, oid)
-             .map(_.asJson.success)
+      (_, oid, _) => {
+        services.useTransactionally:
+          generatorParamsService
+           .selectExecutionState(oid)
+           .map(_.getOrElse(ExecutionState.NotDefined).asJson.success)
       }
 
     effectHandler(_ => ().success, calculate)

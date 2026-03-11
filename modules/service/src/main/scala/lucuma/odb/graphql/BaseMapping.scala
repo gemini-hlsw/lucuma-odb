@@ -15,7 +15,6 @@ trait BaseMapping[F[_]]
      with CirceMappingLike[F] {
 
   // TODO: auto-generate this
-  lazy val AddAtomEventResultType                  = schema.ref("AddAtomEventResult")
   lazy val AddConditionsEntryResultType            = schema.ref("AddConditionsEntryResult")
   lazy val AddDatasetEventResultType               = schema.ref("AddDatasetEventResult")
   lazy val AddProgramUserResultType                = schema.ref("AddProgramUserResult")
@@ -58,7 +57,6 @@ trait BaseMapping[F[_]]
   lazy val ChargeClassType                         = schema.ref("ChargeClass")
   lazy val ChronicleIdType                         = schema.ref("ChronicleId")
   lazy val ClassicalType                           = schema.ref("Classical")
-  lazy val ClientIdType                            = schema.ref("ClientId")
   lazy val CloneGroupResultType                    = schema.ref("CloneGroupResult")
   lazy val CloneObservationResultType              = schema.ref("CloneObservationResult")
   lazy val CloneTargetResultType                   = schema.ref("CloneTargetResult")
@@ -303,7 +301,6 @@ trait BaseMapping[F[_]]
   lazy val QueueType                               = schema.ref("Queue")
   lazy val RadialVelocityType                      = schema.ref("RadialVelocity")
   lazy val RandomTelescopeConfigGeneratorType      = schema.ref("RandomTelescopeConfigGenerator")
-  lazy val RecordAtomResultType                    = schema.ref("RecordAtomResult")
   lazy val RecordDatasetResultType                 = schema.ref("RecordDatasetResult")
   lazy val RecordFlamingos2StepResultType          = schema.ref("RecordFlamingos2StepResult")
   lazy val RecordFlamingos2VisitResultType         = schema.ref("RecordFlamingos2VisitResult")

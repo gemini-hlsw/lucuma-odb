@@ -34,8 +34,6 @@ import lucuma.core.enums.GmosSouthGrating
 import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
 import lucuma.core.enums.Instrument
-import lucuma.core.enums.ObserveClass
-import lucuma.core.enums.SequenceType
 import lucuma.core.enums.StepGuideState
 import lucuma.core.math.BoundedInterval
 import lucuma.core.math.Wavelength
@@ -50,8 +48,13 @@ import lucuma.core.model.sequence.gmos.DynamicConfig.GmosSouth
 import lucuma.core.model.sequence.gmos.GmosCcdMode
 import lucuma.core.model.sequence.gmos.GmosFpuMask
 import lucuma.core.model.sequence.gmos.GmosGratingConfig
+import lucuma.core.model.sequence.gmos.StaticConfig
 import lucuma.core.syntax.string.*
+import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
+import lucuma.itc.IntegrationTime
+import lucuma.odb.sequence.TimeEstimateCalculator
+import lucuma.odb.sequence.gmos.longslit.Acquisition.RepeatingAtomCount
 import lucuma.odb.service.Services
 import lucuma.odb.smartgcal.data.Gmos
 import lucuma.odb.smartgcal.data.SmartGcalValue
@@ -59,6 +62,12 @@ import lucuma.odb.smartgcal.data.SmartGcalValue.LegacyInstrumentConfig
 import skunk.Session
 
 trait ExecutionTestSupportForGmos extends ExecutionTestSupport:
+
+  override def fakeItcSpectroscopyResult: IntegrationTime =
+    IntegrationTime(
+      20.minTimeSpan,
+      PosInt.unsafeFrom(10)
+    )
 
   val gn_key_0_50: Gmos.TableKey[GmosNorthGrating, GmosNorthFilter, GmosNorthFpu] =
     Gmos.TableKey(
@@ -69,6 +78,34 @@ trait ExecutionTestSupportForGmos extends ExecutionTestSupport:
       ).some,
       GmosNorthFilter.RPrime.some,
       GmosNorthFpu.LongSlit_0_50.some,
+      GmosXBinning.One,
+      GmosYBinning.Two,
+      GmosAmpGain.Low
+    )
+
+  val gs_key_0_50: Gmos.TableKey[GmosSouthGrating, GmosSouthFilter, GmosSouthFpu] =
+    Gmos.TableKey(
+      Gmos.GratingConfigKey(
+        GmosSouthGrating.B1200_G5321,
+        GmosGratingOrder.One,
+        BoundedInterval.unsafeOpenUpper(Wavelength.Min, Wavelength.Max)
+      ).some,
+      GmosSouthFilter.RPrime.some,
+      GmosSouthFpu.LongSlit_0_50.some,
+      GmosXBinning.One,
+      GmosYBinning.Two,
+      GmosAmpGain.Low
+    )
+
+  val gs_key_0_50_R600: Gmos.TableKey[GmosSouthGrating, GmosSouthFilter, GmosSouthFpu] =
+    Gmos.TableKey(
+      Gmos.GratingConfigKey(
+        GmosSouthGrating.R600_G5324,
+        GmosGratingOrder.One,
+        BoundedInterval.unsafeOpenUpper(Wavelength.Min, Wavelength.Max)
+      ).some,
+      GmosSouthFilter.RPrime.some,
+      GmosSouthFpu.LongSlit_0_50.some,
       GmosXBinning.One,
       GmosYBinning.Two,
       GmosAmpGain.Low
@@ -112,20 +149,6 @@ trait ExecutionTestSupportForGmos extends ExecutionTestSupport:
       ).some,
       GmosNorthFilter.RPrime.some,
       GmosNorthFpu.LongSlit_5_00.some,
-      GmosXBinning.One,
-      GmosYBinning.Two,
-      GmosAmpGain.Low
-    )
-
-  val gs_key_0_50: Gmos.TableKey[GmosSouthGrating, GmosSouthFilter, GmosSouthFpu] =
-    Gmos.TableKey(
-      Gmos.GratingConfigKey(
-        GmosSouthGrating.R600_G5324,
-        GmosGratingOrder.One,
-        BoundedInterval.unsafeOpenUpper(Wavelength.Min, Wavelength.Max)
-      ).some,
-      GmosSouthFilter.RPrime.some,
-      GmosSouthFpu.LongSlit_0_50.some,
       GmosXBinning.One,
       GmosYBinning.Two,
       GmosAmpGain.Low
@@ -176,8 +199,10 @@ trait ExecutionTestSupportForGmos extends ExecutionTestSupport:
 
     val rowsSouth: List[Gmos.TableRow.South] =
       List(
-        Gmos.TableRow(PosLong.unsafeFrom(1), gs_key_0_50, gmos_flat),
-        Gmos.TableRow(PosLong.unsafeFrom(1), gs_key_0_50, gmos_arc)
+        Gmos.TableRow(PosLong.unsafeFrom(1), gs_key_0_50,      gmos_flat),
+        Gmos.TableRow(PosLong.unsafeFrom(1), gs_key_0_50,      gmos_arc),
+        Gmos.TableRow(PosLong.unsafeFrom(1), gs_key_0_50_R600, gmos_flat),
+        Gmos.TableRow(PosLong.unsafeFrom(1), gs_key_0_50_R600, gmos_arc)
       )
 
     val north = servicesFor(pi /* doesn't matter*/).map(_(s)).use: services =>
@@ -194,6 +219,12 @@ trait ExecutionTestSupportForGmos extends ExecutionTestSupport:
 
     north >> south
   }
+
+  def gmosNorthTimeEstimateCalculator: IO[TimeEstimateCalculator[StaticConfig.GmosNorth, GmosNorth]] =
+    timeEstimateCalculator.map(_.gmosNorth)
+
+  def gmosSouthTimeEstimateCalculator: IO[TimeEstimateCalculator[StaticConfig.GmosSouth, GmosSouth]] =
+    timeEstimateCalculator.map(_.gmosSouth)
 
   val GmosAtomQuery: String =
     s"""
@@ -300,6 +331,23 @@ trait ExecutionTestSupportForGmos extends ExecutionTestSupport:
       case 1 => gmosNorthAcq1(roi)
       case 2 => gmosNorthAcq2(roi)
       case _ => sys.error("Only 3 steps in a GMOS North Acq")
+
+  def fineAcquisitionAdjustmentsList(n: Int): Json =
+    List
+      .fill(n):
+        json"""
+          {
+            "description": "Fine Adjustments",
+            "observeClass": "ACQUISITION",
+            "steps": [
+              ${gmosNorthExpectedAcq(2, 0)}
+            ]
+          }
+        """
+      .asJson
+
+  lazy val AllAcquisitionAdjustmentsList: Json =
+    fineAcquisitionAdjustmentsList(RepeatingAtomCount)
 
   val FlatStep: StepConfig.Gcal =
     StepConfig.Gcal(Gcal.Lamp.fromContinuum(GcalContinuum.QuartzHalogen5W), GcalFilter.Gmos, GcalDiffuser.Ir, GcalShutter.Open)
@@ -504,31 +552,25 @@ trait ExecutionTestSupportForGmos extends ExecutionTestSupport:
         .as[Observation.Id]
         .getOrElse(sys.error("Could not create observation"))
     }
-  
+
   val createOngoingGmosNorthObservation: IO[Observation.Id] =
-    // importing at the top level breaks other tests in a never-ending cycle of despair.
-    import lucuma.odb.json.all.transport.given
     for
       p <- createProgramAs(pi)
       t <- createTargetWithProfileAs(pi, p)
       o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
       v <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
-      a <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
-      s <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthArc(0), ArcStep, gcalTelescopeConfig(0), ObserveClass.NightCal)
-      _ <- addEndStepEvent(s)
+      s <- firstScienceStepId(serviceUser, o)
+      _ <- addEndStepEvent(s, v)
       _ <- runObscalcUpdate(p, o)
     yield o
 
   val createOngoingGmosSouthObservation: IO[Observation.Id] =
-    // importing at the top level breaks other tests in a never-ending cycle of despair.
-    import lucuma.odb.json.all.transport.given
     for
       p <- createProgramAs(pi)
       t <- createTargetWithProfileAs(pi, p)
       o <- createGmosSouthLongSlitObservationAs(pi, p, List(t))
       v <- recordVisitAs(serviceUser, Instrument.GmosSouth, o)
-      a <- recordAtomAs(serviceUser, Instrument.GmosSouth, v, SequenceType.Science)
-      s <- recordStepAs(serviceUser, a, Instrument.GmosSouth, gmosSouthArc(0), ArcStep, gcalTelescopeConfig(0), ObserveClass.NightCal)
-      _ <- addEndStepEvent(s)
+      s <- firstScienceStepId(serviceUser, o)
+      _ <- addEndStepEvent(s, v)
       _ <- runObscalcUpdate(p, o)
     yield o

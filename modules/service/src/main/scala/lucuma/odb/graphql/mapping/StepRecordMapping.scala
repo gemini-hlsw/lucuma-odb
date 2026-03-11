@@ -5,7 +5,6 @@ package lucuma.odb.graphql
 package mapping
 
 import cats.effect.Resource
-import cats.syntax.apply.*
 import grackle.Query.Binding
 import grackle.QueryCompiler.Elab
 import grackle.TypeRef
@@ -20,14 +19,14 @@ import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.json.time.query.given
 import lucuma.odb.service.Services
 
-import table.AtomRecordTable
+import table.AtomRecordView
 import table.Flamingos2DynamicView
 import table.GmosDynamicTables
 import table.StepRecordView
 import table.VisitTable
 
 trait StepRecordMapping[F[_]] extends StepRecordView[F]
-                                 with AtomRecordTable[F]
+                                 with AtomRecordView[F]
                                  with EventRangeEffectHandler[F]
                                  with KeyValueEffectHandler[F]
                                  with Flamingos2DynamicView[F]
@@ -41,18 +40,17 @@ trait StepRecordMapping[F[_]] extends StepRecordView[F]
   lazy val StepRecordMapping: ObjectMapping =
     ObjectMapping(StepRecordType)(
       SqlField("id",              StepRecordView.Id, key = true),
-      SqlField("index",           StepRecordView.StepIndex),
+      SqlField("index",           StepRecordView.ExecutionOrder),
       SqlField("instrument",      StepRecordView.Instrument, discriminator = true),
-      SqlObject("atom",           Join(StepRecordView.AtomId, AtomRecordTable.Id)),
-      SqlField("created",         StepRecordView.Created),
+      SqlObject("atom",           Join(StepRecordView.AtomId, AtomRecordView.AtomId)),
       SqlField("executionState",  StepRecordView.ExecutionState),
-      SqlField("_firstEventTime", StepRecordView.FirstEvent, hidden = true),
-      SqlField("_lastEventTime",  StepRecordView.LastEvent, hidden = true),
+      SqlField("_firstEventTime", StepRecordView.FirstEventTime, hidden = true),
+      SqlField("_lastEventTime",  StepRecordView.LastEventTime, hidden = true),
       CursorFieldJson("interval", c =>
         for
-          f <- c.fieldAs[Option[Timestamp]]("_firstEventTime")
-          l <- c.fieldAs[Option[Timestamp]]("_lastEventTime")
-        yield (f, l).mapN((first, last) => TimestampInterval.between(first, last)).asJson,
+          f <- c.fieldAs[Timestamp]("_firstEventTime")
+          l <- c.fieldAs[Timestamp]("_lastEventTime")
+        yield TimestampInterval.between(f, l).asJson,
         List("_firstEventTime", "_lastEventTime")
       ),
       SqlObject("stepConfig"),
@@ -62,8 +60,6 @@ trait StepRecordMapping[F[_]] extends StepRecordView[F]
       SqlField("qaState",         StepRecordView.QaState),
       SqlObject("datasets"),
       SqlObject("events"),
-      SqlField("generatedId",     StepRecordView.GeneratedId),
-      SqlField("idempotencyKey",  StepRecordView.IdempotencyKey),
       SqlObject("flamingos2",     Join(StepRecordView.Id, Flamingos2DynamicView.Id)),
       SqlObject("gmosNorth",      Join(StepRecordView.Id, GmosNorthDynamicTable.Id)),
       SqlObject("gmosSouth",      Join(StepRecordView.Id, GmosSouthDynamicTable.Id))
