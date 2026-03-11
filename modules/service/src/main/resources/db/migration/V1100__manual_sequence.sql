@@ -197,35 +197,25 @@ INSERT INTO t_step_execution (
   c_last_event_time
 )
 SELECT
-  r2.c_step_id,
-  r2.c_observation_id,
-  r2.c_sequence_type,
-  r2.c_visit_id,
-  r2.c_execution_state,
-  r2.c_execution_order,
-  r2.c_first_event_time,
-  r2.c_last_event_time
-FROM (
-  SELECT
-    r.c_step_id,
-    a.c_observation_id,
-    a.c_sequence_type,
-    a.c_visit_id,
-    CASE
-      WHEN r.c_execution_state = 'ongoing' THEN 'abandoned'
-      ELSE r.c_execution_state
-    END AS c_execution_state,
-    ROW_NUMBER() OVER (
-      PARTITION BY a.c_observation_id
-      ORDER BY r.c_created, r.c_step_id
-    ) AS c_execution_order,
-    r.c_first_event_time,
-    r.c_last_event_time
-  FROM t_step_record r
-  JOIN t_atom_record a ON a.c_atom_id = r.c_atom_id
-  WHERE r.c_first_event_time IS NOT NULL
-    AND r.c_last_event_time  IS NOT NULL
-) r2;
+  r.c_step_id,
+  a.c_observation_id,
+  a.c_sequence_type,
+  a.c_visit_id,
+  CASE
+    WHEN NOT es.c_terminal THEN 'abandoned'
+    ELSE r.c_execution_state
+  END AS c_execution_state,
+  ROW_NUMBER() OVER (
+    PARTITION BY a.c_observation_id
+    ORDER BY r.c_created, r.c_step_id
+  ) AS c_execution_order,
+  r.c_first_event_time,
+  r.c_last_event_time
+FROM t_step_record r
+JOIN t_atom_record a           ON a.c_atom_id = r.c_atom_id
+JOIN t_step_execution_state es ON es.c_tag = r.c_execution_state
+WHERE r.c_first_event_time IS NOT NULL
+  AND r.c_last_event_time  IS NOT NULL;
 
 -- Set the new execution order field in t_observation.
 UPDATE t_observation o
@@ -551,14 +541,12 @@ INSERT INTO t_sequence_materialization (
   c_updated
 )
 SELECT
-  a.c_observation_id,
-  a.c_sequence_type,
+  se.c_observation_id,
+  se.c_sequence_type,
   MIN(se.c_first_event_time) AS c_created,
   MIN(se.c_first_event_time) AS c_updated
 FROM t_step_execution se
-JOIN t_step s ON s.c_step_id = se.c_step_id
-JOIN t_atom a ON a.c_atom_id = s.c_atom_id
-GROUP BY (a.c_observation_id, a.c_sequence_type);
+GROUP BY se.c_observation_id, se.c_sequence_type;
 
 -- When a new step is completed (or uncompleted if that ever happens), we need
 -- to poke obscalc.
@@ -725,8 +713,7 @@ BEGIN
     obs_ref
   FROM t_step_execution se
   JOIN t_observation o ON o.c_observation_id = se.c_observation_id
-  WHERE se.c_step_id = NEW.c_step_id
-    AND se.c_execution_order IS NOT NULL;
+  WHERE se.c_step_id = NEW.c_step_id;
 
   IF visit_id IS NULL THEN
     RAISE EXCEPTION

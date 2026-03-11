@@ -64,11 +64,10 @@ SELECT
     WHEN EXISTS (
       SELECT 1
       FROM t_step s
-      JOIN t_atom a ON a.c_atom_id = s.c_atom_id
-      LEFT JOIN t_step_execution se ON se.c_step_id = s.c_step_id
-      WHERE a.c_observation_id = o.c_observation_id
-        AND a.c_sequence_type = 'science'
-        AND COALESCE(se.c_execution_state, 'not_started') NOT IN ('completed', 'abandoned')
+      JOIN t_atom a ON a.c_atom_id = s.c_atom_id AND a.c_observation_id = o.c_observation_id AND a.c_sequence_type = 'science'
+      LEFT JOIN t_step_execution se       ON se.c_step_id = s.c_step_id
+      LEFT JOIN t_step_execution_state es ON es.c_tag     = se.c_execution_state AND es.c_terminal
+      WHERE es.c_tag IS NULL -- no step execution or a non-terminal execution state
     ) THEN 'ongoing'::e_execution_state
 
     ELSE 'completed'::e_execution_state
@@ -82,7 +81,7 @@ SELECT
   t.c_source_profile
 FROM
   t_observation o
-LEFT JOIN t_target b ON c_target_id = o.c_blind_offset_target_id
+LEFT JOIN t_target b ON b.c_target_id = o.c_blind_offset_target_id
 LEFT JOIN LATERAL (
   SELECT t.c_target_id,
          t.c_sid_rv,
@@ -98,12 +97,10 @@ LEFT JOIN t_exposure_time_mode e
  AND e.c_role = 'requirement'
 LEFT JOIN (
   SELECT
-    a.c_observation_id,
+    se.c_observation_id,
     COUNT(*) AS c_step_count
   FROM t_step_execution se
-  JOIN t_step s ON s.c_step_id = se.c_step_id
-  JOIN t_atom a ON a.c_atom_id = s.c_atom_id
-  GROUP BY a.c_observation_id
+  GROUP BY se.c_observation_id
 ) s_counts ON s_counts.c_observation_id = o.c_observation_id
 ORDER BY
   o.c_observation_id,
