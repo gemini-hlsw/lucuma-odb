@@ -51,8 +51,8 @@ val testcontainersScalaVersion = "0.44.1" // check test output if you attempt to
 val weaverVersion              = "0.8.4"
 
 ThisBuild / tlBaseVersion      := "0.56"
-ThisBuild / scalaVersion       := "3.7.4"
-ThisBuild / crossScalaVersions := Seq("3.7.4")
+ThisBuild / scalaVersion       := "3.8.2"
+ThisBuild / crossScalaVersions := Seq("3.8.2")
 ThisBuild / scalacOptions     ++= Seq("-Xmax-inlines", "50") // Hash derivation fails with default of 32
 
 ThisBuild / Test / fork              := false
