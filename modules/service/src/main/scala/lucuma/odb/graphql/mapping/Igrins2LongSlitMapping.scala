@@ -8,8 +8,8 @@ import grackle.Query.Binding
 import grackle.Query.Filter
 import grackle.Query.Unique
 import grackle.QueryCompiler.Elab
-import grackle.TypeRef
 import grackle.Result
+import grackle.TypeRef
 import grackle.skunk.SkunkMapping
 import lucuma.core.enums.Igrins2OffsetMode
 import lucuma.odb.data.ExposureTimeModeRole

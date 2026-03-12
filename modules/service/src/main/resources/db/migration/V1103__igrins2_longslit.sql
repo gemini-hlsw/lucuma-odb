@@ -135,7 +135,7 @@ CREATE OR REPLACE VIEW v_observing_mode_group AS
     max(m.c_observation_id) as c_observation_id
   FROM
     t_gmos_north_long_slit m
-  LEFT JOIN t_observation o ON m.c_observation_id = o.c_observation_id
+  JOIN t_observation o ON m.c_observation_id = o.c_observation_id
   GROUP BY
     m.c_mode_key,
     o.c_program_id
@@ -147,7 +147,7 @@ UNION ALL
     max(m.c_observation_id) as c_observation_id
   FROM
     t_gmos_south_long_slit m
-  LEFT JOIN t_observation o ON m.c_observation_id = o.c_observation_id
+  JOIN t_observation o ON m.c_observation_id = o.c_observation_id
   GROUP BY
     m.c_mode_key,
     o.c_program_id
@@ -159,7 +159,7 @@ UNION ALL
     max(m.c_observation_id) as c_observation_id
   FROM
     t_flamingos_2_long_slit m
-  LEFT JOIN t_observation o ON m.c_observation_id = o.c_observation_id
+  JOIN t_observation o ON m.c_observation_id = o.c_observation_id
   GROUP BY
     m.c_mode_key,
     o.c_program_id
@@ -171,7 +171,7 @@ UNION ALL
     max(m.c_observation_id) as c_observation_id
   FROM
     t_igrins_2_long_slit m
-  LEFT JOIN t_observation o ON m.c_observation_id = o.c_observation_id
+  JOIN t_observation o ON m.c_observation_id = o.c_observation_id
   GROUP BY
     m.c_mode_key,
     o.c_program_id;
