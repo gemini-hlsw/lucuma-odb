@@ -9,6 +9,7 @@ import grackle.Query.Filter
 import grackle.Query.Unique
 import grackle.QueryCompiler.Elab
 import grackle.TypeRef
+import grackle.Result
 import grackle.skunk.SkunkMapping
 import lucuma.core.enums.Igrins2OffsetMode
 import lucuma.odb.data.ExposureTimeModeRole
@@ -21,6 +22,10 @@ trait Igrins2LongSlitMapping[F[_]]
      with OptionalFieldMapping[F]
      with Predicates[F] { this: SkunkMapping[F] =>
 
+  val defaultOffsetMode: FieldMapping = CursorField[Igrins2OffsetMode]("defaultOffsetMode", _ => Result(Igrins2OffsetMode.NodAlongSlit))
+
+  val defaultSaveSVCImages: FieldMapping = CursorField[Boolean]("defaultSaveSVCImages", _ => Result(false))
+
   lazy val Igrins2LongSlitMapping: ObjectMapping =
     ObjectMapping(Igrins2LongSlitType)(
 
@@ -29,12 +34,13 @@ trait Igrins2LongSlitMapping[F[_]]
       SqlObject("exposureTimeMode", Join(Igrins2LongSlitTable.ObservationId, ExposureTimeModeView.ObservationId)),
 
       explicitOrElseDefault[Igrins2OffsetMode]("offsetMode", "explicitOffsetMode", "defaultOffsetMode"),
-      SqlField("defaultOffsetMode",  Igrins2LongSlitTable.OffsetModeDefault),
       SqlField("explicitOffsetMode", Igrins2LongSlitTable.OffsetMode),
+      defaultOffsetMode,
 
       explicitOrElseDefault[Boolean]("saveSVCImages", "explicitSaveSVCImages", "defaultSaveSVCImages"),
-      SqlField("defaultSaveSVCImages",  Igrins2LongSlitTable.SaveSVCImagesDefault),
+
       SqlField("explicitSaveSVCImages", Igrins2LongSlitTable.SaveSVCImages),
+      defaultSaveSVCImages
 
     )
 

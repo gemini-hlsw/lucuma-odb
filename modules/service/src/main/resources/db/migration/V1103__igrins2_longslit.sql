@@ -12,9 +12,7 @@ CREATE OR REPLACE FUNCTION format_igrins_2_long_slit_mode_group(
   program_id              d_program_id,
   observing_mode_type     e_observing_mode_type,
   offset_mode             d_tag,
-  offset_mode_default     d_tag,
-  save_svc_images         boolean,
-  save_svc_images_default boolean
+  save_svc_images         boolean
 ) RETURNS text AS $$
 DECLARE
 BEGIN
@@ -23,8 +21,8 @@ BEGIN
     ':',
     program_id::text,
     observing_mode_type::text,
-    COALESCE(offset_mode, offset_mode_default)::text,
-    COALESCE(save_svc_images, save_svc_images_default)::text
+    COALESCE(offset_mode, 'nod_along_slit')::text,
+    COALESCE(save_svc_images, false)::text
   );
 END;
 $$ LANGUAGE plpgsql IMMUTABLE;
@@ -37,18 +35,14 @@ CREATE TABLE t_igrins_2_long_slit (
   c_observing_mode_type        e_observing_mode_type NOT NULL DEFAULT 'igrins_2_long_slit'                                CHECK (c_observing_mode_type = 'igrins_2_long_slit'),
 
   c_offset_mode                d_tag                 NULL DEFAULT NULL                     REFERENCES t_igrins_2_offset_mode(c_tag),
-  c_offset_mode_default        d_tag                 NOT NULL DEFAULT 'nod_along_slit'     REFERENCES t_igrins_2_offset_mode(c_tag),
   c_save_svc_images            boolean               NULL DEFAULT NULL,
-  c_save_svc_images_default    boolean               NOT NULL DEFAULT false,
 
   c_mode_key                   text                  NOT NULL GENERATED ALWAYS AS (
     format_igrins_2_long_slit_mode_group(
       c_program_id,
       c_observing_mode_type,
       c_offset_mode,
-      c_offset_mode_default,
-      c_save_svc_images,
-      c_save_svc_images_default
+      c_save_svc_images
     )
   ) STORED,
 
