@@ -8,9 +8,9 @@ import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.Igrins2Codecs.*
 import skunk.codec.all.*
 
-trait Igrins2LongSlitView[F[_]] extends BaseMapping[F]:
+trait Igrins2LongSlitTable[F[_]] extends BaseMapping[F]:
 
-  object Igrins2LongSlitView extends TableDef("v_igrins_2_long_slit"):
+  object Igrins2LongSlitTable extends TableDef("t_igrins_2_long_slit"):
 
     val ObservationId: ColumnRef         = col("c_observation_id", observation_id)
 

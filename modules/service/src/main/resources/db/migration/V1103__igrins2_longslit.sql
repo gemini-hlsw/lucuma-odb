@@ -56,14 +56,6 @@ CREATE TABLE t_igrins_2_long_slit (
   FOREIGN KEY (c_observation_id, c_instrument, c_observing_mode_type) REFERENCES t_observation(c_observation_id, c_instrument, c_observing_mode_type) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED
 );
 
-CREATE OR REPLACE VIEW v_igrins_2_long_slit AS
-SELECT
-  m.*
-FROM
-  t_igrins_2_long_slit m
-INNER JOIN t_observation o
-  ON m.c_observation_id = o.c_observation_id;
-
 -- Update check_etm_consistent to handle igrins_2_long_slit (science ETM only, no acquisition required)
 CREATE OR REPLACE FUNCTION check_etm_consistent()
 RETURNS TRIGGER AS $$

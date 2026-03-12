@@ -16,7 +16,7 @@ import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.graphql.table.*
 
 trait Igrins2LongSlitMapping[F[_]]
-  extends Igrins2LongSlitView[F]
+  extends Igrins2LongSlitTable[F]
      with ExposureTimeModeMapping[F]
      with OptionalFieldMapping[F]
      with Predicates[F] { this: SkunkMapping[F] =>
@@ -24,17 +24,17 @@ trait Igrins2LongSlitMapping[F[_]]
   lazy val Igrins2LongSlitMapping: ObjectMapping =
     ObjectMapping(Igrins2LongSlitType)(
 
-      SqlField("observationId", Igrins2LongSlitView.ObservationId, key = true, hidden = true),
+      SqlField("observationId", Igrins2LongSlitTable.ObservationId, key = true, hidden = true),
 
-      SqlObject("exposureTimeMode", Join(Igrins2LongSlitView.ObservationId, ExposureTimeModeView.ObservationId)),
+      SqlObject("exposureTimeMode", Join(Igrins2LongSlitTable.ObservationId, ExposureTimeModeView.ObservationId)),
 
       explicitOrElseDefault[Igrins2OffsetMode]("offsetMode", "explicitOffsetMode", "defaultOffsetMode"),
-      SqlField("defaultOffsetMode",  Igrins2LongSlitView.OffsetModeDefault),
-      SqlField("explicitOffsetMode", Igrins2LongSlitView.OffsetMode),
+      SqlField("defaultOffsetMode",  Igrins2LongSlitTable.OffsetModeDefault),
+      SqlField("explicitOffsetMode", Igrins2LongSlitTable.OffsetMode),
 
       explicitOrElseDefault[Boolean]("saveSVCImages", "explicitSaveSVCImages", "defaultSaveSVCImages"),
-      SqlField("defaultSaveSVCImages",  Igrins2LongSlitView.SaveSVCImagesDefault),
-      SqlField("explicitSaveSVCImages", Igrins2LongSlitView.SaveSVCImages),
+      SqlField("defaultSaveSVCImages",  Igrins2LongSlitTable.SaveSVCImagesDefault),
+      SqlField("explicitSaveSVCImages", Igrins2LongSlitTable.SaveSVCImages),
 
     )
 
