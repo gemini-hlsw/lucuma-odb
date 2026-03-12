@@ -808,6 +808,9 @@ trait DatabaseOperations { this: OdbSuite =>
     ): IO[Observation.Id] =
     createObservationWithSpatialOffsets(user, pid, ObservingModeType.Flamingos2LongSlit, iq, offsets, tids*)
 
+  def createIgrins2LongSlitObservationAs(user: User, pid: Program.Id, tids: Target.Id*): IO[Observation.Id] =
+    createObservationWithSpatialOffsets(user, pid, ObservingModeType.Igrins2LongSlit, ImageQuality.Preset.PointEight, None, tids*)
+
   private def createObservationWithSpatialOffsets(
     user:          User,
     pid:           Program.Id,
@@ -1007,8 +1010,15 @@ trait DatabaseOperations { this: OdbSuite =>
             }
           }"""
       case ObservingModeType.Igrins2LongSlit =>
-        // FIXME
-        "{}"
+        """{
+          spectroscopy: {
+            wavelength: { nanometers: 1700 }
+            resolution: 45000
+            wavelengthCoverage: { nanometers: 900 }
+            focalPlane: SINGLE_SLIT
+            focalPlaneAngle: { microarcseconds: 0 }
+          }
+        }"""
 
   private def observingModeObject(observingMode: ObservingModeType): String =
     observingMode match
@@ -1065,8 +1075,16 @@ trait DatabaseOperations { this: OdbSuite =>
           }
         }"""
       case ObservingModeType.Igrins2LongSlit =>
-        // FIXME
-        "{}"
+        """{
+          igrins2LongSlit: {
+            exposureTimeMode: {
+              signalToNoise: {
+                value: 50.0
+                at: { nanometers: 2200 }
+              }
+            }
+          }
+        }"""
 
   private def observingModeWithSpatialOffsets(observingMode: ObservingModeType, offsets: Option[String]): String =
     observingMode match
@@ -1106,6 +1124,17 @@ trait DatabaseOperations { this: OdbSuite =>
             filter: Y
             fpu: LONG_SLIT_2
             $offsetsField
+          }
+        }"""
+      case ObservingModeType.Igrins2LongSlit =>
+        """{
+          igrins2LongSlit: {
+            exposureTimeMode: {
+              signalToNoise: {
+                value: 50.0
+                at: { nanometers: 2200 }
+              }
+            }
           }
         }"""
       case _ => ""

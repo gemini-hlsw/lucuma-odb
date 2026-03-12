@@ -64,3 +64,6 @@ trait ConfigurationRequestView[F[_]] extends BaseMapping[F]:
     object GmosSouthImaging:
       val Id = col("c_gmos_south_imaging_id", configuration_request_id.embedded)
       val Filters = col("c_gmos_south_imaging_filters", _gmos_south_filter.embedded)
+
+    object Igrins2LongSlit:
+      val Id = col("c_igrins_2_longslit_id", configuration_request_id.embedded)

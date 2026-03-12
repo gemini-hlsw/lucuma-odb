@@ -70,6 +70,7 @@ import lucuma.odb.json.target
 import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.sequence.flamingos2
 import lucuma.odb.sequence.gmos
+import lucuma.odb.sequence.igrins2
 import lucuma.odb.sequence.syntax.hash.*
 import lucuma.odb.sequence.util.HashBytes
 import lucuma.odb.service.Services.SuperUserAccess
@@ -291,6 +292,9 @@ object GuideService {
           (Site.GS, ObservingModeType.GmosSouthImaging, filters.map(_.filter.wavelength).maximum)
         case mode: flamingos2.longslit.Config =>
           (Site.GS, ObservingModeType.Flamingos2LongSlit, mode.filter.wavelength)
+        case _: igrins2.longslit.Config =>
+          // TODO Verify what wavelength to use for ags
+          (Site.GS, ObservingModeType.Igrins2LongSlit, Wavelength.fromIntNanometers(1700).get)
 
     def agsParamsFor(trackType: TrackType): Option[AgsParams] =
       probes.guideProbe(observingModeType, trackType).flatMap: probe =>

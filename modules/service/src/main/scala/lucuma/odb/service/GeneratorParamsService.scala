@@ -48,6 +48,7 @@ import lucuma.odb.sequence.data.MissingParam
 import lucuma.odb.sequence.data.MissingParamSet
 import lucuma.odb.sequence.flamingos2
 import lucuma.odb.sequence.flamingos2.longslit.Acquisition as F2Acquisition
+import lucuma.odb.sequence.igrins2
 import lucuma.odb.util.Codecs.*
 import skunk.*
 import skunk.circe.codec.json.*
@@ -314,6 +315,13 @@ object GeneratorParamsService {
               sciEtm  = sci,
               sciMode = sciMode
             )
+
+          case ig: igrins2.longslit.Config =>
+            val itcInput =
+              MissingParamSet
+                .fromParams(NonEmptyList.one(MissingParam.MissingObservationParam("IGRINS-2 ITC integration")))
+                .asLeft[ItcInput]
+            GeneratorParams(itcInput, obsParams.scienceBand, ig, obsParams.calibrationRole, obsParams.declaredComplete, obsParams.executionState, obsParams.stepCount)
 
           case gn @ gmos.imaging.Config.GmosNorth(_, fs, _) =>
             // An input per filter.

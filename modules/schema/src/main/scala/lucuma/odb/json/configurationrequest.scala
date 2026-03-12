@@ -39,7 +39,7 @@ object configurationrequest:
       val NoObservingMode = DecodingFailure("Observing mode is undefined.", Nil)
 
     given Decoder[Conditions] = hc =>
-      for 
+      for
         c <- hc.downField("cloudExtinction").as[CloudExtinction.Preset]
         i <- hc.downField("imageQuality").as[ImageQuality.Preset]
         s <- hc.downField("skyBackground").as[SkyBackground]
@@ -75,21 +75,26 @@ object configurationrequest:
       hc.downField("gmosNorthImaging").as(using DecodeGmosNorthImaging) orElse
       hc.downField("gmosSouthImaging").as(using DecodeGmosSouthImaging) orElse
       hc.downField("flamingos2LongSlit").as(using DecodeFlamingos2LongSlit) orElse
-      Left(DecodingFailure(s"couldn't decode mode: ${hc.top}", Nil))
+      // Igrins2LongSlit doesn't have any parameters, so we decode it by name
+      hc.downField("mode").as[String].flatMap:
+        case "IGRINS_2_LONG_SLIT" => Right(Igrins2LongSlit)
+        case other => Left(DecodingFailure(s"couldn't decode mode: $other", Nil))
 
-    given Encoder[ObservingMode] = m => 
+    given Encoder[ObservingMode] = m =>
       Json.obj(
-        "gmosNorthLongSlit" -> Json.Null, // one of these will be replaced below
-        "gmosSouthLongSlit" -> Json.Null, // one of these will be replaced below
-        "gmosNorthImaging" -> Json.Null, // one of these will be replaced below
-        "gmosSouthImaging" -> Json.Null, // one of these will be replaced below
+        "gmosNorthLongSlit"  -> Json.Null, // one of these will be replaced below
+        "gmosSouthLongSlit"  -> Json.Null, // one of these will be replaced below
+        "gmosNorthImaging"   -> Json.Null, // one of these will be replaced below
+        "gmosSouthImaging"   -> Json.Null, // one of these will be replaced below
         "flamingos2LongSlit" -> Json.Null, // one of these will be replaced below
+        "igrins2LongSlit"    -> Json.Null, // one of these will be replaced below
         m match
-          case GmosNorthLongSlit(grating) => "gmosNorthLongSlit" -> Json.obj("grating" -> grating.asJson)
-          case GmosSouthLongSlit(grating) => "gmosSouthLongSlit" -> Json.obj("grating" -> grating.asJson)
-          case GmosNorthImaging(filter) => "gmosNorthImaging" -> Json.obj("filter" -> filter.asJson)
-          case GmosSouthImaging(filter) => "gmosSouthImaging" -> Json.obj("filter" -> filter.asJson)
+          case GmosNorthLongSlit(grating)    => "gmosNorthLongSlit"  -> Json.obj("grating" -> grating.asJson)
+          case GmosSouthLongSlit(grating)    => "gmosSouthLongSlit"  -> Json.obj("grating" -> grating.asJson)
+          case GmosNorthImaging(filter)      => "gmosNorthImaging"   -> Json.obj("filter" -> filter.asJson)
+          case GmosSouthImaging(filter)      => "gmosSouthImaging"   -> Json.obj("filter" -> filter.asJson)
           case Flamingos2LongSlit(disperser) => "flamingos2LongSlit" -> Json.obj("disperser" -> disperser.asJson)
+          case Igrins2LongSlit               => "igrins2LongSlit"    -> Json.obj("ignore" -> Json.Null)
       )
 
     given Encoder[Either[Coordinates, Region]] = e =>
@@ -118,7 +123,7 @@ object configurationrequest:
         case (conds, Some(coords), Some(mode)) => Right(Configuration(conds, coords, mode))
         case (conds, None, _)                  => Left(DecodingFailures.NoReferenceCoordinates)
         case (conds, _, None)                  => Left(DecodingFailures.NoObservingMode)
-      
+
     given Encoder[Configuration] = c =>
       Json.obj(
         "conditions" -> c.conditions.asJson,

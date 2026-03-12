@@ -149,6 +149,8 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[GuideProbe](GuideProbeType),
       LeafMapping[StepGuideState](GuideStateType),
       LeafMapping[IdempotencyKey](IdempotencyKeyType),
+      LeafMapping[Igrins2OffsetMode](Igrins2OffsetModeType),
+      LeafMapping[String](IgnoreType),
       LeafMapping[ImageQuality.Preset](ImageQualityPresetType),
       LeafMapping[Instrument](InstrumentType),
       LeafMapping[IntPercent](IntPercentType),

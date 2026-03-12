@@ -3841,3 +3841,345 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
 
     updateBlindOffsetTest(pi, true) *>
       updateBlindOffsetTest(pi, false)
+
+  test("observing mode: create igrins2 long slit in existing observation"):
+
+    val update = """
+      observingMode: {
+        igrins2LongSlit: {
+          exposureTimeMode: {
+            signalToNoise: {
+              value: 50.0
+              at: { nanometers: 2200 }
+            }
+          }
+        }
+      }
+    """
+
+    val query = """
+      observations {
+        instrument
+        observingMode {
+          igrins2LongSlit {
+            offsetMode
+            defaultOffsetMode
+            explicitOffsetMode
+            saveSVCImages
+            defaultSaveSVCImages
+            explicitSaveSVCImages
+            exposureTimeMode {
+              signalToNoise {
+                value
+                at { nanometers }
+              }
+            }
+          }
+        }
+      }
+    """
+
+    val expected =
+      json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "instrument": "IGRINS2",
+              "observingMode": {
+                "igrins2LongSlit": {
+                  "offsetMode": "NOD_ALONG_SLIT",
+                  "defaultOffsetMode": "NOD_ALONG_SLIT",
+                  "explicitOffsetMode": null,
+                  "saveSVCImages": false,
+                  "defaultSaveSVCImages": false,
+                  "explicitSaveSVCImages": null,
+                  "exposureTimeMode": {
+                    "signalToNoise": {
+                      "value": 50.000,
+                      "at": {
+                        "nanometers": 2200.000
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    """.asRight
+
+    oneUpdateTest(pi, update, query, expected)
+
+  test("observing mode: update igrins2 long slit offset mode"):
+
+    val update0 = """
+      observingMode: {
+        igrins2LongSlit: {
+          exposureTimeMode: {
+            signalToNoise: {
+              value: 50.0
+              at: { nanometers: 2200 }
+            }
+          }
+        }
+      }
+    """
+
+    val update1 = """
+      observingMode: {
+        igrins2LongSlit: {
+          explicitOffsetMode: NOD_TO_SKY
+          explicitSaveSVCImages: true
+        }
+      }
+    """
+
+    val query = """
+      observations {
+        observingMode {
+          igrins2LongSlit {
+            offsetMode
+            defaultOffsetMode
+            explicitOffsetMode
+            saveSVCImages
+            defaultSaveSVCImages
+            explicitSaveSVCImages
+          }
+        }
+      }
+    """
+
+    val expected0 =
+      json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "observingMode": {
+                "igrins2LongSlit": {
+                  "offsetMode": "NOD_ALONG_SLIT",
+                  "defaultOffsetMode": "NOD_ALONG_SLIT",
+                  "explicitOffsetMode": null,
+                  "saveSVCImages": false,
+                  "defaultSaveSVCImages": false,
+                  "explicitSaveSVCImages": null
+                }
+              }
+            }
+          ]
+        }
+      }
+    """.asRight
+
+    val expected1 =
+      json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "observingMode": {
+                "igrins2LongSlit": {
+                  "offsetMode": "NOD_TO_SKY",
+                  "defaultOffsetMode": "NOD_ALONG_SLIT",
+                  "explicitOffsetMode": "NOD_TO_SKY",
+                  "saveSVCImages": true,
+                  "defaultSaveSVCImages": false,
+                  "explicitSaveSVCImages": true
+                }
+              }
+            }
+          ]
+        }
+      }
+    """.asRight
+
+    multiUpdateTest(pi,
+      List(
+        (update0, query, expected0),
+        (update1, query, expected1)
+      )
+    )
+
+  test("observing mode: clear igrins2 explicit overrides"):
+
+    val update0 = """
+      observingMode: {
+        igrins2LongSlit: {
+          exposureTimeMode: {
+            signalToNoise: {
+              value: 50.0
+              at: { nanometers: 2200 }
+            }
+          }
+          explicitOffsetMode: NOD_TO_SKY
+          explicitSaveSVCImages: true
+        }
+      }
+    """
+
+    val update1 = """
+      observingMode: {
+        igrins2LongSlit: {
+          explicitOffsetMode: null
+          explicitSaveSVCImages: null
+        }
+      }
+    """
+
+    val query = """
+      observations {
+        observingMode {
+          igrins2LongSlit {
+            offsetMode
+            explicitOffsetMode
+            saveSVCImages
+            explicitSaveSVCImages
+          }
+        }
+      }
+    """
+
+    val expected0 =
+      json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "observingMode": {
+                "igrins2LongSlit": {
+                  "offsetMode": "NOD_TO_SKY",
+                  "explicitOffsetMode": "NOD_TO_SKY",
+                  "saveSVCImages": true,
+                  "explicitSaveSVCImages": true
+                }
+              }
+            }
+          ]
+        }
+      }
+    """.asRight
+
+    val expected1 =
+      json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "observingMode": {
+                "igrins2LongSlit": {
+                  "offsetMode": "NOD_ALONG_SLIT",
+                  "explicitOffsetMode": null,
+                  "saveSVCImages": false,
+                  "explicitSaveSVCImages": null
+                }
+              }
+            }
+          ]
+        }
+      }
+    """.asRight
+
+    multiUpdateTest(pi,
+      List(
+        (update0, query, expected0),
+        (update1, query, expected1)
+      )
+    )
+
+  test("observing mode: switch from gmos to igrins2"):
+
+    val update0 = """
+      observingMode: {
+        gmosNorthLongSlit: {
+          grating: B1200_G5301
+          filter: G_PRIME
+          fpu: LONG_SLIT_0_25
+          centralWavelength: {
+            nanometers: 234.56
+          }
+          exposureTimeMode: {
+            signalToNoise: {
+              value: 20.0
+              at: { nanometers: 234.56 }
+            }
+          }
+        }
+      }
+    """
+
+    val update1 = """
+      observingMode: {
+        igrins2LongSlit: {
+          exposureTimeMode: {
+            signalToNoise: {
+              value: 50.0
+              at: { nanometers: 2200 }
+            }
+          }
+          explicitOffsetMode: NOD_TO_SKY
+        }
+      }
+    """
+
+    val query = """
+      observations {
+        instrument
+        observingMode {
+          gmosNorthLongSlit {
+            grating
+          }
+          igrins2LongSlit {
+            offsetMode
+            explicitOffsetMode
+          }
+        }
+      }
+    """
+
+    val expected0 =
+      json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "instrument": "GMOS_NORTH",
+              "observingMode": {
+                "gmosNorthLongSlit": {
+                  "grating": "B1200_G5301"
+                },
+                "igrins2LongSlit": null
+              }
+            }
+          ]
+        }
+      }
+    """.asRight
+
+    val expected1 =
+      json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "instrument": "IGRINS2",
+              "observingMode": {
+                "gmosNorthLongSlit": null,
+                "igrins2LongSlit": {
+                  "offsetMode": "NOD_TO_SKY",
+                  "explicitOffsetMode": "NOD_TO_SKY"
+                }
+              }
+            }
+          ]
+        }
+      }
+    """.asRight
+
+    multiUpdateTest(pi,
+      List(
+        (update0, query, expected0),
+        (update1, query, expected1)
+      )
+    )

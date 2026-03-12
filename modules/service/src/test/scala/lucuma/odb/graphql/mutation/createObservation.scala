@@ -2590,4 +2590,108 @@ class createObservation extends OdbSuite {
       }
     }
 
+  private def createObsWithIgrins2ObservingMode(
+    pid:                    Program.Id,
+    explicitOffsetMode:     Option[String] = None,
+    explicitSaveSVCImages:  Option[Boolean] = None
+  ): String =
+    s"""
+      mutation {
+        createObservation(input: {
+          programId: ${pid.asJson}
+          SET: {
+            scienceRequirements: {
+              exposureTimeMode: {
+                signalToNoise: {
+                  value: 100.0
+                  at: { nanometers: 2200 }
+                }
+              }
+            }
+            observingMode: {
+              igrins2LongSlit: {
+                exposureTimeMode: {
+                  signalToNoise: {
+                    value: 50.0
+                    at: { nanometers: 2200 }
+                  }
+                }
+                ${explicitOffsetMode.map(m => s"explicitOffsetMode: $m").getOrElse("")}
+                ${explicitSaveSVCImages.map(b => s"explicitSaveSVCImages: $b").getOrElse("")}
+              }
+            }
+          }
+        }) {
+          observation {
+            observingMode {
+              igrins2LongSlit {
+                exposureTimeMode {
+                  signalToNoise {
+                    value
+                    at { nanometers }
+                  }
+                }
+                offsetMode
+                defaultOffsetMode
+                explicitOffsetMode
+                saveSVCImages
+                defaultSaveSVCImages
+                explicitSaveSVCImages
+              }
+            }
+          }
+        }
+      }
+    """
+
+  test("[igrins2] create observation with IGRINS2 defaults"):
+    createProgramAs(pi).flatMap: pid =>
+      query(pi, createObsWithIgrins2ObservingMode(pid)).flatMap: js =>
+        val ls = js.hcursor.downPath(
+          "createObservation", "observation", "observingMode", "igrins2LongSlit"
+        )
+        assertIO(
+          (ls.downIO[Igrins2OffsetMode]("offsetMode"),
+           ls.downIO[Igrins2OffsetMode]("defaultOffsetMode"),
+           ls.downIO[Option[Igrins2OffsetMode]]("explicitOffsetMode"),
+           ls.downIO[Boolean]("saveSVCImages"),
+           ls.downIO[Boolean]("defaultSaveSVCImages"),
+           ls.downIO[Option[Boolean]]("explicitSaveSVCImages"),
+           ls.downIO[Double]("exposureTimeMode", "signalToNoise", "value"),
+           ls.downIO[Double]("exposureTimeMode", "signalToNoise", "at", "nanometers")
+          ).tupled,
+          (Igrins2OffsetMode.NodAlongSlit,
+           Igrins2OffsetMode.NodAlongSlit,
+           None,
+           false,
+           false,
+           None,
+           50.0,
+           2200.0
+          )
+        )
+
+  test("[igrins2] create observation with overrides"):
+    createProgramAs(pi).flatMap: pid =>
+      query(pi, createObsWithIgrins2ObservingMode(
+        pid,
+        explicitOffsetMode = Some("NOD_TO_SKY"),
+        explicitSaveSVCImages = Some(true)
+      )).flatMap: js =>
+        val ls = js.hcursor.downPath(
+          "createObservation", "observation", "observingMode", "igrins2LongSlit"
+        )
+        assertIO(
+          (ls.downIO[Igrins2OffsetMode]("offsetMode"),
+           ls.downIO[Option[Igrins2OffsetMode]]("explicitOffsetMode"),
+           ls.downIO[Boolean]("saveSVCImages"),
+           ls.downIO[Option[Boolean]]("explicitSaveSVCImages")
+          ).tupled,
+          (Igrins2OffsetMode.NodToSky,
+           Some(Igrins2OffsetMode.NodToSky),
+           true,
+           Some(true)
+          )
+        )
+
 }
