@@ -8,19 +8,13 @@ import lucuma.core.math.Angle
 import lucuma.core.math.Offset
 import lucuma.core.math.Offset.P
 import lucuma.core.math.Offset.Q
+import lucuma.core.math.syntax.bigDecimal.*
 import lucuma.core.optics.Format
 import lucuma.core.syntax.string.*
 
 import scala.util.Try
 
 trait SpatialOffsetsFormat:
-
-  extension(v: BigDecimal)
-    def qArcsec: Offset.Q =
-      Offset.Q.signedDecimalArcseconds.reverseGet(v)
-
-    def pArcsec: Offset.P =
-      Offset.P.signedDecimalArcseconds.reverseGet(v)
 
   /**
    * Format for encoding/decoding a list of offset q components as a comma-separated sstring

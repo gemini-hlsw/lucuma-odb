@@ -9,7 +9,7 @@ import cats.syntax.all.*
 import lucuma.core.enums.Igrins2OffsetMode
 import lucuma.core.math.Offset
 import lucuma.core.model.ExposureTimeMode
-import lucuma.odb.format.spatialOffsets.*
+import lucuma.core.model.sequence.igrins2.*
 import lucuma.odb.sequence.syntax.all.*
 
 import java.io.ByteArrayOutputStream
@@ -23,7 +23,7 @@ case class Config(
 ) derives Eq:
 
   def offsets: List[Offset] =
-    explicitSpatialOffsets.getOrElse(Config.defaultOffsetsFor(offsetMode))
+    explicitSpatialOffsets.getOrElse(defaultOffsetsFor(offsetMode))
 
   def hashBytes: Array[Byte] =
     val bao = new ByteArrayOutputStream(256)
@@ -37,28 +37,3 @@ case class Config(
 
     out.close()
     bao.toByteArray
-
-object Config:
-  // TODO: Move this logic to lucuma-core
-
-  val NodAlongSlitDefaultOffsets: List[Offset] =
-    List(
-      Offset.Zero.copy(q = -1.25.qArcsec),
-      Offset.Zero.copy(q =  1.25.qArcsec),
-      Offset.Zero.copy(q =  1.25.qArcsec),
-      Offset.Zero.copy(q = -1.25.qArcsec),
-    )
-
-  val DefaultSpatialOffsets: List[Offset] = NodAlongSlitDefaultOffsets
-
-  val NodToSkyDefaultOffsets: List[Offset] =
-    List(
-      Offset.Zero,
-      Offset.Zero.copy(p = 10.0.pArcsec, q = 10.0.qArcsec),
-      Offset.Zero,
-    )
-
-  def defaultOffsetsFor(mode: Igrins2OffsetMode): List[Offset] =
-    mode match
-      case Igrins2OffsetMode.NodAlongSlit => NodAlongSlitDefaultOffsets
-      case Igrins2OffsetMode.NodToSky     => NodToSkyDefaultOffsets
