@@ -18,7 +18,7 @@ import lucuma.core.model.User
 import lucuma.core.syntax.timespan.*
 import lucuma.odb.graphql.input.AllocationInput
 
-class observations extends OdbSuite {
+class observations extends OdbSuite with ObservingModeSetupOperations {
 
   val pi      = TestUsers.Standard.pi(nextId, nextId)
   val pi2     = TestUsers.Standard.pi(nextId, nextId)
@@ -1019,5 +1019,68 @@ class observations extends OdbSuite {
                 )
               )
     } yield ()
+
+  test("query Flamingos2 long slit observations with explicit acquisition filter"):
+    for
+      pid <- createProgramAs(pi)
+      tid <- createTargetAs(pi, pid)
+      oid <- createObservationWithModeAs(pi, pid, List(tid),
+               s"""
+                 flamingos2LongSlit: {
+                   disperser: R1200_HK
+                   filter: Y
+                   fpu: LONG_SLIT_2
+                   acquisition: {
+                     explicitFilter: J
+                   }
+                 }
+               """
+             )
+      _   <- expect(
+                user = pi,
+                query = s"""
+                  query {
+                    observations(WHERE: {
+                      id: { EQ: "$oid" }
+                    }) {
+                      matches {
+                        id
+                        observingMode {
+                          flamingos2LongSlit {
+                            disperser
+                            filter
+                            fpu
+                            acquisition {
+                              filter
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                """,
+                expected = Right(
+                  json"""
+                    {
+                      "observations": {
+                        "matches": [
+                          {
+                            "id": $oid,
+                            "observingMode": {
+                              "flamingos2LongSlit": {
+                                "disperser": "R1200_HK",
+                                "filter": "Y",
+                                "fpu": "LONG_SLIT_2",
+                                "acquisition": { "filter": "J" }
+                              }
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  """
+                )
+              )
+    yield ()
 
 }
