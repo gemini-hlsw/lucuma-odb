@@ -1484,6 +1484,81 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
             )
       } yield ()
 
+  test("clone IGRINS-2 long slit observation preserves spatial offsets"):
+    for {
+      pid <- createProgramAs(pi)
+      tid <- createTargetAs(pi, pid)
+      oid <- createIgrins2LongSlitObservationAs(pi, pid, Some("""[
+                { p: { arcseconds: 0.0 }, q: { arcseconds: -1.5 } },
+                { p: { arcseconds: 0.0 }, q: { arcseconds:  1.5 } },
+                { p: { arcseconds: 0.0 }, q: { arcseconds:  1.5 } },
+                { p: { arcseconds: 0.0 }, q: { arcseconds: -1.5 } }
+              ]"""), tid)
+      _   <- expect(
+              user = pi,
+              query = s"""
+                mutation {
+                  cloneObservation(input: {
+                    observationId: "$oid"
+                  }) {
+                    originalObservation {
+                      observingMode {
+                        igrins2LongSlit {
+                          offsets {
+                            p { arcseconds }
+                            q { arcseconds }
+                          }
+                        }
+                      }
+                    }
+                    newObservation {
+                      observingMode {
+                        igrins2LongSlit {
+                          offsets {
+                            p { arcseconds }
+                            q { arcseconds }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              """,
+              expected = Right(
+                json"""
+                  {
+                    "cloneObservation": {
+                      "originalObservation": {
+                        "observingMode": {
+                          "igrins2LongSlit": {
+                            "offsets": [
+                              { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -1.500000 } },
+                              { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  1.500000 } },
+                              { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  1.500000 } },
+                              { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -1.500000 } }
+                            ]
+                          }
+                        }
+                      },
+                      "newObservation": {
+                        "observingMode": {
+                          "igrins2LongSlit": {
+                            "offsets": [
+                              { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -1.500000 } },
+                              { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  1.500000 } },
+                              { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  1.500000 } },
+                              { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -1.500000 } }
+                            ]
+                          }
+                        }
+                      }
+                    }
+                  }
+                """
+              )
+            )
+    } yield ()
+
   test("clone observation should preserve observer notes"):
     for {
       pid    <- createProgramAs(pi)

@@ -811,6 +811,9 @@ trait DatabaseOperations { this: OdbSuite =>
   def createIgrins2LongSlitObservationAs(user: User, pid: Program.Id, tids: Target.Id*): IO[Observation.Id] =
     createObservationWithSpatialOffsets(user, pid, ObservingModeType.Igrins2LongSlit, ImageQuality.Preset.PointEight, None, tids*)
 
+  def createIgrins2LongSlitObservationAs(user: User, pid: Program.Id, offsets: Option[String], tids: Target.Id*): IO[Observation.Id] =
+    createObservationWithSpatialOffsets(user, pid, ObservingModeType.Igrins2LongSlit, ImageQuality.Preset.PointEight, offsets, tids*)
+
   private def createObservationWithSpatialOffsets(
     user:          User,
     pid:           Program.Id,
@@ -1127,7 +1130,8 @@ trait DatabaseOperations { this: OdbSuite =>
           }
         }"""
       case ObservingModeType.Igrins2LongSlit =>
-        """{
+        val offsetsField = offsets.fold("")(offsets => s", explicitOffsets: $offsets")
+        s"""{
           igrins2LongSlit: {
             exposureTimeMode: {
               signalToNoise: {
@@ -1135,6 +1139,7 @@ trait DatabaseOperations { this: OdbSuite =>
                 at: { nanometers: 2200 }
               }
             }
+            $offsetsField
           }
         }"""
       case _ => ""

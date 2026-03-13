@@ -11,16 +11,24 @@ import grackle.QueryCompiler.Elab
 import grackle.Result
 import grackle.TypeRef
 import grackle.skunk.SkunkMapping
+import io.circe.Json
+import io.circe.syntax.*
 import lucuma.core.enums.Igrins2OffsetMode
+import lucuma.core.math.Offset
 import lucuma.odb.data.ExposureTimeModeRole
+import lucuma.odb.format.spatialOffsets.*
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.graphql.table.*
+import lucuma.odb.json.offset.query.given
 
 trait Igrins2LongSlitMapping[F[_]]
-  extends Igrins2LongSlitTable[F]
+  extends Igrins2LongSlitView[F]
      with ExposureTimeModeMapping[F]
      with OptionalFieldMapping[F]
      with Predicates[F] { this: SkunkMapping[F] =>
+
+  private def decodeIgrins2Offsets(s: String): Json =
+    OffsetsFormat.getOption(s).map(_.asJson).getOrElse(List.empty[Offset].asJson)
 
   val defaultOffsetMode: FieldMapping = CursorField[Igrins2OffsetMode]("defaultOffsetMode", _ => Result(Igrins2OffsetMode.NodAlongSlit))
 
@@ -29,18 +37,48 @@ trait Igrins2LongSlitMapping[F[_]]
   lazy val Igrins2LongSlitMapping: ObjectMapping =
     ObjectMapping(Igrins2LongSlitType)(
 
-      SqlField("observationId", Igrins2LongSlitTable.ObservationId, key = true, hidden = true),
+      SqlField("observationId", Igrins2LongSlitView.ObservationId, key = true, hidden = true),
 
-      SqlObject("exposureTimeMode", Join(Igrins2LongSlitTable.ObservationId, ExposureTimeModeView.ObservationId)),
+      SqlObject("exposureTimeMode", Join(Igrins2LongSlitView.ObservationId, ExposureTimeModeView.ObservationId)),
 
       explicitOrElseDefault[Igrins2OffsetMode]("offsetMode", "explicitOffsetMode", "defaultOffsetMode"),
-      SqlField("explicitOffsetMode", Igrins2LongSlitTable.OffsetMode),
+      SqlField("explicitOffsetMode", Igrins2LongSlitView.OffsetMode),
       defaultOffsetMode,
 
       explicitOrElseDefault[Boolean]("saveSVCImages", "explicitSaveSVCImages", "defaultSaveSVCImages"),
 
-      SqlField("explicitSaveSVCImages", Igrins2LongSlitTable.SaveSVCImages),
-      defaultSaveSVCImages
+      SqlField("explicitSaveSVCImages", Igrins2LongSlitView.SaveSVCImages),
+      defaultSaveSVCImages,
+
+      SqlField("offsetsString", Igrins2LongSlitView.Offsets, hidden = true),
+      SqlField("defaultOffsetsString", Igrins2LongSlitView.DefaultOffsets, hidden = true),
+
+      CursorFieldJson("offsets",
+        cursor =>
+          for
+            s <- cursor.field("offsetsString", None).flatMap(_.as[Option[String]])
+            d <- cursor.field("defaultOffsetsString", None).flatMap(_.as[String])
+          yield s.map(decodeIgrins2Offsets)
+            .getOrElse(decodeIgrins2Offsets(d)),
+        List("offsetsString", "defaultOffsetsString")
+      ),
+
+      CursorFieldJson("explicitOffsets",
+        cursor =>
+          cursor
+            .field("offsetsString", None)
+            .flatMap(_.as[Option[String]].map(_.map(decodeIgrins2Offsets).asJson)),
+        List("offsetsString")
+      ),
+
+      CursorFieldJson("defaultOffsets",
+        cursor =>
+          cursor
+            .field("defaultOffsetsString", None)
+            .flatMap(_.as[String])
+            .map(decodeIgrins2Offsets),
+        List("defaultOffsetsString")
+      )
 
     )
 

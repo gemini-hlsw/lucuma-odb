@@ -8420,6 +8420,24 @@ type Igrins2LongSlit {
   """
   explicitSaveSVCImages: Boolean
 
+  """
+  Spatial offsets, either explicitly specified in explicitOffsets or else
+  taken from defaultOffsets
+  """
+  offsets: [Offset!]!
+
+  """
+  Default spatial offsets 
+  (ABBA pattern, q = -1.25, +1.25, +1.25, -1.25 arcsec) for NodAlongSlit, or 
+  (p = 0, q = 0), (p = 10, q = 10), (p = 0, q = 0) for NodToSky.
+  """
+  defaultOffsets: [Offset!]!
+
+  """
+  Optional explicitly specified spatial offsets. If set, overrides the default.
+  """
+  explicitOffsets: [Offset!]
+
 }
 
 """
@@ -8444,6 +8462,12 @@ input Igrins2LongSlitInput {
   by skipping it altogether
   """
   explicitSaveSVCImages: Boolean
+
+  """
+  Spatial offsets. May be unset by assigning null, or ignored by skipping.
+  For NodAlongSlit mode, all offsets must have P = 0.
+  """
+  explicitOffsets: [OffsetInput!]
 
 }
 
