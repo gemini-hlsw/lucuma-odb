@@ -6,6 +6,7 @@ package lucuma.odb.graphql.query
 import cats.data.NonEmptyList
 import cats.effect.IO
 import cats.syntax.either.*
+import cats.syntax.option.*
 import cats.syntax.traverse.*
 import eu.timepit.refined.types.numeric.PosInt
 import io.circe.Json
@@ -14,20 +15,24 @@ import io.circe.syntax.*
 import lucuma.core.enums.Breakpoint
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.StepStage
+import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.Step
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
 import lucuma.itc.IntegrationTime
+import lucuma.itc.client.ImagingInput
 import lucuma.odb.sequence.flamingos2.longslit.Acquisition.RepeatingAtomCount
 
 class executionAcqFlamingos2_WithoutSkySubtraction extends ExecutionTestSupportForFlamingos2:
 
   val ExposureTime: TimeSpan = 2.secTimeSpan
 
-  override def fakeItcImagingResult: IntegrationTime =
-    IntegrationTime(ExposureTime, PosInt.unsafeFrom(1))
+  override def fakeItcImagingResultFor(input: ImagingInput): Option[IntegrationTime] =
+    input.exposureTimeMode match
+      case ExposureTimeMode.TimeAndCountMode(t, c, _) => IntegrationTime(t, c).some
+      case _                                          => IntegrationTime(ExposureTime, PosInt.unsafeFrom(1)).some
 
   def fineAdjustmentsList(n: Int): Json =
     List
@@ -302,3 +307,211 @@ class executionAcqFlamingos2_WithoutSkySubtraction extends ExecutionTestSupportF
     execAcq.map: ids =>
       ids.zip(ids.tail).foreach: (before, after) =>
         assertEquals(before.tail, after.toList, s"before: $before, after: $after")
+
+  test("override exposure time"):
+    val setup: IO[Observation.Id] =
+      for
+        p <- createProgram
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createObservationWithModeAs(pi, p, List(t), s"""
+               flamingos2LongSlit: {
+                 disperser: R1200_JH
+                 filter: JH
+                 fpu: LONG_SLIT_1
+                 acquisition: {
+                   exposureTimeMode: {
+                     timeAndCount: {
+                       time: { seconds: 6 }
+                       count: 1
+                       at: { nanometers: 500 }
+                     }
+                   }
+                 }
+               }
+             """)
+      yield o
+
+    setup.flatMap: oid =>
+      expect(
+        user  = pi,
+        query = s"""
+          query {
+            executionConfig(observationId: "$oid") {
+              flamingos2 {
+                acquisition {
+                  nextAtom {
+                    steps {
+                      instrumentConfig {
+                        exposure { seconds }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        """,
+        expected = json"""
+          {
+            "executionConfig": {
+              "flamingos2": {
+                "acquisition": {
+                  "nextAtom": {
+                    "steps": [
+                      {
+                        "instrumentConfig": {
+                          "exposure": { "seconds": 6.000000 }
+                        }
+                      },
+                      {
+                        "instrumentConfig": {
+                          "exposure": { "seconds": 6.000000 }
+                        }
+                      },
+                      {
+                        "instrumentConfig": {
+                          "exposure": { "seconds": 10.000000 }
+                        }
+                      },
+                      {
+                        "instrumentConfig": {
+                          "exposure": { "seconds": 6.000000 }
+                        }
+                      },
+                      {
+                        "instrumentConfig": {
+                          "exposure": { "seconds": 6.000000 }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        """.asRight
+      )
+
+  test("override filter"):
+    val setup: IO[Observation.Id] =
+      for
+        p <- createProgram
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createObservationWithModeAs(pi, p, List(t), s"""
+               flamingos2LongSlit: {
+                 disperser: R1200_JH
+                 filter: JH
+                 fpu: LONG_SLIT_1
+                 acquisition: {
+                   explicitFilter: K_SHORT
+                 }
+               }
+             """)
+        - <- expect(
+               user  = pi,
+               query = s"""
+                 query {
+                   observation(observationId: "$o") {
+                     observingMode {
+                       flamingos2LongSlit {
+                         acquisition {
+                           filter
+                           defaultFilter
+                           explicitFilter
+                         }
+                       }
+                     }
+                   }
+                 }
+               """,
+               expected = json"""
+                  {
+                    "observation": {
+                      "observingMode": {
+                        "flamingos2LongSlit": {
+                          "acquisition": {
+                            "filter": "K_SHORT",
+                            "defaultFilter": "J",
+                            "explicitFilter": "K_SHORT"
+                          }
+                        }
+                      }
+                    }
+                  }
+               """.asRight
+             )
+      yield o
+
+    setup.flatMap: oid =>
+      expect(
+        user  = pi,
+        query = s"""
+          query {
+            executionConfig(observationId: "$oid") {
+              flamingos2 {
+                acquisition {
+                  nextAtom {
+                    steps {
+                      instrumentConfig {
+                        filter
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        """,
+        expected = json"""
+          {
+            "executionConfig": {
+              "flamingos2": {
+                "acquisition": {
+                  "nextAtom": {
+                    "steps": [
+                      {
+                        "instrumentConfig": {
+                          "filter": "K_SHORT"
+                        }
+                      },
+                      {
+                        "instrumentConfig": {
+                          "filter": "K_SHORT"
+                        }
+                      },
+                      {
+                        "instrumentConfig": {
+                          "filter": "K_SHORT"
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        """.asRight
+      )
+
+  test("fail to override filter"):
+      for
+        p <- createProgram
+        t <- createTargetWithProfileAs(pi, p)
+        _ <- expect(
+               user = pi,
+               query = createObservationWithModeQuery(p, List(t),
+                 s"""
+                   flamingos2LongSlit: {
+                     disperser: R1200_JH
+                     filter: JH
+                     fpu: LONG_SLIT_1
+                     acquisition: {
+                       explicitFilter: K_LONG
+                     }
+                   }
+                 """),
+                 expected = List(
+                   "Argument 'input.SET.observingMode.flamingos2LongSlit.acquisition' is invalid: 'explicitFilter' must contain one of: J, H, K_SHORT"
+                 ).asLeft
+             )
+      yield ()

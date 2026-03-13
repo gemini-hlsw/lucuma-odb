@@ -47,7 +47,6 @@ import lucuma.odb.sequence.data.ItcInput
 import lucuma.odb.sequence.data.MissingParam
 import lucuma.odb.sequence.data.MissingParamSet
 import lucuma.odb.sequence.flamingos2
-import lucuma.odb.sequence.flamingos2.longslit.Acquisition as F2Acquisition
 import lucuma.odb.sequence.igrins2
 import lucuma.odb.util.Codecs.*
 import skunk.*
@@ -304,13 +303,13 @@ object GeneratorParamsService {
               sciMode  = sciMode
             )
 
-          case f2 @ flamingos2.longslit.Config(disperser, filter, fpu, acq, sci, _, _, _, _, _, _, _, _) =>
+          case f2 @ flamingos2.longslit.Config(disperser, filter, fpu, sci, acq, _, _, _, _, _, _, _, _) =>
             val sciMode   = InstrumentMode.Flamingos2Spectroscopy(disperser, filter, fpu)
             spectroscopyGeneratorParams(
               obsMode = f2,
-              acqEtm  = acq,
+              acqEtm  = acq.exposureTimeMode,
               acqMode = InstrumentMode.Flamingos2Imaging(
-                F2Acquisition.toAcquisitionFilter(sciMode.filter)
+                acq.filter
               ),
               sciEtm  = sci,
               sciMode = sciMode

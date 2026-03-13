@@ -70,15 +70,15 @@ object Acquisition:
 
   private object StepComputer extends SequenceState[F2] with Flamingos2InitialDynamicConfig:
     def compute(
-      exposureTime:  TimeSpan,
-      scienceFilter: Flamingos2Filter,
-      builtin:       Flamingos2Fpu
+      exposureTime: TimeSpan,
+      acqConfig:    AcquisitionConfig,
+      builtin:      Flamingos2Fpu
     ): Steps =
       eval:
         for
           _  <- F2.exposure    := exposureTime
           _  <- F2.disperser   := none[Flamingos2Disperser]
-          _  <- F2.filter      := scienceFilter.toAcquisitionFilter
+          _  <- F2.filter      := acqConfig.filter
           _  <- F2.readMode    := Flamingos2ReadMode.forExposureTime(exposureTime)
           _  <- F2.lyotWheel   := Flamingos2LyotWheel.F16
           _  <- F2.fpu         := Flamingos2FpuMask.Imaging
@@ -132,5 +132,5 @@ object Acquisition:
             namespace,
             SequenceType.Acquisition
           ),
-          StepComputer.compute(t.exposureTime, config.filter, config.fpu)
+          StepComputer.compute(t.exposureTime, config.acquisition, config.fpu)
         )

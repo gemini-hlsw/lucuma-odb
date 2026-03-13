@@ -2266,6 +2266,189 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
     )
   }
 
+  test("observing mode: update existing F2 Long Slit, setting explicit acquisition filter") {
+
+    val update0 = """
+      observingMode: {
+        flamingos2LongSlit: {
+          disperser: R1200_JH
+          filter: JH
+          fpu: LONG_SLIT_1
+          exposureTimeMode: {
+            signalToNoise: {
+              value: 2.0
+              at: { nanometers: 234.56 }
+            }
+          }
+        }
+      }
+    """
+
+    val query = """
+      observations {
+        instrument
+        observingMode {
+          flamingos2LongSlit {
+            acquisition {
+              filter
+              defaultFilter
+              explicitFilter
+            }
+          }
+        }
+      }
+    """
+
+    val expected0 =
+      json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "instrument": "FLAMINGOS2",
+              "observingMode": {
+                "flamingos2LongSlit": {
+                  "acquisition": {
+                    "filter": "J",
+                    "defaultFilter": "J",
+                    "explicitFilter": null
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    """.asRight
+
+    val update1 = """
+      observingMode: {
+        flamingos2LongSlit: {
+          acquisition: {
+            explicitFilter: K_SHORT
+          }
+        }
+      }
+    """
+
+    val expected1 =
+      json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "instrument": "FLAMINGOS2",
+              "observingMode": {
+                "flamingos2LongSlit": {
+                  "acquisition": {
+                    "filter": "K_SHORT",
+                    "defaultFilter": "J",
+                    "explicitFilter": "K_SHORT"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    """.asRight
+
+    multiUpdateTest(pi, List((update0, query, expected0), (update1, query, expected1)))
+  }
+
+  test("observing mode: update existing F2 Long Slit, deleting explicit acquisition filter") {
+
+    val update0 = """
+      observingMode: {
+        flamingos2LongSlit: {
+          disperser: R1200_JH
+          filter: JH
+          fpu: LONG_SLIT_1
+          exposureTimeMode: {
+            signalToNoise: {
+              value: 2.0
+              at: { nanometers: 234.56 }
+            }
+          }
+          acquisition: {
+            explicitFilter: K_SHORT
+          }
+        }
+      }
+    """
+
+    val query = """
+      observations {
+        instrument
+        observingMode {
+          flamingos2LongSlit {
+            acquisition {
+              filter
+              defaultFilter
+              explicitFilter
+            }
+          }
+        }
+      }
+    """
+
+    val expected0 =
+      json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "instrument": "FLAMINGOS2",
+              "observingMode": {
+                "flamingos2LongSlit": {
+                  "acquisition": {
+                    "filter": "K_SHORT",
+                    "defaultFilter": "J",
+                    "explicitFilter": "K_SHORT"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    """.asRight
+
+    val update1 = """
+      observingMode: {
+        flamingos2LongSlit: {
+          acquisition: {
+            explicitFilter: null
+          }
+        }
+      }
+    """
+
+    val expected1 =
+      json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "instrument": "FLAMINGOS2",
+              "observingMode": {
+                "flamingos2LongSlit": {
+                  "acquisition": {
+                    "filter": "J",
+                    "defaultFilter": "J",
+                    "explicitFilter": null
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    """.asRight
+
+    multiUpdateTest(pi, List((update0, query, expected0), (update1, query, expected1)))
+  }
+
   test("observing mode: update existing, all fields") {
 
     val update0 = """

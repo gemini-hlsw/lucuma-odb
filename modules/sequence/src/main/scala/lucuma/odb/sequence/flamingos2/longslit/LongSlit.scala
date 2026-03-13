@@ -21,7 +21,7 @@ object LongSlit:
 
   val Static: F2Static =
     F2Static(
-      mosPreImaging          = MosPreImaging.IsNotMosPreImaging,
+      mosPreImaging           = MosPreImaging.IsNotMosPreImaging,
       useElectronicOffsetting = false
     )
 
