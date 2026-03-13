@@ -4292,6 +4292,34 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
       }
     """
 
+    val update1 = """
+      observingMode: {
+        igrins2LongSlit: {
+          explicitOffsets: null
+        }
+      }
+    """
+
+    val update2 = """
+      observingMode: {
+        igrins2LongSlit: {
+          explicitOffsetMode: NOD_TO_SKY
+          explicitOffsets: [
+            { p: { arcseconds: 1.0 }, q: { arcseconds: -5.0 } },
+            { p: { arcseconds: 2.0 }, q: { arcseconds:  5.0 } }
+          ]
+        }
+      }
+    """
+
+    val update3 = """
+      observingMode: {
+        igrins2LongSlit: {
+          explicitOffsets: null
+        }
+      }
+    """
+
     val query = """
       observations {
         observingMode {
@@ -4346,81 +4374,6 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
       }
     """.asRight
 
-    oneUpdateTest(pi, update0, query, expected0)
-
-  test("observing mode: clear igrins2 spatial offsets"):
-
-    val update0 = """
-      observingMode: {
-        igrins2LongSlit: {
-          exposureTimeMode: {
-            signalToNoise: {
-              value: 50.0
-              at: { nanometers: 2200 }
-            }
-          }
-          explicitOffsets: [
-            { p: { arcseconds: 0.0 }, q: { arcseconds: -5.0 } },
-            { p: { arcseconds: 0.0 }, q: { arcseconds:  5.0 } },
-            { p: { arcseconds: 0.0 }, q: { arcseconds:  3.5 } },
-            { p: { arcseconds: 0.0 }, q: { arcseconds: -2.5 } }
-          ]
-        }
-      }
-    """
-
-    val update1 = """
-      observingMode: {
-        igrins2LongSlit: {
-          explicitOffsets: null
-        }
-      }
-    """
-
-    val query = """
-      observations {
-        observingMode {
-          igrins2LongSlit {
-            offsets {
-              p { arcseconds }
-              q { arcseconds }
-            }
-            explicitOffsets {
-              p { arcseconds }
-              q { arcseconds }
-            }
-          }
-        }
-      }
-    """
-
-    val expected0 = json"""
-      {
-        "updateObservations": {
-          "observations": [
-            {
-              "observingMode": {
-                "igrins2LongSlit": {
-                  "offsets": [
-                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -5.000000 } },
-                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  5.000000 } },
-                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  3.500000 } },
-                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -2.500000 } }
-                  ],
-                  "explicitOffsets": [
-                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -5.000000 } },
-                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  5.000000 } },
-                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  3.500000 } },
-                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -2.500000 } }
-                  ]
-                }
-              }
-            }
-          ]
-        }
-      }
-    """.asRight
-
     val expected1 = json"""
       {
         "updateObservations": {
@@ -4434,7 +4387,13 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
                     { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  1.250000 } },
                     { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -1.250000 } }
                   ],
-                  "explicitOffsets": null
+                  "explicitOffsets": null,
+                  "defaultOffsets": [
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -1.250000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  1.250000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  1.250000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -1.250000 } }
+                  ]
                 }
               }
             }
@@ -4443,59 +4402,7 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
       }
     """.asRight
 
-    multiUpdateTest(pi,
-      List(
-        (update0, query, expected0),
-        (update1, query, expected1)
-      )
-    )
-
-  test("observing mode: clear igrins2 spatial offsets with NodToSky"):
-
-    val update0 = """
-      observingMode: {
-        igrins2LongSlit: {
-          exposureTimeMode: {
-            signalToNoise: {
-              value: 50.0
-              at: { nanometers: 2200 }
-            }
-          }
-          explicitOffsetMode: NOD_TO_SKY
-          explicitOffsets: [
-            { p: { arcseconds: 1.0 }, q: { arcseconds: -5.0 } },
-            { p: { arcseconds: 2.0 }, q: { arcseconds:  5.0 } }
-          ]
-        }
-      }
-    """
-
-    val update1 = """
-      observingMode: {
-        igrins2LongSlit: {
-          explicitOffsets: null
-        }
-      }
-    """
-
-    val query = """
-      observations {
-        observingMode {
-          igrins2LongSlit {
-            offsets {
-              p { arcseconds }
-              q { arcseconds }
-            }
-            explicitOffsets {
-              p { arcseconds }
-              q { arcseconds }
-            }
-          }
-        }
-      }
-    """
-
-    val expected0 = json"""
+    val expected2 = json"""
       {
         "updateObservations": {
           "observations": [
@@ -4509,6 +4416,11 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
                   "explicitOffsets": [
                     { "p": { "arcseconds": 1.000000 }, "q": { "arcseconds": -5.000000 } },
                     { "p": { "arcseconds": 2.000000 }, "q": { "arcseconds":  5.000000 } }
+                  ],
+                  "defaultOffsets": [
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 0.000000 } },
+                    { "p": { "arcseconds": 10.000000 }, "q": { "arcseconds": 10.000000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 0.000000 } }
                   ]
                 }
               }
@@ -4518,7 +4430,7 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
       }
     """.asRight
 
-    val expected1 = json"""
+    val expected3 = json"""
       {
         "updateObservations": {
           "observations": [
@@ -4530,7 +4442,12 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
                     { "p": { "arcseconds": 10.000000 }, "q": { "arcseconds": 10.000000 } },
                     { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 0.000000 } }
                   ],
-                  "explicitOffsets": null
+                  "explicitOffsets": null,
+                  "defaultOffsets": [
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 0.000000 } },
+                    { "p": { "arcseconds": 10.000000 }, "q": { "arcseconds": 10.000000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 0.000000 } }
+                  ]
                 }
               }
             }
@@ -4541,8 +4458,10 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
 
     multiUpdateTest(pi,
       List(
-        (update0, query, expected0),
-        (update1, query, expected1)
+        (update0, query, expected0), // create with explicit offsets
+        (update1, query, expected1), // clear explicit offsets, revert to default
+        (update2, query, expected2), // switch mode with new explicit offsets
+        (update3, query, expected3)  // clear explicit offsets again, revert to default offsets
       )
     )
 
@@ -4648,8 +4567,8 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
 
     multiUpdateTest(pi,
       List(
-        (update0, query, expected0),
-        (update1, query, expected1)
+        (update0, query, expected0), // create with explicit offsets
+        (update1, query, expected1)  // change mode, clear explicit offsets
       )
     )
 
@@ -4744,7 +4663,7 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
 
     multiUpdateTest(pi,
       List(
-        (update0, query, expected0),
-        (update1, query, expected1)
+        (update0, query, expected0), // create as gmos
+        (update1, query, expected1)  // switcth to igrins 2
       )
     )

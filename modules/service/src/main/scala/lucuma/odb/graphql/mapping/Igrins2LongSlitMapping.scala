@@ -20,19 +20,15 @@ import lucuma.odb.format.spatialOffsets.*
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.graphql.table.*
 import lucuma.odb.json.offset.query.given
-import lucuma.odb.sequence.igrins2.longslit.Config
 
 trait Igrins2LongSlitMapping[F[_]]
-  extends Igrins2LongSlitTable[F]
+  extends Igrins2LongSlitView[F]
      with ExposureTimeModeMapping[F]
      with OptionalFieldMapping[F]
      with Predicates[F] { this: SkunkMapping[F] =>
 
   private def decodeIgrins2Offsets(s: String): Json =
     OffsetsFormat.getOption(s).map(_.asJson).getOrElse(List.empty[Offset].asJson)
-
-  private def defaultIgrins2OffsetsJson(mode: Igrins2OffsetMode): Json =
-    Config.defaultOffsetsFor(mode).map(_.asJson).asJson
 
   val defaultOffsetMode: FieldMapping = CursorField[Igrins2OffsetMode]("defaultOffsetMode", _ => Result(Igrins2OffsetMode.NodAlongSlit))
 
@@ -41,29 +37,30 @@ trait Igrins2LongSlitMapping[F[_]]
   lazy val Igrins2LongSlitMapping: ObjectMapping =
     ObjectMapping(Igrins2LongSlitType)(
 
-      SqlField("observationId", Igrins2LongSlitTable.ObservationId, key = true, hidden = true),
+      SqlField("observationId", Igrins2LongSlitView.ObservationId, key = true, hidden = true),
 
-      SqlObject("exposureTimeMode", Join(Igrins2LongSlitTable.ObservationId, ExposureTimeModeView.ObservationId)),
+      SqlObject("exposureTimeMode", Join(Igrins2LongSlitView.ObservationId, ExposureTimeModeView.ObservationId)),
 
       explicitOrElseDefault[Igrins2OffsetMode]("offsetMode", "explicitOffsetMode", "defaultOffsetMode"),
-      SqlField("explicitOffsetMode", Igrins2LongSlitTable.OffsetMode),
+      SqlField("explicitOffsetMode", Igrins2LongSlitView.OffsetMode),
       defaultOffsetMode,
 
       explicitOrElseDefault[Boolean]("saveSVCImages", "explicitSaveSVCImages", "defaultSaveSVCImages"),
 
-      SqlField("explicitSaveSVCImages", Igrins2LongSlitTable.SaveSVCImages),
+      SqlField("explicitSaveSVCImages", Igrins2LongSlitView.SaveSVCImages),
       defaultSaveSVCImages,
 
-      SqlField("offsetsString", Igrins2LongSlitTable.Offsets, hidden = true),
+      SqlField("offsetsString", Igrins2LongSlitView.Offsets, hidden = true),
+      SqlField("defaultOffsetsString", Igrins2LongSlitView.DefaultOffsets, hidden = true),
 
       CursorFieldJson("offsets",
         cursor =>
           for
             s <- cursor.field("offsetsString", None).flatMap(_.as[Option[String]])
-            m <- cursor.field("explicitOffsetMode", None).flatMap(_.as[Option[Igrins2OffsetMode]])
+            d <- cursor.field("defaultOffsetsString", None).flatMap(_.as[String])
           yield s.map(decodeIgrins2Offsets)
-            .getOrElse(defaultIgrins2OffsetsJson(m.getOrElse(Igrins2OffsetMode.NodAlongSlit))),
-        List("offsetsString", "explicitOffsetMode")
+            .getOrElse(decodeIgrins2Offsets(d)),
+        List("offsetsString", "defaultOffsetsString")
       ),
 
       CursorFieldJson("explicitOffsets",
@@ -77,10 +74,10 @@ trait Igrins2LongSlitMapping[F[_]]
       CursorFieldJson("defaultOffsets",
         cursor =>
           cursor
-            .field("explicitOffsetMode", None)
-            .flatMap(_.as[Option[Igrins2OffsetMode]])
-            .map(m => defaultIgrins2OffsetsJson(m.getOrElse(Igrins2OffsetMode.NodAlongSlit))),
-        List("explicitOffsetMode")
+            .field("defaultOffsetsString", None)
+            .flatMap(_.as[String])
+            .map(decodeIgrins2Offsets),
+        List("defaultOffsetsString")
       )
 
     )

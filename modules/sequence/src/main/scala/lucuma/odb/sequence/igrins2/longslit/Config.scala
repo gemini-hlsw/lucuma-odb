@@ -39,6 +39,7 @@ case class Config(
     bao.toByteArray
 
 object Config:
+  // TODO: Move this logic to lucuma-core
 
   val NodAlongSlitDefaultOffsets: List[Offset] =
     List(

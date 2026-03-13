@@ -31,7 +31,6 @@ import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.sequence.gmos.GmosCcdMode
 import lucuma.core.model.sequence.gmos.longslit.*
 import lucuma.core.util.Enumerated
-import lucuma.odb.format.spatialOffsets.*
 import lucuma.odb.sequence.syntax.hash.*
 import monocle.Lens
 
@@ -321,9 +320,9 @@ object Config:
   // ShortCut 3374
   val DefaultSpatialOffsets: List[Q] =
     List(
-        0.qArcsec,
-       15.qArcsec,
-      -15.qArcsec
+      Q.signedDecimalArcseconds.reverseGet(BigDecimal(  0)),
+      Q.signedDecimalArcseconds.reverseGet(BigDecimal( 15)),
+      Q.signedDecimalArcseconds.reverseGet(BigDecimal(-15))
     )
 
   def gapSize(site: Site): Quantity[PosInt, Pixels] =
