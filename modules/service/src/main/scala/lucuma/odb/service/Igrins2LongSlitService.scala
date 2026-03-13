@@ -12,6 +12,7 @@ import lucuma.core.enums.Igrins2OffsetMode
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.Observation
 import lucuma.odb.data.ExposureTimeModeRole
+import lucuma.odb.data.Nullable
 import lucuma.odb.format.spatialOffsets.*
 import lucuma.odb.graphql.input.Igrins2LongSlitInput
 import lucuma.odb.sequence.igrins2.longslit.Config
@@ -193,12 +194,21 @@ object Igrins2LongSlitService:
       val upOffsetMode    = sql"c_offset_mode     = ${igrins_2_offset_mode.opt}"
       val upSaveSVCImages = sql"c_save_svc_images = ${bool.opt}"
       val upOffsets       = sql"c_spatial_offsets = ${text.opt}"
+      val clearOffsets    = sql"c_spatial_offsets = ${text.opt}".apply(None)
+
+      // When offset mode changes to a new value and no explicit offsets
+      // are provided, clear the existing offsets.
+      val clearOffsetsOnModeChange: Option[AppliedFragment] =
+        input.explicitOffsetMode match
+          case Nullable.NonNull(_) if input.explicitOffsets.isAbsent =>
+            Some(clearOffsets)
+          case _ => None
 
       val ups: List[AppliedFragment] =
         List(
           input.explicitOffsetMode.toOptionOption.map(upOffsetMode),
           input.explicitSaveSVCImages.toOptionOption.map(upSaveSVCImages),
-          input.formattedOffsets.toOptionOption.map(upOffsets)
+          input.formattedOffsets.toOptionOption.map(upOffsets).orElse(clearOffsetsOnModeChange)
         ).flatten
 
       NonEmptyList.fromList(ups)

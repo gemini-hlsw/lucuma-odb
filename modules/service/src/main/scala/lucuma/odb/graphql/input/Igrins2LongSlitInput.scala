@@ -4,6 +4,7 @@
 package lucuma.odb.graphql
 package input
 
+import cats.syntax.eq.*
 import cats.syntax.parallel.*
 import grackle.Result
 import lucuma.core.enums.Igrins2OffsetMode
@@ -17,9 +18,11 @@ import lucuma.odb.graphql.binding.*
 
 object Igrins2LongSlitInput:
 
-  private def validateOffsets(offsets: List[Offset]): Result[List[Offset]] =
-    if (offsets.nonEmpty && offsets.length != 4)
-      Result.failure(s"IGRINS-2 must have exactly 0 or 4 offsets, but ${offsets.length} were provided.")
+  private def validateAllOnQ(
+    offsets: List[Offset]
+  ): Result[List[Offset]] =
+    if offsets.exists(_.p =!= Offset.P.Zero) then
+      Result.failure("IGRINS-2 NodAlongSlit offsets must have p = 0.")
     else
       Result(offsets)
 
@@ -42,17 +45,17 @@ object Igrins2LongSlitInput:
         case List(
           ExposureTimeModeInput.Binding.Option("exposureTimeMode", rETM),
           Igrins2OffsetModeBinding.Option("explicitOffsetMode", rOffsetMode),
-          OffsetInput.Binding.List.Option("explicitOffsets", rOffsets),
-          BooleanBinding.Option("explicitSaveSVCImages", rSaveSVC)
+          BooleanBinding.Option("explicitSaveSVCImages", rSaveSVC),
+          OffsetInput.Binding.List.Option("explicitOffsets", rOffsets)
         ) =>
           (rETM, rOffsetMode, rOffsets, rSaveSVC).parTupled.flatMap {
             case (etm, offsetMode, offsets, saveSVC) =>
               offsets match
-                case Some(os) =>
-                  validateOffsets(os).map(_ =>
+                case Some(os) if offsetMode.forall(_ === Igrins2OffsetMode.NodAlongSlit) =>
+                  validateAllOnQ(os).map(_ =>
                     Create(etm, offsetMode, saveSVC, offsets)
                   )
-                case None =>
+                case _ =>
                   Result(Create(etm, offsetMode, saveSVC, offsets))
           }
       }
@@ -85,14 +88,18 @@ object Igrins2LongSlitInput:
         case List(
           ExposureTimeModeInput.Binding.Option("exposureTimeMode", rETM),
           Igrins2OffsetModeBinding.Nullable("explicitOffsetMode", rOffsetMode),
-          OffsetInput.Binding.List.Nullable("explicitOffsets", rOffsets),
-          BooleanBinding.Nullable("explicitSaveSVCImages", rSaveSVC)
+          BooleanBinding.Nullable("explicitSaveSVCImages", rSaveSVC),
+          OffsetInput.Binding.List.Nullable("explicitOffsets", rOffsets)
         ) =>
           (rETM, rOffsetMode, rOffsets, rSaveSVC).parTupled.flatMap {
             case (etm, offsetMode, offsets, saveSVC) =>
-              offsets match
-                case NonNull(os) =>
-                  validateOffsets(os).map(_ =>
+              val isNodAlongSlit = offsetMode match
+                case NonNull(Igrins2OffsetMode.NodAlongSlit) => true
+                case _                                       => false
+
+              (offsets, isNodAlongSlit) match
+                case (NonNull(os), true) =>
+                  validateAllOnQ(os).map(_ =>
                     Edit(etm, offsetMode, saveSVC, offsets)
                   )
                 case _ =>

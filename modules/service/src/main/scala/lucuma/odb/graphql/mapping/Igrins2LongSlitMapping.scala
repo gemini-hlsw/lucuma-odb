@@ -31,8 +31,8 @@ trait Igrins2LongSlitMapping[F[_]]
   private def decodeIgrins2Offsets(s: String): Json =
     OffsetsFormat.getOption(s).map(_.asJson).getOrElse(List.empty[Offset].asJson)
 
-  private val defaultIgrins2OffsetsJson: Json =
-    Config.DefaultSpatialOffsets.map(_.asJson).asJson
+  private def defaultIgrins2OffsetsJson(mode: Igrins2OffsetMode): Json =
+    Config.defaultOffsetsFor(mode).map(_.asJson).asJson
 
   val defaultOffsetMode: FieldMapping = CursorField[Igrins2OffsetMode]("defaultOffsetMode", _ => Result(Igrins2OffsetMode.NodAlongSlit))
 
@@ -58,11 +58,12 @@ trait Igrins2LongSlitMapping[F[_]]
 
       CursorFieldJson("offsets",
         cursor =>
-          cursor
-            .field("offsetsString", None)
-            .flatMap(_.as[Option[String]].map(_.map(decodeIgrins2Offsets)))
-            .map(_.getOrElse(defaultIgrins2OffsetsJson)),
-        List("explicitOffsets", "defaultOffsets")
+          for
+            s <- cursor.field("offsetsString", None).flatMap(_.as[Option[String]])
+            m <- cursor.field("explicitOffsetMode", None).flatMap(_.as[Option[Igrins2OffsetMode]])
+          yield s.map(decodeIgrins2Offsets)
+            .getOrElse(defaultIgrins2OffsetsJson(m.getOrElse(Igrins2OffsetMode.NodAlongSlit))),
+        List("offsetsString", "explicitOffsetMode")
       ),
 
       CursorFieldJson("explicitOffsets",
@@ -73,7 +74,14 @@ trait Igrins2LongSlitMapping[F[_]]
         List("offsetsString")
       ),
 
-      CursorFieldJson("defaultOffsets", _ => Result(defaultIgrins2OffsetsJson), Nil)
+      CursorFieldJson("defaultOffsets",
+        cursor =>
+          cursor
+            .field("explicitOffsetMode", None)
+            .flatMap(_.as[Option[Igrins2OffsetMode]])
+            .map(m => defaultIgrins2OffsetsJson(m.getOrElse(Igrins2OffsetMode.NodAlongSlit))),
+        List("explicitOffsetMode")
+      )
 
     )
 

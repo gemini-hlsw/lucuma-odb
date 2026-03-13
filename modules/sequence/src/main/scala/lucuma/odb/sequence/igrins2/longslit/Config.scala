@@ -23,7 +23,7 @@ case class Config(
 ) derives Eq:
 
   def offsets: List[Offset] =
-    explicitSpatialOffsets.getOrElse(Config.DefaultSpatialOffsets)
+    explicitSpatialOffsets.getOrElse(Config.defaultOffsetsFor(offsetMode))
 
   def hashBytes: Array[Byte] =
     val bao = new ByteArrayOutputStream(256)
@@ -32,7 +32,7 @@ case class Config(
     out.write(scienceExposureTimeMode.hashBytes)
     out.writeChars(offsetMode.tag)
     out.writeBoolean(saveSVCImages)
-    val off: Array[Byte] = explicitSpatialOffsets.foldMap(_.map(_.hashBytes)).flatten.toArray
+    val off = explicitSpatialOffsets.foldMap(_.map(_.hashBytes)).flatten.toArray
     out.write(off, 0, off.length)
 
     out.close()
@@ -40,10 +40,24 @@ case class Config(
 
 object Config:
 
-  val DefaultSpatialOffsets: List[Offset] =
+  val NodAlongSlitDefaultOffsets: List[Offset] =
     List(
       Offset.Zero.copy(q = -1.25.qArcsec),
       Offset.Zero.copy(q =  1.25.qArcsec),
       Offset.Zero.copy(q =  1.25.qArcsec),
       Offset.Zero.copy(q = -1.25.qArcsec),
     )
+
+  val DefaultSpatialOffsets: List[Offset] = NodAlongSlitDefaultOffsets
+
+  val NodToSkyDefaultOffsets: List[Offset] =
+    List(
+      Offset.Zero,
+      Offset.Zero.copy(p = 10.0.pArcsec, q = 10.0.qArcsec),
+      Offset.Zero,
+    )
+
+  def defaultOffsetsFor(mode: Igrins2OffsetMode): List[Offset] =
+    mode match
+      case Igrins2OffsetMode.NodAlongSlit => NodAlongSlitDefaultOffsets
+      case Igrins2OffsetMode.NodToSky     => NodToSkyDefaultOffsets
