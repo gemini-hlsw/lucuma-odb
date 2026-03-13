@@ -17,3 +17,5 @@ trait Igrins2LongSlitTable[F[_]] extends BaseMapping[F]:
     val OffsetMode: ColumnRef            = col("c_offset_mode", igrins_2_offset_mode.opt)
 
     val SaveSVCImages: ColumnRef         = col("c_save_svc_images", bool.opt)
+
+    val Offsets: ColumnRef               = col("c_spatial_offsets", text.opt)

@@ -11,16 +11,28 @@ import grackle.QueryCompiler.Elab
 import grackle.Result
 import grackle.TypeRef
 import grackle.skunk.SkunkMapping
+import io.circe.Json
+import io.circe.syntax.*
 import lucuma.core.enums.Igrins2OffsetMode
+import lucuma.core.math.Offset
 import lucuma.odb.data.ExposureTimeModeRole
+import lucuma.odb.format.spatialOffsets.*
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.graphql.table.*
+import lucuma.odb.json.offset.query.given
+import lucuma.odb.sequence.igrins2.longslit.Config
 
 trait Igrins2LongSlitMapping[F[_]]
   extends Igrins2LongSlitTable[F]
      with ExposureTimeModeMapping[F]
      with OptionalFieldMapping[F]
      with Predicates[F] { this: SkunkMapping[F] =>
+
+  private def decodeIgrins2Offsets(s: String): Json =
+    OffsetsFormat.getOption(s).map(_.asJson).getOrElse(List.empty[Offset].asJson)
+
+  private val defaultIgrins2OffsetsJson: Json =
+    Config.DefaultSpatialOffsets.map(_.asJson).asJson
 
   val defaultOffsetMode: FieldMapping = CursorField[Igrins2OffsetMode]("defaultOffsetMode", _ => Result(Igrins2OffsetMode.NodAlongSlit))
 
@@ -40,7 +52,28 @@ trait Igrins2LongSlitMapping[F[_]]
       explicitOrElseDefault[Boolean]("saveSVCImages", "explicitSaveSVCImages", "defaultSaveSVCImages"),
 
       SqlField("explicitSaveSVCImages", Igrins2LongSlitTable.SaveSVCImages),
-      defaultSaveSVCImages
+      defaultSaveSVCImages,
+
+      SqlField("offsetsString", Igrins2LongSlitTable.Offsets, hidden = true),
+
+      CursorFieldJson("offsets",
+        cursor =>
+          cursor
+            .field("offsetsString", None)
+            .flatMap(_.as[Option[String]].map(_.map(decodeIgrins2Offsets)))
+            .map(_.getOrElse(defaultIgrins2OffsetsJson)),
+        List("explicitOffsets", "defaultOffsets")
+      ),
+
+      CursorFieldJson("explicitOffsets",
+        cursor =>
+          cursor
+            .field("offsetsString", None)
+            .flatMap(_.as[Option[String]].map(_.map(decodeIgrins2Offsets).asJson)),
+        List("offsetsString")
+      ),
+
+      CursorFieldJson("defaultOffsets", _ => Result(defaultIgrins2OffsetsJson), Nil)
 
     )
 

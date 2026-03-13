@@ -12,12 +12,14 @@ import lucuma.core.enums.Igrins2OffsetMode
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.Observation
 import lucuma.odb.data.ExposureTimeModeRole
+import lucuma.odb.format.spatialOffsets.*
 import lucuma.odb.graphql.input.Igrins2LongSlitInput
 import lucuma.odb.sequence.igrins2.longslit.Config
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.Igrins2Codecs.*
 import skunk.*
 import skunk.codec.boolean.bool
+import skunk.codec.text.text
 import skunk.implicits.*
 
 import Services.Syntax.*
@@ -51,13 +53,18 @@ object Igrins2LongSlitService:
       val igrins2LS: Decoder[Config] =
         (exposure_time_mode       *:
          igrins_2_offset_mode.opt *:
-         bool.opt
-        ).map { case (sci, offsetMode, saveSVC) =>
-          Config(
-            sci,
-            offsetMode.getOrElse(Igrins2OffsetMode.NodAlongSlit),
-            saveSVC.getOrElse(false)
-          )
+         bool.opt                 *:
+         text.opt
+        ).emap { case (sci, offsetMode, saveSVC, offsetsText) =>
+          offsetsText.traverse: so =>
+            OffsetsFormat.getOption(so).toRight(s"Could not parse '$so' as a spatial offsets list.")
+          .map: offsets =>
+            Config(
+              sci,
+              offsetMode.getOrElse(Igrins2OffsetMode.NodAlongSlit),
+              saveSVC.getOrElse(false),
+              offsets
+            )
         }
 
       override def select(
@@ -119,14 +126,15 @@ object Igrins2LongSlitService:
     def selectIgrins2LongSlit(observationIds: NonEmptyList[Observation.Id]): AppliedFragment =
       sql"""
         SELECT
-          ls.c_observation_id,
+          ls.c_observation_id     ,
           sci.c_exposure_time_mode,
           sci.c_signal_to_noise_at,
-          sci.c_signal_to_noise,
-          sci.c_exposure_time,
-          sci.c_exposure_count,
-          ls.c_offset_mode,
-          ls.c_save_svc_images
+          sci.c_signal_to_noise   ,
+          sci.c_exposure_time     ,
+          sci.c_exposure_count    ,
+          ls.c_offset_mode        ,
+          ls.c_save_svc_images    ,
+          ls.c_spatial_offsets
         FROM
           t_igrins_2_long_slit ls
         LEFT JOIN t_exposure_time_mode sci
@@ -142,23 +150,26 @@ object Igrins2LongSlitService:
     val InsertIgrins2LongSlit: Fragment[(
       Observation.Id,
       Option[Igrins2OffsetMode],
-      Option[Boolean]
+      Option[Boolean],
+      Option[String]
     )] =
       sql"""
         INSERT INTO t_igrins_2_long_slit (
-          c_observation_id,
-          c_program_id,
-          c_offset_mode,
-          c_save_svc_images
+          c_observation_id ,
+          c_program_id     ,
+          c_offset_mode    ,
+          c_save_svc_images,
+          c_spatial_offsets
         )
         SELECT
-          $observation_id,
-          c_program_id,
+          $observation_id            ,
+          c_program_id               ,
           ${igrins_2_offset_mode.opt},
-          ${bool.opt}
+          ${bool.opt}                ,
+          ${text.opt}
         FROM t_observation
         WHERE c_observation_id = $observation_id
-       """.contramap { (o, m, s) => (o, m, s, o) }
+       """.contramap { (o, m, s, off) => (o, m, s, off, o) }
 
     def insertIgrins2LongSlit(
       observationId: Observation.Id,
@@ -167,7 +178,8 @@ object Igrins2LongSlitService:
       InsertIgrins2LongSlit.apply(
         observationId,
         input.explicitOffsetMode,
-        input.explicitSaveSVCImages
+        input.explicitSaveSVCImages,
+        input.formattedOffsets
       )
 
     def deleteIgrins2(which: List[Observation.Id]): Option[AppliedFragment] =
@@ -180,11 +192,13 @@ object Igrins2LongSlitService:
 
       val upOffsetMode    = sql"c_offset_mode     = ${igrins_2_offset_mode.opt}"
       val upSaveSVCImages = sql"c_save_svc_images = ${bool.opt}"
+      val upOffsets       = sql"c_spatial_offsets = ${text.opt}"
 
       val ups: List[AppliedFragment] =
         List(
           input.explicitOffsetMode.toOptionOption.map(upOffsetMode),
-          input.explicitSaveSVCImages.toOptionOption.map(upSaveSVCImages)
+          input.explicitSaveSVCImages.toOptionOption.map(upSaveSVCImages),
+          input.formattedOffsets.toOptionOption.map(upOffsets)
         ).flatten
 
       NonEmptyList.fromList(ups)
@@ -205,18 +219,20 @@ object Igrins2LongSlitService:
     def cloneIgrins2(originalId: Observation.Id, newId: Observation.Id): AppliedFragment =
       sql"""
       INSERT INTO t_igrins_2_long_slit (
-        c_observation_id,
-        c_program_id,
+        c_observation_id     ,
+        c_program_id         ,
         c_observing_mode_type,
-        c_offset_mode,
-        c_save_svc_images
+        c_offset_mode        ,
+        c_save_svc_images    ,
+        c_spatial_offsets
       )
       SELECT
         $observation_id,
         (SELECT c_program_id FROM t_observation WHERE c_observation_id = $observation_id) AS c_program_id,
         c_observing_mode_type,
         c_offset_mode,
-        c_save_svc_images
+        c_save_svc_images,
+        c_spatial_offsets
       FROM t_igrins_2_long_slit
       WHERE c_observation_id = $observation_id
       """.apply(newId, newId, originalId)

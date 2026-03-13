@@ -5,8 +5,11 @@ package lucuma.odb.sequence.igrins2.longslit
 
 import cats.Eq
 import cats.derived.*
+import cats.syntax.all.*
 import lucuma.core.enums.Igrins2OffsetMode
+import lucuma.core.math.Offset
 import lucuma.core.model.ExposureTimeMode
+import lucuma.odb.format.spatialOffsets.*
 import lucuma.odb.sequence.syntax.all.*
 
 import java.io.ByteArrayOutputStream
@@ -15,8 +18,12 @@ import java.io.DataOutputStream
 case class Config(
   scienceExposureTimeMode: ExposureTimeMode,
   offsetMode: Igrins2OffsetMode,
-  saveSVCImages: Boolean
+  saveSVCImages: Boolean,
+  explicitSpatialOffsets: Option[List[Offset]]
 ) derives Eq:
+
+  def offsets: List[Offset] =
+    explicitSpatialOffsets.getOrElse(Config.DefaultSpatialOffsets)
 
   def hashBytes: Array[Byte] =
     val bao = new ByteArrayOutputStream(256)
@@ -25,6 +32,18 @@ case class Config(
     out.write(scienceExposureTimeMode.hashBytes)
     out.writeChars(offsetMode.tag)
     out.writeBoolean(saveSVCImages)
+    val off: Array[Byte] = explicitSpatialOffsets.foldMap(_.map(_.hashBytes)).flatten.toArray
+    out.write(off, 0, off.length)
 
     out.close()
     bao.toByteArray
+
+object Config:
+
+  val DefaultSpatialOffsets: List[Offset] =
+    List(
+      Offset.Zero.copy(q = -1.25.qArcsec),
+      Offset.Zero.copy(q =  1.25.qArcsec),
+      Offset.Zero.copy(q =  1.25.qArcsec),
+      Offset.Zero.copy(q = -1.25.qArcsec),
+    )

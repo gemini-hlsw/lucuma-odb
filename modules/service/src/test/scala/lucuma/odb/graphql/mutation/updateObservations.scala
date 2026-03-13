@@ -4271,6 +4271,185 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
       )
     )
 
+  test("observing mode: update igrins2 spatial offsets"):
+
+    val update0 = """
+      observingMode: {
+        igrins2LongSlit: {
+          exposureTimeMode: {
+            signalToNoise: {
+              value: 50.0
+              at: { nanometers: 2200 }
+            }
+          }
+          explicitOffsets: [
+            { p: { arcseconds: 0.0 }, q: { arcseconds: -5.0 } },
+            { p: { arcseconds: 0.0 }, q: { arcseconds:  5.0 } },
+            { p: { arcseconds: 0.0 }, q: { arcseconds:  3.5 } },
+            { p: { arcseconds: 0.0 }, q: { arcseconds: -2.5 } }
+          ]
+        }
+      }
+    """
+
+    val query = """
+      observations {
+        observingMode {
+          igrins2LongSlit {
+            offsets {
+              p { arcseconds }
+              q { arcseconds }
+            }
+            explicitOffsets {
+              p { arcseconds }
+              q { arcseconds }
+            }
+            defaultOffsets {
+              p { arcseconds }
+              q { arcseconds }
+            }
+          }
+        }
+      }
+    """
+
+    val expected0 = json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "observingMode": {
+                "igrins2LongSlit": {
+                  "offsets": [
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -5.000000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  5.000000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  3.500000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -2.500000 } }
+                  ],
+                  "explicitOffsets": [
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -5.000000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  5.000000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  3.500000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -2.500000 } }
+                  ],
+                  "defaultOffsets": [
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -1.250000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  1.250000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  1.250000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -1.250000 } }
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      }
+    """.asRight
+
+    oneUpdateTest(pi, update0, query, expected0)
+
+  test("observing mode: clear igrins2 spatial offsets"):
+
+    val update0 = """
+      observingMode: {
+        igrins2LongSlit: {
+          exposureTimeMode: {
+            signalToNoise: {
+              value: 50.0
+              at: { nanometers: 2200 }
+            }
+          }
+          explicitOffsets: [
+            { p: { arcseconds: 0.0 }, q: { arcseconds: -5.0 } },
+            { p: { arcseconds: 0.0 }, q: { arcseconds:  5.0 } },
+            { p: { arcseconds: 0.0 }, q: { arcseconds:  3.5 } },
+            { p: { arcseconds: 0.0 }, q: { arcseconds: -2.5 } }
+          ]
+        }
+      }
+    """
+
+    val update1 = """
+      observingMode: {
+        igrins2LongSlit: {
+          explicitOffsets: null
+        }
+      }
+    """
+
+    val query = """
+      observations {
+        observingMode {
+          igrins2LongSlit {
+            offsets {
+              p { arcseconds }
+              q { arcseconds }
+            }
+            explicitOffsets {
+              p { arcseconds }
+              q { arcseconds }
+            }
+          }
+        }
+      }
+    """
+
+    val expected0 = json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "observingMode": {
+                "igrins2LongSlit": {
+                  "offsets": [
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -5.000000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  5.000000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  3.500000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -2.500000 } }
+                  ],
+                  "explicitOffsets": [
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -5.000000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  5.000000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  3.500000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -2.500000 } }
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      }
+    """.asRight
+
+    val expected1 = json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "observingMode": {
+                "igrins2LongSlit": {
+                  "offsets": [
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -1.250000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  1.250000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  1.250000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -1.250000 } }
+                  ],
+                  "explicitOffsets": null
+                }
+              }
+            }
+          ]
+        }
+      }
+    """.asRight
+
+    multiUpdateTest(pi,
+      List(
+        (update0, query, expected0),
+        (update1, query, expected1)
+      )
+    )
+
   test("observing mode: switch from gmos to igrins2"):
 
     val update0 = """

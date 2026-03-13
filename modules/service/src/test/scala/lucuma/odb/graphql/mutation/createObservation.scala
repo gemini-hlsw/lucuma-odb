@@ -2593,7 +2593,8 @@ class createObservation extends OdbSuite {
   private def createObsWithIgrins2ObservingMode(
     pid:                    Program.Id,
     explicitOffsetMode:     Option[String] = None,
-    explicitSaveSVCImages:  Option[Boolean] = None
+    explicitSaveSVCImages:  Option[Boolean] = None,
+    explicitOffsets:        Option[String] = None
   ): String =
     s"""
       mutation {
@@ -2618,6 +2619,7 @@ class createObservation extends OdbSuite {
                 }
                 ${explicitOffsetMode.map(m => s"explicitOffsetMode: $m").getOrElse("")}
                 ${explicitSaveSVCImages.map(b => s"explicitSaveSVCImages: $b").getOrElse("")}
+                ${explicitOffsets.map(o => s"explicitOffsets: $o").getOrElse("")}
               }
             }
           }
@@ -2637,6 +2639,18 @@ class createObservation extends OdbSuite {
                 saveSVCImages
                 defaultSaveSVCImages
                 explicitSaveSVCImages
+                offsets {
+                  p { arcseconds }
+                  q { arcseconds }
+                }
+                explicitOffsets {
+                  p { arcseconds }
+                  q { arcseconds }
+                }
+                defaultOffsets {
+                  p { arcseconds }
+                  q { arcseconds }
+                }
               }
             }
           }
@@ -2693,5 +2707,53 @@ class createObservation extends OdbSuite {
            Some(true)
           )
         )
+
+  test("[igrins2] IGRINS-2 observation defaults to 4 spatial offsets"):
+    createProgramAs(pi).flatMap: pid =>
+      query(pi, createObsWithIgrins2ObservingMode(pid)).flatMap: js =>
+        val ls = js.hcursor.downPath(
+          "createObservation", "observation", "observingMode", "igrins2LongSlit"
+        )
+        assertIO(
+          (IO(ls.downField("offsets").values.toList.flatMap(_.toList).length),
+           IO(ls.downField("explicitOffsets").focus.flatMap(_.asNull)),
+           IO(ls.downField("defaultOffsets").values.toList.flatMap(_.toList).length)
+          ).tupled,
+          (4, Some(()), 4)
+        )
+
+  test("[igrins2] create observation with explicit spatial offsets"):
+    createProgramAs(pi).flatMap: pid =>
+      query(pi, createObsWithIgrins2ObservingMode(
+        pid,
+        explicitOffsets = Some("""[
+          { p: { arcseconds: 0.0 }, q: { arcseconds: -5.0 } },
+          { p: { arcseconds: 0.0 }, q: { arcseconds:  5.0 } },
+          { p: { arcseconds: 0.0 }, q: { arcseconds:  3.5 } },
+          { p: { arcseconds: 0.0 }, q: { arcseconds: -2.5 } }
+        ]""")
+      )).flatMap: js =>
+        val ls = js.hcursor.downPath(
+          "createObservation", "observation", "observingMode", "igrins2LongSlit"
+        )
+        assertIO(
+          (IO(ls.downField("offsets").values.toList.flatMap(_.toList).length),
+           IO(ls.downField("explicitOffsets").values.map(_.toList.length)),
+           IO(ls.downField("defaultOffsets").values.toList.flatMap(_.toList).length)
+          ).tupled,
+          (4, Some(4), 4)
+        )
+
+  test("[igrins2] rejects 3 spatial offsets"):
+    createProgramAs(pi).flatMap: pid =>
+      interceptGraphQL("Argument 'input.SET.observingMode.igrins2LongSlit' is invalid: IGRINS-2 must have exactly 0 or 4 offsets, but 3 were provided."):
+        query(pi, createObsWithIgrins2ObservingMode(
+          pid,
+          explicitOffsets = Some("""[
+            { p: { arcseconds: 0.0 }, q: { arcseconds: -5.0 } },
+            { p: { arcseconds: 0.0 }, q: { arcseconds:  5.0 } },
+            { p: { arcseconds: 0.0 }, q: { arcseconds:  3.5 } }
+          ]""")
+        ))
 
 }
