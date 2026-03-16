@@ -316,11 +316,14 @@ object GeneratorParamsService {
             )
 
           case ig: igrins2.longslit.Config =>
-            val itcInput =
-              MissingParamSet
-                .fromParams(NonEmptyList.one(MissingParam.MissingObservationParam("IGRINS-2 ITC integration")))
-                .asLeft[ItcInput]
-            GeneratorParams(itcInput, obsParams.scienceBand, ig, obsParams.calibrationRole, obsParams.declaredComplete, obsParams.executionState, obsParams.stepCount)
+            val sciMode = InstrumentMode.Igrins2Spectroscopy()
+            spectroscopyGeneratorParams(
+              obsMode = ig,
+              acqEtm  = ig.scienceExposureTimeMode,
+              acqMode = sciMode,
+              sciEtm  = ig.scienceExposureTimeMode,
+              sciMode = sciMode
+            )
 
           case gn @ gmos.imaging.Config.GmosNorth(_, fs, _) =>
             // An input per filter.
