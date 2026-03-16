@@ -39,6 +39,8 @@ import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosSouth
 import lucuma.core.model.sequence.gmos.StaticConfig.GmosNorth as GmosNorthStatic
 import lucuma.core.model.sequence.gmos.StaticConfig.GmosSouth as GmosSouthStatic
+import lucuma.core.model.sequence.igrins2.Igrins2DynamicConfig
+import lucuma.core.model.sequence.igrins2.Igrins2StaticConfig
 import lucuma.core.util.TimeSpan
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
@@ -53,6 +55,7 @@ import lucuma.odb.sequence.util.AtomBuilder
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.Flamingos2Codecs.*
 import lucuma.odb.util.GmosCodecs.*
+import lucuma.odb.util.Igrins2Codecs.*
 import skunk.*
 import skunk.codec.boolean.bool
 import skunk.codec.numeric.int2
@@ -112,6 +115,23 @@ trait SequenceService[F[_]]:
   def replaceGmosSouthSequence(
     checked: CheckedWithId[(SequenceType, List[ProtoAtom[ProtoStep[GmosSouth]]]), Observation.Id]
   )(using Transaction[F]): F[Result[Stream[Pure, Atom[GmosSouth]]]]
+
+  def insertIgrins2Sequence(
+    observationId: Observation.Id,
+    sequenceType:  SequenceType,
+    sequence:      Stream[F, Atom[Igrins2DynamicConfig]]
+  )(using Transaction[F], Services.ServiceAccess): F[Unit]
+
+  def materializeIgrins2ExecutionConfig(
+    observationId: Observation.Id,
+    stream:        StreamingExecutionConfig[F, Igrins2StaticConfig, Igrins2DynamicConfig]
+  )(using Transaction[F], Services.ServiceAccess): F[Unit]
+
+  def selectIgrins2Sequence(
+    observationId: Observation.Id,
+    sequenceType:  SequenceType,
+    staticConfig:  Igrins2StaticConfig
+  )(using Transaction[F]): F[Option[Stream[F, Atom[Igrins2DynamicConfig]]]]
 
   def resetFlamingos2Acquisition(
     observationId: Observation.Id,
@@ -258,6 +278,19 @@ object SequenceService:
           sequenceType,
           sequence,
           GmosSequenceService.Statements.InsertGmosSouthDynamic
+        )
+
+      override def insertIgrins2Sequence(
+        observationId:  Observation.Id,
+        sequenceType:   SequenceType,
+        sequence:       Stream[F, Atom[Igrins2DynamicConfig]]
+      )(using Transaction[F], Services.ServiceAccess): F[Unit] =
+        insertSequence(
+          Instrument.Igrins2,
+          observationId,
+          sequenceType,
+          sequence,
+          Igrins2SequenceService.Statements.InsertDynamic
         )
 
       private def insertSequence[D](
@@ -582,6 +615,12 @@ object SequenceService:
       )(using Transaction[F], Services.ServiceAccess): F[Unit] =
         materializeExecutionConfig(observationId, stream)(insertGmosSouthSequence)
 
+      override def materializeIgrins2ExecutionConfig(
+        observationId: Observation.Id,
+        stream:        StreamingExecutionConfig[F, Igrins2StaticConfig, Igrins2DynamicConfig]
+      )(using Transaction[F], Services.ServiceAccess): F[Unit] =
+        materializeExecutionConfig(observationId, stream)(insertIgrins2Sequence)
+
       private def selectSequence[S, D](
         instrument:    Instrument,
         observationId: Observation.Id,
@@ -638,6 +677,20 @@ object SequenceService:
           Statements.SelectGmosSouthSequence,
           staticConfig,
           estimator.gmosSouth
+        )
+
+      override def selectIgrins2Sequence(
+        observationId: Observation.Id,
+        sequenceType:  SequenceType,
+        staticConfig:  Igrins2StaticConfig
+      )(using Transaction[F]): F[Option[Stream[F, Atom[Igrins2DynamicConfig]]]] =
+        selectSequence(
+          Instrument.Igrins2,
+          observationId,
+          sequenceType,
+          Statements.SelectIgrins2Sequence,
+          staticConfig,
+          estimator.igrins2
         )
 
   object Statements:
@@ -909,6 +962,13 @@ object SequenceService:
         "t_gmos_south_dynamic",
         GmosSequenceService.Statements.GmosDynamicColumns,
         gmos_south_dynamic
+      )
+
+    val SelectIgrins2Sequence: Query[(Instrument, Observation.Id, SequenceType), (Atom.Id, Option[String], Step.Id, ProtoStep[Igrins2DynamicConfig])] =
+      selectSequence(
+        "t_igrins_2_dynamic",
+        Igrins2SequenceService.Statements.Igrins2DynamicColumns,
+        igrins_2_dynamic
       )
 
     val IsMaterialized: Query[(Observation.Id, SequenceType), Boolean] =
