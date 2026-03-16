@@ -436,12 +436,15 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
   protected def trace: Resource[IO, Trace[IO]] =
     Resource.pure(Trace.Implicits.noop)
 
+  protected def serverResponseTimeout: FiniteDuration = 30.seconds
+
   protected def server: Resource[IO, Server] =
     for {
       t <- trace
       a <- httpApp(using t)
       s <- BlazeServerBuilder[IO]
              .withHttpWebSocketApp(a)
+             .withResponseHeaderTimeout(serverResponseTimeout)
              .bindAny()
              .resource
     } yield s
