@@ -11,6 +11,8 @@ import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig
 import lucuma.core.model.sequence.flamingos2.Flamingos2StaticConfig
 import lucuma.core.model.sequence.gmos.DynamicConfig
 import lucuma.core.model.sequence.gmos.StaticConfig
+import lucuma.core.model.sequence.igrins2.Igrins2DynamicConfig
+import lucuma.core.model.sequence.igrins2.Igrins2StaticConfig
 import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.sequence.TimeEstimateCalculator
 import lucuma.odb.sequence.data.ProtoStep
@@ -42,6 +44,16 @@ object TimeEstimateCalculatorImplementation:
   class ForInstrumentMode private[TimeEstimateCalculatorImplementation] (private val ctx: TimeEstimateContext):
     private val cce = ConfigChangeEstimator.using(ctx.enums)
     private val de  = DetectorEstimator.using(ctx)
+
+    lazy val igrins2: TimeEstimateCalculator[Igrins2StaticConfig, Igrins2DynamicConfig] =
+      fromEstimators(
+        SetupTime(
+          ctx.enums.TimeEstimate.Igrins2LongslitSetup.time,
+          ctx.enums.TimeEstimate.Igrins2Reacquisition.time
+        ),
+        cce.igrins2,
+        de.igrins2
+      )
 
     lazy val flamingos2: TimeEstimateCalculator[Flamingos2StaticConfig, Flamingos2DynamicConfig] =
       fromEstimators(

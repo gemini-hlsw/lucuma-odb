@@ -12,6 +12,7 @@ import lucuma.core.model.sequence.ConfigChangeEstimate
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig
 import lucuma.core.model.sequence.gmos.DynamicConfig
+import lucuma.core.model.sequence.igrins2.Igrins2DynamicConfig
 import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.sequence.TimeEstimateCalculator
 import lucuma.odb.sequence.data.ProtoStep
@@ -47,6 +48,15 @@ object ConfigChangeEstimator:
 
       def estimate(past: TimeEstimateCalculator.Last[D], present: ProtoStep[D]): List[ConfigChangeEstimate] =
         instrumentChecks(past, present).flattenOption ++ gcal(past, present) ++ offset(past, present)
+
+    lazy val igrins2: ConfigChangeEstimator[Igrins2DynamicConfig] =
+      new ForInstrument[Igrins2DynamicConfig]:
+        override def instrumentChecks(
+          past: TimeEstimateCalculator.Last[Igrins2DynamicConfig],
+          present: ProtoStep[Igrins2DynamicConfig]
+        ): List[Option[ConfigChangeEstimate]] =
+          // IGRINS-2 has no configurable mechanisms
+          Nil
 
     lazy val flamingos2: ConfigChangeEstimator[Flamingos2DynamicConfig] =
       new ForInstrument[Flamingos2DynamicConfig]:

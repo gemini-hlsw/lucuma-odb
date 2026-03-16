@@ -62,6 +62,10 @@ final class Enums(
     case Flamingos2Reacquisition extends TimeEstimate("f2_reacquisition")
     case Flamingos2Write         extends TimeEstimate("f2_write")
 
+    case Igrins2LongslitSetup   extends TimeEstimate("igrins2_longslit_setup")
+    case Igrins2Reacquisition   extends TimeEstimate("igrins2_reacquisition")
+    case Igrins2Write           extends TimeEstimate("igrins2_write")
+
     case GcalDiffuser            extends TimeEstimate("gcal_diffuser")
     case GcalFilter              extends TimeEstimate("gcal_filter")
     case GcalShutter             extends TimeEstimate("gcal_shutter")
@@ -103,7 +107,7 @@ final class Enums(
 
     def name: String = meta.name
 
-    // Note: The order here controls the Order of the Enumerated in the ODB, so keep them in order. 
+    // Note: The order here controls the Order of the Enumerated in the ODB, so keep them in order.
     case NotSubmitted   extends ProposalStatus("not_submitted", 0)
     case Submitted      extends ProposalStatus("submitted", 1)
     case Accepted       extends ProposalStatus("accepted", 2)
@@ -122,7 +126,7 @@ final class Enums(
   val schema: Schema =
     new Schema {
       def pos: SourcePos = SourcePos.instance
-      def baseTypes: List[NamedType] = 
+      def baseTypes: List[NamedType] =
         Enumerated[ProposalStatus].toEnumType("ProposalStatus", "Enumerated type of ProposalStatus")(_.name) ::
           enumMeta.unreferencedTypes
       def directives: List[DirectiveDef] = Nil
