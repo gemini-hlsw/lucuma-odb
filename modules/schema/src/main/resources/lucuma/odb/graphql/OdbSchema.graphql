@@ -8289,6 +8289,7 @@ input Flamingos2LongSlitAcquisitionInput {
   may be unset by assigning a null value, or ignored by skipping it altogether.  If not provided,
   the filter that will be used for the acquisition sequence is the acquisition filter closest to
   the science filter wavelength.
+  Allowed filters are J, H and K_SHORT.
   """
   explicitFilter: Flamingos2Filter
 
