@@ -7,15 +7,18 @@
 package lucuma.odb.service
 
 import cats.effect.Concurrent
+import cats.syntax.eq.*
 import cats.syntax.functor.*
 import cats.syntax.option.*
-import fs2.Stream
+import lucuma.core.enums.GmosImagingVariantType
+import lucuma.core.enums.MosPreImaging
+import lucuma.core.enums.ObservingModeType
 import lucuma.core.model.Observation
 import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.gmos.DynamicConfig
 import lucuma.core.model.sequence.gmos.StaticConfig
-import lucuma.odb.sequence.data.StepRecord
+import lucuma.odb.sequence.gmos.InitialConfigs
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.GmosCodecs.*
 import skunk.*
@@ -24,15 +27,7 @@ import skunk.implicits.*
 
 import Services.Syntax.*
 
-trait GmosSequenceService[F[_]] {
-
-  def selectGmosNorthStepRecords(
-    observationId: Observation.Id
-  ): Stream[F, StepRecord[DynamicConfig.GmosNorth]]
-
-  def selectGmosSouthStepRecords(
-    observationId: Observation.Id
-  ): Stream[F, StepRecord[DynamicConfig.GmosSouth]]
+trait GmosSequenceService[F[_]]:
 
   def insertGmosNorthDynamic(
     stepId:  Step.Id,
@@ -42,8 +37,12 @@ trait GmosSequenceService[F[_]] {
   /**
    * Selects the static configuration corresponding to the given visit.
    */
-  def selectGmosNorthStatic(
+  def selectGmosNorthStaticForVisit(
     visitId: Visit.Id
+  )(using Transaction[F]): F[Option[StaticConfig.GmosNorth]]
+
+  def selectGmosNorthStatic(
+    observationId: Observation.Id
   )(using Transaction[F]): F[Option[StaticConfig.GmosNorth]]
 
   /**
@@ -67,8 +66,12 @@ trait GmosSequenceService[F[_]] {
   /**
    * Selects the static configuration corresponding to the given visit.
    */
-  def selectGmosSouthStatic(
+  def selectGmosSouthStaticForVisit(
     visitId: Visit.Id
+  )(using Transaction[F]): F[Option[StaticConfig.GmosSouth]]
+
+  def selectGmosSouthStatic(
+    observationId: Observation.Id
   )(using Transaction[F]): F[Option[StaticConfig.GmosSouth]]
 
   /**
@@ -84,13 +87,17 @@ trait GmosSequenceService[F[_]] {
     static:        StaticConfig.GmosSouth
   )(using Transaction[F], Services.ServiceAccess): F[Long]
 
-}
+object GmosSequenceService:
 
-object GmosSequenceService {
+  // Extract the mos-preimaging setting from the imaging variant
+  private def mosPreImaging(v: Option[GmosImagingVariantType]): MosPreImaging =
+    v.filter(_ === GmosImagingVariantType.PreImaging)
+     .as(MosPreImaging.IsMosPreImaging)
+     .getOrElse(MosPreImaging.IsNotMosPreImaging)
 
   def instantiate[F[_]: Concurrent](using Services[F]): GmosSequenceService[F] =
 
-    new GmosSequenceService[F] {
+    new GmosSequenceService[F]:
 
       override def insertGmosNorthDynamic(
         stepId:  Step.Id,
@@ -98,42 +105,26 @@ object GmosSequenceService {
       )(using Transaction[F], Services.ServiceAccess): F[Unit] =
         session.execute(Statements.InsertGmosNorthDynamic)(stepId, dynamic).void
 
-      override def selectGmosNorthStatic(
+      override def selectGmosNorthStaticForVisit(
         visitId: Visit.Id
       )(using Transaction[F]): F[Option[StaticConfig.GmosNorth]] =
         session.option(Statements.SelectGmosNorthStatic)(visitId)
 
-      private def selectGmosStepRecords[A](
-        observationId: Observation.Id,
-        site:          String,
-        decoderA:      Decoder[A]
-      ): Stream[F, StepRecord[A]] =
-        session.stream(
-          SequenceService.Statements.selectStepRecord(
-            s"t_gmos_${site}_dynamic",
-            s"gmos$site",
-            Statements.GmosDynamicColumns,
-            decoderA
-          )
-        )(observationId, 1024)
-
-      override def selectGmosNorthStepRecords(
+      override def selectGmosNorthStatic(
         observationId: Observation.Id
-      ): Stream[F, StepRecord[DynamicConfig.GmosNorth]] =
-        selectGmosStepRecords(
-          observationId,
-          "north",
-          gmos_north_dynamic
-        )
+      )(using Transaction[F]): F[Option[StaticConfig.GmosNorth]] =
+        def toStatic(mode: ObservingModeType, variant: Option[GmosImagingVariantType]): Option[StaticConfig.GmosNorth] =
+          mode match
+            case ObservingModeType.GmosNorthLongSlit =>
+              InitialConfigs.GmosNorthStatic.some
+            case ObservingModeType.GmosSouthImaging  =>
+              InitialConfigs.GmosNorthStatic.copy(mosPreImaging = mosPreImaging(variant)).some
+            case _                                   =>
+              none
 
-      override def selectGmosSouthStepRecords(
-        observationId: Observation.Id
-      ): Stream[F, StepRecord[DynamicConfig.GmosSouth]] =
-        selectGmosStepRecords(
-          observationId,
-          "south",
-          gmos_south_dynamic
-        )
+        session
+          .option(Statements.selectStaticParams("north"))(observationId)
+          .map(_.flatMap(toStatic(_, _)))
 
       override def selectGmosNorthDynamicForStep(
         stepId: Step.Id
@@ -157,10 +148,26 @@ object GmosSequenceService {
       )(using Transaction[F], Services.ServiceAccess): F[Unit] =
         session.execute(Statements.InsertGmosSouthDynamic)(stepId, dynamic).void
 
-      override def selectGmosSouthStatic(
+      override def selectGmosSouthStaticForVisit(
         visitId: Visit.Id
       )(using Transaction[F]): F[Option[StaticConfig.GmosSouth]] =
         session.option(Statements.SelectGmosSouthStatic)(visitId)
+
+      override def selectGmosSouthStatic(
+        observationId: Observation.Id
+      )(using Transaction[F]): F[Option[StaticConfig.GmosSouth]] =
+        def toStatic(mode: ObservingModeType, variant: Option[GmosImagingVariantType]): Option[StaticConfig.GmosSouth] =
+          mode match
+            case ObservingModeType.GmosSouthLongSlit =>
+              InitialConfigs.GmosSouthStatic.some
+            case ObservingModeType.GmosSouthImaging  =>
+              InitialConfigs.GmosSouthStatic.copy(mosPreImaging = mosPreImaging(variant)).some
+            case _                                   =>
+              none
+
+        session
+          .option(Statements.selectStaticParams("south"))(observationId)
+          .map(_.flatMap(toStatic(_, _)))
 
       override def selectGmosSouthDynamicForStep(
         stepId: Step.Id
@@ -177,9 +184,8 @@ object GmosSequenceService {
           visitId,
           static
         )
-   }
 
-  object Statements {
+  object Statements:
 
     val GmosDynamicColumns: List[String] =
       List(
@@ -249,6 +255,15 @@ object GmosSequenceService {
     val SelectGmosSouthStatic: Query[Visit.Id, StaticConfig.GmosSouth] =
       selectStatic("south", gmos_south_static)
 
+    def selectStaticParams(site: String): Query[Observation.Id, (ObservingModeType, Option[GmosImagingVariantType])] =
+      sql"""
+        SELECT o.c_observing_mode_type,
+               i.c_variant
+          FROM t_observation o
+          LEFT JOIN t_gmos_#${site}_imaging i ON i.c_observation_id = o.c_observation_id
+         WHERE o.c_observation_id = $observation_id
+      """.query(observing_mode_type *: gmos_imaging_variant.opt)
+
     def insertStatic[A](site: String, encoderA: Encoder[A]): Query[(Observation.Id, Option[Visit.Id], A), Long] =
       sql"""
         INSERT INTO t_gmos_#${site}_static (
@@ -267,6 +282,3 @@ object GmosSequenceService {
 
     val InsertGmosSouthStatic: Query[(Observation.Id, Option[Visit.Id], StaticConfig.GmosSouth), Long] =
       insertStatic("south", gmos_south_static)
-
-  }
-}

@@ -22,26 +22,6 @@ Email address, matching ^\w+@[a-zA-Z_]+?\.[a-zA-Z]{2,3}$
 """
 scalar EmailAddress @specifiedBy(url: "https://html.spec.whatwg.org/multipage/input.html#valid-e-mail-address")
 
-"AtomEvent creation parameters."
-input AddAtomEventInput {
-  atomId: AtomId!
-  atomStage: AtomStage!
-  clientId: ClientId @deprecated(reason: "Use idempotencyKey instead")
-
-  """
-  Idempotency key, if any.  The IdempotencyKey may be provided by clients when
-  the event is created and is used to enable problem-free retry in the case of
-  failure.
-  """
-  idempotencyKey: IdempotencyKey
-}
-
-"The result of adding a atom event."
-type AddAtomEventResult {
-  "The new atom event that was added."
-  event: AtomEvent!
-}
-
 "DatasetEvent creation parameters."
 input AddDatasetEventInput {
   "Dataset id"
@@ -49,8 +29,6 @@ input AddDatasetEventInput {
 
   "Dataset execution stage."
   datasetStage: DatasetStage!
-
-  clientId: ClientId @deprecated(reason: "Use idempotencyKey instead")
 
   """
   Idempotency key, if any.  The IdempotencyKey may be provided by clients when
@@ -81,8 +59,6 @@ input AddSequenceEventInput {
   visitId: VisitId!
   command: SequenceCommand!
 
-  clientId: ClientId @deprecated(reason: "Use idempotencyKey instead")
-
   """
   Idempotency key, if any.  The IdempotencyKey may be provided by clients when
   the event is created and is used to enable problem-free retry in the case of
@@ -102,8 +78,6 @@ input AddSlewEventInput {
   observationId: ObservationId!
   slewStage: SlewStage!
 
-  clientId: ClientId @deprecated(reason: "Use idempotencyKey instead")
-
   """
   Idempotency key, if any.  The IdempotencyKey may be provided by clients when
   the event is created and is used to enable problem-free retry in the case of
@@ -121,9 +95,8 @@ type AddSlewEventResult {
 "StepEvent creation parameters."
 input AddStepEventInput {
   stepId: StepId!
+  visitId: VisitId!
   stepStage: StepStage!
-
-  clientId: ClientId @deprecated(reason: "Use idempotencyKey instead")
 
   """
   Idempotency key, if any.  The IdempotencyKey may be provided by clients when
@@ -219,13 +192,14 @@ type AtomEvent implements ExecutionEvent {
   "Event type."
   eventType: ExecutionEventType!
 
-  "Atom associated with this event."
-  atom: AtomRecord!
+  """
+  Atom record associated with this event, if any.  Atom records only materialize
+  when the steps they contain execute.
+  """
+  atom: AtomRecord
 
   "Atom execution stage."
   atomStage: AtomStage!
-
-  clientId: ClientId @deprecated(reason: "Use idempotencyKey instead")
 
   """
   Idempotency key, if any.  The IdempotencyKey may be provided by clients when
@@ -261,19 +235,25 @@ enum AtomStage {
   START_ATOM
 }
 
-"An atom as recorded by Observe."
+"The portion of an atom that executed in a particular visit."
 type AtomRecord {
   "Atom ID."
   id: AtomId!
 
+  "Visit in which this atom executed."
+  visit: Visit!
+
+  "Atom execution order -- the index of its first executed step."
+  index: PosInt!
+
+  "Description, if any."
+  description: NonEmptyString
+
   "The instrument associated with this atom."
   instrument: Instrument!
 
-  "Visit in which this atom was executed."
-  visit: Visit!
-
-  "Created by Observe at this time."
-  created: Timestamp!
+  "Observation containing this atom."
+  observation: Observation!
 
   """
   The execution state of this atom, according to events received (if any) from
@@ -287,27 +267,17 @@ type AtomRecord {
   "Sequence type."
   sequenceType: SequenceType!
 
-  "Recorded steps associated with this atom."
+  "Recorded steps associated with this atom, ordered by execution order."
   steps(
     """
-    Starts the result set at (or after if not existent) the given step creation
-    time.
+    Starts the result set at this index.
     """
-    OFFSET: Timestamp
+    OFFSET: PosInt
 
     "Limits the result to at most this number of matches (but never more than 1000)."
     LIMIT: NonNegInt
   ): StepRecordSelectResult!
 
-  "Atom ID from the generated atom, if any, that produced this atom record."
-  generatedId: AtomId
-
-  """
-  Idempotency key, if any.  The IdempotencyKey may be provided by clients when
-  the atom is created and is used to enable problem-free retry in the case of
-  failure.
-  """
-  idempotencyKey: IdempotencyKey
 }
 
 "AtomRecord query results, limited to a maximum of 1000 entries."
@@ -767,9 +737,6 @@ Result of the program user role update, which is the updated program user itself
 type ChangeProgramUserRoleResult {
   programUser: ProgramUser!
 }
-
-"@deprecated: use IdempotencyKey (UUID) instead"
-scalar ClientId
 
 """
 Describes an observation clone operation, making any edits in the `SET`
@@ -1276,7 +1243,7 @@ enum ExecutionEventType {
   "Slew event type."
   SLEW
 
-  "Atom-level event type."
+  "Atom-level event type. NOTE: this is no longer used."
   ATOM
 
   "Step-level event type."
@@ -2992,19 +2959,6 @@ type Mutation {
   addConditionsEntry(input: ConditionsEntryInput): AddConditionsEntryResult!
 
   """
-  Adds a new atom event.
-  """
-  addAtomEvent(
-    """
-    Describes the atom event to add.  All events are associated with a
-    particular visit (see 'record{InstrumentName}Visit').  Atom events are
-    further associated with an an observation id and an atom id. Each atom event
-    identifies the stage through which the atom execution is passing.
-    """
-    input: AddAtomEventInput!
-  ): AddAtomEventResult!
-
-  """
   Adds a new dataset event associated with the given visit.  The
   generation of a single dataset will produce multiple events as it
   transitions through the observe, readout and write stages.
@@ -3178,12 +3132,6 @@ type Mutation {
   """
   linkUser(input: LinkUserInput!): LinkUserResult!
 
-  "Record a new atom"
-  recordAtom(
-    "Atom configuration parameters"
-    input: RecordAtomInput!
-  ): RecordAtomResult!
-
   """
   Records a new dataset.  This dataset may be subsequently referenced by dataset events.
   """
@@ -3195,14 +3143,6 @@ type Mutation {
   ): RecordDatasetResult!
 
   """
-  Record a new Flamingos 2 step.
-  """
-  recordFlamingos2Step(
-    "Flamingos 2 step configuration parameters"
-    input: RecordFlamingos2StepInput!
-  ): RecordFlamingos2StepResult!
-
-  """
   Record a new Flamingos 2 visit
   """
   recordFlamingos2Visit(
@@ -3212,11 +3152,14 @@ type Mutation {
     input: RecordFlamingos2VisitInput!
   ): RecordFlamingos2VisitResult!
 
-  "Record a new GMOS North step"
-  recordGmosNorthStep(
-    "GMOS North step configuration parameters"
-    input: RecordGmosNorthStepInput!
-  ): RecordGmosNorthStepResult!
+  """
+  Replaces the remaining steps in an execution sequence with the provided
+  sequence.  Previously executed (or even partially executed) steps are not
+  deleted.  Any ongoing steps are abandoned.
+  """
+  replaceFlamingos2Sequence(
+    input: ReplaceFlamingos2SequenceInput!
+  ): ReplaceFlamingos2SequenceResult!
 
   """
   Record a new GMOS North visit
@@ -3228,11 +3171,14 @@ type Mutation {
     input: RecordGmosNorthVisitInput!
   ): RecordGmosNorthVisitResult!
 
-  "Record a new GMOS South step"
-  recordGmosSouthStep(
-    "GmosSouth step configuration parameters"
-    input: RecordGmosSouthStepInput!
-  ): RecordGmosSouthStepResult!
+  """
+  Replaces the remaining steps in an execution sequence with the provided
+  sequence.  Previously executed (or even partially executed) steps are not
+  deleted.  Any ongoing steps are abandoned.
+  """
+  replaceGmosNorthSequence(
+    input: ReplaceGmosNorthSequenceInput!
+  ): ReplaceGmosNorthSequenceResult!
 
   """
   Record a new GMOS South visit
@@ -3243,6 +3189,15 @@ type Mutation {
     """
     input: RecordGmosSouthVisitInput!
   ): RecordGmosSouthVisitResult!
+
+  """
+  Replaces the remaining steps in an execution sequence with the provided
+  sequence.  Previously executed (or even partially executed) steps are not
+  deleted.  Any ongoing steps are abandoned.
+  """
+  replaceGmosSouthSequence(
+    input: ReplaceGmosSouthSequenceInput!
+  ): ReplaceGmosSouthSequenceResult!
 
   """
   Resets the acquisition sequence to start from the initial step regardless of
@@ -4524,33 +4479,13 @@ input RadialVelocityInput @oneOf {
   kilometersPerSecond: BigDecimal
 }
 
-"""
-Input parameters for creating a new atom record.
-"""
-input RecordAtomInput {
-  visitId: VisitId!
-  instrument: Instrument!
-  sequenceType: SequenceType!
-  generatedId: AtomId
-
-  """
-  Idempotency key, if any.  The IdempotencyKey may be provided by clients when
-  the atom is created and is used to enable problem-free retry in the case of
-  failure.
-  """
-  idempotencyKey: IdempotencyKey
-}
-
-"The result of recording an atom."
-type RecordAtomResult {
-  "The newly added atom record itself."
-  atomRecord: AtomRecord!
-}
-
 "Dataset creation parameters."
 input RecordDatasetInput {
   "Corresponding Step id."
   stepId: StepId!
+
+  "Visit associated with the dataset."
+  visitId: VisitId!
 
   "Dataset filename."
   filename: DatasetFilename!
@@ -4573,33 +4508,6 @@ input RecordDatasetInput {
 type RecordDatasetResult {
   "The new dataset that was added."
   dataset: Dataset!
-}
-
-"Input parameters for creating a new GmosNorth StepRecord"
-input RecordGmosNorthStepInput {
-  atomId: AtomId!
-  gmosNorth: GmosNorthDynamicInput!
-  stepConfig: StepConfigInput!
-  telescopeConfig: TelescopeConfigInput
-  observeClass: ObserveClass!
-  generatedId: StepId
-
-  """
-  Idempotency key, if any.  The IdempotencyKey may be provided by clients when
-  the step is created and is used to enable problem-free retry in the case of
-  failure.
-  """
-  idempotencyKey: IdempotencyKey
-}
-
-"""
-The result of recording a GmosNorth step.
-"""
-type RecordGmosNorthStepResult {
-  """
-  The newly added step record itself.
-  """
-  stepRecord: StepRecord!
 }
 
 """
@@ -4625,35 +4533,6 @@ type RecordGmosNorthVisitResult {
   The newly added visit record itself.
   """
   visit: Visit!
-}
-
-"""
-Input parameters for creating a new GmosSouth StepRecord
-"""
-input RecordGmosSouthStepInput {
-  atomId: AtomId!
-  gmosSouth: GmosSouthDynamicInput!
-  stepConfig: StepConfigInput!
-  telescopeConfig: TelescopeConfigInput
-  observeClass: ObserveClass!
-  generatedId: StepId
-
-  """
-  Idempotency key, if any.  The IdempotencyKey may be provided by clients when
-  the step is created and is used to enable problem-free retry in the case of
-  failure.
-  """
-  idempotencyKey: IdempotencyKey
-}
-
-"""
-The result of recording a GmosSouth step.
-"""
-type RecordGmosSouthStepResult {
-  """
-  The newly added step record itself.
-  """
-  stepRecord: StepRecord!
 }
 
 """
@@ -4771,6 +4650,11 @@ input ObservingModeInput @oneOf {
   The flamingos2LongSlit field must be either specified or skipped altogether.  It cannot be unset with a null value.
   """
   flamingos2LongSlit: Flamingos2LongSlitInput
+
+  """
+  The igrins2LongSlit field must be either specified or skipped altogether.  It cannot be unset with a null value.
+  """
+  igrins2LongSlit: Igrins2LongSlitInput
 }
 
 """
@@ -7198,8 +7082,6 @@ type DatasetEvent implements ExecutionEvent {
   "The associated dataset."
   dataset: Dataset!
 
-  clientId: ClientId @deprecated(reason: "Use idempotencyKey instead")
-
   """
   Idempotency key, if any.  The IdempotencyKey may be provided by clients when
   the event is created and is used to enable problem-free retry in the case of
@@ -7445,10 +7327,16 @@ type Execution {
   """
   executionState: ExecutionState!
 
-  "Executed (or at least partially executed) atom records, across all visits."
+  """
+  Executed (or at least partially executed) atom records, across all visits,
+  ordered by execution order of the first contained step.
+  """
   atomRecords(
-    "Starts the result set at the given atom creation time."
-    OFFSET: Timestamp
+    """
+    Starts the result set at the given step (execution) index -- atom indices
+    are the index of the first contained step.
+    """
+    OFFSET: PosInt
 
     "Limits the result to at most this number of matches (but never more than 1000)."
     LIMIT: NonNegInt
@@ -7532,8 +7420,6 @@ interface ExecutionEvent {
 
   "Event type."
   eventType: ExecutionEventType!
-
-  clientId: ClientId @deprecated(reason: "Use idempotencyKey instead")
 
   """
   Idempotency key, if any.  The IdempotencyKey may be provided by clients when
@@ -7691,35 +7577,6 @@ input Flamingos2StaticInput {
   """
   useElectronicOffsetting: Boolean
 
-}
-
-"""
-Input parameters for creating a new Flamingos 2 StepRecord
-"""
-input RecordFlamingos2StepInput {
-  atomId: AtomId!
-  flamingos2: Flamingos2DynamicInput!
-  stepConfig: StepConfigInput!
-  telescopeConfig: TelescopeConfigInput
-  observeClass: ObserveClass!
-  generatedId: StepId
-
-  """
-  Idempotency key, if any.  The IdempotencyKey may be provided by clients when
-  the step is created and is used to enable problem-free retry in the case of
-  failure.
-  """
-  idempotencyKey: IdempotencyKey
-}
-
-"""
-The result of recording a Flamingos 2 step.
-"""
-type RecordFlamingos2StepResult {
-  """
-  The newly added step record itself.
-  """
-  stepRecord: StepRecord!
 }
 
 """
@@ -8279,6 +8136,24 @@ Flamingos2 Long Slit acquisition settings.
 type Flamingos2LongSlitAcquisition {
 
   """
+  The filter that will be used in the acquisition sequence.  This will be the
+  `explicitFilter` if specified, but otherwise the `defaultFilter`.
+  """
+  filter: Flamingos2Filter!
+
+  """
+  The filter that will be used by default, if an explicit acquisition filter was
+  not specified.  The default is calculated as the acquisition filter closest in
+  wavelength to the observation's science filter.
+  """
+  defaultFilter: Flamingos2Filter!
+
+  """
+  An explicitly specified filter to use in acquisition (if any).
+  """
+  explicitFilter: Flamingos2Filter
+
+  """
   The exposure time mode used for ITC lookup for the acquisition sequence.
   """
   exposureTimeMode: ExposureTimeMode!
@@ -8410,6 +8285,15 @@ default values.
 input Flamingos2LongSlitAcquisitionInput {
 
   """
+  An explicit acquisition filter to use instead of the default.  The `explicitFilter`
+  may be unset by assigning a null value, or ignored by skipping it altogether.  If not provided,
+  the filter that will be used for the acquisition sequence is the acquisition filter closest to
+  the science filter wavelength.
+  Allowed filters are J, H and K_SHORT.
+  """
+  explicitFilter: Flamingos2Filter
+
+  """
   Exposure time mode for the acquisition sequence.  If not specified, a default
   exposure time mode is used.
   """
@@ -8477,6 +8361,115 @@ input Flamingos2LongSlitInput {
   Acquisition properties that, when set, override default values.
   """
   acquisition: Flamingos2LongSlitAcquisitionInput
+}
+
+"""
+IGRINS-2 Offset Mode
+"""
+enum Igrins2OffsetMode {
+  """
+  Igrins2OffsetMode NodAlongSlit
+  """
+  NOD_ALONG_SLIT
+
+  """
+  Igrins2OffsetMode NodToSky
+  """
+  NOD_TO_SKY
+}
+
+"""
+IGRINS-2 Long Slit mode
+"""
+type Igrins2LongSlit {
+
+  """
+  The exposure time mode used for ITC lookup for the science sequence.
+  """
+  exposureTimeMode: ExposureTimeMode!
+
+  """
+  The offset mode is either explicitly specified in explicitOffsetMode or else
+  taken from defaultOffsetMode
+  """
+  offsetMode: Igrins2OffsetMode!
+
+  """
+  Default offset mode
+  """
+  defaultOffsetMode: Igrins2OffsetMode!
+
+  """
+  Optional explicitly specified offset mode. If set it overrides the default.
+  """
+  explicitOffsetMode: Igrins2OffsetMode
+
+  """
+  Whether to save SVC images, either explicitly specified in
+  explicitSaveSVCImages or else taken from defaultSaveSVCImages
+  """
+  saveSVCImages: Boolean!
+
+  """
+  Default save SVC images setting
+  """
+  defaultSaveSVCImages: Boolean!
+
+  """
+  Optional explicitly specified save SVC images setting. If set it overrides
+  the default.
+  """
+  explicitSaveSVCImages: Boolean
+
+  """
+  Spatial offsets, either explicitly specified in explicitOffsets or else
+  taken from defaultOffsets
+  """
+  offsets: [Offset!]!
+
+  """
+  Default spatial offsets 
+  (ABBA pattern, q = -1.25, +1.25, +1.25, -1.25 arcsec) for NodAlongSlit, or 
+  (p = 0, q = 0), (p = 10, q = 10), (p = 0, q = 0) for NodToSky.
+  """
+  defaultOffsets: [Offset!]!
+
+  """
+  Optional explicitly specified spatial offsets. If set, overrides the default.
+  """
+  explicitOffsets: [Offset!]
+
+}
+
+"""
+Edit or create IGRINS-2 Long Slit configuration
+"""
+input Igrins2LongSlitInput {
+
+  """
+  The exposureTimeMode field may be unset by assigning a null value, or ignored
+  by skipping it altogether
+  """
+  exposureTimeMode: ExposureTimeModeInput
+
+  """
+  The offset mode field may be unset by assigning a null value, or ignored by
+  skipping it altogether
+  """
+  explicitOffsetMode: Igrins2OffsetMode
+
+  """
+  The save SVC images field may be unset by assigning a null value, or ignored
+  by skipping it altogether
+  """
+  explicitSaveSVCImages: Boolean
+
+  """
+  Spatial offsets. May be unset by assigning null, or ignored by skipping.
+  For NodAlongSlit mode, all offsets must have P = 0.
+  """
+  explicitOffsets: [OffsetInput!]
+
 }
 
 """
@@ -11279,6 +11272,7 @@ type ConfigurationObservingMode {
   gmosNorthImaging: ConfigurationGmosNorthImaging
   gmosSouthImaging: ConfigurationGmosSouthImaging
   flamingos2LongSlit: ConfigurationFlamingos2LongSlit
+  igrins2LongSlit: ConfigurationIgrins2LongSlit
 }
 
 type ConfigurationGmosNorthLongSlit {
@@ -11299,6 +11293,10 @@ type ConfigurationGmosSouthImaging {
 
 type ConfigurationFlamingos2LongSlit {
   disperser: Flamingos2Disperser!
+}
+
+type ConfigurationIgrins2LongSlit {
+  ignore: Ignore
 }
 
 scalar ConfigurationRequestId
@@ -12525,6 +12523,11 @@ type ObservingMode {
   """
   flamingos2LongSlit: Flamingos2LongSlit
 
+  """
+  IGRINS-2 Long Slit mode
+  """
+  igrins2LongSlit: Igrins2LongSlit
+
 }
 
 type ObservingModeGroup {
@@ -12782,8 +12785,6 @@ type SequenceEvent implements ExecutionEvent {
   "Sequence event data."
   command: SequenceCommand!
 
-  clientId: ClientId @deprecated(reason: "Use idempotencyKey instead")
-
   """
   Idempotency key, if any.  The IdempotencyKey may be provided by clients when
   the event is created and is used to enable problem-free retry in the case of
@@ -12930,8 +12931,6 @@ type SlewEvent implements ExecutionEvent {
 
   "Slew event data."
   slewStage: SlewStage!
-
-  clientId: ClientId @deprecated(reason: "Use idempotencyKey instead")
 
   """
   Idempotency key, if any.  The IdempotencyKey may be provided by clients when
@@ -13874,8 +13873,6 @@ type StepEvent implements ExecutionEvent {
   "Step execution stage."
   stepStage: StepStage!
 
-  clientId: ClientId @deprecated(reason: "Use idempotencyKey instead")
-
   """
   Idempotency key, if any.  The IdempotencyKey may be provided by clients when
   the event is created and is used to enable problem-free retry in the case of
@@ -14096,9 +14093,6 @@ type StepRecord {
   "The atom in which the step was executed."
   atom: AtomRecord!
 
-  "The step was created by Observe at this time."
-  created: Timestamp!
-
   """
   The execution state of this step, according to events received (if any) from
   Observe.
@@ -14108,8 +14102,7 @@ type StepRecord {
   """
   Time interval during which this step executed.  This measures the range of
   time from the first event to the last, whether or not the step ever
-  actually completed.  A 'null' result means there are no events associated
-  with this step.
+  actually completed.
   """
   interval: TimestampInterval
 
@@ -14153,16 +14146,6 @@ type StepRecord {
     "Limits the result to at most this number of matches (but never more than 1000)."
     LIMIT: NonNegInt
   ): ExecutionEventSelectResult!
-
-  "Step ID of the generated step, if any, that produced this step record."
-  generatedId: StepId
-
-  """
-  Idempotency key, if any.  The IdempotencyKey may be provided by clients when
-  the step is created and is used to enable problem-free retry in the case of
-  failure.
-  """
-  idempotencyKey: IdempotencyKey
 
   """
   Flamingos 2 instrument configuration for this step, if any.  This will be null
@@ -14946,8 +14929,11 @@ type Visit {
 
   "Executed (or at least partially executed) atom records for this visit."
   atomRecords(
-    "Starts the result set at the given atom creation time."
-    OFFSET: Timestamp
+    """
+    Starts the result set at the given step index.  The atom record index is the
+    index of its first contained step.
+    """
+    OFFSET: PosInt
 
     "Limits the result to at most this number of matches (but never more than 1000)."
     LIMIT: NonNegInt
@@ -18211,4 +18197,127 @@ type CalculatedObservationWorkflow {
   state: CalculationState! @deprecated(reason: "Use `calculationState` instead.")
 
   value: ObservationWorkflow!
+}
+
+input Flamingos2StepInput {
+  instrumentConfig: Flamingos2DynamicInput!
+  breakpoint: Breakpoint
+  stepConfig: StepConfigInput!
+  telescopeConfig: TelescopeConfigInput
+  observeClass: ObserveClass!
+}
+
+input GmosNorthStepInput {
+  instrumentConfig: GmosNorthDynamicInput!
+  breakpoint: Breakpoint
+  stepConfig: StepConfigInput!
+  telescopeConfig: TelescopeConfigInput
+  observeClass: ObserveClass!
+}
+
+input GmosSouthStepInput {
+  instrumentConfig: GmosSouthDynamicInput!
+  breakpoint: Breakpoint
+  stepConfig: StepConfigInput!
+  telescopeConfig: TelescopeConfigInput
+  observeClass: ObserveClass!
+}
+
+input Flamingos2AtomInput {
+  description: NonEmptyString
+  steps: [Flamingos2StepInput!]!
+}
+
+input GmosNorthAtomInput {
+  description: NonEmptyString
+  steps: [GmosNorthStepInput!]!
+}
+
+input GmosSouthAtomInput {
+  description: NonEmptyString
+  steps: [GmosSouthStepInput!]!
+}
+
+"""
+Replace Flamingos 2 sequence input.  Select the observation using one of the
+observation ID or the observation reference.  If both are provided, they must
+refer to the same observation.
+"""
+input ReplaceFlamingos2SequenceInput {
+  observationId: ObservationId
+  observationReference: ObservationReferenceLabel
+
+  "Specifies which sequence should be replaced."
+  sequenceType: SequenceType!
+
+  """
+  The new sequence.  Any unexecuted steps are deleted and replaced with the
+  provided sequence.  Steps that were previously executed, or for which at least
+  one execution event was received, are preserved.
+  """
+  sequence: [Flamingos2AtomInput!]
+}
+
+"""
+The result of a replace sequence mutation, consisting of the newly inserted
+sequence.
+"""
+type ReplaceFlamingos2SequenceResult {
+  sequence: [Flamingos2Atom!]!
+}
+
+"""
+Replace GMOS North sequence input.  Select the observation using one of the
+observation ID or the observation reference.  If both are provided, they must
+refer to the same observation.
+"""
+input ReplaceGmosNorthSequenceInput {
+  observationId: ObservationId
+  observationReference: ObservationReferenceLabel
+
+  "Specifies which sequence should be replaced."
+  sequenceType: SequenceType!
+
+  """
+  The new sequence.  Any unexecuted steps are deleted and replaced with the
+  provided sequence.  Steps that were previously executed, or for which at least
+  one execution event was received, are preserved.
+  """
+  sequence: [GmosNorthAtomInput!]
+}
+
+"""
+The result of a replace sequence mutation, consisting of the newly inserted
+sequence.
+"""
+type ReplaceGmosNorthSequenceResult {
+  sequence: [GmosNorthAtom!]!
+}
+
+"""
+Replace GMOS South sequence input.  Select the observation using one of the
+observation ID or the observation reference.  If both are provided, they must
+refer to the same observation.
+"""
+input ReplaceGmosSouthSequenceInput {
+  observationId: ObservationId
+  observationReference: ObservationReferenceLabel
+
+  "Specifies which sequence should be replaced."
+  sequenceType: SequenceType!
+
+  """
+  The new sequence.  Any unexecuted steps are deleted and replaced with the
+  provided sequence.  Steps that were previously executed, or for which at least
+  one execution event was received, are preserved.
+  """
+  sequence: [GmosSouthAtomInput!]
+}
+
+"""
+The result of a replace sequence mutation, consisting of the newly inserted
+sequence.
+"""
+type ReplaceGmosSouthSequenceResult {
+  sequence: [GmosSouthAtom!]!
 }

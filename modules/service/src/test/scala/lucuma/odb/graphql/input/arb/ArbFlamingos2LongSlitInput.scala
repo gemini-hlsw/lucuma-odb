@@ -27,8 +27,10 @@ trait ArbFlamingos2LongSlitInput:
 
   given Arbitrary[Flamingos2LongSlitInput.Acquisition] =
     Arbitrary:
-      arbitrary[Option[ExposureTimeMode]].map: e =>
-        Flamingos2LongSlitInput.Acquisition(e)
+      for
+        f <- arbitrary[Nullable[Flamingos2Filter]]
+        e <- arbitrary[Option[ExposureTimeMode]]
+      yield Flamingos2LongSlitInput.Acquisition(f, e)
 
   given Arbitrary[Flamingos2LongSlitInput.Create] =
     Arbitrary:

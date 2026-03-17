@@ -15,7 +15,6 @@ import io.circe.refined.*
 import io.circe.syntax.*
 import lucuma.core.data.EmailAddress
 import lucuma.core.data.PerSite
-import lucuma.core.enums.AtomStage
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.CallForProposalsType
 import lucuma.core.enums.DatasetQaState
@@ -25,24 +24,20 @@ import lucuma.core.enums.EmailStatus
 import lucuma.core.enums.Gender
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObservationWorkflowState
-import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.Partner
 import lucuma.core.enums.ProgramUserRole
 import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.SequenceCommand
-import lucuma.core.enums.SequenceType
 import lucuma.core.enums.SlewStage
 import lucuma.core.enums.StepStage
 import lucuma.core.enums.TimeAccountingCategory
 import lucuma.core.math.Angle
 import lucuma.core.math.Coordinates
 import lucuma.core.model.CallForProposals
-import lucuma.core.model.Client
 import lucuma.core.model.ConfigurationRequest
 import lucuma.core.model.Ephemeris
 import lucuma.core.model.ExecutionEvent
-import lucuma.core.model.ExecutionEvent.AtomEvent
 import lucuma.core.model.ExecutionEvent.DatasetEvent
 import lucuma.core.model.ExecutionEvent.SequenceEvent
 import lucuma.core.model.ExecutionEvent.SlewEvent
@@ -67,8 +62,6 @@ import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.Step
-import lucuma.core.model.sequence.StepConfig
-import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.syntax.string.*
 import lucuma.core.util.CalculationState
 import lucuma.core.util.DateInterval
@@ -83,9 +76,6 @@ import lucuma.odb.data.Obscalc
 import lucuma.odb.data.OdbError
 import lucuma.odb.graphql.input.AllocationInput
 import lucuma.odb.graphql.input.TimeChargeCorrectionInput
-import lucuma.odb.json.offset.transport.given
-import lucuma.odb.json.stepconfig.given
-import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.service.EmailService
 import lucuma.odb.service.ObscalcService
 import lucuma.odb.service.Services
@@ -289,7 +279,196 @@ trait DatabaseOperations { this: OdbSuite =>
           ).pure
         .map(_._1)
 
+  def createTargetWithProfileAs(
+    user:     User,
+    pid:      Program.Id,
+    profile:  String = PointBandNormalizedProfile
+  ): IO[Target.Id] =
+    query(
+      user  = user,
+      query =
+      s"""
+        mutation {
+          createTarget(input: {
+            programId: ${pid.asJson},
+            SET: {
+              name: "V1647 Orionis"
+              sidereal: {
+                ra: { hms: "05:46:13.137" },
+                dec: { dms: "-00:06:04.89" },
+                epoch: "J2000.0",
+                properMotion: {
+                  ra: {
+                    milliarcsecondsPerYear: 0.918
+                  },
+                  dec: {
+                    milliarcsecondsPerYear: -1.057
+                  },
+                },
+                radialVelocity: {
+                  kilometersPerSecond: 27.58
+                },
+                parallax: {
+                  milliarcseconds: 2.422
+                }
+              },
+              $profile
+            }
+          }) {
+            target {
+              id
+            }
+          }
+        }
+      """
+    ).map(
+      _.hcursor.downFields("createTarget", "target", "id").require[Target.Id]
+    )
 
+  val PointBandNormalizedProfile: String = """
+    sourceProfile: {
+      point: {
+        bandNormalized: {
+          sed: {
+            stellarLibrary: O5_V
+          },
+          brightnesses: [
+            {
+              band: J,
+              value: 14.74,
+              units: VEGA_MAGNITUDE
+            },
+            {
+              band: V,
+              value: 18.1,
+              units: VEGA_MAGNITUDE
+            }
+          ]
+        }
+      }
+    }
+  """
+
+  val PointEmissionLinesProfile: String = """
+    sourceProfile: {
+      point: {
+        emissionLines: {
+          lines: [
+            {
+              wavelength: {micrometers: 0.5 },
+              lineWidth: 801,
+              lineFlux: {
+                value: 1e-12,
+                units: ERG_PER_S_PER_CM_SQUARED
+              }
+            },
+            {
+              wavelength: {micrometers: 0.65 },
+              lineWidth: 850,
+              lineFlux: {
+                value: 1e-13,
+                units: ERG_PER_S_PER_CM_SQUARED
+              }
+            }
+          ],
+          fluxDensityContinuum: {
+            value: 1e-15,
+            units: ERG_PER_S_PER_CM_SQUARED_PER_A
+          }
+        }
+      }
+    }
+  """
+
+  val PointEmissionLinesProfileNoLines: String = """
+    sourceProfile: {
+      point: {
+        emissionLines: {
+          lines: [
+          ],
+          fluxDensityContinuum: {
+            value: 1e-15,
+            units: ERG_PER_S_PER_CM_SQUARED_PER_A
+          }
+        }
+      }
+    }
+  """
+
+  val UniformEmissionLinesProfile: String = """
+    sourceProfile: {
+      uniform: {
+        emissionLines: {
+          lines: [
+            {
+              wavelength: {micrometers: 0.5 },
+              lineWidth: 801,
+              lineFlux: {
+                value: 1e-12,
+                units: ERG_PER_S_PER_CM_SQUARED_PER_ARCSEC_SQUARED
+              }
+            },
+            {
+              wavelength: {micrometers: 0.65 },
+              lineWidth: 850,
+              lineFlux: {
+                value: 1e-13,
+                units:ERG_PER_S_PER_CM_SQUARED_PER_ARCSEC_SQUARED
+              }
+            }
+          ],
+          fluxDensityContinuum: {
+            value: 1e-15,
+            units: ERG_PER_S_PER_CM_SQUARED_PER_A_PER_ARCSEC_SQUARED
+          }
+        }
+      }
+    }
+  """
+
+  val UniformEmissionLinesProfileNoLines: String = """
+    sourceProfile: {
+      uniform: {
+        emissionLines: {
+          lines: [
+          ],
+          fluxDensityContinuum: {
+            value: 1e-15,
+            units: ERG_PER_S_PER_CM_SQUARED_PER_A_PER_ARCSEC_SQUARED
+          }
+        }
+      }
+    }
+  """
+
+  def gaussianBandNormalizedProfile(fwhm: Angle): String = s"""
+    sourceProfile: {
+      gaussian: {
+        fwhm: {
+          microarcseconds: ${fwhm.toMicroarcseconds}
+        },
+        spectralDefinition: {
+          bandNormalized: {
+            sed: {
+              stellarLibrary: O5_V
+            },
+            brightnesses: [
+              {
+                band: J,
+                value: 14.74,
+                units: VEGA_MAGNITUDE
+              },
+              {
+                band: V,
+                value: 18.1,
+                units: VEGA_MAGNITUDE
+              }
+            ]
+          }
+        }
+      }
+    }
+  """
 
   def fetchPid(user: User, pro: ProposalReference): IO[Program.Id] =
     query(user, s"""
@@ -629,6 +808,12 @@ trait DatabaseOperations { this: OdbSuite =>
     ): IO[Observation.Id] =
     createObservationWithSpatialOffsets(user, pid, ObservingModeType.Flamingos2LongSlit, iq, offsets, tids*)
 
+  def createIgrins2LongSlitObservationAs(user: User, pid: Program.Id, tids: Target.Id*): IO[Observation.Id] =
+    createObservationWithSpatialOffsets(user, pid, ObservingModeType.Igrins2LongSlit, ImageQuality.Preset.PointEight, None, tids*)
+
+  def createIgrins2LongSlitObservationAs(user: User, pid: Program.Id, offsets: Option[String], tids: Target.Id*): IO[Observation.Id] =
+    createObservationWithSpatialOffsets(user, pid, ObservingModeType.Igrins2LongSlit, ImageQuality.Preset.PointEight, offsets, tids*)
+
   private def createObservationWithSpatialOffsets(
     user:          User,
     pid:           Program.Id,
@@ -828,8 +1013,15 @@ trait DatabaseOperations { this: OdbSuite =>
             }
           }"""
       case ObservingModeType.Igrins2LongSlit =>
-        // FIXME
-        "{}"
+        """{
+          spectroscopy: {
+            wavelength: { nanometers: 1700 }
+            resolution: 45000
+            wavelengthCoverage: { nanometers: 900 }
+            focalPlane: SINGLE_SLIT
+            focalPlaneAngle: { microarcseconds: 0 }
+          }
+        }"""
 
   private def observingModeObject(observingMode: ObservingModeType): String =
     observingMode match
@@ -886,8 +1078,16 @@ trait DatabaseOperations { this: OdbSuite =>
           }
         }"""
       case ObservingModeType.Igrins2LongSlit =>
-        // FIXME
-        "{}"
+        """{
+          igrins2LongSlit: {
+            exposureTimeMode: {
+              signalToNoise: {
+                value: 50.0
+                at: { nanometers: 2200 }
+              }
+            }
+          }
+        }"""
 
   private def observingModeWithSpatialOffsets(observingMode: ObservingModeType, offsets: Option[String]): String =
     observingMode match
@@ -926,6 +1126,19 @@ trait DatabaseOperations { this: OdbSuite =>
             disperser: R1200_HK
             filter: Y
             fpu: LONG_SLIT_2
+            $offsetsField
+          }
+        }"""
+      case ObservingModeType.Igrins2LongSlit =>
+        val offsetsField = offsets.fold("")(offsets => s", explicitOffsets: $offsets")
+        s"""{
+          igrins2LongSlit: {
+            exposureTimeMode: {
+              signalToNoise: {
+                value: 50.0
+                at: { nanometers: 2200 }
+              }
+            }
             $offsetsField
           }
         }"""
@@ -1858,146 +2071,17 @@ trait DatabaseOperations { this: OdbSuite =>
       e.fold(f => throw new RuntimeException(f.message), identity)
   }
 
-  def recordAtomAs(user: User, instrument: Instrument, vid: Visit.Id, sequenceType: SequenceType = SequenceType.Science): IO[Atom.Id] =
-    query(
-      user = user,
-      query =
-        s"""
-          mutation {
-            recordAtom(input: {
-              visitId: ${vid.asJson},
-              instrument: ${instrument.tag.toScreamingSnakeCase},
-              sequenceType: ${sequenceType.tag.toScreamingSnakeCase}
-            }) {
-              atomRecord {
-                id
-              }
-            }
-          }
-        """
-    ).map { json =>
-      json.hcursor.downFields("recordAtom", "atomRecord", "id").require[Atom.Id]
-    }
-
-  def recordStepAs(user: User, instrument: Instrument, aid: Atom.Id): IO[Step.Id] =
-    recordStepAs(user, aid, instrument, dynamicConfig(instrument), stepConfigScienceInput, telescopeConfigInput)
-
-  def recordStepAs(
-    user:                 User,
-    aid:                  Atom.Id,
-    instrument:           Instrument,
-    instrumentInput:      String,
-    stepConfigInput:      String,
-    telescopeConfigInput: String
-  ): IO[Step.Id] = {
-
-    val name = s"record${instrument.tag}Step"
-
-    val q = s"""
-      mutation {
-        $name(input: {
-          atomId: ${aid.asJson},
-          $instrumentInput,
-          $stepConfigInput,
-          $telescopeConfigInput,
-          observeClass: ${ObserveClass.Science.tag.toScreamingSnakeCase}
-        }) {
-          stepRecord {
-            id
-          }
-        }
-      }
-    """
-
-    query(
-      user  = user,
-      query = q,
-    ).map { json =>
-      json.hcursor.downFields(name, "stepRecord", "id").require[Step.Id]
-    }
-
-  }
-
-  def recordStepAs[D: io.circe.Encoder](
-    user:            User,
-    aid:             Atom.Id,
-    instrument:      Instrument,
-    instrumentInput: D,
-    stepConfig:      StepConfig,
-    telescopeConfig: TelescopeConfig,
-    observeClass:    ObserveClass = ObserveClass.Science
-  ): IO[Step.Id] = {
-
-    val name = s"record${instrument.tag}Step"
-
-    def step = stepConfig.asJson.mapObject(_.remove("stepType"))
-
-    // HACK: to make it easy to write test cases we take the instrument dynamic
-    // config scala object and turn it into JSON, relying on the fact that the
-    // input is explicitly structured to be equivalent to the output.  There's
-    // just one problem, the `centralWavelength` is a computed value that
-    // appears only in the output.  So, we prune `centralWavelength` from the
-    // JSON here.
-    val instJson = instrumentInput
-                     .asJson
-                     .hcursor
-                     .downField("centralWavelength")
-                     .delete
-                     .top
-                     .fold(instrumentInput.asJson)(_.asJson)
-
-    val vars = Json.obj(
-      "input" -> Json.obj(
-        "atomId" -> aid.asJson,
-        instrument.fieldName -> instJson,
-        "stepConfig" -> (stepConfig match {
-          case StepConfig.Bias          => Json.obj("bias"      -> true.asJson)
-          case StepConfig.Dark          => Json.obj("dark"      -> true.asJson)
-          case StepConfig.Gcal(_,_,_,_) => Json.obj("gcal"      -> step)
-          case StepConfig.Science       => Json.obj("science"   -> true.asJson)
-          case StepConfig.SmartGcal(_)  => Json.obj("smartGcal" -> step)
-        }),
-        "telescopeConfig" -> telescopeConfig.asJson,
-        "observeClass" -> observeClass.asJson
-      )
-    )
-
-    val q = s"""
-      mutation RecordStep($$input: ${name.capitalize}Input!) {
-        $name(input: $$input) {
-          stepRecord {
-            id
-          }
-        }
-      }
-    """
-
-    query(
-      user      = user,
-      query     = q,
-      variables = vars.asObject
-    ).map { json =>
-      json.hcursor.downFields(name, "stepRecord", "id").require[Step.Id]
-    }
-  }
-
-  def recordStepAs[D: io.circe.Encoder](
-    user:       User,
-    aid:        Atom.Id,
-    instrument: Instrument,
-    step:       ProtoStep[D]
-  ): IO[Step.Id] =
-    recordStepAs(user, aid, instrument, step.value, step.stepConfig, step.telescopeConfig, step.observeClass)
-
   def addStepEventAs(
     user:  User,
     sid:   Step.Id,
+    vid:   Visit.Id,
     stage: StepStage
   ): IO[StepEvent] = {
     val q = s"""
       mutation {
         addStepEvent(input: {
           stepId:    "$sid",
+          visitId:   "$vid",
           stepStage: ${stage.tag.toUpperCase}
         }) {
           event {
@@ -2024,55 +2108,17 @@ trait DatabaseOperations { this: OdbSuite =>
       e.fold(f => throw new RuntimeException(f.message), identity)
   }
 
-  def addAtomEventAs(
-    user:           User,
-    aid:            Atom.Id,
-    stage:          AtomStage,
-    idempotencyKey: Option[IdempotencyKey] = None,
-    clientId:       Option[Client.Id]      = None
-  ): IO[AtomEvent] =
-    val q = s"""
-      mutation {
-        addAtomEvent(input: {
-          atomId:    "$aid",
-          atomStage: ${stage.tag.toScreamingSnakeCase}
-          ${idempotencyKey.fold("")(idm => s"idempotencyKey: \"$idm\"")}
-          ${clientId.fold("")(cid => s"clientId: \"$cid\"")}
-        }) {
-          event {
-            id
-            received
-            observation { id }
-            visit { id }
-            idempotencyKey
-            clientId
-          }
-        }
-      }
-    """
-    query(user = user, query = q).map: json =>
-      val c = json.hcursor.downFields("addAtomEvent", "event")
-      val e = for
-        i <- c.downField("id").as[ExecutionEvent.Id]
-        r <- c.downField("received").as[Timestamp]
-        o <- c.downFields("observation", "id").as[Observation.Id]
-        v <- c.downFields("visit", "id").as[Visit.Id]
-        n <- c.downField("idempotencyKey").as[Option[IdempotencyKey]]
-        x <- c.downField("clientId").as[Option[Client.Id]]
-      yield
-        assertEquals(n, x.map(c => IdempotencyKey(c.toUuid)))
-        AtomEvent(i, r, o, v, n, aid, stage)
-      e.fold(f => throw new RuntimeException(f.message), identity)
-
   def recordDatasetAs(
     user:     User,
     sid:      Step.Id,
+    vid:      Visit.Id,
     filename: String
-  ): IO[Dataset.Id] = {
+  ): IO[Dataset.Id] =
     val q = s"""
       mutation {
         recordDataset(input: {
-          stepId: ${sid.asJson},
+          stepId: ${sid.asJson}
+          visitId: ${vid.asJson}
           filename: "$filename"
         }) {
           dataset {
@@ -2082,10 +2128,8 @@ trait DatabaseOperations { this: OdbSuite =>
       }
     """
 
-    query(user = user, query = q).map { json =>
+    query(user = user, query = q).map: json =>
       json.hcursor.downFields("recordDataset", "dataset", "id").require[Dataset.Id]
-    }
-  }
 
   def addDatasetEventAs(
     user:  User,

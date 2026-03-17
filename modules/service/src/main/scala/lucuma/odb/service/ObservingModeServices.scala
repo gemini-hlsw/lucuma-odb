@@ -4,7 +4,6 @@
 package lucuma.odb.service
 
 import cats.effect.MonadCancelThrow
-import cats.syntax.applicative.*
 import cats.syntax.apply.*
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
@@ -104,7 +103,9 @@ object ObservingModeServices:
               .map(_.widen[ObservingMode])
 
           case (Igrins2LongSlit, oids) =>
-            Map.empty.pure[F]
+            igrins2LongSlitService
+              .select(oids)
+              .map(_.widen[ObservingMode])
 
         }.map(_.fold(Map.empty[Observation.Id, ObservingMode])(_ ++ _))
 
@@ -118,7 +119,8 @@ object ObservingModeServices:
           input.gmosNorthImaging.map(m =>   gmosImagingService.insertNorth(m, etm, which)),
           input.gmosNorthLongSlit.map(m =>  gmosLongSlitService.insertNorth(m, etm, which)),
           input.gmosSouthImaging.map(m =>   gmosImagingService.insertSouth(m, etm, which)),
-          input.gmosSouthLongSlit.map(m =>  gmosLongSlitService.insertSouth(m, etm, which))
+          input.gmosSouthLongSlit.map(m =>  gmosLongSlitService.insertSouth(m, etm, which)),
+          input.igrins2LongSlit.map(m =>    igrins2LongSlitService.insert(m, etm, which))
         ).flattenOption match
           case List(r) => r
           case Nil     => OdbError.InvalidArgument("No observing mode creation parameters were provided.".some).asFailureF
@@ -139,8 +141,7 @@ object ObservingModeServices:
             case ObservingModeType.GmosNorthLongSlit  => gmosLongSlitService.deleteNorth(which)
             case ObservingModeType.GmosSouthImaging   => gmosImagingService.deleteSouth(which)
             case ObservingModeType.GmosSouthLongSlit  => gmosLongSlitService.deleteSouth(which)
-            // FIXME
-            case ObservingModeType.Igrins2LongSlit    => ().pure[F]
+            case ObservingModeType.Igrins2LongSlit    => igrins2LongSlitService.delete(which)
 
         deleteExposureTimeModes *> deleteObservingMode
 
@@ -153,7 +154,8 @@ object ObservingModeServices:
           input.gmosNorthImaging.map(m => gmosImagingService.updateNorth(m, which)),
           input.gmosNorthLongSlit.map(m => gmosLongSlitService.updateNorth(m, which).map(_.success)),
           input.gmosSouthImaging.map(m => gmosImagingService.updateSouth(m, which)),
-          input.gmosSouthLongSlit.map(m => gmosLongSlitService.updateSouth(m, which).map(_.success))
+          input.gmosSouthLongSlit.map(m => gmosLongSlitService.updateSouth(m, which).map(_.success)),
+          input.igrins2LongSlit.map(m => igrins2LongSlitService.update(m, which).map(_.success))
         ).flattenOption match
           case List(r) => r
           case Nil     => OdbError.InvalidArgument("No observing mode edit parameters were provided.".some).asFailureF
@@ -179,8 +181,7 @@ object ObservingModeServices:
             case ObservingModeType.GmosNorthImaging   => gmosImagingService.cloneNorth(origOid, newOid, etms)
             case ObservingModeType.GmosSouthLongSlit  => gmosLongSlitService.cloneSouth(origOid, newOid)
             case ObservingModeType.GmosSouthImaging   => gmosImagingService.cloneSouth(origOid, newOid, etms)
-            // FIXME
-            case ObservingModeType.Igrins2LongSlit    => ().pure[F]
+            case ObservingModeType.Igrins2LongSlit    => igrins2LongSlitService.clone(origOid, newOid)
 
         exposureTimeModeService
           .clone(origOid, newOid)

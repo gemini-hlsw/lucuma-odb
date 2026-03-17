@@ -108,8 +108,6 @@ object OdbMapping {
   ): Mapping[F] =
         new SkunkMapping[F](database, monitor0)
           with BaseMapping[F]
-          with ArcMapping[F]
-          with AddAtomEventResultMapping[F]
           with AddConditionsEntryResultMapping[F]
           with AddDatasetEventResultMapping[F]
           with AddProgramUserResultMapping[F]
@@ -120,6 +118,7 @@ object OdbMapping {
           with AirMassRangeMapping[F]
           with AllocationMapping[F]
           with AngleMapping[F]
+          with ArcMapping[F]
           with AsterismGroupMapping[F]
           with AsterismGroupSelectResultMapping[F]
           with AtomRecordMapping[F]
@@ -175,10 +174,12 @@ object OdbMapping {
           with ExecutionEventSelectResultMapping[F]
           with ExposureTimeModeMapping[F]
           with ConfigurationFlamingos2LongSlitMappings[F]
+          with ConfigurationIgrins2LongSlitMappings[F]
           with Flamingos2CustomMaskMapping[F]
           with Flamingos2DynamicMapping[F]
           with Flamingos2FpuMaskMapping[F]
           with Flamingos2LongSlitMapping[F]
+          with Igrins2LongSlitMapping[F]
           with Flamingos2StaticMapping[F]
           with FilterTypeMetaMapping[F]
           with GmosCcdModeMapping[F]
@@ -235,8 +236,6 @@ object OdbMapping {
           with QueryMapping[F]
           with RadialVelocityMapping[F]
           with RecordDatasetResultMapping[F]
-          with RecordAtomResultMapping[F]
-          with RecordStepResultMapping[F]
           with RecordVisitResultMapping[F]
           with RedeemUserInvitationResultMapping[F]
           with RegionMapping[F]
@@ -355,7 +354,6 @@ object OdbMapping {
           override val typeMappings: TypeMappings =
             mkTypeMappings(
               List[TypeMapping](
-                AddAtomEventResultMapping,
                 AddConditionsEntryResultMapping,
                 AddDatasetEventResultMapping,
                 AddProgramUserResultMapping,
@@ -421,6 +419,7 @@ object OdbMapping {
                 Flamingos2LongSlitAcquisitionMapping,
                 Flamingos2LongSlitMapping,
                 Flamingos2StaticMapping,
+                Igrins2LongSlitMapping,
                 GmosNorthImagingFilterMapping,
                 GmosNorthLongSlitAcquisitionMapping,
                 GmosNorthLongSlitMapping,
@@ -474,13 +473,9 @@ object OdbMapping {
                 QueryMapping,
                 QueueMapping,
                 RadialVelocityMapping,
-                RecordAtomResultMapping,
                 RecordDatasetResultMapping,
-                RecordFlamingos2StepResultMapping,
                 RecordFlamingos2VisitResultMapping,
-                RecordGmosNorthStepResultMapping,
                 RecordGmosNorthVisitResultMapping,
-                RecordGmosSouthStepResultMapping,
                 RecordGmosSouthVisitResultMapping,
                 RedeemUserInvitationResultMapping,
                 ResetAcquisitionResultMapping,
@@ -556,6 +551,7 @@ object OdbMapping {
                 ConfigurationMappings,
                 ConfigurationConditionsMappings,
                 ConfigurationFlamingos2LongSlitMappings,
+                ConfigurationIgrins2LongSlitMappings,
                 ConfigurationGmosNorthImagingMappings,
                 ConfigurationGmosSouthImagingMappings,
                 ConfigurationGmosNorthLongSlitMappings,
@@ -606,6 +602,7 @@ object OdbMapping {
                 EnumeratedOffsetElaborator,
                 ExecutionElaborator,
                 Flamingos2LongSlitElaborator,
+                Igrins2LongSlitElaborator,
                 GmosNorthImagingElaborator,
                 GmosNorthLongSlitElaborator,
                 GmosSouthImagingElaborator,

@@ -61,6 +61,7 @@ object CalibrationConfigMatcher:
       case _: GmosNImagingConfigs => GmosNorthImaging
       case _: GmosSImagingConfigs => GmosSouthImaging
       case _: Flamingos2Configs   => Flamingos2LongSlit
+      case Igrins2Configs         => Igrins2LongSlit
     matchers(modeType, calibRole)
 
 object SpecphotoGmosLS extends CalibrationConfigMatcher:

@@ -5,28 +5,27 @@ package lucuma.odb.service
 
 import cats.Applicative
 import cats.Order.catsKernelOrderingForOrder
-import cats.data.EitherT
-import cats.data.OptionT
+import cats.data.NonEmptyList
 import cats.effect.Concurrent
 import cats.effect.std.UUIDGen
+import cats.syntax.applicative.*
 import cats.syntax.apply.*
 import cats.syntax.either.*
-import cats.syntax.eq.*
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import cats.syntax.option.*
-import cats.syntax.traverse.*
+import eu.timepit.refined.types.string.NonEmptyString
+import fs2.Pipe
+import fs2.Pure
 import fs2.Stream
 import grackle.Result
-import lucuma.core.enums.AtomStage
+import grackle.ResultT
 import lucuma.core.enums.ChargeClass
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SequenceType
-import lucuma.core.enums.StepStage
 import lucuma.core.enums.StepType
 import lucuma.core.model.Observation
-import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.AtomDigest
 import lucuma.core.model.sequence.CategorizedTime
@@ -40,88 +39,32 @@ import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosSouth
 import lucuma.core.model.sequence.gmos.StaticConfig.GmosNorth as GmosNorthStatic
 import lucuma.core.model.sequence.gmos.StaticConfig.GmosSouth as GmosSouthStatic
-import lucuma.core.util.IdempotencyKey
 import lucuma.core.util.TimeSpan
-import lucuma.core.util.Timestamp
-import lucuma.core.util.TimestampInterval
-import lucuma.odb.data.AtomExecutionState
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
-import lucuma.odb.data.StepExecutionState
+import lucuma.odb.graphql.mapping.AccessControl.CheckedWithId
+import lucuma.odb.logic.Generator.SequenceAtomLimit
+import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.TimeEstimateCalculator
-import lucuma.odb.sequence.data.AtomRecord
+import lucuma.odb.sequence.data.ProtoAtom
 import lucuma.odb.sequence.data.ProtoStep
-import lucuma.odb.sequence.data.StepRecord
+import lucuma.odb.sequence.data.StreamingExecutionConfig
+import lucuma.odb.sequence.util.AtomBuilder
 import lucuma.odb.util.Codecs.*
+import lucuma.odb.util.Flamingos2Codecs.*
+import lucuma.odb.util.GmosCodecs.*
 import skunk.*
+import skunk.codec.boolean.bool
 import skunk.codec.numeric.int2
+import skunk.codec.numeric.int4
+import skunk.codec.text.text
 import skunk.implicits.*
+
+import java.util.UUID
 
 import Services.Syntax.*
 
 trait SequenceService[F[_]]:
-
-  def abandonOngoingSteps(
-    observationId: Observation.Id
-  )(using Transaction[F], Services.ServiceAccess): F[Unit]
-
-  def setAtomExecutionState(
-    atomId: Atom.Id,
-    stage:  AtomStage
-  )(using Transaction[F], Services.ServiceAccess): F[Unit]
-
-  def abandonOngoingStepsExcept(
-    observationId: Observation.Id,
-    atomId:        Atom.Id,
-    stepId:        Option[Step.Id]
-  )(using Transaction[F], Services.ServiceAccess): F[Unit]
-
-  def setStepExecutionState(
-    stepId: Step.Id,
-    stage:  StepStage,
-    time:   Timestamp
-  )(using Transaction[F], Services.ServiceAccess): F[Unit]
-
-  def insertAtomRecord(
-    visitId:        Visit.Id,
-    instrument:     Instrument,
-    sequenceType:   SequenceType,
-    generatedId:    Option[Atom.Id],
-    idempotencyKey: Option[IdempotencyKey]
-  )(using Transaction[F], Services.ServiceAccess): F[Result[Atom.Id]]
-
-  def insertFlamingos2StepRecord(
-    atomId:         Atom.Id,
-    instrument:     Flamingos2DynamicConfig,
-    step:           StepConfig,
-    telescope:      TelescopeConfig,
-    observeClass:   ObserveClass,
-    generatedId:    Option[Step.Id],
-    idempotencyKey: Option[IdempotencyKey],
-    timeCalculator: TimeEstimateCalculator[Flamingos2StaticConfig, Flamingos2DynamicConfig]
-  )(using Transaction[F], Services.ServiceAccess): F[Result[Step.Id]]
-
-  def insertGmosNorthStepRecord(
-    atomId:         Atom.Id,
-    instrument:     GmosNorth,
-    step:           StepConfig,
-    telescope:      TelescopeConfig,
-    observeClass:   ObserveClass,
-    generatedId:    Option[Step.Id],
-    idempotencyKey: Option[IdempotencyKey],
-    timeCalculator: TimeEstimateCalculator[GmosNorthStatic, GmosNorth]
-  )(using Transaction[F], Services.ServiceAccess): F[Result[Step.Id]]
-
-  def insertGmosSouthStepRecord(
-    atomId:         Atom.Id,
-    instrument:     GmosSouth,
-    step:           StepConfig,
-    telescope:      TelescopeConfig,
-    observeClass:   ObserveClass,
-    generatedId:    Option[Step.Id],
-    idempotencyKey: Option[IdempotencyKey],
-    timeCalculator: TimeEstimateCalculator[GmosSouthStatic, GmosSouth]
-  )(using Transaction[F], Services.ServiceAccess): F[Result[Step.Id]]
 
   def insertAtomDigests(
     observationId: Observation.Id,
@@ -132,275 +75,116 @@ trait SequenceService[F[_]]:
     which: List[Observation.Id]
   )(using Transaction[F], Services.ServiceAccess): Stream[F, (Observation.Id, Short, AtomDigest)]
 
-  def selectAtomRecords(
-    observationId: Observation.Id
-  )(using Services.ServiceAccess): Stream[F, AtomRecord]
+  def isMaterialized(
+    observationId: Observation.Id,
+    sequenceType:  SequenceType
+  )(using Transaction[F]): F[Boolean]
+
+  def replaceFlamingos2Sequence(
+    observationId:  Observation.Id,
+    sequenceType:   SequenceType,
+    sequence:       List[ProtoAtom[ProtoStep[Flamingos2DynamicConfig]]],
+    namespace:      Option[UUID] = None
+  )(using Transaction[F]): F[Result[Stream[Pure, Atom[Flamingos2DynamicConfig]]]]
+
+  def replaceFlamingos2Sequence(
+    checked: CheckedWithId[(SequenceType, List[ProtoAtom[ProtoStep[Flamingos2DynamicConfig]]]), Observation.Id]
+  )(using Transaction[F]): F[Result[Stream[Pure, Atom[Flamingos2DynamicConfig]]]]
+
+  def replaceGmosNorthSequence(
+    observationId:  Observation.Id,
+    sequenceType:   SequenceType,
+    sequence:       List[ProtoAtom[ProtoStep[GmosNorth]]],
+    namespace:      Option[UUID] = None
+  )(using Transaction[F]): F[Result[Stream[Pure, Atom[GmosNorth]]]]
+
+  def replaceGmosNorthSequence(
+    checked: CheckedWithId[(SequenceType, List[ProtoAtom[ProtoStep[GmosNorth]]]), Observation.Id]
+  )(using Transaction[F]): F[Result[Stream[Pure, Atom[GmosNorth]]]]
+
+  def replaceGmosSouthSequence(
+    observationId:  Observation.Id,
+    sequenceType:   SequenceType,
+    sequence:       List[ProtoAtom[ProtoStep[GmosSouth]]],
+    namespace:      Option[UUID] = None
+  )(using Transaction[F]): F[Result[Stream[Pure, Atom[GmosSouth]]]]
+
+  def replaceGmosSouthSequence(
+    checked: CheckedWithId[(SequenceType, List[ProtoAtom[ProtoStep[GmosSouth]]]), Observation.Id]
+  )(using Transaction[F]): F[Result[Stream[Pure, Atom[GmosSouth]]]]
+
+  def resetFlamingos2Acquisition(
+    observationId: Observation.Id,
+    sequence:      Stream[F, Atom[Flamingos2DynamicConfig]]
+  )(using Transaction[F], Services.ServiceAccess): F[Unit]
+
+  def resetGmosNorthAcquisition(
+    observationId: Observation.Id,
+    sequence:      Stream[F, Atom[GmosNorth]]
+  )(using Transaction[F], Services.ServiceAccess): F[Unit]
+
+  def resetGmosSouthAcquisition(
+    observationId: Observation.Id,
+    sequence:      Stream[F, Atom[GmosSouth]]
+  )(using Transaction[F], Services.ServiceAccess): F[Unit]
+
+  def insertFlamingos2Sequence(
+    observationId: Observation.Id,
+    sequenceType:  SequenceType,
+    sequence:      Stream[F, Atom[Flamingos2DynamicConfig]]
+  )(using Transaction[F], Services.ServiceAccess): F[Unit]
+
+  def insertGmosNorthSequence(
+    observationId: Observation.Id,
+    sequenceType:  SequenceType,
+    sequence:      Stream[F, Atom[GmosNorth]]
+  )(using Transaction[F], Services.ServiceAccess): F[Unit]
+
+  def insertGmosSouthSequence(
+    observationId: Observation.Id,
+    sequenceType:  SequenceType,
+    sequence:      Stream[F, Atom[GmosSouth]]
+  )(using Transaction[F], Services.ServiceAccess): F[Unit]
+
+  def materializeFlamingos2ExecutionConfig(
+    observationId: Observation.Id,
+    stream:        StreamingExecutionConfig[F, Flamingos2StaticConfig, Flamingos2DynamicConfig]
+  )(using Transaction[F], Services.ServiceAccess): F[Unit]
+
+  def materializeGmosNorthExecutionConfig(
+    observationId: Observation.Id,
+    stream:        StreamingExecutionConfig[F, GmosNorthStatic, GmosNorth]
+  )(using Transaction[F], Services.ServiceAccess): F[Unit]
+
+  def materializeGmosSouthExecutionConfig(
+    observationId: Observation.Id,
+    stream:        StreamingExecutionConfig[F, GmosSouthStatic, GmosSouth]
+  )(using Transaction[F], Services.ServiceAccess): F[Unit]
+
+  def selectFlamingos2Sequence(
+    observationId: Observation.Id,
+    sequenceType:  SequenceType,
+    staticConfig:  Flamingos2StaticConfig
+  )(using Transaction[F]): F[Option[Stream[F, Atom[Flamingos2DynamicConfig]]]]
+
+  def selectGmosNorthSequence(
+    observationId: Observation.Id,
+    sequenceType:  SequenceType,
+    staticConfig:  GmosNorthStatic
+  )(using Transaction[F]): F[Option[Stream[F, Atom[GmosNorth]]]]
+
+  def selectGmosSouthSequence(
+    observationId: Observation.Id,
+    sequenceType:  SequenceType,
+    staticConfig:  GmosSouthStatic
+  )(using Transaction[F]): F[Option[Stream[F, Atom[GmosSouth]]]]
 
 object SequenceService:
 
-  sealed trait InsertAtomResponse extends Product with Serializable
-
-  object InsertAtomResponse:
-    case class VisitNotFound(
-      vid:        Visit.Id,
-      instrument: Instrument
-    ) extends InsertAtomResponse
-
-    case class Success(
-      aid: Atom.Id
-    ) extends InsertAtomResponse
-
-  sealed trait InsertStepResponse extends Product with Serializable
-
-  object InsertStepResponse:
-    case class AtomNotFound(
-      aid:        Atom.Id,
-      instrument: Instrument
-    ) extends InsertStepResponse
-
-    case class Success(
-      sid: Step.Id
-    ) extends InsertStepResponse
-
-
-  def instantiate[F[_]: Concurrent: UUIDGen](using Services[F]): SequenceService[F] =
+  def instantiate[F[_]: Concurrent: UUIDGen](
+    estimator: TimeEstimateCalculatorImplementation.ForInstrumentMode
+  )(using Services[F]): SequenceService[F] =
     new SequenceService[F]:
-
-      /**
-       * We'll need to estimate the cost of executing the next step.  For that
-       * we have to find the static config, the last gcal step (if any), the
-       * last science step (if any) and the last step in general (if any).
-       * This will serve as an input to the time estimate calculator so that it
-       * can compare a new step being recorded with the previous state and
-       * determine the cost of making the prescribed changes.
-       */
-      @annotation.nowarn("msg=unused implicit parameter")
-      private def selectEstimatorState[S, D](
-        observationId: Observation.Id,
-        staticConfig:  Visit.Id => F[Option[S]],
-        dynamicConfig: Step.Id => F[Option[D]]
-      )(using Transaction[F]): F[Option[(S, TimeEstimateCalculator.Last[D])]] =
-        for
-          vid     <- session.option(Statements.SelectLastVisit)(observationId)
-          static  <- vid.flatTraverse(staticConfig)
-          gcal    <- session.option(Statements.SelectLastGcalConfig)(observationId)
-          step    <- session.option(Statements.SelectLastStepConfig)(observationId)
-          dynamic <- step.flatTraverse { case (id, _, _, _) => dynamicConfig(id) }
-        yield static.tupleRight(
-          TimeEstimateCalculator.Last(
-            gcal,
-            (step, dynamic).mapN { case ((_, stepConfig, telescopeConfig, observeClass), d) =>
-              ProtoStep(d, stepConfig, telescopeConfig, observeClass)
-            }
-          )
-        )
-
-      private def selectFlamingos2EstimatorState(
-        observationId: Observation.Id
-      )(using Transaction[F]): F[Option[(Flamingos2StaticConfig, TimeEstimateCalculator.Last[Flamingos2DynamicConfig])]] =
-        selectEstimatorState(
-          observationId,
-          services.flamingos2SequenceService.selectStatic,
-          services.flamingos2SequenceService.selectDynamicForStep
-        )
-
-      private def selectGmosNorthEstimatorState(
-        observationId: Observation.Id
-      )(using Transaction[F]): F[Option[(GmosNorthStatic, TimeEstimateCalculator.Last[GmosNorth])]] =
-        selectEstimatorState(
-          observationId,
-          services.gmosSequenceService.selectGmosNorthStatic,
-          services.gmosSequenceService.selectGmosNorthDynamicForStep
-        )
-
-      private def selectGmosSouthEstimatorState(
-        observationId: Observation.Id
-      )(using Transaction[F]): F[Option[(GmosSouthStatic, TimeEstimateCalculator.Last[GmosSouth])]] =
-        selectEstimatorState(
-          observationId,
-          services.gmosSequenceService.selectGmosSouthStatic,
-          services.gmosSequenceService.selectGmosSouthDynamicForStep
-        )
-
-      override def setAtomExecutionState(
-        atomId: Atom.Id,
-        stage:  AtomStage
-      )(using Transaction[F], Services.ServiceAccess): F[Unit] =
-        val state = stage match
-          case AtomStage.StartAtom => AtomExecutionState.Ongoing
-          case AtomStage.EndAtom   => AtomExecutionState.Completed
-        session.execute(Statements.SetAtomExecutionState)(state, atomId).void
-
-      override def abandonOngoingSteps(
-        observationId: Observation.Id
-      )(using Transaction[F], Services.ServiceAccess): F[Unit] =
-        for
-          _ <- session.execute(Statements.CompleteAllNonTerminalAtomsForObservation)(observationId)
-          _ <- session.execute(Statements.AbandonAllNonTerminalStepsForObservation)(observationId)
-        yield ()
-
-      override def abandonOngoingStepsExcept(
-        observationId: Observation.Id,
-        atomId:        Atom.Id,
-        stepId:        Option[Step.Id]
-      )(using Transaction[F], Services.ServiceAccess): F[Unit] =
-        val abandonSteps =
-          stepId.fold(session.execute(Statements.AbandonOngoingStepsWithoutAtomId)(observationId, atomId)): sid =>
-            session.execute(Statements.AbandonOngoingStepsWithoutStepId)(observationId, sid)
-
-        for
-          _ <- session.execute(Statements.CompleteOngoingAtomsWithoutAtomId)(observationId, atomId)
-          _ <- abandonSteps
-        yield ()
-
-      override def setStepExecutionState(
-        stepId: Step.Id,
-        stage:  StepStage,
-        time:   Timestamp
-      )(using Transaction[F], Services.ServiceAccess): F[Unit] =
-        val state = stage match
-          case StepStage.EndStep => StepExecutionState.Completed
-          case StepStage.Abort   => StepExecutionState.Aborted
-          case StepStage.Stop    => StepExecutionState.Stopped
-          case _                 => StepExecutionState.Ongoing
-        val completedTime = Option.when(stage === StepStage.EndStep)(time)
-        session.execute(Statements.SetStepExecutionState)(state, completedTime, stepId).void
-
-      @annotation.nowarn("msg=unused implicit parameter")
-      def insertAtomRecordImpl(
-        visitId:        Visit.Id,
-        instrument:     Instrument,
-        sequenceType:   SequenceType,
-        generatedId:    Option[Atom.Id],
-        idempotencyKey: Option[IdempotencyKey]
-      )(using Transaction[F], Services.ServiceAccess): F[InsertAtomResponse] =
-        val v = visitService.select(visitId).map(_.filter(_.instrument === instrument))
-        (for
-          inv  <- EitherT.fromOptionF(v, InsertAtomResponse.VisitNotFound(visitId, instrument))
-          aid  <- EitherT.right[InsertAtomResponse](UUIDGen[F].randomUUID.map(Atom.Id.fromUuid))
-          aidʹ <- EitherT.right[InsertAtomResponse](session.unique(Statements.InsertAtom)(aid, inv.observationId, visitId, instrument, sequenceType, generatedId, idempotencyKey))
-        yield InsertAtomResponse.Success(aidʹ)).merge
-
-      override def insertAtomRecord(
-        visitId:        Visit.Id,
-        instrument:     Instrument,
-        sequenceType:   SequenceType,
-        generatedId:    Option[Atom.Id],
-        idempotencyKey: Option[IdempotencyKey]
-      )(using Transaction[F], Services.ServiceAccess): F[Result[Atom.Id]] =
-        insertAtomRecordImpl(visitId, instrument, sequenceType, generatedId, idempotencyKey).map:
-          case InsertAtomResponse.VisitNotFound(id, instrument) => OdbError.InvalidVisit(id, Some(s"Visit '$id' not found or is not a ${instrument.longName} visit")).asFailure
-          case InsertAtomResponse.Success(aid)                  => Result.success(aid)
-
-      import InsertStepResponse.*
-
-      private def insertStepConfig(
-        stepId:     Step.Id,
-        stepConfig: StepConfig
-      ): F[Unit] =
-        stepConfig match {
-          case StepConfig.Bias | StepConfig.Dark | StepConfig.Science => Applicative[F].unit
-          case s @ StepConfig.Gcal(_, _, _, _) => session.execute(Statements.InsertStepConfigGcal)(stepId, s).void
-          case s @ StepConfig.SmartGcal(_)     => session.execute(Statements.InsertStepConfigSmartGcal)(stepId, s).void
-        }
-
-      @annotation.nowarn("msg=unused implicit parameter")
-      private def insertStepRecord[S, D](
-        atomId:              Atom.Id,
-        instrument:          Instrument,
-        stepConfig:          StepConfig,
-        telescopeConfig:     TelescopeConfig,
-        observeClass:        ObserveClass,
-        generatedId:         Option[Step.Id],
-        idempotencyKey:      Option[IdempotencyKey],
-        timeEstimate:        (S, TimeEstimateCalculator.Last[D]) => StepEstimate,
-        estimatorState:      Observation.Id => F[Option[(S, TimeEstimateCalculator.Last[D])]],
-        insertDynamicConfig: Step.Id => F[Unit]
-      )(using Transaction[F], Services.ServiceAccess): F[Result[Step.Id]] =
-        val foo = session.option(Statements.SelectObservationId)((atomId, instrument))
-        val fos = OptionT(foo).flatMap(o => OptionT(estimatorState(o))).value
-        (for {
-          sid  <- EitherT.right(UUIDGen[F].randomUUID.map(Step.Id.fromUuid))
-          es   <- EitherT.fromOptionF(fos, AtomNotFound(atomId, instrument))
-          sidʹ <- EitherT.right(session.unique(Statements.InsertStep)(
-                    sid, atomId, instrument, stepConfig.stepType, telescopeConfig, observeClass, generatedId, idempotencyKey, timeEstimate.tupled(es).total
-                  ))
-                  // If the insertion uses the given random step id, it must be new.  Otherwise, we are
-                  // returning an existing one.
-          _    <- if sid === sidʹ then EitherT.right(insertStepConfig(sidʹ, stepConfig)) else EitherT.pure(())
-          _    <- if sid === sidʹ then EitherT.right(insertDynamicConfig(sidʹ)) else EitherT.pure(())
-        } yield Success(sidʹ)).merge.map:
-          case AtomNotFound(id, instrument)  => OdbError.InvalidAtom(id, Some(s"Atom '$id' not found or is not a ${instrument.longName} atom")).asFailure
-          case Success(sid)                  => Result(sid)
-
-      def insertFlamingos2StepRecord(
-        atomId:          Atom.Id,
-        dynamicConfig:   Flamingos2DynamicConfig,
-        stepConfig:      StepConfig,
-        telescopeConfig: TelescopeConfig,
-        observeClass:    ObserveClass,
-        generatedId:     Option[Step.Id],
-        idempotencyKey:  Option[IdempotencyKey],
-        timeCalculator:  TimeEstimateCalculator[Flamingos2StaticConfig, Flamingos2DynamicConfig]
-      )(using Transaction[F], Services.ServiceAccess): F[Result[Step.Id]] =
-        insertStepRecord(
-          atomId,
-          Instrument.Flamingos2,
-          stepConfig,
-          telescopeConfig,
-          observeClass,
-          generatedId,
-          idempotencyKey,
-          timeCalculator.estimateStep(_, _, ProtoStep(dynamicConfig, stepConfig, telescopeConfig, observeClass)),
-          selectFlamingos2EstimatorState,
-          sid => flamingos2SequenceService.insertDynamic(sid, dynamicConfig)
-        )
-
-      override def insertGmosNorthStepRecord(
-        atomId:          Atom.Id,
-        dynamicConfig:   GmosNorth,
-        stepConfig:      StepConfig,
-        telescopeConfig: TelescopeConfig,
-        observeClass:    ObserveClass,
-        generatedId:     Option[Step.Id],
-        idempotencyKey:  Option[IdempotencyKey],
-        timeCalculator:  TimeEstimateCalculator[GmosNorthStatic, GmosNorth]
-      )(using Transaction[F], Services.ServiceAccess): F[Result[Step.Id]] =
-        insertStepRecord(
-          atomId,
-          Instrument.GmosNorth,
-          stepConfig,
-          telescopeConfig,
-          observeClass,
-          generatedId,
-          idempotencyKey,
-          timeCalculator.estimateStep(_, _, ProtoStep(dynamicConfig, stepConfig, telescopeConfig, observeClass)),
-          selectGmosNorthEstimatorState,
-          sid => gmosSequenceService.insertGmosNorthDynamic(sid, dynamicConfig)
-        )
-
-      override def insertGmosSouthStepRecord(
-        atomId:          Atom.Id,
-        dynamicConfig:   GmosSouth,
-        stepConfig:      StepConfig,
-        telescopeConfig: TelescopeConfig,
-        observeClass:    ObserveClass,
-        generatedId:     Option[Step.Id],
-        idempotencyKey:  Option[IdempotencyKey],
-        timeCalculator:  TimeEstimateCalculator[GmosSouthStatic, GmosSouth]
-      )(using Transaction[F], Services.ServiceAccess): F[Result[Step.Id]] =
-        insertStepRecord(
-          atomId,
-          Instrument.GmosSouth,
-          stepConfig,
-          telescopeConfig,
-          observeClass,
-          generatedId,
-          idempotencyKey,
-          timeCalculator.estimateStep(_, _, ProtoStep(dynamicConfig, stepConfig, telescopeConfig, observeClass)),
-          selectGmosSouthEstimatorState,
-          sid => gmosSequenceService.insertGmosSouthDynamic(sid, dynamicConfig)
-        )
 
       override def insertAtomDigests(
         observationId: Observation.Id,
@@ -427,100 +211,507 @@ object SequenceService:
         if which.isEmpty then Stream.empty
         else session.stream(Statements.selectAtomDigests(which))(which, 1024)
 
-      override def selectAtomRecords(
-        observationId: Observation.Id
-      )(using Services.ServiceAccess): Stream[F, AtomRecord] =
-        session.stream(Statements.SelectAtomRecords)(observationId, 1024)
+      /**
+       * Marks ongoing steps as abandoned and deletes any steps that are
+       * `not_started`.
+       */
+      private def abandonAndDeleteUnexecuted(
+        observationId: Observation.Id,
+        sequenceType:  SequenceType
+      ): F[Unit] =
+        session.execute(Statements.AbandonAndDeleteUnexecuted)(observationId, sequenceType).void
+
+      override def insertFlamingos2Sequence(
+        observationId:  Observation.Id,
+        sequenceType:   SequenceType,
+        sequence:       Stream[F, Atom[Flamingos2DynamicConfig]]
+      )(using Transaction[F], Services.ServiceAccess): F[Unit] =
+        insertSequence(
+          Instrument.Flamingos2,
+          observationId,
+          sequenceType,
+          sequence,
+          Flamingos2SequenceService.Statements.InsertDynamic
+        )
+
+      override def insertGmosNorthSequence(
+        observationId:  Observation.Id,
+        sequenceType:   SequenceType,
+        sequence:       Stream[F, Atom[GmosNorth]]
+      )(using Transaction[F], Services.ServiceAccess): F[Unit] =
+        insertSequence(
+          Instrument.GmosNorth,
+          observationId,
+          sequenceType,
+          sequence,
+          GmosSequenceService.Statements.InsertGmosNorthDynamic
+        )
+
+      override def insertGmosSouthSequence(
+        observationId:  Observation.Id,
+        sequenceType:   SequenceType,
+        sequence:       Stream[F, Atom[GmosSouth]]
+      )(using Transaction[F], Services.ServiceAccess): F[Unit] =
+        insertSequence(
+          Instrument.GmosSouth,
+          observationId,
+          sequenceType,
+          sequence,
+          GmosSequenceService.Statements.InsertGmosSouthDynamic
+        )
+
+      private def insertSequence[D](
+        instrument:       Instrument,
+        observationId:    Observation.Id,
+        sequenceType:     SequenceType,
+        sequence:         Stream[F, Atom[D]],
+        insertInstConfig: Command[(Step.Id, D)]
+      ): F[Unit] =
+
+        val atom: Pipe[F, Atom[D], Nothing] = atomStream =>
+          atomStream
+            .zipWithIndex
+            .map { case (atom, idx) =>
+              (atom.id, observationId, sequenceType, instrument, idx.toInt, atom.description.map(_.value))
+            }
+            .through(session.pipe(Statements.insertAtom))
+            .drain
+
+        val step: Pipe[F, Atom[D], Nothing] = atomStream =>
+          atomStream
+            .flatMap: atom =>
+              Stream.emits(
+                atom.steps.toList.zipWithIndex.tupleLeft(atom.id).map { case (aid, (step, idx)) =>
+                  (step, aid, instrument, idx)
+                }
+              )
+            .through(session.pipe(Statements.insertStep[D]))
+            .drain
+
+        val gcal: Pipe[F, Atom[D], Nothing] = atomStream =>
+          atomStream
+            .flatMap: atom =>
+              Stream.emits(
+                atom.steps.toList.flatMap: step =>
+                  StepConfig.gcal.getOption(step.stepConfig).tupleLeft(step.id)
+              )
+            .through(session.pipe(Statements.InsertStepConfigGcal))
+            .drain
+
+        val instrumentConfig: Pipe[F, Atom[D], Nothing] = atomStream =>
+          atomStream
+            .flatMap: atom =>
+              Stream.emits(
+                atom.steps.toList.map: step =>
+                  (step.id, step.instrumentConfig)
+              )
+            .through(session.pipe(insertInstConfig))
+            .drain
+
+        sequence
+          .broadcastThrough(atom, step, gcal, instrumentConfig)
+          .compile
+          .drain
+
+      extension [D](p: ProtoStep[D])
+        def toStep(sid: Step.Id, estimate: StepEstimate): Step[D] =
+          Step(sid, p.value, p.stepConfig, p.telescopeConfig, estimate, p.observeClass, p.breakpoint)
+
+      // Turns a stream of ProtoStep into an atom by running the time estimation
+      // and grouping the steps by atom id.
+      private def atomPipe[S, D](
+        static:    S,
+        estimator: TimeEstimateCalculator[S, D]
+      ): Pipe[F, (Atom.Id, Option[String], Step.Id, ProtoStep[D]), Atom[D]] =
+        _.mapAccumulate(TimeEstimateCalculator.Last.empty[D]) {
+          case (last, (aid, desc, sid, protoStep)) =>
+            val (lastʹ, estimate) = estimator.estimateOne(static, protoStep).run(last).value
+            (lastʹ, (aid, desc, protoStep.toStep(sid, estimate)))
+        }
+        .map(_._2)
+        .groupAdjacentBy(_._1)
+        .map: (aid, chunk) =>
+          Atom(
+            aid,
+            chunk.head.flatMap(_._2).flatMap(NonEmptyString.from(_).toOption),
+            NonEmptyList.fromListUnsafe(chunk.map(_._3).toList)
+          )
+
+      override def isMaterialized(
+        observationId: Observation.Id,
+        sequenceType:  SequenceType
+      )(using Transaction[F]): F[Boolean] =
+        session.unique(Statements.IsMaterialized)(observationId, sequenceType)
+
+      /**
+       * Marks the sequence as materialized, or if already materialized does
+       * nothing.
+       *
+       * @return `true` if a new row was inserted, `false` if nothing changed
+       */
+      private def markMaterializedOrDoNothing(
+        observationId: Observation.Id,
+        sequenceType:  SequenceType
+      ): F[Boolean] =
+        session.unique(Statements.MarkMaterializedOrDoNothing)(observationId, sequenceType)
+
+      /**
+       * Marks the sequence as materialized, or updates the timestamp of the
+       * last materialization.
+       *
+       * @return `true` if a new row was inserted, `false` if an existing row
+       *         was updated
+       */
+      private def markMaterializedOrUpdate(
+        observationId: Observation.Id,
+        sequenceType:  SequenceType
+      ): F[Boolean] =
+        session.unique(Statements.MarkMaterializedOrUpdate)(observationId, sequenceType)
+
+      private def atomBuilder[S, D](
+        sequenceType: SequenceType,
+        static:       S,
+        namespace:    Option[UUID],
+        estimator:    TimeEstimateCalculator[S, D]
+      ): F[AtomBuilder[D]] =
+        namespace
+          .fold(UUIDGen[F].randomUUID)(_.pure[F])
+          .map: uuid =>
+            AtomBuilder.instantiate(estimator, static, uuid, sequenceType)
+
+      private def replaceSequence[D](
+        instrument:       Instrument,
+        observationId:    Observation.Id,
+        sequenceType:     SequenceType,
+        sequence:         List[ProtoAtom[ProtoStep[D]]],
+        insertInstConfig: Command[(Step.Id, D)],
+        atomBuilder:      AtomBuilder[D]
+      ): ResultT[F, Stream[Pure, Atom[D]]] =
+
+        val checkLength =
+          if sequence.lengthIs <= SequenceAtomLimit then ResultT.unit
+          else ResultT:
+            OdbError
+              .InvalidArgument(s"Execution sequences containing over $SequenceAtomLimit atoms are not supported.".some)
+              .asFailureF
+
+        val doReplace: F[Stream[Pure, Atom[D]]] =
+          val atoms = atomBuilder.buildStream(Stream.emits(sequence))
+
+          for
+            _ <- markMaterializedOrUpdate(observationId, sequenceType)
+            _ <- abandonAndDeleteUnexecuted(observationId, sequenceType)
+            _ <- insertSequence(instrument, observationId, sequenceType, atoms.covary[F], insertInstConfig)
+          yield atoms
+
+        checkLength *> ResultT.liftF(doReplace)
+
+      private def selectStatic[S](
+        observationId: Observation.Id,
+        expected:      String,
+        select:        (Observation.Id) => Transaction[F] ?=> F[Option[S]]
+      )(using Transaction[F]): ResultT[F, S] =
+        ResultT:
+          select(observationId)
+            .map: static =>
+              Result.fromOption(
+                static,
+                OdbError
+                  .InvalidArgument(s"Observation $observationId not found or is not a $expected observation.".some)
+                  .asProblem
+              )
+
+      override def replaceFlamingos2Sequence(
+        observationId: Observation.Id,
+        sequenceType:  SequenceType,
+        sequence:      List[ProtoAtom[ProtoStep[Flamingos2DynamicConfig]]],
+        namespace:     Option[UUID] = None
+      )(using Transaction[F]): F[Result[Stream[Pure, Atom[Flamingos2DynamicConfig]]]] =
+
+        (for
+          s <- selectStatic(observationId, "Flamingos 2", flamingos2SequenceService.selectStatic)
+          b <- ResultT.liftF(atomBuilder(sequenceType, s, namespace, estimator.flamingos2))
+          r <- replaceSequence(
+                 Instrument.Flamingos2,
+                 observationId,
+                 sequenceType,
+                 sequence,
+                 Flamingos2SequenceService.Statements.InsertDynamic,
+                 b
+               )
+        yield r).value
+
+      override def replaceFlamingos2Sequence(
+        checked: CheckedWithId[(SequenceType, List[ProtoAtom[ProtoStep[Flamingos2DynamicConfig]]]), Observation.Id]
+      )(using Transaction[F]): F[Result[Stream[Pure, Atom[Flamingos2DynamicConfig]]]] =
+        checked.foldWithId(OdbError.InvalidArgument().asFailureF[F, Stream[Pure, Atom[Flamingos2DynamicConfig]]]) { case ((sequenceType, sequence), oid) =>
+          replaceFlamingos2Sequence(
+            oid,
+            sequenceType,
+            sequence
+          )
+        }
+
+      override def replaceGmosNorthSequence(
+        observationId: Observation.Id,
+        sequenceType:  SequenceType,
+        sequence:      List[ProtoAtom[ProtoStep[GmosNorth]]],
+        namespace:     Option[UUID] = None
+      )(using Transaction[F]): F[Result[Stream[Pure, Atom[GmosNorth]]]] =
+        (for
+          s <- selectStatic(observationId, "GMOS North", gmosSequenceService.selectGmosNorthStatic)
+          b <- ResultT.liftF(atomBuilder(sequenceType, s, namespace, estimator.gmosNorth))
+          r <- replaceSequence(
+                 Instrument.GmosNorth,
+                 observationId,
+                 sequenceType,
+                 sequence,
+                 GmosSequenceService.Statements.InsertGmosNorthDynamic,
+                 b
+               )
+        yield r).value
+
+      override def replaceGmosNorthSequence(
+        checked: CheckedWithId[(SequenceType, List[ProtoAtom[ProtoStep[GmosNorth]]]), Observation.Id]
+      )(using Transaction[F]): F[Result[Stream[Pure, Atom[GmosNorth]]]] =
+        checked.foldWithId(OdbError.InvalidArgument().asFailureF[F, Stream[Pure, Atom[GmosNorth]]]) { case ((sequenceType, sequence), oid) =>
+          replaceGmosNorthSequence(
+            oid,
+            sequenceType,
+            sequence
+          )
+        }
+
+      override def replaceGmosSouthSequence(
+        observationId: Observation.Id,
+        sequenceType:  SequenceType,
+        sequence:      List[ProtoAtom[ProtoStep[GmosSouth]]],
+        namespace:     Option[UUID] = None
+      )(using Transaction[F]): F[Result[Stream[Pure, Atom[GmosSouth]]]] =
+        (for
+          s <- selectStatic(observationId, "GMOS South", gmosSequenceService.selectGmosSouthStatic)
+          b <- ResultT.liftF(atomBuilder(sequenceType, s, namespace, estimator.gmosSouth))
+          r <- replaceSequence(
+                 Instrument.GmosSouth,
+                 observationId,
+                 sequenceType,
+                 sequence,
+                 GmosSequenceService.Statements.InsertGmosSouthDynamic,
+                 b
+               )
+        yield r).value
+
+
+      override def replaceGmosSouthSequence(
+        checked: CheckedWithId[(SequenceType, List[ProtoAtom[ProtoStep[GmosSouth]]]), Observation.Id]
+      )(using Transaction[F]): F[Result[Stream[Pure, Atom[GmosSouth]]]] =
+        checked.foldWithId(OdbError.InvalidArgument().asFailureF[F, Stream[Pure, Atom[GmosSouth]]]) { case ((sequenceType, sequence), oid) =>
+          replaceGmosSouthSequence(
+            oid,
+            sequenceType,
+            sequence
+          )
+        }
+
+      private def resetAcquisition[D](
+        observationId: Observation.Id,
+        stream:        Stream[F, Atom[D]]
+      )(
+        insert: (Observation.Id, SequenceType, Stream[F, Atom[D]]) => F[Unit]
+      )(using Transaction[F], Services.ServiceAccess): F[Unit] =
+        val reset = for
+          _ <- markMaterializedOrUpdate(observationId, SequenceType.Acquisition)
+          _ <- abandonAndDeleteUnexecuted(observationId, SequenceType.Acquisition)
+          _ <- insert(observationId, SequenceType.Acquisition, stream)
+        yield ()
+
+        isMaterialized(observationId, SequenceType.Acquisition).ifM(
+          reset,
+          Applicative[F].unit
+        )
+
+      override def resetFlamingos2Acquisition(
+        observationId: Observation.Id,
+        stream:        Stream[F, Atom[Flamingos2DynamicConfig]]
+      )(using Transaction[F], Services.ServiceAccess): F[Unit] =
+        resetAcquisition(observationId, stream)(insertFlamingos2Sequence)
+
+      override def resetGmosNorthAcquisition(
+        observationId: Observation.Id,
+        stream:        Stream[F, Atom[GmosNorth]]
+      )(using Transaction[F], Services.ServiceAccess): F[Unit] =
+        resetAcquisition(observationId, stream)(insertGmosNorthSequence)
+
+      override def resetGmosSouthAcquisition(
+        observationId: Observation.Id,
+        stream:        Stream[F, Atom[GmosSouth]]
+      )(using Transaction[F], Services.ServiceAccess): F[Unit] =
+        resetAcquisition(observationId, stream)(insertGmosSouthSequence)
+
+      private def materializeExecutionConfig[S, D](
+        observationId: Observation.Id,
+        stream:        StreamingExecutionConfig[F, S, D]
+      )(
+        insert: (Observation.Id, SequenceType, Stream[F, Atom[D]]) => F[Unit]
+      )(using Services.ServiceAccess): F[Unit] =
+
+        def materialize(sequenceType: SequenceType, s: Stream[F, Atom[D]]): F[Unit] =
+          markMaterializedOrDoNothing(observationId, sequenceType).ifM(
+            insert(observationId, sequenceType, s),
+            Applicative[F].unit
+          )
+
+        materialize(SequenceType.Acquisition, stream.acquisition) *>
+        materialize(SequenceType.Science, stream.science)
+
+      override def materializeFlamingos2ExecutionConfig(
+        observationId: Observation.Id,
+        stream:        StreamingExecutionConfig[F, Flamingos2StaticConfig, Flamingos2DynamicConfig]
+      )(using Transaction[F], Services.ServiceAccess): F[Unit] =
+        materializeExecutionConfig(observationId, stream)(insertFlamingos2Sequence)
+
+      override def materializeGmosNorthExecutionConfig(
+        observationId: Observation.Id,
+        stream:        StreamingExecutionConfig[F, GmosNorthStatic, GmosNorth]
+      )(using Transaction[F], Services.ServiceAccess): F[Unit] =
+        materializeExecutionConfig(observationId, stream)(insertGmosNorthSequence)
+
+      override def materializeGmosSouthExecutionConfig(
+        observationId: Observation.Id,
+        stream:        StreamingExecutionConfig[F, GmosSouthStatic, GmosSouth]
+      )(using Transaction[F], Services.ServiceAccess): F[Unit] =
+        materializeExecutionConfig(observationId, stream)(insertGmosSouthSequence)
+
+      private def selectSequence[S, D](
+        instrument:    Instrument,
+        observationId: Observation.Id,
+        sequenceType:  SequenceType,
+        query:         Query[(Instrument, Observation.Id, SequenceType), (Atom.Id, Option[String], Step.Id, ProtoStep[D])],
+        staticConfig:  S,
+        estimator:     TimeEstimateCalculator[S, D]
+      )(using Transaction[F]): F[Option[Stream[F, Atom[D]]]] =
+        isMaterialized(observationId, sequenceType).ifF(
+          session
+            .stream(query)((instrument, observationId, sequenceType), 256)
+            .through(atomPipe(staticConfig, estimator))
+            .some,
+          none
+        )
+
+      override def selectFlamingos2Sequence(
+        observationId: Observation.Id,
+        sequenceType:  SequenceType,
+        staticConfig:  Flamingos2StaticConfig
+      )(using Transaction[F]): F[Option[Stream[F, Atom[Flamingos2DynamicConfig]]]] =
+        selectSequence(
+          Instrument.Flamingos2,
+          observationId,
+          sequenceType,
+          Statements.SelectFlamingos2Sequence,
+          staticConfig,
+          estimator.flamingos2
+        )
+
+      override def selectGmosNorthSequence(
+        observationId: Observation.Id,
+        sequenceType:  SequenceType,
+        staticConfig:  GmosNorthStatic
+      )(using Transaction[F]): F[Option[Stream[F, Atom[GmosNorth]]]] =
+        selectSequence(
+          Instrument.GmosNorth,
+          observationId,
+          sequenceType,
+          Statements.SelectGmosNorthSequence,
+          staticConfig,
+          estimator.gmosNorth
+        )
+
+      override def selectGmosSouthSequence(
+        observationId: Observation.Id,
+        sequenceType:  SequenceType,
+        staticConfig:  GmosSouthStatic
+      )(using Transaction[F]): F[Option[Stream[F, Atom[GmosSouth]]]] =
+        selectSequence(
+          Instrument.GmosSouth,
+          observationId,
+          sequenceType,
+          Statements.SelectGmosSouthSequence,
+          staticConfig,
+          estimator.gmosSouth
+        )
 
   object Statements:
 
-    val SelectObservationId: Query[(Atom.Id, Instrument), Observation.Id] =
+    val AbandonAndDeleteUnexecuted: Command[(Observation.Id, SequenceType)] =
       sql"""
-        SELECT c_observation_id
-          FROM t_atom_record
-         WHERE c_atom_id = $atom_id AND c_instrument = $instrument
-      """.query(observation_id)
+        CALL abandon_ongoing_and_delete_unexecuted_steps($observation_id, $sequence_type)
+      """.command
 
-    val InsertAtom: Query[(
+    val insertAtom: Command[(
       Atom.Id,
       Observation.Id,
-      Visit.Id,
-      Instrument,
       SequenceType,
-      Option[Atom.Id],
-      Option[IdempotencyKey]
-    ), Atom.Id] =
+      Instrument,
+      Int,
+      Option[String]
+    )] =
       sql"""
-        INSERT INTO t_atom_record (
+        INSERT INTO t_atom (
           c_atom_id,
           c_observation_id,
-          c_visit_id,
-          c_instrument,
           c_sequence_type,
-          c_generated_id,
-          c_idempotency_key
+          c_instrument,
+          c_atom_index,
+          c_description
         ) SELECT
           $atom_id,
           $observation_id,
-          $visit_id,
-          $instrument,
           $sequence_type,
-          ${atom_id.opt},
-          ${idempotency_key.opt}
-        ON CONFLICT (c_idempotency_key) DO UPDATE
-          SET c_idempotency_key = EXCLUDED.c_idempotency_key
-        RETURNING
-          c_atom_id
-      """.query(atom_id)
+          $instrument,
+          $int4,
+          ${text.opt}
+      """.command
 
-    val InsertStep: Query[(
-      Step.Id,
+    def insertStep[D]: Command[(
+      Step[D],
       Atom.Id,
       Instrument,
-      StepType,
-      TelescopeConfig,
-      ObserveClass,
-      Option[Step.Id],
-      Option[IdempotencyKey],
-      TimeSpan,
-    ), Step.Id] =
+      Int
+    )] =
       sql"""
-        INSERT INTO t_step_record (
+        INSERT INTO t_step (
           c_step_id,
-          c_step_index,
           c_atom_id,
           c_instrument,
           c_step_type,
+          c_step_index,
+          c_observe_class,
+          c_time_estimate,
           c_offset_p,
           c_offset_q,
           c_guide_state,
-          c_observe_class,
-          c_generated_id,
-          c_idempotency_key,
-          c_time_estimate
+          c_breakpoint
         ) SELECT
           $step_id,
-          COALESCE(
-            (SELECT MAX(c_step_index) + 1
-             FROM t_step_record AS s
-             INNER JOIN t_atom_record AS a ON a.c_atom_id = s.c_atom_id
-             WHERE a.c_observation_id = (SELECT c_observation_id FROM t_atom_record WHERE c_atom_id = $atom_id)
-            ),
-            1
-          ),
           $atom_id,
           $instrument,
           $step_type,
-          $telescope_config,
+          $int4,
           $obs_class,
-          ${step_id.opt},
-          ${idempotency_key.opt},
-          $time_span
-        ON CONFLICT (c_idempotency_key) DO UPDATE
-          SET c_idempotency_key = EXCLUDED.c_idempotency_key
-        RETURNING
-          c_step_id
-      """.query(step_id).contramap { (s, a, i, st, tc, oc, g, idm, d) => (s, a, a, i, st, tc, oc, g, idm, d) }
+          $time_span,
+          $telescope_config,
+          $breakpoint
+      """.command.contramap { (step, aid, inst, idx) => (
+        step.id,
+        aid,
+        inst,
+        step.stepConfig.stepType,
+        idx,
+        step.observeClass,
+        step.estimate.total,
+        step.telescopeConfig,
+        step.breakpoint
+      )}
 
     private def insertStepConfigFragment(table: String, columns: List[String]): Fragment[Void] =
       sql"""
@@ -581,191 +772,6 @@ object SequenceService:
         )
       }
 
-    private val timestamp_interval: Codec[TimestampInterval] =
-      (core_timestamp *: core_timestamp)
-        .imap((first, last) => TimestampInterval.between(first, last))(interval =>
-          (interval.start, interval.end)
-        )
-
-    val SelectStepConfigForObs: Query[Observation.Id, (Step.Id, StepConfig)] =
-      (sql"""
-        SELECT
-          v.c_step_id,
-          v.c_step_type,
-          #${encodeColumns("v".some, StepConfigGcalColumns)},
-          #${encodeColumns("v".some, StepConfigSmartGcalColumns)}
-        FROM v_step_record v
-        INNER JOIN t_atom_record a ON a.c_atom_id = v.c_atom_id
-        WHERE """ ~> sql"""a.c_observation_id = $observation_id"""
-      ).query(step_id *: step_config)
-
-
-
-    private def step_record[D](dynamic_config: Decoder[D]): Decoder[StepRecord[D]] =
-      (
-        step_id                *:
-        atom_id                *:
-        visit_id               *:
-        int4_pos               *:
-        step_config            *:
-        telescope_config       *:
-        instrument             *:
-        dynamic_config         *:
-        core_timestamp         *:
-        timestamp_interval.opt *:
-        sequence_type          *:
-        obs_class              *:
-        step_execution_state   *:
-        dataset_qa_state.opt
-      ).to[StepRecord[D]]
-
-    def selectStepRecord[D](
-      instTable:   String,
-      instAlias:   String,
-      instColumns: List[String],
-      instDecoder: Decoder[D]
-    ): Query[Observation.Id, StepRecord[D]] =
-      (sql"""
-        SELECT
-          v.c_step_id,
-          v.c_atom_id,
-          v.c_visit_id,
-          v.c_step_index,
-          v.c_step_type,
-          #${encodeColumns("v".some, StepConfigGcalColumns)},
-          #${encodeColumns("v".some, StepConfigSmartGcalColumns)},
-          v.c_offset_p,
-          v.c_offset_q,
-          v.c_guide_state,
-          v.c_instrument,
-          #${encodeColumns(instAlias.some, instColumns)},
-          v.c_created,
-          v.c_first_event_time,
-          v.c_last_event_time,
-          a.c_sequence_type,
-          v.c_observe_class,
-          v.c_execution_state,
-          v.c_qa_state
-        FROM v_step_record v
-        INNER JOIN #$instTable #$instAlias ON #$instAlias.c_step_id = v.c_step_id
-        INNER JOIN t_atom_record a ON a.c_atom_id = v.c_atom_id
-        WHERE a.c_observation_id = $observation_id
-        ORDER BY v.c_created
-      """).query(step_record(instDecoder))
-
-    val SetStepExecutionState: Command[(StepExecutionState, Option[Timestamp], Step.Id)] =
-      sql"""
-        UPDATE t_step_record s
-           SET c_execution_state = $step_execution_state,
-               c_completed       = ${core_timestamp.opt}
-          FROM t_step_execution_state e
-         WHERE s.c_execution_state = e.c_tag
-           AND e.c_terminal = FALSE
-           AND s.c_step_id = $step_id
-      """.command
-
-    val AbandonAllNonTerminalStepsForObservation: Command[Observation.Id] =
-      sql"""
-        UPDATE t_step_record s
-           SET c_execution_state = 'abandoned'
-          FROM t_atom_record a, t_step_execution_state e
-         WHERE s.c_atom_id = a.c_atom_id
-           AND s.c_execution_state = e.c_tag
-           AND a.c_observation_id = $observation_id
-           AND e.c_terminal = FALSE
-      """.command
-
-    val AbandonOngoingStepsWithoutStepId: Command[(Observation.Id, Step.Id)] =
-      sql"""
-        UPDATE t_step_record s
-           SET c_execution_state = 'abandoned'
-          FROM t_atom_record a
-         WHERE s.c_atom_id = a.c_atom_id
-           AND a.c_observation_id = $observation_id
-           AND s.c_step_id != $step_id
-           AND s.c_execution_state = 'ongoing';
-      """.command
-
-    val AbandonOngoingStepsWithoutAtomId: Command[(Observation.Id, Atom.Id)] =
-      sql"""
-        UPDATE t_step_record s
-           SET c_execution_state = 'abandoned'
-          FROM t_atom_record a
-         WHERE s.c_atom_id = a.c_atom_id
-           AND a.c_observation_id = $observation_id
-           AND a.c_atom_id != $atom_id
-           AND s.c_execution_state = 'ongoing';
-      """.command
-
-    val SetAtomExecutionState: Command[(AtomExecutionState, Atom.Id)] =
-      sql"""
-        UPDATE t_atom_record a
-           SET c_execution_state = $atom_execution_state
-          FROM t_atom_execution_state e
-         WHERE a.c_execution_state = e.c_tag
-           AND a.c_atom_id = $atom_id
-      """.command
-
-    val CompleteAllNonTerminalAtomsForObservation: Command[Observation.Id] =
-      sql"""
-        UPDATE t_atom_record a
-           SET c_execution_state = 'completed'
-          FROM t_atom_execution_state e
-         WHERE a.c_execution_state = e.c_tag
-           AND a.c_observation_id = $observation_id
-           AND e.c_terminal = FALSE
-      """.command
-
-    val CompleteOngoingAtomsWithoutAtomId: Command[(Observation.Id, Atom.Id)] =
-      sql"""
-        UPDATE t_atom_record
-           SET c_execution_state = 'completed'
-         WHERE c_observation_id = $observation_id
-           AND c_atom_id != $atom_id
-           AND c_execution_state = 'ongoing';
-      """.command
-
-    val SelectLastVisit: Query[Observation.Id, Visit.Id] =
-      sql"""
-        SELECT c_visit_id
-          FROM t_visit
-         WHERE c_observation_id = $observation_id
-      ORDER BY c_created DESC
-         LIMIT 1
-      """.query(visit_id)
-
-    val SelectLastGcalConfig: Query[Observation.Id, StepConfig.Gcal] =
-      sql"""
-        SELECT
-          #${encodeColumns("s".some, StepConfigGcalColumns)}
-        FROM v_step_record s
-        INNER JOIN t_atom_record a ON a.c_atom_id = s.c_atom_id
-        WHERE
-          a.c_observation_id = $observation_id AND
-          s.c_step_type      = 'gcal'
-        ORDER BY s.c_created DESC
-        LIMIT 1
-      """.query(step_config_gcal)
-
-    val SelectLastStepConfig: Query[Observation.Id, (Step.Id, StepConfig, TelescopeConfig, ObserveClass)] =
-      sql"""
-        SELECT
-          s.c_step_id,
-          s.c_step_type,
-          #${encodeColumns("s".some, StepConfigGcalColumns)},
-          #${encodeColumns("s".some, StepConfigSmartGcalColumns)},
-          s.c_offset_p,
-          s.c_offset_q,
-          s.c_guide_state,
-          s.c_observe_class
-        FROM v_step_record s
-        INNER JOIN t_atom_record a ON a.c_atom_id = s.c_atom_id
-        WHERE
-          a.c_observation_id = $observation_id
-        ORDER BY s.c_created DESC
-        LIMIT 1
-      """.query(step_id *: step_config *: telescope_config *: obs_class)
-
     val DeleteAtomDigests: Command[Observation.Id] =
       sql"""
         DELETE FROM t_atom_digest WHERE c_observation_id = $observation_id
@@ -798,15 +804,6 @@ object SequenceService:
     val atom_digest_row: Codec[(Observation.Id, Short, AtomDigest)] =
       observation_id *: int2 *: atom_digest
 
-    val atom_record: Codec[AtomRecord] = (
-      atom_id              *:
-      visit_id             *:
-      sequence_type        *:
-      core_timestamp       *:
-      atom_execution_state *:
-      atom_id.opt
-    ).to[AtomRecord]
-
     val AtomDigestRowColumns: String =
       """
           c_observation_id,
@@ -838,18 +835,118 @@ object SequenceService:
         ORDER BY c_observation_id, c_atom_index
       """.query(atom_digest_row)
 
-    val SelectAtomRecords: Query[Observation.Id, AtomRecord] =
+    def selectSequence[D](
+      instrumentTable:   String,
+      instrumentColumns: List[String],
+      instrumentDecoder: Decoder[D]
+    ): Query[(Instrument, Observation.Id, SequenceType), (Atom.Id, Option[String], Step.Id, ProtoStep[D])] =
+
+      val proto_step = (
+        instrumentDecoder *:
+        step_config       *:
+        telescope_config  *:
+        obs_class         *:
+        breakpoint
+      ).to[ProtoStep[D]]
+
       sql"""
         SELECT
-          c_atom_id,
-          c_visit_id,
+          a.c_atom_id,
+          a.c_description,
+          s.c_step_id,
+          #${encodeColumns("i".some, instrumentColumns)},
+          s.c_step_type,
+          #${encodeColumns("g".some, StepConfigGcalColumns)},
+          #${encodeColumns("r".some, StepConfigSmartGcalColumns)},
+          s.c_offset_p,
+          s.c_offset_q,
+          s.c_guide_state,
+          s.c_observe_class,
+          s.c_breakpoint
+
+        FROM t_atom a
+
+        JOIN t_step s
+          ON s.c_atom_id = a.c_atom_id
+
+        LEFT JOIN t_step_execution se ON se.c_step_id = s.c_step_id
+
+        JOIN #${instrumentTable} i
+          ON i.c_step_id = s.c_step_id
+
+        LEFT JOIN t_step_config_gcal g
+          ON g.c_step_id = s.c_step_id
+
+        LEFT JOIN t_step_config_smart_gcal r
+          ON r.c_step_id = s.c_step_id
+
+        WHERE
+          a.c_instrument     = $instrument      AND
+          a.c_observation_id = $observation_id  AND
+          a.c_sequence_type  = $sequence_type   AND
+          (se.c_step_id IS NULL OR se.c_execution_state IN ( 'not_started', 'ongoing' ))
+        ORDER BY
+          a.c_atom_index,
+          s.c_step_index
+      """.query(atom_id *: text.opt *: step_id *: proto_step)
+
+    val SelectFlamingos2Sequence: Query[(Instrument, Observation.Id, SequenceType), (Atom.Id, Option[String], Step.Id, ProtoStep[Flamingos2DynamicConfig])] =
+      selectSequence(
+        "t_flamingos_2_dynamic",
+        Flamingos2SequenceService.Statements.Flamingos2DynamicColumns,
+        flamingos_2_dynamic
+      )
+
+    val SelectGmosNorthSequence: Query[(Instrument, Observation.Id, SequenceType), (Atom.Id, Option[String], Step.Id, ProtoStep[GmosNorth])] =
+      selectSequence(
+        "t_gmos_north_dynamic",
+        GmosSequenceService.Statements.GmosDynamicColumns,
+        gmos_north_dynamic
+      )
+
+    val SelectGmosSouthSequence: Query[(Instrument, Observation.Id, SequenceType), (Atom.Id, Option[String], Step.Id, ProtoStep[GmosSouth])] =
+      selectSequence(
+        "t_gmos_south_dynamic",
+        GmosSequenceService.Statements.GmosDynamicColumns,
+        gmos_south_dynamic
+      )
+
+    val IsMaterialized: Query[(Observation.Id, SequenceType), Boolean] =
+      sql"""
+        SELECT EXISTS (
+          SELECT 1
+          FROM   t_sequence_materialization
+          WHERE  c_observation_id = $observation_id
+            AND  c_sequence_type  = $sequence_type
+        )
+      """.query(bool)
+
+    val MarkMaterializedOrDoNothing: Query[(Observation.Id, SequenceType), Boolean] =
+      sql"""
+        WITH ins AS (
+          INSERT INTO t_sequence_materialization (
+            c_observation_id,
+            c_sequence_type,
+            c_created,
+            c_updated
+          )
+          VALUES ($observation_id, $sequence_type, now(), now())
+          ON CONFLICT DO NOTHING
+          RETURNING 1
+        )
+        SELECT EXISTS (SELECT 1 FROM ins) AS inserted
+      """.query(bool)
+
+    val MarkMaterializedOrUpdate: Query[(Observation.Id, SequenceType), Boolean] =
+      sql"""
+        INSERT INTO t_sequence_materialization (
+          c_observation_id,
           c_sequence_type,
           c_created,
-          c_execution_state,
-          c_generated_id
-        FROM
-          t_atom_record
-        WHERE
-          c_observation_id = $observation_id
-        ORDER BY c_observation_id, c_created
-      """.query(atom_record)
+          c_updated
+        )
+        VALUES ($observation_id, $sequence_type, now(), now())
+        ON CONFLICT (c_observation_id, c_sequence_type)
+        DO UPDATE SET c_updated = now()
+        RETURNING (xmax = 0) AS inserted
+      """.query(bool)

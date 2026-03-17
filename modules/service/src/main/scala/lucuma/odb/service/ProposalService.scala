@@ -558,7 +558,7 @@ object ProposalService {
 
         ResultT(programService.resolvePid(input.programId, input.proposalReference, input.programReference))
           .flatMap: pid =>
-            ResultT(Services.asSuperUser(observationWorkflowService.getWorkflows(pid, commitHash, itcClient, ptc))).flatMap: wfs =>
+            ResultT(Services.asSuperUser(observationWorkflowService.getWorkflows(pid))).flatMap: wfs =>
               val states = wfs.values.map(_.state).toSet
               ResultT:
                 services.transactionally:

@@ -149,6 +149,9 @@ trait Services[F[_]]:
   /** The `Flamingos2SequenceService` */
   def flamingos2SequenceService: Flamingos2SequenceService[F]
 
+  /** The `Igrins2LongSlitService`. */
+  def igrins2LongSlitService: Igrins2LongSlitService[F]
+
   /** The `GmosSequenceService` */
   def gmosSequenceService: GmosSequenceService[F]
 
@@ -330,6 +333,7 @@ object Services:
       lazy val generatorParamsService = GeneratorParamsService.instantiate
       lazy val flamingos2LongSlitService = Flamingos2LongSlitService.instantiate
       lazy val flamingos2SequenceService = Flamingos2SequenceService.instantiate
+      lazy val igrins2LongSlitService = Igrins2LongSlitService.instantiate
       lazy val gmosLongSlitService = GmosLongSlitService.instantiate
       lazy val gmosImagingService = GmosImagingService.instantiate
       lazy val gmosSequenceService = GmosSequenceService.instantiate
@@ -341,7 +345,6 @@ object Services:
       lazy val programNoteService = ProgramNoteService.instantiate
       lazy val programUserService = ProgramUserService.instantiate
       lazy val smartGcalService = SmartGcalService.instantiate
-      lazy val sequenceService = SequenceService.instantiate
       lazy val targetService = TargetService.instantiate
       lazy val timeAccountingService = TimeAccountingService.instantiate
       lazy val timeService = TimeService.instantiate
@@ -358,14 +361,15 @@ object Services:
       // available, so we require them here instead of demanding them before constructing a
       // `Services` instance.
       lazy val attachmentFileService = AttachmentFileService.instantiate(s3FileService)
-      lazy val itcService = ItcService.instantiate(itcClient)
+      lazy val emailService = EmailService.fromConfigAndClient(emailConfig, httpClient)
       lazy val generator = Generator.instantiate(commitHash, tc)
       lazy val guideService = GuideService.instantiate(gaiaClient)
-      lazy val emailService = EmailService.fromConfigAndClient(emailConfig, httpClient)
+      lazy val itcService = ItcService.instantiate(itcClient)
       lazy val proposalService = ProposalService.instantiate(emailConfig)
-      lazy val userInvitationService = UserInvitationService.instantiate(emailConfig)
+      lazy val sequenceService = SequenceService.instantiate(tc)
       lazy val trackingService = TrackingService.instantiate(horizonsClient)
       lazy val telluricTargetsService: TelluricTargetsService[F] = TelluricTargetsService.instantiate(telluricClient0, hminCache0)
+      lazy val userInvitationService = UserInvitationService.instantiate(emailConfig)
 
   /**
    * This adds syntax to access the members of `Services` and the current `Transaction` when they
@@ -394,6 +398,7 @@ object Services:
     def gmosImagingService[F[_]](using Services[F]): GmosImagingService[F] = summon[Services[F]].gmosImagingService
     def flamingos2LongSlitService[F[_]](using Services[F]): Flamingos2LongSlitService[F] = summon[Services[F]].flamingos2LongSlitService
     def flamingos2SequenceService[F[_]](using Services[F]): Flamingos2SequenceService[F] = summon[Services[F]].flamingos2SequenceService
+    def igrins2LongSlitService[F[_]](using Services[F]): Igrins2LongSlitService[F] = summon[Services[F]].igrins2LongSlitService
     def gmosSequenceService[F[_]](using Services[F]): GmosSequenceService[F] = summon[Services[F]].gmosSequenceService
     def groupService[F[_]](using Services[F]): GroupService[F] = summon[Services[F]].groupService
     def obsAttachmentAssignmentService[F[_]](using Services[F]): ObsAttachmentAssignmentService[F] = summon[Services[F]].obsAttachmentAssignmentService

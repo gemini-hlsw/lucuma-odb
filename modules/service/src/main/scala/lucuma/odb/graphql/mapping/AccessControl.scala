@@ -16,6 +16,7 @@ import grackle.Result
 import grackle.ResultT
 import grackle.Type
 import lucuma.core.enums.ObservationWorkflowState
+import lucuma.core.enums.SequenceType
 import lucuma.core.model.Access
 import lucuma.core.model.Observation
 import lucuma.core.model.ObservationWorkflow
@@ -45,6 +46,7 @@ import lucuma.odb.graphql.input.ObservationTimesInput
 import lucuma.odb.graphql.input.ProgramNotePropertiesInput
 import lucuma.odb.graphql.input.ProgramPropertiesInput
 import lucuma.odb.graphql.input.ProgramReferencePropertiesInput
+import lucuma.odb.graphql.input.ReplaceSequenceInput
 import lucuma.odb.graphql.input.ResetAcquisitionInput
 import lucuma.odb.graphql.input.SetAllocationsInput
 import lucuma.odb.graphql.input.SetGuideTargetNameInput
@@ -62,6 +64,8 @@ import lucuma.odb.graphql.input.UpdateTargetsInput
 import lucuma.odb.graphql.mapping.AccessControl.CheckedWithId
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
+import lucuma.odb.sequence.data.ProtoAtom
+import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.NoTransaction
 import lucuma.odb.service.Services
@@ -194,13 +198,7 @@ trait AccessControl[F[_]] extends Predicates[F] {
     Services.asSuperUser:
       writableOids(includeDeleted, WHERE, includeCalibrations)
         .flatTraverse: which =>
-          observationWorkflowService.filterState(
-            which,
-            allowedStates,
-            commitHash,
-            itcClient,
-            timeEstimateCalculator
-          )
+          observationWorkflowService.filterState(which, allowedStates)
 
   /**
    * Select and return the ids of observations that are clonable by the current user and meet
@@ -299,13 +297,7 @@ trait AccessControl[F[_]] extends Predicates[F] {
           WHERE.getOrElse(True)
         ))
       ).flatTraverse: which =>
-        observationWorkflowService.filterTargets(
-          which,
-          allowedStates,
-          commitHash,
-          itcClient,
-          timeEstimateCalculator
-        )
+        observationWorkflowService.filterTargets(which, allowedStates)
 
   /**
    * Given an operation that defines a set of targets and a proposed edit, select and filter this
@@ -724,11 +716,35 @@ trait AccessControl[F[_]] extends Predicates[F] {
   def selectForUpdate(input: SetObservationWorkflowStateInput)(using Services[F], NoTransaction[F]): F[Result[CheckedWithId[(ObservationWorkflow, ObservationWorkflowState), Observation.Id]]] =
     verifyWritable(input.observationId) >>
     Services.asSuperUser:
-      observationWorkflowService.getWorkflows(List(input.observationId), commitHash, itcClient, timeEstimateCalculator)
+      observationWorkflowService.getWorkflows(List(input.observationId))
         .map: res =>
           res.map(_(input.observationId)).flatMap: w =>
             if w.state === input.state || w.validTransitions.contains(input.state)
             then Result(AccessControl.unchecked((w, input.state), input.observationId, observation_id))
             else Result.failure(OdbError.InvalidWorkflowTransition(w.state, input.state).asProblem)
+
+
+  def selectForUpdate[D](
+    input: ReplaceSequenceInput[D]
+  )(using Services[F], NoTransaction[F]): F[Result[CheckedWithId[(SequenceType, List[ProtoAtom[ProtoStep[D]]]), Observation.Id]]] =
+    val allowedStates: Set[ObservationWorkflowState] =
+      if user.role.access <= Access.Pi then ObservationWorkflowState.preExecutionSet // ok prior to execution
+      else ObservationWorkflowState.fullSet
+
+    Services.asSuperUser:
+      (for
+        o  <- ResultT(observationService.resolveOid(input.observationId, input.observationRef))
+        os <- ResultT(selectForObservationUpdateImpl(
+                includeDeleted      = None,
+                oids                = List(o),
+                includeCalibrations = false,
+                allowedStates       = allowedStates
+              ))
+        c  <- ResultT.fromResult:
+                os match
+                  case Nil     => Result.failure(OdbError.NotAuthorized(user.id, s"User cannot replace the sequence in the current observation workflow state.".some).asProblem)
+                  case List(o) => Result(AccessControl.unchecked(input.sequenceType -> input.sequence, o, observation_id))
+                  case o       => Result.internalError(s"Checked one id '$o', but got a list of ids back: $os")
+      yield c).value
 
 }

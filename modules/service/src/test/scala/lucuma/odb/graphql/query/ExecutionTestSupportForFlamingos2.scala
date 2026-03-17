@@ -27,17 +27,16 @@ import lucuma.core.enums.GcalDiffuser
 import lucuma.core.enums.GcalFilter
 import lucuma.core.enums.GcalShutter
 import lucuma.core.enums.Instrument
-import lucuma.core.enums.ObserveClass
-import lucuma.core.enums.SequenceType
 import lucuma.core.enums.StepGuideState
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.StepConfig.Gcal
 import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig
 import lucuma.core.model.sequence.flamingos2.Flamingos2FpuMask
+import lucuma.core.model.sequence.flamingos2.Flamingos2StaticConfig
 import lucuma.core.syntax.string.*
-import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
+import lucuma.odb.sequence.TimeEstimateCalculator
 import lucuma.odb.service.Services
 import lucuma.odb.smartgcal.data.Flamingos2
 import lucuma.odb.smartgcal.data.SmartGcalValue
@@ -105,6 +104,9 @@ trait ExecutionTestSupportForFlamingos2 extends ExecutionTestSupport:
           Services.asSuperUser:
             services.smartGcalService.insertFlamingos2(i, r)
   }
+
+  def flamingos2TimeEstimateCalculator: IO[TimeEstimateCalculator[Flamingos2StaticConfig, Flamingos2DynamicConfig]] =
+    timeEstimateCalculator.map(_.flamingos2)
 
   val Flamingos2AtomQuery: String =
     s"""
@@ -322,16 +324,13 @@ trait ExecutionTestSupportForFlamingos2 extends ExecutionTestSupport:
     }
 
   val createOngoingFlamingos2Observation: IO[Observation.Id] =
-    // importing at the top level breaks other tests in a never-ending cycle of despair.
-    import lucuma.odb.json.all.transport.given
     for
       p <- createProgram
       t <- createTargetWithProfileAs(pi, p)
       o <- createFlamingos2LongSlitObservationAs(pi, p, List(t))
       v <- recordVisitAs(serviceUser, Instrument.Flamingos2, o)
-      a <- recordAtomAs(serviceUser, Instrument.Flamingos2, v, SequenceType.Science)
-      s <- recordStepAs(serviceUser, a, Instrument.Flamingos2, flamingos2Science(20.secondTimeSpan), StepConfig.Science, sciTelescopeConfig(15), ObserveClass.Science)
-      _ <- addEndStepEvent(s)
+      s <- firstScienceStepId(serviceUser, o)
+      _ <- addEndStepEvent(s, v)
       _ <- runObscalcUpdate(p, o)
     yield o
 

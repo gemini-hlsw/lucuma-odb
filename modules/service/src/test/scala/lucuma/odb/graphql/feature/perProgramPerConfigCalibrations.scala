@@ -36,7 +36,7 @@ import lucuma.odb.graphql.OdbSuite
 import lucuma.odb.graphql.TestUsers
 import lucuma.odb.graphql.input.ProgramPropertiesInput
 import lucuma.odb.graphql.query.ExecutionQuerySetupOperations
-import lucuma.odb.graphql.query.ExecutionTestSupport
+import lucuma.odb.graphql.query.ExecutionTestSupportForGmos
 import lucuma.odb.graphql.subscription.SubscriptionUtils
 import lucuma.odb.json.wavelength.decoder.given
 import lucuma.odb.service.PerProgramPerConfigCalibrationsService
@@ -57,7 +57,7 @@ class perProgramPerConfigCalibrations
     extends OdbSuite
     with SubscriptionUtils
     with ExecutionQuerySetupOperations
-    with ExecutionTestSupport {
+    with ExecutionTestSupportForGmos {
   override val pi       = TestUsers.Standard.pi(1, 101)
   val service  = TestUsers.service(3)
 

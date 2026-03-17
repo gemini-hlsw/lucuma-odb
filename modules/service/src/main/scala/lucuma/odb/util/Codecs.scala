@@ -218,6 +218,9 @@ trait Codecs {
   val blind_offset_type: Codec[BlindOffsetType] =
     enumerated(Type("e_blind_offset_type"))
 
+  val breakpoint: Codec[Breakpoint] =
+    enumerated(Type("e_breakpoint"))
+
   val catalog_name: Codec[CatalogName] =
     enumerated(Type("e_catalog_name"))
 
@@ -229,9 +232,6 @@ trait Codecs {
 
   val charge_class: Codec[ChargeClass] =
     enumerated(Type("e_charge_class"))
-
-  val client_id: Codec[Client.Id] =
-    uid[Client.Id]
 
   val cloud_extinction_preset: Codec[CloudExtinction.Preset] =
     enumerated[CloudExtinction.Preset](Type.varchar)
