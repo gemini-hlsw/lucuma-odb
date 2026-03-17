@@ -55,9 +55,10 @@ object Itc:
 
   // ITC result type discriminator.
   enum Type(val tag: String) derives Enumerated:
-    case GmosNorthImaging extends Type("gmos_north_imaging")
-    case GmosSouthImaging extends Type("gmos_south_imaging")
-    case Spectroscopy     extends Type("spectroscopy")
+    case GmosNorthImaging    extends Type("gmos_north_imaging")
+    case GmosSouthImaging    extends Type("gmos_south_imaging")
+    case Spectroscopy        extends Type("spectroscopy")
+    case Igrins2Spectroscopy extends Type("igrins2_spectroscopy")
 
   /**
    * GMOS North imaging results.  There are results per-GMOS North filter.
@@ -131,10 +132,31 @@ object Itc:
   val spectroscopy: Prism[Itc, Spectroscopy] =
     GenPrism[Itc, Spectroscopy]
 
+  /**
+   * Spectroscopy results for IGRINS-2 withoutout acquisition.
+   */
+  case class Igrins2Spectroscopy(
+    science: Zipper[Result]
+  ) extends Itc:
+
+    override def dataType: Type =
+      Type.Igrins2Spectroscopy
+
+    override def scienceExposureCount: PosInt =
+      science.focus.value.exposureCount
+
+  object Igrins2Spectroscopy:
+    given Eq[Igrins2Spectroscopy] =
+      Eq.by(_.science)
+
+  val igrins2Spectroscopy: Prism[Itc, Igrins2Spectroscopy] =
+    GenPrism[Itc, Igrins2Spectroscopy]
+
   given Eq[Itc] =
     Eq.instance {
-      case (a: GmosNorthImaging, b: GmosNorthImaging) => a === b
-      case (a: GmosSouthImaging, b: GmosSouthImaging) => a === b
-      case (a: Spectroscopy,     b: Spectroscopy    ) => a === b
-      case _                                          => false
+      case (a: GmosNorthImaging,    b: GmosNorthImaging)    => a === b
+      case (a: GmosSouthImaging,    b: GmosSouthImaging)    => a === b
+      case (a: Spectroscopy,        b: Spectroscopy)        => a === b
+      case (a: Igrins2Spectroscopy, b: Igrins2Spectroscopy) => a === b
+      case _                                                => false
     }

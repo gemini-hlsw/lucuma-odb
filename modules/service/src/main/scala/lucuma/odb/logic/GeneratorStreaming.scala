@@ -117,6 +117,14 @@ object GeneratorStreaming:
       Itc.spectroscopy.getOption(i).toRight:
         OdbError.InvalidObservation(oid, s"Expecting a spectroscopy ITC result for this observation".some)
 
+  def requireIgrins2SpectroscopyItc(
+    oid: Observation.Id,
+    itc: Either[OdbError, Itc]
+  ): Either[OdbError, Itc.Igrins2Spectroscopy] =
+    itc.flatMap: i =>
+      Itc.igrins2Spectroscopy.getOption(i).toRight:
+        OdbError.InvalidObservation(oid, s"Expecting an IGRINS-2 spectroscopy ITC result for this observation".some)
+
   def instantiate[F[_]: Async: Services](
     commitHash: CommitHash,
     calculator: TimeEstimateCalculatorImplementation.ForInstrumentMode
@@ -286,6 +294,6 @@ object GeneratorStreaming:
         import lucuma.odb.sequence.igrins2.longslit.LongSlit
         (for
           cfg <- extractMode(ObservingMode.Igrins2LongSlitName, context)(_.asIgrins2LongSlit)
-          itc  = requireSpectroscopyItc(context.oid, context.itcRes)
+          itc  = requireIgrins2SpectroscopyItc(context.oid, context.itcRes)
           gen <- EitherT(LongSlit.instantiate(context.oid, calculator.igrins2, context.namespace, exp.igrins2, cfg, itc))
         yield gen.covary[F]).value

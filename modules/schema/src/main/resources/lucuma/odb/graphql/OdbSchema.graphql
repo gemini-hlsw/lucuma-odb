@@ -10886,6 +10886,7 @@ A discriminator for the types of ITC results.
 """
 enum ItcType {
   SPECTROSCOPY,
+  IGRINS_2_SPECTROSCOPY,
   GMOS_NORTH_IMAGING,
   GMOS_SOUTH_IMAGING
 }
@@ -10958,6 +10959,14 @@ ITC results for spectroscopy observations.
 type ItcSpectroscopy implements Itc {
   itcType: ItcType!
   acquisition: ItcResultSet!
+  spectroscopyScience: ItcResultSet!
+}
+
+"""
+ITC results for IGRINS-2 spectroscopy observations (no acquisition).
+"""
+type ItcIgrins2Spectroscopy implements Itc {
+  itcType: ItcType!
   spectroscopyScience: ItcResultSet!
 }
 

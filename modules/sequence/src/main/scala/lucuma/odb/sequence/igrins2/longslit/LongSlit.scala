@@ -12,7 +12,7 @@ import lucuma.core.model.Observation
 import lucuma.core.model.sequence.igrins2.Igrins2DynamicConfig
 import lucuma.core.model.sequence.igrins2.Igrins2SVCImages
 import lucuma.core.model.sequence.igrins2.Igrins2StaticConfig
-import lucuma.odb.data.Itc.Spectroscopy
+import lucuma.odb.data.Itc.Igrins2Spectroscopy
 import lucuma.odb.data.OdbError
 import lucuma.odb.sequence.data.StreamingExecutionConfig
 
@@ -29,7 +29,7 @@ object LongSlit:
     namespace:     UUID,
     expander:      SmartGcalExpander[F, Igrins2DynamicConfig],
     config:        Config,
-    itc:           Either[OdbError, Spectroscopy]
+    itc:           Either[OdbError, Igrins2Spectroscopy]
   ): F[Either[OdbError, StreamingExecutionConfig[Pure, Igrins2StaticConfig, Igrins2DynamicConfig]]] =
     val static = staticFrom(config)
     (for

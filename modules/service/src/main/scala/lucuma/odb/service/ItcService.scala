@@ -397,11 +397,16 @@ object ItcService {
                 .handleError: t =>
                   OdbError.RemoteServiceCallError(s"Error calling ITC service: ${t.getMessage}".some).asLeft
 
-          for
-            acq <- safeAcquisitionCall(oid, sp.acquisitionInput, sp.acquisitionTargets)
+          for {
             cr  <- callSpectroscopy
             sci <- EitherT.fromEither(toTargetResults(sp.targets, NonEmptyList.one(cr)).map(_.head))
-          yield Itc.Spectroscopy(acq, sci)
+            itc <- sp.acquisition.mode match
+                     // igrins 2 acquisition is handled outside gpp
+                     case InstrumentMode.Igrins2Spectroscopy() =>
+                       EitherT.pure(Itc.Igrins2Spectroscopy(sci))
+                     case _                                    =>
+                       safeAcquisitionCall(oid, sp.acquisitionInput, sp.acquisitionTargets).map(Itc.Spectroscopy(_, sci))
+          } yield itc
 
         (input match
           case im @ ItcInput.Imaging(science, _)      => imaging(im)
