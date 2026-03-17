@@ -15,7 +15,10 @@ import fs2.Pure
 import fs2.Stream
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SequenceType
+import lucuma.core.enums.StepGuideState.Disabled
 import lucuma.core.enums.StepGuideState.Enabled
+import lucuma.core.math.Angle
+import lucuma.core.math.Offset
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.TelescopeConfig
@@ -37,17 +40,25 @@ object Science:
    */
   val AbbaCycleTitle: NonEmptyString = NonEmptyString.unsafeFrom("ABBA Cycle")
 
+  /**
+   * Slit length (5 arcsec). Offsets with Q beyond ±2.5 arcsec are off slit.
+   */
+  val SlitLength: Angle =
+    Angle.fromBigDecimalArcseconds(5.0)
+
   object Igrins2SequenceState extends SequenceState[Igrins2DynamicConfig]:
     override val initialDynamicConfig: Igrins2DynamicConfig =
       Igrins2DynamicConfig(TimeSpan.Min)
 
+    def igrins2ScienceStep(o: Offset): State[Igrins2DynamicConfig, ProtoStep[Igrins2DynamicConfig]] =
+      val guideState = if isOnSlit(SlitLength, o) then Enabled else Disabled
+      scienceStep(TelescopeConfig(o, guideState), ObserveClass.Science)
+
   case class StepDefinition(
     scienceSteps: NonEmptyList[ProtoStep[Igrins2DynamicConfig]]
   ):
-    def cycleCount(t: IntegrationTime): NonNegInt =
-      val requiredExposures = t.exposureCount.value
-      val exposuresPerCycle = scienceSteps.size
-      NonNegInt.unsafeFrom((requiredExposures + (exposuresPerCycle - 1)) / exposuresPerCycle)
+    def cycleCount(t: IntegrationTime): Either[String, NonNegInt] =
+      lucuma.odb.sequence.cycleCount(SlitLength, scienceSteps.toList, t)
 
   object StepDefinition:
 
@@ -61,12 +72,8 @@ object Science:
         .map: nel =>
           val sciSteps = Igrins2SequenceState.eval:
             for
-              _ <- State.modify[Igrins2DynamicConfig](_.copy(exposure = time.exposureTime))
-              ss <- nel.traverse: o =>
-                      Igrins2SequenceState.scienceStep(
-                        TelescopeConfig(o, Enabled),
-                        ObserveClass.Science
-                      )
+              _  <- State.modify[Igrins2DynamicConfig](_.copy(exposure = time.exposureTime))
+              ss <- nel.traverse(Igrins2SequenceState.igrins2ScienceStep)
             yield ss
           StepDefinition(sciSteps)
 
@@ -106,7 +113,8 @@ object Science:
            )
       s <- StepDefinition.compute(config, t)
              .leftMap(m => definitionError(observationId, m))
-      c  = s.cycleCount(t)
+      c <- s.cycleCount(t)
+             .leftMap(m => definitionError(observationId, m))
     yield Generator(
       s,
       AtomBuilder.instantiate(estimator, static, namespace, SequenceType.Science),
