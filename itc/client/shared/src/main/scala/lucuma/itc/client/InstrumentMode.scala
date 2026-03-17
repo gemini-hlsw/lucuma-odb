@@ -211,7 +211,7 @@ object InstrumentMode {
 
   case class Igrins2Spectroscopy() extends InstrumentMode derives Eq:
     override def displayName: String =
-      "IGRINS2 Spectroscopy"
+      "IGRINS-2 Spectroscopy"
 
   object Igrins2Spectroscopy:
     given Encoder[Igrins2Spectroscopy] = _ => Json.obj()

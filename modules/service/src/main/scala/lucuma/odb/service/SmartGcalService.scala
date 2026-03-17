@@ -393,7 +393,7 @@ object SmartGcalService {
         whereSmartGcalType(sgt),
       )
 
-      selectGcal("t_smart_flamingos2", where)
+      selectGcal("t_smart_flamingos_2", where)
     }
 
     val InsertGcal: Fragment[(
@@ -521,7 +521,7 @@ object SmartGcalService {
       TimeSpan
     )] =
       sql"""
-        INSERT INTO t_smart_flamingos2 (
+        INSERT INTO t_smart_flamingos_2 (
           c_instrument,
           c_gcal_id,
           c_step_order,
@@ -547,7 +547,7 @@ object SmartGcalService {
         whereSmartGcalType(sgt),
       )
 
-      selectGcal("t_smart_igrins2", where)
+      selectGcal("t_smart_igrins_2", where)
     }
 
     val InsertIgrins2: Fragment[(
@@ -557,7 +557,7 @@ object SmartGcalService {
       TimeSpan
     )] =
       sql"""
-        INSERT INTO t_smart_igrins2 (
+        INSERT INTO t_smart_igrins_2 (
           c_instrument,
           c_gcal_id,
           c_step_order,
