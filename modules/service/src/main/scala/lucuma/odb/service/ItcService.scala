@@ -397,20 +397,30 @@ object ItcService {
                 .handleError: t =>
                   OdbError.RemoteServiceCallError(s"Error calling ITC service: ${t.getMessage}".some).asLeft
 
-          for {
+          for
             cr  <- callSpectroscopy
             sci <- EitherT.fromEither(toTargetResults(sp.targets, NonEmptyList.one(cr)).map(_.head))
-            itc <- sp.acquisition.mode match
-                     // igrins 2 acquisition is handled outside gpp
-                     case InstrumentMode.Igrins2Spectroscopy() =>
-                       EitherT.pure(Itc.Igrins2Spectroscopy(sci))
-                     case _                                    =>
-                       safeAcquisitionCall(oid, sp.acquisitionInput, sp.acquisitionTargets).map(Itc.Spectroscopy(_, sci))
-          } yield itc
+            acq <- safeAcquisitionCall(oid, sp.acquisitionInput, sp.acquisitionTargets)
+          yield Itc.Spectroscopy(acq, sci)
+
+        def igrins2Spectroscopy(sp: ItcInput.Igrins2Spectroscopy): EitherT[F, OdbError, Itc] =
+          val callSpectroscopy: EitherT[F, OdbError, ClientCalculationResult] =
+            EitherT:
+              client
+                .spectroscopy(sp.scienceInput, useCache = false)
+                .map(_.asRight)
+                .handleError: t =>
+                  OdbError.RemoteServiceCallError(s"Error calling ITC service: ${t.getMessage}".some).asLeft
+
+          for
+            cr  <- callSpectroscopy
+            sci <- EitherT.fromEither(toTargetResults(sp.targets, NonEmptyList.one(cr)).map(_.head))
+          yield Itc.Igrins2Spectroscopy(sci)
 
         (input match
-          case im @ ItcInput.Imaging(science, _)      => imaging(im)
-          case sp @ ItcInput.Spectroscopy(_, _, _, _) => spectroscopy(sp)
+          case im @ ItcInput.Imaging(_, _)             => imaging(im)
+          case sp @ ItcInput.Spectroscopy(_, _, _, _)  => spectroscopy(sp)
+          case ig @ ItcInput.Igrins2Spectroscopy(_, _) => igrins2Spectroscopy(ig)
         ).value
 
       @annotation.nowarn("msg=unused implicit parameter")
