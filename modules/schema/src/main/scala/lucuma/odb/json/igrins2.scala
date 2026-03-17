@@ -32,8 +32,8 @@ trait Igrins2Codec:
       )
 
   given Decoder[Igrins2DynamicConfig] =
-    Decoder.instance: c =>
-      c.downField("exposure").as[TimeSpan].map(Igrins2DynamicConfig(_))
+    Decoder.instance:
+      _.downField("exposure").as[TimeSpan].map(Igrins2DynamicConfig.apply)
 
   given (using Encoder[TimeSpan]): Encoder[Igrins2DynamicConfig] =
     Encoder.instance: a =>

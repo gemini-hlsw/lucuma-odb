@@ -5,10 +5,9 @@ package lucuma.odb.sequence
 package igrins2
 package longslit
 
-import cats.Monad
-import cats.data.EitherT
 import cats.data.NonEmptyList
 import cats.data.State
+import cats.syntax.either.*
 import cats.syntax.option.*
 import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.string.NonEmptyString
@@ -16,7 +15,6 @@ import fs2.Pure
 import fs2.Stream
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SequenceType
-import lucuma.core.enums.StepGuideState.Disabled
 import lucuma.core.enums.StepGuideState.Enabled
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.Atom
@@ -34,17 +32,17 @@ import java.util.UUID
 
 object Science:
 
-  val ScienceCycleTitle: NonEmptyString = NonEmptyString.unsafeFrom("IGRINS-2 Cycle")
-
-  val NighttimeCalTitle: NonEmptyString = NonEmptyString.unsafeFrom("Nighttime Calibrations")
+  /**
+   * The name of the ABBA cycle atoms.
+   */
+  val AbbaCycleTitle: NonEmptyString = NonEmptyString.unsafeFrom("ABBA Cycle")
 
   object Igrins2SequenceState extends SequenceState[Igrins2DynamicConfig]:
     override val initialDynamicConfig: Igrins2DynamicConfig =
       Igrins2DynamicConfig(TimeSpan.Min)
 
   case class StepDefinition(
-    scienceSteps: NonEmptyList[ProtoStep[Igrins2DynamicConfig]],
-    cals:         NonEmptyList[ProtoStep[Igrins2DynamicConfig]]
+    scienceSteps: NonEmptyList[ProtoStep[Igrins2DynamicConfig]]
   ):
     def cycleCount(t: IntegrationTime): NonNegInt =
       val requiredExposures = t.exposureCount.value
@@ -53,33 +51,24 @@ object Science:
 
   object StepDefinition:
 
-    def compute[F[_]: Monad](
-      config:   Config,
-      time:     IntegrationTime,
-      expander: SmartGcalExpander[F, Igrins2DynamicConfig]
-    ): EitherT[F, String, StepDefinition] =
+    def compute(
+      config: Config,
+      time:   IntegrationTime
+    ): Either[String, StepDefinition] =
       val offsets = config.offsets
-      for
-        nel <- EitherT.fromOption[F](
-                 NonEmptyList.fromList(offsets),
-                 "At least one offset position is required for IGRINS-2 Long Slit."
-               )
-        steps = Igrins2SequenceState.eval:
-                  for
-                    _  <- State.modify[Igrins2DynamicConfig](_.copy(exposure = time.exposureTime))
-                    ss <- nel.traverse: o =>
-                            Igrins2SequenceState.scienceStep(
-                              TelescopeConfig(o, Enabled),
-                              ObserveClass.Science
-                            )
-                    f  <- Igrins2SequenceState.flatStep(
-                            TelescopeConfig(nel.last, Disabled),
-                            ObserveClass.NightCal
-                          )
-                  yield (ss, f)
-        (sciSteps, flatStep) = steps
-        cals <- EitherT(expander.expandStep(flatStep))
-      yield StepDefinition(sciSteps, cals)
+      NonEmptyList.fromList(offsets)
+        .toRight("At least one offset position is required for IGRINS-2 Long Slit.")
+        .map: nel =>
+          val sciSteps = Igrins2SequenceState.eval:
+            for
+              _ <- State.modify[Igrins2DynamicConfig](_.copy(exposure = time.exposureTime))
+              ss <- nel.traverse: o =>
+                      Igrins2SequenceState.scienceStep(
+                        TelescopeConfig(o, Enabled),
+                        ObserveClass.Science
+                      )
+            yield ss
+          StepDefinition(sciSteps)
 
   case class Generator(
     steps:      StepDefinition,
@@ -89,17 +78,12 @@ object Science:
 
     override def generate: Stream[Pure, Atom[Igrins2DynamicConfig]] =
       val scienceAtom: ProtoAtom[ProtoStep[Igrins2DynamicConfig]] =
-        ProtoAtom(ScienceCycleTitle.some, steps.scienceSteps)
-      val gcalAtom: ProtoAtom[ProtoStep[Igrins2DynamicConfig]] =
-        ProtoAtom(NighttimeCalTitle.some, steps.cals)
+        ProtoAtom(AbbaCycleTitle.some, steps.scienceSteps)
 
       val atoms: List[ProtoAtom[ProtoStep[Igrins2DynamicConfig]]] =
-        List.fill(goalCycles.value)(scienceAtom) ++
-        Option.when(goalCycles.value > 0)(gcalAtom).toList
+        List.fill(goalCycles.value)(scienceAtom)
 
       builder.buildStream(Stream.emits(atoms))
-
-  end Generator
 
   private def definitionError(oid: Observation.Id, msg: String): OdbError =
     OdbError.SequenceUnavailable(oid, s"Could not generate a sequence for $oid: $msg".some)
@@ -107,26 +91,20 @@ object Science:
   private def zeroExposureTime(oid: Observation.Id): OdbError =
     definitionError(oid, "IGRINS-2 Long Slit requires a positive exposure time.")
 
-  def instantiate[F[_]: Monad](
+  def instantiate(
     observationId: Observation.Id,
     estimator:     TimeEstimateCalculator[Igrins2StaticConfig, Igrins2DynamicConfig],
     static:        Igrins2StaticConfig,
     namespace:     UUID,
-    expander:      SmartGcalExpander[F, Igrins2DynamicConfig],
     config:        Config,
     time:          Either[OdbError, IntegrationTime]
-  ): F[Either[OdbError, SequenceGenerator[Igrins2DynamicConfig]]] =
-
-    val posTime: EitherT[F, OdbError, IntegrationTime] =
-      EitherT.fromEither:
-        time.filterOrElse(
-          _.exposureTime.toNonNegMicroseconds.value > 0,
-          zeroExposureTime(observationId)
-        )
-
-    val gen = for
-      t <- posTime
-      s <- StepDefinition.compute(config, t, expander)
+  ): Either[OdbError, SequenceGenerator[Igrins2DynamicConfig]] =
+    for
+      t <- time.filterOrElse(
+             _.exposureTime.toNonNegMicroseconds.value > 0,
+             zeroExposureTime(observationId)
+           )
+      s <- StepDefinition.compute(config, t)
              .leftMap(m => definitionError(observationId, m))
       c  = s.cycleCount(t)
     yield Generator(
@@ -134,5 +112,3 @@ object Science:
       AtomBuilder.instantiate(estimator, static, namespace, SequenceType.Science),
       c
     ): SequenceGenerator[Igrins2DynamicConfig]
-
-    gen.value

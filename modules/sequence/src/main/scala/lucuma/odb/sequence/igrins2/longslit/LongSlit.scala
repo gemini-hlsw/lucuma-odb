@@ -4,8 +4,6 @@
 package lucuma.odb.sequence
 package igrins2.longslit
 
-import cats.Monad
-import cats.data.EitherT
 import fs2.Pure
 import fs2.Stream
 import lucuma.core.model.Observation
@@ -23,18 +21,15 @@ object LongSlit:
   def staticFrom(config: Config): Igrins2StaticConfig =
     Igrins2StaticConfig(Igrins2SVCImages(config.saveSVCImages), config.offsetMode)
 
-  def instantiate[F[_]: Monad](
+  def instantiate(
     observationId: Observation.Id,
     estimator:     TimeEstimateCalculator[Igrins2StaticConfig, Igrins2DynamicConfig],
     namespace:     UUID,
-    expander:      SmartGcalExpander[F, Igrins2DynamicConfig],
     config:        Config,
     itc:           Either[OdbError, Igrins2Spectroscopy]
-  ): F[Either[OdbError, StreamingExecutionConfig[Pure, Igrins2StaticConfig, Igrins2DynamicConfig]]] =
+  ): Either[OdbError, StreamingExecutionConfig[Pure, Igrins2StaticConfig, Igrins2DynamicConfig]] =
     val static = staticFrom(config)
-    (for
-      s <- EitherT(Science.instantiate(
-             observationId, estimator, static, namespace, expander, config,
-             itc.map(_.science.focus.value)
-           ))
-    yield StreamingExecutionConfig(static, Stream.empty, s.generate)).value
+    Science.instantiate(
+      observationId, estimator, static, namespace, config,
+      itc.map(_.science.focus.value)
+    ).map(s => StreamingExecutionConfig(static, Stream.empty, s.generate))

@@ -58,7 +58,7 @@ object Itc:
     case GmosNorthImaging    extends Type("gmos_north_imaging")
     case GmosSouthImaging    extends Type("gmos_south_imaging")
     case Spectroscopy        extends Type("spectroscopy")
-    case Igrins2Spectroscopy extends Type("igrins2_spectroscopy")
+    case Igrins2Spectroscopy extends Type("igrins_2_spectroscopy")
 
   /**
    * GMOS North imaging results.  There are results per-GMOS North filter.

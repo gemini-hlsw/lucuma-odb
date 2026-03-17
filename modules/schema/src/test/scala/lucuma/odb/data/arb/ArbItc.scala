@@ -110,9 +110,7 @@ trait ArbItc:
 
   given Arbitrary[Itc.Igrins2Spectroscopy] =
     Arbitrary:
-      for
-        s <- arbitrary[Zipper[Itc.Result]]
-      yield Itc.Igrins2Spectroscopy(s)
+      arbitrary[Zipper[Itc.Result]].map(Itc.Igrins2Spectroscopy.apply)
 
   given Cogen[Itc.Igrins2Spectroscopy] =
     Cogen[Zipper[Itc.Result]].contramap(_.science)
