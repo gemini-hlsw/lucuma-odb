@@ -11,12 +11,12 @@ import lucuma.core.model.sequence.igrins2.arb.ArbIgrins2DynamicConfig
 import lucuma.core.model.sequence.igrins2.arb.ArbIgrins2StaticConfig
 import munit.DisciplineSuite
 
-class Igrins2Suite extends DisciplineSuite with ArbitraryInstances:
+import ArbIgrins2DynamicConfig.given
+import ArbIgrins2StaticConfig.given
+import igrins2.given
+import time.query.given
 
-  import ArbIgrins2DynamicConfig.given
-  import ArbIgrins2StaticConfig.given
-  import igrins2.given
-  import time.query.given
+class Igrins2Suite extends DisciplineSuite with ArbitraryInstances:
 
   checkAll("Igrins2Codec DynamicConfig", CodecTests[Igrins2DynamicConfig].codec)
   checkAll("Igrins2Codec StaticConfig",  CodecTests[Igrins2StaticConfig].codec)

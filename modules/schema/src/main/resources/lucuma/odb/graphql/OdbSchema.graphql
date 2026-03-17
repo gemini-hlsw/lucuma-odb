@@ -7839,7 +7839,9 @@ type Igrins2Step {
   """
   stepConfig: StepConfig!
 
-  "The telescope configuration at this step."
+  """
+  The telescope configuration at this step.
+  """
   telescopeConfig: TelescopeConfig!
 
   """

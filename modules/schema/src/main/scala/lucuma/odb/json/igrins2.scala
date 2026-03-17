@@ -13,9 +13,9 @@ import lucuma.core.model.sequence.igrins2.Igrins2SVCImages
 import lucuma.core.model.sequence.igrins2.Igrins2StaticConfig
 import lucuma.core.util.TimeSpan
 
-trait Igrins2Codec:
+import time.decoder.given
 
-  import time.decoder.given
+trait Igrins2Codec:
 
   given Decoder[Igrins2StaticConfig] =
     Decoder.instance: c =>

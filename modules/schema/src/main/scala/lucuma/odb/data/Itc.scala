@@ -133,7 +133,7 @@ object Itc:
     GenPrism[Itc, Spectroscopy]
 
   /**
-   * Spectroscopy results for IGRINS-2 withoutout acquisition.
+   * Spectroscopy results for IGRINS-2 without acquisition.
    */
   case class Igrins2Spectroscopy(
     science: Zipper[Result]
