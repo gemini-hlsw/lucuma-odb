@@ -8,11 +8,13 @@ package longslit
 import cats.data.NonEmptyList
 import cats.data.State
 import cats.syntax.either.*
+import cats.syntax.eq.*
 import cats.syntax.option.*
 import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.string.NonEmptyString
 import fs2.Pure
 import fs2.Stream
+import lucuma.core.enums.Igrins2OffsetMode
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SequenceType
 import lucuma.core.enums.StepGuideState.Disabled
@@ -46,19 +48,25 @@ object Science:
   val SlitLength: Angle =
     Angle.fromBigDecimalArcseconds(5.0)
 
+  private def isOnTarget(mode: Igrins2OffsetMode, o: Offset): Boolean =
+    mode match
+      case Igrins2OffsetMode.NodAlongSlit => isOnSlit(SlitLength, o)
+      case Igrins2OffsetMode.NodToSky     => o.p.toAngle.toMicroarcseconds === 0L
+
   object Igrins2SequenceState extends SequenceState[Igrins2DynamicConfig]:
     override val initialDynamicConfig: Igrins2DynamicConfig =
       Igrins2DynamicConfig(TimeSpan.Min)
 
-    def igrins2ScienceStep(o: Offset): State[Igrins2DynamicConfig, ProtoStep[Igrins2DynamicConfig]] =
-      val guideState = if isOnSlit(SlitLength, o) then Enabled else Disabled
+    def igrins2ScienceStep(mode: Igrins2OffsetMode)(o: Offset): State[Igrins2DynamicConfig, ProtoStep[Igrins2DynamicConfig]] =
+      val guideState = if isOnTarget(mode, o) then Enabled else Disabled
       scienceStep(TelescopeConfig(o, guideState), ObserveClass.Science)
 
   case class StepDefinition(
-    scienceSteps: NonEmptyList[ProtoStep[Igrins2DynamicConfig]]
+    scienceSteps: NonEmptyList[ProtoStep[Igrins2DynamicConfig]],
+    offsetMode:   Igrins2OffsetMode
   ):
     def cycleCount(t: IntegrationTime): Either[String, NonNegInt] =
-      lucuma.odb.sequence.cycleCount(SlitLength, scienceSteps.toList, t)
+      calculateCycleCount[Igrins2DynamicConfig](isOnTarget(offsetMode, _), scienceSteps.toList, t)
 
   object StepDefinition:
 
@@ -73,9 +81,9 @@ object Science:
           val sciSteps = Igrins2SequenceState.eval:
             for
               _  <- State.modify[Igrins2DynamicConfig](_.copy(exposure = time.exposureTime))
-              ss <- nel.traverse(Igrins2SequenceState.igrins2ScienceStep)
+              ss <- nel.traverse(Igrins2SequenceState.igrins2ScienceStep(config.offsetMode))
             yield ss
-          StepDefinition(sciSteps)
+          StepDefinition(sciSteps, config.offsetMode)
 
   case class Generator(
     steps:      StepDefinition,
@@ -106,16 +114,19 @@ object Science:
     config:        Config,
     time:          Either[OdbError, IntegrationTime]
   ): Either[OdbError, SequenceGenerator[Igrins2DynamicConfig]] =
-    for
-      t <- time.filterOrElse(
-             _.exposureTime.toNonNegMicroseconds.value > 0,
-             zeroExposureTime(observationId)
-           )
+    val posTime: Either[OdbError, IntegrationTime] =
+      time.filterOrElse(
+        _.exposureTime.toNonNegMicroseconds.value > 0,
+        zeroExposureTime(observationId)
+      )
+
+    for {
+      t <- posTime
       s <- StepDefinition.compute(config, t)
              .leftMap(m => definitionError(observationId, m))
       c <- s.cycleCount(t)
              .leftMap(m => definitionError(observationId, m))
-    yield Generator(
+    } yield Generator(
       s,
       AtomBuilder.instantiate(estimator, static, namespace, SequenceType.Science),
       c

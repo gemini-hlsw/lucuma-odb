@@ -108,7 +108,7 @@ object Science:
       NonEmptyList.of(a0, b0, b1, a1)
 
     def cycleCount(t: IntegrationTime): Either[String, NonNegInt] =
-      lucuma.odb.sequence.cycleCount(SlitLength, abbaCycle.toList, t)
+      calculateCycleCount(isOnSlit(SlitLength, _), abbaCycle.toList, t)
 
   object StepDefinition extends SequenceState[F2] with Flamingos2InitialDynamicConfig:
 
