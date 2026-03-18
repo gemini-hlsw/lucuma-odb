@@ -23,7 +23,7 @@ object LongSlit:
 
   def instantiate(
     observationId: Observation.Id,
-    estimator:     TimeEstimateCalculator[Igrins2StaticConfig, Igrins2DynamicConfig],
+    estimator:     StepTimeEstimateCalculator[Igrins2StaticConfig, Igrins2DynamicConfig],
     namespace:     UUID,
     config:        Config,
     itc:           Either[OdbError, Igrins2Spectroscopy]

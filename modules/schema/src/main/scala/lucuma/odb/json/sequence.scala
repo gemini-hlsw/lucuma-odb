@@ -119,15 +119,17 @@ trait SequenceCodec {
     Decoder.instance { c =>
       for {
         t <- c.downField("setup").as[SetupTime]
+        n <- c.downField("setupCount").as[NonNegInt]
         a <- c.downField("acquisition").as[SequenceDigest]
         s <- c.downField("science").as[SequenceDigest]
-      } yield ExecutionDigest(t, a, s)
+      } yield ExecutionDigest(t, n, a, s)
     }
 
   given (using Encoder[Offset], Encoder[TimeSpan]): Encoder[ExecutionDigest] =
     Encoder.instance { (a: ExecutionDigest) =>
       Json.obj(
         "setup"       -> a.setup.asJson,
+        "setupCount"  -> a.setupCount.asJson,
         "acquisition" -> a.acquisition.asJson,
         "science"     -> a.science.asJson
       )

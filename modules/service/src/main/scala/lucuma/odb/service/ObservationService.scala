@@ -1205,7 +1205,6 @@ object ObservationService {
           FROM t_observation
          WHERE c_observation_id = $observation_id
       """.query(instrument)
-
   }
 
 }

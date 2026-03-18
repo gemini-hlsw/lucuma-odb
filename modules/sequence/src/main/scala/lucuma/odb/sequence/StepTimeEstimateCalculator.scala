@@ -9,42 +9,36 @@ import cats.syntax.foldable.*
 import cats.syntax.option.*
 import cats.syntax.traverse.*
 import lucuma.core.math.Offset
-import lucuma.core.model.sequence.SetupTime
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.StepEstimate
 import lucuma.core.util.TimeSpan
 import lucuma.odb.sequence.data.ProtoStep
 
 /**
- * Estimates the cost of setup and step execution.
+ * Estimates the cost of step execution.
  *
  * @tparam S static config type
  * @tparam D dynamic config type
  */
-trait TimeEstimateCalculator[S, D]:
-
-  /**
-   * Provides a rough estimate of the setup time, which includes acquisition.
-   */
-  def estimateSetup: SetupTime
+trait StepTimeEstimateCalculator[S, D]:
 
   /**
    * Provides an estimate of the cost for executing the 'next' step, given the
    * provided 'past' state.
    */
-  def estimateStep(static: S, last: TimeEstimateCalculator.Last[D], next: ProtoStep[D]): StepEstimate
+  def estimateStep(static: S, last: StepTimeEstimateCalculator.Last[D], next: ProtoStep[D]): StepEstimate
 
-  def estimateOne(static: S, step: ProtoStep[D]): State[TimeEstimateCalculator.Last[D], StepEstimate] =
-    State.apply[TimeEstimateCalculator.Last[D], StepEstimate]: last =>
+  def estimateOne(static: S, step: ProtoStep[D]): State[StepTimeEstimateCalculator.Last[D], StepEstimate] =
+    State.apply[StepTimeEstimateCalculator.Last[D], StepEstimate]: last =>
       (last.next(step), estimateStep(static, last, step))
 
-  def estimateTotal(static: S, steps: List[ProtoStep[D]]): State[TimeEstimateCalculator.Last[D], TimeSpan] =
+  def estimateTotal(static: S, steps: List[ProtoStep[D]]): State[StepTimeEstimateCalculator.Last[D], TimeSpan] =
     steps.traverse(estimateOne(static, _)).map(_.foldMap(_.total))
 
-  def estimateTotalNel(static: S, steps: NonEmptyList[ProtoStep[D]]): State[TimeEstimateCalculator.Last[D], TimeSpan] =
+  def estimateTotalNel(static: S, steps: NonEmptyList[ProtoStep[D]]): State[StepTimeEstimateCalculator.Last[D], TimeSpan] =
     estimateTotal(static, steps.toList)
 
-object TimeEstimateCalculator:
+object StepTimeEstimateCalculator:
 
   /**
    * State kept while computing time estimates.  Figuring out how long a step will
@@ -76,5 +70,5 @@ object TimeEstimateCalculator:
    * Execute the state calculation with an empty `Last` value.  In other words,
    * with no assumption about the current state of the telescope and instrument.
    */
-  def runEmpty[D, A](s: State[TimeEstimateCalculator.Last[D], A]): A =
+  def runEmpty[D, A](s: State[StepTimeEstimateCalculator.Last[D], A]): A =
     s.runA(Last.empty[D]).value

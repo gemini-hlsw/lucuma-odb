@@ -47,7 +47,7 @@ import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.mapping.AccessControl.CheckedWithId
 import lucuma.odb.logic.Generator.SequenceAtomLimit
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
-import lucuma.odb.sequence.TimeEstimateCalculator
+import lucuma.odb.sequence.StepTimeEstimateCalculator
 import lucuma.odb.sequence.data.ProtoAtom
 import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.sequence.data.StreamingExecutionConfig
@@ -355,9 +355,9 @@ object SequenceService:
       // and grouping the steps by atom id.
       private def atomPipe[S, D](
         static:    S,
-        estimator: TimeEstimateCalculator[S, D]
+        estimator: StepTimeEstimateCalculator[S, D]
       ): Pipe[F, (Atom.Id, Option[String], Step.Id, ProtoStep[D]), Atom[D]] =
-        _.mapAccumulate(TimeEstimateCalculator.Last.empty[D]) {
+        _.mapAccumulate(StepTimeEstimateCalculator.Last.empty[D]) {
           case (last, (aid, desc, sid, protoStep)) =>
             val (lastʹ, estimate) = estimator.estimateOne(static, protoStep).run(last).value
             (lastʹ, (aid, desc, protoStep.toStep(sid, estimate)))
@@ -406,7 +406,7 @@ object SequenceService:
         sequenceType: SequenceType,
         static:       S,
         namespace:    Option[UUID],
-        estimator:    TimeEstimateCalculator[S, D]
+        estimator:    StepTimeEstimateCalculator[S, D]
       ): F[AtomBuilder[D]] =
         namespace
           .fold(UUIDGen[F].randomUUID)(_.pure[F])
@@ -464,7 +464,7 @@ object SequenceService:
 
         (for
           s <- selectStatic(observationId, "Flamingos 2", flamingos2SequenceService.selectStatic)
-          b <- ResultT.liftF(atomBuilder(sequenceType, s, namespace, estimator.flamingos2))
+          b <- ResultT.liftF(atomBuilder(sequenceType, s, namespace, estimator.flamingos2Step))
           r <- replaceSequence(
                  Instrument.Flamingos2,
                  observationId,
@@ -494,7 +494,7 @@ object SequenceService:
       )(using Transaction[F]): F[Result[Stream[Pure, Atom[GmosNorth]]]] =
         (for
           s <- selectStatic(observationId, "GMOS North", gmosSequenceService.selectGmosNorthStatic)
-          b <- ResultT.liftF(atomBuilder(sequenceType, s, namespace, estimator.gmosNorth))
+          b <- ResultT.liftF(atomBuilder(sequenceType, s, namespace, estimator.gmosNorthStep))
           r <- replaceSequence(
                  Instrument.GmosNorth,
                  observationId,
@@ -524,7 +524,7 @@ object SequenceService:
       )(using Transaction[F]): F[Result[Stream[Pure, Atom[GmosSouth]]]] =
         (for
           s <- selectStatic(observationId, "GMOS South", gmosSequenceService.selectGmosSouthStatic)
-          b <- ResultT.liftF(atomBuilder(sequenceType, s, namespace, estimator.gmosSouth))
+          b <- ResultT.liftF(atomBuilder(sequenceType, s, namespace, estimator.gmosSouthStep))
           r <- replaceSequence(
                  Instrument.GmosSouth,
                  observationId,
@@ -628,7 +628,7 @@ object SequenceService:
         sequenceType:  SequenceType,
         query:         Query[(Instrument, Observation.Id, SequenceType), (Atom.Id, Option[String], Step.Id, ProtoStep[D])],
         staticConfig:  S,
-        estimator:     TimeEstimateCalculator[S, D]
+        estimator:     StepTimeEstimateCalculator[S, D]
       )(using Transaction[F]): F[Option[Stream[F, Atom[D]]]] =
         isMaterialized(observationId, sequenceType).ifF(
           session
@@ -649,7 +649,7 @@ object SequenceService:
           sequenceType,
           Statements.SelectFlamingos2Sequence,
           staticConfig,
-          estimator.flamingos2
+          estimator.flamingos2Step
         )
 
       override def selectGmosNorthSequence(
@@ -663,7 +663,7 @@ object SequenceService:
           sequenceType,
           Statements.SelectGmosNorthSequence,
           staticConfig,
-          estimator.gmosNorth
+          estimator.gmosNorthStep
         )
 
       override def selectGmosSouthSequence(
@@ -677,7 +677,7 @@ object SequenceService:
           sequenceType,
           Statements.SelectGmosSouthSequence,
           staticConfig,
-          estimator.gmosSouth
+          estimator.gmosSouthStep
         )
 
       override def selectIgrins2Sequence(
@@ -691,7 +691,7 @@ object SequenceService:
           sequenceType,
           Statements.SelectIgrins2Sequence,
           staticConfig,
-          estimator.igrins2
+          estimator.igrins2Step
         )
 
   object Statements:

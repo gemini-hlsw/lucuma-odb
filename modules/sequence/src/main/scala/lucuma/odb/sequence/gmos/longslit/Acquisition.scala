@@ -134,7 +134,7 @@ object Acquisition:
         a0 <- builder.build(NonEmptyString.unapply("Initial Acquisition"), 0, 0, steps.initialAtom)
         as <- (1 to RepeatingAtomCount).toList.traverse: aix =>
                 builder.build(NonEmptyString.unapply("Fine Adjustments"), aix, 0, steps.repeatingAtom)
-      yield Stream.emits(a0 :: as)).runA(TimeEstimateCalculator.Last.empty[D]).value
+      yield Stream.emits(a0 :: as)).runA(StepTimeEstimateCalculator.Last.empty[D]).value
 
   private def instantiate[D, G, L, U](
     oid:         Observation.Id,
@@ -161,7 +161,7 @@ object Acquisition:
 
   def gmosNorth(
     observationId: Observation.Id,
-    estimator:     TimeEstimateCalculator[StaticConfig.GmosNorth, GmosNorth],
+    estimator:     StepTimeEstimateCalculator[StaticConfig.GmosNorth, GmosNorth],
     static:        StaticConfig.GmosNorth,
     namespace:     UUID,
     config:        Config.GmosNorth,
@@ -179,7 +179,7 @@ object Acquisition:
 
   def gmosSouth(
     observationId: Observation.Id,
-    estimator:     TimeEstimateCalculator[StaticConfig.GmosSouth, GmosSouth],
+    estimator:     StepTimeEstimateCalculator[StaticConfig.GmosSouth, GmosSouth],
     static:        StaticConfig.GmosSouth,
     namespace:     UUID,
     config:        Config.GmosSouth,

@@ -53,7 +53,7 @@ import lucuma.core.syntax.string.*
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
 import lucuma.itc.IntegrationTime
-import lucuma.odb.sequence.TimeEstimateCalculator
+import lucuma.odb.sequence.StepTimeEstimateCalculator
 import lucuma.odb.sequence.gmos.longslit.Acquisition.RepeatingAtomCount
 import lucuma.odb.service.Services
 import lucuma.odb.smartgcal.data.Gmos
@@ -220,11 +220,11 @@ trait ExecutionTestSupportForGmos extends ExecutionTestSupport:
     north >> south
   }
 
-  def gmosNorthTimeEstimateCalculator: IO[TimeEstimateCalculator[StaticConfig.GmosNorth, GmosNorth]] =
-    timeEstimateCalculator.map(_.gmosNorth)
+  def gmosNorthTimeEstimateCalculator: IO[StepTimeEstimateCalculator[StaticConfig.GmosNorth, GmosNorth]] =
+    timeEstimateCalculator.map(_.gmosNorthStep)
 
-  def gmosSouthTimeEstimateCalculator: IO[TimeEstimateCalculator[StaticConfig.GmosSouth, GmosSouth]] =
-    timeEstimateCalculator.map(_.gmosSouth)
+  def gmosSouthTimeEstimateCalculator: IO[StepTimeEstimateCalculator[StaticConfig.GmosSouth, GmosSouth]] =
+    timeEstimateCalculator.map(_.gmosSouthStep)
 
   val GmosAtomQuery: String =
     s"""

@@ -108,7 +108,7 @@ object Science:
 
   def instantiate(
     observationId: Observation.Id,
-    estimator:     TimeEstimateCalculator[Igrins2StaticConfig, Igrins2DynamicConfig],
+    estimator:     StepTimeEstimateCalculator[Igrins2StaticConfig, Igrins2DynamicConfig],
     static:        Igrins2StaticConfig,
     namespace:     UUID,
     config:        Config,

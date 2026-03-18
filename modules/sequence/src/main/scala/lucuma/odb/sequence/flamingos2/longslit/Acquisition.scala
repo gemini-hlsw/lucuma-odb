@@ -109,11 +109,11 @@ object Acquisition:
         a0 <- builder.build(NonEmptyString.unapply("Initial Acquisition"), 0, 0, steps.initialAtom)
         as <- (1 to RepeatingAtomCount).toList.traverse: aix =>
                 builder.build(NonEmptyString.unapply("Fine Adjustments"), aix, 0, steps.repeatingAtom)
-      yield Stream.emits(a0 :: as)).runA(TimeEstimateCalculator.Last.empty[F2]).value
+      yield Stream.emits(a0 :: as)).runA(StepTimeEstimateCalculator.Last.empty[F2]).value
 
   def instantiate(
     observationId: Observation.Id,
-    estimator:     TimeEstimateCalculator[Flamingos2StaticConfig, F2],
+    estimator:     StepTimeEstimateCalculator[Flamingos2StaticConfig, F2],
     static:        Flamingos2StaticConfig,
     namespace:     UUID,
     config:        Config,

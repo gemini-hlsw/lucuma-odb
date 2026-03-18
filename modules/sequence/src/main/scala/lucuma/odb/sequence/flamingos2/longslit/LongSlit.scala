@@ -27,7 +27,7 @@ object LongSlit:
 
   def instantiate[F[_]: Monad](
     observationId:  Observation.Id,
-    estimator:      TimeEstimateCalculator[F2Static, F2Dynamic],
+    estimator:      StepTimeEstimateCalculator[F2Static, F2Dynamic],
     namespace:      UUID,
     expander:       SmartGcalExpander[F, F2Dynamic],
     config:         Config,

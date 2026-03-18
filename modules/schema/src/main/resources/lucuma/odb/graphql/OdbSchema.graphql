@@ -7476,6 +7476,9 @@ type ExecutionDigest {
   "Setup time calculations."
   setup: SetupTime!
 
+  "Estimated number of setups required to complete this observation."
+  setupCount: NonNegInt!
+
   "Acquisition sequence summary."
   acquisition: SequenceDigest
 

@@ -30,7 +30,7 @@ object Imaging:
       .value
 
   def gmosNorth[F[_]: Sync](
-    estimator:  TimeEstimateCalculator[StaticConfig.GmosNorth, DynamicConfig.GmosNorth],
+    estimator:  StepTimeEstimateCalculator[StaticConfig.GmosNorth, DynamicConfig.GmosNorth],
     namespace:  UUID,
     config:     Config.GmosNorth,
     scienceItc: Either[OdbError, GmosNorthImaging]
@@ -45,7 +45,7 @@ object Imaging:
     )
 
   def gmosSouth[F[_]: Sync](
-    estimator:  TimeEstimateCalculator[StaticConfig.GmosSouth, DynamicConfig.GmosSouth],
+    estimator:  StepTimeEstimateCalculator[StaticConfig.GmosSouth, DynamicConfig.GmosSouth],
     namespace:  UUID,
     config:     Config.GmosSouth,
     scienceItc: Either[OdbError, GmosSouthImaging]

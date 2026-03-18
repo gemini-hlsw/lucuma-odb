@@ -182,7 +182,7 @@ object GeneratorStreaming:
         (for
           cfg <- extractMode(ObservingMode.Flamingos2LongSlitName, context)(_.asFlamingos2LongSlit)
           itc  = requireSpectroscopyItc(context.oid, context.itcRes)
-          gen <- EitherT(LongSlit.instantiate(context.oid, calculator.flamingos2, context.namespace, exp.flamingos2, cfg, itc))
+          gen <- EitherT(LongSlit.instantiate(context.oid, calculator.flamingos2Step, context.namespace, exp.flamingos2, cfg, itc))
         yield gen.covary[F]).value
 
       override def selectOrGenerateIgrins2LongSlit(
@@ -205,7 +205,7 @@ object GeneratorStreaming:
         (for
           cfg <- extractMode(ObservingMode.Igrins2LongSlitName, context)(_.asIgrins2LongSlit)
           itc  = requireIgrins2SpectroscopyItc(context.oid, context.itcRes)
-          gen <- EitherT.fromEither(LongSlit.instantiate(context.oid, calculator.igrins2, context.namespace, cfg, itc))
+          gen <- EitherT.fromEither(LongSlit.instantiate(context.oid, calculator.igrins2Step, context.namespace, cfg, itc))
         yield gen.covary[F]).value
 
       override def selectOrGenerateGmosNorthImaging(
@@ -227,7 +227,7 @@ object GeneratorStreaming:
         (for
           cfg <- extractMode(ObservingMode.GmosNorthImagingName, context)(_.asGmosNorthImaging)
           itc  = requireImagingItc(ObservingMode.GmosNorthImagingName, context.oid, context.itcRes, Itc.gmosNorthImaging.getOption)
-          gen <- EitherT(Imaging.gmosNorth(calculator.gmosNorth, context.namespace, cfg, itc))
+          gen <- EitherT(Imaging.gmosNorth(calculator.gmosNorthStep, context.namespace, cfg, itc))
         yield gen.covary[F]).value
 
 
@@ -248,7 +248,7 @@ object GeneratorStreaming:
           cfg <- extractMode(ObservingMode.GmosNorthLongSlitName, context)(_.asGmosNorthLongSlit)
           itc  = requireSpectroscopyItc(context.oid, context.itcRes)
           rol  = context.params.calibrationRole
-          gen <- EitherT(LongSlit.gmosNorth(context.oid, calculator.gmosNorth, context.namespace, exp.gmosNorth, cfg, itc, rol))
+          gen <- EitherT(LongSlit.gmosNorth(context.oid, calculator.gmosNorthStep, context.namespace, exp.gmosNorth, cfg, itc, rol))
         yield gen.covary[F]).value
 
 
@@ -271,7 +271,7 @@ object GeneratorStreaming:
         (for
           cfg <- extractMode(ObservingMode.GmosSouthImagingName, context)(_.asGmosSouthImaging)
           itc  = requireImagingItc(ObservingMode.GmosSouthImagingName, context.oid, context.itcRes, Itc.gmosSouthImaging.getOption)
-          gen <- EitherT(Imaging.gmosSouth(calculator.gmosSouth, context.namespace, cfg, itc))
+          gen <- EitherT(Imaging.gmosSouth(calculator.gmosSouthStep, context.namespace, cfg, itc))
         yield gen.covary[F]).value
 
 
@@ -292,5 +292,5 @@ object GeneratorStreaming:
           cfg <- extractMode(ObservingMode.GmosSouthLongSlitName, context)(_.asGmosSouthLongSlit)
           itc  = requireSpectroscopyItc(context.oid, context.itcRes)
           rol  = context.params.calibrationRole
-          gen <- EitherT(LongSlit.gmosSouth(context.oid, calculator.gmosSouth, context.namespace, exp.gmosSouth, cfg, itc, rol))
+          gen <- EitherT(LongSlit.gmosSouth(context.oid, calculator.gmosSouthStep, context.namespace, exp.gmosSouth, cfg, itc, rol))
         yield gen.covary[F]).value

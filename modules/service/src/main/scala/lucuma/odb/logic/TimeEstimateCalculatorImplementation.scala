@@ -5,6 +5,7 @@ package lucuma.odb.logic
 
 import cats.MonadError
 import cats.syntax.functor.*
+import eu.timepit.refined.types.numeric.NonNegInt
 import lucuma.core.model.sequence.SetupTime
 import lucuma.core.model.sequence.StepEstimate
 import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig
@@ -13,8 +14,11 @@ import lucuma.core.model.sequence.gmos.DynamicConfig
 import lucuma.core.model.sequence.gmos.StaticConfig
 import lucuma.core.model.sequence.igrins2.Igrins2DynamicConfig
 import lucuma.core.model.sequence.igrins2.Igrins2StaticConfig
+import lucuma.core.refined.numeric.NonZeroInt
+import lucuma.core.util.TimeSpan
 import lucuma.odb.graphql.enums.Enums
-import lucuma.odb.sequence.TimeEstimateCalculator
+import lucuma.odb.sequence.SetupTimeEstimateCalculator
+import lucuma.odb.sequence.StepTimeEstimateCalculator
 import lucuma.odb.sequence.data.ProtoStep
 import skunk.Session
 
@@ -26,61 +30,98 @@ object TimeEstimateCalculatorImplementation:
   private def fromContext(ctx: TimeEstimateContext): ForInstrumentMode =
     new ForInstrumentMode(ctx)
 
-  private def fromEstimators[S, D](
+  private def setupCalculatorfromEstimation(
     setup:             SetupTime,
-    configChange:      ConfigChangeEstimator[D],
-    detectorEstimator: DetectorEstimator[S, D]
-  ): TimeEstimateCalculator[S, D] =
-    new TimeEstimateCalculator[S, D]:
-      override def estimateSetup: SetupTime =
+    maxVisit:          TimeSpan,
+  ): SetupTimeEstimateCalculator =
+    new SetupTimeEstimateCalculator:
+      override def estimateSetupTime: SetupTime =
         setup
 
-      override def estimateStep(static: S, last: TimeEstimateCalculator.Last[D], next: ProtoStep[D]): StepEstimate = {
+      override def estimateSetupCount(scienceTime: TimeSpan): NonNegInt =
+        if scienceTime.isZero then NonNegInt.MinValue
+        else
+          val OneQuarter: TimeSpan = maxVisit /| NonZeroInt.unsafeFrom(4)
+          NonNegInt.unsafeFrom:
+           (math.ceil((scienceTime -| OneQuarter).toMicroseconds.toDouble / maxVisit.toMicroseconds.toDouble) max 1.0).toInt
+
+  private def stepCalculatorfromEstimators[S, D](
+    configChange:      ConfigChangeEstimator[D],
+    detectorEstimator: DetectorEstimator[S, D]
+  ): StepTimeEstimateCalculator[S, D] =
+    new StepTimeEstimateCalculator[S, D]:
+      override def estimateStep(static: S, last: StepTimeEstimateCalculator.Last[D], next: ProtoStep[D]): StepEstimate =
         val c = configChange.estimate(last, next)
         val d = detectorEstimator.estimate(static, next)
         StepEstimate.fromMax(c, d)
-      }
 
   class ForInstrumentMode private[TimeEstimateCalculatorImplementation] (private val ctx: TimeEstimateContext):
     private val cce = ConfigChangeEstimator.using(ctx.enums)
     private val de  = DetectorEstimator.using(ctx)
 
-    lazy val igrins2: TimeEstimateCalculator[Igrins2StaticConfig, Igrins2DynamicConfig] =
-      fromEstimators(
-        SetupTime(
-          ctx.enums.TimeEstimate.Igrins2LongslitSetup.time,
-          ctx.enums.TimeEstimate.Igrins2Reacquisition.time
-        ),
-        cce.igrins2,
-        de.igrins2
-      )
-
-    lazy val flamingos2: TimeEstimateCalculator[Flamingos2StaticConfig, Flamingos2DynamicConfig] =
-      fromEstimators(
+    lazy val flamingos2LongSlitSetup: SetupTimeEstimateCalculator =
+      setupCalculatorfromEstimation(
         SetupTime(
           ctx.enums.TimeEstimate.Flamingos2LongslitSetup.time,
           ctx.enums.TimeEstimate.Flamingos2Reacquisition.time
         ),
-        cce.flamingos2,
-        de.flamingos2
+        ctx.enums.TimeEstimate.Flamingos2LongslitMaxVisit.time
       )
 
-    lazy val gmosNorth: TimeEstimateCalculator[StaticConfig.GmosNorth, DynamicConfig.GmosNorth] =
-      fromEstimators(
+    lazy val gmosNorthImagingSetup: SetupTimeEstimateCalculator =
+      setupCalculatorfromEstimation(
+        SetupTime(
+          ctx.enums.TimeEstimate.GmosNorthImagingSetup.time,
+          ctx.enums.TimeEstimate.GmosNorthReacquisition.time
+        ),
+        ctx.enums.TimeEstimate.GmosNorthImagingMaxVisit.time
+      )
+
+    lazy val gmosNorthLongSlitSetup: SetupTimeEstimateCalculator =
+      setupCalculatorfromEstimation(
         SetupTime(
           ctx.enums.TimeEstimate.GmosNorthLongslitSetup.time,
           ctx.enums.TimeEstimate.GmosNorthReacquisition.time
         ),
-        cce.gmosNorth,
-        de.gmosNorth
+        ctx.enums.TimeEstimate.GmosNorthLongslitMaxVisit.time
       )
 
-    lazy val gmosSouth: TimeEstimateCalculator[StaticConfig.GmosSouth, DynamicConfig.GmosSouth] =
-      fromEstimators(
+    lazy val gmosSouthImagingSetup: SetupTimeEstimateCalculator =
+      setupCalculatorfromEstimation(
+        SetupTime(
+          ctx.enums.TimeEstimate.GmosSouthImagingSetup.time,
+          ctx.enums.TimeEstimate.GmosSouthReacquisition.time
+        ),
+        ctx.enums.TimeEstimate.GmosSouthImagingMaxVisit.time
+      )
+
+    lazy val gmosSouthLongSlitSetup: SetupTimeEstimateCalculator =
+      setupCalculatorfromEstimation(
         SetupTime(
           ctx.enums.TimeEstimate.GmosSouthLongslitSetup.time,
           ctx.enums.TimeEstimate.GmosSouthReacquisition.time
         ),
-        cce.gmosSouth,
-        de.gmosSouth
+        ctx.enums.TimeEstimate.GmosSouthLongslitMaxVisit.time
       )
+
+    lazy val igrins2LongSlitSetup: SetupTimeEstimateCalculator =
+      setupCalculatorfromEstimation(
+        SetupTime(
+          ctx.enums.TimeEstimate.Igrins2LongslitSetup.time,
+          ctx.enums.TimeEstimate.Igrins2Reacquisition.time
+        ),
+        ctx.enums.TimeEstimate.Igrins2LongslitMaxVisit.time
+      )
+
+
+    lazy val flamingos2Step: StepTimeEstimateCalculator[Flamingos2StaticConfig, Flamingos2DynamicConfig] =
+      stepCalculatorfromEstimators(cce.flamingos2, de.flamingos2)
+
+    lazy val gmosNorthStep: StepTimeEstimateCalculator[StaticConfig.GmosNorth, DynamicConfig.GmosNorth] =
+      stepCalculatorfromEstimators(cce.gmosNorth, de.gmosNorth)
+
+    lazy val gmosSouthStep: StepTimeEstimateCalculator[StaticConfig.GmosSouth, DynamicConfig.GmosSouth] =
+      stepCalculatorfromEstimators(cce.gmosSouth, de.gmosSouth)
+
+    lazy val igrins2Step: StepTimeEstimateCalculator[Igrins2StaticConfig, Igrins2DynamicConfig] =
+      stepCalculatorfromEstimators(cce.igrins2, de.igrins2)
