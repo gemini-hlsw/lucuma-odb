@@ -12,6 +12,7 @@ import cats.syntax.traverse.*
 import io.circe.Json
 import io.circe.literal.*
 import lucuma.core.enums.Instrument
+import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.SequenceCommand
 import lucuma.core.enums.Site
@@ -257,3 +258,27 @@ class addSlewEvent extends OdbSuite with query.ExecutionTestSupportForGmos:
     createObservation(ObservingModeType.GmosNorthLongSlit, pi).flatMap: oid =>
       addWithIdempotencyKey(oid, idm = idm).flatMap: (eid, _) =>
         assertIO(addWithIdempotencyKey(oid, idm = idm).map(_._1), eid)
+
+  test("slewing alone isn't enough to transition workflow state"):
+    assertIOBoolean:
+      for
+        p <- createProgramAs(pi)
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createObservationAs(pi, p, ObservingModeType.GmosNorthLongSlit.some, t)
+        _ <- addSlewEventAs(serviceUser, o, SlewStage.StartSlew)
+        _ <- runObscalcUpdate(p, o)
+        s <- queryObservationWorkflowState(pi, o)
+      yield s === ObservationWorkflowState.Defined
+
+  test("when a non-slew event is added we transition to ongoing"):
+    assertIOBoolean:
+      for
+        p <- createProgramAs(pi)
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createObservationAs(pi, p, ObservingModeType.GmosNorthLongSlit.some, t)
+        _ <- addSlewEventAs(serviceUser, o, SlewStage.StartSlew)
+        v <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
+        _ <- addSequenceEventAs(serviceUser, v, SequenceCommand.Start)
+        _ <- runObscalcUpdate(p, o)
+        s <- queryObservationWorkflowState(pi, o)
+      yield s === ObservationWorkflowState.Ongoing
