@@ -119,15 +119,17 @@ trait SequenceCodec {
     Decoder.instance { c =>
       for {
         t <- c.downField("setup").as[SetupTime]
+        n <- c.downField("setupCount").as[NonNegInt]
         a <- c.downField("acquisition").as[SequenceDigest]
         s <- c.downField("science").as[SequenceDigest]
-      } yield ExecutionDigest(t, a, s)
+      } yield ExecutionDigest(t, n, a, s)
     }
 
   given (using Encoder[Offset], Encoder[TimeSpan]): Encoder[ExecutionDigest] =
     Encoder.instance { (a: ExecutionDigest) =>
       Json.obj(
         "setup"       -> a.setup.asJson,
+        "setupCount"  -> a.setupCount.asJson,
         "acquisition" -> a.acquisition.asJson,
         "science"     -> a.science.asJson
       )
@@ -171,6 +173,7 @@ trait SequenceCodec {
 
   import lucuma.odb.json.flamingos2.given
   import lucuma.odb.json.gmos.given
+  import lucuma.odb.json.igrins2.given
 
   private def rootDecoder[R, S: Decoder, D: Decoder](instrumentExecutionConfig: ExecutionConfig[S, D] => R): Decoder[R] =
     Decoder.instance { _.as[ExecutionConfig[S, D]].map(instrumentExecutionConfig) }
@@ -183,6 +186,9 @@ trait SequenceCodec {
 
   given Decoder[InstrumentExecutionConfig.GmosSouth] =
     rootDecoder(InstrumentExecutionConfig.GmosSouth.apply)
+
+  given Decoder[InstrumentExecutionConfig.Igrins2] =
+    rootDecoder(InstrumentExecutionConfig.Igrins2.apply)
 
   private def rootEncoder[R, S: Encoder, D: Encoder](using Encoder[Offset], Encoder[TimeSpan])(
     root: R => ExecutionConfig[S, D]
@@ -198,6 +204,9 @@ trait SequenceCodec {
   given (using Encoder[Offset], Encoder[TimeSpan], Encoder[Wavelength]): Encoder[InstrumentExecutionConfig.GmosSouth] =
     rootEncoder(_.executionConfig)
 
+  given (using Encoder[Offset], Encoder[TimeSpan]): Encoder[InstrumentExecutionConfig.Igrins2] =
+    rootEncoder(_.executionConfig)
+
   given Decoder[InstrumentExecutionConfig] =
     Decoder.instance { c =>
       for {
@@ -206,6 +215,7 @@ trait SequenceCodec {
           case Instrument.Flamingos2 => c.downField("flamingos2").as[InstrumentExecutionConfig.Flamingos2]
           case Instrument.GmosNorth  => c.downField("gmosNorth").as[InstrumentExecutionConfig.GmosNorth]
           case Instrument.GmosSouth  => c.downField("gmosSouth").as[InstrumentExecutionConfig.GmosSouth]
+          case Instrument.Igrins2    => c.downField("igrins2").as[InstrumentExecutionConfig.Igrins2]
           case _                     => DecodingFailure(s"Unexpected instrument $i", c.history).asLeft[InstrumentExecutionConfig]
         }
       } yield r
@@ -218,10 +228,12 @@ trait SequenceCodec {
         "flamingos2" -> Json.Null, // one of these will be replaced
         "gmosNorth"  -> Json.Null, // one of these will be replaced
         "gmosSouth"  -> Json.Null, // one of these will be replaced
+        "igrins2"    -> Json.Null, // one of these will be replaced
         a match
           case i@InstrumentExecutionConfig.Flamingos2(_) => "flamingos2" -> i.asJson
           case i@InstrumentExecutionConfig.GmosNorth(_)  => "gmosNorth"  -> i.asJson
           case i@InstrumentExecutionConfig.GmosSouth(_)  => "gmosSouth"  -> i.asJson
+          case i@InstrumentExecutionConfig.Igrins2(_)    => "igrins2"    -> i.asJson
       )
 
 }

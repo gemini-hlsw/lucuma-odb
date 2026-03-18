@@ -5,7 +5,10 @@ package lucuma.itc.legacy
 
 import cats.effect.Sync
 import cats.syntax.all.*
+import io.circe.Json
 import io.circe.parser.decode
+import io.circe.parser.parse
+import lucuma.itc.Error
 import lucuma.itc.legacy
 import lucuma.itc.legacy.codecs.given
 
@@ -22,7 +25,40 @@ import java.lang.reflect.Method
  * that may not be compatible. Instead we pass back and forth json encoded version of the params
  * essentially the same as if ITC were a server accepting json and responding json
  */
-case class LocalItc[F[_]: Sync](classLoader: ClassLoader):
+object LocalItc:
+  val OutOfRangeMsg: String = Error.WavelengthAtOutOfRangeMessage
+
+case class LocalItc[F[_]: {Sync as F}](classLoader: ClassLoader):
+
+  import LocalItc.OutOfRangeMsg
+
+  private def resultKey(json: io.circe.Json): Option[io.circe.ACursor] =
+    val c = json.hcursor
+    c.downField("ItcSpectroscopyResult")
+      .success
+      .orElse(c.downField("ItcImagingResult").success)
+
+  private def hasAllNullExposureTimes(json: String): Boolean =
+    parse(json).toOption
+      .flatMap(resultKey)
+      .exists: result =>
+        result
+          .downField("times")
+          .downField("detectors")
+          .as[List[Json]]
+          .toOption
+          .exists(_.forall(_.hcursor.downField("exposureTime").focus.exists(_.isNull)))
+
+  private def hasAllNullCcdSNRatios(json: String): Boolean =
+    parse(json).toOption
+      .flatMap(resultKey)
+      .exists: result =>
+        result
+          .downField("ccds")
+          .as[List[Json]]
+          .toOption
+          .exists(_.forall(_.hcursor.downField("singleSNRatio").focus.exists(_.isNull)))
+
   // We need to keep a single reference to the reflected method
   private val calculateGraphsMethod: Method = classLoader
     .loadClass("edu.gemini.itc.web.servlets.ItcCalculation")
@@ -52,21 +88,23 @@ case class LocalItc[F[_]: Sync](classLoader: ClassLoader):
    * essentially the same as if ITC were a server accepting json and responding json
    */
   def calculateGraphs(jsonParams: String): F[Either[List[String], GraphsRemoteResult]] =
-    Sync[F].blocking:
+    F.blocking:
       val res = calculateGraphsMethod
         .invoke(null, jsonParams) // null as it is a static method
         .asInstanceOf[String]
 
       val result = res match
-        case LegacyRight(result)          =>
+        case LegacyRight(result) if hasAllNullCcdSNRatios(result) =>
+          Left(List(OutOfRangeMsg))
+        case LegacyRight(result)                                  =>
           decode[legacy.GraphsRemoteResult](result).leftMap { e =>
             List(e.getMessage())
           }
-        case LegacyLeft(result)           =>
+        case LegacyLeft(result)                                   =>
           Left(List(result))
-        case LegacyLeft(result1, result2) =>
+        case LegacyLeft(result1, result2)                         =>
           Left(List(result1, result2))
-        case m                            =>
+        case m                                                    =>
           Left(List(m))
 
       result
@@ -83,15 +121,17 @@ case class LocalItc[F[_]: Sync](classLoader: ClassLoader):
         .asInstanceOf[String]
 
       val result = res match
-        case LegacyRight(result)    =>
+        case LegacyRight(result) if hasAllNullExposureTimes(result) =>
+          Left(List(OutOfRangeMsg))
+        case LegacyRight(result)                                    =>
           decode[IntegrationTimeRemoteResult](result).leftMap { e =>
             List(e.getMessage())
           }
-        case LegacyLeft(result)     =>
+        case LegacyLeft(result)                                     =>
           Left(result.split("\n").toList)
-        case LegacyLeftList(result) =>
+        case LegacyLeftList(result)                                 =>
           Left(result.split("\n").toList)
-        case m                      =>
+        case m                                                      =>
           Left(List(m))
 
       result
@@ -102,21 +142,23 @@ case class LocalItc[F[_]: Sync](classLoader: ClassLoader):
   def calculateSignalToNoise(
     jsonParams: String
   ): F[Either[List[String], IntegrationTimeRemoteResult]] =
-    Sync[F].blocking:
+    F.blocking:
       val res = calculateSignalToNoiseMethod
         .invoke(null, jsonParams) // null as it is a static method
         .asInstanceOf[String]
 
       val result = res match
-        case LegacyRight(result)    =>
+        case LegacyRight(result) if hasAllNullExposureTimes(result) =>
+          Left(List(OutOfRangeMsg))
+        case LegacyRight(result)                                    =>
           decode[IntegrationTimeRemoteResult](result).leftMap { e =>
             List(e.getMessage())
           }
-        case LegacyLeft(result)     =>
+        case LegacyLeft(result)                                     =>
           Left(result.split("\n").toList)
-        case LegacyLeftList(result) =>
+        case LegacyLeftList(result)                                 =>
           Left(result.split("\n").toList)
-        case m                      =>
+        case m                                                      =>
           Left(List(m))
 
       result

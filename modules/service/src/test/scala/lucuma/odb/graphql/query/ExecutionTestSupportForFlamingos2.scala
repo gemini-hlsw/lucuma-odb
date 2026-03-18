@@ -26,14 +26,17 @@ import lucuma.core.enums.GcalContinuum
 import lucuma.core.enums.GcalDiffuser
 import lucuma.core.enums.GcalFilter
 import lucuma.core.enums.GcalShutter
+import lucuma.core.enums.Instrument
 import lucuma.core.enums.StepGuideState
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.StepConfig.Gcal
 import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig
 import lucuma.core.model.sequence.flamingos2.Flamingos2FpuMask
+import lucuma.core.model.sequence.flamingos2.Flamingos2StaticConfig
 import lucuma.core.syntax.string.*
 import lucuma.core.util.TimeSpan
+import lucuma.odb.sequence.StepTimeEstimateCalculator
 import lucuma.odb.service.Services
 import lucuma.odb.smartgcal.data.Flamingos2
 import lucuma.odb.smartgcal.data.SmartGcalValue
@@ -47,6 +50,13 @@ trait ExecutionTestSupportForFlamingos2 extends ExecutionTestSupport:
       Flamingos2Disperser.R1200JH.some,
       Flamingos2Filter.JH,
       Flamingos2Fpu.LongSlit1.some
+    )
+
+  val f2_key_JH2: Flamingos2.TableKey =
+    Flamingos2.TableKey(
+      Flamingos2Disperser.R1200JH.some,
+      Flamingos2Filter.JH,
+      Flamingos2Fpu.LongSlit2.some
     )
 
   val f2_flat_JH1 =
@@ -83,7 +93,9 @@ trait ExecutionTestSupportForFlamingos2 extends ExecutionTestSupport:
     val rows: List[Flamingos2.TableRow] =
       List(
         Flamingos2.TableRow(PosLong.unsafeFrom(1), f2_key_JH1, f2_flat_JH1),
-        Flamingos2.TableRow(PosLong.unsafeFrom(1), f2_key_JH1, f2_arc_JH1)
+        Flamingos2.TableRow(PosLong.unsafeFrom(1), f2_key_JH1, f2_arc_JH1),
+        Flamingos2.TableRow(PosLong.unsafeFrom(1), f2_key_JH2, f2_flat_JH1),
+        Flamingos2.TableRow(PosLong.unsafeFrom(1), f2_key_JH2, f2_arc_JH1)
       )
 
     servicesFor(pi /* doesn't matter*/).map(_(s)).use: services =>
@@ -92,6 +104,9 @@ trait ExecutionTestSupportForFlamingos2 extends ExecutionTestSupport:
           Services.asSuperUser:
             services.smartGcalService.insertFlamingos2(i, r)
   }
+
+  def flamingos2TimeEstimateCalculator: IO[StepTimeEstimateCalculator[Flamingos2StaticConfig, Flamingos2DynamicConfig]] =
+    timeEstimateCalculator.map(_.flamingos2Step)
 
   val Flamingos2AtomQuery: String =
     s"""
@@ -275,3 +290,47 @@ trait ExecutionTestSupportForFlamingos2 extends ExecutionTestSupport:
       "observeClass" -> "NIGHT_CAL".asJson,
       "steps" -> gcalSteps.asJson
     )
+
+  def queryObservationConstraints(oid: Observation.Id): IO[Json] =
+    query(
+      serviceUser,
+      s"""query {
+            observation(observationId: "$oid") {
+              id
+              constraintSet {
+                cloudExtinction
+                imageQuality
+                skyBackground
+                waterVapor
+                elevationRange {
+                  airMass {
+                    min
+                    max
+                  }
+                  hourAngle {
+                    minHours
+                    maxHours
+                  }
+                }
+              }
+            }
+          }"""
+    ).map { c =>
+      c.hcursor
+        .downField("observation")
+        .downField("constraintSet")
+        .focus
+        .getOrElse(Json.Null)
+    }
+
+  val createOngoingFlamingos2Observation: IO[Observation.Id] =
+    for
+      p <- createProgram
+      t <- createTargetWithProfileAs(pi, p)
+      o <- createFlamingos2LongSlitObservationAs(pi, p, List(t))
+      v <- recordVisitAs(serviceUser, Instrument.Flamingos2, o)
+      s <- firstScienceStepId(serviceUser, o)
+      _ <- addEndStepEvent(s, v)
+      _ <- runObscalcUpdate(p, o)
+    yield o
+

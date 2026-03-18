@@ -11,12 +11,8 @@ import grackle.Predicate.Eql
 import grackle.Result
 import grackle.Type
 import grackle.syntax.*
-import io.circe.syntax.*
-import lucuma.core.model.Client
 
-import java.util.UUID
-
-import table.AtomRecordTable
+import table.AtomRecordView
 import table.DatasetTable
 import table.ExecutionEventTable
 import table.ObservationView
@@ -24,7 +20,7 @@ import table.StepRecordView
 import table.VisitTable
 
 trait ExecutionEventMapping[F[_]] extends ExecutionEventTable[F]
-                                     with AtomRecordTable[F]
+                                     with AtomRecordView[F]
                                      with DatasetTable[F]
                                      with ObservationView[F]
                                      with StepRecordView[F]
@@ -37,11 +33,6 @@ trait ExecutionEventMapping[F[_]] extends ExecutionEventTable[F]
       SqlObject("observation",   Join(ExecutionEventTable.ObservationId, ObservationView.Id)),
       SqlField("received",       ExecutionEventTable.Received),
       SqlField("eventType",      ExecutionEventTable.EventType, discriminator = true),
-      CursorFieldJson(
-        "clientId",
-        cursor => cursor.fieldAs[Option[UUID]]("idempotencyKey").map(_.map(Client.Id.fromUuid).asJson),
-        List("idempotencyKey")
-      ),
       SqlField("idempotencyKey", ExecutionEventTable.IdempotencyKey),
 
       // Hidden fields used in the WhereExecutionEvent predicate.  There
@@ -95,20 +86,20 @@ trait ExecutionEventMapping[F[_]] extends ExecutionEventTable[F]
 
   lazy val AtomEventMapping: ObjectMapping =
     ObjectMapping(AtomEventType)(
-      SqlObject("atom",     Join(ExecutionEventTable.AtomId, AtomRecordTable.Id)),
+      SqlObject("atom",     Join(ExecutionEventTable.AtomId, AtomRecordView.AtomId)),
       SqlField("atomStage", ExecutionEventTable.AtomStage)
     )
 
   lazy val StepEventMapping: ObjectMapping =
   ObjectMapping(StepEventType)(
-      SqlObject("atom",     Join(ExecutionEventTable.AtomId, AtomRecordTable.Id)),
+      SqlObject("atom",     Join(ExecutionEventTable.AtomId, AtomRecordView.AtomId)),
       SqlObject("step",     Join(ExecutionEventTable.StepId, StepRecordView.Id)),
       SqlField("stepStage", ExecutionEventTable.StepStage)
     )
 
   lazy val DatasetEventMapping: ObjectMapping =
     ObjectMapping(DatasetEventType)(
-      SqlObject("atom",        Join(ExecutionEventTable.AtomId, AtomRecordTable.Id)),
+      SqlObject("atom",        Join(ExecutionEventTable.AtomId, AtomRecordView.AtomId)),
       SqlObject("step",        Join(ExecutionEventTable.StepId, StepRecordView.Id)),
       SqlObject("dataset",     Join(ExecutionEventTable.DatasetId, DatasetTable.Id)),
       SqlField("datasetStage", ExecutionEventTable.DatasetStage)

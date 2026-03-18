@@ -51,4 +51,7 @@ object FileReader {
 
   def flamingos2[F[_]](fileName: String)(using ApplicativeError[F, Throwable]): Pipe[F, Byte, (PosLong, data.Flamingos2.FileEntry)] =
     read(fileName, parsers.flamingos2.fileEntry.map(Current.apply))
+
+  def igrins2[F[_]](fileName: String)(using ApplicativeError[F, Throwable]): Pipe[F, Byte, (PosLong, data.Igrins2.FileEntry)] =
+    read(fileName, parsers.igrins2.fileEntry.map(Current.apply))
 }

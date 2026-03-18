@@ -33,6 +33,9 @@ import lucuma.core.model.sequence.gmos.arb.ArbDynamicConfig
 import lucuma.core.model.sequence.gmos.arb.ArbStaticConfig
 import lucuma.core.util.arb.ArbGid
 import munit.DisciplineSuite
+import org.scalacheck.Arbitrary
+import org.scalacheck.Cogen
+import org.scalacheck.Gen
 
 import scala.collection.immutable.SortedSet
 
@@ -42,8 +45,19 @@ class SequenceSuite extends DisciplineSuite with ArbitraryInstances:
   import ArbDataset.given
   import ArbDynamicConfig.given
   import ArbGid.given
-  import ArbInstrumentExecutionConfig.given
   import ArbExecutionConfig.given
+
+  // FIXME Exclude Igrins2 until codecs are implemented
+  // Override the Arbitrary locally
+  given Arbitrary[InstrumentExecutionConfig] =
+    Arbitrary:
+      Gen.oneOf(
+        ArbInstrumentExecutionConfig.given_Arbitrary_Flamingos2.arbitrary,
+        ArbInstrumentExecutionConfig.given_Arbitrary_GmosNorth.arbitrary,
+        ArbInstrumentExecutionConfig.given_Arbitrary_GmosSouth.arbitrary,
+      )
+
+  given Cogen[InstrumentExecutionConfig] = ArbInstrumentExecutionConfig.given_Cogen_InstrumentExecutionConfig
   import ArbExecutionSequence.given
   import ArbSequenceDigest.given
   import ArbStaticConfig.given

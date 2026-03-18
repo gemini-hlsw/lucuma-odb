@@ -9,7 +9,6 @@ import io.circe.Json
 import io.circe.JsonObject
 import io.circe.literal.*
 import lucuma.core.model.Observation
-import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.odb.graphql.query.ExecutionTestSupportForGmos
 
@@ -24,15 +23,6 @@ class observationEditOnCachedResultUpdate extends ExecutionTestSupportForGmos wi
     s"""
       subscription {
         observationEdit(input: { observationId: "$oid" }) {
-          editType
-        }
-      }
-    """
-
-  def programUpdateSubscription(pid: Program.Id): String =
-    s"""
-      subscription {
-        observationEdit(input: { programId: "$pid" }) {
           editType
         }
       }
@@ -55,37 +45,12 @@ class observationEditOnCachedResultUpdate extends ExecutionTestSupportForGmos wi
           query {
             observation(observationId: "$oid") {
               itc {
-                science {
-                  selected {
-                    exposureCount
-                  }
-                }
+                itcType
               }
             }
           }
         """
       ).void
-
-  def requestSequenceDigest(user: User, oid: Observation.Id) =
-    sleep >>
-      query(
-        user = user,
-        query = s"""
-          query {
-            observation(observationId: "$oid") {
-              execution {
-                digest {
-                  value {
-                    science {
-                      atomCount
-                    }
-                  }
-                }
-              }
-            }
-          }
-        """
-      )
 
   test("triggers when caching an ITC result"):
     for

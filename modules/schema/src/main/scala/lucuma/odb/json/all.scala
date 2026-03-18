@@ -11,6 +11,8 @@ object all {
        with EpochCodec
        with Flamingos2Codec
        with GmosCodec
+       with Igrins2Codec
+       with ItcCodec
        with NumericCodec
        with PartnerLinkCodec
        with SequenceCodec

@@ -104,6 +104,7 @@ class errorChannelSuite extends FailingCalculationSuite:
               "targetIndex": 0,
               "error": {
                 "wellHalfFilledSeconds": null,
+                "wavelength": null,
                 "errorCode": "GENERAL",
                 "message": "Error calculating ITC: A calculation error"
               }

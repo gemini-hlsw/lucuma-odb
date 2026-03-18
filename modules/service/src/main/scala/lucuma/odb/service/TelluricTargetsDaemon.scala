@@ -34,19 +34,22 @@ object TelluricTargetsDaemon:
   ): F[Unit] =
     given Logger[F] = LoggerFactory[F].getLoggerFromName("telluric-targets")
 
+    val WaitToRestart = 5.seconds
+
     // Stream of pending requestes
     // Filter for transitions TO 'pending' state
     val eventStream: Stream[F, TelluricTargets.Pending] =
-      topic.subscribe(1024).evalMapFilter: e =>
-        Option
-          .when(
-            e.oldState.forall(_ =!= CalculationState.Pending) &&
-            e.newState.exists(_ === CalculationState.Pending)
-          )(e.observationId)
-          .flatTraverse: oid =>
-            services.useTransactionally:
-              Services.asSuperUser:
-                telluricTargetsService.loadObs(oid)
+      topic.subscribe(1024)
+        .evalMapFilter: e =>
+          Option
+            .when(
+              e.oldState.forall(_ =!= CalculationState.Pending) &&
+              e.newState.exists(_ === CalculationState.Pending)
+            )(e.observationId)
+            .flatTraverse: oid =>
+              services.useTransactionally:
+                Services.asSuperUser:
+                  telluricTargetsService.loadObs(oid)
 
     // pending entries to handle 'pending' and 'retry' entries
     val pollStream: Stream[F, TelluricTargets.Pending] =
@@ -62,16 +65,17 @@ object TelluricTargetsDaemon:
       eventStream
         .merge(pollStream)
         .evalTap: pending =>
-          debug"Loaded pending resolution ${pending.observationId}"
+          info"Loaded pending resolution ${pending.observationId}"
         .parEvalMapUnordered(connectionsLimit): pending =>
           services.useNonTransactionally:
             Services.asSuperUser:
               telluricTargetsService
                 .resolveTargets(pending)
                 .map((pending, _))
-        .evalTap: result =>
-          val (pending, meta) = result
-          debug"Resolved telluric for ${pending.observationId}: $meta"
+        .attempts(Stream.constant(WaitToRestart))
+        .evalTap:
+          case Left(e)  => error"Telluric daemon error: ${e.getMessage}, restarting in $WaitToRestart..."
+          case Right((pending, meta)) => info"Resolved telluric for ${pending.observationId}: $meta"
         .void
 
     // Initial processing on startup

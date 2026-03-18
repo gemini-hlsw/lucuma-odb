@@ -9,16 +9,15 @@ import cats.syntax.option.*
 import eu.timepit.refined.types.numeric.NonNegInt
 import lucuma.core.enums.ChargeClass
 import lucuma.core.enums.ExecutionState
+import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.StepGuideState
 import lucuma.core.math.Offset
-import lucuma.core.math.Wavelength
 import lucuma.core.model.Observation
 import lucuma.core.model.ObservationValidation
 import lucuma.core.model.ObservationWorkflow
 import lucuma.core.model.Program
-import lucuma.core.model.Target
 import lucuma.core.model.sequence.CategorizedTime
 import lucuma.core.model.sequence.ExecutionDigest
 import lucuma.core.model.sequence.SequenceDigest
@@ -30,6 +29,7 @@ import lucuma.core.util.Timestamp
 import lucuma.odb.data.Obscalc
 import lucuma.odb.data.OdbError
 import lucuma.odb.graphql.query.ExecutionTestSupportForGmos
+import lucuma.odb.sequence.gmos.longslit.Acquisition.RepeatingAtomCount
 import lucuma.odb.service.Services.ServiceAccess
 import lucuma.odb.util.Codecs.calculation_state
 import lucuma.odb.util.Codecs.core_timestamp
@@ -131,9 +131,9 @@ class ObscalcServiceSuite extends ObscalcServiceSuiteSupport:
       BigDecimal(s).setScale(6)
 
   val OneDataset =
-    "10.0".sec + // exposure time
-    "41.1".sec + // readout
-    "10.0".sec   // writeout
+    "1200.0".sec + // exposure time
+      "41.1".sec + // readout
+      "10.0".sec   // writeout
 
   val CalTime =
     "15.0".sec +  // science fold
@@ -144,13 +144,14 @@ class ObscalcServiceSuite extends ObscalcServiceSuiteSupport:
   val Offset_30arcsec = "7.0".sec + "0.18750".sec
 
 
-  val Atom1 = CalTime + "15.0".sec + OneDataset + Offset_15arcsec + OneDataset
+  val Atom1 = CalTime + "15.0".sec + OneDataset + Offset_15arcsec + OneDataset + Offset_30arcsec + OneDataset
   val Atom2 = Atom1
-  val Atom3 = CalTime + "15.0".sec + OneDataset + Offset_30arcsec + OneDataset
+  val Atom3 = Atom2
+  val Atom4 = CalTime + "15.0".sec + OneDataset
 
-  val ScienceSequence = Atom1 + Atom2 + Atom3
+  val ScienceSequence = Atom1 + Atom2 + Atom3 + Atom4
 
-  val setup: IO[(Program.Id, Target.Id, Observation.Id)] =
+  val setup: IO[(Program.Id, Observation.Id)] =
     for
       _ <- cleanup
       p <- createProgram
@@ -179,35 +180,25 @@ class ObscalcServiceSuite extends ObscalcServiceSuiteSupport:
           }
         """
       )
-    yield (p, t, o)
+    yield (p, o)
 
-  def fakeWithTargetResult(tid: Target.Id): Obscalc.Result =
-    Obscalc.Result.WithTarget(
-      Obscalc.ItcResult(
-        ItcService.TargetResult(
-          tid,
-          fakeItcSpectroscopyResult,
-          none
-        ),
-        ItcService.TargetResult(
-          tid,
-          fakeItcImagingResult,
-          Wavelength.fromIntPicometers(500000).map(fakeSignalToNoiseAt)
-        )
-      ),
+  val fakeSuccessResult: Obscalc.Result =
+    Obscalc.Result.Success(
+      true,
       ExecutionDigest(
           SetupTime(
             TimeSpan.unsafeFromMicroseconds(960000000),
             TimeSpan.unsafeFromMicroseconds(300000000)
           ),
+          NonNegInt.unsafeFrom(2),
           SequenceDigest(
             ObserveClass.Acquisition,
-            CategorizedTime(ChargeClass.Program -> TimeSpan.unsafeFromMicroseconds(219362500L)),
+            CategorizedTime(ChargeClass.Program -> TimeSpan.unsafeFromMicroseconds(617162500L)),
             SortedSet.from(List(
               TelescopeConfig(Offset.Zero, StepGuideState.Enabled),
               TelescopeConfig(Offset.microarcseconds.reverseGet(10000000L, 0L), StepGuideState.Enabled)
             )),
-            NonNegInt.unsafeFrom(2),
+            NonNegInt.unsafeFrom(1 + RepeatingAtomCount),
             ExecutionState.NotStarted
           ),
           SequenceDigest(
@@ -216,11 +207,10 @@ class ObscalcServiceSuite extends ObscalcServiceSuiteSupport:
             SortedSet.from(List(
               TelescopeConfig(Offset.Zero, StepGuideState.Disabled),
               TelescopeConfig(Offset.Zero, StepGuideState.Enabled),
-              TelescopeConfig(Offset.microarcseconds.reverseGet(0L, 15000000L), StepGuideState.Disabled),
               TelescopeConfig(Offset.microarcseconds.reverseGet(0L, 15000000L), StepGuideState.Enabled),
               TelescopeConfig(Offset.microarcseconds.reverseGet(0L, 1295985000000L), StepGuideState.Enabled)
             )),
-            NonNegInt.unsafeFrom(3),
+            NonNegInt.unsafeFrom(4),
             ExecutionState.NotStarted
           )
       ),
@@ -243,20 +233,20 @@ class ObscalcServiceSuite extends ObscalcServiceSuiteSupport:
     yield ()
 
   test("calc with target"):
-    setup.flatTap: (p, t, o) =>
+    setup.flatTap: (p, o) =>
       assertIO(
         calculateOnly(Obscalc.PendingCalc(p, o, randomTime)),
-        fakeWithTargetResult(t)
+        fakeSuccessResult
       )
 
   test("load"):
-    setup.flatTap: (p, _, o) =>
+    setup.flatTap: (p, o) =>
        val pc = Obscalc.PendingCalc(p, o, randomTime)
        assertIO(insert(pc) *> load, List(pc)) *>
        assertIO(calculationState(o), CalculationState.Calculating)
 
   test("update then select"):
-    setup.flatTap: (p, _, o) =>
+    setup.flatTap: (p, o) =>
       val pc = Obscalc.PendingCalc(p, o, randomTime)
       calculateOnly(pc).flatTap: r =>
         assertIO(
@@ -285,12 +275,12 @@ class ObscalcServiceSuite extends ObscalcServiceSuiteSupport:
     yield ()
 
   test("update then load"):
-    (setup <* cleanup).flatTap: (p, _, o) =>
+    (setup <* cleanup).flatTap: (p, o) =>
       val pc = Obscalc.PendingCalc(p, o, randomTime)
       assertIO(insert(pc) *> calculateAndUpdate(pc) *> load, Nil)
 
   test("invalidate, update then load"):
-    setup.flatTap: (p, _, o) =>
+    setup.flatTap: (p, o) =>
       val pc  = Obscalc.PendingCalc(p, o, randomTime)
       val pc2 = pc.copy(lastInvalidation = randomTime.plusMicrosOption(1).get)
       assertIO(insert(pc2) *> calculateAndUpdate(pc) *> load, List(pc2))
@@ -325,9 +315,23 @@ class ObscalcServiceSuite extends ObscalcServiceSuiteSupport:
         """.command
         session.execute(cmd)(o).void
 
-    val res = (setup <* cleanup).flatMap: (_, _, o) =>
+    val res = (setup <* cleanup).flatMap: (_, o) =>
       setWavelengthToMagicValue(o) *>
       load.flatMap: lst =>
         calculateAndUpdate(lst.head) *> selectStates
 
     assertIO(res.map(_.values.toList.head), CalculationState.Retry)
+
+  test("insert visit sets state to pending"):
+    val states = for
+      _  <- cleanup
+      p  <- createProgram
+      t  <- createTargetWithProfileAs(pi, p)
+      o  <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+      _  <- runObscalcUpdate(p, o)
+      r0 <- selectStates
+      _  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
+      r1 <- selectStates
+    yield (r0(o), r1(o))
+
+    assertIO(states, (CalculationState.Ready, CalculationState.Pending))

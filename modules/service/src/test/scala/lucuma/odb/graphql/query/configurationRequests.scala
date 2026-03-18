@@ -11,12 +11,12 @@ import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.model.ConfigurationRequest
 import lucuma.core.model.User
-import lucuma.odb.graphql.mutation.UpdateConstraintSetOps
+import lucuma.odb.graphql.mutation.UpdateObservationsOps
 
 class configurationRequests 
   extends OdbSuite 
      with ObservingModeSetupOperations 
-     with UpdateConstraintSetOps {
+     with UpdateObservationsOps {
 
   val pi1   = TestUsers.Standard.pi(1, 30)
   val pi2   = TestUsers.Standard.pi(2, 31)

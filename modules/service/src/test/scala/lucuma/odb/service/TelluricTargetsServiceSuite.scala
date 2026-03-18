@@ -5,7 +5,9 @@ package lucuma.odb.service
 
 import cats.syntax.all.*
 import lucuma.core.model.Observation
+import lucuma.core.syntax.timespan.*
 import lucuma.core.util.CalculationState
+import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.odb.data.TelluricTargets
 import lucuma.odb.graphql.TestUsers
@@ -17,6 +19,9 @@ class TelluricTargetsServiceSuite extends TelluricTargetsServiceSuiteSupport {
   override val pi = TestUsers.Standard.pi(1, 30)
   override val validUsers = List(pi)
 
+  // Test duration value - actual value doesn't matter for queue loading tests
+  val testDuration: TimeSpan = 30.minTimeSpan
+
   test("loadObs - loads specific pending observation"):
     for {
       _        <- cleanup
@@ -25,8 +30,8 @@ class TelluricTargetsServiceSuite extends TelluricTargetsServiceSuiteSupport {
       oid2     <- createTelluricCalibrationObservation(pi, pid)
       sid      <- createFlamingos2LongSlitObservationAs(pi, pid, Nil)
       // Insert pending entries for both observations
-      pending1 = createPendingEntry(pid, oid1, sid)
-      pending2 = createPendingEntry(pid, oid2, sid)
+      pending1 = createPendingEntry(pid, oid1, sid, testDuration)
+      pending2 = createPendingEntry(pid, oid2, sid, testDuration)
       _        <- insertPending(pending1)
       _        <- insertPending(pending2)
       // Load specific observation
@@ -47,7 +52,7 @@ class TelluricTargetsServiceSuite extends TelluricTargetsServiceSuiteSupport {
       sid    <- createFlamingos2LongSlitObservationAs(pi, pid, Nil)
       // Insert 10 pending entries
       oids   <- (1 to 10).toList.traverse(_ => createTelluricCalibrationObservation(pi, pid))
-      _      <- oids.traverse(oid => insertPending(createPendingEntry(pid, oid, sid)))
+      _      <- oids.traverse(oid => insertPending(createPendingEntry(pid, oid, sid, testDuration)))
       // Load 5
       loaded <- load(5)
       // Verify states
@@ -68,9 +73,9 @@ class TelluricTargetsServiceSuite extends TelluricTargetsServiceSuiteSupport {
       oid1        <- createTelluricCalibrationObservation(pi, pid)
       oid2        <- createTelluricCalibrationObservation(pi, pid)
       oid3        <- createTelluricCalibrationObservation(pi, pid)
-      _           <- insertPending(createPendingEntry(pid, oid1, sid))
-      _           <- insertPending(createPendingEntry(pid, oid2, sid))
-      futureRetry = createMetaEntry(pid, oid3, sid, CalculationState.Retry)
+      _           <- insertPending(createPendingEntry(pid, oid1, sid, testDuration))
+      _           <- insertPending(createPendingEntry(pid, oid2, sid, testDuration))
+      futureRetry = createMetaEntry(pid, oid3, sid, CalculationState.Retry, testDuration)
                       .copy(
                         retryAt = Some(Timestamp.fromLocalDateTimeTruncatedAndBounded(LocalDateTime.now().plusDays(7))),
                         failureCount = 2
@@ -101,7 +106,7 @@ class TelluricTargetsServiceSuite extends TelluricTargetsServiceSuiteSupport {
       sid       <- createFlamingos2LongSlitObservationAs(pi, pid, Nil)
       oid       <- createTelluricCalibrationObservation(pi, pid)
       // Insert retry entry with retry_at in the past
-      pastRetry = createMetaEntry(pid, oid, sid, CalculationState.Retry)
+      pastRetry = createMetaEntry(pid, oid, sid, CalculationState.Retry, testDuration)
                     .copy(
                       retryAt = Some(Timestamp.fromLocalDateTimeTruncatedAndBounded(LocalDateTime.now().minusHours(1))),
                       failureCount = 2
@@ -122,7 +127,7 @@ class TelluricTargetsServiceSuite extends TelluricTargetsServiceSuiteSupport {
       pid    <- createProgramAs(pi, "Telluric Test Program")
       oid    <- createTelluricCalibrationObservation(pi, pid)
       sid    <- createFlamingos2LongSlitObservationAs(pi, pid, Nil)
-      _      <- insertPending(createPendingEntry(pid, oid, sid))
+      _      <- insertPending(createPendingEntry(pid, oid, sid, testDuration))
       before <- calculationState(oid)
       // Load
       loaded <- load(1)
@@ -140,7 +145,7 @@ class TelluricTargetsServiceSuite extends TelluricTargetsServiceSuiteSupport {
       oid   <- createTelluricCalibrationObservation(pi, pid)
       sid   <- createFlamingos2LongSlitObservationAs(pi, pid, Nil)
       // Insert retry entry with retry_at in the past
-      retry = createMetaEntry(pid, oid, sid, CalculationState.Retry)
+      retry = createMetaEntry(pid, oid, sid, CalculationState.Retry, testDuration)
                 .copy(
                   retryAt = Some(Timestamp.fromLocalDateTimeTruncatedAndBounded(LocalDateTime.now().minusHours(1))),
                   failureCount = 2

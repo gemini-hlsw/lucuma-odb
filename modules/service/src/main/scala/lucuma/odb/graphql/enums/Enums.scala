@@ -52,40 +52,53 @@ final class Enums(
     def instrument: Option[Instrument] = meta.instrument
     def time: TimeSpan                 = meta.time
 
-    case Flamingos2BrightReadout extends TimeEstimate("f2_bright_readout")
-    case Flamingos2Disperser     extends TimeEstimate("f2_disperser")
-    case Flamingos2FaintReadout  extends TimeEstimate("f2_faint_readout")
-    case Flamingos2Filter        extends TimeEstimate("f2_filter")
-    case Flamingos2Fpu           extends TimeEstimate("f2_fpu")
-    case Flamingos2LongslitSetup extends TimeEstimate("f2_longslit_setup")
-    case Flamingos2MediumReadout extends TimeEstimate("f2_medium_readout")
-    case Flamingos2Reacquisition extends TimeEstimate("f2_reacquisition")
-    case Flamingos2Write         extends TimeEstimate("f2_write")
+    case Flamingos2BrightReadout    extends TimeEstimate("f2_bright_readout")
+    case Flamingos2Disperser        extends TimeEstimate("f2_disperser")
+    case Flamingos2FaintReadout     extends TimeEstimate("f2_faint_readout")
+    case Flamingos2Filter           extends TimeEstimate("f2_filter")
+    case Flamingos2Fpu              extends TimeEstimate("f2_fpu")
+    case Flamingos2LongslitSetup    extends TimeEstimate("f2_longslit_setup")
+    case Flamingos2LongslitMaxVisit extends TimeEstimate("f2_longslit_max_visit")
+    case Flamingos2MediumReadout    extends TimeEstimate("f2_medium_readout")
+    case Flamingos2Reacquisition    extends TimeEstimate("f2_reacquisition")
+    case Flamingos2Write            extends TimeEstimate("f2_write")
 
-    case GcalDiffuser            extends TimeEstimate("gcal_diffuser")
-    case GcalFilter              extends TimeEstimate("gcal_filter")
-    case GcalShutter             extends TimeEstimate("gcal_shutter")
+    case GcalDiffuser               extends TimeEstimate("gcal_diffuser")
+    case GcalFilter                 extends TimeEstimate("gcal_filter")
+    case GcalShutter                extends TimeEstimate("gcal_shutter")
 
-    case GmosNorthDisperser      extends TimeEstimate("gmos_north_disperser")
-    case GmosNorthFilter         extends TimeEstimate("gmos_north_filter")
-    case GmosNorthFpu            extends TimeEstimate("gmos_north_fpu")
-    case GmosNorthLongslitSetup  extends TimeEstimate("gmos_north_longslit_setup")
-    case GmosNorthNod            extends TimeEstimate("gmos_north_nod")
-    case GmosNorthNodEOffset     extends TimeEstimate("gmos_north_nod_e_offset")
-    case GmosNorthReacquisition  extends TimeEstimate("gmos_north_reacquisition")
-    case GmosNorthWrite          extends TimeEstimate("gmos_north_write")
-    case GmosSouthDisperser      extends TimeEstimate("gmos_south_disperser")
-    case GmosSouthFilter         extends TimeEstimate("gmos_south_filter")
-    case GmosSouthFpu            extends TimeEstimate("gmos_south_fpu")
-    case GmosSouthLongslitSetup  extends TimeEstimate("gmos_south_longslit_setup")
-    case GmosSouthNod            extends TimeEstimate("gmos_south_nod")
-    case GmosSouthNodEOffset     extends TimeEstimate("gmos_south_nod_e_offset")
-    case GmosSouthReacquisition  extends TimeEstimate("gmos_south_reacquisition")
-    case GmosSouthWrite          extends TimeEstimate("gmos_south_write")
+    case GmosNorthDisperser         extends TimeEstimate("gmos_north_disperser")
+    case GmosNorthFilter            extends TimeEstimate("gmos_north_filter")
+    case GmosNorthFpu               extends TimeEstimate("gmos_north_fpu")
+    case GmosNorthImagingMaxVisit   extends TimeEstimate("gmos_north_imaging_max_visit")
+    case GmosNorthImagingSetup      extends TimeEstimate("gmos_north_imaging_setup")
+    case GmosNorthLongslitMaxVisit  extends TimeEstimate("gmos_north_longslit_max_visit")
+    case GmosNorthLongslitSetup     extends TimeEstimate("gmos_north_longslit_setup")
+    case GmosNorthNod               extends TimeEstimate("gmos_north_nod")
+    case GmosNorthNodEOffset        extends TimeEstimate("gmos_north_nod_e_offset")
+    case GmosNorthReacquisition     extends TimeEstimate("gmos_north_reacquisition")
+    case GmosNorthWrite             extends TimeEstimate("gmos_north_write")
 
-    case OffsetConstant          extends TimeEstimate("offset_constant")
-    case OffsetDistance          extends TimeEstimate("offset_distance")
-    case ScienceFold             extends TimeEstimate("science_fold")
+    case GmosSouthDisperser         extends TimeEstimate("gmos_south_disperser")
+    case GmosSouthFilter            extends TimeEstimate("gmos_south_filter")
+    case GmosSouthFpu               extends TimeEstimate("gmos_south_fpu")
+    case GmosSouthImagingMaxVisit   extends TimeEstimate("gmos_south_imaging_max_visit")
+    case GmosSouthImagingSetup      extends TimeEstimate("gmos_south_imaging_setup")
+    case GmosSouthLongslitMaxVisit  extends TimeEstimate("gmos_south_longslit_max_visit")
+    case GmosSouthLongslitSetup     extends TimeEstimate("gmos_south_longslit_setup")
+    case GmosSouthNod               extends TimeEstimate("gmos_south_nod")
+    case GmosSouthNodEOffset        extends TimeEstimate("gmos_south_nod_e_offset")
+    case GmosSouthReacquisition     extends TimeEstimate("gmos_south_reacquisition")
+    case GmosSouthWrite             extends TimeEstimate("gmos_south_write")
+
+    case Igrins2LongslitMaxVisit    extends TimeEstimate("igrins2_longslit_max_visit")
+    case Igrins2LongslitSetup       extends TimeEstimate("igrins2_longslit_setup")
+    case Igrins2Reacquisition       extends TimeEstimate("igrins2_reacquisition")
+    case Igrins2Write               extends TimeEstimate("igrins2_write")
+
+    case OffsetConstant             extends TimeEstimate("offset_constant")
+    case OffsetDistance             extends TimeEstimate("offset_distance")
+    case ScienceFold                extends TimeEstimate("science_fold")
 
     // Used to test that undefined values in the database produce immediate failure on startup.
     // case FooBar              extends TimeEstimate("foo_bar")
@@ -103,7 +116,7 @@ final class Enums(
 
     def name: String = meta.name
 
-    // Note: The order here controls the Order of the Enumerated in the ODB, so keep them in order. 
+    // Note: The order here controls the Order of the Enumerated in the ODB, so keep them in order.
     case NotSubmitted   extends ProposalStatus("not_submitted", 0)
     case Submitted      extends ProposalStatus("submitted", 1)
     case Accepted       extends ProposalStatus("accepted", 2)
@@ -122,7 +135,7 @@ final class Enums(
   val schema: Schema =
     new Schema {
       def pos: SourcePos = SourcePos.instance
-      def baseTypes: List[NamedType] = 
+      def baseTypes: List[NamedType] =
         Enumerated[ProposalStatus].toEnumType("ProposalStatus", "Enumerated type of ProposalStatus")(_.name) ::
           enumMeta.unreferencedTypes
       def directives: List[DirectiveDef] = Nil

@@ -32,6 +32,7 @@ import lucuma.core.model.sequence.StepConfig.Gcal
 import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig as Flamingos2
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosSouth
+import lucuma.core.model.sequence.igrins2.Igrins2DynamicConfig as Igrins2
 import lucuma.core.util.TimeSpan
 import lucuma.odb.service.Services.GuestAccess
 import lucuma.odb.service.Services.SuperUserAccess
@@ -41,6 +42,8 @@ import lucuma.odb.smartgcal.data.Gmos.SearchKey.North as GmosNorthSearchKey
 import lucuma.odb.smartgcal.data.Gmos.SearchKey.South as GmosSouthSearchKey
 import lucuma.odb.smartgcal.data.Gmos.TableRow.North as GmosNorthTableRow
 import lucuma.odb.smartgcal.data.Gmos.TableRow.South as GmosSouthTableRow
+import lucuma.odb.smartgcal.data.Igrins2.TableKey as Igrins2SearchKey
+import lucuma.odb.smartgcal.data.Igrins2.TableRow as Igrins2TableRow
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.Flamingos2Codecs.*
 import lucuma.odb.util.GmosCodecs.*
@@ -100,6 +103,11 @@ trait SmartGcalService[F[_]] {
     sgt: SmartGcalType
   )(using GuestAccess): F[List[(Flamingos2 => Flamingos2, Gcal)]]
 
+  def selectIgrins2(
+    key: Igrins2SearchKey.type,
+    sgt: SmartGcalType
+  )(using GuestAccess): F[List[(Igrins2 => Igrins2, Gcal)]]
+
   // N.B. Insertion is done by a flyway migration and not via this method.  The
   // insert here is intended for initializing a database for testing.
   def insertGmosNorth(
@@ -115,6 +123,11 @@ trait SmartGcalService[F[_]] {
   def insertFlamingos2(
     id:  Int,
     row: Flamingos2TableRow
+  )(using SuperUserAccess): F[Unit]
+
+  def insertIgrins2(
+    id:  Int,
+    row: Igrins2TableRow
   )(using SuperUserAccess): F[Unit]
 }
 
@@ -160,6 +173,13 @@ object SmartGcalService {
         selectGcal(Statements.selectF2(f2, sgt)) { exposureTime =>
           Flamingos2.exposure.replace(exposureTime)
         }
+
+      def selectIgrins2(
+        key: Igrins2SearchKey.type,
+        sgt: SmartGcalType
+      )(using GuestAccess): F[List[(Igrins2 => Igrins2, Gcal)]] =
+        selectGcal(Statements.selectIgrins2(key, sgt)): exposureTime =>
+          Igrins2.exposure.replace(exposureTime)
 
       override def insertGmosNorth(
         id:  Int,
@@ -251,6 +271,36 @@ object SmartGcalService {
               row.key.disperser                      ,
               row.key.filter                         ,
               row.key.fpu                            ,
+              row.value.instrumentConfig.exposureTime
+            )
+          ).void
+
+        for {
+          _ <- insertGcalRow
+          _ <- insertInstRow
+        } yield ()
+
+      def insertIgrins2(
+        id:  Int,
+        row: Igrins2TableRow
+      )(using SuperUserAccess): F[Unit] =
+        val insertGcalRow =
+          session.executeCommand(
+            Statements.InsertGcal(
+              Instrument.Igrins2,
+              id,
+              row.value.gcalConfig,
+              row.value.stepCount,
+              row.value.baselineType
+            )
+          ).void
+
+        val insertInstRow =
+          session.executeCommand(
+            Statements.InsertIgrins2(
+              Instrument.Igrins2                     ,
+              id                                     ,
+              row.line                               ,
               row.value.instrumentConfig.exposureTime
             )
           ).void
@@ -489,6 +539,35 @@ object SmartGcalService {
           $time_span
       """
 
+    def selectIgrins2(
+      key: Igrins2SearchKey.type,
+      sgt: SmartGcalType
+    ): AppliedFragment = {
+      val where = List(
+        whereSmartGcalType(sgt),
+      )
+
+      selectGcal("t_smart_igrins2", where)
+    }
+
+    val InsertIgrins2: Fragment[(
+      Instrument ,
+      Int        ,
+      PosLong    ,
+      TimeSpan
+    )] =
+      sql"""
+        INSERT INTO t_smart_igrins2 (
+          c_instrument,
+          c_gcal_id,
+          c_step_order,
+          c_exposure_time
+        ) SELECT
+          $instrument,
+          $int4,
+          $int8_pos,
+          $time_span
+      """
+
   }
 }
-

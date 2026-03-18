@@ -291,6 +291,37 @@ object EmissionLineMockItc extends Itc[IO]:
   ): IO[TargetGraphsCalcResult] =
     IO.raiseError(CalculationError("Not implemented"))
 
+object WavelengthAtOutOfRangeMockItc extends Itc[IO]:
+
+  override def calculateSignalToNoise(
+    target:        TargetData,
+    atWavelength:  Wavelength,
+    observingMode: ObservingMode,
+    constraints:   ItcObservingConditions,
+    exposureTime:  TimeSpan,
+    exposureCount: PosInt
+  ): IO[TargetIntegrationTime] =
+    IO.raiseError(WavelengthOutOfRange(atWavelength))
+
+  override def calculateIntegrationTime(
+    target:        TargetData,
+    atWavelength:  Wavelength,
+    observingMode: ObservingMode,
+    constraints:   ItcObservingConditions,
+    signalToNoise: SignalToNoise
+  ): IO[TargetIntegrationTime] =
+    IO.raiseError(WavelengthOutOfRange(atWavelength))
+
+  override def calculateGraphs(
+    target:        TargetData,
+    atWavelength:  Wavelength,
+    observingMode: ObservingMode,
+    constraints:   ItcObservingConditions,
+    exposureTime:  TimeSpan,
+    exposureCount: PosInt
+  ): IO[TargetGraphsCalcResult] =
+    IO.raiseError(WavelengthOutOfRange(atWavelength))
+
 object FailingMockItc extends Itc[IO]:
 
   override def calculateSignalToNoise(

@@ -27,12 +27,14 @@ import lucuma.core.math.Wavelength
 import lucuma.odb.graphql.input.Flamingos2LongSlitInput
 import lucuma.odb.graphql.input.GmosImagingFilterInput
 import lucuma.odb.graphql.input.GmosImagingInput
+import lucuma.odb.graphql.input.GmosImagingVariantInput
 import lucuma.odb.graphql.input.GmosLongSlitInput
 import lucuma.odb.graphql.input.ObservingModeInput
 import lucuma.odb.sequence.ObservingMode
 import lucuma.odb.sequence.flamingos2.longslit.Config as Flamingos2Config
 import lucuma.odb.sequence.gmos.imaging.Config as ImagingConfig
 import lucuma.odb.sequence.gmos.longslit.Config
+import lucuma.odb.sequence.igrins2.longslit.Config as Igrins2Config
 
 sealed trait CalibrationConfigSubset derives Eq:
   def modeType: ObservingModeType
@@ -85,6 +87,7 @@ object CalibrationConfigSubset:
         none,
         none,
         none,
+        none,
         none
       )
 
@@ -106,6 +109,7 @@ object CalibrationConfigSubset:
       ObservingModeInput.Create(
         none,
         GmosLongSlitInput.Create.South(grating, filter, fpu, longSlitCommonInput, none).some,
+        none,
         none,
         none,
         none
@@ -135,18 +139,16 @@ object CalibrationConfigSubset:
         none,
         none,
         GmosImagingInput.Create(
+          GmosImagingVariantInput.Default,
           filters.map(f => GmosImagingFilterInput(f, none)),
           GmosImagingInput.Create.Common(
-            none,
-            none,
-            none, // Do we need multipleFiltersMode here?
             binning.some,
             ampReadMode.some,
             ampGain.some,
-            roi.some,
-            Nil // TODO do we need offsets here?
+            roi.some
           )
         ).some,
+        none,
         none,
         none
       )
@@ -167,18 +169,16 @@ object CalibrationConfigSubset:
         none,
         none,
         GmosImagingInput.Create(
+          GmosImagingVariantInput.Default,
           filters.map(f => GmosImagingFilterInput(f, none)),
           GmosImagingInput.Create.Common(
-            none,
-            none,
-            none, // Do we need multipleFiltersMode here?
             binning.some,
             ampReadMode.some,
             ampGain.some,
-            roi.some,
-            Nil // TODO do we need offsets here?
+            roi.some
           )
         ).some,
+        none,
         none
       )
 
@@ -196,8 +196,12 @@ object CalibrationConfigSubset:
         none,
         none,
         none,
-        Flamingos2LongSlitInput.Create(disperser, filter, fpu, none, none, none, none, none, none).some
+        Flamingos2LongSlitInput.Create(disperser, filter, fpu, none, none, none, none, none, none).some,
+        none
       )
+
+  case object Igrins2Configs extends CalibrationConfigSubset derives Eq:
+    def modeType: ObservingModeType = ObservingModeType.Igrins2LongSlit
 
   extension (mode: ObservingMode)
     def toConfigSubset: CalibrationConfigSubset =
@@ -228,7 +232,7 @@ object CalibrationConfigSubset:
           )
         case gni: ImagingConfig.GmosNorth =>
           GmosNImagingConfigs(
-            gni.filters,
+            gni.filters.map(_._1),
             gni.bin,
             gni.ampReadMode,
             gni.ampGain,
@@ -236,7 +240,7 @@ object CalibrationConfigSubset:
           )
         case gsi: ImagingConfig.GmosSouth =>
           GmosSImagingConfigs(
-            gsi.filters,
+            gsi.filters.map(_._1),
             gsi.bin,
             gsi.ampReadMode,
             gsi.ampGain,
@@ -248,3 +252,5 @@ object CalibrationConfigSubset:
             f2.filter,
             f2.fpu
           )
+        case _: Igrins2Config =>
+          Igrins2Configs

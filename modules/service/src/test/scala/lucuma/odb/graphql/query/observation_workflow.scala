@@ -14,9 +14,7 @@ import io.circe.syntax.*
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObservationWorkflowState
-import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.ScienceBand
-import lucuma.core.enums.SequenceType
 import lucuma.core.enums.TimeAccountingCategory
 import lucuma.core.model.CallForProposals
 import lucuma.core.model.CloudExtinction
@@ -32,14 +30,13 @@ import lucuma.core.syntax.timespan.*
 import lucuma.core.util.CalculatedValue
 import lucuma.core.util.CalculationState
 import lucuma.odb.graphql.input.AllocationInput
-import lucuma.odb.graphql.mutation.UpdateConstraintSetOps
-import lucuma.odb.json.all.transport.given
+import lucuma.odb.graphql.mutation.UpdateObservationsOps
 import lucuma.odb.service.ObservationService
 import lucuma.odb.service.ObservationWorkflowService
 
 class observation_workflow
   extends ExecutionTestSupportForGmos
-     with UpdateConstraintSetOps {
+     with UpdateObservationsOps {
 
   // ra and dec values in degrees
   val RaStart = 90
@@ -65,6 +62,7 @@ class observation_workflow
           matches {
             workflow {
               state
+              calculationState
               value {
                 state
                 validTransitions
@@ -85,6 +83,7 @@ class observation_workflow
         {
           "workflow": {
             "state": ${wf.state},
+            "calculationState": ${wf.state},
             "value": {
               "state": ${wf.value.state},
               "validTransitions": ${wf.value.validTransitions},
@@ -1065,20 +1064,8 @@ class observation_workflow
         ).asRight
       )
 
-  val OngoingSetup: IO[Observation.Id] =
-    for
-      p <- createProgram
-      t <- createTargetWithProfileAs(pi, p)
-      o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
-      v <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
-      a <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
-      s <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthArc(0), ArcStep, gcalTelescopeConfig(0), ObserveClass.NightCal)
-      _ <- addEndStepEvent(s)
-      _ <- runObscalcUpdate(p, o)
-    yield o
-
   test("ongoing"):
-    OngoingSetup.flatMap: oid =>
+    createOngoingGmosNorthObservation.flatMap: oid =>
       expect(
         pi,
         workflowQuery(oid),
@@ -1163,13 +1150,14 @@ class observation_workflow
   test("where workflow"):
     for
       pending <- PendingSetup
-      ongoing <- OngoingSetup
+      ongoing <- createOngoingGmosNorthObservation
       invalid <- MissingTargetInvalidInstrumentSetup
       matches  = expectWhere(pending, ongoing, invalid)
       _       <- matches("workflowState: { GTE: READY }", List(ongoing))
       _       <- matches("workflowState: { EQ: UNDEFINED }", List(pending, invalid))
       _       <- matches("calculationState: { EQ: READY }", List(ongoing, invalid))
       _       <- matches("calculationState: { LT: READY }", List(pending))
+      _       <- matches("state: { EQ: READY }", List(ongoing, invalid)) // deprecated
       _       <- matches("IS_NULL: false", List(pending, ongoing, invalid))
     yield ()
 

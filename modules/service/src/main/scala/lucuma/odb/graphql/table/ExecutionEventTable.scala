@@ -6,7 +6,6 @@ package table
 
 import lucuma.odb.util.Codecs.atom_id
 import lucuma.odb.util.Codecs.atom_stage
-import lucuma.odb.util.Codecs.client_id
 import lucuma.odb.util.Codecs.core_timestamp
 import lucuma.odb.util.Codecs.dataset_id
 import lucuma.odb.util.Codecs.dataset_stage
@@ -39,5 +38,4 @@ trait ExecutionEventTable[F[_]] extends BaseMapping[F]:
     val StepStage: ColumnRef       = col("c_step_stage",         step_stage)
     val DatasetStage: ColumnRef    = col("c_dataset_stage",      dataset_stage)
 
-    val ClientId: ColumnRef        = col("c_client_id",         client_id.opt)
     val IdempotencyKey: ColumnRef  = col("c_idempotency_key",   idempotency_key.opt)

@@ -22,26 +22,6 @@ Email address, matching ^\w+@[a-zA-Z_]+?\.[a-zA-Z]{2,3}$
 """
 scalar EmailAddress @specifiedBy(url: "https://html.spec.whatwg.org/multipage/input.html#valid-e-mail-address")
 
-"AtomEvent creation parameters."
-input AddAtomEventInput {
-  atomId: AtomId!
-  atomStage: AtomStage!
-  clientId: ClientId @deprecated(reason: "Use idempotencyKey instead")
-
-  """
-  Idempotency key, if any.  The IdempotencyKey may be provided by clients when
-  the event is created and is used to enable problem-free retry in the case of
-  failure.
-  """
-  idempotencyKey: IdempotencyKey
-}
-
-"The result of adding a atom event."
-type AddAtomEventResult {
-  "The new atom event that was added."
-  event: AtomEvent!
-}
-
 "DatasetEvent creation parameters."
 input AddDatasetEventInput {
   "Dataset id"
@@ -49,8 +29,6 @@ input AddDatasetEventInput {
 
   "Dataset execution stage."
   datasetStage: DatasetStage!
-
-  clientId: ClientId @deprecated(reason: "Use idempotencyKey instead")
 
   """
   Idempotency key, if any.  The IdempotencyKey may be provided by clients when
@@ -81,8 +59,6 @@ input AddSequenceEventInput {
   visitId: VisitId!
   command: SequenceCommand!
 
-  clientId: ClientId @deprecated(reason: "Use idempotencyKey instead")
-
   """
   Idempotency key, if any.  The IdempotencyKey may be provided by clients when
   the event is created and is used to enable problem-free retry in the case of
@@ -102,8 +78,6 @@ input AddSlewEventInput {
   observationId: ObservationId!
   slewStage: SlewStage!
 
-  clientId: ClientId @deprecated(reason: "Use idempotencyKey instead")
-
   """
   Idempotency key, if any.  The IdempotencyKey may be provided by clients when
   the event is created and is used to enable problem-free retry in the case of
@@ -121,9 +95,8 @@ type AddSlewEventResult {
 "StepEvent creation parameters."
 input AddStepEventInput {
   stepId: StepId!
+  visitId: VisitId!
   stepStage: StepStage!
-
-  clientId: ClientId @deprecated(reason: "Use idempotencyKey instead")
 
   """
   Idempotency key, if any.  The IdempotencyKey may be provided by clients when
@@ -219,13 +192,14 @@ type AtomEvent implements ExecutionEvent {
   "Event type."
   eventType: ExecutionEventType!
 
-  "Atom associated with this event."
-  atom: AtomRecord!
+  """
+  Atom record associated with this event, if any.  Atom records only materialize
+  when the steps they contain execute.
+  """
+  atom: AtomRecord
 
   "Atom execution stage."
   atomStage: AtomStage!
-
-  clientId: ClientId @deprecated(reason: "Use idempotencyKey instead")
 
   """
   Idempotency key, if any.  The IdempotencyKey may be provided by clients when
@@ -261,19 +235,25 @@ enum AtomStage {
   START_ATOM
 }
 
-"An atom as recorded by Observe."
+"The portion of an atom that executed in a particular visit."
 type AtomRecord {
   "Atom ID."
   id: AtomId!
 
+  "Visit in which this atom executed."
+  visit: Visit!
+
+  "Atom execution order -- the index of its first executed step."
+  index: PosInt!
+
+  "Description, if any."
+  description: NonEmptyString
+
   "The instrument associated with this atom."
   instrument: Instrument!
 
-  "Visit in which this atom was executed."
-  visit: Visit!
-
-  "Created by Observe at this time."
-  created: Timestamp!
+  "Observation containing this atom."
+  observation: Observation!
 
   """
   The execution state of this atom, according to events received (if any) from
@@ -287,27 +267,17 @@ type AtomRecord {
   "Sequence type."
   sequenceType: SequenceType!
 
-  "Recorded steps associated with this atom."
+  "Recorded steps associated with this atom, ordered by execution order."
   steps(
     """
-    Starts the result set at (or after if not existent) the given step creation
-    time.
+    Starts the result set at this index.
     """
-    OFFSET: Timestamp
+    OFFSET: PosInt
 
     "Limits the result to at most this number of matches (but never more than 1000)."
     LIMIT: NonNegInt
   ): StepRecordSelectResult!
 
-  "Atom ID from the generated atom, if any, that produced this atom record."
-  generatedId: AtomId
-
-  """
-  Idempotency key, if any.  The IdempotencyKey may be provided by clients when
-  the atom is created and is used to enable problem-free retry in the case of
-  failure.
-  """
-  idempotencyKey: IdempotencyKey
 }
 
 "AtomRecord query results, limited to a maximum of 1000 entries."
@@ -337,7 +307,11 @@ A BandedTime that is automatically updated by a background process.
 """
 type CalculatedBandedTime {
   "The current state of the background calculation."
-  state: CalculationState!
+  calculationState: CalculationState!
+
+  "The current state of the background calculation."
+  state: CalculationState! @deprecated(reason: "Use `calculationState` instead.")
+
   value: BandedTime
 }
 
@@ -738,7 +712,11 @@ A CategorizedTimeRange that is automatically updated by a background process.
 """
 type CalculatedCategorizedTimeRange {
   "The current state of the background calculation."
-  state: CalculationState!
+  calculationState: CalculationState!
+
+  "The current state of the background calculation."
+  state: CalculationState! @deprecated(reason: "Use `calculationState` instead.")
+
   value: CategorizedTimeRange
 }
 
@@ -759,9 +737,6 @@ Result of the program user role update, which is the updated program user itself
 type ChangeProgramUserRoleResult {
   programUser: ProgramUser!
 }
-
-"@deprecated: use IdempotencyKey (UUID) instead"
-scalar ClientId
 
 """
 Describes an observation clone operation, making any edits in the `SET`
@@ -1268,7 +1243,7 @@ enum ExecutionEventType {
   "Slew event type."
   SLEW
 
-  "Atom-level event type."
+  "Atom-level event type. NOTE: this is no longer used."
   ATOM
 
   "Step-level event type."
@@ -2178,27 +2153,13 @@ Edit or create GMOS North Imaging advanced configuration
 """
 input GmosNorthImagingInput {
 
+  variant: GmosImagingVariantInput
+
   """
-  The filters field must be specified with at least one filter. It cannot be unset with a null value.
+  The filters field must be specified with at least one filter. It cannot be
+  unset with a null value.
   """
   filters: [GmosNorthImagingFilterInput!]
-
-  """
-  The offsets field may be unset by assigning a null value, or ignored by skipping it altogether
-  """
-  offsets: [OffsetInput!]
-
-  "Temporary, WIP -- will be moved."
-  objectOffsetGenerator: OffsetGeneratorInput
-
-  "Temporary, WIP -- will be moved."
-  skyOffsetGenerator: OffsetGeneratorInput
-
-  """
-  How sequences are generated when multiple filters are specified.
-  Defaults to GROUPED.
-  """
-  explicitMultipleFiltersMode: MultipleFiltersMode
 
   """
   The explicitBin field may be unset by assigning a null value, or ignored by skipping it altogether
@@ -2691,27 +2652,13 @@ Edit or create GMOS South Imaging advanced configuration
 """
 input GmosSouthImagingInput {
 
+  variant: GmosImagingVariantInput
+
   """
-  The filters field must be specified with at least one filter. It cannot be unset with a null value.
+  The filters field must be specified with at least one filter. It cannot be
+  unset with a null value.
   """
   filters: [GmosSouthImagingFilterInput!]
-
-  """
-  The offsets field may be unset by assigning a null value, or ignored by skipping it altogether
-  """
-  offsets: [OffsetInput!]
-
-  "Temporary, WIP -- will be moved."
-  objectOffsetGenerator: OffsetGeneratorInput
-
-  "Temporary, WIP -- will be moved."
-  skyOffsetGenerator: OffsetGeneratorInput
-
-  """
-  How sequences are generated when multiple filters are specified.
-  Defaults to GROUPED.
-  """
-  explicitMultipleFiltersMode: MultipleFiltersMode
 
   """
   The explicitBin field may be unset by assigning a null value, or ignored by skipping it altogether
@@ -3012,19 +2959,6 @@ type Mutation {
   addConditionsEntry(input: ConditionsEntryInput): AddConditionsEntryResult!
 
   """
-  Adds a new atom event.
-  """
-  addAtomEvent(
-    """
-    Describes the atom event to add.  All events are associated with a
-    particular visit (see 'record{InstrumentName}Visit').  Atom events are
-    further associated with an an observation id and an atom id. Each atom event
-    identifies the stage through which the atom execution is passing.
-    """
-    input: AddAtomEventInput!
-  ): AddAtomEventResult!
-
-  """
   Adds a new dataset event associated with the given visit.  The
   generation of a single dataset will produce multiple events as it
   transitions through the observe, readout and write stages.
@@ -3198,12 +3132,6 @@ type Mutation {
   """
   linkUser(input: LinkUserInput!): LinkUserResult!
 
-  "Record a new atom"
-  recordAtom(
-    "Atom configuration parameters"
-    input: RecordAtomInput!
-  ): RecordAtomResult!
-
   """
   Records a new dataset.  This dataset may be subsequently referenced by dataset events.
   """
@@ -3215,14 +3143,6 @@ type Mutation {
   ): RecordDatasetResult!
 
   """
-  Record a new Flamingos 2 step.
-  """
-  recordFlamingos2Step(
-    "Flamingos 2 step configuration parameters"
-    input: RecordFlamingos2StepInput!
-  ): RecordFlamingos2StepResult!
-
-  """
   Record a new Flamingos 2 visit
   """
   recordFlamingos2Visit(
@@ -3232,11 +3152,14 @@ type Mutation {
     input: RecordFlamingos2VisitInput!
   ): RecordFlamingos2VisitResult!
 
-  "Record a new GMOS North step"
-  recordGmosNorthStep(
-    "GMOS North step configuration parameters"
-    input: RecordGmosNorthStepInput!
-  ): RecordGmosNorthStepResult!
+  """
+  Replaces the remaining steps in an execution sequence with the provided
+  sequence.  Previously executed (or even partially executed) steps are not
+  deleted.  Any ongoing steps are abandoned.
+  """
+  replaceFlamingos2Sequence(
+    input: ReplaceFlamingos2SequenceInput!
+  ): ReplaceFlamingos2SequenceResult!
 
   """
   Record a new GMOS North visit
@@ -3248,11 +3171,14 @@ type Mutation {
     input: RecordGmosNorthVisitInput!
   ): RecordGmosNorthVisitResult!
 
-  "Record a new GMOS South step"
-  recordGmosSouthStep(
-    "GmosSouth step configuration parameters"
-    input: RecordGmosSouthStepInput!
-  ): RecordGmosSouthStepResult!
+  """
+  Replaces the remaining steps in an execution sequence with the provided
+  sequence.  Previously executed (or even partially executed) steps are not
+  deleted.  Any ongoing steps are abandoned.
+  """
+  replaceGmosNorthSequence(
+    input: ReplaceGmosNorthSequenceInput!
+  ): ReplaceGmosNorthSequenceResult!
 
   """
   Record a new GMOS South visit
@@ -3263,6 +3189,15 @@ type Mutation {
     """
     input: RecordGmosSouthVisitInput!
   ): RecordGmosSouthVisitResult!
+
+  """
+  Replaces the remaining steps in an execution sequence with the provided
+  sequence.  Previously executed (or even partially executed) steps are not
+  deleted.  Any ongoing steps are abandoned.
+  """
+  replaceGmosSouthSequence(
+    input: ReplaceGmosSouthSequenceInput!
+  ): ReplaceGmosSouthSequenceResult!
 
   """
   Resets the acquisition sequence to start from the initial step regardless of
@@ -3449,7 +3384,25 @@ input SetObservationWorkflowStateInput {
 }
 
 """
-Nonsidereal target parameters.  Supply (`keyType` and `des`) or (`key`)
+Input for an element in a user-supplied ephemeris. All values must be specified.
+"""
+input UserSuppliedEphemerisElement {
+  when: Timestamp
+  coordinates: CoordinatesInput
+  velocity: OffsetInput
+}
+
+"""
+Input for a user-supplied ephemeris. Both sites must be specified (but may be empty).
+"""
+input UserSuppliedEphemeris {
+  gn: [UserSuppliedEphemerisElement!]!
+  gs: [UserSuppliedEphemerisElement!]!
+}
+
+"""
+Nonsidereal target parameters.
+For the key, if specified, provide either (`keyType` and `des`) or `key`.
 """
 input NonsiderealInput {
   """
@@ -3466,6 +3419,12 @@ input NonsiderealInput {
   The key field must be either specified or skipped altogether.  It cannot be unset with a null value.
   """
   key: NonEmptyString
+
+  """
+  Ephemeris must be specified if (and only if) the key type is USER_SUPPLIED.
+  """
+  ephemeris: UserSuppliedEphemeris
+
 }
 
 """
@@ -3656,13 +3615,13 @@ will be defined.  All others will be `null`.  The `generatorType` corresponds to
 the entry (if any) that is defined.  If the generator type of `NONE`, then none
 of the entries will be defined.
 """
-type OffsetGenerator {
-  generatorType: OffsetGeneratorType!
+type TelescopeConfigGenerator {
+  generatorType: TelescopeConfigGeneratorType!
 
-  enumerated: EnumeratedOffsetGenerator
-  random:     RandomOffsetGenerator
-  spiral:     SpiralOffsetGenerator
-  uniform:    UniformOffsetGenerator
+  enumerated: EnumeratedTelescopeConfigGenerator
+  random:     RandomTelescopeConfigGenerator
+  spiral:     SpiralTelescopeConfigGenerator
+  uniform:    UniformTelescopeConfigGenerator
 }
 
 """
@@ -3670,14 +3629,14 @@ An offset generator is specified by defining one of the `enumerated`, `random`,
 `spiral` or `uniform` options.  If none are defined, the generator type will be
 `NONE`.
 """
-input OffsetGeneratorInput {
-  enumerated: EnumeratedOffsetGeneratorInput
-  random:     RandomOffsetGeneratorInput
-  spiral:     SpiralOffsetGeneratorInput
-  uniform:    UniformOffsetGeneratorInput
+input TelescopeConfigGeneratorInput @oneOf {
+  enumerated: EnumeratedTelescopeConfigGeneratorInput
+  random:     RandomTelescopeConfigGeneratorInput
+  spiral:     SpiralTelescopeConfigGeneratorInput
+  uniform:    UniformTelescopeConfigGeneratorInput
 }
 
-enum OffsetGeneratorType {
+enum TelescopeConfigGeneratorType {
   NONE,
   ENUMERATED,
   RANDOM,
@@ -3688,14 +3647,14 @@ enum OffsetGeneratorType {
 """
 In the `ENUMERATED` option offsets are explicitly specified instead of calculated.
 """
-type EnumeratedOffsetGenerator {
+type EnumeratedTelescopeConfigGenerator {
   # Explicit offset (and guiding values).  If the list is empty then this
   # is essentially the same as `NONE`.  If the ITC prescribes _n_ steps for
   # an observation, but only _m_ < _n_ are provided, the sequence repeats.
   values: [TelescopeConfig!]!
 }
 
-input EnumeratedOffsetGeneratorInput {
+input EnumeratedTelescopeConfigGeneratorInput {
   # TelescopeConfigInput groups an offset position with a guide state (guided or not guided).
   # Not-guided offsets are intended for sky positions.
   values: [TelescopeConfigInput!]!
@@ -3703,38 +3662,46 @@ input EnumeratedOffsetGeneratorInput {
 
 # The random offset pattern is defined by the limiting `size` and
 # the `center` point.  The offsets are random, but non-repeating.
-type RandomOffsetGenerator {
+type RandomTelescopeConfigGenerator {
   size: Angle!
   center: Offset!
+  seed: Long!
 }
 
-input RandomOffsetGeneratorInput {
-  # Radius defining the circular area in which all offsets will be placed.
+input RandomTelescopeConfigGeneratorInput {
+  "Radius defining the circular area in which all offsets will be placed."
   size: AngleInput!
 
-  # Defaults to (0, 0).
+  "Center of the random pattern.  Defaults to (0, 0)."
   center: OffsetInput
+
+  "Random generator seed, which will default to a random value if not specified."
+  seed: Long
 }
 
 # A Fermat spiral pattern limited by the given size.
-type SpiralOffsetGenerator {
+type SpiralTelescopeConfigGenerator {
   size: Angle!
   center: Offset!
+  seed: Long!
 }
 
-input SpiralOffsetGeneratorInput {
-  # Radius defining the circular area in which all offsets will be placed.
+input SpiralTelescopeConfigGeneratorInput {
+  "Radius defining the circular area in which all offsets will be placed."
   size: AngleInput!
 
-  # Defaults to (0, 0).
+  "Center of the spiral pattern.  Defaults to (0, 0)."
   center: OffsetInput
+
+  "Random generator seed, which will default to a random value if not specified."
+  seed: Long
 }
 
 """
 Defines a region of the sky using two corners.  Exposures are
 then distributed across this region as evenly as possible.
 """
-type UniformOffsetGenerator {
+type UniformTelescopeConfigGenerator {
   cornerA: Offset!
   cornerB: Offset!
 }
@@ -3743,7 +3710,7 @@ type UniformOffsetGenerator {
 Defines the region over which the pattern of offsets will be distributed.
 The number of points is determined by integration time calculator results.
 """
-input UniformOffsetGeneratorInput {
+input UniformTelescopeConfigGeneratorInput {
   cornerA: OffsetInput!
   cornerB: OffsetInput!
 }
@@ -4512,33 +4479,13 @@ input RadialVelocityInput @oneOf {
   kilometersPerSecond: BigDecimal
 }
 
-"""
-Input parameters for creating a new atom record.
-"""
-input RecordAtomInput {
-  visitId: VisitId!
-  instrument: Instrument!
-  sequenceType: SequenceType!
-  generatedId: AtomId
-
-  """
-  Idempotency key, if any.  The IdempotencyKey may be provided by clients when
-  the atom is created and is used to enable problem-free retry in the case of
-  failure.
-  """
-  idempotencyKey: IdempotencyKey
-}
-
-"The result of recording an atom."
-type RecordAtomResult {
-  "The newly added atom record itself."
-  atomRecord: AtomRecord!
-}
-
 "Dataset creation parameters."
 input RecordDatasetInput {
   "Corresponding Step id."
   stepId: StepId!
+
+  "Visit associated with the dataset."
+  visitId: VisitId!
 
   "Dataset filename."
   filename: DatasetFilename!
@@ -4561,33 +4508,6 @@ input RecordDatasetInput {
 type RecordDatasetResult {
   "The new dataset that was added."
   dataset: Dataset!
-}
-
-"Input parameters for creating a new GmosNorth StepRecord"
-input RecordGmosNorthStepInput {
-  atomId: AtomId!
-  gmosNorth: GmosNorthDynamicInput!
-  stepConfig: StepConfigInput!
-  telescopeConfig: TelescopeConfigInput
-  observeClass: ObserveClass!
-  generatedId: StepId
-
-  """
-  Idempotency key, if any.  The IdempotencyKey may be provided by clients when
-  the step is created and is used to enable problem-free retry in the case of
-  failure.
-  """
-  idempotencyKey: IdempotencyKey
-}
-
-"""
-The result of recording a GmosNorth step.
-"""
-type RecordGmosNorthStepResult {
-  """
-  The newly added step record itself.
-  """
-  stepRecord: StepRecord!
 }
 
 """
@@ -4613,35 +4533,6 @@ type RecordGmosNorthVisitResult {
   The newly added visit record itself.
   """
   visit: Visit!
-}
-
-"""
-Input parameters for creating a new GmosSouth StepRecord
-"""
-input RecordGmosSouthStepInput {
-  atomId: AtomId!
-  gmosSouth: GmosSouthDynamicInput!
-  stepConfig: StepConfigInput!
-  telescopeConfig: TelescopeConfigInput
-  observeClass: ObserveClass!
-  generatedId: StepId
-
-  """
-  Idempotency key, if any.  The IdempotencyKey may be provided by clients when
-  the step is created and is used to enable problem-free retry in the case of
-  failure.
-  """
-  idempotencyKey: IdempotencyKey
-}
-
-"""
-The result of recording a GmosSouth step.
-"""
-type RecordGmosSouthStepResult {
-  """
-  The newly added step record itself.
-  """
-  stepRecord: StepRecord!
 }
 
 """
@@ -4759,6 +4650,11 @@ input ObservingModeInput @oneOf {
   The flamingos2LongSlit field must be either specified or skipped altogether.  It cannot be unset with a null value.
   """
   flamingos2LongSlit: Flamingos2LongSlitInput
+
+  """
+  The igrins2LongSlit field must be either specified or skipped altogether.  It cannot be unset with a null value.
+  """
+  igrins2LongSlit: Igrins2LongSlitInput
 }
 
 """
@@ -5302,10 +5198,12 @@ id to filter events to that program and/or observation.  Specify the old and
 new states to limit events to only those transitions.
 """
 input ObscalcUpdateInput {
-  programId:     ProgramId
-  observationId: ObservationId
-  oldState:      WhereOptionEqCalculationState
-  newState:      WhereOptionEqCalculationState
+  programId:            ProgramId
+  observationId:        ObservationId
+  oldCalculationState:  WhereOptionEqCalculationState
+  oldState:             WhereOptionEqCalculationState @deprecated(reason: "Use `oldCalculationState` instead.")
+  newCalculationState:  WhereOptionEqCalculationState
+  newState:             WhereOptionEqCalculationState @deprecated(reason: "Use `newCalculationState` instead.")
 }
 
 input WhereOrderCalculationState {
@@ -5394,12 +5292,22 @@ type ObscalcUpdate {
   """
   Old calculation state, if any.
   """
-  oldState: CalculationState
+  oldCalculationState: CalculationState
+
+  """
+  Old calculation state, if any.
+  """
+  oldState: CalculationState @deprecated(reason: "Use `oldCalculationState` instead.")
 
   """
   New calculation state, if any.
   """
-  newState: CalculationState
+  newCalculationState: CalculationState
+
+  """
+  New calculation state, if any.
+  """
+  newState: CalculationState @deprecated(reason: "Use `newCalculationState` instead.")
 
   """
   Id of the observation that was updated.
@@ -6754,7 +6662,7 @@ enum ObservingModeType {
   """
   ObservingModeType Flamingos2LongSlit
   """
-  FLAMINGOS_2LONG_SLIT
+  FLAMINGOS_2_LONG_SLIT
 
   """
   ObservingModeType GmosNorthImaging
@@ -6765,6 +6673,11 @@ enum ObservingModeType {
   ObservingModeType GmosSouthImaging
   """
   GMOS_SOUTH_IMAGING
+
+  """
+  ObservingModeType Igrins2LongSlit
+  """
+  IGRINS_2_LONG_SLIT
 }
 
 type ConstraintSet {
@@ -7169,8 +7082,6 @@ type DatasetEvent implements ExecutionEvent {
   "The associated dataset."
   dataset: Dataset!
 
-  clientId: ClientId @deprecated(reason: "Use idempotencyKey instead")
-
   """
   Idempotency key, if any.  The IdempotencyKey may be provided by clients when
   the event is created and is used to enable problem-free retry in the case of
@@ -7416,10 +7327,16 @@ type Execution {
   """
   executionState: ExecutionState!
 
-  "Executed (or at least partially executed) atom records, across all visits."
+  """
+  Executed (or at least partially executed) atom records, across all visits,
+  ordered by execution order of the first contained step.
+  """
   atomRecords(
-    "Starts the result set at the given atom creation time."
-    OFFSET: Timestamp
+    """
+    Starts the result set at the given step (execution) index -- atom indices
+    are the index of the first contained step.
+    """
+    OFFSET: PosInt
 
     "Limits the result to at most this number of matches (but never more than 1000)."
     LIMIT: NonNegInt
@@ -7483,6 +7400,12 @@ type ExecutionConfig {
   `GMOS_SOUTH`.
   """
   gmosSouth: GmosSouthExecutionConfig
+
+  """
+  IGRINS-2 execution config.  This will be null unless the `instrument` is
+  `IGRINS2`.
+  """
+  igrins2: Igrins2ExecutionConfig
 }
 
 """
@@ -7503,8 +7426,6 @@ interface ExecutionEvent {
 
   "Event type."
   eventType: ExecutionEventType!
-
-  clientId: ClientId @deprecated(reason: "Use idempotencyKey instead")
 
   """
   Idempotency key, if any.  The IdempotencyKey may be provided by clients when
@@ -7555,6 +7476,9 @@ type ExecutionDigest {
   "Setup time calculations."
   setup: SetupTime!
 
+  "Estimated number of setups required to complete this observation."
+  setupCount: NonNegInt!
+
   "Acquisition sequence summary."
   acquisition: SequenceDigest
 
@@ -7569,7 +7493,10 @@ Wraps an ExecutionDigest with the background calculation state.
 type CalculatedExecutionDigest {
 
   "Background calculation state."
-  state: CalculationState!
+  calculationState: CalculationState!
+
+  "Background calculation state."
+  state: CalculationState! @deprecated(reason: "Use `calculationState` instead.")
 
   "The current execution digest itself."
   value: ExecutionDigest
@@ -7659,35 +7586,6 @@ input Flamingos2StaticInput {
   """
   useElectronicOffsetting: Boolean
 
-}
-
-"""
-Input parameters for creating a new Flamingos 2 StepRecord
-"""
-input RecordFlamingos2StepInput {
-  atomId: AtomId!
-  flamingos2: Flamingos2DynamicInput!
-  stepConfig: StepConfigInput!
-  telescopeConfig: TelescopeConfigInput
-  observeClass: ObserveClass!
-  generatedId: StepId
-
-  """
-  Idempotency key, if any.  The IdempotencyKey may be provided by clients when
-  the step is created and is used to enable problem-free retry in the case of
-  failure.
-  """
-  idempotencyKey: IdempotencyKey
-}
-
-"""
-The result of recording a Flamingos 2 step.
-"""
-type RecordFlamingos2StepResult {
-  """
-  The newly added step record itself.
-  """
-  stepRecord: StepRecord!
 }
 
 """
@@ -7833,6 +7731,131 @@ type Flamingos2Dynamic {
   Central wavelength, which is taken from the filter wavelength.
   """
   centralWavelength: Wavelength!
+}
+
+"""
+IGRINS-2 Execution Config
+"""
+type Igrins2ExecutionConfig {
+  """
+  IGRINS-2 static configuration
+  """
+  static: Igrins2Static!
+
+  """
+  IGRINS-2 science execution
+  """
+  science: Igrins2ExecutionSequence
+}
+
+"""
+Next atom to execute and potential future atoms.
+"""
+type Igrins2ExecutionSequence {
+  """
+  Next atom to execute.
+  """
+  nextAtom: Igrins2Atom!
+
+  """
+  (Prefix of the) remaining atoms to execute, if any.
+  """
+  possibleFuture: [Igrins2Atom!]!
+
+  """
+  Whether there are additional atoms beyond those listed in possibleFuture.
+  """
+  hasMore: Boolean!
+}
+
+"""
+IGRINS-2 static configuration
+"""
+type Igrins2Static {
+  """
+  Whether to save SVC images.
+  """
+  saveSVCImages: Boolean!
+
+  """
+  Offset mode.
+  """
+  offsetMode: Igrins2OffsetMode!
+}
+
+"""
+IGRINS-2 dynamic step configuration
+"""
+type Igrins2Dynamic {
+  """
+  IGRINS-2 exposure time
+  """
+  exposure: TimeSpan!
+}
+
+"""
+IGRINS-2 atom, a collection of steps that should be executed in their entirety
+"""
+type Igrins2Atom {
+  """
+  Atom id
+  """
+  id: AtomId!
+
+  """
+  Atom description, if any
+  """
+  description: String
+
+  """
+  Observe class for this atom
+  """
+  observeClass: ObserveClass!
+
+  """
+  Individual steps that comprise the atom
+  """
+  steps: [Igrins2Step!]!
+}
+
+"""
+IGRINS-2 step with potential breakpoint
+"""
+type Igrins2Step {
+  """
+  Instrument configuration for this step
+  """
+  instrumentConfig: Igrins2Dynamic!
+
+  """
+  Step id
+  """
+  id: StepId!
+
+  """
+  Whether to pause before the execution of this step
+  """
+  breakpoint: Breakpoint!
+
+  """
+  The sequence step itself
+  """
+  stepConfig: StepConfig!
+
+  """
+  The telescope configuration at this step.
+  """
+  telescopeConfig: TelescopeConfig!
+
+  """
+  Time estimate for this step's execution
+  """
+  estimate: StepEstimate!
+
+  """
+  Observe class for this step
+  """
+  observeClass: ObserveClass!
 }
 
 """
@@ -8247,6 +8270,24 @@ Flamingos2 Long Slit acquisition settings.
 type Flamingos2LongSlitAcquisition {
 
   """
+  The filter that will be used in the acquisition sequence.  This will be the
+  `explicitFilter` if specified, but otherwise the `defaultFilter`.
+  """
+  filter: Flamingos2Filter!
+
+  """
+  The filter that will be used by default, if an explicit acquisition filter was
+  not specified.  The default is calculated as the acquisition filter closest in
+  wavelength to the observation's science filter.
+  """
+  defaultFilter: Flamingos2Filter!
+
+  """
+  An explicitly specified filter to use in acquisition (if any).
+  """
+  explicitFilter: Flamingos2Filter
+
+  """
   The exposure time mode used for ITC lookup for the acquisition sequence.
   """
   exposureTimeMode: ExposureTimeMode!
@@ -8378,6 +8419,15 @@ default values.
 input Flamingos2LongSlitAcquisitionInput {
 
   """
+  An explicit acquisition filter to use instead of the default.  The `explicitFilter`
+  may be unset by assigning a null value, or ignored by skipping it altogether.  If not provided,
+  the filter that will be used for the acquisition sequence is the acquisition filter closest to
+  the science filter wavelength.
+  Allowed filters are J, H and K_SHORT.
+  """
+  explicitFilter: Flamingos2Filter
+
+  """
   Exposure time mode for the acquisition sequence.  If not specified, a default
   exposure time mode is used.
   """
@@ -8437,13 +8487,123 @@ input Flamingos2LongSlitInput {
 
   """
   The telluricType field must be either specified or skipped altogether. It cannot be unset with a null value.
+  On create the default is HOT.
   """
-  telluricType: TelluricTypeInput = { tag: HOT }
+  telluricType: TelluricTypeInput
 
   """
   Acquisition properties that, when set, override default values.
   """
   acquisition: Flamingos2LongSlitAcquisitionInput
+}
+
+"""
+IGRINS-2 Offset Mode
+"""
+enum Igrins2OffsetMode {
+  """
+  Igrins2OffsetMode NodAlongSlit
+  """
+  NOD_ALONG_SLIT
+
+  """
+  Igrins2OffsetMode NodToSky
+  """
+  NOD_TO_SKY
+}
+
+"""
+IGRINS-2 Long Slit mode
+"""
+type Igrins2LongSlit {
+
+  """
+  The exposure time mode used for ITC lookup for the science sequence.
+  """
+  exposureTimeMode: ExposureTimeMode!
+
+  """
+  The offset mode is either explicitly specified in explicitOffsetMode or else
+  taken from defaultOffsetMode
+  """
+  offsetMode: Igrins2OffsetMode!
+
+  """
+  Default offset mode
+  """
+  defaultOffsetMode: Igrins2OffsetMode!
+
+  """
+  Optional explicitly specified offset mode. If set it overrides the default.
+  """
+  explicitOffsetMode: Igrins2OffsetMode
+
+  """
+  Whether to save SVC images, either explicitly specified in
+  explicitSaveSVCImages or else taken from defaultSaveSVCImages
+  """
+  saveSVCImages: Boolean!
+
+  """
+  Default save SVC images setting
+  """
+  defaultSaveSVCImages: Boolean!
+
+  """
+  Optional explicitly specified save SVC images setting. If set it overrides
+  the default.
+  """
+  explicitSaveSVCImages: Boolean
+
+  """
+  Spatial offsets, either explicitly specified in explicitOffsets or else
+  taken from defaultOffsets
+  """
+  offsets: [Offset!]!
+
+  """
+  Default spatial offsets
+  (ABBA pattern, q = -1.25, +1.25, +1.25, -1.25 arcsec) for NodAlongSlit, or
+  (p = 0, q = 0), (p = 10, q = 10), (p = 0, q = 0) for NodToSky.
+  """
+  defaultOffsets: [Offset!]!
+
+  """
+  Optional explicitly specified spatial offsets. If set, overrides the default.
+  """
+  explicitOffsets: [Offset!]
+
+}
+
+"""
+Edit or create IGRINS-2 Long Slit configuration
+"""
+input Igrins2LongSlitInput {
+
+  """
+  The exposureTimeMode field may be unset by assigning a null value, or ignored
+  by skipping it altogether
+  """
+  exposureTimeMode: ExposureTimeModeInput
+
+  """
+  The offset mode field may be unset by assigning a null value, or ignored by
+  skipping it altogether
+  """
+  explicitOffsetMode: Igrins2OffsetMode
+
+  """
+  The save SVC images field may be unset by assigning a null value, or ignored
+  by skipping it altogether
+  """
+  explicitSaveSVCImages: Boolean
+
+  """
+  Spatial offsets. May be unset by assigning null, or ignored by skipping.
+  For NodAlongSlit mode, all offsets must have P = 0.
+  """
+  explicitOffsets: [OffsetInput!]
+
 }
 
 """
@@ -9164,6 +9324,197 @@ type GmosNorthLongSlit {
 }
 
 """
+Wavength observation order, either decreasing or increasing by wavelength.
+"""
+enum WavelengthOrder {
+  DECREASING,
+  INCREASING
+}
+
+"""
+The available GMOS imaging categories.  Each category will produce a distinct
+sequence.
+"""
+enum GmosImagingVariantType {
+  GROUPED,
+  INTERLEAVED,
+  PRE_IMAGING
+}
+
+"""
+The specific imaging sub-type, one of which will be defined and the remaining
+options null.
+"""
+type GmosImagingVariant {
+  variantType: GmosImagingVariantType!
+
+  "Grouped mode collects all datasets for each filter before changing filters."
+  grouped:     GmosGroupedImagingVariant
+
+  "Interleaved mode cycles through all filters repeatedly."
+  interleaved: GmosInterleavedImagingVariant
+
+  "PreImaging mode is used for MOS mask creation."
+  preImaging:  GmosPreImagingVariant
+}
+
+"""
+Input that specifies which imaging sub-type is desired along with its configuration
+details.  Exactly one of the options should be defined and the other two left
+unspecified.
+"""
+input GmosImagingVariantInput @oneOf {
+
+  "Grouped mode collects all datasets for each filter before changing filters."
+  grouped:     GmosGroupedImagingVariantInput
+
+  "Interleaved mode cycles through all filters repeatedly."
+  interleaved: GmosInterleavedImagingVariantInput
+
+  "PreImaging mode is used for MOS mask creation."
+  preImaging:  GmosPreImagingVariantInput
+}
+
+"""
+When doing "grouped" filter imaging, datasets associated with a particular
+filter are collected consecutively before moving on to other filters (if any).
+Sky datasets may be collected before and after each group of object datasets.
+"""
+type GmosGroupedImagingVariant {
+
+  """
+  Whether the filters should appear in the sequence in increasing or decreasing
+  order by their wavelength.
+  """
+  order: WavelengthOrder!
+
+  """
+  Offset generator for the science object datasets. The same offset sequence is
+  created for each filter using the specified generator.
+  """
+  offsets: TelescopeConfigGenerator!
+
+  """
+  Number of sky positions to collect before and after object datasets. For
+  example, if set to 2 there will be two sky positions before a group of object
+  exposures and two more after using the same filter as the object datasets.
+  """
+  skyCount: NonNegInt!
+
+  """
+  Offset generator to use for the sky datasets.
+  """
+  skyOffsets: TelescopeConfigGenerator!
+}
+
+"""
+Input used for specifying GMOS grouped filter imaging.
+"""
+input GmosGroupedImagingVariantInput {
+
+  """
+  Whether the filters should appear in the sequence in increasing or decreasing
+  order by their wavelength.  Defaults to `INCREASING` on create, absent (i.e.,
+  not modified) on update.
+  """
+  order: WavelengthOrder
+
+  """
+  Offset generator for the science object datasets. The same offset sequence is
+  created for each filter using the specified generator.  If not specified, no
+  offsets will be used.
+  """
+  offsets: TelescopeConfigGeneratorInput
+
+  """
+  Number of sky positions to collect before and after object datasets. For
+  example, if set to 2 there will be two sky positions before a group of object
+  exposures and two more after using the same filter as the object datasets.
+  Defaults to 0 on creation, absent (i.e., not modified) on update.
+  """
+  skyCount: NonNegInt
+
+  """
+  Offset generator to use for sky positions.  If not specified, no offsets will
+  be used.
+  """
+  skyOffsets: TelescopeConfigGeneratorInput
+
+}
+
+"""
+When doing "interleaved" filter imaging, the sequence repeatedly alternates
+through the set of filters in use.
+"""
+type GmosInterleavedImagingVariant {
+
+  """
+  Offset generator for the science object datasets. The offset pattern is
+  applied to the sequence of science datasets as a whole.
+  """
+  offsets: TelescopeConfigGenerator!
+
+  """
+  Number of sky positions to collect, per filter, before and after a series of
+  object datasets.  For example, if set to 2 and 2 filters are in use, there
+  would be 4 sky positions before (2 per filter) and 4 after (2 per filter).
+  """
+  skyCount: NonNegInt!
+
+  """
+  Offset generator to use for the sky datasets.
+  """
+  skyOffsets: TelescopeConfigGenerator!
+}
+
+"""
+Input used for specifying GMOS interleaved filter imaging.
+"""
+input GmosInterleavedImagingVariantInput {
+
+  """
+  Offset generator for the science object datasets. The offset pattern is
+  created for the sequence of science datasets as a whole.
+  """
+  offsets: TelescopeConfigGeneratorInput
+
+  """
+  Number of sky positions to collect, per filter, before and after a series of
+  object datasets. Defaults to 0 on creation, absent (i.e., not modified) on
+  update.
+  """
+  skyCount: NonNegInt
+
+  """
+  Offset generator to use for sky positions.  If not specified, no offsets will
+  be used.  When specifying an offset generator, the skyCount should be set to
+  a value greater than 0.
+  """
+  skyOffsets: TelescopeConfigGeneratorInput
+
+}
+
+"""
+A special imaging case, MOS pre-imaging is defined by an offset region.
+"""
+type GmosPreImagingVariant {
+  offset1: Offset!
+  offset2: Offset!
+  offset3: Offset!
+  offset4: Offset!
+}
+
+"""
+MOS pre-imaging offsets, each of which default to (0, 0).
+"""
+input GmosPreImagingVariantInput {
+  offset1: OffsetInput
+  offset2: OffsetInput
+  offset3: OffsetInput
+  offset4: OffsetInput
+}
+
+"""
 Imaging filters combine an actual filter with an exposure time mode.
 """
 type GmosNorthImagingFilter {
@@ -9193,42 +9544,20 @@ GMOS North Imaging mode
 type GmosNorthImaging {
 
   """
-  GMOS North Filters for imaging mode (multiple filters allowed)
+  Details specific to the type of imaging being performed.
+  """
+  variant: GmosImagingVariant!
+
+  """
+  The filters (at least one is required) to be used for data collection. How
+  they are used depends on the imaging variant configuration.
   """
   filters: [GmosNorthImagingFilter!]!
 
   """
-  Initial GMOS North Filters that were used when creating the imaging mode
+  Initial GMOS North Filters that were used when creating the imaging mode.
   """
   initialFilters: [GmosNorthImagingFilter!]!
-
-  """
-  Spatial offsets
-  """
-  offsets: [Offset!]!
-
-  "Temporary, WIP -- will be moved."
-  objectOffsetGenerator: OffsetGenerator
-
-  "Temporary, WIP -- will be moved."
-  skyOffsetGenerator: OffsetGenerator
-
-  """
-  MultipleFiltersMode, either explicitly specified in explicitMultipleFiltersMode or else taken
-  from the defaultMultipleFiltersMode.
-  """
-  multipleFiltersMode: MultipleFiltersMode!
-
-  """
-  Default MultipleFiltersMode (GROUPED).
-  """
-  defaultMultipleFiltersMode: MultipleFiltersMode!
-
-  """
-  Optional explictly specified MultipleFiltersMode. If set it overrides the
-  default.
-  """
-  explicitMultipleFiltersMode: MultipleFiltersMode
 
   """
   GMOS Binning, either explicitly specified in explicitBin or else taken
@@ -9859,42 +10188,20 @@ GMOS South Imaging mode
 type GmosSouthImaging {
 
   """
-  GMOS South Filters for imaging mode (multiple filters allowed)
+  Details specific to the type of imaging being performed.
+  """
+  variant: GmosImagingVariant!
+
+  """
+  The filters (at least one is required) to be used for data collection. How
+  they are used depends on the imaging variant configuration.
   """
   filters: [GmosSouthImagingFilter!]!
 
   """
-  Initial GMOS South Filters that were used when creating the imaging mode
+  Initial GMOS North Filters that were used when creating the imaging mode.
   """
   initialFilters: [GmosSouthImagingFilter!]!
-
-  """
-  Spatial offsets
-  """
-  offsets: [Offset!]!
-
-  "Temporary, WIP -- will be moved."
-  objectOffsetGenerator: OffsetGenerator
-
-  "Temporary, WIP -- will be moved."
-  skyOffsetGenerator: OffsetGenerator
-
-  """
-  MultipleFiltersMode, either explicitly specified in explicitMultipleFiltersMode or else taken
-  from the defaultMultipleFiltersMode.
-  """
-  multipleFiltersMode: MultipleFiltersMode!
-
-  """
-  Default MultipleFiltersMode (GROUPED).
-  """
-  defaultMultipleFiltersMode: MultipleFiltersMode!
-
-  """
-  Optional explictly specified MultipleFiltersMode. If set it overrides the
-  default.
-  """
-  explicitMultipleFiltersMode: MultipleFiltersMode
 
   """
   GMOS Binning, either explicitly specified in explicitBin or else taken
@@ -10570,18 +10877,102 @@ An 'Int` in the range 0 to 100
 scalar IntPercent
 
 """
-Contains the result of calling the ITC for a particular observation.  Since
-the observation may contain multiple targets, there may be multiple results.
-The "result" field contains the selected, representative, result for all
-targets.  If there are multiple successful results, this will be the one that
-prescribes the longest observation. If there is a mix of failures and
-successes, the overall "result" will be a failure. The "all" field contains
-results for all targets regardless.
+An ITC result for a single target.
+"""
+type ItcResult {
+  targetId: TargetId!
+  exposureTime: TimeSpan!
+  exposureCount: NonNegInt!
+  signalToNoiseAt: SignalToNoiseAt
+}
+
+"""
+A discriminator for the types of ITC results.
+"""
+enum ItcType {
+  SPECTROSCOPY,
+  IGRINS_2_SPECTROSCOPY,
+  GMOS_NORTH_IMAGING,
+  GMOS_SOUTH_IMAGING
+}
+
+"""
+Contains the result of calling the ITC for all targets, but a single instrument
+configuration.  Since the observation may contain multiple targets, there may
+be multiple results. The "result" field contains the selected, representative,
+result for all targets.  If there are multiple successful results, this will
+be the one that prescribes the longest observation. If there is a mix of
+failures and successes, the overall "result" will be a failure. The "all" field
+contains results for all targets regardless.
 """
 type ItcResultSet {
   selected: ItcResult!
   all: [ItcResult!]
   index: NonNegInt!
+}
+
+"""
+Combines a GMOS North filter with an `ItcResultSet`. In other words, ITC
+results for all targets but a single filter.
+"""
+type ItcGmosNorthImagingResultSet {
+  filter:  GmosNorthFilter!
+  results: ItcResultSet!
+}
+
+"""
+Combines a GMOS South filter with an `ItcResultSet`. In other words, ITC
+results for all targets but a single filter.
+"""
+type ItcGmosSouthImagingResultSet {
+  filter:  GmosSouthFilter!
+  results: ItcResultSet!
+}
+
+"""
+ITC results for a particular observation, including relevant instrument
+configurations and targets.  There are specific instances for each `ItcType`.
+"""
+interface Itc {
+
+  "The type of the Itc results."
+  itcType: ItcType!
+
+}
+
+"""
+GMOS North imaging ITC results.  Here each filter is paired with its result
+set.
+"""
+type ItcGmosNorthImaging implements Itc {
+  itcType: ItcType!
+  gmosNorthImagingScience: [ItcGmosNorthImagingResultSet!]!
+}
+
+"""
+GMOS South imaging ITC results.  Here each filter is paired with its result
+set.
+"""
+type ItcGmosSouthImaging implements Itc {
+  itcType: ItcType!
+  gmosSouthImagingScience: [ItcGmosSouthImagingResultSet!]!
+}
+
+"""
+ITC results for spectroscopy observations.
+"""
+type ItcSpectroscopy implements Itc {
+  itcType: ItcType!
+  acquisition: ItcResultSet!
+  spectroscopyScience: ItcResultSet!
+}
+
+"""
+ITC results for IGRINS-2 spectroscopy observations (no acquisition).
+"""
+type ItcIgrins2Spectroscopy implements Itc {
+  itcType: ItcType!
+  spectroscopyScience: ItcResultSet!
 }
 
 """
@@ -10604,15 +10995,6 @@ type SignalToNoiseAt {
   wavelength: Wavelength!
 }
 
-"""
-A single ITC call result.
-"""
-type ItcResult {
-  targetId: TargetId!
-  exposureTime: TimeSpan!
-  exposureCount: NonNegInt!
-  signalToNoiseAt: SignalToNoiseAt
-}
 
 type LineFluxIntegrated {
   value: PosBigDecimal!
@@ -11033,6 +11415,7 @@ type ConfigurationObservingMode {
   gmosNorthImaging: ConfigurationGmosNorthImaging
   gmosSouthImaging: ConfigurationGmosSouthImaging
   flamingos2LongSlit: ConfigurationFlamingos2LongSlit
+  igrins2LongSlit: ConfigurationIgrins2LongSlit
 }
 
 type ConfigurationGmosNorthLongSlit {
@@ -11053,6 +11436,10 @@ type ConfigurationGmosSouthImaging {
 
 type ConfigurationFlamingos2LongSlit {
   disperser: Flamingos2Disperser!
+}
+
+type ConfigurationIgrins2LongSlit {
+  ignore: Ignore
 }
 
 scalar ConfigurationRequestId
@@ -11078,17 +11465,6 @@ input CreateConfigurationRequestInput {
   SET: ConfigurationRequestProperties
 }
 
-type Itc {
-  """
-  The ITC result for the science part of the sequence
-  """
-  science: ItcResultSet!
-
-  """
-  The ITC result for the acquisition part of the sequence
-  """
-  acquisition: ItcResultSet!
-}
 
 """
 ObservationId id formatted as `o-[1-9a-f][0-9a-f]*`
@@ -11123,17 +11499,6 @@ type ConfigurationRequestSelectResult {
   `true` when there were additional matches that were not returned.
   """
   hasMore: Boolean!
-}
-
-"""
-How sequences are generated when multiple filters are specified.
-"""
-enum MultipleFiltersMode {
-  "Grouped filters"
-  GROUPED
-
-  "Interleaved filters"
-  INTERLEAVED
 }
 
 """
@@ -12301,6 +12666,11 @@ type ObservingMode {
   """
   flamingos2LongSlit: Flamingos2LongSlit
 
+  """
+  IGRINS-2 Long Slit mode
+  """
+  igrins2LongSlit: Igrins2LongSlit
+
 }
 
 type ObservingModeGroup {
@@ -12558,8 +12928,6 @@ type SequenceEvent implements ExecutionEvent {
   "Sequence event data."
   command: SequenceCommand!
 
-  clientId: ClientId @deprecated(reason: "Use idempotencyKey instead")
-
   """
   Idempotency key, if any.  The IdempotencyKey may be provided by clients when
   the event is created and is used to enable problem-free retry in the case of
@@ -12706,8 +13074,6 @@ type SlewEvent implements ExecutionEvent {
 
   "Slew event data."
   slewStage: SlewStage!
-
-  clientId: ClientId @deprecated(reason: "Use idempotencyKey instead")
 
   """
   Idempotency key, if any.  The IdempotencyKey may be provided by clients when
@@ -13650,8 +14016,6 @@ type StepEvent implements ExecutionEvent {
   "Step execution stage."
   stepStage: StepStage!
 
-  clientId: ClientId @deprecated(reason: "Use idempotencyKey instead")
-
   """
   Idempotency key, if any.  The IdempotencyKey may be provided by clients when
   the event is created and is used to enable problem-free retry in the case of
@@ -13872,9 +14236,6 @@ type StepRecord {
   "The atom in which the step was executed."
   atom: AtomRecord!
 
-  "The step was created by Observe at this time."
-  created: Timestamp!
-
   """
   The execution state of this step, according to events received (if any) from
   Observe.
@@ -13884,8 +14245,7 @@ type StepRecord {
   """
   Time interval during which this step executed.  This measures the range of
   time from the first event to the last, whether or not the step ever
-  actually completed.  A 'null' result means there are no events associated
-  with this step.
+  actually completed.
   """
   interval: TimestampInterval
 
@@ -13929,16 +14289,6 @@ type StepRecord {
     "Limits the result to at most this number of matches (but never more than 1000)."
     LIMIT: NonNegInt
   ): ExecutionEventSelectResult!
-
-  "Step ID of the generated step, if any, that produced this step record."
-  generatedId: StepId
-
-  """
-  Idempotency key, if any.  The IdempotencyKey may be provided by clients when
-  the step is created and is used to enable problem-free retry in the case of
-  failure.
-  """
-  idempotencyKey: IdempotencyKey
 
   """
   Flamingos 2 instrument configuration for this step, if any.  This will be null
@@ -14722,8 +15072,11 @@ type Visit {
 
   "Executed (or at least partially executed) atom records for this visit."
   atomRecords(
-    "Starts the result set at the given atom creation time."
-    OFFSET: Timestamp
+    """
+    Starts the result set at the given step index.  The atom record index is the
+    index of its first contained step.
+    """
+    OFFSET: PosInt
 
     "Limits the result to at most this number of matches (but never more than 1000)."
     LIMIT: NonNegInt
@@ -17928,6 +18281,9 @@ input WhereCalculatedObservationWorkflow {
   "Matches the current state of the background calculation."
   calculationState: WhereOrderCalculationState
 
+  "Matches the current state of the background calculation."
+  state: WhereOrderCalculationState @deprecated(reason: "Use `calculationState` instead.")
+
   "Matchs the workflow state itself."
   workflowState: WhereOrderObservationWorkflowState
 
@@ -17978,6 +18334,133 @@ type ObservationWorkflow {
 
 type CalculatedObservationWorkflow {
   "The current state of the background calculation."
-  state: CalculationState!
+  calculationState: CalculationState!
+
+  "The current state of the background calculation."
+  state: CalculationState! @deprecated(reason: "Use `calculationState` instead.")
+
   value: ObservationWorkflow!
+}
+
+input Flamingos2StepInput {
+  instrumentConfig: Flamingos2DynamicInput!
+  breakpoint: Breakpoint
+  stepConfig: StepConfigInput!
+  telescopeConfig: TelescopeConfigInput
+  observeClass: ObserveClass!
+}
+
+input GmosNorthStepInput {
+  instrumentConfig: GmosNorthDynamicInput!
+  breakpoint: Breakpoint
+  stepConfig: StepConfigInput!
+  telescopeConfig: TelescopeConfigInput
+  observeClass: ObserveClass!
+}
+
+input GmosSouthStepInput {
+  instrumentConfig: GmosSouthDynamicInput!
+  breakpoint: Breakpoint
+  stepConfig: StepConfigInput!
+  telescopeConfig: TelescopeConfigInput
+  observeClass: ObserveClass!
+}
+
+input Flamingos2AtomInput {
+  description: NonEmptyString
+  steps: [Flamingos2StepInput!]!
+}
+
+input GmosNorthAtomInput {
+  description: NonEmptyString
+  steps: [GmosNorthStepInput!]!
+}
+
+input GmosSouthAtomInput {
+  description: NonEmptyString
+  steps: [GmosSouthStepInput!]!
+}
+
+"""
+Replace Flamingos 2 sequence input.  Select the observation using one of the
+observation ID or the observation reference.  If both are provided, they must
+refer to the same observation.
+"""
+input ReplaceFlamingos2SequenceInput {
+  observationId: ObservationId
+  observationReference: ObservationReferenceLabel
+
+  "Specifies which sequence should be replaced."
+  sequenceType: SequenceType!
+
+  """
+  The new sequence.  Any unexecuted steps are deleted and replaced with the
+  provided sequence.  Steps that were previously executed, or for which at least
+  one execution event was received, are preserved.
+  """
+  sequence: [Flamingos2AtomInput!]
+}
+
+"""
+The result of a replace sequence mutation, consisting of the newly inserted
+sequence.
+"""
+type ReplaceFlamingos2SequenceResult {
+  sequence: [Flamingos2Atom!]!
+}
+
+"""
+Replace GMOS North sequence input.  Select the observation using one of the
+observation ID or the observation reference.  If both are provided, they must
+refer to the same observation.
+"""
+input ReplaceGmosNorthSequenceInput {
+  observationId: ObservationId
+  observationReference: ObservationReferenceLabel
+
+  "Specifies which sequence should be replaced."
+  sequenceType: SequenceType!
+
+  """
+  The new sequence.  Any unexecuted steps are deleted and replaced with the
+  provided sequence.  Steps that were previously executed, or for which at least
+  one execution event was received, are preserved.
+  """
+  sequence: [GmosNorthAtomInput!]
+}
+
+"""
+The result of a replace sequence mutation, consisting of the newly inserted
+sequence.
+"""
+type ReplaceGmosNorthSequenceResult {
+  sequence: [GmosNorthAtom!]!
+}
+
+"""
+Replace GMOS South sequence input.  Select the observation using one of the
+observation ID or the observation reference.  If both are provided, they must
+refer to the same observation.
+"""
+input ReplaceGmosSouthSequenceInput {
+  observationId: ObservationId
+  observationReference: ObservationReferenceLabel
+
+  "Specifies which sequence should be replaced."
+  sequenceType: SequenceType!
+
+  """
+  The new sequence.  Any unexecuted steps are deleted and replaced with the
+  provided sequence.  Steps that were previously executed, or for which at least
+  one execution event was received, are preserved.
+  """
+  sequence: [GmosSouthAtomInput!]
+}
+
+"""
+The result of a replace sequence mutation, consisting of the newly inserted
+sequence.
+"""
+type ReplaceGmosSouthSequenceResult {
+  sequence: [GmosSouthAtom!]!
 }

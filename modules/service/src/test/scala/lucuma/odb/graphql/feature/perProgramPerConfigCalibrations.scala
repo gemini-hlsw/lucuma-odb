@@ -21,10 +21,7 @@ import lucuma.core.enums.GmosRoi
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.Site
-import lucuma.core.math.Angle
 import lucuma.core.math.Coordinates
-import lucuma.core.math.Declination
-import lucuma.core.math.RightAscension
 import lucuma.core.math.Wavelength
 import lucuma.core.model.CloudExtinction
 import lucuma.core.model.Group
@@ -39,7 +36,7 @@ import lucuma.odb.graphql.OdbSuite
 import lucuma.odb.graphql.TestUsers
 import lucuma.odb.graphql.input.ProgramPropertiesInput
 import lucuma.odb.graphql.query.ExecutionQuerySetupOperations
-import lucuma.odb.graphql.query.ExecutionTestSupport
+import lucuma.odb.graphql.query.ExecutionTestSupportForGmos
 import lucuma.odb.graphql.subscription.SubscriptionUtils
 import lucuma.odb.json.wavelength.decoder.given
 import lucuma.odb.service.PerProgramPerConfigCalibrationsService
@@ -60,58 +57,13 @@ class perProgramPerConfigCalibrations
     extends OdbSuite
     with SubscriptionUtils
     with ExecutionQuerySetupOperations
-    with ExecutionTestSupport {
+    with ExecutionTestSupportForGmos {
   override val pi       = TestUsers.Standard.pi(1, 101)
   val service  = TestUsers.service(3)
 
   val DefaultSnAt: Wavelength = Wavelength.fromIntNanometers(510).get
 
   override val validUsers = List(pi, service)
-
-  def updateTargetProperties(pi: User, tid: Target.Id, ra: Long, dec: Long, rv:  Double): IO[Json] =
-    query(
-      pi,
-      s"""
-          mutation {
-            updateTargets(input: {
-              SET: {
-                sidereal: {
-                  ra: { degrees: ${Angle.fromMicroarcseconds(ra).toDoubleDegrees} }
-                  dec: { degrees: ${Angle.fromMicroarcseconds(dec).toDoubleDegrees} }
-                  radialVelocity: { metersPerSecond: $rv }
-                  epoch: "J2000.000"
-                  radialVelocity: {
-                    kilometersPerSecond: 0.0
-                  }
-                },
-                sourceProfile: {
-                  point: {
-                    bandNormalized: {
-                      sed: {
-                        stellarLibrary: B5_III
-                      },
-                      brightnesses: [
-                        {
-                          band: R
-                          value: 15.0
-                          units: VEGA_MAGNITUDE
-                        }
-                      ]
-                    }
-                  }
-                }
-              }
-              WHERE: {
-                id: { EQ: "$tid"}
-              }
-            }) {
-              targets {
-                id
-              }
-            }
-          }
-      """
-    )
 
   def scienceRequirements(pi: User, oid: Observation.Id, snAt: Wavelength = DefaultSnAt): IO[Json] =
     query(
@@ -156,13 +108,7 @@ class perProgramPerConfigCalibrations
 
   def prepareObservation(pi: User, pid: Program.Id, oid: Observation.Id, tid: Target.Id, snAt: Wavelength = DefaultSnAt): IO[Unit] =
     for {
-      _ <- updateTargetProperties(
-             pi,
-             tid,
-             RightAscension.Zero.toAngle.toMicroarcseconds,
-             Declination.Zero.toAngle.toMicroarcseconds,
-             0.0
-           )
+      _ <- updateTargetPropertiesAs(pi, tid, Coordinates.Zero)
       _ <- scienceRequirements(pi, oid, snAt)
       _ <- runObscalcUpdate(pid, oid)
     } yield ()
@@ -1572,7 +1518,7 @@ class perProgramPerConfigCalibrations
         pid  <- createProgramAs(pi)
         tid  <- createTargetAs(pi, pid, "Target-Defined")
         oid  <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid)
-        _    <- updateTargetProperties(pi, tid, RightAscension.Zero.toAngle.toMicroarcseconds, Declination.Zero.toAngle.toMicroarcseconds, 0.0)
+        _    <- updateTargetPropertiesAs(pi, tid, Coordinates.Zero)
         _    <- scienceRequirements(pi, oid, DefaultSnAt)
         _    <- setCalculatedWorkflowState(oid, state)
         _    <- recalculateCalibrations(pid, when)

@@ -2,86 +2,64 @@
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
 package lucuma.odb.sequence
-package gmos.longslit
+package gmos
+package longslit
 
 import cats.Monad
 import cats.data.EitherT
-import cats.syntax.option.*
+import fs2.Pure
 import lucuma.core.enums.CalibrationRole
-import lucuma.core.enums.GmosNorthDetector
-import lucuma.core.enums.GmosNorthStageMode
-import lucuma.core.enums.GmosSouthDetector
-import lucuma.core.enums.GmosSouthStageMode
-import lucuma.core.enums.MosPreImaging
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.gmos.DynamicConfig
 import lucuma.core.model.sequence.gmos.StaticConfig
-import lucuma.core.util.Timestamp
-import lucuma.itc.IntegrationTime
+import lucuma.odb.data.Itc.Spectroscopy
 import lucuma.odb.data.OdbError
+import lucuma.odb.sequence.data.StreamingExecutionConfig
 
 import java.util.UUID
 
 object LongSlit:
 
-  val GmosNorthStatic: StaticConfig.GmosNorth =
-    StaticConfig.GmosNorth(
-      GmosNorthStageMode.FollowXy,
-      GmosNorthDetector.Hamamatsu,
-      MosPreImaging.IsNotMosPreImaging,
-      none
-    )
-
-  val GmosSouthStatic: StaticConfig.GmosSouth =
-    StaticConfig.GmosSouth(
-      GmosSouthStageMode.FollowXyz,
-      GmosSouthDetector.Hamamatsu,
-      MosPreImaging.IsNotMosPreImaging,
-      none
-    )
-
   private def instantiate[F[_]: Monad, S, D](
     static:      S,
     acquisition: Either[OdbError, SequenceGenerator[D]],
     science:     F[Either[OdbError, SequenceGenerator[D]]]
-  ): F[Either[OdbError, ExecutionConfigGenerator[S, D]]] =
+  ): F[Either[OdbError, StreamingExecutionConfig[Pure, S, D]]] =
     (for
       a <- EitherT.fromEither(acquisition)
       s <- EitherT(science)
-    yield ExecutionConfigGenerator(static, a, s)).value
+    yield StreamingExecutionConfig(static, a.generate, s.generate)).value
 
   def gmosNorth[F[_]: Monad](
     observationId:  Observation.Id,
-    estimator:      TimeEstimateCalculator[StaticConfig.GmosNorth, DynamicConfig.GmosNorth],
+    estimator:      StepTimeEstimateCalculator[StaticConfig.GmosNorth, DynamicConfig.GmosNorth],
     namespace:      UUID,
     expander:       SmartGcalExpander[F, DynamicConfig.GmosNorth],
     config:         Config.GmosNorth,
-    acquisitionItc: Either[OdbError, IntegrationTime],
-    scienceItc:     Either[OdbError, IntegrationTime],
-    calRole:        Option[CalibrationRole],
-    lastAcqReset:   Option[Timestamp]
-  ): F[Either[OdbError, ExecutionConfigGenerator[StaticConfig.GmosNorth, DynamicConfig.GmosNorth]]] =
+    itc:            Either[OdbError, Spectroscopy],
+    calRole:        Option[CalibrationRole]
+  ): F[Either[OdbError, StreamingExecutionConfig[Pure, StaticConfig.GmosNorth, DynamicConfig.GmosNorth]]] =
+    val static = InitialConfigs.GmosNorthStatic
     instantiate(
-      GmosNorthStatic,
-      Acquisition.gmosNorth(observationId, estimator, GmosNorthStatic, namespace, config, acquisitionItc, calRole, lastAcqReset),
-      Science.gmosNorth(observationId, estimator, GmosNorthStatic, namespace, expander, config, scienceItc, calRole)
+      static,
+      Acquisition.gmosNorth(observationId, estimator, static, namespace, config, itc.map(_.acquisition.focus.value), calRole),
+      Science.gmosNorth(observationId, estimator, static, namespace, expander, config, itc.map(_.science.focus.value), calRole)
     )
 
   def gmosSouth[F[_]: Monad](
     observationId:  Observation.Id,
-    estimator:      TimeEstimateCalculator[StaticConfig.GmosSouth, DynamicConfig.GmosSouth],
+    estimator:      StepTimeEstimateCalculator[StaticConfig.GmosSouth, DynamicConfig.GmosSouth],
     namespace:      UUID,
     expander:       SmartGcalExpander[F, DynamicConfig.GmosSouth],
     config:         Config.GmosSouth,
-    acquisitionItc: Either[OdbError, IntegrationTime],
-    scienceItc:     Either[OdbError, IntegrationTime],
-    calRole:        Option[CalibrationRole],
-    lastAcqReset:   Option[Timestamp]
-  ): F[Either[OdbError, ExecutionConfigGenerator[StaticConfig.GmosSouth, DynamicConfig.GmosSouth]]] =
+    itc:            Either[OdbError, Spectroscopy],
+    calRole:        Option[CalibrationRole]
+  ): F[Either[OdbError, StreamingExecutionConfig[Pure, StaticConfig.GmosSouth, DynamicConfig.GmosSouth]]] =
+    val static = InitialConfigs.GmosSouthStatic
     instantiate(
-      GmosSouthStatic,
-      Acquisition.gmosSouth(observationId, estimator, GmosSouthStatic, namespace, config, acquisitionItc, calRole, lastAcqReset),
-      Science.gmosSouth(observationId, estimator, GmosSouthStatic, namespace, expander, config, scienceItc, calRole)
+      static,
+      Acquisition.gmosSouth(observationId, estimator, static, namespace, config, itc.map(_.acquisition.focus.value), calRole),
+      Science.gmosSouth(observationId, estimator, static, namespace, expander, config, itc.map(_.science.focus.value), calRole)
     )
 
 end LongSlit

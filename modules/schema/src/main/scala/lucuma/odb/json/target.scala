@@ -21,7 +21,7 @@ import lucuma.core.math.RadialVelocity
 import lucuma.core.math.Region
 import lucuma.core.math.RightAscension
 import lucuma.core.model.CatalogInfo
-import lucuma.core.model.EphemerisKey
+import lucuma.core.model.Ephemeris
 import lucuma.core.model.SiderealTracking
 import lucuma.core.model.SourceProfile
 import lucuma.core.model.Target
@@ -76,7 +76,7 @@ object target {
       Decoder.instance(c =>
         for {
           name          <- c.downField("name").as[NonEmptyString]
-          ephemerisKey  <- c.downField("nonsidereal").downField("key").as[EphemerisKey]
+          ephemerisKey  <- c.downField("nonsidereal").downField("key").as[Ephemeris.Key]
           sourceProfile <- c.downField("sourceProfile").as[SourceProfile]
         } yield Target.Nonsidereal(name, ephemerisKey, sourceProfile)
       )

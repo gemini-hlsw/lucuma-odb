@@ -29,7 +29,8 @@ import lucuma.odb.json.wavelength.transport.given
 import monocle.Prism
 import monocle.macros.GenPrism
 
-sealed trait InstrumentMode
+sealed trait InstrumentMode:
+  def displayName: String
 
 object InstrumentMode {
 
@@ -40,7 +41,9 @@ object InstrumentMode {
     fpu:               GmosFpu.North,
     ccdMode:           Option[GmosCcdMode],
     roi:               Option[GmosRoi]
-  ) extends InstrumentMode derives Eq
+  ) extends InstrumentMode derives Eq:
+    override def displayName: String =
+      "GMOS North Spectroscopy"
 
   object GmosNorthSpectroscopy {
 
@@ -74,7 +77,9 @@ object InstrumentMode {
     fpu:               GmosFpu.South,
     ccdMode:           Option[GmosCcdMode],
     roi:               Option[GmosRoi]
-  ) extends InstrumentMode derives Eq
+  ) extends InstrumentMode derives Eq:
+    override def displayName: String =
+      "GMOS South Spectroscopy"
 
   object GmosSouthSpectroscopy:
 
@@ -103,7 +108,9 @@ object InstrumentMode {
     disperser: Flamingos2Disperser,
     filter:    Flamingos2Filter,
     fpu:       Flamingos2Fpu
-  ) extends InstrumentMode derives Eq
+  ) extends InstrumentMode derives Eq:
+    override def displayName: String =
+      "Flamingos 2 Spectroscopy"
 
   object Flamingos2Spectroscopy:
 
@@ -126,7 +133,9 @@ object InstrumentMode {
   case class GmosNorthImaging(
     filter:  GmosNorthFilter,
     ccdMode: Option[GmosCcdMode]
-  ) extends InstrumentMode derives Eq
+  ) extends InstrumentMode derives Eq:
+    override def displayName: String =
+      "GMOS North Imaging"
 
   object GmosNorthImaging:
 
@@ -145,7 +154,9 @@ object InstrumentMode {
   case class GmosSouthImaging(
     filter:  GmosSouthFilter,
     ccdMode: Option[GmosCcdMode]
-  ) extends InstrumentMode derives Eq
+  ) extends InstrumentMode derives Eq:
+    override def displayName: String =
+      "GMOS South Imaging"
 
   object GmosSouthImaging:
 
@@ -163,7 +174,9 @@ object InstrumentMode {
 
   case class Flamingos2Imaging(
     filter: Flamingos2Filter
-  ) extends InstrumentMode derives Eq
+  ) extends InstrumentMode derives Eq:
+    override def displayName: String =
+      "Flamingos 2 Imaging"
 
   object Flamingos2Imaging:
 
@@ -196,6 +209,18 @@ object InstrumentMode {
   val flamingos2Imaging: Prism[InstrumentMode, Flamingos2Imaging] =
     GenPrism[InstrumentMode, Flamingos2Imaging]
 
+  case class Igrins2Spectroscopy() extends InstrumentMode derives Eq:
+    override def displayName: String =
+      "IGRINS2 Spectroscopy"
+
+  object Igrins2Spectroscopy:
+    given Encoder[Igrins2Spectroscopy] = _ => Json.obj()
+
+    given Decoder[Igrins2Spectroscopy] = _ => Igrins2Spectroscopy().asRight
+
+  val igrins2Spectroscopy: Prism[InstrumentMode, Igrins2Spectroscopy] =
+    GenPrism[InstrumentMode, Igrins2Spectroscopy]
+
   given Encoder[InstrumentMode] = a =>
     a match
       case a @ GmosNorthSpectroscopy(_, _, _, _, _, _) =>
@@ -210,26 +235,31 @@ object InstrumentMode {
         Json.obj("flamingos2Spectroscopy" -> a.asJson)
       case a @ Flamingos2Imaging(_)                    =>
         Json.obj("flamingos2Imaging" -> a.asJson)
+      case a @ Igrins2Spectroscopy()                   =>
+        Json.obj("igrins2Spectroscopy" -> a.asJson)
 
   given Decoder[InstrumentMode] = c =>
     for
-      ns <- c.downField("gmosNSpectroscopy").as[Option[GmosNorthSpectroscopy]]
-      ss <- c.downField("gmosSSpectroscopy").as[Option[GmosSouthSpectroscopy]]
-      ni <- c.downField("gmosNImaging").as[Option[GmosNorthImaging]]
-      si <- c.downField("gmosSImaging").as[Option[GmosSouthImaging]]
-      fs <- c.downField("flamingos2Spectroscopy").as[Option[Flamingos2Spectroscopy]]
-      fi <- c.downField("flamingos2Imaging").as[Option[Flamingos2Imaging]]
-      m  <- (ns, ss, ni, si, fs, fi) match
-              case (Some(n), None, None, None, None, None) => (n: InstrumentMode).asRight
-              case (None, Some(s), None, None, None, None) => (s: InstrumentMode).asRight
-              case (None, None, Some(s), None, None, None) => (s: InstrumentMode).asRight
-              case (None, None, None, Some(s), None, None) => (s: InstrumentMode).asRight
-              case (None, None, None, None, Some(s), None) => (s: InstrumentMode).asRight
-              case (None, None, None, None, None, Some(s)) => (s: InstrumentMode).asRight
-              case _                                       =>
-                DecodingFailure("Expected exactly one of 'gmosN' or 'gmosS' or 'flamingos2'.",
-                                c.history
-                ).asLeft
+      ns  <- c.downField("gmosNSpectroscopy").as[Option[GmosNorthSpectroscopy]]
+      ss  <- c.downField("gmosSSpectroscopy").as[Option[GmosSouthSpectroscopy]]
+      ni  <- c.downField("gmosNImaging").as[Option[GmosNorthImaging]]
+      si  <- c.downField("gmosSImaging").as[Option[GmosSouthImaging]]
+      fs  <- c.downField("flamingos2Spectroscopy").as[Option[Flamingos2Spectroscopy]]
+      fi  <- c.downField("flamingos2Imaging").as[Option[Flamingos2Imaging]]
+      ig2 <- c.downField("igrins2Spectroscopy").as[Option[Igrins2Spectroscopy]]
+      m   <- (ns, ss, ni, si, fs, fi, ig2) match
+               case (Some(n), None, None, None, None, None, None) => (n: InstrumentMode).asRight
+               case (None, Some(s), None, None, None, None, None) => (s: InstrumentMode).asRight
+               case (None, None, Some(s), None, None, None, None) => (s: InstrumentMode).asRight
+               case (None, None, None, Some(s), None, None, None) => (s: InstrumentMode).asRight
+               case (None, None, None, None, Some(s), None, None) => (s: InstrumentMode).asRight
+               case (None, None, None, None, None, Some(s), None) => (s: InstrumentMode).asRight
+               case (None, None, None, None, None, None, Some(s)) => (s: InstrumentMode).asRight
+               case _                                             =>
+                 DecodingFailure(
+                   "Expected exactly one instrument mode.",
+                   c.history
+                 ).asLeft
     yield m
 
   given Eq[InstrumentMode] with
@@ -241,5 +271,6 @@ object InstrumentMode {
         case (x0: GmosSouthImaging, y0: GmosSouthImaging)             => x0 === y0
         case (x0: Flamingos2Spectroscopy, y0: Flamingos2Spectroscopy) => x0 === y0
         case (x0: Flamingos2Imaging, y0: Flamingos2Imaging)           => x0 === y0
+        case (x0: Igrins2Spectroscopy, y0: Igrins2Spectroscopy)       => x0 === y0
         case _                                                        => false
 }

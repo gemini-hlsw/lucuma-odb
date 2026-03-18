@@ -5,14 +5,12 @@ package lucuma.odb.data
 
 import cats.syntax.option.*
 import eu.timepit.refined.types.numeric.NonNegInt
-import lucuma.core.data.Zipper
 import lucuma.core.model.Observation
 import lucuma.core.model.ObservationWorkflow
 import lucuma.core.model.Program
 import lucuma.core.model.sequence.ExecutionDigest
 import lucuma.core.util.CalculationState
 import lucuma.core.util.Timestamp
-import lucuma.odb.service.ItcService
 
 /**
  * Data used in performing background observation calculations.
@@ -58,46 +56,33 @@ object Obscalc:
     failureCount:     NonNegInt
   )
 
-  final case class ItcResult(
-    imaging:      ItcService.TargetResult,
-    spectroscopy: ItcService.TargetResult
-  ):
-    def toAsterismResults: Option[ItcService.AsterismResults] =
-      ItcService.AsterismResults.fromResults(
-        Zipper.one(imaging),
-        Zipper.one(spectroscopy)
-      )
-
   /**
    * Obscalc calculation results.
    */
   sealed trait Result extends Product with Serializable:
     def fold[A](
-      error:         Result.Error         => A,
-      withoutTarget: Result.WithoutTarget => A,
-      withTarget:    Result.WithTarget    => A
+      error:   Result.Error   => A,
+      success: Result.Success => A
     ): A =
       this match
-        case a@Result.Error(_, _)         => error(a)
-        case a@Result.WithoutTarget(_, _) => withoutTarget(a)
-        case a@Result.WithTarget(_, _, _) => withTarget(a)
+        case a@Result.Error(_, _)      => error(a)
+        case a@Result.Success(_, _, _) => success(a)
 
     def odbError: Option[OdbError] =
-      fold(_.e.some, _ => none, _ => none)
+      fold(_.e.some, _ => none)
 
-    def itcResult: Option[ItcResult] =
-      fold(_ => none, _ => none, _.i.some)
+    def hasItcResult: Boolean =
+      fold(_ => false, _.i)
 
     def digest: Option[ExecutionDigest] =
-      fold(_ => none, _.d.some, _.d.some)
+      fold(_ => none, _.d.some)
 
     def workflow: ObservationWorkflow =
-      fold(_.w, _.w, _.w)
+      fold(_.w, _.w)
 
   object Result:
-    case class Error(e: OdbError, w: ObservationWorkflow)                           extends Result
-    case class WithoutTarget(d: ExecutionDigest, w: ObservationWorkflow)            extends Result
-    case class WithTarget(i: ItcResult, d: ExecutionDigest, w: ObservationWorkflow) extends Result
+    case class Error(e: OdbError, w: ObservationWorkflow)                      extends Result
+    case class Success(i: Boolean, d: ExecutionDigest, w: ObservationWorkflow) extends Result
 
   /**
    * The Obscalc Entry pairs metadata with a (possibily missing, possibly

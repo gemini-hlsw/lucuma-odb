@@ -54,6 +54,17 @@ class createObservation_GmosImaging extends OdbSuite:
               observation(observationId: "$oid") {
                 observingMode {
                   gmosNorthImaging {
+                    variant {
+                      interleaved {
+                        offsets {
+                          generatorType
+                        }
+                        skyCount
+                        skyOffsets {
+                          generatorType
+                        }
+                      }
+                    }
                     filters {
                       filter
                     }
@@ -70,13 +81,20 @@ class createObservation_GmosImaging extends OdbSuite:
               "observation": {
                 "observingMode": {
                   "gmosNorthImaging": {
-                    "filters": [
-                      {
-                        "filter": "G_PRIME"
-                      },
-                      {
-                        "filter": "R_PRIME"
+                    "variant": {
+                      "interleaved": {
+                        "offsets": {
+                          "generatorType": "NONE"
+                        },
+                        "skyCount": 1,
+                        "skyOffsets": {
+                          "generatorType": "NONE"
+                        }
                       }
+                    },
+                    "filters": [
+                      { "filter": "G_PRIME" },
+                      { "filter": "R_PRIME" }
                     ],
                     "bin": "TWO",
                     "ampReadMode": "SLOW",
@@ -113,15 +131,18 @@ class createObservation_GmosImaging extends OdbSuite:
 
     createProgramAs(pi).flatMap: pid =>
       createTargetAs(pi, pid, sourceProfile = gaussian).flatMap: tid =>
-        createGmosNorthImagingObservationAs(pi, pid, iq = ImageQuality.Preset.PointOne, offsets = None, tid).flatMap: oid =>
+        createGmosNorthImagingObservationAs(pi, pid, iq = ImageQuality.Preset.PointOne, tid).flatMap: oid =>
           expect(pi, s"""
             query {
               observation(observationId: "$oid") {
                 observingMode {
                   gmosNorthImaging {
-                    filters {
-                      filter
+                    variant {
+                      interleaved {
+                        skyCount
+                      }
                     }
+                    filters { filter }
                     bin
                     ampReadMode
                     ampGain
@@ -135,13 +156,14 @@ class createObservation_GmosImaging extends OdbSuite:
               "observation": {
                 "observingMode": {
                   "gmosNorthImaging": {
-                    "filters": [
-                      {
-                        "filter": "G_PRIME"
-                      },
-                      {
-                        "filter": "R_PRIME"
+                    "variant": {
+                      "interleaved": {
+                        "skyCount": 1
                       }
+                    },
+                    "filters": [
+                      { "filter": "G_PRIME" },
+                      { "filter": "R_PRIME" }
                     ],
                     "bin": "ONE",
                     "ampReadMode": "SLOW",
@@ -162,6 +184,11 @@ class createObservation_GmosImaging extends OdbSuite:
               observation(observationId: "$oid") {
                 observingMode {
                   gmosSouthImaging {
+                    variant {
+                      interleaved {
+                        skyCount
+                      }
+                    }
                     filters {
                       filter
                     }
@@ -178,6 +205,11 @@ class createObservation_GmosImaging extends OdbSuite:
               "observation": {
                 "observingMode": {
                   "gmosSouthImaging": {
+                    "variant": {
+                      "interleaved": {
+                        "skyCount": 1
+                      }
+                    },
                     "filters": [
                       {
                         "filter": "G_PRIME"
@@ -257,6 +289,10 @@ class createObservation_GmosImaging extends OdbSuite:
                 }
                 observingMode: {
                   gmosNorthImaging: {
+                    variant: {
+                      interleaved: {
+                      }
+                    }
                     filters: []
                   }
                 }
@@ -265,15 +301,50 @@ class createObservation_GmosImaging extends OdbSuite:
               observation {
                 observingMode {
                   gmosNorthImaging {
-                    filters {
-                      filter
-                    }
+                    filters { filter }
                   }
                 }
               }
             }
           }
         """, List("Argument 'input.SET.observingMode.gmosNorthImaging' is invalid: At least one filter must be specified for GMOS imaging observations.").asLeft)
+
+  test("cannot create GMOS North without specifying the variant"):
+    createProgramAs(pi).flatMap: pid =>
+      createTargetAs(pi, pid).flatMap: tid =>
+        expect(pi, s"""
+          mutation {
+            createObservation(input: {
+              programId: ${pid.asJson}
+              SET: {
+                targetEnvironment: {
+                  asterism: [${tid.asJson}]
+                }
+                scienceRequirements: {
+                  imaging: {
+                    minimumFov: { arcseconds: 100 }
+                    narrowFilters: false
+                    broadFilters: false
+                    combinedFilters: true
+                  }
+                }
+                observingMode: {
+                  gmosNorthImaging: {
+                    filters: []
+                  }
+                }
+              }
+            }) {
+              observation {
+                observingMode {
+                  gmosNorthImaging {
+                    filters { filter }
+                  }
+                }
+              }
+            }
+          }
+        """, List("Argument 'input.SET.observingMode.gmosNorthImaging.variant' is invalid: Input is not optional").asLeft)
 
   test("cannot create GMOS South with empty filters"):
     createProgramAs(pi).flatMap: pid =>
@@ -296,6 +367,10 @@ class createObservation_GmosImaging extends OdbSuite:
                 }
                 observingMode: {
                   gmosSouthImaging: {
+                    variant: {
+                      interleaved: {
+                      }
+                    }
                     filters: []
                   }
                 }
@@ -304,9 +379,7 @@ class createObservation_GmosImaging extends OdbSuite:
               observation {
                 observingMode {
                   gmosSouthImaging {
-                    filters {
-                      filter
-                    }
+                    filters { filter }
                   }
                 }
               }
@@ -353,6 +426,10 @@ class createObservation_GmosImaging extends OdbSuite:
                 }
                 observingMode: {
                   gmosNorthImaging: {
+                    variant: {
+                      interleaved: {
+                      }
+                    }
                     filters: [
                       {
                         filter: G_PRIME
@@ -502,82 +579,7 @@ class createObservation_GmosImaging extends OdbSuite:
       """
     )
 
-  test("can create GMOS North with spatial offsets"):
-    createProgramAs(pi).flatMap: pid =>
-      createTargetAs(pi, pid).flatMap: tid =>
-        expect(pi, s"""
-          mutation {
-            createObservation(input: {
-              programId: ${pid.asJson}
-              SET: {
-                targetEnvironment: {
-                  asterism: [${tid.asJson}]
-                }
-                scienceRequirements: {
-                  exposureTimeMode: {
-                    signalToNoise: {
-                      value: 10.0
-                      at: { nanometers: 500.0 }
-                    }
-                  }
-                  imaging: {
-                    minimumFov: { arcseconds: 100 }
-                    narrowFilters: false
-                    broadFilters: false
-                    combinedFilters: true
-                  }
-                }
-                observingMode: {
-                  gmosNorthImaging: {
-                    filters: [
-                      { filter: G_PRIME },
-                      { filter: R_PRIME }
-                    ]
-                    offsets: [
-                      { p: { arcseconds: "1.5" }, q: { arcseconds: "2.0" } },
-                      { p: { arcseconds: "-0.5" }, q: { arcseconds: "1.0" } }
-                    ]
-                  }
-                }
-              }
-            }) {
-              observation {
-                observingMode {
-                  gmosNorthImaging {
-                    filters {
-                      filter
-                    }
-                    offsets {
-                      p { arcseconds }
-                      q { arcseconds }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        """, json"""
-          {
-            "createObservation": {
-              "observation": {
-                "observingMode": {
-                  "gmosNorthImaging": {
-                    "filters": [
-                      { "filter": "G_PRIME" },
-                      { "filter": "R_PRIME" }
-                    ],
-                    "offsets": [
-                      { "p": { "arcseconds": 1.500000 }, "q": { "arcseconds": 2.000000 } },
-                      { "p": { "arcseconds": -0.500000 }, "q": { "arcseconds": 1.000000 } }
-                    ]
-                  }
-                }
-              }
-            }
-          }
-        """.asRight)
-
-  test("can create GMOS South with spatial offsets"):
+  def testNotEnumeratedGenerator(variantName: String): IO[Unit] =
     createProgramAs(pi).flatMap: pid =>
       createTargetAs(pi, pid).flatMap: tid =>
         expect(pi, s"""
@@ -604,212 +606,82 @@ class createObservation_GmosImaging extends OdbSuite:
                 }
                 observingMode: {
                   gmosSouthImaging: {
-                    filters: [
-                      { filter: G_PRIME },
-                      { filter: R_PRIME }
-                    ]
-                    offsets: [
-                      { p: { arcseconds: "2.5" }, q: { arcseconds: "-1.5" } }
-                    ]
-                  }
-                }
-              }
-            }) {
-              observation {
-                observingMode {
-                  gmosSouthImaging {
-                    filters {
-                      filter
-                    }
-                    offsets {
-                      p { arcseconds }
-                      q { arcseconds }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        """, json"""
-          {
-            "createObservation": {
-              "observation": {
-                "observingMode": {
-                  "gmosSouthImaging": {
-                    "filters": [
-                      { "filter": "G_PRIME" },
-                      { "filter": "R_PRIME" }
-                    ],
-                    "offsets": [
-                      { "p": { "arcseconds": 2.500000 }, "q": { "arcseconds": -1.500000 } }
-                    ]
-                  }
-                }
-              }
-            }
-          }
-        """.asRight)
-
-  test("defaults to empty spatial offsets"):
-    createProgramAs(pi).flatMap: pid =>
-      createTargetAs(pi, pid).flatMap: tid =>
-        expect(pi, s"""
-          mutation {
-            createObservation(input: {
-              programId: ${pid.asJson}
-              SET: {
-                targetEnvironment: {
-                  asterism: [${tid.asJson}]
-                }
-                scienceRequirements: {
-                  exposureTimeMode: {
-                    signalToNoise: {
-                      value: 10.0
-                      at: { nanometers: 500.0 }
-                    }
-                  }
-                  imaging: {
-                    minimumFov: { arcseconds: 100 }
-                    narrowFilters: false
-                    broadFilters: false
-                    combinedFilters: true
-                  }
-                }
-                observingMode: {
-                  gmosNorthImaging: {
-                    filters: [
-                      {
-                        filter: G_PRIME
-                      },
-                      {
-                        filter: R_PRIME
-                      }
-                    ]
-                  }
-                }
-              }
-            }) {
-              observation {
-                observingMode {
-                  gmosNorthImaging {
-                    offsets {
-                      p { arcseconds }
-                      q { arcseconds }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        """, json"""
-          {
-            "createObservation": {
-              "observation": {
-                "observingMode": {
-                  "gmosNorthImaging": {
-                    "offsets": []
-                  }
-                }
-              }
-            }
-          }
-        """.asRight)
-
-  test("can create with uniform object and random sky offset generators"):
-    createProgramAs(pi).flatMap: pid =>
-      createTargetAs(pi, pid).flatMap: tid =>
-        expect(pi, s"""
-          mutation {
-            createObservation(input: {
-              programId: ${pid.asJson}
-              SET: {
-                targetEnvironment: {
-                  asterism: [${tid.asJson}]
-                }
-                scienceRequirements: {
-                  exposureTimeMode: {
-                    signalToNoise: {
-                      value: 10.0
-                      at: { nanometers: 500.0 }
-                    }
-                  }
-                  imaging: {
-                    minimumFov: { arcseconds: 100 }
-                    narrowFilters: false
-                    broadFilters: false
-                    combinedFilters: true
-                  }
-                }
-                observingMode: {
-                  gmosSouthImaging: {
-                    filters: [
-                      { filter: G_PRIME },
-                      { filter: R_PRIME }
-                    ]
-                    objectOffsetGenerator: {
-                      uniform: {
-                        cornerA: {
-                          p: { arcseconds: 10.0 }
-                          q: { arcseconds: 11.0 }
-                        }
-                        cornerB: {
-                          p: { arcseconds: 12.0 }
-                          q: { arcseconds: 13.0 }
-                        }
-                      }
-                    }
-                    skyOffsetGenerator: {
-                      random: {
-                        size: { arcseconds: 14.0 }
-                        center: {
-                          p: { arcseconds: 15.0 }
-                          q: { arcseconds: 16.0 }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }) {
-              observation {
-                observingMode {
-                  gmosSouthImaging {
-                    objectOffsetGenerator {
-                      generatorType
-                      enumerated {
-                        values {
-                          offset {
-                            p { arcseconds }
-                            q { arcseconds }
+                    variant: {
+                      $variantName: {
+                        offsets: {
+                          uniform: {
+                            cornerA: {
+                              p: { arcseconds: 10.0 }
+                              q: { arcseconds: 11.0 }
+                            }
+                            cornerB: {
+                              p: { arcseconds: 12.0 }
+                              q: { arcseconds: 13.0 }
+                            }
                           }
-                          guiding
                         }
-                      }
-                      uniform {
-                        cornerA {
-                          p { arcseconds }
-                          q { arcseconds }
-                        }
-                        cornerB {
-                          p { arcseconds }
-                          q { arcseconds }
+                        skyOffsets: {
+                          random: {
+                            size: { arcseconds: 14.0 }
+                            center: {
+                              p: { arcseconds: 15.0 }
+                              q: { arcseconds: 16.0 }
+                            }
+                          }
                         }
                       }
                     }
-                    skyOffsetGenerator {
-                      generatorType
-                      random {
-                        size { arcseconds }
-                        center {
-                          p { arcseconds }
-                          q { arcseconds }
+                    filters: [
+                      { filter: G_PRIME },
+                      { filter: R_PRIME }
+                    ]
+                  }
+                }
+              }
+            }) {
+              observation {
+                observingMode {
+                  gmosSouthImaging {
+                    variant {
+                      $variantName {
+                        offsets {
+                          generatorType
+                          enumerated {
+                            values {
+                              offset {
+                                p { arcseconds }
+                                q { arcseconds }
+                              }
+                              guiding
+                            }
+                          }
+                          uniform {
+                            cornerA {
+                              p { arcseconds }
+                              q { arcseconds }
+                            }
+                            cornerB {
+                              p { arcseconds }
+                              q { arcseconds }
+                            }
+                          }
                         }
-                      }
-                      spiral {
-                        size { arcseconds }
-                        center {
-                          p { arcseconds }
-                          q { arcseconds }
+                        skyOffsets {
+                          generatorType
+                          random {
+                            size { arcseconds }
+                            center {
+                              p { arcseconds }
+                              q { arcseconds }
+                            }
+                          }
+                          spiral {
+                            size { arcseconds }
+                            center {
+                              p { arcseconds }
+                              q { arcseconds }
+                            }
+                          }
                         }
                       }
                     }
@@ -824,30 +696,34 @@ class createObservation_GmosImaging extends OdbSuite:
               "observation": {
                 "observingMode": {
                   "gmosSouthImaging": {
-                    "objectOffsetGenerator": {
-                      "generatorType": "UNIFORM",
-                      "enumerated": null,
-                      "uniform": {
-                        "cornerA": {
-                          "p": { "arcseconds": 10 },
-                          "q": { "arcseconds": 11 }
+                    "variant": {
+                      $variantName: {
+                        "offsets": {
+                          "generatorType": "UNIFORM",
+                          "enumerated": null,
+                          "uniform": {
+                            "cornerA": {
+                              "p": { "arcseconds": 10 },
+                              "q": { "arcseconds": 11 }
+                            },
+                            "cornerB": {
+                              "p": { "arcseconds": 12 },
+                              "q": { "arcseconds": 13 }
+                            }
+                          }
                         },
-                        "cornerB": {
-                          "p": { "arcseconds": 12 },
-                          "q": { "arcseconds": 13 }
+                        "skyOffsets": {
+                          "generatorType": "RANDOM",
+                          "random": {
+                            "size": { "arcseconds":  14 },
+                            "center": {
+                              "p": { "arcseconds": 15 },
+                              "q": { "arcseconds": 16 }
+                            }
+                          },
+                          "spiral": null
                         }
                       }
-                    },
-                    "skyOffsetGenerator": {
-                      "generatorType": "RANDOM",
-                      "random": {
-                        "size": { "arcseconds":  14 },
-                        "center": {
-                          "p": { "arcseconds": 15 },
-                          "q": { "arcseconds": 16 }
-                        }
-                      },
-                      "spiral": null
                     }
                   }
                 }
@@ -857,7 +733,13 @@ class createObservation_GmosImaging extends OdbSuite:
         """.asRight
       )
 
-  test("can create with enumerated generators"):
+  test("can create with grouped filters, uniform object and random sky offset generators"):
+    testNotEnumeratedGenerator("grouped")
+
+  test("can create with interleaved filters, uniform object and random sky offset generators"):
+    testNotEnumeratedGenerator("interleaved")
+
+  def testEnumeratedGenerator(variantName: String): IO[Unit] =
     createProgramAs(pi).flatMap: pid =>
       createTargetAs(pi, pid).flatMap: tid =>
         expect(pi,
@@ -885,43 +767,47 @@ class createObservation_GmosImaging extends OdbSuite:
                   }
                   observingMode: {
                     gmosSouthImaging: {
+                      variant: {
+                        $variantName: {
+                          offsets: {
+                            enumerated: {
+                              values: [
+                                {
+                                  offset: {
+                                    p: { arcseconds: 10.0 }
+                                    q: { arcseconds: 11.0 }
+                                  }
+                                  guiding: ENABLED
+                                },
+                                {
+                                  offset: {
+                                    p: { arcseconds: 12.0 }
+                                    q: { arcseconds: 13.0 }
+                                  }
+                                  guiding: ENABLED
+                                }
+                              ]
+                            }
+                          }
+                          skyOffsets: {
+                            enumerated: {
+                              values: [
+                                {
+                                  offset: {
+                                    p: { arcseconds: 14.0 }
+                                    q: { arcseconds: 15.0 }
+                                  }
+                                  guiding: DISABLED
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      }
                       filters: [
                         { filter: G_PRIME },
                         { filter: R_PRIME }
                       ]
-                      objectOffsetGenerator: {
-                        enumerated: {
-                          values: [
-                            {
-                              offset: {
-                                p: { arcseconds: 10.0 }
-                                q: { arcseconds: 11.0 }
-                              }
-                              guiding: ENABLED
-                            },
-                            {
-                              offset: {
-                                p: { arcseconds: 12.0 }
-                                q: { arcseconds: 13.0 }
-                              }
-                              guiding: ENABLED
-                            }
-                          ]
-                        }
-                      }
-                      skyOffsetGenerator: {
-                        enumerated: {
-                          values: [
-                            {
-                              offset: {
-                                p: { arcseconds: 14.0 }
-                                q: { arcseconds: 15.0 }
-                              }
-                              guiding: DISABLED
-                            }
-                          ]
-                        }
-                      }
                     }
                   }
                 }
@@ -930,27 +816,31 @@ class createObservation_GmosImaging extends OdbSuite:
               observation {
                 observingMode {
                   gmosSouthImaging {
-                    objectOffsetGenerator {
-                      generatorType
-                      enumerated {
-                        values {
-                          offset {
-                            p { arcseconds }
-                            q { arcseconds }
+                    variant {
+                      $variantName {
+                        offsets {
+                          generatorType
+                          enumerated {
+                            values {
+                              offset {
+                                p { arcseconds }
+                                q { arcseconds }
+                              }
+                              guiding
+                            }
                           }
-                          guiding
                         }
-                      }
-                    }
-                    skyOffsetGenerator {
-                      generatorType
-                      enumerated {
-                        values {
-                          offset {
-                            p { arcseconds }
-                            q { arcseconds }
+                        skyOffsets {
+                          generatorType
+                          enumerated {
+                            values {
+                              offset {
+                                p { arcseconds }
+                                q { arcseconds }
+                              }
+                              guiding
+                            }
                           }
-                          guiding
                         }
                       }
                     }
@@ -966,39 +856,43 @@ class createObservation_GmosImaging extends OdbSuite:
                 "observation": {
                   "observingMode": {
                     "gmosSouthImaging": {
-                      "objectOffsetGenerator": {
-                        "generatorType": "ENUMERATED",
-                        "enumerated": {
-                          "values": [
-                            {
-                              "offset": {
-                                "p": { "arcseconds": 10 },
-                                "q": { "arcseconds": 11 }
-                              },
-                              "guiding": "ENABLED"
-                            },
-                            {
-                              "offset": {
-                                "p": { "arcseconds": 12 },
-                                "q": { "arcseconds": 13 }
-                              },
-                              "guiding": "ENABLED"
+                      "variant": {
+                        $variantName: {
+                          "offsets": {
+                            "generatorType": "ENUMERATED",
+                            "enumerated": {
+                              "values": [
+                                {
+                                  "offset": {
+                                    "p": { "arcseconds": 10 },
+                                    "q": { "arcseconds": 11 }
+                                  },
+                                  "guiding": "ENABLED"
+                                },
+                                {
+                                  "offset": {
+                                    "p": { "arcseconds": 12 },
+                                    "q": { "arcseconds": 13 }
+                                  },
+                                  "guiding": "ENABLED"
+                                }
+                              ]
                             }
-                          ]
-                        }
-                      },
-                      "skyOffsetGenerator": {
-                        "generatorType": "ENUMERATED",
-                        "enumerated": {
-                          "values": [
-                            {
-                              "offset": {
-                                "p": { "arcseconds": 14 },
-                                "q": { "arcseconds": 15 }
-                              },
-                              "guiding": "DISABLED"
+                          },
+                          "skyOffsets": {
+                            "generatorType": "ENUMERATED",
+                            "enumerated": {
+                              "values": [
+                                {
+                                  "offset": {
+                                    "p": { "arcseconds": 14 },
+                                    "q": { "arcseconds": 15 }
+                                  },
+                                  "guiding": "DISABLED"
+                                }
+                              ]
                             }
-                          ]
+                          }
                         }
                       }
                     }
@@ -1009,7 +903,200 @@ class createObservation_GmosImaging extends OdbSuite:
           """.asRight
         )
 
+  test("can create with grouped filters, enumerated generators"):
+    testEnumeratedGenerator("grouped")
+
+  test("can create with interleaved filters, enumerated generators"):
+    testEnumeratedGenerator("interleaved")
+
+  def spiralImagingInput(
+    pid: Program.Id,
+    tid: Target.Id,
+    spiral: String
+  ): String =
+    s"""
+      {
+        programId: ${pid.asJson}
+        SET: {
+          targetEnvironment: {
+            asterism: [${tid.asJson}]
+          }
+          scienceRequirements: {
+            exposureTimeMode: {
+              signalToNoise: {
+                value: 10.0
+                at: { nanometers: 500.0 }
+              }
+            }
+            imaging: {
+              minimumFov: { arcseconds: 100 }
+              narrowFilters: false
+              broadFilters: false
+              combinedFilters: true
+            }
+          }
+          observingMode: {
+            gmosSouthImaging: {
+              variant: {
+                grouped: {
+                  offsets: {
+                    spiral: $spiral
+                  }
+                }
+              }
+              filters: [
+                { filter: G_PRIME },
+                { filter: R_PRIME }
+              ]
+            }
+          }
+        }
+      }
+    """
+
   test("can create with spiral generator"):
+    createProgramAs(pi).flatMap: pid =>
+      createTargetAs(pi, pid).flatMap: tid =>
+        expect(pi, s"""
+          mutation {
+            createObservation(input: ${spiralImagingInput(pid, tid, "{size: { arcseconds: 14.0 }}")}) {
+              observation {
+                observingMode {
+                  gmosSouthImaging {
+                    variant {
+                      grouped {
+                        offsets {
+                          generatorType
+                          spiral {
+                            size { arcseconds }
+                            center {
+                              p { arcseconds }
+                              q { arcseconds }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        """, json"""
+          {
+            "createObservation": {
+              "observation": {
+                "observingMode": {
+                  "gmosSouthImaging": {
+                    "variant": {
+                      "grouped": {
+                        "offsets": {
+                          "generatorType": "SPIRAL",
+                          "spiral": {
+                            "size": { "arcseconds":  14 },
+                            "center": {
+                              "p": { "arcseconds": 0 },
+                              "q": { "arcseconds": 0 }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        """.asRight
+      )
+
+  test("can create with spiral generator and explicit seed"):
+    createProgramAs(pi).flatMap: pid =>
+      createTargetAs(pi, pid).flatMap: tid =>
+        expect(pi, s"""
+          mutation {
+            createObservation(input: ${spiralImagingInput(pid, tid, "{ size: { arcseconds: 14.0 }, seed: 42 }")}) {
+              observation {
+                observingMode {
+                  gmosSouthImaging {
+                    variant {
+                      grouped {
+                        offsets {
+                          generatorType
+                          spiral {
+                            seed
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        """, json"""
+          {
+            "createObservation": {
+              "observation": {
+                "observingMode": {
+                  "gmosSouthImaging": {
+                    "variant": {
+                      "grouped": {
+                        "offsets": {
+                          "generatorType": "SPIRAL",
+                          "spiral": {
+                            "seed": 42
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        """.asRight
+      )
+
+  test("can create with spiral generator and random seed"):
+    val randomSeed: IO[Long] =
+      createProgramAs(pi).flatMap: pid =>
+        createTargetAs(pi, pid).flatMap: tid =>
+          query(pi, s"""
+            mutation {
+              createObservation(input: ${spiralImagingInput(pid, tid, "{size: { arcseconds: 14.0 }}")}) {
+                observation {
+                  observingMode {
+                    gmosSouthImaging {
+                      variant {
+                        grouped {
+                          offsets {
+                            generatorType
+                            spiral {
+                              seed
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }"""
+          ).map: json =>
+            json
+              .hcursor
+              .downFields("createObservation", "observation", "observingMode", "gmosSouthImaging", "variant", "grouped", "offsets", "spiral", "seed")
+              .require[Long]
+
+    val seedsDiffer = for
+      s0 <- randomSeed
+      s1 <- randomSeed
+    yield s0 =!= s1
+
+    assertIOBoolean(seedsDiffer)
+
+  test("can create pre-imaging"):
     createProgramAs(pi).flatMap: pid =>
       createTargetAs(pi, pid).flatMap: tid =>
         expect(pi, s"""
@@ -1036,15 +1123,30 @@ class createObservation_GmosImaging extends OdbSuite:
                 }
                 observingMode: {
                   gmosSouthImaging: {
+                    variant: {
+                      preImaging: {
+                        offset1: {
+                          p: { arcseconds: 0 }
+                          q: { arcseconds: 1 }
+                        }
+                        offset2: {
+                          p: { arcseconds: 2 }
+                          q: { arcseconds: 3 }
+                        }
+                        offset3: {
+                          p: { arcseconds: 4 }
+                          q: { arcseconds: 5 }
+                        }
+                        offset4: {
+                          p: { arcseconds: 6 }
+                          q: { arcseconds: 7 }
+                        }
+                      }
+                    }
                     filters: [
                       { filter: G_PRIME },
                       { filter: R_PRIME }
                     ]
-                    objectOffsetGenerator: {
-                      spiral: {
-                        size: { arcseconds: 14.0 }
-                      }
-                    }
                   }
                 }
               }
@@ -1052,11 +1154,21 @@ class createObservation_GmosImaging extends OdbSuite:
               observation {
                 observingMode {
                   gmosSouthImaging {
-                    objectOffsetGenerator {
-                      generatorType
-                      spiral {
-                        size { arcseconds }
-                        center {
+                    variant {
+                      preImaging {
+                        offset1 {
+                          p { arcseconds }
+                          q { arcseconds }
+                        }
+                        offset2 {
+                          p { arcseconds }
+                          q { arcseconds }
+                        }
+                        offset3 {
+                          p { arcseconds }
+                          q { arcseconds }
+                        }
+                        offset4 {
                           p { arcseconds }
                           q { arcseconds }
                         }
@@ -1073,13 +1185,23 @@ class createObservation_GmosImaging extends OdbSuite:
               "observation": {
                 "observingMode": {
                   "gmosSouthImaging": {
-                    "objectOffsetGenerator": {
-                      "generatorType": "SPIRAL",
-                      "spiral": {
-                        "size": { "arcseconds":  14 },
-                        "center": {
+                    "variant": {
+                      "preImaging": {
+                        "offset1": {
                           "p": { "arcseconds": 0 },
-                          "q": { "arcseconds": 0 }
+                          "q": { "arcseconds": 1 }
+                        },
+                        "offset2": {
+                          "p": { "arcseconds": 2 },
+                          "q": { "arcseconds": 3 }
+                        },
+                        "offset3": {
+                          "p": { "arcseconds": 4 },
+                          "q": { "arcseconds": 5 }
+                        },
+                        "offset4": {
+                          "p": { "arcseconds": 6 },
+                          "q": { "arcseconds": 7 }
                         }
                       }
                     }

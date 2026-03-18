@@ -2590,4 +2590,253 @@ class createObservation extends OdbSuite {
       }
     }
 
+  private def createObsWithIgrins2ObservingMode(
+    pid:                    Program.Id,
+    explicitOffsetMode:     Option[String] = None,
+    explicitSaveSVCImages:  Option[Boolean] = None,
+    explicitOffsets:        Option[String] = None
+  ): String =
+    s"""
+      mutation {
+        createObservation(input: {
+          programId: ${pid.asJson}
+          SET: {
+            scienceRequirements: {
+              exposureTimeMode: {
+                signalToNoise: {
+                  value: 100.0
+                  at: { nanometers: 2200 }
+                }
+              }
+            }
+            observingMode: {
+              igrins2LongSlit: {
+                exposureTimeMode: {
+                  signalToNoise: {
+                    value: 50.0
+                    at: { nanometers: 2200 }
+                  }
+                }
+                ${explicitOffsetMode.map(m => s"explicitOffsetMode: $m").getOrElse("")}
+                ${explicitSaveSVCImages.map(b => s"explicitSaveSVCImages: $b").getOrElse("")}
+                ${explicitOffsets.map(o => s"explicitOffsets: $o").getOrElse("")}
+              }
+            }
+          }
+        }) {
+          observation {
+            observingMode {
+              igrins2LongSlit {
+                exposureTimeMode {
+                  signalToNoise {
+                    value
+                    at { nanometers }
+                  }
+                }
+                offsetMode
+                defaultOffsetMode
+                explicitOffsetMode
+                saveSVCImages
+                defaultSaveSVCImages
+                explicitSaveSVCImages
+                offsets {
+                  p { arcseconds }
+                  q { arcseconds }
+                }
+                explicitOffsets {
+                  p { arcseconds }
+                  q { arcseconds }
+                }
+                defaultOffsets {
+                  p { arcseconds }
+                  q { arcseconds }
+                }
+              }
+            }
+          }
+        }
+      }
+    """
+
+  test("[igrins2] create observation with IGRINS2 defaults"):
+    createProgramAs(pi).flatMap: pid =>
+      query(pi, createObsWithIgrins2ObservingMode(pid)).flatMap: js =>
+        val ls = js.hcursor.downPath(
+          "createObservation", "observation", "observingMode", "igrins2LongSlit"
+        )
+        assertIO(
+          (ls.downIO[Igrins2OffsetMode]("offsetMode"),
+           ls.downIO[Igrins2OffsetMode]("defaultOffsetMode"),
+           ls.downIO[Option[Igrins2OffsetMode]]("explicitOffsetMode"),
+           ls.downIO[Boolean]("saveSVCImages"),
+           ls.downIO[Boolean]("defaultSaveSVCImages"),
+           ls.downIO[Option[Boolean]]("explicitSaveSVCImages"),
+           ls.downIO[Double]("exposureTimeMode", "signalToNoise", "value"),
+           ls.downIO[Double]("exposureTimeMode", "signalToNoise", "at", "nanometers")
+          ).tupled,
+          (Igrins2OffsetMode.NodAlongSlit,
+           Igrins2OffsetMode.NodAlongSlit,
+           None,
+           false,
+           false,
+           None,
+           50.0,
+           2200.0
+          )
+        )
+
+  test("[igrins2] create observation with overrides"):
+    createProgramAs(pi).flatMap: pid =>
+      query(pi, createObsWithIgrins2ObservingMode(
+        pid,
+        explicitOffsetMode = Some("NOD_TO_SKY"),
+        explicitSaveSVCImages = Some(true)
+      )).flatMap: js =>
+        val ls = js.hcursor.downPath(
+          "createObservation", "observation", "observingMode", "igrins2LongSlit"
+        )
+        assertIO(
+          (ls.downIO[Igrins2OffsetMode]("offsetMode"),
+           ls.downIO[Option[Igrins2OffsetMode]]("explicitOffsetMode"),
+           ls.downIO[Boolean]("saveSVCImages"),
+           ls.downIO[Option[Boolean]]("explicitSaveSVCImages")
+          ).tupled,
+          (Igrins2OffsetMode.NodToSky,
+           Some(Igrins2OffsetMode.NodToSky),
+           true,
+           Some(true)
+          )
+        )
+
+  private val nodAlongSlitDefaults = json"""[
+    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -1.250000 } },
+    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 1.250000 } },
+    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 1.250000 } },
+    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -1.250000 } }
+  ]"""
+
+  private val nodToSkyDefaults = json"""[
+    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 0.000000 } },
+    { "p": { "arcseconds": 10.000000 }, "q": { "arcseconds": 10.000000 } },
+    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 0.000000 } }
+  ]"""
+
+  test("[igrins2] IGRINS-2 observation defaults to 4 spatial offsets"):
+    createProgramAs(pi).flatMap: pid =>
+      query(pi, createObsWithIgrins2ObservingMode(pid)).flatMap: js =>
+        val ls = js.hcursor.downPath(
+          "createObservation", "observation", "observingMode", "igrins2LongSlit"
+        )
+        assertIO(
+          (IO(ls.downField("offsets").focus),
+           IO(ls.downField("explicitOffsets").focus),
+           IO(ls.downField("defaultOffsets").focus)
+          ).tupled,
+          (Some(nodAlongSlitDefaults), Some(Json.Null), Some(nodAlongSlitDefaults))
+        )
+
+  test("[igrins2] create observation with explicit spatial offsets"):
+    val explicitValues = json"""[
+      { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -5.000000 } },
+      { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 5.000000 } },
+      { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 3.500000 } },
+      { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -2.500000 } }
+    ]"""
+    createProgramAs(pi).flatMap: pid =>
+      query(pi, createObsWithIgrins2ObservingMode(
+        pid,
+        explicitOffsets = Some("""[
+          { p: { arcseconds: 0.0 }, q: { arcseconds: -5.0 } },
+          { p: { arcseconds: 0.0 }, q: { arcseconds:  5.0 } },
+          { p: { arcseconds: 0.0 }, q: { arcseconds:  3.5 } },
+          { p: { arcseconds: 0.0 }, q: { arcseconds: -2.5 } }
+        ]""")
+      )).flatMap: js =>
+        val ls = js.hcursor.downPath(
+          "createObservation", "observation", "observingMode", "igrins2LongSlit"
+        )
+        assertIO(
+          (IO(ls.downField("offsets").focus),
+           IO(ls.downField("explicitOffsets").focus),
+           IO(ls.downField("defaultOffsets").focus)
+          ).tupled,
+          (Some(explicitValues), Some(explicitValues), Some(nodAlongSlitDefaults))
+        )
+
+  test("[igrins2] rejects NodAlongSlit offsets with P != 0"):
+    createProgramAs(pi).flatMap: pid =>
+      interceptGraphQL("Argument 'input.SET.observingMode.igrins2LongSlit' is invalid: IGRINS-2 NodAlongSlit offsets must have p = 0."):
+        query(pi, createObsWithIgrins2ObservingMode(
+          pid,
+          explicitOffsets = Some("""[
+            { p: { arcseconds: 1.0 }, q: { arcseconds: -5.0 } },
+            { p: { arcseconds: 0.0 }, q: { arcseconds:  5.0 } }
+          ]""")
+        ))
+
+  test("[igrins2] create observation with NodToSky defaults"):
+    createProgramAs(pi).flatMap: pid =>
+      query(pi, createObsWithIgrins2ObservingMode(
+        pid,
+        explicitOffsetMode = Some("NOD_TO_SKY")
+      )).flatMap: js =>
+        val ls = js.hcursor.downPath(
+          "createObservation", "observation", "observingMode", "igrins2LongSlit"
+        )
+        assertIO(
+          (IO(ls.downField("offsets").focus),
+           IO(ls.downField("explicitOffsets").focus),
+           IO(ls.downField("defaultOffsets").focus)
+          ).tupled,
+          (Some(nodToSkyDefaults), Some(Json.Null), Some(nodToSkyDefaults))
+        )
+
+  test("[igrins2] create NodToSky observation with 4 explicit offsets"):
+    val explicitValues = json"""[
+      { "p": { "arcseconds": 1.000000 }, "q": { "arcseconds": -5.000000 } },
+      { "p": { "arcseconds": 2.000000 }, "q": { "arcseconds": 5.000000 } },
+      { "p": { "arcseconds": 3.000000 }, "q": { "arcseconds": 3.500000 } },
+      { "p": { "arcseconds": 4.000000 }, "q": { "arcseconds": -2.500000 } }
+    ]"""
+    createProgramAs(pi).flatMap: pid =>
+      query(pi, createObsWithIgrins2ObservingMode(
+        pid,
+        explicitOffsetMode = Some("NOD_TO_SKY"),
+        explicitOffsets = Some("""[
+          { p: { arcseconds: 1.0 }, q: { arcseconds: -5.0 } },
+          { p: { arcseconds: 2.0 }, q: { arcseconds:  5.0 } },
+          { p: { arcseconds: 3.0 }, q: { arcseconds:  3.5 } },
+          { p: { arcseconds: 4.0 }, q: { arcseconds: -2.5 } }
+        ]""")
+      )).flatMap: js =>
+        val ls = js.hcursor.downPath(
+          "createObservation", "observation", "observingMode", "igrins2LongSlit"
+        )
+        assertIO(
+          (IO(ls.downField("offsets").focus),
+           IO(ls.downField("explicitOffsets").focus),
+           IO(ls.downField("defaultOffsets").focus)
+          ).tupled,
+          (Some(explicitValues), Some(explicitValues), Some(nodToSkyDefaults))
+        )
+
+  test("[igrins2] create NodToSky observation with 0 explicit offsets"):
+    val emptyOffsets = json"""[]"""
+    createProgramAs(pi).flatMap: pid =>
+      query(pi, createObsWithIgrins2ObservingMode(
+        pid,
+        explicitOffsetMode = Some("NOD_TO_SKY"),
+        explicitOffsets = Some("[]")
+      )).flatMap: js =>
+        val ls = js.hcursor.downPath(
+          "createObservation", "observation", "observingMode", "igrins2LongSlit"
+        )
+        assertIO(
+          (IO(ls.downField("offsets").focus),
+           IO(ls.downField("explicitOffsets").focus),
+           IO(ls.downField("defaultOffsets").focus)
+          ).tupled,
+          (Some(emptyOffsets), Some(emptyOffsets), Some(nodToSkyDefaults))
+        )
+
 }

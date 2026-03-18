@@ -16,6 +16,7 @@ import fs2.aws.s3.models.Models.FileKey
 import fs2.io.net.Network
 import lucuma.catalog.clients.GaiaClient
 import lucuma.catalog.clients.SimbadClient
+import lucuma.catalog.simbad.SEDDataLoader
 import lucuma.catalog.telluric.TelluricTargetsClient
 import lucuma.core.data.EmailAddress
 import lucuma.core.model.Program
@@ -35,6 +36,7 @@ import org.http4s.client.Client
 import org.http4s.ember.client.EmberClientBuilder
 import org.http4s.syntax.all.*
 import org.typelevel.log4cats.Logger
+import org.typelevel.log4cats.LoggerFactory
 
 import java.net.URI
 import java.net.URISyntaxException
@@ -82,15 +84,18 @@ case class Config(
       ItcClient.create(itc.root, httpClient)
 
   // Gaia client resource
-  def gaiaClient[F[_]: Async: Network]: Resource[F, GaiaClient[F]] =
+  def gaiaClient[F[_]: Async: Network: LoggerFactory]: Resource[F, GaiaClient[F]] =
     httpClientResource[F].map: httpClient =>
       GaiaClient.build[F](httpClient, adapters = GaiaClient.DefaultAdapters)
 
   // Telluric client resource
   def telluricClient[F[_]: Async: Network: Logger]: Resource[F, TelluricTargetsClient[F]] =
     httpClientResource[F].evalMap: httpClient =>
-      val simbadClient = SimbadClient.build(httpClient)
-      TelluricTargetsClient.build(telluric.root, httpClient, simbadClient)
+      for {
+        sedMatcher   <- SEDDataLoader.loadMatcher[F]
+        simbadClient  = SimbadClient.build(httpClient, sedMatcher)
+        result       <- TelluricTargetsClient.build(telluric.root, httpClient, simbadClient)
+      } yield result
 
   // SSO Client resource (has to be a resource because it owns an HTTP client).
   def ssoClient[F[_]: Async: Trace: Network: Logger]: Resource[F, SsoClient[F, User]] =

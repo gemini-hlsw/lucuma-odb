@@ -103,14 +103,18 @@ trait WorkflowStateQueries[F[_]: Monad: Services] {
   def filterWorkflowStateNotIn[A](obs: List[A], oid: A => Observation.Id, states: List[ObservationWorkflowState]) =
     filterWorkflow(obs, oid, states, !_, ready = false)
 
-  def filterWorkflowStateIn[A](obs: List[A], oid: A => Observation.Id, states: List[ObservationWorkflowState]) =
-    filterWorkflow(obs, oid, states, identity)
+  def filterWorkflowStateIn[A](obs: List[A], oid: A => Observation.Id, states: List[ObservationWorkflowState], ready: Boolean) =
+    filterWorkflow(obs, oid, states, identity, ready)
 
   def excludeOngoingAndCompleted[A](obs: List[A], oid: A => Observation.Id): F[List[A]] =
     filterWorkflowStateNotIn(obs, oid, List(ObservationWorkflowState.Ongoing, ObservationWorkflowState.Completed))
 
+  def excludeFromDeletion[A](obs: List[A], oid: A => Observation.Id)(using Transaction[F]): F[List[A]] =
+    excludeOngoingAndCompleted(obs, oid).flatMap: filtered =>
+      filtered.filterA(a => visitService.hasVisits(oid(a)).map(!_))
+
   def onlyDefinedAndReady[A](obs: List[A], oid: A => Observation.Id): F[List[A]] =
-    filterWorkflowStateIn(obs, oid, List(ObservationWorkflowState.Defined, ObservationWorkflowState.Ready))
+    filterWorkflowStateIn(obs, oid, List(ObservationWorkflowState.Defined, ObservationWorkflowState.Ready), true)
 
   private val WorkflowStateReadyQuery =
     sql"""
@@ -127,7 +131,7 @@ trait WorkflowStateQueries[F[_]: Monad: Services] {
       WHERE c_observation_id = $observation_id
     """.query(observation_workflow_state.opt)
 
-  private def filterWorkflow[A](obs: List[A], oid: A => Observation.Id, states: List[ObservationWorkflowState], f: Boolean => Boolean, ready: Boolean = true) =
+  private def filterWorkflow[A](obs: List[A], oid: A => Observation.Id, states: List[ObservationWorkflowState], f: Boolean => Boolean, ready: Boolean) =
     val selectFn = if (ready) selectObscalcWorkflowState else selectObscalcWorkflowStateAny
     obs.filterA: obs =>
       selectFn(oid(obs)).map: calculatedState =>

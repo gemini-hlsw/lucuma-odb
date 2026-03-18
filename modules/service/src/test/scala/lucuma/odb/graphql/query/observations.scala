@@ -18,7 +18,7 @@ import lucuma.core.model.User
 import lucuma.core.syntax.timespan.*
 import lucuma.odb.graphql.input.AllocationInput
 
-class observations extends OdbSuite {
+class observations extends OdbSuite with ObservingModeSetupOperations {
 
   val pi      = TestUsers.Standard.pi(nextId, nextId)
   val pi2     = TestUsers.Standard.pi(nextId, nextId)
@@ -509,6 +509,11 @@ class observations extends OdbSuite {
                         }
                         observingMode {
                           gmosNorthImaging {
+                            variant {
+                              interleaved {
+                                skyCount
+                              }
+                            }
                             filters { filter }
                             initialFilters { filter }
                             bin
@@ -533,6 +538,11 @@ class observations extends OdbSuite {
                             },
                             "observingMode": {
                               "gmosNorthImaging": {
+                                "variant": {
+                                  "interleaved": {
+                                    "skyCount": 1
+                                  }
+                                },
                                 "filters": [
                                   { "filter": "G_PRIME" },
                                   { "filter": "R_PRIME" }
@@ -572,6 +582,11 @@ class observations extends OdbSuite {
                         id
                         observingMode {
                           gmosSouthImaging {
+                            variant {
+                              interleaved {
+                                skyCount
+                              }
+                            }
                             filters { filter }
                             initialFilters { filter }
                             bin
@@ -593,6 +608,11 @@ class observations extends OdbSuite {
                             "id": $oid,
                             "observingMode": {
                               "gmosSouthImaging": {
+                                "variant": {
+                                  "interleaved": {
+                                    "skyCount": 1
+                                  }
+                                },
                                 "filters": [
                                   { "filter": "G_PRIME" },
                                   { "filter": "R_PRIME" }
@@ -656,6 +676,11 @@ class observations extends OdbSuite {
                       observingMode {
                         mode
                         gmosNorthImaging {
+                          variant {
+                            interleaved {
+                              skyCount
+                            }
+                          }
                           filters { filter }
                           initialFilters { filter }
                           bin
@@ -664,6 +689,11 @@ class observations extends OdbSuite {
                           roi
                         }
                         gmosSouthImaging {
+                          variant {
+                            interleaved {
+                              skyCount
+                            }
+                          }
                           filters { filter }
                           initialFilters { filter }
                           bin
@@ -687,6 +717,11 @@ class observations extends OdbSuite {
                           "observingMode": {
                             "mode": "GMOS_NORTH_IMAGING",
                             "gmosNorthImaging": {
+                              "variant": {
+                                "interleaved": {
+                                  "skyCount": 1
+                                }
+                              },
                               "filters": [
                                 { "filter": "G_PRIME" },
                                 { "filter": "R_PRIME" }
@@ -710,6 +745,11 @@ class observations extends OdbSuite {
                             "mode": "GMOS_SOUTH_IMAGING",
                             "gmosNorthImaging": null,
                             "gmosSouthImaging": {
+                              "variant": {
+                                "interleaved": {
+                                  "skyCount": 1
+                                }
+                              },
                               "filters": [
                                 { "filter": "G_PRIME" },
                                 { "filter": "R_PRIME" }
@@ -979,5 +1019,68 @@ class observations extends OdbSuite {
                 )
               )
     } yield ()
+
+  test("query Flamingos2 long slit observations with explicit acquisition filter"):
+    for
+      pid <- createProgramAs(pi)
+      tid <- createTargetAs(pi, pid)
+      oid <- createObservationWithModeAs(pi, pid, List(tid),
+               s"""
+                 flamingos2LongSlit: {
+                   disperser: R1200_HK
+                   filter: Y
+                   fpu: LONG_SLIT_2
+                   acquisition: {
+                     explicitFilter: J
+                   }
+                 }
+               """
+             )
+      _   <- expect(
+                user = pi,
+                query = s"""
+                  query {
+                    observations(WHERE: {
+                      id: { EQ: "$oid" }
+                    }) {
+                      matches {
+                        id
+                        observingMode {
+                          flamingos2LongSlit {
+                            disperser
+                            filter
+                            fpu
+                            acquisition {
+                              filter
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                """,
+                expected = Right(
+                  json"""
+                    {
+                      "observations": {
+                        "matches": [
+                          {
+                            "id": $oid,
+                            "observingMode": {
+                              "flamingos2LongSlit": {
+                                "disperser": "R1200_HK",
+                                "filter": "Y",
+                                "fpu": "LONG_SLIT_2",
+                                "acquisition": { "filter": "J" }
+                              }
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  """
+                )
+              )
+    yield ()
 
 }

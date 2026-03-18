@@ -10,57 +10,27 @@ import eu.timepit.refined.types.numeric.NonNegShort
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
-import lucuma.core.enums.GmosBinning
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.TimeAccountingCategory
 import lucuma.core.model.Group
-import lucuma.core.model.ImageQuality
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.User
-import lucuma.core.syntax.string.*
 import lucuma.core.syntax.timespan.*
 import lucuma.odb.graphql.input.AllocationInput
+import lucuma.odb.graphql.query.ExecutionQuerySetupOperations
 import lucuma.odb.service.ObservationService
 
-class updateObservations extends OdbSuite
-                            with UpdateConstraintSetOps {
+class updateObservations extends OdbSuite with UpdateObservationsOps with ExecutionQuerySetupOperations:
 
   val pi: User    = TestUsers.Standard.pi(nextId, nextId)
   val pi2: User   = TestUsers.Standard.pi(nextId, nextId)
   val staff: User = TestUsers.Standard.staff(nextId, nextId)
+  val service     = TestUsers.service(nextId)
 
-  override lazy val validUsers: List[User] = List(pi, pi2, staff)
-
-  private def oneUpdateTest(
-    user:          User,
-    update:        String,
-    query:         String,
-    expected:      Either[String, Json],
-    observingMode: Option[ObservingModeType] = None
-  ): IO[Unit] =
-
-    for
-      pid <- createProgramAs(user)
-      oid <- createObservationAs(user, pid, observingMode)
-      _   <- updateObservation(user, oid, update, query, expected)
-    yield ()
-
-  private def multiUpdateTest(
-    user:    User,
-    updates: List[(String, String, Either[String, Json])],
-    observingMode: Option[ObservingModeType] = None
-  ): IO[Unit] =
-
-    for
-      pid <- createProgramAs(user)
-      oid <- createObservationAs(user, pid, observingMode)
-      _   <- updates.traverse_ { case (update, query, expected) =>
-        updateObservation(user, oid, update, query, expected)
-      }
-    yield ()
+  override lazy val validUsers: List[User] = List(pi, pi2, staff, service)
 
   test("general: update that selects nothing") {
     def emptyUpdate(user: User): IO[Unit] =
@@ -2296,6 +2266,189 @@ class updateObservations extends OdbSuite
     )
   }
 
+  test("observing mode: update existing F2 Long Slit, setting explicit acquisition filter") {
+
+    val update0 = """
+      observingMode: {
+        flamingos2LongSlit: {
+          disperser: R1200_JH
+          filter: JH
+          fpu: LONG_SLIT_1
+          exposureTimeMode: {
+            signalToNoise: {
+              value: 2.0
+              at: { nanometers: 234.56 }
+            }
+          }
+        }
+      }
+    """
+
+    val query = """
+      observations {
+        instrument
+        observingMode {
+          flamingos2LongSlit {
+            acquisition {
+              filter
+              defaultFilter
+              explicitFilter
+            }
+          }
+        }
+      }
+    """
+
+    val expected0 =
+      json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "instrument": "FLAMINGOS2",
+              "observingMode": {
+                "flamingos2LongSlit": {
+                  "acquisition": {
+                    "filter": "J",
+                    "defaultFilter": "J",
+                    "explicitFilter": null
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    """.asRight
+
+    val update1 = """
+      observingMode: {
+        flamingos2LongSlit: {
+          acquisition: {
+            explicitFilter: K_SHORT
+          }
+        }
+      }
+    """
+
+    val expected1 =
+      json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "instrument": "FLAMINGOS2",
+              "observingMode": {
+                "flamingos2LongSlit": {
+                  "acquisition": {
+                    "filter": "K_SHORT",
+                    "defaultFilter": "J",
+                    "explicitFilter": "K_SHORT"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    """.asRight
+
+    multiUpdateTest(pi, List((update0, query, expected0), (update1, query, expected1)))
+  }
+
+  test("observing mode: update existing F2 Long Slit, deleting explicit acquisition filter") {
+
+    val update0 = """
+      observingMode: {
+        flamingos2LongSlit: {
+          disperser: R1200_JH
+          filter: JH
+          fpu: LONG_SLIT_1
+          exposureTimeMode: {
+            signalToNoise: {
+              value: 2.0
+              at: { nanometers: 234.56 }
+            }
+          }
+          acquisition: {
+            explicitFilter: K_SHORT
+          }
+        }
+      }
+    """
+
+    val query = """
+      observations {
+        instrument
+        observingMode {
+          flamingos2LongSlit {
+            acquisition {
+              filter
+              defaultFilter
+              explicitFilter
+            }
+          }
+        }
+      }
+    """
+
+    val expected0 =
+      json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "instrument": "FLAMINGOS2",
+              "observingMode": {
+                "flamingos2LongSlit": {
+                  "acquisition": {
+                    "filter": "K_SHORT",
+                    "defaultFilter": "J",
+                    "explicitFilter": "K_SHORT"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    """.asRight
+
+    val update1 = """
+      observingMode: {
+        flamingos2LongSlit: {
+          acquisition: {
+            explicitFilter: null
+          }
+        }
+      }
+    """
+
+    val expected1 =
+      json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "instrument": "FLAMINGOS2",
+              "observingMode": {
+                "flamingos2LongSlit": {
+                  "acquisition": {
+                    "filter": "J",
+                    "defaultFilter": "J",
+                    "explicitFilter": null
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    """.asRight
+
+    multiUpdateTest(pi, List((update0, query, expected0), (update1, query, expected1)))
+  }
+
   test("observing mode: update existing, all fields") {
 
     val update0 = """
@@ -3459,917 +3612,6 @@ class updateObservations extends OdbSuite
       }
     }
 
-  test("observing mode: create GMOS imaging in an existing observation"):
-
-    val update = """
-      scienceRequirements: {
-        exposureTimeMode: {
-          signalToNoise: {
-            value: 100.0
-            at: { nanometers: 500.0 }
-          }
-        }
-      }
-      observingMode: {
-        gmosNorthImaging: {
-          filters: [
-            { filter: G_PRIME },
-            { filter: R_PRIME }
-          ]
-          explicitMultipleFiltersMode: INTERLEAVED
-          explicitBin: TWO
-          explicitAmpReadMode: FAST
-          explicitAmpGain: HIGH
-          explicitRoi: CCD2
-        }
-      }
-    """
-
-    val query = """
-      observations {
-        instrument
-        observingMode {
-          gmosNorthImaging {
-            filters {
-              filter
-            }
-            initialFilters {
-              filter
-            }
-            multipleFiltersMode
-            bin
-            ampReadMode
-            ampGain
-            roi
-          }
-          gmosSouthImaging {
-            filters {
-              filter
-            }
-            initialFilters {
-              filter
-            }
-            multipleFiltersMode
-            bin
-            ampReadMode
-            ampGain
-            roi
-          }
-        }
-      }
-    """
-
-    val expected =
-      json"""
-      {
-        "updateObservations": {
-          "observations": [
-            {
-              "instrument": "GMOS_NORTH",
-              "observingMode": {
-                "gmosNorthImaging": {
-                  "filters": [
-                    { "filter": "G_PRIME" },
-                    { "filter": "R_PRIME" }
-                  ],
-                  "initialFilters": [
-                    { "filter": "G_PRIME" },
-                    { "filter": "R_PRIME" }
-                  ],
-                  "multipleFiltersMode": "INTERLEAVED",
-                  "bin": "TWO",
-                  "ampReadMode": "FAST",
-                  "ampGain": "HIGH",
-                  "roi": "CCD2"
-                },
-                "gmosSouthImaging": null
-              }
-            }
-          ]
-        }
-      }
-    """.asRight
-
-    oneUpdateTest(pi, update, query, expected)
-
-  test("observing mode: update existing GMOS imaging"):
-
-    val update0 = """
-      scienceRequirements: {
-        exposureTimeMode: {
-          signalToNoise: {
-            value: 100.0
-            at: { nanometers: 500.0 }
-          }
-        }
-      }
-      observingMode: {
-        gmosNorthImaging: {
-          filters: [
-            { filter: G_PRIME },
-            { filter: R_PRIME }
-          ]
-          objectOffsetGenerator: {
-            enumerated: {
-              values: [
-                {
-                  offset: {
-                    p: { arcseconds: 10.0 }
-                    q: { arcseconds: 11.0 }
-                  }
-                  guiding: ENABLED
-                },
-                {
-                  offset: {
-                    p: { arcseconds: 12.0 }
-                    q: { arcseconds: 13.0 }
-                  }
-                  guiding: ENABLED
-                }
-              ]
-            }
-          }
-          skyOffsetGenerator: {
-            random: {
-              size: { arcseconds: 14.0 }
-              center: {
-                p: { arcseconds: 15.0 }
-                q: { arcseconds: 16.0 }
-              }
-            }
-          }
-          explicitBin: ONE
-          explicitAmpReadMode: SLOW
-          explicitAmpGain: LOW
-          explicitRoi: FULL_FRAME
-        }
-      }
-    """
-
-    val query = """
-      observations {
-        instrument
-        observingMode {
-          gmosNorthImaging {
-            filters {
-              filter
-            }
-            objectOffsetGenerator {
-              enumerated {
-                values {
-                  offset {
-                    p { arcseconds }
-                    q { arcseconds }
-                  }
-                  guiding
-                }
-              }
-            }
-            skyOffsetGenerator {
-              random {
-                size { arcseconds }
-                center {
-                  p { arcseconds }
-                  q { arcseconds }
-                }
-              }
-            }
-            multipleFiltersMode
-            bin
-            ampReadMode
-            ampGain
-            roi
-          }
-        }
-      }
-    """
-
-    val expected0 =
-      json"""
-      {
-        "updateObservations": {
-          "observations": [
-            {
-              "instrument": "GMOS_NORTH",
-              "observingMode": {
-                "gmosNorthImaging": {
-                  "filters": [
-                    { "filter": "G_PRIME" },
-                    { "filter": "R_PRIME" }
-                  ],
-                  "objectOffsetGenerator": {
-                    "enumerated": {
-                      "values": [
-                        {
-                          "offset": {
-                            "p": { "arcseconds": 10 },
-                            "q": { "arcseconds": 11 }
-                          },
-                          "guiding": "ENABLED"
-                        },
-                        {
-                          "offset": {
-                            "p": { "arcseconds": 12 },
-                            "q": { "arcseconds": 13 }
-                          },
-                          "guiding": "ENABLED"
-                        }
-                      ]
-                    }
-                  },
-                  "skyOffsetGenerator": {
-                    "random": {
-                      "size": { "arcseconds": 14 },
-                      "center": {
-                        "p": { "arcseconds": 15 },
-                        "q": { "arcseconds": 16 }
-                      }
-                    }
-                  },
-                  "multipleFiltersMode": "GROUPED",
-                  "bin": "ONE",
-                  "ampReadMode": "SLOW",
-                  "ampGain": "LOW",
-                  "roi": "FULL_FRAME"
-                }
-              }
-            }
-          ]
-        }
-      }
-    """.asRight
-
-    val update1 = """
-      observingMode: {
-        gmosNorthImaging: {
-          filters: [
-            { filter: I_PRIME },
-            { filter: Z_PRIME }
-          ]
-          objectOffsetGenerator: {
-            enumerated: {
-              values: [
-                {
-                  offset: {
-                    p: { arcseconds: 17.0 }
-                    q: { arcseconds: 18.0 }
-                  }
-                  guiding: ENABLED
-                }
-              ]
-            }
-          }
-          skyOffsetGenerator: null
-          explicitMultipleFiltersMode: INTERLEAVED
-          explicitBin: FOUR
-          explicitAmpReadMode: FAST
-          explicitAmpGain: HIGH
-          explicitRoi: CCD2
-        }
-      }
-    """
-
-    val expected1 =
-      json"""
-      {
-        "updateObservations": {
-          "observations": [
-            {
-              "instrument": "GMOS_NORTH",
-              "observingMode": {
-                "gmosNorthImaging": {
-                  "filters": [
-                    { "filter": "I_PRIME" },
-                    { "filter": "Z_PRIME" }
-                  ],
-                  "objectOffsetGenerator": {
-                    "enumerated": {
-                      "values": [
-                        {
-                          "offset": {
-                            "p": { "arcseconds": 17 },
-                            "q": { "arcseconds": 18 }
-                          },
-                          "guiding": "ENABLED"
-                        }
-                      ]
-                    }
-                  },
-                  "skyOffsetGenerator": null,
-                  "multipleFiltersMode": "INTERLEAVED",
-                  "bin": "FOUR",
-                  "ampReadMode": "FAST",
-                  "ampGain": "HIGH",
-                  "roi": "CCD2"
-                }
-              }
-            }
-          ]
-        }
-      }
-    """.asRight
-
-    multiUpdateTest(pi,
-      List(
-        (update0, query, expected0),
-        (update1, query, expected1)
-      )
-    )
-
-  test("observing mode: switch from GMOS imaging to long slit"):
-
-    val update0 = """
-      scienceRequirements: {
-        exposureTimeMode: {
-          signalToNoise: {
-            value: 100.0
-            at: { nanometers: 500.0 }
-          }
-        }
-      }
-      observingMode: {
-        gmosNorthImaging: {
-          filters: [
-            { filter: G_PRIME },
-            { filter: R_PRIME }
-          ]
-        }
-      }
-    """
-
-    val query0 = """
-      observations {
-        instrument
-        observingMode {
-          gmosNorthImaging {
-            filters {
-              filter
-            }
-          }
-        }
-      }
-    """
-
-    val expected0 =
-      json"""
-      {
-        "updateObservations": {
-          "observations": [
-            {
-              "instrument": "GMOS_NORTH",
-              "observingMode": {
-                "gmosNorthImaging": {
-                  "filters": [
-                    { "filter": "G_PRIME" },
-                    { "filter": "R_PRIME" }
-                  ]
-                }
-              }
-            }
-          ]
-        }
-      }
-    """.asRight
-
-    val update1 = """
-      observingMode: {
-        gmosNorthLongSlit: {
-          grating: B1200_G5301
-          filter: G_PRIME
-          fpu: LONG_SLIT_0_25
-          centralWavelength: {
-            nanometers: 500
-          }
-          exposureTimeMode: {
-            signalToNoise: {
-              value: 20.0
-              at: { nanometers: 500.0 }
-            }
-          }
-        }
-      }
-    """
-
-    val query1 = """
-      observations {
-        instrument
-        observingMode {
-          gmosNorthImaging {
-            filters {
-              filter
-            }
-          }
-          gmosNorthLongSlit {
-            grating
-          }
-        }
-      }
-    """
-
-    val expected1 =
-      json"""
-      {
-        "updateObservations": {
-          "observations": [
-            {
-              "instrument": "GMOS_NORTH",
-              "observingMode": {
-                "gmosNorthImaging": null,
-                "gmosNorthLongSlit": {
-                  "grating": "B1200_G5301"
-                }
-              }
-            }
-          ]
-        }
-      }
-    """.asRight
-
-    multiUpdateTest(pi, List((update0, query0, expected0), (update1, query1, expected1)))
-
-  test("observing mode: delete GMOS imaging"):
-
-    val update0 = """
-      scienceRequirements: {
-        exposureTimeMode: {
-          signalToNoise: {
-            value: 100.0
-            at: { nanometers: 500.0 }
-          }
-        }
-      }
-      observingMode: {
-        gmosNorthImaging: {
-          filters: [
-            { filter: G_PRIME },
-            { filter: R_PRIME }
-          ]
-        }
-      }
-    """
-
-    val query = """
-      observations {
-        instrument
-        observingMode {
-          mode
-          gmosNorthImaging {
-            filters {
-              filter
-            }
-          }
-        }
-      }
-    """
-
-    val expected0 =
-      json"""
-      {
-        "updateObservations": {
-          "observations": [
-            {
-              "instrument": "GMOS_NORTH",
-              "observingMode": {
-                "mode": "GMOS_NORTH_IMAGING",
-                "gmosNorthImaging": {
-                  "filters": [
-                    { "filter": "G_PRIME" },
-                    { "filter": "R_PRIME" }
-                  ]
-                }
-              }
-            }
-          ]
-        }
-      }
-    """.asRight
-
-    val update1 = """
-      observingMode: null
-    """
-
-    val expected1 =
-      json"""
-      {
-        "updateObservations": {
-          "observations": [
-            {
-              "instrument": null,
-              "observingMode": null
-            }
-          ]
-        }
-      }
-    """.asRight
-
-    multiUpdateTest(pi,
-      List(
-        (update0, query, expected0),
-        (update1, query, expected1)
-      )
-    )
-
-  test("observing mode: update GMOS imaging binning without filters"):
-
-    val update = """
-      observingMode: {
-        gmosSouthImaging: {
-          explicitBin: FOUR
-        }
-      }
-    """
-
-    val query = """
-      observations {
-        observingMode {
-          gmosSouthImaging {
-            filters {
-              filter
-            }
-            explicitBin
-          }
-        }
-      }
-    """
-
-    val expected =
-      json"""
-        {
-          "updateObservations": {
-            "observations": [
-              {
-                "observingMode": {
-                  "gmosSouthImaging": {
-                    "filters": [
-                      { "filter": "G_PRIME" },
-                      { "filter": "R_PRIME" }
-                    ],
-                    "explicitBin": "FOUR"
-                  }
-                }
-              }
-            ]
-          }
-        }
-      """.asRight
-    oneUpdateTest(pi, update, query, expected, ObservingModeType.GmosSouthImaging.some)
-
-
-  test("observing mode: update default GMOS imaging bin by changing IQ"):
-    val gaussian: String = """
-      sourceProfile: {
-        gaussian: {
-          fwhm: { arcseconds: 0.1 }
-          spectralDefinition: {
-            bandNormalized: {
-              sed: {
-                stellarLibrary: B5_III
-              }
-              brightnesses: [
-                {
-                  band: R
-                  value: 15.0
-                  units: VEGA_MAGNITUDE
-                }
-              ]
-            }
-          }
-        }
-      }
-    """
-
-    def expectBinning(o: Observation.Id, b: GmosBinning): IO[Unit] =
-      expect(
-        user  = pi,
-        query = s"""
-            query {
-              observation(observationId: "$o") {
-                observingMode {
-                  gmosNorthImaging {
-                    bin
-                  }
-                }
-              }
-            }
-        """,
-        json"""
-          {
-            "observation": {
-              "observingMode": {
-                "gmosNorthImaging": {
-                  "bin": ${b.tag.toScreamingSnakeCase}
-                }
-              }
-            }
-          }
-        """.asRight
-      )
-
-    val update: String = """
-      constraintSet: {
-        imageQuality: POINT_ONE
-      }
-    """
-
-    val throwawayQuery = """
-      observations {
-        observingMode {
-          gmosSouthImaging {
-            defaultBin
-          }
-        }
-      }
-    """
-
-    for
-      p <- createProgramAs(pi)
-      t <- createTargetAs(pi, p, sourceProfile = gaussian)
-      o <- createGmosNorthImagingObservationAs(pi, p, iq = ImageQuality.Preset.OnePointZero, offsets = None, t)
-      _ <- expectBinning(o, GmosBinning.Two)
-      _ <- query(pi, updateObservationsMutation(o, update, throwawayQuery))
-      _ <- expectBinning(o, GmosBinning.One)
-    yield ()
-
-
-  test("observing mode: (fail to) update GMOS imaging with empty filters"):
-
-    val update = """
-      observingMode: {
-        gmosNorthImaging: {
-          filters: []
-        }
-      }
-    """
-
-    val query = """
-      observations {
-        observingMode {
-          gmosNorthImaging {
-            filters {
-              filter
-            }
-          }
-        }
-      }
-    """
-
-    val expected = "Argument 'input.SET.observingMode.gmosNorthImaging' is invalid: At least one filter must be specified for GMOS imaging observations.".asLeft
-    oneUpdateTest(pi, update, query, expected)
-
-  test("observing mode: (fail to) update existing GMOS imaging with empty filters - rollback other changes"):
-    createProgramAs(pi).flatMap { pid =>
-      createGmosNorthImagingObservationAs(pi, pid).flatMap { oid =>
-        val initialUpdate = """
-          observingMode: {
-            gmosNorthImaging: {
-              filters: [
-                { filter: G_PRIME },
-                { filter: R_PRIME }
-              ],
-              explicitBin: TWO,
-              explicitAmpGain: LOW
-            }
-          }
-        """
-
-        val failingUpdate = """
-          observingMode: {
-            gmosNorthImaging: {
-              filters: [],
-              explicitBin: FOUR,
-              explicitAmpGain: HIGH
-            }
-          }
-        """
-
-        val query = """
-          observations {
-            observingMode {
-              gmosNorthImaging {
-                filters {
-                  filter
-                }
-                bin
-                ampGain
-              }
-            }
-          }
-        """
-
-        for {
-          _ <- expect(
-            user = pi,
-            query = updateObservationsMutation(oid, initialUpdate, query),
-            expected = json"""
-              {
-                "updateObservations": {
-                  "observations": [
-                    {
-                      "observingMode": {
-                        "gmosNorthImaging": {
-                          "filters": [
-                            { "filter": "G_PRIME" },
-                            { "filter": "R_PRIME" }
-                          ],
-                          "bin": "TWO",
-                          "ampGain": "LOW"
-                        }
-                      }
-                    }
-                  ]
-                }
-              }
-            """.asRight
-          )
-          _ <- expect(
-            user = pi,
-            query = updateObservationsMutation(oid, failingUpdate, query),
-            expected = List("Argument 'input.SET.observingMode.gmosNorthImaging' is invalid: At least one filter must be specified for GMOS imaging observations.").asLeft
-          )
-          // Verify that ALL values remain unchanged (transaction rollback)
-          _ <- expect(
-            user = pi,
-            query = s"""
-              query {
-                observation(observationId: "$oid") {
-                  observingMode {
-                    gmosNorthImaging {
-                      filters { filter }
-                      initialFilters { filter }
-                      bin
-                      ampGain
-                    }
-                  }
-                }
-              }
-            """,
-            expected = json"""
-              {
-                "observation": {
-                  "observingMode": {
-                    "gmosNorthImaging": {
-                      "filters": [
-                        { "filter": "G_PRIME" },
-                        { "filter": "R_PRIME" }
-                      ],
-                      "initialFilters": [
-                        { "filter": "G_PRIME" },
-                        { "filter": "R_PRIME" }
-                      ],
-                      "bin": "TWO",
-                      "ampGain": "LOW"
-                    }
-                  }
-                }
-              }
-            """.asRight
-          )
-        } yield ()
-      }
-    }
-
-  test("observing mode: set GMOS North imaging in existing observation") {
-    val update = """
-      scienceRequirements: {
-        exposureTimeMode: {
-          signalToNoise: {
-            value: 100.0
-            at: { nanometers: 500.0 }
-          }
-        }
-      }
-      observingMode: {
-        gmosNorthImaging: {
-          filters: [
-            { filter: G_PRIME },
-            { filter: R_PRIME },
-            { filter: I_PRIME }
-          ]
-          explicitMultipleFiltersMode: INTERLEAVED
-          explicitBin: TWO
-          explicitAmpReadMode: SLOW
-          explicitAmpGain: LOW
-          explicitRoi: FULL_FRAME
-        }
-      }
-    """
-
-    val query = """
-      observations {
-        instrument
-        observingMode {
-          gmosNorthImaging {
-            filters { filter }
-            multipleFiltersMode
-            bin
-            ampReadMode
-            ampGain
-            roi
-          }
-        }
-      }
-    """
-
-    val expected = json"""
-      {
-        "updateObservations": {
-          "observations": [
-            {
-              "instrument": "GMOS_NORTH",
-              "observingMode": {
-                "gmosNorthImaging": {
-                  "filters": [
-                    { "filter": "G_PRIME" },
-                    { "filter": "R_PRIME" },
-                    { "filter": "I_PRIME" }
-                  ],
-                  "multipleFiltersMode": "INTERLEAVED",
-                  "bin": "TWO",
-                  "ampReadMode": "SLOW",
-                  "ampGain": "LOW",
-                  "roi": "FULL_FRAME"
-                }
-              }
-            }
-          ]
-        }
-      }
-    """.asRight
-
-    oneUpdateTest(pi, update, query, expected)
-  }
-
-  test("observing mode: set GMOS South imaging in existing observation") {
-    val update = """
-      scienceRequirements: {
-        exposureTimeMode: {
-          signalToNoise: {
-            value: 100.0
-            at: { nanometers: 500.0 }
-          }
-        }
-      }
-      observingMode: {
-        gmosSouthImaging: {
-          filters: [
-            { filter: G_PRIME },
-            { filter: R_PRIME },
-            { filter: I_PRIME }
-          ]
-          explicitMultipleFiltersMode: INTERLEAVED
-          explicitBin: FOUR
-          explicitAmpReadMode: FAST
-          explicitAmpGain: HIGH
-          explicitRoi: CCD2
-        }
-      }
-    """
-
-    val query = """
-      observations {
-        instrument
-        observingMode {
-          gmosSouthImaging {
-            filters { filter }
-            multipleFiltersMode
-            bin
-            ampReadMode
-            ampGain
-            roi
-          }
-        }
-      }
-    """
-
-    val expected = json"""
-      {
-        "updateObservations": {
-          "observations": [
-            {
-              "instrument": "GMOS_SOUTH",
-              "observingMode": {
-                "gmosSouthImaging": {
-                  "filters":  [
-                    { "filter": "G_PRIME" },
-                    { "filter": "R_PRIME" },
-                    { "filter": "I_PRIME" }
-                  ],
-                  "multipleFiltersMode": "INTERLEAVED",
-                  "bin": "FOUR",
-                  "ampReadMode": "FAST",
-                  "ampGain": "HIGH",
-                  "roi": "CCD2"
-                }
-              }
-            }
-          ]
-        }
-      }
-    """.asRight
-
-    oneUpdateTest(pi, update, query, expected)
-  }
-
   test("updateObservations: flamingos2 rejects 2 spatial offsets"):
     for {
       pid <- createProgramAs(pi)
@@ -4783,72 +4025,645 @@ class updateObservations extends OdbSuite
     updateBlindOffsetTest(pi, true) *>
       updateBlindOffsetTest(pi, false)
 
-}
+  test("observing mode: create igrins2 long slit in existing observation"):
 
-trait UpdateConstraintSetOps { this: OdbSuite =>
-
-  def updateObservationsMutation(
-    oid:    Observation.Id,
-    update: String,
-    query:  String
-  ): String = s"""
-    mutation {
-      updateObservations(input: {
-        SET: {
-          $update
-        },
-        WHERE: {
-          id: { EQ: ${oid.asJson} }
+    val update = """
+      observingMode: {
+        igrins2LongSlit: {
+          exposureTimeMode: {
+            signalToNoise: {
+              value: 50.0
+              at: { nanometers: 2200 }
+            }
+          }
         }
-      }) {
-        $query
       }
-    }
-  """
+    """
 
-  def updateObservation(
-    user:     User,
-    oid:      Observation.Id,
-    update:   String,
-    query:    String,
-    expected: Either[String, Json]
-  ): IO[Unit] =
-    expect(
-      user     = user,
-      query    = updateObservationsMutation(oid, update, query),
-      expected = expected.leftMap(msg => List(msg))
+    val query = """
+      observations {
+        instrument
+        observingMode {
+          igrins2LongSlit {
+            offsetMode
+            defaultOffsetMode
+            explicitOffsetMode
+            saveSVCImages
+            defaultSaveSVCImages
+            explicitSaveSVCImages
+            exposureTimeMode {
+              signalToNoise {
+                value
+                at { nanometers }
+              }
+            }
+          }
+        }
+      }
+    """
+
+    val expected =
+      json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "instrument": "IGRINS2",
+              "observingMode": {
+                "igrins2LongSlit": {
+                  "offsetMode": "NOD_ALONG_SLIT",
+                  "defaultOffsetMode": "NOD_ALONG_SLIT",
+                  "explicitOffsetMode": null,
+                  "saveSVCImages": false,
+                  "defaultSaveSVCImages": false,
+                  "explicitSaveSVCImages": null,
+                  "exposureTimeMode": {
+                    "signalToNoise": {
+                      "value": 50.000,
+                      "at": {
+                        "nanometers": 2200.000
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    """.asRight
+
+    oneUpdateTest(pi, update, query, expected)
+
+  test("observing mode: update igrins2 long slit offset mode"):
+
+    val update0 = """
+      observingMode: {
+        igrins2LongSlit: {
+          exposureTimeMode: {
+            signalToNoise: {
+              value: 50.0
+              at: { nanometers: 2200 }
+            }
+          }
+        }
+      }
+    """
+
+    val update1 = """
+      observingMode: {
+        igrins2LongSlit: {
+          explicitOffsetMode: NOD_TO_SKY
+          explicitSaveSVCImages: true
+        }
+      }
+    """
+
+    val query = """
+      observations {
+        observingMode {
+          igrins2LongSlit {
+            offsetMode
+            defaultOffsetMode
+            explicitOffsetMode
+            saveSVCImages
+            defaultSaveSVCImages
+            explicitSaveSVCImages
+          }
+        }
+      }
+    """
+
+    val expected0 =
+      json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "observingMode": {
+                "igrins2LongSlit": {
+                  "offsetMode": "NOD_ALONG_SLIT",
+                  "defaultOffsetMode": "NOD_ALONG_SLIT",
+                  "explicitOffsetMode": null,
+                  "saveSVCImages": false,
+                  "defaultSaveSVCImages": false,
+                  "explicitSaveSVCImages": null
+                }
+              }
+            }
+          ]
+        }
+      }
+    """.asRight
+
+    val expected1 =
+      json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "observingMode": {
+                "igrins2LongSlit": {
+                  "offsetMode": "NOD_TO_SKY",
+                  "defaultOffsetMode": "NOD_ALONG_SLIT",
+                  "explicitOffsetMode": "NOD_TO_SKY",
+                  "saveSVCImages": true,
+                  "defaultSaveSVCImages": false,
+                  "explicitSaveSVCImages": true
+                }
+              }
+            }
+          ]
+        }
+      }
+    """.asRight
+
+    multiUpdateTest(pi,
+      List(
+        (update0, query, expected0),
+        (update1, query, expected1)
+      )
     )
 
-  def updateObservationsTimesMutation(
-    oid:    Observation.Id,
-    update: String,
-    query:  String
-  ): String = s"""
-    mutation {
-      updateObservationsTimes(input: {
-        SET: {
-          $update
-        },
-        WHERE: {
-          id: { EQ: ${oid.asJson} }
-        }
-      }) {
-        $query
-      }
-    }
-  """
+  test("observing mode: clear igrins2 explicit overrides"):
 
-  def updateObservationTimes(
-    user:     User,
-    oid:      Observation.Id,
-    update:   String,
-    query:    String,
-    expected: Either[String, Json]
-  ): IO[Unit] =
-    expect(
-      user     = user,
-      query    = updateObservationsTimesMutation(oid, update, query),
-      expected = expected.leftMap(msg => List(msg))
+    val update0 = """
+      observingMode: {
+        igrins2LongSlit: {
+          exposureTimeMode: {
+            signalToNoise: {
+              value: 50.0
+              at: { nanometers: 2200 }
+            }
+          }
+          explicitOffsetMode: NOD_TO_SKY
+          explicitSaveSVCImages: true
+        }
+      }
+    """
+
+    val update1 = """
+      observingMode: {
+        igrins2LongSlit: {
+          explicitOffsetMode: null
+          explicitSaveSVCImages: null
+        }
+      }
+    """
+
+    val query = """
+      observations {
+        observingMode {
+          igrins2LongSlit {
+            offsetMode
+            explicitOffsetMode
+            saveSVCImages
+            explicitSaveSVCImages
+          }
+        }
+      }
+    """
+
+    val expected0 =
+      json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "observingMode": {
+                "igrins2LongSlit": {
+                  "offsetMode": "NOD_TO_SKY",
+                  "explicitOffsetMode": "NOD_TO_SKY",
+                  "saveSVCImages": true,
+                  "explicitSaveSVCImages": true
+                }
+              }
+            }
+          ]
+        }
+      }
+    """.asRight
+
+    val expected1 =
+      json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "observingMode": {
+                "igrins2LongSlit": {
+                  "offsetMode": "NOD_ALONG_SLIT",
+                  "explicitOffsetMode": null,
+                  "saveSVCImages": false,
+                  "explicitSaveSVCImages": null
+                }
+              }
+            }
+          ]
+        }
+      }
+    """.asRight
+
+    multiUpdateTest(pi,
+      List(
+        (update0, query, expected0),
+        (update1, query, expected1)
+      )
     )
 
-}
+  test("observing mode: update igrins2 spatial offsets"):
+
+    val update0 = """
+      observingMode: {
+        igrins2LongSlit: {
+          exposureTimeMode: {
+            signalToNoise: {
+              value: 50.0
+              at: { nanometers: 2200 }
+            }
+          }
+          explicitOffsets: [
+            { p: { arcseconds: 0.0 }, q: { arcseconds: -5.0 } },
+            { p: { arcseconds: 0.0 }, q: { arcseconds:  5.0 } },
+            { p: { arcseconds: 0.0 }, q: { arcseconds:  3.5 } },
+            { p: { arcseconds: 0.0 }, q: { arcseconds: -2.5 } }
+          ]
+        }
+      }
+    """
+
+    val update1 = """
+      observingMode: {
+        igrins2LongSlit: {
+          explicitOffsets: null
+        }
+      }
+    """
+
+    val update2 = """
+      observingMode: {
+        igrins2LongSlit: {
+          explicitOffsetMode: NOD_TO_SKY
+          explicitOffsets: [
+            { p: { arcseconds: 1.0 }, q: { arcseconds: -5.0 } },
+            { p: { arcseconds: 2.0 }, q: { arcseconds:  5.0 } }
+          ]
+        }
+      }
+    """
+
+    val update3 = """
+      observingMode: {
+        igrins2LongSlit: {
+          explicitOffsets: null
+        }
+      }
+    """
+
+    val query = """
+      observations {
+        observingMode {
+          igrins2LongSlit {
+            offsets {
+              p { arcseconds }
+              q { arcseconds }
+            }
+            explicitOffsets {
+              p { arcseconds }
+              q { arcseconds }
+            }
+            defaultOffsets {
+              p { arcseconds }
+              q { arcseconds }
+            }
+          }
+        }
+      }
+    """
+
+    val expected0 = json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "observingMode": {
+                "igrins2LongSlit": {
+                  "offsets": [
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -5.000000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  5.000000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  3.500000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -2.500000 } }
+                  ],
+                  "explicitOffsets": [
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -5.000000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  5.000000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  3.500000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -2.500000 } }
+                  ],
+                  "defaultOffsets": [
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -1.250000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  1.250000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  1.250000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -1.250000 } }
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      }
+    """.asRight
+
+    val expected1 = json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "observingMode": {
+                "igrins2LongSlit": {
+                  "offsets": [
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -1.250000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  1.250000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  1.250000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -1.250000 } }
+                  ],
+                  "explicitOffsets": null,
+                  "defaultOffsets": [
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -1.250000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  1.250000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  1.250000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -1.250000 } }
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      }
+    """.asRight
+
+    val expected2 = json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "observingMode": {
+                "igrins2LongSlit": {
+                  "offsets": [
+                    { "p": { "arcseconds": 1.000000 }, "q": { "arcseconds": -5.000000 } },
+                    { "p": { "arcseconds": 2.000000 }, "q": { "arcseconds":  5.000000 } }
+                  ],
+                  "explicitOffsets": [
+                    { "p": { "arcseconds": 1.000000 }, "q": { "arcseconds": -5.000000 } },
+                    { "p": { "arcseconds": 2.000000 }, "q": { "arcseconds":  5.000000 } }
+                  ],
+                  "defaultOffsets": [
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 0.000000 } },
+                    { "p": { "arcseconds": 10.000000 }, "q": { "arcseconds": 10.000000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 0.000000 } }
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      }
+    """.asRight
+
+    val expected3 = json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "observingMode": {
+                "igrins2LongSlit": {
+                  "offsets": [
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 0.000000 } },
+                    { "p": { "arcseconds": 10.000000 }, "q": { "arcseconds": 10.000000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 0.000000 } }
+                  ],
+                  "explicitOffsets": null,
+                  "defaultOffsets": [
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 0.000000 } },
+                    { "p": { "arcseconds": 10.000000 }, "q": { "arcseconds": 10.000000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 0.000000 } }
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      }
+    """.asRight
+
+    multiUpdateTest(pi,
+      List(
+        (update0, query, expected0), // create with explicit offsets
+        (update1, query, expected1), // clear explicit offsets, revert to default
+        (update2, query, expected2), // switch mode with new explicit offsets
+        (update3, query, expected3)  // clear explicit offsets again, revert to default offsets
+      )
+    )
+
+  test("observing mode: changing igrins2 offset mode clears explicit offsets"):
+
+    val update0 = """
+      observingMode: {
+        igrins2LongSlit: {
+          exposureTimeMode: {
+            signalToNoise: {
+              value: 50.0
+              at: { nanometers: 2200 }
+            }
+          }
+          explicitOffsets: [
+            { p: { arcseconds: 0.0 }, q: { arcseconds: -5.0 } },
+            { p: { arcseconds: 0.0 }, q: { arcseconds:  5.0 } },
+            { p: { arcseconds: 0.0 }, q: { arcseconds:  3.5 } },
+            { p: { arcseconds: 0.0 }, q: { arcseconds: -2.5 } }
+          ]
+        }
+      }
+    """
+
+    val update1 = """
+      observingMode: {
+        igrins2LongSlit: {
+          explicitOffsetMode: NOD_TO_SKY
+        }
+      }
+    """
+
+    val query = """
+      observations {
+        observingMode {
+          igrins2LongSlit {
+            offsetMode
+            explicitOffsetMode
+            offsets {
+              p { arcseconds }
+              q { arcseconds }
+            }
+            explicitOffsets {
+              p { arcseconds }
+              q { arcseconds }
+            }
+          }
+        }
+      }
+    """
+
+    val expected0 = json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "observingMode": {
+                "igrins2LongSlit": {
+                  "offsetMode": "NOD_ALONG_SLIT",
+                  "explicitOffsetMode": null,
+                  "offsets": [
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -5.000000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  5.000000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  3.500000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -2.500000 } }
+                  ],
+                  "explicitOffsets": [
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -5.000000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  5.000000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  3.500000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -2.500000 } }
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      }
+    """.asRight
+
+    val expected1 = json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "observingMode": {
+                "igrins2LongSlit": {
+                  "offsetMode": "NOD_TO_SKY",
+                  "explicitOffsetMode": "NOD_TO_SKY",
+                  "offsets": [
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 0.000000 } },
+                    { "p": { "arcseconds": 10.000000 }, "q": { "arcseconds": 10.000000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 0.000000 } }
+                  ],
+                  "explicitOffsets": null
+                }
+              }
+            }
+          ]
+        }
+      }
+    """.asRight
+
+    multiUpdateTest(pi,
+      List(
+        (update0, query, expected0), // create with explicit offsets
+        (update1, query, expected1)  // change mode, clear explicit offsets
+      )
+    )
+
+  test("observing mode: switch from gmos to igrins2"):
+
+    val update0 = """
+      observingMode: {
+        gmosNorthLongSlit: {
+          grating: B1200_G5301
+          filter: G_PRIME
+          fpu: LONG_SLIT_0_25
+          centralWavelength: {
+            nanometers: 234.56
+          }
+          exposureTimeMode: {
+            signalToNoise: {
+              value: 20.0
+              at: { nanometers: 234.56 }
+            }
+          }
+        }
+      }
+    """
+
+    val update1 = """
+      observingMode: {
+        igrins2LongSlit: {
+          exposureTimeMode: {
+            signalToNoise: {
+              value: 50.0
+              at: { nanometers: 2200 }
+            }
+          }
+          explicitOffsetMode: NOD_TO_SKY
+        }
+      }
+    """
+
+    val query = """
+      observations {
+        instrument
+        observingMode {
+          gmosNorthLongSlit {
+            grating
+          }
+          igrins2LongSlit {
+            offsetMode
+            explicitOffsetMode
+          }
+        }
+      }
+    """
+
+    val expected0 =
+      json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "instrument": "GMOS_NORTH",
+              "observingMode": {
+                "gmosNorthLongSlit": {
+                  "grating": "B1200_G5301"
+                },
+                "igrins2LongSlit": null
+              }
+            }
+          ]
+        }
+      }
+    """.asRight
+
+    val expected1 =
+      json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "instrument": "IGRINS2",
+              "observingMode": {
+                "gmosNorthLongSlit": null,
+                "igrins2LongSlit": {
+                  "offsetMode": "NOD_TO_SKY",
+                  "explicitOffsetMode": "NOD_TO_SKY"
+                }
+              }
+            }
+          ]
+        }
+      }
+    """.asRight
+
+    multiUpdateTest(pi,
+      List(
+        (update0, query, expected0), // create as gmos
+        (update1, query, expected1)  // switcth to igrins 2
+      )
+    )

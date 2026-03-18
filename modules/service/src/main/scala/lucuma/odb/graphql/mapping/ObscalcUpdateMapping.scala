@@ -19,9 +19,11 @@ trait ObscalcUpdateMapping[F[_]] extends ObservationView[F] with ProgramTable[F]
   lazy val ObscalcUpdateMapping =
     ObjectMapping(ObscalcUpdateType)(
       SqlField("synthetic-id", ProgramTable.Id, key = true, hidden = true),
-      CursorField("editType",      _.envR[EditType]("editType"),             List("synthetic-id")),
-      CursorField("oldState",      _.envR[Option[CalculationState]]("oldState"), List("synthetic-id")),
-      CursorField("newState",      _.envR[Option[CalculationState]]("newState"), List("synthetic-id")),
-      CursorField("observationId", _.envR[Observation.Id]("observationId"),  List("synthetic-id")),
+      CursorField("editType",            _.envR[EditType]("editType"),                 List("synthetic-id")),
+      CursorField("oldCalculationState", _.envR[Option[CalculationState]]("oldState"), List("synthetic-id")),
+      CursorField("oldState",            _.envR[Option[CalculationState]]("oldState"), List("synthetic-id")),
+      CursorField("newCalculationState", _.envR[Option[CalculationState]]("newState"), List("synthetic-id")),
+      CursorField("newState",            _.envR[Option[CalculationState]]("newState"), List("synthetic-id")),
+      CursorField("observationId",       _.envR[Observation.Id]("observationId"),      List("synthetic-id")),
       SqlObject("value", Join(ProgramTable.Id, ObservationView.ProgramId))
     )

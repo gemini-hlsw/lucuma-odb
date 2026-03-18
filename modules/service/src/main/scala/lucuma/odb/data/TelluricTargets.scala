@@ -3,11 +3,14 @@
 
 package lucuma.odb.data
 
+import lucuma.core.enums.TelluricCalibrationOrder
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.util.CalculationState
+import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
+import lucuma.odb.data.Md5Hash
 
 /**
   * Data classes for the telluric targets service
@@ -27,16 +30,21 @@ object TelluricTargets:
     retryAt:              Option[Timestamp],
     failureCount:         Int,
     resolvedTargetId:     Option[Target.Id],
-    errorMessage:         Option[String]
+    errorMessage:         Option[String],
+    scienceDuration:      TimeSpan,
+    calibrationOrder:     TelluricCalibrationOrder
   )
 
   /**
-   h* Identifies an observation that needs resolving
+   * Identifies an observation that needs resolving
    */
   case class Pending(
     observationId:        Observation.Id,
     programId:            Program.Id,
     scienceObservationId: Observation.Id,
     lastInvalidation:     Timestamp,
-    failureCount:         Int
+    failureCount:         Int,
+    scienceDuration:      TimeSpan,
+    paramsHash:           Option[Md5Hash],
+    calibrationOrder:     TelluricCalibrationOrder
   )

@@ -14,6 +14,7 @@ import grackle.skunk.SkunkMapping
 import io.circe.Json
 import io.circe.syntax.*
 import lucuma.core.enums.Flamingos2Decker
+import lucuma.core.enums.Flamingos2Filter
 import lucuma.core.enums.Flamingos2ReadoutMode
 import lucuma.core.math.Offset
 import lucuma.odb.data.ExposureTimeModeRole
@@ -38,6 +39,11 @@ trait Flamingos2LongSlitMapping[F[_]]
   lazy val Flamingos2LongSlitAcquisitionMapping: ObjectMapping =
     ObjectMapping(Flamingos2LongSlitAcquisitionType)(
       SqlField("observationId", Flamingos2LongSlitView.ObservationId, key = true, hidden = true),
+
+      explicitOrElseDefault[Flamingos2Filter]("filter", "explicitFilter", "defaultFilter"),
+      SqlField("defaultFilter",  Flamingos2LongSlitView.AcquisitionFilterDefault),
+      SqlField("explicitFilter", Flamingos2LongSlitView.AcquisitionFilter),
+
       SqlObject("exposureTimeMode", Join(Flamingos2LongSlitView.ObservationId, ExposureTimeModeView.ObservationId))
     )
 

@@ -18,8 +18,10 @@ trait CalculatedObservationWorkflowMapping[F[_]] extends ObscalcTable[F]:
 
   private lazy val CalculatedObservationWorkflowMapping: TypeMapping =
     ObjectMapping(CalculatedObservationWorkflowType)(
-      SqlField("synthetic_id", ObscalcTable.ObservationId, hidden = true, key = true),
-      SqlField("state",        ObscalcTable.CalculationState),
+      SqlField("synthetic_id",     ObscalcTable.ObservationId, hidden = true, key = true),
+      SqlField("calculationState", ObscalcTable.CalculationState),
+      // state is deprecated on the graphql schema
+      SqlField("state",            ObscalcTable.CalculationState),
       SqlObject("value")
     )
 
