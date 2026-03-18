@@ -20,6 +20,8 @@ import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth as GmosNorthDynam
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosSouth as GmosSouthDynamic
 import lucuma.core.model.sequence.gmos.StaticConfig.GmosNorth as GmosNorthStatic
 import lucuma.core.model.sequence.gmos.StaticConfig.GmosSouth as GmosSouthStatic
+import lucuma.core.model.sequence.igrins2.Igrins2DynamicConfig as Igrins2Dynamic
+import lucuma.core.model.sequence.igrins2.Igrins2StaticConfig as Igrins2Static
 import lucuma.odb.data.Itc
 import lucuma.odb.data.OdbError
 import lucuma.odb.sequence.ObservingMode
@@ -87,6 +89,13 @@ sealed trait GeneratorStreaming[F[_]]:
     context: GeneratorContext
   ): F[Either[OdbError, StreamingExecutionConfig[F, GmosSouthStatic, GmosSouthDynamic]]]
 
+  def selectOrGenerateIgrins2LongSlit(
+    context: GeneratorContext
+  )(using Transaction[F]): F[Either[OdbError, StreamingExecutionConfig[F, Igrins2Static, Igrins2Dynamic]]]
+
+  def generateIgrins2LongSlit(
+    context: GeneratorContext
+  ): F[Either[OdbError, StreamingExecutionConfig[F, Igrins2Static, Igrins2Dynamic]]]
 
 object GeneratorStreaming:
 
@@ -107,6 +116,14 @@ object GeneratorStreaming:
     itc.flatMap: i =>
       Itc.spectroscopy.getOption(i).toRight:
         OdbError.InvalidObservation(oid, s"Expecting a spectroscopy ITC result for this observation".some)
+
+  def requireIgrins2SpectroscopyItc(
+    oid: Observation.Id,
+    itc: Either[OdbError, Itc]
+  ): Either[OdbError, Itc.Igrins2Spectroscopy] =
+    itc.flatMap: i =>
+      Itc.igrins2Spectroscopy.getOption(i).toRight:
+        OdbError.InvalidObservation(oid, s"Expecting an IGRINS-2 spectroscopy ITC result for this observation".some)
 
   def instantiate[F[_]: Async: Services](
     commitHash: CommitHash,
@@ -168,6 +185,28 @@ object GeneratorStreaming:
           gen <- EitherT(LongSlit.instantiate(context.oid, calculator.flamingos2, context.namespace, exp.flamingos2, cfg, itc))
         yield gen.covary[F]).value
 
+      override def selectOrGenerateIgrins2LongSlit(
+        context: GeneratorContext
+      )(using Transaction[F]): F[Either[OdbError, StreamingExecutionConfig[F, Igrins2Static, Igrins2Dynamic]]] =
+        import lucuma.odb.sequence.igrins2.longslit.LongSlit
+        (for
+          cfg <- extractMode(ObservingMode.Igrins2LongSlitName, context)(_.asIgrins2LongSlit)
+          res <- EitherT(selectOrGenerate(
+                   LongSlit.staticFrom(cfg),
+                   sequenceService.selectIgrins2Sequence(context.oid, _, _),
+                   generateIgrins2LongSlit(context)
+                 ))
+        yield res).value
+
+      override def generateIgrins2LongSlit(
+        context: GeneratorContext
+      ): F[Either[OdbError, StreamingExecutionConfig[F, Igrins2Static, Igrins2Dynamic]]] =
+        import lucuma.odb.sequence.igrins2.longslit.LongSlit
+        (for
+          cfg <- extractMode(ObservingMode.Igrins2LongSlitName, context)(_.asIgrins2LongSlit)
+          itc  = requireIgrins2SpectroscopyItc(context.oid, context.itcRes)
+          gen <- EitherT.fromEither(LongSlit.instantiate(context.oid, calculator.igrins2, context.namespace, cfg, itc))
+        yield gen.covary[F]).value
 
       override def selectOrGenerateGmosNorthImaging(
         context: GeneratorContext

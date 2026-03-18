@@ -221,7 +221,7 @@ object Generator:
             case ObservingModeType.GmosSouthLongSlit  =>
               EitherT(streaming.selectOrGenerateGmosSouthLongSlit(ctx)).flatMap(digest(_, calculator.gmosSouth.estimateSetup))
             case ObservingModeType.Igrins2LongSlit    =>
-              EitherT.leftT(OdbError.InvalidObservation(ctx.oid, s"IGRINS2 is not yet supported".some))
+              EitherT(streaming.selectOrGenerateIgrins2LongSlit(ctx)).flatMap(digest(_, calculator.igrins2.estimateSetup))
 
       private def calculateScienceAtomDigests(
         ctx: GeneratorContext
@@ -244,7 +244,7 @@ object Generator:
           case ObservingModeType.GmosSouthLongSlit  =>
             EitherT(streaming.selectOrGenerateGmosSouthLongSlit(ctx)).map(_.science.map(AtomDigest.fromAtom))
           case ObservingModeType.Igrins2LongSlit    =>
-            EitherT.leftT(OdbError.InvalidObservation(ctx.oid, s"IGRINS2 is not yet supported".some))
+            EitherT(streaming.selectOrGenerateIgrins2LongSlit(ctx)).map(_.science.map(AtomDigest.fromAtom))
 
         checkSequence *> atomDigests
 
@@ -315,7 +315,9 @@ object Generator:
                 .map(InstrumentExecutionConfig.GmosSouth.apply)
 
             case ObservingModeType.Igrins2LongSlit    =>
-              EitherT.leftT(OdbError.InvalidObservation(ctx.oid, s"IGRINS2 is not yet supported".some))
+              EitherT(streaming.selectOrGenerateIgrins2LongSlit(ctx))
+                .flatMap(s => EitherT.liftF(executionConfig(s)))
+                .map(InstrumentExecutionConfig.Igrins2.apply)
 
         transactionallyWithContext(oid, commitHash): ctx =>
           instrumentExecutionConfig(ctx)
@@ -348,7 +350,7 @@ object Generator:
                 .flatMap(s => EitherT.liftF(sequenceService.resetGmosSouthAcquisition(observationId, s.acquisition)))
 
             case ObservingModeType.Igrins2LongSlit =>
-              EitherT.leftT(OdbError.InvalidObservation(ctx.oid, s"IGRINS2 is not yet supported".some))
+              EitherT.pure(())
 
       override def materializeAndThen[A](
         oid:  Observation.Id
@@ -382,7 +384,8 @@ object Generator:
                 .flatMap(s => EitherT.liftF(sequenceService.materializeGmosSouthExecutionConfig(oid, s)))
 
             case ObservingModeType.Igrins2LongSlit =>
-              EitherT.leftT(OdbError.InvalidObservation(ctx.oid, s"IGRINS2 is not yet supported".some))
+              EitherT(streaming.generateIgrins2LongSlit(ctx))
+                .flatMap(s => EitherT.liftF(sequenceService.materializeIgrins2ExecutionConfig(oid, s)))
 
         transactionallyWithContext(oid, commitHash): ctx =>
           materializeExecutionConfig(ctx) *> EitherT(f)

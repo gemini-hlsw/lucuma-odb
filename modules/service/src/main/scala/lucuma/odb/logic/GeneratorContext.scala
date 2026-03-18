@@ -48,8 +48,10 @@ case class GeneratorContext(
     // ITC
     itcRes.foreach: itc =>
       itc match
-        case Itc.Spectroscopy(acq, sci) =>
+        case Itc.Spectroscopy(acq, sci)    =>
           addResultSet(acq)
+          addResultSet(sci)
+        case Itc.Igrins2Spectroscopy(sci) =>
           addResultSet(sci)
         case Itc.GmosNorthImaging(m)   =>
           m.toNel.toList.foreach(addImagingResultSet)

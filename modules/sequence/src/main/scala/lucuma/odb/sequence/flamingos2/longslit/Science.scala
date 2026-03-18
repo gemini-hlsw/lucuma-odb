@@ -41,6 +41,7 @@ import lucuma.itc.IntegrationTime
 import lucuma.odb.data.OdbError
 import lucuma.odb.sequence.data.ProtoAtom
 import lucuma.odb.sequence.data.ProtoStep
+import lucuma.odb.sequence.isOnSlit
 import lucuma.odb.sequence.util.AtomBuilder
 
 import java.util.UUID
@@ -79,10 +80,6 @@ object Science:
   val SlitLength: Angle =
     Angle.fromBigDecimalArcseconds(108.0)
 
-  private def isOnSlit(o: Offset): Boolean =
-    (o.p.toAngle.toMicroarcseconds === 0) &&
-    (Angle.signedDecimalArcseconds.get(o.q.toAngle).abs <= (Angle.signedDecimalArcseconds.get(SlitLength) / 2))
-
   private val Two: NonZeroInt = NonZeroInt.unsafeFrom(2)
 
   extension (start: Timestamp)
@@ -111,19 +108,12 @@ object Science:
       NonEmptyList.of(a0, b0, b1, a1)
 
     def cycleCount(t: IntegrationTime): Either[String, NonNegInt] =
-      val requiredExposures = t.exposureCount.value
-      val exposuresPerCycle = abbaCycle.toList.count(s => isOnSlit(s.telescopeConfig.offset))
-      Either.cond(
-        exposuresPerCycle > 0,
-        // Round up to a whole cycle even if it produces extra data.
-        NonNegInt.unsafeFrom((requiredExposures + (exposuresPerCycle - 1)) / exposuresPerCycle),
-        "At least one exposure must be taken on slit."
-      )
+      calculateCycleCount(isOnSlit(SlitLength, _), abbaCycle.toList, t)
 
   object StepDefinition extends SequenceState[F2] with Flamingos2InitialDynamicConfig:
 
     def f2ScienceStep(o: Offset): State[F2, ProtoStep[F2]] =
-      val guideState = if isOnSlit(o) then Enabled else Disabled
+      val guideState = if isOnSlit(SlitLength, o) then Enabled else Disabled
       scienceStep(TelescopeConfig(o, guideState), ObserveClass.Science)
 
     // PreDef is a StepDefinition before SmartGcal expansion.
