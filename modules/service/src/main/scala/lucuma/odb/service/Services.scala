@@ -269,7 +269,7 @@ object Services:
     telluricClient0: TelluricTargetsClient[F],
     hminCache0: HminBrightnessCache = HminBrightnessCache.Empty,
   )(s: Session[F])(
-    using tf: Trace[F], uf: UUIDGen[F], ay: Async[F], pf: Parallel[F],  log: Logger[F], lf: LoggerFactory[F]
+    using tf: Trace[F], uf: UUIDGen[F], ay: Async[F], pf: Parallel[F], log: Logger[F], lf: LoggerFactory[F]
   ): Services[F[_]] =
     new Services[F]:
 
