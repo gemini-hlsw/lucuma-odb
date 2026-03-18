@@ -5,28 +5,27 @@ package lucuma.odb.graphql.query
 
 import cats.effect.IO
 import cats.syntax.either.*
-import eu.timepit.refined.types.numeric.PosInt
-import lucuma.core.enums.Igrins2OffsetMode
 import io.circe.Json
 import io.circe.syntax.*
+import lucuma.core.enums.Igrins2OffsetMode
 import lucuma.core.enums.StepGuideState.Disabled
 import lucuma.core.enums.StepGuideState.Enabled
 import lucuma.core.model.Observation
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
 import lucuma.itc.IntegrationTime
+import lucuma.refined.*
 
 class executionSciIgrins2 extends ExecutionTestSupportForIgrins2:
   val ExposureTime: TimeSpan = 20.secondTimeSpan
 
   override def fakeItcSpectroscopyResult: IntegrationTime =
-    IntegrationTime(ExposureTime, PosInt.unsafeFrom(4))
+    IntegrationTime(ExposureTime, 4.refined)
 
-  // Default NodAlongSlit offsets: ±1.25 arcsec in Q
   val qA = -1.25
   val qB =  1.25
 
-  test("[igrins2] mode nod along slit (4 offsets, 1 cycle)"):
+  test("[igrins2] mode nod along slit (4 offsets, 1 atom)"):
     val setup: IO[Observation.Id] =
       for {
         p <- createProgram
@@ -80,7 +79,7 @@ class executionSciIgrins2 extends ExecutionTestSupportForIgrins2:
           ).asLeft
       )
 
-  test("[igrins2] nod to sky - 2 on target, 1 off, need 4 => 2 cycles"):
+  test("[igrins2] nod to sky - 2 on target, 1 off"):
     val setup: IO[Observation.Id] =
       for {
         p <- createProgram
@@ -119,8 +118,33 @@ class executionSciIgrins2 extends ExecutionTestSupportForIgrins2:
           ).asRight
       )
 
+  test("[igrins2] nod to sky, all offsets off target"):
+    val setup: IO[Observation.Id] =
+      for {
+        p <- createProgram
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createIgrins2LongSlitObservationAs(pi, p, t)
+        _ <- setOffsets(o, Igrins2OffsetMode.NodToSky,
+               """[
+                 { p: { arcseconds: 10 }, q: { arcseconds: 0 } },
+                 { p: { arcseconds: 20 }, q: { arcseconds: 0 } },
+                 { p: { arcseconds: 10 }, q: { arcseconds: 0 } }
+               ]"""
+             )
+      } yield o
+
+    setup.flatMap: oid =>
+      expect(
+        user     = pi,
+        query    = igrins2ScienceQuery(oid),
+        expected =
+          List(
+            s"Could not generate a sequence for $oid: At least one exposure must be taken on slit."
+          ).asLeft
+      )
+
   // This is legal though we nay need to forbid setting q larger than the slit?
-  test("[igrins2] mode nod along slit, 3 offsets on slit per cycle, needs 2 cycles"):
+  test("[igrins2] mode nod along slit, 3 offsets on slit"):
     val setup: IO[Observation.Id] =
       for {
         p <- createProgram

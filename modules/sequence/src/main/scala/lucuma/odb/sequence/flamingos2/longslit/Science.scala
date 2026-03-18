@@ -41,8 +41,8 @@ import lucuma.itc.IntegrationTime
 import lucuma.odb.data.OdbError
 import lucuma.odb.sequence.data.ProtoAtom
 import lucuma.odb.sequence.data.ProtoStep
-import lucuma.odb.sequence.util.AtomBuilder
 import lucuma.odb.sequence.isOnSlit
+import lucuma.odb.sequence.util.AtomBuilder
 
 import java.util.UUID
 
