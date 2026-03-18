@@ -30,14 +30,14 @@ trait AtomBuilder[D]:
     aix:   Int,
     six:   Int,
     steps: NonEmptyList[ProtoStep[D]],
-  ): State[TimeEstimateCalculator.Last[D], Atom[D]]
+  ): State[StepTimeEstimateCalculator.Last[D], Atom[D]]
 
   def buildOption(
     desc:  Option[NonEmptyString],
     aix:   Int,
     six:   Int,
     steps: List[ProtoStep[D]]
-  ): State[TimeEstimateCalculator.Last[D], Option[Atom[D]]] =
+  ): State[StepTimeEstimateCalculator.Last[D], Option[Atom[D]]] =
     NonEmptyList.fromList(steps) match
       case None      => State.pure(None)
       case Some(nel) => build(desc, aix, six, nel).map(_.some)
@@ -46,7 +46,7 @@ trait AtomBuilder[D]:
     s: Stream[F, ProtoAtom[ProtoStep[D]]]
   ): Stream[F, Atom[D]] =
     s.zipWithIndex
-     .mapAccumulate(TimeEstimateCalculator.Last.empty[D]) { case (state, (protoAtom, idx)) =>
+     .mapAccumulate(StepTimeEstimateCalculator.Last.empty[D]) { case (state, (protoAtom, idx)) =>
        build(protoAtom.description, idx.toInt, 0, protoAtom.steps).run(state).value
      }
      .map(_._2)
@@ -54,7 +54,7 @@ trait AtomBuilder[D]:
 object AtomBuilder:
 
   def instantiate[S, D](
-    estimator:    TimeEstimateCalculator[S, D],
+    estimator:    StepTimeEstimateCalculator[S, D],
     static:       S,
     namespace:    UUID,
     sequenceType: SequenceType
@@ -67,8 +67,8 @@ object AtomBuilder:
         aix:       Int,
         six:       Int,
         steps:     NonEmptyList[ProtoStep[D]]
-      ): State[TimeEstimateCalculator.Last[D], Atom[D]] =
-        State { (calcState: TimeEstimateCalculator.Last[D]) =>
+      ): State[StepTimeEstimateCalculator.Last[D], Atom[D]] =
+        State { (calcState: StepTimeEstimateCalculator.Last[D]) =>
           steps.mapAccumulate(calcState) { (e, s) =>
             val estimate = estimator.estimateStep(static, e, s)
             (e.next(s), estimate)

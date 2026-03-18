@@ -225,7 +225,7 @@ trait Services[F[_]]:
 
   def trackingService: TrackingService[F]
 
-  /** Construct a `guideService`, given a `CommitHash` and a `TimeEstimateCalculator`. */
+  /** The `GuideService`. */
   def guideService: GuideService[F]
 
   /** The `UserInvitationService` */

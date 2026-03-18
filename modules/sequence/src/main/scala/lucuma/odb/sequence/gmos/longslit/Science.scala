@@ -358,7 +358,7 @@ object Science:
    * with all remaining steps.
    */
   private case class ScienceGenerator[S, D](
-    estimator:   TimeEstimateCalculator[S, D],
+    estimator:   StepTimeEstimateCalculator[S, D],
     static:      S,
     atomBuilder: AtomBuilder[D],
     expMicroSec: PosLong,
@@ -373,7 +373,7 @@ object Science:
     override def generate: Stream[Pure, Atom[D]] =
       Stream
         .iterate(0)(pos => (pos + 1) % length)
-        .mapAccumulate((dithers, 0, TimeEstimateCalculator.Last.empty[D])) { case ((ds, aix, cs), pos) =>
+        .mapAccumulate((dithers, 0, StepTimeEstimateCalculator.Last.empty[D])) { case ((ds, aix, cs), pos) =>
           val dither      = ds.getUnsafe(pos)
           val (dʹ, steps) = dither.generateFullBlock(maxExpPerBlock)
           val (csʹ, atom) = atomBuilder.buildOption(dither.desc.some, aix, 0, steps).run(cs).value
@@ -400,7 +400,7 @@ object Science:
 
     def instantiate[F[_]: Monad, S, D, G, L, U](
       oid:       Observation.Id,
-      estimator: TimeEstimateCalculator[S, D],
+      estimator: StepTimeEstimateCalculator[S, D],
       static:    S,
       namespace: UUID,
       expander:  SmartGcalExpander[F, D],
@@ -467,7 +467,7 @@ object Science:
 
   def gmosNorth[F[_]: Monad](
     observationId: Observation.Id,
-    estimator:     TimeEstimateCalculator[StaticConfig.GmosNorth, GmosNorth],
+    estimator:     StepTimeEstimateCalculator[StaticConfig.GmosNorth, GmosNorth],
     static:        StaticConfig.GmosNorth,
     namespace:     UUID,
     expander:      SmartGcalExpander[F, GmosNorth],
@@ -479,7 +479,7 @@ object Science:
 
   def gmosSouth[F[_]: Monad](
     observationId: Observation.Id,
-    estimator:     TimeEstimateCalculator[StaticConfig.GmosSouth, GmosSouth],
+    estimator:     StepTimeEstimateCalculator[StaticConfig.GmosSouth, GmosSouth],
     static:        StaticConfig.GmosSouth,
     namespace:     UUID,
     expander:      SmartGcalExpander[F, GmosSouth],

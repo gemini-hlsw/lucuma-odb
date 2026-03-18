@@ -195,7 +195,7 @@ object Science:
   case class Generator(
     steps:         StepDefinition,
     cycleEstimate: TimeSpan,
-    estimate:      (NonEmptyList[ProtoStep[F2]], TimeEstimateCalculator.Last[F2]) => TimeSpan,
+    estimate:      (NonEmptyList[ProtoStep[F2]], StepTimeEstimateCalculator.Last[F2]) => TimeSpan,
     builder:       AtomBuilder[F2],
     goalCycles:    NonNegInt
   ) extends SequenceGenerator[F2]:
@@ -260,7 +260,7 @@ object Science:
 
       // Convert the proto atoms into real atoms with ids and estimates.
       future
-        .mapAccumulate((0, 0, TimeEstimateCalculator.Last.empty[F2])) { case ((a, s, calcState), protoAtom) =>
+        .mapAccumulate((0, 0, StepTimeEstimateCalculator.Last.empty[F2])) { case ((a, s, calcState), protoAtom) =>
           val (csʹ, atom) = builder.build(protoAtom.description, a, s, protoAtom.steps).run(calcState).value
           ((a + 1, 0, csʹ), atom)
         }
@@ -279,7 +279,7 @@ object Science:
 
   def instantiate[F[_]: Monad](
     observationId: Observation.Id,
-    estimator:     TimeEstimateCalculator[Flamingos2StaticConfig, F2],
+    estimator:     StepTimeEstimateCalculator[Flamingos2StaticConfig, F2],
     static:        Flamingos2StaticConfig,
     namespace:     UUID,
     expander:      SmartGcalExpander[F, F2],
@@ -292,7 +292,7 @@ object Science:
         time.filterOrElse(_.exposureTime.toNonNegMicroseconds.value > 0, zeroExposureTime(observationId))
 
     def cycleEstimate(steps: StepDefinition): EitherT[F, OdbError, TimeSpan] =
-      val estimate = TimeEstimateCalculator.runEmpty(estimator.estimateTotalNel(static, steps.abbaCycle))
+      val estimate = StepTimeEstimateCalculator.runEmpty(estimator.estimateTotalNel(static, steps.abbaCycle))
       EitherT.fromEither:
         Either.cond(estimate < MaxSciencePeriod, estimate, exposureTimeTooLong(observationId, estimate))
 

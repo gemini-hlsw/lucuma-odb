@@ -188,7 +188,7 @@ object Science:
                     with ProtoSequences[GmosSouth, GmosSouthGrating, GmosSouthFilter, GmosSouthFpu]
 
   def makeGenerator[S, D](
-      estimator:  TimeEstimateCalculator[S, D],
+      estimator:  StepTimeEstimateCalculator[S, D],
       static:     S,
       namespace:  UUID,
       protoAtoms: Stream[Pure, ProtoAtom[ProtoStep[D]]]
@@ -203,7 +203,7 @@ object Science:
 
         protoAtoms
           .zipWithIndex
-          .mapAccumulate(TimeEstimateCalculator.Last.empty[D]) { case (cs, (protoAtom, idx)) =>
+          .mapAccumulate(StepTimeEstimateCalculator.Last.empty[D]) { case (cs, (protoAtom, idx)) =>
             build.build(protoAtom.description, idx.toInt, 0, protoAtom.steps).run(cs).value
           }
           .map(_._2)
@@ -227,7 +227,7 @@ object Science:
 
     def instantiate[F[_]: Sync, S, D, G, L, U](
       state:     ProtoSequences[D, G, L, U],
-      estimator: TimeEstimateCalculator[S, D],
+      estimator: StepTimeEstimateCalculator[S, D],
       static:    S,
       namespace: UUID,
       config:    Config[L],
@@ -287,7 +287,7 @@ object Science:
       case Decreasing => Order.reverse(Order.by(f))
 
   def gmosNorth[F[_]: Sync](
-    estimator: TimeEstimateCalculator[StaticConfig.GmosNorth, GmosNorth],
+    estimator: StepTimeEstimateCalculator[StaticConfig.GmosNorth, GmosNorth],
     static:    StaticConfig.GmosNorth,
     namespace: UUID,
     config:    Config.GmosNorth,
@@ -297,7 +297,7 @@ object Science:
     ScienceGenerator.instantiate(ProtoSequences.North, estimator, static, namespace, config, time.map(_.science))
 
   def gmosSouth[F[_]: Sync](
-    estimator: TimeEstimateCalculator[StaticConfig.GmosSouth, GmosSouth],
+    estimator: StepTimeEstimateCalculator[StaticConfig.GmosSouth, GmosSouth],
     static:    StaticConfig.GmosSouth,
     namespace: UUID,
     config:    Config.GmosSouth,

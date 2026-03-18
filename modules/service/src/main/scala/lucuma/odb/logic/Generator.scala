@@ -31,7 +31,7 @@ import lucuma.odb.data.Itc
 import lucuma.odb.data.Md5Hash
 import lucuma.odb.data.OdbError
 import lucuma.odb.sequence.ObservingMode.Syntax.*
-import lucuma.odb.sequence.TimeEstimateCalculator
+import lucuma.odb.sequence.SetupTimeEstimateCalculator
 import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.sequence.data.StreamingExecutionConfig
 import lucuma.odb.sequence.util.CommitHash
@@ -184,7 +184,7 @@ object Generator:
 
         def digest[S, D](
           stream:    StreamingExecutionConfig[F, S, D],
-          estimator: TimeEstimateCalculator[S, D]
+          estimator: SetupTimeEstimateCalculator
         ): EitherT[F, OdbError, ExecutionDigest] =
 
           def sequenceDigest(s: Stream[F, Atom[D]]): F[Either[OdbError, SequenceDigest]] =
@@ -201,7 +201,7 @@ object Generator:
           for
             a <- EitherT(sequenceDigest(stream.acquisition))
             s <- EitherT(sequenceDigest(stream.science))
-          yield ExecutionDigest(estimator.estimateSetup, estimator.estimateSetupCount(s.timeEstimate.sum), a, s)
+          yield ExecutionDigest(estimator.estimateSetupTime, estimator.estimateSetupCount(s.timeEstimate.sum), a, s)
 
         if ctx.params.declaredComplete then
           EitherT.pure:
@@ -214,15 +214,15 @@ object Generator:
         else
           ctx.params.observingMode.modeType match
             case ObservingModeType.Flamingos2LongSlit =>
-              EitherT(streaming.selectOrGenerateFlamingos2LongSlit(ctx)).flatMap(digest(_, calculator.flamingos2))
+              EitherT(streaming.selectOrGenerateFlamingos2LongSlit(ctx)).flatMap(digest(_, calculator.flamingos2LongSlitSetup))
             case ObservingModeType.GmosNorthImaging   =>
-              EitherT(streaming.selectOrGenerateGmosNorthImaging(ctx)).flatMap(digest(_, calculator.gmosNorthImaging))
+              EitherT(streaming.selectOrGenerateGmosNorthImaging(ctx)).flatMap(digest(_, calculator.gmosNorthImagingSetup))
             case ObservingModeType.GmosNorthLongSlit  =>
-              EitherT(streaming.selectOrGenerateGmosNorthLongSlit(ctx)).flatMap(digest(_, calculator.gmosNorthLongSlit))
+              EitherT(streaming.selectOrGenerateGmosNorthLongSlit(ctx)).flatMap(digest(_, calculator.gmosNorthLongSlitSetup))
             case ObservingModeType.GmosSouthImaging   =>
-              EitherT(streaming.selectOrGenerateGmosSouthImaging(ctx)).flatMap(digest(_, calculator.gmosSouthImaging))
+              EitherT(streaming.selectOrGenerateGmosSouthImaging(ctx)).flatMap(digest(_, calculator.gmosSouthImagingSetup))
             case ObservingModeType.GmosSouthLongSlit  =>
-              EitherT(streaming.selectOrGenerateGmosSouthLongSlit(ctx)).flatMap(digest(_, calculator.gmosSouthLongSlit))
+              EitherT(streaming.selectOrGenerateGmosSouthLongSlit(ctx)).flatMap(digest(_, calculator.gmosSouthLongSlitSetup))
             case ObservingModeType.Igrins2LongSlit    =>
               EitherT(streaming.selectOrGenerateIgrins2LongSlit(ctx)).flatMap(digest(_, calculator.igrins2.estimateSetup))
 

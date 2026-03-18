@@ -32,7 +32,7 @@ object LongSlit:
 
   def gmosNorth[F[_]: Monad](
     observationId:  Observation.Id,
-    estimator:      TimeEstimateCalculator[StaticConfig.GmosNorth, DynamicConfig.GmosNorth],
+    estimator:      StepTimeEstimateCalculator[StaticConfig.GmosNorth, DynamicConfig.GmosNorth],
     namespace:      UUID,
     expander:       SmartGcalExpander[F, DynamicConfig.GmosNorth],
     config:         Config.GmosNorth,
@@ -48,7 +48,7 @@ object LongSlit:
 
   def gmosSouth[F[_]: Monad](
     observationId:  Observation.Id,
-    estimator:      TimeEstimateCalculator[StaticConfig.GmosSouth, DynamicConfig.GmosSouth],
+    estimator:      StepTimeEstimateCalculator[StaticConfig.GmosSouth, DynamicConfig.GmosSouth],
     namespace:      UUID,
     expander:       SmartGcalExpander[F, DynamicConfig.GmosSouth],
     config:         Config.GmosSouth,

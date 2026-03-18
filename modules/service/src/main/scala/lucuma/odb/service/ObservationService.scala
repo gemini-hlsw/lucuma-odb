@@ -117,14 +117,6 @@ sealed trait ObservationService[F[_]] {
     oid: Observation.Id
   )(using Transaction[F]): F[Option[Instrument]]
 
-  def selectObservingModeType(
-    oid: Observation.Id
-  )(using Transaction[F]): F[Option[ObservingModeType]]
-
-  def selectObservingModeTypes(
-    oids: NonEmptyList[Observation.Id]
-  )(using Transaction[F]): F[Map[Observation.Id, ObservingModeType]]
-
 }
 
 object ObservationService {
@@ -605,18 +597,6 @@ object ObservationService {
         oid: Observation.Id
       )(using Transaction[F]): F[Option[Instrument]] =
         session.option(Statements.SelectInstrument)(oid)
-
-      override def selectObservingModeTypes(
-        oids: NonEmptyList[Observation.Id]
-      )(using Transaction[F]): F[Map[Observation.Id, ObservingModeType]] =
-        session
-          .execute(Statements.selectObservingModeTypes(oids))(oids.toList)
-          .map(_.toMap)
-
-      override def selectObservingModeType(
-        oid: Observation.Id
-      )(using Transaction[F]): F[Option[ObservingModeType]] =
-        selectObservingModeTypes(NonEmptyList.one(oid)).map(_.get(oid))
 
     }
 
@@ -1225,18 +1205,6 @@ object ObservationService {
           FROM t_observation
          WHERE c_observation_id = $observation_id
       """.query(instrument)
-
-    def selectObservingModeTypes(
-      oids: NonEmptyList[Observation.Id]
-    ): Query[List[Observation.Id], (Observation.Id, ObservingModeType)] =
-      sql"""
-        SELECT c_observation_id,
-               c_observing_mode_type
-          FROM t_observation
-         WHERE c_observation_id IN (${observation_id.list(oids.size)})
-           AND c_observing_mode_type IS NOT NULL
-      """.query(observation_id *: observing_mode_type)
-
   }
 
 }
