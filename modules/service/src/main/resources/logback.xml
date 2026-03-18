@@ -19,6 +19,9 @@
   <logger name="lucuma-odb-test-attachments" level="OFF" />
   <logger name="lucuma.odb.Main" level="INFO"/>
 
+  <!-- Log slow queries -->
+  <logger name="lucuma-odb-slow-query" level="WARN"/>
+
   <root level="WARN">
     <appender-ref ref="STDOUT" />
   </root>
