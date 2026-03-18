@@ -224,7 +224,7 @@ object Generator:
             case ObservingModeType.GmosSouthLongSlit  =>
               EitherT(streaming.selectOrGenerateGmosSouthLongSlit(ctx)).flatMap(digest(_, calculator.gmosSouthLongSlitSetup))
             case ObservingModeType.Igrins2LongSlit    =>
-              EitherT(streaming.selectOrGenerateIgrins2LongSlit(ctx)).flatMap(digest(_, calculator.igrins2.estimateSetup))
+              EitherT(streaming.selectOrGenerateIgrins2LongSlit(ctx)).flatMap(digest(_, calculator.igrins2LongSlitSetup))
 
       private def calculateScienceAtomDigests(
         ctx: GeneratorContext

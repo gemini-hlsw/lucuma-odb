@@ -691,7 +691,7 @@ object SequenceService:
           sequenceType,
           Statements.SelectIgrins2Sequence,
           staticConfig,
-          estimator.igrins2
+          estimator.igrins2Step
         )
 
   object Statements:

@@ -205,7 +205,7 @@ object GeneratorStreaming:
         (for
           cfg <- extractMode(ObservingMode.Igrins2LongSlitName, context)(_.asIgrins2LongSlit)
           itc  = requireIgrins2SpectroscopyItc(context.oid, context.itcRes)
-          gen <- EitherT.fromEither(LongSlit.instantiate(context.oid, calculator.igrins2, context.namespace, cfg, itc))
+          gen <- EitherT.fromEither(LongSlit.instantiate(context.oid, calculator.igrins2Step, context.namespace, cfg, itc))
         yield gen.covary[F]).value
 
       override def selectOrGenerateGmosNorthImaging(
