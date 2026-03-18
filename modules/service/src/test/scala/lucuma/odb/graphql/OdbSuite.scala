@@ -35,7 +35,6 @@ import grackle.Result.Failure
 import grackle.Result.Success
 import grackle.Result.Warning
 import grackle.skunk.SkunkMonitor
-import lucuma.core.math.Wavelength
 import io.circe.Decoder
 import io.circe.Encoder
 import io.circe.Json
@@ -277,7 +276,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
           case lucuma.itc.client.InstrumentMode.Flamingos2Spectroscopy(d, _, _)         => d.wavelength
           case lucuma.itc.client.InstrumentMode.GmosNorthSpectroscopy(w, _, _, _, _, _) => w
           case lucuma.itc.client.InstrumentMode.GmosSouthSpectroscopy(w, _, _, _, _, _) => w
-          case lucuma.itc.client.InstrumentMode.Igrins2Spectroscopy()                   => igrins2Default
+          case lucuma.itc.client.InstrumentMode.Igrins2Spectroscopy()                   => igrins2Signal
           case _                                                                        => signal
         IO.whenA(wavelength === signal) {
           IO.raiseError(new RuntimeException("Artifical exception for test cases."))

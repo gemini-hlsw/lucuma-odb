@@ -3,16 +3,41 @@
 
 package lucuma.odb.graphql.query
 
+import cats.effect.IO
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
+import lucuma.core.enums.Igrins2OffsetMode
 import lucuma.core.enums.StepGuideState
 import lucuma.core.math.Offset
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.TelescopeConfig
+import lucuma.core.syntax.string.*
 import lucuma.core.util.TimeSpan
 
 trait ExecutionTestSupportForIgrins2 extends ExecutionTestSupport:
+
+  def setOffsets(oid: Observation.Id, mode: Igrins2OffsetMode, offsets: String): IO[Unit] =
+    query(
+      pi,
+      s"""
+        mutation {
+          updateObservations(input: {
+            SET: {
+              observingMode: {
+                igrins2LongSlit: {
+                  explicitOffsetMode: ${mode.tag.toScreamingSnakeCase}
+                  explicitOffsets: $offsets
+                }
+              }
+            }
+            WHERE: { id: { EQ: "$oid" } }
+          }) {
+            observations { id }
+          }
+        }
+      """
+    ).void
 
   val Igrins2AtomQuery: String =
     s"""
