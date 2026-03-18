@@ -14,6 +14,7 @@ import cats.syntax.either.*
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import cats.syntax.option.*
+import cats.syntax.traverse.*
 import eu.timepit.refined.types.string.NonEmptyString
 import fs2.Pipe
 import fs2.Pure
@@ -23,6 +24,7 @@ import grackle.ResultT
 import lucuma.core.enums.ChargeClass
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObserveClass
+import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.SequenceType
 import lucuma.core.enums.StepType
 import lucuma.core.model.Observation
@@ -167,19 +169,22 @@ trait SequenceService[F[_]]:
   def selectFlamingos2Sequence(
     observationId: Observation.Id,
     sequenceType:  SequenceType,
-    staticConfig:  Flamingos2StaticConfig
+    staticConfig:  Flamingos2StaticConfig,
+    modeType:      ObservingModeType
   )(using Transaction[F]): F[Option[Stream[F, Atom[Flamingos2DynamicConfig]]]]
 
   def selectGmosNorthSequence(
     observationId: Observation.Id,
     sequenceType:  SequenceType,
-    staticConfig:  GmosNorthStatic
+    staticConfig:  GmosNorthStatic,
+    modeType:      ObservingModeType
   )(using Transaction[F]): F[Option[Stream[F, Atom[GmosNorth]]]]
 
   def selectGmosSouthSequence(
     observationId: Observation.Id,
     sequenceType:  SequenceType,
-    staticConfig:  GmosSouthStatic
+    staticConfig:  GmosSouthStatic,
+    modeType:      ObservingModeType
   )(using Transaction[F]): F[Option[Stream[F, Atom[GmosSouth]]]]
 
   // IGRINS-2 Spectrosocpy
@@ -455,6 +460,24 @@ object SequenceService:
                   .asProblem
               )
 
+      private def fromObservingModeTypeOrFail[A](
+        observationId: Observation.Id
+      )(
+        pf: PartialFunction[ObservingModeType, A]
+      )(using Transaction[F]): ResultT[F, A] =
+        ResultT:
+          observationService
+            .selectObservingModeType(observationId)
+            .map: oType =>
+              Result.fromOption(
+                oType,
+                OdbError.InvalidObservation(observationId, s"Observation '$observationId' has no observing mode.".some).asProblem
+              ).flatMap: t =>
+                Result.fromOption(
+                  pf.unapply(t),
+                  OdbError.InvalidObservation(observationId, s"Observation '$observationId' has an unexpected observing mode: $t".some).asProblem
+                )
+
       override def replaceFlamingos2Sequence(
         observationId: Observation.Id,
         sequenceType:  SequenceType,
@@ -463,8 +486,11 @@ object SequenceService:
       )(using Transaction[F]): F[Result[Stream[Pure, Atom[Flamingos2DynamicConfig]]]] =
 
         (for
+          e <- fromObservingModeTypeOrFail(observationId) {
+                 case ObservingModeType.Flamingos2LongSlit => estimator.flamingos2
+               }
           s <- selectStatic(observationId, "Flamingos 2", flamingos2SequenceService.selectStatic)
-          b <- ResultT.liftF(atomBuilder(sequenceType, s, namespace, estimator.flamingos2))
+          b <- ResultT.liftF(atomBuilder(sequenceType, s, namespace, e))
           r <- replaceSequence(
                  Instrument.Flamingos2,
                  observationId,
@@ -493,8 +519,12 @@ object SequenceService:
         namespace:     Option[UUID] = None
       )(using Transaction[F]): F[Result[Stream[Pure, Atom[GmosNorth]]]] =
         (for
+          e <- fromObservingModeTypeOrFail(observationId) {
+                 case ObservingModeType.GmosNorthImaging  => estimator.gmosNorthImaging
+                 case ObservingModeType.GmosNorthLongSlit => estimator.gmosNorthLongSlit
+               }
           s <- selectStatic(observationId, "GMOS North", gmosSequenceService.selectGmosNorthStatic)
-          b <- ResultT.liftF(atomBuilder(sequenceType, s, namespace, estimator.gmosNorth))
+          b <- ResultT.liftF(atomBuilder(sequenceType, s, namespace, e))
           r <- replaceSequence(
                  Instrument.GmosNorth,
                  observationId,
@@ -523,8 +553,12 @@ object SequenceService:
         namespace:     Option[UUID] = None
       )(using Transaction[F]): F[Result[Stream[Pure, Atom[GmosSouth]]]] =
         (for
+          e <- fromObservingModeTypeOrFail(observationId) {
+                 case ObservingModeType.GmosSouthImaging  => estimator.gmosSouthImaging
+                 case ObservingModeType.GmosSouthLongSlit => estimator.gmosSouthLongSlit
+               }
           s <- selectStatic(observationId, "GMOS South", gmosSequenceService.selectGmosSouthStatic)
-          b <- ResultT.liftF(atomBuilder(sequenceType, s, namespace, estimator.gmosSouth))
+          b <- ResultT.liftF(atomBuilder(sequenceType, s, namespace, e))
           r <- replaceSequence(
                  Instrument.GmosSouth,
                  observationId,
@@ -641,44 +675,64 @@ object SequenceService:
       override def selectFlamingos2Sequence(
         observationId: Observation.Id,
         sequenceType:  SequenceType,
-        staticConfig:  Flamingos2StaticConfig
+        staticConfig:  Flamingos2StaticConfig,
+        modeType:      ObservingModeType
       )(using Transaction[F]): F[Option[Stream[F, Atom[Flamingos2DynamicConfig]]]] =
-        selectSequence(
-          Instrument.Flamingos2,
-          observationId,
-          sequenceType,
-          Statements.SelectFlamingos2Sequence,
-          staticConfig,
-          estimator.flamingos2
-        )
+        val est = modeType match
+          case ObservingModeType.Flamingos2LongSlit => estimator.flamingos2.some
+          case _                                    => none
+
+        est.flatTraverse: e =>
+          selectSequence(
+            Instrument.Flamingos2,
+            observationId,
+            sequenceType,
+            Statements.SelectFlamingos2Sequence,
+            staticConfig,
+            e
+          )
 
       override def selectGmosNorthSequence(
         observationId: Observation.Id,
         sequenceType:  SequenceType,
-        staticConfig:  GmosNorthStatic
+        staticConfig:  GmosNorthStatic,
+        modeType:      ObservingModeType
       )(using Transaction[F]): F[Option[Stream[F, Atom[GmosNorth]]]] =
-        selectSequence(
-          Instrument.GmosNorth,
-          observationId,
-          sequenceType,
-          Statements.SelectGmosNorthSequence,
-          staticConfig,
-          estimator.gmosNorth
-        )
+        val est = modeType match
+          case ObservingModeType.GmosNorthImaging  => estimator.gmosNorthImaging.some
+          case ObservingModeType.GmosNorthLongSlit => estimator.gmosNorthLongSlit.some
+          case _                                   => none
+
+        est.flatTraverse: e =>
+          selectSequence(
+            Instrument.GmosNorth,
+            observationId,
+            sequenceType,
+            Statements.SelectGmosNorthSequence,
+            staticConfig,
+            e
+          )
 
       override def selectGmosSouthSequence(
         observationId: Observation.Id,
         sequenceType:  SequenceType,
-        staticConfig:  GmosSouthStatic
+        staticConfig:  GmosSouthStatic,
+        modeType:      ObservingModeType
       )(using Transaction[F]): F[Option[Stream[F, Atom[GmosSouth]]]] =
-        selectSequence(
-          Instrument.GmosSouth,
-          observationId,
-          sequenceType,
-          Statements.SelectGmosSouthSequence,
-          staticConfig,
-          estimator.gmosSouth
-        )
+        val est = modeType match
+          case ObservingModeType.GmosSouthImaging  => estimator.gmosSouthImaging.some
+          case ObservingModeType.GmosSouthLongSlit => estimator.gmosSouthLongSlit.some
+          case _                                   => none
+
+        est.flatTraverse: e =>
+          selectSequence(
+            Instrument.GmosSouth,
+            observationId,
+            sequenceType,
+            Statements.SelectGmosSouthSequence,
+            staticConfig,
+            e
+          )
 
       override def selectIgrins2Sequence(
         observationId: Observation.Id,

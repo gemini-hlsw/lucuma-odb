@@ -635,7 +635,7 @@ trait Codecs {
     }
 
   lazy val execution_digest: Codec[ExecutionDigest] =
-    (setup_time *: sequence_digest *: sequence_digest).to[ExecutionDigest]
+    (setup_time *: int4_nonneg *: sequence_digest *: sequence_digest).to[ExecutionDigest]
 
   val step_type: Codec[StepType] =
     enumerated(Type("e_step_type"))

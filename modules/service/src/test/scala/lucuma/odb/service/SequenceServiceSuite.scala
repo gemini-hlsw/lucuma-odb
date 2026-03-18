@@ -7,6 +7,7 @@ import cats.effect.IO
 import cats.syntax.traverse.*
 import eu.timepit.refined.types.numeric.PosInt
 import lucuma.core.enums.Instrument
+import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.SequenceType
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.Atom
@@ -45,7 +46,7 @@ class SequenceServiceSuite extends ExecutionTestSupportForGmos:
       services
         .transactionally:
           sequenceService
-            .selectGmosNorthSequence(o, SequenceType.Science, GmosNorthStatic)
+            .selectGmosNorthSequence(o, SequenceType.Science, GmosNorthStatic, ObservingModeType.GmosNorthLongSlit)
             .flatMap(_.toList.flatTraverse(_.compile.toList))
 
   test("exercise serialization"):

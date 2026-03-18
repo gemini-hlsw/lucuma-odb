@@ -190,6 +190,7 @@ class ObscalcServiceSuite extends ObscalcServiceSuiteSupport:
             TimeSpan.unsafeFromMicroseconds(960000000),
             TimeSpan.unsafeFromMicroseconds(300000000)
           ),
+          NonNegInt.unsafeFrom(2),
           SequenceDigest(
             ObserveClass.Acquisition,
             CategorizedTime(ChargeClass.Program -> TimeSpan.unsafeFromMicroseconds(617162500L)),

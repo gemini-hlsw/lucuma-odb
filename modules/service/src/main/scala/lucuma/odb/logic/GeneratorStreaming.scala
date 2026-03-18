@@ -11,6 +11,7 @@ import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import cats.syntax.option.*
 import fs2.Stream
+import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.SequenceType
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.Atom
@@ -171,7 +172,7 @@ object GeneratorStreaming:
       )(using Transaction[F]): F[Either[OdbError, StreamingExecutionConfig[F, Flamingos2Static, Flamingos2Dynamic]]] =
         selectOrGenerate(
           lucuma.odb.sequence.flamingos2.longslit.LongSlit.Static,
-          sequenceService.selectFlamingos2Sequence(context.oid, _, _),
+          sequenceService.selectFlamingos2Sequence(context.oid, _, _, ObservingModeType.Flamingos2LongSlit),
           generateFlamingos2LongSlit(context)
         )
 
@@ -215,7 +216,7 @@ object GeneratorStreaming:
           cfg <- extractMode(ObservingMode.GmosNorthImagingName, context)(_.asGmosNorthImaging)
           res <- EitherT(selectOrGenerate(
             cfg.staticConfig,
-            sequenceService.selectGmosNorthSequence(context.oid, _, _),
+            sequenceService.selectGmosNorthSequence(context.oid, _, _, ObservingModeType.GmosNorthImaging),
             generateGmosNorthImaging(context)
           ))
         yield res).value
@@ -227,7 +228,7 @@ object GeneratorStreaming:
         (for
           cfg <- extractMode(ObservingMode.GmosNorthImagingName, context)(_.asGmosNorthImaging)
           itc  = requireImagingItc(ObservingMode.GmosNorthImagingName, context.oid, context.itcRes, Itc.gmosNorthImaging.getOption)
-          gen <- EitherT(Imaging.gmosNorth(calculator.gmosNorth, context.namespace, cfg, itc))
+          gen <- EitherT(Imaging.gmosNorth(calculator.gmosNorthImaging, context.namespace, cfg, itc))
         yield gen.covary[F]).value
 
 
@@ -236,7 +237,7 @@ object GeneratorStreaming:
       )(using Transaction[F]): F[Either[OdbError, StreamingExecutionConfig[F, GmosNorthStatic, GmosNorthDynamic]]] =
         selectOrGenerate(
           lucuma.odb.sequence.gmos.InitialConfigs.GmosNorthStatic,
-          sequenceService.selectGmosNorthSequence(context.oid, _, _),
+          sequenceService.selectGmosNorthSequence(context.oid, _, _, ObservingModeType.GmosNorthLongSlit),
           generateGmosNorthLongSlit(context)
         )
 
@@ -248,7 +249,7 @@ object GeneratorStreaming:
           cfg <- extractMode(ObservingMode.GmosNorthLongSlitName, context)(_.asGmosNorthLongSlit)
           itc  = requireSpectroscopyItc(context.oid, context.itcRes)
           rol  = context.params.calibrationRole
-          gen <- EitherT(LongSlit.gmosNorth(context.oid, calculator.gmosNorth, context.namespace, exp.gmosNorth, cfg, itc, rol))
+          gen <- EitherT(LongSlit.gmosNorth(context.oid, calculator.gmosNorthLongSlit, context.namespace, exp.gmosNorth, cfg, itc, rol))
         yield gen.covary[F]).value
 
 
@@ -259,7 +260,7 @@ object GeneratorStreaming:
           cfg <- extractMode(ObservingMode.GmosSouthImagingName, context)(_.asGmosSouthImaging)
           res <- EitherT(selectOrGenerate(
             cfg.staticConfig,
-            sequenceService.selectGmosSouthSequence(context.oid, _, _),
+            sequenceService.selectGmosSouthSequence(context.oid, _, _, ObservingModeType.GmosSouthImaging),
             generateGmosSouthImaging(context)
           ))
         yield res).value
@@ -271,7 +272,7 @@ object GeneratorStreaming:
         (for
           cfg <- extractMode(ObservingMode.GmosSouthImagingName, context)(_.asGmosSouthImaging)
           itc  = requireImagingItc(ObservingMode.GmosSouthImagingName, context.oid, context.itcRes, Itc.gmosSouthImaging.getOption)
-          gen <- EitherT(Imaging.gmosSouth(calculator.gmosSouth, context.namespace, cfg, itc))
+          gen <- EitherT(Imaging.gmosSouth(calculator.gmosSouthImaging, context.namespace, cfg, itc))
         yield gen.covary[F]).value
 
 
@@ -280,7 +281,7 @@ object GeneratorStreaming:
       )(using Transaction[F]): F[Either[OdbError, StreamingExecutionConfig[F, GmosSouthStatic, GmosSouthDynamic]]] =
         selectOrGenerate(
           lucuma.odb.sequence.gmos.InitialConfigs.GmosSouthStatic,
-          sequenceService.selectGmosSouthSequence(context.oid, _, _),
+          sequenceService.selectGmosSouthSequence(context.oid, _, _, ObservingModeType.GmosSouthLongSlit),
           generateGmosSouthLongSlit(context)
         )
 
@@ -292,5 +293,5 @@ object GeneratorStreaming:
           cfg <- extractMode(ObservingMode.GmosSouthLongSlitName, context)(_.asGmosSouthLongSlit)
           itc  = requireSpectroscopyItc(context.oid, context.itcRes)
           rol  = context.params.calibrationRole
-          gen <- EitherT(LongSlit.gmosSouth(context.oid, calculator.gmosSouth, context.namespace, exp.gmosSouth, cfg, itc, rol))
+          gen <- EitherT(LongSlit.gmosSouth(context.oid, calculator.gmosSouthLongSlit, context.namespace, exp.gmosSouth, cfg, itc, rol))
         yield gen.covary[F]).value

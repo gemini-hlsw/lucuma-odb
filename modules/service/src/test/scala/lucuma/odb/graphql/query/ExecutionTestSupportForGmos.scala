@@ -221,10 +221,10 @@ trait ExecutionTestSupportForGmos extends ExecutionTestSupport:
   }
 
   def gmosNorthTimeEstimateCalculator: IO[TimeEstimateCalculator[StaticConfig.GmosNorth, GmosNorth]] =
-    timeEstimateCalculator.map(_.gmosNorth)
+    timeEstimateCalculator.map(_.gmosNorthLongSlit)
 
   def gmosSouthTimeEstimateCalculator: IO[TimeEstimateCalculator[StaticConfig.GmosSouth, GmosSouth]] =
-    timeEstimateCalculator.map(_.gmosSouth)
+    timeEstimateCalculator.map(_.gmosSouthLongSlit)
 
   val GmosAtomQuery: String =
     s"""

@@ -8,6 +8,7 @@ import cats.data.State
 import cats.syntax.foldable.*
 import cats.syntax.option.*
 import cats.syntax.traverse.*
+import eu.timepit.refined.types.numeric.NonNegInt
 import lucuma.core.math.Offset
 import lucuma.core.model.sequence.SetupTime
 import lucuma.core.model.sequence.StepConfig
@@ -27,6 +28,12 @@ trait TimeEstimateCalculator[S, D]:
    * Provides a rough estimate of the setup time, which includes acquisition.
    */
   def estimateSetup: SetupTime
+
+  /**
+   * Estimates the number of setups that will be required to execute an
+   * observation of the given `scienceTime` duration.
+   */
+  def estimateSetupCount(scienceTime: TimeSpan): NonNegInt
 
   /**
    * Provides an estimate of the cost for executing the 'next' step, given the
