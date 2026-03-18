@@ -41,6 +41,7 @@ import lucuma.itc.client.ClientCalculationResult
 import lucuma.itc.client.ImagingInput
 import lucuma.itc.client.InstrumentMode
 import lucuma.itc.client.ItcClient
+import lucuma.itc.client.SpectroscopyInput
 import lucuma.odb.data.Itc
 import lucuma.odb.data.Md5Hash
 import lucuma.odb.data.OdbError
@@ -376,6 +377,14 @@ object ItcService {
         input: ItcInput
       )(using NoTransaction[F]): F[Either[OdbError, Itc]] =
 
+        def callSpectroscopy(si: SpectroscopyInput): EitherT[F, OdbError, ClientCalculationResult] =
+          EitherT:
+            client
+              .spectroscopy(si, useCache = false)
+              .map(_.asRight)
+              .handleError: t =>
+                OdbError.RemoteServiceCallError(s"Error calling ITC service: ${t.getMessage}".some).asLeft
+
         def imaging(im: ItcInput.Imaging): EitherT[F, OdbError, Itc] =
           im.science.head.mode match
             case InstrumentMode.GmosNorthImaging(_, _) =>
@@ -389,31 +398,15 @@ object ItcService {
                 OdbError.InvalidObservation(oid, s"Imaging ITC lookup is not supported for ${m.displayName}.".some)
 
         def spectroscopy(sp: ItcInput.Spectroscopy): EitherT[F, OdbError, Itc] =
-          val callSpectroscopy: EitherT[F, OdbError, ClientCalculationResult] =
-            EitherT:
-              client
-                .spectroscopy(sp.scienceInput, useCache = false)
-                .map(_.asRight)
-                .handleError: t =>
-                  OdbError.RemoteServiceCallError(s"Error calling ITC service: ${t.getMessage}".some).asLeft
-
           for
-            cr  <- callSpectroscopy
+            cr  <- callSpectroscopy(sp.scienceInput)
             sci <- EitherT.fromEither(toTargetResults(sp.targets, NonEmptyList.one(cr)).map(_.head))
             acq <- safeAcquisitionCall(oid, sp.acquisitionInput, sp.acquisitionTargets)
           yield Itc.Spectroscopy(acq, sci)
 
         def igrins2Spectroscopy(sp: ItcInput.Igrins2Spectroscopy): EitherT[F, OdbError, Itc] =
-          val callSpectroscopy: EitherT[F, OdbError, ClientCalculationResult] =
-            EitherT:
-              client
-                .spectroscopy(sp.scienceInput, useCache = false)
-                .map(_.asRight)
-                .handleError: t =>
-                  OdbError.RemoteServiceCallError(s"Error calling ITC service: ${t.getMessage}".some).asLeft
-
           for
-            cr  <- callSpectroscopy
+            cr  <- callSpectroscopy(sp.scienceInput)
             sci <- EitherT.fromEither(toTargetResults(sp.targets, NonEmptyList.one(cr)).map(_.head))
           yield Itc.Igrins2Spectroscopy(sci)
 

@@ -22,6 +22,7 @@ class executionSciIgrins2 extends ExecutionTestSupportForIgrins2:
   override def fakeItcSpectroscopyResult: IntegrationTime =
     IntegrationTime(ExposureTime, 4.refined)
 
+  // q components of the ABBA pattern
   val qA = -1.25
   val qB =  1.25
 

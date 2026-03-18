@@ -116,23 +116,6 @@ trait SequenceService[F[_]]:
     checked: CheckedWithId[(SequenceType, List[ProtoAtom[ProtoStep[GmosSouth]]]), Observation.Id]
   )(using Transaction[F]): F[Result[Stream[Pure, Atom[GmosSouth]]]]
 
-  def insertIgrins2Sequence(
-    observationId: Observation.Id,
-    sequenceType:  SequenceType,
-    sequence:      Stream[F, Atom[Igrins2DynamicConfig]]
-  )(using Transaction[F], Services.ServiceAccess): F[Unit]
-
-  def materializeIgrins2ExecutionConfig(
-    observationId: Observation.Id,
-    stream:        StreamingExecutionConfig[F, Igrins2StaticConfig, Igrins2DynamicConfig]
-  )(using Transaction[F], Services.ServiceAccess): F[Unit]
-
-  def selectIgrins2Sequence(
-    observationId: Observation.Id,
-    sequenceType:  SequenceType,
-    staticConfig:  Igrins2StaticConfig
-  )(using Transaction[F]): F[Option[Stream[F, Atom[Igrins2DynamicConfig]]]]
-
   def resetFlamingos2Acquisition(
     observationId: Observation.Id,
     sequence:      Stream[F, Atom[Flamingos2DynamicConfig]]
@@ -198,6 +181,24 @@ trait SequenceService[F[_]]:
     sequenceType:  SequenceType,
     staticConfig:  GmosSouthStatic
   )(using Transaction[F]): F[Option[Stream[F, Atom[GmosSouth]]]]
+
+  // IGRINS-2 Spectrosocpy
+  def insertIgrins2Sequence(
+    observationId: Observation.Id,
+    sequenceType:  SequenceType,
+    sequence:      Stream[F, Atom[Igrins2DynamicConfig]]
+  )(using Transaction[F], Services.ServiceAccess): F[Unit]
+
+  def materializeIgrins2ExecutionConfig(
+    observationId: Observation.Id,
+    stream:        StreamingExecutionConfig[F, Igrins2StaticConfig, Igrins2DynamicConfig]
+  )(using Transaction[F], Services.ServiceAccess): F[Unit]
+
+  def selectIgrins2Sequence(
+    observationId: Observation.Id,
+    sequenceType:  SequenceType,
+    staticConfig:  Igrins2StaticConfig
+  )(using Transaction[F]): F[Option[Stream[F, Atom[Igrins2DynamicConfig]]]]
 
 object SequenceService:
 
