@@ -89,7 +89,7 @@ object OdbMapping {
   private implicit def monoidPartialFunction[A, B]: Monoid[PartialFunction[A, B]] =
     Monoid.instance(PartialFunction.empty, _ orElse _)
 
-  def apply[F[_]: {Async, Parallel, Trace, Logger as L, LoggerFactory as LF, SecureRandom}](
+  def apply[F[_]: {Async, Parallel, Trace as T, Logger as L, LoggerFactory as LF, SecureRandom}](
     database:      Resource[F, Session[F]],
     monitor0:      SkunkMonitor[F],
     user0:         User,
@@ -644,12 +644,30 @@ object OdbMapping {
               val colored   = cleanedUp.linesIterator.map(s => s"${AnsiColor.GREEN}$s${AnsiColor.RESET}").mkString("\n")
               s"\n\n$colored\n\n"
             } *>
-              // log to warn very slow querios
-              Temporal[F].timed(super.fetch(fragment, codecs)).flatMap: (elapsed, result) =>
-                SlowQueryLogger.warn {
-                  // Don't format, some of the queries are so huge that formatting them takes a long time.
-                  s"Slow query (${elapsed.toMillis}ms):\n${fragment.fragment.sql}"
-                }.whenA(elapsed > SlowQueryThreshold).as(result)
+              Trace[F].span("grackle.fetch"):
+                Temporal[F].timed(super.fetch(fragment, codecs)).flatMap: (elapsed, result) =>
+                  val slowQuery = elapsed > SlowQueryThreshold
+
+                  // Add some attributes to every query and a few specific ones for slow queries
+                  val baseAttrs =
+                    T.put(
+                      "db.duration_ms" -> elapsed.toMillis,
+                      "db.row_count"   -> result.size.toLong
+                    )
+                  val slowAttrs =
+                    T.put(
+                      "db.statement"  -> fragment.fragment.sql,
+                      "db.slow_query" -> true
+                    )
+                  // We are explicitly not formatting sql because it is very expensive for large queries
+                  val logWarn =
+                    SlowQueryLogger.warn(s"Slow query (${elapsed.toMillis}ms):\n${fragment.fragment.sql}")
+
+                  for {
+                    _ <- baseAttrs
+                    _ <- slowAttrs.whenA(slowQuery)
+                    _ <- logWarn.whenA(slowQuery)
+                  } yield result
           }
 
           // HACK: If the codec is a DomainCodec then use the domain name when generating `null::<type>` in Grackle queries
