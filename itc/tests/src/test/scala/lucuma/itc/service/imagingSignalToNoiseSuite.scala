@@ -12,12 +12,6 @@ class imagingSignalToNoiseSuite extends GraphImagingQLSuite:
       """
         query {
           imaging(input: {
-            exposureTimeMode: {
-              signalToNoise: {
-                value: 600,
-                at: { picometers: 530000 }
-              }
-            },
             asterism: [
               {
                 sourceProfile: {
@@ -89,29 +83,11 @@ class imagingSignalToNoiseSuite extends GraphImagingQLSuite:
             },
             mode: {
               gmosNImaging: {
+                exposureTimeMode: { signalToNoise: { value: 600, at: { picometers: 530000 } } },
                 filter: G_PRIME
               }
             }
           }) {
-            mode {
-              __typename
-              ... on ImagingMode {
-                instrument
-                params {
-                  ... on GmosNImagingParams {
-                    filter
-                  }
-                }
-              }
-            }
-            exposureTimeMode {
-              signalToNoise {
-                value
-                at {
-                  picometers
-                }
-              }
-            }
             brightest {
               all {
                 exposureCount
@@ -133,19 +109,6 @@ class imagingSignalToNoiseSuite extends GraphImagingQLSuite:
         {
           "data": {
             "imaging" : {
-              "mode" : {
-                "__typename" : "ImagingMode",
-                "instrument" : "GMOS_NORTH",
-                "params": {
-                  "filter": "G_PRIME"
-                }
-              },
-              "exposureTimeMode": {
-                "signalToNoise": {
-                  "value": 600,
-                  "at": { "picometers": 530000 }
-                }
-              },
               "brightest" : {
                 "all" : [{
                   "exposureCount" : 10,
@@ -176,13 +139,6 @@ class imagingSignalToNoiseSuite extends GraphImagingQLSuite:
       """
         query {
           imaging(input: {
-            exposureTimeMode: {
-              timeAndCount: {
-                time: { seconds: 1.5 },
-                count: 5,
-                at: { picometers: 530000 }
-              }
-            },
             asterism: [
               {
                 sourceProfile: {
@@ -254,32 +210,11 @@ class imagingSignalToNoiseSuite extends GraphImagingQLSuite:
             },
             mode: {
               gmosNImaging: {
+                exposureTimeMode: { timeAndCount: { time: { seconds: 1.5 }, count: 5, at: { picometers: 530000 } } },
                 filter: G_PRIME
               }
             }
           }) {
-            mode {
-              __typename
-              ... on ImagingMode {
-                instrument
-                params {
-                  ... on GmosNImagingParams {
-                    filter
-                  }
-                }
-              }
-            }
-            exposureTimeMode {
-              timeAndCount {
-                time {
-                  seconds
-                }
-                count
-                at {
-                  picometers
-                }
-              }
-            }
             brightest {
               all {
                 exposureCount
@@ -301,20 +236,6 @@ class imagingSignalToNoiseSuite extends GraphImagingQLSuite:
         {
           "data": {
             "imaging" : {
-              "mode" : {
-                "__typename" : "ImagingMode",
-                "instrument" : "GMOS_NORTH",
-                "params": {
-                  "filter": "G_PRIME"
-                }
-              },
-              "exposureTimeMode": {
-                "timeAndCount": {
-                  "time": { "seconds": 1.5 },
-                  "count": 5,
-                  "at": { "picometers": 530000 }
-                }
-              },
               "brightest" : {
                 "all" : [{
                   "exposureCount" : 10,
@@ -340,12 +261,6 @@ class imagingSignalToNoiseSuite extends GraphImagingQLSuite:
       """
         query {
           imaging(input: {
-            exposureTimeMode: {
-              signalToNoise: {
-                value: 600,
-                at: { picometers: 1650000 }
-              }
-            },
             asterism: [
               {
                 sourceProfile: {
@@ -417,29 +332,11 @@ class imagingSignalToNoiseSuite extends GraphImagingQLSuite:
             },
             mode: {
               flamingos2Imaging: {
+                exposureTimeMode: { signalToNoise: { value: 600, at: { picometers: 1650000 } } },
                 filter: H
               }
             }
           }) {
-            mode {
-              __typename
-              ... on ImagingMode {
-                instrument
-                params {
-                  ... on Flamingos2ImagingParams {
-                    filter
-                  }
-                }
-              }
-            }
-            exposureTimeMode {
-              signalToNoise {
-                value
-                at {
-                  picometers
-                }
-              }
-            }
             brightest {
               signalToNoiseAt {
                 wavelength {
@@ -468,19 +365,6 @@ class imagingSignalToNoiseSuite extends GraphImagingQLSuite:
         {
           "data": {
             "imaging" : {
-              "mode" : {
-                "__typename" : "ImagingMode",
-                "instrument" : "FLAMINGOS2",
-                "params": {
-                  "filter": "H"
-                }
-              },
-              "exposureTimeMode": {
-                "signalToNoise": {
-                  "value": 600.000,
-                  "at": { "picometers": 1650000 }
-                }
-              },
               "brightest" : {
                 "signalToNoiseAt" : {
                   "wavelength" : {

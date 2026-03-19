@@ -11,6 +11,8 @@ import lucuma.core.enums.GmosSouthFilter
 import lucuma.core.enums.GmosSouthGrating
 import lucuma.core.math.Wavelength
 import lucuma.core.math.arb.ArbWavelength
+import lucuma.core.model.ExposureTimeMode
+import lucuma.core.model.arb.ArbExposureTimeMode
 import lucuma.core.model.sequence.gmos.GmosCcdMode
 import lucuma.core.model.sequence.gmos.arb.ArbGmosCcdMode
 import lucuma.core.util.arb.ArbEnumerated
@@ -19,6 +21,7 @@ import org.scalacheck.Arbitrary.arbitrary
 
 trait ArbInstrumentMode {
   import ArbEnumerated.given
+  import ArbExposureTimeMode.given
   import ArbGmosFpu.given
   import ArbGmosCcdMode.given
   import ArbWavelength.given
@@ -32,18 +35,20 @@ trait ArbInstrumentMode {
   given Arbitrary[GmosNorthSpectroscopy] =
     Arbitrary {
       for {
+        et <- arbitrary[ExposureTimeMode]
         cw <- arbitrary[Wavelength]
         g  <- arbitrary[GmosNorthGrating]
         f  <- arbitrary[Option[GmosNorthFilter]]
         u  <- arbitrary[GmosFpu.North]
         c  <- arbitrary[Option[GmosCcdMode]]
         r  <- arbitrary[Option[GmosRoi]]
-      } yield GmosNorthSpectroscopy(cw, g, f, u, c, r)
+      } yield GmosNorthSpectroscopy(et, cw, g, f, u, c, r)
     }
 
   given Cogen[GmosNorthSpectroscopy] =
     Cogen[
       (
+        ExposureTimeMode,
         Wavelength,
         GmosNorthGrating,
         Option[GmosNorthFilter],
@@ -51,6 +56,7 @@ trait ArbInstrumentMode {
       )
     ].contramap { a =>
       (
+        a.exposureTimeMode,
         a.centralWavelength,
         a.grating,
         a.filter,
@@ -61,18 +67,20 @@ trait ArbInstrumentMode {
   given Arbitrary[GmosSouthSpectroscopy] =
     Arbitrary {
       for {
+        et <- arbitrary[ExposureTimeMode]
         cw <- arbitrary[Wavelength]
         g  <- arbitrary[GmosSouthGrating]
         f  <- arbitrary[Option[GmosSouthFilter]]
         u  <- arbitrary[GmosFpu.South]
         c  <- arbitrary[Option[GmosCcdMode]]
         r  <- arbitrary[Option[GmosRoi]]
-      } yield GmosSouthSpectroscopy(cw, g, f, u, c, r)
+      } yield GmosSouthSpectroscopy(et, cw, g, f, u, c, r)
     }
 
   given Cogen[GmosSouthSpectroscopy] =
     Cogen[
       (
+        ExposureTimeMode,
         Wavelength,
         GmosSouthGrating,
         Option[GmosSouthFilter],
@@ -80,6 +88,7 @@ trait ArbInstrumentMode {
       )
     ].contramap { a =>
       (
+        a.exposureTimeMode,
         a.centralWavelength,
         a.grating,
         a.filter,
@@ -90,30 +99,40 @@ trait ArbInstrumentMode {
   given Arbitrary[GmosNorthImaging] =
     Arbitrary {
       for {
-        f <- arbitrary[GmosNorthFilter]
-        c <- arbitrary[Option[GmosCcdMode]]
-      } yield GmosNorthImaging(f, c)
+        et <- arbitrary[ExposureTimeMode]
+        f  <- arbitrary[GmosNorthFilter]
+        c  <- arbitrary[Option[GmosCcdMode]]
+      } yield GmosNorthImaging(et, f, c)
     }
 
   given Cogen[GmosNorthImaging] =
-    Cogen[(GmosNorthFilter, Option[GmosCcdMode])].contramap(a => (a.filter, a.ccdMode))
+    Cogen[(ExposureTimeMode, GmosNorthFilter, Option[GmosCcdMode])].contramap(a =>
+      (a.exposureTimeMode, a.filter, a.ccdMode)
+    )
 
   given Arbitrary[GmosSouthImaging] =
     Arbitrary {
       for {
-        f <- arbitrary[GmosSouthFilter]
-        c <- arbitrary[Option[GmosCcdMode]]
-      } yield GmosSouthImaging(f, c)
+        et <- arbitrary[ExposureTimeMode]
+        f  <- arbitrary[GmosSouthFilter]
+        c  <- arbitrary[Option[GmosCcdMode]]
+      } yield GmosSouthImaging(et, f, c)
     }
 
   given Cogen[GmosSouthImaging] =
-    Cogen[(GmosSouthFilter, Option[GmosCcdMode])].contramap(a => (a.filter, a.ccdMode))
+    Cogen[(ExposureTimeMode, GmosSouthFilter, Option[GmosCcdMode])].contramap(a =>
+      (a.exposureTimeMode, a.filter, a.ccdMode)
+    )
 
   given Arbitrary[Igrins2Spectroscopy] =
-    Arbitrary(Gen.const(Igrins2Spectroscopy()))
+    Arbitrary {
+      for {
+        et <- arbitrary[ExposureTimeMode]
+      } yield Igrins2Spectroscopy(et)
+    }
 
   given Cogen[Igrins2Spectroscopy] =
-    Cogen[Unit].contramap(_ => ())
+    Cogen[ExposureTimeMode].contramap(_.exposureTimeMode)
 
   given Arbitrary[InstrumentMode] =
     Arbitrary {

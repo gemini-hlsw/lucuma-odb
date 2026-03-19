@@ -12,12 +12,6 @@ class spectroscopyTimeAndGraphSuite extends GraphQLSuite {
       """
         query {
           spectroscopyIntegrationTimeAndGraphs(input: {
-            exposureTimeMode: {
-              signalToNoise: {
-                value: 2,
-                at: { nanometers: 60 }
-              }
-            },
             asterism: [
               {
                 sourceProfile: {
@@ -61,6 +55,7 @@ class spectroscopyTimeAndGraphSuite extends GraphQLSuite {
             },
             mode: {
               gmosNSpectroscopy: {
+                exposureTimeMode: { signalToNoise: { value: 2, at: { nanometers: 60 } } },
                 centralWavelength: {
                   nanometers: 60
                 },
@@ -181,12 +176,6 @@ class spectroscopyTimeAndGraphSuite extends GraphQLSuite {
       """
         query {
           spectroscopyIntegrationTimeAndGraphs(input: {
-            exposureTimeMode: {
-              signalToNoise: {
-                value: 2,
-                at: { nanometers: 1600 }
-              }
-            },
             asterism: [
               {
                 sourceProfile: {
@@ -229,7 +218,9 @@ class spectroscopyTimeAndGraphSuite extends GraphQLSuite {
               }
             },
             mode: {
-              igrins2Spectroscopy: {}
+              igrins2Spectroscopy: {
+                exposureTimeMode: { signalToNoise: { value: 2, at: { nanometers: 1600 } } }
+              }
             },
             significantFigures: {
               xAxis: 4

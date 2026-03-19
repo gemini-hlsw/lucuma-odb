@@ -144,7 +144,7 @@ class perScienceObservationCalibrations
 
   // Override fake ITC to vary duration based on exposure time mode
   override def fakeItcSpectroscopyResultFor(input: SpectroscopyInput): Option[IntegrationTime] =
-    input.exposureTimeMode match
+    input.parameters.mode.exposureTimeMode match
       case ExposureTimeMode.TimeAndCountMode(time, count, _) =>
         Some(IntegrationTime(time, count))
       case ExposureTimeMode.SignalToNoiseMode(sn, _) =>

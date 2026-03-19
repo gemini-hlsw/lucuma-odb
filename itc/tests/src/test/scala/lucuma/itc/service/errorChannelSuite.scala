@@ -12,12 +12,6 @@ class errorChannelSuite extends FailingCalculationSuite:
       """
         query {
           spectroscopy(input: {
-            exposureTimeMode: {
-              signalToNoise: {
-                value: 2,
-                at: { nanometers: 60 }
-              }
-            },
             asterism: [
               {
                 sourceProfile: {
@@ -61,6 +55,7 @@ class errorChannelSuite extends FailingCalculationSuite:
             },
             mode: {
               gmosNSpectroscopy: {
+                exposureTimeMode: { signalToNoise: { value: 2, at: { nanometers: 60 } } },
                 centralWavelength: {
                   nanometers: 60
                 },
@@ -72,19 +67,6 @@ class errorChannelSuite extends FailingCalculationSuite:
               }
             }
           }) {
-            mode {
-              ... on SpectroscopyMode {
-                instrument
-                params {
-                  ... on GmosNSpectroscopyParams {
-                    grating
-                    centralWavelength {
-                      nanometers
-                    }
-                  }
-                }
-              }
-            }
             brightest {
               selected {
                 exposureCount
@@ -112,15 +94,6 @@ class errorChannelSuite extends FailingCalculationSuite:
           }],
           "data": {
             "spectroscopy" : {
-              "mode" : {
-                "instrument" : "GMOS_NORTH",
-                "params" : {
-                  "grating" : "B1200_G5301",
-                  "centralWavelength" : {
-                    "nanometers" : 60.000
-                  }
-                }
-              },
               "brightest" : null
             }
           }

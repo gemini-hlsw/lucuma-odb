@@ -9,21 +9,15 @@ import cats.derived.*
 import io.circe.Encoder
 import io.circe.Json
 import io.circe.syntax.*
-import lucuma.core.model.ExposureTimeMode
-import lucuma.itc.client.json.encoders.given
 import monocle.Focus
 import monocle.Lens
 
 case class SpectroscopyParameters(
-  exposureTimeMode: ExposureTimeMode,
-  constraints:      ItcConstraintsInput,
-  mode:             InstrumentMode
+  constraints: ItcConstraintsInput,
+  mode:        InstrumentMode
 ) derives Eq
 
 object SpectroscopyParameters:
-  val exposureTimeMode: Lens[SpectroscopyParameters, ExposureTimeMode] =
-    Focus[SpectroscopyParameters](_.exposureTimeMode)
-
   val constraints: Lens[SpectroscopyParameters, ItcConstraintsInput] =
     Focus[SpectroscopyParameters](_.constraints)
 
@@ -34,9 +28,8 @@ object SpectroscopyParameters:
     def apply(a: SpectroscopyParameters): Json =
       Json
         .obj(
-          "exposureTimeMode" -> a.exposureTimeMode.asJson,
-          "constraints"      -> a.constraints.asJson,
-          "mode"             -> a.mode.asJson
+          "constraints" -> a.constraints.asJson,
+          "mode"        -> a.mode.asJson
         )
         .dropNullValues
 

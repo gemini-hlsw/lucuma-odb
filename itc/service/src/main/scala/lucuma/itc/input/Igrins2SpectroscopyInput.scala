@@ -3,15 +3,18 @@
 
 package lucuma.itc.input
 
-import cats.syntax.functor.*
+import lucuma.core.model.ExposureTimeMode
 import lucuma.odb.graphql.binding.*
+import lucuma.odb.graphql.input.ExposureTimeModeInput
 
-case class Igrins2SpectroscopyInput() extends InstrumentModesInput
+case class Igrins2SpectroscopyInput(
+  exposureTimeMode: ExposureTimeMode
+) extends InstrumentModesInput
 
 object Igrins2SpectroscopyInput:
   val binding: Matcher[Igrins2SpectroscopyInput] =
     ObjectFieldsBinding.rmap:
       case List(
-            EnumBinding.Option("ignore", rIgnore)
+            ExposureTimeModeInput.Binding("exposureTimeMode", exposureTimeMode)
           ) =>
-        rIgnore.as(Igrins2SpectroscopyInput())
+        exposureTimeMode.map(Igrins2SpectroscopyInput.apply)

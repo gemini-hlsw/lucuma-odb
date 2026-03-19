@@ -44,12 +44,15 @@ case class AsterismSpectroscopyTimeRequest(
 
 object AsterismSpectroscopyTimeRequest:
   def fromInput(input: SpectroscopyTimeInput): Result[AsterismSpectroscopyTimeRequest] = {
-    val SpectroscopyTimeInput(exposureTimeMode, asterism, constraints, mode) =
+    val SpectroscopyTimeInput(asterism, constraints, mode) =
       input
+
+    val exposureTimeMode = mode.exposureTimeMode
 
     val modeResult: Result[ObservingMode.SpectroscopyMode] =
       mode match
         case GmosNSpectroscopyInput(
+              _,
               centralWavelength,
               grating,
               GmosFpuMask.Builtin(fpu),
@@ -61,6 +64,7 @@ object AsterismSpectroscopyTimeRequest:
             ObservingMode.SpectroscopyMode
               .GmosNorth(centralWavelength, grating, GmosNorthFpuParam(fpu), filter, ccdMode, roi)
         case GmosSSpectroscopyInput(
+              _,
               centralWavelength,
               grating,
               GmosFpuMask.Builtin(fpu),
@@ -72,16 +76,17 @@ object AsterismSpectroscopyTimeRequest:
             ObservingMode.SpectroscopyMode
               .GmosSouth(centralWavelength, grating, GmosSouthFpuParam(fpu), filter, ccdMode, roi)
         case Flamingos2SpectroscopyInput(
+              _,
               disperser,
               filter,
               fpu
             ) =>
           Result.success:
             ObservingMode.SpectroscopyMode.Flamingos2(disperser, filter, fpu)
-        case Igrins2SpectroscopyInput() =>
+        case Igrins2SpectroscopyInput(_) =>
           Result.success:
             ObservingMode.SpectroscopyMode.Igrins2()
-        case _                          =>
+        case _                           =>
           Result.failure("Invalid spectroscopy mode")
 
     (asterism.targetInputsToData, modeResult, constraints.create).parMapN:

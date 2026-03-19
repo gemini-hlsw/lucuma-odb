@@ -42,24 +42,25 @@ case class AsterismImagingTimeRequest(
 object AsterismImagingTimeRequest:
   def fromInput(input: ImagingInput): Result[AsterismImagingTimeRequest] = {
     val ImagingInput(
-      exposureTimeMode,
       asterism,
       constraints,
       mode
     ) = input
 
+    val exposureTimeMode = mode.exposureTimeMode
+
     val modeResult: Result[ObservingMode.ImagingMode] =
       mode match
-        case GmosNImagingInput(filter, ccdMode) =>
+        case GmosNImagingInput(_, filter, ccdMode) =>
           Result.success:
             ObservingMode.ImagingMode.GmosNorth(filter, ccdMode)
-        case GmosSImagingInput(filter, ccdMode) =>
+        case GmosSImagingInput(_, filter, ccdMode) =>
           Result.success:
             ObservingMode.ImagingMode.GmosSouth(filter, ccdMode)
-        case Flamingos2ImagingInput(filter)     =>
+        case Flamingos2ImagingInput(_, filter)     =>
           Result.success:
             ObservingMode.ImagingMode.Flamingos2(filter)
-        case _                                  =>
+        case _                                     =>
           Result.failure("Invalid imaging mode")
 
     (asterism.targetInputsToData, modeResult, constraints.create).parMapN:

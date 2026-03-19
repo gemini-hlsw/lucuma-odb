@@ -12,12 +12,6 @@ class customSedSuite extends GraphQLSuite {
       """
         query {
           spectroscopy(input: {
-            exposureTimeMode: {
-              signalToNoise: {
-                value: 2,
-                at: { nanometers: 600 }
-              }
-            },
             asterism: [
               {
                 sourceProfile: {
@@ -61,6 +55,7 @@ class customSedSuite extends GraphQLSuite {
             },
             mode: {
               gmosNSpectroscopy: {
+                exposureTimeMode: { signalToNoise: { value: 2, at: { nanometers: 600 } } },
                 centralWavelength: {
                   nanometers: 60
                 },
@@ -72,19 +67,6 @@ class customSedSuite extends GraphQLSuite {
               }
             }
           }) {
-            mode {
-              ... on SpectroscopyMode {
-                instrument
-                params {
-                  ... on GmosNSpectroscopyParams {
-                    grating
-                    centralWavelength {
-                      nanometers
-                    }
-                  }
-                }
-              }
-            }
             brightest {
               selected {
                 exposureCount
@@ -101,15 +83,6 @@ class customSedSuite extends GraphQLSuite {
         {
           "data": {
             "spectroscopy" : {
-              "mode" : {
-                "instrument" : "GMOS_NORTH",
-                "params": {
-                  "grating": "B1200_G5301",
-                  "centralWavelength" : {
-                    "nanometers" : 60.000
-                  }
-                }
-              },
               "brightest": {
                 "selected" : {
                   "exposureCount" : 10,
@@ -131,12 +104,6 @@ class customSedSuite extends GraphQLSuite {
       """
         query {
           spectroscopy(input: {
-            exposureTimeMode: {
-              signalToNoise: {
-                value: 2,
-                at: { nanometers: 600 }
-              }
-            },
             asterism: [
               {
                 sourceProfile: {
@@ -176,6 +143,7 @@ class customSedSuite extends GraphQLSuite {
             },
             mode: {
               gmosNSpectroscopy: {
+                exposureTimeMode: { signalToNoise: { value: 2, at: { nanometers: 600 } } },
                 centralWavelength: {
                   nanometers: 60
                 },
@@ -187,19 +155,6 @@ class customSedSuite extends GraphQLSuite {
               }
             }
           }) {
-            mode {
-              ... on SpectroscopyMode {
-                instrument
-                params {
-                  ... on GmosNSpectroscopyParams {
-                    grating
-                    centralWavelength {
-                      nanometers
-                    }
-                  }
-                }
-              }
-            }
             brightest {
               selected {
                 exposureCount
@@ -216,15 +171,6 @@ class customSedSuite extends GraphQLSuite {
         {
           "data": {
             "spectroscopy" : {
-              "mode" : {
-                "instrument" : "GMOS_NORTH",
-                "params": {
-                  "grating": "B1200_G5301",
-                  "centralWavelength" : {
-                    "nanometers" : 60.000
-                  }
-                }
-              },
               "brightest": {
                 "selected" : {
                   "exposureCount" : 10,
@@ -246,12 +192,6 @@ class customSedSuite extends GraphQLSuite {
       """
         query {
           spectroscopy(input: {
-            exposureTimeMode: {
-              signalToNoise: {
-                value: 2,
-                at: { nanometers: 600 }
-              }
-            },
             asterism: [
               {
                 sourceProfile: {
@@ -291,6 +231,7 @@ class customSedSuite extends GraphQLSuite {
             },
             mode: {
               gmosNSpectroscopy: {
+                exposureTimeMode: { signalToNoise: { value: 2, at: { nanometers: 600 } } },
                 centralWavelength: {
                   nanometers: 60
                 },
@@ -302,19 +243,6 @@ class customSedSuite extends GraphQLSuite {
               }
             }
           }) {
-            mode {
-              ... on SpectroscopyMode {
-                instrument
-                params {
-                  ... on GmosNSpectroscopyParams {
-                    grating
-                    centralWavelength {
-                      nanometers
-                    }
-                  }
-                }
-              }
-            }
             brightest {
               selected {
                 exposureCount
@@ -345,15 +273,6 @@ class customSedSuite extends GraphQLSuite {
           ],
           "data": {
             "spectroscopy" : {
-              "mode" : {
-                "instrument" : "GMOS_NORTH",
-                "params" : {
-                  "grating" : "B1200_G5301",
-                  "centralWavelength" : {
-                    "nanometers" : 60.000
-                  }
-                }
-              },
               "brightest" : null
             }
           }
@@ -367,12 +286,6 @@ class customSedSuite extends GraphQLSuite {
       """
         query {
           spectroscopy(input: {
-            exposureTimeMode: {
-              signalToNoise: {
-                value: 2,
-                at: { nanometers: 600 }
-              }
-            },
             asterism: [
               {
                 sourceProfile: {
@@ -412,6 +325,7 @@ class customSedSuite extends GraphQLSuite {
             },
             mode: {
               gmosNSpectroscopy: {
+                exposureTimeMode: { signalToNoise: { value: 2, at: { nanometers: 600 } } },
                 centralWavelength: {
                   nanometers: 60
                 },
@@ -423,19 +337,6 @@ class customSedSuite extends GraphQLSuite {
               }
             }
           }) {
-            mode {
-              ... on SpectroscopyMode {
-                instrument
-                params {
-                  ... on GmosNSpectroscopyParams {
-                    grating
-                    centralWavelength {
-                      nanometers
-                    }
-                  }
-                }
-              }
-            }
             brightest {
               selected {
                 exposureCount
@@ -466,15 +367,6 @@ class customSedSuite extends GraphQLSuite {
           ],
           "data": {
             "spectroscopy" : {
-              "mode" : {
-                "instrument" : "GMOS_NORTH",
-                "params" : {
-                  "grating" : "B1200_G5301",
-                  "centralWavelength" : {
-                    "nanometers" : 60.000
-                  }
-                }
-              },
               "brightest" : null
             }
           }

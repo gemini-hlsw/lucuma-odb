@@ -235,15 +235,13 @@ object GeneratorParamsService {
 
         def spectroscopyGeneratorParams(
           obsMode: ObservingMode,
-          acqEtm:  ExposureTimeMode,
           acqMode: InstrumentMode,
-          sciEtm:  ExposureTimeMode,
           sciMode: InstrumentMode
         ): GeneratorParams =
 
           val consInput   = obsParams.constraints.toInput
-          val acquisition = ImagingParameters(acqEtm, consInput, acqMode)
-          val science     = SpectroscopyParameters(sciEtm, consInput, sciMode)
+          val acquisition = ImagingParameters(consInput, acqMode)
+          val science     = SpectroscopyParameters(consInput, sciMode)
 
           val itcInput    = (
              obsParams.targets.traverse(itcTargetParams),
@@ -265,6 +263,7 @@ object GeneratorParamsService {
         observingMode(obsParams.targets, config).map:
           case gn @ gmos.longslit.Config.GmosNorth(g, f, u, c, a) =>
             val sciMode = InstrumentMode.GmosNorthSpectroscopy(
+              c.exposureTimeMode,
               c.centralWavelength,
               g,
               f,
@@ -274,17 +273,17 @@ object GeneratorParamsService {
             )
             spectroscopyGeneratorParams(
               obsMode = gn,
-              acqEtm  = a.exposureTimeMode,
               acqMode = InstrumentMode.GmosNorthImaging(
+                exposureTimeMode = a.exposureTimeMode,
                 filter  = a.explicitFilter.getOrElse(a.defaultFilter),
                 ccdMode = sciMode.ccdMode
               ),
-              sciEtm   = c.exposureTimeMode,
               sciMode  = sciMode
             )
 
           case gs @ gmos.longslit.Config.GmosSouth(g, f, u, c, a) =>
             val sciMode = InstrumentMode.GmosSouthSpectroscopy(
+              c.exposureTimeMode,
               c.centralWavelength,
               g,
               f,
@@ -294,31 +293,29 @@ object GeneratorParamsService {
             )
             spectroscopyGeneratorParams(
               obsMode = gs,
-              acqEtm  = a.exposureTimeMode,
               acqMode = InstrumentMode.GmosSouthImaging(
+                exposureTimeMode = a.exposureTimeMode,
                 filter  = a.explicitFilter.getOrElse(a.defaultFilter),
                 ccdMode = sciMode.ccdMode
               ),
-              sciEtm   = c.exposureTimeMode,
               sciMode  = sciMode
             )
 
           case f2 @ flamingos2.longslit.Config(disperser, filter, fpu, sci, acq, _, _, _, _, _, _, _, _) =>
-            val sciMode   = InstrumentMode.Flamingos2Spectroscopy(disperser, filter, fpu)
+            val sciMode   = InstrumentMode.Flamingos2Spectroscopy(sci, disperser, filter, fpu)
             spectroscopyGeneratorParams(
               obsMode = f2,
-              acqEtm  = acq.exposureTimeMode,
               acqMode = InstrumentMode.Flamingos2Imaging(
+                acq.exposureTimeMode,
                 acq.filter
               ),
-              sciEtm  = sci,
               sciMode = sciMode
             )
 
           case ig: igrins2.longslit.Config =>
-            val sciMode   = InstrumentMode.Igrins2Spectroscopy()
+            val sciMode   = InstrumentMode.Igrins2Spectroscopy(ig.scienceExposureTimeMode)
             val consInput = obsParams.constraints.toInput
-            val science   = SpectroscopyParameters(ig.scienceExposureTimeMode, consInput, sciMode)
+            val science   = SpectroscopyParameters(consInput, sciMode)
 
             val itcInput =
               obsParams.targets
@@ -333,9 +330,8 @@ object GeneratorParamsService {
             // An input per filter.
             val inputs = fs.map: f =>
               ImagingParameters(
-                f.exposureTimeMode,
                 obsParams.constraints.toInput,
-                InstrumentMode.GmosNorthImaging(f.filter, gn.ccdMode.some)
+                InstrumentMode.GmosNorthImaging(f.exposureTimeMode, f.filter, gn.ccdMode.some)
               )
 
             val itcInput =
@@ -352,9 +348,8 @@ object GeneratorParamsService {
             // An input per filter.
             val inputs = fs.map: f =>
               ImagingParameters(
-                f.exposureTimeMode,
                 obsParams.constraints.toInput,
-                InstrumentMode.GmosSouthImaging(f.filter, gs.ccdMode.some)
+                InstrumentMode.GmosSouthImaging(f.exposureTimeMode, f.filter, gs.ccdMode.some)
               )
 
             val itcInput =

@@ -61,6 +61,7 @@ object AsterismGraphRequest:
 
     val modeResult: Result[ObservingMode.SpectroscopyMode] = mode match {
       case GmosNSpectroscopyInput(
+            _,
             centralWavelength,
             grating,
             GmosFpuMask.Builtin(fpu),
@@ -73,6 +74,7 @@ object AsterismGraphRequest:
             .GmosNorth(centralWavelength, grating, GmosNorthFpuParam(fpu), filter, ccdMode, roi)
         )
       case GmosSSpectroscopyInput(
+            _,
             centralWavelength,
             grating,
             GmosFpuMask.Builtin(fpu),
@@ -84,11 +86,11 @@ object AsterismGraphRequest:
           ObservingMode.SpectroscopyMode
             .GmosSouth(centralWavelength, grating, GmosSouthFpuParam(fpu), filter, ccdMode, roi)
         )
-      case Igrins2SpectroscopyInput() =>
+      case Igrins2SpectroscopyInput(_) =>
         Result(
           ObservingMode.SpectroscopyMode.Igrins2()
         )
-      case _                          =>
+      case _                           =>
         Result.failure("Invalid spectroscopy mode")
     }
 

@@ -18,12 +18,6 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
       """
         query {
           spectroscopy(input: {
-            exposureTimeMode: {
-              signalToNoise: {
-                value: 2,
-                at: { nanometers: 60 }
-              }
-            },
             asterism: [
               {
                 sourceProfile: {
@@ -67,6 +61,7 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
             },
             mode: {
               gmosNSpectroscopy: {
+                exposureTimeMode: { signalToNoise: { value: 2, at: { nanometers: 60 } } },
                 centralWavelength: {
                   nanometers: 60
                 },
@@ -78,24 +73,6 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
               }
             }
           }) {
-            mode {
-              ... on SpectroscopyMode {
-                instrument
-                params {
-                  ... on GmosNSpectroscopyParams {
-                    grating
-                  }
-                }
-              }
-            }
-            exposureTimeMode {
-              signalToNoise {
-                value
-                at {
-                  nanometers
-                }
-              }
-            }
             brightest {
               selected {
                 exposureCount
@@ -112,18 +89,6 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
         {
           "data": {
             "spectroscopy" : {
-              "mode" : {
-                "instrument" : "GMOS_NORTH",
-                "params": {
-                  "grating": "B1200_G5301"
-                }
-              },
-              "exposureTimeMode": {
-                "signalToNoise": {
-                  "value": 2,
-                  "at": { "nanometers": 60.000 }
-                }
-              },
               "brightest": {
                 "selected" : {
                   "exposureCount" : 10,
@@ -145,12 +110,6 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
       """
         query {
           spectroscopy(input: {
-            exposureTimeMode: {
-              signalToNoise: {
-                value: 2,
-                at: { nanometers: 60 }
-              }
-            },
             asterism: [
               {
                 sourceProfile: {
@@ -195,6 +154,7 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
             },
             mode: {
               gmosSSpectroscopy: {
+                exposureTimeMode: { signalToNoise: { value: 2, at: { nanometers: 60 } } },
                 centralWavelength: {
                   nanometers: 60
                 },
@@ -206,27 +166,6 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
               }
             }
           }) {
-              mode {
-                ... on SpectroscopyMode {
-                  instrument
-                  params {
-                    ... on GmosSSpectroscopyParams {
-                      grating
-                      centralWavelength {
-                        nanometers
-                      }
-                    }
-                  }
-                }
-              }
-              exposureTimeMode {
-                signalToNoise {
-                  value
-                  at {
-                    nanometers
-                  }
-                }
-              }
               brightest {
                 selected {
                   exposureCount
@@ -242,21 +181,6 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
         {
           "data": {
             "spectroscopy" : {
-                "mode" : {
-                  "instrument" : "GMOS_SOUTH",
-                  "params": {
-                    "grating": "B1200_G5321",
-                    "centralWavelength" : {
-                      "nanometers" : 60.000
-                    }
-                  }
-                },
-                "exposureTimeMode": {
-                  "signalToNoise": {
-                    "value": 2,
-                    "at": { "nanometers": 60.000 }
-                  }
-                },
                 "brightest": {
                   "selected" : {
                     "exposureCount" : 10,
@@ -277,12 +201,6 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
       """
         query {
           spectroscopy(input: {
-            exposureTimeMode: {
-              signalToNoise: {
-                value: 2,
-                at: { nanometers: 60 }
-              }
-            },
             asterism: [
               {
                 sourceProfile: {
@@ -327,23 +245,13 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
             },
             mode: {
               flamingos2Spectroscopy: {
+                exposureTimeMode: { signalToNoise: { value: 2, at: { nanometers: 60 } } },
                 filter: Y,
                 fpu: LONG_SLIT_1,
                 disperser: R3000
               }
             }
           }) {
-              mode {
-                ... on SpectroscopyMode {
-                  instrument
-                  params {
-                    ... on Flamingos2SpectroscopyParams {
-                      disperser
-                      fpu
-                    }
-                  }
-                }
-              }
               targetTimes {
                 ... on TargetIntegrationTime {
                   signalToNoiseAt {
@@ -370,13 +278,6 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
         {
           "data": {
             "spectroscopy" : {
-                "mode" : {
-                  "instrument" : "FLAMINGOS2",
-                  "params": {
-                    "disperser": "R3000",
-                    "fpu": "LONG_SLIT_1"
-                  }
-                },
                 "targetTimes": [
                   {
                     "signalToNoiseAt": {
@@ -406,17 +307,11 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
   test("gmos north case with variables") {
     query(
       """
-        query($spectroscopy: SpectroscopyInput) {\n          spectroscopy(input: $spectroscopy) {\n            mode {\n ... on SpectroscopyMode {\n                instrument\n              }\n       }\n            }\n        }\n
+        query($spectroscopy: SpectroscopyInput) {\n          spectroscopy(input: $spectroscopy) {\n            brightestIndex         }\n        }\n
       """,
       """
         {
           "spectroscopy" : {
-            "exposureTimeMode": {
-              "signalToNoise": {
-                "value": 2,
-                "at": { "nanometers": "600" }
-              }
-            },
             "asterism": [
               {
                 "sourceProfile": {
@@ -456,6 +351,7 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
             },
             "mode": {
               "gmosNSpectroscopy": {
+                "exposureTimeMode": { "signalToNoise": { "value": 2, "at": { "nanometers": "600" } } },
                 "centralWavelength": {
                   "nanometers": "600"
                 },
@@ -474,9 +370,7 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
           "data": {
             "spectroscopy" :
               {
-                "mode" : {
-                  "instrument" : "GMOS_NORTH"
-                }
+                "brightestIndex" : 0
               }
           }
         }
@@ -511,12 +405,6 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
         s"""
         query {
           spectroscopy(input: {
-            exposureTimeMode: {
-              signalToNoise: {
-                value: 2,
-                at: { nanometers: 60 }
-              }
-            },
             asterism: [
               {
                 sourceProfile: {
@@ -556,6 +444,7 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
             },
             mode: {
               gmosNSpectroscopy: {
+                exposureTimeMode: { signalToNoise: { value: 2, at: { nanometers: 60 } } },
                 centralWavelength: {
                   nanometers: 60
                 },
@@ -567,24 +456,6 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
               }
             }
           }) {
-                mode {
-                  ... on SpectroscopyMode {
-                    instrument
-                    params {
-                      ... on GmosNSpectroscopyParams {
-                        grating
-                      }
-                    }
-                  }
-                }
-                exposureTimeMode {
-                  signalToNoise {
-                    value
-                    at {
-                      nanometers
-                    }
-                  }
-                }
                 brightest {
                   selected {
                     exposureCount
@@ -601,18 +472,6 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
           "data": {
             "spectroscopy" :
               {
-                "mode" : {
-                  "instrument" : "GMOS_NORTH",
-                  "params": {
-                    "grating": "B1200_G5301"
-                  }
-                },
-                "exposureTimeMode": {
-                  "signalToNoise": {
-                    "value": 2,
-                    "at": { "nanometers": 60.000 }
-                  }
-                },
                 "brightest": {
                   "selected" : {
                     "exposureCount" : 10,
@@ -634,12 +493,6 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
       """
         query {
           spectroscopy(input: {
-            exposureTimeMode: {
-              signalToNoise: {
-                value: 2,
-                at: { nanometers: 60 }
-              }
-            },
             asterism: [
               {
                 sourceProfile: {
@@ -679,6 +532,7 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
             },
             mode: {
               gmosNSpectroscopy: {
+                exposureTimeMode: { signalToNoise: { value: 2, at: { nanometers: 60 } } },
                 centralWavelength: {
                   nanometers: 60
                 },
@@ -690,24 +544,6 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
               }
             }
           }) {
-              mode {
-                ... on SpectroscopyMode {
-                  instrument
-                  params {
-                    ... on GmosNSpectroscopyParams {
-                      grating
-                    }
-                  }
-                }
-              }
-              exposureTimeMode {
-                signalToNoise {
-                  value
-                  at {
-                    nanometers
-                  }
-                }
-              }
               brightest {
                 selected {
                   exposureCount
@@ -738,12 +574,6 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
         s"""
         query {
           spectroscopy(input: {
-            exposureTimeMode: {
-              signalToNoise: {
-                value: 2,
-                at: { nanometers: 60 }
-              }
-            },
             asterism: [
               {
                 sourceProfile: {
@@ -787,6 +617,7 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
             },
             mode: {
               gmosNSpectroscopy: {
+                exposureTimeMode: { signalToNoise: { value: 2, at: { nanometers: 60 } } },
                 centralWavelength: {
                   nanometers: 60
                 },
@@ -798,24 +629,6 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
               }
             }
           }) {
-                mode {
-                  ... on SpectroscopyMode {
-                    instrument
-                    params {
-                      ... on GmosNSpectroscopyParams {
-                        grating
-                      }
-                    }
-                  }
-                }
-                exposureTimeMode {
-                  signalToNoise {
-                    value
-                    at {
-                      nanometers
-                    }
-                  }
-                }
                 brightest {
                   selected {
                     exposureCount
@@ -832,18 +645,6 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
           "data": {
             "spectroscopy" :
               {
-                "mode" : {
-                  "instrument" : "GMOS_NORTH",
-                  "params": {
-                    "grating": ${d.tag.toScreamingSnakeCase}
-                  }
-                },
-                "exposureTimeMode": {
-                  "signalToNoise": {
-                    "value": 2,
-                    "at": { "nanometers": 60.000 }
-                  }
-                },
                 "brightest": {
                   "selected" : {
                     "exposureCount" : 10,
@@ -866,12 +667,6 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
         s"""
         query {
           spectroscopy(input: {
-            exposureTimeMode: {
-              signalToNoise: {
-                value: 2,
-                at: { nanometers: 60 }
-              }
-            },
             asterism: [
               {
                 sourceProfile: {
@@ -920,6 +715,7 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
             },
             mode: {
               gmosSSpectroscopy: {
+                exposureTimeMode: { signalToNoise: { value: 2, at: { nanometers: 60 } } },
                 centralWavelength: {
                   nanometers: 60
                 },
@@ -931,27 +727,6 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
               }
             }
           }) {
-                mode {
-                  ... on SpectroscopyMode {
-                    instrument
-                    params {
-                      ... on GmosSSpectroscopyParams {
-                        grating
-                        centralWavelength {
-                          nanometers
-                        }
-                      }
-                    }
-                  }
-                }
-                exposureTimeMode {
-                  signalToNoise {
-                    value
-                    at {
-                      nanometers
-                    }
-                  }
-                }
                 brightest {
                   selected {
                     exposureCount
@@ -968,21 +743,6 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
           "data": {
             "spectroscopy" :
               {
-                "mode" : {
-                  "instrument" : "GMOS_SOUTH",
-                  "params": {
-                    "grating": ${d.tag.toScreamingSnakeCase},
-                    "centralWavelength" : {
-                      "nanometers" : 60.000
-                    }
-                  }
-                },
-                "exposureTimeMode": {
-                  "signalToNoise": {
-                    "value": 2,
-                    "at": { "nanometers": 60.000 }
-                  }
-                },
                 "brightest": {
                   "selected" : {
                     "exposureCount" : 10,
@@ -1005,12 +765,6 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
         s"""
           query {
             spectroscopy(input: {
-              exposureTimeMode: {
-                signalToNoise: {
-                  value: 2,
-                  at: { nanometers: 60 }
-                }
-              },
               asterism: [
                 {
                   sourceProfile: {
@@ -1055,6 +809,7 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
               },
               mode: {
                 gmosNSpectroscopy: {
+                  exposureTimeMode: { signalToNoise: { value: 2, at: { nanometers: 60 } } },
                   centralWavelength: {
                     nanometers: 60,
                   },
@@ -1066,26 +821,6 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
                 }
               }
             }) {
-                  mode {
-                    ... on SpectroscopyMode {
-                      instrument
-                      params {
-                        ... on GmosNSpectroscopyParams {
-                          fpu {
-                            builtin
-                          }
-                        }
-                      }
-                    }
-                  }
-                  exposureTimeMode {
-                    signalToNoise {
-                      value
-                      at {
-                        nanometers
-                      }
-                    }
-                  }
                   brightest {
                     selected {
                       exposureCount
@@ -1102,20 +837,6 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
           "data": {
             "spectroscopy" :
               {
-                "mode" : {
-                  "instrument" : "GMOS_NORTH",
-                  "params": {
-                    "fpu": {
-                      "builtin": ${d.tag.toScreamingSnakeCase}
-                    }
-                  }
-                },
-                "exposureTimeMode": {
-                  "signalToNoise": {
-                    "value": 2,
-                    "at": { "nanometers": 60.000 }
-                  }
-                },
                 "brightest": {
                   "selected" : {
                     "exposureCount" : 10,
@@ -1138,12 +859,6 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
         s"""
         query {
           spectroscopy(input: {
-            exposureTimeMode: {
-              signalToNoise: {
-                value: 2,
-                at: { nanometers: 60 }
-              }
-            },
             asterism: [
               {
                 sourceProfile: {
@@ -1187,6 +902,7 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
             },
             mode: {
               gmosSSpectroscopy: {
+                exposureTimeMode: { signalToNoise: { value: 2, at: { nanometers: 60 } } },
                 centralWavelength: {
                   nanometers: 60,
                 },
@@ -1198,29 +914,6 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
               }
             }
           }) {
-                mode {
-                  ... on SpectroscopyMode {
-                    instrument
-                    params {
-                      ... on GmosSSpectroscopyParams {
-                        fpu {
-                          builtin
-                        }
-                        centralWavelength {
-                          nanometers
-                        }
-                      }
-                    }
-                  }
-                }
-                exposureTimeMode {
-                  signalToNoise {
-                    value
-                    at {
-                      nanometers
-                    }
-                  }
-                }
                 brightest {
                   selected {
                     exposureCount
@@ -1237,23 +930,6 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
           "data": {
             "spectroscopy" :
               {
-                "mode" : {
-                  "instrument" : "GMOS_SOUTH",
-                  "params": {
-                    "fpu": {
-                      "builtin": ${d.tag.toScreamingSnakeCase}
-                    },
-                    "centralWavelength" : {
-                      "nanometers" : 60.000
-                    }
-                  }
-                },
-                "exposureTimeMode": {
-                  "signalToNoise": {
-                    "value": 2,
-                    "at": { "nanometers": 60.000 }
-                  }
-                },
                 "brightest": {
                   "selected" : {
                     "exposureCount" : 10,
@@ -1276,12 +952,6 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
         s"""
         query {
           spectroscopy(input: {
-            exposureTimeMode: {
-              signalToNoise: {
-                value: 2,
-                at: { nanometers: 60 }
-              }
-            },
             asterism: [
               {
                 sourceProfile: {
@@ -1325,6 +995,7 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
             },
             mode: {
               gmosNSpectroscopy: {
+                exposureTimeMode: { signalToNoise: { value: 2, at: { nanometers: 60 } } },
                 centralWavelength: {
                   nanometers: 60,
                 },
@@ -1336,27 +1007,6 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
               }
             }
           }) {
-                mode {
-                  ... on SpectroscopyMode {
-                    instrument
-                    params {
-                      ... on GmosNSpectroscopyParams {
-                        filter
-                        centralWavelength {
-                          nanometers
-                        }
-                      }
-                    }
-                  }
-                }
-                exposureTimeMode {
-                  signalToNoise {
-                    value
-                    at {
-                      nanometers
-                    }
-                  }
-                }
                 brightest {
                   selected {
                       exposureCount
@@ -1373,21 +1023,6 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
           "data": {
             "spectroscopy" :
               {
-                "mode" : {
-                  "instrument" : "GMOS_NORTH",
-                  "params": {
-                    "filter": ${d.tag.toScreamingSnakeCase},
-                    "centralWavelength" : {
-                      "nanometers" : 60.000
-                    }
-                  }
-                },
-                "exposureTimeMode": {
-                  "signalToNoise": {
-                    "value": 2,
-                    "at": { "nanometers": 60.000 }
-                  }
-                },
                 "brightest": {
                   "selected" : {
                     "exposureCount" : 10,
@@ -1410,12 +1045,6 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
         s"""
         query {
           spectroscopy(input: {
-            exposureTimeMode: {
-              signalToNoise: {
-                value: 2,
-                at: { nanometers: 60 }
-              }
-            },
             asterism: [
               {
                 sourceProfile: {
@@ -1459,6 +1088,7 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
             },
             mode: {
               gmosSSpectroscopy: {
+                exposureTimeMode: { signalToNoise: { value: 2, at: { nanometers: 60 } } },
                 centralWavelength: {
                   nanometers: 60,
                 },
@@ -1470,27 +1100,6 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
               }
             }
           }) {
-                mode {
-                  ... on SpectroscopyMode {
-                    instrument
-                    params {
-                      ... on GmosSSpectroscopyParams {
-                        filter
-                        centralWavelength {
-                          nanometers
-                        }
-                      }
-                    }
-                  }
-                }
-                exposureTimeMode {
-                  signalToNoise {
-                    value
-                    at {
-                      nanometers
-                    }
-                  }
-                }
                 brightest {
                   selected {
                       exposureCount
@@ -1507,21 +1116,6 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
           "data": {
             "spectroscopy" :
               {
-                "mode" : {
-                  "instrument" : "GMOS_SOUTH",
-                  "params": {
-                    "filter": ${d.tag.toScreamingSnakeCase},
-                    "centralWavelength" : {
-                      "nanometers" : 60.000
-                    }
-                  }
-                },
-                "exposureTimeMode": {
-                  "signalToNoise": {
-                    "value": 2,
-                    "at": { "nanometers": 60.000 }
-                  }
-                },
                 "brightest": {
                   "selected" : {
                     "exposureCount" : 10,
@@ -1543,12 +1137,6 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
       """
         query {
           spectroscopy(input: {
-            exposureTimeMode: {
-              signalToNoise: {
-                value: 2,
-                at: { nanometers: 60 }
-              }
-            },
             asterism: [
               {
                 sourceProfile: {
@@ -1611,6 +1199,7 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
             },
             mode: {
               gmosNSpectroscopy: {
+                exposureTimeMode: { signalToNoise: { value: 2, at: { nanometers: 60 } } },
                 centralWavelength: {
                   nanometers: 600
                 },
@@ -1622,27 +1211,6 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
               }
             }
           }) {
-            mode {
-              ... on SpectroscopyMode {
-                instrument
-                params {
-                  ... on GmosNSpectroscopyParams {
-                    grating
-                    centralWavelength {
-                      nanometers
-                    }
-                  }
-                }
-              }
-            }
-            exposureTimeMode {
-              signalToNoise {
-                value
-                at {
-                  nanometers
-                }
-              }
-            }
             targetTimes {
               ...on TargetIntegrationTime {
                 selected {
@@ -1662,21 +1230,6 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
         {
           "data": {
             "spectroscopy" : {
-              "mode" : {
-                "instrument" : "GMOS_NORTH",
-                "params": {
-                  "grating": "B1200_G5301",
-                  "centralWavelength" : {
-                    "nanometers" : 600.000
-                  }
-                }
-              },
-              "exposureTimeMode": {
-                "signalToNoise": {
-                  "value": 2,
-                  "at": { "nanometers": 60.000 }
-                }
-              },
               "targetTimes": [
                 {
                   "selected" : {
@@ -1703,122 +1256,109 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
         }
         """
     )
+  }
 
-    test("igrins2 case") {
-      query(
-        """
-        query {
-          spectroscopy(input: {
-            exposureTimeMode: {
-              signalToNoise: {
-                value: 2,
-                at: { nanometers: 1600 }
-              }
-            },
-            asterism: [
-              {
-                sourceProfile: {
-                  point: {
-                    bandNormalized: {
-                      sed: {
-                        planet: JUPITER
-                      }
-                      brightnesses: [ {
-                        band: R
-                        value: 3
-                        units: ERG_PER_S_PER_CM_SQUARED_PER_A
-                        error: 0.2
-                      }, {
-                        band: J
-                        value: 2.1
-                        units: AB_MAGNITUDE
-                      }]
+  test("igrins2 case") {
+    query(
+      """
+      query {
+        spectroscopy(input: {
+          asterism: [
+            {
+              sourceProfile: {
+                point: {
+                  bandNormalized: {
+                    sed: {
+                      planet: JUPITER
                     }
+                    brightnesses: [ {
+                      band: R
+                      value: 3
+                      units: ERG_PER_S_PER_CM_SQUARED_PER_A
+                      error: 0.2
+                    }, {
+                      band: J
+                      value: 2.1
+                      units: AB_MAGNITUDE
+                    }]
                   }
-                },
-                radialVelocity: {
-                  kilometersPerSecond: 1000
                 }
-              }
-            ],
-            constraints: {
-              imageQuality: {
-                preset: POINT_THREE
               },
-              cloudExtinction: {
-                preset: POINT_FIVE
-              },
-              skyBackground: DARK,
-              waterVapor: DRY,
-              elevationRange: {
-                airMass: {
-                  min: 1,
-                  max: 2
-                }
+              radialVelocity: {
+                kilometersPerSecond: 1000
               }
-            },
-            mode: {
-              igrins2Spectroscopy: {}
             }
-          }) {
-              mode {
-                ... on SpectroscopyMode {
-                  instrument
-                }
+          ],
+          constraints: {
+            imageQuality: {
+              preset: POINT_THREE
+            },
+            cloudExtinction: {
+              preset: POINT_FIVE
+            },
+            skyBackground: DARK,
+            waterVapor: DRY,
+            elevationRange: {
+              airMass: {
+                min: 1,
+                max: 2
               }
-              targetTimes {
-                ... on TargetIntegrationTime {
-                  signalToNoiseAt {
-                    single
-                    total
-                    wavelength {
-                      nanometers
-                    }
-                  }
-                }
-              }
-              brightest {
-                selected {
-                  exposureCount
-                  exposureTime {
-                    seconds
-                  }
-                }
-              }
+            }
+          },
+          mode: {
+            igrins2Spectroscopy: {
+              exposureTimeMode: { signalToNoise: { value: 2, at: { nanometers: 1600 } } }
+            }
           }
-        }
-        """,
-        json"""
-        {
-          "data": {
-            "spectroscopy" : {
-                "mode" : {
-                  "instrument" : "IGRINS2"
-                },
-                "targetTimes": [
-                  {
-                    "signalToNoiseAt": {
-                      "single": 101.000000,
-                      "total": 102.000000,
-                      "wavelength": {
-                        "nanometers": 1600.000
-                      }
-                    }
-                  }
-                ],
-                "brightest": {
-                  "selected" : {
-                    "exposureCount" : 10,
-                    "exposureTime" : {
-                      "seconds" : 1.000000
-                    }
+        }) {
+            targetTimes {
+              ... on TargetIntegrationTime {
+                signalToNoiseAt {
+                  single
+                  total
+                  wavelength {
+                    nanometers
                   }
                 }
               }
-          }
+            }
+            brightest {
+              selected {
+                exposureCount
+                exposureTime {
+                  seconds
+                }
+              }
+            }
         }
-        """
-      )
-    }
-
+      }
+      """,
+      json"""
+      {
+        "data": {
+          "spectroscopy" : {
+              "targetTimes": [
+                {
+                  "signalToNoiseAt": {
+                    "single": 101.000000,
+                    "total": 102.000000,
+                    "wavelength": {
+                      "nanometers": 1600.000
+                    }
+                  }
+                }
+              ],
+              "brightest": {
+                "selected" : {
+                  "exposureCount" : 10,
+                  "exposureTime" : {
+                    "seconds" : 1.000000
+                  }
+                }
+              }
+            }
+        }
+      }
+      """
+    )
   }

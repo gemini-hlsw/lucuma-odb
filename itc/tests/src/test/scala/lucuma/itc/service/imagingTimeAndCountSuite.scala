@@ -12,15 +12,6 @@ class imagingTimeAndCountSuite extends GraphImagingQLSuite:
       """
         query {
           imaging(input: {
-            exposureTimeMode: {
-              timeAndCount: {
-                time: {
-                  seconds: 2
-                },
-                count: 3,
-                at: { nanometers: 600 }
-              }
-            },
             asterism: [
               {
                 sourceProfile: {
@@ -92,32 +83,11 @@ class imagingTimeAndCountSuite extends GraphImagingQLSuite:
             },
             mode: {
               flamingos2Imaging: {
+                exposureTimeMode: { timeAndCount: { time: { seconds: 2 }, count: 3, at: { nanometers: 600 } } },
                 filter: H
               }
             }
           }) {
-            mode {
-              __typename
-              ... on ImagingMode {
-                instrument
-                params {
-                  ... on Flamingos2ImagingParams {
-                    filter
-                  }
-                }
-              }
-            }
-            exposureTimeMode {
-              timeAndCount {
-                time {
-                  seconds
-                }
-                count
-                at {
-                  nanometers
-                }
-              }
-            }
             brightest {
               all {
                 exposureCount
@@ -147,22 +117,6 @@ class imagingTimeAndCountSuite extends GraphImagingQLSuite:
         {
           "data": {
             "imaging" : {
-              "mode" : {
-                "__typename" : "ImagingMode",
-                "instrument" : "FLAMINGOS2",
-                "params": {
-                  "filter": "H"
-                }
-              },
-              "exposureTimeMode": {
-                "timeAndCount": {
-                  "time": {
-                    "seconds": 2
-                  },
-                  "count": 3,
-                  "at": { "nanometers": 600.000 }
-                }
-              },
               "brightest" : {
                 "all" : [{
                   "exposureCount" : 10,

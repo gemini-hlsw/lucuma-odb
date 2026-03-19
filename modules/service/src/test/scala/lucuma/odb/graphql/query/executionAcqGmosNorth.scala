@@ -25,7 +25,7 @@ import lucuma.odb.sequence.gmos.longslit.Acquisition.RepeatingAtomCount
 class executionAcqGmosNorth extends ExecutionTestSupportForGmos with mutation.UpdateObservationsOps:
 
   override def fakeItcImagingResultFor(input: ImagingInput): Option[IntegrationTime] =
-    input.exposureTimeMode match
+    input.mode.exposureTimeMode match
       case ExposureTimeMode.TimeAndCountMode(t, c, _) => IntegrationTime(t, c).some
       case _ => none
 

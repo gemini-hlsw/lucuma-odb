@@ -4,15 +4,13 @@
 package lucuma.itc.input
 
 import cats.syntax.all.*
-import lucuma.core.model.ExposureTimeMode
 import lucuma.odb.graphql.binding.*
 import lucuma.odb.graphql.input.*
 
 case class ImagingInput(
-  exposureTimeMode: ExposureTimeMode,
-  asterism:         List[TargetDataInput],
-  constraints:      ItcConstraintsInput,
-  mode:             InstrumentModesInput
+  asterism:    List[TargetDataInput],
+  constraints: ItcConstraintsInput,
+  mode:        InstrumentModesInput
 )
 
 object ImagingInput:
@@ -20,10 +18,9 @@ object ImagingInput:
   val Binding: Matcher[ImagingInput] =
     ObjectFieldsBinding.rmap:
       case List(
-            ExposureTimeModeInput.Binding("exposureTimeMode", exposureTimeMode),
             TargetDataInput.Binding.List("asterism", asterism),
             ItcConstraintsInput.Binding("constraints", constraints),
             InstrumentModesInput.Binding("mode", mode)
           ) =>
-        (exposureTimeMode, asterism, constraints, mode)
+        (asterism, constraints, mode)
           .parMapN(apply)
