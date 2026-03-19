@@ -45,6 +45,7 @@ import org.tpolecat.sourcepos.SourcePos
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.LoggerFactory
 
+import scala.concurrent.duration.*
 import scala.io.AnsiColor
 import scala.io.Source
 
@@ -88,7 +89,7 @@ object OdbMapping {
   private implicit def monoidPartialFunction[A, B]: Monoid[PartialFunction[A, B]] =
     Monoid.instance(PartialFunction.empty, _ orElse _)
 
-  def apply[F[_]: Async: Parallel: Trace: Logger: LoggerFactory: SecureRandom](
+  def apply[F[_]: {Async, Parallel, Trace as T, Logger as L, LoggerFactory as LF, SecureRandom}](
     database:      Resource[F, Session[F]],
     monitor0:      SkunkMonitor[F],
     user0:         User,
@@ -627,18 +628,46 @@ object OdbMapping {
 
           // Override `defaultRootCursor` to log the GraphQL query. This is optional.
           override def defaultRootCursor(query: Query, tpe: Type, parentCursor: Option[Cursor]): F[Result[(Query, Cursor)]] =
-            Logger[F].debug("\n\n" + PrettyPrinter.query(query).render(100) + "\n") >>
+            L.debug("\n\n" + PrettyPrinter.query(query).render(100) + "\n") >>
             super.defaultRootCursor(query, tpe, parentCursor)
 
           // Override `fetch` to log the SQL query. This is optional.
           override def fetch(fragment: AppliedFragment, codecs: List[(Boolean, Codec)]): F[Vector[Array[Any]]] = {
-            Logger[F].debug {
+            val SlowQueryLogger: Logger[F] = LF.getLoggerFromName("lucuma-odb-slow-query")
+
+            // Maybe it should be an env variable
+            val SlowQueryThreshold = 5.second
+
+            L.debug {
               val formatted = SqlFormatter.format(fragment.fragment.sql)
               val cleanedUp = formatted.replaceAll("\\$ (\\d+)", "\\$$1") // turn $ 42 into $42
               val colored   = cleanedUp.linesIterator.map(s => s"${AnsiColor.GREEN}$s${AnsiColor.RESET}").mkString("\n")
               s"\n\n$colored\n\n"
             } *>
-            super.fetch(fragment, codecs)
+              Trace[F].span("grackle.fetch"):
+                Temporal[F].timed(super.fetch(fragment, codecs)).flatMap: (elapsed, result) =>
+                  val slowQuery = elapsed > SlowQueryThreshold
+
+                  // Add some attributes to every query and a few specific ones for slow queries
+                  val baseAttrs =
+                    T.put(
+                      "db.duration_ms" -> elapsed.toMillis,
+                      "db.row_count"   -> result.size.toLong
+                    )
+                  val slowAttrs =
+                    T.put(
+                      "db.statement"  -> fragment.fragment.sql,
+                      "db.slow_query" -> true
+                    )
+                  // We are explicitly not formatting sql because it is very expensive for large queries
+                  val logWarn =
+                    SlowQueryLogger.warn(s"Slow query (${elapsed.toMillis}ms):\n${fragment.fragment.sql}")
+
+                  for {
+                    _ <- baseAttrs
+                    _ <- slowAttrs.whenA(slowQuery)
+                    _ <- logWarn.whenA(slowQuery)
+                  } yield result
           }
 
           // HACK: If the codec is a DomainCodec then use the domain name when generating `null::<type>` in Grackle queries
