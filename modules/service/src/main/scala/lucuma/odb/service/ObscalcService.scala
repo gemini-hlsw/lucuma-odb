@@ -418,17 +418,18 @@ object ObscalcService:
       prefixedColumns(prefix.some,
         "c_obscalc_state",
         "c_full_setup_time",
+        "c_setup_count",
         "c_sci_obs_class",
         "c_sci_non_charged_time",
         "c_sci_program_time"
       )
 
     val full_categorized_time: Decoder[CategorizedTime] =
-       (time_span *: obs_class *: time_span *: time_span).map: (setup, obsclass, nonCharged, program) =>
+       (time_span *: int4_nonneg *: obs_class *: time_span *: time_span).map: (setup, count, obsclass, nonCharged, program) =>
          CategorizedTime(
            ChargeClass.NonCharged -> nonCharged,
            ChargeClass.Program    -> program
-         ).sumCharge(obsclass.chargeClass, setup)
+         ).sumCharge(obsclass.chargeClass, setup *| count.value)
 
     val SelectOneCategorizedTime: Query[Observation.Id, CalculatedValue[CategorizedTime]] =
       sql"""
