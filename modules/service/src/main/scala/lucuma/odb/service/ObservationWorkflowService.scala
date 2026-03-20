@@ -377,7 +377,8 @@ object ObservationWorkflowService {
               case ObservationValidationCode.ConfigurationRequestPending => 7
 
           val validationStatus: ValidationState =
-            codes.minOption.fold(Defined):
+            if info.role.isDefined then Defined // Calibrations are immediately Defined
+            else codes.minOption.fold(Defined):
               case ObservationValidationCode.CallForProposalsError            |
                    ObservationValidationCode.ConfigurationError               |
                    ObservationValidationCode.ItcError                         => Undefined
@@ -387,8 +388,7 @@ object ObservationWorkflowService {
                    ObservationValidationCode.ConfigurationRequestPending      => Unapproved
 
           def userStatus(validationStatus: ValidationState): Option[UserState] =
-            if info.role.isDefined then Some(Ready) // Calibrations are immediately ready
-            else info.userState.flatMap:
+            info.userState.flatMap:
               case Inactive => Some(Inactive)       // Inactive overrides validation errors
               case Ready    =>
                 validationStatus match              // Validation errors override Ready
@@ -406,8 +406,7 @@ object ObservationWorkflowService {
               case (Some(es), _)    => es
 
           val allowedTransitions: List[ObservationWorkflowState] =
-            if info.role.isDefined then Nil // User can't set the state for calibrations
-            else state match
+            state match
               case Inactive   => List(executionState.getOrElse(validationStatus))
               case Undefined  => List(Inactive)
               case Unapproved => List(Inactive)

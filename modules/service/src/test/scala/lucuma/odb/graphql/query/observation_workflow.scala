@@ -783,10 +783,15 @@ class observation_workflow
         ).asRight
       )
 
-  test("calibrations are not validated and are immediately Ready"):
+  test("calibrations are not validated and are immediately Defined"):
     val setup: IO[Observation.Id] =
       for
-        pid <- createProgramAs(pi)
+        cfp <- createCallForProposalsAs(staff)
+        pid <- createProgramWithNonPartnerPi(pi, "Foo")
+        _   <- addProposal(pi, pid, Some(cfp), None)
+        _   <- addPartnerSplits(pi, pid)
+        _   <- addCoisAs(pi, pid)
+        _   <- setProposalStatus(staff, pid, "ACCEPTED")
         tid <- createTargetWithProfileAs(pi, pid)
         oid <- createObservationAs(pi, pid, tid)
         _   <- setObservationCalibrationRole(List(oid), CalibrationRole.SpectroPhotometric)
@@ -801,8 +806,8 @@ class observation_workflow
           CalculatedValue(
             CalculationState.Ready,
             ObservationWorkflow(
-              ObservationWorkflowState.Ready,
-              Nil,
+              ObservationWorkflowState.Defined,
+              List(ObservationWorkflowState.Inactive, ObservationWorkflowState.Ready),
               Nil
             )
           )
