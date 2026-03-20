@@ -61,7 +61,9 @@ object GmosLongSlitInput:
     filter:           Nullable[GmosNorthFilter],
     roi:              Nullable[GmosLongSlitAcquisitionRoi],
     exposureTimeMode: Option[ExposureTimeMode]
-  )
+  ):
+    def updatesAcquisition: Boolean =
+      filter.isDefined || roi.isDefined || exposureTimeMode.isDefined
 
   object NorthAcquisition:
     val Binding: Matcher[NorthAcquisition] =
@@ -85,7 +87,9 @@ object GmosLongSlitInput:
     filter:           Nullable[GmosSouthFilter],
     roi:              Nullable[GmosLongSlitAcquisitionRoi],
     exposureTimeMode: Option[ExposureTimeMode]
-  )
+  ):
+    def updatesAcquisition: Boolean =
+      filter.isDefined || roi.isDefined || exposureTimeMode.isDefined
 
   object SouthAcquisition:
     val Binding: Matcher[SouthAcquisition] =
@@ -284,6 +288,9 @@ object GmosLongSlitInput:
       common:      Edit.Common,
       acquisition: Option[NorthAcquisition]
     ) derives Eq:
+      def updatesAcquisition: Boolean =
+        acquisition.exists(_.updatesAcquisition)
+
       def limitToPreExecution(access: Access): Boolean =
         // Staff can edit the acquisition info for ongoing observations
         access <= Access.Pi ||
@@ -346,6 +353,9 @@ object GmosLongSlitInput:
       common:      Edit.Common,
       acquisition: Option[SouthAcquisition]
     ) derives Eq:
+      def updatesAcquisition: Boolean =
+        acquisition.exists(_.updatesAcquisition)
+
       def limitToPreExecution(access: Access): Boolean =
         // Staff can edit the acquisition info for ongoing observations
         access <= Access.Pi ||

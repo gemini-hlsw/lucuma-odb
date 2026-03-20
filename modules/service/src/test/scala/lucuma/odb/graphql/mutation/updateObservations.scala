@@ -1967,6 +1967,7 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
     multiUpdateTest(pi, List((update0, query, expected0), (update1, query, expected1)))
   }
 
+
   test("observing mode: existing f2 update read_mode updates reads") {
 
     val update0 = """

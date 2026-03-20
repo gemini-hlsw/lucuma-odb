@@ -45,7 +45,9 @@ object Flamingos2LongSlitInput:
   case class Acquisition(
     filter:           Nullable[Flamingos2Filter],
     exposureTimeMode: Option[ExposureTimeMode]
-  )
+  ):
+    def updatesAcquisition: Boolean =
+      filter.isDefined || exposureTimeMode.isDefined
 
   object Acquisition:
 
@@ -173,6 +175,10 @@ object Flamingos2LongSlitInput:
     telluricType: Option[TelluricType],
     acquisition: Option[Acquisition]
   ) derives Eq:
+
+    def updatesAcquisition: Boolean =
+      acquisition.exists(_.updatesAcquisition)
+
     def limitToPreExecution(access: Access): Boolean =
       // Staff can edit the acquisition info for ongoing observations
       access <= Access.Pi || 
