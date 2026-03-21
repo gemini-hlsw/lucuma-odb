@@ -68,6 +68,10 @@ object ObservingModeInput:
     flamingos2LongSlit: Option[Flamingos2LongSlitInput.Edit],
     igrins2LongSlit: Option[Igrins2LongSlitInput.Edit]
   ):
+    def updatesAcquisition: Boolean =
+      flamingos2LongSlit.exists(_.updatesAcquisition) ||
+      gmosNorthLongSlit.exists(_.updatesAcquisition)  ||
+      gmosSouthLongSlit.exists(_.updatesAcquisition)
 
     def limitToPreExecution(access: Access): Boolean =
       access <= Access.Pi ||

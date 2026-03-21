@@ -768,22 +768,37 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
             }).flatMap(_ => accum)
           }.value
 
+      def resetAcquisitionIfNecessary(
+        approval: Result[AccessControl.CheckedWithIds[ObservationPropertiesInput.Edit, Observation.Id]]
+      ): F[Unit] =
+        val (updatesAcquisition, ids) = approval.toOption.fold((false, List.empty[Observation.Id])): checked =>
+          checked.foldWithIds((false, List.empty[Observation.Id])): (set, ids) =>
+            (set.updatesAcquisition, ids.toList)
+
+        services
+          .useNonTransactionally:
+            Services.asSuperUser:
+              ids.traverse(id => generator.resetAcquisition(id)).void
+          .whenA(updatesAcquisition)
+
       // Put it all together
       services
         .useNonTransactionally(selectForUpdate(input, false /* ignore calibrations */)) // this performs all the access control checks
         .flatMap: approval =>
-          services.useTransactionally:
-            approval.flatTraverse: edit =>
-                updateObservations(edit)
-                  .flatMap:
-                    case (map, query) =>
-                      Services.asSuperUser:
-                        setAsterisms(map)
-                          .as(query)
-                  .value
-                  .flatTap: q =>
-                    transaction.rollback.unlessA(q.hasValue)
+          val resultQuery =
+            services.useTransactionally:
+              approval.flatTraverse: edit =>
+                  updateObservations(edit)
+                    .flatMap:
+                      case (map, query) =>
+                        Services.asSuperUser:
+                          setAsterisms(map).as(query)
+                    .value
+                    .flatTap: q =>
+                      transaction.rollback.unlessA(q.hasValue)
 
+          resultQuery.flatTap: r =>
+            resetAcquisitionIfNecessary(approval).whenA(r.hasValue)
     }
 
   private lazy val UpdateObservationsTimes: MutationField =

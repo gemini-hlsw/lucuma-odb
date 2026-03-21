@@ -19,18 +19,18 @@ final case class UpdateObservationsInput(
   WHERE:          Option[Predicate],
   LIMIT:          Option[NonNegInt],
   includeDeleted: Option[Boolean]
-) {
-
+):
   def asterism: Nullable[NonEmptyList[Target.Id]] =
     SET.asterism
 
-}
+  def updatesAcquisition: Boolean =
+    SET.updatesAcquisition
 
-object UpdateObservationsInput {
+object UpdateObservationsInput:
 
-  def binding(path: Path): Matcher[UpdateObservationsInput] = {
+  def binding(path: Path): Matcher[UpdateObservationsInput] =
     val WhereObservationBinding = WhereObservation.binding(path)
-    ObjectFieldsBinding.rmap {
+    ObjectFieldsBinding.rmap:
       case List(
         ObservationPropertiesInput.Edit.Binding("SET", rSET),
         WhereObservationBinding.Option("WHERE", rWHERE),
@@ -38,7 +38,3 @@ object UpdateObservationsInput {
         BooleanBinding.Option("includeDeleted", rIncludeDeleted)
       ) =>
         (rSET, rWHERE, rLIMIT, rIncludeDeleted).parMapN(apply)
-    }
-  }
-
-}
