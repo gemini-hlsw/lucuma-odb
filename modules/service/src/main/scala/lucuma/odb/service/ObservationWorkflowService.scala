@@ -43,6 +43,7 @@ import lucuma.odb.graphql.mapping.AccessControl
 import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.sequence.data.MissingParamSet
 import lucuma.odb.service.GeneratorParamsService.Error as GenParamsError
+import lucuma.odb.service.ObservationWorkflowService.UserState
 import lucuma.odb.service.Services.SuperUserAccess
 import lucuma.odb.syntax.instrument.*
 import lucuma.odb.util.Codecs.*
@@ -117,10 +118,15 @@ case class ObservationValidationInfo(
   cfpid:              Option[CallForProposals.Id],
   scienceBand:        Option[ScienceBand],
   asterism:           List[Target],
+  associatedUserState:Option[ObservationWorkflowService.UserState], // state of science obs if this is a telluric
   generatorParams:    Option[Either[GeneratorParamsService.Error, GeneratorParams]] = None,
   cfpInfo:            Option[CfpInfo] = None,
   programAllocations: Option[NonEmptyList[ScienceBand]] = None,
 ) {
+
+  def effectiveUserState: Option[UserState] =
+    if role === Some(CalibrationRole.Telluric) then associatedUserState
+    else userState
 
   /* Has the proposal been accepted? */
   def isAccepted(using enums: Enums): Result[Boolean] =
@@ -377,7 +383,8 @@ object ObservationWorkflowService {
               case ObservationValidationCode.ConfigurationRequestPending => 7
 
           val validationStatus: ValidationState =
-            codes.minOption.fold(Defined):
+            if info.role.isDefined then Defined // Calibrations are immediately Defined
+            else codes.minOption.fold(Defined):
               case ObservationValidationCode.CallForProposalsError            |
                    ObservationValidationCode.ConfigurationError               |
                    ObservationValidationCode.ItcError                         => Undefined
@@ -387,8 +394,7 @@ object ObservationWorkflowService {
                    ObservationValidationCode.ConfigurationRequestPending      => Unapproved
 
           def userStatus(validationStatus: ValidationState): Option[UserState] =
-            if info.role.isDefined then Some(Ready) // Calibrations are immediately ready
-            else info.userState.flatMap:
+            info.effectiveUserState.flatMap:
               case Inactive => Some(Inactive)       // Inactive overrides validation errors
               case Ready    =>
                 validationStatus match              // Validation errors override Ready
@@ -406,7 +412,7 @@ object ObservationWorkflowService {
               case (Some(es), _)    => es
 
           val allowedTransitions: List[ObservationWorkflowState] =
-            if info.role.isDefined then Nil // User can't set the state for calibrations
+            if (info.role === Some(CalibrationRole.Telluric) && state <= Ready) then Nil
             else state match
               case Inactive   => List(executionState.getOrElse(validationStatus))
               case Undefined  => List(Inactive)
@@ -688,16 +694,22 @@ object ObservationWorkflowService {
           o.c_declared_complete,
           p.c_proposal_status,
           x.c_cfp_id,
-          o.c_science_band
+          o.c_science_band,
+          s.c_workflow_user_state
         FROM t_observation o
         JOIN t_program p on p.c_program_id = o.c_program_id
-        LEFT JOIN t_proposal x ON o.c_program_id = x.c_program_id
-        WHERE c_observation_id IN ($enc)
+        LEFT JOIN t_proposal x 
+          ON o.c_program_id = x.c_program_id
+        LEFT JOIN t_observation s 
+          ON  o.c_calibration_role = 'telluric' 
+          AND s.c_calibration_role IS NULL
+          AND o.c_group_id = s.c_group_id
+        WHERE o.c_observation_id IN ($enc)
       """
-      .query(program_id *: program_type *: observation_id *: instrument.opt *: right_ascension.opt *: declination.opt *: calibration_role.opt *: user_state.opt *: bool *: tag *: cfp_id.opt *: science_band.opt)
+      .query(program_id *: program_type *: observation_id *: instrument.opt *: right_ascension.opt *: declination.opt *: calibration_role.opt *: user_state.opt *: bool *: tag *: cfp_id.opt *: science_band.opt *: user_state.opt)
       .map:
-        case (pid, tpe, oid, inst, ra, dec, cal, state, dc, tag, cfp, sci) =>
-          ObservationValidationInfo(pid, tpe, oid, inst, None, (ra, dec).mapN(Coordinates.apply), cal, state, dc, tag, cfp, sci, Nil)
+        case (pid, tpe, oid, inst, ra, dec, cal, state, dc, tag, cfp, sci, state2) =>
+          ObservationValidationInfo(pid, tpe, oid, inst, None, (ra, dec).mapN(Coordinates.apply), cal, state, dc, tag, cfp, sci, Nil, state2)
 
     def ProgramAllocations[A <: NonEmptyList[Program.Id]](enc: Encoder[A]): Query[A, (Program.Id, ScienceBand)] =
       sql"""
