@@ -120,7 +120,9 @@ object ObservationPropertiesInput {
     group:               Nullable[Group.Id],
     groupIndex:          Option[NonNegShort],
     observerNotes:       Nullable[NonEmptyString],
-  ) extends AsterismInput
+  ) extends AsterismInput:
+    def updatesAcquisition: Boolean =
+      observingMode.toOption.exists(_.updatesAcquisition)
 
   object Edit {
 

@@ -10,6 +10,7 @@ import cats.syntax.option.*
 import cats.syntax.traverse.*
 import io.circe.Json
 import io.circe.literal.*
+import io.circe.syntax.*
 import lucuma.core.enums.Breakpoint
 import lucuma.core.enums.GmosLongSlitAcquisitionRoi
 import lucuma.core.enums.GmosLongSlitAcquisitionRoi.*
@@ -21,7 +22,7 @@ import lucuma.itc.IntegrationTime
 import lucuma.itc.client.ImagingInput
 import lucuma.odb.sequence.gmos.longslit.Acquisition.RepeatingAtomCount
 
-class executionAcqGmosNorth extends ExecutionTestSupportForGmos:
+class executionAcqGmosNorth extends ExecutionTestSupportForGmos with mutation.UpdateObservationsOps:
 
   override def fakeItcImagingResultFor(input: ImagingInput): Option[IntegrationTime] =
     input.exposureTimeMode match
@@ -335,7 +336,50 @@ class executionAcqGmosNorth extends ExecutionTestSupportForGmos:
            )
     yield ()
 
-  test("override acquisition filter"):
+  private def nextAtomFilterQuery(o: Observation.Id): String =
+    s"""
+      query {
+        executionConfig(observationId: "$o") {
+          gmosNorth {
+            acquisition {
+              nextAtom {
+                steps {
+                  instrumentConfig {
+                    filter
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    """
+
+  private def nextAtomExpectedFilter(f: String, c: Int): Json =
+    json"""
+      {
+        "executionConfig": {
+          "gmosNorth": {
+            "acquisition": {
+              "nextAtom": {
+                "steps": ${List.fill(c)(
+                  json"""
+                    {
+                      "instrumentConfig": {
+                        "filter": $f
+                      }
+                    }
+                  """
+                ).asJson}
+              }
+            }
+          }
+        }
+      }
+    """
+
+
+  test("override acquisition filter before execution"):
     val setup: IO[Observation.Id] =
       for
         p <- createProgram
@@ -392,53 +436,61 @@ class executionAcqGmosNorth extends ExecutionTestSupportForGmos:
     setup.flatMap: oid =>
       expect(
         user     = pi,
-        query    = s"""
-          query {
-            executionConfig(observationId: "$oid") {
-              gmosNorth {
-                acquisition {
-                  nextAtom {
-                    steps {
-                      instrumentConfig {
-                        filter
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        """,
-        expected = json"""
-          {
-            "executionConfig": {
-              "gmosNorth": {
-                "acquisition": {
-                  "nextAtom": {
-                    "steps": [
-                      {
-                        "instrumentConfig": {
-                          "filter": "Z_PRIME"
-                        }
-                      },
-                      {
-                        "instrumentConfig": {
-                          "filter": "Z_PRIME"
-                        }
-                      },
-                      {
-                        "instrumentConfig": {
-                          "filter": "Z_PRIME"
-                        }
-                      }
-                    ]
-                  }
-                }
-              }
-            }
-          }
-        """.asRight
+        query    = nextAtomFilterQuery(oid),
+        expected = nextAtomExpectedFilter("Z_PRIME", 3).asRight
       )
+
+  test("override acquisition filter after execution begins"):
+    val update = """
+      observingMode: {
+        gmosNorthLongSlit: {
+          acquisition: {
+            explicitFilter: Z_PRIME
+          }
+        }
+      }
+    """
+
+    for
+      p <- createProgram
+      t <- createTargetWithProfileAs(pi, p)
+      o <- createObservationWithModeAs(pi, p, List(t), s"""
+        gmosNorthLongSlit: {
+          grating: R831_G5302
+          filter: R_PRIME
+          fpu: LONG_SLIT_0_50
+          centralWavelength: {
+            nanometers: 500
+          }
+          explicitYBin: TWO
+       }"""
+      )
+
+      // Record a visit, observe the default 3 first atom steps with g' filter
+      v <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
+      _ <- expect(
+        user     = pi,
+        query    = nextAtomFilterQuery(o),
+        expected = nextAtomExpectedFilter("G_PRIME", 3).asRight
+      )
+
+      // Execute the first step, observe remaining 2 first atom steps with g'
+      s <- firstAcquisitionStepId(serviceUser, o)
+      _ <- addEndStepEvent(s, v)
+      _ <- expect(
+        user     = pi,
+        query    = nextAtomFilterQuery(o),
+        expected = nextAtomExpectedFilter("G_PRIME", 2).asRight
+      )
+
+      // Update the acquisition parameters to change the default filter to z'
+      _ <- query(serviceUser, updateObservationsMutation(o, update, "observations { id }"))
+      _ <- expect(
+        user     = pi,
+        query    = nextAtomFilterQuery(o),
+        expected = nextAtomExpectedFilter("Z_PRIME", 3).asRight
+      )
+    yield o
 
   test("override roi"):
     val setup: IO[Observation.Id] =
