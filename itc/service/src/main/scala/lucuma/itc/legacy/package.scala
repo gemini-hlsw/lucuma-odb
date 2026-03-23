@@ -39,9 +39,7 @@ case class ItcParameters(
 case class ItcInstrumentDetails(mode: ObservingMode)
 
 extension (mode: ObservingMode)
-  def instrumentPort: PortDisposition = mode match
-    case ObservingMode.SpectroscopyMode.Igrins2() => PortDisposition.Bottom
-    case _                                        => PortDisposition.Side
+  def instrumentPort: PortDisposition = mode.portDisposition
 
 private def buildSourceDefinition(
   target:       TargetData,

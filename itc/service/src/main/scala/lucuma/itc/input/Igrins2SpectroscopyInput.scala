@@ -3,15 +3,15 @@
 
 package lucuma.itc.input
 
-import cats.syntax.functor.*
+import lucuma.core.enums.PortDisposition
 import lucuma.odb.graphql.binding.*
 
-case class Igrins2SpectroscopyInput() extends InstrumentModesInput
+case class Igrins2SpectroscopyInput(port: PortDisposition) extends InstrumentModesInput
 
 object Igrins2SpectroscopyInput:
   val binding: Matcher[Igrins2SpectroscopyInput] =
     ObjectFieldsBinding.rmap:
       case List(
-            EnumBinding.Option("ignore", rIgnore)
+            PortDispositionBinding("port", portDisposition)
           ) =>
-        rIgnore.as(Igrins2SpectroscopyInput())
+        portDisposition.map(Igrins2SpectroscopyInput.apply)

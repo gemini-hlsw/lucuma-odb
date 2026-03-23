@@ -60,35 +60,47 @@ object AsterismGraphRequest:
     ) = input
 
     val modeResult: Result[ObservingMode.SpectroscopyMode] = mode match {
-      case GmosNSpectroscopyInput(
-            centralWavelength,
-            grating,
-            GmosFpuMask.Builtin(fpu),
-            filter,
-            ccdMode,
-            roi
+      case GmosNSpectroscopyInput(centralWavelength,
+                                  grating,
+                                  GmosFpuMask.Builtin(fpu),
+                                  filter,
+                                  ccdMode,
+                                  roi,
+                                  port
           ) =>
         Result(
           ObservingMode.SpectroscopyMode
-            .GmosNorth(centralWavelength, grating, GmosNorthFpuParam(fpu), filter, ccdMode, roi)
+            .GmosNorth(centralWavelength,
+                       grating,
+                       GmosNorthFpuParam(fpu),
+                       filter,
+                       ccdMode,
+                       roi,
+                       port
+            )
         )
-      case GmosSSpectroscopyInput(
-            centralWavelength,
-            grating,
-            GmosFpuMask.Builtin(fpu),
-            filter,
-            ccdMode,
-            roi
+      case GmosSSpectroscopyInput(centralWavelength,
+                                  grating,
+                                  GmosFpuMask.Builtin(fpu),
+                                  filter,
+                                  ccdMode,
+                                  roi,
+                                  port
           ) =>
         Result(
           ObservingMode.SpectroscopyMode
-            .GmosSouth(centralWavelength, grating, GmosSouthFpuParam(fpu), filter, ccdMode, roi)
+            .GmosSouth(centralWavelength,
+                       grating,
+                       GmosSouthFpuParam(fpu),
+                       filter,
+                       ccdMode,
+                       roi,
+                       port
+            )
         )
-      case Igrins2SpectroscopyInput() =>
-        Result(
-          ObservingMode.SpectroscopyMode.Igrins2()
-        )
-      case _                          =>
+      case Igrins2SpectroscopyInput(port) =>
+        Result(ObservingMode.SpectroscopyMode.Igrins2(port))
+      case _                              =>
         Result.failure("Invalid spectroscopy mode")
     }
 

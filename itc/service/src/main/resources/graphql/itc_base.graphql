@@ -67,6 +67,9 @@ input GmosSSpectroscopyInput {
 
   """Regions of interest"""
   roi: GmosRoi
+
+  """Instrument port disposition"""
+  port: PortDisposition! = Side
 }
 
 input GmosSImagingInput {
@@ -75,6 +78,9 @@ input GmosSImagingInput {
 
   """ccd mode"""
   ccdMode: GmosCcdModeInput
+
+  """Instrument port disposition"""
+  port: PortDisposition! = Side
 }
 
 input GmosNSpectroscopyInput {
@@ -95,6 +101,9 @@ input GmosNSpectroscopyInput {
 
   """Regions of interest"""
   roi: GmosRoi
+
+  """Instrument port disposition"""
+  port: PortDisposition! = Side
 }
 
 input GmosNImagingInput {
@@ -103,6 +112,9 @@ input GmosNImagingInput {
 
   """ccd mode"""
   ccdMode: GmosCcdModeInput
+
+  """Instrument port disposition"""
+  port: PortDisposition! = Side
 }
 
 input Flamingos2SpectroscopyInput {
@@ -114,15 +126,22 @@ input Flamingos2SpectroscopyInput {
 
   """Flamingos2 filter"""
   filter: Flamingos2Filter!
+
+  """Instrument port disposition"""
+  port: PortDisposition! = Side
 }
 
 input Flamingos2ImagingInput {
   """Flamingos2 filter"""
   filter: Flamingos2Filter!
+
+  """Instrument port disposition"""
+  port: PortDisposition! = Side
 }
 
 input Igrins2SpectroscopyInput {
-  ignore: Ignore
+  """Instrument port disposition"""
+  port: PortDisposition! = Bottom
 }
 
 type GmosSSpectroscopyParams {

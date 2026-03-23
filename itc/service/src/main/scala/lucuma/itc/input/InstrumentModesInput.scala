@@ -4,10 +4,12 @@
 package lucuma.itc.input
 
 import cats.syntax.parallel.*
+import lucuma.core.enums.PortDisposition
 import lucuma.odb.graphql.binding.*
 import lucuma.odb.graphql.input.*
 
-trait InstrumentModesInput
+trait InstrumentModesInput:
+  def port: PortDisposition
 
 object InstrumentModesInput:
 

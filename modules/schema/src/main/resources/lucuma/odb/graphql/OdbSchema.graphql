@@ -10629,6 +10629,21 @@ Timestamp of time in ISO-8601 representation in format '2011-12-03T10:15:30Z'
 scalar Timestamp
 
 """
+PortDisposition
+"""
+enum PortDisposition {
+  """
+  Side looking port
+  """
+  Side
+
+  """
+  Up (bottom) looking port
+  """
+  Bottom
+}
+
+"""
 Instrument
 """
 enum Instrument {
