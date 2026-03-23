@@ -38,9 +38,6 @@ case class ItcParameters(
 
 case class ItcInstrumentDetails(mode: ObservingMode)
 
-extension (mode: ObservingMode)
-  def instrumentPort: PortDisposition = mode.portDisposition
-
 private def buildSourceDefinition(
   target:       TargetData,
   atWavelength: Wavelength
@@ -76,7 +73,7 @@ def spectroscopyGraphParams(
       conditions = conditions,
       telescope = ItcTelescopeDetails(
         wfs = ItcWavefrontSensor.OIWFS,
-        instrumentPort = observingMode.instrumentPort
+        instrumentPort = observingMode.portDisposition
       ),
       instrument = ItcInstrumentDetails(observingMode)
     )
@@ -108,7 +105,7 @@ def spectroscopyIntegrationTimeParams(
       conditions = conditions,
       telescope = ItcTelescopeDetails(
         wfs = ItcWavefrontSensor.OIWFS,
-        instrumentPort = observingMode.instrumentPort
+        instrumentPort = observingMode.portDisposition
       ),
       instrument = ItcInstrumentDetails(observingMode)
     )
@@ -141,7 +138,7 @@ def spectroscopySNParams(
       conditions = conditions,
       telescope = ItcTelescopeDetails(
         wfs = ItcWavefrontSensor.OIWFS,
-        instrumentPort = observingMode.instrumentPort
+        instrumentPort = observingMode.portDisposition
       ),
       instrument = ItcInstrumentDetails(observingMode)
     )
@@ -172,7 +169,7 @@ def imagingIntegrationTimeParams(
       conditions = conditions,
       telescope = ItcTelescopeDetails(
         wfs = ItcWavefrontSensor.OIWFS,
-        instrumentPort = observingMode.instrumentPort
+        instrumentPort = observingMode.portDisposition
       ),
       instrument = ItcInstrumentDetails(observingMode)
     )
@@ -204,7 +201,7 @@ def imagingS2NParams(
       conditions = conditions,
       telescope = ItcTelescopeDetails(
         wfs = ItcWavefrontSensor.OIWFS,
-        instrumentPort = observingMode.instrumentPort
+        instrumentPort = observingMode.portDisposition
       ),
       instrument = ItcInstrumentDetails(observingMode)
     )

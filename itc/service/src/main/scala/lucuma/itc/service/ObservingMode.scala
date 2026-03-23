@@ -67,7 +67,7 @@ object ObservingMode {
       filter:            Option[GmosNorthFilter],
       ccdMode:           Option[GmosCcdMode],
       roi:               Option[GmosRoi],
-      portDisposition:   PortDisposition = PortDisposition.Side
+      portDisposition:   PortDisposition
     ) extends GmosSpectroscopy derives Hash {
       val isIfu = fpu.isIfu
 
@@ -99,7 +99,7 @@ object ObservingMode {
       filter:            Option[GmosSouthFilter],
       ccdMode:           Option[GmosCcdMode],
       roi:               Option[GmosRoi],
-      portDisposition:   PortDisposition = PortDisposition.Side
+      portDisposition:   PortDisposition
     ) extends GmosSpectroscopy derives Hash {
       val isIfu = fpu.isIfu
 
@@ -128,7 +128,7 @@ object ObservingMode {
       disperser:       Flamingos2Disperser,
       filter:          Flamingos2Filter,
       fpu:             Flamingos2Fpu,
-      portDisposition: PortDisposition = PortDisposition.Side
+      portDisposition: PortDisposition
     ) extends SpectroscopyMode derives Hash {
 
       override def analysisMethod: AnalysisMethod =
@@ -148,8 +148,7 @@ object ObservingMode {
           ("params", Flamingos2SpectroscopyParams(a.disperser, a.fpu, a.filter).asJson)
         )
 
-    case class Igrins2(portDisposition: PortDisposition = PortDisposition.Bottom)
-        extends SpectroscopyMode derives Hash {
+    case class Igrins2(portDisposition: PortDisposition) extends SpectroscopyMode derives Hash {
       override def analysisMethod: AnalysisMethod =
         ItcObservationDetails.AnalysisMethod.Aperture.Auto(
           skyAperture = 5.0
@@ -188,7 +187,7 @@ object ObservingMode {
     case class GmosNorth(
       filter:          GmosNorthFilter,
       ccdMode:         Option[GmosCcdMode],
-      portDisposition: PortDisposition = PortDisposition.Side
+      portDisposition: PortDisposition
     ) extends GmosImaging {
       val centralWavelength: Wavelength = Wavelength.Min // Ignored for imaging
 
@@ -207,7 +206,7 @@ object ObservingMode {
     case class GmosSouth(
       filter:          GmosSouthFilter,
       ccdMode:         Option[GmosCcdMode],
-      portDisposition: PortDisposition = PortDisposition.Side
+      portDisposition: PortDisposition
     ) extends GmosImaging {
       val centralWavelength: Wavelength = Wavelength.Min // Ignored for imaging
 
@@ -224,7 +223,7 @@ object ObservingMode {
 
     case class Flamingos2(
       filter:          Flamingos2Filter,
-      portDisposition: PortDisposition = PortDisposition.Side
+      portDisposition: PortDisposition
     ) extends ImagingMode {
       val instrument: Instrument = Instrument.Flamingos2
 

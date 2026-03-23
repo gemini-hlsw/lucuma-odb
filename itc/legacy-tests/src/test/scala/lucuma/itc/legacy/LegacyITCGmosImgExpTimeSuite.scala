@@ -44,7 +44,8 @@ class LegacyITCGmosImgExpTimeSuite extends CommonITCLegacySuite:
         GmosAmpCount.Twelve,
         GmosAmpGain.High,
         GmosAmpReadMode.Fast
-      ).some
+      ).some,
+      PortDisposition.Side
     )
   )
 
@@ -60,7 +61,8 @@ class LegacyITCGmosImgExpTimeSuite extends CommonITCLegacySuite:
       GmosAmpCount.Twelve,
       GmosAmpGain.High,
       GmosAmpReadMode.Fast
-    ).some
+    ).some,
+    PortDisposition.Side
   )
 
   test("gmos north filter".tag(LegacyITCTest)):
@@ -80,7 +82,8 @@ class LegacyITCGmosImgExpTimeSuite extends CommonITCLegacySuite:
       GmosAmpCount.Twelve,
       GmosAmpGain.High,
       GmosAmpReadMode.Fast
-    ).some
+    ).some,
+    PortDisposition.Side
   )
 
   test("gmos south filter".tag(LegacyITCTest)):

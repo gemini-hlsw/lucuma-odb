@@ -4,6 +4,7 @@
 package lucuma.itc.legacy
 
 import io.circe.syntax.*
+import lucuma.core.enums.PortDisposition
 import lucuma.core.math.Angle
 import lucuma.core.math.Wavelength
 import lucuma.itc.legacy.codecs.given
@@ -31,7 +32,9 @@ class LegacyITCIgrins2SpecExpTimeSuite extends CommonITCLegacySuite:
     analysisMethod = lsAnalysisMethod
   )
 
-  override def instrument = ItcInstrumentDetails(ObservingMode.SpectroscopyMode.Igrins2())
+  override def instrument = ItcInstrumentDetails(
+    ObservingMode.SpectroscopyMode.Igrins2(PortDisposition.Bottom)
+  )
 
   test("IGRINS-2 spectroscopy S/N".tag(LegacyITCTest)):
     val result = localItc.calculateIntegrationTime(baseParams.asJson.noSpaces)

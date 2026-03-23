@@ -42,7 +42,8 @@ class LegacyITCGmosImgSignalToNoiseSuite extends CommonITCLegacySuite:
         GmosAmpCount.Twelve,
         GmosAmpGain.High,
         GmosAmpReadMode.Fast
-      ).some
+      ).some,
+      PortDisposition.Side
     )
   )
 
@@ -58,7 +59,8 @@ class LegacyITCGmosImgSignalToNoiseSuite extends CommonITCLegacySuite:
       GmosAmpCount.Twelve,
       GmosAmpGain.High,
       GmosAmpReadMode.Fast
-    ).some
+    ).some,
+    PortDisposition.Side
   )
 
   test("gmos north filter".tag(LegacyITCTest)):
@@ -78,7 +80,8 @@ class LegacyITCGmosImgSignalToNoiseSuite extends CommonITCLegacySuite:
       GmosAmpCount.Twelve,
       GmosAmpGain.High,
       GmosAmpReadMode.Fast
-    ).some
+    ).some,
+    PortDisposition.Side
   )
 
   test("gmos south filter".tag(LegacyITCTest)):
