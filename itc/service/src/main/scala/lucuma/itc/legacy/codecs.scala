@@ -245,10 +245,14 @@ private[legacy] object codecs:
 
   private given Encoder[ItcWavefrontSensor] = Encoder[String].contramap(_.ocs2Tag)
 
+  private given Encoder[PortDisposition] = Encoder[String].contramap:
+    case PortDisposition.Side   => "SIDE_LOOKING"
+    case PortDisposition.Bottom => "UP_LOOKING"
+
   private given Encoder[ItcTelescopeDetails] = (a: ItcTelescopeDetails) =>
     Json.obj(
       "mirrorCoating"  -> Json.fromString("SILVER"),
-      "instrumentPort" -> Json.fromString("SIDE_LOOKING"),
+      "instrumentPort" -> a.instrumentPort.asJson,
       "wfs"            -> a.wfs.asJson
     )
 

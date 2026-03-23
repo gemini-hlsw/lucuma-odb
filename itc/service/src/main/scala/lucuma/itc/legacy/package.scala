@@ -20,7 +20,7 @@ enum ItcWavefrontSensor(val ocs2Tag: String):
   case PWFS  extends ItcWavefrontSensor("PWFS")
   case OIWFS extends ItcWavefrontSensor("OIWFS")
 
-case class ItcTelescopeDetails(wfs: ItcWavefrontSensor)
+case class ItcTelescopeDetails(wfs: ItcWavefrontSensor, instrumentPort: PortDisposition)
 
 case class ItcSourceDefinition(
   target:     TargetData,
@@ -37,6 +37,11 @@ case class ItcParameters(
 )
 
 case class ItcInstrumentDetails(mode: ObservingMode)
+
+extension (mode: ObservingMode)
+  def instrumentPort: PortDisposition = mode match
+    case ObservingMode.SpectroscopyMode.Igrins2() => PortDisposition.Bottom
+    case _                                        => PortDisposition.Side
 
 private def buildSourceDefinition(
   target:       TargetData,
@@ -72,7 +77,8 @@ def spectroscopyGraphParams(
       ),
       conditions = conditions,
       telescope = ItcTelescopeDetails(
-        wfs = ItcWavefrontSensor.OIWFS
+        wfs = ItcWavefrontSensor.OIWFS,
+        instrumentPort = observingMode.instrumentPort
       ),
       instrument = ItcInstrumentDetails(observingMode)
     )
@@ -103,7 +109,8 @@ def spectroscopyIntegrationTimeParams(
       ),
       conditions = conditions,
       telescope = ItcTelescopeDetails(
-        wfs = ItcWavefrontSensor.OIWFS
+        wfs = ItcWavefrontSensor.OIWFS,
+        instrumentPort = observingMode.instrumentPort
       ),
       instrument = ItcInstrumentDetails(observingMode)
     )
@@ -135,7 +142,8 @@ def spectroscopySNParams(
       ),
       conditions = conditions,
       telescope = ItcTelescopeDetails(
-        wfs = ItcWavefrontSensor.OIWFS
+        wfs = ItcWavefrontSensor.OIWFS,
+        instrumentPort = observingMode.instrumentPort
       ),
       instrument = ItcInstrumentDetails(observingMode)
     )
@@ -165,7 +173,8 @@ def imagingIntegrationTimeParams(
       ),
       conditions = conditions,
       telescope = ItcTelescopeDetails(
-        wfs = ItcWavefrontSensor.OIWFS
+        wfs = ItcWavefrontSensor.OIWFS,
+        instrumentPort = observingMode.instrumentPort
       ),
       instrument = ItcInstrumentDetails(observingMode)
     )
@@ -196,7 +205,8 @@ def imagingS2NParams(
       ),
       conditions = conditions,
       telescope = ItcTelescopeDetails(
-        wfs = ItcWavefrontSensor.OIWFS
+        wfs = ItcWavefrontSensor.OIWFS,
+        instrumentPort = observingMode.instrumentPort
       ),
       instrument = ItcInstrumentDetails(observingMode)
     )

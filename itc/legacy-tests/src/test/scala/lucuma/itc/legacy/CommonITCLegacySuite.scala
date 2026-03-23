@@ -110,7 +110,8 @@ trait CommonITCLegacySuite extends CatsEffectSuite:
 
   // Common telescope details - this will be used in tests
   def telescope = ItcTelescopeDetails(
-    wfs = ItcWavefrontSensor.OIWFS
+    wfs = ItcWavefrontSensor.OIWFS,
+    instrumentPort = instrument.mode.instrumentPort
   )
 
   // Common observing conditions - this will be used in tests
