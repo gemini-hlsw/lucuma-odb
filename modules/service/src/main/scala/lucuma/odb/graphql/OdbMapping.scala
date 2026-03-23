@@ -637,16 +637,22 @@ object OdbMapping {
 
             // Maybe it should be an env variable
             val SlowQueryThreshold = 5.second
+            val MaxSqlLength       = 1024
+
+            def truncateSql(sql: String): String =
+              if sql.length <= MaxSqlLength then sql
+              else s"${sql.take(MaxSqlLength)}... (${sql.length - MaxSqlLength} more chars)"
 
             L.debug {
-              val formatted = SqlFormatter.format(fragment.fragment.sql)
+              val formatted = SqlFormatter.format(truncateSql(fragment.fragment.sql))
               val cleanedUp = formatted.replaceAll("\\$ (\\d+)", "\\$$1") // turn $ 42 into $42
               val colored   = cleanedUp.linesIterator.map(s => s"${AnsiColor.GREEN}$s${AnsiColor.RESET}").mkString("\n")
               s"\n\n$colored\n\n"
             } *>
               Trace[F].span("grackle.fetch"):
                 Temporal[F].timed(super.fetch(fragment, codecs)).flatMap: (elapsed, result) =>
-                  val slowQuery = elapsed > SlowQueryThreshold
+                  val slowQuery    = elapsed > SlowQueryThreshold
+                  val truncatedSql = truncateSql(fragment.fragment.sql)
 
                   // Add some attributes to every query and a few specific ones for slow queries
                   val baseAttrs =
@@ -656,12 +662,11 @@ object OdbMapping {
                     )
                   val slowAttrs =
                     T.put(
-                      "db.statement"  -> fragment.fragment.sql,
+                      "db.statement"  -> truncatedSql,
                       "db.slow_query" -> true
                     )
-                  // We are explicitly not formatting sql because it is very expensive for large queries
                   val logWarn =
-                    SlowQueryLogger.warn(s"Slow query (${elapsed.toMillis}ms):\n${fragment.fragment.sql}")
+                    SlowQueryLogger.warn(s"Slow query (${elapsed.toMillis}ms):\n$truncatedSql")
 
                   for {
                     _ <- baseAttrs
