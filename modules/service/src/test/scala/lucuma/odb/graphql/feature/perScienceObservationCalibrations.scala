@@ -1,7 +1,8 @@
 // Copyright (c) 2016-2025 Association of Universities for Research in Astronomy, Inc. (AURA)
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
-package lucuma.odb.feature
+package lucuma.odb.graphql
+package feature
 
 import cats.effect.IO
 import cats.syntax.all.*
@@ -41,7 +42,6 @@ import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.itc.IntegrationTime
 import lucuma.itc.client.SpectroscopyInput
-import lucuma.odb.graphql.OdbSuite
 import lucuma.odb.graphql.query.ExecutionTestSupportForFlamingos2
 import lucuma.odb.graphql.query.ObservingModeSetupOperations
 import lucuma.odb.graphql.subscription.SubscriptionUtils
@@ -302,6 +302,14 @@ class perScienceObservationCalibrations
         .flatten
       elements.pure[IO]
     }
+
+  private def selectTelluricObservationFor(oid: Observation.Id): IO[Option[Observation.Id]] =
+    queryObservation(oid).flatMap: obs =>
+      obs.groupId.flatTraverse: gid =>
+        queryObservationsInGroup(gid).map: infos =>
+          infos
+            .find(_.calibrationRole.exists(_ === CalibrationRole.Telluric))
+            .map(_.id)
 
   private def queryObservationWithTarget(oid: Observation.Id): IO[ObsWithTarget] =
     query(
@@ -661,6 +669,133 @@ class perScienceObservationCalibrations
       assert(grp.exists(_.system))
       assert(grp.exists(_.calibrationRoles.contains(CalibrationRole.Telluric)))
     }
+
+  private def editSequence(oid: Observation.Id): IO[Unit] =
+    query(
+      user  = serviceUser,
+      query = s"""
+        mutation {
+          replaceFlamingos2Sequence(input: {
+            observationId: "$oid"
+            sequenceType: SCIENCE
+            sequence: [
+              {
+                description: "Manually Edited Atom"
+                steps: [
+                  {
+                    instrumentConfig: {
+                      exposure: {
+                        seconds: 20
+                      }
+                      filter: J_LOW
+                      readMode: BRIGHT
+                      lyotWheel: F16
+                      decker: LONG_SLIT
+                      readoutMode: SCIENCE
+                      reads: READS_1
+                    }
+                    stepConfig: {
+                      science: true
+                    }
+                    observeClass: SCIENCE
+                  }
+                ]
+              }
+            ]
+          }) {
+            sequence {
+              id
+            }
+          }
+        }
+      """
+    ).void
+
+  def nextAtomDescription(oid: Observation.Id): IO[Option[String]] =
+    query(
+      user  = pi,
+      query = s"""
+        query {
+          executionConfig(observationId: "$oid") {
+            flamingos2 {
+              science {
+                nextAtom {
+                  description
+                }
+              }
+            }
+          }
+        }
+      """
+    ).map: json =>
+      json
+        .hcursor
+        .downFields("executionConfig", "flamingos2", "science", "nextAtom", "description")
+        .require[Option[String]]
+
+  test("F2 telluric sequence may be edited and the changes are stored"):
+    for
+      pid  <- createProgramWithNonPartnerPi(pi)
+      tid  <- createTargetWithProfileAs(pi, pid)
+      oid  <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+      _    <- runObscalcUpdate(pid, oid)
+
+      _    <- recalculateCalibrations(pid, when)
+      toid <- selectTelluricObservationFor(oid).map(_.get)
+      _    <- runObscalcUpdate(pid, toid)
+
+      _    <- editSequence(toid)
+      _    <- sleep >> resolveTelluricTargets
+      d    <- nextAtomDescription(toid)
+    yield assertEquals(d, "Manually Edited Atom".some)
+
+  test("Deleting the science observation of an edited F2 telluric sequence observation doesn't prevent its deletion"):
+    for
+      pid  <- createProgramWithNonPartnerPi(pi)
+      tid  <- createTargetWithProfileAs(pi, pid)
+      oid  <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+      _    <- runObscalcUpdate(pid, oid)
+
+      _    <- recalculateCalibrations(pid, when)
+      toid <- selectTelluricObservationFor(oid).map(_.get)
+      _    <- runObscalcUpdate(pid, toid)
+
+      _    <- editSequence(toid)
+      _    <- sleep >> resolveTelluricTargets
+      d    <- nextAtomDescription(toid)
+
+      _    <- deleteObservation(pi, oid)
+      _    <- recalculateCalibrations(pid, when)
+      xist <- queryObservationExists(toid)
+    yield
+      assertEquals(d, "Manually Edited Atom".some)
+      assert(!xist)
+
+  test("Once partially executed, you cannot delete a telluric with manually edited steps"):
+    for
+      pid  <- createProgramWithNonPartnerPi(pi)
+      tid  <- createTargetWithProfileAs(pi, pid)
+      oid  <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+      _    <- runObscalcUpdate(pid, oid)
+
+      _    <- recalculateCalibrations(pid, when)
+      toid <- selectTelluricObservationFor(oid).map(_.get)
+      _    <- runObscalcUpdate(pid, toid)
+
+      _    <- editSequence(toid)
+      _    <- sleep >> resolveTelluricTargets
+      d    <- nextAtomDescription(toid)
+
+      sid  <- firstScienceStepId(serviceUser, toid)
+      vid  <- recordVisitAs(serviceUser, Instrument.Flamingos2, toid)
+      _    <- addEndStepEvent(sid, vid)
+
+      _    <- deleteObservation(pi, oid)
+      _    <- recalculateCalibrations(pid, when)
+      xist <- queryObservationExists(toid)
+    yield
+      assertEquals(d, "Manually Edited Atom".some)
+      assert(xist)
 
   test("each F2 observations gets its own group"):
     for {
