@@ -651,8 +651,7 @@ object OdbMapping {
             } *>
               Trace[F].span("grackle.fetch"):
                 Temporal[F].timed(super.fetch(fragment, codecs)).flatMap: (elapsed, result) =>
-                  val slowQuery    = elapsed > SlowQueryThreshold
-                  val truncatedSql = truncateSql(fragment.fragment.sql)
+                  val slowQuery = elapsed > SlowQueryThreshold
 
                   // Add some attributes to every query and a few specific ones for slow queries
                   val baseAttrs =
@@ -660,18 +659,15 @@ object OdbMapping {
                       "db.duration_ms" -> elapsed.toMillis,
                       "db.row_count"   -> result.size.toLong
                     )
-                  val slowAttrs =
-                    T.put(
-                      "db.statement"  -> truncatedSql,
-                      "db.slow_query" -> true
-                    )
-                  val logWarn =
-                    SlowQueryLogger.warn(s"Slow query (${elapsed.toMillis}ms):\n$truncatedSql")
+
+                  val slowQueryAttrsAndLog =
+                    val truncatedSql = truncateSql(fragment.fragment.sql)
+                    T.put("db.statement"  -> truncatedSql, "db.slow_query" -> true) *>
+                      SlowQueryLogger.warn(s"Slow query (${elapsed.toMillis}ms):\n$truncatedSql")
 
                   for {
                     _ <- baseAttrs
-                    _ <- slowAttrs.whenA(slowQuery)
-                    _ <- logWarn.whenA(slowQuery)
+                    _ <- slowQueryAttrsAndLog.whenA(slowQuery)
                   } yield result
           }
 
