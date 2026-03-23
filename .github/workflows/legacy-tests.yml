@@ -5,6 +5,7 @@ on:
     paths:
       - 'itc/service/ocslib/**'
       - 'itc/legacy-tests/**'
+      - 'itc/service/src/main/scala/lucuma/itc/legacy/**'
   schedule:
     - cron: '0 2 * * *'  # Daily at 2 AM UTC
   workflow_dispatch:
