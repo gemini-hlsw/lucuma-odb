@@ -26,6 +26,7 @@ import lucuma.core.enums.GmosNorthGrating
 import lucuma.core.enums.GmosRoi
 import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
+import lucuma.core.enums.PortDisposition
 import lucuma.core.enums.SkyBackground
 import lucuma.core.enums.WaterVapor
 import lucuma.core.math.BrightnessUnits.Brightness
@@ -492,7 +493,8 @@ object WiringSuite:
             GmosAmpGain.High,
             GmosAmpReadMode.Fast
           ).some,
-          GmosRoi.FullFrame.some
+          GmosRoi.FullFrame.some,
+          PortDisposition.Side
         )
       ),
       NonEmptyList.of(
@@ -531,7 +533,8 @@ object WiringSuite:
         InstrumentMode.Flamingos2Spectroscopy(
           Flamingos2Disperser.R3000,
           Flamingos2Filter.J,
-          Flamingos2Fpu.LongSlit2
+          Flamingos2Fpu.LongSlit2,
+          PortDisposition.Side
         )
       ),
       NonEmptyList.of(
@@ -567,7 +570,7 @@ object WiringSuite:
           waterVapor = WaterVapor.VeryDry,
           elevationRange = ElevationRange.ByAirMass.Default
         ),
-        InstrumentMode.Igrins2Spectroscopy()
+        InstrumentMode.Igrins2Spectroscopy(PortDisposition.Bottom)
       ),
       NonEmptyList.of(
         TargetInput(
@@ -602,7 +605,7 @@ object WiringSuite:
           waterVapor = WaterVapor.VeryDry,
           elevationRange = ElevationRange.ByAirMass.Default
         ),
-        InstrumentMode.Flamingos2Imaging(Flamingos2Filter.J)
+        InstrumentMode.Flamingos2Imaging(Flamingos2Filter.J, PortDisposition.Side)
       ),
       NonEmptyList.of(
         TargetInput(
@@ -639,7 +642,8 @@ object WiringSuite:
         ),
         InstrumentMode.GmosNorthImaging(
           GmosNorthFilter.GPrime,
-          none
+          none,
+          PortDisposition.Side
         )
       ),
       NonEmptyList.of(
@@ -686,7 +690,8 @@ object WiringSuite:
             GmosAmpGain.High,
             GmosAmpReadMode.Fast
           ).some,
-          GmosRoi.FullFrame.some
+          GmosRoi.FullFrame.some,
+          PortDisposition.Side
         ),
         Some(SignificantFiguresInput(2.refined, 2.refined, 2.refined))
       ),
@@ -735,7 +740,8 @@ object WiringSuite:
             GmosAmpGain.High,
             GmosAmpReadMode.Fast
           ).some,
-          GmosRoi.FullFrame.some
+          GmosRoi.FullFrame.some,
+          PortDisposition.Side
         )
       ),
       NonEmptyList.of(
@@ -790,7 +796,8 @@ object WiringSuite:
             GmosAmpGain.High,
             GmosAmpReadMode.Fast
           ).some,
-          GmosRoi.FullFrame.some
+          GmosRoi.FullFrame.some,
+          PortDisposition.Side
         )
       ),
       NonEmptyList.of(
@@ -828,7 +835,8 @@ object WiringSuite:
         ),
         InstrumentMode.GmosNorthImaging(
           GmosNorthFilter.GPrime,
-          none
+          none,
+          PortDisposition.Side
         )
       ),
       NonEmptyList.of(
@@ -875,7 +883,8 @@ object WiringSuite:
             GmosAmpGain.High,
             GmosAmpReadMode.Fast
           ).some,
-          GmosRoi.FullFrame.some
+          GmosRoi.FullFrame.some,
+          PortDisposition.Side
         ),
         Some(SignificantFiguresInput(2.refined, 2.refined, 2.refined))
       ),
