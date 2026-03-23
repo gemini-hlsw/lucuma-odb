@@ -10635,12 +10635,12 @@ enum PortDisposition {
   """
   Side looking port
   """
-  Side
+  SIDE
 
   """
   Up (bottom) looking port
   """
-  Bottom
+  BOTTOM
 }
 
 """
