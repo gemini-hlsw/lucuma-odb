@@ -4,6 +4,7 @@
 package lucuma.itc.legacy
 
 import io.circe.syntax.*
+import lucuma.core.enums.PortDisposition
 import lucuma.core.math.Angle
 import lucuma.core.math.Wavelength
 import lucuma.itc.legacy.codecs.given
@@ -27,7 +28,7 @@ class LegacyITCIgrins2WavelengthOutOfRangeSuite extends CommonITCLegacySuite:
   )
 
   override def instrument = ItcInstrumentDetails(
-    ObservingMode.SpectroscopyMode.Igrins2()
+    ObservingMode.SpectroscopyMode.Igrins2(PortDisposition.Bottom)
   )
 
   test("igrins2 at 1.9 µm returns out-of-range".tag(LegacyITCTest)):

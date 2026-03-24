@@ -35,7 +35,8 @@ class LegacyITCFlamingos2SpecTimeAndCountSuite extends LegacyITCFlamingos2Suite:
     ObservingMode.SpectroscopyMode.Flamingos2(
       Flamingos2Disperser.R3000,
       Flamingos2Filter.J,
-      Flamingos2Fpu.LongSlit2
+      Flamingos2Fpu.LongSlit2,
+      PortDisposition.Side
     )
 
   override def instrument = ItcInstrumentDetails(f2)

@@ -55,14 +55,14 @@ class executionSciGmosNorthImaging extends ExecutionTestSupportForGmos:
   // 120s x 6 in g, 60s x 12 in i, and 30s x 30 in Y
   override def fakeItcImagingResultFor(input: ImagingInput): Option[IntegrationTime] =
     input.mode match
-      case InstrumentMode.GmosNorthImaging(f, _) =>
+      case InstrumentMode.GmosNorthImaging(f, _, _) =>
         f match
           case GmosNorthFilter.GPrime => Time120x06.some
           case GmosNorthFilter.IPrime => Time060x12.some
           case GmosNorthFilter.Y      => Time030x30.some
           case _                      => none
 
-      case InstrumentMode.GmosSouthImaging(f, _) =>
+      case InstrumentMode.GmosSouthImaging(f, _, _) =>
         f match
           case GmosSouthFilter.GPrime => Time120x06.some
           case GmosSouthFilter.IPrime => Time060x12.some
@@ -195,7 +195,7 @@ class executionSciGmosNorthImaging extends ExecutionTestSupportForGmos:
           "breakpoint" : "DISABLED"
         }
       """
-  
+
   object Step:
     def apply[L: Enumerated](filter: L, time: IntegrationTime): Step[L] =
       Step(filter, time, (0, 0), ObserveClass.Science)
