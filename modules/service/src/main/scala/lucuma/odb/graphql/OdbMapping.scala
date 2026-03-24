@@ -637,9 +637,14 @@ object OdbMapping {
 
             // Maybe it should be an env variable
             val SlowQueryThreshold = 5.second
+            val MaxSqlLength       = 1024
+
+            def truncateSql(sql: String): String =
+              if sql.length <= MaxSqlLength then sql
+              else s"${sql.take(MaxSqlLength)}... (${sql.length - MaxSqlLength} more chars)"
 
             L.debug {
-              val formatted = SqlFormatter.format(fragment.fragment.sql)
+              val formatted = SqlFormatter.format(truncateSql(fragment.fragment.sql))
               val cleanedUp = formatted.replaceAll("\\$ (\\d+)", "\\$$1") // turn $ 42 into $42
               val colored   = cleanedUp.linesIterator.map(s => s"${AnsiColor.GREEN}$s${AnsiColor.RESET}").mkString("\n")
               s"\n\n$colored\n\n"
@@ -654,19 +659,15 @@ object OdbMapping {
                       "db.duration_ms" -> elapsed.toMillis,
                       "db.row_count"   -> result.size.toLong
                     )
-                  val slowAttrs =
-                    T.put(
-                      "db.statement"  -> fragment.fragment.sql,
-                      "db.slow_query" -> true
-                    )
-                  // We are explicitly not formatting sql because it is very expensive for large queries
-                  val logWarn =
-                    SlowQueryLogger.warn(s"Slow query (${elapsed.toMillis}ms):\n${fragment.fragment.sql}")
+
+                  val slowQueryAttrsAndLog =
+                    val truncatedSql = truncateSql(fragment.fragment.sql)
+                    T.put("db.statement"  -> truncatedSql, "db.slow_query" -> true) *>
+                      SlowQueryLogger.warn(s"Slow query (${elapsed.toMillis}ms):\n$truncatedSql")
 
                   for {
                     _ <- baseAttrs
-                    _ <- slowAttrs.whenA(slowQuery)
-                    _ <- logWarn.whenA(slowQuery)
+                    _ <- slowQueryAttrsAndLog.whenA(slowQuery)
                   } yield result
           }
 
