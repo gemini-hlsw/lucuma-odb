@@ -7,8 +7,8 @@ import cats.syntax.parallel.*
 import lucuma.core.enums.Flamingos2Disperser
 import lucuma.core.enums.Flamingos2Filter
 import lucuma.core.enums.Flamingos2Fpu
-import lucuma.core.model.ExposureTimeMode
 import lucuma.core.enums.PortDisposition
+import lucuma.core.model.ExposureTimeMode
 import lucuma.odb.graphql.binding.*
 import lucuma.odb.graphql.input.ExposureTimeModeInput
 
