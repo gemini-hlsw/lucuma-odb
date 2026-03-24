@@ -70,7 +70,7 @@ class updateObservationsTimes extends OdbSuite
 
   test("observation time: set ISO-8601") {
 
-    val timeStr = "2022-08-30 17:18:00"
+    val timeStr = "2022-08-30T17:18:00Z"
     val update = s"""
       observationTime: "$timeStr"
     """
@@ -89,7 +89,7 @@ class updateObservationsTimes extends OdbSuite
   
   test("observation time and duration: set") {
 
-    val timeStr = "2022-08-30 17:18:00"
+    val timeStr = "2022-08-30T17:18:00Z"
     val update = s"""
       observationTime: "$timeStr", observationDuration: { seconds: 12 }
     """
@@ -98,7 +98,7 @@ class updateObservationsTimes extends OdbSuite
   }
   test("observation time: delete") {
 
-    val timeStr = "2022-08-30 17:18:00"
+    val timeStr = "2022-08-30T17:18:00Z"
     val update0 = s"""
       observationTime: "$timeStr", observationDuration: { seconds: 13 }
     """
@@ -115,7 +115,7 @@ class updateObservationsTimes extends OdbSuite
 
   test("observation duration: delete") {
 
-    val timeStr = "2022-08-30 17:18:00"
+    val timeStr = "2022-08-30T17:18:00Z"
     val update0 = s"""
       observationTime: "$timeStr", observationDuration: { seconds: 10 }
     """
@@ -132,7 +132,7 @@ class updateObservationsTimes extends OdbSuite
   
   test("observation time and duration: delete") {
 
-    val timeStr = "2022-08-30 17:18:00"
+    val timeStr = "2022-08-30T17:18:00Z"
     val update0 = s"""
       observationTime: "$timeStr", observationDuration: { seconds: 10 }
     """

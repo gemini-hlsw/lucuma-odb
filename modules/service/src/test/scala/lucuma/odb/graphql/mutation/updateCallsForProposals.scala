@@ -50,11 +50,11 @@ class updateCallsForProposals extends OdbSuite {
                   }
                 }
                 instruments:   [GMOS_NORTH]
-                submissionDeadlineDefault: "2025-07-31 10:00:01"
+                submissionDeadlineDefault: "2025-07-31T10:00:01Z"
                 partners:      [
                   {
                     partner: CA
-                    submissionDeadlineOverride: "2025-07-31 10:00:00"
+                    submissionDeadlineOverride: "2025-07-31T10:00:00Z"
                   },
                   {
                     partner: US
@@ -605,7 +605,7 @@ class updateCallsForProposals extends OdbSuite {
                 partners: [
                   {
                     partner: BR
-                    submissionDeadlineOverride: "2025-08-15 04:00:00"
+                    submissionDeadlineOverride: "2025-08-15T04:00:00Z"
                   },
                   {
                     partner: AR
@@ -633,11 +633,11 @@ class updateCallsForProposals extends OdbSuite {
                   "partners": [
                     {
                       "partner": "AR",
-                      "submissionDeadline": "2025-07-31 10:00:01"
+                      "submissionDeadline": "2025-07-31T10:00:01Z"
                     },
                     {
                       "partner": "BR",
-                      "submissionDeadline": "2025-08-15 04:00:00"
+                      "submissionDeadline": "2025-08-15T04:00:00Z"
                     }
                   ]
                 }
@@ -695,11 +695,11 @@ class updateCallsForProposals extends OdbSuite {
                 partners: [
                   {
                     partner: BR
-                    submissionDeadlineOverride: "2025-08-15 04:00:00"
+                    submissionDeadlineOverride: "2025-08-15T04:00:00Z"
                   },
                   {
                     partner: BR
-                    submissionDeadlineOverride: "2025-08-15 04:00:00"
+                    submissionDeadlineOverride: "2025-08-15T04:00:00Z"
                   }
                 ]
               },
@@ -749,7 +749,7 @@ class updateCallsForProposals extends OdbSuite {
                   "partners": [
                     {
                       "partner": "CA",
-                      "submissionDeadline": "2025-07-31 10:00:00"
+                      "submissionDeadline": "2025-07-31T10:00:00Z"
                     },
                     {
                       "partner": "US",

@@ -227,18 +227,18 @@ class createCallForProposals extends OdbSuite {
                 semester:    "2025A"
                 activeStart: "2026-02-01"
                 activeEnd:   "2026-07-31"
-                submissionDeadlineDefault: "2025-07-31 10:00:02"
+                submissionDeadlineDefault: "2025-07-31T10:00:02Z"
                 partners:    [
                   {
                     partner: CA
-                    submissionDeadlineOverride: "2025-07-31 10:00:00"
+                    submissionDeadlineOverride: "2025-07-31T10:00:00Z"
                   },
                   {
                     partner: CL
                   },
                   {
                     partner: US
-                    submissionDeadlineOverride: "2025-07-31 10:00:01"
+                    submissionDeadlineOverride: "2025-07-31T10:00:01Z"
                   }
                 ]
               }
@@ -263,26 +263,26 @@ class createCallForProposals extends OdbSuite {
           "createCallForProposals": {
             "callForProposals": {
               "id": "c-101",
-              "submissionDeadlineDefault": "2025-07-31 10:00:02",
+              "submissionDeadlineDefault": "2025-07-31T10:00:02Z",
               "partners": [
                 {
                   "partner": "CA",
-                  "submissionDeadlineOverride": "2025-07-31 10:00:00",
-                  "submissionDeadline": "2025-07-31 10:00:00"
+                  "submissionDeadlineOverride": "2025-07-31T10:00:00Z",
+                  "submissionDeadline": "2025-07-31T10:00:00Z"
                 },
                 {
                   "partner": "CL",
                   "submissionDeadlineOverride": null,
-                  "submissionDeadline": "2025-07-31 10:00:02"
+                  "submissionDeadline": "2025-07-31T10:00:02Z"
                 },
                 {
                   "partner": "US",
-                  "submissionDeadlineOverride": "2025-07-31 10:00:01",
-                  "submissionDeadline": "2025-07-31 10:00:01"
+                  "submissionDeadlineOverride": "2025-07-31T10:00:01Z",
+                  "submissionDeadline": "2025-07-31T10:00:01Z"
                 }
               ],
               "allowsNonPartnerPi": true,
-              "nonPartnerDeadline": "2025-07-31 10:00:01"
+              "nonPartnerDeadline": "2025-07-31T10:00:01Z"
             }
           }
         }
@@ -345,11 +345,11 @@ class createCallForProposals extends OdbSuite {
                 partners:    [
                   {
                     partner: US
-                    submissionDeadlineOverride: "2025-07-31 10:00:00"
+                    submissionDeadlineOverride: "2025-07-31T10:00:00Z"
                   },
                   {
                     partner: US
-                    submissionDeadlineOverride: "2025-07-31 10:00:01"
+                    submissionDeadlineOverride: "2025-07-31T10:00:01Z"
                   }
                 ]
               }
@@ -574,7 +574,7 @@ class createCallForProposals extends OdbSuite {
                 semester:    "2024B"
                 activeStart: "2024-07-31"
                 activeEnd:   "2025-02-01"
-                submissionDeadlineDefault: "2025-07-31 10:00:02"
+                submissionDeadlineDefault: "2025-07-31T10:00:02Z"
               }
             }
           ) {
@@ -595,7 +595,7 @@ class createCallForProposals extends OdbSuite {
               "id":   "c-106",
               "type": "DIRECTORS_TIME",
               "allowsNonPartnerPi": true,
-              "nonPartnerDeadline": "2025-07-31 10:00:02",
+              "nonPartnerDeadline": "2025-07-31T10:00:02Z",
               "proprietaryMonths": 6
             }
           }
@@ -618,7 +618,7 @@ class createCallForProposals extends OdbSuite {
                 semester:    "2024B"
                 activeStart: "2024-07-31"
                 activeEnd:   "2025-02-01"
-                submissionDeadlineDefault: "2025-07-31 10:00:02"
+                submissionDeadlineDefault: "2025-07-31T10:00:02Z"
               }
             }
           ) {

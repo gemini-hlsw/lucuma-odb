@@ -581,7 +581,7 @@ class perProgramPerConfigCalibrations
                   {
                     "updateObservationsTimes": {
                       "observations": [ {
-                          "observationTime": "2011-12-03 10:15:30"
+                          "observationTime": "2011-12-03T10:15:30Z"
                         }
                       ]
                     }

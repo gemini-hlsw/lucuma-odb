@@ -2583,7 +2583,7 @@ trait DatabaseOperations { this: OdbSuite =>
         "updateObservationsTimes": {
           "observations": [
             {
-              "observationTime": ${obsTime.map(_.format)},
+              "observationTime": ${obsTime.map(_.isoFormat)},
               "observationDuration": $expectDur
             }
           ]
