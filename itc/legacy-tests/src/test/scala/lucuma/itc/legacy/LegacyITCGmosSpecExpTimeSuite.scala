@@ -52,7 +52,8 @@ class LegacyITCGmosSpecExpTimeSuite extends CommonITCLegacySuite:
         GmosAmpGain.High,
         GmosAmpReadMode.Fast
       ).some,
-      GmosRoi.FullFrame.some
+      GmosRoi.FullFrame.some,
+      PortDisposition.Side
     )
   )
 
@@ -72,7 +73,8 @@ class LegacyITCGmosSpecExpTimeSuite extends CommonITCLegacySuite:
       GmosAmpGain.High,
       GmosAmpReadMode.Fast
     ).some,
-    GmosRoi.FullFrame.some
+    GmosRoi.FullFrame.some,
+    PortDisposition.Side
   )
 
   test("gmos north grating".tag(LegacyITCTest)):
@@ -125,7 +127,8 @@ class LegacyITCGmosSpecExpTimeSuite extends CommonITCLegacySuite:
       GmosAmpGain.High,
       GmosAmpReadMode.Fast
     ).some,
-    GmosRoi.FullFrame.some
+    GmosRoi.FullFrame.some,
+    PortDisposition.Side
   )
 
   test("gmos south grating".tag(LegacyITCTest)):

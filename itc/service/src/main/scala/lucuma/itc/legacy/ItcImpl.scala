@@ -73,14 +73,14 @@ object ItcImpl {
       ): F[TargetIntegrationTime] =
         T.span("calculate integration_time"):
           observingMode match
-            case s @ (SpectroscopyMode.GmosNorth(_, _, _, _, _, _) |
-                SpectroscopyMode.GmosSouth(_, _, _, _, _, _) |
-                SpectroscopyMode.Flamingos2(_, _, _) | SpectroscopyMode.Igrins2()) =>
+            case s @ (SpectroscopyMode.GmosNorth(_, _, _, _, _, _, _) |
+                SpectroscopyMode.GmosSouth(_, _, _, _, _, _, _) |
+                SpectroscopyMode.Flamingos2(_, _, _, _) | SpectroscopyMode.Igrins2(_)) =>
               spectroscopyIntegrationTime(target, atWavelength, s, constraints, signalToNoise)
             case i @ (
-                  ObservingMode.ImagingMode.GmosNorth(_, _) |
-                  ObservingMode.ImagingMode.GmosSouth(_, _) |
-                  ObservingMode.ImagingMode.Flamingos2(_)
+                  ObservingMode.ImagingMode.GmosNorth(_, _, _) |
+                  ObservingMode.ImagingMode.GmosSouth(_, _, _) |
+                  ObservingMode.ImagingMode.Flamingos2(_, _)
                 ) =>
               imagingIntegrationTime(target, atWavelength, i, constraints, signalToNoise)
 
@@ -94,9 +94,9 @@ object ItcImpl {
       ): F[TargetGraphsCalcResult] =
         T.span("calculate graphs"):
           observingMode match
-            case s @ (SpectroscopyMode.GmosNorth(_, _, _, _, _, _) |
-                SpectroscopyMode.GmosSouth(_, _, _, _, _, _) |
-                SpectroscopyMode.Flamingos2(_, _, _) | SpectroscopyMode.Igrins2()) =>
+            case s @ (SpectroscopyMode.GmosNorth(_, _, _, _, _, _, _) |
+                SpectroscopyMode.GmosSouth(_, _, _, _, _, _, _) |
+                SpectroscopyMode.Flamingos2(_, _, _, _) | SpectroscopyMode.Igrins2(_)) =>
               spectroscopyGraphs(
                 target,
                 atWavelength,
@@ -105,8 +105,8 @@ object ItcImpl {
                 exposureTime,
                 exposureCount
               )
-            case ImagingMode.GmosNorth(_, _) | ImagingMode.GmosSouth(_, _) |
-                ImagingMode.Flamingos2(_) =>
+            case ImagingMode.GmosNorth(_, _, _) | ImagingMode.GmosSouth(_, _, _) |
+                ImagingMode.Flamingos2(_, _) =>
               MonadThrow[F].raiseError:
                 new IllegalArgumentException("Imaging mode not supported for graph calculation")
 
@@ -257,10 +257,10 @@ object ItcImpl {
       ): F[TargetIntegrationTime] =
         T.span("calculate signal_to_noise"):
           observingMode match
-            case s @ (ObservingMode.SpectroscopyMode.GmosNorth(_, _, _, _, _, _) |
-                ObservingMode.SpectroscopyMode.GmosSouth(_, _, _, _, _, _) |
-                ObservingMode.SpectroscopyMode.Flamingos2(_, _, _) |
-                ObservingMode.SpectroscopyMode.Igrins2()) =>
+            case s @ (ObservingMode.SpectroscopyMode.GmosNorth(_, _, _, _, _, _, _) |
+                ObservingMode.SpectroscopyMode.GmosSouth(_, _, _, _, _, _, _) |
+                ObservingMode.SpectroscopyMode.Flamingos2(_, _, _, _) |
+                ObservingMode.SpectroscopyMode.Igrins2(_)) =>
               spectroscopySignalToNoise(target,
                                         atWavelength,
                                         s,
@@ -268,9 +268,9 @@ object ItcImpl {
                                         exposureTime,
                                         exposureCount
               )
-            case s @ (ObservingMode.ImagingMode.Flamingos2(_) |
-                ObservingMode.ImagingMode.GmosSouth(_, _) |
-                ObservingMode.ImagingMode.GmosNorth(_, _)) =>
+            case s @ (ObservingMode.ImagingMode.Flamingos2(_, _) |
+                ObservingMode.ImagingMode.GmosSouth(_, _, _) |
+                ObservingMode.ImagingMode.GmosNorth(_, _, _)) =>
               imagingSignalToNoise(target,
                                    atWavelength,
                                    s,

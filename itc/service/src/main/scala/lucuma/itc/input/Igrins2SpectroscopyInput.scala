@@ -3,18 +3,22 @@
 
 package lucuma.itc.input
 
+import cats.syntax.parallel.*
 import lucuma.core.model.ExposureTimeMode
+import lucuma.core.enums.PortDisposition
 import lucuma.odb.graphql.binding.*
 import lucuma.odb.graphql.input.ExposureTimeModeInput
 
 case class Igrins2SpectroscopyInput(
-  exposureTimeMode: ExposureTimeMode
+  exposureTimeMode: ExposureTimeMode,
+  port: PortDisposition
 ) extends InstrumentModesInput
 
 object Igrins2SpectroscopyInput:
   val binding: Matcher[Igrins2SpectroscopyInput] =
     ObjectFieldsBinding.rmap:
       case List(
-            ExposureTimeModeInput.Binding("exposureTimeMode", exposureTimeMode)
+            ExposureTimeModeInput.Binding("exposureTimeMode", exposureTimeMode),
+            PortDispositionBinding("port", portDisposition)
           ) =>
-        exposureTimeMode.map(Igrins2SpectroscopyInput.apply)
+        (exposureTimeMode, portDisposition).parMapN(apply)

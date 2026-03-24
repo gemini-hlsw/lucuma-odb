@@ -285,11 +285,11 @@ object ItcService {
                 toTargetResults(targets, NonEmptyList.one(modifiedCcr)).map(_.head)
 
         input.mode match
-          case InstrumentMode.GmosNorthImaging(_, _, _) |
-               InstrumentMode.GmosSouthImaging(_, _, _) =>
+          case InstrumentMode.GmosNorthImaging(_, _, _, _) |
+               InstrumentMode.GmosSouthImaging(_, _, _, _) =>
             go(lucuma.odb.sequence.gmos.MinAcquisitionExposureTime,
                lucuma.odb.sequence.gmos.MaxAcquisitionExposureTime)
-          case InstrumentMode.Flamingos2Imaging(_, _)   =>
+          case InstrumentMode.Flamingos2Imaging(_, _, _)   =>
             go(lucuma.odb.sequence.flamingos2.MinAcquisitionExposureTime,
                lucuma.odb.sequence.flamingos2.MaxAcquisitionExposureTime)
           case m                                                      =>
@@ -326,14 +326,14 @@ object ItcService {
       object Imaging:
         case object GmosNorthImaging extends Imaging[GmosNorthFilter]:
           override def pf: PartialFunction[InstrumentMode, GmosNorthFilter] = {
-            case InstrumentMode.GmosNorthImaging(_, f, _) => f
+            case InstrumentMode.GmosNorthImaging(_, f, _, _) => f
           }
           override def wrap(nem: NonEmptyMap[GmosNorthFilter, Zipper[Itc.Result]]): Itc =
             Itc.GmosNorthImaging(nem)
 
         case object GmosSouthImaging extends Imaging[GmosSouthFilter]:
           override def pf: PartialFunction[InstrumentMode, GmosSouthFilter] = {
-            case InstrumentMode.GmosSouthImaging(_, f, _) => f
+               case InstrumentMode.GmosSouthImaging(_, f, _, _) => f
           }
           override def wrap(nem: NonEmptyMap[GmosSouthFilter, Zipper[Itc.Result]]): Itc =
             Itc.GmosSouthImaging(nem)
@@ -387,10 +387,10 @@ object ItcService {
 
         def imaging(im: ItcInput.Imaging): EitherT[F, OdbError, Itc] =
           im.science.head.mode match
-            case InstrumentMode.GmosNorthImaging(_, _, _) =>
+            case InstrumentMode.GmosNorthImaging(_, _, _, _) =>
               callRemoteImagingItc(oid, im, Imaging.GmosNorthImaging)
 
-            case InstrumentMode.GmosSouthImaging(_, _, _) =>
+            case InstrumentMode.GmosSouthImaging(_, _, _, _) =>
               callRemoteImagingItc(oid, im, Imaging.GmosSouthImaging)
 
             case m                                     =>

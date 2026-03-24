@@ -141,7 +141,7 @@ object CMain extends MainParams {
       trt <- Resource.eval(TelluricTargetTopic(ses, 1024, sup))
     } yield (top, ctt, trt)
 
-  def runCalibrationsDaemon[F[_]: {Async, Logger, Clock as C}](
+  def runCalibrationsDaemon[F[_]: {Async, Logger as L, Clock as C}](
     obscalcTopic: Topic[F, ObscalcTopic.Element],
     calibTopic: Topic[F, CalibTimeTopic.Element],
     services: Resource[F, Services[F]]
@@ -166,6 +166,10 @@ object CMain extends MainParams {
                                   (elem.editType === EditType.Created ||
                                    elem.editType === EditType.Updated))
                   } yield Result.unit
+              .handleErrorWith: e =>
+                L.error(e)(
+                  s"Error precessing obscalc event for ${elem.programId}/${elem.observationId}"
+                ).as(Result.unit)
             }.compile.drain.start.void)
       _  <- Resource.eval(info"Start listening for calibration time changes")
       _  <- Resource.eval(calibTopic.subscribe(100).evalMap: elem =>
@@ -173,6 +177,10 @@ object CMain extends MainParams {
                 Services.asSuperUser:
                   calibrationsService.recalculateCalibrationTarget(elem.programId, elem.observationId)
                     .map(Result.success)
+              .handleErrorWith: e =>
+                L.error(e)(
+                  s"Error processing calib time event for ${elem.programId}/${elem.observationId}"
+                ).as(Result.unit)
             .compile.drain.start.void)
     } yield ()
 

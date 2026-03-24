@@ -6,6 +6,7 @@ package lucuma.itc.input
 import cats.syntax.parallel.*
 import lucuma.core.enums.GmosSouthFilter
 import lucuma.core.model.ExposureTimeMode
+import lucuma.core.enums.PortDisposition
 import lucuma.core.model.sequence.gmos.GmosCcdMode
 import lucuma.odb.graphql.binding.*
 import lucuma.odb.graphql.input.ExposureTimeModeInput
@@ -13,8 +14,9 @@ import lucuma.odb.graphql.input.GmosCcdModeInput
 
 case class GmosSImagingInput(
   exposureTimeMode: ExposureTimeMode,
-  filter:           GmosSouthFilter,
-  ccdMode:          Option[GmosCcdMode]
+  filter:  GmosSouthFilter,
+  ccdMode: Option[GmosCcdMode],
+  port:    PortDisposition
 ) extends InstrumentModesInput
 
 object GmosSImagingInput {
@@ -24,9 +26,10 @@ object GmosSImagingInput {
       case List(
             ExposureTimeModeInput.Binding("exposureTimeMode", exposureTimeMode),
             GmosSouthFilterBinding("filter", filter),
-            GmosCcdModeInput.Binding.Option("ccdMode", ccdMode)
+            GmosCcdModeInput.Binding.Option("ccdMode", ccdMode),
+            PortDispositionBinding("port", portDisposition)
           ) =>
-        (exposureTimeMode, filter, ccdMode).parMapN(apply)
+        (exposureTimeMode, filter, ccdMode, portDisposition).parMapN(apply)
     }
 
 }

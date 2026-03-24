@@ -5,10 +5,13 @@ package lucuma.itc.input
 
 import cats.syntax.parallel.*
 import lucuma.core.model.ExposureTimeMode
+import lucuma.core.enums.PortDisposition
 import lucuma.odb.graphql.binding.*
 import lucuma.odb.graphql.input.*
 
 trait InstrumentModesInput:
+  def port: PortDisposition
+
   // This will return "a" exposure time mode. For most instruments this is "the" exposure time mode,
   // but for some (e.g. Ghost) there are multiple. In the case of ghost, the ITC will ignore the
   // "top level" exposure time mode and use the one in the spectroscopy mode, but we still need

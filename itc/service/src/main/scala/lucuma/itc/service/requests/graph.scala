@@ -67,11 +67,19 @@ object AsterismGraphRequest:
             GmosFpuMask.Builtin(fpu),
             filter,
             ccdMode,
-            roi
+            roi,
+            port
           ) =>
         Result(
           ObservingMode.SpectroscopyMode
-            .GmosNorth(centralWavelength, grating, GmosNorthFpuParam(fpu), filter, ccdMode, roi)
+            .GmosNorth(centralWavelength,
+                       grating,
+                       GmosNorthFpuParam(fpu),
+                       filter,
+                       ccdMode,
+                       roi,
+                       port
+            )
         )
       case GmosSSpectroscopyInput(
             _,
@@ -80,17 +88,23 @@ object AsterismGraphRequest:
             GmosFpuMask.Builtin(fpu),
             filter,
             ccdMode,
-            roi
+            roi,
+            port
           ) =>
         Result(
           ObservingMode.SpectroscopyMode
-            .GmosSouth(centralWavelength, grating, GmosSouthFpuParam(fpu), filter, ccdMode, roi)
+            .GmosSouth(centralWavelength,
+                       grating,
+                       GmosSouthFpuParam(fpu),
+                       filter,
+                       ccdMode,
+                       roi,
+                       port
+            )
         )
-      case Igrins2SpectroscopyInput(_) =>
-        Result(
-          ObservingMode.SpectroscopyMode.Igrins2()
-        )
-      case _                           =>
+      case Igrins2SpectroscopyInput(i_, port) =>
+        Result(ObservingMode.SpectroscopyMode.Igrins2(port))
+      case _                              =>
         Result.failure("Invalid spectroscopy mode")
     }
 

@@ -5465,6 +5465,15 @@ Timestamp of time in ISO-8601 representation in format '2011-12-03T10:15:30Z'
 """
 scalar Timestamp
 
+"""PortDisposition"""
+enum PortDisposition {
+  """Side looking port"""
+  SIDE
+
+  """Up (bottom) looking port"""
+  BOTTOM
+}
+
 """Instrument"""
 enum Instrument {
   """Instrument AcqCam"""
@@ -8575,6 +8584,9 @@ input GmosSSpectroscopyInput {
 
   """Regions of interest"""
   roi: GmosRoi
+
+  """Instrument port disposition"""
+  port: PortDisposition = SIDE
 }
 
 input GmosSImagingInput {
@@ -8586,6 +8598,9 @@ input GmosSImagingInput {
 
   """ccd mode"""
   ccdMode: GmosCcdModeInput
+
+  """Instrument port disposition"""
+  port: PortDisposition = SIDE
 }
 
 input GmosNSpectroscopyInput {
@@ -8609,6 +8624,9 @@ input GmosNSpectroscopyInput {
 
   """Regions of interest"""
   roi: GmosRoi
+
+  """Instrument port disposition"""
+  port: PortDisposition = SIDE
 }
 
 input GmosNImagingInput {
@@ -8620,6 +8638,9 @@ input GmosNImagingInput {
 
   """ccd mode"""
   ccdMode: GmosCcdModeInput
+
+  """Instrument port disposition"""
+  port: PortDisposition = SIDE
 }
 
 input Flamingos2SpectroscopyInput {
@@ -8634,6 +8655,9 @@ input Flamingos2SpectroscopyInput {
 
   """Flamingos2 filter"""
   filter: Flamingos2Filter!
+
+  """Instrument port disposition"""
+  port: PortDisposition = SIDE
 }
 
 input Flamingos2ImagingInput {
@@ -8642,11 +8666,16 @@ input Flamingos2ImagingInput {
 
   """Flamingos2 filter"""
   filter: Flamingos2Filter!
+
+  """Instrument port disposition"""
+  port: PortDisposition = SIDE
 }
 
 input Igrins2SpectroscopyInput {
   """Exposure time mode."""
   exposureTimeMode: ExposureTimeModeInput!
+  """Instrument port disposition"""
+  port: PortDisposition = BOTTOM
 }
 
 type GmosSSpectroscopyParams {

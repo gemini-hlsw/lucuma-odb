@@ -6,12 +6,14 @@ package lucuma.itc.input
 import cats.syntax.parallel.*
 import lucuma.core.enums.Flamingos2Filter
 import lucuma.core.model.ExposureTimeMode
+import lucuma.core.enums.PortDisposition
 import lucuma.odb.graphql.binding.*
 import lucuma.odb.graphql.input.ExposureTimeModeInput
 
 case class Flamingos2ImagingInput(
   exposureTimeMode: ExposureTimeMode,
-  filter:           Flamingos2Filter
+  filter: Flamingos2Filter,
+  port:   PortDisposition
 ) extends InstrumentModesInput
 
 object Flamingos2ImagingInput:
@@ -19,6 +21,7 @@ object Flamingos2ImagingInput:
     ObjectFieldsBinding.rmap:
       case List(
             ExposureTimeModeInput.Binding("exposureTimeMode", exposureTimeMode),
-            Flamingos2FilterBinding("filter", filter)
+            Flamingos2FilterBinding("filter", filter),
+            PortDispositionBinding("port", portDisposition)
           ) =>
-        (exposureTimeMode, filter).parMapN(Flamingos2ImagingInput(_, _))
+        (exposureTimeMode, filter, portDisposition).parMapN(apply)
