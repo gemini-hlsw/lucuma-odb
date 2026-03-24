@@ -12,8 +12,8 @@ import lucuma.odb.graphql.input.ExposureTimeModeInput
 
 case class Flamingos2ImagingInput(
   exposureTimeMode: ExposureTimeMode,
-  filter: Flamingos2Filter,
-  port:   PortDisposition
+  filter:           Flamingos2Filter,
+  port:             PortDisposition
 ) extends InstrumentModesInput
 
 object Flamingos2ImagingInput:

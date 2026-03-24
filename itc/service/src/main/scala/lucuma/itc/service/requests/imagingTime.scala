@@ -60,7 +60,7 @@ object AsterismImagingTimeRequest:
         case Flamingos2ImagingInput(_, filter, port)     =>
           Result.success:
             ObservingMode.ImagingMode.Flamingos2(filter, port)
-        case _                                        =>
+        case _                                           =>
           Result.failure("Invalid imaging mode")
 
     (asterism.targetInputsToData, modeResult, constraints.create).parMapN:

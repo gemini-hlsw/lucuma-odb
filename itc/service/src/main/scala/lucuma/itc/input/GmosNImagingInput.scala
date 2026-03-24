@@ -14,9 +14,9 @@ import lucuma.odb.graphql.input.GmosCcdModeInput
 
 case class GmosNImagingInput(
   exposureTimeMode: ExposureTimeMode,
-  filter:  GmosNorthFilter,
-  ccdMode: Option[GmosCcdMode],
-  port:    PortDisposition
+  filter:           GmosNorthFilter,
+  ccdMode:          Option[GmosCcdMode],
+  port:             PortDisposition
 ) extends InstrumentModesInput
 
 object GmosNImagingInput {

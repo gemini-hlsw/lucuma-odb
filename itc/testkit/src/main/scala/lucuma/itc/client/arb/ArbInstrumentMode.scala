@@ -107,24 +107,23 @@ trait ArbInstrumentMode {
     Arbitrary {
       for {
         et <- arbitrary[ExposureTimeMode]
-        f <- arbitrary[GmosNorthFilter]
-        c <- arbitrary[Option[GmosCcdMode]]
-        p <- arbitrary[PortDisposition]
+        f  <- arbitrary[GmosNorthFilter]
+        c  <- arbitrary[Option[GmosCcdMode]]
+        p  <- arbitrary[PortDisposition]
       } yield GmosNorthImaging(et, f, c, p)
     }
 
   given Cogen[GmosNorthImaging] =
     Cogen[(ExposureTimeMode, GmosNorthFilter, Option[GmosCcdMode], PortDisposition)]
-      .contramap(a => (a.exposureTimeMode, a.filter, a.ccdMode, a.port)
-    )
+      .contramap(a => (a.exposureTimeMode, a.filter, a.ccdMode, a.port))
 
   given Arbitrary[GmosSouthImaging] =
     Arbitrary {
       for {
         et <- arbitrary[ExposureTimeMode]
-        f <- arbitrary[GmosSouthFilter]
-        c <- arbitrary[Option[GmosCcdMode]]
-        p <- arbitrary[PortDisposition]
+        f  <- arbitrary[GmosSouthFilter]
+        c  <- arbitrary[Option[GmosCcdMode]]
+        p  <- arbitrary[PortDisposition]
       } yield GmosSouthImaging(et, f, c, p)
     }
 

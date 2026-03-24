@@ -104,7 +104,7 @@ object AsterismGraphRequest:
         )
       case Igrins2SpectroscopyInput(i_, port) =>
         Result(ObservingMode.SpectroscopyMode.Igrins2(port))
-      case _                              =>
+      case _                                  =>
         Result.failure("Invalid spectroscopy mode")
     }
 

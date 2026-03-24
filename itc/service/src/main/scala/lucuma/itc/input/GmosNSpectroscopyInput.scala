@@ -42,7 +42,8 @@ object GmosNSpectroscopyInput {
             GmosRoiBinding.Option("roi", roi),
             PortDispositionBinding("port", portDisposition)
           ) =>
-        (exposureTimeMode, centralWavelength, grating, fpu, filter, ccdMode, roi, portDisposition).parMapN(apply)
+        (exposureTimeMode, centralWavelength, grating, fpu, filter, ccdMode, roi, portDisposition)
+          .parMapN(apply)
     }
 
 }

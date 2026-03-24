@@ -101,10 +101,10 @@ object InstrumentMode {
 
   case class Flamingos2Spectroscopy(
     exposureTimeMode: ExposureTimeMode,
-    disperser: Flamingos2Disperser,
-    filter:    Flamingos2Filter,
-    fpu:       Flamingos2Fpu,
-    port:      PortDisposition = PortDisposition.Side
+    disperser:        Flamingos2Disperser,
+    filter:           Flamingos2Filter,
+    fpu:              Flamingos2Fpu,
+    port:             PortDisposition = PortDisposition.Side
   ) extends InstrumentMode derives Eq:
     override def displayName: String =
       "Flamingos 2 Spectroscopy"
@@ -124,9 +124,9 @@ object InstrumentMode {
 
   case class GmosNorthImaging(
     exposureTimeMode: ExposureTimeMode,
-    filter:  GmosNorthFilter,
-    ccdMode: Option[GmosCcdMode],
-    port:    PortDisposition = PortDisposition.Side
+    filter:           GmosNorthFilter,
+    ccdMode:          Option[GmosCcdMode],
+    port:             PortDisposition = PortDisposition.Side
   ) extends InstrumentMode derives Eq:
     override def displayName: String =
       "GMOS North Imaging"
@@ -136,16 +136,16 @@ object InstrumentMode {
     given Encoder[GmosNorthImaging] = a =>
       Json.obj(
         "exposureTimeMode" -> a.exposureTimeMode.asJson,
-        "filter"  -> a.filter.asScreamingJson,
-        "ccdMode" -> a.ccdMode.asJson,
-        "port"    -> a.port.asScreamingJson
+        "filter"           -> a.filter.asScreamingJson,
+        "ccdMode"          -> a.ccdMode.asJson,
+        "port"             -> a.port.asScreamingJson
       )
 
   case class GmosSouthImaging(
     exposureTimeMode: ExposureTimeMode,
-    filter:  GmosSouthFilter,
-    ccdMode: Option[GmosCcdMode],
-    port:    PortDisposition = PortDisposition.Side
+    filter:           GmosSouthFilter,
+    ccdMode:          Option[GmosCcdMode],
+    port:             PortDisposition = PortDisposition.Side
   ) extends InstrumentMode derives Eq:
     override def displayName: String =
       "GMOS South Imaging"
@@ -155,15 +155,15 @@ object InstrumentMode {
     given Encoder[GmosSouthImaging] = a =>
       Json.obj(
         "exposureTimeMode" -> a.exposureTimeMode.asJson,
-        "filter"  -> a.filter.asScreamingJson,
-        "ccdMode" -> a.ccdMode.asJson,
-        "port"    -> a.port.asScreamingJson
+        "filter"           -> a.filter.asScreamingJson,
+        "ccdMode"          -> a.ccdMode.asJson,
+        "port"             -> a.port.asScreamingJson
       )
 
   case class Flamingos2Imaging(
     exposureTimeMode: ExposureTimeMode,
-    filter: Flamingos2Filter,
-    port:   PortDisposition = PortDisposition.Side
+    filter:           Flamingos2Filter,
+    port:             PortDisposition = PortDisposition.Side
   ) extends InstrumentMode derives Eq:
     override def displayName: String =
       "Flamingos 2 Imaging"
@@ -174,8 +174,8 @@ object InstrumentMode {
       Json.fromFields(
         List(
           "exposureTimeMode" -> a.exposureTimeMode.asJson,
-          "filter" -> a.filter.asJson,
-          "port"   -> a.port.asScreamingJson
+          "filter"           -> a.filter.asJson,
+          "port"             -> a.port.asScreamingJson
         )
       )
 
@@ -199,16 +199,17 @@ object InstrumentMode {
 
   case class Igrins2Spectroscopy(
     exposureTimeMode: ExposureTimeMode,
-    port: PortDisposition = PortDisposition.Bottom
+    port:             PortDisposition = PortDisposition.Bottom
   ) extends InstrumentMode derives Eq:
     override def displayName: String =
       "IGRINS2 Spectroscopy"
 
   object Igrins2Spectroscopy:
-    given Encoder[Igrins2Spectroscopy] = a => Json.obj(
-      "exposureTimeMode" -> a.exposureTimeMode.asJson,
-      "port"             -> a.port.asScreamingJson
-    )
+    given Encoder[Igrins2Spectroscopy] = a =>
+      Json.obj(
+        "exposureTimeMode" -> a.exposureTimeMode.asJson,
+        "port"             -> a.port.asScreamingJson
+      )
 
   val igrins2Spectroscopy: Prism[InstrumentMode, Igrins2Spectroscopy] =
     GenPrism[InstrumentMode, Igrins2Spectroscopy]

@@ -11,7 +11,7 @@ import lucuma.odb.graphql.input.ExposureTimeModeInput
 
 case class Igrins2SpectroscopyInput(
   exposureTimeMode: ExposureTimeMode,
-  port: PortDisposition
+  port:             PortDisposition
 ) extends InstrumentModesInput
 
 object Igrins2SpectroscopyInput:
