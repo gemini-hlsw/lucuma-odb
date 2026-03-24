@@ -737,7 +737,7 @@ trait AccessControl[F[_]] extends Predicates[F] {
         os <- ResultT(selectForObservationUpdateImpl(
                 includeDeleted      = None,
                 oids                = List(o),
-                includeCalibrations = false,
+                includeCalibrations = true,
                 allowedStates       = allowedStates
               ))
         c  <- ResultT.fromResult:
