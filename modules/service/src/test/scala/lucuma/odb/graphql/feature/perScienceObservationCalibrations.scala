@@ -42,6 +42,7 @@ import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.itc.IntegrationTime
 import lucuma.itc.client.SpectroscopyInput
+import lucuma.odb.data.OdbError
 import lucuma.odb.graphql.query.ExecutionTestSupportForFlamingos2
 import lucuma.odb.graphql.query.ObservingModeSetupOperations
 import lucuma.odb.graphql.subscription.SubscriptionUtils
@@ -49,7 +50,6 @@ import lucuma.odb.json.time.transport.given
 import lucuma.odb.json.wavelength.decoder.given
 import lucuma.odb.service.TelluricTargetsServiceSuiteSupport
 import lucuma.refined.*
-import org.http4s.client.UnexpectedStatus
 
 import java.time.LocalDateTime
 import java.time.ZoneOffset
@@ -1449,9 +1449,10 @@ class perScienceObservationCalibrations
       obs1  <- queryObservation(oid1)
       gid   =  obs1.groupId.get
       oid2  <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
-      err   <- moveObservationAs(serviceUser, oid2, Some(gid)).intercept[UnexpectedStatus]
-    } yield
-      assertEquals(err.status.code, 500)
+      _     <- interceptOdbError(moveObservationAs(serviceUser, oid2, Some(gid))):
+                 case OdbError.InconsistentGroupError(Some(msg)) =>
+                   assert(msg.contains("at most one science observation"))
+    } yield ()
 
   test("telluric group rejects creating child groups"):
     for
@@ -1462,9 +1463,10 @@ class perScienceObservationCalibrations
       _    <- recalculateCalibrations(pid, when, oid)
       obs  <- queryObservation(oid)
       gid  =  obs.groupId.get
-      err  <- createGroupAs(pi, pid, parentGroupId = Some(gid)).intercept[UnexpectedStatus]
-    yield
-      assertEquals(err.status.code, 500)
+      _    <- interceptOdbError(createGroupAs(pi, pid, parentGroupId = Some(gid))):
+                case OdbError.InconsistentGroupError(Some(msg)) =>
+                  assert(msg.contains("Cannot create group inside telluric group"))
+    yield ()
 
   test("telluric target gets SED from telluric type when not set"):
     for {
