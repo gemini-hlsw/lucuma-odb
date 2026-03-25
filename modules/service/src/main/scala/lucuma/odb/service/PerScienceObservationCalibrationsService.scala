@@ -333,13 +333,14 @@ object PerScienceObservationCalibrationsService:
               .void
 
         for {
-          allSciEtm  <- S.exposureTimeModeService
-                           .select(List(scienceOid, telluricOid), ExposureTimeModeRole.Science)
-                           .map(_.view.mapValues(_.head).toMap)
-                        // TODO Add a method to read several modes in one call
-          allAcqEtm  <- S.exposureTimeModeService
-                           .select(List(scienceOid, telluricOid), ExposureTimeModeRole.Acquisition)
-                           .map(_.view.mapValues(_.head).toMap)
+          allEtm     <- S.exposureTimeModeService
+                           .select(List(scienceOid, telluricOid), ExposureTimeModeRole.Science, ExposureTimeModeRole.Acquisition)
+          allSciEtm   = allEtm.collect:
+                          case (oid, roles) if roles.contains(ExposureTimeModeRole.Science) =>
+                            oid -> roles(ExposureTimeModeRole.Science).head
+          allAcqEtm   = allEtm.collect:
+                          case (oid, roles) if roles.contains(ExposureTimeModeRole.Acquisition) =>
+                            oid -> roles(ExposureTimeModeRole.Acquisition).head
           scienceEtm  = allSciEtm.get(scienceOid)
           _          <- scienceEtm.traverse_ : etm =>
                           // Normally there is a single acq etm but is safe to go over all of them
