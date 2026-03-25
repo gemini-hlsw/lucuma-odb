@@ -28,8 +28,12 @@ import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosNorthFpu
 import lucuma.core.enums.GmosNorthGrating
 import lucuma.core.enums.GmosRoi
+import lucuma.core.enums.GmosSouthFilter
+import lucuma.core.enums.GmosSouthFpu
+import lucuma.core.enums.GmosSouthGrating
 import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
+import lucuma.core.enums.Instrument
 import lucuma.core.enums.StepGuideState
 import lucuma.core.math.BoundedInterval
 import lucuma.core.math.Wavelength
@@ -40,11 +44,17 @@ import lucuma.core.model.User
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.StepConfig.Gcal
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth
+import lucuma.core.model.sequence.gmos.DynamicConfig.GmosSouth
 import lucuma.core.model.sequence.gmos.GmosCcdMode
 import lucuma.core.model.sequence.gmos.GmosFpuMask
 import lucuma.core.model.sequence.gmos.GmosGratingConfig
+import lucuma.core.model.sequence.gmos.StaticConfig
 import lucuma.core.syntax.string.*
+import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
+import lucuma.itc.IntegrationTime
+import lucuma.odb.sequence.StepTimeEstimateCalculator
+import lucuma.odb.sequence.gmos.longslit.Acquisition.RepeatingAtomCount
 import lucuma.odb.service.Services
 import lucuma.odb.smartgcal.data.Gmos
 import lucuma.odb.smartgcal.data.SmartGcalValue
@@ -52,6 +62,12 @@ import lucuma.odb.smartgcal.data.SmartGcalValue.LegacyInstrumentConfig
 import skunk.Session
 
 trait ExecutionTestSupportForGmos extends ExecutionTestSupport:
+
+  override def fakeItcSpectroscopyResult: IntegrationTime =
+    IntegrationTime(
+      20.minTimeSpan,
+      PosInt.unsafeFrom(10)
+    )
 
   val gn_key_0_50: Gmos.TableKey[GmosNorthGrating, GmosNorthFilter, GmosNorthFpu] =
     Gmos.TableKey(
@@ -62,6 +78,34 @@ trait ExecutionTestSupportForGmos extends ExecutionTestSupport:
       ).some,
       GmosNorthFilter.RPrime.some,
       GmosNorthFpu.LongSlit_0_50.some,
+      GmosXBinning.One,
+      GmosYBinning.Two,
+      GmosAmpGain.Low
+    )
+
+  val gs_key_0_50: Gmos.TableKey[GmosSouthGrating, GmosSouthFilter, GmosSouthFpu] =
+    Gmos.TableKey(
+      Gmos.GratingConfigKey(
+        GmosSouthGrating.B1200_G5321,
+        GmosGratingOrder.One,
+        BoundedInterval.unsafeOpenUpper(Wavelength.Min, Wavelength.Max)
+      ).some,
+      GmosSouthFilter.RPrime.some,
+      GmosSouthFpu.LongSlit_0_50.some,
+      GmosXBinning.One,
+      GmosYBinning.Two,
+      GmosAmpGain.Low
+    )
+
+  val gs_key_0_50_R600: Gmos.TableKey[GmosSouthGrating, GmosSouthFilter, GmosSouthFpu] =
+    Gmos.TableKey(
+      Gmos.GratingConfigKey(
+        GmosSouthGrating.R600_G5324,
+        GmosGratingOrder.One,
+        BoundedInterval.unsafeOpenUpper(Wavelength.Min, Wavelength.Max)
+      ).some,
+      GmosSouthFilter.RPrime.some,
+      GmosSouthFpu.LongSlit_0_50.some,
       GmosXBinning.One,
       GmosYBinning.Two,
       GmosAmpGain.Low
@@ -110,7 +154,7 @@ trait ExecutionTestSupportForGmos extends ExecutionTestSupport:
       GmosAmpGain.Low
     )
 
-  val gn_flat =
+  val gmos_flat =
     SmartGcalValue(
       Gcal(
         Gcal.Lamp.fromContinuum(GcalContinuum.QuartzHalogen5W),
@@ -125,7 +169,7 @@ trait ExecutionTestSupportForGmos extends ExecutionTestSupport:
       )
     )
 
-  val gn_arc =
+  val gmos_arc =
     SmartGcalValue(
       Gcal(
         Gcal.Lamp.fromArcs(NonEmptySet.one(GcalArc.CuArArc)),
@@ -141,24 +185,46 @@ trait ExecutionTestSupportForGmos extends ExecutionTestSupport:
     )
 
   override def dbInitialization: Option[Session[IO] => IO[Unit]] = Some { s =>
-    val rows: List[Gmos.TableRow.North] =
+    val rowsNorth: List[Gmos.TableRow.North] =
       List(
-        Gmos.TableRow(PosLong.unsafeFrom(1), gn_key_0_50, gn_flat),
-        Gmos.TableRow(PosLong.unsafeFrom(1), gn_key_0_50, gn_arc),
-        Gmos.TableRow(PosLong.unsafeFrom(1), gn_key_0_75, gn_flat),
-        Gmos.TableRow(PosLong.unsafeFrom(1), gn_key_0_75, gn_arc),
-        Gmos.TableRow(PosLong.unsafeFrom(1), gn_key_1_00, gn_flat),
-        Gmos.TableRow(PosLong.unsafeFrom(1), gn_key_1_00, gn_arc),
-        Gmos.TableRow(PosLong.unsafeFrom(1), gn_key_5_00, gn_flat),
-        Gmos.TableRow(PosLong.unsafeFrom(1), gn_key_5_00, gn_arc)
+        Gmos.TableRow(PosLong.unsafeFrom(1), gn_key_0_50, gmos_flat),
+        Gmos.TableRow(PosLong.unsafeFrom(1), gn_key_0_50, gmos_arc),
+        Gmos.TableRow(PosLong.unsafeFrom(1), gn_key_0_75, gmos_flat),
+        Gmos.TableRow(PosLong.unsafeFrom(1), gn_key_0_75, gmos_arc),
+        Gmos.TableRow(PosLong.unsafeFrom(1), gn_key_1_00, gmos_flat),
+        Gmos.TableRow(PosLong.unsafeFrom(1), gn_key_1_00, gmos_arc),
+        Gmos.TableRow(PosLong.unsafeFrom(1), gn_key_5_00, gmos_flat),
+        Gmos.TableRow(PosLong.unsafeFrom(1), gn_key_5_00, gmos_arc)
       )
 
-    servicesFor(pi /* doesn't matter*/).map(_(s)).use: services =>
+    val rowsSouth: List[Gmos.TableRow.South] =
+      List(
+        Gmos.TableRow(PosLong.unsafeFrom(1), gs_key_0_50,      gmos_flat),
+        Gmos.TableRow(PosLong.unsafeFrom(1), gs_key_0_50,      gmos_arc),
+        Gmos.TableRow(PosLong.unsafeFrom(1), gs_key_0_50_R600, gmos_flat),
+        Gmos.TableRow(PosLong.unsafeFrom(1), gs_key_0_50_R600, gmos_arc)
+      )
+
+    val north = servicesFor(pi /* doesn't matter*/).map(_(s)).use: services =>
       services.transactionally:
-        rows.zipWithIndex.traverse_ : (r, i) =>
+        rowsNorth.zipWithIndex.traverse_ : (r, i) =>
           Services.asSuperUser:
             services.smartGcalService.insertGmosNorth(i, r)
+
+    val south = servicesFor(pi /* doesn't matter*/).map(_(s)).use: services =>
+      services.transactionally:
+        rowsSouth.zipWithIndex.traverse_ : (r, i) =>
+          Services.asSuperUser:
+            services.smartGcalService.insertGmosSouth(i, r)
+
+    north >> south
   }
+
+  def gmosNorthTimeEstimateCalculator: IO[StepTimeEstimateCalculator[StaticConfig.GmosNorth, GmosNorth]] =
+    timeEstimateCalculator.map(_.gmosNorthStep)
+
+  def gmosSouthTimeEstimateCalculator: IO[StepTimeEstimateCalculator[StaticConfig.GmosSouth, GmosSouth]] =
+    timeEstimateCalculator.map(_.gmosSouthStep)
 
   val GmosAtomQuery: String =
     s"""
@@ -216,11 +282,25 @@ trait ExecutionTestSupportForGmos extends ExecutionTestSupport:
       GmosFpuMask.Builtin(GmosNorthFpu.LongSlit_0_50).some
     )
 
+  def gmosSouthScience(ditherNm: Int): GmosSouth =
+    GmosSouth(
+      fakeItcSpectroscopyResult.exposureTime,
+      GmosCcdMode(GmosXBinning.One, GmosYBinning.Two, GmosAmpCount.Twelve, GmosAmpGain.Low, GmosAmpReadMode.Slow),
+      GmosDtax.Zero,
+      GmosRoi.FullFrame,
+      GmosGratingConfig.South(GmosSouthGrating.R600_G5324, GmosGratingOrder.One, obsWavelengthAt(ditherNm)).some,
+      GmosSouthFilter.RPrime.some,
+      GmosFpuMask.Builtin(GmosSouthFpu.LongSlit_0_50).some
+    )
+
   def gmosNorthArc(ditherNm: Int): GmosNorth =
-    gmosNorthScience(ditherNm).copy(exposure = gn_arc.instrumentConfig.exposureTime)
+    gmosNorthScience(ditherNm).copy(exposure = gmos_arc.instrumentConfig.exposureTime)
+
+  def gmosSouthArc(ditherNm: Int): GmosSouth =
+    gmosSouthScience(ditherNm).copy(exposure = gmos_arc.instrumentConfig.exposureTime)
 
   def gmosNorthFlat(ditherNm: Int): GmosNorth =
-    gmosNorthScience(ditherNm).copy(exposure = gn_flat.instrumentConfig.exposureTime)
+    gmosNorthScience(ditherNm).copy(exposure = gmos_flat.instrumentConfig.exposureTime)
 
   def gmosNorthAcq0(roi: GmosLongSlitAcquisitionRoi): GmosNorth =
     gmosNorthScience(0).copy(
@@ -251,6 +331,23 @@ trait ExecutionTestSupportForGmos extends ExecutionTestSupport:
       case 1 => gmosNorthAcq1(roi)
       case 2 => gmosNorthAcq2(roi)
       case _ => sys.error("Only 3 steps in a GMOS North Acq")
+
+  def fineAcquisitionAdjustmentsList(n: Int): Json =
+    List
+      .fill(n):
+        json"""
+          {
+            "description": "Fine Adjustments",
+            "observeClass": "ACQUISITION",
+            "steps": [
+              ${gmosNorthExpectedAcq(2, 0)}
+            ]
+          }
+        """
+      .asJson
+
+  lazy val AllAcquisitionAdjustmentsList: Json =
+    fineAcquisitionAdjustmentsList(RepeatingAtomCount)
 
   val FlatStep: StepConfig.Gcal =
     StepConfig.Gcal(Gcal.Lamp.fromContinuum(GcalContinuum.QuartzHalogen5W), GcalFilter.Gmos, GcalDiffuser.Ir, GcalShutter.Open)
@@ -298,7 +395,7 @@ trait ExecutionTestSupportForGmos extends ExecutionTestSupport:
         "stepConfig" : {
           "stepType": "GCAL",
           "continuum" : null,
-          "arcs" : ${gn_arc.gcalConfig.lamp.arcs.map(_.toList) }
+          "arcs" : ${gmos_arc.gcalConfig.lamp.arcs.map(_.toList) }
         },
         "telescopeConfig": ${expectedTelescopeConfig(p, q, StepGuideState.Disabled)},
         "observeClass" : "NIGHT_CAL",
@@ -312,7 +409,7 @@ trait ExecutionTestSupportForGmos extends ExecutionTestSupport:
         "instrumentConfig" : ${gmosNorthExpectedInstrumentConfig(gmosNorthFlat(ditherNm))},
         "stepConfig" : {
           "stepType": "GCAL",
-          "continuum" : ${gn_flat.gcalConfig.lamp.continuum},
+          "continuum" : ${gmos_flat.gcalConfig.lamp.continuum},
           "arcs" : []
         },
         "telescopeConfig": ${expectedTelescopeConfig(p, q, StepGuideState.Disabled)},
@@ -455,3 +552,25 @@ trait ExecutionTestSupportForGmos extends ExecutionTestSupport:
         .as[Observation.Id]
         .getOrElse(sys.error("Could not create observation"))
     }
+
+  val createOngoingGmosNorthObservation: IO[Observation.Id] =
+    for
+      p <- createProgramAs(pi)
+      t <- createTargetWithProfileAs(pi, p)
+      o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+      v <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
+      s <- firstScienceStepId(serviceUser, o)
+      _ <- addEndStepEvent(s, v)
+      _ <- runObscalcUpdate(p, o)
+    yield o
+
+  val createOngoingGmosSouthObservation: IO[Observation.Id] =
+    for
+      p <- createProgramAs(pi)
+      t <- createTargetWithProfileAs(pi, p)
+      o <- createGmosSouthLongSlitObservationAs(pi, p, List(t))
+      v <- recordVisitAs(serviceUser, Instrument.GmosSouth, o)
+      s <- firstScienceStepId(serviceUser, o)
+      _ <- addEndStepEvent(s, v)
+      _ <- runObscalcUpdate(p, o)
+    yield o

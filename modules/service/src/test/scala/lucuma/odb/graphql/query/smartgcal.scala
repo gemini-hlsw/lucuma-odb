@@ -46,8 +46,10 @@ import lucuma.odb.service.SmartGcalService
 import lucuma.odb.smartgcal.data.Flamingos2
 import lucuma.odb.smartgcal.data.Gmos
 import lucuma.odb.smartgcal.data.Gmos.GratingConfigKey
+import lucuma.odb.smartgcal.data.Igrins2
 import lucuma.odb.smartgcal.data.SmartGcalValue
 import lucuma.odb.smartgcal.data.SmartGcalValue.LegacyInstrumentConfig
+import lucuma.refined.*
 import skunk.Session
 
 class smartgcal extends OdbSuite with ObservingModeSetupOperations {
@@ -166,6 +168,19 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
         val tableRowFlatF2: Flamingos2.TableRow =
           f2Row(flat)
 
+        def ig2Row(s: SmartGcalValue[LegacyInstrumentConfig]): Igrins2.TableRow =
+          Igrins2.TableRow(
+            1.refined,
+            Igrins2.TableKey,
+            s
+          )
+
+        val tableRowArcIg2: Igrins2.TableRow =
+          ig2Row(arc)
+
+        val tableRowFlatIg2: Igrins2.TableRow =
+          ig2Row(flat)
+
         def defineGmosN(
           id:         Int,
           row:        Gmos.TableRow.North,
@@ -245,6 +260,26 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
             services.smartGcalService.insertFlamingos2(id, update.runS(tableRow).value)
         }
 
+        def defineIgrins2(
+          id:         Int,
+          stepOrder:  Int,
+          expTimeSec: Int,
+          count:      Int,
+          tableRow:   Igrins2.TableRow
+        ): IO[Unit] = {
+          import lucuma.core.optics.syntax.all.*
+
+          val update: State[Igrins2.TableRow, Unit] =
+            for {
+              _ <- Igrins2.TableRow.line         := PosLong.unsafeFrom(stepOrder)
+              _ <- Igrins2.TableRow.exposureTime := TimeSpan.unsafeFromMicroseconds(expTimeSec * 1_000_000L)
+              _ <- Igrins2.TableRow.stepCount    := PosInt.unsafeFrom(count)
+            } yield ()
+
+          Services.asSuperUser:
+            services.smartGcalService.insertIgrins2(id, update.runS(tableRow).value)
+        }
+
         for {
           // simple lookup
           _ <- defineGmosN(1, tableRowFlatGmosN, high = 500_000, expTimeSec = 1)
@@ -259,6 +294,9 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
 
           _ <- defineF2(1, 1, expTimeSec = 1, count = 1, tableRow = tableRowFlatF2)
           _ <- defineF2(2, 1, expTimeSec = 1, count = 1, tableRow = tableRowArcF2)
+
+          _ <- defineIgrins2(1, 1, expTimeSec = 1, count = 1, tableRow = tableRowFlatIg2)
+          _ <- defineIgrins2(2, 1, expTimeSec = 1, count = 1, tableRow = tableRowArcIg2)
 
           // multi steps
           _ <- defineGmosN(5, tableRowFlatGmosN, stepOrder = 10, disperser = GmosNorthGrating.R600_G5304, expTimeSec = 4)

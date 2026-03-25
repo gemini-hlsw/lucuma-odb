@@ -4,9 +4,12 @@
 package lucuma.odb.graphql
 package input
 
+import cats.Eq
+import cats.derived.*
 import cats.syntax.foldable.*
 import cats.syntax.option.*
 import cats.syntax.parallel.*
+import cats.syntax.partialOrder.*
 import cats.syntax.traverse.*
 import coulomb.Quantity
 import grackle.Result
@@ -28,6 +31,7 @@ import lucuma.core.enums.Site
 import lucuma.core.math.Offset.Q
 import lucuma.core.math.Wavelength
 import lucuma.core.math.WavelengthDither
+import lucuma.core.model.Access
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.optics.Format
 import lucuma.core.syntax.string.*
@@ -57,7 +61,9 @@ object GmosLongSlitInput:
     filter:           Nullable[GmosNorthFilter],
     roi:              Nullable[GmosLongSlitAcquisitionRoi],
     exposureTimeMode: Option[ExposureTimeMode]
-  )
+  ):
+    def updatesAcquisition: Boolean =
+      filter.isDefined || roi.isDefined || exposureTimeMode.isDefined
 
   object NorthAcquisition:
     val Binding: Matcher[NorthAcquisition] =
@@ -81,7 +87,9 @@ object GmosLongSlitInput:
     filter:           Nullable[GmosSouthFilter],
     roi:              Nullable[GmosLongSlitAcquisitionRoi],
     exposureTimeMode: Option[ExposureTimeMode]
-  )
+  ):
+    def updatesAcquisition: Boolean =
+      filter.isDefined || roi.isDefined || exposureTimeMode.isDefined
 
   object SouthAcquisition:
     val Binding: Matcher[SouthAcquisition] =
@@ -239,8 +247,8 @@ object GmosLongSlitInput:
       explicitRoi:          Nullable[GmosRoi],
       explicitλDithers:     Nullable[List[WavelengthDither]],
       explicitOffsets:      Nullable[List[Q]]
-    ):
-
+    ) derives Eq:
+          
       def toCreate(site: Site): Result[Create.Common] =
         required(site, centralWavelength, "centralWavelength").map: w =>
           Create.Common(
@@ -269,13 +277,24 @@ object GmosLongSlitInput:
 
       Result.fromOption(oa, Matcher.validationProblem(s"A $itemName is required in order to create a GMOS ${siteName} Long Slit observing mode."))
 
+    object Common:
+      val AllUndefined: Common =
+        Common(None, None, Nullable.Absent, Nullable.Absent, Nullable.Absent, Nullable.Absent, Nullable.Absent, Nullable.Absent, Nullable.Absent)
+
     final case class North(
       grating:     Option[GmosNorthGrating],
       filter:      Nullable[GmosNorthFilter],
       fpu:         Option[GmosNorthFpu],
       common:      Edit.Common,
       acquisition: Option[NorthAcquisition]
-    ):
+    ) derives Eq:
+      def updatesAcquisition: Boolean =
+        acquisition.exists(_.updatesAcquisition)
+
+      def limitToPreExecution(access: Access): Boolean =
+        // Staff can edit the acquisition info for ongoing observations
+        access <= Access.Pi ||
+          copy(acquisition = None) =!= North.AllUndefined
 
       val observingModeType: ObservingModeType =
         ObservingModeType.GmosNorthLongSlit
@@ -324,13 +343,23 @@ object GmosLongSlitInput:
               acquisition
             ))
 
+      private val AllUndefined: North =
+        North(None, Nullable.Absent, None, Common.AllUndefined, None)
+
     final case class South(
       grating:     Option[GmosSouthGrating],
       filter:      Nullable[GmosSouthFilter],
       fpu:         Option[GmosSouthFpu],
       common:      Edit.Common,
       acquisition: Option[SouthAcquisition]
-    ):
+    ) derives Eq:
+      def updatesAcquisition: Boolean =
+        acquisition.exists(_.updatesAcquisition)
+
+      def limitToPreExecution(access: Access): Boolean =
+        // Staff can edit the acquisition info for ongoing observations
+        access <= Access.Pi ||
+          copy(acquisition = None) =!= South.AllUndefined
 
       val observingModeType: ObservingModeType =
         ObservingModeType.GmosSouthLongSlit
@@ -378,6 +407,9 @@ object GmosLongSlitInput:
               ),
               acquisition
             ))
+
+      private val AllUndefined: South =
+        South(None, Nullable.Absent, None, Common.AllUndefined, None)
 
 
   private val NorthData: Matcher[(

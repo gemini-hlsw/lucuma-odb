@@ -4,14 +4,12 @@
 package lucuma.odb.graphql
 package mutation
 
-import cats.data.NonEmptyList
 import cats.effect.IO
 import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.NonNegShort
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
-import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.TimeAccountingCategory
@@ -21,7 +19,6 @@ import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.core.syntax.timespan.*
-import lucuma.odb.data.OdbError
 import lucuma.odb.graphql.input.AllocationInput
 import lucuma.odb.graphql.query.ExecutionQuerySetupOperations
 import lucuma.odb.service.ObservationService
@@ -1970,6 +1967,7 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
     multiUpdateTest(pi, List((update0, query, expected0), (update1, query, expected1)))
   }
 
+
   test("observing mode: existing f2 update read_mode updates reads") {
 
     val update0 = """
@@ -2267,6 +2265,189 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
       ),
       observingMode = Some(ObservingModeType.Flamingos2LongSlit)
     )
+  }
+
+  test("observing mode: update existing F2 Long Slit, setting explicit acquisition filter") {
+
+    val update0 = """
+      observingMode: {
+        flamingos2LongSlit: {
+          disperser: R1200_JH
+          filter: JH
+          fpu: LONG_SLIT_1
+          exposureTimeMode: {
+            signalToNoise: {
+              value: 2.0
+              at: { nanometers: 234.56 }
+            }
+          }
+        }
+      }
+    """
+
+    val query = """
+      observations {
+        instrument
+        observingMode {
+          flamingos2LongSlit {
+            acquisition {
+              filter
+              defaultFilter
+              explicitFilter
+            }
+          }
+        }
+      }
+    """
+
+    val expected0 =
+      json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "instrument": "FLAMINGOS2",
+              "observingMode": {
+                "flamingos2LongSlit": {
+                  "acquisition": {
+                    "filter": "J",
+                    "defaultFilter": "J",
+                    "explicitFilter": null
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    """.asRight
+
+    val update1 = """
+      observingMode: {
+        flamingos2LongSlit: {
+          acquisition: {
+            explicitFilter: K_SHORT
+          }
+        }
+      }
+    """
+
+    val expected1 =
+      json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "instrument": "FLAMINGOS2",
+              "observingMode": {
+                "flamingos2LongSlit": {
+                  "acquisition": {
+                    "filter": "K_SHORT",
+                    "defaultFilter": "J",
+                    "explicitFilter": "K_SHORT"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    """.asRight
+
+    multiUpdateTest(pi, List((update0, query, expected0), (update1, query, expected1)))
+  }
+
+  test("observing mode: update existing F2 Long Slit, deleting explicit acquisition filter") {
+
+    val update0 = """
+      observingMode: {
+        flamingos2LongSlit: {
+          disperser: R1200_JH
+          filter: JH
+          fpu: LONG_SLIT_1
+          exposureTimeMode: {
+            signalToNoise: {
+              value: 2.0
+              at: { nanometers: 234.56 }
+            }
+          }
+          acquisition: {
+            explicitFilter: K_SHORT
+          }
+        }
+      }
+    """
+
+    val query = """
+      observations {
+        instrument
+        observingMode {
+          flamingos2LongSlit {
+            acquisition {
+              filter
+              defaultFilter
+              explicitFilter
+            }
+          }
+        }
+      }
+    """
+
+    val expected0 =
+      json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "instrument": "FLAMINGOS2",
+              "observingMode": {
+                "flamingos2LongSlit": {
+                  "acquisition": {
+                    "filter": "K_SHORT",
+                    "defaultFilter": "J",
+                    "explicitFilter": "K_SHORT"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    """.asRight
+
+    val update1 = """
+      observingMode: {
+        flamingos2LongSlit: {
+          acquisition: {
+            explicitFilter: null
+          }
+        }
+      }
+    """
+
+    val expected1 =
+      json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "instrument": "FLAMINGOS2",
+              "observingMode": {
+                "flamingos2LongSlit": {
+                  "acquisition": {
+                    "filter": "J",
+                    "defaultFilter": "J",
+                    "explicitFilter": null
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    """.asRight
+
+    multiUpdateTest(pi, List((update0, query, expected0), (update1, query, expected1)))
   }
 
   test("observing mode: update existing, all fields") {
@@ -3845,57 +4026,645 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
     updateBlindOffsetTest(pi, true) *>
       updateBlindOffsetTest(pi, false)
 
-  test("existence: can delete observation without events"):
-    for {
-      pid <- createProgramAs(pi)
-      oid <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some)
-      _   <- deleteObservation(pi, oid)
-    } yield ()
+  test("observing mode: create igrins2 long slit in existing observation"):
 
-  test("existence: cannot soft-delete observation with visits"):
-    recordAll(
-      pi,
-      service,
-      ObservingModeType.GmosNorthLongSlit,
-      offset = 10000,
-      atomCount = 1,
-      stepCount = 1,
-      datasetCount = 1).flatMap: on =>
-        expectOdbError(
-          user = pi,
-          query = s"""
-            mutation {
-              updateObservations(input: {
-                SET: { existence: DELETED }
-                WHERE: { id: { EQ: "${on.id}" } }
-              }) {
-                observations { id }
+    val update = """
+      observingMode: {
+        igrins2LongSlit: {
+          exposureTimeMode: {
+            signalToNoise: {
+              value: 50.0
+              at: { nanometers: 2200 }
+            }
+          }
+        }
+      }
+    """
+
+    val query = """
+      observations {
+        instrument
+        observingMode {
+          igrins2LongSlit {
+            offsetMode
+            defaultOffsetMode
+            explicitOffsetMode
+            saveSVCImages
+            defaultSaveSVCImages
+            explicitSaveSVCImages
+            exposureTimeMode {
+              signalToNoise {
+                value
+                at { nanometers }
               }
             }
-          """,
-          expected = {
-            case OdbError.UpdateFailed(Some(msg)) if msg.contains("Cannot delete observation") && msg.contains("visit") => ()
           }
-        )
+        }
+      }
+    """
 
-  test("existence: cannot hard-delete calibration observation with visits"):
-    for
-      pid <- createProgramAs(pi)
-      tid <- createTargetAs(pi, pid)
-      oid <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid)
-      _   <- setObservationCalibrationRole(List(oid), CalibrationRole.Telluric)
-      vid <- recordVisitAs(service, lucuma.core.enums.Instrument.GmosNorth, oid)
-      _   <- addSequenceEventAs(service, vid, lucuma.core.enums.SequenceCommand.Start)
-      res <- withServices(service) { services =>
-               services.session.transaction.use { xa =>
-                 services.observationService.deleteCalibrationObservations(NonEmptyList.one(oid))(using xa)
-               }
-             }.attempt
-      _   <- res match
-               case Left(ex) if ex.getMessage.contains("Cannot delete observation") && ex.getMessage.contains("visit") =>
-                 IO.unit
-               case Left(ex) =>
-                 IO.raiseError(new AssertionError(s"Expected deletion to fail with visit constraint, but got: ${ex.getMessage}"))
-               case Right(_) =>
-                 IO.raiseError(new AssertionError("Expected deletion to fail, but it succeeded"))
-    yield ()
+    val expected =
+      json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "instrument": "IGRINS2",
+              "observingMode": {
+                "igrins2LongSlit": {
+                  "offsetMode": "NOD_ALONG_SLIT",
+                  "defaultOffsetMode": "NOD_ALONG_SLIT",
+                  "explicitOffsetMode": null,
+                  "saveSVCImages": false,
+                  "defaultSaveSVCImages": false,
+                  "explicitSaveSVCImages": null,
+                  "exposureTimeMode": {
+                    "signalToNoise": {
+                      "value": 50.000,
+                      "at": {
+                        "nanometers": 2200.000
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    """.asRight
+
+    oneUpdateTest(pi, update, query, expected)
+
+  test("observing mode: update igrins2 long slit offset mode"):
+
+    val update0 = """
+      observingMode: {
+        igrins2LongSlit: {
+          exposureTimeMode: {
+            signalToNoise: {
+              value: 50.0
+              at: { nanometers: 2200 }
+            }
+          }
+        }
+      }
+    """
+
+    val update1 = """
+      observingMode: {
+        igrins2LongSlit: {
+          explicitOffsetMode: NOD_TO_SKY
+          explicitSaveSVCImages: true
+        }
+      }
+    """
+
+    val query = """
+      observations {
+        observingMode {
+          igrins2LongSlit {
+            offsetMode
+            defaultOffsetMode
+            explicitOffsetMode
+            saveSVCImages
+            defaultSaveSVCImages
+            explicitSaveSVCImages
+          }
+        }
+      }
+    """
+
+    val expected0 =
+      json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "observingMode": {
+                "igrins2LongSlit": {
+                  "offsetMode": "NOD_ALONG_SLIT",
+                  "defaultOffsetMode": "NOD_ALONG_SLIT",
+                  "explicitOffsetMode": null,
+                  "saveSVCImages": false,
+                  "defaultSaveSVCImages": false,
+                  "explicitSaveSVCImages": null
+                }
+              }
+            }
+          ]
+        }
+      }
+    """.asRight
+
+    val expected1 =
+      json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "observingMode": {
+                "igrins2LongSlit": {
+                  "offsetMode": "NOD_TO_SKY",
+                  "defaultOffsetMode": "NOD_ALONG_SLIT",
+                  "explicitOffsetMode": "NOD_TO_SKY",
+                  "saveSVCImages": true,
+                  "defaultSaveSVCImages": false,
+                  "explicitSaveSVCImages": true
+                }
+              }
+            }
+          ]
+        }
+      }
+    """.asRight
+
+    multiUpdateTest(pi,
+      List(
+        (update0, query, expected0),
+        (update1, query, expected1)
+      )
+    )
+
+  test("observing mode: clear igrins2 explicit overrides"):
+
+    val update0 = """
+      observingMode: {
+        igrins2LongSlit: {
+          exposureTimeMode: {
+            signalToNoise: {
+              value: 50.0
+              at: { nanometers: 2200 }
+            }
+          }
+          explicitOffsetMode: NOD_TO_SKY
+          explicitSaveSVCImages: true
+        }
+      }
+    """
+
+    val update1 = """
+      observingMode: {
+        igrins2LongSlit: {
+          explicitOffsetMode: null
+          explicitSaveSVCImages: null
+        }
+      }
+    """
+
+    val query = """
+      observations {
+        observingMode {
+          igrins2LongSlit {
+            offsetMode
+            explicitOffsetMode
+            saveSVCImages
+            explicitSaveSVCImages
+          }
+        }
+      }
+    """
+
+    val expected0 =
+      json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "observingMode": {
+                "igrins2LongSlit": {
+                  "offsetMode": "NOD_TO_SKY",
+                  "explicitOffsetMode": "NOD_TO_SKY",
+                  "saveSVCImages": true,
+                  "explicitSaveSVCImages": true
+                }
+              }
+            }
+          ]
+        }
+      }
+    """.asRight
+
+    val expected1 =
+      json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "observingMode": {
+                "igrins2LongSlit": {
+                  "offsetMode": "NOD_ALONG_SLIT",
+                  "explicitOffsetMode": null,
+                  "saveSVCImages": false,
+                  "explicitSaveSVCImages": null
+                }
+              }
+            }
+          ]
+        }
+      }
+    """.asRight
+
+    multiUpdateTest(pi,
+      List(
+        (update0, query, expected0),
+        (update1, query, expected1)
+      )
+    )
+
+  test("observing mode: update igrins2 spatial offsets"):
+
+    val update0 = """
+      observingMode: {
+        igrins2LongSlit: {
+          exposureTimeMode: {
+            signalToNoise: {
+              value: 50.0
+              at: { nanometers: 2200 }
+            }
+          }
+          explicitOffsets: [
+            { p: { arcseconds: 0.0 }, q: { arcseconds: -5.0 } },
+            { p: { arcseconds: 0.0 }, q: { arcseconds:  5.0 } },
+            { p: { arcseconds: 0.0 }, q: { arcseconds:  3.5 } },
+            { p: { arcseconds: 0.0 }, q: { arcseconds: -2.5 } }
+          ]
+        }
+      }
+    """
+
+    val update1 = """
+      observingMode: {
+        igrins2LongSlit: {
+          explicitOffsets: null
+        }
+      }
+    """
+
+    val update2 = """
+      observingMode: {
+        igrins2LongSlit: {
+          explicitOffsetMode: NOD_TO_SKY
+          explicitOffsets: [
+            { p: { arcseconds: 1.0 }, q: { arcseconds: -5.0 } },
+            { p: { arcseconds: 2.0 }, q: { arcseconds:  5.0 } }
+          ]
+        }
+      }
+    """
+
+    val update3 = """
+      observingMode: {
+        igrins2LongSlit: {
+          explicitOffsets: null
+        }
+      }
+    """
+
+    val query = """
+      observations {
+        observingMode {
+          igrins2LongSlit {
+            offsets {
+              p { arcseconds }
+              q { arcseconds }
+            }
+            explicitOffsets {
+              p { arcseconds }
+              q { arcseconds }
+            }
+            defaultOffsets {
+              p { arcseconds }
+              q { arcseconds }
+            }
+          }
+        }
+      }
+    """
+
+    val expected0 = json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "observingMode": {
+                "igrins2LongSlit": {
+                  "offsets": [
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -5.000000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  5.000000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  3.500000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -2.500000 } }
+                  ],
+                  "explicitOffsets": [
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -5.000000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  5.000000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  3.500000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -2.500000 } }
+                  ],
+                  "defaultOffsets": [
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -1.250000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  1.250000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  1.250000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -1.250000 } }
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      }
+    """.asRight
+
+    val expected1 = json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "observingMode": {
+                "igrins2LongSlit": {
+                  "offsets": [
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -1.250000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  1.250000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  1.250000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -1.250000 } }
+                  ],
+                  "explicitOffsets": null,
+                  "defaultOffsets": [
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -1.250000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  1.250000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  1.250000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -1.250000 } }
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      }
+    """.asRight
+
+    val expected2 = json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "observingMode": {
+                "igrins2LongSlit": {
+                  "offsets": [
+                    { "p": { "arcseconds": 1.000000 }, "q": { "arcseconds": -5.000000 } },
+                    { "p": { "arcseconds": 2.000000 }, "q": { "arcseconds":  5.000000 } }
+                  ],
+                  "explicitOffsets": [
+                    { "p": { "arcseconds": 1.000000 }, "q": { "arcseconds": -5.000000 } },
+                    { "p": { "arcseconds": 2.000000 }, "q": { "arcseconds":  5.000000 } }
+                  ],
+                  "defaultOffsets": [
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 0.000000 } },
+                    { "p": { "arcseconds": 10.000000 }, "q": { "arcseconds": 10.000000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 0.000000 } }
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      }
+    """.asRight
+
+    val expected3 = json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "observingMode": {
+                "igrins2LongSlit": {
+                  "offsets": [
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 0.000000 } },
+                    { "p": { "arcseconds": 10.000000 }, "q": { "arcseconds": 10.000000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 0.000000 } }
+                  ],
+                  "explicitOffsets": null,
+                  "defaultOffsets": [
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 0.000000 } },
+                    { "p": { "arcseconds": 10.000000 }, "q": { "arcseconds": 10.000000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 0.000000 } }
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      }
+    """.asRight
+
+    multiUpdateTest(pi,
+      List(
+        (update0, query, expected0), // create with explicit offsets
+        (update1, query, expected1), // clear explicit offsets, revert to default
+        (update2, query, expected2), // switch mode with new explicit offsets
+        (update3, query, expected3)  // clear explicit offsets again, revert to default offsets
+      )
+    )
+
+  test("observing mode: changing igrins2 offset mode clears explicit offsets"):
+
+    val update0 = """
+      observingMode: {
+        igrins2LongSlit: {
+          exposureTimeMode: {
+            signalToNoise: {
+              value: 50.0
+              at: { nanometers: 2200 }
+            }
+          }
+          explicitOffsets: [
+            { p: { arcseconds: 0.0 }, q: { arcseconds: -5.0 } },
+            { p: { arcseconds: 0.0 }, q: { arcseconds:  5.0 } },
+            { p: { arcseconds: 0.0 }, q: { arcseconds:  3.5 } },
+            { p: { arcseconds: 0.0 }, q: { arcseconds: -2.5 } }
+          ]
+        }
+      }
+    """
+
+    val update1 = """
+      observingMode: {
+        igrins2LongSlit: {
+          explicitOffsetMode: NOD_TO_SKY
+        }
+      }
+    """
+
+    val query = """
+      observations {
+        observingMode {
+          igrins2LongSlit {
+            offsetMode
+            explicitOffsetMode
+            offsets {
+              p { arcseconds }
+              q { arcseconds }
+            }
+            explicitOffsets {
+              p { arcseconds }
+              q { arcseconds }
+            }
+          }
+        }
+      }
+    """
+
+    val expected0 = json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "observingMode": {
+                "igrins2LongSlit": {
+                  "offsetMode": "NOD_ALONG_SLIT",
+                  "explicitOffsetMode": null,
+                  "offsets": [
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -5.000000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  5.000000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  3.500000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -2.500000 } }
+                  ],
+                  "explicitOffsets": [
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -5.000000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  5.000000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  3.500000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -2.500000 } }
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      }
+    """.asRight
+
+    val expected1 = json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "observingMode": {
+                "igrins2LongSlit": {
+                  "offsetMode": "NOD_TO_SKY",
+                  "explicitOffsetMode": "NOD_TO_SKY",
+                  "offsets": [
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 0.000000 } },
+                    { "p": { "arcseconds": 10.000000 }, "q": { "arcseconds": 10.000000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 0.000000 } }
+                  ],
+                  "explicitOffsets": null
+                }
+              }
+            }
+          ]
+        }
+      }
+    """.asRight
+
+    multiUpdateTest(pi,
+      List(
+        (update0, query, expected0), // create with explicit offsets
+        (update1, query, expected1)  // change mode, clear explicit offsets
+      )
+    )
+
+  test("observing mode: switch from gmos to igrins2"):
+
+    val update0 = """
+      observingMode: {
+        gmosNorthLongSlit: {
+          grating: B1200_G5301
+          filter: G_PRIME
+          fpu: LONG_SLIT_0_25
+          centralWavelength: {
+            nanometers: 234.56
+          }
+          exposureTimeMode: {
+            signalToNoise: {
+              value: 20.0
+              at: { nanometers: 234.56 }
+            }
+          }
+        }
+      }
+    """
+
+    val update1 = """
+      observingMode: {
+        igrins2LongSlit: {
+          exposureTimeMode: {
+            signalToNoise: {
+              value: 50.0
+              at: { nanometers: 2200 }
+            }
+          }
+          explicitOffsetMode: NOD_TO_SKY
+        }
+      }
+    """
+
+    val query = """
+      observations {
+        instrument
+        observingMode {
+          gmosNorthLongSlit {
+            grating
+          }
+          igrins2LongSlit {
+            offsetMode
+            explicitOffsetMode
+          }
+        }
+      }
+    """
+
+    val expected0 =
+      json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "instrument": "GMOS_NORTH",
+              "observingMode": {
+                "gmosNorthLongSlit": {
+                  "grating": "B1200_G5301"
+                },
+                "igrins2LongSlit": null
+              }
+            }
+          ]
+        }
+      }
+    """.asRight
+
+    val expected1 =
+      json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "instrument": "IGRINS2",
+              "observingMode": {
+                "gmosNorthLongSlit": null,
+                "igrins2LongSlit": {
+                  "offsetMode": "NOD_TO_SKY",
+                  "explicitOffsetMode": "NOD_TO_SKY"
+                }
+              }
+            }
+          ]
+        }
+      }
+    """.asRight
+
+    multiUpdateTest(pi,
+      List(
+        (update0, query, expected0), // create as gmos
+        (update1, query, expected1)  // switcth to igrins 2
+      )
+    )

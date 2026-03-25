@@ -55,30 +55,45 @@ object AsterismSpectroscopyTimeRequest:
               GmosFpuMask.Builtin(fpu),
               filter,
               ccdMode,
-              roi
+              roi,
+              port
             ) =>
           Result.success:
             ObservingMode.SpectroscopyMode
-              .GmosNorth(centralWavelength, grating, GmosNorthFpuParam(fpu), filter, ccdMode, roi)
+              .GmosNorth(centralWavelength,
+                         grating,
+                         GmosNorthFpuParam(fpu),
+                         filter,
+                         ccdMode,
+                         roi,
+                         port
+              )
         case GmosSSpectroscopyInput(
               centralWavelength,
               grating,
               GmosFpuMask.Builtin(fpu),
               filter,
               ccdMode,
-              roi
+              roi,
+              port
             ) =>
           Result.success:
             ObservingMode.SpectroscopyMode
-              .GmosSouth(centralWavelength, grating, GmosSouthFpuParam(fpu), filter, ccdMode, roi)
-        case Flamingos2SpectroscopyInput(
-              disperser,
-              filter,
-              fpu
-            ) =>
+              .GmosSouth(centralWavelength,
+                         grating,
+                         GmosSouthFpuParam(fpu),
+                         filter,
+                         ccdMode,
+                         roi,
+                         port
+              )
+        case Flamingos2SpectroscopyInput(disperser, filter, fpu, port) =>
           Result.success:
-            ObservingMode.SpectroscopyMode.Flamingos2(disperser, filter, fpu)
-        case _ =>
+            ObservingMode.SpectroscopyMode.Flamingos2(disperser, filter, fpu, port)
+        case Igrins2SpectroscopyInput(port)                            =>
+          Result.success:
+            ObservingMode.SpectroscopyMode.Igrins2(port)
+        case _                                                         =>
           Result.failure("Invalid spectroscopy mode")
 
     (asterism.targetInputsToData, modeResult, constraints.create).parMapN:

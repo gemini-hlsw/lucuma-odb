@@ -2,7 +2,8 @@
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
 package lucuma.odb.sequence
-package gmos.imaging
+package gmos
+package imaging
 
 import cats.Eq
 import cats.data.NonEmptyList
@@ -10,12 +11,16 @@ import lucuma.core.enums.GmosAmpCount
 import lucuma.core.enums.GmosAmpGain
 import lucuma.core.enums.GmosAmpReadMode
 import lucuma.core.enums.GmosBinning
+import lucuma.core.enums.GmosImagingVariantType.PreImaging
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosRoi
 import lucuma.core.enums.GmosSouthFilter
 import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
+import lucuma.core.enums.MosPreImaging.IsMosPreImaging
 import lucuma.core.model.sequence.gmos.GmosCcdMode
+import lucuma.core.model.sequence.gmos.StaticConfig.GmosNorth as GmosNorthStatic
+import lucuma.core.model.sequence.gmos.StaticConfig.GmosSouth as GmosSouthStatic
 import lucuma.core.util.Enumerated
 import lucuma.odb.sequence.syntax.hash.*
 import lucuma.odb.sequence.util.HashBytes
@@ -124,6 +129,11 @@ object Config:
     override def explicitRoi: Option[GmosRoi] =
       common.explicitRoi
 
+    def staticConfig: GmosNorthStatic =
+      variant.variantType match
+        case PreImaging => InitialConfigs.GmosNorthStatic.copy(mosPreImaging = IsMosPreImaging)
+        case _          => InitialConfigs.GmosNorthStatic
+
   object GmosNorth:
     given Eq[GmosNorth] =
       Eq.by(a => (a.variant, a.filters, a.common))
@@ -150,6 +160,11 @@ object Config:
 
     override def explicitRoi: Option[GmosRoi] =
       common.explicitRoi
+
+    def staticConfig: GmosSouthStatic =
+      variant.variantType match
+        case PreImaging => InitialConfigs.GmosSouthStatic.copy(mosPreImaging = IsMosPreImaging)
+        case _          => InitialConfigs.GmosSouthStatic
 
   object GmosSouth:
 

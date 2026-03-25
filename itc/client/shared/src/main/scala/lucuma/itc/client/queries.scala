@@ -71,6 +71,7 @@ object SpectroscopyIntegrationTime extends GraphQLOperation[Unit] {
           errorCode
           message
           wellHalfFilledSeconds
+          wavelength { picometers }
         }
       }
 
@@ -157,6 +158,7 @@ object ImagingIntegrationTime extends GraphQLOperation[Unit] {
           errorCode
           message
           wellHalfFilledSeconds
+          wavelength { picometers }
         }
       }
 
@@ -252,6 +254,7 @@ object SpectroscopyGraphsQuery extends GraphQLOperation[Unit] {
               errorCode
               message
               wellHalfFilledSeconds
+              wavelength { picometers }
             }
           }
         }
@@ -354,6 +357,7 @@ object SpectroscopyIntegrationTimeAndGraphsQuery extends GraphQLOperation[Unit] 
           errorCode
           message
           wellHalfFilledSeconds
+          wavelength { picometers }
       }
 
       fragment TargetIntegrationTimeOutcomeFields on TargetIntegrationTimeOutcome {

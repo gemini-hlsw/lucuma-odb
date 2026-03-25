@@ -30,7 +30,7 @@ class LegacyITCFlamingos2ImgExpTimeSuite extends LegacyITCFlamingos2Suite:
     analysisMethod = analysisMethod
   )
 
-  lazy val f2 = ObservingMode.ImagingMode.Flamingos2(Flamingos2Filter.J)
+  lazy val f2 = ObservingMode.ImagingMode.Flamingos2(Flamingos2Filter.J, PortDisposition.Side)
 
   override def instrument = ItcInstrumentDetails(f2)
 

@@ -2,8 +2,21 @@
 
 set -e
 
+SKIP_GIT_CHECKS=false
+while getopts "f" opt; do
+  case $opt in
+    f) SKIP_GIT_CHECKS=true ;;
+    *) echo "🔥 Usage: `basename $0` [-f] <path to itc distribution bundle directory>"
+       echo "   -f  Skip git status checks on the OCS directory"
+       echo "   Example: `basename $0` /path/to/ocs/app/itc/target/itc/2026A-test.1.1.1/Test/itc/bundle"
+       exit 1 ;;
+  esac
+done
+shift $((OPTIND - 1))
+
 if [ -z "$1" ]; then
-  echo "🔥 Usage: `basename $0` <path to itc distribution bundle directory>"
+  echo "🔥 Usage: `basename $0` [-f] <path to itc distribution bundle directory>"
+  echo "   -f  Skip git status checks on the OCS directory"
   echo "   Example: `basename $0` /path/to/ocs/app/itc/target/itc/2026A-test.1.1.1/Test/itc/bundle"
   exit 1
 fi
@@ -37,17 +50,20 @@ OCS_GIT_HASH=$(git rev-parse HEAD)
 OCS_GIT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
 OCS_GIT_DESCRIBE=$(git describe --always --dirty 2>/dev/null || echo "no-tags")
 
-# Check if working directory is dirty
-if ! git diff --quiet; then
-  echo "🔥 Error: Working directory has uncommitted changes"
-  exit 1
-fi
-
-# Check if current commit is local-only
-# We want to know if it is on the repo. should we fail if not?
 OCS_LOCAL="true"
-if git cat-file -e "$OCS_GIT_HASH" 2>/dev/null && git branch -r --contains "$OCS_GIT_HASH" 2>/dev/null | grep -q "origin/"; then
-  OCS_LOCAL="false"
+if [ "$SKIP_GIT_CHECKS" = false ]; then
+  # Check if working directory is dirty
+  if ! git diff --quiet; then
+    echo "🔥 Error: Working directory has uncommitted changes"
+    exit 1
+  fi
+
+  # Check if current commit is local-only
+  if git cat-file -e "$OCS_GIT_HASH" 2>/dev/null && git branch -r --contains "$OCS_GIT_HASH" 2>/dev/null | grep -q "origin/"; then
+    OCS_LOCAL="false"
+  fi
+else
+  echo "🔸 Skipping git status checks (-f flag)"
 fi
 
 cd - > /dev/null

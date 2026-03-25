@@ -10,6 +10,7 @@ import lucuma.itc.tests.EmissionLineMockItc
 import lucuma.itc.tests.FailingMockItc
 import lucuma.itc.tests.MockImagingItc
 import lucuma.itc.tests.MockItc
+import lucuma.itc.tests.WavelengthAtOutOfRangeMockItc
 import natchez.Trace.Implicits.noop
 import org.http4s.*
 import org.http4s.circe.*
@@ -65,3 +66,6 @@ trait GraphQLEmissionLineSuite extends GraphQLSuiteBase:
 
 trait FailingCalculationSuite extends GraphQLSuiteBase:
   override def itcService = FailingMockItc
+
+trait WavelengthAtOutOfRangeSuite extends GraphQLSuiteBase:
+  override def itcService = WavelengthAtOutOfRangeMockItc

@@ -16,6 +16,7 @@ import lucuma.core.model.Observation
 import lucuma.core.syntax.string.*
 import lucuma.core.syntax.timespan.*
 import lucuma.itc.IntegrationTime
+import lucuma.odb.sequence.gmos.longslit.Acquisition.RepeatingAtomCount
 
 
 class executionPlannedTime extends ExecutionTestSupportForGmos {
@@ -343,11 +344,16 @@ class executionPlannedTime extends ExecutionTestSupportForGmos {
                         "nextAtom": {
                            "steps": ${List(Step1, Step2, Step3).asJson}
                         },
-                        "possibleFuture": [
-                          {
-                            "steps": ${List(Step4).asJson}
-                          }
-                        ]
+                        "possibleFuture": ${
+                          List
+                            .fill(RepeatingAtomCount):
+                              json"""
+                                {
+                                  "steps": ${List(Step4).asJson}
+                                }
+                              """
+                            .asJson
+                        }
                       }
                     }
                   }

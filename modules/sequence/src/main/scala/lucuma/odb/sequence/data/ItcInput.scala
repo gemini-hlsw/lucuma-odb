@@ -101,20 +101,47 @@ object ItcInput:
           hashTargets(a.blindOffset.fold(a.targets)(_ :: a.targets))
         )
 
+  /**
+    * ItcInput for igrins 2 spectroscopy, does not contain acquisition
+    */
+  case class Igrins2Spectroscopy(
+    science: SpectroscopyParameters,
+    targets: NonEmptyList[TargetDefinition]
+  ) extends ItcInput derives Eq:
+
+    def scienceInput: SpectroscopyInput =
+      SpectroscopyInput(science, targets.map(_.input))
+
+  object Igrins2Spectroscopy:
+    given HashBytes[Igrins2Spectroscopy] with
+      def hashBytes(a: Igrins2Spectroscopy): Array[Byte] =
+        Array.concat(
+          a.science.hashBytes,
+          hashTargets(a.targets)
+        )
+
   val spectroscopy: Prism[ItcInput, ItcInput.Spectroscopy] =
     Prism[ItcInput, ItcInput.Spectroscopy] {
       case s: ItcInput.Spectroscopy => s.some
       case _                        => none
     }(identity)
 
+  val igrins2Spectroscopy: Prism[ItcInput, ItcInput.Igrins2Spectroscopy] =
+    Prism[ItcInput, ItcInput.Igrins2Spectroscopy] {
+      case s: ItcInput.Igrins2Spectroscopy => s.some
+      case _                               => none
+    }(identity)
+
   given Eq[ItcInput] =
     Eq.instance:
-      case (im0: Imaging,      im1: Imaging)      => im0 === im1
-      case (sp0: Spectroscopy, sp1: Spectroscopy) => sp0 === sp1
-      case _                                      => false
+      case (im0: Imaging,               im1: Imaging)                => im0 === im1
+      case (sp0: Spectroscopy,           sp1: Spectroscopy)          => sp0 === sp1
+      case (ig0: Igrins2Spectroscopy,    ig1: Igrins2Spectroscopy)   => ig0 === ig1
+      case _                                                         => false
 
   given HashBytes[ItcInput] with
     def hashBytes(a: ItcInput): Array[Byte] =
       a match
-        case in @ Imaging(_, _)            => in.hashBytes
-        case in @ Spectroscopy(_, _, _, _) => in.hashBytes
+        case in @ Imaging(_, _)              => in.hashBytes
+        case in @ Spectroscopy(_, _, _, _)   => in.hashBytes
+        case in @ Igrins2Spectroscopy(_, _)  => in.hashBytes

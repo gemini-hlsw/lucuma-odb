@@ -109,13 +109,13 @@ sealed trait ObservationService[F[_]] {
     oids: NonEmptyList[Observation.Id]
   )(using Transaction[F], ServiceAccess): F[Result[Unit]]
 
-  def resetAcquisition(
-    input: AccessControl.CheckedWithId[Unit, Observation.Id]
-  )(using Transaction[F]): F[Result[Observation.Id]]
-
   def selectBands(
     pid: Program.Id
   )(using Transaction[F]): F[Map[Observation.Id, Option[ScienceBand]]]
+
+  def selectInstrument(
+    oid: Observation.Id
+  )(using Transaction[F]): F[Option[Instrument]]
 
 }
 
@@ -302,19 +302,23 @@ object ObservationService {
                   transaction.rollback >>
                   OdbError.InvalidObservationList(oids, s"One or more specified observations are not calibrations.".some).asFailureF
 
-        // delete asterisms and observations
-        for {
-          _    <- oids.traverse { o =>
-                    // set the existence to deleted, so it gets removed from groups too
-                    updateObservations:
-                      Services.asSuperUser:
-                        AccessControl.unchecked(existenceOff, List(o), observation_id)
-                  }
+        // delete asterisms and observations. need to do this in ResultT so we stop on failure
+        val rt = for {
+          _    <-           
+            ResultT:
+              oids.traverse { o =>
+                // set the existence to deleted, so it gets removed from groups too
+                updateObservations:
+                  Services.asSuperUser:
+                    AccessControl.unchecked(existenceOff, List(o), observation_id)
+              }.map(_.sequence)
                   // Delete asterism_target entries for these observations
-          _    <- session.executeCommand(Statements.deleteAsterismsForObservations(oids))
+          _    <- ResultT.liftF(session.executeCommand(Statements.deleteAsterismsForObservations(oids)))
                   // Delete the observations themselves
-          r    <- doDelete
+          r    <- ResultT(doDelete)
         } yield r
+        rt.value
+
 
       }
 
@@ -582,18 +586,17 @@ object ObservationService {
                   .setAsterism(pid, NonEmptyList.of(newOid), oSET.fold(Nullable.Absent)(_.asterism))
                   .map(_.as(CloneIds(origOid, newOid)))
 
-      override def resetAcquisition(
-        input: AccessControl.CheckedWithId[Unit, Observation.Id]
-      )(using Transaction[F]): F[Result[Observation.Id]] =
-        input.foldWithId(OdbError.InvalidArgument().asFailureF): (_, oid) =>
-          session.execute(Statements.ResetAcquisition)(oid).as(oid.success)
-
       override def selectBands(
         pid: Program.Id
       )(using Transaction[F]): F[Map[Observation.Id, Option[ScienceBand]]] =
         session
           .execute(Statements.SelectBands)(pid)
           .map(_.toMap)
+
+      override def selectInstrument(
+        oid: Observation.Id
+      )(using Transaction[F]): F[Option[Instrument]] =
+        session.option(Statements.SelectInstrument)(oid)
 
     }
 
@@ -1187,13 +1190,6 @@ object ObservationService {
         RETURNING c_observation_id
       """.query(observation_id)
 
-    val ResetAcquisition: Command[Observation.Id] =
-      sql"""
-        UPDATE t_observation
-           SET c_acq_reset_time = now()
-         WHERE c_observation_id = $observation_id
-      """.command
-
     val SelectBands: Query[Program.Id, (Observation.Id, Option[ScienceBand])] =
       sql"""
         SELECT
@@ -1203,6 +1199,12 @@ object ObservationService {
         WHERE c_program_id = $program_id AND c_existence = 'present'
       """.query(observation_id *: science_band.opt)
 
+    val SelectInstrument: Query[Observation.Id, Instrument] =
+      sql"""
+        SELECT c_instrument
+          FROM t_observation
+         WHERE c_observation_id = $observation_id
+      """.query(instrument)
   }
 
 }

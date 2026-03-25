@@ -34,6 +34,8 @@ case class Flamingos2SpectroscopyParams(
   filter:    Flamingos2Filter
 ) extends SpectroscopyParams derives Encoder.AsObject
 
+case class Igrins2SpectroscopyParams() extends SpectroscopyParams derives Encoder.AsObject
+
 sealed trait ImagingParams
 
 case class GmosNImagingParams(filter: GmosNorthFilter) extends ImagingParams

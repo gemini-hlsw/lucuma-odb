@@ -9,6 +9,7 @@ import lucuma.core.enums.GmosNorthGrating
 import lucuma.core.enums.GmosRoi
 import lucuma.core.enums.GmosSouthFilter
 import lucuma.core.enums.GmosSouthGrating
+import lucuma.core.enums.PortDisposition
 import lucuma.core.math.Wavelength
 import lucuma.core.math.arb.ArbWavelength
 import lucuma.core.model.sequence.gmos.GmosCcdMode
@@ -27,6 +28,7 @@ trait ArbInstrumentMode {
   import InstrumentMode.GmosSouthSpectroscopy
   import InstrumentMode.GmosNorthImaging
   import InstrumentMode.GmosSouthImaging
+  import InstrumentMode.Igrins2Spectroscopy
 
   given Arbitrary[GmosNorthSpectroscopy] =
     Arbitrary {
@@ -37,7 +39,8 @@ trait ArbInstrumentMode {
         u  <- arbitrary[GmosFpu.North]
         c  <- arbitrary[Option[GmosCcdMode]]
         r  <- arbitrary[Option[GmosRoi]]
-      } yield GmosNorthSpectroscopy(cw, g, f, u, c, r)
+        p  <- arbitrary[PortDisposition]
+      } yield GmosNorthSpectroscopy(cw, g, f, u, c, r, p)
     }
 
   given Cogen[GmosNorthSpectroscopy] =
@@ -46,14 +49,16 @@ trait ArbInstrumentMode {
         Wavelength,
         GmosNorthGrating,
         Option[GmosNorthFilter],
-        GmosFpu.North
+        GmosFpu.North,
+        PortDisposition
       )
     ].contramap { a =>
       (
         a.centralWavelength,
         a.grating,
         a.filter,
-        a.fpu
+        a.fpu,
+        a.port
       )
     }
 
@@ -66,7 +71,8 @@ trait ArbInstrumentMode {
         u  <- arbitrary[GmosFpu.South]
         c  <- arbitrary[Option[GmosCcdMode]]
         r  <- arbitrary[Option[GmosRoi]]
-      } yield GmosSouthSpectroscopy(cw, g, f, u, c, r)
+        p  <- arbitrary[PortDisposition]
+      } yield GmosSouthSpectroscopy(cw, g, f, u, c, r, p)
     }
 
   given Cogen[GmosSouthSpectroscopy] =
@@ -75,14 +81,16 @@ trait ArbInstrumentMode {
         Wavelength,
         GmosSouthGrating,
         Option[GmosSouthFilter],
-        GmosFpu.South
+        GmosFpu.South,
+        PortDisposition
       )
     ].contramap { a =>
       (
         a.centralWavelength,
         a.grating,
         a.filter,
-        a.fpu
+        a.fpu,
+        a.port
       )
     }
 
@@ -91,22 +99,32 @@ trait ArbInstrumentMode {
       for {
         f <- arbitrary[GmosNorthFilter]
         c <- arbitrary[Option[GmosCcdMode]]
-      } yield GmosNorthImaging(f, c)
+        p <- arbitrary[PortDisposition]
+      } yield GmosNorthImaging(f, c, p)
     }
 
   given Cogen[GmosNorthImaging] =
-    Cogen[(GmosNorthFilter, Option[GmosCcdMode])].contramap(a => (a.filter, a.ccdMode))
+    Cogen[(GmosNorthFilter, Option[GmosCcdMode], PortDisposition)]
+      .contramap(a => (a.filter, a.ccdMode, a.port))
 
   given Arbitrary[GmosSouthImaging] =
     Arbitrary {
       for {
         f <- arbitrary[GmosSouthFilter]
         c <- arbitrary[Option[GmosCcdMode]]
-      } yield GmosSouthImaging(f, c)
+        p <- arbitrary[PortDisposition]
+      } yield GmosSouthImaging(f, c, p)
     }
 
   given Cogen[GmosSouthImaging] =
-    Cogen[(GmosSouthFilter, Option[GmosCcdMode])].contramap(a => (a.filter, a.ccdMode))
+    Cogen[(GmosSouthFilter, Option[GmosCcdMode], PortDisposition)]
+      .contramap(a => (a.filter, a.ccdMode, a.port))
+
+  given Arbitrary[Igrins2Spectroscopy] =
+    Arbitrary(arbitrary[PortDisposition].map(Igrins2Spectroscopy(_)))
+
+  given Cogen[Igrins2Spectroscopy] =
+    Cogen[PortDisposition].contramap(_.port)
 
   given Arbitrary[InstrumentMode] =
     Arbitrary {
@@ -114,7 +132,8 @@ trait ArbInstrumentMode {
         arbitrary[GmosNorthSpectroscopy],
         arbitrary[GmosSouthSpectroscopy],
         arbitrary[GmosNorthImaging],
-        arbitrary[GmosSouthImaging]
+        arbitrary[GmosSouthImaging],
+        arbitrary[Igrins2Spectroscopy]
       )
     }
 
@@ -124,14 +143,16 @@ trait ArbInstrumentMode {
         Option[GmosNorthSpectroscopy],
         Option[GmosSouthSpectroscopy],
         Option[GmosNorthImaging],
-        Option[GmosSouthImaging]
+        Option[GmosSouthImaging],
+        Option[Igrins2Spectroscopy]
       )
     ].contramap { a =>
       (
         InstrumentMode.gmosNorthSpectroscopy.getOption(a),
         InstrumentMode.gmosSouthSpectroscopy.getOption(a),
         InstrumentMode.gmosNorthImaging.getOption(a),
-        InstrumentMode.gmosSouthImaging.getOption(a)
+        InstrumentMode.gmosSouthImaging.getOption(a),
+        InstrumentMode.igrins2Spectroscopy.getOption(a)
       )
     }
 }

@@ -29,6 +29,7 @@ import lucuma.core.util.Timestamp
 import lucuma.odb.data.Obscalc
 import lucuma.odb.data.OdbError
 import lucuma.odb.graphql.query.ExecutionTestSupportForGmos
+import lucuma.odb.sequence.gmos.longslit.Acquisition.RepeatingAtomCount
 import lucuma.odb.service.Services.ServiceAccess
 import lucuma.odb.util.Codecs.calculation_state
 import lucuma.odb.util.Codecs.core_timestamp
@@ -130,9 +131,9 @@ class ObscalcServiceSuite extends ObscalcServiceSuiteSupport:
       BigDecimal(s).setScale(6)
 
   val OneDataset =
-    "10.0".sec + // exposure time
-    "41.1".sec + // readout
-    "10.0".sec   // writeout
+    "1200.0".sec + // exposure time
+      "41.1".sec + // readout
+      "10.0".sec   // writeout
 
   val CalTime =
     "15.0".sec +  // science fold
@@ -143,11 +144,12 @@ class ObscalcServiceSuite extends ObscalcServiceSuiteSupport:
   val Offset_30arcsec = "7.0".sec + "0.18750".sec
 
 
-  val Atom1 = CalTime + "15.0".sec + OneDataset + Offset_15arcsec + OneDataset
+  val Atom1 = CalTime + "15.0".sec + OneDataset + Offset_15arcsec + OneDataset + Offset_30arcsec + OneDataset
   val Atom2 = Atom1
-  val Atom3 = CalTime + "15.0".sec + OneDataset + Offset_30arcsec + OneDataset
+  val Atom3 = Atom2
+  val Atom4 = CalTime + "15.0".sec + OneDataset
 
-  val ScienceSequence = Atom1 + Atom2 + Atom3
+  val ScienceSequence = Atom1 + Atom2 + Atom3 + Atom4
 
   val setup: IO[(Program.Id, Observation.Id)] =
     for
@@ -188,14 +190,15 @@ class ObscalcServiceSuite extends ObscalcServiceSuiteSupport:
             TimeSpan.unsafeFromMicroseconds(960000000),
             TimeSpan.unsafeFromMicroseconds(300000000)
           ),
+          NonNegInt.unsafeFrom(2),
           SequenceDigest(
             ObserveClass.Acquisition,
-            CategorizedTime(ChargeClass.Program -> TimeSpan.unsafeFromMicroseconds(219362500L)),
+            CategorizedTime(ChargeClass.Program -> TimeSpan.unsafeFromMicroseconds(617162500L)),
             SortedSet.from(List(
               TelescopeConfig(Offset.Zero, StepGuideState.Enabled),
               TelescopeConfig(Offset.microarcseconds.reverseGet(10000000L, 0L), StepGuideState.Enabled)
             )),
-            NonNegInt.unsafeFrom(2),
+            NonNegInt.unsafeFrom(1 + RepeatingAtomCount),
             ExecutionState.NotStarted
           ),
           SequenceDigest(
@@ -204,11 +207,10 @@ class ObscalcServiceSuite extends ObscalcServiceSuiteSupport:
             SortedSet.from(List(
               TelescopeConfig(Offset.Zero, StepGuideState.Disabled),
               TelescopeConfig(Offset.Zero, StepGuideState.Enabled),
-              TelescopeConfig(Offset.microarcseconds.reverseGet(0L, 15000000L), StepGuideState.Disabled),
               TelescopeConfig(Offset.microarcseconds.reverseGet(0L, 15000000L), StepGuideState.Enabled),
               TelescopeConfig(Offset.microarcseconds.reverseGet(0L, 1295985000000L), StepGuideState.Enabled)
             )),
-            NonNegInt.unsafeFrom(3),
+            NonNegInt.unsafeFrom(4),
             ExecutionState.NotStarted
           )
       ),
@@ -324,7 +326,8 @@ class ObscalcServiceSuite extends ObscalcServiceSuiteSupport:
     val states = for
       _  <- cleanup
       p  <- createProgram
-      o  <- createGmosNorthLongSlitObservationAs(pi, p, Nil)
+      t  <- createTargetWithProfileAs(pi, p)
+      o  <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
       _  <- runObscalcUpdate(p, o)
       r0 <- selectStates
       _  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)

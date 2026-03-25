@@ -159,11 +159,17 @@ object SmartGcalTable {
     def index: String =
       s"i_smart_${inst.tag.toSnakeCase}"
 
-    def dropIndex: String =
-      s"DROP INDEX IF EXISTS $index"
+    def dropIndex: Option[String] =
+      val indexCols = cols.collect:
+        case c @ Col(isIndex = true) => c.name
+      Option.when(indexCols.nonEmpty):
+        s"DROP INDEX IF EXISTS $index"
 
-    def createIndex: String =
-      s"CREATE INDEX $index ON $name ( ${cols.collect { case c@Col(_, _, true, _) => c.name }.mkString(", ")} )"
+    def createIndex: Option[String] =
+      val indexCols = cols.collect:
+        case c @ Col(isIndex = true) => c.name
+      Option.when(indexCols.nonEmpty):
+        s"CREATE INDEX $index ON $name ( ${indexCols.mkString(", ")} )"
 
     private def gcalTableRefConstraint: String =
       s"${name}_${InstrumentCol.name}_${GcalIdCol.name}_fkey"

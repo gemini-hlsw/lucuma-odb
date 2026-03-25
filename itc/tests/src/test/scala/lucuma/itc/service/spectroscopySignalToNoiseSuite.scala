@@ -1703,4 +1703,122 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
         }
         """
     )
+
+    test("igrins2 case") {
+      query(
+        """
+        query {
+          spectroscopy(input: {
+            exposureTimeMode: {
+              signalToNoise: {
+                value: 2,
+                at: { nanometers: 1600 }
+              }
+            },
+            asterism: [
+              {
+                sourceProfile: {
+                  point: {
+                    bandNormalized: {
+                      sed: {
+                        planet: JUPITER
+                      }
+                      brightnesses: [ {
+                        band: R
+                        value: 3
+                        units: ERG_PER_S_PER_CM_SQUARED_PER_A
+                        error: 0.2
+                      }, {
+                        band: J
+                        value: 2.1
+                        units: AB_MAGNITUDE
+                      }]
+                    }
+                  }
+                },
+                radialVelocity: {
+                  kilometersPerSecond: 1000
+                }
+              }
+            ],
+            constraints: {
+              imageQuality: {
+                preset: POINT_THREE
+              },
+              cloudExtinction: {
+                preset: POINT_FIVE
+              },
+              skyBackground: DARK,
+              waterVapor: DRY,
+              elevationRange: {
+                airMass: {
+                  min: 1,
+                  max: 2
+                }
+              }
+            },
+            mode: {
+              igrins2Spectroscopy: {}
+            }
+          }) {
+              mode {
+                ... on SpectroscopyMode {
+                  instrument
+                }
+              }
+              targetTimes {
+                ... on TargetIntegrationTime {
+                  signalToNoiseAt {
+                    single
+                    total
+                    wavelength {
+                      nanometers
+                    }
+                  }
+                }
+              }
+              brightest {
+                selected {
+                  exposureCount
+                  exposureTime {
+                    seconds
+                  }
+                }
+              }
+          }
+        }
+        """,
+        json"""
+        {
+          "data": {
+            "spectroscopy" : {
+                "mode" : {
+                  "instrument" : "IGRINS2"
+                },
+                "targetTimes": [
+                  {
+                    "signalToNoiseAt": {
+                      "single": 101.000000,
+                      "total": 102.000000,
+                      "wavelength": {
+                        "nanometers": 1600.000
+                      }
+                    }
+                  }
+                ],
+                "brightest": {
+                  "selected" : {
+                    "exposureCount" : 10,
+                    "exposureTime" : {
+                      "seconds" : 1.000000
+                    }
+                  }
+                }
+              }
+          }
+        }
+        """
+      )
+    }
+
   }

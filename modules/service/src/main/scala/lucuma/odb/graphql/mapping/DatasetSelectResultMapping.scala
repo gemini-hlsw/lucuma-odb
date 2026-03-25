@@ -6,7 +6,7 @@ package mapping
 
 import grackle.Path
 
-import table.AtomRecordTable
+import table.AtomRecordView
 import table.DatasetTable
 import table.ObservationView
 import table.StepRecordView
@@ -14,7 +14,7 @@ import table.VisitTable
 
 trait DatasetSelectResultMapping[F[_]]
   extends DatasetTable[F]
-     with AtomRecordTable[F]
+     with AtomRecordView[F]
      with ObservationView[F]
      with ResultMapping[F]
      with StepRecordView[F]

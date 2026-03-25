@@ -33,7 +33,6 @@ import lucuma.core.syntax.string.*
 import lucuma.core.util.DateInterval
 import lucuma.core.util.Enumerated
 import lucuma.core.util.Timestamp
-import lucuma.itc.client.ItcClient
 import lucuma.odb.data.Itc
 import lucuma.odb.data.ObservationValidationMap
 import lucuma.odb.data.OdbError
@@ -41,12 +40,10 @@ import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.data.Tag
 import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.graphql.mapping.AccessControl
-import lucuma.odb.logic.Generator
-import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.sequence.data.MissingParamSet
-import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.GeneratorParamsService.Error as GenParamsError
+import lucuma.odb.service.ObservationWorkflowService.UserState
 import lucuma.odb.service.Services.SuperUserAccess
 import lucuma.odb.syntax.instrument.*
 import lucuma.odb.util.Codecs.*
@@ -61,24 +58,15 @@ import Services.Syntax.*
 sealed trait ObservationWorkflowService[F[_]] {
 
   def getWorkflows(
-    oids: List[Observation.Id],
-    commitHash: CommitHash,
-    itcClient: ItcClient[F],
-    ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode
+    oids: List[Observation.Id]
   )(using NoTransaction[F], SuperUserAccess): F[Result[Map[Observation.Id, ObservationWorkflow]]]
 
   def getWorkflow(
-    oid: Observation.Id,
-    commitHash: CommitHash,
-    itcClient: ItcClient[F],
-    ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode
+    oid: Observation.Id
   )(using NoTransaction[F], SuperUserAccess): F[Result[ObservationWorkflow]]
 
   def getWorkflows(
-    pid: Program.Id,
-    commitHash: CommitHash,
-    itcClient: ItcClient[F],
-    ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode
+    pid: Program.Id
   )(using NoTransaction[F], SuperUserAccess): F[Result[Map[Observation.Id, ObservationWorkflow]]]
 
   /**
@@ -95,34 +83,22 @@ sealed trait ObservationWorkflowService[F[_]] {
   )(using Transaction[F]): F[Result[ObservationWorkflow]]
 
   def setWorkflowState(
-    input: AccessControl.CheckedWithId[(ObservationWorkflow, ObservationWorkflowState), Observation.Id],
-    commitHash: CommitHash,
-    itcClient: ItcClient[F],
-    ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode
+    input: AccessControl.CheckedWithId[(ObservationWorkflow, ObservationWorkflowState), Observation.Id]
   )(using NoTransaction[F]): F[Result[ObservationWorkflow]]
 
   def filterState(
     oids: List[Observation.Id],
-    states: Set[ObservationWorkflowState],
-    commitHash: CommitHash,
-    itcClient: ItcClient[F],
-    ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode
+    states: Set[ObservationWorkflowState]
   )(using NoTransaction[F], SuperUserAccess): F[Result[List[Observation.Id]]]
 
   def filterState(
     which: AppliedFragment,
-    states: Set[ObservationWorkflowState],
-    commitHash: CommitHash,
-    itcClient: ItcClient[F],
-    ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode
+    states: Set[ObservationWorkflowState]
   )(using NoTransaction[F], SuperUserAccess): F[Result[List[Observation.Id]]]
 
   def filterTargets(
     which: AppliedFragment,
-    states: Set[ObservationWorkflowState],
-    commitHash: CommitHash,
-    itcClient: ItcClient[F],
-    ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode
+    states: Set[ObservationWorkflowState]
   )(using NoTransaction[F], SuperUserAccess): F[Result[List[Target.Id]]]
 
 }
@@ -142,10 +118,15 @@ case class ObservationValidationInfo(
   cfpid:              Option[CallForProposals.Id],
   scienceBand:        Option[ScienceBand],
   asterism:           List[Target],
+  associatedUserState:Option[ObservationWorkflowService.UserState], // state of science obs if this is a telluric
   generatorParams:    Option[Either[GeneratorParamsService.Error, GeneratorParams]] = None,
   cfpInfo:            Option[CfpInfo] = None,
   programAllocations: Option[NonEmptyList[ScienceBand]] = None,
 ) {
+
+  def effectiveUserState: Option[UserState] =
+    if role === Some(CalibrationRole.Telluric) then associatedUserState
+    else userState
 
   /* Has the proposal been accepted? */
   def isAccepted(using enums: Enums): Result[Boolean] =
@@ -368,28 +349,19 @@ object ObservationWorkflowService {
                 }
             .toMap
 
-      // Computes the observation execution state if not cached
       private def executionStates(
-        infos:      Map[Observation.Id, ObservationValidationInfo],
-        itcResults: Map[Observation.Id, Itc],
-        commitHash: CommitHash,
-        ptc:        TimeEstimateCalculatorImplementation.ForInstrumentMode
-      )(using NoTransaction[F], SuperUserAccess): F[Map[Observation.Id, ExecutionState]] =
-        Generator.instantiate(commitHash, ptc)
-          .executionStates:
-            infos
-              .toList
-              .flatMap: (oid, info) =>
-                (itcResults.get(oid), info.generatorParams.flatMap(_.toOption)).mapN: (itc, gps) =>
-                  oid -> (info.pid, itc, gps)
-              .toMap
-          .map: result =>
-            result
-              .view
-              .mapValues(_.workflowExecutionState)
-              .collect[(Observation.Id, ExecutionState)]:
-                case (oid, Some(es)) => oid -> es
-              .toMap
+        infos: Map[Observation.Id, ObservationValidationInfo]
+      )(using NoTransaction[F], SuperUserAccess): Map[Observation.Id, ExecutionState] =
+        infos
+          .view
+          .mapValues[Option[ExecutionState]]: info =>
+            info
+              .generatorParams
+              .flatMap(_.toOption)
+              .flatMap(_.executionState.workflowExecutionState)
+          .collect[(Observation.Id, ExecutionState)]:
+            case (oid, Some(es)) => oid -> es
+          .toMap
 
       // Compute the observation status, as well as a list of legal transitions,
       private def workflowStateAndTransitions(
@@ -411,7 +383,8 @@ object ObservationWorkflowService {
               case ObservationValidationCode.ConfigurationRequestPending => 7
 
           val validationStatus: ValidationState =
-            codes.minOption.fold(Defined):
+            if info.role.isDefined then Defined // Calibrations are immediately Defined
+            else codes.minOption.fold(Defined):
               case ObservationValidationCode.CallForProposalsError            |
                    ObservationValidationCode.ConfigurationError               |
                    ObservationValidationCode.ItcError                         => Undefined
@@ -421,8 +394,7 @@ object ObservationWorkflowService {
                    ObservationValidationCode.ConfigurationRequestPending      => Unapproved
 
           def userStatus(validationStatus: ValidationState): Option[UserState] =
-            if info.role.isDefined then Some(Ready) // Calibrations are immediately ready
-            else info.userState.flatMap:
+            info.effectiveUserState.flatMap:
               case Inactive => Some(Inactive)       // Inactive overrides validation errors
               case Ready    =>
                 validationStatus match              // Validation errors override Ready
@@ -440,7 +412,7 @@ object ObservationWorkflowService {
               case (Some(es), _)    => es
 
           val allowedTransitions: List[ObservationWorkflowState] =
-            if info.role.isDefined then Nil // User can't set the state for calibrations
+            if (info.role === Some(CalibrationRole.Telluric) && state <= Ready) then Nil
             else state match
               case Inactive   => List(executionState.getOrElse(validationStatus))
               case Undefined  => List(Inactive)
@@ -468,9 +440,9 @@ object ObservationWorkflowService {
 
         val generatorValidator: Validator = info =>
           info.generatorParams.foldMap:
-            case Left(error)                                    => ObservationValidationMap.singleton(error.toObsValidation)
-            case Right(GeneratorParams(Left(m), _, _, _, _, _)) => ObservationValidationMap.singleton(m.toObsValidation)
-            case Right(ps)                                      => ObservationValidationMap.empty
+            case Left(error)                                       => ObservationValidationMap.singleton(error.toObsValidation)
+            case Right(GeneratorParams(Left(m), _, _, _, _, _, _)) => ObservationValidationMap.singleton(m.toObsValidation)
+            case Right(ps)                                         => ObservationValidationMap.empty
 
         val cfpInstrumentValidator: Validator = info =>
           info.cfpInfo.foldMap: cfp =>
@@ -559,10 +531,7 @@ object ObservationWorkflowService {
           .map(_.toMap)
 
       override def getWorkflows(
-        oids: List[Observation.Id],
-        commitHash: CommitHash,
-        itcClient: ItcClient[F],
-        ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode
+        oids: List[Observation.Id]
       )(using NoTransaction[F], SuperUserAccess): F[Result[Map[Observation.Id, ObservationWorkflow]]] =
 
         // Data obtained from the database, requiring a transaction.
@@ -574,26 +543,23 @@ object ObservationWorkflowService {
           services.transactionally:
             (
               for
-                infos  <- ResultT.liftF(lookupObsDefinitions(oids))               // Map[Observation.Id, ObsDefinition]
-                itcRes <- ResultT.liftF(lookupCachedItcResults(infos)) // Map[Observation.Id, ItcService.AsterismResults]
-                errs   <- validateObsDefinition(infos, itcRes.keySet.apply)       // Map[Observation.Id, ObservationValidationMap]
+                infos  <- ResultT.liftF(lookupObsDefinitions(oids))         // Map[Observation.Id, ObsDefinition]
+                itcRes <- ResultT.liftF(lookupCachedItcResults(infos))      // Map[Observation.Id, ItcService.AsterismResults]
+                errs   <- validateObsDefinition(infos, itcRes.keySet.apply) // Map[Observation.Id, ObservationValidationMap]
               yield (infos, errs, itcRes)
             ).value
 
         (for
           (infos, errs, itcRes) <- ResultT(select)
           errorFree              = infos.view.filterKeys(oid => errs.get(oid).forall(_.isEmpty)).toMap
-          execs                 <- ResultT.liftF(executionStates(errorFree, itcRes, commitHash, ptc))
+          execs                  = executionStates(errorFree)
           workflows             <- ResultT.fromResult(computeWorkflows(infos, errs, execs))
         yield workflows).value
 
       override def getWorkflow(
-        oid: Observation.Id,
-        commitHash: CommitHash,
-        itcClient: ItcClient[F],
-        ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode
+        oid: Observation.Id
       )(using NoTransaction[F], SuperUserAccess): F[Result[ObservationWorkflow]] =
-        getWorkflows(List(oid), commitHash, itcClient, ptc).map: result =>
+        getWorkflows(List(oid)).map: result =>
           result.flatMap: map =>
             map.get(oid) match
               case Some(wf) => Result(wf)
@@ -614,45 +580,40 @@ object ObservationWorkflowService {
         yield res).value
 
       override def getWorkflows(
-        pid: Program.Id,
-        commitHash: CommitHash,
-        itcClient: ItcClient[F],
-        ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode
+        pid: Program.Id
       )(using NoTransaction[F], SuperUserAccess): F[Result[Map[Observation.Id, ObservationWorkflow]]] =
         services
           .transactionally:
             session.prepareR(Statements.selectObservationIds).use: pq =>
               pq.stream(pid, 1024).compile.toList
-          .flatMap(getWorkflows(_, commitHash, itcClient, ptc))
+          .flatMap(getWorkflows)
 
       override def setWorkflowState(
-        input: AccessControl.CheckedWithId[(ObservationWorkflow, ObservationWorkflowState), Observation.Id],
-        commitHash: CommitHash,
-        itcClient: ItcClient[F],
-        ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode
+        input: AccessControl.CheckedWithId[(ObservationWorkflow, ObservationWorkflowState), Observation.Id]
       )(using NoTransaction[F]): F[Result[ObservationWorkflow]] =
         input.foldWithId(OdbError.InvalidArgument().asFailureF):
           case ((w, state), oid) =>
-            if w.state === state then ResultT.success(w)
-            else ResultT:
-              // If we're transitioning to or from a UserState, just update that column
-              if w.state.isUserState || state.isUserState then
-                services.transactionally:
-                  session.prepareR(Statements.UpdateUserState).use: pc =>
-                    pc.execute(state.asUserState, oid)
-                      .as(Result(w.copy(state = state)))
-              else // we must be declaring completion (or revoking that declaration)
-                import ObservationWorkflowState.*
-                (w.state, state) match
-                  case (Ongoing, Completed) | (Completed, Ongoing) =>
-                    services.transactionally:
-                      session.prepareR(Statements.UpdateDeclaredCompletion).use: pc =>
-                        pc.execute(state === Completed, oid)
-                          .as(Result(w.copy(state = state)))
-                  case _ =>
-                    // This should never happen but I want to check for it anyway.
-                    Result.internalError(s"Transition from ${w.state} to $state was not expected.").pure[F]
-          .value
+            (
+              if w.state === state then ResultT.success(w)
+              else ResultT:
+                // If we're transitioning to or from a UserState, just update that column
+                if w.state.isUserState || state.isUserState then
+                  services.transactionally:
+                    session.prepareR(Statements.UpdateUserState).use: pc =>
+                      pc.execute(state.asUserState, oid)
+                        .as(Result(w.copy(state = state)))
+                else // we must be declaring completion (or revoking that declaration)
+                  import ObservationWorkflowState.*
+                  (w.state, state) match
+                    case (Ongoing, Completed) | (Completed, Ongoing) =>
+                      services.transactionally:
+                        session.prepareR(Statements.UpdateDeclaredCompletion).use: pc =>
+                          pc.execute(state === Completed, oid)
+                            .as(Result(w.copy(state = state)))
+                    case _ =>
+                      // This should never happen but I want to check for it anyway.
+                      Result.internalError(s"Transition from ${w.state} to $state was not expected.").pure[F]
+            ).value
 
       extension (wf: ObservationWorkflow) def isCompatibleWith(states: Set[ObservationWorkflowState]): Boolean =
         // An allowed transition from ongoing to completed [via declared completion] shouldn't prevent editing,
@@ -661,12 +622,9 @@ object ObservationWorkflowService {
 
       override def filterState(
         oids: List[Observation.Id],
-        states: Set[ObservationWorkflowState],
-        commitHash: CommitHash,
-        itcClient: ItcClient[F],
-        ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode
+        states: Set[ObservationWorkflowState]
       )(using NoTransaction[F], SuperUserAccess): F[Result[List[Observation.Id]]] =
-        getWorkflows(oids, commitHash, itcClient, ptc)
+        getWorkflows(oids)
           .map: res =>
             res.flatMap: wfs =>
               oids.foldLeft(Result(Nil)): (r, oid) =>
@@ -675,24 +633,21 @@ object ObservationWorkflowService {
                   case Some(wf) =>
                     if wf.isCompatibleWith(states) then r.map(oid :: _)
                     else r.withProblems:
-                      val prefix = s"Observation $oid is ineligibile for this operation due to its workflow state (${wf.state}"
+                      val prefix = s"Observation $oid is ineligible for this operation due to its workflow state (${wf.state}"
                       val suffix = if wf.validTransitions.isEmpty then ")." else s" with allowed transition to ${wf.validTransitions.mkString("/")})."
                       OdbError.InvalidObservation(oid, (prefix + suffix).some)
                         .asProblemNec
 
       override def filterState(
         which: AppliedFragment,
-        states: Set[ObservationWorkflowState],
-        commitHash: CommitHash,
-        itcClient: ItcClient[F],
-        ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode
+        states: Set[ObservationWorkflowState]
       )(using NoTransaction[F], SuperUserAccess): F[Result[List[Observation.Id]]] =
         services
           .transactionally:
             session.prepareR(which.fragment.query(observation_id)).use: pq =>
               pq.stream(which.argument, chunkSize = 1024).compile.toList
           .flatMap: oids =>
-            filterState(oids, states, commitHash, itcClient, ptc)
+            filterState(oids, states)
 
       private def getObservationsForTargets(whichTargets: AppliedFragment)(using NoTransaction[F]): F[Map[Target.Id, List[Observation.Id]]] =
         services.transactionally:
@@ -703,14 +658,11 @@ object ObservationWorkflowService {
 
       override def filterTargets(
         which: AppliedFragment,
-        states: Set[ObservationWorkflowState],
-        commitHash: CommitHash,
-        itcClient: ItcClient[F],
-        ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode
+        states: Set[ObservationWorkflowState]
       )(using NoTransaction[F], SuperUserAccess): F[Result[List[Target.Id]]] =
         getObservationsForTargets(which)
           .flatMap: map =>
-            getWorkflows(map.values.toList.flatten, commitHash, itcClient, ptc)
+            getWorkflows(map.values.toList.flatten)
               .map: res =>
                 res.flatMap: wfs =>
                   map.toList.foldLeft(Result(Nil)):
@@ -742,16 +694,22 @@ object ObservationWorkflowService {
           o.c_declared_complete,
           p.c_proposal_status,
           x.c_cfp_id,
-          o.c_science_band
+          o.c_science_band,
+          s.c_workflow_user_state
         FROM t_observation o
         JOIN t_program p on p.c_program_id = o.c_program_id
-        LEFT JOIN t_proposal x ON o.c_program_id = x.c_program_id
-        WHERE c_observation_id IN ($enc)
+        LEFT JOIN t_proposal x 
+          ON o.c_program_id = x.c_program_id
+        LEFT JOIN t_observation s 
+          ON  o.c_calibration_role = 'telluric' 
+          AND s.c_calibration_role IS NULL
+          AND o.c_group_id = s.c_group_id
+        WHERE o.c_observation_id IN ($enc)
       """
-      .query(program_id *: program_type *: observation_id *: instrument.opt *: right_ascension.opt *: declination.opt *: calibration_role.opt *: user_state.opt *: bool *: tag *: cfp_id.opt *: science_band.opt)
+      .query(program_id *: program_type *: observation_id *: instrument.opt *: right_ascension.opt *: declination.opt *: calibration_role.opt *: user_state.opt *: bool *: tag *: cfp_id.opt *: science_band.opt *: user_state.opt)
       .map:
-        case (pid, tpe, oid, inst, ra, dec, cal, state, dc, tag, cfp, sci) =>
-          ObservationValidationInfo(pid, tpe, oid, inst, None, (ra, dec).mapN(Coordinates.apply), cal, state, dc, tag, cfp, sci, Nil)
+        case (pid, tpe, oid, inst, ra, dec, cal, state, dc, tag, cfp, sci, state2) =>
+          ObservationValidationInfo(pid, tpe, oid, inst, None, (ra, dec).mapN(Coordinates.apply), cal, state, dc, tag, cfp, sci, Nil, state2)
 
     def ProgramAllocations[A <: NonEmptyList[Program.Id]](enc: Encoder[A]): Query[A, (Program.Id, ScienceBand)] =
       sql"""

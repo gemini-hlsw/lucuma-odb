@@ -73,14 +73,14 @@ object ItcImpl {
       ): F[TargetIntegrationTime] =
         T.span("calculate integration_time"):
           observingMode match
-            case s @ (SpectroscopyMode.GmosNorth(_, _, _, _, _, _) |
-                SpectroscopyMode.GmosSouth(_, _, _, _, _, _) |
-                SpectroscopyMode.Flamingos2(_, _, _)) =>
+            case s @ (SpectroscopyMode.GmosNorth(_, _, _, _, _, _, _) |
+                SpectroscopyMode.GmosSouth(_, _, _, _, _, _, _) |
+                SpectroscopyMode.Flamingos2(_, _, _, _) | SpectroscopyMode.Igrins2(_)) =>
               spectroscopyIntegrationTime(target, atWavelength, s, constraints, signalToNoise)
             case i @ (
-                  ObservingMode.ImagingMode.GmosNorth(_, _) |
-                  ObservingMode.ImagingMode.GmosSouth(_, _) |
-                  ObservingMode.ImagingMode.Flamingos2(_)
+                  ObservingMode.ImagingMode.GmosNorth(_, _, _) |
+                  ObservingMode.ImagingMode.GmosSouth(_, _, _) |
+                  ObservingMode.ImagingMode.Flamingos2(_, _)
                 ) =>
               imagingIntegrationTime(target, atWavelength, i, constraints, signalToNoise)
 
@@ -94,9 +94,9 @@ object ItcImpl {
       ): F[TargetGraphsCalcResult] =
         T.span("calculate graphs"):
           observingMode match
-            case s @ (SpectroscopyMode.GmosNorth(_, _, _, _, _, _) |
-                SpectroscopyMode.GmosSouth(_, _, _, _, _, _) |
-                SpectroscopyMode.Flamingos2(_, _, _)) =>
+            case s @ (SpectroscopyMode.GmosNorth(_, _, _, _, _, _, _) |
+                SpectroscopyMode.GmosSouth(_, _, _, _, _, _, _) |
+                SpectroscopyMode.Flamingos2(_, _, _, _) | SpectroscopyMode.Igrins2(_)) =>
               spectroscopyGraphs(
                 target,
                 atWavelength,
@@ -105,8 +105,8 @@ object ItcImpl {
                 exposureTime,
                 exposureCount
               )
-            case ImagingMode.GmosNorth(_, _) | ImagingMode.GmosSouth(_, _) |
-                ImagingMode.Flamingos2(_) =>
+            case ImagingMode.GmosNorth(_, _, _) | ImagingMode.GmosSouth(_, _, _) |
+                ImagingMode.Flamingos2(_, _) =>
               MonadThrow[F].raiseError:
                 new IllegalArgumentException("Imaging mode not supported for graph calculation")
 
@@ -136,7 +136,7 @@ object ItcImpl {
           _      <- T.put("params.science_mode" -> "spectroscopy")
           _      <- L.info("spectroscopy graph request:")
           _      <- L.info(request.noSpaces) // Request to the legacy itc
-          r      <- itcLocal.calculateGraphs(request.noSpaces)
+          r      <- itcLocal.calculateGraphs(request.noSpaces, atWavelength)
           result <- T.span("convert graphs_result"):
                       TargetGraphsCalcResult
                         .fromLegacy(r.ccds, r.groups, atWavelength, bandOrLine)
@@ -173,7 +173,7 @@ object ItcImpl {
           _      <- T.put("params.science_mode" -> "spectroscopy")
           _      <- L.info(request.noSpaces) // Request to the legacy itc
           _      <- L.info("spectroscopy time request:")
-          a      <- itcLocal.calculateIntegrationTime(request.noSpaces)
+          a      <- itcLocal.calculateIntegrationTime(request.noSpaces, atWavelength)
           result <- T.span("convert integration_time_result"):
                       convertIntegrationTimeRemoteResult(a, bandOrLine)
         yield result
@@ -239,7 +239,7 @@ object ItcImpl {
           _ <- L.info(
                  s"Spectroscopy: Signal to noise mode ${request.noSpaces}"
                ) // Request to the legacy itc
-          a <- itcLocal.calculateSignalToNoise(request.noSpaces)
+          a <- itcLocal.calculateSignalToNoise(request.noSpaces, atWavelength)
         yield TargetIntegrationTime(
           Zipper.one(IntegrationTime(exposureTime, exposureCount)),
           bandOrLine,
@@ -257,9 +257,10 @@ object ItcImpl {
       ): F[TargetIntegrationTime] =
         T.span("calculate signal_to_noise"):
           observingMode match
-            case s @ (ObservingMode.SpectroscopyMode.GmosNorth(_, _, _, _, _, _) |
-                ObservingMode.SpectroscopyMode.GmosSouth(_, _, _, _, _, _) |
-                ObservingMode.SpectroscopyMode.Flamingos2(_, _, _)) =>
+            case s @ (ObservingMode.SpectroscopyMode.GmosNorth(_, _, _, _, _, _, _) |
+                ObservingMode.SpectroscopyMode.GmosSouth(_, _, _, _, _, _, _) |
+                ObservingMode.SpectroscopyMode.Flamingos2(_, _, _, _) |
+                ObservingMode.SpectroscopyMode.Igrins2(_)) =>
               spectroscopySignalToNoise(target,
                                         atWavelength,
                                         s,
@@ -267,9 +268,9 @@ object ItcImpl {
                                         exposureTime,
                                         exposureCount
               )
-            case s @ (ObservingMode.ImagingMode.Flamingos2(_) |
-                ObservingMode.ImagingMode.GmosSouth(_, _) |
-                ObservingMode.ImagingMode.GmosNorth(_, _)) =>
+            case s @ (ObservingMode.ImagingMode.Flamingos2(_, _) |
+                ObservingMode.ImagingMode.GmosSouth(_, _, _) |
+                ObservingMode.ImagingMode.GmosNorth(_, _, _)) =>
               imagingSignalToNoise(target,
                                    atWavelength,
                                    s,
@@ -309,7 +310,7 @@ object ItcImpl {
           _            <- T.put("params.science_mode" -> "imaging")
           // Request to the legacy itc
           _            <- L.info(s"Imaging: Signal to noise mode ${request.noSpaces}")
-          remoteResult <- itcLocal.calculateIntegrationTime(request.noSpaces)
+          remoteResult <- itcLocal.calculateIntegrationTime(request.noSpaces, atWavelength)
           result       <- T.span("convert integration_time_result"):
                             convertIntegrationTimeRemoteResult(remoteResult, bandOrLine)
         yield result
@@ -346,7 +347,7 @@ object ItcImpl {
           _            <- T.put("params.exposure_count" -> exposureCount.value)
           // Request to the legacy itc
           _            <- L.info(s"Imaging: time and count mode ${request.noSpaces}")
-          remoteResult <- itcLocal.calculateIntegrationTime(request.noSpaces)
+          remoteResult <- itcLocal.calculateIntegrationTime(request.noSpaces, atWavelength)
           result       <- T.span("convert integration_time_result"):
                             convertIntegrationTimeRemoteResult(remoteResult, bandOrLine)
         } yield result

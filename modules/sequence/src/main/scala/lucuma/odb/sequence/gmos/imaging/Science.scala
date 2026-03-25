@@ -5,7 +5,6 @@ package lucuma.odb.sequence
 package gmos
 package imaging
 
-import cats.Eq
 import cats.Order
 import cats.Order.catsKernelOrderingForOrder
 import cats.data.NonEmptyList
@@ -41,7 +40,6 @@ import lucuma.core.model.sequence.gmos.GmosFpuMask
 import lucuma.core.model.sequence.gmos.StaticConfig
 import lucuma.core.optics.syntax.lens.*
 import lucuma.core.util.TimeSpan
-import lucuma.core.util.Timestamp
 import lucuma.itc.IntegrationTime
 import lucuma.odb.data.Itc.GmosNorthImaging
 import lucuma.odb.data.Itc.GmosSouthImaging
@@ -49,7 +47,6 @@ import lucuma.odb.data.Itc.Result
 import lucuma.odb.data.OdbError
 import lucuma.odb.sequence.data.ProtoAtom
 import lucuma.odb.sequence.data.ProtoStep
-import lucuma.odb.sequence.data.StepRecord
 import lucuma.odb.sequence.data.TelescopeConfigGenerator
 import lucuma.odb.sequence.util.AtomBuilder
 
@@ -191,7 +188,7 @@ object Science:
                     with ProtoSequences[GmosSouth, GmosSouthGrating, GmosSouthFilter, GmosSouthFpu]
 
   def makeGenerator[S, D](
-      estimator:  TimeEstimateCalculator[S, D],
+      estimator:  StepTimeEstimateCalculator[S, D],
       static:     S,
       namespace:  UUID,
       protoAtoms: Stream[Pure, ProtoAtom[ProtoStep[D]]]
@@ -199,22 +196,14 @@ object Science:
 
     case class ImagingGenerator(
       recordedSteps: Map[ProtoStep[D], Int]
-    ) extends SequenceGenerator.Base[D]:
+    ) extends SequenceGenerator[D]:
 
-      override def recordStep(step: StepRecord[D])(using Eq[D]): SequenceGenerator[D] =
-        if step.successfullyCompleted && step.isScience then
-          ImagingGenerator:
-            recordedSteps.updatedWith(step.protoStep): count =>
-              count.map(_ + 1).orElse(1.some)
-        else
-          this
-
-      override def generate(when: Timestamp): Stream[Pure, Atom[D]] =
+      override def generate: Stream[Pure, Atom[D]] =
         val build = AtomBuilder.instantiate(estimator, static, namespace, SequenceType.Science)
 
         protoAtoms
           .zipWithIndex
-          .mapAccumulate(TimeEstimateCalculator.Last.empty[D]) { case (cs, (protoAtom, idx)) =>
+          .mapAccumulate(StepTimeEstimateCalculator.Last.empty[D]) { case (cs, (protoAtom, idx)) =>
             build.build(protoAtom.description, idx.toInt, 0, protoAtom.steps).run(cs).value
           }
           .map(_._2)
@@ -238,7 +227,7 @@ object Science:
 
     def instantiate[F[_]: Sync, S, D, G, L, U](
       state:     ProtoSequences[D, G, L, U],
-      estimator: TimeEstimateCalculator[S, D],
+      estimator: StepTimeEstimateCalculator[S, D],
       static:    S,
       namespace: UUID,
       config:    Config[L],
@@ -298,7 +287,7 @@ object Science:
       case Decreasing => Order.reverse(Order.by(f))
 
   def gmosNorth[F[_]: Sync](
-    estimator: TimeEstimateCalculator[StaticConfig.GmosNorth, GmosNorth],
+    estimator: StepTimeEstimateCalculator[StaticConfig.GmosNorth, GmosNorth],
     static:    StaticConfig.GmosNorth,
     namespace: UUID,
     config:    Config.GmosNorth,
@@ -308,7 +297,7 @@ object Science:
     ScienceGenerator.instantiate(ProtoSequences.North, estimator, static, namespace, config, time.map(_.science))
 
   def gmosSouth[F[_]: Sync](
-    estimator: TimeEstimateCalculator[StaticConfig.GmosSouth, GmosSouth],
+    estimator: StepTimeEstimateCalculator[StaticConfig.GmosSouth, GmosSouth],
     static:    StaticConfig.GmosSouth,
     namespace: UUID,
     config:    Config.GmosSouth,

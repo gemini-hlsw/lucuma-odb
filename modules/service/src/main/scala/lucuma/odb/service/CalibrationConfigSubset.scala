@@ -34,6 +34,7 @@ import lucuma.odb.sequence.ObservingMode
 import lucuma.odb.sequence.flamingos2.longslit.Config as Flamingos2Config
 import lucuma.odb.sequence.gmos.imaging.Config as ImagingConfig
 import lucuma.odb.sequence.gmos.longslit.Config
+import lucuma.odb.sequence.igrins2.longslit.Config as Igrins2Config
 
 sealed trait CalibrationConfigSubset derives Eq:
   def modeType: ObservingModeType
@@ -86,6 +87,7 @@ object CalibrationConfigSubset:
         none,
         none,
         none,
+        none,
         none
       )
 
@@ -107,6 +109,7 @@ object CalibrationConfigSubset:
       ObservingModeInput.Create(
         none,
         GmosLongSlitInput.Create.South(grating, filter, fpu, longSlitCommonInput, none).some,
+        none,
         none,
         none,
         none
@@ -146,6 +149,7 @@ object CalibrationConfigSubset:
           )
         ).some,
         none,
+        none,
         none
       )
 
@@ -174,6 +178,7 @@ object CalibrationConfigSubset:
             roi.some
           )
         ).some,
+        none,
         none
       )
 
@@ -191,8 +196,12 @@ object CalibrationConfigSubset:
         none,
         none,
         none,
-        Flamingos2LongSlitInput.Create(disperser, filter, fpu, none, none, none, none, none, none).some
+        Flamingos2LongSlitInput.Create(disperser, filter, fpu, none, none, none, none, none, none).some,
+        none
       )
+
+  case object Igrins2Configs extends CalibrationConfigSubset derives Eq:
+    def modeType: ObservingModeType = ObservingModeType.Igrins2LongSlit
 
   extension (mode: ObservingMode)
     def toConfigSubset: CalibrationConfigSubset =
@@ -243,3 +252,5 @@ object CalibrationConfigSubset:
             f2.filter,
             f2.fpu
           )
+        case _: Igrins2Config =>
+          Igrins2Configs

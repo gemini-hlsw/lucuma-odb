@@ -30,8 +30,8 @@ case class Config private[longslit](
   disperser: Flamingos2Disperser,
   filter: Flamingos2Filter,
   fpu: Flamingos2Fpu,
-  acquisitionExposureTimeMode: ExposureTimeMode,
-  scienceExposureTimeMode: ExposureTimeMode,
+  exposureTimeMode: ExposureTimeMode,
+  acquisition: AcquisitionConfig,
   explicitReadMode: Option[Flamingos2ReadMode],
   explicitReads: Option[Flamingos2Reads],
   defaultDecker: Flamingos2Decker,
@@ -58,16 +58,17 @@ case class Config private[longslit](
     out.writeChars(disperser.tag)
     out.writeChars(filter.tag)
     out.writeChars(fpu.tag)
-    out.write(acquisitionExposureTimeMode.hashBytes)
-    out.write(scienceExposureTimeMode.hashBytes)
+    out.write(exposureTimeMode.hashBytes)
+    out.write(acquisition.hashBytes)
     out.writeChars(explicitReadMode.foldMap(_.tag))
     out.writeChars(explicitReads.foldMap(_.tag))
     out.writeChars(decker.tag)
     out.writeChars(readoutMode.tag)
-    val off: Array[Byte] = explicitSpatialOffsets.foldMap(_.map(_.hashBytes)).flatten.toArray
-    out.write(off, 0, off.length)
-    val tt: Array[Byte] = telluricType.hashBytes
-    out.write(tt, 0, tt.length)
+
+    out.write:
+      explicitSpatialOffsets.foldMap(_.map(_.hashBytes)).flatten.toArray
+
+    out.write(telluricType.hashBytes)
 
     out.close()
     bao.toByteArray
@@ -87,8 +88,8 @@ object Config:
     disperser: Flamingos2Disperser,
     filter: Flamingos2Filter,
     fpu: Flamingos2Fpu,
-    acquisitionExposureTimeMode: ExposureTimeMode,
-    scienceExposureTimeMode: ExposureTimeMode,
+    exposureTimeMode: ExposureTimeMode,
+    acquisition: AcquisitionConfig,
     explicitReadMode: Option[Flamingos2ReadMode] = None,
     explicitReads: Option[Flamingos2Reads] = None,
     explicitDecker: Option[Flamingos2Decker] = None,
@@ -100,8 +101,8 @@ object Config:
       disperser,
       filter,
       fpu,
-      acquisitionExposureTimeMode,
-      scienceExposureTimeMode,
+      exposureTimeMode,
+      acquisition,
       explicitReadMode,
       explicitReads,
       Flamingos2Decker.LongSlit,

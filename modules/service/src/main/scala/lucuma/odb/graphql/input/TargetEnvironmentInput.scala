@@ -5,6 +5,8 @@ package lucuma.odb.graphql
 package input
 
 import cats.syntax.parallel.*
+import cats.syntax.partialOrder.*
+import lucuma.core.model.Access
 import lucuma.core.model.Target
 import lucuma.odb.data.BlindOffsetType
 import lucuma.odb.data.Nullable
@@ -41,7 +43,10 @@ object TargetEnvironmentInput:
     useBlindOffset:      Option[Boolean],
     blindOffsetTarget:   Nullable[TargetPropertiesInput.Create],
     blindOffsetType:     BlindOffsetType
-  ) extends TargetEnvironmentInput
+  ) extends TargetEnvironmentInput:
+    def limitToPreExecution(access: Access): Boolean =
+      // staff can edit the blind offset for ongoing observations
+      access <= Access.Pi || asterism.isDefined || explicitBase.isDefined
 
   object Edit:
     val Binding: Matcher[Edit] =

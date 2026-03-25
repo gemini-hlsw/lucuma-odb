@@ -108,24 +108,28 @@ trait ArbItc:
     Cogen[(Zipper[Itc.Result], Zipper[Itc.Result])].contramap: a =>
       (a.acquisition, a.science)
 
+  given Arbitrary[Itc.Igrins2Spectroscopy] =
+    Arbitrary:
+      arbitrary[Zipper[Itc.Result]].map(Itc.Igrins2Spectroscopy.apply)
+
+  given Cogen[Itc.Igrins2Spectroscopy] =
+    Cogen[Zipper[Itc.Result]].contramap(_.science)
+
   given Arbitrary[Itc] =
     Arbitrary:
       Gen.oneOf(
         arbitrary[Itc.GmosNorthImaging],
         arbitrary[Itc.GmosSouthImaging],
-        arbitrary[Itc.Spectroscopy]
+        arbitrary[Itc.Spectroscopy],
+        arbitrary[Itc.Igrins2Spectroscopy]
       )
 
   given Cogen[Itc] =
-    Cogen[(
-      Option[Itc.GmosNorthImaging],
-      Option[Itc.GmosSouthImaging],
-      Option[Itc.Spectroscopy]
-    )].contramap: a =>
-      (
-        Itc.gmosNorthImaging.getOption(a),
-        Itc.gmosSouthImaging.getOption(a),
-        Itc.spectroscopy.getOption(a)
-      )
+    Cogen[
+      Either[Itc.Spectroscopy, Either[Itc.GmosNorthImaging, Either[Itc.GmosSouthImaging, Itc.Igrins2Spectroscopy]]]].contramap:
+      case a: Itc.Spectroscopy        => Left(a)
+      case a: Itc.GmosNorthImaging    => Right(Left(a))
+      case a: Itc.GmosSouthImaging    => Right(Right(Left(a)))
+      case a: Itc.Igrins2Spectroscopy => Right(Right(Right(a)))
 
 object ArbItc extends ArbItc

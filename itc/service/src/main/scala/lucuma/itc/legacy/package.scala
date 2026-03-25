@@ -20,7 +20,7 @@ enum ItcWavefrontSensor(val ocs2Tag: String):
   case PWFS  extends ItcWavefrontSensor("PWFS")
   case OIWFS extends ItcWavefrontSensor("OIWFS")
 
-case class ItcTelescopeDetails(wfs: ItcWavefrontSensor)
+case class ItcTelescopeDetails(wfs: ItcWavefrontSensor, instrumentPort: PortDisposition)
 
 case class ItcSourceDefinition(
   target:     TargetData,
@@ -72,7 +72,8 @@ def spectroscopyGraphParams(
       ),
       conditions = conditions,
       telescope = ItcTelescopeDetails(
-        wfs = ItcWavefrontSensor.OIWFS
+        wfs = ItcWavefrontSensor.OIWFS,
+        instrumentPort = observingMode.portDisposition
       ),
       instrument = ItcInstrumentDetails(observingMode)
     )
@@ -103,7 +104,8 @@ def spectroscopyIntegrationTimeParams(
       ),
       conditions = conditions,
       telescope = ItcTelescopeDetails(
-        wfs = ItcWavefrontSensor.OIWFS
+        wfs = ItcWavefrontSensor.OIWFS,
+        instrumentPort = observingMode.portDisposition
       ),
       instrument = ItcInstrumentDetails(observingMode)
     )
@@ -135,7 +137,8 @@ def spectroscopySNParams(
       ),
       conditions = conditions,
       telescope = ItcTelescopeDetails(
-        wfs = ItcWavefrontSensor.OIWFS
+        wfs = ItcWavefrontSensor.OIWFS,
+        instrumentPort = observingMode.portDisposition
       ),
       instrument = ItcInstrumentDetails(observingMode)
     )
@@ -165,7 +168,8 @@ def imagingIntegrationTimeParams(
       ),
       conditions = conditions,
       telescope = ItcTelescopeDetails(
-        wfs = ItcWavefrontSensor.OIWFS
+        wfs = ItcWavefrontSensor.OIWFS,
+        instrumentPort = observingMode.portDisposition
       ),
       instrument = ItcInstrumentDetails(observingMode)
     )
@@ -196,7 +200,8 @@ def imagingS2NParams(
       ),
       conditions = conditions,
       telescope = ItcTelescopeDetails(
-        wfs = ItcWavefrontSensor.OIWFS
+        wfs = ItcWavefrontSensor.OIWFS,
+        instrumentPort = observingMode.portDisposition
       ),
       instrument = ItcInstrumentDetails(observingMode)
     )

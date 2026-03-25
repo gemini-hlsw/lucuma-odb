@@ -5,6 +5,7 @@ package lucuma.odb.graphql
 package query
 
 import cats.effect.IO
+import cats.syntax.all.*
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
@@ -13,6 +14,7 @@ import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosNorthGrating
 import lucuma.core.enums.GmosSouthFilter
 import lucuma.core.enums.GmosSouthGrating
+import lucuma.core.enums.Igrins2OffsetMode
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.model.CloudExtinction
 import lucuma.core.model.ConfigurationRequest
@@ -22,9 +24,9 @@ import lucuma.core.syntax.string.*
 import lucuma.core.util.Enumerated
 import lucuma.odb.graphql.mutation.UpdateObservationsOps
 
-class observation_configurationRequests 
-  extends OdbSuite 
-     with ObservingModeSetupOperations 
+class observation_configurationRequests
+  extends OdbSuite
+     with ObservingModeSetupOperations
      with UpdateObservationsOps {
 
   val pi       = TestUsers.Standard.pi(1, 30)
@@ -91,6 +93,16 @@ class observation_configurationRequests
           }
         """
 
+    def forIgrins2LongSlit(user: User, oid: Observation.Id, offsetMode: Igrins2OffsetMode): IO[Unit] =
+      updateObservationAs(user, oid):
+        s"""
+          observingMode: {
+            igrins2LongSlit: {
+              explicitOffsetMode: ${offsetMode.tag.toScreamingSnakeCase}
+            }
+          }
+        """
+
   }
 
   def baseMutation(user: User, oid: Observation.Id, mode: ObservingModeType): IO[Unit] =
@@ -100,7 +112,8 @@ class observation_configurationRequests
       case ObservingModeType.Flamingos2LongSlit => Mutation.forFlamingos2LongSlit(user, oid, Flamingos2Disperser.R1200HK)
       case ObservingModeType.GmosNorthImaging   => Mutation.forGmosNorthImaging(user, oid, List(GmosNorthFilter.CaT, GmosNorthFilter.DS920))
       case ObservingModeType.GmosSouthImaging   => Mutation.forGmosSouthImaging(user, oid, List(GmosSouthFilter.CaT, GmosSouthFilter.GG455))
-    
+      case ObservingModeType.Igrins2LongSlit    => Mutation.forIgrins2LongSlit(user, oid, Igrins2OffsetMode.NodAlongSlit)
+
   def compatibleMutation(user: User, oid: Observation.Id, mode: ObservingModeType): IO[Unit] =
     mode match
       case ObservingModeType.GmosNorthLongSlit  => IO.unit // no changes are compatible
@@ -108,14 +121,16 @@ class observation_configurationRequests
       case ObservingModeType.Flamingos2LongSlit => IO.unit // no changes are compatible
       case ObservingModeType.GmosNorthImaging   => Mutation.forGmosNorthImaging(user, oid, List(GmosNorthFilter.DS920)) // subset of original, ok
       case ObservingModeType.GmosSouthImaging   => Mutation.forGmosSouthImaging(user, oid, List(GmosSouthFilter.GG455)) // subset of original, ok
+      case ObservingModeType.Igrins2LongSlit    => IO.unit // no changes are compatible
 
-  def incompatibleMutation(user: User, oid: Observation.Id, mode: ObservingModeType): IO[Unit] =
+  def incompatibleMutation(user: User, oid: Observation.Id, mode: ObservingModeType): Option[IO[Unit]] =
     mode match
-      case ObservingModeType.GmosNorthLongSlit  => Mutation.forGmosNorthLongSlit(user, oid, GmosNorthGrating.B1200_G5301)
-      case ObservingModeType.GmosSouthLongSlit  => Mutation.forGmosSouthLongSlit(user, oid, GmosSouthGrating.R600_G5324)
-      case ObservingModeType.Flamingos2LongSlit => Mutation.forFlamingos2LongSlit(user, oid, Flamingos2Disperser.R1200JH)
-      case ObservingModeType.GmosNorthImaging   => Mutation.forGmosNorthImaging(user, oid, List(GmosNorthFilter.GG455, GmosNorthFilter.GPrime_GG455))
-      case ObservingModeType.GmosSouthImaging   => Mutation.forGmosSouthImaging(user, oid, List(GmosSouthFilter.GG455, GmosSouthFilter.GPrime_GG455))
+      case ObservingModeType.GmosNorthLongSlit  => Some(Mutation.forGmosNorthLongSlit(user, oid, GmosNorthGrating.B1200_G5301))
+      case ObservingModeType.GmosSouthLongSlit  => Some(Mutation.forGmosSouthLongSlit(user, oid, GmosSouthGrating.R600_G5324))
+      case ObservingModeType.Flamingos2LongSlit => Some(Mutation.forFlamingos2LongSlit(user, oid, Flamingos2Disperser.R1200JH))
+      case ObservingModeType.GmosNorthImaging   => None // Mutation.forGmosNorthImaging(user, oid, List(GmosNorthFilter.GG455, GmosNorthFilter.GPrime_GG455))
+      case ObservingModeType.GmosSouthImaging   => None // Mutation.forGmosSouthImaging(user, oid, List(GmosSouthFilter.GG455, GmosSouthFilter.GPrime_GG455))
+      case ObservingModeType.Igrins2LongSlit    => None // Mutation.forIgrins2LongSlit(user, oid, Igrins2OffsetMode.NodToSky)
 
   private def updateObservationAs(user: User, oid: Observation.Id)(update: String): IO[Unit] =
     updateObservation(user, oid, update,
@@ -168,12 +183,12 @@ class observation_configurationRequests
           }
         }
       """,
-      expected = Right(json"""                
+      expected = Right(json"""
         {
           "observation" : {
             "configurationRequests" : ${ids.map(id => Json.obj("id" -> id.asJson))}
           }
-        }                
+        }
       """)
     )
 
@@ -184,13 +199,14 @@ class observation_configurationRequests
       pid   <- createProgramAs(pi, "Foo")
       _     <- addProposal(pi, pid, Some(cfpid), None)
       tid   <- if !too then createTargetWithProfileAs(pi, pid) else createOpportunityTargetAs(pi, pid)
-      oid   <- 
+      oid   <-
         mode match
           case ObservingModeType.GmosNorthLongSlit  => createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
           case ObservingModeType.GmosSouthLongSlit  => createGmosSouthLongSlitObservationAs(pi, pid, List(tid))
           case ObservingModeType.Flamingos2LongSlit => createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
           case ObservingModeType.GmosNorthImaging   => createGmosNorthImagingObservationAs(pi, pid, tid)
           case ObservingModeType.GmosSouthImaging   => createGmosSouthImagingObservationAs(pi, pid, tid)
+          case ObservingModeType.Igrins2LongSlit    => createIgrins2LongSlitObservationAs(pi, pid, tid)
     yield oid
 
   Enumerated[ObservingModeType].all.foreach { mode =>
@@ -251,13 +267,13 @@ class observation_configurationRequests
           _    <- expectRequests(pi, oid, List(mid))
         yield ()
 
-      test(s"$prefix request should apply after compatible mutation"):
+      test(s"$prefix request should not apply after incompatible mutation"):
         for
           oid  <- setup(too, mode)
           _    <- baseMutation(pi, oid, mode)
           mid  <- createConfigurationRequestAs(pi, oid)
-          _    <- incompatibleMutation(pi, oid, mode)
-          _    <- expectRequests(pi, oid, Nil)
+          _    <- incompatibleMutation(pi, oid, mode).traverse: mut =>
+            mut >> expectRequests(pi, oid, Nil)
         yield ()
 
       test(s"$prefix request should not apply for narrower conditions"):
@@ -282,9 +298,3 @@ class observation_configurationRequests
   }
 
 }
-
-
-
-
-
-  

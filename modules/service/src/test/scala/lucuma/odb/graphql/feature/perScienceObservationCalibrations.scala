@@ -1,7 +1,8 @@
 // Copyright (c) 2016-2025 Association of Universities for Research in Astronomy, Inc. (AURA)
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
-package lucuma.odb.feature
+package lucuma.odb.graphql
+package feature
 
 import cats.effect.IO
 import cats.syntax.all.*
@@ -13,11 +14,15 @@ import lucuma.catalog.clients.SimbadClientMock
 import lucuma.catalog.clients.TelluricTargetsClientMock
 import lucuma.catalog.telluric.TelluricStar
 import lucuma.catalog.telluric.TelluricTargetsClient
+import lucuma.core.enums.Band
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.Flamingos2Fpu
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.TelluricCalibrationOrder
+import lucuma.core.math.BrightnessUnits.BrightnessMeasure
+import lucuma.core.math.BrightnessUnits.Integrated
+import lucuma.core.math.BrightnessValue
 import lucuma.core.math.Coordinates
 import lucuma.core.math.Declination
 import lucuma.core.math.RightAscension
@@ -37,7 +42,6 @@ import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.itc.IntegrationTime
 import lucuma.itc.client.SpectroscopyInput
-import lucuma.odb.graphql.OdbSuite
 import lucuma.odb.graphql.query.ExecutionTestSupportForFlamingos2
 import lucuma.odb.graphql.query.ObservingModeSetupOperations
 import lucuma.odb.graphql.subscription.SubscriptionUtils
@@ -89,6 +93,10 @@ class perScienceObservationCalibrations
     order = TelluricCalibrationOrder.After
   )
 
+  val mockBrightnesses = SortedMap[Band, BrightnessMeasure[Integrated]](
+    Band.J -> Band.J.defaultUnits[Integrated].withValueTagged(BrightnessValue.unsafeFrom(14.74))
+  )
+
   val mockTarget = Target.Sidereal(
     name = "HIP 12345".refined,
     tracking = SiderealTracking(
@@ -99,7 +107,7 @@ class perScienceObservationCalibrations
       parallax = None
     ),
     sourceProfile = SourceProfile.Point(
-      SpectralDefinition.BandNormalized(None, SortedMap.empty)
+      SpectralDefinition.BandNormalized(None, mockBrightnesses)
     ),
     catalogInfo = None
   )
@@ -294,6 +302,14 @@ class perScienceObservationCalibrations
         .flatten
       elements.pure[IO]
     }
+
+  private def selectTelluricObservationFor(oid: Observation.Id): IO[Option[Observation.Id]] =
+    queryObservation(oid).flatMap: obs =>
+      obs.groupId.flatTraverse: gid =>
+        queryObservationsInGroup(gid).map: infos =>
+          infos
+            .find(_.calibrationRole.exists(_ === CalibrationRole.Telluric))
+            .map(_.id)
 
   private def queryObservationWithTarget(oid: Observation.Id): IO[ObsWithTarget] =
     query(
@@ -668,6 +684,133 @@ class perScienceObservationCalibrations
       assert(grp.exists(_.calibrationRoles.contains(CalibrationRole.Telluric)))
     }
 
+  private def editSequence(oid: Observation.Id): IO[Unit] =
+    query(
+      user  = serviceUser,
+      query = s"""
+        mutation {
+          replaceFlamingos2Sequence(input: {
+            observationId: "$oid"
+            sequenceType: SCIENCE
+            sequence: [
+              {
+                description: "Manually Edited Atom"
+                steps: [
+                  {
+                    instrumentConfig: {
+                      exposure: {
+                        seconds: 20
+                      }
+                      filter: J_LOW
+                      readMode: BRIGHT
+                      lyotWheel: F16
+                      decker: LONG_SLIT
+                      readoutMode: SCIENCE
+                      reads: READS_1
+                    }
+                    stepConfig: {
+                      science: true
+                    }
+                    observeClass: SCIENCE
+                  }
+                ]
+              }
+            ]
+          }) {
+            sequence {
+              id
+            }
+          }
+        }
+      """
+    ).void
+
+  def nextAtomDescription(oid: Observation.Id): IO[Option[String]] =
+    query(
+      user  = pi,
+      query = s"""
+        query {
+          executionConfig(observationId: "$oid") {
+            flamingos2 {
+              science {
+                nextAtom {
+                  description
+                }
+              }
+            }
+          }
+        }
+      """
+    ).map: json =>
+      json
+        .hcursor
+        .downFields("executionConfig", "flamingos2", "science", "nextAtom", "description")
+        .require[Option[String]]
+
+  test("F2 telluric sequence may be edited and the changes are stored"):
+    for
+      pid  <- createProgramWithNonPartnerPi(pi)
+      tid  <- createTargetWithProfileAs(pi, pid)
+      oid  <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+      _    <- runObscalcUpdate(pid, oid)
+
+      _    <- recalculateCalibrations(pid, when)
+      toid <- selectTelluricObservationFor(oid).map(_.get)
+      _    <- runObscalcUpdate(pid, toid)
+
+      _    <- editSequence(toid)
+      _    <- sleep >> resolveTelluricTargets
+      d    <- nextAtomDescription(toid)
+    yield assertEquals(d, "Manually Edited Atom".some)
+
+  test("Deleting the science observation of an edited F2 telluric sequence observation doesn't prevent its deletion"):
+    for
+      pid  <- createProgramWithNonPartnerPi(pi)
+      tid  <- createTargetWithProfileAs(pi, pid)
+      oid  <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+      _    <- runObscalcUpdate(pid, oid)
+
+      _    <- recalculateCalibrations(pid, when)
+      toid <- selectTelluricObservationFor(oid).map(_.get)
+      _    <- runObscalcUpdate(pid, toid)
+
+      _    <- editSequence(toid)
+      _    <- sleep >> resolveTelluricTargets
+      d    <- nextAtomDescription(toid)
+
+      _    <- deleteObservation(pi, oid)
+      _    <- recalculateCalibrations(pid, when)
+      xist <- queryObservationExists(toid)
+    yield
+      assertEquals(d, "Manually Edited Atom".some)
+      assert(!xist)
+
+  test("Once partially executed, you cannot delete a telluric with manually edited steps"):
+    for
+      pid  <- createProgramWithNonPartnerPi(pi)
+      tid  <- createTargetWithProfileAs(pi, pid)
+      oid  <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+      _    <- runObscalcUpdate(pid, oid)
+
+      _    <- recalculateCalibrations(pid, when)
+      toid <- selectTelluricObservationFor(oid).map(_.get)
+      _    <- runObscalcUpdate(pid, toid)
+
+      _    <- editSequence(toid)
+      _    <- sleep >> resolveTelluricTargets
+      d    <- nextAtomDescription(toid)
+
+      sid  <- firstScienceStepId(serviceUser, toid)
+      vid  <- recordVisitAs(serviceUser, Instrument.Flamingos2, toid)
+      _    <- addEndStepEvent(sid, vid)
+
+      _    <- deleteObservation(pi, oid)
+      _    <- recalculateCalibrations(pid, when)
+      xist <- queryObservationExists(toid)
+    yield
+      assertEquals(d, "Manually Edited Atom".some)
+      assert(xist)
+
   test("each F2 observations gets its own group"):
     for {
       pid   <- createProgramAs(pi)
@@ -738,7 +881,7 @@ class perScienceObservationCalibrations
       groupId   =  obs.groupId.get
       groupInfo <- queryGroup(groupId)
     } yield {
-      assertEquals(groupInfo.ordered, true)
+      assertEquals(groupInfo.ordered, false)
       assertEquals(groupInfo.minimumRequired, None) // all observations
       assertEquals(groupInfo.maximumInterval, TimeSpan.Zero.some)
     }
@@ -1778,4 +1921,46 @@ class perScienceObservationCalibrations
       // Only Science ETM is synced for tellurics
       assertEquals(telluricEtms2.science.snValue, SignalToNoise.unsafeFromBigDecimalExact(100).some)
       assertEquals(telluricEtms2.science.snWAt, Wavelength.fromIntNanometers(1500))
+    }
+
+  test("telluric acquisition ETM is independent from science"):
+    for {
+      pid          <- createProgramAs(pi)
+      tid          <- createTargetWithProfileAs(pi, pid)
+      oid          <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+      _            <- setScienceRequirements(oid, DefaultSnAt, 75.0)
+      // Set a non-default acquisition etm
+      _            <- query(pi, s"""mutation {
+                        updateObservations(input: {
+                          SET: {
+                            observingMode: {
+                              flamingos2LongSlit: {
+                                acquisition: {
+                                  exposureTimeMode: {
+                                    signalToNoise: {
+                                      value: 50,
+                                      at: { nanometers: 500 }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                          WHERE: { id: { EQ: "$oid" } }
+                        }) {
+                          observations { id }
+                        }
+                      }""")
+      _            <- runObscalcUpdate(pid, oid)
+      _            <- recalculateCalibrations(pid, when)
+      obs          <- queryObservation(oid)
+      groupId      =  obs.groupId.get
+      obsInGroup   <- queryObservationsInGroup(groupId)
+      telluricOid  =  obsInGroup.find(_.calibrationRole.contains(CalibrationRole.Telluric)).get.id
+      telluricEtms <- queryAllEtms(telluricOid)
+    } yield {
+      // Telluric acquisition ETM should be the default SN=
+      assertEquals(telluricEtms.acquisition.snValue, SignalToNoise.unsafeFromBigDecimalExact(10).some)
+      // Wavelength at taken from science
+      assertEquals(telluricEtms.acquisition.snWAt, Wavelength.fromIntNanometers(500))
     }

@@ -91,6 +91,10 @@ trait ItcCodec:
         science     <- c.downField("spectroscopyScience").as[Zipper[Itc.Result]]
       yield Itc.Spectroscopy(acquisition, science)
 
+  given Decoder[Itc.Igrins2Spectroscopy] =
+    Decoder.instance:
+      _.downField("spectroscopyScience").as[Zipper[Itc.Result]].map(Itc.Igrins2Spectroscopy.apply)
+
   private def imagingScienceNemEncoder[A: Encoder](
     using Encoder[TimeSpan], Encoder[Wavelength]
   ): Encoder[NonEmptyMap[A, Zipper[Itc.Result]]] =
@@ -124,19 +128,28 @@ trait ItcCodec:
         "spectroscopyScience" -> a.science.asJson
       )
 
+  given (using Encoder[TimeSpan], Encoder[Wavelength]): Encoder[Itc.Igrins2Spectroscopy] =
+    Encoder.instance: a =>
+      Json.obj(
+        "itcType"             -> Itc.Type.Igrins2Spectroscopy.asJson,
+        "spectroscopyScience" -> a.science.asJson
+      )
+
   given Decoder[Itc] =
     Decoder.instance: c =>
       c.downField("itcType")
        .as[Itc.Type]
        .flatMap:
-         case Itc.Type.GmosNorthImaging => Decoder[Itc.GmosNorthImaging].apply(c)
-         case Itc.Type.GmosSouthImaging => Decoder[Itc.GmosSouthImaging].apply(c)
-         case Itc.Type.Spectroscopy     => Decoder[Itc.Spectroscopy].apply(c)
+         case Itc.Type.GmosNorthImaging    => Decoder[Itc.GmosNorthImaging].apply(c)
+         case Itc.Type.GmosSouthImaging    => Decoder[Itc.GmosSouthImaging].apply(c)
+         case Itc.Type.Spectroscopy        => Decoder[Itc.Spectroscopy].apply(c)
+         case Itc.Type.Igrins2Spectroscopy => Decoder[Itc.Igrins2Spectroscopy].apply(c)
 
   given (using Encoder[TimeSpan], Encoder[Wavelength]): Encoder[Itc] =
     Encoder.instance:
-      case a @ Itc.GmosNorthImaging(_) => Encoder[Itc.GmosNorthImaging].apply(a)
-      case a @ Itc.GmosSouthImaging(_) => Encoder[Itc.GmosSouthImaging].apply(a)
-      case a @ Itc.Spectroscopy(_, _)  => Encoder[Itc.Spectroscopy].apply(a)
+      case a @ Itc.GmosNorthImaging(_)    => Encoder[Itc.GmosNorthImaging].apply(a)
+      case a @ Itc.GmosSouthImaging(_)    => Encoder[Itc.GmosSouthImaging].apply(a)
+      case a @ Itc.Spectroscopy(_, _)     => Encoder[Itc.Spectroscopy].apply(a)
+      case a @ Itc.Igrins2Spectroscopy(_) => Encoder[Itc.Igrins2Spectroscopy].apply(a)
 
 object itc extends ItcCodec

@@ -67,6 +67,9 @@ input GmosSSpectroscopyInput {
 
   """Regions of interest"""
   roi: GmosRoi
+
+  """Instrument port disposition"""
+  port: PortDisposition = SIDE
 }
 
 input GmosSImagingInput {
@@ -75,6 +78,9 @@ input GmosSImagingInput {
 
   """ccd mode"""
   ccdMode: GmosCcdModeInput
+
+  """Instrument port disposition"""
+  port: PortDisposition = SIDE
 }
 
 input GmosNSpectroscopyInput {
@@ -95,6 +101,9 @@ input GmosNSpectroscopyInput {
 
   """Regions of interest"""
   roi: GmosRoi
+
+  """Instrument port disposition"""
+  port: PortDisposition = SIDE
 }
 
 input GmosNImagingInput {
@@ -103,6 +112,9 @@ input GmosNImagingInput {
 
   """ccd mode"""
   ccdMode: GmosCcdModeInput
+
+  """Instrument port disposition"""
+  port: PortDisposition = SIDE
 }
 
 input Flamingos2SpectroscopyInput {
@@ -114,11 +126,22 @@ input Flamingos2SpectroscopyInput {
 
   """Flamingos2 filter"""
   filter: Flamingos2Filter!
+
+  """Instrument port disposition"""
+  port: PortDisposition = SIDE
 }
 
 input Flamingos2ImagingInput {
   """Flamingos2 filter"""
   filter: Flamingos2Filter!
+
+  """Instrument port disposition"""
+  port: PortDisposition = SIDE
+}
+
+input Igrins2SpectroscopyInput {
+  """Instrument port disposition"""
+  port: PortDisposition = BOTTOM
 }
 
 type GmosSSpectroscopyParams {
@@ -166,7 +189,11 @@ type Flamingos2SpectroscopyParams {
   filter: Flamingos2Filter
 }
 
-union SpectroscopyParams = GmosNSpectroscopyParams | GmosSSpectroscopyParams | Flamingos2SpectroscopyParams
+type Igrins2SpectroscopyParams {
+  ignore: Ignore
+}
+
+union SpectroscopyParams = GmosNSpectroscopyParams | GmosSSpectroscopyParams | Flamingos2SpectroscopyParams | Igrins2SpectroscopyParams
 
 type GmosSImagingParams {
   """Gmos South filter"""
@@ -204,6 +231,9 @@ input InstrumentModesInput @oneOf {
 
   """Flamingos2 Imaging"""
   flamingos2Imaging: Flamingos2ImagingInput
+
+  """IGRINS2 Spectroscopy"""
+  igrins2Spectroscopy: Igrins2SpectroscopyInput
 }
 
 """Image quality input - specify either preset or exact arcsec value"""
@@ -396,6 +426,7 @@ type TargetError {
   errorCode: String!
   message: String!
   wellHalfFilledSeconds: Float
+  wavelength: Wavelength
 }
 
 interface ITCObservingMode {

@@ -13,7 +13,6 @@ import eu.timepit.refined.types.numeric.PosInt
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
-import lucuma.core.enums.DatasetQaState
 import lucuma.core.enums.GmosAmpCount
 import lucuma.core.enums.GmosAmpGain
 import lucuma.core.enums.GmosAmpReadMode
@@ -26,7 +25,6 @@ import lucuma.core.enums.GmosYBinning
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.ObservingModeType
-import lucuma.core.enums.SequenceType
 import lucuma.core.enums.Site
 import lucuma.core.enums.StepGuideState
 import lucuma.core.math.Offset
@@ -46,7 +44,6 @@ import lucuma.core.util.TimeSpan
 import lucuma.itc.IntegrationTime
 import lucuma.itc.client.ImagingInput
 import lucuma.itc.client.InstrumentMode
-import lucuma.odb.json.all.transport.given
 import lucuma.odb.sequence.data.ProtoStep
 
 class executionSciGmosNorthImaging extends ExecutionTestSupportForGmos:
@@ -58,14 +55,14 @@ class executionSciGmosNorthImaging extends ExecutionTestSupportForGmos:
   // 120s x 6 in g, 60s x 12 in i, and 30s x 30 in Y
   override def fakeItcImagingResultFor(input: ImagingInput): Option[IntegrationTime] =
     input.mode match
-      case InstrumentMode.GmosNorthImaging(f, _) =>
+      case InstrumentMode.GmosNorthImaging(f, _, _) =>
         f match
           case GmosNorthFilter.GPrime => Time120x06.some
           case GmosNorthFilter.IPrime => Time060x12.some
           case GmosNorthFilter.Y      => Time030x30.some
           case _                      => none
 
-      case InstrumentMode.GmosSouthImaging(f, _) =>
+      case InstrumentMode.GmosSouthImaging(f, _, _) =>
         f match
           case GmosSouthFilter.GPrime => Time120x06.some
           case GmosSouthFilter.IPrime => Time060x12.some
@@ -198,7 +195,7 @@ class executionSciGmosNorthImaging extends ExecutionTestSupportForGmos:
           "breakpoint" : "DISABLED"
         }
       """
-  
+
   object Step:
     def apply[L: Enumerated](filter: L, time: IntegrationTime): Step[L] =
       Step(filter, time, (0, 0), ObserveClass.Science)
@@ -722,9 +719,8 @@ class executionSciGmosNorthImaging extends ExecutionTestSupportForGmos:
           }"""
 
         v <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
-        a <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
-        s <- recordStepAs(serviceUser, a, Instrument.GmosNorth, Step(GmosNorthFilter.GPrime, Time120x06).toGmosNorthProtoStep)
-        _  <- addEndStepEvent(s)
+        s <- firstScienceStepId(serviceUser, o)
+        _  <- addEndStepEvent(s, v)
       yield o
 
     val json: List[Json] = List(
@@ -760,61 +756,12 @@ class executionSciGmosNorthImaging extends ExecutionTestSupportForGmos:
           }"""
 
         v  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
-        a  <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
-        _  <- (0 until 6).toList.traverse { _ =>
-                recordStepAs(serviceUser, a, Instrument.GmosNorth, Step(GmosNorthFilter.GPrime, Time120x06).toGmosNorthProtoStep)
-                  .flatTap(addEndStepEvent)
-              }.void
+        ss <- scienceStepIds(serviceUser, o)
+        _  <- ss.take(6).traverse(sid => addEndStepEvent(sid, v))
       yield o
 
     val json: List[Json] = List(
       List.fill(12)(gnAtom(Step(GmosNorthFilter.IPrime, Time060x12))) ++
-      List.fill(30)(gnAtom(Step(GmosNorthFilter.Y,      Time030x30)))
-    ).flatten
-
-    setup.flatMap: oid =>
-      expect(
-        user     = pi,
-        query    = gmosNorthScienceQuery(oid, 100.some),
-        expected = expectedResult(json).asRight
-      )
-
-  test("repeat failed"):
-    val setup: IO[Observation.Id] =
-      for
-        p  <- createProgram
-        t  <- createTargetWithProfileAs(pi, p)
-        o  <- createObservation(p, t, Site.GN):
-          s"""{
-            gmosNorthImaging: {
-              variant: {
-                grouped: { skyCount: 0 }
-              }
-              filters: [
-                { filter: G_PRIME },
-                { filter: I_PRIME },
-                { filter: Y       }
-              ]
-            }
-          }"""
-
-        v  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
-        a  <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
-        s0 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, Step(GmosNorthFilter.GPrime, Time120x06).toGmosNorthProtoStep)
-        _  <- addEndStepEvent(s0)
-        d  <- recordDatasetAs(serviceUser, s0, "N20240905S1001.fits")
-        _  <- setQaState(d, DatasetQaState.Usable)
-        _  <- (0 until 5).toList.traverse { _ =>
-                recordStepAs(serviceUser, a, Instrument.GmosNorth, Step(GmosNorthFilter.GPrime, Time120x06).toGmosNorthProtoStep)
-                  .flatTap(addEndStepEvent)
-              }.void
-        s1 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, Step(GmosNorthFilter.IPrime, Time060x12).toGmosNorthProtoStep)
-        _  <- addEndStepEvent(s1)
-      yield o
-
-    val json: List[Json] = List(
-      List(gnAtom(Step(GmosNorthFilter.GPrime, Time120x06)))          ++
-      List.fill(11)(gnAtom(Step(GmosNorthFilter.IPrime, Time060x12))) ++
       List.fill(30)(gnAtom(Step(GmosNorthFilter.Y,      Time030x30)))
     ).flatten
 

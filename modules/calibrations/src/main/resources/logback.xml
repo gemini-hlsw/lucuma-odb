@@ -10,6 +10,9 @@
   <logger name="lucuma-odb-test" level="ERROR" />
   <logger name="lucuma.odb.calibrations.Main" level="INFO"/>
 
+  <!-- Log slow queries -->
+  <logger name="lucuma-odb-slow-query" level="WARN"/>
+
   <root level="INFO">
     <appender-ref ref="STDOUT" />
   </root>

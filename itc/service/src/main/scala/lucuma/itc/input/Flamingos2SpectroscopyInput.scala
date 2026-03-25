@@ -7,12 +7,14 @@ import cats.syntax.parallel.*
 import lucuma.core.enums.Flamingos2Disperser
 import lucuma.core.enums.Flamingos2Filter
 import lucuma.core.enums.Flamingos2Fpu
+import lucuma.core.enums.PortDisposition
 import lucuma.odb.graphql.binding.*
 
 case class Flamingos2SpectroscopyInput(
   disperser: Flamingos2Disperser,
   filter:    Flamingos2Filter,
-  fpu:       Flamingos2Fpu
+  fpu:       Flamingos2Fpu,
+  port:      PortDisposition
 ) extends InstrumentModesInput
 
 object Flamingos2SpectroscopyInput:
@@ -22,7 +24,10 @@ object Flamingos2SpectroscopyInput:
       case List(
             Flamingos2DisperserBinding("disperser", disperser),
             Flamingos2FpuBinding("fpu", fpu),
-            Flamingos2FilterBinding("filter", filter)
+            Flamingos2FilterBinding("filter", filter),
+            PortDispositionBinding("port", portDisposition)
           ) =>
-        (disperser, filter, fpu).parMapN((d, f, u) => Flamingos2SpectroscopyInput(d, f, u))
+        (disperser, filter, fpu, portDisposition).parMapN((d, f, u, p) =>
+          Flamingos2SpectroscopyInput(d, f, u, p)
+        )
     }

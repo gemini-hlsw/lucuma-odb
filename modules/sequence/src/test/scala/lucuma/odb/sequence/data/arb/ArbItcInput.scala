@@ -55,8 +55,23 @@ trait ArbItcInput:
         bo
       )
 
+  given Arbitrary[ItcInput.Igrins2Spectroscopy] =
+    Arbitrary:
+      for
+        sci <- arbitrary[SpectroscopyParameters]
+        ct  <- Gen.choose(1, 10)
+        ts  <- List.range(1L, ct + 1L).traverse(genTargetDefinition)
+      yield ItcInput.Igrins2Spectroscopy(
+        sci,
+        NonEmptyList.fromListUnsafe(ts)
+      )
+
   given Arbitrary[ItcInput] =
     Arbitrary:
-      Gen.oneOf(arbitrary[ItcInput.Imaging], arbitrary[ItcInput.Spectroscopy])
+      Gen.oneOf(
+        arbitrary[ItcInput.Imaging],
+        arbitrary[ItcInput.Spectroscopy],
+        arbitrary[ItcInput.Igrins2Spectroscopy]
+      )
 
 object ArbItcInput extends ArbItcInput

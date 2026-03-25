@@ -20,6 +20,7 @@ import spire.math.Rational
 sealed trait ObservingMode {
   def instrument: Instrument
   def analysisMethod: ItcObservationDetails.AnalysisMethod
+  def portDisposition: PortDisposition
 }
 
 object ObservingMode {
@@ -35,6 +36,7 @@ object ObservingMode {
       case gn: GmosNorth  => gn.asJson
       case gs: GmosSouth  => gs.asJson
       case f2: Flamingos2 => f2.asJson
+      case ig: Igrins2    => ig.asJson
     }
 
     sealed trait GmosSpectroscopy extends SpectroscopyMode derives Hash {
@@ -64,7 +66,8 @@ object ObservingMode {
       fpu:               GmosNorthFpuParam,
       filter:            Option[GmosNorthFilter],
       ccdMode:           Option[GmosCcdMode],
-      roi:               Option[GmosRoi]
+      roi:               Option[GmosRoi],
+      portDisposition:   PortDisposition
     ) extends GmosSpectroscopy derives Hash {
       val isIfu = fpu.isIfu
 
@@ -95,7 +98,8 @@ object ObservingMode {
       fpu:               GmosSouthFpuParam,
       filter:            Option[GmosSouthFilter],
       ccdMode:           Option[GmosCcdMode],
-      roi:               Option[GmosRoi]
+      roi:               Option[GmosRoi],
+      portDisposition:   PortDisposition
     ) extends GmosSpectroscopy derives Hash {
       val isIfu = fpu.isIfu
 
@@ -121,9 +125,10 @@ object ObservingMode {
         )
 
     case class Flamingos2(
-      disperser: Flamingos2Disperser,
-      filter:    Flamingos2Filter,
-      fpu:       Flamingos2Fpu
+      disperser:       Flamingos2Disperser,
+      filter:          Flamingos2Filter,
+      fpu:             Flamingos2Fpu,
+      portDisposition: PortDisposition
     ) extends SpectroscopyMode derives Hash {
 
       override def analysisMethod: AnalysisMethod =
@@ -141,6 +146,23 @@ object ObservingMode {
         Json.obj(
           ("instrument", a.instrument.asJson),
           ("params", Flamingos2SpectroscopyParams(a.disperser, a.fpu, a.filter).asJson)
+        )
+
+    case class Igrins2(portDisposition: PortDisposition) extends SpectroscopyMode derives Hash {
+      override def analysisMethod: AnalysisMethod =
+        ItcObservationDetails.AnalysisMethod.Aperture.Auto(
+          skyAperture = 5.0
+        )
+
+      val instrument: Instrument =
+        Instrument.Igrins2
+    }
+
+    object Igrins2:
+      given Encoder[Igrins2] = a =>
+        Json.obj(
+          ("instrument", a.instrument.asJson),
+          ("params", Igrins2SpectroscopyParams().asJson)
         )
 
   }
@@ -163,8 +185,9 @@ object ObservingMode {
     }
 
     case class GmosNorth(
-      filter:  GmosNorthFilter,
-      ccdMode: Option[GmosCcdMode]
+      filter:          GmosNorthFilter,
+      ccdMode:         Option[GmosCcdMode],
+      portDisposition: PortDisposition
     ) extends GmosImaging {
       val centralWavelength: Wavelength = Wavelength.Min // Ignored for imaging
 
@@ -181,8 +204,9 @@ object ObservingMode {
         )
 
     case class GmosSouth(
-      filter:  GmosSouthFilter,
-      ccdMode: Option[GmosCcdMode]
+      filter:          GmosSouthFilter,
+      ccdMode:         Option[GmosCcdMode],
+      portDisposition: PortDisposition
     ) extends GmosImaging {
       val centralWavelength: Wavelength = Wavelength.Min // Ignored for imaging
 
@@ -197,7 +221,10 @@ object ObservingMode {
           ("params", GmosSImagingParams(a.filter).asJson)
         )
 
-    case class Flamingos2(filter: Flamingos2Filter) extends ImagingMode {
+    case class Flamingos2(
+      filter:          Flamingos2Filter,
+      portDisposition: PortDisposition
+    ) extends ImagingMode {
       val instrument: Instrument = Instrument.Flamingos2
 
       def analysisMethod: ItcObservationDetails.AnalysisMethod =

@@ -8,7 +8,9 @@ import lucuma.core.math.Angle
 import lucuma.core.math.Offset
 import lucuma.core.math.Offset.P
 import lucuma.core.math.Offset.Q
+import lucuma.core.math.syntax.bigDecimal.*
 import lucuma.core.optics.Format
+import lucuma.core.syntax.string.*
 
 import scala.util.Try
 
@@ -21,9 +23,7 @@ trait SpatialOffsetsFormat:
     Format(
       s => Try {
         if (s.trim.isEmpty) List.empty[Q]
-        else s.split(",").toList.map { q =>
-          Q.signedDecimalArcseconds.reverseGet(BigDecimal(q))
-        }
+        else s.split(",").toList.flatMap(parseBigDecimalOption).map(_.qArcsec)
       }.toOption,
       _.map(q => Angle.signedDecimalArcseconds.get(q.toAngle).bigDecimal.toPlainString).intercalate(",")
     )
@@ -35,9 +35,7 @@ trait SpatialOffsetsFormat:
     Format(
       s => Try {
         if (s.trim.isEmpty) List.empty[P]
-        else s.split(",").toList.map { p =>
-          P.signedDecimalArcseconds.reverseGet(BigDecimal(p))
-        }
+        else s.split(",").toList.flatMap(parseBigDecimalOption).map(_.pArcsec)
       }.toOption,
       _.map(p => Angle.signedDecimalArcseconds.get(p.toAngle).bigDecimal.toPlainString).intercalate(",")
     )
@@ -51,12 +49,9 @@ trait SpatialOffsetsFormat:
       s => Try {
         if (s.trim.isEmpty) List.empty[Offset]
         else {
-          val values = s.split(",").toList.map(BigDecimal(_))
+          val values = s.split(",").toList.flatMap(parseBigDecimalOption)
           values.grouped(2).toList.collect {
-            case List(p, q) => Offset(
-              Offset.P.signedDecimalArcseconds.reverseGet(p),
-              Offset.Q.signedDecimalArcseconds.reverseGet(q)
-            )
+            case List(p, q) => Offset(p.pArcsec, q.qArcsec)
           }
         }
       }.toOption,

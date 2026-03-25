@@ -311,6 +311,51 @@ class obscalcUpdate extends ObscalcServiceSuiteSupport:
       )
     )
 
+  test("trigger for sequence replace"):
+    def replaceSequence(o: Observation.Id): IO[Json] =
+      query(
+        user  = pi,
+        query = s"""
+          mutation {
+            replaceGmosSouthSequence(input: {
+              observationId: "$o"
+              sequenceType: SCIENCE,
+              sequence: []
+            }) {
+              sequence { description }
+            }
+          }
+        """
+      )
+
+    setup.flatMap: (_, oid) =>
+      subscriptionExpect(
+        user      = pi,
+        query     = s"""
+          subscription {
+            obscalcUpdate {
+              oldCalculationState
+              newCalculationState
+              editType
+              value { id }
+            }
+          }
+        """,
+        mutations = replaceSequence(oid).asRight,
+        expected  = List(
+          Json.obj(
+            "obscalcUpdate" -> Json.obj(
+              "oldCalculationState" -> CalculationState.Pending.asJson,
+              "newCalculationState" -> CalculationState.Pending.asJson,
+              "editType" -> EditType.Updated.tag.toUpperCase.asJson,
+              "value" -> Json.obj(
+                "id" -> oid.asJson
+              )
+            )
+          )
+        )
+      )
+
   test("trigger for exposure time mode update"):
     def updateEtm(o: Observation.Id): IO[Json] =
       query(

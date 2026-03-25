@@ -55,8 +55,9 @@ object ItcMapping extends ItcCacheOrRemote with Version {
     Result(ItcVersions(version(environment).value, BuildInfo.ocslibHash.some)).pure[F]
 
   private val buildError: Throwable => Error =
-    case SourceTooBright(hw) => Error.SourceTooBright(hw)
-    case t                   => Error.General(s"Error calculating ITC: ${t.getMessage}")
+    case SourceTooBright(hw)      => Error.SourceTooBright(hw)
+    case WavelengthOutOfRange(wv) => Error.WavelengthAtOutOfRange(wv)
+    case t                        => Error.General(s"Error calculating ITC: ${t.getMessage}")
 
   private def errorToProblem(error: Error, targetIndex: Int): Problem =
     Problem(error.message, extensions = ErrorExtension(targetIndex, error).asJsonObject.some)
@@ -126,12 +127,12 @@ object ItcMapping extends ItcCacheOrRemote with Version {
                     .leftMap(buildError)
                     .map: (integrationTime: TargetIntegrationTime) =>
                       asterismRequest.imagingMode match
-                        case ObservingMode.ImagingMode.GmosNorth(_, _) |
-                            ObservingMode.ImagingMode.GmosSouth(_, _) =>
+                        case ObservingMode.ImagingMode.GmosNorth(_, _, _) |
+                            ObservingMode.ImagingMode.GmosSouth(_, _, _) =>
                           integrationTime
                             .focusIndex(1) // For gmos focus on the second CCD
                             .getOrElse(integrationTime)
-                        case ObservingMode.ImagingMode.Flamingos2(_) =>
+                        case ObservingMode.ImagingMode.Flamingos2(_, _) =>
                           integrationTime
       .flatMap: (targetOutcomes: NonEmptyChain[TargetIntegrationTimeOutcome]) =>
         Trace[F].span("build imaging_result"):

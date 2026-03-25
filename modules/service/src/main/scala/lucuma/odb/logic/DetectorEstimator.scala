@@ -4,7 +4,6 @@
 package lucuma.odb.logic
 
 import cats.syntax.either.*
-import eu.timepit.refined.types.numeric.NonNegInt
 import lucuma.core.enums.Flamingos2ReadMode
 import lucuma.core.enums.GmosNorthDetector
 import lucuma.core.enums.GmosSouthDetector
@@ -14,7 +13,10 @@ import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig
 import lucuma.core.model.sequence.flamingos2.Flamingos2StaticConfig
 import lucuma.core.model.sequence.gmos.DynamicConfig
 import lucuma.core.model.sequence.gmos.StaticConfig
+import lucuma.core.model.sequence.igrins2.Igrins2DynamicConfig
+import lucuma.core.model.sequence.igrins2.Igrins2StaticConfig
 import lucuma.odb.sequence.data.ProtoStep
+import lucuma.refined.*
 
 /**
  * Estimates the detector exposure, readout, and write times for the current
@@ -35,6 +37,15 @@ object DetectorEstimator {
     new Applied(ctx)
 
   class Applied private[DetectorEstimator] (private val ctx: TimeEstimateContext) {
+
+    extension (ig2: Igrins2DynamicConfig) {
+      def datasetEstimate: DatasetEstimate =
+        DatasetEstimate(
+          ig2.exposure,
+          ig2.readoutTime, // depends on exposure time
+          ctx.enums.TimeEstimate.Igrins2Write.time
+        )
+    }
 
     extension (f2: Flamingos2DynamicConfig) {
       def datasetEstimate: DatasetEstimate =
@@ -72,13 +83,23 @@ object DetectorEstimator {
         )
     }
 
+    lazy val igrins2: DetectorEstimator[Igrins2StaticConfig, Igrins2DynamicConfig] =
+      (_: Igrins2StaticConfig, step: ProtoStep[Igrins2DynamicConfig]) => List(
+        DetectorEstimate(
+          "Igrins2",
+          "IGRINS-2 Detector Array",
+          step.value.datasetEstimate,
+          1.refined
+        )
+      )
+
     lazy val flamingos2: DetectorEstimator[Flamingos2StaticConfig, Flamingos2DynamicConfig] =
       (_: Flamingos2StaticConfig, step: ProtoStep[Flamingos2DynamicConfig]) => List(
         DetectorEstimate(
           "Flamingos2",
           s"Flamingos 2 Detector Array",
           step.value.datasetEstimate,
-          NonNegInt.unsafeFrom(1)
+          1.refined
         )
       )
 
@@ -88,7 +109,7 @@ object DetectorEstimator {
           "GMOS North",
           s"GMOS North ${static.detector.shortName} Detector Array",
           step.value.datasetEstimate(static.detector),
-          NonNegInt.unsafeFrom(1)
+          1.refined
         )
       )
 
@@ -98,7 +119,7 @@ object DetectorEstimator {
           "GMOS South",
           s"GMOS South ${static.detector.shortName} Detector Array",
           step.value.datasetEstimate(static.detector),
-          NonNegInt.unsafeFrom(1)
+          1.refined
         )
       )
 

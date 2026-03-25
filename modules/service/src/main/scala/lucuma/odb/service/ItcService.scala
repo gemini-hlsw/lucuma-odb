@@ -41,6 +41,7 @@ import lucuma.itc.client.ClientCalculationResult
 import lucuma.itc.client.ImagingInput
 import lucuma.itc.client.InstrumentMode
 import lucuma.itc.client.ItcClient
+import lucuma.itc.client.SpectroscopyInput
 import lucuma.odb.data.Itc
 import lucuma.odb.data.Md5Hash
 import lucuma.odb.data.OdbError
@@ -284,11 +285,11 @@ object ItcService {
                 toTargetResults(targets, NonEmptyList.one(modifiedCcr)).map(_.head)
 
         input.mode match
-          case InstrumentMode.GmosNorthImaging(_, _) |
-               InstrumentMode.GmosSouthImaging(_, _) =>
+          case InstrumentMode.GmosNorthImaging(_, _, _) |
+               InstrumentMode.GmosSouthImaging(_, _, _) =>
             go(lucuma.odb.sequence.gmos.MinAcquisitionExposureTime,
                lucuma.odb.sequence.gmos.MaxAcquisitionExposureTime)
-          case InstrumentMode.Flamingos2Imaging(_)   =>
+          case InstrumentMode.Flamingos2Imaging(_, _)   =>
             go(lucuma.odb.sequence.flamingos2.MinAcquisitionExposureTime,
                lucuma.odb.sequence.flamingos2.MaxAcquisitionExposureTime)
           case m                                                      =>
@@ -325,14 +326,14 @@ object ItcService {
       object Imaging:
         case object GmosNorthImaging extends Imaging[GmosNorthFilter]:
           override def pf: PartialFunction[InstrumentMode, GmosNorthFilter] = {
-            case InstrumentMode.GmosNorthImaging(f, _) => f
+            case InstrumentMode.GmosNorthImaging(f, _, _) => f
           }
           override def wrap(nem: NonEmptyMap[GmosNorthFilter, Zipper[Itc.Result]]): Itc =
             Itc.GmosNorthImaging(nem)
 
         case object GmosSouthImaging extends Imaging[GmosSouthFilter]:
           override def pf: PartialFunction[InstrumentMode, GmosSouthFilter] = {
-            case InstrumentMode.GmosSouthImaging(f, _) => f
+            case InstrumentMode.GmosSouthImaging(f, _, _) => f
           }
           override def wrap(nem: NonEmptyMap[GmosSouthFilter, Zipper[Itc.Result]]): Itc =
             Itc.GmosSouthImaging(nem)
@@ -376,12 +377,20 @@ object ItcService {
         input: ItcInput
       )(using NoTransaction[F]): F[Either[OdbError, Itc]] =
 
+        def callSpectroscopy(si: SpectroscopyInput): EitherT[F, OdbError, ClientCalculationResult] =
+          EitherT:
+            client
+              .spectroscopy(si, useCache = false)
+              .map(_.asRight)
+              .handleError: t =>
+                OdbError.RemoteServiceCallError(s"Error calling ITC service: ${t.getMessage}".some).asLeft
+
         def imaging(im: ItcInput.Imaging): EitherT[F, OdbError, Itc] =
           im.science.head.mode match
-            case InstrumentMode.GmosNorthImaging(_, _) =>
+            case InstrumentMode.GmosNorthImaging(_, _, _) =>
               callRemoteImagingItc(oid, im, Imaging.GmosNorthImaging)
 
-            case InstrumentMode.GmosSouthImaging(_, _) =>
+            case InstrumentMode.GmosSouthImaging(_, _, _) =>
               callRemoteImagingItc(oid, im, Imaging.GmosSouthImaging)
 
             case m                                     =>
@@ -389,23 +398,22 @@ object ItcService {
                 OdbError.InvalidObservation(oid, s"Imaging ITC lookup is not supported for ${m.displayName}.".some)
 
         def spectroscopy(sp: ItcInput.Spectroscopy): EitherT[F, OdbError, Itc] =
-          val callSpectroscopy: EitherT[F, OdbError, ClientCalculationResult] =
-            EitherT:
-              client
-                .spectroscopy(sp.scienceInput, useCache = false)
-                .map(_.asRight)
-                .handleError: t =>
-                  OdbError.RemoteServiceCallError(s"Error calling ITC service: ${t.getMessage}".some).asLeft
-
           for
-            acq <- safeAcquisitionCall(oid, sp.acquisitionInput, sp.acquisitionTargets)
-            cr  <- callSpectroscopy
+            cr  <- callSpectroscopy(sp.scienceInput)
             sci <- EitherT.fromEither(toTargetResults(sp.targets, NonEmptyList.one(cr)).map(_.head))
+            acq <- safeAcquisitionCall(oid, sp.acquisitionInput, sp.acquisitionTargets)
           yield Itc.Spectroscopy(acq, sci)
 
+        def igrins2Spectroscopy(sp: ItcInput.Igrins2Spectroscopy): EitherT[F, OdbError, Itc] =
+          for
+            cr  <- callSpectroscopy(sp.scienceInput)
+            sci <- EitherT.fromEither(toTargetResults(sp.targets, NonEmptyList.one(cr)).map(_.head))
+          yield Itc.Igrins2Spectroscopy(sci)
+
         (input match
-          case im @ ItcInput.Imaging(science, _)      => imaging(im)
-          case sp @ ItcInput.Spectroscopy(_, _, _, _) => spectroscopy(sp)
+          case im @ ItcInput.Imaging(_, _)             => imaging(im)
+          case sp @ ItcInput.Spectroscopy(_, _, _, _)  => spectroscopy(sp)
+          case ig @ ItcInput.Igrins2Spectroscopy(_, _) => igrins2Spectroscopy(ig)
         ).value
 
       @annotation.nowarn("msg=unused implicit parameter")

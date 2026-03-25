@@ -9,9 +9,11 @@ import cats.data.State
 import cats.syntax.option.*
 import cats.syntax.traverse.*
 import eu.timepit.refined.types.string.NonEmptyString
+import fs2.Stream
 import lucuma.core.enums.SequenceType
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.Step
+import lucuma.odb.sequence.data.ProtoAtom
 import lucuma.odb.sequence.data.ProtoStep
 
 import java.util.UUID
@@ -28,36 +30,31 @@ trait AtomBuilder[D]:
     aix:   Int,
     six:   Int,
     steps: NonEmptyList[ProtoStep[D]],
-  ): State[TimeEstimateCalculator.Last[D], Atom[D]]
-
-  def build(
-    desc:    String,
-    tracker: IndexTracker,
-    steps:   NonEmptyList[ProtoStep[D]]
-  ): State[TimeEstimateCalculator.Last[D], Atom[D]] =
-    build(NonEmptyString.from(desc).toOption, tracker.atomCount, tracker.stepCount, steps)
+  ): State[StepTimeEstimateCalculator.Last[D], Atom[D]]
 
   def buildOption(
     desc:  Option[NonEmptyString],
     aix:   Int,
     six:   Int,
     steps: List[ProtoStep[D]]
-  ): State[TimeEstimateCalculator.Last[D], Option[Atom[D]]] =
+  ): State[StepTimeEstimateCalculator.Last[D], Option[Atom[D]]] =
     NonEmptyList.fromList(steps) match
       case None      => State.pure(None)
       case Some(nel) => build(desc, aix, six, nel).map(_.some)
 
-  def buildOption(
-    desc:    String,
-    tracker: IndexTracker,
-    steps:   List[ProtoStep[D]]
-  ): State[TimeEstimateCalculator.Last[D], Option[Atom[D]]] =
-    buildOption(NonEmptyString.from(desc).toOption, tracker.atomCount, tracker.stepCount, steps)
+  def buildStream[F[_]](
+    s: Stream[F, ProtoAtom[ProtoStep[D]]]
+  ): Stream[F, Atom[D]] =
+    s.zipWithIndex
+     .mapAccumulate(StepTimeEstimateCalculator.Last.empty[D]) { case (state, (protoAtom, idx)) =>
+       build(protoAtom.description, idx.toInt, 0, protoAtom.steps).run(state).value
+     }
+     .map(_._2)
 
 object AtomBuilder:
 
   def instantiate[S, D](
-    estimator:    TimeEstimateCalculator[S, D],
+    estimator:    StepTimeEstimateCalculator[S, D],
     static:       S,
     namespace:    UUID,
     sequenceType: SequenceType
@@ -70,8 +67,8 @@ object AtomBuilder:
         aix:       Int,
         six:       Int,
         steps:     NonEmptyList[ProtoStep[D]]
-      ): State[TimeEstimateCalculator.Last[D], Atom[D]] =
-        State { (calcState: TimeEstimateCalculator.Last[D]) =>
+      ): State[StepTimeEstimateCalculator.Last[D], Atom[D]] =
+        State { (calcState: StepTimeEstimateCalculator.Last[D]) =>
           steps.mapAccumulate(calcState) { (e, s) =>
             val estimate = estimator.estimateStep(static, e, s)
             (e.next(s), estimate)
@@ -94,3 +91,4 @@ object AtomBuilder:
               )
             }
           )
+

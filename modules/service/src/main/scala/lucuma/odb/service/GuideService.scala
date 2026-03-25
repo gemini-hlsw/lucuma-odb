@@ -21,6 +21,7 @@ import io.circe.refined.given
 import io.circe.syntax.*
 import lucuma.ags
 import lucuma.ags.*
+import lucuma.ags.DefaultAreaBuffer
 import lucuma.ags.syntax.*
 import lucuma.catalog.clients.GaiaClient
 import lucuma.catalog.votable.*
@@ -32,7 +33,6 @@ import lucuma.core.enums.PortDisposition
 import lucuma.core.enums.Site
 import lucuma.core.enums.TrackType
 import lucuma.core.geom.ShapeExpression
-import lucuma.core.geom.gmos.candidatesArea
 import lucuma.core.geom.jts.interpreter.given
 import lucuma.core.math.Angle
 import lucuma.core.math.Coordinates
@@ -67,10 +67,10 @@ import lucuma.odb.graphql.input.SetGuideTargetNameInput
 import lucuma.odb.graphql.mapping.AccessControl
 import lucuma.odb.json.all.query.given
 import lucuma.odb.json.target
-import lucuma.odb.logic.Generator
 import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.sequence.flamingos2
 import lucuma.odb.sequence.gmos
+import lucuma.odb.sequence.igrins2
 import lucuma.odb.sequence.syntax.hash.*
 import lucuma.odb.sequence.util.HashBytes
 import lucuma.odb.service.Services.SuperUserAccess
@@ -280,20 +280,21 @@ object GuideService {
     val acqOffsets   = NonEmptySet.fromSet(digest.acquisition.telescopeConfigs).flatMap(_.asAcqOffsets)
     val sciOffsets   = NonEmptySet.fromSet(digest.science.telescopeConfigs).flatMap(_.asSciOffsets)
 
-    val (site, observingModeType, centralWavelength): (Site, ObservingModeType, Wavelength) =
+    val (site, observingModeType, agsWavelength): (Site, ObservingModeType, Wavelength) =
       params.observingMode match
         case mode: gmos.longslit.Config.GmosNorth =>
           (Site.GN, ObservingModeType.GmosNorthLongSlit, mode.centralWavelength)
         case mode: gmos.longslit.Config.GmosSouth =>
           (Site.GS, ObservingModeType.GmosSouthLongSlit, mode.centralWavelength)
-        case _: gmos.imaging.Config.GmosNorth =>
-          // GMOS imaging doesn't use an FPU or central wavelength; use a default wavelength for AGS
-          (Site.GN, ObservingModeType.GmosNorthImaging, Wavelength.fromIntNanometers(500).get)
-        case _: gmos.imaging.Config.GmosSouth =>
-          // GMOS imaging doesn't use an FPU or central wavelength; use a default wavelength for AGS
-          (Site.GS, ObservingModeType.GmosSouthImaging, Wavelength.fromIntNanometers(500).get)
+        case gmos.imaging.Config.GmosNorth(filters = filters) =>
+          (Site.GN, ObservingModeType.GmosNorthImaging, filters.map(_.filter.wavelength).maximum)
+        case gmos.imaging.Config.GmosSouth(filters = filters) =>
+          (Site.GS, ObservingModeType.GmosSouthImaging, filters.map(_.filter.wavelength).maximum)
         case mode: flamingos2.longslit.Config =>
           (Site.GS, ObservingModeType.Flamingos2LongSlit, mode.filter.wavelength)
+        case _: igrins2.longslit.Config =>
+          // TODO Verify what wavelength to use for ags
+          (Site.GS, ObservingModeType.Igrins2LongSlit, Wavelength.fromIntNanometers(1700).get)
 
     def agsParamsFor(trackType: TrackType): Option[AgsParams] =
       probes.guideProbe(observingModeType, trackType).flatMap: probe =>
@@ -316,6 +317,12 @@ object GuideService {
             AgsParams.Flamingos2LongSlit(Flamingos2LyotWheel.F16, Flamingos2FpuMask.Builtin(fpu), PortDisposition.Side).withPWFS1.some
           case (flamingos2.longslit.Config(fpu = fpu), GuideProbe.PWFS2) =>
             AgsParams.Flamingos2LongSlit(Flamingos2LyotWheel.F16, Flamingos2FpuMask.Builtin(fpu), PortDisposition.Side).withPWFS2.some
+          case (_: gmos.imaging.Config.GmosNorth | _: gmos.imaging.Config.GmosSouth, GuideProbe.GmosOIWFS) =>
+            AgsParams.GmosImaging(PortDisposition.Side).some
+          case (_: gmos.imaging.Config.GmosNorth | _: gmos.imaging.Config.GmosSouth, GuideProbe.PWFS1) =>
+            AgsParams.GmosImaging(PortDisposition.Side).withPWFS1.some
+          case (_: gmos.imaging.Config.GmosNorth | _: gmos.imaging.Config.GmosSouth, GuideProbe.PWFS2) =>
+            AgsParams.GmosImaging(PortDisposition.Side).withPWFS2.some
           case _ =>
             none
 
@@ -450,7 +457,7 @@ object GuideService {
         start:           Timestamp,
         end:             Timestamp,
         tracking:        Tracking,
-        shapeConstraint: ShapeExpression,
+        probe:           GuideProbe,
         wavelength:      Wavelength,
         constraints:     ConstraintSet
       ): Result[ADQLQuery] =
@@ -462,8 +469,9 @@ object GuideService {
             // Make a query based on two coordinates of the base of an asterism over a year
             CoordinatesRangeQueryByADQL(
               NonEmptyList.of(a, b),
-              shapeConstraint,
-              brightnessConstraints.some
+              probe.candidatesArea,
+              brightnessConstraints.some,
+              areaBuffer = DefaultAreaBuffer
             )
           }
           .toResult(
@@ -474,8 +482,11 @@ object GuideService {
         query: ADQLQuery
       ): F[Result[List[(Target.Sidereal, GuideStarCandidate)]]] =
         Trace[F].span("callGaia"):
-          val MaxTargets                     = 100
-          given ADQLInterpreter          = ADQLInterpreter.nTarget(MaxTargets)
+
+          val MaxTargets = 1000
+
+          given ADQLInterpreter = ADQLInterpreter.nTarget(MaxTargets)
+
           gaiaClient
             .query(query)
             .map:
@@ -490,11 +501,12 @@ object GuideService {
         end:         Timestamp,
         tracking:    Tracking,
         wavelength:  Wavelength,
+        probe:       GuideProbe,
         constraints: ConstraintSet
       ): F[Result[List[(Target.Sidereal, GuideStarCandidate)]]] =
         (for {
           query      <- ResultT.fromResult(
-                          getGaiaQuery(oid, start, end, tracking, candidatesArea.candidatesArea, wavelength, constraints)
+                          getGaiaQuery(oid, start, end, tracking, probe, wavelength, constraints)
                         )
           candidates <- ResultT(callGaia(query))
         } yield candidates).value
@@ -505,10 +517,11 @@ object GuideService {
         end:         Timestamp,
         tracking:    Tracking,
         wavelength:  Wavelength,
+        probe:       GuideProbe,
         constraints: ConstraintSet
       ): F[Result[NonEmptyList[(Target.Sidereal, GuideStarCandidate)]]] =
         (for {
-          candidates <- ResultT(getAllCandidates(oid, start, end, tracking, wavelength, constraints))
+          candidates <- ResultT(getAllCandidates(oid, start, end, tracking, wavelength, probe, constraints))
           nel        <- ResultT.fromResult(
                           NonEmptyList.fromList(candidates)
                             .toResult(generalError("No potential guidestars found on Gaia.").asProblem)
@@ -598,12 +611,11 @@ object GuideService {
             GuideEnvironment(usable.posAngle, List(GuideTarget(usable.guideProbe, target)))
 
       def getGeneratorInfo(
-        pid: Program.Id,
         oid: Observation.Id
       ): F[Result[GeneratorInfo]] =
         Services.asSuperUser:
           generator
-            .digestWithParamsAndHash(pid, oid)
+            .digestWithParamsAndHash(oid)
             .map:
               case Right((d, p, h)) => GeneratorInfo(d, p, h).success
               case Left(ge)         => generatorError(ge).asFailure
@@ -679,13 +691,17 @@ object GuideService {
                            tracking match
                               case None    => Result.success(Nil).pure[F]
                               case Some(t) =>
-                                getAllCandidates(
-                                  obsInfo.id,
-                                  candPeriod.start,
-                                  candPeriod.end, t.base,
-                                  genInfo.centralWavelength,
-                                  obsInfo.constraints
-                                )
+                                val trackType = CompositeTracking(t.asterism.map(_._2)).trackType
+                                genInfo.agsParamsFor(trackType).map: agsParams =>
+                                  getAllCandidates(
+                                    obsInfo.id,
+                                    candPeriod.start,
+                                    candPeriod.end, t.base,
+                                    genInfo.agsWavelength,
+                                    agsParams.probe,
+                                    obsInfo.constraints
+                                  )
+                                .getOrElse(Result.success(List.empty[(Target.Sidereal, GuideStarCandidate)]).pure[F])
           neededLists  <- ResultT.fromResult:
                             neededPeriods.traverse: p =>
                               tracking match
@@ -695,7 +711,7 @@ object GuideService {
                                     p,
                                     obsInfo,
                                     genInfo,
-                                    genInfo.centralWavelength,
+                                    genInfo.agsWavelength,
                                     t.asterism.map(_._2),
                                     t.base,
                                     blindOffset,
@@ -878,9 +894,14 @@ object GuideService {
           baseTracking     = tracking.base
           asterismTracking = tracking.asterism.map(_._2) // discard the target ids
 
+          trackType      = CompositeTracking(asterismTracking).trackType
+          agsParams     <- ResultT.fromResult(
+                             genInfo.agsParamsFor(trackType)
+                               .toResult(generalError("No guide probe available for this observing mode.").asProblem)
+                           )
           original      <- ResultT(
                              oGuideStarName.fold(
-                              getAllCandidatesNonEmpty(oid, obsTime, visitEnd, baseTracking, genInfo.centralWavelength, obsInfo.constraints)
+                              getAllCandidatesNonEmpty(oid, obsTime, visitEnd, baseTracking, genInfo.agsWavelength, agsParams.probe, obsInfo.constraints)
                              )(gsn => getGuideStarFromGaia(gsn).map(_.map(NonEmptyList.one)))
                            )
           candidates     = original.map(_._2.at(obsTime.toInstant)) // PM corrected
@@ -907,8 +928,7 @@ object GuideService {
                               .toResult(generalError(s"No angles to test for guide target candidates for observation $oid.").asProblem)
                            )
           blindOffsetOpt <- ResultT.liftF(getBlindOffsetCoordinates(oid, obsTime.toInstant))
-          trackType      = CompositeTracking(asterismTracking).trackType
-          optUsable      = chooseBestGuideStar(obsInfo, genInfo.centralWavelength, genInfo, baseCoords, scienceCoords, blindOffsetOpt, angles, candidates, trackType)
+          optUsable      = chooseBestGuideStar(obsInfo, genInfo.agsWavelength, genInfo, baseCoords, scienceCoords, blindOffsetOpt, angles, candidates, trackType)
           tgts           = original.map(x => (x._2.id, x._1)).toList.toMap
           env            <- ResultT.fromResult(
                              optUsable
@@ -931,7 +951,7 @@ object GuideService {
             obsTime         <- ResultT.fromResult(obsInfo.obsTime)
             obsDuration     <- ResultT.fromResult(obsInfo.obsDuration)
             asterism        <- ResultT(getAsterism(pid, oid))
-            genInfo         <- ResultT(getGeneratorInfo(pid, oid))
+            genInfo         <- ResultT(getGeneratorInfo(oid))
             scienceDuration <- ResultT.fromResult(genInfo.getScienceDuration(obsDuration, oid))
             scienceStart     = genInfo.getScienceStartTime(obsTime)
             oGSName          = obsInfo.validGuideStarName(genInfo.hash)
@@ -943,7 +963,7 @@ object GuideService {
       ): F[Result[Option[NonEmptyString]]] =
         (for {
           obsInfo    <- ResultT(getObservationInfo(oid))
-          genInfo    <- ResultT.liftF(getGeneratorInfo(pid, oid)).map(_.toOption)
+          genInfo    <- ResultT.liftF(getGeneratorInfo(oid)).map(_.toOption)
           oGSName    <- ResultT.pure(
                           genInfo.flatMap{ gi =>
                             obsInfo.validGuideStarName(gi.hash)
@@ -957,7 +977,7 @@ object GuideService {
       ): F[Result[List[GuideEnvironment]]] =
         (for {
           obsInfo       <- ResultT(getObservationInfo(oid))
-          genInfo       <- ResultT(getGeneratorInfo(pid, oid))
+          genInfo       <- ResultT(getGeneratorInfo(oid))
 
           tracking      <- ResultT(trackingService.getTrackingSnapshot(oid, TimestampInterval.empty(obsTime), false))
           baseTracking     = tracking.base // use explicit base if defined
@@ -968,7 +988,12 @@ object GuideService {
                                .plusMicrosOption(genInfo.timeEstimate.toMicroseconds)
                                .toResult(generalError("Visit end time out of range").asProblem)
                            )
-          original <- ResultT(getAllCandidates(oid, obsTime, visitEnd, baseTracking, genInfo.centralWavelength, obsInfo.constraints))
+          trackType = CompositeTracking(asterismTracking).trackType
+          agsParams     <- ResultT.fromResult(
+                             genInfo.agsParamsFor(trackType)
+                               .toResult(generalError("No guide probe available for this observing mode.").asProblem)
+                           )
+          original <- ResultT(getAllCandidates(oid, obsTime, visitEnd, baseTracking, genInfo.agsWavelength, agsParams.probe, obsInfo.constraints))
           originals      = original.map(c => c._2.id -> c._1).toMap
           candidates     = original.map(_._2.at(obsTime.toInstant))
           baseCoords    <- ResultT.fromResult(
@@ -992,8 +1017,7 @@ object GuideService {
                               .toResult(generalError(s"No angles to test for guide target candidates for observation $oid.").asProblem)
                            )
           blindOffsetOpt <- ResultT.liftF(getBlindOffsetCoordinates(oid, obsTime.toInstant))
-          trackType      = CompositeTracking(asterismTracking).trackType
-          usable         = processCandidates(obsInfo, genInfo.centralWavelength, genInfo, baseCoords, scienceCoords, blindOffsetOpt, angles, candidates, trackType)
+          usable         = processCandidates(obsInfo, genInfo.agsWavelength, genInfo, baseCoords, scienceCoords, blindOffsetOpt, angles, candidates, trackType)
         } yield usable.toGuideEnvironments(originals).toList).value
 
       override def getGuideAvailability(pid: Program.Id, oid: Observation.Id, period: TimestampInterval)(
@@ -1008,7 +1032,7 @@ object GuideService {
                               ).asFailure
                             )
             obsInfo       <- ResultT(getObservationInfo(oid))
-            genInfo       <- ResultT(getGeneratorInfo(pid, oid))
+            genInfo       <- ResultT(getGeneratorInfo(oid))
             blindOffset   <- ResultT.liftF(getBlindOffsetCoordinates(oid, period.start.toInstant))
             newHash        = obsInfo.availabilityHash(genInfo.hash)
             currentAvail  <- ResultT.liftF(getFromCacheOrEmpty(pid, oid, newHash))
@@ -1030,7 +1054,7 @@ object GuideService {
             gsn    <- ResultT.fromResult(
                         GuideStarName.from(name.value).toOption.toResult(guideStarNameError(name.value).asProblem)
                       )
-            genInfo  <- ResultT(getGeneratorInfo(obsInfo.programId, obsInfo.id))
+            genInfo  <- ResultT(getGeneratorInfo(obsInfo.id))
             hash      = obsInfo.newGuideStarHash(genInfo.hash)
             result   <- ResultT(updateGuideTargetName(obsInfo.programId, obsInfo.id, gsn.some, hash.some))
           } yield result).value

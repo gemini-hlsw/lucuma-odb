@@ -76,7 +76,7 @@ class programPlannedTime extends ExecutionTestSupportForGmos:
     "10.0".sec    // writeout
 
   val BaseTime =
-    "960.0".sec +                                // full setup
+    ("960.0".sec * 2) +                          // full setup (2 times)
     ("15.0".sec + "52.1".sec + "57.1".sec) * 3 + // (science fold + arc + flat)
     "15".sec * 3 +                               // calibration -> science, 3 wavelength blocks
     OneDataset * 18                              // 6 steps per 3 wavelength blocks
