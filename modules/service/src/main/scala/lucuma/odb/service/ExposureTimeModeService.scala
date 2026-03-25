@@ -32,9 +32,9 @@ import skunk.implicits.*
 sealed trait ExposureTimeModeService[F[_]]:
 
   def select(
-    oids: List[Observation.Id],
-    role: ExposureTimeModeRole
-  )(using Transaction[F]): F[Map[Observation.Id, NonEmptyList[ExposureTimeMode]]]
+    oids:  List[Observation.Id],
+    roles: ExposureTimeModeRole*
+  )(using Transaction[F]): F[Map[Observation.Id, Map[ExposureTimeModeRole, NonEmptyList[ExposureTimeMode]]]]
 
   def selectRequirement(
     oids: List[Observation.Id]
@@ -163,25 +163,35 @@ object ExposureTimeModeService:
     new ExposureTimeModeService[F]:
 
       override def select(
-        oids: List[Observation.Id],
-        role: ExposureTimeModeRole
-      )(using Transaction[F]): F[Map[Observation.Id, NonEmptyList[ExposureTimeMode]]] =
-        val af = Statements.Select(oids, role)
-        session.prepareR(af.fragment.query(observation_id *: exposure_time_mode)).use: pq =>
+        oids:  List[Observation.Id],
+        roles: ExposureTimeModeRole*
+      )(using Transaction[F]): F[Map[Observation.Id, Map[ExposureTimeModeRole, NonEmptyList[ExposureTimeMode]]]] =
+        val af = Statements.Select(oids, roles.toList)
+
+        session.prepareR(af.fragment.query(observation_id *: exposure_time_mode_role *: exposure_time_mode)).use: pq =>
           pq.stream(af.argument, chunkSize = 1024)
             .compile
             .toList
             .map: lst =>
-              lst.groupMap(_._1)(_._2)
+              lst.groupMap(_._1)(t => (t._2, t._3))
                  .view
-                 .mapValues(NonEmptyList.fromListUnsafe)
+                 .mapValues: entries =>
+                   entries.groupMap(_._1)(_._2)
+                     .view
+                     .mapValues(NonEmptyList.fromList)
+                     .collect:
+                        case (a, Some(b)) => (a, b)
+                     .toMap
                  .toMap
 
       override def selectRequirement(
         oids: List[Observation.Id]
       )(using Transaction[F]): F[Map[Observation.Id, ExposureTimeMode]] =
         select(oids, ExposureTimeModeRole.Requirement)
-          .map(_.view.mapValues(_.head).toMap)
+          .map:
+            _.collect:
+              case (oid, roles) if roles.contains(ExposureTimeModeRole.Requirement) =>
+                oid -> roles(ExposureTimeModeRole.Requirement).head
 
       override def insertOne(
         oid:  Observation.Id,
@@ -347,12 +357,13 @@ object ExposureTimeModeService:
   object Statements:
 
     def Select(
-      oids: List[Observation.Id],
-      role: ExposureTimeModeRole,
+      oids:  List[Observation.Id],
+      roles: List[ExposureTimeModeRole],
     ): AppliedFragment =
       sql"""
         SELECT
           c_observation_id,
+          c_role,
           c_exposure_time_mode,
           c_signal_to_noise_at,
           c_signal_to_noise,
@@ -360,8 +371,8 @@ object ExposureTimeModeService:
           c_exposure_count
         FROM t_exposure_time_mode
         WHERE c_observation_id IN ${observation_id.list(oids.length).values}
-        AND c_role = $exposure_time_mode_role
-      """.apply(oids.toList, role)
+        AND c_role IN ${exposure_time_mode_role.list(roles.length).values}
+      """.apply(oids.toList, roles)
 
     val Insert: Query[(Observation.Id, ExposureTimeModeRole, ExposureTimeMode), ExposureTimeModeId] =
       sql"""
