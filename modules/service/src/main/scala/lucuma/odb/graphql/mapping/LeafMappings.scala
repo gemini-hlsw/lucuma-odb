@@ -125,6 +125,8 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[GcalDiffuser](GcalDiffuserType),
       LeafMapping[GcalFilter](GcalFilterType),
       LeafMapping[GcalShutter](GcalShutterType),
+      LeafMapping[GhostBinning](GhostBinningType),
+      LeafMapping[GhostResolutionMode](GhostResolutionModeType),
       LeafMapping[GmosAmpCount](GmosAmpCountType),
       LeafMapping[GmosAmpGain](GmosAmpGainType),
       LeafMapping[GmosAmpReadMode](GmosAmpReadModeType),

@@ -27,11 +27,16 @@ class spectroscopyConfigOptions extends OdbSuite {
   val validUsers = List(pi)
 
 
-  override def dbInitialization: Option[Session[IO] => IO[Unit]] = Some { s =>
-    // Add a F2 option
-    (s.execute(sql"insert into t_spectroscopy_config_option values('Flamingos2', 1, 'R3K + H + 0.36\"', 'single_slit', 'Long Slit 8px', 144000, 263000000, 'R3000', 'H', 1486000, 1775000, 1630500, 289000, 700, false, NULL, 'gs')".command) *>
-      s.execute(sql"insert into t_spectroscopy_config_option_f2 values('Flamingos2', 1, 'LongSlit_8', 'R3000', 'H')".command)).void
-  }
+  override def dbInitialization: Option[Session[IO] => IO[Unit]] =
+    Some(s =>
+      // Add a Ghost and F2 options
+      (
+        s.execute(sql"insert into t_spectroscopy_config_option values('Ghost', 1, 'SR-IFU 1x1', 'ifu', 'SR-IFU', 1200000, 1200000, 'echelle', NULL, 347000, 1060000, 703500, 713000, 56000, false, NULL, 'gs')".command) *>
+        s.execute(sql"insert into t_spectroscopy_config_option values('Flamingos2', 1, 'R3K + H + 0.36\"', 'single_slit', 'Long Slit 8px', 144000, 263000000, 'R3000', 'H', 1486000, 1775000, 1630500, 289000, 700, false, NULL, 'gs')".command) *>
+        s.execute(sql"insert into t_spectroscopy_config_option_ghost values('Ghost', 1, 'one_by_one', 'standard')".command) *>
+        s.execute(sql"insert into t_spectroscopy_config_option_f2 values('Flamingos2', 1, 'LongSlit_8', 'R3000', 'H')".command)
+      ).void
+    )
 
   case class ConfigOption(
     name:               String,
@@ -301,6 +306,7 @@ class spectroscopyConfigOptions extends OdbSuite {
           spectroscopyConfigOptions(
             WHERE: {
               rangeIncludes: { micrometers: 0.35 }
+              focalPlane: { EQ: SINGLE_SLIT }
             }
           ) {
             name
@@ -452,6 +458,76 @@ class spectroscopyConfigOptions extends OdbSuite {
     )
   }
 
+  test("Flamingos2") {
+    expect(
+      user = pi,
+      query = s"""
+        query {
+          spectroscopyConfigOptions(
+            WHERE: {
+              instrument: { EQ: FLAMINGOS2 }
+            }
+          ) {
+            name
+            flamingos2 {
+              fpu
+              disperser
+              filter
+            }
+          }
+        }
+      """,
+      expected = json"""
+        {
+          "spectroscopyConfigOptions": [
+            {
+              "name" : "R3K + H + 0.36\\\"",
+              "flamingos2": {
+                "fpu": "LONG_SLIT_8",
+                "disperser": "R3000",
+                "filter": "H"
+              }
+            }
+          ]
+        }
+      """.asRight
+    )
+  }
+//              focalPlane: { EQ: IFU }
+
+  test("Ghost"):
+    expect(
+      user  = pi,
+      query = s"""
+        query {
+          spectroscopyConfigOptions(
+            WHERE: {
+              instrument: { EQ: GHOST }
+            }
+          ) {
+            name
+            ghost {
+              binning
+              resolutionMode
+            }
+          }
+        }
+      """,
+      expected = json"""
+        {
+          "spectroscopyConfigOptions": [
+            {
+              "name": "SR-IFU 1x1",
+              "ghost": {
+                "binning": "ONE_BY_ONE",
+                "resolutionMode": "STANDARD"
+              }
+            }
+          ]
+        }
+      """.asRight
+    )
+
   test("GmosNorth") {
     expect(
       user = pi,
@@ -536,39 +612,4 @@ class spectroscopyConfigOptions extends OdbSuite {
     )
   }
 
-  test("Flamingos2") {
-    expect(
-      user = pi,
-      query = s"""
-        query {
-          spectroscopyConfigOptions(
-            WHERE: {
-              instrument: { EQ: FLAMINGOS2 }
-            }
-          ) {
-            name
-            flamingos2 {
-              fpu
-              disperser
-              filter
-            }
-          }
-        }
-      """,
-      expected = json"""
-        {
-          "spectroscopyConfigOptions": [
-            {
-              "name" : "R3K + H + 0.36\\\"",
-              "flamingos2": {
-                "fpu": "LONG_SLIT_8",
-                "disperser": "R3000",
-                "filter": "H"
-              }
-            }
-          ]
-        }
-      """.asRight
-    )
-  }
 }

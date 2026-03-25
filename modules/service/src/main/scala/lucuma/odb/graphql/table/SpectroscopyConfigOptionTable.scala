@@ -6,12 +6,13 @@ package table
 
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.Flamingos2Codecs.*
+import lucuma.odb.util.GhostCodecs.*
 import lucuma.odb.util.GmosCodecs.*
 import skunk.codec.boolean.bool
 
-trait SpectroscopyConfigOptionTable[F[_]] extends BaseMapping[F] {
+trait SpectroscopyConfigOptionTable[F[_]] extends BaseMapping[F]:
 
-  object SpectroscopyConfigOptionTable extends TableDef("t_spectroscopy_config_option") {
+  object SpectroscopyConfigOptionTable extends TableDef("t_spectroscopy_config_option"):
     val Instrument         = col("c_instrument",  instrument)
     val Index              = col("c_index",       int4_pos)
 
@@ -35,33 +36,33 @@ trait SpectroscopyConfigOptionTable[F[_]] extends BaseMapping[F] {
     val Capability         = col("c_capability", spectroscopy_capabilities.opt)
 
     val Site               = col("c_site",       site)
-  }
 
-  object SpectroscopyConfigOptionGmosNorthTable extends TableDef("t_spectroscopy_config_option_gmos_north") {
-    val Instrument = col("c_instrument",  instrument)
-    val Index      = col("c_index",       int4_pos)
-
-    val Fpu        = col("c_fpu",     gmos_north_fpu)
-    val Grating    = col("c_grating", gmos_north_grating)
-    val Filter     = col("c_filter",  gmos_north_filter.opt)
-  }
-
-  object SpectroscopyConfigOptionGmosSouthTable extends TableDef("t_spectroscopy_config_option_gmos_south") {
-    val Instrument = col("c_instrument",  instrument)
-    val Index      = col("c_index",       int4_pos)
-
-    val Fpu        = col("c_fpu",     gmos_south_fpu)
-    val Grating    = col("c_grating", gmos_south_grating)
-    val Filter     = col("c_filter",  gmos_south_filter.opt)
-  }
-
-  object SpectroscopyConfigOptionFlamingos2Table extends TableDef("t_spectroscopy_config_option_f2") {
+  object SpectroscopyConfigOptionFlamingos2Table extends TableDef("t_spectroscopy_config_option_f2"):
     val Instrument = col("c_instrument",  instrument)
     val Index      = col("c_index",       int4_pos)
 
     val Fpu        = col("c_fpu",       flamingos_2_fpu)
     val Disperser  = col("c_disperser", flamingos_2_disperser)
     val Filter     = col("c_filter",    flamingos_2_filter)
-  }
 
-}
+  object SpectroscopyConfigOptionGhostTable extends TableDef("t_spectroscopy_config_option_ghost"):
+    val Instrument     = col("c_instrument",      instrument)
+    val Index          = col("c_index",           int4_pos)
+    val Binning        = col("c_binning",         ghost_binning)
+    val ResolutionMode = col("c_resolution_mode", ghost_resolution_mode)
+
+  object SpectroscopyConfigOptionGmosNorthTable extends TableDef("t_spectroscopy_config_option_gmos_north"):
+    val Instrument = col("c_instrument",  instrument)
+    val Index      = col("c_index",       int4_pos)
+
+    val Fpu        = col("c_fpu",     gmos_north_fpu)
+    val Grating    = col("c_grating", gmos_north_grating)
+    val Filter     = col("c_filter",  gmos_north_filter.opt)
+
+  object SpectroscopyConfigOptionGmosSouthTable extends TableDef("t_spectroscopy_config_option_gmos_south"):
+    val Instrument = col("c_instrument",  instrument)
+    val Index      = col("c_index",       int4_pos)
+
+    val Fpu        = col("c_fpu",     gmos_south_fpu)
+    val Grating    = col("c_grating", gmos_south_grating)
+    val Filter     = col("c_filter",  gmos_south_filter.opt)

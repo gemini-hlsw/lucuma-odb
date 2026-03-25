@@ -1498,6 +1498,22 @@ enum GcalShutter {
   CLOSED
 }
 
+enum GhostResolutionMode {
+  STANDARD,
+  HIGH
+}
+
+enum GhostBinning {
+  ONE_BY_ONE,
+  ONE_BY_TWO,
+  ONE_BY_FOUR,
+  ONE_BY_EIGHT,
+  TWO_BY_TWO,
+  TWO_BY_FOUR,
+  TWO_BY_EIGHT,
+  FOUR_BY_FOUR
+}
+
 """
 GMOS amp count
 """
@@ -10748,6 +10764,17 @@ type SpectroscopyConfigOption {
   site: Site!
 
   """
+  For Flamingos2 options, the Flamingos 2configuration.  Null for other
+  instruments.
+  """
+  flamingos2: SpectroscopyConfigOptionFlamingos2
+
+  """
+  For GHOST options, the GHOST configuration.  Null for other instruments.
+  """
+  ghost: SpectroscopyConfigOptionGhost
+
+  """
   For GMOS North options, the GMOS North configuration.  Null for other
   instruments.
   """
@@ -10759,11 +10786,17 @@ type SpectroscopyConfigOption {
   """
   gmosSouth: SpectroscopyConfigOptionGmosSouth
 
-  """
-  For Flamingos2 options, the Flamingos 2configuration.  Null for other
-  instruments.
-  """
-  flamingos2: SpectroscopyConfigOptionFlamingos2
+}
+
+type SpectroscopyConfigOptionFlamingos2 {
+  fpu: Flamingos2Fpu!
+  disperser: Flamingos2Disperser!
+  filter: Flamingos2Filter!
+}
+
+type SpectroscopyConfigOptionGhost {
+  resolutionMode: GhostResolutionMode!
+  binning:        GhostBinning!
 }
 
 type SpectroscopyConfigOptionGmosNorth {
@@ -10776,12 +10809,6 @@ type SpectroscopyConfigOptionGmosSouth {
   fpu: GmosSouthBuiltinFpu!
   grating: GmosSouthGrating!
   filter: GmosSouthFilter
-}
-
-type SpectroscopyConfigOptionFlamingos2 {
-  fpu: Flamingos2Fpu!
-  disperser: Flamingos2Disperser!
-  filter: Flamingos2Filter!
 }
 
 """
