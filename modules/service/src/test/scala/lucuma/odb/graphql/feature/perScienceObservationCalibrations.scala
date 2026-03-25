@@ -754,7 +754,7 @@ class perScienceObservationCalibrations
       oid  <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
       _    <- runObscalcUpdate(pid, oid)
 
-      _    <- recalculateCalibrations(pid, when)
+      _    <- recalculateCalibrations(pid, when, oid)
       toid <- selectTelluricObservationFor(oid).map(_.get)
       _    <- runObscalcUpdate(pid, toid)
 
@@ -770,7 +770,7 @@ class perScienceObservationCalibrations
       oid  <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
       _    <- runObscalcUpdate(pid, oid)
 
-      _    <- recalculateCalibrations(pid, when)
+      _    <- recalculateCalibrations(pid, when, oid)
       toid <- selectTelluricObservationFor(oid).map(_.get)
       _    <- runObscalcUpdate(pid, toid)
 
@@ -779,7 +779,7 @@ class perScienceObservationCalibrations
       d    <- nextAtomDescription(toid)
 
       _    <- deleteObservation(pi, oid)
-      _    <- recalculateCalibrations(pid, when)
+      _    <- recalculateCalibrations(pid, when, oid)
       xist <- queryObservationExists(toid)
     yield
       assertEquals(d, "Manually Edited Atom".some)
@@ -792,7 +792,7 @@ class perScienceObservationCalibrations
       oid  <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
       _    <- runObscalcUpdate(pid, oid)
 
-      _    <- recalculateCalibrations(pid, when)
+      _    <- recalculateCalibrations(pid, when, oid)
       toid <- selectTelluricObservationFor(oid).map(_.get)
       _    <- runObscalcUpdate(pid, toid)
 
@@ -805,7 +805,7 @@ class perScienceObservationCalibrations
       _    <- addEndStepEvent(sid, vid)
 
       _    <- deleteObservation(pi, oid)
-      _    <- recalculateCalibrations(pid, when)
+      _    <- recalculateCalibrations(pid, when, oid)
       xist <- queryObservationExists(toid)
     yield
       assertEquals(d, "Manually Edited Atom".some)
@@ -1724,6 +1724,7 @@ class perScienceObservationCalibrations
       oid                <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
       _                  <- runObscalcUpdate(pid, oid)
       (added1, removed1) <- recalculateCalibrations(pid, when, oid)
+      _                  <- sleep >> resolveTelluricTargets
       obsBefore          <- queryObservation(oid)
       groupId            =  obsBefore.groupId.get
       obsInGroup1        <- queryObservationsInGroup(groupId)
@@ -1749,6 +1750,7 @@ class perScienceObservationCalibrations
       oid                <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
       _                  <- runObscalcUpdate(pid, oid)
       (added1, removed1) <- recalculateCalibrations(pid, when, oid)
+      _                  <- sleep >> resolveTelluricTargets
       obs1               <- queryObservation(oid)
       groupId            =  obs1.groupId.get
       obsInGroup1        <- queryObservationsInGroup(groupId)
@@ -1775,6 +1777,7 @@ class perScienceObservationCalibrations
       _                    <- setExposureTime(oid, 120)
       _                    <- runObscalcUpdate(pid, oid)
       (added1, removed1)   <- recalculateCalibrations(pid, when, oid)
+      _                    <- sleep >> resolveTelluricTargets
       obs1                 <- queryObservation(oid)
       groupId              =  obs1.groupId.get
       obsInGroup1          <- queryObservationsInGroup(groupId)
@@ -1952,7 +1955,7 @@ class perScienceObservationCalibrations
                         }
                       }""")
       _            <- runObscalcUpdate(pid, oid)
-      _            <- recalculateCalibrations(pid, when)
+      _            <- recalculateCalibrations(pid, when, oid)
       obs          <- queryObservation(oid)
       groupId      =  obs.groupId.get
       obsInGroup   <- queryObservationsInGroup(groupId)

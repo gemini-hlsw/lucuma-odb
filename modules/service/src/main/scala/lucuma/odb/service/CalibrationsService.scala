@@ -127,9 +127,9 @@ object CalibrationsService extends CalibrationObservations {
             .map(targetCoordinates(referenceInstant))
 
       def recalculateCalibrations(
-        pid: Program.Id,
+        pid:              Program.Id,
         referenceInstant: Instant,
-        oid: Observation.Id
+        oid:              Observation.Id
       )(using Transaction[F], SuperUserAccess): F[(List[Observation.Id], List[Observation.Id])] =
         val perObsService = PerScienceObservationCalibrationsService.instantiate
         val sharedService = PerProgramPerConfigCalibrationsService.instantiate
@@ -149,7 +149,7 @@ object CalibrationsService extends CalibrationObservations {
           perObs           = allSci.collect(ObsExtract.perObsFilter).map(_.map(_.toConfigSubset))
           perProgram       = allSci.collect(ObsExtract.perProgramFilter)
           _                <- (info"Program $pid has ${perObs.length} science observations with per obs calibrations: ${perObs.map(_.id)}").whenA(perObs.nonEmpty)
-          // Handle per-science-observation calibs (pass changedObsId for targeted processing)
+          // Handle per-science-observation calibs
           (f2Added, f2Removed)     <- perObsService.generateCalibrations(pid, perObs, oid)
           _                <- (info"Program ID: $pid has ${perProgram.length} science observations for per program calibrations: ${perProgram.map(_.id)}").whenA(perProgram.nonEmpty)
           // Handle per--config calib
