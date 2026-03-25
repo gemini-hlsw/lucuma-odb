@@ -17,7 +17,7 @@ import lucuma.core.enums.Instrument
 /**
  * Reads and parses the configuration file into instrument-specific rows.
  */
-class FileReader[F[_]](fileName: String)(using ApplicativeError[F, Throwable]) {
+class FileReader[F[_]](fileName: String)(using ApplicativeError[F, Throwable]):
 
   final class ReadException(
     val lineNumber: PosInt,
@@ -57,26 +57,28 @@ class FileReader[F[_]](fileName: String)(using ApplicativeError[F, Throwable]) {
      }
      .through(zipWithLineNumber)
 
+  val flamingos2Spectroscopy: Pipe[F, Byte, (Flamingos2SpectroscopyRow, PosInt)] =
+    read(Instrument.Flamingos2, Flamingos2SpectroscopyRow.flamingos2)
+      .andThen(_.filter(_._1.spec.fpuOption === FpuOption.Singleslit)) // for now only single slit
+
+  val ghostIfu: Pipe[F, Byte, (GhostIfuRow, PosInt)] =
+    read(Instrument.Ghost, GhostIfuRow.ghost)
+
+  val gmosNorthImaging: Pipe[F, Byte, (GmosImagingRow.GmosNorth, PosInt)] =
+    read(Instrument.GmosNorth, GmosImagingRow.gmosNorth)
+
   val gmosNorthSpectroscopy: Pipe[F, Byte, (GmosSpectroscopyRow.GmosNorth, PosInt)] =
     read(Instrument.GmosNorth, GmosSpectroscopyRow.gmosNorth)
       .andThen(_.filter(_._1.spec.fpuOption === FpuOption.Singleslit)) // for now only single slit
       .andThen(_.filter(_._1.spec.capability.isEmpty))                 // for now no N&S
+
+  val gmosSouthImaging: Pipe[F, Byte, (GmosImagingRow.GmosSouth, PosInt)] =
+    read(Instrument.GmosSouth, GmosImagingRow.gmosSouth)
 
   val gmosSouthSpectroscopy: Pipe[F, Byte, (GmosSpectroscopyRow.GmosSouth, PosInt)] =
     read(Instrument.GmosSouth, GmosSpectroscopyRow.gmosSouth)
       .andThen(_.filter(_._1.spec.fpuOption === FpuOption.Singleslit)) // for now only single slit
       .andThen(_.filter(_._1.spec.capability.isEmpty))                 // for now no N&S
 
-  val flamingos2Spectroscopy: Pipe[F, Byte, (Flamingos2SpectroscopyRow, PosInt)] =
-    read(Instrument.Flamingos2, Flamingos2SpectroscopyRow.flamingos2)
-      .andThen(_.filter(_._1.spec.fpuOption === FpuOption.Singleslit)) // for now only single slit
-
-  val igrins2Spectroscopy: Pipe[F, Byte, (SpectroscopyRow, PosInt)] = 
+  val igrins2Spectroscopy: Pipe[F, Byte, (SpectroscopyRow, PosInt)] =
     read(Instrument.Igrins2, SpectroscopyRow.rows)
-
-  val gmosNorthImaging: Pipe[F, Byte, (GmosImagingRow.GmosNorth, PosInt)] =
-    read(Instrument.GmosNorth, GmosImagingRow.gmosNorth)
-
-  val gmosSouthImaging: Pipe[F, Byte, (GmosImagingRow.GmosSouth, PosInt)] =
-    read(Instrument.GmosSouth, GmosImagingRow.gmosSouth)
-}

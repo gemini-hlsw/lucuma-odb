@@ -486,6 +486,7 @@ object OdbMapping {
                 SequenceEventMapping,
                 SpectroscopyConfigOptionMapping,
                 SpectroscopyConfigOptionF2Mapping,
+                SpectroscopyConfigOptionGhostMapping,
                 SpectroscopyConfigOptionGmosNorthMapping,
                 SpectroscopyConfigOptionGmosSouthMapping,
                 SpectroscopyScienceRequirementsMapping,

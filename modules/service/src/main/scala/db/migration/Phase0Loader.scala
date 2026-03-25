@@ -14,6 +14,7 @@ import lucuma.core.enums.Instrument
 import lucuma.odb.phase0.ConfigurationRow
 import lucuma.odb.phase0.FileReader
 import lucuma.odb.phase0.Flamingos2SpectroscopyRow
+import lucuma.odb.phase0.GhostIfuRow
 import lucuma.odb.phase0.GmosImagingRow
 import lucuma.odb.phase0.GmosSpectroscopyRow
 import lucuma.odb.phase0.ImagingRow
@@ -96,9 +97,10 @@ object Phase0Loader {
   def spectroscopyLoadAll(bc: BaseConnection, fileName: String, is: IO[InputStream]): IO[Unit] =
     val rdr = FileReader[IO](fileName)
     List(
+      new Phase0Loader[Flamingos2SpectroscopyRow, SpectroscopyRow](Instrument.Flamingos2, rdr.flamingos2Spectroscopy, _.spec, Phase0Table.SpectroscopyFlamingos2.some),
+      new Phase0Loader[GhostIfuRow, SpectroscopyRow](Instrument.Ghost, rdr.ghostIfu, _.spec, Phase0Table.SpectroscopyGhostIfu.some),
       new Phase0Loader[GmosSpectroscopyRow.GmosNorth, SpectroscopyRow](Instrument.GmosNorth, rdr.gmosNorthSpectroscopy, _.spec, Phase0Table.SpectroscopyGmosNorth.some),
       new Phase0Loader[GmosSpectroscopyRow.GmosSouth, SpectroscopyRow](Instrument.GmosSouth, rdr.gmosSouthSpectroscopy, _.spec, Phase0Table.SpectroscopyGmosSouth.some),
-      new Phase0Loader[Flamingos2SpectroscopyRow, SpectroscopyRow](Instrument.Flamingos2, rdr.flamingos2Spectroscopy, _.spec, Phase0Table.SpectroscopyFlamingos2.some),
       new Phase0Loader[SpectroscopyRow, SpectroscopyRow](Instrument.Igrins2, rdr.igrins2Spectroscopy, identity, none)
     ).traverse_(_.load(bc, ConfigModeVariant.Spectroscopy, is))
 
