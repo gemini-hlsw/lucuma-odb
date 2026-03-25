@@ -13,12 +13,14 @@ import lucuma.core.enums.GmosSouthFpu
 import lucuma.core.enums.GmosSouthGrating
 import lucuma.core.enums.Instrument
 import lucuma.odb.phase0.Flamingos2SpectroscopyRow
+import lucuma.odb.phase0.GhostIfuRow
 import lucuma.odb.phase0.GmosImagingRow
 import lucuma.odb.phase0.GmosSpectroscopyRow
 import lucuma.odb.phase0.ImagingRow
 import lucuma.odb.phase0.SpectroscopyRow
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.Flamingos2Codecs.*
+import lucuma.odb.util.GhostCodecs.*
 import lucuma.odb.util.GmosCodecs.*
 import skunk.Encoder
 import skunk.codec.boolean.bool
@@ -170,7 +172,7 @@ object Phase0Table {
 
     override def encoder: Encoder[Flamingos2SpectroscopyRow] =
       (
-        instrument   *:
+        instrument            *:
         flamingos_2_disperser *:
         flamingos_2_filter    *:
         flamingos_2_fpu
@@ -189,6 +191,29 @@ object Phase0Table {
         "c_fpu"
       )
   }
+
+  val SpectroscopyGhostIfu = new Phase0Table[GhostIfuRow]:
+    override def name: String =
+      s"${Spectroscopy.name}_ghost_ifu"
+
+    override def encoder: Encoder[GhostIfuRow] =
+      (
+        instrument           *:
+        ghost_binning        *:
+        ghost_resolution_mode
+      ).contramap[GhostIfuRow]: row =>
+        (
+          row.spec.instrument,
+          row.binning,
+          row.resolutionMode
+        )
+
+    override def columns: List[String] =
+      List(
+        "c_instrument",
+        "c_binning",
+        "c_resolution"
+      )
 
   val Imaging = new Phase0Table[ImagingRow] {
     override def name: String =
