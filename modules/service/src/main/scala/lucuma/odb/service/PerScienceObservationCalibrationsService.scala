@@ -31,6 +31,7 @@ import lucuma.odb.graphql.input.PosAngleConstraintInput
 import lucuma.odb.graphql.input.TargetEnvironmentInput
 import lucuma.odb.graphql.mapping.AccessControl
 import lucuma.odb.service.Services.SuperUserAccess
+import lucuma.odb.syntax.exposureTimeMode.*
 import lucuma.odb.util.Codecs.*
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.syntax.*
@@ -271,13 +272,13 @@ object PerScienceObservationCalibrationsService:
         gid: Group.Id
       )(using Transaction[F], SuperUserAccess): F[(List[Observation.Id], List[Observation.Id])] =
         for {
-          existing      <- findAllTelluricObservations(gid)
-          deletable     <- excludeFromDeletion(existing, identity)
-          duration      <- obsDuration(obs.id)
-          requiredCount  = duration match
-                             case Some(d) if d > MultiTelluricThreshold => 2
-                             case Some(_)                               => 1
-                             case None                                  => 0
+          existing           <- findAllTelluricObservations(gid)
+          deletable          <- excludeFromDeletion(existing, identity)
+          duration           <- obsDuration(obs.id)
+          requiredCount      = duration match
+                                 case Some(d) if d > MultiTelluricThreshold => 2
+                                 case Some(_)                               => 1
+                                 case None                                  => 0
           // Delete/recreate if count changes
           (created, deleted) <- if (existing.size != requiredCount)
                                   for
@@ -288,9 +289,9 @@ object PerScienceObservationCalibrationsService:
                                 else
                                   (List.empty, List.empty).pure[F]
           // sync configuration on all deletable tellurics
-          allTellurics  <- findAllTelluricObservations(gid)
-          toSync        <- excludeFromDeletion(allTellurics, identity)
-          _             <- toSync.traverse_(tid => syncConfiguration(obs.id, tid))
+          allTellurics       <- findAllTelluricObservations(gid)
+          toSync             <- excludeFromDeletion(allTellurics, identity)
+          _                  <- toSync.traverse_(tid => syncConfiguration(obs.id, tid))
         } yield (created, deleted)
 
       private def generateTelluricForScience(
@@ -321,18 +322,32 @@ object PerScienceObservationCalibrationsService:
               MaxTelluricSN
           ExposureTimeMode.SignalToNoiseMode(snValue, etm.at)
 
+        def replaceEtm(
+          role:    ExposureTimeModeRole,
+          newEtm:  ExposureTimeMode,
+          current: Option[ExposureTimeMode]
+        ): F[Unit] =
+          (S.exposureTimeModeService.deleteMany(List(telluricOid), role) *>
+            S.exposureTimeModeService.insertOne(telluricOid, role, newEtm))
+              .unlessA(current.contains(newEtm))
+              .void
+
         for {
           allEtm     <- S.exposureTimeModeService
-                           .select(List(scienceOid, telluricOid), ExposureTimeModeRole.Science)
-                           .map(_.view.mapValues(_.head).toMap)
-          scienceEtm  = allEtm.get(scienceOid)
+                           .select(List(scienceOid, telluricOid), ExposureTimeModeRole.Science, ExposureTimeModeRole.Acquisition)
+          allSciEtm   = allEtm.collect:
+                          case (oid, roles) if roles.contains(ExposureTimeModeRole.Science) =>
+                            oid -> roles(ExposureTimeModeRole.Science).head
+          allAcqEtm   = allEtm.collect:
+                          case (oid, roles) if roles.contains(ExposureTimeModeRole.Acquisition) =>
+                            oid -> roles(ExposureTimeModeRole.Acquisition).head
+          scienceEtm  = allSciEtm.get(scienceOid)
           _          <- scienceEtm.traverse_ : etm =>
-                          val calibEtm   = telluricEtm(etm)
-                          val currentEtm = allEtm.get(telluricOid)
+                          // Normally there is a single acq etm but is safe to go over all of them
+                          val acqEtm = allAcqEtm.get(scienceOid).map(a => ExposureTimeMode.forAcquisition(a.at))
 
-                          (S.exposureTimeModeService.deleteMany(List(telluricOid), ExposureTimeModeRole.Science) *>
-                            S.exposureTimeModeService.insertOne(telluricOid, ExposureTimeModeRole.Science, calibEtm))
-                              .unlessA(currentEtm.contains(calibEtm))
+                          replaceEtm(ExposureTimeModeRole.Science, telluricEtm(etm), allSciEtm.get(telluricOid)) *>
+                            acqEtm.traverse_(replaceEtm(ExposureTimeModeRole.Acquisition, _, allAcqEtm.get(telluricOid)))
         } yield ()
 
       private def syncConfiguration(
@@ -394,7 +409,7 @@ object PerScienceObservationCalibrationsService:
         pid:        Program.Id,
         scienceObs: List[ObsExtract[CalibrationConfigSubset]]
       )(using Transaction[F], SuperUserAccess): F[(List[Observation.Id], List[Observation.Id])] =
-        for
+        for {
           // only include observations that are Defined or Ready
           activeScienceObs     <- onlyDefinedAndReady(scienceObs, _.id)
           currentObsIds         = activeScienceObs.map(_.id).toSet
@@ -448,7 +463,7 @@ object PerScienceObservationCalibrationsService:
           added                 = results.flatMap(_._1)
           allDeleted            = deleted ++ results.flatMap(_._2)
           _                     <- (info"Added ${added.size} telluric observations on program $pid: $added").whenA(added.nonEmpty)
-        yield (added, allDeleted)
+      } yield (added, allDeleted)
 
       object Statements:
 

@@ -1901,3 +1901,45 @@ class perScienceObservationCalibrations
       assertEquals(telluricEtms2.science.snValue, SignalToNoise.unsafeFromBigDecimalExact(100).some)
       assertEquals(telluricEtms2.science.snWAt, Wavelength.fromIntNanometers(1500))
     }
+
+  test("telluric acquisition ETM is independent from science"):
+    for {
+      pid          <- createProgramAs(pi)
+      tid          <- createTargetWithProfileAs(pi, pid)
+      oid          <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+      _            <- setScienceRequirements(oid, DefaultSnAt, 75.0)
+      // Set a non-default acquisition etm
+      _            <- query(pi, s"""mutation {
+                        updateObservations(input: {
+                          SET: {
+                            observingMode: {
+                              flamingos2LongSlit: {
+                                acquisition: {
+                                  exposureTimeMode: {
+                                    signalToNoise: {
+                                      value: 50,
+                                      at: { nanometers: 500 }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                          WHERE: { id: { EQ: "$oid" } }
+                        }) {
+                          observations { id }
+                        }
+                      }""")
+      _            <- runObscalcUpdate(pid, oid)
+      _            <- recalculateCalibrations(pid, when)
+      obs          <- queryObservation(oid)
+      groupId      =  obs.groupId.get
+      obsInGroup   <- queryObservationsInGroup(groupId)
+      telluricOid  =  obsInGroup.find(_.calibrationRole.contains(CalibrationRole.Telluric)).get.id
+      telluricEtms <- queryAllEtms(telluricOid)
+    } yield {
+      // Telluric acquisition ETM should be the default SN=
+      assertEquals(telluricEtms.acquisition.snValue, SignalToNoise.unsafeFromBigDecimalExact(10).some)
+      // Wavelength at taken from science
+      assertEquals(telluricEtms.acquisition.snWAt, Wavelength.fromIntNanometers(500))
+    }
