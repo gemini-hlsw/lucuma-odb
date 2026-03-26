@@ -29,7 +29,7 @@ object LongSlit:
     observationId:  Observation.Id,
     estimator:      StepTimeEstimateCalculator[F2Static, F2Dynamic],
     namespace:      UUID,
-    expander:       SmartGcalExpander[F, F2Dynamic],
+    expander:       SmartGcalExpander[F, F2Static, F2Dynamic],
     config:         Config,
     itc:            Either[OdbError, Spectroscopy]
   ): F[Either[OdbError, StreamingExecutionConfig[Pure, F2Static, F2Dynamic]]] =
