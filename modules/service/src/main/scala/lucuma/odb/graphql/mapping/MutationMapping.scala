@@ -394,6 +394,9 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
       services.useTransactionally:
         groupService.createGroup(input).nestMap: gid =>
             Unique(Filter(Predicates.group.id.eql(gid), child))
+      .recover:
+        case SqlState.RaiseException(ex) =>
+          OdbError.InconsistentGroupError(Some(ex.message)).asFailure
 
   private lazy val CreateObservation: MutationField =
     MutationField("createObservation", CreateObservationInput.Binding): (input, child) =>
@@ -796,6 +799,9 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
                     .value
                     .flatTap: q =>
                       transaction.rollback.unlessA(q.hasValue)
+            .recover:
+              case SqlState.RaiseException(ex) =>
+                OdbError.InconsistentGroupError(Some(ex.message)).asFailure
 
           resultQuery.flatTap: r =>
             resetAcquisitionIfNecessary(approval).whenA(r.hasValue)

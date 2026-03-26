@@ -260,7 +260,7 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations wi
   /**
    * @return list of added and removed calibration observations
    */
-  def recalculateCalibrations(pid: Program.Id, when: Instant): IO[(List[Observation.Id], List[Observation.Id])] =
+  def recalculateCalibrations(pid: Program.Id, when: Instant, oid: Observation.Id): IO[(List[Observation.Id], List[Observation.Id])] =
     import Trace.Implicits.noop
     // First run obscalc for all pending observations in this program
     runProgramObscalc(pid) *>
@@ -271,7 +271,7 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations wi
                 Services.asSuperUser:
                   services
                     .calibrationsService
-                    .recalculateCalibrations(pid, when)
+                    .recalculateCalibrations(pid, when, oid)
         yield r
 
   /**

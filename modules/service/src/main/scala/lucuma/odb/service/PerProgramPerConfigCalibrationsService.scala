@@ -303,13 +303,11 @@ object PerProgramPerConfigCalibrationsService:
         when: Instant
       )(using Transaction[F], ServiceAccess): F[(List[Observation.Id], List[Observation.Id])] =
 
-        // Filter for GMOS observations (exclude F2)
-        val gmosSci = allSci.collect(ObsExtract.perProgramFilter)
         val gmosCalibs = toConfigForCalibration(allCalibs).collect(ObsExtract.perProgramCalibrationFilter)
 
         for {
           // Filter for only 'defined' or 'ready' observations where obscalc has been calculated
-          activeGmosSci   <- onlyDefinedAndReady(gmosSci, _.id)
+          activeGmosSci   <- onlyDefinedAndReady(allSci, _.id)
           // unique GMOS configurations
           uniqueSci       = uniqueConfiguration(activeGmosSci)
           // Extract props from all science observations
