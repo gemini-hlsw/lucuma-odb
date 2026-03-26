@@ -35,8 +35,8 @@ import lucuma.odb.service.ItcService
 import lucuma.odb.service.S3FileService
 import lucuma.odb.service.UserService
 import lucuma.odb.util.LucumaEntryPoint
+import lucuma.odb.util.OtelServices
 import lucuma.sso.client.SsoClient
-import natchez.EntryPoint
 import natchez.Trace
 import org.flywaydb.core.Flyway
 import org.flywaydb.core.api.output.MigrateResult
@@ -129,7 +129,7 @@ object Main extends CommandIOApp(
       for {
         _ <- IO.whenA(reset.isRequested)(IO.println("Resetting database."))
         _ <- IO.whenA(skipMigration.isRequested)(IO.println("Skipping migration.  Ensure that your database is up-to-date."))
-        e <- FMain.runF[IO](reset, skipMigration, Trace.ioTraceForEntryPoint)
+        e <- FMain.runF[IO](reset, skipMigration, LucumaEntryPoint.otelServicesResource)
       } yield e
     })
 
@@ -333,27 +333,26 @@ object FMain extends MainParams {
   def server[F[_]: Async: Parallel: Logger: LoggerFactory: Console: Network: SecureRandom](
     reset:         ResetDatabase,
     skipMigration: SkipMigration,
-    mkTrace:       EntryPoint[F] => F[Trace[F]]
+    mkOtelServices: (String, Config) => Resource[F, OtelServices[F]]
   ): Resource[F, ExitCode] =
     for {
-      c  <- Resource.eval(Config.fromCiris.load[F])
-      _  <- Resource.eval(banner[F](c))
-      _  <- Applicative[Resource[F, *]].whenA(reset.isRequested)(Resource.eval(resetDatabase[F](c.database)))
-      _  <- Applicative[Resource[F, *]].unlessA(skipMigration.isRequested)(Resource.eval(migrateDatabase[F](c.database)))
-      _  <- Resource.eval(runStartupDiagnostics(c.database, true))
-      ep <- LucumaEntryPoint.entryPointResource(ServiceName, c)
-      t  <- Resource.eval(mkTrace(ep))
-      ap <- { given Trace[F] = t; routesResource(c).map(_.map(_.orNotFound)) }
-      _  <- Resource.eval(ItcService.pollVersionsForever(c.itcClient, singleSession(c.database), c.itc.pollPeriod))
-      _  <- serverResource(c.port, ap)
+      c    <- Resource.eval(Config.fromCiris.load[F])
+      _    <- Resource.eval(banner[F](c))
+      _    <- Applicative[Resource[F, *]].whenA(reset.isRequested)(Resource.eval(resetDatabase[F](c.database)))
+      _    <- Applicative[Resource[F, *]].unlessA(skipMigration.isRequested)(Resource.eval(migrateDatabase[F](c.database)))
+      _    <- Resource.eval(runStartupDiagnostics(c.database, true))
+      otel <- mkOtelServices(ServiceName, c)
+      ap   <- { given Trace[F] = otel.trace; routesResource(c).map(_.map(_.orNotFound)) }
+      _    <- Resource.eval(ItcService.pollVersionsForever(c.itcClient, singleSession(c.database), c.itc.pollPeriod))
+      _    <- serverResource(c.port, ap)
     } yield ExitCode.Success
 
   /** Our logical entry point. */
   def runF[F[_]: Async: Parallel: Logger: LoggerFactory: Console: Network: SecureRandom](
     reset:         ResetDatabase,
     skipMigration: SkipMigration,
-    mkTrace:       EntryPoint[F] => F[Trace[F]]
+    mkOtelServices: (String, Config) => Resource[F, OtelServices[F]]
   ): F[ExitCode] =
-    server(reset, skipMigration, mkTrace).use(_ => Concurrent[F].never[ExitCode])
+    server(reset, skipMigration, mkOtelServices).use(_ => Concurrent[F].never[ExitCode])
 
 }

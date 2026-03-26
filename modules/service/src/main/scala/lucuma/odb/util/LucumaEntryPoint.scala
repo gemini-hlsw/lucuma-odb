@@ -5,58 +5,68 @@ package lucuma.odb.util
 
 import cats.effect.*
 import cats.syntax.all.*
-import io.opentelemetry.exporter.otlp.http.trace.OtlpHttpSpanExporter
-import io.opentelemetry.sdk.resources.Resource as OTelResource
-import io.opentelemetry.sdk.trace.SdkTracerProvider
-import io.opentelemetry.sdk.trace.`export`.BatchSpanProcessor
-import io.opentelemetry.api.common.AttributeKey
 import lucuma.odb.Config
-import natchez.EntryPoint
-import natchez.noop.NoopEntrypoint
-import natchez.opentelemetry.OpenTelemetry
+import natchez.Trace
+import org.typelevel.otel4s.context.LocalProvider
+import org.typelevel.otel4s.metrics.MeterProvider
+import org.typelevel.otel4s.oteljava.OtelJava
+import org.typelevel.otel4s.oteljava.context.Context
+import org.typelevel.otel4s.trace.TracerProvider
 import org.typelevel.log4cats.Logger
 
 import java.util.Base64
+
+case class OtelServices[F[_]](
+  trace:          Trace[F],
+  meterProvider:  MeterProvider[F],
+  tracerProvider: TracerProvider[F]
+)
 
 object LucumaEntryPoint:
   def tracingBackend(config: Config) = config.otel match
     case Some(_) => "OpenTelemetry (OTLP)"
     case None    => "No-op (silent)"
 
-  def entryPointResource[F[_]: Sync: Logger](
+  def otelServicesResource(
     serviceName: String,
     config: Config
-  ): Resource[F, EntryPoint[F]] =
+  )(using Logger[IO]): Resource[IO, OtelServices[IO]] =
     config.otel match
       case Some(otelConfig) =>
-        Resource.eval(Logger[F].info("Initializing OpenTelemetry tracing backend")) *>
-          OpenTelemetry.entryPoint[F]() { sdkBuilder =>
-            Resource.make(
-              Sync[F].delay {
-                val credentials =
-                  Base64.getEncoder.encodeToString(
-                    s"${otelConfig.instanceId}:${otelConfig.apiKey}".getBytes
-                  )
-                val endpoint =
-                  val base = otelConfig.endpoint.stripSuffix("/")
-                  if base.endsWith("/v1/traces") then base
-                  else s"$base/v1/traces"
-                val exporter = OtlpHttpSpanExporter.builder()
-                  .setEndpoint(endpoint)
-                  .addHeader("Authorization", s"Basic $credentials")
-                  .build()
-                val processor = BatchSpanProcessor.builder(exporter).build()
-                val resource = OTelResource.builder()
-                  .put(AttributeKey.stringKey("service.name"), serviceName)
-                  .build()
-                val tracerProvider = SdkTracerProvider.builder()
-                  .setResource(OTelResource.getDefault.merge(resource))
-                  .addSpanProcessor(processor)
-                  .build()
-                sdkBuilder.setTracerProvider(tracerProvider)
+        Resource.eval(Logger[IO].info("Initializing OpenTelemetry tracing backend")) *>
+          IOLocal(Context.root).toResource.flatMap { ioLocal =>
+            given LocalProvider[IO, Context] =
+              LocalProvider.fromIOLocal[IO, Context](ioLocal)
+            OtelJava.autoConfigured[IO] { builder =>
+              val credentials =
+                Base64.getEncoder.encodeToString(
+                  s"${otelConfig.instanceId}:${otelConfig.apiKey}".getBytes
+                )
+              builder.addPropertiesSupplier { () =>
+                val props = new java.util.HashMap[String, String]()
+                props.put("otel.service.name", serviceName)
+                props.put("otel.exporter.otlp.protocol", "http/protobuf")
+                props.put("otel.exporter.otlp.endpoint", otelConfig.endpoint)
+                props.put(
+                  "otel.exporter.otlp.headers",
+                  s"Authorization=Basic $credentials"
+                )
+                props
               }
-            )(_ => Sync[F].unit)
+            }.evalMap { otel =>
+              otel.tracerProvider.get(serviceName).map { tracer =>
+                OtelServices(
+                  trace = Otel4sTrace.fromTracer(tracer),
+                  meterProvider = otel.meterProvider,
+                  tracerProvider = otel.tracerProvider
+                )
+              }
+            }
           }
       case None =>
-        Resource.eval(Logger[F].info("No OpenTelemetry configuration")) *>
-          Resource.pure(NoopEntrypoint())
+        Resource.eval(Logger[IO].info("No OpenTelemetry configuration")) *>
+          Resource.pure(OtelServices(
+            trace = Trace.Implicits.noop,
+            meterProvider = MeterProvider.noop,
+            tracerProvider = TracerProvider.noop
+          ))
