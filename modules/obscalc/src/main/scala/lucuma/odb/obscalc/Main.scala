@@ -242,7 +242,6 @@ object CalcMain extends MainParams:
     for
       c          <- Resource.eval(Config.fromCiris.load[F])
       _          <- Resource.eval(banner[F](c))
-      ep         <- LucumaEntryPoint.entryPointResource(ServiceName, c)
       pool       <- databasePoolResource[F](c.database)
       enums      <- Resource.eval(pool.use(Enums.load))
       http       <- c.httpClientResource
