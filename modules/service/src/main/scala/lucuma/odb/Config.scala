@@ -50,7 +50,7 @@ case class Config(
   sso:           Config.Sso,                // SSO config
   telluric:      Config.Telluric,           // Telluric service config
   serviceJwt:    String,                    // Only service users can exchange API keys, so we need a service user JWT.
-  honeycomb:     Option[Config.Honeycomb],  // Honeycomb config
+  otel:          Option[Config.OpenTelemetry], // OpenTelemetry/Grafana config
   database:      Config.Database,           // Database config
   aws:           Config.Aws,                // AWS config
   email:         Config.Email,              // Mailgun config
@@ -141,24 +141,34 @@ object Config:
         .default(uri"https://telluric-targets.gpp.gemini.edu/")
         .map(Telluric.apply)
 
-  case class Honeycomb(
-    writeKey: String,
-    dataset:  String
+  case class OpenTelemetry(
+    endpoint:   String,
+    instanceId: String,
+    apiKey:     String
   )
 
-  object Honeycomb:
+  object OpenTelemetry:
     private val inHeroku: ConfigValue[Effect, Boolean] =
       envOrProp("DYNO").option.map(_.isDefined)
 
-    lazy val fromCiris: ConfigValue[Effect, Option[Honeycomb]] =
+    lazy val fromCiris: ConfigValue[Effect, Option[OpenTelemetry]] =
       inHeroku.flatMap: inHeroku =>
         if (inHeroku)
-          (envOrProp("ODB_HONEYCOMB_WRITE_KEY"), envOrProp("ODB_HONEYCOMB_DATASET")).parMapN: (writeKey, dataset) =>
-            Honeycomb(writeKey, dataset).some
+          (
+            envOrProp("ODB_OTEL_ENDPOINT"),
+            envOrProp("ODB_OTEL_INSTANCE_ID"),
+            envOrProp("ODB_OTEL_API_KEY")
+          ).parMapN: (endpoint, instanceId, apiKey) =>
+            OpenTelemetry(endpoint, instanceId, apiKey).some
         else
-          (envOrProp("ODB_HONEYCOMB_WRITE_KEY").option, envOrProp("ODB_HONEYCOMB_DATASET").option).parTupled.map:
-            case (Some(writeKey), Some(dataset)) if writeKey.trim.nonEmpty && dataset.trim.nonEmpty =>
-              Honeycomb(writeKey, dataset).some
+          (
+            envOrProp("ODB_OTEL_ENDPOINT").option,
+            envOrProp("ODB_OTEL_INSTANCE_ID").option,
+            envOrProp("ODB_OTEL_API_KEY").option
+          ).parTupled.map:
+            case (Some(endpoint), Some(instanceId), Some(apiKey))
+              if endpoint.trim.nonEmpty && instanceId.trim.nonEmpty && apiKey.trim.nonEmpty =>
+              OpenTelemetry(endpoint, instanceId, apiKey).some
             case _ =>
               None
 
@@ -337,7 +347,7 @@ object Config:
     Sso.fromCiris,
     Telluric.fromCiris,
     envOrProp("ODB_SERVICE_JWT"),
-    Honeycomb.fromCiris,
+    OpenTelemetry.fromCiris,
     Database.fromCiris,
     Aws.fromCiris,
     Email.fromCiris,

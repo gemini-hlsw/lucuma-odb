@@ -38,7 +38,8 @@ val munitDisciplineVersion     = "2.0.0"   // check test output if you attempt t
 val munitScalacheckVersion     = "1.2.0"   // check test output if you attempt to update this
 val scalacheckEffectMunitVersion = "1.0.4"
 val natchezHttp4sVersion       = "0.6.1"
-val natchezVersion             = "0.3.7"
+val natchezVersion             = "0.3.8"
+val openTelemetryVersion       = "1.60.1"
 val paigesVersion              = "0.4.4"
 val postgresVersion            = "42.7.9"
 val pprintVersion              = "0.9.6"
@@ -333,7 +334,7 @@ lazy val ssoService = project
       "org.typelevel"       %% "log4cats-slf4j"          % log4catsVersion,
       "ch.qos.logback"       % "logback-classic"         % logbackVersion,
       "io.circe"            %% "circe-generic"           % circeVersion,
-      "org.tpolecat"        %% "natchez-honeycomb"       % natchezVersion,
+      "org.tpolecat"        %% "natchez-opentelemetry"       % natchezVersion,
       "org.tpolecat"        %% "natchez-http4s"          % natchezHttp4sVersion,
       "org.tpolecat"        %% "natchez-log"             % natchezVersion,
       "edu.gemini"          %% "lucuma-graphql-routes" % lucumaGraphQLRoutesVersion,
@@ -364,7 +365,7 @@ lazy val ssoBackendExample = project
       "org.http4s"   %% "http4s-ember-server" % http4sEmberVersion,
       "org.slf4j"    %  "slf4j-simple"        % slf4jVersion,
       "org.tpolecat" %% "natchez-http4s"      % natchezHttp4sVersion,
-      "org.tpolecat" %% "natchez-honeycomb"   % natchezVersion,
+      "org.tpolecat" %% "natchez-opentelemetry"   % natchezVersion,
     )
   )
 
@@ -463,7 +464,7 @@ lazy val itcService = project
       "org.typelevel"        %% "grackle-generic"       % grackleVersion,
       "org.typelevel"        %% "grackle-circe"         % grackleVersion,
       "edu.gemini"           %% "lucuma-graphql-routes" % lucumaGraphQLRoutesVersion,
-      "org.tpolecat"         %% "natchez-honeycomb"     % natchezVersion,
+      "org.tpolecat"         %% "natchez-opentelemetry"     % natchezVersion,
       "org.tpolecat"         %% "natchez-log"           % natchezVersion,
       "org.tpolecat"         %% "natchez-http4s"        % natchezHttp4sVersion,
       "co.fs2"               %% "fs2-core"              % fs2Version,
@@ -704,10 +705,12 @@ lazy val service = project
       "org.http4s"               %% "http4s-blaze-server"                % http4sBlazeVersion,
       "org.http4s"               %% "http4s-ember-client"                % http4sEmberVersion,
       "org.postgresql"            % "postgresql"                         % postgresVersion,
-      "org.tpolecat"             %% "natchez-honeycomb"                  % natchezVersion,
+      "org.tpolecat"             %% "natchez-opentelemetry"              % natchezVersion,
       "org.tpolecat"             %% "natchez-http4s"                     % natchezHttp4sVersion,
       "org.tpolecat"             %% "natchez-log"                        % natchezVersion,
       "org.tpolecat"             %% "natchez-noop"                       % natchezVersion,
+      "io.opentelemetry"          % "opentelemetry-sdk"                  % openTelemetryVersion,
+      "io.opentelemetry"          % "opentelemetry-exporter-otlp"        % openTelemetryVersion,
       "org.tpolecat"             %% "skunk-core"                         % skunkVersion,
       "org.tpolecat"             %% "skunk-circe"                        % skunkVersion,
       "com.lihaoyi"              %% "pprint"                             % pprintVersion,
