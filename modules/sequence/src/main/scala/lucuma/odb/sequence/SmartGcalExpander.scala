@@ -17,9 +17,10 @@ import lucuma.odb.sequence.data.ProtoStep
  * Expands `SmartGcal` steps into a (non-empty) list of fully specified `Gcal`
  * steps.
  *
+ * @tparam S static instrument configuration
  * @tparam D dynamic instrument configuration
  */
-trait SmartGcalExpander[F[_], D]:
+trait SmartGcalExpander[F[_], S, D]:
 
   /**
    * Expands a single step. If `step` is a smart gcal step it is replaced with
@@ -27,7 +28,8 @@ trait SmartGcalExpander[F[_], D]:
    * step it is returned unmodified as the single element of a `NonEmptyList`.
    */
   def expandStep(
-    step: ProtoStep[D]
+    static: S,
+    step:   ProtoStep[D]
   ): F[Either[String, NonEmptyList[ProtoStep[D]]]]
 
   /**
@@ -35,31 +37,34 @@ trait SmartGcalExpander[F[_], D]:
    * normal gcal steps, if possible.
    */
   def expandAtom(
-    atom: ProtoAtom[ProtoStep[D]]
+    static: S,
+    atom:   ProtoAtom[ProtoStep[D]]
   ): F[Either[String, ProtoAtom[ProtoStep[D]]]]
 
 
 object SmartGcalExpander:
 
   /** A simple implementation for testing. */
-  def pure[F[_], D](
-    lookup: (SmartGcalType, D) => (D, StepConfig.Gcal, ObserveClass)
-  )(using Applicative[F]): SmartGcalExpander[F, D] =
-    new SmartGcalExpander[F, D]:
-      private def expand(step: ProtoStep[D]): ProtoStep[D] =
+  def pure[F[_], S, D](
+    lookup: (SmartGcalType, S, D) => (D, StepConfig.Gcal, ObserveClass)
+  )(using Applicative[F]): SmartGcalExpander[F, S, D] =
+    new SmartGcalExpander[F, S, D]:
+      private def expand(static: S, step: ProtoStep[D]): ProtoStep[D] =
         step.stepConfig match
           case StepConfig.SmartGcal(s) =>
-            val (d, g, c) = lookup(s, step.value)
+            val (d, g, c) = lookup(s, static, step.value)
             ProtoStep(d, g, step.telescopeConfig, c)
           case _                       =>
             step
 
       override def expandStep(
-        step: ProtoStep[D]
+        static: S,
+        step:   ProtoStep[D]
       ): F[Either[String, NonEmptyList[ProtoStep[D]]]] =
-        NonEmptyList.one(expand(step)).asRight.pure[F]
+        NonEmptyList.one(expand(static, step)).asRight.pure[F]
 
       override def expandAtom(
-        atom: ProtoAtom[ProtoStep[D]]
+        static: S,
+        atom:   ProtoAtom[ProtoStep[D]]
       ): F[Either[String, ProtoAtom[ProtoStep[D]]]] =
-        ProtoAtom(atom.description, atom.steps.map(expand)).asRight.pure[F]
+        ProtoAtom(atom.description, atom.steps.map(expand(static, _))).asRight.pure[F]
