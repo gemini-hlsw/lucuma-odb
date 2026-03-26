@@ -126,7 +126,8 @@ object Science:
       arc:  ProtoStep[F2]   // Unexpanded SmartGcal Arc
     ):
       def expand[F[_]: Monad](
-        expander: SmartGcalExpander[F, F2]
+        static:   Flamingos2StaticConfig,
+        expander: SmartGcalExpander[F, Flamingos2StaticConfig, F2]
       ): EitherT[F, String, StepDefinition] =
 
         // Flamingos2 needs read mode and reads to be consistent with exposure time
@@ -135,8 +136,8 @@ object Science:
           f2.copy(value = f2.value.copy(readMode = mode, reads = mode.readCount))
 
         for
-          fs <- EitherT(expander.expandStep(flat))
-          rs <- EitherT(expander.expandStep(arc))
+          fs <- EitherT(expander.expandStep(static, flat))
+          rs <- EitherT(expander.expandStep(static, arc))
         yield StepDefinition(a0, b0, b1, a1, fs.map(adjustReadMode) ::: rs.map(adjustReadMode))
 
     object PreDef:
@@ -178,7 +179,8 @@ object Science:
     def compute[F[_]: Monad](
       config:    Config,
       time:      IntegrationTime,
-      expander:  SmartGcalExpander[F, F2]
+      static:    Flamingos2StaticConfig,
+      expander:  SmartGcalExpander[F, Flamingos2StaticConfig, F2]
     ): EitherT[F, String, StepDefinition] =
       for
         p <- EitherT.fromEither:
@@ -187,7 +189,7 @@ object Science:
                  // This case should be caught when validating arguments to the mode
                  // construction / update.  Nevertheless, we'll guarantee it here.
                  case _                    => s"Exactly 4 offset positions are needed for Flamingos 2 Long Slit (${config.offsets.size} provided).".asLeft
-        d <- p.expand(expander)
+        d <- p.expand(static, expander)
       yield d
 
   end StepDefinition
@@ -282,7 +284,7 @@ object Science:
     estimator:     StepTimeEstimateCalculator[Flamingos2StaticConfig, F2],
     static:        Flamingos2StaticConfig,
     namespace:     UUID,
-    expander:      SmartGcalExpander[F, F2],
+    expander:      SmartGcalExpander[F, Flamingos2StaticConfig, F2],
     config:        Config,
     time:          Either[OdbError, IntegrationTime]
   ): F[Either[OdbError, SequenceGenerator[F2]]] =
@@ -298,7 +300,7 @@ object Science:
 
     val gen = for
       t <- posTime
-      s <- StepDefinition.compute(config, t, expander).leftMap(m => definitionError(observationId, m))
+      s <- StepDefinition.compute(config, t, static, expander).leftMap(m => definitionError(observationId, m))
       e <- cycleEstimate(s)
       c <- EitherT.fromEither(s.cycleCount(t).leftMap(m => definitionError(observationId, m)))
     yield Generator(

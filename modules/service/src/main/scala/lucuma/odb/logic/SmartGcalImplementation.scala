@@ -13,9 +13,13 @@ import lucuma.core.enums.SmartGcalType
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.StepConfig.Gcal
 import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig
-import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth
-import lucuma.core.model.sequence.gmos.DynamicConfig.GmosSouth
+import lucuma.core.model.sequence.flamingos2.Flamingos2StaticConfig
+import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth as GmosNorthDynamicConfig
+import lucuma.core.model.sequence.gmos.DynamicConfig.GmosSouth as GmosSouthDynamicConfig
+import lucuma.core.model.sequence.gmos.StaticConfig.GmosNorth as GmosNorthStaticConfig
+import lucuma.core.model.sequence.gmos.StaticConfig.GmosSouth as GmosSouthStaticConfig
 import lucuma.core.model.sequence.igrins2.Igrins2DynamicConfig
+import lucuma.core.model.sequence.igrins2.Igrins2StaticConfig
 import lucuma.odb.sequence.SmartGcalExpander
 import lucuma.odb.sequence.data.ProtoAtom
 import lucuma.odb.sequence.data.ProtoStep
@@ -36,28 +40,30 @@ object SmartGcalImplementation {
   ): ForInstrument[F] =
     new ForInstrument[F](service)
 
-  private class Expander[F[_]: Concurrent, K, D](
-    toKey:     D => K,
+  private class Expander[F[_]: Concurrent, K, S, D](
+    toKey:     (S, D) => K,
     formatKey: K => String,
     select:    (K, SmartGcalType) => F[List[(D => D, Gcal)]]
-  ) extends SmartGcalExpander[F, D] {
+  ) extends SmartGcalExpander[F, S, D] {
 
     private def expandAtomWithCache(
-      cache: Cache[K, D],
-      atom:  ProtoAtom[ProtoStep[D]]
+      cache:  Cache[K, D],
+      static: S,
+      atom:   ProtoAtom[ProtoStep[D]]
     ): F[(Cache[K, D], Either[String, ProtoAtom[ProtoStep[D]]])] =
       atom
         .steps
-        .mapAccumulateM(cache)(expandStepWithCache)
+        .mapAccumulateM(cache)(expandStepWithCache(_, static, _))
         .map(_.map(_.flatSequence.map(steps => ProtoAtom(atom.description, steps))))
 
     private def expandStepWithCache(
-      cache: Cache[K, D],
-      step:  ProtoStep[D]
+      cache:  Cache[K, D],
+      static: S,
+      step:   ProtoStep[D]
     ): F[(Cache[K, D], Either[String, NonEmptyList[ProtoStep[D]]])] =
       step match {
         case ProtoStep(d, StepConfig.SmartGcal(sgt), t, o, b) =>
-          val key = toKey(d)
+          val key = toKey(static, d)
 
           def toStep(tup: (D => D, Gcal)): ProtoStep[D] = {
             val (update, gcal) = tup
@@ -82,43 +88,45 @@ object SmartGcalImplementation {
       }
 
     override def expandStep(
-      step: ProtoStep[D]
+      static: S,
+      step:   ProtoStep[D]
     ): F[Either[String, NonEmptyList[ProtoStep[D]]]] =
-      expandStepWithCache(emptyCache[K, D], step).map(_._2)
+      expandStepWithCache(emptyCache[K, D], static, step).map(_._2)
 
     override def expandAtom(
-      atom: ProtoAtom[ProtoStep[D]]
+      static: S,
+      atom:   ProtoAtom[ProtoStep[D]]
     ): F[Either[String, ProtoAtom[ProtoStep[D]]]] =
-      expandAtomWithCache(emptyCache[K, D], atom).map(_._2)
+      expandAtomWithCache(emptyCache[K, D], static, atom).map(_._2)
 
   }
 
   class ForInstrument[F[_]: Concurrent](service: SmartGcalService[F]) {
 
-    val flamingos2: SmartGcalExpander[F, Flamingos2DynamicConfig] =
-      new Expander[F, Flamingos2.TableKey, Flamingos2DynamicConfig](
-        Flamingos2.TableKey.fromDynamicConfig,
+    val flamingos2: SmartGcalExpander[F, Flamingos2StaticConfig, Flamingos2DynamicConfig] =
+      new Expander[F, Flamingos2.TableKey, Flamingos2StaticConfig, Flamingos2DynamicConfig](
+        (_, d) => Flamingos2.TableKey.fromDynamicConfig(d),
         _.format,
         service.selectFlamingos2
       )
 
-    val gmosNorth: SmartGcalExpander[F, GmosNorth] =
-      new Expander[F, Gmos.SearchKey.North, GmosNorth](
-        Gmos.SearchKey.North.fromDynamicConfig,
+    val gmosNorth: SmartGcalExpander[F, GmosNorthStaticConfig, GmosNorthDynamicConfig] =
+      new Expander[F, Gmos.SearchKey.North, GmosNorthStaticConfig, GmosNorthDynamicConfig](
+        (_, d) => Gmos.SearchKey.North.fromDynamicConfig(d),
         _.format,
         service.selectGmosNorth
       )
 
-    val gmosSouth: SmartGcalExpander[F, GmosSouth] =
-      new Expander[F, Gmos.SearchKey.South, GmosSouth](
-        Gmos.SearchKey.South.fromDynamicConfig,
+    val gmosSouth: SmartGcalExpander[F, GmosSouthStaticConfig, GmosSouthDynamicConfig] =
+      new Expander[F, Gmos.SearchKey.South, GmosSouthStaticConfig, GmosSouthDynamicConfig](
+        (_, d) => Gmos.SearchKey.South.fromDynamicConfig(d),
         _.format,
         service.selectGmosSouth
       )
 
-    val igrins2: SmartGcalExpander[F, Igrins2DynamicConfig] =
-      new Expander[F, Igrins2.TableKey.type, Igrins2DynamicConfig](
-        _ => Igrins2.TableKey,
+    val igrins2: SmartGcalExpander[F, Igrins2StaticConfig, Igrins2DynamicConfig] =
+      new Expander[F, Igrins2.TableKey.type, Igrins2StaticConfig, Igrins2DynamicConfig](
+        (_, _) => Igrins2.TableKey,
         _.format,
         service.selectIgrins2
       )

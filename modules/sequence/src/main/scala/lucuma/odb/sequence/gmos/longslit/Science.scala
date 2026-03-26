@@ -266,9 +266,10 @@ object Science:
        * @param calRole   calibration role, which determines whether arcs and/or
        *                  flats are needed
        */
-      def compute[F[_]: Monad](
+      def compute[F[_]: Monad, S](
         oid:       Observation.Id,
-        expander:  SmartGcalExpander[F, D],
+        static:    S,
+        expander:  SmartGcalExpander[F, S, D],
         config:    Config[G, L, U],
         expTimeμs: PosLong,
         expCount:  PosInt,
@@ -293,8 +294,8 @@ object Science:
               yield (a, f, s)
 
           val defn = for
-            fs <- if includeFlats then EitherT(expander.expandStep(smartFlat)).map(_.toList) else EitherT.pure(List.empty)
-            as <- if includeArcs then EitherT(expander.expandStep(smartArc)).map(_.toList) else EitherT.pure(List.empty)
+            fs <- if includeFlats then EitherT(expander.expandStep(static, smartFlat)).map(_.toList) else EitherT.pure(List.empty)
+            as <- if includeArcs then EitherT(expander.expandStep(static, smartArc)).map(_.toList) else EitherT.pure(List.empty)
           yield StepDefinition(g, as.toList, fs, science)
 
           defn.leftMap(s => OdbError.SequenceUnavailable(oid, s"Could not generate a sequence for $oid: $s".some))
@@ -403,7 +404,7 @@ object Science:
       estimator: StepTimeEstimateCalculator[S, D],
       static:    S,
       namespace: UUID,
-      expander:  SmartGcalExpander[F, D],
+      expander:  SmartGcalExpander[F, S, D],
       stepDef:   StepDefinition.Computer[D, G, L, U],
       config:    Config[G, L, U],
       time:      Either[OdbError, IntegrationTime],
@@ -451,7 +452,7 @@ object Science:
       // Compute the generator
       val result = for
         (configʹ, (μs, n)) <- EitherT.fromEither[F](configAndTimeʹ)
-        defs               <- EitherT(stepDef.compute(oid, expander, configʹ, μs, n, calRole))
+        defs               <- EitherT(stepDef.compute(oid, static, expander, configʹ, μs, n, calRole))
       yield ScienceGenerator(
         estimator,
         static,
@@ -470,7 +471,7 @@ object Science:
     estimator:     StepTimeEstimateCalculator[StaticConfig.GmosNorth, GmosNorth],
     static:        StaticConfig.GmosNorth,
     namespace:     UUID,
-    expander:      SmartGcalExpander[F, GmosNorth],
+    expander:      SmartGcalExpander[F, StaticConfig.GmosNorth, GmosNorth],
     config:        Config.GmosNorth,
     time:          Either[OdbError, IntegrationTime],
     calRole:       Option[CalibrationRole]
@@ -482,7 +483,7 @@ object Science:
     estimator:     StepTimeEstimateCalculator[StaticConfig.GmosSouth, GmosSouth],
     static:        StaticConfig.GmosSouth,
     namespace:     UUID,
-    expander:      SmartGcalExpander[F, GmosSouth],
+    expander:      SmartGcalExpander[F, StaticConfig.GmosSouth, GmosSouth],
     config:        Config.GmosSouth,
     time:          Either[OdbError, IntegrationTime],
     calRole:       Option[CalibrationRole]

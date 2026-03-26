@@ -34,7 +34,7 @@ object LongSlit:
     observationId:  Observation.Id,
     estimator:      StepTimeEstimateCalculator[StaticConfig.GmosNorth, DynamicConfig.GmosNorth],
     namespace:      UUID,
-    expander:       SmartGcalExpander[F, DynamicConfig.GmosNorth],
+    expander:       SmartGcalExpander[F, StaticConfig.GmosNorth, DynamicConfig.GmosNorth],
     config:         Config.GmosNorth,
     itc:            Either[OdbError, Spectroscopy],
     calRole:        Option[CalibrationRole]
@@ -50,7 +50,7 @@ object LongSlit:
     observationId:  Observation.Id,
     estimator:      StepTimeEstimateCalculator[StaticConfig.GmosSouth, DynamicConfig.GmosSouth],
     namespace:      UUID,
-    expander:       SmartGcalExpander[F, DynamicConfig.GmosSouth],
+    expander:       SmartGcalExpander[F, StaticConfig.GmosSouth, DynamicConfig.GmosSouth],
     config:         Config.GmosSouth,
     itc:            Either[OdbError, Spectroscopy],
     calRole:        Option[CalibrationRole]
