@@ -429,10 +429,10 @@ object PerScienceObservationCalibrationsService:
         oid:        Observation.Id
       )(using Transaction[F], SuperUserAccess): F[(List[Observation.Id], List[Observation.Id])] =
         for {
-          // only include observations that are Defined or Ready
-          activeScienceObs <- onlyDefinedAndReady(scienceObs, _.id)
-          // Observation with changes
-          changedObs        = activeScienceObs.find(_.id === oid)
+          // Find the changed observation, then check its workflow state
+          changedObs       <- scienceObs.find(_.id === oid)
+                                .traverse(obs => onlyDefinedAndReady(List(obs), _.id).map(_.headOption))
+                                .map(_.flatten)
           _                <- info"Calibration recalculation for observation $oid"
           _                <- S.session.execute(sql"set constraints all deferred".command)
           // Inspect the group tree
