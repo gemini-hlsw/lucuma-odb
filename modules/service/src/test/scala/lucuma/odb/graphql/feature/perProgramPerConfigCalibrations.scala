@@ -244,7 +244,7 @@ class perProgramPerConfigCalibrations
     for {
       pid <- createProgramAs(pi)
       oid <- createObservationAs(pi, pid, None)
-      _   <- recalculateCalibrations(pid, when)
+      _   <- recalculateCalibrations(pid, when, oid)
       gr1 <- groupElementsAs(pi, pid, None)
     } yield {
       val cgid = gr1.calibrationGroupId
@@ -259,7 +259,7 @@ class perProgramPerConfigCalibrations
       oid <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid)
       _   <- prepareObservation(pi, pid, oid, tid)
       gr  <- groupElementsAs(pi, pid, None)
-      _   <- recalculateCalibrations(pid, when)
+      _   <- recalculateCalibrations(pid, when, oid)
       gr1  <- groupElementsAs(pi, pid, None)
       cgid = gr1.calibrationGroupId
       cg   <- cgid.map(queryGroup)
@@ -280,7 +280,8 @@ class perProgramPerConfigCalibrations
       oid1 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid1)
       oid2 <- createObservationAs(pi, pid, ObservingModeType.GmosSouthLongSlit.some, tid2)
       _    <- prepareObservation(pi, pid, oid1, tid1) *> prepareObservation(pi, pid, oid2, tid2)
-      _    <- recalculateCalibrations(pid, when)
+      _    <- recalculateCalibrations(pid, when, oid1)
+      _    <- recalculateCalibrations(pid, when, oid2)
       gr1  <- groupElementsAs(pi, pid, None)
       ob   <- queryObservations(pid)
     } yield {
@@ -318,7 +319,10 @@ class perProgramPerConfigCalibrations
               prepareObservation(pi, pid, oid3, tid2) *>
               prepareObservation(pi, pid, oid4, tid2)
 
-      _    <- recalculateCalibrations(pid, when)
+      _    <- recalculateCalibrations(pid, when, oid1)
+      _    <- recalculateCalibrations(pid, when, oid2)
+      _    <- recalculateCalibrations(pid, when, oid3)
+      _    <- recalculateCalibrations(pid, when, oid4)
       gr1  <- groupElementsAs(pi, pid, None)
       ob   <- queryObservations(pid)
     yield
@@ -342,7 +346,7 @@ class perProgramPerConfigCalibrations
         tid1 <- createTargetAs(pi, pid, "One")
         oid1 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid1)
         _    <- prepareObservation(pi, pid, oid1, tid1)
-        _    <- recalculateCalibrations(pid, when)
+        _    <- recalculateCalibrations(pid, when, oid1)
         gr1  <- groupElementsAs(pi, pid, None)
         ob   <- queryObservations(pid)
       } yield {
@@ -367,7 +371,8 @@ class perProgramPerConfigCalibrations
       oid2 <- createObservationAs(pi, pid, ObservingModeType.GmosSouthLongSlit.some, tid2)
               // No target for oid2 -> no conf
       _    <- prepareObservation(pi, pid, oid1, tid1) *> scienceRequirements(pi, oid2)
-      _    <- recalculateCalibrations(pid, when)
+      _    <- recalculateCalibrations(pid, when, oid1)
+      _    <- recalculateCalibrations(pid, when, oid2)
       gr1  <- groupElementsAs(pi, pid, None)
       ob   <- queryObservations(pid)
     } yield {
@@ -446,13 +451,14 @@ class perProgramPerConfigCalibrations
       pid  <- createProgramAs(pi)
       tid1 <- createTargetAs(pi, pid, "One")
       tid2 <- createTargetAs(pi, pid, "Two")
-      _    <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid1).flatTap { oid =>
+      oid1 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid1).flatTap { oid =>
                 prepareObservation(pi, pid, oid, tid1)
               }
-      _    <- createObservationAs(pi, pid, ObservingModeType.GmosSouthLongSlit.some, tid2).flatTap { oid =>
+      oid2 <- createObservationAs(pi, pid, ObservingModeType.GmosSouthLongSlit.some, tid2).flatTap { oid =>
                 prepareObservation(pi, pid, oid, tid2)
               }
-      _    <- recalculateCalibrations(pid, when)
+      _    <- recalculateCalibrations(pid, when, oid1)
+      _    <- recalculateCalibrations(pid, when, oid2)
       ob   <- queryObservations(pid)
     } yield {
       val cCount = ob.countCalibrationsWithTE
@@ -468,8 +474,10 @@ class perProgramPerConfigCalibrations
       oid1 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid1)
       oid2 <- createObservationAs(pi, pid, ObservingModeType.GmosSouthLongSlit.some, tid2)
       _    <- prepareObservation(pi, pid, oid1, tid1) *> prepareObservation(pi, pid, oid2, tid2)
-      _    <- recalculateCalibrations(pid, when)
-      _    <- recalculateCalibrations(pid, when)
+      _    <- recalculateCalibrations(pid, when, oid1)
+      _    <- recalculateCalibrations(pid, when, oid2)
+      _    <- recalculateCalibrations(pid, when, oid1)
+      _    <- recalculateCalibrations(pid, when, oid2)
       gr1  <- groupElementsAs(pi, pid, None)
       ob   <- queryObservations(pid)
     } yield {
@@ -492,8 +500,10 @@ class perProgramPerConfigCalibrations
       oid1 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid1)
       oid2 <- createObservationAs(pi, pid, ObservingModeType.GmosSouthLongSlit.some, tid2)
       _    <- prepareObservation(pi, pid, oid1, tid1) *> scienceRequirements(pi, oid2)
-      _    <- recalculateCalibrations(pid, when)
-      _    <- recalculateCalibrations(pid, when)
+      _    <- recalculateCalibrations(pid, when, oid1)
+      _    <- recalculateCalibrations(pid, when, oid2)
+      _    <- recalculateCalibrations(pid, when, oid1)
+      _    <- recalculateCalibrations(pid, when, oid2)
       gr1  <- groupElementsAs(pi, pid, None)
       ob   <- queryObservations(pid)
     } yield {
@@ -514,7 +524,7 @@ class perProgramPerConfigCalibrations
       tid1 <- createTargetAs(pi, pid, "One")
       oid1 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid1)
       _    <- prepareObservation(pi, pid, oid1, tid1)
-      _    <- recalculateCalibrations(pid, when)
+      _    <- recalculateCalibrations(pid, when, oid1)
       ob   <- queryObservations(pid)
       cid = ob.callibrationIds
       _    <- expect(
@@ -556,7 +566,7 @@ class perProgramPerConfigCalibrations
       tid1 <- createTargetAs(pi, pid, "One")
       oid1 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid1)
       _    <- prepareObservation(pi, pid, oid1, tid1)
-      _    <- recalculateCalibrations(pid, when)
+      _    <- recalculateCalibrations(pid, when, oid1)
       ob   <- queryObservations(pid)
       cid = ob.callibrationIds
       _    <- expect(
@@ -597,7 +607,7 @@ class perProgramPerConfigCalibrations
       tid1 <- createTargetAs(pi, pid, "One")
       oid1 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid1)
       _    <- prepareObservation(pi, pid, oid1, tid1)
-      _    <- recalculateCalibrations(pid, when)
+      _    <- recalculateCalibrations(pid, when, oid1)
       ob   <- queryObservations(pid)
       (cid1, ct1) = ob.collect {
         case CalibObs(cid, _, Some(_), Some(ct1), _, _, _) => (cid, ct1)
@@ -644,7 +654,7 @@ class perProgramPerConfigCalibrations
       tid1 <- createTargetAs(pi, pid, "One")
       oid1 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid1)
       _    <- prepareObservation(pi, pid, oid1, tid1)
-      _    <- recalculateCalibrations(pid, when)
+      _    <- recalculateCalibrations(pid, when, oid1)
       ob   <- queryObservations(pid)
       cid = ob.callibrationIds.head
       _    <- expect(
@@ -676,9 +686,11 @@ class perProgramPerConfigCalibrations
       oid1 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid1)
       oid2 <- createObservationAs(pi, pid, ObservingModeType.GmosSouthLongSlit.some, tid2)
       _    <- prepareObservation(pi, pid, oid1, tid1) *> prepareObservation(pi, pid, oid2, tid2)
-      _    <- recalculateCalibrations(pid, when)
+      _    <- recalculateCalibrations(pid, when, oid1)
+      _    <- recalculateCalibrations(pid, when, oid2)
       _    <- deleteObservation(pi, oid2)
-      _    <- recalculateCalibrations(pid, when)
+      _    <- recalculateCalibrations(pid, when, oid1)
+      _    <- recalculateCalibrations(pid, when, oid2)
       gr1  <- groupElementsAs(pi, pid, None)
       ob   <- queryObservations(pid)
     } yield {
@@ -727,7 +739,7 @@ class perProgramPerConfigCalibrations
                 user      = pi,
                 query     = deletedSubscription(pid),
                 mutations =
-                  Right(recalculateCalibrations(pid, when).flatMap { case (cids, _) =>
+                  Right(recalculateCalibrations(pid, when, oid).flatMap { case (cids, _) =>
                     a.set(cids)
                   }),
                 expectedF =
@@ -778,7 +790,9 @@ class perProgramPerConfigCalibrations
       oid2    <- createObservationAs(pi, pid, ObservingModeType.GmosSouthLongSlit.some, tid2)
       _       <- prepareObservation(pi, pid, oid1, tid1) *> prepareObservation(pi, pid, oid2, tid2)
               // This will add four calibrations
-      (ad, _) <- recalculateCalibrations(pid, when)
+      (ad1, _) <- recalculateCalibrations(pid, when, oid1)
+      (ad2, _) <- recalculateCalibrations(pid, when, oid2)
+      ad       = ad1 ++ ad2
       // Run obscalc on newly created calibrations so they're 'ready' and don't generate extra events
       _       <- ad.traverse_(cid => runObscalcUpdate(pid, cid))
               // This should delete two
@@ -790,9 +804,10 @@ class perProgramPerConfigCalibrations
                     user      = pi,
                     query     = deletedSubscription(pid),
                     mutations =
-                      Right(recalculateCalibrations(pid, when).flatMap { case (_, cids) =>
-                        a.set(cids)
-                      }),
+                      Right((for {
+                        (_, cids1) <- recalculateCalibrations(pid, when, oid1)
+                        (_, cids2) <- recalculateCalibrations(pid, when, oid2)
+                      } yield cids1 ++ cids2).flatMap(a.set)),
                     expectedF = (
                       a.get.map(_.map: cid =>
                         json"""
@@ -851,7 +866,9 @@ class perProgramPerConfigCalibrations
       _    <- prepareObservation(pi, pid, oid1, tid1, Wavelength.fromIntNanometers(500).get) *>
                 prepareObservation(pi, pid, oid2, tid2, Wavelength.fromIntNanometers(520).get)
               // This will add four calibrations
-      (ad, _) <- recalculateCalibrations(pid, when)
+      (ad1, _) <- recalculateCalibrations(pid, when, oid1)
+      (ad2, _) <- recalculateCalibrations(pid, when, oid2)
+      ad       = ad1 ++ ad2
       ob   <- queryObservations(pid)
     } yield {
       val wv = ob.collect {
@@ -871,7 +888,8 @@ class perProgramPerConfigCalibrations
       oid2 <- createObservationAs(pi, pid, ObservingModeType.GmosSouthLongSlit.some, tid2)
       _    <- prepareObservation(pi, pid, oid1, tid1) *> prepareObservation(pi, pid, oid2, tid2)
       _    <- setObservationWorkflowState(pi, oid1, ObservationWorkflowState.Inactive)
-      _    <- recalculateCalibrations(pid, when)
+      _    <- recalculateCalibrations(pid, when, oid1)
+      _    <- recalculateCalibrations(pid, when, oid2)
       gr1  <- groupElementsAs(pi, pid, None)
       ob   <- queryObservations(pid)
     } yield {
@@ -943,7 +961,7 @@ class perProgramPerConfigCalibrations
       oid1      <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid1)
       _         <- prepareObservation(pi, pid, oid1, tid1)
       // should produce 2 calibrations
-      _         <- recalculateCalibrations(pid, when)
+      _         <- recalculateCalibrations(pid, when, oid1)
       ob1       <- queryObservations(pid)
       calibIds1 = ob1.callibrationIds
       // Add execution events to one of the calibrations (making it Ongoing)
@@ -955,7 +973,7 @@ class perProgramPerConfigCalibrations
       _         <- updateCentralWavelength(oid1, Wavelength.fromIntNanometers(600).get)
       _         <- runObscalcUpdate(pid, oid1)
       // Run calibrations again - should keep the Ongoing calibration and add new ones
-      _         <- recalculateCalibrations(pid, when)
+      _         <- recalculateCalibrations(pid, when, oid1)
       ob2       <- queryObservations(pid)
       calibIds2 = ob2.callibrationIds
       gr1       <- groupElementsAs(pi, pid, None)
@@ -1031,7 +1049,8 @@ class perProgramPerConfigCalibrations
       )
       _ <- prepareObservation(pi, pid, oid1, tid1) *> prepareObservation(pi, pid, oid2, tid2)
       // Generate calibrations
-      _ <- recalculateCalibrations(pid, when)
+      _ <- recalculateCalibrations(pid, when, oid1)
+      _ <- recalculateCalibrations(pid, when, oid2)
       ob <- queryObservations(pid)
     } yield {
       val calibCount = ob.count(_.calibrationRole.contains(CalibrationRole.SpectroPhotometric))
@@ -1094,7 +1113,8 @@ class perProgramPerConfigCalibrations
         """,
       )
       _ <- prepareObservation(pi, pid, oid1, tid1) *> prepareObservation(pi, pid, oid2, tid2)
-      _ <- recalculateCalibrations(pid, when)
+      _ <- recalculateCalibrations(pid, when, oid1)
+      _ <- recalculateCalibrations(pid, when, oid2)
 
       ob <- queryObservations(pid)
     } yield {
@@ -1164,10 +1184,12 @@ class perProgramPerConfigCalibrations
         """
       )
       _    <- prepareObservation(pi, pid, oid1, tid1) *> prepareObservation(pi, pid, oid2, tid2)
-      _    <- recalculateCalibrations(pid, when)
+      _    <- recalculateCalibrations(pid, when, oid1)
+      _    <- recalculateCalibrations(pid, when, oid2)
       obsBefore <- queryObservations(pid)
       _    <- deleteObservation(pi, oid2)  // Delete full frame
-      _    <- recalculateCalibrations(pid, when)
+      _    <- recalculateCalibrations(pid, when, oid1)
+      _    <- recalculateCalibrations(pid, when, oid2)
       gr1  <- groupElementsAs(pi, pid, None)
       obsAfter   <- queryObservations(pid)
     } yield {
@@ -1249,7 +1271,8 @@ class perProgramPerConfigCalibrations
         """
       )
       _    <- prepareObservation(pi, pid, oid1, tid1) *> prepareObservation(pi, pid, oid2, tid2)
-      _    <- recalculateCalibrations(pid, when)
+      _    <- recalculateCalibrations(pid, when, oid1)
+      _    <- recalculateCalibrations(pid, when, oid2)
       obsBefore <- queryObservations(pid)
       // Convert full observation to central
       _ <- query(
@@ -1275,7 +1298,8 @@ class perProgramPerConfigCalibrations
           }
         """
       )
-      _    <- recalculateCalibrations(pid, when)
+      _    <- recalculateCalibrations(pid, when, oid1)
+      _    <- recalculateCalibrations(pid, when, oid2)
       gr1  <- groupElementsAs(pi, pid, None)
       obsAfter   <- queryObservations(pid)
     } yield {
@@ -1333,7 +1357,7 @@ class perProgramPerConfigCalibrations
       )
       _ <- prepareObservation(pi, pid, oid1, tid1)
       // Generate calibrations for first observation
-      _ <- recalculateCalibrations(pid, when)
+      _ <- recalculateCalibrations(pid, when, oid1)
       obsAfterFirst <- queryObservations(pid)
       // Now add second observation with same config but different ROI
       oid2 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid2)
@@ -1362,7 +1386,8 @@ class perProgramPerConfigCalibrations
       )
       _ <- prepareObservation(pi, pid, oid2, tid2)
       // Recalculate calibrations after adding second observation
-      _ <- recalculateCalibrations(pid, when)
+      _ <- recalculateCalibrations(pid, when, oid1)
+      _ <- recalculateCalibrations(pid, when, oid2)
       obsAfterSecond <- queryObservations(pid)
     } yield {
       // After first observation: 1 specphote + 1 Twilight
@@ -1399,7 +1424,8 @@ class perProgramPerConfigCalibrations
       _    <- updateConf(oid2, GmosAmpReadMode.Slow, GmosAmpGain.Low)
       _    <- prepareObservation(pi, pid, oid1, tid1) *> prepareObservation(pi, pid, oid2, tid2)
       // run calibrations
-      _    <- recalculateCalibrations(pid, when)
+      _    <- recalculateCalibrations(pid, when, oid1)
+      _    <- recalculateCalibrations(pid, when, oid2)
       ob   <- queryObservations(pid)
     } yield {
       val calibTargetIds = ob.collect:
@@ -1419,7 +1445,8 @@ class perProgramPerConfigCalibrations
       oid1 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid1)
       oid2 <- createObservationAs(pi, pid, ObservingModeType.GmosSouthLongSlit.some, tid2)
       _    <- prepareObservation(pi, pid, oid1, tid1) *> prepareObservation(pi, pid, oid2, tid2)
-      _    <- recalculateCalibrations(pid, when)
+      _    <- recalculateCalibrations(pid, when, oid1)
+      _    <- recalculateCalibrations(pid, when, oid2)
       ev   <- Ref.of[IO, List[Notification[String]]](Nil)
       fib  <- withServices(service): services =>
                 // listen to the raw notifications channel, ObsTopic filters bogus
@@ -1428,7 +1455,8 @@ class perProgramPerConfigCalibrations
                   .interruptAfter(10.seconds)
                   .compile.toList.flatTap(ev.set).start
       _    <- deleteObservation(pi, oid2)
-      _    <- recalculateCalibrations(pid, when)
+      _    <- recalculateCalibrations(pid, when, oid1)
+      _    <- recalculateCalibrations(pid, when, oid2)
       _    <- fib.join
       _    <- ev.get.map: not =>
                 // Bogus notifiactions carry no value
@@ -1451,7 +1479,8 @@ class perProgramPerConfigCalibrations
       _    <- prepareObservation(pi, pid, oid1, tid1) *> prepareObservation(pi, pid, oid2, tid2)
       _    <- setObservationWorkflowState(pi, oid1, ObservationWorkflowState.Inactive)
       _    <- setObservationWorkflowState(pi, oid2, ObservationWorkflowState.Inactive)
-      _    <- recalculateCalibrations(pid, when)
+      _    <- recalculateCalibrations(pid, when, oid1)
+      _    <- recalculateCalibrations(pid, when, oid2)
       gr1  <- groupElementsAs(pi, pid, None)
       ob   <- queryObservations(pid)
     } yield {
@@ -1471,7 +1500,8 @@ class perProgramPerConfigCalibrations
       oid2 <- createObservationAs(pi, pid, ObservingModeType.GmosSouthLongSlit.some, tid2)
       _    <- prepareObservation(pi, pid, oid1, tid1) *> prepareObservation(pi, pid, oid2, tid2)
       _    <- setObservationWorkflowState(pi, oid2, ObservationWorkflowState.Inactive)
-      _    <- recalculateCalibrations(pid, when)
+      _    <- recalculateCalibrations(pid, when, oid1)
+      _    <- recalculateCalibrations(pid, when, oid2)
       gr1  <- groupElementsAs(pi, pid, None)
       ob   <- queryObservations(pid)
     } yield {
@@ -1492,11 +1522,11 @@ class perProgramPerConfigCalibrations
         tid1 <- createTargetAs(pi, pid, "One")
         oid1 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid1)
         _    <- prepareObservation(pi, pid, oid1, tid1)
-        _    <- recalculateCalibrations(pid, when)
+        _    <- recalculateCalibrations(pid, when, oid1)
         ob1  <- queryObservations(pid)
         gr1  <- groupElementsAs(pi, pid, None)
         _    <- set(oid1)
-        _    <- recalculateCalibrations(pid, when)
+        _    <- recalculateCalibrations(pid, when, oid1)
         ob2  <- queryObservations(pid)
         gr2  <- groupElementsAs(pi, pid, None)
       } yield {
@@ -1521,7 +1551,7 @@ class perProgramPerConfigCalibrations
         _    <- updateTargetPropertiesAs(pi, tid, Coordinates.Zero)
         _    <- scienceRequirements(pi, oid, DefaultSnAt)
         _    <- setCalculatedWorkflowState(oid, state)
-        _    <- recalculateCalibrations(pid, when)
+        _    <- recalculateCalibrations(pid, when, oid)
         ob   <- queryObservations(pid)
         gr   <- groupElementsAs(pi, pid, None)
       } yield {
@@ -1536,7 +1566,7 @@ class perProgramPerConfigCalibrations
         tid        <- createTargetAs(pi, pid, "Target")
         oid        <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid)
         _          <- prepareObservation(pi, pid, oid, tid)
-        (added, _) <- recalculateCalibrations(pid, when)
+        (added, _) <- recalculateCalibrations(pid, when, oid)
         // Run obscalc on newly created calibrations so they're 'ready' before we set workflow state
         _          <- added.traverse_(cid => runObscalcUpdate(pid, cid))
         ob1        <- queryObservations(pid)
@@ -1544,7 +1574,7 @@ class perProgramPerConfigCalibrations
         _          <- setCalculatedWorkflowState(calibIds.head, state)
         _          <- updateCentralWavelength(oid, Wavelength.fromIntNanometers(600).get)
         _          <- runObscalcUpdate(pid, oid)
-        _          <- recalculateCalibrations(pid, when)
+        _          <- recalculateCalibrations(pid, when, oid)
         ob2        <- queryObservations(pid)
       } yield {
         // Calibration preserved + 2 new calibrations
