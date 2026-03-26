@@ -4,6 +4,7 @@
 package lucuma.odb.service
 
 import cats.effect.MonadCancelThrow
+import cats.syntax.applicative.*
 import cats.syntax.apply.*
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
@@ -107,6 +108,9 @@ object ObservingModeServices:
               .select(oids)
               .map(_.widen[ObservingMode])
 
+          case (GhostIfu, oids) =>
+            Map.empty.pure[F]
+
         }.map(_.fold(Map.empty[Observation.Id, ObservingMode])(_ ++ _))
 
       override def create(
@@ -142,6 +146,7 @@ object ObservingModeServices:
             case ObservingModeType.GmosSouthImaging   => gmosImagingService.deleteSouth(which)
             case ObservingModeType.GmosSouthLongSlit  => gmosLongSlitService.deleteSouth(which)
             case ObservingModeType.Igrins2LongSlit    => igrins2LongSlitService.delete(which)
+            case ObservingModeType.GhostIfu           => ().pure
 
         deleteExposureTimeModes *> deleteObservingMode
 
@@ -182,6 +187,7 @@ object ObservingModeServices:
             case ObservingModeType.GmosSouthLongSlit  => gmosLongSlitService.cloneSouth(origOid, newOid)
             case ObservingModeType.GmosSouthImaging   => gmosImagingService.cloneSouth(origOid, newOid, etms)
             case ObservingModeType.Igrins2LongSlit    => igrins2LongSlitService.clone(origOid, newOid)
+            case ObservingModeType.GhostIfu           => ().pure
 
         exposureTimeModeService
           .clone(origOid, newOid)
