@@ -2232,10 +2232,11 @@ type GmosNorthStatic {
   """
   mosPreImaging: MosPreImaging!
 
-  """
-  Nod-and-shuffle configuration
-  """
-  nodAndShuffle: GmosNodAndShuffle
+  # There is no mapping for this, so it cannot have been in use anywhere.
+  #"""
+  #Nod-and-shuffle configuration
+  #"""
+  #nodAndShuffle: GmosNodAndShuffle
 }
 
 """
@@ -2258,7 +2259,7 @@ input GmosNorthStaticInput {
   mosPreImaging: MosPreImaging
 
   """
-  GMOS Nod And Shuffle configuration
+  GMOS Nod And Shuffle configuration.  Warning: Currently not used or stored.
   """
   nodAndShuffle: GmosNodAndShuffleInput
 }
@@ -2736,10 +2737,11 @@ type GmosSouthStatic {
   """
   mosPreImaging: MosPreImaging!
 
-  """
-  Nod-and-shuffle configuration
-  """
-  nodAndShuffle: GmosNodAndShuffle
+  # There is no mapping for this, so it cannot have been in use anywhere.
+  #"""
+  #Nod-and-shuffle configuration
+  #"""
+  #nodAndShuffle: GmosNodAndShuffle
 }
 
 """
@@ -2762,7 +2764,7 @@ input GmosSouthStaticInput {
   mosPreImaging: MosPreImaging
 
   """
-  GMOS Nod And Shuffle configuration
+  GMOS Nod And Shuffle configuration.  Warning: currently not used or stored.
   """
   nodAndShuffle: GmosNodAndShuffleInput
 }
@@ -7322,23 +7324,6 @@ type Execution {
   digest: CalculatedExecutionDigest
 
   """
-  Full execution config, including acquisition and science sequences.  If a
-  sequence cannot be generated for this observation, `null` is returned along
-  with warning messages.
-  """
-  config(
-    """
-    The maximum size (number of atoms) of the `possibleFuture` in the sequences.
-    If the projected future is longer, the size will be capped at this value.
-    Use 0 if only interested in the `nextAtom`.  The maximum is 100.  Each
-    sequence has a `hasMore` field that can be used to determine whether there
-    additional atoms beyond those returned in `possibleFuture`.  The total
-    projected atom count is available in the execution digest.
-    """
-    futureLimit: NonNegInt = 25
-  ): ExecutionConfig @deprecated(reason: "moved to Query -> executionConfig")
-
-  """
   Determines the execution state as a whole of this observation.
   """
   executionState: ExecutionState!
@@ -11351,9 +11336,6 @@ type Observation {
   The instrument in use for this observation, if the observing mode is set.
   """
   instrument: Instrument
-
-  # Manual instrument configuration
-  # manualConfig: ManualConfig
 
   """
   Execution sequence and runtime artifacts
