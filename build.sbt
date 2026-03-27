@@ -1,57 +1,58 @@
 import NativePackagerHelper._
 
 // Please keep in alphabetical order
-val awsJavaSdkVersion          = "1.12.792"
-val boopickleVersion           = "1.5.0"
-val bouncycastleVersion        = "1.70"
-val catsEffectVersion          = "3.7.0"
-val catsParseVersion           = "1.1.0"
-val catsScalacheckVersion      = "0.3.2"
-val catsTimeVersion            = "0.6.0"
-val catsVersion                = "2.13.0"
-val circeVersion               = "0.14.15"
-val circeRefinedVersion        = "0.15.1"
-val cirisVersion               = "3.12.0"
-val clueVersion                = "0.51.3"
-val declineVersion             = "2.6.1"
-val dropwizardVersion          = "4.2.38"
-val flywayVersion              = "9.22.3"
-val fs2AwsVersion              = "6.2.0"
-val fs2Version                 = "3.13.0"
-val grackleVersion             = "0.26.0"
-val http4sVersion              = "0.23.33"
-val http4sBlazeVersion         = "0.23.17"
-val http4sEmberVersion         = "0.23.33"
-val http4sJdkHttpClientVersion = "0.10.0"
-val jmhVersion                 = "1.37"
-val jwtVersion                 = "11.0.3"
-val keySemaphoreVersion        = "0.3.0-M1"
-val kittensVersion             = "3.5.0"
-val logbackVersion             = "1.5.32"
-val log4catsVersion            = "2.8.0"
-val lucumaCoreVersion          = "0.178.0"
-val lucumaGraphQLRoutesVersion = "0.11.7"
-val monocleVersion             = "3.3.0"
-val munitVersion               = "1.2.1"
-val munitCatsEffectVersion     = "2.1.0"   // check test output if you attempt to update this
-val munitDisciplineVersion     = "2.0.0"   // check test output if you attempt to update this
-val munitScalacheckVersion     = "1.2.0"   // check test output if you attempt to update this
+val awsJavaSdkVersion            = "1.12.792"
+val boopickleVersion             = "1.5.0"
+val bouncycastleVersion          = "1.70"
+val catsEffectVersion            = "3.7.0"
+val catsParseVersion             = "1.1.0"
+val catsScalacheckVersion        = "0.3.2"
+val catsTimeVersion              = "0.6.0"
+val catsVersion                  = "2.13.0"
+val circeVersion                 = "0.14.15"
+val circeRefinedVersion          = "0.15.1"
+val cirisVersion                 = "3.12.0"
+val clueVersion                  = "0.51.3"
+val declineVersion               = "2.6.1"
+val dropwizardVersion            = "4.2.38"
+val flywayVersion                = "9.22.3"
+val fs2AwsVersion                = "6.2.0"
+val fs2Version                   = "3.13.0"
+val grackleVersion               = "0.26.0"
+val http4sVersion                = "0.23.33"
+val http4sBlazeVersion           = "0.23.17"
+val http4sEmberVersion           = "0.23.33"
+val http4sJdkHttpClientVersion   = "0.10.0"
+val jmhVersion                   = "1.37"
+val jwtVersion                   = "11.0.3"
+val keySemaphoreVersion          = "0.3.0-M1"
+val kittensVersion               = "3.5.0"
+val logbackVersion               = "1.5.32"
+val log4catsVersion              = "2.8.0"
+val lucumaCoreVersion            = "0.178.0"
+val lucumaGraphQLRoutesVersion   = "0.11.7"
+val monocleVersion               = "3.3.0"
+val munitVersion                 = "1.2.1"
+val munitCatsEffectVersion       = "2.1.0"   // check test output if you attempt to update this
+val munitDisciplineVersion       = "2.0.0"   // check test output if you attempt to update this
+val munitScalacheckVersion       = "1.2.0"   // check test output if you attempt to update this
 val scalacheckEffectMunitVersion = "1.0.4"
-val natchezHttp4sVersion       = "0.6.1"
-val natchezVersion             = "0.3.8"
-val otel4sVersion              = "0.15.2"
-val openTelemetryVersion       = "1.60.1"
-val openTelemetryInstrVersion  = "2.26.1-alpha"
-val paigesVersion              = "0.4.4"
-val postgresVersion            = "42.7.9"
-val pprintVersion              = "0.9.6"
-val redis4CatsVersion          = "2.0.1"
-val refinedVersion             = "0.11.3"
-val skunkVersion               = "0.6.5"
-val spireVersion               = "0.18.0"
-val slf4jVersion               = "2.0.17"
-val testcontainersScalaVersion = "0.44.1" // check test output if you attempt to update this
-val weaverVersion              = "0.8.4"
+val natchezHttp4sVersion         = "0.6.1"
+val natchezVersion               = "0.3.8"
+val otel4sVersion                = "0.15.2"
+val openTelemetryVersion         = "1.60.1"
+val openTelemetryInstrVersion    = "2.26.1-alpha"
+val paigesVersion                = "0.4.4"
+val postgresVersion              = "42.7.9"
+val pprintVersion                = "0.9.6"
+val redis4CatsVersion            = "2.0.1"
+val refinedVersion               = "0.11.3"
+val skunkVersion                 = "0.6.5"
+val sqlFormatterVersion          = "2.0.5"
+val spireVersion                 = "0.18.0"
+val slf4jVersion                 = "2.0.17"
+val testcontainersScalaVersion   = "0.44.1" // check test output if you attempt to update this
+val weaverVersion                = "0.8.4"
 
 ThisBuild / tlBaseVersion      := "0.59"
 ThisBuild / scalaVersion       := "3.7.4"
@@ -335,13 +336,13 @@ lazy val ssoService = project
       "org.typelevel"       %% "log4cats-slf4j"          % log4catsVersion,
       "ch.qos.logback"       % "logback-classic"         % logbackVersion,
       "io.circe"            %% "circe-generic"           % circeVersion,
-      "org.tpolecat"        %% "natchez-noop"       % natchezVersion,
+      "org.tpolecat"        %% "natchez-noop"            % natchezVersion,
       "org.tpolecat"        %% "natchez-http4s"          % natchezHttp4sVersion,
       "org.tpolecat"        %% "natchez-log"             % natchezVersion,
-      "edu.gemini"          %% "lucuma-graphql-routes" % lucumaGraphQLRoutesVersion,
-      "io.circe"            %% "circe-literal"         % circeVersion  % Test,
-      "com.disneystreaming" %% "weaver-cats"           % weaverVersion % Test,
-      "com.disneystreaming" %% "weaver-scalacheck"     % weaverVersion % Test
+      "edu.gemini"          %% "lucuma-graphql-routes"   % lucumaGraphQLRoutesVersion,
+      "io.circe"            %% "circe-literal"           % circeVersion  % Test,
+      "com.disneystreaming" %% "weaver-cats"             % weaverVersion % Test,
+      "com.disneystreaming" %% "weaver-scalacheck"       % weaverVersion % Test
     ),
     testFrameworks += new TestFramework("weaver.framework.CatsEffect"),
     reStart / envVars += "PORT" -> "8082",
@@ -366,7 +367,7 @@ lazy val ssoBackendExample = project
       "org.http4s"   %% "http4s-ember-server" % http4sEmberVersion,
       "org.slf4j"    %  "slf4j-simple"        % slf4jVersion,
       "org.tpolecat" %% "natchez-http4s"      % natchezHttp4sVersion,
-      "org.tpolecat" %% "natchez-noop"   % natchezVersion,
+      "org.tpolecat" %% "natchez-noop"        % natchezVersion,
     )
   )
 
@@ -465,7 +466,7 @@ lazy val itcService = project
       "org.typelevel"        %% "grackle-generic"       % grackleVersion,
       "org.typelevel"        %% "grackle-circe"         % grackleVersion,
       "edu.gemini"           %% "lucuma-graphql-routes" % lucumaGraphQLRoutesVersion,
-      "org.tpolecat"         %% "natchez-noop"     % natchezVersion,
+      "org.tpolecat"         %% "natchez-noop"          % natchezVersion,
       "org.tpolecat"         %% "natchez-log"           % natchezVersion,
       "org.tpolecat"         %% "natchez-http4s"        % natchezHttp4sVersion,
       "co.fs2"               %% "fs2-core"              % fs2Version,
@@ -691,51 +692,52 @@ lazy val service = project
     name                        := "lucuma-odb-service",
     projectDependencyArtifacts  := (Compile / dependencyClasspathAsJars).value,
     libraryDependencies ++= Seq(
-      "ch.qos.logback"            % "logback-classic"                    % logbackVersion,
-      "com.monovore"             %% "decline-effect"                     % declineVersion,
-      "com.monovore"             %% "decline"                            % declineVersion,
-      "io.laserdisc"             %% "fs2-aws-s3"                         % fs2AwsVersion,
-      "org.typelevel"            %% "grackle-skunk"                      % grackleVersion,
-      "edu.gemini"               %% "lucuma-catalog"                     % lucumaCoreVersion,
-      "edu.gemini"               %% "lucuma-horizons"                    % lucumaCoreVersion,
-      "edu.gemini"               %% "lucuma-ags"                         % lucumaCoreVersion,
-      "edu.gemini"               %% "lucuma-graphql-routes"              % lucumaGraphQLRoutesVersion,
-      "is.cir"                   %% "ciris"                              % cirisVersion,
-      "is.cir"                   %% "ciris-refined"                      % cirisVersion,
-      "org.flywaydb"              % "flyway-core"                        % flywayVersion,
-      "org.http4s"               %% "http4s-blaze-server"                % http4sBlazeVersion,
-      "org.http4s"               %% "http4s-ember-client"                % http4sEmberVersion,
-      "org.postgresql"            % "postgresql"                         % postgresVersion,
-      "org.tpolecat"             %% "natchez-http4s"                     % natchezHttp4sVersion,
-      "org.tpolecat"             %% "natchez-log"                        % natchezVersion,
-      "org.tpolecat"             %% "natchez-noop"                       % natchezVersion,
-      "org.typelevel"            %% "otel4s-oteljava"                    % otel4sVersion,
-      "io.opentelemetry"          % "opentelemetry-sdk-extension-autoconfigure" % openTelemetryVersion,
-      "io.opentelemetry"          % "opentelemetry-exporter-otlp"        % openTelemetryVersion,
-      "io.opentelemetry.instrumentation" % "opentelemetry-runtime-telemetry" % openTelemetryInstrVersion,
-      "org.tpolecat"             %% "skunk-core"                         % skunkVersion,
-      "org.tpolecat"             %% "skunk-circe"                        % skunkVersion,
-      "com.lihaoyi"              %% "pprint"                             % pprintVersion,
-      "com.dimafeng"             %% "testcontainers-scala-munit"         % testcontainersScalaVersion % Test,
-      "com.dimafeng"             %% "testcontainers-scala-localstack-v2" % testcontainersScalaVersion % Test,
-      "com.dimafeng"             %% "testcontainers-scala-postgresql"    % testcontainersScalaVersion % Test,
-      // testcontainers-scala-localstack-v2 requires both v1 and v2 of the aws sdk
-      "io.circe"                 %% "circe-testing"                      % circeVersion                 % Test,
-      "com.amazonaws"             % "aws-java-sdk-core"                  % awsJavaSdkVersion            % Test,
-      "edu.gemini"               %% "clue-http4s"                        % clueVersion                  % Test,
-      "org.scalameta"            %% "munit"                              % munitVersion                 % Test,
-      "org.scalameta"            %% "munit-diff"                         % munitVersion                 % Test,
-      "org.scalameta"            %% "munit-scalacheck"                   % munitScalacheckVersion       % Test,
-      "org.typelevel"            %% "scalacheck-effect-munit"            % scalacheckEffectMunitVersion % Test,
-      "org.typelevel"            %% "discipline-munit"                   % munitDisciplineVersion       % Test,
-      "edu.gemini"               %% "lucuma-catalog-testkit"             % lucumaCoreVersion            % Test,
-      "edu.gemini"               %% "lucuma-core-testkit"                % lucumaCoreVersion            % Test,
-      "org.http4s"               %% "http4s-jdk-http-client"             % http4sJdkHttpClientVersion   % Test,
-      "org.typelevel"            %% "cats-time"                          % catsTimeVersion,
-      "org.typelevel"            %% "log4cats-slf4j"                     % log4catsVersion,
-      "org.typelevel"            %% "munit-cats-effect"                  % munitCatsEffectVersion % Test,
-      "org.typelevel"            %% "paiges-core"                        % paigesVersion,
-      "com.github.vertical-blank" % "sql-formatter"                      % "2.0.5"
+      "ch.qos.logback"                    % "logback-classic"                            % logbackVersion,
+      "com.monovore"                     %% "decline-effect"                             % declineVersion,
+      "com.monovore"                     %% "decline"                                    % declineVersion,
+      "io.laserdisc"                     %% "fs2-aws-s3"                                 % fs2AwsVersion,
+      "org.typelevel"                    %% "grackle-skunk"                              % grackleVersion,
+      "edu.gemini"                       %% "lucuma-catalog"                             % lucumaCoreVersion,
+      "edu.gemini"                       %% "lucuma-horizons"                            % lucumaCoreVersion,
+      "edu.gemini"                       %% "lucuma-ags"                                 % lucumaCoreVersion,
+      "edu.gemini"                       %% "lucuma-graphql-routes"                      % lucumaGraphQLRoutesVersion,
+      "is.cir"                           %% "ciris"                                      % cirisVersion,
+      "is.cir"                           %% "ciris-refined"                              % cirisVersion,
+      "org.flywaydb"                      % "flyway-core"                                % flywayVersion,
+      "org.http4s"                       %% "http4s-blaze-server"                        % http4sBlazeVersion,
+      "org.http4s"                       %% "http4s-ember-client"                        % http4sEmberVersion,
+      "org.postgresql"                    % "postgresql"                                 % postgresVersion,
+      "org.tpolecat"                     %% "natchez-http4s"                             % natchezHttp4sVersion,
+      "org.tpolecat"                     %% "natchez-log"                                % natchezVersion % Test,
+      "org.tpolecat"                     %% "natchez-noop"                               % natchezVersion,
+      "org.typelevel"                    %% "otel4s-oteljava"                            % otel4sVersion,
+      "org.typelevel"                    %% "otel4s-instrumentation-metrics"             % otel4sVersion,
+      "io.opentelemetry"                  % "opentelemetry-sdk-extension-autoconfigure"  % openTelemetryVersion,
+      "io.opentelemetry"                  % "opentelemetry-exporter-otlp"                % openTelemetryVersion,
+      "io.opentelemetry.instrumentation"  % "opentelemetry-runtime-telemetry"            % openTelemetryInstrVersion,
+      "org.tpolecat"                     %% "skunk-core"                                 % skunkVersion,
+      "org.tpolecat"                     %% "skunk-circe"                                % skunkVersion,
+      "com.lihaoyi"                      %% "pprint"                                     % pprintVersion,
+      "com.dimafeng"                     %% "testcontainers-scala-munit"                 % testcontainersScalaVersion % Test,
+      "com.dimafeng"                     %% "testcontainers-scala-localstack-v2"         % testcontainersScalaVersion % Test,
+      "com.dimafeng"                     %% "testcontainers-scala-postgresql"            % testcontainersScalaVersion % Test,
+      // testcontainers-scala-localstack-v2 requires both v1 and v2 of the aws sd        k
+      "io.circe"                         %% "circe-testing"                              % circeVersion                 % Test,
+      "com.amazonaws"                     % "aws-java-sdk-core"                          % awsJavaSdkVersion            % Test,
+      "edu.gemini"                       %% "clue-http4s"                                % clueVersion                  % Test,
+      "org.scalameta"                    %% "munit"                                      % munitVersion                 % Test,
+      "org.scalameta"                    %% "munit-diff"                                 % munitVersion                 % Test,
+      "org.scalameta"                    %% "munit-scalacheck"                           % munitScalacheckVersion       % Test,
+      "org.typelevel"                    %% "scalacheck-effect-munit"                    % scalacheckEffectMunitVersion % Test,
+      "org.typelevel"                    %% "discipline-munit"                           % munitDisciplineVersion       % Test,
+      "edu.gemini"                       %% "lucuma-catalog-testkit"                     % lucumaCoreVersion            % Test,
+      "edu.gemini"                       %% "lucuma-core-testkit"                        % lucumaCoreVersion            % Test,
+      "org.http4s"                       %% "http4s-jdk-http-client"                     % http4sJdkHttpClientVersion   % Test,
+      "org.typelevel"                    %% "cats-time"                                  % catsTimeVersion,
+      "org.typelevel"                    %% "log4cats-slf4j"                             % log4catsVersion,
+      "org.typelevel"                    %% "munit-cats-effect"                          % munitCatsEffectVersion % Test,
+      "org.typelevel"                    %% "paiges-core"                                % paigesVersion,
+      "com.github.vertical-blank"         % "sql-formatter"                              % sqlFormatterVersion
     ),
     reStart / envVars += "PORT" -> "8082",
     reStartArgs += "serve",

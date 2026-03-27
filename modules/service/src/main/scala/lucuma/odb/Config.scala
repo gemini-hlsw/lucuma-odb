@@ -45,21 +45,21 @@ import java.util.UUID
 import scala.concurrent.duration.*
 
 case class Config(
-  port:          Port,                      // Our port, nothing fancy.
-  itc:           Config.Itc,                // ITC config
-  sso:           Config.Sso,                // SSO config
-  telluric:      Config.Telluric,           // Telluric service config
-  serviceJwt:    String,                    // Only service users can exchange API keys, so we need a service user JWT.
-  otel:          Option[Config.OpenTelemetry], // OpenTelemetry/Grafana config
-  database:      Config.Database,           // Database config
-  aws:           Config.Aws,                // AWS config
-  email:         Config.Email,              // Mailgun config
-  corsOverHttps: Boolean,                   // Whether to require CORS over HTTPS
-  domain:        List[String],              // Domains, for CORS headers
-  commitHash:    CommitHash,                // From Heroku Dyno Metadata
-  goaUsers:      Set[User.Id],              // Gemini Observatory Archive user id(s)
-  obscalcPoll:   FiniteDuration,            // Obscalc poll period
-  httpClient:    Config.HttpClient          // Configuration for HTTP requests made by the ODB
+  port:          Port,                          // Our port, nothing fancy.
+  itc:           Config.Itc,                    // ITC config
+  sso:           Config.Sso,                    // SSO config
+  telluric:      Config.Telluric,               // Telluric service config
+  serviceJwt:    String,                        // Only service users can exchange API keys, so we need a service user JWT.
+  otel:          Option[Config.OpenTelemetry],  // OpenTelemetry/Grafana config
+  database:      Config.Database,               // Database config
+  aws:           Config.Aws,                    // AWS config
+  email:         Config.Email,                  // Mailgun config
+  corsOverHttps: Boolean,                       // Whether to require CORS over HTTPS
+  domain:        List[String],                  // Domains, for CORS headers
+  commitHash:    CommitHash,                    // From Heroku Dyno Metadata
+  goaUsers:      Set[User.Id],                  // Gemini Observatory Archive user id(s)
+  obscalcPoll:   FiniteDuration,                // Obscalc poll period
+  httpClient:    Config.HttpClient              // Configuration for HTTP requests made by the ODB
 ):
 
   // People send us their JWTs. We need to be able to extract them from the request, decode them,

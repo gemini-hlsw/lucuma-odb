@@ -3,7 +3,6 @@
 
 package lucuma.odb.util
 
-import cats.Applicative
 import cats.arrow.FunctionK
 import cats.effect.MonadCancelThrow
 import cats.effect.Resource
@@ -20,36 +19,32 @@ import java.net.URI
 
 object Otel4sTrace:
 
+  // Bride to let libraries using natchez to trace to otel4s
   def fromTracer[F[_]: MonadCancelThrow](tracer: Tracer[F]): Trace[F] =
     new Trace[F]:
 
       def put(fields: (String, TraceValue)*): F[Unit] =
         tracer.currentSpanOrNoop.flatMap: span =>
-          fields.toList.traverse_ { case (k, v) =>
-            span.addAttribute(traceValueToAttribute(k, v))
-          }
+          fields.toList.traverse_ : (k, v) =>
+            span.addAttribute(traceToAttr(k, v))
 
       def attachError(err: Throwable, fields: (String, TraceValue)*): F[Unit] =
         tracer.currentSpanOrNoop.flatMap: span =>
           span.recordException(err) *>
-            span.setStatus(StatusCode.Error, err.getMessage.nn) *>
-            fields.toList.traverse_ { case (k, v) =>
-              span.addAttribute(traceValueToAttribute(k, v))
-            }
+            span.setStatus(StatusCode.Error, err.getMessage) *>
+            fields.toList.traverse_ : (k, v) =>
+              span.addAttribute(traceToAttr(k, v))
 
-      def log(fields: Seq[(String, TraceValue)]): F[Unit] =
+      def log(fields: (String, TraceValue)*): F[Unit] =
         tracer.currentSpanOrNoop.flatMap: span =>
-          span.addEvent("log", fields.map { case (k, v) => traceValueToAttribute(k, v) }*)
+          span.addEvent("log", fields.map { case (k, v) => traceToAttr(k, v) }*)
 
       def log(event: String): F[Unit] =
         tracer.currentSpanOrNoop.flatMap: span =>
           span.addEvent(event)
 
       def kernel: F[Kernel] =
-        Applicative[F].pure(Kernel(Map.empty))
-
-      def span[A](name: String)(k: F[A]): F[A] =
-        tracer.span(name).surround(k)
+        Kernel(Map.empty).pure[F]
 
       def span[A](name: String, options: Span.Options)(k: F[A]): F[A] =
         tracer.span(name).surround(k)
@@ -62,12 +57,9 @@ object Otel4sTrace:
           _.map(_.traceIdHex).filter(id => id.nonEmpty && id != "0" * 32)
 
       def traceUri: F[Option[URI]] =
-        Applicative[F].pure(None)
+        none.pure
 
-  private def traceValueToAttribute(
-    key: String,
-    tv: TraceValue
-  ): Attribute[?] =
+  private def traceToAttr(key: String, tv: TraceValue): Attribute[?] =
     tv match
       case TraceValue.StringValue(v)  => Attribute(key, v)
       case TraceValue.BooleanValue(v) => Attribute(key, v)
