@@ -8,6 +8,8 @@ import cats.data.Kleisli
 import cats.data.Validated
 import cats.effect.*
 import cats.effect.std.Console
+import cats.effect.std.SecureRandom
+import cats.effect.std.UUIDGen
 import cats.implicits.*
 import com.comcast.ip4s.Host
 import com.comcast.ip4s.Port
@@ -190,7 +192,8 @@ object FMain extends AnsiColor {
    * A resource that yields a Natchez tracing entry point, either a Honeycomb endpoint if `config`
    * is defined, otherwise a log endpoint.
    */
-  def entryPointResource[F[_]: Sync: Logger](config: Option[HoneycombConfig]): Resource[F, EntryPoint[F]] =
+  def entryPointResource[F[_]: Sync: Logger: SecureRandom](config: Option[HoneycombConfig]): Resource[F, EntryPoint[F]] =
+    given UUIDGen[F] = UUIDGen.fromSecureRandom
     config.fold(Log.entryPoint(ServiceName).pure[Resource[F, *]]) { cfg =>
       Honeycomb.entryPoint(ServiceName) { cb =>
           Sync[F].delay {
@@ -359,4 +362,3 @@ object FMain extends AnsiColor {
         yield ExitCode.Success
 
 }
-
