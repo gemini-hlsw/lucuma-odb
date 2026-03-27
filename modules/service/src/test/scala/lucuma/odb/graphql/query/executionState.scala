@@ -48,7 +48,7 @@ class executionState extends ExecutionTestSupportForGmos {
 
   import ExecutionState.*
 
-  test("isComplete - NOT_STARTED") {
+  test("executionState - NOT_STARTED") {
     val setup: IO[Observation.Id] =
       for
         p <- createProgram
@@ -64,7 +64,7 @@ class executionState extends ExecutionTestSupportForGmos {
       )
   }
 
-  test("isComplete - ONGOING") {
+  test("executionState - ONGOING") {
     val setup: IO[Observation.Id] =
       for
         p <- createProgram
@@ -84,7 +84,7 @@ class executionState extends ExecutionTestSupportForGmos {
       )
   }
 
-  test("isComplete - COMPLETED"):
+  test("executionState - COMPLETED"):
     val setup: IO[Observation.Id] =
       for
         p <- createProgram
@@ -105,7 +105,7 @@ class executionState extends ExecutionTestSupportForGmos {
 
   // the completion state is computed now from events so there's not a convenient
   // way to determine that the observation is ill-defined vs not started
-  test("isComplete - NOT_DEFINED".ignore) {
+  test("executionState - NOT_DEFINED".ignore) {
     val setup: IO[Observation.Id] =
       for
         p <- createProgram
@@ -120,4 +120,65 @@ class executionState extends ExecutionTestSupportForGmos {
         expected = stateResult(NotDefined).asRight
       )
   }
+
+  test("executionState - many"):
+    expect(
+      user  = pi,
+      query = s"""
+        query {
+          programs(WHERE: { pi: { user: { id: { EQ: "${pi.id}" } } } }) {
+            matches {
+              observations {
+                matches {
+                  execution {
+                    executionState
+                  }
+                }
+              }
+            }
+          }
+        }
+      """,
+      expected = json"""
+        {
+          "programs": {
+            "matches": [
+              {
+                "observations": {
+                  "matches": [
+                    {
+                      "execution": {
+                        "executionState": "NOT_STARTED"
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "observations": {
+                  "matches": [
+                    {
+                      "execution": {
+                        "executionState": "ONGOING"
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "observations": {
+                  "matches": [
+                    {
+                      "execution": {
+                        "executionState": "COMPLETED"
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      """.asRight
+    )
 }
