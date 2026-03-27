@@ -323,6 +323,10 @@ object GuideService {
             AgsParams.GmosImaging(PortDisposition.Side).withPWFS1.some
           case (_: gmos.imaging.Config.GmosNorth | _: gmos.imaging.Config.GmosSouth, GuideProbe.PWFS2) =>
             AgsParams.GmosImaging(PortDisposition.Side).withPWFS2.some
+          case (_: igrins2.longslit.Config, GuideProbe.PWFS2) =>
+            AgsParams.Igrins2LongSlit(PortDisposition.Bottom).withPWFS2.some
+          case (_: igrins2.longslit.Config, GuideProbe.PWFS1) =>
+            AgsParams.Igrins2LongSlit(PortDisposition.Bottom).withPWFS1.some
           case _ =>
             none
 
