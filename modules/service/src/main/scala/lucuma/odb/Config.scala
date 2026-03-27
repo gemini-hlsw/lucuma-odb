@@ -142,14 +142,18 @@ object Config:
         .map(Telluric.apply)
 
   case class OpenTelemetry(
-    endpoint:   String,
-    instanceId: String,
-    apiKey:     String
+    endpoint:    String,
+    instanceId:  String,
+    apiKey:      String,
+    environment: String
   )
 
   object OpenTelemetry:
     private val inHeroku: ConfigValue[Effect, Boolean] =
       envOrProp("DYNO").option.map(_.isDefined)
+
+    private val environment: ConfigValue[Effect, String] =
+      envOrProp("ODB_ENVIRONMENT").default("local")
 
     lazy val fromCiris: ConfigValue[Effect, Option[OpenTelemetry]] =
       inHeroku.flatMap: inHeroku =>
@@ -157,18 +161,20 @@ object Config:
           (
             envOrProp("ODB_OTEL_ENDPOINT"),
             envOrProp("ODB_OTEL_INSTANCE_ID"),
-            envOrProp("ODB_OTEL_API_KEY")
-          ).parMapN: (endpoint, instanceId, apiKey) =>
-            OpenTelemetry(endpoint, instanceId, apiKey).some
+            envOrProp("ODB_OTEL_API_KEY"),
+            environment
+          ).parMapN: (endpoint, instanceId, apiKey, env) =>
+            OpenTelemetry(endpoint, instanceId, apiKey, env).some
         else
           (
             envOrProp("ODB_OTEL_ENDPOINT").option,
             envOrProp("ODB_OTEL_INSTANCE_ID").option,
-            envOrProp("ODB_OTEL_API_KEY").option
+            envOrProp("ODB_OTEL_API_KEY").option,
+            environment
           ).parTupled.map:
-            case (Some(endpoint), Some(instanceId), Some(apiKey))
+            case (Some(endpoint), Some(instanceId), Some(apiKey), env)
               if endpoint.trim.nonEmpty && instanceId.trim.nonEmpty && apiKey.trim.nonEmpty =>
-              OpenTelemetry(endpoint, instanceId, apiKey).some
+              OpenTelemetry(endpoint, instanceId, apiKey, env).some
             case _ =>
               None
 
