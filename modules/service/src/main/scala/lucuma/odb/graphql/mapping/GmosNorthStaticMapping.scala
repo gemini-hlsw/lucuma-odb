@@ -2,18 +2,19 @@
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
 package lucuma.odb.graphql
- package mapping
+package mapping
 
- import table.GmosStaticTables
+import grackle.syntax.*
+import io.circe.Json
 
- trait GmosNorthStaticMapping[F[_]] extends GmosStaticTables[F] {
+import table.GmosStaticTables
 
-   lazy val GmosNorthStaticMapping: ObjectMapping =
-     ObjectMapping(GmosNorthStaticType)(
-        SqlField("id",            GmosNorthStaticTable.Id, key = true, hidden = true),
-        SqlField("detector",      GmosNorthStaticTable.Detector),
-        SqlField("mosPreImaging", GmosNorthStaticTable.MosPreImaging),
-        SqlField("stageMode",     GmosNorthStaticTable.StageMode)
-      )
-
- }
+trait GmosNorthStaticMapping[F[_]] extends GmosStaticTables[F]:
+  lazy val GmosNorthStaticMapping: ObjectMapping =
+    ObjectMapping(GmosNorthStaticType)(
+      SqlField("id",            GmosNorthStaticTable.Id, key = true, hidden = true),
+      SqlField("detector",      GmosNorthStaticTable.Detector),
+      SqlField("mosPreImaging", GmosNorthStaticTable.MosPreImaging),
+      SqlField("stageMode",     GmosNorthStaticTable.StageMode),
+      CursorFieldJson("nodAndShuffle", _ => Json.Null.success, Nil)
+    )

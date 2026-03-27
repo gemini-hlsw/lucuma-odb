@@ -2232,11 +2232,11 @@ type GmosNorthStatic {
   """
   mosPreImaging: MosPreImaging!
 
-  # There is no mapping for this, so it cannot have been in use anywhere.
-  #"""
-  #Nod-and-shuffle configuration
-  #"""
-  #nodAndShuffle: GmosNodAndShuffle
+  """
+  Nod-and-shuffle configuration.  This is currently not used and will always
+  return null.
+  """
+  nodAndShuffle: GmosNodAndShuffle
 }
 
 """
@@ -2737,11 +2737,12 @@ type GmosSouthStatic {
   """
   mosPreImaging: MosPreImaging!
 
-  # There is no mapping for this, so it cannot have been in use anywhere.
-  #"""
+  """
   #Nod-and-shuffle configuration
-  #"""
-  #nodAndShuffle: GmosNodAndShuffle
+  Nod-and-shuffle configuration.  This is currently not used and will always
+  return null.
+  """
+  nodAndShuffle: GmosNodAndShuffle
 }
 
 """
