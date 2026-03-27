@@ -336,7 +336,7 @@ lazy val ssoService = project
       "org.typelevel"       %% "log4cats-slf4j"          % log4catsVersion,
       "ch.qos.logback"       % "logback-classic"         % logbackVersion,
       "io.circe"            %% "circe-generic"           % circeVersion,
-      "org.tpolecat"        %% "natchez-noop"            % natchezVersion,
+      "org.tpolecat"        %% "natchez-honeycomb"       % natchezVersion,
       "org.tpolecat"        %% "natchez-http4s"          % natchezHttp4sVersion,
       "org.tpolecat"        %% "natchez-log"             % natchezVersion,
       "edu.gemini"          %% "lucuma-graphql-routes"   % lucumaGraphQLRoutesVersion,
@@ -367,7 +367,7 @@ lazy val ssoBackendExample = project
       "org.http4s"   %% "http4s-ember-server" % http4sEmberVersion,
       "org.slf4j"    %  "slf4j-simple"        % slf4jVersion,
       "org.tpolecat" %% "natchez-http4s"      % natchezHttp4sVersion,
-      "org.tpolecat" %% "natchez-noop"        % natchezVersion,
+      "org.tpolecat" %% "natchez-honeycomb"   % natchezVersion,
     )
   )
 
@@ -466,7 +466,7 @@ lazy val itcService = project
       "org.typelevel"        %% "grackle-generic"       % grackleVersion,
       "org.typelevel"        %% "grackle-circe"         % grackleVersion,
       "edu.gemini"           %% "lucuma-graphql-routes" % lucumaGraphQLRoutesVersion,
-      "org.tpolecat"         %% "natchez-noop"          % natchezVersion,
+      "org.tpolecat"         %% "natchez-honeycomb"     % natchezVersion,
       "org.tpolecat"         %% "natchez-log"           % natchezVersion,
       "org.tpolecat"         %% "natchez-http4s"        % natchezHttp4sVersion,
       "co.fs2"               %% "fs2-core"              % fs2Version,
