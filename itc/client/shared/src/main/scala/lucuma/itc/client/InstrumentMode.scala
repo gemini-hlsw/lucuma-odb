@@ -5,11 +5,8 @@ package lucuma.itc.client
 
 import cats.Eq
 import cats.derived.*
-import cats.syntax.either.*
 import cats.syntax.eq.*
 import cats.syntax.functor.*
-import io.circe.Decoder
-import io.circe.DecodingFailure
 import io.circe.Encoder
 import io.circe.Json
 import io.circe.syntax.*
@@ -23,7 +20,9 @@ import lucuma.core.enums.GmosSouthFilter
 import lucuma.core.enums.GmosSouthGrating
 import lucuma.core.enums.PortDisposition
 import lucuma.core.math.Wavelength
+import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.sequence.gmos.GmosCcdMode
+import lucuma.itc.client.json.encoders.given
 import lucuma.itc.client.json.syntax.*
 import lucuma.odb.json.gmos.given
 import lucuma.odb.json.wavelength.transport.given
@@ -31,11 +30,19 @@ import monocle.Prism
 import monocle.macros.GenPrism
 
 sealed trait InstrumentMode:
+  // This will return "an" exposure time mode. For most instruments this is "the" exposure time mode,
+  // but for some (e.g. GHOST) there are multiple. In the case of GHOST, the ITC will ignore the
+  // "top level" exposure time mode and use the one in the spectroscopy mode, but we still need
+  // to have one to satisfy the legacy interface.
+  // This is also used in PerProgramPerConfigCalibrationsService. That might need to be updated
+  // if it needs to create calibrations for GHOST.
+  def exposureTimeMode: ExposureTimeMode
   def displayName: String
 
 object InstrumentMode {
 
   case class GmosNorthSpectroscopy(
+    exposureTimeMode:  ExposureTimeMode,
     centralWavelength: Wavelength,
     grating:           GmosNorthGrating,
     filter:            Option[GmosNorthFilter],
@@ -52,6 +59,7 @@ object InstrumentMode {
     given Encoder[GmosNorthSpectroscopy] = a =>
       Json.fromFields(
         List(
+          "exposureTimeMode"  -> a.exposureTimeMode.asJson,
           "centralWavelength" -> a.centralWavelength.asJson,
           "grating"           -> a.grating.asScreamingJson,
           "fpu"               -> a.fpu.asJson,
@@ -61,20 +69,10 @@ object InstrumentMode {
         ) ++ a.filter.map(_.asScreamingJson).tupleLeft("filter").toList
       )
 
-    given Decoder[GmosNorthSpectroscopy] = c =>
-      for
-        cw <- c.downField("centralWavelength").as[Wavelength]
-        g  <- c.downField("grating").as[GmosNorthGrating]
-        f  <- c.downField("filter").as[Option[GmosNorthFilter]]
-        u  <- c.downField("fpu").as[GmosFpu.North]
-        d  <- c.downField("ccdMode").as[Option[GmosCcdMode]]
-        r  <- c.downField("roi").as[Option[GmosRoi]]
-        p  <- c.downField("port").as[PortDisposition]
-      yield GmosNorthSpectroscopy(cw, g, f, u, d, r, p)
-
   }
 
   case class GmosSouthSpectroscopy(
+    exposureTimeMode:  ExposureTimeMode,
     centralWavelength: Wavelength,
     grating:           GmosSouthGrating,
     filter:            Option[GmosSouthFilter],
@@ -91,6 +89,7 @@ object InstrumentMode {
     given Encoder[GmosSouthSpectroscopy] = a =>
       Json.fromFields(
         List(
+          "exposureTimeMode"  -> a.exposureTimeMode.asJson,
           "centralWavelength" -> a.centralWavelength.asJson,
           "grating"           -> a.grating.asScreamingJson,
           "fpu"               -> a.fpu.asJson,
@@ -100,22 +99,12 @@ object InstrumentMode {
         ) ++ a.filter.map(_.asScreamingJson).tupleLeft("filter").toList
       )
 
-    given Decoder[GmosSouthSpectroscopy] = c =>
-      for
-        cw <- c.downField("centralWavelength").as[Wavelength]
-        g  <- c.downField("grating").as[GmosSouthGrating]
-        f  <- c.downField("filter").as[Option[GmosSouthFilter]]
-        u  <- c.downField("fpu").as[GmosFpu.South]
-        d  <- c.downField("ccdMode").as[Option[GmosCcdMode]]
-        r  <- c.downField("roi").as[Option[GmosRoi]]
-        p  <- c.downField("port").as[PortDisposition]
-      yield GmosSouthSpectroscopy(cw, g, f, u, d, r, p)
-
   case class Flamingos2Spectroscopy(
-    disperser: Flamingos2Disperser,
-    filter:    Flamingos2Filter,
-    fpu:       Flamingos2Fpu,
-    port:      PortDisposition = PortDisposition.Side
+    exposureTimeMode: ExposureTimeMode,
+    disperser:        Flamingos2Disperser,
+    filter:           Flamingos2Filter,
+    fpu:              Flamingos2Fpu,
+    port:             PortDisposition = PortDisposition.Side
   ) extends InstrumentMode derives Eq:
     override def displayName: String =
       "Flamingos 2 Spectroscopy"
@@ -125,25 +114,19 @@ object InstrumentMode {
     given Encoder[Flamingos2Spectroscopy] = a =>
       Json.fromFields(
         List(
-          "disperser" -> a.disperser.asScreamingJson,
-          "fpu"       -> a.fpu.asJson,
-          "filter"    -> a.filter.asJson,
-          "port"      -> a.port.asScreamingJson
+          "exposureTimeMode" -> a.exposureTimeMode.asJson,
+          "disperser"        -> a.disperser.asScreamingJson,
+          "fpu"              -> a.fpu.asJson,
+          "filter"           -> a.filter.asJson,
+          "port"             -> a.port.asScreamingJson
         )
       )
 
-    given Decoder[Flamingos2Spectroscopy] = c =>
-      for
-        g <- c.downField("disperser").as[Flamingos2Disperser]
-        f <- c.downField("filter").as[Flamingos2Filter]
-        u <- c.downField("fpu").as[Flamingos2Fpu]
-        p <- c.downField("port").as[PortDisposition]
-      yield Flamingos2Spectroscopy(g, f, u, p)
-
   case class GmosNorthImaging(
-    filter:  GmosNorthFilter,
-    ccdMode: Option[GmosCcdMode],
-    port:    PortDisposition = PortDisposition.Side
+    exposureTimeMode: ExposureTimeMode,
+    filter:           GmosNorthFilter,
+    ccdMode:          Option[GmosCcdMode],
+    port:             PortDisposition = PortDisposition.Side
   ) extends InstrumentMode derives Eq:
     override def displayName: String =
       "GMOS North Imaging"
@@ -152,22 +135,17 @@ object InstrumentMode {
 
     given Encoder[GmosNorthImaging] = a =>
       Json.obj(
-        "filter"  -> a.filter.asScreamingJson,
-        "ccdMode" -> a.ccdMode.asJson,
-        "port"    -> a.port.asScreamingJson
+        "exposureTimeMode" -> a.exposureTimeMode.asJson,
+        "filter"           -> a.filter.asScreamingJson,
+        "ccdMode"          -> a.ccdMode.asJson,
+        "port"             -> a.port.asScreamingJson
       )
 
-    given Decoder[GmosNorthImaging] = c =>
-      for
-        f <- c.downField("filter").as[GmosNorthFilter]
-        d <- c.downField("ccdMode").as[Option[GmosCcdMode]]
-        p <- c.downField("port").as[PortDisposition]
-      yield GmosNorthImaging(f, d, p)
-
   case class GmosSouthImaging(
-    filter:  GmosSouthFilter,
-    ccdMode: Option[GmosCcdMode],
-    port:    PortDisposition = PortDisposition.Side
+    exposureTimeMode: ExposureTimeMode,
+    filter:           GmosSouthFilter,
+    ccdMode:          Option[GmosCcdMode],
+    port:             PortDisposition = PortDisposition.Side
   ) extends InstrumentMode derives Eq:
     override def displayName: String =
       "GMOS South Imaging"
@@ -176,21 +154,16 @@ object InstrumentMode {
 
     given Encoder[GmosSouthImaging] = a =>
       Json.obj(
-        "filter"  -> a.filter.asScreamingJson,
-        "ccdMode" -> a.ccdMode.asJson,
-        "port"    -> a.port.asScreamingJson
+        "exposureTimeMode" -> a.exposureTimeMode.asJson,
+        "filter"           -> a.filter.asScreamingJson,
+        "ccdMode"          -> a.ccdMode.asJson,
+        "port"             -> a.port.asScreamingJson
       )
 
-    given Decoder[GmosSouthImaging] = c =>
-      for
-        f <- c.downField("filter").as[GmosSouthFilter]
-        d <- c.downField("ccdMode").as[Option[GmosCcdMode]]
-        p <- c.downField("port").as[PortDisposition]
-      yield GmosSouthImaging(f, d, p)
-
   case class Flamingos2Imaging(
-    filter: Flamingos2Filter,
-    port:   PortDisposition = PortDisposition.Side
+    exposureTimeMode: ExposureTimeMode,
+    filter:           Flamingos2Filter,
+    port:             PortDisposition = PortDisposition.Side
   ) extends InstrumentMode derives Eq:
     override def displayName: String =
       "Flamingos 2 Imaging"
@@ -200,16 +173,11 @@ object InstrumentMode {
     given Encoder[Flamingos2Imaging] = a =>
       Json.fromFields(
         List(
-          "filter" -> a.filter.asJson,
-          "port"   -> a.port.asScreamingJson
+          "exposureTimeMode" -> a.exposureTimeMode.asJson,
+          "filter"           -> a.filter.asJson,
+          "port"             -> a.port.asScreamingJson
         )
       )
-
-    given Decoder[Flamingos2Imaging] = c =>
-      for
-        f <- c.downField("filter").as[Flamingos2Filter]
-        p <- c.downField("port").as[PortDisposition]
-      yield Flamingos2Imaging(f, p)
 
   val gmosNorthSpectroscopy: Prism[InstrumentMode, GmosNorthSpectroscopy] =
     GenPrism[InstrumentMode, GmosNorthSpectroscopy]
@@ -230,60 +198,38 @@ object InstrumentMode {
     GenPrism[InstrumentMode, Flamingos2Imaging]
 
   case class Igrins2Spectroscopy(
-    port: PortDisposition = PortDisposition.Bottom
+    exposureTimeMode: ExposureTimeMode,
+    port:             PortDisposition = PortDisposition.Bottom
   ) extends InstrumentMode derives Eq:
     override def displayName: String =
       "IGRINS2 Spectroscopy"
 
   object Igrins2Spectroscopy:
-    given Encoder[Igrins2Spectroscopy] = a => Json.obj("port" -> a.port.asScreamingJson)
-
-    given Decoder[Igrins2Spectroscopy] = c =>
-      c.downField("port").as[PortDisposition].map(Igrins2Spectroscopy(_))
+    given Encoder[Igrins2Spectroscopy] = a =>
+      Json.obj(
+        "exposureTimeMode" -> a.exposureTimeMode.asJson,
+        "port"             -> a.port.asScreamingJson
+      )
 
   val igrins2Spectroscopy: Prism[InstrumentMode, Igrins2Spectroscopy] =
     GenPrism[InstrumentMode, Igrins2Spectroscopy]
 
   given Encoder[InstrumentMode] = a =>
     a match
-      case a @ GmosNorthSpectroscopy(_, _, _, _, _, _, _) =>
+      case a @ GmosNorthSpectroscopy(_, _, _, _, _, _, _, _) =>
         Json.obj("gmosNSpectroscopy" -> a.asJson)
-      case a @ GmosSouthSpectroscopy(_, _, _, _, _, _, _) =>
+      case a @ GmosSouthSpectroscopy(_, _, _, _, _, _, _, _) =>
         Json.obj("gmosSSpectroscopy" -> a.asJson)
-      case a @ GmosNorthImaging(_, _, _)                  =>
+      case a @ GmosNorthImaging(_, _, _, _)                  =>
         Json.obj("gmosNImaging" -> a.asJson)
-      case a @ GmosSouthImaging(_, _, _)                  =>
+      case a @ GmosSouthImaging(_, _, _, _)                  =>
         Json.obj("gmosSImaging" -> a.asJson)
-      case a @ Flamingos2Spectroscopy(_, _, _, _)         =>
+      case a @ Flamingos2Spectroscopy(_, _, _, _, _)         =>
         Json.obj("flamingos2Spectroscopy" -> a.asJson)
-      case a @ Flamingos2Imaging(_, _)                    =>
+      case a @ Flamingos2Imaging(_, _, _)                    =>
         Json.obj("flamingos2Imaging" -> a.asJson)
-      case a @ Igrins2Spectroscopy(_)                     =>
+      case a @ Igrins2Spectroscopy(_, _)                     =>
         Json.obj("igrins2Spectroscopy" -> a.asJson)
-
-  given Decoder[InstrumentMode] = c =>
-    for
-      ns  <- c.downField("gmosNSpectroscopy").as[Option[GmosNorthSpectroscopy]]
-      ss  <- c.downField("gmosSSpectroscopy").as[Option[GmosSouthSpectroscopy]]
-      ni  <- c.downField("gmosNImaging").as[Option[GmosNorthImaging]]
-      si  <- c.downField("gmosSImaging").as[Option[GmosSouthImaging]]
-      fs  <- c.downField("flamingos2Spectroscopy").as[Option[Flamingos2Spectroscopy]]
-      fi  <- c.downField("flamingos2Imaging").as[Option[Flamingos2Imaging]]
-      ig2 <- c.downField("igrins2Spectroscopy").as[Option[Igrins2Spectroscopy]]
-      m   <- (ns, ss, ni, si, fs, fi, ig2) match
-               case (Some(n), None, None, None, None, None, None) => (n: InstrumentMode).asRight
-               case (None, Some(s), None, None, None, None, None) => (s: InstrumentMode).asRight
-               case (None, None, Some(s), None, None, None, None) => (s: InstrumentMode).asRight
-               case (None, None, None, Some(s), None, None, None) => (s: InstrumentMode).asRight
-               case (None, None, None, None, Some(s), None, None) => (s: InstrumentMode).asRight
-               case (None, None, None, None, None, Some(s), None) => (s: InstrumentMode).asRight
-               case (None, None, None, None, None, None, Some(s)) => (s: InstrumentMode).asRight
-               case _                                             =>
-                 DecodingFailure(
-                   "Expected exactly one instrument mode.",
-                   c.history
-                 ).asLeft
-    yield m
 
   given Eq[InstrumentMode] with
     def eqv(x: InstrumentMode, y: InstrumentMode): Boolean =

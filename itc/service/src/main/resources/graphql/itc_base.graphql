@@ -50,6 +50,9 @@ type ItcVersions {
 }
 
 input GmosSSpectroscopyInput {
+  """Exposure time mode."""
+  exposureTimeMode: ExposureTimeModeInput!
+
   """Center of the configuration spectrum"""
   centralWavelength: WavelengthInput!
 
@@ -73,6 +76,9 @@ input GmosSSpectroscopyInput {
 }
 
 input GmosSImagingInput {
+  """Exposure time mode."""
+  exposureTimeMode: ExposureTimeModeInput!
+
   """Gmos South filter"""
   filter: GmosSouthFilter!
 
@@ -84,6 +90,9 @@ input GmosSImagingInput {
 }
 
 input GmosNSpectroscopyInput {
+  """Exposure time mode."""
+  exposureTimeMode: ExposureTimeModeInput!
+
   """Center of the configuration spectrum"""
   centralWavelength: WavelengthInput!
 
@@ -107,6 +116,9 @@ input GmosNSpectroscopyInput {
 }
 
 input GmosNImagingInput {
+  """Exposure time mode."""
+  exposureTimeMode: ExposureTimeModeInput!
+
   """Gmos North filter"""
   filter: GmosNorthFilter!
 
@@ -118,6 +130,9 @@ input GmosNImagingInput {
 }
 
 input Flamingos2SpectroscopyInput {
+  """Exposure time mode."""
+  exposureTimeMode: ExposureTimeModeInput!
+
   """Flamingos2 disperser"""
   disperser: Flamingos2Disperser!
 
@@ -132,6 +147,9 @@ input Flamingos2SpectroscopyInput {
 }
 
 input Flamingos2ImagingInput {
+  """Exposure time mode."""
+  exposureTimeMode: ExposureTimeModeInput!
+
   """Flamingos2 filter"""
   filter: Flamingos2Filter!
 
@@ -140,6 +158,9 @@ input Flamingos2ImagingInput {
 }
 
 input Igrins2SpectroscopyInput {
+  """Exposure time mode."""
+  exposureTimeMode: ExposureTimeModeInput!
+
   """Instrument port disposition"""
   port: PortDisposition = BOTTOM
 }
@@ -277,9 +298,6 @@ input ItcConstraintsInput {
 """Params for spectroscopy integration time calculation"""
 input SpectroscopyInput {
 
-  """Exposure time mode."""
-  exposureTimeMode: ExposureTimeModeInput!
-
   """Relevant data for targets in asterism."""
   asterism: [TargetInput!]!
 
@@ -300,9 +318,6 @@ input TargetInput {
 
 """Params for imaging integration time calculation"""
 input ImagingInput {
-
-  """Exposure time mode."""
-  exposureTimeMode: ExposureTimeModeInput!
 
   """Relevant data for targets in asterism."""
   asterism: [TargetInput!]!
@@ -353,9 +368,6 @@ input SpectroscopyGraphsInput {
 """Parameters to retrieve graph data"""
 input SpectroscopyIntegrationTimeAndGraphsInput {
 
-  """Exposure time mode."""
-  exposureTimeMode: ExposureTimeModeInput!
-
   """Relevant data for targets in asterism."""
   asterism: [TargetInput!]!
 
@@ -380,12 +392,6 @@ type IntegrationTime {
 type CalculationResult {
   """server and data versions"""
   versions: ItcVersions!
-
-  """queried mode"""
-  mode: ITCObservingMode!
-
-  """exposure time mode"""
-  exposureTimeMode: ExposureTimeMode!
 
   """ITC results for each target"""
   targetTimes: [TargetIntegrationTimeOutcome!]!

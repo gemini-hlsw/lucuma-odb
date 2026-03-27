@@ -9,12 +9,9 @@ import cats.derived.*
 import io.circe.Encoder
 import io.circe.JsonObject
 import io.circe.syntax.*
-import lucuma.core.model.ExposureTimeMode
 import lucuma.core.util.TimeSpan
-import lucuma.itc.client.json.encoders.given
 
 case class SpectroscopyIntegrationTimeAndGraphsParameters(
-  exposureTimeMode:   ExposureTimeMode,
   constraints:        ItcConstraintsInput,
   mode:               InstrumentMode,
   significantFigures: Option[SignificantFiguresInput]
@@ -23,7 +20,6 @@ case class SpectroscopyIntegrationTimeAndGraphsParameters(
 object SpectroscopyIntegrationTimeAndGraphsParameters {
   given Encoder.AsObject[SpectroscopyIntegrationTimeAndGraphsParameters] = a =>
     JsonObject(
-      "exposureTimeMode"   -> a.exposureTimeMode.asJson,
       "constraints"        -> a.constraints.asJson,
       "mode"               -> a.mode.asJson,
       "significantFigures" -> a.significantFigures.asJson

@@ -12,15 +12,6 @@ class exactConstraintsSuite extends GraphQLSuite:
       """
         query {
           spectroscopy(input: {
-            exposureTimeMode: {
-              timeAndCount: {
-                time: {
-                  seconds: 2
-                },
-                count: 3,
-                at: { nanometers: 600 }
-              }
-            },
             asterism: [
               {
                 sourceProfile: {
@@ -60,6 +51,7 @@ class exactConstraintsSuite extends GraphQLSuite:
             },
             mode: {
               gmosNSpectroscopy: {
+                exposureTimeMode: { timeAndCount: { time: { seconds: 2 }, count: 3, at: { nanometers: 600 } } },
                 centralWavelength: {
                   nanometers: 600
                 },
@@ -71,19 +63,7 @@ class exactConstraintsSuite extends GraphQLSuite:
               }
             }
           }) {
-            mode {
-              ... on SpectroscopyMode {
-                instrument
-              }
-            }
-            exposureTimeMode {
-              timeAndCount {
-                time {
-                  seconds
-                }
-                count
-              }
-            }
+            brightestIndex
           }
         }
       """,
@@ -91,17 +71,7 @@ class exactConstraintsSuite extends GraphQLSuite:
         {
           "data": {
             "spectroscopy": {
-              "mode": {
-                "instrument": "GMOS_NORTH"
-              },
-              "exposureTimeMode": {
-                "timeAndCount": {
-                  "time": {
-                    "seconds": 2.000000
-                  },
-                  "count": 3
-                }
-              }
+              "brightestIndex": 0
             }
           }
         }
@@ -113,12 +83,6 @@ class exactConstraintsSuite extends GraphQLSuite:
       """
         query {
           spectroscopy(input: {
-            exposureTimeMode: {
-              signalToNoise: {
-                value: 100
-                at: { nanometers: 600 }
-              }
-            },
             asterism: [
               {
                 sourceProfile: {
@@ -158,6 +122,7 @@ class exactConstraintsSuite extends GraphQLSuite:
             },
             mode: {
               gmosSSpectroscopy: {
+                exposureTimeMode: { signalToNoise: { value: 100, at: { nanometers: 600 } } },
                 centralWavelength: {
                   nanometers: 700
                 },
@@ -169,19 +134,8 @@ class exactConstraintsSuite extends GraphQLSuite:
               }
             }
           }) {
-            mode {
-              ... on SpectroscopyMode {
-                instrument
-              }
-            }
-            exposureTimeMode {
-              signalToNoise {
-                value
-                at {
-                  nanometers
-                }
-              }
-            }
+            brightestIndex
+
           }
         }
       """,
@@ -189,17 +143,7 @@ class exactConstraintsSuite extends GraphQLSuite:
         {
           "data": {
             "spectroscopy": {
-              "mode": {
-                "instrument": "GMOS_SOUTH"
-              },
-              "exposureTimeMode": {
-                "signalToNoise": {
-                  "value": 100,
-                  "at": {
-                    "nanometers": 600.000
-                  }
-                }
-              }
+              "brightestIndex": 0
             }
           }
         }
@@ -211,15 +155,6 @@ class exactConstraintsSuite extends GraphQLSuite:
       """
         query {
           imaging(input: {
-            exposureTimeMode: {
-              timeAndCount: {
-                time: {
-                  seconds: 30
-                },
-                count: 5,
-                at: { nanometers: 800 }
-              }
-            },
             asterism: [
               {
                 sourceProfile: {
@@ -264,23 +199,12 @@ class exactConstraintsSuite extends GraphQLSuite:
             },
             mode: {
               gmosNImaging: {
+                exposureTimeMode: { timeAndCount: { time: { seconds: 30 }, count: 5, at: { nanometers: 800 } } },
                 filter: G_PRIME
               }
             }
           }) {
-            mode {
-              ... on ImagingMode {
-                instrument
-              }
-            }
-            exposureTimeMode {
-              timeAndCount {
-                time {
-                  seconds
-                }
-                count
-              }
-            }
+            brightestIndex
           }
         }
       """,
@@ -288,17 +212,7 @@ class exactConstraintsSuite extends GraphQLSuite:
         {
           "data": {
             "imaging": {
-              "mode": {
-                "instrument": "GMOS_NORTH"
-              },
-              "exposureTimeMode": {
-                "timeAndCount": {
-                  "time": {
-                    "seconds": 30.000000
-                  },
-                  "count": 5
-                }
-              }
+              "brightestIndex": 0
             }
           }
         }
@@ -310,34 +224,13 @@ class exactConstraintsSuite extends GraphQLSuite:
       """
         query($spectroscopy: SpectroscopyInput) {
           spectroscopy(input: $spectroscopy) {
-            mode {
-              ... on SpectroscopyMode {
-                instrument
-              }
-            }
-            exposureTimeMode {
-              timeAndCount {
-                time {
-                  seconds
-                }
-                count
-              }
-            }
+            brightestIndex
           }
         }
       """,
       """
         {
           "spectroscopy" : {
-            "exposureTimeMode": {
-              "timeAndCount": {
-                "time": {
-                  "seconds": 10
-                },
-                "count": 2,
-                "at": { "nanometers": "500" }
-              }
-            },
             "asterism": [
               {
                 "sourceProfile": {
@@ -377,6 +270,7 @@ class exactConstraintsSuite extends GraphQLSuite:
             },
             "mode": {
               "flamingos2Spectroscopy": {
+                "exposureTimeMode": { "timeAndCount": { "time": { "seconds": 10 }, "count": 2, "at": { "nanometers": "500" } } },
                 "disperser": "R3000",
                 "filter": "Y",
                 "fpu": "LONG_SLIT_1"
@@ -389,17 +283,7 @@ class exactConstraintsSuite extends GraphQLSuite:
         {
           "data": {
             "spectroscopy": {
-              "mode": {
-                "instrument": "FLAMINGOS2"
-              },
-              "exposureTimeMode": {
-                "timeAndCount": {
-                  "time": {
-                    "seconds": 10.000000
-                  },
-                  "count": 2
-                }
-              }
+              "brightestIndex": 0
             }
           }
         }
@@ -411,12 +295,6 @@ class exactConstraintsSuite extends GraphQLSuite:
       """
         query {
           spectroscopy(input: {
-            exposureTimeMode: {
-              signalToNoise: {
-                value: 50
-                at: { nanometers: 650 }
-              }
-            },
             asterism: [
               {
                 sourceProfile: {
@@ -456,6 +334,7 @@ class exactConstraintsSuite extends GraphQLSuite:
             },
             mode: {
               gmosNSpectroscopy: {
+                exposureTimeMode: { signalToNoise: { value: 50, at: { nanometers: 650 } } },
                 centralWavelength: {
                   nanometers: 650
                 },
@@ -467,19 +346,7 @@ class exactConstraintsSuite extends GraphQLSuite:
               }
             }
           }) {
-            mode {
-              ... on SpectroscopyMode {
-                instrument
-              }
-            }
-            exposureTimeMode {
-              signalToNoise {
-                value
-                at {
-                  nanometers
-                }
-              }
-            }
+            brightestIndex
           }
         }
       """,
@@ -487,17 +354,7 @@ class exactConstraintsSuite extends GraphQLSuite:
         {
           "data": {
             "spectroscopy": {
-              "mode": {
-                "instrument": "GMOS_NORTH"
-              },
-              "exposureTimeMode": {
-                "signalToNoise": {
-                  "value": 50,
-                  "at": {
-                    "nanometers": 650.000
-                  }
-                }
-              }
+              "brightestIndex": 0
             }
           }
         }
@@ -551,6 +408,7 @@ class exactConstraintsSuite extends GraphQLSuite:
             },
             mode: {
               gmosSSpectroscopy: {
+                exposureTimeMode: { signalToNoise: { value: 50, at: { nanometers: 650 } } },
                 centralWavelength: {
                   nanometers: 500
                 },
@@ -606,12 +464,6 @@ class exactConstraintsSuite extends GraphQLSuite:
       """
         query {
           spectroscopy(input: {
-            exposureTimeMode: {
-              signalToNoise: {
-                value: 50
-                at: { nanometers: 600 }
-              }
-            },
             asterism: [
               {
                 sourceProfile: {
@@ -651,6 +503,7 @@ class exactConstraintsSuite extends GraphQLSuite:
             },
             mode: {
               gmosNSpectroscopy: {
+                exposureTimeMode: { signalToNoise: { value: 50, at: { nanometers: 600 } } },
                 centralWavelength: {
                   nanometers: 600
                 },
@@ -662,11 +515,7 @@ class exactConstraintsSuite extends GraphQLSuite:
               }
             }
           }) {
-            mode {
-              ... on SpectroscopyMode {
-                instrument
-              }
-            }
+            brightestIndex
           }
         }
       """,
@@ -674,9 +523,7 @@ class exactConstraintsSuite extends GraphQLSuite:
         {
           "data": {
             "spectroscopy": {
-              "mode": {
-                "instrument": "GMOS_NORTH"
-              }
+              "brightestIndex": 0
             }
           }
         }
@@ -688,12 +535,6 @@ class exactConstraintsSuite extends GraphQLSuite:
       """
         query {
           spectroscopy(input: {
-            exposureTimeMode: {
-              signalToNoise: {
-                value: 50
-                at: { nanometers: 600 }
-              }
-            },
             asterism: [
               {
                 sourceProfile: {
@@ -733,6 +574,7 @@ class exactConstraintsSuite extends GraphQLSuite:
             },
             mode: {
               gmosNSpectroscopy: {
+                exposureTimeMode: { signalToNoise: { value: 50, at: { nanometers: 600 } } },
                 centralWavelength: {
                   nanometers: 600
                 },
@@ -744,11 +586,7 @@ class exactConstraintsSuite extends GraphQLSuite:
               }
             }
           }) {
-            mode {
-              ... on SpectroscopyMode {
-                instrument
-              }
-            }
+            brightestIndex
           }
         }
       """,
@@ -756,9 +594,7 @@ class exactConstraintsSuite extends GraphQLSuite:
         {
           "data": {
             "spectroscopy": {
-              "mode": {
-                "instrument": "GMOS_NORTH"
-              }
+              "brightestIndex": 0
             }
           }
         }
@@ -770,12 +606,6 @@ class exactConstraintsSuite extends GraphQLSuite:
       """
         query {
           spectroscopy(input: {
-            exposureTimeMode: {
-              signalToNoise: {
-                value: 50
-                at: { nanometers: 600 }
-              }
-            },
             asterism: [
               {
                 sourceProfile: {
@@ -815,6 +645,7 @@ class exactConstraintsSuite extends GraphQLSuite:
             },
             mode: {
               gmosNSpectroscopy: {
+                exposureTimeMode: { signalToNoise: { value: 50, at: { nanometers: 600 } } },
                 centralWavelength: {
                   nanometers: 600
                 },
@@ -826,11 +657,7 @@ class exactConstraintsSuite extends GraphQLSuite:
               }
             }
           }) {
-            mode {
-              ... on SpectroscopyMode {
-                instrument
-              }
-            }
+            brightestIndex
           }
         }
       """,
@@ -838,9 +665,7 @@ class exactConstraintsSuite extends GraphQLSuite:
         {
           "data": {
             "spectroscopy": {
-              "mode": {
-                "instrument": "GMOS_NORTH"
-              }
+              "brightestIndex": 0
             }
           }
         }
@@ -852,12 +677,6 @@ class exactConstraintsSuite extends GraphQLSuite:
       """
         query {
           spectroscopy(input: {
-            exposureTimeMode: {
-              signalToNoise: {
-                value: 50
-                at: { nanometers: 600 }
-              }
-            },
             asterism: [
               {
                 sourceProfile: {
@@ -897,6 +716,7 @@ class exactConstraintsSuite extends GraphQLSuite:
             },
             mode: {
               gmosNSpectroscopy: {
+                exposureTimeMode: { signalToNoise: { value: 50, at: { nanometers: 600 } } },
                 centralWavelength: {
                   nanometers: 600
                 },
@@ -908,11 +728,7 @@ class exactConstraintsSuite extends GraphQLSuite:
               }
             }
           }) {
-            mode {
-              ... on SpectroscopyMode {
-                instrument
-              }
-            }
+            brightestIndex
           }
         }
       """,
@@ -920,9 +736,7 @@ class exactConstraintsSuite extends GraphQLSuite:
         {
           "data": {
             "spectroscopy": {
-              "mode": {
-                "instrument": "GMOS_NORTH"
-              }
+              "brightestIndex": 0
             }
           }
         }
@@ -934,12 +748,6 @@ class exactConstraintsSuite extends GraphQLSuite:
       """
         query {
           spectroscopy(input: {
-            exposureTimeMode: {
-              signalToNoise: {
-                value: 50
-                at: { nanometers: 600 }
-              }
-            },
             asterism: [
               {
                 sourceProfile: {
@@ -980,6 +788,7 @@ class exactConstraintsSuite extends GraphQLSuite:
             },
             mode: {
               gmosNSpectroscopy: {
+                exposureTimeMode: { signalToNoise: { value: 50, at: { nanometers: 600 } } },
                 centralWavelength: {
                   nanometers: 600
                 },
@@ -991,11 +800,7 @@ class exactConstraintsSuite extends GraphQLSuite:
               }
             }
           }) {
-            mode {
-              ... on SpectroscopyMode {
-                instrument
-              }
-            }
+            brightestIndex
           }
         }
       """,
@@ -1015,12 +820,6 @@ class exactConstraintsSuite extends GraphQLSuite:
       """
         query {
           spectroscopy(input: {
-            exposureTimeMode: {
-              signalToNoise: {
-                value: 50
-                at: { nanometers: 600 }
-              }
-            },
             asterism: [
               {
                 sourceProfile: {
@@ -1061,6 +860,7 @@ class exactConstraintsSuite extends GraphQLSuite:
             },
             mode: {
               gmosNSpectroscopy: {
+                exposureTimeMode: { signalToNoise: { value: 50, at: { nanometers: 600 } } },
                 centralWavelength: {
                   nanometers: 600
                 },
@@ -1072,11 +872,7 @@ class exactConstraintsSuite extends GraphQLSuite:
               }
             }
           }) {
-            mode {
-              ... on SpectroscopyMode {
-                instrument
-              }
-            }
+            brightestIndex
           }
         }
       """,
@@ -1096,12 +892,6 @@ class exactConstraintsSuite extends GraphQLSuite:
       """
         query {
           spectroscopy(input: {
-            exposureTimeMode: {
-              signalToNoise: {
-                value: 50
-                at: { nanometers: 600 }
-              }
-            },
             asterism: [
               {
                 sourceProfile: {
@@ -1141,6 +931,7 @@ class exactConstraintsSuite extends GraphQLSuite:
             },
             mode: {
               gmosNSpectroscopy: {
+                exposureTimeMode: { signalToNoise: { value: 50, at: { nanometers: 600 } } },
                 centralWavelength: {
                   nanometers: 600
                 },
@@ -1152,11 +943,7 @@ class exactConstraintsSuite extends GraphQLSuite:
               }
             }
           }) {
-            mode {
-              ... on SpectroscopyMode {
-                instrument
-              }
-            }
+            brightestIndex
           }
         }
       """,
@@ -1177,12 +964,6 @@ class exactConstraintsSuite extends GraphQLSuite:
       """
         query {
           spectroscopy(input: {
-            exposureTimeMode: {
-              signalToNoise: {
-                value: 50
-                at: { nanometers: 600 }
-              }
-            },
             asterism: [
               {
                 sourceProfile: {
@@ -1222,6 +1003,7 @@ class exactConstraintsSuite extends GraphQLSuite:
             },
             mode: {
               gmosNSpectroscopy: {
+                exposureTimeMode: { signalToNoise: { value: 50, at: { nanometers: 600 } } },
                 centralWavelength: {
                   nanometers: 600
                 },
@@ -1233,11 +1015,7 @@ class exactConstraintsSuite extends GraphQLSuite:
               }
             }
           }) {
-            mode {
-              ... on SpectroscopyMode {
-                instrument
-              }
-            }
+            brightestIndex
           }
         }
       """,
@@ -1258,12 +1036,6 @@ class exactConstraintsSuite extends GraphQLSuite:
       """
         query {
           spectroscopy(input: {
-            exposureTimeMode: {
-              signalToNoise: {
-                value: 50
-                at: { nanometers: 600 }
-              }
-            },
             asterism: [
               {
                 sourceProfile: {
@@ -1301,6 +1073,7 @@ class exactConstraintsSuite extends GraphQLSuite:
             },
             mode: {
               gmosNSpectroscopy: {
+                exposureTimeMode: { signalToNoise: { value: 50, at: { nanometers: 600 } } },
                 centralWavelength: {
                   nanometers: 600
                 },
@@ -1312,11 +1085,7 @@ class exactConstraintsSuite extends GraphQLSuite:
               }
             }
           }) {
-            mode {
-              ... on SpectroscopyMode {
-                instrument
-              }
-            }
+            brightestIndex
           }
         }
       """,
@@ -1336,12 +1105,6 @@ class exactConstraintsSuite extends GraphQLSuite:
       """
         query {
           spectroscopy(input: {
-            exposureTimeMode: {
-              signalToNoise: {
-                value: 50
-                at: { nanometers: 600 }
-              }
-            },
             asterism: [
               {
                 sourceProfile: {
@@ -1379,6 +1142,7 @@ class exactConstraintsSuite extends GraphQLSuite:
             },
             mode: {
               gmosNSpectroscopy: {
+                exposureTimeMode: { signalToNoise: { value: 50, at: { nanometers: 600 } } },
                 centralWavelength: {
                   nanometers: 600
                 },
@@ -1390,11 +1154,7 @@ class exactConstraintsSuite extends GraphQLSuite:
               }
             }
           }) {
-            mode {
-              ... on SpectroscopyMode {
-                instrument
-              }
-            }
+            brightestIndex
           }
         }
       """,

@@ -12,10 +12,9 @@ import lucuma.itc.client.*
 
 // Decoders for the client don't need to be as generic as the ones for the server.
 private[client] object encoders:
+  // TODO get this directly from the odb. Also other encoders that are duplicated here.
   given Encoder[TimeSpan] = t =>
     Json.obj("microseconds" -> TimeSpan.FromMicroseconds.reverseGet(t).asJson)
-
-  given Encoder[Wavelength] = w => Json.obj("picometers" -> w.toPicometers.value.value.asJson)
 
   given (using Encoder[Wavelength], Encoder[TimeSpan]): Encoder[ExposureTimeMode] = {
     case ExposureTimeMode.SignalToNoiseMode(n, w) =>

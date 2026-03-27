@@ -62,6 +62,7 @@ class spectroscopyGraphSuite extends GraphQLSuite {
             },
             mode: {
               gmosNSpectroscopy: {
+                exposureTimeMode: { signalToNoise: { value: 600, at: { picometers: 1650000 } } },
                 centralWavelength: {
                   nanometers: 60
                 },
@@ -223,7 +224,9 @@ class spectroscopyGraphSuite extends GraphQLSuite {
               }
             },
             mode: {
-              igrins2Spectroscopy: {}
+              igrins2Spectroscopy: {
+                exposureTimeMode: { signalToNoise: { value: 600, at: { picometers: 1650000 } } }
+              }
             },
             significantFigures: {
               xAxis: 4

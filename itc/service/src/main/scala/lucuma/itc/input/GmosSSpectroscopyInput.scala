@@ -10,12 +10,15 @@ import lucuma.core.enums.GmosSouthFpu
 import lucuma.core.enums.GmosSouthGrating
 import lucuma.core.enums.PortDisposition
 import lucuma.core.math.Wavelength
+import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.sequence.gmos.GmosCcdMode
 import lucuma.core.model.sequence.gmos.GmosFpuMask
 import lucuma.odb.graphql.binding.*
 import lucuma.odb.graphql.input.*
+import lucuma.odb.graphql.input.ExposureTimeModeInput
 
 case class GmosSSpectroscopyInput(
+  exposureTimeMode:  ExposureTimeMode,
   centralWavelength: Wavelength,
   grating:           GmosSouthGrating,
   fpu:               GmosFpuMask[GmosSouthFpu],
@@ -30,6 +33,7 @@ object GmosSSpectroscopyInput {
   def binding: Matcher[GmosSSpectroscopyInput] =
     ObjectFieldsBinding.rmap {
       case List(
+            ExposureTimeModeInput.Binding("exposureTimeMode", exposureTimeMode),
             WavelengthInput.Binding("centralWavelength", centralWavelength),
             GmosSouthGratingBinding("grating", grating),
             GmosSouthFpuInput.Binding("fpu", fpu),
@@ -38,7 +42,8 @@ object GmosSSpectroscopyInput {
             GmosRoiBinding.Option("roi", roi),
             PortDispositionBinding("port", portDisposition)
           ) =>
-        (centralWavelength, grating, fpu, filter, ccdMode, roi, portDisposition).parMapN(apply)
+        (exposureTimeMode, centralWavelength, grating, fpu, filter, ccdMode, roi, portDisposition)
+          .parMapN(apply)
     }
 
 }

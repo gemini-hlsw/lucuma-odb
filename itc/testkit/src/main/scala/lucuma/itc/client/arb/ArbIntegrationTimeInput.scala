@@ -9,10 +9,8 @@ import lucuma.core.enums.SkyBackground
 import lucuma.core.enums.WaterVapor
 import lucuma.core.model.CloudExtinction
 import lucuma.core.model.ElevationRange
-import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.ImageQuality
 import lucuma.core.model.arb.ArbElevationRange.given
-import lucuma.core.model.arb.ArbExposureTimeMode
 import lucuma.core.util.arb.ArbEnumerated.given
 import lucuma.itc.CloudExtinctionInput
 import lucuma.itc.ImageQualityInput
@@ -20,7 +18,6 @@ import org.scalacheck.*
 import org.scalacheck.Arbitrary.arbitrary
 
 trait ArbIntegrationTimeInput {
-  import ArbExposureTimeMode.given
   import ArbInstrumentMode.given
   import ArbTargetInput.given
 
@@ -76,10 +73,9 @@ trait ArbIntegrationTimeInput {
   given Arbitrary[SpectroscopyParameters] =
     Arbitrary:
       for
-        ex <- arbitrary[ExposureTimeMode]
         cs <- arbitrary[ItcConstraintsInput]
         im <- arbitrary[InstrumentMode]
-      yield SpectroscopyParameters(ex, cs, im)
+      yield SpectroscopyParameters(cs, im)
 
   given Arbitrary[SpectroscopyInput] =
     Arbitrary:
@@ -90,17 +86,16 @@ trait ArbIntegrationTimeInput {
 
   given Cogen[SpectroscopyInput] =
     Cogen[
-      (ExposureTimeMode, List[TargetInput], ItcConstraintsInput, InstrumentMode)
+      (List[TargetInput], ItcConstraintsInput, InstrumentMode)
     ].contramap: a =>
-      (a.exposureTimeMode, a.asterism.toList, a.constraints, a.mode)
+      (a.asterism.toList, a.constraints, a.mode)
 
   given Arbitrary[ImagingParameters] =
     Arbitrary:
       for {
-        ex <- arbitrary[ExposureTimeMode]
         cs <- arbitrary[ItcConstraintsInput]
         im <- arbitrary[InstrumentMode]
-      } yield ImagingParameters(ex, cs, im)
+      } yield ImagingParameters(cs, im)
 
   given Arbitrary[ImagingInput] =
     Arbitrary:
@@ -112,13 +107,12 @@ trait ArbIntegrationTimeInput {
   given Cogen[ImagingInput] =
     Cogen[
       (
-        ExposureTimeMode,
         List[TargetInput],
         ItcConstraintsInput,
         InstrumentMode
       )
     ].contramap: a =>
-      (a.exposureTimeMode, a.asterism.toList, a.constraints, a.mode)
+      (a.asterism.toList, a.constraints, a.mode)
 }
 
 object ArbIntegrationTimeInput extends ArbIntegrationTimeInput

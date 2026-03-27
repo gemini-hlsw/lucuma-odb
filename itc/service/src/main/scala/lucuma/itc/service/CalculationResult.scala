@@ -7,27 +7,21 @@ import io.circe.Encoder
 import io.circe.Json
 import io.circe.syntax.*
 import lucuma.core.math.Wavelength
-import lucuma.core.model.ExposureTimeMode
 import lucuma.core.util.TimeSpan
 import lucuma.itc.AsterismIntegrationTimeOutcomes
 import lucuma.itc.ItcVersions
-import lucuma.itc.encoders.given
 
 case class CalculationResult(
-  versions:         ItcVersions,
-  mode:             ObservingMode,
-  targetTimes:      AsterismIntegrationTimeOutcomes,
-  exposureTimeMode: ExposureTimeMode
+  versions:    ItcVersions,
+  targetTimes: AsterismIntegrationTimeOutcomes
 )
 
 object CalculationResult:
   given (using Encoder[Wavelength], Encoder[TimeSpan]): Encoder[CalculationResult] = r =>
     Json
       .obj(
-        "versions"         -> r.versions.asJson,
-        "mode"             -> r.mode.asJson,
-        "exposureTimeMode" -> r.exposureTimeMode.asJson,
-        "targetTimes"      -> r.targetTimes.asJson,
-        "brightestIndex"   -> r.targetTimes.brightestIndex.asJson,
-        "brightest"        -> r.targetTimes.brightest.asJson
+        "versions"       -> r.versions.asJson,
+        "targetTimes"    -> r.targetTimes.asJson,
+        "brightestIndex" -> r.targetTimes.brightestIndex.asJson,
+        "brightest"      -> r.targetTimes.brightest.asJson
       )

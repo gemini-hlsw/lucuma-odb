@@ -12,12 +12,6 @@ class emissionLineSuite extends GraphQLEmissionLineSuite {
       """
         query {
           spectroscopy(input: {
-            exposureTimeMode: {
-              signalToNoise: {
-                value: 2,
-                at: { nanometers: 60 }
-              }
-            },
             asterism: [
               {
                 sourceProfile: {
@@ -65,6 +59,7 @@ class emissionLineSuite extends GraphQLEmissionLineSuite {
             },
             mode: {
               gmosNSpectroscopy: {
+                exposureTimeMode: { signalToNoise: { value: 2, at: { nanometers: 60 } } },
                 centralWavelength: {
                   nanometers: 60
                 },
@@ -76,19 +71,6 @@ class emissionLineSuite extends GraphQLEmissionLineSuite {
               }
             }
           }) {
-            mode {
-              ... on SpectroscopyMode {
-                instrument
-                params {
-                  ... on GmosNSpectroscopyParams {
-                    grating
-                    centralWavelength {
-                      nanometers
-                    }
-                  }
-                }
-              }
-            }
             brightest {
               selected {
                 exposureCount
@@ -105,15 +87,6 @@ class emissionLineSuite extends GraphQLEmissionLineSuite {
         {
           "data": {
             "spectroscopy" : {
-              "mode" : {
-                "instrument" : "GMOS_NORTH",
-                "params": {
-                  "grating": "B1200_G5301",
-                  "centralWavelength" : {
-                    "nanometers" : 60.000
-                  }
-                }
-              },
               "brightest": {
                 "selected" : {
                   "exposureCount" : 10,

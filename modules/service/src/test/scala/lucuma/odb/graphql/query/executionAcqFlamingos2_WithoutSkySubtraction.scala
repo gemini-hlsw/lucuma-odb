@@ -30,7 +30,7 @@ class executionAcqFlamingos2_WithoutSkySubtraction extends ExecutionTestSupportF
   val ExposureTime: TimeSpan = 2.secTimeSpan
 
   override def fakeItcImagingResultFor(input: ImagingInput): Option[IntegrationTime] =
-    input.exposureTimeMode match
+    input.mode.exposureTimeMode match
       case ExposureTimeMode.TimeAndCountMode(t, c, _) => IntegrationTime(t, c).some
       case _                                          => IntegrationTime(ExposureTime, PosInt.unsafeFrom(1)).some
 

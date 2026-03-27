@@ -273,16 +273,16 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
         val signal = Wavelength.fromIntNanometers(666).get
         val igrins2Signal = Wavelength.fromIntNanometers(2200).get
         val wavelength = input.mode match
-          case lucuma.itc.client.InstrumentMode.Flamingos2Spectroscopy(d, _, _, _)         => d.wavelength
-          case lucuma.itc.client.InstrumentMode.GmosNorthSpectroscopy(w, _, _, _, _, _, _) => w
-          case lucuma.itc.client.InstrumentMode.GmosSouthSpectroscopy(w, _, _, _, _, _, _) => w
-          case lucuma.itc.client.InstrumentMode.Igrins2Spectroscopy(_)                    => igrins2Signal
-          case _                                                                        => signal
+          case lucuma.itc.client.InstrumentMode.Flamingos2Spectroscopy(_, d, _, _, _)         => d.wavelength
+          case lucuma.itc.client.InstrumentMode.GmosNorthSpectroscopy(_, w, _, _, _, _, _, _) => w
+          case lucuma.itc.client.InstrumentMode.GmosSouthSpectroscopy(_, w, _, _, _, _, _, _) => w
+          case lucuma.itc.client.InstrumentMode.Igrins2Spectroscopy(_, _)                     => igrins2Signal
+          case _                                                                           => signal
         IO.whenA(wavelength === signal) {
           IO.raiseError(new RuntimeException("Artifical exception for test cases."))
         } *> {
           val result =
-            input.exposureTimeMode match
+            input.mode.exposureTimeMode match
               case ExposureTimeMode.SignalToNoiseMode(_, _)   =>
                 fakeItcSpectroscopyResultFor(input).getOrElse(fakeItcSpectroscopyResult)
               case ExposureTimeMode.TimeAndCountMode(t, c, _) =>

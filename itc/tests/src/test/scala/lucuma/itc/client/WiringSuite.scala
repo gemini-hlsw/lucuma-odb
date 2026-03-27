@@ -201,12 +201,10 @@ class WiringSuite extends ClientSuite:
     )
 
   test("ItcClient imaging f2 basic wiring and sanity check for txc"):
-    val toITC = ImagingInput.parameters
-      .andThen(ImagingParameters.exposureTimeMode)
-      .replace(
-        ExposureTimeMode
-          .TimeAndCountMode(TimeSpan.fromSeconds(1).get, 10.refined, atWavelength)
-      )(WiringSuite.Flamingos2ImagingInputData)
+    val toITC = WiringSuite.flaminos2ImagingInput(
+      ExposureTimeMode.TimeAndCountMode(TimeSpan.fromSeconds(1).get, 10.refined, atWavelength)
+    )
+
     imaging(
       toITC,
       ClientCalculationResult(
@@ -282,12 +280,10 @@ class WiringSuite extends ClientSuite:
     ).asRight
 
   test("ItcClient spectroscopy with exposure time mode"):
-    val toTC = SpectroscopyInput.parameters
-      .andThen(SpectroscopyParameters.exposureTimeMode)
-      .replace(
-        ExposureTimeMode
-          .TimeAndCountMode(TimeSpan.fromSeconds(1).get, 10.refined, atWavelength)
-      )(WiringSuite.GmosSpectroscopyInputData)
+    val toTC = WiringSuite.gmosSpectroscopyInput(
+      ExposureTimeMode.TimeAndCountMode(TimeSpan.fromSeconds(1).get, 10.refined, atWavelength)
+    )
+
     spectroscopy(
       toTC,
       ClientCalculationResult(
@@ -339,12 +335,10 @@ class WiringSuite extends ClientSuite:
   )
 
   test("ItcClient spectroscopy with large exposure time, shortcut 5331"):
-    val toTC = SpectroscopyInput.parameters
-      .andThen(SpectroscopyParameters.exposureTimeMode)
-      .replace(
-        ExposureTimeMode
-          .TimeAndCountMode(TimeSpan.fromSeconds(1000000).get, 10.refined, atWavelength)
-      )(WiringSuite.GmosSpectroscopyInputData)
+    val etm  = ExposureTimeMode
+      .TimeAndCountMode(TimeSpan.fromSeconds(1000000).get, 10.refined, atWavelength)
+    val toTC = WiringSuite.gmosSpectroscopyInput(etm)
+
     spectroscopy(
       toTC,
       ClientCalculationResult(
@@ -467,13 +461,18 @@ class WiringSuite extends ClientSuite:
 
 object WiringSuite:
 
+  private val defaultEtm: ExposureTimeMode =
+    ExposureTimeMode.SignalToNoiseMode(
+      SignalToNoise.unsafeFromBigDecimalExact(BigDecimal(1)),
+      atWavelength
+    )
+
   val GmosSpectroscopyInputData: SpectroscopyInput =
+    gmosSpectroscopyInput(defaultEtm)
+
+  def gmosSpectroscopyInput(etm: ExposureTimeMode): SpectroscopyInput =
     SpectroscopyInput(
       SpectroscopyParameters(
-        ExposureTimeMode.SignalToNoiseMode(
-          SignalToNoise.unsafeFromBigDecimalExact(BigDecimal(1)),
-          atWavelength
-        ),
         ItcConstraintsInput(
           ImageQualityInput.preset(ImageQuality.Preset.PointOne),
           CloudExtinctionInput.preset(CloudExtinction.Preset.PointOne),
@@ -482,6 +481,7 @@ object WiringSuite:
           elevationRange = ElevationRange.ByAirMass.Default
         ),
         InstrumentMode.GmosNorthSpectroscopy(
+          etm,
           Wavelength.Min,
           GmosNorthGrating.B1200_G5301,
           GmosNorthFilter.GPrime.some,
@@ -519,10 +519,6 @@ object WiringSuite:
   val Flamingos2SpectroscopyInputData: SpectroscopyInput =
     SpectroscopyInput(
       SpectroscopyParameters(
-        ExposureTimeMode.SignalToNoiseMode(
-          SignalToNoise.unsafeFromBigDecimalExact(BigDecimal(1)),
-          atWavelength
-        ),
         ItcConstraintsInput(
           ImageQualityInput.preset(ImageQuality.Preset.PointOne),
           CloudExtinctionInput.preset(CloudExtinction.Preset.PointOne),
@@ -531,6 +527,7 @@ object WiringSuite:
           elevationRange = ElevationRange.ByAirMass.Default
         ),
         InstrumentMode.Flamingos2Spectroscopy(
+          defaultEtm,
           Flamingos2Disperser.R3000,
           Flamingos2Filter.J,
           Flamingos2Fpu.LongSlit2,
@@ -559,10 +556,6 @@ object WiringSuite:
   val Igrins2SpectroscopyInputData: SpectroscopyInput =
     SpectroscopyInput(
       SpectroscopyParameters(
-        ExposureTimeMode.SignalToNoiseMode(
-          SignalToNoise.unsafeFromBigDecimalExact(BigDecimal(1)),
-          atWavelength
-        ),
         ItcConstraintsInput(
           ImageQualityInput.preset(ImageQuality.Preset.PointOne),
           CloudExtinctionInput.preset(CloudExtinction.Preset.PointOne),
@@ -570,7 +563,7 @@ object WiringSuite:
           waterVapor = WaterVapor.VeryDry,
           elevationRange = ElevationRange.ByAirMass.Default
         ),
-        InstrumentMode.Igrins2Spectroscopy(PortDisposition.Bottom)
+        InstrumentMode.Igrins2Spectroscopy(defaultEtm, PortDisposition.Bottom)
       ),
       NonEmptyList.of(
         TargetInput(
@@ -592,12 +585,11 @@ object WiringSuite:
     )
 
   val Flamingos2ImagingInputData: ImagingInput =
+    flaminos2ImagingInput(defaultEtm)
+
+  def flaminos2ImagingInput(etm: ExposureTimeMode): ImagingInput =
     ImagingInput(
       ImagingParameters(
-        ExposureTimeMode.SignalToNoiseMode(
-          SignalToNoise.unsafeFromBigDecimalExact(BigDecimal(1)),
-          atWavelength
-        ),
         ItcConstraintsInput(
           ImageQualityInput.preset(ImageQuality.Preset.PointOne),
           CloudExtinctionInput.preset(CloudExtinction.Preset.PointOne),
@@ -605,7 +597,7 @@ object WiringSuite:
           waterVapor = WaterVapor.VeryDry,
           elevationRange = ElevationRange.ByAirMass.Default
         ),
-        InstrumentMode.Flamingos2Imaging(Flamingos2Filter.J, PortDisposition.Side)
+        InstrumentMode.Flamingos2Imaging(etm, Flamingos2Filter.J, PortDisposition.Side)
       ),
       NonEmptyList.of(
         TargetInput(
@@ -629,10 +621,6 @@ object WiringSuite:
   val GmosImagingInputData: ImagingInput =
     ImagingInput(
       ImagingParameters(
-        ExposureTimeMode.SignalToNoiseMode(
-          SignalToNoise.unsafeFromBigDecimalExact(BigDecimal(1)),
-          atWavelength
-        ),
         ItcConstraintsInput(
           ImageQualityInput.preset(ImageQuality.Preset.PointOne),
           CloudExtinctionInput.preset(CloudExtinction.Preset.PointOne),
@@ -641,6 +629,7 @@ object WiringSuite:
           elevationRange = ElevationRange.ByAirMass.Default
         ),
         InstrumentMode.GmosNorthImaging(
+          defaultEtm,
           GmosNorthFilter.GPrime,
           none,
           PortDisposition.Side
@@ -679,6 +668,7 @@ object WiringSuite:
           elevationRange = ElevationRange.ByAirMass.Default
         ),
         InstrumentMode.GmosNorthSpectroscopy(
+          defaultEtm,
           Wavelength.Min,
           GmosNorthGrating.B1200_G5301,
           GmosNorthFilter.GPrime.some,
@@ -717,10 +707,6 @@ object WiringSuite:
   val SpectroscopyEmissionLinesInput: SpectroscopyInput =
     SpectroscopyInput(
       SpectroscopyParameters(
-        ExposureTimeMode.SignalToNoiseMode(
-          SignalToNoise.unsafeFromBigDecimalExact(BigDecimal(1)),
-          atWavelength
-        ),
         ItcConstraintsInput(
           ImageQualityInput.preset(ImageQuality.Preset.PointOne),
           CloudExtinctionInput.preset(CloudExtinction.Preset.PointOne),
@@ -729,6 +715,7 @@ object WiringSuite:
           elevationRange = ElevationRange.ByAirMass.Default
         ),
         InstrumentMode.GmosNorthSpectroscopy(
+          defaultEtm,
           Wavelength.Min,
           GmosNorthGrating.B1200_G5301,
           GmosNorthFilter.GPrime.some,
@@ -773,10 +760,6 @@ object WiringSuite:
   val GmosSpectroscopyExactValuesInputData: SpectroscopyInput =
     SpectroscopyInput(
       SpectroscopyParameters(
-        ExposureTimeMode.SignalToNoiseMode(
-          SignalToNoise.unsafeFromBigDecimalExact(BigDecimal(1)),
-          atWavelength
-        ),
         ItcConstraintsInput(
           ImageQualityInput.arcsec(BigDecimal("0.85")),
           CloudExtinctionInput.extinction(BigDecimal("0.3")),
@@ -785,6 +768,7 @@ object WiringSuite:
           elevationRange = ElevationRange.ByAirMass.Default
         ),
         InstrumentMode.GmosNorthSpectroscopy(
+          defaultEtm,
           Wavelength.Min,
           GmosNorthGrating.B1200_G5301,
           GmosNorthFilter.GPrime.some,
@@ -822,10 +806,6 @@ object WiringSuite:
   val GmosImagingExactValuesInputData: ImagingInput =
     ImagingInput(
       ImagingParameters(
-        ExposureTimeMode.SignalToNoiseMode(
-          SignalToNoise.unsafeFromBigDecimalExact(BigDecimal(1)),
-          atWavelength
-        ),
         ItcConstraintsInput(
           ImageQualityInput.arcsec(BigDecimal("1.2")),
           CloudExtinctionInput.extinction(BigDecimal("0.1")),
@@ -834,6 +814,7 @@ object WiringSuite:
           elevationRange = ElevationRange.ByAirMass.Default
         ),
         InstrumentMode.GmosNorthImaging(
+          defaultEtm,
           GmosNorthFilter.GPrime,
           none,
           PortDisposition.Side
@@ -872,6 +853,7 @@ object WiringSuite:
           elevationRange = ElevationRange.ByAirMass.Default
         ),
         InstrumentMode.GmosNorthSpectroscopy(
+          defaultEtm,
           Wavelength.Min,
           GmosNorthGrating.B1200_G5301,
           GmosNorthFilter.GPrime.some,

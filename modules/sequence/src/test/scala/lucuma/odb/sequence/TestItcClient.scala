@@ -46,13 +46,13 @@ object TestItcClient {
         useCache: Boolean
       ): F[ClientCalculationResult] =
         val resultʹ =
-          input.exposureTimeMode match
+          input.mode.exposureTimeMode match
             case ExposureTimeMode.SignalToNoiseMode(_, _)   =>
               result
             case ExposureTimeMode.TimeAndCountMode(t, c, _) =>
               IntegrationTime(t, c)
 
-        val snAt = input.exposureTimeMode match
+        val snAt = input.mode.exposureTimeMode match
           case ExposureTimeMode.SignalToNoiseMode(sn, at) =>
             SignalToNoiseAt(
               at,

@@ -12,12 +12,6 @@ class WavelengthAtOutOfRangeErrorSuite extends WavelengthAtOutOfRangeSuite:
       """
         query {
           spectroscopy(input: {
-            exposureTimeMode: {
-              signalToNoise: {
-                value: 2,
-                at: { nanometers: 1800 }
-              }
-            },
             asterism: [
               {
                 sourceProfile: {
@@ -60,14 +54,11 @@ class WavelengthAtOutOfRangeErrorSuite extends WavelengthAtOutOfRangeSuite:
               }
             },
             mode: {
-              igrins2Spectroscopy: {}
-            }
-          }) {
-            mode {
-              ... on SpectroscopyMode {
-                instrument
+              igrins2Spectroscopy: {
+                exposureTimeMode: { signalToNoise: { value: 2, at: { nanometers: 1800 } } }
               }
             }
+          }) {
             brightest {
               selected {
                 exposureCount
@@ -100,9 +91,6 @@ class WavelengthAtOutOfRangeErrorSuite extends WavelengthAtOutOfRangeSuite:
           }],
           "data": {
             "spectroscopy" : {
-              "mode" : {
-                "instrument" : "IGRINS2"
-              },
               "brightest" : null
             }
           }
