@@ -507,15 +507,11 @@ class executionAtomRecords extends OdbSuite with ExecutionQuerySetupOperations
       user,
       s"""
         query {
-          observation(observationId: "$oid") {
-            execution {
-              config {
-                gmosNorth {
-                  ${sequenceType.tag} {
-                    nextAtom {
-                      id
-                    }
-                  }
+          executionConfig(observationId: "$oid") {
+            gmosNorth {
+              ${sequenceType.tag} {
+                nextAtom {
+                  id
                 }
               }
             }
@@ -524,7 +520,7 @@ class executionAtomRecords extends OdbSuite with ExecutionQuerySetupOperations
       """
     ).flatMap { js =>
       js.hcursor
-        .downFields("observation", "execution", "config", "gmosNorth", sequenceType.tag, "nextAtom", "id")
+        .downFields("executionConfig", "gmosNorth", sequenceType.tag, "nextAtom", "id")
         .as[Atom.Id]
         .leftMap(f => new RuntimeException(f.message))
         .liftTo[IO]

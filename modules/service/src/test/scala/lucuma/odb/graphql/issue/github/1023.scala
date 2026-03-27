@@ -27,15 +27,11 @@ class GitHub_1023 extends ExecutionTestSupportForGmos {
         query =
           s"""
              query {
-               observation(observationId: "$oid") {
-                 execution {
-                   config(futureLimit: 100) {
-                     gmosNorth {
-                       static {
-                         stageMode
-                         detector
-                       }
-                     }
+               executionConfig(observationId: "$oid", futureLimit: 100) {
+                 gmosNorth {
+                   static {
+                     stageMode
+                     detector
                    }
                  }
                }
@@ -44,15 +40,11 @@ class GitHub_1023 extends ExecutionTestSupportForGmos {
         expected =
           json"""
             {
-              "observation" : {
-                "execution" : {
-                  "config" : {
-                    "gmosNorth": {
-                      "static" : {
-                        "stageMode" : "FOLLOW_XY",
-                        "detector" : "HAMAMATSU"
-                      }
-                    }
+              "executionConfig" : {
+                "gmosNorth": {
+                  "static" : {
+                    "stageMode" : "FOLLOW_XY",
+                    "detector" : "HAMAMATSU"
                   }
                 }
               }
@@ -77,22 +69,18 @@ class GitHub_1023 extends ExecutionTestSupportForGmos {
         query =
           s"""
              query {
-               observation(observationId: "$oid") {
-                 execution {
-                   config(futureLimit: 100) {
-                     instrument
-                     gmosNorth {
-                       static {
-                         stageMode
-                         detector
-                       }
-                     }
-                     gmosSouth {
-                       static {
-                         stageMode
-                         detector
-                       }
-                     }
+               executionConfig(observationId: "$oid", futureLimit: 100) {
+                 instrument
+                 gmosNorth {
+                   static {
+                     stageMode
+                     detector
+                   }
+                 }
+                 gmosSouth {
+                   static {
+                     stageMode
+                     detector
                    }
                  }
                }
@@ -101,19 +89,15 @@ class GitHub_1023 extends ExecutionTestSupportForGmos {
         expected =
           json"""
             {
-              "observation" : {
-                "execution" : {
-                  "config" : {
-                    "instrument": "GMOS_NORTH",
-                    "gmosNorth": {
-                      "static" : {
-                        "stageMode" : "FOLLOW_XY",
-                        "detector" : "HAMAMATSU"
-                      }
-                    },
-                    "gmosSouth": null
+              "executionConfig" : {
+                "instrument": "GMOS_NORTH",
+                "gmosNorth": {
+                  "static" : {
+                    "stageMode" : "FOLLOW_XY",
+                    "detector" : "HAMAMATSU"
                   }
-                }
+                },
+                "gmosSouth": null
               }
             }
           """.asRight

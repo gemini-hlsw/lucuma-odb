@@ -37,56 +37,52 @@ class executionSpecPhot extends ExecutionTestSupportForGmos {
         query =
           s"""
              query {
-               observation(observationId: "$oid") {
-                 execution {
-                   config {
-                     gmosNorth {
-                       science {
-                         nextAtom {
-                           observeClass
-                           steps {
-                             observeClass
-                             instrumentConfig {
-                               exposure {
-                                 seconds
-                               }
-                               readout {
-                                 xBin
-                                 yBin
-                                 ampCount
-                                 ampGain
-                                 ampReadMode
-                               }
-                               dtax
-                               roi
-                               gratingConfig {
-                                 grating
-                                 order
-                                 wavelength {
-                                   nanometers
-                                 }
-                               }
-                               filter
-                               fpu {
-                                 builtin
-                                 customMask { slitWidth }
-                               }
-                             }
-                             telescopeConfig {
-                               offset {
-                                 p { arcseconds }
-                                 q { arcseconds }
-                               }
+               executionConfig(observationId: "$oid") {
+                 gmosNorth {
+                   science {
+                     nextAtom {
+                       observeClass
+                       steps {
+                         observeClass
+                         instrumentConfig {
+                           exposure {
+                             seconds
+                           }
+                           readout {
+                             xBin
+                             yBin
+                             ampCount
+                             ampGain
+                             ampReadMode
+                           }
+                           dtax
+                           roi
+                           gratingConfig {
+                             grating
+                             order
+                             wavelength {
+                               nanometers
                              }
                            }
+                           filter
+                           fpu {
+                             builtin
+                             customMask { slitWidth }
+                           }
                          }
-                         possibleFuture {
-                           steps {
-                             instrumentConfig {
-                               exposure {
-                                 seconds
-                               }
-                             }
+                         telescopeConfig {
+                           offset {
+                             p { arcseconds }
+                             q { arcseconds }
+                           }
+                         }
+                       }
+                     }
+                     possibleFuture {
+                       steps {
+                         instrumentConfig {
+                           exposure {
+                             seconds
                            }
                          }
                        }
@@ -99,97 +95,93 @@ class executionSpecPhot extends ExecutionTestSupportForGmos {
         expected =
           json"""
             {
-              "observation": {
-                "execution": {
-                  "config": {
-                    "gmosNorth": {
-                      "science": {
-                        "nextAtom": {
-                          "observeClass": "SCIENCE",
-                          "steps": [
-                            {
-                              "observeClass": "NIGHT_CAL",
-                              "instrumentConfig": {
-                                "exposure": {
-                                  "seconds": 1.000000
-                                },
-                                "readout": {
-                                  "xBin": "ONE",
-                                  "yBin": "TWO",
-                                  "ampCount": "TWELVE",
-                                  "ampGain": "LOW",
-                                  "ampReadMode": "SLOW"
-                                },
-                                "dtax": "ZERO",
-                                "roi": "FULL_FRAME",
-                                "gratingConfig": {
-                                  "grating" : "R831_G5302",
-                                  "order" : "ONE",
-                                  "wavelength" : {
-                                    "nanometers" : 500.000
-                                  }
-                                },
-                                "filter": "R_PRIME",
-                                "fpu": {
-                                  "builtin": "LONG_SLIT_0_50",
-                                  "customMask": null
-                                }
-                              },
-                              "telescopeConfig": {
-                                "offset": {
-                                  "p": {
-                                    "arcseconds": 0.000000
-                                  },
-                                  "q": {
-                                    "arcseconds": 0.000000
-                                  }
-                                }
+              "executionConfig": {
+                "gmosNorth": {
+                  "science": {
+                    "nextAtom": {
+                      "observeClass": "SCIENCE",
+                      "steps": [
+                        {
+                          "observeClass": "NIGHT_CAL",
+                          "instrumentConfig": {
+                            "exposure": {
+                              "seconds": 1.000000
+                            },
+                            "readout": {
+                              "xBin": "ONE",
+                              "yBin": "TWO",
+                              "ampCount": "TWELVE",
+                              "ampGain": "LOW",
+                              "ampReadMode": "SLOW"
+                            },
+                            "dtax": "ZERO",
+                            "roi": "FULL_FRAME",
+                            "gratingConfig": {
+                              "grating" : "R831_G5302",
+                              "order" : "ONE",
+                              "wavelength" : {
+                                "nanometers" : 500.000
                               }
                             },
-                            {
-                              "observeClass": "SCIENCE",
-                              "instrumentConfig": {
-                                "exposure": {
-                                  "seconds": 1200.000000
-                                },
-                                "readout": {
-                                  "xBin": "ONE",
-                                  "yBin": "TWO",
-                                  "ampCount": "TWELVE",
-                                  "ampGain": "LOW",
-                                  "ampReadMode": "SLOW"
-                                },
-                                "dtax": "ZERO",
-                                "roi": "FULL_FRAME",
-                                "gratingConfig": {
-                                  "grating": "R831_G5302",
-                                  "order": "ONE",
-                                  "wavelength": {
-                                    "nanometers": 500.000
-                                  }
-                                },
-                                "filter": "R_PRIME",
-                                "fpu": {
-                                  "builtin": "LONG_SLIT_0_50",
-                                  "customMask": null
-                                }
+                            "filter": "R_PRIME",
+                            "fpu": {
+                              "builtin": "LONG_SLIT_0_50",
+                              "customMask": null
+                            }
+                          },
+                          "telescopeConfig": {
+                            "offset": {
+                              "p": {
+                                "arcseconds": 0.000000
                               },
-                              "telescopeConfig": {
-                                "offset": {
-                                  "p": {
-                                    "arcseconds": 0.000000
-                                  },
-                                  "q": {
-                                    "arcseconds": 0.000000
-                                  }
-                                }
+                              "q": {
+                                "arcseconds": 0.000000
                               }
                             }
-                          ]
+                          }
                         },
-                        "possibleFuture": []
-                      }
-                    }
+                        {
+                          "observeClass": "SCIENCE",
+                          "instrumentConfig": {
+                            "exposure": {
+                              "seconds": 1200.000000
+                            },
+                            "readout": {
+                              "xBin": "ONE",
+                              "yBin": "TWO",
+                              "ampCount": "TWELVE",
+                              "ampGain": "LOW",
+                              "ampReadMode": "SLOW"
+                            },
+                            "dtax": "ZERO",
+                            "roi": "FULL_FRAME",
+                            "gratingConfig": {
+                              "grating": "R831_G5302",
+                              "order": "ONE",
+                              "wavelength": {
+                                "nanometers": 500.000
+                              }
+                            },
+                            "filter": "R_PRIME",
+                            "fpu": {
+                              "builtin": "LONG_SLIT_0_50",
+                              "customMask": null
+                            }
+                          },
+                          "telescopeConfig": {
+                            "offset": {
+                              "p": {
+                                "arcseconds": 0.000000
+                              },
+                              "q": {
+                                "arcseconds": 0.000000
+                              }
+                            }
+                          }
+                        }
+                      ]
+                    },
+                    "possibleFuture": []
                   }
                 }
               }
@@ -239,32 +231,28 @@ class executionSpecPhot extends ExecutionTestSupportForGmos {
         query =
           s"""
              query {
-               observation(observationId: "$oid") {
-                 execution {
-                   config {
-                     gmosNorth {
-                       science {
-                         nextAtom {
-                           steps {
-                             observeClass
-                             instrumentConfig {
-                               gratingConfig {
-                                 wavelength {
-                                   nanometers
-                                 }
-                               }
+               executionConfig(observationId: "$oid") {
+                 gmosNorth {
+                   science {
+                     nextAtom {
+                       steps {
+                         observeClass
+                         instrumentConfig {
+                           gratingConfig {
+                             wavelength {
+                               nanometers
                              }
                            }
                          }
-                         possibleFuture {
-                           steps {
-                             observeClass
-                             instrumentConfig {
-                               gratingConfig {
-                                 wavelength {
-                                   nanometers
-                                 }
-                               }
+                       }
+                     }
+                     possibleFuture {
+                       steps {
+                         observeClass
+                         instrumentConfig {
+                           gratingConfig {
+                             wavelength {
+                               nanometers
                              }
                            }
                          }
@@ -278,38 +266,34 @@ class executionSpecPhot extends ExecutionTestSupportForGmos {
         expected =
           json"""
             {
-              "observation": {
-                "execution": {
-                  "config": {
-                    "gmosNorth": {
-                      "science": {
-                        "nextAtom": {
-                          "steps": [
-                            {
-                              "observeClass": "NIGHT_CAL",
-                              "instrumentConfig": {
-                                "gratingConfig": {
-                                  "wavelength" : {
-                                    "nanometers" : 500.000
-                                  }
-                                }
-                              }
-                            },
-                            {
-                              "observeClass": "SCIENCE",
-                              "instrumentConfig": {
-                                "gratingConfig": {
-                                  "wavelength": {
-                                    "nanometers": 500.000
-                                  }
-                                }
+              "executionConfig": {
+                "gmosNorth": {
+                  "science": {
+                    "nextAtom": {
+                      "steps": [
+                        {
+                          "observeClass": "NIGHT_CAL",
+                          "instrumentConfig": {
+                            "gratingConfig": {
+                              "wavelength" : {
+                                "nanometers" : 500.000
                               }
                             }
-                          ]
+                          }
                         },
-                        "possibleFuture": []
-                      }
-                    }
+                        {
+                          "observeClass": "SCIENCE",
+                          "instrumentConfig": {
+                            "gratingConfig": {
+                              "wavelength": {
+                                "nanometers": 500.000
+                              }
+                            }
+                          }
+                        }
+                      ]
+                    },
+                    "possibleFuture": []
                   }
                 }
               }
@@ -356,32 +340,28 @@ class executionSpecPhot extends ExecutionTestSupportForGmos {
         query =
           s"""
              query {
-               observation(observationId: "$oid") {
-                 execution {
-                   config {
-                     gmosNorth {
-                       science {
-                         nextAtom {
-                           steps {
-                             observeClass
-                             instrumentConfig {
-                               gratingConfig {
-                                 wavelength {
-                                   nanometers
-                                 }
-                               }
+               executionConfig(observationId: "$oid") {
+                 gmosNorth {
+                   science {
+                     nextAtom {
+                       steps {
+                         observeClass
+                         instrumentConfig {
+                           gratingConfig {
+                             wavelength {
+                               nanometers
                              }
                            }
                          }
-                         possibleFuture {
-                           steps {
-                             observeClass
-                             instrumentConfig {
-                               gratingConfig {
-                                 wavelength {
-                                   nanometers
-                                 }
-                               }
+                       }
+                     }
+                     possibleFuture {
+                       steps {
+                         observeClass
+                         instrumentConfig {
+                           gratingConfig {
+                             wavelength {
+                               nanometers
                              }
                            }
                          }
@@ -395,63 +375,59 @@ class executionSpecPhot extends ExecutionTestSupportForGmos {
         expected =
           json"""
             {
-              "observation": {
-                "execution": {
-                  "config": {
-                    "gmosNorth": {
-                      "science": {
-                        "nextAtom": {
-                          "steps": [
-                            {
-                              "observeClass": "NIGHT_CAL",
-                              "instrumentConfig": {
-                                "gratingConfig": {
-                                  "wavelength" : {
-                                    "nanometers" : 500.000
-                                  }
-                                }
+              "executionConfig": {
+                "gmosNorth": {
+                  "science": {
+                    "nextAtom": {
+                      "steps": [
+                        {
+                          "observeClass": "NIGHT_CAL",
+                          "instrumentConfig": {
+                            "gratingConfig": {
+                              "wavelength" : {
+                                "nanometers" : 500.000
                               }
-                            },
-                            {
-                              "observeClass": "SCIENCE",
-                              "instrumentConfig": {
-                                "gratingConfig": {
-                                  "wavelength": {
-                                    "nanometers": 500.000
-                                  }
+                            }
+                          }
+                        },
+                        {
+                          "observeClass": "SCIENCE",
+                          "instrumentConfig": {
+                            "gratingConfig": {
+                              "wavelength": {
+                                "nanometers": 500.000
+                              }
+                            }
+                          }
+                        }
+                      ]
+                    },
+                    "possibleFuture": [
+                      {
+                        "steps": [
+                          {
+                            "observeClass": "NIGHT_CAL",
+                            "instrumentConfig": {
+                              "gratingConfig": {
+                                "wavelength" : {
+                                  "nanometers" : 523.501
                                 }
                               }
                             }
-                          ]
-                        },
-                        "possibleFuture": [
+                          },
                           {
-                            "steps": [
-                              {
-                                "observeClass": "NIGHT_CAL",
-                                "instrumentConfig": {
-                                  "gratingConfig": {
-                                    "wavelength" : {
-                                      "nanometers" : 523.501
-                                    }
-                                  }
-                                }
-                              },
-                              {
-                                "observeClass": "SCIENCE",
-                                "instrumentConfig": {
-                                  "gratingConfig": {
-                                    "wavelength": {
-                                      "nanometers": 523.501
-                                    }
-                                  }
+                            "observeClass": "SCIENCE",
+                            "instrumentConfig": {
+                              "gratingConfig": {
+                                "wavelength": {
+                                  "nanometers": 523.501
                                 }
                               }
-                            ]
+                            }
                           }
                         ]
                       }
-                    }
+                    ]
                   }
                 }
               }

@@ -87,56 +87,52 @@ class executionTwilight extends ExecutionTestSupportForGmos {
   def query(sequenceType: String, oid: Observation.Id): String =
     s"""
        query {
-         observation(observationId: "$oid") {
-           execution {
-             config {
-               gmosNorth {
-                 $sequenceType {
-                   nextAtom {
-                     observeClass
-                     steps {
-                       observeClass
-                       instrumentConfig {
-                         exposure {
-                           seconds
-                         }
-                         readout {
-                           xBin
-                           yBin
-                           ampCount
-                           ampGain
-                           ampReadMode
-                         }
-                         dtax
-                         roi
-                         gratingConfig {
-                           grating
-                           order
-                           wavelength {
-                             nanometers
-                           }
-                         }
-                         filter
-                         fpu {
-                           builtin
-                           customMask { slitWidth }
-                         }
-                       }
-                       telescopeConfig {
-                         offset {
-                           p { arcseconds }
-                           q { arcseconds }
-                         }
+         executionConfig(observationId: "$oid") {
+           gmosNorth {
+             $sequenceType {
+               nextAtom {
+                 observeClass
+                 steps {
+                   observeClass
+                   instrumentConfig {
+                     exposure {
+                       seconds
+                     }
+                     readout {
+                       xBin
+                       yBin
+                       ampCount
+                       ampGain
+                       ampReadMode
+                     }
+                     dtax
+                     roi
+                     gratingConfig {
+                       grating
+                       order
+                       wavelength {
+                         nanometers
                        }
                      }
+                     filter
+                     fpu {
+                       builtin
+                       customMask { slitWidth }
+                     }
                    }
-                   possibleFuture {
-                     steps {
-                       instrumentConfig {
-                         exposure {
-                           seconds
-                         }
-                       }
+                   telescopeConfig {
+                     offset {
+                       p { arcseconds }
+                       q { arcseconds }
+                     }
+                   }
+                 }
+               }
+               possibleFuture {
+                 steps {
+                   instrumentConfig {
+                     exposure {
+                       seconds
                      }
                    }
                  }
@@ -155,58 +151,54 @@ class executionTwilight extends ExecutionTestSupportForGmos {
         expected =
           json"""
             {
-              "observation": {
-                "execution": {
-                  "config": {
-                    "gmosNorth": {
-                      "science": {
-                        "nextAtom": {
+              "executionConfig": {
+                "gmosNorth": {
+                  "science": {
+                    "nextAtom": {
+                      "observeClass": "DAY_CAL",
+                      "steps": [
+                        {
                           "observeClass": "DAY_CAL",
-                          "steps": [
-                            {
-                              "observeClass": "DAY_CAL",
-                              "instrumentConfig": {
-                                "exposure": {
-                                  "seconds": 30.000000
-                                },
-                                "readout": {
-                                  "xBin": "ONE",
-                                  "yBin": "TWO",
-                                  "ampCount": "TWELVE",
-                                  "ampGain": "LOW",
-                                  "ampReadMode": "SLOW"
-                                },
-                                "dtax": "ZERO",
-                                "roi": "FULL_FRAME",
-                                "gratingConfig": {
-                                  "grating": "R831_G5302",
-                                  "order": "ONE",
-                                  "wavelength": {
-                                    "nanometers": 500.000
-                                  }
-                                },
-                                "filter": "R_PRIME",
-                                "fpu": {
-                                  "builtin": "LONG_SLIT_0_50",
-                                  "customMask": null
-                                }
+                          "instrumentConfig": {
+                            "exposure": {
+                              "seconds": 30.000000
+                            },
+                            "readout": {
+                              "xBin": "ONE",
+                              "yBin": "TWO",
+                              "ampCount": "TWELVE",
+                              "ampGain": "LOW",
+                              "ampReadMode": "SLOW"
+                            },
+                            "dtax": "ZERO",
+                            "roi": "FULL_FRAME",
+                            "gratingConfig": {
+                              "grating": "R831_G5302",
+                              "order": "ONE",
+                              "wavelength": {
+                                "nanometers": 500.000
+                              }
+                            },
+                            "filter": "R_PRIME",
+                            "fpu": {
+                              "builtin": "LONG_SLIT_0_50",
+                              "customMask": null
+                            }
+                          },
+                          "telescopeConfig": {
+                            "offset": {
+                              "p": {
+                                "arcseconds": 0.000000
                               },
-                              "telescopeConfig": {
-                                "offset": {
-                                  "p": {
-                                    "arcseconds": 0.000000
-                                  },
-                                  "q": {
-                                    "arcseconds": 0.000000
-                                  }
-                                }
+                              "q": {
+                                "arcseconds": 0.000000
                               }
                             }
-                          ]
-                        },
-                        "possibleFuture": []
-                      }
-                    }
+                          }
+                        }
+                      ]
+                    },
+                    "possibleFuture": []
                   }
                 }
               }
@@ -223,13 +215,9 @@ class executionTwilight extends ExecutionTestSupportForGmos {
         expected =
           json"""
             {
-              "observation": {
-                "execution": {
-                  "config": {
-                    "gmosNorth": {
-                      "acquisition": null
-                    }
-                  }
+              "executionConfig": {
+                "gmosNorth": {
+                  "acquisition": null
                 }
               }
             }

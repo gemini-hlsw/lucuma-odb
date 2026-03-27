@@ -135,36 +135,32 @@ class ShortCut_2772 extends ExecutionTestSupportForGmos {
       json.hcursor.downFields("createObservation", "observation", "id").require[Observation.Id]
     }
 
-  test("binning calculation is correct") {
+  test("binning calculation is correct"):
     val setup: IO[Observation.Id] =
-      for {
+      for
         p <- createProgram
         t <- createTargetWithProfile(p)
         o <- createGmosNorthLongSlitObservation(p, t)
-      } yield o
+      yield o
 
-    setup.flatMap { oid =>
+    setup.flatMap: oid =>
       expect(
         user  = user,
         query =
           s"""
              query {
-               observation(observationId: "$oid") {
-                 execution {
-                   config {
-                     gmosNorth {
-                       science {
-                         nextAtom {
-                           steps {
-                             stepConfig {
-                               stepType
-                             }
-                             instrumentConfig {
-                               readout {
-                                 xBin
-                                 yBin
-                               }
-                             }
+               executionConfig(observationId: "$oid") {
+                 gmosNorth {
+                   science {
+                     nextAtom {
+                       steps {
+                         stepConfig {
+                           stepType
+                         }
+                         instrumentConfig {
+                           readout {
+                             xBin
+                             yBin
                            }
                          }
                        }
@@ -177,60 +173,56 @@ class ShortCut_2772 extends ExecutionTestSupportForGmos {
         expected = Right(
           json"""
             {
-              "observation": {
-                "execution": {
-                  "config": {
-                    "gmosNorth": {
-                      "science": {
-                        "nextAtom": {
-                          "steps": [
-                            {
-                              "stepConfig": {
-                                "stepType": "GCAL"
-                              },
-                              "instrumentConfig": {
-                                "readout": {
-                                  "xBin": "TWO",
-                                  "yBin": "TWO"
-                                }
-                              }
-                            },
-                            {
-                              "stepConfig": {
-                                "stepType": "GCAL"
-                              },
-                              "instrumentConfig": {
-                                "readout": {
-                                  "xBin": "TWO",
-                                  "yBin": "TWO"
-                                }
-                              }
-                            },
-                            {
-                              "stepConfig": {
-                                "stepType": "SCIENCE"
-                              },
-                              "instrumentConfig": {
-                                "readout": {
-                                  "xBin": "TWO",
-                                  "yBin": "TWO"
-                                }
-                              }
-                            },
-                            {
-                              "stepConfig": {
-                                "stepType": "SCIENCE"
-                              },
-                              "instrumentConfig": {
-                                "readout": {
-                                  "xBin": "TWO",
-                                  "yBin": "TWO"
-                                }
-                              }
+              "executionConfig": {
+                "gmosNorth": {
+                  "science": {
+                    "nextAtom": {
+                      "steps": [
+                        {
+                          "stepConfig": {
+                            "stepType": "GCAL"
+                          },
+                          "instrumentConfig": {
+                            "readout": {
+                              "xBin": "TWO",
+                              "yBin": "TWO"
                             }
-                          ]
+                          }
+                        },
+                        {
+                          "stepConfig": {
+                            "stepType": "GCAL"
+                          },
+                          "instrumentConfig": {
+                            "readout": {
+                              "xBin": "TWO",
+                              "yBin": "TWO"
+                            }
+                          }
+                        },
+                        {
+                          "stepConfig": {
+                            "stepType": "SCIENCE"
+                          },
+                          "instrumentConfig": {
+                            "readout": {
+                              "xBin": "TWO",
+                              "yBin": "TWO"
+                            }
+                          }
+                        },
+                        {
+                          "stepConfig": {
+                            "stepType": "SCIENCE"
+                          },
+                          "instrumentConfig": {
+                            "readout": {
+                              "xBin": "TWO",
+                              "yBin": "TWO"
+                            }
+                          }
                         }
-                      }
+                      ]
                     }
                   }
                 }
@@ -239,8 +231,5 @@ class ShortCut_2772 extends ExecutionTestSupportForGmos {
           """
         )
       )
-    }
-
-  }
 
 }

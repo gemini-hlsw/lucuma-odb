@@ -167,37 +167,33 @@ class timeAndCountExposureTimeMode extends ExecutionTestSupportForGmos:
         user     = pi,
         query    = s"""
           query {
-            observation(observationId: "$o") {
-              execution {
-                config(futureLimit: 2) {
-                  gmosNorth {
-                    science {
-                      nextAtom {
-                        description
-                        steps {
-                          instrumentConfig {
-                            exposure { seconds }
-                          }
-                          stepConfig { stepType }
-                          telescopeConfig {
-                            offset {
-                              q { arcseconds }
-                            }
-                          }
+            executionConfig(observationId: "$o", futureLimit: 2) {
+              gmosNorth {
+                science {
+                  nextAtom {
+                    description
+                    steps {
+                      instrumentConfig {
+                        exposure { seconds }
+                      }
+                      stepConfig { stepType }
+                      telescopeConfig {
+                        offset {
+                          q { arcseconds }
                         }
                       }
-                      possibleFuture {
-                        description
-                        steps {
-                          instrumentConfig {
-                            exposure { seconds }
-                          }
-                          stepConfig { stepType }
-                          telescopeConfig {
-                            offset {
-                              q { arcseconds }
-                            }
-                          }
+                    }
+                  }
+                  possibleFuture {
+                    description
+                    steps {
+                      instrumentConfig {
+                        exposure { seconds }
+                      }
+                      stepConfig { stepType }
+                      telescopeConfig {
+                        offset {
+                          q { arcseconds }
                         }
                       }
                     }
@@ -209,129 +205,125 @@ class timeAndCountExposureTimeMode extends ExecutionTestSupportForGmos:
         """,
         expected = json"""
           {
-            "observation": {
-              "execution": {
-                "config": {
-                  "gmosNorth": {
-                    "science": {
-                      "nextAtom": {
-                        "description": "0.000 nm",
-                        "steps": [
-                          {
-                            "instrumentConfig": {
-                              "exposure": { "seconds":  1.000000 }
-                            },
-                            "stepConfig": { "stepType": "GCAL" },
-                            "telescopeConfig": {
-                              "offset": {
-                                "q": { "arcseconds": 0.000000 }
-                              }
-                            }
+            "executionConfig": {
+              "gmosNorth": {
+                "science": {
+                  "nextAtom": {
+                    "description": "0.000 nm",
+                    "steps": [
+                      {
+                        "instrumentConfig": {
+                          "exposure": { "seconds":  1.000000 }
+                        },
+                        "stepConfig": { "stepType": "GCAL" },
+                        "telescopeConfig": {
+                          "offset": {
+                            "q": { "arcseconds": 0.000000 }
+                          }
+                        }
+                      },
+                      {
+                        "instrumentConfig": {
+                          "exposure": { "seconds":  1.000000 }
+                        },
+                        "stepConfig": { "stepType": "GCAL" },
+                        "telescopeConfig": {
+                          "offset": {
+                            "q": { "arcseconds": 0.000000 }
+                          }
+                        }
+                      },
+                      {
+                        "instrumentConfig": {
+                          "exposure": { "seconds":  600.000000 }
+                        },
+                        "stepConfig": { "stepType": "SCIENCE" },
+                        "telescopeConfig": {
+                          "offset": {
+                            "q": { "arcseconds": 0.000000 }
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "possibleFuture": [
+                    {
+                      "description": "5.000 nm",
+                      "steps": [
+                        {
+                          "instrumentConfig": {
+                            "exposure": { "seconds":  1.000000 }
                           },
-                          {
-                            "instrumentConfig": {
-                              "exposure": { "seconds":  1.000000 }
-                            },
-                            "stepConfig": { "stepType": "GCAL" },
-                            "telescopeConfig": {
-                              "offset": {
-                                "q": { "arcseconds": 0.000000 }
-                              }
-                            }
-                          },
-                          {
-                            "instrumentConfig": {
-                              "exposure": { "seconds":  600.000000 }
-                            },
-                            "stepConfig": { "stepType": "SCIENCE" },
-                            "telescopeConfig": {
-                              "offset": {
-                                "q": { "arcseconds": 0.000000 }
-                              }
+                          "stepConfig": { "stepType": "GCAL" },
+                          "telescopeConfig": {
+                            "offset": {
+                              "q": { "arcseconds": 15.000000 }
                             }
                           }
-                        ]
-                      },
-                      "possibleFuture": [
-                        {
-                          "description": "5.000 nm",
-                          "steps": [
-                            {
-                              "instrumentConfig": {
-                                "exposure": { "seconds":  1.000000 }
-                              },
-                              "stepConfig": { "stepType": "GCAL" },
-                              "telescopeConfig": {
-                                "offset": {
-                                  "q": { "arcseconds": 15.000000 }
-                                }
-                              }
-                            },
-                            {
-                              "instrumentConfig": {
-                                "exposure": { "seconds":  1.000000 }
-                              },
-                              "stepConfig": { "stepType": "GCAL" },
-                              "telescopeConfig": {
-                                "offset": {
-                                  "q": { "arcseconds": 15.000000 }
-                                }
-                              }
-                            },
-                            {
-                              "instrumentConfig": {
-                                "exposure": { "seconds":  600.000000 }
-                              },
-                              "stepConfig": { "stepType": "SCIENCE" },
-                              "telescopeConfig": {
-                                "offset": {
-                                  "q": { "arcseconds": 15.000000 }
-                                }
-                              }
-                            }
-                          ]
                         },
                         {
-                          "description": "-5.000 nm",
-                          "steps": [
-                            {
-                              "instrumentConfig": {
-                                "exposure": { "seconds":  1.000000 }
-                              },
-                              "stepConfig": { "stepType": "GCAL" },
-                              "telescopeConfig": {
-                                "offset": {
-                                  "q": { "arcseconds": -15.000000 }
-                                }
-                              }
-                            },
-                            {
-                              "instrumentConfig": {
-                                "exposure": { "seconds":  1.000000 }
-                              },
-                              "stepConfig": { "stepType": "GCAL" },
-                              "telescopeConfig": {
-                                "offset": {
-                                  "q": { "arcseconds": -15.000000 }
-                                }
-                              }
-                            },
-                            {
-                              "instrumentConfig": {
-                                "exposure": { "seconds":  600.000000 }
-                              },
-                              "stepConfig": { "stepType": "SCIENCE" },
-                              "telescopeConfig": {
-                                "offset": {
-                                  "q": { "arcseconds": -15.000000 }
-                                }
-                              }
+                          "instrumentConfig": {
+                            "exposure": { "seconds":  1.000000 }
+                          },
+                          "stepConfig": { "stepType": "GCAL" },
+                          "telescopeConfig": {
+                            "offset": {
+                              "q": { "arcseconds": 15.000000 }
                             }
-                          ]
+                          }
+                        },
+                        {
+                          "instrumentConfig": {
+                            "exposure": { "seconds":  600.000000 }
+                          },
+                          "stepConfig": { "stepType": "SCIENCE" },
+                          "telescopeConfig": {
+                            "offset": {
+                              "q": { "arcseconds": 15.000000 }
+                            }
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "description": "-5.000 nm",
+                      "steps": [
+                        {
+                          "instrumentConfig": {
+                            "exposure": { "seconds":  1.000000 }
+                          },
+                          "stepConfig": { "stepType": "GCAL" },
+                          "telescopeConfig": {
+                            "offset": {
+                              "q": { "arcseconds": -15.000000 }
+                            }
+                          }
+                        },
+                        {
+                          "instrumentConfig": {
+                            "exposure": { "seconds":  1.000000 }
+                          },
+                          "stepConfig": { "stepType": "GCAL" },
+                          "telescopeConfig": {
+                            "offset": {
+                              "q": { "arcseconds": -15.000000 }
+                            }
+                          }
+                        },
+                        {
+                          "instrumentConfig": {
+                            "exposure": { "seconds":  600.000000 }
+                          },
+                          "stepConfig": { "stepType": "SCIENCE" },
+                          "telescopeConfig": {
+                            "offset": {
+                              "q": { "arcseconds": -15.000000 }
+                            }
+                          }
                         }
                       ]
                     }
-                  }
+                  ]
                 }
               }
             }
