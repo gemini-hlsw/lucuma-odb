@@ -315,18 +315,14 @@ class executionPlannedTime extends ExecutionTestSupportForGmos {
              }
 
              query {
-               observation(observationId: "$oid") {
-                 execution {
-                   config {
-                     gmosNorth {
-                       acquisition {
-                         nextAtom {
-                           ...gmosNorthAtomFields
-                         }
-                         possibleFuture {
-                           ...gmosNorthAtomFields
-                         }
-                       }
+               executionConfig(observationId: "$oid") {
+                 gmosNorth {
+                   acquisition {
+                     nextAtom {
+                       ...gmosNorthAtomFields
+                     }
+                     possibleFuture {
+                       ...gmosNorthAtomFields
                      }
                    }
                  }
@@ -336,25 +332,21 @@ class executionPlannedTime extends ExecutionTestSupportForGmos {
         expected =
           json"""
             {
-              "observation": {
-                "execution": {
-                  "config": {
-                    "gmosNorth": {
-                      "acquisition": {
-                        "nextAtom": {
-                           "steps": ${List(Step1, Step2, Step3).asJson}
-                        },
-                        "possibleFuture": ${
-                          List
-                            .fill(RepeatingAtomCount):
-                              json"""
-                                {
-                                  "steps": ${List(Step4).asJson}
-                                }
-                              """
-                            .asJson
-                        }
-                      }
+              "executionConfig": {
+                "gmosNorth": {
+                  "acquisition": {
+                    "nextAtom": {
+                       "steps": ${List(Step1, Step2, Step3).asJson}
+                    },
+                    "possibleFuture": ${
+                      List
+                        .fill(RepeatingAtomCount):
+                          json"""
+                            {
+                              "steps": ${List(Step4).asJson}
+                            }
+                          """
+                        .asJson
                     }
                   }
                 }
@@ -464,18 +456,14 @@ class executionPlannedTime extends ExecutionTestSupportForGmos {
              }
 
              query {
-               observation(observationId: "$oid") {
-                 execution {
-                   config {
-                     gmosNorth {
-                       science {
-                         nextAtom {
-                           ...gmosNorthAtomFields
-                         }
-                         possibleFuture {
-                           ...gmosNorthAtomFields
-                         }
-                       }
+               executionConfig(observationId: "$oid") {
+                 gmosNorth {
+                   science {
+                     nextAtom {
+                       ...gmosNorthAtomFields
+                     }
+                     possibleFuture {
+                       ...gmosNorthAtomFields
                      }
                    }
                  }
@@ -485,19 +473,15 @@ class executionPlannedTime extends ExecutionTestSupportForGmos {
         expected =
           json"""
             {
-              "observation": {
-                "execution": {
-                  "config" : {
-                    "gmosNorth": {
-                      "science" : {
-                        "nextAtom" : ${atom(Step1, Step2, Step3)},
-                        "possibleFuture" : [
-                          ${atom(Step1, Step2, Step3)},
-                          ${atom(Step1, Step2, Step3)},
-                          ${atom(Step1)}
-                        ]
-                      }
-                    }
+              "executionConfig": {
+                "gmosNorth": {
+                  "science" : {
+                    "nextAtom" : ${atom(Step1, Step2, Step3)},
+                    "possibleFuture" : [
+                      ${atom(Step1, Step2, Step3)},
+                      ${atom(Step1, Step2, Step3)},
+                      ${atom(Step1)}
+                    ]
                   }
                 }
               }

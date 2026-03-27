@@ -194,6 +194,9 @@ class recordVisit extends OdbSuite with query.GenerationTestSupport with Executi
                 stageMode
                 detector
                 mosPreImaging
+                nodAndShuffle {
+                  shuffleCycles
+                }
               }
               gmosSouth {
                 stageMode
@@ -209,7 +212,8 @@ class recordVisit extends OdbSuite with query.GenerationTestSupport with Executi
             "gmosNorth": {
               "stageMode": "NO_FOLLOW",
               "detector": "HAMAMATSU",
-              "mosPreImaging": "IS_NOT_MOS_PRE_IMAGING"
+              "mosPreImaging": "IS_NOT_MOS_PRE_IMAGING",
+              "nodAndShuffle": null
             },
             "gmosSouth": null
           }
@@ -338,6 +342,9 @@ class recordVisit extends OdbSuite with query.GenerationTestSupport with Executi
                 stageMode
                 detector
                 mosPreImaging
+                nodAndShuffle {
+                  shuffleCycles
+                }
               }
             }
           }
@@ -350,7 +357,8 @@ class recordVisit extends OdbSuite with query.GenerationTestSupport with Executi
             "gmosSouth": {
               "stageMode": "FOLLOW_XYZ",
               "detector": "HAMAMATSU",
-              "mosPreImaging": "IS_NOT_MOS_PRE_IMAGING"
+              "mosPreImaging": "IS_NOT_MOS_PRE_IMAGING",
+              "nodAndShuffle": null
             }
           }
         }

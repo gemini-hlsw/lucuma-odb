@@ -52,15 +52,11 @@ class executionFailures extends ExecutionTestSupportForGmos {
         query =
           s"""
              query {
-               observation(observationId: "$oid") {
-                 execution {
-                   config {
-                     gmosNorth {
-                       science {
-                         nextAtom {
-                           steps { instrumentConfig { exposure { seconds } } }
-                         }
-                       }
+               executionConfig(observationId: "$oid") {
+                 gmosNorth {
+                   science {
+                     nextAtom {
+                       steps { instrumentConfig { exposure { seconds } } }
                      }
                    }
                  }
@@ -89,14 +85,10 @@ class executionFailures extends ExecutionTestSupportForGmos {
         query =
           s"""
              query {
-               observation(observationId: "$oid") {
-                 execution {
-                   config {
-                     gmosNorth {
-                       static {
-                         stageMode
-                       }
-                     }
+               executionConfig(observationId: "$oid") {
+                 gmosNorth {
+                   static {
+                     stageMode
                    }
                  }
                }
@@ -123,15 +115,11 @@ class executionFailures extends ExecutionTestSupportForGmos {
         query =
           s"""
              query {
-               observation(observationId: "$oid") {
-                 execution {
-                   config(futureLimit: 101) {
-                     gmosNorth {
-                       science {
-                         possibleFuture {
-                           observeClass
-                         }
-                       }
+               executionConfig(observationId: "$oid", futureLimit: 101) {
+                 gmosNorth {
+                   science {
+                     possibleFuture {
+                       observeClass
                      }
                    }
                  }
@@ -143,40 +131,29 @@ class executionFailures extends ExecutionTestSupportForGmos {
     }
   }
 
-  test("user cannot access program") {
-    val setup: IO[Observation.Id] =
-      for {
+  test("user cannot access program"):
+    val setup: IO[(Program.Id, Observation.Id)] =
+      for
         p <- createProgram
         t <- createTargetWithProfileAs(pi, p)
         o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
-      } yield o
+      yield (p, o)
 
-    setup.flatMap { oid =>
+    setup.flatMap: (pid, oid) =>
       expect(
         user  = pi2,
         query =
           s"""
              query {
-               observation(observationId: "$oid") {
-                 execution {
-                   config {
-                     instrument
-                   }
-                 }
+               executionConfig(observationId: "$oid") {
+                 instrument
                }
              }
            """,
-        expected = Right(
-          json"""
-            {
-              "observation": null
-            }
-          """
-        )
+        expected = List(
+          s"User not authorized to view program $pid"
+        ).asLeft
       )
-    }
-
-  }
 
   test("cross site execution config") {
     val setup: IO[(Program.Id, Observation.Id)] =
@@ -192,18 +169,14 @@ class executionFailures extends ExecutionTestSupportForGmos {
         query =
           s"""
              query {
-               observation(observationId: "$oid") {
-                 execution {
-                   config {
-                     gmosSouth {
-                       science {
-                         nextAtom {
-                           steps {
-                             instrumentConfig {
-                               gratingConfig {
-                                 wavelength { nanometers }
-                               }
-                             }
+               executionConfig(observationId: "$oid") {
+                 gmosSouth {
+                   science {
+                     nextAtom {
+                       steps {
+                         instrumentConfig {
+                           gratingConfig {
+                             wavelength { nanometers }
                            }
                          }
                        }
@@ -216,12 +189,8 @@ class executionFailures extends ExecutionTestSupportForGmos {
         expected = Right(
           json"""
             {
-              "observation": {
-                "execution": {
-                  "config": {
-                    "gmosSouth": null
-                  }
-                }
+              "executionConfig": {
+                "gmosSouth": null
               }
             }
           """
@@ -246,15 +215,11 @@ class executionFailures extends ExecutionTestSupportForGmos {
         query =
           s"""
              query {
-               observation(observationId: "$oid") {
-                 execution {
-                   config {
-                     gmosNorth {
-                       science {
-                         nextAtom {
-                           observeClass
-                         }
-                       }
+               executionConfig(observationId: "$oid") {
+                 gmosNorth {
+                   science {
+                     nextAtom {
+                       observeClass
                      }
                    }
                  }

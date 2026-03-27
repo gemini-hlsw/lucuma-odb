@@ -5,12 +5,9 @@ package lucuma.odb.graphql
 package mapping
 
 import cats.effect.Resource
-import cats.syntax.bifunctor.*
 import cats.syntax.functor.*
 import cats.syntax.traverse.*
 import eu.timepit.refined.cats.*
-import grackle.Env
-import grackle.Query
 import grackle.Query.Binding
 import grackle.Query.EffectHandler
 import grackle.QueryCompiler.Elab
@@ -61,7 +58,6 @@ trait ExecutionMapping[F[_]] extends ObservationEffectHandler[F]
       SqlField("id", ObservationView.Id, key = true, hidden = true),
       SqlField("programId", ObservationView.ProgramId, hidden = true),
       EffectField("digest", digestHandler, List("id", "programId")),
-      EffectField("config", configHandler, List("id", "programId")),
       EffectField("executionState",  executionStateHandler, List("id", "programId")),
       SqlObject("atomRecords"),
       SqlObject("datasets"),
@@ -116,30 +112,6 @@ trait ExecutionMapping[F[_]] extends ObservationEffectHandler[F]
       selectWithOffsetAndLimit(rOFFSET, rLIMIT, VisitType, "id", Predicates.visit.id, Predicates.visit.observation.program)
 
   }
-
-  private lazy val configHandler: EffectHandler[F] =
-
-    val readEnv: Env => Result[Generator.FutureLimit] = env =>
-      env.getR[Generator.FutureLimit](FutureLimitParam)
-
-    val calculate: (Program.Id, Observation.Id, Generator.FutureLimit) => F[Result[Json]] =
-      (_, oid, futureLimit) =>
-        services.use: s =>
-          Services.asSuperUser:
-            s.generator
-             .generate(oid, futureLimit)
-             .map(_.bimap(_.asWarning(Json.Null), _.asJson.success).merge)
-
-    // Scans the top-level query and its descendents for environment entries,
-    // merges them with the top-level query environment.  This is done in order
-    // to pick up the 'reset' parameter on acquisition sequence generation.
-    def buildEnv(env: Env, query: Query): Env =
-      Query.children(query).foldLeft(env)((e, child) => buildEnv(e.addFromQuery(child), child))
-
-    readQueryAndCursorEffectHander(
-      (q, c) => readEnv(buildEnv(c.fullEnv, q)),
-      calculate
-    )
 
   private lazy val executionStateHandler: EffectHandler[F] =
     val calculate: (Program.Id, Observation.Id, Unit) => F[Result[Json]] =

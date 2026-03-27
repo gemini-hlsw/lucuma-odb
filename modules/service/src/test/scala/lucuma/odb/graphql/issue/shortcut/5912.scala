@@ -89,17 +89,13 @@ class ShortCut_5912 extends ExecutionTestSupportForFlamingos2:
         query =
           s"""
             query {
-              observation(observationId: "$oid") {
-                execution {
-                  config {
-                    flamingos2 {
-                      acquisition {
-                        nextAtom {
-                          steps {
-                            instrumentConfig {
-                              exposure { seconds }
-                            }
-                          }
+              executionConfig(observationId: "$oid") {
+                flamingos2 {
+                  acquisition {
+                    nextAtom {
+                      steps {
+                        instrumentConfig {
+                          exposure { seconds }
                         }
                       }
                     }
@@ -113,37 +109,33 @@ class ShortCut_5912 extends ExecutionTestSupportForFlamingos2:
         expected =
           json"""
             {
-              "observation" : {
-                "execution" : {
-                  "config" : {
-                    "flamingos2" : {
-                      "acquisition" : {
-                        "nextAtom" : {
-                          "steps" : [
-                            {
-                              "instrumentConfig" : {
-                                "exposure" : {
-                                  "seconds" : 2.000000
-                                }
-                              }
-                            },
-                            {
-                              "instrumentConfig" : {
-                                "exposure" : {
-                                  "seconds" : 10.000000
-                                }
-                              }
-                            },
-                            {
-                              "instrumentConfig" : {
-                                "exposure" : {
-                                  "seconds" : 2.000000
-                                }
-                              }
+              "executionConfig" : {
+                "flamingos2" : {
+                  "acquisition" : {
+                    "nextAtom" : {
+                      "steps" : [
+                        {
+                          "instrumentConfig" : {
+                            "exposure" : {
+                              "seconds" : 2.000000
                             }
-                          ]
+                          }
+                        },
+                        {
+                          "instrumentConfig" : {
+                            "exposure" : {
+                              "seconds" : 10.000000
+                            }
+                          }
+                        },
+                        {
+                          "instrumentConfig" : {
+                            "exposure" : {
+                              "seconds" : 2.000000
+                            }
+                          }
                         }
-                      }
+                      ]
                     }
                   }
                 }
