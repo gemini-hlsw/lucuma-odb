@@ -41,6 +41,7 @@ val natchezHttp4sVersion       = "0.6.1"
 val natchezVersion             = "0.3.8"
 val otel4sVersion              = "0.15.2"
 val openTelemetryVersion       = "1.60.1"
+val openTelemetryInstrVersion  = "2.26.1-alpha"
 val paigesVersion              = "0.4.4"
 val postgresVersion            = "42.7.9"
 val pprintVersion              = "0.9.6"
@@ -711,6 +712,7 @@ lazy val service = project
       "org.typelevel"            %% "otel4s-oteljava"                    % otel4sVersion,
       "io.opentelemetry"          % "opentelemetry-sdk-extension-autoconfigure" % openTelemetryVersion,
       "io.opentelemetry"          % "opentelemetry-exporter-otlp"        % openTelemetryVersion,
+      "io.opentelemetry.instrumentation" % "opentelemetry-runtime-telemetry" % openTelemetryInstrVersion,
       "org.tpolecat"             %% "skunk-core"                         % skunkVersion,
       "org.tpolecat"             %% "skunk-circe"                        % skunkVersion,
       "com.lihaoyi"              %% "pprint"                             % pprintVersion,
