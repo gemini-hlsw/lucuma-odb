@@ -113,6 +113,7 @@ class observation_configurationRequests
       case ObservingModeType.GmosNorthImaging   => Mutation.forGmosNorthImaging(user, oid, List(GmosNorthFilter.CaT, GmosNorthFilter.DS920))
       case ObservingModeType.GmosSouthImaging   => Mutation.forGmosSouthImaging(user, oid, List(GmosSouthFilter.CaT, GmosSouthFilter.GG455))
       case ObservingModeType.Igrins2LongSlit    => Mutation.forIgrins2LongSlit(user, oid, Igrins2OffsetMode.NodAlongSlit)
+      case ObservingModeType.GhostIfu           => IO.unit
 
   def compatibleMutation(user: User, oid: Observation.Id, mode: ObservingModeType): IO[Unit] =
     mode match
@@ -122,6 +123,7 @@ class observation_configurationRequests
       case ObservingModeType.GmosNorthImaging   => Mutation.forGmosNorthImaging(user, oid, List(GmosNorthFilter.DS920)) // subset of original, ok
       case ObservingModeType.GmosSouthImaging   => Mutation.forGmosSouthImaging(user, oid, List(GmosSouthFilter.GG455)) // subset of original, ok
       case ObservingModeType.Igrins2LongSlit    => IO.unit // no changes are compatible
+      case ObservingModeType.GhostIfu           => IO.unit
 
   def incompatibleMutation(user: User, oid: Observation.Id, mode: ObservingModeType): Option[IO[Unit]] =
     mode match
@@ -131,6 +133,7 @@ class observation_configurationRequests
       case ObservingModeType.GmosNorthImaging   => None // Mutation.forGmosNorthImaging(user, oid, List(GmosNorthFilter.GG455, GmosNorthFilter.GPrime_GG455))
       case ObservingModeType.GmosSouthImaging   => None // Mutation.forGmosSouthImaging(user, oid, List(GmosSouthFilter.GG455, GmosSouthFilter.GPrime_GG455))
       case ObservingModeType.Igrins2LongSlit    => None // Mutation.forIgrins2LongSlit(user, oid, Igrins2OffsetMode.NodToSky)
+      case ObservingModeType.GhostIfu           => None
 
   private def updateObservationAs(user: User, oid: Observation.Id)(update: String): IO[Unit] =
     updateObservation(user, oid, update,
@@ -207,6 +210,7 @@ class observation_configurationRequests
           case ObservingModeType.GmosNorthImaging   => createGmosNorthImagingObservationAs(pi, pid, tid)
           case ObservingModeType.GmosSouthImaging   => createGmosSouthImagingObservationAs(pi, pid, tid)
           case ObservingModeType.Igrins2LongSlit    => createIgrins2LongSlitObservationAs(pi, pid, tid)
+          case ObservingModeType.GhostIfu           => IO.raiseError(new RuntimeException("GHOST not supported yet"))
     yield oid
 
   Enumerated[ObservingModeType].all.foreach { mode =>
