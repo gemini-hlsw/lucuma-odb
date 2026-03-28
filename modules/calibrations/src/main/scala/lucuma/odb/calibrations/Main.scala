@@ -87,9 +87,7 @@ object CalibrationsMain extends CommandIOApp(
     given LF: LoggerFactory[IO] = Slf4jFactory.create[IO]
     given Logger[IO] = LF.getLoggerFromName("calibrations-service")
 
-    import natchez.Trace.Implicits.noop
-
-    CMain.runF[IO]
+    CMain.runF(LucumaEntryPoint.otelServicesResource)
   }
 
 }
@@ -268,7 +266,13 @@ object CMain extends MainParams {
     } yield ExitCode.Success
 
   /** Our logical entry point. */
-  def runF[F[_]:   Async: Parallel: Logger: LoggerFactory: Trace: Network: Console: SecureRandom]: F[ExitCode] =
-    server.use(_ => Concurrent[F].never[ExitCode])
+  def runF(
+    mkOtelServices: (String, Config) => Resource[IO, lucuma.odb.otel.OtelServices[IO]]
+  )(using Logger[IO], LoggerFactory[IO]): IO[ExitCode] =
+    (for
+      c    <- Resource.eval(Config.fromCiris.load[IO])
+      otel <- mkOtelServices(ServiceName, c)
+      _    <- { given Trace[IO] = otel.trace; server[IO] }
+    yield ExitCode.Success).useForever
 
 }
