@@ -9,8 +9,6 @@ import cats.Functor
 import cats.Parallel
 import cats.data.Kleisli
 import cats.effect.*
-import cats.effect.std.SecureRandom
-import cats.effect.std.UUIDGen
 import cats.syntax.all.*
 import com.comcast.ip4s.*
 import dev.profunktor.redis4cats.Redis
@@ -32,12 +30,10 @@ import lucuma.itc.legacy.LocalItc
 import lucuma.itc.service.config.*
 import lucuma.itc.service.config.ExecutionEnvironment.*
 import lucuma.itc.service.metrics.MetricsService
-import natchez.EntryPoint
+import lucuma.odb.otel.OtelConfig
+import lucuma.odb.otel.OtelSetup
 import natchez.Trace
-import natchez.honeycomb.Honeycomb
 import natchez.http4s.NatchezMiddleware
-import natchez.http4s.implicits.*
-import natchez.log.Log
 import org.http4s.*
 import org.http4s.ember.server.EmberServerBuilder
 import org.http4s.headers.`Cache-Control`
@@ -106,27 +102,14 @@ object Main extends IOApp with ItcCacheOrRemote {
         CORS.policy
           .withAllowOriginHostCi(domain.contains)
 
-  /**
-   * A resource that yields a Natchez tracing entry point, either a Honeycomb endpoint if `config`
-   * is defined, otherwise a log endpoint.
-   */
-  def entryPointResource[F[_]: Sync: Logger: SecureRandom](
-    config:      Option[HoneycombConfig],
-    environment: ExecutionEnvironment
-  ): Resource[F, EntryPoint[F]] =
-    given UUIDGen[F] = UUIDGen.fromSecureRandom
-    config.fold(
-      Log.entryPoint(ServiceName).pure[Resource[F, *]]
-    ): cfg =>
-      Honeycomb.entryPoint(ServiceName): cb =>
-        Sync[F].blocking:
-          val existingFields = cb.getGlobalFields
-          val newFields      = new java.util.HashMap[String, Object](existingFields)
-          newFields.put("service.version", version(environment).value)
-          cb.setGlobalFields(newFields)
-          cb.setWriteKey(cfg.writeKey)
-          cb.setDataset(cfg.dataset)
-          cb.build()
+  def otelServicesResource(
+    otelConfig: Option[config.OtelConfig]
+  )(using Logger[IO]): Resource[IO, Trace[IO]] =
+    OtelSetup.resource(
+      ServiceName,
+      version(Local).value,
+      otelConfig.map(c => OtelConfig(c.endpoint, c.instanceId, c.apiKey, c.environment))
+    ).map(_.trace)
 
   def cacheMiddleware[F[_]: Functor](service: HttpRoutes[F]): HttpRoutes[F] =
     Kleisli: (req: Request[F]) =>
@@ -215,11 +198,11 @@ object Main extends IOApp with ItcCacheOrRemote {
    */
   def server(cfg: Config)(using Logger[IO]): Resource[IO, ExitCode] =
     for
-      _  <- Resource.eval(banner[IO](cfg))
-      _  <- MetricsService.resource[IO](cfg.metrics)
-      ep <- entryPointResource[IO](cfg.honeycomb, cfg.environment)
-      ap <- ep.wsLiftR(routes(cfg)).map(_.map(_.orNotFound))
-      _  <- serverResource(ap, cfg)
+      _     <- Resource.eval(banner[IO](cfg))
+      _     <- MetricsService.resource[IO](cfg.metrics)
+      trace <- otelServicesResource(cfg.otel)
+      ap    <- { given Trace[IO] = trace; routes[IO](cfg).map(_.map(_.orNotFound)) }
+      _     <- serverResource(ap, cfg)
     yield ExitCode.Success
 
   def run(args: List[String]): IO[ExitCode] =

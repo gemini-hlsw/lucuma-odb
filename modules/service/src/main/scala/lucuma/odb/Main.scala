@@ -34,8 +34,8 @@ import lucuma.odb.service.EmailWebhookService
 import lucuma.odb.service.ItcService
 import lucuma.odb.service.S3FileService
 import lucuma.odb.service.UserService
+import lucuma.odb.otel.OtelServices
 import lucuma.odb.util.LucumaEntryPoint
-import lucuma.odb.util.OtelServices
 import lucuma.sso.client.SsoClient
 import natchez.Trace
 import org.flywaydb.core.Flyway
@@ -129,7 +129,7 @@ object Main extends CommandIOApp(
       for {
         _ <- IO.whenA(reset.isRequested)(IO.println("Resetting database."))
         _ <- IO.whenA(skipMigration.isRequested)(IO.println("Skipping migration.  Ensure that your database is up-to-date."))
-        e <- FMain.runF[IO](reset, skipMigration, LucumaEntryPoint.otel)
+        e <- FMain.runF[IO](reset, skipMigration, LucumaEntryPoint.otelServicesResource)
       } yield e
     })
 

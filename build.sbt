@@ -450,7 +450,7 @@ ThisBuild / ocsLocal       := ocsBuildInfo.value._4
 // Contains the grackle server
 lazy val itcService = project
   .in(file("itc/service"))
-  .dependsOn(itcModel.jvm, binding)
+  .dependsOn(itcModel.jvm, binding, otel)
   .enablePlugins(BuildInfoPlugin, LucumaDockerPlugin, JavaServerAppPackaging)
   .settings(itcCommonSettings)
   .settings(
@@ -466,8 +466,6 @@ lazy val itcService = project
       "org.typelevel"        %% "grackle-generic"       % grackleVersion,
       "org.typelevel"        %% "grackle-circe"         % grackleVersion,
       "edu.gemini"           %% "lucuma-graphql-routes" % lucumaGraphQLRoutesVersion,
-      "org.tpolecat"         %% "natchez-honeycomb"     % natchezVersion,
-      "org.tpolecat"         %% "natchez-log"           % natchezVersion,
       "org.tpolecat"         %% "natchez-http4s"        % natchezHttp4sVersion,
       "co.fs2"               %% "fs2-core"              % fs2Version,
       "edu.gemini"           %% "lucuma-core"           % lucumaCoreVersion,
@@ -640,6 +638,22 @@ lazy val schema =
       )
     )
 
+lazy val otel = project
+  .in(file("modules/otel"))
+  .settings(
+    name := "lucuma-odb-otel",
+    libraryDependencies ++= Seq(
+      "org.tpolecat"                     %% "natchez-core"                              % natchezVersion,
+      "org.tpolecat"                     %% "natchez-noop"                              % natchezVersion,
+      "org.typelevel"                    %% "otel4s-oteljava"                           % otel4sVersion,
+      "org.typelevel"                    %% "otel4s-instrumentation-metrics"            % otel4sVersion,
+      "io.opentelemetry"                  % "opentelemetry-sdk-extension-autoconfigure" % openTelemetryVersion,
+      "io.opentelemetry"                  % "opentelemetry-exporter-otlp"               % openTelemetryVersion,
+      "io.opentelemetry.instrumentation"  % "opentelemetry-runtime-telemetry"           % openTelemetryInstrVersion,
+      "org.typelevel"                    %% "log4cats-core"                             % log4catsVersion,
+    )
+  )
+
 lazy val binding = project
   .in(file("modules/binding"))
   .dependsOn(schema.jvm)
@@ -685,7 +699,7 @@ lazy val smartgcal = project
 
 lazy val service = project
   .in(file("modules/service"))
-  .dependsOn(binding, phase0, sequence, smartgcal, ssoFrontendClient.jvm, ssoBackendClient)
+  .dependsOn(binding, otel, phase0, sequence, smartgcal, ssoFrontendClient.jvm, ssoBackendClient)
   .enablePlugins(NoPublishPlugin, LucumaDockerPlugin, JavaAppPackaging, BuildInfoPlugin)
   .settings(buildInfoSettings)
   .settings(
@@ -710,11 +724,6 @@ lazy val service = project
       "org.tpolecat"                     %% "natchez-http4s"                             % natchezHttp4sVersion,
       "org.tpolecat"                     %% "natchez-log"                                % natchezVersion % Test,
       "org.tpolecat"                     %% "natchez-noop"                               % natchezVersion,
-      "org.typelevel"                    %% "otel4s-oteljava"                            % otel4sVersion,
-      "org.typelevel"                    %% "otel4s-instrumentation-metrics"             % otel4sVersion,
-      "io.opentelemetry"                  % "opentelemetry-sdk-extension-autoconfigure"  % openTelemetryVersion,
-      "io.opentelemetry"                  % "opentelemetry-exporter-otlp"                % openTelemetryVersion,
-      "io.opentelemetry.instrumentation"  % "opentelemetry-runtime-telemetry"            % openTelemetryInstrVersion,
       "org.tpolecat"                     %% "skunk-core"                                 % skunkVersion,
       "org.tpolecat"                     %% "skunk-circe"                                % skunkVersion,
       "com.lihaoyi"                      %% "pprint"                                     % pprintVersion,
