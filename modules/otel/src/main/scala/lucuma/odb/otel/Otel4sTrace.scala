@@ -1,7 +1,7 @@
 // Copyright (c) 2016-2025 Association of Universities for Research in Astronomy, Inc. (AURA)
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
-package lucuma.odb.util
+package lucuma.odb.otel
 
 import cats.arrow.FunctionK
 import cats.effect.MonadCancelThrow
@@ -19,7 +19,6 @@ import java.net.URI
 
 object Otel4sTrace:
 
-  // Bride to let libraries using natchez to trace to otel4s
   def fromTracer[F[_]: MonadCancelThrow](tracer: Tracer[F]): Trace[F] =
     new Trace[F]:
 
