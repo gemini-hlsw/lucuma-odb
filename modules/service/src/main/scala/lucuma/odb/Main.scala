@@ -34,8 +34,7 @@ import lucuma.odb.service.EmailWebhookService
 import lucuma.odb.service.ItcService
 import lucuma.odb.service.S3FileService
 import lucuma.odb.service.UserService
-import lucuma.odb.otel.OtelServices
-import lucuma.odb.util.LucumaEntryPoint
+import lucuma.odb.util.OdbTelemetry
 import lucuma.sso.client.SsoClient
 import natchez.Trace
 import org.flywaydb.core.Flyway
@@ -129,7 +128,7 @@ object Main extends CommandIOApp(
       for {
         _ <- IO.whenA(reset.isRequested)(IO.println("Resetting database."))
         _ <- IO.whenA(skipMigration.isRequested)(IO.println("Skipping migration.  Ensure that your database is up-to-date."))
-        e <- FMain.runF[IO](reset, skipMigration, LucumaEntryPoint.otelServicesResource)
+        e <- FMain.runF[IO](reset, skipMigration)
       } yield e
     })
 
@@ -162,7 +161,7 @@ object FMain extends MainParams {
             | ITC Root           : ${config.itc.root}
             | Port               : ${config.port}
             | PID                : ${ProcessHandle.current.pid}
-            | Tracing            : ${LucumaEntryPoint.tracingBackend(config)}
+            | Tracing            : ${OdbTelemetry.tracingBackend(config)}
             |
             | Cores              : ${runtime.availableProcessors()}
             | Current JVM memory : ${runtime.totalMemory() / 1024 / 1024} MB
@@ -330,10 +329,9 @@ object FMain extends MainParams {
    * Our main server, as a resource that starts up our server on acquire and shuts it all down
    * in cleanup, yielding an `ExitCode`. Users will `use` this resource and hold it forever.
    */
-  def server[F[_]: Async: Parallel: Logger: LoggerFactory: Console: Network: SecureRandom](
+  def server[F[_]: Async: Parallel: LiftIO: Logger: LoggerFactory: Console: Network: SecureRandom](
     reset:         ResetDatabase,
     skipMigration: SkipMigration,
-    mkOtel: (String, Config) => Resource[F, OtelServices[F]]
   ): Resource[F, ExitCode] =
     for {
       c  <- Resource.eval(Config.fromCiris.load[F])
@@ -341,7 +339,7 @@ object FMain extends MainParams {
       _  <- Applicative[Resource[F, *]].whenA(reset.isRequested)(Resource.eval(resetDatabase[F](c.database)))
       _  <- Applicative[Resource[F, *]].unlessA(skipMigration.isRequested)(Resource.eval(migrateDatabase[F](c.database)))
       _  <- Resource.eval(runStartupDiagnostics(c.database, true))
-      ot <- mkOtel(ServiceName, c)
+      ot <- OdbTelemetry.otel(ServiceName, c)
       given Trace[F] = ot.trace
       ap <- routesResource(c).map(_.map(_.orNotFound))
       _  <- Resource.eval(ItcService.pollVersionsForever(c.itcClient, singleSession(c.database), c.itc.pollPeriod))
@@ -349,11 +347,10 @@ object FMain extends MainParams {
     } yield ExitCode.Success
 
   /** Our logical entry point. */
-  def runF[F[_]: Async: Parallel: Logger: LoggerFactory: Console: Network: SecureRandom](
+  def runF[F[_]: Async: Parallel: LiftIO: Logger: LoggerFactory: Console: Network: SecureRandom](
     reset:         ResetDatabase,
-    skipMigration: SkipMigration,
-    mkOtel: (String, Config) => Resource[F, OtelServices[F]]
+    skipMigration: SkipMigration
   ): F[ExitCode] =
-    server(reset, skipMigration, mkOtel).use(_ => Concurrent[F].never[ExitCode])
+    server(reset, skipMigration).use(_ => Concurrent[F].never[ExitCode])
 
 }

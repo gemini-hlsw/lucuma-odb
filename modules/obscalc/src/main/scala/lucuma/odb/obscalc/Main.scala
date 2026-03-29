@@ -36,7 +36,7 @@ import lucuma.odb.service.S3FileService
 import lucuma.odb.service.Services
 import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.service.UserService
-import lucuma.odb.util.LucumaEntryPoint
+import lucuma.odb.util.OdbTelemetry
 import natchez.Trace
 import org.http4s.Credentials
 import org.http4s.client.Client
@@ -79,9 +79,7 @@ object ObscalcMain extends CommandIOApp(
     given LF: LoggerFactory[IO] = Slf4jFactory.create[IO]
     given Logger[IO] = LF.getLoggerFromName("obscalc-service")
 
-    import natchez.Trace.Implicits.noop
-
-    CalcMain.runF[IO]
+    CalcMain.runF
 
 object CalcMain extends MainParams:
 
@@ -95,7 +93,7 @@ object CalcMain extends MainParams:
             |Max Connections: ${config.database.maxObscalcConnections}
             |Poll Period....: ${config.obscalcPoll}
             |PID............: ${ProcessHandle.current.pid}
-            |Tracing........: ${LucumaEntryPoint.tracingBackend(config)}
+            |Tracing........: ${OdbTelemetry.tracingBackend(config)}
             |
             |""".stripMargin
     banner.linesIterator.toList.traverse_(Logger[F].info(_))
@@ -286,9 +284,14 @@ object CalcMain extends MainParams:
     yield o
 
   /** Our logical entry point. */
-  def runF[F[_]:   Async: Parallel: Logger: LoggerFactory: Trace: Network: Console: SecureRandom]: F[ExitCode] =
-    server.use: o =>
+  def runF(using Logger[IO], LoggerFactory[IO]): IO[ExitCode] =
+    (for
+      c    <- Resource.eval(Config.fromCiris.load[IO])
+      otel <- OdbTelemetry.otel(ServiceName, c)
+      given Trace[IO] = otel.trace
+      o    <- server[IO]
+    yield o).use: o =>
       o.flatMap:
-        case Outcome.Succeeded(_) => Logger[F].info("Obscalc completed.")  >> ExitCode.Success.pure[F]
-        case Outcome.Errored(e)   => Logger[F].error(e)("Obscalc failed.") >> ExitCode.Error.pure[F]
-        case Outcome.Canceled()   => Logger[F].info("Obscalc cancelled.")  >> ExitCode.Success.pure[F]
+        case Outcome.Succeeded(_) => Logger[IO].info("Obscalc completed.")  >> ExitCode.Success.pure[IO]
+        case Outcome.Errored(e)   => Logger[IO].error(e)("Obscalc failed.") >> ExitCode.Error.pure[IO]
+        case Outcome.Canceled()   => Logger[IO].info("Obscalc cancelled.")  >> ExitCode.Success.pure[IO]
