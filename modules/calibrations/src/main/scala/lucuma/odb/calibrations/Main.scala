@@ -38,7 +38,7 @@ import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.service.TelluricTargetsDaemon
 import lucuma.odb.service.TelluricTargetsService
 import lucuma.odb.service.UserService
-import lucuma.odb.util.LucumaEntryPoint
+import lucuma.odb.util.OdbTelemetry
 import natchez.Trace
 import org.http4s.Credentials
 import org.http4s.client.Client
@@ -87,7 +87,7 @@ object CalibrationsMain extends CommandIOApp(
     given LF: LoggerFactory[IO] = Slf4jFactory.create[IO]
     given Logger[IO] = LF.getLoggerFromName("calibrations-service")
 
-    CMain.runF(LucumaEntryPoint.otelServicesResource)
+    CMain.runF
   }
 
 }
@@ -102,7 +102,7 @@ object CMain extends MainParams {
             |
             |CommitHash. : ${config.commitHash.format}
             |PID         : ${ProcessHandle.current.pid}
-            |Tracing     : ${LucumaEntryPoint.tracingBackend(config)}
+            |Tracing     : ${OdbTelemetry.tracingBackend(config)}
             |
             |""".stripMargin
     banner.linesIterator.toList.traverse_(Logger[F].info(_))
@@ -266,13 +266,12 @@ object CMain extends MainParams {
     } yield ExitCode.Success
 
   /** Our logical entry point. */
-  def runF(
-    mkOtelServices: (String, Config) => Resource[IO, lucuma.odb.otel.OtelServices[IO]]
-  )(using Logger[IO], LoggerFactory[IO]): IO[ExitCode] =
+  def runF(using Logger[IO], LoggerFactory[IO]): IO[ExitCode] =
     (for
-      c    <- Resource.eval(Config.fromCiris.load[IO])
-      otel <- mkOtelServices(ServiceName, c)
-      _    <- { given Trace[IO] = otel.trace; server[IO] }
+      c               <- Resource.eval(Config.fromCiris.load[IO])
+      otel            <- OdbTelemetry.otel(ServiceName, c)
+      given Trace[IO] = otel.trace
+      _               <- server[IO]
     yield ExitCode.Success).useForever
 
 }
