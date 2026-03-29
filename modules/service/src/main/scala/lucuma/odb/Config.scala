@@ -24,6 +24,7 @@ import lucuma.core.model.User
 import lucuma.core.util.Gid
 import lucuma.horizons.HorizonsClient
 import lucuma.itc.client.ItcClient
+import lucuma.odb.otel.OtelConfig
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.sso.client.SsoClient
 import lucuma.sso.client.SsoJwtReader
@@ -50,7 +51,7 @@ case class Config(
   sso:           Config.Sso,                    // SSO config
   telluric:      Config.Telluric,               // Telluric service config
   serviceJwt:    String,                        // Only service users can exchange API keys, so we need a service user JWT.
-  otel:          Option[Config.OpenTelemetry],  // OpenTelemetry/Grafana config
+  otel:          Option[OtelConfig],             // OpenTelemetry/Grafana config
   database:      Config.Database,               // Database config
   aws:           Config.Aws,                    // AWS config
   email:         Config.Email,                  // Mailgun config
@@ -141,42 +142,6 @@ object Config:
         .default(uri"https://telluric-targets.gpp.gemini.edu/")
         .map(Telluric.apply)
 
-  case class OpenTelemetry(
-    endpoint:    String,
-    instanceId:  String,
-    apiKey:      String,
-    environment: String
-  )
-
-  object OpenTelemetry:
-    private val inHeroku: ConfigValue[Effect, Boolean] =
-      envOrProp("DYNO").option.map(_.isDefined)
-
-    private val environment: ConfigValue[Effect, String] =
-      envOrProp("ODB_ENVIRONMENT").default("local")
-
-    lazy val fromCiris: ConfigValue[Effect, Option[OpenTelemetry]] =
-      inHeroku.flatMap: inHeroku =>
-        if (inHeroku)
-          (
-            envOrProp("ODB_OTEL_ENDPOINT"),
-            envOrProp("ODB_OTEL_INSTANCE_ID"),
-            envOrProp("ODB_OTEL_API_KEY"),
-            environment
-          ).parMapN: (endpoint, instanceId, apiKey, env) =>
-            OpenTelemetry(endpoint, instanceId, apiKey, env).some
-        else
-          (
-            envOrProp("ODB_OTEL_ENDPOINT").option,
-            envOrProp("ODB_OTEL_INSTANCE_ID").option,
-            envOrProp("ODB_OTEL_API_KEY").option,
-            environment
-          ).parTupled.map:
-            case (Some(endpoint), Some(instanceId), Some(apiKey), env)
-              if endpoint.trim.nonEmpty && instanceId.trim.nonEmpty && apiKey.trim.nonEmpty =>
-              OpenTelemetry(endpoint, instanceId, apiKey, env).some
-            case _ =>
-              None
 
   case class Database(
     maxConnections: Int,
@@ -347,13 +312,42 @@ object Config:
     value.fold(ConfigValue.failed(ConfigError("Missing value"))): v =>
       ConfigValue.loaded(ConfigKey(key), v)
 
+  private val otelEnvironment: ConfigValue[Effect, String] =
+    envOrProp("ODB_ENVIRONMENT").default("local")
+
+  private val inHeroku: ConfigValue[Effect, Boolean] =
+    envOrProp("DYNO").option.map(_.isDefined)
+
+  private val otelConfig: ConfigValue[Effect, Option[OtelConfig]] =
+    inHeroku.flatMap: inHeroku =>
+      if inHeroku then
+        (
+          envOrProp("ODB_OTEL_ENDPOINT"),
+          envOrProp("ODB_OTEL_INSTANCE_ID"),
+          envOrProp("ODB_OTEL_API_KEY"),
+          otelEnvironment
+        ).parMapN: (endpoint, instanceId, apiKey, env) =>
+          OtelConfig(endpoint, instanceId, apiKey, env).some
+      else
+        (
+          envOrProp("ODB_OTEL_ENDPOINT").option,
+          envOrProp("ODB_OTEL_INSTANCE_ID").option,
+          envOrProp("ODB_OTEL_API_KEY").option,
+          otelEnvironment
+        ).parTupled.map:
+          case (Some(endpoint), Some(instanceId), Some(apiKey), env)
+            if endpoint.trim.nonEmpty && instanceId.trim.nonEmpty && apiKey.trim.nonEmpty =>
+            OtelConfig(endpoint, instanceId, apiKey, env).some
+          case _ =>
+            None
+
   lazy val fromCiris: ConfigValue[Effect, Config] = (
     envOrProp("PORT").as[Int].as[Port], // passed by Heroku
     Itc.fromCiris,
     Sso.fromCiris,
     Telluric.fromCiris,
     envOrProp("ODB_SERVICE_JWT"),
-    OpenTelemetry.fromCiris,
+    otelConfig,
     Database.fromCiris,
     Aws.fromCiris,
     Email.fromCiris,

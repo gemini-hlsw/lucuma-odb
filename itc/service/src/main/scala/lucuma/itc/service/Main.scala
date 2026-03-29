@@ -102,15 +102,6 @@ object Main extends IOApp with ItcCacheOrRemote {
         CORS.policy
           .withAllowOriginHostCi(domain.contains)
 
-  def otelServicesResource(
-    otelConfig: Option[config.OtelConfig]
-  )(using Logger[IO]): Resource[IO, Trace[IO]] =
-    OtelSetup.resource(
-      ServiceName,
-      version(Local).value,
-      otelConfig.map(c => OtelConfig(c.endpoint, c.instanceId, c.apiKey, c.environment))
-    ).map(_.trace)
-
   def cacheMiddleware[F[_]: Functor](service: HttpRoutes[F]): HttpRoutes[F] =
     Kleisli: (req: Request[F]) =>
       service(req).map:
@@ -198,11 +189,12 @@ object Main extends IOApp with ItcCacheOrRemote {
    */
   def server(cfg: Config)(using Logger[IO]): Resource[IO, ExitCode] =
     for
-      _     <- Resource.eval(banner[IO](cfg))
-      _     <- MetricsService.resource[IO](cfg.metrics)
-      trace <- otelServicesResource(cfg.otel)
-      ap    <- { given Trace[IO] = trace; routes[IO](cfg).map(_.map(_.orNotFound)) }
-      _     <- serverResource(ap, cfg)
+      _              <- Resource.eval(banner[IO](cfg))
+      _              <- MetricsService.resource[IO](cfg.metrics)
+      trace          <- OtelSetup.resource(ServiceName, version(Local).value, cfg.otel).map(_.trace)
+      given Trace[IO] = trace
+      ap             <- routes[IO](cfg).map(_.map(_.orNotFound))
+      _              <- serverResource(ap, cfg)
     yield ExitCode.Success
 
   def run(args: List[String]): IO[ExitCode] =

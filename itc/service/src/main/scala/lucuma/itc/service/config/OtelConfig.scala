@@ -3,16 +3,9 @@
 
 package lucuma.itc.service.config
 
-import cats.implicits.*
+import cats.syntax.all.*
 import ciris.*
-import ciris.ConfigValue.configValueNonEmptyParallel
-
-case class OtelConfig(
-  endpoint:    String,
-  instanceId:  String,
-  apiKey:      String,
-  environment: String
-)
+import lucuma.odb.otel.OtelConfig as SharedOtelConfig
 
 object OtelConfig:
 
@@ -22,7 +15,7 @@ object OtelConfig:
   private val inHeroku: ConfigValue[Effect, Boolean] =
     envOrProp("DYNO").option.map(_.isDefined)
 
-  val config: ConfigValue[Effect, Option[OtelConfig]] =
+  val fromCiris: ConfigValue[Effect, Option[SharedOtelConfig]] =
     inHeroku.flatMap: inHeroku =>
       if inHeroku then
         (
@@ -31,7 +24,7 @@ object OtelConfig:
           envOrProp("ODB_OTEL_API_KEY"),
           environment
         ).parMapN: (endpoint, instanceId, apiKey, env) =>
-          OtelConfig(endpoint, instanceId, apiKey, env).some
+          SharedOtelConfig(endpoint, instanceId, apiKey, env).some
       else
         (
           envOrProp("ODB_OTEL_ENDPOINT").option,
@@ -40,7 +33,7 @@ object OtelConfig:
           environment
         ).parTupled.map:
           case (Some(endpoint), Some(instanceId), Some(apiKey), env)
-            if endpoint.trim.nonEmpty && instanceId.trim.nonEmpty && apiKey.trim.nonEmpty =>
-            OtelConfig(endpoint, instanceId, apiKey, env).some
+              if endpoint.trim.nonEmpty && instanceId.trim.nonEmpty && apiKey.trim.nonEmpty =>
+            SharedOtelConfig(endpoint, instanceId, apiKey, env).some
           case _ =>
             None
