@@ -5,7 +5,6 @@ package lucuma.odb.util
 
 import cats.effect.*
 import lucuma.odb.Config
-import lucuma.odb.otel.OtelConfig
 import lucuma.odb.otel.OtelServices
 import lucuma.odb.otel.OtelSetup
 import org.typelevel.log4cats.Logger
@@ -19,8 +18,4 @@ object OdbTelemetry:
     serviceName: String,
     config: Config
   ): Resource[F, OtelServices[F]] =
-    OtelSetup.resource(
-      serviceName,
-      config.commitHash.format,
-      config.otel.map(c => OtelConfig(c.endpoint, c.instanceId, c.apiKey, c.environment))
-    )
+    OtelSetup.resource(serviceName, config.commitHash.format, config.otel)
