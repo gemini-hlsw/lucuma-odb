@@ -180,9 +180,10 @@ object OdbMapping {
           with Flamingos2DynamicMapping[F]
           with Flamingos2FpuMaskMapping[F]
           with Flamingos2LongSlitMapping[F]
+          with Flamingos2StaticMapping[F]
+          with Igrins2DynamicMapping[F]
           with Igrins2LongSlitMapping[F]
           with Igrins2StaticMapping[F]
-          with Flamingos2StaticMapping[F]
           with FilterTypeMetaMapping[F]
           with GmosCcdModeMapping[F]
           with GmosCustomMaskMapping[F]
@@ -419,6 +420,7 @@ object OdbMapping {
                 FilterTypeMetaMapping,
                 Flamingos2DynamicMapping,
                 Flamingos2LongSlitAcquisitionMapping,
+                Igrins2DynamicMapping,
                 Flamingos2LongSlitMapping,
                 Flamingos2StaticMapping,
                 Igrins2LongSlitMapping,
