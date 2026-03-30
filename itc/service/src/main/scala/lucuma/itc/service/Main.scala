@@ -30,7 +30,6 @@ import lucuma.itc.legacy.LocalItc
 import lucuma.itc.service.config.*
 import lucuma.itc.service.config.ExecutionEnvironment.*
 import lucuma.itc.service.metrics.MetricsService
-import lucuma.odb.otel.OtelConfig
 import lucuma.odb.otel.OtelSetup
 import natchez.Trace
 import natchez.http4s.NatchezMiddleware

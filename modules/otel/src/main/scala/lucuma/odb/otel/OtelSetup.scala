@@ -15,8 +15,8 @@ import org.typelevel.otel4s.oteljava.OtelJava
 import org.typelevel.otel4s.oteljava.context.Context
 import org.typelevel.otel4s.trace.TracerProvider
 
-import scala.jdk.CollectionConverters.*
 import java.util.Base64
+import scala.jdk.CollectionConverters.*
 
 case class OtelServices[F[_]](
   trace:          Trace[F],

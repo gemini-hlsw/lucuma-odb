@@ -7,14 +7,13 @@ import cats.effect.*
 import lucuma.odb.Config
 import lucuma.odb.otel.OtelServices
 import lucuma.odb.otel.OtelSetup
-import org.typelevel.log4cats.Logger
 
 object OdbTelemetry:
   def tracingBackend(config: Config) = config.otel match
     case Some(_) => "OpenTelemetry (OTLP)"
     case None    => "No-op (silent)"
 
-  def otel[F[_]: Async: Logger: LiftIO](
+  def otel[F[_]: Async: LiftIO](
     serviceName: String,
     config: Config
   ): Resource[F, OtelServices[F]] =
