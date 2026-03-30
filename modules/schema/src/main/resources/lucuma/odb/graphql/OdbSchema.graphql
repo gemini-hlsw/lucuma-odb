@@ -3210,6 +3210,16 @@ type Mutation {
   ): RecordGmosSouthVisitResult!
 
   """
+  Record a new IGRINS-2 visit
+  """
+  recordIgrins2Visit(
+    """
+    Visit creation parameters
+    """
+    input: RecordIgrins2VisitInput!
+  ): RecordIgrins2VisitResult!
+
+  """
   Replaces the remaining steps in an execution sequence with the provided
   sequence.  Previously executed (or even partially executed) steps are not
   deleted.  Any ongoing steps are abandoned.
@@ -7609,6 +7619,48 @@ input RecordFlamingos2VisitInput {
 Result for recordFlamingos2Visit mutation.
 """
 type RecordFlamingos2VisitResult {
+  """
+  The newly added visit record itself.
+  """
+  visit: Visit!
+}
+
+"""
+IGRINS-2 static configuration input parameters
+"""
+input Igrins2StaticInput {
+
+  """
+  Whether to save SVC images (defaults to false)
+  """
+  saveSVCImages: Boolean
+
+  """
+  Offset mode (defaults to NOD_ALONG_SLIT)
+  """
+  offsetMode: Igrins2OffsetMode
+
+}
+
+"""
+Input parameters for creating a new IGRINS-2 Visit
+"""
+input RecordIgrins2VisitInput {
+  observationId: ObservationId!
+  igrins2:       Igrins2StaticInput!
+
+  """
+  Idempotency key, if any.  The IdempotencyKey may be provided by clients when
+  the visit is created and is used to enable problem-free retry in the case of
+  failure.
+  """
+  idempotencyKey: IdempotencyKey
+}
+
+"""
+Result for recordIgrins2Visit mutation.
+"""
+type RecordIgrins2VisitResult {
   """
   The newly added visit record itself.
   """
@@ -15154,6 +15206,13 @@ type Visit {
   `GMOS_SOUTH`.
   """
   gmosSouth: GmosSouthStatic
+
+  """
+  IGRINS-2 static instrument configuration, for IGRINS-2 visits.  See the
+  `instrument` discriminator.  This will be null unless the instrument is
+  `IGRINS2`.
+  """
+  igrins2: Igrins2Static
 }
 
 """

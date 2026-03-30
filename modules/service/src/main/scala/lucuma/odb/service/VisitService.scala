@@ -17,6 +17,7 @@ import lucuma.core.model.Visit
 import lucuma.core.model.sequence.flamingos2.Flamingos2StaticConfig
 import lucuma.core.model.sequence.gmos.StaticConfig.GmosNorth
 import lucuma.core.model.sequence.gmos.StaticConfig.GmosSouth
+import lucuma.core.model.sequence.igrins2.Igrins2StaticConfig
 import lucuma.core.util.IdempotencyKey
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.ResultExtensions.*
@@ -64,6 +65,10 @@ trait VisitService[F[_]]:
 
   def recordGmosSouth(
     input: RecordVisitInput[GmosSouth]
+  )(using NoTransaction[F], Services.ServiceAccess): F[Result[Visit.Id]]
+
+  def recordIgrins2(
+    input: RecordVisitInput[Igrins2StaticConfig]
   )(using NoTransaction[F], Services.ServiceAccess): F[Result[Visit.Id]]
 
 
@@ -239,6 +244,18 @@ object VisitService:
           Instrument.GmosSouth,
           gmosSequenceService.selectGmosSouthStaticForVisit,
           gmosSequenceService.insertGmosSouthStatic
+        )
+
+      override def recordIgrins2(
+        input: RecordVisitInput[Igrins2StaticConfig]
+      )(using NoTransaction[F], Services.ServiceAccess): F[Result[Visit.Id]] =
+        materializeAndRecord(
+          input.observationId,
+          input.static,
+          input.idempotencyKey,
+          Instrument.Igrins2,
+          igrins2SequenceService.selectStaticForVisit,
+          igrins2SequenceService.insertStatic
         )
 
   object Statements:

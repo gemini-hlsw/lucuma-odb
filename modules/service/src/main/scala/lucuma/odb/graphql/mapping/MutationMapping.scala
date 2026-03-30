@@ -97,6 +97,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
       RecordFlamingos2Visit,
       RecordGmosNorthVisit,
       RecordGmosSouthVisit,
+      RecordIgrins2Visit,
       RedeemUserInvitation,
       ReplaceFlamingos2Sequence,
       ReplaceGmosNorthSequence,
@@ -599,6 +600,16 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
         requireServiceAccess:
           recordVisit(
             visitService.recordGmosSouth(input),
+            Predicates.visit.id,
+            child
+          )
+
+  private lazy val RecordIgrins2Visit: MutationField =
+    MutationField("recordIgrins2Visit", RecordVisitInput.Igrins2Binding): (input, child) =>
+      services.useNonTransactionally:
+        requireServiceAccess:
+          recordVisit(
+            visitService.recordIgrins2(input),
             Predicates.visit.id,
             child
           )

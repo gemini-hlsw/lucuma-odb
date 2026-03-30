@@ -46,10 +46,10 @@ import lucuma.odb.data.StepExecutionState
 import lucuma.odb.service.Services
 import lucuma.odb.smartgcal.data.Flamingos2
 import lucuma.odb.smartgcal.data.Gmos
+import lucuma.odb.smartgcal.data.Igrins2
 import lucuma.odb.smartgcal.data.SmartGcalValue
 import lucuma.odb.smartgcal.data.SmartGcalValue.LegacyInstrumentConfig
 import skunk.Session
-
 
 class recordVisit extends OdbSuite with query.GenerationTestSupport with ExecutionState:
 
@@ -144,12 +144,22 @@ class recordVisit extends OdbSuite with query.GenerationTestSupport with Executi
         Flamingos2.TableRow(Line1, f2_key_HK, arc)
       )
 
+    val ig2_rows: List[Igrins2.TableRow] =
+      List(
+        Igrins2.TableRow(Line1, Igrins2.TableKey, flat),
+        Igrins2.TableRow(Line1, Igrins2.TableKey, arc)
+      )
+
     servicesFor(service /* doesn't matter*/).map(_(s)).use: services =>
       services.transactionally:
 
         val f2 = f2_rows.zipWithIndex.traverse_ : (r, i) =>
           Services.asSuperUser:
             services.smartGcalService.insertFlamingos2(i, r)
+
+        val ig2 = ig2_rows.zipWithIndex.traverse_ : (r, i) =>
+          Services.asSuperUser:
+            services.smartGcalService.insertIgrins2(i, r)
 
         val north = gn_rows.zipWithIndex.traverse_ : (r, i) =>
           Services.asSuperUser:
@@ -159,7 +169,7 @@ class recordVisit extends OdbSuite with query.GenerationTestSupport with Executi
           Services.asSuperUser:
             services.smartGcalService.insertGmosSouth(i, r)
 
-        f2 *> north *> south
+        f2 *> ig2 *> north *> south
 
   private def recordVisitTest(
     mode:     ObservingModeType,
@@ -173,7 +183,7 @@ class recordVisit extends OdbSuite with query.GenerationTestSupport with Executi
       oid <- createObservationAs(user, pid, mode.some, tid)
       _   <- expectSuccessOrOdbError(user, query(oid), expected.leftMap: f =>
         case OdbError.InvalidObservation(_, Some(d)) if d === f(oid) => ()
-      ) 
+      )
     yield ()
 
   test("recordGmosNorthVisit"):
@@ -472,6 +482,85 @@ class recordVisit extends OdbSuite with query.GenerationTestSupport with Executi
             },
             "gmosNorth": null,
             "gmosSouth": null
+          }
+        }
+      }
+      """.asRight
+    )
+
+  test("recordIgrins2Visit"):
+
+    recordVisitTest(
+      ObservingModeType.Igrins2LongSlit,
+      service,
+      oid => s"""
+        mutation {
+          recordIgrins2Visit(input: {
+            observationId: "$oid",
+            igrins2: {
+              saveSVCImages: true,
+              offsetMode: NOD_TO_SKY
+            }
+          }) {
+            visit {
+              igrins2 {
+                saveSVCImages
+                offsetMode
+              }
+              flamingos2 {
+                mosPreImaging
+              }
+              gmosNorth {
+                stageMode
+              }
+            }
+          }
+        }
+      """,
+      json"""
+      {
+        "recordIgrins2Visit": {
+          "visit": {
+            "igrins2": {
+              "saveSVCImages": true,
+              "offsetMode": "NOD_TO_SKY"
+            },
+            "flamingos2": null,
+            "gmosNorth": null
+          }
+        }
+      }
+      """.asRight
+    )
+
+  test("recordIgrins2Visit (defaults)"):
+
+    recordVisitTest(
+      ObservingModeType.Igrins2LongSlit,
+      service,
+      oid => s"""
+        mutation {
+          recordIgrins2Visit(input: {
+            observationId: "$oid",
+            igrins2: {}
+          }) {
+            visit {
+              igrins2 {
+                saveSVCImages
+                offsetMode
+              }
+            }
+          }
+        }
+      """,
+      json"""
+      {
+        "recordIgrins2Visit": {
+          "visit": {
+            "igrins2": {
+              "saveSVCImages": false,
+              "offsetMode": "NOD_ALONG_SLIT"
+            }
           }
         }
       }

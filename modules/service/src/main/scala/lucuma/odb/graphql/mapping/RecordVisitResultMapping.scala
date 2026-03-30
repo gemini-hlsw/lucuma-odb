@@ -26,3 +26,6 @@ trait RecordVisitResultMapping[F[_]] extends VisitTable[F]:
 
   lazy val RecordGmosSouthVisitResultMapping: ObjectMapping =
     recordVisitResultMapping(RecordGmosSouthVisitResultType)
+
+  lazy val RecordIgrins2VisitResultMapping: ObjectMapping =
+    recordVisitResultMapping(RecordIgrins2VisitResultType)
