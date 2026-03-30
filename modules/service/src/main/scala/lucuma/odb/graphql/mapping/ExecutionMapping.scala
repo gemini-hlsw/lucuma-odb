@@ -8,10 +8,13 @@ import cats.effect.Resource
 import cats.syntax.functor.*
 import cats.syntax.traverse.*
 import eu.timepit.refined.cats.*
+import grackle.Cursor
+import grackle.Query
 import grackle.Query.Binding
 import grackle.Query.EffectHandler
 import grackle.QueryCompiler.Elab
 import grackle.Result
+import grackle.ResultT
 import grackle.TypeRef
 import grackle.syntax.*
 import io.circe.Json
@@ -58,7 +61,7 @@ trait ExecutionMapping[F[_]] extends ObservationEffectHandler[F]
       SqlField("id", ObservationView.Id, key = true, hidden = true),
       SqlField("programId", ObservationView.ProgramId, hidden = true),
       EffectField("digest", digestHandler, List("id", "programId")),
-      EffectField("executionState",  executionStateHandler, List("id", "programId")),
+      EffectField("executionState",  executionStateHandler, List("id")),
       SqlObject("atomRecords"),
       SqlObject("datasets"),
       SqlObject("events"),
@@ -114,15 +117,35 @@ trait ExecutionMapping[F[_]] extends ObservationEffectHandler[F]
   }
 
   private lazy val executionStateHandler: EffectHandler[F] =
-    val calculate: (Program.Id, Observation.Id, Unit) => F[Result[Json]] =
-      (_, oid, _) => {
-        services.useTransactionally:
-          generatorParamsService
-           .selectExecutionState(oid)
-           .map(_.getOrElse(ExecutionState.NotDefined).asJson.success)
-      }
+    new EffectHandler[F]:
+      private def queryContext(queries: List[(Query, Cursor)]): Result[List[Observation.Id]] =
+        queries.traverse { case (_, cursor) => cursor.fieldAs[Observation.Id]("id") }
 
-    effectHandler(_ => ().success, calculate)
+      private def execute(oids: List[Observation.Id]): F[List[Json]] =
+        services
+          .useTransactionally:
+            generatorParamsService
+              .selectExecutionStates(oids)
+              .map: states =>
+                oids.map(oid => states.getOrElse(oid, ExecutionState.NotDefined).asJson)
+
+      override def runEffects(queries: List[(Query, Cursor)]): F[Result[List[Cursor]]] =
+        (
+          for
+            oids <- ResultT.fromResult(queryContext(queries))
+            stat <- ResultT.liftF(execute(oids))
+            res  <- ResultT.fromResult:
+                      stat
+                        .zip(queries)
+                        .traverse { case (state, (query, parentCursor)) =>
+                          Query
+                            .childContext(parentCursor.context, query)
+                            .map: childContext =>
+                              CirceCursor(childContext, state, Some(parentCursor), parentCursor.fullEnv)
+                        }
+
+          yield res
+        ).value
 
   private lazy val digestHandler: EffectHandler[F] =
     val calculate: (Program.Id, Observation.Id, Unit) => F[Result[Json]] =

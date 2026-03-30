@@ -65,9 +65,9 @@ enum ObservationSelection derives Order:
 
 trait GeneratorParamsService[F[_]] {
 
-  def selectExecutionState(
-    observationId: Observation.Id
-  )(using Transaction[F]): F[Option[ExecutionState]]
+  def selectExecutionStates(
+    observationIds: List[Observation.Id]
+  )(using Transaction[F]): F[Map[Observation.Id, ExecutionState]]
 
   def selectOne(
     programId:     Program.Id,
@@ -122,10 +122,17 @@ object GeneratorParamsService {
 
       val customSedIdOptional = SourceProfile.unnormalizedSED.some.andThen(UnnormalizedSED.userDefinedAttachment).andThen(UnnormalizedSED.UserDefinedAttachment.attachmentId)
 
-      override def selectExecutionState(
-        observationId: Observation.Id
-      )(using Transaction[F]): F[Option[ExecutionState]] =
-        session.option(Statements.SelectExecutionState)(observationId)
+      override def selectExecutionStates(
+        oids: List[Observation.Id]
+      )(using Transaction[F]): F[Map[Observation.Id, ExecutionState]] =
+        NonEmptyList
+          .fromList(oids)
+          .fold(Map.empty[Observation.Id, ExecutionState].pure[F]): which =>
+            val af = Statements.selectExecutionStates(which)
+            session
+              .prepareR(af.fragment.query(observation_id *: execution_state))
+              .use(_.stream(af.argument, chunkSize = 1024).compile.to(List))
+              .map(_.toMap)
 
       override def selectOne(
         pid: Program.Id,
@@ -461,10 +468,15 @@ object GeneratorParamsService {
 
   object Statements {
 
-    val SelectExecutionState: Query[Observation.Id, ExecutionState] =
-      sql"""
-        SELECT c_execution_state FROM v_generator_params WHERE c_observation_id = $observation_id
-      """.query(execution_state)
+    def selectExecutionStates(which: NonEmptyList[Observation.Id]): AppliedFragment =
+      void"""
+        SELECT
+          c_observation_id,
+          c_execution_state
+        FROM v_generator_params
+        WHERE c_observation_id IN (""" |+|
+          which.map(sql"$observation_id").intercalate(void", ") |+|
+        void")"
 
     import ProgramUserService.Statements.existsUserReadAccess
 
