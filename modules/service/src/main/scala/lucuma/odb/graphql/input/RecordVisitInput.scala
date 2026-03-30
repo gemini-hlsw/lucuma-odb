@@ -9,6 +9,7 @@ import lucuma.core.model.Observation
 import lucuma.core.model.sequence.flamingos2.Flamingos2StaticConfig
 import lucuma.core.model.sequence.gmos.StaticConfig.GmosNorth
 import lucuma.core.model.sequence.gmos.StaticConfig.GmosSouth
+import lucuma.core.model.sequence.igrins2.Igrins2StaticConfig
 import lucuma.core.util.IdempotencyKey
 import lucuma.odb.graphql.binding.*
 
@@ -40,3 +41,6 @@ object RecordVisitInput:
 
   val GmosSouthBinding: Matcher[RecordVisitInput[GmosSouth]] =
     binding("gmosSouth", GmosSouthStaticInput.Binding)
+
+  val Igrins2Binding: Matcher[RecordVisitInput[Igrins2StaticConfig]] =
+    binding("igrins2", Igrins2StaticInput.Binding)

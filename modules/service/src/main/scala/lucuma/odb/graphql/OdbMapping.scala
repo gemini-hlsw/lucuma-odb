@@ -181,6 +181,7 @@ object OdbMapping {
           with Flamingos2FpuMaskMapping[F]
           with Flamingos2LongSlitMapping[F]
           with Igrins2LongSlitMapping[F]
+          with Igrins2StaticMapping[F]
           with Flamingos2StaticMapping[F]
           with FilterTypeMetaMapping[F]
           with GmosCcdModeMapping[F]
@@ -421,6 +422,7 @@ object OdbMapping {
                 Flamingos2LongSlitMapping,
                 Flamingos2StaticMapping,
                 Igrins2LongSlitMapping,
+                Igrins2StaticMapping,
                 GmosNorthImagingFilterMapping,
                 GmosNorthLongSlitAcquisitionMapping,
                 GmosNorthLongSlitMapping,
@@ -478,6 +480,7 @@ object OdbMapping {
                 RecordFlamingos2VisitResultMapping,
                 RecordGmosNorthVisitResultMapping,
                 RecordGmosSouthVisitResultMapping,
+                RecordIgrins2VisitResultMapping,
                 RedeemUserInvitationResultMapping,
                 ResetAcquisitionResultMapping,
                 RevokeUserInvitationResultMapping,
