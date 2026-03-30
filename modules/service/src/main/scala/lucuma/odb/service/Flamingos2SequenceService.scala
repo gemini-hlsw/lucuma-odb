@@ -127,6 +127,8 @@ object Flamingos2SequenceService:
           $observation_id,
           ${visit_id.opt},
           $flamingos_2_static
+        ON CONFLICT (c_observation_id, c_visit_id) DO UPDATE
+          SET c_mos_pre_imaging = EXCLUDED.c_mos_pre_imaging
         RETURNING c_static_id
       """.query(int8)
 

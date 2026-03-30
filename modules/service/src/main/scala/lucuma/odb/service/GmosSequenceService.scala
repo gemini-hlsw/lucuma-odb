@@ -274,6 +274,8 @@ object GmosSequenceService:
           $observation_id,
           ${visit_id.opt},
           $encoderA
+        ON CONFLICT (c_observation_id, c_visit_id) DO UPDATE
+          SET c_stage_mode = EXCLUDED.c_stage_mode
         RETURNING c_static_id
       """.query(int8)
 

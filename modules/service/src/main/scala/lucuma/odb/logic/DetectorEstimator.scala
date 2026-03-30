@@ -4,6 +4,7 @@
 package lucuma.odb.logic
 
 import cats.syntax.either.*
+import cats.syntax.order.*
 import lucuma.core.enums.Flamingos2ReadMode
 import lucuma.core.enums.GmosNorthDetector
 import lucuma.core.enums.GmosSouthDetector
@@ -11,10 +12,15 @@ import lucuma.core.model.sequence.DatasetEstimate
 import lucuma.core.model.sequence.DetectorEstimate
 import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig
 import lucuma.core.model.sequence.flamingos2.Flamingos2StaticConfig
+import lucuma.core.model.sequence.ghost.GhostDetector
+import lucuma.core.model.sequence.ghost.GhostDynamicConfig
+import lucuma.core.model.sequence.ghost.GhostStaticConfig
 import lucuma.core.model.sequence.gmos.DynamicConfig
 import lucuma.core.model.sequence.gmos.StaticConfig
 import lucuma.core.model.sequence.igrins2.Igrins2DynamicConfig
 import lucuma.core.model.sequence.igrins2.Igrins2StaticConfig
+import lucuma.core.syntax.timespan.*
+import lucuma.core.util.TimeSpan
 import lucuma.odb.sequence.data.ProtoStep
 import lucuma.refined.*
 
@@ -38,15 +44,6 @@ object DetectorEstimator {
 
   class Applied private[DetectorEstimator] (private val ctx: TimeEstimateContext) {
 
-    extension (ig2: Igrins2DynamicConfig) {
-      def datasetEstimate: DatasetEstimate =
-        DatasetEstimate(
-          ig2.exposure,
-          ig2.readoutTime, // depends on exposure time
-          ctx.enums.TimeEstimate.Igrins2Write.time
-        )
-    }
-
     extension (f2: Flamingos2DynamicConfig) {
       def datasetEstimate: DatasetEstimate =
         DatasetEstimate(
@@ -56,6 +53,21 @@ object DetectorEstimator {
             case Flamingos2ReadMode.Medium => ctx.enums.TimeEstimate.Flamingos2MediumReadout.time
             case Flamingos2ReadMode.Faint  => ctx.enums.TimeEstimate.Flamingos2FaintReadout.time,
           ctx.enums.TimeEstimate.Flamingos2Write.time
+        )
+    }
+
+    // TODO: Move this to core
+    extension (ghostDetector: GhostDetector) {
+      def grossExposureTime: TimeSpan =
+        ghostDetector.exposureTime *| ghostDetector.exposureCount.value
+    }
+
+    extension (ghost: GhostDynamicConfig) {
+      def datasetEstimate: DatasetEstimate =
+        DatasetEstimate(
+          ghost.redCamera.value.grossExposureTime max ghost.blueCamera.value.grossExposureTime,
+          0.secondTimeSpan,
+          0.secondTimeSpan
         )
     }
 
@@ -83,21 +95,31 @@ object DetectorEstimator {
         )
     }
 
-    lazy val igrins2: DetectorEstimator[Igrins2StaticConfig, Igrins2DynamicConfig] =
-      (_: Igrins2StaticConfig, step: ProtoStep[Igrins2DynamicConfig]) => List(
-        DetectorEstimate(
-          "Igrins2",
-          "IGRINS-2 Detector Array",
-          step.value.datasetEstimate,
-          1.refined
+    extension (ig2: Igrins2DynamicConfig) {
+      def datasetEstimate: DatasetEstimate =
+        DatasetEstimate(
+          ig2.exposure,
+          ig2.readoutTime, // depends on exposure time
+          ctx.enums.TimeEstimate.Igrins2Write.time
         )
-      )
+    }
 
     lazy val flamingos2: DetectorEstimator[Flamingos2StaticConfig, Flamingos2DynamicConfig] =
       (_: Flamingos2StaticConfig, step: ProtoStep[Flamingos2DynamicConfig]) => List(
         DetectorEstimate(
           "Flamingos2",
           s"Flamingos 2 Detector Array",
+          step.value.datasetEstimate,
+          1.refined
+        )
+      )
+
+    // N.B., Placeholder
+    lazy val ghost: DetectorEstimator[GhostStaticConfig, GhostDynamicConfig] =
+      (_: GhostStaticConfig, step: ProtoStep[GhostDynamicConfig]) => List(
+        DetectorEstimate(
+          "GHOST",
+          "GHOST Detector Array",
           step.value.datasetEstimate,
           1.refined
         )
@@ -123,6 +145,15 @@ object DetectorEstimator {
         )
       )
 
+    lazy val igrins2: DetectorEstimator[Igrins2StaticConfig, Igrins2DynamicConfig] =
+      (_: Igrins2StaticConfig, step: ProtoStep[Igrins2DynamicConfig]) => List(
+        DetectorEstimate(
+          "Igrins2",
+          "IGRINS-2 Detector Array",
+          step.value.datasetEstimate,
+          1.refined
+        )
+      )
 
   }
 

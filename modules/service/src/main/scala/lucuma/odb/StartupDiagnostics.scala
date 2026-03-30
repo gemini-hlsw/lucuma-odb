@@ -66,6 +66,12 @@ object StartupDiagnostics:
           checkPostgresEnum(exposure_time_mode_type),
           checkPostgresEnum(gcal_baseline),
           checkPostgresEnum(gcal_lamp_type),
+          {
+            // We'll skip this one.  There is a postgres enum, but it is tied
+            // to a scala NewBoolean type.  There is no Enumerated instance.
+            StateT.modify[F, DiagState]: ds =>
+              ds.updated(Type("e_ghost_fiber_agitator"))
+          },
           checkPostgresEnum(gmos_imaging_variant),
           checkPostgresEnum(gmos_long_slit_acquisition_roi),
           checkPostgresEnum(gender),

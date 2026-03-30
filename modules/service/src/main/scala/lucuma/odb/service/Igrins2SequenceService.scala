@@ -84,6 +84,8 @@ object Igrins2SequenceService:
           $observation_id,
           ${visit_id.opt},
           $igrins_2_static
+        ON CONFLICT (c_observation_id, c_visit_id) DO UPDATE
+          SET c_save_svc_images = EXCLUDED.c_save_svc_images
         RETURNING c_static_id
       """.query(int8)
 

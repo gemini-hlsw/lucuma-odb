@@ -11,6 +11,7 @@ import lucuma.core.math.Offset
 import lucuma.core.model.sequence.ConfigChangeEstimate
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig
+import lucuma.core.model.sequence.ghost.GhostDynamicConfig
 import lucuma.core.model.sequence.gmos.DynamicConfig
 import lucuma.core.model.sequence.igrins2.Igrins2DynamicConfig
 import lucuma.odb.graphql.enums.Enums
@@ -49,15 +50,6 @@ object ConfigChangeEstimator:
       def estimate(past: StepTimeEstimateCalculator.Last[D], present: ProtoStep[D]): List[ConfigChangeEstimate] =
         instrumentChecks(past, present).flattenOption ++ gcal(past, present) ++ offset(past, present)
 
-    lazy val igrins2: ConfigChangeEstimator[Igrins2DynamicConfig] =
-      new ForInstrument[Igrins2DynamicConfig]:
-        override def instrumentChecks(
-          past: StepTimeEstimateCalculator.Last[Igrins2DynamicConfig],
-          present: ProtoStep[Igrins2DynamicConfig]
-        ): List[Option[ConfigChangeEstimate]] =
-          // IGRINS-2 has no configurable mechanisms
-          Nil
-
     lazy val flamingos2: ConfigChangeEstimator[Flamingos2DynamicConfig] =
       new ForInstrument[Flamingos2DynamicConfig]:
         override def instrumentChecks(past: StepTimeEstimateCalculator.Last[Flamingos2DynamicConfig], present:  ProtoStep[Flamingos2DynamicConfig]): List[Option[ConfigChangeEstimate]] =
@@ -66,6 +58,12 @@ object ConfigChangeEstimator:
             check(enums.TimeEstimate.Flamingos2Fpu, past, present)(_.fpu),
             check(enums.TimeEstimate.Flamingos2Disperser, past, present)(_.disperser)
           )
+
+    // N.B., Placeholder
+    lazy val ghost: ConfigChangeEstimator[GhostDynamicConfig] =
+      new ForInstrument[GhostDynamicConfig]:
+        override def instrumentChecks(past: StepTimeEstimateCalculator.Last[GhostDynamicConfig], present:  ProtoStep[GhostDynamicConfig]): List[Option[ConfigChangeEstimate]] =
+          Nil
 
     lazy val gmosNorth: ConfigChangeEstimator[DynamicConfig.GmosNorth] =
       new ForInstrument[DynamicConfig.GmosNorth]:
@@ -84,6 +82,15 @@ object ConfigChangeEstimator:
             check(enums.TimeEstimate.GmosSouthFpu, past, present)(_.fpu),
             check(enums.TimeEstimate.GmosSouthDisperser, past, present)(_.gratingConfig.map(_.grating))
           )
+
+    lazy val igrins2: ConfigChangeEstimator[Igrins2DynamicConfig] =
+      new ForInstrument[Igrins2DynamicConfig]:
+        override def instrumentChecks(
+          past: StepTimeEstimateCalculator.Last[Igrins2DynamicConfig],
+          present: ProtoStep[Igrins2DynamicConfig]
+        ): List[Option[ConfigChangeEstimate]] =
+          // IGRINS-2 has no configurable mechanisms
+          Nil
 
     private def gcal[D](past: StepTimeEstimateCalculator.Last[D], present: ProtoStep[D]): List[ConfigChangeEstimate] =
       val scienceFold = Option.unless(past.step.exists(_.stepConfig.usesGcalUnit) === present.stepConfig.usesGcalUnit)(
