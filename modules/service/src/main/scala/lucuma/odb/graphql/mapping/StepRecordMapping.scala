@@ -22,6 +22,7 @@ import lucuma.odb.service.Services
 import table.AtomRecordView
 import table.Flamingos2DynamicView
 import table.GmosDynamicTables
+import table.Igrins2DynamicTable
 import table.StepRecordView
 import table.VisitTable
 
@@ -31,6 +32,7 @@ trait StepRecordMapping[F[_]] extends StepRecordView[F]
                                  with KeyValueEffectHandler[F]
                                  with Flamingos2DynamicView[F]
                                  with GmosDynamicTables[F]
+                                 with Igrins2DynamicTable[F]
                                  with Predicates[F]
                                  with SelectSubquery
                                  with VisitTable[F] {
@@ -62,7 +64,8 @@ trait StepRecordMapping[F[_]] extends StepRecordView[F]
       SqlObject("events"),
       SqlObject("flamingos2",     Join(StepRecordView.Id, Flamingos2DynamicView.Id)),
       SqlObject("gmosNorth",      Join(StepRecordView.Id, GmosNorthDynamicTable.Id)),
-      SqlObject("gmosSouth",      Join(StepRecordView.Id, GmosSouthDynamicTable.Id))
+      SqlObject("gmosSouth",      Join(StepRecordView.Id, GmosSouthDynamicTable.Id)),
+      SqlObject("igrins2",        Join(StepRecordView.Id, Igrins2DynamicTable.Id))
     )
 
   lazy val StepRecordElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] = {

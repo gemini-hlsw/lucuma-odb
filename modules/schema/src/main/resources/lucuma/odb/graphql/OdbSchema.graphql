@@ -14384,6 +14384,12 @@ type StepRecord {
   unless the `instrument` discriminator is "GMOS_SOUTH".
   """
   gmosSouth: GmosSouthDynamic
+
+  """
+  IGRINS-2 instrument configuration for this step, if any.  This will be null
+  unless the `instrument` discriminator is "IGRINS2".
+  """
+  igrins2: Igrins2Dynamic
 }
 
 "StepRecord query results, limited to a maximum of 1000 entries."
