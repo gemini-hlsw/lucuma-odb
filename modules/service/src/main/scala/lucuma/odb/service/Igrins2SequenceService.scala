@@ -99,8 +99,8 @@ object Igrins2SequenceService:
     val SelectStaticByObservation: Query[Observation.Id, Igrins2StaticConfig] =
       sql"""
         SELECT
-          c_save_svc_images,
-          c_offset_mode
+          COALESCE(c_save_svc_images, false),
+          COALESCE(c_offset_mode, 'nod_along_slit')
         FROM t_igrins_2_long_slit
         WHERE c_observation_id = $observation_id
       """.query(igrins_2_static)

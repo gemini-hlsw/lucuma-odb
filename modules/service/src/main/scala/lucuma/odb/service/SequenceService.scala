@@ -193,11 +193,6 @@ trait SequenceService[F[_]]:
     checked: CheckedWithId[(SequenceType, List[ProtoAtom[ProtoStep[Igrins2DynamicConfig]]]), Observation.Id]
   )(using Transaction[F]): F[Result[Stream[Pure, Atom[Igrins2DynamicConfig]]]]
 
-  def resetIgrins2Acquisition(
-    observationId: Observation.Id,
-    sequence:      Stream[F, Atom[Igrins2DynamicConfig]]
-  )(using Transaction[F], Services.ServiceAccess): F[Unit]
-
   def insertIgrins2Sequence(
     observationId: Observation.Id,
     sequenceType:  SequenceType,
@@ -626,12 +621,6 @@ object SequenceService:
         stream:        Stream[F, Atom[GmosSouth]]
       )(using Transaction[F], Services.ServiceAccess): F[Unit] =
         resetAcquisition(observationId, stream)(insertGmosSouthSequence)
-
-      override def resetIgrins2Acquisition(
-        observationId: Observation.Id,
-        stream:        Stream[F, Atom[Igrins2DynamicConfig]]
-      )(using Transaction[F], Services.ServiceAccess): F[Unit] =
-        resetAcquisition(observationId, stream)(insertIgrins2Sequence)
 
       private def materializeExecutionConfig[S, D](
         observationId: Observation.Id,

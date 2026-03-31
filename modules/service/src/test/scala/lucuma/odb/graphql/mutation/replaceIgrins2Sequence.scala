@@ -7,30 +7,19 @@ package mutation
 import cats.effect.IO
 import cats.syntax.either.*
 import cats.syntax.eq.*
-import io.circe.Json
 import io.circe.literal.*
-import lucuma.core.enums.Flamingos2Filter
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.SequenceType
 import lucuma.core.model.Observation
-import lucuma.core.model.sequence.Atom
-import lucuma.core.model.sequence.Step
-import lucuma.core.syntax.string.*
 
-class replaceFlamingos2Sequence extends query.ExecutionTestSupportForFlamingos2 with ReplaceSequenceOps:
-  def stepInput(filter: Flamingos2Filter): String =
+class replaceIgrins2Sequence extends query.ExecutionTestSupportForIgrins2 with ReplaceSequenceOps:
+  def stepInput(exposureSeconds: BigDecimal): String =
     s"""
           {
             instrumentConfig: {
               exposure: {
-                seconds: 20
+                seconds: $exposureSeconds
               }
-              filter: ${filter.tag.toScreamingSnakeCase}
-              readMode: BRIGHT
-              lyotWheel: F16
-              decker: LONG_SLIT
-              readoutMode: SCIENCE
-              reads: READS_1
             }
             stepConfig: {
               science: true
@@ -44,21 +33,21 @@ class replaceFlamingos2Sequence extends query.ExecutionTestSupportForFlamingos2 
       for
         p <- createProgram
         t <- createTargetWithProfileAs(pi, p)
-        o <- createFlamingos2LongSlitObservationAs(pi, p, List(t))
+        o <- createIgrins2LongSlitObservationAs(pi, p, t)
       yield o
 
     setup.flatMap: oid =>
-      val inputString = input(oid, SequenceType.Science, atomInput("Foo", stepInput(Flamingos2Filter.J)))
+      val inputString = input(oid, SequenceType.Science, atomInput("Foo", stepInput(20)))
       expect(
         user     = pi,
         query    = s"""
           mutation {
-            replaceFlamingos2Sequence(input: $inputString) {
+            replaceIgrins2Sequence(input: $inputString) {
               sequence {
                 description
                 steps {
                   instrumentConfig {
-                    filter
+                    exposure { seconds }
                   }
                 }
               }
@@ -67,13 +56,15 @@ class replaceFlamingos2Sequence extends query.ExecutionTestSupportForFlamingos2 
         """,
         expected = json"""
           {
-            "replaceFlamingos2Sequence": {
+            "replaceIgrins2Sequence": {
               "sequence": [
                 {
                   "description": "Foo",
                   "steps": [
                     {
-                      "instrumentConfig": { "filter": "J" }
+                      "instrumentConfig": {
+                        "exposure": { "seconds": 20.000000 }
+                      }
                     }
                   ]
                 }
@@ -88,7 +79,7 @@ class replaceFlamingos2Sequence extends query.ExecutionTestSupportForFlamingos2 
       for
         p <- createProgram
         t <- createTargetWithProfileAs(pi, p)
-        o <- createFlamingos2LongSlitObservationAs(pi, p, List(t))
+        o <- createIgrins2LongSlitObservationAs(pi, p, t)
       yield o
 
     setup.flatMap: oid =>
@@ -96,7 +87,7 @@ class replaceFlamingos2Sequence extends query.ExecutionTestSupportForFlamingos2 
         user     = pi,
         query    = s"""
           mutation {
-            replaceFlamingos2Sequence(input: {
+            replaceIgrins2Sequence(input: {
               observationId: "$oid"
               sequenceType: SCIENCE
               sequence: []
@@ -109,7 +100,7 @@ class replaceFlamingos2Sequence extends query.ExecutionTestSupportForFlamingos2 
         """,
         expected = json"""
           {
-            "replaceFlamingos2Sequence": {
+            "replaceIgrins2Sequence": {
               "sequence": []
             }
           }
@@ -121,14 +112,14 @@ class replaceFlamingos2Sequence extends query.ExecutionTestSupportForFlamingos2 
       for
         p <- createProgram
         t <- createTargetWithProfileAs(pi, p)
-        o <- createFlamingos2LongSlitObservationAs(pi, p, List(t))
+        o <- createIgrins2LongSlitObservationAs(pi, p, t)
       yield o
 
     assertIOBoolean:
       for
         o  <- setup
-        in  = input(o, SequenceType.Science, atomInput("Foo", stepInput(Flamingos2Filter.J)))
-        i0 <- query(pi, mutation(Instrument.Flamingos2, in)).map(mutationOutput(Instrument.Flamingos2, _))
+        in  = input(o, SequenceType.Science, atomInput("Foo", stepInput(20)))
+        i0 <- query(pi, mutation(Instrument.Igrins2, in)).map(mutationOutput(Instrument.Igrins2, _))
         i1 <- scienceSequenceIds(pi, o).map(_.toList)
       yield i0 === i1
 
@@ -137,15 +128,15 @@ class replaceFlamingos2Sequence extends query.ExecutionTestSupportForFlamingos2 
       for
         p <- createProgram
         t <- createTargetWithProfileAs(pi, p)
-        o <- createFlamingos2LongSlitObservationAs(pi, p, List(t))
-        _ <- recordVisitAs(serviceUser, Instrument.Flamingos2, o)
+        o <- createIgrins2LongSlitObservationAs(pi, p, t)
+        _ <- recordVisitAs(serviceUser, Instrument.Igrins2, o)
       yield o
 
     assertIOBoolean:
       for
         o  <- setup
-        in  = input(o, SequenceType.Science, atomInput("Foo", stepInput(Flamingos2Filter.J)))
-        i0 <- query(pi, mutation(Instrument.Flamingos2, in)).map(mutationOutput(Instrument.Flamingos2, _))
+        in  = input(o, SequenceType.Science, atomInput("Foo", stepInput(20)))
+        i0 <- query(pi, mutation(Instrument.Igrins2, in)).map(mutationOutput(Instrument.Igrins2, _))
         i1 <- scienceSequenceIds(pi, o).map(_.toList)
       yield i0 === i1
 
@@ -154,18 +145,18 @@ class replaceFlamingos2Sequence extends query.ExecutionTestSupportForFlamingos2 
       for
         p <- createProgram
         t <- createTargetWithProfileAs(pi, p)
-        o <- createFlamingos2LongSlitObservationAs(pi, p, List(t))
-        v <- recordVisitAs(serviceUser, Instrument.Flamingos2, o)
+        o <- createIgrins2LongSlitObservationAs(pi, p, t)
+        v <- recordVisitAs(serviceUser, Instrument.Igrins2, o)
         s <- firstScienceStepId(serviceUser, o)
         _ <- addEndStepEvent(s, v)
       yield o
 
     for
       o  <- setup
-      in  = input(o, SequenceType.Science, atomInput("Foo", stepInput(Flamingos2Filter.J)))
+      in  = input(o, SequenceType.Science, atomInput("Foo", stepInput(20)))
       _  <- expect(
         pi,
-        mutation(Instrument.Flamingos2, in),
+        mutation(Instrument.Igrins2, in),
         List(
           s"Observation $o is ineligible for this operation due to its workflow state (Ongoing with allowed transition to Inactive/Completed).",
           "User cannot replace the sequence in the current observation workflow state."
@@ -178,8 +169,8 @@ class replaceFlamingos2Sequence extends query.ExecutionTestSupportForFlamingos2 
       for
         p <- createProgram
         t <- createTargetWithProfileAs(pi, p)
-        o <- createFlamingos2LongSlitObservationAs(pi, p, List(t))
-        v <- recordVisitAs(serviceUser, Instrument.Flamingos2, o)
+        o <- createIgrins2LongSlitObservationAs(pi, p, t)
+        v <- recordVisitAs(serviceUser, Instrument.Igrins2, o)
         s <- firstScienceStepId(serviceUser, o)
         _ <- addEndStepEvent(s, v)
       yield o
@@ -187,22 +178,22 @@ class replaceFlamingos2Sequence extends query.ExecutionTestSupportForFlamingos2 
     assertIOBoolean:
       for
         o  <- setup
-        in  = input(o, SequenceType.Science, atomInput("Foo", stepInput(Flamingos2Filter.J)))
-        r  <- query(staff, mutation(Instrument.Flamingos2, in))
-      yield mutationOutput(Instrument.Flamingos2, r).nonEmpty
+        in  = input(o, SequenceType.Science, atomInput("Foo", stepInput(20)))
+        r  <- query(staff, mutation(Instrument.Igrins2, in))
+      yield mutationOutput(Instrument.Igrins2, r).nonEmpty
 
   test("Can't add too many atoms"):
     val setup: IO[Observation.Id] =
       for
         p <- createProgram
         t <- createTargetWithProfileAs(pi, p)
-        o <- createFlamingos2LongSlitObservationAs(pi, p, List(t))
+        o <- createIgrins2LongSlitObservationAs(pi, p, t)
       yield o
 
     for
       o  <- setup
-      in  = input(o, SequenceType.Science, List.fill(1001)(atomInput("Foo", stepInput(Flamingos2Filter.J)))*)
-      _  <- expect(pi, mutation(Instrument.Flamingos2, in), List(
+      in  = input(o, SequenceType.Science, List.fill(1001)(atomInput("Foo", stepInput(20)))*)
+      _  <- expect(pi, mutation(Instrument.Igrins2, in), List(
         "Execution sequences containing over 1000 atoms are not supported."
       ).asLeft)
     yield ()
