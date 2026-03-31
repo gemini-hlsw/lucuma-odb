@@ -775,11 +775,6 @@ The result of cloning a target, containing the original and new targets.
 """
 type CloneTargetResult {
   """
-  The original unmodified target which was cloned
-  """
-  originalTarget: Target!
-
-  """
   The new cloned (but possibly modified) target
   """
   newTarget: Target!
@@ -2809,7 +2804,6 @@ input CloneGroupInput {
 }
 
 type CloneGroupResult {
-  originalGroup: Group!
   newGroup: Group!
 }
 

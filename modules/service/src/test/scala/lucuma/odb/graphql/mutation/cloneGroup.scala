@@ -24,10 +24,6 @@ class cloneGroup extends OdbSuite {
               cloneGroup(input: {
                 groupId: "$gid"
               }) {
-                originalGroup {
-                  parentIndex
-                  minimumRequired
-                }
                 newGroup {
                   parentIndex
                   minimumRequired
@@ -38,10 +34,6 @@ class cloneGroup extends OdbSuite {
           expected = Right(json"""
             {
               "cloneGroup" : {
-                "originalGroup" : {
-                  "parentIndex" : 2,
-                  "minimumRequired" : 42
-                },
                 "newGroup" : {
                   "parentIndex" : 1,
                   "minimumRequired" : 42
@@ -65,9 +57,6 @@ class cloneGroup extends OdbSuite {
                   parentGroupIndex: 2
                 }
               }) {
-                originalGroup {
-                  parentIndex
-                }
                 newGroup {
                   parentIndex
                 }
@@ -77,9 +66,6 @@ class cloneGroup extends OdbSuite {
           expected = Right(json"""
             {
               "cloneGroup" : {
-                "originalGroup" : {
-                  "parentIndex" : 0
-                },
                 "newGroup" : {
                   "parentIndex" : 2
                  }
@@ -140,9 +126,6 @@ class cloneGroup extends OdbSuite {
                 parentGroupIndex: 2
               }
             }) {
-              originalGroup {
-                parentIndex
-              }
               newGroup {
                 parentIndex
               }
