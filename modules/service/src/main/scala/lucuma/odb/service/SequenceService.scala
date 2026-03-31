@@ -182,7 +182,22 @@ trait SequenceService[F[_]]:
     staticConfig:  GmosSouthStatic
   )(using Transaction[F]): F[Option[Stream[F, Atom[GmosSouth]]]]
 
-  // IGRINS-2 Spectrosocpy
+  def replaceIgrins2Sequence(
+    observationId:  Observation.Id,
+    sequenceType:   SequenceType,
+    sequence:       List[ProtoAtom[ProtoStep[Igrins2DynamicConfig]]],
+    namespace:      Option[UUID] = None
+  )(using Transaction[F]): F[Result[Stream[Pure, Atom[Igrins2DynamicConfig]]]]
+
+  def replaceIgrins2Sequence(
+    checked: CheckedWithId[(SequenceType, List[ProtoAtom[ProtoStep[Igrins2DynamicConfig]]]), Observation.Id]
+  )(using Transaction[F]): F[Result[Stream[Pure, Atom[Igrins2DynamicConfig]]]]
+
+  def resetIgrins2Acquisition(
+    observationId: Observation.Id,
+    sequence:      Stream[F, Atom[Igrins2DynamicConfig]]
+  )(using Transaction[F], Services.ServiceAccess): F[Unit]
+
   def insertIgrins2Sequence(
     observationId: Observation.Id,
     sequenceType:  SequenceType,
@@ -547,6 +562,36 @@ object SequenceService:
           )
         }
 
+      override def replaceIgrins2Sequence(
+        observationId: Observation.Id,
+        sequenceType:  SequenceType,
+        sequence:      List[ProtoAtom[ProtoStep[Igrins2DynamicConfig]]],
+        namespace:     Option[UUID] = None
+      )(using Transaction[F]): F[Result[Stream[Pure, Atom[Igrins2DynamicConfig]]]] =
+        (for
+          s <- selectStatic(observationId, "IGRINS-2", igrins2SequenceService.selectStatic)
+          b <- ResultT.liftF(atomBuilder(sequenceType, s, namespace, estimator.igrins2Step))
+          r <- replaceSequence(
+                 Instrument.Igrins2,
+                 observationId,
+                 sequenceType,
+                 sequence,
+                 Igrins2SequenceService.Statements.InsertDynamic,
+                 b
+               )
+        yield r).value
+
+      override def replaceIgrins2Sequence(
+        checked: CheckedWithId[(SequenceType, List[ProtoAtom[ProtoStep[Igrins2DynamicConfig]]]), Observation.Id]
+      )(using Transaction[F]): F[Result[Stream[Pure, Atom[Igrins2DynamicConfig]]]] =
+        checked.foldWithId(OdbError.InvalidArgument().asFailureF[F, Stream[Pure, Atom[Igrins2DynamicConfig]]]) { case ((sequenceType, sequence), oid) =>
+          replaceIgrins2Sequence(
+            oid,
+            sequenceType,
+            sequence
+          )
+        }
+
       private def resetAcquisition[D](
         observationId: Observation.Id,
         stream:        Stream[F, Atom[D]]
@@ -581,6 +626,12 @@ object SequenceService:
         stream:        Stream[F, Atom[GmosSouth]]
       )(using Transaction[F], Services.ServiceAccess): F[Unit] =
         resetAcquisition(observationId, stream)(insertGmosSouthSequence)
+
+      override def resetIgrins2Acquisition(
+        observationId: Observation.Id,
+        stream:        Stream[F, Atom[Igrins2DynamicConfig]]
+      )(using Transaction[F], Services.ServiceAccess): F[Unit] =
+        resetAcquisition(observationId, stream)(insertIgrins2Sequence)
 
       private def materializeExecutionConfig[S, D](
         observationId: Observation.Id,
