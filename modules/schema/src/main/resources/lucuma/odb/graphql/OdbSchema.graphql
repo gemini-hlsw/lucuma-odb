@@ -752,14 +752,9 @@ input CloneObservationInput {
 }
 
 """
-The result of cloning an observation, containing the original and new observations.
+The result of cloning an observation, containing the new observation.
 """
 type CloneObservationResult {
-  """
-  The original unmodified observation which was cloned.
-  """
-  originalObservation: Observation!
-
   """
   The new cloned (but possibly modified) observation.
   """

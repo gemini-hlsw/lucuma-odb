@@ -337,10 +337,10 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
               OdbError.NotAuthorized(user.id).asFailureF
             else
               observationService.cloneObservation(checked).nestMap: ids =>
-                Filter(And(
-                  Predicates.cloneObservationResult.originalObservation.id.eql(ids.originalId),
-                  Predicates.cloneObservationResult.newObservation.id.eql(ids.cloneId)
-                ), child)
+                Filter(
+                  Predicates.cloneObservationResult.newObservation.id.eql(ids.cloneId),
+                  child
+                )
 
   private lazy val ResetAcquisition: MutationField =
     MutationField("resetAcquisition", ResetAcquisitionInput.Binding): (input, child) =>
