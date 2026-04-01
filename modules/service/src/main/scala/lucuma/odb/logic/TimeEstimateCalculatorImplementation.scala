@@ -10,6 +10,8 @@ import lucuma.core.model.sequence.SetupTime
 import lucuma.core.model.sequence.StepEstimate
 import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig
 import lucuma.core.model.sequence.flamingos2.Flamingos2StaticConfig
+import lucuma.core.model.sequence.ghost.GhostDynamicConfig
+import lucuma.core.model.sequence.ghost.GhostStaticConfig
 import lucuma.core.model.sequence.gmos.DynamicConfig
 import lucuma.core.model.sequence.gmos.StaticConfig
 import lucuma.core.model.sequence.igrins2.Igrins2DynamicConfig
@@ -116,6 +118,9 @@ object TimeEstimateCalculatorImplementation:
 
     lazy val flamingos2Step: StepTimeEstimateCalculator[Flamingos2StaticConfig, Flamingos2DynamicConfig] =
       stepCalculatorfromEstimators(cce.flamingos2, de.flamingos2)
+
+    lazy val ghostStep: StepTimeEstimateCalculator[GhostStaticConfig, GhostDynamicConfig] =
+      stepCalculatorfromEstimators(cce.ghost, de.ghost)
 
     lazy val gmosNorthStep: StepTimeEstimateCalculator[StaticConfig.GmosNorth, DynamicConfig.GmosNorth] =
       stepCalculatorfromEstimators(cce.gmosNorth, de.gmosNorth)

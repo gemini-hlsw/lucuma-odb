@@ -26,6 +26,7 @@ import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SequenceType
 import lucuma.core.enums.StepType
 import lucuma.core.model.Observation
+import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.AtomDigest
 import lucuma.core.model.sequence.CategorizedTime
@@ -35,6 +36,8 @@ import lucuma.core.model.sequence.StepEstimate
 import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig
 import lucuma.core.model.sequence.flamingos2.Flamingos2StaticConfig
+import lucuma.core.model.sequence.ghost.GhostDynamicConfig
+import lucuma.core.model.sequence.ghost.GhostStaticConfig
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosSouth
 import lucuma.core.model.sequence.gmos.StaticConfig.GmosNorth as GmosNorthStatic
@@ -54,6 +57,7 @@ import lucuma.odb.sequence.data.StreamingExecutionConfig
 import lucuma.odb.sequence.util.AtomBuilder
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.Flamingos2Codecs.*
+import lucuma.odb.util.GhostCodecs.*
 import lucuma.odb.util.GmosCodecs.*
 import lucuma.odb.util.Igrins2Codecs.*
 import skunk.*
@@ -93,6 +97,17 @@ trait SequenceService[F[_]]:
   def replaceFlamingos2Sequence(
     checked: CheckedWithId[(SequenceType, List[ProtoAtom[ProtoStep[Flamingos2DynamicConfig]]]), Observation.Id]
   )(using Transaction[F]): F[Result[Stream[Pure, Atom[Flamingos2DynamicConfig]]]]
+
+  def replaceGhostSequence(
+    observationId:  Observation.Id,
+    sequenceType:   SequenceType,
+    sequence:       List[ProtoAtom[ProtoStep[GhostDynamicConfig]]],
+    namespace:      Option[UUID] = None
+  )(using Transaction[F]): F[Result[Stream[Pure, Atom[GhostDynamicConfig]]]]
+
+  def replaceGhostSequence(
+    checked: CheckedWithId[(SequenceType, List[ProtoAtom[ProtoStep[GhostDynamicConfig]]]), Observation.Id]
+  )(using Transaction[F]): F[Result[Stream[Pure, Atom[GhostDynamicConfig]]]]
 
   def replaceGmosNorthSequence(
     observationId:  Observation.Id,
@@ -137,6 +152,12 @@ trait SequenceService[F[_]]:
     sequence:      Stream[F, Atom[Flamingos2DynamicConfig]]
   )(using Transaction[F], Services.ServiceAccess): F[Unit]
 
+  def insertGhostSequence(
+    observationId:  Observation.Id,
+    sequenceType:   SequenceType,
+    sequence:       Stream[F, Atom[GhostDynamicConfig]]
+  )(using Transaction[F], Services.ServiceAccess): F[Unit]
+
   def insertGmosNorthSequence(
     observationId: Observation.Id,
     sequenceType:  SequenceType,
@@ -154,6 +175,11 @@ trait SequenceService[F[_]]:
     stream:        StreamingExecutionConfig[F, Flamingos2StaticConfig, Flamingos2DynamicConfig]
   )(using Transaction[F], Services.ServiceAccess): F[Unit]
 
+  def materializeGhostExecutionConfig(
+    observationId: Observation.Id,
+    stream:        StreamingExecutionConfig[F, GhostStaticConfig, GhostDynamicConfig]
+  )(using Transaction[F], Services.ServiceAccess): F[Unit]
+
   def materializeGmosNorthExecutionConfig(
     observationId: Observation.Id,
     stream:        StreamingExecutionConfig[F, GmosNorthStatic, GmosNorth]
@@ -169,6 +195,12 @@ trait SequenceService[F[_]]:
     sequenceType:  SequenceType,
     staticConfig:  Flamingos2StaticConfig
   )(using Transaction[F]): F[Option[Stream[F, Atom[Flamingos2DynamicConfig]]]]
+
+  def selectGhostSequence(
+    observationId: Observation.Id,
+    sequenceType:  SequenceType,
+    staticConfig:  GhostStaticConfig
+  )(using Transaction[F]): F[Option[Stream[F, Atom[GhostDynamicConfig]]]]
 
   def selectGmosNorthSequence(
     observationId: Observation.Id,
@@ -263,6 +295,19 @@ object SequenceService:
           sequenceType,
           sequence,
           Flamingos2SequenceService.Statements.InsertDynamic
+        )
+
+      override def insertGhostSequence(
+        observationId:  Observation.Id,
+        sequenceType:   SequenceType,
+        sequence:       Stream[F, Atom[GhostDynamicConfig]]
+      )(using Transaction[F], Services.ServiceAccess): F[Unit] =
+        insertSequence(
+          Instrument.Ghost,
+          observationId,
+          sequenceType,
+          sequence,
+          GhostSequenceService.Statements.InsertDynamic
         )
 
       override def insertGmosNorthSequence(
@@ -473,7 +518,7 @@ object SequenceService:
       )(using Transaction[F]): F[Result[Stream[Pure, Atom[Flamingos2DynamicConfig]]]] =
 
         (for
-          s <- selectStatic(observationId, "Flamingos 2", flamingos2SequenceService.selectStatic)
+          s <- selectStatic(observationId, "Flamingos 2", flamingos2SequenceService.selectStaticOrDefault)
           b <- ResultT.liftF(atomBuilder(sequenceType, s, namespace, estimator.flamingos2Step))
           r <- replaceSequence(
                  Instrument.Flamingos2,
@@ -496,6 +541,36 @@ object SequenceService:
           )
         }
 
+      override def replaceGhostSequence(
+        observationId:  Observation.Id,
+        sequenceType:   SequenceType,
+        sequence:       List[ProtoAtom[ProtoStep[GhostDynamicConfig]]],
+        namespace:      Option[UUID] = None
+      )(using Transaction[F]): F[Result[Stream[Pure, Atom[GhostDynamicConfig]]]] =
+        (for
+          s <- selectStatic(observationId, "GHOST", ghostSequenceService.selectStaticOrDefault)
+          b <- ResultT.liftF(atomBuilder(sequenceType, s, namespace, estimator.ghostStep))
+          r <- replaceSequence(
+                 Instrument.Ghost,
+                 observationId,
+                 sequenceType,
+                 sequence,
+                 GhostSequenceService.Statements.InsertDynamic,
+                 b
+               )
+        yield r).value
+
+      override def replaceGhostSequence(
+        checked: CheckedWithId[(SequenceType, List[ProtoAtom[ProtoStep[GhostDynamicConfig]]]), Observation.Id]
+      )(using Transaction[F]): F[Result[Stream[Pure, Atom[GhostDynamicConfig]]]] =
+        checked.foldWithId(OdbError.InvalidArgument().asFailureF[F, Stream[Pure, Atom[GhostDynamicConfig]]]) { case ((sequenceType, sequence), oid) =>
+          replaceGhostSequence(
+            oid,
+            sequenceType,
+            sequence
+          )
+        }
+
       override def replaceGmosNorthSequence(
         observationId: Observation.Id,
         sequenceType:  SequenceType,
@@ -503,7 +578,7 @@ object SequenceService:
         namespace:     Option[UUID] = None
       )(using Transaction[F]): F[Result[Stream[Pure, Atom[GmosNorth]]]] =
         (for
-          s <- selectStatic(observationId, "GMOS North", gmosSequenceService.selectGmosNorthStatic)
+          s <- selectStatic(observationId, "GMOS North", gmosSequenceService.selectGmosNorthStaticOrDefault)
           b <- ResultT.liftF(atomBuilder(sequenceType, s, namespace, estimator.gmosNorthStep))
           r <- replaceSequence(
                  Instrument.GmosNorth,
@@ -533,7 +608,7 @@ object SequenceService:
         namespace:     Option[UUID] = None
       )(using Transaction[F]): F[Result[Stream[Pure, Atom[GmosSouth]]]] =
         (for
-          s <- selectStatic(observationId, "GMOS South", gmosSequenceService.selectGmosSouthStatic)
+          s <- selectStatic(observationId, "GMOS South", gmosSequenceService.selectGmosSouthStaticOrDefault)
           b <- ResultT.liftF(atomBuilder(sequenceType, s, namespace, estimator.gmosSouthStep))
           r <- replaceSequence(
                  Instrument.GmosSouth,
@@ -564,7 +639,7 @@ object SequenceService:
         namespace:     Option[UUID] = None
       )(using Transaction[F]): F[Result[Stream[Pure, Atom[Igrins2DynamicConfig]]]] =
         (for
-          s <- selectStatic(observationId, "IGRINS-2", igrins2SequenceService.selectStatic)
+          s <- selectStatic(observationId, "IGRINS-2", igrins2SequenceService.selectStaticOrDefault)
           b <- ResultT.liftF(atomBuilder(sequenceType, s, namespace, estimator.igrins2Step))
           r <- replaceSequence(
                  Instrument.Igrins2,
@@ -624,43 +699,51 @@ object SequenceService:
 
       private def materializeExecutionConfig[S, D](
         observationId: Observation.Id,
-        stream:        StreamingExecutionConfig[F, S, D]
+        stream:        StreamingExecutionConfig[F, S, D],
+        insertStatic:  (Observation.Id, Option[Visit.Id], S) => F[Option[Long]]
       )(
-        insert: (Observation.Id, SequenceType, Stream[F, Atom[D]]) => F[Unit]
+        insertSequence: (Observation.Id, SequenceType, Stream[F, Atom[D]]) => F[Unit]
       )(using Services.ServiceAccess): F[Unit] =
 
-        def materialize(sequenceType: SequenceType, s: Stream[F, Atom[D]]): F[Unit] =
+        def materializeSequence(sequenceType: SequenceType, s: Stream[F, Atom[D]]): F[Unit] =
           markMaterializedOrDoNothing(observationId, sequenceType).ifM(
-            insert(observationId, sequenceType, s),
+            insertSequence(observationId, sequenceType, s),
             Applicative[F].unit
           )
 
-        materialize(SequenceType.Acquisition, stream.acquisition) *>
-        materialize(SequenceType.Science, stream.science)
+        insertStatic(observationId, none, stream.static)                  *>
+        materializeSequence(SequenceType.Acquisition, stream.acquisition) *>
+        materializeSequence(SequenceType.Science,     stream.science)
 
       override def materializeFlamingos2ExecutionConfig(
         observationId: Observation.Id,
         stream:        StreamingExecutionConfig[F, Flamingos2StaticConfig, Flamingos2DynamicConfig]
       )(using Transaction[F], Services.ServiceAccess): F[Unit] =
-        materializeExecutionConfig(observationId, stream)(insertFlamingos2Sequence)
+        materializeExecutionConfig(observationId, stream, flamingos2SequenceService.insertStatic)(insertFlamingos2Sequence)
+
+      override def materializeGhostExecutionConfig(
+        observationId: Observation.Id,
+        stream:        StreamingExecutionConfig[F, GhostStaticConfig, GhostDynamicConfig]
+      )(using Transaction[F], Services.ServiceAccess): F[Unit] =
+        materializeExecutionConfig(observationId, stream, ghostSequenceService.insertStatic)(insertGhostSequence)
 
       override def materializeGmosNorthExecutionConfig(
         observationId: Observation.Id,
         stream:        StreamingExecutionConfig[F, GmosNorthStatic, GmosNorth]
       )(using Transaction[F], Services.ServiceAccess): F[Unit] =
-        materializeExecutionConfig(observationId, stream)(insertGmosNorthSequence)
+        materializeExecutionConfig(observationId, stream, gmosSequenceService.insertGmosNorthStatic)(insertGmosNorthSequence)
 
       override def materializeGmosSouthExecutionConfig(
         observationId: Observation.Id,
         stream:        StreamingExecutionConfig[F, GmosSouthStatic, GmosSouth]
       )(using Transaction[F], Services.ServiceAccess): F[Unit] =
-        materializeExecutionConfig(observationId, stream)(insertGmosSouthSequence)
+        materializeExecutionConfig(observationId, stream, gmosSequenceService.insertGmosSouthStatic)(insertGmosSouthSequence)
 
       override def materializeIgrins2ExecutionConfig(
         observationId: Observation.Id,
         stream:        StreamingExecutionConfig[F, Igrins2StaticConfig, Igrins2DynamicConfig]
       )(using Transaction[F], Services.ServiceAccess): F[Unit] =
-        materializeExecutionConfig(observationId, stream)(insertIgrins2Sequence)
+        materializeExecutionConfig(observationId, stream, igrins2SequenceService.insertStatic)(insertIgrins2Sequence)
 
       private def selectSequence[S, D](
         instrument:    Instrument,
@@ -690,6 +773,20 @@ object SequenceService:
           Statements.SelectFlamingos2Sequence,
           staticConfig,
           estimator.flamingos2Step
+        )
+
+      override def selectGhostSequence(
+        observationId: Observation.Id,
+        sequenceType:  SequenceType,
+        staticConfig:  GhostStaticConfig
+      )(using Transaction[F]): F[Option[Stream[F, Atom[GhostDynamicConfig]]]] =
+        selectSequence(
+          Instrument.Ghost,
+          observationId,
+          sequenceType,
+          Statements.SelectGhostSequence,
+          staticConfig,
+          estimator.ghostStep
         )
 
       override def selectGmosNorthSequence(
@@ -989,6 +1086,13 @@ object SequenceService:
         "t_flamingos_2_dynamic",
         Flamingos2SequenceService.Statements.Flamingos2DynamicColumns,
         flamingos_2_dynamic
+      )
+
+    val SelectGhostSequence: Query[(Instrument, Observation.Id, SequenceType), (Atom.Id, Option[String], Step.Id, ProtoStep[GhostDynamicConfig])] =
+      selectSequence(
+        "t_ghost_dynamic",
+        GhostSequenceService.Statements.DynamicColumns,
+        ghost_dynamic
       )
 
     val SelectGmosNorthSequence: Query[(Instrument, Observation.Id, SequenceType), (Atom.Id, Option[String], Step.Id, ProtoStep[GmosNorth])] =
