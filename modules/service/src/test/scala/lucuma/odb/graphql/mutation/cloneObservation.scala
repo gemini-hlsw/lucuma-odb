@@ -602,58 +602,42 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
       }
     """
 
-  test("clone GMOS North imaging observation preserves filters and configuration".ignore):
+  test("clone GMOS North imaging observation preserves filters and configuration"):
     createProgramAs(pi).flatMap: pid =>
       createTargetAs(pi, pid).flatMap: tid =>
         createGmosNorthImagingObservationAs(pi, pid, tid).flatMap: oid =>
-          expect(
-            user = pi,
-            query = s"""
-              mutation {
-                cloneObservation(input: {
-                  observationId: "$oid"
-                }) {
-                  originalObservation {
-                    observingMode {
-                      gmosNorthImaging {
-                        ${filtersQuery("filters")}
-                        variant {
-                          interleaved {
-                            skyCount
-                          }
-                        }
-                        ${filtersQuery("initialFilters")}
-                        bin
-                        ampReadMode
-                        ampGain
-                        roi
+          cloneObservationAs(pi, oid).flatMap: oid2 =>
+            val graph =
+              s"""
+              {
+                observingMode {
+                  gmosNorthImaging {
+                    ${filtersQuery("filters")}
+                    variant {
+                      interleaved {
+                        skyCount
                       }
                     }
-                  }
-                  newObservation {
-                    observingMode {
-                      gmosNorthImaging {
-                        ${filtersQuery("filters")}
-                        variant {
-                          interleaved {
-                            skyCount
-                          }
-                        }
-                        ${filtersQuery("initialFilters")}
-                        bin
-                        ampReadMode
-                        ampGain
-                        roi
-                      }
-                    }
+                    ${filtersQuery("initialFilters")}
+                    bin
+                    ampReadMode
+                    ampGain
+                    roi
                   }
                 }
               }
-            """,
-            expected = Right(
-              json"""
-                {
-                  "cloneObservation": {
+              """              
+            expect(
+              user = pi,
+              query = s"""
+                query {
+                  originalObservation: observation(observationId: "$oid") $graph
+                  newObservation: observation(observationId: "$oid2") $graph
+                }
+              """,
+              expected = Right(
+                json"""
+                  {
                     "originalObservation": {
                       "observingMode": {
                         "gmosNorthImaging": {
@@ -701,12 +685,11 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
                       }
                     }
                   }
-                }
-              """
+                """
+              )
             )
-          )
 
-  test("clone GMOS North imaging observation makes independent filters".ignore):
+  test("clone GMOS North imaging observation makes independent filters"):
     createProgramAs(pi).flatMap: pid =>
       createTargetAs(pi, pid).flatMap: tid =>
         createGmosNorthImagingObservationAs(pi, pid, tid).flatMap: oid =>
@@ -805,14 +788,6 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
                 cloneObservation(input: {
                   observationId: "$oid"
                 }) {
-                  originalObservation {
-                    observingMode {
-                      gmosNorthImaging {
-                        ${filtersQuery("filters")}
-                        ${filtersQuery("initialFilters")}
-                      }
-                    }
-                  }
                   newObservation {
                     observingMode {
                       gmosNorthImaging {
@@ -827,22 +802,6 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
             expected = json"""
               {
                 "cloneObservation": {
-                  "originalObservation": {
-                    "observingMode": {
-                      "gmosNorthImaging": {
-                        "filters": [
-                          ${filterJson(GmosNorthFilter.GPrime, 101, 501)},
-                          ${filterJson(GmosNorthFilter.RPrime, 102, 502)},
-                          ${filterJson(GmosNorthFilter.IPrime, 103, 503)},
-                          ${filterJson(GmosNorthFilter.ZPrime, 104, 504)}
-                        ],
-                        "initialFilters": [
-                          ${filterJson(GmosNorthFilter.GPrime, 100, 1210)},
-                          ${filterJson(GmosNorthFilter.RPrime, 100, 1210)}
-                        ]
-                      }
-                    }
-                  },
                   "newObservation": {
                     "observingMode": {
                       "gmosNorthImaging": {
@@ -986,46 +945,36 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
             """.asRight
           )
 
-  test("clone GMOS South imaging observation preserves filters and configuration".ignore) {
+  test("clone GMOS South imaging observation preserves filters and configuration") {
     createProgramAs(pi).flatMap { pid =>
       createTargetAs(pi, pid).flatMap { tid =>
         createGmosSouthImagingObservationAs(pi, pid, tid).flatMap { oid =>
-          expect(
-            user = pi,
-            query = s"""
-              mutation {
-                cloneObservation(input: {
-                  observationId: "$oid"
-                }) {
-                  originalObservation {
-                    observingMode {
-                      gmosSouthImaging {
-                        filters { filter }
-                        bin
-                        ampReadMode
-                        ampGain
-                        roi
-                      }
-                    }
-                  }
-                  newObservation {
-                    observingMode {
-                      gmosSouthImaging {
-                        filters { filter }
-                        bin
-                        ampReadMode
-                        ampGain
-                        roi
-                      }
-                    }
+          cloneObservationAs(pi, oid).flatMap { oid2 =>
+            val graph =
+              """
+              {
+                observingMode {
+                  gmosSouthImaging {
+                    filters { filter }
+                    bin
+                    ampReadMode
+                    ampGain
+                    roi
                   }
                 }
               }
-            """,
-            expected = Right(
-              json"""
-                {
-                  "cloneObservation": {
+              """
+            expect(
+              user = pi,
+              query = s"""
+                query {                  
+                  originalObservation: observation(observationId: "$oid") $graph
+                  newObservation: observation(observationId: "$oid2") $graph
+                }
+              """,
+              expected = Right(
+                json"""
+                  {
                     "originalObservation": {
                       "observingMode": {
                         "gmosSouthImaging": {
@@ -1055,16 +1004,16 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
                       }
                     }
                   }
-                }
-              """
+                """
+              )
             )
-          )
+          }
         }
       }
     }
   }
 
-  test("clone GMOS imaging observation preserves offset generator".ignore):
+  test("clone GMOS imaging observation preserves offset generator"):
     val inputsAndResults = List(
       s"""
         {
@@ -1352,7 +1301,7 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
               )
 
 
-  test("clone Flamingos2 long slit observation preserves spatial offsets".ignore):
+  test("clone Flamingos2 long slit observation preserves spatial offsets"):
     for {
       pid <- createProgramAs(pi)
       tid <- createTargetAs(pi, pid)
@@ -1389,85 +1338,67 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
                             }
                           }
                         """)
+      oid2 <- cloneObservationAs(pi, oid)
+      graph =
+        """
+        {
+          observingMode {
+            flamingos2LongSlit {
+              offsets {
+                p {
+                  arcseconds
+                }
+                q {
+                  arcseconds
+                }
+              }
+              telluricType {
+                tag
+                starTypes
+              }
+            }
+          }
+        }
+        """
       _   <- expect(
               user = pi,
               query = s"""
-                mutation {
-                  cloneObservation(input: {
-                    observationId: "$oid"
-                  }) {
-                    originalObservation {
-                      observingMode {
-                        flamingos2LongSlit {
-                          offsets {
-                            p {
-                              arcseconds
-                            }
-                            q {
-                              arcseconds
-                            }
-                          }
-                          telluricType {
-                            tag
-                            starTypes
-                          }
-                        }
-                      }
-                    }
-                    newObservation {
-                      observingMode {
-                        flamingos2LongSlit {
-                          offsets {
-                            p {
-                              arcseconds
-                            }
-                            q {
-                              arcseconds
-                            }
-                          }
-                          telluricType {
-                            tag
-                            starTypes
-                          }
-                        }
-                      }
-                    }
-                  }
+                query {
+                  originalObservation: observation(observationId: "$oid") $graph
+                  newObservation: observation(observationId: "$oid2") $graph
                 }
               """,
               expected = Right(
                 json"""
                   {
-                    "cloneObservation": {
-                      "originalObservation": {
-                        "observingMode": {
-                          "flamingos2LongSlit": {
-                            "offsets": [
-                              { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 1.500000 } },
-                              { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 0.500000 } },
-                              { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 2.250000 } },
-                              { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -1.000000 } }
-                            ],
-                            "telluricType": {
-                              "tag": "MANUAL",
-                              "starTypes": ["A1", "A2"]
-                            }
+                    "originalObservation": {
+                      "observingMode": {
+                        "flamingos2LongSlit": {
+                          "offsets": [
+                            { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 1.500000 } },
+                            { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 0.500000 } },
+                            { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 2.250000 } },
+                            { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -1.000000 } }
+                          ],
+                          "telluricType": {
+                            "tag": "MANUAL",
+                            "starTypes": ["A1", "A2"]
                           }
                         }
-                      },
-                      "newObservation": {
-                        "observingMode": {
-                          "flamingos2LongSlit": {
-                            "offsets": [
-                              { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 1.500000 } },
-                              { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 0.500000 } },
-                              { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 2.250000 } },
-                              { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -1.000000 } }
-                            ],
-                            "telluricType": {
-                              "tag": "MANUAL",
-                              "starTypes": ["A1", "A2"]
-                            }
+                      }
+                    },
+                    "newObservation": {
+                      "observingMode": {
+                        "flamingos2LongSlit": {
+                          "offsets": [
+                            { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 1.500000 } },
+                            { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 0.500000 } },
+                            { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 2.250000 } },
+                            { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -1.000000 } }
+                          ],
+                          "telluricType": {
+                            "tag": "MANUAL",
+                            "starTypes": ["A1", "A2"]
                           }
                         }
                       }
@@ -1478,7 +1409,7 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
             )
       } yield ()
 
-  test("clone IGRINS-2 long slit observation preserves spatial offsets".ignore):
+  test("clone IGRINS-2 long slit observation preserves spatial offsets"):
     for {
       pid <- createProgramAs(pi)
       tid <- createTargetAs(pi, pid)
@@ -1488,62 +1419,52 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
                 { p: { arcseconds: 0.0 }, q: { arcseconds:  1.5 } },
                 { p: { arcseconds: 0.0 }, q: { arcseconds: -1.5 } }
               ]"""), tid)
+      oid2 <- cloneObservationAs(pi, oid)
+      graph =
+        """
+        {
+          observingMode {
+            igrins2LongSlit {
+              offsets {
+                p { arcseconds }
+                q { arcseconds }
+              }
+            }
+          }
+        }
+        """
       _   <- expect(
               user = pi,
               query = s"""
-                mutation {
-                  cloneObservation(input: {
-                    observationId: "$oid"
-                  }) {
-                    originalObservation {
-                      observingMode {
-                        igrins2LongSlit {
-                          offsets {
-                            p { arcseconds }
-                            q { arcseconds }
-                          }
-                        }
-                      }
-                    }
-                    newObservation {
-                      observingMode {
-                        igrins2LongSlit {
-                          offsets {
-                            p { arcseconds }
-                            q { arcseconds }
-                          }
-                        }
-                      }
-                    }
-                  }
+                query {
+                  originalObservation: observation(observationId: "$oid") $graph
+                  newObservation: observation(observationId: "$oid2") $graph
                 }
               """,
               expected = Right(
                 json"""
                   {
-                    "cloneObservation": {
-                      "originalObservation": {
-                        "observingMode": {
-                          "igrins2LongSlit": {
-                            "offsets": [
-                              { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -1.500000 } },
-                              { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  1.500000 } },
-                              { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  1.500000 } },
-                              { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -1.500000 } }
-                            ]
-                          }
+                    "originalObservation": {
+                      "observingMode": {
+                        "igrins2LongSlit": {
+                          "offsets": [
+                            { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -1.500000 } },
+                            { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  1.500000 } },
+                            { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  1.500000 } },
+                            { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -1.500000 } }
+                          ]
                         }
-                      },
-                      "newObservation": {
-                        "observingMode": {
-                          "igrins2LongSlit": {
-                            "offsets": [
-                              { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -1.500000 } },
-                              { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  1.500000 } },
-                              { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  1.500000 } },
-                              { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -1.500000 } }
-                            ]
-                          }
+                      }
+                    },
+                    "newObservation": {
+                      "observingMode": {
+                        "igrins2LongSlit": {
+                          "offsets": [
+                            { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -1.500000 } },
+                            { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  1.500000 } },
+                            { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  1.500000 } },
+                            { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -1.500000 } }
+                          ]
                         }
                       }
                     }
@@ -1553,7 +1474,7 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
             )
     } yield ()
 
-  test("clone observation should preserve observer notes".ignore):
+  test("clone observation should preserve observer notes"):
     for {
       pid    <- createProgramAs(pi)
       idjson <- query(
@@ -1577,43 +1498,37 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
                   """
                 )
       oid   = idjson.hcursor.downFields("createObservation", "observation", "id").require[Observation.Id]
+      oid2  <- cloneObservationAs(pi, oid)
+      graph  =
+        """
+        {
+          observerNotes
+          targetEnvironment {
+            useBlindOffset
+          }
+        }
+        """
       _     <- expect(
                 user = pi,
                 query = s"""
-                  mutation {
-                    cloneObservation(input: {
-                      observationId: ${oid.asJson}
-                    }) {
-                      originalObservation {
-                        observerNotes
-                        targetEnvironment {
-                          useBlindOffset
-                        }
-                      }
-                      newObservation {
-                        observerNotes
-                        targetEnvironment {
-                          useBlindOffset
-                        }
-                      }
-                    }
+                  query {
+                    originalObservation: observation(observationId: ${oid.asJson}) $graph
+                    newObservation: observation(observationId: ${oid2.asJson}) $graph
                   }
                 """,
                 expected = Right(
                   json"""
                     {
-                      "cloneObservation": {
-                        "originalObservation": {
-                          "observerNotes": "Observation notes",
-                          "targetEnvironment": {
-                            "useBlindOffset": true
-                          }
-                        },
-                        "newObservation": {
-                          "observerNotes": "Observation notes",
-                          "targetEnvironment": {
-                            "useBlindOffset": true
-                          }
+                      "originalObservation": {
+                        "observerNotes": "Observation notes",
+                        "targetEnvironment": {
+                          "useBlindOffset": true
+                        }
+                      },
+                      "newObservation": {
+                        "observerNotes": "Observation notes",
+                        "targetEnvironment": {
+                          "useBlindOffset": true
                         }
                       }
                     }
@@ -1717,63 +1632,53 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
       """
     ).map(_.hcursor.downFields("createObservation", "observation", "id").require[Observation.Id])
 
-  test("clone IGRINS2 long slit observation preserves defaults".ignore):
+  test("clone IGRINS2 long slit observation preserves defaults"):
     for {
       pid <- createProgramAs(pi)
       tid <- createTargetAs(pi, pid)
       oid <- createIgrins2Observation(pid, tid)
+      oid2 <- cloneObservationAs(pi, oid)
+      graph =
+        """
+        {
+          observingMode {
+            igrins2LongSlit {
+              offsetMode
+              explicitOffsetMode
+              saveSVCImages
+              explicitSaveSVCImages
+            }
+          }
+        }
+        """
       _   <- expect(
               user = pi,
               query = s"""
-                mutation {
-                  cloneObservation(input: {
-                    observationId: "$oid"
-                  }) {
-                    originalObservation {
-                      observingMode {
-                        igrins2LongSlit {
-                          offsetMode
-                          explicitOffsetMode
-                          saveSVCImages
-                          explicitSaveSVCImages
-                        }
-                      }
-                    }
-                    newObservation {
-                      observingMode {
-                        igrins2LongSlit {
-                          offsetMode
-                          explicitOffsetMode
-                          saveSVCImages
-                          explicitSaveSVCImages
-                        }
-                      }
-                    }
-                  }
+                query {
+                  originalObservation: observation(observationId: "$oid") $graph
+                  newObservation: observation(observationId: "$oid2") $graph                  
                 }
               """,
               expected = Right(
                 json"""
                   {
-                    "cloneObservation": {
-                      "originalObservation": {
-                        "observingMode": {
-                          "igrins2LongSlit": {
-                            "offsetMode": "NOD_ALONG_SLIT",
-                            "explicitOffsetMode": null,
-                            "saveSVCImages": false,
-                            "explicitSaveSVCImages": null
-                          }
+                    "originalObservation": {
+                      "observingMode": {
+                        "igrins2LongSlit": {
+                          "offsetMode": "NOD_ALONG_SLIT",
+                          "explicitOffsetMode": null,
+                          "saveSVCImages": false,
+                          "explicitSaveSVCImages": null
                         }
-                      },
-                      "newObservation": {
-                        "observingMode": {
-                          "igrins2LongSlit": {
-                            "offsetMode": "NOD_ALONG_SLIT",
-                            "explicitOffsetMode": null,
-                            "saveSVCImages": false,
-                            "explicitSaveSVCImages": null
-                          }
+                      }
+                    },
+                    "newObservation": {
+                      "observingMode": {
+                        "igrins2LongSlit": {
+                          "offsetMode": "NOD_ALONG_SLIT",
+                          "explicitOffsetMode": null,
+                          "saveSVCImages": false,
+                          "explicitSaveSVCImages": null
                         }
                       }
                     }
@@ -1783,7 +1688,7 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
             )
     } yield ()
 
-  test("clone IGRINS2 long slit observation preserves explicit overrides".ignore):
+  test("clone IGRINS2 long slit observation preserves explicit overrides"):
     for {
       pid <- createProgramAs(pi)
       tid <- createTargetAs(pi, pid)
@@ -1809,58 +1714,48 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
                     }
                   }
                 """)
+      oid2 <- cloneObservationAs(pi, oid)
+      graph =
+        """
+        {
+          observingMode {
+            igrins2LongSlit {
+              offsetMode
+              explicitOffsetMode
+              saveSVCImages
+              explicitSaveSVCImages
+            }
+          }
+        }
+        """
       _   <- expect(
               user = pi,
               query = s"""
-                mutation {
-                  cloneObservation(input: {
-                    observationId: "$oid"
-                  }) {
-                    originalObservation {
-                      observingMode {
-                        igrins2LongSlit {
-                          offsetMode
-                          explicitOffsetMode
-                          saveSVCImages
-                          explicitSaveSVCImages
-                        }
-                      }
-                    }
-                    newObservation {
-                      observingMode {
-                        igrins2LongSlit {
-                          offsetMode
-                          explicitOffsetMode
-                          saveSVCImages
-                          explicitSaveSVCImages
-                        }
-                      }
-                    }
-                  }
+                query {
+                  originalObservation: observation(observationId: "$oid") $graph
+                  newObservation: observation(observationId: "$oid2") $graph
                 }
               """,
               expected = Right(
                 json"""
                   {
-                    "cloneObservation": {
-                      "originalObservation": {
-                        "observingMode": {
-                          "igrins2LongSlit": {
-                            "offsetMode": "NOD_TO_SKY",
-                            "explicitOffsetMode": "NOD_TO_SKY",
-                            "saveSVCImages": true,
-                            "explicitSaveSVCImages": true
-                          }
+                    "originalObservation": {
+                      "observingMode": {
+                        "igrins2LongSlit": {
+                          "offsetMode": "NOD_TO_SKY",
+                          "explicitOffsetMode": "NOD_TO_SKY",
+                          "saveSVCImages": true,
+                          "explicitSaveSVCImages": true
                         }
-                      },
-                      "newObservation": {
-                        "observingMode": {
-                          "igrins2LongSlit": {
-                            "offsetMode": "NOD_TO_SKY",
-                            "explicitOffsetMode": "NOD_TO_SKY",
-                            "saveSVCImages": true,
-                            "explicitSaveSVCImages": true
-                          }
+                      }
+                    },
+                    "newObservation": {
+                      "observingMode": {
+                        "igrins2LongSlit": {
+                          "offsetMode": "NOD_TO_SKY",
+                          "explicitOffsetMode": "NOD_TO_SKY",
+                          "saveSVCImages": true,
+                          "explicitSaveSVCImages": true
                         }
                       }
                     }
