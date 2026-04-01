@@ -32,6 +32,10 @@ trait Igrins2SequenceService[F[_]]:
     visitId: Visit.Id
   )(using Transaction[F]): F[Option[Igrins2StaticConfig]]
 
+  def selectStatic(
+    observationId: Observation.Id
+  )(using Transaction[F]): F[Option[Igrins2StaticConfig]]
+
 object Igrins2SequenceService:
 
   def instantiate[F[_]](using Services[F]): Igrins2SequenceService[F] =
@@ -48,6 +52,11 @@ object Igrins2SequenceService:
         visitId: Visit.Id
       )(using Transaction[F]): F[Option[Igrins2StaticConfig]] =
         session.option(Statements.SelectStaticByVisit)(visitId)
+
+      override def selectStatic(
+        observationId: Observation.Id
+      )(using Transaction[F]): F[Option[Igrins2StaticConfig]] =
+        session.option(Statements.SelectStaticByObservation)(observationId)
 
   object Statements:
 
@@ -85,4 +94,13 @@ object Igrins2SequenceService:
           c_offset_mode
         FROM t_igrins_2_static
         WHERE c_visit_id = $visit_id
+      """.query(igrins_2_static)
+
+    val SelectStaticByObservation: Query[Observation.Id, Igrins2StaticConfig] =
+      sql"""
+        SELECT
+          COALESCE(c_save_svc_images, false),
+          COALESCE(c_offset_mode, 'nod_along_slit')
+        FROM t_igrins_2_long_slit
+        WHERE c_observation_id = $observation_id
       """.query(igrins_2_static)

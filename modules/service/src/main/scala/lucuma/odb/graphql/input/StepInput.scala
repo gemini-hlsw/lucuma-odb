@@ -9,6 +9,7 @@ import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosSouth
+import lucuma.core.model.sequence.igrins2.Igrins2DynamicConfig
 import lucuma.odb.graphql.binding.*
 import lucuma.odb.sequence.data.ProtoStep
 
@@ -42,3 +43,6 @@ object StepInput:
 
   val GmosSouthBinding: Matcher[ProtoStep[GmosSouth]] =
     binding(GmosSouthDynamicInput.Binding)
+
+  val Igrins2Binding: Matcher[ProtoStep[Igrins2DynamicConfig]] =
+    binding(Igrins2DynamicInput.Binding)
