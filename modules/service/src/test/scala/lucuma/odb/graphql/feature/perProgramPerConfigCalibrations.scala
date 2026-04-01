@@ -664,9 +664,6 @@ class perProgramPerConfigCalibrations
                     cloneObservation(input: {
                       observationId: "$cid"
                     }) {
-                      originalObservation {
-                        id
-                      }
                       newObservation {
                         id
                       }

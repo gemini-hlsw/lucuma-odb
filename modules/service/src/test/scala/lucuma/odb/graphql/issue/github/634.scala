@@ -34,13 +34,6 @@ class GitHub_634 extends OdbSuite {
                     }
                   }
                 ) {
-                  originalObservation {
-                    targetEnvironment {
-                      asterism {
-                        id
-                      }
-                    }
-                  }
                   newObservation {
                     targetEnvironment {
                       asterism {
@@ -54,18 +47,6 @@ class GitHub_634 extends OdbSuite {
             expected = Right(json"""
               {
                 "cloneObservation" : {
-                  "originalObservation" : {
-                    "targetEnvironment" : {
-                      "asterism" : [
-                        {
-                          "id" : $t1
-                        },
-                        {
-                          "id" : $t2
-                        }
-                      ]
-                    }
-                  },
                   "newObservation" : {
                     "targetEnvironment" : {
                       "asterism" : [

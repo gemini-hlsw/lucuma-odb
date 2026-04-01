@@ -324,10 +324,9 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
       services.useTransactionally:
         groupService.cloneGroup(input).nestMap: id =>
           Filter(
-            And(
-              Predicates.cloneGroupResult.originalGroup.id.eql(input.groupId),
-              Predicates.cloneGroupResult.newGroup.id.eql(id),
-            ), child)
+            Predicates.cloneGroupResult.newGroup.id.eql(id),
+            child
+          )
 
   private lazy val CloneObservation: MutationField =
     MutationField("cloneObservation", CloneObservationInput.Binding): (input, child) =>
@@ -338,10 +337,10 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
               OdbError.NotAuthorized(user.id).asFailureF
             else
               observationService.cloneObservation(checked).nestMap: ids =>
-                Filter(And(
-                  Predicates.cloneObservationResult.originalObservation.id.eql(ids.originalId),
-                  Predicates.cloneObservationResult.newObservation.id.eql(ids.cloneId)
-                ), child)
+                Filter(
+                  Predicates.cloneObservationResult.newObservation.id.eql(ids.cloneId),
+                  child
+                )
 
   private lazy val ResetAcquisition: MutationField =
     MutationField("resetAcquisition", ResetAcquisitionInput.Binding): (input, child) =>
@@ -366,11 +365,11 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
         .flatMap: res =>
           res.flatTraverse: checked =>
             services.useTransactionally:
-              targetService.cloneTarget(checked).nestMap: (oldTargetId, newTargetId) =>
-                Filter(And(
-                  Predicates.cloneTargetResult.originalTarget.id.eql(oldTargetId),
-                  Predicates.cloneTargetResult.newTarget.id.eql(newTargetId)
-                ), child)
+              targetService.cloneTarget(checked).nestMap: (_, newTargetId) =>
+                Filter(
+                  Predicates.cloneTargetResult.newTarget.id.eql(newTargetId),
+                  child
+                )
 
   private lazy val CreateCallForProposals: MutationField =
     MutationField("createCallForProposals", CreateCallForProposalsInput.Binding): (input, child) =>

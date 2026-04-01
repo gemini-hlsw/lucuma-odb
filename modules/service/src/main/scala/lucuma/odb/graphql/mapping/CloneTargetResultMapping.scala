@@ -3,16 +3,14 @@
 
 package lucuma.odb.graphql.mapping
 
-import lucuma.odb.graphql.table.TargetPairsView
 import lucuma.odb.graphql.table.TargetView
 
-trait CloneTargetResultMapping[F[_]] extends ResultMapping[F] with TargetView[F] with TargetPairsView[F] {
+trait CloneTargetResultMapping[F[_]] extends ResultMapping[F] with TargetView[F] {
 
   lazy val CloneTargetResultMapping: ObjectMapping =
     ObjectMapping(CloneTargetResultType)(
-      SqlField("synthetic-id", TargetPairsView.Left, key = true, hidden = true),
-      SqlObject("originalTarget", Join(TargetPairsView.Left, TargetView.TargetId)),
-      SqlObject("newTarget", Join(TargetPairsView.Right, TargetView.TargetId)),
+      SqlField("synthetic-id", TargetView.TargetId, key = true, hidden = true),
+      SqlObject("newTarget"),
     )
 
 }

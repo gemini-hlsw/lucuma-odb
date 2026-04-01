@@ -3,17 +3,15 @@
 
 package lucuma.odb.graphql.mapping
 
-import lucuma.odb.graphql.table.ObservationPairsView
 import lucuma.odb.graphql.table.ObservationView
 
-trait CloneObservationResultMapping[F[_]] extends ResultMapping[F] with ObservationView[F] with ObservationPairsView[F] {
+trait CloneObservationResultMapping[F[_]] extends ResultMapping[F] with ObservationView[F] {
 
   lazy val CloneObservationResultMapping: ObjectMapping =
     ObjectMapping(CloneObservationResultType)(
-      SqlField("synthetic-id-1", ObservationPairsView.Left, key = true, hidden = true),
-      SqlField("synthetic-id-2", ObservationPairsView.Right, key = true, hidden = true),
-      SqlObject("originalObservation", Join(ObservationPairsView.Left, ObservationView.Id)),
-      SqlObject("newObservation", Join(ObservationPairsView.Right, ObservationView.Id)),
+      SqlField("synthetic-id", ObservationView.Id, key = true, hidden = true),
+      SqlObject("newObservation")
     )
 
 }
+

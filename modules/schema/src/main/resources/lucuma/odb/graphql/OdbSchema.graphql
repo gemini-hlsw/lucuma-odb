@@ -752,14 +752,9 @@ input CloneObservationInput {
 }
 
 """
-The result of cloning an observation, containing the original and new observations.
+The result of cloning an observation, containing the new observation.
 """
 type CloneObservationResult {
-  """
-  The original unmodified observation which was cloned.
-  """
-  originalObservation: Observation!
-
   """
   The new cloned (but possibly modified) observation.
   """
@@ -779,11 +774,6 @@ input CloneTargetInput {
 The result of cloning a target, containing the original and new targets.
 """
 type CloneTargetResult {
-  """
-  The original unmodified target which was cloned
-  """
-  originalTarget: Target!
-
   """
   The new cloned (but possibly modified) target
   """
@@ -2814,7 +2804,6 @@ input CloneGroupInput {
 }
 
 type CloneGroupResult {
-  originalGroup: Group!
   newGroup: Group!
 }
 
