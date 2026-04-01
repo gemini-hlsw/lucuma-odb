@@ -167,7 +167,7 @@ object VisitService:
         idempotencyKey: Option[IdempotencyKey],
         instrument:     Instrument,
         lookupStatic:   Visit.Id => Transaction[F] ?=> F[Option[A]],
-        insertStatic:   (Observation.Id, Option[Visit.Id], A) => (Transaction[F], Services.ServiceAccess) ?=> F[Long]
+        insertStatic:   (Observation.Id, Option[Visit.Id], A) => (Transaction[F], Services.ServiceAccess) ?=> F[Option[Long]]
       )(using Transaction[F], Services.ServiceAccess): F[Either[OdbError, Visit.Id]] =
 
         val insertNewVisit: EitherT[F, OdbError, Visit.Id] =
@@ -177,7 +177,10 @@ object VisitService:
           yield v.visitId
 
         def insertStaticForVisit(v: Visit.Id): EitherT[F, OdbError, Unit] =
-          EitherT.liftF(insertStatic(observationId, v.some, static).void)
+          EitherT.fromOptionF(
+            insertStatic(observationId, v.some, static).map(_.void),
+            OdbError.InvalidVisit(v, s"Visit $v already has a static configuration".some)
+          )
 
         val update = for
           v0 <- lookupOrInsertImpl(observationId, idempotencyKey)
@@ -203,7 +206,7 @@ object VisitService:
         idempotencyKey: Option[IdempotencyKey],
         instrument:     Instrument,
         lookupStatic:   Visit.Id => Transaction[F] ?=> F[Option[A]],
-        insertStatic:   (Observation.Id, Option[Visit.Id], A) => (Transaction[F], Services.ServiceAccess) ?=> F[Long]
+        insertStatic:   (Observation.Id, Option[Visit.Id], A) => (Transaction[F], Services.ServiceAccess) ?=> F[Option[Long]]
       )(using NoTransaction[F], Services.ServiceAccess): F[Result[Visit.Id]] =
         generator
           .materializeAndThen(observationId):

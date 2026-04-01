@@ -518,7 +518,7 @@ object SequenceService:
       )(using Transaction[F]): F[Result[Stream[Pure, Atom[Flamingos2DynamicConfig]]]] =
 
         (for
-          s <- selectStatic(observationId, "Flamingos 2", flamingos2SequenceService.selectStatic)
+          s <- selectStatic(observationId, "Flamingos 2", flamingos2SequenceService.selectStaticOrDefault)
           b <- ResultT.liftF(atomBuilder(sequenceType, s, namespace, estimator.flamingos2Step))
           r <- replaceSequence(
                  Instrument.Flamingos2,
@@ -548,7 +548,7 @@ object SequenceService:
         namespace:      Option[UUID] = None
       )(using Transaction[F]): F[Result[Stream[Pure, Atom[GhostDynamicConfig]]]] =
         (for
-          s <- selectStatic(observationId, "GHOST", ghostSequenceService.selectStatic)
+          s <- selectStatic(observationId, "GHOST", ghostSequenceService.selectStaticOrDefault)
           b <- ResultT.liftF(atomBuilder(sequenceType, s, namespace, estimator.ghostStep))
           r <- replaceSequence(
                  Instrument.Ghost,
@@ -578,7 +578,7 @@ object SequenceService:
         namespace:     Option[UUID] = None
       )(using Transaction[F]): F[Result[Stream[Pure, Atom[GmosNorth]]]] =
         (for
-          s <- selectStatic(observationId, "GMOS North", gmosSequenceService.selectGmosNorthStatic)
+          s <- selectStatic(observationId, "GMOS North", gmosSequenceService.selectGmosNorthStaticOrDefault)
           b <- ResultT.liftF(atomBuilder(sequenceType, s, namespace, estimator.gmosNorthStep))
           r <- replaceSequence(
                  Instrument.GmosNorth,
@@ -608,7 +608,7 @@ object SequenceService:
         namespace:     Option[UUID] = None
       )(using Transaction[F]): F[Result[Stream[Pure, Atom[GmosSouth]]]] =
         (for
-          s <- selectStatic(observationId, "GMOS South", gmosSequenceService.selectGmosSouthStatic)
+          s <- selectStatic(observationId, "GMOS South", gmosSequenceService.selectGmosSouthStaticOrDefault)
           b <- ResultT.liftF(atomBuilder(sequenceType, s, namespace, estimator.gmosSouthStep))
           r <- replaceSequence(
                  Instrument.GmosSouth,
@@ -639,7 +639,7 @@ object SequenceService:
         namespace:     Option[UUID] = None
       )(using Transaction[F]): F[Result[Stream[Pure, Atom[Igrins2DynamicConfig]]]] =
         (for
-          s <- selectStatic(observationId, "IGRINS-2", igrins2SequenceService.selectStatic)
+          s <- selectStatic(observationId, "IGRINS-2", igrins2SequenceService.selectStaticOrDefault)
           b <- ResultT.liftF(atomBuilder(sequenceType, s, namespace, estimator.igrins2Step))
           r <- replaceSequence(
                  Instrument.Igrins2,
@@ -700,20 +700,20 @@ object SequenceService:
       private def materializeExecutionConfig[S, D](
         observationId: Observation.Id,
         stream:        StreamingExecutionConfig[F, S, D],
-        static:        (Observation.Id, Option[Visit.Id], S) => F[Long]
+        insertStatic:  (Observation.Id, Option[Visit.Id], S) => F[Option[Long]]
       )(
-        insert: (Observation.Id, SequenceType, Stream[F, Atom[D]]) => F[Unit]
+        insertSequence: (Observation.Id, SequenceType, Stream[F, Atom[D]]) => F[Unit]
       )(using Services.ServiceAccess): F[Unit] =
 
-        def materialize(sequenceType: SequenceType, s: Stream[F, Atom[D]]): F[Unit] =
+        def materializeSequence(sequenceType: SequenceType, s: Stream[F, Atom[D]]): F[Unit] =
           markMaterializedOrDoNothing(observationId, sequenceType).ifM(
-            insert(observationId, sequenceType, s),
+            insertSequence(observationId, sequenceType, s),
             Applicative[F].unit
           )
 
-        static(observationId, None, stream.static)                *>
-        materialize(SequenceType.Acquisition, stream.acquisition) *>
-        materialize(SequenceType.Science,     stream.science)
+        insertStatic(observationId, none, stream.static)                  *>
+        materializeSequence(SequenceType.Acquisition, stream.acquisition) *>
+        materializeSequence(SequenceType.Science,     stream.science)
 
       override def materializeFlamingos2ExecutionConfig(
         observationId: Observation.Id,

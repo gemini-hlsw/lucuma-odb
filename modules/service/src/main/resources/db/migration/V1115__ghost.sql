@@ -40,39 +40,3 @@ CREATE TABLE t_ghost_static (
 
   c_resolution_mode d_tag NOT NULL REFERENCES t_ghost_resolution_mode(c_tag)
 );
-
-CREATE OR REPLACE FUNCTION enforce_write_once_static_config()
-RETURNS trigger AS $$
-BEGIN
-  IF NEW IS DISTINCT FROM OLD THEN
-    RAISE EXCEPTION 'write-once violation for old=%, new=%', OLD, NEW;
-  END IF;
-
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE CONSTRAINT TRIGGER write_once_flamingos_2_static_config
-AFTER UPDATE ON t_flamingos_2_static
-FOR EACH ROW
-EXECUTE FUNCTION enforce_write_once_static_config();
-
-CREATE CONSTRAINT TRIGGER write_once_ghost_static_config
-AFTER UPDATE ON t_ghost_static
-FOR EACH ROW
-EXECUTE FUNCTION enforce_write_once_static_config();
-
-CREATE CONSTRAINT TRIGGER write_once_gmos_north_static_config
-AFTER UPDATE ON t_gmos_north_static
-FOR EACH ROW
-EXECUTE FUNCTION enforce_write_once_static_config();
-
-CREATE CONSTRAINT TRIGGER write_once_gmos_south_static_config
-AFTER UPDATE ON t_gmos_south_static
-FOR EACH ROW
-EXECUTE FUNCTION enforce_write_once_static_config();
-
-CREATE CONSTRAINT TRIGGER write_once_igrins_2_static_config
-AFTER UPDATE ON t_igrins_2_static
-FOR EACH ROW
-EXECUTE FUNCTION enforce_write_once_static_config();

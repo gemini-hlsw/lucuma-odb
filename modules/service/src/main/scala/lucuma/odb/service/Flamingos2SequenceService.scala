@@ -35,7 +35,7 @@ trait Flamingos2SequenceService[F[_]]:
     observationId: Observation.Id,
     visitId:       Option[Visit.Id],
     static:        Flamingos2StaticConfig
-  )(using Transaction[F], Services.ServiceAccess): F[Long]
+  )(using Transaction[F], Services.ServiceAccess): F[Option[Long]]
 
   def selectDynamicForStep(
     stepId: Step.Id
@@ -46,6 +46,10 @@ trait Flamingos2SequenceService[F[_]]:
   )(using Transaction[F]): F[Option[Flamingos2StaticConfig]]
 
   def selectStatic(
+    observationId: Observation.Id
+  )(using Transaction[F]): F[Option[Flamingos2StaticConfig]]
+
+  def selectStaticOrDefault(
     observationId: Observation.Id
   )(using Transaction[F]): F[Option[Flamingos2StaticConfig]]
 
@@ -66,12 +70,27 @@ object Flamingos2SequenceService:
       )(using Transaction[F]): F[Option[Flamingos2StaticConfig]] =
         session.option(Statements.SelectStaticByVisit)(visitId)
 
-      override def selectStatic(
+      private def defaultStatic(
         observationId: Observation.Id
-      )(using Transaction[F]): F[Option[Flamingos2StaticConfig]] =
+      ): F[Option[Flamingos2StaticConfig]] =
+        // We'll need something like the GmosSequenceService version when
+        // F2 imaging is supported.
         session
           .option(Statements.SelectIsLongSlit)(observationId)
           .map(_.as(lucuma.odb.sequence.flamingos2.longslit.LongSlit.Static))
+
+      override def selectStatic(
+        observationId: Observation.Id
+      )(using Transaction[F]): F[Option[Flamingos2StaticConfig]] =
+        session.option(Statements.SelectStatic)(observationId)
+
+      override def selectStaticOrDefault(
+        observationId: Observation.Id
+      )(using Transaction[F]): F[Option[Flamingos2StaticConfig]] =
+        for
+          s0 <- selectStatic(observationId)
+          s1 <- s0.fold(defaultStatic(observationId))(_.some.pure[F])
+        yield s1
 
       override def selectDynamicForStep(
         stepId: Step.Id
@@ -82,8 +101,8 @@ object Flamingos2SequenceService:
         observationId: Observation.Id,
         visitId:       Option[Visit.Id],
         static:        Flamingos2StaticConfig
-      )(using Transaction[F], Services.ServiceAccess): F[Long] =
-        session.unique(Statements.InsertStatic)(
+      )(using Transaction[F], Services.ServiceAccess): F[Option[Long]] =
+        session.option(Statements.InsertStatic)(
           observationId,
           visitId,
           static
@@ -127,8 +146,7 @@ object Flamingos2SequenceService:
           $observation_id,
           ${visit_id.opt},
           $flamingos_2_static
-        ON CONFLICT (c_observation_id, c_visit_id) DO UPDATE
-          SET c_mos_pre_imaging = EXCLUDED.c_mos_pre_imaging
+        ON CONFLICT DO NOTHING
         RETURNING c_static_id
       """.query(int8)
 
@@ -139,6 +157,16 @@ object Flamingos2SequenceService:
           c_use_eoffsetting
         FROM t_flamingos_2_static
         WHERE c_visit_id = $visit_id
+      """.query(flamingos_2_static)
+
+    val SelectStatic: Query[Observation.Id, Flamingos2StaticConfig] =
+      sql"""
+        SELECT
+          c_mos_pre_imaging,
+          c_use_eoffsetting
+        FROM t_flamingos_2_static
+        WHERE c_observation_id = $observation_id
+          AND c_visit_id IS NULL
       """.query(flamingos_2_static)
 
     val SelectIsLongSlit: Query[Observation.Id, Boolean] =

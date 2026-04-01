@@ -4,8 +4,11 @@
 package lucuma.odb.service
 
 import cats.effect.Concurrent
+import cats.syntax.applicative.*
+import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import cats.syntax.option.*
+import lucuma.core.enums.GhostResolutionMode
 import lucuma.core.model.Observation
 import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Step
@@ -30,13 +33,17 @@ trait GhostSequenceService[F[_]]:
     observationId: Observation.Id,
     visitId:       Option[Visit.Id],
     static:        GhostStaticConfig
-  )(using Transaction[F], Services.ServiceAccess): F[Long]
+  )(using Transaction[F], Services.ServiceAccess): F[Option[Long]]
 
   def selectStaticForVisit(
     visitId: Visit.Id
   )(using Transaction[F]): F[Option[GhostStaticConfig]]
 
   def selectStatic(
+    observationId: Observation.Id
+  )(using Transaction[F]): F[Option[GhostStaticConfig]]
+
+  def selectStaticOrDefault(
     observationId: Observation.Id
   )(using Transaction[F]): F[Option[GhostStaticConfig]]
 
@@ -56,8 +63,8 @@ object GhostSequenceService:
         observationId: Observation.Id,
         visitId:       Option[Visit.Id],
         static:        GhostStaticConfig
-      )(using Transaction[F], Services.ServiceAccess): F[Long] =
-        session.unique(Statements.InsertStatic)(observationId, visitId, static)
+      )(using Transaction[F], Services.ServiceAccess): F[Option[Long]] =
+        session.option(Statements.InsertStatic)(observationId, visitId, static)
 
       override def selectStaticForVisit(
         visitId: Visit.Id
@@ -69,6 +76,17 @@ object GhostSequenceService:
       )(using Transaction[F]): F[Option[GhostStaticConfig]] =
         session.option(Statements.SelectStatic)(observationId)
 
+      private def defaultStatic: F[Option[GhostStaticConfig]] =
+        // Placeholder
+        GhostStaticConfig(GhostResolutionMode.Standard).some.pure[F]
+
+      override def selectStaticOrDefault(
+        observationId: Observation.Id
+      )(using Transaction[F]): F[Option[GhostStaticConfig]] =
+        for
+          s0 <- selectStatic(observationId)
+          s1 <- s0.fold(defaultStatic)(_.some.pure[F])
+        yield s1
 
   object Statements:
 
@@ -108,8 +126,7 @@ object GhostSequenceService:
           $observation_id,
           ${visit_id.opt},
           $ghost_static
-        ON CONFLICT (c_observation_id, c_visit_id) DO UPDATE
-          SET c_resolution_mode = EXCLUDED.c_resolution_mode
+        ON CONFLICT DO NOTHING
         RETURNING c_static_id
       """.query(int8)
 
