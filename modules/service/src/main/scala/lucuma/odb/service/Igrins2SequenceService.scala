@@ -13,8 +13,8 @@ import lucuma.core.model.Observation
 import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.igrins2.Igrins2DynamicConfig
-import lucuma.core.model.sequence.igrins2.Igrins2StaticConfig
 import lucuma.core.model.sequence.igrins2.Igrins2SVCImages
+import lucuma.core.model.sequence.igrins2.Igrins2StaticConfig
 import lucuma.odb.util.Codecs.observation_id
 import lucuma.odb.util.Codecs.step_id
 import lucuma.odb.util.Codecs.visit_id
