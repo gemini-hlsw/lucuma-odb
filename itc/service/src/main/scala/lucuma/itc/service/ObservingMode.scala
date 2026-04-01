@@ -151,7 +151,7 @@ object ObservingMode {
     case class Igrins2(portDisposition: PortDisposition) extends SpectroscopyMode derives Hash {
       override def analysisMethod: AnalysisMethod =
         ItcObservationDetails.AnalysisMethod.Aperture.Auto(
-          skyAperture = 5.0
+          skyAperture = 1.0
         )
 
       val instrument: Instrument =
