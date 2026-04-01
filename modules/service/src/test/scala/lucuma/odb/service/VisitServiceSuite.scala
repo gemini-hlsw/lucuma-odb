@@ -4,7 +4,6 @@
 package lucuma.odb.service
 
 import cats.syntax.all.*
-import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObservingModeType
 import lucuma.odb.graphql.query.ExecutionTestSupportForGmos
 
@@ -18,7 +17,7 @@ class VisitServiceSuite extends ExecutionTestSupportForGmos:
       before <- withServices(serviceUser): services =>
                   services.transactionally:
                     services.visitService.hasVisits(oid)
-      _      <- recordVisitAs(serviceUser, Instrument.GmosNorth, oid)
+      _      <- recordVisitAs(serviceUser, oid)
       after  <- withServices(serviceUser): services =>
                   services.transactionally:
                     services.visitService.hasVisits(oid)

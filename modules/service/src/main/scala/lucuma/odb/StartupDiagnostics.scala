@@ -117,6 +117,7 @@ object StartupDiagnostics:
                 checkPostgresEnum(user_state)
           },
           checkPostgresEnum(user_type),
+          checkPostgresEnum(visit_origin),
           checkPostgresEnum(wavelength_order),
 
           // Postgres Lookup Tables

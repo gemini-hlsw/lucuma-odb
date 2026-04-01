@@ -13,7 +13,6 @@ import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.enums.Breakpoint
-import lucuma.core.enums.Instrument
 import lucuma.core.enums.StepStage
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.Observation
@@ -113,7 +112,7 @@ class executionAcqFlamingos2_WithoutSkySubtraction extends ExecutionTestSupportF
         p  <- createProgram
         t  <- createTargetWithProfileAs(pi, p)
         o  <- createFlamingos2LongSlitObservationAs(pi, p, List(t))
-        v  <- recordVisitAs(serviceUser, Instrument.Flamingos2, o)
+        v  <- recordVisitAs(serviceUser, o)
 
         // Execute the first step.
         s  <- firstAcquisitionStepId(serviceUser, o)
@@ -134,7 +133,7 @@ class executionAcqFlamingos2_WithoutSkySubtraction extends ExecutionTestSupportF
         p  <- createProgram
         t  <- createTargetWithProfileAs(pi, p)
         o  <- createFlamingos2LongSlitObservationAs(pi, p, List(t))
-        v  <- recordVisitAs(serviceUser, Instrument.Flamingos2, o)
+        v  <- recordVisitAs(serviceUser, o)
 
         // Start the first step.
         s  <- firstAcquisitionStepId(serviceUser, o)
@@ -155,7 +154,7 @@ class executionAcqFlamingos2_WithoutSkySubtraction extends ExecutionTestSupportF
         p  <- createProgram
         t  <- createTargetWithProfileAs(pi, p)
         o  <- createFlamingos2LongSlitObservationAs(pi, p, List(t))
-        v  <- recordVisitAs(serviceUser, Instrument.Flamingos2, o)
+        v  <- recordVisitAs(serviceUser, o)
 
         // Start the first step.
         i0 <- acquisitionSequenceIds(serviceUser, o)
@@ -174,7 +173,7 @@ class executionAcqFlamingos2_WithoutSkySubtraction extends ExecutionTestSupportF
         p <- createProgram
         t <- createTargetWithProfileAs(pi, p)
         o <- createFlamingos2LongSlitObservationAs(pi, p, List(t))
-        v <- recordVisitAs(serviceUser, Instrument.Flamingos2, o)
+        v <- recordVisitAs(serviceUser,  o)
 
         // Record the first atom with 3 steps
         i <- firstAcquisitionAtomStepIds(serviceUser, o)
@@ -194,7 +193,7 @@ class executionAcqFlamingos2_WithoutSkySubtraction extends ExecutionTestSupportF
         p <- createProgram
         t <- createTargetWithProfileAs(pi, p)
         o <- createFlamingos2LongSlitObservationAs(pi, p, List(t))
-        v <- recordVisitAs(serviceUser, Instrument.Flamingos2, o)
+        v <- recordVisitAs(serviceUser, o)
 
         // Record the first atom and one of its steps
         s <- firstAcquisitionStepId(serviceUser, o)
@@ -234,7 +233,7 @@ class executionAcqFlamingos2_WithoutSkySubtraction extends ExecutionTestSupportF
         p  <- createProgram
         t  <- createTargetWithProfileAs(pi, p)
         o  <- createFlamingos2LongSlitObservationAs(pi, p, List(t))
-        v  <- recordVisitAs(serviceUser, Instrument.Flamingos2, o)
+        v  <- recordVisitAs(serviceUser, o)
 
         // Acquisition Sequence
         i  <- acquisitionStepIds(serviceUser, o)
@@ -263,7 +262,7 @@ class executionAcqFlamingos2_WithoutSkySubtraction extends ExecutionTestSupportF
         p  <- createProgram
         t  <- createTargetWithProfileAs(pi, p)
         o  <- createFlamingos2LongSlitObservationAs(pi, p, List(t))
-        v  <- recordVisitAs(serviceUser, Instrument.Flamingos2, o)
+        v  <- recordVisitAs(serviceUser, o)
 
         // Acquisition Sequence
         i  <- acquisitionStepIds(serviceUser, o)
@@ -289,7 +288,7 @@ class executionAcqFlamingos2_WithoutSkySubtraction extends ExecutionTestSupportF
         p  <- createProgram
         t  <- createTargetWithProfileAs(pi, p)
         o  <- createFlamingos2LongSlitObservationAs(pi, p, List(t))
-        v  <- recordVisitAs(serviceUser, Instrument.Flamingos2, o)
+        v  <- recordVisitAs(serviceUser, o)
 
         x0 <- nextAtomStepIds(o)
 

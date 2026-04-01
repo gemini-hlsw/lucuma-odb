@@ -129,7 +129,7 @@ class replaceIgrins2Sequence extends query.ExecutionTestSupportForIgrins2 with R
         p <- createProgram
         t <- createTargetWithProfileAs(pi, p)
         o <- createIgrins2LongSlitObservationAs(pi, p, t)
-        _ <- recordVisitAs(serviceUser, Instrument.Igrins2, o)
+        _ <- recordVisitAs(serviceUser, o)
       yield o
 
     assertIOBoolean:
@@ -146,7 +146,7 @@ class replaceIgrins2Sequence extends query.ExecutionTestSupportForIgrins2 with R
         p <- createProgram
         t <- createTargetWithProfileAs(pi, p)
         o <- createIgrins2LongSlitObservationAs(pi, p, t)
-        v <- recordVisitAs(serviceUser, Instrument.Igrins2, o)
+        v <- recordVisitAs(serviceUser, o)
         s <- firstScienceStepId(serviceUser, o)
         _ <- addEndStepEvent(s, v)
       yield o
@@ -170,7 +170,7 @@ class replaceIgrins2Sequence extends query.ExecutionTestSupportForIgrins2 with R
         p <- createProgram
         t <- createTargetWithProfileAs(pi, p)
         o <- createIgrins2LongSlitObservationAs(pi, p, t)
-        v <- recordVisitAs(serviceUser, Instrument.Igrins2, o)
+        v <- recordVisitAs(serviceUser, o)
         s <- firstScienceStepId(serviceUser, o)
         _ <- addEndStepEvent(s, v)
       yield o

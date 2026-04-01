@@ -30,7 +30,7 @@ class addSequenceEvent extends OdbSuite with ExecutionState with query.Execution
       pid <- createProgramAs(user)
       tid  <- createTargetWithProfileAs(user, pid)
       oid <- createObservationAs(user, pid, mode.some, tid)
-      vid <- recordVisitAs(user, mode.instrument, oid)
+      vid <- recordVisitAs(user, oid)
     yield (oid, vid)
 
   private def addSequenceEventTest(
@@ -120,7 +120,7 @@ class addSequenceEvent extends OdbSuite with ExecutionState with query.Execution
       pid  <- createProgramAs(user)
       tid  <- createTargetWithProfileAs(user, pid)
       oid  <- createObservationAs(user, pid, mode.some, tid)
-      vid  <- recordVisitAs(user, mode.instrument, oid)
+      vid  <- recordVisitAs(user, oid)
       sids <- scienceSequenceIds(user, oid)
       aids  = sids.keys.toList
       aid0  = aids(0)

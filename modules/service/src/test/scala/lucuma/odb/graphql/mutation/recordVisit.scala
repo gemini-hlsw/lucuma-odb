@@ -30,7 +30,6 @@ import lucuma.core.enums.GmosSouthFpu
 import lucuma.core.enums.GmosSouthGrating
 import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
-import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.StepStage
 import lucuma.core.math.BoundedInterval
@@ -186,18 +185,15 @@ class recordVisit extends OdbSuite with query.GenerationTestSupport with Executi
       )
     yield ()
 
-  test("recordGmosNorthVisit"):
+  test("recordVisit - GMOS North"):
 
     recordVisitTest(
       ObservingModeType.GmosNorthLongSlit,
       service,
       oid => s"""
         mutation {
-          recordGmosNorthVisit(input: {
+          recordVisit(input: {
             observationId: "$oid",
-            gmosNorth: {
-              stageMode: NO_FOLLOW
-            }
           }) {
             visit {
               gmosNorth {
@@ -217,10 +213,10 @@ class recordVisit extends OdbSuite with query.GenerationTestSupport with Executi
       """,
       json"""
       {
-        "recordGmosNorthVisit": {
+        "recordVisit": {
           "visit": {
             "gmosNorth": {
-              "stageMode": "NO_FOLLOW",
+              "stageMode": "FOLLOW_XY",
               "detector": "HAMAMATSU",
               "mosPreImaging": "IS_NOT_MOS_PRE_IMAGING",
               "nodAndShuffle": null
@@ -232,7 +228,7 @@ class recordVisit extends OdbSuite with query.GenerationTestSupport with Executi
       """.asRight
     )
 
-  test("recordGmosNorthVisit - idempotencyKey"):
+  test("recordVisit - idempotencyKey"):
     val idm   = IdempotencyKey.FromString.getOption("7304956b-45ab-45b6-8db1-ae6f743b519c").get
     val setup =
       for
@@ -246,11 +242,8 @@ class recordVisit extends OdbSuite with query.GenerationTestSupport with Executi
         user  = service,
         query = s"""
           mutation {
-            recordGmosNorthVisit(input: {
+            recordVisit(input: {
               observationId: "$oid"
-              gmosNorth: {
-                stageMode: NO_FOLLOW
-              }
               idempotencyKey: "${IdempotencyKey.FromString.reverseGet(idm)}"
             }) {
               visit {
@@ -261,7 +254,7 @@ class recordVisit extends OdbSuite with query.GenerationTestSupport with Executi
           }
         """
       ).map: js =>
-        val v = js.hcursor.downFields("recordGmosNorthVisit", "visit")
+        val v = js.hcursor.downFields("recordVisit", "visit")
         (
           v.downField("id").require[Visit.Id],
           v.downField("idempotencyKey").require[IdempotencyKey]
@@ -274,7 +267,7 @@ class recordVisit extends OdbSuite with query.GenerationTestSupport with Executi
         (v1, k1) <- recordVisit(o)
       yield (v0 === v1) && (k0 === idm) && (k1 === idm)
 
-  test("recordGmosNorthVisit - idempotencyKey (slew)"):
+  test("recordVisit - idempotencyKey (slew)"):
     val idm0  = IdempotencyKey.FromString.getOption("100fbce7-73eb-4c82-8a1e-e987a087b89d").get
     val idm1  = IdempotencyKey.FromString.getOption("c7adcb5c-b0c4-404b-a01a-89b7658ebfac").get
 
@@ -311,11 +304,8 @@ class recordVisit extends OdbSuite with query.GenerationTestSupport with Executi
         user  = service,
         query = s"""
           mutation {
-            recordGmosNorthVisit(input: {
+            recordVisit(input: {
               observationId: "$oid"
-              gmosNorth: {
-                stageMode: NO_FOLLOW
-              }
               idempotencyKey: "${IdempotencyKey.FromString.reverseGet(idm1)}"
             }) {
               visit { id }
@@ -324,7 +314,7 @@ class recordVisit extends OdbSuite with query.GenerationTestSupport with Executi
         """
       ).map: js =>
         js.hcursor
-          .downFields("recordGmosNorthVisit", "visit", "id")
+          .downFields("recordVisit", "visit", "id")
           .require[Visit.Id]
 
     assertIOBoolean:
@@ -334,18 +324,15 @@ class recordVisit extends OdbSuite with query.GenerationTestSupport with Executi
         v1 <- recordVisit(o)
       yield v0 === v1
 
-  test("recordGmosSouthVisit"):
+  test("recordVisit - GMOS South"):
 
     recordVisitTest(
       ObservingModeType.GmosSouthLongSlit,
       service,
       oid => s"""
         mutation {
-          recordGmosSouthVisit(input: {
+          recordVisit(input: {
             observationId: "$oid",
-            gmosSouth: {
-              stageMode: FOLLOW_XYZ
-            }
           }) {
             visit {
               gmosSouth {
@@ -362,7 +349,7 @@ class recordVisit extends OdbSuite with query.GenerationTestSupport with Executi
       """,
       json"""
       {
-        "recordGmosSouthVisit": {
+        "recordVisit": {
           "visit": {
             "gmosSouth": {
               "stageMode": "FOLLOW_XYZ",
@@ -376,44 +363,15 @@ class recordVisit extends OdbSuite with query.GenerationTestSupport with Executi
       """.asRight
     )
 
-  test("record visit cross site"):
-
-    recordVisitTest(
-      ObservingModeType.GmosNorthLongSlit,
-      service,
-      oid => s"""
-        mutation {
-          recordGmosSouthVisit(input: {
-            observationId: "$oid",
-            gmosSouth: {
-              stageMode: FOLLOW_XYZ,
-              detector: HAMAMATSU,
-              mosPreImaging: IS_NOT_MOS_PRE_IMAGING
-            }
-          }) {
-            visit {
-              gmosSouth {
-                stageMode
-              }
-            }
-          }
-        }
-      """,
-      ((oid: Observation.Id) => s"Observation '$oid' not found or is not a GMOS South observation").asLeft
-    )
-
-  test("recordFlamingos2Visit"):
+  test("recordVisit - F2"):
 
     recordVisitTest(
       ObservingModeType.Flamingos2LongSlit,
       service,
       oid => s"""
         mutation {
-          recordFlamingos2Visit(input: {
+          recordVisit(input: {
             observationId: "$oid",
-            flamingos2: {
-              useElectronicOffsetting: true
-            }
           }) {
             visit {
               flamingos2 {
@@ -432,49 +390,7 @@ class recordVisit extends OdbSuite with query.GenerationTestSupport with Executi
       """,
       json"""
       {
-        "recordFlamingos2Visit": {
-          "visit": {
-            "flamingos2": {
-              "mosPreImaging": "IS_NOT_MOS_PRE_IMAGING",
-              "useElectronicOffsetting": true
-            },
-            "gmosNorth": null,
-            "gmosSouth": null
-          }
-        }
-      }
-      """.asRight
-    )
-
-  test("recordFlamingos2Visit (defaults)"):
-
-    recordVisitTest(
-      ObservingModeType.Flamingos2LongSlit,
-      service,
-      oid => s"""
-        mutation {
-          recordFlamingos2Visit(input: {
-            observationId: "$oid",
-            flamingos2: {}
-          }) {
-            visit {
-              flamingos2 {
-                mosPreImaging
-                useElectronicOffsetting
-              }
-              gmosNorth {
-                stageMode
-              }
-              gmosSouth {
-                stageMode
-              }
-            }
-          }
-        }
-      """,
-      json"""
-      {
-        "recordFlamingos2Visit": {
+        "recordVisit": {
           "visit": {
             "flamingos2": {
               "mosPreImaging": "IS_NOT_MOS_PRE_IMAGING",
@@ -488,19 +404,15 @@ class recordVisit extends OdbSuite with query.GenerationTestSupport with Executi
       """.asRight
     )
 
-  test("recordIgrins2Visit"):
+  test("recordVisit - IGRINS2"):
 
     recordVisitTest(
       ObservingModeType.Igrins2LongSlit,
       service,
       oid => s"""
         mutation {
-          recordIgrins2Visit(input: {
+          recordVisit(input: {
             observationId: "$oid",
-            igrins2: {
-              saveSVCImages: true,
-              offsetMode: NOD_TO_SKY
-            }
           }) {
             visit {
               igrins2 {
@@ -519,11 +431,11 @@ class recordVisit extends OdbSuite with query.GenerationTestSupport with Executi
       """,
       json"""
       {
-        "recordIgrins2Visit": {
+        "recordVisit": {
           "visit": {
             "igrins2": {
-              "saveSVCImages": true,
-              "offsetMode": "NOD_TO_SKY"
+              "saveSVCImages": false,
+              "offsetMode": "NOD_ALONG_SLIT"
             },
             "flamingos2": null,
             "gmosNorth": null
@@ -533,53 +445,21 @@ class recordVisit extends OdbSuite with query.GenerationTestSupport with Executi
       """.asRight
     )
 
-  test("recordIgrins2Visit (defaults)"):
-
-    recordVisitTest(
-      ObservingModeType.Igrins2LongSlit,
-      service,
-      oid => s"""
-        mutation {
-          recordIgrins2Visit(input: {
-            observationId: "$oid",
-            igrins2: {}
-          }) {
-            visit {
-              igrins2 {
-                saveSVCImages
-                offsetMode
-              }
-            }
-          }
-        }
-      """,
-      json"""
-      {
-        "recordIgrins2Visit": {
-          "visit": {
-            "igrins2": {
-              "saveSVCImages": false,
-              "offsetMode": "NOD_ALONG_SLIT"
-            }
-          }
-        }
-      }
-      """.asRight
-    )
-
-  test("recordGmosNorthVisit - abandon steps"):
+  test("recordVisit - abandon steps"):
     assertIOBoolean:
       for
         pid <- createProgramAs(service)
         tid <- createTargetWithProfileAs(service, pid)
         oid <- createObservationAs(service, pid, ObservingModeType.GmosNorthLongSlit.some, tid)
+        o2  <- createObservationAs(service, pid, ObservingModeType.GmosNorthLongSlit.some, tid)
         sa  <- firstAcquisitionAtomStepIds(service, oid)
         ss  <- firstScienceAtomStepIds(service, oid)
-        v0  <- recordVisitAs(service, Instrument.GmosNorth, oid)
+        v0  <- recordVisitAs(service, oid)
         _   <- addStepEventAs(service, sa(0), v0, StepStage.StartStep)
         _   <- addStepEventAs(service, ss(0), v0, StepStage.StartStep)
         e0  <- stepExecutionState(service, oid)
-        _   <- recordVisitAs(service, Instrument.GmosNorth, oid)
+        _   <- recordVisitAs(service, o2)
+        _   <- recordVisitAs(service, oid)
         e1  <- stepExecutionState(service, oid)
       yield (e0 === List(StepExecutionState.Abandoned, StepExecutionState.Ongoing)) &&
             e1.forall(_ === StepExecutionState.Abandoned)

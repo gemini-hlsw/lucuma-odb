@@ -12,7 +12,6 @@ import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
-import lucuma.core.enums.Instrument
 import lucuma.core.enums.StepType
 import lucuma.core.math.Angle
 import lucuma.core.model.Observation
@@ -147,7 +146,7 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos:
         t <- createTargetWithProfileAs(pi, p)
         o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
 
-        v  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
+        v  <- recordVisitAs(serviceUser, o)
         ss <- firstScienceAtomStepIds(serviceUser, o)
        // Arc, flat, one science
         _  <- ss.take(3).traverse(sid => addEndStepEvent(sid, v))
@@ -167,7 +166,7 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos:
         t  <- createTargetWithProfileAs(pi, p)
         o  <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
 
-        v  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
+        v  <- recordVisitAs(serviceUser, o)
 
         // We do the whole second block, 5 nm wavelength dither
         is <- scienceSequenceIds(serviceUser, o)
@@ -204,7 +203,7 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos:
         t <- createTargetWithProfileAs(pi, p)
         o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
 
-        v  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
+        v  <- recordVisitAs(serviceUser, o)
         is <- firstScienceAtomStepIds(serviceUser, o)
         _  <- List(is(2), is(0), is(1)).traverse(sid => addEndStepEvent(sid, v))
       yield o
@@ -226,7 +225,7 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos:
         x0 <- firstScienceAtomId(serviceUser, o)
         ss <- firstScienceAtomStepIds(serviceUser, o)
 
-        v  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
+        v  <- recordVisitAs(serviceUser, o)
 
         // First atom
         _  <- addEndStepEvent(ss(0), v)
@@ -620,7 +619,7 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos:
             }
           """
         )
-        v  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
+        v  <- recordVisitAs(serviceUser, o)
         ss <- firstScienceAtomStepIds(serviceUser, o)
         _  <- ss.take(3).traverse(sid => addEndStepEvent(sid, v))
       yield o
@@ -733,7 +732,7 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos:
         p <- createProgram
         t <- createTargetWithProfileAs(pi, p)
         o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
-        v <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
+        v <- recordVisitAs(serviceUser, o)
 
         ss <- firstScienceAtomStepIds(serviceUser, o)
         x0 <- firstAcquisitionStepId(serviceUser, o)

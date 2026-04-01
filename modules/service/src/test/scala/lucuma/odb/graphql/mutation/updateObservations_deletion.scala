@@ -55,7 +55,7 @@ class updateObservations_deletion extends OdbSuite with UpdateObservationsOps wi
       tid <- createTargetAs(serviceUser, pid)
       oid <- createObservationAs(serviceUser, pid, ObservingModeType.GmosNorthLongSlit.some, tid)
       _   <- setObservationCalibrationRole(List(oid), CalibrationRole.SpectroPhotometric)
-      vid <- recordVisitAs(serviceUser, lucuma.core.enums.Instrument.GmosNorth, oid)
+      vid <- recordVisitAs(serviceUser, oid)
       _   <- addSequenceEventAs(serviceUser, vid, lucuma.core.enums.SequenceCommand.Start)
       res <- withServices(serviceUser) { services =>
               services.transactionally:

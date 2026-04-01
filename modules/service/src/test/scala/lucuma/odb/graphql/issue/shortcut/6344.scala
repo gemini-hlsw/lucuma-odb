@@ -7,7 +7,6 @@ package issue.shortcut
 import cats.effect.IO
 import cats.syntax.foldable.*
 import eu.timepit.refined.types.numeric.PosInt
-import lucuma.core.enums.Instrument
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.syntax.timespan.*
@@ -46,7 +45,7 @@ class ShortCut_6344 extends OdbSuite with query.ExecutionTestSupportForGmos:
         p  <- createProgramWithNonPartnerPi(pi)
         t  <- createTargetAs(pi, p)
         o  <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
-        v  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
+        v  <- recordVisitAs(serviceUser, o)
         c0 <- setupCount(p, o)  // 5.8 ~ hours => 3 setups
         s  <- scienceStepIds(serviceUser, o)
         _  <- addEndStepEvent(s(0), v) // arc

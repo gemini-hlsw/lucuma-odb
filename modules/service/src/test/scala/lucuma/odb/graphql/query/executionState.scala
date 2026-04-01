@@ -10,7 +10,6 @@ import eu.timepit.refined.types.numeric.PosInt
 import io.circe.Json
 import io.circe.literal.*
 import lucuma.core.enums.ExecutionState
-import lucuma.core.enums.Instrument
 import lucuma.core.model.Observation
 import lucuma.core.syntax.string.*
 import lucuma.core.syntax.timespan.*
@@ -71,7 +70,7 @@ class executionState extends ExecutionTestSupportForGmos {
         t <- createTargetWithProfileAs(pi, p)
         o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
 
-        v  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
+        v  <- recordVisitAs(serviceUser, o)
         ss <- firstScienceAtomStepIds(serviceUser, o)
         _  <- ss.take(3).traverse(sid => addEndStepEvent(sid, v))
       yield o
@@ -92,7 +91,7 @@ class executionState extends ExecutionTestSupportForGmos {
         o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
 
         ss <- scienceStepIds(serviceUser, o)
-        v  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
+        v  <- recordVisitAs(serviceUser, o)
         _  <- ss.traverse(sid => addEndStepEvent(sid, v))
       yield o
 

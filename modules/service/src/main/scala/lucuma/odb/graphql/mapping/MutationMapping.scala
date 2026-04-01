@@ -98,6 +98,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
       RecordGmosNorthVisit,
       RecordGmosSouthVisit,
       RecordIgrins2Visit,
+      RecordVisit,
       RedeemUserInvitation,
       ReplaceFlamingos2Sequence,
       ReplaceGmosNorthSequence,
@@ -591,7 +592,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
       services.useNonTransactionally:
         requireServiceAccess:
           recordVisit(
-            visitService.recordFlamingos2(input),
+            visitService.lookupOrInsertForObserve(input),
             Predicates.visit.id,
             child
           )
@@ -601,7 +602,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
       services.useNonTransactionally:
         requireServiceAccess:
           recordVisit(
-            visitService.recordGmosNorth(input),
+            visitService.lookupOrInsertForObserve(input),
             Predicates.visit.id,
             child
           )
@@ -611,7 +612,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
       services.useNonTransactionally:
         requireServiceAccess:
           recordVisit(
-            visitService.recordGmosSouth(input),
+            visitService.lookupOrInsertForObserve(input),
             Predicates.visit.id,
             child
           )
@@ -621,7 +622,17 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
       services.useNonTransactionally:
         requireServiceAccess:
           recordVisit(
-            visitService.recordIgrins2(input),
+            visitService.lookupOrInsertForObserve(input),
+            Predicates.visit.id,
+            child
+          )
+
+  private lazy val RecordVisit: MutationField =
+    MutationField("recordVisit", RecordVisitInput.Binding): (input, child) =>
+      services.useNonTransactionally:
+        requireServiceAccess:
+          recordVisit(
+            visitService.lookupOrInsertForObserve(input),
             Predicates.visit.id,
             child
           )

@@ -18,14 +18,21 @@ trait RecordVisitResultMapping[F[_]] extends VisitTable[F]:
       SqlObject("visit")
     )
 
+  // Deprecated, switching to generic RecordVisitResultMapping
   lazy val RecordFlamingos2VisitResultMapping: ObjectMapping =
     recordVisitResultMapping(RecordFlamingos2VisitResultType)
 
+  // Deprecated, switching to generic RecordVisitResultMapping
   lazy val RecordGmosNorthVisitResultMapping: ObjectMapping =
     recordVisitResultMapping(RecordGmosNorthVisitResultType)
 
+  // Deprecated, switching to generic RecordVisitResultMapping
   lazy val RecordGmosSouthVisitResultMapping: ObjectMapping =
     recordVisitResultMapping(RecordGmosSouthVisitResultType)
 
+  // Deprecated, switching to generic RecordVisitResultMapping
   lazy val RecordIgrins2VisitResultMapping: ObjectMapping =
     recordVisitResultMapping(RecordIgrins2VisitResultType)
+
+  lazy val RecordVisitResultMapping: ObjectMapping =
+    recordVisitResultMapping(RecordVisitResultType)

@@ -23,7 +23,6 @@ import lucuma.core.enums.GmosNorthGrating
 import lucuma.core.enums.GmosRoi
 import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
-import lucuma.core.enums.Instrument
 import lucuma.core.enums.StepGuideState
 import lucuma.core.enums.StepGuideState.*
 import lucuma.core.math.Wavelength
@@ -336,7 +335,7 @@ class ShortCut_7591 extends ExecutionTestSupportForGmos:
         t <- createTargetWithProfile(p)
         o <- createGmosNorthLongSlitObservation(p, t)
 
-        v <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
+        v <- recordVisitAs(serviceUser, o)
         s <- firstScienceAtomStepIds(serviceUser, o)
         _ <- s.take(4).traverse(sid => addEndStepEvent(sid, v))
       yield o
@@ -367,13 +366,13 @@ class ShortCut_7591 extends ExecutionTestSupportForGmos:
         o <- createGmosNorthLongSlitObservation(p, t)
 
         // First night
-        v0 <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
+        v0 <- recordVisitAs(serviceUser, o)
         s0 <- firstScienceAtomStepIds(serviceUser, o)
         _  <- s0.take(4).traverse(sid => addEndStepEvent(sid, v0))
 
         // Second night -- just do any acquisition step to switch the context.
         // We don't care about the acquisition details.
-        v1 <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
+        v1 <- recordVisitAs(serviceUser, o)
         s1 <- firstAcquisitionStepId(serviceUser, o)
         _  <- addEndStepEvent(s1, v1)
 
@@ -413,12 +412,12 @@ class ShortCut_7591 extends ExecutionTestSupportForGmos:
         o <- createGmosNorthLongSlitObservation(p, t)
 
         // First night
-        v0 <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
+        v0 <- recordVisitAs(serviceUser, o)
         s0 <- firstScienceAtomStepIds(serviceUser, o)
         _  <- s0.traverse(sid => addEndStepEvent(sid, v0))
 
         // Second night
-        v1 <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
+        v1 <- recordVisitAs(serviceUser, o)
         s1 <- firstScienceAtomStepIds(serviceUser, o)
         _  <- s1.take(2).traverse(sid => addEndStepEvent(sid, v1))
 
@@ -448,7 +447,7 @@ class ShortCut_7591 extends ExecutionTestSupportForGmos:
         o <- createGmosNorthLongSlitObservation(p, t)
 
         // First night
-        v0 <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
+        v0 <- recordVisitAs(serviceUser, o)
         id <- scienceSequenceIds(serviceUser, o)
 
         a0  = id.head._1 // first atom id
@@ -457,7 +456,7 @@ class ShortCut_7591 extends ExecutionTestSupportForGmos:
         _  <- id.head._2.take(4).traverse(sid => addEndStepEvent(sid, v0))
 
         // Second night
-        v1 <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
+        v1 <- recordVisitAs(serviceUser, o)
 
         // Now finish the first atom
         a1 <- nextAtomId(o)

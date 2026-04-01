@@ -11,7 +11,6 @@ import cats.syntax.option.*
 import cats.syntax.traverse.*
 import io.circe.Json
 import io.circe.literal.*
-import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.SequenceCommand
@@ -166,7 +165,7 @@ class addSlewEvent extends OdbSuite with query.ExecutionTestSupportForGmos:
       for
         o  <- createObservation(ObservingModeType.GmosNorthLongSlit, pi)
         _  <- addSlewEventAs(serviceUser, o, SlewStage.StartSlew)
-        v  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
+        v  <- recordVisitAs(serviceUser, o)
         _  <- addSlewEventAs(serviceUser, o, SlewStage.EndSlew)
         _  <- addSequenceEventAs(serviceUser, v, SequenceCommand.Start)
         vs <- visits(o)
@@ -176,7 +175,7 @@ class addSlewEvent extends OdbSuite with query.ExecutionTestSupportForGmos:
     assertIOBoolean:
       for
         o  <- createObservation(ObservingModeType.GmosNorthLongSlit, pi)
-        v  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
+        v  <- recordVisitAs(serviceUser, o)
         _  <- addSlewEventAs(serviceUser, o, SlewStage.StartSlew)
         _  <- addSlewEventAs(serviceUser, o, SlewStage.EndSlew)
         _  <- addSequenceEventAs(serviceUser, v, SequenceCommand.Start)
@@ -277,7 +276,7 @@ class addSlewEvent extends OdbSuite with query.ExecutionTestSupportForGmos:
         t <- createTargetWithProfileAs(pi, p)
         o <- createObservationAs(pi, p, ObservingModeType.GmosNorthLongSlit.some, t)
         _ <- addSlewEventAs(serviceUser, o, SlewStage.StartSlew)
-        v <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
+        v <- recordVisitAs(serviceUser, o)
         _ <- addSequenceEventAs(serviceUser, v, SequenceCommand.Start)
         _ <- runObscalcUpdate(p, o)
         s <- queryObservationWorkflowState(pi, o)

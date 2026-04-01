@@ -3158,7 +3158,7 @@ type Mutation {
     Visit creation parameters
     """
     input: RecordFlamingos2VisitInput!
-  ): RecordFlamingos2VisitResult!
+  ): RecordFlamingos2VisitResult! @deprecated(reason: "Use `recordVisit` instead.")
 
   """
   Replaces the remaining steps in an execution sequence with the provided
@@ -3177,7 +3177,7 @@ type Mutation {
     Visit creation parameters
     """
     input: RecordGmosNorthVisitInput!
-  ): RecordGmosNorthVisitResult!
+  ): RecordGmosNorthVisitResult! @deprecated(reason: "Use `recordVisit` instead.")
 
   """
   Replaces the remaining steps in an execution sequence with the provided
@@ -3196,7 +3196,7 @@ type Mutation {
     Visit creation parameters
     """
     input: RecordGmosSouthVisitInput!
-  ): RecordGmosSouthVisitResult!
+  ): RecordGmosSouthVisitResult! @deprecated(reason: "Use `recordVisit` instead.")
 
   """
   Record a new IGRINS-2 visit
@@ -3206,7 +3206,14 @@ type Mutation {
     Visit creation parameters
     """
     input: RecordIgrins2VisitInput!
-  ): RecordIgrins2VisitResult!
+  ): RecordIgrins2VisitResult! @deprecated(reason: "Use `recordVisit` instead.")
+
+  """
+  Record a new visit.
+  """
+  recordVisit(
+    input: RecordVisitInput!
+  ): RecordVisitResult!
 
   """
   Replaces the remaining steps in an execution sequence with the provided
@@ -4535,6 +4542,27 @@ input RecordDatasetInput {
 type RecordDatasetResult {
   "The new dataset that was added."
   dataset: Dataset!
+}
+
+"""
+Input parameters for creating a new visit.
+"""
+input RecordVisitInput {
+  observationId: ObservationId!
+
+  """
+  Idempotency key, if any.  The IdempotencyKey may be provided by clients when
+  the visit is created and is used to enable problem-free retry in the case of
+  failure.
+  """
+  idempotencyKey: IdempotencyKey
+}
+
+"""
+The result of recording a new Visit.
+"""
+type RecordVisitResult {
+  visit: Visit!
 }
 
 """

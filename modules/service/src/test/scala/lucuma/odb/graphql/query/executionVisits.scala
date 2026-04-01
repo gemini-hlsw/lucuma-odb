@@ -339,7 +339,7 @@ class executionVisits extends OdbSuite with ExecutionQuerySetupOperations with E
       pid <- createProgramAs(pi)
       tid <- createTargetWithProfileAs(pi, pid)
       oid <- createObservationAs(pi, pid, mode.some, tid)
-      vid <- recordVisitAs(serviceUser, mode.instrument, oid)
+      vid <- recordVisitAs(serviceUser, oid)
       _   <- expect(pi, query(oid), expected)
     yield ()
   }
@@ -408,9 +408,9 @@ class executionVisits extends OdbSuite with ExecutionQuerySetupOperations with E
       aid   = ids._1
       sids  = ids._2
 
-      vid0 <- recordVisitAs(serviceUser, mode.instrument, oid)
+      vid0 <- recordVisitAs(serviceUser, oid)
       _    <- addEndStepEvent(sids(0), vid0)
-      vid1 <- recordVisitAs(serviceUser, mode.instrument, oid)
+      vid1 <- recordVisitAs(serviceUser, oid)
       _    <- addEndStepEvent(sids(1), vid1)
 
       _    <- expect(pi, query(oid), expected(aid, vid0, vid1))

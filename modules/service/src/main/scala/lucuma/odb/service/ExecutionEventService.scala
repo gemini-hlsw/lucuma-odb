@@ -175,7 +175,7 @@ object ExecutionEventService:
             .map(_.success)
 
         (for
-          v <- ResultT(visitService.lookupOrInsert(input.observationId, none))
+          v <- ResultT(visitService.lookupOrInsertForSlew(input.observationId, none))
           e <- ResultT(insert(v))
           (eid, wasInserted) = e
           _ <- ResultT.liftF(timeAccountingService.update(v)).whenA(wasInserted)

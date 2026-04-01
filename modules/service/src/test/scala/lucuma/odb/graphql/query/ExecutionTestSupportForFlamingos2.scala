@@ -26,7 +26,6 @@ import lucuma.core.enums.GcalContinuum
 import lucuma.core.enums.GcalDiffuser
 import lucuma.core.enums.GcalFilter
 import lucuma.core.enums.GcalShutter
-import lucuma.core.enums.Instrument
 import lucuma.core.enums.StepGuideState
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.StepConfig
@@ -328,7 +327,7 @@ trait ExecutionTestSupportForFlamingos2 extends ExecutionTestSupport:
       p <- createProgram
       t <- createTargetWithProfileAs(pi, p)
       o <- createFlamingos2LongSlitObservationAs(pi, p, List(t))
-      v <- recordVisitAs(serviceUser, Instrument.Flamingos2, o)
+      v <- recordVisitAs(serviceUser, o)
       s <- firstScienceStepId(serviceUser, o)
       _ <- addEndStepEvent(s, v)
       _ <- runObscalcUpdate(p, o)

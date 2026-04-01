@@ -14,14 +14,11 @@ import lucuma.core.enums.Site
 import lucuma.core.model.Observation
 import lucuma.core.model.ObservingNight
 import lucuma.core.model.Visit
-import lucuma.core.model.sequence.flamingos2.Flamingos2StaticConfig
-import lucuma.core.model.sequence.gmos.StaticConfig.GmosNorth
-import lucuma.core.model.sequence.gmos.StaticConfig.GmosSouth
-import lucuma.core.model.sequence.igrins2.Igrins2StaticConfig
 import lucuma.core.util.IdempotencyKey
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.ResultExtensions.*
 import lucuma.odb.graphql.input.RecordVisitInput
+import lucuma.odb.sequence.data.VisitOrigin
 import lucuma.odb.sequence.data.VisitRecord
 import lucuma.odb.syntax.instrument.*
 import lucuma.odb.util.Codecs.{site as _, *}
@@ -50,25 +47,13 @@ trait VisitService[F[_]]:
     observationId: Observation.Id
   )(using Transaction[F]): F[Boolean]
 
-  def lookupOrInsert(
+  def lookupOrInsertForSlew(
     observationId:  Observation.Id,
     idempotencyKey: Option[IdempotencyKey]
   )(using Transaction[F], Services.ServiceAccess): F[Result[Visit.Id]]
 
-  def recordFlamingos2(
-    input: RecordVisitInput[Flamingos2StaticConfig]
-  )(using NoTransaction[F], Services.ServiceAccess): F[Result[Visit.Id]]
-
-  def recordGmosNorth(
-    input: RecordVisitInput[GmosNorth]
-  )(using NoTransaction[F], Services.ServiceAccess): F[Result[Visit.Id]]
-
-  def recordGmosSouth(
-    input: RecordVisitInput[GmosSouth]
-  )(using NoTransaction[F], Services.ServiceAccess): F[Result[Visit.Id]]
-
-  def recordIgrins2(
-    input: RecordVisitInput[Igrins2StaticConfig]
+  def lookupOrInsertForObserve(
+    input: RecordVisitInput
   )(using NoTransaction[F], Services.ServiceAccess): F[Result[Visit.Id]]
 
 
@@ -122,11 +107,14 @@ object VisitService:
 
       private def lookupOrInsertImpl(
         observationId:  Observation.Id,
+        origin:         VisitOrigin,
         idempotencyKey: Option[IdempotencyKey]
       )(using Transaction[F], Services.ServiceAccess): EitherT[F, OdbError, VisitRecord] =
 
         def lookupVisit(desc:  ObsDescription, night: ObservingNight): F[Option[VisitRecord]] =
           if desc.isChargeable then
+            // Lookup the current chargeable visit if any, assuming it is
+            // associated with the same observation.
             session
               .option(Statements.SelectChargeableVisit)(night)
               .map: o =>
@@ -137,7 +125,31 @@ object VisitService:
               .option(Statements.SelectLastVisit)(night, observationId)
 
         def insertNewVisit(desc: ObsDescription): F[VisitRecord] =
-          session.unique(Statements.InsertVisit)(observationId, desc, idempotencyKey)
+          session.unique(Statements.InsertVisit)(observationId, desc, origin, idempotencyKey)
+
+        // Decide what to do based on whether the lookup of the current visit
+        // succeeded, what we're going to use this visit for, and what the
+        // current visit was being used for.  Slew visits are created
+        // automatically to associate slew events.  We use those when present
+        // instead of creating a distinct new visit for them. Observe visits
+        // are created explicitly so, unless there is an existing slew visit, we
+        // always make a new one for it.
+
+        def go(desc: ObsDescription, existingVisit: Option[VisitRecord]): F[VisitRecord] =
+          existingVisit.fold(insertNewVisit(desc)): existing =>
+            // (new origin, existing origin)
+            (origin, existing.origin) match
+              case (VisitOrigin.Observe, VisitOrigin.Slew)    =>
+                // Reuse it for observing, but mark it as having been claimed.
+                session.execute(Statements.MarkPurpose)(existing.visitId, VisitOrigin.Observe).as(existing)
+
+              case (VisitOrigin.Observe, VisitOrigin.Observe) =>
+                // Explicitly requested a new visit, so make it.
+                insertNewVisit(desc)
+
+              case (VisitOrigin.Slew, _)                       =>
+                // Just keep the existing visit, no need for a new one.
+                existing.pure[F]
 
         obsDescription(observationId)
           .semiflatMap: d =>
@@ -149,117 +161,25 @@ object VisitService:
               // visit.
               _  <- session.unique(Statements.LockCreation)(Statements.VisitCreationLockId)
               v  <- lookupVisit(d, n)
-              vʹ <- v.fold(insertNewVisit(d))(Concurrent[F].pure)
+              vʹ <- go(d, v)
             yield vʹ
 
-      override def lookupOrInsert(
+      override def lookupOrInsertForSlew(
         observationId:  Observation.Id,
         idempotencyKey: Option[IdempotencyKey]
       )(using Transaction[F], Services.ServiceAccess): F[Result[Visit.Id]] =
-        lookupOrInsertImpl(observationId, idempotencyKey)
+        lookupOrInsertImpl(observationId, VisitOrigin.Slew, idempotencyKey)
           .map(_.visitId)
           .value
           .map(Result.fromEitherOdbError)
 
-      private def insertWithStaticConfig[A](
-        observationId:  Observation.Id,
-        static:         A,
-        idempotencyKey: Option[IdempotencyKey],
-        instrument:     Instrument,
-        lookupStatic:   Visit.Id => Transaction[F] ?=> F[Option[A]],
-        insertStatic:   (Observation.Id, Option[Visit.Id], A) => (Transaction[F], Services.ServiceAccess) ?=> F[Option[Long]]
-      )(using Transaction[F], Services.ServiceAccess): F[Either[OdbError, Visit.Id]] =
-
-        val insertNewVisit: EitherT[F, OdbError, Visit.Id] =
-          for
-            d <- obsDescription(observationId)
-            v <- EitherT.liftF(session.unique(Statements.InsertVisit)(observationId, d, idempotencyKey))
-          yield v.visitId
-
-        def insertStaticForVisit(v: Visit.Id): EitherT[F, OdbError, Unit] =
-          EitherT.fromOptionF(
-            insertStatic(observationId, v.some, static).map(_.void),
-            OdbError.InvalidVisit(v, s"Visit $v already has a static configuration".some)
-          )
-
-        val update = for
-          v0 <- lookupOrInsertImpl(observationId, idempotencyKey)
-          os <- EitherT.liftF(lookupStatic(v0.visitId))
-          v1 <- os.fold(insertStaticForVisit(v0.visitId).as(v0.visitId)): _ =>
-                  val sameKey = (v0.idempotencyKey, idempotencyKey).tupled.exists(_ === _)
-                  if sameKey then
-                    EitherT.pure[F, OdbError](v0.visitId)
-                  else
-                    insertNewVisit.flatMap: v =>
-                      insertStaticForVisit(v).as(v)
-        yield v1
-
-        update
-          .value
-          .recover:
-            case SqlState.ForeignKeyViolation(_) =>
-              OdbError.InvalidObservation(observationId, s"Observation '$observationId' not found or is not a ${instrument.longName} observation".some).asLeft[Visit.Id]
-
-      private def materializeAndRecord[A](
-        observationId:  Observation.Id,
-        static:         A,
-        idempotencyKey: Option[IdempotencyKey],
-        instrument:     Instrument,
-        lookupStatic:   Visit.Id => Transaction[F] ?=> F[Option[A]],
-        insertStatic:   (Observation.Id, Option[Visit.Id], A) => (Transaction[F], Services.ServiceAccess) ?=> F[Option[Long]]
+      override def lookupOrInsertForObserve(
+        input: RecordVisitInput
       )(using NoTransaction[F], Services.ServiceAccess): F[Result[Visit.Id]] =
         generator
-          .materializeAndThen(observationId):
-            insertWithStaticConfig(observationId, static, idempotencyKey, instrument, lookupStatic, insertStatic)
+          .materializeAndThen(input.observationId):
+            lookupOrInsertImpl(input.observationId, VisitOrigin.Observe, input.idempotencyKey).map(_.visitId).value
           .map(Result.fromEitherOdbError)
-
-      def recordFlamingos2(
-        input: RecordVisitInput[Flamingos2StaticConfig]
-      )(using NoTransaction[F], Services.ServiceAccess): F[Result[Visit.Id]] =
-        materializeAndRecord(
-          input.observationId,
-          input.static,
-          input.idempotencyKey,
-          Instrument.Flamingos2,
-          flamingos2SequenceService.selectStaticForVisit,
-          flamingos2SequenceService.insertStatic
-        )
-
-      override def recordGmosNorth(
-        input: RecordVisitInput[GmosNorth]
-      )(using NoTransaction[F], Services.ServiceAccess): F[Result[Visit.Id]] =
-        materializeAndRecord(
-          input.observationId,
-          input.static,
-          input.idempotencyKey,
-          Instrument.GmosNorth,
-          gmosSequenceService.selectGmosNorthStaticForVisit,
-          gmosSequenceService.insertGmosNorthStatic
-        )
-
-      override def recordGmosSouth(
-        input: RecordVisitInput[GmosSouth]
-      )(using NoTransaction[F], Services.ServiceAccess): F[Result[Visit.Id]] =
-        materializeAndRecord(
-          input.observationId,
-          input.static,
-          input.idempotencyKey,
-          Instrument.GmosSouth,
-          gmosSequenceService.selectGmosSouthStaticForVisit,
-          gmosSequenceService.insertGmosSouthStatic
-        )
-
-      override def recordIgrins2(
-        input: RecordVisitInput[Igrins2StaticConfig]
-      )(using NoTransaction[F], Services.ServiceAccess): F[Result[Visit.Id]] =
-        materializeAndRecord(
-          input.observationId,
-          input.static,
-          input.idempotencyKey,
-          Instrument.Igrins2,
-          igrins2SequenceService.selectStaticForVisit,
-          igrins2SequenceService.insertStatic
-        )
 
   object Statements:
 
@@ -274,6 +194,7 @@ object VisitService:
         core_timestamp              *:
         lucuma.odb.util.Codecs.site *:
         bool                        *:
+        visit_origin                *:
         idempotency_key.opt
       ).to[VisitRecord]
 
@@ -293,6 +214,7 @@ object VisitService:
           c_created,
           c_site,
           c_chargeable,
+          c_origin,
           c_idempotency_key
         FROM t_visit
         WHERE c_visit_id = $visit_id
@@ -307,6 +229,7 @@ object VisitService:
           c_created,
           c_site,
           c_chargeable,
+          c_origin,
           c_idempotency_key
         FROM t_visit
         WHERE c_observation_id = $observation_id
@@ -330,6 +253,7 @@ object VisitService:
           c_created,
           c_site,
           c_chargeable,
+          c_origin,
           c_idempotency_key
          FROM t_visit
         WHERE c_chargeable = true
@@ -355,6 +279,7 @@ object VisitService:
           c_created,
           c_site,
           c_chargeable,
+          c_origin,
           c_idempotency_key
          FROM t_visit
         WHERE c_created >= $timestamp
@@ -379,10 +304,11 @@ object VisitService:
            AND c_instrument IS NOT NULL
       """.query(obs_description)
 
-    val InsertVisit: Query[(Observation.Id, ObsDescription, Option[IdempotencyKey]), VisitRecord] =
+    val InsertVisit: Query[(Observation.Id, ObsDescription, VisitOrigin, Option[IdempotencyKey]), VisitRecord] =
       sql"""
         INSERT INTO t_visit (
           c_observation_id,
+          c_origin,
           c_idempotency_key,
           c_instrument,
           c_site,
@@ -390,6 +316,7 @@ object VisitService:
         )
         SELECT
           $observation_id,
+          $visit_origin,
           ${idempotency_key.opt},
           $instrument,
           ${lucuma.odb.util.Codecs.site},
@@ -403,12 +330,21 @@ object VisitService:
           c_created,
           c_site,
           c_chargeable,
+          c_origin,
           c_idempotency_key
-      """.query(visit_record).contramap: (oid, od, idm) =>
+      """.query(visit_record).contramap: (oid, od, origin, idm) =>
         (
           oid,
+          origin,
           idm,
           od.instrument,
           od.site,
           od.isChargeable
         )
+
+    val MarkPurpose: Command[(Visit.Id, VisitOrigin)] =
+      sql"""
+        UPDATE t_visit
+        SET c_origin = $visit_origin
+        WHERE c_visit_id = $visit_id
+      """.command.contramap((id, origin) => (origin, id))

@@ -31,7 +31,7 @@ class recordDataset extends OdbSuite with query.ExecutionTestSupportForGmos {
       pid <- createProgramAs(user)
       tid <- createTargetWithProfileAs(user, pid)
       oid <- createObservationAs(user, pid, mode.some, tid)
-      vid <- recordVisitAs(user, mode.instrument, oid)
+      vid <- recordVisitAs(user, oid)
       ids <- scienceSequenceIds(user, oid).map(_.head)
       aid  = ids._1
       sid  = ids._2.head
@@ -345,7 +345,7 @@ class recordDataset extends OdbSuite with query.ExecutionTestSupportForGmos {
 
         tid <- createTargetWithProfileAs(pi, pid)
         oid <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid)
-        vid <- recordVisitAs(serviceUser, ObservingModeType.GmosNorthLongSlit.instrument, oid)
+        vid <- recordVisitAs(serviceUser, oid)
 
         acq <- firstAcquisitionAtomStepIds(serviceUser, oid)
         sci <- firstScienceAtomStepIds(serviceUser, oid)

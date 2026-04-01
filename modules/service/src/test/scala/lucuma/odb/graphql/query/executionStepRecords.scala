@@ -189,7 +189,7 @@ class executionStepRecords extends OdbSuite with ExecutionTestSupportForGmos wit
       pid <- createProgramAs(pi)
       tid <- createTargetWithProfileAs(pi, pid)
       oid <- createObservationAs(pi, pid, mode.some, tid)
-      vid <- recordVisitAs(serviceUser, mode.instrument, oid)
+      vid <- recordVisitAs(serviceUser, oid)
       sid <- firstScienceStepId(serviceUser, oid)
     yield (oid, sid, vid)
 

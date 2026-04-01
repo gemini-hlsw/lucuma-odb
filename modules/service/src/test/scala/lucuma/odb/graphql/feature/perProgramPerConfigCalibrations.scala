@@ -962,7 +962,7 @@ class perProgramPerConfigCalibrations
       ob1       <- queryObservations(pid)
       calibIds1 = ob1.callibrationIds
       // Add execution events to one of the calibrations (making it Ongoing)
-      visit     <- recordVisit(ObservingModeType.GmosNorthLongSlit, setupEvent, service, calibIds1.head)
+      visit     <- recordVisit(setupEvent, service, calibIds1.head)
       _         <- runObscalcUpdate(pid, calibIds1.head)
       // I expected the workflow to automatically switch to ongoing but it doesn't
       _         <- setCalculatedWorkflowState(calibIds1.head, ObservationWorkflowState.Ongoing)

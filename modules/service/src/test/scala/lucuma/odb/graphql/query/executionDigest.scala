@@ -13,7 +13,6 @@ import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.enums.ExecutionState
-import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.SequenceCommand
 import lucuma.core.enums.StepStage
@@ -568,7 +567,7 @@ class executionDigest extends ExecutionTestSupportForGmos {
         p <- createProgram
         t <- createTargetWithProfileAs(pi, p)
         o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
-        v <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
+        v <- recordVisitAs(serviceUser, o)
         s <- firstScienceStepId(serviceUser, o)
       yield (o, v, s)
 
@@ -591,7 +590,7 @@ class executionDigest extends ExecutionTestSupportForGmos {
         p <- createProgram
         t <- createTargetWithProfileAs(pi, p)
         o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
-        v <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
+        v <- recordVisitAs(serviceUser, o)
         s <- firstScienceStepId(serviceUser, o)
       yield (o, v, s)
 
@@ -659,7 +658,7 @@ class executionDigest extends ExecutionTestSupportForGmos {
         p <- createProgram
         t <- createTargetWithProfileAs(pi, p)
         o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
-        v <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
+        v <- recordVisitAs(serviceUser, o)
         // We now need to record at least a single event
         _ <- addSequenceEventAs(serviceUser, v, SequenceCommand.Start)
         _ <- runObscalcUpdate(p, o)
@@ -679,7 +678,7 @@ class executionDigest extends ExecutionTestSupportForGmos {
         p <- createProgram
         t <- createTargetWithProfileAs(pi, p)
         o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
-        v <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
+        v <- recordVisitAs(serviceUser, o)
         // We now need to record at least a single event
         i <- scienceSequenceIds(serviceUser, o)
         // complete just the first atom
@@ -700,7 +699,7 @@ class executionDigest extends ExecutionTestSupportForGmos {
         p  <- createProgram
         t  <- createTargetWithProfileAs(pi, p)
         o  <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
-        v  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
+        v  <- recordVisitAs(serviceUser, o)
         id <- firstScienceAtomStepIds(serviceUser, o)
         _  <- addEndStepEvent(id(0), v)
         _  <- addEndStepEvent(id(1), v)
@@ -724,7 +723,7 @@ class executionDigest extends ExecutionTestSupportForGmos {
         p <- createProgram
         t <- createTargetWithProfileAs(pi, p)
         o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
-        v  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
+        v  <- recordVisitAs(serviceUser, o)
         id <- firstScienceAtomStepIds(serviceUser, o)
         _  <- addEndStepEvent(id(0), v)
         _  <- addEndStepEvent(id(1), v)
@@ -785,7 +784,7 @@ class executionDigest extends ExecutionTestSupportForGmos {
         p <- createProgram
         t <- createTargetWithProfileAs(pi, p)
         o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
-        v <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
+        v <- recordVisitAs(serviceUser, o)
         i <- scienceStepIds(serviceUser, o)
         _ <- i.traverse(sid => addEndStepEvent(sid, v))
         _ <- runObscalcUpdate(p, o)

@@ -33,13 +33,12 @@ class executionEvents extends OdbSuite with ExecutionQuerySetupOperations with E
   val mode = ObservingModeType.GmosNorthLongSlit
 
   override def recordVisit(
-    mode:    ObservingModeType,
     setup:   Setup,
     user:    User,
     oid:     Observation.Id
   ): IO[VisitNode] =
     for
-      vid <- recordVisitAs(user, mode.instrument, oid)
+      vid <- recordVisitAs(user, oid)
       e0  <- addSlewEventAs(user, oid, SlewStage.StartSlew)
       e1  <- addSlewEventAs(user, oid, SlewStage.EndSlew)
       e2  <- addSequenceEventAs(user, vid, SequenceCommand.Start)

@@ -17,7 +17,6 @@ import lucuma.catalog.telluric.TelluricTargetsClient
 import lucuma.core.enums.Band
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.Flamingos2Fpu
-import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.TelluricCalibrationOrder
 import lucuma.core.math.BrightnessUnits.BrightnessMeasure
@@ -801,7 +800,7 @@ class perScienceObservationCalibrations
       d    <- nextAtomDescription(toid)
 
       sid  <- firstScienceStepId(serviceUser, toid)
-      vid  <- recordVisitAs(serviceUser, Instrument.Flamingos2, toid)
+      vid  <- recordVisitAs(serviceUser, toid)
       _    <- addEndStepEvent(sid, vid)
 
       _    <- deleteObservation(pi, oid)
@@ -1732,7 +1731,7 @@ class perScienceObservationCalibrations
       obsInGroup1        <- queryObservationsInGroup(groupId)
       telluricOid        =  obsInGroup1.find(_.calibrationRole.contains(CalibrationRole.Telluric)).get.id
       // Record a visit
-      _                  <- recordVisitAs(serviceUser, Instrument.Flamingos2, telluricOid)
+      _                  <- recordVisitAs(serviceUser, telluricOid)
       // science observation becomes Inactive, should not delete the telluric
       _                  <- setObservationWorkflowState(pi, oid, ObservationWorkflowState.Inactive)
       (added2, removed2) <- recalculateCalibrations(pid, when, oid)
@@ -1758,7 +1757,7 @@ class perScienceObservationCalibrations
       obsInGroup1        <- queryObservationsInGroup(groupId)
       telluricOid        =  obsInGroup1.find(_.calibrationRole.contains(CalibrationRole.Telluric)).get.id
       // Record a visit on the telluric
-      _                  <- recordVisitAs(serviceUser, Instrument.Flamingos2, telluricOid)
+      _                  <- recordVisitAs(serviceUser, telluricOid)
       // Change to GMOS
       _                  <- updateObservationMode(oid, "gmosNorthLongSlit")
       (added2, removed2) <- recalculateCalibrations(pid, when, oid)
@@ -1786,7 +1785,7 @@ class perScienceObservationCalibrations
       telluricObs1         =  obsInGroup1.filter(_.calibrationRole.contains(CalibrationRole.Telluric))
       telluricOids1        =  telluricObs1.map(_.id).toSet
       // Record visits on both tellurics
-      _                    <- telluricObs1.traverse_(t => recordVisitAs(serviceUser, Instrument.Flamingos2, t.id))
+      _                    <- telluricObs1.traverse_(t => recordVisitAs(serviceUser, t.id))
       // Change to short duration
       _                    <- setExposureTime(oid, 60)
       _                    <- runObscalcUpdate(pid, oid)

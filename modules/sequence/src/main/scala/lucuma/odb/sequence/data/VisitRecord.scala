@@ -17,5 +17,6 @@ case class VisitRecord(
   created:        Timestamp,
   site:           Site,
   chargeable:     Boolean,
+  origin:         VisitOrigin,
   idempotencyKey: Option[IdempotencyKey]
 )

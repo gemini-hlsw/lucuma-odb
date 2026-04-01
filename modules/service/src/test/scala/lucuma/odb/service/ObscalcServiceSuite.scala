@@ -9,7 +9,6 @@ import cats.syntax.option.*
 import eu.timepit.refined.types.numeric.NonNegInt
 import lucuma.core.enums.ChargeClass
 import lucuma.core.enums.ExecutionState
-import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.StepGuideState
@@ -330,7 +329,7 @@ class ObscalcServiceSuite extends ObscalcServiceSuiteSupport:
       o  <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
       _  <- runObscalcUpdate(p, o)
       r0 <- selectStates
-      _  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
+      _  <- recordVisitAs(serviceUser, o)
       r1 <- selectStates
     yield (r0(o), r1(o))
 

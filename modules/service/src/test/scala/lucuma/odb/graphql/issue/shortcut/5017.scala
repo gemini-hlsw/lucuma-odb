@@ -10,7 +10,6 @@ import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.PosInt
 import lucuma.core.enums.DatasetQaState
 import lucuma.core.enums.DatasetStage
-import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.StepStage
 import lucuma.core.model.Observation
@@ -67,7 +66,7 @@ class ShortCut_5017 extends ExecutionTestSupportForGmos:
         t <- createTargetWithProfileAs(pi, p)
         o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
         a <- scienceSequenceIds(serviceUser, o).map(_.toList)
-        v <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
+        v <- recordVisitAs(serviceUser, o)
         c <- AtomicCell[IO].of(0)
         _ <- executeAtom(c, a(0), v)
         _ <- executeAtom(c, a(1), v)
