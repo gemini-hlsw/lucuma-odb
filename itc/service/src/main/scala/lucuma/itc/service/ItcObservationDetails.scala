@@ -208,12 +208,20 @@ object ItcObservationDetails {
         val encoder: Encoder[Sum] = deriveEncoder
       }
 
+      // Specific to GHOST, it seems. Just called `Ifu` in the OTC, but `ifuSky` on the web form.
+      case class Sky(skyFibres: Int) extends Ifu
+
+      object Sky {
+        val encoder: Encoder[Sky] = deriveEncoder
+      }
+
       val encoder: Encoder[Ifu] = a =>
         a match {
           case a: Single => Json.obj("IfuSingle" -> Single.encoder(a))
           case a: Radial => Json.obj("IfuRadial" -> Radial.encoder(a))
           case a: Summed => Json.obj("IfuSummed" -> Summed.encoder(a))
           case a: Sum    => Json.obj("IfuSum" -> Sum.encoder(a))
+          case a: Sky    => Json.obj("IfuSky" -> Sky.encoder(a))
         }
 
     }

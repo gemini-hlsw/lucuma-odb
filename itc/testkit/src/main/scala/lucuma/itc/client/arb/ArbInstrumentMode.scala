@@ -4,6 +4,12 @@
 package lucuma.itc.client
 package arb
 
+import lucuma.core.enums.Flamingos2Disperser
+import lucuma.core.enums.Flamingos2Filter
+import lucuma.core.enums.Flamingos2Fpu
+import lucuma.core.enums.GhostBinning
+import lucuma.core.enums.GhostReadMode
+import lucuma.core.enums.GhostResolutionMode
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosNorthGrating
 import lucuma.core.enums.GmosRoi
@@ -17,6 +23,7 @@ import lucuma.core.model.arb.ArbExposureTimeMode
 import lucuma.core.model.sequence.gmos.GmosCcdMode
 import lucuma.core.model.sequence.gmos.arb.ArbGmosCcdMode
 import lucuma.core.util.arb.ArbEnumerated
+import lucuma.itc.ItcGhostDetector
 import org.scalacheck.*
 import org.scalacheck.Arbitrary.arbitrary
 
@@ -31,7 +38,9 @@ trait ArbInstrumentMode {
   import InstrumentMode.GmosSouthSpectroscopy
   import InstrumentMode.GmosNorthImaging
   import InstrumentMode.GmosSouthImaging
+  import InstrumentMode.Flamingos2Spectroscopy
   import InstrumentMode.Igrins2Spectroscopy
+  import InstrumentMode.GhostSpectroscopy
 
   given Arbitrary[GmosNorthSpectroscopy] =
     Arbitrary {
@@ -131,6 +140,21 @@ trait ArbInstrumentMode {
     Cogen[(ExposureTimeMode, GmosSouthFilter, Option[GmosCcdMode], PortDisposition)]
       .contramap(a => (a.exposureTimeMode, a.filter, a.ccdMode, a.port))
 
+  given Arbitrary[Flamingos2Spectroscopy] =
+    Arbitrary {
+      for {
+        et <- arbitrary[ExposureTimeMode]
+        d  <- arbitrary[Flamingos2Disperser]
+        f  <- arbitrary[Flamingos2Filter]
+        fp <- arbitrary[Flamingos2Fpu]
+        p  <- arbitrary[PortDisposition]
+      } yield Flamingos2Spectroscopy(et, d, f, fp, p)
+    }
+
+  given Cogen[Flamingos2Spectroscopy] =
+    Cogen[(ExposureTimeMode, Flamingos2Disperser, Flamingos2Filter, Flamingos2Fpu, PortDisposition)]
+      .contramap(a => (a.exposureTimeMode, a.disperser, a.filter, a.fpu, a.port))
+
   given Arbitrary[Igrins2Spectroscopy] =
     Arbitrary {
       for {
@@ -143,6 +167,43 @@ trait ArbInstrumentMode {
     Cogen[(ExposureTimeMode, PortDisposition)]
       .contramap(a => (a.exposureTimeMode, a.port))
 
+  given Arbitrary[ItcGhostDetector] =
+    Arbitrary {
+      for {
+        et <- arbitrary[ExposureTimeMode.TimeAndCountMode]
+        rm <- arbitrary[GhostReadMode]
+        b  <- arbitrary[GhostBinning]
+      } yield ItcGhostDetector(et, rm, b)
+    }
+
+  given Cogen[ItcGhostDetector] =
+    Cogen[(ExposureTimeMode, GhostReadMode, GhostBinning)]
+      .contramap(a => (a.timeAndCount, a.readMode, a.binning))
+
+  given Arbitrary[GhostSpectroscopy] =
+    Arbitrary {
+      for {
+        w  <- arbitrary[Wavelength]
+        n  <- arbitrary[Int]
+        re <- arbitrary[GhostResolutionMode]
+        r  <- arbitrary[ItcGhostDetector]
+        b  <- arbitrary[ItcGhostDetector]
+      } yield GhostSpectroscopy(w, n, re, r, b)
+    }
+
+  given Cogen[GhostSpectroscopy] =
+    Cogen[
+      (
+        Wavelength,
+        Int,
+        GhostResolutionMode,
+        ItcGhostDetector,
+        ItcGhostDetector
+      )
+    ].contramap(a =>
+      (a.centralWavelength, a.numSkyMicrolens, a.resolutionMode, a.redDetector, a.blueDetector)
+    )
+
   given Arbitrary[InstrumentMode] =
     Arbitrary {
       Gen.oneOf(
@@ -150,7 +211,9 @@ trait ArbInstrumentMode {
         arbitrary[GmosSouthSpectroscopy],
         arbitrary[GmosNorthImaging],
         arbitrary[GmosSouthImaging],
-        arbitrary[Igrins2Spectroscopy]
+        arbitrary[Flamingos2Spectroscopy],
+        arbitrary[Igrins2Spectroscopy],
+        arbitrary[GhostSpectroscopy]
       )
     }
 
@@ -161,7 +224,9 @@ trait ArbInstrumentMode {
         Option[GmosSouthSpectroscopy],
         Option[GmosNorthImaging],
         Option[GmosSouthImaging],
-        Option[Igrins2Spectroscopy]
+        Option[Flamingos2Spectroscopy],
+        Option[Igrins2Spectroscopy],
+        Option[GhostSpectroscopy]
       )
     ].contramap { a =>
       (
@@ -169,7 +234,9 @@ trait ArbInstrumentMode {
         InstrumentMode.gmosSouthSpectroscopy.getOption(a),
         InstrumentMode.gmosNorthImaging.getOption(a),
         InstrumentMode.gmosSouthImaging.getOption(a),
-        InstrumentMode.igrins2Spectroscopy.getOption(a)
+        InstrumentMode.flamingos2Spectroscopy.getOption(a),
+        InstrumentMode.igrins2Spectroscopy.getOption(a),
+        InstrumentMode.ghostSpectroscopy.getOption(a)
       )
     }
 }

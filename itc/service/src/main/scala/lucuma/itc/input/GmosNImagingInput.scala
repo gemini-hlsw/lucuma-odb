@@ -8,6 +8,7 @@ import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.PortDisposition
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.sequence.gmos.GmosCcdMode
+import lucuma.itc.binding.*
 import lucuma.odb.graphql.binding.*
 import lucuma.odb.graphql.input.ExposureTimeModeInput
 import lucuma.odb.graphql.input.GmosCcdModeInput

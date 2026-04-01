@@ -8,13 +8,14 @@ import lucuma.core.math.Angle
 import lucuma.core.math.Redshift
 import lucuma.core.math.SignalToNoise
 import lucuma.core.math.Wavelength
+import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.SourceProfile
 import lucuma.itc.service.ItcObservationDetails
 import lucuma.itc.service.ItcObservingConditions
 import lucuma.itc.service.ObservingMode
 import lucuma.itc.service.TargetData
 
-import scala.concurrent.duration.FiniteDuration
+import scala.concurrent.duration.*
 
 enum ItcWavefrontSensor(val ocs2Tag: String):
   case PWFS  extends ItcWavefrontSensor("PWFS")
@@ -27,6 +28,60 @@ case class ItcSourceDefinition(
   bandOrLine: Either[Band, Wavelength]
 ):
   export target.*
+
+extension (etm: ExposureTimeMode)
+  def spectroscopyCalculationMethod: ItcObservationDetails.CalculationMethod =
+    etm match
+      case ExposureTimeMode.SignalToNoiseMode(sn, at)         =>
+        ItcObservationDetails.CalculationMethod.IntegrationTimeMethod.SpectroscopyIntegrationTime(
+          sigma = sn.toBigDecimal.toDouble,
+          coadds = None,
+          wavelengthAt = at,
+          sourceFraction = 1.0,
+          ditherOffset = Angle.Angle0
+        )
+      case ExposureTimeMode.TimeAndCountMode(time, count, at) =>
+        ItcObservationDetails.CalculationMethod.S2NMethod.SpectroscopyS2N(
+          exposureCount = count.value,
+          coadds = None,
+          exposureDuration = time.toMilliseconds.toDouble.milliseconds,
+          sourceFraction = 1.0,
+          ditherOffset = Angle.Angle0,
+          wavelengthAt = at
+        )
+  def imagingCalculationMethod: ItcObservationDetails.CalculationMethod      =
+    etm match
+      case ExposureTimeMode.SignalToNoiseMode(sn, at)         =>
+        ItcObservationDetails.CalculationMethod.IntegrationTimeMethod.ImagingIntegrationTime(
+          sigma = sn.toBigDecimal.toDouble,
+          coadds = None,
+          sourceFraction = 1.0,
+          ditherOffset = Angle.Angle0
+        )
+      case ExposureTimeMode.TimeAndCountMode(time, count, at) =>
+        ItcObservationDetails.CalculationMethod.S2NMethod.ImagingS2N(
+          exposureCount = count.value,
+          coadds = None,
+          exposureDuration = time.toMilliseconds.toDouble.milliseconds,
+          sourceFraction = 1.0,
+          ditherOffset = Angle.Angle0
+        )
+
+  def desiredString: String =
+    etm match
+      case ExposureTimeMode.SignalToNoiseMode(sn, at)         => s"Desired S/N $sn at $at"
+      case ExposureTimeMode.TimeAndCountMode(time, count, at) =>
+        s"Calculate S/N for exp time $time and count $count at $at"
+
+def getCalculationMethod(
+  observingMode:    ObservingMode,
+  exposureTimeMode: ExposureTimeMode
+): ItcObservationDetails.CalculationMethod =
+  observingMode match
+    case s: ObservingMode.SpectroscopyMode =>
+      exposureTimeMode.spectroscopyCalculationMethod
+    case i: ObservingMode.ImagingMode      =>
+      exposureTimeMode.imagingCalculationMethod
 
 case class ItcParameters(
   source:      ItcSourceDefinition,
@@ -79,123 +134,19 @@ def spectroscopyGraphParams(
     )
   (parameters, bandOrLine)
 
-def spectroscopyIntegrationTimeParams(
-  target:        TargetData,
-  atWavelength:  Wavelength,
-  observingMode: ObservingMode.SpectroscopyMode,
-  conditions:    ItcObservingConditions,
-  sigma:         SignalToNoise
-): (ItcParameters, Either[Band, Wavelength]) = // Bubble up the selected band or line
-  val (sourceDefinition, bandOrLine): (ItcSourceDefinition, Either[Band, Wavelength]) =
-    buildSourceDefinition(target, atWavelength)
-  val parameters: ItcParameters                                                       =
-    ItcParameters(
-      source = sourceDefinition,
-      observation = ItcObservationDetails(
-        calculationMethod =
-          ItcObservationDetails.CalculationMethod.IntegrationTimeMethod.SpectroscopyIntegrationTime(
-            sigma = sigma.toBigDecimal.toDouble,
-            coadds = None,
-            wavelengthAt = atWavelength,
-            sourceFraction = 1.0,
-            ditherOffset = Angle.Angle0
-          ),
-        analysisMethod = observingMode.analysisMethod
-      ),
-      conditions = conditions,
-      telescope = ItcTelescopeDetails(
-        wfs = ItcWavefrontSensor.OIWFS,
-        instrumentPort = observingMode.portDisposition
-      ),
-      instrument = ItcInstrumentDetails(observingMode)
-    )
-  (parameters, bandOrLine)
-
-def spectroscopySNParams(
+def toItcParameters(
   target:           TargetData,
-  atWavelength:     Wavelength,
-  observingMode:    ObservingMode.SpectroscopyMode,
-  conditions:       ItcObservingConditions,
-  exposureDuration: FiniteDuration,
-  exposureCount:    Int
-): (ItcParameters, Either[Band, Wavelength]) = // Bubble up the selected band or line
-  val (sourceDefinition, bandOrLine): (ItcSourceDefinition, Either[Band, Wavelength]) =
-    buildSourceDefinition(target, atWavelength)
-  val parameters: ItcParameters                                                       =
-    ItcParameters(
-      source = sourceDefinition,
-      observation = ItcObservationDetails(
-        calculationMethod = ItcObservationDetails.CalculationMethod.S2NMethod.SpectroscopyS2N(
-          exposureCount = exposureCount,
-          exposureDuration = exposureDuration,
-          coadds = None,
-          sourceFraction = 1.0,
-          ditherOffset = Angle.Angle0,
-          wavelengthAt = atWavelength
-        ),
-        analysisMethod = observingMode.analysisMethod
-      ),
-      conditions = conditions,
-      telescope = ItcTelescopeDetails(
-        wfs = ItcWavefrontSensor.OIWFS,
-        instrumentPort = observingMode.portDisposition
-      ),
-      instrument = ItcInstrumentDetails(observingMode)
-    )
-  (parameters, bandOrLine)
-
-def imagingIntegrationTimeParams(
-  target:        TargetData,
-  atWavelength:  Wavelength,
-  observingMode: ObservingMode,
-  conditions:    ItcObservingConditions,
-  sigma:         SignalToNoise
-): (ItcParameters, Either[Band, Wavelength]) = // Bubble up the selected band or line
-  val (sourceDefinition, bandOrLine): (ItcSourceDefinition, Either[Band, Wavelength]) =
-    buildSourceDefinition(target, atWavelength)
-  val parameters: ItcParameters                                                       =
-    ItcParameters(
-      source = sourceDefinition,
-      observation = ItcObservationDetails(
-        calculationMethod =
-          ItcObservationDetails.CalculationMethod.IntegrationTimeMethod.ImagingIntegrationTime(
-            sigma = sigma.toBigDecimal.toDouble,
-            coadds = None,
-            sourceFraction = 1.0,
-            ditherOffset = Angle.Angle0
-          ),
-        analysisMethod = observingMode.analysisMethod
-      ),
-      conditions = conditions,
-      telescope = ItcTelescopeDetails(
-        wfs = ItcWavefrontSensor.OIWFS,
-        instrumentPort = observingMode.portDisposition
-      ),
-      instrument = ItcInstrumentDetails(observingMode)
-    )
-  (parameters, bandOrLine)
-
-def imagingS2NParams(
-  target:           TargetData,
-  atWavelength:     Wavelength,
   observingMode:    ObservingMode,
   conditions:       ItcObservingConditions,
-  exposureDuration: FiniteDuration,
-  exposureCount:    Int
+  exposureTimeMode: ExposureTimeMode
 ): (ItcParameters, Either[Band, Wavelength]) = // Bubble up the selected band or line
   val (sourceDefinition, bandOrLine): (ItcSourceDefinition, Either[Band, Wavelength]) =
-    buildSourceDefinition(target, atWavelength)
+    buildSourceDefinition(target, exposureTimeMode.at)
   val parameters: ItcParameters                                                       =
     ItcParameters(
       source = sourceDefinition,
       observation = ItcObservationDetails(
-        calculationMethod = ItcObservationDetails.CalculationMethod.S2NMethod.ImagingS2N(
-          exposureCount = exposureCount,
-          exposureDuration = exposureDuration,
-          coadds = None,
-          sourceFraction = 1.0,
-          ditherOffset = Angle.Angle0
-        ),
+        calculationMethod = getCalculationMethod(observingMode, exposureTimeMode),
         analysisMethod = observingMode.analysisMethod
       ),
       conditions = conditions,

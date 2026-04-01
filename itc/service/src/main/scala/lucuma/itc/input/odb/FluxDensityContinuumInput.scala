@@ -10,6 +10,7 @@ import grackle.Result
 import lucuma.core.math.BrightnessUnits.*
 import lucuma.core.math.dimensional.Units
 import lucuma.core.util.*
+import lucuma.itc.binding.*
 import lucuma.odb.graphql.binding.*
 
 object FluxDensityContinuumInput {

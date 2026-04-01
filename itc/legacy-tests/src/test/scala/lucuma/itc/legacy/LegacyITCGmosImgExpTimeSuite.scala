@@ -68,7 +68,7 @@ class LegacyITCGmosImgExpTimeSuite extends CommonITCLegacySuite:
   test("gmos north filter".tag(LegacyITCTest)):
     Enumerated[GmosNorthFilter].all.foreach: f =>
       val result = localItc
-        .calculateIntegrationTime(
+        .calculate(
           bodyConf(sourceDefinition, obs, gmosNConf.copy(filter = f)).asJson.noSpaces
         )
       assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))
@@ -89,7 +89,7 @@ class LegacyITCGmosImgExpTimeSuite extends CommonITCLegacySuite:
   test("gmos south filter".tag(LegacyITCTest)):
     Enumerated[GmosSouthFilter].all.foreach: f =>
       val result = localItc
-        .calculateIntegrationTime(
+        .calculate(
           bodyConf(sourceDefinition, obs, gmosSConf.copy(filter = f)).asJson.noSpaces
         )
       assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))

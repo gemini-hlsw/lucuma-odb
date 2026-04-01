@@ -15,6 +15,7 @@ import lucuma.core.math.SignalToNoise
 import lucuma.core.math.SingleSN
 import lucuma.core.math.TotalSN
 import lucuma.core.math.Wavelength
+import lucuma.core.model.ExposureTimeMode
 import lucuma.core.refined.auto.*
 import lucuma.core.util.TimeSpan
 import lucuma.itc.*
@@ -23,7 +24,37 @@ import lucuma.itc.service.ItcObservingConditions
 import lucuma.itc.service.ObservingMode
 import lucuma.itc.service.TargetData
 
-object MockItc extends Itc[IO]:
+trait MockItcBase extends Itc[IO]:
+  override def calculate(
+    target:           TargetData,
+    observingMode:    ObservingMode,
+    constraints:      ItcObservingConditions,
+    exposureTimeMode: ExposureTimeMode
+  ): IO[TargetIntegrationTime] =
+    exposureTimeMode match
+      case ExposureTimeMode.SignalToNoiseMode(sn, at)         =>
+        calculateIntegrationTime(target, at, observingMode, constraints, sn)
+      case ExposureTimeMode.TimeAndCountMode(time, count, at) =>
+        calculateSignalToNoise(target, at, observingMode, constraints, time, count)
+
+  def calculateSignalToNoise(
+    target:        TargetData,
+    atWavelength:  Wavelength,
+    observingMode: ObservingMode,
+    constraints:   ItcObservingConditions,
+    exposureTime:  TimeSpan,
+    exposureCount: PosInt
+  ): IO[TargetIntegrationTime]
+
+  def calculateIntegrationTime(
+    target:        TargetData,
+    atWavelength:  Wavelength,
+    observingMode: ObservingMode,
+    constraints:   ItcObservingConditions,
+    signalToNoise: SignalToNoise
+  ): IO[TargetIntegrationTime]
+
+object MockItc extends MockItcBase:
 
   override def calculateSignalToNoise(
     target:        TargetData,
@@ -103,7 +134,7 @@ object MockItc extends Itc[IO]:
     )
       .pure[IO]
 
-object MockImagingItc extends Itc[IO]:
+object MockImagingItc extends MockItcBase:
 
   override def calculateSignalToNoise(
     target:        TargetData,
@@ -244,7 +275,7 @@ object MockImagingItc extends Itc[IO]:
     )
       .pure[IO]
 
-object EmissionLineMockItc extends Itc[IO]:
+object EmissionLineMockItc extends MockItcBase:
 
   override def calculateSignalToNoise(
     target:        TargetData,
@@ -291,7 +322,7 @@ object EmissionLineMockItc extends Itc[IO]:
   ): IO[TargetGraphsCalcResult] =
     IO.raiseError(CalculationError("Not implemented"))
 
-object WavelengthAtOutOfRangeMockItc extends Itc[IO]:
+object WavelengthAtOutOfRangeMockItc extends MockItcBase:
 
   override def calculateSignalToNoise(
     target:        TargetData,
@@ -322,7 +353,7 @@ object WavelengthAtOutOfRangeMockItc extends Itc[IO]:
   ): IO[TargetGraphsCalcResult] =
     IO.raiseError(WavelengthOutOfRange(atWavelength))
 
-object FailingMockItc extends Itc[IO]:
+object FailingMockItc extends MockItcBase:
 
   override def calculateSignalToNoise(
     target:        TargetData,

@@ -35,20 +35,17 @@ object ItcSpeedTest:
       testData    <- ItcBenchmarkSetup.initializeTestData()
       _           <- IO.println("Running performance tests with 5 iterations per test...")
       itResult    <- timeCalculation("Integration Time - GMOS-N", 5) {
-                       testData.itc.calculateIntegrationTime(testData.mediumTarget,
-                                                             testData.testWavelength,
-                                                             testData.gmosNorthMode,
-                                                             testData.grayConditions,
-                                                             testData.testSignalToNoise
+                       testData.itc.calculate(testData.mediumTarget,
+                                              testData.gmosNorthMode,
+                                              testData.grayConditions,
+                                              testData.signalToNoiseMode
                        )
                      }
       snResult    <- timeCalculation("Signal-to-Noise - GMOS-N", 5) {
-                       testData.itc.calculateSignalToNoise(testData.mediumTarget,
-                                                           testData.testWavelength,
-                                                           testData.gmosNorthMode,
-                                                           testData.grayConditions,
-                                                           testData.testExposureTime,
-                                                           testData.testExposureCount
+                       testData.itc.calculate(testData.mediumTarget,
+                                              testData.gmosNorthMode,
+                                              testData.grayConditions,
+                                              testData.timeAndCountMode
                        )
                      }
       graphResult <- timeCalculation("Graph Generation - GMOS-N", 5) {

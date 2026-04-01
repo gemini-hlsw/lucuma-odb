@@ -43,43 +43,19 @@ case class FLocalItc[F[_]: {Async as F, Trace as T}](itcLocal: LocalItc[F]):
             }
         }
 
-  def calculateIntegrationTime(
+  def calculate(
     jsonParams:   String,
     atWavelength: Wavelength
   ): F[IntegrationTimeRemoteResult] =
     F.delay(pprint.pprintln(jsonParams)) *>
-      T.span("call_legacy integration_time"):
-        T.put("method"       -> "calculateIntegrationTime",
+      T.span("call_legacy calculate"):
+        T.put("method"       -> "calculate",
               "params.json"  -> jsonParams,
               "ocs_git_hash" -> BuildInfo.ocsGitHash
         ) *>
-          (F.cede *> itcLocal.calculateIntegrationTime(jsonParams).guarantee(F.cede)).flatMap {
+          (F.cede *> itcLocal.calculate(jsonParams).guarantee(F.cede)).flatMap {
             case Right(result) =>
               F.pure(result)
-            case Left(msg)     =>
-              msg match {
-                case TooBright :: HalfWell(v) :: Nil =>
-                  F.raiseError(SourceTooBright(BigDecimal(v)))
-                case List(LocalItc.OutOfRangeMsg)    =>
-                  F.raiseError(WavelengthOutOfRange(atWavelength))
-                case _                               =>
-                  F.raiseError(new UpstreamException(msg))
-              }
-          }
-
-  def calculateSignalToNoise(
-    jsonParams:   String,
-    atWavelength: Wavelength
-  ): F[IntegrationTimeRemoteResult] =
-    F.delay(pprint.pprintln(jsonParams)) *>
-      T.span("call_legacy signal_to_noise"):
-        T.put("method"       -> "calculateSignalToNoise",
-              "params.json"  -> jsonParams,
-              "ocs_git_hash" -> BuildInfo.ocsGitHash
-        ) *>
-          (F.cede *> itcLocal.calculateSignalToNoise(jsonParams).guarantee(F.cede)).flatMap {
-            case Right(result) =>
-              result.pure[F]
             case Left(msg)     =>
               msg match {
                 case TooBright :: HalfWell(v) :: Nil =>

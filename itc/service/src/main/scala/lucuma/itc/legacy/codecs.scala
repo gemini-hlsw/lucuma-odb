@@ -26,6 +26,7 @@ import lucuma.core.model.UnnormalizedSED
 import lucuma.core.syntax.display.*
 import lucuma.core.syntax.string.*
 import lucuma.itc.GraphType
+import lucuma.itc.ItcGhostDetector
 import lucuma.itc.ItcGraph
 import lucuma.itc.ItcGraphGroup
 import lucuma.itc.ItcSeries
@@ -226,6 +227,22 @@ private[legacy] object codecs:
   private val encodeIgrins2Spectroscopy: Encoder[ObservingMode.SpectroscopyMode.Igrins2] = _ =>
     Json.obj()
 
+  private val encodeGhostSpectroscopy: Encoder[ObservingMode.SpectroscopyMode.Ghost] = a =>
+    given Encoder[ItcGhostDetector] = d =>
+      Json.obj(
+        "readMode"          -> d.readMode.ocs2Tag.asJson,
+        "binning"           -> d.binning.ocs2Tag.asJson,
+        "calculationMethod" -> d.timeAndCount.spectroscopyCalculationMethod.asJson
+      )
+
+    Json.obj(
+      "centralWavelength" -> a.centralWavelength.asJson,
+      "nSkyMicroLens"     -> a.numSkyMicrolens.asJson,
+      "resolution"        -> a.resolutionMode.ocs2Tag.asJson,
+      "blueCamera"        -> a.blueDetector.asJson,
+      "redCamera"         -> a.redDetector.asJson
+    )
+
   private given Encoder[ItcInstrumentDetails] = (a: ItcInstrumentDetails) =>
     a.mode match
       case a: ObservingMode.SpectroscopyMode.GmosNorth  =>
@@ -236,6 +253,8 @@ private[legacy] object codecs:
         Json.obj("Flamingos2Parameters" -> encodeF2Spectroscopy(a))
       case a: ObservingMode.SpectroscopyMode.Igrins2    =>
         Json.obj("Igrins2Parameters" -> encodeIgrins2Spectroscopy(a))
+      case a: ObservingMode.SpectroscopyMode.Ghost      =>
+        Json.obj("GhostParameters" -> encodeGhostSpectroscopy(a))
       case a: ObservingMode.ImagingMode.Flamingos2      =>
         Json.obj("Flamingos2Parameters" -> encodeF2Imaging(a))
       case a: ObservingMode.ImagingMode.GmosNorth       =>

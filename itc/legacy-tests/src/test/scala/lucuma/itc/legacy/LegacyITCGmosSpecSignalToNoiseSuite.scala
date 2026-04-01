@@ -74,7 +74,7 @@ class LegacyITCGmosSpecSignalToNoiseSuite extends CommonITCLegacySuite:
   test("gmos north grating".tag(LegacyITCTest)):
     Enumerated[GmosNorthGrating].all.foreach: d =>
       val result = localItc
-        .calculateIntegrationTime(
+        .calculate(
           bodyConf(sourceDefinition, obs, gnConf.copy(disperser = d)).asJson.noSpaces
         )
       assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))
@@ -82,7 +82,7 @@ class LegacyITCGmosSpecSignalToNoiseSuite extends CommonITCLegacySuite:
   test("gmos north filter".tag(LegacyITCTest)):
     Enumerated[GmosNorthFilter].all.foreach: f =>
       val result = localItc
-        .calculateIntegrationTime(
+        .calculate(
           bodyConf(sourceDefinition, obs, gnConf.copy(filter = f.some)).asJson.noSpaces
         )
       assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))
@@ -90,7 +90,7 @@ class LegacyITCGmosSpecSignalToNoiseSuite extends CommonITCLegacySuite:
   test("gmos north fpu".tag(LegacyITCTest)):
     Enumerated[GmosNorthFpu].all.foreach: f =>
       val result = localItc
-        .calculateIntegrationTime(
+        .calculate(
           bodyConf(sourceDefinition,
                    obs,
                    gnConf.copy(fpu = GmosNorthFpuParam(f)),
@@ -117,7 +117,7 @@ class LegacyITCGmosSpecSignalToNoiseSuite extends CommonITCLegacySuite:
   test("gmos south grating".tag(LegacyITCTest)):
     Enumerated[GmosSouthGrating].all.foreach: d =>
       val result = localItc
-        .calculateIntegrationTime(
+        .calculate(
           bodyConf(sourceDefinition, obs, gsConf.copy(disperser = d)).asJson.noSpaces
         )
       assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))
@@ -125,7 +125,7 @@ class LegacyITCGmosSpecSignalToNoiseSuite extends CommonITCLegacySuite:
   test("gmos south filter".tag(LegacyITCTest)):
     Enumerated[GmosSouthFilter].all.foreach: f =>
       val result = localItc
-        .calculateIntegrationTime(
+        .calculate(
           bodyConf(sourceDefinition, obs, gsConf.copy(filter = f.some)).asJson.noSpaces
         )
       assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))
@@ -133,7 +133,7 @@ class LegacyITCGmosSpecSignalToNoiseSuite extends CommonITCLegacySuite:
   test("gmos south fpu".tag(LegacyITCTest)):
     Enumerated[GmosSouthFpu].all.foreach: f =>
       val result = localItc
-        .calculateIntegrationTime(
+        .calculate(
           bodyConf(sourceDefinition,
                    obs,
                    gsConf.copy(fpu = GmosSouthFpuParam(f)),

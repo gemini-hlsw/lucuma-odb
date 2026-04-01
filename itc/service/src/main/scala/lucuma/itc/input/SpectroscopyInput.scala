@@ -6,7 +6,6 @@ package lucuma.itc.input
 import cats.syntax.all.*
 import lucuma.itc.SignificantFigures
 import lucuma.odb.graphql.binding.*
-import lucuma.odb.graphql.input.*
 
 sealed trait SpectroscopyTimeInput:
   def asterism: List[TargetDataInput]

@@ -103,6 +103,19 @@ object AsterismSpectroscopyTimeRequest:
         case Igrins2SpectroscopyInput(_, port) =>
           Result.success:
             ObservingMode.SpectroscopyMode.Igrins2(port)
+        case GhostSpectroscopyInput(centralWavelength,
+                                    numSkyMicrolens,
+                                    resolutionMode,
+                                    redDetector,
+                                    blueDetector
+            ) =>
+          Result.success:
+            ObservingMode.SpectroscopyMode.Ghost(centralWavelength,
+                                                 numSkyMicrolens,
+                                                 resolutionMode,
+                                                 redDetector,
+                                                 blueDetector
+            )
         case _                                 =>
           Result.failure("Invalid spectroscopy mode")
 

@@ -35,7 +35,7 @@ class LegacyITCIgrins2SpecSignalToNoiseSuite extends CommonITCLegacySuite:
   )
 
   test("IGRINS-2 spectroscopy integration time".tag(LegacyITCTest)):
-    val result = localItc.calculateIntegrationTime(baseParams.asJson.noSpaces)
+    val result = localItc.calculate(baseParams.asJson.noSpaces)
     assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))
 
   testConditions("IGRINS-2 spectroscopy integration time", baseParams)

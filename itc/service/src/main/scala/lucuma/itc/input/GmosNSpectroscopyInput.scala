@@ -13,6 +13,7 @@ import lucuma.core.math.Wavelength
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.sequence.gmos.GmosCcdMode
 import lucuma.core.model.sequence.gmos.GmosFpuMask
+import lucuma.itc.binding.*
 import lucuma.odb.graphql.binding.*
 import lucuma.odb.graphql.input.*
 import lucuma.odb.graphql.input.ExposureTimeModeInput

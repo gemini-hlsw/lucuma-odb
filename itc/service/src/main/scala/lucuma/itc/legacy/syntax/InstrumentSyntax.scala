@@ -207,3 +207,28 @@ trait Flamingos2FpuSyntax:
         case LongSlit8     => "LONGSLIT_8"
 
 object flamingos2fpu extends Flamingos2FpuSyntax
+
+trait GhostBinningSyntax:
+  import lucuma.core.enums.GhostBinning
+  extension (self: GhostBinning) def ocs2Tag: String = self.tag.toUpperCase
+
+object ghostbinning extends GhostBinningSyntax
+
+trait GhostReadModeSyntax:
+  import lucuma.core.enums.GhostReadMode
+  extension (self: GhostReadMode)
+    def ocs2Tag: String = self match
+      case GhostReadMode.Slow   => "SLOW_LOW"
+      case GhostReadMode.Medium => "MEDIUM_LOW"
+      case GhostReadMode.Fast   => "FAST_LOW"
+
+object ghostreadmode extends GhostReadModeSyntax
+
+trait GhostResolutionModeSyntax:
+  import lucuma.core.enums.GhostResolutionMode
+  extension (self: GhostResolutionMode)
+    def ocs2Tag: String = self match
+      case GhostResolutionMode.Standard => "GhostStandard"
+      case GhostResolutionMode.High     => "GhostHigh"
+
+object ghostresolutionmode extends GhostResolutionModeSyntax

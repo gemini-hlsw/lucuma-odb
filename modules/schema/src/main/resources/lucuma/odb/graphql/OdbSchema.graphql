@@ -1505,6 +1505,15 @@ enum GhostBinning {
 }
 
 """
+GHOST read mode
+"""
+enum GhostReadMode {
+  SLOW
+  MEDIUM
+  FAST
+}
+
+"""
 GMOS amp count
 """
 enum GmosAmpCount {

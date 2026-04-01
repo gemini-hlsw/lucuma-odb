@@ -33,7 +33,7 @@ class LegacyITCIgrins2WavelengthOutOfRangeSuite extends CommonITCLegacySuite:
 
   test("igrins2 at 1.9 µm returns out-of-range".tag(LegacyITCTest)):
     val result = localItc
-      .calculateIntegrationTime(baseParams.asJson.noSpaces)
+      .calculate(baseParams.asJson.noSpaces)
     assertIO(
       result.map:
         case Left(msgs) => msgs.contains(LocalItc.OutOfRangeMsg)

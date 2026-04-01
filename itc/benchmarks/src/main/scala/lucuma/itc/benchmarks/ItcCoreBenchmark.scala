@@ -8,6 +8,7 @@ import cats.effect.unsafe.implicits.global
 import eu.timepit.refined.types.numeric.PosInt
 import lucuma.core.math.SignalToNoise
 import lucuma.core.math.Wavelength
+import lucuma.core.model.ExposureTimeMode
 import lucuma.core.util.TimeSpan
 import lucuma.itc.service.Itc
 import lucuma.itc.service.ItcObservingConditions
@@ -29,7 +30,11 @@ case class BenchmarkState(
   testSignalToNoise: SignalToNoise,
   testExposureTime:  TimeSpan,
   testExposureCount: PosInt
-)
+):
+  val signalToNoiseMode: ExposureTimeMode =
+    ExposureTimeMode.SignalToNoiseMode(testSignalToNoise, testWavelength)
+  val timeAndCountMode: ExposureTimeMode  =
+    ExposureTimeMode.TimeAndCountMode(testExposureTime, testExposureCount, testWavelength)
 
 object BenchmarkState:
   def fromTestData(testData: ItcTestData): BenchmarkState =
@@ -71,12 +76,11 @@ class ItcCoreBenchmark:
   def benchmarkIntegrationTime_GmosN_Medium(bh: Blackhole): Unit =
     val s      = state.getOrElse(sys.exit(1))
     val result = s.itc
-      .calculateIntegrationTime(
+      .calculate(
         s.mediumTarget,
-        s.testWavelength,
         s.gmosNorthMode,
         s.grayConditions,
-        s.testSignalToNoise
+        s.signalToNoiseMode
       )
       .unsafeRunSync()
     bh.consume(result)
@@ -85,13 +89,11 @@ class ItcCoreBenchmark:
   def benchmarkSignalToNoise_GmosN_Medium(bh: Blackhole): Unit =
     val s      = state.getOrElse(sys.exit(1))
     val result = s.itc
-      .calculateSignalToNoise(
+      .calculate(
         s.mediumTarget,
-        s.testWavelength,
         s.gmosNorthMode,
         s.grayConditions,
-        s.testExposureTime,
-        s.testExposureCount
+        s.timeAndCountMode
       )
       .unsafeRunSync()
     bh.consume(result)

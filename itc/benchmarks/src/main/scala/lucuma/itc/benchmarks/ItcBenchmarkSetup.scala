@@ -17,6 +17,7 @@ import lucuma.core.math.dimensional.Measure
 import lucuma.core.math.dimensional.TaggedUnit
 import lucuma.core.math.units.VegaMagnitude
 import lucuma.core.model.CloudExtinction
+import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.ImageQuality
 import lucuma.core.model.SourceProfile
 import lucuma.core.model.SpectralDefinition
@@ -52,7 +53,11 @@ case class ItcTestData(
   gmosNorthMode:     ObservingMode.SpectroscopyMode,
   grayConditions:    ItcObservingConditions,
   mediumTarget:      TargetData
-)
+):
+  val signalToNoiseMode: ExposureTimeMode =
+    ExposureTimeMode.SignalToNoiseMode(testSignalToNoise, testWavelength)
+  val timeAndCountMode: ExposureTimeMode  =
+    ExposureTimeMode.TimeAndCountMode(testExposureTime, testExposureCount, testWavelength)
 
 object ItcBenchmarkSetup:
 

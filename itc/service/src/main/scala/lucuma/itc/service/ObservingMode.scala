@@ -6,11 +6,10 @@ package lucuma.itc.service
 import cats.Hash
 import cats.derived.*
 import cats.syntax.all.*
-import io.circe.*
-import io.circe.syntax.*
 import lucuma.core.enums.*
 import lucuma.core.math.Wavelength
 import lucuma.core.model.sequence.gmos.GmosCcdMode
+import lucuma.itc.ItcGhostDetector
 import lucuma.itc.service.ItcObservationDetails.AnalysisMethod
 import lucuma.itc.service.hashes.given
 import lucuma.itc.service.syntax.*
@@ -21,24 +20,14 @@ sealed trait ObservingMode {
   def instrument: Instrument
   def analysisMethod: ItcObservationDetails.AnalysisMethod
   def portDisposition: PortDisposition
+
+  def description: String
 }
 
 object ObservingMode {
-  given Encoder[ObservingMode] = Encoder.instance {
-    case spec: SpectroscopyMode => spec.asJson
-    case img: ImagingMode       => img.asJson
-  }
-
   sealed trait SpectroscopyMode extends ObservingMode derives Hash {}
 
   object SpectroscopyMode {
-    given Encoder[ObservingMode.SpectroscopyMode] = Encoder.instance {
-      case gn: GmosNorth  => gn.asJson
-      case gs: GmosSouth  => gs.asJson
-      case f2: Flamingos2 => f2.asJson
-      case ig: Igrins2    => ig.asJson
-    }
-
     sealed trait GmosSpectroscopy extends SpectroscopyMode derives Hash {
       def isIfu: Boolean
 
@@ -81,16 +70,10 @@ object ObservingMode {
         filter.foldLeft(disperser.simultaneousCoverage.centeredAt(centralWavelength).toInterval)(
           (a, b) => a.intersect(b.coverageGN)
         )
-    }
 
-    object GmosNorth:
-      given Encoder[GmosNorth] = a =>
-        Json.obj(
-          ("instrument", a.instrument.asJson),
-          ("params",
-           GmosNSpectroscopyParams(a.centralWavelength, a.disperser, a.fpu, a.filter).asJson
-          )
-        )
+      val description: String =
+        s"${instrument.shortName} Longslit"
+    }
 
     case class GmosSouth(
       centralWavelength: Wavelength,
@@ -113,16 +96,10 @@ object ObservingMode {
         filter.foldLeft(disperser.simultaneousCoverage.centeredAt(centralWavelength).toInterval)(
           (a, b) => a.intersect(b.coverageGS)
         )
-    }
 
-    object GmosSouth:
-      given Encoder[GmosSouth] = a =>
-        Json.obj(
-          ("instrument", a.instrument.asJson),
-          ("params",
-           GmosSSpectroscopyParams(a.centralWavelength, a.disperser, a.fpu, a.filter).asJson
-          )
-        )
+      val description: String =
+        s"${instrument.shortName} Longslit"
+    }
 
     case class Flamingos2(
       disperser:       Flamingos2Disperser,
@@ -139,14 +116,9 @@ object ObservingMode {
       val instrument: Instrument =
         Instrument.Flamingos2
 
+      val description: String =
+        s"${instrument.shortName} Longslit"
     }
-
-    object Flamingos2:
-      given Encoder[Flamingos2] = a =>
-        Json.obj(
-          ("instrument", a.instrument.asJson),
-          ("params", Flamingos2SpectroscopyParams(a.disperser, a.fpu, a.filter).asJson)
-        )
 
     case class Igrins2(portDisposition: PortDisposition) extends SpectroscopyMode derives Hash {
       override def analysisMethod: AnalysisMethod =
@@ -156,25 +128,38 @@ object ObservingMode {
 
       val instrument: Instrument =
         Instrument.Igrins2
+
+      val description: String =
+        s"${instrument.shortName} Longslit"
     }
 
-    object Igrins2:
-      given Encoder[Igrins2] = a =>
-        Json.obj(
-          ("instrument", a.instrument.asJson),
-          ("params", Igrins2SpectroscopyParams().asJson)
+    case class Ghost(
+      centralWavelength: Wavelength,
+      numSkyMicrolens:   Int,
+      resolutionMode:    GhostResolutionMode,
+      redDetector:       ItcGhostDetector,
+      blueDetector:      ItcGhostDetector
+    ) extends SpectroscopyMode derives Hash {
+
+      val instrument: Instrument =
+        Instrument.Ghost
+
+      def portDisposition: PortDisposition =
+        PortDisposition.Bottom
+
+      override def analysisMethod: AnalysisMethod =
+        ItcObservationDetails.AnalysisMethod.Ifu.Sky(
+          skyFibres = numSkyMicrolens
         )
 
+      val description: String =
+        s"${instrument.shortName} IFU"
+    }
   }
 
   sealed trait ImagingMode extends ObservingMode derives Hash
 
   object ImagingMode {
-    given Encoder[ObservingMode.ImagingMode] = Encoder.instance {
-      case gn: GmosNorth  => gn.asJson
-      case gs: GmosSouth  => gs.asJson
-      case f2: Flamingos2 => f2.asJson
-    }
 
     sealed trait GmosImaging extends ImagingMode derives Hash {
 
@@ -194,14 +179,9 @@ object ObservingMode {
       val instrument: Instrument =
         Instrument.GmosNorth
 
+      val description: String =
+        s"${instrument.shortName} Imaging"
     }
-
-    object GmosNorth:
-      given Encoder[GmosNorth] = a =>
-        Json.obj(
-          ("instrument", a.instrument.asJson),
-          ("params", GmosNImagingParams(a.filter).asJson)
-        )
 
     case class GmosSouth(
       filter:          GmosSouthFilter,
@@ -212,14 +192,10 @@ object ObservingMode {
 
       val instrument: Instrument =
         Instrument.GmosSouth
-    }
 
-    object GmosSouth:
-      given Encoder[GmosSouth] = a =>
-        Json.obj(
-          ("instrument", a.instrument.asJson),
-          ("params", GmosSImagingParams(a.filter).asJson)
-        )
+      val description: String =
+        s"${instrument.shortName} Imaging"
+    }
 
     case class Flamingos2(
       filter:          Flamingos2Filter,
@@ -231,14 +207,9 @@ object ObservingMode {
         ItcObservationDetails.AnalysisMethod.Aperture.Auto(
           skyAperture = 1.0
         )
+
+      val description: String =
+        s"${instrument.shortName} Imaging"
     }
-
-    object Flamingos2:
-      given Encoder[Flamingos2] = a =>
-        Json.obj(
-          ("instrument", a.instrument.asJson),
-          ("params", Flamingos2ImagingParams(a.filter).asJson)
-        )
   }
-
 }

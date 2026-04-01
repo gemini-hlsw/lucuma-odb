@@ -5,7 +5,6 @@ package lucuma.itc.input
 
 import cats.syntax.all.*
 import lucuma.odb.graphql.binding.*
-import lucuma.odb.graphql.input.*
 
 case class ImagingInput(
   asterism:    List[TargetDataInput],
