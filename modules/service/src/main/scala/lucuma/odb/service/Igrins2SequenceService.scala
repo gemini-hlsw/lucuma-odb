@@ -132,4 +132,5 @@ object Igrins2SequenceService:
           COALESCE(c_offset_mode, 'nod_along_slit')
         FROM t_igrins_2_long_slit
         WHERE c_observation_id = $observation_id
+          AND c_visit_id IS NULL
       """.query(igrins_2_static)
