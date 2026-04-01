@@ -3218,6 +3218,15 @@ type Mutation {
   ): ReplaceGmosSouthSequenceResult!
 
   """
+  Replaces the remaining steps in an execution sequence with the provided
+  sequence.  Previously executed (or even partially executed) steps are not
+  deleted.  Any ongoing steps are abandoned.
+  """
+  replaceIgrins2Sequence(
+    input: ReplaceIgrins2SequenceInput!
+  ): ReplaceIgrins2SequenceResult!
+
+  """
   Resets the acquisition sequence to start from the initial step regardless of
   which acquisition steps may have been executed.  Requires staff (or better)
   access.
@@ -18445,6 +18454,18 @@ input GmosSouthStepInput {
   observeClass: ObserveClass!
 }
 
+input Igrins2DynamicInput {
+  exposure: TimeSpanInput!
+}
+
+input Igrins2StepInput {
+  instrumentConfig: Igrins2DynamicInput!
+  breakpoint: Breakpoint
+  stepConfig: StepConfigInput!
+  telescopeConfig: TelescopeConfigInput
+  observeClass: ObserveClass!
+}
+
 input Flamingos2AtomInput {
   description: NonEmptyString
   steps: [Flamingos2StepInput!]!
@@ -18458,6 +18479,11 @@ input GmosNorthAtomInput {
 input GmosSouthAtomInput {
   description: NonEmptyString
   steps: [GmosSouthStepInput!]!
+}
+
+input Igrins2AtomInput {
+  description: NonEmptyString
+  steps: [Igrins2StepInput!]!
 }
 
 """
@@ -18542,4 +18568,32 @@ sequence.
 """
 type ReplaceGmosSouthSequenceResult {
   sequence: [GmosSouthAtom!]!
+}
+
+"""
+Replace IGRINS-2 sequence input.  Select the observation using one of the
+observation ID or the observation reference.  If both are provided, they must
+refer to the same observation.
+"""
+input ReplaceIgrins2SequenceInput {
+  observationId: ObservationId
+  observationReference: ObservationReferenceLabel
+
+  "Specifies which sequence should be replaced."
+  sequenceType: SequenceType!
+
+  """
+  The new sequence.  Any unexecuted steps are deleted and replaced with the
+  provided sequence.  Steps that were previously executed, or for which at least
+  one execution event was received, are preserved.
+  """
+  sequence: [Igrins2AtomInput!]
+}
+
+"""
+The result of a replace sequence mutation, consisting of the newly inserted
+sequence.
+"""
+type ReplaceIgrins2SequenceResult {
+  sequence: [Igrins2Atom!]!
 }

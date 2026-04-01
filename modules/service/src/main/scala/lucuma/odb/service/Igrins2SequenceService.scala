@@ -3,11 +3,17 @@
 
 package lucuma.odb.service
 
+import cats.effect.Concurrent
+import cats.syntax.applicative.*
+import cats.syntax.flatMap.*
+import cats.syntax.functor.*
 import cats.syntax.option.*
+import lucuma.core.enums.Igrins2OffsetMode
 import lucuma.core.model.Observation
 import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.igrins2.Igrins2DynamicConfig
+import lucuma.core.model.sequence.igrins2.Igrins2SVCImages
 import lucuma.core.model.sequence.igrins2.Igrins2StaticConfig
 import lucuma.odb.util.Codecs.observation_id
 import lucuma.odb.util.Codecs.step_id
@@ -26,28 +32,49 @@ trait Igrins2SequenceService[F[_]]:
     observationId: Observation.Id,
     visitId:       Option[Visit.Id],
     static:        Igrins2StaticConfig
-  )(using Transaction[F], Services.ServiceAccess): F[Long]
+  )(using Transaction[F], Services.ServiceAccess): F[Option[Long]]
 
   def selectStaticForVisit(
     visitId: Visit.Id
   )(using Transaction[F]): F[Option[Igrins2StaticConfig]]
 
+  def selectStatic(
+    observationId: Observation.Id
+  )(using Transaction[F]): F[Option[Igrins2StaticConfig]]
+
+  def selectStaticOrDefault(
+    observationId: Observation.Id
+  )(using Transaction[F]): F[Option[Igrins2StaticConfig]]
+
 object Igrins2SequenceService:
 
-  def instantiate[F[_]](using Services[F]): Igrins2SequenceService[F] =
+  def instantiate[F[_]: Concurrent](using Services[F]): Igrins2SequenceService[F] =
     new Igrins2SequenceService[F]:
 
       override def insertStatic(
         observationId: Observation.Id,
         visitId:       Option[Visit.Id],
         static:        Igrins2StaticConfig
-      )(using Transaction[F], Services.ServiceAccess): F[Long] =
-        session.unique(Statements.InsertStatic)(observationId, visitId, static)
+      )(using Transaction[F], Services.ServiceAccess): F[Option[Long]] =
+        session.option(Statements.InsertStatic)(observationId, visitId, static)
 
       override def selectStaticForVisit(
         visitId: Visit.Id
       )(using Transaction[F]): F[Option[Igrins2StaticConfig]] =
         session.option(Statements.SelectStaticByVisit)(visitId)
+
+      override def selectStatic(
+        observationId: Observation.Id
+      )(using Transaction[F]): F[Option[Igrins2StaticConfig]] =
+        session.option(Statements.SelectStaticByObservation)(observationId)
+
+      override def selectStaticOrDefault(
+        observationId: Observation.Id
+      )(using Transaction[F]): F[Option[Igrins2StaticConfig]] =
+        for
+          s0 <- selectStatic(observationId)
+          s1 <- s0.fold(session.option(Statements.SelectStaticByMode)(observationId))(_.some.pure[F])
+        yield s1.getOrElse(Igrins2StaticConfig(Igrins2SVCImages.DontSave, Igrins2OffsetMode.NodAlongSlit)).some
 
   object Statements:
 
@@ -75,6 +102,7 @@ object Igrins2SequenceService:
           $observation_id,
           ${visit_id.opt},
           $igrins_2_static
+        ON CONFLICT DO NOTHING
         RETURNING c_static_id
       """.query(int8)
 
@@ -85,4 +113,23 @@ object Igrins2SequenceService:
           c_offset_mode
         FROM t_igrins_2_static
         WHERE c_visit_id = $visit_id
+      """.query(igrins_2_static)
+
+    val SelectStaticByObservation: Query[Observation.Id, Igrins2StaticConfig] =
+      sql"""
+        SELECT
+          c_save_svc_images,
+          c_offset_mode
+        FROM t_igrins_2_static
+        WHERE c_observation_id = $observation_id
+        AND c_visit_id IS NULL
+      """.query(igrins_2_static)
+
+    val SelectStaticByMode: Query[Observation.Id, Igrins2StaticConfig] =
+      sql"""
+        SELECT
+          COALESCE(c_save_svc_images, false),
+          COALESCE(c_offset_mode, 'nod_along_slit')
+        FROM t_igrins_2_long_slit
+        WHERE c_observation_id = $observation_id
       """.query(igrins_2_static)
