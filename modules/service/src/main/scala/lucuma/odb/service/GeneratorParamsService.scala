@@ -47,6 +47,7 @@ import lucuma.odb.sequence.data.ItcInput
 import lucuma.odb.sequence.data.MissingParam
 import lucuma.odb.sequence.data.MissingParamSet
 import lucuma.odb.sequence.flamingos2
+import lucuma.odb.sequence.ghost
 import lucuma.odb.sequence.igrins2
 import lucuma.odb.util.Codecs.*
 import skunk.*
@@ -268,6 +269,9 @@ object GeneratorParamsService {
           GeneratorParams(itcInput, obsParams.scienceBand, obsMode, obsParams.calibrationRole, obsParams.declaredComplete, obsParams.executionState, obsParams.stepCount)
 
         observingMode(obsParams.targets, config).map:
+          case gh @ ghost.ifu.Config(_, _, _, _, _) =>
+            throw new RuntimeException("GHOST TBD")
+
           case gn @ gmos.longslit.Config.GmosNorth(g, f, u, c, a) =>
             val sciMode = InstrumentMode.GmosNorthSpectroscopy(
               c.exposureTimeMode,

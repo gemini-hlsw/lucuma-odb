@@ -120,6 +120,7 @@ object ObservingModeServices:
       )(using Transaction[F], SuperUserAccess): F[Result[Unit]] =
         List(
           input.flamingos2LongSlit.map(m => flamingos2LongSlitService.insert(m, etm, which)),
+          input.ghostIfu.map(m =>           ghostIfuService.insert(m, etm, which)),
           input.gmosNorthImaging.map(m =>   gmosImagingService.insertNorth(m, etm, which)),
           input.gmosNorthLongSlit.map(m =>  gmosLongSlitService.insertNorth(m, etm, which)),
           input.gmosSouthImaging.map(m =>   gmosImagingService.insertSouth(m, etm, which)),

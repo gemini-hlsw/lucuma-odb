@@ -48,7 +48,7 @@ import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.LoggerFactory
 import org.typelevel.log4cats.slf4j.Slf4jFactory
 import org.typelevel.log4cats.syntax.*
-import skunk.{Command as _, *}
+import skunk.*
 
 import java.time.LocalDate
 import java.time.LocalDateTime

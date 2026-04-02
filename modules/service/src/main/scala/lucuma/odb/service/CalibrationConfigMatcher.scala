@@ -56,6 +56,7 @@ object CalibrationConfigMatcher:
 
   def matcherFor(config: CalibrationConfigSubset, calibRole: CalibrationRole): CalibrationConfigMatcher =
     val modeType = config match
+      case GhostConfigs           => GhostIfu
       case _: GmosNConfigs        => GmosNorthLongSlit
       case _: GmosSConfigs        => GmosSouthLongSlit
       case _: GmosNImagingConfigs => GmosNorthImaging

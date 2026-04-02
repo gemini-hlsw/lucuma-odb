@@ -3,17 +3,15 @@
 
 package lucuma.odb.util
 
-import cats.syntax.option.*
 import lucuma.core.enums.GhostBinning
+import lucuma.core.enums.GhostIfu1FiberAgitator
+import lucuma.core.enums.GhostIfu2FiberAgitator
 import lucuma.core.enums.GhostReadMode
 import lucuma.core.enums.GhostResolutionMode
 import lucuma.core.model.sequence.ghost.GhostDetector
 import lucuma.core.model.sequence.ghost.GhostDynamicConfig
 import lucuma.core.model.sequence.ghost.GhostStaticConfig
-import lucuma.core.model.sequence.ghost.Ifu1FiberAgitator
-import lucuma.core.model.sequence.ghost.Ifu2FiberAgitator
 import skunk.*
-import skunk.codec.`enum`.`enum`
 import skunk.data.Type
 
 trait GhostCodecs:
@@ -25,28 +23,11 @@ trait GhostCodecs:
   val ghost_binning: Codec[GhostBinning] =
     enumerated[GhostBinning](Type.varchar)
 
-  private def ghost_fiber_agitator[A](
-    toBoolean: A => Boolean,
-    enabled:   A,
-    disabled:  A
-  ): Codec[A] =
+  val ghost_ifu1_fiber_agitator: Codec[GhostIfu1FiberAgitator] =
+    enumerated[GhostIfu1FiberAgitator](Type("e_ghost_fiber_agitator"))
 
-    val toString: A => String =
-      a => if toBoolean(a) then "enabled" else "disabled"
-
-    val fromString: String => Option[A] = {
-      case "enabled"  => enabled.some
-      case "disabled" => disabled.some
-      case _          => none
-    }
-
-    `enum`(toString, fromString, Type("e_ghost_fiber_agitator"))
-
-  val ghost_ifu1_fiber_agitator: Codec[Ifu1FiberAgitator] =
-    ghost_fiber_agitator(_.value, Ifu1FiberAgitator.Enabled, Ifu1FiberAgitator.Disabled)
-
-  val ghost_ifu2_fiber_agitator: Codec[Ifu2FiberAgitator] =
-    ghost_fiber_agitator(_.value, Ifu2FiberAgitator.Enabled, Ifu2FiberAgitator.Disabled)
+  val ghost_ifu2_fiber_agitator: Codec[GhostIfu2FiberAgitator] =
+    enumerated[GhostIfu2FiberAgitator](Type("e_ghost_fiber_agitator"))
 
   val ghost_read_mode: Codec[GhostReadMode] =
     enumerated[GhostReadMode](Type.varchar)

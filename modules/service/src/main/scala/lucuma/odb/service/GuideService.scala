@@ -32,7 +32,6 @@ import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.PortDisposition
 import lucuma.core.enums.Site
 import lucuma.core.enums.TrackType
-import lucuma.core.geom.ShapeExpression
 import lucuma.core.geom.jts.interpreter.given
 import lucuma.core.math.Angle
 import lucuma.core.math.Coordinates
@@ -69,6 +68,7 @@ import lucuma.odb.json.all.query.given
 import lucuma.odb.json.target
 import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.sequence.flamingos2
+import lucuma.odb.sequence.ghost
 import lucuma.odb.sequence.gmos
 import lucuma.odb.sequence.igrins2
 import lucuma.odb.sequence.syntax.hash.*
@@ -282,16 +282,18 @@ object GuideService {
 
     val (site, observingModeType, agsWavelength): (Site, ObservingModeType, Wavelength) =
       params.observingMode match
-        case mode: gmos.longslit.Config.GmosNorth =>
-          (Site.GN, ObservingModeType.GmosNorthLongSlit, mode.centralWavelength)
-        case mode: gmos.longslit.Config.GmosSouth =>
-          (Site.GS, ObservingModeType.GmosSouthLongSlit, mode.centralWavelength)
-        case gmos.imaging.Config.GmosNorth(filters = filters) =>
-          (Site.GN, ObservingModeType.GmosNorthImaging, filters.map(_.filter.wavelength).maximum)
-        case gmos.imaging.Config.GmosSouth(filters = filters) =>
-          (Site.GS, ObservingModeType.GmosSouthImaging, filters.map(_.filter.wavelength).maximum)
         case mode: flamingos2.longslit.Config =>
           (Site.GS, ObservingModeType.Flamingos2LongSlit, mode.filter.wavelength)
+        case mode: ghost.ifu.Config =>
+          (Site.GS, ObservingModeType.GhostIfu, lucuma.odb.sequence.ghost.CentralWavelength)
+        case gmos.imaging.Config.GmosNorth(filters = filters) =>
+          (Site.GN, ObservingModeType.GmosNorthImaging, filters.map(_.filter.wavelength).maximum)
+        case mode: gmos.longslit.Config.GmosNorth =>
+          (Site.GN, ObservingModeType.GmosNorthLongSlit, mode.centralWavelength)
+        case gmos.imaging.Config.GmosSouth(filters = filters) =>
+          (Site.GS, ObservingModeType.GmosSouthImaging, filters.map(_.filter.wavelength).maximum)
+        case mode: gmos.longslit.Config.GmosSouth =>
+          (Site.GS, ObservingModeType.GmosSouthLongSlit, mode.centralWavelength)
         case _: igrins2.longslit.Config =>
           // TODO Verify what wavelength to use for ags
           (Site.GS, ObservingModeType.Igrins2LongSlit, Wavelength.fromIntNanometers(1700).get)

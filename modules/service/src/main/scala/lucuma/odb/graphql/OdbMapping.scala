@@ -7,9 +7,9 @@ import _root_.skunk.AppliedFragment
 import _root_.skunk.Session
 import cats.Monoid
 import cats.Parallel
+import cats.effect.*
 import cats.effect.std.SecureRandom
 import cats.effect.std.Supervisor
-import cats.effect.{Unique as _, *}
 import cats.syntax.all.*
 import com.github.vertical_blank.sqlformatter.SqlFormatter
 import fs2.concurrent.Topic
@@ -185,6 +185,7 @@ object OdbMapping {
           with Igrins2LongSlitMapping[F]
           with Igrins2StaticMapping[F]
           with FilterTypeMetaMapping[F]
+          with GhostIfuMapping[F]
           with GmosCcdModeMapping[F]
           with GmosCustomMaskMapping[F]
           with GmosDynamicMapping[F]
@@ -574,6 +575,7 @@ object OdbMapping {
                 ExecutionEventSelectResultMapping,
                 Flamingos2CustomMaskMappings,
                 Flamingos2FpuMaskMappings,
+                GhostIfuMappings,
                 GmosCcdModeMappings,
                 GmosCustomMaskMappings,
                 GmosImagingMappings,
