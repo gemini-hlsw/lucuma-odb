@@ -52,6 +52,31 @@ class replaceGmosSouthSequence extends query.ExecutionTestSupportForGmos with Re
           }
     """
 
+  def imagingStepInput(filter: GmosSouthFilter): String =
+    s"""
+          {
+            instrumentConfig: {
+              exposure: {
+                seconds: 20
+              }
+              readout: {
+                xBin: ONE
+                yBin: ONE
+                ampCount: TWELVE
+                ampGain: LOW
+                ampReadMode: SLOW
+              }
+              dtax: ZERO
+              roi: FULL_FRAME
+              filter: ${filter.tag.toScreamingSnakeCase}
+            }
+            stepConfig: {
+              science: true
+            }
+            observeClass: SCIENCE
+          }
+    """
+
   test("Simple one atom, one step"):
     val setup: IO[Observation.Id] =
       for
@@ -128,3 +153,47 @@ class replaceGmosSouthSequence extends query.ExecutionTestSupportForGmos with Re
         i0 <- query(pi, mutation(Instrument.GmosSouth, in)).map(mutationOutput(Instrument.GmosSouth, _))
         i1 <- scienceSequenceIds(pi, o).map(_.toList)
       yield i0 === i1
+
+  test("mutating imaging observation"):
+    val setup: IO[Observation.Id] =
+      for
+        p <- createProgram
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createGmosSouthImagingObservationAs(pi, p, t)
+      yield o
+
+    setup.flatMap: oid =>
+      val inputString = input(oid, SequenceType.Science, atomInput("Img", imagingStepInput(GmosSouthFilter.GPrime)))
+      expect(
+        user     = pi,
+        query    = s"""
+          mutation {
+            replaceGmosSouthSequence(input: $inputString) {
+              sequence {
+                description
+                steps {
+                  instrumentConfig {
+                    filter
+                  }
+                }
+              }
+            }
+          }
+        """,
+        expected = json"""
+          {
+            "replaceGmosSouthSequence": {
+              "sequence": [
+                {
+                  "description": "Img",
+                  "steps": [
+                    {
+                      "instrumentConfig": { "filter": "G_PRIME" }
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        """.asRight
+      )

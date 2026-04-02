@@ -110,7 +110,7 @@ object GmosSequenceService:
           mode match
             case ObservingModeType.GmosNorthLongSlit =>
               InitialConfigs.GmosNorthStatic.some
-            case ObservingModeType.GmosSouthImaging  =>
+            case ObservingModeType.GmosNorthImaging  =>
               InitialConfigs.GmosNorthStatic.copy(mosPreImaging = mosPreImaging(variant)).some
             case _                                   =>
               none
