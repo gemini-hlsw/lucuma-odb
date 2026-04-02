@@ -14,7 +14,6 @@ import io.circe.syntax.*
 import lucuma.core.enums.Breakpoint
 import lucuma.core.enums.GmosLongSlitAcquisitionRoi
 import lucuma.core.enums.GmosLongSlitAcquisitionRoi.*
-import lucuma.core.enums.Instrument
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.Step
@@ -98,7 +97,7 @@ class executionAcqGmosNorth extends ExecutionTestSupportForGmos with mutation.Up
         p  <- createProgram
         t  <- createTargetWithProfileAs(pi, p)
         o  <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
-        v  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
+        v  <- recordVisitAs(serviceUser, o)
 
         // Execute the first step.
         s  <- firstAcquisitionStepId(serviceUser, o)
@@ -119,7 +118,7 @@ class executionAcqGmosNorth extends ExecutionTestSupportForGmos with mutation.Up
         p  <- createProgram
         t  <- createTargetWithProfileAs(pi, p)
         o  <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
-        v  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
+        v  <- recordVisitAs(serviceUser, o)
 
         // Execute the first step.
         s  <- firstAcquisitionStepId(serviceUser, o)
@@ -159,7 +158,7 @@ class executionAcqGmosNorth extends ExecutionTestSupportForGmos with mutation.Up
         p  <- createProgram
         t  <- createTargetWithProfileAs(pi, p)
         o  <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
-        v  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
+        v  <- recordVisitAs(serviceUser, o)
 
         // Acquisition Sequence
         ac <- acquisitionStepIds(serviceUser, o)
@@ -186,7 +185,7 @@ class executionAcqGmosNorth extends ExecutionTestSupportForGmos with mutation.Up
         p  <- createProgram
         t  <- createTargetWithProfileAs(pi, p)
         o  <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
-        v  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
+        v  <- recordVisitAs(serviceUser, o)
 
         x0 <- firstScienceStepId(serviceUser, o)
 
@@ -467,7 +466,7 @@ class executionAcqGmosNorth extends ExecutionTestSupportForGmos with mutation.Up
       )
 
       // Record a visit, observe the default 3 first atom steps with g' filter
-      v <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
+      v <- recordVisitAs(serviceUser, o)
       _ <- expect(
         user     = pi,
         query    = nextAtomFilterQuery(o),

@@ -9,7 +9,6 @@ import cats.syntax.either.*
 import cats.syntax.option.*
 import io.circe.Json
 import io.circe.literal.*
-import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.StepStage
 import lucuma.core.model.ExecutionEvent
@@ -47,7 +46,7 @@ class addStepEvent extends OdbSuite with ExecutionState with query.ExecutionTest
       pid  <- createProgramAs(user)
       tid  <- createTargetWithProfileAs(user, pid)
       oid  <- createObservationAs(user, pid, mode.some, tid)
-      vid  <- recordVisitAs(user, mode.instrument, oid)
+      vid  <- recordVisitAs(user, oid)
       sids <- scienceSequenceIds(user, oid)
     yield Setup(oid, vid, sids)
 
@@ -224,7 +223,7 @@ class addStepEvent extends OdbSuite with ExecutionState with query.ExecutionTest
     for
       su   <- setup(ObservingModeType.GmosNorthLongSlit, serviceUser)
       _    <- addStepEventAs(serviceUser, su.sid0, su.vid, StepStage.StartStep)
-      v    <- recordVisitAs(serviceUser, Instrument.GmosNorth, su.oid)
+      v    <- recordVisitAs(serviceUser, su.oid)
       _    <- expect(
         serviceUser,
         query(su.sid0, v),

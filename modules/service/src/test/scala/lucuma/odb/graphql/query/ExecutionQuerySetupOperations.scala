@@ -105,13 +105,12 @@ trait ExecutionQuerySetupOperations extends DatabaseOperations with GenerationTe
       .map(steps => AtomNode(aid, steps))
 
   def recordVisit(
-    mode:  ObservingModeType,
     setup: Setup,
     user:  User,
     oid:   Observation.Id
   ): IO[VisitNode] =
     for
-      vid <- recordVisitAs(user, mode.instrument, oid)
+      vid <- recordVisitAs(user, oid)
       ids <- scienceSequenceIds(user, oid)
       e0  <- addSequenceEventAs(user, vid, SequenceCommand.Start)
       as  <- (0 until setup.atomCount).toList.traverse { a => recordAtom(setup, user, vid, a, ids) }
@@ -132,7 +131,7 @@ trait ExecutionQuerySetupOperations extends DatabaseOperations with GenerationTe
       pid <- createProgramAs(user)
       tid <- createTargetWithProfileAs(user, pid)
       oid <- createObservationAs(user, pid, mode.some, tid)
-      v   <- recordVisit(mode, setup, serviceUser, oid)
+      v   <- recordVisit(setup, serviceUser, oid)
     yield ObservationNode(oid, v)
 
   def setQaState(

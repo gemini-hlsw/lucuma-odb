@@ -36,7 +36,7 @@ class executionAtomRecords extends OdbSuite with ExecutionQuerySetupOperations
       pid <- createProgramAs(pi)
       tid <- createTargetWithProfileAs(pi, pid)
       oid <- createObservationAs(pi, pid, mode.some, tid)
-      vid <- recordVisitAs(serviceUser, mode.instrument, oid)
+      vid <- recordVisitAs(serviceUser, oid)
       sid <- firstScienceAtomStepIds(serviceUser, oid)
     yield (oid, vid, sid)
 
@@ -455,7 +455,7 @@ class executionAtomRecords extends OdbSuite with ExecutionQuerySetupOperations
       pid <- createProgramAs(pi)
       tid <- createTargetWithProfileAs(pi, pid)
       oid <- createObservationAs(pi, pid, mode.some, tid)
-      vid <- recordVisitAs(serviceUser, mode.instrument, oid)
+      vid <- recordVisitAs(serviceUser, oid)
       _   <- expect(pi, query(oid), expected)
     yield ()
 
@@ -531,7 +531,7 @@ class executionAtomRecords extends OdbSuite with ExecutionQuerySetupOperations
       pid <- createProgramAs(pi)
       tid <- createTargetWithProfileAs(pi, pid)
       oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
-      vid <- recordVisitAs(serviceUser, mode.instrument, oid)
+      vid <- recordVisitAs(serviceUser, oid)
       ga0 <- generatedNextAtomId(pi, oid, Acquisition)
       ids <- acquisitionSequenceIds(pi, oid)
       _   <- addEndStepEvent(ids.head._2.head, vid)
@@ -543,7 +543,7 @@ class executionAtomRecords extends OdbSuite with ExecutionQuerySetupOperations
       pid <- createProgramAs(pi)
       tid <- createTargetWithProfileAs(pi, pid)
       oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
-      vid <- recordVisitAs(serviceUser, mode.instrument, oid)
+      vid <- recordVisitAs(serviceUser, oid)
       ga0 <- generatedNextAtomId(pi, oid, Science)
       acq <- acquisitionSequenceIds(serviceUser, oid)
       _   <- addEndStepEvent(acq.head._2.head, vid)
@@ -561,9 +561,9 @@ class executionAtomRecords extends OdbSuite with ExecutionQuerySetupOperations
       (aid, ss)  = ids
 
       // execute first step in one visit, second in another
-      v0  <- recordVisitAs(serviceUser, mode.instrument, oid)
+      v0  <- recordVisitAs(serviceUser, oid)
       _   <- addEndStepEvent(ss(0), v0)
-      v1  <- recordVisitAs(serviceUser, mode.instrument, oid)
+      v1  <- recordVisitAs(serviceUser, oid)
       _   <- addEndStepEvent(ss(1), v1)
 
       _   <- expect(

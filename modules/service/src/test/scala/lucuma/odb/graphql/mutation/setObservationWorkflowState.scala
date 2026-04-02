@@ -8,7 +8,6 @@ package mutation
 import cats.effect.IO
 import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.PosInt
-import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.model.ConfigurationRequest
 import lucuma.core.model.Observation
@@ -158,7 +157,7 @@ class setObservationWorkflowState
       p  <- createProgram
       t  <- createTargetWithProfileAs(pi, p)
       o  <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
-      v  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
+      v  <- recordVisitAs(serviceUser, o)
       s  <- firstScienceAtomStepIds(serviceUser, o)
       _  <- addEndStepEvent(s(0), v)
       _  <- addEndStepEvent(s(1), v)
@@ -174,7 +173,7 @@ class setObservationWorkflowState
       p <- createProgram
       t <- createTargetWithProfileAs(pi, p)
       o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
-      v <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
+      v <- recordVisitAs(serviceUser, o)
       s <- scienceStepIds(serviceUser, o)
       _ <- s.traverse(sid => addEndStepEvent(sid, v))
       _ <- runObscalcUpdate(p, o)
@@ -187,7 +186,7 @@ class setObservationWorkflowState
       p <- createProgram
       t <- createTargetWithProfileAs(pi, p)
       o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
-      v <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
+      v <- recordVisitAs(serviceUser, o)
       s <- firstScienceAtomStepIds(serviceUser, o)
       _ <- s.traverse(sid => addEndStepEvent(sid, v))
       _ <- runObscalcUpdate(p, o)
@@ -214,7 +213,7 @@ class setObservationWorkflowState
       _ <- setProgramReference(staff, p, """engineering: { semester: "2025B", instrument: GMOS_SOUTH }""")
       t <- createTargetWithProfileAs(pi, p)
       o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
-      v <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
+      v <- recordVisitAs(serviceUser, o)
       s <- firstScienceAtomStepIds(serviceUser, o)
       _ <- s.traverse(sid => addEndStepEvent(sid, v))
       _ <- runObscalcUpdate(p, o)
@@ -228,7 +227,7 @@ class setObservationWorkflowState
       _ <- setProgramReference(staff, p, """engineering: { semester: "2025B", instrument: GMOS_SOUTH }""")
       t <- createTargetWithProfileAs(pi, p)
       o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
-      v <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
+      v <- recordVisitAs(serviceUser, o)
       s <- scienceStepIds(serviceUser, o)
       _ <- s.traverse(sid => addEndStepEvent(sid, v))
       _ <- runObscalcUpdate(p, o)

@@ -62,7 +62,7 @@ class datasetChronicleEntries extends OdbSuite with DatasetSetupOperations with 
       _   <- acceptProposal(staff, pid)
       ref <- fetchProgramReference(pi, pid)
 
-      vid <- recordVisitAs(serviceUser, mode.instrument, oid)
+      vid <- recordVisitAs(serviceUser, oid)
       sid <- firstScienceStepId(serviceUser, oid)
       _   <- addEndStepEvent(sid, vid)
       did <- recordDatasetAs(serviceUser, sid, vid, "N18630703S0001.fits")
@@ -185,7 +185,7 @@ class datasetChronicleEntries extends OdbSuite with DatasetSetupOperations with 
       pid <- createProgramAs(pi)
       tid <- createTargetWithProfileAs(pi, pid)
       oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
-      vid <- recordVisitAs(serviceUser, mode.instrument, oid)
+      vid <- recordVisitAs(serviceUser, oid)
       sid <- firstScienceStepId(serviceUser, oid)
       _   <- addEndStepEvent(sid, vid)
       did <- recordDatasetAs(serviceUser, sid, vid, "N18630703S0002.fits")
@@ -290,7 +290,7 @@ class datasetChronicleEntries extends OdbSuite with DatasetSetupOperations with 
       _   <- acceptProposal(staff, pid)
       ref <- fetchProgramReference(pi, pid)
 
-      vid <- recordVisitAs(serviceUser, mode.instrument, oid)
+      vid <- recordVisitAs(serviceUser, oid)
       sid <- firstScienceStepId(serviceUser, oid)
       _   <- addEndStepEvent(sid, vid)
       did <- recordDatasetAs(serviceUser, sid, vid, f"N18630703S$index%04d.fits")

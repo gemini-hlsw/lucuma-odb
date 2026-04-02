@@ -29,7 +29,7 @@ trait DatasetSetupOperations extends DatabaseOperations with query.GenerationTes
       pid <- createProgramAs(user)
       tid <- createTargetWithProfileAs(user, pid)
       oid <- createObservationAs(user, pid, mode.some, tid)
-      vid <- recordVisitAs(service, mode.instrument, oid)
+      vid <- recordVisitAs(service, oid)
       sid <- firstScienceStepId(service, oid)
       _   <- addStepEventAs(service, sid, vid, StepStage.StartStep)
       ids <- (0 until stepCount).toList.traverse { x =>

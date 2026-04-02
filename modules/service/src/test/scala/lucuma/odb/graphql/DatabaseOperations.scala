@@ -1863,26 +1863,6 @@ trait DatabaseOperations { this: OdbSuite =>
         }
       )
 
-  protected def staticConfig(instrument: Instrument): String =
-    instrument match {
-      case Instrument.GmosNorth =>
-        """
-          {
-            stageMode: FOLLOW_XY
-          }
-        """
-
-      case Instrument.GmosSouth =>
-        """
-          {
-            stageMode: FOLLOW_XYZ
-          }
-        """
-
-      case _ => "{}"
-
-    }
-
   protected def dynamicConfigGmos(instrument: Instrument): String =
     s"""
       ${instrument.fieldName}: {
@@ -1990,17 +1970,14 @@ trait DatabaseOperations { this: OdbSuite =>
         """
       ).void
 
-  def recordVisitAs(user: User, instrument: Instrument, oid: Observation.Id): IO[Visit.Id] = {
-    val name = s"record${instrument.tag}Visit"
-
+  def recordVisitAs(user: User, oid: Observation.Id): IO[Visit.Id] =
     query(
       user = user,
       query =
         s"""
           mutation {
-            $name(input: {
-              observationId: ${oid.asJson},
-              ${instrument.fieldName}: ${staticConfig(instrument)}
+            recordVisit(input: {
+              observationId: ${oid.asJson}
             }) {
               visit {
                 id
@@ -2008,10 +1985,9 @@ trait DatabaseOperations { this: OdbSuite =>
             }
           }
         """
-    ).map { json =>
-      json.hcursor.downFields(name, "visit", "id").require[Visit.Id]
-    }
-  }
+    ).map: json =>
+      json.hcursor.downFields("recordVisit", "visit", "id").require[Visit.Id]
+
 
   def addSequenceEventAs(
     user: User,

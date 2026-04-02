@@ -10,7 +10,6 @@ import cats.syntax.traverse.*
 import eu.timepit.refined.types.numeric.PosInt
 import io.circe.Json
 import io.circe.syntax.*
-import lucuma.core.enums.Instrument
 import lucuma.core.enums.StepGuideState.Enabled
 import lucuma.core.model.Observation
 import lucuma.core.syntax.timespan.*
@@ -55,7 +54,7 @@ class executionSciFlamingos2 extends ExecutionTestSupportForFlamingos2:
         p <- createProgram
         t <- createTargetWithProfileAs(pi, p)
         o <- createFlamingos2LongSlitObservationAs(pi, p, List(t))
-        v <- recordVisitAs(serviceUser, Instrument.Flamingos2, o)
+        v <- recordVisitAs(serviceUser, o)
         s <- firstScienceStepId(serviceUser, o)
         _ <- addEndStepEvent(s, v)
       yield o
@@ -84,7 +83,7 @@ class executionSciFlamingos2 extends ExecutionTestSupportForFlamingos2:
         p  <- createProgram
         t  <- createTargetWithProfileAs(pi, p)
         o  <- createFlamingos2LongSlitObservationAs(pi, p, List(t))
-        v  <- recordVisitAs(serviceUser, Instrument.Flamingos2, o)
+        v  <- recordVisitAs(serviceUser, o)
         ss <- firstScienceAtomStepIds(serviceUser, o)
         _  <- ss.traverse(sid => addEndStepEvent(sid, v))
       yield o
@@ -113,7 +112,7 @@ class executionSciFlamingos2 extends ExecutionTestSupportForFlamingos2:
         p  <- createProgram
         t  <- createTargetWithProfileAs(pi, p)
         o  <- createFlamingos2LongSlitObservationAs(pi, p, List(t))
-        v  <- recordVisitAs(serviceUser, Instrument.Flamingos2, o)
+        v  <- recordVisitAs(serviceUser, o)
         ss <- scienceStepIds(serviceUser, o)
         _  <- ss.traverse(sid => addEndStepEvent(sid, v))
       yield o

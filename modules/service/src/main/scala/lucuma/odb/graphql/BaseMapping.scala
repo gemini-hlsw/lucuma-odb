@@ -314,6 +314,7 @@ trait BaseMapping[F[_]]
   lazy val RecordGmosSouthStepResultType           = schema.ref("RecordGmosSouthStepResult")
   lazy val RecordGmosSouthVisitResultType          = schema.ref("RecordGmosSouthVisitResult")
   lazy val RecordIgrins2VisitResultType            = schema.ref("RecordIgrins2VisitResult")
+  lazy val RecordVisitResultType                   = schema.ref("RecordVisitResult")
   lazy val RedeemUserInvitationResultType          = schema.ref("RedeemUserInvitationResult")
   lazy val ReplaceFlamingos2SequenceResultType     = schema.ref("ReplaceFlamingos2SequenceResult")
   lazy val ReplaceGmosNorthSequenceResultType      = schema.ref("ReplaceGmosNorthSequenceResult")

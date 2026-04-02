@@ -10,7 +10,6 @@ import cats.syntax.functor.*
 import cats.syntax.option.*
 import lucuma.core.enums.GhostResolutionMode
 import lucuma.core.model.Observation
-import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.ghost.GhostDynamicConfig
 import lucuma.core.model.sequence.ghost.GhostStaticConfig
@@ -31,13 +30,8 @@ trait GhostSequenceService[F[_]]:
 
   def insertStatic(
     observationId: Observation.Id,
-    visitId:       Option[Visit.Id],
     static:        GhostStaticConfig
   )(using Transaction[F], Services.ServiceAccess): F[Option[Long]]
-
-  def selectStaticForVisit(
-    visitId: Visit.Id
-  )(using Transaction[F]): F[Option[GhostStaticConfig]]
 
   def selectStatic(
     observationId: Observation.Id
@@ -61,15 +55,9 @@ object GhostSequenceService:
 
       override def insertStatic(
         observationId: Observation.Id,
-        visitId:       Option[Visit.Id],
         static:        GhostStaticConfig
       )(using Transaction[F], Services.ServiceAccess): F[Option[Long]] =
-        session.option(Statements.InsertStatic)(observationId, visitId, static)
-
-      override def selectStaticForVisit(
-        visitId: Visit.Id
-      )(using Transaction[F]): F[Option[GhostStaticConfig]] =
-        session.option(Statements.SelectStaticForVisit)(visitId)
+        session.option(Statements.InsertStatic)(observationId, static)
 
       override def selectStatic(
         observationId: Observation.Id
@@ -115,28 +103,18 @@ object GhostSequenceService:
           $ghost_dynamic
       """.command
 
-    val InsertStatic: Query[(Observation.Id, Option[Visit.Id], GhostStaticConfig), Long] =
+    val InsertStatic: Query[(Observation.Id, GhostStaticConfig), Long] =
       sql"""
         INSERT INTO t_ghost_static (
           c_observation_id,
-          c_visit_id,
           c_resolution_mode
         )
         SELECT
           $observation_id,
-          ${visit_id.opt},
           $ghost_static
         ON CONFLICT DO NOTHING
         RETURNING c_static_id
       """.query(int8)
-
-    val SelectStaticForVisit: Query[Visit.Id, GhostStaticConfig] =
-      sql"""
-        SELECT
-          c_resolution_mode
-        FROM t_ghost_static
-        WHERE c_visit_id = $visit_id
-      """.query(ghost_static)
 
     val SelectStatic: Query[Observation.Id, GhostStaticConfig] =
       sql"""
@@ -144,5 +122,4 @@ object GhostSequenceService:
           c_resolution_mode
         FROM t_ghost_static
         WHERE c_observation_id = $observation_id
-          AND c_visit_id IS NULL
       """.query(ghost_static)

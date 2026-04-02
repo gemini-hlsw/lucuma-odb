@@ -22,7 +22,6 @@ import lucuma.core.enums.GmosRoi
 import lucuma.core.enums.GmosSouthFilter
 import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
-import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.Site
@@ -718,7 +717,7 @@ class executionSciGmosNorthImaging extends ExecutionTestSupportForGmos:
             }
           }"""
 
-        v <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
+        v <- recordVisitAs(serviceUser, o)
         s <- firstScienceStepId(serviceUser, o)
         _  <- addEndStepEvent(s, v)
       yield o
@@ -755,7 +754,7 @@ class executionSciGmosNorthImaging extends ExecutionTestSupportForGmos:
             }
           }"""
 
-        v  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
+        v  <- recordVisitAs(serviceUser, o)
         ss <- scienceStepIds(serviceUser, o)
         _  <- ss.take(6).traverse(sid => addEndStepEvent(sid, v))
       yield o

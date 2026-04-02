@@ -118,7 +118,7 @@ class replaceGmosSouthSequence extends query.ExecutionTestSupportForGmos with Re
         p <- createProgram
         t <- createTargetWithProfileAs(pi, p)
         o <- createGmosSouthLongSlitObservationAs(pi, p, List(t))
-        _ <- recordVisitAs(serviceUser, Instrument.GmosSouth, o)
+        _ <- recordVisitAs(serviceUser, o)
       yield o
 
     assertIOBoolean:

@@ -12,7 +12,6 @@ import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.ags.GuideStarName
-import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.ObservationWorkflowState.Completed
 import lucuma.core.enums.ObservationWorkflowState.Ongoing
@@ -62,7 +61,7 @@ class ShortCut_4596 extends OdbSuite
     for
       t  <- createTargetWithProfileAs(pi, p)
       o  <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
-      v  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
+      v  <- recordVisitAs(serviceUser, o)
       s  <- firstScienceAtomStepIds(serviceUser, o)
       _  <- s.init.traverse(sid => addEndStepEvent(sid, v))
       _  <- addEndStepEvent(s.last, v).whenA(state === Completed)

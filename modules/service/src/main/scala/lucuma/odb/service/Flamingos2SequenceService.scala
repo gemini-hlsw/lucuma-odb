@@ -7,14 +7,12 @@ import cats.effect.Concurrent
 import cats.syntax.all.*
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.model.Observation
-import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig
 import lucuma.core.model.sequence.flamingos2.Flamingos2StaticConfig
 import lucuma.odb.util.Codecs.observation_id
 import lucuma.odb.util.Codecs.observing_mode_type
 import lucuma.odb.util.Codecs.step_id
-import lucuma.odb.util.Codecs.visit_id
 import lucuma.odb.util.Flamingos2Codecs.flamingos_2_dynamic
 import lucuma.odb.util.Flamingos2Codecs.flamingos_2_static
 import skunk.*
@@ -33,17 +31,12 @@ trait Flamingos2SequenceService[F[_]]:
 
   def insertStatic(
     observationId: Observation.Id,
-    visitId:       Option[Visit.Id],
     static:        Flamingos2StaticConfig
   )(using Transaction[F], Services.ServiceAccess): F[Option[Long]]
 
   def selectDynamicForStep(
     stepId: Step.Id
   )(using Transaction[F]): F[Option[Flamingos2DynamicConfig]]
-
-  def selectStaticForVisit(
-    visitId: Visit.Id
-  )(using Transaction[F]): F[Option[Flamingos2StaticConfig]]
 
   def selectStatic(
     observationId: Observation.Id
@@ -64,11 +57,6 @@ object Flamingos2SequenceService:
         dynamic: Flamingos2DynamicConfig
       )(using Transaction[F], Services.ServiceAccess): F[Unit] =
         session.execute(Statements.InsertDynamic)(stepId, dynamic).void
-
-      override def selectStaticForVisit(
-        visitId: Visit.Id
-      )(using Transaction[F]): F[Option[Flamingos2StaticConfig]] =
-        session.option(Statements.SelectStaticByVisit)(visitId)
 
       private def defaultStatic(
         observationId: Observation.Id
@@ -99,14 +87,9 @@ object Flamingos2SequenceService:
 
       override def insertStatic(
         observationId: Observation.Id,
-        visitId:       Option[Visit.Id],
         static:        Flamingos2StaticConfig
       )(using Transaction[F], Services.ServiceAccess): F[Option[Long]] =
-        session.option(Statements.InsertStatic)(
-          observationId,
-          visitId,
-          static
-        )
+        session.option(Statements.InsertStatic)(observationId, static)
 
   object Statements:
 
@@ -135,29 +118,18 @@ object Flamingos2SequenceService:
           $flamingos_2_dynamic
       """.command
 
-    val InsertStatic: Query[(Observation.Id, Option[Visit.Id], Flamingos2StaticConfig), Long] =
+    val InsertStatic: Query[(Observation.Id, Flamingos2StaticConfig), Long] =
       sql"""
         INSERT INTO t_flamingos_2_static (
           c_observation_id,
-          c_visit_id,
           c_mos_pre_imaging,
           c_use_eoffsetting
         ) SELECT
           $observation_id,
-          ${visit_id.opt},
           $flamingos_2_static
         ON CONFLICT DO NOTHING
         RETURNING c_static_id
       """.query(int8)
-
-    val SelectStaticByVisit: Query[Visit.Id, Flamingos2StaticConfig] =
-      sql"""
-        SELECT
-          c_mos_pre_imaging,
-          c_use_eoffsetting
-        FROM t_flamingos_2_static
-        WHERE c_visit_id = $visit_id
-      """.query(flamingos_2_static)
 
     val SelectStatic: Query[Observation.Id, Flamingos2StaticConfig] =
       sql"""
@@ -166,7 +138,6 @@ object Flamingos2SequenceService:
           c_use_eoffsetting
         FROM t_flamingos_2_static
         WHERE c_observation_id = $observation_id
-          AND c_visit_id IS NULL
       """.query(flamingos_2_static)
 
     val SelectIsLongSlit: Query[Observation.Id, Boolean] =

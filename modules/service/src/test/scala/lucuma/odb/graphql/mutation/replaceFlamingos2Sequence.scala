@@ -138,7 +138,7 @@ class replaceFlamingos2Sequence extends query.ExecutionTestSupportForFlamingos2 
         p <- createProgram
         t <- createTargetWithProfileAs(pi, p)
         o <- createFlamingos2LongSlitObservationAs(pi, p, List(t))
-        _ <- recordVisitAs(serviceUser, Instrument.Flamingos2, o)
+        _ <- recordVisitAs(serviceUser, o)
       yield o
 
     assertIOBoolean:
@@ -155,7 +155,7 @@ class replaceFlamingos2Sequence extends query.ExecutionTestSupportForFlamingos2 
         p <- createProgram
         t <- createTargetWithProfileAs(pi, p)
         o <- createFlamingos2LongSlitObservationAs(pi, p, List(t))
-        v <- recordVisitAs(serviceUser, Instrument.Flamingos2, o)
+        v <- recordVisitAs(serviceUser, o)
         s <- firstScienceStepId(serviceUser, o)
         _ <- addEndStepEvent(s, v)
       yield o
@@ -179,7 +179,7 @@ class replaceFlamingos2Sequence extends query.ExecutionTestSupportForFlamingos2 
         p <- createProgram
         t <- createTargetWithProfileAs(pi, p)
         o <- createFlamingos2LongSlitObservationAs(pi, p, List(t))
-        v <- recordVisitAs(serviceUser, Instrument.Flamingos2, o)
+        v <- recordVisitAs(serviceUser, o)
         s <- firstScienceStepId(serviceUser, o)
         _ <- addEndStepEvent(s, v)
       yield o

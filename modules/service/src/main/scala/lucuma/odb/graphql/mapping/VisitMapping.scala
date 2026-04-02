@@ -56,10 +56,10 @@ trait VisitMapping[F[_]] extends VisitTable[F]
       SqlObject("events"),
       SqlObject("timeChargeInvoice"),
       SqlField("idempotencyKey", VisitTable.IdempotencyKey),
-      SqlObject("flamingos2", Join(VisitTable.Id, Flamingos2StaticTable.VisitId)),
-      SqlObject("gmosNorth",  Join(VisitTable.Id, GmosNorthStaticTable.VisitId)),
-      SqlObject("gmosSouth",  Join(VisitTable.Id, GmosSouthStaticTable.VisitId)),
-      SqlObject("igrins2",    Join(VisitTable.Id, Igrins2StaticTable.VisitId))
+      SqlObject("flamingos2", Join(VisitTable.ObservationId, Flamingos2StaticTable.ObservationId)),
+      SqlObject("gmosNorth",  Join(VisitTable.ObservationId, GmosNorthStaticTable.ObservationId)),
+      SqlObject("gmosSouth",  Join(VisitTable.ObservationId, GmosSouthStaticTable.ObservationId)),
+      SqlObject("igrins2",    Join(VisitTable.ObservationId, Igrins2StaticTable.ObservationId))
     )
 
   lazy val VisitElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] = {

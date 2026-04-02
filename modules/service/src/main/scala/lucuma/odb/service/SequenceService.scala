@@ -26,7 +26,6 @@ import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SequenceType
 import lucuma.core.enums.StepType
 import lucuma.core.model.Observation
-import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.AtomDigest
 import lucuma.core.model.sequence.CategorizedTime
@@ -700,7 +699,7 @@ object SequenceService:
       private def materializeExecutionConfig[S, D](
         observationId: Observation.Id,
         stream:        StreamingExecutionConfig[F, S, D],
-        insertStatic:  (Observation.Id, Option[Visit.Id], S) => F[Option[Long]]
+        insertStatic:  (Observation.Id, S) => F[Option[Long]]
       )(
         insertSequence: (Observation.Id, SequenceType, Stream[F, Atom[D]]) => F[Unit]
       )(using Services.ServiceAccess): F[Unit] =
@@ -711,7 +710,7 @@ object SequenceService:
             Applicative[F].unit
           )
 
-        insertStatic(observationId, none, stream.static)                  *>
+        insertStatic(observationId, stream.static)                  *>
         materializeSequence(SequenceType.Acquisition, stream.acquisition) *>
         materializeSequence(SequenceType.Science,     stream.science)
 

@@ -33,7 +33,6 @@ import lucuma.core.enums.GmosSouthFpu
 import lucuma.core.enums.GmosSouthGrating
 import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
-import lucuma.core.enums.Instrument
 import lucuma.core.enums.StepGuideState
 import lucuma.core.math.BoundedInterval
 import lucuma.core.math.Wavelength
@@ -558,7 +557,7 @@ trait ExecutionTestSupportForGmos extends ExecutionTestSupport:
       p <- createProgramAs(pi)
       t <- createTargetWithProfileAs(pi, p)
       o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
-      v <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
+      v <- recordVisitAs(serviceUser, o)
       s <- firstScienceStepId(serviceUser, o)
       _ <- addEndStepEvent(s, v)
       _ <- runObscalcUpdate(p, o)
@@ -569,7 +568,7 @@ trait ExecutionTestSupportForGmos extends ExecutionTestSupport:
       p <- createProgramAs(pi)
       t <- createTargetWithProfileAs(pi, p)
       o <- createGmosSouthLongSlitObservationAs(pi, p, List(t))
-      v <- recordVisitAs(serviceUser, Instrument.GmosSouth, o)
+      v <- recordVisitAs(serviceUser, o)
       s <- firstScienceStepId(serviceUser, o)
       _ <- addEndStepEvent(s, v)
       _ <- runObscalcUpdate(p, o)

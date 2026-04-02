@@ -82,9 +82,9 @@ class SequenceServiceSuite extends ExecutionTestSupportForGmos:
       sn <- generateSequence(o)
 
       b  <- IO.realTimeInstant
-      _  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
+      _  <- recordVisitAs(serviceUser, o)
       e0 <- IO.realTimeInstant
-      _  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
+      _  <- recordVisitAs(serviceUser, o)
       e1 <- IO.realTimeInstant
 
       so <- readGmosNorthSequence(o)

@@ -483,6 +483,7 @@ object OdbMapping {
                 RecordGmosNorthVisitResultMapping,
                 RecordGmosSouthVisitResultMapping,
                 RecordIgrins2VisitResultMapping,
+                RecordVisitResultMapping,
                 RedeemUserInvitationResultMapping,
                 ResetAcquisitionResultMapping,
                 RevokeUserInvitationResultMapping,

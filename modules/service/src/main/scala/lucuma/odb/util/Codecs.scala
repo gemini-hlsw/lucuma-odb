@@ -77,6 +77,7 @@ import lucuma.odb.data.TelescopeConfigGeneratorRole
 import lucuma.odb.data.TimeCharge.DiscountDiscriminator
 import lucuma.odb.data.TimingWindowEndTypeEnum
 import lucuma.odb.data.UserType
+import lucuma.odb.sequence.data.VisitOrigin
 import lucuma.odb.service.ObservationWorkflowService
 import lucuma.odb.syntax.exposureTimeMode.*
 import monocle.Prism
@@ -706,6 +707,9 @@ trait Codecs {
 
   val visit_id: Codec[Visit.Id] =
     gid[Visit.Id]
+
+  val visit_origin: Codec[VisitOrigin] =
+    enumerated(Type("e_visit_origin"))
 
   val water_vapor: Codec[WaterVapor] =
     enumerated[WaterVapor](Type.varchar)
