@@ -277,7 +277,8 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
           case lucuma.itc.client.InstrumentMode.GmosNorthSpectroscopy(_, w, _, _, _, _, _, _) => w
           case lucuma.itc.client.InstrumentMode.GmosSouthSpectroscopy(_, w, _, _, _, _, _, _) => w
           case lucuma.itc.client.InstrumentMode.Igrins2Spectroscopy(_, _)                     => igrins2Signal
-          case _                                                                           => signal
+          // If we need a wavelength for GHOST tests, we'll need to figure out one.
+          case _                                                                              => signal
         IO.whenA(wavelength === signal) {
           IO.raiseError(new RuntimeException("Artifical exception for test cases."))
         } *> {

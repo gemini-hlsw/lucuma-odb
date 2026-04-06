@@ -4,8 +4,8 @@
 package lucuma.itc.service
 
 import eu.timepit.refined.types.numeric.PosInt
-import lucuma.core.math.SignalToNoise
 import lucuma.core.math.Wavelength
+import lucuma.core.model.ExposureTimeMode
 import lucuma.core.util.TimeSpan
 import lucuma.itc.TargetGraphsCalcResult
 import lucuma.itc.TargetIntegrationTime
@@ -13,27 +13,13 @@ import lucuma.itc.TargetIntegrationTime
 trait Itc[F[_]]:
 
   /**
-   * Compute the exposure time and number of exposures required to achieve the desired
-   * signal-to-noise under the requested conditions.
+   * Retrieve the integration time for the given mode and exposureTimeMode.
    */
-  def calculateIntegrationTime(
-    target:        TargetData,
-    atWavelength:  Wavelength,
-    observingMode: ObservingMode,
-    constraints:   ItcObservingConditions,
-    signalToNoise: SignalToNoise
-  ): F[TargetIntegrationTime]
-
-  /**
-   * Compute the signal to noise with an exposure time and number of exposures ed conditions.
-   */
-  def calculateSignalToNoise(
-    target:        TargetData,
-    atWavelength:  Wavelength,
-    observingMode: ObservingMode,
-    constraints:   ItcObservingConditions,
-    exposureTime:  TimeSpan,
-    exposureCount: PosInt
+  def calculate(
+    target:           TargetData,
+    observingMode:    ObservingMode,
+    constraints:      ItcObservingConditions,
+    exposureTimeMode: ExposureTimeMode
   ): F[TargetIntegrationTime]
 
   /**

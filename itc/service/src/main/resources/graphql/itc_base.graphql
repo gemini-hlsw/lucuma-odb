@@ -165,73 +165,34 @@ input Igrins2SpectroscopyInput {
   port: PortDisposition = BOTTOM
 }
 
-type GmosSSpectroscopyParams {
-  """Wavelength in appropriate units"""
-  centralWavelength: Wavelength!
+input ItcGhostDetectorInput {
+  """Exposure time mode."""
+  timeAndCount: TimeAndCountExposureTimeModeInput!
 
-  """Gmos South disperser"""
-  grating: GmosSouthGrating
+  """Ghost read mode"""
+  readMode: GhostReadMode!
 
-  """Gmos North Focal plane unit"""
-  customMask: GmosCustomMask
-
-  """Gmos South Focal plane unit"""
-  fpu: GmosSouthFpu
-
-  """Gmos South filter"""
-  filter: GmosSouthFilter
+  """Ghost binning"""
+  binning: GhostBinning!
 }
 
-type GmosNSpectroscopyParams {
-  """Wavelength in appropriate units"""
-  centralWavelength: Wavelength!
+input GhostSpectroscopyInput {
+  """
+  Number of microlenses to use for sky estimation in ghost spectroscopy mode.
+  Permitted values are 3, 7 and 10 for Standard resolution and 7 for High resolution.
+  If omitted, defaults to 3 for Standard resolution and 7 for High resolution.
+  """
+  numSkyMicrolens: Int
 
-  """Gmos North disperser"""
-  grating: GmosNorthGrating
+  """Resolution mode for ghost spectroscopy mode"""
+  resolutionMode: GhostResolutionMode!
 
-  """Gmos North Focal plane unit"""
-  customMask: GmosCustomMask
+  """Input for the red detector in ghost spectroscopy mode"""
+  redDetector: ItcGhostDetectorInput!
 
-  """Gmos North Focal plane unit"""
-  fpu: GmosNorthFpu
-
-  """Gmos North filter"""
-  filter: GmosNorthFilter
+  """Input for the blue detector in ghost spectroscopy mode"""
+  blueDetector: ItcGhostDetectorInput!
 }
-
-type Flamingos2SpectroscopyParams {
-  """Flamingos2 disperser"""
-  disperser: Flamingos2Disperser
-
-  """Flamingos2 Focal plane unit"""
-  fpu: Flamingos2Fpu
-
-  """Flamingos2 filter"""
-  filter: Flamingos2Filter
-}
-
-type Igrins2SpectroscopyParams {
-  ignore: Ignore
-}
-
-union SpectroscopyParams = GmosNSpectroscopyParams | GmosSSpectroscopyParams | Flamingos2SpectroscopyParams | Igrins2SpectroscopyParams
-
-type GmosSImagingParams {
-  """Gmos South filter"""
-  filter: GmosSouthFilter!
-}
-
-type GmosNImagingParams {
-  """Gmos North filter"""
-  filter: GmosNorthFilter
-}
-
-type Flamingos2ImagingParams {
-  """Flamingos2 filter"""
-  filter: Flamingos2Filter
-}
-
-union ImagingParams = GmosNImagingParams | GmosSImagingParams | Flamingos2ImagingParams
 
 """Params for instrument modes"""
 input InstrumentModesInput @oneOf {
@@ -255,6 +216,9 @@ input InstrumentModesInput @oneOf {
 
   """IGRINS2 Spectroscopy"""
   igrins2Spectroscopy: Igrins2SpectroscopyInput
+
+  """GHOST Spectroscopy"""
+  ghostSpectroscopy: GhostSpectroscopyInput
 }
 
 """Image quality input - specify either preset or exact arcsec value"""
@@ -433,27 +397,6 @@ type TargetError {
   message: String!
   wellHalfFilledSeconds: Float
   wavelength: Wavelength
-}
-
-interface ITCObservingMode {
-  """instrument"""
-  instrument: Instrument!
-}
-
-type ImagingMode implements ITCObservingMode {
-  """instrument"""
-  instrument: Instrument!
-
-  """params"""
-  params: ImagingParams!
-}
-
-type SpectroscopyMode implements ITCObservingMode {
-  """instrument"""
-  instrument: Instrument!
-
-  """params"""
-  params: SpectroscopyParams!
 }
 
 """Graph data types"""

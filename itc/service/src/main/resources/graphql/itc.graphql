@@ -509,13 +509,8 @@ type ChangeProgramUserRoleResult {
   programUser: ProgramUser!
 }
 
-"""
-The result of cloning an observation, containing the original and new observations.
-"""
+"""The result of cloning an observation, containing the new observation."""
 type CloneObservationResult {
-  """The original unmodified observation which was cloned."""
-  originalObservation: Observation!
-
   """The new cloned (but possibly modified) observation."""
   newObservation: Observation!
 }
@@ -524,9 +519,6 @@ type CloneObservationResult {
 The result of cloning a target, containing the original and new targets.
 """
 type CloneTargetResult {
-  """The original unmodified target which was cloned"""
-  originalTarget: Target!
-
   """The new cloned (but possibly modified) target"""
   newTarget: Target!
 }
@@ -991,6 +983,29 @@ enum GcalShutter {
   CLOSED
 }
 
+enum GhostResolutionMode {
+  STANDARD
+  HIGH
+}
+
+enum GhostBinning {
+  ONE_BY_ONE
+  ONE_BY_TWO
+  ONE_BY_FOUR
+  ONE_BY_EIGHT
+  TWO_BY_TWO
+  TWO_BY_FOUR
+  TWO_BY_EIGHT
+  FOUR_BY_FOUR
+}
+
+"""GHOST read mode"""
+enum GhostReadMode {
+  SLOW
+  MEDIUM
+  FAST
+}
+
 """GMOS amp count"""
 enum GmosAmpCount {
   """GmosAmpCount Three"""
@@ -1294,7 +1309,10 @@ type GmosNorthStatic {
   """Is MOS Pre-Imaging Observation"""
   mosPreImaging: MosPreImaging!
 
-  """Nod-and-shuffle configuration"""
+  """
+  Nod-and-shuffle configuration.  This is currently not used and will always
+  return null.
+  """
   nodAndShuffle: GmosNodAndShuffle
 }
 
@@ -1464,7 +1482,11 @@ type GmosSouthStatic {
   """Is MOS Pre-Imaging Observation"""
   mosPreImaging: MosPreImaging!
 
-  """Nod-and-shuffle configuration"""
+  """
+  #Nod-and-shuffle configuration
+  Nod-and-shuffle configuration.  This is currently not used and will always
+  return null.
+  """
   nodAndShuffle: GmosNodAndShuffle
 }
 
@@ -1493,7 +1515,6 @@ type GmosSouthStep {
 }
 
 type CloneGroupResult {
-  originalGroup: Group!
   newGroup: Group!
 }
 
@@ -3291,23 +3312,6 @@ type Execution {
   """
   digest: CalculatedExecutionDigest
 
-  """
-  Full execution config, including acquisition and science sequences.  If a
-  sequence cannot be generated for this observation, `null` is returned along
-  with warning messages.
-  """
-  config(
-    """
-    The maximum size (number of atoms) of the `possibleFuture` in the sequences.
-    If the projected future is longer, the size will be capped at this value.
-    Use 0 if only interested in the `nextAtom`.  The maximum is 100.  Each
-    sequence has a `hasMore` field that can be used to determine whether there
-    additional atoms beyond those returned in `possibleFuture`.  The total
-    projected atom count is available in the execution digest.
-    """
-    futureLimit: NonNegInt = 25
-  ): ExecutionConfig @deprecated(reason: "moved to Query -> executionConfig")
-
   """Determines the execution state as a whole of this observation."""
   executionState: ExecutionState!
 
@@ -3528,6 +3532,12 @@ type Flamingos2Static {
 
 """Result for recordFlamingos2Visit mutation."""
 type RecordFlamingos2VisitResult {
+  """The newly added visit record itself."""
+  visit: Visit!
+}
+
+"""Result for recordIgrins2Visit mutation."""
+type RecordIgrins2VisitResult {
   """The newly added visit record itself."""
   visit: Visit!
 }
@@ -5541,6 +5551,17 @@ type SpectroscopyConfigOption {
   site: Site!
 
   """
+  For Flamingos2 options, the Flamingos 2configuration.  Null for other
+  instruments.
+  """
+  flamingos2: SpectroscopyConfigOptionFlamingos2
+
+  """
+  For GHOST options, the GHOST configuration.  Null for other instruments.
+  """
+  ghost: SpectroscopyConfigOptionGhost
+
+  """
   For GMOS North options, the GMOS North configuration.  Null for other
   instruments.
   """
@@ -5551,12 +5572,17 @@ type SpectroscopyConfigOption {
   instruments.
   """
   gmosSouth: SpectroscopyConfigOptionGmosSouth
+}
 
-  """
-  For Flamingos2 options, the Flamingos 2configuration.  Null for other
-  instruments.
-  """
-  flamingos2: SpectroscopyConfigOptionFlamingos2
+type SpectroscopyConfigOptionFlamingos2 {
+  fpu: Flamingos2Fpu!
+  disperser: Flamingos2Disperser!
+  filter: Flamingos2Filter!
+}
+
+type SpectroscopyConfigOptionGhost {
+  resolutionMode: GhostResolutionMode!
+  binning: GhostBinning!
 }
 
 type SpectroscopyConfigOptionGmosNorth {
@@ -5569,12 +5595,6 @@ type SpectroscopyConfigOptionGmosSouth {
   fpu: GmosSouthBuiltinFpu!
   grating: GmosSouthGrating!
   filter: GmosSouthFilter
-}
-
-type SpectroscopyConfigOptionFlamingos2 {
-  fpu: Flamingos2Fpu!
-  disperser: Flamingos2Disperser!
-  filter: Flamingos2Filter!
 }
 
 """
@@ -7735,6 +7755,12 @@ type StepRecord {
   unless the `instrument` discriminator is "GMOS_SOUTH".
   """
   gmosSouth: GmosSouthDynamic
+
+  """
+  IGRINS-2 instrument configuration for this step, if any.  This will be null
+  unless the `instrument` discriminator is "IGRINS2".
+  """
+  igrins2: Igrins2Dynamic
 }
 
 """StepRecord query results, limited to a maximum of 1000 entries."""
@@ -8389,6 +8415,13 @@ type Visit {
   `GMOS_SOUTH`.
   """
   gmosSouth: GmosSouthStatic
+
+  """
+  IGRINS-2 static instrument configuration, for IGRINS-2 visits.  See the
+  `instrument` discriminator.  This will be null unless the instrument is
+  `IGRINS2`.
+  """
+  igrins2: Igrins2Static
 }
 
 """Matching visit results, limited to a maximum of 1000 entries."""
@@ -8519,6 +8552,14 @@ sequence.
 """
 type ReplaceGmosSouthSequenceResult {
   sequence: [GmosSouthAtom!]!
+}
+
+"""
+The result of a replace sequence mutation, consisting of the newly inserted
+sequence.
+"""
+type ReplaceIgrins2SequenceResult {
+  sequence: [Igrins2Atom!]!
 }
 
 """
@@ -8674,77 +8715,39 @@ input Flamingos2ImagingInput {
 input Igrins2SpectroscopyInput {
   """Exposure time mode."""
   exposureTimeMode: ExposureTimeModeInput!
+
   """Instrument port disposition"""
   port: PortDisposition = BOTTOM
 }
 
-type GmosSSpectroscopyParams {
-  """Wavelength in appropriate units"""
-  centralWavelength: Wavelength!
+input ItcGhostDetectorInput {
+  """Exposure time mode."""
+  timeAndCount: TimeAndCountExposureTimeModeInput!
 
-  """Gmos South disperser"""
-  grating: GmosSouthGrating
+  """Ghost read mode"""
+  readMode: GhostReadMode!
 
-  """Gmos North Focal plane unit"""
-  customMask: GmosCustomMask
-
-  """Gmos South Focal plane unit"""
-  fpu: GmosSouthFpu
-
-  """Gmos South filter"""
-  filter: GmosSouthFilter
+  """Ghost binning"""
+  binning: GhostBinning!
 }
 
-type GmosNSpectroscopyParams {
-  """Wavelength in appropriate units"""
-  centralWavelength: Wavelength!
+input GhostSpectroscopyInput {
+  """
+  Number of microlenses to use for sky estimation in ghost spectroscopy mode.
+  Permitted values are 3, 7 and 10 for Standard resolution and 7 for High resolution.
+  If omitted, defaults to 3 for Standard resolution and 7 for High resolution.
+  """
+  numSkyMicrolens: Int
 
-  """Gmos North disperser"""
-  grating: GmosNorthGrating
+  """Resolution mode for ghost spectroscopy mode"""
+  resolutionMode: GhostResolutionMode!
 
-  """Gmos North Focal plane unit"""
-  customMask: GmosCustomMask
+  """Input for the red detector in ghost spectroscopy mode"""
+  redDetector: ItcGhostDetectorInput!
 
-  """Gmos North Focal plane unit"""
-  fpu: GmosNorthFpu
-
-  """Gmos North filter"""
-  filter: GmosNorthFilter
+  """Input for the blue detector in ghost spectroscopy mode"""
+  blueDetector: ItcGhostDetectorInput!
 }
-
-type Flamingos2SpectroscopyParams {
-  """Flamingos2 disperser"""
-  disperser: Flamingos2Disperser
-
-  """Flamingos2 Focal plane unit"""
-  fpu: Flamingos2Fpu
-
-  """Flamingos2 filter"""
-  filter: Flamingos2Filter
-}
-
-type Igrins2SpectroscopyParams {
-  ignore: Ignore
-}
-
-union SpectroscopyParams = GmosNSpectroscopyParams | GmosSSpectroscopyParams | Flamingos2SpectroscopyParams | Igrins2SpectroscopyParams
-
-type GmosSImagingParams {
-  """Gmos South filter"""
-  filter: GmosSouthFilter!
-}
-
-type GmosNImagingParams {
-  """Gmos North filter"""
-  filter: GmosNorthFilter
-}
-
-type Flamingos2ImagingParams {
-  """Flamingos2 filter"""
-  filter: Flamingos2Filter
-}
-
-union ImagingParams = GmosNImagingParams | GmosSImagingParams | Flamingos2ImagingParams
 
 """Params for instrument modes"""
 input InstrumentModesInput @oneOf {
@@ -8768,6 +8771,9 @@ input InstrumentModesInput @oneOf {
 
   """IGRINS2 Spectroscopy"""
   igrins2Spectroscopy: Igrins2SpectroscopyInput
+
+  """GHOST Spectroscopy"""
+  ghostSpectroscopy: GhostSpectroscopyInput
 }
 
 """Image quality input - specify either preset or exact arcsec value"""
@@ -8950,27 +8956,6 @@ type TargetError {
   message: String!
   wellHalfFilledSeconds: Float
   wavelength: Wavelength
-}
-
-interface ITCObservingMode {
-  """instrument"""
-  instrument: Instrument!
-}
-
-type ImagingMode implements ITCObservingMode {
-  """instrument"""
-  instrument: Instrument!
-
-  """params"""
-  params: ImagingParams!
-}
-
-type SpectroscopyMode implements ITCObservingMode {
-  """instrument"""
-  instrument: Instrument!
-
-  """params"""
-  params: SpectroscopyParams!
 }
 
 """Graph data types"""

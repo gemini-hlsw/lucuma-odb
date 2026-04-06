@@ -5,7 +5,6 @@ package lucuma.itc.client
 
 import cats.Eq
 import cats.derived.*
-import cats.syntax.eq.*
 import cats.syntax.functor.*
 import io.circe.Encoder
 import io.circe.Json
@@ -13,6 +12,7 @@ import io.circe.syntax.*
 import lucuma.core.enums.Flamingos2Disperser
 import lucuma.core.enums.Flamingos2Filter
 import lucuma.core.enums.Flamingos2Fpu
+import lucuma.core.enums.GhostResolutionMode
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosNorthGrating
 import lucuma.core.enums.GmosRoi
@@ -22,6 +22,7 @@ import lucuma.core.enums.PortDisposition
 import lucuma.core.math.Wavelength
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.sequence.gmos.GmosCcdMode
+import lucuma.itc.ItcGhostDetector
 import lucuma.itc.client.json.encoders.given
 import lucuma.itc.client.json.syntax.*
 import lucuma.odb.json.gmos.given
@@ -29,7 +30,7 @@ import lucuma.odb.json.wavelength.transport.given
 import monocle.Prism
 import monocle.macros.GenPrism
 
-sealed trait InstrumentMode:
+sealed trait InstrumentMode derives Eq:
   // This will return "an" exposure time mode. For most instruments this is "the" exposure time mode,
   // but for some (e.g. GHOST) there are multiple. In the case of GHOST, the ITC will ignore the
   // "top level" exposure time mode and use the one in the spectroscopy mode, but we still need
@@ -122,6 +123,48 @@ object InstrumentMode {
         )
       )
 
+  case class Igrins2Spectroscopy(
+    exposureTimeMode: ExposureTimeMode,
+    port:             PortDisposition = PortDisposition.Bottom
+  ) extends InstrumentMode derives Eq:
+    override def displayName: String =
+      "IGRINS2 Spectroscopy"
+
+  object Igrins2Spectroscopy:
+    given Encoder[Igrins2Spectroscopy] = a =>
+      Json.obj(
+        "exposureTimeMode" -> a.exposureTimeMode.asJson,
+        "port"             -> a.port.asScreamingJson
+      )
+
+  case class GhostSpectroscopy(
+    resolutionMode: GhostResolutionMode,
+    redDetector:    ItcGhostDetector,
+    blueDetector:   ItcGhostDetector
+  ) extends InstrumentMode derives Eq:
+    // This will not be used by the OCS ITC, but is required to meet the API
+    val exposureTimeMode: ExposureTimeMode = redDetector.timeAndCount
+    override def displayName: String       = "GHOST Spectroscopy"
+
+  object GhostSpectroscopy:
+    given Encoder[ItcGhostDetector] = a =>
+      Json.fromFields(
+        List(
+          "timeAndCount" -> a.timeAndCount.asJson,
+          "readMode"     -> a.readMode.asJson,
+          "binning"      -> a.binning.asJson
+        )
+      )
+
+    given Encoder[GhostSpectroscopy] = a =>
+      Json.fromFields(
+        List(
+          "resolutionMode" -> a.resolutionMode.asScreamingJson,
+          "redDetector"    -> a.redDetector.asJson,
+          "blueDetector"   -> a.blueDetector.asJson
+        )
+      )
+
   case class GmosNorthImaging(
     exposureTimeMode: ExposureTimeMode,
     filter:           GmosNorthFilter,
@@ -188,6 +231,12 @@ object InstrumentMode {
   val flamingos2Spectroscopy: Prism[InstrumentMode, Flamingos2Spectroscopy] =
     GenPrism[InstrumentMode, Flamingos2Spectroscopy]
 
+  val igrins2Spectroscopy: Prism[InstrumentMode, Igrins2Spectroscopy] =
+    GenPrism[InstrumentMode, Igrins2Spectroscopy]
+
+  val ghostSpectroscopy: Prism[InstrumentMode, GhostSpectroscopy] =
+    GenPrism[InstrumentMode, GhostSpectroscopy]
+
   val gmosNorthImaging: Prism[InstrumentMode, GmosNorthImaging] =
     GenPrism[InstrumentMode, GmosNorthImaging]
 
@@ -196,23 +245,6 @@ object InstrumentMode {
 
   val flamingos2Imaging: Prism[InstrumentMode, Flamingos2Imaging] =
     GenPrism[InstrumentMode, Flamingos2Imaging]
-
-  case class Igrins2Spectroscopy(
-    exposureTimeMode: ExposureTimeMode,
-    port:             PortDisposition = PortDisposition.Bottom
-  ) extends InstrumentMode derives Eq:
-    override def displayName: String =
-      "IGRINS2 Spectroscopy"
-
-  object Igrins2Spectroscopy:
-    given Encoder[Igrins2Spectroscopy] = a =>
-      Json.obj(
-        "exposureTimeMode" -> a.exposureTimeMode.asJson,
-        "port"             -> a.port.asScreamingJson
-      )
-
-  val igrins2Spectroscopy: Prism[InstrumentMode, Igrins2Spectroscopy] =
-    GenPrism[InstrumentMode, Igrins2Spectroscopy]
 
   given Encoder[InstrumentMode] = a =>
     a match
@@ -230,16 +262,6 @@ object InstrumentMode {
         Json.obj("flamingos2Imaging" -> a.asJson)
       case a @ Igrins2Spectroscopy(_, _)                     =>
         Json.obj("igrins2Spectroscopy" -> a.asJson)
-
-  given Eq[InstrumentMode] with
-    def eqv(x: InstrumentMode, y: InstrumentMode): Boolean =
-      (x, y) match
-        case (x0: GmosNorthSpectroscopy, y0: GmosNorthSpectroscopy)   => x0 === y0
-        case (x0: GmosSouthSpectroscopy, y0: GmosSouthSpectroscopy)   => x0 === y0
-        case (x0: GmosNorthImaging, y0: GmosNorthImaging)             => x0 === y0
-        case (x0: GmosSouthImaging, y0: GmosSouthImaging)             => x0 === y0
-        case (x0: Flamingos2Spectroscopy, y0: Flamingos2Spectroscopy) => x0 === y0
-        case (x0: Flamingos2Imaging, y0: Flamingos2Imaging)           => x0 === y0
-        case (x0: Igrins2Spectroscopy, y0: Igrins2Spectroscopy)       => x0 === y0
-        case _                                                        => false
+      case a @ GhostSpectroscopy(_, _, _)                    =>
+        Json.obj("ghostSpectroscopy" -> a.asJson)
 }

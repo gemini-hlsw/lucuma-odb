@@ -331,7 +331,7 @@ trait CommonITCLegacySuite extends CatsEffectSuite:
     test(s"$name - image quality".tag(LegacyITCTest)):
       Enumerated[ImageQuality.Preset].all.foreach: iq =>
         val result = localItc
-          .calculateIntegrationTime(
+          .calculate(
             params
               .copy(conditions = params.conditions.copy(iq = iq.toImageQuality.toArcSeconds))
               .asJson
@@ -342,7 +342,7 @@ trait CommonITCLegacySuite extends CatsEffectSuite:
     test(s"$name - cloud extinction".tag(LegacyITCTest)):
       Enumerated[CloudExtinction.Preset].all.foreach: ce =>
         val result = localItc
-          .calculateIntegrationTime(
+          .calculate(
             params
               .copy(conditions = params.conditions.copy(cc = ce.toCloudExtinction.toVegaMagnitude))
               .asJson
@@ -353,7 +353,7 @@ trait CommonITCLegacySuite extends CatsEffectSuite:
     test(s"$name - water vapor".tag(LegacyITCTest)):
       Enumerated[WaterVapor].all.foreach: wv =>
         val result = localItc
-          .calculateIntegrationTime(
+          .calculate(
             params.copy(conditions = params.conditions.copy(wv = wv)).asJson.noSpaces
           )
         assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))
@@ -361,7 +361,7 @@ trait CommonITCLegacySuite extends CatsEffectSuite:
     test(s"$name - sky background".tag(LegacyITCTest)):
       Enumerated[SkyBackground].all.foreach: sb =>
         val result = localItc
-          .calculateIntegrationTime(
+          .calculate(
             params.copy(conditions = params.conditions.copy(sb = sb)).asJson.noSpaces
           )
         assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))
@@ -376,7 +376,7 @@ trait CommonITCLegacySuite extends CatsEffectSuite:
       assume(runStellar, "Skip stellar library spectrum test")
       Enumerated[StellarLibrarySpectrum].all.foreach: f =>
         val result = localItc
-          .calculateIntegrationTime(
+          .calculate(
             bodySED(
               baseParams.source,
               baseParams.observation,
@@ -391,7 +391,7 @@ trait CommonITCLegacySuite extends CatsEffectSuite:
       assume(runCoolStar, "Skip cool star test")
       Enumerated[CoolStarTemperature].all.foreach: f =>
         val result = localItc
-          .calculateIntegrationTime(
+          .calculate(
             bodySED(
               baseParams.source,
               baseParams.observation,
@@ -405,7 +405,7 @@ trait CommonITCLegacySuite extends CatsEffectSuite:
     test(s"$name - galaxy spectrum".tag(LegacyITCTest)):
       Enumerated[GalaxySpectrum].all.foreach: f =>
         val result = localItc
-          .calculateIntegrationTime(
+          .calculate(
             bodySED(
               baseParams.source,
               baseParams.observation,
@@ -419,7 +419,7 @@ trait CommonITCLegacySuite extends CatsEffectSuite:
     test(s"$name - planet spectrum".tag(LegacyITCTest)):
       Enumerated[PlanetSpectrum].all.foreach: f =>
         val result = localItc
-          .calculateIntegrationTime(
+          .calculate(
             bodySED(
               baseParams.source,
               baseParams.observation,
@@ -433,7 +433,7 @@ trait CommonITCLegacySuite extends CatsEffectSuite:
     test(s"$name - quasar spectrum".tag(LegacyITCTest)):
       Enumerated[QuasarSpectrum].all.foreach: f =>
         val result = localItc
-          .calculateIntegrationTime(
+          .calculate(
             bodySED(
               baseParams.source,
               baseParams.observation,
@@ -447,7 +447,7 @@ trait CommonITCLegacySuite extends CatsEffectSuite:
     test(s"$name - hii region spectrum".tag(LegacyITCTest)):
       Enumerated[HIIRegionSpectrum].all.foreach: f =>
         val result = localItc
-          .calculateIntegrationTime(
+          .calculate(
             bodySED(
               baseParams.source,
               baseParams.observation,
@@ -461,7 +461,7 @@ trait CommonITCLegacySuite extends CatsEffectSuite:
     test(s"$name - planetary nebula spectrum".tag(LegacyITCTest)):
       Enumerated[PlanetaryNebulaSpectrum].all.foreach: f =>
         val result = localItc
-          .calculateIntegrationTime(
+          .calculate(
             bodySED(
               baseParams.source,
               baseParams.observation,
@@ -482,7 +482,7 @@ trait CommonITCLegacySuite extends CatsEffectSuite:
       )
 
       val result = localItc
-        .calculateIntegrationTime(
+        .calculate(
           bodySED(
             baseParams.source,
             baseParams.observation,
@@ -501,7 +501,7 @@ trait CommonITCLegacySuite extends CatsEffectSuite:
     test(s"$name - brightness integrated units".tag(LegacyITCTest)):
       Brightness.Integrated.all.toList.foreach: f =>
         val result = localItc
-          .calculateIntegrationTime(
+          .calculate(
             bodyIntMagUnits(
               baseParams.source,
               baseParams.observation,
@@ -515,7 +515,7 @@ trait CommonITCLegacySuite extends CatsEffectSuite:
     test(s"$name - surface units".tag(LegacyITCTest)):
       Brightness.Surface.all.toList.foreach: f =>
         val result = localItc
-          .calculateIntegrationTime(
+          .calculate(
             bodySurfaceMagUnits(
               baseParams.source,
               baseParams.observation,
@@ -529,7 +529,7 @@ trait CommonITCLegacySuite extends CatsEffectSuite:
     test(s"$name - gaussian units".tag(LegacyITCTest)):
       Brightness.Integrated.all.toList.foreach: f =>
         val result = localItc
-          .calculateIntegrationTime(
+          .calculate(
             bodyIntGaussianMagUnits(
               baseParams.source,
               baseParams.observation,
@@ -544,7 +544,7 @@ trait CommonITCLegacySuite extends CatsEffectSuite:
     test(s"$name - power law".tag(LegacyITCTest)):
       List(-10, 0, 10).foreach: f =>
         val result = localItc
-          .calculateIntegrationTime(
+          .calculate(
             bodyPowerLaw(
               baseParams.source,
               baseParams.observation,

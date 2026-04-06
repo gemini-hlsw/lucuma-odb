@@ -15,6 +15,7 @@ import lucuma.core.math.SignalToNoise
 import lucuma.core.math.SingleSN
 import lucuma.core.math.TotalSN
 import lucuma.core.math.Wavelength
+import lucuma.core.model.ExposureTimeMode
 import lucuma.core.util.TimeSpan
 import lucuma.itc.CalculationError
 import lucuma.itc.IntegrationTime
@@ -64,26 +65,6 @@ object ItcImpl {
           warnings = remoteCcd.warnings
         )
 
-      def calculateIntegrationTime(
-        target:        TargetData,
-        atWavelength:  Wavelength,
-        observingMode: ObservingMode,
-        constraints:   ItcObservingConditions,
-        signalToNoise: SignalToNoise
-      ): F[TargetIntegrationTime] =
-        T.span("calculate integration_time"):
-          observingMode match
-            case s @ (SpectroscopyMode.GmosNorth(_, _, _, _, _, _, _) |
-                SpectroscopyMode.GmosSouth(_, _, _, _, _, _, _) |
-                SpectroscopyMode.Flamingos2(_, _, _, _) | SpectroscopyMode.Igrins2(_)) =>
-              spectroscopyIntegrationTime(target, atWavelength, s, constraints, signalToNoise)
-            case i @ (
-                  ObservingMode.ImagingMode.GmosNorth(_, _, _) |
-                  ObservingMode.ImagingMode.GmosSouth(_, _, _) |
-                  ObservingMode.ImagingMode.Flamingos2(_, _)
-                ) =>
-              imagingIntegrationTime(target, atWavelength, i, constraints, signalToNoise)
-
       def calculateGraphs(
         target:        TargetData,
         atWavelength:  Wavelength,
@@ -96,7 +77,8 @@ object ItcImpl {
           observingMode match
             case s @ (SpectroscopyMode.GmosNorth(_, _, _, _, _, _, _) |
                 SpectroscopyMode.GmosSouth(_, _, _, _, _, _, _) |
-                SpectroscopyMode.Flamingos2(_, _, _, _) | SpectroscopyMode.Igrins2(_)) =>
+                SpectroscopyMode.Flamingos2(_, _, _, _) | SpectroscopyMode.Igrins2(_) |
+                SpectroscopyMode.Ghost(_, _, _, _)) =>
               spectroscopyGraphs(
                 target,
                 atWavelength,
@@ -143,40 +125,43 @@ object ItcImpl {
                         .pure[F]
         yield result
 
-      /**
-       * Compute the exposure time and number of exposures required to achieve the desired
-       * signal-to-noise under the requested conditions. Only for spectroscopy modes.
-       */
-      private def spectroscopyIntegrationTime(
-        target:        TargetData,
-        atWavelength:  Wavelength,
-        observingMode: ObservingMode.SpectroscopyMode,
-        constraints:   ItcObservingConditions,
-        signalToNoise: SignalToNoise
+      /** Calculate the Integration Time under the requested conditions. */
+      def calculate(
+        target:           TargetData,
+        observingMode:    ObservingMode,
+        constraints:      ItcObservingConditions,
+        exposureTimeMode: ExposureTimeMode
       ): F[TargetIntegrationTime] =
         import lucuma.itc.legacy.*
 
-        val (request, bandOrLine): (Json, Either[Band, Wavelength]) =
-          spectroscopyIntegrationTimeParams(
-            target,
-            atWavelength,
-            observingMode,
-            constraints,
-            signalToNoise
-          ).leftMap(_.asJson)
+        T.span(s"ITC calculate"):
+          val (request, bandOrLine): (Json, Either[Band, Wavelength]) =
+            toItcParameters(
+              target,
+              observingMode,
+              constraints,
+              exposureTimeMode
+            ).leftMap(_.asJson)
 
-        for
-          _      <- L.info(s"Desired S/N $signalToNoise")
-          _      <- L.info(s"Target $target at wavelength $atWavelength")
-          _      <- T.put("params.signal_to_noise" -> signalToNoise.toBigDecimal.toDouble)
-          _      <- T.put("params.at" -> atWavelength.nm.value.value.toDouble)
-          _      <- T.put("params.science_mode" -> "spectroscopy")
-          _      <- L.info(request.noSpaces) // Request to the legacy itc
-          _      <- L.info("spectroscopy time request:")
-          a      <- itcLocal.calculateIntegrationTime(request.noSpaces, atWavelength)
-          result <- T.span("convert integration_time_result"):
-                      convertIntegrationTimeRemoteResult(a, bandOrLine)
-        yield result
+          def traceParams: F[Unit] =
+            exposureTimeMode match
+              case ExposureTimeMode.SignalToNoiseMode(sn, at)         =>
+                T.put("params.signal_to_noise" -> sn.toBigDecimal.toDouble)
+              case ExposureTimeMode.TimeAndCountMode(time, count, at) =>
+                T.put("params.exposure_time" -> time.toMilliseconds.toInt) *>
+                  T.put("params.exposure_count" -> count.value)
+
+          for
+            _      <- L.info(exposureTimeMode.desiredString)
+            _      <- L.info(s"Target $target")
+            _      <- traceParams
+            _      <- T.put("params.at" -> exposureTimeMode.at.nm.value.value.toDouble)
+            _      <- T.put("params.observing_mode" -> observingMode.description)
+            _      <- L.info(request.noSpaces)
+            a      <- itcLocal.calculate(request.noSpaces, exposureTimeMode.at)
+            result <- T.span("convert integration_time_result"):
+                        convertIntegrationTimeRemoteResult(a, bandOrLine)
+          yield result
 
       private def convertIntegrationTimeRemoteResult(
         r:          IntegrationTimeRemoteResult,
@@ -205,152 +190,6 @@ object ItcImpl {
         tgts.map(times =>
           TargetIntegrationTime(times, bandOrLine, r.signalToNoiseAt.map(fromLegacy), convertedCcds)
         )
-
-      /**
-       * Compute the exposure time and number of exposures required to achieve the desired
-       * signal-to-noise under the requested conditions. Only for spectroscopy modes.
-       */
-      private def spectroscopySignalToNoise(
-        target:        TargetData,
-        atWavelength:  Wavelength,
-        observingMode: ObservingMode.SpectroscopyMode,
-        constraints:   ItcObservingConditions,
-        exposureTime:  TimeSpan,
-        exposureCount: PosInt
-      ): F[TargetIntegrationTime] =
-        import lucuma.itc.legacy.*
-
-        val (request, bandOrLine): (Json, Either[Band, Wavelength]) =
-          spectroscopySNParams(
-            target,
-            atWavelength,
-            observingMode,
-            constraints,
-            exposureTime.toMilliseconds.toDouble.milliseconds,
-            exposureCount.value
-          ).leftMap(_.asJson)
-
-        for
-          _ <- L.info(s"Calculate S/N for exp time $exposureTime and count $exposureCount")
-          _ <- L.info(s"Target $target at wavelength $atWavelength")
-          _ <- T.put("params.science_mode" -> "spectroscopy")
-          _ <- T.put("params.exposure_time" -> exposureTime.toMilliseconds.toInt)
-          _ <- T.put("params.exposure_count" -> exposureCount.value)
-          _ <- L.info(
-                 s"Spectroscopy: Signal to noise mode ${request.noSpaces}"
-               ) // Request to the legacy itc
-          a <- itcLocal.calculateSignalToNoise(request.noSpaces, atWavelength)
-        yield TargetIntegrationTime(
-          Zipper.one(IntegrationTime(exposureTime, exposureCount)),
-          bandOrLine,
-          a.signalToNoiseAt.map(fromLegacy),
-          a.ccds.toList.flatMap(fromLegacyCcd)
-        )
-
-      def calculateSignalToNoise(
-        target:        TargetData,
-        atWavelength:  Wavelength,
-        observingMode: ObservingMode,
-        constraints:   ItcObservingConditions,
-        exposureTime:  TimeSpan,
-        exposureCount: PosInt
-      ): F[TargetIntegrationTime] =
-        T.span("calculate signal_to_noise"):
-          observingMode match
-            case s @ (ObservingMode.SpectroscopyMode.GmosNorth(_, _, _, _, _, _, _) |
-                ObservingMode.SpectroscopyMode.GmosSouth(_, _, _, _, _, _, _) |
-                ObservingMode.SpectroscopyMode.Flamingos2(_, _, _, _) |
-                ObservingMode.SpectroscopyMode.Igrins2(_)) =>
-              spectroscopySignalToNoise(target,
-                                        atWavelength,
-                                        s,
-                                        constraints,
-                                        exposureTime,
-                                        exposureCount
-              )
-            case s @ (ObservingMode.ImagingMode.Flamingos2(_, _) |
-                ObservingMode.ImagingMode.GmosSouth(_, _, _) |
-                ObservingMode.ImagingMode.GmosNorth(_, _, _)) =>
-              imagingSignalToNoise(target,
-                                   atWavelength,
-                                   s,
-                                   constraints,
-                                   exposureTime,
-                                   exposureCount
-              )
-
-      /**
-       * Compute the exposure time and number of exposures required to achieve the desired
-       * signal-to-noise under the requested conditions. Only for spectroscopy modes
-       */
-      private def imagingIntegrationTime(
-        target:        TargetData,
-        atWavelength:  Wavelength,
-        observingMode: ObservingMode.ImagingMode,
-        constraints:   ItcObservingConditions,
-        signalToNoise: SignalToNoise
-      ): F[TargetIntegrationTime] =
-        import lucuma.itc.legacy.*
-
-        val (request, bandOrLine): (Json, Either[Band, Wavelength]) =
-          imagingIntegrationTimeParams(target,
-                                       atWavelength,
-                                       observingMode,
-                                       constraints,
-                                       signalToNoise
-          ).leftMap(
-            _.asJson
-          )
-
-        for
-          _            <- L.info(s"Desired S/N $signalToNoise")
-          _            <- L.info(s"Target $target  at wavelength $atWavelength")
-          _            <- T.put("params.signal_to_noise" -> signalToNoise.toBigDecimal.toDouble)
-          _            <- T.put("params.at" -> atWavelength.nm.value.value.toDouble)
-          _            <- T.put("params.science_mode" -> "imaging")
-          // Request to the legacy itc
-          _            <- L.info(s"Imaging: Signal to noise mode ${request.noSpaces}")
-          remoteResult <- itcLocal.calculateIntegrationTime(request.noSpaces, atWavelength)
-          result       <- T.span("convert integration_time_result"):
-                            convertIntegrationTimeRemoteResult(remoteResult, bandOrLine)
-        yield result
-
-      /**
-       * Compute the exposure time and number of exposures required to achieve the desired
-       * signal-to-noise under the requested conditions. Only for spectroscopy modes
-       */
-      private def imagingSignalToNoise(
-        target:        TargetData,
-        atWavelength:  Wavelength,
-        observingMode: ObservingMode.ImagingMode,
-        constraints:   ItcObservingConditions,
-        exposureTime:  TimeSpan,
-        exposureCount: PosInt
-      ): F[TargetIntegrationTime] =
-        import lucuma.itc.legacy.*
-
-        val (request, bandOrLine): (Json, Either[Band, Wavelength]) =
-          imagingS2NParams(
-            target,
-            atWavelength,
-            observingMode,
-            constraints,
-            exposureTime.toMilliseconds.toDouble.milliseconds,
-            exposureCount.value
-          ).leftMap(_.asJson)
-
-        for {
-          _            <- L.info(s"Calculate S/N for exp time $exposureTime and count $exposureCount")
-          _            <- L.info(s"Target $target  at wavelength $atWavelength")
-          _            <- T.put("params.science_mode" -> "imaging")
-          _            <- T.put("params.exposure_time" -> exposureTime.toMilliseconds.toInt)
-          _            <- T.put("params.exposure_count" -> exposureCount.value)
-          // Request to the legacy itc
-          _            <- L.info(s"Imaging: time and count mode ${request.noSpaces}")
-          remoteResult <- itcLocal.calculateIntegrationTime(request.noSpaces, atWavelength)
-          result       <- T.span("convert integration_time_result"):
-                            convertIntegrationTimeRemoteResult(remoteResult, bandOrLine)
-        } yield result
     }
 
 }

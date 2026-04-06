@@ -64,13 +64,10 @@ case class LocalItc[F[_]: {Sync as F}](classLoader: ClassLoader):
     .loadClass("edu.gemini.itc.web.servlets.ItcCalculation")
     .getMethod("calculateCharts", classOf[String])
 
-  private val calculateExposureTimeMethod = classLoader
+  private val calculateMethod = classLoader
     .loadClass("edu.gemini.itc.web.servlets.ItcCalculation")
+    // The ocs calculateExposureTime and calculateSignalToNoise are exactly the same.
     .getMethod("calculateExposureTime", classOf[String])
-
-  private val calculateSignalToNoiseMethod = classLoader
-    .loadClass("edu.gemini.itc.web.servlets.ItcCalculation")
-    .getMethod("calculateSignalToNoise", classOf[String])
 
   private val LegacyRight    = """Right\((.*)\)""".r
   private val LegacyLeft     = """Left\(([\s\S]*?)\)""".r
@@ -112,38 +109,11 @@ case class LocalItc[F[_]: {Sync as F}](classLoader: ClassLoader):
   /**
    * This method does a call to the method ItcCalculation.calculate via reflection.
    */
-  def calculateIntegrationTime(
+  def calculate(
     jsonParams: String
   ): F[Either[List[String], IntegrationTimeRemoteResult]] =
     Sync[F].blocking:
-      val res = calculateExposureTimeMethod
-        .invoke(null, jsonParams) // null as it is a static method
-        .asInstanceOf[String]
-
-      val result = res match
-        case LegacyRight(result) if hasAllNullExposureTimes(result) =>
-          Left(List(OutOfRangeMsg))
-        case LegacyRight(result)                                    =>
-          decode[IntegrationTimeRemoteResult](result).leftMap { e =>
-            List(e.getMessage())
-          }
-        case LegacyLeft(result)                                     =>
-          Left(result.split("\n").toList)
-        case LegacyLeftList(result)                                 =>
-          Left(result.split("\n").toList)
-        case m                                                      =>
-          Left(List(m))
-
-      result
-
-  /**
-   * This method does a call to the method ItcCalculation.calculate via reflection.
-   */
-  def calculateSignalToNoise(
-    jsonParams: String
-  ): F[Either[List[String], IntegrationTimeRemoteResult]] =
-    F.blocking:
-      val res = calculateSignalToNoiseMethod
+      val res = calculateMethod
         .invoke(null, jsonParams) // null as it is a static method
         .asInstanceOf[String]
 

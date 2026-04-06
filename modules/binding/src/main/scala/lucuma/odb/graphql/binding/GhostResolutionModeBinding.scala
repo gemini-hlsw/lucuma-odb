@@ -3,7 +3,7 @@
 
 package lucuma.odb.graphql.binding
 
-import lucuma.core.enums.GmosAmpReadMode
+import lucuma.core.enums.GhostResolutionMode
 
-val GmosAmpReadModeBinding: Matcher[GmosAmpReadMode] =
+val GhostResolutionModeBinding: Matcher[GhostResolutionMode] =
   enumeratedBinding

@@ -3,7 +3,7 @@
 
 package lucuma.odb.graphql.binding
 
-import lucuma.core.enums.PortDisposition
+import lucuma.core.enums.GhostBinning
 
-val PortDispositionBinding: Matcher[PortDisposition] =
+val GhostBinningBinding: Matcher[GhostBinning] =
   enumeratedBinding

@@ -3,7 +3,7 @@
 
 package lucuma.odb.graphql.binding
 
-import lucuma.core.enums.GmosYBinning
+import lucuma.core.enums.GhostReadMode
 
-val GmosYBinningBinding: Matcher[GmosYBinning] =
+val GhostReadModeBinding: Matcher[GhostReadMode] =
   enumeratedBinding

@@ -28,7 +28,7 @@ trait LegacyITCFlamingos2Suite extends CommonITCLegacySuite:
   test(s"$title - Flamingos2 filter".tag(LegacyITCTest)):
     Enumerated[Flamingos2Filter].all.foreach: f =>
       val result = localItc
-        .calculateIntegrationTime(
+        .calculate(
           bodyConf(sourceDefinition,
                    obs,
                    observingModeWithFilter(f),
@@ -40,7 +40,7 @@ trait LegacyITCFlamingos2Suite extends CommonITCLegacySuite:
   test(s"$title - Flamingos2 fpu".tag(LegacyITCTest)):
     Enumerated[Flamingos2Fpu].all.foreach: f =>
       val result = localItc
-        .calculateIntegrationTime(
+        .calculate(
           bodyConf(sourceDefinition, obs, observingModeWithFpu(f)).asJson.noSpaces
         )
       assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))

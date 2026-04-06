@@ -8,7 +8,6 @@ import buildinfo.BuildInfo
 import cats.*
 import cats.syntax.all.*
 import lucuma.core.math.Wavelength
-import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.SourceProfile
 import lucuma.core.model.SpectralDefinition.BandNormalized
 import lucuma.core.model.UnnormalizedSED
@@ -121,39 +120,21 @@ trait ItcCacheOrRemote extends Version:
                                   s"$CacheRootPrefix:graph:spec"
           )
 
-  private def requestSpecSNCalc[F[_]: MonadThrow: Logger](itc: Itc[F])(
-    calcRequest: TargetSpectroscopyTimeRequest,
-    mode:        ExposureTimeMode.TimeAndCountMode
+  private def requestSpectroscopy[F[_]: MonadThrow: Logger](itc: Itc[F])(
+    calcRequest: TargetSpectroscopyTimeRequest
   ): F[TargetIntegrationTime] =
     itc
-      .calculateSignalToNoise(
+      .calculate(
         calcRequest.target,
-        mode.at,
         calcRequest.specMode,
         calcRequest.constraints,
-        mode.time,
-        mode.count
-      )
-      .onError:
-        logSedOnFailure(calcRequest)
-
-  private def requestSpecTimeCalc[F[_]: MonadThrow: Logger](itc: Itc[F])(
-    calcRequest: TargetSpectroscopyTimeRequest,
-    mode:        ExposureTimeMode.SignalToNoiseMode
-  ): F[TargetIntegrationTime] =
-    itc
-      .calculateIntegrationTime(
-        calcRequest.target,
-        mode.at,
-        calcRequest.specMode,
-        calcRequest.constraints,
-        mode.value
+        calcRequest.exposureTimeMode
       )
       .onError:
         logSedOnFailure(calcRequest)
 
   /**
-   * Request exposure time calculation for spectroscopy
+   * Request ITC calculation for spectroscopy
    */
   def spectroscopyFromCacheOrRemote[F[
     _
@@ -169,55 +150,28 @@ trait ItcCacheOrRemote extends Version:
         CustomSed // We must resolve CustomSed before caching.
           .resolveTargetSpectroscopyTimeRequest(calcRequest)
       .flatMap: r =>
-        r.exposureTimeMode match
-          case m @ ExposureTimeMode.SignalToNoiseMode(_, _)   =>
-            Trace[F].span("cache_or_calculate spec_sn"):
-              cache.getOrInvokeBinary(r,
-                                      requestSpecTimeCalc(itc)(r, m),
-                                      TTL(config),
-                                      s"$CacheRootPrefix:calc:spec:sn"
-              )
-          case m @ ExposureTimeMode.TimeAndCountMode(_, _, _) =>
-            Trace[F].span("cache_or_calculate spec_tc"):
-              cache.getOrInvokeBinary(r,
-                                      requestSpecSNCalc(itc)(r, m),
-                                      TTL(config),
-                                      s"$CacheRootPrefix:calc:spec:tc"
-              )
+        Trace[F].span("cache_or_calculate spectroscopy"):
+          cache.getOrInvokeBinary(r,
+                                  requestSpectroscopy(itc)(r),
+                                  TTL(config),
+                                  s"$CacheRootPrefix:calc:spec"
+          )
 
-  private def requestImgTimeCalc[F[_]: MonadThrow: Logger](itc: Itc[F])(
-    calcRequest: TargetImagingTimeRequest,
-    mode:        ExposureTimeMode.SignalToNoiseMode
+  private def requestImaging[F[_]: MonadThrow: Logger](itc: Itc[F])(
+    calcRequest: TargetImagingTimeRequest
   ): F[TargetIntegrationTime] =
     itc
-      .calculateIntegrationTime(
+      .calculate(
         calcRequest.target,
-        mode.at,
         calcRequest.imagingMode,
         calcRequest.constraints,
-        mode.value
-      )
-      .onError:
-        logSedOnFailure(calcRequest)
-
-  private def requestImgSNCalc[F[_]: MonadThrow: Logger](itc: Itc[F])(
-    calcRequest: TargetImagingTimeRequest,
-    mode:        ExposureTimeMode.TimeAndCountMode
-  ): F[TargetIntegrationTime] =
-    itc
-      .calculateSignalToNoise(
-        calcRequest.target,
-        mode.at,
-        calcRequest.imagingMode,
-        calcRequest.constraints,
-        mode.time,
-        mode.count
+        calcRequest.exposureTimeMode
       )
       .onError:
         logSedOnFailure(calcRequest)
 
   /**
-   * Request exposure time calculation for imaging
+   * Request ITC calculation for imaging
    */
   def imagingFromCacheOrRemote[
     F[_]: MonadThrow: Parallel: Logger: CustomSed.Resolver
@@ -233,21 +187,12 @@ trait ItcCacheOrRemote extends Version:
         CustomSed // We must resolve CustomSed before caching.
           .resolveTargetImagingTimeRequest(calcRequest)
       .flatMap: r =>
-        r.exposureTimeMode match
-          case m @ ExposureTimeMode.SignalToNoiseMode(_, _)   =>
-            Trace[F].span("cache_or_calculate imaging_sn"):
-              cache.getOrInvokeBinary(r,
-                                      requestImgTimeCalc(itc)(r, m),
-                                      TTL(config),
-                                      s"$CacheRootPrefix:calc:img:sn"
-              )
-          case m @ ExposureTimeMode.TimeAndCountMode(_, _, _) =>
-            Trace[F].span("cache_or_calculate imaging_tc"):
-              cache.getOrInvokeBinary(r,
-                                      requestImgSNCalc(itc)(r, m),
-                                      TTL(config),
-                                      s"$CacheRootPrefix:calc:img:tc"
-              )
+        Trace[F].span("cache_or_calculate imaging"):
+          cache.getOrInvokeBinary(r,
+                                  requestImaging(itc)(r),
+                                  TTL(config),
+                                  s"$CacheRootPrefix:calc:img"
+          )
 
   /**
    * This method will get the version from the remote itc and compare it with the one on the cache.

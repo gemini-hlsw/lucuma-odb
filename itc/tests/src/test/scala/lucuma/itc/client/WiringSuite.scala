@@ -17,6 +17,9 @@ import lucuma.core.enums.Flamingos2Disperser
 import lucuma.core.enums.Flamingos2Filter
 import lucuma.core.enums.Flamingos2Fpu
 import lucuma.core.enums.GalaxySpectrum.Spiral
+import lucuma.core.enums.GhostBinning
+import lucuma.core.enums.GhostReadMode
+import lucuma.core.enums.GhostResolutionMode
 import lucuma.core.enums.GmosAmpCount
 import lucuma.core.enums.GmosAmpGain
 import lucuma.core.enums.GmosAmpReadMode
@@ -67,6 +70,7 @@ import lucuma.itc.ImageQualityInput
 import lucuma.itc.IntegrationTime
 import lucuma.itc.ItcAxis
 import lucuma.itc.ItcCcd
+import lucuma.itc.ItcGhostDetector
 import lucuma.itc.ItcVersions
 import lucuma.itc.SeriesDataType
 import lucuma.itc.SignalToNoiseAt
@@ -134,6 +138,29 @@ class WiringSuite extends ClientSuite:
   test("ItcClient igrins2 spectroscopy basic wiring and sanity check"):
     spectroscopy(
       WiringSuite.Igrins2SpectroscopyInputData,
+      ClientCalculationResult(
+        ItcVersions(
+          versionDateTimeFormatter.format(Instant.ofEpochMilli(buildinfo.BuildInfo.buildDateTime)),
+          BuildInfo.ocslibHash.some
+        ),
+        AsterismIntegrationTimeOutcomes:
+          NonEmptyChain:
+            TargetIntegrationTimeOutcome:
+              TargetIntegrationTime(
+                Zipper.fromNel(NonEmptyList.one(selected)),
+                Band.R.asLeft,
+                SignalToNoiseAt(atWavelength,
+                                SingleSN(SignalToNoise.unsafeFromBigDecimalExact(101.0)),
+                                TotalSN(SignalToNoise.unsafeFromBigDecimalExact(102.0))
+                ).some,
+                List.empty
+              ).asRight
+      ).asRight
+    )
+
+  test("ItcClient ghost spectroscopy basic wiring and sanity check"):
+    spectroscopy(
+      WiringSuite.GhostSpectroscopyInputData,
       ClientCalculationResult(
         ItcVersions(
           versionDateTimeFormatter.format(Instant.ofEpochMilli(buildinfo.BuildInfo.buildDateTime)),
@@ -467,6 +494,9 @@ object WiringSuite:
       atWavelength
     )
 
+  private val defaultTimeAndCount: ExposureTimeMode.TimeAndCountMode =
+    ExposureTimeMode.TimeAndCountMode(TimeSpan.fromSeconds(1).get, 10.refined, atWavelength)
+
   val GmosSpectroscopyInputData: SpectroscopyInput =
     gmosSpectroscopyInput(defaultEtm)
 
@@ -564,6 +594,49 @@ object WiringSuite:
           elevationRange = ElevationRange.ByAirMass.Default
         ),
         InstrumentMode.Igrins2Spectroscopy(defaultEtm, PortDisposition.Bottom)
+      ),
+      NonEmptyList.of(
+        TargetInput(
+          SourceProfile.Point(
+            BandNormalized[Integrated](
+              Galaxy(Spiral).some,
+              SortedMap(
+                Band.R ->
+                  Measure(
+                    BrightnessValue.unsafeFrom(BigDecimal(10.0)),
+                    TaggedUnit[VegaMagnitude, Brightness[Integrated]].unit
+                  ).tag
+              )
+            )
+          ),
+          RadialVelocity.fromMetersPerSecond.getOption(1.0).get
+        )
+      )
+    )
+
+  val GhostSpectroscopyInputData: SpectroscopyInput =
+    SpectroscopyInput(
+      SpectroscopyParameters(
+        ItcConstraintsInput(
+          ImageQualityInput.preset(ImageQuality.Preset.PointOne),
+          CloudExtinctionInput.preset(CloudExtinction.Preset.PointOne),
+          skyBackground = SkyBackground.Darkest,
+          waterVapor = WaterVapor.VeryDry,
+          elevationRange = ElevationRange.ByAirMass.Default
+        ),
+        InstrumentMode.GhostSpectroscopy(
+          GhostResolutionMode.Standard,
+          ItcGhostDetector(
+            defaultTimeAndCount,
+            GhostReadMode.Slow,
+            GhostBinning.OneByOne
+          ),
+          ItcGhostDetector(
+            defaultTimeAndCount,
+            GhostReadMode.Slow,
+            GhostBinning.OneByOne
+          )
+        )
       ),
       NonEmptyList.of(
         TargetInput(

@@ -164,6 +164,7 @@ trait BaseMapping[F[_]]
   lazy val GcalType                                = schema.ref("Gcal")
   lazy val GenderType                              = schema.ref("Gender")
   lazy val GhostBinningType                        = schema.ref("GhostBinning")
+  lazy val GhostReadModeType                       = schema.ref("GhostReadMode")
   lazy val GhostResolutionModeType                 = schema.ref("GhostResolutionMode")
   lazy val GmosAmpCountType                        = schema.ref("GmosAmpCount")
   lazy val GmosAmpGainType                         = schema.ref("GmosAmpGain")

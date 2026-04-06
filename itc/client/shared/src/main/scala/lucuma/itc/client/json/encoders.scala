@@ -16,6 +16,13 @@ private[client] object encoders:
   given Encoder[TimeSpan] = t =>
     Json.obj("microseconds" -> TimeSpan.FromMicroseconds.reverseGet(t).asJson)
 
+  given (using Encoder[Wavelength]): Encoder[ExposureTimeMode.TimeAndCountMode] = t =>
+    Json.obj(
+      "time"  -> t.time.asJson,
+      "count" -> t.count.value.asJson,
+      "at"    -> t.at.asJson
+    )
+
   given (using Encoder[Wavelength], Encoder[TimeSpan]): Encoder[ExposureTimeMode] = {
     case ExposureTimeMode.SignalToNoiseMode(n, w) =>
       Json.obj(
