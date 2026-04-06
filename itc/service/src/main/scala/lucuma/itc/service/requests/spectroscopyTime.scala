@@ -100,23 +100,17 @@ object AsterismSpectroscopyTimeRequest:
             ) =>
           Result.success:
             ObservingMode.SpectroscopyMode.Flamingos2(disperser, filter, fpu, port)
-        case Igrins2SpectroscopyInput(_, port) =>
+        case Igrins2SpectroscopyInput(_, port)                                                  =>
           Result.success:
             ObservingMode.SpectroscopyMode.Igrins2(port)
-        case GhostSpectroscopyInput(centralWavelength,
-                                    numSkyMicrolens,
-                                    resolutionMode,
-                                    redDetector,
-                                    blueDetector
-            ) =>
+        case GhostSpectroscopyInput(numSkyMicrolens, resolutionMode, redDetector, blueDetector) =>
           Result.success:
-            ObservingMode.SpectroscopyMode.Ghost(centralWavelength,
-                                                 numSkyMicrolens,
+            ObservingMode.SpectroscopyMode.Ghost(numSkyMicrolens,
                                                  resolutionMode,
                                                  redDetector,
                                                  blueDetector
             )
-        case _                                 =>
+        case _                                                                                  =>
           Result.failure("Invalid spectroscopy mode")
 
     (asterism.targetInputsToData, modeResult, constraints.create).parMapN:

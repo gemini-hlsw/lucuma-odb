@@ -236,11 +236,10 @@ private[legacy] object codecs:
       )
 
     Json.obj(
-      "centralWavelength" -> a.centralWavelength.asJson,
-      "nSkyMicroLens"     -> a.numSkyMicrolens.asJson,
-      "resolution"        -> a.resolutionMode.ocs2Tag.asJson,
-      "blueCamera"        -> a.blueDetector.asJson,
-      "redCamera"         -> a.redDetector.asJson
+      "nSkyMicrolens" -> a.numSkyMicrolens.asJson,
+      "resolution"    -> a.resolutionMode.ocs2Tag.asJson,
+      "blueCamera"    -> a.blueDetector.asJson,
+      "redCamera"     -> a.redDetector.asJson
     )
 
   private given Encoder[ItcInstrumentDetails] = (a: ItcInstrumentDetails) =>

@@ -183,26 +183,20 @@ trait ArbInstrumentMode {
   given Arbitrary[GhostSpectroscopy] =
     Arbitrary {
       for {
-        w  <- arbitrary[Wavelength]
-        n  <- arbitrary[Int]
         re <- arbitrary[GhostResolutionMode]
         r  <- arbitrary[ItcGhostDetector]
         b  <- arbitrary[ItcGhostDetector]
-      } yield GhostSpectroscopy(w, n, re, r, b)
+      } yield GhostSpectroscopy(re, r, b)
     }
 
   given Cogen[GhostSpectroscopy] =
     Cogen[
       (
-        Wavelength,
-        Int,
         GhostResolutionMode,
         ItcGhostDetector,
         ItcGhostDetector
       )
-    ].contramap(a =>
-      (a.centralWavelength, a.numSkyMicrolens, a.resolutionMode, a.redDetector, a.blueDetector)
-    )
+    ].contramap(a => (a.resolutionMode, a.redDetector, a.blueDetector))
 
   given Arbitrary[InstrumentMode] =
     Arbitrary {

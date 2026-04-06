@@ -138,11 +138,9 @@ object InstrumentMode {
       )
 
   case class GhostSpectroscopy(
-    centralWavelength: Wavelength,
-    numSkyMicrolens:   Int,
-    resolutionMode:    GhostResolutionMode,
-    redDetector:       ItcGhostDetector,
-    blueDetector:      ItcGhostDetector
+    resolutionMode: GhostResolutionMode,
+    redDetector:    ItcGhostDetector,
+    blueDetector:   ItcGhostDetector
   ) extends InstrumentMode derives Eq:
     // This will not be used by the OCS ITC, but is required to meet the API
     val exposureTimeMode: ExposureTimeMode = redDetector.timeAndCount
@@ -161,11 +159,9 @@ object InstrumentMode {
     given Encoder[GhostSpectroscopy] = a =>
       Json.fromFields(
         List(
-          "centralWavelength" -> a.centralWavelength.asJson,
-          "numSkyMicrolens"   -> a.numSkyMicrolens.asJson,
-          "resolutionMode"    -> a.resolutionMode.asScreamingJson,
-          "redDetector"       -> a.redDetector.asJson,
-          "blueDetector"      -> a.blueDetector.asJson
+          "resolutionMode" -> a.resolutionMode.asScreamingJson,
+          "redDetector"    -> a.redDetector.asJson,
+          "blueDetector"   -> a.blueDetector.asJson
         )
       )
 
@@ -266,6 +262,6 @@ object InstrumentMode {
         Json.obj("flamingos2Imaging" -> a.asJson)
       case a @ Igrins2Spectroscopy(_, _)                     =>
         Json.obj("igrins2Spectroscopy" -> a.asJson)
-      case a @ GhostSpectroscopy(_, _, _, _, _)              =>
+      case a @ GhostSpectroscopy(_, _, _)                    =>
         Json.obj("ghostSpectroscopy" -> a.asJson)
 }

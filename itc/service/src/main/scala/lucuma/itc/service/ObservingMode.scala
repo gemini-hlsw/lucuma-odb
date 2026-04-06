@@ -134,11 +134,10 @@ object ObservingMode {
     }
 
     case class Ghost(
-      centralWavelength: Wavelength,
-      numSkyMicrolens:   Int,
-      resolutionMode:    GhostResolutionMode,
-      redDetector:       ItcGhostDetector,
-      blueDetector:      ItcGhostDetector
+      numSkyMicrolens: Int,
+      resolutionMode:  GhostResolutionMode,
+      redDetector:     ItcGhostDetector,
+      blueDetector:    ItcGhostDetector
     ) extends SpectroscopyMode derives Hash {
 
       val instrument: Instrument =

@@ -8732,9 +8732,6 @@ input ItcGhostDetectorInput {
 }
 
 input GhostSpectroscopyInput {
-  """Central wavelength for the ghost spectroscopy mode"""
-  centralWavelength: WavelengthInput!
-
   """
   Number of microlenses to use for sky estimation in ghost spectroscopy mode.
   Permitted values are 3, 7 and 10 for Standard resolution and 7 for High resolution.

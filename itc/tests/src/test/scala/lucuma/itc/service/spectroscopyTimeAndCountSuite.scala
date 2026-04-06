@@ -1793,10 +1793,6 @@ class spectroscopyTimeAndCountSuite extends GraphQLSuite:
             },
             mode: {
               ghostSpectroscopy: {
-                centralWavelength: {
-                  nanometers: 1600
-                },
-                numSkyMicrolens: 7,
                 resolutionMode: HIGH,
                 redDetector: {
                   timeAndCount: {
