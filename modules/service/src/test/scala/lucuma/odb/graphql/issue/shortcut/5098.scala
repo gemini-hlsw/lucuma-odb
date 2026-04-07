@@ -75,7 +75,7 @@ class ShortCut_5098 extends ExecutionTestSupportForGmos:
              }
            """,
         expected = Ior.both(
-          List(s"ITC cannot be queried until the following parameters are defined: SED"),
+          List(s"Could not generate a sequence for $oid: Missing parameters: target $tid is missing SED"),
           json"""
             {
               "observation": {

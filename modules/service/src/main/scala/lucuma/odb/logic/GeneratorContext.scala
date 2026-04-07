@@ -4,7 +4,9 @@
 package lucuma.odb.logic
 
 import cats.data.EitherT
+import cats.data.OptionT
 import cats.effect.Concurrent
+import cats.syntax.applicative.*
 import cats.syntax.either.*
 import cats.syntax.functor.*
 import cats.syntax.option.*
@@ -80,15 +82,22 @@ object GeneratorContext:
           .selectProgram(oid)
           .map(_.toOption.toRight(programNotFound(oid)))
 
-    val opc: F[Either[OdbError, (Program.Id, GeneratorParams, Option[Itc])]] =
+    // Attempt a cached ITC result lookup.
+    def fetchCached(
+      pid:    Program.Id,
+      params: GeneratorParams
+    )(using Transaction[F]): F[Option[Either[OdbError, Itc]]] =
+      OptionT(itc.selectOne(pid, oid, params)).map(_.asRight).value
+
+    val opc: F[Either[OdbError, (Program.Id, GeneratorParams, Option[Either[OdbError, Itc]])]] =
       services.transactionally:
         (for
           pid <- lookupPid
           p   <- EitherT(generatorParamsService.selectOne(pid, oid).map(_.leftMap(e => sequenceUnavailable(oid, e.format))))
-          c   <- itcResults match {
-                    case Some(r) => EitherT.fromEither(r).map(_.some)
-                    case None    => EitherT.liftF(itc.selectOne(pid, oid, p))
-                 }
+          c   <- EitherT.liftF:
+                   itcResults match
+                     case Some(r) => r.some.pure[F]       // use provided results when given
+                     case None    => fetchCached(pid, p)  // attempt a lookup when not given
         yield (pid, p, c)).value
 
     def callItc(pid: Program.Id, p: GeneratorParams): EitherT[F, OdbError, Itc] =
@@ -96,13 +105,16 @@ object GeneratorContext:
 
     (for
       pc <- EitherT(opc)
-      (pid, params, cached) = pc
+      (pid, params, cachedItcResults) = pc
       // This will be confusing, but the idea here is that if the observation
       // definition is missing target information we just record that in the
       // Context.  On the other hand if there is an error calling the ITC then
-      // we cannot create the Context.
+      // we shortcircuit / cannot create the GeneratorContext at all.  So,
+      // we use EitherT for short-circuiting control flow, but the payload is
+      // also an Either value which may be a Left (for example when the target
+      // is missing a SED).
       as <- params.itcInput.fold(
         m => EitherT.pure(sequenceUnavailable(oid, s"Missing parameters: ${m.format}").asLeft),
-        _ => cached.fold(callItc(pid, params))(EitherT.pure(_)).map(_.asRight)
+        _ => cachedItcResults.fold(callItc(pid, params).map(_.asRight))(EitherT.pure(_))
       )
     yield GeneratorContext(oid, as, params, commitHash)).value

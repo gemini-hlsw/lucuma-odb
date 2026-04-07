@@ -225,11 +225,7 @@ class executionTwilight extends ExecutionTestSupportForGmos {
       )
     }
 
-  // TODO: MANUAL SEQUENCE UPDATE
-  // Fails with:
-  // ITC cannot be queried until the following parameters are defined: SED, brightness measure
-  // I think the calibration observations need to have their target filled in?
-  test("twilight - observation timeEstimate".ignore):
+  test("twilight - observation timeEstimate"):
     setup.flatMap { case (pid, _, Calibrations(_, oid)) =>
       runObscalcUpdate(pid, oid) *>
       expect(
