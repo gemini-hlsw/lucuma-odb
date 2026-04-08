@@ -34,29 +34,29 @@ END;
 $$ LANGUAGE plpgsql IMMUTABLE;
 
 CREATE TABLE t_ghost_ifu (
-  c_observation_id          d_observation_id       NOT NULL,
-  c_program_id              d_program_id           NOT NULL,
-  c_instrument              d_tag                  NOT NULL DEFAULT 'Ghost' REFERENCES t_instrument(c_tag) CHECK (c_instrument = 'Ghost'),
-  c_observing_mode_type     e_observing_mode_type  NOT NULL DEFAULT 'ghost_ifu' check (c_observing_mode_type = 'ghost_ifu'),
+  c_observation_id             d_observation_id       NOT NULL,
+  c_program_id                 d_program_id           NOT NULL,
+  c_instrument                 d_tag                  NOT NULL DEFAULT 'Ghost' REFERENCES t_instrument(c_tag) CHECK (c_instrument = 'Ghost'),
+  c_observing_mode_type        e_observing_mode_type  NOT NULL DEFAULT 'ghost_ifu' check (c_observing_mode_type = 'ghost_ifu'),
 
-  c_resolution_mode         d_tag                  NOT NULL REFERENCES t_ghost_resolution_mode(c_tag),
+  c_resolution_mode            d_tag                  NOT NULL REFERENCES t_ghost_resolution_mode(c_tag),
 
-  c_red_exposure_time_mode  integer                NOT NULL REFERENCES t_exposure_time_mode(c_exposure_time_mode_id),
-  c_red_binning             d_tag                  NULL     REFERENCES t_ghost_binning(c_tag)   DEFAULT NULL ,
-  c_red_binning_default     d_tag                  NOT NULL REFERENCES t_ghost_binning(c_tag)   DEFAULT 'one_by_one',
-  c_red_read_mode           d_tag                  NULL     REFERENCES t_ghost_read_mode(c_tag) DEFAULT NULL,
-  c_red_read_mode_default   d_tag                  NOT NULL REFERENCES t_ghost_read_mode(c_tag) DEFAULT 'medium',
+  c_red_exposure_time_mode_id  integer                NOT NULL REFERENCES t_exposure_time_mode(c_exposure_time_mode_id),
+  c_red_binning                d_tag                  NULL     REFERENCES t_ghost_binning(c_tag)   DEFAULT NULL ,
+  c_red_binning_default        d_tag                  NOT NULL REFERENCES t_ghost_binning(c_tag)   DEFAULT 'one_by_one',
+  c_red_read_mode              d_tag                  NULL     REFERENCES t_ghost_read_mode(c_tag) DEFAULT NULL,
+  c_red_read_mode_default      d_tag                  NOT NULL REFERENCES t_ghost_read_mode(c_tag) DEFAULT 'medium',
 
-  c_blue_exposure_time_mode integer                NOT NULL REFERENCES t_exposure_time_mode(c_exposure_time_mode_id),
-  c_blue_binning            d_tag                  NULL     REFERENCES t_ghost_binning(c_tag)   DEFAULT NULL ,
-  c_blue_binning_default    d_tag                  NOT NULL REFERENCES t_ghost_binning(c_tag)   DEFAULT 'one_by_one',
-  c_blue_read_mode          d_tag                  NULL     REFERENCES t_ghost_read_mode(c_tag) DEFAULT NULL,
-  c_blue_read_mode_default  d_tag                  NOT NULL REFERENCES t_ghost_read_mode(c_tag) DEFAULT 'slow',
+  c_blue_exposure_time_mode_id integer                NOT NULL REFERENCES t_exposure_time_mode(c_exposure_time_mode_id),
+  c_blue_binning               d_tag                  NULL     REFERENCES t_ghost_binning(c_tag)   DEFAULT NULL ,
+  c_blue_binning_default       d_tag                  NOT NULL REFERENCES t_ghost_binning(c_tag)   DEFAULT 'one_by_one',
+  c_blue_read_mode             d_tag                  NULL     REFERENCES t_ghost_read_mode(c_tag) DEFAULT NULL,
+  c_blue_read_mode_default     d_tag                  NOT NULL REFERENCES t_ghost_read_mode(c_tag) DEFAULT 'slow',
 
-  c_ifu1_fiber_agitator     e_ghost_fiber_agitator NULL     DEFAULT NULL,
-  c_ifu2_fiber_agitator     e_ghost_fiber_agitator NULL     DEFAULT NULL,
+  c_ifu1_fiber_agitator        e_ghost_fiber_agitator NULL     DEFAULT NULL,
+  c_ifu2_fiber_agitator        e_ghost_fiber_agitator NULL     DEFAULT NULL,
 
-  c_mode_key                text                  NOT NULL GENERATED ALWAYS AS (
+  c_mode_key                   text                  NOT NULL GENERATED ALWAYS AS (
     format_ghost_ifu_mode_group(
       c_program_id,
       c_observing_mode_type,
