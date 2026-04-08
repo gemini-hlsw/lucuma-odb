@@ -22,7 +22,7 @@ trait GhostIfuMapping[F[_]]
 
   def ghostDetectorConfigMapping(camera: GhostIfuTable.Camera): ObjectMapping =
     ObjectMapping(GhostIfuType / camera.name)(
-      SqlField(s"observationId", GhostIfuTable.ObservationId, key = true, hidden = true),
+      SqlField("observationId", GhostIfuTable.ObservationId, key = true, hidden = true),
       SqlObject("exposureTimeMode", Join(camera.ExposureTimeModeId, ExposureTimeModeView.Id)),
 
       explicitOrElseDefault[GhostBinning]("binning", "explicitBinning", "defaultBinning"),

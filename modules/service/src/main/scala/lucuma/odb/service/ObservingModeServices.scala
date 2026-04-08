@@ -83,6 +83,11 @@ object ObservingModeServices:
               .select(oids)
               .map(_.widen[ObservingMode])
 
+          case (GhostIfu, oids) =>
+            ghostIfuService
+              .select(oids)
+              .map(_.widen[ObservingMode])
+
           case (GmosNorthLongSlit, oids) =>
             gmosLongSlitService
               .selectNorth(oids)
@@ -107,9 +112,6 @@ object ObservingModeServices:
             igrins2LongSlitService
               .select(oids)
               .map(_.widen[ObservingMode])
-
-          case (GhostIfu, oids) =>
-            Map.empty.pure[F]
 
         }.map(_.fold(Map.empty[Observation.Id, ObservingMode])(_ ++ _))
 

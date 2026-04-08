@@ -17,13 +17,11 @@ import java.io.DataOutputStream
 
 case class DetectorConfig(
   exposureTimeMode: ExposureTimeMode,
+  defaultBinning:   GhostBinning,
   explicitBinning:  Option[GhostBinning],
   defaultReadMode:  GhostReadMode,
   explicitReadMode: Option[GhostReadMode]
 ) derives Eq:
-
-  def defaultBinning: GhostBinning =
-    GhostBinning.Default
 
   def binning: GhostBinning =
     explicitBinning.getOrElse(defaultBinning)
@@ -36,6 +34,7 @@ case class DetectorConfig(
     val out: DataOutputStream      = new DataOutputStream(bao)
 
     out.write(exposureTimeMode.hashBytes)
+    out.writeChars(defaultBinning.tag)
     out.writeChars(explicitBinning.foldMap(_.tag))
     out.writeChars(defaultReadMode.tag)
     out.writeChars(explicitReadMode.foldMap(_.tag))
@@ -59,6 +58,7 @@ object DetectorConfig:
     Red.apply:
       DetectorConfig(
         exposureTimeMode,
+        GhostBinning.Default,
         explicitBinning,
         GhostReadMode.DefaultRed,
         explicitReadMode
@@ -72,6 +72,7 @@ object DetectorConfig:
     Blue.apply:
       DetectorConfig(
         exposureTimeMode,
+        GhostBinning.Default,
         explicitBinning,
         GhostReadMode.DefaultBlue,
         explicitReadMode
