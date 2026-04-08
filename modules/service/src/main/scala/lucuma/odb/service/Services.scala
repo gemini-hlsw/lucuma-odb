@@ -134,23 +134,26 @@ trait Services[F[_]]:
   /** The `ExposureTimeModeService`. */
   def exposureTimeModeService: ExposureTimeModeService[F]
 
-  /** The `GeneratorParamsService`. */
-  def generatorParamsService: GeneratorParamsService[F]
-
-  /** The `GmosLongSlitService`. */
-  def gmosLongSlitService: GmosLongSlitService[F]
-
-  /** The `GmosImagingService`. */
-  def gmosImagingService: GmosImagingService[F]
-
   /** The `Flamingos2LongSlitService`. */
   def flamingos2LongSlitService: Flamingos2LongSlitService[F]
 
   /** The `Flamingos2SequenceService` */
   def flamingos2SequenceService: Flamingos2SequenceService[F]
 
+  /** The `GeneratorParamsService`. */
+  def generatorParamsService: GeneratorParamsService[F]
+
+  /** The `GhostIfuService`. */
+  def ghostIfuService: GhostIfuService[F]
+
   /** The `GhostSequenceService` */
   def ghostSequenceService: GhostSequenceService[F]
+
+  /** The `GmosImagingService`. */
+  def gmosImagingService: GmosImagingService[F]
+
+  /** The `GmosLongSlitService`. */
+  def gmosLongSlitService: GmosLongSlitService[F]
 
   /** The `GmosSequenceService` */
   def gmosSequenceService: GmosSequenceService[F]
@@ -339,6 +342,7 @@ object Services:
       lazy val generatorParamsService = GeneratorParamsService.instantiate
       lazy val flamingos2LongSlitService = Flamingos2LongSlitService.instantiate
       lazy val flamingos2SequenceService = Flamingos2SequenceService.instantiate
+      lazy val ghostIfuService = GhostIfuService.instantiate
       lazy val ghostSequenceService = GhostSequenceService.instantiate
       lazy val gmosLongSlitService = GmosLongSlitService.instantiate
       lazy val gmosImagingService = GmosImagingService.instantiate
@@ -404,6 +408,7 @@ object Services:
     def flamingos2LongSlitService[F[_]](using Services[F]): Flamingos2LongSlitService[F] = summon[Services[F]].flamingos2LongSlitService
     def flamingos2SequenceService[F[_]](using Services[F]): Flamingos2SequenceService[F] = summon[Services[F]].flamingos2SequenceService
     def generatorParamsService[F[_]](using Services[F]): GeneratorParamsService[F] = summon[Services[F]].generatorParamsService
+    def ghostIfuService[F[_]](using Services[F]): GhostIfuService[F] = summon[Services[F]].ghostIfuService
     def ghostSequenceService[F[_]](using Services[F]): GhostSequenceService[F] = summon[Services[F]].ghostSequenceService
     def gmosLongSlitService[F[_]](using Services[F]): GmosLongSlitService[F] = summon[Services[F]].gmosLongSlitService
     def gmosImagingService[F[_]](using Services[F]): GmosImagingService[F] = summon[Services[F]].gmosImagingService

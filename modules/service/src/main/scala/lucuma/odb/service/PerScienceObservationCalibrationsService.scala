@@ -66,7 +66,7 @@ object PerScienceObservationCalibrationsService:
         calibrationRole: CalibrationRole,
         oid:             Observation.Id
       ): NonEmptyString =
-        NonEmptyString.unsafeFrom(s"${config.modeType.dbTag}/${calibrationRole.tag}/${oid.show}")
+        NonEmptyString.unsafeFrom(s"${config.modeType.tag}/${calibrationRole.tag}/${oid.show}")
 
       private def findSystemGroupForObservation(
         tree: GroupTree,

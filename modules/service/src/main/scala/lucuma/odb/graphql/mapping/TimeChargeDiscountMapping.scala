@@ -10,7 +10,6 @@ import grackle.Predicate.Const
 import grackle.Predicate.Eql
 import grackle.Result
 import grackle.Type
-import grackle.TypeRef
 import grackle.syntax.*
 import io.circe.syntax.*
 import lucuma.core.util.Timestamp

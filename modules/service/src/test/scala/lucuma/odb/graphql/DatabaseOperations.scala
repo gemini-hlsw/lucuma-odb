@@ -947,20 +947,36 @@ trait DatabaseOperations { this: OdbSuite =>
     observingMode match
       case ObservingModeType.Flamingos2LongSlit =>
         """{
-        exposureTimeMode: {
-          signalToNoise: {
-            value: 100.0
-            at: { nanometers: 1210 }
+          exposureTimeMode: {
+            signalToNoise: {
+              value: 100.0
+              at: { nanometers: 1210 }
+            }
           }
-        }
-        spectroscopy: {
-          wavelength: { nanometers: 1200 }
-          resolution: 100
-          wavelengthCoverage: { nanometers: 20 }
-          focalPlane: SINGLE_SLIT
-          focalPlaneAngle: { microarcseconds: 0 }
-        }
-      }"""
+          spectroscopy: {
+            wavelength: { nanometers: 1200 }
+            resolution: 100
+            wavelengthCoverage: { nanometers: 20 }
+            focalPlane: SINGLE_SLIT
+            focalPlaneAngle: { microarcseconds: 0 }
+          }
+        }"""
+      case ObservingModeType.GhostIfu         =>
+        """{
+          exposureTimeMode: {
+            signalToNoise: {
+              value: 100.0
+              at: { nanometers: 500 }
+            }
+          }
+          spectroscopy: {
+            wavelength: { nanometers: 500 }
+            resolution: 100
+            wavelengthCoverage: { nanometers: 20 }
+            focalPlane: IFU
+            focalPlaneAngle: { microarcseconds: 0 }
+          }
+        }"""
       case ObservingModeType.GmosNorthImaging =>
         """{
           exposureTimeMode: {
@@ -1022,8 +1038,6 @@ trait DatabaseOperations { this: OdbSuite =>
             focalPlaneAngle: { microarcseconds: 0 }
           }
         }"""
-      case ObservingModeType.GhostIfu =>
-        "{}"
 
   private def observingModeObject(observingMode: ObservingModeType): String =
     observingMode match

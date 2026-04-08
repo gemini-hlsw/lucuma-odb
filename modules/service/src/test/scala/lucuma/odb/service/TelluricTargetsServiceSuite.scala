@@ -9,7 +9,6 @@ import lucuma.core.syntax.timespan.*
 import lucuma.core.util.CalculationState
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
-import lucuma.odb.data.TelluricTargets
 import lucuma.odb.graphql.TestUsers
 
 import java.time.LocalDateTime

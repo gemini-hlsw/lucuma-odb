@@ -4691,14 +4691,14 @@ Edit or create an observation's observing mode
 """
 input ObservingModeInput @oneOf {
   """
-  The gmosNorthLongSlit field must be either specified or skipped altogether.  It cannot be unset with a null value.
+  The flamingos2LongSlit field must be either specified or skipped altogether.  It cannot be unset with a null value.
   """
-  gmosNorthLongSlit: GmosNorthLongSlitInput
+  flamingos2LongSlit: Flamingos2LongSlitInput
 
   """
-  The gmosSouthLongSlit field must be either specified or skipped altogether.  It cannot be unset with a null value.
+  The ghostIfu field must be either specified or skipped altogether.  It cannot be unset with a null value.
   """
-  gmosSouthLongSlit: GmosSouthLongSlitInput
+  ghostIfu: GhostIfuInput
 
   """
   The gmosNorthImaging field must be either specified or skipped altogether.  It cannot be unset with a null value.
@@ -4706,14 +4706,19 @@ input ObservingModeInput @oneOf {
   gmosNorthImaging: GmosNorthImagingInput
 
   """
+  The gmosNorthLongSlit field must be either specified or skipped altogether.  It cannot be unset with a null value.
+  """
+  gmosNorthLongSlit: GmosNorthLongSlitInput
+
+  """
   The gmosSouthImaging field must be either specified or skipped altogether.  It cannot be unset with a null value.
   """
   gmosSouthImaging: GmosSouthImagingInput
 
   """
-  The flamingos2LongSlit field must be either specified or skipped altogether.  It cannot be unset with a null value.
+  The gmosSouthLongSlit field must be either specified or skipped altogether.  It cannot be unset with a null value.
   """
-  flamingos2LongSlit: Flamingos2LongSlitInput
+  gmosSouthLongSlit: GmosSouthLongSlitInput
 
   """
   The igrins2LongSlit field must be either specified or skipped altogether.  It cannot be unset with a null value.
@@ -6714,19 +6719,14 @@ ObservingMode
 """
 enum ObservingModeType {
   """
-  ObservingModeType GmosNorthLongSlit
-  """
-  GMOS_NORTH_LONG_SLIT
-
-  """
-  ObservingModeType GmosSouthLongSlit
-  """
-  GMOS_SOUTH_LONG_SLIT
-
-  """
   ObservingModeType Flamingos2LongSlit
   """
   FLAMINGOS_2_LONG_SLIT
+
+  """
+  ObservingModeType GhostIfu
+  """
+  GHOST_IFU
 
   """
   ObservingModeType GmosNorthImaging
@@ -6734,9 +6734,19 @@ enum ObservingModeType {
   GMOS_NORTH_IMAGING
 
   """
+  ObservingModeType GmosNorthLongSlit
+  """
+  GMOS_NORTH_LONG_SLIT
+
+  """
   ObservingModeType GmosSouthImaging
   """
   GMOS_SOUTH_IMAGING
+
+  """
+  ObservingModeType GmosSouthLongSlit
+  """
+  GMOS_SOUTH_LONG_SLIT
 
   """
   ObservingModeType Igrins2LongSlit
@@ -8584,6 +8594,166 @@ input Flamingos2LongSlitInput {
   Acquisition properties that, when set, override default values.
   """
   acquisition: Flamingos2LongSlitAcquisitionInput
+}
+
+enum GhostIfu1FiberAgitator {
+  DISABLED
+  ENABLED
+}
+
+enum GhostIfu2FiberAgitator {
+  DISABLED
+  ENABLED
+}
+
+input GhostDetectorConfigInput {
+
+  """
+  Exposure time mode for the detector.  If not specified, the exposure time mode
+  of the observation's science requirements are used.
+  """
+  exposureTimeMode: ExposureTimeModeInput
+
+  """
+  Explicit binning to use for the detector.  If not specified upon creation, a
+  1x1 default will be used.
+  """
+  explicitBinning: GhostBinning
+
+  """
+  Explicit read mode for the detector.  If not specified upon creation, a
+  default of MEDIUM (red camera) or SLOW (blue camera) will be used.
+  """
+  explicitReadMode: GhostReadMode
+}
+
+"""
+Edit or create GHOST IFU Mode
+"""
+input GhostIfuInput {
+
+  """
+  The disperser field must be specified.  It cannot be unset with a null value.
+  """
+  resolutionMode: GhostResolutionMode
+
+  """
+  Red camera detector config.  If not specified, defaults will be applied.
+  Cannot be unset with a null value.
+  """
+  red: GhostDetectorConfigInput
+
+  """
+  Blue camera detector config.  If not specified, defaults will be applied.
+  Cannot be unset with a null value.
+  """
+  blue: GhostDetectorConfigInput
+
+  """
+  IFU1 fiber agitator setting.  If not specified, a default (DISABLED) will be
+  applied.  Cannot be unset with a null value.
+  """
+  explicitIfu1Agitator: GhostIfu1FiberAgitator
+
+  """
+  IFU2 fiber agitator setting.  If not specified, a default (DISABLED) will be
+  applied.  Cannot be unset with a null value.
+  """
+  explicitIfu2Agitator: GhostIfu2FiberAgitator
+
+}
+
+type GhostDetectorConfig {
+
+  """
+  Exposure time mode for the detector.
+  """
+  exposureTimeMode: ExposureTimeMode!
+
+  """
+  Binning that will be used, either explicitly specified or default.
+  """
+  binning: GhostBinning!
+
+  """
+  Default binning that will be used for the detector, if not explicitly
+  specified.
+  """
+  defaultBinning: GhostBinning!
+
+  """
+  Explicit binning to use for the detector, if specified.
+  """
+  explicitBinning: GhostBinning
+
+  """
+  Read mode for the detector, either explicitly specified or default.
+  """
+  readMode: GhostReadMode!
+
+  """
+  Default read mode that will be used for the detector, if not explicitly
+  specified.
+  """
+  defaultReadMode: GhostReadMode!
+
+  """
+  Explicit read mode for the detector, if specified.
+  """
+  explicitReadMode: GhostReadMode
+
+}
+
+"""
+GHOST IFU observing mode.
+"""
+type GhostIfu {
+
+  """
+  Resolution mode.
+  """
+  resolutionMode: GhostResolutionMode!
+
+  """
+  Red camera detector config.
+  """
+  red: GhostDetectorConfig!
+
+  """
+  Blue camera detector config.
+  """
+  blue: GhostDetectorConfig!
+
+  """
+  IFU 1 fiber agitator setting, either explicitly specified or else default.
+  """
+  ifu1Agitator: GhostIfu1FiberAgitator!
+
+  """
+  Default IFU 1 fiber agitator setting, used if not explicitly specified.
+  """
+  defaultIfu1Agitator: GhostIfu1FiberAgitator!
+
+  """
+  IFU 1 fiber agitator setting, if explicitly specified.
+  """
+  explicitIfu1Agitator: GhostIfu1FiberAgitator
+
+  """
+  IFU 2 fiber agitator setting, either explicitly specified or else default.
+  """
+  ifu2Agitator: GhostIfu2FiberAgitator!
+
+  """
+  Default IFU 2 fiber agitator setting, used if not explicitly specified.
+  """
+  defaultIfu2Agitator: GhostIfu2FiberAgitator!
+
+  """
+  IFU 2 fiber agitator setting, if explicitly specified.
+  """
+  explicitIfu2Agitator: GhostIfu2FiberAgitator
+
 }
 
 """
@@ -12754,14 +12924,14 @@ type ObservingMode {
   mode: ObservingModeType!
 
   """
-  GMOS North Long Slit mode
+  Flamingos 2 Long Slit mode
   """
-  gmosNorthLongSlit: GmosNorthLongSlit
+  flamingos2LongSlit: Flamingos2LongSlit
 
   """
-  GMOS South Long Slit mode
+  GHOST IFU mode
   """
-  gmosSouthLongSlit: GmosSouthLongSlit
+  ghostIfu: GhostIfu
 
   """
   GMOS North Imaging mode
@@ -12769,14 +12939,19 @@ type ObservingMode {
   gmosNorthImaging: GmosNorthImaging
 
   """
+  GMOS North Long Slit mode
+  """
+  gmosNorthLongSlit: GmosNorthLongSlit
+
+  """
   GMOS South Imaging mode
   """
   gmosSouthImaging: GmosSouthImaging
 
   """
-  Flamingos 2 Long Slit mode
+  GMOS South Long Slit mode
   """
-  flamingos2LongSlit: Flamingos2LongSlit
+  gmosSouthLongSlit: GmosSouthLongSlit
 
   """
   IGRINS-2 Long Slit mode

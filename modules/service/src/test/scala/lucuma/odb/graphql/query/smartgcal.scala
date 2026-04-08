@@ -42,7 +42,6 @@ import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
 import lucuma.itc.IntegrationTime
 import lucuma.odb.service.Services
-import lucuma.odb.service.SmartGcalService
 import lucuma.odb.smartgcal.data.Flamingos2
 import lucuma.odb.smartgcal.data.Gmos
 import lucuma.odb.smartgcal.data.Gmos.GratingConfigKey

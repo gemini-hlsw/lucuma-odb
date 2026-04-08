@@ -12,6 +12,8 @@ import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.string.NonEmptyString
 import fs2.Stream
 import lucuma.core.enums.GhostBinning
+import lucuma.core.enums.GhostIfu1FiberAgitator
+import lucuma.core.enums.GhostIfu2FiberAgitator
 import lucuma.core.enums.GhostReadMode
 import lucuma.core.enums.GhostResolutionMode.Standard
 import lucuma.core.enums.Instrument
@@ -28,8 +30,6 @@ import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.model.sequence.ghost.GhostDetector
 import lucuma.core.model.sequence.ghost.GhostDynamicConfig
 import lucuma.core.model.sequence.ghost.GhostStaticConfig
-import lucuma.core.model.sequence.ghost.Ifu1FiberAgitator
-import lucuma.core.model.sequence.ghost.Ifu2FiberAgitator
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth
 import lucuma.core.syntax.timespan.*
 import lucuma.itc.IntegrationTime
@@ -171,8 +171,8 @@ class SequenceServiceSuite extends ExecutionTestSupportForGmos:
       GhostDynamicConfig(
         red10,
         blue5,
-        Ifu1FiberAgitator.Enabled,
-        Ifu2FiberAgitator.Disabled
+        GhostIfu1FiberAgitator.Enabled,
+        GhostIfu2FiberAgitator.Disabled
       ),
       StepConfig.Science,
       TelescopeConfig.Default,
@@ -188,8 +188,8 @@ class SequenceServiceSuite extends ExecutionTestSupportForGmos:
       GhostDynamicConfig(
         red20,
         blue6,
-        Ifu1FiberAgitator.Disabled,
-        Ifu2FiberAgitator.Enabled
+        GhostIfu1FiberAgitator.Disabled,
+        GhostIfu2FiberAgitator.Enabled
       ),
       StepConfig.Science,
       TelescopeConfig.Default,

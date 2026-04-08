@@ -9,7 +9,6 @@ import cats.derived.*
 import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.PosInt
 import grackle.*
-import lucuma.core.enums.ExecutionEnvironment as _
 import lucuma.core.math.Wavelength
 import lucuma.core.model.sequence.gmos.GmosFpuMask
 import lucuma.core.util.TimeSpan

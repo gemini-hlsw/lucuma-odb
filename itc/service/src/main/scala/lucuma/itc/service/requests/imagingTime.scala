@@ -8,7 +8,6 @@ import cats.data.NonEmptyChain
 import cats.derived.*
 import cats.syntax.all.*
 import grackle.*
-import lucuma.core.enums.ExecutionEnvironment as _
 import lucuma.core.model.ExposureTimeMode
 import lucuma.itc.*
 import lucuma.itc.input.*

@@ -3,7 +3,7 @@
 
 package lucuma.odb.graphql.binding
 
-import lucuma.core.enums.GhostBinning
+import lucuma.core.enums.GhostIfu1FiberAgitator
 
-val GhostBinningBinding: Matcher[GhostBinning] =
-  enumeratedBinding
+val GhostIfu1FiberAgitatorBinding: Matcher[GhostIfu1FiberAgitator] =
+  enumeratedBinding[GhostIfu1FiberAgitator]

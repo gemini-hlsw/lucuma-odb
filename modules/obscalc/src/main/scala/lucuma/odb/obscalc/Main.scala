@@ -45,7 +45,7 @@ import org.typelevel.ci.CIString
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.LoggerFactory
 import org.typelevel.log4cats.slf4j.Slf4jFactory
-import skunk.{Command as _, *}
+import skunk.*
 
 import scala.concurrent.duration.*
 import scala.util.NotGiven
