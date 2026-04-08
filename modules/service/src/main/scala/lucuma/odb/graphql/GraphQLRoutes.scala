@@ -41,6 +41,7 @@ import org.http4s.headers.`Content-Type`
 import org.http4s.server.websocket.WebSocketBuilder2
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.LoggerFactory
+import org.typelevel.otel4s.trace.Tracer
 import skunk.Session
 import skunk.SqlState
 
@@ -55,7 +56,7 @@ object GraphQLRoutes {
    * Construct a source of `HttpRoutes` tailored to the requesting user. Routes will be cached
    * based on the `Authorization` header and discarded when `ttl` expires.
    */
-  def apply[F[_]: Async: Parallel: Trace: Logger: LoggerFactory: SecureRandom](
+  def apply[F[_]: Async: Parallel: Trace: Tracer: Logger: LoggerFactory: SecureRandom](
     gaiaClient:      GaiaClient[F],
     itcClient:       ItcClient[F],
     commitHash:      CommitHash,

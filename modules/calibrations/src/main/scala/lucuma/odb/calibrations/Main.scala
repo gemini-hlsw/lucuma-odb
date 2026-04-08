@@ -19,6 +19,8 @@ import grackle.Result
 import lucuma.catalog.clients.GaiaClient
 import lucuma.catalog.telluric.TelluricTargetsClient
 import lucuma.core.model.Access
+import lucuma.core.model.Observation
+import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.core.util.CalculationState
 import lucuma.horizons.HorizonsClient
@@ -48,6 +50,9 @@ import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.LoggerFactory
 import org.typelevel.log4cats.slf4j.Slf4jFactory
 import org.typelevel.log4cats.syntax.*
+import org.typelevel.otel4s.Attribute
+import org.typelevel.otel4s.AttributeKey
+import org.typelevel.otel4s.trace.Tracer
 import skunk.*
 
 import java.time.LocalDate
@@ -108,10 +113,9 @@ object CMain extends MainParams {
     banner.linesIterator.toList.traverse_(Logger[F].info(_))
 
   /** A resource that yields a Skunk session pool. */
-  def databasePoolResource[F[_]: Temporal: Network: Console](
+  def databasePoolResource[F[_]: Temporal: Trace: Network: Console](
     config: Config.Database
   ): Resource[F, Resource[F, Session[F]]] = {
-    import natchez.Trace.Implicits.noop
     Session.pooled(
       host     = config.host,
       port     = config.port,
@@ -139,7 +143,9 @@ object CMain extends MainParams {
       trt <- Resource.eval(TelluricTargetTopic(ses, 1024, sup))
     } yield (top, ctt, trt)
 
-  def runCalibrationsDaemon[F[_]: {Async, Logger as L, Clock as C}](
+  val IsCalibrationKey: AttributeKey[Boolean] = AttributeKey("observation.isCalibration")
+
+  def runCalibrationsDaemon[F[_]: {Async, Tracer as T, Logger as L, Clock as C}](
     obscalcTopic: Topic[F, ObscalcTopic.Element],
     calibTopic: Topic[F, CalibTimeTopic.Element],
     services: Resource[F, Services[F]]
@@ -150,21 +156,22 @@ object CMain extends MainParams {
       _  <- Resource.eval(obscalcTopic.subscribe(100).evalMap { elem =>
               services.useTransactionally:
                 Services.asSuperUser:
-                  for {
-                    i <- calibrationsService.isCalibration(elem.observationId)
-                    _ <- (info"Calibrations Service Obscalc channel: Element(${elem.observationId},${elem.programId},${elem.editType},oldState=${elem.oldState},newState=${elem.newState},${elem.users}), is calibration: $i").whenA(i)
-                    t <- C.realTimeInstant.map(LocalDate.ofInstant(_, ZoneOffset.UTC))
-                    _ <- calibrationsService
-                          .recalculateCalibrations(
-                            elem.programId,
-                            LocalDateTime.of(t, LocalTime.MIDNIGHT).toInstant(ZoneOffset.UTC),
-                            elem.observationId
-                          ).whenA(!i &&
-                                  elem.newState.exists(_ === CalculationState.Ready) &&
-                                  elem.oldState =!= elem.newState &&
-                                  (elem.editType === EditType.Created ||
-                                   elem.editType === EditType.Updated))
-                  } yield Result.unit
+                  T.rootSpan("calibration-calculation").use: _ =>
+                    for {
+                      cal <- calibrationsService.isCalibration(elem.observationId)
+                      run = (!cal &&
+                             elem.newState.exists(_ === CalculationState.Ready) &&
+                             elem.oldState =!= elem.newState &&
+                             (elem.editType === EditType.Created || elem.editType === EditType.Updated))
+                      _ <- (info"Calibrations Service Obscalc channel: Element(${elem.observationId},${elem.programId},${elem.editType},oldState=${elem.oldState},newState=${elem.newState},${elem.users}), is calibration: $cal")//.whenA(run)
+                      t <- C.realTimeInstant.map(LocalDate.ofInstant(_, ZoneOffset.UTC))
+                      _ <- calibrationsService
+                            .recalculateCalibrations(
+                              elem.programId,
+                              LocalDateTime.of(t, LocalTime.MIDNIGHT).toInstant(ZoneOffset.UTC),
+                              elem.observationId
+                            ).whenA(run)
+                    } yield Result.unit
               .handleErrorWith: e =>
                 L.error(e)(
                   s"Error precessing obscalc event for ${elem.programId}/${elem.observationId}"
@@ -244,7 +251,7 @@ object CMain extends MainParams {
    * Our main server, as a resource that starts up our server on acquire and shuts it all down
    * in cleanup, yielding an `ExitCode`. Users will `use` this resource and hold it forever.
    */
-  def server[F[_]: Async: Parallel: Logger: LoggerFactory: Trace: Console: Network: SecureRandom]: Resource[F, ExitCode] =
+  def server[F[_]: Async: Parallel: Logger: LoggerFactory: Trace: Tracer: Console: Network: SecureRandom]: Resource[F, ExitCode] =
     for {
       c                  <- Resource.eval(Config.fromCiris.load[F])
       _                  <- Resource.eval(banner[F](c))
@@ -270,7 +277,8 @@ object CMain extends MainParams {
     (for
       c               <- Resource.eval(Config.fromCiris.load[IO])
       otel            <- OdbTelemetry.otel(ServiceName, c)
-      given Trace[IO] = otel.trace
+      given Tracer[IO] = otel.tracer
+      given Trace[IO]  = otel.trace
       _               <- server[IO]
     yield ExitCode.Success).useForever
 

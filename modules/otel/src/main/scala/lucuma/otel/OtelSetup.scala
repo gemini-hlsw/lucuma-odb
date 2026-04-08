@@ -13,12 +13,14 @@ import org.typelevel.otel4s.instrumentation.ce.IORuntimeMetrics
 import org.typelevel.otel4s.metrics.MeterProvider
 import org.typelevel.otel4s.oteljava.OtelJava
 import org.typelevel.otel4s.oteljava.context.Context
+import org.typelevel.otel4s.trace.Tracer
 import org.typelevel.otel4s.trace.TracerProvider
 
 import scala.jdk.CollectionConverters.*
 
 case class OtelServices[F[_]](
   trace:          Trace[F],
+  tracer:          Tracer[F],
   meterProvider:  MeterProvider[F],
   tracerProvider: TracerProvider[F]
 )
@@ -57,12 +59,14 @@ object OtelSetup:
           otel.tracerProvider.get(serviceName).map: tracer =>
             OtelServices(
               trace = Otel4sTrace.fromTracer(tracer),
+              tracer = tracer,
               meterProvider = otel.meterProvider,
               tracerProvider = otel.tracerProvider
             )
       case None =>
         Resource.pure(OtelServices(
           trace = Trace.Implicits.noop,
+          tracer = Tracer.noop,
           meterProvider = MeterProvider.noop,
           tracerProvider = TracerProvider.noop
         ))
