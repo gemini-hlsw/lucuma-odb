@@ -213,7 +213,7 @@ class observation_configurationRequests
           case ObservingModeType.GhostIfu           => IO.raiseError(new RuntimeException("GHOST not supported yet"))
     yield oid
 
-  Enumerated[ObservingModeType].all.foreach { mode =>
+  Enumerated[ObservingModeType].all.filterNot(_ === ObservingModeType.GhostIfu).foreach { mode =>
     List(false, true).foreach { too =>
 
       val prefix = s"[$mode, ${if too then "opportunity" else "sidereal"}]"
