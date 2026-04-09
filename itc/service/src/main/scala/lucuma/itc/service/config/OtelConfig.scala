@@ -30,8 +30,7 @@ object OtelConfig:
           envOrProp("ODB_OTEL_KEY").option,
           environment
         ).parTupled.map:
-          case (Some(endpoint), Some(key), env)
-              if endpoint.trim.nonEmpty && key.trim.nonEmpty =>
+          case (Some(endpoint), Some(key), env) if endpoint.trim.nonEmpty && key.trim.nonEmpty =>
             SharedOtelConfig(endpoint, key, env).some
-          case _ =>
+          case _                                                                               =>
             None
