@@ -13,7 +13,7 @@ import lucuma.odb.graphql.binding.*
 
 
 case class GhostDetectorConfigInput(
-  exposureTimeMode: Option[TimeAndCountMode],
+  timeAndCount:     Option[TimeAndCountMode],
   explicitBinning:  Nullable[GhostBinning],
   explicitReadMode: Nullable[GhostReadMode]
 )

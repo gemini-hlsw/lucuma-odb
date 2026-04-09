@@ -93,8 +93,8 @@ object GhostIfuService:
         which:  List[Observation.Id]
       )(using Transaction[F]): F[Result[Unit]] =
         val science = NonEmptyList.of(
-          Detector.Red  -> input.red.flatMap(_.exposureTimeMode),
-          Detector.Blue -> input.blue.flatMap(_.exposureTimeMode)
+          Detector.Red  -> input.red.flatMap(_.timeAndCount),
+          Detector.Blue -> input.blue.flatMap(_.timeAndCount)
         )
 
         NonEmptyList
