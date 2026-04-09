@@ -5,7 +5,10 @@ package lucuma.odb.service
 
 import cats.data.NonEmptyList
 import cats.effect.Concurrent
+import cats.syntax.applicative.*
+import cats.syntax.apply.*
 import cats.syntax.foldable.*
+import cats.syntax.functor.*
 import cats.syntax.option.*
 import grackle.Result
 import grackle.ResultT
@@ -15,8 +18,11 @@ import lucuma.core.enums.GhostResolutionMode
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.Observation
 import lucuma.odb.data.ExposureTimeModeId
+import lucuma.odb.data.OdbError
+import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.input.GhostIfuInput
 import lucuma.odb.sequence.ghost.ifu.Config
+import lucuma.odb.sequence.ghost.ifu.DetectorConfig
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.GhostCodecs.*
 import skunk.*
@@ -53,13 +59,33 @@ object GhostIfuService:
   enum Detector:
     case Red, Blue
 
+  private def validateEtms(
+    requirementsEtm: Option[ExposureTimeMode],
+    scienceEtms:     Map[Detector, Option[ExposureTimeMode.TimeAndCountMode]]
+  ): Result[Unit] =
+    Result
+      .fromOption(
+        (scienceEtms.get(Detector.Red).flatten, scienceEtms.get(Detector.Blue).flatten)
+          .tupled
+          .void
+          .orElse:
+            requirementsEtm.flatMap(ExposureTimeMode.timeAndCount.getOption).void,
+        OdbError.InvalidArgument("GHOST observations require a TimeAndCount exposure time mode.".some).asProblem
+      )
+
   def instantiate[F[_]: {Concurrent, Services}]: GhostIfuService[F] =
 
     new GhostIfuService[F]:
       override def select(
         which:  List[Observation.Id]
       ): F[Map[Observation.Id, Config]] =
-        ???
+        NonEmptyList
+          .fromList(which)
+          .fold(List.empty.pure[F]): oids =>
+            val af = Statements.select(oids)
+            session.prepareR(af.fragment.query(observation_id *: Statements.ghost_ifu)).use: pq =>
+              pq.stream(af.argument, chunkSize = 1024).compile.toList
+          .map(_.toMap)
 
       override def insert(
         input:  GhostIfuInput.Create,
@@ -67,14 +93,15 @@ object GhostIfuService:
         which:  List[Observation.Id]
       )(using Transaction[F]): F[Result[Unit]] =
         val science = NonEmptyList.of(
-          Detector.Red  -> input.red.flatMap(_.exposureTimeMode),
-          Detector.Blue -> input.blue.flatMap(_.exposureTimeMode)
+          Detector.Red  -> input.red.flatMap(_.timeAndCount),
+          Detector.Blue -> input.blue.flatMap(_.timeAndCount)
         )
 
         NonEmptyList
           .fromList(which)
           .fold(ResultT.unit[F]): nel =>
             for
+              _   <- ResultT.fromResult(validateEtms(reqEtm, science.toList.toMap))
               r   <- ResultT(exposureTimeModeService.resolve("GHOST IFU", none, science, reqEtm, which))
               ids <- ResultT.liftF(exposureTimeModeService.insertResolvedAcquisitionAndScience(r))
               etms = nel.map: oid =>
@@ -102,95 +129,144 @@ object GhostIfuService:
         ???
 
   object Statements:
-      def insert(
-        input: GhostIfuInput.Create,
-        which: NonEmptyList[(Observation.Id, ExposureTimeModeId, ExposureTimeModeId)]
-      ): AppliedFragment =
-        val modeEntries =
-          which.map: (oid, red, blue) =>
-            sql"""(
-              $observation_id,
-              $ghost_resolution_mode,
-              $exposure_time_mode_id,
-              ${ghost_binning.opt},
-              $ghost_binning,
-              ${ghost_read_mode.opt},
-              $ghost_read_mode,
-              $exposure_time_mode_id,
-              ${ghost_binning.opt},
-              $ghost_binning,
-              ${ghost_read_mode.opt},
-              $ghost_read_mode,
-              ${ghost_ifu1_fiber_agitator.opt},
-              ${ghost_ifu2_fiber_agitator.opt}
-            )"""(
-              oid,
-              input.resolutionMode,
-              red,
-              input.red.flatMap(_.explicitBinning.toOption),
-              GhostBinning.OneByOne,
-              input.red.flatMap(_.explicitReadMode.toOption),
-              GhostReadMode.Medium,
-              blue,
-              input.blue.flatMap(_.explicitBinning.toOption),
-              GhostBinning.OneByOne,
-              input.blue.flatMap(_.explicitReadMode.toOption),
-              GhostReadMode.Slow,
-              input.explicitIfu1FiberAgitator,
-              input.explicitIfu2FiberAgitator
-            )
 
-        void"""
-          INSERT INTO t_ghost_ifu (
-            c_observation_id,
-            c_program_id,
-            c_resolution_mode,
-            c_red_exposure_time_mode_id,
-            c_red_binning,
-            c_red_binning_default,
-            c_red_read_mode,
-            c_red_read_mode_default,
-            c_blue_exposure_time_mode_id,
-            c_blue_binning,
-            c_blue_binning_default,
-            c_blue_read_mode,
-            c_blue_read_mode_default,
-            c_ifu1_fiber_agitator,
-            c_ifu2_fiber_agitator
+    val ghost_detector_config: Decoder[DetectorConfig] =
+      (
+        exposure_time_mode  *:
+        ghost_binning       *:
+        ghost_binning.opt   *:
+        ghost_read_mode     *:
+        ghost_read_mode.opt
+      ).emap: (etm, dBinning, eBinning, dReadMode, eReadMode) =>
+        ExposureTimeMode
+          .timeAndCount
+          .getOption(etm)
+          .toRight(s"GHOST only supports time and count exposure time mode.")
+          .map: tc =>
+            DetectorConfig(tc, dBinning, eBinning, dReadMode, eReadMode)
+
+    val ghost_detector_config_red: Decoder[DetectorConfig.Red] =
+      (ghost_detector_config).map(dc => DetectorConfig.Red(dc))
+
+    val ghost_detector_config_blue: Decoder[DetectorConfig.Blue] =
+      (ghost_detector_config).map(dc => DetectorConfig.Blue(dc))
+
+    val ghost_ifu: Decoder[Config] =
+      (
+        ghost_resolution_mode         *:
+        ghost_detector_config_red     *:
+        ghost_detector_config_blue    *:
+        ghost_ifu1_fiber_agitator.opt *:
+        ghost_ifu2_fiber_agitator.opt
+      ).to[Config]
+
+    private def detectorColumns(color: String): List[String] =
+      List(
+        s"c_${color}_exposure_time_mode_id",
+        s"c_${color}_binning_default",
+        s"c_${color}_binning",
+        s"c_${color}_read_mode_default",
+        s"c_${color}_read_mode"
+      )
+
+    private val AgitatorColumns: List[String] =
+      List(
+        "c_ifu1_fiber_agitator",
+        "c_ifu2_fiber_agitator"
+      )
+
+    private val Columns: List[String] =
+      List(
+        "c_observation_id",
+        "c_resolution_mode"
+      )                       ++
+      detectorColumns("red")  ++
+      detectorColumns("blue") ++
+      AgitatorColumns
+
+    private val ExposureTimeColumns: List[String] =
+      List(
+        "c_exposure_time_mode",
+        "c_signal_to_noise_at",
+        "c_signal_to_noise",
+        "c_exposure_time",
+        "c_exposure_count"
+      )
+
+    extension (cols: List[String])
+      def prefixed(prefix: String): List[String] = cols.map(c => s"$prefix.$c")
+      def string: String = cols.mkString("", ",\n", "\n")
+      def insert(index: Int, s: String*): List[String] = cols.patch(index, s.toList, 0)
+
+    def select(
+      which: NonEmptyList[Observation.Id]
+    ): AppliedFragment =
+      sql"""
+        SELECT
+          g.c_observation_id,
+          g.c_resolution_mode,
+          #${ExposureTimeColumns.prefixed("red").string},
+          #${detectorColumns("red").tail.prefixed("g").string},
+          #${ExposureTimeColumns.prefixed("blue").string},
+          #${detectorColumns("blue").tail.prefixed("g").string},
+          #${AgitatorColumns.prefixed("g").string}
+        FROM
+          t_ghost_ifu g
+        JOIN t_exposure_time_mode red  ON g.c_red_exposure_time_mode_id  = red.c_exposure_time_mode_id
+        JOIN t_exposure_time_mode blue ON g.c_blue_exposure_time_mode_id = blue.c_exposure_time_mode_id
+        WHERE
+          g.c_observation_id IN ("""(Void)                       |+|
+            which.map(sql"$observation_id").intercalate(void",") |+|
+          void")"
+
+    def insert(
+      input: GhostIfuInput.Create,
+      which: NonEmptyList[(Observation.Id, ExposureTimeModeId, ExposureTimeModeId)]
+    ): AppliedFragment =
+      val modeEntries =
+        which.map: (oid, red, blue) =>
+          sql"""(
+            $observation_id,
+            $ghost_resolution_mode,
+            $exposure_time_mode_id,
+            $ghost_binning,
+            ${ghost_binning.opt},
+            $ghost_read_mode,
+            ${ghost_read_mode.opt},
+            $exposure_time_mode_id,
+            $ghost_binning,
+            ${ghost_binning.opt},
+            $ghost_read_mode,
+            ${ghost_read_mode.opt},
+            ${ghost_ifu1_fiber_agitator.opt},
+            ${ghost_ifu2_fiber_agitator.opt}
+          )"""(
+            oid,
+            input.resolutionMode,
+            red,
+            GhostBinning.OneByOne,
+            input.red.flatMap(_.explicitBinning.toOption),
+            GhostReadMode.Medium,
+            input.red.flatMap(_.explicitReadMode.toOption),
+            blue,
+            GhostBinning.OneByOne,
+            input.blue.flatMap(_.explicitBinning.toOption),
+            GhostReadMode.Slow,
+            input.blue.flatMap(_.explicitReadMode.toOption),
+            input.explicitIfu1FiberAgitator,
+            input.explicitIfu2FiberAgitator
           )
-          SELECT
-            g.c_observation_id,
-            o.c_program_id,
-            g.c_resolution_mode,
-            g.c_red_exposure_time_mode_id,
-            g.c_red_binning,
-            g.c_red_binning_default,
-            g.c_red_read_mode,
-            g.c_red_read_mode_default,
-            g.c_blue_exposure_time_mode_id,
-            g.c_blue_binning,
-            g.c_blue_binning_default,
-            g.c_blue_read_mode,
-            g.c_blue_read_mode_default,
-            g.c_ifu1_fiber_agitator,
-            g.c_ifu2_fiber_agitator
-          FROM (
-            VALUES""" |+| modeEntries.intercalate(void", ") |+| void"""
-          ) AS g (
-            c_observation_id,
-            c_resolution_mode,
-            c_red_exposure_time_mode_id,
-            c_red_binning,
-            c_red_binning_default,
-            c_red_read_mode,
-            c_red_read_mode_default,
-            c_blue_exposure_time_mode_id,
-            c_blue_binning,
-            c_blue_binning_default,
-            c_blue_read_mode,
-            c_blue_read_mode_default,
-            c_ifu1_fiber_agitator,
-            c_ifu2_fiber_agitator
-          )
-          JOIN t_observation o ON o.c_observation_id = g.c_observation_id
-        """
+
+      sql"""
+        INSERT INTO t_ghost_ifu (
+          #${Columns.insert(1, "c_program_id").string}
+        )
+        SELECT
+          #${Columns.prefixed("g").insert(1, "o.c_program_id").string}
+        FROM (
+          VALUES"""(Void) |+| modeEntries.intercalate(void", ") |+| sql"""
+        ) AS g (
+          #${Columns.string}
+        )
+        JOIN t_observation o ON o.c_observation_id = g.c_observation_id
+      """(Void)

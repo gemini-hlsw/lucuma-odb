@@ -964,8 +964,9 @@ trait DatabaseOperations { this: OdbSuite =>
       case ObservingModeType.GhostIfu         =>
         """{
           exposureTimeMode: {
-            signalToNoise: {
-              value: 100.0
+            timeAndCount: {
+              time: { seconds: 1.0 }
+              count: 5
               at: { nanometers: 500 }
             }
           }

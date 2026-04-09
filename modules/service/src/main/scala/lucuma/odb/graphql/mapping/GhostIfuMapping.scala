@@ -22,8 +22,8 @@ trait GhostIfuMapping[F[_]]
 
   def ghostDetectorConfigMapping(camera: GhostIfuTable.Camera): ObjectMapping =
     ObjectMapping(GhostIfuType / camera.name)(
-      SqlField(s"observationId", GhostIfuTable.ObservationId, key = true, hidden = true),
-      SqlObject("exposureTimeMode", Join(camera.ExposureTimeModeId, ExposureTimeModeView.Id)),
+      SqlField("observationId", GhostIfuTable.ObservationId, key = true, hidden = true),
+      SqlObject("timeAndCount", Join(camera.ExposureTimeModeId, ExposureTimeModeView.TimeAndCount.SyntheticId)),
 
       explicitOrElseDefault[GhostBinning]("binning", "explicitBinning", "defaultBinning"),
       SqlField("explicitBinning", camera.Binning),

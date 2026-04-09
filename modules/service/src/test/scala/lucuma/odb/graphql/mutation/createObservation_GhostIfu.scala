@@ -6,7 +6,7 @@ package mutation
 
 import cats.syntax.either.*
 import io.circe.literal.*
-import lucuma.core.enums.ObservingModeType.GhostIfu
+import lucuma.core.enums.ObservingModeType.*
 import lucuma.core.model.StandardUser
 import lucuma.core.model.User
 
@@ -36,12 +36,10 @@ class createObservation_GhostIfu extends OdbSuite:
                       ghostIfu: {
                         resolutionMode: STANDARD
                         red: {
-                          exposureTimeMode: {
-                            timeAndCount: {
-                              time: { seconds: 10.0 }
-                              count: 2
-                              at: { nanometers: 500 }
-                            }
+                          timeAndCount: {
+                            time: { seconds: 10.0 }
+                            count: 2
+                            at: { nanometers: 500 }
                           }
                           explicitBinning: ONE_BY_TWO
                         }
@@ -60,12 +58,10 @@ class createObservation_GhostIfu extends OdbSuite:
                       ghostIfu {
                         resolutionMode
                         red {
-                          exposureTimeMode {
-                            timeAndCount {
-                              time { seconds }
-                              count
-                              at { nanometers }
-                            }
+                          timeAndCount {
+                            time { seconds }
+                            count
+                            at { nanometers }
                           }
                           binning
                           defaultBinning
@@ -75,11 +71,10 @@ class createObservation_GhostIfu extends OdbSuite:
                           explicitReadMode
                         }
                         blue {
-                          exposureTimeMode {
-                            signalToNoise {
-                              value
-                              at { nanometers }
-                            }
+                          timeAndCount {
+                            time { seconds }
+                            count
+                            at { nanometers }
                           }
                           binning
                           defaultBinning
@@ -111,12 +106,10 @@ class createObservation_GhostIfu extends OdbSuite:
                       "ghostIfu": {
                         "resolutionMode": "STANDARD",
                         "red": {
-                          "exposureTimeMode": {
-                            "timeAndCount": {
-                              "time": { "seconds": 10.000000 },
-                              "count": 2,
-                              "at": { "nanometers": 500.000 }
-                            }
+                          "timeAndCount": {
+                            "time": { "seconds": 10.000000 },
+                            "count": 2,
+                            "at": { "nanometers": 500.000 }
                           },
                           "binning": "ONE_BY_TWO",
                           "defaultBinning": "ONE_BY_ONE",
@@ -126,11 +119,10 @@ class createObservation_GhostIfu extends OdbSuite:
                           "explicitReadMode": null
                         },
                         "blue": {
-                          "exposureTimeMode": {
-                            "signalToNoise": {
-                              "value": 100.000,
-                              "at": { "nanometers": 500.000 }
-                            }
+                          "timeAndCount": {
+                            "time": { "seconds": 1.000000 },
+                            "count": 5,
+                            "at": { "nanometers": 500.000 }
                           },
                           "binning": "ONE_BY_ONE",
                           "defaultBinning": "ONE_BY_ONE",
@@ -146,6 +138,99 @@ class createObservation_GhostIfu extends OdbSuite:
                         "defaultIfu2Agitator": "DISABLED",
                         "explicitIfu2Agitator": null
                       }
+                    }
+                  }
+                }
+              }
+            """.asRight
+        )
+
+  test("cannot create GHOST IFU with S/N requirements only"):
+    createProgramAs(pi).flatMap: pid =>
+      createTargetAs(pi, pid).flatMap: tid =>
+        expect(
+          user  = pi,
+          query =
+            // N.B. Using the F2 science requirements to get a S/N ETM
+            s"""
+              mutation {
+                createObservation(input: {
+                  programId: "$pid"
+                  SET: {
+                    targetEnvironment: {
+                      asterism: [ "$tid" ]
+                    }
+                    scienceRequirements: ${scienceRequirementsObject(Flamingos2LongSlit)}
+                    observingMode: {
+                      ghostIfu: {
+                        resolutionMode: STANDARD
+                      }
+                    }
+                  }
+                }) {
+                  observation { id }
+                }
+              }
+            """,
+          expected = List(
+            "GHOST observations require a TimeAndCount exposure time mode."
+          ).asLeft
+        )
+
+  test("can create GHOST IFU with S/N requirements if both detectors are specified as time and count"):
+    createProgramAs(pi).flatMap: pid =>
+      createTargetAs(pi, pid).flatMap: tid =>
+        expect(
+          user  = pi,
+          query =
+            // N.B. Using the F2 science requirements to get a S/N ETM
+            s"""
+              mutation {
+                createObservation(input: {
+                  programId: "$pid"
+                  SET: {
+                    targetEnvironment: {
+                      asterism: [ "$tid" ]
+                    }
+                    scienceRequirements: ${scienceRequirementsObject(Flamingos2LongSlit)}
+                    observingMode: {
+                      ghostIfu: {
+                        resolutionMode: STANDARD
+                        red: {
+                          timeAndCount: {
+                            time: { seconds: 1.0 }
+                            count: 1
+                            at: { nanometers: 500 }
+                          }
+                        }
+                        blue: {
+                          timeAndCount: {
+                            time: { seconds: 2.0 }
+                            count: 2
+                            at: { nanometers: 500 }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }) {
+                  observation {
+                    observingMode {
+                      instrument
+                      mode
+                    }
+                  }
+                }
+              }
+            """,
+          expected =
+            json"""
+              {
+                "createObservation": {
+                  "observation": {
+                    "observingMode": {
+                      "instrument": "GHOST",
+                      "mode": "GHOST_IFU"
                     }
                   }
                 }
