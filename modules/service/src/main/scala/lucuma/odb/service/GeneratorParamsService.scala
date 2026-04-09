@@ -34,6 +34,7 @@ import lucuma.core.model.Target
 import lucuma.core.model.UnnormalizedSED
 import lucuma.core.model.User
 import lucuma.core.util.Timestamp
+import lucuma.itc.ItcGhostDetector
 import lucuma.itc.client.GmosFpu
 import lucuma.itc.client.ImagingParameters
 import lucuma.itc.client.InstrumentMode
@@ -97,6 +98,10 @@ object GeneratorParamsService {
     def format: String
 
   object Error:
+    case class MisconfiguredObservation(observationId: Observation.Id, msg: String) extends Error:
+      def format: String =
+        s"Observation '$observationId' is misconfigured: $msg."
+
     case class MissingObservation(programId: Program.Id, observationId: Observation.Id) extends Error:
       def format: String =
         s"Observation '$observationId' in program '$programId' not found."
@@ -111,10 +116,11 @@ object GeneratorParamsService {
     given Eq[Error] with
       def eqv(x: Error, y: Error): Boolean =
         (x, y) match
-          case (MissingObservation(p0, o0), MissingObservation(p1, o1)) => (p0 === p1) && (o0 === o1)
-          case (MissingData(p0), MissingData(p1))                       => p0 === p1
-          case (ConflictingData, ConflictingData)                       => true
-          case _                                                        => false
+          case (MisconfiguredObservation(o0, m0), MisconfiguredObservation(o1, m1)) => (o0 === o1) && (m0 === m1)
+          case (MissingObservation(p0, o0), MissingObservation(p1, o1))             => (p0 === p1) && (o0 === o1)
+          case (MissingData(p0), MissingData(p1))                                   => p0 === p1
+          case (ConflictingData, ConflictingData)                                   => true
+          case _                                                                    => false
 
   def instantiate[F[_]: Concurrent](using Services[F]): GeneratorParamsService[F] =
     new GeneratorParamsService[F] {
@@ -268,9 +274,32 @@ object GeneratorParamsService {
 
           GeneratorParams(itcInput, obsParams.scienceBand, obsMode, obsParams.calibrationRole, obsParams.declaredComplete, obsParams.executionState, obsParams.stepCount)
 
-        observingMode(obsParams.targets, config).map:
-          case gh @ ghost.ifu.Config(_, _, _, _, _) =>
-            throw new RuntimeException("GHOST TBD")
+        observingMode(obsParams.targets, config).flatMap:
+
+          case gh @ ghost.ifu.Config(resolutionMode, red, blue, _, _) =>
+            (
+              ExposureTimeMode.timeAndCount.getOption(red.value.exposureTimeMode),
+              ExposureTimeMode.timeAndCount.getOption(blue.value.exposureTimeMode)
+            )
+            .tupled
+            .toRight(Error.MisconfiguredObservation(obsParams.observationId, "GHOST requires TimeAndCount exposure time modes"))
+            .map: (redEtm, blueEtm) =>
+              val sciMode = InstrumentMode.GhostSpectroscopy(
+                resolutionMode,
+                ItcGhostDetector(redEtm, red.value.readMode, red.value.binning),
+                ItcGhostDetector(blueEtm, blue.value.readMode, blue.value.binning)
+              )
+              val consInput = obsParams.constraints.toInput
+              val science   = SpectroscopyParameters(consInput, sciMode)
+
+              val itcInput  =
+                obsParams.targets
+                  .traverse(itcTargetParams)
+                  .map(ItcInput.ScienceOnlySpectroscopy(science, _))
+                  .leftMap(MissingParamSet.fromParams)
+                  .toEither
+
+              GeneratorParams(itcInput, obsParams.scienceBand, gh, obsParams.calibrationRole, obsParams.declaredComplete, obsParams.executionState, obsParams.stepCount)
 
           case gn @ gmos.longslit.Config.GmosNorth(g, f, u, c, a) =>
             val sciMode = InstrumentMode.GmosNorthSpectroscopy(
@@ -290,7 +319,7 @@ object GeneratorParamsService {
                 ccdMode = sciMode.ccdMode
               ),
               sciMode  = sciMode
-            )
+            ).asRight
 
           case gs @ gmos.longslit.Config.GmosSouth(g, f, u, c, a) =>
             val sciMode = InstrumentMode.GmosSouthSpectroscopy(
@@ -310,7 +339,7 @@ object GeneratorParamsService {
                 ccdMode = sciMode.ccdMode
               ),
               sciMode  = sciMode
-            )
+            ).asRight
 
           case f2 @ flamingos2.longslit.Config(disperser, filter, fpu, sci, acq, _, _, _, _, _, _, _, _) =>
             val sciMode   = InstrumentMode.Flamingos2Spectroscopy(sci, disperser, filter, fpu)
@@ -321,7 +350,7 @@ object GeneratorParamsService {
                 acq.filter
               ),
               sciMode = sciMode
-            )
+            ).asRight
 
           case ig: igrins2.longslit.Config =>
             val sciMode   = InstrumentMode.Igrins2Spectroscopy(ig.scienceExposureTimeMode)
@@ -331,11 +360,11 @@ object GeneratorParamsService {
             val itcInput =
               obsParams.targets
                 .traverse(itcTargetParams)
-                .map(ItcInput.Igrins2Spectroscopy(science, _))
+                .map(ItcInput.ScienceOnlySpectroscopy(science, _))
                 .leftMap(MissingParamSet.fromParams)
                 .toEither
 
-            GeneratorParams(itcInput, obsParams.scienceBand, ig, obsParams.calibrationRole, obsParams.declaredComplete, obsParams.executionState, obsParams.stepCount)
+            GeneratorParams(itcInput, obsParams.scienceBand, ig, obsParams.calibrationRole, obsParams.declaredComplete, obsParams.executionState, obsParams.stepCount).asRight
 
           case gn @ gmos.imaging.Config.GmosNorth(_, fs, _) =>
             // An input per filter.
@@ -353,7 +382,7 @@ object GeneratorParamsService {
                 .leftMap(MissingParamSet.fromParams)
                 .toEither
 
-            GeneratorParams(itcInput, obsParams.scienceBand, gn, obsParams.calibrationRole, obsParams.declaredComplete, obsParams.executionState, obsParams.stepCount)
+            GeneratorParams(itcInput, obsParams.scienceBand, gn, obsParams.calibrationRole, obsParams.declaredComplete, obsParams.executionState, obsParams.stepCount).asRight
 
           case gs @ gmos.imaging.Config.GmosSouth(_, fs, _) =>
             // An input per filter.
@@ -371,7 +400,7 @@ object GeneratorParamsService {
                 .leftMap(MissingParamSet.fromParams)
                 .toEither
 
-            GeneratorParams(itcInput, obsParams.scienceBand, gs, obsParams.calibrationRole, obsParams.declaredComplete, obsParams.executionState, obsParams.stepCount)
+            GeneratorParams(itcInput, obsParams.scienceBand, gs, obsParams.calibrationRole, obsParams.declaredComplete, obsParams.executionState, obsParams.stepCount).asRight
 
       private def itcTargetParams(targetParams: TargetParams): ValidatedNel[MissingParam, ItcInput.TargetDefinition] = {
         // If emission line, SED not required, otherwhise must be defined

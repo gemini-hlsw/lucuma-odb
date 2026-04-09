@@ -73,6 +73,17 @@ trait ArbItc:
     Cogen[(Target.Id, IntegrationTime, Option[SignalToNoiseAt])].contramap: a =>
       (a.targetId, a.value, a.signalToNoise)
 
+  given Arbitrary[Itc.GhostIfu] =
+    Arbitrary:
+      for
+        red  <- arbitrary[Zipper[Itc.Result]]
+        blue <- arbitrary[Zipper[Itc.Result]]
+      yield Itc.GhostIfu(red, blue)
+
+  given Cogen[Itc.GhostIfu] =
+    Cogen[(Zipper[Itc.Result], Zipper[Itc.Result])].contramap: a =>
+      (a.red, a.blue)
+
   given Arbitrary[Itc.GmosNorthImaging] =
     Arbitrary:
       for
@@ -118,18 +129,21 @@ trait ArbItc:
   given Arbitrary[Itc] =
     Arbitrary:
       Gen.oneOf(
+        arbitrary[Itc.GhostIfu],
         arbitrary[Itc.GmosNorthImaging],
         arbitrary[Itc.GmosSouthImaging],
-        arbitrary[Itc.Spectroscopy],
-        arbitrary[Itc.Igrins2Spectroscopy]
+        arbitrary[Itc.Igrins2Spectroscopy],
+        arbitrary[Itc.Spectroscopy]
       )
 
   given Cogen[Itc] =
     Cogen[
-      Either[Itc.Spectroscopy, Either[Itc.GmosNorthImaging, Either[Itc.GmosSouthImaging, Itc.Igrins2Spectroscopy]]]].contramap:
+      Either[Itc.Spectroscopy, Either[Itc.GmosNorthImaging, Either[Itc.GmosSouthImaging, Either[Itc.Igrins2Spectroscopy, Itc.GhostIfu]]]]
+    ].contramap:
       case a: Itc.Spectroscopy        => Left(a)
       case a: Itc.GmosNorthImaging    => Right(Left(a))
       case a: Itc.GmosSouthImaging    => Right(Right(Left(a)))
-      case a: Itc.Igrins2Spectroscopy => Right(Right(Right(a)))
+      case a: Itc.Igrins2Spectroscopy => Right(Right(Right(Left(a))))
+      case a: Itc.GhostIfu            => Right(Right(Right(Right(a))))
 
 object ArbItc extends ArbItc

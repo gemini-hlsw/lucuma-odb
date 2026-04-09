@@ -99,6 +99,22 @@ sealed trait GeneratorStreaming[F[_]]:
 
 object GeneratorStreaming:
 
+  def requireGhostItc(
+    oid: Observation.Id,
+    itc: Either[OdbError, Itc]
+  ): Either[OdbError, Itc.GhostIfu] =
+    itc.flatMap: i =>
+      Itc.ghostIfu.getOption(i).toRight:
+        OdbError.InvalidObservation(oid, s"Expecting a GHOST IFU result for this observation".some)
+
+  def requireIgrins2SpectroscopyItc(
+    oid: Observation.Id,
+    itc: Either[OdbError, Itc]
+  ): Either[OdbError, Itc.Igrins2Spectroscopy] =
+    itc.flatMap: i =>
+      Itc.igrins2Spectroscopy.getOption(i).toRight:
+        OdbError.InvalidObservation(oid, s"Expecting an IGRINS-2 spectroscopy ITC result for this observation".some)
+
   def requireImagingItc[A](
     name: String,
     oid:  Observation.Id,
@@ -116,14 +132,6 @@ object GeneratorStreaming:
     itc.flatMap: i =>
       Itc.spectroscopy.getOption(i).toRight:
         OdbError.InvalidObservation(oid, s"Expecting a spectroscopy ITC result for this observation".some)
-
-  def requireIgrins2SpectroscopyItc(
-    oid: Observation.Id,
-    itc: Either[OdbError, Itc]
-  ): Either[OdbError, Itc.Igrins2Spectroscopy] =
-    itc.flatMap: i =>
-      Itc.igrins2Spectroscopy.getOption(i).toRight:
-        OdbError.InvalidObservation(oid, s"Expecting an IGRINS-2 spectroscopy ITC result for this observation".some)
 
   def instantiate[F[_]: Async: Services](
     commitHash: CommitHash,

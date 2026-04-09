@@ -50,15 +50,18 @@ case class GeneratorContext(
     // ITC
     itcRes.foreach: itc =>
       itc match
-        case Itc.Spectroscopy(acq, sci)    =>
-          addResultSet(acq)
-          addResultSet(sci)
+        case Itc.GhostIfu(r, b)           =>
+          addResultSet(r)
+          addResultSet(b)
+        case Itc.GmosNorthImaging(m)      =>
+          m.toNel.toList.foreach(addImagingResultSet)
+        case Itc.GmosSouthImaging(m)      =>
+          m.toNel.toList.foreach(addImagingResultSet)
         case Itc.Igrins2Spectroscopy(sci) =>
           addResultSet(sci)
-        case Itc.GmosNorthImaging(m)   =>
-          m.toNel.toList.foreach(addImagingResultSet)
-        case Itc.GmosSouthImaging(m)   =>
-          m.toNel.toList.foreach(addImagingResultSet)
+        case Itc.Spectroscopy(acq, sci)   =>
+          addResultSet(acq)
+          addResultSet(sci)
 
     // Commit Hash
     md5.update(commitHash.hashBytes)

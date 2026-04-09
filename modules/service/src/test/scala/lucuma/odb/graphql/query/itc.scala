@@ -477,4 +477,130 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
     } yield r
   }
 
+  test("ghost bypass"):
+    val mode = s"""
+      ghostIfu: {
+        resolutionMode: STANDARD
+        red: {
+          exposureTimeMode: {
+            timeAndCount: {
+              time: { seconds: 1.0 }
+              count: 1
+              at: { nanometers: 500 }
+            }
+          }
+        }
+        blue: {
+          exposureTimeMode: {
+            timeAndCount: {
+              time: { seconds: 2.0 }
+              count: 2
+              at: { nanometers: 500 }
+            }
+          }
+        }
+      }
+    """
+
+    def query(oid: Observation.Id) = s"""
+      query {
+        observation(observationId: "$oid") {
+          itc {
+            ... on ItcGhostIfu {
+              itcType
+              red {
+                selected {
+                  targetId
+                  exposureTime {
+                    seconds
+                  }
+                  exposureCount
+                  signalToNoiseAt {
+                    wavelength {
+                      picometers
+                    }
+                    single
+                    total
+                  }
+                }
+                all {
+                  targetId
+                }
+              }
+              blue {
+                selected {
+                  targetId
+                  exposureTime {
+                    seconds
+                  }
+                  exposureCount
+                  signalToNoiseAt {
+                    wavelength {
+                      picometers
+                    }
+                    single
+                    total
+                  }
+                }
+                all {
+                  targetId
+                }
+              }
+            }
+          }
+        }
+      }
+    """
+
+    def expected(t: Target.Id) = json"""
+      {
+        "observation": {
+          "itc": {
+            "itcType": "GHOST_IFU",
+            "red" : {
+              "selected" : {
+                "targetId" : ${t.asJson},
+                "exposureTime" : {
+                  "seconds" : 1.000000
+                },
+                "exposureCount" : 1,
+                "signalToNoiseAt" : null
+              },
+              "all" : [
+                {
+                  "targetId" : ${t.asJson}
+                }
+              ]
+            },
+            "blue" : {
+              "selected" : {
+                "targetId" : ${t.asJson},
+                "exposureTime" : {
+                  "seconds" : 2.000000
+                },
+                "exposureCount" : 2,
+                "signalToNoiseAt" : null
+              },
+              "all" : [
+                {
+                  "targetId" : ${t.asJson}
+                }
+              ]
+            }
+          }
+        }
+      }
+    """
+
+    for
+      p <- createProgram
+      t <- createTargetWithProfileAs(user, p)
+      o <- createObservationWithModeAs(user, p, List(t), mode)
+      _ <- expect(
+        user     = user,
+        query    = query(o),
+        expected = expected(t).asRight
+      )
+    yield ()
+
 }

@@ -102,9 +102,10 @@ object ItcInput:
         )
 
   /**
-    * ItcInput for igrins 2 spectroscopy, does not contain acquisition
+    * ItcInput for spectroscopy, for instruments where GPP does not manage
+    * acquisition (IGRINS2, GHOST).
     */
-  case class Igrins2Spectroscopy(
+  case class ScienceOnlySpectroscopy(
     science: SpectroscopyParameters,
     targets: NonEmptyList[TargetDefinition]
   ) extends ItcInput derives Eq:
@@ -112,9 +113,9 @@ object ItcInput:
     def scienceInput: SpectroscopyInput =
       SpectroscopyInput(science, targets.map(_.input))
 
-  object Igrins2Spectroscopy:
-    given HashBytes[Igrins2Spectroscopy] with
-      def hashBytes(a: Igrins2Spectroscopy): Array[Byte] =
+  object ScienceOnlySpectroscopy:
+    given HashBytes[ScienceOnlySpectroscopy] with
+      def hashBytes(a: ScienceOnlySpectroscopy): Array[Byte] =
         Array.concat(
           a.science.hashBytes,
           hashTargets(a.targets)
@@ -126,22 +127,22 @@ object ItcInput:
       case _                        => none
     }(identity)
 
-  val igrins2Spectroscopy: Prism[ItcInput, ItcInput.Igrins2Spectroscopy] =
-    Prism[ItcInput, ItcInput.Igrins2Spectroscopy] {
-      case s: ItcInput.Igrins2Spectroscopy => s.some
-      case _                               => none
+  val scienceOnlySpectroscopy: Prism[ItcInput, ItcInput.ScienceOnlySpectroscopy] =
+    Prism[ItcInput, ItcInput.ScienceOnlySpectroscopy] {
+      case s: ItcInput.ScienceOnlySpectroscopy => s.some
+      case _                                   => none
     }(identity)
 
   given Eq[ItcInput] =
     Eq.instance:
-      case (im0: Imaging,               im1: Imaging)                => im0 === im1
-      case (sp0: Spectroscopy,           sp1: Spectroscopy)          => sp0 === sp1
-      case (ig0: Igrins2Spectroscopy,    ig1: Igrins2Spectroscopy)   => ig0 === ig1
-      case _                                                         => false
+      case (n0: Imaging,                 n1: Imaging)                 => n0 === n1
+      case (n0: Spectroscopy,            n1: Spectroscopy)            => n0 === n1
+      case (n0: ScienceOnlySpectroscopy, n1: ScienceOnlySpectroscopy) => n0 === n1
+      case _                                                          => false
 
   given HashBytes[ItcInput] with
     def hashBytes(a: ItcInput): Array[Byte] =
       a match
-        case in @ Imaging(_, _)              => in.hashBytes
-        case in @ Spectroscopy(_, _, _, _)   => in.hashBytes
-        case in @ Igrins2Spectroscopy(_, _)  => in.hashBytes
+        case in @ Imaging(_, _)                  => in.hashBytes
+        case in @ Spectroscopy(_, _, _, _)       => in.hashBytes
+        case in @ ScienceOnlySpectroscopy(_, _)  => in.hashBytes
