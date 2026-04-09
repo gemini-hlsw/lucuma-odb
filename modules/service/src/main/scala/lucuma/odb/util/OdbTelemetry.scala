@@ -5,8 +5,8 @@ package lucuma.odb.util
 
 import cats.effect.*
 import lucuma.odb.Config
-import lucuma.odb.otel.OtelServices
-import lucuma.odb.otel.OtelSetup
+import lucuma.otel.OtelServices
+import lucuma.otel.OtelSetup
 
 object OdbTelemetry:
   def tracingBackend(config: Config) = config.otel match

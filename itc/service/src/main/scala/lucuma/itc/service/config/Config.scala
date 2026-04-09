@@ -5,7 +5,7 @@ package lucuma.itc.service.config
 
 import cats.syntax.all.*
 import ciris.*
-import lucuma.odb.otel.OtelConfig as SharedOtelConfig
+import lucuma.otel.OtelConfig as SharedOtelConfig
 import org.http4s.Uri
 
 /**
