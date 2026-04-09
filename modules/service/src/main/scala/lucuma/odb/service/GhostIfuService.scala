@@ -6,6 +6,7 @@ package lucuma.odb.service
 import cats.data.NonEmptyList
 import cats.effect.Concurrent
 import cats.syntax.applicative.*
+import cats.syntax.apply.*
 import cats.syntax.foldable.*
 import cats.syntax.functor.*
 import cats.syntax.option.*
@@ -17,6 +18,8 @@ import lucuma.core.enums.GhostResolutionMode
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.Observation
 import lucuma.odb.data.ExposureTimeModeId
+import lucuma.odb.data.OdbError
+import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.input.GhostIfuInput
 import lucuma.odb.sequence.ghost.ifu.Config
 import lucuma.odb.sequence.ghost.ifu.DetectorConfig
@@ -56,6 +59,20 @@ object GhostIfuService:
   enum Detector:
     case Red, Blue
 
+  private def validateEtms(
+    requirementsEtm: Option[ExposureTimeMode],
+    scienceEtms:     Map[Detector, Option[ExposureTimeMode.TimeAndCountMode]]
+  ): Result[Unit] =
+    Result
+      .fromOption(
+        (scienceEtms.get(Detector.Red).flatten, scienceEtms.get(Detector.Blue).flatten)
+          .tupled
+          .void
+          .orElse:
+            requirementsEtm.flatMap(ExposureTimeMode.timeAndCount.getOption).void,
+        OdbError.InvalidArgument("GHOST observations require a TimeAndCount exposure time mode.".some).asProblem
+      )
+
   def instantiate[F[_]: {Concurrent, Services}]: GhostIfuService[F] =
 
     new GhostIfuService[F]:
@@ -84,6 +101,7 @@ object GhostIfuService:
           .fromList(which)
           .fold(ResultT.unit[F]): nel =>
             for
+              _   <- ResultT.fromResult(validateEtms(reqEtm, science.toList.toMap))
               r   <- ResultT(exposureTimeModeService.resolve("GHOST IFU", none, science, reqEtm, which))
               ids <- ResultT.liftF(exposureTimeModeService.insertResolvedAcquisitionAndScience(r))
               etms = nel.map: oid =>
@@ -119,7 +137,13 @@ object GhostIfuService:
         ghost_binning.opt   *:
         ghost_read_mode     *:
         ghost_read_mode.opt
-      ).to[DetectorConfig]
+      ).emap: (etm, dBinning, eBinning, dReadMode, eReadMode) =>
+        ExposureTimeMode
+          .timeAndCount
+          .getOption(etm)
+          .toRight(s"GHOST only supports time and count exposure time mode.")
+          .map: tc =>
+            DetectorConfig(tc, dBinning, eBinning, dReadMode, eReadMode)
 
     val ghost_detector_config_red: Decoder[DetectorConfig.Red] =
       (ghost_detector_config).map(dc => DetectorConfig.Red(dc))

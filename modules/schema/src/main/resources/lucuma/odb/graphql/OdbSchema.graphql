@@ -8612,7 +8612,7 @@ input GhostDetectorConfigInput {
   Exposure time mode for the detector.  If not specified, the exposure time mode
   of the observation's science requirements are used.
   """
-  exposureTimeMode: ExposureTimeModeInput
+  timeAndCount: TimeAndCountExposureTimeModeInput
 
   """
   Explicit binning to use for the detector.  If not specified upon creation, a
@@ -8668,7 +8668,7 @@ type GhostDetectorConfig {
   """
   Exposure time mode for the detector.
   """
-  exposureTimeMode: ExposureTimeMode!
+  timeAndCount: TimeAndCountExposureTimeMode!
 
   """
   Binning that will be used, either explicitly specified or default.
