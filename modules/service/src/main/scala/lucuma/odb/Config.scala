@@ -24,8 +24,8 @@ import lucuma.core.model.User
 import lucuma.core.util.Gid
 import lucuma.horizons.HorizonsClient
 import lucuma.itc.client.ItcClient
-import lucuma.otel.OtelConfig
 import lucuma.odb.sequence.util.CommitHash
+import lucuma.otel.OtelConfig
 import lucuma.sso.client.SsoClient
 import lucuma.sso.client.SsoJwtReader
 import lucuma.sso.client.util.GpgPublicKeyReader
