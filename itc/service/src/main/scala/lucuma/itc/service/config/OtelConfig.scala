@@ -20,20 +20,18 @@ object OtelConfig:
       if inHeroku then
         (
           envOrProp("ODB_OTEL_ENDPOINT"),
-          envOrProp("ODB_OTEL_INSTANCE_ID"),
-          envOrProp("ODB_OTEL_API_KEY"),
+          envOrProp("ODB_OTEL_KEY"),
           environment
-        ).parMapN: (endpoint, instanceId, apiKey, env) =>
-          SharedOtelConfig(endpoint, instanceId, apiKey, env).some
+        ).parMapN: (endpoint, key, env) =>
+          SharedOtelConfig(endpoint, key, env).some
       else
         (
           envOrProp("ODB_OTEL_ENDPOINT").option,
-          envOrProp("ODB_OTEL_INSTANCE_ID").option,
-          envOrProp("ODB_OTEL_API_KEY").option,
+          envOrProp("ODB_OTEL_KEY").option,
           environment
         ).parTupled.map:
-          case (Some(endpoint), Some(instanceId), Some(apiKey), env)
-              if endpoint.trim.nonEmpty && instanceId.trim.nonEmpty && apiKey.trim.nonEmpty =>
-            SharedOtelConfig(endpoint, instanceId, apiKey, env).some
+          case (Some(endpoint), Some(key), env)
+              if endpoint.trim.nonEmpty && key.trim.nonEmpty =>
+            SharedOtelConfig(endpoint, key, env).some
           case _ =>
             None

@@ -15,7 +15,6 @@ import org.typelevel.otel4s.oteljava.OtelJava
 import org.typelevel.otel4s.oteljava.context.Context
 import org.typelevel.otel4s.trace.TracerProvider
 
-import java.util.Base64
 import scala.jdk.CollectionConverters.*
 
 case class OtelServices[F[_]](
@@ -36,8 +35,6 @@ object OtelSetup:
         given LocalProvider[F, Context] = LocalProvider.fromLiftIO[F, Context]
 
         OtelJava.autoConfigured[F]: builder =>
-          val credentials =
-            Base64.getEncoder.encodeToString(s"${cfg.instanceId}:${cfg.apiKey}".getBytes)
           val dynoAttr = sys.env.get("DYNO").fold("")(d => s",dyno.id=$d")
 
           builder.addPropertiesSupplier: () =>
@@ -47,7 +44,7 @@ object OtelSetup:
               "otel.resource.attributes"    -> s"deployment.environment.name=${cfg.environment}$dynoAttr",
               "otel.exporter.otlp.protocol" -> "http/protobuf",
               "otel.exporter.otlp.endpoint" -> cfg.endpoint,
-              "otel.exporter.otlp.headers"  -> s"Authorization=Basic $credentials"
+              "otel.exporter.otlp.headers"  -> s"Authorization=Basic ${cfg.key}"
             ).asJava
         .flatTap: otel =>
           Resource.fromAutoCloseable(

@@ -5,7 +5,6 @@ package lucuma.otel
 
 case class OtelConfig(
   endpoint:    String,
-  instanceId:  String,
-  apiKey:      String,
+  key:         String,
   environment: String
 )
