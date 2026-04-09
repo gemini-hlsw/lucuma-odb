@@ -25,6 +25,7 @@ import lucuma.core.util.Gid
 import lucuma.horizons.HorizonsClient
 import lucuma.itc.client.ItcClient
 import lucuma.odb.sequence.util.CommitHash
+import lucuma.otel.OtelConfig
 import lucuma.sso.client.SsoClient
 import lucuma.sso.client.SsoJwtReader
 import lucuma.sso.client.util.GpgPublicKeyReader
@@ -45,21 +46,21 @@ import java.util.UUID
 import scala.concurrent.duration.*
 
 case class Config(
-  port:          Port,                      // Our port, nothing fancy.
-  itc:           Config.Itc,                // ITC config
-  sso:           Config.Sso,                // SSO config
-  telluric:      Config.Telluric,           // Telluric service config
-  serviceJwt:    String,                    // Only service users can exchange API keys, so we need a service user JWT.
-  honeycomb:     Option[Config.Honeycomb],  // Honeycomb config
-  database:      Config.Database,           // Database config
-  aws:           Config.Aws,                // AWS config
-  email:         Config.Email,              // Mailgun config
-  corsOverHttps: Boolean,                   // Whether to require CORS over HTTPS
-  domain:        List[String],              // Domains, for CORS headers
-  commitHash:    CommitHash,                // From Heroku Dyno Metadata
-  goaUsers:      Set[User.Id],              // Gemini Observatory Archive user id(s)
-  obscalcPoll:   FiniteDuration,            // Obscalc poll period
-  httpClient:    Config.HttpClient          // Configuration for HTTP requests made by the ODB
+  port:          Port,                          // Our port, nothing fancy.
+  itc:           Config.Itc,                    // ITC config
+  sso:           Config.Sso,                    // SSO config
+  telluric:      Config.Telluric,               // Telluric service config
+  serviceJwt:    String,                        // Only service users can exchange API keys, so we need a service user JWT.
+  otel:          Option[OtelConfig],             // OpenTelemetry/Grafana config
+  database:      Config.Database,               // Database config
+  aws:           Config.Aws,                    // AWS config
+  email:         Config.Email,                  // Mailgun config
+  corsOverHttps: Boolean,                       // Whether to require CORS over HTTPS
+  domain:        List[String],                  // Domains, for CORS headers
+  commitHash:    CommitHash,                    // From Heroku Dyno Metadata
+  goaUsers:      Set[User.Id],                  // Gemini Observatory Archive user id(s)
+  obscalcPoll:   FiniteDuration,                // Obscalc poll period
+  httpClient:    Config.HttpClient              // Configuration for HTTP requests made by the ODB
 ):
 
   // People send us their JWTs. We need to be able to extract them from the request, decode them,
@@ -141,26 +142,6 @@ object Config:
         .default(uri"https://telluric-targets.gpp.gemini.edu/")
         .map(Telluric.apply)
 
-  case class Honeycomb(
-    writeKey: String,
-    dataset:  String
-  )
-
-  object Honeycomb:
-    private val inHeroku: ConfigValue[Effect, Boolean] =
-      envOrProp("DYNO").option.map(_.isDefined)
-
-    lazy val fromCiris: ConfigValue[Effect, Option[Honeycomb]] =
-      inHeroku.flatMap: inHeroku =>
-        if (inHeroku)
-          (envOrProp("ODB_HONEYCOMB_WRITE_KEY"), envOrProp("ODB_HONEYCOMB_DATASET")).parMapN: (writeKey, dataset) =>
-            Honeycomb(writeKey, dataset).some
-        else
-          (envOrProp("ODB_HONEYCOMB_WRITE_KEY").option, envOrProp("ODB_HONEYCOMB_DATASET").option).parTupled.map:
-            case (Some(writeKey), Some(dataset)) if writeKey.trim.nonEmpty && dataset.trim.nonEmpty =>
-              Honeycomb(writeKey, dataset).some
-            case _ =>
-              None
 
   case class Database(
     maxConnections: Int,
@@ -331,13 +312,40 @@ object Config:
     value.fold(ConfigValue.failed(ConfigError("Missing value"))): v =>
       ConfigValue.loaded(ConfigKey(key), v)
 
+  private val otelEnvironment: ConfigValue[Effect, String] =
+    envOrProp("ODB_ENVIRONMENT").default("local")
+
+  private val inHeroku: ConfigValue[Effect, Boolean] =
+    envOrProp("DYNO").option.map(_.isDefined)
+
+  private val otelConfig: ConfigValue[Effect, Option[OtelConfig]] =
+    inHeroku.flatMap: inHeroku =>
+      if inHeroku then
+        (
+          envOrProp("ODB_OTEL_ENDPOINT"),
+          envOrProp("ODB_OTEL_KEY"),
+          otelEnvironment
+        ).parMapN: (endpoint, key, env) =>
+          OtelConfig(endpoint, key, env).some
+      else
+        (
+          envOrProp("ODB_OTEL_ENDPOINT").option,
+          envOrProp("ODB_OTEL_KEY").option,
+          otelEnvironment
+        ).parTupled.map:
+          case (Some(endpoint), Some(key), env)
+            if endpoint.trim.nonEmpty && key.trim.nonEmpty =>
+            OtelConfig(endpoint, key, env).some
+          case _ =>
+            None
+
   lazy val fromCiris: ConfigValue[Effect, Config] = (
     envOrProp("PORT").as[Int].as[Port], // passed by Heroku
     Itc.fromCiris,
     Sso.fromCiris,
     Telluric.fromCiris,
     envOrProp("ODB_SERVICE_JWT"),
-    Honeycomb.fromCiris,
+    otelConfig,
     Database.fromCiris,
     Aws.fromCiris,
     Email.fromCiris,

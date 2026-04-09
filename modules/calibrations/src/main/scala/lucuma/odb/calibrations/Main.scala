@@ -38,7 +38,7 @@ import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.service.TelluricTargetsDaemon
 import lucuma.odb.service.TelluricTargetsService
 import lucuma.odb.service.UserService
-import lucuma.odb.util.LucumaEntryPoint
+import lucuma.odb.util.OdbTelemetry
 import natchez.Trace
 import org.http4s.Credentials
 import org.http4s.client.Client
@@ -87,9 +87,7 @@ object CalibrationsMain extends CommandIOApp(
     given LF: LoggerFactory[IO] = Slf4jFactory.create[IO]
     given Logger[IO] = LF.getLoggerFromName("calibrations-service")
 
-    import natchez.Trace.Implicits.noop
-
-    CMain.runF[IO]
+    CMain.runF
   }
 
 }
@@ -104,7 +102,7 @@ object CMain extends MainParams {
             |
             |CommitHash. : ${config.commitHash.format}
             |PID         : ${ProcessHandle.current.pid}
-            |Tracing     : ${LucumaEntryPoint.tracingBackend(config)}
+            |Tracing     : ${OdbTelemetry.tracingBackend(config)}
             |
             |""".stripMargin
     banner.linesIterator.toList.traverse_(Logger[F].info(_))
@@ -250,7 +248,6 @@ object CMain extends MainParams {
     for {
       c                  <- Resource.eval(Config.fromCiris.load[F])
       _                  <- Resource.eval(banner[F](c))
-      ep                 <- LucumaEntryPoint.entryPointResource(ServiceName, c)
       pool               <- databasePoolResource[F](c.database)
       enums              <- Resource.eval(pool.use(Enums.load))
       (obsT, ctT, trT)   <- topics(pool)
@@ -269,7 +266,12 @@ object CMain extends MainParams {
     } yield ExitCode.Success
 
   /** Our logical entry point. */
-  def runF[F[_]:   Async: Parallel: Logger: LoggerFactory: Trace: Network: Console: SecureRandom]: F[ExitCode] =
-    server.use(_ => Concurrent[F].never[ExitCode])
+  def runF(using Logger[IO], LoggerFactory[IO]): IO[ExitCode] =
+    (for
+      c               <- Resource.eval(Config.fromCiris.load[IO])
+      otel            <- OdbTelemetry.otel(ServiceName, c)
+      given Trace[IO] = otel.trace
+      _               <- server[IO]
+    yield ExitCode.Success).useForever
 
 }

@@ -60,7 +60,7 @@ def routesForWsb(
     redisUrl = None,
     odbBaseUrl = Uri.unsafeFromString("http://localhost"),
     odbServiceToken = "",
-    honeycomb = None,
+    otel = None,
     inHeroku = false,
     metrics = MetricsConfig(graphite = None, frequency = 60.seconds),
     cacheTtlDays = 7

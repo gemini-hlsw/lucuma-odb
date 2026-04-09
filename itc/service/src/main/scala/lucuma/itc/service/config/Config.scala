@@ -5,6 +5,7 @@ package lucuma.itc.service.config
 
 import cats.syntax.all.*
 import ciris.*
+import lucuma.otel.OtelConfig as SharedOtelConfig
 import org.http4s.Uri
 
 /**
@@ -16,7 +17,7 @@ final case class Config(
   redisUrl:        Option[Uri],
   odbBaseUrl:      Uri,
   odbServiceToken: String,
-  honeycomb:       Option[HoneycombConfig],
+  otel:            Option[SharedOtelConfig],
   inHeroku:        Boolean,
   metrics:         MetricsConfig,
   cacheTtlDays:    Int
@@ -41,7 +42,7 @@ object Config:
      redisUrlConfig(dynoCheck),
      envOrProp("ODB_BASE_URL").as[Uri],
      envOrProp("ODB_SERVICE_JWT"),
-     HoneycombConfig.config.option,
+     OtelConfig.fromCiris,
      dynoCheck.map(_.isDefined),
      MetricsConfig.config,
      envOrProp("ITC_CACHE_TTL_DAYS").as[Int].default(7)

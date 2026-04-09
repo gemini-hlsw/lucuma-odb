@@ -79,6 +79,14 @@ pull_request_rules:
       add:
       - obscalc
       remove: []
+- name: Label otel PRs
+  conditions:
+  - files~=^modules/otel/
+  actions:
+    label:
+      add:
+      - otel
+      remove: []
 - name: Label phase0 PRs
   conditions:
   - files~=^modules/phase0/
