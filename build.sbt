@@ -641,7 +641,6 @@ lazy val schema =
 
 lazy val otel = project
   .in(file("modules/otel"))
-  .enablePlugins(NoPublishPlugin)
   .settings(
     name := "lucuma-odb-otel",
     libraryDependencies ++= Seq(
