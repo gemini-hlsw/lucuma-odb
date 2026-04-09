@@ -88,6 +88,7 @@ object Main extends IOApp with ItcCacheOrRemote {
             | total memory         : ${runtime.totalMemory() / 1024 / 1024} MB
             | max memory           : ${runtime.maxMemory() / 1024 / 1024} MB
             | java version         : ${System.getProperty("java.version")}
+            | tracing              : ${cfg.otel.fold("No-op (silent)")(c => s"OpenTelemetry (OTLP) endpoint=${c.endpoint} environment=${c.environment}")}
             |""".stripMargin
 
     banner.linesIterator.toList.traverse_(Logger[F].info(_))

@@ -165,6 +165,42 @@ loading the configuration. Here is the complete list with some example values.
 
 Mailgun sets other variables in the Heroku app, but they are for things we are not using.
 
+## OpenTelemetry (OTLP) Setup
+
+Services support exporting traces and metrics via OTLP.
+Telemetry is enabled when both `ODB_OTEL_ENDPOINT` and `ODB_OTEL_KEY` are set; otherwise it is a no-op.
+
+### Environment Variables
+
+| Variable | Required | Description |
+|---|---|---|
+| `ODB_OTEL_ENDPOINT` | Yes | OTLP HTTP endpoint (e.g. `http://localhost:4318`) |
+| `ODB_OTEL_KEY` | Yes | Value for the `Authorization` header (e.g. `Basic dXNlcjpwYXNz`) |
+| `ODB_ENVIRONMENT` | No | Deployment environment name (`local`, `dev`, `staging`, `production`). Defaults to `local` or set in heroku|
+
+### Using an OTLP Collector
+
+We have a collector installed on heroku that can send metrics and traces to both grafana and honeycomb
+The actual grafana and honeycomb keys are in the collector configuration. We still require clients to
+authenticate using basic auth.
+
+```
+ODB_OTEL_ENDPOINT=http://collector.example.com:4318
+ODB_OTEL_KEY=dXNlcjpwYXNz....
+```
+
+### Using Grafana Cloud Directly (local testing)
+
+For local development you can send telemetry straight to Grafana Cloud. Encode your
+instance ID and API key as basic auth:
+
+```bash
+ODB_OTEL_ENDPOINT=https://otlp-gateway-prod-us-east-0.grafana.net/otlp
+ODB_OTEL_KEY=$(echo -n "<instance-id>:<api-key>" | base64)
+```
+
+The instance ID and API key are found in the Grafana Cloud page under the OpenTelemetry connection page.
+
 ## SOPS Setup for Nix Users
 
 If using Nix flake for development, secrets are managed via SOPS:

@@ -10,8 +10,8 @@ import lucuma.otel.OtelSetup
 
 object OdbTelemetry:
   def tracingBackend(config: Config) = config.otel match
-    case Some(_) => "OpenTelemetry (OTLP)"
-    case None    => "No-op (silent)"
+    case Some(cfg) => s"OpenTelemetry (OTLP) endpoint=${cfg.endpoint} environment=${cfg.environment}"
+    case None      => "No-op (silent)"
 
   def otel[F[_]: Async: LiftIO](
     serviceName: String,
