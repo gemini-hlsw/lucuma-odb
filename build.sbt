@@ -52,7 +52,7 @@ val sqlFormatterVersion          = "2.0.5"
 val spireVersion                 = "0.18.0"
 val slf4jVersion                 = "2.0.17"
 val testcontainersScalaVersion   = "0.44.1" // check test output if you attempt to update this
-val weaverVersion                = "0.8.4"
+val weaverVersion                = "0.12.0"
 
 ThisBuild / tlBaseVersion      := "0.61"
 ThisBuild / scalaVersion       := "3.8.3"
@@ -342,8 +342,8 @@ lazy val ssoService = project
       "org.tpolecat"        %% "natchez-log"             % natchezVersion,
       "edu.gemini"          %% "lucuma-graphql-routes"   % lucumaGraphQLRoutesVersion,
       "io.circe"            %% "circe-literal"           % circeVersion  % Test,
-      "com.disneystreaming" %% "weaver-cats"             % weaverVersion % Test,
-      "com.disneystreaming" %% "weaver-scalacheck"       % weaverVersion % Test
+      "org.typelevel" %% "weaver-cats"             % weaverVersion % Test,
+      "org.typelevel" %% "weaver-scalacheck"       % weaverVersion % Test
     ),
     testFrameworks += new TestFramework("weaver.framework.CatsEffect"),
     reStart / envVars += "PORT" -> "8082",
