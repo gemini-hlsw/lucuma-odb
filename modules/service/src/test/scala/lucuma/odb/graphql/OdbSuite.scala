@@ -738,6 +738,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
 
   def servicesFor(u: User): Resource[IO, Session[IO] => Services[IO]] =
     import Trace.Implicits.noop
+    import Tracer.Implicits.noop
 
     for
       db   <- FMain.databasePoolResource[IO](databaseConfig)

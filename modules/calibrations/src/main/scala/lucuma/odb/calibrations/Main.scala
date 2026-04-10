@@ -19,8 +19,6 @@ import grackle.Result
 import lucuma.catalog.clients.GaiaClient
 import lucuma.catalog.telluric.TelluricTargetsClient
 import lucuma.core.model.Access
-import lucuma.core.model.Observation
-import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.core.util.CalculationState
 import lucuma.horizons.HorizonsClient
@@ -41,6 +39,7 @@ import lucuma.odb.service.TelluricTargetsDaemon
 import lucuma.odb.service.TelluricTargetsService
 import lucuma.odb.service.UserService
 import lucuma.odb.util.OdbTelemetry
+import lucuma.odb.otel.given
 import natchez.Trace
 import org.http4s.Credentials
 import org.http4s.client.Client
@@ -50,8 +49,6 @@ import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.LoggerFactory
 import org.typelevel.log4cats.slf4j.Slf4jFactory
 import org.typelevel.log4cats.syntax.*
-import org.typelevel.otel4s.Attribute
-import org.typelevel.otel4s.AttributeKey
 import org.typelevel.otel4s.trace.Tracer
 import skunk.*
 
@@ -60,6 +57,8 @@ import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.ZoneOffset
 import scala.concurrent.duration.*
+import org.typelevel.otel4s.Attribute
+import lucuma.odb.otel.*
 
 sealed trait MainParams {
   val ServiceName: String =
@@ -143,8 +142,6 @@ object CMain extends MainParams {
       trt <- Resource.eval(TelluricTargetTopic(ses, 1024, sup))
     } yield (top, ctt, trt)
 
-  val IsCalibrationKey: AttributeKey[Boolean] = AttributeKey("observation.isCalibration")
-
   def runCalibrationsDaemon[F[_]: {Async, Tracer as T, Logger as L, Clock as C}](
     obscalcTopic: Topic[F, ObscalcTopic.Element],
     calibTopic: Topic[F, CalibTimeTopic.Element],
@@ -156,14 +153,18 @@ object CMain extends MainParams {
       _  <- Resource.eval(obscalcTopic.subscribe(100).evalMap { elem =>
               services.useTransactionally:
                 Services.asSuperUser:
-                  T.rootSpan("calibration-calculation").use: _ =>
+                  T.rootSpan("calibration-calculation").use: span =>
                     for {
                       cal <- calibrationsService.isCalibration(elem.observationId)
                       run = (!cal &&
                              elem.newState.exists(_ === CalculationState.Ready) &&
                              elem.oldState =!= elem.newState &&
                              (elem.editType === EditType.Created || elem.editType === EditType.Updated))
-                      _ <- (info"Calibrations Service Obscalc channel: Element(${elem.observationId},${elem.programId},${elem.editType},oldState=${elem.oldState},newState=${elem.newState},${elem.users}), is calibration: $cal")//.whenA(run)
+                      _ <- (info"Calibrations Service Obscalc channel: Element(${elem.observationId},${elem.programId},${elem.editType},oldState=${elem.oldState},newState=${elem.newState},${elem.users}), is calibration: $cal, will run: $run") //.whenA(run)
+                      _ <- span.addAttributes(
+                             Attribute.from(ProgramIdKey, elem.programId),
+                             Attribute.from(ObservationIdKey, elem.observationId),
+                             Attribute.from(IsCalibrationKey, cal))
                       t <- C.realTimeInstant.map(LocalDate.ofInstant(_, ZoneOffset.UTC))
                       _ <- calibrationsService
                             .recalculateCalibrations(
@@ -206,7 +207,7 @@ object CMain extends MainParams {
           services = services
         )
 
-  def services[F[_]: Async: Parallel: UUIDGen: Trace: Logger: LoggerFactory](
+  def services[F[_]: Async: Parallel: UUIDGen: Trace: Tracer: Logger: LoggerFactory](
     user: Option[User],
     enums: Enums,
     emailConfig: Config.Email,

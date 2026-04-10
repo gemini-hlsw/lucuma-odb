@@ -43,6 +43,7 @@ import skunk.codec.text.text
 import skunk.syntax.all.*
 
 import java.time.Instant
+import org.typelevel.otel4s.trace.Tracer
 
 trait CalibrationsService[F[_]] {
 
@@ -98,7 +99,7 @@ object CalibrationsService extends CalibrationObservations {
       case (tid, name, role, Some(st)) => (tid, name, role, st)
     }
 
-  def instantiate[F[_]: {Concurrent, Services, LoggerFactory as LF}]: CalibrationsService[F] =
+  def instantiate[F[_]: {Concurrent, Services, Tracer as T, LoggerFactory as LF}]: CalibrationsService[F] =
     new CalibrationsService[F] with WorkflowStateQueries[F] {
       given Logger[F] = LF.getLoggerFromName("calibrations-service")
 

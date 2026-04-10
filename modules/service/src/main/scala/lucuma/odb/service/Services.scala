@@ -44,6 +44,7 @@ import skunk.codec.all.*
 import skunk.syntax.all.*
 
 import scala.util.NotGiven
+import org.typelevel.otel4s.trace.Tracer
 
 /** Witnesses that there is no transaction in context. */
 type NoTransaction[F[_]] = NotGiven[Transaction[F]]
@@ -263,7 +264,7 @@ object Services:
    * Construct a `Services` for the given `User` and `Session`. Service instances are constructed
    * lazily.
    */
-  def forUser[F[_]](
+  def forUser[F[_]: Trace: Tracer: Logger: LoggerFactory: UUIDGen: Async: Parallel](
     user0: User,
     enums0: Enums,
     mapping0: Option[Session[F] => Mapping[F]],
@@ -277,9 +278,7 @@ object Services:
     horizonsClient: HorizonsClient[F],
     telluricClient0: TelluricTargetsClient[F],
     hminCache0: HminBrightnessCache = HminBrightnessCache.Empty,
-  )(s: Session[F])(
-    using tf: Trace[F], uf: UUIDGen[F], ay: Async[F], pf: Parallel[F], log: Logger[F], lf: LoggerFactory[F]
-  ): Services[F[_]] =
+  )(s: Session[F]): Services[F[_]] =
     new Services[F]:
 
       val user = user0

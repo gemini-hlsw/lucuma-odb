@@ -20,7 +20,7 @@ import scala.jdk.CollectionConverters.*
 
 case class OtelServices[F[_]](
   trace:          Trace[F],
-  tracer:          Tracer[F],
+  tracer:         Tracer[F],
   meterProvider:  MeterProvider[F],
   tracerProvider: TracerProvider[F]
 )
