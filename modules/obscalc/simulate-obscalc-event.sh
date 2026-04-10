@@ -5,10 +5,10 @@ usage() {
   cat <<EOF
 Usage: $0 <observation-id>
 
-Triggers an obscalc recalculation by touching the observation time and setting it to now
+Triggers an obscalc recalculation marking the obscalc row as pending,
 avoiding going through explore.
-Changing the time fires an DB trigger that invalidates obscalc, which in turn
-sends the ch_obscalc_update notification.
+Obscalc will pick it up, recalculate, and on transition to 'ready' fire 
+a ch_obscalc_update notification.
 Use it to e.g. test the calibration loop
 
 Example:
@@ -27,8 +27,9 @@ PG_DATABASE=lucuma-odb
 export PGPASSWORD=banana
 
 psql -h "$PG_HOST" -U "$PG_USER" -d "$PG_DATABASE" -v ON_ERROR_STOP=1 <<SQL
-UPDATE t_observation
-SET c_observation_time = now()
+UPDATE t_obscalc
+SET c_obscalc_state = 'pending',
+    c_last_invalidation = now()
 WHERE c_observation_id = '${OBS_ID}';
 SQL
 
