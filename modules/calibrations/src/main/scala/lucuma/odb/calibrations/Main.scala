@@ -164,7 +164,8 @@ object CMain extends MainParams {
                       _ <- span.addAttributes(
                              Attribute.from(ProgramIdKey, elem.programId),
                              Attribute.from(ObservationIdKey, elem.observationId),
-                             Attribute.from(IsCalibrationKey, cal))
+                             Attribute.from(IsCalibrationKey, cal),
+                             Attribute.from(CalibrationRunKey, run))
                       t <- C.realTimeInstant.map(LocalDate.ofInstant(_, ZoneOffset.UTC))
                       _ <- calibrationsService
                             .recalculateCalibrations(

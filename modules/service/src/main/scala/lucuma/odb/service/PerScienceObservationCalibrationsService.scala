@@ -40,6 +40,10 @@ import skunk.AppliedFragment
 import skunk.Query
 import skunk.Transaction
 import skunk.syntax.all.*
+import org.typelevel.otel4s.trace.Tracer
+import lucuma.odb.otel.*
+import lucuma.odb.otel.given
+import org.typelevel.otel4s.Attribute
 
 trait PerScienceObservationCalibrationsService[F[_]]:
 
@@ -50,7 +54,7 @@ trait PerScienceObservationCalibrationsService[F[_]]:
   )(using Transaction[F], SuperUserAccess): F[(List[Observation.Id], List[Observation.Id])]
 
 object PerScienceObservationCalibrationsService:
-  def instantiate[F[_]: {Concurrent as F, Logger, Services as S}]: PerScienceObservationCalibrationsService[F] =
+  def instantiate[F[_]: {Concurrent as F, Tracer as T, Logger, Services as S}]: PerScienceObservationCalibrationsService[F] =
     new PerScienceObservationCalibrationsService[F] with CalibrationObservations with WorkflowStateQueries[F]:
 
       val groupService  = S.groupService
@@ -218,54 +222,57 @@ object PerScienceObservationCalibrationsService:
         obs:  ObsExtract[CalibrationConfigSubset]
       )(using Transaction[F]): F[Group.Id] =
         val obsIndexMap = tree.collectObservations(_ => true).flatMap((_, obs) => obs).toMap
-        findSystemGroupForObservation(tree, obs.id)
-          .fold(
-            newTelluricGroup(
-              pid,
-              obs.data,
-              obs.id,
-              findParentGroupForObservation(tree, obs.id),
-              obsIndexMap.get(obs.id)
-            )
-          )(gid => gid.pure[F])
+        T.span("read-telluric", Attribute.from(ProgramIdKey, pid)).surround:
+          findSystemGroupForObservation(tree, obs.id)
+            .fold(
+              newTelluricGroup(
+                pid,
+                obs.data,
+                obs.id,
+                findParentGroupForObservation(tree, obs.id),
+                obsIndexMap.get(obs.id)
+              )
+            )(gid => gid.pure[F])
 
       private def syncTelluricObservation(
         pid: Program.Id,
         obs: ObsExtract[CalibrationConfigSubset],
         gid: Group.Id
       )(using Transaction[F], SuperUserAccess): F[(List[Observation.Id], List[Observation.Id])] =
-        for {
-          existing           <- findAllTelluricObservations(gid)
-          deletable          <- excludeFromDeletion(existing, identity)
-          duration           <- obsDuration(obs.id)
-          requiredCount      = duration match
-                                 case Some(d) if d > MultiTelluricThreshold => 2
-                                 case Some(_)                               => 1
-                                 case None                                  => 0
-          // Delete/recreate if count changes
-          (created, deleted) <- if (existing.size != requiredCount)
-                                  for
-                                    _ <- NonEmptyList.fromList(deletable)
-                                          .traverse_(observationService.deleteCalibrationObservations)
-                                    c <- createTelluricCalibrations(pid, obs.id, gid)
-                                  yield (c, deletable)
-                                else
-                                  (List.empty, List.empty).pure[F]
-          // sync configuration on all deletable tellurics
-          allTellurics       <- findAllTelluricObservations(gid)
-          toSync             <- excludeFromDeletion(allTellurics, identity)
-          _                  <- toSync.traverse_(tid => syncConfiguration(obs.id, tid))
-        } yield (created, deleted)
+        T.span("sync-telluric", Attribute.from(ProgramIdKey, pid), Attribute.from(GroupIdKey, gid)).surround:
+          for {
+            existing           <- findAllTelluricObservations(gid)
+            deletable          <- excludeFromDeletion(existing, identity)
+            duration           <- obsDuration(obs.id)
+            requiredCount      = duration match
+                                  case Some(d) if d > MultiTelluricThreshold => 2
+                                  case Some(_)                               => 1
+                                  case None                                  => 0
+            // Delete/recreate if count changes
+            (created, deleted) <- if (existing.size != requiredCount)
+                                    for
+                                      _ <- NonEmptyList.fromList(deletable)
+                                            .traverse_(observationService.deleteCalibrationObservations)
+                                      c <- createTelluricCalibrations(pid, obs.id, gid)
+                                    yield (c, deletable)
+                                  else
+                                    (List.empty, List.empty).pure[F]
+            // sync configuration on all deletable tellurics
+            allTellurics       <- findAllTelluricObservations(gid)
+            toSync             <- excludeFromDeletion(allTellurics, identity)
+            _                  <- toSync.traverse_(tid => syncConfiguration(obs.id, tid))
+          } yield (created, deleted)
 
       private def generateTelluricForScience(
         pid:  Program.Id,
         tree: GroupTree,
         obs:  ObsExtract[CalibrationConfigSubset]
       )(using Transaction[F], SuperUserAccess): F[(List[Observation.Id], List[Observation.Id])] =
-        for
-          gid    <- readTelluricGroup(pid, tree, obs)
-          result <- syncTelluricObservation(pid, obs, gid)
-        yield result
+        T.span("generate-telluric-for-science", Attribute.from(ProgramIdKey, pid)).surround:
+          for
+            gid    <- readTelluricGroup(pid, tree, obs)
+            result <- syncTelluricObservation(pid, obs, gid)
+          yield result
 
       private val MaxTelluricSN = SignalToNoise.fromInt(100).get
 
@@ -428,31 +435,32 @@ object PerScienceObservationCalibrationsService:
         scienceObs: List[ObsExtract[CalibrationConfigSubset]],
         oid:        Observation.Id
       )(using Transaction[F], SuperUserAccess): F[(List[Observation.Id], List[Observation.Id])] =
-        for {
-          // Find the changed observation, then check its workflow state
-          changedObs       <- scienceObs.find(_.id === oid)
-                                .traverse(obs => onlyDefinedAndReady(List(obs), _.id).map(_.headOption))
-                                .map(_.flatten)
-          _                <- info"Calibration recalculation for observation $oid"
-          _                <- S.session.execute(sql"set constraints all deferred".command)
-          // Inspect the group tree
-          groupTree        <- groupService.selectGroups(pid)
-          result           <- changedObs match
-                                case Some(obs) =>
-                                  info"Observation $oid is active per-obs type, generating telluric" *>
-                                    generateTelluricForScience(pid, groupTree, obs)
-                                case None =>
-                                  for {
-                                    gidOpt  <- findTelluricGroupForObservation(oid)
-                                    result  <- gidOpt match
-                                                case Some(gid) =>
-                                                  info"Observation $oid no longer active, cleaning up telluric group $gid" *>
-                                                    cleanupOrphanedTelluricGroup(pid, gid, oid)
-                                                case None =>
-                                                  debug"Observation $oid has no telluric group, skipping" *>
-                                                    (List.empty[Observation.Id], List.empty[Observation.Id]).pure[F]
-                                  } yield result
-        } yield result
+        T.span("per-science-obs").surround:
+          for {
+            // Find the changed observation, then check its workflow state
+            changedObs       <- scienceObs.find(_.id === oid)
+                                  .traverse(obs => onlyDefinedAndReady(List(obs), _.id).map(_.headOption))
+                                  .map(_.flatten)
+            _                <- info"Calibration recalculation for observation $oid"
+            _                <- S.session.execute(sql"set constraints all deferred".command)
+            // Inspect the group tree
+            groupTree        <- groupService.selectGroups(pid)
+            result           <- changedObs match
+                                  case Some(obs) =>
+                                    info"Observation $oid is active per-obs type, generating telluric" *>
+                                      generateTelluricForScience(pid, groupTree, obs)
+                                  case None =>
+                                    for {
+                                      gidOpt  <- findTelluricGroupForObservation(oid)
+                                      result  <- gidOpt match
+                                                  case Some(gid) =>
+                                                    info"Observation $oid no longer active, cleaning up telluric group $gid" *>
+                                                      cleanupOrphanedTelluricGroup(pid, gid, oid)
+                                                  case None =>
+                                                    debug"Observation $oid has no telluric group, skipping" *>
+                                                      (List.empty[Observation.Id], List.empty[Observation.Id]).pure[F]
+                                    } yield result
+          } yield result
 
       object Statements:
 

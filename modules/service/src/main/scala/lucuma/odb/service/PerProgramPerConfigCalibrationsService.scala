@@ -46,6 +46,7 @@ import skunk.Transaction
 import skunk.syntax.all.*
 
 import java.time.Instant
+import org.typelevel.otel4s.trace.Tracer
 
 trait PerProgramPerConfigCalibrationsService[F[_]]:
   def generateCalibrations(
@@ -59,7 +60,7 @@ trait PerProgramPerConfigCalibrationsService[F[_]]:
 object PerProgramPerConfigCalibrationsService:
   val CalibrationsGroupName: NonEmptyString = "Calibrations".refined
 
-  def instantiate[F[_]: {MonadCancelThrow, Services, LoggerFactory as LF}]: PerProgramPerConfigCalibrationsService[F] =
+  def instantiate[F[_]: {MonadCancelThrow, Services, Tracer, LoggerFactory as LF}]: PerProgramPerConfigCalibrationsService[F] =
     new PerProgramPerConfigCalibrationsService[F] with CalibrationObservations with WorkflowStateQueries[F]:
       given Logger[F] = LF.getLoggerFromName("per-program-calibrations")
 

@@ -44,6 +44,7 @@ import skunk.syntax.all.*
 
 import java.time.Instant
 import org.typelevel.otel4s.trace.Tracer
+import org.typelevel.otel4s.Attribute
 
 trait CalibrationsService[F[_]] {
 
@@ -103,6 +104,9 @@ object CalibrationsService extends CalibrationObservations {
     new CalibrationsService[F] with WorkflowStateQueries[F] {
       given Logger[F] = LF.getLoggerFromName("calibrations-service")
 
+      val perObsService = PerScienceObservationCalibrationsService.instantiate
+      val sharedService = PerProgramPerConfigCalibrationsService.instantiate
+
       private def collectValid(
         requiresItcInputs: Boolean
       ): PartialFunction[(Observation.Id, Either[GeneratorParamsService.Error, GeneratorParams]), ObsExtract[ObservingMode]] =
@@ -118,12 +122,14 @@ object CalibrationsService extends CalibrationObservations {
         pid:       Program.Id,
         selection: ObservationSelection
       )(using Transaction[F]): F[List[ObsExtract[ObservingMode]]] =
-        services.generatorParamsService.selectAll(pid, selection = selection).map { paramsMap =>
-          paramsMap.toList.collect(collectValid(selection === ObservationSelection.Science))
-        }
+        T.span("all-observations", Attribute("selection", selection.toString)).surround:
+          services.generatorParamsService.selectAll(pid, selection = selection).map { paramsMap =>
+            paramsMap.toList.collect(collectValid(selection === ObservationSelection.Science))
+          }
 
       override def calibrationTargets(roles: List[CalibrationRole], referenceInstant: Instant)
         : F[List[(Target.Id, String, CalibrationRole, Coordinates)]] =
+        T.span("calibration-targets").surround:
           session.execute(Statements.selectCalibrationTargets(roles))(roles)
             .map(targetCoordinates(referenceInstant))
 
@@ -132,32 +138,30 @@ object CalibrationsService extends CalibrationObservations {
         referenceInstant: Instant,
         oid:              Observation.Id
       )(using Transaction[F], SuperUserAccess): F[(List[Observation.Id], List[Observation.Id])] =
-        val perObsService = PerScienceObservationCalibrationsService.instantiate
-        val sharedService = PerProgramPerConfigCalibrationsService.instantiate
-
-        for {
-          _                <- info"=== Recalculating calibrations for program ID: $pid, reference instant $referenceInstant, oid: $oid ==="
-          // Read calibration targets (shared resource)
-          calibTargets     <- calibrationTargets(PerProgramPerConfigCalibrationTypes, referenceInstant)
-          // Get all science and calibration observations (regardless of workflow state)
-          allSci           <- allObservations(pid, ObservationSelection.Science)
-          _                <- (info"Program ID: $pid has ${allSci.length} science observations: ${allSci.map(_.id)}").whenA(allSci.nonEmpty)
-          // Get all calibration observations
-          allCalibsRaw     <- allObservations(pid, ObservationSelection.Calibration)
-          // Filter out calibrations that are ongoing or completed
-          allCalibs        <- excludeOngoingAndCompleted(allCalibsRaw, _.id)
-          _                <- (info"Program ID: $pid has ${allCalibs.length} unexecuted calibration observations: ${allCalibs.map(_.id)}").whenA(allCalibs.nonEmpty)
-          perObs           = allSci.collect(ObsExtract.perObsFilter).map(_.map(_.toConfigSubset))
-          perProgram       = allSci.collect(ObsExtract.perProgramFilter)
-          _                <- (info"Program $pid has ${perObs.length} science observations with per obs calibrations: ${perObs.map(_.id)}").whenA(perObs.nonEmpty)
-          // Handle per-science-observation calibs
-          (f2Added, f2Removed)     <- perObsService.generateCalibrations(pid, perObs, oid)
-          _                <- (info"Program ID: $pid has ${perProgram.length} science observations for per program calibrations: ${perProgram.map(_.id)}").whenA(perProgram.nonEmpty)
-          // Handle per--config calib
-          (gmosAdded, gmosRemoved) <- sharedService.generateCalibrations(pid, perProgram, allCalibs, calibTargets, referenceInstant)
-          // Clean orphaned targets
-          _                        <- targetService.deleteOrphanCalibrationTargets(pid)
-        } yield (f2Added ++ gmosAdded, f2Removed ++ gmosRemoved)
+        T.span("recalculate-calibrations").surround:
+          for {
+            _                <- info"=== Recalculating calibrations for program ID: $pid, reference instant $referenceInstant, oid: $oid ==="
+            // Read calibration targets (shared resource)
+            calibTargets     <- calibrationTargets(PerProgramPerConfigCalibrationTypes, referenceInstant)
+            // Get all science and calibration observations (regardless of workflow state)
+            allSci           <- allObservations(pid, ObservationSelection.Science)
+            _                <- (info"Program ID: $pid has ${allSci.length} science observations: ${allSci.map(_.id)}").whenA(allSci.nonEmpty)
+            // Get all calibration observations
+            allCalibsRaw     <- allObservations(pid, ObservationSelection.Calibration)
+            // Filter out calibrations that are ongoing or completed
+            allCalibs        <- excludeOngoingAndCompleted(allCalibsRaw, _.id)
+            _                <- (info"Program ID: $pid has ${allCalibs.length} unexecuted calibration observations: ${allCalibs.map(_.id)}").whenA(allCalibs.nonEmpty)
+            perObs           = allSci.collect(ObsExtract.perObsFilter).map(_.map(_.toConfigSubset))
+            perProgram       = allSci.collect(ObsExtract.perProgramFilter)
+            _                <- (info"Program $pid has ${perObs.length} science observations with per obs calibrations: ${perObs.map(_.id)}").whenA(perObs.nonEmpty)
+            // Handle per-science-observation calibs
+            (f2Added, f2Removed)     <- perObsService.generateCalibrations(pid, perObs, oid)
+            _                <- (info"Program ID: $pid has ${perProgram.length} science observations for per program calibrations: ${perProgram.map(_.id)}").whenA(perProgram.nonEmpty)
+            // Handle per--config calib
+            (gmosAdded, gmosRemoved) <- sharedService.generateCalibrations(pid, perProgram, allCalibs, calibTargets, referenceInstant)
+            // Clean orphaned targets
+            _                        <- targetService.deleteOrphanCalibrationTargets(pid)
+          } yield (f2Added ++ gmosAdded, f2Removed ++ gmosRemoved)
 
       // Recalcula the target of a calibration observation
       def recalculateCalibrationTarget(

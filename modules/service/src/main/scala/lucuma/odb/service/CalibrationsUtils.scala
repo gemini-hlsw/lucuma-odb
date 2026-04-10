@@ -49,6 +49,7 @@ import skunk.syntax.all.*
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.LocalTime
+import org.typelevel.otel4s.trace.Tracer
 
 case class ObsExtract[A](
   id:   Observation.Id,
@@ -97,7 +98,7 @@ extension[F[_], A](r: F[Result[A]])
       case Result.InternalError(a) => F.raiseError(a)
     }
 
-trait WorkflowStateQueries[F[_]: Monad: Services] {
+trait WorkflowStateQueries[F[_]: {Monad, Services, Tracer as T}] {
 
 
   def filterWorkflowStateNotIn[A](obs: List[A], oid: A => Observation.Id, states: List[ObservationWorkflowState]) =
@@ -133,9 +134,10 @@ trait WorkflowStateQueries[F[_]: Monad: Services] {
 
   private def filterWorkflow[A](obs: List[A], oid: A => Observation.Id, states: List[ObservationWorkflowState], f: Boolean => Boolean, ready: Boolean) =
     val selectFn = if (ready) selectObscalcWorkflowState else selectObscalcWorkflowStateAny
-    obs.filterA: obs =>
-      selectFn(oid(obs)).map: calculatedState =>
-        f(calculatedState.exists(s => states.exists(_ === s)))
+    T.span("filter-workflow").surround:
+      obs.filterA: obs =>
+        selectFn(oid(obs)).map: calculatedState =>
+          f(calculatedState.exists(s => states.exists(_ === s)))
 
   private def selectWorkflowState(oid: Observation.Id, onlyReady: Boolean): F[Option[ObservationWorkflowState]] =
     session.option(if (onlyReady) WorkflowStateReadyQuery else WorkflowStateAnyQuery)(oid).map(_.flatten)

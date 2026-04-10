@@ -52,6 +52,7 @@ import lucuma.odb.service.TargetService.UpdateTargetsResponse.SourceProfileUpdat
 import lucuma.odb.service.TargetService.UpdateTargetsResponse.TrackingSwitchFailed
 import lucuma.odb.util.Codecs.*
 import org.typelevel.log4cats.Logger
+import org.typelevel.log4cats.syntax.*
 import skunk.AppliedFragment
 import skunk.Codec
 import skunk.Encoder
@@ -63,6 +64,10 @@ import skunk.codec.all.*
 import skunk.implicits.*
 
 import Services.Syntax.*
+import org.typelevel.otel4s.trace.Tracer
+import lucuma.odb.otel.ProgramIdKey
+import lucuma.odb.otel.given
+import org.typelevel.otel4s.Attribute
 
 trait TargetService[F[_]] {
   def createTarget(
@@ -99,7 +104,7 @@ object TargetService {
     case NoSuchProgram(programId: Program.Id)
     case UpdateFailed(problem: UpdateTargetsError)
 
-  def instantiate[F[_]: {Concurrent, Services, Logger as L}]: TargetService[F] =
+  def instantiate[F[_]: {Concurrent, Services, Tracer as T, Logger as L}]: TargetService[F] =
     new TargetService[F] {
 
       override def createTarget(
@@ -112,7 +117,7 @@ object TargetService {
             case s: SiderealInput.Create  => Statements.insertSiderealFragment(pid, input.name, s, input.sourceProfile.asJson, disposition, role).pure
             case OpportunityInput.Create(r) => Statements.insertOpportunityFragment(pid, input.name, r, input.sourceProfile.asJson, disposition, role).pure
             case NonsiderealInput.Create.Horizons(k) => Statements.insertNonsiderealFragment(pid, input.name, k, input.sourceProfile.asJson, disposition, role).pure
-            case NonsiderealInput.Create.UserSupplied(elems) =>              
+            case NonsiderealInput.Create.UserSupplied(elems) =>
               ResultT(Services.asSuperUser(trackingService.createUserSuppliedEphemeris(elems))).map: k =>
                  Statements.insertNonsiderealFragment(pid, input.name, k, input.sourceProfile.asJson, disposition, role)
           insertFragment
@@ -121,7 +126,7 @@ object TargetService {
                 session.prepareR(af.fragment.query(target_id)).use: ps =>
                   ps.unique(af.argument)
             .value
-            
+
       override def updateTargets(checked: AccessControl.Checked[TargetPropertiesInput.Edit])(using Transaction[F]): F[Result[List[Target.Id]]] =
         checked.fold(Result(Nil).pure[F]): (props, which) =>
           Services.asSuperUser(updateTargetsImpl(props, which)).map:
@@ -132,7 +137,7 @@ object TargetService {
       private def updateTargetsImpl(input: TargetPropertiesInput.Edit, which: AppliedFragment)(using Transaction[F], SuperUserAccess): F[UpdateTargetsResponse] =
 
         // Updates to the user-supplied ephemeris, if any
-        val replaceEphemeris: F[Unit] = 
+        val replaceEphemeris: F[Unit] =
           input
             .subtypeInfo
             .collect:
@@ -243,12 +248,14 @@ object TargetService {
 
       override def deleteOrphanCalibrationTargets(pid: Program.Id)(using Transaction[F], ServiceAccess): F[Result[Unit]] = {
         val s = Statements.deleteOrphanCalibrationTargets(pid)
-        L.info(s"Delete orphan calibration targets for $pid") *>
-          session
-            .prepareR(s.fragment.command)
-            .use(_.execute(s.argument))
-            .flatTap(r => L.debug(s"Orphan target deletion result: $r"))
-            .as(Result.unit)
+
+        T.span("orphan-calibration-targets", Attribute.from(ProgramIdKey, pid)).surround:
+          info"Delete orphan calibration targets for $pid" *>
+            session
+              .prepareR(s.fragment.command)
+              .use(_.execute(s.argument))
+              .flatTap(r => debug"Orphan target deletion result: $r")
+              .as(Result.unit)
       }
     }
 
@@ -505,7 +512,7 @@ object TargetService {
           NullOutNonsiderealFields ++
           NullOutOpportunityFields
 
-        case e: NonsiderealInput.Edit =>          
+        case e: NonsiderealInput.Edit =>
           void"c_type = 'nonsidereal'" ::
           List(
             sql"c_nsid_des = $text".apply(e.key.des),
