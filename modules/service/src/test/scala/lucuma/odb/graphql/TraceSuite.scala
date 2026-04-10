@@ -4,11 +4,14 @@
 package lucuma.odb.graphql
 
 import cats.effect.IO
+import cats.effect.Resource
 import cats.effect.kernel.Ref
 import cats.syntax.all.*
 import io.circe.Json
 import io.circe.parser.parse
 import io.circe.syntax.*
+import natchez.Trace
+import natchez.log.Log
 import org.typelevel.log4cats.Logger
 
 class TraceSuite extends OdbSuite {
@@ -17,6 +20,13 @@ class TraceSuite extends OdbSuite {
   val pi = TestUsers.Standard.pi(1, 30)
   val validUsers = List(pi)
   var alog: AccumluatingTraceLogger = null // sorry
+
+  override def trace: Resource[IO, Trace[IO]] =
+    Resource.eval:
+      Ref[IO].of(List.empty[Json]).flatMap: ref =>
+        alog = new AccumluatingTraceLogger(ref)
+        val ep = Log.entryPoint[IO](getClass.getName)(using summon, alog)
+        Trace.ioTraceForEntryPoint(ep)
 
   extension (j: Json)
 

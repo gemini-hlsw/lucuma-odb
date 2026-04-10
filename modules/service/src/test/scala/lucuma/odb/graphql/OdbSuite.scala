@@ -437,16 +437,21 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       map  = OdbMapping(db, mon, usr, top, gaiaClient, itc, CommitHash.Zero, goaUsers, enm, ptc, httpClient, horizonsClient, emailConfig)
     } yield map
 
-  protected def server: Resource[IO, Server] =
-    given Trace[IO] = Trace.Implicits.noop
-    given Tracer[IO] = Tracer.Implicits.noop
+  protected def trace: Resource[IO, Trace[IO]] =
+    Resource.pure(Trace.Implicits.noop)
 
+  protected def tracer: Resource[IO, Tracer[IO]] =
+    Resource.pure(Tracer.Implicits.noop)
+
+  protected def server: Resource[IO, Server] =
     for {
-      a <- httpApp
-      s <- BlazeServerBuilder[IO]
-             .withHttpWebSocketApp(a)
-             .bindAny()
-             .resource
+      given Trace[IO]  <- trace
+      given Tracer[IO] <- tracer
+      a                <- httpApp
+      s                <- BlazeServerBuilder[IO]
+                            .withHttpWebSocketApp(a)
+                            .bindAny()
+                            .resource
     } yield s
 
   protected def session: Resource[IO, Session[IO]] =

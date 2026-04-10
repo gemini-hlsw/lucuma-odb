@@ -46,7 +46,8 @@ object OtelSetup:
               "otel.resource.attributes"    -> s"deployment.environment.name=${cfg.environment}$dynoAttr",
               "otel.exporter.otlp.protocol" -> "http/protobuf",
               "otel.exporter.otlp.endpoint" -> cfg.endpoint,
-              "otel.exporter.otlp.headers"  -> s"Authorization=Basic ${cfg.key}"
+              "otel.exporter.otlp.headers"  -> s"Authorization=Basic ${cfg.key}",
+              "otel.exporter.otlp.timeout"  -> "30000"
             ).asJava
         .flatTap: otel =>
           Resource.fromAutoCloseable(

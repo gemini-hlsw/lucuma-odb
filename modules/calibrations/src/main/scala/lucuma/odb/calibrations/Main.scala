@@ -160,12 +160,12 @@ object CMain extends MainParams {
                              elem.newState.exists(_ === CalculationState.Ready) &&
                              elem.oldState =!= elem.newState &&
                              (elem.editType === EditType.Created || elem.editType === EditType.Updated))
-                      _ <- (info"Calibrations Service Obscalc channel: Element(${elem.observationId},${elem.programId},${elem.editType},oldState=${elem.oldState},newState=${elem.newState},${elem.users}), is calibration: $cal, will run: $run") //.whenA(run)
+                      _ <- (info"Calibrations Service Obscalc channel: Element(${elem.observationId},${elem.programId},${elem.editType},oldState=${elem.oldState},newState=${elem.newState},${elem.users}), is calibration: $cal").whenA(run)
                       _ <- span.addAttributes(
                              Attribute.from(ProgramIdKey, elem.programId),
                              Attribute.from(ObservationIdKey, elem.observationId),
                              Attribute.from(IsCalibrationKey, cal),
-                             Attribute.from(CalibrationRunKey, run))
+                             Attribute.from(CalibrationRunKey, run)).whenA(run)
                       t <- C.realTimeInstant.map(LocalDate.ofInstant(_, ZoneOffset.UTC))
                       _ <- calibrationsService
                             .recalculateCalibrations(
