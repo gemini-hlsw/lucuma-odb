@@ -14,6 +14,7 @@ import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.Site
 import lucuma.core.math.Coordinates
+import lucuma.core.math.SignalToNoise
 import lucuma.core.math.Wavelength
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.Group
@@ -259,8 +260,8 @@ object PerProgramPerConfigCalibrationsService:
             val waveFragment = props.wavelengthAt.map(w => sql"(e.c_signal_to_noise_at <> $wavelength_pm AND e.c_role = $exposure_time_mode_role)".apply(w, ExposureTimeModeRole.Science))
             val needsUpdate  = List(bandFragment, waveFragment).flatten.intercalate(void" OR ")
 
-            val oidInClause = void"o.c_observation_id IN (" |+|
-              oids.map(sql"$observation_id").intercalate(void", ") |+| void")"
+            val oidInClause =
+              void"o.c_observation_id IN (" |+| oids.map(sql"$observation_id").intercalate(void", ") |+| void")"
 
             services.observationService.updateObservations(
               Services.asSuperUser:
@@ -270,10 +271,7 @@ object PerProgramPerConfigCalibrationsService:
                     scienceRequirements = props.wavelengthAt.map: w =>
                       ScienceRequirementsInput(
                         exposureTimeMode = Nullable.NonNull(
-                          ExposureTimeMode.SignalToNoiseMode(
-                            lucuma.core.math.SignalToNoise.unsafeFromBigDecimalExact(100.0),
-                            w
-                          )
+                          ExposureTimeMode.SignalToNoiseMode(SignalToNoise.unsafeFromBigDecimalExact(100.0), w)
                         ),
                         spectroscopy = SpectroscopyScienceRequirementsInput.Default.some,
                         imaging      = None
@@ -282,16 +280,9 @@ object PerProgramPerConfigCalibrationsService:
                   void"""
                     SELECT DISTINCT c_observation_id
                       FROM t_observation o
-                  """               |+|
-                  etmJoin           |+|
-                  void""" WHERE """ |+|
-                  oidInClause       |+|
-                  void"""
-                      AND o.c_calibration_role IS NOT NULL
-                      AND (
-                  """               |+|
-                  needsUpdate       |+|
-                  void")"
+                  """               |+| etmJoin     |+|
+                  void""" WHERE """ |+| oidInClause |+|
+                  void""" AND o.c_calibration_role IS NOT NULL AND (""" |+| needsUpdate |+| void")"
                 )
             )
 
@@ -299,7 +290,7 @@ object PerProgramPerConfigCalibrationsService:
         groupService.selectGroups(pid).flatMap:
           case GroupTree.Root(_, children) =>
             children.collectFirst {
-              case GroupTree.Branch(gid, _, _, obs, Some(CalibrationsGroupName), _, _, _, true, _)
+              case GroupTree.Branch(groupId = gid, children = obs, name = Some(CalibrationsGroupName), system = true)
                 if obs.isEmpty => gid
             }.traverse_(groupService.deleteSystemGroup(pid, _))
           case _                           =>

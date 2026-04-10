@@ -166,11 +166,14 @@ object WorkflowStateQueries:
     def selectWorkflowStates(oids: NonEmptyList[Observation.Id], onlyReady: Boolean): AppliedFragment =
       val includeReady = if (onlyReady) void" AND c_obscalc_state = 'ready'" else void""
       void"SELECT c_observation_id, c_workflow_state FROM t_obscalc WHERE c_observation_id IN (" |+|
-        oids.map(sql"$observation_id").intercalate(void", ") |+| void")" |+| includeReady
+        oids.map(sql"$observation_id").intercalate(void", ")                                     |+| 
+        void")"                                                                                  |+| 
+        includeReady
 
     def selectVisitedObservations(oids: NonEmptyList[Observation.Id]): AppliedFragment =
       void"SELECT DISTINCT c_observation_id FROM t_visit WHERE c_observation_id IN (" |+|
-        oids.map(sql"$observation_id").intercalate(void", ") |+| void")"
+        oids.map(sql"$observation_id").intercalate(void", ")                          |+| 
+        void")"
 
 trait SpecPhotoCalibrations extends CalibrationTargetLocator {
   def idealLocation(site: Site, referenceInstant: Instant): Coordinates = {
