@@ -113,6 +113,7 @@ import java.net.SocketException
 import java.nio.file.Paths
 import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
+import org.typelevel.otel4s.trace.TracerProvider
 
 object OdbSuite:
   def reportFailure: Throwable => Unit =
@@ -405,7 +406,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
   private val horizonsClient: HorizonsClient[IO] =
     HorizonsClient.forTesting(horizonsFixture)
 
-  private def httpApp(using Trace[IO], Tracer[IO]): Resource[IO, WebSocketBuilder2[IO] => HttpApp[IO]] =
+  private def httpApp(using Trace[IO], Tracer[IO], TracerProvider[IO]): Resource[IO, WebSocketBuilder2[IO] => HttpApp[IO]] =
     FMain.routesResource[IO](
       databaseConfig,
       awsConfig,
@@ -440,18 +441,19 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
   protected def trace: Resource[IO, Trace[IO]] =
     Resource.pure(Trace.Implicits.noop)
 
-  protected def tracer: Resource[IO, Tracer[IO]] =
-    Resource.pure(Tracer.Implicits.noop)
+  protected def tracerProvider: Resource[IO, TracerProvider[IO]] =
+    Resource.pure(TracerProvider.noop)
 
   protected def server: Resource[IO, Server] =
     for {
-      given Trace[IO]  <- trace
-      given Tracer[IO] <- tracer
-      a                <- httpApp
-      s                <- BlazeServerBuilder[IO]
-                            .withHttpWebSocketApp(a)
-                            .bindAny()
-                            .resource
+      given Trace[IO]          <- trace
+      given TracerProvider[IO] <- tracerProvider
+      given Tracer[IO]         <- tracerProvider.evalMap(_.get("test-tracer"))
+      a                        <- httpApp
+      s                        <- BlazeServerBuilder[IO]
+                                    .withHttpWebSocketApp(a)
+                                    .bindAny()
+                                    .resource
     } yield s
 
   protected def session: Resource[IO, Session[IO]] =

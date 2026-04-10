@@ -23,6 +23,7 @@ val http4sVersion                = "0.23.33"
 val http4sBlazeVersion           = "0.23.17"
 val http4sEmberVersion           = "0.23.33"
 val http4sJdkHttpClientVersion   = "0.10.0"
+val http4sOtel4sVersion          = "0.16.0"
 val jmhVersion                   = "1.37"
 val jwtVersion                   = "11.0.4"
 val keySemaphoreVersion          = "0.3.0-M1"
@@ -722,7 +723,7 @@ lazy val service = project
       "org.http4s"                       %% "http4s-blaze-server"                        % http4sBlazeVersion,
       "org.http4s"                       %% "http4s-ember-client"                        % http4sEmberVersion,
       "org.postgresql"                    % "postgresql"                                 % postgresVersion,
-      "org.tpolecat"                     %% "natchez-http4s"                             % natchezHttp4sVersion,
+      "org.http4s"                       %% "http4s-otel4s-middleware-trace-server"      % http4sOtel4sVersion,
       "org.tpolecat"                     %% "natchez-log"                                % natchezVersion % Test,
       "org.tpolecat"                     %% "natchez-noop"                               % natchezVersion,
       "org.tpolecat"                     %% "skunk-core"                                 % skunkVersion,

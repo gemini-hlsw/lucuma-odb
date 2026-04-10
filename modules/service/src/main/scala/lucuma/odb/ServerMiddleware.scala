@@ -12,26 +12,27 @@ import lucuma.core.model.User
 import lucuma.odb.service.Services
 import lucuma.odb.service.UserService
 import lucuma.sso.client.SsoClient
-import natchez.Trace
-import natchez.http4s.NatchezMiddleware
 import org.http4s.HttpRoutes
 import org.http4s.Uri.Scheme
+import org.http4s.otel4s.middleware.trace.redact.PathRedactor
+import org.http4s.otel4s.middleware.trace.redact.QueryRedactor
+import org.http4s.otel4s.middleware.trace.server.ServerMiddleware as OtelServerMiddleware
+import org.http4s.otel4s.middleware.trace.server.ServerSpanDataProvider
 import org.http4s.server.middleware.CORS
 import org.http4s.server.middleware.ErrorAction
 import org.typelevel.log4cats.Logger
+import org.typelevel.otel4s.trace.Tracer
+import org.typelevel.otel4s.trace.TracerProvider
 
 import scala.collection.immutable.TreeMap
 import scala.concurrent.duration.*
-
+import lucuma.odb.otel.given
+import org.typelevel.otel4s.Attributes
 
 /** A module of all the middlewares we apply to the server routes. */
 object ServerMiddleware {
 
   type Middleware[F[_]] = Endo[HttpRoutes[F]]
-
-  /** A middleware that adds distributed tracing. */
-  def natchez[F[_]: MonadCancelThrow: Trace]: Middleware[F] =
-    NatchezMiddleware.server[F]
 
   /** A middleware that logs request and response. Headers are redacted in staging/production. */
   def logging[F[_]: Async]: Middleware[F] =
@@ -82,38 +83,37 @@ object ServerMiddleware {
   /**
    * Add the user to the trace, if known.
    */
-  def traceUser[F[_]: Monad: Trace](
+  def traceUser[F[_]: Monad: Tracer](
     client: SsoClient[F, User]
   ): Middleware[F] = routes =>
     Kleisli { req =>
       val putFields: F[Unit] =
         client.find(req).flatMap {
-          case None    => 
+          case None    =>
             Monad[F].unit
           case Some(u) =>
-            Trace[F].put(
-              "user.id"          -> u.id.toString,
-              "user.access"      -> u.role.access.tag,
-              "user.displayName" -> u.displayName,
-            )
+            Tracer[F].withCurrentSpanOrNoop:
+              _.addAttributes(Attributes.from(u))
         }
-      OptionT:
-        Trace[F].span("http"):
-          putFields >> routes(req).value
+      OptionT(putFields >> routes(req).value)
     }
 
   /** A middleware that composes all the others defined in this module. */
-  def apply[F[_]: Async: Trace: Logger](
+  def apply[F[_]: Async: Tracer: TracerProvider: Logger](
     corsOverHttps: Boolean,
     domain: List[String],
     client: SsoClient[F, User],
     userService: UserService[F],
   ): F[Middleware[F]] =
-    userCache(client, userService).map { userCache =>
+    val spanDataProvider = ServerSpanDataProvider.openTelemetry(new PathRedactor.NeverRedact with QueryRedactor.NeverRedact {})
+    (
+      userCache(client, userService),
+      OtelServerMiddleware.builder[F](spanDataProvider).build
+    ).mapN { (userCache, otelMw) =>
       List[Middleware[F]](
         cors(corsOverHttps, domain),
         logging,
-        natchez,
+        otelMw.asHttpRoutesMiddleware,
         traceUser(client),
         errorReporting,
         userCache,
