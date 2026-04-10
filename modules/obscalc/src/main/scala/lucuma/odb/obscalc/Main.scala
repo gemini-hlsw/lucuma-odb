@@ -131,7 +131,7 @@ object CalcMain extends MainParams:
          Logger[F].error("Failed to get service user") *>
            MonadThrow[F].raiseError(new RuntimeException("Failed to get service user"))
 
-  def topic[F[_]: Concurrent: Logger: Trace](
+  def topic[F[_]: Concurrent: Logger: Tracer](
     pool: Resource[F, Session[F]]
   ): Resource[F, Topic[F, ObscalcTopic.Element]] =
       for

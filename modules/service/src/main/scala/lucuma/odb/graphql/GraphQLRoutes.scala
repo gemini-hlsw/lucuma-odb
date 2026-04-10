@@ -29,7 +29,6 @@ import lucuma.odb.service.UserService
 import lucuma.odb.util.Cache
 import lucuma.sso.client.SsoClient
 import natchez.Trace
-import natchez.TraceValue
 import org.http4s.Header
 import org.http4s.HttpRoutes
 import org.http4s.MediaType
@@ -46,6 +45,9 @@ import skunk.Session
 import skunk.SqlState
 
 import scala.concurrent.duration.*
+import org.typelevel.otel4s.Attribute
+import lucuma.odb.otel.UserIdKey
+import lucuma.odb.otel.given
 
 object GraphQLRoutes {
 
@@ -106,9 +108,9 @@ object GraphQLRoutes {
                     {
                       for {
                         user <- OptionT(ssoClient.get(a))
-                        props = List[(String, TraceValue)](
-                          "lucuma.user.id"          -> user.id.toString,
-                          "lucuma.user.displayName" -> user.displayName
+                        props = List[Attribute[?]](
+                          Attribute.from(UserIdKey, user.id),
+                          Attribute("lucuma.user.displayName", user.displayName)
                         )
 
                         // If the user has never hit the ODB using http then there will be no user

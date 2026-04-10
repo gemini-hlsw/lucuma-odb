@@ -12,10 +12,10 @@ import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.core.util.Gid
 import lucuma.odb.data.EditType
-import natchez.Trace
 import org.typelevel.log4cats.Logger
 import skunk.*
 import skunk.implicits.*
+import org.typelevel.otel4s.trace.Tracer
 
 object ObservationTopic:
 
@@ -47,7 +47,7 @@ object ObservationTopic:
         ).tupled
     }
 
-  def apply[F[_]: Concurrent: Logger: Trace](
+  def apply[F[_]: Concurrent: Logger: Tracer](
     s:         Session[F],
     maxQueued: Int,
     sup:       Supervisor[F]

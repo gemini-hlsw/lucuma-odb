@@ -13,14 +13,14 @@ import fs2.concurrent.Topic
 import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.odb.util.Codecs.user_id
-import natchez.Trace
 import org.typelevel.log4cats.Logger
 import skunk.Session
 import skunk.data.Identifier
 import skunk.implicits.*
+import org.typelevel.otel4s.trace.Tracer
 
 trait OdbTopic[E]:
-  def create[F[_]: Trace](
+  def create[F[_]: Tracer](
     s:         Session[F],
     maxQueued: Int,
     sup:       Supervisor[F]
@@ -32,11 +32,11 @@ object OdbTopic:
   // in fs2 or skunk that releases the portal too early and you get portal not found
   // asynchronously when doing other things. This is a workaround for now that just
   // interpolates the strings directly rather than preparing a statement.
-  def selectProgramUsers[F[_]: Trace](
+  def selectProgramUsers[F[_]: Tracer](
     s:   Session[F],
     pid: Program.Id,
   ): F[List[User.Id]] =
-    Trace[F].span("topic.selectProgramUsers"):
+    Tracer[F].span("topic.selectProgramUsers").surround:
       s.execute(
         sql"""
           select c_user_id from t_program_user where c_program_id = '#${pid.toString}' and c_user_id notnull
@@ -61,7 +61,7 @@ object OdbTopic:
             .flatten
             .fold(Stream.exec(Logger[F].warn(s"Invalid $name event: $n")))(Stream(_))
 
-      def elements[F[_]: Logger: Trace](
+      def elements[F[_]: Logger: Tracer](
         s:         Session[F],
         maxQueued: Int
       ): Stream[F, E] =
@@ -72,7 +72,7 @@ object OdbTopic:
           _  <- Stream.eval(Logger[F].info(s"$name channel: $e"))
         yield e
 
-      def create[F[_]: Trace](
+      def create[F[_]: Tracer](
         s:         Session[F],
         maxQueued: Int,
         sup:       Supervisor[F]
@@ -101,6 +101,6 @@ object OdbTopic:
                        case e => Logger[F].error(e)(s"$name Event Consumer crashed!")
                    ) >> Logger[F].info(s"$name Event Consumer terminated.")
                  )
-                   
+
           _   <- Logger[F].info(s"Started topic for ${channel.value}")
         yield top
