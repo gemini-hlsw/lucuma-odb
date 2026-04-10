@@ -38,13 +38,13 @@ import natchez.Trace
 import org.http4s.client.Client
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.LoggerFactory
+import org.typelevel.otel4s.trace.Tracer
 import skunk.Session
 import skunk.Transaction
 import skunk.codec.all.*
 import skunk.syntax.all.*
 
 import scala.util.NotGiven
-import org.typelevel.otel4s.trace.Tracer
 
 /** Witnesses that there is no transaction in context. */
 type NoTransaction[F[_]] = NotGiven[Transaction[F]]

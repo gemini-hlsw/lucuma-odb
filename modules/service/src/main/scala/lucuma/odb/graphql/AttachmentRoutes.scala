@@ -34,8 +34,8 @@ import org.http4s.dsl.Http4sDsl
 import org.http4s.server.middleware.EntityLimiter
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.LoggerFactory
-import skunk.Session
 import org.typelevel.otel4s.trace.Tracer
+import skunk.Session
 
 object AttachmentRoutes {
   object AttachmentId {

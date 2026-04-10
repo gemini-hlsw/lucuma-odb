@@ -30,20 +30,20 @@ import lucuma.odb.graphql.input.ObservationPropertiesInput
 import lucuma.odb.graphql.input.PosAngleConstraintInput
 import lucuma.odb.graphql.input.TargetEnvironmentInput
 import lucuma.odb.graphql.mapping.AccessControl
+import lucuma.odb.otel.*
+import lucuma.odb.otel.given
 import lucuma.odb.service.Services.SuperUserAccess
 import lucuma.odb.syntax.exposureTimeMode.*
 import lucuma.odb.util.Codecs.*
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.syntax.*
+import org.typelevel.otel4s.Attribute
+import org.typelevel.otel4s.trace.Tracer
 import skunk.*
 import skunk.AppliedFragment
 import skunk.Query
 import skunk.Transaction
 import skunk.syntax.all.*
-import org.typelevel.otel4s.trace.Tracer
-import lucuma.odb.otel.*
-import lucuma.odb.otel.given
-import org.typelevel.otel4s.Attribute
 
 trait PerScienceObservationCalibrationsService[F[_]]:
 

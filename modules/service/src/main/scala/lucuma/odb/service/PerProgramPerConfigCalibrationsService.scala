@@ -41,12 +41,12 @@ import lucuma.refined.*
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.LoggerFactory
 import org.typelevel.log4cats.syntax.*
+import org.typelevel.otel4s.trace.Tracer
 import skunk.AppliedFragment
 import skunk.Transaction
 import skunk.syntax.all.*
 
 import java.time.Instant
-import org.typelevel.otel4s.trace.Tracer
 
 trait PerProgramPerConfigCalibrationsService[F[_]]:
   def generateCalibrations(

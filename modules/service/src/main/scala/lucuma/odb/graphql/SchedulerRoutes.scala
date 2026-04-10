@@ -39,8 +39,8 @@ import org.http4s.headers.`Accept-Encoding`
 import org.typelevel.ci.*
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.LoggerFactory
-import skunk.Session
 import org.typelevel.otel4s.trace.Tracer
+import skunk.Session
 
 object SchedulerRoutes:
 

@@ -46,6 +46,8 @@ import lucuma.odb.graphql.mapping.AccessControl.CheckedWithId
 import lucuma.odb.json.angle.query.given
 import lucuma.odb.json.sourceprofile.given
 import lucuma.odb.json.wavelength.query.given
+import lucuma.odb.otel.ProgramIdKey
+import lucuma.odb.otel.given
 import lucuma.odb.service.Services.ServiceAccess
 import lucuma.odb.service.Services.SuperUserAccess
 import lucuma.odb.service.TargetService.UpdateTargetsResponse.SourceProfileUpdatesFailed
@@ -53,6 +55,8 @@ import lucuma.odb.service.TargetService.UpdateTargetsResponse.TrackingSwitchFail
 import lucuma.odb.util.Codecs.*
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.syntax.*
+import org.typelevel.otel4s.Attribute
+import org.typelevel.otel4s.trace.Tracer
 import skunk.AppliedFragment
 import skunk.Codec
 import skunk.Encoder
@@ -64,10 +68,6 @@ import skunk.codec.all.*
 import skunk.implicits.*
 
 import Services.Syntax.*
-import org.typelevel.otel4s.trace.Tracer
-import lucuma.odb.otel.ProgramIdKey
-import lucuma.odb.otel.given
-import org.typelevel.otel4s.Attribute
 
 trait TargetService[F[_]] {
   def createTarget(

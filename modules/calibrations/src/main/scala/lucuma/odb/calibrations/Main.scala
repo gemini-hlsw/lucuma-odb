@@ -30,6 +30,8 @@ import lucuma.odb.graphql.topic.CalibTimeTopic
 import lucuma.odb.graphql.topic.ObscalcTopic
 import lucuma.odb.graphql.topic.TelluricTargetTopic
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
+import lucuma.odb.otel.*
+import lucuma.odb.otel.given
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.HminBrightnessCache
 import lucuma.odb.service.S3FileService
@@ -39,7 +41,6 @@ import lucuma.odb.service.TelluricTargetsDaemon
 import lucuma.odb.service.TelluricTargetsService
 import lucuma.odb.service.UserService
 import lucuma.odb.util.OdbTelemetry
-import lucuma.odb.otel.given
 import natchez.Trace
 import org.http4s.Credentials
 import org.http4s.client.Client
@@ -49,6 +50,7 @@ import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.LoggerFactory
 import org.typelevel.log4cats.slf4j.Slf4jFactory
 import org.typelevel.log4cats.syntax.*
+import org.typelevel.otel4s.Attribute
 import org.typelevel.otel4s.trace.Tracer
 import skunk.*
 
@@ -57,8 +59,6 @@ import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.ZoneOffset
 import scala.concurrent.duration.*
-import org.typelevel.otel4s.Attribute
-import lucuma.odb.otel.*
 
 sealed trait MainParams {
   val ServiceName: String =

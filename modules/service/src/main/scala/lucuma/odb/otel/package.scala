@@ -4,11 +4,11 @@
 package lucuma.odb.otel
 
 import cats.syntax.show.*
-import org.typelevel.otel4s.AttributeKey
-import org.typelevel.otel4s.Attribute
-import lucuma.core.model.Program
-import lucuma.core.model.Observation
 import lucuma.core.model.Group
+import lucuma.core.model.Observation
+import lucuma.core.model.Program
+import org.typelevel.otel4s.Attribute
+import org.typelevel.otel4s.AttributeKey
 
 val ProgramIdKey: AttributeKey[String] = AttributeKey("program.id")
 val ObservationIdKey: AttributeKey[String] = AttributeKey("observation.id")

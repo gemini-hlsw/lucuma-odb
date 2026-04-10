@@ -43,13 +43,13 @@ import lucuma.odb.service.CalibrationConfigSubset.*
 import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.util.Codecs
 import lucuma.odb.util.Codecs.*
+import org.typelevel.otel4s.trace.Tracer
 import skunk.Transaction
 import skunk.syntax.all.*
 
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.LocalTime
-import org.typelevel.otel4s.trace.Tracer
 
 case class ObsExtract[A](
   id:   Observation.Id,

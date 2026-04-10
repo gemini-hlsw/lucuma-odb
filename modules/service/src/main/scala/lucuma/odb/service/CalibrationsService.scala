@@ -34,6 +34,8 @@ import lucuma.odb.util.Codecs.*
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.LoggerFactory
 import org.typelevel.log4cats.syntax.*
+import org.typelevel.otel4s.Attribute
+import org.typelevel.otel4s.trace.Tracer
 import skunk.AppliedFragment
 import skunk.Command
 import skunk.Query
@@ -43,8 +45,6 @@ import skunk.codec.text.text
 import skunk.syntax.all.*
 
 import java.time.Instant
-import org.typelevel.otel4s.trace.Tracer
-import org.typelevel.otel4s.Attribute
 
 trait CalibrationsService[F[_]] {
 
