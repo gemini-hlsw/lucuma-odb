@@ -45,6 +45,7 @@ import org.typelevel.ci.CIString
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.LoggerFactory
 import org.typelevel.log4cats.slf4j.Slf4jFactory
+import org.typelevel.otel4s.trace.Tracer
 import skunk.*
 
 import scala.concurrent.duration.*
@@ -203,7 +204,7 @@ object CalcMain extends MainParams:
       o <- calcAndUpdateStream.compile.drain.background
     yield o
 
-  def services[F[_]: Async: Parallel: UUIDGen: Trace: Logger: LoggerFactory](
+  def services[F[_]: Async: Parallel: UUIDGen: Trace: Tracer: Logger: LoggerFactory](
     user:        User,
     enums:       Enums,
     mapping:     Session[F] => Mapping[F],
@@ -236,7 +237,7 @@ object CalcMain extends MainParams:
    * Our main server, as a resource that starts up our server on acquire and shuts it all down
    * in cleanup, yielding an `ExitCode`. Users will `use` this resource and hold it forever.
    */
-  def server[F[_]: Async: Parallel: Logger: LoggerFactory: Trace: Console: Network: SecureRandom]: Resource[F, F[Outcome[F, Throwable, Unit]]] =
+  def server[F[_]: Async: Parallel: Logger: LoggerFactory: Trace: Tracer: Console: Network: SecureRandom]: Resource[F, F[Outcome[F, Throwable, Unit]]] =
     for
       c          <- Resource.eval(Config.fromCiris.load[F])
       _          <- Resource.eval(banner[F](c))
@@ -288,7 +289,8 @@ object CalcMain extends MainParams:
     (for
       c    <- Resource.eval(Config.fromCiris.load[IO])
       otel <- OdbTelemetry.otel(ServiceName, c)
-      given Trace[IO] = otel.trace
+      given Tracer[IO] = otel.tracer
+      given Trace[IO]  = otel.trace
       o    <- server[IO]
     yield o).use: o =>
       o.flatMap:

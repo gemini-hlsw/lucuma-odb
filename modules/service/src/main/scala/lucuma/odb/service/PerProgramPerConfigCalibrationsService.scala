@@ -6,7 +6,7 @@ package lucuma.odb.service
 import cats.Applicative
 import cats.Order.catsKernelOrderingForOrder
 import cats.data.NonEmptyList
-import cats.effect.MonadCancelThrow
+import cats.effect.Concurrent
 import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.string.NonEmptyString
@@ -14,6 +14,7 @@ import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.Site
 import lucuma.core.math.Coordinates
+import lucuma.core.math.SignalToNoise
 import lucuma.core.math.Wavelength
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.Group
@@ -41,6 +42,7 @@ import lucuma.refined.*
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.LoggerFactory
 import org.typelevel.log4cats.syntax.*
+import org.typelevel.otel4s.trace.Tracer
 import skunk.AppliedFragment
 import skunk.Transaction
 import skunk.syntax.all.*
@@ -59,7 +61,7 @@ trait PerProgramPerConfigCalibrationsService[F[_]]:
 object PerProgramPerConfigCalibrationsService:
   val CalibrationsGroupName: NonEmptyString = "Calibrations".refined
 
-  def instantiate[F[_]: {MonadCancelThrow, Services, LoggerFactory as LF}]: PerProgramPerConfigCalibrationsService[F] =
+  def instantiate[F[_]: {Concurrent, Services, Tracer, LoggerFactory as LF}]: PerProgramPerConfigCalibrationsService[F] =
     new PerProgramPerConfigCalibrationsService[F] with CalibrationObservations with WorkflowStateQueries[F]:
       given Logger[F] = LF.getLoggerFromName("per-program-calibrations")
 
@@ -156,7 +158,7 @@ object PerProgramPerConfigCalibrationsService:
         props:     Map[CalibrationConfigSubset, CalObsProps],
         config:    CalibrationConfigSubset,
         tid:       Target.Id
-      )(using Transaction[F], MonadCancelThrow[F]): Option[F[Observation.Id]] =
+      )(using Transaction[F], Concurrent[F]): Option[F[Observation.Id]] =
         (site, calibRole, config) match
           case (Site.GN, CalibrationRole.SpectroPhotometric, c: GmosNConfigs) =>
             gmosLongSlitSpecPhotObs(pid, gid, tid, props, c).some
@@ -244,8 +246,10 @@ object PerProgramPerConfigCalibrationsService:
       private def updatePropsAt(
         calibrationUpdates: List[(Observation.Id, CalObsProps)]
       )(using Transaction[F]): F[Unit] =
-        calibrationUpdates
-          .traverse { (oid, props) =>
+        calibrationUpdates.groupBy(_._2).toList
+          .traverse_ : (props, entries) =>
+            val oids = entries.map(_._1)
+
             val etmJoin: AppliedFragment =
               if props.wavelengthAt.isDefined then
                 void"""LEFT JOIN t_exposure_time_mode e USING (c_observation_id)"""
@@ -256,6 +260,9 @@ object PerProgramPerConfigCalibrationsService:
             val waveFragment = props.wavelengthAt.map(w => sql"(e.c_signal_to_noise_at <> $wavelength_pm AND e.c_role = $exposure_time_mode_role)".apply(w, ExposureTimeModeRole.Science))
             val needsUpdate  = List(bandFragment, waveFragment).flatten.intercalate(void" OR ")
 
+            val oidInClause =
+              void"o.c_observation_id IN (" |+| oids.map(sql"$observation_id").intercalate(void", ") |+| void")"
+
             services.observationService.updateObservations(
               Services.asSuperUser:
                 AccessControl.unchecked(
@@ -264,10 +271,7 @@ object PerProgramPerConfigCalibrationsService:
                     scienceRequirements = props.wavelengthAt.map: w =>
                       ScienceRequirementsInput(
                         exposureTimeMode = Nullable.NonNull(
-                          ExposureTimeMode.SignalToNoiseMode(
-                            lucuma.core.math.SignalToNoise.unsafeFromBigDecimalExact(100.0),
-                            w
-                          )
+                          ExposureTimeMode.SignalToNoiseMode(SignalToNoise.unsafeFromBigDecimalExact(100.0), w)
                         ),
                         spectroscopy = SpectroscopyScienceRequirementsInput.Default.some,
                         imaging      = None
@@ -276,20 +280,17 @@ object PerProgramPerConfigCalibrationsService:
                   void"""
                     SELECT DISTINCT c_observation_id
                       FROM t_observation o
-                  """ |+| etmJoin |+| sql"""
-                    WHERE o.c_observation_id = $observation_id
-                      AND o.c_calibration_role IS NOT NULL
-                      AND (
-                  """.apply(oid) |+| needsUpdate |+| void")"
+                  """               |+| etmJoin     |+|
+                  void""" WHERE """ |+| oidInClause |+|
+                  void""" AND o.c_calibration_role IS NOT NULL AND (""" |+| needsUpdate |+| void")"
                 )
             )
-          }.void
 
       private def deleteEmptyCalibrationGroup(pid: Program.Id)(using Transaction[F], ServiceAccess): F[Unit] =
         groupService.selectGroups(pid).flatMap:
           case GroupTree.Root(_, children) =>
             children.collectFirst {
-              case GroupTree.Branch(gid, _, _, obs, Some(CalibrationsGroupName), _, _, _, true, _)
+              case GroupTree.Branch(groupId = gid, children = obs, name = Some(CalibrationsGroupName), system = true)
                 if obs.isEmpty => gid
             }.traverse_(groupService.deleteSystemGroup(pid, _))
           case _                           =>

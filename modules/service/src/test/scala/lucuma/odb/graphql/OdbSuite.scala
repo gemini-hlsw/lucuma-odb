@@ -104,6 +104,7 @@ import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.LoggerFactory
 import org.typelevel.log4cats.slf4j.Slf4jFactory
 import org.typelevel.log4cats.slf4j.Slf4jLogger
+import org.typelevel.otel4s.trace.Tracer
 import skunk.Session
 import software.amazon.awssdk.services.s3.model.S3Exception
 import software.amazon.awssdk.services.s3.presigner.S3Presigner
@@ -404,7 +405,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
   private val horizonsClient: HorizonsClient[IO] =
     HorizonsClient.forTesting(horizonsFixture)
 
-  private def httpApp(using Trace[IO]): Resource[IO, WebSocketBuilder2[IO] => HttpApp[IO]] =
+  private def httpApp(using Trace[IO], Tracer[IO]): Resource[IO, WebSocketBuilder2[IO] => HttpApp[IO]] =
     FMain.routesResource[IO](
       databaseConfig,
       awsConfig,
@@ -424,7 +425,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
     ).map(_.map(_.orNotFound))
 
   /** Resource yielding an instantiated OdbMapping, which we can use for some whitebox testing. */
-  def mapping(using Trace[IO]): Resource[IO, Mapping[IO]] =
+  def mapping(using Trace[IO], Tracer[IO]): Resource[IO, Mapping[IO]] =
     for {
       db  <- FMain.databasePoolResource[IO](databaseConfig)
       mon  = SkunkMonitor.noopMonitor[IO]
@@ -439,14 +440,18 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
   protected def trace: Resource[IO, Trace[IO]] =
     Resource.pure(Trace.Implicits.noop)
 
+  protected def tracer: Resource[IO, Tracer[IO]] =
+    Resource.pure(Tracer.Implicits.noop)
+
   protected def server: Resource[IO, Server] =
     for {
-      t <- trace
-      a <- httpApp(using t)
-      s <- BlazeServerBuilder[IO]
-             .withHttpWebSocketApp(a)
-             .bindAny()
-             .resource
+      given Trace[IO]  <- trace
+      given Tracer[IO] <- tracer
+      a                <- httpApp
+      s                <- BlazeServerBuilder[IO]
+                            .withHttpWebSocketApp(a)
+                            .bindAny()
+                            .resource
     } yield s
 
   protected def session: Resource[IO, Session[IO]] =
@@ -738,6 +743,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
 
   def servicesFor(u: User): Resource[IO, Session[IO] => Services[IO]] =
     import Trace.Implicits.noop
+    import Tracer.Implicits.noop
 
     for
       db   <- FMain.databasePoolResource[IO](databaseConfig)
@@ -779,6 +785,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
   // which in turn does a GraphQL call).
   def withServicesForObscalc[A](u: ServiceUser)(f: ServiceAccess ?=> Services[IO] => IO[A]): IO[A] =
     import Trace.Implicits.noop
+    import Tracer.Implicits.noop
 
     val res =
       for

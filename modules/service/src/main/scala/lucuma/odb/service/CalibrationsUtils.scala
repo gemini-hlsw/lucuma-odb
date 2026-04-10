@@ -3,8 +3,9 @@
 
 package lucuma.odb.service
 
-import cats.Monad
 import cats.MonadThrow
+import cats.data.NonEmptyList
+import cats.effect.Concurrent
 import cats.syntax.all.*
 import grackle.Result
 import lucuma.core.enums.CalibrationRole
@@ -43,6 +44,8 @@ import lucuma.odb.service.CalibrationConfigSubset.*
 import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.util.Codecs
 import lucuma.odb.util.Codecs.*
+import org.typelevel.otel4s.trace.Tracer
+import skunk.AppliedFragment
 import skunk.Transaction
 import skunk.syntax.all.*
 
@@ -97,8 +100,8 @@ extension[F[_], A](r: F[Result[A]])
       case Result.InternalError(a) => F.raiseError(a)
     }
 
-trait WorkflowStateQueries[F[_]: Monad: Services] {
-
+trait WorkflowStateQueries[F[_]: {Concurrent, Services, Tracer as T}] {
+  import WorkflowStateQueries.Statements
 
   def filterWorkflowStateNotIn[A](obs: List[A], oid: A => Observation.Id, states: List[ObservationWorkflowState]) =
     filterWorkflow(obs, oid, states, !_, ready = false)
@@ -109,36 +112,47 @@ trait WorkflowStateQueries[F[_]: Monad: Services] {
   def excludeOngoingAndCompleted[A](obs: List[A], oid: A => Observation.Id): F[List[A]] =
     filterWorkflowStateNotIn(obs, oid, List(ObservationWorkflowState.Ongoing, ObservationWorkflowState.Completed))
 
-  def excludeFromDeletion[A](obs: List[A], oid: A => Observation.Id)(using Transaction[F]): F[List[A]] =
+  def excludeFromDeletion[A](obs: List[A], oid: A => Observation.Id): F[List[A]] =
     excludeOngoingAndCompleted(obs, oid).flatMap: filtered =>
-      filtered.filterA(a => visitService.hasVisits(oid(a)).map(!_))
+      haveVisits(filtered.map(oid)).map: visited =>
+        filtered.filterNot(a => visited.contains(oid(a)))
 
   def onlyDefinedAndReady[A](obs: List[A], oid: A => Observation.Id): F[List[A]] =
     filterWorkflowStateIn(obs, oid, List(ObservationWorkflowState.Defined, ObservationWorkflowState.Ready), true)
 
-  private val WorkflowStateReadyQuery =
-    sql"""
-      SELECT c_workflow_state
-      FROM t_obscalc
-      WHERE c_observation_id = $observation_id
-        AND c_obscalc_state = 'ready'
-    """.query(observation_workflow_state.opt)
+  private def workflowStates(
+    oids:      List[Observation.Id],
+    onlyReady: Boolean
+  ): F[Map[Observation.Id, ObservationWorkflowState]] =
+    NonEmptyList.fromList(oids) match
+      case None      => Map.empty.pure
+      case Some(oids) =>
+        val af = Statements.selectWorkflowStates(oids, onlyReady)
+        session
+          .prepareR(af.fragment.query(observation_id *: observation_workflow_state))
+          .use(_.stream(af.argument, 1024).compile.toList)
+          .map(_.map((oid, state) => oid -> state).toMap)
 
-  private val WorkflowStateAnyQuery =
-    sql"""
-      SELECT c_workflow_state
-      FROM t_obscalc
-      WHERE c_observation_id = $observation_id
-    """.query(observation_workflow_state.opt)
+  private def haveVisits(
+    oids: List[Observation.Id]
+  ): F[Set[Observation.Id]] =
+    NonEmptyList.fromList(oids) match
+      case None      => Set.empty.pure
+      case Some(oids) =>
+        val af = Statements.selectVisitedObservations(oids)
+        session
+          .prepareR(af.fragment.query(observation_id))
+          .use(_.stream(af.argument, 1024).compile.toList)
+          .map(_.toSet)
 
   private def filterWorkflow[A](obs: List[A], oid: A => Observation.Id, states: List[ObservationWorkflowState], f: Boolean => Boolean, ready: Boolean) =
-    val selectFn = if (ready) selectObscalcWorkflowState else selectObscalcWorkflowStateAny
-    obs.filterA: obs =>
-      selectFn(oid(obs)).map: calculatedState =>
-        f(calculatedState.exists(s => states.exists(_ === s)))
+    T.span("filter-workflow").surround:
+      workflowStates(obs.map(oid), ready).map: stateMap =>
+        obs.filter: o =>
+          f(stateMap.get(oid(o)).exists(s => states.exists(_ === s)))
 
   private def selectWorkflowState(oid: Observation.Id, onlyReady: Boolean): F[Option[ObservationWorkflowState]] =
-    session.option(if (onlyReady) WorkflowStateReadyQuery else WorkflowStateAnyQuery)(oid).map(_.flatten)
+    workflowStates(List(oid), onlyReady).map(_.get(oid))
 
   def selectObscalcWorkflowState(oid: Observation.Id): F[Option[ObservationWorkflowState]] =
     selectWorkflowState(oid, onlyReady = true)
@@ -146,6 +160,20 @@ trait WorkflowStateQueries[F[_]: Monad: Services] {
   def selectObscalcWorkflowStateAny(oid: Observation.Id): F[Option[ObservationWorkflowState]] =
     selectWorkflowState(oid, onlyReady = false)
 }
+
+object WorkflowStateQueries:
+  object Statements:
+    def selectWorkflowStates(oids: NonEmptyList[Observation.Id], onlyReady: Boolean): AppliedFragment =
+      val includeReady = if (onlyReady) void" AND c_obscalc_state = 'ready'" else void""
+      void"SELECT c_observation_id, c_workflow_state FROM t_obscalc WHERE c_observation_id IN (" |+|
+        oids.map(sql"$observation_id").intercalate(void", ")                                     |+| 
+        void")"                                                                                  |+| 
+        includeReady
+
+    def selectVisitedObservations(oids: NonEmptyList[Observation.Id]): AppliedFragment =
+      void"SELECT DISTINCT c_observation_id FROM t_visit WHERE c_observation_id IN (" |+|
+        oids.map(sql"$observation_id").intercalate(void", ")                          |+| 
+        void")"
 
 trait SpecPhotoCalibrations extends CalibrationTargetLocator {
   def idealLocation(site: Site, referenceInstant: Instant): Coordinates = {
