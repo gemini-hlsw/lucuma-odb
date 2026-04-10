@@ -10,7 +10,6 @@ import scala.math.*
 // This will not work for extremely small numbers but we don't expect such
 def roundToSignificantFigures(num: BigDecimal, n: Int): Double =
   if num == 0 then 0
-  else if num.isExactDouble then num.toDouble
   else
     val d     = ceil(log10(abs(num.toDouble)))
     val power = n - d.toInt
