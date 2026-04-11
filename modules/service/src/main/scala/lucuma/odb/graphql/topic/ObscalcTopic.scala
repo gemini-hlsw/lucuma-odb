@@ -15,9 +15,9 @@ import lucuma.core.util.Enumerated
 import lucuma.core.util.Gid
 import lucuma.odb.data.EditType
 import org.typelevel.log4cats.Logger
+import org.typelevel.otel4s.trace.Tracer
 import skunk.*
 import skunk.implicits.*
-import org.typelevel.otel4s.trace.Tracer
 
 object ObscalcTopic:
 

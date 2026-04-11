@@ -14,10 +14,10 @@ import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.odb.util.Codecs.user_id
 import org.typelevel.log4cats.Logger
+import org.typelevel.otel4s.trace.Tracer
 import skunk.Session
 import skunk.data.Identifier
 import skunk.implicits.*
-import org.typelevel.otel4s.trace.Tracer
 
 trait OdbTopic[E]:
   def create[F[_]: Tracer](

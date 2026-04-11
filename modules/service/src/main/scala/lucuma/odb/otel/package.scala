@@ -7,11 +7,11 @@ import cats.syntax.show.*
 import lucuma.core.model.Group
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
-import org.typelevel.otel4s.Attribute
-import org.typelevel.otel4s.Attributes
-import org.typelevel.otel4s.AttributeKey
-import lucuma.core.model.User
 import lucuma.core.model.Role
+import lucuma.core.model.User
+import org.typelevel.otel4s.Attribute
+import org.typelevel.otel4s.AttributeKey
+import org.typelevel.otel4s.Attributes
 
 val ProgramIdKey: AttributeKey[String] = AttributeKey("program.id")
 val ObservationIdKey: AttributeKey[String] = AttributeKey("observation.id")

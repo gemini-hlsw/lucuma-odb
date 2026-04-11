@@ -105,6 +105,7 @@ import org.typelevel.log4cats.LoggerFactory
 import org.typelevel.log4cats.slf4j.Slf4jFactory
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 import org.typelevel.otel4s.trace.Tracer
+import org.typelevel.otel4s.trace.TracerProvider
 import skunk.Session
 import software.amazon.awssdk.services.s3.model.S3Exception
 import software.amazon.awssdk.services.s3.presigner.S3Presigner
@@ -113,7 +114,6 @@ import java.net.SocketException
 import java.nio.file.Paths
 import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
-import org.typelevel.otel4s.trace.TracerProvider
 
 object OdbSuite:
   def reportFailure: Throwable => Unit =

@@ -23,7 +23,7 @@ val http4sVersion                = "0.23.33"
 val http4sBlazeVersion           = "0.23.17"
 val http4sEmberVersion           = "0.23.33"
 val http4sJdkHttpClientVersion   = "0.10.0"
-val http4sOtel4sVersion          = "0.16.0"
+val http4sOtel4sVersion          = "0.17.0"
 val jmhVersion                   = "1.37"
 val jwtVersion                   = "11.0.4"
 val keySemaphoreVersion          = "0.3.0-M1"
@@ -40,9 +40,9 @@ val munitScalacheckVersion       = "1.2.0"   // check test output if you attempt
 val scalacheckEffectMunitVersion = "1.0.4"
 val natchezHttp4sVersion         = "0.6.1"
 val natchezVersion               = "0.3.8"
-val otel4sVersion                = "0.15.2"
 val openTelemetryVersion         = "1.61.0"
 val openTelemetryInstrVersion    = "2.26.1-alpha"
+val otel4sVersion                = "0.16.0"
 val paigesVersion                = "0.4.4"
 val postgresVersion              = "42.7.9"
 val pprintVersion                = "0.9.6"
@@ -724,6 +724,7 @@ lazy val service = project
       "org.http4s"                       %% "http4s-ember-client"                        % http4sEmberVersion,
       "org.postgresql"                    % "postgresql"                                 % postgresVersion,
       "org.http4s"                       %% "http4s-otel4s-middleware-trace-server"      % http4sOtel4sVersion,
+      "org.http4s"                       %% "http4s-otel4s-middleware-trace-client"      % http4sOtel4sVersion,
       "org.tpolecat"                     %% "natchez-log"                                % natchezVersion % Test,
       "org.tpolecat"                     %% "natchez-noop"                               % natchezVersion,
       "org.tpolecat"                     %% "skunk-core"                                 % skunkVersion,

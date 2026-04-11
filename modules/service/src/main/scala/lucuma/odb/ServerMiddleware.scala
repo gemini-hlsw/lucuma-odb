@@ -9,25 +9,30 @@ import cats.data.OptionT
 import cats.effect.*
 import cats.implicits.*
 import lucuma.core.model.User
+import lucuma.odb.otel.given
 import lucuma.odb.service.Services
 import lucuma.odb.service.UserService
 import lucuma.sso.client.SsoClient
 import org.http4s.HttpRoutes
+import org.http4s.Query
+import org.http4s.Uri
 import org.http4s.Uri.Scheme
-import org.http4s.otel4s.middleware.trace.redact.PathRedactor
-import org.http4s.otel4s.middleware.trace.redact.QueryRedactor
+import org.http4s.dsl.Http4sDsl
+import org.http4s.otel4s.middleware.server.RouteClassifier
+import org.http4s.otel4s.middleware.trace.client.UriRedactor
+import org.http4s.otel4s.middleware.trace.redact
+import org.http4s.otel4s.middleware.trace.redact.HeaderRedactor
 import org.http4s.otel4s.middleware.trace.server.ServerMiddleware as OtelServerMiddleware
 import org.http4s.otel4s.middleware.trace.server.ServerSpanDataProvider
 import org.http4s.server.middleware.CORS
 import org.http4s.server.middleware.ErrorAction
 import org.typelevel.log4cats.Logger
+import org.typelevel.otel4s.Attributes
 import org.typelevel.otel4s.trace.Tracer
 import org.typelevel.otel4s.trace.TracerProvider
 
 import scala.collection.immutable.TreeMap
 import scala.concurrent.duration.*
-import lucuma.odb.otel.given
-import org.typelevel.otel4s.Attributes
 
 /** A module of all the middlewares we apply to the server routes. */
 object ServerMiddleware {
@@ -98,6 +103,36 @@ object ServerMiddleware {
       OptionT(putFields >> routes(req).value)
     }
 
+  val redactor: UriRedactor = new UriRedactor:
+    def redactPath(path: Uri.Path): Uri.Path = path
+    def redactQuery(query: Query): Query =
+      if (query.isEmpty) query
+      else Query(redact.REDACTED -> None)
+    def redactFragment(fragment: Uri.Fragment): Option[Uri.Fragment] =
+      Some(fragment)
+
+  // Maps dynamic route paths to stable routes
+  private def routeClassifier[F[_]]: RouteClassifier = {
+    val dsl = Http4sDsl[F]
+    import dsl.*
+    RouteClassifier.of[F] {
+      // AttachmentRoutes.scala
+      case GET    -> Root / "attachment" / "url" / _ => "/attachment/url/{id}"
+      case GET    -> Root / "attachment" / _         => "/attachment/{id}"
+      case POST   -> Root / "attachment"             => "/attachment"
+      case PUT    -> Root / "attachment" / _         => "/attachment/{id}"
+      case DELETE -> Root / "attachment" / _         => "/attachment/{id}"
+      // GraphQLRoutes.scala
+      case GET    -> Root / "export" / _             => "/export/{name}"
+      case GET    -> Root / "odb"                    => "/odb"
+      case POST   -> Root / "odb"                    => "/odb"
+      // EmailWebhookRoutes.scala
+      case POST   -> Root / "mailgun"                => "/mailgun"
+      // SchedulerRoutes.scala
+      case POST   -> Root / "scheduler" / "atoms"    => "/scheduler/atoms"
+    }
+  }
+
   /** A middleware that composes all the others defined in this module. */
   def apply[F[_]: Async: Tracer: TracerProvider: Logger](
     corsOverHttps: Boolean,
@@ -105,7 +140,13 @@ object ServerMiddleware {
     client: SsoClient[F, User],
     userService: UserService[F],
   ): F[Middleware[F]] =
-    val spanDataProvider = ServerSpanDataProvider.openTelemetry(new PathRedactor.NeverRedact with QueryRedactor.NeverRedact {})
+    val spanDataProvider =
+      ServerSpanDataProvider
+        .openTelemetry(redactor)
+        .withRouteClassifier(routeClassifier)
+        .optIntoClientPort
+        .optIntoHttpRequestHeaders(HeaderRedactor.default)
+        .optIntoHttpResponseHeaders(HeaderRedactor.default)
     (
       userCache(client, userService),
       OtelServerMiddleware.builder[F](spanDataProvider).build
