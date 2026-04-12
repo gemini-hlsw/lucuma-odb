@@ -37,7 +37,6 @@ given attrMakeGrpId: Attribute.Make[Group.Id, String] = Attribute.Make.const(Gro
 given makeIsCalibKey: Attribute.Make[Boolean, Boolean] = Attribute.Make.const(IsCalibrationKey)
 given makeCalibRunKey:Attribute.Make[Boolean, Boolean] = Attribute.Make.const(CalibrationRunKey)
 
-
 given attrsUser: Attributes.Make[User] = u =>
   Attributes(
     Attribute.from(UserIdKey, u.id),

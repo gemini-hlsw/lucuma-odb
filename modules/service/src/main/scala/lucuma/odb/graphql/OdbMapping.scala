@@ -49,6 +49,7 @@ import org.typelevel.otel4s.trace.Tracer
 import scala.concurrent.duration.*
 import scala.io.AnsiColor
 import scala.io.Source
+import org.typelevel.otel4s.Attribute
 
 object OdbMapping {
 
@@ -90,7 +91,7 @@ object OdbMapping {
   private implicit def monoidPartialFunction[A, B]: Monoid[PartialFunction[A, B]] =
     Monoid.instance(PartialFunction.empty, _ orElse _)
 
-  def apply[F[_]: {Async, Parallel, Trace as T, Tracer, Logger as L, LoggerFactory as LF, SecureRandom}](
+  def apply[F[_]: {Async, Parallel, Tracer as T, Logger as L, LoggerFactory as LF, SecureRandom}](
     database:      Resource[F, Session[F]],
     monitor0:      SkunkMonitor[F],
     user0:         User,
@@ -659,20 +660,22 @@ object OdbMapping {
               val colored   = cleanedUp.linesIterator.map(s => s"${AnsiColor.GREEN}$s${AnsiColor.RESET}").mkString("\n")
               s"\n\n$colored\n\n"
             } *>
-              Trace[F].span("grackle.fetch"):
+            T.span("grackle.fetch").use: span =>
                 Temporal[F].timed(super.fetch(fragment, codecs)).flatMap: (elapsed, result) =>
                   val slowQuery = elapsed > SlowQueryThreshold
 
                   // Add some attributes to every query and a few specific ones for slow queries
                   val baseAttrs =
-                    T.put(
-                      "db.duration_ms" -> elapsed.toMillis,
-                      "db.row_count"   -> result.size.toLong
+                    span.addAttributes(
+                      Attribute("db.duration_ms", elapsed.toMillis),
+                      Attribute("db.row_count", result.size.toLong)
                     )
 
                   val slowQueryAttrsAndLog =
                     val truncatedSql = truncateSql(fragment.fragment.sql)
-                    T.put("db.statement"  -> truncatedSql, "db.slow_query" -> true) *>
+                    span.addAttributes(
+                      Attribute("db.statement", truncatedSql),
+                      Attribute("db.slow_query", true)) *>
                       SlowQueryLogger.warn(s"Slow query (${elapsed.toMillis}ms):\n$truncatedSql")
 
                   for {

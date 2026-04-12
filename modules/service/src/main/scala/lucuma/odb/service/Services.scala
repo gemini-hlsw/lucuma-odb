@@ -264,7 +264,7 @@ object Services:
    * Construct a `Services` for the given `User` and `Session`. Service instances are constructed
    * lazily.
    */
-  def forUser[F[_]: Trace: Tracer: Logger: LoggerFactory: UUIDGen: Async: Parallel](
+  def forUser[F[_]: Tracer: Logger: LoggerFactory: UUIDGen: Async: Parallel](
     user0: User,
     enums0: Enums,
     mapping0: Option[Session[F] => Mapping[F]],

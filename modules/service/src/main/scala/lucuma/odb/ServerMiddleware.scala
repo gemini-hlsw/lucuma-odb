@@ -144,9 +144,11 @@ object ServerMiddleware {
       ServerSpanDataProvider
         .openTelemetry(redactor)
         .withRouteClassifier(routeClassifier)
-        .optIntoClientPort
+        // These could be a bit expensive if there are lots of calls
+        // OTOH a lot of traffic is via websockets
         .optIntoHttpRequestHeaders(HeaderRedactor.default)
         .optIntoHttpResponseHeaders(HeaderRedactor.default)
+
     (
       userCache(client, userService),
       OtelServerMiddleware.builder[F](spanDataProvider).build
