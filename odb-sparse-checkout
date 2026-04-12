@@ -21,5 +21,6 @@
 /modules/smartgcal/
 /modules/sso-backend-client/
 /modules/sso-frontend-client/
+/modules/otel/
 /project/
 /test-cert/

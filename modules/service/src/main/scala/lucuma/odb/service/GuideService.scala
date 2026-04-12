@@ -51,8 +51,8 @@ import lucuma.core.model.Tracking
 import lucuma.core.model.User
 import lucuma.core.model.probes
 import lucuma.core.model.sequence.ExecutionDigest
-import lucuma.core.model.sequence.igrins2.{CentralWavelength => Igrins2CentralWavelength}
 import lucuma.core.model.sequence.flamingos2.Flamingos2FpuMask
+import lucuma.core.model.sequence.igrins2.CentralWavelength as Igrins2CentralWavelength
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
