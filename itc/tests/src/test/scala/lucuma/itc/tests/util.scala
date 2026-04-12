@@ -24,13 +24,14 @@ import org.http4s.HttpRoutes
 import org.http4s.Uri
 import org.http4s.server.websocket.WebSocketBuilder2
 import org.typelevel.log4cats.Logger
+import org.typelevel.otel4s.trace.Tracer
 
 import java.nio.file.Paths as JPaths
 import scala.concurrent.duration.*
 
 def app(
   itc: Itc[IO]
-)(using Logger[IO], Trace[IO]): IO[WebSocketBuilder2[IO] => HttpApp[IO]] =
+)(using Logger[IO], Trace[IO], Tracer[IO]): IO[WebSocketBuilder2[IO] => HttpApp[IO]] =
   routesForWsb(itc).map { f => (wsb: WebSocketBuilder2[IO]) =>
     f(wsb).orNotFound
   }
@@ -53,7 +54,7 @@ given CustomSed.Resolver[IO] = new CustomSedDatResolver[IO] {
 
 def routesForWsb(
   itc: Itc[IO]
-)(using Logger[IO], Trace[IO]): IO[WebSocketBuilder2[IO] => HttpRoutes[IO]] =
+)(using Logger[IO], Trace[IO], Tracer[IO]): IO[WebSocketBuilder2[IO] => HttpRoutes[IO]] =
   val testConfig = Config(
     environment = ExecutionEnvironment.Local,
     port = 6060,
@@ -72,7 +73,7 @@ def routesForWsb(
   yield (wsb: WebSocketBuilder2[IO]) =>
     Routes.forService(_ => IO.pure(GraphQLService(itcMap).some), wsb)
 
-def routes(itc: Itc[IO])(using Logger[IO], Trace[IO]): IO[HttpRoutes[IO]] =
+def routes(itc: Itc[IO])(using Logger[IO], Trace[IO], Tracer[IO]): IO[HttpRoutes[IO]] =
   for
     wsb <- WebSocketBuilder2[IO]
     rts <- routesForWsb(itc)

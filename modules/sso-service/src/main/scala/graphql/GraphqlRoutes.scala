@@ -16,11 +16,12 @@ import natchez.Trace
 import org.http4s.*
 import org.http4s.server.websocket.WebSocketBuilder2
 import org.typelevel.log4cats.Logger
+import org.typelevel.otel4s.trace.Tracer
 import skunk.Session
 
 object GraphQLRoutes {
 
-  def apply[F[_]: Async: Trace: Logger](
+  def apply[F[_]: Async: Trace: Tracer: Logger](
     client:   SsoClient[F, StandardUser],
     pool:     Resource[F, Session[F]],
     channels: SsoMapping.Channels[F],

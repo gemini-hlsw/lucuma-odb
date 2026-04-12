@@ -21,6 +21,7 @@ import org.http4s.server.Server
 import org.http4s.server.websocket.WebSocketBuilder2
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
+import org.typelevel.otel4s.trace.Tracer.Implicits.noop
 
 import scala.concurrent.duration.*
 

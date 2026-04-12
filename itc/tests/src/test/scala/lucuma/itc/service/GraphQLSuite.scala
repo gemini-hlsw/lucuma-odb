@@ -17,6 +17,7 @@ import org.http4s.circe.*
 import org.http4s.syntax.all.*
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
+import org.typelevel.otel4s.trace.Tracer.Implicits.noop
 
 trait GraphQLSuiteBase extends munit.CatsEffectSuite:
   given Logger[IO] = Slf4jLogger.getLogger[IO]
