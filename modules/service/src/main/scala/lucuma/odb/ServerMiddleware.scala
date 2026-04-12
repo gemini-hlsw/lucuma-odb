@@ -16,8 +16,10 @@ import lucuma.sso.client.SsoClient
 import org.http4s.HttpRoutes
 import org.http4s.Query
 import org.http4s.Uri
+import org.http4s.headers.Upgrade
 import org.http4s.Uri.Scheme
 import org.http4s.dsl.Http4sDsl
+import org.http4s.otel4s.middleware.metrics.OtelMetrics
 import org.http4s.otel4s.middleware.server.RouteClassifier
 import org.http4s.otel4s.middleware.trace.client.UriRedactor
 import org.http4s.otel4s.middleware.trace.redact
@@ -26,8 +28,10 @@ import org.http4s.otel4s.middleware.trace.server.ServerMiddleware as OtelServerM
 import org.http4s.otel4s.middleware.trace.server.ServerSpanDataProvider
 import org.http4s.server.middleware.CORS
 import org.http4s.server.middleware.ErrorAction
+import org.http4s.server.middleware.Metrics
 import org.typelevel.log4cats.Logger
 import org.typelevel.otel4s.Attributes
+import org.typelevel.otel4s.metrics.MeterProvider
 import org.typelevel.otel4s.trace.Tracer
 import org.typelevel.otel4s.trace.TracerProvider
 
@@ -134,12 +138,12 @@ object ServerMiddleware {
   }
 
   /** A middleware that composes all the others defined in this module. */
-  def apply[F[_]: Async: Tracer: TracerProvider: Logger](
+  def apply[F[_]: Async: Tracer: TracerProvider: MeterProvider: Logger](
     corsOverHttps: Boolean,
     domain: List[String],
     client: SsoClient[F, User],
     userService: UserService[F],
-  ): F[Middleware[F]] =
+  ): Resource[F, Middleware[F]] =
     val spanDataProvider =
       ServerSpanDataProvider
         .openTelemetry(redactor)
@@ -150,13 +154,20 @@ object ServerMiddleware {
         .optIntoHttpResponseHeaders(HeaderRedactor.default)
 
     (
-      userCache(client, userService),
-      OtelServerMiddleware.builder[F](spanDataProvider).build
-    ).mapN { (userCache, otelMw) =>
+      Resource.eval(userCache(client, userService)),
+      Resource.eval(OtelServerMiddleware.builder[F](spanDataProvider).build),
+      Resource.eval(OtelMetrics.serverMetricsOps[F]())
+    ).mapN { (userCache, otel, metricsOps) =>
+      // Metrics middleware wrapped skips WebSocket requests as they can be very long lived
+      val httpMetrics: Middleware[F] = routes =>
+        val withMetrics = Metrics[F](metricsOps)(routes)
+        Kleisli(req => if (req.headers.get[Upgrade].isDefined) routes(req) else withMetrics(req))
+
       List[Middleware[F]](
         cors(corsOverHttps, domain),
         logging,
-        otelMw.asHttpRoutesMiddleware,
+        httpMetrics,
+        otel.asHttpRoutesMiddleware,
         traceUser(client),
         errorReporting,
         userCache,
