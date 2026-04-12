@@ -34,7 +34,6 @@ import lucuma.odb.logic.Generator
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.logic.TimeEstimateService
 import lucuma.odb.sequence.util.CommitHash
-import natchez.Trace
 import org.http4s.client.Client
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.LoggerFactory

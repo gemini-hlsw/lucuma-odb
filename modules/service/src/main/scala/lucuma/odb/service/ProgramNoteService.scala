@@ -21,7 +21,7 @@ import lucuma.odb.graphql.input.ProgramNotePropertiesInput.Create
 import lucuma.odb.graphql.input.ProgramNotePropertiesInput.Edit
 import lucuma.odb.graphql.mapping.AccessControl
 import lucuma.odb.util.Codecs.*
-import natchez.Trace
+import org.typelevel.otel4s.trace.Tracer
 import skunk.*
 import skunk.codec.boolean.bool
 import skunk.implicits.*
@@ -39,13 +39,13 @@ trait ProgramNoteService[F[_]]:
 
 object ProgramNoteService:
 
-  def instantiate[F[_]: Concurrent : Trace](using Services[F]): ProgramNoteService[F] =
+  def instantiate[F[_]: {Concurrent, Tracer as T, Services}]: ProgramNoteService[F] =
 
     new ProgramNoteService[F]:
       override def createNote(
         input: AccessControl.CheckedWithId[Create, Program.Id]
       )(using Transaction[F]): F[Result[ProgramNote.Id]] =
-        Trace[F].span("createNote"):
+        T.span("createNote").surround:
           session.execute(sql"SET CONSTRAINTS ALL DEFERRED".command) >>
           input.foldWithId(
             OdbError.InvalidArgument().asFailureF
@@ -54,7 +54,7 @@ object ProgramNoteService:
       override def updateNotes(
         update: AccessControl.Checked[Edit]
       )(using Transaction[F]): F[List[ProgramNote.Id]] =
-        Trace[F].span("updateNotes"):
+        T.span("updateNotes").surround:
           update.fold(List.empty.pure[F]): (SET, which) =>
             Statements.updateNotes(SET, which).traverse: af =>
               session.prepareR(af.fragment.query(program_note_id)).use: pq =>

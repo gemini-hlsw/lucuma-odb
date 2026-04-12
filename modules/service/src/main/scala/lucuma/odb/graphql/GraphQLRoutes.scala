@@ -23,14 +23,12 @@ import lucuma.itc.client.ItcClient
 import lucuma.odb.Config
 import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
-import lucuma.odb.otel.UserIdKey
 import lucuma.odb.otel.given
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.Services
 import lucuma.odb.service.UserService
 import lucuma.odb.util.Cache
 import lucuma.sso.client.SsoClient
-import natchez.Trace
 import org.http4s.Header
 import org.http4s.HttpRoutes
 import org.http4s.MediaType
@@ -41,15 +39,14 @@ import org.http4s.headers.Authorization
 import org.http4s.headers.`Content-Type`
 import org.http4s.server.websocket.WebSocketBuilder2
 import org.typelevel.log4cats.Logger
-import org.typelevel.log4cats.syntax.*
 import org.typelevel.log4cats.LoggerFactory
-import org.typelevel.otel4s.Attribute
+import org.typelevel.log4cats.syntax.*
+import org.typelevel.otel4s.Attributes
 import org.typelevel.otel4s.trace.Tracer
 import skunk.Session
 import skunk.SqlState
 
 import scala.concurrent.duration.*
-import org.typelevel.otel4s.Attributes
 
 object GraphQLRoutes {
 

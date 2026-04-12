@@ -29,7 +29,7 @@ import lucuma.odb.graphql.input.ProgramReferencePropertiesInput
 import lucuma.odb.graphql.mapping.AccessControl
 import lucuma.odb.service.Services.SuperUserAccess
 import lucuma.odb.util.Codecs.*
-import natchez.Trace
+import org.typelevel.otel4s.trace.Tracer
 import skunk.*
 import skunk.codec.all.*
 import skunk.syntax.all.*
@@ -99,7 +99,7 @@ object ProgramService {
    * Construct a `ProgramService` using the specified `Session`, for the specified `User`. All
    * operations will be performed on behalf of `user`.
    */
-  def instantiate[F[_]: Concurrent: Trace](using Services[F]): ProgramService[F] =
+  def instantiate[F[_]: {Concurrent, Tracer as T, Services}]: ProgramService[F] =
     new ProgramService[F] {
 
       def selectPid(ref: Ior[ProposalReference, ProgramReference]): F[Option[Program.Id]] = {
@@ -203,7 +203,7 @@ object ProgramService {
         input: AccessControl.Checked[Option[ProgramPropertiesInput.Create]]
       )(using Transaction[F]): F[Result[Program.Id]] =
         input.fold(OdbError.InvalidArgument().asFailureF): (SET, _) =>
-          Trace[F].span("insertProgram") {
+          T.span("insertProgram").surround {
             val SETʹ = SET.getOrElse(ProgramPropertiesInput.Create.Default)
 
             val create =
@@ -242,7 +242,7 @@ object ProgramService {
 
 
       def insertCalibrationProgram(SET: Option[ProgramPropertiesInput.Create], calibrationRole: CalibrationRole, description: Description)(using Transaction[F], SuperUserAccess): F[Program.Id] =
-        Trace[F].span("insertCalibrationProgram") {
+        T.span("insertCalibrationProgram").surround {
           val SETʹ = SET.getOrElse(ProgramPropertiesInput.Create.Default)
 
           session.prepareR(Statements.InsertCalibrationProgram).use(_.unique(SETʹ.name, calibrationRole, description.value))

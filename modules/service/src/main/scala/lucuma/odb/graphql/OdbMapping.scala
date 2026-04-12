@@ -39,17 +39,16 @@ import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.S3FileService
 import lucuma.odb.service.Services
 import lucuma.odb.util.Codecs.DomainCodec
-import natchez.Trace
 import org.http4s.client.Client
 import org.tpolecat.sourcepos.SourcePos
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.LoggerFactory
+import org.typelevel.otel4s.Attribute
 import org.typelevel.otel4s.trace.Tracer
 
 import scala.concurrent.duration.*
 import scala.io.AnsiColor
 import scala.io.Source
-import org.typelevel.otel4s.Attribute
 
 object OdbMapping {
 
@@ -744,7 +743,7 @@ object OdbMapping {
    * a `Services` instance that has a mapping.  This mapping ignores
    * subscriptions.
    */
-  def forObscalc[F[_]: Async: Parallel: Trace: Tracer: Logger: LoggerFactory: SecureRandom](
+  def forObscalc[F[_]: Async: Parallel: Tracer: Logger: LoggerFactory: SecureRandom](
     database:    Resource[F, Session[F]],
     monitor:     SkunkMonitor[F],
     user:        User,

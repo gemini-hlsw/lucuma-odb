@@ -31,7 +31,6 @@ import lucuma.odb.service.S3FileService
 import lucuma.odb.service.Services
 import lucuma.odb.service.Services.Syntax.*
 import lucuma.sso.client.SsoClient
-import natchez.Trace
 import org.http4s.*
 import org.http4s.client.Client
 import org.http4s.dsl.Http4sDsl
@@ -45,7 +44,7 @@ import skunk.Session
 object SchedulerRoutes:
 
   // the normal constructor
-  def apply[F[_]: Async: Parallel: Logger: LoggerFactory: Trace: Tracer: SecureRandom](
+  def apply[F[_]: Async: Parallel: Logger: LoggerFactory: Tracer: SecureRandom](
     pool:           Resource[F, Session[F]],
     ssoClient:      SsoClient[F, User],
     enums:          Enums,

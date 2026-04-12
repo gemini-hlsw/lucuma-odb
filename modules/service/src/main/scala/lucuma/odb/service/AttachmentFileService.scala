@@ -19,7 +19,7 @@ import lucuma.core.model.User
 import lucuma.core.util.NewType
 import lucuma.odb.service.Services.SuperUserAccess
 import lucuma.odb.util.Codecs.*
-import natchez.Trace
+import org.typelevel.otel4s.trace.Tracer
 import skunk.*
 import skunk.codec.all.*
 import skunk.syntax.all.*
@@ -145,7 +145,7 @@ object AttachmentFileService {
     if (fileSize <= 0) InvalidRequest("File cannot be empty").asLeft
     else ().asRight
 
-  def instantiate[F[_]: Concurrent: Trace: UUIDGen](
+  def instantiate[F[_]: {Concurrent, Tracer as T, UUIDGen}](
     s3FileSvc: S3FileService[F]
   )(using Services[F]): AttachmentFileService[F] = {
 
@@ -165,7 +165,7 @@ object AttachmentFileService {
         val check: F[Boolean] = required match
           case AccessRequired.Read => programUserService.userHasReadAccess(programId)
           case AccessRequired.Write => programUserService.userHasWriteAccess(programId)
-        
+
         check
           .map(b => if (b) ().asRight else onNoAccess.asLeft)
           .asEitherT
@@ -179,7 +179,7 @@ object AttachmentFileService {
       fileSize:       Long,
       remotePath:     NonEmptyString
     ): F[Either[AttachmentException, Attachment.Id]] =
-      Trace[F].span("insertAttachment") {
+      T.span("insertAttachment").surround {
         session
           .unique(Statements.InsertAttachment)(programId,
                                                attachmentType,
@@ -205,7 +205,7 @@ object AttachmentFileService {
       fileSize:     Long,
       remotePath:   NonEmptyString
     ): F[Either[AttachmentException, Unit]] =
-      Trace[F].span("updateAttachment") {
+      T.span("updateAttachment").surround {
         session
           .unique(Statements.UpdateAttachment)(fileName.value,
                                                description,
@@ -244,7 +244,7 @@ object AttachmentFileService {
     def deleteAttachmentFromDB(
       attachmentId: Attachment.Id
     ): F[Either[AttachmentException, NonEmptyString]] =
-      Trace[F].span("deleteAttachmentFromDB") {
+      T.span("deleteAttachmentFromDB").surround {
         session
           .option(Statements.DeleteAttachment)(attachmentId)
           .map(_.toRight(FileNotFound))
@@ -340,9 +340,9 @@ object AttachmentFileService {
             } yield (fn, path)
           ).value
           .flatTap {
-            // Up to this point, we haven't read the data yet. 
+            // Up to this point, we haven't read the data yet.
             // If we don't drain the request body before returning,
-            // the client that Heroku uses as a proxy will simply 
+            // the client that Heroku uses as a proxy will simply
             // return a network error. See this for more info:
             // https://github.com/http4s/http4s/pull/7602
             case Left(_)  => data.compile.drain
@@ -377,7 +377,7 @@ object AttachmentFileService {
                 for {
                   (pid, oldPath) <- getAttachmentInfoAndCheckAccess(user, attachmentId, AccessRequired.Write)
                   _              <- validateFileExtensionById(attachmentId, fn).asEitherT
-                  _              <- checkForDuplicateName(pid, fn, attachmentId.some).asEitherT 
+                  _              <- checkForDuplicateName(pid, fn, attachmentId.some).asEitherT
                 } yield (pid, oldPath)
               }
             uuid           <- UUIDGen[F].randomUUID.right
