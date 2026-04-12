@@ -751,7 +751,6 @@ lazy val service = project
       "edu.gemini"                       %% "lucuma-core-testkit"                        % lucumaCoreVersion            % Test,
       "io.opentelemetry"                  % "opentelemetry-sdk-testing"                  % openTelemetryVersion         % Test,
       "org.typelevel"                    %% "munit-cats-effect"                          % munitCatsEffectVersion       % Test,
-      "org.tpolecat"                     %% "natchez-log"                                % natchezVersion               % Test,
     ),
     reStart / envVars += "PORT" -> "8082",
     reStartArgs += "serve",

@@ -208,7 +208,7 @@ object CMain extends MainParams {
           services = services
         )
 
-  def services[F[_]: Async: Parallel: UUIDGen: Trace: Tracer: Logger: LoggerFactory](
+  def services[F[_]: Async: Parallel: UUIDGen: Tracer: Logger: LoggerFactory](
     user: Option[User],
     enums: Enums,
     emailConfig: Config.Email,

@@ -32,7 +32,7 @@ import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.service.Services
 import lucuma.odb.service.UserService
 import lucuma.odb.util.Codecs.*
-import natchez.Trace
+import org.typelevel.otel4s.trace.Tracer
 import skunk.implicits.*
 
 import java.time.Instant
@@ -261,7 +261,7 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations wi
    * @return list of added and removed calibration observations
    */
   def recalculateCalibrations(pid: Program.Id, when: Instant, oid: Observation.Id): IO[(List[Observation.Id], List[Observation.Id])] =
-    import Trace.Implicits.noop
+    import Tracer.Implicits.noop
     // First run obscalc for all pending observations in this program
     runProgramObscalc(pid) *>
       withServices(serviceUser): services =>
@@ -280,7 +280,7 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations wi
    */
   def resolveTelluricTargets: IO[Unit] =
     withServices(serviceUser) { services =>
-      import Trace.Implicits.noop
+      import Tracer.Implicits.noop
       for
         _       <- Services.asSuperUser(UserService.fromSession(services.session).canonicalizeUser(serviceUser))
         pending <- services.session.transaction.use: _ =>

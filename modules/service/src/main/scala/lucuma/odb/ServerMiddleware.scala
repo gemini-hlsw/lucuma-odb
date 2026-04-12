@@ -16,9 +16,9 @@ import lucuma.sso.client.SsoClient
 import org.http4s.HttpRoutes
 import org.http4s.Query
 import org.http4s.Uri
-import org.http4s.headers.Upgrade
 import org.http4s.Uri.Scheme
 import org.http4s.dsl.Http4sDsl
+import org.http4s.headers.Upgrade
 import org.http4s.otel4s.middleware.metrics.OtelMetrics
 import org.http4s.otel4s.middleware.server.RouteClassifier
 import org.http4s.otel4s.middleware.trace.client.UriRedactor
