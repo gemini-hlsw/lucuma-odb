@@ -104,6 +104,7 @@ import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.LoggerFactory
 import org.typelevel.log4cats.slf4j.Slf4jFactory
 import org.typelevel.log4cats.slf4j.Slf4jLogger
+import org.typelevel.otel4s.metrics.MeterProvider
 import org.typelevel.otel4s.trace.Tracer
 import org.typelevel.otel4s.trace.TracerProvider
 import skunk.Session
@@ -406,7 +407,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
   private val horizonsClient: HorizonsClient[IO] =
     HorizonsClient.forTesting(horizonsFixture)
 
-  private def httpApp(using Trace[IO], Tracer[IO], TracerProvider[IO]): Resource[IO, WebSocketBuilder2[IO] => HttpApp[IO]] =
+  private def httpApp(using Trace[IO], Tracer[IO], TracerProvider[IO], MeterProvider[IO]): Resource[IO, WebSocketBuilder2[IO] => HttpApp[IO]] =
     FMain.routesResource[IO](
       databaseConfig,
       awsConfig,
@@ -449,6 +450,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       given Trace[IO]          <- trace
       given TracerProvider[IO] <- tracerProvider
       given Tracer[IO]         <- tracerProvider.evalMap(_.get("test-tracer"))
+      given MeterProvider[IO]   = MeterProvider.noop[IO]
       a                        <- httpApp
       s                        <- BlazeServerBuilder[IO]
                                     .withHttpWebSocketApp(a)

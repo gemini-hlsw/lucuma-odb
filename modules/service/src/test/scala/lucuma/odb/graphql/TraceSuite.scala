@@ -5,90 +5,60 @@ package lucuma.odb.graphql
 
 import cats.effect.IO
 import cats.effect.Resource
-import cats.effect.kernel.Ref
-import cats.syntax.all.*
-import io.circe.Json
-import io.circe.parser.parse
-import io.circe.syntax.*
-import natchez.Trace
-import natchez.log.Log
-import org.typelevel.log4cats.Logger
+import io.opentelemetry.sdk.OpenTelemetrySdk
+import io.opentelemetry.sdk.testing.exporter.InMemorySpanExporter
+import io.opentelemetry.sdk.trace.SdkTracerProvider
+import io.opentelemetry.sdk.trace.data.SpanData
+import io.opentelemetry.sdk.trace.`export`.SimpleSpanProcessor
+import org.typelevel.otel4s.context.LocalProvider
+import org.typelevel.otel4s.oteljava.OtelJava
+import org.typelevel.otel4s.oteljava.context.Context
+import org.typelevel.otel4s.trace.TracerProvider
+
+import scala.jdk.CollectionConverters.*
 
 class TraceSuite extends OdbSuite {
-  import TraceSuite.*
 
   val pi = TestUsers.Standard.pi(1, 30)
   val validUsers = List(pi)
-  var alog: AccumluatingTraceLogger = null // sorry
 
-  override def trace: Resource[IO, Trace[IO]] =
+  // Provided by otel4 java for testing, not very functional friendly
+  var spanExporter: InMemorySpanExporter = null
+
+  override def tracerProvider: Resource[IO, TracerProvider[IO]] =
     Resource.eval:
-      Ref[IO].of(List.empty[Json]).flatMap: ref =>
-        alog = new AccumluatingTraceLogger(ref)
-        val ep = Log.entryPoint[IO](getClass.getName)(using summon, alog)
-        Trace.ioTraceForEntryPoint(ep)
+      IO {
+        spanExporter = InMemorySpanExporter.create()
+        val sdkProvider = SdkTracerProvider.builder()
+          .addSpanProcessor(SimpleSpanProcessor.create(spanExporter))
+          .build()
+        OpenTelemetrySdk.builder().setTracerProvider(sdkProvider).build()
+      }.flatMap { sdk =>
+        given LocalProvider[IO, Context] = LocalProvider.fromLiftIO[IO, Context]
+        OtelJava.fromJOpenTelemetry[IO](sdk).map(_.tracerProvider)
+      }
 
-  extension (j: Json)
+  def clearSpans: IO[Unit] =
+    IO(spanExporter.reset())
 
-    def hasField(k: String): Boolean =
-      j.hcursor.downField(k).succeeded
-
-    def hasField(k: String, v: Json): Boolean =
-      j.hcursor.downField(k).as[Json].toOption.exists(_ === v)
-
-    def hasName(s: String): Boolean =
-      hasField("name", s.asJson)
+  def finishedSpans: IO[List[SpanData]] =
+    IO(spanExporter.getFinishedSpanItems.asScala.toList)
 
   test("test tracing (WS)") {
-    alog.clear >>
-    createProgramAs(pi, clientOption = ClientOption.Ws).replicateA(5) *>
-    alog.roots.map: roots =>
+    clearSpans >>
+    createProgramAs(pi, clientOption = ClientOption.Ws).replicateA(5) >>
+    finishedSpans.map: spans =>
       assert:
-        roots.exists(_.hasName("connection.init")) &&
-        roots.exists(_.hasName("connection.execute"))
+        spans.exists(_.getName == "connection.init") &&
+        spans.exists(_.getName == "connection.execute")
   }
 
   test("test tracing (HTTP)") {
-    alog.clear >>
-    createProgramAs(pi, clientOption = ClientOption.Http).replicateA(5) *>
-    alog.all.map: all =>
+    clearSpans >>
+    createProgramAs(pi, clientOption = ClientOption.Http).replicateA(5) >>
+    finishedSpans.map: all =>
       assert:
-        all.exists(_.hasName("POST /odb"))
+        all.exists(_.getName == "POST /odb")
   }
 
 }
-
-object TraceSuite:
-
-  class NoopLogger extends Logger[IO]:
-    def debug(t: Throwable)(message: => String) = IO.unit
-    def error(t: Throwable)(message: => String) = IO.unit
-    def info(t: Throwable)(message: => String) = IO.unit
-    def trace(t: Throwable)(message: => String) = IO.unit
-    def warn(t: Throwable)(message: => String) = IO.unit
-    def debug(message: => String) = IO.unit
-    def error(message: => String) = IO.unit
-    def info(message: => String) = IO.unit
-    def trace(message: => String) = IO.unit
-    def warn(message: => String) = IO.unit
-
-  class AccumluatingTraceLogger(ref: Ref[IO, List[Json]]) extends NoopLogger:
-
-    def clear: IO[Unit] =
-      ref.set(Nil)
-
-    override def info(message: => String): IO[Unit] =
-      val j = parse(message).toOption.get
-      ref.update(j :: _)
-
-    def roots: IO[List[Json]] =
-      ref.get
-
-    def all: IO[List[Json]] =
-      ref.get.map: roots =>
-        roots.flatMap: j =>
-          j :: j.hcursor.downField("children").require[List[Json]]
-
-  object AccumluatingTraceLogger:
-    def initial: IO[AccumluatingTraceLogger] =
-      Ref[IO].of(List.empty[Json]).map(AccumluatingTraceLogger(_))
