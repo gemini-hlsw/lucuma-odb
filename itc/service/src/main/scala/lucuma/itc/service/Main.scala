@@ -33,6 +33,7 @@ import lucuma.itc.service.metrics.MetricsService
 import lucuma.otel.OtelSetup
 import natchez.Trace
 import natchez.http4s.NatchezMiddleware
+import org.typelevel.otel4s.trace.Tracer
 import org.http4s.*
 import org.http4s.ember.server.EmberServerBuilder
 import org.http4s.headers.`Cache-Control`
@@ -44,7 +45,6 @@ import org.http4s.server.middleware.GZip
 import org.http4s.server.websocket.WebSocketBuilder2
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
-import org.typelevel.otel4s.trace.Tracer
 
 import java.io.File
 import java.io.FileFilter
@@ -126,7 +126,7 @@ object Main extends IOApp with ItcCacheOrRemote {
       .withHttpWebSocketApp(app)
       .build
 
-  private def createCache[F[_]: Async: Trace: Logger](
+  private def createCache[F[_]: Async: Tracer: Logger](
     redisUrl: Option[Uri]
   ): Resource[F, BinaryEffectfulCache[F]] =
     redisUrl match
@@ -138,7 +138,7 @@ object Main extends IOApp with ItcCacheOrRemote {
       case None      =>
         Resource.eval(NoOpBinaryCache[F])
 
-  def routes[F[_]: Async: Logger: Parallel: Trace: Tracer: Compression: Network](
+  def routes[F[_]: Async: Logger: Parallel: Tracer: Compression: Network](
     cfg: Config
   ): Resource[F, WebSocketBuilder2[F] => HttpRoutes[F]] =
     for

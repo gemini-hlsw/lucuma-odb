@@ -26,7 +26,7 @@ import lucuma.itc.service.config.*
 import lucuma.itc.service.encoders.given
 import lucuma.itc.service.requests.*
 import lucuma.itc.service.syntax.all.*
-import natchez.Trace
+import org.typelevel.otel4s.trace.Tracer
 import org.typelevel.log4cats.Logger
 
 import scala.io.Source
@@ -78,16 +78,16 @@ object ItcMapping extends ItcCacheOrRemote with Version {
 
   def calculateSpectroscopyIntegrationTime[F[
     _
-  ]: MonadThrow: Parallel: Logger: CustomSed.Resolver](
+  ]: MonadThrow: Parallel: Logger: CustomSed.Resolver: Tracer](
     environment:     ExecutionEnvironment,
     cache:           BinaryEffectfulCache[F],
     itc:             Itc[F],
     config:          Config
   )(
     asterismRequest: AsterismSpectroscopyTimeRequest
-  )(using t: Trace[F]): F[Result[CalculationResult]] =
-    Trace[F]
-      .span("process target_requests_parallel"):
+  ): F[Result[CalculationResult]] =
+    Tracer[F]
+      .span("process target_requests_parallel").surround:
         asterismRequest.toTargetRequests
           .parTraverse: (targetRequest: TargetSpectroscopyTimeRequest) =>
             spectroscopyFromCacheOrRemote(targetRequest)(itc, cache, config).attempt
@@ -95,7 +95,7 @@ object ItcMapping extends ItcCacheOrRemote with Version {
                 TargetIntegrationTimeOutcome:
                   result.leftMap(buildError)
       .flatMap: (targetOutcomes: NonEmptyChain[TargetIntegrationTimeOutcome]) =>
-        Trace[F].span("build spectroscopy_result"):
+        Tracer[F].span("build spectroscopy_result").surround:
           CalculationResult(
             ItcVersions(version(environment).value, BuildInfo.ocslibHash.some),
             AsterismIntegrationTimeOutcomes(targetOutcomes)
@@ -107,14 +107,14 @@ object ItcMapping extends ItcCacheOrRemote with Version {
 
   def calculateImagingIntegrationTime[F[
     _
-  ]: MonadThrow: Parallel: Logger: CustomSed.Resolver](
+  ]: MonadThrow: Parallel: Logger: CustomSed.Resolver: Tracer](
     environment: ExecutionEnvironment,
     cache:       BinaryEffectfulCache[F],
     itc:         Itc[F],
     config:      Config
-  )(asterismRequest: AsterismImagingTimeRequest)(using t: Trace[F]): F[Result[CalculationResult]] =
-    Trace[F]
-      .span("process imaging_targets_parallel"):
+  )(asterismRequest: AsterismImagingTimeRequest): F[Result[CalculationResult]] =
+    Tracer[F]
+      .span("process imaging_targets_parallel").surround:
         asterismRequest.toTargetRequests
           .parTraverse: (targetRequest: TargetImagingTimeRequest) =>
             imagingFromCacheOrRemote(targetRequest)(itc, cache, config).attempt
@@ -132,7 +132,7 @@ object ItcMapping extends ItcCacheOrRemote with Version {
                         case ObservingMode.ImagingMode.Flamingos2(_, _) =>
                           integrationTime
       .flatMap: (targetOutcomes: NonEmptyChain[TargetIntegrationTimeOutcome]) =>
-        Trace[F].span("build imaging_result"):
+        Tracer[F].span("build imaging_result").surround:
           CalculationResult(
             ItcVersions(version(environment).value, BuildInfo.ocslibHash.some),
             AsterismIntegrationTimeOutcomes(targetOutcomes)
@@ -182,14 +182,14 @@ object ItcMapping extends ItcCacheOrRemote with Version {
     )
   }
 
-  def spectroscopyGraphs[F[_]: MonadThrow: Parallel: Logger: CustomSed.Resolver](
+  def spectroscopyGraphs[F[_]: MonadThrow: Parallel: Logger: CustomSed.Resolver: Tracer](
     environment: ExecutionEnvironment,
     cache:       BinaryEffectfulCache[F],
     itc:         Itc[F],
     config:      Config
-  )(asterismRequest: AsterismGraphRequest)(using t: Trace[F]): F[Result[SpectroscopyGraphsResult]] =
-    Trace[F]
-      .span("process graph_targets_parallel"):
+  )(asterismRequest: AsterismGraphRequest): F[Result[SpectroscopyGraphsResult]] =
+    Tracer[F]
+      .span("process graph_targets_parallel").surround:
         asterismRequest.toTargetRequests
           .parTraverse: (targetRequest: TargetGraphRequest) =>
             graphsFromCacheOrRemote(targetRequest)(itc, cache, config).attempt
@@ -199,7 +199,7 @@ object ItcMapping extends ItcCacheOrRemote with Version {
                                buildTargetGraphsResult(asterismRequest.significantFigures)
                   )
       .flatMap: (targetGraphs: NonEmptyChain[TargetGraphsOutcome]) =>
-        Trace[F].span("build graphs_result"):
+        Tracer[F].span("build graphs_result").surround:
           SpectroscopyGraphsResult(
             ItcVersions(version(environment).value, BuildInfo.ocslibHash.some),
             AsterismTargetGraphsOutcomes(targetGraphs)
@@ -232,7 +232,7 @@ object ItcMapping extends ItcCacheOrRemote with Version {
 
   def spectroscopyIntegrationTimeAndGraphs[F[
     _
-  ]: MonadThrow: Parallel: Logger: CustomSed.Resolver](
+  ]: MonadThrow: Parallel: Logger: CustomSed.Resolver: Tracer](
     environment:     ExecutionEnvironment,
     cache:           BinaryEffectfulCache[F],
     itc:             Itc[F],
@@ -240,8 +240,8 @@ object ItcMapping extends ItcCacheOrRemote with Version {
   )(
     asterismRequest: AsterismSpectroscopyTimeRequest,
     figures:         Option[SignificantFigures]
-  )(using t: Trace[F]): F[Result[SpectroscopyTimeAndGraphsResult]] =
-    Trace[F].span("spectroscopy time_and_graphs_combined"):
+  ): F[Result[SpectroscopyTimeAndGraphsResult]] =
+    Tracer[F].span("spectroscopy time_and_graphs_combined").surround:
       ResultT(
         calculateSpectroscopyIntegrationTime(environment, cache, itc, config)(asterismRequest)
       )
@@ -272,7 +272,7 @@ object ItcMapping extends ItcCacheOrRemote with Version {
               s"Error calculating spectroscopy integration time and graph for input: $asterismRequest"
         .toGraphQLErrors
 
-  def apply[F[_]: Sync: Logger: Parallel: Trace: CustomSed.Resolver](
+  def apply[F[_]: Sync: Logger: Parallel: Tracer: CustomSed.Resolver](
     environment: ExecutionEnvironment,
     cache:       BinaryEffectfulCache[F],
     itc:         Itc[F],

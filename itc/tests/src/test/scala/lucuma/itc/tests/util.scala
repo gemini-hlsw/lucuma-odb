@@ -18,16 +18,18 @@ import lucuma.itc.service.ItcMapping
 import lucuma.itc.service.config.Config
 import lucuma.itc.service.config.ExecutionEnvironment
 import lucuma.itc.service.config.MetricsConfig
-import natchez.Trace
 import org.http4s.HttpApp
 import org.http4s.HttpRoutes
 import org.http4s.Uri
 import org.http4s.server.websocket.WebSocketBuilder2
+import natchez.Trace
 import org.typelevel.log4cats.Logger
 import org.typelevel.otel4s.trace.Tracer
 
 import java.nio.file.Paths as JPaths
 import scala.concurrent.duration.*
+
+given Trace[IO] = Trace.Implicits.noop
 
 def app(
   itc: Itc[IO]

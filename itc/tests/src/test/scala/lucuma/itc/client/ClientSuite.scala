@@ -12,8 +12,8 @@ import lucuma.itc.tests.EmissionLineMockItc
 import lucuma.itc.tests.MockItc
 import munit.CatsEffectSuite
 import munit.catseffect.IOFixture
-import natchez.Trace.Implicits.noop
 import org.http4s.*
+import org.typelevel.otel4s.trace.Tracer
 import org.http4s.client.middleware.ResponseLogger
 import org.http4s.ember.server.EmberServerBuilder
 import org.http4s.jdkhttpclient.JdkHttpClient
@@ -27,8 +27,8 @@ import scala.concurrent.duration.*
 
 trait ClientSuite extends CatsEffectSuite:
 
-  given Logger[IO] =
-    Slf4jLogger.getLoggerFromClass(getClass)
+  given Logger[IO] = Slf4jLogger.getLoggerFromClass(getClass)
+  given Tracer[IO] = Tracer.noop
 
   private def httpApp(backend: Itc[IO]): Resource[IO, WebSocketBuilder2[IO] => HttpApp[IO]] =
     Resource.eval(lucuma.itc.tests.app(backend))
