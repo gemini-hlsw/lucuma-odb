@@ -29,7 +29,6 @@ import lucuma.itc.legacy.ItcImpl
 import lucuma.itc.legacy.LocalItc
 import lucuma.itc.service.config.*
 import lucuma.itc.service.config.ExecutionEnvironment.*
-import lucuma.itc.service.metrics.MetricsService
 import lucuma.otel.OtelSetup
 import natchez.Trace
 import natchez.http4s.NatchezMiddleware
@@ -138,7 +137,7 @@ object Main extends IOApp with ItcCacheOrRemote {
       case None      =>
         Resource.eval(NoOpBinaryCache[F])
 
-  def routes[F[_]: Async: Logger: Parallel: Tracer: Compression: Network](
+  def routes[F[_]: Async: Logger: Parallel: Tracer: Trace: Compression: Network](
     cfg: Config
   ): Resource[F, WebSocketBuilder2[F] => HttpRoutes[F]] =
     for
@@ -193,7 +192,6 @@ object Main extends IOApp with ItcCacheOrRemote {
   def server(cfg: Config)(using Logger[IO]): Resource[IO, ExitCode] =
     for
       _               <- Resource.eval(banner[IO](cfg))
-      _               <- MetricsService.resource[IO](cfg.metrics)
       otel            <- OtelSetup.resource(ServiceName, version(Local).value, cfg.otel)
       given Trace[IO]  = otel.trace
       given Tracer[IO] = otel.tracer

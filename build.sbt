@@ -14,7 +14,6 @@ val circeRefinedVersion          = "0.15.1"
 val cirisVersion                 = "3.14.1"
 val clueVersion                  = "0.51.3"
 val declineVersion               = "2.6.2"
-val dropwizardVersion            = "4.2.38"
 val flywayVersion                = "9.22.3"
 val fs2AwsVersion                = "6.2.0"
 val fs2Version                   = "3.13.0"
@@ -486,9 +485,6 @@ lazy val itcService = project
       "com.lihaoyi"          %% "pprint"                % pprintVersion,
       "io.suzaku"            %% "boopickle"             % boopickleVersion,
       "io.chrisdavenport"    %% "keysemaphore"          % keySemaphoreVersion,
-      "io.dropwizard.metrics" % "metrics-core"          % dropwizardVersion,
-      "io.dropwizard.metrics" % "metrics-jvm"           % dropwizardVersion,
-      "io.dropwizard.metrics" % "metrics-graphite"      % dropwizardVersion,
       "org.typelevel"        %% "munit-cats-effect"     % munitCatsEffectVersion % Test
     ),
     envVars ++= Map("ODB_BASE_URL" -> "https://lucuma-postgres-odb-dev.herokuapp.com"), // Used for local development
