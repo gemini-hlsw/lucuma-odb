@@ -30,29 +30,22 @@ trait GhostIfuMapping[F[_]]
      with OptionalFieldMapping[F]
      with Predicates[F] { this: SkunkMapping[F] =>
 
-  def ghostDetectorConfigMapping(
-    arm: GhostIfuTable.Arm
+  def ghostDetectorMapping(
+    detector: GhostIfuTable.DetectorTable,
+    idCol:    ColumnRef
   ): ObjectMapping =
-    ObjectMapping(GhostIfuType / arm.name / "detector")(
+    ObjectMapping(GhostIfuType / detector.name)(
       SqlField("observationId", GhostIfuTable.ObservationId, key = true, hidden = true),
+
+      SqlObject("exposureTimeMode", Join(GhostIfuTable.ObservationId, idCol), Join(GhostExposureTimeModeLinkView.Id, ExposureTimeModeView.Id)),
 
       explicitOrElseDefault[GhostBinning]("binning", "explicitBinning", "defaultBinning"),
-      SqlField("explicitBinning", arm.Binning),
-      SqlField("defaultBinning", arm.BinningDefault),
+      SqlField("explicitBinning", detector.Binning),
+      SqlField("defaultBinning", detector.BinningDefault),
 
       explicitOrElseDefault[GhostReadMode]("readMode", "explicitReadMode", "defaultReadMode"),
-      SqlField("explicitReadMode", arm.ReadMode),
-      SqlField("defaultReadMode", arm.ReadModeDefault)
-    )
-
-  def ghostArmMapping(
-    arm:   GhostIfuTable.Arm,
-    idCol: ColumnRef
-  ): ObjectMapping =
-    ObjectMapping(GhostIfuType / arm.name)(
-      SqlField("observationId", GhostIfuTable.ObservationId, key = true, hidden = true),
-      SqlObject("exposureTimeMode", Join(GhostIfuTable.ObservationId, idCol), Join(GhostExposureTimeModeLinkView.Id, ExposureTimeModeView.Id)),
-      SqlObject("detector")
+      SqlField("explicitReadMode", detector.ReadMode),
+      SqlField("defaultReadMode", detector.ReadModeDefault)
     )
 
   lazy val GhostIfuMapping: ObjectMapping =
@@ -73,15 +66,13 @@ trait GhostIfuMapping[F[_]]
 
   lazy val GhostIfuMappings: List[TypeMapping] =
     List(
-      ghostDetectorConfigMapping(GhostIfuTable.Red),
-      ghostDetectorConfigMapping(GhostIfuTable.Blue),
-      ghostArmMapping(GhostIfuTable.Blue, GhostExposureTimeModeLinkView.BlueObservationId),
-      ghostArmMapping(GhostIfuTable.Red, GhostExposureTimeModeLinkView.RedObservationId),
+      ghostDetectorMapping(GhostIfuTable.Blue, GhostExposureTimeModeLinkView.BlueObservationId),
+      ghostDetectorMapping(GhostIfuTable.Red, GhostExposureTimeModeLinkView.RedObservationId),
       GhostIfuMapping
     )
 
   lazy val GhostIfuElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
-    case (GhostArmType, "exposureTimeMode", Nil) =>
+    case (GhostDetectorType, "exposureTimeMode", Nil) =>
       Elab.transformChild: child =>
         Unique(
           Filter(

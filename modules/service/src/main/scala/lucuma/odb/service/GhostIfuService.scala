@@ -21,7 +21,6 @@ import lucuma.odb.data.ExposureTimeModeId
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.input.GhostIfuInput
-import lucuma.odb.sequence.ghost.Arm
 import lucuma.odb.sequence.ghost.Detector
 import lucuma.odb.sequence.ghost.ifu.Config
 import lucuma.odb.util.Codecs.*
@@ -135,37 +134,32 @@ object GhostIfuService:
 
   object Statements:
 
-    val ghost_detector_config: Decoder[Detector] =
+    val ghost_detector: Decoder[Detector] =
       (
+        exposure_time_mode  *:
         ghost_binning       *:
         ghost_binning.opt   *:
         ghost_read_mode     *:
         ghost_read_mode.opt
-      ).to[Detector]
-
-    val ghost_camera: Decoder[Arm] =
-      (
-        exposure_time_mode  *:
-        ghost_detector_config
-      ).emap: (etm, detector) =>
+      ).emap: (etm, defaultBinning, explicitBinning, defaultReadMode, explicitReadMode) =>
         ExposureTimeMode
           .timeAndCount
           .getOption(etm)
           .toRight(s"GHOST only supports time and count exposure time mode.")
           .map: tc =>
-            Arm(tc, detector)
+            Detector(tc, defaultBinning, explicitBinning, defaultReadMode, explicitReadMode)
 
-    val ghost_camera_blue: Decoder[Arm.Blue] =
-      (ghost_camera).map(dc => Arm.Blue(dc))
+    val ghost_detector_blue: Decoder[Detector.Blue] =
+      (ghost_detector).map(Detector.Blue(_))
 
-    val ghost_camera_red: Decoder[Arm.Red] =
-      (ghost_camera).map(dc => Arm.Red(dc))
+    val ghost_detector_red: Decoder[Detector.Red] =
+      (ghost_detector).map(Detector.Red(_))
 
     val ghost_ifu: Decoder[Config] =
       (
         ghost_resolution_mode         *:
-        ghost_camera_red              *:
-        ghost_camera_blue             *:
+        ghost_detector_red            *:
+        ghost_detector_blue           *:
         ghost_ifu1_fiber_agitator.opt *:
         ghost_ifu2_fiber_agitator.opt
       ).to[Config]
@@ -255,14 +249,14 @@ object GhostIfuService:
             input.resolutionMode,
             red,
             GhostBinning.OneByOne,
-            input.red.flatMap(_.detector).flatMap(_.explicitBinning.toOption),
+            input.red.flatMap(_.explicitBinning.toOption),
             GhostReadMode.Medium,
-            input.red.flatMap(_.detector).flatMap(_.explicitReadMode.toOption),
+            input.red.flatMap(_.explicitReadMode.toOption),
             blue,
             GhostBinning.OneByOne,
-            input.blue.flatMap(_.detector).flatMap(_.explicitBinning.toOption),
+            input.blue.flatMap(_.explicitBinning.toOption),
             GhostReadMode.Slow,
-            input.blue.flatMap(_.detector).flatMap(_.explicitReadMode.toOption),
+            input.blue.flatMap(_.explicitReadMode.toOption),
             input.explicitIfu1FiberAgitator,
             input.explicitIfu2FiberAgitator
           )

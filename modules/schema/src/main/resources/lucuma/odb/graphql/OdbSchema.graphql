@@ -8609,6 +8609,13 @@ enum GhostIfu2FiberAgitator {
 input GhostDetectorInput {
 
   """
+  Exposure time mode for the detector.  If not specified, the exposure time mode
+  of the observation's science requirements are used.  Note, only TimeAndCount
+  exposure time modes are accepted at this time.
+  """
+  exposureTimeMode: ExposureTimeModeInput
+
+  """
   Explicit binning to use for the detector.  If not specified upon creation, a
   1x1 default will be used.
   """
@@ -8619,22 +8626,6 @@ input GhostDetectorInput {
   default of MEDIUM (red camera) or SLOW (blue camera) will be used.
   """
   explicitReadMode: GhostReadMode
-}
-
-input GhostArmInput {
-
-  """
-  Exposure time mode for the detector.  If not specified, the exposure time mode
-  of the observation's science requirements are used.  Note, only TimeAndCount
-  exposure time modes are accepted at this time.
-  """
-  exposureTimeMode: ExposureTimeModeInput
-
-  """
-  Detector config, which will be defaulted if not specified.
-  """
-  detector: GhostDetectorInput
-
 }
 
 """
@@ -8651,13 +8642,13 @@ input GhostIfuInput {
   Red config.  If not specified, defaults will be applied. Cannot be unset with
   a null value.
   """
-  red: GhostArmInput
+  red: GhostDetectorInput
 
   """
   Blue config.  If not specified, defaults will be applied. Cannot be unset with
   a null value.
   """
-  blue: GhostArmInput
+  blue: GhostDetectorInput
 
   """
   IFU1 fiber agitator setting.  If not specified, a default (DISABLED) will be
@@ -8675,6 +8666,11 @@ input GhostIfuInput {
 
 
 type GhostDetector {
+
+  """
+  Exposure time mode for the detector.
+  """
+  exposureTimeMode: ExposureTimeMode!
 
   """
   Binning that will be used, either explicitly specified or default.
@@ -8711,23 +8707,6 @@ type GhostDetector {
 }
 
 """
-GHOST arm configuration.
-"""
-type GhostArm {
-
-  """
-  Exposure time mode for the detector.
-  """
-  exposureTimeMode: ExposureTimeMode!
-
-  """
-  GHOST detector.
-  """
-  detector: GhostDetector!
-
-}
-
-"""
 GHOST IFU observing mode.
 """
 type GhostIfu {
@@ -8740,12 +8719,12 @@ type GhostIfu {
   """
   Red detector config.
   """
-  red: GhostArm!
+  red: GhostDetector!
 
   """
   Blue detector config.
   """
-  blue: GhostArm!
+  blue: GhostDetector!
 
   """
   IFU 1 fiber agitator setting, either explicitly specified or else default.

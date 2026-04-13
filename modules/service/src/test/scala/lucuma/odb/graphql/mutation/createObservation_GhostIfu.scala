@@ -43,14 +43,10 @@ class createObservation_GhostIfu extends OdbSuite:
                               at: { nanometers: 500 }
                             }
                           }
-                          detector: {
-                            explicitBinning: ONE_BY_TWO
-                          }
+                          explicitBinning: ONE_BY_TWO
                         }
                         blue: {
-                          detector: {
-                            explicitReadMode: FAST
-                          }
+                          explicitReadMode: FAST
                         }
                         explicitIfu1Agitator: ENABLED
                       }
@@ -71,14 +67,12 @@ class createObservation_GhostIfu extends OdbSuite:
                               at { nanometers }
                             }
                           }
-                          detector {
-                            binning
-                            defaultBinning
-                            explicitBinning
-                            readMode
-                            defaultReadMode
-                            explicitReadMode
-                          }
+                          binning
+                          defaultBinning
+                          explicitBinning
+                          readMode
+                          defaultReadMode
+                          explicitReadMode
                         }
                         blue {
                           exposureTimeMode {
@@ -88,14 +82,12 @@ class createObservation_GhostIfu extends OdbSuite:
                               at { nanometers }
                             }
                           }
-                          detector {
-                            binning
-                            defaultBinning
-                            explicitBinning
-                            readMode
-                            defaultReadMode
-                            explicitReadMode
-                          }
+                          binning
+                          defaultBinning
+                          explicitBinning
+                          readMode
+                          defaultReadMode
+                          explicitReadMode
                         }
                         ifu1Agitator
                         defaultIfu1Agitator
@@ -127,14 +119,12 @@ class createObservation_GhostIfu extends OdbSuite:
                               "at": { "nanometers": 500.000 }
                             }
                           },
-                          "detector": {
-                            "binning": "ONE_BY_TWO",
-                            "defaultBinning": "ONE_BY_ONE",
-                            "explicitBinning": "ONE_BY_TWO",
-                            "readMode": "MEDIUM",
-                            "defaultReadMode": "MEDIUM",
-                            "explicitReadMode": null
-                          }
+                          "binning": "ONE_BY_TWO",
+                          "defaultBinning": "ONE_BY_ONE",
+                          "explicitBinning": "ONE_BY_TWO",
+                          "readMode": "MEDIUM",
+                          "defaultReadMode": "MEDIUM",
+                          "explicitReadMode": null
                         },
                         "blue": {
                           "exposureTimeMode": {
@@ -144,14 +134,12 @@ class createObservation_GhostIfu extends OdbSuite:
                               "at": { "nanometers": 500.000 }
                             }
                           },
-                          "detector": {
-                            "binning": "ONE_BY_ONE",
-                            "defaultBinning": "ONE_BY_ONE",
-                            "explicitBinning": null,
-                            "readMode": "FAST",
-                            "defaultReadMode": "SLOW",
-                            "explicitReadMode": "FAST"
-                          }
+                          "binning": "ONE_BY_ONE",
+                          "defaultBinning": "ONE_BY_ONE",
+                          "explicitBinning": null,
+                          "readMode": "FAST",
+                          "defaultReadMode": "SLOW",
+                          "explicitReadMode": "FAST"
                         },
                         "ifu1Agitator": "ENABLED",
                         "defaultIfu1Agitator": "DISABLED",
@@ -183,10 +171,10 @@ class createObservation_GhostIfu extends OdbSuite:
                        ghostIfu {
                          resolutionMode
                          red {
-                           detector { binning }
+                           binning
                          }
                          blue {
-                           detector { binning }
+                           binning
                          }
                        }
                      }
@@ -204,10 +192,10 @@ class createObservation_GhostIfu extends OdbSuite:
                          "ghostIfu": {
                            "resolutionMode": "STANDARD",
                            "red": {
-                             "detector": { "binning": "ONE_BY_TWO" }
+                             "binning": "ONE_BY_TWO"
                            },
                            "blue": {
-                             "detector": { "binning": "ONE_BY_ONE" }
+                             "binning": "ONE_BY_ONE"
                            }
                          }
                        }
