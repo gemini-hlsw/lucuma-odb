@@ -49,8 +49,7 @@ class GhostIfuServiceSuite extends ExecutionTestSupport:
     withServices(serviceUser): services =>
       services
         .transactionally:
-          val setType = withSession: session =>
-            session.execute(SetObservingMode)(Instrument.Ghost, ObservingModeType.GhostIfu, oid)
+          val setType  = services.session.execute(SetObservingMode)(Instrument.Ghost, ObservingModeType.GhostIfu, oid).void
           val doInsert = ghostIfuService.insert(in, etm, List(oid))
           setType *> doInsert
 
