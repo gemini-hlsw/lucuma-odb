@@ -132,7 +132,7 @@ object CMain extends MainParams {
     c.ssoClient.use: sso =>
       sso.get(Authorization(Credentials.Token(CIString("Bearer"), c.serviceJwt)))
 
-  def topics[F[_]: Concurrent: Logger: Trace](pool: Resource[F, Session[F]]):
+  def topics[F[_]: Concurrent: Logger: Tracer](pool: Resource[F, Session[F]]):
    Resource[F, (Topic[F, ObscalcTopic.Element], Topic[F, CalibTimeTopic.Element], Topic[F, TelluricTargetTopic.Element])] =
     for {
       sup <- Supervisor[F]
@@ -208,7 +208,7 @@ object CMain extends MainParams {
           services = services
         )
 
-  def services[F[_]: Async: Parallel: UUIDGen: Trace: Tracer: Logger: LoggerFactory](
+  def services[F[_]: Async: Parallel: UUIDGen: Tracer: Logger: LoggerFactory](
     user: Option[User],
     enums: Enums,
     emailConfig: Config.Email,

@@ -23,6 +23,7 @@ val http4sVersion                = "0.23.33"
 val http4sBlazeVersion           = "0.23.17"
 val http4sEmberVersion           = "0.23.33"
 val http4sJdkHttpClientVersion   = "0.10.0"
+val http4sOtel4sVersion          = "0.17.0"
 val jmhVersion                   = "1.37"
 val jwtVersion                   = "11.0.4"
 val keySemaphoreVersion          = "0.3.0-M1"
@@ -30,7 +31,7 @@ val kittensVersion               = "3.5.0"
 val logbackVersion               = "1.5.32"
 val log4catsVersion              = "2.8.0"
 val lucumaCoreVersion            = "0.180.1"
-val lucumaGraphQLRoutesVersion   = "0.11.7"
+val lucumaGraphQLRoutesVersion   = "0.12.0"
 val monocleVersion               = "3.3.0"
 val munitVersion                 = "1.2.1"
 val munitCatsEffectVersion       = "2.1.0"   // check test output if you attempt to update this
@@ -39,9 +40,9 @@ val munitScalacheckVersion       = "1.2.0"   // check test output if you attempt
 val scalacheckEffectMunitVersion = "1.0.4"
 val natchezHttp4sVersion         = "0.6.1"
 val natchezVersion               = "0.3.8"
-val otel4sVersion                = "0.15.2"
 val openTelemetryVersion         = "1.61.0"
 val openTelemetryInstrVersion    = "2.26.1-alpha"
+val otel4sVersion                = "0.16.0"
 val paigesVersion                = "0.4.4"
 val postgresVersion              = "42.7.9"
 val pprintVersion                = "0.9.6"
@@ -722,15 +723,21 @@ lazy val service = project
       "org.http4s"                       %% "http4s-blaze-server"                        % http4sBlazeVersion,
       "org.http4s"                       %% "http4s-ember-client"                        % http4sEmberVersion,
       "org.postgresql"                    % "postgresql"                                 % postgresVersion,
-      "org.tpolecat"                     %% "natchez-http4s"                             % natchezHttp4sVersion,
-      "org.tpolecat"                     %% "natchez-log"                                % natchezVersion % Test,
+      "org.http4s"                       %% "http4s-otel4s-middleware-trace-server"      % http4sOtel4sVersion,
+      "org.http4s"                       %% "http4s-otel4s-middleware-trace-client"      % http4sOtel4sVersion,
+      "org.http4s"                       %% "http4s-otel4s-middleware-metrics"           % http4sOtel4sVersion,
       "org.tpolecat"                     %% "natchez-noop"                               % natchezVersion,
       "org.tpolecat"                     %% "skunk-core"                                 % skunkVersion,
       "org.tpolecat"                     %% "skunk-circe"                                % skunkVersion,
       "com.lihaoyi"                      %% "pprint"                                     % pprintVersion,
-      "com.dimafeng"                     %% "testcontainers-scala-munit"                 % testcontainersScalaVersion % Test,
-      "com.dimafeng"                     %% "testcontainers-scala-localstack-v2"         % testcontainersScalaVersion % Test,
-      "com.dimafeng"                     %% "testcontainers-scala-postgresql"            % testcontainersScalaVersion % Test,
+      "org.typelevel"                    %% "cats-time"                                  % catsTimeVersion,
+      "org.typelevel"                    %% "log4cats-slf4j"                             % log4catsVersion,
+      "org.typelevel"                    %% "paiges-core"                                % paigesVersion,
+      "com.github.vertical-blank"         % "sql-formatter"                              % sqlFormatterVersion,
+      "org.http4s"                       %% "http4s-jdk-http-client"                     % http4sJdkHttpClientVersion   % Test,
+      "com.dimafeng"                     %% "testcontainers-scala-munit"                 % testcontainersScalaVersion   % Test,
+      "com.dimafeng"                     %% "testcontainers-scala-localstack-v2"         % testcontainersScalaVersion   % Test,
+      "com.dimafeng"                     %% "testcontainers-scala-postgresql"            % testcontainersScalaVersion   % Test,
       // testcontainers-scala-localstack-v2 requires both v1 and v2 of the aws sd        k
       "io.circe"                         %% "circe-testing"                              % circeVersion                 % Test,
       "com.amazonaws"                     % "aws-java-sdk-core"                          % awsJavaSdkVersion            % Test,
@@ -742,12 +749,8 @@ lazy val service = project
       "org.typelevel"                    %% "discipline-munit"                           % munitDisciplineVersion       % Test,
       "edu.gemini"                       %% "lucuma-catalog-testkit"                     % lucumaCoreVersion            % Test,
       "edu.gemini"                       %% "lucuma-core-testkit"                        % lucumaCoreVersion            % Test,
-      "org.http4s"                       %% "http4s-jdk-http-client"                     % http4sJdkHttpClientVersion   % Test,
-      "org.typelevel"                    %% "cats-time"                                  % catsTimeVersion,
-      "org.typelevel"                    %% "log4cats-slf4j"                             % log4catsVersion,
-      "org.typelevel"                    %% "munit-cats-effect"                          % munitCatsEffectVersion % Test,
-      "org.typelevel"                    %% "paiges-core"                                % paigesVersion,
-      "com.github.vertical-blank"         % "sql-formatter"                              % sqlFormatterVersion
+      "io.opentelemetry"                  % "opentelemetry-sdk-testing"                  % openTelemetryVersion         % Test,
+      "org.typelevel"                    %% "munit-cats-effect"                          % munitCatsEffectVersion       % Test,
     ),
     reStart / envVars += "PORT" -> "8082",
     reStartArgs += "serve",

@@ -44,6 +44,7 @@ import org.http4s.server.middleware.GZip
 import org.http4s.server.websocket.WebSocketBuilder2
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
+import org.typelevel.otel4s.trace.Tracer
 
 import java.io.File
 import java.io.FileFilter
@@ -137,7 +138,7 @@ object Main extends IOApp with ItcCacheOrRemote {
       case None      =>
         Resource.eval(NoOpBinaryCache[F])
 
-  def routes[F[_]: Async: Logger: Parallel: Trace: Compression: Network](
+  def routes[F[_]: Async: Logger: Parallel: Trace: Tracer: Compression: Network](
     cfg: Config
   ): Resource[F, WebSocketBuilder2[F] => HttpRoutes[F]] =
     for
@@ -191,12 +192,13 @@ object Main extends IOApp with ItcCacheOrRemote {
    */
   def server(cfg: Config)(using Logger[IO]): Resource[IO, ExitCode] =
     for
-      _              <- Resource.eval(banner[IO](cfg))
-      _              <- MetricsService.resource[IO](cfg.metrics)
-      trace          <- OtelSetup.resource(ServiceName, version(Local).value, cfg.otel).map(_.trace)
-      given Trace[IO] = trace
-      ap             <- routes[IO](cfg).map(_.map(_.orNotFound))
-      _              <- serverResource(ap, cfg)
+      _               <- Resource.eval(banner[IO](cfg))
+      _               <- MetricsService.resource[IO](cfg.metrics)
+      otel            <- OtelSetup.resource(ServiceName, version(Local).value, cfg.otel)
+      given Trace[IO]  = otel.trace
+      given Tracer[IO] = otel.tracer
+      ap              <- routes[IO](cfg).map(_.map(_.orNotFound))
+      _               <- serverResource(ap, cfg)
     yield ExitCode.Success
 
   def run(args: List[String]): IO[ExitCode] =

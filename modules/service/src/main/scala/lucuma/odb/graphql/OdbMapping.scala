@@ -39,11 +39,11 @@ import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.S3FileService
 import lucuma.odb.service.Services
 import lucuma.odb.util.Codecs.DomainCodec
-import natchez.Trace
 import org.http4s.client.Client
 import org.tpolecat.sourcepos.SourcePos
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.LoggerFactory
+import org.typelevel.otel4s.Attribute
 import org.typelevel.otel4s.trace.Tracer
 
 import scala.concurrent.duration.*
@@ -64,7 +64,7 @@ object OdbMapping {
   )
 
   object Topics {
-    def apply[F[_]: Concurrent: Logger: Trace](pool: Resource[F, Session[F]]): Resource[F, Topics[F]] =
+    def apply[F[_]: Concurrent: Logger: Tracer](pool: Resource[F, Session[F]]): Resource[F, Topics[F]] =
       for {
         sup <- Supervisor[F]
         ses <- pool
@@ -90,7 +90,7 @@ object OdbMapping {
   private implicit def monoidPartialFunction[A, B]: Monoid[PartialFunction[A, B]] =
     Monoid.instance(PartialFunction.empty, _ orElse _)
 
-  def apply[F[_]: {Async, Parallel, Trace as T, Tracer, Logger as L, LoggerFactory as LF, SecureRandom}](
+  def apply[F[_]: {Async, Parallel, Tracer as T, Logger as L, LoggerFactory as LF, SecureRandom}](
     database:      Resource[F, Session[F]],
     monitor0:      SkunkMonitor[F],
     user0:         User,
@@ -659,20 +659,22 @@ object OdbMapping {
               val colored   = cleanedUp.linesIterator.map(s => s"${AnsiColor.GREEN}$s${AnsiColor.RESET}").mkString("\n")
               s"\n\n$colored\n\n"
             } *>
-              Trace[F].span("grackle.fetch"):
+            T.span("grackle.fetch").use: span =>
                 Temporal[F].timed(super.fetch(fragment, codecs)).flatMap: (elapsed, result) =>
                   val slowQuery = elapsed > SlowQueryThreshold
 
                   // Add some attributes to every query and a few specific ones for slow queries
                   val baseAttrs =
-                    T.put(
-                      "db.duration_ms" -> elapsed.toMillis,
-                      "db.row_count"   -> result.size.toLong
+                    span.addAttributes(
+                      Attribute("db.duration_ms", elapsed.toMillis),
+                      Attribute("db.row_count", result.size.toLong)
                     )
 
                   val slowQueryAttrsAndLog =
                     val truncatedSql = truncateSql(fragment.fragment.sql)
-                    T.put("db.statement"  -> truncatedSql, "db.slow_query" -> true) *>
+                    span.addAttributes(
+                      Attribute("db.statement", truncatedSql),
+                      Attribute("db.slow_query", true)) *>
                       SlowQueryLogger.warn(s"Slow query (${elapsed.toMillis}ms):\n$truncatedSql")
 
                   for {
@@ -741,7 +743,7 @@ object OdbMapping {
    * a `Services` instance that has a mapping.  This mapping ignores
    * subscriptions.
    */
-  def forObscalc[F[_]: Async: Parallel: Trace: Tracer: Logger: LoggerFactory: SecureRandom](
+  def forObscalc[F[_]: Async: Parallel: Tracer: Logger: LoggerFactory: SecureRandom](
     database:    Resource[F, Session[F]],
     monitor:     SkunkMonitor[F],
     user:        User,

@@ -23,13 +23,12 @@ import lucuma.itc.client.ItcClient
 import lucuma.odb.Config
 import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
+import lucuma.odb.otel.given
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.Services
 import lucuma.odb.service.UserService
 import lucuma.odb.util.Cache
 import lucuma.sso.client.SsoClient
-import natchez.Trace
-import natchez.TraceValue
 import org.http4s.Header
 import org.http4s.HttpRoutes
 import org.http4s.MediaType
@@ -41,6 +40,8 @@ import org.http4s.headers.`Content-Type`
 import org.http4s.server.websocket.WebSocketBuilder2
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.LoggerFactory
+import org.typelevel.log4cats.syntax.*
+import org.typelevel.otel4s.Attributes
 import org.typelevel.otel4s.trace.Tracer
 import skunk.Session
 import skunk.SqlState
@@ -49,14 +50,14 @@ import scala.concurrent.duration.*
 
 object GraphQLRoutes {
 
-  implicit val x: Order[Authorization] =
+  given Order[Authorization] =
     Order.by(Header[Authorization].value)
 
   /**
    * Construct a source of `HttpRoutes` tailored to the requesting user. Routes will be cached
    * based on the `Authorization` header and discarded when `ttl` expires.
    */
-  def apply[F[_]: Async: Parallel: Trace: Tracer: Logger: LoggerFactory: SecureRandom](
+  def apply[F[_]: {Async, Parallel, Tracer as T, Logger as L, LoggerFactory, SecureRandom}](
     gaiaClient:      GaiaClient[F],
     itcClient:       ItcClient[F],
     commitHash:      CommitHash,
@@ -79,15 +80,15 @@ object GraphQLRoutes {
       extension [A](fa: F[A]) def retryOnInvalidCursorName: F[A] =
         fa.recoverWith {
           case SqlState.InvalidCursorName(_) =>
-            Logger[F].warn(s"Invalid cursor; retrying (once).") >> fa
+            warn"Invalid cursor; retrying (once)." >> fa
         }
 
       // Log a message with the user
       def info(user: User, message: String): F[Unit] =
-        Logger[F].info(s"${user.id}/${user.displayName}: $message")
+        info"${user.id}/${user.displayName}: $message"
 
       def error(user: User, message: String, t: Throwable): F[Unit] =
-        Logger[F].error(t)(s"${user.id}/${user.displayName}: $message")
+        L.error(t)(s"${user.id}/${user.displayName}: $message")
 
       def debug(user: User, message: String): F[Unit] =
         Logger[F].debug(s"${user.id}/${user.displayName}: $message")
@@ -95,21 +96,18 @@ object GraphQLRoutes {
       Cache.timed[F, Authorization, Option[GraphQLService[F]]](ttl).map { cache => wsb =>
         LucumaGraphQLRoutes.forService[F](
           {
-            case None    => metadataService.some.pure[F]  // No auth, use metadata service for introspection
+            case None    => metadataService.some.pure  // No auth, use metadata service for introspection
             case Some(a) =>
               cache.get(a).flatMap {
                 case Some(opt) =>
-                  Logger[F].debug(s"Cache hit for $a").as(opt) // it was in the cache
+                  debug"Cache hit for $a".as(opt) // it was in the cache
                 case None    =>           // It was not in the cache
-                  Logger[F].debug(s"Cache miss for $a") *>
-                  Trace[F].span("newServiceInstance"):
+                  debug"Cache miss for $a" *>
+                  T.span("newServiceInstance").surround:
                     {
                       for {
                         user <- OptionT(ssoClient.get(a))
-                        props = List[(String, TraceValue)](
-                          "lucuma.user.id"          -> user.id.toString,
-                          "lucuma.user.displayName" -> user.displayName
-                        )
+                        props = Attributes.from(user)
 
                         // If the user has never hit the ODB using http then there will be no user
                         // entry in the database. So go ahead and [re]canonicalize here to be sure.
@@ -117,7 +115,7 @@ object GraphQLRoutes {
 
                         _    <- OptionT.liftF(info(user, s"New service instance."))
                         map   = OdbMapping(pool, monitor, user, topics, gaiaClient, itcClient, commitHash, goaUsers, enums, ptc, httpClient, horizonsClient, emailConfig)
-                        svc   = new GraphQLService(map, props*) {
+                        svc   = new GraphQLService(map, props.toList*) {
                           override def query(request: Operation): F[Result[Json]] =
                             super.query(request).retryOnInvalidCursorName
                               .handleError(Result.InternalError.apply)

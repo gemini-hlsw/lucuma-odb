@@ -20,7 +20,8 @@ import lucuma.core.model.Program
 import lucuma.odb.Config
 import lucuma.odb.service.Services.SuperUserAccess
 import lucuma.refined.*
-import natchez.Trace
+import org.typelevel.otel4s.Attribute
+import org.typelevel.otel4s.trace.Tracer
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider
 import software.amazon.awssdk.regions.Region
@@ -102,7 +103,7 @@ object S3FileService {
         fileName
     }
 
-  def fromS3ConfigAndClient[F[_]: Async: Trace](
+  def fromS3ConfigAndClient[F[_]: {Async, Tracer as T}](
     awsConfig: Config.Aws,
     s3Ops:     S3AsyncClientOp[F],
     presigner: S3Presigner
@@ -120,7 +121,7 @@ object S3FileService {
         s3.readFileMultipart(awsConfig.bucketName, filePath.toKey, partSize)
 
       def getMetadata(filePath: NonEmptyString)(using SuperUserAccess): F[HeadObjectResponse] =
-        Trace[F].span(s"get remote file metadata for file key: ${filePath.toKey}") {
+        T.span(s"get remote file metadata for file key: ${filePath.toKey}").use { s =>
           s3Ops
             .headObject(
               HeadObjectRequest
@@ -129,7 +130,7 @@ object S3FileService {
                 .key(filePath.toKeyString)
                 .build
             )
-            .onError { case e => Trace[F].attachError(e, ("error", true)) }
+            .onError { case e => s.recordException(e, Attribute("error", true)) }
         }
 
       def verifyFileAcess(filePath: NonEmptyString)(using SuperUserAccess): F[Unit] =
@@ -139,24 +140,24 @@ object S3FileService {
         verifyFileAcess(filePath).map(_ => get(filePath))
 
       def upload(filePath: NonEmptyString, data: Stream[F, Byte])(using SuperUserAccess): F[Long] =
-        Trace[F].span(s"uploading remote file with file key: ${filePath.toKey}") {
+        T.span(s"uploading remote file with file key: ${filePath.toKey}").use { s =>
           val f = for {
             ref  <- Ref.of(0L)
             pipe  = s3.uploadFileMultipart(awsConfig.bucketName, filePath.toKey, partSize)
             _    <- data.chunks.evalTap(c => ref.update(_ + c.size)).unchunks.through(pipe).compile.drain
             size <- ref.get
           } yield size
-          f.onError { case e => Trace[F].attachError(e, ("error", true)) }
+          f.onError { case e => s.recordException(e, Attribute("error", true)) }
         }
 
       def delete(filePath: NonEmptyString)(using SuperUserAccess): F[Unit] =
-        Trace[F].span(s"deleting remote file with file key: ${filePath.toKey}") {
+        T.span(s"deleting remote file with file key: ${filePath.toKey}").use { s =>
           s3.delete(awsConfig.bucketName, filePath.toKey)
-            .onError { case e => Trace[F].attachError(e, ("error", true)) }
+            .onError { case e => s.recordException(e, Attribute("error", true)) }
         }
 
       def presignedUrl(filePath: NonEmptyString)(using SuperUserAccess): F[String] =
-        Trace[F].span(s"getting presigned URL for file key: ${filePath.toKey}") {
+        T.span(s"getting presigned URL for file key: ${filePath.toKey}").use { s =>
           val objectRequest = GetObjectRequest
             .builder()
             .bucket(awsConfig.bucketName.value.value)
@@ -170,7 +171,8 @@ object S3FileService {
             .build
 
           Async[F].blocking(presigner.presignGetObject(presignRequest)).map(_.url().toString)
-            .onError { case e => Trace[F].attachError(e, ("error", true)) }
+            .onError { case e => s.recordException(e, Attribute("error", true)) }
+
         }
 
       def filePath(programId: Program.Id, uuid: UUID, fileName: NonEmptyString)(using SuperUserAccess): NonEmptyString =

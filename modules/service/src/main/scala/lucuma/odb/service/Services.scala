@@ -34,7 +34,6 @@ import lucuma.odb.logic.Generator
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.logic.TimeEstimateService
 import lucuma.odb.sequence.util.CommitHash
-import natchez.Trace
 import org.http4s.client.Client
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.LoggerFactory
@@ -264,7 +263,7 @@ object Services:
    * Construct a `Services` for the given `User` and `Session`. Service instances are constructed
    * lazily.
    */
-  def forUser[F[_]: Trace: Tracer: Logger: LoggerFactory: UUIDGen: Async: Parallel](
+  def forUser[F[_]: Tracer: Logger: LoggerFactory: UUIDGen: Async: Parallel](
     user0: User,
     enums0: Enums,
     mapping0: Option[Session[F] => Mapping[F]],

@@ -27,7 +27,6 @@ import lucuma.odb.service.AttachmentFileService.AttachmentException
 import lucuma.odb.service.S3FileService
 import lucuma.odb.service.Services
 import lucuma.sso.client.SsoClient
-import natchez.Trace
 import org.http4s.*
 import org.http4s.client.Client
 import org.http4s.dsl.Http4sDsl
@@ -43,7 +42,7 @@ object AttachmentRoutes {
   }
 
   // the normal constructor
-  def apply[F[_]: Async: Parallel: Logger: LoggerFactory: Trace: Tracer: SecureRandom](
+  def apply[F[_]: Async: Parallel: Logger: LoggerFactory: Tracer: SecureRandom](
     pool:           Resource[F, Session[F]],
     s3:             S3FileService[F],
     ssoClient:      SsoClient[F, User],

@@ -10,7 +10,7 @@ import lucuma.core.model.ServiceUser
 import lucuma.core.model.StandardUser
 import lucuma.core.model.User
 import lucuma.odb.util.Codecs.*
-import natchez.Trace
+import org.typelevel.otel4s.trace.Tracer
 import skunk.Command
 import skunk.Session
 import skunk.SqlState
@@ -23,7 +23,7 @@ trait UserService[F[_]] {
 
 object UserService {
 
-  def fromSession[F[_]: MonadCancelThrow: Trace](s: Session[F]): UserService[F] =
+  def fromSession[F[_]: {MonadCancelThrow, Tracer as T}](s: Session[F]): UserService[F] =
     new UserService[F] {
       import Statements._
 
@@ -31,7 +31,7 @@ object UserService {
         // RCN: This operation sometimes fails with an unknown portal
         // exception. It's not yet clear why, so for now we retry.
         def go(retries: Int): F[Unit] =
-          Trace[F].span("canonicalizeUser") {
+          T.span("canonicalizeUser").surround {
             u match {
               case gu @ GuestUser(_)             => canonicalizeGuestUser(gu)
               case su @ ServiceUser(_, _)        => canonicalizeServiceUser(su)
@@ -44,19 +44,16 @@ object UserService {
         go(2)
 
       def canonicalizeGuestUser(gu: GuestUser): F[Unit] =
-        Trace[F].span("canonicalizeGuestUser") {
+        T.span("canonicalizeGuestUser").surround:
           s.prepareR(CanonicalizeGuestUser).use(_.execute(gu)).void
-        }
 
       def canonicalizeServiceUser(su: ServiceUser): F[Unit] =
-        Trace[F].span("canonicalizeServiceUser") {
+        T.span("canonicalizeServiceUser").surround:
           s.prepareR(CanonicalizeServiceUser).use(_.execute(su)).void
-        }
 
       def canonicalizeStandardUser(su: StandardUser): F[Unit] =
-        Trace[F].span("canonicalizeStandardUser") {
+        T.span("canonicalizeStandardUser").surround:
           s.prepareR(CanonicalizeStandardUser).use(_.execute(su)).void
-        }
 
     }
 

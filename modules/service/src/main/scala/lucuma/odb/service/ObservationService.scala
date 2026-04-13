@@ -66,7 +66,7 @@ import lucuma.odb.graphql.mapping.AccessControl
 import lucuma.odb.service.Services.ServiceAccess
 import lucuma.odb.service.Services.SuperUserAccess
 import lucuma.odb.util.Codecs.*
-import natchez.Trace
+import org.typelevel.otel4s.trace.Tracer
 import skunk.*
 import skunk.codec.all.*
 import skunk.exception.PostgresErrorException
@@ -202,7 +202,7 @@ object ObservationService {
     def isMarkedReady: Boolean = false // TODO
   }
 
-  def instantiate[F[_]: Concurrent: Trace](using Services[F]): ObservationService[F] =
+  def instantiate[F[_]: {Concurrent, Tracer as T, Services}]: ObservationService[F] =
     new ObservationService[F] {
 
       val resolver = new IdResolver("observation", Statements.selectOid, _.label)
@@ -235,7 +235,7 @@ object ObservationService {
         SET:       ObservationPropertiesInput.Create,
         calibrationRole: Option[CalibrationRole]
       )(using Transaction[F], SuperUserAccess): F[Result[Observation.Id]] =
-        Trace[F].span("createObservation") {
+        T.span("createObservation").surround {
           session.execute(sql"set constraints all deferred".command) >>
           session.prepareR(GroupService.Statements.OpenHole).use(_.unique(programId, SET.group, SET.groupIndex)).flatMap { ix =>
             val oEtm = SET.scienceRequirements.flatMap(_.exposureTimeMode.toOption)
@@ -304,7 +304,7 @@ object ObservationService {
 
         // delete asterisms and observations. need to do this in ResultT so we stop on failure
         val rt = for {
-          _    <-           
+          _    <-
             ResultT:
               oids.traverse { o =>
                 // set the existence to deleted, so it gets removed from groups too
@@ -434,7 +434,7 @@ object ObservationService {
       override def updateObservations(
         update: AccessControl.Checked[ObservationPropertiesInput.Edit]
       )(using Transaction[F]): F[Result[Map[Program.Id, List[Observation.Id]]]] =
-        Trace[F].span("updateObservation") {
+        T.span("updateObservation").surround {
           update.fold(Result(Map.empty).pure[F]): (SET, which) =>
             def validateBand(pids: => List[Program.Id]): ResultT[F, Unit] =
               SET.scienceBand.toOption.fold(ResultT.unit): band =>
@@ -490,7 +490,7 @@ object ObservationService {
       override def updateObservationsTimes(
         update: AccessControl.Checked[ObservationTimesInput]
       )(using Transaction[F]): F[Result[Map[Program.Id, List[Observation.Id]]]] =
-        Trace[F].span("updateObservationTimes"):
+        T.span("updateObservationTimes").surround:
           update.fold(Result(Map.empty).pure[F]): (set, which) =>
             Statements.updateObsTime(set, which).traverse: af =>
               session

@@ -48,7 +48,9 @@ import org.http4s.server.websocket.WebSocketBuilder2
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.LoggerFactory
 import org.typelevel.log4cats.slf4j.Slf4jFactory
+import org.typelevel.otel4s.metrics.MeterProvider
 import org.typelevel.otel4s.trace.Tracer
+import org.typelevel.otel4s.trace.TracerProvider
 import skunk.{Command as _, *}
 import software.amazon.awssdk.services.s3.presigner.S3Presigner
 
@@ -205,7 +207,7 @@ object FMain extends MainParams {
       .resource
 
   /** A resource that yields our HttpRoutes, wrapped in accessory middleware. */
-  def routesResource[F[_]: Async: Parallel: Trace: Tracer: Logger: LoggerFactory: Network: Console: SecureRandom](
+  def routesResource[F[_]: Async: Parallel: Trace: Tracer: TracerProvider: MeterProvider: Logger: LoggerFactory: Network: Console: SecureRandom](
     config: Config
   ): Resource[F, WebSocketBuilder2[F] => HttpRoutes[F]] =
     routesResource(
@@ -227,7 +229,7 @@ object FMain extends MainParams {
     )
 
   /** A resource that yields our HttpRoutes, wrapped in accessory middleware. */
-  def routesResource[F[_]: Async: Parallel: Trace: Tracer: Logger: LoggerFactory: Network: Console: SecureRandom](
+  def routesResource[F[_]: Async: Parallel: Trace: Tracer: TracerProvider: MeterProvider: Logger: LoggerFactory: Network: Console: SecureRandom](
     databaseConfig:       Config.Database,
     awsConfig:            Config.Aws,
     emailConfig:          Config.Email,
@@ -253,7 +255,7 @@ object FMain extends MainParams {
       httpClient        <- httpClientResource
       horizonsClient    <- horizonsClientResource
       userSvc           <- pool.map(UserService.fromSession(_))
-      middleware        <- Resource.eval(ServerMiddleware(corsOverHttps, domain, ssoClient, userSvc))
+      middleware        <- ServerMiddleware(corsOverHttps, domain, ssoClient, userSvc)
       enums             <- Resource.eval(pool.use(Enums.load))
       ptc               <- Resource.eval(pool.use(TimeEstimateCalculatorImplementation.fromSession(_, enums)))
       metadataService    = GraphQLService(OdbMapping.forMetadata(pool, SkunkMonitor.noopMonitor[F], enums))
@@ -341,8 +343,10 @@ object FMain extends MainParams {
       _  <- Applicative[Resource[F, *]].unlessA(skipMigration.isRequested)(Resource.eval(migrateDatabase[F](c.database)))
       _  <- Resource.eval(runStartupDiagnostics(c.database, true))
       ot <- OdbTelemetry.otel(ServiceName, c)
-      given Tracer[F] = ot.tracer
-      given Trace[F]  = ot.trace
+      given Tracer[F]         = ot.tracer
+      given Trace[F]          = ot.trace
+      given TracerProvider[F] = ot.tracerProvider
+      given MeterProvider[F]  = ot.meterProvider
       ap <- routesResource(c).map(_.map(_.orNotFound))
       _  <- Resource.eval(ItcService.pollVersionsForever(c.itcClient, singleSession(c.database), c.itc.pollPeriod))
       _  <- serverResource(c.port, ap)

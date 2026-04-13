@@ -26,6 +26,7 @@ import org.http4s.client.middleware.CookieJar
 import org.http4s.implicits.*
 import org.http4s.server.Router
 import org.typelevel.log4cats.Logger
+import org.typelevel.otel4s.trace.Tracer.Implicits.noop
 
 object SsoSimulator {
 

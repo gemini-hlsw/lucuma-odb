@@ -79,7 +79,7 @@ import lucuma.odb.syntax.result.*
 import lucuma.odb.util.Codecs.*
 import monocle.Focus
 import monocle.Lens
-import natchez.Trace
+import org.typelevel.otel4s.trace.Tracer
 import skunk.*
 import skunk.implicits.*
 
@@ -343,7 +343,7 @@ object GuideService {
           .toResult(generalError(s"Observation duration of ${obsDuration.format} is less than the setup time of ${setupTime.format} for observation $obsId.").asProblem)
   }
 
-  def instantiate[F[_]: Concurrent: Services: Trace](
+  def instantiate[F[_]: {Concurrent, Services, Tracer as T}](
     gaiaClient:             GaiaClient[F],
   ): GuideService[F] =
     new GuideService[F] {
@@ -487,7 +487,7 @@ object GuideService {
       def callGaia(
         query: ADQLQuery
       ): F[Result[List[(Target.Sidereal, GuideStarCandidate)]]] =
-        Trace[F].span("callGaia"):
+        T.span("callGaia").surround:
 
           val MaxTargets = 1000
 
@@ -868,7 +868,7 @@ object GuideService {
         oid:     Observation.Id,
         instant: Instant
       ): F[Option[Coordinates]] =
-          Trace[F].span("getBlindOffsetCoordinates"):
+          T.span("getBlindOffsetCoordinates").surround:
             val trackingStmt = Statements.getBlindOffsetTracking(oid)
             session.prepareR(
               trackingStmt.fragment.query(siderealTrackingDecoder)
@@ -951,7 +951,7 @@ object GuideService {
       override def getGuideEnvironment(pid: Program.Id, oid: Observation.Id)(
         using NoTransaction[F], SuperUserAccess
       ): F[Result[GuideEnvironment]] =
-        Trace[F].span("getGuideEnvironment"):
+        T.span("getGuideEnvironment").surround:
           (for {
             obsInfo         <- ResultT(getObservationInfo(oid))
             obsTime         <- ResultT.fromResult(obsInfo.obsTime)
@@ -1029,7 +1029,7 @@ object GuideService {
       override def getGuideAvailability(pid: Program.Id, oid: Observation.Id, period: TimestampInterval)(
         using NoTransaction[F], SuperUserAccess
       ): F[Result[List[AvailabilityPeriod]]] =
-        Trace[F].span("getGuideAvailability"):
+        T.span("getGuideAvailability").surround:
           (for {
             _             <- ResultT.fromResult(
                               if (period.timeSpan <= maxAvailabilityPeriod) ().success
@@ -1068,7 +1068,7 @@ object GuideService {
 
       override def setGuideTargetName(checked: AccessControl.CheckedWithId[SetGuideTargetNameInput, Observation.Id])(
         using NoTransaction[F]): F[Result[Observation.Id]] =
-          Trace[F].span("setGuideTargetName"):
+          T.span("setGuideTargetName").surround:
             checked.foldWithId(
               OdbError.InvalidArgument().asFailureF
             ): (input, obsId) =>

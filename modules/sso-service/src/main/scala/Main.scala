@@ -41,6 +41,8 @@ import org.http4s.server.*
 import org.http4s.server.websocket.WebSocketBuilder2
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
+import org.typelevel.otel4s.trace.Tracer
+import org.typelevel.otel4s.trace.Tracer.Implicits.noop
 import skunk.{Command as _, *}
 
 import scala.concurrent.duration.*
@@ -214,7 +216,7 @@ object FMain extends AnsiColor {
     }
 
   /** A resource that yields our HttpRoutes, wrapped in accessory middleware. */
-  def routesResource[F[_]: Async: Trace: Logger: Network: Console](config: Config): Resource[F, WebSocketBuilder2[F] => HttpRoutes[F]] =
+  def routesResource[F[_]: Async: Trace: Tracer: Logger: Network: Console](config: Config): Resource[F, WebSocketBuilder2[F] => HttpRoutes[F]] =
     for {
       pool     <- databasePoolResource[F](config.database)
       channels <- SsoMapping.Channels(pool)

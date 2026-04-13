@@ -42,8 +42,7 @@ object OtelSetup:
           builder.addPropertiesSupplier: () =>
             Map(
               "otel.service.name"           -> serviceName,
-              "otel.service.version"        -> serviceVersion,
-              "otel.resource.attributes"    -> s"deployment.environment.name=${cfg.environment}$dynoAttr",
+              "otel.resource.attributes"    -> s"service.version=$serviceVersion,deployment.environment.name=${cfg.environment}$dynoAttr",
               "otel.exporter.otlp.protocol" -> "http/protobuf",
               "otel.exporter.otlp.endpoint" -> cfg.endpoint,
               "otel.exporter.otlp.headers"  -> s"Authorization=Basic ${cfg.key}",
