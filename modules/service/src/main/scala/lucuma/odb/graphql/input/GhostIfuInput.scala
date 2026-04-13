@@ -20,8 +20,8 @@ object GhostIfuInput:
 
   case class Create(
     resolutionMode:            GhostResolutionMode,
-    red:                       Option[GhostDetectorConfigInput],
-    blue:                      Option[GhostDetectorConfigInput],
+    red:                       Option[GhostArmInput],
+    blue:                      Option[GhostArmInput],
     explicitIfu1FiberAgitator: Option[GhostIfu1FiberAgitator],
     explicitIfu2FiberAgitator: Option[GhostIfu2FiberAgitator]
   ):
@@ -33,8 +33,8 @@ object GhostIfuInput:
       ObjectFieldsBinding.rmap:
         case List(
           GhostResolutionModeBinding("resolutionMode", rResMode),
-          GhostDetectorConfigInput.Binding.Option("red", rRed),
-          GhostDetectorConfigInput.Binding.Option("blue", rBlue),
+          GhostArmInput.Binding.Option("red", rRed),
+          GhostArmInput.Binding.Option("blue", rBlue),
           GhostIfu1FiberAgitatorBinding.Option("explicitIfu1Agitator", rIfu1),
           GhostIfu2FiberAgitatorBinding.Option("explicitIfu2Agitator", rIfu2)
         ) => (rResMode, rRed, rBlue, rIfu1, rIfu2).parMapN: (resMode, red, blue, ifu1, ifu2) =>
@@ -42,8 +42,8 @@ object GhostIfuInput:
 
   case class Edit(
     resolutionMode:            Option[GhostResolutionMode],
-    red:                       Option[GhostDetectorConfigInput],
-    blue:                      Option[GhostDetectorConfigInput],
+    red:                       Option[GhostArmInput],
+    blue:                      Option[GhostArmInput],
     explicitIfu1FiberAgitator: Nullable[GhostIfu1FiberAgitator],
     explicitIfu2FiberAgitator: Nullable[GhostIfu2FiberAgitator]
   ):
@@ -60,8 +60,8 @@ object GhostIfuInput:
       ObjectFieldsBinding.rmap:
         case List(
           GhostResolutionModeBinding.Option("resolutionMode", rResMode),
-          GhostDetectorConfigInput.Binding.Option("red", rRed),
-          GhostDetectorConfigInput.Binding.Option("blue", rBlue),
+          GhostArmInput.Binding.Option("red", rRed),
+          GhostArmInput.Binding.Option("blue", rBlue),
           GhostIfu1FiberAgitatorBinding.Nullable("explicitIfu1Agitator", rIfu1),
           GhostIfu2FiberAgitatorBinding.Nullable("explicitIfu2Agitator", rIfu2)
         ) => (rResMode, rRed, rBlue, rIfu1, rIfu2).parMapN: (resMode, red, blue, ifu1, ifu2) =>

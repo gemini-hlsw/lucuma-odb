@@ -19,11 +19,13 @@ import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.Observation
 import lucuma.core.syntax.timespan.*
 import lucuma.odb.data.Nullable
-import lucuma.odb.graphql.input.GhostDetectorConfigInput
+import lucuma.odb.graphql.input.GhostArmInput
+import lucuma.odb.graphql.input.GhostDetectorInput
 import lucuma.odb.graphql.input.GhostIfuInput
 import lucuma.odb.graphql.query.ExecutionTestSupport
+import lucuma.odb.sequence.ghost.Arm
+import lucuma.odb.sequence.ghost.Detector
 import lucuma.odb.sequence.ghost.ifu.Config
-import lucuma.odb.sequence.ghost.ifu.DetectorConfig
 import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.util.Codecs.instrument
 import lucuma.odb.util.Codecs.observation_id
@@ -68,24 +70,25 @@ class GhostIfuServiceSuite extends ExecutionTestSupport:
     in:  GhostIfuInput.Create,
     etm: Option[ExposureTimeMode],
   ): Config =
-    def expectedDetectorConfig(
-      in: Option[GhostDetectorConfigInput],
+    def expectedCamera(
+      in: Option[GhostArmInput],
       rm: GhostReadMode
-    ): DetectorConfig =
-      val reqTimeAndCount = etm.flatMap(ExposureTimeMode.timeAndCount.getOption)
-      val timeAndCount    = in.flatMap(_.timeAndCount).orElse(reqTimeAndCount).get
-      DetectorConfig(
-        timeAndCount     = timeAndCount,
-        defaultBinning   = GhostBinning.OneByOne,
-        explicitBinning  = in.flatMap(_.explicitBinning.toOption),
-        defaultReadMode  = rm,
-        explicitReadMode = in.flatMap(_.explicitReadMode.toOption)
+    ): Arm =
+      val exposureTimeMode = in.flatMap(_.exposureTimeMode).orElse(etm).get
+      Arm(
+        exposureTimeMode = exposureTimeMode,
+        Detector(
+          defaultBinning   = GhostBinning.OneByOne,
+          explicitBinning  = in.flatMap(_.detector).flatMap(_.explicitBinning.toOption),
+          defaultReadMode  = rm,
+          explicitReadMode = in.flatMap(_.detector).flatMap(_.explicitReadMode.toOption)
+        )
       )
 
     Config(
       resolutionMode       = in.resolutionMode,
-      red                  = DetectorConfig.Red(expectedDetectorConfig(in.red, GhostReadMode.Medium)),
-      blue                 = DetectorConfig.Blue(expectedDetectorConfig(in.blue, GhostReadMode.Slow)),
+      red                  = Arm.Red(expectedCamera(in.red, GhostReadMode.Medium)),
+      blue                 = Arm.Blue(expectedCamera(in.blue, GhostReadMode.Slow)),
       explicitIfu1Agitator = in.explicitIfu1FiberAgitator,
       explicitIfu2Agitator = in.explicitIfu2FiberAgitator
     )
@@ -112,15 +115,19 @@ class GhostIfuServiceSuite extends ExecutionTestSupport:
 
     val create = GhostIfuInput.Create(
       resolutionMode = GhostResolutionMode.Standard,
-      red            = GhostDetectorConfigInput(
+      red            = GhostArmInput(
         redEtm.some,
-        Nullable.NonNull(GhostBinning.TwoByTwo),
-        Nullable.NonNull(GhostReadMode.Fast)
+        GhostDetectorInput(
+          Nullable.NonNull(GhostBinning.TwoByTwo),
+          Nullable.NonNull(GhostReadMode.Fast)
+        ).some
       ).some,
-      blue           = GhostDetectorConfigInput(
+      blue           = GhostArmInput(
         blueEtm.some,
-        Nullable.NonNull(GhostBinning.FourByFour),
-        Nullable.NonNull(GhostReadMode.Slow)
+        GhostDetectorInput(
+          Nullable.NonNull(GhostBinning.FourByFour),
+          Nullable.NonNull(GhostReadMode.Slow)
+        ).some
       ).some,
       explicitIfu1FiberAgitator = GhostIfu1FiberAgitator.Enabled.some,
       explicitIfu2FiberAgitator = GhostIfu2FiberAgitator.Disabled.some

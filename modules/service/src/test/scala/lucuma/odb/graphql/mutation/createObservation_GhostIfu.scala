@@ -36,15 +36,21 @@ class createObservation_GhostIfu extends OdbSuite:
                       ghostIfu: {
                         resolutionMode: STANDARD
                         red: {
-                          timeAndCount: {
-                            time: { seconds: 10.0 }
-                            count: 2
-                            at: { nanometers: 500 }
+                          exposureTimeMode: {
+                            timeAndCount: {
+                              time: { seconds: 10.0 }
+                              count: 2
+                              at: { nanometers: 500 }
+                            }
                           }
-                          explicitBinning: ONE_BY_TWO
+                          detector: {
+                            explicitBinning: ONE_BY_TWO
+                          }
                         }
                         blue: {
-                          explicitReadMode: FAST
+                          detector: {
+                            explicitReadMode: FAST
+                          }
                         }
                         explicitIfu1Agitator: ENABLED
                       }
@@ -58,30 +64,38 @@ class createObservation_GhostIfu extends OdbSuite:
                       ghostIfu {
                         resolutionMode
                         red {
-                          timeAndCount {
-                            time { seconds }
-                            count
-                            at { nanometers }
+                          exposureTimeMode {
+                            timeAndCount {
+                              time { seconds }
+                              count
+                              at { nanometers }
+                            }
                           }
-                          binning
-                          defaultBinning
-                          explicitBinning
-                          readMode
-                          defaultReadMode
-                          explicitReadMode
+                          detector {
+                            binning
+                            defaultBinning
+                            explicitBinning
+                            readMode
+                            defaultReadMode
+                            explicitReadMode
+                          }
                         }
                         blue {
-                          timeAndCount {
-                            time { seconds }
-                            count
-                            at { nanometers }
+                          exposureTimeMode {
+                            timeAndCount {
+                              time { seconds }
+                              count
+                              at { nanometers }
+                            }
                           }
-                          binning
-                          defaultBinning
-                          explicitBinning
-                          readMode
-                          defaultReadMode
-                          explicitReadMode
+                          detector {
+                            binning
+                            defaultBinning
+                            explicitBinning
+                            readMode
+                            defaultReadMode
+                            explicitReadMode
+                          }
                         }
                         ifu1Agitator
                         defaultIfu1Agitator
@@ -106,30 +120,38 @@ class createObservation_GhostIfu extends OdbSuite:
                       "ghostIfu": {
                         "resolutionMode": "STANDARD",
                         "red": {
-                          "timeAndCount": {
-                            "time": { "seconds": 10.000000 },
-                            "count": 2,
-                            "at": { "nanometers": 500.000 }
+                          "exposureTimeMode": {
+                            "timeAndCount": {
+                              "time": { "seconds": 10.000000 },
+                              "count": 2,
+                              "at": { "nanometers": 500.000 }
+                            }
                           },
-                          "binning": "ONE_BY_TWO",
-                          "defaultBinning": "ONE_BY_ONE",
-                          "explicitBinning": "ONE_BY_TWO",
-                          "readMode": "MEDIUM",
-                          "defaultReadMode": "MEDIUM",
-                          "explicitReadMode": null
+                          "detector": {
+                            "binning": "ONE_BY_TWO",
+                            "defaultBinning": "ONE_BY_ONE",
+                            "explicitBinning": "ONE_BY_TWO",
+                            "readMode": "MEDIUM",
+                            "defaultReadMode": "MEDIUM",
+                            "explicitReadMode": null
+                          }
                         },
                         "blue": {
-                          "timeAndCount": {
-                            "time": { "seconds": 1.000000 },
-                            "count": 5,
-                            "at": { "nanometers": 500.000 }
+                          "exposureTimeMode": {
+                            "timeAndCount": {
+                              "time": { "seconds": 1.000000 },
+                              "count": 5,
+                              "at": { "nanometers": 500.000 }
+                            }
                           },
-                          "binning": "ONE_BY_ONE",
-                          "defaultBinning": "ONE_BY_ONE",
-                          "explicitBinning": null,
-                          "readMode": "FAST",
-                          "defaultReadMode": "SLOW",
-                          "explicitReadMode": "FAST"
+                          "detector": {
+                            "binning": "ONE_BY_ONE",
+                            "defaultBinning": "ONE_BY_ONE",
+                            "explicitBinning": null,
+                            "readMode": "FAST",
+                            "defaultReadMode": "SLOW",
+                            "explicitReadMode": "FAST"
+                          }
                         },
                         "ifu1Agitator": "ENABLED",
                         "defaultIfu1Agitator": "DISABLED",
@@ -144,6 +166,64 @@ class createObservation_GhostIfu extends OdbSuite:
               }
             """.asRight
         )
+
+  test("query GHOST IFU"):
+    for
+      p <- createProgramAs(pi)
+      t <- createTargetAs(pi, p)
+      o <- createGmosNorthImagingObservationAs(pi, p, t)
+      _ <- expect(
+             user = pi,
+             query = s"""
+               query {
+                 observations() {
+                   matches {
+                     observingMode {
+                       mode
+                       ghostIfu {
+                         resolutionMode
+                         red {
+                           detector { binning }
+                         }
+                         blue {
+                           detector { binning }
+                         }
+                       }
+                     }
+                   }
+                 }
+               }
+             """,
+             expected = json"""
+               {
+                 "observations": {
+                   "matches": [
+                     {
+                       "observingMode": {
+                         "mode": "GHOST_IFU",
+                         "ghostIfu": {
+                           "resolutionMode": "STANDARD",
+                           "red": {
+                             "detector": { "binning": "ONE_BY_TWO" }
+                           },
+                           "blue": {
+                             "detector": { "binning": "ONE_BY_ONE" }
+                           }
+                         }
+                       }
+                     },
+                     {
+                       "observingMode": {
+                         "mode": "GMOS_NORTH_IMAGING",
+                         "ghostIfu": null
+                       }
+                     }
+                   ]
+                 }
+               }
+             """.asRight
+           )
+    yield ()
 
   test("cannot create GHOST IFU with S/N requirements only"):
     createProgramAs(pi).flatMap: pid =>
@@ -197,17 +277,21 @@ class createObservation_GhostIfu extends OdbSuite:
                       ghostIfu: {
                         resolutionMode: STANDARD
                         red: {
-                          timeAndCount: {
-                            time: { seconds: 1.0 }
-                            count: 1
-                            at: { nanometers: 500 }
+                          exposureTimeMode: {
+                            timeAndCount: {
+                              time: { seconds: 1.0 }
+                              count: 1
+                              at: { nanometers: 500 }
+                            }
                           }
                         }
                         blue: {
-                          timeAndCount: {
-                            time: { seconds: 2.0 }
-                            count: 2
-                            at: { nanometers: 500 }
+                          exposureTimeMode: {
+                            timeAndCount: {
+                              time: { seconds: 2.0 }
+                              count: 2
+                              at: { nanometers: 500 }
+                            }
                           }
                         }
                       }

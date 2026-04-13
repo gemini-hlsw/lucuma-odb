@@ -7,24 +7,21 @@ package input
 import cats.syntax.parallel.*
 import lucuma.core.enums.GhostBinning
 import lucuma.core.enums.GhostReadMode
-import lucuma.core.model.ExposureTimeMode.TimeAndCountMode
 import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.binding.*
 
 
-case class GhostDetectorConfigInput(
-  timeAndCount:     Option[TimeAndCountMode],
+case class GhostDetectorInput(
   explicitBinning:  Nullable[GhostBinning],
   explicitReadMode: Nullable[GhostReadMode]
 )
 
-object GhostDetectorConfigInput:
+object GhostDetectorInput:
 
-  val Binding: Matcher[GhostDetectorConfigInput] =
+  val Binding: Matcher[GhostDetectorInput] =
     ObjectFieldsBinding.rmap:
       case List(
-        ExposureTimeModeInput.TimeAndCount.Binding.Option("timeAndCount", rEtm),
         GhostBinningBinding.Nullable("explicitBinning", rBin),
         GhostReadModeBinding.Nullable("explicitReadMode", rReadMode)
-      ) => (rEtm, rBin, rReadMode).parMapN: (etm, bin, readMode) =>
-        GhostDetectorConfigInput(etm, bin, readMode)
+      ) => (rBin, rReadMode).parMapN: (bin, readMode) =>
+        GhostDetectorInput(bin, readMode)

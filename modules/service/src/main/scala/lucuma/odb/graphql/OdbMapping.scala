@@ -300,6 +300,7 @@ object OdbMapping {
             GraphQLParser
               .defaultConfig
               .copy(maxInputValueDepth = 16)
+              .copy(terseError = false)
 
           // Our schema
           val schema: Schema =
@@ -614,6 +615,7 @@ object OdbMapping {
                 ExecutionElaborator,
                 Flamingos2LongSlitElaborator,
                 Igrins2LongSlitElaborator,
+                GhostIfuElaborator,
                 GmosNorthImagingElaborator,
                 GmosNorthLongSlitElaborator,
                 GmosSouthImagingElaborator,
