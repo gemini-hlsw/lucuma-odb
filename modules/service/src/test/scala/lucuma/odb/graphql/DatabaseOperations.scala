@@ -2518,6 +2518,11 @@ trait DatabaseOperations { this: OdbSuite =>
       .use(_.prepareR(command).use(_.execute(system, id).void))
   }
 
+  def setGroupCalibrationRoles(id: Group.Id, roles: List[CalibrationRole]): IO[Unit] =
+    val command = sql"update t_group set c_calibration_roles = ${ _calibration_role } where c_group_id = $group_id".command
+    FMain.databasePoolResource[IO](databaseConfig).flatten
+      .use(_.prepareR(command).use(_.execute(roles, id).void))
+
   def setObservationCalibrationRole(oids: List[Observation.Id], role: CalibrationRole): IO[Unit] =
     val af = void"UPDATE t_observation " |+|
       sql"SET c_calibration_role = $calibration_role "(role) |+|

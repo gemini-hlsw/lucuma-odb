@@ -10,6 +10,7 @@ import eu.timepit.refined.types.numeric.NonNegShort
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
+import lucuma.core.enums.CalibrationRole
 import lucuma.core.model.Group
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
@@ -463,28 +464,28 @@ class updateGroups extends OdbSuite {
   }
 
   test("can create group with any value for minimumInterval and no maximumInterval") {
-    for 
+    for
       pid <- createProgramAs(pi)
       _   <- createGroupAs(pi, pid, minimumInterval = TimeSpan.fromMinutes(5))
     yield ()
   }
 
   test("can create group with any value for maximumInterval and no minimumInterval") {
-    for 
+    for
       pid <- createProgramAs(pi)
       _   <- createGroupAs(pi, pid, maximumInterval = TimeSpan.fromMinutes(5))
     yield ()
   }
 
   test("can create group with minimumInterval < maximumInterval") {
-    for 
+    for
       pid <- createProgramAs(pi)
       _   <- createGroupAs(pi, pid, minimumInterval = TimeSpan.fromMinutes(5), maximumInterval = TimeSpan.fromMinutes(6))
     yield ()
   }
 
   test("can create group with minimumInterval == maximumInterval") {
-    for 
+    for
       pid <- createProgramAs(pi)
       _   <- createGroupAs(pi, pid, minimumInterval = TimeSpan.fromMinutes(5), maximumInterval = TimeSpan.fromMinutes(5))
     yield ()
@@ -512,7 +513,7 @@ class updateGroups extends OdbSuite {
         """,
         expected = List(inputIntervalError).asLeft
       )
-    
+
     for {
       pid <- createProgramAs(pi)
       _   <- createGroupError(pid)
@@ -525,7 +526,7 @@ class updateGroups extends OdbSuite {
     minimumInterval: Option[Option[TimeSpan]],
     maximumInterval: Option[Option[TimeSpan]],
     error: Option[String]
-  ): IO[Unit] = 
+  ): IO[Unit] =
     extension (oots: Option[Option[TimeSpan]])
       def toSetter(prefix: String): String =
         oots.foldMap(ots =>
@@ -703,4 +704,28 @@ class updateGroups extends OdbSuite {
         error = inputIntervalError.some)
     } yield ()
   }
+
+  test("can move telluric system group"):
+    for {
+      pid <- createProgramAs(pi)
+      g1  <- createGroupAs(pi, pid)
+      g2  <- createGroupAs(pi, pid)
+      _   <- updateGroupSystem(g2, true)
+      _   <- setGroupCalibrationRoles(g2, List(CalibrationRole.Telluric))
+      // Move the telluric group into another group
+      _   <- moveGroupsAs(pi, List(g2), Some(g1), None)
+      es  <- groupElementsAs(pi, pid, Some(g1))
+    } yield assertEquals(es, List(Left(g2)))
+
+  test("cannot move non-telluric system group"):
+    for {
+      pid <- createProgramAs(pi)
+      g1  <- createGroupAs(pi, pid)
+      g2  <- createGroupAs(pi, pid)
+      _   <- updateGroupSystem(g2, true)
+      // Moving a system group into another group is a no-op
+      _   <- moveGroupsAs(pi, List(g2), Some(g1), None)
+      es  <- groupElementsAs(pi, pid, Some(g1))
+    } yield assertEquals(es, Nil)
+
 }

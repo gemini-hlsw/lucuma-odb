@@ -216,20 +216,22 @@ object GroupService {
             session.prepareR(af.fragment.query(group_id *: void)).use(pq => pq.stream(af.argument, 512).map(_._1).compile.toList)
 
       def updateGroups(SET: GroupPropertiesInput.Edit, which: AppliedFragment)(using Transaction[F]): F[Result[List[Group.Id]]] =
+        // Only telluric system groups can move
+        val movePredicate = user.role.access match
+          case Access.Service => AppliedFragment.empty
+          case _              => sql" AND (c_system = FALSE OR $calibration_role = ANY(c_calibration_roles))"(CalibrationRole.Telluric)
         val accessPredicate = user.role.access match
-            case Access.Service => void""
-            case _              => void" AND c_system = FALSE" // Non service can't update system groups
+          case Access.Service => void""
+          case _              => void" AND c_system = FALSE"
+
         session.execute(sql"SET CONSTRAINTS ALL DEFERRED".command) >>
-        moveGroups(SET.parentGroupId, SET.parentGroupIndex, which, accessPredicate).flatMap { ids =>
-          Statements.updateGroups(SET, which, accessPredicate).traverse { af =>
+        moveGroups(SET.parentGroupId, SET.parentGroupIndex, which, movePredicate).flatMap: ids =>
+          Statements.updateGroups(SET, which, accessPredicate).traverse: af =>
             session.prepareR(af.fragment.query(group_id)).use { pq => pq.stream(af.argument, 512).compile.toList }
-          }
           .map(moreIds => Result(moreIds.foldLeft(ids)((a, b) => (a ++ b).distinct)))
           .recoverWith { case SqlState.CheckViolation(ex) =>  Result.failure("Minimum interval must be less than or equal maximum interval.").pure}
-        }
 
-      @annotation.nowarn("msg=unused implicit parameter")
-      def openHole(pid: Program.Id, gid: Option[Group.Id], index: Option[NonNegShort])(using Transaction[F]): F[NonNegShort] =
+      def openHole(pid: Program.Id, gid: Option[Group.Id], index: Option[NonNegShort]): F[NonNegShort] =
         session.prepareR(Statements.OpenHole).use(_.unique(pid, gid, index))
 
       def selectGroups(
