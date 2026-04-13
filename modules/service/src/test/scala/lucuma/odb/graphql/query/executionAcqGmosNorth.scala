@@ -330,7 +330,7 @@ class executionAcqGmosNorth extends ExecutionTestSupportForGmos with mutation.Up
                }
              """),
              expected = List(
-               "Argument 'input.SET.observingMode.gmosNorthLongSlit.acquisition' is invalid: 'explicitFilter' must contain one of: G_PRIME, R_PRIME, I_PRIME, Z_PRIME"
+               "Argument 'input.SET.observingMode.gmosNorthLongSlit.acquisition' is invalid: 'explicitFilter' must contain one of: G_PRIME, R_PRIME, I_PRIME"
              ).asLeft
            )
     yield ()
@@ -393,7 +393,7 @@ class executionAcqGmosNorth extends ExecutionTestSupportForGmos with mutation.Up
                  }
                  explicitYBin: TWO
                  acquisition: {
-                   explicitFilter: Z_PRIME
+                   explicitFilter: I_PRIME
                  }
               }
              """)
@@ -420,9 +420,9 @@ class executionAcqGmosNorth extends ExecutionTestSupportForGmos with mutation.Up
                 "observingMode": {
                   "gmosNorthLongSlit": {
                     "acquisition": {
-                      "filter": "Z_PRIME",
+                      "filter": "I_PRIME",
                       "defaultFilter": "G_PRIME",
-                      "explicitFilter": "Z_PRIME"
+                      "explicitFilter": "I_PRIME"
                     }
                   }
                 }
@@ -436,7 +436,7 @@ class executionAcqGmosNorth extends ExecutionTestSupportForGmos with mutation.Up
       expect(
         user     = pi,
         query    = nextAtomFilterQuery(oid),
-        expected = nextAtomExpectedFilter("Z_PRIME", 3).asRight
+        expected = nextAtomExpectedFilter("I_PRIME", 3).asRight
       )
 
   test("override acquisition filter after execution begins"):
@@ -444,7 +444,7 @@ class executionAcqGmosNorth extends ExecutionTestSupportForGmos with mutation.Up
       observingMode: {
         gmosNorthLongSlit: {
           acquisition: {
-            explicitFilter: Z_PRIME
+            explicitFilter: I_PRIME
           }
         }
       }
@@ -482,12 +482,12 @@ class executionAcqGmosNorth extends ExecutionTestSupportForGmos with mutation.Up
         expected = nextAtomExpectedFilter("G_PRIME", 2).asRight
       )
 
-      // Update the acquisition parameters to change the default filter to z'
+      // Update the acquisition parameters to change the default filter to i'
       _ <- query(serviceUser, updateObservationsMutation(o, update, "observations { id }"))
       _ <- expect(
         user     = pi,
         query    = nextAtomFilterQuery(o),
-        expected = nextAtomExpectedFilter("Z_PRIME", 3).asRight
+        expected = nextAtomExpectedFilter("I_PRIME", 3).asRight
       )
     yield o
 
