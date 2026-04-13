@@ -87,7 +87,8 @@ object ItcMapping extends ItcCacheOrRemote with Version {
     asterismRequest: AsterismSpectroscopyTimeRequest
   ): F[Result[CalculationResult]] =
     Tracer[F]
-      .span("process target_requests_parallel").surround:
+      .span("process target_requests_parallel")
+      .surround:
         asterismRequest.toTargetRequests
           .parTraverse: (targetRequest: TargetSpectroscopyTimeRequest) =>
             spectroscopyFromCacheOrRemote(targetRequest)(itc, cache, config).attempt
@@ -95,11 +96,13 @@ object ItcMapping extends ItcCacheOrRemote with Version {
                 TargetIntegrationTimeOutcome:
                   result.leftMap(buildError)
       .flatMap: (targetOutcomes: NonEmptyChain[TargetIntegrationTimeOutcome]) =>
-        Tracer[F].span("build spectroscopy_result").surround:
-          CalculationResult(
-            ItcVersions(version(environment).value, BuildInfo.ocslibHash.some),
-            AsterismIntegrationTimeOutcomes(targetOutcomes)
-          ).toResult.pure[F]
+        Tracer[F]
+          .span("build spectroscopy_result")
+          .surround:
+            CalculationResult(
+              ItcVersions(version(environment).value, BuildInfo.ocslibHash.some),
+              AsterismIntegrationTimeOutcomes(targetOutcomes)
+            ).toResult.pure[F]
       .onError: t =>
         Logger[F]
           .error(t):
@@ -114,7 +117,8 @@ object ItcMapping extends ItcCacheOrRemote with Version {
     config:      Config
   )(asterismRequest: AsterismImagingTimeRequest): F[Result[CalculationResult]] =
     Tracer[F]
-      .span("process imaging_targets_parallel").surround:
+      .span("process imaging_targets_parallel")
+      .surround:
         asterismRequest.toTargetRequests
           .parTraverse: (targetRequest: TargetImagingTimeRequest) =>
             imagingFromCacheOrRemote(targetRequest)(itc, cache, config).attempt
@@ -132,11 +136,13 @@ object ItcMapping extends ItcCacheOrRemote with Version {
                         case ObservingMode.ImagingMode.Flamingos2(_, _) =>
                           integrationTime
       .flatMap: (targetOutcomes: NonEmptyChain[TargetIntegrationTimeOutcome]) =>
-        Tracer[F].span("build imaging_result").surround:
-          CalculationResult(
-            ItcVersions(version(environment).value, BuildInfo.ocslibHash.some),
-            AsterismIntegrationTimeOutcomes(targetOutcomes)
-          ).toResult.pure[F]
+        Tracer[F]
+          .span("build imaging_result")
+          .surround:
+            CalculationResult(
+              ItcVersions(version(environment).value, BuildInfo.ocslibHash.some),
+              AsterismIntegrationTimeOutcomes(targetOutcomes)
+            ).toResult.pure[F]
       .onError: t =>
         Logger[F]
           .error(t)(s"Error calculating imaging integration time for input: $asterismRequest")
@@ -189,7 +195,8 @@ object ItcMapping extends ItcCacheOrRemote with Version {
     config:      Config
   )(asterismRequest: AsterismGraphRequest): F[Result[SpectroscopyGraphsResult]] =
     Tracer[F]
-      .span("process graph_targets_parallel").surround:
+      .span("process graph_targets_parallel")
+      .surround:
         asterismRequest.toTargetRequests
           .parTraverse: (targetRequest: TargetGraphRequest) =>
             graphsFromCacheOrRemote(targetRequest)(itc, cache, config).attempt
@@ -199,11 +206,13 @@ object ItcMapping extends ItcCacheOrRemote with Version {
                                buildTargetGraphsResult(asterismRequest.significantFigures)
                   )
       .flatMap: (targetGraphs: NonEmptyChain[TargetGraphsOutcome]) =>
-        Tracer[F].span("build graphs_result").surround:
-          SpectroscopyGraphsResult(
-            ItcVersions(version(environment).value, BuildInfo.ocslibHash.some),
-            AsterismTargetGraphsOutcomes(targetGraphs)
-          ).toResult.pure[F]
+        Tracer[F]
+          .span("build graphs_result")
+          .surround:
+            SpectroscopyGraphsResult(
+              ItcVersions(version(environment).value, BuildInfo.ocslibHash.some),
+              AsterismTargetGraphsOutcomes(targetGraphs)
+            ).toResult.pure[F]
       .onError: t =>
         Logger[F]
           .error(t)(s"Error calculating spectroscopy graphs for input: $asterismRequest")
@@ -241,36 +250,39 @@ object ItcMapping extends ItcCacheOrRemote with Version {
     asterismRequest: AsterismSpectroscopyTimeRequest,
     figures:         Option[SignificantFigures]
   ): F[Result[SpectroscopyTimeAndGraphsResult]] =
-    Tracer[F].span("spectroscopy time_and_graphs_combined").surround:
-      ResultT(
-        calculateSpectroscopyIntegrationTime(environment, cache, itc, config)(asterismRequest)
-      )
-        .flatMap: (specTimeResults: CalculationResult) =>
-          specTimeResults.targetTimes.partitionErrors
-            .bimap(
-              // If there was an error computing integration times, we cannot compute the graphs
-              // and we short circuit to just returning the times we could get and errors.
-              _ => specTimeResults.targetTimes.pure[ResultT[F, *]],
-              // If integration times were all successful, compute graphs with brightest target's times.
-              (integrationTimes: AsterismIntegrationTimes) =>
-                val graphRequest =
-                  buildAsterismGraphRequest(asterismRequest, figures)(integrationTimes)
-                ResultT(spectroscopyGraphs(environment, cache, itc, config)(graphRequest)).map:
-                  (graphResult: SpectroscopyGraphsResult) =>
-                    AsterismTimeAndGraphs.fromTimeAndGraphResults(integrationTimes, graphResult)
-            )
-            .bisequence
-            .map: (timesOrGraphs: Either[AsterismIntegrationTimeOutcomes, AsterismTimeAndGraphs]) =>
-              SpectroscopyTimeAndGraphsResult(
-                specTimeResults.versions,
-                AsterismTimesAndGraphsOutcomes(timesOrGraphs)
+    Tracer[F]
+      .span("spectroscopy time_and_graphs_combined")
+      .surround:
+        ResultT(
+          calculateSpectroscopyIntegrationTime(environment, cache, itc, config)(asterismRequest)
+        )
+          .flatMap: (specTimeResults: CalculationResult) =>
+            specTimeResults.targetTimes.partitionErrors
+              .bimap(
+                // If there was an error computing integration times, we cannot compute the graphs
+                // and we short circuit to just returning the times we could get and errors.
+                _ => specTimeResults.targetTimes.pure[ResultT[F, *]],
+                // If integration times were all successful, compute graphs with brightest target's times.
+                (integrationTimes: AsterismIntegrationTimes) =>
+                  val graphRequest =
+                    buildAsterismGraphRequest(asterismRequest, figures)(integrationTimes)
+                  ResultT(spectroscopyGraphs(environment, cache, itc, config)(graphRequest)).map:
+                    (graphResult: SpectroscopyGraphsResult) =>
+                      AsterismTimeAndGraphs.fromTimeAndGraphResults(integrationTimes, graphResult)
               )
-        .value
-        .onError: t =>
-          Logger[F]
-            .error(t):
-              s"Error calculating spectroscopy integration time and graph for input: $asterismRequest"
-        .toGraphQLErrors
+              .bisequence
+              .map:
+                (timesOrGraphs: Either[AsterismIntegrationTimeOutcomes, AsterismTimeAndGraphs]) =>
+                  SpectroscopyTimeAndGraphsResult(
+                    specTimeResults.versions,
+                    AsterismTimesAndGraphsOutcomes(timesOrGraphs)
+                  )
+          .value
+          .onError: t =>
+            Logger[F]
+              .error(t):
+                s"Error calculating spectroscopy integration time and graph for input: $asterismRequest"
+          .toGraphQLErrors
 
   def apply[F[_]: Sync: Logger: Parallel: Tracer: CustomSed.Resolver](
     environment: ExecutionEnvironment,

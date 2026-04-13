@@ -31,8 +31,13 @@ import lucuma.itc.service.config.*
 import lucuma.itc.service.config.ExecutionEnvironment.*
 import lucuma.otel.OtelSetup
 import natchez.Trace
-import natchez.http4s.NatchezMiddleware
+import org.http4s.otel4s.middleware.metrics.OtelMetrics
+import org.http4s.otel4s.middleware.trace.client.UriRedactor
+import org.http4s.otel4s.middleware.trace.server.ServerMiddleware as OtelServerMiddleware
+import org.http4s.otel4s.middleware.trace.server.ServerSpanDataProvider
+import org.typelevel.otel4s.metrics.MeterProvider
 import org.typelevel.otel4s.trace.Tracer
+import org.typelevel.otel4s.trace.TracerProvider
 import org.http4s.*
 import org.http4s.ember.server.EmberServerBuilder
 import org.http4s.headers.`Cache-Control`
@@ -41,6 +46,7 @@ import org.http4s.server.Server
 import org.http4s.server.middleware.CORS
 import org.http4s.server.middleware.CORSPolicy
 import org.http4s.server.middleware.GZip
+import org.http4s.server.middleware.Metrics
 import org.http4s.server.websocket.WebSocketBuilder2
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
@@ -137,9 +143,19 @@ object Main extends IOApp with ItcCacheOrRemote {
       case None      =>
         Resource.eval(NoOpBinaryCache[F])
 
-  def routes[F[_]: Async: Logger: Parallel: Tracer: Trace: Compression: Network](
+  private val redactor: UriRedactor = new UriRedactor:
+    def redactPath(path: Uri.Path) = path
+
+    def redactQuery(query: Query) = query
+
+    def redactFragment(fragment: Uri.Fragment) = fragment.some
+
+  def routes[F[
+    _
+  ]: Async: Logger: Parallel: Tracer: TracerProvider: MeterProvider: Compression: Network](
     cfg: Config
   ): Resource[F, WebSocketBuilder2[F] => HttpRoutes[F]] =
+    val spanDataProvider = ServerSpanDataProvider.openTelemetry(redactor)
     for
       localItc                   <- Resource.eval(legacyItcLoader[F])
       itc                        <- Resource.eval(ItcImpl.build(FLocalItc[F](localItc)).pure[F])
@@ -148,13 +164,15 @@ object Main extends IOApp with ItcCacheOrRemote {
       customSedResolver          <- CustomSedOdbAttachmentResolver[F](cfg.odbBaseUrl, cfg.odbServiceToken)
       given CustomSed.Resolver[F] = CustomSedCachedResolver(customSedResolver, cache, CustomSedTTL)
       mapping                    <- Resource.eval(ItcMapping[F](cfg.environment, cache, itc, cfg))
+      otelMiddleware             <- Resource.eval(OtelServerMiddleware.builder[F](spanDataProvider).build)
+      metricsOps                 <- Resource.eval(OtelMetrics.serverMetricsOps[F]())
     yield wsb =>
-      // Routes for the ITC GraphQL service
-      NatchezMiddleware.server:
+      otelMiddleware.asHttpRoutesMiddleware:
         GZip:
           cors(cfg.environment, none):
             cacheMiddleware:
-              Routes.forService(_ => GraphQLService[F](mapping).some.pure[F], wsb, "itc")
+              Metrics[F](metricsOps):
+                Routes.forService(_ => GraphQLService[F](mapping).some.pure[F], wsb, "itc")
 
   // Custom class loader to give priority to the jars in the urls over the parent classloader
   class ReverseClassLoader(urls: Array[URL], parent: ClassLoader)
@@ -191,12 +209,14 @@ object Main extends IOApp with ItcCacheOrRemote {
    */
   def server(cfg: Config)(using Logger[IO]): Resource[IO, ExitCode] =
     for
-      _               <- Resource.eval(banner[IO](cfg))
-      otel            <- OtelSetup.resource(ServiceName, version(Local).value, cfg.otel)
-      given Trace[IO]  = otel.trace
-      given Tracer[IO] = otel.tracer
-      ap              <- routes[IO](cfg).map(_.map(_.orNotFound))
-      _               <- serverResource(ap, cfg)
+      _                       <- Resource.eval(banner[IO](cfg))
+      otel                    <- OtelSetup.resource(ServiceName, version(Local).value, cfg.otel)
+      given Trace[IO]          = otel.trace
+      given Tracer[IO]         = otel.tracer
+      given TracerProvider[IO] = otel.tracerProvider
+      given MeterProvider[IO]  = otel.meterProvider
+      ap                      <- routes[IO](cfg).map(_.map(_.orNotFound))
+      _                       <- serverResource(ap, cfg)
     yield ExitCode.Success
 
   def run(args: List[String]): IO[ExitCode] =
