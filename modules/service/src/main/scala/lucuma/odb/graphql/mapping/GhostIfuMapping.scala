@@ -45,17 +45,13 @@ trait GhostIfuMapping[F[_]]
       SqlField("defaultReadMode", arm.ReadModeDefault)
     )
 
-  lazy val GhostBlueArmMapping: ObjectMapping =
-    ObjectMapping(GhostBlueArmType)(
+  def ghostArmMapping(
+    arm:   GhostIfuTable.Arm,
+    idCol: ColumnRef
+  ): ObjectMapping =
+    ObjectMapping(GhostIfuType / arm.name)(
       SqlField("observationId", GhostIfuTable.ObservationId, key = true, hidden = true),
-      SqlObject("exposureTimeMode", Join(GhostIfuTable.ObservationId, GhostExposureTimeModeLinkView.BlueObservationId), Join(GhostExposureTimeModeLinkView.Id, ExposureTimeModeView.Id)),
-      SqlObject("detector")
-    )
-
-  lazy val GhostRedArmMapping: ObjectMapping =
-    ObjectMapping(GhostRedArmType)(
-      SqlField("observationId", GhostIfuTable.ObservationId, key = true, hidden = true),
-      SqlObject("exposureTimeMode", Join(GhostIfuTable.ObservationId, GhostExposureTimeModeLinkView.RedObservationId), Join(GhostExposureTimeModeLinkView.Id, ExposureTimeModeView.Id)),
+      SqlObject("exposureTimeMode", Join(GhostIfuTable.ObservationId, idCol), Join(GhostExposureTimeModeLinkView.Id, ExposureTimeModeView.Id)),
       SqlObject("detector")
     )
 
@@ -79,22 +75,13 @@ trait GhostIfuMapping[F[_]]
     List(
       ghostDetectorConfigMapping(GhostIfuTable.Red),
       ghostDetectorConfigMapping(GhostIfuTable.Blue),
-      GhostBlueArmMapping,
-      GhostRedArmMapping,
+      ghostArmMapping(GhostIfuTable.Blue, GhostExposureTimeModeLinkView.BlueObservationId),
+      ghostArmMapping(GhostIfuTable.Red, GhostExposureTimeModeLinkView.RedObservationId),
       GhostIfuMapping
     )
 
   lazy val GhostIfuElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
-    case (GhostBlueArmType, "exposureTimeMode", Nil) =>
-      Elab.transformChild: child =>
-        Unique(
-          Filter(
-            Predicates.exposureTimeMode.role.eql(ExposureTimeModeRole.Science),
-            child
-          )
-        )
-
-    case (GhostRedArmType, "exposureTimeMode", Nil) =>
+    case (GhostArmType, "exposureTimeMode", Nil) =>
       Elab.transformChild: child =>
         Unique(
           Filter(

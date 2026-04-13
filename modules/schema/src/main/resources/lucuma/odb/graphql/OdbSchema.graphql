@@ -8711,26 +8711,9 @@ type GhostDetector {
 }
 
 """
-GHOST blue arm configuration.
+GHOST arm configuration.
 """
-type GhostBlueArm {
-
-  """
-  Exposure time mode for the detector.
-  """
-  exposureTimeMode: ExposureTimeMode!
-
-  """
-  GHOST detector.
-  """
-  detector: GhostDetector!
-
-}
-
-"""
-GHOST red arm configuration.
-"""
-type GhostRedArm {
+type GhostArm {
 
   """
   Exposure time mode for the detector.
@@ -8757,12 +8740,12 @@ type GhostIfu {
   """
   Red detector config.
   """
-  red: GhostRedArm!
+  red: GhostArm!
 
   """
   Blue detector config.
   """
-  blue: GhostBlueArm!
+  blue: GhostArm!
 
   """
   IFU 1 fiber agitator setting, either explicitly specified or else default.
