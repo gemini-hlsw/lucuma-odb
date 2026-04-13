@@ -52,6 +52,7 @@ import lucuma.core.model.User
 import lucuma.core.model.probes
 import lucuma.core.model.sequence.ExecutionDigest
 import lucuma.core.model.sequence.flamingos2.Flamingos2FpuMask
+import lucuma.core.model.sequence.igrins2.CentralWavelength as Igrins2CentralWavelength
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
@@ -295,8 +296,7 @@ object GuideService {
         case mode: gmos.longslit.Config.GmosSouth =>
           (Site.GS, ObservingModeType.GmosSouthLongSlit, mode.centralWavelength)
         case _: igrins2.longslit.Config =>
-          // TODO Verify what wavelength to use for ags
-          (Site.GS, ObservingModeType.Igrins2LongSlit, Wavelength.fromIntNanometers(1700).get)
+          (Site.GN, ObservingModeType.Igrins2LongSlit, Igrins2CentralWavelength)
 
     def agsParamsFor(trackType: TrackType): Option[AgsParams] =
       probes.guideProbe(observingModeType, trackType).flatMap: probe =>
