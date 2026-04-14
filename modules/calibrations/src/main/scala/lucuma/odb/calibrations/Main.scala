@@ -13,6 +13,7 @@ import cats.effect.syntax.all.*
 import cats.syntax.all.*
 import com.monovore.decline.*
 import com.monovore.decline.effect.CommandIOApp
+import fs2.compression.Compression
 import fs2.concurrent.Topic
 import fs2.io.net.Network
 import grackle.Result
@@ -52,6 +53,7 @@ import org.typelevel.log4cats.slf4j.Slf4jFactory
 import org.typelevel.log4cats.syntax.*
 import org.typelevel.otel4s.Attribute
 import org.typelevel.otel4s.trace.Tracer
+import org.typelevel.otel4s.trace.TracerProvider
 import skunk.*
 
 import java.time.LocalDate
@@ -253,7 +255,7 @@ object CMain extends MainParams {
    * Our main server, as a resource that starts up our server on acquire and shuts it all down
    * in cleanup, yielding an `ExitCode`. Users will `use` this resource and hold it forever.
    */
-  def server[F[_]: Async: Parallel: Logger: LoggerFactory: Trace: Tracer: Console: Network: SecureRandom]: Resource[F, ExitCode] =
+  def server[F[_]: Async: Compression: Parallel: Logger: LoggerFactory: Trace: Tracer: TracerProvider: Console: Network: SecureRandom]: Resource[F, ExitCode] =
     for {
       c                  <- Resource.eval(Config.fromCiris.load[F])
       _                  <- Resource.eval(banner[F](c))
@@ -277,11 +279,12 @@ object CMain extends MainParams {
   /** Our logical entry point. */
   def runF(using Logger[IO], LoggerFactory[IO]): IO[ExitCode] =
     (for
-      c               <- Resource.eval(Config.fromCiris.load[IO])
-      otel            <- OdbTelemetry.otel(ServiceName, c)
-      given Tracer[IO] = otel.tracer
-      given Trace[IO]  = otel.trace
-      _               <- server[IO]
+      c                        <- Resource.eval(Config.fromCiris.load[IO])
+      otel                     <- OdbTelemetry.otel(ServiceName, c)
+      given Tracer[IO]         = otel.tracer
+      given Trace[IO]          = otel.trace
+      given TracerProvider[IO] = otel.tracerProvider
+      _                        <- server[IO]
     yield ExitCode.Success).useForever
 
 }

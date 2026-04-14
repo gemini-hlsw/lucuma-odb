@@ -8,59 +8,62 @@ import cats.syntax.all.*
 import dev.profunktor.redis4cats.algebra.Flush
 import dev.profunktor.redis4cats.algebra.StringCommands
 import io.chrisdavenport.keysemaphore.KeySemaphore
-import natchez.Trace
 import org.typelevel.log4cats.Logger
+import org.typelevel.otel4s.Attribute
+import org.typelevel.otel4s.trace.Tracer
 
 import scala.concurrent.duration.*
 
-trait RedisEffectfulCache[F[_]: Async: Trace](
+trait RedisEffectfulCache[F[_]: {Async, Tracer as T}](
   redis:                      StringCommands[F, Array[Byte], Array[Byte]] & Flush[F, Array[Byte]],
   protected val keySemaphore: KeySemaphore[F, Array[Byte]]
 ) extends BinaryEffectfulCache[F]:
 
   override protected def read(key: Array[Byte]): F[Option[Array[Byte]]] =
-    Trace[F].span("redis_read"):
-      Trace[F].put("cache.operation" -> "read", "cache.backend" -> "redis") *>
+    T.span("redis_read", Attribute("cache.operation", "read"), Attribute("cache.backend", "redis"))
+      .use: span =>
         redis
           .get(key)
           .flatTap: result =>
-            Trace[F].put("cache.status" -> (result.fold("miss")(_ => "hit")))
+            span.addAttribute(Attribute("cache.status", result.fold("miss")(_ => "hit")))
 
   override protected def readWithContext(
     key:     Array[Byte],
     context: String = ""
   ): F[Option[Array[Byte]]] =
-    Trace[F].span("redis_read_with_context"):
-      Trace[F].put("cache.operation"  -> "read",
-                   "cache.backend"    -> "redis",
-                   "cache.key_prefix" -> context
-      ) *>
-        redis
-          .get(key)
-          .flatTap: result =>
-            Trace[F].put("cache.status" -> (result.fold("miss")(_ => "hit")))
+    T.span("redis_read_with_context",
+           Attribute("cache.operation", "read"),
+           Attribute("cache.backend", "redis"),
+           Attribute("cache.key_prefix", context)
+    ).use: span =>
+      redis
+        .get(key)
+        .flatTap: result =>
+          span.addAttribute(Attribute("cache.status", result.fold("miss")(_ => "hit")))
 
   override protected def write(
     key:   Array[Byte],
     value: Array[Byte],
     ttl:   Option[FiniteDuration]
   ): F[Unit] =
-    Trace[F].span("redis_write"):
-      Trace[F].put("cache.operation" -> "write",
-                   "cache.backend"   -> "redis",
-                   "cache.has_ttl"   -> ttl.isDefined.toString
-      ) *>
-        ttl.fold(redis.set(key, value))(redis.setEx(key, value, _))
+    T.span("redis_write",
+           Attribute("cache.operation", "write"),
+           Attribute("cache.backend", "redis"),
+           Attribute("cache.has_ttl", ttl.isDefined.toString)
+    ).surround:
+      ttl.fold(redis.set(key, value))(redis.setEx(key, value, _))
 
   override protected def delete(key: Array[Byte]): F[Unit] =
-    Trace[F].span("redis_delete"):
-      Trace[F].put("cache.operation" -> "delete", "cache.backend" -> "redis") *>
-        redis.unsafe(_.del(key)).void
+    T.span("redis_delete",
+           Attribute("cache.operation", "delete"),
+           Attribute("cache.backend", "redis")
+    ).surround:
+      redis.unsafe(_.del(key)).void
 
   override def flush: F[Unit] = redis.flushAll
 
 object RedisEffectfulCache:
-  def apply[F[_]: Async: Trace: Logger](
+  def apply[F[_]: Async: Tracer: Logger](
     redis: StringCommands[F, Array[Byte], Array[Byte]] & Flush[F, Array[Byte]]
   ): F[RedisEffectfulCache[F]] =
     KeySemaphore

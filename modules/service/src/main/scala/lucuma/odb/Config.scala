@@ -13,6 +13,7 @@ import com.comcast.ip4s.Port
 import eu.timepit.refined.types.string.NonEmptyString
 import fs2.aws.s3.models.Models.BucketName
 import fs2.aws.s3.models.Models.FileKey
+import fs2.compression.Compression
 import fs2.io.net.Network
 import lucuma.catalog.clients.GaiaClient
 import lucuma.catalog.clients.SimbadClient
@@ -34,10 +35,14 @@ import natchez.Trace
 import natchez.http4s.NatchezMiddleware
 import org.http4s.Uri
 import org.http4s.client.Client
+import org.http4s.client.middleware.GZip
 import org.http4s.ember.client.EmberClientBuilder
+import org.http4s.otel4s.middleware.trace.client.ClientMiddleware
+import org.http4s.otel4s.middleware.trace.client.ClientSpanDataProvider
 import org.http4s.syntax.all.*
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.LoggerFactory
+import org.typelevel.otel4s.trace.TracerProvider
 
 import java.net.URI
 import java.net.URISyntaxException
@@ -80,9 +85,17 @@ case class Config(
     httpClientResource.map(HorizonsClient.apply(_, 5, 1.second))
 
   // ITC client resource
-  def itcClient[F[_]: Async: Logger: Network]: Resource[F, ItcClient[F]] =
-    httpClientResource[F].evalMap: httpClient =>
-      ItcClient.create(itc.root, httpClient)
+  // TODO make the client using tracing always including called from explore
+  def itcClient[F[_]: Async: Network: Logger: TracerProvider: Compression]: Resource[F, ItcClient[F]] =
+    for {
+      httpClient       <- httpClientResource[F]
+      otelMiddleware   <- Resource.eval(
+                            ClientMiddleware
+                              .builder(ClientSpanDataProvider.openTelemetry(ServerMiddleware.redactor))
+                              .build
+                          )
+      client           <- Resource.eval(ItcClient.create(itc.root, GZip()(otelMiddleware(httpClient))))
+    } yield client
 
   // Gaia client resource
   def gaiaClient[F[_]: Async: Network: LoggerFactory]: Resource[F, GaiaClient[F]] =

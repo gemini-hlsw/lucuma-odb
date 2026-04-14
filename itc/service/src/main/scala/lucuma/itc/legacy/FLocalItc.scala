@@ -12,12 +12,13 @@ import lucuma.itc.SourceTooBright
 import lucuma.itc.UpstreamException
 import lucuma.itc.WavelengthOutOfRange
 import lucuma.itc.legacy
-import natchez.Trace
+import org.typelevel.otel4s.Attribute
+import org.typelevel.otel4s.trace.Tracer
 
 /**
  * Wraps local calls to ITC to ensure fairness
  */
-case class FLocalItc[F[_]: {Async as F, Trace as T}](itcLocal: LocalItc[F]):
+case class FLocalItc[F[_]: {Async as F, Tracer as T}](itcLocal: LocalItc[F]):
 
   val TooBright =
     """This target is too bright for this configuration."""
@@ -27,42 +28,42 @@ case class FLocalItc[F[_]: {Async as F, Trace as T}](itcLocal: LocalItc[F]):
     jsonParams:   String,
     atWavelength: Wavelength
   ): F[GraphsRemoteResult] =
-    T.span("call_legacy graphs"):
-      T.put("method"       -> "calculateGraphs",
-            "params.json"  -> jsonParams,
-            "ocs_git_hash" -> BuildInfo.ocsGitHash
-      ) *>
-        (F.cede *> itcLocal.calculateGraphs(jsonParams).guarantee(F.cede)).flatMap {
-          case Right(result) => F.pure(result)
-          case Left(msg)     =>
-            msg match {
-              case TooBright :: HalfWell(v) :: Nil => F.raiseError(SourceTooBright(BigDecimal(v)))
-              case List(LocalItc.OutOfRangeMsg)    =>
-                F.raiseError(WavelengthOutOfRange(atWavelength))
-              case _                               => F.raiseError(new UpstreamException(msg))
-            }
-        }
+    T.span("call_legacy graphs",
+           Attribute("method", "calculateGraphs"),
+           Attribute("params.json", jsonParams),
+           Attribute("ocs_git_hash", BuildInfo.ocsGitHash)
+    ).surround:
+      (F.cede *> itcLocal.calculateGraphs(jsonParams).guarantee(F.cede)).flatMap {
+        case Right(result) => F.pure(result)
+        case Left(msg)     =>
+          msg match {
+            case TooBright :: HalfWell(v) :: Nil => F.raiseError(SourceTooBright(BigDecimal(v)))
+            case List(LocalItc.OutOfRangeMsg)    =>
+              F.raiseError(WavelengthOutOfRange(atWavelength))
+            case _                               => F.raiseError(new UpstreamException(msg))
+          }
+      }
 
   def calculate(
     jsonParams:   String,
     atWavelength: Wavelength
   ): F[IntegrationTimeRemoteResult] =
     F.delay(pprint.pprintln(jsonParams)) *>
-      T.span("call_legacy calculate"):
-        T.put("method"       -> "calculate",
-              "params.json"  -> jsonParams,
-              "ocs_git_hash" -> BuildInfo.ocsGitHash
-        ) *>
-          (F.cede *> itcLocal.calculate(jsonParams).guarantee(F.cede)).flatMap {
-            case Right(result) =>
-              F.pure(result)
-            case Left(msg)     =>
-              msg match {
-                case TooBright :: HalfWell(v) :: Nil =>
-                  F.raiseError(SourceTooBright(BigDecimal(v)))
-                case List(LocalItc.OutOfRangeMsg)    =>
-                  F.raiseError(WavelengthOutOfRange(atWavelength))
-                case _                               =>
-                  F.raiseError(new UpstreamException(msg))
-              }
-          }
+      T.span("call_legacy calculate",
+             Attribute("method", "calculate"),
+             Attribute("params.json", jsonParams),
+             Attribute("ocs_git_hash", BuildInfo.ocsGitHash)
+      ).surround:
+        (F.cede *> itcLocal.calculate(jsonParams).guarantee(F.cede)).flatMap {
+          case Right(result) =>
+            F.pure(result)
+          case Left(msg)     =>
+            msg match {
+              case TooBright :: HalfWell(v) :: Nil =>
+                F.raiseError(SourceTooBright(BigDecimal(v)))
+              case List(LocalItc.OutOfRangeMsg)    =>
+                F.raiseError(WavelengthOutOfRange(atWavelength))
+              case _                               =>
+                F.raiseError(new UpstreamException(msg))
+            }
+        }

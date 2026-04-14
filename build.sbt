@@ -14,7 +14,6 @@ val circeRefinedVersion          = "0.15.1"
 val cirisVersion                 = "3.14.1"
 val clueVersion                  = "0.51.3"
 val declineVersion               = "2.6.2"
-val dropwizardVersion            = "4.2.38"
 val flywayVersion                = "9.22.3"
 val fs2AwsVersion                = "6.2.0"
 val fs2Version                   = "3.13.0"
@@ -464,32 +463,31 @@ lazy val itcService = project
       "-Dcats.effect.tracing.mode=none"
     ),
     libraryDependencies ++= Seq(
-      "org.typelevel"        %% "grackle-core"          % grackleVersion,
-      "org.typelevel"        %% "grackle-generic"       % grackleVersion,
-      "org.typelevel"        %% "grackle-circe"         % grackleVersion,
-      "edu.gemini"           %% "lucuma-graphql-routes" % lucumaGraphQLRoutesVersion,
-      "org.tpolecat"         %% "natchez-http4s"        % natchezHttp4sVersion,
-      "co.fs2"               %% "fs2-core"              % fs2Version,
-      "edu.gemini"           %% "lucuma-core"           % lucumaCoreVersion,
-      "org.typelevel"        %% "cats-core"             % catsVersion,
-      "org.typelevel"        %% "cats-effect"           % catsEffectVersion,
-      "is.cir"               %% "ciris"                 % cirisVersion,
-      "org.typelevel"        %% "log4cats-slf4j"        % log4catsVersion,
-      "org.slf4j"             % "slf4j-simple"          % slf4jVersion,
-      "org.http4s"           %% "http4s-core"           % http4sVersion,
-      "org.http4s"           %% "http4s-ember-server"   % http4sVersion,
-      "org.http4s"           %% "http4s-ember-client"   % http4sVersion,
-      "eu.timepit"           %% "refined"               % refinedVersion,
-      "eu.timepit"           %% "refined-cats"          % refinedVersion,
-      "dev.profunktor"       %% "redis4cats-effects"    % redis4CatsVersion,
-      "dev.profunktor"       %% "redis4cats-log4cats"   % redis4CatsVersion,
-      "com.lihaoyi"          %% "pprint"                % pprintVersion,
-      "io.suzaku"            %% "boopickle"             % boopickleVersion,
-      "io.chrisdavenport"    %% "keysemaphore"          % keySemaphoreVersion,
-      "io.dropwizard.metrics" % "metrics-core"          % dropwizardVersion,
-      "io.dropwizard.metrics" % "metrics-jvm"           % dropwizardVersion,
-      "io.dropwizard.metrics" % "metrics-graphite"      % dropwizardVersion,
-      "org.typelevel"        %% "munit-cats-effect"     % munitCatsEffectVersion % Test
+      "org.typelevel"        %% "grackle-core"                          % grackleVersion,
+      "org.typelevel"        %% "grackle-generic"                       % grackleVersion,
+      "org.typelevel"        %% "grackle-circe"                         % grackleVersion,
+      "edu.gemini"           %% "lucuma-graphql-routes"                 % lucumaGraphQLRoutesVersion,
+      "org.http4s"           %% "http4s-otel4s-middleware-trace-server" % http4sOtel4sVersion,
+      "org.http4s"           %% "http4s-otel4s-middleware-trace-client" % http4sOtel4sVersion,
+      "org.http4s"           %% "http4s-otel4s-middleware-metrics"      % http4sOtel4sVersion,
+      "co.fs2"               %% "fs2-core"                              % fs2Version,
+      "edu.gemini"           %% "lucuma-core"                           % lucumaCoreVersion,
+      "org.typelevel"        %% "cats-core"                             % catsVersion,
+      "org.typelevel"        %% "cats-effect"                           % catsEffectVersion,
+      "is.cir"               %% "ciris"                                 % cirisVersion,
+      "org.typelevel"        %% "log4cats-slf4j"                        % log4catsVersion,
+      "org.slf4j"             % "slf4j-simple"                          % slf4jVersion,
+      "org.http4s"           %% "http4s-core"                           % http4sVersion,
+      "org.http4s"           %% "http4s-ember-server"                   % http4sVersion,
+      "org.http4s"           %% "http4s-ember-client"                   % http4sVersion,
+      "eu.timepit"           %% "refined"                               % refinedVersion,
+      "eu.timepit"           %% "refined-cats"                          % refinedVersion,
+      "dev.profunktor"       %% "redis4cats-effects"                    % redis4CatsVersion,
+      "dev.profunktor"       %% "redis4cats-log4cats"                   % redis4CatsVersion,
+      "com.lihaoyi"          %% "pprint"                                % pprintVersion,
+      "io.suzaku"            %% "boopickle"                             % boopickleVersion,
+      "io.chrisdavenport"    %% "keysemaphore"                          % keySemaphoreVersion,
+      "org.typelevel"        %% "munit-cats-effect"                     % munitCatsEffectVersion % Test
     ),
     envVars ++= Map("ODB_BASE_URL" -> "https://lucuma-postgres-odb-dev.herokuapp.com"), // Used for local development
     buildInfoKeys         := Seq[BuildInfoKey](

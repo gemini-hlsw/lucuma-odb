@@ -9,7 +9,6 @@ import cats.syntax.all.*
 import fs2.io.net.Network
 import fs2.text
 import lucuma.core.model.Attachment
-import natchez.Trace
 import org.http4s.AuthScheme
 import org.http4s.Credentials
 import org.http4s.Headers
@@ -19,39 +18,43 @@ import org.http4s.client.Client
 import org.http4s.ember.client.EmberClientBuilder
 import org.http4s.headers.Authorization
 import org.typelevel.log4cats.Logger
+import org.typelevel.log4cats.syntax.*
+import org.typelevel.otel4s.Attribute
+import org.typelevel.otel4s.trace.Tracer
 
 /**
  * Implementation of `CustomSed.Resolver` that uses a URL to fetch the custom SED.
  */
-class CustomSedOdbAttachmentResolver[F[_]: Async: Logger: Trace] private (
+class CustomSedOdbAttachmentResolver[F[_]: {Async, Logger, Tracer as T}] private (
   client:     Client[F],
   odbBaseUrl: Uri,
   authToken:  String
 ) extends CustomSedDatResolver[F]:
 
   protected def datLines(id: Attachment.Id): F[fs2.Stream[F, String]] =
-    Trace[F].span("custom-sed-attachment-resolver"):
-      val uri: Uri            =
-        odbBaseUrl / "attachment" / id.show
-      val request: Request[F] =
-        Request(
-          uri = uri,
-          headers = Headers:
-            Authorization:
-              Credentials.Token(AuthScheme.Bearer, authToken)
-        )
+    T.span("custom-sed-attachment-resolver")
+      .use: span =>
+        val uri: Uri            =
+          odbBaseUrl / "attachment" / id.show
+        val request: Request[F] =
+          Request(
+            uri = uri,
+            headers = Headers:
+              Authorization:
+                Credentials.Token(AuthScheme.Bearer, authToken)
+          )
 
-      for
-        _ <- Trace[F].put("custom-sed-attachment-resolver.uri" -> uri.toString)
-        _ <- Logger[F].info(s"Fetching custom SED for id [$id]: $uri")
-      yield client
-        .stream(request)
-        .flatMap(_.body)
-        .through(text.utf8.decode)
-        .through(text.lines)
+        for
+          _ <- span.addAttribute(Attribute("custom-sed-attachment-resolver.uri", uri.toString))
+          _ <- info"Fetching custom SED for id [$id]: $uri"
+        yield client
+          .stream(request)
+          .flatMap(_.body)
+          .through(text.utf8.decode)
+          .through(text.lines)
 
 object CustomSedOdbAttachmentResolver:
-  def apply[F[_]: Async: Network: Logger: Trace](
+  def apply[F[_]: Async: Network: Logger: Tracer](
     odbBaseUrl: Uri,
     authToken:  String
   ): Resource[F, CustomSed.Resolver[F]] =

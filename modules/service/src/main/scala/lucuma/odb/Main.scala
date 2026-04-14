@@ -13,6 +13,7 @@ import cats.implicits.*
 import com.comcast.ip4s.Port
 import com.monovore.decline.*
 import com.monovore.decline.effect.CommandIOApp
+import fs2.compression.Compression
 import fs2.io.net.Network
 import grackle.skunk.SkunkMonitor
 import io.laserdisc.pure.s3.tagless.S3AsyncClientOp
@@ -207,7 +208,7 @@ object FMain extends MainParams {
       .resource
 
   /** A resource that yields our HttpRoutes, wrapped in accessory middleware. */
-  def routesResource[F[_]: Async: Parallel: Trace: Tracer: TracerProvider: MeterProvider: Logger: LoggerFactory: Network: Console: SecureRandom](
+  def routesResource[F[_]: Compression: Async: Parallel: Trace: Tracer: TracerProvider: MeterProvider: Logger: LoggerFactory: Network: Console: SecureRandom](
     config: Config
   ): Resource[F, WebSocketBuilder2[F] => HttpRoutes[F]] =
     routesResource(

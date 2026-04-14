@@ -19,7 +19,6 @@ final case class Config(
   odbServiceToken: String,
   otel:            Option[SharedOtelConfig],
   inHeroku:        Boolean,
-  metrics:         MetricsConfig,
   cacheTtlDays:    Int
 )
 
@@ -44,7 +43,6 @@ object Config:
      envOrProp("ODB_SERVICE_JWT"),
      OtelConfig.fromCiris,
      dynoCheck.map(_.isDefined),
-     MetricsConfig.config,
      envOrProp("ITC_CACHE_TTL_DAYS").as[Int].default(7)
     ).parMapN(Config.apply)
 

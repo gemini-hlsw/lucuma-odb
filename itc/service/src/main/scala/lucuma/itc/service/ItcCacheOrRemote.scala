@@ -17,8 +17,8 @@ import lucuma.itc.input.customSed.CustomSed
 import lucuma.itc.service.config.Config
 import lucuma.itc.service.redis.given
 import lucuma.itc.service.requests.*
-import natchez.Trace
 import org.typelevel.log4cats.Logger
+import org.typelevel.otel4s.trace.Tracer
 
 import scala.concurrent.duration.*
 
@@ -101,24 +101,27 @@ trait ItcCacheOrRemote extends Version:
   /**
    * Request a graph
    */
-  def graphsFromCacheOrRemote[F[_]: MonadThrow: Parallel: Logger: CustomSed.Resolver](
+  def graphsFromCacheOrRemote[
+    F[_]: {MonadThrow, Parallel, Logger, CustomSed.Resolver, Tracer as T}
+  ](
     request: TargetGraphRequest
   )(
     itc:     Itc[F],
     cache:   BinaryEffectfulCache[F],
     config:  Config
-  )(using t: Trace[F]): F[TargetGraphsCalcResult] =
-    Trace[F]
-      .span("resolve custom_sed_graphs"):
+  ): F[TargetGraphsCalcResult] =
+    T.span("resolve custom_sed_graphs")
+      .surround:
         CustomSed // We must resolve CustomSed before caching.
           .resolveTargetGraphRequest(request)
       .flatMap: r =>
-        Trace[F].span("cache_or_calculate graphs"):
-          cache.getOrInvokeBinary(r,
-                                  requestGraphs(itc)(r),
-                                  TTL(config),
-                                  s"$CacheRootPrefix:graph:spec"
-          )
+        T.span("cache_or_calculate graphs")
+          .surround:
+            cache.getOrInvokeBinary(r,
+                                    requestGraphs(itc)(r),
+                                    TTL(config),
+                                    s"$CacheRootPrefix:graph:spec"
+            )
 
   private def requestSpectroscopy[F[_]: MonadThrow: Logger](itc: Itc[F])(
     calcRequest: TargetSpectroscopyTimeRequest
@@ -138,24 +141,25 @@ trait ItcCacheOrRemote extends Version:
    */
   def spectroscopyFromCacheOrRemote[F[
     _
-  ]: MonadThrow: Parallel: Logger: CustomSed.Resolver](
+  ]: {MonadThrow, Parallel, Logger, CustomSed.Resolver, Tracer as T}](
     calcRequest: TargetSpectroscopyTimeRequest
   )(
     itc:         Itc[F],
     cache:       BinaryEffectfulCache[F],
     config:      Config
-  )(using t: Trace[F]): F[TargetIntegrationTime] =
-    Trace[F]
-      .span("resolve custom_sed_spectroscopy"):
+  ): F[TargetIntegrationTime] =
+    T.span("resolve custom_sed_spectroscopy")
+      .surround:
         CustomSed // We must resolve CustomSed before caching.
           .resolveTargetSpectroscopyTimeRequest(calcRequest)
       .flatMap: r =>
-        Trace[F].span("cache_or_calculate spectroscopy"):
-          cache.getOrInvokeBinary(r,
-                                  requestSpectroscopy(itc)(r),
-                                  TTL(config),
-                                  s"$CacheRootPrefix:calc:spec"
-          )
+        T.span("cache_or_calculate spectroscopy")
+          .surround:
+            cache.getOrInvokeBinary(r,
+                                    requestSpectroscopy(itc)(r),
+                                    TTL(config),
+                                    s"$CacheRootPrefix:calc:spec"
+            )
 
   private def requestImaging[F[_]: MonadThrow: Logger](itc: Itc[F])(
     calcRequest: TargetImagingTimeRequest
@@ -174,35 +178,35 @@ trait ItcCacheOrRemote extends Version:
    * Request ITC calculation for imaging
    */
   def imagingFromCacheOrRemote[
-    F[_]: MonadThrow: Parallel: Logger: CustomSed.Resolver
+    F[_]: {MonadThrow, Parallel, Logger, CustomSed.Resolver, Tracer as T}
   ](
     calcRequest: TargetImagingTimeRequest
   )(
     itc:         Itc[F],
     cache:       BinaryEffectfulCache[F],
     config:      Config
-  )(using t: Trace[F]): F[TargetIntegrationTime] =
-    Trace[F]
-      .span("resolve custom_sed_imaging"):
+  ): F[TargetIntegrationTime] =
+    T.span("resolve custom_sed_imaging")
+      .surround:
         CustomSed // We must resolve CustomSed before caching.
           .resolveTargetImagingTimeRequest(calcRequest)
       .flatMap: r =>
-        Trace[F].span("cache_or_calculate imaging"):
-          cache.getOrInvokeBinary(r,
-                                  requestImaging(itc)(r),
-                                  TTL(config),
-                                  s"$CacheRootPrefix:calc:img"
-          )
+        T.span("cache_or_calculate imaging")
+          .surround:
+            cache.getOrInvokeBinary(r,
+                                    requestImaging(itc)(r),
+                                    TTL(config),
+                                    s"$CacheRootPrefix:calc:img"
+            )
 
   /**
    * This method will get the version from the remote itc and compare it with the one on the cache.
    * If there is none in the cache we just store it. If the remote is different than the local then
    * flush the cache.
    */
-  def checkVersionToPurge[F[_]: MonadThrow: Logger](
+  def checkVersionToPurge[F[_]: {MonadThrow, Logger as L}](
     cache: BinaryEffectfulCache[F]
   ): F[Unit] = {
-    val L      = Logger[F]
     val result = for
       _              <- L.info("Check for stale cache")
       versionOnCache <-
