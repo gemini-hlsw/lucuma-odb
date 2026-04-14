@@ -155,7 +155,12 @@ class createObservation_GhostIfu extends OdbSuite:
             """.asRight
         )
 
-  test("query GHOST IFU"):
+  // This test case revealed a flaw in the ETM mapping that lead to Grackle
+  // adding a join which filtered out the GMOS results.  We add a new GMOS
+  // north observation and rely on the fact that a GHOST IFU observation is
+  // already in the database from the previous test case.  Both should be
+  // found by a query that filters no observations.
+  test("query observations with mixed modes, including GHOST IFU exposureTimeModes"):
     for
       p <- createProgramAs(pi)
       t <- createTargetAs(pi, p)
@@ -171,9 +176,15 @@ class createObservation_GhostIfu extends OdbSuite:
                        ghostIfu {
                          resolutionMode
                          red {
+                           exposureTimeMode {
+                             timeAndCount { count }
+                           }
                            binning
                          }
                          blue {
+                           exposureTimeMode {
+                             timeAndCount { count }
+                           }
                            binning
                          }
                        }
@@ -192,9 +203,19 @@ class createObservation_GhostIfu extends OdbSuite:
                          "ghostIfu": {
                            "resolutionMode": "STANDARD",
                            "red": {
+                             "exposureTimeMode": {
+                               "timeAndCount": {
+                                 "count": 2
+                               }
+                             },
                              "binning": "ONE_BY_TWO"
                            },
                            "blue": {
+                             "exposureTimeMode": {
+                               "timeAndCount": {
+                                 "count": 5
+                               }
+                             },
                              "binning": "ONE_BY_ONE"
                            }
                          }

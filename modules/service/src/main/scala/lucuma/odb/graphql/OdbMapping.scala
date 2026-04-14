@@ -253,7 +253,6 @@ object OdbMapping {
           with SetProgramReferenceResultMapping[F]
           with SetProposalStatusResultMapping[F]
           with SiderealMapping[F]
-          with SignalToNoiseExposureTimeModeMapping[F]
           with SiteCoordinateLimitsMapping[F]
           with SpectroscopyConfigOptionMapping[F]
           with SpectroscopyScienceRequirementsMapping[F]
@@ -268,7 +267,6 @@ object OdbMapping {
           with TargetGroupSelectResultMapping[F]
           with TargetSelectResultMapping[F]
           with TelescopeConfigMapping[F]
-          with TimeAndCountExposureTimeModeMapping[F]
           with TimeChargeCorrectionMapping[F]
           with TimeChargeDiscountMapping[F]
           with TimeChargeInvoiceMapping[F]
@@ -418,7 +416,6 @@ object OdbMapping {
                 ExecutionEventAddedMapping,
                 ExecutionEventMapping,
                 ExecutionMapping,
-                ExposureTimeModeMapping,
                 FastTurnaroundMapping,
                 FilterTypeMetaMapping,
                 Flamingos2DynamicMapping,
@@ -504,7 +501,6 @@ object OdbMapping {
                 SetProgramReferenceResultMapping,
                 SetProposalStatusResultMapping,
                 SiderealMapping,
-                SignalToNoiseExposureTimeModeMapping,
                 SlewEventMapping,
                 StepConfigMapping,
                 StepConfigBiasMapping,
@@ -524,7 +520,6 @@ object OdbMapping {
                 TargetGroupSelectResultMapping,
                 TargetMapping,
                 TargetSelectResultMapping,
-                TimeAndCountExposureTimeModeMapping,
                 TimeChargeCorrectionMapping,
                 TimeChargeDaylightDiscountMapping,
                 TimeChargeNoDataDiscountMapping,
@@ -575,6 +570,7 @@ object OdbMapping {
                 DateIntervalMappings,
                 DeclinationMapping,
                 ExecutionEventSelectResultMapping,
+                ExposureTimeModeMappings,
                 Flamingos2CustomMaskMappings,
                 Flamingos2FpuMaskMappings,
                 GhostIfuMappings,
