@@ -13,6 +13,7 @@ import cats.effect.syntax.all.*
 import cats.syntax.all.*
 import com.monovore.decline.*
 import com.monovore.decline.effect.CommandIOApp
+import fs2.compression.Compression
 import fs2.concurrent.Topic
 import fs2.io.net.Network
 import grackle.Result
@@ -52,6 +53,7 @@ import org.typelevel.log4cats.slf4j.Slf4jFactory
 import org.typelevel.log4cats.syntax.*
 import org.typelevel.otel4s.Attribute
 import org.typelevel.otel4s.trace.Tracer
+import org.typelevel.otel4s.trace.TracerProvider
 import skunk.*
 
 import java.time.LocalDate
@@ -59,8 +61,6 @@ import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.ZoneOffset
 import scala.concurrent.duration.*
-import org.typelevel.otel4s.trace.TracerProvider
-import fs2.compression.Compression
 
 sealed trait MainParams {
   val ServiceName: String =

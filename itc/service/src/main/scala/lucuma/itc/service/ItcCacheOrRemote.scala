@@ -17,8 +17,8 @@ import lucuma.itc.input.customSed.CustomSed
 import lucuma.itc.service.config.Config
 import lucuma.itc.service.redis.given
 import lucuma.itc.service.requests.*
-import org.typelevel.otel4s.trace.Tracer
 import org.typelevel.log4cats.Logger
+import org.typelevel.otel4s.trace.Tracer
 
 import scala.concurrent.duration.*
 

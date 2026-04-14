@@ -29,20 +29,20 @@ case class FLocalItc[F[_]: {Async as F, Tracer as T}](itcLocal: LocalItc[F]):
     atWavelength: Wavelength
   ): F[GraphsRemoteResult] =
     T.span("call_legacy graphs",
-      Attribute("method", "calculateGraphs"),
-      Attribute("params.json", jsonParams),
-      Attribute("ocs_git_hash", BuildInfo.ocsGitHash)
+           Attribute("method", "calculateGraphs"),
+           Attribute("params.json", jsonParams),
+           Attribute("ocs_git_hash", BuildInfo.ocsGitHash)
     ).surround:
       (F.cede *> itcLocal.calculateGraphs(jsonParams).guarantee(F.cede)).flatMap {
-          case Right(result) => F.pure(result)
-          case Left(msg)     =>
-            msg match {
-              case TooBright :: HalfWell(v) :: Nil => F.raiseError(SourceTooBright(BigDecimal(v)))
-              case List(LocalItc.OutOfRangeMsg)    =>
-                F.raiseError(WavelengthOutOfRange(atWavelength))
-              case _                               => F.raiseError(new UpstreamException(msg))
-            }
-        }
+        case Right(result) => F.pure(result)
+        case Left(msg)     =>
+          msg match {
+            case TooBright :: HalfWell(v) :: Nil => F.raiseError(SourceTooBright(BigDecimal(v)))
+            case List(LocalItc.OutOfRangeMsg)    =>
+              F.raiseError(WavelengthOutOfRange(atWavelength))
+            case _                               => F.raiseError(new UpstreamException(msg))
+          }
+      }
 
   def calculate(
     jsonParams:   String,
@@ -50,20 +50,20 @@ case class FLocalItc[F[_]: {Async as F, Tracer as T}](itcLocal: LocalItc[F]):
   ): F[IntegrationTimeRemoteResult] =
     F.delay(pprint.pprintln(jsonParams)) *>
       T.span("call_legacy calculate",
-        Attribute("method", "calculate"),
-        Attribute("params.json", jsonParams),
-        Attribute("ocs_git_hash", BuildInfo.ocsGitHash)
+             Attribute("method", "calculate"),
+             Attribute("params.json", jsonParams),
+             Attribute("ocs_git_hash", BuildInfo.ocsGitHash)
       ).surround:
         (F.cede *> itcLocal.calculate(jsonParams).guarantee(F.cede)).flatMap {
-            case Right(result) =>
-              F.pure(result)
-            case Left(msg)     =>
-              msg match {
-                case TooBright :: HalfWell(v) :: Nil =>
-                  F.raiseError(SourceTooBright(BigDecimal(v)))
-                case List(LocalItc.OutOfRangeMsg)    =>
-                  F.raiseError(WavelengthOutOfRange(atWavelength))
-                case _                               =>
-                  F.raiseError(new UpstreamException(msg))
-              }
-          }
+          case Right(result) =>
+            F.pure(result)
+          case Left(msg)     =>
+            msg match {
+              case TooBright :: HalfWell(v) :: Nil =>
+                F.raiseError(SourceTooBright(BigDecimal(v)))
+              case List(LocalItc.OutOfRangeMsg)    =>
+                F.raiseError(WavelengthOutOfRange(atWavelength))
+              case _                               =>
+                F.raiseError(new UpstreamException(msg))
+            }
+        }

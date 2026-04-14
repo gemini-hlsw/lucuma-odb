@@ -14,6 +14,7 @@ import cats.implicits.*
 import com.monovore.decline.*
 import com.monovore.decline.effect.CommandIOApp
 import fs2.Stream
+import fs2.compression.Compression
 import fs2.concurrent.Topic
 import fs2.io.net.Network
 import grackle.Mapping
@@ -46,12 +47,11 @@ import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.LoggerFactory
 import org.typelevel.log4cats.slf4j.Slf4jFactory
 import org.typelevel.otel4s.trace.Tracer
+import org.typelevel.otel4s.trace.TracerProvider
 import skunk.*
 
 import scala.concurrent.duration.*
 import scala.util.NotGiven
-import fs2.compression.Compression
-import org.typelevel.otel4s.trace.TracerProvider
 
 sealed trait MainParams:
   val ServiceName: String =

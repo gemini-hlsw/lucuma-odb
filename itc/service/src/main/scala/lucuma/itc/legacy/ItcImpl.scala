@@ -30,9 +30,9 @@ import lucuma.itc.service.ObservingMode
 import lucuma.itc.service.ObservingMode.ImagingMode
 import lucuma.itc.service.ObservingMode.SpectroscopyMode
 import lucuma.itc.service.TargetData
+import org.typelevel.log4cats.Logger
 import org.typelevel.otel4s.Attribute
 import org.typelevel.otel4s.trace.Tracer
-import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration.*
 import scala.math.*

@@ -26,8 +26,8 @@ import lucuma.itc.service.config.*
 import lucuma.itc.service.encoders.given
 import lucuma.itc.service.requests.*
 import lucuma.itc.service.syntax.all.*
-import org.typelevel.otel4s.trace.Tracer
 import org.typelevel.log4cats.Logger
+import org.typelevel.otel4s.trace.Tracer
 
 import scala.io.Source
 import scala.util.Using

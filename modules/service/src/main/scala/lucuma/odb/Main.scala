@@ -13,6 +13,7 @@ import cats.implicits.*
 import com.comcast.ip4s.Port
 import com.monovore.decline.*
 import com.monovore.decline.effect.CommandIOApp
+import fs2.compression.Compression
 import fs2.io.net.Network
 import grackle.skunk.SkunkMonitor
 import io.laserdisc.pure.s3.tagless.S3AsyncClientOp
@@ -55,7 +56,6 @@ import skunk.{Command as _, *}
 import software.amazon.awssdk.services.s3.presigner.S3Presigner
 
 import scala.concurrent.duration.*
-import fs2.compression.Compression
 
 object MainArgs {
   opaque type ResetDatabase = Boolean

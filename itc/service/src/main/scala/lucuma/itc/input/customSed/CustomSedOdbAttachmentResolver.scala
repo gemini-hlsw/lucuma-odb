@@ -19,8 +19,8 @@ import org.http4s.ember.client.EmberClientBuilder
 import org.http4s.headers.Authorization
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.syntax.*
-import org.typelevel.otel4s.trace.Tracer
 import org.typelevel.otel4s.Attribute
+import org.typelevel.otel4s.trace.Tracer
 
 /**
  * Implementation of `CustomSed.Resolver` that uses a URL to fetch the custom SED.

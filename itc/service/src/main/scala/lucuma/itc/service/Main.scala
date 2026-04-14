@@ -31,17 +31,14 @@ import lucuma.itc.service.config.*
 import lucuma.itc.service.config.ExecutionEnvironment.*
 import lucuma.otel.OtelSetup
 import natchez.Trace
-import org.http4s.otel4s.middleware.metrics.OtelMetrics
-import org.http4s.otel4s.middleware.trace.client.UriRedactor
-import org.http4s.otel4s.middleware.trace.server.ServerMiddleware as OtelServerMiddleware
-import org.http4s.otel4s.middleware.trace.server.ServerSpanDataProvider
-import org.typelevel.otel4s.metrics.MeterProvider
-import org.typelevel.otel4s.trace.Tracer
-import org.typelevel.otel4s.trace.TracerProvider
 import org.http4s.*
 import org.http4s.ember.server.EmberServerBuilder
 import org.http4s.headers.`Cache-Control`
 import org.http4s.implicits.*
+import org.http4s.otel4s.middleware.metrics.OtelMetrics
+import org.http4s.otel4s.middleware.trace.client.UriRedactor
+import org.http4s.otel4s.middleware.trace.server.ServerMiddleware as OtelServerMiddleware
+import org.http4s.otel4s.middleware.trace.server.ServerSpanDataProvider
 import org.http4s.server.Server
 import org.http4s.server.middleware.CORS
 import org.http4s.server.middleware.CORSPolicy
@@ -50,6 +47,9 @@ import org.http4s.server.middleware.Metrics
 import org.http4s.server.websocket.WebSocketBuilder2
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
+import org.typelevel.otel4s.metrics.MeterProvider
+import org.typelevel.otel4s.trace.Tracer
+import org.typelevel.otel4s.trace.TracerProvider
 
 import java.io.File
 import java.io.FileFilter

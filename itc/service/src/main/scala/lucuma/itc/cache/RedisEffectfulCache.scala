@@ -8,9 +8,9 @@ import cats.syntax.all.*
 import dev.profunktor.redis4cats.algebra.Flush
 import dev.profunktor.redis4cats.algebra.StringCommands
 import io.chrisdavenport.keysemaphore.KeySemaphore
+import org.typelevel.log4cats.Logger
 import org.typelevel.otel4s.Attribute
 import org.typelevel.otel4s.trace.Tracer
-import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration.*
 
