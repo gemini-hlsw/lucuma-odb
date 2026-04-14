@@ -50,6 +50,8 @@ import skunk.*
 
 import scala.concurrent.duration.*
 import scala.util.NotGiven
+import fs2.compression.Compression
+import org.typelevel.otel4s.trace.TracerProvider
 
 sealed trait MainParams:
   val ServiceName: String =
@@ -237,7 +239,7 @@ object CalcMain extends MainParams:
    * Our main server, as a resource that starts up our server on acquire and shuts it all down
    * in cleanup, yielding an `ExitCode`. Users will `use` this resource and hold it forever.
    */
-  def server[F[_]: Async: Parallel: Logger: LoggerFactory: Trace: Tracer: Console: Network: SecureRandom]: Resource[F, F[Outcome[F, Throwable, Unit]]] =
+  def server[F[_]: Async: Compression: Parallel: Logger: LoggerFactory: Trace: Tracer: TracerProvider: Console: Network: SecureRandom]: Resource[F, F[Outcome[F, Throwable, Unit]]] =
     for
       c          <- Resource.eval(Config.fromCiris.load[F])
       _          <- Resource.eval(banner[F](c))
@@ -291,6 +293,7 @@ object CalcMain extends MainParams:
       otel <- OdbTelemetry.otel(ServiceName, c)
       given Tracer[IO] = otel.tracer
       given Trace[IO]  = otel.trace
+      given TracerProvider[IO]  = otel.tracerProvider
       o    <- server[IO]
     yield o).use: o =>
       o.flatMap:

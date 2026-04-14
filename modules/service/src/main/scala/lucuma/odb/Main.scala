@@ -55,6 +55,7 @@ import skunk.{Command as _, *}
 import software.amazon.awssdk.services.s3.presigner.S3Presigner
 
 import scala.concurrent.duration.*
+import fs2.compression.Compression
 
 object MainArgs {
   opaque type ResetDatabase = Boolean
@@ -207,7 +208,7 @@ object FMain extends MainParams {
       .resource
 
   /** A resource that yields our HttpRoutes, wrapped in accessory middleware. */
-  def routesResource[F[_]: Async: Parallel: Trace: Tracer: TracerProvider: MeterProvider: Logger: LoggerFactory: Network: Console: SecureRandom](
+  def routesResource[F[_]: Compression: Async: Parallel: Trace: Tracer: TracerProvider: MeterProvider: Logger: LoggerFactory: Network: Console: SecureRandom](
     config: Config
   ): Resource[F, WebSocketBuilder2[F] => HttpRoutes[F]] =
     routesResource(

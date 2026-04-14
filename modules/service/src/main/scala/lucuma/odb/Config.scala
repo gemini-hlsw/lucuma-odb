@@ -35,6 +35,10 @@ import natchez.http4s.NatchezMiddleware
 import org.http4s.Uri
 import org.http4s.client.Client
 import org.http4s.ember.client.EmberClientBuilder
+import org.http4s.client.middleware.GZip
+import org.http4s.otel4s.middleware.trace.client.ClientMiddleware
+import org.http4s.otel4s.middleware.trace.client.ClientSpanDataProvider
+import org.typelevel.otel4s.trace.TracerProvider
 import org.http4s.syntax.all.*
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.LoggerFactory
@@ -44,6 +48,7 @@ import java.net.URISyntaxException
 import java.security.PublicKey
 import java.util.UUID
 import scala.concurrent.duration.*
+import fs2.compression.Compression
 
 case class Config(
   port:          Port,                          // Our port, nothing fancy.
@@ -80,9 +85,17 @@ case class Config(
     httpClientResource.map(HorizonsClient.apply(_, 5, 1.second))
 
   // ITC client resource
-  def itcClient[F[_]: Async: Logger: Network]: Resource[F, ItcClient[F]] =
-    httpClientResource[F].evalMap: httpClient =>
-      ItcClient.create(itc.root, httpClient)
+  def itcClient[F[_]: Async: Network: Logger: TracerProvider: Compression]: Resource[F, ItcClient[F]] =
+    for {
+      httpClient       <- httpClientResource[F]
+      otelMiddleware   <- Resource.eval(
+                        ClientMiddleware
+                          .builder(ClientSpanDataProvider.openTelemetry(ServerMiddleware.redactor))
+                          .build
+                       )
+      // loggedClient     = ClientLogger[F](logHeaders = true, logBody = false, logAction = ((s: String) => {println(s);Logger[F].debug(s)}).some)(GZip()(otelMiddleware(httpClient)))
+      client           <- Resource.eval(ItcClient.create(itc.root, GZip()(otelMiddleware(httpClient))))
+    } yield client
 
   // Gaia client resource
   def gaiaClient[F[_]: Async: Network: LoggerFactory]: Resource[F, GaiaClient[F]] =
