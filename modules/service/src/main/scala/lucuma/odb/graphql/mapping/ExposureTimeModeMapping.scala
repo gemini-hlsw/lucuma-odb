@@ -49,21 +49,27 @@ trait ExposureTimeModeMapping[F[_]] extends ExposureTimeModeView[F]:
 
   lazy val ExposureTimeModeMappings: List[ObjectMapping] =
     List(
-      etmMappings(Flamingos2LongSlitType, ExposureTimeModeView),
+      // Flamingos 2
+      etmMappings(Flamingos2LongSlitType,            ExposureTimeModeView),
       etmMappings(Flamingos2LongSlitAcquisitionType, ExposureTimeModeView),
 
+      // Ghost
       etmMappings(GhostIfuType / "blue",  GhostBlueExposureTimeModeView),
       etmMappings(GhostIfuType / "red",   GhostRedExposureTimeModeView),
 
-      etmMappings(GmosNorthImagingFilterType, ExposureTimeModeView),
-      etmMappings(GmosNorthLongSlitType, ExposureTimeModeView),
+      // GmosNorth
+      etmMappings(GmosNorthImagingFilterType,       ExposureTimeModeView),
+      etmMappings(GmosNorthLongSlitType,            ExposureTimeModeView),
       etmMappings(GmosNorthLongSlitAcquisitionType, ExposureTimeModeView),
 
-      etmMappings(GmosSouthImagingFilterType, ExposureTimeModeView),
-      etmMappings(GmosSouthLongSlitType, ExposureTimeModeView),
+      // GmosSouth
+      etmMappings(GmosSouthImagingFilterType,       ExposureTimeModeView),
+      etmMappings(GmosSouthLongSlitType,            ExposureTimeModeView),
       etmMappings(GmosSouthLongSlitAcquisitionType, ExposureTimeModeView),
 
+      // IGRINS2
       etmMappings(Igrins2LongSlitType, ExposureTimeModeView),
 
+      // Science Requirements
       etmMappings(ScienceRequirementsType, ExposureTimeModeView)
     ).flatten

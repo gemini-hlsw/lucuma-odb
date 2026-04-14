@@ -1,6 +1,7 @@
 
--- A view that facilitates the GHOST IFU mapping by adding embedded ids that are
--- null or non-null depending on camera type.
+-- A view that facilitates the GHOST IFU mapping by separating the blue and
+-- red channels.  Otherwise, the views are identical to v_exposure_time_mode.
+
 CREATE VIEW v_ghost_blue_exposure_time_mode AS
   SELECT
     e.*,
