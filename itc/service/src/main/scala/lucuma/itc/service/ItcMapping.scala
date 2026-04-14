@@ -40,13 +40,14 @@ object ItcMapping extends ItcCacheOrRemote with Version {
   // for error in dev is high and it's nice to handle failures in `F`.
   def loadSchema[F[_]: Sync]: F[Schema] =
     Sync[F]
-      .defer:
+      .blocking:
         Using(Source.fromResource("graphql/itc.graphql", getClass().getClassLoader())): src =>
-          Schema(src.mkString).toEither.fold(
-            x => sys.error(s"Invalid schema: ${x.toList.mkString(", ")}"),
-            identity
-          )
-        .liftTo[F]
+          Schema(src.mkString).toEither
+            .fold(
+              x => sys.error(s"Invalid schema: ${x.toList.mkString(", ")}"),
+              identity
+            )
+      .flatMap(_.liftTo[F])
 
   def versions[F[_]: Applicative](
     environment: ExecutionEnvironment
