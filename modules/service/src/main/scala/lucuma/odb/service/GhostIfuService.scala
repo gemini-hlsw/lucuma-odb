@@ -21,8 +21,8 @@ import lucuma.odb.data.ExposureTimeModeId
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.input.GhostIfuInput
+import lucuma.odb.sequence.ghost.Detector
 import lucuma.odb.sequence.ghost.ifu.Config
-import lucuma.odb.sequence.ghost.ifu.DetectorConfig
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.GhostCodecs.*
 import skunk.*
@@ -56,22 +56,26 @@ trait GhostIfuService[F[_]]:
   ): F[Unit]
 
 object GhostIfuService:
-  enum Detector:
+  enum Channel:
     case Red, Blue
 
   private def validateEtms(
     requirementsEtm: Option[ExposureTimeMode],
-    scienceEtms:     Map[Detector, Option[ExposureTimeMode.TimeAndCountMode]]
+    scienceEtms:     Map[Channel, Option[ExposureTimeMode]]
   ): Result[Unit] =
-    Result
-      .fromOption(
-        (scienceEtms.get(Detector.Red).flatten, scienceEtms.get(Detector.Blue).flatten)
-          .tupled
-          .void
-          .orElse:
-            requirementsEtm.flatMap(ExposureTimeMode.timeAndCount.getOption).void,
-        OdbError.InvalidArgument("GHOST observations require a TimeAndCount exposure time mode.".some).asProblem
-      )
+    def validateEtm(c: Channel): Result[Unit] =
+      Result
+        .fromOption(
+          scienceEtms
+            .get(c)
+            .flatten
+            .orElse(requirementsEtm)
+            .flatMap(ExposureTimeMode.timeAndCount.getOption)
+            .void,
+          OdbError.InvalidArgument("GHOST observations require a TimeAndCount exposure time mode.".some).asProblem
+        )
+
+    validateEtm(Channel.Red) *> validateEtm(Channel.Blue)
 
   def instantiate[F[_]: {Concurrent, Services}]: GhostIfuService[F] =
 
@@ -93,8 +97,8 @@ object GhostIfuService:
         which:  List[Observation.Id]
       )(using Transaction[F]): F[Result[Unit]] =
         val science = NonEmptyList.of(
-          Detector.Red  -> input.red.flatMap(_.timeAndCount),
-          Detector.Blue -> input.blue.flatMap(_.timeAndCount)
+          Channel.Blue -> input.blue.flatMap(_.exposureTimeMode),
+          Channel.Red  -> input.red.flatMap(_.exposureTimeMode)
         )
 
         NonEmptyList
@@ -106,7 +110,7 @@ object GhostIfuService:
               ids <- ResultT.liftF(exposureTimeModeService.insertResolvedAcquisitionAndScience(r))
               etms = nel.map: oid =>
                 val m = ids(oid)._2.toList.toMap
-                (oid, m(Detector.Red), m(Detector.Blue))
+                (oid, m(Channel.Red), m(Channel.Blue))
               _   <- ResultT.liftF(session.exec(Statements.insert(input, etms)))
             yield ()
           .value
@@ -130,32 +134,32 @@ object GhostIfuService:
 
   object Statements:
 
-    val ghost_detector_config: Decoder[DetectorConfig] =
+    val ghost_detector: Decoder[Detector] =
       (
         exposure_time_mode  *:
         ghost_binning       *:
         ghost_binning.opt   *:
         ghost_read_mode     *:
         ghost_read_mode.opt
-      ).emap: (etm, dBinning, eBinning, dReadMode, eReadMode) =>
+      ).emap: (etm, defaultBinning, explicitBinning, defaultReadMode, explicitReadMode) =>
         ExposureTimeMode
           .timeAndCount
           .getOption(etm)
           .toRight(s"GHOST only supports time and count exposure time mode.")
           .map: tc =>
-            DetectorConfig(tc, dBinning, eBinning, dReadMode, eReadMode)
+            Detector(tc, defaultBinning, explicitBinning, defaultReadMode, explicitReadMode)
 
-    val ghost_detector_config_red: Decoder[DetectorConfig.Red] =
-      (ghost_detector_config).map(dc => DetectorConfig.Red(dc))
+    val ghost_detector_blue: Decoder[Detector.Blue] =
+      (ghost_detector).map(Detector.Blue(_))
 
-    val ghost_detector_config_blue: Decoder[DetectorConfig.Blue] =
-      (ghost_detector_config).map(dc => DetectorConfig.Blue(dc))
+    val ghost_detector_red: Decoder[Detector.Red] =
+      (ghost_detector).map(Detector.Red(_))
 
     val ghost_ifu: Decoder[Config] =
       (
         ghost_resolution_mode         *:
-        ghost_detector_config_red     *:
-        ghost_detector_config_blue    *:
+        ghost_detector_red            *:
+        ghost_detector_blue           *:
         ghost_ifu1_fiber_agitator.opt *:
         ghost_ifu2_fiber_agitator.opt
       ).to[Config]

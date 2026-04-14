@@ -8,10 +8,13 @@ import lucuma.odb.util.Codecs.*
 
 trait ExposureTimeModeView[F[_]] extends BaseMapping[F]:
 
-  object ExposureTimeModeView extends TableDef("v_exposure_time_mode"):
+  class BaseExposureTimeModeView(
+    viewName: String
+  ) extends TableDef(viewName):
+
     val Id: ColumnRef            = col("c_exposure_time_mode_id", exposure_time_mode_id)
-    val ObservationId: ColumnRef = col("c_observation_id", observation_id)
-    val Role: ColumnRef          = col("c_role", exposure_time_mode_role)
+    val ObservationId: ColumnRef = col("c_observation_id",        observation_id)
+    val Role: ColumnRef          = col("c_role",                  exposure_time_mode_role)
 
     object SignalToNoise:
       val SyntheticId: ColumnRef = col("c_signal_to_noise_id", exposure_time_mode_id.embedded)
@@ -19,7 +22,11 @@ trait ExposureTimeModeView[F[_]] extends BaseMapping[F]:
       val At: ColumnRef          = col("c_signal_to_noise_at", wavelength_pm.embedded)
 
     object TimeAndCount:
-      val SyntheticId: ColumnRef = col("c_time_and_count_id", exposure_time_mode_id.embedded)
-      val Time: ColumnRef        = col("c_exposure_time",     time_span.embedded)
-      val Count: ColumnRef       = col("c_exposure_count",    int4_pos.embedded)
+      val SyntheticId: ColumnRef = col("c_time_and_count_id",  exposure_time_mode_id.embedded)
+      val Time: ColumnRef        = col("c_exposure_time",      time_span.embedded)
+      val Count: ColumnRef       = col("c_exposure_count",     int4_pos.embedded)
       val At: ColumnRef          = col("c_signal_to_noise_at", wavelength_pm.embedded)
+
+  object ExposureTimeModeView          extends BaseExposureTimeModeView("v_exposure_time_mode")
+  object GhostBlueExposureTimeModeView extends BaseExposureTimeModeView("v_ghost_blue_exposure_time_mode")
+  object GhostRedExposureTimeModeView  extends BaseExposureTimeModeView("v_ghost_red_exposure_time_mode")

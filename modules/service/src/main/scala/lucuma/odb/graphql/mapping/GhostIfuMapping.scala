@@ -4,12 +4,19 @@
 package lucuma.odb.graphql
 package mapping
 
+import grackle.Query.Binding
+import grackle.Query.Filter
+import grackle.Query.Unique
+import grackle.QueryCompiler.Elab
 import grackle.Result
+import grackle.TypeRef
 import grackle.skunk.SkunkMapping
 import lucuma.core.enums.GhostBinning
 import lucuma.core.enums.GhostIfu1FiberAgitator
 import lucuma.core.enums.GhostIfu2FiberAgitator
 import lucuma.core.enums.GhostReadMode
+import lucuma.odb.data.ExposureTimeModeRole
+import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.graphql.table.ExposureTimeModeView
 import lucuma.odb.graphql.table.GhostIfuTable
 
@@ -18,24 +25,26 @@ import lucuma.odb.graphql.table.GhostIfuTable
 trait GhostIfuMapping[F[_]]
   extends GhostIfuTable[F]
      with ExposureTimeModeView[F]
-     with OptionalFieldMapping[F] { this: SkunkMapping[F] =>
+     with OptionalFieldMapping[F]
+     with Predicates[F] { this: SkunkMapping[F] =>
 
-  def ghostDetectorConfigMapping(camera: GhostIfuTable.Camera): ObjectMapping =
-    ObjectMapping(GhostIfuType / camera.name)(
+  def ghostDetectorMapping(
+    detector: GhostIfuTable.DetectorTable,
+    etmView:  BaseExposureTimeModeView
+  ): ObjectMapping =
+    ObjectMapping(GhostIfuType / detector.name)(
       SqlField("observationId", GhostIfuTable.ObservationId, key = true, hidden = true),
-      SqlObject("timeAndCount", Join(camera.ExposureTimeModeId, ExposureTimeModeView.TimeAndCount.SyntheticId)),
+
+      SqlObject("exposureTimeMode", Join(GhostIfuTable.ObservationId, etmView.ObservationId)),
 
       explicitOrElseDefault[GhostBinning]("binning", "explicitBinning", "defaultBinning"),
-      SqlField("explicitBinning", camera.Binning),
-      SqlField("defaultBinning", camera.BinningDefault),
+      SqlField("explicitBinning", detector.Binning),
+      SqlField("defaultBinning", detector.BinningDefault),
 
       explicitOrElseDefault[GhostReadMode]("readMode", "explicitReadMode", "defaultReadMode"),
-      SqlField("explicitReadMode", camera.ReadMode),
-      SqlField("defaultReadMode", camera.ReadModeDefault)
+      SqlField("explicitReadMode", detector.ReadMode),
+      SqlField("defaultReadMode", detector.ReadModeDefault)
     )
-
-  lazy val RedMapping: ObjectMapping  = ghostDetectorConfigMapping(GhostIfuTable.Red)
-  lazy val BlueMapping: ObjectMapping = ghostDetectorConfigMapping(GhostIfuTable.Blue)
 
   lazy val GhostIfuMapping: ObjectMapping =
     ObjectMapping(GhostIfuType)(
@@ -55,9 +64,19 @@ trait GhostIfuMapping[F[_]]
 
   lazy val GhostIfuMappings: List[TypeMapping] =
     List(
-      RedMapping,
-      BlueMapping,
+      ghostDetectorMapping(GhostIfuTable.Blue, GhostBlueExposureTimeModeView),
+      ghostDetectorMapping(GhostIfuTable.Red,  GhostRedExposureTimeModeView),
       GhostIfuMapping
     )
+
+  lazy val GhostIfuElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
+    case (GhostDetectorType, "exposureTimeMode", Nil) =>
+      Elab.transformChild: child =>
+        Unique(
+          Filter(
+            Predicates.exposureTimeMode.role.eql(ExposureTimeModeRole.Science),
+            child
+          )
+        )
 
 }

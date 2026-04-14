@@ -8606,13 +8606,14 @@ enum GhostIfu2FiberAgitator {
   ENABLED
 }
 
-input GhostDetectorConfigInput {
+input GhostDetectorInput {
 
   """
   Exposure time mode for the detector.  If not specified, the exposure time mode
-  of the observation's science requirements are used.
+  of the observation's science requirements are used.  Note, only TimeAndCount
+  exposure time modes are accepted at this time.
   """
-  timeAndCount: TimeAndCountExposureTimeModeInput
+  exposureTimeMode: ExposureTimeModeInput
 
   """
   Explicit binning to use for the detector.  If not specified upon creation, a
@@ -8638,16 +8639,16 @@ input GhostIfuInput {
   resolutionMode: GhostResolutionMode
 
   """
-  Red camera detector config.  If not specified, defaults will be applied.
-  Cannot be unset with a null value.
+  Red config.  If not specified, defaults will be applied. Cannot be unset with
+  a null value.
   """
-  red: GhostDetectorConfigInput
+  red: GhostDetectorInput
 
   """
-  Blue camera detector config.  If not specified, defaults will be applied.
-  Cannot be unset with a null value.
+  Blue config.  If not specified, defaults will be applied. Cannot be unset with
+  a null value.
   """
-  blue: GhostDetectorConfigInput
+  blue: GhostDetectorInput
 
   """
   IFU1 fiber agitator setting.  If not specified, a default (DISABLED) will be
@@ -8663,12 +8664,13 @@ input GhostIfuInput {
 
 }
 
-type GhostDetectorConfig {
+
+type GhostDetector {
 
   """
   Exposure time mode for the detector.
   """
-  timeAndCount: TimeAndCountExposureTimeMode!
+  exposureTimeMode: ExposureTimeMode!
 
   """
   Binning that will be used, either explicitly specified or default.
@@ -8715,14 +8717,14 @@ type GhostIfu {
   resolutionMode: GhostResolutionMode!
 
   """
-  Red camera detector config.
+  Red detector config.
   """
-  red: GhostDetectorConfig!
+  red: GhostDetector!
 
   """
-  Blue camera detector config.
+  Blue detector config.
   """
-  blue: GhostDetectorConfig!
+  blue: GhostDetector!
 
   """
   IFU 1 fiber agitator setting, either explicitly specified or else default.

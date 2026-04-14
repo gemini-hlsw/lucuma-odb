@@ -36,10 +36,12 @@ class createObservation_GhostIfu extends OdbSuite:
                       ghostIfu: {
                         resolutionMode: STANDARD
                         red: {
-                          timeAndCount: {
-                            time: { seconds: 10.0 }
-                            count: 2
-                            at: { nanometers: 500 }
+                          exposureTimeMode: {
+                            timeAndCount: {
+                              time: { seconds: 10.0 }
+                              count: 2
+                              at: { nanometers: 500 }
+                            }
                           }
                           explicitBinning: ONE_BY_TWO
                         }
@@ -58,10 +60,12 @@ class createObservation_GhostIfu extends OdbSuite:
                       ghostIfu {
                         resolutionMode
                         red {
-                          timeAndCount {
-                            time { seconds }
-                            count
-                            at { nanometers }
+                          exposureTimeMode {
+                            timeAndCount {
+                              time { seconds }
+                              count
+                              at { nanometers }
+                            }
                           }
                           binning
                           defaultBinning
@@ -71,10 +75,12 @@ class createObservation_GhostIfu extends OdbSuite:
                           explicitReadMode
                         }
                         blue {
-                          timeAndCount {
-                            time { seconds }
-                            count
-                            at { nanometers }
+                          exposureTimeMode {
+                            timeAndCount {
+                              time { seconds }
+                              count
+                              at { nanometers }
+                            }
                           }
                           binning
                           defaultBinning
@@ -106,10 +112,12 @@ class createObservation_GhostIfu extends OdbSuite:
                       "ghostIfu": {
                         "resolutionMode": "STANDARD",
                         "red": {
-                          "timeAndCount": {
-                            "time": { "seconds": 10.000000 },
-                            "count": 2,
-                            "at": { "nanometers": 500.000 }
+                          "exposureTimeMode": {
+                            "timeAndCount": {
+                              "time": { "seconds": 10.000000 },
+                              "count": 2,
+                              "at": { "nanometers": 500.000 }
+                            }
                           },
                           "binning": "ONE_BY_TWO",
                           "defaultBinning": "ONE_BY_ONE",
@@ -119,10 +127,12 @@ class createObservation_GhostIfu extends OdbSuite:
                           "explicitReadMode": null
                         },
                         "blue": {
-                          "timeAndCount": {
-                            "time": { "seconds": 1.000000 },
-                            "count": 5,
-                            "at": { "nanometers": 500.000 }
+                          "exposureTimeMode": {
+                            "timeAndCount": {
+                              "time": { "seconds": 1.000000 },
+                              "count": 5,
+                              "at": { "nanometers": 500.000 }
+                            }
                           },
                           "binning": "ONE_BY_ONE",
                           "defaultBinning": "ONE_BY_ONE",
@@ -144,6 +154,85 @@ class createObservation_GhostIfu extends OdbSuite:
               }
             """.asRight
         )
+
+  // This test case revealed a flaw in the ETM mapping that lead to Grackle
+  // adding a join which filtered out the GMOS results.  We add a new GMOS
+  // north observation and rely on the fact that a GHOST IFU observation is
+  // already in the database from the previous test case.  Both should be
+  // found by a query that filters no observations.
+  test("query observations with mixed modes, including GHOST IFU exposureTimeModes"):
+    for
+      p <- createProgramAs(pi)
+      t <- createTargetAs(pi, p)
+      o <- createGmosNorthImagingObservationAs(pi, p, t)
+      _ <- expect(
+             user = pi,
+             query = s"""
+               query {
+                 observations() {
+                   matches {
+                     observingMode {
+                       mode
+                       ghostIfu {
+                         resolutionMode
+                         red {
+                           exposureTimeMode {
+                             timeAndCount { count }
+                           }
+                           binning
+                         }
+                         blue {
+                           exposureTimeMode {
+                             timeAndCount { count }
+                           }
+                           binning
+                         }
+                       }
+                     }
+                   }
+                 }
+               }
+             """,
+             expected = json"""
+               {
+                 "observations": {
+                   "matches": [
+                     {
+                       "observingMode": {
+                         "mode": "GHOST_IFU",
+                         "ghostIfu": {
+                           "resolutionMode": "STANDARD",
+                           "red": {
+                             "exposureTimeMode": {
+                               "timeAndCount": {
+                                 "count": 2
+                               }
+                             },
+                             "binning": "ONE_BY_TWO"
+                           },
+                           "blue": {
+                             "exposureTimeMode": {
+                               "timeAndCount": {
+                                 "count": 5
+                               }
+                             },
+                             "binning": "ONE_BY_ONE"
+                           }
+                         }
+                       }
+                     },
+                     {
+                       "observingMode": {
+                         "mode": "GMOS_NORTH_IMAGING",
+                         "ghostIfu": null
+                       }
+                     }
+                   ]
+                 }
+               }
+             """.asRight
+           )
+    yield ()
 
   test("cannot create GHOST IFU with S/N requirements only"):
     createProgramAs(pi).flatMap: pid =>
@@ -197,17 +286,21 @@ class createObservation_GhostIfu extends OdbSuite:
                       ghostIfu: {
                         resolutionMode: STANDARD
                         red: {
-                          timeAndCount: {
-                            time: { seconds: 1.0 }
-                            count: 1
-                            at: { nanometers: 500 }
+                          exposureTimeMode: {
+                            timeAndCount: {
+                              time: { seconds: 1.0 }
+                              count: 1
+                              at: { nanometers: 500 }
+                            }
                           }
                         }
                         blue: {
-                          timeAndCount: {
-                            time: { seconds: 2.0 }
-                            count: 2
-                            at: { nanometers: 500 }
+                          exposureTimeMode: {
+                            timeAndCount: {
+                              time: { seconds: 2.0 }
+                              count: 2
+                              at: { nanometers: 500 }
+                            }
                           }
                         }
                       }

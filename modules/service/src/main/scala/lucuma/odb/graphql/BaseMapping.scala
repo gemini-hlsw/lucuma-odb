@@ -164,7 +164,7 @@ trait BaseMapping[F[_]]
   lazy val GcalType                                = schema.ref("Gcal")
   lazy val GenderType                              = schema.ref("Gender")
   lazy val GhostBinningType                        = schema.ref("GhostBinning")
-  lazy val GhostDetectorConfigType                 = schema.ref("GhostDetectorConfig")
+  lazy val GhostDetectorType                       = schema.ref("GhostDetector")
   lazy val GhostIfuType                            = schema.ref("GhostIfu")
   lazy val GhostIfu1FiberAgitatorType              = schema.ref("GhostIfu1FiberAgitator")
   lazy val GhostIfu2FiberAgitatorType              = schema.ref("GhostIfu2FiberAgitator")

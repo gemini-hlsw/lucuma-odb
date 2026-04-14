@@ -1,7 +1,8 @@
 // Copyright (c) 2016-2025 Association of Universities for Research in Astronomy, Inc. (AURA)
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
-package lucuma.odb.sequence.ghost.ifu
+package lucuma.odb.sequence.ghost
+package ifu
 
 import cats.Eq
 import cats.derived.*
@@ -16,8 +17,8 @@ import java.io.DataOutputStream
 
 case class Config(
   resolutionMode:       GhostResolutionMode,
-  red:                  DetectorConfig.Red,
-  blue:                 DetectorConfig.Blue,
+  red:                  Detector.Red,
+  blue:                 Detector.Blue,
   explicitIfu1Agitator: Option[GhostIfu1FiberAgitator],
   explicitIfu2Agitator: Option[GhostIfu2FiberAgitator]
 ) derives Eq:
