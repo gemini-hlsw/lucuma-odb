@@ -25,7 +25,7 @@ class ShortCut_7265 extends ExecutionTestSupportForGmos:
                }
                explicitYBin: TWO
                acquisition: {
-                 explicitFilter: Z_PRIME
+                 explicitFilter: I_PRIME
                }
             }
            """)
@@ -40,4 +40,4 @@ class ShortCut_7265 extends ExecutionTestSupportForGmos:
       g <- InstrumentMode.gmosNorthImaging.getOption(s.acquisition.mode).toRight(new RuntimeException(s"expected GMOS North Imaging: $s")).liftTo[IO]
     yield g
 
-    assertIO(imaging.map(_.filter), GmosNorthFilter.ZPrime)
+    assertIO(imaging.map(_.filter), GmosNorthFilter.IPrime)
