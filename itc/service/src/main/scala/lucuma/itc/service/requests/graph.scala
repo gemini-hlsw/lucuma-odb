@@ -101,9 +101,16 @@ object AsterismGraphRequest:
                        port
             )
         )
-      case Igrins2SpectroscopyInput(i_, port) =>
+      case Igrins2SpectroscopyInput(i_, port)                                                 =>
         Result(ObservingMode.SpectroscopyMode.Igrins2(port))
-      case _                                  =>
+      case GhostSpectroscopyInput(numSkyMicrolens, resolutionMode, redDetector, blueDetector) =>
+        Result.success:
+          ObservingMode.SpectroscopyMode.Ghost(numSkyMicrolens,
+                                               resolutionMode,
+                                               redDetector,
+                                               blueDetector
+          )
+      case _                                                                                  =>
         Result.failure("Invalid spectroscopy mode")
     }
 

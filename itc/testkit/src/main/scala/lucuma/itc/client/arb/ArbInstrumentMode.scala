@@ -7,8 +7,6 @@ package arb
 import lucuma.core.enums.Flamingos2Disperser
 import lucuma.core.enums.Flamingos2Filter
 import lucuma.core.enums.Flamingos2Fpu
-import lucuma.core.enums.GhostBinning
-import lucuma.core.enums.GhostReadMode
 import lucuma.core.enums.GhostResolutionMode
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosNorthGrating
@@ -24,6 +22,7 @@ import lucuma.core.model.sequence.gmos.GmosCcdMode
 import lucuma.core.model.sequence.gmos.arb.ArbGmosCcdMode
 import lucuma.core.util.arb.ArbEnumerated
 import lucuma.itc.ItcGhostDetector
+import lucuma.itc.arb.ArbItcGhostDetector
 import org.scalacheck.*
 import org.scalacheck.Arbitrary.arbitrary
 
@@ -33,6 +32,7 @@ trait ArbInstrumentMode {
   import ArbGmosFpu.given
   import ArbGmosCcdMode.given
   import ArbWavelength.given
+  import ArbItcGhostDetector.given
 
   import InstrumentMode.GmosNorthSpectroscopy
   import InstrumentMode.GmosSouthSpectroscopy
@@ -166,19 +166,6 @@ trait ArbInstrumentMode {
   given Cogen[Igrins2Spectroscopy] =
     Cogen[(ExposureTimeMode, PortDisposition)]
       .contramap(a => (a.exposureTimeMode, a.port))
-
-  given Arbitrary[ItcGhostDetector] =
-    Arbitrary {
-      for {
-        et <- arbitrary[ExposureTimeMode.TimeAndCountMode]
-        rm <- arbitrary[GhostReadMode]
-        b  <- arbitrary[GhostBinning]
-      } yield ItcGhostDetector(et, rm, b)
-    }
-
-  given Cogen[ItcGhostDetector] =
-    Cogen[(ExposureTimeMode, GhostReadMode, GhostBinning)]
-      .contramap(a => (a.timeAndCount, a.readMode, a.binning))
 
   given Arbitrary[GhostSpectroscopy] =
     Arbitrary {

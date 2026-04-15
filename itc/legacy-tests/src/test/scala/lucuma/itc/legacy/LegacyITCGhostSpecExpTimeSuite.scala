@@ -58,7 +58,7 @@ class LegacyITCGhostSpecExpTimeSuite extends CommonITCLegacySuite:
     )
   )
 
-  test("IGRINS-2 spectroscopy S/N".tag(LegacyITCTest)):
+  test("GHOST spectroscopy S/N".tag(LegacyITCTest)):
     val result = localItc.calculate(baseParams.asJson.noSpaces)
     assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))
 
