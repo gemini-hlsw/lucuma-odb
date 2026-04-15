@@ -8,6 +8,7 @@ import cats.Order
 import cats.data.NonEmptyList
 import cats.data.NonEmptyMap
 import cats.syntax.all.*
+import eu.timepit.refined.cats.given
 import eu.timepit.refined.types.numeric.PosInt
 import lucuma.core.data.Zipper
 import lucuma.core.enums.GmosNorthFilter
@@ -55,10 +56,29 @@ object Itc:
 
   // ITC result type discriminator.
   enum Type(val tag: String) derives Enumerated:
+    case GhostIfu            extends Type("ghost_ifu")
     case GmosNorthImaging    extends Type("gmos_north_imaging")
     case GmosSouthImaging    extends Type("gmos_south_imaging")
-    case Spectroscopy        extends Type("spectroscopy")
     case Igrins2Spectroscopy extends Type("igrins_2_spectroscopy")
+    case Spectroscopy        extends Type("spectroscopy")
+
+  case class GhostIfu(
+    red:  Zipper[Result],
+    blue: Zipper[Result]
+  ) extends Itc:
+
+    override def dataType: Type =
+      Type.GhostIfu
+
+    override def scienceExposureCount: PosInt =
+      red.focus.value.exposureCount max blue.focus.value.exposureCount
+
+  object GhostIfu:
+    given Eq[GhostIfu] =
+      Eq.by(a => (a.red, a.blue))
+
+  val ghostIfu: Prism[Itc, GhostIfu] =
+    GenPrism[Itc, GhostIfu]
 
   /**
    * GMOS North imaging results.  There are results per-GMOS North filter.
@@ -153,10 +173,10 @@ object Itc:
     GenPrism[Itc, Igrins2Spectroscopy]
 
   given Eq[Itc] =
-    Eq.instance {
+    Eq.instance:
+      case (a: GhostIfu,            b: GhostIfu)            => a === b
       case (a: GmosNorthImaging,    b: GmosNorthImaging)    => a === b
       case (a: GmosSouthImaging,    b: GmosSouthImaging)    => a === b
-      case (a: Spectroscopy,        b: Spectroscopy)        => a === b
       case (a: Igrins2Spectroscopy, b: Igrins2Spectroscopy) => a === b
+      case (a: Spectroscopy,        b: Spectroscopy)        => a === b
       case _                                                => false
-    }

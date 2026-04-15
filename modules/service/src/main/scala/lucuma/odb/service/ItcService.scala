@@ -36,12 +36,14 @@ import lucuma.core.model.Target
 import lucuma.core.util.TimeSpan
 import lucuma.itc.AsterismIntegrationTimes
 import lucuma.itc.IntegrationTime
+import lucuma.itc.ItcGhostDetector
 import lucuma.itc.TargetIntegrationTime
 import lucuma.itc.client.ClientCalculationResult
 import lucuma.itc.client.ImagingInput
 import lucuma.itc.client.InstrumentMode
 import lucuma.itc.client.ItcClient
 import lucuma.itc.client.SpectroscopyInput
+import lucuma.itc.client.SpectroscopyParameters
 import lucuma.odb.data.Itc
 import lucuma.odb.data.Md5Hash
 import lucuma.odb.data.OdbError
@@ -385,6 +387,31 @@ object ItcService {
               .handleError: t =>
                 OdbError.RemoteServiceCallError(s"Error calling ITC service: ${t.getMessage}".some).asLeft
 
+        // A placeholder result for GHOST, at least for now.
+        //
+        // * The ITC accepts the red and blue exposure time mode data, but
+        //   only returns a single result set?  It isn't clear how to map this
+        //   back onto the red and blue channels.
+        //
+        // * The ITC only handles Time And Count mode and we don't use the S/N
+        //   value so we'll just short-circuit the call and make a fake result
+        //   that has the time and count we need per channel.
+        def ghost(
+          ghost:   InstrumentMode.GhostSpectroscopy,
+          targets: NonEmptyList[ItcInput.TargetDefinition]
+        ): EitherT[F, OdbError, Itc] =
+          def resultSet(d: ItcGhostDetector): Zipper[Itc.Result] =
+            Zipper.fromNel:
+              targets.map: t =>
+                val it = IntegrationTime(d.timeAndCount.time, d.timeAndCount.count)
+                Itc.Result(t.targetId, it, none)
+
+          EitherT.pure:
+            Itc.GhostIfu(
+              resultSet(ghost.redDetector),
+              resultSet(ghost.blueDetector)
+            )
+
         def imaging(im: ItcInput.Imaging): EitherT[F, OdbError, Itc] =
           im.science.head.mode match
             case InstrumentMode.GmosNorthImaging(_, _, _, _) =>
@@ -404,16 +431,23 @@ object ItcService {
             acq <- safeAcquisitionCall(oid, sp.acquisitionInput, sp.acquisitionTargets)
           yield Itc.Spectroscopy(acq, sci)
 
-        def igrins2Spectroscopy(sp: ItcInput.Igrins2Spectroscopy): EitherT[F, OdbError, Itc] =
+        def igrins2Spectroscopy(sp: ItcInput.ScienceOnlySpectroscopy): EitherT[F, OdbError, Itc] =
           for
             cr  <- callSpectroscopy(sp.scienceInput)
             sci <- EitherT.fromEither(toTargetResults(sp.targets, NonEmptyList.one(cr)).map(_.head))
           yield Itc.Igrins2Spectroscopy(sci)
 
         (input match
-          case im @ ItcInput.Imaging(_, _)             => imaging(im)
-          case sp @ ItcInput.Spectroscopy(_, _, _, _)  => spectroscopy(sp)
-          case ig @ ItcInput.Igrins2Spectroscopy(_, _) => igrins2Spectroscopy(ig)
+          case im @ ItcInput.Imaging(_, _) =>
+            imaging(im)
+          case sp @ ItcInput.Spectroscopy(_, _, _, _) =>
+            spectroscopy(sp)
+          case sp @ ItcInput.ScienceOnlySpectroscopy(SpectroscopyParameters(_, gh @ InstrumentMode.GhostSpectroscopy(_, _, _)), targets) =>
+            ghost(gh, targets)
+          case sp @ ItcInput.ScienceOnlySpectroscopy(SpectroscopyParameters(_, InstrumentMode.Igrins2Spectroscopy(_, _)), _) =>
+            igrins2Spectroscopy(sp)
+          case _ =>
+            EitherT.leftT(OdbError.InvalidObservation(oid, s"Unrecognized ItcInput: $input".some))
         ).value
 
       @annotation.nowarn("msg=unused implicit parameter")
