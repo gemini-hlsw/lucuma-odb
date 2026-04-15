@@ -166,7 +166,7 @@ object ProposalService {
       s"Invalid email address \"$email\" for PI in program $pid".invalidArg
 
     def missingConsiderForBand3(pid: Program.Id): OdbError =
-      s"Proposal $pid must specify if it should be considered for band 3.".invalidArg
+      s"Proposal $pid must specify whether it should be considered for Band 3 before it can be submitted.".invalidArg
 
   }
 
