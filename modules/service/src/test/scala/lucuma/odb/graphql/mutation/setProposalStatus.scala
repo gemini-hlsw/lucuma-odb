@@ -956,7 +956,7 @@ class setProposalStatus extends OdbSuite
                 }
               """,
               expected = List(
-                s"Proposal $pid must specify if it should be considered for band 3."
+                s"Proposal $pid must specify whether it should be considered for Band 3 before it can be submitted."
               ).asLeft
             )
     yield ()

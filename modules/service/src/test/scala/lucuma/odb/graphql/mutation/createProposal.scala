@@ -1423,8 +1423,8 @@ class createProposal extends OdbSuite with DatabaseOperations {
     }
   }
 
-  test("✓ classical proposal with new phase I flags") {
-    createProgramAs(pi, "Classical Proposal").flatMap { pid =>
+  test("✓ classical proposal with new phase I flags"):
+    createProgramAs(pi, "Classical Proposal").flatMap: pid =>
       expect(
         user = pi,
         query = s"""
@@ -1476,11 +1476,9 @@ class createProposal extends OdbSuite with DatabaseOperations {
           }
         """.asRight
       )
-    }
-  }
 
-  test("✓ large program with new phase I flags") {
-    createProgramAs(pi, "Large Program").flatMap { pid =>
+  test("✓ large program with new phase I flags"):
+    createProgramAs(pi, "Large Program").flatMap: pid =>
       expect(
         user = pi,
         query = s"""
@@ -1537,11 +1535,9 @@ class createProposal extends OdbSuite with DatabaseOperations {
           }
         """.asRight
       )
-    }
-  }
 
-  test("✓ queue proposal with new phase I flags") {
-    createProgramAs(pi, "Queue Proposal").flatMap { pid =>
+  test("✓ queue proposal with new phase I flags"):
+    createProgramAs(pi, "Queue Proposal").flatMap: pid =>
       expect(
         user = pi,
         query = s"""
@@ -1599,7 +1595,5 @@ class createProposal extends OdbSuite with DatabaseOperations {
           }
         """.asRight
       )
-    }
-  }
 
 }

@@ -1007,8 +1007,8 @@ class updateProposal extends OdbSuite with DatabaseOperations {
     }
   }
 
-  test("✓ update classical proposal with new phase I flags") {
-    createProgramAs(pi).flatMap { pid =>
+  test("✓ update classical proposal with new phase I flags"):
+    createProgramAs(pi).flatMap: pid =>
       addProposal(pi, pid) *>
       expect(
         user = pi,
@@ -1058,11 +1058,9 @@ class updateProposal extends OdbSuite with DatabaseOperations {
           }
         """.asRight
       )
-    }
-  }
 
-  test("✓ update classical proposal phase I flags to false") {
-    createProgramAs(pi).flatMap { pid =>
+  test("✓ update classical proposal phase I flags to false"):
+    createProgramAs(pi).flatMap: pid =>
       addProposal(pi, pid) *>
       expect(
         user = pi,
@@ -1110,11 +1108,9 @@ class updateProposal extends OdbSuite with DatabaseOperations {
           }
         """.asRight
       )
-    }
-  }
 
-  test("✓ update large program with new phase I flags") {
-    createProgramAs(pi).flatMap { pid =>
+  test("✓ update large program with new phase I flags"):
+    createProgramAs(pi).flatMap: pid =>
       addProposal(pi, pid) *>
       expect(
         user = pi,
@@ -1169,11 +1165,9 @@ class updateProposal extends OdbSuite with DatabaseOperations {
           }
         """.asRight
       )
-    }
-  }
 
-  test("✓ update queue proposal with new phase I flags") {
-    createProgramAs(pi).flatMap { pid =>
+  test("✓ update queue proposal with new phase I flags"):
+    createProgramAs(pi).flatMap: pid =>
       addProposal(pi, pid) *>
       expect(
         user = pi,
@@ -1229,11 +1223,9 @@ class updateProposal extends OdbSuite with DatabaseOperations {
           }
         """.asRight
       )
-    }
-  }
 
-  test("✓ update queue proposal considerForBand3 to null") {
-    createProgramAs(pi).flatMap { pid =>
+  test("✓ update queue proposal considerForBand3 to null"):
+    createProgramAs(pi).flatMap: pid =>
       addProposal(pi, pid) *>
       expect(
         user = pi,
@@ -1285,7 +1277,5 @@ class updateProposal extends OdbSuite with DatabaseOperations {
           }
         """.asRight
       )
-    }
-  }
 
 }

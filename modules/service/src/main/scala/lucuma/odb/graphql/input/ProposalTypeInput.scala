@@ -198,10 +198,10 @@ object ProposalTypeInput {
         ) => (rToo, rMin, rMinTotal, rTotal, rAeon, rJwst).parMapN { (too, min, minTotal, total, aeon, jwst) =>
           Create(ScienceSubtype.LargeProgram).update {
             for {
-              _ <- tooActivation   := too
-              _ <- minPercentTime  := min
-              _ <- minPercentTotal := minTotal.orElse(HundredPercent.some)
-              _ <- totalTime       := total.orElse(TimeSpan.Zero.some)
+              _ <- tooActivation     := too
+              _ <- minPercentTime    := min
+              _ <- minPercentTotal   := minTotal.orElse(HundredPercent.some)
+              _ <- totalTime         := total.orElse(TimeSpan.Zero.some)
               _ <- aeonMultiFacility := aeon
               _ <- jwstSynergy       := jwst
             } yield ()

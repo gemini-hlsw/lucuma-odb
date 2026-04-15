@@ -4290,7 +4290,9 @@ type Queue implements ProposalType {
   partnerSplits: [PartnerSplit!]!
 
   """
-  Whether this proposal should be considered for Band 3.
+  Whether this proposal should be considered for Band 3. May be left unset
+  at creation or update time, but must have a value before the proposal
+  can be submitted.
   """
   considerForBand3: Boolean
 
@@ -4366,13 +4368,19 @@ input ClassicalInput {
   """
   partnerSplits: [PartnerSplitInput!]
 
-  "Whether this proposal is part of the AEON/Multi-facility program."
+  """
+  Whether this proposal is part of the AEON/Multi-facility program.
+  """
   aeonMultiFacility: Boolean = false
 
-  "Whether this proposal has JWST synergy."
+  """
+  Whether this proposal has JWST synergy.
+  """
   jwstSynergy: Boolean = false
 
-  "Whether this is a US Long Term proposal."
+  """
+  Whether this is a US Long Term proposal.
+  """
   usLongTerm: Boolean = false
 }
 
@@ -4504,7 +4512,11 @@ input QueueInput {
   """
   partnerSplits: [PartnerSplitInput!]
 
-  "Whether this proposal should be considered for Band 3."
+  """
+  Whether this proposal should be considered for Band 3. May be left unset
+  at creation or update time, but must have a value before the proposal
+  can be submitted.
+  """
   considerForBand3: Boolean
 
   "Whether this proposal is part of the AEON/Multi-facility program."
