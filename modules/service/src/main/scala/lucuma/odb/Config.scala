@@ -42,6 +42,7 @@ import org.http4s.otel4s.middleware.trace.client.ClientSpanDataProvider
 import org.http4s.syntax.all.*
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.LoggerFactory
+import org.typelevel.otel4s.trace.Tracer
 import org.typelevel.otel4s.trace.TracerProvider
 
 import java.net.URI
@@ -98,9 +99,9 @@ case class Config(
     } yield client
 
   // Gaia client resource
-  def gaiaClient[F[_]: Async: Network: LoggerFactory]: Resource[F, GaiaClient[F]] =
+  def gaiaClient[F[_]: Async: Compression: Network: Tracer: LoggerFactory]: Resource[F, GaiaClient[F]] =
     httpClientResource[F].map: httpClient =>
-      GaiaClient.build[F](httpClient, adapters = GaiaClient.DefaultAdapters)
+      GaiaClient.build[F](GZip()(httpClient), adapters = GaiaClient.DefaultAdapters)
 
   // Telluric client resource
   def telluricClient[F[_]: Async: Network: Logger]: Resource[F, TelluricTargetsClient[F]] =
