@@ -402,6 +402,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
     NonEmptyChain.one(CatalogAdapter.Gaia3LiteEsa)
 
   private def gaiaClient: GaiaClient[IO] =
+    given Tracer[IO] = Tracer.noop
     GaiaClient.build[IO](httpClient, adapters = gaiaAdapters)
 
   private val horizonsClient: HorizonsClient[IO] =
