@@ -1,16 +1,8 @@
-extensions:
-  basicauth/otlp:
-    htpasswd:
-      inline: |
-        ${env:OTLP_HTPASSWD}
-
 receivers:
   otlp:
     protocols:
       http:
-        endpoint: 0.0.0.0:${env:PORT}
-        auth:
-          authenticator: basicauth/otlp
+        endpoint: 127.0.0.1:4318
 
 processors:
   memory_limiter:
@@ -22,23 +14,22 @@ processors:
     send_batch_size: 512
 
 exporters:
-  otlp_http/honeycomb:
+  otlphttp/honeycomb:
     endpoint: "https://api.honeycomb.io"
     headers:
       x-honeycomb-team: "${env:HONEYCOMB_API_KEY}"
-  otlp_http/grafana:
+  otlphttp/grafana:
     endpoint: "${env:GRAFANA_OTLP_ENDPOINT}"
     headers:
       authorization: "Basic ${env:GRAFANA_OTLP_TOKEN}"
 
 service:
-  extensions: [basicauth/otlp]
   pipelines:
     traces:
       receivers: [otlp]
       processors: [memory_limiter, batch]
-      exporters: [otlp_http/grafana, otlp_http/honeycomb]
+      exporters: [otlphttp/grafana, otlphttp/honeycomb]
     metrics:
       receivers: [otlp]
       processors: [memory_limiter, batch]
-      exporters: [otlp_http/grafana, otlp_http/honeycomb]
+      exporters: [otlphttp/grafana, otlphttp/honeycomb]

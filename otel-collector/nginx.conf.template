@@ -1,0 +1,54 @@
+worker_processes  1;
+error_log  /dev/stderr  warn;
+events { worker_connections 1024; }
+
+http {
+  access_log /dev/stdout;
+
+  # Browser-allowlisted origins skip auth; everything else must auth.
+  # "off" is a magic value that disables auth_basic.
+  map $http_origin $auth_realm {
+    default                               "Restricted";
+    "https://explore.gemini.edu"          off;
+    "https://explore-test.gemini.edu"     off;
+    "https://explore-dev.lucuma.xyz"      off;
+    "https://local.lucuma.xyz:8080"       off;
+    "https://local.gemini.edu:8080"       off;
+  }
+
+  # Echo back only allowlisted origins in ACAO; empty otherwise.
+  map $http_origin $cors_allow_origin {
+    default                               "";
+    "https://explore.gemini.edu"          $http_origin;
+    "https://explore-test.gemini.edu"     $http_origin;
+    "https://explore-dev.lucuma.xyz"      $http_origin;
+    "https://local.lucuma.xyz:8080"       $http_origin;
+    "https://local.gemini.edu:8080"       $http_origin;
+  }
+
+  server {
+    listen ${PORT} default_server;
+
+    location / {
+      if ($request_method = OPTIONS) {
+        add_header Access-Control-Allow-Origin  $cors_allow_origin always;
+        add_header Access-Control-Allow-Methods "POST, OPTIONS"    always;
+        add_header Access-Control-Allow-Headers "*"                always;
+        add_header Access-Control-Max-Age       7200               always;
+        add_header Content-Length               0                  always;
+        return 204;
+      }
+
+      add_header Access-Control-Allow-Origin $cors_allow_origin always;
+
+      auth_basic           $auth_realm;
+      auth_basic_user_file /etc/nginx/.htpasswd;
+
+      proxy_pass http://127.0.0.1:4318;
+      proxy_http_version 1.1;
+      proxy_set_header Host              $host;
+      proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+      proxy_set_header X-Forwarded-Proto $scheme;
+    }
+  }
+}
