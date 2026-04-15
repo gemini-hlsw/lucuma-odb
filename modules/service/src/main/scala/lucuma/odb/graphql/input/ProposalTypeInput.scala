@@ -65,14 +65,18 @@ object ProposalTypeInput {
     }
 
   case class Create(
-    scienceSubtype:  ScienceSubtype,
-    tooActivation:   ToOActivation            = ToOActivation.None,
-    minPercentTime:  IntPercent               = HundredPercent,
-    minPercentTotal: Option[IntPercent]       = none,
-    totalTime:       Option[TimeSpan]         = none,
-    partnerSplits:   Map[Partner, IntPercent] = Map.empty,
-    reviewerId:      Option[ProgramUser.Id]   = none,
-    mentorId:        Option[ProgramUser.Id]   = none
+    scienceSubtype:     ScienceSubtype,
+    tooActivation:      ToOActivation            = ToOActivation.None,
+    minPercentTime:     IntPercent               = HundredPercent,
+    minPercentTotal:    Option[IntPercent]       = none,
+    totalTime:          Option[TimeSpan]         = none,
+    partnerSplits:      Map[Partner, IntPercent] = Map.empty,
+    reviewerId:         Option[ProgramUser.Id]   = none,
+    mentorId:           Option[ProgramUser.Id]   = none,
+    aeonMultiFacility:  Boolean                  = false,
+    jwstSynergy:        Boolean                  = false,
+    usLongTerm:         Boolean                  = false,
+    considerForBand3:   Option[Boolean]          = none
   ) {
 
     def asEdit: Edit =
@@ -84,7 +88,11 @@ object ProposalTypeInput {
         Nullable.orNull(totalTime),
         Nullable.NonNull(partnerSplits),
         Nullable.orNull(reviewerId),
-        Nullable.orNull(mentorId)
+        Nullable.orNull(mentorId),
+        Nullable.NonNull(aeonMultiFacility),
+        Nullable.NonNull(jwstSynergy),
+        Nullable.NonNull(usLongTerm),
+        Nullable.orNull(considerForBand3)
       )
 
     def update(s: State[Create, Unit]): Create =
@@ -105,13 +113,17 @@ object ProposalTypeInput {
 
     val Default: Create = DefaultFor(ScienceSubtype.Queue)
 
-    val tooActivation: Lens[Create, ToOActivation]        = Focus[Create](_.tooActivation)
-    val minPercentTime: Lens[Create, IntPercent]          = Focus[Create](_.minPercentTime)
-    val minPercentTotal: Lens[Create, Option[IntPercent]] = Focus[Create](_.minPercentTotal)
-    val totalTime: Lens[Create, Option[TimeSpan]]         = Focus[Create](_.totalTime)
+    val tooActivation: Lens[Create, ToOActivation]            = Focus[Create](_.tooActivation)
+    val minPercentTime: Lens[Create, IntPercent]              = Focus[Create](_.minPercentTime)
+    val minPercentTotal: Lens[Create, Option[IntPercent]]     = Focus[Create](_.minPercentTotal)
+    val totalTime: Lens[Create, Option[TimeSpan]]             = Focus[Create](_.totalTime)
     val partnerSplits: Lens[Create, Map[Partner, IntPercent]] = Focus[Create](_.partnerSplits)
-    val reviewerId: Lens[Create, Option[ProgramUser.Id]]  = Focus[Create](_.reviewerId)
-    val mentorId: Lens[Create, Option[ProgramUser.Id]]    = Focus[Create](_.mentorId)
+    val reviewerId: Lens[Create, Option[ProgramUser.Id]]      = Focus[Create](_.reviewerId)
+    val mentorId: Lens[Create, Option[ProgramUser.Id]]        = Focus[Create](_.mentorId)
+    val aeonMultiFacility: Lens[Create, Boolean]              = Focus[Create](_.aeonMultiFacility)
+    val jwstSynergy: Lens[Create, Boolean]                    = Focus[Create](_.jwstSynergy)
+    val usLongTerm: Lens[Create, Boolean]                     = Focus[Create](_.usLongTerm)
+    val considerForBand3: Lens[Create, Option[Boolean]]       = Focus[Create](_.considerForBand3)
 
     private def simpleCreateBinding(s: ScienceSubtype): Matcher[Create] =
       ObjectFieldsBinding.rmap {
@@ -132,12 +144,18 @@ object ProposalTypeInput {
       ObjectFieldsBinding.rmap {
         case List(
           IntPercentBinding.Option("minPercentTime", rMin),
-          PartnerSplitsInput.Option("partnerSplits", rSplits)
-        ) => (rMin, rSplits).parMapN { (min, splits) =>
+          PartnerSplitsInput.Option("partnerSplits", rSplits),
+          BooleanBinding.Option("aeonMultiFacility", rAeon),
+          BooleanBinding.Option("jwstSynergy", rJwst),
+          BooleanBinding.Option("usLongTerm", rUsLong)
+        ) => (rMin, rSplits, rAeon, rJwst, rUsLong).parMapN { (min, splits, aeon, jwst, usLong) =>
           Create(ScienceSubtype.Classical).update(
             for {
-              _ <- minPercentTime := min
-              _ <- partnerSplits  := splits
+              _ <- minPercentTime     := min
+              _ <- partnerSplits      := splits
+              _ <- aeonMultiFacility  := aeon
+              _ <- jwstSynergy        := jwst
+              _ <- usLongTerm         := usLong
             } yield ()
           )
         }
@@ -174,14 +192,18 @@ object ProposalTypeInput {
           ToOActivationBinding.Option("toOActivation", rToo),
           IntPercentBinding.Option("minPercentTime", rMin),
           IntPercentBinding.Option("minPercentTotalTime", rMinTotal),
-          TimeSpanInput.Binding.Option("totalTime", rTotal)
-        ) => (rToo, rMin, rMinTotal, rTotal).parMapN { (too, min, minTotal, total) =>
+          TimeSpanInput.Binding.Option("totalTime", rTotal),
+          BooleanBinding.Option("aeonMultiFacility", rAeon),
+          BooleanBinding.Option("jwstSynergy", rJwst)
+        ) => (rToo, rMin, rMinTotal, rTotal, rAeon, rJwst).parMapN { (too, min, minTotal, total, aeon, jwst) =>
           Create(ScienceSubtype.LargeProgram).update {
             for {
               _ <- tooActivation   := too
               _ <- minPercentTime  := min
               _ <- minPercentTotal := minTotal.orElse(HundredPercent.some)
               _ <- totalTime       := total.orElse(TimeSpan.Zero.some)
+              _ <- aeonMultiFacility := aeon
+              _ <- jwstSynergy       := jwst
             } yield ()
           }
         }
@@ -199,13 +221,21 @@ object ProposalTypeInput {
         case List(
           ToOActivationBinding.Option("toOActivation", rToo),
           IntPercentBinding.Option("minPercentTime", rMin),
-          PartnerSplitsInput.Option("partnerSplits", rSplits)
-        ) => (rToo, rMin, rSplits).parMapN { (too, min, splits) =>
+          PartnerSplitsInput.Option("partnerSplits", rSplits),
+          BooleanBinding.Option("aeonMultiFacility", rAeon),
+          BooleanBinding.Option("jwstSynergy", rJwst),
+          BooleanBinding.Option("usLongTerm", rUsLong),
+          BooleanBinding.Option("considerForBand3", rBand3)
+        ) => (rToo, rMin, rSplits, rAeon, rJwst, rUsLong, rBand3).parMapN { (too, min, splits, aeon, jwst, usLong, band3) =>
           Create(ScienceSubtype.Queue).update(
             for {
-              _ <- tooActivation  := too
-              _ <- minPercentTime := min
-              _ <- partnerSplits  := splits
+              _ <- tooActivation     := too
+              _ <- minPercentTime    := min
+              _ <- partnerSplits     := splits
+              _ <- aeonMultiFacility := aeon
+              _ <- jwstSynergy       := jwst
+              _ <- usLongTerm        := usLong
+              _ <- considerForBand3  := band3
             } yield ()
           )
         }
@@ -228,25 +258,33 @@ object ProposalTypeInput {
   }
 
   case class Edit(
-    scienceSubtype:  ScienceSubtype,
-    tooActivation:   Option[ToOActivation]              = None,
-    minPercentTime:  Option[IntPercent]                 = None,
-    minPercentTotal: Nullable[IntPercent]               = Nullable.Null,
-    totalTime:       Nullable[TimeSpan]                 = Nullable.Null,
-    partnerSplits:   Nullable[Map[Partner, IntPercent]] = Nullable.Null,
-    reviewerId:      Nullable[ProgramUser.Id]           = Nullable.Null,
-    mentorId:        Nullable[ProgramUser.Id]           = Nullable.Null
+    scienceSubtype:     ScienceSubtype,
+    tooActivation:      Option[ToOActivation]              = None,
+    minPercentTime:     Option[IntPercent]                 = None,
+    minPercentTotal:    Nullable[IntPercent]               = Nullable.Null,
+    totalTime:          Nullable[TimeSpan]                 = Nullable.Null,
+    partnerSplits:      Nullable[Map[Partner, IntPercent]] = Nullable.Null,
+    reviewerId:         Nullable[ProgramUser.Id]           = Nullable.Null,
+    mentorId:           Nullable[ProgramUser.Id]           = Nullable.Null,
+    aeonMultiFacility:  Nullable[Boolean]                  = Nullable.Null,
+    jwstSynergy:        Nullable[Boolean]                  = Nullable.Null,
+    usLongTerm:         Nullable[Boolean]                  = Nullable.Null,
+    considerForBand3:   Nullable[Boolean]                  = Nullable.Null
   ) {
     def asCreate: Create =
       Create.DefaultFor(scienceSubtype).update {
         for {
-          _ <- Create.tooActivation   := tooActivation
-          _ <- Create.minPercentTime  := minPercentTime
-          _ <- Create.minPercentTotal := minPercentTotal.toOptionOption
-          _ <- Create.totalTime       := totalTime.toOptionOption
-          _ <- Create.partnerSplits   := partnerSplits.toOption
-          _ <- Create.reviewerId      := reviewerId.toOptionOption
-          _ <- Create.mentorId        := mentorId.toOptionOption
+          _ <- Create.tooActivation     := tooActivation
+          _ <- Create.minPercentTime    := minPercentTime
+          _ <- Create.minPercentTotal   := minPercentTotal.toOptionOption
+          _ <- Create.totalTime         := totalTime.toOptionOption
+          _ <- Create.partnerSplits     := partnerSplits.toOption
+          _ <- Create.reviewerId        := reviewerId.toOptionOption
+          _ <- Create.mentorId          := mentorId.toOptionOption
+          _ <- Create.aeonMultiFacility := aeonMultiFacility.toOption
+          _ <- Create.jwstSynergy       := jwstSynergy.toOption
+          _ <- Create.usLongTerm        := usLongTerm.toOption
+          _ <- Create.considerForBand3  := considerForBand3.toOptionOption
         } yield ()
       }
   }
@@ -267,9 +305,12 @@ object ProposalTypeInput {
       ObjectFieldsBinding.rmap {
         case List(
           IntPercentBinding.Option("minPercentTime", rMin),
-          PartnerSplitsInput.Nullable("partnerSplits", rSplits)
-        ) => (rMin, rSplits).parMapN { (min, splits) =>
-          Edit(ScienceSubtype.Classical, minPercentTime = min, partnerSplits = splits)
+          PartnerSplitsInput.Nullable("partnerSplits", rSplits),
+          BooleanBinding.Nullable("aeonMultiFacility", rAeon),
+          BooleanBinding.Nullable("jwstSynergy", rJwst),
+          BooleanBinding.Nullable("usLongTerm", rUsLong)
+        ) => (rMin, rSplits, rAeon, rJwst, rUsLong).parMapN { (min, splits, aeon, jwst, usLong) =>
+          Edit(ScienceSubtype.Classical, minPercentTime = min, partnerSplits = splits, aeonMultiFacility = aeon, jwstSynergy = jwst, usLongTerm = usLong)
         }
       }
 
@@ -297,9 +338,11 @@ object ProposalTypeInput {
           ToOActivationBinding.Option("toOActivation", rToo),
           IntPercentBinding.Option("minPercentTime", rMin),
           IntPercentBinding.Nullable("minPercentTotalTime", rMinTotal),
-          TimeSpanInput.Binding.Nullable("totalTime", rTotal)
-        ) => (rToo, rMin, rMinTotal, rTotal).parMapN { (too, min, minTotal, total) =>
-          Edit(ScienceSubtype.LargeProgram, too, min, minTotal, total)
+          TimeSpanInput.Binding.Nullable("totalTime", rTotal),
+          BooleanBinding.Nullable("aeonMultiFacility", rAeon),
+          BooleanBinding.Nullable("jwstSynergy", rJwst)
+        ) => (rToo, rMin, rMinTotal, rTotal, rAeon, rJwst).parMapN { (too, min, minTotal, total, aeon, jwst) =>
+          Edit(ScienceSubtype.LargeProgram, too, min, minTotal, total, aeonMultiFacility = aeon, jwstSynergy = jwst)
         }
       }
 
@@ -315,9 +358,13 @@ object ProposalTypeInput {
         case List(
           ToOActivationBinding.Option("toOActivation", rToo),
           IntPercentBinding.Option("minPercentTime", rMin),
-          PartnerSplitsInput.Nullable("partnerSplits", rSplits)
-        ) => (rToo, rMin, rSplits).parMapN { (too, min, splits) =>
-          Edit(ScienceSubtype.Queue, too, min, partnerSplits = splits)
+          PartnerSplitsInput.Nullable("partnerSplits", rSplits),
+          BooleanBinding.Nullable("aeonMultiFacility", rAeon),
+          BooleanBinding.Nullable("jwstSynergy", rJwst),
+          BooleanBinding.Nullable("usLongTerm", rUsLong),
+          BooleanBinding.Nullable("considerForBand3", rBand3)
+        ) => (rToo, rMin, rSplits, rAeon, rJwst, rUsLong, rBand3).parMapN { (too, min, splits, aeon, jwst, usLong, band3) =>
+          Edit(ScienceSubtype.Queue, too, min, partnerSplits = splits, aeonMultiFacility = aeon, jwstSynergy = jwst, usLongTerm = usLong, considerForBand3 = band3)
         }
       }
 
