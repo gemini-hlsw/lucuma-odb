@@ -46,6 +46,10 @@ class createProposal extends OdbSuite with DatabaseOperations {
                   ... on Queue {
                     toOActivation
                     minPercentTime
+                    aeonMultiFacility
+                    jwstSynergy
+                    usLongTerm
+                    considerForBand3
                   }
                 }
               }
@@ -60,7 +64,11 @@ class createProposal extends OdbSuite with DatabaseOperations {
                 "type": {
                   "scienceSubtype": "QUEUE",
                   "toOActivation": "NONE",
-                  "minPercentTime": 100
+                  "minPercentTime": 100,
+                  "aeonMultiFacility": false,
+                  "jwstSynergy": false,
+                  "usLongTerm": false,
+                  "considerForBand3": null
                 }
               }
             }
@@ -370,6 +378,9 @@ class createProposal extends OdbSuite with DatabaseOperations {
                   scienceSubtype
                   ... on Classical {
                     minPercentTime
+                    aeonMultiFacility
+                    jwstSynergy
+                    usLongTerm
                   }
                 }
               }
@@ -383,7 +394,10 @@ class createProposal extends OdbSuite with DatabaseOperations {
                 "category" : "COSMOLOGY",
                 "type": {
                   "scienceSubtype": "CLASSICAL",
-                  "minPercentTime": 100
+                  "minPercentTime": 100,
+                  "aeonMultiFacility": false,
+                  "jwstSynergy": false,
+                  "usLongTerm": false
                 }
               }
             }
@@ -1405,6 +1419,185 @@ class createProposal extends OdbSuite with DatabaseOperations {
           }
         """,
         expected = List("Unknown field(s) 'mentorId' for input object value of type QueueInput in field 'createProposal' of type 'Mutation'").asLeft
+      )
+    }
+  }
+
+  test("✓ classical proposal with new phase I flags") {
+    createProgramAs(pi, "Classical Proposal").flatMap { pid =>
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            createProposal(
+              input: {
+                programId: "$pid"
+                SET: {
+                  category: SMALL_BODIES
+                  type: {
+                    classical: {
+                      minPercentTime: 80
+                      partnerSplits: [{ partner: US, percent: 100 }]
+                      aeonMultiFacility: true
+                      jwstSynergy: true
+                      usLongTerm: true
+                    }
+                  }
+                }
+              }
+            ) {
+              proposal {
+                category
+                type {
+                  ... on Classical {
+                    minPercentTime
+                    aeonMultiFacility
+                    jwstSynergy
+                    usLongTerm
+                  }
+                }
+              }
+            }
+          }
+        """,
+        expected = json"""
+          {
+            "createProposal": {
+              "proposal": {
+                "category": "SMALL_BODIES",
+                "type": {
+                  "minPercentTime": 80,
+                  "aeonMultiFacility": true,
+                  "jwstSynergy": true,
+                  "usLongTerm": true
+                }
+              }
+            }
+          }
+        """.asRight
+      )
+    }
+  }
+
+  test("✓ large program with new phase I flags") {
+    createProgramAs(pi, "Large Program").flatMap { pid =>
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            createProposal(
+              input: {
+                programId: "$pid"
+                SET: {
+                  category: COSMOLOGY
+                  type: {
+                    largeProgram: {
+                      toOActivation: NONE
+                      minPercentTime: 80
+                      minPercentTotalTime: 90
+                      totalTime: { hours: 120.0 }
+                      aeonMultiFacility: true
+                      jwstSynergy: true
+                    }
+                  }
+                }
+              }
+            ) {
+              proposal {
+                category
+                type {
+                  ... on LargeProgram {
+                    toOActivation
+                    minPercentTime
+                    minPercentTotalTime
+                    totalTime { hours }
+                    aeonMultiFacility
+                    jwstSynergy
+                  }
+                }
+              }
+            }
+          }
+        """,
+        expected = json"""
+          {
+            "createProposal": {
+              "proposal": {
+                "category": "COSMOLOGY",
+                "type": {
+                  "toOActivation": "NONE",
+                  "minPercentTime": 80,
+                  "minPercentTotalTime": 90,
+                  "totalTime": { "hours": 120.000000 },
+                  "aeonMultiFacility": true,
+                  "jwstSynergy": true
+                }
+              }
+            }
+          }
+        """.asRight
+      )
+    }
+  }
+
+  test("✓ queue proposal with new phase I flags") {
+    createProgramAs(pi, "Queue Proposal").flatMap { pid =>
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            createProposal(
+              input: {
+                programId: "$pid"
+                SET: {
+                  category: EXOPLANET_HOST_STAR
+                  type: {
+                    queue: {
+                      toOActivation: NONE
+                      minPercentTime: 80
+                      partnerSplits: [{ partner: US, percent: 100 }]
+                      aeonMultiFacility: true
+                      jwstSynergy: true
+                      usLongTerm: true
+                      considerForBand3: true
+                    }
+                  }
+                }
+              }
+            ) {
+              proposal {
+                category
+                type {
+                  ... on Queue {
+                    toOActivation
+                    minPercentTime
+                    aeonMultiFacility
+                    jwstSynergy
+                    usLongTerm
+                    considerForBand3
+                  }
+                }
+              }
+            }
+          }
+        """,
+        expected = json"""
+          {
+            "createProposal": {
+              "proposal": {
+                "category": "EXOPLANET_HOST_STAR",
+                "type": {
+                  "toOActivation": "NONE",
+                  "minPercentTime": 80,
+                  "aeonMultiFacility": true,
+                  "jwstSynergy": true,
+                  "usLongTerm": true,
+                  "considerForBand3": true
+                }
+              }
+            }
+          }
+        """.asRight
       )
     }
   }
