@@ -738,7 +738,7 @@ class reference extends OdbSuite with query.ExecutionTestSupportForGmos {
       _   <- deleteProposal(staff, pid)
       _   <- setProgramReference(staff, pid, """calibration: { semester: "2025B", instrument: GMOS_SOUTH }""")
       _   <- setProgramReference(staff, pid, """science: { semester: "2025B", scienceSubtype: QUEUE }""")
-      _   <- addProposal(pi, pid, cid.some, "queue: { }".some)
+      _   <- addProposal(pi, pid, cid.some, "queue: { considerForBand3: false }".some)
       _   <- acceptProposal(staff, pid)
       ref <- fetchProgramReference(pi, pid)
     } yield assertEquals(ref, "G-2025B-0002-Q".programReference.some)
