@@ -7,6 +7,7 @@ package table
 
 import grackle.skunk.SkunkMapping
 import lucuma.odb.util.Codecs.*
+import skunk.codec.boolean.bool
 
 trait ProposalView[F[_]] extends BaseMapping[F] {
 
@@ -25,7 +26,10 @@ trait ProposalView[F[_]] extends BaseMapping[F] {
     val CallId          = col("c_cfp_id", cfp_id.opt)
 
     object Classical {
-      val Id = col("c_program_id_c", program_id.embedded)
+      val Id                = col("c_program_id_c", program_id.embedded)
+      val AeonMultiFacility = col("c_aeon_multi_facility", bool)
+      val JwstSynergy       = col("c_jwst_synergy", bool)
+      val UsLongTerm        = col("c_us_long_term", bool)
     }
     object DemoScience {
       val Id = col("c_program_id_s", program_id.embedded)
@@ -42,12 +46,18 @@ trait ProposalView[F[_]] extends BaseMapping[F] {
       val Id              = col("c_program_id_l", program_id.embedded)
       val MinPercentTotal = col("c_min_percent_total", int_percent)
       val TotalTime       = col("c_total_time", time_span)
+      val AeonMultiFacility = col("c_aeon_multi_facility", bool)
+      val JwstSynergy     = col("c_jwst_synergy", bool)
     }
     object PoorWeather {
       val Id  = col("c_program_id_p", program_id.embedded)
     }
     object Queue {
-      val Id = col("c_program_id_q", program_id.embedded)
+      val Id                = col("c_program_id_q", program_id.embedded)
+      val AeonMultiFacility = col("c_aeon_multi_facility", bool)
+      val JwstSynergy       = col("c_jwst_synergy", bool)
+      val UsLongTerm        = col("c_us_long_term", bool)
+      val ConsiderForBand3  = col("c_consider_for_band_3", bool.opt)
     }
     object SystemVerification {
       val Id = col("c_program_id_v", program_id.embedded)
