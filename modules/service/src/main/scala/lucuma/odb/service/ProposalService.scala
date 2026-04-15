@@ -165,6 +165,9 @@ object ProposalService {
     def invalidPiEmailAddress(email: String, pid: Program.Id): OdbError =
       s"Invalid email address \"$email\" for PI in program $pid".invalidArg
 
+    def missingConsiderForBand3(pid: Program.Id): OdbError =
+      s"Proposal $pid must specify if it should be considered for band 3.".invalidArg
+
   }
 
   /** Construct a `ProposalService` using the specified `Session`. */
@@ -211,7 +214,8 @@ object ProposalService {
         currentTime:       Timestamp,
         deadline:          Option[Timestamp],
         cfpTitle:          Option[NonEmptyString],
-        cfp:               Option[CfpProperties]
+        cfp:               Option[CfpProperties],
+        considerForBand3:  Option[Boolean]
       ) {
         val status: Result[enumsVal.ProposalStatus] =
           statusTag.toProposalStatus
@@ -246,6 +250,9 @@ object ProposalService {
                  (s === ScienceSubtype.Queue))
               )
             },
+            missingConsiderForBand3(pid).asFailure.whenA(
+              scienceSubtype.contains(ScienceSubtype.Queue) && considerForBand3.isEmpty
+            ),
             missingPartners(pid, unmatchedPartners).asFailure.unlessA(unmatchedPartners.isEmpty),
             validatePiEmailAddress(pid)
           ).tupled.unlessA(newStatus === enumsVal.ProposalStatus.NotSubmitted)
@@ -390,7 +397,7 @@ object ProposalService {
           _text.map(_.toList.map(n => NonEmptyString.from(n).toOption))
 
         val codec: Decoder[ProposalContext] =
-          (tag *: bool *: varchar_nonempty.opt *: text_nonempty.opt *: proposal_reference.opt *: semester.opt *: science_subtype.opt *: int8 *: parts *: parts *: int4_nonneg *: core_timestamp *: core_timestamp.opt *: text_nonempty.opt *: CallForProposalsService.Statements.cfp_properties.opt).to[ProposalContext]
+          (tag *: bool *: varchar_nonempty.opt *: text_nonempty.opt *: proposal_reference.opt *: semester.opt *: science_subtype.opt *: int8 *: parts *: parts *: int4_nonneg *: core_timestamp *: core_timestamp.opt *: text_nonempty.opt *: CallForProposalsService.Statements.cfp_properties.opt *: bool.opt).to[ProposalContext]
 
         def lookup(pid: Program.Id): F[Result[ProposalContext]] =
           val af = Statements.selectProposalContext(user, pid)
@@ -740,7 +747,8 @@ object ProposalService {
           cfp.c_cfp_id,
           cfp.c_type,
           cfp.c_semester,
-          cfp.c_proprietary
+          cfp.c_proprietary,
+          prop.c_consider_for_band_3
         FROM t_program prog
         LEFT JOIN t_proposal prop
           ON prog.c_program_id = prop.c_program_id
