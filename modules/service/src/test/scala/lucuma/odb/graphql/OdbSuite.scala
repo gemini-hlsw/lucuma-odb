@@ -759,6 +759,10 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
   def withSession[A](f: Session[IO] => IO[A]): IO[A] =
     Resource.eval(IO(sessionFixture())).use(f)
 
+  // Use this when your operations may leave the session in a bad state, e.g. when a trigger fails
+  def withFreshSession[A](f: Session[IO] => IO[A]): IO[A] =
+    IO.defer(session.use(f))
+
   def withServices[A](u: User)(f: Services[IO] => IO[A]): IO[A] =
     (for {
       s <- Resource.eval(IO(sessionFixture()))

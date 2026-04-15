@@ -18,9 +18,8 @@ val flywayVersion                = "9.22.3"
 val fs2AwsVersion                = "6.2.0"
 val fs2Version                   = "3.13.0"
 val grackleVersion               = "0.26.0"
-val http4sVersion                = "0.23.33"
+val http4sVersion                = "0.23.34"
 val http4sBlazeVersion           = "0.23.17"
-val http4sEmberVersion           = "0.23.33"
 val http4sJdkHttpClientVersion   = "0.10.0"
 val http4sOtel4sVersion          = "0.17.0"
 val jmhVersion                   = "1.37"
@@ -29,23 +28,23 @@ val keySemaphoreVersion          = "0.3.0-M1"
 val kittensVersion               = "3.5.0"
 val logbackVersion               = "1.5.32"
 val log4catsVersion              = "2.8.0"
-val lucumaCoreVersion            = "0.180.2"
+val lucumaCoreVersion            = "0.180.3"
 val lucumaGraphQLRoutesVersion   = "0.12.0"
 val monocleVersion               = "3.3.0"
-val munitVersion                 = "1.2.1"
-val munitCatsEffectVersion       = "2.1.0"   // check test output if you attempt to update this
+val munitVersion                 = "1.3.0"
+val munitCatsEffectVersion       = "2.2.0"   // check test output if you attempt to update this
 val munitDisciplineVersion       = "2.0.0"   // check test output if you attempt to update this
-val munitScalacheckVersion       = "1.2.0"   // check test output if you attempt to update this
-val scalacheckEffectMunitVersion = "1.0.4"
+val munitScalacheckVersion       = "1.3.0"   // check test output if you attempt to update this
+val scalacheckEffectMunitVersion = "2.1.0"
 val natchezHttp4sVersion         = "0.6.1"
-val natchezVersion               = "0.3.8"
+val natchezVersion               = "0.3.9"
 val openTelemetryVersion         = "1.61.0"
 val openTelemetryInstrVersion    = "2.26.1-alpha"
 val otel4sVersion                = "0.16.0"
 val paigesVersion                = "0.4.4"
-val postgresVersion              = "42.7.9"
+val postgresVersion              = "42.7.10"
 val pprintVersion                = "0.9.6"
-val redis4CatsVersion            = "2.0.1"
+val redis4CatsVersion            = "2.0.3"
 val refinedVersion               = "0.11.3"
 val skunkVersion                 = "0.6.5"
 val sqlFormatterVersion          = "2.0.5"
@@ -307,9 +306,9 @@ lazy val ssoBackendClient = project
       "com.github.jwt-scala" %% "jwt-circe"          % jwtVersion,
       "org.bouncycastle"      % "bcpkix-jdk15on"     % bouncycastleVersion,
       "org.bouncycastle"      % "bcpg-jdk15on"       % bouncycastleVersion,
-      "org.http4s"           %% "http4s-core"        % http4sEmberVersion,
-      "org.http4s"           %% "http4s-client"      % http4sEmberVersion,
-      "org.http4s"           %% "http4s-dsl"         % http4sEmberVersion,
+      "org.http4s"           %% "http4s-core"        % http4sVersion,
+      "org.http4s"           %% "http4s-client"      % http4sVersion,
+      "org.http4s"           %% "http4s-dsl"         % http4sVersion,
       "org.tpolecat"         %% "natchez-core"       % natchezVersion,
       "org.typelevel"        %% "log4cats-core"      % log4catsVersion
     )
@@ -329,9 +328,9 @@ lazy val ssoService = project
       "org.flywaydb"         % "flyway-core"             % flywayVersion,
       "org.postgresql"       % "postgresql"              % postgresVersion,
       "org.http4s"          %% "http4s-blaze-server"     % http4sBlazeVersion,
-      "org.http4s"          %% "http4s-ember-client"     % http4sEmberVersion,
-      "org.http4s"          %% "http4s-circe"            % http4sEmberVersion,
-      "org.http4s"          %% "http4s-dsl"              % http4sEmberVersion,
+      "org.http4s"          %% "http4s-ember-client"     % http4sVersion,
+      "org.http4s"          %% "http4s-circe"            % http4sVersion,
+      "org.http4s"          %% "http4s-dsl"              % http4sVersion,
       "is.cir"              %% "ciris"                   % cirisVersion,
       "com.monovore"        %% "decline-effect"          % declineVersion,
       "org.typelevel"       %% "log4cats-slf4j"          % log4catsVersion,
@@ -364,8 +363,8 @@ lazy val ssoBackendExample = project
     name := "lucuma-sso-backend-example",
     libraryDependencies ++= Seq(
       "is.cir"       %% "ciris"               % cirisVersion,
-      "org.http4s"   %% "http4s-ember-client" % http4sEmberVersion,
-      "org.http4s"   %% "http4s-ember-server" % http4sEmberVersion,
+      "org.http4s"   %% "http4s-ember-client" % http4sVersion,
+      "org.http4s"   %% "http4s-ember-server" % http4sVersion,
       "org.slf4j"    %  "slf4j-simple"        % slf4jVersion,
       "org.tpolecat" %% "natchez-http4s"      % natchezHttp4sVersion,
       "org.tpolecat" %% "natchez-honeycomb"   % natchezVersion,
@@ -719,7 +718,7 @@ lazy val service = project
       "is.cir"                           %% "ciris-refined"                              % cirisVersion,
       "org.flywaydb"                      % "flyway-core"                                % flywayVersion,
       "org.http4s"                       %% "http4s-blaze-server"                        % http4sBlazeVersion,
-      "org.http4s"                       %% "http4s-ember-client"                        % http4sEmberVersion,
+      "org.http4s"                       %% "http4s-ember-client"                        % http4sVersion,
       "org.postgresql"                    % "postgresql"                                 % postgresVersion,
       "org.http4s"                       %% "http4s-otel4s-middleware-trace-server"      % http4sOtel4sVersion,
       "org.http4s"                       %% "http4s-otel4s-middleware-trace-client"      % http4sOtel4sVersion,
