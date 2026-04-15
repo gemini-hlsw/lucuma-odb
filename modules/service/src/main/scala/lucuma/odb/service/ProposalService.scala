@@ -607,7 +607,11 @@ object ProposalService {
             call.minPercentTotal.foldPresent(sql"c_min_percent_total = ${int_percent.opt}"),
             call.totalTime.foldPresent(sql"c_total_time = ${time_span.opt}"),
             call.reviewerId.foldPresent(sql"c_reviewer_id = ${program_user_id.opt}"),
-            call.mentorId.foldPresent(sql"c_mentor_id = ${program_user_id.opt}")
+            call.mentorId.foldPresent(sql"c_mentor_id = ${program_user_id.opt}"),
+            call.aeonMultiFacility.foldPresent(sql"c_aeon_multi_facility = ${bool.opt}"),
+            call.jwstSynergy.foldPresent(sql"c_jwst_synergy = ${bool.opt}"),
+            call.usLongTerm.foldPresent(sql"c_us_long_term = ${bool.opt}"),
+            call.considerForBand3.foldPresent(sql"c_consider_for_band_3 = ${bool.opt}")
           ).flatten
         }
 
@@ -637,7 +641,11 @@ object ProposalService {
           c_min_percent_total,
           c_total_time,
           c_reviewer_id,
-          c_mentor_id
+          c_mentor_id,
+          c_aeon_multi_facility,
+          c_jwst_synergy,
+          c_us_long_term,
+          c_consider_for_band_3
         ) SELECT
           ${program_id},
           ${cfp_id.opt},
@@ -648,7 +656,11 @@ object ProposalService {
           ${int_percent.opt},
           ${time_span.opt},
           ${program_user_id.opt},
-          ${program_user_id.opt}
+          ${program_user_id.opt},
+          ${bool},
+          ${bool},
+          ${bool},
+          ${bool.opt}
       """.apply(
         pid,
         c.callId,
@@ -659,7 +671,11 @@ object ProposalService {
         c.typeʹ.minPercentTotal,
         c.typeʹ.totalTime,
         c.typeʹ.reviewerId,
-        c.typeʹ.mentorId
+        c.typeʹ.mentorId,
+        c.typeʹ.aeonMultiFacility,
+        c.typeʹ.jwstSynergy,
+        c.typeʹ.usLongTerm,
+        c.typeʹ.considerForBand3
       )
 
     val UpdateProgram: Command[(Program.Id, Option[ScienceSubtype], Option[Semester], Option[NonNegInt])] =
