@@ -14,22 +14,23 @@ browser (explore) ──► nginx (:$PORT) ──► otelcol-contrib (127.0.0.1:
                                           └──► Honeycomb (OTLP HTTP)
 ```
 
-The collector runs as a Heroku Docker app (`lucuma-otel-collector`). A
-single dyno runs nginx alongside the collector; nginx terminates HTTP on
-`$PORT`, handles CORS, and enforces Basic auth for every request whose
-`Origin` header is **not** in the browser allowlist. Allowlisted
-browser origins bypass auth. The collector itself listens only on
-loopback. Honeycomb routing is determined by the `service.name`.
+The collector runs as a Docker app in heroku (`lucuma-otel-collector`).
+
+A single dyno runs nginx alongside the collector.
+nginx terminates HTTP, handles CORS, and enforces auth for every request whose
+`Origin` header is **not** in the browser allowlist. This lets the webapps
+through but requires auth for other clients.
+
+The Allow list of browser origins bypass auth, this is a weak for of protection and
+we could improve it in the future, but I don't want to have secrets on the client code
 
 ## Configuration
 
-- `otel-collector-config.yaml` — receivers, exporters, and pipelines for
-  the collector. Secrets are injected via environment variables.
-- `nginx.conf.template` — nginx ingress; edit the two `map` blocks to
-  change the browser `Origin` allowlist.
-- `entrypoint.sh` — materializes `OTLP_HTPASSWD` into
-  `/etc/nginx/.htpasswd`, renders the nginx template, and runs both
-  processes.
+* `otel-collector-config.yaml` — receivers, exporters, and pipelines for the collector.
+Secrets are injected via environment variables.
+* `nginx.conf.template` — nginx template, defines the allow list.
+* `entrypoint.sh` — materializes `OTLP_HTPASSWD` into
+  `/etc/nginx/.htpasswd`, and runs both processes.
 
 ### Heroku config vars
 
@@ -38,31 +39,13 @@ loopback. Honeycomb routing is determined by the `service.name`.
 | `HONEYCOMB_API_KEY` | Honeycomb ingest key |
 | `GRAFANA_OTLP_ENDPOINT` | Full URL, e.g. `https://otlp-gateway-prod-us-east-3.grafana.net/otlp` |
 | `GRAFANA_OTLP_TOKEN` | Base64-encoded `instanceID:token` from Grafana Cloud |
-| `OTLP_HTPASSWD` | htpasswd entry enforced by nginx for non-browser origins, e.g. `otlp:$2y$05$...`. Generate with: `htpasswd -nbB otlp <password>` |
+| `OTLP_HTPASSWD` | htpasswd entry for receiver auth, e.g. `otlp:$2y$05$...`. Generate with: `htpasswd -nbB otlp <password>` |
 
 ### Browser origin allowlist
 
-Allow listed origins bypass Basic auth and receive CORS headers. Thus we avoid including the pwd
-on the web applications though is a weak form of protection
-
-```nginx
-map $http_origin $auth_realm {
-  default                            "Restricted";
-  "https://explore.gemini.edu"       off;
-  "https://explore-test.gemini.edu"  off;
-  "https://explore-dev.lucuma.xyz"   off;
-  "https://local.lucuma.xyz:8080"    off;
-  "https://local.gemini.edu:8080"    off;
-}
-map $http_origin $cors_allow_origin {
-  default                            "";
-  "https://explore.gemini.edu"       $http_origin;
-  "https://explore-test.gemini.edu"  $http_origin;
-  "https://explore-dev.lucuma.xyz"   $http_origin;
-  "https://local.lucuma.xyz:8080"    $http_origin;
-  "https://local.gemini.edu:8080"    $http_origin;
-}
-```
+Allow listed origins bypass Basic auth and receive CORS headers.
+Thus we avoid including the pwd or a token on the web applications though it
+is a weak form of protection. see `nginx.conf.template`
 
 ## Deploying changes
 
@@ -79,4 +62,31 @@ The `heroku-collector` remote must point to `https://git.heroku.com/lucuma-otel-
 
 ```bash
 heroku git:remote -a lucuma-otel-collector --remote heroku-collector
+```
+
+## Running locally
+
+Build and run the collector with dummy exporter secrets:
+
+```bash
+docker build -t otel-collector-local .
+
+# Generate an htpasswd entry for user oltp and password banana
+HTPASSWD=$(docker run --rm httpd:2.4-alpine htpasswd -nbB otlp banana)
+
+docker run --rm --name otel-local \
+  -p 8888:8888 \
+  -e PORT=8888 \
+  -e OTLP_HTPASSWD="$HTPASSWD" \
+  -e HONEYCOMB_API_KEY=dummy \
+  -e GRAFANA_OTLP_ENDPOINT=https://otlp-gateway.example.invalid \
+  -e GRAFANA_OTLP_TOKEN=dummy \
+  otel-collector-local
+```
+
+To point ODB at the local collector:
+
+```bash
+export ODB_OTEL_ENDPOINT=http://localhost:8888
+export ODB_OTEL_KEY=$(echo -n 'otlp:banana' | base64)
 ```

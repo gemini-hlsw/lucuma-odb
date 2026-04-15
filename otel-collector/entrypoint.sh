@@ -11,7 +11,7 @@ trap 'kill 0' EXIT
 
 # htpasswd entry as an env var
 printf '%s\n' "${OTLP_HTPASSWD}" > /etc/nginx/.htpasswd
-chmod 0400 /etc/nginx/.htpasswd
+chmod 0644 /etc/nginx/.htpasswd
 
 # Update variables on the nginx conf
 envsubst '${PORT}' \
