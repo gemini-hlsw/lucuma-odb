@@ -75,8 +75,11 @@ trait ProposalTypeMapping[F[_]] extends BaseMapping[F]
   lazy val ClassicalMapping: ObjectMapping =
     ObjectMapping(ClassicalType)(
       SqlField("id", ProposalView.Classical.Id, key = true, hidden = true),
-      SqlField("minPercentTime",  ProposalView.MinPercent),
-      SqlObject("partnerSplits",  Join(ProposalView.Classical.Id, PartnerSplitTable.ProgramId))
+      SqlField("minPercentTime",     ProposalView.MinPercent),
+      SqlField("aeonMultiFacility",  ProposalView.Classical.AeonMultiFacility),
+      SqlField("jwstSynergy",        ProposalView.Classical.JwstSynergy),
+      SqlField("usLongTerm",         ProposalView.Classical.UsLongTerm),
+      SqlObject("partnerSplits",     Join(ProposalView.Classical.Id, PartnerSplitTable.ProgramId))
     )
 
   lazy val DemoScienceMapping: ObjectMapping =
@@ -108,6 +111,8 @@ trait ProposalTypeMapping[F[_]] extends BaseMapping[F]
       SqlField("toOActivation",       ProposalView.TooActivation),
       SqlField("minPercentTime",      ProposalView.MinPercent),
       SqlField("minPercentTotalTime", ProposalView.LargeProgram.MinPercentTotal),
+      SqlField("aeonMultiFacility",   ProposalView.LargeProgram.AeonMultiFacility),
+      SqlField("jwstSynergy",         ProposalView.LargeProgram.JwstSynergy),
       SqlObject("totalTime")
     )
 
@@ -119,9 +124,13 @@ trait ProposalTypeMapping[F[_]] extends BaseMapping[F]
   lazy val QueueMapping: ObjectMapping =
     ObjectMapping(QueueType)(
       SqlField("id", ProposalView.Queue.Id, key = true, hidden = true),
-      SqlField("toOActivation",   ProposalView.TooActivation),
-      SqlField("minPercentTime",  ProposalView.MinPercent),
-      SqlObject("partnerSplits",  Join(ProposalView.Queue.Id, PartnerSplitTable.ProgramId))
+      SqlField("toOActivation",      ProposalView.TooActivation),
+      SqlField("minPercentTime",     ProposalView.MinPercent),
+      SqlField("aeonMultiFacility",  ProposalView.Queue.AeonMultiFacility),
+      SqlField("jwstSynergy",        ProposalView.Queue.JwstSynergy),
+      SqlField("usLongTerm",         ProposalView.Queue.UsLongTerm),
+      SqlField("considerForBand3",   ProposalView.Queue.ConsiderForBand3),
+      SqlObject("partnerSplits",     Join(ProposalView.Queue.Id, PartnerSplitTable.ProgramId))
     )
 
   lazy val SystemVerificationMapping: ObjectMapping =

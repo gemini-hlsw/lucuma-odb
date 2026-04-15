@@ -61,6 +61,8 @@ ThisBuild / scalacOptions     ++= Seq("-Xmax-inlines", "50") // Hash derivation 
 ThisBuild / Test / fork              := false
 ThisBuild / Test / parallelExecution := false
 
+ThisBuild / Test / testOptions += Tests.Argument(TestFrameworks.MUnit, "--log=debug")
+
 ThisBuild / watchOnTermination := { (action, cmd, times, state) =>
   val projNames = cmd
     .split(";")

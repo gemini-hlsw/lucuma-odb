@@ -1007,4 +1007,285 @@ class updateProposal extends OdbSuite with DatabaseOperations {
     }
   }
 
+  test("✓ update classical proposal with new phase I flags") {
+    createProgramAs(pi).flatMap { pid =>
+      addProposal(pi, pid) *>
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            updateProposal(
+              input: {
+                programId: "$pid"
+                SET: {
+                  type: {
+                    classical: {
+                      minPercentTime: 80
+                      partnerSplits: [{ partner: US, percent: 100 }]
+                      aeonMultiFacility: true
+                      jwstSynergy: true
+                      usLongTerm: true
+                    }
+                  }
+                }
+              }
+            ) {
+              proposal {
+                type {
+                  ... on Classical {
+                    minPercentTime
+                    aeonMultiFacility
+                    jwstSynergy
+                    usLongTerm
+                  }
+                }
+              }
+            }
+          }
+        """,
+        expected = json"""
+          {
+            "updateProposal": {
+              "proposal": {
+                "type": {
+                  "minPercentTime": 80,
+                  "aeonMultiFacility": true,
+                  "jwstSynergy": true,
+                  "usLongTerm": true
+                }
+              }
+            }
+          }
+        """.asRight
+      )
+    }
+  }
+
+  test("✓ update classical proposal phase I flags to false") {
+    createProgramAs(pi).flatMap { pid =>
+      addProposal(pi, pid) *>
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            updateProposal(
+              input: {
+                programId: "$pid"
+                SET: {
+                  type: {
+                    classical: {
+                      minPercentTime: 80
+                      partnerSplits: [{ partner: US, percent: 100 }]
+                      aeonMultiFacility: false
+                      jwstSynergy: false
+                      usLongTerm: false
+                    }
+                  }
+                }
+              }
+            ) {
+              proposal {
+                type {
+                  ... on Classical {
+                    aeonMultiFacility
+                    jwstSynergy
+                    usLongTerm
+                  }
+                }
+              }
+            }
+          }
+        """,
+        expected = json"""
+          {
+            "updateProposal": {
+              "proposal": {
+                "type": {
+                  "aeonMultiFacility": false,
+                  "jwstSynergy": false,
+                  "usLongTerm": false
+                }
+              }
+            }
+          }
+        """.asRight
+      )
+    }
+  }
+
+  test("✓ update large program with new phase I flags") {
+    createProgramAs(pi).flatMap { pid =>
+      addProposal(pi, pid) *>
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            updateProposal(
+              input: {
+                programId: "$pid"
+                SET: {
+                  type: {
+                    largeProgram: {
+                      toOActivation: NONE
+                      minPercentTime: 80
+                      minPercentTotalTime: 90
+                      totalTime: { hours: 120.0 }
+                      aeonMultiFacility: true
+                      jwstSynergy: true
+                    }
+                  }
+                }
+              }
+            ) {
+              proposal {
+                type {
+                  ... on LargeProgram {
+                    toOActivation
+                    minPercentTime
+                    minPercentTotalTime
+                    totalTime { hours }
+                    aeonMultiFacility
+                    jwstSynergy
+                  }
+                }
+              }
+            }
+          }
+        """,
+        expected = json"""
+          {
+            "updateProposal": {
+              "proposal": {
+                "type": {
+                  "toOActivation": "NONE",
+                  "minPercentTime": 80,
+                  "minPercentTotalTime": 90,
+                  "totalTime": { "hours": 120.000000 },
+                  "aeonMultiFacility": true,
+                  "jwstSynergy": true
+                }
+              }
+            }
+          }
+        """.asRight
+      )
+    }
+  }
+
+  test("✓ update queue proposal with new phase I flags") {
+    createProgramAs(pi).flatMap { pid =>
+      addProposal(pi, pid) *>
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            updateProposal(
+              input: {
+                programId: "$pid"
+                SET: {
+                  type: {
+                    queue: {
+                      toOActivation: NONE
+                      minPercentTime: 80
+                      partnerSplits: [{ partner: US, percent: 100 }]
+                      aeonMultiFacility: true
+                      jwstSynergy: true
+                      usLongTerm: true
+                      considerForBand3: true
+                    }
+                  }
+                }
+              }
+            ) {
+              proposal {
+                type {
+                  ... on Queue {
+                    toOActivation
+                    minPercentTime
+                    aeonMultiFacility
+                    jwstSynergy
+                    usLongTerm
+                    considerForBand3
+                  }
+                }
+              }
+            }
+          }
+        """,
+        expected = json"""
+          {
+            "updateProposal": {
+              "proposal": {
+                "type": {
+                  "toOActivation": "NONE",
+                  "minPercentTime": 80,
+                  "aeonMultiFacility": true,
+                  "jwstSynergy": true,
+                  "usLongTerm": true,
+                  "considerForBand3": true
+                }
+              }
+            }
+          }
+        """.asRight
+      )
+    }
+  }
+
+  test("✓ update queue proposal considerForBand3 to null") {
+    createProgramAs(pi).flatMap { pid =>
+      addProposal(pi, pid) *>
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            updateProposal(
+              input: {
+                programId: "$pid"
+                SET: {
+                  type: {
+                    queue: {
+                      toOActivation: NONE
+                      minPercentTime: 80
+                      partnerSplits: [{ partner: US, percent: 100 }]
+                      aeonMultiFacility: true
+                      jwstSynergy: true
+                      usLongTerm: true
+                      considerForBand3: null
+                    }
+                  }
+                }
+              }
+            ) {
+              proposal {
+                type {
+                  ... on Queue {
+                    aeonMultiFacility
+                    jwstSynergy
+                    usLongTerm
+                    considerForBand3
+                  }
+                }
+              }
+            }
+          }
+        """,
+        expected = json"""
+          {
+            "updateProposal": {
+              "proposal": {
+                "type": {
+                  "aeonMultiFacility": true,
+                  "jwstSynergy": true,
+                  "usLongTerm": true,
+                  "considerForBand3": null
+                }
+              }
+            }
+          }
+        """.asRight
+      )
+    }
+  }
+
 }

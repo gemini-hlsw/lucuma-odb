@@ -222,20 +222,20 @@ object ProposalTypeInput {
           ToOActivationBinding.Option("toOActivation", rToo),
           IntPercentBinding.Option("minPercentTime", rMin),
           PartnerSplitsInput.Option("partnerSplits", rSplits),
+          BooleanBinding.Option("considerForBand3", rBand3),
           BooleanBinding.Option("aeonMultiFacility", rAeon),
           BooleanBinding.Option("jwstSynergy", rJwst),
-          BooleanBinding.Option("usLongTerm", rUsLong),
-          BooleanBinding.Option("considerForBand3", rBand3)
-        ) => (rToo, rMin, rSplits, rAeon, rJwst, rUsLong, rBand3).parMapN { (too, min, splits, aeon, jwst, usLong, band3) =>
+          BooleanBinding.Option("usLongTerm", rUsLong)
+        ) => (rToo, rMin, rSplits, rBand3, rAeon, rJwst, rUsLong).parMapN { (too, min, splits, band3, aeon, jwst, usLong) =>
           Create(ScienceSubtype.Queue).update(
             for {
               _ <- tooActivation     := too
               _ <- minPercentTime    := min
               _ <- partnerSplits     := splits
+              _ <- considerForBand3  := band3
               _ <- aeonMultiFacility := aeon
               _ <- jwstSynergy       := jwst
               _ <- usLongTerm        := usLong
-              _ <- considerForBand3  := band3
             } yield ()
           )
         }
@@ -266,9 +266,9 @@ object ProposalTypeInput {
     partnerSplits:      Nullable[Map[Partner, IntPercent]] = Nullable.Null,
     reviewerId:         Nullable[ProgramUser.Id]           = Nullable.Null,
     mentorId:           Nullable[ProgramUser.Id]           = Nullable.Null,
-    aeonMultiFacility:  Nullable[Boolean]                  = Nullable.Null,
-    jwstSynergy:        Nullable[Boolean]                  = Nullable.Null,
-    usLongTerm:         Nullable[Boolean]                  = Nullable.Null,
+    aeonMultiFacility:  Nullable[Boolean]                  = Nullable.Absent,
+    jwstSynergy:        Nullable[Boolean]                  = Nullable.Absent,
+    usLongTerm:         Nullable[Boolean]                  = Nullable.Absent,
     considerForBand3:   Nullable[Boolean]                  = Nullable.Null
   ) {
     def asCreate: Create =
@@ -359,12 +359,12 @@ object ProposalTypeInput {
           ToOActivationBinding.Option("toOActivation", rToo),
           IntPercentBinding.Option("minPercentTime", rMin),
           PartnerSplitsInput.Nullable("partnerSplits", rSplits),
+          BooleanBinding.Nullable("considerForBand3", rBand3),
           BooleanBinding.Nullable("aeonMultiFacility", rAeon),
           BooleanBinding.Nullable("jwstSynergy", rJwst),
-          BooleanBinding.Nullable("usLongTerm", rUsLong),
-          BooleanBinding.Nullable("considerForBand3", rBand3)
-        ) => (rToo, rMin, rSplits, rAeon, rJwst, rUsLong, rBand3).parMapN { (too, min, splits, aeon, jwst, usLong, band3) =>
-          Edit(ScienceSubtype.Queue, too, min, partnerSplits = splits, aeonMultiFacility = aeon, jwstSynergy = jwst, usLongTerm = usLong, considerForBand3 = band3)
+          BooleanBinding.Nullable("usLongTerm", rUsLong)
+        ) => (rToo, rMin, rSplits, rBand3, rAeon, rJwst, rUsLong).parMapN { (too, min, splits, band3, aeon, jwst, usLong) =>
+          Edit(ScienceSubtype.Queue, too, min, partnerSplits = splits, considerForBand3 = band3, aeonMultiFacility = aeon, jwstSynergy = jwst, usLongTerm = usLong)
         }
       }
 
