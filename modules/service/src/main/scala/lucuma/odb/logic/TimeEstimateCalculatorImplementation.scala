@@ -70,6 +70,15 @@ object TimeEstimateCalculatorImplementation:
         ctx.enums.TimeEstimate.Flamingos2LongslitMaxVisit.time
       )
 
+    lazy val ghostIfuSetup: SetupTimeEstimateCalculator =
+      // Placeholder
+      new SetupTimeEstimateCalculator:
+        override def estimateSetupTime: SetupTime =
+          SetupTime.Zero
+
+        override def estimateSetupCount(scienceTime: TimeSpan): NonNegInt =
+          NonNegInt.unsafeFrom(1)
+
     lazy val gmosNorthImagingSetup: SetupTimeEstimateCalculator =
       setupCalculatorfromEstimation(
         SetupTime(

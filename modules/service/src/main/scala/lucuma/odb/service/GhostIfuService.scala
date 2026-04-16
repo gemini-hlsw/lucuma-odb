@@ -21,7 +21,7 @@ import lucuma.odb.data.ExposureTimeModeId
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.input.GhostIfuInput
-import lucuma.odb.sequence.ghost.Detector
+import lucuma.odb.sequence.ghost.DetectorConfig
 import lucuma.odb.sequence.ghost.ifu.Config
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.GhostCodecs.*
@@ -134,7 +134,7 @@ object GhostIfuService:
 
   object Statements:
 
-    val ghost_detector: Decoder[Detector] =
+    val ghost_detector: Decoder[DetectorConfig] =
       (
         exposure_time_mode  *:
         ghost_binning       *:
@@ -147,13 +147,13 @@ object GhostIfuService:
           .getOption(etm)
           .toRight(s"GHOST only supports time and count exposure time mode.")
           .map: tc =>
-            Detector(tc, defaultBinning, explicitBinning, defaultReadMode, explicitReadMode)
+            DetectorConfig(tc, defaultBinning, explicitBinning, defaultReadMode, explicitReadMode)
 
-    val ghost_detector_blue: Decoder[Detector.Blue] =
-      (ghost_detector).map(Detector.Blue(_))
+    val ghost_detector_blue: Decoder[DetectorConfig.Blue] =
+      (ghost_detector).map(DetectorConfig.Blue(_))
 
-    val ghost_detector_red: Decoder[Detector.Red] =
-      (ghost_detector).map(Detector.Red(_))
+    val ghost_detector_red: Decoder[DetectorConfig.Red] =
+      (ghost_detector).map(DetectorConfig.Red(_))
 
     val ghost_ifu: Decoder[Config] =
       (

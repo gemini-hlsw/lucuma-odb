@@ -17,8 +17,8 @@ import java.io.DataOutputStream
 
 case class Config(
   resolutionMode:       GhostResolutionMode,
-  red:                  Detector.Red,
-  blue:                 Detector.Blue,
+  red:                  DetectorConfig.Red,
+  blue:                 DetectorConfig.Blue,
   explicitIfu1Agitator: Option[GhostIfu1FiberAgitator],
   explicitIfu2Agitator: Option[GhostIfu2FiberAgitator]
 ) derives Eq:

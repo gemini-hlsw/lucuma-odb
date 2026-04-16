@@ -16,6 +16,8 @@ import lucuma.core.model.Observation
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig as Flamingos2Dynamic
 import lucuma.core.model.sequence.flamingos2.Flamingos2StaticConfig as Flamingos2Static
+import lucuma.core.model.sequence.ghost.GhostDynamicConfig as GhostDynamic
+import lucuma.core.model.sequence.ghost.GhostStaticConfig as GhostStatic
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth as GmosNorthDynamic
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosSouth as GmosSouthDynamic
 import lucuma.core.model.sequence.gmos.StaticConfig.GmosNorth as GmosNorthStatic
@@ -53,6 +55,13 @@ sealed trait GeneratorStreaming[F[_]]:
     context: GeneratorContext
   ): F[Either[OdbError, StreamingExecutionConfig[F, Flamingos2Static, Flamingos2Dynamic]]]
 
+  def selectOrGenerateGhost(
+    context: GeneratorContext
+  )(using Transaction[F]): F[Either[OdbError, StreamingExecutionConfig[F, GhostStatic, GhostDynamic]]]
+
+  def generateGhost(
+    context: GeneratorContext
+  ): F[Either[OdbError, StreamingExecutionConfig[F, GhostStatic, GhostDynamic]]]
 
   def selectOrGenerateGmosNorthImaging(
     context: GeneratorContext
@@ -191,6 +200,31 @@ object GeneratorStreaming:
           cfg <- extractMode(ObservingMode.Flamingos2LongSlitName, context)(_.asFlamingos2LongSlit)
           itc  = requireSpectroscopyItc(context.oid, context.itcRes)
           gen <- EitherT(LongSlit.instantiate(context.oid, calculator.flamingos2Step, context.namespace, exp.flamingos2, cfg, itc))
+        yield gen.covary[F]).value
+
+      override def selectOrGenerateGhost(
+        context: GeneratorContext
+      )(using Transaction[F]): F[Either[OdbError, StreamingExecutionConfig[F, GhostStatic, GhostDynamic]]] =
+        (for
+          cfg <- extractMode(ObservingMode.GhostIfuName, context)(_.asGhostIfu)
+          stc  = GhostStatic(cfg.resolutionMode)
+          res <- EitherT:
+                   selectOrGenerate(
+                     stc,
+                     sequenceService.selectGhostSequence(context.oid, _, _),
+                     generateGhost(context)
+                   )
+        yield res).value
+
+      override def generateGhost(
+        context: GeneratorContext
+      ): F[Either[OdbError, StreamingExecutionConfig[F, GhostStatic, GhostDynamic]]] =
+        import lucuma.odb.sequence.ghost.ifu.Ifu
+        (for
+          cfg <- extractMode(ObservingMode.GhostIfuName, context)(_.asGhostIfu)
+          stc  = GhostStatic(cfg.resolutionMode)
+          itc  = requireGhostItc(context.oid, context.itcRes)
+          gen <- EitherT(Ifu.instantiate(calculator.ghostStep, stc, context.namespace, cfg, itc))
         yield gen.covary[F]).value
 
       override def selectOrGenerateIgrins2LongSlit(

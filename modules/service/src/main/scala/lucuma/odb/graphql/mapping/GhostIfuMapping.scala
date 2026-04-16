@@ -28,7 +28,7 @@ trait GhostIfuMapping[F[_]]
      with OptionalFieldMapping[F]
      with Predicates[F] { this: SkunkMapping[F] =>
 
-  def ghostDetectorMapping(
+  def ghostDetectorConfigMapping(
     detector: GhostIfuTable.DetectorTable,
     etmView:  BaseExposureTimeModeView
   ): ObjectMapping =
@@ -64,13 +64,13 @@ trait GhostIfuMapping[F[_]]
 
   lazy val GhostIfuMappings: List[TypeMapping] =
     List(
-      ghostDetectorMapping(GhostIfuTable.Blue, GhostBlueExposureTimeModeView),
-      ghostDetectorMapping(GhostIfuTable.Red,  GhostRedExposureTimeModeView),
+      ghostDetectorConfigMapping(GhostIfuTable.Blue, GhostBlueExposureTimeModeView),
+      ghostDetectorConfigMapping(GhostIfuTable.Red,  GhostRedExposureTimeModeView),
       GhostIfuMapping
     )
 
   lazy val GhostIfuElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
-    case (GhostDetectorType, "exposureTimeMode", Nil) =>
+    case (GhostDetectorConfigType, "exposureTimeMode", Nil) =>
       Elab.transformChild: child =>
         Unique(
           Filter(

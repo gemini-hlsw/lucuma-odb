@@ -186,7 +186,9 @@ object OdbMapping {
           with Igrins2LongSlitMapping[F]
           with Igrins2StaticMapping[F]
           with FilterTypeMetaMapping[F]
+          with GhostDynamicMapping[F]
           with GhostIfuMapping[F]
+          with GhostStaticMapping[F]
           with GmosCcdModeMapping[F]
           with GmosCustomMaskMapping[F]
           with GmosDynamicMapping[F]
@@ -423,8 +425,7 @@ object OdbMapping {
                 Igrins2DynamicMapping,
                 Flamingos2LongSlitMapping,
                 Flamingos2StaticMapping,
-                Igrins2LongSlitMapping,
-                Igrins2StaticMapping,
+                GhostStaticMapping,
                 GmosNorthImagingFilterMapping,
                 GmosNorthLongSlitAcquisitionMapping,
                 GmosNorthLongSlitMapping,
@@ -437,6 +438,8 @@ object OdbMapping {
                 GroupMapping,
                 GroupEditMapping,
                 GroupElementMapping,
+                Igrins2LongSlitMapping,
+                Igrins2StaticMapping,
                 ImagingConfigOptionMapping,
                 ImagingConfigOptionGmosNorthMapping,
                 ImagingConfigOptionGmosSouthMapping,
@@ -573,6 +576,7 @@ object OdbMapping {
                 ExposureTimeModeMappings,
                 Flamingos2CustomMaskMappings,
                 Flamingos2FpuMaskMappings,
+                GhostDynamicMappings,
                 GhostIfuMappings,
                 GmosCcdModeMappings,
                 GmosCustomMaskMappings,
