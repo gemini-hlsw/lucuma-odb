@@ -615,9 +615,9 @@ object ProposalService {
             call.totalTime.foldPresent(sql"c_total_time = ${time_span.opt}"),
             call.reviewerId.foldPresent(sql"c_reviewer_id = ${program_user_id.opt}"),
             call.mentorId.foldPresent(sql"c_mentor_id = ${program_user_id.opt}"),
-            call.aeonMultiFacility.foldPresent(sql"c_aeon_multi_facility = ${bool.opt}"),
-            call.jwstSynergy.foldPresent(sql"c_jwst_synergy = ${bool.opt}"),
-            call.usLongTerm.foldPresent(sql"c_us_long_term = ${bool.opt}"),
+            call.aeonMultiFacility.map(sql"c_aeon_multi_facility = ${bool}"),
+            call.jwstSynergy.map(sql"c_jwst_synergy = ${bool}"),
+            call.usLongTerm.map(sql"c_us_long_term = ${bool}"),
             call.considerForBand3.foldPresent(sql"c_consider_for_band_3 = ${bool.opt}")
           ).flatten
         }
