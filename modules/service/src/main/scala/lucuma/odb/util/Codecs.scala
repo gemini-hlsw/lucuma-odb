@@ -59,6 +59,7 @@ import lucuma.core.util.TimestampInterval
 import lucuma.core.util.Uid
 import lucuma.odb.data.AtomExecutionState
 import lucuma.odb.data.BlindOffsetType
+import lucuma.odb.data.ConsiderForBand3
 import lucuma.odb.data.DatabaseOperation
 import lucuma.odb.data.EmailId
 import lucuma.odb.data.ExecutionEventType
@@ -698,6 +699,9 @@ trait Codecs {
 
   val too_activation: Codec[ToOActivation] =
     enumerated(Type("e_too_activation"))
+
+  val consider_for_band_3: Codec[ConsiderForBand3] =
+    enumerated(Type("e_consider_for_band_3"))
 
   val user_id: Codec[User.Id] =
     gid[User.Id]

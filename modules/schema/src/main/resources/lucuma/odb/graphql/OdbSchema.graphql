@@ -4290,11 +4290,11 @@ type Queue implements ProposalType {
   partnerSplits: [PartnerSplit!]!
 
   """
-  Whether this proposal should be considered for Band 3. May be left unset
-  at creation or update time, but must have a value before the proposal
-  can be submitted.
+  Whether this proposal should be considered for Band 3. Defaults to UNSET
+  on creation; must be CONSIDER or DO_NOT_CONSIDER before the proposal can
+  be submitted.
   """
-  considerForBand3: Boolean
+  considerForBand3: ConsiderForBand3!
 
   """
   Whether this proposal is part of the AEON/Multi-facility program.
@@ -4513,11 +4513,11 @@ input QueueInput {
   partnerSplits: [PartnerSplitInput!]
 
   """
-  Whether this proposal should be considered for Band 3. May be left unset
-  at creation or update time, but must have a value before the proposal
-  can be submitted.
+  Whether this proposal should be considered for Band 3. Defaults to UNSET
+  on creation; must be CONSIDER or DO_NOT_CONSIDER before the proposal can
+  be submitted.
   """
-  considerForBand3: Boolean
+  considerForBand3: ConsiderForBand3
 
   "Whether this proposal is part of the AEON/Multi-facility program."
   aeonMultiFacility: Boolean
@@ -15326,6 +15326,26 @@ type TimestampInterval {
 
   "Duration of the interval."
   duration: TimeSpan!
+}
+
+"""
+Whether a queue proposal should be considered for Band 3 scheduling.
+"""
+enum ConsiderForBand3 {
+  """
+  No decision has been made yet. The proposal cannot be submitted in this state.
+  """
+  UNSET
+
+  """
+  The proposal should be considered for Band 3.
+  """
+  CONSIDER
+
+  """
+  The proposal should not be considered for Band 3.
+  """
+  DO_NOT_CONSIDER
 }
 
 """

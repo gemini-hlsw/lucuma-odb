@@ -7,8 +7,14 @@ ALTER TABLE t_proposal ADD COLUMN c_jwst_synergy boolean DEFAULT false NOT NULL;
 -- US Long Term flag (Queue only)
 ALTER TABLE t_proposal ADD COLUMN c_us_long_term boolean DEFAULT false NOT NULL;
 
--- Consider for Band 3 flag (Queue only)
-ALTER TABLE t_proposal ADD COLUMN c_consider_for_band_3 boolean DEFAULT NULL;
+-- Enum to flag whether a proposal can be considered for band 3
+CREATE TYPE e_consider_for_band_3 AS ENUM (
+  'unset',
+  'consider',
+  'do_not_consider'
+);
+
+ALTER TABLE t_proposal ADD COLUMN c_consider_for_band_3 e_consider_for_band_3 DEFAULT 'unset' NOT NULL;
 
 -- Update v_proposal view to include the new columns
 DROP VIEW v_proposal;
