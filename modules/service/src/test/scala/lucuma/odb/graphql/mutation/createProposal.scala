@@ -68,7 +68,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
                   "aeonMultiFacility": false,
                   "jwstSynergy": false,
                   "usLongTerm": false,
-                  "considerForBand3": null
+                  "considerForBand3": "UNSET"
                 }
               }
             }
@@ -1555,7 +1555,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
                       aeonMultiFacility: true
                       jwstSynergy: true
                       usLongTerm: true
-                      considerForBand3: true
+                      considerForBand3: CONSIDER
                     }
                   }
                 }
@@ -1588,7 +1588,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
                   "aeonMultiFacility": true,
                   "jwstSynergy": true,
                   "usLongTerm": true,
-                  "considerForBand3": true
+                  "considerForBand3": "CONSIDER"
                 }
               }
             }

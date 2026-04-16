@@ -1185,7 +1185,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
                       aeonMultiFacility: true
                       jwstSynergy: true
                       usLongTerm: true
-                      considerForBand3: true
+                      considerForBand3: CONSIDER
                     }
                   }
                 }
@@ -1216,7 +1216,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
                   "aeonMultiFacility": true,
                   "jwstSynergy": true,
                   "usLongTerm": true,
-                  "considerForBand3": true
+                  "considerForBand3": "CONSIDER"
                 }
               }
             }
@@ -1224,7 +1224,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
         """.asRight
       )
 
-  test("✓ update queue proposal considerForBand3 to null"):
+  test("✓ update queue proposal considerForBand3 to UNSET"):
     createProgramAs(pi).flatMap: pid =>
       addProposal(pi, pid) *>
       expect(
@@ -1243,7 +1243,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
                       aeonMultiFacility: true
                       jwstSynergy: true
                       usLongTerm: true
-                      considerForBand3: null
+                      considerForBand3: UNSET
                     }
                   }
                 }
@@ -1270,7 +1270,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
                   "aeonMultiFacility": true,
                   "jwstSynergy": true,
                   "usLongTerm": true,
-                  "considerForBand3": null
+                  "considerForBand3": "UNSET"
                 }
               }
             }
@@ -1282,7 +1282,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
     createProgramAs(pi).flatMap: pid =>
       addProposal(
         pi, pid,
-        callProps = "queue: { considerForBand3: false, aeonMultiFacility: true, jwstSynergy: true, usLongTerm: true }".some
+        callProps = "queue: { considerForBand3: DO_NOT_CONSIDER, aeonMultiFacility: true, jwstSynergy: true, usLongTerm: true }".some
       ) *>
       expect(
         user = pi,
@@ -1323,7 +1323,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
                   "aeonMultiFacility": true,
                   "jwstSynergy": true,
                   "usLongTerm": true,
-                  "considerForBand3": false
+                  "considerForBand3": "DO_NOT_CONSIDER"
                 }
               }
             }

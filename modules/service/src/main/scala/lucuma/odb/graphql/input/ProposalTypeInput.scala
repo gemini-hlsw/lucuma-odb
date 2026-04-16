@@ -21,6 +21,7 @@ import lucuma.core.model.IntPercent
 import lucuma.core.model.ProgramUser
 import lucuma.core.optics.syntax.lens.*
 import lucuma.core.util.TimeSpan
+import lucuma.odb.data.ConsiderForBand3
 import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.binding.*
 import monocle.Focus
@@ -76,7 +77,7 @@ object ProposalTypeInput {
     aeonMultiFacility:  Boolean                  = false,
     jwstSynergy:        Boolean                  = false,
     usLongTerm:         Boolean                  = false,
-    considerForBand3:   Option[Boolean]          = none
+    considerForBand3:   ConsiderForBand3         = ConsiderForBand3.Unset
   ) {
 
     def asEdit: Edit =
@@ -92,7 +93,7 @@ object ProposalTypeInput {
         aeonMultiFacility.some,
         jwstSynergy.some,
         usLongTerm.some,
-        Nullable.orNull(considerForBand3)
+        considerForBand3.some
       )
 
     def update(s: State[Create, Unit]): Create =
@@ -123,7 +124,7 @@ object ProposalTypeInput {
     val aeonMultiFacility: Lens[Create, Boolean]              = Focus[Create](_.aeonMultiFacility)
     val jwstSynergy: Lens[Create, Boolean]                    = Focus[Create](_.jwstSynergy)
     val usLongTerm: Lens[Create, Boolean]                     = Focus[Create](_.usLongTerm)
-    val considerForBand3: Lens[Create, Option[Boolean]]       = Focus[Create](_.considerForBand3)
+    val considerForBand3: Lens[Create, ConsiderForBand3]      = Focus[Create](_.considerForBand3)
 
     private def simpleCreateBinding(s: ScienceSubtype): Matcher[Create] =
       ObjectFieldsBinding.rmap {
@@ -222,7 +223,7 @@ object ProposalTypeInput {
           ToOActivationBinding.Option("toOActivation", rToo),
           IntPercentBinding.Option("minPercentTime", rMin),
           PartnerSplitsInput.Option("partnerSplits", rSplits),
-          BooleanBinding.Option("considerForBand3", rBand3),
+          ConsiderForBand3Binding.Option("considerForBand3", rBand3),
           BooleanBinding.Option("aeonMultiFacility", rAeon),
           BooleanBinding.Option("jwstSynergy", rJwst),
           BooleanBinding.Option("usLongTerm", rUsLong)
@@ -269,7 +270,7 @@ object ProposalTypeInput {
     aeonMultiFacility:  Option[Boolean]                    = None,
     jwstSynergy:        Option[Boolean]                    = None,
     usLongTerm:         Option[Boolean]                    = None,
-    considerForBand3:   Nullable[Boolean]                  = Nullable.Null
+    considerForBand3:   Option[ConsiderForBand3]           = None
   ) {
     def asCreate: Create =
       Create.DefaultFor(scienceSubtype).update {
@@ -284,7 +285,7 @@ object ProposalTypeInput {
           _ <- Create.aeonMultiFacility := aeonMultiFacility
           _ <- Create.jwstSynergy       := jwstSynergy
           _ <- Create.usLongTerm        := usLongTerm
-          _ <- Create.considerForBand3  := considerForBand3.toOptionOption
+          _ <- Create.considerForBand3  := considerForBand3
         } yield ()
       }
   }
@@ -359,7 +360,7 @@ object ProposalTypeInput {
           ToOActivationBinding.Option("toOActivation", rToo),
           IntPercentBinding.Option("minPercentTime", rMin),
           PartnerSplitsInput.Nullable("partnerSplits", rSplits),
-          BooleanBinding.Nullable("considerForBand3", rBand3),
+          ConsiderForBand3Binding.Option("considerForBand3", rBand3),
           BooleanBinding.Option("aeonMultiFacility", rAeon),
           BooleanBinding.Option("jwstSynergy", rJwst),
           BooleanBinding.Option("usLongTerm", rUsLong)

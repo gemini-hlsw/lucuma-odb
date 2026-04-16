@@ -48,6 +48,7 @@ import lucuma.core.util.IdempotencyKey
 import lucuma.core.util.Timestamp
 import lucuma.odb.data.AtomExecutionState
 import lucuma.odb.data.BlindOffsetType
+import lucuma.odb.data.ConsiderForBand3
 import lucuma.odb.data.DatabaseOperation
 import lucuma.odb.data.EditType
 import lucuma.odb.data.ExecutionEventType
@@ -88,6 +89,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[CloudExtinction.Preset](CloudExtinctionPresetType),
       LeafMapping[ConfigurationRequest.Id](ConfigurationRequestIdType),
       LeafMapping[ConfigurationRequestStatus](ConfigurationRequestStatusType),
+      LeafMapping[ConsiderForBand3](ConsiderForBand3Type),
       LeafMapping[DatabaseOperation](DatabaseOperationType),
       LeafMapping[DatasetQaState](DatasetQaStateType),
       LeafMapping[DatasetReference](DatasetReferenceLabelType),

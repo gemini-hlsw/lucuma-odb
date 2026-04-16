@@ -215,7 +215,7 @@ object ProposalService {
         deadline:          Option[Timestamp],
         cfpTitle:          Option[NonEmptyString],
         cfp:               Option[CfpProperties],
-        considerForBand3:  Option[Boolean]
+        considerForBand3:  Option[ConsiderForBand3]
       ) {
         val status: Result[enumsVal.ProposalStatus] =
           statusTag.toProposalStatus
@@ -251,7 +251,7 @@ object ProposalService {
               )
             },
             missingConsiderForBand3(pid).asFailure.whenA(
-              scienceSubtype.contains(ScienceSubtype.Queue) && considerForBand3.isEmpty
+              scienceSubtype.contains(ScienceSubtype.Queue) && considerForBand3.contains(ConsiderForBand3.Unset)
             ),
             missingPartners(pid, unmatchedPartners).asFailure.unlessA(unmatchedPartners.isEmpty),
             validatePiEmailAddress(pid)
@@ -397,7 +397,7 @@ object ProposalService {
           _text.map(_.toList.map(n => NonEmptyString.from(n).toOption))
 
         val codec: Decoder[ProposalContext] =
-          (tag *: bool *: varchar_nonempty.opt *: text_nonempty.opt *: proposal_reference.opt *: semester.opt *: science_subtype.opt *: int8 *: parts *: parts *: int4_nonneg *: core_timestamp *: core_timestamp.opt *: text_nonempty.opt *: CallForProposalsService.Statements.cfp_properties.opt *: bool.opt).to[ProposalContext]
+          (tag *: bool *: varchar_nonempty.opt *: text_nonempty.opt *: proposal_reference.opt *: semester.opt *: science_subtype.opt *: int8 *: parts *: parts *: int4_nonneg *: core_timestamp *: core_timestamp.opt *: text_nonempty.opt *: CallForProposalsService.Statements.cfp_properties.opt *: consider_for_band_3.opt).to[ProposalContext]
 
         def lookup(pid: Program.Id): F[Result[ProposalContext]] =
           val af = Statements.selectProposalContext(user, pid)
@@ -618,7 +618,7 @@ object ProposalService {
             call.aeonMultiFacility.map(sql"c_aeon_multi_facility = ${bool}"),
             call.jwstSynergy.map(sql"c_jwst_synergy = ${bool}"),
             call.usLongTerm.map(sql"c_us_long_term = ${bool}"),
-            call.considerForBand3.foldPresent(sql"c_consider_for_band_3 = ${bool.opt}")
+            call.considerForBand3.map(sql"c_consider_for_band_3 = ${consider_for_band_3}")
           ).flatten
         }
 
@@ -667,7 +667,7 @@ object ProposalService {
           ${bool},
           ${bool},
           ${bool},
-          ${bool.opt}
+          ${consider_for_band_3}
       """.apply(
         pid,
         c.callId,
