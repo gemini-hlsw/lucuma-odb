@@ -4371,17 +4371,17 @@ input ClassicalInput {
   """
   Whether this proposal is part of the AEON/Multi-facility program.
   """
-  aeonMultiFacility: Boolean = false
+  aeonMultiFacility: Boolean
 
   """
   Whether this proposal has JWST synergy.
   """
-  jwstSynergy: Boolean = false
+  jwstSynergy: Boolean
 
   """
   Whether this is a US Long Term proposal.
   """
-  usLongTerm: Boolean = false
+  usLongTerm: Boolean
 }
 
 input DemoScienceInput {
@@ -4464,10 +4464,10 @@ input LargeProgramInput {
   totalTime: TimeSpanInput
 
   "Whether this proposal is part of the AEON/Multi-facility program."
-  aeonMultiFacility: Boolean = false
+  aeonMultiFacility: Boolean
 
   "Whether this proposal has JWST synergy."
-  jwstSynergy: Boolean = false
+  jwstSynergy: Boolean
 }
 
 """
@@ -4520,13 +4520,13 @@ input QueueInput {
   considerForBand3: Boolean
 
   "Whether this proposal is part of the AEON/Multi-facility program."
-  aeonMultiFacility: Boolean = false
+  aeonMultiFacility: Boolean
 
   "Whether this proposal has JWST synergy."
-  jwstSynergy: Boolean = false
+  jwstSynergy: Boolean
 
   "Whether this is a US Long Term proposal."
-  usLongTerm: Boolean = false
+  usLongTerm: Boolean
 }
 
 input SystemVerificationInput {

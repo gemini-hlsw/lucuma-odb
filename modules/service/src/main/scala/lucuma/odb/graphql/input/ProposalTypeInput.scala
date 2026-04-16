@@ -89,9 +89,9 @@ object ProposalTypeInput {
         Nullable.NonNull(partnerSplits),
         Nullable.orNull(reviewerId),
         Nullable.orNull(mentorId),
-        Nullable.NonNull(aeonMultiFacility),
-        Nullable.NonNull(jwstSynergy),
-        Nullable.NonNull(usLongTerm),
+        aeonMultiFacility.some,
+        jwstSynergy.some,
+        usLongTerm.some,
         Nullable.orNull(considerForBand3)
       )
 
@@ -266,9 +266,9 @@ object ProposalTypeInput {
     partnerSplits:      Nullable[Map[Partner, IntPercent]] = Nullable.Null,
     reviewerId:         Nullable[ProgramUser.Id]           = Nullable.Null,
     mentorId:           Nullable[ProgramUser.Id]           = Nullable.Null,
-    aeonMultiFacility:  Nullable[Boolean]                  = Nullable.Absent,
-    jwstSynergy:        Nullable[Boolean]                  = Nullable.Absent,
-    usLongTerm:         Nullable[Boolean]                  = Nullable.Absent,
+    aeonMultiFacility:  Option[Boolean]                    = None,
+    jwstSynergy:        Option[Boolean]                    = None,
+    usLongTerm:         Option[Boolean]                    = None,
     considerForBand3:   Nullable[Boolean]                  = Nullable.Null
   ) {
     def asCreate: Create =
@@ -281,9 +281,9 @@ object ProposalTypeInput {
           _ <- Create.partnerSplits     := partnerSplits.toOption
           _ <- Create.reviewerId        := reviewerId.toOptionOption
           _ <- Create.mentorId          := mentorId.toOptionOption
-          _ <- Create.aeonMultiFacility := aeonMultiFacility.toOption
-          _ <- Create.jwstSynergy       := jwstSynergy.toOption
-          _ <- Create.usLongTerm        := usLongTerm.toOption
+          _ <- Create.aeonMultiFacility := aeonMultiFacility
+          _ <- Create.jwstSynergy       := jwstSynergy
+          _ <- Create.usLongTerm        := usLongTerm
           _ <- Create.considerForBand3  := considerForBand3.toOptionOption
         } yield ()
       }
@@ -306,9 +306,9 @@ object ProposalTypeInput {
         case List(
           IntPercentBinding.Option("minPercentTime", rMin),
           PartnerSplitsInput.Nullable("partnerSplits", rSplits),
-          BooleanBinding.Nullable("aeonMultiFacility", rAeon),
-          BooleanBinding.Nullable("jwstSynergy", rJwst),
-          BooleanBinding.Nullable("usLongTerm", rUsLong)
+          BooleanBinding.Option("aeonMultiFacility", rAeon),
+          BooleanBinding.Option("jwstSynergy", rJwst),
+          BooleanBinding.Option("usLongTerm", rUsLong)
         ) => (rMin, rSplits, rAeon, rJwst, rUsLong).parMapN { (min, splits, aeon, jwst, usLong) =>
           Edit(ScienceSubtype.Classical, minPercentTime = min, partnerSplits = splits, aeonMultiFacility = aeon, jwstSynergy = jwst, usLongTerm = usLong)
         }
@@ -339,8 +339,8 @@ object ProposalTypeInput {
           IntPercentBinding.Option("minPercentTime", rMin),
           IntPercentBinding.Nullable("minPercentTotalTime", rMinTotal),
           TimeSpanInput.Binding.Nullable("totalTime", rTotal),
-          BooleanBinding.Nullable("aeonMultiFacility", rAeon),
-          BooleanBinding.Nullable("jwstSynergy", rJwst)
+          BooleanBinding.Option("aeonMultiFacility", rAeon),
+          BooleanBinding.Option("jwstSynergy", rJwst)
         ) => (rToo, rMin, rMinTotal, rTotal, rAeon, rJwst).parMapN { (too, min, minTotal, total, aeon, jwst) =>
           Edit(ScienceSubtype.LargeProgram, too, min, minTotal, total, aeonMultiFacility = aeon, jwstSynergy = jwst)
         }
@@ -360,9 +360,9 @@ object ProposalTypeInput {
           IntPercentBinding.Option("minPercentTime", rMin),
           PartnerSplitsInput.Nullable("partnerSplits", rSplits),
           BooleanBinding.Nullable("considerForBand3", rBand3),
-          BooleanBinding.Nullable("aeonMultiFacility", rAeon),
-          BooleanBinding.Nullable("jwstSynergy", rJwst),
-          BooleanBinding.Nullable("usLongTerm", rUsLong)
+          BooleanBinding.Option("aeonMultiFacility", rAeon),
+          BooleanBinding.Option("jwstSynergy", rJwst),
+          BooleanBinding.Option("usLongTerm", rUsLong)
         ) => (rToo, rMin, rSplits, rBand3, rAeon, rJwst, rUsLong).parMapN { (too, min, splits, band3, aeon, jwst, usLong) =>
           Edit(ScienceSubtype.Queue, too, min, partnerSplits = splits, considerForBand3 = band3, aeonMultiFacility = aeon, jwstSynergy = jwst, usLongTerm = usLong)
         }

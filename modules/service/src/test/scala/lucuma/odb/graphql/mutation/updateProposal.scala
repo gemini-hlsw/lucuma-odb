@@ -1278,4 +1278,57 @@ class updateProposal extends OdbSuite with DatabaseOperations {
         """.asRight
       )
 
+  test("✓ omitted queue flags preserved across edit"):
+    createProgramAs(pi).flatMap: pid =>
+      addProposal(
+        pi, pid,
+        callProps = "queue: { considerForBand3: false, aeonMultiFacility: true, jwstSynergy: true, usLongTerm: true }".some
+      ) *>
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            updateProposal(
+              input: {
+                programId: "$pid"
+                SET: {
+                  type: {
+                    queue: {
+                      minPercentTime: 50
+                    }
+                  }
+                }
+              }
+            ) {
+              proposal {
+                type {
+                  ... on Queue {
+                    minPercentTime
+                    aeonMultiFacility
+                    jwstSynergy
+                    usLongTerm
+                    considerForBand3
+                  }
+                }
+              }
+            }
+          }
+        """,
+        expected = json"""
+          {
+            "updateProposal": {
+              "proposal": {
+                "type": {
+                  "minPercentTime": 50,
+                  "aeonMultiFacility": true,
+                  "jwstSynergy": true,
+                  "usLongTerm": true,
+                  "considerForBand3": false
+                }
+              }
+            }
+          }
+        """.asRight
+      )
+
 }
