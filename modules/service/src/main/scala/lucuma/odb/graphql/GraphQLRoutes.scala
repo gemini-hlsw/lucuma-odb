@@ -67,6 +67,11 @@ object GraphQLRoutes {
             case (k, v) if v.isString => k -> v.asString.orEmpty
         .filter((_, v) => v.nonEmpty)
 
+  // joinOrRoot without a traceparent starts a new *root* trace.
+  // Only call joinOrRoot when we have a remote context otherwise inherit the current span context.
+  private def joinRemote[F[_]: Tracer, A](carrier: Map[String, String])(fa: F[A]): F[A] =
+    if (carrier.contains("traceparent")) Tracer[F].joinOrRoot(carrier)(fa) else fa
+
   /**
    * Construct a source of `HttpRoutes` tailored to the requesting user. Routes will be cached
    * based on the `Authorization` header and discarded when `ttl` expires.
@@ -130,28 +135,37 @@ object GraphQLRoutes {
                         _    <- OptionT.liftF(info(user, s"New service instance."))
                         map   = OdbMapping(pool, monitor, user, topics, gaiaClient, itcClient, commitHash, goaUsers, enums, ptc, httpClient, horizonsClient, emailConfig)
                         svc   = new GraphQLService(map, props.toList*) {
-                                  override def query(request: Operation, extensions: Option[GraphQLExtensions]): F[Result[Json]] =
-                                    T.joinOrRoot(extensions.traceCarrier):
-                                      T.spanBuilder("graphql-query").withSpanKind(SpanKind.Server).build.surround:
-                                        super.query(request, extensions).retryOnInvalidCursorName
-                                          .handleError(Result.InternalError.apply)
-                                          .flatTap {
-                                            case Result.InternalError(t) => error(user, s"Internal error: ${t.getClass.getSimpleName}: ${t.getMessage}", t)
-                                            case _                       => debug(user, s"Query (success).")
-                                          }
+                                  override def query(
+                                    request:       Operation,
+                                    document:      String,
+                                    extensions:    Option[GraphQLExtensions],
+                                    operationName: Option[String]
+                                  ): F[Result[Json]] =
+                                    joinRemote(extensions.traceCarrier):
+                                      super.query(request, document, extensions, operationName).retryOnInvalidCursorName
+                                        .handleError(Result.InternalError.apply)
+                                        .flatTap {
+                                          case Result.InternalError(t) => error(user, s"Internal error: ${t.getClass.getSimpleName}: ${t.getMessage}", t)
+                                          case _                       => debug(user, s"Query (success).")
+                                        }
 
-                                  override def subscribe(request: Operation, extensions: Option[GraphQLExtensions]): Stream[F, Result[Json]] = {
+                                  override def subscribe(
+                                    request:       Operation,
+                                    document:      String,
+                                    extensions:    Option[GraphQLExtensions],
+                                    operationName: Option[String]
+                                  ): Stream[F, Result[Json]] = {
                                     // Open a server span rooted at the client's remote context; keep it
                                     // alive for the lifetime of the subscription stream.
                                     val allocate: F[((Any, F[Unit]))] =
-                                      T.joinOrRoot(extensions.traceCarrier)(
+                                      joinRemote(extensions.traceCarrier)(
                                         T.spanBuilder("graphql-subscription").withSpanKind(SpanKind.Server).build.resource.allocated
                                       )
                                     val spanResource: Resource[F, Unit] =
                                       Resource.suspend(allocate.map { case (_, release) =>
                                         Resource.make(Applicative[F].unit)(_ => release)
                                       })
-                                    Stream.resource(spanResource) >> super.subscribe(request, extensions)
+                                    Stream.resource(spanResource) >> super.subscribe(request, document, extensions, operationName)
                                   }
                                 }
                       } yield svc
