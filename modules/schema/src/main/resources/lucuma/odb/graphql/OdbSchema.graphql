@@ -4129,10 +4129,20 @@ type Classical implements ProposalType {
   "Describes how time for the program will be apportioned across partners."
   partnerSplits: [PartnerSplit!]!
 
-  # TODO: AEON / Multi-facility
-  # TODO: JWST Synergy
-  # TODO: US Long Term
-  # TODO: Visitors?
+  """
+  Whether this proposal is part of the AEON/Multi-facility program.
+  """
+  aeonMultiFacility: Boolean!
+
+  """
+  Whether this proposal has JWST synergy.
+  """
+  jwstSynergy: Boolean!
+
+  """
+  Whether this is a US Long Term proposal.
+  """
+  usLongTerm: Boolean!
 }
 
 """
@@ -4236,8 +4246,15 @@ type LargeProgram implements ProposalType {
   """
   totalTime: TimeSpan!
 
-  # TODO: AEON / Multi-facility
-  # TODO: JWST Synergy
+  """
+  Whether this proposal is part of the AEON/Multi-facility program.
+  """
+  aeonMultiFacility: Boolean!
+
+  """
+  Whether this proposal has JWST synergy.
+  """
+  jwstSynergy: Boolean!
 }
 
 """
@@ -4272,10 +4289,27 @@ type Queue implements ProposalType {
   """
   partnerSplits: [PartnerSplit!]!
 
-  # TODO: Band 3 ?
-  # TODO: AEON / Multi-facility
-  # TODO: JWST Synergy
-  # TODO: US Long Term
+  """
+  Whether this proposal should be considered for Band 3. Defaults to UNSET
+  on creation; must be CONSIDER or DO_NOT_CONSIDER before the proposal can
+  be submitted.
+  """
+  considerForBand3: ConsiderForBand3!
+
+  """
+  Whether this proposal is part of the AEON/Multi-facility program.
+  """
+  aeonMultiFacility: Boolean!
+
+  """
+  Whether this proposal has JWST synergy.
+  """
+  jwstSynergy: Boolean!
+
+  """
+  Whether this is a US Long Term proposal.
+  """
+  usLongTerm: Boolean!
 }
 
 """
@@ -4334,10 +4368,20 @@ input ClassicalInput {
   """
   partnerSplits: [PartnerSplitInput!]
 
-  # TODO: AEON / Multi-facility
-  # TODO: JWST Synergy
-  # TODO: US Long Term
-  # TODO: Visitors?
+  """
+  Whether this proposal is part of the AEON/Multi-facility program.
+  """
+  aeonMultiFacility: Boolean
+
+  """
+  Whether this proposal has JWST synergy.
+  """
+  jwstSynergy: Boolean
+
+  """
+  Whether this is a US Long Term proposal.
+  """
+  usLongTerm: Boolean
 }
 
 input DemoScienceInput {
@@ -4419,8 +4463,11 @@ input LargeProgramInput {
   """
   totalTime: TimeSpanInput
 
-  # TODO: AEON / Multi-facility
-  # TODO: JWST Synergy
+  "Whether this proposal is part of the AEON/Multi-facility program."
+  aeonMultiFacility: Boolean
+
+  "Whether this proposal has JWST synergy."
+  jwstSynergy: Boolean
 }
 
 """
@@ -4465,10 +4512,21 @@ input QueueInput {
   """
   partnerSplits: [PartnerSplitInput!]
 
-  # TODO: Band 3 ?
-  # TODO: AEON / Multi-facility
-  # TODO: JWST Synergy
-  # TODO: US Long Term
+  """
+  Whether this proposal should be considered for Band 3. Defaults to UNSET
+  on creation; must be CONSIDER or DO_NOT_CONSIDER before the proposal can
+  be submitted.
+  """
+  considerForBand3: ConsiderForBand3
+
+  "Whether this proposal is part of the AEON/Multi-facility program."
+  aeonMultiFacility: Boolean
+
+  "Whether this proposal has JWST synergy."
+  jwstSynergy: Boolean
+
+  "Whether this is a US Long Term proposal."
+  usLongTerm: Boolean
 }
 
 input SystemVerificationInput {
@@ -15268,6 +15326,26 @@ type TimestampInterval {
 
   "Duration of the interval."
   duration: TimeSpan!
+}
+
+"""
+Whether a queue proposal should be considered for Band 3 scheduling.
+"""
+enum ConsiderForBand3 {
+  """
+  No decision has been made yet. The proposal cannot be submitted in this state.
+  """
+  UNSET
+
+  """
+  The proposal should be considered for Band 3.
+  """
+  CONSIDER
+
+  """
+  The proposal should not be considered for Band 3.
+  """
+  DO_NOT_CONSIDER
 }
 
 """

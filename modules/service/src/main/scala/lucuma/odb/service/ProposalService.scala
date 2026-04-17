@@ -13,6 +13,7 @@ import grackle.Result
 import grackle.ResultT
 import grackle.syntax.*
 import lucuma.core.data.EmailAddress
+import lucuma.core.enums.ConsiderForBand3
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.ProgramType
 import lucuma.core.enums.ScienceSubtype
@@ -165,6 +166,9 @@ object ProposalService {
     def invalidPiEmailAddress(email: String, pid: Program.Id): OdbError =
       s"Invalid email address \"$email\" for PI in program $pid".invalidArg
 
+    def missingConsiderForBand3(pid: Program.Id): OdbError =
+      s"Proposal $pid must specify whether it should be considered for Band 3 before it can be submitted.".invalidArg
+
   }
 
   /** Construct a `ProposalService` using the specified `Session`. */
@@ -211,7 +215,8 @@ object ProposalService {
         currentTime:       Timestamp,
         deadline:          Option[Timestamp],
         cfpTitle:          Option[NonEmptyString],
-        cfp:               Option[CfpProperties]
+        cfp:               Option[CfpProperties],
+        considerForBand3:  Option[ConsiderForBand3]
       ) {
         val status: Result[enumsVal.ProposalStatus] =
           statusTag.toProposalStatus
@@ -246,6 +251,9 @@ object ProposalService {
                  (s === ScienceSubtype.Queue))
               )
             },
+            missingConsiderForBand3(pid).asFailure.whenA(
+              scienceSubtype.contains(ScienceSubtype.Queue) && considerForBand3.contains(ConsiderForBand3.Unset)
+            ),
             missingPartners(pid, unmatchedPartners).asFailure.unlessA(unmatchedPartners.isEmpty),
             validatePiEmailAddress(pid)
           ).tupled.unlessA(newStatus === enumsVal.ProposalStatus.NotSubmitted)
@@ -390,7 +398,7 @@ object ProposalService {
           _text.map(_.toList.map(n => NonEmptyString.from(n).toOption))
 
         val codec: Decoder[ProposalContext] =
-          (tag *: bool *: varchar_nonempty.opt *: text_nonempty.opt *: proposal_reference.opt *: semester.opt *: science_subtype.opt *: int8 *: parts *: parts *: int4_nonneg *: core_timestamp *: core_timestamp.opt *: text_nonempty.opt *: CallForProposalsService.Statements.cfp_properties.opt).to[ProposalContext]
+          (tag *: bool *: varchar_nonempty.opt *: text_nonempty.opt *: proposal_reference.opt *: semester.opt *: science_subtype.opt *: int8 *: parts *: parts *: int4_nonneg *: core_timestamp *: core_timestamp.opt *: text_nonempty.opt *: CallForProposalsService.Statements.cfp_properties.opt *: consider_for_band_3.opt).to[ProposalContext]
 
         def lookup(pid: Program.Id): F[Result[ProposalContext]] =
           val af = Statements.selectProposalContext(user, pid)
@@ -607,7 +615,11 @@ object ProposalService {
             call.minPercentTotal.foldPresent(sql"c_min_percent_total = ${int_percent.opt}"),
             call.totalTime.foldPresent(sql"c_total_time = ${time_span.opt}"),
             call.reviewerId.foldPresent(sql"c_reviewer_id = ${program_user_id.opt}"),
-            call.mentorId.foldPresent(sql"c_mentor_id = ${program_user_id.opt}")
+            call.mentorId.foldPresent(sql"c_mentor_id = ${program_user_id.opt}"),
+            call.aeonMultiFacility.map(sql"c_aeon_multi_facility = ${bool}"),
+            call.jwstSynergy.map(sql"c_jwst_synergy = ${bool}"),
+            call.usLongTerm.map(sql"c_us_long_term = ${bool}"),
+            call.considerForBand3.map(sql"c_consider_for_band_3 = ${consider_for_band_3}")
           ).flatten
         }
 
@@ -637,7 +649,11 @@ object ProposalService {
           c_min_percent_total,
           c_total_time,
           c_reviewer_id,
-          c_mentor_id
+          c_mentor_id,
+          c_aeon_multi_facility,
+          c_jwst_synergy,
+          c_us_long_term,
+          c_consider_for_band_3
         ) SELECT
           ${program_id},
           ${cfp_id.opt},
@@ -648,7 +664,11 @@ object ProposalService {
           ${int_percent.opt},
           ${time_span.opt},
           ${program_user_id.opt},
-          ${program_user_id.opt}
+          ${program_user_id.opt},
+          ${bool},
+          ${bool},
+          ${bool},
+          ${consider_for_band_3}
       """.apply(
         pid,
         c.callId,
@@ -659,7 +679,11 @@ object ProposalService {
         c.typeʹ.minPercentTotal,
         c.typeʹ.totalTime,
         c.typeʹ.reviewerId,
-        c.typeʹ.mentorId
+        c.typeʹ.mentorId,
+        c.typeʹ.aeonMultiFacility,
+        c.typeʹ.jwstSynergy,
+        c.typeʹ.usLongTerm,
+        c.typeʹ.considerForBand3
       )
 
     val UpdateProgram: Command[(Program.Id, Option[ScienceSubtype], Option[Semester], Option[NonNegInt])] =
@@ -724,7 +748,8 @@ object ProposalService {
           cfp.c_cfp_id,
           cfp.c_type,
           cfp.c_semester,
-          cfp.c_proprietary
+          cfp.c_proprietary,
+          prop.c_consider_for_band_3
         FROM t_program prog
         LEFT JOIN t_proposal prop
           ON prog.c_program_id = prop.c_program_id

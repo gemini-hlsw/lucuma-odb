@@ -563,6 +563,7 @@ trait DatabaseOperations { this: OdbSuite =>
         queue: {
           toOActivation: NONE
           minPercentTime: 0
+          considerForBand3: DO_NOT_CONSIDER
         }
       """.some
     )
@@ -586,6 +587,7 @@ trait DatabaseOperations { this: OdbSuite =>
     callId: Option[CallForProposals.Id] = None,
     callProps: Option[String] = None
   ): IO[Unit] =
+    val props = callProps.getOrElse("queue: { considerForBand3: DO_NOT_CONSIDER }")
     expect(
       user = user,
       query = s"""
@@ -596,13 +598,9 @@ trait DatabaseOperations { this: OdbSuite =>
               SET: {
                 category: GALACTIC_OTHER
                 ${callId.fold("")(c => s"callId: \"$c\"")}
-                ${callProps.fold("") { c =>
-                  s"""
-                    type: {
-                      $c
-                    }
-                  """
-                }}
+                type: {
+                  $props
+                }
               }
             }
           ) {

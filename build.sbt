@@ -28,7 +28,7 @@ val keySemaphoreVersion          = "0.3.0-M1"
 val kittensVersion               = "3.5.0"
 val logbackVersion               = "1.5.32"
 val log4catsVersion              = "2.8.0"
-val lucumaCoreVersion            = "0.181.0"
+val lucumaCoreVersion            = "0.181.1"
 val lucumaGraphQLRoutesVersion   = "0.12.0"
 val monocleVersion               = "3.3.0"
 val munitVersion                 = "1.3.0"
@@ -60,6 +60,8 @@ ThisBuild / scalacOptions     ++= Seq("-Xmax-inlines", "50") // Hash derivation 
 
 ThisBuild / Test / fork              := false
 ThisBuild / Test / parallelExecution := false
+
+ThisBuild / Test / testOptions += Tests.Argument(TestFrameworks.MUnit, "--log=debug")
 
 ThisBuild / watchOnTermination := { (action, cmd, times, state) =>
   val projNames = cmd

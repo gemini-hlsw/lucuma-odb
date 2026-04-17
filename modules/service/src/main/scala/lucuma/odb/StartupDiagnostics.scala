@@ -54,6 +54,7 @@ object StartupDiagnostics:
           checkPostgresEnum(cfp_type),
           checkPostgresEnum(charge_class),
           checkPostgresEnum(configuration_request_status),
+          checkPostgresEnum(consider_for_band_3),
           checkPostgresEnum(dataset_qa_state),
           checkPostgresEnum(dataset_stage),
           checkPostgresEnum(educational_status),

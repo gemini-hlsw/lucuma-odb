@@ -699,6 +699,9 @@ trait Codecs {
   val too_activation: Codec[ToOActivation] =
     enumerated(Type("e_too_activation"))
 
+  val consider_for_band_3: Codec[ConsiderForBand3] =
+    enumerated(Type("e_consider_for_band_3"))
+
   val user_id: Codec[User.Id] =
     gid[User.Id]
 

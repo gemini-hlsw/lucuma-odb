@@ -82,6 +82,7 @@ trait BaseMapping[F[_]]
   lazy val ConfigurationRequestIdType              = schema.ref("ConfigurationRequestId")
   lazy val ConfigurationRequestStatusType          = schema.ref("ConfigurationRequestStatus")
   lazy val ConfigurationTargetType                 = schema.ref("ConfigurationTarget")
+  lazy val ConsiderForBand3Type                    = schema.ref("ConsiderForBand3")
   lazy val ConstraintSetType                       = schema.ref("ConstraintSet")
   lazy val ConstraintSetGroupType                  = schema.ref("ConstraintSetGroup")
   lazy val ConstraintSetGroupSelectResultType      = schema.ref("ConstraintSetGroupSelectResult")

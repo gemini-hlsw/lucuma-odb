@@ -934,4 +934,31 @@ class setProposalStatus extends OdbSuite
         )
     yield ()
 
+  test("⨯ queue submission requires band 3 flag"):
+    for
+      cid <- createCallForProposalsAs(staff, CallForProposalsType.RegularSemester)
+      pid <- createProgramWithNonPartnerPi(pi)
+      _   <- addProposal(pi, pid, cid.some, "queue: { toOActivation: NONE, minPercentTime: 0 }".some)
+      _   <- addPartnerSplits(pi, pid)
+      _   <- addCoisAs(pi, pid)
+      _   <- expect(
+              user = pi,
+              query = s"""
+                mutation {
+                  setProposalStatus(
+                    input: {
+                      programId: "$pid"
+                      status: SUBMITTED
+                    }
+                  ) {
+                    program { proposal { reference { label } } }
+                  }
+                }
+              """,
+              expected = List(
+                s"Proposal $pid must specify whether it should be considered for Band 3 before it can be submitted."
+              ).asLeft
+            )
+    yield ()
+
 }
