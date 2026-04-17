@@ -4143,6 +4143,13 @@ type Classical implements ProposalType {
   Whether this is a US Long Term proposal.
   """
   usLongTerm: Boolean!
+
+  """
+  Whether this proposal should be considered for Band 3. Defaults to UNSET
+  on creation; must be CONSIDER or DO_NOT_CONSIDER before the proposal can
+  be submitted.
+  """
+  considerForBand3: ConsiderForBand3!
 }
 
 """
@@ -4382,6 +4389,11 @@ input ClassicalInput {
   Whether this is a US Long Term proposal.
   """
   usLongTerm: Boolean
+
+  """
+  Whether this proposal should be considered for Band 3.
+  """
+  considerForBand3: ConsiderForBand3
 }
 
 input DemoScienceInput {

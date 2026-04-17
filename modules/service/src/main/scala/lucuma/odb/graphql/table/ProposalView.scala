@@ -30,6 +30,7 @@ trait ProposalView[F[_]] extends BaseMapping[F] {
       val AeonMultiFacility = col("c_aeon_multi_facility", bool)
       val JwstSynergy       = col("c_jwst_synergy", bool)
       val UsLongTerm        = col("c_us_long_term", bool)
+      val ConsiderForBand3  = col("c_consider_for_band_3", consider_for_band_3)
     }
     object DemoScience {
       val Id = col("c_program_id_s", program_id.embedded)
