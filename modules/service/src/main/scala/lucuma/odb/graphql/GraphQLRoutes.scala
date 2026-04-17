@@ -3,12 +3,15 @@
 
 package lucuma.odb.graphql
 
+import cats.Applicative
 import cats.Parallel
 import cats.data.OptionT
 import cats.effect.*
 import cats.effect.std.SecureRandom
 import cats.implicits.*
 import cats.kernel.Order
+import clue.model.GraphQLExtensions
+import fs2.Stream
 import grackle.Operation
 import grackle.Result
 import grackle.skunk.SkunkMonitor
@@ -42,6 +45,7 @@ import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.LoggerFactory
 import org.typelevel.log4cats.syntax.*
 import org.typelevel.otel4s.Attributes
+import org.typelevel.otel4s.trace.SpanKind
 import org.typelevel.otel4s.trace.Tracer
 import skunk.Session
 import skunk.SqlState
@@ -52,6 +56,16 @@ object GraphQLRoutes {
 
   given Order[Authorization] =
     Order.by(Header[Authorization].value)
+
+  // Extract W3C trace context headers (traceparent, tracestate) from the GraphQL
+  // `extensions` map pass to otel4s and re-parent spans.
+  extension (extensions: Option[GraphQLExtensions])
+    def traceCarrier: Map[String, String] =
+      extensions.fold(Map.empty):
+        _.toMap
+          .collect:
+            case (k, v) if v.isString => k -> v.asString.orEmpty
+        .filter((_, v) => v.nonEmpty)
 
   /**
    * Construct a source of `HttpRoutes` tailored to the requesting user. Routes will be cached
@@ -116,14 +130,30 @@ object GraphQLRoutes {
                         _    <- OptionT.liftF(info(user, s"New service instance."))
                         map   = OdbMapping(pool, monitor, user, topics, gaiaClient, itcClient, commitHash, goaUsers, enums, ptc, httpClient, horizonsClient, emailConfig)
                         svc   = new GraphQLService(map, props.toList*) {
-                          override def query(request: Operation): F[Result[Json]] =
-                            super.query(request).retryOnInvalidCursorName
-                              .handleError(Result.InternalError.apply)
-                              .flatTap {
-                                case Result.InternalError(t)  => error(user, s"Internal error: ${t.getClass.getSimpleName}: ${t.getMessage}", t)
-                                case _ => debug(user, s"Query (success).")
-                              }
-                        }
+                                  override def query(request: Operation, extensions: Option[GraphQLExtensions]): F[Result[Json]] =
+                                    T.joinOrRoot(extensions.traceCarrier):
+                                      T.spanBuilder("graphql-query").withSpanKind(SpanKind.Server).build.surround:
+                                        super.query(request, extensions).retryOnInvalidCursorName
+                                          .handleError(Result.InternalError.apply)
+                                          .flatTap {
+                                            case Result.InternalError(t) => error(user, s"Internal error: ${t.getClass.getSimpleName}: ${t.getMessage}", t)
+                                            case _                       => debug(user, s"Query (success).")
+                                          }
+
+                                  override def subscribe(request: Operation, extensions: Option[GraphQLExtensions]): Stream[F, Result[Json]] = {
+                                    // Open a server span rooted at the client's remote context; keep it
+                                    // alive for the lifetime of the subscription stream.
+                                    val allocate: F[((Any, F[Unit]))] =
+                                      T.joinOrRoot(extensions.traceCarrier)(
+                                        T.spanBuilder("graphql-subscription").withSpanKind(SpanKind.Server).build.resource.allocated
+                                      )
+                                    val spanResource: Resource[F, Unit] =
+                                      Resource.suspend(allocate.map { case (_, release) =>
+                                        Resource.make(Applicative[F].unit)(_ => release)
+                                      })
+                                    Stream.resource(spanResource) >> super.subscribe(request, extensions)
+                                  }
+                                }
                       } yield svc
                     } .widen[GraphQLService[F]]
                       .value
