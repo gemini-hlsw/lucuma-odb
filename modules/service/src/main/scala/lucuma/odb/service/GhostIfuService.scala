@@ -118,7 +118,7 @@ object GhostIfuService:
       override def delete(
         which: List[Observation.Id]
       )(using Transaction[F]): F[Unit] =
-        ???
+        Statements.delete(which).traverse_(session.exec)
 
       override def update(
         SET:   GhostIfuInput.Edit,
@@ -274,3 +274,9 @@ object GhostIfuService:
         )
         JOIN t_observation o ON o.c_observation_id = g.c_observation_id
       """(Void)
+
+    def delete(
+      which: List[Observation.Id]
+    ): Option[AppliedFragment] =
+      NonEmptyList.fromList(which).map: oids =>
+        void"DELETE FROM ONLY t_ghost_ifu WHERE " |+| observationIdIn(oids)

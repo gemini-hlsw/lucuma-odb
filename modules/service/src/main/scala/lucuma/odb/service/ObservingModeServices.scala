@@ -144,14 +144,14 @@ object ObservingModeServices:
         val deleteObservingMode: F[Unit] =
           mode match
             case ObservingModeType.Flamingos2LongSlit => flamingos2LongSlitService.delete(which)
+            case ObservingModeType.GhostIfu           => ghostIfuService.delete(which)
             case ObservingModeType.GmosNorthImaging   => gmosImagingService.deleteNorth(which)
             case ObservingModeType.GmosNorthLongSlit  => gmosLongSlitService.deleteNorth(which)
             case ObservingModeType.GmosSouthImaging   => gmosImagingService.deleteSouth(which)
             case ObservingModeType.GmosSouthLongSlit  => gmosLongSlitService.deleteSouth(which)
             case ObservingModeType.Igrins2LongSlit    => igrins2LongSlitService.delete(which)
-            case ObservingModeType.GhostIfu           => ().pure
 
-        deleteExposureTimeModes *> deleteObservingMode
+        deleteObservingMode *> deleteExposureTimeModes
 
       def update(
         input: ObservingModeInput.Edit,

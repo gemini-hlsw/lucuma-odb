@@ -1104,7 +1104,29 @@ trait DatabaseOperations { this: OdbSuite =>
           }
         }"""
       case ObservingModeType.GhostIfu =>
-        "{}"
+        """{
+          ghostIfu: {
+            resolutionMode: STANDARD
+            red: {
+              exposureTimeMode: {
+                timeAndCount: {
+                  time: { seconds: 1.0 }
+                  count: 1
+                  at: { nanometers: 500 }
+                }
+              }
+            }
+            blue: {
+              exposureTimeMode: {
+                timeAndCount: {
+                  time: { seconds: 2.0 }
+                  count: 2
+                  at: { nanometers: 500 }
+                }
+              }
+            }
+          }
+        }"""
 
   private def observingModeWithSpatialOffsets(observingMode: ObservingModeType, offsets: Option[String]): String =
     observingMode match
