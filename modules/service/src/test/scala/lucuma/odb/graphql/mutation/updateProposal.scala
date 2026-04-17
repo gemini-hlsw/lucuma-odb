@@ -1278,6 +1278,53 @@ class updateProposal extends OdbSuite with DatabaseOperations {
         """.asRight
       )
 
+  test("✓ omitted considerForBand3 preserved"):
+    createProgramAs(pi).flatMap: pid =>
+      addProposal(
+        pi, pid,
+        callProps = "queue: { considerForBand3: CONSIDER }".some
+      ) *>
+      expect(
+        user = pi,
+        // Mutation not including considerForBand3
+        query = s"""
+          mutation {
+            updateProposal(
+              input: {
+                programId: "$pid"
+                SET: {
+                  type: {
+                    queue: {
+                      minPercentTime: 50
+                    }
+                  }
+                }
+              }
+            ) {
+              proposal {
+                type {
+                  ... on Queue {
+                    considerForBand3
+                  }
+                }
+              }
+            }
+          }
+        """,
+        // flag value preserved
+        expected = json"""
+          {
+            "updateProposal": {
+              "proposal": {
+                "type": {
+                  "considerForBand3": "CONSIDER"
+                }
+              }
+            }
+          }
+        """.asRight
+      )
+
   test("✓ omitted queue flags preserved across edit"):
     createProgramAs(pi).flatMap: pid =>
       addProposal(
