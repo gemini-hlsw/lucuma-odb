@@ -59,7 +59,6 @@ import lucuma.core.util.TimestampInterval
 import lucuma.core.util.Uid
 import lucuma.odb.data.AtomExecutionState
 import lucuma.odb.data.BlindOffsetType
-import lucuma.odb.data.ConsiderForBand3
 import lucuma.odb.data.DatabaseOperation
 import lucuma.odb.data.EmailId
 import lucuma.odb.data.ExecutionEventType

@@ -14,6 +14,7 @@ import cats.syntax.option.*
 import cats.syntax.parallel.*
 import grackle.Result
 import grackle.syntax.*
+import lucuma.core.enums.ConsiderForBand3
 import lucuma.core.enums.Partner
 import lucuma.core.enums.ScienceSubtype
 import lucuma.core.enums.ToOActivation
@@ -21,7 +22,6 @@ import lucuma.core.model.IntPercent
 import lucuma.core.model.ProgramUser
 import lucuma.core.optics.syntax.lens.*
 import lucuma.core.util.TimeSpan
-import lucuma.odb.data.ConsiderForBand3
 import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.binding.*
 import monocle.Focus

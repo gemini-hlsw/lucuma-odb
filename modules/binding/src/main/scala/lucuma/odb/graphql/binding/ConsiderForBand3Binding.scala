@@ -3,7 +3,7 @@
 
 package lucuma.odb.graphql.binding
 
-import lucuma.odb.data.ConsiderForBand3
+import lucuma.core.enums.ConsiderForBand3
 
 val ConsiderForBand3Binding: Matcher[ConsiderForBand3] =
   enumeratedBinding

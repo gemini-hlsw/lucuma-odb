@@ -13,6 +13,7 @@ import grackle.Result
 import grackle.ResultT
 import grackle.syntax.*
 import lucuma.core.data.EmailAddress
+import lucuma.core.enums.ConsiderForBand3
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.ProgramType
 import lucuma.core.enums.ScienceSubtype

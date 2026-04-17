@@ -16,6 +16,7 @@ import io.circe.refined.*
 import io.circe.syntax.*
 import lucuma.core.data.EmailAddress
 import lucuma.core.enums.*
+import lucuma.core.enums.ConsiderForBand3
 import lucuma.core.math.Epoch
 import lucuma.core.math.SignalToNoise
 import lucuma.core.model.Attachment
@@ -48,7 +49,6 @@ import lucuma.core.util.IdempotencyKey
 import lucuma.core.util.Timestamp
 import lucuma.odb.data.AtomExecutionState
 import lucuma.odb.data.BlindOffsetType
-import lucuma.odb.data.ConsiderForBand3
 import lucuma.odb.data.DatabaseOperation
 import lucuma.odb.data.EditType
 import lucuma.odb.data.ExecutionEventType
