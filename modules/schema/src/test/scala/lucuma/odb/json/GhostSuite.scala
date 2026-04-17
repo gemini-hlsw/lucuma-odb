@@ -15,7 +15,6 @@ import munit.DisciplineSuite
 
 class GhostSuite extends DisciplineSuite with ArbitraryInstances:
 
-  import ArbEnumerated.given
   import ArbGhostDetector.given
   import ArbGhostDynamicConfig.given
   import ArbGhostStaticConfig.given
