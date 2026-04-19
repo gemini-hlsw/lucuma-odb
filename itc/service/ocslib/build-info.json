@@ -1,7 +1,7 @@
 {
-  "ocs_git_hash": "360c649c3cf20f3888df78f3d2d1d1288c0e0a15",
-  "ocs_git_branch": "main",
-  "ocs_git_describe": "v-33-g360c649c3",
-  "local": false,
-  "build_timestamp": "2026-04-17T01:17:36Z"
+  "ocs_git_hash": "f53fa271357ae56e3719b3cef40818682116f2e9",
+  "ocs_git_branch": "sc-8430-igrins2-itc-error",
+  "ocs_git_describe": "v-34-gf53fa2713",
+  "local": true,
+  "build_timestamp": "2026-04-19T19:39:32Z"
 }
