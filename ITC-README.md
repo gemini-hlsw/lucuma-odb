@@ -121,7 +121,7 @@ node itc/schemastitcher.mjs \
   <path-to-odb-schema> \
   itc/service/src/main/resources/graphql/itc_base.graphql \
   itc/service/src/main/resources/graphql/itc.graphql
- ```
+```
 ## Benchmarking
 
 ### Simple Performance Test
