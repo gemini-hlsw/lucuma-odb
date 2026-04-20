@@ -344,12 +344,18 @@ object GeneratorParamsService {
 
           case f2 @ flamingos2.longslit.Config(disperser, filter, fpu, sci, acq, _, _, _, _, _, _, _, _) =>
             val sciMode   = InstrumentMode.Flamingos2Spectroscopy(sci, disperser, filter, fpu)
+
+            val readMode = acq.exposureTimeMode match
+              case ExposureTimeMode.TimeAndCountMode(time = time) => Flamingos2ReadMode.forExposureTime(time)
+              // n.b. Using bright as originally specified but we may want to support an override
+              case ExposureTimeMode.SignalToNoiseMode(_, _)       => Flamingos2ReadMode.Bright
+
             spectroscopyGeneratorParams(
               obsMode = f2,
               acqMode = InstrumentMode.Flamingos2Imaging(
                 acq.exposureTimeMode,
                 acq.filter,
-                Flamingos2ReadMode.Bright
+                readMode
               ),
               sciMode = sciMode
             ).asRight
