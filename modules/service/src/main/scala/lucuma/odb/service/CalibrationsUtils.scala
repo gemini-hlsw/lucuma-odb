@@ -40,6 +40,7 @@ import lucuma.odb.sequence.data.ItcInput
 import lucuma.odb.sequence.flamingos2.longslit.Config as Flamingos2Config
 import lucuma.odb.sequence.gmos.longslit.Config.GmosNorth as GmosNorthLongSlit
 import lucuma.odb.sequence.gmos.longslit.Config.GmosSouth as GmosSouthLongSlit
+import lucuma.odb.sequence.igrins2.longslit.Config as Igrins2Config
 import lucuma.odb.service.CalibrationConfigSubset.*
 import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.util.Codecs
@@ -68,6 +69,7 @@ object ObsExtract:
 
   def perObsFilter: PartialFunction[ObsExtract[ObservingMode], ObsExtract[ObservingMode]] =
     case d @ ObsExtract(data = _: Flamingos2Config) => d
+    case d @ ObsExtract(data = _: Igrins2Config)    => d
 
   def perProgramFilter: PartialFunction[ObsExtract[ObservingMode], ObsExtract[ObservingMode]] =
     case d @ ObsExtract(data = _: GmosNorthLongSlit) => d
@@ -166,13 +168,13 @@ object WorkflowStateQueries:
     def selectWorkflowStates(oids: NonEmptyList[Observation.Id], onlyReady: Boolean): AppliedFragment =
       val includeReady = if (onlyReady) void" AND c_obscalc_state = 'ready'" else void""
       void"SELECT c_observation_id, c_workflow_state FROM t_obscalc WHERE c_observation_id IN (" |+|
-        oids.map(sql"$observation_id").intercalate(void", ")                                     |+| 
-        void")"                                                                                  |+| 
+        oids.map(sql"$observation_id").intercalate(void", ")                                     |+|
+        void")"                                                                                  |+|
         includeReady
 
     def selectVisitedObservations(oids: NonEmptyList[Observation.Id]): AppliedFragment =
       void"SELECT DISTINCT c_observation_id FROM t_visit WHERE c_observation_id IN (" |+|
-        oids.map(sql"$observation_id").intercalate(void", ")                          |+| 
+        oids.map(sql"$observation_id").intercalate(void", ")                          |+|
         void")"
 
 trait SpecPhotoCalibrations extends CalibrationTargetLocator {

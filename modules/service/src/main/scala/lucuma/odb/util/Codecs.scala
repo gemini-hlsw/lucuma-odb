@@ -664,6 +664,7 @@ trait Codecs {
   val telluric_calibration_order: Codec[TelluricCalibrationOrder] =
     enumerated(Type("e_telluric_calibration_order"))
 
+  // TelluricType is an ADT and we store it as jsonb in the db.
   val telluric_type: Codec[TelluricType] =
     jsonb.eimap(_.as[TelluricType].leftMap(f => s"Could not decode TelluricType: ${f.message}."))(_.asJson)
 

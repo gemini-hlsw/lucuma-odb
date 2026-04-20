@@ -51,6 +51,8 @@ object CalibrationConfigMatcher:
         TwilightGmosLS
       case (Flamingos2LongSlit, CalibrationRole.Telluric)                              =>
         Flamingos2LS
+      case (Igrins2LongSlit, CalibrationRole.Telluric)                                =>
+        Igrins2LS
       case (_, _)                                                                      =>
         UnknownConfig
 
@@ -89,6 +91,16 @@ object TwilightGmosLS extends CalibrationConfigMatcher:
     config
 
 object Flamingos2LS extends CalibrationConfigMatcher:
+  def extractConfig(mode: ObservingMode): CalibrationConfigSubset =
+    mode.toConfigSubset
+
+  def configsMatch(c1: CalibrationConfigSubset, c2: CalibrationConfigSubset): Boolean =
+    c1 === c2
+
+  def normalize(config: CalibrationConfigSubset): CalibrationConfigSubset =
+    config
+
+object Igrins2LS extends CalibrationConfigMatcher:
   def extractConfig(mode: ObservingMode): CalibrationConfigSubset =
     mode.toConfigSubset
 
