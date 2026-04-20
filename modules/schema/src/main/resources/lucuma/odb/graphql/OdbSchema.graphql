@@ -9036,6 +9036,11 @@ type Igrins2LongSlit {
   """
   explicitOffsets: [Offset!]
 
+  """
+  Telluric type configuration for this observation.
+  """
+  telluricType: TelluricType!
+
 }
 
 """
@@ -9066,6 +9071,12 @@ input Igrins2LongSlitInput {
   For NodAlongSlit mode, all offsets must have P = 0.
   """
   explicitOffsets: [OffsetInput!]
+
+  """
+  The telluricType field must be either specified or skipped altogether. It cannot be unset with a null value.
+  On create the default is HOT.
+  """
+  telluricType: TelluricTypeInput
 
 }
 

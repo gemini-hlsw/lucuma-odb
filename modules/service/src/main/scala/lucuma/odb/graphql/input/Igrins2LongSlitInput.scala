@@ -5,12 +5,14 @@ package lucuma.odb.graphql
 package input
 
 import cats.syntax.eq.*
+import cats.syntax.functor.*
 import cats.syntax.parallel.*
 import grackle.Result
 import lucuma.core.enums.Igrins2OffsetMode
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.math.Offset
 import lucuma.core.model.ExposureTimeMode
+import lucuma.core.model.TelluricType
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.Nullable.NonNull
 import lucuma.odb.format.spatialOffsets.*
@@ -30,7 +32,8 @@ object Igrins2LongSlitInput:
     exposureTimeMode: Option[ExposureTimeMode],
     explicitOffsetMode: Option[Igrins2OffsetMode] = None,
     explicitSaveSVCImages: Option[Boolean] = None,
-    explicitOffsets: Option[List[Offset]] = None
+    explicitOffsets: Option[List[Offset]] = None,
+    telluricType: TelluricType = TelluricType.Hot
   ):
     def observingModeType: ObservingModeType =
       ObservingModeType.Igrins2LongSlit
@@ -46,17 +49,17 @@ object Igrins2LongSlitInput:
           ExposureTimeModeInput.Binding.Option("exposureTimeMode", rETM),
           Igrins2OffsetModeBinding.Option("explicitOffsetMode", rOffsetMode),
           BooleanBinding.Option("explicitSaveSVCImages", rSaveSVC),
-          OffsetInput.Binding.List.Option("explicitOffsets", rOffsets)
+          OffsetInput.Binding.List.Option("explicitOffsets", rOffsets),
+          TelluricTypeBinding.Option("telluricType", rTelluricType)
         ) =>
-          (rETM, rOffsetMode, rOffsets, rSaveSVC).parTupled.flatMap {
-            case (etm, offsetMode, offsets, saveSVC) =>
+          (rETM, rOffsetMode, rOffsets, rSaveSVC, rTelluricType).parTupled.flatMap {
+            case (etm, offsetMode, offsets, saveSVC, telluricType) =>
+              val create = Create(etm, offsetMode, saveSVC, offsets, telluricType.getOrElse(TelluricType.Hot))
               offsets match
                 case Some(os) if offsetMode.forall(_ === Igrins2OffsetMode.NodAlongSlit) =>
-                  validateAllOnQ(os).map(_ =>
-                    Create(etm, offsetMode, saveSVC, offsets)
-                  )
+                  validateAllOnQ(os).as(create)
                 case _ =>
-                  Result(Create(etm, offsetMode, saveSVC, offsets))
+                  Result(create)
           }
       }
 
@@ -64,7 +67,8 @@ object Igrins2LongSlitInput:
     exposureTimeMode: Option[ExposureTimeMode],
     explicitOffsetMode: Nullable[Igrins2OffsetMode],
     explicitSaveSVCImages: Nullable[Boolean],
-    explicitOffsets: Nullable[List[Offset]]
+    explicitOffsets: Nullable[List[Offset]],
+    telluricType: Option[TelluricType]
   ):
 
     val observingModeType: ObservingModeType =
@@ -78,7 +82,8 @@ object Igrins2LongSlitInput:
         exposureTimeMode,
         explicitOffsetMode.toOption,
         explicitSaveSVCImages.toOption,
-        explicitOffsets.toOption
+        explicitOffsets.toOption,
+        telluricType.getOrElse(TelluricType.Hot)
       ))
 
   object Edit:
@@ -89,20 +94,20 @@ object Igrins2LongSlitInput:
           ExposureTimeModeInput.Binding.Option("exposureTimeMode", rETM),
           Igrins2OffsetModeBinding.Nullable("explicitOffsetMode", rOffsetMode),
           BooleanBinding.Nullable("explicitSaveSVCImages", rSaveSVC),
-          OffsetInput.Binding.List.Nullable("explicitOffsets", rOffsets)
+          OffsetInput.Binding.List.Nullable("explicitOffsets", rOffsets),
+          TelluricTypeBinding.Option("telluricType", rTelluricType)
         ) =>
-          (rETM, rOffsetMode, rOffsets, rSaveSVC).parTupled.flatMap {
-            case (etm, offsetMode, offsets, saveSVC) =>
+          (rETM, rOffsetMode, rOffsets, rSaveSVC, rTelluricType).parTupled.flatMap {
+            case (etm, offsetMode, offsets, saveSVC, telluricType) =>
               val isNodAlongSlit = offsetMode match
                 case NonNull(Igrins2OffsetMode.NodAlongSlit) => true
                 case _                                       => false
 
+              val edit = Edit(etm, offsetMode, saveSVC, offsets, telluricType)
               (offsets, isNodAlongSlit) match
                 case (NonNull(os), true) =>
-                  validateAllOnQ(os).map(_ =>
-                    Edit(etm, offsetMode, saveSVC, offsets)
-                  )
+                  validateAllOnQ(os).as(edit)
                 case _ =>
-                  Result(Edit(etm, offsetMode, saveSVC, offsets))
+                  Result(edit)
           }
       }

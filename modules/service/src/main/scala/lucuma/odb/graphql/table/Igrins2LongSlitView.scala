@@ -6,6 +6,7 @@ package table
 
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.Igrins2Codecs.*
+import skunk.circe.codec.json.*
 import skunk.codec.all.*
 
 trait Igrins2LongSlitView[F[_]] extends BaseMapping[F]:
@@ -21,3 +22,5 @@ trait Igrins2LongSlitView[F[_]] extends BaseMapping[F]:
     val Offsets: ColumnRef               = col("c_spatial_offsets", text.opt)
 
     val DefaultOffsets: ColumnRef        = col("c_default_spatial_offsets", text)
+
+    val TelluricType: ColumnRef          = col("c_telluric_type", jsonb)
