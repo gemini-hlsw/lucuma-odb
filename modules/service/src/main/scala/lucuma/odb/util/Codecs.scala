@@ -77,6 +77,7 @@ import lucuma.odb.data.TelescopeConfigGeneratorRole
 import lucuma.odb.data.TimeCharge.DiscountDiscriminator
 import lucuma.odb.data.TimingWindowEndTypeEnum
 import lucuma.odb.data.UserType
+import lucuma.odb.json.all.query.given
 import lucuma.odb.sequence.data.VisitOrigin
 import lucuma.odb.service.ObservationWorkflowService
 import lucuma.odb.syntax.exposureTimeMode.*
@@ -662,6 +663,9 @@ trait Codecs {
 
   val telluric_calibration_order: Codec[TelluricCalibrationOrder] =
     enumerated(Type("e_telluric_calibration_order"))
+
+  val telluric_type: Codec[TelluricType] =
+    jsonb.eimap(_.as[TelluricType].leftMap(f => s"Could not decode TelluricType: ${f.message}."))(_.asJson)
 
   val target_disposition: Codec[TargetDisposition] =
     enumerated(Type("e_target_disposition"))

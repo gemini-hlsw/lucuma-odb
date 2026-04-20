@@ -626,7 +626,7 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
                   }
                 }
               }
-              """              
+              """
             expect(
               user = pi,
               query = s"""
@@ -967,7 +967,7 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
             expect(
               user = pi,
               query = s"""
-                query {                  
+                query {
                   originalObservation: observation(observationId: "$oid") $graph
                   newObservation: observation(observationId: "$oid2") $graph
                 }
@@ -1474,6 +1474,87 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
             )
     } yield ()
 
+  test("clone IGRINS-2 long slit observation preserves telluricType"):
+    for {
+      pid <- createProgramAs(pi)
+      tid <- createTargetAs(pi, pid)
+      oid <- createIgrins2LongSlitObservationAs(pi, pid, tid)
+      _   <- query(
+                user = pi,
+                query = s"""
+                          mutation {
+                            updateObservations(input: {
+                              SET: {
+                                observingMode: {
+                                  igrins2LongSlit: {
+                                    telluricType: {
+                                      tag: MANUAL
+                                      starTypes: ["A1", "A2"]
+                                    }
+                                  }
+                                }
+                              }
+                              WHERE: {
+                                id: { EQ: ${oid.asJson} }
+                              }
+                            }) {
+                              observations {
+                                id
+                              }
+                            }
+                          }
+                        """)
+      oid2 <- cloneObservationAs(pi, oid)
+      graph =
+        """
+        {
+          observingMode {
+            igrins2LongSlit {
+              telluricType {
+                tag
+                starTypes
+              }
+            }
+          }
+        }
+        """
+      _   <- expect(
+              user = pi,
+              query = s"""
+                query {
+                  originalObservation: observation(observationId: "$oid") $graph
+                  newObservation: observation(observationId: "$oid2") $graph
+                }
+              """,
+              expected = Right(
+                json"""
+                  {
+                    "originalObservation": {
+                      "observingMode": {
+                        "igrins2LongSlit": {
+                          "telluricType": {
+                            "tag": "MANUAL",
+                            "starTypes": ["A1", "A2"]
+                          }
+                        }
+                      }
+                    },
+                    "newObservation": {
+                      "observingMode": {
+                        "igrins2LongSlit": {
+                          "telluricType": {
+                            "tag": "MANUAL",
+                            "starTypes": ["A1", "A2"]
+                          }
+                        }
+                      }
+                    }
+                  }
+                """
+              )
+            )
+    } yield ()
+
   test("clone observation should preserve observer notes"):
     for {
       pid    <- createProgramAs(pi)
@@ -1791,7 +1872,7 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
               query = s"""
                 query {
                   originalObservation: observation(observationId: "$oid") $graph
-                  newObservation: observation(observationId: "$oid2") $graph                  
+                  newObservation: observation(observationId: "$oid2") $graph
                 }
               """,
               expected = Right(

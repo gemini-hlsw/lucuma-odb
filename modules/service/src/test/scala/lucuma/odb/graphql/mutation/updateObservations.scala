@@ -3922,6 +3922,117 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
                 """.asRight)
     } yield ()
 
+  test("[igrins2] updateObservations with telluricType"):
+    for {
+      pid <- createProgramAs(pi)
+      oid <- createObservationAs(pi, pid)
+      _   <- expect(
+                user = pi,
+                query = s"""
+                  mutation {
+                    updateObservations(input: {
+                      SET: {
+                        observingMode: {
+                          igrins2LongSlit: {
+                            exposureTimeMode: {
+                              signalToNoise: {
+                                value: 30.0
+                                at: { nanometers: 2200 }
+                              }
+                            }
+                            telluricType: {
+                              tag: MANUAL
+                              starTypes: ["A5V", "G2V", "K0III"]
+                            }
+                          }
+                        }
+                      }
+                      WHERE: {
+                        id: { EQ: ${oid.asJson} }
+                      }
+                    }) {
+                      observations {
+                        observingMode {
+                          igrins2LongSlit {
+                            telluricType {
+                              tag
+                              starTypes
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                """,
+                expected = json"""
+                  {
+                    "updateObservations": {
+                      "observations": [
+                        {
+                          "observingMode": {
+                            "igrins2LongSlit": {
+                              "telluricType": {
+                                "tag": "MANUAL",
+                                "starTypes": ["A5V", "G2V", "K0III"]
+                              }
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                """.asRight)
+      _   <- expect(
+                user = pi,
+                query =s"""
+                  mutation {
+                    updateObservations(input: {
+                      SET: {
+                        observingMode: {
+                          igrins2LongSlit: {
+                            telluricType: {
+                              tag: SOLAR
+                            }
+                          }
+                        }
+                      }
+                      WHERE: {
+                        id: { EQ: ${oid.asJson} }
+                      }
+                    }) {
+                      observations {
+                        observingMode {
+                          igrins2LongSlit {
+                            telluricType {
+                              tag
+                              starTypes
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                """,
+                expected = json"""
+                  {
+                    "updateObservations": {
+                      "observations": [
+                        {
+                          "observingMode": {
+                            "igrins2LongSlit": {
+                              "telluricType": {
+                                "tag": "SOLAR",
+                                "starTypes": null
+                              }
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                """.asRight)
+    } yield ()
+
   test("field precedence: new offset fields take priority over deprecated ones"):
 
     val update = """

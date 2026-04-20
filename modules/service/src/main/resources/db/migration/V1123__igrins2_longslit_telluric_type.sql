@@ -1,8 +1,10 @@
--- Add teluric type
+-- Add telluric type field, defaults to HOT
 ALTER TABLE t_igrins_2_long_slit
 ADD COLUMN c_telluric_type jsonb NOT NULL DEFAULT '{"tag":"HOT","starTypes":null}'::jsonb;
 
-CREATE OR REPLACE VIEW v_igrins_2_long_slit AS
+DROP VIEW v_igrins_2_long_slit;
+
+CREATE VIEW v_igrins_2_long_slit AS
 SELECT
   m.*,
   CASE COALESCE(m.c_offset_mode, 'nod_along_slit')

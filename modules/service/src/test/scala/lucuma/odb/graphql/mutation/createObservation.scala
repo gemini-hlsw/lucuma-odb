@@ -31,7 +31,7 @@ import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.graphql.input.AllocationInput
 import lucuma.odb.json.tellurictype.query.given
 
-class createObservation extends OdbSuite {
+class createObservation extends OdbSuite with TelluricTypeGraphQLFormat {
 
   extension (ac: ACursor)
     def downPath(p: String*): ACursor =
@@ -1377,15 +1377,6 @@ class createObservation extends OdbSuite {
     explicitReads:       Option[Flamingos2Reads],
     telluricType:        TelluricType
   ): String =
-    def telluricTypeToGraphQL(tt: TelluricType): String = tt match {
-      case TelluricType.Hot   => "{ tag: HOT }"
-      case TelluricType.A0V   => "{ tag: A0V }"
-      case TelluricType.Solar => "{ tag: SOLAR }"
-      case TelluricType.Manual(starTypes) =>
-        val types = starTypes.toList.map(s => s""""$s"""").mkString("[", ", ", "]")
-        s"{ tag: MANUAL, starTypes: $types }"
-    }
-
     s"""
       mutation {
         createObservation(input: {
@@ -2651,6 +2642,10 @@ class createObservation extends OdbSuite {
                   p { arcseconds }
                   q { arcseconds }
                 }
+                telluricType {
+                  tag
+                  starTypes
+                }
               }
             }
           }
@@ -2672,7 +2667,8 @@ class createObservation extends OdbSuite {
            ls.downIO[Boolean]("defaultSaveSVCImages"),
            ls.downIO[Option[Boolean]]("explicitSaveSVCImages"),
            ls.downIO[Double]("exposureTimeMode", "signalToNoise", "value"),
-           ls.downIO[Double]("exposureTimeMode", "signalToNoise", "at", "nanometers")
+           ls.downIO[Double]("exposureTimeMode", "signalToNoise", "at", "nanometers"),
+           ls.downIO[TelluricType]("telluricType")
           ).tupled,
           (Igrins2OffsetMode.NodAlongSlit,
            Igrins2OffsetMode.NodAlongSlit,
@@ -2681,7 +2677,8 @@ class createObservation extends OdbSuite {
            false,
            None,
            50.0,
-           2200.0
+           2200.0,
+           TelluricType.Hot
           )
         )
 
@@ -2838,5 +2835,132 @@ class createObservation extends OdbSuite {
           ).tupled,
           (Some(emptyOffsets), Some(emptyOffsets), Some(nodToSkyDefaults))
         )
+
+  private def createObsWithIgrins2ObservingModeAllParams(
+    pid:                    Program.Id,
+    explicitOffsetMode:     Option[Igrins2OffsetMode],
+    explicitSaveSVCImages:  Option[Boolean],
+    telluricType:           TelluricType
+  ): String =
+    s"""
+      mutation {
+        createObservation(input: {
+          programId: ${pid.asJson}
+          SET: {
+            scienceRequirements: {
+              exposureTimeMode: {
+                signalToNoise: {
+                  value: 100.0
+                  at: { nanometers: 2200 }
+                }
+              }
+            }
+            observingMode: {
+              igrins2LongSlit: {
+                exposureTimeMode: {
+                  signalToNoise: {
+                    value: 50.0
+                    at: { nanometers: 2200 }
+                  }
+                }
+                explicitOffsetMode: ${explicitOffsetMode.map(_.tag.toScreamingSnakeCase).getOrElse("null")}
+                explicitSaveSVCImages: ${explicitSaveSVCImages.map(_.toString).getOrElse("null")}
+                telluricType: ${telluricTypeToGraphQL(telluricType)}
+              }
+            }
+          }
+        }) {
+          observation {
+            observingMode {
+              igrins2LongSlit {
+                offsetMode
+                defaultOffsetMode
+                explicitOffsetMode
+                saveSVCImages
+                defaultSaveSVCImages
+                explicitSaveSVCImages
+                telluricType {
+                  tag
+                  starTypes
+                }
+              }
+            }
+          }
+        }
+      }
+    """
+
+  test("[igrins2] specify igrins-2 long slit observing mode at observation creation with telluricType Solar") {
+    createProgramAs(pi).flatMap { pid =>
+      query(pi,
+        createObsWithIgrins2ObservingModeAllParams(
+          pid,
+          explicitOffsetMode = Some(Igrins2OffsetMode.NodToSky),
+          explicitSaveSVCImages = Some(true),
+          telluricType = TelluricType.Solar
+        )).flatMap { js =>
+          val longSlit = js.hcursor.downPath("createObservation", "observation", "observingMode", "igrins2LongSlit")
+
+          assertIO((
+            longSlit.downIO[Igrins2OffsetMode]("offsetMode"),
+            longSlit.downIO[Option[Igrins2OffsetMode]]("explicitOffsetMode"),
+            longSlit.downIO[Boolean]("saveSVCImages"),
+            longSlit.downIO[Option[Boolean]]("explicitSaveSVCImages"),
+            longSlit.downIO[TelluricType]("telluricType")
+          ).tupled, (
+            Igrins2OffsetMode.NodToSky,
+            Some(Igrins2OffsetMode.NodToSky),
+            true,
+            Some(true),
+            TelluricType.Solar
+          )
+        )
+      }
+    }
+  }
+
+  test("[igrins2] specify igrins-2 long slit observing mode at observation creation with telluricType A0V") {
+    createProgramAs(pi).flatMap { pid =>
+      query(pi,
+        createObsWithIgrins2ObservingModeAllParams(
+          pid,
+          explicitOffsetMode = None,
+          explicitSaveSVCImages = None,
+          telluricType = TelluricType.A0V
+        )).flatMap { js =>
+          val longSlit = js.hcursor.downPath("createObservation", "observation", "observingMode", "igrins2LongSlit")
+
+          assertIO((
+            longSlit.downIO[Igrins2OffsetMode]("offsetMode"),
+            longSlit.downIO[Option[Igrins2OffsetMode]]("explicitOffsetMode"),
+            longSlit.downIO[TelluricType]("telluricType")
+          ).tupled, (
+            Igrins2OffsetMode.NodAlongSlit,
+            None,
+            TelluricType.A0V
+          )
+        )
+      }
+    }
+  }
+
+  test("[igrins2] specify igrins-2 long slit observing mode at observation creation with telluricType Manual") {
+    createProgramAs(pi).flatMap { pid =>
+      query(pi,
+        createObsWithIgrins2ObservingModeAllParams(
+          pid,
+          explicitOffsetMode = None,
+          explicitSaveSVCImages = None,
+          telluricType = TelluricType.Manual(NonEmptyList.of("A5V", "G2V"))
+        )).flatMap { js =>
+          val longSlit = js.hcursor.downPath("createObservation", "observation", "observingMode", "igrins2LongSlit")
+
+          assertIO(
+            longSlit.downIO[TelluricType]("telluricType"),
+            TelluricType.Manual(NonEmptyList.of("A5V", "G2V"))
+          )
+      }
+    }
+  }
 
 }
