@@ -302,7 +302,7 @@ object Services:
         for
           svc    <- ResultT(graphQlService.pure[F])
           parsed <- ResultT(svc.parse(query, op, vars).pure[F])
-          json   <- ResultT(svc.query(parsed, query, none, op))
+          json   <- ResultT(svc.query(parsed, query, op))
         yield json
 
       def runGraphQLQuery(query: String, op: Option[String], vars: Option[JsonObject]): F[Result[Json]] =

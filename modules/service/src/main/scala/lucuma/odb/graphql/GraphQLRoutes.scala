@@ -3,14 +3,12 @@
 
 package lucuma.odb.graphql
 
-import cats.Applicative
 import cats.Parallel
 import cats.data.OptionT
 import cats.effect.*
 import cats.effect.std.SecureRandom
 import cats.implicits.*
 import cats.kernel.Order
-import clue.model.GraphQLExtensions
 import fs2.Stream
 import grackle.Operation
 import grackle.Result
@@ -56,21 +54,6 @@ object GraphQLRoutes {
 
   given Order[Authorization] =
     Order.by(Header[Authorization].value)
-
-  // Extract W3C trace context headers (traceparent, tracestate) from the GraphQL
-  // `extensions` map pass to otel4s and re-parent spans.
-  extension (extensions: Option[GraphQLExtensions])
-    def traceCarrier: Map[String, String] =
-      extensions.fold(Map.empty):
-        _.toMap
-          .collect:
-            case (k, v) if v.isString => k -> v.asString.orEmpty
-        .filter((_, v) => v.nonEmpty)
-
-  // joinOrRoot without a traceparent starts a new *root* trace.
-  // Only call joinOrRoot when we have a remote context otherwise inherit the current span context.
-  private def joinRemote[F[_]: Tracer, A](carrier: Map[String, String])(fa: F[A]): F[A] =
-    if (carrier.contains("traceparent")) Tracer[F].joinOrRoot(carrier)(fa) else fa
 
   /**
    * Construct a source of `HttpRoutes` tailored to the requesting user. Routes will be cached
@@ -138,35 +121,33 @@ object GraphQLRoutes {
                                   override def query(
                                     request:       Operation,
                                     document:      String,
-                                    extensions:    Option[GraphQLExtensions],
                                     operationName: Option[String]
                                   ): F[Result[Json]] =
-                                    joinRemote(extensions.traceCarrier):
-                                      super.query(request, document, extensions, operationName).retryOnInvalidCursorName
-                                        .handleError(Result.InternalError.apply)
-                                        .flatTap {
-                                          case Result.InternalError(t) => error(user, s"Internal error: ${t.getClass.getSimpleName}: ${t.getMessage}", t)
-                                          case _                       => debug(user, s"Query (success).")
-                                        }
+                                    T.spanBuilder("graphql-query")
+                                      .withSpanKind(SpanKind.Server)
+                                      .build
+                                      .surround:
+                                        super.query(request, document, operationName).retryOnInvalidCursorName
+                                          .handleError(Result.InternalError.apply)
+                                          .flatTap {
+                                            case Result.InternalError(t) => error(user, s"Internal error: ${t.getClass.getSimpleName}: ${t.getMessage}", t)
+                                            case _                       => debug(user, s"Query (success).")
+                                          }
 
                                   override def subscribe(
                                     request:       Operation,
                                     document:      String,
-                                    extensions:    Option[GraphQLExtensions],
                                     operationName: Option[String]
-                                  ): Stream[F, Result[Json]] = {
-                                    // Open a server span rooted at the client's remote context; keep it
-                                    // alive for the lifetime of the subscription stream.
-                                    val allocate: F[((Any, F[Unit]))] =
-                                      joinRemote(extensions.traceCarrier)(
-                                        T.spanBuilder("graphql-subscription").withSpanKind(SpanKind.Server).build.resource.allocated
-                                      )
-                                    val spanResource: Resource[F, Unit] =
-                                      Resource.suspend(allocate.map { case (_, release) =>
-                                        Resource.make(Applicative[F].unit)(_ => release)
-                                      })
-                                    Stream.resource(spanResource) >> super.subscribe(request, document, extensions, operationName)
-                                  }
+                                  ): Stream[F, Result[Json]] =
+                                    val spanResource =
+                                      T.spanBuilder("graphql-subscription")
+                                        .withSpanKind(SpanKind.Server)
+                                        .build
+                                        .resource
+                                    Stream.resource(spanResource).flatMap: res =>
+                                      super.subscribe(request, document, operationName)
+                                        // use `res.trace` to make it the current context for each inner effect
+                                        .translate(res.trace)
                                 }
                       } yield svc
                     } .widen[GraphQLService[F]]
@@ -184,7 +165,7 @@ object GraphQLRoutes {
    * An endpoint that listens on `/export/<name>` and returns an application/javascript response
    * of the form `export const <name> = '<query result>'`.
    */
-  def exportConst[F[_]: Temporal](
+  def exportConst[F[_]: Temporal: Tracer](
     service: GraphQLService[F],
     name:    String,
     query:   String,
@@ -206,7 +187,7 @@ object GraphQLRoutes {
     }
   }
 
-  def enumMetadata[F[_]: Temporal](
+  def enumMetadata[F[_]: Temporal: Tracer](
     service: GraphQLService[F]
   ): HttpRoutes[F] =
     exportConst(service, "enumMetadata", """
