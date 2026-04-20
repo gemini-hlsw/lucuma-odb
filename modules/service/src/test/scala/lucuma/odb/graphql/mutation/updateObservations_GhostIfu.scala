@@ -131,3 +131,75 @@ class updateObservations_GhostIfu extends OdbSuite with UpdateObservationsOps wi
       o <- createObservationWithModeAs(pi, p, List(t), GhostIfuInput)
       _ <- updateObservation(pi, o, update, query, expected)
     yield o
+
+  test("Update non-exposure time mode parameters"):
+    val update = """
+      observingMode: {
+        ghostIfu: {
+          resolutionMode: HIGH
+          red: {
+            explicitBinning:  FOUR_BY_FOUR
+            explicitReadMode: FAST
+          }
+          blue: {
+            explicitBinning:  TWO_BY_EIGHT
+            explicitReadMode: MEDIUM
+          }
+          explicitIfu1Agitator: DISABLED
+          explicitIfu2Agitator: ENABLED
+        }
+      }
+    """
+
+    val query = """
+      observations {
+        observingMode {
+          ghostIfu {
+            resolutionMode
+            red {
+              explicitBinning
+              explicitReadMode
+            }
+            blue {
+              explicitBinning
+              explicitReadMode
+            }
+            explicitIfu1Agitator
+            explicitIfu2Agitator
+          }
+        }
+      }
+    """
+
+    val expected = json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "observingMode": {
+                "ghostIfu": {
+                  "resolutionMode": "HIGH",
+                  "red": {
+                    "explicitBinning": "FOUR_BY_FOUR",
+                    "explicitReadMode": "FAST"
+                  },
+                  "blue": {
+                    "explicitBinning": "TWO_BY_EIGHT",
+                    "explicitReadMode": "MEDIUM"
+                  },
+                  "explicitIfu1Agitator": "DISABLED",
+                  "explicitIfu2Agitator": "ENABLED"
+                }
+              }
+            }
+          ]
+        }
+      }
+    """.asRight
+
+    for
+      p <- createProgramAs(pi)
+      t <- createTargetWithProfileAs(pi, p)
+      o <- createObservationWithModeAs(pi, p, List(t), GhostIfuInput)
+      _ <- updateObservation(pi, o, update, query, expected)
+    yield o

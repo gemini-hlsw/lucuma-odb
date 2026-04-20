@@ -129,6 +129,7 @@ object GhostIfuService:
         which: List[Observation.Id]
       )(using Transaction[F]): F[Unit] =
         for
+          _ <- Statements.updateGhostIfu(SET, which).traverse_(session.exec)
           _ <- SET.red.flatMap(_.exposureTimeMode).traverse_(etm => session.exec(Statements.updateEtm(which, etm, "red")))
           _ <- SET.blue.flatMap(_.exposureTimeMode).traverse_(etm => session.exec(Statements.updateEtm(which, etm, "blue")))
         yield ()
@@ -356,3 +357,35 @@ object GhostIfuService:
         update.exposureCount,
         oids
       )
+
+    def updateGhostIfu(
+      SET:   GhostIfuInput.Edit,
+      which: List[Observation.Id]
+    ): Option[AppliedFragment] =
+      val updates =
+        val upResolutionMode = sql"c_resolution_mode     = $ghost_resolution_mode"
+        val upRedBinning     = sql"c_red_binning         = ${ghost_binning.opt}"
+        val upRedReadMode    = sql"c_red_read_mode       = ${ghost_read_mode.opt}"
+        val upBlueBinning    = sql"c_blue_binning        = ${ghost_binning.opt}"
+        val upBlueReadMode   = sql"c_blue_read_mode      = ${ghost_read_mode.opt}"
+        val upIfu1Agitator   = sql"c_ifu1_fiber_agitator = ${ghost_ifu1_fiber_agitator.opt}"
+        val upIfu2Agitator   = sql"c_ifu2_fiber_agitator = ${ghost_ifu2_fiber_agitator.opt}"
+
+        NonEmptyList.fromList:
+          List(
+            SET.resolutionMode.map(upResolutionMode),
+            SET.red.flatMap(_.explicitBinning.toOptionOption).map(upRedBinning),
+            SET.red.flatMap(_.explicitReadMode.toOptionOption).map(upRedReadMode),
+            SET.blue.flatMap(_.explicitBinning.toOptionOption).map(upBlueBinning),
+            SET.blue.flatMap(_.explicitReadMode.toOptionOption).map(upBlueReadMode),
+            SET.explicitIfu1FiberAgitator.toOptionOption.map(upIfu1Agitator),
+            SET.explicitIfu2FiberAgitator.toOptionOption.map(upIfu2Agitator)
+          ).flatten
+
+      for
+        us <- updates
+        os <- NonEmptyList.fromList(which)
+      yield
+        void"UPDATE t_ghost_ifu " |+|
+          void"SET " |+| us.intercalate(void", ") |+| void" " |+|
+          void"WHERE " |+| observationIdIn(os)
