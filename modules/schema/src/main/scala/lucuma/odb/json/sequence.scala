@@ -172,6 +172,7 @@ trait SequenceCodec {
     }
 
   import lucuma.odb.json.flamingos2.given
+  import lucuma.odb.json.ghost.given
   import lucuma.odb.json.gmos.given
   import lucuma.odb.json.igrins2.given
 
@@ -180,6 +181,9 @@ trait SequenceCodec {
 
   given Decoder[InstrumentExecutionConfig.Flamingos2] =
     rootDecoder(InstrumentExecutionConfig.Flamingos2.apply)
+
+  given Decoder[InstrumentExecutionConfig.Ghost] =
+    rootDecoder(InstrumentExecutionConfig.Ghost.apply)
 
   given Decoder[InstrumentExecutionConfig.GmosNorth] =
     rootDecoder(InstrumentExecutionConfig.GmosNorth.apply)
@@ -198,6 +202,9 @@ trait SequenceCodec {
   given (using Encoder[Offset], Encoder[TimeSpan], Encoder[Wavelength]): Encoder[InstrumentExecutionConfig.Flamingos2] =
     rootEncoder(_.executionConfig)
 
+  given (using Encoder[Offset], Encoder[TimeSpan]): Encoder[InstrumentExecutionConfig.Ghost] =
+    rootEncoder(_.executionConfig)
+
   given (using Encoder[Offset], Encoder[TimeSpan], Encoder[Wavelength]): Encoder[InstrumentExecutionConfig.GmosNorth] =
     rootEncoder(_.executionConfig)
 
@@ -213,6 +220,7 @@ trait SequenceCodec {
         i <- c.downField("instrument").as[Instrument]
         r <- i match {
           case Instrument.Flamingos2 => c.downField("flamingos2").as[InstrumentExecutionConfig.Flamingos2]
+          case Instrument.Ghost      => c.downField("ghost").as[InstrumentExecutionConfig.Ghost]
           case Instrument.GmosNorth  => c.downField("gmosNorth").as[InstrumentExecutionConfig.GmosNorth]
           case Instrument.GmosSouth  => c.downField("gmosSouth").as[InstrumentExecutionConfig.GmosSouth]
           case Instrument.Igrins2    => c.downField("igrins2").as[InstrumentExecutionConfig.Igrins2]
@@ -226,11 +234,13 @@ trait SequenceCodec {
       Json.obj(
         "instrument" -> a.instrument.asJson,
         "flamingos2" -> Json.Null, // one of these will be replaced
+        "ghost"      -> Json.Null, // one of these will be replaced
         "gmosNorth"  -> Json.Null, // one of these will be replaced
         "gmosSouth"  -> Json.Null, // one of these will be replaced
         "igrins2"    -> Json.Null, // one of these will be replaced
         a match
           case i@InstrumentExecutionConfig.Flamingos2(_) => "flamingos2" -> i.asJson
+          case i@InstrumentExecutionConfig.Ghost(_)      => "ghost"      -> i.asJson
           case i@InstrumentExecutionConfig.GmosNorth(_)  => "gmosNorth"  -> i.asJson
           case i@InstrumentExecutionConfig.GmosSouth(_)  => "gmosSouth"  -> i.asJson
           case i@InstrumentExecutionConfig.Igrins2(_)    => "igrins2"    -> i.asJson

@@ -215,6 +215,8 @@ object Generator:
           ctx.params.observingMode.modeType match
             case ObservingModeType.Flamingos2LongSlit =>
               EitherT(streaming.selectOrGenerateFlamingos2LongSlit(ctx)).flatMap(digest(_, calculator.flamingos2LongSlitSetup))
+            case ObservingModeType.GhostIfu    =>
+              EitherT(streaming.selectOrGenerateGhost(ctx)).flatMap(digest(_, calculator.ghostIfuSetup))
             case ObservingModeType.GmosNorthImaging   =>
               EitherT(streaming.selectOrGenerateGmosNorthImaging(ctx)).flatMap(digest(_, calculator.gmosNorthImagingSetup))
             case ObservingModeType.GmosNorthLongSlit  =>
@@ -225,8 +227,6 @@ object Generator:
               EitherT(streaming.selectOrGenerateGmosSouthLongSlit(ctx)).flatMap(digest(_, calculator.gmosSouthLongSlitSetup))
             case ObservingModeType.Igrins2LongSlit    =>
               EitherT(streaming.selectOrGenerateIgrins2LongSlit(ctx)).flatMap(digest(_, calculator.igrins2LongSlitSetup))
-            case ObservingModeType.GhostIfu    =>
-              EitherT.leftT(OdbError.InvalidObservation(ctx.oid, s"GHOST is not yet supported".some))
 
       private def calculateScienceAtomDigests(
         ctx: GeneratorContext
@@ -240,6 +240,8 @@ object Generator:
         val atomDigests = ctx.params.observingMode.modeType match
           case ObservingModeType.Flamingos2LongSlit =>
             EitherT(streaming.selectOrGenerateFlamingos2LongSlit(ctx)).map(_.science.map(AtomDigest.fromAtom))
+          case ObservingModeType.GhostIfu    =>
+            EitherT(streaming.selectOrGenerateGhost(ctx)).map(_.science.map(AtomDigest.fromAtom))
           case ObservingModeType.GmosNorthImaging   =>
             EitherT(streaming.selectOrGenerateGmosNorthImaging(ctx)).map(_.science.map(AtomDigest.fromAtom))
           case ObservingModeType.GmosNorthLongSlit  =>
@@ -250,8 +252,6 @@ object Generator:
             EitherT(streaming.selectOrGenerateGmosSouthLongSlit(ctx)).map(_.science.map(AtomDigest.fromAtom))
           case ObservingModeType.Igrins2LongSlit    =>
             EitherT(streaming.selectOrGenerateIgrins2LongSlit(ctx)).map(_.science.map(AtomDigest.fromAtom))
-          case ObservingModeType.GhostIfu    =>
-            EitherT.leftT(OdbError.InvalidObservation(ctx.oid, s"GHOST is not yet supported".some))
 
         checkSequence *> atomDigests
 
@@ -301,6 +301,11 @@ object Generator:
                 .flatMap(s => EitherT.liftF(executionConfig(s)))
                 .map(InstrumentExecutionConfig.Flamingos2.apply)
 
+            case ObservingModeType.GhostIfu           =>
+              EitherT(streaming.selectOrGenerateGhost(ctx))
+                .flatMap(s => EitherT.liftF(executionConfig(s)))
+                .map(InstrumentExecutionConfig.Ghost.apply)
+
             case ObservingModeType.GmosNorthImaging   =>
               EitherT(streaming.selectOrGenerateGmosNorthImaging(ctx))
                 .flatMap(s => EitherT.liftF(executionConfig(s)))
@@ -326,9 +331,6 @@ object Generator:
                 .flatMap(s => EitherT.liftF(executionConfig(s)))
                 .map(InstrumentExecutionConfig.Igrins2.apply)
 
-            case ObservingModeType.GhostIfu           =>
-              EitherT.leftT(OdbError.InvalidObservation(ctx.oid, s"GHOST is not yet supported".some))
-
         transactionallyWithContext(oid, commitHash): ctx =>
           instrumentExecutionConfig(ctx)
 
@@ -343,17 +345,18 @@ object Generator:
                 .flatMap(s => EitherT.liftF(sequenceService.resetFlamingos2Acquisition(observationId, s.acquisition)))
 
             // N.B. there is no imaging acquisition, but it should not blow up.
+            case ObservingModeType.GhostIfu           =>
+              EitherT.pure(())
+
             case ObservingModeType.GmosNorthImaging   =>
-              EitherT(streaming.generateGmosNorthImaging(ctx))
-                .flatMap(s => EitherT.liftF(sequenceService.resetGmosNorthAcquisition(observationId, s.acquisition)))
+              EitherT.pure(())
 
             case ObservingModeType.GmosNorthLongSlit  =>
               EitherT(streaming.generateGmosNorthLongSlit(ctx))
                 .flatMap(s => EitherT.liftF(sequenceService.resetGmosNorthAcquisition(observationId, s.acquisition)))
 
             case ObservingModeType.GmosSouthImaging   =>
-              EitherT(streaming.generateGmosSouthImaging(ctx))
-                .flatMap(s => EitherT.liftF(sequenceService.resetGmosSouthAcquisition(observationId, s.acquisition)))
+              EitherT.pure(())
 
             case ObservingModeType.GmosSouthLongSlit  =>
               EitherT(streaming.generateGmosSouthLongSlit(ctx))
@@ -361,9 +364,6 @@ object Generator:
 
             case ObservingModeType.Igrins2LongSlit    =>
               EitherT.pure(())
-
-            case ObservingModeType.GhostIfu           =>
-              EitherT.leftT(OdbError.InvalidObservation(ctx.oid, s"GHOST is not yet supported".some))
 
       override def materializeAndThen[A](
         oid:  Observation.Id
@@ -379,6 +379,10 @@ object Generator:
             case ObservingModeType.Flamingos2LongSlit =>
               EitherT(streaming.generateFlamingos2LongSlit(ctx))
                 .flatMap(s => EitherT.liftF(sequenceService.materializeFlamingos2ExecutionConfig(oid, s)))
+
+            case ObservingModeType.GhostIfu           =>
+              EitherT(streaming.generateGhost(ctx))
+                .flatMap(s => EitherT.liftF(sequenceService.materializeGhostExecutionConfig(oid, s)))
 
             case ObservingModeType.GmosNorthImaging   =>
               EitherT(streaming.generateGmosNorthImaging(ctx))
@@ -399,9 +403,6 @@ object Generator:
             case ObservingModeType.Igrins2LongSlit    =>
               EitherT(streaming.generateIgrins2LongSlit(ctx))
                 .flatMap(s => EitherT.liftF(sequenceService.materializeIgrins2ExecutionConfig(oid, s)))
-
-            case ObservingModeType.GhostIfu           =>
-              EitherT.leftT(OdbError.InvalidObservation(ctx.oid, s"GHOST is not yet supported".some))
 
         transactionallyWithContext(oid, commitHash): ctx =>
           materializeExecutionConfig(ctx) *> EitherT(f)

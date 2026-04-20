@@ -3,13 +3,14 @@
 
 package lucuma.odb.json
 
-object all {
+object all:
 
   trait UniversalCodecs
     extends CalculatedValueCodec
        with CatalogInfoCodec
        with EpochCodec
        with Flamingos2Codec
+       with GhostCodec
        with GmosCodec
        with Igrins2Codec
        with ItcCodec
@@ -48,5 +49,3 @@ object all {
        with target.TransportCodec
        with tellurictype.TransportCodec
        with UniversalCodecs
-
-}

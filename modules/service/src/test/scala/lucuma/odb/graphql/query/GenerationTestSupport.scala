@@ -95,6 +95,7 @@ trait GenerationTestSupport extends OdbSuite:
   ): IO[ExecutionConfig[?, ?]] =
     generateOrFailAs(user, oid).map:
       case InstrumentExecutionConfig.Flamingos2(e) => e
+      case InstrumentExecutionConfig.Ghost(e)      => e
       case InstrumentExecutionConfig.GmosNorth(e)  => e
       case InstrumentExecutionConfig.GmosSouth(e)  => e
       case InstrumentExecutionConfig.Igrins2(e)    => e

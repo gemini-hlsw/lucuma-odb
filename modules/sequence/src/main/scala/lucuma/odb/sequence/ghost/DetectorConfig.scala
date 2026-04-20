@@ -15,7 +15,7 @@ import lucuma.odb.sequence.syntax.all.*
 import java.io.ByteArrayOutputStream
 import java.io.DataOutputStream
 
-case class Detector(
+case class DetectorConfig(
   exposureTimeMode: ExposureTimeMode,
   defaultBinning:   GhostBinning,
   explicitBinning:  Option[GhostBinning],
@@ -42,11 +42,11 @@ case class Detector(
     out.close()
     bao.toByteArray
 
-object Detector:
-  object Blue extends NewType[Detector]
+object DetectorConfig:
+  object Blue extends NewType[DetectorConfig]
   type Blue = Blue.Type
 
-  object Red extends NewType[Detector]
+  object Red extends NewType[DetectorConfig]
   type Red = Red.Type
 
   def blue(
@@ -55,7 +55,7 @@ object Detector:
     explicitReadMode: Option[GhostReadMode] = None
   ): Blue.Type =
     Blue.apply:
-      Detector(
+      DetectorConfig(
         exposureTimeMode,
         GhostBinning.Default,
         explicitBinning,
@@ -69,7 +69,7 @@ object Detector:
     explicitReadMode: Option[GhostReadMode] = None
   ): Red.Type =
     Red.apply:
-      Detector(
+      DetectorConfig(
         exposureTimeMode,
         GhostBinning.Default,
         explicitBinning,

@@ -52,7 +52,7 @@ trait GhostCodecs:
     ).imap(
       (red, blue, ifu1, ifu2) => GhostDynamicConfig(GhostDetector.Red(red), GhostDetector.Blue(blue), ifu1, ifu2)
     )(
-      dyn => (dyn.redCamera.value, dyn.blueCamera.value, dyn.ifu1FiberAgitator, dyn.ifu2FiberAgitator)
+      dyn => (dyn.red.value, dyn.blue.value, dyn.ifu1FiberAgitator, dyn.ifu2FiberAgitator)
     )
 
   val ghost_static: Codec[GhostStaticConfig] =

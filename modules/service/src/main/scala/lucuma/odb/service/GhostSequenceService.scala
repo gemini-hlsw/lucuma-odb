@@ -80,14 +80,14 @@ object GhostSequenceService:
 
     val DynamicColumns: List[String] =
       List(
-        "c_blue_exposure_time",
-        "c_blue_exposure_count",
-        "c_blue_binning",
-        "c_blue_read_mode",
         "c_red_exposure_time",
         "c_red_exposure_count",
         "c_red_binning",
         "c_red_read_mode",
+        "c_blue_exposure_time",
+        "c_blue_exposure_count",
+        "c_blue_binning",
+        "c_blue_read_mode",
         "c_ifu1_fiber_agitator",
         "c_ifu2_fiber_agitator"
       )

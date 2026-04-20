@@ -19,10 +19,10 @@ import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.Observation
 import lucuma.core.syntax.timespan.*
 import lucuma.odb.data.Nullable
-import lucuma.odb.graphql.input.GhostDetectorInput
+import lucuma.odb.graphql.input.GhostDetectorConfigInput
 import lucuma.odb.graphql.input.GhostIfuInput
 import lucuma.odb.graphql.query.ExecutionTestSupport
-import lucuma.odb.sequence.ghost.Detector
+import lucuma.odb.sequence.ghost.DetectorConfig
 import lucuma.odb.sequence.ghost.ifu.Config
 import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.util.Codecs.instrument
@@ -68,11 +68,11 @@ class GhostIfuServiceSuite extends ExecutionTestSupport:
     etm: Option[ExposureTimeMode],
   ): Config =
     def expectedDetector(
-      in: Option[GhostDetectorInput],
+      in: Option[GhostDetectorConfigInput],
       rm: GhostReadMode
-    ): Detector =
+    ): DetectorConfig =
       val exposureTimeMode = in.flatMap(_.exposureTimeMode).orElse(etm).get
-      Detector(
+      DetectorConfig(
         exposureTimeMode = exposureTimeMode,
         defaultBinning   = GhostBinning.OneByOne,
         explicitBinning  = in.flatMap(_.explicitBinning.toOption),
@@ -82,8 +82,8 @@ class GhostIfuServiceSuite extends ExecutionTestSupport:
 
     Config(
       resolutionMode       = in.resolutionMode,
-      red                  = Detector.Red(expectedDetector(in.red, GhostReadMode.Medium)),
-      blue                 = Detector.Blue(expectedDetector(in.blue, GhostReadMode.Slow)),
+      red                  = DetectorConfig.Red(expectedDetector(in.red, GhostReadMode.Medium)),
+      blue                 = DetectorConfig.Blue(expectedDetector(in.blue, GhostReadMode.Slow)),
       explicitIfu1Agitator = in.explicitIfu1FiberAgitator,
       explicitIfu2Agitator = in.explicitIfu2FiberAgitator
     )
@@ -110,12 +110,12 @@ class GhostIfuServiceSuite extends ExecutionTestSupport:
 
     val create = GhostIfuInput.Create(
       resolutionMode = GhostResolutionMode.Standard,
-      red            = GhostDetectorInput(
+      red            = GhostDetectorConfigInput(
         redEtm.some,
         Nullable.NonNull(GhostBinning.TwoByTwo),
         Nullable.NonNull(GhostReadMode.Fast)
       ).some,
-      blue           = GhostDetectorInput(
+      blue           = GhostDetectorConfigInput(
         blueEtm.some,
         Nullable.NonNull(GhostBinning.FourByFour),
         Nullable.NonNull(GhostReadMode.Slow)

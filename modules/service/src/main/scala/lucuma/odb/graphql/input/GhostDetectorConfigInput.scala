@@ -12,19 +12,19 @@ import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.binding.*
 
 
-case class GhostDetectorInput(
+case class GhostDetectorConfigInput(
   exposureTimeMode: Option[ExposureTimeMode],
   explicitBinning:  Nullable[GhostBinning],
   explicitReadMode: Nullable[GhostReadMode]
 )
 
-object GhostDetectorInput:
+object GhostDetectorConfigInput:
 
-  val Binding: Matcher[GhostDetectorInput] =
+  val Binding: Matcher[GhostDetectorConfigInput] =
     ObjectFieldsBinding.rmap:
       case List(
         ExposureTimeModeInput.Binding.Option("exposureTimeMode", rEtm),
         GhostBinningBinding.Nullable("explicitBinning", rBin),
         GhostReadModeBinding.Nullable("explicitReadMode", rReadMode)
       ) => (rEtm, rBin, rReadMode).parMapN: (etm, bin, readMode) =>
-        GhostDetectorInput(etm, bin, readMode)
+        GhostDetectorConfigInput(etm, bin, readMode)

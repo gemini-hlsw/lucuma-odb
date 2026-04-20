@@ -4,7 +4,6 @@
 package lucuma.odb.logic
 
 import cats.syntax.either.*
-import cats.syntax.order.*
 import lucuma.core.enums.Flamingos2ReadMode
 import lucuma.core.enums.GmosNorthDetector
 import lucuma.core.enums.GmosSouthDetector
@@ -12,7 +11,6 @@ import lucuma.core.model.sequence.DatasetEstimate
 import lucuma.core.model.sequence.DetectorEstimate
 import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig
 import lucuma.core.model.sequence.flamingos2.Flamingos2StaticConfig
-import lucuma.core.model.sequence.ghost.GhostDetector
 import lucuma.core.model.sequence.ghost.GhostDynamicConfig
 import lucuma.core.model.sequence.ghost.GhostStaticConfig
 import lucuma.core.model.sequence.gmos.DynamicConfig
@@ -56,16 +54,10 @@ object DetectorEstimator {
         )
     }
 
-    // TODO: Move this to core
-    extension (ghostDetector: GhostDetector) {
-      def grossExposureTime: TimeSpan =
-        ghostDetector.exposureTime *| ghostDetector.exposureCount.value
-    }
-
     extension (ghost: GhostDynamicConfig) {
       def datasetEstimate: DatasetEstimate =
         DatasetEstimate(
-          ghost.redCamera.value.grossExposureTime max ghost.blueCamera.value.grossExposureTime,
+          ghost.totalExposureTime,
           0.secondTimeSpan,
           0.secondTimeSpan
         )
