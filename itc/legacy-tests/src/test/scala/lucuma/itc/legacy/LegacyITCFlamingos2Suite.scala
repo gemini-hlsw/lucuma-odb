@@ -3,6 +3,7 @@
 
 package lucuma.itc.legacy
 
+import cats.syntax.traverse.*
 import io.circe.syntax.*
 import lucuma.core.enums.*
 import lucuma.core.util.Enumerated
@@ -23,10 +24,12 @@ trait LegacyITCFlamingos2Suite extends CommonITCLegacySuite:
 
   def observingModeWithFpu(f: Flamingos2Fpu): ObservingMode
 
+  def observingModeWithReadMode(rm: Flamingos2ReadMode): ObservingMode
+
   def title: String
 
   test(s"$title - Flamingos2 filter".tag(LegacyITCTest)):
-    Enumerated[Flamingos2Filter].all.foreach: f =>
+    Enumerated[Flamingos2Filter].all.traverse: f =>
       val result = localItc
         .calculate(
           bodyConf(sourceDefinition,
@@ -38,10 +41,22 @@ trait LegacyITCFlamingos2Suite extends CommonITCLegacySuite:
       assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))
 
   test(s"$title - Flamingos2 fpu".tag(LegacyITCTest)):
-    Enumerated[Flamingos2Fpu].all.foreach: f =>
+    Enumerated[Flamingos2Fpu].all.traverse: f =>
       val result = localItc
         .calculate(
           bodyConf(sourceDefinition, obs, observingModeWithFpu(f)).asJson.noSpaces
+        )
+      assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))
+
+  test(s"$title - Flamingos2 read mode".tag(LegacyITCTest)):
+    Enumerated[Flamingos2ReadMode].all.traverse: rm =>
+      val result = localItc
+        .calculate(
+          bodyConf(sourceDefinition,
+                   obs,
+                   observingModeWithReadMode(rm),
+                   analysisMethod
+          ).asJson.noSpaces
         )
       assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))
 

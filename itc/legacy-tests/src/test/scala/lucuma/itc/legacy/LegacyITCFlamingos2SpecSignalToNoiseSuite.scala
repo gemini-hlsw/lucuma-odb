@@ -49,4 +49,7 @@ class LegacyITCFlamingos2SpecSignalToNoiseSuite extends LegacyITCFlamingos2Suite
     f2.copy(filter = f, disperser = d)
 
   def observingModeWithFpu(f: Flamingos2Fpu): ObservingMode =
+    f2.copy(fpu = f)
+
+  def observingModeWithReadMode(rm: Flamingos2ReadMode): ObservingMode =
     f2

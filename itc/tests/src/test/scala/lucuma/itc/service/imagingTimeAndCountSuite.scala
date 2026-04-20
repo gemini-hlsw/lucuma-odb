@@ -84,7 +84,8 @@ class imagingTimeAndCountSuite extends GraphImagingQLSuite:
             mode: {
               flamingos2Imaging: {
                 exposureTimeMode: { timeAndCount: { time: { seconds: 2 }, count: 3, at: { nanometers: 600 } } },
-                filter: H
+                filter: H,
+                readMode: BRIGHT
               }
             }
           }) {

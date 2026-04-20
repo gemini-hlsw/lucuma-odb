@@ -333,7 +333,8 @@ class imagingSignalToNoiseSuite extends GraphImagingQLSuite:
             mode: {
               flamingos2Imaging: {
                 exposureTimeMode: { signalToNoise: { value: 600, at: { picometers: 1650000 } } },
-                filter: H
+                filter: H,
+                readMode: BRIGHT
               }
             }
           }) {
