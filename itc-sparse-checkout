@@ -5,6 +5,7 @@
 /.github/
 /itc/
 /modules/binding/
+/modules/otel/
 /modules/schema/
 /modules/sso-backend-client/
 /modules/sso-frontend-client/
