@@ -1588,6 +1588,141 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
               val b = json.hcursor.downFields("cloneObservation", "newObservation").require[Json]
               assertEquals(a, b)
 
+
+  val GhostIfuInput: String = s"""
+    ghostIfu: {
+      resolutionMode: STANDARD
+      red: {
+        exposureTimeMode: {
+          timeAndCount: {
+            time: { seconds: 10.0 }
+            count: 10
+            at: { nanometers: 500 }
+          }
+        }
+        explicitBinning: ONE_BY_TWO
+      }
+      blue: {
+        exposureTimeMode: {
+          timeAndCount: {
+            time: { seconds: 20.0 }
+            count: 20
+            at: { nanometers: 500 }
+          }
+        }
+        explicitReadMode: FAST
+      }
+      explicitIfu1Agitator: ENABLED
+    }
+  """
+
+  test("clone GHOST preserves ETMs"):
+    val setup = for
+      p  <- createProgramAs(pi)
+      t  <- createTargetWithProfileAs(pi, p)
+      o0 <- createObservationWithModeAs(pi, p, List(t), GhostIfuInput)
+      o1 <- cloneObservationAs(pi, o0)
+    yield o1
+
+    setup.flatMap: o =>
+      expect(
+        user  = pi,
+        query = s"""
+          query {
+            observation(observationId: "$o") {
+              observingMode {
+                ghostIfu {
+                  resolutionMode
+                  red {
+                    exposureTimeMode {
+                      timeAndCount {
+                        time { seconds }
+                        count
+                        at { nanometers }
+                      }
+                    }
+                    binning
+                    defaultBinning
+                    explicitBinning
+                    readMode
+                    defaultReadMode
+                    explicitReadMode
+                  }
+                  blue {
+                    exposureTimeMode {
+                      timeAndCount {
+                        time { seconds }
+                        count
+                        at { nanometers }
+                      }
+                    }
+                    binning
+                    defaultBinning
+                    explicitBinning
+                    readMode
+                    defaultReadMode
+                    explicitReadMode
+                  }
+                  ifu1Agitator
+                  defaultIfu1Agitator
+                  explicitIfu1Agitator
+                  ifu2Agitator
+                  defaultIfu2Agitator
+                  explicitIfu2Agitator
+                }
+              }
+            }
+          }
+        """,
+        expected = json"""
+          {
+            "observation": {
+              "observingMode": {
+                "ghostIfu": {
+                  "resolutionMode": "STANDARD",
+                  "red": {
+                    "exposureTimeMode": {
+                      "timeAndCount": {
+                        "time": { "seconds":  10.000000 },
+                        "count": 10,
+                        "at": { "nanometers": 500.000 }
+                      }
+                    },
+                    "binning": "ONE_BY_TWO",
+                    "defaultBinning": "ONE_BY_ONE",
+                    "explicitBinning" : "ONE_BY_TWO",
+                    "readMode": "MEDIUM",
+                    "defaultReadMode": "MEDIUM",
+                    "explicitReadMode": null
+                  },
+                  "blue": {
+                    "exposureTimeMode": {
+                      "timeAndCount": {
+                        "time": { "seconds":  20.000000 },
+                        "count": 20,
+                        "at": { "nanometers": 500.000 }
+                      }
+                    },
+                    "binning": "ONE_BY_ONE",
+                    "defaultBinning": "ONE_BY_ONE",
+                    "explicitBinning": null,
+                    "readMode": "FAST",
+                    "defaultReadMode": "SLOW",
+                    "explicitReadMode": "FAST"
+                  },
+                  "ifu1Agitator": "ENABLED",
+                  "defaultIfu1Agitator": "DISABLED",
+                  "explicitIfu1Agitator": "ENABLED",
+                  "ifu2Agitator": "DISABLED",
+                  "defaultIfu2Agitator": "DISABLED",
+                  "explicitIfu2Agitator": null
+                }
+              }
+            }
+          }
+        """.asRight
+      )
+
   private def createIgrins2Observation(pid: Program.Id, tid: Target.Id): IO[Observation.Id] =
     query(
       user = pi,
