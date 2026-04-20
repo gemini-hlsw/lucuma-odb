@@ -53,3 +53,6 @@ class LegacyITCFlamingos2SpecSignalToNoiseSuite extends LegacyITCFlamingos2Suite
 
   def observingModeWithReadMode(rm: Flamingos2ReadMode): ObservingMode =
     f2
+
+  override def munitTests() =
+    super.munitTests().filterNot(_.tags.contains(F2ReadModeTest))

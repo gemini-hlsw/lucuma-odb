@@ -10,12 +10,19 @@ import lucuma.core.util.Enumerated
 import lucuma.itc.legacy.codecs.given
 import lucuma.itc.service.ItcObservationDetails.AnalysisMethod
 import lucuma.itc.service.ObservingMode
+import munit.Tag
 
 /**
  * This is a unit test for Flamingos2 imaging mode in the legacy ITC, ensuring all possible
  * combinations of parameters can be parsed. The ITC may still return an error but we want to ensure
  * it can parse the values.
  */
+
+// tags to filter out unnecessary tests for img or spec mode
+// https://scalameta.org/munit/docs/filtering.html#filter-tests-cases-based-on-a-dynamic-conditions
+object F2FpuTest      extends Tag("F2FpuTest")
+object F2ReadModeTest extends Tag("F2ReadModeTest")
+
 trait LegacyITCFlamingos2Suite extends CommonITCLegacySuite:
 
   def analysisMethod: AnalysisMethod
@@ -40,7 +47,7 @@ trait LegacyITCFlamingos2Suite extends CommonITCLegacySuite:
         )
       assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))
 
-  test(s"$title - Flamingos2 fpu".tag(LegacyITCTest)):
+  test(s"$title - Flamingos2 fpu".tag(LegacyITCTest).tag(F2FpuTest)):
     Enumerated[Flamingos2Fpu].all.traverse: f =>
       val result = localItc
         .calculate(
@@ -48,7 +55,7 @@ trait LegacyITCFlamingos2Suite extends CommonITCLegacySuite:
         )
       assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))
 
-  test(s"$title - Flamingos2 read mode".tag(LegacyITCTest)):
+  test(s"$title - Flamingos2 read mode".tag(LegacyITCTest).tag(F2ReadModeTest)):
     Enumerated[Flamingos2ReadMode].all.traverse: rm =>
       val result = localItc
         .calculate(

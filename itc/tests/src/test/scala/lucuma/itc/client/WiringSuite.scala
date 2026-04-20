@@ -671,7 +671,11 @@ object WiringSuite:
           waterVapor = WaterVapor.VeryDry,
           elevationRange = ElevationRange.ByAirMass.Default
         ),
-        InstrumentMode.Flamingos2Imaging(etm, Flamingos2Filter.J, Flamingos2ReadMode.Bright, PortDisposition.Side)
+        InstrumentMode.Flamingos2Imaging(etm,
+                                         Flamingos2Filter.J,
+                                         Flamingos2ReadMode.Bright,
+                                         PortDisposition.Side
+        )
       ),
       NonEmptyList.of(
         TargetInput(

@@ -47,3 +47,6 @@ class LegacyITCFlamingos2ImgExpTimeSuite extends LegacyITCFlamingos2Suite:
 
   def observingModeWithReadMode(rm: Flamingos2ReadMode): ObservingMode =
     f2.copy(readMode = rm)
+
+  override def munitTests() =
+    super.munitTests().filterNot(_.tags.contains(F2FpuTest))
