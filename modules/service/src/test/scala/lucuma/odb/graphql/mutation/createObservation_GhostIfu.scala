@@ -4,9 +4,12 @@
 package lucuma.odb.graphql
 package mutation
 
+import cats.effect.IO
 import cats.syntax.either.*
+import cats.syntax.option.*
 import io.circe.literal.*
 import lucuma.core.enums.ObservingModeType.*
+import lucuma.core.model.Observation
 import lucuma.core.model.StandardUser
 import lucuma.core.model.User
 
@@ -16,6 +19,26 @@ class createObservation_GhostIfu extends OdbSuite:
 
   lazy val validUsers: List[User] =
     List(pi)
+
+  val GhostIfuInput: String = s"""
+    ghostIfu: {
+      resolutionMode: STANDARD
+      red: {
+        exposureTimeMode: {
+          timeAndCount: {
+            time: { seconds: 10.0 }
+            count: 2
+            at: { nanometers: 500 }
+          }
+        }
+        explicitBinning: ONE_BY_TWO
+      }
+      blue: {
+        explicitReadMode: FAST
+      }
+      explicitIfu1Agitator: ENABLED
+    }
+  """
 
   test("create GHOST IFU"):
     createProgramAs(pi).flatMap: pid =>
@@ -33,23 +56,7 @@ class createObservation_GhostIfu extends OdbSuite:
                     }
                     scienceRequirements: ${scienceRequirementsObject(GhostIfu)}
                     observingMode: {
-                      ghostIfu: {
-                        resolutionMode: STANDARD
-                        red: {
-                          exposureTimeMode: {
-                            timeAndCount: {
-                              time: { seconds: 10.0 }
-                              count: 2
-                              at: { nanometers: 500 }
-                            }
-                          }
-                          explicitBinning: ONE_BY_TWO
-                        }
-                        blue: {
-                          explicitReadMode: FAST
-                        }
-                        explicitIfu1Agitator: ENABLED
-                      }
+                      $GhostIfuInput
                     }
                   }
                 }) {
@@ -330,3 +337,59 @@ class createObservation_GhostIfu extends OdbSuite:
               }
             """.asRight
         )
+
+  test("Can switch to a different mode after initial creation"):
+    val setup: IO[Observation.Id] =
+      for
+        p <- createProgramAs(pi)
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createObservationAs(pi, p, GhostIfu.some, t)
+      yield o
+
+    setup.flatMap: oid =>
+      expect(
+        user  = pi,
+        query = s"""
+          mutation {
+            updateObservations(input: {
+              SET: {
+                observingMode: {
+                  flamingos2LongSlit: {
+                    disperser: R1200_HK
+                    filter: Y
+                    fpu: LONG_SLIT_2
+                  }
+                }
+              },
+              WHERE: {
+                id: { EQ: "$oid" }
+              }
+            }) {
+              observations {
+                instrument
+                observingMode {
+                  ghostIfu { resolutionMode }
+                  flamingos2LongSlit { fpu }
+                }
+              }
+            }
+          }
+        """,
+        expected = json"""
+          {
+            "updateObservations": {
+              "observations": [
+                {
+                  "instrument": "FLAMINGOS2",
+                  "observingMode": {
+                    "ghostIfu": null,
+                    "flamingos2LongSlit": {
+                      "fpu": "LONG_SLIT_2"
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        """.asRight
+      )
