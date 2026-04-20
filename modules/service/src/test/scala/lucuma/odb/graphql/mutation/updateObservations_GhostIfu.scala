@@ -7,8 +7,8 @@ package mutation
 import cats.syntax.either.*
 import io.circe.Json
 import io.circe.literal.*
-import lucuma.odb.graphql.query.ObservingModeSetupOperations
 import lucuma.core.model.User
+import lucuma.odb.graphql.query.ObservingModeSetupOperations
 
 
 class updateObservations_GhostIfu extends OdbSuite with UpdateObservationsOps with ObservingModeSetupOperations:
