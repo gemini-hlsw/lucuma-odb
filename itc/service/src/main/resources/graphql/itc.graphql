@@ -2,7 +2,7 @@
 """
 This file is generated. Do not manually modify it.
 It is generated from the following source files:
-  - ObservationDB.graphql
+  - OdbSchema.graphql
   - itc_base.graphql
 """
 enum ConditionsMeasurementSource {
@@ -1887,6 +1887,22 @@ type Classical implements ProposalType {
   Describes how time for the program will be apportioned across partners.
   """
   partnerSplits: [PartnerSplit!]!
+
+  """Whether this proposal is part of the AEON/Multi-facility program."""
+  aeonMultiFacility: Boolean!
+
+  """Whether this proposal has JWST synergy."""
+  jwstSynergy: Boolean!
+
+  """Whether this is a US Long Term proposal."""
+  usLongTerm: Boolean!
+
+  """
+  Whether this proposal should be considered for Band 3. Defaults to UNSET
+  on creation; must be CONSIDER or DO_NOT_CONSIDER before the proposal can
+  be submitted.
+  """
+  considerForBand3: ConsiderForBand3!
 }
 
 """Proposal properties for Demo Science CallForProposals."""
@@ -1977,6 +1993,12 @@ type LargeProgram implements ProposalType {
 
   """Total time requested (over multiple all semesters) for this proposal."""
   totalTime: TimeSpan!
+
+  """Whether this proposal is part of the AEON/Multi-facility program."""
+  aeonMultiFacility: Boolean!
+
+  """Whether this proposal has JWST synergy."""
+  jwstSynergy: Boolean!
 }
 
 """
@@ -2008,6 +2030,22 @@ type Queue implements ProposalType {
   Describes how time for the program will be apportioned across partners.
   """
   partnerSplits: [PartnerSplit!]!
+
+  """
+  Whether this proposal should be considered for Band 3. Defaults to UNSET
+  on creation; must be CONSIDER or DO_NOT_CONSIDER before the proposal can
+  be submitted.
+  """
+  considerForBand3: ConsiderForBand3!
+
+  """Whether this proposal is part of the AEON/Multi-facility program."""
+  aeonMultiFacility: Boolean!
+
+  """Whether this proposal has JWST synergy."""
+  jwstSynergy: Boolean!
+
+  """Whether this is a US Long Term proposal."""
+  usLongTerm: Boolean!
 }
 
 """Proposal properties for System Verification CallForProposals."""
@@ -2048,6 +2086,11 @@ input RadialVelocityInput @oneOf {
 type RecordDatasetResult {
   """The new dataset that was added."""
   dataset: Dataset!
+}
+
+"""The result of recording a new Visit."""
+type RecordVisitResult {
+  visit: Visit!
 }
 
 """The result of recording a GmosNorth visit."""
@@ -2880,20 +2923,23 @@ enum CloudExtinctionPreset {
 
 """ObservingMode"""
 enum ObservingModeType {
-  """ObservingModeType GmosNorthLongSlit"""
-  GMOS_NORTH_LONG_SLIT
-
-  """ObservingModeType GmosSouthLongSlit"""
-  GMOS_SOUTH_LONG_SLIT
-
   """ObservingModeType Flamingos2LongSlit"""
   FLAMINGOS_2_LONG_SLIT
+
+  """ObservingModeType GhostIfu"""
+  GHOST_IFU
 
   """ObservingModeType GmosNorthImaging"""
   GMOS_NORTH_IMAGING
 
+  """ObservingModeType GmosNorthLongSlit"""
+  GMOS_NORTH_LONG_SLIT
+
   """ObservingModeType GmosSouthImaging"""
   GMOS_SOUTH_IMAGING
+
+  """ObservingModeType GmosSouthLongSlit"""
+  GMOS_SOUTH_LONG_SLIT
 
   """ObservingModeType Igrins2LongSlit"""
   IGRINS_2_LONG_SLIT
@@ -3390,6 +3436,11 @@ type ExecutionConfig {
   `FLAMINGOS2`.
   """
   flamingos2: Flamingos2ExecutionConfig
+
+  """
+  GHOST execution config.  This will be null unless the `instrument` is `GHOST`.
+  """
+  ghost: GhostExecutionConfig
 
   """
   GMOS North execution config.  This will be null unless the `instrument` is
@@ -4021,6 +4072,172 @@ type Flamingos2LongSlit {
   will be used in the observation.
   """
   initialFpu: Flamingos2Fpu!
+}
+
+enum GhostIfu1FiberAgitator {
+  DISABLED
+  ENABLED
+}
+
+enum GhostIfu2FiberAgitator {
+  DISABLED
+  ENABLED
+}
+
+type GhostDetectorConfig {
+  """Exposure time mode for the detector."""
+  exposureTimeMode: ExposureTimeMode!
+
+  """Binning that will be used, either explicitly specified or default."""
+  binning: GhostBinning!
+
+  """
+  Default binning that will be used for the detector, if not explicitly
+  specified.
+  """
+  defaultBinning: GhostBinning!
+
+  """Explicit binning to use for the detector, if specified."""
+  explicitBinning: GhostBinning
+
+  """Read mode for the detector, either explicitly specified or default."""
+  readMode: GhostReadMode!
+
+  """
+  Default read mode that will be used for the detector, if not explicitly
+  specified.
+  """
+  defaultReadMode: GhostReadMode!
+
+  """Explicit read mode for the detector, if specified."""
+  explicitReadMode: GhostReadMode
+}
+
+"""GHOST IFU observing mode."""
+type GhostIfu {
+  """Resolution mode."""
+  resolutionMode: GhostResolutionMode!
+
+  """Red detector config."""
+  red: GhostDetectorConfig!
+
+  """Blue detector config."""
+  blue: GhostDetectorConfig!
+
+  """
+  IFU 1 fiber agitator setting, either explicitly specified or else default.
+  """
+  ifu1Agitator: GhostIfu1FiberAgitator!
+
+  """
+  Default IFU 1 fiber agitator setting, used if not explicitly specified.
+  """
+  defaultIfu1Agitator: GhostIfu1FiberAgitator!
+
+  """IFU 1 fiber agitator setting, if explicitly specified."""
+  explicitIfu1Agitator: GhostIfu1FiberAgitator
+
+  """
+  IFU 2 fiber agitator setting, either explicitly specified or else default.
+  """
+  ifu2Agitator: GhostIfu2FiberAgitator!
+
+  """
+  Default IFU 2 fiber agitator setting, used if not explicitly specified.
+  """
+  defaultIfu2Agitator: GhostIfu2FiberAgitator!
+
+  """IFU 2 fiber agitator setting, if explicitly specified."""
+  explicitIfu2Agitator: GhostIfu2FiberAgitator
+}
+
+"""GHOST configuration that applies across all steps."""
+type GhostStatic {
+  resolutionMode: GhostResolutionMode!
+}
+
+"""GHOST detector configuration for a single step."""
+type GhostDetector {
+  exposureTime: TimeSpan!
+  exposureCount: PosInt!
+  binning: GhostBinning!
+  readMode: GhostReadMode!
+}
+
+"""GHOST instrument configuration for a single step."""
+type GhostDynamic {
+  red: GhostDetector!
+  blue: GhostDetector!
+  ifu1FiberAgitator: GhostIfu1FiberAgitator!
+  ifu2FiberAgitator: GhostIfu2FiberAgitator!
+}
+
+"""GHOST step with potential breakpoint."""
+type GhostStep {
+  """Instrument configuration for this step"""
+  instrumentConfig: GhostDynamic!
+
+  """Step id"""
+  id: StepId!
+
+  """Whether to pause before the execution of this step"""
+  breakpoint: Breakpoint!
+
+  """The sequence step itself"""
+  stepConfig: StepConfig!
+
+  """The telescope configuration at this step."""
+  telescopeConfig: TelescopeConfig!
+
+  """Time estimate for this step's execution"""
+  estimate: StepEstimate!
+
+  """Observe class for this step"""
+  observeClass: ObserveClass!
+}
+
+"""
+GHOST atom, a collection of steps that should be executed in their entirety
+"""
+type GhostAtom {
+  """Atom id"""
+  id: AtomId!
+
+  """Optional description of the atom."""
+  description: String
+
+  """
+  Observe class for this atom as a whole (combined observe class for each of
+  its steps).
+  """
+  observeClass: ObserveClass!
+
+  """Individual steps that comprise the atom"""
+  steps: [GhostStep!]!
+}
+
+"""Next atom to execute and potential future atoms."""
+type GhostExecutionSequence {
+  """Next atom to execute."""
+  nextAtom: GhostAtom!
+
+  """(Prefix of the) remaining atoms to execute, if any."""
+  possibleFuture: [GhostAtom!]!
+
+  """
+  Whether there are more anticipated atoms than those that appear in
+  'possibleFuture'.
+  """
+  hasMore: Boolean!
+}
+
+"""GHOST Execution Config"""
+type GhostExecutionConfig {
+  """GHOST static configuration"""
+  static: GhostStatic!
+
+  """GHOST science execution"""
+  science: GhostExecutionSequence
 }
 
 """IGRINS-2 Offset Mode"""
@@ -5673,10 +5890,11 @@ type ItcResult {
 
 """A discriminator for the types of ITC results."""
 enum ItcType {
-  SPECTROSCOPY
-  IGRINS_2_SPECTROSCOPY
+  GHOST_IFU
   GMOS_NORTH_IMAGING
   GMOS_SOUTH_IMAGING
+  IGRINS_2_SPECTROSCOPY
+  SPECTROSCOPY
 }
 
 """
@@ -5719,6 +5937,13 @@ configurations and targets.  There are specific instances for each `ItcType`.
 interface Itc {
   """The type of the Itc results."""
   itcType: ItcType!
+}
+
+"""GHOST IFU ITC results.  Each channel is paired with its result set."""
+type ItcGhostIfu implements Itc {
+  itcType: ItcType!
+  red: ItcResultSet!
+  blue: ItcResultSet!
 }
 
 """
@@ -6597,20 +6822,23 @@ type ObservingMode {
   """Mode type"""
   mode: ObservingModeType!
 
-  """GMOS North Long Slit mode"""
-  gmosNorthLongSlit: GmosNorthLongSlit
+  """Flamingos 2 Long Slit mode"""
+  flamingos2LongSlit: Flamingos2LongSlit
 
-  """GMOS South Long Slit mode"""
-  gmosSouthLongSlit: GmosSouthLongSlit
+  """GHOST IFU mode"""
+  ghostIfu: GhostIfu
 
   """GMOS North Imaging mode"""
   gmosNorthImaging: GmosNorthImaging
 
+  """GMOS North Long Slit mode"""
+  gmosNorthLongSlit: GmosNorthLongSlit
+
   """GMOS South Imaging mode"""
   gmosSouthImaging: GmosSouthImaging
 
-  """Flamingos 2 Long Slit mode"""
-  flamingos2LongSlit: Flamingos2LongSlit
+  """GMOS South Long Slit mode"""
+  gmosSouthLongSlit: GmosSouthLongSlit
 
   """IGRINS-2 Long Slit mode"""
   igrins2LongSlit: Igrins2LongSlit
@@ -7745,6 +7973,12 @@ type StepRecord {
   flamingos2: Flamingos2Dynamic
 
   """
+  Ghost instrument configuration for this step, if any. This will be null unless
+  the `instrument` discriminator is "GHOST".
+  """
+  ghost: GhostDynamic
+
+  """
   GMOS North instrument configuration for this step, if any.  This will be null
   unless the `instrument` discriminator is "GMOS_NORTH".
   """
@@ -8260,6 +8494,20 @@ type TimestampInterval {
   duration: TimeSpan!
 }
 
+"""Whether a queue proposal should be considered for Band 3 scheduling."""
+enum ConsiderForBand3 {
+  """
+  No decision has been made yet. The proposal cannot be submitted in this state.
+  """
+  UNSET
+
+  """The proposal should be considered for Band 3."""
+  CONSIDER
+
+  """The proposal should not be considered for Band 3."""
+  DO_NOT_CONSIDER
+}
+
 """ToO Activation"""
 enum ToOActivation {
   """ToOActivation None"""
@@ -8707,6 +8955,9 @@ input Flamingos2ImagingInput {
 
   """Flamingos2 filter"""
   filter: Flamingos2Filter!
+
+  """Flamingos2 read mode"""
+  readMode: Flamingos2ReadMode!
 
   """Instrument port disposition"""
   port: PortDisposition = SIDE
