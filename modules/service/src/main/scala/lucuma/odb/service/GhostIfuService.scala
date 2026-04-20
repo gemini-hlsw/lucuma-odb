@@ -7,6 +7,7 @@ import cats.data.NonEmptyList
 import cats.effect.Concurrent
 import cats.syntax.applicative.*
 import cats.syntax.apply.*
+import cats.syntax.flatMap.*
 import cats.syntax.foldable.*
 import cats.syntax.functor.*
 import cats.syntax.option.*
@@ -26,6 +27,7 @@ import lucuma.odb.sequence.ghost.ifu.Config
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.GhostCodecs.*
 import skunk.*
+import skunk.data.Completion
 import skunk.implicits.*
 
 import Services.Syntax.*
@@ -52,8 +54,9 @@ trait GhostIfuService[F[_]]:
 
   def clone(
     originalId: Observation.Id,
-    newId:      Observation.Id
-  ): F[Unit]
+    newId:      Observation.Id,
+    etms:       List[(ExposureTimeModeId, ExposureTimeModeId)]
+  )(using Transaction[F]): F[Unit]
 
 object GhostIfuService:
   enum Channel:
@@ -128,9 +131,16 @@ object GhostIfuService:
 
       override def clone(
         originalId: Observation.Id,
-        newId:      Observation.Id
-      ): F[Unit] =
-        ???
+        newId:      Observation.Id,
+        etms:       List[(ExposureTimeModeId, ExposureTimeModeId)]
+      )(using Transaction[F]): F[Unit] =
+        session
+          .executeCommand(Statements.clone(originalId, newId, etms))
+          .flatMap:
+            case Completion.Insert(1) =>
+              ().pure[F]
+            case _                    =>
+              Concurrent[F].raiseError(new RuntimeException(s"Could not clone Ghost IFU observing mode $originalId, $newId"))
 
   object Statements:
 
@@ -280,3 +290,40 @@ object GhostIfuService:
     ): Option[AppliedFragment] =
       NonEmptyList.fromList(which).map: oids =>
         void"DELETE FROM ONLY t_ghost_ifu WHERE " |+| observationIdIn(oids)
+
+    def clone(
+      originalId: Observation.Id,
+      newId:      Observation.Id,
+      etms:       List[(ExposureTimeModeId, ExposureTimeModeId)]
+    ): AppliedFragment =
+
+      val replace = List(
+        "c_observation_id",
+        "c_red_exposure_time_mode_id",
+        "c_blue_exposure_time_mode_id"
+      )
+
+      val others  = Columns.insert(1, "c_program_id").filterNot(replace.toSet)
+      val all     = replace ++ others
+
+      val mappingValues: AppliedFragment =
+        etms
+          .map: (oldEtm, newEtm) =>
+            sql"($exposure_time_mode_id, $exposure_time_mode_id)"(oldEtm, newEtm)
+          .intercalate(void", ")
+
+      sql"""
+        INSERT INTO t_ghost_ifu (
+          #${all.string}
+        )
+        SELECT
+          $observation_id,
+          red_map.new_id,
+          blue_map.new_id,
+          #${others.prefixed("src").string}
+        FROM t_ghost_ifu src
+        JOIN (VALUES"""(newId) |+| mappingValues |+| void""") AS red_map(old_id, new_id)
+          ON red_map.old_id = src.c_red_exposure_time_mode_id
+        JOIN (VALUES""" |+| mappingValues |+| sql""") AS blue_map(old_id, new_id)
+          ON blue_map.old_id = src.c_blue_exposure_time_mode_id
+        WHERE src.c_observation_id = $observation_id"""(originalId)
