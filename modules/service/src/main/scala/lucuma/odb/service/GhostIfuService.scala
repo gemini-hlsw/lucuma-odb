@@ -24,6 +24,7 @@ import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.input.GhostIfuInput
 import lucuma.odb.sequence.ghost.DetectorConfig
 import lucuma.odb.sequence.ghost.ifu.Config
+import lucuma.odb.syntax.exposureTimeMode.*
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.GhostCodecs.*
 import skunk.*
@@ -127,7 +128,10 @@ object GhostIfuService:
         SET:   GhostIfuInput.Edit,
         which: List[Observation.Id]
       )(using Transaction[F]): F[Unit] =
-        ???
+        for
+          _ <- SET.red.flatMap(_.exposureTimeMode).traverse_(etm => session.exec(Statements.updateEtm(which, etm, "red")))
+          _ <- SET.blue.flatMap(_.exposureTimeMode).traverse_(etm => session.exec(Statements.updateEtm(which, etm, "blue")))
+        yield ()
 
       override def clone(
         originalId: Observation.Id,
@@ -327,3 +331,28 @@ object GhostIfuService:
         JOIN (VALUES""" |+| mappingValues |+| sql""") AS blue_map(old_id, new_id)
           ON blue_map.old_id = src.c_blue_exposure_time_mode_id
         WHERE src.c_observation_id = $observation_id"""(originalId)
+
+    def updateEtm(
+      oids:   List[Observation.Id],
+      update: ExposureTimeMode,
+      color:  String
+    ): AppliedFragment =
+      sql"""
+        UPDATE t_exposure_time_mode e
+        SET c_exposure_time_mode = $exposure_time_mode_type,
+            c_signal_to_noise    = ${signal_to_noise.opt},
+            c_signal_to_noise_at = $wavelength_pm,
+            c_exposure_time      = ${time_span.opt},
+            c_exposure_count     = ${int4_pos.opt}
+        FROM t_ghost_ifu g
+        WHERE g.c_observation_id                  = e.c_observation_id
+          AND g.c_#${color}_exposure_time_mode_id = e.c_exposure_time_mode_id
+          AND e.c_observation_id IN ${observation_id.list(oids.length).values}
+      """.apply(
+        update.modeType,
+        update.signalToNoise,
+        update.at,
+        update.exposureTime,
+        update.exposureCount,
+        oids
+      )
