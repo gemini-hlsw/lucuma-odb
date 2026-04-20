@@ -291,7 +291,7 @@ object ItcService {
                InstrumentMode.GmosSouthImaging(_, _, _, _) =>
             go(lucuma.odb.sequence.gmos.MinAcquisitionExposureTime,
                lucuma.odb.sequence.gmos.MaxAcquisitionExposureTime)
-          case InstrumentMode.Flamingos2Imaging(_, _, _)   =>
+          case InstrumentMode.Flamingos2Imaging(_, _, _, _) =>
             go(lucuma.odb.sequence.flamingos2.MinAcquisitionExposureTime,
                lucuma.odb.sequence.flamingos2.MaxAcquisitionExposureTime)
           case m                                                      =>

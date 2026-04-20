@@ -16,6 +16,7 @@ import lucuma.core.enums.Band
 import lucuma.core.enums.Flamingos2Disperser
 import lucuma.core.enums.Flamingos2Filter
 import lucuma.core.enums.Flamingos2Fpu
+import lucuma.core.enums.Flamingos2ReadMode
 import lucuma.core.enums.GalaxySpectrum.Spiral
 import lucuma.core.enums.GhostBinning
 import lucuma.core.enums.GhostReadMode
@@ -670,7 +671,7 @@ object WiringSuite:
           waterVapor = WaterVapor.VeryDry,
           elevationRange = ElevationRange.ByAirMass.Default
         ),
-        InstrumentMode.Flamingos2Imaging(etm, Flamingos2Filter.J, PortDisposition.Side)
+        InstrumentMode.Flamingos2Imaging(etm, Flamingos2Filter.J, Flamingos2ReadMode.Bright, PortDisposition.Side)
       ),
       NonEmptyList.of(
         TargetInput(

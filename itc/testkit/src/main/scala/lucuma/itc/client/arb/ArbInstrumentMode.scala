@@ -7,6 +7,7 @@ package arb
 import lucuma.core.enums.Flamingos2Disperser
 import lucuma.core.enums.Flamingos2Filter
 import lucuma.core.enums.Flamingos2Fpu
+import lucuma.core.enums.Flamingos2ReadMode
 import lucuma.core.enums.GhostResolutionMode
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosNorthGrating
@@ -39,6 +40,7 @@ trait ArbInstrumentMode {
   import InstrumentMode.GmosNorthImaging
   import InstrumentMode.GmosSouthImaging
   import InstrumentMode.Flamingos2Spectroscopy
+  import InstrumentMode.Flamingos2Imaging
   import InstrumentMode.Igrins2Spectroscopy
   import InstrumentMode.GhostSpectroscopy
 
@@ -155,6 +157,20 @@ trait ArbInstrumentMode {
     Cogen[(ExposureTimeMode, Flamingos2Disperser, Flamingos2Filter, Flamingos2Fpu, PortDisposition)]
       .contramap(a => (a.exposureTimeMode, a.disperser, a.filter, a.fpu, a.port))
 
+  given Arbitrary[Flamingos2Imaging] =
+    Arbitrary {
+      for {
+        et <- arbitrary[ExposureTimeMode]
+        f  <- arbitrary[Flamingos2Filter]
+        rm <- arbitrary[Flamingos2ReadMode]
+        p  <- arbitrary[PortDisposition]
+      } yield Flamingos2Imaging(et, f, rm, p)
+    }
+
+  given Cogen[Flamingos2Imaging] =
+    Cogen[(ExposureTimeMode, Flamingos2Filter, Flamingos2ReadMode, PortDisposition)]
+      .contramap(a => (a.exposureTimeMode, a.filter, a.readMode, a.port))
+
   given Arbitrary[Igrins2Spectroscopy] =
     Arbitrary {
       for {
@@ -193,6 +209,7 @@ trait ArbInstrumentMode {
         arbitrary[GmosNorthImaging],
         arbitrary[GmosSouthImaging],
         arbitrary[Flamingos2Spectroscopy],
+        arbitrary[Flamingos2Imaging],
         arbitrary[Igrins2Spectroscopy],
         arbitrary[GhostSpectroscopy]
       )
@@ -206,6 +223,7 @@ trait ArbInstrumentMode {
         Option[GmosNorthImaging],
         Option[GmosSouthImaging],
         Option[Flamingos2Spectroscopy],
+        Option[Flamingos2Imaging],
         Option[Igrins2Spectroscopy],
         Option[GhostSpectroscopy]
       )
@@ -216,6 +234,7 @@ trait ArbInstrumentMode {
         InstrumentMode.gmosNorthImaging.getOption(a),
         InstrumentMode.gmosSouthImaging.getOption(a),
         InstrumentMode.flamingos2Spectroscopy.getOption(a),
+        InstrumentMode.flamingos2Imaging.getOption(a),
         InstrumentMode.igrins2Spectroscopy.getOption(a),
         InstrumentMode.ghostSpectroscopy.getOption(a)
       )
