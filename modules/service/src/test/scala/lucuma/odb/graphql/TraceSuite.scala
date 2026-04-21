@@ -50,7 +50,7 @@ class TraceSuite extends OdbSuite {
     finishedSpans.map: spans =>
       assert:
         spans.exists(_.getName == "connection.init") &&
-        spans.exists(_.getName == "connection.execute")
+        spans.exists(_.getName == "graphql-query")
   }
 
   test("test tracing (HTTP)") {
