@@ -9,6 +9,7 @@ import cats.syntax.all.*
 import lucuma.core.enums.Igrins2OffsetMode
 import lucuma.core.math.Offset
 import lucuma.core.model.ExposureTimeMode
+import lucuma.core.model.TelluricType
 import lucuma.core.model.sequence.igrins2.*
 import lucuma.odb.sequence.syntax.all.*
 
@@ -19,7 +20,8 @@ case class Config(
   scienceExposureTimeMode: ExposureTimeMode,
   offsetMode: Igrins2OffsetMode,
   saveSVCImages: Boolean,
-  explicitSpatialOffsets: Option[List[Offset]]
+  explicitSpatialOffsets: Option[List[Offset]],
+  telluricType: TelluricType
 ) derives Eq:
 
   def offsets: List[Offset] =
@@ -34,6 +36,7 @@ case class Config(
     out.writeBoolean(saveSVCImages)
     val off = explicitSpatialOffsets.foldMap(_.map(_.hashBytes)).flatten.toArray
     out.write(off, 0, off.length)
+    out.write(telluricType.hashBytes)
 
     out.close()
     bao.toByteArray

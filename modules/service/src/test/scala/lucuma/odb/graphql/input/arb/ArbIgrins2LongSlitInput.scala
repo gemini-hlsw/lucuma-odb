@@ -8,7 +8,9 @@ import lucuma.core.enums.Igrins2OffsetMode
 import lucuma.core.math.Offset
 import lucuma.core.math.arb.ArbOffset.given
 import lucuma.core.model.ExposureTimeMode
+import lucuma.core.model.TelluricType
 import lucuma.core.model.arb.ArbExposureTimeMode.given
+import lucuma.core.model.arb.ArbTelluricType.given
 import lucuma.core.util.arb.ArbEnumerated.given
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.arb.ArbNullable.given
@@ -24,7 +26,8 @@ trait ArbIgrins2LongSlitInput:
         om <- arbitrary[Option[Igrins2OffsetMode]]
         sv <- arbitrary[Option[Boolean]]
         so <- arbitrary[Option[List[Offset]]]
-      yield Igrins2LongSlitInput.Create(e, om, sv, so)
+        tt <- arbitrary[TelluricType]
+      yield Igrins2LongSlitInput.Create(e, om, sv, so, tt)
 
   given Arbitrary[Igrins2LongSlitInput.Edit] =
     Arbitrary:
@@ -33,6 +36,7 @@ trait ArbIgrins2LongSlitInput:
         om <- arbitrary[Nullable[Igrins2OffsetMode]]
         sv <- arbitrary[Nullable[Boolean]]
         so <- arbitrary[Nullable[List[Offset]]]
-      yield Igrins2LongSlitInput.Edit(e, om, sv, so)
+        tt <- arbitrary[Option[TelluricType]]
+      yield Igrins2LongSlitInput.Edit(e, om, sv, so, tt)
 
 object ArbIgrins2LongSlitInput extends ArbIgrins2LongSlitInput

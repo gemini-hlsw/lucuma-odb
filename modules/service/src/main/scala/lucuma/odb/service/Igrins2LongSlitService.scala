@@ -11,6 +11,7 @@ import grackle.ResultT
 import lucuma.core.enums.Igrins2OffsetMode
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.Observation
+import lucuma.core.model.TelluricType
 import lucuma.odb.data.ExposureTimeModeRole
 import lucuma.odb.data.Nullable
 import lucuma.odb.format.spatialOffsets.*
@@ -55,8 +56,9 @@ object Igrins2LongSlitService:
         (exposure_time_mode       *:
          igrins_2_offset_mode.opt *:
          bool.opt                 *:
-         text.opt
-        ).emap { case (sci, offsetMode, saveSVC, offsetsText) =>
+         text.opt                 *:
+         telluric_type
+        ).emap { case (sci, offsetMode, saveSVC, offsetsText, telluricType) =>
           offsetsText.traverse: so =>
             OffsetsFormat.getOption(so).toRight(s"Could not parse '$so' as a spatial offsets list.")
           .map: offsets =>
@@ -64,7 +66,8 @@ object Igrins2LongSlitService:
               sci,
               offsetMode.getOrElse(Igrins2OffsetMode.NodAlongSlit),
               saveSVC.getOrElse(false),
-              offsets
+              offsets,
+              telluricType
             )
         }
 
@@ -135,7 +138,8 @@ object Igrins2LongSlitService:
           sci.c_exposure_count    ,
           ls.c_offset_mode        ,
           ls.c_save_svc_images    ,
-          ls.c_spatial_offsets
+          ls.c_spatial_offsets    ,
+          ls.c_telluric_type
         FROM
           t_igrins_2_long_slit ls
         LEFT JOIN t_exposure_time_mode sci
@@ -152,7 +156,8 @@ object Igrins2LongSlitService:
       Observation.Id,
       Option[Igrins2OffsetMode],
       Option[Boolean],
-      Option[String]
+      Option[String],
+      TelluricType
     )] =
       sql"""
         INSERT INTO t_igrins_2_long_slit (
@@ -160,17 +165,19 @@ object Igrins2LongSlitService:
           c_program_id     ,
           c_offset_mode    ,
           c_save_svc_images,
-          c_spatial_offsets
+          c_spatial_offsets,
+          c_telluric_type
         )
         SELECT
           $observation_id            ,
           c_program_id               ,
           ${igrins_2_offset_mode.opt},
           ${bool.opt}                ,
-          ${text.opt}
+          ${text.opt}                ,
+          $telluric_type
         FROM t_observation
         WHERE c_observation_id = $observation_id
-       """.contramap { (o, m, s, off) => (o, m, s, off, o) }
+       """.contramap { (o, m, s, off, tt) => (o, m, s, off, tt, o) }
 
     def insertIgrins2LongSlit(
       observationId: Observation.Id,
@@ -180,7 +187,8 @@ object Igrins2LongSlitService:
         observationId,
         input.explicitOffsetMode,
         input.explicitSaveSVCImages,
-        input.formattedOffsets
+        input.formattedOffsets,
+        input.telluricType
       )
 
     def deleteIgrins2(which: List[Observation.Id]): Option[AppliedFragment] =
@@ -194,6 +202,7 @@ object Igrins2LongSlitService:
       val upOffsetMode    = sql"c_offset_mode     = ${igrins_2_offset_mode.opt}"
       val upSaveSVCImages = sql"c_save_svc_images = ${bool.opt}"
       val upOffsets       = sql"c_spatial_offsets = ${text.opt}"
+      val upTelluricType  = sql"c_telluric_type   = ${telluric_type.opt}"
       val clearOffsets    = sql"c_spatial_offsets = ${text.opt}".apply(None)
 
       // When offset mode changes to a new value and no explicit offsets
@@ -208,7 +217,8 @@ object Igrins2LongSlitService:
         List(
           input.explicitOffsetMode.toOptionOption.map(upOffsetMode),
           input.explicitSaveSVCImages.toOptionOption.map(upSaveSVCImages),
-          input.formattedOffsets.toOptionOption.map(upOffsets).orElse(clearOffsetsOnModeChange)
+          input.formattedOffsets.toOptionOption.map(upOffsets).orElse(clearOffsetsOnModeChange),
+          input.telluricType.map(tt => upTelluricType(Some(tt)))
         ).flatten
 
       NonEmptyList.fromList(ups)
@@ -234,7 +244,8 @@ object Igrins2LongSlitService:
         c_observing_mode_type,
         c_offset_mode        ,
         c_save_svc_images    ,
-        c_spatial_offsets
+        c_spatial_offsets    ,
+        c_telluric_type
       )
       SELECT
         $observation_id,
@@ -242,7 +253,8 @@ object Igrins2LongSlitService:
         c_observing_mode_type,
         c_offset_mode,
         c_save_svc_images,
-        c_spatial_offsets
+        c_spatial_offsets,
+        c_telluric_type
       FROM t_igrins_2_long_slit
       WHERE c_observation_id = $observation_id
       """.apply(newId, newId, originalId)

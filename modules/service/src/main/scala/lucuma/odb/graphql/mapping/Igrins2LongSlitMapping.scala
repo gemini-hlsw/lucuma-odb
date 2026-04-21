@@ -78,7 +78,9 @@ trait Igrins2LongSlitMapping[F[_]]
             .flatMap(_.as[String])
             .map(decodeIgrins2Offsets),
         List("defaultOffsetsString")
-      )
+      ),
+
+      SqlJson("telluricType", Igrins2LongSlitView.TelluricType)
 
     )
 
