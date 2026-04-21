@@ -106,6 +106,30 @@ case class LocalItc[F[_]: {Sync as F}](classLoader: ClassLoader):
 
       result
 
+  def calculateTimeAndGraphs(
+    jsonParams: String
+  ): F[Either[List[String], TimeAndGraphsRemoteResult]] =
+    F.blocking:
+      val res = calculateGraphsMethod
+        .invoke(null, jsonParams) // null as it is a static method
+        .asInstanceOf[String]
+
+      val result = res match
+        case LegacyRight(result) if hasAllNullCcdSNRatios(result) =>
+          Left(List(OutOfRangeMsg))
+        case LegacyRight(result)                                  =>
+          decode[legacy.TimeAndGraphsRemoteResult](result).leftMap { e =>
+            List(e.getMessage())
+          }
+        case LegacyLeft(result)                                   =>
+          Left(List(result))
+        case LegacyLeft(result1, result2)                         =>
+          Left(List(result1, result2))
+        case m                                                    =>
+          Left(List(m))
+
+      result
+
   /**
    * This method does a call to the method ItcCalculation.calculate via reflection.
    */

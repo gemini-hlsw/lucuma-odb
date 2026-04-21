@@ -45,3 +45,10 @@ case class IntegrationTimeRemoteResult(
   // CCD performance data from the legacy ITC
   ccds: NonEmptyChain[ItcRemoteCcd]
 )
+
+case class TimeAndGraphsRemoteResult(
+  exposureCalculation: AllExposureCalculations,
+  signalToNoiseAt:     Option[SignalToNoiseAt],
+  ccds:                NonEmptyChain[ItcRemoteCcd],
+  groups:              NonEmptyChain[ItcGraphGroup]
+)

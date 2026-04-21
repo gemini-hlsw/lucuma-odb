@@ -9,6 +9,7 @@ import lucuma.core.model.ExposureTimeMode
 import lucuma.core.util.TimeSpan
 import lucuma.itc.TargetGraphsCalcResult
 import lucuma.itc.TargetIntegrationTime
+import lucuma.itc.TargetTimeAndGraphs
 
 trait Itc[F[_]]:
 
@@ -33,6 +34,13 @@ trait Itc[F[_]]:
     exposureTime:  TimeSpan,
     exposureCount: PosInt
   ): F[TargetGraphsCalcResult]
+
+  def calculateTimeAndGraphs(
+    target:           TargetData,
+    observingMode:    ObservingMode,
+    constraints:      ItcObservingConditions,
+    exposureTimeMode: ExposureTimeMode
+  ): F[TargetTimeAndGraphs]
 
 object Itc:
   def apply[F[_]](using ev: Itc[F]): ev.type = ev

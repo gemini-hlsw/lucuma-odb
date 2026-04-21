@@ -21,7 +21,18 @@ case class TargetGraphsCalcResult(
   peakSingleSNRatio:         SingleSN,
   atWavelengthSingleSNRatio: Option[SingleSN],
   bandOrLine:                Either[Band, Wavelength]
-)
+):
+  // TODO: If we simplify the API, we might be able to get rid of TargetGraphsCalcResult entirely
+  // and just adapt fromLegacy below to TargetGraphs
+  def toTargetGraphs: TargetGraphs =
+    TargetGraphs(
+      ccds,
+      data.flatMap(_.graphs),
+      peakFinalSNRatio,
+      atWavelengthFinalSNRatio,
+      peakSingleSNRatio,
+      atWavelengthSingleSNRatio
+    )
 
 object TargetGraphsCalcResult:
   def fromLegacy(

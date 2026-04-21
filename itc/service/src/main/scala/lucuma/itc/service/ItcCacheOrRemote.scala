@@ -123,6 +123,41 @@ trait ItcCacheOrRemote extends Version:
                                     s"$CacheRootPrefix:graph:spec"
             )
 
+  private def requestTimeAndGraphs[F[_]: MonadThrow: Logger](
+    itc: Itc[F]
+  )(request: TargetSpectroscopyTimeRequest): F[TargetTimeAndGraphs] =
+    itc
+      .calculateTimeAndGraphs(
+        request.target,
+        request.specMode,
+        request.constraints,
+        request.exposureTimeMode
+      )
+      .onError:
+        logSedOnFailure(request)
+
+  def timeAndGraphsFromCacheOrRemote[
+    F[_]: {MonadThrow, Parallel, Logger, CustomSed.Resolver, Tracer as T}
+  ](
+    request: TargetSpectroscopyTimeRequest
+  )(
+    itc:     Itc[F],
+    cache:   BinaryEffectfulCache[F],
+    config:  Config
+  ): F[TargetTimeAndGraphs] =
+    T.span("resolve custom_sed_time_and_graphs")
+      .surround:
+        CustomSed // We must resolve CustomSed before caching.
+          .resolveTargetSpectroscopyTimeRequest(request)
+      .flatMap: r =>
+        T.span("cache_or_calculate time_and_graphs")
+          .surround:
+            cache.getOrInvokeBinary(r,
+                                    requestTimeAndGraphs(itc)(r),
+                                    TTL(config),
+                                    s"$CacheRootPrefix:time_and_graph:spec"
+            )
+
   private def requestSpectroscopy[F[_]: MonadThrow: Logger](itc: Itc[F])(
     calcRequest: TargetSpectroscopyTimeRequest
   ): F[TargetIntegrationTime] =

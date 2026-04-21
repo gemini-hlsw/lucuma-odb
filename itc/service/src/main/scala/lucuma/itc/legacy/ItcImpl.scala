@@ -23,6 +23,7 @@ import lucuma.itc.ItcCcd
 import lucuma.itc.SignalToNoiseAt
 import lucuma.itc.TargetGraphsCalcResult
 import lucuma.itc.TargetIntegrationTime
+import lucuma.itc.TargetTimeAndGraphs
 import lucuma.itc.legacy.codecs.given
 import lucuma.itc.service.Itc
 import lucuma.itc.service.ItcObservingConditions
@@ -100,8 +101,6 @@ object ItcImpl {
         exposureTime:  TimeSpan,
         exposureCount: PosInt
       ): F[TargetGraphsCalcResult] =
-        import lucuma.itc.legacy.*
-
         val (request, bandOrLine): (Json, Either[Band, Wavelength]) =
           spectroscopyGraphParams(
             target,
@@ -137,8 +136,6 @@ object ItcImpl {
         constraints:      ItcObservingConditions,
         exposureTimeMode: ExposureTimeMode
       ): F[TargetIntegrationTime] =
-        import lucuma.itc.legacy.*
-
         T.span("ITC calculate")
           .use: span =>
             val (request, bandOrLine): (Json, Either[Band, Wavelength]) =
@@ -199,6 +196,56 @@ object ItcImpl {
         tgts.map(times =>
           TargetIntegrationTime(times, bandOrLine, r.signalToNoiseAt.map(fromLegacy), convertedCcds)
         )
-    }
 
+      def calculateTimeAndGraphs(
+        target:           TargetData,
+        observingMode:    ObservingMode,
+        constraints:      ItcObservingConditions,
+        exposureTimeMode: ExposureTimeMode
+      ): F[TargetTimeAndGraphs] =
+        T.span("Spectoscopy time and graphs")
+          .use: span =>
+            val (request, bandOrLine): (Json, Either[Band, Wavelength]) =
+              toItcParameters(
+                target,
+                observingMode,
+                constraints,
+                exposureTimeMode
+              ).leftMap(_.asJson)
+
+            def traceParams: F[Unit] =
+              exposureTimeMode match
+                case ExposureTimeMode.SignalToNoiseMode(sn, at)         =>
+                  span.addAttribute(Attribute("params.signal_to_noise", sn.toBigDecimal.toDouble))
+                case ExposureTimeMode.TimeAndCountMode(time, count, at) =>
+                  span.addAttributes(Attribute("params.exposure_time", time.toMilliseconds.toLong),
+                                     Attribute("params.exposure_count", count.value.toLong)
+                  )
+
+            for
+              _ <- L.info(exposureTimeMode.desiredString)
+              _ <- L.info(s"Target $target")
+              _ <- traceParams
+              _ <- span.addAttributes(
+                     Attribute("params.at", exposureTimeMode.at.nm.value.value.toDouble),
+                     Attribute("params.observing_mode", observingMode.description)
+                   )
+              _ <- L.info(request.noSpaces)
+              a <- itcLocal.calculateTimeAndGraphs(request.noSpaces, exposureTimeMode.at)
+              g <- T.span("convert graphs_result")
+                     .surround:
+                       // TODO: if we get rid of calculateGraphs above we can just convert to TargetGraphs here instead of TargetGraphsCalcResult
+                       TargetGraphsCalcResult
+                         .fromLegacy(a.ccds, a.groups, exposureTimeMode.at, bandOrLine)
+                         .pure[F]
+              i <-
+                T.span("convert integration_time_result")
+                  .surround:
+                    convertIntegrationTimeRemoteResult(
+                      IntegrationTimeRemoteResult(a.exposureCalculation, a.signalToNoiseAt, a.ccds),
+                      bandOrLine
+                    )
+            yield TargetTimeAndGraphs(i, g.toTargetGraphs)
+
+    }
 }

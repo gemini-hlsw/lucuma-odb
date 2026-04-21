@@ -92,3 +92,5 @@ given Pickler[Zipper[IntegrationTime]] =
     (List[IntegrationTime], IntegrationTime, List[IntegrationTime])
   ]((l, a, r) => Zipper(l, a, r))(z => (z.lefts, z.focus, z.rights))
 given Pickler[TargetIntegrationTime]   = generatePickler
+given Pickler[TargetGraphs]            = generatePickler
+given Pickler[TargetTimeAndGraphs]     = generatePickler

@@ -54,6 +54,13 @@ trait MockItcBase extends Itc[IO]:
     signalToNoise: SignalToNoise
   ): IO[TargetIntegrationTime]
 
+  override def calculateTimeAndGraphs(
+    target:           TargetData,
+    observingMode:    ObservingMode,
+    constraints:      ItcObservingConditions,
+    exposureTimeMode: ExposureTimeMode
+  ): IO[TargetTimeAndGraphs] = ???
+
 object MockItc extends MockItcBase:
 
   override def calculateSignalToNoise(

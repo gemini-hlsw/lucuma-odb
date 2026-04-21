@@ -83,6 +83,10 @@ object AsterismTimeAndGraphs extends NewType[NonEmptyChain[TargetTimeAndGraphsOu
                 TargetTimeAndGraphs(integrationTime, targetResult.graphs)
 
   extension (a: AsterismTimeAndGraphs)
+    def collectErrors: Option[NonEmptyChain[(Error, Int)]] =
+      NonEmptyChain.fromChain:
+        a.value.map(_.value).zipWithIndex.collect { case (Left(e), i) => (e, i) }
+
     // If there are no errors, return an Zipper with the brightest target focused.
     private def onlyIfNoErrors: Option[Zipper[TargetTimeAndGraphs]] =
       a.value
