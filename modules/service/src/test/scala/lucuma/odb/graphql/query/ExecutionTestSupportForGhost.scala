@@ -107,6 +107,7 @@ trait ExecutionTestSupportForGhost extends ExecutionTestSupport:
           ghost {
             static {
               resolutionMode
+              slitViewingCameraExposureTime { seconds }
             }
             science {
               nextAtom {

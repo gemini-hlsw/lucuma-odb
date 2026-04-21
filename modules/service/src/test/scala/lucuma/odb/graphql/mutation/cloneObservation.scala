@@ -1672,6 +1672,7 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
 
   val GhostIfuInput: String = s"""
     ghostIfu: {
+      stepCount: 57
       resolutionMode: STANDARD
       red: {
         exposureTimeMode: {
@@ -1693,6 +1694,7 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
         }
         explicitReadMode: FAST
       }
+      slitViewingCameraExposureTime: { seconds: 43.0 }
       explicitIfu1Agitator: ENABLED
     }
   """
@@ -1713,6 +1715,7 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
             observation(observationId: "$o") {
               observingMode {
                 ghostIfu {
+                  stepCount
                   resolutionMode
                   red {
                     exposureTimeMode {
@@ -1744,6 +1747,7 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
                     defaultReadMode
                     explicitReadMode
                   }
+                  slitViewingCameraExposureTime { seconds }
                   ifu1Agitator
                   defaultIfu1Agitator
                   explicitIfu1Agitator
@@ -1760,6 +1764,7 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
             "observation": {
               "observingMode": {
                 "ghostIfu": {
+                  "stepCount": 57,
                   "resolutionMode": "STANDARD",
                   "red": {
                     "exposureTimeMode": {
@@ -1791,6 +1796,7 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
                     "defaultReadMode": "SLOW",
                     "explicitReadMode": "FAST"
                   },
+                  "slitViewingCameraExposureTime": { "seconds": 43.000000 },
                   "ifu1Agitator": "ENABLED",
                   "defaultIfu1Agitator": "DISABLED",
                   "explicitIfu1Agitator": "ENABLED",

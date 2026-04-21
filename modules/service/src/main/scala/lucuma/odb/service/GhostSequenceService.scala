@@ -66,7 +66,7 @@ object GhostSequenceService:
 
       private def defaultStatic: F[Option[GhostStaticConfig]] =
         // Placeholder
-        GhostStaticConfig(GhostResolutionMode.Standard).some.pure[F]
+        GhostStaticConfig(GhostResolutionMode.Standard, none).some.pure[F]
 
       override def selectStaticOrDefault(
         observationId: Observation.Id
@@ -107,7 +107,8 @@ object GhostSequenceService:
       sql"""
         INSERT INTO t_ghost_static (
           c_observation_id,
-          c_resolution_mode
+          c_resolution_mode,
+          c_slit_viewing_camera_exposure_time
         )
         SELECT
           $observation_id,
@@ -119,7 +120,8 @@ object GhostSequenceService:
     val SelectStatic: Query[Observation.Id, GhostStaticConfig] =
       sql"""
         SELECT
-          c_resolution_mode
+          c_resolution_mode,
+          c_slit_viewing_camera_exposure_time
         FROM t_ghost_static
         WHERE c_observation_id = $observation_id
       """.query(ghost_static)

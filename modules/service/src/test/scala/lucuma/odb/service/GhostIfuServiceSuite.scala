@@ -18,6 +18,7 @@ import lucuma.core.math.Wavelength
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.Observation
 import lucuma.core.syntax.timespan.*
+import lucuma.core.util.TimeSpan
 import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.input.GhostDetectorConfigInput
 import lucuma.odb.graphql.input.GhostIfuInput
@@ -81,11 +82,13 @@ class GhostIfuServiceSuite extends ExecutionTestSupport:
       )
 
     Config(
-      resolutionMode       = in.resolutionMode,
-      red                  = DetectorConfig.Red(expectedDetector(in.red, GhostReadMode.Medium)),
-      blue                 = DetectorConfig.Blue(expectedDetector(in.blue, GhostReadMode.Slow)),
-      explicitIfu1Agitator = in.explicitIfu1FiberAgitator,
-      explicitIfu2Agitator = in.explicitIfu2FiberAgitator
+      stepCount              = in.stepCount,
+      resolutionMode         = in.resolutionMode,
+      red                    = DetectorConfig.Red(expectedDetector(in.red, GhostReadMode.Medium)),
+      blue                   = DetectorConfig.Blue(expectedDetector(in.blue, GhostReadMode.Slow)),
+      slitCameraExposureTime = in.slitCameraExposureTime,
+      explicitIfu1Agitator   = in.explicitIfu1FiberAgitator,
+      explicitIfu2Agitator   = in.explicitIfu2FiberAgitator
     )
 
   private def roundTrip(
@@ -109,6 +112,7 @@ class GhostIfuServiceSuite extends ExecutionTestSupport:
     )
 
     val create = GhostIfuInput.Create(
+      stepCount      = PosInt.unsafeFrom(3),
       resolutionMode = GhostResolutionMode.Standard,
       red            = GhostDetectorConfigInput(
         redEtm.some,
@@ -120,6 +124,7 @@ class GhostIfuServiceSuite extends ExecutionTestSupport:
         Nullable.NonNull(GhostBinning.FourByFour),
         Nullable.NonNull(GhostReadMode.Slow)
       ).some,
+      slitCameraExposureTime    = TimeSpan.FromMicroseconds.getOption(1000L),
       explicitIfu1FiberAgitator = GhostIfu1FiberAgitator.Enabled.some,
       explicitIfu2FiberAgitator = GhostIfu2FiberAgitator.Disabled.some
     )
@@ -139,9 +144,11 @@ class GhostIfuServiceSuite extends ExecutionTestSupport:
     )
 
     val create = GhostIfuInput.Create(
-      resolutionMode = GhostResolutionMode.Standard,
-      red            = none,
-      blue           = none,
+      stepCount                 = PosInt.unsafeFrom(1),
+      resolutionMode            = GhostResolutionMode.Standard,
+      red                       = none,
+      blue                      = none,
+      slitCameraExposureTime    = none,
       explicitIfu1FiberAgitator = none,
       explicitIfu2FiberAgitator = none
     )

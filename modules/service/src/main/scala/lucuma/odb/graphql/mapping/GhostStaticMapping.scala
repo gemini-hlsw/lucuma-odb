@@ -4,12 +4,13 @@
 package lucuma.odb.graphql
 package mapping
 
-import table.GhostStaticTable
+import table.GhostStaticView
 
-trait GhostStaticMapping[F[_]] extends GhostStaticTable[F]:
+trait GhostStaticMapping[F[_]] extends GhostStaticView[F]:
 
   lazy val GhostStaticMapping: ObjectMapping =
     ObjectMapping(GhostStaticType)(
-      SqlField("id", GhostStaticTable.Id, key = true, hidden = true),
-      SqlField("resolutionMode", GhostStaticTable.ResolutionMode)
+      SqlField("id", GhostStaticView.Id, key = true, hidden = true),
+      SqlField("resolutionMode", GhostStaticView.ResolutionMode),
+      SqlObject("slitViewingCameraExposureTime")
     )

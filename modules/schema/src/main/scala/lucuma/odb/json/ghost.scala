@@ -25,13 +25,17 @@ trait GhostCodec:
 
   given Decoder[GhostStaticConfig] =
     Decoder.instance: c =>
-      c.downField("resolutionMode")
-       .as[GhostResolutionMode]
-       .map(GhostStaticConfig.apply)
+      for
+        r <- c.downField("resolutionMode").as[GhostResolutionMode]
+        s <- c.downField("slitViewingCameraExposureTime").as[Option[TimeSpan]]
+      yield GhostStaticConfig(r, s)
 
-  given Encoder[GhostStaticConfig] =
+  given (using Encoder[TimeSpan]): Encoder[GhostStaticConfig] =
     Encoder.instance: a =>
-      Json.obj("resolutionMode" -> a.resolutionMode.asJson)
+      Json.obj(
+        "resolutionMode"                -> a.resolutionMode.asJson,
+        "slitViewingCameraExposureTime" -> a.slitViewingCameraExposureTime.asJson
+      )
 
   given Decoder[GhostDetector] =
     Decoder.instance: c =>

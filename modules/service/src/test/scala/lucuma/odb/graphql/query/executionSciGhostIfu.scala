@@ -21,8 +21,11 @@ import lucuma.core.syntax.timespan.*
 
 class executionSciGhostIfu extends ExecutionTestSupportForGhost:
 
-  val mode = """
+  val StepCount: Int = 3
+
+  val mode = s"""
     ghostIfu: {
+      stepCount: $StepCount
       resolutionMode: STANDARD
       red: {
         exposureTimeMode: {
@@ -44,6 +47,7 @@ class executionSciGhostIfu extends ExecutionTestSupportForGhost:
         }
         explicitReadMode: FAST
       }
+      slitViewingCameraExposureTime: { seconds: 5.0 }
       explicitIfu1Agitator: ENABLED
     }
   """
@@ -71,10 +75,13 @@ class executionSciGhostIfu extends ExecutionTestSupportForGhost:
         "ghost" -> Json.obj(
           "static" -> Json.obj(
             "resolutionMode" -> GhostResolutionMode.Standard.asJson,
+            "slitViewingCameraExposureTime" -> Json.obj(
+              "seconds" -> BigDecimal("5.000000").asJson
+            )
           ),
           "science" -> Json.obj(
             "nextAtom" -> expectedAtom(config),
-            "possibleFuture" -> Json.arr(),
+            "possibleFuture" -> List.fill(StepCount-1)(expectedAtom(config)).asJson,
             "hasMore" -> Json.fromBoolean(false)
           )
         )

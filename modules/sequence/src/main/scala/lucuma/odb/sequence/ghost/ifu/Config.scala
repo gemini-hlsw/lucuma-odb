@@ -6,9 +6,12 @@ package ifu
 
 import cats.Eq
 import cats.derived.*
+import eu.timepit.refined.cats.*
+import eu.timepit.refined.types.numeric.PosInt
 import lucuma.core.enums.GhostIfu1FiberAgitator
 import lucuma.core.enums.GhostIfu2FiberAgitator
 import lucuma.core.enums.GhostResolutionMode
+import lucuma.core.util.TimeSpan
 
 import java.io.ByteArrayOutputStream
 import java.io.DataOutputStream
@@ -16,11 +19,13 @@ import java.io.DataOutputStream
 
 
 case class Config(
-  resolutionMode:       GhostResolutionMode,
-  red:                  DetectorConfig.Red,
-  blue:                 DetectorConfig.Blue,
-  explicitIfu1Agitator: Option[GhostIfu1FiberAgitator],
-  explicitIfu2Agitator: Option[GhostIfu2FiberAgitator]
+  stepCount:              PosInt,
+  resolutionMode:         GhostResolutionMode,
+  red:                    DetectorConfig.Red,
+  blue:                   DetectorConfig.Blue,
+  slitCameraExposureTime: Option[TimeSpan],
+  explicitIfu1Agitator:   Option[GhostIfu1FiberAgitator],
+  explicitIfu2Agitator:   Option[GhostIfu2FiberAgitator]
 ) derives Eq:
 
   def defaultIfu1Agitator:  GhostIfu1FiberAgitator =
@@ -39,9 +44,12 @@ case class Config(
     val bao: ByteArrayOutputStream = new ByteArrayOutputStream(256)
     val out: DataOutputStream      = new DataOutputStream(bao)
 
+    out.write(stepCount.value)
     out.writeChars(resolutionMode.tag)
     out.write(red.value.hashBytes)
     out.write(blue.value.hashBytes)
+    slitCameraExposureTime.foreach: t =>
+      out.writeLong(t.toMicroseconds)
     out.writeChars(ifu1Agitator.tag)
     out.writeChars(ifu2Agitator.tag)
 

@@ -7,9 +7,9 @@ package table
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.GhostCodecs.*
 
-trait GhostIfuTable[F[_]] extends BaseMapping[F]:
+trait GhostIfuView[F[_]] extends BaseMapping[F]:
 
-  object GhostIfuTable extends TableDef("t_ghost_ifu"):
+  object GhostIfuView extends TableDef("v_ghost_ifu"):
     val ObservationId: ColumnRef     = col("c_observation_id",      observation_id)
     val ProgramId:     ColumnRef     = col("c_program_id",          program_id)
     val Instrument:    ColumnRef     = col("c_instrument",          instrument)
@@ -26,6 +26,12 @@ trait GhostIfuTable[F[_]] extends BaseMapping[F]:
 
     val Red: DetectorTable  = DetectorTable("red")
     val Blue: DetectorTable = DetectorTable("blue")
+
+    object SlitViewingCamera:
+      val Id: ColumnRef           = col("c_slit_viewing_camera_id",            observation_id.embedded)
+      val ExposureTime: ColumnRef = col("c_slit_viewing_camera_exposure_time", time_span.embedded)
+
+    val StepCount: ColumnRef         = col("c_step_count", int4_pos)
 
     val Ifu1FiberAgitator: ColumnRef = col("c_ifu1_fiber_agitator", ghost_ifu1_fiber_agitator.opt)
     val Ifu2FiberAgitator: ColumnRef = col("c_ifu2_fiber_agitator", ghost_ifu2_fiber_agitator.opt)

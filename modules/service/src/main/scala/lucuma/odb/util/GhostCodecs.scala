@@ -56,6 +56,9 @@ trait GhostCodecs:
     )
 
   val ghost_static: Codec[GhostStaticConfig] =
-    ghost_resolution_mode.to[GhostStaticConfig]
+    (
+      ghost_resolution_mode *:
+      time_span.opt
+    ).to[GhostStaticConfig]
 
 object GhostCodecs extends GhostCodecs

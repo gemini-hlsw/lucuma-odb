@@ -172,9 +172,11 @@ object GhostIfuService:
 
     val ghost_ifu: Decoder[Config] =
       (
+        int4_pos                      *:
         ghost_resolution_mode         *:
         ghost_detector_red            *:
         ghost_detector_blue           *:
+        time_span.opt                 *:
         ghost_ifu1_fiber_agitator.opt *:
         ghost_ifu2_fiber_agitator.opt
       ).to[Config]
@@ -188,8 +190,9 @@ object GhostIfuService:
         s"c_${color}_read_mode"
       )
 
-    private val AgitatorColumns: List[String] =
+    private val RemainingColumns: List[String] =
       List(
+        "c_slit_viewing_camera_exposure_time",
         "c_ifu1_fiber_agitator",
         "c_ifu2_fiber_agitator"
       )
@@ -197,11 +200,12 @@ object GhostIfuService:
     private val Columns: List[String] =
       List(
         "c_observation_id",
+        "c_step_count",
         "c_resolution_mode"
       )                       ++
       detectorColumns("red")  ++
       detectorColumns("blue") ++
-      AgitatorColumns
+      RemainingColumns
 
     private val ExposureTimeColumns: List[String] =
       List(
@@ -223,12 +227,13 @@ object GhostIfuService:
       sql"""
         SELECT
           g.c_observation_id,
+          g.c_step_count,
           g.c_resolution_mode,
           #${ExposureTimeColumns.prefixed("red").string},
           #${detectorColumns("red").tail.prefixed("g").string},
           #${ExposureTimeColumns.prefixed("blue").string},
           #${detectorColumns("blue").tail.prefixed("g").string},
-          #${AgitatorColumns.prefixed("g").string}
+          #${RemainingColumns.prefixed("g").string}
         FROM
           t_ghost_ifu g
         JOIN t_exposure_time_mode red  ON g.c_red_exposure_time_mode_id  = red.c_exposure_time_mode_id
@@ -246,6 +251,7 @@ object GhostIfuService:
         which.map: (oid, red, blue) =>
           sql"""(
             $observation_id,
+            $int4_pos,
             $ghost_resolution_mode,
             $exposure_time_mode_id,
             $ghost_binning,
@@ -257,10 +263,12 @@ object GhostIfuService:
             ${ghost_binning.opt},
             $ghost_read_mode,
             ${ghost_read_mode.opt},
+            ${time_span.opt},
             ${ghost_ifu1_fiber_agitator.opt},
             ${ghost_ifu2_fiber_agitator.opt}
           )"""(
             oid,
+            input.stepCount,
             input.resolutionMode,
             red,
             GhostBinning.OneByOne,
@@ -272,6 +280,7 @@ object GhostIfuService:
             input.blue.flatMap(_.explicitBinning.toOption),
             GhostReadMode.Slow,
             input.blue.flatMap(_.explicitReadMode.toOption),
+            input.slitCameraExposureTime,
             input.explicitIfu1FiberAgitator,
             input.explicitIfu2FiberAgitator
           )
@@ -363,21 +372,25 @@ object GhostIfuService:
       which: List[Observation.Id]
     ): Option[AppliedFragment] =
       val updates =
+        val upStepCount      = sql"c_step_count          = $int4_pos"
         val upResolutionMode = sql"c_resolution_mode     = $ghost_resolution_mode"
         val upRedBinning     = sql"c_red_binning         = ${ghost_binning.opt}"
         val upRedReadMode    = sql"c_red_read_mode       = ${ghost_read_mode.opt}"
         val upBlueBinning    = sql"c_blue_binning        = ${ghost_binning.opt}"
         val upBlueReadMode   = sql"c_blue_read_mode      = ${ghost_read_mode.opt}"
+        val upSlitExpTime    = sql"c_slit_viewing_camera_exposure_time = ${time_span.opt}"
         val upIfu1Agitator   = sql"c_ifu1_fiber_agitator = ${ghost_ifu1_fiber_agitator.opt}"
         val upIfu2Agitator   = sql"c_ifu2_fiber_agitator = ${ghost_ifu2_fiber_agitator.opt}"
 
         NonEmptyList.fromList:
           List(
+            SET.stepCount.map(upStepCount),
             SET.resolutionMode.map(upResolutionMode),
             SET.red.flatMap(_.explicitBinning.toOptionOption).map(upRedBinning),
             SET.red.flatMap(_.explicitReadMode.toOptionOption).map(upRedReadMode),
             SET.blue.flatMap(_.explicitBinning.toOptionOption).map(upBlueBinning),
             SET.blue.flatMap(_.explicitReadMode.toOptionOption).map(upBlueReadMode),
+            SET.slitCameraExposureTime.toOptionOption.map(upSlitExpTime),
             SET.explicitIfu1FiberAgitator.toOptionOption.map(upIfu1Agitator),
             SET.explicitIfu2FiberAgitator.toOptionOption.map(upIfu2Agitator)
           ).flatten

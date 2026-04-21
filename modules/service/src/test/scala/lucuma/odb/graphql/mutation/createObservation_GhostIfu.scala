@@ -22,6 +22,7 @@ class createObservation_GhostIfu extends OdbSuite:
 
   val GhostIfuInput: String = s"""
     ghostIfu: {
+      stepCount: 3
       resolutionMode: STANDARD
       red: {
         exposureTimeMode: {
@@ -36,6 +37,7 @@ class createObservation_GhostIfu extends OdbSuite:
       blue: {
         explicitReadMode: FAST
       }
+      slitViewingCameraExposureTime: { seconds: 5.0 }
       explicitIfu1Agitator: ENABLED
     }
   """
@@ -65,6 +67,7 @@ class createObservation_GhostIfu extends OdbSuite:
                       instrument
                       mode
                       ghostIfu {
+                        stepCount
                         resolutionMode
                         red {
                           exposureTimeMode {
@@ -96,6 +99,7 @@ class createObservation_GhostIfu extends OdbSuite:
                           defaultReadMode
                           explicitReadMode
                         }
+                        slitViewingCameraExposureTime { seconds }
                         ifu1Agitator
                         defaultIfu1Agitator
                         explicitIfu1Agitator
@@ -117,6 +121,7 @@ class createObservation_GhostIfu extends OdbSuite:
                       "instrument": "GHOST",
                       "mode": "GHOST_IFU",
                       "ghostIfu": {
+                        "stepCount": 3,
                         "resolutionMode": "STANDARD",
                         "red": {
                           "exposureTimeMode": {
@@ -148,6 +153,7 @@ class createObservation_GhostIfu extends OdbSuite:
                           "defaultReadMode": "SLOW",
                           "explicitReadMode": "FAST"
                         },
+                        "slitViewingCameraExposureTime": { "seconds": 5.000000 },
                         "ifu1Agitator": "ENABLED",
                         "defaultIfu1Agitator": "DISABLED",
                         "explicitIfu1Agitator": "ENABLED",
@@ -393,3 +399,131 @@ class createObservation_GhostIfu extends OdbSuite:
           }
         """.asRight
       )
+
+  test("create GHOST IFU with defaults"):
+    createProgramAs(pi).flatMap: pid =>
+      createTargetAs(pi, pid).flatMap: tid =>
+        expect(
+          user  = pi,
+          query =
+            s"""
+              mutation {
+                createObservation(input: {
+                  programId: "$pid"
+                  SET: {
+                    targetEnvironment: {
+                      asterism: [ "$tid" ]
+                    }
+                    scienceRequirements: ${scienceRequirementsObject(GhostIfu)}
+                    observingMode: {
+                      ghostIfu: {
+                        resolutionMode: STANDARD
+                      }
+                    }
+                  }
+                }) {
+                  observation {
+                    observingMode {
+                      instrument
+                      mode
+                      ghostIfu {
+                        stepCount
+                        resolutionMode
+                        red {
+                          exposureTimeMode {
+                            timeAndCount {
+                              time { seconds }
+                              count
+                              at { nanometers }
+                            }
+                          }
+                          binning
+                          defaultBinning
+                          explicitBinning
+                          readMode
+                          defaultReadMode
+                          explicitReadMode
+                        }
+                        blue {
+                          exposureTimeMode {
+                            timeAndCount {
+                              time { seconds }
+                              count
+                              at { nanometers }
+                            }
+                          }
+                          binning
+                          defaultBinning
+                          explicitBinning
+                          readMode
+                          defaultReadMode
+                          explicitReadMode
+                        }
+                        slitViewingCameraExposureTime { seconds }
+                        ifu1Agitator
+                        defaultIfu1Agitator
+                        explicitIfu1Agitator
+                        ifu2Agitator
+                        defaultIfu2Agitator
+                        explicitIfu2Agitator
+                      }
+                    }
+                  }
+                }
+              }
+            """,
+          expected =
+            json"""
+              {
+                "createObservation": {
+                  "observation": {
+                    "observingMode": {
+                      "instrument": "GHOST",
+                      "mode": "GHOST_IFU",
+                      "ghostIfu": {
+                        "stepCount": 1,
+                        "resolutionMode": "STANDARD",
+                        "red": {
+                          "exposureTimeMode": {
+                            "timeAndCount": {
+                              "time": { "seconds": 1.000000 },
+                              "count": 5,
+                              "at": { "nanometers": 500.000 }
+                            }
+                          },
+                          "binning": "ONE_BY_ONE",
+                          "defaultBinning": "ONE_BY_ONE",
+                          "explicitBinning": null,
+                          "readMode": "MEDIUM",
+                          "defaultReadMode": "MEDIUM",
+                          "explicitReadMode": null
+                        },
+                        "blue": {
+                          "exposureTimeMode": {
+                            "timeAndCount": {
+                              "time": { "seconds": 1.000000 },
+                              "count": 5,
+                              "at": { "nanometers": 500.000 }
+                            }
+                          },
+                          "binning": "ONE_BY_ONE",
+                          "defaultBinning": "ONE_BY_ONE",
+                          "explicitBinning": null,
+                          "readMode": "SLOW",
+                          "defaultReadMode": "SLOW",
+                          "explicitReadMode": null
+                        },
+                        "slitViewingCameraExposureTime": null,
+                        "ifu1Agitator": "DISABLED",
+                        "defaultIfu1Agitator": "DISABLED",
+                        "explicitIfu1Agitator": null,
+                        "ifu2Agitator": "DISABLED",
+                        "defaultIfu2Agitator": "DISABLED",
+                        "explicitIfu2Agitator": null
+                      }
+                    }
+                  }
+                }
+              }
+            """.asRight
+        )

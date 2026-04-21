@@ -8709,6 +8709,12 @@ Edit or create GHOST IFU Mode
 input GhostIfuInput {
 
   """
+  Requested step count. If not specified, a default of 1 will applied.  Cannot
+  be unset with a null value.
+  """
+  stepCount: PosInt
+
+  """
   The disperser field must be specified.  It cannot be unset with a null value.
   """
   resolutionMode: GhostResolutionMode
@@ -8724,6 +8730,12 @@ input GhostIfuInput {
   a null value.
   """
   blue: GhostDetectorConfigInput
+
+  """
+  Slit viewing camera exposure time.  If not specified, this will remain null.
+  May be unset with a null value.
+  """
+  slitViewingCameraExposureTime: TimeSpanInput
 
   """
   IFU1 fiber agitator setting.  If not specified, a default (DISABLED) will be
@@ -8787,6 +8799,11 @@ GHOST IFU observing mode.
 type GhostIfu {
 
   """
+  Number of steps requested.
+  """
+  stepCount: PosInt!
+
+  """
   Resolution mode.
   """
   resolutionMode: GhostResolutionMode!
@@ -8800,6 +8817,11 @@ type GhostIfu {
   Blue detector config.
   """
   blue: GhostDetectorConfig!
+
+  """
+  Slit viewing camera exposure time (if specified).
+  """
+  slitViewingCameraExposureTime: TimeSpan
 
   """
   IFU 1 fiber agitator setting, either explicitly specified or else default.
@@ -8838,6 +8860,7 @@ GHOST configuration that applies across all steps.
 """
 type GhostStatic {
   resolutionMode: GhostResolutionMode!
+  slitViewingCameraExposureTime: TimeSpan
 }
 
 """
