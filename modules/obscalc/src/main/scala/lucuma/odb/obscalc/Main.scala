@@ -142,7 +142,7 @@ object CalcMain extends MainParams:
         t <- Resource.eval(ObscalcTopic(p, 65536, s))
       yield t
 
-  def runObscalcDaemon[F[_]: Async: Logger](
+  def runObscalcDaemon[F[_]: {Async, Logger, Tracer as T}](
     connectionsLimit: Int,
     pollPeriod:       FiniteDuration,
     topic:            Topic[F, ObscalcTopic.Element],
@@ -164,9 +164,10 @@ object CalcMain extends MainParams:
             e.newState.exists(_ === CalculationState.Pending)
           )(e.observationId)
           .flatTraverse: oid =>
-            services.useTransactionally:
-              requireServiceAccessOrThrow:
-                obscalcService.loadObs(oid)
+            T.rootSpan("obscalc.event").surround:
+              services.useTransactionally:
+                requireServiceAccessOrThrow:
+                  obscalcService.loadObs(oid)
 
     // Stream of pending calc produced by periodic polling.  This will pick up
     // up to connectionsLimit entries including those that are in a 'Retry'
@@ -175,9 +176,11 @@ object CalcMain extends MainParams:
       Stream
         .awakeEvery(pollPeriod)
         .evalMap: _ =>
-          services.useTransactionally:
-            requireServiceAccessOrThrow:
-              obscalcService.load(1024)
+          // These polls are noisy and not very useful to trace
+          T.noopScope:
+            services.useTransactionally:
+              requireServiceAccessOrThrow:
+                obscalcService.load(1024)
         .flatMap(Stream.emits)
 
     // Combine the eventStream and the pollStream (after startup), process each
@@ -188,11 +191,12 @@ object CalcMain extends MainParams:
         .evalTap: pc =>
           Logger[F].debug(s"Loaded PendingCalc ${pc.observationId}. Last invalidated at ${pc.lastInvalidation}.")
         .parEvalMapUnordered(connectionsLimit): pc =>
-          services.useNonTransactionally:
-            requireServiceAccessOrThrow:
-              obscalcService
-                .calculateAndUpdate(pc)
-                .tupleLeft(pc)
+          T.span("obscalc.calculate").surround:
+            services.useNonTransactionally:
+              requireServiceAccessOrThrow:
+                obscalcService
+                  .calculateAndUpdate(pc)
+                  .tupleLeft(pc)
         .evalTap: (pc, meta) =>
           Logger[F].debug(s"Stored obscalc result for ${pc.observationId}. Current status: $meta.")
         .void
@@ -200,9 +204,10 @@ object CalcMain extends MainParams:
     for
       _ <- Resource.eval(Logger[F].info("Processing PendingCalc"))
       _ <- Resource.eval:
-             services.useTransactionally:
-               requireServiceAccessOrThrow:
-                 obscalcService.reset
+             T.rootSpan("obscalc.startup.reset").surround:
+               services.useTransactionally:
+                 requireServiceAccessOrThrow:
+                   obscalcService.reset
       o <- calcAndUpdateStream.compile.drain.background
     yield o
 

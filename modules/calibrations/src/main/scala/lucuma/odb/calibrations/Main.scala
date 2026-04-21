@@ -183,10 +183,11 @@ object CMain extends MainParams {
             }.compile.drain.start.void)
       _  <- Resource.eval(info"Start listening for calibration time changes")
       _  <- Resource.eval(calibTopic.subscribe(100).evalMap: elem =>
-              services.useTransactionally:
-                Services.asSuperUser:
-                  calibrationsService.recalculateCalibrationTarget(elem.programId, elem.observationId)
-                    .map(Result.success)
+              T.rootSpan("calibration-time-event").surround:
+                services.useTransactionally:
+                  Services.asSuperUser:
+                    calibrationsService.recalculateCalibrationTarget(elem.programId, elem.observationId)
+                      .map(Result.success)
               .handleErrorWith: e =>
                 L.error(e)(
                   s"Error processing calib time event for ${elem.programId}/${elem.observationId}"
@@ -194,7 +195,7 @@ object CMain extends MainParams {
             .compile.drain.start.void)
     } yield ()
 
-  def runTelluricTargetsDaemon[F[_]: {Async, Parallel, Logger, LoggerFactory}](
+  def runTelluricTargetsDaemon[F[_]: {Async, Parallel, Logger, LoggerFactory, Tracer}](
     connectionsLimit: Int,
     pollPeriod: FiniteDuration,
     telluricTopic: Topic[F, TelluricTargetTopic.Element],

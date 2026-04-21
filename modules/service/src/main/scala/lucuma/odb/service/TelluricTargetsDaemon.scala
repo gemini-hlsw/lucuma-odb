@@ -17,6 +17,7 @@ import lucuma.odb.service.Services.Syntax.*
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.LoggerFactory
 import org.typelevel.log4cats.syntax.*
+import org.typelevel.otel4s.trace.Tracer
 
 import scala.concurrent.duration.*
 
@@ -25,14 +26,14 @@ object TelluricTargetsDaemon:
   /**
    * Run the telluric resolution daemon.
    */
-  def run[F[_]: Async: Parallel: LoggerFactory](
+  def run[F[_]: {Async, Parallel, LoggerFactory as LF, Tracer as T}](
     connectionsLimit: Int,
     pollPeriod:       FiniteDuration,
     batchSize:        Int,
     topic:            Topic[F, TelluricTargetTopic.Element],
     services:         Resource[F, Services[F]]
   ): F[Unit] =
-    given Logger[F] = LoggerFactory[F].getLoggerFromName("telluric-targets")
+    given Logger[F] = LF.getLoggerFromName("telluric-targets")
 
     val WaitToRestart = 5.seconds
 
@@ -47,18 +48,21 @@ object TelluricTargetsDaemon:
               e.newState.exists(_ === CalculationState.Pending)
             )(e.observationId)
             .flatTraverse: oid =>
-              services.useTransactionally:
-                Services.asSuperUser:
-                  telluricTargetsService.loadObs(oid)
+              T.rootSpan("telluric.event").surround:
+                services.useTransactionally:
+                  Services.asSuperUser:
+                    telluricTargetsService.loadObs(oid)
 
     // pending entries to handle 'pending' and 'retry' entries
     val pollStream: Stream[F, TelluricTargets.Pending] =
       Stream
         .awakeEvery(pollPeriod)
         .evalMap: _ =>
-          services.useTransactionally:
-            Services.asSuperUser:
-              telluricTargetsService.load(connectionsLimit)
+          // These polls are noisy and not very useful to trace
+          T.noopScope:
+            services.useTransactionally:
+              Services.asSuperUser:
+                telluricTargetsService.load(connectionsLimit)
         .flatMap(Stream.emits)
 
     val mainStream: Stream[F, Unit] =
@@ -67,11 +71,12 @@ object TelluricTargetsDaemon:
         .evalTap: pending =>
           info"Loaded pending resolution ${pending.observationId}"
         .parEvalMapUnordered(connectionsLimit): pending =>
-          services.useNonTransactionally:
-            Services.asSuperUser:
-              telluricTargetsService
-                .resolveTargets(pending)
-                .map((pending, _))
+          T.span("telluric.resolve").surround:
+            services.useNonTransactionally:
+              Services.asSuperUser:
+                telluricTargetsService
+                  .resolveTargets(pending)
+                  .map((pending, _))
         .attempts(Stream.constant(WaitToRestart))
         .evalTap:
           case Left(e)  => error"Telluric daemon error: ${e.getMessage}, restarting in $WaitToRestart..."
@@ -81,18 +86,20 @@ object TelluricTargetsDaemon:
     // Initial processing on startup
     def startupBatch: F[Unit] =
       def processBatch: F[Boolean] =
-        services.useTransactionally:
-          Services.asSuperUser:
-            telluricTargetsService.load(batchSize)
-        .flatMap: batch =>
-          if batch.isEmpty then
-            false.pure[F]
-          else
-            batch.parTraverse_ : pending =>
-              services.useNonTransactionally:
-                Services.asSuperUser:
-                  telluricTargetsService.resolveTargets(pending)
-            .as(true)
+        T.rootSpan("telluric.startup.batch").surround:
+          services.useTransactionally:
+            Services.asSuperUser:
+              telluricTargetsService.load(batchSize)
+          .flatMap: batch =>
+            if batch.isEmpty then
+              false.pure[F]
+            else
+              batch.parTraverse_ : pending =>
+                T.span("telluric.startup.resolve").surround:
+                  services.useNonTransactionally:
+                    Services.asSuperUser:
+                      telluricTargetsService.resolveTargets(pending)
+              .as(true)
 
       def runStart(processed: Int): F[Unit] =
         processBatch.flatMap: hasMore =>
@@ -107,9 +114,10 @@ object TelluricTargetsDaemon:
 
     for {
       _ <- info"Resetting 'calculating' entries to 'pending'"
-      _ <- services.useTransactionally:
-             Services.asSuperUser:
-               telluricTargetsService.reset
+      _ <- T.rootSpan("telluric.startup.reset").surround:
+             services.useTransactionally:
+               Services.asSuperUser:
+                 telluricTargetsService.reset
       _ <- info"Processing pending resolutions on startup"
       _ <- startupBatch
       _ <- info"Starting telluric resolution event/poll streams"
