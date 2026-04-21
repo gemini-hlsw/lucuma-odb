@@ -11,6 +11,8 @@ import lucuma.odb.graphql.table.ChronConditionsEntryView
 import lucuma.odb.graphql.table.ExposureTimeModeView
 import lucuma.odb.graphql.table.Flamingos2DynamicView
 import lucuma.odb.graphql.table.GhostDynamicTable
+import lucuma.odb.graphql.table.GhostIfuView
+import lucuma.odb.graphql.table.GhostStaticView
 import lucuma.odb.graphql.table.GmosDynamicTables
 import lucuma.odb.graphql.table.GroupView
 import lucuma.odb.graphql.table.Igrins2DynamicTable
@@ -27,6 +29,8 @@ trait TimeSpanMapping[F[_]] extends AllocationTable[F]
                                with ExposureTimeModeView[F]
                                with Flamingos2DynamicView[F]
                                with GhostDynamicTable[F]
+                               with GhostIfuView[F]
+                               with GhostStaticView[F]
                                with GmosDynamicTables[F]
                                with Igrins2DynamicTable[F]
                                with ProgramTable[F]
@@ -46,6 +50,8 @@ trait TimeSpanMapping[F[_]] extends AllocationTable[F]
     List(
       timeSpanMappingAtPath(AllocationType / "duration",   AllocationTable.Duration)(AllocationTable.ProgramId, AllocationTable.Category, AllocationTable.ScienceBand),
       timeSpanMappingAtPath(ConditionsExpectationType / "timeframe", ChronConditionsEntryView.Intuition.Expectation.Timespan)(ChronConditionsEntryView.Intuition.Expectation.SyntheticId),
+      timeSpanMappingAtPath(GhostIfuType    / "slitViewingCameraExposureTime", GhostIfuView.SlitViewingCamera.ExposureTime)(GhostIfuView.SlitViewingCamera.Id),
+      timeSpanMappingAtPath(GhostStaticType / "slitViewingCameraExposureTime", GhostStaticView.SlitViewingCamera.ExposureTime)(GhostStaticView.SlitViewingCamera.Id),
       timeSpanMappingAtPath(GroupType / "maximumInterval", GroupView.MaxInterval)(GroupView.MaxIntervalId),
       timeSpanMappingAtPath(GroupType / "minimumInterval", GroupView.MinInterval)(GroupView.MinIntervalId),
       timeSpanMappingAtPath(LargeProgramType / "totalTime", ProposalView.LargeProgram.TotalTime)(ProposalView.ProgramId),

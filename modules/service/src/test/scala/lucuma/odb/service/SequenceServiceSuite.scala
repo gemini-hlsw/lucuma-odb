@@ -118,7 +118,7 @@ class SequenceServiceSuite extends ExecutionTestSupportForGmos:
       services
         .transactionally:
           sequenceService
-            .selectGhostSequence(o, SequenceType.Science, GhostStaticConfig(Standard))
+            .selectGhostSequence(o, SequenceType.Science, GhostStaticConfig(Standard, none))
             .flatMap(_.toList.flatTraverse(_.compile.toList))
 
   private def writeGhostSequence(
@@ -213,7 +213,7 @@ class SequenceServiceSuite extends ExecutionTestSupportForGmos:
     )
 
     val config = StreamingExecutionConfig[IO, GhostStaticConfig, GhostDynamicConfig](
-      GhostStaticConfig(Standard),
+      GhostStaticConfig(Standard, none),
       Stream.empty.covary[IO],
       Stream.emits(List(a0, a1)).covary[IO]
     )

@@ -46,8 +46,6 @@ object Science:
     val generator = new SequenceGenerator[GhostDynamicConfig]:
       def generate: Stream[Pure, Atom[GhostDynamicConfig]] =
 
-        // A one step stand-in "sequence".
-
         val redDetector = GhostDetector(
           red.exposureTime,
           red.exposureCount,
@@ -82,6 +80,6 @@ object Science:
 
         AtomBuilder
           .instantiate(estimator, static, namespace, SequenceType.Science)
-          .buildStream(Stream.emit(protoAtom))
+          .buildStream(Stream.emits(List.fill(config.stepCount.value)(protoAtom)))
 
     generator.asRight[OdbError].pure[F]

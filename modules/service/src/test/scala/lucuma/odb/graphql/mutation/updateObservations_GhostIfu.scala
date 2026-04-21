@@ -136,6 +136,7 @@ class updateObservations_GhostIfu extends OdbSuite with UpdateObservationsOps wi
     val update = """
       observingMode: {
         ghostIfu: {
+          stepCount: 57,
           resolutionMode: HIGH
           red: {
             explicitBinning:  FOUR_BY_FOUR
@@ -145,6 +146,7 @@ class updateObservations_GhostIfu extends OdbSuite with UpdateObservationsOps wi
             explicitBinning:  TWO_BY_EIGHT
             explicitReadMode: MEDIUM
           }
+          slitViewingCameraExposureTime: { seconds: 23.0 }
           explicitIfu1Agitator: DISABLED
           explicitIfu2Agitator: ENABLED
         }
@@ -155,6 +157,7 @@ class updateObservations_GhostIfu extends OdbSuite with UpdateObservationsOps wi
       observations {
         observingMode {
           ghostIfu {
+            stepCount
             resolutionMode
             red {
               explicitBinning
@@ -164,6 +167,7 @@ class updateObservations_GhostIfu extends OdbSuite with UpdateObservationsOps wi
               explicitBinning
               explicitReadMode
             }
+            slitViewingCameraExposureTime { seconds }
             explicitIfu1Agitator
             explicitIfu2Agitator
           }
@@ -178,6 +182,7 @@ class updateObservations_GhostIfu extends OdbSuite with UpdateObservationsOps wi
             {
               "observingMode": {
                 "ghostIfu": {
+                  "stepCount": 57,
                   "resolutionMode": "HIGH",
                   "red": {
                     "explicitBinning": "FOUR_BY_FOUR",
@@ -186,6 +191,9 @@ class updateObservations_GhostIfu extends OdbSuite with UpdateObservationsOps wi
                   "blue": {
                     "explicitBinning": "TWO_BY_EIGHT",
                     "explicitReadMode": "MEDIUM"
+                  },
+                  "slitViewingCameraExposureTime": {
+                    "seconds": 23.000000
                   },
                   "explicitIfu1Agitator": "DISABLED",
                   "explicitIfu2Agitator": "ENABLED"

@@ -18,24 +18,24 @@ import lucuma.core.enums.GhostReadMode
 import lucuma.odb.data.ExposureTimeModeRole
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.graphql.table.ExposureTimeModeView
-import lucuma.odb.graphql.table.GhostIfuTable
+import lucuma.odb.graphql.table.GhostIfuView
 
 
 
 trait GhostIfuMapping[F[_]]
-  extends GhostIfuTable[F]
+  extends GhostIfuView[F]
      with ExposureTimeModeView[F]
      with OptionalFieldMapping[F]
      with Predicates[F] { this: SkunkMapping[F] =>
 
   def ghostDetectorConfigMapping(
-    detector: GhostIfuTable.DetectorTable,
+    detector: GhostIfuView.DetectorTable,
     etmView:  BaseExposureTimeModeView
   ): ObjectMapping =
     ObjectMapping(GhostIfuType / detector.name)(
-      SqlField("observationId", GhostIfuTable.ObservationId, key = true, hidden = true),
+      SqlField("observationId", GhostIfuView.ObservationId, key = true, hidden = true),
 
-      SqlObject("exposureTimeMode", Join(GhostIfuTable.ObservationId, etmView.ObservationId)),
+      SqlObject("exposureTimeMode", Join(GhostIfuView.ObservationId, etmView.ObservationId)),
 
       explicitOrElseDefault[GhostBinning]("binning", "explicitBinning", "defaultBinning"),
       SqlField("explicitBinning", detector.Binning),
@@ -48,24 +48,28 @@ trait GhostIfuMapping[F[_]]
 
   lazy val GhostIfuMapping: ObjectMapping =
     ObjectMapping(GhostIfuType)(
-      SqlField("observationId", GhostIfuTable.ObservationId, key = true, hidden = true),
-      SqlField("resolutionMode", GhostIfuTable.ResolutionMode),
+      SqlField("observationId", GhostIfuView.ObservationId, key = true, hidden = true),
+      SqlField("stepCount",      GhostIfuView.StepCount),
+      SqlField("resolutionMode", GhostIfuView.ResolutionMode),
+
       SqlObject("red"),
       SqlObject("blue"),
 
+      SqlObject("slitViewingCameraExposureTime"),
+
       explicitOrElseDefault[GhostIfu1FiberAgitator]("ifu1Agitator", "explicitIfu1Agitator", "defaultIfu1Agitator"),
       CursorField("defaultIfu1Agitator", _ => Result.success(GhostIfu1FiberAgitator.Disabled)),
-      SqlField("explicitIfu1Agitator", GhostIfuTable.Ifu1FiberAgitator),
+      SqlField("explicitIfu1Agitator", GhostIfuView.Ifu1FiberAgitator),
 
       explicitOrElseDefault[GhostIfu2FiberAgitator]("ifu2Agitator", "explicitIfu2Agitator", "defaultIfu2Agitator"),
       CursorField("defaultIfu2Agitator", _ => Result.success(GhostIfu2FiberAgitator.Disabled)),
-      SqlField("explicitIfu2Agitator", GhostIfuTable.Ifu2FiberAgitator)
+      SqlField("explicitIfu2Agitator", GhostIfuView.Ifu2FiberAgitator)
     )
 
   lazy val GhostIfuMappings: List[TypeMapping] =
     List(
-      ghostDetectorConfigMapping(GhostIfuTable.Blue, GhostBlueExposureTimeModeView),
-      ghostDetectorConfigMapping(GhostIfuTable.Red,  GhostRedExposureTimeModeView),
+      ghostDetectorConfigMapping(GhostIfuView.Blue, GhostBlueExposureTimeModeView),
+      ghostDetectorConfigMapping(GhostIfuView.Red,  GhostRedExposureTimeModeView),
       GhostIfuMapping
     )
 

@@ -276,7 +276,7 @@ object GeneratorParamsService {
 
         observingMode(obsParams.targets, config).flatMap:
 
-          case gh @ ghost.ifu.Config(resolutionMode, red, blue, _, _) =>
+          case gh @ ghost.ifu.Config(_, resolutionMode, red, blue, _, _, _) =>
             (
               ExposureTimeMode.timeAndCount.getOption(red.value.exposureTimeMode),
               ExposureTimeMode.timeAndCount.getOption(blue.value.exposureTimeMode)
