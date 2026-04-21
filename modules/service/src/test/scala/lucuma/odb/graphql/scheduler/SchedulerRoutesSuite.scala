@@ -52,7 +52,9 @@ abstract class SchedulerRoutesSuite extends OdbSuite:
         a.observeClass.tag.toScreamingSnakeCase,
         a.timeEstimate.sum.toMicroseconds.toString,
         a.stepTypes.toList.sorted.map(_.tag.toScreamingSnakeCase).mkString("[", ", ", "]"),
-        a.lampTypes.toList.sorted.map(_.tag.toScreamingSnakeCase).mkString("[", ", ", "]")
+        a.lampTypes.toList.sorted.map(_.tag.toScreamingSnakeCase).mkString("[", ", ", "]"),
+        a.stepIndex.value.toString,
+        a.stepCount.value.toString
       )
 
   private def assertAtoms(

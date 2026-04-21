@@ -968,19 +968,23 @@ object SequenceService:
       """.command
 
     val atom_digest: Codec[AtomDigest] = (
-      atom_id        *:
-      obs_class      *:
-      time_span      *:
-      time_span      *:
-      _step_type     *:
-      _gcal_lamp_type
-    ).imap { case (a, c, n, p, ss, ls) =>
+      atom_id         *:
+      obs_class       *:
+      time_span       *:
+      time_span       *:
+      _step_type      *:
+      _gcal_lamp_type *:
+      int4_nonneg     *:
+      int4_pos
+    ).imap { case (a, c, n, p, ss, ls, nonNeg, pos) =>
       AtomDigest(
         a,
         c,
         CategorizedTime(ChargeClass.NonCharged -> n, ChargeClass.Program -> p),
         ss.toSet,
-        ls.toSet
+        ls.toSet,
+        nonNeg,
+        pos
       )
     } { (a: AtomDigest) => (
       a.id,
@@ -988,7 +992,9 @@ object SequenceService:
       a.timeEstimate.nonCharged,
       a.timeEstimate.programTime,
       a.stepTypes.toList.sorted,
-      a.lampTypes.toList.sorted
+      a.lampTypes.toList.sorted,
+      a.stepIndex,
+      a.stepCount
     )}
 
     val atom_digest_row: Codec[(Observation.Id, Short, AtomDigest)] =
@@ -1003,7 +1009,9 @@ object SequenceService:
           c_non_charged_time_estimate,
           c_program_time_estimate,
           c_step_types,
-          c_lamp_types
+          c_lamp_types,
+          c_step_index,
+          c_step_count
       """
 
     def insertAtomDigest(ds: List[(Observation.Id, Short, AtomDigest)]): Command[ds.type] =

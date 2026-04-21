@@ -93,7 +93,9 @@ object SchedulerRoutes:
       row._3.observeClass.tag.toScreamingSnakeCase,
       row._3.timeEstimate.sum.toMicroseconds.toString,
       row._3.stepTypes.map(_.tag.toScreamingSnakeCase).mkString("[", ", ", "]"),
-      row._3.lampTypes.map(_.tag.toScreamingSnakeCase).mkString("[", ", ", "]")
+      row._3.lampTypes.map(_.tag.toScreamingSnakeCase).mkString("[", ", ", "]"),
+      row._3.stepIndex.value.toString,
+      row._3.stepCount.value.toString
     ).intercalate("\t")
 
   def apply[F[_]: Async](
