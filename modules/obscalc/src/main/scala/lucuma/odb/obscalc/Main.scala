@@ -231,9 +231,7 @@ object CalcMain extends MainParams:
       S3FileService.noop[F],
       horizonsClient,
       TelluricTargetsClient.noop[F]
-    )(session).pure[F].flatTap: _ =>
-      val us = UserService.fromSession(session)
-      Services.asSuperUser(us.canonicalizeUser(user))
+    )(session).pure
 
   /**
    * Our main server, as a resource that starts up our server on acquire and shuts it all down
@@ -252,6 +250,9 @@ object CalcMain extends MainParams:
       ptc        <- Resource.eval(pool.use(TimeEstimateCalculatorImplementation.fromSession(_, enums)))
       t          <- topic(pool)
       user       <- Resource.eval(serviceUser[F](c))
+      _          <- Resource.eval(pool.use: s =>
+                      Services.asSuperUser(UserService.fromSession(s).canonicalizeUser(user))
+                    )
       mapping     = (s: Session[F]) =>
                       OdbMapping.forObscalc(
                         Resource.pure(s),

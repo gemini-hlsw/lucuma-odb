@@ -239,10 +239,7 @@ object CMain extends MainParams {
           horizonsClient,
           telClient,
           hminCache
-        )(pool).pure[F].flatTap { _ =>
-          val us = UserService.fromSession(pool)
-          Services.asSuperUser(us.canonicalizeUser(u))
-        }
+        )(pool).pure
       case Some(u) =>
         Logger[F].error(s"User $u is not allowed to execute this service") *>
           MonadThrow[F].raiseError(new RuntimeException(s"User $u doesn't have permission to execute"))
@@ -263,6 +260,9 @@ object CMain extends MainParams {
       enums              <- Resource.eval(pool.use(Enums.load))
       (obsT, ctT, trT)   <- topics(pool)
       user               <- Resource.eval(serviceUser[F](c))
+      _                  <- Resource.eval(user.traverse_ : u =>
+                              pool.use(s => Services.asSuperUser(UserService.fromSession(s).canonicalizeUser(u)))
+                            )
       httpClient         <- c.httpClientResource
       gaiaClient         <- c.gaiaClient
       horizonsClient     <- c.horizonsClientResource
