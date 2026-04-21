@@ -88,7 +88,7 @@ object ItcImpl {
                   exposureCount
                 )
               case ImagingMode.GmosNorth(_, _, _) | ImagingMode.GmosSouth(_, _, _) |
-                  ImagingMode.Flamingos2(_, _) =>
+                  ImagingMode.Flamingos2(_, _, _) =>
                 F.raiseError:
                   new IllegalArgumentException("Imaging mode not supported for graph calculation")
 

@@ -22,6 +22,7 @@ import cats.syntax.option.*
 import cats.syntax.traverse.*
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.ExecutionState
+import lucuma.core.enums.Flamingos2ReadMode
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.ScienceBand
 import lucuma.core.math.RadialVelocity
@@ -343,11 +344,13 @@ object GeneratorParamsService {
 
           case f2 @ flamingos2.longslit.Config(disperser, filter, fpu, sci, acq, _, _, _, _, _, _, _, _) =>
             val sciMode   = InstrumentMode.Flamingos2Spectroscopy(sci, disperser, filter, fpu)
+
             spectroscopyGeneratorParams(
               obsMode = f2,
               acqMode = InstrumentMode.Flamingos2Imaging(
                 acq.exposureTimeMode,
-                acq.filter
+                acq.filter,
+                Flamingos2ReadMode.Bright // Default to Bright, may support overrides in the future
               ),
               sciMode = sciMode
             ).asRight

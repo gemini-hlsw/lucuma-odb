@@ -198,6 +198,7 @@ object ObservingMode {
 
     case class Flamingos2(
       filter:          Flamingos2Filter,
+      readMode:        Flamingos2ReadMode,
       portDisposition: PortDisposition
     ) extends ImagingMode {
       val instrument: Instrument = Instrument.Flamingos2

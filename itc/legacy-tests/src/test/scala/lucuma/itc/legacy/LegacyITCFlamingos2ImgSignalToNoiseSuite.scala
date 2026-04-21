@@ -28,7 +28,10 @@ class LegacyITCFlamingos2ImgSignalToNoiseSuite extends LegacyITCFlamingos2Suite:
     analysisMethod = analysisMethod
   )
 
-  lazy val f2 = ObservingMode.ImagingMode.Flamingos2(Flamingos2Filter.J, PortDisposition.Side)
+  lazy val f2 = ObservingMode.ImagingMode.Flamingos2(Flamingos2Filter.J,
+                                                     Flamingos2ReadMode.Bright,
+                                                     PortDisposition.Side
+  )
 
   override def instrument = ItcInstrumentDetails(f2)
 
@@ -39,3 +42,9 @@ class LegacyITCFlamingos2ImgSignalToNoiseSuite extends LegacyITCFlamingos2Suite:
 
   def observingModeWithFpu(f: Flamingos2Fpu): ObservingMode =
     f2
+
+  def observingModeWithReadMode(rm: Flamingos2ReadMode): ObservingMode =
+    f2.copy(readMode = rm)
+
+  override def munitTests() =
+    super.munitTests().filterNot(_.tags.contains(F2FpuTest))

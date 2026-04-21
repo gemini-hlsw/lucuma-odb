@@ -52,3 +52,9 @@ class LegacyITCFlamingos2SpecTimeAndCountSuite extends LegacyITCFlamingos2Suite:
 
   def observingModeWithFpu(f: Flamingos2Fpu): ObservingMode =
     f2.copy(fpu = f)
+
+  def observingModeWithReadMode(rm: Flamingos2ReadMode): ObservingMode =
+    f2
+
+  override def munitTests() =
+    super.munitTests().filterNot(_.tags.contains(F2ReadModeTest))

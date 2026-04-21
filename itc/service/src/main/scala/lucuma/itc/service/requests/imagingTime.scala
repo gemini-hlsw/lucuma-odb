@@ -50,16 +50,16 @@ object AsterismImagingTimeRequest:
 
     val modeResult: Result[ObservingMode.ImagingMode] =
       mode match
-        case GmosNImagingInput(_, filter, ccdMode, port) =>
+        case GmosNImagingInput(_, filter, ccdMode, port)       =>
           Result.success:
             ObservingMode.ImagingMode.GmosNorth(filter, ccdMode, port)
-        case GmosSImagingInput(_, filter, ccdMode, port) =>
+        case GmosSImagingInput(_, filter, ccdMode, port)       =>
           Result.success:
             ObservingMode.ImagingMode.GmosSouth(filter, ccdMode, port)
-        case Flamingos2ImagingInput(_, filter, port)     =>
+        case Flamingos2ImagingInput(_, filter, readMode, port) =>
           Result.success:
-            ObservingMode.ImagingMode.Flamingos2(filter, port)
-        case _                                           =>
+            ObservingMode.ImagingMode.Flamingos2(filter, readMode, port)
+        case _                                                 =>
           Result.failure("Invalid imaging mode")
 
     (asterism.targetInputsToData, modeResult, constraints.create).parMapN:

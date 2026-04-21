@@ -12,6 +12,7 @@ import io.circe.syntax.*
 import lucuma.core.enums.Flamingos2Disperser
 import lucuma.core.enums.Flamingos2Filter
 import lucuma.core.enums.Flamingos2Fpu
+import lucuma.core.enums.Flamingos2ReadMode
 import lucuma.core.enums.GhostResolutionMode
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosNorthGrating
@@ -206,6 +207,7 @@ object InstrumentMode {
   case class Flamingos2Imaging(
     exposureTimeMode: ExposureTimeMode,
     filter:           Flamingos2Filter,
+    readMode:         Flamingos2ReadMode,
     port:             PortDisposition = PortDisposition.Side
   ) extends InstrumentMode derives Eq:
     override def displayName: String =
@@ -218,6 +220,7 @@ object InstrumentMode {
         List(
           "exposureTimeMode" -> a.exposureTimeMode.asJson,
           "filter"           -> a.filter.asJson,
+          "readMode"         -> a.readMode.asScreamingJson,
           "port"             -> a.port.asScreamingJson
         )
       )
@@ -258,7 +261,7 @@ object InstrumentMode {
         Json.obj("gmosSImaging" -> a.asJson)
       case a @ Flamingos2Spectroscopy(_, _, _, _, _)         =>
         Json.obj("flamingos2Spectroscopy" -> a.asJson)
-      case a @ Flamingos2Imaging(_, _, _)                    =>
+      case a @ Flamingos2Imaging(_, _, _, _)                 =>
         Json.obj("flamingos2Imaging" -> a.asJson)
       case a @ Igrins2Spectroscopy(_, _)                     =>
         Json.obj("igrins2Spectroscopy" -> a.asJson)

@@ -102,25 +102,18 @@ base `itc_base.graphql` and stitches it with the ODB schema fetched from a local
 It starts with the queries defined on `itc_base.graphql` and prunes the unused types, as itc doesn't
 need most of the ODB schema types.
 
-### Local ITC schema generation
+### ITC schema generation
 
-To stitch the ITC schema with a local ODB server:
+Run `itc/stitchSchema.sh` with some of the environments as argument (local/dev/staging/production)
 
-1. Start the ODB server:
-   ```bash
-   sbt service/reStart
-   ```
+For `local`, start the ODB server first:
 
-2. Run the stitching script from the `itc/` directory:
-   ```bash
-   cd itc
-   ./stitchSchemaFromLocal.sh
-   ```
+```bash
+sbt service/reStart
+```
 
-The script will:
-- Check if ODB server is running on localhost:8082
-- Fetch the schema via GraphQL introspection
-- Stitch it with `itc_base.graphql` to create `itc.graphql`
+The script fetches the ODB schema via GraphQL introspection, stitches it with `itc_base.graphql`,
+and writes the result to `itc/service/src/main/resources/graphql/itc.graphql`.
 
 You can also stitch manually:
 ```bash
@@ -129,7 +122,6 @@ node itc/schemastitcher.mjs \
   itc/service/src/main/resources/graphql/itc_base.graphql \
   itc/service/src/main/resources/graphql/itc.graphql
 ```
-
 ## Benchmarking
 
 ### Simple Performance Test
