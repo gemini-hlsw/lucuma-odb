@@ -6,6 +6,7 @@ package scheduler
 
 import cats.effect.IO
 import cats.syntax.all.*
+import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.numeric.PosInt
 import lucuma.core.enums.ChargeClass
 import lucuma.core.enums.GcalLampType
@@ -60,10 +61,19 @@ class schedulerRoutes extends SchedulerRoutesSuite with ExecutionTestSupportForG
       ObserveClass.Science,
       CategorizedTime(ChargeClass.Program -> TimeSpan.unsafeFromMicroseconds(3906781250L)),
       Set(StepType.Gcal, StepType.Science),
-      Set(GcalLampType.Arc, GcalLampType.Flat)
+      Set(GcalLampType.Arc, GcalLampType.Flat),
+      NonNegInt.MinValue,
+      PosInt.unsafeFrom(5)
     )
 
-  val a3 = a0.copy(timeEstimate = CategorizedTime(ChargeClass.Program -> TimeSpan.unsafeFromMicroseconds(1390300000L)))
+  val a1 = a0.copy(stepIndex = NonNegInt.unsafeFrom( 5))
+  val a2 = a0.copy(stepIndex = NonNegInt.unsafeFrom(10))
+
+  val a3 = a0.copy(
+    timeEstimate = CategorizedTime(ChargeClass.Program -> TimeSpan.unsafeFromMicroseconds(1390300000L)),
+    stepIndex    = NonNegInt.unsafeFrom(15),
+    stepCount    = PosInt.unsafeFrom(3)
+  )
 
   test("one observation"):
     val setup: IO[Observation.Id] =
@@ -76,7 +86,33 @@ class schedulerRoutes extends SchedulerRoutesSuite with ExecutionTestSupportForG
 
     setup.flatMap: oid =>
       atomsRequest(serviceUser, oid.toString).flatMap: request =>
-        withRoutes(serviceUser, request).assertUncompressedAtoms(Status.Ok, List(oid -> List(a0, a0, a0, a3)))
+        withRoutes(serviceUser, request).assertUncompressedAtoms(Status.Ok, List(oid -> List(a0, a1, a2, a3)))
+
+  test("one observation, partial execution"):
+    // Execute the first two steps, which are an arc and a flat, leaving 3
+    // science steps.
+    val setup: IO[Observation.Id] =
+      for
+        p <- createProgram
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+        v <- recordVisitAs(serviceUser, o)
+        s <- firstScienceAtomStepIds(serviceUser, o)
+        _ <- addEndStepEvent(s(0), v)  // arc
+        _ <- addEndStepEvent(s(1), v)  // flat
+        _ <- runObscalcUpdate(p, o)
+      yield o
+
+    setup.flatMap: oid =>
+      atomsRequest(serviceUser, oid.toString).flatMap: request =>
+        val a0ʹ = a0.copy(
+          timeEstimate = CategorizedTime(ChargeClass.Program -> TimeSpan.unsafeFromMicroseconds(3767581250L)),
+          stepTypes    = Set(StepType.Science),
+          lampTypes    = Set.empty,
+          stepIndex    = NonNegInt.unsafeFrom(2),
+          stepCount    = PosInt.unsafeFrom(3)
+        )
+        withRoutes(serviceUser, request).assertUncompressedAtoms(Status.Ok, List(oid -> List(a0ʹ, a1, a2, a3)))
 
   test("two observations"):
     val setup: IO[(Observation.Id, Observation.Id)] =
@@ -91,7 +127,7 @@ class schedulerRoutes extends SchedulerRoutesSuite with ExecutionTestSupportForG
 
     setup.flatMap: (oid0, oid1) =>
       atomsRequest(serviceUser, oid0.toString, oid1.toString).flatMap: request =>
-        withRoutes(serviceUser, request).assertUncompressedAtoms(Status.Ok, List(oid0 -> List(a0, a0, a0, a3), oid1 -> List(a0, a0, a0, a3)))
+        withRoutes(serviceUser, request).assertUncompressedAtoms(Status.Ok, List(oid0 -> List(a0, a1, a2, a3), oid1 -> List(a0, a1, a2, a3)))
 
   test("gzip"):
     val setup: IO[Observation.Id] =
@@ -104,4 +140,4 @@ class schedulerRoutes extends SchedulerRoutesSuite with ExecutionTestSupportForG
 
     setup.flatMap: oid =>
       gzipAtomsRequest(serviceUser, gzip = true, oid.toString).flatMap: request =>
-        withRoutes(serviceUser, request).assertCompressedAtoms(Status.Ok, List(oid -> List(a0, a0, a0, a3)))
+        withRoutes(serviceUser, request).assertCompressedAtoms(Status.Ok, List(oid -> List(a0, a1, a2, a3)))

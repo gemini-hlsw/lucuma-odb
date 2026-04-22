@@ -237,23 +237,31 @@ object Generator:
             .fromEither(GeneratorError.sequenceTooLong(ctx.oid).asLeft[ExecutionDigest])
             .unlessA(ctx.itcRes.toOption.forall(_.scienceExposureCount.value <= SequenceAtomLimit))
 
-        val atomDigests = ctx.params.observingMode.modeType match
-          case ObservingModeType.Flamingos2LongSlit =>
-            EitherT(streaming.selectOrGenerateFlamingos2LongSlit(ctx)).map(_.science.map(AtomDigest.fromAtom))
-          case ObservingModeType.GhostIfu    =>
-            EitherT(streaming.selectOrGenerateGhost(ctx)).map(_.science.map(AtomDigest.fromAtom))
-          case ObservingModeType.GmosNorthImaging   =>
-            EitherT(streaming.selectOrGenerateGmosNorthImaging(ctx)).map(_.science.map(AtomDigest.fromAtom))
-          case ObservingModeType.GmosNorthLongSlit  =>
-            EitherT(streaming.selectOrGenerateGmosNorthLongSlit(ctx)).map(_.science.map(AtomDigest.fromAtom))
-          case ObservingModeType.GmosSouthImaging   =>
-            EitherT(streaming.selectOrGenerateGmosSouthImaging(ctx)).map(_.science.map(AtomDigest.fromAtom))
-          case ObservingModeType.GmosSouthLongSlit  =>
-            EitherT(streaming.selectOrGenerateGmosSouthLongSlit(ctx)).map(_.science.map(AtomDigest.fromAtom))
-          case ObservingModeType.Igrins2LongSlit    =>
-            EitherT(streaming.selectOrGenerateIgrins2LongSlit(ctx)).map(_.science.map(AtomDigest.fromAtom))
+        val stepCount =
+          EitherT
+            .fromOption(
+              Option.when(ctx.params.stepCount <= Int.MaxValue)(ctx.params.stepCount.toInt).flatMap(NonNegInt.unapply),
+              GeneratorError.sequenceTooLong(ctx.oid)
+            )
 
-        checkSequence *> atomDigests
+        val stream = ctx.params.observingMode.modeType match
+          case ObservingModeType.Flamingos2LongSlit => EitherT(streaming.selectOrGenerateFlamingos2LongSlit(ctx))
+          case ObservingModeType.GhostIfu           => EitherT(streaming.selectOrGenerateGhost(ctx))
+          case ObservingModeType.GmosNorthImaging   => EitherT(streaming.selectOrGenerateGmosNorthImaging(ctx))
+          case ObservingModeType.GmosNorthLongSlit  => EitherT(streaming.selectOrGenerateGmosNorthLongSlit(ctx))
+          case ObservingModeType.GmosSouthImaging   => EitherT(streaming.selectOrGenerateGmosSouthImaging(ctx))
+          case ObservingModeType.GmosSouthLongSlit  => EitherT(streaming.selectOrGenerateGmosSouthLongSlit(ctx))
+          case ObservingModeType.Igrins2LongSlit    => EitherT(streaming.selectOrGenerateIgrins2LongSlit(ctx))
+
+        (checkSequence *> stepCount).flatMap: sc =>
+          val base = sc.value
+          stream
+            .map: s =>
+              s.science
+               .mapAccumulate(base): (nextStart, atom) =>
+                 val digest = AtomDigest.fromAtom(NonNegInt.unsafeFrom(nextStart))(atom)
+                 (nextStart + digest.stepCount.value, digest)
+               .map(_._2)
 
       override def obscalc(
         observationId: Observation.Id,
