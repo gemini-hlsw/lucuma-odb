@@ -4,6 +4,8 @@
 package lucuma.odb.logic
 
 import cats.syntax.either.*
+import eu.timepit.refined.types.numeric.NonNegInt
+import eu.timepit.refined.types.numeric.PosInt
 import lucuma.core.enums.Flamingos2ReadMode
 import lucuma.core.enums.GmosNorthDetector
 import lucuma.core.enums.GmosSouthDetector
@@ -11,13 +13,13 @@ import lucuma.core.model.sequence.DatasetEstimate
 import lucuma.core.model.sequence.DetectorEstimate
 import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig
 import lucuma.core.model.sequence.flamingos2.Flamingos2StaticConfig
+import lucuma.core.model.sequence.ghost.GhostDetector
 import lucuma.core.model.sequence.ghost.GhostDynamicConfig
 import lucuma.core.model.sequence.ghost.GhostStaticConfig
 import lucuma.core.model.sequence.gmos.DynamicConfig
 import lucuma.core.model.sequence.gmos.StaticConfig
 import lucuma.core.model.sequence.igrins2.Igrins2DynamicConfig
 import lucuma.core.model.sequence.igrins2.Igrins2StaticConfig
-import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
 import lucuma.odb.sequence.data.ProtoStep
 import lucuma.refined.*
@@ -55,12 +57,24 @@ object DetectorEstimator {
     }
 
     extension (ghost: GhostDynamicConfig) {
-      def datasetEstimate: DatasetEstimate =
+
+      private def datasetEstimate(
+        detector: GhostDetector,
+        time:     GhostReadoutTime.Value => TimeSpan
+      ): DatasetEstimate =
+        val readoutKey = GhostReadoutTime.Key(detector.readMode, detector.binning)
+
         DatasetEstimate(
-          ghost.totalExposureTime,
-          0.secondTimeSpan,
-          0.secondTimeSpan
+          detector.exposureTime,
+          time(ctx.ghostReadout(readoutKey)),
+          ctx.enums.TimeEstimate.GhostWrite.time
         )
+
+      def redDatasetEstimate: DatasetEstimate =
+        datasetEstimate(ghost.red.value, _.red)
+
+      def blueDatasetEstimate: DatasetEstimate =
+        datasetEstimate(ghost.blue.value, _.blue)
     }
 
     extension (gn: DynamicConfig.GmosNorth) {
@@ -108,12 +122,22 @@ object DetectorEstimator {
 
     // N.B., Placeholder
     lazy val ghost: DetectorEstimator[GhostStaticConfig, GhostDynamicConfig] =
+      extension (p: PosInt)
+        def asNonNegInt: NonNegInt =
+          NonNegInt.unsafeFrom(p.value)
+
       (_: GhostStaticConfig, step: ProtoStep[GhostDynamicConfig]) => List(
         DetectorEstimate(
-          "GHOST",
-          "GHOST Detector Array",
-          step.value.datasetEstimate,
-          1.refined
+          "GHOST Red",
+          "GHOST Red Detector Array",
+          step.value.redDatasetEstimate,
+          step.value.red.value.exposureCount.asNonNegInt
+        ),
+        DetectorEstimate(
+          "GHOST Blue",
+          "GHOST Blue Detector Array",
+          step.value.blueDatasetEstimate,
+          step.value.blue.value.exposureCount.asNonNegInt
         )
       )
 

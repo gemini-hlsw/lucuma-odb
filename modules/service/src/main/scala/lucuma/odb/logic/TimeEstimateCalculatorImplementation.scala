@@ -71,13 +71,13 @@ object TimeEstimateCalculatorImplementation:
       )
 
     lazy val ghostIfuSetup: SetupTimeEstimateCalculator =
-      // Placeholder
-      new SetupTimeEstimateCalculator:
-        override def estimateSetupTime: SetupTime =
-          SetupTime.Zero
-
-        override def estimateSetupCount(scienceTime: TimeSpan): NonNegInt =
-          NonNegInt.unsafeFrom(1)
+      setupCalculatorfromEstimation(
+        SetupTime(
+          ctx.enums.TimeEstimate.GhostIfuSetup.time,
+          ctx.enums.TimeEstimate.GhostReacquisition.time
+        ),
+        ctx.enums.TimeEstimate.GhostIfuMaxVisit.time
+      )
 
     lazy val gmosNorthImagingSetup: SetupTimeEstimateCalculator =
       setupCalculatorfromEstimation(
