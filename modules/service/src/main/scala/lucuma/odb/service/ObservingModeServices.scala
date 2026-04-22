@@ -25,6 +25,7 @@ import lucuma.odb.service.Services.SuperUserAccess
 import skunk.Transaction
 
 import Services.Syntax.*
+import lucuma.core.enums.VisitorObservingModeType
 
 // N.B., observing modes come with an acquisition exposure time mode and one or
 // more science exposure time modes.  This class directly handles ETM updates
@@ -77,6 +78,12 @@ object ObservingModeServices:
         import ObservingModeType.*
 
         which.groupMap(_._2)(_._1).toList.traverse {
+
+          case (v: VisitorObservingModeType, oids) =>
+            visitorService
+              .select(oids)
+              .map(_.widen[ObservingMode])
+
           case (Flamingos2LongSlit, oids) =>
             flamingos2LongSlitService
               .select(oids)
@@ -126,7 +133,8 @@ object ObservingModeServices:
           input.gmosNorthLongSlit.map(m =>  gmosLongSlitService.insertNorth(m, etm, which)),
           input.gmosSouthImaging.map(m =>   gmosImagingService.insertSouth(m, etm, which)),
           input.gmosSouthLongSlit.map(m =>  gmosLongSlitService.insertSouth(m, etm, which)),
-          input.igrins2LongSlit.map(m =>    igrins2LongSlitService.insert(m, etm, which))
+          input.igrins2LongSlit.map(m =>    igrins2LongSlitService.insert(m, etm, which)),
+          input.visitor.map(m => visitorService.insert(m, which)),
         ).flattenOption match
           case List(r) => r
           case Nil     => OdbError.InvalidArgument("No observing mode creation parameters were provided.".some).asFailureF
@@ -149,6 +157,11 @@ object ObservingModeServices:
             case ObservingModeType.GmosSouthImaging   => gmosImagingService.deleteSouth(which)
             case ObservingModeType.GmosSouthLongSlit  => gmosLongSlitService.deleteSouth(which)
             case ObservingModeType.Igrins2LongSlit    => igrins2LongSlitService.delete(which)
+<<<<<<< HEAD
+=======
+            case ObservingModeType.GhostIfu           => ().pure
+            case _: VisitorObservingModeType          => visitorService.delete(which)
+>>>>>>> a8c48da9a (wip)
 
         deleteObservingMode *> deleteExposureTimeModes
 
@@ -191,6 +204,7 @@ object ObservingModeServices:
             case ObservingModeType.GmosSouthLongSlit  => gmosLongSlitService.cloneSouth(origOid, newOid)
             case ObservingModeType.GmosSouthImaging   => gmosImagingService.cloneSouth(origOid, newOid, etms)
             case ObservingModeType.Igrins2LongSlit    => igrins2LongSlitService.clone(origOid, newOid)
+            case _: VisitorObservingModeType          => visitorService.clone(origOid, newOid)
 
         exposureTimeModeService
           .clone(origOid, newOid)

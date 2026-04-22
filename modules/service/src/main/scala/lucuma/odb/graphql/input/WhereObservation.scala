@@ -5,8 +5,7 @@ package lucuma.odb.graphql
 
 package input
 
-import cats.syntax.option.*
-import cats.syntax.parallel.*
+import cats.syntax.all.*
 import grackle.Path
 import grackle.Predicate
 import grackle.Predicate.*
@@ -29,7 +28,7 @@ object WhereObservation {
       val instrumentPath = path / "instrument"
 
       def instrumentsForSite(site: Site): List[Instrument] =
-        Enumerated[Instrument].all.filter(_.site.contains(site))
+        Enumerated[Instrument].all.filter(_.site === site)
 
       def instrumentsForSites(sites: List[Site]): List[Instrument] =
         sites.flatMap(instrumentsForSite).distinct

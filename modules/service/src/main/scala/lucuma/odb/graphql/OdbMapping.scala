@@ -290,6 +290,7 @@ object OdbMapping {
           with UserMapping[F]
           with UserProfileMapping[F]
           with VisitMapping[F]
+          with VisitorMapping[F]
           with VisitSelectResultMapping[F]
           with WavelengthMapping[F]
         {
@@ -550,6 +551,7 @@ object OdbMapping {
                 UserInvitationMapping,
                 UserMapping,
                 VisitMapping,
+                VisitorMapping,
                 VisitSelectResultMapping,
               ) ++ List(
                 AngleMappings,

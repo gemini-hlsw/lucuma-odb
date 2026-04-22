@@ -221,7 +221,8 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[UserType](UserTypeType),
       LeafMapping[Visit.Id](VisitIdType),
       LeafMapping[WaterVapor](WaterVaporType),
-      LeafMapping[WavelengthOrder](WavelengthOrderType)
+      LeafMapping[WavelengthOrder](WavelengthOrderType),
+      LeafMapping[VisitorObservingModeType](VisitorObservingModeTypeType),
     )
 
 }

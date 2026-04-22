@@ -244,6 +244,7 @@ trait SequenceCodec {
           case i@InstrumentExecutionConfig.GmosNorth(_)  => "gmosNorth"  -> i.asJson
           case i@InstrumentExecutionConfig.GmosSouth(_)  => "gmosSouth"  -> i.asJson
           case i@InstrumentExecutionConfig.Igrins2(_)    => "igrins2"    -> i.asJson
+          case _ => ???
       )
 
 }

@@ -4794,6 +4794,24 @@ input ObservingModeInput @oneOf {
   The igrins2LongSlit field must be either specified or skipped altogether.  It cannot be unset with a null value.
   """
   igrins2LongSlit: Igrins2LongSlitInput
+
+  """
+  A visiting instrument mode. It cannot be unset with a null value.
+  """
+  visitor: VisitorInput
+
+}
+
+input VisitorInput {
+  mode: VisitorObservingModeType
+  centralWavelength: WavelengthInput
+  guideStarMinSep: AngleInput
+}
+
+type Visitor {
+  mode: VisitorObservingModeType!
+  centralWavelength: Wavelength!
+  guideStarMinSep: Angle!
 }
 
 """
@@ -6822,6 +6840,19 @@ enum ObservingModeType {
   ObservingModeType Igrins2LongSlit
   """
   IGRINS_2_LONG_SLIT
+}
+
+"""
+VisitorObservingModeType
+"""
+enum VisitorObservingModeType {
+  ALOPEKE_SPECKLE
+  ALOPEKE_WIDE_FIELD
+  MAROON_X
+  VISITOR_NORTH
+  VISITOR_SOUTH
+  ZORRO_SPECKLE
+  ZORRO_WIDE_FIELD
 }
 
 type ConstraintSet {
@@ -11145,9 +11176,14 @@ Instrument
 """
 enum Instrument {
   """
-  Instrument AcqCam
+  Instrument AcqCam at Gemini North
   """
-  ACQ_CAM
+  ACQ_CAM_NORTH
+
+  """
+  Instrument AcqCam at Gemini South
+  """
+  ACQ_CAM_SOUTH
 
   """
   Instrument Flamingos2
@@ -11195,9 +11231,14 @@ enum Instrument {
   NIRI
 
   """
-  Instrument Visitor
+  Visitor Instrument at Gemini North
   """
-  VISITOR
+  VISITOR_NORTH
+
+  """
+  Visitor Instrument at Gemini North
+  """
+  VISITOR_SOUTH
 
   """
   Instrument Scorpio
@@ -11213,6 +11254,12 @@ enum Instrument {
   Instrument Zorro
   """
   ZORRO
+
+  """
+  Instrument MAROON-X
+  """
+  MAROON_X
+
 }
 
 """
@@ -13205,6 +13252,8 @@ type ObservingMode {
   IGRINS-2 Long Slit mode
   """
   igrins2LongSlit: Igrins2LongSlit
+
+  visitor: Visitor
 
 }
 

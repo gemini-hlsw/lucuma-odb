@@ -14,6 +14,7 @@ import lucuma.odb.graphql.table.GmosDynamicTables
 import lucuma.odb.graphql.table.GmosLongSlitView
 import lucuma.odb.graphql.table.ObservationView
 import lucuma.odb.graphql.table.SpectroscopyConfigOptionTable
+import lucuma.odb.graphql.table.VisitorTable
 
 trait WavelengthMapping[F[_]]
   extends GmosLongSlitView[F]
@@ -22,7 +23,8 @@ trait WavelengthMapping[F[_]]
      with Flamingos2DynamicView[F]
      with GmosDynamicTables[F]
      with ObservationView[F]
-     with SpectroscopyConfigOptionTable[F]:
+     with SpectroscopyConfigOptionTable[F]
+     with VisitorTable[F]:
 
   private def wavelengthMappingAtPath(
     path: Path,
@@ -69,5 +71,6 @@ trait WavelengthMapping[F[_]]
       wavelengthMappingAtPath(StepRecordType / "gmosSouth" / "centralWavelength", GmosSouthDynamicTable.CentralWavelength.Value, GmosSouthDynamicTable.CentralWavelength.SyntheticId),
       wavelengthMappingAtPath(StepRecordType / "gmosNorth" / "gratingConfig" / "wavelength", GmosNorthDynamicTable.Grating.Wavelength, GmosNorthDynamicTable.Id),
       wavelengthMappingAtPath(StepRecordType / "gmosSouth" / "gratingConfig" / "wavelength", GmosSouthDynamicTable.Grating.Wavelength, GmosSouthDynamicTable.Id),
-      wavelengthMappingAtPath(TimeAndCountExposureTimeModeType / "at", ExposureTimeModeView.TimeAndCount.At, ExposureTimeModeView.TimeAndCount.SyntheticId)
+      wavelengthMappingAtPath(TimeAndCountExposureTimeModeType / "at", ExposureTimeModeView.TimeAndCount.At, ExposureTimeModeView.TimeAndCount.SyntheticId),
+      wavelengthMappingAtPath(VisitorType / "centralWavelength", VisitorTable.CentralWavelength, VisitorTable.ObservationId),
     )
