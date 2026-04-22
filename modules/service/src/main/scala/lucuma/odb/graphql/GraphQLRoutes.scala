@@ -9,6 +9,7 @@ import cats.effect.*
 import cats.effect.std.SecureRandom
 import cats.implicits.*
 import cats.kernel.Order
+import fs2.Stream
 import grackle.Operation
 import grackle.Result
 import grackle.skunk.SkunkMonitor
@@ -42,6 +43,7 @@ import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.LoggerFactory
 import org.typelevel.log4cats.syntax.*
 import org.typelevel.otel4s.Attributes
+import org.typelevel.otel4s.trace.SpanKind
 import org.typelevel.otel4s.trace.Tracer
 import skunk.Session
 import skunk.SqlState
@@ -116,14 +118,37 @@ object GraphQLRoutes {
                         _    <- OptionT.liftF(info(user, s"New service instance."))
                         map   = OdbMapping(pool, monitor, user, topics, gaiaClient, itcClient, commitHash, goaUsers, enums, ptc, httpClient, horizonsClient, emailConfig)
                         svc   = new GraphQLService(map, props.toList*) {
-                          override def query(request: Operation): F[Result[Json]] =
-                            super.query(request).retryOnInvalidCursorName
-                              .handleError(Result.InternalError.apply)
-                              .flatTap {
-                                case Result.InternalError(t)  => error(user, s"Internal error: ${t.getClass.getSimpleName}: ${t.getMessage}", t)
-                                case _ => debug(user, s"Query (success).")
-                              }
-                        }
+                                  override def query(
+                                    request:       Operation,
+                                    document:      String,
+                                    operationName: Option[String]
+                                  ): F[Result[Json]] =
+                                    T.spanBuilder("graphql-query")
+                                      .withSpanKind(SpanKind.Server)
+                                      .build
+                                      .surround:
+                                        super.query(request, document, operationName).retryOnInvalidCursorName
+                                          .handleError(Result.InternalError.apply)
+                                          .flatTap {
+                                            case Result.InternalError(t) => error(user, s"Internal error: ${t.getClass.getSimpleName}: ${t.getMessage}", t)
+                                            case _                       => debug(user, s"Query (success).")
+                                          }
+
+                                  override def subscribe(
+                                    request:       Operation,
+                                    document:      String,
+                                    operationName: Option[String]
+                                  ): Stream[F, Result[Json]] =
+                                    val spanResource =
+                                      T.spanBuilder("graphql-subscription")
+                                        .withSpanKind(SpanKind.Server)
+                                        .build
+                                        .resource
+                                    Stream.resource(spanResource).flatMap: res =>
+                                      super.subscribe(request, document, operationName)
+                                        // use `res.trace` to make it the current context for each inner effect
+                                        .translate(res.trace)
+                                }
                       } yield svc
                     } .widen[GraphQLService[F]]
                       .value
@@ -140,7 +165,7 @@ object GraphQLRoutes {
    * An endpoint that listens on `/export/<name>` and returns an application/javascript response
    * of the form `export const <name> = '<query result>'`.
    */
-  def exportConst[F[_]: Temporal](
+  def exportConst[F[_]: Temporal: Tracer](
     service: GraphQLService[F],
     name:    String,
     query:   String,
@@ -162,7 +187,7 @@ object GraphQLRoutes {
     }
   }
 
-  def enumMetadata[F[_]: Temporal](
+  def enumMetadata[F[_]: Temporal: Tracer](
     service: GraphQLService[F]
   ): HttpRoutes[F] =
     exportConst(service, "enumMetadata", """
