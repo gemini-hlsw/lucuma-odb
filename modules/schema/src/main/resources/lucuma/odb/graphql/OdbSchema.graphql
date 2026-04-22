@@ -17352,6 +17352,38 @@ input WhereOptionEqInstrument {
 }
 
 """
+Filters on equality (or not) of the observing mode type. All supplied criteria
+must match, but usually only one is selected.
+"""
+input WhereOptionEqObservingModeType {
+  """
+  When `true`, matches if the observing mode type is not defined. When `false`
+  matches if the observing mode type is defined.
+  """
+  IS_NULL: Boolean
+
+  """
+  Matches if the observing mode type is exactly the supplied value.
+  """
+  EQ: ObservingModeType
+
+  """
+  Matches if the observing mode type is not the supplied value.
+  """
+  NEQ: ObservingModeType
+
+  """
+  Matches if the observing mode type is any of the supplied options.
+  """
+  IN: [ObservingModeType!]
+
+  """
+  Matches if the observing mode type is none of the supplied values.
+  """
+  NIN: [ObservingModeType!]
+}
+
+"""
 Filters on equality (or not) of the property value and the supplied criteria.
 All supplied criteria must match, but usually only one is selected.  E.g.
 'EQ = "Foo"' will match when the property value is "FOO".
@@ -17752,6 +17784,11 @@ input WhereObservation {
   Matches on the instrument in use, if any.
   """
   instrument: WhereOptionEqInstrument
+
+  """
+  Matches on the observation's observing mode type, if any.
+  """
+  observingModeType: WhereOptionEqObservingModeType
 
   """
   Matches on the site associated with the observation's instrument, if any.

@@ -61,7 +61,7 @@ class observations extends OdbSuite with ObservingModeSetupOperations {
                         "observerNotes"   -> Json.Null,
                         "targetEnvironment" -> Json.obj(
                           "useBlindOffset"  -> Json.False
-                        )  
+                        )
                       )
                     }
                 )
@@ -125,7 +125,7 @@ class observations extends OdbSuite with ObservingModeSetupOperations {
                 matches {
                   id
                   targetEnvironment {
-                    useBlindOffset 
+                    useBlindOffset
                   }
                 }
               }
@@ -479,6 +479,28 @@ class observations extends OdbSuite with ObservingModeSetupOperations {
       assertEquals(gn, List(oid1, oid4))
       assertEquals(gs, List(oid2, oid5))
       assertEquals(both,    List(oid1, oid2, oid4, oid5))
+      assertEquals(isNull,  List(oid3))
+      assertEquals(notNull, List(oid1, oid2, oid4, oid5))
+
+  test("filter on observingModeType"):
+    for
+      pid     <- createProgramAs(pi4)
+      oid1    <- createObservationAs(pi4, pid, ObservingModeType.GmosNorthLongSlit.some)
+      oid2    <- createObservationAs(pi4, pid, ObservingModeType.GmosSouthLongSlit.some)
+      oid3    <- createObservationAs(pi4, pid)
+      oid4    <- createObservationAs(pi4, pid, ObservingModeType.GmosNorthImaging.some)
+      oid5    <- createObservationAs(pi4, pid, ObservingModeType.GmosSouthImaging.some)
+      gnLs    <- observationsWhere(pi4, s"""program: { id: { EQ: "$pid" } }, observingModeType: { EQ: GMOS_NORTH_LONG_SLIT }""")
+      longSl  <- observationsWhere(pi4, s"""program: { id: { EQ: "$pid" } }, observingModeType: { IN: [ GMOS_NORTH_LONG_SLIT, GMOS_SOUTH_LONG_SLIT ] }""")
+      notImg  <- observationsWhere(pi4, s"""program: { id: { EQ: "$pid" } }, observingModeType: { NEQ: GMOS_NORTH_IMAGING }""")
+      notInIm <- observationsWhere(pi4, s"""program: { id: { EQ: "$pid" } }, observingModeType: { NIN: [ GMOS_NORTH_IMAGING, GMOS_SOUTH_IMAGING ] }""")
+      isNull  <- observationsWhere(pi4, s"""program: { id: { EQ: "$pid" } }, observingModeType: { IS_NULL: true }""")
+      notNull <- observationsWhere(pi4, s"""program: { id: { EQ: "$pid" } }, observingModeType: { IS_NULL: false }""")
+    yield
+      assertEquals(gnLs,    List(oid1))
+      assertEquals(longSl,  List(oid1, oid2))
+      assertEquals(notImg,  List(oid1, oid2, oid5))
+      assertEquals(notInIm, List(oid1, oid2))
       assertEquals(isNull,  List(oid3))
       assertEquals(notNull, List(oid1, oid2, oid4, oid5))
 

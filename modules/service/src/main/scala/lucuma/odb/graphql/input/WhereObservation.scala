@@ -10,6 +10,7 @@ import grackle.Path
 import grackle.Predicate
 import grackle.Predicate.*
 import lucuma.core.enums.Instrument
+import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.Site
 import lucuma.core.model.Observation
@@ -52,12 +53,32 @@ object WhereObservation {
               ).flatten)
           }
 
+    def observingModeTypeBinding(binding: Matcher[ObservingModeType]): Matcher[Predicate] =
+      val modePath = path / "observingMode" / "mode"
+      ObjectFieldsBinding.rmap:
+        case List(
+          BooleanBinding.Option("IS_NULL", rIsNull),
+          binding.Option("EQ", rEQ),
+          binding.Option("NEQ", rNEQ),
+          binding.List.Option("IN", rIN),
+          binding.List.Option("NIN", rNIN)
+        ) =>
+          (rIsNull, rEQ, rNEQ, rIN, rNIN).parMapN: (isNull, EQ, NEQ, IN, NIN) =>
+              and(List(
+                isNull.map(IsNull(modePath, _)),
+                EQ.map(a => Eql(modePath, Const(a))),
+                NEQ.map(a => NEql(modePath, Const(a))),
+                IN.map(as => In(modePath, as)),
+                NIN.map(as => Not(In(modePath, as)))
+              ).flatten)
+
     val SubtitleBinding = WhereOptionString.binding(path / "subtitle")
     val WhereOrderObservationIdBinding = WhereOrder.binding[Observation.Id](path / "id", ObservationIdBinding)
     val WhereReferenceBinding = WhereObservationReference.binding(path / "reference")
     val WhereProgramBinding = WhereProgram.binding(path / "program")
     val ScienceBandBinding = WhereOptionOrder.binding(path / "scienceBand", enumeratedBinding[ScienceBand])
     val InstrumentBinding = WhereOptionEq.binding(path / "instrument", enumeratedBinding[Instrument])
+    val ObservingModeTypeBinding = observingModeTypeBinding(enumeratedBinding[ObservingModeType])
     val SiteBinding = siteBinding(enumeratedBinding[Site])
     val WorkflowBinding = WhereCalculatedObservationWorkflow.binding(path / "workflow")
 
@@ -73,11 +94,12 @@ object WhereObservation {
         SubtitleBinding.Option("subtitle", rSubtitle),
         ScienceBandBinding.Option("scienceBand", rScienceBand),
         InstrumentBinding.Option("instrument", rInstrument),
+        ObservingModeTypeBinding.Option("observingModeType", rObservingModeType),
         SiteBinding.Option("site", rSite),
         WorkflowBinding.Option("workflow", rWorkflow)
       ) =>
-        (rAND, rOR, rNOT, rId, rRef, rProgram, rSubtitle, rScienceBand, rInstrument, rSite, rWorkflow).parMapN {
-          (AND, OR, NOT, id, ref, program, subtitle, scienceBand, instrument, site, workflow) =>
+        (rAND, rOR, rNOT, rId, rRef, rProgram, rSubtitle, rScienceBand, rInstrument, rObservingModeType, rSite, rWorkflow).parMapN {
+          (AND, OR, NOT, id, ref, program, subtitle, scienceBand, instrument, observingModeType, site, workflow) =>
             and(List(
               AND.map(and),
               OR.map(or),
@@ -88,6 +110,7 @@ object WhereObservation {
               subtitle,
               scienceBand,
               instrument,
+              observingModeType,
               site,
               workflow
             ).flatten)
@@ -96,4 +119,3 @@ object WhereObservation {
   }
 
 }
-
