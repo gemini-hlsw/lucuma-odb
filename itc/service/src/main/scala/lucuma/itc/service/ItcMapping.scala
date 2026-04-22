@@ -14,8 +14,6 @@ import grackle.*
 import grackle.circe.CirceMapping
 import io.circe.syntax.*
 import lucuma.core.math.SignalToNoise
-import lucuma.core.math.SingleSN
-import lucuma.core.math.TotalSN
 import lucuma.itc.*
 import lucuma.itc.cache.BinaryEffectfulCache
 import lucuma.itc.input.*
@@ -64,11 +62,6 @@ object ItcMapping extends ItcCacheOrRemote with Version {
     private def toResult: Result[CalculationResult] =
       timeResult.targetTimes.collectErrors.fold(Result.success(timeResult)): errors =>
         Result.Warning(errors.map(errorToProblem), timeResult)
-
-  extension (graphResult: SpectroscopyGraphsResult)
-    private def toResult: Result[SpectroscopyGraphsResult] =
-      graphResult.targetGraphs.collectErrors.fold(Result.success(graphResult)): errors =>
-        Result.Warning(errors.map(errorToProblem), graphResult)
 
   extension (timeAndGraphsResult: SpectroscopyTimeAndGraphsResult)
     private def toResult: Result[SpectroscopyTimeAndGraphsResult] =
@@ -155,51 +148,6 @@ object ItcMapping extends ItcCacheOrRemote with Version {
           .error(t)(s"Error calculating imaging integration time for input: $asterismRequest")
       .toGraphQLErrors
 
-  private def buildTargetGraphs(significantFigures: Option[SignificantFigures])(
-    graphResult: TargetGraphsCalcResult
-  ): TargetGraphs = {
-    val graphs: NonEmptyChain[ItcGraphGroup] =
-      significantFigures.fold(graphResult.data): v =>
-        graphResult.data.map(_.adjustSignificantFigures(v))
-
-    val ccds: NonEmptyChain[ItcCcd] =
-      significantFigures.fold(graphResult.ccds): v =>
-        graphResult.ccds.map(_.adjustSignificantFigures(v))
-
-    val peakFinalSNRatio =
-      significantFigures.fold(graphResult.peakFinalSNRatio):
-        graphResult.peakFinalSNRatio.adjustSignificantFigures
-
-    val peakSingleSNRatio =
-      significantFigures.fold(graphResult.peakSingleSNRatio):
-        graphResult.peakSingleSNRatio.adjustSignificantFigures
-
-    val atWvFinalSNRatio: Option[TotalSN] =
-      significantFigures.fold(graphResult.atWavelengthFinalSNRatio): s =>
-        graphResult.atWavelengthFinalSNRatio.map(_.adjustSignificantFigures(s))
-
-    val atWvSingleSNRatio: Option[SingleSN] =
-      significantFigures.fold(graphResult.atWavelengthSingleSNRatio): s =>
-        graphResult.atWavelengthSingleSNRatio.map(_.adjustSignificantFigures(s))
-
-    TargetGraphs(
-      ccds,
-      graphs.flatMap(_.graphs),
-      peakFinalSNRatio,
-      atWvFinalSNRatio,
-      peakSingleSNRatio,
-      atWvSingleSNRatio
-    )
-  }
-
-  private def buildTargetGraphsResult(significantFigures: Option[SignificantFigures])(
-    graphResult: TargetGraphsCalcResult
-  ): TargetGraphsResult =
-    TargetGraphsResult(
-      buildTargetGraphs(significantFigures)(graphResult),
-      graphResult.bandOrLine
-    )
-
   extension (tAndG: TargetTimeAndGraphs)
     private def roundSigFigs(significantFigures: Option[SignificantFigures]): TargetTimeAndGraphs =
       significantFigures.fold(tAndG): sigfigs =>
@@ -225,36 +173,6 @@ object ItcMapping extends ItcCacheOrRemote with Version {
         peakSingleSNRatio,
         atWvSingleSNRatio
       )
-
-  def spectroscopyGraphs[F[_]: MonadThrow: Parallel: Logger: CustomSed.Resolver: Tracer](
-    environment: ExecutionEnvironment,
-    cache:       BinaryEffectfulCache[F],
-    itc:         Itc[F],
-    config:      Config
-  )(asterismRequest: AsterismGraphRequest): F[Result[SpectroscopyGraphsResult]] =
-    Tracer[F]
-      .span("process graph_targets_parallel")
-      .surround:
-        asterismRequest.toTargetRequests
-          .parTraverse: (targetRequest: TargetGraphRequest) =>
-            graphsFromCacheOrRemote(targetRequest)(itc, cache, config).attempt
-              .map: (result: Either[Throwable, TargetGraphsCalcResult]) =>
-                TargetGraphsOutcome:
-                  result.bimap(buildError,
-                               buildTargetGraphsResult(asterismRequest.significantFigures)
-                  )
-      .flatMap: (targetGraphs: NonEmptyChain[TargetGraphsOutcome]) =>
-        Tracer[F]
-          .span("build graphs_result")
-          .surround:
-            SpectroscopyGraphsResult(
-              ItcVersions(version(environment).value, BuildInfo.ocslibHash.some),
-              AsterismTargetGraphsOutcomes(targetGraphs)
-            ).toResult.pure[F]
-      .onError: t =>
-        Logger[F]
-          .error(t)(s"Error calculating spectroscopy graphs for input: $asterismRequest")
-      .toGraphQLErrors
 
   def spectroscopyIntegrationTimeAndGraphs[F[
     _
@@ -332,15 +250,6 @@ object ItcMapping extends ItcCacheOrRemote with Version {
                       calculateImagingIntegrationTime(environment, cache, itc, config)
                     .toGraphQLErrors
                 },
-                // TODO: Get rid of this?
-                RootEffect.computeEncodable("spectroscopyGraphs") { (_, env) =>
-                  env
-                    .getR[SpectroscopyGraphsInput]("input")
-                    .flatMap(AsterismGraphRequest.fromInput)
-                    .flatTraverse:
-                      spectroscopyGraphs(environment, cache, itc, config)
-                    .toGraphQLErrors
-                },
                 RootEffect.computeEncodable("spectroscopyIntegrationTimeAndGraphs") { (_, env) =>
                   env
                     .getR[SpectroscopyIntegrationTimeAndGraphsInput]("input")
@@ -368,11 +277,6 @@ object ItcMapping extends ItcCacheOrRemote with Version {
             case (QueryType, "spectroscopy", List(SpectroscopyInput.Binding("input", input))) =>
               handle(input)
             case (QueryType, "imaging", List(ImagingInput.Binding("input", input)))           =>
-              handle(input)
-            case (QueryType,
-                  "spectroscopyGraphs",
-                  List(SpectroscopyGraphsInput.Binding("input", input))
-                ) =>
               handle(input)
             case (QueryType,
                   "spectroscopyIntegrationTimeAndGraphs",

@@ -83,46 +83,6 @@ trait ItcCacheOrRemote extends Version:
             |Error: ${error.getMessage}""".stripMargin)
         .getOrElse(Applicative[F].unit)
 
-  private def requestGraphs[F[_]: MonadThrow: Logger](
-    itc: Itc[F]
-  )(request: TargetGraphRequest): F[TargetGraphsCalcResult] =
-    itc
-      .calculateGraphs(
-        request.target,
-        request.atWavelength,
-        request.specMode,
-        request.constraints,
-        request.expTime,
-        request.exp
-      )
-      .onError:
-        logSedOnFailure(request)
-
-  /**
-   * Request a graph
-   */
-  def graphsFromCacheOrRemote[
-    F[_]: {MonadThrow, Parallel, Logger, CustomSed.Resolver, Tracer as T}
-  ](
-    request: TargetGraphRequest
-  )(
-    itc:     Itc[F],
-    cache:   BinaryEffectfulCache[F],
-    config:  Config
-  ): F[TargetGraphsCalcResult] =
-    T.span("resolve custom_sed_graphs")
-      .surround:
-        CustomSed // We must resolve CustomSed before caching.
-          .resolveTargetGraphRequest(request)
-      .flatMap: r =>
-        T.span("cache_or_calculate graphs")
-          .surround:
-            cache.getOrInvokeBinary(r,
-                                    requestGraphs(itc)(r),
-                                    TTL(config),
-                                    s"$CacheRootPrefix:graph:spec"
-            )
-
   private def requestTimeAndGraphs[F[_]: MonadThrow: Logger](
     itc: Itc[F]
   )(request: TargetSpectroscopyTimeRequest): F[TargetTimeAndGraphs] =

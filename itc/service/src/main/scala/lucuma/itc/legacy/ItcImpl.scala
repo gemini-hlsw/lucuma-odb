@@ -18,12 +18,13 @@ import lucuma.core.math.Wavelength
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.util.TimeSpan
 import lucuma.itc.CalculationError
+import lucuma.itc.Conversions
 import lucuma.itc.IntegrationTime
 import lucuma.itc.ItcCcd
 import lucuma.itc.SignalToNoiseAt
-import lucuma.itc.TargetGraphsCalcResult
 import lucuma.itc.TargetIntegrationTime
 import lucuma.itc.TargetTimeAndGraphs
+import lucuma.itc.*
 import lucuma.itc.legacy.codecs.given
 import lucuma.itc.service.Itc
 import lucuma.itc.service.ItcObservingConditions
@@ -35,7 +36,6 @@ import org.typelevel.log4cats.Logger
 import org.typelevel.otel4s.Attribute
 import org.typelevel.otel4s.trace.Tracer
 
-import scala.concurrent.duration.*
 import scala.math.*
 
 /** An ITC implementation that calls the OCS2 ITC server remotely. */
@@ -64,70 +64,6 @@ object ItcImpl {
           ampGain = remoteCcd.ampGain,
           warnings = remoteCcd.warnings
         )
-
-      def calculateGraphs(
-        target:        TargetData,
-        atWavelength:  Wavelength,
-        observingMode: ObservingMode,
-        constraints:   ItcObservingConditions,
-        exposureTime:  TimeSpan,
-        exposureCount: PosInt
-      ): F[TargetGraphsCalcResult] =
-        T.span("calculate graphs")
-          .surround:
-            observingMode match
-              case s @ (SpectroscopyMode.GmosNorth(_, _, _, _, _, _, _) |
-                  SpectroscopyMode.GmosSouth(_, _, _, _, _, _, _) |
-                  SpectroscopyMode.Flamingos2(_, _, _, _, _) | SpectroscopyMode.Igrins2(_) |
-                  SpectroscopyMode.Ghost(_, _, _, _)) =>
-                spectroscopyGraphs(
-                  target,
-                  atWavelength,
-                  s,
-                  constraints,
-                  exposureTime,
-                  exposureCount
-                )
-              case ImagingMode.GmosNorth(_, _, _) | ImagingMode.GmosSouth(_, _, _) |
-                  ImagingMode.Flamingos2(_, _, _) =>
-                F.raiseError:
-                  new IllegalArgumentException("Imaging mode not supported for graph calculation")
-
-      private def spectroscopyGraphs(
-        target:        TargetData,
-        atWavelength:  Wavelength,
-        observingMode: ObservingMode,
-        constraints:   ItcObservingConditions,
-        exposureTime:  TimeSpan,
-        exposureCount: PosInt
-      ): F[TargetGraphsCalcResult] =
-        val (request, bandOrLine): (Json, Either[Band, Wavelength]) =
-          spectroscopyGraphParams(
-            target,
-            atWavelength,
-            observingMode,
-            exposureTime.toMilliseconds.toDouble.milliseconds,
-            constraints,
-            exposureCount.value
-          ).leftMap(_.asJson)
-
-        T.span("spectroscopy graphs")
-          .use: span =>
-            for
-              _      <- span.addAttributes(
-                          Attribute("params.exposure_time", exposureTime.toMilliseconds.toLong),
-                          Attribute("params.exposure_count", exposureCount.value.toLong),
-                          Attribute("params.science_mode", "spectroscopy")
-                        )
-              _      <- L.info("spectroscopy graph request:")
-              _      <- L.info(request.noSpaces) // Request to the legacy itc
-              r      <- itcLocal.calculateGraphs(request.noSpaces, atWavelength)
-              result <- T.span("convert graphs_result")
-                          .surround:
-                            TargetGraphsCalcResult
-                              .fromLegacy(r.ccds, r.groups, atWavelength, bandOrLine)
-                              .pure[F]
-            yield result
 
       /** Calculate the Integration Time under the requested conditions. */
       def calculate(
@@ -203,6 +139,30 @@ object ItcImpl {
         constraints:      ItcObservingConditions,
         exposureTimeMode: ExposureTimeMode
       ): F[TargetTimeAndGraphs] =
+        T.span("calculate time and graphs")
+          .surround:
+            observingMode match
+              case s @ (SpectroscopyMode.GmosNorth(_, _, _, _, _, _, _) |
+                  SpectroscopyMode.GmosSouth(_, _, _, _, _, _, _) |
+                  SpectroscopyMode.Flamingos2(_, _, _, _) | SpectroscopyMode.Igrins2(_) |
+                  SpectroscopyMode.Ghost(_, _, _, _)) =>
+                spectroscopyTimeAndGraphs(
+                  target,
+                  observingMode,
+                  constraints,
+                  exposureTimeMode
+                )
+              case ImagingMode.GmosNorth(_, _, _) | ImagingMode.GmosSouth(_, _, _) |
+                  ImagingMode.Flamingos2(_, _, _) =>
+                F.raiseError:
+                  new IllegalArgumentException("Imaging mode not supported for graph calculation")
+
+      private def spectroscopyTimeAndGraphs(
+        target:           TargetData,
+        observingMode:    ObservingMode,
+        constraints:      ItcObservingConditions,
+        exposureTimeMode: ExposureTimeMode
+      ): F[TargetTimeAndGraphs] =
         T.span("Spectoscopy time and graphs")
           .use: span =>
             val (request, bandOrLine): (Json, Either[Band, Wavelength]) =
@@ -234,9 +194,8 @@ object ItcImpl {
               a <- itcLocal.calculateTimeAndGraphs(request.noSpaces, exposureTimeMode.at)
               g <- T.span("convert graphs_result")
                      .surround:
-                       // TODO: if we get rid of calculateGraphs above we can just convert to TargetGraphs here instead of TargetGraphsCalcResult
-                       TargetGraphsCalcResult
-                         .fromLegacy(a.ccds, a.groups, exposureTimeMode.at, bandOrLine)
+                       Conversions
+                         .targetGraphsFromLegacy(a.ccds, a.groups, exposureTimeMode.at)
                          .pure[F]
               i <-
                 T.span("convert integration_time_result")
@@ -245,7 +204,7 @@ object ItcImpl {
                       IntegrationTimeRemoteResult(a.exposureCalculation, a.signalToNoiseAt, a.ccds),
                       bandOrLine
                     )
-            yield TargetTimeAndGraphs(i, g.toTargetGraphs)
+            yield TargetTimeAndGraphs(i, g)
 
     }
 }

@@ -98,7 +98,8 @@ object MockItc extends MockItcBase:
       List.empty
     ).pure[IO]
 
-  override def calculateGraphs(
+    // TODO: To calculateTimeAndGraphs
+    override def calculateGraphs(
     target:        TargetData,
     atWavelength:  Wavelength,
     observingMode: ObservingMode,
@@ -239,6 +240,7 @@ object MockImagingItc extends MockItcBase:
       )
     ).pure[IO]
 
+    // TODO: To calculateTimeAndGraphs
   override def calculateGraphs(
     target:        TargetData,
     atWavelength:  Wavelength,
@@ -319,6 +321,7 @@ object EmissionLineMockItc extends MockItcBase:
       List.empty
     ).pure[IO]
 
+    // TODO: To calculateTimeAndGraphs
   override def calculateGraphs(
     target:        TargetData,
     atWavelength:  Wavelength,
@@ -389,6 +392,7 @@ object FailingMockItc extends MockItcBase:
   ): IO[TargetIntegrationTime] =
     IO.raiseError(CalculationError("A calculation error"))
 
+    // TODO: To calculateTimeAndGraphs
   override def calculateGraphs(
     target:        TargetData,
     atWavelength:  Wavelength,

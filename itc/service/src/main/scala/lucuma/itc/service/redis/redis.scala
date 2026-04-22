@@ -83,7 +83,6 @@ given Pickler[ItcWarning]              = generatePickler
 given Pickler[ItcCcd]                  = generatePickler
 given Pickler[TotalSN]                 = transformPickler((s: SignalToNoise) => TotalSN(s))(_.value)
 given Pickler[SingleSN]                = transformPickler((s: SignalToNoise) => SingleSN(s))(_.value)
-given Pickler[TargetGraphsCalcResult]  = generatePickler
 given Pickler[SignalToNoiseAt]         = generatePickler
 given Pickler[IntegrationTime]         = generatePickler
 given Pickler[Zipper[IntegrationTime]] =
