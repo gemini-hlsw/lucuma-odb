@@ -43,6 +43,7 @@ import lucuma.itc.IntegrationTime
 import lucuma.itc.client.SpectroscopyInput
 import lucuma.odb.data.OdbError
 import lucuma.odb.graphql.query.ExecutionTestSupportForFlamingos2
+import lucuma.odb.graphql.query.ExecutionTestSupportForIgrins2
 import lucuma.odb.graphql.query.ObservingModeSetupOperations
 import lucuma.odb.graphql.subscription.SubscriptionUtils
 import lucuma.odb.json.time.transport.given
@@ -58,6 +59,7 @@ class perScienceObservationCalibrations
   extends OdbSuite
   with SubscriptionUtils
   with ExecutionTestSupportForFlamingos2
+  with ExecutionTestSupportForIgrins2
   with ObservingModeSetupOperations
   with TelluricTargetsServiceSuiteSupport:
 
@@ -1967,4 +1969,76 @@ class perScienceObservationCalibrations
       assertEquals(telluricEtms.acquisition.snValue, SignalToNoise.unsafeFromBigDecimalExact(10).some)
       // Wavelength at taken from science
       assertEquals(telluricEtms.acquisition.snWAt, Wavelength.fromIntNanometers(500))
+    }
+
+  test("igrins2 observation is placed in a telluric system group"):
+    for {
+      pid  <- createProgramAs(pi)
+      tid  <- createTargetWithProfileAs(pi, pid)
+      oid  <- createIgrins2LongSlitObservationAs(pi, pid, List(tid)*)
+      _    <- runObscalcUpdate(pid, oid)
+      _    <- recalculateCalibrations(pid, when, oid)
+      obs  <- queryObservation(oid)
+      grp  <- obs.groupId.traverse(queryGroup)
+    } yield {
+      assert(obs.groupId.isDefined)
+      assert(grp.exists(_.system))
+      assert(grp.exists(_.calibrationRoles.contains(CalibrationRole.Telluric)))
+    }
+
+  test("igrins2 telluric observation is created in the same group as science"):
+    for {
+      pid     <- createProgramAs(pi)
+      tid     <- createTargetWithProfileAs(pi, pid)
+      oid     <- createIgrins2LongSlitObservationAs(pi, pid, List(tid)*)
+      _       <- runObscalcUpdate(pid, oid)
+      _       <- recalculateCalibrations(pid, when, oid)
+      toidOpt <- selectTelluricObservationFor(oid)
+      toid    =  toidOpt.get
+      _       <- runObscalcUpdate(pid, toid)
+      _       <- sleep >> resolveTelluricTargets
+      twt     <- queryObservationWithTarget(toid)
+    } yield {
+      assert(twt.targetId.isDefined)
+      assert(twt.targetName.isDefined)
+    }
+
+  test("Changing igrins2 to GMOS removes the group"):
+    for {
+      pid         <- createProgramAs(pi)
+      tid         <- createTargetWithProfileAs(pi, pid)
+      oid         <- createIgrins2LongSlitObservationAs(pi, pid, List(tid)*)
+      _           <- runObscalcUpdate(pid, oid)
+      _           <- recalculateCalibrations(pid, when, oid)
+      obsBefore   <- queryObservation(oid)
+      groupId     =  obsBefore.groupId.get
+      // Change observation to GMOS
+      _           <- updateObservationMode(oid, "gmosNorthLongSlit")
+      _           <- recalculateCalibrations(pid, when, oid)
+      obsAfter    <- queryObservation(oid)
+      // Group should be deleted
+      groupExists <- queryGroupExists(groupId)
+    } yield {
+      assert(obsBefore.groupId.isDefined)
+      assert(obsAfter.groupId.isEmpty)
+      assert(!groupExists)
+    }
+
+  test("Deleting igrins2 removes group"):
+    for {
+      pid         <- createProgramAs(pi)
+      tid         <- createTargetWithProfileAs(pi, pid)
+      oid         <- createIgrins2LongSlitObservationAs(pi, pid, List(tid)*)
+      _           <- runObscalcUpdate(pid, oid)
+      _           <- recalculateCalibrations(pid, when, oid)
+      obsBefore   <- queryObservation(oid)
+      groupId     =  obsBefore.groupId.get
+      // Set observation to inactive (deleted)
+      _           <- setObservationInactive(oid)
+      _           <- recalculateCalibrations(pid, when, oid)
+      // Group should be deleted
+      groupExists <- queryGroupExists(groupId)
+    } yield {
+      assert(obsBefore.groupId.isDefined)
+      assert(!groupExists)
     }

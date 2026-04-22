@@ -90,29 +90,43 @@ trait TelluricTargetsService[F[_]]:
     pending: TelluricTargets.Pending
   )(using ServiceAccess, NoTransaction[F]): F[Option[TelluricTargets.Meta]]
 
-case class HminBrightnessKey(
-  disperser: Flamingos2Disperser,
-  filter:    Flamingos2Filter,
-  fpu:       Flamingos2Fpu
-)
+enum HminBrightnessKey:
+  case F2(disperser: Flamingos2Disperser, filter: Flamingos2Filter, fpu: Flamingos2Fpu)
+  case Igrins2
 
 object HminBrightnessCache extends NewType[Map[HminBrightnessKey, (Option[BigDecimal], Option[BigDecimal])]]:
   val Empty: HminBrightnessCache = HminBrightnessCache(Map.empty)
   val DefaultHmin: BigDecimal = BigDecimal(8)
 
+  private def entry(
+    entry:        (Option[BigDecimal], Option[BigDecimal]),
+    telluricType: TelluricType
+  ): Option[BigDecimal] =
+    val (hminHot, hminSolar) = entry
+    telluricType match
+      case TelluricType.Solar     => hminSolar
+      case TelluricType.Hot       => hminHot
+      case TelluricType.A0V       => hminHot
+      case _: TelluricType.Manual => hminHot
+
   extension(m: HminBrightnessCache)
-    def lookup(config: F2Config): BigDecimal =
-      val key = HminBrightnessKey(config.disperser, config.filter, config.fpu)
-      m.value.get(key).flatMap: (hminHot, hminSolar) =>
-        config.telluricType match
-          case TelluricType.Solar     => hminSolar
-          case TelluricType.Hot       => hminHot
-          case TelluricType.A0V       => hminHot
-          case _: TelluricType.Manual => hminHot
-      .getOrElse(HminBrightnessCache.DefaultHmin)
+    def lookupF2(config: F2Config): BigDecimal =
+      val key = HminBrightnessKey.F2(config.disperser, config.filter, config.fpu)
+      m.value.get(key).flatMap(entry(_, config.telluricType))
+        .getOrElse(HminBrightnessCache.DefaultHmin)
+
+    def lookupIgrins2(telluricType: TelluricType): BigDecimal =
+      m.value.get(HminBrightnessKey.Igrins2).flatMap(entry(_, telluricType))
+        .getOrElse(HminBrightnessCache.DefaultHmin)
 end HminBrightnessCache
 
 type HminBrightnessCache = HminBrightnessCache.Type
+
+case class TelluricSearchParams(
+  coords:       Coordinates,
+  telluricType: TelluricType,
+  hmin:         BigDecimal
+)
 
 object TelluricTargetsService:
 
@@ -126,10 +140,16 @@ object TelluricTargetsService:
       )
 
   def loadBrightnessCache[F[_]: Monad](session: Session[F]): F[HminBrightnessCache] =
-    session.execute(Statements.SelectAllHmin).map: rows =>
-      HminBrightnessCache(rows.map { case (disperser, filter, fpu, hminHot, hminSolar) =>
-        HminBrightnessKey(disperser, filter, fpu) -> (hminHot, hminSolar)
-      }.toMap)
+    for
+      f2Rows  <- session.execute(Statements.SelectAllHmin)
+      ig2Opt  <- session.execute(Statements.SelectIgrins2Hmin).map(_.headOption)
+    yield
+      val f2Entries: Map[HminBrightnessKey, (Option[BigDecimal], Option[BigDecimal])] =
+        f2Rows.map { case (disperser, filter, fpu, hminHot, hminSolar) =>
+          HminBrightnessKey.F2(disperser, filter, fpu) -> (hminHot, hminSolar)
+        }.toMap
+      val ig2Entry = ig2Opt.tupleLeft(HminBrightnessKey.Igrins2)
+      HminBrightnessCache(f2Entries ++ ig2Entry)
 
   def instantiate[F[_]: {Temporal, LoggerFactory as LF, Services as S}](
     telluricClient: TelluricTargetsClient[F],
@@ -138,10 +158,10 @@ object TelluricTargetsService:
     new TelluricTargetsService[F]:
       given Logger[F] = LF.getLoggerFromName("telluric-targets")
 
-      val F2MaxDuration = TimeSpan.fromHours(3).get
+      val MaxTelluricDuration = TimeSpan.fromHours(3).get
 
       private def fetchSearchParams(scienceObsId: Observation.Id)(
-        using ServiceAccess): F[Option[(Coordinates, F2Config)]] =
+        using ServiceAccess): F[Option[TelluricSearchParams]] =
         S.transactionally:
           Services.asSuperUser:
             for
@@ -155,7 +175,14 @@ object TelluricTargetsService:
                                 session.prepareR(Statements.SelectTargetCoordinates).use(_.option(scienceObsId))
               f2Config   <- flamingos2LongSlitService.select(List(scienceObsId))
                               .map(_.get(scienceObsId))
-            yield (coordsOpt, f2Config).tupled
+              ig2Config  <- igrins2LongSlitService.select(List(scienceObsId))
+                              .map(_.get(scienceObsId))
+            yield coordsOpt.flatMap: coords =>
+              f2Config.map: f2 =>
+                TelluricSearchParams(coords, f2.telluricType, hminCache.lookupF2(f2))
+              .orElse:
+                ig2Config.map: ig2 =>
+                  TelluricSearchParams(coords, ig2.telluricType, hminCache.lookupIgrins2(ig2.telluricType))
 
       // Exponential backoff calculation
       // Should this be configurable?
@@ -181,16 +208,14 @@ object TelluricTargetsService:
           .use(_.option(oid))
 
       private def mkSearchInput(
-        coords:     Coordinates,
-        config:     F2Config,
-        brightness: BigDecimal,
-        duration:   TimeSpan
+        params:   TelluricSearchParams,
+        duration: TimeSpan
       ) =
         TelluricSearchInput(
-          coordinates = coords,
+          coordinates = params.coords,
           duration    = duration,
-          brightest   = brightness,
-          spType      = config.telluricType
+          brightest   = params.hmin,
+          spType      = params.telluricType
         )
 
       override def requestTelluricTarget(
@@ -232,9 +257,9 @@ object TelluricTargetsService:
               .prepareR(Statements.RetryRequest)
               .use(_.option((failureCount + 1, s"${retryDelay.toSeconds} seconds", errorMsg, pending.observationId)))
 
-        def queryParams: F[Either[String, (Coordinates, F2Config)]] =
+        def queryParams: F[Either[String, TelluricSearchParams]] =
           fetchSearchParams(pending.scienceObservationId)
-            .map(_.toRight(s"Missing coordinates or F2 config for science observation ${pending.scienceObservationId}"))
+            .map(_.toRight(s"Missing coordinates or instrument config for science observation ${pending.scienceObservationId}"))
 
         def createAndLinkTarget(sidereal: Target.Sidereal): F[Option[Target.Id]] =
           S.transactionally:
@@ -289,9 +314,8 @@ object TelluricTargetsService:
               case _                  => UnnormalizedSED.StellarLibrary(StellarLibrarySpectrum.A0V)
             Target.Sidereal.unnormalizedSED.modify(_.orElse(sed.some))(target)
 
-        def searchAndResolve(coords: Coordinates, config: F2Config): F[Option[(Either[String, Target.Id], Md5Hash)]] =
-          val brightness = hminCache.lookup(config)
-          val searchInput = mkSearchInput(coords, config, brightness, pending.scienceDuration.min(F2MaxDuration))
+        def searchAndResolve(params: TelluricSearchParams): F[Option[(Either[String, Target.Id], Md5Hash)]] =
+          val searchInput = mkSearchInput(params, pending.scienceDuration.min(MaxTelluricDuration))
           val paramsHash = Md5Hash.unsafeFromByteArray(searchInput.md5)
 
           def observationExists: F[Boolean] =
@@ -309,7 +333,7 @@ object TelluricTargetsService:
                 matchingStar match
                   case Some((star, catalogResult)) =>
                     val sidereal =
-                      catalogResult.map(_.target).getOrElse(star.asSiderealTarget).sedFromTelluricType(config.telluricType)
+                      catalogResult.map(_.target).getOrElse(star.asSiderealTarget).sedFromTelluricType(params.telluricType)
 
                     info"Found telluric star HIP ${star.hip} with order: ${star.order} for ${pending.calibrationOrder} observation ${pending.observationId}" *>
                       createAndLinkTarget(sidereal).map:
@@ -358,7 +382,7 @@ object TelluricTargetsService:
           searchData <- queryParams
           resultOpt  <- searchData.fold(
                           _ => none[(Either[String, Target.Id], Md5Hash)].pure[F],
-                          searchAndResolve.tupled
+                          searchAndResolve
                         )
           meta       <- (searchData, resultOpt) match
                           case (Left(msg), _)               => handleMissingParams(msg)
@@ -530,7 +554,7 @@ object TelluricTargetsService:
           """.command
 
   object Statements:
-    // lead the limits for all the f2 configurations
+    // load the limits for all configurations
     val SelectAllHmin: Query[Void, (Flamingos2Disperser, Flamingos2Filter, Flamingos2Fpu, Option[BigDecimal], Option[BigDecimal])] =
       sql"""
         SELECT f2config.c_disperser, f2config.c_filter, f2config.c_fpu,
@@ -540,3 +564,11 @@ object TelluricTargetsService:
           ON   config.c_instrument = f2config.c_instrument AND config.c_index = f2config.c_index
         WHERE  config.c_instrument = 'Flamingos2'
       """.query(flamingos_2_disperser *: flamingos_2_filter *: flamingos_2_fpu *: numeric.opt *: numeric.opt)
+
+    val SelectIgrins2Hmin: Query[Void, (Option[BigDecimal], Option[BigDecimal])] =
+      sql"""
+        SELECT c_hmin_hot, c_hmin_solar
+        FROM   t_spectroscopy_config_option
+        WHERE  c_instrument = 'Igrins2'
+        LIMIT  1
+      """.query(numeric.opt *: numeric.opt)

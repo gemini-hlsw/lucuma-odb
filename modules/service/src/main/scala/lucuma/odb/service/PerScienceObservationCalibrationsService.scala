@@ -257,9 +257,9 @@ object PerScienceObservationCalibrationsService:
                                     yield (c, deletable)
                                   else
                                     (List.empty, List.empty).pure[F]
-            // sync configuration on all deletable tellurics
-            allTellurics       <- findAllTelluricObservations(gid)
-            toSync             <- excludeFromDeletion(allTellurics, identity)
+            // Only sync existing tellurics that are note deleted or recreated.
+            toSync              = if (created.nonEmpty) List.empty
+                                  else existing.filterNot(deleted.contains)
             _                  <- toSync.traverse_(tid => syncConfiguration(obs.id, tid))
           } yield (created, deleted)
 
