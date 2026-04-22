@@ -32,6 +32,7 @@ import lucuma.core.model.sequence.ghost.GhostDynamicConfig
 import lucuma.core.model.sequence.ghost.GhostStaticConfig
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth
 import lucuma.core.syntax.timespan.*
+import lucuma.core.util.TimeSpan
 import lucuma.itc.IntegrationTime
 import lucuma.odb.graphql.query.ExecutionTestSupportForGmos
 import lucuma.odb.sequence.data.StreamingExecutionConfig
@@ -132,6 +133,18 @@ class SequenceServiceSuite extends ExecutionTestSupportForGmos:
             .materializeGhostExecutionConfig(o, c)
 
   test("ghost - simple round trip"):
+    def estimate(c: String, d: GhostDetector, readout: TimeSpan): DetectorEstimate =
+      DetectorEstimate(
+        s"GHOST $c",
+        s"GHOST $c Detector Array",
+        DatasetEstimate(
+          d.exposureTime,
+          readout,
+          5.secondTimeSpan
+        ),
+        NonNegInt.unsafeFrom(d.exposureCount.value)
+      )
+
     val red10 = GhostDetector.Red(
       GhostDetector(
         10.secondTimeSpan,
@@ -178,7 +191,10 @@ class SequenceServiceSuite extends ExecutionTestSupportForGmos:
       TelescopeConfig.Default,
       StepEstimate.fromMax(
         Nil,
-        List(DetectorEstimate("GHOST", "GHOST Detector Array", DatasetEstimate(100.secondTimeSpan, 0.secondTimeSpan, 0.secondTimeSpan), NonNegInt.unsafeFrom(1)))
+        List(
+          estimate("Red",  red10.value, 27500.millisecondTimeSpan),
+          estimate("Blue", blue5.value,  6500.millisecondTimeSpan)
+        )
       )
     )
 
@@ -195,7 +211,10 @@ class SequenceServiceSuite extends ExecutionTestSupportForGmos:
       TelescopeConfig.Default,
       StepEstimate.fromMax(
         Nil,
-        List(DetectorEstimate("GHOST", "GHOST Detector Array", DatasetEstimate(400.secondTimeSpan, 0.secondTimeSpan, 0.secondTimeSpan), NonNegInt.unsafeFrom(1)))
+        List(
+          estimate("Red",  red20.value, 21700.millisecondTimeSpan),
+          estimate("Blue", blue6.value, 24800.millisecondTimeSpan)
+        )
       )
     )
 
