@@ -179,7 +179,11 @@ private[legacy] object codecs:
       "filter"          -> Json.fromString(a.filter.ocs2Tag),
       "grism"           -> Json.fromString(a.disperser.ocs2Tag),
       "mask"            -> Json.fromString(a.fpu.ocs2Tag),
-      "readMode"        -> Json.fromString("FAINT_OBJECT_SPEC"),
+      "readMode"        -> Json.fromString(a.readMode match {
+        case Flamingos2ReadMode.Bright => "BRIGHT_OBJECT_SPEC"
+        case Flamingos2ReadMode.Medium => "MEDIUM_OBJECT_SPEC"
+        case Flamingos2ReadMode.Faint  => "FAINT_OBJECT_SPEC"
+      }),
       "customSlitWidth" -> Json.Null
     )
 

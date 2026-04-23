@@ -148,14 +148,22 @@ trait ArbInstrumentMode {
         et <- arbitrary[ExposureTimeMode]
         d  <- arbitrary[Flamingos2Disperser]
         f  <- arbitrary[Flamingos2Filter]
+        rm <- arbitrary[Flamingos2ReadMode]
         fp <- arbitrary[Flamingos2Fpu]
         p  <- arbitrary[PortDisposition]
-      } yield Flamingos2Spectroscopy(et, d, f, fp, p)
+      } yield Flamingos2Spectroscopy(et, d, f, rm, fp, p)
     }
 
   given Cogen[Flamingos2Spectroscopy] =
-    Cogen[(ExposureTimeMode, Flamingos2Disperser, Flamingos2Filter, Flamingos2Fpu, PortDisposition)]
-      .contramap(a => (a.exposureTimeMode, a.disperser, a.filter, a.fpu, a.port))
+    Cogen[
+      (ExposureTimeMode,
+       Flamingos2Disperser,
+       Flamingos2Filter,
+       Flamingos2ReadMode,
+       Flamingos2Fpu,
+       PortDisposition
+      )
+    ].contramap(a => (a.exposureTimeMode, a.disperser, a.filter, a.readMode, a.fpu, a.port))
 
   given Arbitrary[Flamingos2Imaging] =
     Arbitrary {

@@ -142,6 +142,9 @@ input Flamingos2SpectroscopyInput {
   """Flamingos2 filter"""
   filter: Flamingos2Filter!
 
+  """Flamingos2 read mode"""
+  readMode: Flamingos2ReadMode!
+
   """Instrument port disposition"""
   port: PortDisposition = SIDE
 }

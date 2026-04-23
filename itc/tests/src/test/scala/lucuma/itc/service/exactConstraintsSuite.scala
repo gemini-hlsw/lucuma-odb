@@ -273,7 +273,8 @@ class exactConstraintsSuite extends GraphQLSuite:
                 "exposureTimeMode": { "timeAndCount": { "time": { "seconds": 10 }, "count": 2, "at": { "nanometers": "500" } } },
                 "disperser": "R3000",
                 "filter": "Y",
-                "fpu": "LONG_SLIT_1"
+                "fpu": "LONG_SLIT_1",
+                "readMode": "FAINT"
               }
             }
           }

@@ -105,6 +105,7 @@ object InstrumentMode {
     exposureTimeMode: ExposureTimeMode,
     disperser:        Flamingos2Disperser,
     filter:           Flamingos2Filter,
+    readMode:         Flamingos2ReadMode,
     fpu:              Flamingos2Fpu,
     port:             PortDisposition = PortDisposition.Side
   ) extends InstrumentMode derives Eq:
@@ -120,6 +121,7 @@ object InstrumentMode {
           "disperser"        -> a.disperser.asScreamingJson,
           "fpu"              -> a.fpu.asJson,
           "filter"           -> a.filter.asJson,
+          "readMode"         -> a.readMode.asScreamingJson,
           "port"             -> a.port.asScreamingJson
         )
       )
@@ -259,7 +261,7 @@ object InstrumentMode {
         Json.obj("gmosNImaging" -> a.asJson)
       case a @ GmosSouthImaging(_, _, _, _)                  =>
         Json.obj("gmosSImaging" -> a.asJson)
-      case a @ Flamingos2Spectroscopy(_, _, _, _, _)         =>
+      case a @ Flamingos2Spectroscopy(_, _, _, _, _, _)      =>
         Json.obj("flamingos2Spectroscopy" -> a.asJson)
       case a @ Flamingos2Imaging(_, _, _, _)                 =>
         Json.obj("flamingos2Imaging" -> a.asJson)
