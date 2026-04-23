@@ -8,37 +8,43 @@ CREATE TABLE t_ghost_readout (
   c_blue_time interval    NOT NULL
 );
 
--- https://www.gemini.edu/instrumentation/ghost/components Table 3
+-- Taken from:
+-- https://github.com/gemini-hlsw/seqexec/blob/main/modules/server/src/main/scala/seqexec/server/ghost/GhostLUT.scala#L145
+
+-- The values published at:
+-- https://www.gemini.edu/instrumentation/ghost/components (Table 3)
+-- are reportedly fake news.
+
 COPY t_ghost_readout (
   c_read_mode,
   c_binning,
   c_red_time,
   c_blue_time
 ) FROM STDIN;
-slow	one_by_one	97.4 seconds	45.6 seconds
-slow	one_by_two	49.6 seconds	24.8 seconds
-slow	one_by_four	25.7 seconds	14.4 seconds
-slow	one_by_eight	13.8 seconds	9.1 seconds
-slow	two_by_two	27.5 seconds	15.4 seconds
-slow	two_by_four	14.7 seconds	9.8 seconds
-slow	two_by_eight	8.4 seconds	7.0 seconds
-slow	four_by_four	9.5 seconds	7.9 seconds
-medium	one_by_one	50.1 seconds	24.6 seconds
-medium	one_by_two	26.1 seconds	14.3 seconds
-medium	one_by_four	13.9 seconds	9.1 seconds
-medium	one_by_eight	7.9 seconds	6.5 seconds
-medium	two_by_two	15.7 seconds	10.1 seconds
-medium	two_by_four	8.8 seconds	7.2 seconds
-medium	two_by_eight	5.4 seconds	5.6 seconds
-medium	four_by_four	6.5 seconds	6.5 seconds
-fast	one_by_one	21.7 seconds	12.0 seconds
-fast	one_by_two	11.7 seconds	7.9 seconds
-fast	one_by_four	6.8 seconds	5.9 seconds
-fast	one_by_eight	4.3 seconds	4.9 seconds
-fast	two_by_two	8.6 seconds	6.9 seconds
-fast	two_by_four	5.2 seconds	5.6 seconds
-fast	two_by_eight	3.6 seconds	4.9 seconds
-fast	four_by_four	4.7 seconds	5.8 seconds
+slow	one_by_one	100.675 seconds	45.957 seconds
+slow	one_by_two	51.271 seconds	23.808 seconds
+slow	one_by_four	26.564 seconds	12.741 seconds
+slow	one_by_eight	14.198 seconds	7.229 seconds
+slow	two_by_two	28.364 seconds	13.644 seconds
+slow	two_by_four	15.146 seconds	7.68 seconds
+slow	two_by_eight	8.534 seconds	4.722 seconds
+slow	four_by_four	9.536 seconds	5.226 seconds
+medium	one_by_one	58.994 seconds	27.118 seconds
+medium	one_by_two	30.230 seconds	14.237 seconds
+medium	one_by_four	15.838 seconds	7.784 seconds
+medium	one_by_eight	8.686 seconds	4.574 seconds
+medium	two_by_two	17.696 seconds	8.633 seconds
+medium	two_by_four	9.638 seconds	5.24 seconds
+medium	two_by_eight	5.580 seconds	3.223 seconds
+medium	four_by_four	6.581 seconds	3.722 seconds
+fast	one_by_one	23.520 seconds	11.78 seconds
+fast	one_by_two	12.341 seconds	6.72 seconds
+fast	one_by_four	6.773 seconds	3.575 seconds
+fast	one_by_eight	3.977 seconds	3.75 seconds
+fast	two_by_two	8.577 seconds	4.425 seconds
+fast	two_by_four	4.929 seconds	3.71 seconds
+fast	two_by_eight	3.578 seconds	3.42 seconds
+fast	four_by_four	4.77 seconds	3.44 seconds
 \.
 
 INSERT INTO t_time_estimate VALUES(
