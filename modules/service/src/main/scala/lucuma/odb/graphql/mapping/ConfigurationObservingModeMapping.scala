@@ -16,7 +16,8 @@ trait ConfigurationObservingModeMappings[F[_]]
      with Flamingos2LongSlitView[F]
      with GmosImagingView[F]
      with GmosLongSlitView[F]
-     with Igrins2LongSlitView[F] {
+     with Igrins2LongSlitView[F]
+     with VisitorTable[F] {
 
   lazy val ConfigurationObservingModeMappings = List(
     ConfigurationObservingModeMapping,
@@ -34,6 +35,7 @@ trait ConfigurationObservingModeMappings[F[_]]
       SqlObject("gmosNorthImaging", Join(ObservationView.Id, GmosNorthImagingView.Common.ObservationId)),
       SqlObject("gmosSouthImaging", Join(ObservationView.Id, GmosSouthImagingView.Common.ObservationId)),
       SqlObject("igrins2LongSlit", Join(ObservationView.Id, Igrins2LongSlitView.ObservationId)),
+      SqlObject("visitor", Join(ObservationView.Id, VisitorTable.ObservationId)),
     )
 
   private lazy val ConfigurationRequestObservingModeMapping: ObjectMapping =
@@ -47,6 +49,7 @@ trait ConfigurationObservingModeMappings[F[_]]
       SqlObject("gmosNorthImaging"),
       SqlObject("gmosSouthImaging"),
       SqlObject("igrins2LongSlit"),
+      SqlObject("visitor"),
     )
 
 }

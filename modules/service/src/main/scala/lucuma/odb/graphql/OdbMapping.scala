@@ -147,6 +147,7 @@ object OdbMapping {
           with ConfigurationRequestSelectResultMapping[F]
           with ConfigurationObservingModeMappings[F]
           with ConfigurationTargetMapping[F]
+          with ConfigurationVisitorMappings[F]
           with ConstraintSetGroupMapping[F]
           with ConstraintSetGroupSelectResultMapping[F]
           with ConstraintSetMapping[F]
@@ -569,6 +570,7 @@ object OdbMapping {
                 ConfigurationGmosSouthLongSlitMappings,
                 ConfigurationObservingModeMappings,
                 ConfigurationTargetMappings,
+                ConfigurationVisitorMappings,
                 CoordinatesMappings,
                 CoordinateLimitsMappings,
                 DatasetSelectResultMappings,

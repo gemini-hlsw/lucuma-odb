@@ -15,6 +15,7 @@ import lucuma.odb.graphql.table.SpectroscopyConfigOptionTable
 import lucuma.odb.graphql.table.TelescopeConfigGeneratorView
 import lucuma.odb.graphql.util.MappingExtras
 import lucuma.odb.graphql.table.VisitorTable
+import lucuma.odb.graphql.table.ConfigurationRequestView
 
 trait AngleMapping[F[_]] extends ObservationView[F]
                             with ChronConditionsEntryView[F]
@@ -22,6 +23,7 @@ trait AngleMapping[F[_]] extends ObservationView[F]
                             with TelescopeConfigGeneratorView[F]
                             with SpectroscopyConfigOptionTable[F]
                             with VisitorTable[F]
+                            with ConfigurationRequestView[F]
                             with MappingExtras[F] {
 
   private val µPerMilli: Long = 1000L
@@ -73,7 +75,9 @@ trait AngleMapping[F[_]] extends ObservationView[F]
       angleMappingAtPath(ImagingScienceRequirementsType / "minimumFov", Imaging.MinimumFovAngle.Value, Imaging.MinimumFovAngle.SyntheticId),
       angleMappingAtPath(RandomTelescopeConfigGeneratorType / "size", TelescopeConfigGeneratorView.Size, TelescopeConfigGeneratorView.Random.ObservationId, TelescopeConfigGeneratorView.Random.Role),
       angleMappingAtPath(SpiralTelescopeConfigGeneratorType / "size", TelescopeConfigGeneratorView.Size, TelescopeConfigGeneratorView.Spiral.ObservationId, TelescopeConfigGeneratorView.Spiral.Role),
-      angleMappingAtPath(VisitorType / "guideStarMinSep", VisitorTable.GuideStarMinSep, VisitorTable.ObservationId)
+      angleMappingAtPath(VisitorType / "guideStarMinSep", VisitorTable.GuideStarMinSep, VisitorTable.ObservationId),
+      angleMappingAtPath(ConfigurationRequestType / "configuration" / "observingMode" / "visitor" / "radius", ConfigurationRequestView.Visitor.Radius, ConfigurationRequestView.Visitor.Id),
+      angleMappingAtPath(ObservationType / "configuration" / "observingMode" / "visitor" / "radius", VisitorTable.GuideStarMinSep, VisitorTable.ObservationId),
     )
 
 }

@@ -11993,6 +11993,12 @@ type ConfigurationObservingMode {
   gmosSouthImaging: ConfigurationGmosSouthImaging
   flamingos2LongSlit: ConfigurationFlamingos2LongSlit
   igrins2LongSlit: ConfigurationIgrins2LongSlit
+  visitor: ConfigurationVisitor
+}
+
+type ConfigurationVisitor {
+  mode: VisitorObservingModeType!
+  radius: Angle!
 }
 
 type ConfigurationGmosNorthLongSlit {
