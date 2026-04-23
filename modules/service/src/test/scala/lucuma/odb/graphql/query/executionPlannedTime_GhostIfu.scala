@@ -114,10 +114,10 @@ class executionPlannedTime_GhostIfu extends ExecutionTestSupportForGhost:
         }
       """
 
-    // slow 1x2 red => 49.6 seconds
+    // slow 1x2 red => 51.271 seconds
     val Red:  Expected = Expected("Red", "10.0".sec, "51.271".sec, 2)
 
-    // medium 2x2 blue => 10.1 seconds
+    // medium 2x2 blue => 8.633 seconds
     val Blue: Expected = Expected("Blue", "5.0".sec, "8.633".sec, 5)
 
     val Step1: Json =
