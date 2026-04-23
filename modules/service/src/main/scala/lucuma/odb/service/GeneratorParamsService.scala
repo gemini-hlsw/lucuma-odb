@@ -343,7 +343,13 @@ object GeneratorParamsService {
             ).asRight
 
           case f2 @ flamingos2.longslit.Config(disperser, filter, fpu, sci, acq, _, _, _, _, _, _, _, _) =>
-            val sciMode   = InstrumentMode.Flamingos2Spectroscopy(sci, disperser, filter, fpu)
+            val sciReadMode  = f2.exposureTimeMode match
+                                 case ExposureTimeMode.SignalToNoiseMode(_, _) =>
+                                   Flamingos2ReadMode.Bright // In practice thil will be ignored by the ITC
+                                 case ExposureTimeMode.TimeAndCountMode(time = time) =>
+                                   f2.explicitReadMode.getOrElse(Flamingos2ReadMode.forExposureTime(time))
+
+            val sciMode   = InstrumentMode.Flamingos2Spectroscopy(sci, disperser, filter, sciReadMode, fpu)
 
             spectroscopyGeneratorParams(
               obsMode = f2,
