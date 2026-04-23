@@ -25,7 +25,7 @@ class executionAcqGmosNorth extends ExecutionTestSupportForGmos with mutation.Up
 
   override def fakeItcImagingResultFor(input: ImagingInput): Option[IntegrationTime] =
     input.mode.exposureTimeMode match
-      case ExposureTimeMode.TimeAndCountMode(t, c, _) => IntegrationTime(t, c).some
+      case ExposureTimeMode.TimeAndCountMode(t, c, _, _) => IntegrationTime(t, c).some
       case _ => none
 
   def initialAcquisition(

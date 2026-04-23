@@ -30,8 +30,8 @@ class executionAcqFlamingos2_WithoutSkySubtraction extends ExecutionTestSupportF
 
   override def fakeItcImagingResultFor(input: ImagingInput): Option[IntegrationTime] =
     input.mode.exposureTimeMode match
-      case ExposureTimeMode.TimeAndCountMode(t, c, _) => IntegrationTime(t, c).some
-      case _                                          => IntegrationTime(ExposureTime, PosInt.unsafeFrom(1)).some
+      case ExposureTimeMode.TimeAndCountMode(t, c, _,  _) => IntegrationTime(t, c).some
+      case _                                              => IntegrationTime(ExposureTime, PosInt.unsafeFrom(1)).some
 
   def fineAdjustmentsList(n: Int): Json =
     List

@@ -32,9 +32,9 @@ trait MockItcBase extends Itc[IO]:
     exposureTimeMode: ExposureTimeMode
   ): IO[TargetIntegrationTime] =
     exposureTimeMode match
-      case ExposureTimeMode.SignalToNoiseMode(sn, at)         =>
+      case ExposureTimeMode.SignalToNoiseMode(sn, at)            =>
         calculateIntegrationTime(target, at, observingMode, constraints, sn)
-      case ExposureTimeMode.TimeAndCountMode(time, count, at) =>
+      case ExposureTimeMode.TimeAndCountMode(time, count, _, at) =>
         calculateSignalToNoise(target, at, observingMode, constraints, time, count)
 
   def calculateSignalToNoise(

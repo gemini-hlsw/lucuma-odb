@@ -607,7 +607,7 @@ object ObservationService {
       def tpe: ExposureTimeModeType =
         m match
           case ExposureTimeMode.SignalToNoiseMode(_, _)   => ExposureTimeModeType.SignalToNoiseMode
-          case ExposureTimeMode.TimeAndCountMode(_, _, _) => ExposureTimeModeType.TimeAndCountMode
+          case ExposureTimeMode.TimeAndCountMode(_, _, _, _) => ExposureTimeModeType.TimeAndCountMode
 
     val selectOid: Query[ObservationReference, Observation.Id] =
       sql"""

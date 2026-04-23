@@ -98,6 +98,7 @@ trait GenerationTestSupport extends OdbSuite:
       case InstrumentExecutionConfig.Ghost(e)      => e
       case InstrumentExecutionConfig.GmosNorth(e)  => e
       case InstrumentExecutionConfig.GmosSouth(e)  => e
+      case InstrumentExecutionConfig.Gnirs(e)      => e
       case InstrumentExecutionConfig.Igrins2(e)    => e
 
   def acquisitionSequenceIds(user: User, oid:  Observation.Id): IO[ListMap[Atom.Id, List[Step.Id]]] =
