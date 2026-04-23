@@ -67,6 +67,11 @@ final class Enums(
     case GcalFilter                 extends TimeEstimate("gcal_filter")
     case GcalShutter                extends TimeEstimate("gcal_shutter")
 
+    case GhostIfuMaxVisit           extends TimeEstimate("ghost_ifu_max_visit")
+    case GhostIfuSetup              extends TimeEstimate("ghost_ifu_setup")
+    case GhostReacquisition         extends TimeEstimate("ghost_reacquisition")
+    case GhostWrite                 extends TimeEstimate("ghost_write")
+
     case GmosNorthDisperser         extends TimeEstimate("gmos_north_disperser")
     case GmosNorthFilter            extends TimeEstimate("gmos_north_filter")
     case GmosNorthFpu               extends TimeEstimate("gmos_north_fpu")
