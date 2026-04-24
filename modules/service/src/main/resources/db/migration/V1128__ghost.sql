@@ -6,7 +6,8 @@ CREATE TABLE t_smart_ghost (
 
   -- Matching key
   c_resolution_mode d_tag NOT NULL REFERENCES t_ghost_resolution_mode(c_tag),
-  c_binning         d_tag NOT NULL REFERENCES t_ghost_binning(c_tag),
+  c_red_binning     d_tag NOT NULL REFERENCES t_ghost_binning(c_tag),
+  c_blue_binning    d_tag NOT NULL REFERENCES t_ghost_binning(c_tag),
 
   c_step_order int8  NOT NULL DEFAULT 0 CHECK (c_step_order > 0),
 

@@ -22,7 +22,12 @@ object Ghost:
     resolutionMode: GhostResolutionMode,
     redBinning:     GhostBinning,
     blueBinning:    GhostBinning
-  ) derives Eq
+  ) derives Eq:
+    def format: String =
+      val r  = s"resolutionMode: $resolutionMode"
+      val rb = s"redBinning: $redBinning"
+      val bb = s"blueBinning: $blueBinning"
+      s"Ghost { $r, red: $rb, blue: $bb }"
 
   object SearchKey:
 
@@ -32,7 +37,7 @@ object Ghost:
     ): SearchKey =
       SearchKey(s.resolutionMode, d.red.value.binning, d.blue.value.binning)
 
-  case class GhostConfig(
+  case class GhostUpdate(
     redExposureTime:   TimeSpan,
     redExposureCount:  PosInt,
     blueExposureTime:  TimeSpan,
@@ -40,12 +45,7 @@ object Ghost:
     slitExposureTime:  TimeSpan
   )
 
-  case class TableKey(
-    resolutionMode: GhostResolutionMode,
-    binning:        GhostBinning
-  )
-
   case class TableRow(
-    key:   TableKey,
-    value: SmartGcalValue[GhostConfig]
+    key:   SearchKey,
+    value: SmartGcalValue[GhostUpdate]
   )

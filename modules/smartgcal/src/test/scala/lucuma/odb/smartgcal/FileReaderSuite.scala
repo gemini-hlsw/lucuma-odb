@@ -14,8 +14,9 @@ import lucuma.odb.smartgcal.parsers.Availability
 final class FileReaderSuite extends munit.FunSuite:
 
   private def loadInstrument[A](
-    filename:    String,
-    entryParser: String => Either[Parser.Error, Availability[A]]
+    filename:        String,
+    entryParser:     String => Either[Parser.Error, Availability[A]],
+    headerLineCount: Int = 2
   ): Unit =
 
     val r  = s"smartgcal/$filename.csv"
@@ -23,7 +24,7 @@ final class FileReaderSuite extends munit.FunSuite:
     val s  = fs2.io.readInputStream[IO](is,8192)
 
     val (obsolete, current) =
-       s.through(FileReader.entryLines)
+       s.through(FileReader.entryLines(headerLineCount))
         .flatMap: (lineNumber, s) =>
           entryParser(s) match
             case Left(e)  => Stream.raiseError[IO](new RuntimeException(s"$filename $lineNumber:\n${e.show}"))
@@ -35,7 +36,7 @@ final class FileReaderSuite extends munit.FunSuite:
         .onlyOrError
         .unsafeRunSync()
 
-    val rawLineCount     = s.through(FileReader.entryLines).compile.count.unsafeRunSync()
+    val rawLineCount     = s.through(FileReader.entryLines(headerLineCount)).compile.count.unsafeRunSync()
 
     // In reality, the test is just that the parsing doesn't fail.  Assuming
     // there are no parse errors the parsed entry count should be the same as
@@ -46,7 +47,7 @@ final class FileReaderSuite extends munit.FunSuite:
     loadInstrument(filename, parsers.flamingos2.fileEntry.map(Availability.Current.apply).parseAll)
 
   private def loadGhost(filename: String): Unit =
-    loadInstrument(filename, parsers.ghost.row.map(Availability.Current.apply).parseAll)
+    loadInstrument(filename, parsers.ghost.row.map(Availability.Current.apply).parseAll, headerLineCount = 1)
 
   private def loadGmos[G, L, U](
     filename:    String,

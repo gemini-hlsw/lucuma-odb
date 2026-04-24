@@ -11,8 +11,8 @@ import lucuma.core.enums.GhostResolutionMode
 import lucuma.core.parser.MiscParsers.posInt
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.parser.UtilParsers.posSecondsTimeSpan
-import lucuma.odb.smartgcal.data.Ghost.GhostConfig
-import lucuma.odb.smartgcal.data.Ghost.TableKey
+import lucuma.odb.smartgcal.data.Ghost.GhostUpdate
+import lucuma.odb.smartgcal.data.Ghost.SearchKey
 import lucuma.odb.smartgcal.data.Ghost.TableRow
 import lucuma.odb.smartgcal.data.SmartGcalValue
 import lucuma.core.util.Enumerated
@@ -28,16 +28,16 @@ trait GhostParsers:
   val resolution: Parser[GhostResolutionMode] =
     oneOf(Enumerated[GhostResolutionMode].all.fproductLeft(_.longName)*).withContext("GHOST resolution mode")
 
-  val key: Parser[TableKey] =
+  val key: Parser[SearchKey] =
     (
       (resolution <* columnSep) ~
       (skipColumn *> binning)
-    ).map { case (r, b) => TableKey(r, b) }
+    ).map { case (r, b) => SearchKey(r, b, b) }  // for now, we assume the binning applies to both red and blue
 
   private val seconds: Parser0[TimeSpan] =
     posSecondsTimeSpan <* Parser.char('s')
 
-  val value: Parser[SmartGcalValue[GhostConfig]] =
+  val value: Parser[SmartGcalValue[GhostUpdate]] =
     (
       (posInt       <* columnSep) ~  // observe count (step count)
       (stepConfig   <* columnSep) ~
@@ -48,7 +48,7 @@ trait GhostParsers:
       (baselineType <* columnSep) ~
       (skipColumns(4) *> seconds <* columnSep <* skipColumn <* ignoredValue)
     ).map { case ((((((((cnt, gcal), redTime), redCount)), blueTime), blueCount), baseline), slitTime) =>
-      SmartGcalValue(gcal, baseline, cnt, GhostConfig(redTime, redCount, blueTime, blueCount, slitTime))
+      SmartGcalValue(gcal, baseline, cnt, GhostUpdate(redTime, redCount, blueTime, blueCount, slitTime))
     }
 
   val row: Parser[TableRow] =

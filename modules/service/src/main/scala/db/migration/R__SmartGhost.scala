@@ -16,7 +16,7 @@ import java.io.InputStream
  */
 class R__SmartGhost extends SmartGcalMigration("GHOST"):
 
-  override val importForcingVersion: Int = 4
+  override val importForcingVersion: Int = 5
 
   lazy val definitionFiles: NonEmptyList[(String, IO[InputStream])] =
     gcalFilesFromClasspath("GHOST_ARC", "GHOST_FLAT")
