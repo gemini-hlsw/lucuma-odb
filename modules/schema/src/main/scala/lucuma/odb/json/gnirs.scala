@@ -4,34 +4,34 @@
 package lucuma.odb.json
 
 import cats.syntax.either.*
+import coulomb.Quantity
+import coulomb.syntax.*
+import eu.timepit.refined.types.numeric.PosInt
 import io.circe.Decoder
 import io.circe.Encoder
 import io.circe.Json
-import io.circe.syntax.*
-import lucuma.core.model.sequence.gnirs.GnirsStaticConfig
-import lucuma.core.model.sequence.gnirs.GnirsDynamicConfig
-import lucuma.core.util.TimeSpan
 import io.circe.refined.*
-import coulomb.syntax.*
+import io.circe.syntax.*
+import lucuma.core.enums.GnirsCamera
+import lucuma.core.enums.GnirsDecker
+import lucuma.core.enums.GnirsFilter
+import lucuma.core.enums.GnirsFpuOther
+import lucuma.core.enums.GnirsFpuSlit
+import lucuma.core.enums.GnirsGrating
+import lucuma.core.enums.GnirsPrism
+import lucuma.core.enums.GnirsReadMode
+import lucuma.core.enums.GnirsWellDepth
+import lucuma.core.model.sequence.gnirs.GnirsAcquisitionMirrorMode
+import lucuma.core.model.sequence.gnirs.GnirsDynamicConfig
+import lucuma.core.model.sequence.gnirs.GnirsFocus
+import lucuma.core.model.sequence.gnirs.GnirsFocusMotorStep
+import lucuma.core.model.sequence.gnirs.GnirsFocusMotorStepsValue
+import lucuma.core.model.sequence.gnirs.GnirsGratingWavelength
+import lucuma.core.model.sequence.gnirs.GnirsStaticConfig
+import lucuma.core.util.TimeSpan
 
 import time.decoder.given
 import wavelength.transport.given
-import lucuma.core.enums.GnirsWellDepth
-import lucuma.core.enums.GnirsFilter
-import lucuma.core.enums.GnirsDecker
-import lucuma.core.model.sequence.gnirs.GnirsAcquisitionMirrorMode
-import lucuma.core.enums.GnirsPrism
-import lucuma.core.enums.GnirsGrating
-import lucuma.core.model.sequence.gnirs.GnirsGratingWavelength
-import lucuma.core.enums.GnirsFpuSlit
-import lucuma.core.enums.GnirsFpuOther
-import lucuma.core.enums.GnirsCamera
-import lucuma.core.model.sequence.gnirs.GnirsFocus
-import coulomb.Quantity
-import lucuma.core.model.sequence.gnirs.GnirsFocusMotorStepsValue
-import lucuma.core.model.sequence.gnirs.GnirsFocusMotorStep
-import lucuma.core.enums.GnirsReadMode
-import eu.timepit.refined.types.numeric.PosInt
 
 trait GnirsCodec:
 
