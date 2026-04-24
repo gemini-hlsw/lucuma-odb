@@ -287,7 +287,10 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
     }
     """
 
-  val IsImplemented: Set[ObservingModeType] = ObservingModeType.values.toSet - ObservingModeType.GhostIfu
+  val IsImplemented: Set[ObservingModeType] = 
+    ObservingModeType.values.toSet 
+      - ObservingModeType.GhostIfu 
+      - ObservingModeType.GnirsLongSlit
 
   def load(oid: Observation.Id, graph: String = ObservationGraph): IO[Json] =
     query(user = pi, query = s"""query{observation(observationId: "$oid")$graph}""")
