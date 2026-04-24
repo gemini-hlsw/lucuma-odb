@@ -289,7 +289,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
             input.mode.exposureTimeMode match
               case ExposureTimeMode.SignalToNoiseMode(_, _)   =>
                 fakeItcSpectroscopyResultFor(input).getOrElse(fakeItcSpectroscopyResult)
-              case ExposureTimeMode.TimeAndCountMode(t, c, _, _) =>
+              case ExposureTimeMode.TimeAndCountMode(t, c, _) =>
                 IntegrationTime(t, PosInt.unsafeFrom(c.value))
 
           ClientCalculationResult(

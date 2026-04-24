@@ -151,9 +151,9 @@ object ItcImpl {
 
             def traceParams: F[Unit] =
               exposureTimeMode match
-                case ExposureTimeMode.SignalToNoiseMode(sn, at)            =>
+                case ExposureTimeMode.SignalToNoiseMode(sn, at)         =>
                   span.addAttribute(Attribute("params.signal_to_noise", sn.toBigDecimal.toDouble))
-                case ExposureTimeMode.TimeAndCountMode(time, count, _, at) => // TODO add coadds
+                case ExposureTimeMode.TimeAndCountMode(time, count, at) => // TODO add coadds
                   span.addAttributes(Attribute("params.exposure_time", time.toMilliseconds.toLong),
                                      Attribute("params.exposure_count", count.value.toLong)
                   )

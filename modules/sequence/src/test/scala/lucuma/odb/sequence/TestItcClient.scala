@@ -49,7 +49,7 @@ object TestItcClient {
           input.mode.exposureTimeMode match
             case ExposureTimeMode.SignalToNoiseMode(_, _)   =>
               result
-            case ExposureTimeMode.TimeAndCountMode(t, c, _, _) =>
+            case ExposureTimeMode.TimeAndCountMode(t, c, _) =>
               IntegrationTime(t, c)
 
         val snAt = input.mode.exposureTimeMode match

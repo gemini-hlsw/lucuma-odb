@@ -32,7 +32,7 @@ case class ItcSourceDefinition(
 extension (etm: ExposureTimeMode)
   def spectroscopyCalculationMethod: ItcObservationDetails.CalculationMethod =
     etm match
-      case ExposureTimeMode.SignalToNoiseMode(sn, at)            =>
+      case ExposureTimeMode.SignalToNoiseMode(sn, at)         =>
         ItcObservationDetails.CalculationMethod.IntegrationTimeMethod.SpectroscopyIntegrationTime(
           sigma = sn.toBigDecimal.toDouble,
           coadds = None,
@@ -40,7 +40,7 @@ extension (etm: ExposureTimeMode)
           sourceFraction = 1.0,
           ditherOffset = Angle.Angle0
         )
-      case ExposureTimeMode.TimeAndCountMode(time, count, _, at) => // TODO add coadds
+      case ExposureTimeMode.TimeAndCountMode(time, count, at) => // TODO add coadds
         ItcObservationDetails.CalculationMethod.S2NMethod.SpectroscopyS2N(
           exposureCount = count.value,
           coadds = None,
@@ -51,14 +51,14 @@ extension (etm: ExposureTimeMode)
         )
   def imagingCalculationMethod: ItcObservationDetails.CalculationMethod      =
     etm match
-      case ExposureTimeMode.SignalToNoiseMode(sn, at)            =>
+      case ExposureTimeMode.SignalToNoiseMode(sn, at)         =>
         ItcObservationDetails.CalculationMethod.IntegrationTimeMethod.ImagingIntegrationTime(
           sigma = sn.toBigDecimal.toDouble,
           coadds = None,
           sourceFraction = 1.0,
           ditherOffset = Angle.Angle0
         )
-      case ExposureTimeMode.TimeAndCountMode(time, count, _, at) => // TODO add coadds
+      case ExposureTimeMode.TimeAndCountMode(time, count, at) => // TODO add coadds
         ItcObservationDetails.CalculationMethod.S2NMethod.ImagingS2N(
           exposureCount = count.value,
           coadds = None,
@@ -69,8 +69,8 @@ extension (etm: ExposureTimeMode)
 
   def desiredString: String =
     etm match
-      case ExposureTimeMode.SignalToNoiseMode(sn, at)            => s"Desired S/N $sn at $at"
-      case ExposureTimeMode.TimeAndCountMode(time, count, _, at) => // TODO add coadds
+      case ExposureTimeMode.SignalToNoiseMode(sn, at)         => s"Desired S/N $sn at $at"
+      case ExposureTimeMode.TimeAndCountMode(time, count, at) => // TODO add coadds
         s"Calculate S/N for exp time $time and count $count at $at"
 
 def getCalculationMethod(

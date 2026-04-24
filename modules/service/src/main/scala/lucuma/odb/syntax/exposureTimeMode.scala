@@ -24,7 +24,7 @@ trait ToExposureTimeModeOps:
     def modeType: ExposureTimeModeType =
       etm match
         case ExposureTimeMode.SignalToNoiseMode(_, _)   => ExposureTimeModeType.SignalToNoiseMode
-        case ExposureTimeMode.TimeAndCountMode(_, _, _, _) => ExposureTimeModeType.TimeAndCountMode
+        case ExposureTimeMode.TimeAndCountMode(_, _, _) => ExposureTimeModeType.TimeAndCountMode
 
     def signalToNoise: Option[SignalToNoise] =
       ExposureTimeMode
