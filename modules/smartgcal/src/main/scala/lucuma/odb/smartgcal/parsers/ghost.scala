@@ -9,13 +9,13 @@ import cats.syntax.all.*
 import lucuma.core.enums.GhostBinning
 import lucuma.core.enums.GhostResolutionMode
 import lucuma.core.parser.MiscParsers.posInt
+import lucuma.core.util.Enumerated
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.parser.UtilParsers.posSecondsTimeSpan
 import lucuma.odb.smartgcal.data.Ghost.GhostUpdate
 import lucuma.odb.smartgcal.data.Ghost.SearchKey
 import lucuma.odb.smartgcal.data.Ghost.TableRow
 import lucuma.odb.smartgcal.data.SmartGcalValue
-import lucuma.core.util.Enumerated
 
 trait GhostParsers:
   import common.*
