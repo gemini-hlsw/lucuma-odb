@@ -225,6 +225,8 @@ object Generator:
               EitherT(streaming.selectOrGenerateGmosSouthImaging(ctx)).flatMap(digest(_, calculator.gmosSouthImagingSetup))
             case ObservingModeType.GmosSouthLongSlit  =>
               EitherT(streaming.selectOrGenerateGmosSouthLongSlit(ctx)).flatMap(digest(_, calculator.gmosSouthLongSlitSetup))
+            case ObservingModeType.GnirsLongSlit      =>
+              ??? // TODO Implement Gnirs observing mode service
             case ObservingModeType.Igrins2LongSlit    =>
               EitherT(streaming.selectOrGenerateIgrins2LongSlit(ctx)).flatMap(digest(_, calculator.igrins2LongSlitSetup))
 
@@ -251,6 +253,7 @@ object Generator:
           case ObservingModeType.GmosNorthLongSlit  => EitherT(streaming.selectOrGenerateGmosNorthLongSlit(ctx))
           case ObservingModeType.GmosSouthImaging   => EitherT(streaming.selectOrGenerateGmosSouthImaging(ctx))
           case ObservingModeType.GmosSouthLongSlit  => EitherT(streaming.selectOrGenerateGmosSouthLongSlit(ctx))
+          case ObservingModeType.GnirsLongSlit      => ??? // TODO Implement Gnirs observing mode service
           case ObservingModeType.Igrins2LongSlit    => EitherT(streaming.selectOrGenerateIgrins2LongSlit(ctx))
 
         (checkSequence *> stepCount).flatMap: sc =>
@@ -334,6 +337,9 @@ object Generator:
                 .flatMap(s => EitherT.liftF(executionConfig(s)))
                 .map(InstrumentExecutionConfig.GmosSouth.apply)
 
+            case ObservingModeType.GnirsLongSlit      =>
+              ??? // TODO Implement Gnirs observing mode service
+
             case ObservingModeType.Igrins2LongSlit    =>
               EitherT(streaming.selectOrGenerateIgrins2LongSlit(ctx))
                 .flatMap(s => EitherT.liftF(executionConfig(s)))
@@ -369,6 +375,9 @@ object Generator:
             case ObservingModeType.GmosSouthLongSlit  =>
               EitherT(streaming.generateGmosSouthLongSlit(ctx))
                 .flatMap(s => EitherT.liftF(sequenceService.resetGmosSouthAcquisition(observationId, s.acquisition)))
+
+            case ObservingModeType.GnirsLongSlit      =>  
+              ??? // TODO Implement Gnirs observing mode service
 
             case ObservingModeType.Igrins2LongSlit    =>
               EitherT.pure(())
@@ -407,6 +416,9 @@ object Generator:
             case ObservingModeType.GmosSouthLongSlit  =>
               EitherT(streaming.generateGmosSouthLongSlit(ctx))
                 .flatMap(s => EitherT.liftF(sequenceService.materializeGmosSouthExecutionConfig(oid, s)))
+
+            case ObservingModeType.GnirsLongSlit      =>
+              ??? // TODO Implement Gnirs observing mode service
 
             case ObservingModeType.Igrins2LongSlit    =>
               EitherT(streaming.generateIgrins2LongSlit(ctx))

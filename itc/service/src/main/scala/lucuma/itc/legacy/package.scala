@@ -40,7 +40,7 @@ extension (etm: ExposureTimeMode)
           sourceFraction = 1.0,
           ditherOffset = Angle.Angle0
         )
-      case ExposureTimeMode.TimeAndCountMode(time, count, at) =>
+      case ExposureTimeMode.TimeAndCountMode(time, count, at) => // TODO add coadds
         ItcObservationDetails.CalculationMethod.S2NMethod.SpectroscopyS2N(
           exposureCount = count.value,
           coadds = None,
@@ -58,7 +58,7 @@ extension (etm: ExposureTimeMode)
           sourceFraction = 1.0,
           ditherOffset = Angle.Angle0
         )
-      case ExposureTimeMode.TimeAndCountMode(time, count, at) =>
+      case ExposureTimeMode.TimeAndCountMode(time, count, at) => // TODO add coadds
         ItcObservationDetails.CalculationMethod.S2NMethod.ImagingS2N(
           exposureCount = count.value,
           coadds = None,
@@ -70,7 +70,7 @@ extension (etm: ExposureTimeMode)
   def desiredString: String =
     etm match
       case ExposureTimeMode.SignalToNoiseMode(sn, at)         => s"Desired S/N $sn at $at"
-      case ExposureTimeMode.TimeAndCountMode(time, count, at) =>
+      case ExposureTimeMode.TimeAndCountMode(time, count, at) => // TODO add coadds
         s"Calculate S/N for exp time $time and count $count at $at"
 
 def getCalculationMethod(

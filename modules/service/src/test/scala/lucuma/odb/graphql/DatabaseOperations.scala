@@ -1027,6 +1027,8 @@ trait DatabaseOperations { this: OdbSuite =>
               focalPlaneAngle: { microarcseconds: 0 }
             }
           }"""
+      case ObservingModeType.GnirsLongSlit =>
+        ??? // TODO implement Gnirs
       case ObservingModeType.Igrins2LongSlit =>
         """{
           spectroscopy: {
@@ -1092,6 +1094,8 @@ trait DatabaseOperations { this: OdbSuite =>
             centralWavelength: { nanometers: 500 }
           }
         }"""
+      case ObservingModeType.GnirsLongSlit =>
+        ??? // TODO implement Gnirs
       case ObservingModeType.Igrins2LongSlit =>
         """{
           igrins2LongSlit: {

@@ -153,7 +153,7 @@ object ItcImpl {
               exposureTimeMode match
                 case ExposureTimeMode.SignalToNoiseMode(sn, at)         =>
                   span.addAttribute(Attribute("params.signal_to_noise", sn.toBigDecimal.toDouble))
-                case ExposureTimeMode.TimeAndCountMode(time, count, at) =>
+                case ExposureTimeMode.TimeAndCountMode(time, count, at) => // TODO add coadds
                   span.addAttributes(Attribute("params.exposure_time", time.toMilliseconds.toLong),
                                      Attribute("params.exposure_count", count.value.toLong)
                   )
