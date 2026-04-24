@@ -1,0 +1,60 @@
+#import Timestamp, TimestampInterval, Site, Date from "lucuma/odb/graphql/OdbSchema.graphql"
+
+enum TelescopeAvailability {
+  OPEN
+  CLOSED
+}
+
+enum TooSupport {
+  STANDARD
+  INTERRUPT
+  RAPID
+  NONE
+}
+
+enum TelescopeModeType {
+  QUEUE
+  CLASSICAL
+  PRIORITY_VISITOR
+  ENGINEERING
+  COMMISSIONING
+}
+
+
+type TelescopeMode {
+  type: TelescopeModeType!
+  programReference: String
+}
+
+type TelescopeAvailabilityStatus {
+  interval: TimestampInterval!
+  availability: TelescopeAvailability!
+  reason: String
+  plannedAvailability: TelescopeAvailability
+  site: Site!
+}
+
+type TelescopeTooStatus {
+  interval: TimestampInterval!
+  tooSupport: TooSupport!
+  site: Site!
+}
+
+type TelescopeModeStatus {
+  interval: TimestampInterval!
+  site: Site!
+  mode: TelescopeMode!
+}
+
+type TelescopeNightTimeline {
+  site: Site!
+  observingNight: Date!
+  displayInterval: TimestampInterval!
+  availability: [TelescopeAvailabilityStatus!]!
+  tooStatus: [TelescopeTooStatus!]!
+  modes: [TelescopeModeStatus!]!
+}
+
+type Query {
+  telescopeNightTimeline(site: Site!, observingNight: Date!): TelescopeNightTimeline
+}
