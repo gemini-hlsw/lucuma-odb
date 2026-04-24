@@ -19,12 +19,15 @@ class introspection extends OdbSuite:
           __schema {
             queryType {
               name
+              kind
             }
             mutationType {
               name
+              kind
             }
             subscriptionType {
               name
+              kind
             }
             types {
               ...FullType
@@ -32,8 +35,9 @@ class introspection extends OdbSuite:
             directives {
               name
               description
+              isRepeatable
               locations
-              args {
+              args(includeDeprecated: true) {
                 ...InputValue
               }
             }
@@ -44,10 +48,12 @@ class introspection extends OdbSuite:
           kind
           name
           description
+          specifiedByURL
+          isOneOf
           fields(includeDeprecated: true) {
             name
             description
-            args {
+            args(includeDeprecated: true) {
               ...InputValue
             }
             type {
@@ -56,7 +62,7 @@ class introspection extends OdbSuite:
             isDeprecated
             deprecationReason
           }
-          inputFields {
+          inputFields(includeDeprecated: true) {
             ...InputValue
           }
           interfaces {
@@ -80,6 +86,8 @@ class introspection extends OdbSuite:
             ...TypeRef
           }
           defaultValue
+          isDeprecated
+          deprecationReason
         }
 
         fragment TypeRef on __Type {
@@ -106,6 +114,14 @@ class introspection extends OdbSuite:
                       ofType {
                         kind
                         name
+                        ofType {
+                          kind
+                          name
+                          ofType {
+                            kind
+                            name
+                          }
+                        }
                       }
                     }
                   }

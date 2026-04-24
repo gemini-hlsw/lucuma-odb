@@ -1,4 +1,4 @@
-import NativePackagerHelper._
+import NativePackagerHelper.*
 
 // Please keep in alphabetical order
 val awsJavaSdkVersion            = "1.12.797"
@@ -815,3 +815,65 @@ lazy val phase0 = project
 // Command aliases for starting/stopping all services
 addCommandAlias("allStart", ";service/reStart;obscalc/reStart;calibrations/reStart")
 addCommandAlias("allStop", ";service/reStop;obscalc/reStop;calibrations/reStop")
+
+// START RESOURCE
+
+lazy val resourceModel =
+  project
+    .in(file("resource/model"))
+    .enablePlugins(NoPublishPlugin)
+    .dependsOn(otel)
+    .settings(resourceCommonSettings)
+    .settings(
+      name := "lucuma-resource-model",
+      libraryDependencies ++= Seq(
+        "edu.gemini"    %% "lucuma-core"  % lucumaCoreVersion,
+        "io.circe"      %% "circe-core"   % circeVersion,
+        "is.cir"        %% "ciris-http4s" % cirisVersion,
+        "is.cir"        %% "ciris"        % cirisVersion,
+        "org.http4s"    %% "http4s-core"  % http4sVersion,
+        "org.typelevel" %% "cats-core"    % catsVersion
+      )
+    )
+
+lazy val resourceService = project
+  .in(file("resource/service"))
+  .dependsOn(resourceModel, binding, otel)
+  .enablePlugins(BuildInfoPlugin, LucumaDockerPlugin, NoPublishPlugin)
+  .settings(resourceCommonSettings, buildInfoSettings)
+  .settings(
+    name                        := "lucuma-resource-service",
+    description                 := "Lucuma Resource Service",
+    libraryDependencies ++= Seq(
+      "ch.qos.logback" % "logback-classic"                       % logbackVersion,
+      "co.fs2"        %% "fs2-core"                              % fs2Version,
+      "co.fs2"        %% "fs2-io"                                % fs2Version,
+      "edu.gemini"    %% "lucuma-graphql-routes"                 % lucumaGraphQLRoutesVersion,
+      "is.cir"        %% "ciris-http4s"                          % cirisVersion,
+      "is.cir"        %% "ciris"                                 % cirisVersion,
+      "org.flywaydb"   % "flyway-core"                           % flywayVersion,
+      "org.http4s"    %% "http4s-circe"                          % http4sVersion,
+      "org.http4s"    %% "http4s-dsl"                            % http4sVersion,
+      "org.http4s"    %% "http4s-ember-server"                   % http4sBlazeVersion,
+      "org.http4s"    %% "http4s-otel4s-middleware-metrics"      % http4sOtel4sVersion,
+      "org.http4s"    %% "http4s-otel4s-middleware-trace-server" % http4sOtel4sVersion,
+      "org.postgresql" % "postgresql"                            % postgresVersion,
+      "org.tpolecat"  %% "skunk-circe"                           % skunkVersion,
+      "org.tpolecat"  %% "skunk-core"                            % skunkVersion,
+      "org.typelevel" %% "cats-effect"                           % catsEffectVersion,
+      "org.typelevel" %% "grackle-skunk"                         % grackleVersion,
+      "org.typelevel" %% "log4cats-slf4j"                        % log4catsVersion,
+      "com.dimafeng"  %% "testcontainers-scala-munit"            % testcontainersScalaVersion   % Test,
+      "com.dimafeng"  %% "testcontainers-scala-postgresql"       % testcontainersScalaVersion   % Test,
+      "edu.gemini"    %% "lucuma-core-testkit"                   % lucumaCoreVersion            % Test,
+      "org.scalameta" %% "munit-scalacheck"                      % munitScalacheckVersion       % Test,
+      "org.scalameta" %% "munit"                                 % munitVersion                 % Test,
+      "org.typelevel" %% "munit-cats-effect"                     % munitCatsEffectVersion       % Test,
+      "org.typelevel" %% "scalacheck-effect-munit"               % scalacheckEffectMunitVersion % Test
+    ),
+    reStart / envVars += "PORT" -> "8484",
+    dockerExposedPorts ++= Seq(8484)
+  )
+
+lazy val resourceCommonSettings = lucumaGlobalSettings ++ Seq(
+)
