@@ -9007,6 +9007,14 @@ input GhostSpectroscopyInput {
   blueDetector: ItcGhostDetectorInput!
 }
 
+input GnirsSpectroscopyInput {
+  """Exposure time mode."""
+  exposureTimeMode: ExposureTimeModeInput!
+
+  """Number of cycles per exposure"""
+  coadds: PosInt!
+}
+
 """Params for instrument modes"""
 input InstrumentModesInput @oneOf {
   """Gmos North Spectroscopy"""
@@ -9032,6 +9040,9 @@ input InstrumentModesInput @oneOf {
 
   """GHOST Spectroscopy"""
   ghostSpectroscopy: GhostSpectroscopyInput
+
+  """Gnirs Longslit Spectroscopy"""
+  gnirsSpectroscopy: GnirsSpectroscopyInput
 }
 
 """Image quality input - specify either preset or exact arcsec value"""

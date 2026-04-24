@@ -155,6 +155,23 @@ object ObservingMode {
       val description: String =
         s"${instrument.shortName} IFU"
     }
+
+    final case class GnirsLongSlit(
+    ) extends SpectroscopyMode derives Hash {
+      val instrument: Instrument =
+        Instrument.Gnirs
+
+      def portDisposition: PortDisposition =
+        PortDisposition.Bottom // ???
+
+      override def analysisMethod: AnalysisMethod =
+        ItcObservationDetails.AnalysisMethod.Aperture.Auto(
+          skyAperture = 1.0
+        )
+
+      val description: String =
+        s"${instrument.shortName} Longslit"
+    }
   }
 
   sealed trait ImagingMode extends ObservingMode derives Hash
