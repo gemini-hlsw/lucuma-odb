@@ -23,6 +23,7 @@ import lucuma.core.model.User
 import lucuma.core.syntax.string.*
 import lucuma.core.util.Enumerated
 import lucuma.odb.graphql.mutation.UpdateObservationsOps
+import lucuma.odb.isImplemented
 
 class observation_configurationRequests
   extends OdbSuite
@@ -113,7 +114,7 @@ class observation_configurationRequests
       case ObservingModeType.GmosNorthImaging   => Mutation.forGmosNorthImaging(user, oid, List(GmosNorthFilter.CaT, GmosNorthFilter.DS920))
       case ObservingModeType.GmosSouthLongSlit  => Mutation.forGmosSouthLongSlit(user, oid, GmosSouthGrating.B480_G5327)
       case ObservingModeType.GmosSouthImaging   => Mutation.forGmosSouthImaging(user, oid, List(GmosSouthFilter.CaT, GmosSouthFilter.GG455))
-      case ObservingModeType.GnirsLongSlit      => IO.raiseError(new RuntimeException("GNIRS not supported yet"))
+      case ObservingModeType.GnirsLongSlit      => IO.unit // TODO implement Gnirs
       case ObservingModeType.Igrins2LongSlit    => Mutation.forIgrins2LongSlit(user, oid, Igrins2OffsetMode.NodAlongSlit)
 
   def compatibleMutation(user: User, oid: Observation.Id, mode: ObservingModeType): IO[Unit] =
@@ -124,7 +125,7 @@ class observation_configurationRequests
       case ObservingModeType.GmosNorthImaging   => Mutation.forGmosNorthImaging(user, oid, List(GmosNorthFilter.DS920)) // subset of original, ok
       case ObservingModeType.GmosSouthLongSlit  => IO.unit // no changes are compatible
       case ObservingModeType.GmosSouthImaging   => Mutation.forGmosSouthImaging(user, oid, List(GmosSouthFilter.GG455)) // subset of original, ok
-      case ObservingModeType.GnirsLongSlit      => IO.raiseError(new RuntimeException("GNIRS not supported yet"))
+      case ObservingModeType.GnirsLongSlit      => IO.unit // TODO implement Gnirs
       case ObservingModeType.Igrins2LongSlit    => IO.unit // no changes are compatible
 
   def incompatibleMutation(user: User, oid: Observation.Id, mode: ObservingModeType): Option[IO[Unit]] =
@@ -135,7 +136,7 @@ class observation_configurationRequests
       case ObservingModeType.GmosNorthImaging   => None // Mutation.forGmosNorthImaging(user, oid, List(GmosNorthFilter.GG455, GmosNorthFilter.GPrime_GG455))
       case ObservingModeType.GmosSouthLongSlit  => Some(Mutation.forGmosSouthLongSlit(user, oid, GmosSouthGrating.R600_G5324))
       case ObservingModeType.GmosSouthImaging   => None // Mutation.forGmosSouthImaging(user, oid, List(GmosSouthFilter.GG455, GmosSouthFilter.GPrime_GG455))
-      case ObservingModeType.GnirsLongSlit      => Some(IO.raiseError(new RuntimeException("GNIRS not supported yet")))
+      case ObservingModeType.GnirsLongSlit      => Some(IO.unit) // TODO implement Gnirs
       case ObservingModeType.Igrins2LongSlit    => None // Mutation.forIgrins2LongSlit(user, oid, Igrins2OffsetMode.NodToSky)
 
   private def updateObservationAs(user: User, oid: Observation.Id)(update: String): IO[Unit] =
@@ -217,7 +218,7 @@ class observation_configurationRequests
           case ObservingModeType.Igrins2LongSlit    => createIgrins2LongSlitObservationAs(pi, pid, tid)
     yield oid
 
-  Enumerated[ObservingModeType].all.filterNot(_ === ObservingModeType.GhostIfu).foreach { mode =>
+  Enumerated[ObservingModeType].all.filter(_.isImplemented).foreach { mode =>
     List(false, true).foreach { too =>
 
       val prefix = s"[$mode, ${if too then "opportunity" else "sidereal"}]"
