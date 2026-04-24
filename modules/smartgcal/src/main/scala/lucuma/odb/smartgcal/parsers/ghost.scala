@@ -1,0 +1,57 @@
+// Copyright (c) 2016-2025 Association of Universities for Research in Astronomy, Inc. (AURA)
+// For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
+
+package lucuma.odb.smartgcal.parsers
+
+import cats.parse.Parser
+import cats.parse.Parser0
+import cats.syntax.all.*
+import lucuma.core.enums.GhostBinning
+import lucuma.core.enums.GhostResolutionMode
+import lucuma.core.parser.MiscParsers.posInt
+import lucuma.core.util.TimeSpan
+import lucuma.core.util.parser.UtilParsers.posSecondsTimeSpan
+import lucuma.odb.smartgcal.data.Ghost.GhostConfig
+import lucuma.odb.smartgcal.data.Ghost.TableKey
+import lucuma.odb.smartgcal.data.Ghost.TableRow
+import lucuma.odb.smartgcal.data.SmartGcalValue
+import lucuma.core.util.Enumerated
+
+trait GhostParsers:
+  import common.*
+  import gcal.*
+  import util.*
+
+  val binning: Parser[GhostBinning] =
+    oneOf(Enumerated[GhostBinning].all.fproductLeft(_.name)*).withContext("GHOST binning")
+
+  val resolution: Parser[GhostResolutionMode] =
+    oneOf(Enumerated[GhostResolutionMode].all.fproductLeft(_.longName)*).withContext("GHOST resolution mode")
+
+  val key: Parser[TableKey] =
+    (
+      (resolution <* columnSep) ~
+      (skipColumn *> binning)
+    ).map { case (r, b) => TableKey(r, b) }
+
+  private val seconds: Parser0[TimeSpan] =
+    posSecondsTimeSpan <* Parser.char('s')
+
+  val value: Parser[SmartGcalValue[GhostConfig]] =
+    (
+      (posInt       <* columnSep) ~  // observe count (step count)
+      (stepConfig   <* columnSep) ~
+      (seconds      <* columnSep) ~  // red exposure time
+      (posInt       <* columnSep) ~  // red exposure count
+      (seconds      <* columnSep) ~  // blue exposure time
+      (posInt       <* columnSep) ~  // blue exposure count
+      (baselineType <* columnSep) ~
+      (skipColumns(4) *> seconds <* columnSep <* skipColumn <* ignoredValue)
+    ).map { case ((((((((cnt, gcal), redTime), redCount)), blueTime), blueCount), baseline), slitTime) =>
+      SmartGcalValue(gcal, baseline, cnt, GhostConfig(redTime, redCount, blueTime, blueCount, slitTime))
+    }
+
+  val row: Parser[TableRow] =
+    ((key <* columnSep) ~ value).map((key, value) => TableRow(key, value))
+
+object ghost extends GhostParsers

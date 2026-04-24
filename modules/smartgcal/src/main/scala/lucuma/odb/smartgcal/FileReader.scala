@@ -21,7 +21,7 @@ object FileReader {
     val error:      Parser.Error
   ) extends RuntimeException(s"$fileName, line $lineNumber: ${error.show}")
 
-  def entryLines[F[_]]: Pipe[F, Byte, (PosLong, String)] = { in =>
+  def entryLines[F[_]](dropCount: Int): Pipe[F, Byte, (PosLong, String)] = { in =>
     def skip(s: String): Boolean =
       s.startsWith("#") || s.startsWith(",") || s.isEmpty
 
@@ -32,16 +32,23 @@ object FileReader {
      .collect {
        case (s, n) if !skip(s) => (PosLong.unsafeFrom(n+1), s)  // convert index to line number, skip comments, swap order
      }
-     .drop(2)                               // drop version and header
+     .drop(dropCount) // drop version and header
   }
 
-  def read[F[_], A](n: String, p: Parser[Availability[A]])(using ApplicativeError[F, Throwable]): Pipe[F, Byte, (PosLong, A)] =
-    _.through(entryLines)
+  def read[F[_], A](
+    n: String,
+    p: Parser[Availability[A]],
+    headerLineCount: Int = 2
+  )(using ApplicativeError[F, Throwable]): Pipe[F, Byte, (PosLong, A)] =
+    _.through(entryLines(headerLineCount))
      .flatMap: (lineNumber, s) =>
        p.parseAll(s) match
          case Left(e)           => Stream.raiseError[F](new ReadException(n, lineNumber, e))
          case Right(Obsolete)   => Stream.empty
          case Right(Current(a)) => Stream.emit[F, (PosLong, A)](lineNumber -> a)
+
+  def ghost[F[_]](fileName: String)(using ApplicativeError[F, Throwable]): Pipe[F, Byte, (PosLong, data.Ghost.TableRow)] =
+    read(fileName, parsers.ghost.row.map(Current.apply), headerLineCount = 1)
 
   def gmosNorth[F[_]](fileName: String)(using ApplicativeError[F, Throwable]): Pipe[F, Byte, (PosLong, data.Gmos.FileEntry.North)] =
     read(fileName, parsers.gmosNorth.fileEntry)

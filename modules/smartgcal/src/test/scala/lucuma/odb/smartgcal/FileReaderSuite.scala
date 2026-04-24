@@ -6,6 +6,7 @@ package lucuma.odb.smartgcal
 import cats.effect.IO
 import cats.effect.unsafe.implicits.global
 import cats.parse.Parser
+import cats.syntax.show.*
 import fs2.Stream
 import lucuma.odb.smartgcal.data.Gmos.FileEntry as GmosFileEntry
 import lucuma.odb.smartgcal.parsers.Availability
@@ -25,7 +26,7 @@ final class FileReaderSuite extends munit.FunSuite:
        s.through(FileReader.entryLines)
         .flatMap: (lineNumber, s) =>
           entryParser(s) match
-            case Left(e)  => Stream.raiseError[IO](new RuntimeException(s"$filename $lineNumber: $s"))
+            case Left(e)  => Stream.raiseError[IO](new RuntimeException(s"$filename $lineNumber:\n${e.show}"))
             case Right(a) => Stream.emit(a)
         .fold((0L, 0L)) { case ((o, c), a) =>
           a.fold((o+1, c), _ => (o, c+1))
@@ -41,14 +42,29 @@ final class FileReaderSuite extends munit.FunSuite:
     // the number of entry lines.
     assertEquals((obsolete + current), rawLineCount)
 
+  private def loadF2(filename: String): Unit =
+    loadInstrument(filename, parsers.flamingos2.fileEntry.map(Availability.Current.apply).parseAll)
+
+  private def loadGhost(filename: String): Unit =
+    loadInstrument(filename, parsers.ghost.row.map(Availability.Current.apply).parseAll)
+
   private def loadGmos[G, L, U](
     filename:    String,
     entryParser: Parser[Availability[GmosFileEntry[G, L, U]]]
   ): Unit =
     loadInstrument(filename, entryParser.parseAll)
 
-  private def loadF2(filename:    String): Unit =
-    loadInstrument(filename, parsers.flamingos2.fileEntry.map(Availability.Current.apply).parseAll)
+  test("Flamingos2_ARC"):
+    loadF2("Flamingos2_ARC")
+
+  test("Flamingos2_FLAT"):
+    loadF2("Flamingos2_FLAT")
+
+  test("GHOST_ARC"):
+    loadGhost("GHOST_ARC")
+
+  test("GHOST_FLAT"):
+    loadGhost("GHOST_FLAT")
 
   test("GMOS-N_ARC"):
     loadGmos("GMOS-N_ARC", parsers.gmosNorth.fileEntry)
@@ -61,9 +77,3 @@ final class FileReaderSuite extends munit.FunSuite:
 
   test("GMOS-S_FLAT"):
     loadGmos("GMOS-S_FLAT", parsers.gmosSouth.fileEntry)
-
-  test("Flamingos2_ARC"):
-    loadF2("Flamingos2_ARC")
-
-  test("Flamingos2_FLAT"):
-    loadF2("Flamingos2_FLAT")
