@@ -12,10 +12,6 @@ import lucuma.core.model.sequence.ghost.GhostDynamicConfig
 import lucuma.core.model.sequence.ghost.GhostStaticConfig
 import lucuma.core.util.TimeSpan
 
-//Resolution Mode,Binning,Calibration Observe,Calibration Filter,Calibration Diffuser,Calibration Lamps,Calibration Shutter,Calibration Red Exposure Time,Calibration Red Count,Calibration Blue Exposure Time,Calibration Blue Count,Calibration Basecal,IFU1X,IFU1Y,IFU2X,IFU2Y,Slitviewer_exptime,Slitviewer binning,No. of slit viewer exposures
-//,,,,,,,,,,,,,,,,
-//Standard Resolution,1x1,1,GMOS balance,Visible,Quartz Halogen 100W,Closed,6.0s,5,6.0s,5,Day,-68.5,0,68.5,0,0.2s,2x2,150
-
 object Ghost:
 
   case class SearchKey(

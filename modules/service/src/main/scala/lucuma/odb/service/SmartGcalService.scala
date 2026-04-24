@@ -173,9 +173,10 @@ object SmartGcalService:
           g: GhostDynamicConfig,
           c: GhostUpdate
         ): GhostDynamicConfig =
+          // TODO: Core optics to simplify
           val redʹ  = g.red.value.copy(exposureTime = c.redExposureTime, exposureCount = c.redExposureCount)
           val blueʹ = g.blue.value.copy(exposureTime = c.blueExposureTime, exposureCount = c.blueExposureCount)
-          g.copy(red = GhostDetector.Red(redʹ), blue = GhostDetector.Blue(blueʹ))
+          g.copy(red = redʹ.asRed, blue = blueʹ.asBlue)
 
         session
           .execute(Statements.selectGhost(sgt))(ghost)
