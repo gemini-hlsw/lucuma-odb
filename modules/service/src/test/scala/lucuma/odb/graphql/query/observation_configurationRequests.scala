@@ -10,6 +10,7 @@ import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.enums.Flamingos2Disperser
+import lucuma.core.enums.GhostResolutionMode
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosNorthGrating
 import lucuma.core.enums.GmosSouthFilter
@@ -37,22 +38,22 @@ class observation_configurationRequests
   /** Mutations that are relevant to configuration requests. */
   object Mutation {
 
-    def forGmosNorthLongSlit(user: User, oid: Observation.Id, grating: GmosNorthGrating): IO[Unit] =
+    def forFlamingos2LongSlit(user: User, oid: Observation.Id, disperser: Flamingos2Disperser): IO[Unit] =
       updateObservationAs(user, oid):
         s"""
           observingMode: {
-            gmosNorthLongSlit: {
-              grating: ${grating.tag.toScreamingSnakeCase}
+            flamingos2LongSlit: {
+              disperser: ${disperser.tag.toScreamingSnakeCase}
             }
           }
         """
 
-    def forGmosSouthLongSlit(user: User, oid: Observation.Id, grating: GmosSouthGrating): IO[Unit] =
+    def forGhostIfu(user: User, oid: Observation.Id, resolutionMode: GhostResolutionMode): IO[Unit] =
       updateObservationAs(user, oid):
         s"""
           observingMode: {
-            gmosSouthLongSlit: {
-              grating: ${grating.tag.toScreamingSnakeCase}
+            ghostIfu: {
+              resolutionMode: ${resolutionMode.tag.toScreamingSnakeCase}
             }
           }
         """
@@ -84,12 +85,22 @@ class observation_configurationRequests
       updateObservationAs(user, oid):
         gmosImagingObservingMode("South", filters)
 
-    def forFlamingos2LongSlit(user: User, oid: Observation.Id, disperser: Flamingos2Disperser): IO[Unit] =
+    def forGmosNorthLongSlit(user: User, oid: Observation.Id, grating: GmosNorthGrating): IO[Unit] =
       updateObservationAs(user, oid):
         s"""
           observingMode: {
-            flamingos2LongSlit: {
-              disperser: ${disperser.tag.toScreamingSnakeCase}
+            gmosNorthLongSlit: {
+              grating: ${grating.tag.toScreamingSnakeCase}
+            }
+          }
+        """
+
+    def forGmosSouthLongSlit(user: User, oid: Observation.Id, grating: GmosSouthGrating): IO[Unit] =
+      updateObservationAs(user, oid):
+        s"""
+          observingMode: {
+            gmosSouthLongSlit: {
+              grating: ${grating.tag.toScreamingSnakeCase}
             }
           }
         """
@@ -109,7 +120,7 @@ class observation_configurationRequests
   def baseMutation(user: User, oid: Observation.Id, mode: ObservingModeType): IO[Unit] =
     mode match
       case ObservingModeType.Flamingos2LongSlit => Mutation.forFlamingos2LongSlit(user, oid, Flamingos2Disperser.R1200HK)
-      case ObservingModeType.GhostIfu           => IO.unit
+      case ObservingModeType.GhostIfu           => Mutation.forGhostIfu(user, oid, GhostResolutionMode.Standard)
       case ObservingModeType.GmosNorthLongSlit  => Mutation.forGmosNorthLongSlit(user, oid, GmosNorthGrating.B480_G5309)
       case ObservingModeType.GmosNorthImaging   => Mutation.forGmosNorthImaging(user, oid, List(GmosNorthFilter.CaT, GmosNorthFilter.DS920))
       case ObservingModeType.GmosSouthLongSlit  => Mutation.forGmosSouthLongSlit(user, oid, GmosSouthGrating.B480_G5327)
@@ -209,7 +220,7 @@ class observation_configurationRequests
       oid   <-
         mode match
           case ObservingModeType.Flamingos2LongSlit => createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
-          case ObservingModeType.GhostIfu           => IO.raiseError(new RuntimeException("GHOST not supported yet"))
+          case ObservingModeType.GhostIfu           => createGhostIfuObservationAs(pi, pid, List(tid))
           case ObservingModeType.GmosNorthLongSlit  => createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
           case ObservingModeType.GmosNorthImaging   => createGmosNorthImagingObservationAs(pi, pid, tid)
           case ObservingModeType.GmosSouthLongSlit  => createGmosSouthLongSlitObservationAs(pi, pid, List(tid))
