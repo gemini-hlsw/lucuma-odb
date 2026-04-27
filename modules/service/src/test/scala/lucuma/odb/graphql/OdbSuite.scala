@@ -307,13 +307,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
         }
       }
 
-      def spectroscopyGraphs(
-        input: lucuma.itc.client.SpectroscopyGraphsInput,
-        useCache: Boolean
-      ): IO[lucuma.itc.client.SpectroscopyGraphsResult] =
-        IO.raiseError(new java.lang.RuntimeException("spectroscopyGraph: not implemented"))
-
-      def spectroscopyIntegrationTimeAndGraphs(
+      override def spectroscopyIntegrationTimeAndGraphs(
         input:    lucuma.itc.client.SpectroscopyIntegrationTimeAndGraphsInput,
         useCache: Boolean = true
       ): IO[lucuma.itc.client.SpectroscopyIntegrationTimeAndGraphsResult] =

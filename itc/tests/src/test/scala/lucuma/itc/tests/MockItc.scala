@@ -59,7 +59,48 @@ trait MockItcBase extends Itc[IO]:
     observingMode:    ObservingMode,
     constraints:      ItcObservingConditions,
     exposureTimeMode: ExposureTimeMode
-  ): IO[TargetTimeAndGraphs] = ???
+  ): IO[TargetTimeAndGraphs] =
+    val ccds =
+      NonEmptyChain.of(
+        ItcCcd(
+          SingleSN(SignalToNoise.unsafeFromBigDecimalExact(1)),
+          Some(1.0),
+          TotalSN(SignalToNoise.unsafeFromBigDecimalExact(2)),
+          Some(2.0),
+          Some(Wavelength.fromIntNanometers(1001).get),
+          Some(Wavelength.fromIntNanometers(1001).get),
+          3,
+          4,
+          5,
+          Nil
+        )
+      )
+    TargetTimeAndGraphs(
+      TargetIntegrationTime(
+        Zipper.one(IntegrationTime(TimeSpan.fromSeconds(1).get, 10.refined)),
+        Band.R.asLeft,
+        SignalToNoiseAt(exposureTimeMode.at,
+                        SingleSN(SignalToNoise.unsafeFromBigDecimalExact(101.0)),
+                        TotalSN(SignalToNoise.unsafeFromBigDecimalExact(102.0))
+        ).some,
+        ccds.toNonEmptyList.toList
+      ),
+      TargetGraphs(
+        ccds,
+        NonEmptyChain.of(
+          ItcGraph(
+            GraphType.S2NGraph,
+            List(
+              ItcSeries("title", SeriesDataType.FinalS2NData, List((1.0, 1000.0), (2.0, 1001.0)))
+            )
+          )
+        ),
+        TotalSN(SignalToNoise.unsafeFromBigDecimalExact(1009.0)),
+        SignalToNoise.fromInt(1001).map(TotalSN(_)),
+        SingleSN(SignalToNoise.unsafeFromBigDecimalExact(1003.0)),
+        SignalToNoise.fromInt(1002).map(SingleSN(_))
+      )
+    ).pure[IO]
 
 object MockItc extends MockItcBase:
 
@@ -74,9 +115,10 @@ object MockItc extends MockItcBase:
     TargetIntegrationTime(
       Zipper.one(IntegrationTime(exposureTime, 10.refined)),
       Band.R.asLeft,
-      SignalToNoiseAt(atWavelength,
-                      SingleSN(SignalToNoise.unsafeFromBigDecimalExact(101.0)),
-                      TotalSN(SignalToNoise.unsafeFromBigDecimalExact(102.0))
+      SignalToNoiseAt(
+        atWavelength,
+        SingleSN(SignalToNoise.unsafeFromBigDecimalExact(101.0)),
+        TotalSN(SignalToNoise.unsafeFromBigDecimalExact(102.0))
       ).some,
       List.empty // Empty CCD list for mock
     ).pure[IO]
@@ -97,50 +139,6 @@ object MockItc extends MockItcBase:
       ).some,
       List.empty
     ).pure[IO]
-
-    // TODO: To calculateTimeAndGraphs
-    override def calculateGraphs(
-    target:        TargetData,
-    atWavelength:  Wavelength,
-    observingMode: ObservingMode,
-    constraints:   ItcObservingConditions,
-    exposureTime:  TimeSpan,
-    exposureCount: PosInt
-  ): IO[TargetGraphsCalcResult] =
-    TargetGraphsCalcResult(
-      NonEmptyChain.of(
-        ItcCcd(
-          SingleSN(SignalToNoise.unsafeFromBigDecimalExact(1)),
-          Some(1.0),
-          TotalSN(SignalToNoise.unsafeFromBigDecimalExact(2)),
-          Some(2.0),
-          Some(Wavelength.fromIntNanometers(1001).get),
-          Some(Wavelength.fromIntNanometers(1001).get),
-          3,
-          4,
-          5,
-          Nil
-        )
-      ),
-      NonEmptyChain.of(
-        ItcGraphGroup(
-          NonEmptyChain.of(
-            ItcGraph(
-              GraphType.S2NGraph,
-              List(
-                ItcSeries("title", SeriesDataType.FinalS2NData, List((1.0, 1000.0), (2.0, 1001.0)))
-              )
-            )
-          )
-        )
-      ),
-      TotalSN(SignalToNoise.unsafeFromBigDecimalExact(1009.0)),
-      SignalToNoise.fromInt(1001).map(TotalSN.apply(_)),
-      SingleSN(SignalToNoise.unsafeFromBigDecimalExact(1003.0)),
-      SignalToNoise.fromInt(1002).map(SingleSN.apply(_)),
-      Band.R.asLeft
-    )
-      .pure[IO]
 
 object MockImagingItc extends MockItcBase:
 
@@ -240,50 +238,6 @@ object MockImagingItc extends MockItcBase:
       )
     ).pure[IO]
 
-    // TODO: To calculateTimeAndGraphs
-  override def calculateGraphs(
-    target:        TargetData,
-    atWavelength:  Wavelength,
-    observingMode: ObservingMode,
-    constraints:   ItcObservingConditions,
-    exposureTime:  TimeSpan,
-    exposureCount: PosInt
-  ): IO[TargetGraphsCalcResult] =
-    TargetGraphsCalcResult(
-      NonEmptyChain.of(
-        ItcCcd(
-          SingleSN(SignalToNoise.unsafeFromBigDecimalExact(1)),
-          Some(1.0),
-          TotalSN(SignalToNoise.unsafeFromBigDecimalExact(2)),
-          Some(2.0),
-          Some(Wavelength.fromIntNanometers(1001).get),
-          Some(Wavelength.fromIntNanometers(1001).get),
-          3,
-          4,
-          5,
-          Nil
-        )
-      ),
-      NonEmptyChain.of(
-        ItcGraphGroup(
-          NonEmptyChain.of(
-            ItcGraph(
-              GraphType.S2NGraph,
-              List(
-                ItcSeries("title", SeriesDataType.FinalS2NData, List((1.0, 1000.0), (2.0, 1001.0)))
-              )
-            )
-          )
-        )
-      ),
-      TotalSN(SignalToNoise.unsafeFromBigDecimalExact(1009.0)),
-      SignalToNoise.fromInt(1001).map(TotalSN.apply(_)),
-      SingleSN(SignalToNoise.unsafeFromBigDecimalExact(1003.0)),
-      SignalToNoise.fromInt(1002).map(SingleSN.apply(_)),
-      Band.R.asLeft
-    )
-      .pure[IO]
-
 object EmissionLineMockItc extends MockItcBase:
 
   override def calculateSignalToNoise(
@@ -321,15 +275,12 @@ object EmissionLineMockItc extends MockItcBase:
       List.empty
     ).pure[IO]
 
-    // TODO: To calculateTimeAndGraphs
-  override def calculateGraphs(
-    target:        TargetData,
-    atWavelength:  Wavelength,
-    observingMode: ObservingMode,
-    constraints:   ItcObservingConditions,
-    exposureTime:  TimeSpan,
-    exposureCount: PosInt
-  ): IO[TargetGraphsCalcResult] =
+  override def calculateTimeAndGraphs(
+    target:           TargetData,
+    observingMode:    ObservingMode,
+    constraints:      ItcObservingConditions,
+    exposureTimeMode: ExposureTimeMode
+  ): IO[TargetTimeAndGraphs] =
     IO.raiseError(CalculationError("Not implemented"))
 
 object WavelengthAtOutOfRangeMockItc extends MockItcBase:
@@ -353,15 +304,13 @@ object WavelengthAtOutOfRangeMockItc extends MockItcBase:
   ): IO[TargetIntegrationTime] =
     IO.raiseError(WavelengthOutOfRange(atWavelength))
 
-  override def calculateGraphs(
-    target:        TargetData,
-    atWavelength:  Wavelength,
-    observingMode: ObservingMode,
-    constraints:   ItcObservingConditions,
-    exposureTime:  TimeSpan,
-    exposureCount: PosInt
-  ): IO[TargetGraphsCalcResult] =
-    IO.raiseError(WavelengthOutOfRange(atWavelength))
+  override def calculateTimeAndGraphs(
+    target:           TargetData,
+    observingMode:    ObservingMode,
+    constraints:      ItcObservingConditions,
+    exposureTimeMode: ExposureTimeMode
+  ): IO[TargetTimeAndGraphs] =
+    IO.raiseError(WavelengthOutOfRange(exposureTimeMode.at))
 
 object FailingMockItc extends MockItcBase:
 
@@ -391,47 +340,3 @@ object FailingMockItc extends MockItcBase:
     signalToNoise: SignalToNoise
   ): IO[TargetIntegrationTime] =
     IO.raiseError(CalculationError("A calculation error"))
-
-    // TODO: To calculateTimeAndGraphs
-  override def calculateGraphs(
-    target:        TargetData,
-    atWavelength:  Wavelength,
-    observingMode: ObservingMode,
-    constraints:   ItcObservingConditions,
-    exposureTime:  TimeSpan,
-    exposureCount: PosInt
-  ): IO[TargetGraphsCalcResult] =
-    TargetGraphsCalcResult(
-      NonEmptyChain.of(
-        ItcCcd(
-          SingleSN(SignalToNoise.unsafeFromBigDecimalExact(1)),
-          Some(1.0),
-          TotalSN(SignalToNoise.unsafeFromBigDecimalExact(2)),
-          Some(2.0),
-          Some(Wavelength.fromIntNanometers(1001).get),
-          Some(Wavelength.fromIntNanometers(1001).get),
-          3,
-          4,
-          5,
-          Nil
-        )
-      ),
-      NonEmptyChain.of(
-        ItcGraphGroup(
-          NonEmptyChain.of(
-            ItcGraph(
-              GraphType.S2NGraph,
-              List(
-                ItcSeries("title", SeriesDataType.FinalS2NData, List((1.0, 1000.0), (2.0, 1001.0)))
-              )
-            )
-          )
-        )
-      ),
-      TotalSN(SignalToNoise.unsafeFromBigDecimalExact(1000.0)),
-      SignalToNoise.fromInt(1001).map(TotalSN.apply(_)),
-      SingleSN(SignalToNoise.unsafeFromBigDecimalExact(1003.0)),
-      SignalToNoise.fromInt(1002).map(SingleSN.apply(_)),
-      Band.R.asLeft
-    )
-      .pure[IO]

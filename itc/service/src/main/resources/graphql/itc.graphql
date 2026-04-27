@@ -9321,7 +9321,7 @@ type SpectroscopyTimeAndGraphsResult {
   """
   In case of errors in integration times, we short cirtuit to the results from integration times
   """
-  targetTimes: [TargetIntegrationTimeOutcome!]
+  targetTimes: [TargetIntegrationTimeOutcome!] @deprecated(reason: "This field will always be null. The targetTimesAndGraphs field should be used instead.")
 
   """Index of the brightest target"""
   brightestIndex: NonNegInt

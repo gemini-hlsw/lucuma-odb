@@ -3,15 +3,12 @@
 
 package lucuma.itc.client
 
-import cats.syntax.either.*
 import clue.GraphQLOperation
 import io.circe.Decoder
 import io.circe.Encoder
 import io.circe.HCursor
 import io.circe.JsonObject
-import lucuma.itc.AsterismIntegrationTimeOutcomes
 import lucuma.itc.ItcVersions
-import lucuma.itc.client.json.decoders.given
 
 object SpectroscopyIntegrationTime extends GraphQLOperation[Unit] {
   type Data      = ClientCalculationResult
@@ -271,15 +268,6 @@ object SpectroscopyIntegrationTimeAndGraphsQuery extends GraphQLOperation[Unit] 
           wavelength { picometers }
       }
 
-      fragment TargetIntegrationTimeOutcomeFields on TargetIntegrationTimeOutcome {
-        ... on TargetIntegrationTime {
-          ...TargetIntegrationTimeFields
-        }
-        ... on TargetError {
-          ...TargetErrorFields
-        }
-      }
-
       fragment TargetTimeAndGraphsOutcomeFields on TargetTimeAndGraphsOutcome {
         ... on TargetTimeAndGraphs {
           ...TargetTimeAndGraphsFields
@@ -298,9 +286,6 @@ object SpectroscopyIntegrationTimeAndGraphsQuery extends GraphQLOperation[Unit] 
           targetTimesAndGraphs {
             ...TargetTimeAndGraphsOutcomeFields
           }
-          targetTimes {
-            ...TargetIntegrationTimeOutcomeFields
-          }
           brightestIndex
         }
       }
@@ -317,14 +302,7 @@ object SpectroscopyIntegrationTimeAndGraphsQuery extends GraphQLOperation[Unit] 
     val result = c.downField("spectroscopyIntegrationTimeAndGraphs")
     for
       versions       <- result.downField("versions").as[ItcVersions]
-      graphsOrTimes  <-
-        result
-          .downField("targetTimesAndGraphs")
-          .as[AsterismTimeAndGraphsResult]
-          .map(_.asRight)
-          .orElse:
-            result.downField("targetTimes").as[AsterismIntegrationTimeOutcomes].map(_.asLeft)
-          .map(AsterismTimesAndGraphsResultOutcomes(_))
+      graphs         <- result.downField("targetTimesAndGraphs").as[AsterismTimeAndGraphsResult]
       brightestIndex <- result.downField("brightestIndex").as[Option[Int]]
-    yield SpectroscopyIntegrationTimeAndGraphsResult(versions, graphsOrTimes, brightestIndex)
+    yield SpectroscopyIntegrationTimeAndGraphsResult(versions, graphs, brightestIndex)
 }

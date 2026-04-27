@@ -11,14 +11,7 @@ class spectroscopyGraphSuite extends GraphQLSuite {
     query(
       """
         query {
-          spectroscopyGraphs(input: {
-            atWavelength: {
-              nanometers: 60,
-            },
-            exposureTime: {
-              milliseconds: 2.5,
-            },
-            exposureCount: 10,
+          spectroscopyIntegrationTimeAndGraphs(input: {
             asterism: [
               {
                 sourceProfile: {
@@ -77,8 +70,8 @@ class spectroscopyGraphSuite extends GraphQLSuite {
               xAxis: 4
             }
           }) {
-            targetGraphs {
-              ... on TargetGraphsResult {
+            targetTimesAndGraphs {
+              ... on TargetTimeAndGraphs {
                 graphs {
                   peakFinalSNRatio
                   peakSingleSNRatio
@@ -113,8 +106,8 @@ class spectroscopyGraphSuite extends GraphQLSuite {
         """,
       json"""{
           "data": {
-            "spectroscopyGraphs": {
-              "targetGraphs": [
+            "spectroscopyIntegrationTimeAndGraphs": {
+              "targetTimesAndGraphs": [
                 {
                   "graphs": {
                     "peakFinalSNRatio" : 1009.000,
@@ -174,14 +167,7 @@ class spectroscopyGraphSuite extends GraphQLSuite {
     query(
       """
         query {
-          spectroscopyGraphs(input: {
-            atWavelength: {
-              nanometers: 1600,
-            },
-            exposureTime: {
-              milliseconds: 2.5,
-            },
-            exposureCount: 10,
+          spectroscopyIntegrationTimeAndGraphs(input: {
             asterism: [
               {
                 sourceProfile: {
@@ -232,8 +218,8 @@ class spectroscopyGraphSuite extends GraphQLSuite {
               xAxis: 4
             }
           }) {
-            targetGraphs {
-              ... on TargetGraphsResult {
+            targetTimesAndGraphs {
+              ... on TargetTimeAndGraphs {
                 graphs {
                   peakFinalSNRatio
                   peakSingleSNRatio
@@ -268,8 +254,8 @@ class spectroscopyGraphSuite extends GraphQLSuite {
         """,
       json"""{
           "data": {
-            "spectroscopyGraphs": {
-              "targetGraphs": [
+            "spectroscopyIntegrationTimeAndGraphs": {
+              "targetTimesAndGraphs": [
                 {
                   "graphs": {
                     "peakFinalSNRatio" : 1009.000,
@@ -329,14 +315,7 @@ class spectroscopyGraphSuite extends GraphQLSuite {
     query(
       """
         query {
-          spectroscopyGraphs(input: {
-            atWavelength: {
-              nanometers: 1600,
-            },
-            exposureTime: {
-              milliseconds: 2.5,
-            },
-            exposureCount: 10,
+          spectroscopyIntegrationTimeAndGraphs(input: {
             asterism: [
               {
                 sourceProfile: {
@@ -412,8 +391,8 @@ class spectroscopyGraphSuite extends GraphQLSuite {
               xAxis: 4
             }
           }) {
-            targetGraphs {
-              ... on TargetGraphsResult {
+            targetTimesAndGraphs {
+              ... on TargetTimeAndGraphs {
                 graphs {
                   peakFinalSNRatio
                   peakSingleSNRatio
@@ -448,8 +427,8 @@ class spectroscopyGraphSuite extends GraphQLSuite {
         """,
       json"""{
           "data": {
-            "spectroscopyGraphs": {
-              "targetGraphs": [
+            "spectroscopyIntegrationTimeAndGraphs": {
+              "targetTimesAndGraphs": [
                 {
                   "graphs": {
                     "peakFinalSNRatio" : 1009.000,

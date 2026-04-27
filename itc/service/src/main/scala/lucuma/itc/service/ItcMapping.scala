@@ -66,7 +66,7 @@ object ItcMapping extends ItcCacheOrRemote with Version {
   extension (timeAndGraphsResult: SpectroscopyTimeAndGraphsResult)
     private def toResult: Result[SpectroscopyTimeAndGraphsResult] =
       val optErrors: Option[NonEmptyChain[(Error, Int)]] =
-        timeAndGraphsResult.targetOutcomes.value.fold(_.collectErrors, _.collectErrors)
+        timeAndGraphsResult.targetOutcomes.collectErrors
       optErrors.fold(Result.success(timeAndGraphsResult))(errors =>
         Result.Warning(errors.map(errorToProblem), timeAndGraphsResult)
       )
@@ -200,9 +200,7 @@ object ItcMapping extends ItcCacheOrRemote with Version {
           .surround:
             SpectroscopyTimeAndGraphsResult(
               ItcVersions(version(environment).value, BuildInfo.ocslibHash.some),
-              // TODO: The below has an Either, which really makes no sense at all anymore. We can remove it
-              // but it will change the API the itc client uses.
-              AsterismTimesAndGraphsOutcomes(AsterismTimeAndGraphs(targetTimesAndGraphs).asRight)
+              AsterismTimeAndGraphsOutcomes(targetTimesAndGraphs)
             ).toResult.pure[F]
       .onError: t =>
         Logger[F]

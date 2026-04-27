@@ -256,56 +256,77 @@ class WiringSuite extends ClientSuite:
     )
 
   test("ItcClient spectroscopy graph wiring and sanity check"):
-    spectroscopyGraphs(
+    spectroscopyIntegrationTimeAndGraphs(
       WiringSuite.GraphInput,
-      SpectroscopyGraphsResult(
+      SpectroscopyIntegrationTimeAndGraphsResult(
         ItcVersions(
           versionDateTimeFormatter.format(Instant.ofEpochMilli(buildinfo.BuildInfo.buildDateTime)),
           BuildInfo.ocslibHash.some
         ),
-        AsterismTargetGraphsResultOutcomes:
-          NonEmptyChain.of(
-            TargetGraphsResultOutcome:
-              TargetGraphsResult(
-                TargetGraphs(
-                  NonEmptyChain.of(
-                    ItcCcd(
-                      SingleSN(SignalToNoise.unsafeFromBigDecimalExact(1)),
-                      Some(1.0),
-                      TotalSN(SignalToNoise.unsafeFromBigDecimalExact(2)),
-                      Some(2.0),
-                      Some(Wavelength.fromIntNanometers(1001).get),
-                      Some(Wavelength.fromIntNanometers(1001).get),
-                      3,
-                      4,
-                      5,
-                      Nil
-                    )
-                  ),
-                  NonEmptyChain.of(
-                    GraphResult(
-                      GraphType.S2NGraph,
-                      List(
-                        SeriesResult(
-                          "title",
-                          SeriesDataType.FinalS2NData,
-                          List(1000.0, 1001.0),
-                          ItcAxis(1, 2, 1, 2, 2).some,
-                          ItcAxis(1000.0, 1001.0, 1000, 1001, 2).some
-                        )
+          AsterismTimeAndGraphsResult(
+            NonEmptyChain.of(
+              TargetTimeAndGraphsResultOutcome(
+                TargetTimeAndGraphsResult(
+                  TargetIntegrationTime(
+                    Zipper.fromNel(NonEmptyList.one(selected)),
+                    Band.R.asLeft,
+                    None,
+                    List(
+                      ItcCcd(
+                        SingleSN(SignalToNoise.unsafeFromBigDecimalExact(1)),
+                        Some(1.0),
+                        TotalSN(SignalToNoise.unsafeFromBigDecimalExact(2)),
+                        Some(2.0),
+                        Some(Wavelength.fromIntNanometers(1001).get),
+                        Some(Wavelength.fromIntNanometers(1001).get),
+                        3,
+                        4,
+                        5,
+                        Nil
                       )
                     )
                   ),
-                  TotalSN(SignalToNoise.unsafeFromBigDecimalExact(1009.0)),
-                  SignalToNoise.fromInt(1001).map(TotalSN(_)),
-                  SingleSN(SignalToNoise.unsafeFromBigDecimalExact(1003.0)),
-                  SignalToNoise.fromInt(1002).map(SingleSN(_))
-                ),
-                Band.R
-              ).asRight
-          )
+                  TargetGraphs(
+                    NonEmptyChain.of(
+                      ItcCcd(
+                        SingleSN(SignalToNoise.unsafeFromBigDecimalExact(1)),
+                        Some(1.0),
+                        TotalSN(SignalToNoise.unsafeFromBigDecimalExact(2)),
+                        Some(2.0),
+                        Some(Wavelength.fromIntNanometers(1001).get),
+                        Some(Wavelength.fromIntNanometers(1001).get),
+                        3,
+                        4,
+                        5,
+                        Nil
+                      )
+                    ),
+                    NonEmptyChain.of(
+                      GraphResult(
+                        GraphType.S2NGraph,
+                        List(
+                          SeriesResult(
+                            "title",
+                            SeriesDataType.FinalS2NData,
+                            List(1000.0, 1001.0),
+                            ItcAxis(1, 2, 1, 2, 2).some,
+                            ItcAxis(1000.0, 1001.0, 1000, 1001, 2).some
+                          )
+                        )
+                      )
+                    ),
+                    TotalSN(SignalToNoise.unsafeFromBigDecimalExact(1009.0)),
+                    SignalToNoise.fromInt(1001).map(TotalSN(_)),
+                    SingleSN(SignalToNoise.unsafeFromBigDecimalExact(1003.0)),
+                    SignalToNoise.fromInt(1002).map(SingleSN(_))
+                  )
+                ).asRight
+              )
+            )
+        ),
+        Some(0)
       ).asRight
-    ).asRight
+    )
 
   test("ItcClient spectroscopy with exposure time mode"):
     val toTC = WiringSuite.gmosSpectroscopyInput(
@@ -436,56 +457,79 @@ class WiringSuite extends ClientSuite:
     )
 
   test("ItcClient spectroscopy graphs with mixed preset and exact values"):
-    spectroscopyGraphs(
+    spectroscopyIntegrationTimeAndGraphs(
       WiringSuite.GraphExactValuesInput,
-      SpectroscopyGraphsResult(
+      SpectroscopyIntegrationTimeAndGraphsResult(
         ItcVersions(
           versionDateTimeFormatter.format(Instant.ofEpochMilli(buildinfo.BuildInfo.buildDateTime)),
           BuildInfo.ocslibHash.some
         ),
-        AsterismTargetGraphsResultOutcomes:
-          NonEmptyChain.of(
-            TargetGraphsResultOutcome:
-              TargetGraphsResult(
-                TargetGraphs(
-                  NonEmptyChain.of(
-                    ItcCcd(
-                      SingleSN(SignalToNoise.unsafeFromBigDecimalExact(1)),
-                      Some(1.0),
-                      TotalSN(SignalToNoise.unsafeFromBigDecimalExact(2)),
-                      Some(2.0),
-                      Some(Wavelength.fromIntNanometers(1001).get),
-                      Some(Wavelength.fromIntNanometers(1001).get),
-                      3,
-                      4,
-                      5,
-                      Nil
-                    )
-                  ),
-                  NonEmptyChain.of(
-                    GraphResult(
-                      GraphType.S2NGraph,
+          AsterismTimeAndGraphsResult(
+            NonEmptyChain
+              .of(
+                TargetTimeAndGraphsResultOutcome(
+                  TargetTimeAndGraphsResult(
+                    TargetIntegrationTime(
+                      Zipper.fromNel(NonEmptyList.one(selected)),
+                      Band.R.asLeft,
+                      // The itc client does not query the signalToNoiseAt
+                      None,
                       List(
-                        SeriesResult(
-                          "title",
-                          SeriesDataType.FinalS2NData,
-                          List(1000.0, 1001.0),
-                          ItcAxis(1, 2, 1, 2, 2).some,
-                          ItcAxis(1000.0, 1001.0, 1000, 1001, 2).some
+                        ItcCcd(
+                          SingleSN(SignalToNoise.unsafeFromBigDecimalExact(1)),
+                          Some(1.0),
+                          TotalSN(SignalToNoise.unsafeFromBigDecimalExact(2)),
+                          Some(2.0),
+                          Some(Wavelength.fromIntNanometers(1001).get),
+                          Some(Wavelength.fromIntNanometers(1001).get),
+                          3,
+                          4,
+                          5,
+                          Nil
                         )
                       )
+                    ),
+                    TargetGraphs(
+                      NonEmptyChain.of(
+                        ItcCcd(
+                          SingleSN(SignalToNoise.unsafeFromBigDecimalExact(1)),
+                          Some(1.0),
+                          TotalSN(SignalToNoise.unsafeFromBigDecimalExact(2)),
+                          Some(2.0),
+                          Some(Wavelength.fromIntNanometers(1001).get),
+                          Some(Wavelength.fromIntNanometers(1001).get),
+                          3,
+                          4,
+                          5,
+                          Nil
+                        )
+                      ),
+                      NonEmptyChain.of(
+                        GraphResult(
+                          GraphType.S2NGraph,
+                          List(
+                            SeriesResult(
+                              "title",
+                              SeriesDataType.FinalS2NData,
+                              List(1000.0, 1001.0),
+                              ItcAxis(1, 2, 1, 2, 2).some,
+                              ItcAxis(1000.0, 1001.0, 1000, 1001, 2).some
+                            )
+                          )
+                        )
+                      ),
+                      TotalSN(SignalToNoise.unsafeFromBigDecimalExact(1009.0)),
+                      SignalToNoise.fromInt(1001).map(TotalSN(_)),
+                      SingleSN(SignalToNoise.unsafeFromBigDecimalExact(1003.0)),
+                      SignalToNoise.fromInt(1002).map(SingleSN(_))
                     )
-                  ),
-                  TotalSN(SignalToNoise.unsafeFromBigDecimalExact(1009.0)),
-                  SignalToNoise.fromInt(1001).map(TotalSN(_)),
-                  SingleSN(SignalToNoise.unsafeFromBigDecimalExact(1003.0)),
-                  SignalToNoise.fromInt(1002).map(SingleSN(_))
-                ),
-                Band.R
-              ).asRight
-          )
+                  ).asRight
+                )
+              )
+        ),
+        Some(0)
       ).asRight
-    ).asRight
+    )
 
 object WiringSuite:
 
@@ -733,12 +777,9 @@ object WiringSuite:
       )
     )
 
-  val GraphInput: SpectroscopyGraphsInput =
-    SpectroscopyGraphsInput(
-      SpectroscopyGraphParameters(
-        Wavelength.Min,
-        TimeSpan.fromSeconds(1).get,
-        PosInt.unsafeFrom(5),
+  val GraphInput: SpectroscopyIntegrationTimeAndGraphsInput =
+    SpectroscopyIntegrationTimeAndGraphsInput(
+      SpectroscopyIntegrationTimeAndGraphsParameters(
         ItcConstraintsInput(
           ImageQualityInput.preset(ImageQuality.Preset.PointOne),
           CloudExtinctionInput.preset(CloudExtinction.Preset.PointOne),
@@ -762,7 +803,7 @@ object WiringSuite:
           GmosRoi.FullFrame.some,
           PortDisposition.Side
         ),
-        Some(SignificantFiguresInput(2.refined, 2.refined, 2.refined))
+        Some(SignificantFiguresInput(6.refined, 6.refined, 6.refined))
       ),
       NonEmptyList.of(
         TargetInput(
@@ -918,12 +959,9 @@ object WiringSuite:
       )
     )
 
-  val GraphExactValuesInput: SpectroscopyGraphsInput =
-    SpectroscopyGraphsInput(
-      SpectroscopyGraphParameters(
-        Wavelength.Min,
-        TimeSpan.fromSeconds(1).get,
-        PosInt.unsafeFrom(5),
+  val GraphExactValuesInput: SpectroscopyIntegrationTimeAndGraphsInput =
+    SpectroscopyIntegrationTimeAndGraphsInput(
+      SpectroscopyIntegrationTimeAndGraphsParameters(
         ItcConstraintsInput(
           ImageQualityInput.arcsec(BigDecimal("0.7")),
           CloudExtinctionInput.preset(CloudExtinction.Preset.PointFive),
@@ -947,7 +985,7 @@ object WiringSuite:
           GmosRoi.FullFrame.some,
           PortDisposition.Side
         ),
-        Some(SignificantFiguresInput(2.refined, 2.refined, 2.refined))
+        Some(SignificantFiguresInput(6.refined, 6.refined, 6.refined))
       ),
       NonEmptyList.of(
         TargetInput(

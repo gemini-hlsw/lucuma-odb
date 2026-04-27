@@ -13,7 +13,6 @@ import lucuma.core.data.Zipper
 import lucuma.core.math.SingleSN
 import lucuma.core.math.TotalSN
 import lucuma.core.util.NewType
-import lucuma.itc.AsterismIntegrationTimeOutcomes
 import lucuma.itc.Error
 import lucuma.itc.GraphType
 import lucuma.itc.ItcAxis
@@ -82,12 +81,8 @@ object AsterismTimeAndGraphsResult extends NewType[NonEmptyChain[TargetTimeAndGr
       onlyIfNoErrors.map(_.focus)
 type AsterismTimeAndGraphsResult = AsterismTimeAndGraphsResult.Type
 
-object AsterismTimesAndGraphsResultOutcomes
-    extends NewType[Either[AsterismIntegrationTimeOutcomes, AsterismTimeAndGraphsResult]]
-type AsterismTimesAndGraphsResultOutcomes = AsterismTimesAndGraphsResultOutcomes.Type
-
 case class SpectroscopyIntegrationTimeAndGraphsResult(
   versions:       ItcVersions,
-  graphsOrTimes:  AsterismTimesAndGraphsResultOutcomes,
+  graphs:         AsterismTimeAndGraphsResult,
   brightestIndex: Option[Int]
 ) derives Eq
