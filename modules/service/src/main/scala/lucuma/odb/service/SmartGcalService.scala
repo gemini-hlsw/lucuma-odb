@@ -415,8 +415,7 @@ object SmartGcalService:
         time_span *:
         int4_pos  *:
         time_span *:
-        int4_pos  *:
-        time_span
+        int4_pos
       ).to[GhostUpdate]
 
     def selectGhost(sgt: SmartGcalType): Query[GhostSearchKey, (Gcal, PosInt, GhostUpdate)] =
@@ -426,8 +425,7 @@ object SmartGcalService:
           s.c_red_exposure_time,
           s.c_red_exposure_count,
           s.c_blue_exposure_time,
-          s.c_blue_exposure_count,
-          s.c_slit_viewing_camera_exposure_time
+          s.c_blue_exposure_count
         FROM t_smart_ghost s
         JOIN t_gcal g ON s.c_instrument = g.c_instrument
                      AND s.c_gcal_id    = g.c_gcal_id
@@ -534,8 +532,7 @@ object SmartGcalService:
           c_red_exposure_time,
           c_blue_exposure_time,
           c_red_exposure_count,
-          c_blue_exposure_count,
-          c_slit_viewing_camera_exposure_time
+          c_blue_exposure_count
         ) SELECT
           $instrument,
           $int4,
@@ -546,8 +543,7 @@ object SmartGcalService:
           $time_span,
           $time_span,
           $int4_pos,
-          $int4_pos,
-          $time_span
+          $int4_pos
       """.command.contramap { case (gcalId, stepOrder, row) =>
         (
           Instrument.Ghost,
@@ -559,8 +555,7 @@ object SmartGcalService:
           row.value.instrumentConfig.redExposureTime,
           row.value.instrumentConfig.blueExposureTime,
           row.value.instrumentConfig.redExposureCount,
-          row.value.instrumentConfig.blueExposureCount,
-          row.value.instrumentConfig.slitExposureTime
+          row.value.instrumentConfig.blueExposureCount
         )
       }
 

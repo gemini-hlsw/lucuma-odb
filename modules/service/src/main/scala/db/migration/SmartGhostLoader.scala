@@ -33,15 +33,13 @@ object SmartGhostLoader:
       time_span *:
       int4_pos  *:
       time_span *:
-      int4_pos  *:
-      time_span
+      int4_pos
     ).contramap: c =>
       (
         c.redExposureTime,
         c.redExposureCount,
         c.blueExposureTime,
-        c.blueExposureCount,
-        c.slitExposureTime
+        c.blueExposureCount
       )
 
   given Encoder[SmartGcalValue[GhostUpdate]] =
@@ -65,8 +63,7 @@ object SmartGhostLoader:
       Col("c_red_exposure_time", "interval"),
       Col("c_red_exposure_count", "int4"),
       Col("c_blue_exposure_time", "interval"),
-      Col("c_blue_exposure_count", "int4"),
-      Col("c_slit_viewing_camera_exposure_time", "interval")
+      Col("c_blue_exposure_count", "int4")
     )
 
   val (tmp, inst) = SmartGcalTable.forInstrument(

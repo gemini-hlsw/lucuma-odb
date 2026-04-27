@@ -15,6 +15,5 @@ CREATE TABLE t_smart_ghost (
   c_red_exposure_time   interval NOT NULL CHECK (c_red_exposure_time >= interval '0 seconds'),
   c_red_exposure_count  integer  NOT NULL CHECK (c_red_exposure_count > 0),
   c_blue_exposure_time  interval NOT NULL CHECK (c_blue_exposure_time >= interval '0 seconds'),
-  c_blue_exposure_count integer  NOT NULL CHECK (c_blue_exposure_count > 0),
-  c_slit_viewing_camera_exposure_time interval NOT NULL CHECK (c_slit_viewing_camera_exposure_time >= interval '0 seconds')
+  c_blue_exposure_count integer  NOT NULL CHECK (c_blue_exposure_count > 0)
 );

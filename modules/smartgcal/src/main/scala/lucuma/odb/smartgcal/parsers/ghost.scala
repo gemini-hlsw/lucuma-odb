@@ -45,10 +45,9 @@ trait GhostParsers:
       (posInt       <* columnSep) ~  // red exposure count
       (seconds      <* columnSep) ~  // blue exposure time
       (posInt       <* columnSep) ~  // blue exposure count
-      (baselineType <* columnSep) ~
-      (skipColumns(4) *> seconds <* columnSep <* skipColumn <* ignoredValue)
-    ).map { case ((((((((cnt, gcal), redTime), redCount)), blueTime), blueCount), baseline), slitTime) =>
-      SmartGcalValue(gcal, baseline, cnt, GhostUpdate(redTime, redCount, blueTime, blueCount, slitTime))
+      (baselineType <* columnSep) <* (skipColumns(6) <* ignoredValue)
+    ).map { case (((((((cnt, gcal), redTime), redCount)), blueTime), blueCount), baseline) =>
+      SmartGcalValue(gcal, baseline, cnt, GhostUpdate(redTime, redCount, blueTime, blueCount))
     }
 
   val row: Parser[TableRow] =

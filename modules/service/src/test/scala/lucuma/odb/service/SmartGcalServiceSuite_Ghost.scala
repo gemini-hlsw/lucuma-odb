@@ -47,8 +47,7 @@ class SmartGcalServiceSuite_Ghost extends ExecutionTestSupportForGhost:
         10.secondTimeSpan,
         PosInt.unsafeFrom(10),
         20.secondTimeSpan,
-        PosInt.unsafeFrom(20),
-        30.secondTimeSpan
+        PosInt.unsafeFrom(20)
       )
     )
   )

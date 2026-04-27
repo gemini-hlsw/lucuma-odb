@@ -37,8 +37,7 @@ object Ghost:
     redExposureTime:   TimeSpan,
     redExposureCount:  PosInt,
     blueExposureTime:  TimeSpan,
-    blueExposureCount: PosInt,
-    slitExposureTime:  TimeSpan
+    blueExposureCount: PosInt
   )
 
   case class TableRow(
