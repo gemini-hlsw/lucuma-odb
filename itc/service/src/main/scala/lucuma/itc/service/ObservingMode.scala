@@ -104,6 +104,7 @@ object ObservingMode {
     case class Flamingos2(
       disperser:       Flamingos2Disperser,
       filter:          Flamingos2Filter,
+      readMode:        Flamingos2ReadMode,
       fpu:             Flamingos2Fpu,
       portDisposition: PortDisposition
     ) extends SpectroscopyMode derives Hash {

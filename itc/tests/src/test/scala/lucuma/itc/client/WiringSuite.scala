@@ -561,6 +561,7 @@ object WiringSuite:
           defaultEtm,
           Flamingos2Disperser.R3000,
           Flamingos2Filter.J,
+          Flamingos2ReadMode.Faint,
           Flamingos2Fpu.LongSlit2,
           PortDisposition.Side
         )

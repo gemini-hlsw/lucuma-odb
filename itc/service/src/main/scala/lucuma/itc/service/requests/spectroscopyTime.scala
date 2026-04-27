@@ -94,11 +94,12 @@ object AsterismSpectroscopyTimeRequest:
               _,
               disperser,
               filter,
+              readMode,
               fpu,
               port
             ) =>
           Result.success:
-            ObservingMode.SpectroscopyMode.Flamingos2(disperser, filter, fpu, port)
+            ObservingMode.SpectroscopyMode.Flamingos2(disperser, filter, readMode, fpu, port)
         case Igrins2SpectroscopyInput(_, port)                                                  =>
           Result.success:
             ObservingMode.SpectroscopyMode.Igrins2(port)

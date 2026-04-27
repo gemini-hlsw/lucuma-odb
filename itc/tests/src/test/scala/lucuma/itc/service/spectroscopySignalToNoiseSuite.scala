@@ -248,7 +248,8 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
                 exposureTimeMode: { signalToNoise: { value: 2, at: { nanometers: 60 } } },
                 filter: Y,
                 fpu: LONG_SLIT_1,
-                disperser: R3000
+                disperser: R3000,
+                readMode: FAINT
               }
             }
           }) {
