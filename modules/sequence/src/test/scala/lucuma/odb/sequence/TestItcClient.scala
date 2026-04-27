@@ -24,8 +24,6 @@ import lucuma.itc.TargetIntegrationTimeOutcome
 import lucuma.itc.client.ClientCalculationResult
 import lucuma.itc.client.ImagingInput
 import lucuma.itc.client.ItcClient
-import lucuma.itc.client.SpectroscopyGraphsInput
-import lucuma.itc.client.SpectroscopyGraphsResult
 import lucuma.itc.client.SpectroscopyInput
 import lucuma.itc.client.SpectroscopyIntegrationTimeAndGraphsInput
 import lucuma.itc.client.SpectroscopyIntegrationTimeAndGraphsResult
@@ -91,12 +89,6 @@ object TestItcClient {
             ).get
           )
         ).pure[F]
-
-      override def spectroscopyGraphs(
-        input:    SpectroscopyGraphsInput,
-        useCache: Boolean = true
-      ): F[SpectroscopyGraphsResult] =
-        ???
 
       override def spectroscopyIntegrationTimeAndGraphs(
         input:    SpectroscopyIntegrationTimeAndGraphsInput,

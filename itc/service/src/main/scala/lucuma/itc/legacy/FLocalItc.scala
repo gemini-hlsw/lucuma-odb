@@ -44,6 +44,27 @@ case class FLocalItc[F[_]: {Async as F, Tracer as T}](itcLocal: LocalItc[F]):
           }
       }
 
+  def calculateTimeAndGraphs(
+    jsonParams:   String,
+    atWavelength: Wavelength
+  ): F[TimeAndGraphsRemoteResult] =
+    T.span(
+      "call_legacy graphs",
+      Attribute("method", "calculateTimeAndGraphs"),
+      Attribute("params.json", jsonParams),
+      Attribute("ocs_git_hash", BuildInfo.ocsGitHash)
+    ).surround:
+      (F.cede *> itcLocal.calculateTimeAndGraphs(jsonParams).guarantee(F.cede)).flatMap {
+        case Right(result) => F.pure(result)
+        case Left(msg)     =>
+          msg match {
+            case TooBright :: HalfWell(v) :: Nil => F.raiseError(SourceTooBright(BigDecimal(v)))
+            case List(LocalItc.OutOfRangeMsg)    =>
+              F.raiseError(WavelengthOutOfRange(atWavelength))
+            case _                               => F.raiseError(new UpstreamException(msg))
+          }
+      }
+
   def calculate(
     jsonParams:   String,
     atWavelength: Wavelength

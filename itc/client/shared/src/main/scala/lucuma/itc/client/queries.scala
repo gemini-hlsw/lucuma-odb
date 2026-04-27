@@ -3,15 +3,12 @@
 
 package lucuma.itc.client
 
-import cats.syntax.either.*
 import clue.GraphQLOperation
 import io.circe.Decoder
 import io.circe.Encoder
 import io.circe.HCursor
 import io.circe.JsonObject
-import lucuma.itc.AsterismIntegrationTimeOutcomes
 import lucuma.itc.ItcVersions
-import lucuma.itc.client.json.decoders.given
 
 object SpectroscopyIntegrationTime extends GraphQLOperation[Unit] {
   type Data      = ClientCalculationResult
@@ -187,95 +184,6 @@ object ImagingIntegrationTime extends GraphQLOperation[Unit] {
     (c: HCursor) => c.downField("imaging").as[ClientCalculationResult]
 }
 
-object SpectroscopyGraphsQuery extends GraphQLOperation[Unit] {
-  type Data      = SpectroscopyGraphsResult
-  type Variables = SpectroscopyGraphsInput
-
-  val document =
-    """
-      query($input: SpectroscopyGraphsInput!) {
-        spectroscopyGraphs(input: $input) {
-          versions {
-            serverVersion
-            dataVersion
-          }
-          targetGraphs {
-            ... on TargetGraphsResult {
-              graphs {
-                peakFinalSNRatio
-                atWavelengthFinalSNRatio
-                peakSingleSNRatio
-                atWavelengthSingleSNRatio
-                ccds {
-                  singleSNRatio
-                  totalSNRatio
-                  peakPixelFlux
-                  ampGain
-                  maxTotalSNRatio
-                  maxSingleSNRatio
-                  wavelengthForMaxTotalSNRatio {
-                    picometers
-                  }
-                  wavelengthForMaxSingleSNRatio {
-                    picometers
-                  }
-                  wellDepth
-                  warnings {
-                    msg
-                  }
-                }
-                graphData {
-                  graphType
-                  series {
-                    title
-                    seriesType
-                    dataY
-                    xAxis {
-                      start
-                      end
-                      count
-                      min
-                      max
-                    }
-                    yAxis {
-                      start
-                      end
-                      count
-                      min
-                      max
-                    }
-                  }
-                }
-              }
-              band
-              emissionLine { picometers }
-            }
-            ... on TargetError {
-              errorCode
-              message
-              wellHalfFilledSeconds
-              wavelength { picometers }
-            }
-          }
-        }
-      }
-  """
-
-  override val varEncoder: Encoder.AsObject[Variables] =
-    Encoder.AsObject.instance[SpectroscopyGraphsInput] { input =>
-      JsonObject(
-        "input" -> Encoder[SpectroscopyGraphsInput].apply(input)
-      )
-    }
-
-  override val dataDecoder: Decoder[SpectroscopyGraphsResult] = c =>
-    val result = c.downField("spectroscopyGraphs")
-    for
-      versions     <- result.downField("versions").as[ItcVersions]
-      targetGraphs <- result.downField("targetGraphs").as[AsterismTargetGraphsResultOutcomes]
-    yield SpectroscopyGraphsResult(versions, targetGraphs)
-}
-
 object SpectroscopyIntegrationTimeAndGraphsQuery extends GraphQLOperation[Unit] {
   type Data      = SpectroscopyIntegrationTimeAndGraphsResult
   type Variables = SpectroscopyIntegrationTimeAndGraphsInput
@@ -360,15 +268,6 @@ object SpectroscopyIntegrationTimeAndGraphsQuery extends GraphQLOperation[Unit] 
           wavelength { picometers }
       }
 
-      fragment TargetIntegrationTimeOutcomeFields on TargetIntegrationTimeOutcome {
-        ... on TargetIntegrationTime {
-          ...TargetIntegrationTimeFields
-        }
-        ... on TargetError {
-          ...TargetErrorFields
-        }
-      }
-
       fragment TargetTimeAndGraphsOutcomeFields on TargetTimeAndGraphsOutcome {
         ... on TargetTimeAndGraphs {
           ...TargetTimeAndGraphsFields
@@ -387,9 +286,6 @@ object SpectroscopyIntegrationTimeAndGraphsQuery extends GraphQLOperation[Unit] 
           targetTimesAndGraphs {
             ...TargetTimeAndGraphsOutcomeFields
           }
-          targetTimes {
-            ...TargetIntegrationTimeOutcomeFields
-          }
           brightestIndex
         }
       }
@@ -406,14 +302,7 @@ object SpectroscopyIntegrationTimeAndGraphsQuery extends GraphQLOperation[Unit] 
     val result = c.downField("spectroscopyIntegrationTimeAndGraphs")
     for
       versions       <- result.downField("versions").as[ItcVersions]
-      graphsOrTimes  <-
-        result
-          .downField("targetTimesAndGraphs")
-          .as[AsterismTimeAndGraphsResult]
-          .map(_.asRight)
-          .orElse:
-            result.downField("targetTimes").as[AsterismIntegrationTimeOutcomes].map(_.asLeft)
-          .map(AsterismTimesAndGraphsResultOutcomes(_))
+      graphs         <- result.downField("targetTimesAndGraphs").as[AsterismTimeAndGraphsResult]
       brightestIndex <- result.downField("brightestIndex").as[Option[Int]]
-    yield SpectroscopyIntegrationTimeAndGraphsResult(versions, graphsOrTimes, brightestIndex)
+    yield SpectroscopyIntegrationTimeAndGraphsResult(versions, graphs, brightestIndex)
 }

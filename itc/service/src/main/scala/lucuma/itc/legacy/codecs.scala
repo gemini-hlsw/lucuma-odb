@@ -617,3 +617,19 @@ private[legacy] object codecs:
     spec
       .orElse(img)
       .getOrElse(Left(DecodingFailure("No valid IntegrationTimeRemoteResult", c.history)))
+
+  given Decoder[TimeAndGraphsRemoteResult] = (c: HCursor) =>
+    for {
+      t      <- c.downField("ItcSpectroscopyResult")
+                  .downField("times")
+                  .as[AllExposureCalculations]
+      s      <- c.downField("ItcSpectroscopyResult")
+                  .downField("signalToNoiseAt")
+                  .as[Option[SignalToNoiseAt]]
+      ccds   <- c.downField("ItcSpectroscopyResult")
+                  .downField("ccds")
+                  .as[NonEmptyChain[ItcRemoteCcd]]
+      graphs <- c.downField("ItcSpectroscopyResult")
+                  .downField("chartGroups")
+                  .as[NonEmptyChain[ItcGraphGroup]]
+    } yield TimeAndGraphsRemoteResult(t, s, ccds, graphs)

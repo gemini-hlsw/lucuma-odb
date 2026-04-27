@@ -49,12 +49,10 @@ object ItcSpeedTest:
                        )
                      }
       graphResult <- timeCalculation("Graph Generation - GMOS-N", 5) {
-                       testData.itc.calculateGraphs(testData.mediumTarget,
-                                                    testData.testWavelength,
-                                                    testData.gmosNorthMode,
-                                                    testData.grayConditions,
-                                                    testData.testExposureTime,
-                                                    testData.testExposureCount
+                       testData.itc.calculateTimeAndGraphs(testData.mediumTarget,
+                                                           testData.gmosNorthMode,
+                                                           testData.grayConditions,
+                                                           testData.timeAndCountMode
                        )
                      }
     yield List(itResult, snResult, graphResult)

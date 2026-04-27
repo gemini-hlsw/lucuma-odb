@@ -102,13 +102,11 @@ class ItcCoreBenchmark:
   def benchmarkGraphs_GmosN_Medium(bh: Blackhole): Unit =
     val s      = state.getOrElse(sys.exit(1))
     val result = s.itc
-      .calculateGraphs(
+      .calculateTimeAndGraphs(
         s.mediumTarget,
-        s.testWavelength,
         s.gmosNorthMode,
         s.grayConditions,
-        s.testExposureTime,
-        s.testExposureCount
+        s.timeAndCountMode
       )
       .unsafeRunSync()
     bh.consume(result)

@@ -11,7 +11,7 @@ import lucuma.core.util.TimeSpan
 
 case class SpectroscopyTimeAndGraphsResult(
   versions:       ItcVersions,
-  targetOutcomes: AsterismTimesAndGraphsOutcomes
+  targetOutcomes: AsterismTimeAndGraphsOutcomes
 )
 
 object SpectroscopyTimeAndGraphsResult:
@@ -20,8 +20,8 @@ object SpectroscopyTimeAndGraphsResult:
       Json
         .obj(
           "versions"             -> r.versions.asJson,
-          "targetTimesAndGraphs" -> r.targetOutcomes.value.toOption.asJson,
-          "targetTimes"          -> r.targetOutcomes.value.left.toOption.asJson,
-          "brightestIndex"       -> r.targetOutcomes.value.toOption.flatMap(_.brightestIndex).asJson,
-          "brightest"            -> r.targetOutcomes.value.toOption.flatMap(_.brightest).asJson
+          "targetTimesAndGraphs" -> r.targetOutcomes.value.asJson,
+          "targetTimes"          -> Json.Null, // This field is deprecated and should be removed in the future.
+          "brightestIndex"       -> r.targetOutcomes.brightestIndex.asJson,
+          "brightest"            -> r.targetOutcomes.brightest.asJson
         )

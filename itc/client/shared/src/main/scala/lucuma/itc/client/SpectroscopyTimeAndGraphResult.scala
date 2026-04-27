@@ -10,12 +10,40 @@ import cats.derived.*
 import cats.syntax.all.*
 import io.circe.Decoder
 import lucuma.core.data.Zipper
+import lucuma.core.math.SingleSN
+import lucuma.core.math.TotalSN
 import lucuma.core.util.NewType
-import lucuma.itc.AsterismIntegrationTimeOutcomes
 import lucuma.itc.Error
+import lucuma.itc.GraphType
+import lucuma.itc.ItcAxis
+import lucuma.itc.ItcCcd
 import lucuma.itc.ItcVersions
+import lucuma.itc.SeriesDataType
 import lucuma.itc.TargetIntegrationTime
 import lucuma.itc.client.json.decoders.given
+
+// These are limited versions of the graph for the client as we don't want to transfer all the data.
+// This cascades into new types for all wrapping types.
+case class SeriesResult(
+  title:      String,
+  seriesType: SeriesDataType,
+  dataY:      List[Double],
+  xAxis:      Option[ItcAxis],
+  yAxis:      Option[ItcAxis]
+) derives Eq,
+      Decoder
+
+case class GraphResult(graphType: GraphType, series: List[SeriesResult]) derives Eq, Decoder
+
+case class TargetGraphs(
+  ccds:                      NonEmptyChain[ItcCcd],
+  graphData:                 NonEmptyChain[GraphResult],
+  peakFinalSNRatio:          TotalSN,
+  atWavelengthFinalSNRatio:  Option[TotalSN],
+  peakSingleSNRatio:         SingleSN,
+  atWavelengthSingleSNRatio: Option[SingleSN]
+) derives Eq,
+      Decoder
 
 case class TargetTimeAndGraphsResult(
   integrationTime: TargetIntegrationTime,
@@ -53,12 +81,8 @@ object AsterismTimeAndGraphsResult extends NewType[NonEmptyChain[TargetTimeAndGr
       onlyIfNoErrors.map(_.focus)
 type AsterismTimeAndGraphsResult = AsterismTimeAndGraphsResult.Type
 
-object AsterismTimesAndGraphsResultOutcomes
-    extends NewType[Either[AsterismIntegrationTimeOutcomes, AsterismTimeAndGraphsResult]]
-type AsterismTimesAndGraphsResultOutcomes = AsterismTimesAndGraphsResultOutcomes.Type
-
 case class SpectroscopyIntegrationTimeAndGraphsResult(
   versions:       ItcVersions,
-  graphsOrTimes:  AsterismTimesAndGraphsResultOutcomes,
+  graphs:         AsterismTimeAndGraphsResult,
   brightestIndex: Option[Int]
 ) derives Eq

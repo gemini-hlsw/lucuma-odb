@@ -366,10 +366,7 @@ class exactConstraintsSuite extends GraphQLSuite:
     query(
       """
         query {
-          spectroscopyGraphs(input: {
-            atWavelength: { nanometers: 500 },
-            exposureTime: { seconds: 60 },
-            exposureCount: 10,
+          spectroscopyIntegrationTimeAndGraphs(input: {
             asterism: [
               {
                 sourceProfile: {
@@ -421,8 +418,8 @@ class exactConstraintsSuite extends GraphQLSuite:
               }
             }
           }) {
-            targetGraphs {
-              ... on TargetGraphsResult {
+            targetTimesAndGraphs {
+              ... on TargetTimeAndGraphs {
                 graphs {
                   peakFinalSNRatio
                   peakSingleSNRatio
@@ -439,8 +436,8 @@ class exactConstraintsSuite extends GraphQLSuite:
       json"""
         {
           "data": {
-            "spectroscopyGraphs": {
-              "targetGraphs": [
+            "spectroscopyIntegrationTimeAndGraphs": {
+              "targetTimesAndGraphs": [
                 {
                   "graphs": {
                     "peakFinalSNRatio": 1009.000,
