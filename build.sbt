@@ -53,7 +53,7 @@ val slf4jVersion                 = "2.0.17"
 val testcontainersScalaVersion   = "0.44.1" // check test output if you attempt to update this
 val weaverVersion                = "0.8.4"
 
-ThisBuild / tlBaseVersion      := "0.63"
+ThisBuild / tlBaseVersion      := "0.64"
 ThisBuild / scalaVersion       := "3.8.3"
 ThisBuild / crossScalaVersions := Seq("3.8.3")
 ThisBuild / scalacOptions     ++= Seq("-Xmax-inlines", "50") // Hash derivation fails with default of 32
