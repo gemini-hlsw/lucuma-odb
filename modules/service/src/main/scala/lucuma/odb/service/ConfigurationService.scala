@@ -871,14 +871,17 @@ object ConfigurationService {
                   case (ObservingModeType.Flamingos2LongSlit, Some(d), _, _, _, _) =>
                     Right(Configuration.ObservingMode.Flamingos2LongSlit(d))
 
+                  case (ObservingModeType.GhostIfu, _, _, _, _, _) =>
+                    Right(Configuration.ObservingMode.GhostIfu)
+
                   case (ObservingModeType.GmosNorthImaging, _, Some(fs), _, _, _) =>
                     Right(Configuration.ObservingMode.GmosNorthImaging(fs.toList))
 
-                  case (ObservingModeType.GmosSouthImaging, _, _, Some(fs), _, _) =>
-                    Right(Configuration.ObservingMode.GmosSouthImaging(fs.toList))
-
                   case (ObservingModeType.GmosNorthLongSlit, _, _, _, Some(g), _) =>
                     Right(Configuration.ObservingMode.GmosNorthLongSlit(g))
+
+                  case (ObservingModeType.GmosSouthImaging, _, _, Some(fs), _, _) =>
+                    Right(Configuration.ObservingMode.GmosSouthImaging(fs.toList))
 
                   case (ObservingModeType.GmosSouthLongSlit, _, _, _, _, Some(g)) =>
                     Right(Configuration.ObservingMode.GmosSouthLongSlit(g))
@@ -1085,14 +1088,17 @@ object ConfigurationService {
                   case (ObservingModeType.Flamingos2LongSlit, Some(d), _, _, _, _) =>
                     Right(Configuration.ObservingMode.Flamingos2LongSlit(d))
 
+                  case (ObservingModeType.GhostIfu, _, _, _, _, _) =>
+                    Right(Configuration.ObservingMode.GhostIfu)
+
                   case (ObservingModeType.GmosNorthImaging, _, Some(fs), _, _, _) =>
                     Right(Configuration.ObservingMode.GmosNorthImaging(fs.toList))
 
-                  case (ObservingModeType.GmosSouthImaging, _, _, Some(fs), _, _) =>
-                    Right(Configuration.ObservingMode.GmosSouthImaging(fs.toList))
-
                   case (ObservingModeType.GmosNorthLongSlit, _, _, _, Some(g), _) =>
                     Right(Configuration.ObservingMode.GmosNorthLongSlit(g))
+
+                  case (ObservingModeType.GmosSouthImaging, _, _, Some(fs), _, _) =>
+                    Right(Configuration.ObservingMode.GmosSouthImaging(fs.toList))
 
                   case (ObservingModeType.GmosSouthLongSlit, _, _, _, _, Some(g)) =>
                     Right(Configuration.ObservingMode.GmosSouthLongSlit(g))
