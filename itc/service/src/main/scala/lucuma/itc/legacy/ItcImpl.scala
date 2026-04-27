@@ -17,13 +17,6 @@ import lucuma.core.math.TotalSN
 import lucuma.core.math.Wavelength
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.util.TimeSpan
-import lucuma.itc.CalculationError
-import lucuma.itc.Conversions
-import lucuma.itc.IntegrationTime
-import lucuma.itc.ItcCcd
-import lucuma.itc.SignalToNoiseAt
-import lucuma.itc.TargetIntegrationTime
-import lucuma.itc.TargetTimeAndGraphs
 import lucuma.itc.*
 import lucuma.itc.legacy.codecs.given
 import lucuma.itc.service.Itc

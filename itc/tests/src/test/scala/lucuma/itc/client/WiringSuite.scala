@@ -263,66 +263,66 @@ class WiringSuite extends ClientSuite:
           versionDateTimeFormatter.format(Instant.ofEpochMilli(buildinfo.BuildInfo.buildDateTime)),
           BuildInfo.ocslibHash.some
         ),
-          AsterismTimeAndGraphsResult(
-            NonEmptyChain.of(
-              TargetTimeAndGraphsResultOutcome(
-                TargetTimeAndGraphsResult(
-                  TargetIntegrationTime(
-                    Zipper.fromNel(NonEmptyList.one(selected)),
-                    Band.R.asLeft,
-                    None,
-                    List(
-                      ItcCcd(
-                        SingleSN(SignalToNoise.unsafeFromBigDecimalExact(1)),
-                        Some(1.0),
-                        TotalSN(SignalToNoise.unsafeFromBigDecimalExact(2)),
-                        Some(2.0),
-                        Some(Wavelength.fromIntNanometers(1001).get),
-                        Some(Wavelength.fromIntNanometers(1001).get),
-                        3,
-                        4,
-                        5,
-                        Nil
+        AsterismTimeAndGraphsResult(
+          NonEmptyChain.of(
+            TargetTimeAndGraphsResultOutcome(
+              TargetTimeAndGraphsResult(
+                TargetIntegrationTime(
+                  Zipper.fromNel(NonEmptyList.one(selected)),
+                  Band.R.asLeft,
+                  None,
+                  List(
+                    ItcCcd(
+                      SingleSN(SignalToNoise.unsafeFromBigDecimalExact(1)),
+                      Some(1.0),
+                      TotalSN(SignalToNoise.unsafeFromBigDecimalExact(2)),
+                      Some(2.0),
+                      Some(Wavelength.fromIntNanometers(1001).get),
+                      Some(Wavelength.fromIntNanometers(1001).get),
+                      3,
+                      4,
+                      5,
+                      Nil
+                    )
+                  )
+                ),
+                TargetGraphs(
+                  NonEmptyChain.of(
+                    ItcCcd(
+                      SingleSN(SignalToNoise.unsafeFromBigDecimalExact(1)),
+                      Some(1.0),
+                      TotalSN(SignalToNoise.unsafeFromBigDecimalExact(2)),
+                      Some(2.0),
+                      Some(Wavelength.fromIntNanometers(1001).get),
+                      Some(Wavelength.fromIntNanometers(1001).get),
+                      3,
+                      4,
+                      5,
+                      Nil
+                    )
+                  ),
+                  NonEmptyChain.of(
+                    GraphResult(
+                      GraphType.S2NGraph,
+                      List(
+                        SeriesResult(
+                          "title",
+                          SeriesDataType.FinalS2NData,
+                          List(1000.0, 1001.0),
+                          ItcAxis(1, 2, 1, 2, 2).some,
+                          ItcAxis(1000.0, 1001.0, 1000, 1001, 2).some
+                        )
                       )
                     )
                   ),
-                  TargetGraphs(
-                    NonEmptyChain.of(
-                      ItcCcd(
-                        SingleSN(SignalToNoise.unsafeFromBigDecimalExact(1)),
-                        Some(1.0),
-                        TotalSN(SignalToNoise.unsafeFromBigDecimalExact(2)),
-                        Some(2.0),
-                        Some(Wavelength.fromIntNanometers(1001).get),
-                        Some(Wavelength.fromIntNanometers(1001).get),
-                        3,
-                        4,
-                        5,
-                        Nil
-                      )
-                    ),
-                    NonEmptyChain.of(
-                      GraphResult(
-                        GraphType.S2NGraph,
-                        List(
-                          SeriesResult(
-                            "title",
-                            SeriesDataType.FinalS2NData,
-                            List(1000.0, 1001.0),
-                            ItcAxis(1, 2, 1, 2, 2).some,
-                            ItcAxis(1000.0, 1001.0, 1000, 1001, 2).some
-                          )
-                        )
-                      )
-                    ),
-                    TotalSN(SignalToNoise.unsafeFromBigDecimalExact(1009.0)),
-                    SignalToNoise.fromInt(1001).map(TotalSN(_)),
-                    SingleSN(SignalToNoise.unsafeFromBigDecimalExact(1003.0)),
-                    SignalToNoise.fromInt(1002).map(SingleSN(_))
-                  )
-                ).asRight
-              )
+                  TotalSN(SignalToNoise.unsafeFromBigDecimalExact(1009.0)),
+                  SignalToNoise.fromInt(1001).map(TotalSN(_)),
+                  SingleSN(SignalToNoise.unsafeFromBigDecimalExact(1003.0)),
+                  SignalToNoise.fromInt(1002).map(SingleSN(_))
+                )
+              ).asRight
             )
+          )
         ),
         Some(0)
       ).asRight
@@ -464,68 +464,68 @@ class WiringSuite extends ClientSuite:
           versionDateTimeFormatter.format(Instant.ofEpochMilli(buildinfo.BuildInfo.buildDateTime)),
           BuildInfo.ocslibHash.some
         ),
-          AsterismTimeAndGraphsResult(
-            NonEmptyChain
-              .of(
-                TargetTimeAndGraphsResultOutcome(
-                  TargetTimeAndGraphsResult(
-                    TargetIntegrationTime(
-                      Zipper.fromNel(NonEmptyList.one(selected)),
-                      Band.R.asLeft,
-                      // The itc client does not query the signalToNoiseAt
-                      None,
-                      List(
-                        ItcCcd(
-                          SingleSN(SignalToNoise.unsafeFromBigDecimalExact(1)),
-                          Some(1.0),
-                          TotalSN(SignalToNoise.unsafeFromBigDecimalExact(2)),
-                          Some(2.0),
-                          Some(Wavelength.fromIntNanometers(1001).get),
-                          Some(Wavelength.fromIntNanometers(1001).get),
-                          3,
-                          4,
-                          5,
-                          Nil
+        AsterismTimeAndGraphsResult(
+          NonEmptyChain
+            .of(
+              TargetTimeAndGraphsResultOutcome(
+                TargetTimeAndGraphsResult(
+                  TargetIntegrationTime(
+                    Zipper.fromNel(NonEmptyList.one(selected)),
+                    Band.R.asLeft,
+                    // The itc client does not query the signalToNoiseAt
+                    None,
+                    List(
+                      ItcCcd(
+                        SingleSN(SignalToNoise.unsafeFromBigDecimalExact(1)),
+                        Some(1.0),
+                        TotalSN(SignalToNoise.unsafeFromBigDecimalExact(2)),
+                        Some(2.0),
+                        Some(Wavelength.fromIntNanometers(1001).get),
+                        Some(Wavelength.fromIntNanometers(1001).get),
+                        3,
+                        4,
+                        5,
+                        Nil
+                      )
+                    )
+                  ),
+                  TargetGraphs(
+                    NonEmptyChain.of(
+                      ItcCcd(
+                        SingleSN(SignalToNoise.unsafeFromBigDecimalExact(1)),
+                        Some(1.0),
+                        TotalSN(SignalToNoise.unsafeFromBigDecimalExact(2)),
+                        Some(2.0),
+                        Some(Wavelength.fromIntNanometers(1001).get),
+                        Some(Wavelength.fromIntNanometers(1001).get),
+                        3,
+                        4,
+                        5,
+                        Nil
+                      )
+                    ),
+                    NonEmptyChain.of(
+                      GraphResult(
+                        GraphType.S2NGraph,
+                        List(
+                          SeriesResult(
+                            "title",
+                            SeriesDataType.FinalS2NData,
+                            List(1000.0, 1001.0),
+                            ItcAxis(1, 2, 1, 2, 2).some,
+                            ItcAxis(1000.0, 1001.0, 1000, 1001, 2).some
+                          )
                         )
                       )
                     ),
-                    TargetGraphs(
-                      NonEmptyChain.of(
-                        ItcCcd(
-                          SingleSN(SignalToNoise.unsafeFromBigDecimalExact(1)),
-                          Some(1.0),
-                          TotalSN(SignalToNoise.unsafeFromBigDecimalExact(2)),
-                          Some(2.0),
-                          Some(Wavelength.fromIntNanometers(1001).get),
-                          Some(Wavelength.fromIntNanometers(1001).get),
-                          3,
-                          4,
-                          5,
-                          Nil
-                        )
-                      ),
-                      NonEmptyChain.of(
-                        GraphResult(
-                          GraphType.S2NGraph,
-                          List(
-                            SeriesResult(
-                              "title",
-                              SeriesDataType.FinalS2NData,
-                              List(1000.0, 1001.0),
-                              ItcAxis(1, 2, 1, 2, 2).some,
-                              ItcAxis(1000.0, 1001.0, 1000, 1001, 2).some
-                            )
-                          )
-                        )
-                      ),
-                      TotalSN(SignalToNoise.unsafeFromBigDecimalExact(1009.0)),
-                      SignalToNoise.fromInt(1001).map(TotalSN(_)),
-                      SingleSN(SignalToNoise.unsafeFromBigDecimalExact(1003.0)),
-                      SignalToNoise.fromInt(1002).map(SingleSN(_))
-                    )
-                  ).asRight
-                )
+                    TotalSN(SignalToNoise.unsafeFromBigDecimalExact(1009.0)),
+                    SignalToNoise.fromInt(1001).map(TotalSN(_)),
+                    SingleSN(SignalToNoise.unsafeFromBigDecimalExact(1003.0)),
+                    SignalToNoise.fromInt(1002).map(SingleSN(_))
+                  )
+                ).asRight
               )
+            )
         ),
         Some(0)
       ).asRight
