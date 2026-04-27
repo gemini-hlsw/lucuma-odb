@@ -378,6 +378,8 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       SimbadClient.build[IO](httpClient, matcher)
 
   protected def telluricClient: IO[TelluricTargetsClient[IO]] =
+    given Tracer[IO] = Tracer.noop
+
     simbadClient.flatMap: sc =>
       TelluricTargetsClient
         .build[IO](uri"https://telluric-targets.gpp.gemini.edu/", httpClient, sc)
