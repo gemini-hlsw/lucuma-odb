@@ -224,7 +224,7 @@ object GeneratorStreaming:
           cfg <- extractMode(ObservingMode.GhostIfuName, context)(_.asGhostIfu)
           stc  = GhostStatic(cfg.resolutionMode, cfg.slitCameraExposureTime)
           itc  = requireGhostItc(context.oid, context.itcRes)
-          gen <- EitherT(Ifu.instantiate(calculator.ghostStep, stc, context.namespace, cfg, itc))
+          gen <- EitherT(Ifu.instantiate(calculator.ghostStep, stc, context.namespace, exp.ghost, cfg, itc))
         yield gen.covary[F]).value
 
       override def selectOrGenerateIgrins2LongSlit(

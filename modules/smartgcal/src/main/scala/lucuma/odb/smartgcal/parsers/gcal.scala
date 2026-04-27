@@ -37,6 +37,7 @@ trait GcalParsers:
       "IR grey body - low"  -> GcalContinuum.IrGreyBodyLow,
       "IR grey body - high" -> GcalContinuum.IrGreyBodyHigh,
       "Quartz Halogen"      -> GcalContinuum.QuartzHalogen5W,
+      "Quartz Halogen 100W" -> GcalContinuum.QuartzHalogen100W,
       "100W Quartz Halogen" -> GcalContinuum.QuartzHalogen100W
     ).withContext("Gcal continuum")
 

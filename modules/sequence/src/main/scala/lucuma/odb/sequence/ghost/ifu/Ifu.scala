@@ -22,6 +22,7 @@ object Ifu:
     estimator: StepTimeEstimateCalculator[GhostStaticConfig, GhostDynamicConfig],
     static:    GhostStaticConfig,
     namespace: UUID,
+    expander:  SmartGcalExpander[F, GhostStaticConfig, GhostDynamicConfig],
     config:    Config,
     itc:       Either[OdbError, GhostIfu]
   ): F[Either[OdbError, StreamingExecutionConfig[Pure, GhostStaticConfig, GhostDynamicConfig]]] =
@@ -29,5 +30,5 @@ object Ifu:
       g <- EitherT.fromEither(itc)
       r  = g.red.focus.value
       b  = g.blue.focus.value
-      s <- EitherT(Science.instantiate(estimator, static, namespace, config, r, b))
+      s <- EitherT(Science.instantiate(estimator, static, namespace, expander, config, r, b))
     yield StreamingExecutionConfig(static, Stream.empty, s.generate)).value

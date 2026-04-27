@@ -39,6 +39,7 @@ object Science:
     estimator:     StepTimeEstimateCalculator[GhostStaticConfig, GhostDynamicConfig],
     static:        GhostStaticConfig,
     namespace:     UUID,
+    @annotation.unused expander: SmartGcalExpander[F, GhostStaticConfig, GhostDynamicConfig],  // not yet used
     config:        Config,
     red:           IntegrationTime,
     blue:          IntegrationTime
