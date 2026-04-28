@@ -20,6 +20,7 @@ import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.Observation
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
+import lucuma.odb.data.ExposureTimeModeRole
 import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.input.GhostDetectorConfigInput
 import lucuma.odb.graphql.input.GhostIfuInput
@@ -35,13 +36,55 @@ import skunk.implicits.*
 
 class GhostIfuServiceSuite extends ExecutionTestSupport:
 
-  private val SetObservingMode: Command[(Instrument, ObservingModeType, Observation.Id)] =
-    sql"""
+  val etm = ExposureTimeMode.TimeAndCountMode(
+    1.secondTimeSpan,
+    PosInt.unsafeFrom(1),
+    Wavelength.unsafeFromIntPicometers(500001)
+  )
+
+  val redEtm = ExposureTimeMode.TimeAndCountMode(
+    1.secondTimeSpan,
+    PosInt.unsafeFrom(1),
+    Wavelength.unsafeFromIntPicometers(500001)
+  )
+
+  val blueEtm = ExposureTimeMode.TimeAndCountMode(
+    2.secondTimeSpan,
+    PosInt.unsafeFrom(2),
+    Wavelength.unsafeFromIntPicometers(500002)
+  )
+
+  val create = GhostIfuInput.Create(
+    stepCount      = PosInt.unsafeFrom(3),
+    resolutionMode = GhostResolutionMode.Standard,
+    red            = GhostDetectorConfigInput(
+      redEtm.some,
+      Nullable.NonNull(GhostBinning.TwoByTwo),
+      Nullable.NonNull(GhostReadMode.Fast)
+    ).some,
+    blue           = GhostDetectorConfigInput(
+      blueEtm.some,
+      Nullable.NonNull(GhostBinning.FourByFour),
+      Nullable.NonNull(GhostReadMode.Slow)
+    ).some,
+    slitCameraExposureTime    = TimeSpan.FromMicroseconds.getOption(1000L),
+    explicitIfu1FiberAgitator = GhostIfu1FiberAgitator.Enabled.some,
+    explicitIfu2FiberAgitator = GhostIfu2FiberAgitator.Disabled.some
+  )
+
+  private def setObservingMode(
+    oid:      Observation.Id,
+    inst:     Option[Instrument],
+    modeType: Option[ObservingModeType]
+  )(using Services[IO]): IO[Unit] =
+    val cmd = sql"""
       UPDATE t_observation
-         SET c_instrument          = $instrument,
-             c_observing_mode_type = $observing_mode_type
+         SET c_instrument          = ${instrument.opt},
+             c_observing_mode_type = ${observing_mode_type.opt}
        WHERE c_observation_id = $observation_id
     """.command
+
+    services.session.execute(cmd)(inst, modeType, oid).void
 
   private def insert(
     in:  GhostIfuInput.Create,
@@ -51,7 +94,7 @@ class GhostIfuServiceSuite extends ExecutionTestSupport:
     withServices(serviceUser): services =>
       services
         .transactionally:
-          val setType  = services.session.execute(SetObservingMode)(Instrument.Ghost, ObservingModeType.GhostIfu, oid).void
+          val setType  = setObservingMode(oid, Instrument.Ghost.some, ObservingModeType.GhostIfu.some)
           val doInsert = ghostIfuService.insert(in, etm, List(oid))
           (ResultT.liftF(setType) *> ResultT(doInsert)).value.flatMap: r =>
             r.toEither match
@@ -104,36 +147,6 @@ class GhostIfuServiceSuite extends ExecutionTestSupport:
     assertIO(insert(in, etm, oid) *> select(oid), expected(in, etm))
 
   test("round trip"):
-    val redEtm = ExposureTimeMode.TimeAndCountMode(
-      1.secondTimeSpan,
-      PosInt.unsafeFrom(1),
-      Wavelength.unsafeFromIntPicometers(500001)
-    )
-
-    val blueEtm = ExposureTimeMode.TimeAndCountMode(
-      2.secondTimeSpan,
-      PosInt.unsafeFrom(2),
-      Wavelength.unsafeFromIntPicometers(500001)
-    )
-
-    val create = GhostIfuInput.Create(
-      stepCount      = PosInt.unsafeFrom(3),
-      resolutionMode = GhostResolutionMode.Standard,
-      red            = GhostDetectorConfigInput(
-        redEtm.some,
-        Nullable.NonNull(GhostBinning.TwoByTwo),
-        Nullable.NonNull(GhostReadMode.Fast)
-      ).some,
-      blue           = GhostDetectorConfigInput(
-        blueEtm.some,
-        Nullable.NonNull(GhostBinning.FourByFour),
-        Nullable.NonNull(GhostReadMode.Slow)
-      ).some,
-      slitCameraExposureTime    = TimeSpan.FromMicroseconds.getOption(1000L),
-      explicitIfu1FiberAgitator = GhostIfu1FiberAgitator.Enabled.some,
-      explicitIfu2FiberAgitator = GhostIfu2FiberAgitator.Disabled.some
-    )
-
     for
       p <- createProgramAs(pi)
       t <- createTargetWithProfileAs(pi, p)
@@ -142,12 +155,6 @@ class GhostIfuServiceSuite extends ExecutionTestSupport:
     yield ()
 
   test("round trip defaults"):
-    val etm = ExposureTimeMode.TimeAndCountMode(
-      1.secondTimeSpan,
-      PosInt.unsafeFrom(1),
-      Wavelength.unsafeFromIntPicometers(500001)
-    )
-
     val create = GhostIfuInput.Create(
       stepCount                 = PosInt.unsafeFrom(1),
       resolutionMode            = GhostResolutionMode.Standard,
@@ -163,4 +170,36 @@ class GhostIfuServiceSuite extends ExecutionTestSupport:
       t <- createTargetWithProfileAs(pi, p)
       o <- createObservationAs(pi, p, t)
       _ <- roundTrip(create, etm.some, o)
+    yield ()
+
+  def expectObservingModeInconsistency(update: Services[IO] => Transaction[IO] ?=> IO[Unit]): IO[Unit] =
+    withServices(serviceUser): services =>
+      services
+        .transactionally:
+          update(services)
+        .flatMap(_ => IO.raiseError(new Exception("Expected observing mode inconsistency exception but none was raised")))
+        .recoverWith:
+          case SqlState.RaiseException(ex) if ex.message.contains("Observing mode inconsistency for observation") => IO.unit
+
+  test("delete observing mode only"):
+    for
+      p <- createProgramAs(pi)
+      t <- createTargetWithProfileAs(pi, p)
+      o <- createObservationAs(pi, p, t)
+      _ <- insert(create, none, o)
+      _ <- expectObservingModeInconsistency: services =>
+            services.ghostIfuService.delete(List(o)) *>
+            services.exposureTimeModeService.deleteMany(List(o), ExposureTimeModeRole.values*)
+
+    yield ()
+
+  test("set observing mode type only"):
+    for
+      p <- createProgramAs(pi)
+      t <- createTargetWithProfileAs(pi, p)
+      o <- createObservationAs(pi, p, t)
+      _ <- expectObservingModeInconsistency: services =>
+            services.exposureTimeModeService.insertOne(o, ExposureTimeModeRole.Science, ExposureTimeMode.TimeAndCountMode(10.secondTimeSpan, PosInt.unsafeFrom(10), Wavelength.unsafeFromIntPicometers(500000))) *>
+            services.exposureTimeModeService.insertOne(o, ExposureTimeModeRole.Science, ExposureTimeMode.TimeAndCountMode(20.secondTimeSpan, PosInt.unsafeFrom(20), Wavelength.unsafeFromIntPicometers(500000))) *>
+            setObservingMode(o, Instrument.Ghost.some, ObservingModeType.GhostIfu.some)(using services)
     yield ()
