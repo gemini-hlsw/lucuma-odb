@@ -232,3 +232,95 @@ trait GhostResolutionModeSyntax:
       case GhostResolutionMode.High     => "GhostHigh"
 
 object ghostresolutionmode extends GhostResolutionModeSyntax
+
+trait GnirsDisperserSyntax:
+  import lucuma.core.enums.GnirsGrating
+  extension (self: GnirsGrating)
+    def ocs2Tag: String =
+      self match
+        case GnirsGrating.D10  => "D_10"
+        case GnirsGrating.D32  => "D_32"
+        case GnirsGrating.D111 => "D_111"
+object gnirsdisperser extends GnirsDisperserSyntax
+
+trait GnirsFilterSyntax:
+  import lucuma.core.enums.GnirsFilter
+  extension (self: GnirsFilter)
+    def ocs2Tag: String =
+      self match
+        case GnirsFilter.CrossDispersed => "X_DISPERSED"
+        case GnirsFilter.Order6         => "ORDER_6"
+        case GnirsFilter.Order5         => "ORDER_5"
+        case GnirsFilter.Order4         => "ORDER_4"
+        case GnirsFilter.Order3         => "ORDER_3"
+        case GnirsFilter.Order2         => "ORDER_2"
+        case GnirsFilter.Order1         => "ORDER_1"
+        case GnirsFilter.H2             => "H2"
+        case GnirsFilter.HNd100x        => "H_plus_ND100X"
+        case GnirsFilter.H2Nd100x       => "H2_plus_ND100X"
+        case GnirsFilter.PAH            => "PAH"
+        case GnirsFilter.Y              => "Y"
+        case GnirsFilter.J              => "J"
+        case GnirsFilter.K              => "K"
+object gnirsfilter extends GnirsFilterSyntax
+
+trait GnirsPixelScaleSyntax:
+  import lucuma.core.enums.GnirsPixelScale
+  extension (self: GnirsPixelScale)
+    def ocs2Tag: String =
+      self match
+        case GnirsPixelScale.PixelScale_0_05 => "PS_005"
+        case GnirsPixelScale.PixelScale_0_15 => "PS_015"
+object gnirspixelscale extends GnirsPixelScaleSyntax
+
+trait GnirsCrossDispersedSyntax:
+  import lucuma.core.enums.GnirsPrism
+  extension (self: GnirsPrism)
+    def ocs2Tag: String =
+      self match
+        case GnirsPrism.Mirror => "NO"
+        case GnirsPrism.Sxd    => "SXD"
+        case GnirsPrism.Lxd    => "LXD"
+object gnirsprism extends GnirsCrossDispersedSyntax
+
+trait GnirsCameraSyntax:
+  import lucuma.core.enums.GnirsCamera
+  extension (self: GnirsCamera)
+    def ocs2Tag: String =
+      self match
+        case GnirsCamera.ShortBlue => "SHORT_BLUE"
+        case GnirsCamera.LongBlue  => "LONG_BLUE"
+        case GnirsCamera.ShortRed  => "SHORT_RED"
+        case GnirsCamera.LongRed   => "LONG_RED"
+object gnirscamera extends GnirsCameraSyntax
+
+trait GnirsReadModeSyntax:
+  import lucuma.core.enums.GnirsReadMode
+  extension (self: GnirsReadMode)
+    def ocs2Tag: String =
+      self match
+        case GnirsReadMode.Bright     => "BRIGHT"
+        case GnirsReadMode.Faint      => "FAINT"
+        case GnirsReadMode.VeryFaint  => "VERY_FAINT"
+        case GnirsReadMode.VeryBright => "VERY_BRIGHT"
+object gnirsreadmode extends GnirsReadModeSyntax
+
+trait GnirsSlitWidthSyntax:
+  import lucuma.core.enums.GnirsFpuSlit
+  extension (self: GnirsFpuSlit)
+    def ocs2Tag: String =
+      self match
+        case GnirsFpuSlit.LongSlit_0_10  => "SW_1"
+        case GnirsFpuSlit.LongSlit_0_15  => "SW_2"
+        case GnirsFpuSlit.LongSlit_0_20  => "SW_3"
+        case GnirsFpuSlit.LongSlit_0_30  => "SW_4"
+        case GnirsFpuSlit.LongSlit_0_45  => "SW_5"
+        case GnirsFpuSlit.LongSlit_0_675 => "SW_6"
+        case GnirsFpuSlit.LongSlit_1_00  => "SW_7"
+
+object gnirsslitwidth extends GnirsSlitWidthSyntax
+
+trait GnirsWellDepthSyntax:
+  import lucuma.core.enums.GnirsWellDepth
+  extension (self: GnirsWellDepth) def ocs2Tag: String = self.shortName.toUpperCase
+object gnirswelldepth extends GnirsWellDepthSyntax

@@ -33,6 +33,7 @@ import lucuma.core.util.TimeSpan
 
 import time.decoder.given
 import wavelength.transport.given
+import lucuma.core.math.Wavelength
 
 trait GnirsCodec:
 

@@ -144,6 +144,7 @@ class LegacyITCGmosSpecExpTimeSuite extends CommonITCLegacySuite:
       assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))
 
   test("gmos south filter".tag(LegacyITCTest)):
+    println(s"INVOKING: ${bodyConf(sourceDefinition, obs, gsConf).asJson.spaces2}")
     Enumerated[GmosSouthFilter].all.foreach: f =>
       val result = localItc
         .calculate(

@@ -51,10 +51,10 @@ final case class GnirsSpectroscopyInput(
 
 object GnirsSpectroscopyInput:
 
-  def binding: Matcher[GnirsSpectroscopyInput] =
-    ObjectFieldsBinding.rmap:
-      case List(
-            ExposureTimeModeInput.TimeAndCount.Binding("exposureTimeMode", exposureTimeMode),
-            PortDispositionBinding("port", portDisposition)
-          ) =>
-        (exposureTimeMode, portDisposition).parMapN(apply)
+  def binding: Matcher[GnirsSpectroscopyInput] = ???
+  // ObjectFieldsBinding.rmap:
+  //   case List(
+  //         ExposureTimeModeInput.TimeAndCount.Binding("exposureTimeMode", exposureTimeMode),
+  //         PortDispositionBinding("port", portDisposition)
+  //       ) =>
+  //     (exposureTimeMode, portDisposition).parMapN(apply)

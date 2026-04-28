@@ -16,6 +16,14 @@ object all
     with GhostBinningSyntax
     with GhostReadModeSyntax
     with GhostResolutionModeSyntax
+    with GnirsDisperserSyntax
+    with GnirsFilterSyntax
+    with GnirsCameraSyntax
+    with GnirsPixelScaleSyntax
+    with GnirsCrossDispersedSyntax
+    with GnirsReadModeSyntax
+    with GnirsSlitWidthSyntax
+    with GnirsWellDepthSyntax
     with ConditionsSyntax
     with CoolStarModelSyntax
     with StellarLibrarySpectrumSyntax
