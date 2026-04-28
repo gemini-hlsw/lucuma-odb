@@ -82,35 +82,37 @@ case class Config(
       .withIdleConnectionTime(httpClient.effectiveIdleConnectionTime)
       .build
 
-  def horizonsClientResource[F[_]: Async: Network: Logger]: Resource[F, HorizonsClient[F]] =
-    httpClientResource.map(HorizonsClient.apply(_, 5, 1.second))
+  private def otelHttpClient[F[_]: Async: Network: TracerProvider]: Resource[F, Client[F]] =
+    for {
+      client         <- httpClientResource[F]
+      otelMiddleware <- Resource.eval(
+                          ClientMiddleware
+                            .builder(ClientSpanDataProvider.openTelemetry(ServerMiddleware.redactor))
+                            .build
+                        )
+    } yield otelMiddleware(client)
+
+  def horizonsClientResource[F[_]: Async: Network: Logger: TracerProvider]: Resource[F, HorizonsClient[F]] =
+    otelHttpClient.map(HorizonsClient.apply(_, 5, 1.second))
 
   // ITC client resource
-  // TODO make the client using tracing always including called from explore
   def itcClient[F[_]: Async: Network: Logger: TracerProvider: Compression]: Resource[F, ItcClient[F]] =
-    for {
-      httpClient       <- httpClientResource[F]
-      otelMiddleware   <- Resource.eval(
-                            ClientMiddleware
-                              .builder(ClientSpanDataProvider.openTelemetry(ServerMiddleware.redactor))
-                              .build
-                          )
-      client           <- Resource.eval(ItcClient.create(itc.root, GZip()(otelMiddleware(httpClient))))
-    } yield client
+    otelHttpClient[F].evalMap: httpClient =>
+      ItcClient.create(itc.root, GZip()(httpClient))
 
   // Gaia client resource
-  def gaiaClient[F[_]: Async: Compression: Network: Tracer: LoggerFactory]: Resource[F, GaiaClient[F]] =
-    httpClientResource[F].map: httpClient =>
+  def gaiaClient[F[_]: Async: Compression: Network: Tracer: LoggerFactory: TracerProvider]: Resource[F, GaiaClient[F]] =
+    otelHttpClient[F].map: httpClient =>
       GaiaClient.build[F](GZip()(httpClient), adapters = GaiaClient.DefaultAdapters)
 
   // Telluric client resource
-  def telluricClient[F[_]: Async: Network: Logger]: Resource[F, TelluricTargetsClient[F]] =
-    httpClientResource[F].evalMap: httpClient =>
-      for {
-        sedMatcher   <- SEDDataLoader.loadMatcher[F]
-        simbadClient  = SimbadClient.build(httpClient, sedMatcher)
-        result       <- TelluricTargetsClient.build(telluric.root, httpClient, simbadClient)
-      } yield result
+  def telluricClient[F[_]: Async: Network: LoggerFactory: Tracer: TracerProvider]: Resource[F, TelluricTargetsClient[F]] =
+    for {
+      httpClient   <- otelHttpClient[F]
+      sedMatcher   <- Resource.eval(SEDDataLoader.loadMatcher[F])
+      simbadClient  = SimbadClient.build(httpClient, sedMatcher)
+      result       <- Resource.eval(TelluricTargetsClient.build(telluric.root, httpClient, simbadClient))
+    } yield result
 
   // SSO Client resource (has to be a resource because it owns an HTTP client).
   def ssoClient[F[_]: Async: Trace: Network: Logger]: Resource[F, SsoClient[F, User]] =

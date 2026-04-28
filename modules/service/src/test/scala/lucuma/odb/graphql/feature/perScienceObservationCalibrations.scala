@@ -69,7 +69,7 @@ class perScienceObservationCalibrations
 
   // Mock telluric star
   val mockStarBefore = TelluricStar(
-    hip = 12345,
+    id = "12345",
     spType = TelluricType.A0V,
     coordinates = Coordinates(
       RightAscension.fromDoubleDegrees(123.456),
@@ -78,11 +78,12 @@ class perScienceObservationCalibrations
     distance = 100.5,
     hmag = 7.5,
     score = 0.95,
-    order = TelluricCalibrationOrder.Before
+    order = TelluricCalibrationOrder.Before,
+    sed = None
   )
 
   val mockStarAfter = TelluricStar(
-    hip = 12346,
+    id = "12346",
     spType = TelluricType.A0V,
     coordinates = Coordinates(
       RightAscension.fromDoubleDegrees(123.789),
@@ -91,7 +92,8 @@ class perScienceObservationCalibrations
     distance = 98.2,
     hmag = 7.8,
     score = 0.92,
-    order = TelluricCalibrationOrder.After
+    order = TelluricCalibrationOrder.After,
+    sed = None
   )
 
   val mockBrightnesses = SortedMap[Band, BrightnessMeasure[Integrated]](
@@ -117,7 +119,7 @@ class perScienceObservationCalibrations
     "data" -> Json.obj(
       "search" -> Json.arr(
         Json.obj(
-          "HIP" -> mockStarBefore.hip.asJson,
+          "ID" -> mockStarBefore.id.asJson,
           "spType" -> Json.fromString(mockStarBefore.spType.tag),
           "RA" -> mockStarBefore.coordinates.ra.toAngle.toDoubleDegrees.asJson,
           "Dec" -> mockStarBefore.coordinates.dec.toAngle.toSignedDoubleDegrees.asJson,
@@ -127,7 +129,7 @@ class perScienceObservationCalibrations
           "Order" -> Json.fromString(mockStarBefore.order.tag)
         ),
         Json.obj(
-          "HIP" -> mockStarAfter.hip.asJson,
+          "ID" -> mockStarAfter.id.asJson,
           "spType" -> Json.fromString(mockStarAfter.spType.tag),
           "RA" -> mockStarAfter.coordinates.ra.toAngle.toDoubleDegrees.asJson,
           "Dec" -> mockStarAfter.coordinates.dec.toAngle.toSignedDoubleDegrees.asJson,
