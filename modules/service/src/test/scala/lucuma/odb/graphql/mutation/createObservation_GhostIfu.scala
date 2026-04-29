@@ -275,7 +275,57 @@ class createObservation_GhostIfu extends OdbSuite:
               }
             """,
           expected = List(
-            "GHOST observations require a TimeAndCount exposure time mode."
+            "GHOST observations require red and blue channel TimeAndCount exposure time modes with equivalent wavelength values."
+          ).asLeft
+        )
+
+  test("cannot create GHOST IFU with time and count if the red and blue channel wavelengths differ"):
+    createProgramAs(pi).flatMap: pid =>
+      createTargetAs(pi, pid).flatMap: tid =>
+        expect(
+          user  = pi,
+          query =
+            // N.B. Using the F2 science requirements to get a S/N ETM
+            s"""
+              mutation {
+                createObservation(input: {
+                  programId: "$pid"
+                  SET: {
+                    targetEnvironment: {
+                      asterism: [ "$tid" ]
+                    }
+                    scienceRequirements: ${scienceRequirementsObject(Flamingos2LongSlit)}
+                    observingMode: {
+                      ghostIfu: {
+                        resolutionMode: STANDARD
+                        red: {
+                          exposureTimeMode: {
+                            timeAndCount: {
+                              time: { seconds: 1.0 }
+                              count: 1
+                              at: { nanometers: 500 }
+                            }
+                          }
+                        }
+                        blue: {
+                          exposureTimeMode: {
+                            timeAndCount: {
+                              time: { seconds: 2.0 }
+                              count: 2
+                              at: { nanometers: 501 }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }) {
+                  observation { id }
+                }
+              }
+            """,
+          expected = List(
+            "GHOST observations require red and blue channel TimeAndCount exposure time modes with equivalent wavelength values."
           ).asLeft
         )
 

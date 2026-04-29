@@ -3,10 +3,11 @@
 
 package lucuma.odb.service
 
+import cats.Order.catsKernelOrderingForOrder
 import cats.data.NonEmptyList
 import cats.effect.Concurrent
 import cats.syntax.applicative.*
-import cats.syntax.apply.*
+import cats.syntax.eq.*
 import cats.syntax.flatMap.*
 import cats.syntax.foldable.*
 import cats.syntax.functor.*
@@ -51,7 +52,7 @@ trait GhostIfuService[F[_]]:
   def update(
     SET:   GhostIfuInput.Edit,
     which: List[Observation.Id]
-  )(using Transaction[F]): F[Unit]
+  )(using Transaction[F]): F[Result[Unit]]
 
   def clone(
     originalId: Observation.Id,
@@ -63,23 +64,45 @@ object GhostIfuService:
   enum Channel:
     case Red, Blue
 
-  private def validateEtms(
-    requirementsEtm: Option[ExposureTimeMode],
-    scienceEtms:     Map[Channel, Option[ExposureTimeMode]]
-  ): Result[Unit] =
-    def validateEtm(c: Channel): Result[Unit] =
-      Result
-        .fromOption(
-          scienceEtms
-            .get(c)
-            .flatten
-            .orElse(requirementsEtm)
-            .flatMap(ExposureTimeMode.timeAndCount.getOption)
-            .void,
-          OdbError.InvalidArgument("GHOST observations require a TimeAndCount exposure time mode.".some).asProblem
+    def color: String =
+      this match
+        case Red  => "red"
+        case Blue => "blue"
+
+    def etmIdColumn: String =
+      s"c_${color}_exposure_time_mode_id"
+
+  private object validateEtms:
+    def errorMessage(oids: List[Observation.Id]): String =
+      val oidsString = oids match
+        case Nil => ""
+        case _   => s"${oids.sorted.mkString("(", ", ", ")")} "
+      s"GHOST observations ${oidsString}require red and blue channel TimeAndCount exposure time modes with equivalent wavelength values."
+
+    val error: OdbError = OdbError.InvalidArgument(errorMessage(Nil).some)
+
+    def checkAtEquals(a: ExposureTimeMode, b: ExposureTimeMode): Result[Unit] =
+      error.asFailure.unlessA(a.at === b.at)
+
+    def forCreate(
+      requirementsEtm: Option[ExposureTimeMode],
+      scienceEtmA:     Option[ExposureTimeMode],
+      scienceEtmB:     Option[ExposureTimeMode]
+    ): Result[Unit] =
+      def resolveAndValidate(e: Option[ExposureTimeMode]): Result[ExposureTimeMode] =
+        Result.fromOption(
+          e.orElse(requirementsEtm).flatMap(ExposureTimeMode.timeAndCount.getOption),
+          error.asProblem
         )
 
-    validateEtm(Channel.Red) *> validateEtm(Channel.Blue)
+      for
+        a <- resolveAndValidate(scienceEtmA)
+        b <- resolveAndValidate(scienceEtmB)
+        _ <- checkAtEquals(a, b)
+      yield ()
+
+    def forUpdate(a: ExposureTimeMode, b: ExposureTimeMode): Result[Unit] =
+      forCreate(none, a.some, b.some)
 
   def instantiate[F[_]: {Concurrent, Services}]: GhostIfuService[F] =
 
@@ -100,16 +123,15 @@ object GhostIfuService:
         reqEtm: Option[ExposureTimeMode],
         which:  List[Observation.Id]
       )(using Transaction[F]): F[Result[Unit]] =
-        val science = NonEmptyList.of(
-          Channel.Blue -> input.blue.flatMap(_.exposureTimeMode),
-          Channel.Red  -> input.red.flatMap(_.exposureTimeMode)
-        )
+        val redEtm  = input.red.flatMap(_.exposureTimeMode)
+        val blueEtm = input.blue.flatMap(_.exposureTimeMode)
+        val science = NonEmptyList.of(Channel.Red -> redEtm, Channel.Blue -> blueEtm)
 
         NonEmptyList
           .fromList(which)
           .fold(ResultT.unit[F]): nel =>
             for
-              _   <- ResultT.fromResult(validateEtms(reqEtm, science.toList.toMap))
+              _   <- ResultT.fromResult(validateEtms.forCreate(reqEtm, redEtm, blueEtm))
               r   <- ResultT(exposureTimeModeService.resolve("GHOST IFU", none, science, reqEtm, which))
               ids <- ResultT.liftF(exposureTimeModeService.insertResolvedAcquisitionAndScience(r))
               etms = nel.map: oid =>
@@ -127,12 +149,43 @@ object GhostIfuService:
       override def update(
         SET:   GhostIfuInput.Edit,
         which: List[Observation.Id]
-      )(using Transaction[F]): F[Unit] =
-        for
-          _ <- Statements.updateGhostIfu(SET, which).traverse_(session.exec)
-          _ <- SET.red.flatMap(_.exposureTimeMode).traverse_(etm => session.exec(Statements.updateEtm(which, etm, "red")))
-          _ <- SET.blue.flatMap(_.exposureTimeMode).traverse_(etm => session.exec(Statements.updateEtm(which, etm, "blue")))
-        yield ()
+      )(using Transaction[F]): F[Result[Unit]] =
+        def selectEtms(c: Channel): F[List[(Observation.Id, ExposureTimeMode)]] =
+          val af = Statements.selectGhostScienceExposureTimeModes(which, c)
+          session.prepareR(af.fragment.query(observation_id *: exposure_time_mode)).use: pq =>
+            pq.stream(af.argument, chunkSize = 1024)
+              .compile
+              .toList
+
+        def validateOne(
+          updatedEtm:     ExposureTimeMode,
+          lookupExisting: F[List[(Observation.Id, ExposureTimeMode)]]
+        ): ResultT[F, Unit] =
+          ResultT:
+            lookupExisting.map: lst =>
+              NonEmptyList
+                .fromList:
+                  lst.collect:
+                    case (oid, existingEtm) if !validateEtms.forUpdate(updatedEtm, existingEtm).hasValue => oid
+                .fold(Result.unit): oids =>
+                   OdbError.InvalidArgument(validateEtms.errorMessage(oids.toList).some).asFailure
+
+        val setRedEtm  = SET.red.flatMap(_.exposureTimeMode)
+        val setBlueEtm = SET.blue.flatMap(_.exposureTimeMode)
+
+        val validateEtmUpdate: ResultT[F, Unit] =
+          (setRedEtm, setBlueEtm) match
+            case (Some(r), Some(b)) => ResultT.fromResult(validateEtms.forUpdate(r, b))
+            case (None,    None)    => ResultT.unit
+            case (Some(r), None)    => validateOne(r, selectEtms(Channel.Blue))
+            case (None,    Some(b)) => validateOne(b, selectEtms(Channel.Red))
+
+        (for
+          _ <- ResultT.liftF(Statements.updateGhostIfu(SET, which).traverse_(session.exec))
+          _ <- validateEtmUpdate
+          _ <- ResultT.liftF(setRedEtm.traverse_(etm => session.exec(Statements.updateEtm(which, etm, Channel.Red))))
+          _ <- ResultT.liftF(setBlueEtm.traverse_(etm => session.exec(Statements.updateEtm(which, etm, Channel.Blue))))
+        yield ()).value
 
       override def clone(
         originalId: Observation.Id,
@@ -343,9 +396,9 @@ object GhostIfuService:
         WHERE src.c_observation_id = $observation_id"""(originalId)
 
     def updateEtm(
-      oids:   List[Observation.Id],
-      update: ExposureTimeMode,
-      color:  String
+      oids:    List[Observation.Id],
+      update:  ExposureTimeMode,
+      channel: Channel
     ): AppliedFragment =
       sql"""
         UPDATE t_exposure_time_mode e
@@ -355,8 +408,8 @@ object GhostIfuService:
             c_exposure_time      = ${time_span.opt},
             c_exposure_count     = ${int4_pos.opt}
         FROM t_ghost_ifu g
-        WHERE g.c_observation_id                  = e.c_observation_id
-          AND g.c_#${color}_exposure_time_mode_id = e.c_exposure_time_mode_id
+        WHERE g.c_observation_id        = e.c_observation_id
+          AND g.#${channel.etmIdColumn} = e.c_exposure_time_mode_id
           AND e.c_observation_id IN ${observation_id.list(oids.length).values}
       """.apply(
         update.modeType,
@@ -366,6 +419,23 @@ object GhostIfuService:
         update.exposureCount,
         oids
       )
+
+    def selectGhostScienceExposureTimeModes(
+      oids:    List[Observation.Id],
+      channel: Channel
+    ): AppliedFragment =
+      sql"""
+        SELECT
+          g.c_observation_id,
+          e.c_exposure_time_mode,
+          e.c_signal_to_noise_at,
+          e.c_signal_to_noise,
+          e.c_exposure_time,
+          e.c_exposure_count
+        FROM t_ghost_ifu g
+        JOIN t_exposure_time_mode e ON e.c_exposure_time_mode_id = g.#${channel.etmIdColumn}
+        WHERE g.c_observation_id IN ${observation_id.list(oids.length).values}
+      """.apply(oids.toList)
 
     def updateGhostIfu(
       SET:   GhostIfuInput.Edit,
