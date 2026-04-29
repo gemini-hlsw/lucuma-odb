@@ -4,9 +4,10 @@
 package lucuma.odb.service
 
 import cats.effect.IO
+import cats.syntax.apply.*
 import cats.syntax.option.*
 import eu.timepit.refined.types.numeric.PosInt
-import grackle.Result
+import grackle.ResultT
 import lucuma.core.enums.GhostBinning
 import lucuma.core.enums.GhostIfu1FiberAgitator
 import lucuma.core.enums.GhostIfu2FiberAgitator
@@ -46,13 +47,17 @@ class GhostIfuServiceSuite extends ExecutionTestSupport:
     in:  GhostIfuInput.Create,
     etm: Option[ExposureTimeMode],
     oid: Observation.Id
-  ): IO[Result[Unit]] =
+  ): IO[Unit] =
     withServices(serviceUser): services =>
       services
         .transactionally:
           val setType  = services.session.execute(SetObservingMode)(Instrument.Ghost, ObservingModeType.GhostIfu, oid).void
           val doInsert = ghostIfuService.insert(in, etm, List(oid))
-          setType *> doInsert
+          (ResultT.liftF(setType) *> ResultT(doInsert)).value.flatMap: r =>
+            r.toEither match
+              case Right(_)        => IO.unit
+              case Left(Right(ps)) => IO.raiseError(Exception(ps.toString))
+              case Left(Left(e))   => IO.raiseError(e)
 
   private def select(
     oid: Observation.Id
@@ -108,7 +113,7 @@ class GhostIfuServiceSuite extends ExecutionTestSupport:
     val blueEtm = ExposureTimeMode.TimeAndCountMode(
       2.secondTimeSpan,
       PosInt.unsafeFrom(2),
-      Wavelength.unsafeFromIntPicometers(500002)
+      Wavelength.unsafeFromIntPicometers(500001)
     )
 
     val create = GhostIfuInput.Create(

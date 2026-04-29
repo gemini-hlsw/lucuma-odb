@@ -166,7 +166,7 @@ object ExposureTimeModeService:
         oids:  List[Observation.Id],
         roles: ExposureTimeModeRole*
       )(using Transaction[F]): F[Map[Observation.Id, Map[ExposureTimeModeRole, NonEmptyList[ExposureTimeMode]]]] =
-        val af = Statements.Select(oids, roles.toList)
+        val af = Statements.select(oids, roles.toList)
 
         session.prepareR(af.fragment.query(observation_id *: exposure_time_mode_role *: exposure_time_mode)).use: pq =>
           pq.stream(af.argument, chunkSize = 1024)
@@ -356,7 +356,7 @@ object ExposureTimeModeService:
 
   object Statements:
 
-    def Select(
+    def select(
       oids:  List[Observation.Id],
       roles: List[ExposureTimeModeRole],
     ): AppliedFragment =
