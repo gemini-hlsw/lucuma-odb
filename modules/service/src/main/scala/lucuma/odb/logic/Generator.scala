@@ -230,12 +230,7 @@ object Generator:
               EitherT(streaming.selectOrGenerateGmosSouthLongSlit(ctx)).flatMap(digest(_, calculator.gmosSouthLongSlitSetup))
             case ObservingModeType.Igrins2LongSlit    =>
               EitherT(streaming.selectOrGenerateIgrins2LongSlit(ctx)).flatMap(digest(_, calculator.igrins2LongSlitSetup))
-<<<<<<< HEAD
-=======
-            case ObservingModeType.GhostIfu    =>
-              EitherT.leftT(OdbError.InvalidObservation(ctx.oid, s"GHOST is not yet supported".some))
             case _: VisitorObservingModeType => done
->>>>>>> a8c48da9a (wip)
 
       private def calculateScienceAtomDigests(
         ctx: GeneratorContext
@@ -246,33 +241,14 @@ object Generator:
             .fromEither(GeneratorError.sequenceTooLong(ctx.oid).asLeft[ExecutionDigest])
             .unlessA(ctx.itcRes.toOption.forall(_.scienceExposureCount.value <= SequenceAtomLimit))
 
-<<<<<<< HEAD
         val stepCount =
           EitherT
             .fromOption(
               Option.when(ctx.params.stepCount <= Int.MaxValue)(ctx.params.stepCount.toInt).flatMap(NonNegInt.unapply),
               GeneratorError.sequenceTooLong(ctx.oid)
             )
-=======
-        val atomDigests = ctx.params.observingMode.modeType match
-          case ObservingModeType.Flamingos2LongSlit =>
-            EitherT(streaming.selectOrGenerateFlamingos2LongSlit(ctx)).map(_.science.map(AtomDigest.fromAtom))
-          case ObservingModeType.GmosNorthImaging   =>
-            EitherT(streaming.selectOrGenerateGmosNorthImaging(ctx)).map(_.science.map(AtomDigest.fromAtom))
-          case ObservingModeType.GmosNorthLongSlit  =>
-            EitherT(streaming.selectOrGenerateGmosNorthLongSlit(ctx)).map(_.science.map(AtomDigest.fromAtom))
-          case ObservingModeType.GmosSouthImaging   =>
-            EitherT(streaming.selectOrGenerateGmosSouthImaging(ctx)).map(_.science.map(AtomDigest.fromAtom))
-          case ObservingModeType.GmosSouthLongSlit  =>
-            EitherT(streaming.selectOrGenerateGmosSouthLongSlit(ctx)).map(_.science.map(AtomDigest.fromAtom))
-          case ObservingModeType.Igrins2LongSlit    =>
-            EitherT(streaming.selectOrGenerateIgrins2LongSlit(ctx)).map(_.science.map(AtomDigest.fromAtom))
-          case ObservingModeType.GhostIfu    =>
-            EitherT.leftT(OdbError.InvalidObservation(ctx.oid, s"GHOST is not yet supported".some))
-          case _: VisitorObservingModeType =>
-            EitherT.rightT(Stream.empty)
->>>>>>> a8c48da9a (wip)
 
+        // EitherT[F, OdbError, StreamingExecutionConfig[F, A, B] forSome { type A, type B }] but we can't write that anymore
         val stream = ctx.params.observingMode.modeType match
           case ObservingModeType.Flamingos2LongSlit => EitherT(streaming.selectOrGenerateFlamingos2LongSlit(ctx))
           case ObservingModeType.GhostIfu           => EitherT(streaming.selectOrGenerateGhost(ctx))
@@ -281,6 +257,9 @@ object Generator:
           case ObservingModeType.GmosSouthImaging   => EitherT(streaming.selectOrGenerateGmosSouthImaging(ctx))
           case ObservingModeType.GmosSouthLongSlit  => EitherT(streaming.selectOrGenerateGmosSouthLongSlit(ctx))
           case ObservingModeType.Igrins2LongSlit    => EitherT(streaming.selectOrGenerateIgrins2LongSlit(ctx))
+          case _: VisitorObservingModeType          => 
+            EitherT.rightT[F, OdbError]:
+              StreamingExecutionConfig[F, Unit, Nothing]((), Stream.empty, Stream.empty)
 
         (checkSequence *> stepCount).flatMap: sc =>
           val base = sc.value
@@ -368,15 +347,9 @@ object Generator:
                 .flatMap(s => EitherT.liftF(executionConfig(s)))
                 .map(InstrumentExecutionConfig.Igrins2.apply)
 
-<<<<<<< HEAD
-=======
-            case ObservingModeType.GhostIfu           =>
-              EitherT.leftT(OdbError.InvalidObservation(ctx.oid, s"GHOST is not yet supported".some))
-
             case v: VisitorObservingModeType =>
               EitherT.rightT(InstrumentExecutionConfig.Visitor(v.instrument))
 
->>>>>>> a8c48da9a (wip)
         transactionallyWithContext(oid, commitHash): ctx =>
           instrumentExecutionConfig(ctx)
 
@@ -453,15 +426,9 @@ object Generator:
               EitherT(streaming.generateIgrins2LongSlit(ctx))
                 .flatMap(s => EitherT.liftF(sequenceService.materializeIgrins2ExecutionConfig(oid, s)))
 
-<<<<<<< HEAD
-=======
-            case ObservingModeType.GhostIfu           =>
-              EitherT.leftT(OdbError.InvalidObservation(ctx.oid, s"GHOST is not yet supported".some))
-
             case _: VisitorObservingModeType =>
               EitherT.pure(())
               
->>>>>>> a8c48da9a (wip)
         transactionallyWithContext(oid, commitHash): ctx =>
           materializeExecutionConfig(ctx) *> EitherT(f)
 

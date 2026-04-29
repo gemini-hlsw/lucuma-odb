@@ -157,11 +157,7 @@ object ObservingModeServices:
             case ObservingModeType.GmosSouthImaging   => gmosImagingService.deleteSouth(which)
             case ObservingModeType.GmosSouthLongSlit  => gmosLongSlitService.deleteSouth(which)
             case ObservingModeType.Igrins2LongSlit    => igrins2LongSlitService.delete(which)
-<<<<<<< HEAD
-=======
-            case ObservingModeType.GhostIfu           => ().pure
             case _: VisitorObservingModeType          => visitorService.delete(which)
->>>>>>> a8c48da9a (wip)
 
         deleteObservingMode *> deleteExposureTimeModes
 

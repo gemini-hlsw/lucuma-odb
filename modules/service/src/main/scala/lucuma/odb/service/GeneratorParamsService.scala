@@ -416,7 +416,7 @@ object GeneratorParamsService {
               obsParams.declaredComplete,
               obsParams.executionState,
               obsParams.stepCount
-            )
+            ).asRight
           
 
       private def itcTargetParams(targetParams: TargetParams): ValidatedNel[MissingParam, ItcInput.TargetDefinition] = {

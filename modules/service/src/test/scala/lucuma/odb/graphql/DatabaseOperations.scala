@@ -1140,6 +1140,8 @@ trait DatabaseOperations { this: OdbSuite =>
                 }
               }
             }
+        }"""
+          
       case v: VisitorObservingModeType =>
         s"""{
           visitor: {
