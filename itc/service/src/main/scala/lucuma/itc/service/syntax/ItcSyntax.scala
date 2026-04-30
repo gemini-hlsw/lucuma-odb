@@ -57,16 +57,11 @@ end ItcSyntax
 trait ItcGraphSyntax:
   extension (series: ItcSeries)
     def adjustSignificantFigures(figures: SignificantFigures): ItcSeries =
-      val data: List[(Double, Double)] =
-        series.data.map((x, y) =>
-          (figures.xAxis.fold(x)(xDigits => roundToSignificantFigures(x, xDigits.value)),
-           figures.yAxis.fold(y)(yDigits => roundToSignificantFigures(y, yDigits.value))
-          )
-        )
-      ItcSeries(series.title, series.seriesType, data)
-
-  extension (graph: ItcGraph)
-    def adjustSignificantFigures(figures: SignificantFigures): ItcGraph =
+      series.copy(dataY = figures.yAxis match
+        case Some(v) => series.dataY.map(y => roundToSignificantFigures(y, v.value))
+        case None    => series.dataY)
+  extension (graph:  ItcGraph)
+    def adjustSignificantFigures(figures: SignificantFigures): ItcGraph  =
       graph.copy(series = graph.series.map(_.adjustSignificantFigures(figures)))
 
   extension (sn: TotalSN)

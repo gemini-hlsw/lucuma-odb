@@ -394,21 +394,29 @@ enum ItcGraphType {
   S2N_GRAPH
 }
 
-type GraphAxis {
+type GraphXAxis {
   """First value of the axis"""
   start: Float!
 
   """Last value of the axis"""
   end: Float!
 
+  """How many values for the axis"""
+  count: PosInt!
+}
+
+type GraphYAxis {
   """Max value of the axis"""
   max: Float!
+
+  """Index of the max value on the x axis"""
+  indexOfMax: Int!
 
   """Min value of the axis"""
   min: Float!
 
-  """How many values for the axis"""
-  count: PosInt!
+  """Index of the min value on the x axis"""
+  indexOfMin: Int!
 }
 
 type ItcSeries {
@@ -418,16 +426,10 @@ type ItcSeries {
   seriesType: ItcSeriesType!
 
   """Values for the x axis"""
-  xAxis: GraphAxis
+  xAxis: GraphXAxis!
 
   """Values for the x axis"""
-  yAxis: GraphAxis
-
-  """Data series in the form of pairs (x, y)"""
-  data: [[Float!]!]!
-
-  """Data series for the X axis"""
-  dataX: [Float!]!
+  yAxis: GraphYAxis!
 
   """Data series for the Y axis"""
   dataY: [Float!]!
@@ -504,9 +506,6 @@ type SpectroscopyTimeAndGraphsResult {
 
   """ITC results for each target, in case all targets succeed"""
   targetTimesAndGraphs: [TargetTimeAndGraphsOutcome!]
-
-  """In case of errors in integration times, we short cirtuit to the results from integration times"""
-  targetTimes: [TargetIntegrationTimeOutcome!] @deprecated(reason: "This field will always be null. The targetTimesAndGraphs field should be used instead.")
 
   """Index of the brightest target"""
   brightestIndex: NonNegInt
