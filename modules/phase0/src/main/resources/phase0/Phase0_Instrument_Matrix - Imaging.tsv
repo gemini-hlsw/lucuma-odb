@@ -14,3 +14,5 @@ Zorro Speckle	3	u,g,r,i,z,EO466,EO562,EO716,EO832,Halpha	no	speckle	s
 Alopeke Wide Field	35	u,g,r,i,z,EO466,EO562,EO716,EO832	no		n
 Zorro Wide Field	35	u,g,r,i,z,EO466,EO562,EO716,EO832,Halpha	no		s
 SCORPIO	180	g,r,i,z,J,H,Ks	no		s
+Visitor @ GN	-	-	yes		n
+Visitor @ GS	-	-	no		s
