@@ -18,7 +18,9 @@ import lucuma.core.enums.GmosNorthGrating
 import lucuma.core.enums.GmosSouthFilter
 import lucuma.core.enums.GmosSouthGrating
 import lucuma.core.enums.SkyBackground
+import lucuma.core.enums.VisitorObservingModeType
 import lucuma.core.enums.WaterVapor
+import lucuma.core.math.Angle
 import lucuma.core.math.Coordinates
 import lucuma.core.math.Region
 import lucuma.core.model.CloudExtinction
@@ -31,8 +33,6 @@ import lucuma.core.model.ImageQuality
 import lucuma.odb.json.angle.query.given
 import lucuma.odb.json.coordinates.query.given
 import lucuma.odb.json.region.query.given
-import lucuma.core.enums.VisitorObservingModeType
-import lucuma.core.math.Angle
 
 object configurationrequest:
 

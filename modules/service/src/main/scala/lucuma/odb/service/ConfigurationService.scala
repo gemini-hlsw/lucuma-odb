@@ -16,6 +16,7 @@ import io.circe.syntax.*
 import lucuma.core.enums.ArcType
 import lucuma.core.enums.ConfigurationRequestStatus
 import lucuma.core.enums.ObservingModeType
+import lucuma.core.enums.VisitorObservingModeType
 import lucuma.core.math.Angular
 import lucuma.core.math.Arc
 import lucuma.core.math.Coordinates
@@ -45,7 +46,6 @@ import skunk.data.Arr
 import skunk.syntax.all.*
 
 import Services.Syntax.*
-import lucuma.core.enums.VisitorObservingModeType
 
 trait ConfigurationService[F[_]] {
 

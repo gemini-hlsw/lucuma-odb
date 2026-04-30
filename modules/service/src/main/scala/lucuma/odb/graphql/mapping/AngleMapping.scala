@@ -9,13 +9,13 @@ import grackle.skunk.SkunkMapping
 import lucuma.core.math.Angle
 import lucuma.core.math.HourAngle
 import lucuma.odb.graphql.table.ChronConditionsEntryView
+import lucuma.odb.graphql.table.ConfigurationRequestView
 import lucuma.odb.graphql.table.ImagingConfigOptionTable
 import lucuma.odb.graphql.table.ObservationView
 import lucuma.odb.graphql.table.SpectroscopyConfigOptionTable
 import lucuma.odb.graphql.table.TelescopeConfigGeneratorView
-import lucuma.odb.graphql.util.MappingExtras
 import lucuma.odb.graphql.table.VisitorTable
-import lucuma.odb.graphql.table.ConfigurationRequestView
+import lucuma.odb.graphql.util.MappingExtras
 
 trait AngleMapping[F[_]] extends ObservationView[F]
                             with ChronConditionsEntryView[F]

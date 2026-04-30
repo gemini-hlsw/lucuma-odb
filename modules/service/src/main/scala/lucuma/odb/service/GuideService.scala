@@ -71,11 +71,12 @@ import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.sequence.flamingos2
 import lucuma.odb.sequence.ghost
 import lucuma.odb.sequence.gmos
-import lucuma.odb.sequence.visitor
 import lucuma.odb.sequence.igrins2
 import lucuma.odb.sequence.syntax.hash.*
 import lucuma.odb.sequence.util.HashBytes
+import lucuma.odb.sequence.visitor
 import lucuma.odb.service.Services.SuperUserAccess
+import lucuma.odb.syntax.instrument.site
 import lucuma.odb.syntax.result.*
 import lucuma.odb.util.Codecs.*
 import monocle.Focus
@@ -92,7 +93,6 @@ import scala.annotation.tailrec
 import scala.collection.immutable.SortedMap
 
 import Services.Syntax.*
-import lucuma.odb.syntax.instrument.site
 
 trait GuideService[F[_]] {
   import GuideService.AvailabilityPeriod

@@ -23,6 +23,7 @@ import lucuma.core.enums.GmosSouthGrating
 import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
 import lucuma.core.enums.ObservingModeType
+import lucuma.core.enums.VisitorObservingModeType
 import lucuma.core.math.Wavelength
 import lucuma.odb.graphql.input.Flamingos2LongSlitInput
 import lucuma.odb.graphql.input.GmosImagingFilterInput
@@ -37,8 +38,6 @@ import lucuma.odb.sequence.gmos.imaging.Config as ImagingConfig
 import lucuma.odb.sequence.gmos.longslit.Config
 import lucuma.odb.sequence.igrins2.longslit.Config as Igrins2Config
 import lucuma.odb.sequence.visitor.Config as VisitorConfig
-
-import lucuma.core.enums.VisitorObservingModeType
 
 sealed trait CalibrationConfigSubset derives Eq:
   def modeType: ObservingModeType

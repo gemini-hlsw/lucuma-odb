@@ -4,8 +4,8 @@
 package lucuma.odb.sequence.visitor
 
 import lucuma.core.enums.VisitorObservingModeType
-import lucuma.core.math.Wavelength
 import lucuma.core.math.Angle
+import lucuma.core.math.Wavelength
 import lucuma.odb.sequence.util.HashBytes
 
 final case class Config(

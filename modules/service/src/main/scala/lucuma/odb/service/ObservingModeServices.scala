@@ -13,6 +13,7 @@ import cats.syntax.traverse.*
 import grackle.Result
 import grackle.syntax.*
 import lucuma.core.enums.ObservingModeType
+import lucuma.core.enums.VisitorObservingModeType
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.Observation
 import lucuma.odb.data.ExposureTimeModeId
@@ -25,7 +26,6 @@ import lucuma.odb.service.Services.SuperUserAccess
 import skunk.Transaction
 
 import Services.Syntax.*
-import lucuma.core.enums.VisitorObservingModeType
 
 // N.B., observing modes come with an acquisition exposure time mode and one or
 // more science exposure time modes.  This class directly handles ETM updates

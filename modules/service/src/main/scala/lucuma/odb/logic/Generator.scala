@@ -18,6 +18,7 @@ import eu.timepit.refined.types.numeric.NonNegInt
 import fs2.Stream
 import lucuma.core.enums.ExecutionState
 import lucuma.core.enums.ObservingModeType
+import lucuma.core.enums.VisitorObservingModeType
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.AtomDigest
@@ -41,7 +42,6 @@ import lucuma.odb.service.Services.Syntax.*
 import skunk.*
 
 import Generator.FutureLimit
-import lucuma.core.enums.VisitorObservingModeType
 
 sealed trait Generator[F[_]]:
 

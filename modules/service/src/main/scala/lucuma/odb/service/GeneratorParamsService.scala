@@ -50,8 +50,8 @@ import lucuma.odb.sequence.data.MissingParam
 import lucuma.odb.sequence.data.MissingParamSet
 import lucuma.odb.sequence.flamingos2
 import lucuma.odb.sequence.ghost
-import lucuma.odb.sequence.visitor
 import lucuma.odb.sequence.igrins2
+import lucuma.odb.sequence.visitor
 import lucuma.odb.util.Codecs.*
 import skunk.*
 import skunk.circe.codec.json.*

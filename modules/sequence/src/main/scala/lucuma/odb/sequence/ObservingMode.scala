@@ -7,6 +7,7 @@ import cats.Eq
 import cats.syntax.eq.*
 import cats.syntax.option.*
 import lucuma.core.enums.Instrument
+import lucuma.core.enums.ObservingModeType
 import lucuma.odb.sequence.flamingos2.longslit.Config as Flamingos2LongSlit
 import lucuma.odb.sequence.ghost.ifu.Config as GhostIfu
 import lucuma.odb.sequence.gmos.imaging.Config.GmosNorth as GmosNorthImaging
@@ -14,10 +15,9 @@ import lucuma.odb.sequence.gmos.imaging.Config.GmosSouth as GmosSouthImaging
 import lucuma.odb.sequence.gmos.longslit.Config.GmosNorth as GmosNorthLongSlit
 import lucuma.odb.sequence.gmos.longslit.Config.GmosSouth as GmosSouthLongSlit
 import lucuma.odb.sequence.igrins2.longslit.Config as Igrins2LongSlit
-import lucuma.odb.sequence.visitor.Config as Visitor
-import lucuma.odb.sequence.util.HashBytes
 import lucuma.odb.sequence.syntax.all.hashBytes
-import lucuma.core.enums.ObservingModeType
+import lucuma.odb.sequence.util.HashBytes
+import lucuma.odb.sequence.visitor.Config as Visitor
 
 /**
  * All observing mode options.

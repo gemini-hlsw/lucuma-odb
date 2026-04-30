@@ -17,6 +17,7 @@ import lucuma.core.enums.GmosSouthFilter
 import lucuma.core.enums.GmosSouthGrating
 import lucuma.core.enums.Igrins2OffsetMode
 import lucuma.core.enums.ObservingModeType
+import lucuma.core.enums.VisitorObservingModeType
 import lucuma.core.model.CloudExtinction
 import lucuma.core.model.ConfigurationRequest
 import lucuma.core.model.Observation
@@ -24,7 +25,6 @@ import lucuma.core.model.User
 import lucuma.core.syntax.string.*
 import lucuma.core.util.Enumerated
 import lucuma.odb.graphql.mutation.UpdateObservationsOps
-import lucuma.core.enums.VisitorObservingModeType
 import lucuma.odb.isImplemented
 
 class observation_configurationRequests

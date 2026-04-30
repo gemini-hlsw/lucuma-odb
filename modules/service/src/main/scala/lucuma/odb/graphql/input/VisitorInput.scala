@@ -3,15 +3,15 @@
 
 package lucuma.odb.graphql.input
 
-import lucuma.odb.sequence.visitor.Config
+import cats.syntax.all.*
+import grackle.Result
 import lucuma.core.enums.VisitorObservingModeType
-import lucuma.core.math.Wavelength
 import lucuma.core.math.Angle
+import lucuma.core.math.Wavelength
 import lucuma.odb.graphql.binding.Matcher
 import lucuma.odb.graphql.binding.ObjectFieldsBinding
 import lucuma.odb.graphql.binding.VisitorObservingModeTypeBinding
-import cats.syntax.all.* 
-import grackle.Result
+import lucuma.odb.sequence.visitor.Config
 
 object VisitorInput:
 

@@ -32,6 +32,7 @@ import lucuma.core.enums.SequenceCommand
 import lucuma.core.enums.SlewStage
 import lucuma.core.enums.StepStage
 import lucuma.core.enums.TimeAccountingCategory
+import lucuma.core.enums.VisitorObservingModeType
 import lucuma.core.math.Angle
 import lucuma.core.math.Coordinates
 import lucuma.core.model.CallForProposals
@@ -91,7 +92,6 @@ import skunk.syntax.all.*
 import java.time.Instant
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
-import lucuma.core.enums.VisitorObservingModeType
 
 trait DatabaseOperations { this: OdbSuite =>
 

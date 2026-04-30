@@ -3,21 +3,21 @@
 
 package lucuma.odb.service
 
-import lucuma.core.model.Observation
-import lucuma.odb.sequence.visitor.Config
-import skunk.Transaction
+import cats.data.NonEmptyList
+import cats.effect.Concurrent
+import cats.implicits.*
 import grackle.Result
+import lucuma.core.model.Observation
 import lucuma.odb.graphql.input.VisitorInput
+import lucuma.odb.sequence.visitor.Config
+import lucuma.odb.service.Services.Syntax.session
+import lucuma.odb.util.Codecs.*
+import skunk.AppliedFragment
 import skunk.Command
 import skunk.Query
-import skunk.syntax.all.*
-import cats.data.NonEmptyList
-import lucuma.odb.util.Codecs.*
-import cats.implicits.*
-import lucuma.odb.service.Services.Syntax.session
-import cats.effect.Concurrent
+import skunk.Transaction
 import skunk.data.Completion
-import skunk.AppliedFragment
+import skunk.syntax.all.*
 
 trait VisitorService[F[_]]:
   

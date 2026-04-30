@@ -3,9 +3,10 @@
 
 package lucuma.odb.syntax
 
+import lucuma.core.data.Metadata
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.Site
-import lucuma.core.data.Metadata
+
 import java.time.Instant
 
 trait ToInstrumentOps {
