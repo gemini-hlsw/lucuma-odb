@@ -26,7 +26,8 @@ import lucuma.core.enums.GnirsWellDepth
  */
 class LegacyITCGnirsSpecExpTimeSuite extends CommonITCLegacySuite:
 
-  val wavelengthAt = Wavelength.decimalMicrometers.getOption(2.2).get
+  val centralWavelength = Wavelength.decimalMicrometers.getOption(2.2).get
+  val wavelengthAt      = Wavelength.decimalMicrometers.getOption(2.1).get
 
   override def obs = ItcObservationDetails(
     calculationMethod = ItcObservationDetails.CalculationMethod.S2NMethod.SpectroscopyS2N(
@@ -42,7 +43,7 @@ class LegacyITCGnirsSpecExpTimeSuite extends CommonITCLegacySuite:
 
   override def instrument = ItcInstrumentDetails(
     ObservingMode.SpectroscopyMode.GnirsLongSlit(
-      centralWavelength = wavelengthAt,
+      centralWavelength = centralWavelength,
       grating = GnirsGrating.D32,
       filter = GnirsFilter.Order3,
       camera = GnirsCamera.ShortBlue,
