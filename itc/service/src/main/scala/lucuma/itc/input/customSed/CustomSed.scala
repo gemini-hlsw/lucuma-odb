@@ -14,7 +14,6 @@ import lucuma.core.model.SourceProfile
 import lucuma.core.model.SpectralDefinition.BandNormalized
 import lucuma.core.model.UnnormalizedSED
 import lucuma.itc.service.TargetData
-import lucuma.itc.service.requests.TargetGraphRequest
 import lucuma.itc.service.requests.TargetImagingTimeRequest
 import lucuma.itc.service.requests.TargetSpectroscopyTimeRequest
 
@@ -42,11 +41,6 @@ object CustomSed:
             .andThen(SourceProfile.surfaceBandNormalizedSpectralDefinition)
             .andThen(BandNormalized.sed.some)
             .parModifyF(resolveUnnormalizedSed)
-
-  def resolveTargetGraphRequest[F[_]: Monad: Parallel: Resolver]
-    : TargetGraphRequest => F[TargetGraphRequest] =
-    case TargetGraphRequest(targetData, parameters) =>
-      resolveTargetData(targetData).map(TargetGraphRequest(_, parameters))
 
   def resolveTargetSpectroscopyTimeRequest[F[_]: Monad: Parallel: Resolver]
     : TargetSpectroscopyTimeRequest => F[TargetSpectroscopyTimeRequest] =

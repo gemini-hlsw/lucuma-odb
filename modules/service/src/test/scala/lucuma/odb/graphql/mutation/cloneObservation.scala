@@ -21,6 +21,7 @@ import lucuma.core.syntax.string.*
 import lucuma.core.util.Enumerated
 import lucuma.core.util.Gid
 import lucuma.odb.graphql.query.ObservingModeSetupOperations
+import lucuma.odb.isImplemented
 
 class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
   val pi, pi2 = TestUsers.Standard.pi(nextId, nextId)
@@ -287,13 +288,11 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
     }
     """
 
-  val IsImplemented: Set[ObservingModeType] = ObservingModeType.values.toSet - ObservingModeType.GhostIfu
-
   def load(oid: Observation.Id, graph: String = ObservationGraph): IO[Json] =
     query(user = pi, query = s"""query{observation(observationId: "$oid")$graph}""")
 
   test("clones should have the same properties, for all observing modes") {
-    ObservingModeType.values.toList.filter(IsImplemented.apply).traverse { obsMode =>
+    ObservingModeType.values.toList.filter(_.isImplemented).traverse { obsMode =>
       createProgramAs(pi).flatMap { pid =>
         val t = createTargetAs(pi, pid)
         (t, t).tupled.flatMap { (tid1, tid2) =>

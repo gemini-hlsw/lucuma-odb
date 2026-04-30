@@ -80,12 +80,12 @@ trait ClientSuite extends CatsEffectSuite:
         .map(_.leftMap(_.getMessage))
         .assertEquals(expected)
 
-  def spectroscopyGraphs(
-    in:       SpectroscopyGraphsInput,
-    expected: Either[String, SpectroscopyGraphsResult]
+  def spectroscopyIntegrationTimeAndGraphs(
+    in:       SpectroscopyIntegrationTimeAndGraphsInput,
+    expected: Either[String, SpectroscopyIntegrationTimeAndGraphsResult]
   ): IO[Unit] =
     bandNormalizedClient.use:
-      _.spectroscopyGraphs(in).attempt
+      _.spectroscopyIntegrationTimeAndGraphs(in).attempt
         .map(_.leftMap(_.getMessage))
         .assertEquals(expected)
 

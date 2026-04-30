@@ -933,6 +933,9 @@ object ConfigurationService {
                   case (ObservingModeType.Igrins2LongSlit, _, _, _, _, _, _) =>
                     Right(Configuration.ObservingMode.Igrins2LongSlit)
 
+                  case (ObservingModeType.GhostIfu, _, _, _, _, _, _) =>
+                    Right(Configuration.ObservingMode.GhostIfu)
+
                   case (m: VisitorObservingModeType, _, _, _, _, _, Some(radius)) =>
                     Right(Configuration.ObservingMode.Visitor(m, radius))
 
@@ -1152,6 +1155,9 @@ object ConfigurationService {
 
                   case (ObservingModeType.GmosSouthLongSlit, _, _, _, _, Some(g), _) =>
                     Right(Configuration.ObservingMode.GmosSouthLongSlit(g))
+
+                  case (ObservingModeType.GhostIfu, _, _, _, _, _, _) =>
+                    Right(Configuration.ObservingMode.GhostIfu)
 
                   case (ObservingModeType.Igrins2LongSlit, _, _, _, _, _, _) =>
                     Right(Configuration.ObservingMode.Igrins2LongSlit)

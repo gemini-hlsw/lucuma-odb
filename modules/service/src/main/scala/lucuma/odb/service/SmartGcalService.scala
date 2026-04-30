@@ -30,6 +30,8 @@ import lucuma.core.math.BoundedInterval
 import lucuma.core.math.Wavelength
 import lucuma.core.model.sequence.StepConfig.Gcal
 import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig as Flamingos2
+import lucuma.core.model.sequence.ghost.GhostDetector
+import lucuma.core.model.sequence.ghost.GhostDynamicConfig
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosSouth
 import lucuma.core.model.sequence.igrins2.Igrins2DynamicConfig as Igrins2
@@ -38,6 +40,9 @@ import lucuma.odb.service.Services.GuestAccess
 import lucuma.odb.service.Services.SuperUserAccess
 import lucuma.odb.smartgcal.data.Flamingos2.TableKey as Flamingos2SearchKey
 import lucuma.odb.smartgcal.data.Flamingos2.TableRow as Flamingos2TableRow
+import lucuma.odb.smartgcal.data.Ghost.GhostUpdate
+import lucuma.odb.smartgcal.data.Ghost.SearchKey as GhostSearchKey
+import lucuma.odb.smartgcal.data.Ghost.TableRow as GhostTableRow
 import lucuma.odb.smartgcal.data.Gmos.SearchKey.North as GmosNorthSearchKey
 import lucuma.odb.smartgcal.data.Gmos.SearchKey.South as GmosSouthSearchKey
 import lucuma.odb.smartgcal.data.Gmos.TableRow.North as GmosNorthTableRow
@@ -46,14 +51,31 @@ import lucuma.odb.smartgcal.data.Igrins2.TableKey as Igrins2SearchKey
 import lucuma.odb.smartgcal.data.Igrins2.TableRow as Igrins2TableRow
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.Flamingos2Codecs.*
+import lucuma.odb.util.GhostCodecs.*
 import lucuma.odb.util.GmosCodecs.*
 import skunk.*
-import skunk.codec.numeric.int4
+import skunk.codec.all.*
 import skunk.implicits.*
 
 import Services.Syntax.*
 
-trait SmartGcalService[F[_]] {
+trait SmartGcalService[F[_]]:
+
+  /**
+   * Selects calibration information corresponding to the given search key and
+   * type.  There can be multiple steps per key.
+   *
+   * @param ghost Ghost search information
+   * @param sgt SmartGcal type of interest
+   *
+   * @return list of tuples, each corresponding to a calibration step; each
+   *         tuple contains an update to the dynamic config to apply (e.g., to
+   *         set its exposure time) and the GCAL unit configuration to use
+   */
+  def selectGhost(
+    ghost: GhostSearchKey,
+    sgt:   SmartGcalType
+  )(using GuestAccess): F[List[(GhostDynamicConfig => GhostDynamicConfig, Gcal)]]
 
   /**
    * Selects calibration information corresponding to the given search key and
@@ -108,8 +130,15 @@ trait SmartGcalService[F[_]] {
     sgt: SmartGcalType
   )(using GuestAccess): F[List[(Igrins2 => Igrins2, Gcal)]]
 
-  // N.B. Insertion is done by a flyway migration and not via this method.  The
-  // insert here is intended for initializing a database for testing.
+  // N.B. Insertion is done by a flyway migration and not via the insert methods.
+  // The insert here is intended for initializing a database for testing.
+
+  def insertGhost(
+    id:   Int,
+    line: PosLong,
+    row:  GhostTableRow
+  )(using SuperUserAccess): F[Unit]
+
   def insertGmosNorth(
     id:  Int,
     row: GmosNorthTableRow
@@ -129,12 +158,31 @@ trait SmartGcalService[F[_]] {
     id:  Int,
     row: Igrins2TableRow
   )(using SuperUserAccess): F[Unit]
-}
 
-object SmartGcalService {
+
+object SmartGcalService:
 
   def instantiate[F[_] : Concurrent](using Services[F]): SmartGcalService[F] =
-    new SmartGcalService[F] {
+    new SmartGcalService[F]:
+
+      override def selectGhost(
+        ghost: GhostSearchKey,
+        sgt:   SmartGcalType
+      )(using GuestAccess): F[List[(GhostDynamicConfig => GhostDynamicConfig, Gcal)]] =
+        def update(
+          g: GhostDynamicConfig,
+          c: GhostUpdate
+        ): GhostDynamicConfig =
+          // TODO: Core optics to simplify
+          val redʹ  = g.red.value.copy(exposureTime = c.redExposureTime, exposureCount = c.redExposureCount)
+          val blueʹ = g.blue.value.copy(exposureTime = c.blueExposureTime, exposureCount = c.blueExposureCount)
+          g.copy(red = redʹ.asRed, blue = blueʹ.asBlue)
+
+        session
+          .execute(Statements.selectGhost(sgt))(ghost)
+          .map:
+            _.flatMap: (gcal, count, ghostConfig) =>
+              List.fill(count.value)((g => update(g, ghostConfig), gcal))
 
       override def selectGmosNorth(
         gn:  GmosNorthSearchKey,
@@ -180,6 +228,24 @@ object SmartGcalService {
       )(using GuestAccess): F[List[(Igrins2 => Igrins2, Gcal)]] =
         selectGcal(Statements.selectIgrins2(key, sgt)): exposureTime =>
           Igrins2.exposure.replace(exposureTime)
+
+      override def insertGhost(
+        id:   Int,
+        line: PosLong,
+        row:  GhostTableRow
+      )(using SuperUserAccess): F[Unit] =
+        val insertInstRow =
+          session.execute(Statements.InsertGhost)(id, line, row).void
+
+        val insertGcalRow =
+          session.executeCommand(
+            Statements.InsertGcal(Instrument.Ghost, id, row.value.gcalConfig, row.value.stepCount, row.value.baselineType)
+          ).void
+
+        for
+          _ <- insertGcalRow
+          _ <- insertInstRow
+        yield ()
 
       override def insertGmosNorth(
         id:  Int,
@@ -310,40 +376,72 @@ object SmartGcalService {
           _ <- insertInstRow
         } yield ()
 
-    }
-
-  object Statements {
+  object Statements:
 
     private def whereSmartGcalType(sgt: SmartGcalType): AppliedFragment =
-      sgt match {
+      sgt match
         case SmartGcalType.Arc           => void"g.c_gcal_lamp_type = 'Arc'"
         case SmartGcalType.Flat          => void"g.c_gcal_lamp_type = 'Flat'"
         case SmartGcalType.DayBaseline   => void"g.c_gcal_baseline  = 'Day'"
         case SmartGcalType.NightBaseline => void"g.c_gcal_baseline  = 'Night'"
-      }
+
+    private val GcalColumns: List[String] =
+      List(
+        "c_gcal_continuum",
+        "c_gcal_ar_arc",
+        "c_gcal_cuar_arc",
+        "c_gcal_thar_arc",
+        "c_gcal_xe_arc",
+        "c_gcal_filter",
+        "c_gcal_diffuser",
+        "c_gcal_shutter",
+        "c_gcal_step_count"
+      )
+
+    def gcalColumns(prefix: String): String =
+      GcalColumns.map(c => s"$prefix.$c").mkString(",\n")
 
     private def selectGcal(tableName: String, where: List[AppliedFragment]): AppliedFragment =
       sql"""
-        SELECT g.c_gcal_continuum,
-               g.c_gcal_ar_arc,
-               g.c_gcal_cuar_arc,
-               g.c_gcal_thar_arc,
-               g.c_gcal_xe_arc,
-               g.c_gcal_filter,
-               g.c_gcal_diffuser,
-               g.c_gcal_shutter,
-               g.c_gcal_step_count,
+        SELECT #${gcalColumns("g")},
                s.c_exposure_time
           FROM #$tableName s
           JOIN t_gcal      g ON s.c_instrument = g.c_instrument
                             AND s.c_gcal_id    = g.c_gcal_id
          WHERE """(Void) |+| where.intercalate(void" AND ") |+| void" ORDER BY s.c_step_order"
 
+    val ghost_config: Codec[GhostUpdate] =
+      (
+        time_span *:
+        int4_pos  *:
+        time_span *:
+        int4_pos
+      ).to[GhostUpdate]
+
+    def selectGhost(sgt: SmartGcalType): Query[GhostSearchKey, (Gcal, PosInt, GhostUpdate)] =
+      sql"""
+        SELECT
+          #${gcalColumns("g")},
+          s.c_red_exposure_time,
+          s.c_red_exposure_count,
+          s.c_blue_exposure_time,
+          s.c_blue_exposure_count
+        FROM t_smart_ghost s
+        JOIN t_gcal g ON s.c_instrument = g.c_instrument
+                     AND s.c_gcal_id    = g.c_gcal_id
+        WHERE s.c_resolution_mode = $ghost_resolution_mode
+          AND s.c_red_binning     = $ghost_binning
+          AND s.c_blue_binning    = $ghost_binning
+          AND #${whereSmartGcalType(sgt).fragment.sql}
+        ORDER BY s.c_step_order
+      """.query(step_config_gcal *: int4_pos *: ghost_config).contramap: k =>
+        (k.resolutionMode, k.redBinning, k.blueBinning)
+
 
     def selectGmosNorth(
       gn:  GmosNorthSearchKey,
       sgt: SmartGcalType
-    ): AppliedFragment = {
+    ): AppliedFragment =
       val where = List(
         sql"s.c_disperser       IS NOT DISTINCT FROM ${gmos_north_grating.opt}"(gn.grating.map(_.grating)),
         sql"s.c_filter          IS NOT DISTINCT FROM ${gmos_north_filter.opt}"(gn.filter),
@@ -359,12 +457,11 @@ object SmartGcalService {
       )
 
       selectGcal("t_smart_gmos_north", where)
-    }
 
     def selectGmosSouth(
       gs:  GmosSouthSearchKey,
       sgt: SmartGcalType
-    ): AppliedFragment = {
+    ): AppliedFragment =
       val where = List(
         sql"s.c_disperser       IS NOT DISTINCT FROM ${gmos_south_grating.opt}"(gs.grating.map(_.grating)),
         sql"s.c_filter          IS NOT DISTINCT FROM ${gmos_south_filter.opt}"(gs.filter),
@@ -380,12 +477,11 @@ object SmartGcalService {
       )
 
       selectGcal("t_smart_gmos_south", where)
-    }
 
     def selectF2(
       f2:  Flamingos2SearchKey,
       sgt: SmartGcalType
-    ): AppliedFragment = {
+    ): AppliedFragment =
       val where = List(
         sql"s.c_disperser       IS NOT DISTINCT FROM ${flamingos_2_disperser.opt}"(f2.disperser),
         sql"s.c_filter          IS NOT DISTINCT FROM $flamingos_2_filter"(f2.filter),
@@ -394,7 +490,6 @@ object SmartGcalService {
       )
 
       selectGcal("t_smart_flamingos2", where)
-    }
 
     val InsertGcal: Fragment[(
       Instrument ,
@@ -424,6 +519,45 @@ object SmartGcalService {
           $int4_pos,
           $gcal_baseline
       """
+
+    val InsertGhost: Command[(Int, PosLong, GhostTableRow)] =
+      sql"""
+        INSERT INTO t_smart_ghost (
+          c_instrument,
+          c_gcal_id,
+          c_step_order,
+          c_resolution_mode,
+          c_red_binning,
+          c_blue_binning,
+          c_red_exposure_time,
+          c_blue_exposure_time,
+          c_red_exposure_count,
+          c_blue_exposure_count
+        ) SELECT
+          $instrument,
+          $int4,
+          $int8_pos,
+          $ghost_resolution_mode,
+          $ghost_binning,
+          $ghost_binning,
+          $time_span,
+          $time_span,
+          $int4_pos,
+          $int4_pos
+      """.command.contramap { case (gcalId, stepOrder, row) =>
+        (
+          Instrument.Ghost,
+          gcalId,
+          stepOrder,
+          row.key.resolutionMode,
+          row.key.redBinning,
+          row.key.blueBinning,
+          row.value.instrumentConfig.redExposureTime,
+          row.value.instrumentConfig.blueExposureTime,
+          row.value.instrumentConfig.redExposureCount,
+          row.value.instrumentConfig.blueExposureCount
+        )
+      }
 
     val InsertGmosNorth: Fragment[(
       Instrument                          ,
@@ -568,6 +702,3 @@ object SmartGcalService {
           $int8_pos,
           $time_span
       """
-
-  }
-}

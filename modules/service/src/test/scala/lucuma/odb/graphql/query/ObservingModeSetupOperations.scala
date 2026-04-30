@@ -37,6 +37,41 @@ trait ObservingModeSetupOperations extends DatabaseOperations { this: OdbSuite =
       """
     )
 
+  def createGhostIfuObservationAs(
+    user: User,
+    pid:  Program.Id,
+    tids: List[Target.Id]
+  ): IO[Observation.Id] =
+    createObservationWithModeAs(
+      user,
+      pid,
+      tids,
+      s"""
+        ghostIfu: {
+          stepCount: 1
+          resolutionMode: STANDARD
+          red: {
+            exposureTimeMode: {
+              timeAndCount: {
+                time: { seconds: 1 }
+                count: 1
+                at: { nanometers: 500 }
+              }
+            }
+          }
+          blue: {
+            exposureTimeMode: {
+              timeAndCount: {
+                time: { seconds: 1 }
+                count: 1
+                at: { nanometers: 500 }
+              }
+            }
+          }
+        }
+      """
+    )
+
   def createGmosNorthLongSlitObservationAs(
     user:         User,
     pid:          Program.Id,

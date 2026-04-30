@@ -14,6 +14,8 @@ import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.StepConfig.Gcal
 import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig
 import lucuma.core.model.sequence.flamingos2.Flamingos2StaticConfig
+import lucuma.core.model.sequence.ghost.GhostDynamicConfig
+import lucuma.core.model.sequence.ghost.GhostStaticConfig
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth as GmosNorthDynamicConfig
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosSouth as GmosSouthDynamicConfig
 import lucuma.core.model.sequence.gmos.StaticConfig.GmosNorth as GmosNorthStaticConfig
@@ -25,6 +27,7 @@ import lucuma.odb.sequence.data.ProtoAtom
 import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.service.SmartGcalService
 import lucuma.odb.smartgcal.data.Flamingos2
+import lucuma.odb.smartgcal.data.Ghost
 import lucuma.odb.smartgcal.data.Gmos
 import lucuma.odb.smartgcal.data.Igrins2
 
@@ -108,6 +111,13 @@ object SmartGcalImplementation {
         (_, d) => Flamingos2.TableKey.fromDynamicConfig(d),
         _.format,
         service.selectFlamingos2
+      )
+
+    val ghost: SmartGcalExpander[F, GhostStaticConfig, GhostDynamicConfig] =
+      new Expander[F, Ghost.SearchKey, GhostStaticConfig, GhostDynamicConfig](
+        (s, d) => Ghost.SearchKey.forConfig(s, d),
+        _.format,
+        service.selectGhost
       )
 
     val gmosNorth: SmartGcalExpander[F, GmosNorthStaticConfig, GmosNorthDynamicConfig] =

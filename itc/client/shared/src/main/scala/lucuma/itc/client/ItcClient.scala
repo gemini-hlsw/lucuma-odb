@@ -30,11 +30,6 @@ trait ItcClient[F[_]] {
     useCache: Boolean = true
   ): F[ClientCalculationResult]
 
-  def spectroscopyGraphs(
-    input:    SpectroscopyGraphsInput,
-    useCache: Boolean = true
-  ): F[SpectroscopyGraphsResult]
-
   def spectroscopyIntegrationTimeAndGraphs(
     input:    SpectroscopyIntegrationTimeAndGraphsInput,
     useCache: Boolean = true
@@ -53,8 +48,6 @@ object ItcClient {
     for
       specCache         <- ItcCache.simple[F, SpectroscopyInput, ClientCalculationResult]
       imgCache          <- ItcCache.simple[F, ImagingInput, ClientCalculationResult]
-      graphCache        <-
-        ItcCache.simple[F, SpectroscopyGraphsInput, SpectroscopyGraphsResult]
       timeAndGraphCache <-
         ItcCache.simple[F,
                         SpectroscopyIntegrationTimeAndGraphsInput,
@@ -102,24 +95,6 @@ object ItcClient {
 
       override val versions: F[ItcVersions] =
         http.request(VersionsQuery).raiseGraphQLErrors
-
-      def spectroscopyGraphs(
-        input:    SpectroscopyGraphsInput,
-        useCache: Boolean = true
-      ): F[SpectroscopyGraphsResult] = {
-        val callOut: F[SpectroscopyGraphsResult] =
-          http
-            .request(SpectroscopyGraphsQuery)
-            .withInput(input)
-            .raiseGraphQLErrorsOnNoData
-
-        for
-          _ <- Logger[F].debug(s"ITC Input: \n${input.asJson.spaces2}")
-          v <- if (useCache) graphCache.getOrCalcF(input)(callOut)
-               else callOut.flatTap(graphCache.put(input))
-          _ <- Logger[F].debug(s"ITC Result:\n$v")
-        yield v
-      }
 
       def spectroscopyIntegrationTimeAndGraphs(
         input:    SpectroscopyIntegrationTimeAndGraphsInput,

@@ -83,44 +83,39 @@ trait ItcCacheOrRemote extends Version:
             |Error: ${error.getMessage}""".stripMargin)
         .getOrElse(Applicative[F].unit)
 
-  private def requestGraphs[F[_]: MonadThrow: Logger](
+  private def requestTimeAndGraphs[F[_]: MonadThrow: Logger](
     itc: Itc[F]
-  )(request: TargetGraphRequest): F[TargetGraphsCalcResult] =
+  )(request: TargetSpectroscopyTimeRequest): F[TargetTimeAndGraphs] =
     itc
-      .calculateGraphs(
+      .calculateTimeAndGraphs(
         request.target,
-        request.atWavelength,
         request.specMode,
         request.constraints,
-        request.expTime,
-        request.exp
+        request.exposureTimeMode
       )
       .onError:
         logSedOnFailure(request)
 
-  /**
-   * Request a graph
-   */
-  def graphsFromCacheOrRemote[
+  def timeAndGraphsFromCacheOrRemote[
     F[_]: {MonadThrow, Parallel, Logger, CustomSed.Resolver, Tracer as T}
   ](
-    request: TargetGraphRequest
+    request: TargetSpectroscopyTimeRequest
   )(
     itc:     Itc[F],
     cache:   BinaryEffectfulCache[F],
     config:  Config
-  ): F[TargetGraphsCalcResult] =
-    T.span("resolve custom_sed_graphs")
+  ): F[TargetTimeAndGraphs] =
+    T.span("resolve custom_sed_time_and_graphs")
       .surround:
         CustomSed // We must resolve CustomSed before caching.
-          .resolveTargetGraphRequest(request)
+          .resolveTargetSpectroscopyTimeRequest(request)
       .flatMap: r =>
-        T.span("cache_or_calculate graphs")
+        T.span("cache_or_calculate time_and_graphs")
           .surround:
             cache.getOrInvokeBinary(r,
-                                    requestGraphs(itc)(r),
+                                    requestTimeAndGraphs(itc)(r),
                                     TTL(config),
-                                    s"$CacheRootPrefix:graph:spec"
+                                    s"$CacheRootPrefix:time_and_graph:spec"
             )
 
   private def requestSpectroscopy[F[_]: MonadThrow: Logger](itc: Itc[F])(

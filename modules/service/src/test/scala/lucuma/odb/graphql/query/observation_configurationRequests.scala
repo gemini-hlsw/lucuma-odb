@@ -10,6 +10,7 @@ import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.enums.Flamingos2Disperser
+import lucuma.core.enums.GhostResolutionMode
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosNorthGrating
 import lucuma.core.enums.GmosSouthFilter
@@ -24,6 +25,7 @@ import lucuma.core.syntax.string.*
 import lucuma.core.util.Enumerated
 import lucuma.odb.graphql.mutation.UpdateObservationsOps
 import lucuma.core.enums.VisitorObservingModeType
+import lucuma.odb.isImplemented
 
 class observation_configurationRequests
   extends OdbSuite
@@ -37,22 +39,22 @@ class observation_configurationRequests
   /** Mutations that are relevant to configuration requests. */
   object Mutation {
 
-    def forGmosNorthLongSlit(user: User, oid: Observation.Id, grating: GmosNorthGrating): IO[Unit] =
+    def forFlamingos2LongSlit(user: User, oid: Observation.Id, disperser: Flamingos2Disperser): IO[Unit] =
       updateObservationAs(user, oid):
         s"""
           observingMode: {
-            gmosNorthLongSlit: {
-              grating: ${grating.tag.toScreamingSnakeCase}
+            flamingos2LongSlit: {
+              disperser: ${disperser.tag.toScreamingSnakeCase}
             }
           }
         """
 
-    def forGmosSouthLongSlit(user: User, oid: Observation.Id, grating: GmosSouthGrating): IO[Unit] =
+    def forGhostIfu(user: User, oid: Observation.Id, resolutionMode: GhostResolutionMode): IO[Unit] =
       updateObservationAs(user, oid):
         s"""
           observingMode: {
-            gmosSouthLongSlit: {
-              grating: ${grating.tag.toScreamingSnakeCase}
+            ghostIfu: {
+              resolutionMode: ${resolutionMode.tag.toScreamingSnakeCase}
             }
           }
         """
@@ -84,12 +86,22 @@ class observation_configurationRequests
       updateObservationAs(user, oid):
         gmosImagingObservingMode("South", filters)
 
-    def forFlamingos2LongSlit(user: User, oid: Observation.Id, disperser: Flamingos2Disperser): IO[Unit] =
+    def forGmosNorthLongSlit(user: User, oid: Observation.Id, grating: GmosNorthGrating): IO[Unit] =
       updateObservationAs(user, oid):
         s"""
           observingMode: {
-            flamingos2LongSlit: {
-              disperser: ${disperser.tag.toScreamingSnakeCase}
+            gmosNorthLongSlit: {
+              grating: ${grating.tag.toScreamingSnakeCase}
+            }
+          }
+        """
+
+    def forGmosSouthLongSlit(user: User, oid: Observation.Id, grating: GmosSouthGrating): IO[Unit] =
+      updateObservationAs(user, oid):
+        s"""
+          observingMode: {
+            gmosSouthLongSlit: {
+              grating: ${grating.tag.toScreamingSnakeCase}
             }
           }
         """
@@ -108,36 +120,39 @@ class observation_configurationRequests
 
   def baseMutation(user: User, oid: Observation.Id, mode: ObservingModeType): IO[Unit] =
     mode match
-      case ObservingModeType.GmosNorthLongSlit  => Mutation.forGmosNorthLongSlit(user, oid, GmosNorthGrating.B480_G5309)
-      case ObservingModeType.GmosSouthLongSlit  => Mutation.forGmosSouthLongSlit(user, oid, GmosSouthGrating.B480_G5327)
       case ObservingModeType.Flamingos2LongSlit => Mutation.forFlamingos2LongSlit(user, oid, Flamingos2Disperser.R1200HK)
+      case ObservingModeType.GhostIfu           => Mutation.forGhostIfu(user, oid, GhostResolutionMode.Standard)
+      case ObservingModeType.GmosNorthLongSlit  => Mutation.forGmosNorthLongSlit(user, oid, GmosNorthGrating.B480_G5309)
       case ObservingModeType.GmosNorthImaging   => Mutation.forGmosNorthImaging(user, oid, List(GmosNorthFilter.CaT, GmosNorthFilter.DS920))
+      case ObservingModeType.GmosSouthLongSlit  => Mutation.forGmosSouthLongSlit(user, oid, GmosSouthGrating.B480_G5327)
       case ObservingModeType.GmosSouthImaging   => Mutation.forGmosSouthImaging(user, oid, List(GmosSouthFilter.CaT, GmosSouthFilter.GG455))
+      case ObservingModeType.GnirsLongSlit      => IO.unit // TODO implement Gnirs
       case ObservingModeType.Igrins2LongSlit    => Mutation.forIgrins2LongSlit(user, oid, Igrins2OffsetMode.NodAlongSlit)
-      case ObservingModeType.GhostIfu           => IO.unit
       case _: VisitorObservingModeType          => IO.unit
 
   def compatibleMutation(user: User, oid: Observation.Id, mode: ObservingModeType): IO[Unit] =
     mode match
-      case ObservingModeType.GmosNorthLongSlit  => IO.unit // no changes are compatible
-      case ObservingModeType.GmosSouthLongSlit  => IO.unit // no changes are compatible
       case ObservingModeType.Flamingos2LongSlit => IO.unit // no changes are compatible
-      case ObservingModeType.GmosNorthImaging   => Mutation.forGmosNorthImaging(user, oid, List(GmosNorthFilter.DS920)) // subset of original, ok
-      case ObservingModeType.GmosSouthImaging   => Mutation.forGmosSouthImaging(user, oid, List(GmosSouthFilter.GG455)) // subset of original, ok
-      case ObservingModeType.Igrins2LongSlit    => IO.unit // no changes are compatible
       case ObservingModeType.GhostIfu           => IO.unit
       case _: VisitorObservingModeType          => IO.unit
+      case ObservingModeType.GmosNorthLongSlit  => IO.unit // no changes are compatible
+      case ObservingModeType.GmosNorthImaging   => Mutation.forGmosNorthImaging(user, oid, List(GmosNorthFilter.DS920)) // subset of original, ok
+      case ObservingModeType.GmosSouthLongSlit  => IO.unit // no changes are compatible
+      case ObservingModeType.GmosSouthImaging   => Mutation.forGmosSouthImaging(user, oid, List(GmosSouthFilter.GG455)) // subset of original, ok
+      case ObservingModeType.GnirsLongSlit      => IO.unit // TODO implement Gnirs
+      case ObservingModeType.Igrins2LongSlit    => IO.unit // no changes are compatible
 
   def incompatibleMutation(user: User, oid: Observation.Id, mode: ObservingModeType): Option[IO[Unit]] =
     mode match
-      case ObservingModeType.GmosNorthLongSlit  => Some(Mutation.forGmosNorthLongSlit(user, oid, GmosNorthGrating.B1200_G5301))
-      case ObservingModeType.GmosSouthLongSlit  => Some(Mutation.forGmosSouthLongSlit(user, oid, GmosSouthGrating.R600_G5324))
       case ObservingModeType.Flamingos2LongSlit => Some(Mutation.forFlamingos2LongSlit(user, oid, Flamingos2Disperser.R1200JH))
-      case ObservingModeType.GmosNorthImaging   => None // Mutation.forGmosNorthImaging(user, oid, List(GmosNorthFilter.GG455, GmosNorthFilter.GPrime_GG455))
-      case ObservingModeType.GmosSouthImaging   => None // Mutation.forGmosSouthImaging(user, oid, List(GmosSouthFilter.GG455, GmosSouthFilter.GPrime_GG455))
-      case ObservingModeType.Igrins2LongSlit    => None // Mutation.forIgrins2LongSlit(user, oid, Igrins2OffsetMode.NodToSky)
       case ObservingModeType.GhostIfu           => None
       case _: VisitorObservingModeType          => None
+      case ObservingModeType.GmosNorthLongSlit  => Some(Mutation.forGmosNorthLongSlit(user, oid, GmosNorthGrating.B1200_G5301))
+      case ObservingModeType.GmosNorthImaging   => None // Mutation.forGmosNorthImaging(user, oid, List(GmosNorthFilter.GG455, GmosNorthFilter.GPrime_GG455))
+      case ObservingModeType.GmosSouthLongSlit  => Some(Mutation.forGmosSouthLongSlit(user, oid, GmosSouthGrating.R600_G5324))
+      case ObservingModeType.GmosSouthImaging   => None // Mutation.forGmosSouthImaging(user, oid, List(GmosSouthFilter.GG455, GmosSouthFilter.GPrime_GG455))
+      case ObservingModeType.GnirsLongSlit      => Some(IO.unit) // TODO implement Gnirs
+      case ObservingModeType.Igrins2LongSlit    => None // Mutation.forIgrins2LongSlit(user, oid, Igrins2OffsetMode.NodToSky)
 
   private def updateObservationAs(user: User, oid: Observation.Id)(update: String): IO[Unit] =
     updateObservation(user, oid, update,
@@ -208,17 +223,18 @@ class observation_configurationRequests
       tid   <- if !too then createTargetWithProfileAs(pi, pid) else createOpportunityTargetAs(pi, pid)
       oid   <-
         mode match
-          case ObservingModeType.GmosNorthLongSlit  => createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
-          case ObservingModeType.GmosSouthLongSlit  => createGmosSouthLongSlitObservationAs(pi, pid, List(tid))
           case ObservingModeType.Flamingos2LongSlit => createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+          case ObservingModeType.GhostIfu           => createGhostIfuObservationAs(pi, pid, List(tid))
+          case ObservingModeType.GmosNorthLongSlit  => createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
           case ObservingModeType.GmosNorthImaging   => createGmosNorthImagingObservationAs(pi, pid, tid)
+          case ObservingModeType.GmosSouthLongSlit  => createGmosSouthLongSlitObservationAs(pi, pid, List(tid))
           case ObservingModeType.GmosSouthImaging   => createGmosSouthImagingObservationAs(pi, pid, tid)
+          case ObservingModeType.GnirsLongSlit      => IO.raiseError(new RuntimeException("GNIRS not supported yet"))
           case ObservingModeType.Igrins2LongSlit    => createIgrins2LongSlitObservationAs(pi, pid, tid)
-          case ObservingModeType.GhostIfu           => IO.raiseError(new RuntimeException("GHOST not supported yet"))
           case v: VisitorObservingModeType          => createVisitorModeObservationAs(pi, pid, v, tid)
     yield oid
 
-  Enumerated[ObservingModeType].all.filterNot(_ === ObservingModeType.GhostIfu).foreach { mode =>
+  Enumerated[ObservingModeType].all.filter(_.isImplemented).foreach { mode =>
     List(false, true).foreach { too =>
 
       val prefix = s"[$mode, ${if too then "opportunity" else "sidereal"}]"

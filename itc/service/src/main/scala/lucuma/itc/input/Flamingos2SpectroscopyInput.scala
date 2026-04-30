@@ -7,6 +7,7 @@ import cats.syntax.parallel.*
 import lucuma.core.enums.Flamingos2Disperser
 import lucuma.core.enums.Flamingos2Filter
 import lucuma.core.enums.Flamingos2Fpu
+import lucuma.core.enums.Flamingos2ReadMode
 import lucuma.core.enums.PortDisposition
 import lucuma.core.model.ExposureTimeMode
 import lucuma.itc.binding.*
@@ -17,6 +18,7 @@ case class Flamingos2SpectroscopyInput(
   exposureTimeMode: ExposureTimeMode,
   disperser:        Flamingos2Disperser,
   filter:           Flamingos2Filter,
+  readMode:         Flamingos2ReadMode,
   fpu:              Flamingos2Fpu,
   port:             PortDisposition
 ) extends InstrumentModesInput
@@ -30,7 +32,8 @@ object Flamingos2SpectroscopyInput:
             Flamingos2DisperserBinding("disperser", disperser),
             Flamingos2FpuBinding("fpu", fpu),
             Flamingos2FilterBinding("filter", filter),
+            Flamingos2ReadModeBinding("readMode", readMode),
             PortDispositionBinding("port", portDisposition)
           ) =>
-        (exposureTimeMode, disperser, filter, fpu, portDisposition).parMapN(apply)
+        (exposureTimeMode, disperser, filter, readMode, fpu, portDisposition).parMapN(apply)
     }

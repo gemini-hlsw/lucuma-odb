@@ -4,6 +4,7 @@
 package lucuma.odb.smartgcal.parsers
 
 import cats.parse.Parser
+import cats.parse.Parser0
 import cats.parse.Rfc5234.alpha
 import cats.syntax.apply.*
 import lucuma.core.math.BoundedInterval
@@ -23,6 +24,15 @@ trait CommonParsers {
 
   val columnSep: Parser[Unit] =
     comma.surroundedBy(maybeWhiteSpace)
+
+  val ignoredValue: Parser0[Unit] =
+    Parser.charsWhile0(c => c != ',' && c != '\n').void
+
+  val skipColumn: Parser[Unit] =
+    ignoredValue.with1 <* columnSep
+
+  def skipColumns(n: Int): Parser[Unit] =
+    List.fill(n)(skipColumn).reduce(_ *> _)
 
   val instant: Parser[Instant] =
     val dtf = DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm:ss zz", US)

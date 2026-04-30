@@ -174,6 +174,7 @@ trait SequenceCodec {
   import lucuma.odb.json.flamingos2.given
   import lucuma.odb.json.ghost.given
   import lucuma.odb.json.gmos.given
+  import lucuma.odb.json.gnirs.given
   import lucuma.odb.json.igrins2.given
 
   private def rootDecoder[R, S: Decoder, D: Decoder](instrumentExecutionConfig: ExecutionConfig[S, D] => R): Decoder[R] =
@@ -190,6 +191,9 @@ trait SequenceCodec {
 
   given Decoder[InstrumentExecutionConfig.GmosSouth] =
     rootDecoder(InstrumentExecutionConfig.GmosSouth.apply)
+
+  given Decoder[InstrumentExecutionConfig.Gnirs] =
+    rootDecoder(InstrumentExecutionConfig.Gnirs.apply)
 
   given Decoder[InstrumentExecutionConfig.Igrins2] =
     rootDecoder(InstrumentExecutionConfig.Igrins2.apply)
@@ -214,6 +218,9 @@ trait SequenceCodec {
   given (using Encoder[Offset], Encoder[TimeSpan], Encoder[Wavelength]): Encoder[InstrumentExecutionConfig.GmosSouth] =
     rootEncoder(_.executionConfig)
 
+  given (using Encoder[Offset], Encoder[TimeSpan]): Encoder[InstrumentExecutionConfig.Gnirs] =
+    rootEncoder(_.executionConfig)
+
   given (using Encoder[Offset], Encoder[TimeSpan]): Encoder[InstrumentExecutionConfig.Igrins2] =
     rootEncoder(_.executionConfig)
 
@@ -229,6 +236,7 @@ trait SequenceCodec {
           case Instrument.Ghost      => c.downField("ghost").as[InstrumentExecutionConfig.Ghost]
           case Instrument.GmosNorth  => c.downField("gmosNorth").as[InstrumentExecutionConfig.GmosNorth]
           case Instrument.GmosSouth  => c.downField("gmosSouth").as[InstrumentExecutionConfig.GmosSouth]
+          case Instrument.Gnirs      => c.downField("gnirs").as[InstrumentExecutionConfig.Gnirs]
           case Instrument.Igrins2    => c.downField("igrins2").as[InstrumentExecutionConfig.Igrins2]
           case Instrument.VisitorNorth |
                Instrument.VisitorSouth |
@@ -248,6 +256,7 @@ trait SequenceCodec {
         "ghost"      -> Json.Null, // one of these will be replaced
         "gmosNorth"  -> Json.Null, // one of these will be replaced
         "gmosSouth"  -> Json.Null, // one of these will be replaced
+        "gnirs"      -> Json.Null, // one of these will be replaced
         "igrins2"    -> Json.Null, // one of these will be replaced
         "visitor"    -> Json.Null, // one of these will be replaced
         a match
@@ -255,6 +264,7 @@ trait SequenceCodec {
           case i@InstrumentExecutionConfig.Ghost(_)      => "ghost"      -> i.asJson
           case i@InstrumentExecutionConfig.GmosNorth(_)  => "gmosNorth"  -> i.asJson
           case i@InstrumentExecutionConfig.GmosSouth(_)  => "gmosSouth"  -> i.asJson
+          case i@InstrumentExecutionConfig.Gnirs(_)      => "gnirs"      -> i.asJson
           case i@InstrumentExecutionConfig.Igrins2(_)    => "igrins2"    -> i.asJson
           case i@InstrumentExecutionConfig.Visitor(_)    => "visitor"    -> i.asJson
       )

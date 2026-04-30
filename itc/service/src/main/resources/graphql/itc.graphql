@@ -4115,6 +4115,9 @@ type GhostDetectorConfig {
 
 """GHOST IFU observing mode."""
 type GhostIfu {
+  """Number of steps requested."""
+  stepCount: PosInt!
+
   """Resolution mode."""
   resolutionMode: GhostResolutionMode!
 
@@ -4123,6 +4126,9 @@ type GhostIfu {
 
   """Blue detector config."""
   blue: GhostDetectorConfig!
+
+  """Slit viewing camera exposure time (if specified)."""
+  slitViewingCameraExposureTime: TimeSpan
 
   """
   IFU 1 fiber agitator setting, either explicitly specified or else default.
@@ -4154,6 +4160,7 @@ type GhostIfu {
 """GHOST configuration that applies across all steps."""
 type GhostStatic {
   resolutionMode: GhostResolutionMode!
+  slitViewingCameraExposureTime: TimeSpan
 }
 
 """GHOST detector configuration for a single step."""
@@ -4300,6 +4307,9 @@ type Igrins2LongSlit {
   Optional explicitly specified spatial offsets. If set, overrides the default.
   """
   explicitOffsets: [Offset!]
+
+  """Telluric type configuration for this observation."""
+  telluricType: TelluricType!
 }
 
 """Metadata for `enum FilterType`"""
@@ -8831,12 +8841,6 @@ type Query {
   imaging(input: ImagingInput!): CalculationResult!
 
   """
-  Given an instrument and a mode, return the graph data for the given targets.
-  Values are rounded to limit the size of the response.
-  """
-  spectroscopyGraphs(input: SpectroscopyGraphsInput!): SpectroscopyGraphsResult!
-
-  """
   Given an instrument and a mode, return the integration time,
   estimated S/N and graph data for the given targets.
   Graph values are rounded to limit the size of the response.
@@ -8944,6 +8948,9 @@ input Flamingos2SpectroscopyInput {
 
   """Flamingos2 filter"""
   filter: Flamingos2Filter!
+
+  """Flamingos2 read mode"""
+  readMode: Flamingos2ReadMode!
 
   """Instrument port disposition"""
   port: PortDisposition = SIDE
@@ -9111,30 +9118,6 @@ input SignificantFiguresInput {
   ccd: PosInt
 }
 
-"""Params for spectroscopy graphs calculation"""
-input SpectroscopyGraphsInput {
-  """Observing wavelength."""
-  atWavelength: WavelengthInput!
-
-  """Exposure time duration"""
-  exposureTime: TimeSpanInput!
-
-  """Exposures"""
-  exposureCount: PosInt!
-
-  """Relevant data for targets in asterism."""
-  asterism: [TargetInput!]!
-
-  """Conditions"""
-  constraints: ItcConstraintsInput!
-
-  """Instrument modes"""
-  mode: InstrumentModesInput!
-
-  """Significant figures, truncates the amount of significant value"""
-  significantFigures: SignificantFiguresInput
-}
-
 """Parameters to retrieve graph data"""
 input SpectroscopyIntegrationTimeAndGraphsInput {
   """Relevant data for targets in asterism."""
@@ -9209,7 +9192,7 @@ type TargetError {
   wavelength: Wavelength
 }
 
-"""Graph data types"""
+"""Graph series types"""
 enum ItcSeriesType {
   SIGNAL_DATA
   BACKGROUND_DATA
@@ -9328,31 +9311,6 @@ type TargetGraphs {
   atWavelengthSingleSNRatio: SignalToNoise
 }
 
-type TargetGraphsResult {
-  """graphs for the target"""
-  graphs: TargetGraphs!
-
-  """
-  The band used for the graphs calculation, in case of a BandNormalized SED
-  """
-  band: Band
-
-  """
-  The emission line used for the time calculation, in case of an EmissionLines SED
-  """
-  emissionLine: Wavelength
-}
-
-type SpectroscopyGraphsResult {
-  """server and data versions"""
-  versions: ItcVersions!
-
-  """results for each target, in same order as input"""
-  targetGraphs: [TargetGraphsOutcome!]!
-}
-
-union TargetGraphsOutcome = TargetGraphsResult | TargetError
-
 type SpectroscopyTimeAndGraphsResult {
   """server and data versions"""
   versions: ItcVersions!
@@ -9363,7 +9321,7 @@ type SpectroscopyTimeAndGraphsResult {
   """
   In case of errors in integration times, we short cirtuit to the results from integration times
   """
-  targetTimes: [TargetIntegrationTimeOutcome!]
+  targetTimes: [TargetIntegrationTimeOutcome!] @deprecated(reason: "This field will always be null. The targetTimesAndGraphs field should be used instead.")
 
   """Index of the brightest target"""
   brightestIndex: NonNegInt

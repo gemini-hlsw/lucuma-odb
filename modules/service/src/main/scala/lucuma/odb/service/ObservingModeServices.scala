@@ -114,6 +114,9 @@ object ObservingModeServices:
               .selectSouth(oids)
               .map(_.widen[ObservingMode])
 
+          case (GnirsLongSlit, oids) =>
+            ??? // TODO Implement Gnirs observing mode service
+
           case (Igrins2LongSlit, oids) =>
             igrins2LongSlitService
               .select(oids)
@@ -156,6 +159,7 @@ object ObservingModeServices:
             case ObservingModeType.GmosNorthLongSlit  => gmosLongSlitService.deleteNorth(which)
             case ObservingModeType.GmosSouthImaging   => gmosImagingService.deleteSouth(which)
             case ObservingModeType.GmosSouthLongSlit  => gmosLongSlitService.deleteSouth(which)
+            case ObservingModeType.GnirsLongSlit      => ??? // TODO Implement Gnirs observing mode service
             case ObservingModeType.Igrins2LongSlit    => igrins2LongSlitService.delete(which)
             case _: VisitorObservingModeType          => visitorService.delete(which)
 
@@ -199,6 +203,7 @@ object ObservingModeServices:
             case ObservingModeType.GmosNorthImaging   => gmosImagingService.cloneNorth(origOid, newOid, etms)
             case ObservingModeType.GmosSouthLongSlit  => gmosLongSlitService.cloneSouth(origOid, newOid)
             case ObservingModeType.GmosSouthImaging   => gmosImagingService.cloneSouth(origOid, newOid, etms)
+            case ObservingModeType.GnirsLongSlit      => ??? // TODO
             case ObservingModeType.Igrins2LongSlit    => igrins2LongSlitService.clone(origOid, newOid)
             case _: VisitorObservingModeType          => visitorService.clone(origOid, newOid)
 

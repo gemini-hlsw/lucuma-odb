@@ -7,6 +7,7 @@ import cats.Monad
 import cats.effect.Temporal
 import cats.syntax.all.*
 import lucuma.catalog.telluric.TelluricSearchInput
+import lucuma.catalog.telluric.TelluricStar
 import lucuma.catalog.telluric.TelluricTargetsClient
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.Flamingos2Disperser
@@ -308,11 +309,14 @@ object TelluricTargetsService:
               none
 
         extension (target: Target.Sidereal)
-          def sedFromTelluricType(telluricType: TelluricType): Target.Sidereal =
-            val sed = telluricType match
+          def sedFromTelluricType(star: TelluricStar, telluricType: TelluricType): Target.Sidereal =
+            val derivedSed = telluricType match
               case TelluricType.Solar => UnnormalizedSED.StellarLibrary(StellarLibrarySpectrum.G2V)
               case _                  => UnnormalizedSED.StellarLibrary(StellarLibrarySpectrum.A0V)
-            Target.Sidereal.unnormalizedSED.modify(_.orElse(sed.some))(target)
+
+            // First try sed from the telluric star, if not fallback to simbad, if not to the derived value.
+            val sed = star.sed.orElse(Target.Sidereal.unnormalizedSED.getOption(target).flatten).orElse(derivedSed.some)
+            Target.Sidereal.unnormalizedSED.replace(sed)(target)
 
         def searchAndResolve(params: TelluricSearchParams): F[Option[(Either[String, Target.Id], Md5Hash)]] =
           val searchInput = mkSearchInput(params, pending.scienceDuration.min(MaxTelluricDuration))
@@ -333,9 +337,9 @@ object TelluricTargetsService:
                 matchingStar match
                   case Some((star, catalogResult)) =>
                     val sidereal =
-                      catalogResult.map(_.target).getOrElse(star.asSiderealTarget).sedFromTelluricType(params.telluricType)
+                      catalogResult.map(_.target).getOrElse(star.asSiderealTarget).sedFromTelluricType(star, params.telluricType)
 
-                    info"Found telluric star HIP ${star.hip} with order: ${star.order} for ${pending.calibrationOrder} observation ${pending.observationId}" *>
+                    info"Found telluric star ID ${star.id} with order: ${star.order} for ${pending.calibrationOrder} observation ${pending.observationId}" *>
                       createAndLinkTarget(sidereal).map:
                         case Some(tid) => (tid.asRight[String], paramsHash).some
                         case _         => none

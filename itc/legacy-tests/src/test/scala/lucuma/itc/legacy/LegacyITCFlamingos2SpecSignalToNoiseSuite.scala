@@ -33,6 +33,7 @@ class LegacyITCFlamingos2SpecSignalToNoiseSuite extends LegacyITCFlamingos2Suite
     ObservingMode.SpectroscopyMode.Flamingos2(
       Flamingos2Disperser.R3000,
       Flamingos2Filter.J,
+      Flamingos2ReadMode.Faint,
       Flamingos2Fpu.LongSlit2,
       PortDisposition.Side
     )
@@ -52,7 +53,4 @@ class LegacyITCFlamingos2SpecSignalToNoiseSuite extends LegacyITCFlamingos2Suite
     f2.copy(fpu = f)
 
   def observingModeWithReadMode(rm: Flamingos2ReadMode): ObservingMode =
-    f2
-
-  override def munitTests() =
-    super.munitTests().filterNot(_.tags.contains(F2ReadModeTest))
+    f2.copy(readMode = rm)

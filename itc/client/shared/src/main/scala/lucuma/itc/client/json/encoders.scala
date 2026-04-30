@@ -32,7 +32,7 @@ private[client] object encoders:
         )
       )
 
-    case ExposureTimeMode.TimeAndCountMode(t, c, w) =>
+    case ExposureTimeMode.TimeAndCountMode(t, c, w) => // TODO add coadds
       Json.obj(
         "timeAndCount" -> Json.obj(
           "time"  -> t.asJson,

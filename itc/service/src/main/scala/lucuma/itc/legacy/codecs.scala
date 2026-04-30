@@ -179,7 +179,11 @@ private[legacy] object codecs:
       "filter"          -> Json.fromString(a.filter.ocs2Tag),
       "grism"           -> Json.fromString(a.disperser.ocs2Tag),
       "mask"            -> Json.fromString(a.fpu.ocs2Tag),
-      "readMode"        -> Json.fromString("FAINT_OBJECT_SPEC"),
+      "readMode"        -> Json.fromString(a.readMode match {
+        case Flamingos2ReadMode.Bright => "BRIGHT_OBJECT_SPEC"
+        case Flamingos2ReadMode.Medium => "MEDIUM_OBJECT_SPEC"
+        case Flamingos2ReadMode.Faint  => "FAINT_OBJECT_SPEC"
+      }),
       "customSlitWidth" -> Json.Null
     )
 
@@ -613,3 +617,19 @@ private[legacy] object codecs:
     spec
       .orElse(img)
       .getOrElse(Left(DecodingFailure("No valid IntegrationTimeRemoteResult", c.history)))
+
+  given Decoder[TimeAndGraphsRemoteResult] = (c: HCursor) =>
+    for {
+      t      <- c.downField("ItcSpectroscopyResult")
+                  .downField("times")
+                  .as[AllExposureCalculations]
+      s      <- c.downField("ItcSpectroscopyResult")
+                  .downField("signalToNoiseAt")
+                  .as[Option[SignalToNoiseAt]]
+      ccds   <- c.downField("ItcSpectroscopyResult")
+                  .downField("ccds")
+                  .as[NonEmptyChain[ItcRemoteCcd]]
+      graphs <- c.downField("ItcSpectroscopyResult")
+                  .downField("chartGroups")
+                  .as[NonEmptyChain[ItcGraphGroup]]
+    } yield TimeAndGraphsRemoteResult(t, s, ccds, graphs)

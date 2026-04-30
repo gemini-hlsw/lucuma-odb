@@ -276,7 +276,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
         val signal = Wavelength.fromIntNanometers(666).get
         val igrins2Signal = Wavelength.fromIntNanometers(2200).get
         val wavelength = input.mode match
-          case lucuma.itc.client.InstrumentMode.Flamingos2Spectroscopy(_, d, _, _, _)         => d.wavelength
+          case lucuma.itc.client.InstrumentMode.Flamingos2Spectroscopy(_, d, _, _, _, _)      => d.wavelength
           case lucuma.itc.client.InstrumentMode.GmosNorthSpectroscopy(_, w, _, _, _, _, _, _) => w
           case lucuma.itc.client.InstrumentMode.GmosSouthSpectroscopy(_, w, _, _, _, _, _, _) => w
           case lucuma.itc.client.InstrumentMode.Igrins2Spectroscopy(_, _)                     => igrins2Signal
@@ -307,13 +307,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
         }
       }
 
-      def spectroscopyGraphs(
-        input: lucuma.itc.client.SpectroscopyGraphsInput,
-        useCache: Boolean
-      ): IO[lucuma.itc.client.SpectroscopyGraphsResult] =
-        IO.raiseError(new java.lang.RuntimeException("spectroscopyGraph: not implemented"))
-
-      def spectroscopyIntegrationTimeAndGraphs(
+      override def spectroscopyIntegrationTimeAndGraphs(
         input:    lucuma.itc.client.SpectroscopyIntegrationTimeAndGraphsInput,
         useCache: Boolean = true
       ): IO[lucuma.itc.client.SpectroscopyIntegrationTimeAndGraphsResult] =
@@ -384,6 +378,8 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       SimbadClient.build[IO](httpClient, matcher)
 
   protected def telluricClient: IO[TelluricTargetsClient[IO]] =
+    given Tracer[IO] = Tracer.noop
+
     simbadClient.flatMap: sc =>
       TelluricTargetsClient
         .build[IO](uri"https://telluric-targets.gpp.gemini.edu/", httpClient, sc)

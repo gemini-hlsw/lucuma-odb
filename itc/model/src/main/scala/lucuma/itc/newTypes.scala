@@ -67,12 +67,12 @@ object TargetTimeAndGraphsOutcome extends NewType[Either[Error, TargetTimeAndGra
       case Right(t) => t.asJson
 type TargetTimeAndGraphsOutcome = TargetTimeAndGraphsOutcome.Type
 
-object AsterismTimeAndGraphs extends NewType[NonEmptyChain[TargetTimeAndGraphsOutcome]]:
+object AsterismTimeAndGraphsOutcomes extends NewType[NonEmptyChain[TargetTimeAndGraphsOutcome]]:
   def fromTimeAndGraphResults(
     specTimes:    AsterismIntegrationTimes,
     graphResults: SpectroscopyGraphsResult
-  ): AsterismTimeAndGraphs =
-    AsterismTimeAndGraphs:
+  ): AsterismTimeAndGraphsOutcomes =
+    AsterismTimeAndGraphsOutcomes:
       NonEmptyChain
         .fromNonEmptyList(specTimes.value.toNel)
         .zipWith(graphResults.targetGraphs.value):
@@ -82,8 +82,12 @@ object AsterismTimeAndGraphs extends NewType[NonEmptyChain[TargetTimeAndGraphsOu
                 // We discard the band from the graph result, it's already in the integration time.
                 TargetTimeAndGraphs(integrationTime, targetResult.graphs)
 
-  extension (a: AsterismTimeAndGraphs)
-    // If there are no errors, return an Zipper with the brightest target focused.
+  extension (a: AsterismTimeAndGraphsOutcomes)
+    def collectErrors: Option[NonEmptyChain[(Error, Int)]] =
+      NonEmptyChain.fromChain:
+        a.value.map(_.value).zipWithIndex.collect { case (Left(e), i) => (e, i) }
+
+    // If there are no errors, return a Zipper with the brightest target focused.
     private def onlyIfNoErrors: Option[Zipper[TargetTimeAndGraphs]] =
       a.value
         .traverse(_.value.toOption)
@@ -97,8 +101,4 @@ object AsterismTimeAndGraphs extends NewType[NonEmptyChain[TargetTimeAndGraphsOu
 
     def brightest: Option[TargetTimeAndGraphs] =
       onlyIfNoErrors.map(_.focus)
-type AsterismTimeAndGraphs = AsterismTimeAndGraphs.Type
-
-object AsterismTimesAndGraphsOutcomes
-    extends NewType[Either[AsterismIntegrationTimeOutcomes, AsterismTimeAndGraphs]]
-type AsterismTimesAndGraphsOutcomes = AsterismTimesAndGraphsOutcomes.Type
+type AsterismTimeAndGraphsOutcomes = AsterismTimeAndGraphsOutcomes.Type
