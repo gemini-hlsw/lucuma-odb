@@ -1,7 +1,7 @@
 {
-  "ocs_git_hash": "1fa6a07877e1f58a8d655def7cb50062842c0b2d",
-  "ocs_git_branch": "main",
-  "ocs_git_describe": "v-48-g1fa6a0787",
-  "local": false,
-  "build_timestamp": "2026-04-30T18:24:59Z"
+  "ocs_git_hash": "2803ba316113a6fffdc8b260cded52404a28543f",
+  "ocs_git_branch": "gpp-ocs",
+  "ocs_git_describe": "v-50-g2803ba316-dirty",
+  "local": true,
+  "build_timestamp": "2026-05-05T20:07:27Z"
 }

@@ -5,6 +5,7 @@ package lucuma.itc
 
 import cats.Eq
 import cats.data.NonEmptyChain
+import cats.data.NonEmptyList
 import cats.derived.*
 import cats.syntax.all.*
 import io.circe.Decoder
@@ -32,43 +33,59 @@ enum GraphType(val tag: String) derives Enumerated:
   case SignalPixelGraph extends GraphType("signal_pixel_graph")
   case S2NGraph         extends GraphType("s2n_graph")
 
-case class ItcAxis(start: Double, end: Double, min: Double, max: Double, count: Int)
+// X-axis values are always wavelength in nanometers
+case class ItcXAxis(start: Double, end: Double, count: Int) derives Decoder, Encoder.AsObject:
+  assert(start >= 0, "Wavelength <= 0 received in ITC graph data.")
+
+  val step: Double = (end - start) / (count - 1)
+
+  def at(index: Int): Double                       = start + index * step
+  def wavelengthAt(index: Int): Option[Wavelength] =
+    Wavelength.intPicometers
+      .getOption((at(index) * 1000).toInt)
+
+  // Find the index for which the wavelength is at or just above the given wavelength. Return None if out of range.
+  // It might be more accurate to use 'round` instead of 'ceil' but 'ceil' matches previous behavior.
+  def indexOf(w: Double): Option[Int]     =
+    if (w < start || w > end) none
+    else ((w - start) / step).ceil.toInt.some
+  def indexOf(w: Wavelength): Option[Int] =
+    indexOf(w.toNanometers.value.value.toDouble)
+
+case class ItcYAxis(min: Double, indexOfMin: Int, max: Double, indexOfMax: Int)
     derives Decoder,
       Encoder.AsObject
+object ItcYAxis:
+  def fromData(data: NonEmptyList[Double]): ItcYAxis =
+    val (minTuple, maxTuple, _) = data.foldLeft(((Double.MaxValue, 0), (Double.MinValue, 0), 0)) {
+      case ((min, max, count), y) =>
+        val newMin = if (y < min._1) (y, count) else min
+        val newMax = if (y > max._1) (y, count) else max
+        (newMin, newMax, count + 1)
+    }
+    ItcYAxis(minTuple._1, minTuple._2, maxTuple._1, maxTuple._2)
 
-object ItcAxis:
-  // Calculate the values on the axis' range
-  def calcAxis(data: List[(Double, Double)], fun: ((Double, Double)) => Double): Option[ItcAxis] =
-    if (data.nonEmpty)
-      val (min, max, count) =
-        data.foldLeft((Double.MaxValue, Double.MinValue, 0)) { case ((max, min, count), current) =>
-          val x = fun(current)
-          (x.min(max), x.max(min), count + 1)
-        }
-      ItcAxis(fun(data.head), fun(data.last), min, max, count).some
-    else none
-
-case class ItcSeries private (
+case class ItcSeries(
   title:      String,
   seriesType: SeriesDataType,
-  data:       List[(Double, Double)],
-  dataX:      List[Double],
-  dataY:      List[Double],
-  xAxis:      Option[ItcAxis],
-  yAxis:      Option[ItcAxis]
-) derives Encoder.AsObject
+  dataY:      NonEmptyList[Double],
+  xAxis:      ItcXAxis,
+  yAxis:      ItcYAxis
+) derives Encoder.AsObject:
+  def wavelengthAtMaxAndMax: Option[(Wavelength, Double)] =
+    xAxis.wavelengthAt(yAxis.indexOfMax).tupleRight(yAxis.max)
+
+  def yValueAtWavelength(w: Wavelength): Option[Double] =
+    xAxis.indexOf(w).flatMap(i => dataY.toList.lift(i))
 
 object ItcSeries:
-  def apply(title: String, seriesType: SeriesDataType, data: List[(Double, Double)]): ItcSeries =
-    ItcSeries(
-      title,
-      seriesType,
-      data,
-      data.map(_._1),
-      data.map(_._2),
-      ItcAxis.calcAxis(data, _._1),
-      ItcAxis.calcAxis(data, _._2)
-    )
+  def apply(
+    title:      String,
+    seriesType: SeriesDataType,
+    dataY:      NonEmptyList[Double],
+    xAxis:      ItcXAxis
+  ): ItcSeries =
+    ItcSeries(title, seriesType, dataY, xAxis, ItcYAxis.fromData(dataY))
 
 case class ItcGraph(graphType: GraphType, series: List[ItcSeries]) derives Eq, Encoder.AsObject
 

@@ -28,7 +28,7 @@ import scala.concurrent.duration.*
  */
 trait ItcCacheOrRemote extends Version:
   // Manual version to manually force a flush
-  private val ManualCacheVersion = 1
+  private val ManualCacheVersion = 2
   private val CacheRootPrefix    = "itc"
   val VersionKeyRoot: String     = "version"
 

@@ -4,6 +4,7 @@
 package lucuma.itc.legacy
 
 import cats.data.NonEmptyChain
+import cats.data.NonEmptyList
 import cats.syntax.all.*
 import eu.timepit.refined.numeric.NonNegative
 import eu.timepit.refined.refineV
@@ -30,6 +31,7 @@ import lucuma.itc.ItcGhostDetector
 import lucuma.itc.ItcGraph
 import lucuma.itc.ItcGraphGroup
 import lucuma.itc.ItcSeries
+import lucuma.itc.ItcXAxis
 import lucuma.itc.SeriesDataType
 import lucuma.itc.legacy.syntax.all.*
 import lucuma.itc.service.ItcObservingConditions
@@ -526,14 +528,9 @@ private[legacy] object codecs:
     for
       title <- c.downField("title").as[String]
       dt    <- c.downField("dataType").as[SeriesDataType]
-      data  <- c.downField("data")
-                 .as[List[List[Double]]]
-                 .map { i =>
-                   (i.lift(0), i.lift(1)) match
-                     case (Some(a), Some(b)) if a.length === b.length => a.zip(b)
-                     case _                                           => List.empty
-                 }
-    yield ItcSeries(title, dt, data)
+      dataY <- c.downField("dataY").as[NonEmptyList[Double]]
+      xaxis <- c.downField("xAxis").as[ItcXAxis]
+    yield ItcSeries(title, dt, dataY, xaxis)
 
   given Decoder[ItcGraph] = (c: HCursor) =>
     for
