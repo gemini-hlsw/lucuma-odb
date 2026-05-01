@@ -12,6 +12,7 @@ import lucuma.core.util.Enumerated
 import lucuma.odb.service.ObservationWorkflowService
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.GmosCodecs.*
+import lucuma.odb.util.GnirsCodecs.*
 import org.tpolecat.typename.TypeName
 import org.typelevel.log4cats.Logger
 import skunk.Codec
@@ -147,6 +148,9 @@ object StartupDiagnostics:
           checkPostgresLookupTable(gmos_south_fpu, "t_gmos_south_fpu"),
           checkPostgresLookupTable(gmos_south_grating, "t_gmos_south_disperser"),
           checkPostgresLookupTable(gmos_south_stage_mode, "t_gmos_south_stage_mode"),
+          checkPostgresLookupTable(gnirs_grating, "t_gnirs_grating"),
+          checkPostgresLookupTable(gnirs_fpu_slit, "t_gnirs_fpu_slit"),
+          checkPostgresLookupTable(gnirs_filter, "t_gnirs_filter"),
           checkPostgresLookupTable(image_quality_preset, "t_image_quality"),
           checkPostgresLookupTable(instrument, "t_instrument"),
           checkPostgresLookupTable(spectroscopy_capabilities, "t_spectroscopy_capabilities"),
