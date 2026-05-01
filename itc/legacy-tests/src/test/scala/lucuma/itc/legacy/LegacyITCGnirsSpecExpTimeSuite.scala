@@ -20,6 +20,7 @@ import lucuma.core.enums.GnirsPrism
 import lucuma.core.enums.GnirsReadMode
 import lucuma.core.enums.GnirsFpuSlit
 import lucuma.core.enums.GnirsWellDepth
+import lucuma.core.util.Enumerated
 
 /**
  * Unit test for GNIRS exposure time calculation
@@ -41,34 +42,68 @@ class LegacyITCGnirsSpecExpTimeSuite extends CommonITCLegacySuite:
     analysisMethod = ItcObservationDetails.AnalysisMethod.Aperture.Auto(1)
   )
 
-  override def instrument = ItcInstrumentDetails(
-    ObservingMode.SpectroscopyMode.GnirsLongSlit(
-      centralWavelength = centralWavelength,
-      grating = GnirsGrating.D32,
-      filter = GnirsFilter.Order3,
-      camera = GnirsCamera.ShortBlue,
-      prism = GnirsPrism.Mirror,
-      readMode = GnirsReadMode.Bright,
-      slitWidth = GnirsFpuSlit.LongSlit_0_30,
-      wellDepth = GnirsWellDepth.Shallow,
-      portDisposition = PortDisposition.Bottom
-    )
+  val gnirs = ObservingMode.SpectroscopyMode.GnirsLongSlit(
+    centralWavelength = centralWavelength,
+    grating = GnirsGrating.D32,
+    filter = GnirsFilter.Order3,
+    camera = GnirsCamera.ShortBlue,
+    prism = GnirsPrism.Mirror,
+    readMode = GnirsReadMode.Bright,
+    slitWidth = GnirsFpuSlit.LongSlit_0_30,
+    wellDepth = GnirsWellDepth.Shallow,
+    portDisposition = PortDisposition.Bottom
   )
 
-  test("GNIRS spectroscopy S/N".tag(LegacyITCTest)):
-    println(s"INVOKING: ${baseParams.asJson.spaces2}")
-    // TODO TRY OUT ALL PARAMETER COMBINATIONS LIKE IN OTHER INSTRUMENTS
-    val result = localItc
-      .calculate(baseParams.asJson.noSpaces)
-      .flatTap(r => cats.effect.IO.println("**** RESULT ****\n" + r))
-    assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))
+  override def instrument = ItcInstrumentDetails(gnirs)
 
-  // testConditions("GNIRS spectroscopy S/N", baseParams)
+  test("gnirs grating".tag(LegacyITCTest)):
+    Enumerated[GnirsGrating].all.foreach: g =>
+      val result = localItc.calculate:
+        bodyConf(sourceDefinition, obs, gnirs.copy(grating = g)).asJson.noSpaces
+      assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))
 
-  // testSEDs("GNIRS spectroscopy S/N", baseParams)
+  test("gnirs filter".tag(LegacyITCTest)):
+    Enumerated[GnirsFilter].all.foreach: f =>
+      val result = localItc.calculate:
+        bodyConf(sourceDefinition, obs, gnirs.copy(filter = f)).asJson.noSpaces
+      assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))
 
-  // testUserDefinedSED("GNIRS spectroscopy S/N", baseParams)
+  test("gnirs camera".tag(LegacyITCTest)):
+    Enumerated[GnirsCamera].all.foreach: c =>
+      val result = localItc.calculate:
+        bodyConf(sourceDefinition, obs, gnirs.copy(camera = c)).asJson.noSpaces
+      assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))
 
-  // testBrightnessUnits("GNIRS spectroscopy S/N", baseParams)
+  test("gnirs prism".tag(LegacyITCTest)):
+    Enumerated[GnirsPrism].all.foreach: p =>
+      val result = localItc.calculate:
+        bodyConf(sourceDefinition, obs, gnirs.copy(prism = p)).asJson.noSpaces
+      assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))
 
-  // testPowerAndBlackbody("GNIRS spectroscopy S/N", baseParams)
+  test("gnirs read mode".tag(LegacyITCTest)):
+    Enumerated[GnirsReadMode].all.foreach: r =>
+      val result = localItc.calculate:
+        bodyConf(sourceDefinition, obs, gnirs.copy(readMode = r)).asJson.noSpaces
+      assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))
+
+  test("gnirs slit width".tag(LegacyITCTest)):
+    Enumerated[GnirsFpuSlit].all.foreach: s =>
+      val result = localItc.calculate:
+        bodyConf(sourceDefinition, obs, gnirs.copy(slitWidth = s)).asJson.noSpaces
+      assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))
+
+  test("gnirs well depth".tag(LegacyITCTest)):
+    Enumerated[GnirsWellDepth].all.foreach: w =>
+      val result = localItc.calculate:
+        bodyConf(sourceDefinition, obs, gnirs.copy(wellDepth = w)).asJson.noSpaces
+      assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))
+
+  testConditions("GNIRS spectroscopy S/N", baseParams)
+
+  testSEDs("GNIRS spectroscopy S/N", baseParams)
+
+  testUserDefinedSED("GNIRS spectroscopy S/N", baseParams)
+
+  testBrightnessUnits("GNIRS spectroscopy S/N", baseParams)
+
+  testPowerAndBlackbody("GNIRS spectroscopy S/N", baseParams)
