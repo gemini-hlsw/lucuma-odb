@@ -83,7 +83,7 @@ object GroupPropertiesInput {
               case _ if sameNight.contains(true) && maximumInterval.isDefined =>
                 Matcher.validationFailure("Same night and maximum interval are mutually exclusive.")
               case _ if sameNight.contains(true) && minimumRequired.isDefined =>
-                Matcher.validationFailure("Same night is only valid for AND groups (minimumRequired must be null).")
+                Matcher.validationFailure("Same night is only valid for AND groups.")
               case _ =>
                 Result(Create(
                   name,
@@ -121,7 +121,7 @@ object GroupPropertiesInput {
               case _ if sameNight.contains(true) && maximumInterval.toOption.isDefined =>
                 Matcher.validationFailure("Same night and maximum interval are mutually exclusive.")
               case _ if sameNight.contains(true) && minimumRequired.toOption.isDefined =>
-                Matcher.validationFailure("Same night is only valid for AND groups (minimumRequired must be null).")
+                Matcher.validationFailure("Same night is only valid for AND groups.")
               case _ =>
                 Result(Edit(
                   name,

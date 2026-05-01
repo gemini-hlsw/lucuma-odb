@@ -63,6 +63,7 @@ class updateGroups extends OdbSuite {
                   name
                   description
                   ordered
+                  sameNight
                   minimumRequired
                   minimumInterval { minutes }
                   maximumInterval { minutes }
@@ -79,6 +80,7 @@ class updateGroups extends OdbSuite {
                     "name" : "foo",
                     "description": "bar",
                     "ordered": false,
+                    "sameNight": false,
                     "minimumRequired": 4,
                     "minimumInterval" : {
                       "minutes" : 180.000000
@@ -92,6 +94,7 @@ class updateGroups extends OdbSuite {
                     "name" : "foo",
                     "description": "bar",
                     "ordered": false,
+                    "sameNight": false,
                     "minimumRequired": 4,
                     "minimumInterval" : {
                       "minutes" : 180.000000
@@ -704,6 +707,77 @@ class updateGroups extends OdbSuite {
         error = inputIntervalError.some)
     } yield ()
   }
+
+  test("can set sameNight to true on an AND group"):
+    for {
+      pid <- createProgramAs(pi)
+      gid <- createGroupAs(pi, pid)
+      _   <- expect(
+        user = pi,
+        query = s"""
+          mutation {
+            updateGroups(input: {
+              SET: { sameNight: true },
+              WHERE: { id: { EQ: ${gid.asJson} } }
+            }) { groups { id sameNight } }
+          }
+        """,
+        expected = Right(json"""
+          {
+            "updateGroups": {
+              "groups": [ { "id": $gid, "sameNight": true } ]
+            }
+          }
+        """)
+      )
+    } yield ()
+
+  val sameNightInputMaxError =
+    "Argument 'input.SET' is invalid: Same night and maximum interval are mutually exclusive."
+  val sameNightInputMinReqError =
+    "Argument 'input.SET' is invalid: Same night is only valid for AND groups."
+  val sameNightDbError =
+    "Same night is only valid for AND groups and mutually exclusive with maximumInterval."
+
+  def updateSameNight(
+    user: User,
+    gid: Group.Id,
+    setFragment: String,
+    error: Option[String]
+  ): IO[Unit] =
+    val expectation: Either[List[String], Json] = error.fold(
+      Right(json"""
+        { "updateGroups": { "groups": [ { "id": $gid } ] } }
+      """)
+    )(s => Left(List(s)))
+    expect(
+      user = user,
+      query = s"""
+        mutation {
+          updateGroups(input: {
+            SET: { $setFragment },
+            WHERE: { id: { EQ: ${gid.asJson} } }
+          }) { groups { id } }
+        }
+      """,
+      expected = expectation
+    )
+
+  test("cannot set maximumInterval on a sameNight group"):
+    for {
+      pid <- createProgramAs(pi)
+      gid <- createGroupAs(pi, pid)
+      _   <- updateSameNight(pi, gid, "sameNight: true", None)
+      _   <- updateSameNight(pi, gid, "maximumInterval: { hours: 1 }", sameNightDbError.some)
+    } yield ()
+
+  test("cannot set minimumRequired on a sameNight group"):
+    for {
+      pid <- createProgramAs(pi)
+      gid <- createGroupAs(pi, pid)
+      _   <- updateSameNight(pi, gid, "sameNight: true", None)
+      _   <- updateSameNight(pi, gid, "minimumRequired: 1", sameNightDbError.some)
+    } yield ()
 
   test("can move telluric system group"):
     for {

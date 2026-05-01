@@ -124,13 +124,13 @@ object GroupService {
 
       private def toDelete(tree: GroupTree): Result[(List[Group.Id], List[Observation.Id])] =
         tree match
-          case Root(programId, children) =>
+          case Root(programId, _) =>
             OdbError.InvalidArgument(s"Cannot delete root group of $programId.".some).asFailure
-          case Branch(groupId, _, _, children, _, _, _, _, false, _, _) =>
+          case Branch(groupId = groupId, system = false) =>
               OdbError.InvalidArgument(s"Cannot delete non-sytem group $groupId.".some).asFailure
           case Leaf(observationId)                                      =>
             Result((Nil, List(observationId))) // calibration-ness is checked by the obs service
-          case Branch(groupId, _, _, children, _, _, _, _, true, _, _)  =>
+          case Branch(groupId = groupId, children = children, system = true)  =>
               children
                 .traverse(toDelete)
                 .map(_.combineAll)
@@ -232,7 +232,7 @@ object GroupService {
           .recoverWith { case SqlState.CheckViolation(ex) =>
             val msg = ex.constraintName match
               case Some("group_same_night_check") =>
-                "Same night is only valid for AND groups (minimumRequired must be null) and is mutually exclusive with maximumInterval."
+                "Same night is only valid for AND groups and mutually exclusive with maximumInterval."
               case _ =>
                 "Minimum interval must be less than or equal maximum interval."
             Result.failure(msg).pure

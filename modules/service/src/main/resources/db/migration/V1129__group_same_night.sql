@@ -1,8 +1,8 @@
--- Add "Same Night" option to groups
+-- Add Same Night option to groups
 ALTER TABLE t_group
 ADD COLUMN c_same_night bool NOT NULL DEFAULT false;
 
--- Same Night is mutually exclusive with c_max_interval and only valid for
+-- c_same_night is mutually exclusive with c_max_interval and only valid for
 -- AND groups (c_min_required IS NULL).
 ALTER TABLE t_group
 ADD CONSTRAINT group_same_night_check
