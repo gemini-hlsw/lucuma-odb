@@ -10902,6 +10902,12 @@ type Group {
   minimumInterval: TimeSpan
   maximumInterval: TimeSpan
 
+  """
+  If true, all observations in this group must be scheduled on the same night.
+  Mutually exclusive with `maximumInterval`.
+  """
+  sameNight: Boolean!
+
   "Contained elements"
   elements(includeDeleted: Boolean! = false): [GroupElement!]!
 
@@ -10971,6 +10977,12 @@ input GroupPropertiesInput {
 
   "If specified, elements will be separated by at most `maximumInterval`."
   maximumInterval: TimeSpanInput
+
+  """
+  If true, all observations in this group must be scheduled on the same night.
+  Mutually exclusive with `maximumInterval`.
+  """
+  sameNight: Boolean
 
   "Parent group (optional). If specified then parent index must also be specified."
   parentGroup: GroupId
