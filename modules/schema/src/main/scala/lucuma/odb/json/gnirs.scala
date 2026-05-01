@@ -21,6 +21,7 @@ import lucuma.core.enums.GnirsGrating
 import lucuma.core.enums.GnirsPrism
 import lucuma.core.enums.GnirsReadMode
 import lucuma.core.enums.GnirsWellDepth
+import lucuma.core.math.Wavelength
 import lucuma.core.model.sequence.gnirs.GnirsAcquisitionMirrorMode
 import lucuma.core.model.sequence.gnirs.GnirsDynamicConfig
 import lucuma.core.model.sequence.gnirs.GnirsFocus
@@ -75,19 +76,21 @@ trait GnirsCodec:
   given Decoder[GnirsDynamicConfig] =
     Decoder.instance: c =>
       for
-        exposure  <- c.downField("exposure").as[TimeSpan]
-        coadds    <- c.downField("coadds").as[PosInt]
-        filter    <- c.downField("filter").as[GnirsFilter]
-        decker    <- c.downField("decker").as[GnirsDecker]
-        fpu       <- c.downField("fpuSlit").as[GnirsFpuSlit].map(_.asLeft[GnirsFpuOther]) orElse
-                     c.downField("fpuOther").as[GnirsFpuOther].map(_.asRight[GnirsFpuSlit])
-        acqMirror <- c.downField("acquisitionMirrorOut").as[Option[GnirsAcquisitionMirrorMode.Out]].map(_.getOrElse(GnirsAcquisitionMirrorMode.In))
-        camera    <- c.downField("camera").as[GnirsCamera]
-        focus     <- c.downField("focusCustom").as[Option[GnirsFocus.Custom]].map(_.getOrElse(GnirsFocus.Best))
-        readMode  <- c.downField("readMode").as[GnirsReadMode]
+        exposure          <- c.downField("exposure").as[TimeSpan]
+        coadds            <- c.downField("coadds").as[PosInt]
+        centralWavelength <- c.downField("centralWavelength").as[Wavelength]
+        filter            <- c.downField("filter").as[GnirsFilter]
+        decker            <- c.downField("decker").as[GnirsDecker]
+        fpu               <- c.downField("fpuSlit").as[GnirsFpuSlit].map(_.asLeft[GnirsFpuOther]) orElse
+                             c.downField("fpuOther").as[GnirsFpuOther].map(_.asRight[GnirsFpuSlit])
+        acqMirror         <- c.downField("acquisitionMirrorOut").as[Option[GnirsAcquisitionMirrorMode.Out]].map(_.getOrElse(GnirsAcquisitionMirrorMode.In))
+        camera            <- c.downField("camera").as[GnirsCamera]
+        focus             <- c.downField("focusCustom").as[Option[GnirsFocus.Custom]].map(_.getOrElse(GnirsFocus.Best))
+        readMode          <- c.downField("readMode").as[GnirsReadMode]
       yield GnirsDynamicConfig(
         exposure,
         coadds,
+        centralWavelength,
         filter,
         decker,
         fpu,
@@ -102,6 +105,7 @@ trait GnirsCodec:
       Json.obj(
         "exposure"             -> a.exposure.asJson,
         "coadds"               -> a.coadds.asJson,
+        "centralWavelength"    -> a.centralWavelength.asJson,
         "filter"               -> a.filter.asJson,
         "decker"               -> a.decker.asJson,
         "fpuSlit"              -> a.fpu.left.toOption.fold(Json.Null)(_.asJson),
