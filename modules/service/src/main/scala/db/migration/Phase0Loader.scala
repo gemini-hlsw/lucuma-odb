@@ -17,6 +17,7 @@ import lucuma.odb.phase0.Flamingos2SpectroscopyRow
 import lucuma.odb.phase0.GhostIfuRow
 import lucuma.odb.phase0.GmosImagingRow
 import lucuma.odb.phase0.GmosSpectroscopyRow
+import lucuma.odb.phase0.GnirsSpectroscopyRow
 import lucuma.odb.phase0.ImagingRow
 import lucuma.odb.phase0.SpectroscopyRow
 import org.postgresql.core.BaseConnection
@@ -101,6 +102,7 @@ object Phase0Loader {
       new Phase0Loader[GhostIfuRow, SpectroscopyRow](Instrument.Ghost, rdr.ghostIfu, _.spec, Phase0Table.SpectroscopyGhostIfu.some),
       new Phase0Loader[GmosSpectroscopyRow.GmosNorth, SpectroscopyRow](Instrument.GmosNorth, rdr.gmosNorthSpectroscopy, _.spec, Phase0Table.SpectroscopyGmosNorth.some),
       new Phase0Loader[GmosSpectroscopyRow.GmosSouth, SpectroscopyRow](Instrument.GmosSouth, rdr.gmosSouthSpectroscopy, _.spec, Phase0Table.SpectroscopyGmosSouth.some),
+      new Phase0Loader[GnirsSpectroscopyRow, SpectroscopyRow](Instrument.Gnirs, rdr.gnirsSpectroscopy, _.spec, Phase0Table.SpectroscopyGnirs.some),
       new Phase0Loader[SpectroscopyRow, SpectroscopyRow](Instrument.Igrins2, rdr.igrins2Spectroscopy, identity, none)
     ).traverse_(_.load(bc, ConfigModeVariant.Spectroscopy, is))
 

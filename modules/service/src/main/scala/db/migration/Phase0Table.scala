@@ -16,12 +16,14 @@ import lucuma.odb.phase0.Flamingos2SpectroscopyRow
 import lucuma.odb.phase0.GhostIfuRow
 import lucuma.odb.phase0.GmosImagingRow
 import lucuma.odb.phase0.GmosSpectroscopyRow
+import lucuma.odb.phase0.GnirsSpectroscopyRow
 import lucuma.odb.phase0.ImagingRow
 import lucuma.odb.phase0.SpectroscopyRow
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.Flamingos2Codecs.*
 import lucuma.odb.util.GhostCodecs.*
 import lucuma.odb.util.GmosCodecs.*
+import lucuma.odb.util.GnirsCodecs.*
 import skunk.Encoder
 import skunk.codec.boolean.bool
 import skunk.codec.numeric.numeric
@@ -191,6 +193,33 @@ object Phase0Table {
         "c_fpu"
       )
   }
+
+  val SpectroscopyGnirs = new Phase0Table[GnirsSpectroscopyRow]:
+
+    override def name: String =
+      s"${Spectroscopy.name}_gnirs"
+
+    override def encoder: Encoder[GnirsSpectroscopyRow] =
+      (
+        instrument    *:
+        gnirs_grating *:
+        gnirs_filter  *:
+        gnirs_fpu_slit
+      ).contramap[GnirsSpectroscopyRow]: row =>
+        (
+          row.spec.instrument,
+          row.grating,
+          row.filter,
+          row.fpu
+        )
+
+    override def columns: List[String] =
+      List(
+        "c_instrument",
+        "c_grating",
+        "c_filter",
+        "c_fpu"
+      )
 
   val SpectroscopyGhostIfu = new Phase0Table[GhostIfuRow]:
     override def name: String =
