@@ -229,7 +229,14 @@ object GroupService {
           Statements.updateGroups(SET, which, accessPredicate).traverse: af =>
             session.prepareR(af.fragment.query(group_id)).use { pq => pq.stream(af.argument, 512).compile.toList }
           .map(moreIds => Result(moreIds.foldLeft(ids)((a, b) => (a ++ b).distinct)))
-          .recoverWith { case SqlState.CheckViolation(ex) =>  Result.failure("Minimum interval must be less than or equal maximum interval.").pure}
+          .recoverWith { case SqlState.CheckViolation(ex) =>
+            val msg = ex.constraintName match
+              case Some("group_same_night_check") =>
+                "Same night is only valid for AND groups (minimumRequired must be null) and is mutually exclusive with maximumInterval."
+              case _ =>
+                "Minimum interval must be less than or equal maximum interval."
+            Result.failure(msg).pure
+          }
 
       def openHole(pid: Program.Id, gid: Option[Group.Id], index: Option[NonNegShort]): F[NonNegShort] =
         session.prepareR(Statements.OpenHole).use(_.unique(pid, gid, index))
