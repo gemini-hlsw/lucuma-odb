@@ -51,6 +51,11 @@ trait SpectroscopyConfigOptionMapping[F[_]] extends SpectroscopyConfigOptionTabl
       SqlObject("gmosSouth", Join(List(
         SpectroscopyConfigOptionTable.Instrument -> SpectroscopyConfigOptionGmosSouthTable.Instrument,
         SpectroscopyConfigOptionTable.Index      -> SpectroscopyConfigOptionGmosSouthTable.Index
+      ))),
+
+      SqlObject("gnirs", Join(List(
+        SpectroscopyConfigOptionTable.Instrument -> SpectroscopyConfigOptionGnirsTable.Instrument,
+        SpectroscopyConfigOptionTable.Index      -> SpectroscopyConfigOptionGnirsTable.Index
       )))
 
     )
@@ -92,4 +97,14 @@ trait SpectroscopyConfigOptionMapping[F[_]] extends SpectroscopyConfigOptionTabl
       SqlField("fpu",        SpectroscopyConfigOptionGmosSouthTable.Fpu),
       SqlField("grating",    SpectroscopyConfigOptionGmosSouthTable.Grating),
       SqlField("filter",     SpectroscopyConfigOptionGmosSouthTable.Filter)
+    )
+
+  lazy val SpectroscopyConfigOptionGnirsMapping: ObjectMapping =
+    ObjectMapping(SpectroscopyConfigOptionGnirsType)(
+      SqlField("instrument", SpectroscopyConfigOptionGnirsTable.Instrument, key = true, hidden = true),
+      SqlField("index",      SpectroscopyConfigOptionGnirsTable.Index, key = true, hidden = true),
+
+      SqlField("grating",    SpectroscopyConfigOptionGnirsTable.Grating),
+      SqlField("filter",     SpectroscopyConfigOptionGnirsTable.Filter),
+      SqlField("fpu",        SpectroscopyConfigOptionGnirsTable.Fpu)
     )
