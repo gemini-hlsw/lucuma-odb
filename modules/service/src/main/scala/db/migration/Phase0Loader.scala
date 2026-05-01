@@ -14,10 +14,10 @@ import lucuma.core.enums.Instrument
 import lucuma.odb.phase0.ConfigurationRow
 import lucuma.odb.phase0.FileReader
 import lucuma.odb.phase0.Flamingos2SpectroscopyRow
-import lucuma.odb.phase0.GnirsSpectroscopyRow
 import lucuma.odb.phase0.GhostIfuRow
 import lucuma.odb.phase0.GmosImagingRow
 import lucuma.odb.phase0.GmosSpectroscopyRow
+import lucuma.odb.phase0.GnirsSpectroscopyRow
 import lucuma.odb.phase0.ImagingRow
 import lucuma.odb.phase0.SpectroscopyRow
 import org.postgresql.core.BaseConnection
