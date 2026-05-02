@@ -1030,23 +1030,23 @@ enum GnirsFilter {
 }
 
 enum GnirsCamera {
-  LongBlue
-  LongRed
-  ShortBlue
-  ShortRed
+  LONG_BLUE
+  LONG_RED
+  SHORT_BLUE
+  SHORT_RED
 }
 
 enum GnirsPrism {
-  Mirror
-  Sxd
-  Lxd
+  MIRROR
+  SXD
+  LXD
 }
 
 enum GnirsReadMode {
-  VeryBright
-  Bright
-  Faint
-  VeryFaint
+  VERY_BRIGHT
+  BRIGHT
+  FAINT
+  VERY_FAINT
 }
 
 enum GnirsFpuSlit {
@@ -1060,8 +1060,8 @@ enum GnirsFpuSlit {
 }
 
 enum GnirsWellDepth {
-  Shallow
-  Deep
+  SHALLOW
+  DEEP
 }
 
 """GMOS amp count"""
@@ -9072,23 +9072,23 @@ input GnirsSpectroscopyInput {
   """Central wavelength"""
   centralWavelength: WavelengthInput!
 
-  """GNIRS grating"""
-  grating: GnirsGrating!
-
   """GNIRS filter"""
   filter: GnirsFilter!
 
-  """GNIRS camera (determines pixel scale)"""
-  camera: GnirsCamera!
+  """GNIRS slit width"""
+  slitWidth: GnirsFpuSlit!
 
   """GNIRS cross-disperser prism"""
   prism: GnirsPrism!
 
+  """GNIRS grating"""
+  grating: GnirsGrating!
+
+  """GNIRS camera (determines pixel scale)"""
+  camera: GnirsCamera!
+
   """GNIRS read mode"""
   readMode: GnirsReadMode!
-
-  """GNIRS slit width"""
-  slitWidth: GnirsFpuSlit!
 
   """GNIRS well depth"""
   wellDepth: GnirsWellDepth!

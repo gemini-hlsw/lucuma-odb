@@ -5,22 +5,22 @@ package lucuma.itc.legacy
 
 import cats.syntax.option.*
 import io.circe.syntax.*
+import lucuma.core.enums.GnirsCamera
+import lucuma.core.enums.GnirsFilter
+import lucuma.core.enums.GnirsFpuSlit
+import lucuma.core.enums.GnirsGrating
+import lucuma.core.enums.GnirsPrism
+import lucuma.core.enums.GnirsReadMode
+import lucuma.core.enums.GnirsWellDepth
 import lucuma.core.enums.PortDisposition
 import lucuma.core.math.Angle
 import lucuma.core.math.Wavelength
+import lucuma.core.util.Enumerated
 import lucuma.itc.legacy.codecs.given
 import lucuma.itc.service.ItcObservationDetails
 import lucuma.itc.service.ObservingMode
 
 import scala.concurrent.duration.*
-import lucuma.core.enums.GnirsFilter
-import lucuma.core.enums.GnirsCamera
-import lucuma.core.enums.GnirsGrating
-import lucuma.core.enums.GnirsPrism
-import lucuma.core.enums.GnirsReadMode
-import lucuma.core.enums.GnirsFpuSlit
-import lucuma.core.enums.GnirsWellDepth
-import lucuma.core.util.Enumerated
 
 /**
  * Unit test for GNIRS exposure time calculation
