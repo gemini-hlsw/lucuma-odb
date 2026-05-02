@@ -1006,6 +1006,64 @@ enum GhostReadMode {
   FAST
 }
 
+enum GnirsGrating {
+  D10
+  D32
+  D111
+}
+
+enum GnirsFilter {
+  CROSS_DISPERSED
+  ORDER6
+  ORDER5
+  ORDER4
+  ORDER3
+  ORDER2
+  ORDER1
+  H2
+  H_ND100X
+  H2_ND100X
+  PAH
+  Y
+  J
+  K
+}
+
+enum GnirsCamera {
+  LongBlue
+  LongRed
+  ShortBlue
+  ShortRed
+}
+
+enum GnirsPrism {
+  Mirror
+  Sxd
+  Lxd
+}
+
+enum GnirsReadMode {
+  VeryBright
+  Bright
+  Faint
+  VeryFaint
+}
+
+enum GnirsFpuSlit {
+  LONG_SLIT_0_10
+  LONG_SLIT_0_15
+  LONG_SLIT_0_20
+  LONG_SLIT_0_30
+  LONG_SLIT_0_45
+  LONG_SLIT_0_675
+  LONG_SLIT_1_00
+}
+
+enum GnirsWellDepth {
+  Shallow
+  Deep
+}
+
 """GMOS amp count"""
 enum GmosAmpCount {
   """GmosAmpCount Three"""
@@ -9009,10 +9067,34 @@ input GhostSpectroscopyInput {
 
 input GnirsSpectroscopyInput {
   """Exposure time mode."""
-  exposureTimeMode: ExposureTimeModeInput!
+  timeAndCount: TimeAndCountExposureTimeModeInput!
 
-  """Number of cycles per exposure"""
-  coadds: PosInt!
+  """Central wavelength"""
+  centralWavelength: WavelengthInput!
+
+  """GNIRS grating"""
+  grating: GnirsGrating!
+
+  """GNIRS filter"""
+  filter: GnirsFilter!
+
+  """GNIRS camera (determines pixel scale)"""
+  camera: GnirsCamera!
+
+  """GNIRS cross-disperser prism"""
+  prism: GnirsPrism!
+
+  """GNIRS read mode"""
+  readMode: GnirsReadMode!
+
+  """GNIRS slit width"""
+  slitWidth: GnirsFpuSlit!
+
+  """GNIRS well depth"""
+  wellDepth: GnirsWellDepth!
+
+  """Instrument port disposition"""
+  port: PortDisposition = BOTTOM
 }
 
 """Params for instrument modes"""

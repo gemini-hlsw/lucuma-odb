@@ -156,32 +156,14 @@ object ObservingMode {
         s"${instrument.shortName} IFU"
     }
 
-    // def gnirsParameters(r: ITCRequest): GnirsParameters = {
-    //   val grating     = r.parameter("Disperser") match {
-    //     case "imaging" => None
-    //     case _ => Some(r.enumParameter(classOf[GNIRSParams.Disperser])) }
-    //   val filter      = r.parameter("Filter") match {
-    //     case "spectroscopy" => None
-    //     case _ => Some(r.enumParameter(classOf[GNIRSParams.Filter])) }
-    //   val pixelScale = r.enumParameter(classOf[GNIRSParams.PixelScale])
-    //   val xDisp       = r.enumParameter(classOf[GNIRSParams.CrossDispersed])
-    //   val readMode    = r.enumParameter(classOf[GNIRSParams.ReadMode])
-    //   val centralWl   = r.centralWavelengthInMicrons()
-    //   val fpMask      = r.enumParameter(classOf[GNIRSParams.SlitWidth])
-    //   val wellDepth   = r.enumParameter(classOf[GNIRSParams.WellDepth])
-    //   val camera      = None                            //    are selected automatically and not controlled by user
-    //   val altair      = altairParameters(r)
-    //   GnirsParameters(pixelScale, filter, grating, readMode, xDisp, centralWl, fpMask, camera, wellDepth, altair)
-    // }
-
     final case class GnirsLongSlit(
       centralWavelength: Wavelength,
-      grating:           GnirsGrating,
       filter:            GnirsFilter,
-      camera:            GnirsCamera,
-      prism:             GnirsPrism,
-      readMode:          GnirsReadMode,
       slitWidth:         GnirsFpuSlit,
+      prism:             GnirsPrism,
+      grating:           GnirsGrating,
+      camera:            GnirsCamera,
+      readMode:          GnirsReadMode,
       wellDepth:         GnirsWellDepth,
       portDisposition:   PortDisposition
     ) extends SpectroscopyMode derives Hash {

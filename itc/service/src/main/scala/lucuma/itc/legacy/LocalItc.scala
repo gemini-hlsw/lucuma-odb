@@ -141,8 +141,6 @@ case class LocalItc[F[_]: {Sync as F}](classLoader: ClassLoader):
         .invoke(null, jsonParams) // null as it is a static method
         .asInstanceOf[String]
 
-      println(s"RAW RESULT: $res")
-
       val result = res match
         case LegacyRight(result) if hasAllNullExposureTimes(result) =>
           Left(List(OutOfRangeMsg))

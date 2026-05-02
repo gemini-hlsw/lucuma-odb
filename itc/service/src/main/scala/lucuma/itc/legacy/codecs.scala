@@ -254,13 +254,13 @@ private[legacy] object codecs:
     : Encoder[ObservingMode.SpectroscopyMode.GnirsLongSlit] = a =>
     Json.obj(
       "centralWavelength" -> a.centralWavelength.asJson,
-      "grating"           -> Json.fromString(a.grating.ocs2Tag),
       "filter"            -> Json.fromString(a.filter.ocs2Tag),
-      "pixelScale"        -> Json.fromString(a.camera.pixelScale.ocs2Tag),
-      "crossDispersed"    -> Json.fromString(a.prism.ocs2Tag),  // !
-      "camera"            -> Json.fromString(a.camera.ocs2Tag), // Not controlled by user, set to AUTO
-      "readMode"          -> Json.fromString(a.readMode.ocs2Tag),
       "slitWidth"         -> Json.fromString(a.slitWidth.ocs2Tag),
+      "crossDispersed"    -> Json.fromString(a.prism.ocs2Tag),
+      "grating"           -> Json.fromString(a.grating.ocs2Tag),
+      "camera"            -> Json.fromString(a.camera.ocs2Tag),
+      "pixelScale"        -> Json.fromString(a.camera.pixelScale.ocs2Tag),
+      "readMode"          -> Json.fromString(a.readMode.ocs2Tag),
       "wellDepth"         -> Json.fromString(a.wellDepth.ocs2Tag),
       "altair"            -> Json.Null
     )
