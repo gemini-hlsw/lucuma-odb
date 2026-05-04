@@ -124,6 +124,22 @@ object ObservingModeServices:
 
         }.map(_.fold(Map.empty[Observation.Id, ObservingMode])(_ ++ _))
 
+      //------------------------------------------------------------------------
+      // N.B. Whenever a new mode is added to the database, recall that the
+      // database migration requires registering it in `t_observing_mode_registry`
+      // via:
+      //
+      //     SELECT register_observing_mode(mode_type, table_name);
+      //
+      // For example:
+      //
+      //     SELECT register_observing_mode('flamingos_2_long_slit', 't_flamingos_2_long_slit');
+      //
+      // This enables a trigger that checks whether the observation's observing
+      // mode is consistent with an entry in the corresponding observing mode
+      // table.
+      //------------------------------------------------------------------------
+
       override def create(
         input: ObservingModeInput.Create,
         etm:   Option[ExposureTimeMode],
