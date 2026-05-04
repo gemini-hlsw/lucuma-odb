@@ -16,9 +16,12 @@ final case class Config(
 
 object Config:
 
-  given HashBytes[Config] =
-    HashBytes.by(c => (
-      c.mode,
-      // c.centralWavelength,
-      // c.guideStarMinSep
-    ))
+  given HashBytes[Config] with
+    def hashBytes(c: Config): Array[Byte] =
+      Array.concat(
+        HashBytes[VisitorObservingModeType].hashBytes(c.mode),
+        HashBytes[Wavelength].hashBytes(c.centralWavelength),
+        HashBytes[Angle].hashBytes(c.guideStarMinSep),
+      )
+
+
