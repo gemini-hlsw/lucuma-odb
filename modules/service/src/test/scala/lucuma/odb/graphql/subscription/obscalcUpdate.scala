@@ -10,6 +10,8 @@ import cats.syntax.all.*
 import io.circe.Json
 import io.circe.syntax.*
 import lucuma.core.enums.CalibrationRole
+import lucuma.core.enums.ObservationWorkflowState
+import lucuma.core.model.ConfigurationRequest
 import lucuma.core.model.Observation
 import lucuma.core.model.Semester
 import lucuma.core.util.CalculationState
@@ -311,23 +313,60 @@ class obscalcUpdate extends ObscalcServiceSuiteSupport:
       )
     )
 
-  test("trigger for sequence replace"):
-    def replaceSequence(o: Observation.Id): IO[Json] =
-      query(
-        user  = pi,
-        query = s"""
-          mutation {
-            replaceGmosSouthSequence(input: {
-              observationId: "$o"
-              sequenceType: SCIENCE,
-              sequence: []
-            }) {
-              sequence { description }
-            }
+  private def replaceSequence(o: Observation.Id): IO[Json] =
+    query(
+      user  = pi,
+      query = s"""
+        mutation {
+          replaceGmosSouthSequence(input: {
+            observationId: "$o"
+            sequenceType: SCIENCE,
+            sequence: [
+              {
+                description: "Foo"
+                steps: [
+                  {
+                    instrumentConfig: {
+                      exposure: {
+                        seconds: 20
+                      }
+                      readout: {
+                        xBin: ONE
+                        yBin: ONE
+                        ampCount: TWELVE
+                        ampGain: LOW
+                        ampReadMode: SLOW
+                      }
+                      dtax: ZERO
+                      roi: FULL_FRAME
+                      gratingConfig: {
+                        grating: R600_G5324
+                        order: ZERO
+                        wavelength: {
+                          nanometers: 500.0
+                        }
+                      }
+                      filter: Z
+                      fpu: {
+                        builtin: LONG_SLIT_0_50
+                      }
+                    }
+                    stepConfig: {
+                      science: true
+                    }
+                    observeClass: SCIENCE
+                  }
+                ]
+              }
+            ]
+          }) {
+            sequence { description }
           }
-        """
-      )
+        }
+      """
+    )
 
+  test("trigger for sequence replace"):
     setup.flatMap: (_, oid) =>
       subscriptionExpect(
         user      = pi,
@@ -444,4 +483,66 @@ class obscalcUpdate extends ObscalcServiceSuiteSupport:
             )
           )
         )
+      )
+
+  test("don't trigger when executableOnly field is set but not executable"):
+    setup.flatMap: (_, _) =>
+      subscriptionExpect(
+        user       = pi,
+        query      = s"""
+          subscription {
+            obscalcUpdate(input: { executableOnly: true }) {
+              value { id }
+            }
+          }
+        """.stripMargin,
+        mutations  = load.asRight,
+        expected   = Nil
+      )
+
+  test("do trigger when executableOnly field is set and is executable"):
+    def approveConfigurationRequestHack(req: ConfigurationRequest.Id): IO[Unit] =
+      import skunk.syntax.all.*
+      import lucuma.odb.util.Codecs.configuration_request_id
+      session.use: s =>
+        s.prepareR(sql"update t_configuration_request set c_status = 'approved' where c_configuration_request_id = $configuration_request_id".command).use: ps =>
+          ps.execute(req).void
+
+    val setup =
+      for
+        cfp <- createCallForProposalsAs(staff)
+        pid <- createProgramWithNonPartnerPi(pi, "Foo")
+        _   <- addProposal(pi, pid, Some(cfp), None)
+        _   <- addPartnerSplits(pi, pid)
+        _   <- addCoisAs(pi, pid)
+        _   <- setProposalStatus(staff, pid, "ACCEPTED")
+        tid <- createTargetWithProfileAs(pi, pid)
+        oid <- createGmosSouthLongSlitObservationAs(pi, pid, List(tid))
+        _   <- createConfigurationRequestAs(pi, oid).flatMap(approveConfigurationRequestHack)
+        _   <- computeItcResultAs(pi, oid)
+        _   <- setObservationWorkflowState(serviceUser, oid, ObservationWorkflowState.Ready)
+        _   <- runObscalcUpdateAs(serviceUser, pid, oid)
+      yield (pid, oid)
+
+    setup.flatMap: (pid, oid) =>
+      val update =
+        Json.obj(
+          "obscalcUpdate" -> Json.obj(
+            "value" -> Json.obj(
+              "id" -> oid.asJson
+            )
+          )
+        )
+
+      subscriptionExpect(
+        user       = pi,
+        query      = s"""
+          subscription {
+            obscalcUpdate(input: { executableOnly: true }) {
+              value { id }
+            }
+          }
+        """.stripMargin,
+        mutations  = (replaceSequence(oid) *> runObscalcUpdateAs(serviceUser, pid, oid)).asRight,
+        expected   = List(update, update)
       )

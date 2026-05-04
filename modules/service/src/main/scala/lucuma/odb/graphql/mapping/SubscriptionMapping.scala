@@ -16,6 +16,8 @@ import grackle.Result
 import grackle.TypeRef
 import grackle.skunk.SkunkMapping
 import grackle.syntax.*
+import lucuma.core.enums.ObservationWorkflowState.Ongoing
+import lucuma.core.enums.ObservationWorkflowState.Ready
 import lucuma.core.model.Group
 import lucuma.core.model.Program
 import lucuma.core.model.User
@@ -139,6 +141,7 @@ trait SubscriptionMapping[F[_]] extends Predicates[F] {
     }
 
   private val ObscalcUpdate =
+    val isExecutable = Set(Ongoing, Ready)
     SubscriptionField("obscalcUpdate", ObscalcUpdateInput.Binding.Option): (input, child) =>
       topics
         .obscalc
@@ -148,7 +151,8 @@ trait SubscriptionMapping[F[_]] extends Predicates[F] {
           input.flatMap(_.programId).forall(_ === e.programId)         &&
           input.flatMap(_.observationId).forall(_ === e.observationId) &&
           input.flatMap(_.oldCalculationState).forall(_.matches(e.oldState)) &&
-          input.flatMap(_.newCalculationState).forall(_.matches(e.newState))
+          input.flatMap(_.newCalculationState).forall(_.matches(e.newState)) &&
+          input.forall(in => !in.executableOnly || e.oldWorkflow.exists(isExecutable) || e.newWorkflow.exists(isExecutable))
         .map: e =>
           Result(
             Environment(
