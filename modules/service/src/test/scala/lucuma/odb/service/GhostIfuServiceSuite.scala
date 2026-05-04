@@ -51,7 +51,7 @@ class GhostIfuServiceSuite extends ExecutionTestSupport:
   val blueEtm = ExposureTimeMode.TimeAndCountMode(
     2.secondTimeSpan,
     PosInt.unsafeFrom(2),
-    Wavelength.unsafeFromIntPicometers(500002)
+    Wavelength.unsafeFromIntPicometers(500001)
   )
 
   val create = GhostIfuInput.Create(
