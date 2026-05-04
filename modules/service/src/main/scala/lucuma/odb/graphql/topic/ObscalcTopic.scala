@@ -7,6 +7,7 @@ import cats.effect.*
 import cats.effect.std.Supervisor
 import cats.implicits.*
 import fs2.concurrent.Topic
+import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.User
@@ -34,23 +35,35 @@ object ObscalcTopic:
     programId:     Program.Id,
     oldState:      Option[CalculationState],
     newState:      Option[CalculationState],
+    oldWorkflow:   Option[ObservationWorkflowState],
+    newWorkflow:   Option[ObservationWorkflowState],
     editType:      EditType,
     users:         List[User.Id]
   ) extends TopicElement
 
   private val topic =
-    OdbTopic.define[(Observation.Id, Program.Id, Option[CalculationState], Option[CalculationState], EditType), Element](
+    OdbTopic.define[(
+      Observation.Id,
+      Program.Id,
+      Option[CalculationState],
+      Option[CalculationState],
+      Option[ObservationWorkflowState],
+      Option[ObservationWorkflowState],
+      EditType
+    ), Element](
       "Obscalc",
       id"ch_obscalc_update",
       _._2,
-      (update, users) => Element(update._1, update._2, update._3, update._4, update._5, users)
+      (update, users) => Element(update._1, update._2, update._3, update._4, update._5, update._6, update._7, users)
     ) {
-      case Array(_oid, _pid, _oldState, _newState, _tg_op) =>
+      case Array(_oid, _pid, _oldState, _newState, _oldWorkflow, _newWorkflow, _tg_op) =>
         (
           Gid[Observation.Id].fromString.getOption(_oid),
           Gid[Program.Id].fromString.getOption(_pid),
           Enumerated[CalculationState].fromTag(_oldState).some, // treat the string "null" as Some(None)
           Enumerated[CalculationState].fromTag(_newState).some,
+          Enumerated[ObservationWorkflowState].fromTag(_oldWorkflow).some,
+          Enumerated[ObservationWorkflowState].fromTag(_newWorkflow).some,
           EditType.fromTgOp(_tg_op)
         ).tupled
     }
