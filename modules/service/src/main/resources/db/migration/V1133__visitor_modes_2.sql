@@ -181,3 +181,55 @@ CREATE VIEW v_configuration_request AS
     CASE WHEN cr.c_region_dec_arc_type = 'partial' THEN cr.c_configuration_request_id END AS c_partial_dec_region_id
   FROM t_configuration_request cr
   ;
+
+
+-- Visitor mode tables aren't unique
+ALTER TABLE t_observing_mode_registry
+  DROP CONSTRAINT t_observing_mode_registry_c_table_name_key;
+
+-- Update this to avoid duplicate triggers
+CREATE OR REPLACE FUNCTION register_observing_mode(
+  observing_mode_type e_observing_mode_type,
+  mode_table_name     text
+)
+RETURNS void AS $$
+BEGIN
+
+  -- Add the mode to the registry table
+  INSERT INTO t_observing_mode_registry (
+    c_observing_mode_type,
+    c_table_name
+  ) VALUES (
+    observing_mode_type,
+    mode_table_name
+  );
+
+  BEGIN
+    -- Add a new trigger function. This will attempt to create duplicates for t_visitor
+    EXECUTE format($trig$
+      CREATE CONSTRAINT TRIGGER %I
+        AFTER INSERT OR UPDATE OR DELETE ON %I
+        DEFERRABLE INITIALLY DEFERRED
+        FOR EACH ROW EXECUTE FUNCTION check_observing_mode_consistency()
+        $trig$,
+      'trigger_' || mode_table_name || '_consistency',
+      mode_table_name
+    );
+    -- Catch the specific error raised when creating a trigger that already exists
+    EXCEPTION WHEN SQLSTATE '42710' THEN
+      BEGIN
+        RAISE NOTICE 'Ignoring duplicate trigger creation.';
+      END;  
+  END;
+
+END;
+$$ LANGUAGE plpgsql;
+
+SELECT register_observing_mode('alopeke_speckle', 't_visitor');
+SELECT register_observing_mode('alopeke_wide_field', 't_visitor');
+SELECT register_observing_mode('zorro_speckle', 't_visitor');
+SELECT register_observing_mode('zorro_wide_field', 't_visitor');
+SELECT register_observing_mode('visitor_north', 't_visitor');
+SELECT register_observing_mode('visitor_south', 't_visitor');
+SELECT register_observing_mode('maroon_x', 't_visitor');
+
