@@ -110,6 +110,30 @@ object AsterismSpectroscopyTimeRequest:
                                                  redDetector,
                                                  blueDetector
             )
+        case GnirsSpectroscopyInput(
+              _,
+              centralWavelength,
+              filter,
+              slitWidth,
+              prism,
+              grating,
+              camera,
+              readMode,
+              wellDepth,
+              port
+            ) =>
+          Result.success:
+            ObservingMode.SpectroscopyMode.GnirsLongSlit(
+              centralWavelength,
+              filter,
+              slitWidth,
+              prism,
+              grating,
+              camera,
+              readMode,
+              wellDepth,
+              port
+            )
         case _                                                                                  =>
           Result.failure("Invalid spectroscopy mode")
 
