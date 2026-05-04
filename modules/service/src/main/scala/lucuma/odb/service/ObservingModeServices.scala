@@ -13,6 +13,7 @@ import cats.syntax.traverse.*
 import grackle.Result
 import grackle.syntax.*
 import lucuma.core.enums.ObservingModeType
+import lucuma.core.enums.VisitorObservingModeType
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.Observation
 import lucuma.odb.data.ExposureTimeModeId
@@ -77,6 +78,12 @@ object ObservingModeServices:
         import ObservingModeType.*
 
         which.groupMap(_._2)(_._1).toList.traverse {
+
+          case (v: VisitorObservingModeType, oids) =>
+            visitorService
+              .select(oids)
+              .map(_.widen[ObservingMode])
+
           case (Flamingos2LongSlit, oids) =>
             flamingos2LongSlitService
               .select(oids)
@@ -145,7 +152,8 @@ object ObservingModeServices:
           input.gmosNorthLongSlit.map(m =>  gmosLongSlitService.insertNorth(m, etm, which)),
           input.gmosSouthImaging.map(m =>   gmosImagingService.insertSouth(m, etm, which)),
           input.gmosSouthLongSlit.map(m =>  gmosLongSlitService.insertSouth(m, etm, which)),
-          input.igrins2LongSlit.map(m =>    igrins2LongSlitService.insert(m, etm, which))
+          input.igrins2LongSlit.map(m =>    igrins2LongSlitService.insert(m, etm, which)),
+          input.visitor.map(m => visitorService.insert(m, which)),
         ).flattenOption match
           case List(r) => r
           case Nil     => OdbError.InvalidArgument("No observing mode creation parameters were provided.".some).asFailureF
@@ -169,6 +177,7 @@ object ObservingModeServices:
             case ObservingModeType.GmosSouthLongSlit  => gmosLongSlitService.deleteSouth(which)
             case ObservingModeType.GnirsLongSlit      => ??? // TODO Implement Gnirs observing mode service
             case ObservingModeType.Igrins2LongSlit    => igrins2LongSlitService.delete(which)
+            case _: VisitorObservingModeType          => visitorService.delete(which)
 
         deleteObservingMode *> deleteExposureTimeModes
 
@@ -212,6 +221,7 @@ object ObservingModeServices:
             case ObservingModeType.GmosSouthImaging   => gmosImagingService.cloneSouth(origOid, newOid, etms)
             case ObservingModeType.GnirsLongSlit      => ??? // TODO
             case ObservingModeType.Igrins2LongSlit    => igrins2LongSlitService.clone(origOid, newOid)
+            case _: VisitorObservingModeType          => visitorService.clone(origOid, newOid)
 
         exposureTimeModeService
           .clone(origOid, newOid)

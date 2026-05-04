@@ -67,3 +67,8 @@ trait ConfigurationRequestView[F[_]] extends BaseMapping[F]:
 
     object Igrins2LongSlit:
       val Id = col("c_igrins_2_longslit_id", configuration_request_id.embedded)
+
+    object Visitor:
+      val Id = col("c_visitor_id", configuration_request_id.embedded)
+      val Mode = col("c_visitor_mode", visitor_observing_mode_type.embedded)
+      val Radius = col("c_visitor_radius", angle_µas.embedded)

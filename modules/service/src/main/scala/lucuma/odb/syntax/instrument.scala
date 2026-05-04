@@ -3,8 +3,11 @@
 
 package lucuma.odb.syntax
 
+import lucuma.core.data.Metadata
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.Site
+
+import java.time.Instant
 
 trait ToInstrumentOps {
 
@@ -12,23 +15,12 @@ trait ToInstrumentOps {
     def fieldName: String =
       self.tag.updated(0, self.tag.charAt(0).toLower)
 
-    def site: Set[Site] =
-      self match {
-        case Instrument.AcqCam     => Set(Site.GN, Site.GS)
-        case Instrument.Flamingos2 => Set(Site.GS)
-        case Instrument.Ghost      => Set(Site.GS)
-        case Instrument.GmosNorth  => Set(Site.GN)
-        case Instrument.GmosSouth  => Set(Site.GS)
-        case Instrument.Gnirs      => Set(Site.GN)
-        case Instrument.Gpi        => Set(Site.GN)
-        case Instrument.Gsaoi      => Set(Site.GS)
-        case Instrument.Igrins2    => Set(Site.GN)
-        case Instrument.Niri       => Set(Site.GN)
-        case Instrument.Visitor    => Set(Site.GN, Site.GS)
-        case Instrument.Scorpio    => Set(Site.GS)
-        case Instrument.Alopeke    => Set(Site.GN)
-        case Instrument.Zorro      => Set(Site.GS)
-      }
+    def site: Site =
+      Metadata
+        .placeholder
+        .availability(self)
+        .siteForInstant(Instant.now())
+        .get // TODO: this is all bad, but for now we're ok
   }
 
 }

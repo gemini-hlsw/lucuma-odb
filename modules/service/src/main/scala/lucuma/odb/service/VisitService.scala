@@ -63,9 +63,9 @@ object VisitService:
     instrument:      Instrument,
     calibrationRole: Option[CalibrationRole]
   ):
-    // TODO: need to make instrument and site 1:1
+
     def site: Site =
-      instrument.site.head
+      instrument.site
 
     // Determine whether an observation is chargeable.  I'd originally planned
     // to do this by generating the sequence and dropping atoms until the first

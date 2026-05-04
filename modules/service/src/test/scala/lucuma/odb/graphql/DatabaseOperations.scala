@@ -32,6 +32,7 @@ import lucuma.core.enums.SequenceCommand
 import lucuma.core.enums.SlewStage
 import lucuma.core.enums.StepStage
 import lucuma.core.enums.TimeAccountingCategory
+import lucuma.core.enums.VisitorObservingModeType
 import lucuma.core.math.Angle
 import lucuma.core.math.Coordinates
 import lucuma.core.model.CallForProposals
@@ -812,6 +813,9 @@ trait DatabaseOperations { this: OdbSuite =>
   def createIgrins2LongSlitObservationAs(user: User, pid: Program.Id, offsets: Option[String], tids: Target.Id*): IO[Observation.Id] =
     createObservationWithSpatialOffsets(user, pid, ObservingModeType.Igrins2LongSlit, ImageQuality.Preset.PointEight, offsets, tids*)
 
+  def createVisitorModeObservationAs(user: User, pid: Program.Id, mode: VisitorObservingModeType, tids: Target.Id*): IO[Observation.Id] =
+    createObservationWithSpatialOffsets(user, pid, mode, ImageQuality.Preset.PointEight, None, tids*)
+
   private def createObservationWithSpatialOffsets(
     user:          User,
     pid:           Program.Id,
@@ -1039,6 +1043,17 @@ trait DatabaseOperations { this: OdbSuite =>
             focalPlaneAngle: { microarcseconds: 0 }
           }
         }"""
+      case _ => // TODO: FIX THIS!!!
+        """{
+          spectroscopy: {
+            wavelength: { nanometers: 1700 }
+            resolution: 45000
+            wavelengthCoverage: { nanometers: 900 }
+            focalPlane: SINGLE_SLIT
+            focalPlaneAngle: { microarcseconds: 0 }
+          }
+        }"""
+
 
   private def observingModeObject(observingMode: ObservingModeType): String =
     observingMode match
@@ -1131,6 +1146,15 @@ trait DatabaseOperations { this: OdbSuite =>
             }
           }
         }"""
+          
+      case v: VisitorObservingModeType =>
+        s"""{
+          visitor: {
+            mode: ${v.tag.toScreamingSnakeCase}
+            centralWavelength: { nanometers: 2200 }
+            guideStarMinSep: { degrees: 1 }
+          }
+        }"""
 
   private def observingModeWithSpatialOffsets(observingMode: ObservingModeType, offsets: Option[String]): String =
     observingMode match
@@ -1185,7 +1209,15 @@ trait DatabaseOperations { this: OdbSuite =>
             $offsetsField
           }
         }"""
-      case _ => ""
+      case v: VisitorObservingModeType => 
+        s"""{
+          visitor: {
+            mode: ${v.tag.toScreamingSnakeCase}
+            centralWavelength: { nanometers: 2200 }
+            guideStarMinSep: { degrees: 1 }
+          }
+        }"""
+      case _ => ???
 
   def createObservationAs(user: User, pid: Program.Id, observingMode: Option[ObservingModeType] = None, tids: Target.Id*): IO[Observation.Id] =
     query(

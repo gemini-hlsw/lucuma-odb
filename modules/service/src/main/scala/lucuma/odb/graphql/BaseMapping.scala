@@ -435,6 +435,8 @@ trait BaseMapping[F[_]]
   lazy val UserType                                = schema.ref("User")
   lazy val UserTypeType                            = schema.ref("UserType")
   lazy val VisitType                               = schema.ref("Visit")
+  lazy val VisitorType                             = schema.ref("Visitor")
+  lazy val VisitorObservingModeTypeType            = schema.ref("VisitorObservingModeType")
   lazy val VisitIdType                             = schema.ref("VisitId")
   lazy val VisitSelectResultType                   = schema.ref("VisitSelectResult")
   lazy val WaterVaporType                          = schema.ref("WaterVapor")

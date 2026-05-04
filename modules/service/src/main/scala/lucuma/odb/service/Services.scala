@@ -242,6 +242,8 @@ trait Services[F[_]]:
 
   def emailService: EmailService[F]
 
+  def visitorService: VisitorService[F]
+
 object Services:
 
   // Type-level representation of user access. Read <: here as "implies".
@@ -366,6 +368,7 @@ object Services:
       lazy val groupService = GroupService.instantiate
       lazy val programService = ProgramService.instantiate
       lazy val observationWorkflowService = ObservationWorkflowService.instantiate
+      lazy val visitorService = VisitorService.instantiate
 
       // A few services require additional arguments for instantiation that may not always be
       // available, so we require them here instead of demanding them before constructing a
@@ -441,6 +444,7 @@ object Services:
     def emailService[F[_]](using Services[F]) = summon[Services[F]].emailService
     def telluricTargetsService[F[_]](using Services[F]): TelluricTargetsService[F] = summon[Services[F]].telluricTargetsService
     def metadata[F[_]](using Services[F]) = summon[Services[F]].metadata
+    def visitorService[F[_]](using Services[F]) = summon[Services[F]].visitorService
 
     def requirePiAccess[F[_], A](fa: Services.PiAccess ?=> F[Result[A]])(using Services[F], Applicative[F]): F[Result[A]] =
       if user.role.access >= Access.Pi then fa(using ())

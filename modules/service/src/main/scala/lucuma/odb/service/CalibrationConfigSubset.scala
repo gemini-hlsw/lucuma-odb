@@ -23,6 +23,7 @@ import lucuma.core.enums.GmosSouthGrating
 import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
 import lucuma.core.enums.ObservingModeType
+import lucuma.core.enums.VisitorObservingModeType
 import lucuma.core.math.Wavelength
 import lucuma.odb.graphql.input.Flamingos2LongSlitInput
 import lucuma.odb.graphql.input.GmosImagingFilterInput
@@ -36,11 +37,15 @@ import lucuma.odb.sequence.ghost.ifu.Config as GhostConfig
 import lucuma.odb.sequence.gmos.imaging.Config as ImagingConfig
 import lucuma.odb.sequence.gmos.longslit.Config
 import lucuma.odb.sequence.igrins2.longslit.Config as Igrins2Config
+import lucuma.odb.sequence.visitor.Config as VisitorConfig
 
 sealed trait CalibrationConfigSubset derives Eq:
   def modeType: ObservingModeType
 
 object CalibrationConfigSubset:
+
+  case class VisitorConfigSubset(config: VisitorConfig) extends CalibrationConfigSubset:
+    def modeType: ObservingModeType = config.mode
 
   // TODO: What do we need here?
   case object GhostConfigs extends CalibrationConfigSubset derives Eq:
@@ -95,6 +100,7 @@ object CalibrationConfigSubset:
         GmosLongSlitInput.Create.North(grating, filter, fpu, longSlitCommonInput, none).some,
         none,
         none,
+        none,
         none
       )
 
@@ -120,6 +126,7 @@ object CalibrationConfigSubset:
         none,
         none,
         GmosLongSlitInput.Create.South(grating, filter, fpu, longSlitCommonInput, none).some,
+        none,
         none
       )
 
@@ -159,6 +166,7 @@ object CalibrationConfigSubset:
         none,
         none,
         none,
+        none,
         none
       )
 
@@ -189,6 +197,7 @@ object CalibrationConfigSubset:
           )
         ).some,
         none,
+        none,
         none
       )
 
@@ -208,6 +217,7 @@ object CalibrationConfigSubset:
         none,
         none,
         none,
+        none,
         none
       )
 
@@ -217,6 +227,9 @@ object CalibrationConfigSubset:
   extension (mode: ObservingMode)
     def toConfigSubset: CalibrationConfigSubset =
       mode match
+
+        case v: VisitorConfig =>
+          VisitorConfigSubset(v)
 
         case _: GhostConfig =>
           GhostConfigs

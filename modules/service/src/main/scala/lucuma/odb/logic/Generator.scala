@@ -18,6 +18,7 @@ import eu.timepit.refined.types.numeric.NonNegInt
 import fs2.Stream
 import lucuma.core.enums.ExecutionState
 import lucuma.core.enums.ObservingModeType
+import lucuma.core.enums.VisitorObservingModeType
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.AtomDigest
@@ -203,14 +204,16 @@ object Generator:
             s <- EitherT(sequenceDigest(stream.science))
           yield ExecutionDigest(estimator.estimateSetupTime, estimator.estimateSetupCount(s.timeEstimate.sum), a, s)
 
-        if ctx.params.declaredComplete then
-          EitherT.pure:
+        val done =
+          EitherT.pure[F, OdbError]:
             ExecutionDigest(
               SetupTime.Zero,
               NonNegInt.MinValue,
               SequenceDigest.Zero.copy(executionState = ExecutionState.DeclaredComplete),
               SequenceDigest.Zero.copy(executionState = ExecutionState.DeclaredComplete)
             )
+
+        if ctx.params.declaredComplete then done          
         else
           ctx.params.observingMode.modeType match
             case ObservingModeType.Flamingos2LongSlit =>
@@ -229,6 +232,7 @@ object Generator:
               ??? // TODO Implement Gnirs observing mode service
             case ObservingModeType.Igrins2LongSlit    =>
               EitherT(streaming.selectOrGenerateIgrins2LongSlit(ctx)).flatMap(digest(_, calculator.igrins2LongSlitSetup))
+            case _: VisitorObservingModeType => done
 
       private def calculateScienceAtomDigests(
         ctx: GeneratorContext
@@ -246,6 +250,7 @@ object Generator:
               GeneratorError.sequenceTooLong(ctx.oid)
             )
 
+        // EitherT[F, OdbError, StreamingExecutionConfig[F, A, B] forSome { type A, type B }] but we can't write that anymore
         val stream = ctx.params.observingMode.modeType match
           case ObservingModeType.Flamingos2LongSlit => EitherT(streaming.selectOrGenerateFlamingos2LongSlit(ctx))
           case ObservingModeType.GhostIfu           => EitherT(streaming.selectOrGenerateGhost(ctx))
@@ -255,6 +260,9 @@ object Generator:
           case ObservingModeType.GmosSouthLongSlit  => EitherT(streaming.selectOrGenerateGmosSouthLongSlit(ctx))
           case ObservingModeType.GnirsLongSlit      => ??? // TODO Implement Gnirs observing mode service
           case ObservingModeType.Igrins2LongSlit    => EitherT(streaming.selectOrGenerateIgrins2LongSlit(ctx))
+          case _: VisitorObservingModeType          => 
+            EitherT.rightT[F, OdbError]:
+              StreamingExecutionConfig[F, Unit, Nothing]((), Stream.empty, Stream.empty)
 
         (checkSequence *> stepCount).flatMap: sc =>
           val base = sc.value
@@ -345,6 +353,9 @@ object Generator:
                 .flatMap(s => EitherT.liftF(executionConfig(s)))
                 .map(InstrumentExecutionConfig.Igrins2.apply)
 
+            case v: VisitorObservingModeType =>
+              EitherT.rightT(InstrumentExecutionConfig.Visitor(v.instrument))
+
         transactionallyWithContext(oid, commitHash): ctx =>
           instrumentExecutionConfig(ctx)
 
@@ -380,6 +391,9 @@ object Generator:
               ??? // TODO Implement Gnirs observing mode service
 
             case ObservingModeType.Igrins2LongSlit    =>
+              EitherT.pure(())
+
+            case _: VisitorObservingModeType =>
               EitherT.pure(())
 
       override def materializeAndThen[A](
@@ -424,6 +438,9 @@ object Generator:
               EitherT(streaming.generateIgrins2LongSlit(ctx))
                 .flatMap(s => EitherT.liftF(sequenceService.materializeIgrins2ExecutionConfig(oid, s)))
 
+            case _: VisitorObservingModeType =>
+              EitherT.pure(())
+              
         transactionallyWithContext(oid, commitHash): ctx =>
           materializeExecutionConfig(ctx) *> EitherT(f)
 

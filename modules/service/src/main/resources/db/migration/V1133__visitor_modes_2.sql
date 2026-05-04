@@ -1,0 +1,235 @@
+
+-- Fix instruments
+DELETE FROM t_instrument WHERE c_tag IN ('AcqCam', 'Visitor');
+INSERT INTO t_instrument VALUES
+  ('AcqCamNorth', 'AcqCam (North)', 'Acquisition Camera (North)'),
+  ('AcqCamSouth', 'AcqCam (South)', 'Acquisition Camera (South)'),
+  ('VisitorNorth', 'Visitor (North)', 'Visitor Instrument (North)'),
+  ('VisitorSouth', 'Visitor (South)', 'Visitor Instrument (South)'),
+  ('MaroonX', 'MAROON-X', 'MAROON-X');
+
+-- Add oid, mode key so we can refer to it
+CREATE UNIQUE INDEX ON t_observation (c_observation_id, c_observing_mode_type);
+
+-- Add visitor config table
+CREATE TABLE t_visitor (
+
+  c_observation_id             d_observation_id      NOT NULL,
+  c_observing_mode_type        e_observing_mode_type NOT NULL 
+    CHECK (
+      c_observing_mode_type IN (
+        'alopeke_speckle',
+        'alopeke_wide_field',
+        'zorro_speckle',
+        'zorro_wide_field',
+        'visitor_north',
+        'visitor_south',
+        'maroon_x'
+      )
+    ),
+
+  c_central_wavelength         d_wavelength_pm  NOT NULL,
+  c_guide_star_min_sep         d_angle_µas      NOT NULL,
+
+  PRIMARY KEY (c_observation_id, c_observing_mode_type),
+  FOREIGN KEY (c_observation_id, c_observing_mode_type) REFERENCES t_observation(c_observation_id, c_observing_mode_type) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED
+);
+
+-- Update check_etm_consistent to handle ghost_ifu
+CREATE OR REPLACE FUNCTION check_etm_consistent()
+RETURNS TRIGGER AS $$
+DECLARE
+  obs_id   d_observation_id;
+  obs_mode e_observing_mode_type;
+  acq_count INTEGER;
+  sci_count INTEGER;
+BEGIN
+
+  obs_id := COALESCE(NEW.c_observation_id, OLD.c_observation_id);
+
+  SELECT c_observing_mode_type INTO obs_mode
+    FROM t_observation
+   WHERE c_observation_id = obs_id;
+
+  SELECT
+    COUNT(*) FILTER (WHERE c_role = 'acquisition'),
+    COUNT(*) FILTER (WHERE c_role = 'science')
+  INTO acq_count, sci_count
+  FROM t_exposure_time_mode
+  WHERE c_observation_id = obs_id;
+
+  IF obs_mode IS NULL THEN
+
+    IF acq_count <> 0 OR sci_count <> 0 THEN
+      RAISE EXCEPTION 'Observation % with mode % should not have acquisition nor science exposure time modes', obs_id, obs_mode;
+    END IF;
+
+  ELSE
+
+    CASE
+      WHEN obs_mode IN ('flamingos_2_long_slit', 'gmos_north_long_slit', 'gmos_south_long_slit') THEN
+        IF acq_count <> 1 THEN
+          RAISE EXCEPTION 'Observation % with mode % must have an acquisition exposure time mode', obs_id, obs_mode;
+        END IF;
+
+        IF sci_count <> 1 THEN
+          RAISE EXCEPTION 'Observation % with mode % must have exactly one science exposure time mode', obs_id, obs_mode;
+        END IF;
+
+      WHEN obs_mode = 'ghost_ifu' THEN
+        IF sci_count <> 2 THEN
+          RAISE EXCEPTION 'Observation % with mode % must have two science exposure time modes (red and blue camera)', obs_id, obs_mode;
+        END IF;
+
+      WHEN obs_mode = 'igrins_2_long_slit' THEN
+        IF sci_count <> 1 THEN
+          RAISE EXCEPTION 'Observation % with mode % must have exactly one science exposure time mode', obs_id, obs_mode;
+        END IF;
+
+      WHEN obs_mode IN ('gmos_north_imaging', 'gmos_south_imaging') THEN
+        NULL;
+
+      -- no checks for visitor modes
+      WHEN obs_mode IN (
+        'alopeke_speckle',
+        'alopeke_wide_field',
+        'visitor_north',
+        'visitor_south',
+        'zorro_speckle',
+        'zorro_wide_field',
+        'maroon_x'
+      ) THEN
+        NULL;
+
+      ELSE
+        RAISE EXCEPTION 'Unknown observing mode % for observation %', obs_mode, obs_id;
+    END CASE;
+  END IF;
+
+  RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+
+CREATE OR REPLACE FUNCTION instrument_reference_name(
+  instrument d_tag
+)
+RETURNS text AS $$
+DECLARE
+  name text;
+BEGIN
+  name := CASE
+    WHEN instrument = 'AcqCamNorth'  THEN 'ACQCAMN'
+    WHEN instrument = 'AcqCamSouth'  THEN 'ACQCAMS'
+    WHEN instrument = 'Alopeke'      THEN 'ALOPEKE'
+    WHEN instrument = 'Flamingos2'   THEN 'F2'
+    WHEN instrument = 'Ghost'        THEN 'GHOST'
+    WHEN instrument = 'GmosNorth'    THEN 'GMOSN'
+    WHEN instrument = 'GmosSouth'    THEN 'GMOSS'
+    WHEN instrument = 'Gnirs'        THEN 'GNIRS'
+    WHEN instrument = 'Gpi'          THEN 'GPI'
+    WHEN instrument = 'Gsaoi'        THEN 'GSAOI'
+    WHEN instrument = 'Igrins2'      THEN 'IGRINS2'
+    WHEN instrument = 'MaroonX'      THEN 'MAROONX'
+    WHEN instrument = 'Niri'         THEN 'NIRI'
+    WHEN instrument = 'Scorpio'      THEN 'SCORPIO'
+    WHEN instrument = 'VisitorNorth' THEN 'VISITORN'
+    WHEN instrument = 'VisitorSouth' THEN 'VISITORS'
+    WHEN instrument = 'Zorro'        THEN 'ZORRO'
+  END;
+
+  IF name IS NULL THEN
+    RAISE EXCEPTION 'Unknown instrument: %', instrument::text
+      USING HINT = 'Please update instrument_reference_name function';
+  END IF;
+
+  RETURN name;
+END;
+$$ LANGUAGE plpgsql IMMUTABLE;
+
+-- Add fields for f2 longslit and gmos n/s imaging.
+ALTER TABLE t_configuration_request
+  ADD c_visitor_radius d_angle_µas NULL
+    CHECK (c_visitor_radius IS NOT NULL = (
+      c_observing_mode_type IN (
+        'alopeke_speckle',
+        'alopeke_wide_field',
+        'zorro_speckle',
+        'zorro_wide_field',
+        'visitor_north',
+        'visitor_south',
+        'maroon_x'
+      )
+    ))
+;
+
+-- Replace view to pick up new stuff.
+DROP VIEW v_configuration_request;
+CREATE VIEW v_configuration_request AS
+  SELECT 
+    *,
+    CASE WHEN cr.c_reference_ra IS NOT NULL THEN cr.c_configuration_request_id END AS c_reference_id,
+    CASE WHEN cr.c_region_ra_arc_type IS NOT NULL THEN cr.c_configuration_request_id END AS c_region_id,
+    CASE WHEN cr.c_observing_mode_type = 'flamingos_2_long_slit' THEN cr.c_configuration_request_id END AS c_flamingos_2_longslit_id,
+    CASE WHEN cr.c_observing_mode_type = 'gmos_north_imaging' THEN cr.c_configuration_request_id END AS c_gmos_north_imaging_id,    
+    CASE WHEN cr.c_observing_mode_type = 'gmos_south_imaging' THEN cr.c_configuration_request_id END AS c_gmos_south_imaging_id,
+    CASE WHEN cr.c_observing_mode_type = 'gmos_north_long_slit' THEN cr.c_configuration_request_id END AS c_gmos_north_longslit_id,
+    CASE WHEN cr.c_observing_mode_type = 'gmos_south_long_slit' THEN cr.c_configuration_request_id END AS c_gmos_south_longslit_id,
+    CASE WHEN cr.c_visitor_radius IS NOT NULL THEN cr.c_configuration_request_id END AS c_visitor_id,
+    CASE WHEN cr.c_visitor_radius IS NOT NULL THEN cr.c_observing_mode_type END AS c_visitor_mode,
+    CASE WHEN cr.c_region_ra_arc_type = 'partial' THEN cr.c_configuration_request_id END AS c_partial_ra_region_id,
+    CASE WHEN cr.c_region_dec_arc_type = 'partial' THEN cr.c_configuration_request_id END AS c_partial_dec_region_id
+  FROM t_configuration_request cr
+  ;
+
+
+-- Visitor mode tables aren't unique
+ALTER TABLE t_observing_mode_registry
+  DROP CONSTRAINT t_observing_mode_registry_c_table_name_key;
+
+-- Update this to avoid duplicate triggers
+CREATE OR REPLACE FUNCTION register_observing_mode(
+  observing_mode_type e_observing_mode_type,
+  mode_table_name     text
+)
+RETURNS void AS $$
+BEGIN
+
+  -- Add the mode to the registry table
+  INSERT INTO t_observing_mode_registry (
+    c_observing_mode_type,
+    c_table_name
+  ) VALUES (
+    observing_mode_type,
+    mode_table_name
+  );
+
+  BEGIN
+    -- Add a new trigger function. This will attempt to create duplicates for t_visitor
+    EXECUTE format($trig$
+      CREATE CONSTRAINT TRIGGER %I
+        AFTER INSERT OR UPDATE OR DELETE ON %I
+        DEFERRABLE INITIALLY DEFERRED
+        FOR EACH ROW EXECUTE FUNCTION check_observing_mode_consistency()
+        $trig$,
+      'trigger_' || mode_table_name || '_consistency',
+      mode_table_name
+    );
+    -- Catch the specific error raised when creating a trigger that already exists
+    EXCEPTION WHEN SQLSTATE '42710' THEN
+      BEGIN
+        RAISE NOTICE 'Ignoring duplicate trigger creation.';
+      END;  
+  END;
+
+END;
+$$ LANGUAGE plpgsql;
+
+SELECT register_observing_mode('alopeke_speckle', 't_visitor');
+SELECT register_observing_mode('alopeke_wide_field', 't_visitor');
+SELECT register_observing_mode('zorro_speckle', 't_visitor');
+SELECT register_observing_mode('zorro_wide_field', 't_visitor');
+SELECT register_observing_mode('visitor_north', 't_visitor');
+SELECT register_observing_mode('visitor_south', 't_visitor');
+SELECT register_observing_mode('maroon_x', 't_visitor');
+

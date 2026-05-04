@@ -23,7 +23,8 @@ object ObservingModeInput:
     gmosNorthLongSlit:  Option[GmosLongSlitInput.Create.North],
     gmosSouthImaging:   Option[GmosImagingInput.Create.South],
     gmosSouthLongSlit:  Option[GmosLongSlitInput.Create.South],
-    igrins2LongSlit:    Option[Igrins2LongSlitInput.Create]
+    igrins2LongSlit:    Option[Igrins2LongSlitInput.Create],
+    visitor:            Option[VisitorInput.Create]
   ):
 
     def observingModeType: Option[ObservingModeType] =
@@ -36,6 +37,7 @@ object ObservingModeInput:
         .orElse(gmosSouthImaging.as(ObservingModeType.GmosSouthImaging))
         .orElse(gmosSouthLongSlit.map(_.observingModeType))
         .orElse(igrins2LongSlit.map(_.observingModeType))
+        .orElse(visitor.map(_.mode))
 
   object Create:
 
@@ -48,7 +50,8 @@ object ObservingModeInput:
           GmosLongSlitInput.Create.North.Binding.Option("gmosNorthLongSlit", rGmosNorthLongSlit),
           GmosImagingInput.Create.SouthBinding.Option("gmosSouthImaging", rGmosSouthImaging),
           GmosLongSlitInput.Create.South.Binding.Option("gmosSouthLongSlit", rGmosSouthLongSlit),
-          Igrins2LongSlitInput.Create.Binding.Option("igrins2LongSlit", rIgrins2LongSlit)
+          Igrins2LongSlitInput.Create.Binding.Option("igrins2LongSlit", rIgrins2LongSlit),
+          VisitorInput.CreateBinding.Option("visitor", rVisitor)
         ) =>
           (rFlamingos2LongSlit,
            rGhostIfu,
@@ -56,9 +59,10 @@ object ObservingModeInput:
            rGmosNorthLongSlit,
            rGmosSouthImaging,
            rGmosSouthLongSlit,
-           rIgrins2LongSlit
+           rIgrins2LongSlit,
+           rVisitor
           ).parTupled.flatMap:
-            case (flamingos2LongSlit, ghostIfu, gmosNorthImaging, gmosNorthLongSlit, gmosSouthImaging, gmosSouthLongSlit, igrins2LongSlit) =>
+            case (flamingos2LongSlit, ghostIfu, gmosNorthImaging, gmosNorthLongSlit, gmosSouthImaging, gmosSouthLongSlit, igrins2LongSlit, visitor) =>
               oneOrFail(
                 flamingos2LongSlit -> "flamingos2LongSlit",
                 ghostIfu           -> "ghostIfu",
@@ -66,8 +70,9 @@ object ObservingModeInput:
                 gmosNorthLongSlit  -> "gmosNorthLongSlit",
                 gmosSouthImaging   -> "gmosSouthImaging",
                 gmosSouthLongSlit  -> "gmosSouthLongSlit",
-                igrins2LongSlit    -> "igrins2LongSlit"
-              ).as(Create(flamingos2LongSlit, ghostIfu, gmosNorthImaging, gmosNorthLongSlit, gmosSouthImaging, gmosSouthLongSlit, igrins2LongSlit))
+                igrins2LongSlit    -> "igrins2LongSlit",
+                visitor            -> "visitor"
+              ).as(Create(flamingos2LongSlit, ghostIfu, gmosNorthImaging, gmosNorthLongSlit, gmosSouthImaging, gmosSouthLongSlit, igrins2LongSlit, visitor))
 
   final case class Edit(
     flamingos2LongSlit: Option[Flamingos2LongSlitInput.Edit],
@@ -76,7 +81,8 @@ object ObservingModeInput:
     gmosNorthLongSlit:  Option[GmosLongSlitInput.Edit.North],
     gmosSouthImaging:   Option[GmosImagingInput.Edit.South],
     gmosSouthLongSlit:  Option[GmosLongSlitInput.Edit.South],
-    igrins2LongSlit:    Option[Igrins2LongSlitInput.Edit]
+    igrins2LongSlit:    Option[Igrins2LongSlitInput.Edit],
+    visitor:            Option[VisitorInput.Edit]
   ):
     def updatesAcquisition: Boolean =
       flamingos2LongSlit.exists(_.updatesAcquisition) ||
@@ -101,6 +107,7 @@ object ObservingModeInput:
         .orElse(gmosSouthImaging.as(ObservingModeType.GmosSouthImaging))
         .orElse(gmosSouthLongSlit.map(_.observingModeType))
         .orElse(igrins2LongSlit.map(_.observingModeType))
+        .orElse(visitor.flatMap(_.mode))
 
     def toCreate: Result[Create] =
       (flamingos2LongSlit.traverse(_.toCreate),
@@ -109,7 +116,8 @@ object ObservingModeInput:
        gmosNorthLongSlit.traverse(_.toCreate),
        gmosSouthImaging.traverse(_.toCreate),
        gmosSouthLongSlit.traverse(_.toCreate),
-       igrins2LongSlit.traverse(_.toCreate)
+       igrins2LongSlit.traverse(_.toCreate),
+       visitor.traverse(_.toCreate)
       ).parMapN(Create.apply)
 
   object Edit:
@@ -123,7 +131,8 @@ object ObservingModeInput:
           GmosLongSlitInput.Edit.North.Binding.Option("gmosNorthLongSlit", rGmosNorthLongSlit),
           GmosImagingInput.Edit.SouthBinding.Option("gmosSouthImaging", rGmosSouthImaging),
           GmosLongSlitInput.Edit.South.Binding.Option("gmosSouthLongSlit", rGmosSouthLongSlit),
-          Igrins2LongSlitInput.Edit.Binding.Option("igrins2LongSlit", rIgrins2LongSlit)
+          Igrins2LongSlitInput.Edit.Binding.Option("igrins2LongSlit", rIgrins2LongSlit),
+          VisitorInput.EditBinding.Option("visitor", rVisitor),
         ) =>
           (rFlamingos2LongSlit,
            rGhostIfu,
@@ -131,9 +140,10 @@ object ObservingModeInput:
            rGmosNorthLongSlit,
            rGmosSouthImaging,
            rGmosSouthLongSlit,
-           rIgrins2LongSlit
+           rIgrins2LongSlit,
+           rVisitor,
           ).parTupled.flatMap:
-            case (flamingos2LongSlit, ghostIfu, gmosNorthImaging, gmosNorthLongSlit, gmosSouthImaging, gmosSouthLongSlit, igrins2LongSlit) =>
+            case (flamingos2LongSlit, ghostIfu, gmosNorthImaging, gmosNorthLongSlit, gmosSouthImaging, gmosSouthLongSlit, igrins2LongSlit, visitor) =>
               oneOrFail(
                 flamingos2LongSlit -> "flamingos2LongSlit",
                 ghostIfu           -> "ghostIfu",
@@ -141,5 +151,6 @@ object ObservingModeInput:
                 gmosNorthLongSlit  -> "gmosNorthLongSlit",
                 gmosSouthImaging   -> "gmosSouthImaging",
                 gmosSouthLongSlit  -> "gmosSouthLongSlit",
-                igrins2LongSlit    -> "igrins2LongSlit"
-              ).as(Edit(flamingos2LongSlit, ghostIfu, gmosNorthImaging, gmosNorthLongSlit, gmosSouthImaging, gmosSouthLongSlit, igrins2LongSlit))
+                igrins2LongSlit    -> "igrins2LongSlit",
+                visitor            -> "visitor"
+              ).as(Edit(flamingos2LongSlit, ghostIfu, gmosNorthImaging, gmosNorthLongSlit, gmosSouthImaging, gmosSouthLongSlit, igrins2LongSlit, visitor))

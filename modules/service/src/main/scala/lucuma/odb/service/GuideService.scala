@@ -74,7 +74,9 @@ import lucuma.odb.sequence.gmos
 import lucuma.odb.sequence.igrins2
 import lucuma.odb.sequence.syntax.hash.*
 import lucuma.odb.sequence.util.HashBytes
+import lucuma.odb.sequence.visitor
 import lucuma.odb.service.Services.SuperUserAccess
+import lucuma.odb.syntax.instrument.site
 import lucuma.odb.syntax.result.*
 import lucuma.odb.util.Codecs.*
 import monocle.Focus
@@ -297,6 +299,8 @@ object GuideService {
           (Site.GS, ObservingModeType.GmosSouthLongSlit, mode.centralWavelength)
         case _: igrins2.longslit.Config =>
           (Site.GN, ObservingModeType.Igrins2LongSlit, Igrins2CentralWavelength)
+        case visitor.Config(mode, wavelength, _) =>
+          (mode.instrument.site, mode, wavelength)
 
     def agsParamsFor(trackType: TrackType): Option[AgsParams] =
       probes.guideProbe(observingModeType, trackType).flatMap: probe =>
@@ -329,6 +333,8 @@ object GuideService {
             AgsParams.Igrins2LongSlit(PortDisposition.Bottom).withPWFS2.some
           case (_: igrins2.longslit.Config, GuideProbe.PWFS1) =>
             AgsParams.Igrins2LongSlit(PortDisposition.Bottom).withPWFS1.some
+          // case (c: visitor.Config, GuideProbe.PWFS2) =>
+          //   AgsParams.Visitor(PortDisposition.Side, c.guideStarMinSep).withPWFS2.some
           case _ =>
             none
 
@@ -606,7 +612,7 @@ object GuideService {
           }
         }
 
-      // TODO: Can go away after `guideEnvironments` is removed???
+      // TODO: Can go away after `guideEnvironments` is removed
       extension (usables: List[AgsAnalysis.Usable])
         def toGuideEnvironments(originals: Map[Long, Target.Sidereal]): List[GuideEnvironment] =
           usables.map(_.toGuideEnvironment(originals)).flattenOption
@@ -626,7 +632,7 @@ object GuideService {
               case Right((d, p, h)) => GeneratorInfo(d, p, h).success
               case Left(ge)         => generatorError(ge).asFailure
 
-      // TODO: Can go away after `guideEnvironments` is removed???
+      // TODO: Can go away after `guideEnvironments` is removed
       def processCandidates(
         obsInfo:       ObservationInfo,
         wavelength:    Wavelength,

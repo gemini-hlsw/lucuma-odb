@@ -51,6 +51,7 @@ import lucuma.odb.sequence.data.MissingParamSet
 import lucuma.odb.sequence.flamingos2
 import lucuma.odb.sequence.ghost
 import lucuma.odb.sequence.igrins2
+import lucuma.odb.sequence.visitor
 import lucuma.odb.util.Codecs.*
 import skunk.*
 import skunk.circe.codec.json.*
@@ -410,6 +411,19 @@ object GeneratorParamsService {
                 .toEither
 
             GeneratorParams(itcInput, obsParams.scienceBand, gs, obsParams.calibrationRole, obsParams.declaredComplete, obsParams.executionState, obsParams.stepCount).asRight
+
+          // Visitor Modes 
+          case vis: visitor.Config =>
+            GeneratorParams(              
+              MissingParamSet.fromParams(NonEmptyList.one(MissingParam.forObservation("(visitor mode)"))).asLeft,
+              obsParams.scienceBand,
+              vis,
+              obsParams.calibrationRole,
+              obsParams.declaredComplete,
+              obsParams.executionState,
+              obsParams.stepCount
+            ).asRight
+          
 
       private def itcTargetParams(targetParams: TargetParams): ValidatedNel[MissingParam, ItcInput.TargetDefinition] = {
         // If emission line, SED not required, otherwhise must be defined

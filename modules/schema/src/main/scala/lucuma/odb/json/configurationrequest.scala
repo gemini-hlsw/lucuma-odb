@@ -18,7 +18,9 @@ import lucuma.core.enums.GmosNorthGrating
 import lucuma.core.enums.GmosSouthFilter
 import lucuma.core.enums.GmosSouthGrating
 import lucuma.core.enums.SkyBackground
+import lucuma.core.enums.VisitorObservingModeType
 import lucuma.core.enums.WaterVapor
+import lucuma.core.math.Angle
 import lucuma.core.math.Coordinates
 import lucuma.core.math.Region
 import lucuma.core.model.CloudExtinction
@@ -28,6 +30,7 @@ import lucuma.core.model.Configuration.ObservingMode
 import lucuma.core.model.Configuration.ObservingMode.*
 import lucuma.core.model.ConfigurationRequest
 import lucuma.core.model.ImageQuality
+import lucuma.odb.json.angle.query.given
 import lucuma.odb.json.coordinates.query.given
 import lucuma.odb.json.region.query.given
 
@@ -69,8 +72,15 @@ object configurationrequest:
     val DecodeGmosSouthLongSlit: Decoder[GmosSouthLongSlit] = hc =>
       hc.downField("grating").as[GmosSouthGrating].map(GmosSouthLongSlit(_))
 
+    val DecodeVisitor: Decoder[Visitor] = hc =>
+      for
+        m <- hc.downField("mode").as[VisitorObservingModeType]
+        r <- hc.downField("radius").as[Angle]
+      yield Visitor(m, r)
+
     given Decoder[ObservingMode] = hc =>
       hc.downField("flamingos2LongSlit").as(using DecodeFlamingos2LongSlit) orElse
+      hc.downField("visitor").as(using DecodeVisitor) orElse
       hc.downField("gmosNorthImaging").as(using DecodeGmosNorthImaging) orElse
       hc.downField("gmosNorthLongSlit").as(using DecodeGmosNorthLongSlit) orElse
       hc.downField("gmosSouthImaging").as(using DecodeGmosSouthImaging) orElse
@@ -90,6 +100,7 @@ object configurationrequest:
         "gmosSouthImaging"   -> Json.Null, // one of these will be replaced below
         "gmosSouthLongSlit"  -> Json.Null, // one of these will be replaced below
         "igrins2LongSlit"    -> Json.Null, // one of these will be replaced below
+        "visitor"           -> Json.Null,  // one of these will be replaced below
         m match
           case Flamingos2LongSlit(disperser) => "flamingos2LongSlit" -> Json.obj("disperser" -> disperser.asJson)
           case GhostIfu                      => "ghostIfu"           -> Json.obj("ignore" -> Json.Null)
@@ -98,6 +109,7 @@ object configurationrequest:
           case GmosSouthImaging(filter)      => "gmosSouthImaging"   -> Json.obj("filter" -> filter.asJson)
           case GmosSouthLongSlit(grating)    => "gmosSouthLongSlit"  -> Json.obj("grating" -> grating.asJson)
           case Igrins2LongSlit               => "igrins2LongSlit"    -> Json.obj("ignore" -> Json.Null)
+          case Visitor(mode, radius)         => "visitor"            -> Json.obj("mode" -> mode.asJson, "radius" -> radius.asJson)
       )
 
     given Encoder[Either[Coordinates, Region]] = e =>

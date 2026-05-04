@@ -9,10 +9,12 @@ import grackle.skunk.SkunkMapping
 import lucuma.core.math.Angle
 import lucuma.core.math.HourAngle
 import lucuma.odb.graphql.table.ChronConditionsEntryView
+import lucuma.odb.graphql.table.ConfigurationRequestView
 import lucuma.odb.graphql.table.ImagingConfigOptionTable
 import lucuma.odb.graphql.table.ObservationView
 import lucuma.odb.graphql.table.SpectroscopyConfigOptionTable
 import lucuma.odb.graphql.table.TelescopeConfigGeneratorView
+import lucuma.odb.graphql.table.VisitorTable
 import lucuma.odb.graphql.util.MappingExtras
 
 trait AngleMapping[F[_]] extends ObservationView[F]
@@ -20,6 +22,8 @@ trait AngleMapping[F[_]] extends ObservationView[F]
                             with ImagingConfigOptionTable[F]
                             with TelescopeConfigGeneratorView[F]
                             with SpectroscopyConfigOptionTable[F]
+                            with VisitorTable[F]
+                            with ConfigurationRequestView[F]
                             with MappingExtras[F] {
 
   private val µPerMilli: Long = 1000L
@@ -70,7 +74,10 @@ trait AngleMapping[F[_]] extends ObservationView[F]
       angleMappingAtPath(ImagingConfigOptionType / "fov", ImagingConfigOptionTable.Fov, ImagingConfigOptionTable.Instrument, ImagingConfigOptionTable.Index),
       angleMappingAtPath(ImagingScienceRequirementsType / "minimumFov", Imaging.MinimumFovAngle.Value, Imaging.MinimumFovAngle.SyntheticId),
       angleMappingAtPath(RandomTelescopeConfigGeneratorType / "size", TelescopeConfigGeneratorView.Size, TelescopeConfigGeneratorView.Random.ObservationId, TelescopeConfigGeneratorView.Random.Role),
-      angleMappingAtPath(SpiralTelescopeConfigGeneratorType / "size", TelescopeConfigGeneratorView.Size, TelescopeConfigGeneratorView.Spiral.ObservationId, TelescopeConfigGeneratorView.Spiral.Role)
+      angleMappingAtPath(SpiralTelescopeConfigGeneratorType / "size", TelescopeConfigGeneratorView.Size, TelescopeConfigGeneratorView.Spiral.ObservationId, TelescopeConfigGeneratorView.Spiral.Role),
+      angleMappingAtPath(VisitorType / "guideStarMinSep", VisitorTable.GuideStarMinSep, VisitorTable.ObservationId),
+      angleMappingAtPath(ConfigurationRequestType / "configuration" / "observingMode" / "visitor" / "radius", ConfigurationRequestView.Visitor.Radius, ConfigurationRequestView.Visitor.Id),
+      angleMappingAtPath(ObservationType / "configuration" / "observingMode" / "visitor" / "radius", VisitorTable.GuideStarMinSep, VisitorTable.ObservationId),
     )
 
 }

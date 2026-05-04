@@ -198,6 +198,9 @@ trait SequenceCodec {
   given Decoder[InstrumentExecutionConfig.Igrins2] =
     rootDecoder(InstrumentExecutionConfig.Igrins2.apply)
 
+  given Decoder[InstrumentExecutionConfig.Visitor] = hc =>
+    hc.downField("instrument").as[Instrument].map(InstrumentExecutionConfig.Visitor.apply)
+
   private def rootEncoder[R, S: Encoder, D: Encoder](using Encoder[Offset], Encoder[TimeSpan])(
     root: R => ExecutionConfig[S, D]
   ): Encoder[R] =
@@ -221,6 +224,9 @@ trait SequenceCodec {
   given (using Encoder[Offset], Encoder[TimeSpan]): Encoder[InstrumentExecutionConfig.Igrins2] =
     rootEncoder(_.executionConfig)
 
+  given Encoder[InstrumentExecutionConfig.Visitor] = v =>
+    Json.obj("instrument" -> v.instrument.asJson)
+
   given Decoder[InstrumentExecutionConfig] =
     Decoder.instance { c =>
       for {
@@ -232,6 +238,11 @@ trait SequenceCodec {
           case Instrument.GmosSouth  => c.downField("gmosSouth").as[InstrumentExecutionConfig.GmosSouth]
           case Instrument.Gnirs      => c.downField("gnirs").as[InstrumentExecutionConfig.Gnirs]
           case Instrument.Igrins2    => c.downField("igrins2").as[InstrumentExecutionConfig.Igrins2]
+          case Instrument.VisitorNorth |
+               Instrument.VisitorSouth |
+               Instrument.Zorro        |
+               Instrument.Alopeke      |
+               Instrument.MaroonX    => c.downField("visitor").as[InstrumentExecutionConfig.Visitor]
           case _                     => DecodingFailure(s"Unexpected instrument $i", c.history).asLeft[InstrumentExecutionConfig]
         }
       } yield r
@@ -247,6 +258,7 @@ trait SequenceCodec {
         "gmosSouth"  -> Json.Null, // one of these will be replaced
         "gnirs"      -> Json.Null, // one of these will be replaced
         "igrins2"    -> Json.Null, // one of these will be replaced
+        "visitor"    -> Json.Null, // one of these will be replaced
         a match
           case i@InstrumentExecutionConfig.Flamingos2(_) => "flamingos2" -> i.asJson
           case i@InstrumentExecutionConfig.Ghost(_)      => "ghost"      -> i.asJson
@@ -254,6 +266,7 @@ trait SequenceCodec {
           case i@InstrumentExecutionConfig.GmosSouth(_)  => "gmosSouth"  -> i.asJson
           case i@InstrumentExecutionConfig.Gnirs(_)      => "gnirs"      -> i.asJson
           case i@InstrumentExecutionConfig.Igrins2(_)    => "igrins2"    -> i.asJson
+          case i@InstrumentExecutionConfig.Visitor(_)    => "visitor"    -> i.asJson
       )
 
 }

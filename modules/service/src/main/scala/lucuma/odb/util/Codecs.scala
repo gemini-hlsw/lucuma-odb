@@ -423,6 +423,9 @@ trait Codecs {
   val observing_mode_type: Codec[ObservingModeType] =
     enumerated(Type("e_observing_mode_type"))
 
+  val visitor_observing_mode_type: Codec[VisitorObservingModeType] =
+    enumerated(Type("e_observing_mode_type"))
+
   val observing_mode_row_version: Codec[ObservingModeRowVersion] =
     enumerated(Type("e_observing_mode_row_version"))
 

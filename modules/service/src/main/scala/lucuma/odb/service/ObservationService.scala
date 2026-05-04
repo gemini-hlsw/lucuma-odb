@@ -541,7 +541,7 @@ object ObservationService {
                 val cloneRelatedItems =
                   Services.asSuperUser:
                     asterismService.cloneAsterism(observationId, oid2) >>
-                    observingMode.traverse(m => observingModeServices.clone(m, observationId, oid2)) >>
+                    observingMode.traverse(observingModeServices.clone(_, observationId, oid2)) >>
                     timingWindowService.cloneTimingWindows(observationId, oid2) >>
                     obsAttachmentAssignmentService.cloneAssignments(observationId, oid2)
 

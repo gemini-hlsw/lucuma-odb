@@ -147,6 +147,7 @@ object OdbMapping {
           with ConfigurationRequestSelectResultMapping[F]
           with ConfigurationObservingModeMappings[F]
           with ConfigurationTargetMapping[F]
+          with ConfigurationVisitorMappings[F]
           with ConstraintSetGroupMapping[F]
           with ConstraintSetGroupSelectResultMapping[F]
           with ConstraintSetMapping[F]
@@ -290,6 +291,7 @@ object OdbMapping {
           with UserMapping[F]
           with UserProfileMapping[F]
           with VisitMapping[F]
+          with VisitorMapping[F]
           with VisitSelectResultMapping[F]
           with WavelengthMapping[F]
         {
@@ -551,6 +553,7 @@ object OdbMapping {
                 UserInvitationMapping,
                 UserMapping,
                 VisitMapping,
+                VisitorMapping,
                 VisitSelectResultMapping,
               ) ++ List(
                 AngleMappings,
@@ -568,6 +571,7 @@ object OdbMapping {
                 ConfigurationGmosSouthLongSlitMappings,
                 ConfigurationObservingModeMappings,
                 ConfigurationTargetMappings,
+                ConfigurationVisitorMappings,
                 CoordinatesMappings,
                 CoordinateLimitsMappings,
                 DatasetSelectResultMappings,

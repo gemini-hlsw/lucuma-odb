@@ -136,7 +136,7 @@ case class ObservationValidationInfo(
     )
 
   def site: Option[Site] =
-    instrument.flatMap(_.site.headOption) // TODO: fix this so there's never more than one instrument
+    instrument.map(_.site)
 
   def isOpportunity: Boolean =
     asterism.exists:
