@@ -19,6 +19,13 @@ import lucuma.core.enums.GmosNorthGrating
 import lucuma.core.enums.GmosRoi
 import lucuma.core.enums.GmosSouthFilter
 import lucuma.core.enums.GmosSouthGrating
+import lucuma.core.enums.GnirsCamera
+import lucuma.core.enums.GnirsFilter
+import lucuma.core.enums.GnirsFpuSlit
+import lucuma.core.enums.GnirsGrating
+import lucuma.core.enums.GnirsPrism
+import lucuma.core.enums.GnirsReadMode
+import lucuma.core.enums.GnirsWellDepth
 import lucuma.core.enums.PortDisposition
 import lucuma.core.math.Wavelength
 import lucuma.core.model.ExposureTimeMode
@@ -168,6 +175,36 @@ object InstrumentMode {
         )
       )
 
+  case class GnirsSpectroscopy(
+    exposureTimeMode:  ExposureTimeMode,
+    centralWavelength: Wavelength,
+    filter:            GnirsFilter,
+    slitWidth:         GnirsFpuSlit,
+    prism:             GnirsPrism,
+    grating:           GnirsGrating,
+    camera:            GnirsCamera,
+    readMode:          GnirsReadMode,
+    wellDepth:         GnirsWellDepth,
+    port:              PortDisposition = PortDisposition.Bottom
+  ) extends InstrumentMode derives Eq:
+    override def displayName: String =
+      "GNIRS Spectroscopy"
+
+  object GnirsSpectroscopy:
+    given Encoder[GnirsSpectroscopy] = a =>
+      Json.obj(
+        "timeAndCount"      -> a.exposureTimeMode.asJson,
+        "centralWavelength" -> a.centralWavelength.asJson,
+        "filter"            -> a.filter.asScreamingJson,
+        "slitWidth"         -> a.slitWidth.asScreamingJson,
+        "prism"             -> a.prism.asScreamingJson,
+        "grating"           -> a.grating.asScreamingJson,
+        "camera"            -> a.camera.asScreamingJson,
+        "readMode"          -> a.readMode.asScreamingJson,
+        "wellDepth"         -> a.wellDepth.asScreamingJson,
+        "port"              -> a.port.asScreamingJson
+      )
+
   case class GmosNorthImaging(
     exposureTimeMode: ExposureTimeMode,
     filter:           GmosNorthFilter,
@@ -242,6 +279,9 @@ object InstrumentMode {
   val ghostSpectroscopy: Prism[InstrumentMode, GhostSpectroscopy] =
     GenPrism[InstrumentMode, GhostSpectroscopy]
 
+  val gnirsSpectroscopy: Prism[InstrumentMode, GnirsSpectroscopy] =
+    GenPrism[InstrumentMode, GnirsSpectroscopy]
+
   val gmosNorthImaging: Prism[InstrumentMode, GmosNorthImaging] =
     GenPrism[InstrumentMode, GmosNorthImaging]
 
@@ -253,20 +293,22 @@ object InstrumentMode {
 
   given Encoder[InstrumentMode] = a =>
     a match
-      case a @ GmosNorthSpectroscopy(_, _, _, _, _, _, _, _) =>
+      case a @ GmosNorthSpectroscopy(_, _, _, _, _, _, _, _)   =>
         Json.obj("gmosNSpectroscopy" -> a.asJson)
-      case a @ GmosSouthSpectroscopy(_, _, _, _, _, _, _, _) =>
+      case a @ GmosSouthSpectroscopy(_, _, _, _, _, _, _, _)   =>
         Json.obj("gmosSSpectroscopy" -> a.asJson)
-      case a @ GmosNorthImaging(_, _, _, _)                  =>
+      case a @ GmosNorthImaging(_, _, _, _)                    =>
         Json.obj("gmosNImaging" -> a.asJson)
-      case a @ GmosSouthImaging(_, _, _, _)                  =>
+      case a @ GmosSouthImaging(_, _, _, _)                    =>
         Json.obj("gmosSImaging" -> a.asJson)
-      case a @ Flamingos2Spectroscopy(_, _, _, _, _, _)      =>
+      case a @ Flamingos2Spectroscopy(_, _, _, _, _, _)        =>
         Json.obj("flamingos2Spectroscopy" -> a.asJson)
-      case a @ Flamingos2Imaging(_, _, _, _)                 =>
+      case a @ Flamingos2Imaging(_, _, _, _)                   =>
         Json.obj("flamingos2Imaging" -> a.asJson)
-      case a @ Igrins2Spectroscopy(_, _)                     =>
+      case a @ Igrins2Spectroscopy(_, _)                       =>
         Json.obj("igrins2Spectroscopy" -> a.asJson)
-      case a @ GhostSpectroscopy(_, _, _)                    =>
+      case a @ GhostSpectroscopy(_, _, _)                      =>
         Json.obj("ghostSpectroscopy" -> a.asJson)
+      case a @ GnirsSpectroscopy(_, _, _, _, _, _, _, _, _, _) =>
+        Json.obj("gnirsSpectroscopy" -> a.asJson)
 }

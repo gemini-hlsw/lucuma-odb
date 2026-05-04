@@ -33,8 +33,10 @@ class spectroscopyConfigOptions extends OdbSuite {
       (
         s.execute(sql"insert into t_spectroscopy_config_option values('Ghost', 1, 'SR-IFU 1x1', 'ifu', 'SR-IFU', 1200000, 1200000, 'echelle', NULL, 347000, 1060000, 703500, 713000, 56000, false, NULL, 'gs')".command) *>
         s.execute(sql"insert into t_spectroscopy_config_option values('Flamingos2', 1, 'R3K + H + 0.36\"', 'single_slit', 'Long Slit 8px', 144000, 263000000, 'R3000', 'H', 1486000, 1775000, 1630500, 289000, 700, false, NULL, 'gs')".command) *>
+        s.execute(sql"insert into t_spectroscopy_config_option values('Gnirs', 1, 'SC', 'single_slit', '0.3', 300000, 99000000, '32', 'X', 1030000, 1170000, 1100000, 331000, 1700, false, NULL, 'gn')".command) *>
         s.execute(sql"insert into t_spectroscopy_config_option_ghost values('Ghost', 1, 'one_by_one', 'standard')".command) *>
-        s.execute(sql"insert into t_spectroscopy_config_option_f2 values('Flamingos2', 1, 'LongSlit_8', 'R3000', 'H')".command)
+        s.execute(sql"insert into t_spectroscopy_config_option_f2 values('Flamingos2', 1, 'LongSlit_8', 'R3000', 'H')".command) *>
+        s.execute(sql"insert into t_spectroscopy_config_option_gnirs values('Gnirs', 1, 'D32', 'Order6', 'LongSlit_0_30')".command)
       ).void
     )
 
@@ -604,6 +606,42 @@ class spectroscopyConfigOptions extends OdbSuite {
               "gmosSouth": {
                 "fpu": "LONG_SLIT_1_50",
                 "grating": "R150_G5326"
+              }
+            }
+          ]
+        }
+      """.asRight
+    )
+  }
+
+  test("Gnirs") {
+    expect(
+      user = pi,
+      query = s"""
+        query {
+          spectroscopyConfigOptions(
+            WHERE: {
+              instrument: { EQ: GNIRS }
+            }
+          ) {
+            name
+            gnirs {
+              grating
+              filter
+              fpu
+            }
+          }
+        }
+      """,
+      expected = json"""
+        {
+          "spectroscopyConfigOptions": [
+            {
+              "name": "SC",
+              "gnirs": {
+                "grating": "D32",
+                "filter": "ORDER6",
+                "fpu": "LONG_SLIT_0_30"
               }
             }
           ]

@@ -171,7 +171,7 @@ object ObservingModeServices:
       )(using Transaction[F], SuperUserAccess): F[Result[Unit]] =
         List(
           input.flamingos2LongSlit.map(m => flamingos2LongSlitService.update(m, which).map(_.success)),
-          input.ghostIfu.map(m => ghostIfuService.update(m, which).map(_.success)),
+          input.ghostIfu.map(m => ghostIfuService.update(m, which)),
           input.gmosNorthImaging.map(m => gmosImagingService.updateNorth(m, which)),
           input.gmosNorthLongSlit.map(m => gmosLongSlitService.updateNorth(m, which).map(_.success)),
           input.gmosSouthImaging.map(m => gmosImagingService.updateSouth(m, which)),

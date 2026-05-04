@@ -7,6 +7,7 @@ package mutation
 import cats.syntax.either.*
 import io.circe.Json
 import io.circe.literal.*
+import lucuma.core.model.Observation
 import lucuma.core.model.User
 import lucuma.odb.graphql.query.ObservingModeSetupOperations
 
@@ -43,6 +44,32 @@ class updateObservations_GhostIfu extends OdbSuite with UpdateObservationsOps wi
     }
   """
 
+  val EtmQuery: String =
+    s"""
+      observations {
+        observingMode {
+          ghostIfu {
+            red {
+              exposureTimeMode {
+                timeAndCount {
+                  time { seconds }
+                  count
+                }
+              }
+            }
+            blue {
+              exposureTimeMode {
+                timeAndCount {
+                  time { seconds }
+                  count
+                }
+              }
+            }
+          }
+        }
+      }
+    """
+
   test("Update exposure time modes"):
     val update = """
       observingMode: {
@@ -62,31 +89,6 @@ class updateObservations_GhostIfu extends OdbSuite with UpdateObservationsOps wi
                 time: { seconds: 40.0 }
                 count: 40
                 at: { nanometers: 500 }
-              }
-            }
-          }
-        }
-      }
-    """
-
-    val query = """
-      observations {
-        observingMode {
-          ghostIfu {
-            red {
-              exposureTimeMode {
-                timeAndCount {
-                  time { seconds }
-                  count
-                }
-              }
-            }
-            blue {
-              exposureTimeMode {
-                timeAndCount {
-                  time { seconds }
-                  count
-                }
               }
             }
           }
@@ -129,7 +131,124 @@ class updateObservations_GhostIfu extends OdbSuite with UpdateObservationsOps wi
       p <- createProgramAs(pi)
       t <- createTargetWithProfileAs(pi, p)
       o <- createObservationWithModeAs(pi, p, List(t), GhostIfuInput)
-      _ <- updateObservation(pi, o, update, query, expected)
+      _ <- updateObservation(pi, o, update, EtmQuery, expected)
+    yield o
+
+  test("Cannot switch to S/N"):
+    val update = """
+      observingMode: {
+        ghostIfu: {
+          red: {
+            exposureTimeMode: {
+              signalToNoise: {
+                value: 100
+                at: { nanometers: 500 }
+              }
+            }
+          }
+        }
+      }
+    """
+
+    def expected(o: Observation.Id): Either[String, Json] =
+     s"GHOST observations ($o) require red and blue channel TimeAndCount exposure time modes with equivalent wavelength values.".asLeft
+
+    for
+      p <- createProgramAs(pi)
+      t <- createTargetWithProfileAs(pi, p)
+      o <- createObservationWithModeAs(pi, p, List(t), GhostIfuInput)
+      _ <- updateObservation(pi, o, update, EtmQuery, expected(o))
+    yield o
+
+  test("Cannot use a different wavelength"):
+    val update = """
+      observingMode: {
+        ghostIfu: {
+          blue: {
+            exposureTimeMode: {
+              timeAndCount: {
+                time: { seconds: 10.0 }
+                count: 10
+                at: { nanometers: 501 }
+              }
+            }
+          }
+        }
+      }
+    """
+
+    def expected(o: Observation.Id): Either[String, Json] =
+     s"GHOST observations ($o) require red and blue channel TimeAndCount exposure time modes with equivalent wavelength values.".asLeft
+
+    for
+      p <- createProgramAs(pi)
+      t <- createTargetWithProfileAs(pi, p)
+      o <- createObservationWithModeAs(pi, p, List(t), GhostIfuInput)
+      _ <- updateObservation(pi, o, update, EtmQuery, expected(o))
+    yield o
+
+  test("Can switch both"):
+    val update = """
+      observingMode: {
+        ghostIfu: {
+          red: {
+            exposureTimeMode: {
+              timeAndCount: {
+                time: { seconds: 10.0 }
+                count: 10
+                at: { nanometers: 501 }
+              }
+            }
+          }
+          blue: {
+            exposureTimeMode: {
+              timeAndCount: {
+                time: { seconds: 20.0 }
+                count: 20
+                at: { nanometers: 501 }
+              }
+            }
+          }
+        }
+      }
+    """
+
+    val expected = json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "observingMode": {
+                "ghostIfu": {
+                  "red": {
+                    "exposureTimeMode": {
+                      "timeAndCount": {
+                        "time": { "seconds": 10.000000 },
+                        "count": 10
+                      }
+                    }
+                  },
+                  "blue": {
+                    "exposureTimeMode": {
+                      "timeAndCount": {
+                        "time": { "seconds": 20.000000 },
+                        "count": 20
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    """.asRight
+
+    for
+      p <- createProgramAs(pi)
+      t <- createTargetWithProfileAs(pi, p)
+      o <- createObservationWithModeAs(pi, p, List(t), GhostIfuInput)
+      _ <- updateObservation(pi, o, update, EtmQuery, expected)
     yield o
 
   test("Update non-exposure time mode parameters"):

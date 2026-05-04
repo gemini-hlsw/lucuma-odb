@@ -500,6 +500,7 @@ object OdbMapping {
                 SpectroscopyConfigOptionGhostMapping,
                 SpectroscopyConfigOptionGmosNorthMapping,
                 SpectroscopyConfigOptionGmosSouthMapping,
+                SpectroscopyConfigOptionGnirsMapping,
                 SpectroscopyScienceRequirementsMapping,
                 SetAllocationsResultMapping,
                 SetGuideTargetNameResultMapping,

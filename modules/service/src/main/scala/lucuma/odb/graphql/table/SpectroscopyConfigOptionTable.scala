@@ -8,6 +8,7 @@ import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.Flamingos2Codecs.*
 import lucuma.odb.util.GhostCodecs.*
 import lucuma.odb.util.GmosCodecs.*
+import lucuma.odb.util.GnirsCodecs.*
 import skunk.codec.boolean.bool
 
 trait SpectroscopyConfigOptionTable[F[_]] extends BaseMapping[F]:
@@ -66,3 +67,11 @@ trait SpectroscopyConfigOptionTable[F[_]] extends BaseMapping[F]:
     val Fpu        = col("c_fpu",     gmos_south_fpu)
     val Grating    = col("c_grating", gmos_south_grating)
     val Filter     = col("c_filter",  gmos_south_filter.opt)
+
+  object SpectroscopyConfigOptionGnirsTable extends TableDef("t_spectroscopy_config_option_gnirs"):
+    val Instrument = col("c_instrument", instrument)
+    val Index      = col("c_index",      int4_pos)
+
+    val Grating    = col("c_grating", gnirs_grating)
+    val Filter     = col("c_filter",  gnirs_filter)
+    val Fpu        = col("c_fpu",     gnirs_fpu_slit)
