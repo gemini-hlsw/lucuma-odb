@@ -13,7 +13,8 @@ case class ObscalcUpdateInput(
   programId:            Option[Program.Id],
   observationId:        Option[Observation.Id],
   oldCalculationState:  Option[WhereOptionEq[CalculationState]],
-  newCalculationState:  Option[WhereOptionEq[CalculationState]]
+  newCalculationState:  Option[WhereOptionEq[CalculationState]],
+  executableOnly:       Boolean
 )
 
 object ObscalcUpdateInput:
@@ -27,8 +28,9 @@ object ObscalcUpdateInput:
       WhereOptionEqCalculationState.Option("oldCalculationState", rOldCalcState),
       WhereOptionEqCalculationState.Option("oldState", rOldState),
       WhereOptionEqCalculationState.Option("newCalculationState", rNewCalcState),
-      WhereOptionEqCalculationState.Option("newState", rNewState)
+      WhereOptionEqCalculationState.Option("newState", rNewState),
+      BooleanBinding.Option("executableOnly", rExecutableOnly)
     ) =>
-      (rProgramId, rObservationId, rOldCalcState, rOldState, rNewCalcState, rNewState).parMapN:
-        (pid, oid, oldCalc, oldState, newCalc, newState) =>
-          ObscalcUpdateInput(pid, oid, oldCalc.orElse(oldState), newCalc.orElse(newState))
+      (rProgramId, rObservationId, rOldCalcState, rOldState, rNewCalcState, rNewState, rExecutableOnly).parMapN:
+        (pid, oid, oldCalc, oldState, newCalc, newState, executableOnly) =>
+          ObscalcUpdateInput(pid, oid, oldCalc.orElse(oldState), newCalc.orElse(newState), executableOnly.getOrElse(false))

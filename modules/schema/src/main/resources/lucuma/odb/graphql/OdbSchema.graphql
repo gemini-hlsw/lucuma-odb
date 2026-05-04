@@ -5361,6 +5361,13 @@ input ObscalcUpdateInput {
   oldState:             WhereOptionEqCalculationState @deprecated(reason: "Use `oldCalculationState` instead.")
   newCalculationState:  WhereOptionEqCalculationState
   newState:             WhereOptionEqCalculationState @deprecated(reason: "Use `newCalculationState` instead.")
+
+  """
+  When set to `true`, events will be limited to those that impact executable
+  observations only.  Changes to observations that are not yet `READY` or
+  `ONGOING`, or which have already completed, will not trigger events.
+  """
+  executableOnly:       Boolean = false
 }
 
 input WhereOrderCalculationState {
