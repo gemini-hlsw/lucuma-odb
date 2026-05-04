@@ -9094,7 +9094,7 @@ input GnirsSpectroscopyInput {
   wellDepth: GnirsWellDepth!
 
   """Instrument port disposition"""
-  port: PortDisposition = BOTTOM
+  port: PortDisposition = SIDE
 }
 
 """Params for instrument modes"""
