@@ -5919,6 +5919,18 @@ enum GnirsFpuSlit {
   LONG_SLIT_1_00
 }
 
+enum GnirsReadMode {
+  VERY_BRIGHT
+  BRIGHT
+  FAINT
+  VERY_FAINT
+}
+
+enum GnirsWellDepth {
+  SHALLOW
+  DEEP
+}
+
 """
 A UUID provided by a client in order to prevent retrying a failed mutation from
 performing the action a second time when not necessary.  When a mutation is
@@ -9109,6 +9121,38 @@ input GhostSpectroscopyInput {
   blueDetector: ItcGhostDetectorInput!
 }
 
+input GnirsSpectroscopyInput {
+  """Exposure time mode."""
+  timeAndCount: TimeAndCountExposureTimeModeInput!
+
+  """Central wavelength"""
+  centralWavelength: WavelengthInput!
+
+  """GNIRS filter"""
+  filter: GnirsFilter!
+
+  """GNIRS slit width"""
+  slitWidth: GnirsFpuSlit!
+
+  """GNIRS cross-disperser prism"""
+  prism: GnirsPrism!
+
+  """GNIRS grating"""
+  grating: GnirsGrating!
+
+  """GNIRS camera (determines pixel scale)"""
+  camera: GnirsCamera!
+
+  """GNIRS read mode"""
+  readMode: GnirsReadMode!
+
+  """GNIRS well depth"""
+  wellDepth: GnirsWellDepth!
+
+  """Instrument port disposition"""
+  port: PortDisposition = SIDE
+}
+
 """Params for instrument modes"""
 input InstrumentModesInput @oneOf {
   """Gmos North Spectroscopy"""
@@ -9134,6 +9178,9 @@ input InstrumentModesInput @oneOf {
 
   """GHOST Spectroscopy"""
   ghostSpectroscopy: GhostSpectroscopyInput
+
+  """Gnirs Longslit Spectroscopy"""
+  gnirsSpectroscopy: GnirsSpectroscopyInput
 }
 
 """Image quality input - specify either preset or exact arcsec value"""
