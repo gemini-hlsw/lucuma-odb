@@ -176,7 +176,7 @@ object InstrumentMode {
       )
 
   case class GnirsSpectroscopy(
-    exposureTimeMode:  ExposureTimeMode,
+    exposureTimeMode:  ExposureTimeMode.TimeAndCountMode,
     centralWavelength: Wavelength,
     filter:            GnirsFilter,
     slitWidth:         GnirsFpuSlit,
