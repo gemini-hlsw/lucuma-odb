@@ -2,11 +2,10 @@
 ALTER TABLE t_group
 ADD COLUMN c_same_night bool NOT NULL DEFAULT false;
 
--- c_same_night is mutually exclusive with c_max_interval and only valid for
--- AND groups (c_min_required IS NULL).
+-- c_same_night is mutually exclusive with c_max_interval.
 ALTER TABLE t_group
 ADD CONSTRAINT group_same_night_check
-CHECK (c_same_night = false OR (c_max_interval IS NULL AND c_min_required IS NULL));
+CHECK (c_same_night = false OR c_max_interval IS NULL);
 
 DROP VIEW v_group;
 

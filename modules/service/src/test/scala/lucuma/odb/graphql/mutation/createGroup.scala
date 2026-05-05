@@ -190,7 +190,7 @@ class createGroup extends OdbSuite {
       )
     }
 
-  test("cannot create group with sameNight and minimumRequired (AND)"):
+  test("can create group with sameNight and minimumRequired (OR)"):
     createProgramAs(pi).flatMap { pid =>
       expect(
         user = pi,
@@ -205,13 +205,20 @@ class createGroup extends OdbSuite {
                 }
               }
             ) {
-              group { id }
+              group { sameNight minimumRequired }
             }
           }
         """,
-        expected = List(
-          "Argument 'input.SET' is invalid: Same night is only valid for AND groups."
-        ).asLeft
+        expected = json"""
+          {
+            "createGroup": {
+              "group": {
+                "sameNight": true,
+                "minimumRequired": 1
+              }
+            }
+          }
+        """.asRight
       )
     }
 

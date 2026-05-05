@@ -232,7 +232,7 @@ object GroupService {
           .recoverWith { case SqlState.CheckViolation(ex) =>
             val msg = ex.constraintName match
               case Some("group_same_night_check") =>
-                "Same night is only valid for AND groups and mutually exclusive with maximumInterval."
+                "Same night and maximum interval are mutually exclusive."
               case _ =>
                 "Minimum interval must be less than or equal maximum interval."
             Result.failure(msg).pure

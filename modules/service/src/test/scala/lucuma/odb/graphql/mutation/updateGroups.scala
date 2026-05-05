@@ -732,12 +732,8 @@ class updateGroups extends OdbSuite {
       )
     } yield ()
 
-  val sameNightInputMaxError =
-    "Argument 'input.SET' is invalid: Same night and maximum interval are mutually exclusive."
-  val sameNightInputMinReqError =
-    "Argument 'input.SET' is invalid: Same night is only valid for AND groups."
   val sameNightDbError =
-    "Same night is only valid for AND groups and mutually exclusive with maximumInterval."
+    "Same night and maximum interval are mutually exclusive."
 
   def updateSameNight(
     user: User,
@@ -771,12 +767,12 @@ class updateGroups extends OdbSuite {
       _   <- updateSameNight(pi, gid, "maximumInterval: { hours: 1 }", sameNightDbError.some)
     } yield ()
 
-  test("cannot set minimumRequired on a sameNight group"):
+  test("can set minimumRequired on a sameNight group"):
     for {
       pid <- createProgramAs(pi)
       gid <- createGroupAs(pi, pid)
       _   <- updateSameNight(pi, gid, "sameNight: true", None)
-      _   <- updateSameNight(pi, gid, "minimumRequired: 1", sameNightDbError.some)
+      _   <- updateSameNight(pi, gid, "minimumRequired: 1", None)
     } yield ()
 
   test("can move telluric system group"):
