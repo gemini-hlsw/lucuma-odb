@@ -6,7 +6,7 @@ package lucuma.odb.sequence.ghost
 import lucuma.core.math.Wavelength
 
 /**
- * GHOST central wavelength, which seems to be fixed at 530 nm.
+ * GHOST central wavelength, which seems to be fixed at 655 nm.
  */
 val CentralWavelength: Wavelength =
-  Wavelength.unsafeFromIntPicometers(530000)
+  Wavelength.unsafeFromIntPicometers(655000)
