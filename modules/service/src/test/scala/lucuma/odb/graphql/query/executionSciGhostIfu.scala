@@ -155,6 +155,7 @@ class executionSciGhostIfu extends ExecutionTestSupportForGhost:
                               }
                               ifu1FiberAgitator
                               ifu2FiberAgitator
+                              centralWavelength { nanometers }
                             }
                           }
                         }
