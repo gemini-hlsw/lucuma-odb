@@ -111,6 +111,8 @@ object Phase0Loader {
     List(
       new Phase0Loader[GmosImagingRow.GmosNorth, ImagingRow](Instrument.GmosNorth, rdr.gmosNorthImaging, _.img, Phase0Table.ImagingGmosNorth.some),
       new Phase0Loader[GmosImagingRow.GmosSouth, ImagingRow](Instrument.GmosSouth, rdr.gmosSouthImaging, _.img, Phase0Table.ImagingGmosSouth.some),
+      new Phase0Loader[ImagingRow, ImagingRow](Instrument.Alopeke, rdr.alopekeImaging, identity, none),
+      new Phase0Loader[ImagingRow, ImagingRow](Instrument.Zorro, rdr.zorroImaging, identity, none),
     ).traverse_(_.load(bc, ConfigModeVariant.Imaging, is))
 
 }

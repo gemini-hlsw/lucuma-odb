@@ -48,7 +48,7 @@ class FileReader[F[_]](fileName: String)(using ApplicativeError[F, Throwable]):
 
   def read[A](i: Instrument, p: Parser[List[A]]): Pipe[F, Byte, (A, PosInt)] =
     _.through(entryLines)
-     .filter { case (s, _) => s.startsWith(i.shortName.toUpperCase()) }
+     .filter { case (s, _) => s.toUpperCase.startsWith(i.shortName.toUpperCase()) }
      .flatMap { case (s, idx) =>
        p.parseAll(s) match {
          case Left(e)   => Stream.raiseError[F](new ReadException(idx, e))
@@ -77,6 +77,12 @@ class FileReader[F[_]](fileName: String)(using ApplicativeError[F, Throwable]):
 
   val gmosSouthImaging: Pipe[F, Byte, (GmosImagingRow.GmosSouth, PosInt)] =
     read(Instrument.GmosSouth, GmosImagingRow.gmosSouth)
+
+  val alopekeImaging: Pipe[F, Byte, (ImagingRow, PosInt)] =
+    read(Instrument.Alopeke, ImagingRow.rows)
+
+  val zorroImaging: Pipe[F, Byte, (ImagingRow, PosInt)] =
+    read(Instrument.Zorro, ImagingRow.rows)
 
   val gmosSouthSpectroscopy: Pipe[F, Byte, (GmosSpectroscopyRow.GmosSouth, PosInt)] =
     read(Instrument.GmosSouth, GmosSpectroscopyRow.gmosSouth)
