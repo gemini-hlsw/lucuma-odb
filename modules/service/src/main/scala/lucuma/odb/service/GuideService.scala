@@ -477,7 +477,7 @@ object GuideService {
           .mapN { (a, b) =>
             // If caching is implemented for the guide star results, `ags.widestConstraints` should be
             // used for the brightness constraints.
-            val brightnessConstraints = gaiaBrightnessConstraints(constraints, GuideSpeed.Slow, wavelength)
+            val brightnessConstraints = gaiaBrightnessConstraints(constraints, probe, GuideSpeed.Slow, wavelength)
             // Make a query based on two coordinates of the base of an asterism over a year
             CoordinatesRangeQueryByADQL(
               NonEmptyList.of(a, b),
@@ -657,6 +657,7 @@ object GuideService {
                         params,
                         candidates
             )
+            ._1
             .sortUsablePositions
 
       def chooseBestGuideStar(
@@ -683,6 +684,7 @@ object GuideService {
                         params,
                         candidates.toList
             )
+            ._1
             .sortUsablePositions
             .headOption
 
