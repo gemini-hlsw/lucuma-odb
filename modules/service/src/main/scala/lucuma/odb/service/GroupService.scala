@@ -124,13 +124,13 @@ object GroupService {
 
       private def toDelete(tree: GroupTree): Result[(List[Group.Id], List[Observation.Id])] =
         tree match
-          case Root(programId, children) =>
+          case Root(programId, _) =>
             OdbError.InvalidArgument(s"Cannot delete root group of $programId.".some).asFailure
-          case Branch(groupId, _, _, children, _, _, _, _, false, _) =>
+          case Branch(groupId = groupId, system = false) =>
               OdbError.InvalidArgument(s"Cannot delete non-sytem group $groupId.".some).asFailure
-          case Leaf(observationId) =>
+          case Leaf(observationId)                                      =>
             Result((Nil, List(observationId))) // calibration-ness is checked by the obs service
-          case Branch(groupId, _, _, children, _, _, _, _, true, _) =>
+          case Branch(groupId = groupId, children = children, system = true)  =>
               children
                 .traverse(toDelete)
                 .map(_.combineAll)
@@ -229,7 +229,14 @@ object GroupService {
           Statements.updateGroups(SET, which, accessPredicate).traverse: af =>
             session.prepareR(af.fragment.query(group_id)).use { pq => pq.stream(af.argument, 512).compile.toList }
           .map(moreIds => Result(moreIds.foldLeft(ids)((a, b) => (a ++ b).distinct)))
-          .recoverWith { case SqlState.CheckViolation(ex) =>  Result.failure("Minimum interval must be less than or equal maximum interval.").pure}
+          .recoverWith { case SqlState.CheckViolation(ex) =>
+            val msg = ex.constraintName match
+              case Some("group_same_night_check") =>
+                "Same night and maximum interval are mutually exclusive."
+              case _ =>
+                "Minimum interval must be less than or equal maximum interval."
+            Result.failure(msg).pure
+          }
 
       def openHole(pid: Program.Id, gid: Option[Group.Id], index: Option[NonNegShort]): F[NonNegShort] =
         session.prepareR(Statements.OpenHole).use(_.unique(pid, gid, index))
@@ -244,8 +251,8 @@ object GroupService {
 
           def mapChildren(children: List[GroupTree.Child]): List[GroupTree.Child] =
             children.map {
-              case l@GroupTree.Leaf(_)                              => l
-              case b@GroupTree.Branch(_, _, _, _, _, _, _, _, _, _) => mapBranch(b)
+              case l@GroupTree.Leaf(_)                                 => l
+              case b@GroupTree.Branch(_, _, _, _, _, _, _, _, _, _, _) => mapBranch(b)
             }
 
           def mapBranch(p: GroupTree.Branch): GroupTree.Branch =
@@ -298,7 +305,8 @@ object GroupService {
         c_max_interval,
         c_existence,
         c_system,
-        c_calibration_roles
+        c_calibration_roles,
+        c_same_night
       ) values (
         $program_id,
         ${group_id.opt},
@@ -311,7 +319,8 @@ object GroupService {
         ${time_span.opt},
         $existence,
         $bool,
-        ${_calibration_role}
+        ${_calibration_role},
+        $bool
       ) returning c_group_id
       """.query(group_id)
          .contramap[Program.Id ~ GroupPropertiesInput.Create ~ NonNegShort ~ Boolean ~ List[CalibrationRole]] { case ((((pid, c), index), system), calibrationRoles) => (
@@ -326,7 +335,8 @@ object GroupService {
           c.maximumInterval,
           c.existence,
           system,
-          calibrationRoles
+          calibrationRoles,
+          c.sameNight
         )}
 
     val OpenHole: Query[(Program.Id, Option[Group.Id], Option[NonNegShort]), NonNegShort] =
@@ -342,6 +352,7 @@ object GroupService {
           SET.minimumRequired.toOptionOption.map(sql"c_min_required = ${int2_nonneg.opt}"),
           SET.minimumInterval.toOptionOption.map(sql"c_min_interval = ${time_span.opt}"),
           SET.maximumInterval.toOptionOption.map(sql"c_max_interval = ${time_span.opt}"),
+          SET.sameNight.map(sql"c_same_night = $bool"),
           SET.existence.map(sql"c_existence = $existence"),
         ).flatten
 
@@ -369,9 +380,9 @@ object GroupService {
       """.apply(gid, index) |+| which |+| access |+| void")"
 
     val branch: Decoder[GroupTree.Branch] =
-      (group_id *: text_nonempty.opt *: text_nonempty.opt *: int2_nonneg.opt *: bool *:  time_span.opt *: time_span.opt *: bool *: _calibration_role).map {
-        case (gid, name, description, minRequired, ordered, minInterval, maxInterval, system, calibrationRoles) =>
-          GroupTree.Branch(gid, minRequired, ordered, Nil, name, description, minInterval, maxInterval, system, calibrationRoles)
+      (group_id *: text_nonempty.opt *: text_nonempty.opt *: int2_nonneg.opt *: bool *:  time_span.opt *: time_span.opt *: bool *: _calibration_role *: bool).map {
+        case (gid, name, description, minRequired, ordered, minInterval, maxInterval, system, calibrationRoles, sameNight) =>
+          GroupTree.Branch(gid, minRequired, ordered, Nil, name, description, minInterval, maxInterval, system, calibrationRoles, sameNight)
       }
 
     def SelectGroups(pid: Program.Id, filter: AppliedFragment): AppliedFragment =
@@ -387,7 +398,8 @@ object GroupService {
           c_min_interval,
           c_max_interval,
           c_system,
-          c_calibration_roles
+          c_calibration_roles,
+          c_same_night
         FROM
           t_group
         WHERE
@@ -460,7 +472,8 @@ object GroupService {
           c_max_interval,
           c_existence,
           c_system,
-          c_calibration_roles
+          c_calibration_roles,
+          c_same_night
         FROM
           t_group
         WHERE
@@ -477,9 +490,10 @@ object GroupService {
           time_span.opt ~
           existence ~
           bool ~
-          _calibration_role
+          _calibration_role ~
+          bool
         ).map:
-          case pid ~ gid ~ gix ~ nam ~ des ~ mre ~ ord ~ min ~ max ~ exi ~ sys ~ roles =>
+          case pid ~ gid ~ gix ~ nam ~ des ~ mre ~ ord ~ min ~ max ~ exi ~ sys ~ roles ~ sn =>
             (CreateGroupInput(
               programId = Some(pid),
               proposalReference = None,
@@ -491,6 +505,7 @@ object GroupService {
                 ordered = ord,
                 minimumInterval = min,
                 maximumInterval = max,
+                sameNight = sn,
                 parentGroupId = gid,
                 parentGroupIndex = Some(gix),
                 existence = exi,

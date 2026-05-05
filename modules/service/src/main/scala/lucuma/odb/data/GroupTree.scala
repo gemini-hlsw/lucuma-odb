@@ -129,7 +129,8 @@ object GroupTree {
     minInterval:      Option[TimeSpan],
     maxInterval:      Option[TimeSpan],
     system:           Boolean,
-    calibrationRoles: List[CalibrationRole]
+    calibrationRoles: List[CalibrationRole],
+    sameNight:        Boolean
   ) extends Parent with Child
 
   /**

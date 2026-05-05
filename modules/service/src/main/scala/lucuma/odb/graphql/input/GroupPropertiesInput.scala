@@ -24,6 +24,7 @@ object GroupPropertiesInput {
     ordered: Boolean,
     minimumInterval: Option[TimeSpan],
     maximumInterval: Option[TimeSpan],
+    sameNight: Boolean,
     parentGroupId: Option[Group.Id],
     parentGroupIndex: Option[NonNegShort],
     existence: Existence
@@ -37,6 +38,7 @@ object GroupPropertiesInput {
         edit.ordered.getOrElse(ordered),
         edit.minimumInterval.toOptionOption.getOrElse(minimumInterval),
         edit.maximumInterval.toOptionOption.getOrElse(maximumInterval),
+        edit.sameNight.getOrElse(sameNight),
         edit.parentGroupId.toOptionOption.getOrElse(parentGroupId),
         edit.parentGroupIndex.orElse(parentGroupIndex),
         edit.existence.getOrElse(existence)
@@ -51,13 +53,14 @@ object GroupPropertiesInput {
     ordered: Option[Boolean],
     minimumInterval: Nullable[TimeSpan],
     maximumInterval: Nullable[TimeSpan],
+    sameNight: Option[Boolean],
     parentGroupId: Nullable[Group.Id],
     parentGroupIndex: Option[NonNegShort],
     existence: Option[Existence]
   )
 
   val Empty: Create =
-    Create(None, None, None, false, None, None, None, None, Existence.Default)
+    Create(None, None, None, false, None, None, false, None, None, Existence.Default)
 
   val CreateBinding: Matcher[Create] =
     ObjectFieldsBinding.rmap {
@@ -68,23 +71,27 @@ object GroupPropertiesInput {
         BooleanBinding.Option("ordered", rOrdered),
         TimeSpanInput.Binding.Option("minimumInterval", rMinimumInterval),
         TimeSpanInput.Binding.Option("maximumInterval", rMaximumInterval),
+        BooleanBinding.Option("sameNight", rSameNight),
         GroupIdBinding.Option("parentGroup", rParentGroup),
         NonNegShortBinding.Option("parentGroupIndex", rParentGroupIndex),
         ExistenceBinding.Option("existence", rExistence),
       ) =>
-        (rName, rDescription, rMinimumRequired, rOrdered, rMinimumInterval, rMaximumInterval, rParentGroup, rParentGroupIndex, rExistence).parTupled.flatMap {
-          (name, description, minimumRequired, ordered, minimumInterval, maximumInterval, parentGroup, parentGroupIndex, existence) =>
+        (rName, rDescription, rMinimumRequired, rOrdered, rMinimumInterval, rMaximumInterval, rSameNight, rParentGroup, rParentGroupIndex, rExistence).parTupled.flatMap {
+          (name, description, minimumRequired, ordered, minimumInterval, maximumInterval, sameNight, parentGroup, parentGroupIndex, existence) =>
             (minimumInterval, maximumInterval) match
               case (Some(min), Some(max)) if max < min => Matcher.validationFailure("Minimum interval must be less than or equal maximum interval.")
+              case _ if sameNight.contains(true) && maximumInterval.isDefined =>
+                Matcher.validationFailure("Same night and maximum interval are mutually exclusive.")
               case _ =>
                 Result(Create(
-                  name, 
-                  description, 
-                  minimumRequired, 
-                  ordered.getOrElse(false), 
-                  minimumInterval, 
-                  maximumInterval, 
-                  parentGroup, 
+                  name,
+                  description,
+                  minimumRequired,
+                  ordered.getOrElse(false),
+                  minimumInterval,
+                  maximumInterval,
+                  sameNight.getOrElse(false),
+                  parentGroup,
                   parentGroupIndex,
                   existence.getOrElse(Existence.Default),
                 ))
@@ -100,23 +107,27 @@ object GroupPropertiesInput {
         BooleanBinding.Option("ordered", rOrdered),
         TimeSpanInput.Binding.Nullable("minimumInterval", rMinimumInterval),
         TimeSpanInput.Binding.Nullable("maximumInterval", rMaximumInterval),
+        BooleanBinding.Option("sameNight", rSameNight),
         GroupIdBinding.Nullable("parentGroup", rParentGroup),
         NonNegShortBinding.NonNullable("parentGroupIndex", rParentGroupIndex),
         ExistenceBinding.Option("existence", rExistence),
       ) =>
-        (rName, rDescription, rMinimumRequired, rOrdered, rMinimumInterval, rMaximumInterval, rParentGroup, rParentGroupIndex, rExistence).parTupled.flatMap {
-          (name, description, minimumRequired, ordered, minimumInterval, maximumInterval, parentGroup, parentGroupIndex, existence) =>
+        (rName, rDescription, rMinimumRequired, rOrdered, rMinimumInterval, rMaximumInterval, rSameNight, rParentGroup, rParentGroupIndex, rExistence).parTupled.flatMap {
+          (name, description, minimumRequired, ordered, minimumInterval, maximumInterval, sameNight, parentGroup, parentGroupIndex, existence) =>
             (minimumInterval.toOption, maximumInterval.toOption) match // Scala can't typecheck it if we match Nullable.NonNull for some reason :-\
               case (Some(min), Some(max)) if max < min => Matcher.validationFailure("Minimum interval must be less than or equal maximum interval.")
+              case _ if sameNight.contains(true) && maximumInterval.toOption.isDefined =>
+                Matcher.validationFailure("Same night and maximum interval are mutually exclusive.")
               case _ =>
                 Result(Edit(
-                  name, 
-                  description, 
-                  minimumRequired, 
+                  name,
+                  description,
+                  minimumRequired,
                   ordered,
-                  minimumInterval, 
-                  maximumInterval, 
-                  parentGroup, 
+                  minimumInterval,
+                  maximumInterval,
+                  sameNight,
+                  parentGroup,
                   parentGroupIndex,
                   existence,
                 ))

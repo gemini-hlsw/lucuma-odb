@@ -106,6 +106,7 @@ object PerScienceObservationCalibrationsService:
               ordered = false,
               minimumInterval = none,
               maximumInterval = TimeSpan.Zero.some,
+              sameNight = false,
               parentGroupId = parentGroupId,
               parentGroupIndex = parentIndex,
               existence = Existence.Present

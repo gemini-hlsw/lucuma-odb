@@ -5,6 +5,7 @@ package lucuma.odb.graphql
 package mutation
 
 import cats.effect.IO
+import cats.syntax.either.*
 import eu.timepit.refined.types.numeric.NonNegShort
 import io.circe.Json
 import io.circe.literal.*
@@ -47,6 +48,7 @@ class createGroup extends OdbSuite {
                 description
                 minimumRequired
                 ordered
+                sameNight
                 minimumInterval {
                   hours
                 }
@@ -72,6 +74,7 @@ class createGroup extends OdbSuite {
                 "description" : "A description",
                 "minimumRequired" : 4,
                 "ordered" : true,
+                "sameNight" : false,
                 "minimumInterval" : {
                   "hours" : 3.000000
                 },
@@ -161,6 +164,63 @@ class createGroup extends OdbSuite {
       ids  <- groupElementsAs(pi, pid, Some(g2))
     } yield assertEquals(ids, List(Right(o1), Left(g1), Right(o2)))
   }
+
+  test("cannot create group with sameNighte and maximumInterval"):
+    createProgramAs(pi).flatMap { pid =>
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            createGroup(
+              input: {
+                programId: "$pid",
+                SET: {
+                  sameNight: true
+                  maximumInterval: { hours: 1 }
+                }
+              }
+            ) {
+              group { id }
+            }
+          }
+        """,
+        expected = List(
+          "Argument 'input.SET' is invalid: Same night and maximum interval are mutually exclusive."
+        ).asLeft
+      )
+    }
+
+  test("can create group with sameNight and minimumRequired (OR)"):
+    createProgramAs(pi).flatMap { pid =>
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            createGroup(
+              input: {
+                programId: "$pid",
+                SET: {
+                  sameNight: true
+                  minimumRequired: 1
+                }
+              }
+            ) {
+              group { sameNight minimumRequired }
+            }
+          }
+        """,
+        expected = json"""
+          {
+            "createGroup": {
+              "group": {
+                "sameNight": true,
+                "minimumRequired": 1
+              }
+            }
+          }
+        """.asRight
+      )
+    }
 
   test("create group with a proposal reference") {
     val createWithReference: IO[Unit] =

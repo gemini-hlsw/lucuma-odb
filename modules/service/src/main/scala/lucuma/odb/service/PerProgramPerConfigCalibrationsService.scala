@@ -87,7 +87,7 @@ object PerProgramPerConfigCalibrationsService:
           groupService.selectGroups(pid).flatMap {
             case GroupTree.Root(_, c) =>
               val existing = c.collectFirst {
-                case GroupTree.Branch(gid, _, _, _, Some(CalibrationsGroupName), _, _, _, true, _) => gid
+                case GroupTree.Branch(groupId = gid, name = Some(CalibrationsGroupName), system = true) => gid
               }
               existing match {
                 case Some(gid) => gid.some.pure[F]
@@ -104,6 +104,7 @@ object PerProgramPerConfigCalibrationsService:
                           ordered = false,
                           minimumInterval = none,
                           maximumInterval = none,
+                          sameNight = false,
                           parentGroupId = none,
                           parentGroupIndex = none,
                           existence = Existence.Present
