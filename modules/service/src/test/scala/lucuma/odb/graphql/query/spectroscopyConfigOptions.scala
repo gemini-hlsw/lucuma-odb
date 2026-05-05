@@ -36,7 +36,7 @@ class spectroscopyConfigOptions extends OdbSuite {
         s.execute(sql"insert into t_spectroscopy_config_option values('Gnirs', 1, 'SC', 'single_slit', '0.3', 300000, 99000000, '32', 'X', 1030000, 1170000, 1100000, 331000, 1700, false, NULL, 'gn')".command) *>
         s.execute(sql"insert into t_spectroscopy_config_option_ghost values('Ghost', 1, 'one_by_one', 'standard')".command) *>
         s.execute(sql"insert into t_spectroscopy_config_option_f2 values('Flamingos2', 1, 'LongSlit_8', 'R3000', 'H')".command) *>
-        s.execute(sql"insert into t_spectroscopy_config_option_gnirs values('Gnirs', 1, 'D32', 'Order6', 'LongSlit_0_30')".command)
+        s.execute(sql"insert into t_spectroscopy_config_option_gnirs values('Gnirs', 1, 'D32', 'Order6', 'LongSlit_0_30', 'Mirror', 'ShortBlue')".command)
       ).void
     )
 
