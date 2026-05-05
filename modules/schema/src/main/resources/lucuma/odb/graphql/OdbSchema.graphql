@@ -8919,6 +8919,11 @@ type GhostDynamic {
   blue: GhostDetector!
   ifu1FiberAgitator: GhostIfu1FiberAgitator!
   ifu2FiberAgitator: GhostIfu2FiberAgitator!
+
+  """
+  Central wavelength, which is fixed at 655 nm.
+  """
+  centralWavelength: Wavelength
 }
 
 """

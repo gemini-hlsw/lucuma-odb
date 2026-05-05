@@ -4,6 +4,10 @@
 package lucuma.odb.graphql
 package mapping
 
+import io.circe.syntax.given
+import lucuma.odb.json.wavelength.query.given
+import lucuma.odb.sequence.ghost.CentralWavelength
+
 import table.GhostDynamicTable
 
 trait GhostDynamicMapping[F[_]] extends GhostDynamicTable[F]:
@@ -23,7 +27,8 @@ trait GhostDynamicMapping[F[_]] extends GhostDynamicTable[F]:
       SqlObject("red"),
       SqlObject("blue"),
       SqlField("ifu1FiberAgitator", GhostDynamicTable.FiberAgitator.Ifu1),
-      SqlField("ifu2FiberAgitator", GhostDynamicTable.FiberAgitator.Ifu2)
+      SqlField("ifu2FiberAgitator", GhostDynamicTable.FiberAgitator.Ifu2),
+      CirceField("centralWavelength", CentralWavelength.asJson)
     )
 
   lazy val GhostDynamicMappings: List[TypeMapping] =

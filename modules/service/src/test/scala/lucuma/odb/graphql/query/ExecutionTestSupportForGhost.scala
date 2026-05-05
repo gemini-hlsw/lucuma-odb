@@ -9,6 +9,8 @@ import io.circe.syntax.*
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.ghost.GhostDetector
 import lucuma.core.model.sequence.ghost.GhostDynamicConfig
+import lucuma.odb.sequence.ghost.CentralWavelength
+
 
 trait ExecutionTestSupportForGhost extends ExecutionTestSupport:
 
@@ -32,6 +34,7 @@ trait ExecutionTestSupportForGhost extends ExecutionTestSupport:
           }
           ifu1FiberAgitator
           ifu2FiberAgitator
+          centralWavelength { nanometers }
         }
         stepConfig {
           stepType
@@ -66,7 +69,10 @@ trait ExecutionTestSupportForGhost extends ExecutionTestSupport:
         "red": ${detector(c.red.value)},
         "blue": ${detector(c.blue.value)},
         "ifu1FiberAgitator": ${c.ifu1FiberAgitator.asJson},
-        "ifu2FiberAgitator": ${c.ifu2FiberAgitator.asJson}
+        "ifu2FiberAgitator": ${c.ifu2FiberAgitator.asJson},
+        "centralWavelength": {
+          "nanometers": ${CentralWavelength.toNanometers.value.value.asJson}
+        }
       }
     """
 
