@@ -75,3 +75,5 @@ trait SpectroscopyConfigOptionTable[F[_]] extends BaseMapping[F]:
     val Grating    = col("c_grating", gnirs_grating)
     val Filter     = col("c_filter",  gnirs_filter)
     val Fpu        = col("c_fpu",     gnirs_fpu_slit)
+    val Prism      = col("c_prism",   gnirs_prism)
+    val Camera     = col("c_camera",  gnirs_camera)

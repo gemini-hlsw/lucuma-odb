@@ -3,15 +3,20 @@
 
 package lucuma.odb.util
 
+import lucuma.core.enums.GnirsCamera
 import lucuma.core.enums.GnirsFilter
 import lucuma.core.enums.GnirsFpuSlit
 import lucuma.core.enums.GnirsGrating
+import lucuma.core.enums.GnirsPrism
 import skunk.Codec
 import skunk.data.Type
 
 trait GnirsCodecs:
 
   import Codecs.enumerated
+
+  val gnirs_camera: Codec[GnirsCamera] =
+    enumerated(Type.varchar)
 
   val gnirs_filter: Codec[GnirsFilter] =
     enumerated(Type.varchar)
@@ -20,6 +25,9 @@ trait GnirsCodecs:
     enumerated(Type.varchar)
 
   val gnirs_grating: Codec[GnirsGrating] =
+    enumerated(Type.varchar)
+
+  val gnirs_prism: Codec[GnirsPrism] =
     enumerated(Type.varchar)
 
 object GnirsCodecs extends GnirsCodecs

@@ -204,13 +204,17 @@ object Phase0Table {
         instrument    *:
         gnirs_grating *:
         gnirs_filter  *:
-        gnirs_fpu_slit
+        gnirs_fpu_slit *:
+        gnirs_prism   *:
+        gnirs_camera
       ).contramap[GnirsSpectroscopyRow]: row =>
         (
           row.spec.instrument,
           row.grating,
           row.filter,
-          row.fpu
+          row.fpu,
+          row.prism,
+          row.camera
         )
 
     override def columns: List[String] =
@@ -218,7 +222,9 @@ object Phase0Table {
         "c_instrument",
         "c_grating",
         "c_filter",
-        "c_fpu"
+        "c_fpu",
+        "c_prism",
+        "c_camera"
       )
 
   val SpectroscopyGhostIfu = new Phase0Table[GhostIfuRow]:

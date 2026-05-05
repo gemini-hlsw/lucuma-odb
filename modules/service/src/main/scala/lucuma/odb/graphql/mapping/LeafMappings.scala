@@ -155,6 +155,8 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[GnirsFilter](GnirsFilterType),
       LeafMapping[GnirsGrating](GnirsGratingType),
       LeafMapping[GnirsFpuSlit](GnirsFpuSlitType),
+      LeafMapping[GnirsPrism](GnirsPrismType),
+      LeafMapping[GnirsCamera](GnirsCameraType),
       LeafMapping[Group.Id](GroupIdType),
       LeafMapping[GuideProbe](GuideProbeType),
       LeafMapping[StepGuideState](GuideStateType),

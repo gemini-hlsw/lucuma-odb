@@ -11355,6 +11355,21 @@ type SpectroscopyConfigOptionGnirs {
   grating: GnirsGrating!
   filter: GnirsFilter!
   fpu: GnirsFpuSlit!
+  prism: GnirsPrism!
+  camera: GnirsCamera!
+}
+
+enum GnirsPrism {
+  MIRROR
+  SXD
+  LXD
+}
+
+enum GnirsCamera {
+  LONG_BLUE
+  LONG_RED
+  SHORT_BLUE
+  SHORT_RED
 }
 
 enum GnirsGrating {
