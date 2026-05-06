@@ -8003,6 +8003,11 @@ type Igrins2Dynamic {
   IGRINS-2 exposure time
   """
   exposure: TimeSpan!
+
+  """
+  Central wavelength, which is fixed at 2.1 microns.
+  """
+  centralWavelength: Wavelength
 }
 
 """
