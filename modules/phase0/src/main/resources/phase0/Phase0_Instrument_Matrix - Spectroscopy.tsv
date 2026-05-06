@@ -639,4 +639,5 @@ GHOST	HR-IFU 1x4	ifu	HR-IFU	1.20	1.20	echelle	none	0.347	1.060	0.7035	0.713	7600
 GHOST	HR-IFU 2x2	ifu	HR-IFU	1.20	1.20	echelle	none	0.347	1.060	0.7035	0.713	76000	no		s
 Visitor @ GN													yes		n
 Visitor @ GS													no		s
+MAROON-X		fiber	fiber	0.77	0.77	echelle	none	500.0	920.0	710.0	420.0	85000	no		n
 

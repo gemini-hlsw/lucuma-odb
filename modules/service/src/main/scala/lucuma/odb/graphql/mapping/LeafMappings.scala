@@ -60,6 +60,7 @@ import lucuma.odb.data.Tag
 import lucuma.odb.data.UserType
 
 import java.time.LocalDate
+import lucuma.odb.phase0.ImagingCapabilities
 
 trait LeafMappings[F[_]] extends BaseMapping[F] {
 
@@ -164,6 +165,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[Igrins2OffsetMode](Igrins2OffsetModeType),
       LeafMapping[String](IgnoreType),
       LeafMapping[ImageQuality.Preset](ImageQualityPresetType),
+      LeafMapping[ImagingCapabilities](ImagingCapabilitiesType),
       LeafMapping[Instrument](InstrumentType),
       LeafMapping[IntPercent](IntPercentType),
       LeafMapping[Long](LongType),

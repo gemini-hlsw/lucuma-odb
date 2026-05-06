@@ -94,6 +94,7 @@ import spire.math.interval.ValueBound
 import scala.collection.immutable.SortedSet
 import scala.util.control.Exception
 import scala.util.matching.Regex
+import lucuma.odb.phase0.ImagingCapabilities
 
 
 // Codecs for some atomic types.
@@ -576,6 +577,9 @@ trait Codecs {
 
   val spectroscopy_capabilities: Codec[SpectroscopyCapability] =
     enumerated[SpectroscopyCapability](Type.varchar)
+
+  val imaging_capabilities: Codec[ImagingCapabilities] =
+    enumerated[ImagingCapabilities](Type.varchar)
 
   val signal_to_noise: Codec[SignalToNoise] =
     numeric(11,3).eimap(

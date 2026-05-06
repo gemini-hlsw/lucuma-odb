@@ -165,7 +165,7 @@ case class ImagingRow(
   fov:            Angle,
   filter:         String,
   ao:             Boolean,
-  capability:     Option[Capability],
+  capability:     Option[ImagingCapabilities],
   site:           Site
 ) extends ConfigurationRow
 
@@ -178,19 +178,25 @@ object ImagingRow extends RowParsers {
       )
     }
 
+  val imagingCapability: Parser0[Option[ImagingCapabilities]] =
+    (vchar | sp).rep0.string.mapFilter {
+      case "" => none.some
+      case s  => ImagingCapabilities.values.find(_.label === s).map(_.some)
+    }
+
   /**
    * A single line in the .tsv file is split into 1 or more rows according to the filters included.
    */
   val rows: Parser[List[ImagingRow]] = (
-    (instrument    <* htab) ~
-    (arcsec        <* htab) ~
-    (filterOptions <* htab) ~
-    (ao            <* htab) ~
-    (string.?      <* htab) ~
+    (instrument        <* htab) ~
+    (arcsec            <* htab) ~
+    (filterOptions     <* htab) ~
+    (ao                <* htab) ~
+    (imagingCapability <* htab) ~
     site
-  ).map { case (((((inst, fov), filterOpts), ao), _), site) =>
+  ).map { case (((((inst, fov), filterOpts), ao), capability), site) =>
     filterOpts.toList.map { filter =>
-      ImagingRow(inst, fov, filter, ao, None, site)
+      ImagingRow(inst, fov, filter, ao, capability, site)
     }
   }
 

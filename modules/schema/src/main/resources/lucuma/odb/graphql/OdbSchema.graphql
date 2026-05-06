@@ -11530,6 +11530,9 @@ type ImagingConfigOption {
 
   adaptiveOptics: Boolean!
 
+  "A special capability (if any) that the configuration may have."
+  capability: ImagingCapabilities
+
   site: Site!
 
   fov: Angle!
@@ -13844,6 +13847,21 @@ type SpectralDefinitionSurface {
   Emission lines spectral definition
   """
   emissionLines: EmissionLinesSurface
+}
+
+"""
+Imaging capabilities (e.g., Speckle).
+"""
+enum ImagingCapabilities {
+  """
+  ImagingCapabilities Speckle
+  """
+  SPECKLE
+
+  """
+  ImagingCapabilities WideField
+  """
+  WIDE_FIELD
 }
 
 """
