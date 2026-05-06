@@ -52,6 +52,7 @@ import lucuma.core.model.User
 import lucuma.core.model.probes
 import lucuma.core.model.sequence.ExecutionDigest
 import lucuma.core.model.sequence.flamingos2.Flamingos2FpuMask
+import lucuma.core.model.sequence.ghost.CentralWavelength as GhostCentralWavelength
 import lucuma.core.model.sequence.igrins2.CentralWavelength as Igrins2CentralWavelength
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
@@ -288,7 +289,7 @@ object GuideService {
         case mode: flamingos2.longslit.Config =>
           (Site.GS, ObservingModeType.Flamingos2LongSlit, mode.filter.wavelength)
         case mode: ghost.ifu.Config =>
-          (Site.GS, ObservingModeType.GhostIfu, lucuma.odb.sequence.ghost.CentralWavelength)
+          (Site.GS, ObservingModeType.GhostIfu, GhostCentralWavelength)
         case gmos.imaging.Config.GmosNorth(filters = filters) =>
           (Site.GN, ObservingModeType.GmosNorthImaging, filters.map(_.filter.wavelength).maximum)
         case mode: gmos.longslit.Config.GmosNorth =>

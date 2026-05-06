@@ -7,10 +7,9 @@ import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.model.Observation
+import lucuma.core.model.sequence.ghost.CentralWavelength
 import lucuma.core.model.sequence.ghost.GhostDetector
 import lucuma.core.model.sequence.ghost.GhostDynamicConfig
-import lucuma.odb.sequence.ghost.CentralWavelength
-
 
 trait ExecutionTestSupportForGhost extends ExecutionTestSupport:
 

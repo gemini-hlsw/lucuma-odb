@@ -5,8 +5,8 @@ package lucuma.odb.graphql
 package mapping
 
 import io.circe.syntax.given
+import lucuma.core.model.sequence.ghost.CentralWavelength
 import lucuma.odb.json.wavelength.query.given
-import lucuma.odb.sequence.ghost.CentralWavelength
 
 import table.GhostDynamicTable
 

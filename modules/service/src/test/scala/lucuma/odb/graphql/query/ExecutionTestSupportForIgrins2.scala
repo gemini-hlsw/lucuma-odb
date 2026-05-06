@@ -12,6 +12,7 @@ import lucuma.core.enums.StepGuideState
 import lucuma.core.math.Offset
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.TelescopeConfig
+import lucuma.core.model.sequence.igrins2.CentralWavelength
 import lucuma.core.syntax.string.*
 import lucuma.core.util.TimeSpan
 
@@ -46,6 +47,7 @@ trait ExecutionTestSupportForIgrins2 extends ExecutionTestSupport:
       steps {
         instrumentConfig {
           exposure { seconds }
+          centralWavelength { nanometers }
         }
         stepConfig {
           stepType
@@ -76,7 +78,8 @@ trait ExecutionTestSupportForIgrins2 extends ExecutionTestSupport:
     json"""
       {
         "instrumentConfig": {
-          "exposure": { "seconds": ${exposureTime.toSeconds} }
+          "exposure": { "seconds": ${exposureTime.toSeconds} },
+          "centralWavelength": { "nanometers": ${CentralWavelength.toNanometers.value.value.asJson} }
         },
         "stepConfig": { "stepType": "SCIENCE" },
         "telescopeConfig": ${expectedTelescopeConfig(tc)},
