@@ -17158,6 +17158,38 @@ input WhereEqScienceSubtype {
 }
 
 """
+Filters on equality (or not) of the ImagingCapability property. All
+supplied criteria must match, but usually only one is selected.
+"""
+input WhereOptionEqImagingCapabilities {
+  """
+  When `true`, matches if the imaging capability value is not defined.
+  """
+  IS_NULL: Boolean
+
+  """
+  Matches if the imaging capability is the supplied value.
+  """
+  EQ: ImagingCapabilities
+
+  """
+  Matches if the imaging capability is anything other than the supplied
+  value.
+  """
+  NEQ: ImagingCapabilities
+
+  """
+  Matches if the imaging capability is any one of the supplied values.
+  """
+  IN: [ImagingCapabilities!]
+
+  """
+  Matches if the imaging capability is not any one of the supplied values.
+  """
+  NIN: [ImagingCapabilities!]
+}
+
+"""
 Filters on equality (or not) of the SpectroscopyCapability property. All
 supplied criteria must match, but usually only one is selected.
 """
@@ -18845,6 +18877,8 @@ input WhereImagingConfigOption {
   fov: WhereAngle
 
   site: WhereEqSite
+
+  capability: WhereOptionEqImagingCapabilities
 }
 
 """

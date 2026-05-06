@@ -15,6 +15,7 @@ import io.circe.literal.*
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.Site
 import lucuma.core.math.Angle
+import lucuma.odb.phase0.ImagingCapabilities
 import skunk.Session
 import skunk.syntax.all.*
 
@@ -25,9 +26,10 @@ class imagingConfigOptions extends OdbSuite {
 
 
   override def dbInitialization: Option[Session[IO] => IO[Unit]] = Some { s =>
-    (s.execute(sql"insert into t_imaging_config_option values('GmosNorth', 1, 330000000, 'z+CaT', false, 'gn')".command) *>
-      s.execute(sql"insert into t_imaging_config_option values('GmosNorth', 2, 350000000, 'OVI', false, 'gn')".command) *>
-      s.execute(sql"insert into t_imaging_config_option values('GmosSouth', 3, 150000000, 'OVIC', false, 'gs')".command) *>
+    (s.execute(sql"insert into t_imaging_config_option (c_instrument, c_index, c_fov, c_filter_label, c_ao, c_site) values('GmosNorth', 1, 330000000, 'z+CaT', false, 'gn')".command) *>
+      s.execute(sql"insert into t_imaging_config_option (c_instrument, c_index, c_fov, c_filter_label, c_ao, c_site) values('GmosNorth', 2, 350000000, 'OVI', false, 'gn')".command) *>
+      s.execute(sql"insert into t_imaging_config_option (c_instrument, c_index, c_fov, c_filter_label, c_ao, c_site) values('GmosSouth', 3, 150000000, 'OVIC', false, 'gs')".command) *>
+      s.execute(sql"insert into t_imaging_config_option (c_instrument, c_index, c_fov, c_filter_label, c_ao, c_capability, c_site) values('Alopeke', 4, 3000000, 'EO466', false, 'speckle', 'gn')".command) *>
       s.execute(sql"insert into t_imaging_config_option_gmos_north values('GmosNorth', 1, 'ZPrime_CaT')".command) *>
       s.execute(sql"insert into t_imaging_config_option_gmos_north values('GmosNorth', 2, 'OVI')".command) *>
       s.execute(sql"insert into t_imaging_config_option_gmos_south values('GmosSouth', 3, 'OVIC')".command)).void
@@ -38,7 +40,8 @@ class imagingConfigOptions extends OdbSuite {
     filterLabel:        Option[String],
     ao:                 Boolean,
     site:               Site,
-    fov:                Angle
+    fov:                Angle,
+    capability:         Option[ImagingCapabilities]
   )
 
   object ConfigOption {
@@ -53,12 +56,14 @@ class imagingConfigOptions extends OdbSuite {
           ao       <- c.downField("adaptiveOptics").as[Boolean]
           site     <- c.downField("site").as[Site]
           fov      <- c.downField("fov").as[Angle]
+          cap      <- c.downField("capability").as[Option[ImagingCapabilities]]
         } yield ConfigOption(
           inst,
           filLabel,
           ao,
           site,
-          fov
+          fov,
+          cap
         )
       }
   }
@@ -79,6 +84,7 @@ class imagingConfigOptions extends OdbSuite {
             filterLabel
             adaptiveOptics
             site
+            capability
           }
         }
       """
@@ -227,6 +233,43 @@ class imagingConfigOptions extends OdbSuite {
               "gmosNorth": {
                 "filter": "Z_PRIME_CA_T"
               }
+            }
+          ]
+        }
+      """.asRight
+    )
+  }
+
+  test("capability EQ SPECKLE") {
+    val expect = allOptions.map(_.filter(_.capability.contains(ImagingCapabilities.Speckle)))
+    val actual = optionsWhere(s"""capability: { EQ: SPECKLE }""")
+    for {
+      es <- expect
+      as <- actual
+    } yield assertEquals(es, as)
+  }
+
+  test("capability field selection") {
+    expect(
+      user = pi,
+      query = s"""
+        query {
+          imagingConfigOptions(
+            WHERE: {
+              instrument: { EQ: ALOPEKE }
+            }
+          ) {
+            instrument
+            capability
+          }
+        }
+      """,
+      expected = json"""
+        {
+          "imagingConfigOptions": [
+            {
+              "instrument": "ALOPEKE",
+              "capability": "SPECKLE"
             }
           ]
         }
