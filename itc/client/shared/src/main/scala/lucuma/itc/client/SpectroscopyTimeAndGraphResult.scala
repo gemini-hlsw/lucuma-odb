@@ -6,6 +6,7 @@ package lucuma.itc.client
 import cats.Eq
 import cats.Order
 import cats.data.NonEmptyChain
+import cats.data.NonEmptyList
 import cats.derived.*
 import cats.syntax.all.*
 import io.circe.Decoder
@@ -15,9 +16,10 @@ import lucuma.core.math.TotalSN
 import lucuma.core.util.NewType
 import lucuma.itc.Error
 import lucuma.itc.GraphType
-import lucuma.itc.ItcAxis
 import lucuma.itc.ItcCcd
 import lucuma.itc.ItcVersions
+import lucuma.itc.ItcXAxis
+import lucuma.itc.ItcYAxis
 import lucuma.itc.SeriesDataType
 import lucuma.itc.TargetIntegrationTime
 import lucuma.itc.client.json.decoders.given
@@ -27,9 +29,9 @@ import lucuma.itc.client.json.decoders.given
 case class SeriesResult(
   title:      String,
   seriesType: SeriesDataType,
-  dataY:      List[Double],
-  xAxis:      Option[ItcAxis],
-  yAxis:      Option[ItcAxis]
+  dataY:      NonEmptyList[Double],
+  xAxis:      ItcXAxis,
+  yAxis:      ItcYAxis
 ) derives Eq,
       Decoder
 

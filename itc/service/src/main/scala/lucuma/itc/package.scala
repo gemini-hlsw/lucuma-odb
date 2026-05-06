@@ -75,11 +75,7 @@ object Conversions:
       originalGraphs.map: graph =>
         graph.copy(graphs = graph.graphs.map: c =>
           c.copy(series = c.series.map: s =>
-            ItcSeries(
-              s.title,
-              s.seriesType,
-              s.data.collect { case (x, y) if !y.isNaN => (x.toDouble, y.toDouble) }
-            )))
+            s.copy(dataY = s.dataY.map(y => if y.isNaN then 0.0 else y))))
 
     // Find the wavelength that gives the maximum value for the given series data type
     // It returns one value per ccd, returns a pair of wavelength and value
@@ -89,22 +85,14 @@ object Conversions:
     ): List[(Wavelength, Double)] =
       graph.series
         .filter(_.seriesType === seriesDataType)
-        .zip(ccds.toList)
-        .map: (sn, _) =>
-          sn.data
-            .filter(_._1 > 0)
-            .maxByOption(_._2)
-            .flatMap((w, s) => Wavelength.intPicometers.getOption((w * 1000).toInt).tupleRight(s))
+        .map(_.wavelengthAtMaxAndMax)
         .flattenOption
 
+    // Find the SN of the first series that provides a value at the given wavelength
     def signalToNoiseAtWv(graph: ItcGraph, seriesDataType: SeriesDataType): Option[SignalToNoise] =
       graph.series
         .filter(_.seriesType === seriesDataType)
-        .zip(ccds.toList)
-        .map: (sn, _) =>
-          sn.data
-            .find(_._1 >= atWavelength.toNanometers.value.value)
-            .map(_._2)
+        .map(_.yValueAtWavelength(atWavelength))
         .flattenOption
         .headOption
         .flatMap(v => SignalToNoise.FromBigDecimalRounding.getOption(v))

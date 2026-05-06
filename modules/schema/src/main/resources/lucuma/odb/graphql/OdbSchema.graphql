@@ -11424,6 +11424,18 @@ enum GnirsFpuSlit {
   LONG_SLIT_1_00
 }
 
+enum GnirsReadMode {
+  VERY_BRIGHT
+  BRIGHT
+  FAINT
+  VERY_FAINT
+}
+
+enum GnirsWellDepth {
+  SHALLOW
+  DEEP
+}
+
 """
 Edit or create imaging science requirements
 """

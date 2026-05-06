@@ -6,6 +6,7 @@ package lucuma.itc.service.redis
 import boopickle.DefaultBasic.*
 import cats.data.Chain
 import cats.data.NonEmptyChain
+import cats.data.NonEmptyList
 import cats.data.NonEmptyMap
 import eu.timepit.refined.*
 import eu.timepit.refined.api.*
@@ -45,14 +46,18 @@ given [A: Enumerated]: Pickler[A] =
 given [A: Pickler]: Pickler[NonEmptyChain[A]] =
   transformPickler(Chain.fromSeq[A].andThen(NonEmptyChain.fromChainUnsafe[A]))(_.toChain.toList)
 
+given picklerNonEmptyList[A: Pickler]: Pickler[NonEmptyList[A]] =
+  transformPickler(NonEmptyList.fromListUnsafe[A])(_.toList)
+
 given [K: Pickler: Ordering, V: Pickler]: Pickler[SortedMap[K, V]] =
   transformPickler((m: Map[K, V]) => SortedMap.from(m))(_.toMap)
 
 given [K: Pickler: Ordering, V: Pickler]: Pickler[NonEmptyMap[K, V]] =
   transformPickler(NonEmptyMap.fromMapUnsafe[K, V])(_.toSortedMap)
 
-given Pickler[ItcSeries]      =
-  transformPickler(Function.tupled(ItcSeries.apply))(x => (x.title, x.seriesType, x.data))
+given Pickler[ItcXAxis]       = generatePickler
+given Pickler[ItcYAxis]       = generatePickler
+given Pickler[ItcSeries]      = generatePickler
 given Pickler[FiniteDuration] =
   transformPickler(n => new FiniteDuration(n, NANOSECONDS))(_.toNanos)
 

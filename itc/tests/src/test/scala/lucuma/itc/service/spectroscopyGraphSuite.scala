@@ -89,13 +89,16 @@ class spectroscopyGraphSuite extends GraphQLSuite {
                     series {
                       title
                       seriesType
-                      data
+                      dataY
                       xAxis {
                         start
                         end
                         count
                       }
-                      dataY
+                      yAxis {
+                        min
+                        max
+                      }
                     }
                   }
                 }
@@ -130,25 +133,19 @@ class spectroscopyGraphSuite extends GraphQLSuite {
                           {
                             "title": "title",
                             "seriesType": "FINAL_S2_NDATA",
-                            "data": [
-                              [
-                                1.0,
-                                1000.0
-                              ],
-                              [
-                                2.0,
+                            "dataY": [
+                                1000.0,
                                 1001.0
-                              ]
                             ],
                             "xAxis" : {
                               "start" : 1.0,
                               "end" : 2.0,
                               "count" : 2
                             },
-                            "dataY": [
-                              1000.0,
-                              1001.0
-                            ]
+                            "yAxis": { 
+                              "min": 1000.0,
+                              "max": 1001.0
+                             }
                           }
                         ]
                       }
@@ -237,13 +234,16 @@ class spectroscopyGraphSuite extends GraphQLSuite {
                     series {
                       title
                       seriesType
-                      data
+                      dataY
                       xAxis {
                         start
                         end
                         count
                       }
-                      dataY
+                      yAxis {
+                        min
+                        max
+                       }
                     }
                   }
                 }
@@ -278,25 +278,19 @@ class spectroscopyGraphSuite extends GraphQLSuite {
                           {
                             "title": "title",
                             "seriesType": "FINAL_S2_NDATA",
-                            "data": [
-                              [
-                                1.0,
-                                1000.0
-                              ],
-                              [
-                                2.0,
-                                1001.0
-                              ]
+                            "dataY": [
+                              1000.0,
+                              1001.0
                             ],
                             "xAxis" : {
                               "start" : 1.0,
                               "end" : 2.0,
                               "count" : 2
                             },
-                            "dataY": [
-                              1000.0,
-                              1001.0
-                            ]
+                            "yAxis": {
+                              "min": 1000.0,
+                              "max": 1001.0
+                            }
                           }
                         ]
                       }
@@ -410,13 +404,16 @@ class spectroscopyGraphSuite extends GraphQLSuite {
                     series {
                       title
                       seriesType
-                      data
+                      dataY
                       xAxis {
                         start
                         end
                         count
                       }
-                      dataY
+                      yAxis {
+                        min
+                        max
+                      }
                     }
                   }
                 }
@@ -451,25 +448,19 @@ class spectroscopyGraphSuite extends GraphQLSuite {
                           {
                             "title": "title",
                             "seriesType": "FINAL_S2_NDATA",
-                            "data": [
-                              [
-                                1.0,
-                                1000.0
-                              ],
-                              [
-                                2.0,
-                                1001.0
-                              ]
+                            "dataY": [
+                              1000.0,
+                              1001.0
                             ],
                             "xAxis" : {
                               "start" : 1.0,
                               "end" : 2.0,
                               "count" : 2
                             },
-                            "dataY": [
-                              1000.0,
-                              1001.0
-                            ]
+                            "yAxis": {
+                              "min": 1000.0,
+                              "max": 1001.0
+                            }
                           }
                         ]
                       }

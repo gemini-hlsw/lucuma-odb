@@ -69,10 +69,11 @@ import lucuma.itc.CloudExtinctionInput
 import lucuma.itc.GraphType
 import lucuma.itc.ImageQualityInput
 import lucuma.itc.IntegrationTime
-import lucuma.itc.ItcAxis
 import lucuma.itc.ItcCcd
 import lucuma.itc.ItcGhostDetector
 import lucuma.itc.ItcVersions
+import lucuma.itc.ItcXAxis
+import lucuma.itc.ItcYAxis
 import lucuma.itc.SeriesDataType
 import lucuma.itc.SignalToNoiseAt
 import lucuma.itc.TargetIntegrationTime
@@ -308,9 +309,9 @@ class WiringSuite extends ClientSuite:
                         SeriesResult(
                           "title",
                           SeriesDataType.FinalS2NData,
-                          List(1000.0, 1001.0),
-                          ItcAxis(1, 2, 1, 2, 2).some,
-                          ItcAxis(1000.0, 1001.0, 1000, 1001, 2).some
+                          NonEmptyList.of(1000.0, 1001.0),
+                          ItcXAxis(1, 2, 2),
+                          ItcYAxis(1000.0, 0, 1001.0, 1)
                         )
                       )
                     )
@@ -511,9 +512,9 @@ class WiringSuite extends ClientSuite:
                           SeriesResult(
                             "title",
                             SeriesDataType.FinalS2NData,
-                            List(1000.0, 1001.0),
-                            ItcAxis(1, 2, 1, 2, 2).some,
-                            ItcAxis(1000.0, 1001.0, 1000, 1001, 2).some
+                            NonEmptyList.of(1000.0, 1001.0),
+                            ItcXAxis(1, 2, 2),
+                            ItcYAxis(1000.0, 0, 1001.0, 1)
                           )
                         )
                       )
