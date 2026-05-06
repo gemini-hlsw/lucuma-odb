@@ -54,14 +54,9 @@ trait RowParsers:
 
   val instrument: Parser[Instrument] =
     string.mapFilter { s =>
-      Enumerated[Instrument].all
-        .filter { inst =>
-          inst.shortName.equalsIgnoreCase(s) ||
-          inst.longName === s ||
-          inst.tag === s ||
-          s.toLowerCase.startsWith(s"${inst.shortName.toLowerCase} ")
-        }
-        .maxByOption(_.shortName.length)
+      Enumerated[Instrument].all.find { inst =>
+        inst.shortName.equalsIgnoreCase(s) || inst.longName === s || inst.tag === s
+      }
     }
 
   val arcsec: Parser0[Angle] =

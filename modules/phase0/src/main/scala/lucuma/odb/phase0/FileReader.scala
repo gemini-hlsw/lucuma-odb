@@ -91,3 +91,6 @@ class FileReader[F[_]](fileName: String)(using ApplicativeError[F, Throwable]):
 
   val igrins2Spectroscopy: Pipe[F, Byte, (SpectroscopyRow, PosInt)] =
     read(Instrument.Igrins2, SpectroscopyRow.rows)
+
+  val maroonXSpectroscopy: Pipe[F, Byte, (SpectroscopyRow, PosInt)] =
+    read(Instrument.MaroonX, SpectroscopyRow.rows)
