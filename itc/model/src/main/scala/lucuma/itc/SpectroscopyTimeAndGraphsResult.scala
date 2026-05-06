@@ -21,7 +21,6 @@ object SpectroscopyTimeAndGraphsResult:
         .obj(
           "versions"             -> r.versions.asJson,
           "targetTimesAndGraphs" -> r.targetOutcomes.value.asJson,
-          "targetTimes"          -> Json.Null, // This field is deprecated and should be removed in the future.
           "brightestIndex"       -> r.targetOutcomes.brightestIndex.asJson,
           "brightest"            -> r.targetOutcomes.brightest.asJson
         )

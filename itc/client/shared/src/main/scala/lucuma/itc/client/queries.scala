@@ -246,15 +246,12 @@ object SpectroscopyIntegrationTimeAndGraphsQuery extends GraphQLOperation[Unit] 
                 start
                 end
                 count
-                min
-                max
               }
               yAxis {
-                start
-                end
-                count
                 min
+                indexOfMin
                 max
+                indexOfMax
               }
             }
           }

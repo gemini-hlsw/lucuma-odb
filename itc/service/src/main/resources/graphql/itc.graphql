@@ -1006,64 +1006,6 @@ enum GhostReadMode {
   FAST
 }
 
-enum GnirsGrating {
-  D10
-  D32
-  D111
-}
-
-enum GnirsFilter {
-  CROSS_DISPERSED
-  ORDER6
-  ORDER5
-  ORDER4
-  ORDER3
-  ORDER2
-  ORDER1
-  H2
-  H_ND100X
-  H2_ND100X
-  PAH
-  Y
-  J
-  K
-}
-
-enum GnirsCamera {
-  LONG_BLUE
-  LONG_RED
-  SHORT_BLUE
-  SHORT_RED
-}
-
-enum GnirsPrism {
-  MIRROR
-  SXD
-  LXD
-}
-
-enum GnirsReadMode {
-  VERY_BRIGHT
-  BRIGHT
-  FAINT
-  VERY_FAINT
-}
-
-enum GnirsFpuSlit {
-  LONG_SLIT_0_10
-  LONG_SLIT_0_15
-  LONG_SLIT_0_20
-  LONG_SLIT_0_30
-  LONG_SLIT_0_45
-  LONG_SLIT_0_675
-  LONG_SLIT_1_00
-}
-
-enum GnirsWellDepth {
-  SHALLOW
-  DEEP
-}
-
 """GMOS amp count"""
 enum GmosAmpCount {
   """GmosAmpCount Three"""
@@ -2193,6 +2135,12 @@ type SmartGcal implements StepConfig {
   stepType: StepType!
 }
 
+type Visitor {
+  mode: VisitorObservingModeType!
+  centralWavelength: Wavelength!
+  guideStarMinSep: Angle!
+}
+
 type SetAllocationsResult {
   allocations: [Allocation!]!
 }
@@ -3001,6 +2949,17 @@ enum ObservingModeType {
 
   """ObservingModeType Igrins2LongSlit"""
   IGRINS_2_LONG_SLIT
+}
+
+"""VisitorObservingModeType"""
+enum VisitorObservingModeType {
+  ALOPEKE_SPECKLE
+  ALOPEKE_WIDE_FIELD
+  MAROON_X
+  VISITOR_NORTH
+  VISITOR_SOUTH
+  ZORRO_SPECKLE
+  ZORRO_WIDE_FIELD
 }
 
 type ConstraintSet {
@@ -4235,6 +4194,9 @@ type GhostDynamic {
   blue: GhostDetector!
   ifu1FiberAgitator: GhostIfu1FiberAgitator!
   ifu2FiberAgitator: GhostIfu2FiberAgitator!
+
+  """Central wavelength, which is fixed at 655 nm."""
+  centralWavelength: Wavelength
 }
 
 """GHOST step with potential breakpoint."""
@@ -5601,6 +5563,13 @@ type Group {
   minimumInterval: TimeSpan
   maximumInterval: TimeSpan
 
+  """
+  If true, all observations in this group must be scheduled on the same night.
+  Mutually exclusive with `maximumInterval`.
+  Only valid for AND groups.
+  """
+  sameNight: Boolean!
+
   """Contained elements"""
   elements(includeDeleted: Boolean! = false): [GroupElement!]!
 
@@ -5771,8 +5740,11 @@ enum PortDisposition {
 
 """Instrument"""
 enum Instrument {
-  """Instrument AcqCam"""
-  ACQ_CAM
+  """Instrument AcqCam at Gemini North"""
+  ACQ_CAM_NORTH
+
+  """Instrument AcqCam at Gemini South"""
+  ACQ_CAM_SOUTH
 
   """Instrument Flamingos2"""
   FLAMINGOS2
@@ -5801,8 +5773,11 @@ enum Instrument {
   """Instrument Niri"""
   NIRI
 
-  """Instrument Visitor"""
-  VISITOR
+  """Visitor Instrument at Gemini North"""
+  VISITOR_NORTH
+
+  """Visitor Instrument at Gemini North"""
+  VISITOR_SOUTH
 
   """Instrument Scorpio"""
   SCORPIO
@@ -5812,6 +5787,9 @@ enum Instrument {
 
   """Instrument Zorro"""
   ZORRO
+
+  """Instrument MAROON-X"""
+  MAROON_X
 }
 
 """Describes an instrument configuration option for spectroscopy."""
@@ -5857,6 +5835,11 @@ type SpectroscopyConfigOption {
   instruments.
   """
   gmosSouth: SpectroscopyConfigOptionGmosSouth
+
+  """
+  For GNIRS options, the GNIRS configuration.  Null for other instruments.
+  """
+  gnirs: SpectroscopyConfigOptionGnirs
 }
 
 type SpectroscopyConfigOptionFlamingos2 {
@@ -5880,6 +5863,72 @@ type SpectroscopyConfigOptionGmosSouth {
   fpu: GmosSouthBuiltinFpu!
   grating: GmosSouthGrating!
   filter: GmosSouthFilter
+}
+
+type SpectroscopyConfigOptionGnirs {
+  grating: GnirsGrating!
+  filter: GnirsFilter!
+  fpu: GnirsFpuSlit!
+  prism: GnirsPrism!
+  camera: GnirsCamera!
+}
+
+enum GnirsPrism {
+  MIRROR
+  SXD
+  LXD
+}
+
+enum GnirsCamera {
+  LONG_BLUE
+  LONG_RED
+  SHORT_BLUE
+  SHORT_RED
+}
+
+enum GnirsGrating {
+  D10
+  D32
+  D111
+}
+
+enum GnirsFilter {
+  CROSS_DISPERSED
+  ORDER6
+  ORDER5
+  ORDER4
+  ORDER3
+  ORDER2
+  ORDER1
+  H2
+  H_ND100X
+  H2_ND100X
+  PAH
+  Y
+  J
+  K
+}
+
+enum GnirsFpuSlit {
+  LONG_SLIT_0_10
+  LONG_SLIT_0_15
+  LONG_SLIT_0_20
+  LONG_SLIT_0_30
+  LONG_SLIT_0_45
+  LONG_SLIT_0_675
+  LONG_SLIT_1_00
+}
+
+enum GnirsReadMode {
+  VERY_BRIGHT
+  BRIGHT
+  FAINT
+  VERY_FAINT
+}
+
+enum GnirsWellDepth {
+  SHALLOW
+  DEEP
 }
 
 """
@@ -6317,6 +6366,12 @@ type ConfigurationObservingMode {
   gmosSouthImaging: ConfigurationGmosSouthImaging
   flamingos2LongSlit: ConfigurationFlamingos2LongSlit
   igrins2LongSlit: ConfigurationIgrins2LongSlit
+  visitor: ConfigurationVisitor
+}
+
+type ConfigurationVisitor {
+  mode: VisitorObservingModeType!
+  radius: Angle!
 }
 
 type ConfigurationGmosNorthLongSlit {
@@ -6910,6 +6965,7 @@ type ObservingMode {
 
   """IGRINS-2 Long Slit mode"""
   igrins2LongSlit: Igrins2LongSlit
+  visitor: Visitor
 }
 
 type ObservingModeGroup {
@@ -9301,21 +9357,29 @@ enum ItcGraphType {
   S2N_GRAPH
 }
 
-type GraphAxis {
+type GraphXAxis {
   """First value of the axis"""
   start: Float!
 
   """Last value of the axis"""
   end: Float!
 
+  """How many values for the axis"""
+  count: PosInt!
+}
+
+type GraphYAxis {
   """Max value of the axis"""
   max: Float!
+
+  """Index of the max value on the x axis"""
+  indexOfMax: Int!
 
   """Min value of the axis"""
   min: Float!
 
-  """How many values for the axis"""
-  count: PosInt!
+  """Index of the min value on the x axis"""
+  indexOfMin: Int!
 }
 
 type ItcSeries {
@@ -9327,16 +9391,10 @@ type ItcSeries {
   seriesType: ItcSeriesType!
 
   """Values for the x axis"""
-  xAxis: GraphAxis
+  xAxis: GraphXAxis!
 
   """Values for the x axis"""
-  yAxis: GraphAxis
-
-  """Data series in the form of pairs (x, y)"""
-  data: [[Float!]!]!
-
-  """Data series for the X axis"""
-  dataX: [Float!]!
+  yAxis: GraphYAxis!
 
   """Data series for the Y axis"""
   dataY: [Float!]!
@@ -9410,11 +9468,6 @@ type SpectroscopyTimeAndGraphsResult {
 
   """ITC results for each target, in case all targets succeed"""
   targetTimesAndGraphs: [TargetTimeAndGraphsOutcome!]
-
-  """
-  In case of errors in integration times, we short cirtuit to the results from integration times
-  """
-  targetTimes: [TargetIntegrationTimeOutcome!] @deprecated(reason: "This field will always be null. The targetTimesAndGraphs field should be used instead.")
 
   """Index of the brightest target"""
   brightestIndex: NonNegInt
