@@ -5,8 +5,8 @@ package lucuma.odb.graphql
 package mapping
 
 import io.circe.syntax.given
-import lucuma.odb.json.wavelength.query.given
 import lucuma.core.model.sequence.igrins2.CentralWavelength
+import lucuma.odb.json.wavelength.query.given
 
 import table.Igrins2DynamicTable
 
