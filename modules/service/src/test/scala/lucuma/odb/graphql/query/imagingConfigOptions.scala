@@ -12,10 +12,10 @@ import cats.syntax.traverse.*
 import io.circe.Decoder
 import io.circe.Json
 import io.circe.literal.*
+import lucuma.core.enums.ImagingCapabilities
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.Site
 import lucuma.core.math.Angle
-import lucuma.core.enums.ImagingCapabilities
 import skunk.Session
 import skunk.syntax.all.*
 

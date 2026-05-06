@@ -9,10 +9,10 @@ NIRI f/14	50	J,H,K	yes		n
 NIRI f/14	50	L,M	no		n
 NIRI f/32	22	J,H,K	yes		n
 NIRI f/32	22	L,M	no		n
-Alopeke	3	u,g,r,i,z,EO466,EO562,EO716,EO832	no	speckle	n
-Zorro	3	u,g,r,i,z,EO466,EO562,EO716,EO832,Halpha	no	speckle	s
-Alopeke	35	u,g,r,i,z,EO466,EO562,EO716,EO832	no	wide field	n
-Zorro	35	u,g,r,i,z,EO466,EO562,EO716,EO832,Halpha	no	wide field	s
+ALOPEKE	3	u,g,r,i,z,EO466,EO562,EO716,EO832	no	speckle	n
+ZORRO	3	u,g,r,i,z,EO466,EO562,EO716,EO832,Halpha	no	speckle	s
+ALOPEKE	35	u,g,r,i,z,EO466,EO562,EO716,EO832	no	wide field	n
+ZORRO	35	u,g,r,i,z,EO466,EO562,EO716,EO832,Halpha	no	wide field	s
 SCORPIO	180	g,r,i,z,J,H,Ks	no		s
 Visitor @ GN	-	-	yes		n
 Visitor @ GS	-	-	no		s

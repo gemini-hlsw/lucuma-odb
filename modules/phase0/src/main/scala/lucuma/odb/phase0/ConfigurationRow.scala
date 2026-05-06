@@ -175,10 +175,10 @@ object ImagingRow extends RowParsers {
     }
 
   val imagingCapability: Parser0[Option[ImagingCapabilities]] =
-    (vchar | sp).rep0.string.mapFilter {
+    (vchar | sp).rep0.string.mapFilter:
       case "" => none.some
-      case s  => ImagingCapabilities.values.find(_.label === s).map(_.some)
-    }
+      case s  => ImagingCapabilities.values.collectFirst:
+        case c if c.label === s => c.some
 
   /**
    * A single line in the .tsv file is split into 1 or more rows according to the filters included.

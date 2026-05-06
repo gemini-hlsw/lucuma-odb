@@ -23,6 +23,7 @@ import io.circe.syntax.*
 import lucuma.ags.GuideStarName
 import lucuma.core.data.EmailAddress
 import lucuma.core.enums.*
+import lucuma.core.enums.ImagingCapabilities
 import lucuma.core.math.Angle
 import lucuma.core.math.BoundedInterval
 import lucuma.core.math.Coordinates
@@ -94,7 +95,6 @@ import spire.math.interval.ValueBound
 import scala.collection.immutable.SortedSet
 import scala.util.control.Exception
 import scala.util.matching.Regex
-import lucuma.core.enums.ImagingCapabilities
 
 
 // Codecs for some atomic types.

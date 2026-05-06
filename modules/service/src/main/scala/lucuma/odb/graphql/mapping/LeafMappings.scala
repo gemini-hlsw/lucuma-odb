@@ -17,6 +17,7 @@ import io.circe.syntax.*
 import lucuma.core.data.EmailAddress
 import lucuma.core.enums.*
 import lucuma.core.enums.ConsiderForBand3
+import lucuma.core.enums.ImagingCapabilities
 import lucuma.core.math.Epoch
 import lucuma.core.math.SignalToNoise
 import lucuma.core.model.Attachment
@@ -60,7 +61,6 @@ import lucuma.odb.data.Tag
 import lucuma.odb.data.UserType
 
 import java.time.LocalDate
-import lucuma.core.enums.ImagingCapabilities
 
 trait LeafMappings[F[_]] extends BaseMapping[F] {
 
