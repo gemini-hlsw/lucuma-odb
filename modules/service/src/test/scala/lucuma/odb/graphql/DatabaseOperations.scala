@@ -813,6 +813,9 @@ trait DatabaseOperations { this: OdbSuite =>
   def createIgrins2LongSlitObservationAs(user: User, pid: Program.Id, offsets: Option[String], tids: Target.Id*): IO[Observation.Id] =
     createObservationWithSpatialOffsets(user, pid, ObservingModeType.Igrins2LongSlit, ImageQuality.Preset.PointEight, offsets, tids*)
 
+  def createGhostIfuObservationAs(user: User, pid: Program.Id, offsets: Option[String], tids: Target.Id*): IO[Observation.Id] =
+    createObservationWithSpatialOffsets(user, pid, ObservingModeType.GhostIfu, ImageQuality.Preset.PointEight, offsets, tids*)
+
   def createVisitorModeObservationAs(user: User, pid: Program.Id, mode: VisitorObservingModeType, tids: Target.Id*): IO[Observation.Id] =
     createObservationWithSpatialOffsets(user, pid, mode, ImageQuality.Preset.PointEight, None, tids*)
 
@@ -1207,6 +1210,31 @@ trait DatabaseOperations { this: OdbSuite =>
               }
             }
             $offsetsField
+          }
+        }"""
+      case ObservingModeType.GhostIfu =>
+        s"""{
+          ghostIfu: {
+            resolutionMode: STANDARD
+            stepCount: 3
+            red: {
+              exposureTimeMode: {
+                timeAndCount: {
+                  time: { seconds: 1.0 }
+                  count: 1
+                  at: { nanometers: 500 }
+                }
+              }
+            }
+            blue: {
+              exposureTimeMode: {
+                timeAndCount: {
+                  time: { seconds: 2.0 }
+                  count: 2
+                  at: { nanometers: 500 }
+                }
+              }
+            }
           }
         }"""
       case v: VisitorObservingModeType => 
