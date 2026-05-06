@@ -14,9 +14,11 @@ import lucuma.core.enums.ExecutionState as CoreExecutionState
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObservationValidationCode
 import lucuma.core.enums.ObservationWorkflowState
+import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.ProgramType
 import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.Site
+import lucuma.core.enums.VisitorObservingModeType
 import lucuma.core.math.Coordinates
 import lucuma.core.math.Declination
 import lucuma.core.math.RightAscension
@@ -108,7 +110,7 @@ case class ObservationValidationInfo(
   pid:                Program.Id,
   tpe:                ProgramType,
   oid:                Observation.Id,
-  instrument:         Option[Instrument],
+  observingMode:      Option[ObservingModeType],
   coordinates:        Option[Coordinates],  // explicit base, or coordinates at CFP midpoint, if any
   explicitBase:       Option[Coordinates],
   role:               Option[CalibrationRole],
@@ -123,6 +125,9 @@ case class ObservationValidationInfo(
   cfpInfo:            Option[CfpInfo] = None,
   programAllocations: Option[NonEmptyList[ScienceBand]] = None,
 ) {
+
+  def instrument: Option[Instrument] =
+    observingMode.map(_.instrument)
 
   def effectiveUserState: Option[UserState] =
     if role === Some(CalibrationRole.Telluric) then associatedUserState
@@ -141,6 +146,11 @@ case class ObservationValidationInfo(
   def isOpportunity: Boolean =
     asterism.exists:
       case t: Target.Opportunity => true
+      case _ => false
+
+  def isVisitor: Boolean =
+    observingMode.exists:
+      case _: VisitorObservingModeType => true
       case _ => false
 
   lazy val cfpMidpoint: Option[Timestamp] =
@@ -405,7 +415,8 @@ object ObservationWorkflowService {
           // Our final state is the execution state (if any), else the user state (if any), else the validation state,
           // with the one exception that user state Inactive overrides execution state Ongoing
           val state: ObservationWorkflowState =
-            (executionState, userStatus(validationStatus)) match
+            if info.isVisitor then userStatus(validationStatus).getOrElse(validationStatus)
+            else (executionState, userStatus(validationStatus)) match
               case (None, None)     => validationStatus
               case (None, Some(us)) => us
               case (Some(Ongoing), Some(Inactive)) => Inactive
@@ -439,7 +450,8 @@ object ObservationWorkflowService {
         // Here are our simple validators
 
         val generatorValidator: Validator = info =>
-          info.generatorParams.foldMap:
+          if info.isVisitor then ObservationValidationMap.empty
+          else info.generatorParams.foldMap:
             case Left(error)                                       => ObservationValidationMap.singleton(error.toObsValidation)
             case Right(GeneratorParams(Left(m), _, _, _, _, _, _)) => ObservationValidationMap.singleton(m.toObsValidation)
             case Right(ps)                                         => ObservationValidationMap.empty
@@ -465,7 +477,7 @@ object ObservationWorkflowService {
             else ObservationValidationMap.singleton(ObservationValidation.configuration(Messages.invalidScienceBand(b)))
 
         val itcValidator: Validator = info =>
-          if hasItc(info.oid) then ObservationValidationMap.empty
+          if hasItc(info.oid) || info.isVisitor then ObservationValidationMap.empty
           else ObservationValidationMap.singleton(ObservationValidation.itc("ITC results are not present."))
 
         // Here are our composed validators
@@ -686,7 +698,7 @@ object ObservationWorkflowService {
           o.c_program_id,
           p.c_program_type,
           o.c_observation_id,
-          o.c_instrument,
+          o.c_observing_mode_type,
           o.c_explicit_ra,
           o.c_explicit_dec,
           o.c_calibration_role,
@@ -706,10 +718,10 @@ object ObservationWorkflowService {
           AND o.c_group_id = s.c_group_id
         WHERE o.c_observation_id IN ($enc)
       """
-      .query(program_id *: program_type *: observation_id *: instrument.opt *: right_ascension.opt *: declination.opt *: calibration_role.opt *: user_state.opt *: bool *: tag *: cfp_id.opt *: science_band.opt *: user_state.opt)
+      .query(program_id *: program_type *: observation_id *: observing_mode_type.opt *: right_ascension.opt *: declination.opt *: calibration_role.opt *: user_state.opt *: bool *: tag *: cfp_id.opt *: science_band.opt *: user_state.opt)
       .map:
-        case (pid, tpe, oid, inst, ra, dec, cal, state, dc, tag, cfp, sci, state2) =>
-          ObservationValidationInfo(pid, tpe, oid, inst, None, (ra, dec).mapN(Coordinates.apply), cal, state, dc, tag, cfp, sci, Nil, state2)
+        case (pid, tpe, oid, mode, ra, dec, cal, state, dc, tag, cfp, sci, state2) =>
+          ObservationValidationInfo(pid, tpe, oid, mode, None, (ra, dec).mapN(Coordinates.apply), cal, state, dc, tag, cfp, sci, Nil, state2)
 
     def ProgramAllocations[A <: NonEmptyList[Program.Id]](enc: Encoder[A]): Query[A, (Program.Id, ScienceBand)] =
       sql"""
