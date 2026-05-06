@@ -9,6 +9,7 @@ import cats.parse.Rfc5234.sp
 import cats.parse.Rfc5234.vchar
 import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.PosInt
+import lucuma.core.enums.ImagingCapabilities
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.Site
 import lucuma.core.math.Angle

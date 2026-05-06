@@ -60,7 +60,7 @@ import lucuma.odb.data.Tag
 import lucuma.odb.data.UserType
 
 import java.time.LocalDate
-import lucuma.odb.phase0.ImagingCapabilities
+import lucuma.core.enums.ImagingCapabilities
 
 trait LeafMappings[F[_]] extends BaseMapping[F] {
 

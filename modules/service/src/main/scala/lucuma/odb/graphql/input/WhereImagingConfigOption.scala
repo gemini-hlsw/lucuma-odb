@@ -10,7 +10,7 @@ import grackle.Predicate.*
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.Site
 import lucuma.odb.graphql.binding.*
-import lucuma.odb.phase0.ImagingCapabilities
+import lucuma.core.enums.ImagingCapabilities
 
 object WhereImagingConfigOption {
 

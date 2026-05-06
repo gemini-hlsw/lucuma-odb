@@ -15,7 +15,7 @@ import io.circe.literal.*
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.Site
 import lucuma.core.math.Angle
-import lucuma.odb.phase0.ImagingCapabilities
+import lucuma.core.enums.ImagingCapabilities
 import skunk.Session
 import skunk.syntax.all.*
 

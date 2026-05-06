@@ -94,7 +94,7 @@ import spire.math.interval.ValueBound
 import scala.collection.immutable.SortedSet
 import scala.util.control.Exception
 import scala.util.matching.Regex
-import lucuma.odb.phase0.ImagingCapabilities
+import lucuma.core.enums.ImagingCapabilities
 
 
 // Codecs for some atomic types.
