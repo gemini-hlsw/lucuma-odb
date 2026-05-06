@@ -16,6 +16,7 @@ import grackle.Result
 import grackle.syntax.*
 import lucuma.core.enums.GmosAmpGain
 import lucuma.core.enums.GmosAmpReadMode
+import lucuma.core.enums.GmosFpuType
 import lucuma.core.enums.GmosLongSlitAcquisitionRoi
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosNorthFpu
@@ -44,6 +45,26 @@ import lucuma.odb.graphql.binding.*
 import scala.util.Try
 
 object GmosLongSlitInput:
+
+  val AllowedGNFPUs: Set[GmosNorthFpu] =
+    GmosNorthFpu.values.filter(_.fpuType === GmosFpuType.LongSlit).toSet
+
+  val AllowedGSFPUs: Set[GmosSouthFpu] =
+    GmosSouthFpu.values.filter(_.fpuType === GmosFpuType.LongSlit).toSet
+
+  private val AllowedGNFPUNames: String =
+    AllowedGNFPUs.toList.map(_.tag.toScreamingSnakeCase).sorted.mkString(", ")
+
+  private val AllowedGSFPUNames: String =
+    AllowedGSFPUs.toList.map(_.tag.toScreamingSnakeCase).sorted.mkString(", ")
+
+  private def validateNorthLongSlitFpu(fpu: GmosNorthFpu): Result[GmosNorthFpu] =
+    if fpu.fpuType === GmosFpuType.LongSlit then fpu.success
+    else OdbError.InvalidArgument(s"'fpu' must be one of: $AllowedGNFPUNames".some).asFailure
+
+  private def validateSouthLongSlitFpu(fpu: GmosSouthFpu): Result[GmosSouthFpu] =
+    if fpu.fpuType === GmosFpuType.LongSlit then fpu.success
+    else OdbError.InvalidArgument(s"'fpu' must be one of: $AllowedGSFPUNames".some).asFailure
 
   val WavelengthDithersFormat: Format[String, List[WavelengthDither]] =
     Format(
@@ -248,7 +269,7 @@ object GmosLongSlitInput:
       explicitλDithers:     Nullable[List[WavelengthDither]],
       explicitOffsets:      Nullable[List[Q]]
     ) derives Eq:
-          
+
       def toCreate(site: Site): Result[Create.Common] =
         required(site, centralWavelength, "centralWavelength").map: w =>
           Create.Common(
@@ -446,7 +467,7 @@ object GmosLongSlitInput:
       ) => (
         rGrating,
         rFilter,
-        rFpu,
+        rFpu.flatMap(_.traverse(validateNorthLongSlitFpu)),
         rCentralWavelength,
         rExposureTimeMode,
         rExplicitXBin.map(_.map(GmosXBinning(_))),
@@ -495,7 +516,7 @@ object GmosLongSlitInput:
       ) => (
         rGrating,
         rFilter,
-        rFpu,
+        rFpu.flatMap(_.traverse(validateSouthLongSlitFpu)),
         rCentralWavelength,
         rExposureTimeMode,
         rExplicitXBin.map(_.map(GmosXBinning(_))),
