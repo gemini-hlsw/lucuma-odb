@@ -1,0 +1,7 @@
+type Query {
+  hello(name: String): String
+}
+
+type Mutation {
+  sendHello(name: String!): String
+}

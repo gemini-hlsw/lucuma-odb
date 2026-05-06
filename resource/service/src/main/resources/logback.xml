@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+ Configuration of logging for development and local deployment.
+
+ File based logs are rotated daily up to 90 days.
+
+ It supports auto reloading scanning every 60s.
+-->
+<configuration scan="true" scanPeriod="60 seconds">
+    <logger name="org.http4s" level="INFO"/>
+    <logger name="resource.server" level="INFO" />
+    <logger name="org.http4s.server.middleware.Logger" level="WARN" />
+
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d [%thread] %-5level %logger{35} - %msg %n</pattern>
+        </encoder>
+    </appender>
+
+    <logger name="org.apache.activemq" level="INFO">
+        <appender-ref ref="STDOUT" />
+    </logger>
+    <logger name="io.netty" level="INFO">
+        <appender-ref ref="STDOUT" />
+    </logger>
+    <logger name="org.asynchttpclient.netty" level="INFO">
+        <appender-ref ref="STDOUT" />
+    </logger>
+    <logger name="io.honeycomb" level="INFO">
+        <appender-ref ref="STDOUT" />
+    </logger>
+
+    <root level="DEBUG">
+        <appender-ref ref="STDOUT" />
+    </root>
+</configuration>

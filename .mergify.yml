@@ -65,7 +65,7 @@ pull_request_rules:
       remove: []
 - name: Label model PRs
   conditions:
-  - files~=^itc/model/
+  - files~=^/
   actions:
     label:
       add:
