@@ -10,11 +10,13 @@ import io.circe
 import lucuma.core.math.RightAscension
 import lucuma.odb.graphql.table.CallForProposalsView
 import lucuma.odb.graphql.table.ConfigurationRequestView
+import lucuma.odb.graphql.table.GhostIfuView
 import lucuma.odb.graphql.table.ObservationView
 import lucuma.odb.graphql.table.TargetView
 
 trait RightAscensionMapping[F[_]] extends CallForProposalsView[F]
                                      with ConfigurationRequestView[F]
+                                     with GhostIfuView[F]
                                      with ObservationView[F]
                                      with TargetView[F] {
 
@@ -38,13 +40,14 @@ trait RightAscensionMapping[F[_]] extends CallForProposalsView[F]
       rightAscensionMappingAtPath(CallForProposalsType / "coordinateLimits" / "north" / "raEnd",   CallForProposalsView.Id, CallForProposalsView.coordinateLimits.north.RaEnd),
       rightAscensionMappingAtPath(CallForProposalsType / "coordinateLimits" / "south" / "raStart", CallForProposalsView.Id, CallForProposalsView.coordinateLimits.south.RaStart),
       rightAscensionMappingAtPath(CallForProposalsType / "coordinateLimits" / "south" / "raEnd",   CallForProposalsView.Id, CallForProposalsView.coordinateLimits.south.RaEnd),
-      rightAscensionMappingAtPath(CoordinatesType / "ra", ObservationView.TargetEnvironment.Coordinates.SyntheticId, ObservationView.TargetEnvironment.Coordinates.Ra),
-      rightAscensionMappingAtPath(SiderealType / "ra", TargetView.Sidereal.SyntheticId, TargetView.Sidereal.Ra),
       rightAscensionMappingAtPath(ConfigurationTargetType / "coordinates" / "ra", ConfigurationRequestView.Target.ReferenceCoordinates.SyntheticId, ConfigurationRequestView.Target.ReferenceCoordinates.Ra),
       rightAscensionMappingAtPath(ConfigurationTargetType / "region" / "rightAscensionArc" / "start", ConfigurationRequestView.Target.Region.RightAscensionArc.PartialSyntheticId, ConfigurationRequestView.Target.Region.RightAscensionArc.Start),
       rightAscensionMappingAtPath(ConfigurationTargetType / "region" / "rightAscensionArc" / "end", ConfigurationRequestView.Target.Region.RightAscensionArc.PartialSyntheticId, ConfigurationRequestView.Target.Region.RightAscensionArc.End),
+      rightAscensionMappingAtPath(CoordinatesType / "ra", ObservationView.TargetEnvironment.Coordinates.SyntheticId, ObservationView.TargetEnvironment.Coordinates.Ra),
+      rightAscensionMappingAtPath(GhostIfuType / "skyPosition" / "ra", GhostIfuView.Sky.Id, GhostIfuView.Sky.Ra),
       rightAscensionMappingAtPath(OpportunityType / "region" / "rightAscensionArc" / "start", TargetView.Opportunity.Region.RightAscensionArc.StartEndSyntheticId, TargetView.Opportunity.Region.RightAscensionArc.Start),
       rightAscensionMappingAtPath(OpportunityType / "region" / "rightAscensionArc" / "end", TargetView.Opportunity.Region.RightAscensionArc.StartEndSyntheticId, TargetView.Opportunity.Region.RightAscensionArc.End),
+      rightAscensionMappingAtPath(SiderealType / "ra", TargetView.Sidereal.SyntheticId, TargetView.Sidereal.Ra),
     )
 
 }

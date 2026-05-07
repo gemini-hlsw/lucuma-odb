@@ -509,6 +509,10 @@ class createObservation_GhostIfu extends OdbSuite:
                           defaultReadMode
                           explicitReadMode
                         }
+                        skyPosition {
+                          ra { hms }
+                          dec { dms }
+                        }
                         slitViewingCameraExposureTime { seconds }
                         ifu1Agitator
                         defaultIfu1Agitator
@@ -563,6 +567,7 @@ class createObservation_GhostIfu extends OdbSuite:
                           "defaultReadMode": "SLOW",
                           "explicitReadMode": null
                         },
+                        "skyPosition": null,
                         "slitViewingCameraExposureTime": null,
                         "ifu1Agitator": "DISABLED",
                         "defaultIfu1Agitator": "DISABLED",
@@ -570,6 +575,64 @@ class createObservation_GhostIfu extends OdbSuite:
                         "ifu2Agitator": "DISABLED",
                         "defaultIfu2Agitator": "DISABLED",
                         "explicitIfu2Agitator": null
+                      }
+                    }
+                  }
+                }
+              }
+            """.asRight
+        )
+
+  test("create GHOST IFU with sky position"):
+    createProgramAs(pi).flatMap: pid =>
+      createTargetAs(pi, pid).flatMap: tid =>
+        expect(
+          user  = pi,
+          query =
+            s"""
+              mutation {
+                createObservation(input: {
+                  programId: "$pid"
+                  SET: {
+                    targetEnvironment: {
+                      asterism: [ "$tid" ]
+                    }
+                    scienceRequirements: ${scienceRequirementsObject(GhostIfu)}
+                    observingMode: {
+                      ghostIfu: {
+                        resolutionMode: STANDARD
+                        skyPosition: {
+                          ra: { hours: 1.5 }
+                          dec: { degrees: 45.0 }
+                        }
+                      }
+                    }
+                  }
+                }) {
+                  observation {
+                    observingMode {
+                      ghostIfu {
+                        skyPosition {
+                          ra { hms }
+                          dec { dms }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            """,
+          expected =
+            json"""
+              {
+                "createObservation": {
+                  "observation": {
+                    "observingMode": {
+                      "ghostIfu": {
+                        "skyPosition": {
+                          "ra": { "hms": "01:30:00.000000" },
+                          "dec": { "dms": "+45:00:00.000000" }
+                        }
                       }
                     }
                   }

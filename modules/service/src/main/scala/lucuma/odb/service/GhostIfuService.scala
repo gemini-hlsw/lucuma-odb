@@ -17,6 +17,7 @@ import grackle.ResultT
 import lucuma.core.enums.GhostBinning
 import lucuma.core.enums.GhostReadMode
 import lucuma.core.enums.GhostResolutionMode
+import lucuma.core.math.Coordinates
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.Observation
 import lucuma.odb.data.ExposureTimeModeId
@@ -229,6 +230,7 @@ object GhostIfuService:
         ghost_resolution_mode         *:
         ghost_detector_red            *:
         ghost_detector_blue           *:
+        (right_ascension *: declination).to[Coordinates].opt *:
         time_span.opt                 *:
         ghost_ifu1_fiber_agitator.opt *:
         ghost_ifu2_fiber_agitator.opt
@@ -245,6 +247,8 @@ object GhostIfuService:
 
     private val RemainingColumns: List[String] =
       List(
+        "c_sky_ra",
+        "c_sky_dec",
         "c_slit_viewing_camera_exposure_time",
         "c_ifu1_fiber_agitator",
         "c_ifu2_fiber_agitator"
@@ -316,6 +320,8 @@ object GhostIfuService:
             ${ghost_binning.opt},
             $ghost_read_mode,
             ${ghost_read_mode.opt},
+            ${right_ascension.opt},
+            ${declination.opt},
             ${time_span.opt},
             ${ghost_ifu1_fiber_agitator.opt},
             ${ghost_ifu2_fiber_agitator.opt}
@@ -333,6 +339,8 @@ object GhostIfuService:
             input.blue.flatMap(_.explicitBinning.toOption),
             GhostReadMode.Slow,
             input.blue.flatMap(_.explicitReadMode.toOption),
+            input.skyPosition.map(_.ra),
+            input.skyPosition.map(_.dec),
             input.slitCameraExposureTime,
             input.explicitIfu1FiberAgitator,
             input.explicitIfu2FiberAgitator
@@ -448,6 +456,8 @@ object GhostIfuService:
         val upRedReadMode    = sql"c_red_read_mode       = ${ghost_read_mode.opt}"
         val upBlueBinning    = sql"c_blue_binning        = ${ghost_binning.opt}"
         val upBlueReadMode   = sql"c_blue_read_mode      = ${ghost_read_mode.opt}"
+        val upSkyRa          = sql"c_sky_ra              = ${right_ascension.opt}"
+        val upSkyDec         = sql"c_sky_dec             = ${declination.opt}"
         val upSlitExpTime    = sql"c_slit_viewing_camera_exposure_time = ${time_span.opt}"
         val upIfu1Agitator   = sql"c_ifu1_fiber_agitator = ${ghost_ifu1_fiber_agitator.opt}"
         val upIfu2Agitator   = sql"c_ifu2_fiber_agitator = ${ghost_ifu2_fiber_agitator.opt}"
@@ -460,6 +470,8 @@ object GhostIfuService:
             SET.red.flatMap(_.explicitReadMode.toOptionOption).map(upRedReadMode),
             SET.blue.flatMap(_.explicitBinning.toOptionOption).map(upBlueBinning),
             SET.blue.flatMap(_.explicitReadMode.toOptionOption).map(upBlueReadMode),
+            SET.skyPosition.toOptionOption.map(_.flatMap(_.ra)).map(upSkyRa),
+            SET.skyPosition.toOptionOption.map(_.flatMap(_.dec)).map(upSkyDec),
             SET.slitCameraExposureTime.toOptionOption.map(upSlitExpTime),
             SET.explicitIfu1FiberAgitator.toOptionOption.map(upIfu1Agitator),
             SET.explicitIfu2FiberAgitator.toOptionOption.map(upIfu2Agitator)

@@ -265,6 +265,10 @@ class updateObservations_GhostIfu extends OdbSuite with UpdateObservationsOps wi
             explicitBinning:  TWO_BY_EIGHT
             explicitReadMode: MEDIUM
           }
+          skyPosition: {
+            ra: { hours: 1.5 },
+            dec: { degrees: 45.0 }
+          }
           slitViewingCameraExposureTime: { seconds: 23.0 }
           explicitIfu1Agitator: DISABLED
           explicitIfu2Agitator: ENABLED
@@ -285,6 +289,10 @@ class updateObservations_GhostIfu extends OdbSuite with UpdateObservationsOps wi
             blue {
               explicitBinning
               explicitReadMode
+            }
+            skyPosition {
+              ra { hms }
+              dec { dms }
             }
             slitViewingCameraExposureTime { seconds }
             explicitIfu1Agitator
@@ -311,6 +319,10 @@ class updateObservations_GhostIfu extends OdbSuite with UpdateObservationsOps wi
                     "explicitBinning": "TWO_BY_EIGHT",
                     "explicitReadMode": "MEDIUM"
                   },
+                  "skyPosition": {
+                    "ra": { "hms": "01:30:00.000000" },
+                    "dec": { "dms": "+45:00:00.000000" }
+                  },
                   "slitViewingCameraExposureTime": {
                     "seconds": 23.000000
                   },
@@ -323,6 +335,39 @@ class updateObservations_GhostIfu extends OdbSuite with UpdateObservationsOps wi
         }
       }
     """.asRight
+
+    for
+      p <- createProgramAs(pi)
+      t <- createTargetWithProfileAs(pi, p)
+      o <- createObservationWithModeAs(pi, p, List(t), GhostIfuInput)
+      _ <- updateObservation(pi, o, update, query, expected)
+    yield o
+
+  test("Update only ra, but missing dec"):
+    val update = """
+      observingMode: {
+        ghostIfu: {
+          skyPosition: {
+            ra: { hours: 1.5 }
+          }
+        }
+      }
+    """
+
+    val query = """
+      observations {
+        observingMode {
+          ghostIfu {
+            skyPosition {
+              ra { hms }
+              dec { dms }
+            }
+          }
+        }
+      }
+    """
+
+    val expected = "skyPosition requires both ra and dec".asLeft
 
     for
       p <- createProgramAs(pi)

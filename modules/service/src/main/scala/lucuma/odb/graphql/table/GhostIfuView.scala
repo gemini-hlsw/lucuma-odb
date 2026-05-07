@@ -27,6 +27,11 @@ trait GhostIfuView[F[_]] extends BaseMapping[F]:
     val Red: DetectorTable  = DetectorTable("red")
     val Blue: DetectorTable = DetectorTable("blue")
 
+    object Sky:
+      val Id: ColumnRef  = col("c_sky_id", observation_id.embedded)
+      val Ra: ColumnRef  = col("c_sky_ra", right_ascension.embedded)
+      val Dec: ColumnRef = col("c_sky_dec", declination.embedded)
+
     object SlitViewingCamera:
       val Id: ColumnRef           = col("c_slit_viewing_camera_id",            observation_id.embedded)
       val ExposureTime: ColumnRef = col("c_slit_viewing_camera_exposure_time", time_span.embedded)
