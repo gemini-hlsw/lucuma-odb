@@ -11531,7 +11531,7 @@ type ImagingConfigOption {
   adaptiveOptics: Boolean!
 
   "A special capability (if any) that the configuration may have."
-  capability: ImagingCapabilities
+  capability: ImagingCapability
 
   site: Site!
 
@@ -13852,14 +13852,14 @@ type SpectralDefinitionSurface {
 """
 Imaging capabilities (e.g., Speckle).
 """
-enum ImagingCapabilities {
+enum ImagingCapability {
   """
-  ImagingCapabilities Speckle
+  ImagingCapability Speckle
   """
   SPECKLE
 
   """
-  ImagingCapabilities WideField
+  ImagingCapability WideField
   """
   WIDE_FIELD
 }
@@ -17161,7 +17161,7 @@ input WhereEqScienceSubtype {
 Filters on equality (or not) of the ImagingCapability property. All
 supplied criteria must match, but usually only one is selected.
 """
-input WhereOptionEqImagingCapabilities {
+input WhereOptionEqImagingCapability {
   """
   When `true`, matches if the imaging capability value is not defined.
   """
@@ -17170,23 +17170,23 @@ input WhereOptionEqImagingCapabilities {
   """
   Matches if the imaging capability is the supplied value.
   """
-  EQ: ImagingCapabilities
+  EQ: ImagingCapability
 
   """
   Matches if the imaging capability is anything other than the supplied
   value.
   """
-  NEQ: ImagingCapabilities
+  NEQ: ImagingCapability
 
   """
   Matches if the imaging capability is any one of the supplied values.
   """
-  IN: [ImagingCapabilities!]
+  IN: [ImagingCapability!]
 
   """
   Matches if the imaging capability is not any one of the supplied values.
   """
-  NIN: [ImagingCapabilities!]
+  NIN: [ImagingCapability!]
 }
 
 """
@@ -18878,7 +18878,7 @@ input WhereImagingConfigOption {
 
   site: WhereEqSite
 
-  capability: WhereOptionEqImagingCapabilities
+  capability: WhereOptionEqImagingCapability
 }
 
 """

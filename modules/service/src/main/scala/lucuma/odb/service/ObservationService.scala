@@ -828,7 +828,7 @@ object ObservationService {
           ${wavelength_pm.opt},
           ${focal_plane.opt},
           ${angle_µas.opt},
-          ${spectroscopy_capabilities.opt},
+          ${spectroscopy_capability.opt},
           ${angle_µas.opt},
           ${bool.opt},
           ${bool.opt},
@@ -926,7 +926,7 @@ object ObservationService {
       val upWavelengthCoverage = sql"c_spec_wavelength_coverage = ${wavelength_pm.opt}"
       val upFocalPlane         = sql"c_spec_focal_plane = ${focal_plane.opt}"
       val upFocalPlaneAngle    = sql"c_spec_focal_plane_angle = ${angle_µas.opt}"
-      val upCapability         = sql"c_spec_capability = ${spectroscopy_capabilities.opt}"
+      val upCapability         = sql"c_spec_capability = ${spectroscopy_capability.opt}"
 
 
       List(

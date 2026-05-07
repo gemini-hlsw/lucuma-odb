@@ -266,11 +266,11 @@ object Phase0Table {
 
     override def encoder: Encoder[ImagingRow] =
       (
-        instrument                *:
-        angle_µas                 *:
-        text                      *:
-        bool                      *:
-        imaging_capabilities.opt  *:
+        instrument              *:
+        angle_µas               *:
+        text                    *:
+        bool                    *:
+        imaging_capability.opt  *:
         site
       ).contramap[ImagingRow] { row => (
         row.instrument,
