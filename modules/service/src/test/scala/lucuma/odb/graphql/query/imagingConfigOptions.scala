@@ -12,7 +12,7 @@ import cats.syntax.traverse.*
 import io.circe.Decoder
 import io.circe.Json
 import io.circe.literal.*
-import lucuma.core.enums.ImagingCapabilities
+import lucuma.core.enums.ImagingCapability
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.Site
 import lucuma.core.math.Angle
@@ -41,7 +41,7 @@ class imagingConfigOptions extends OdbSuite {
     ao:                 Boolean,
     site:               Site,
     fov:                Angle,
-    capability:         Option[ImagingCapabilities]
+    capability:         Option[ImagingCapability]
   )
 
   object ConfigOption {
@@ -56,7 +56,7 @@ class imagingConfigOptions extends OdbSuite {
           ao       <- c.downField("adaptiveOptics").as[Boolean]
           site     <- c.downField("site").as[Site]
           fov      <- c.downField("fov").as[Angle]
-          cap      <- c.downField("capability").as[Option[ImagingCapabilities]]
+          cap      <- c.downField("capability").as[Option[ImagingCapability]]
         } yield ConfigOption(
           inst,
           filLabel,
@@ -241,7 +241,7 @@ class imagingConfigOptions extends OdbSuite {
   }
 
   test("capability EQ SPECKLE") {
-    val expect = allOptions.map(_.filter(_.capability.contains(ImagingCapabilities.Speckle)))
+    val expect = allOptions.map(_.filter(_.capability.contains(ImagingCapability.Speckle)))
     val actual = optionsWhere(s"""capability: { EQ: SPECKLE }""")
     for {
       es <- expect

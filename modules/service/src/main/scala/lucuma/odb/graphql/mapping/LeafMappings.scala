@@ -17,7 +17,7 @@ import io.circe.syntax.*
 import lucuma.core.data.EmailAddress
 import lucuma.core.enums.*
 import lucuma.core.enums.ConsiderForBand3
-import lucuma.core.enums.ImagingCapabilities
+import lucuma.core.enums.ImagingCapability
 import lucuma.core.math.Epoch
 import lucuma.core.math.SignalToNoise
 import lucuma.core.model.Attachment
@@ -165,7 +165,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[Igrins2OffsetMode](Igrins2OffsetModeType),
       LeafMapping[String](IgnoreType),
       LeafMapping[ImageQuality.Preset](ImageQualityPresetType),
-      LeafMapping[ImagingCapabilities](ImagingCapabilitiesType),
+      LeafMapping[ImagingCapability](ImagingCapabilityType),
       LeafMapping[Instrument](InstrumentType),
       LeafMapping[IntPercent](IntPercentType),
       LeafMapping[Long](LongType),

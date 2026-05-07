@@ -7,14 +7,14 @@ import cats.syntax.parallel.*
 import grackle.Path
 import grackle.Predicate
 import grackle.Predicate.*
-import lucuma.core.enums.ImagingCapabilities
+import lucuma.core.enums.ImagingCapability
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.Site
 import lucuma.odb.graphql.binding.*
 
 object WhereImagingConfigOption {
 
-  private val ImagingCapabilitiesBinding: Matcher[ImagingCapabilities] =
+  private val ImagingCapabilityBinding: Matcher[ImagingCapability] =
     enumeratedBinding
 
   def binding(path: Path): Matcher[Predicate] = {
@@ -22,7 +22,7 @@ object WhereImagingConfigOption {
     val WhereInstrument   = WhereEq.binding[Instrument](path / "instrument", InstrumentBinding)
     val WhereSite         = WhereEq.binding[Site](path / "site", SiteBinding)
     val WhereFov          = WhereAngle.binding(path / "fov")
-    val WhereCapability   = WhereOptionEq.binding[ImagingCapabilities](path / "capability", ImagingCapabilitiesBinding)
+    val WhereCapability   = WhereOptionEq.binding[ImagingCapability](path / "capability", ImagingCapabilityBinding)
 
     lazy val WhereConfigBinding = binding(path)
 

@@ -9,7 +9,7 @@ import cats.parse.Rfc5234.sp
 import cats.parse.Rfc5234.vchar
 import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.PosInt
-import lucuma.core.enums.ImagingCapabilities
+import lucuma.core.enums.ImagingCapability
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.Site
 import lucuma.core.math.Angle
@@ -161,7 +161,7 @@ case class ImagingRow(
   fov:            Angle,
   filter:         String,
   ao:             Boolean,
-  capability:     Option[ImagingCapabilities],
+  capability:     Option[ImagingCapability],
   site:           Site
 ) extends ConfigurationRow
 
@@ -174,10 +174,10 @@ object ImagingRow extends RowParsers {
       )
     }
 
-  val imagingCapability: Parser0[Option[ImagingCapabilities]] =
+  val imagingCapability: Parser0[Option[ImagingCapability]] =
     (vchar | sp).rep0.string.mapFilter:
       case "" => none.some
-      case s  => ImagingCapabilities.values.collectFirst:
+      case s  => ImagingCapability.values.collectFirst:
         case c if c.label === s => c.some
 
   /**
