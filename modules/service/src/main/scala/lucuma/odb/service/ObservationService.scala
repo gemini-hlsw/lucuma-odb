@@ -37,6 +37,7 @@ import lucuma.core.model.Group
 import lucuma.core.model.ImageQuality
 import lucuma.core.model.Observation
 import lucuma.core.model.ObservationReference
+import lucuma.core.model.PosAngleConstraint
 import lucuma.core.model.Program
 import lucuma.core.model.StandardRole.*
 import lucuma.core.model.Target
@@ -630,6 +631,21 @@ object ObservationService {
       calibrationRole: Option[CalibrationRole]
     ): Result[AppliedFragment] =
       SET.constraintSet.traverse(_.create).map { cs =>
+
+        val obsModeType = SET.observingMode.flatMap(_.observingModeType)
+
+        val pacInput =
+          SET.posAngleConstraint
+            .orElse(
+              obsModeType.map(_.defaultPosAngleConstraint)
+                .map(pac =>
+                  PosAngleConstraintInput(
+                    PosAngleConstraintMode.from(pac).some,
+                    PosAngleConstraint.angle.getOption(pac)
+                  )
+                )
+            )
+
         insertObservation(
           programId,
           SET.group,
@@ -637,13 +653,13 @@ object ObservationService {
           SET.subtitle,
           SET.existence.getOrElse(Existence.Default),
           SET.scienceBand,
-          SET.posAngleConstraint.flatMap(_.mode).getOrElse(PosAngleConstraintMode.Unbounded),
-          SET.posAngleConstraint.flatMap(_.angle).getOrElse(Angle.Angle0),
+          pacInput.flatMap(_.mode).getOrElse(PosAngleConstraintMode.Unbounded),
+          pacInput.flatMap(_.angle).getOrElse(Angle.Angle0),
           SET.targetEnvironment.flatMap(_.explicitBase),
           cs.getOrElse(ConstraintSetInput.NominalConstraints),
           SET.scienceRequirements,
-          SET.observingMode.flatMap(_.observingModeType),
-          SET.observingMode.flatMap(_.observingModeType).map(_.instrument),
+          obsModeType,
+          obsModeType.map(_.instrument),
           SET.observerNotes,
           SET.targetEnvironment.flatMap(_.useBlindOffset).getOrElse(false),
           SET.targetEnvironment.map(_.blindOffsetType).getOrElse(BlindOffsetType.Manual),
