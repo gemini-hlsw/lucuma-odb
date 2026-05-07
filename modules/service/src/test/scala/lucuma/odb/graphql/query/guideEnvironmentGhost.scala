@@ -11,6 +11,7 @@ import fs2.Stream
 import fs2.text.utf8
 import io.circe.Json
 import io.circe.literal.*
+import io.circe.syntax.*
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
@@ -29,6 +30,56 @@ class guideEnvironmentGhost extends ExecutionTestSupportForGhost
   override def createObservationAs(user: User, pid: Program.Id, tids: List[Target.Id]): IO[Observation.Id] =
     createGhostIfuObservationAs(user, pid, None, tids*) 
   
+  def setObservationPAC(
+    user: User,
+    oid:  Observation.Id,
+  ): IO[Unit] =
+    expect(
+      user = user,
+      query = s"""
+        mutation {
+          updateObservations(
+            input: {
+              WHERE: {
+                id: {
+                  EQ: ${oid.asJson}
+                }
+              }
+              SET: {
+                posAngleConstraint: {
+                  mode: FIXED,
+                  angle: {
+                    degrees: 0.0
+                  }
+                }
+              }
+              includeDeleted: true
+            }
+          ) {
+            observations {
+              id
+              posAngleConstraint {
+                mode
+                angle {
+                  degrees
+                }
+              }
+            }
+          }
+        }
+      """,
+      expected = json"""
+        {
+          "updateObservations": {
+            "observations": [
+              { "id": $oid, "posAngleConstraint": { "mode": "FIXED", "angle": { "degrees": 0 } } }
+            ]
+          }
+        }
+      """.asRight
+    )
+
+
   private def ghostPwfs2Result(title: String, degrees: BigDecimal): Either[List[String], Json] =
     json"""
     {
@@ -111,10 +162,11 @@ class guideEnvironmentGhost extends ExecutionTestSupportForGhost
         t <- createTargetWithProfileAs(pi, p)
         o <- createObservationAs(pi, p, List(t))
         _ <- setObservationTimeAndDuration(pi, o, gaiaSuccess.some, fullTimeEstimate.some)
+        _ <- setObservationPAC(pi, o)
       yield o
 
     setup.flatMap: oid =>
-      expect(pi, guideEnvironmentQuery(oid), expected = ghostPwfs2Result("V1647 Orionis", BigDecimal("130.000000")))
+      expect(pi, guideEnvironmentQuery(oid), expected = ghostPwfs2Result("V1647 Orionis", BigDecimal("0.000000")))
 
   test("nonsidereal target with PWFS2"):
     val setup: IO[Observation.Id] =
@@ -124,8 +176,9 @@ class guideEnvironmentGhost extends ExecutionTestSupportForGhost
         t   <- createNonsiderealTargetWithUserSuppliedEphemerisAs(pi, p, eph, name = "Nonsidereal Target")
         o   <- createObservationAs(pi, p, List(t))
         _   <- setObservationTimeAndDuration(pi, o, gaiaSuccess.some, fullTimeEstimate.some)
+        _   <- setObservationPAC(pi, o)
       yield o
 
     setup.flatMap: oid =>
-      expect(pi, guideEnvironmentQuery(oid), expected = ghostPwfs2Result("Nonsidereal Target", BigDecimal("220.000000")))
+      expect(pi, guideEnvironmentQuery(oid), expected = ghostPwfs2Result("Nonsidereal Target", BigDecimal("0.000000")))
 
