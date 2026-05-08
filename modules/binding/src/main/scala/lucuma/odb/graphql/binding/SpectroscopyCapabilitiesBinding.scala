@@ -3,7 +3,7 @@
 
 package lucuma.odb.graphql.binding
 
-import lucuma.core.enums.SpectroscopyCapabilities
+import lucuma.core.enums.SpectroscopyCapability
 
-val SpectroscopyCapabilitiesBinding: Matcher[SpectroscopyCapabilities] =
+val SpectroscopyCapabilityBinding: Matcher[SpectroscopyCapability] =
   enumeratedBinding

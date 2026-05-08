@@ -356,7 +356,7 @@ trait BaseMapping[F[_]]
   lazy val SlewStageType                           = schema.ref("SlewStage")
   lazy val SmartGcalType                           = schema.ref("SmartGcal")
   lazy val SmartGcalTypeType                       = schema.ref("SmartGcalType")
-  lazy val SpectroscopyCapabilitiesType            = schema.ref("SpectroscopyCapabilities")
+  lazy val SpectroscopyCapabilityType              = schema.ref("SpectroscopyCapability")
   lazy val SpectroscopyConfigOptionFlamingos2Type  = schema.ref("SpectroscopyConfigOptionFlamingos2")
   lazy val SpectroscopyConfigOptionGhostType       = schema.ref("SpectroscopyConfigOptionGhost")
   lazy val SpectroscopyConfigOptionGmosNorthType   = schema.ref("SpectroscopyConfigOptionGmosNorth")

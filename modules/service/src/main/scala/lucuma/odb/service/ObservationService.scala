@@ -21,7 +21,7 @@ import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.SkyBackground
-import lucuma.core.enums.SpectroscopyCapabilities
+import lucuma.core.enums.SpectroscopyCapability
 import lucuma.core.enums.WaterVapor
 import lucuma.core.math.Angle
 import lucuma.core.math.Coordinates
@@ -755,7 +755,7 @@ object ObservationService {
       Option[Wavelength]               ,
       Option[FocalPlane]               ,
       Option[Angle]                    ,
-      Option[SpectroscopyCapabilities] ,
+      Option[SpectroscopyCapability] ,
       Option[Angle]                    ,
       Option[Boolean]                  ,
       Option[Boolean]                  ,

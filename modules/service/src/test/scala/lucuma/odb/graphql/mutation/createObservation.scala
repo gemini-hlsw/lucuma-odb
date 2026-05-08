@@ -2088,7 +2088,7 @@ class createObservation extends OdbSuite with TelluricTypeGraphQLFormat {
            spectroscopy.downIO[BigDecimal]("wavelengthCoverage", "micrometers"),
            spectroscopy.downIO[FocalPlane]("focalPlane"),
            spectroscopy.downIO[Int]("focalPlaneAngle", "microarcseconds"),
-           spectroscopy.downIO[Option[SpectroscopyCapabilities]]("capability")
+           spectroscopy.downIO[Option[SpectroscopyCapability]]("capability")
           ).tupled,
           (ScienceMode.Spectroscopy,
            400_000L,
@@ -2098,7 +2098,7 @@ class createObservation extends OdbSuite with TelluricTypeGraphQLFormat {
            BigDecimal("0.1"),
            FocalPlane.SingleSlit,
            3,
-           Option.empty[SpectroscopyCapabilities]
+           Option.empty[SpectroscopyCapability]
           )
         )
       }

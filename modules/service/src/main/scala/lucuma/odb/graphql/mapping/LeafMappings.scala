@@ -203,7 +203,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[SkyBackground](SkyBackgroundType),
       LeafMapping[SlewStage](SlewStageType),
       LeafMapping[SmartGcalType](SmartGcalTypeType),
-      LeafMapping[SpectroscopyCapabilities](SpectroscopyCapabilitiesType),
+      LeafMapping[SpectroscopyCapability](SpectroscopyCapabilityType),
       LeafMapping[Step.Id](StepIdType),
       LeafMapping[StepExecutionState](StepExecutionStateType),
       LeafMapping[StepStage](StepStageType),
