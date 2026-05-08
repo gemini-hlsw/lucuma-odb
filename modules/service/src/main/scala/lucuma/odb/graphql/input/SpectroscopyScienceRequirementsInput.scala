@@ -8,7 +8,7 @@ import cats.syntax.parallel.*
 import eu.timepit.refined.types.numeric.PosInt
 import lucuma.core.enums.FocalPlane
 import lucuma.core.enums.ScienceMode
-import lucuma.core.enums.SpectroscopyCapabilities
+import lucuma.core.enums.SpectroscopyCapability
 import lucuma.core.math.Angle
 import lucuma.core.math.Wavelength
 import lucuma.odb.data.Nullable
@@ -23,7 +23,7 @@ final case class SpectroscopyScienceRequirementsInput(
   wavelengthCoverage: Nullable[Wavelength],
   focalPlane:         Nullable[FocalPlane],
   focalPlaneAngle:    Nullable[Angle],
-  capability:         Nullable[SpectroscopyCapabilities]
+  capability:         Nullable[SpectroscopyCapability]
 ) {
   val scienceMode: ScienceMode = ScienceMode.Spectroscopy
 }
@@ -43,8 +43,8 @@ object SpectroscopyScienceRequirementsInput:
   val FocalPlaneBinding: Matcher[FocalPlane] =
     enumeratedBinding[FocalPlane]
 
-  val SpectroscopyCapabilitiesBinding: Matcher[SpectroscopyCapabilities] =
-    enumeratedBinding[SpectroscopyCapabilities]
+  val SpectroscopyCapabilityBinding: Matcher[SpectroscopyCapability] =
+    enumeratedBinding[SpectroscopyCapability]
 
   val Binding: Matcher[SpectroscopyScienceRequirementsInput] =
     ObjectFieldsBinding.rmap {
@@ -54,7 +54,7 @@ object SpectroscopyScienceRequirementsInput:
         WavelengthInput.Binding.Nullable("wavelengthCoverage", rWavelengthCoverage),
         FocalPlaneBinding.Nullable("focalPlane", rFocalPlane),
         AngleInput.Binding.Nullable("focalPlaneAngle", rFocalPlaneAngle),
-        SpectroscopyCapabilitiesBinding.Nullable("capability", rCapability)
+        SpectroscopyCapabilityBinding.Nullable("capability", rCapability)
       ) =>
         (rWavelength, rResolution, rWavelengthCoverage, rFocalPlane, rFocalPlaneAngle, rCapability).parMapN(
           SpectroscopyScienceRequirementsInput.apply

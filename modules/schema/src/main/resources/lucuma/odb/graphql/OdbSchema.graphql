@@ -5138,7 +5138,7 @@ input SpectroscopyScienceRequirementsInput {
   """
   The capabilities field may be unset by assigning a null value, or ignored by skipping it altogether
   """
-  capability: SpectroscopyCapabilities
+  capability: SpectroscopyCapability
 }
 
 """
@@ -11331,7 +11331,7 @@ type SpectroscopyConfigOption {
   adaptiveOptics: Boolean!
 
   "A special capability (if any) that the configuration may have."
-  capability: SpectroscopyCapabilities
+  capability: SpectroscopyCapability
 
   site: Site!
 
@@ -13849,19 +13849,19 @@ type SpectralDefinitionSurface {
 """
 Spectroscopy capabilities Nod&Shuffle/Polarimetry/Corongraphy
 """
-enum SpectroscopyCapabilities {
+enum SpectroscopyCapability {
   """
-  SpectroscopyCapabilities NodAndShuffle
+  SpectroscopyCapability NodAndShuffle
   """
   NOD_AND_SHUFFLE
 
   """
-  SpectroscopyCapabilities Polarimetry
+  SpectroscopyCapability Polarimetry
   """
   POLARIMETRY
 
   """
-  SpectroscopyCapabilities Coronagraphy
+  SpectroscopyCapability Coronagraphy
   """
   CORONAGRAPHY
 }
@@ -13895,7 +13895,7 @@ type SpectroscopyScienceRequirements {
   """
   Spectroscopy Capabilities
   """
-  capability: SpectroscopyCapabilities
+  capability: SpectroscopyCapability
 }
 
 """
@@ -17140,10 +17140,10 @@ input WhereEqScienceSubtype {
 }
 
 """
-Filters on equality (or not) of the SpectroscopyCapabilities property. All
+Filters on equality (or not) of the SpectroscopyCapability property. All
 supplied criteria must match, but usually only one is selected.
 """
-input WhereOptionEqSpectroscopyCapabilities {
+input WhereOptionEqSpectroscopyCapability {
   """
   When `true`, matches if the spectroscopy capability value is not defined.
   """
@@ -17152,23 +17152,23 @@ input WhereOptionEqSpectroscopyCapabilities {
   """
   Matches if the spectroscopy capability is the supplied value.
   """
-  EQ: SpectroscopyCapabilities
+  EQ: SpectroscopyCapability
 
   """
   Matches if the spectroscopy capability is anything other than the supplied
   value.
   """
-  NEQ: SpectroscopyCapabilities
+  NEQ: SpectroscopyCapability
 
   """
   Matches if the spectroscopy capability is any one of the supplied values.
   """
-  IN: [SpectroscopyCapabilities!]
+  IN: [SpectroscopyCapability!]
 
   """
   Matches if the spectroscopy capability is not any one of the supplied values.
   """
-  NIN: [SpectroscopyCapabilities!]
+  NIN: [SpectroscopyCapability!]
 }
 
 """
@@ -18782,7 +18782,7 @@ input WhereSpectroscopyConfigOption {
 
   adaptiveOptics: WhereBoolean
 
-  capability: WhereOptionEqSpectroscopyCapabilities
+  capability: WhereOptionEqSpectroscopyCapability
 
   focalPlane: WhereEqFocalPlane
 

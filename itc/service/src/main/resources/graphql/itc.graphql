@@ -3723,6 +3723,9 @@ type Igrins2Static {
 type Igrins2Dynamic {
   """IGRINS-2 exposure time"""
   exposure: TimeSpan!
+
+  """Central wavelength, which is fixed at 2.1 microns."""
+  centralWavelength: Wavelength
 }
 
 """
@@ -4143,6 +4146,9 @@ type GhostIfu {
 
   """Blue detector config."""
   blue: GhostDetectorConfig!
+
+  """Sky position, if any."""
+  skyPosition: Coordinates
 
   """Slit viewing camera exposure time (if specified)."""
   slitViewingCameraExposureTime: TimeSpan
@@ -5810,7 +5816,7 @@ type SpectroscopyConfigOption {
   adaptiveOptics: Boolean!
 
   """A special capability (if any) that the configuration may have."""
-  capability: SpectroscopyCapabilities
+  capability: SpectroscopyCapability
   site: Site!
 
   """
@@ -7312,14 +7318,14 @@ type SpectralDefinitionSurface {
 }
 
 """Spectroscopy capabilities Nod&Shuffle/Polarimetry/Corongraphy"""
-enum SpectroscopyCapabilities {
-  """SpectroscopyCapabilities NodAndShuffle"""
+enum SpectroscopyCapability {
+  """SpectroscopyCapability NodAndShuffle"""
   NOD_AND_SHUFFLE
 
-  """SpectroscopyCapabilities Polarimetry"""
+  """SpectroscopyCapability Polarimetry"""
   POLARIMETRY
 
-  """SpectroscopyCapabilities Coronagraphy"""
+  """SpectroscopyCapability Coronagraphy"""
   CORONAGRAPHY
 }
 
@@ -7340,7 +7346,7 @@ type SpectroscopyScienceRequirements {
   focalPlaneAngle: Angle
 
   """Spectroscopy Capabilities"""
-  capability: SpectroscopyCapabilities
+  capability: SpectroscopyCapability
 }
 
 """Stellar library spectrum"""

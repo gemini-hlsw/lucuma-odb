@@ -574,8 +574,8 @@ trait Codecs {
   val smart_gcal_type: Codec[SmartGcalType] =
     enumerated(Type("e_smart_gcal_type"))
 
-  val spectroscopy_capabilities: Codec[SpectroscopyCapabilities] =
-    enumerated[SpectroscopyCapabilities](Type.varchar)
+  val spectroscopy_capabilities: Codec[SpectroscopyCapability] =
+    enumerated[SpectroscopyCapability](Type.varchar)
 
   val signal_to_noise: Codec[SignalToNoise] =
     numeric(11,3).eimap(

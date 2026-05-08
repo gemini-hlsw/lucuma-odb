@@ -57,7 +57,7 @@ object GnirsSpectroscopyRow:
                            .toRight(s"Cannot find filter: $f. Does a value exist in the Enumerated?")
           grating <- Enumerated[GnirsGrating]
                         .all
-                        .find(_.shortName === r.disperser)
+                        .find(_.rulingDensity.toString === r.disperser)
                         .toRight(s"Cannot find grating: ${r.disperser}. Does a value exist in the Enumerated?")
           fpu     <- Enumerated[GnirsFpuSlit]
                         .all
