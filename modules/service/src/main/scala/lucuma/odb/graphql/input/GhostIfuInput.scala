@@ -12,6 +12,7 @@ import lucuma.core.enums.GhostIfu1FiberAgitator
 import lucuma.core.enums.GhostIfu2FiberAgitator
 import lucuma.core.enums.GhostResolutionMode
 import lucuma.core.enums.ObservingModeType
+import lucuma.core.math.Coordinates
 import lucuma.core.util.TimeSpan
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.OdbError
@@ -27,6 +28,7 @@ object GhostIfuInput:
     resolutionMode:            GhostResolutionMode,
     red:                       Option[GhostDetectorConfigInput],
     blue:                      Option[GhostDetectorConfigInput],
+    skyPosition:               Option[Coordinates],
     slitCameraExposureTime:    Option[TimeSpan],
     explicitIfu1FiberAgitator: Option[GhostIfu1FiberAgitator],
     explicitIfu2FiberAgitator: Option[GhostIfu2FiberAgitator]
@@ -42,17 +44,19 @@ object GhostIfuInput:
           GhostResolutionModeBinding("resolutionMode", rResMode),
           GhostDetectorConfigInput.Binding.Option("red", rRed),
           GhostDetectorConfigInput.Binding.Option("blue", rBlue),
+          CoordinatesInput.Create.Binding.Option("skyPosition", rSky),
           TimeSpanInput.Binding.Option("slitViewingCameraExposureTime", rSlit),
           GhostIfu1FiberAgitatorBinding.Option("explicitIfu1Agitator", rIfu1),
           GhostIfu2FiberAgitatorBinding.Option("explicitIfu2Agitator", rIfu2)
-        ) => (rStepCount, rResMode, rRed, rBlue, rSlit, rIfu1, rIfu2).parMapN: (stepCount, resMode, red, blue, slit, ifu1, ifu2) =>
-          Create(stepCount.getOrElse(One), resMode, red, blue, slit, ifu1, ifu2)
+        ) => (rStepCount, rResMode, rRed, rBlue, rSky, rSlit, rIfu1, rIfu2).parMapN: (stepCount, resMode, red, blue, sky, slit, ifu1, ifu2) =>
+          Create(stepCount.getOrElse(One), resMode, red, blue, sky, slit, ifu1, ifu2)
 
   case class Edit(
     stepCount:                 Option[PosInt],
     resolutionMode:            Option[GhostResolutionMode],
     red:                       Option[GhostDetectorConfigInput],
     blue:                      Option[GhostDetectorConfigInput],
+    skyPosition:               Nullable[CoordinatesInput.Edit],
     slitCameraExposureTime:    Nullable[TimeSpan],
     explicitIfu1FiberAgitator: Nullable[GhostIfu1FiberAgitator],
     explicitIfu2FiberAgitator: Nullable[GhostIfu2FiberAgitator]
@@ -63,7 +67,7 @@ object GhostIfuInput:
     def toCreate: Result[Create] =
       Result
         .fromOption(resolutionMode, OdbError.InvalidArgument("A resolution mode must be supplied for GHOST IFU observations".some).asProblem)
-        .map(m => Create(stepCount.getOrElse(One), m, red, blue, slitCameraExposureTime.toOption, explicitIfu1FiberAgitator.toOption, explicitIfu2FiberAgitator.toOption))
+        .map(m => Create(stepCount.getOrElse(One), m, red, blue, skyPosition.toOption.flatMap(_.toCoordinates), slitCameraExposureTime.toOption, explicitIfu1FiberAgitator.toOption, explicitIfu2FiberAgitator.toOption))
 
   object Edit:
     val Binding: Matcher[Edit] =
@@ -73,8 +77,9 @@ object GhostIfuInput:
           GhostResolutionModeBinding.Option("resolutionMode", rResMode),
           GhostDetectorConfigInput.Binding.Option("red", rRed),
           GhostDetectorConfigInput.Binding.Option("blue", rBlue),
+          CoordinatesInput.Edit.Binding.Nullable("skyPosition", rSky),
           TimeSpanInput.Binding.Nullable("slitViewingCameraExposureTime", rSlit),
           GhostIfu1FiberAgitatorBinding.Nullable("explicitIfu1Agitator", rIfu1),
           GhostIfu2FiberAgitatorBinding.Nullable("explicitIfu2Agitator", rIfu2)
-        ) => (rStepCount, rResMode, rRed, rBlue, rSlit, rIfu1, rIfu2).parMapN: (stepCount, resMode, red, blue, slit, ifu1, ifu2) =>
-          Edit(stepCount, resMode, red, blue, slit, ifu1, ifu2)
+        ) => (rStepCount, rResMode, rRed, rBlue, rSky, rSlit, rIfu1, rIfu2).parMapN: (stepCount, resMode, red, blue, sky, slit, ifu1, ifu2) =>
+          Edit(stepCount, resMode, red, blue, sky, slit, ifu1, ifu2)

@@ -8775,6 +8775,14 @@ input GhostIfuInput {
   blue: GhostDetectorConfigInput
 
   """
+  Coordinates for taking sky images.  When specified, the observation is
+  considered to be a Target + Sky and is validated to ensure that only a single
+  target exists in its asterism.  If not specified, this will remain null.  May
+  be unset with a null value.
+  """
+  skyPosition: CoordinatesInput
+
+  """
   Slit viewing camera exposure time.  If not specified, this will remain null.
   May be unset with a null value.
   """
@@ -8860,6 +8868,11 @@ type GhostIfu {
   Blue detector config.
   """
   blue: GhostDetectorConfig!
+
+  """
+  Sky position, if any.
+  """
+  skyPosition: Coordinates
 
   """
   Slit viewing camera exposure time (if specified).

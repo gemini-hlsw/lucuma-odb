@@ -7,15 +7,19 @@ package mapping
 
 import grackle.skunk.SkunkMapping
 import lucuma.odb.graphql.table.ConfigurationRequestView
+import lucuma.odb.graphql.table.GhostIfuView
 
 import table.ObservationView
 
-trait CoordinatesMapping[F[_]] extends ObservationView[F] with ConfigurationRequestView[F] {
+trait CoordinatesMapping[F[_]] extends ObservationView[F]
+                                  with ConfigurationRequestView[F]
+                                  with GhostIfuView[F]:
 
   lazy val CoordinatesMappings =
     List(
       CoordinatesMapping,
       ConfigurationRequestReferenceCoordinatesMapping,
+      GhostIfuSkyPositionMapping
     )
 
   private lazy val CoordinatesMapping =
@@ -32,5 +36,9 @@ trait CoordinatesMapping[F[_]] extends ObservationView[F] with ConfigurationRequ
       SqlObject("dec")
     )
 
-}
-
+  private lazy val GhostIfuSkyPositionMapping =
+    ObjectMapping(GhostIfuType / "skyPosition")(
+      SqlField("synthetic-id", GhostIfuView.Sky.Id, key = true, hidden = true),
+      SqlObject("ra"),
+      SqlObject("dec")
+    )
