@@ -154,8 +154,9 @@ object StartupDiagnostics:
           checkPostgresLookupTable(gnirs_grating, "t_gnirs_grating"),
           checkPostgresLookupTable(gnirs_prism, "t_gnirs_prism"),
           checkPostgresLookupTable(image_quality_preset, "t_image_quality"),
+          checkPostgresLookupTable(imaging_capability, "t_imaging_capability"),
           checkPostgresLookupTable(instrument, "t_instrument"),
-          checkPostgresLookupTable(spectroscopy_capabilities, "t_spectroscopy_capabilities"),
+          checkPostgresLookupTable(spectroscopy_capability, "t_spectroscopy_capability"),
           checkPostgresLookupTable(step_execution_state, "t_step_execution_state"),
           checkPostgresLookupTable(water_vapor, "t_water_vapor"),
 

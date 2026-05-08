@@ -17,6 +17,7 @@ trait ImagingConfigOptionMapping[F[_]] extends ImagingConfigOptionTable[F] {
       SqlField("filterLabel",    ImagingConfigOptionTable.FilterLabel),
 
       SqlField("adaptiveOptics", ImagingConfigOptionTable.Ao),
+      SqlField("capability",     ImagingConfigOptionTable.Capability),
       SqlField("site",           ImagingConfigOptionTable.Site),
       SqlObject("fov"),
 

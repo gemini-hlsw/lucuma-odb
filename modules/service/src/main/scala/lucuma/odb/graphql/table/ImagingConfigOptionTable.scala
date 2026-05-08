@@ -20,6 +20,8 @@ trait ImagingConfigOptionTable[F[_]] extends BaseMapping[F] {
 
     val Ao                 = col("c_ao",           bool)
 
+    val Capability         = col("c_capability",   imaging_capability.opt)
+
     val Site               = col("c_site",         site)
   }
 

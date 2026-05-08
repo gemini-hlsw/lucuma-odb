@@ -244,6 +244,7 @@ trait BaseMapping[F[_]]
   lazy val ImagingConfigOptionGmosNorthType        = schema.ref("ImagingConfigOptionGmosNorth")
   lazy val ImagingConfigOptionGmosSouthType        = schema.ref("ImagingConfigOptionGmosSouth")
   lazy val ImagingConfigOptionType                 = schema.ref("ImagingConfigOption")
+  lazy val ImagingCapabilityType                   = schema.ref("ImagingCapability")
   lazy val ImagingScienceRequirementsType          = schema.ref("ImagingScienceRequirements")
   lazy val InstrumentType                          = schema.ref("Instrument")
   lazy val IntPercentType                          = schema.ref("IntPercent")

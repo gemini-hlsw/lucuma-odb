@@ -11530,6 +11530,9 @@ type ImagingConfigOption {
 
   adaptiveOptics: Boolean!
 
+  "A special capability (if any) that the configuration may have."
+  capability: ImagingCapability
+
   site: Site!
 
   fov: Angle!
@@ -13844,6 +13847,21 @@ type SpectralDefinitionSurface {
   Emission lines spectral definition
   """
   emissionLines: EmissionLinesSurface
+}
+
+"""
+Imaging capabilities (e.g., Speckle).
+"""
+enum ImagingCapability {
+  """
+  ImagingCapability Speckle
+  """
+  SPECKLE
+
+  """
+  ImagingCapability WideField
+  """
+  WIDE_FIELD
 }
 
 """
@@ -17140,6 +17158,38 @@ input WhereEqScienceSubtype {
 }
 
 """
+Filters on equality (or not) of the ImagingCapability property. All
+supplied criteria must match, but usually only one is selected.
+"""
+input WhereOptionEqImagingCapability {
+  """
+  When `true`, matches if the imaging capability value is not defined.
+  """
+  IS_NULL: Boolean
+
+  """
+  Matches if the imaging capability is the supplied value.
+  """
+  EQ: ImagingCapability
+
+  """
+  Matches if the imaging capability is anything other than the supplied
+  value.
+  """
+  NEQ: ImagingCapability
+
+  """
+  Matches if the imaging capability is any one of the supplied values.
+  """
+  IN: [ImagingCapability!]
+
+  """
+  Matches if the imaging capability is not any one of the supplied values.
+  """
+  NIN: [ImagingCapability!]
+}
+
+"""
 Filters on equality (or not) of the SpectroscopyCapability property. All
 supplied criteria must match, but usually only one is selected.
 """
@@ -18827,6 +18877,8 @@ input WhereImagingConfigOption {
   fov: WhereAngle
 
   site: WhereEqSite
+
+  capability: WhereOptionEqImagingCapability
 }
 
 """

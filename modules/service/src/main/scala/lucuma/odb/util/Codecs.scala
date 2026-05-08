@@ -23,6 +23,7 @@ import io.circe.syntax.*
 import lucuma.ags.GuideStarName
 import lucuma.core.data.EmailAddress
 import lucuma.core.enums.*
+import lucuma.core.enums.ImagingCapability
 import lucuma.core.math.Angle
 import lucuma.core.math.BoundedInterval
 import lucuma.core.math.Coordinates
@@ -574,8 +575,11 @@ trait Codecs {
   val smart_gcal_type: Codec[SmartGcalType] =
     enumerated(Type("e_smart_gcal_type"))
 
-  val spectroscopy_capabilities: Codec[SpectroscopyCapability] =
+  val spectroscopy_capability: Codec[SpectroscopyCapability] =
     enumerated[SpectroscopyCapability](Type.varchar)
+
+  val imaging_capability: Codec[ImagingCapability] =
+    enumerated[ImagingCapability](Type.varchar)
 
   val signal_to_noise: Codec[SignalToNoise] =
     numeric(11,3).eimap(
