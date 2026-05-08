@@ -15,6 +15,7 @@ import lucuma.core.enums.GhostReadMode
 import lucuma.core.enums.GhostResolutionMode
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObservingModeType
+import lucuma.core.math.Coordinates
 import lucuma.core.math.Wavelength
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.Observation
@@ -67,6 +68,7 @@ class GhostIfuServiceSuite extends ExecutionTestSupport:
       Nullable.NonNull(GhostBinning.FourByFour),
       Nullable.NonNull(GhostReadMode.Slow)
     ).some,
+    skyPosition               = Coordinates.fromHmsDms.getOption("17 57 48.49803 +04 41 36.2072"),
     slitCameraExposureTime    = TimeSpan.FromMicroseconds.getOption(1000L),
     explicitIfu1FiberAgitator = GhostIfu1FiberAgitator.Enabled.some,
     explicitIfu2FiberAgitator = GhostIfu2FiberAgitator.Disabled.some
@@ -134,6 +136,7 @@ class GhostIfuServiceSuite extends ExecutionTestSupport:
       resolutionMode         = in.resolutionMode,
       red                    = DetectorConfig.Red(expectedDetector(in.red, GhostReadMode.Medium)),
       blue                   = DetectorConfig.Blue(expectedDetector(in.blue, GhostReadMode.Slow)),
+      skyPosition            = in.skyPosition,
       slitCameraExposureTime = in.slitCameraExposureTime,
       explicitIfu1Agitator   = in.explicitIfu1FiberAgitator,
       explicitIfu2Agitator   = in.explicitIfu2FiberAgitator
@@ -160,6 +163,7 @@ class GhostIfuServiceSuite extends ExecutionTestSupport:
       resolutionMode            = GhostResolutionMode.Standard,
       red                       = none,
       blue                      = none,
+      skyPosition               = none,
       slitCameraExposureTime    = none,
       explicitIfu1FiberAgitator = none,
       explicitIfu2FiberAgitator = none

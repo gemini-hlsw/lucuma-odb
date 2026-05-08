@@ -55,6 +55,8 @@ trait GhostIfuMapping[F[_]]
       SqlObject("red"),
       SqlObject("blue"),
 
+      SqlObject("skyPosition"),
+
       SqlObject("slitViewingCameraExposureTime"),
 
       explicitOrElseDefault[GhostIfu1FiberAgitator]("ifu1Agitator", "explicitIfu1Agitator", "defaultIfu1Agitator"),

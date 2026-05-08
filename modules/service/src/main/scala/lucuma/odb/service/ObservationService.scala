@@ -157,6 +157,12 @@ object ObservationService {
       "explicitBase requires both ra and dec"
     )
 
+  val BothGhostIfuskyPositionConstraint: DatabaseConstraint =
+    DatabaseConstraint(
+      "ghost_ifu_sky_position_neither_or_both",
+      "skyPosition requires both ra and dec"
+    )
+
   def GenericConstraintViolationMessage(m: String): String =
     s"Database constraint violation produced by input: $m"
 
@@ -165,7 +171,8 @@ object ObservationService {
       MissingAirMassConstraint,
       MissingHourAngleConstraint,
       MissingScienceBandConstraint,
-      BothExplicitCoordinatesConstraint
+      BothExplicitCoordinatesConstraint,
+      BothGhostIfuskyPositionConstraint
     )
 
   def constraintViolationMessage(ex: PostgresErrorException): String =

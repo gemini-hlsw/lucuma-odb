@@ -10,6 +10,7 @@ import io.circe
 import lucuma.core.math.Declination
 import lucuma.odb.graphql.table.CallForProposalsView
 import lucuma.odb.graphql.table.ConfigurationRequestView
+import lucuma.odb.graphql.table.GhostIfuView
 import lucuma.odb.graphql.table.ObservationView
 import lucuma.odb.graphql.table.TargetView
 
@@ -17,6 +18,7 @@ import scala.reflect.ClassTag
 
 trait DeclinationMapping[F[_]] extends CallForProposalsView[F]
                                   with ConfigurationRequestView[F]
+                                  with GhostIfuView[F]
                                   with ObservationView[F]
                                   with TargetView[F] {
 
@@ -39,13 +41,14 @@ trait DeclinationMapping[F[_]] extends CallForProposalsView[F]
       declinationMappingAtPath(CallForProposalsType / "coordinateLimits" / "north" / "decEnd",   CallForProposalsView.Id, CallForProposalsView.coordinateLimits.north.DecEnd),
       declinationMappingAtPath(CallForProposalsType / "coordinateLimits" / "south" / "decStart", CallForProposalsView.Id, CallForProposalsView.coordinateLimits.south.DecStart),
       declinationMappingAtPath(CallForProposalsType / "coordinateLimits" / "south" / "decEnd",   CallForProposalsView.Id, CallForProposalsView.coordinateLimits.south.DecEnd),
-      declinationMappingAtPath(CoordinatesType / "dec", ObservationView.TargetEnvironment.Coordinates.SyntheticId, ObservationView.TargetEnvironment.Coordinates.Dec),
-      declinationMappingAtPath(SiderealType / "dec", TargetView.Sidereal.SyntheticId, TargetView.Sidereal.Dec),
       declinationMappingAtPath(ConfigurationTargetType / "coordinates" / "dec", ConfigurationRequestView.Target.ReferenceCoordinates.SyntheticId, ConfigurationRequestView.Target.ReferenceCoordinates.Dec),
       declinationMappingAtPath(ConfigurationTargetType / "region" / "declinationArc" / "start", ConfigurationRequestView.Target.Region.DeclinationArc.PartialSyntheticId, ConfigurationRequestView.Target.Region.DeclinationArc.Start),
       declinationMappingAtPath(ConfigurationTargetType / "region" / "declinationArc" / "end", ConfigurationRequestView.Target.Region.DeclinationArc.PartialSyntheticId, ConfigurationRequestView.Target.Region.DeclinationArc.End),
+      declinationMappingAtPath(CoordinatesType / "dec", ObservationView.TargetEnvironment.Coordinates.SyntheticId, ObservationView.TargetEnvironment.Coordinates.Dec),
+      declinationMappingAtPath(GhostIfuType / "skyPosition" / "dec", GhostIfuView.Sky.Id, GhostIfuView.Sky.Dec),
       declinationMappingAtPath(OpportunityType / "region" / "declinationArc" / "start", TargetView.Opportunity.Region.DeclinationArc.StartEndSyntheticId, TargetView.Opportunity.Region.DeclinationArc.Start),
       declinationMappingAtPath(OpportunityType / "region" / "declinationArc" / "end", TargetView.Opportunity.Region.DeclinationArc.StartEndSyntheticId, TargetView.Opportunity.Region.DeclinationArc.End),
+      declinationMappingAtPath(SiderealType / "dec", TargetView.Sidereal.SyntheticId, TargetView.Sidereal.Dec),
     )
 
 }
