@@ -64,6 +64,14 @@ trait GnirsCodec:
         "wavelength" -> a.wavelength.asJson
       )
 
+  given Decoder[GnirsAcquisitionMirrorMode] =
+    Decoder.instance: c =>
+      c.as[Option[GnirsAcquisitionMirrorMode.Out]].map(_.getOrElse(GnirsAcquisitionMirrorMode.In))
+
+  given Encoder[GnirsAcquisitionMirrorMode] =
+    Encoder.instance: a =>
+      GnirsAcquisitionMirrorMode.out.getOption(a).fold(Json.Null)(_.asJson)
+
   given Decoder[GnirsFocus.Custom] =
     Decoder.instance: c =>
       c.as[GnirsFocusMotorStepsValue].map: motorSteps =>
@@ -72,6 +80,14 @@ trait GnirsCodec:
   given Encoder[GnirsFocus.Custom] =
     Encoder.instance: a =>
       a.value.value.asJson
+
+  given Decoder[GnirsFocus] =
+    Decoder.instance: c =>
+      c.as[Option[GnirsFocus.Custom]].map(_.getOrElse(GnirsFocus.Best))
+
+  given Encoder[GnirsFocus] =
+    Encoder.instance: a =>
+      GnirsFocus.custom.getOption(a).fold(Json.Null)(_.asJson)
 
   given Decoder[GnirsDynamicConfig] =
     Decoder.instance: c =>
@@ -83,9 +99,9 @@ trait GnirsCodec:
         decker            <- c.downField("decker").as[GnirsDecker]
         fpu               <- c.downField("fpuSlit").as[GnirsFpuSlit].map(_.asLeft[GnirsFpuOther]) orElse
                              c.downField("fpuOther").as[GnirsFpuOther].map(_.asRight[GnirsFpuSlit])
-        acqMirror         <- c.downField("acquisitionMirrorOut").as[Option[GnirsAcquisitionMirrorMode.Out]].map(_.getOrElse(GnirsAcquisitionMirrorMode.In))
+        acqMirror         <- c.downField("acquisitionMirrorOut").as[GnirsAcquisitionMirrorMode]
         camera            <- c.downField("camera").as[GnirsCamera]
-        focus             <- c.downField("focusCustom").as[Option[GnirsFocus.Custom]].map(_.getOrElse(GnirsFocus.Best))
+        focus             <- c.downField("focusCustom").as[GnirsFocus]
         readMode          <- c.downField("readMode").as[GnirsReadMode]
       yield GnirsDynamicConfig(
         exposure,
@@ -110,9 +126,9 @@ trait GnirsCodec:
         "decker"               -> a.decker.asJson,
         "fpuSlit"              -> a.fpu.left.toOption.fold(Json.Null)(_.asJson),
         "fpuOther"             -> a.fpu.toOption.fold(Json.Null)(_.asJson),
-        "acquisitionMirrorOut" -> GnirsAcquisitionMirrorMode.out.getOption(a.acquisitionMirror).fold(Json.Null)(_.asJson),
+        "acquisitionMirrorOut" -> a.acquisitionMirror.asJson,
         "camera"               -> a.camera.asJson,
-        "focus"                -> GnirsFocus.custom.getOption(a.focus).fold(Json.Null)(_.asJson),
+        "focus"                -> a.focus.asJson,
         "readMode"             -> a.readMode.asJson
       )
 
