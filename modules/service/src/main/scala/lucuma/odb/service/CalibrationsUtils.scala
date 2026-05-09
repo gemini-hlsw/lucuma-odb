@@ -119,6 +119,27 @@ trait WorkflowStateQueries[F[_]: {Concurrent, Services, Tracer as T}] {
       haveVisits(filtered.map(oid)).map: visited =>
         filtered.filterNot(a => visited.contains(oid(a)))
 
+  // Like `excludeFromDeletion`, but also checks tellurics parent workflow state
+  def excludeTelluricsFromDeletion[A](obs: List[A], oid: A => Observation.Id): F[List[A]] =
+    excludeFromDeletion(obs, oid).flatMap: base =>
+      telluricScienceStates(base.map(oid)).map: parents =>
+        base.filterNot: a =>
+          parents.get(oid(a)).exists: s =>
+            // if the science obs is ongoing or completed, the telluric should not be deleted.
+            s === ObservationWorkflowState.Ongoing || s === ObservationWorkflowState.Completed
+
+  private def telluricScienceStates(
+    oids: List[Observation.Id]
+  ): F[Map[Observation.Id, ObservationWorkflowState]] =
+    NonEmptyList.fromList(oids) match
+      case None       => Map.empty.pure
+      case Some(nel)  =>
+        val af = Statements.selectTelluricScienceWorkflowStates(nel)
+        session
+          .prepareR(af.fragment.query(observation_id *: observation_workflow_state))
+          .use(_.stream(af.argument, 1024).compile.toList)
+          .map(_.toMap)
+
   def onlyDefinedAndReady[A](obs: List[A], oid: A => Observation.Id): F[List[A]] =
     filterWorkflowStateIn(obs, oid, List(ObservationWorkflowState.Defined, ObservationWorkflowState.Ready), true)
 
@@ -176,6 +197,19 @@ object WorkflowStateQueries:
       void"SELECT DISTINCT c_observation_id FROM t_visit WHERE c_observation_id IN (" |+|
         oids.map(sql"$observation_id").intercalate(void", ")                          |+|
         void")"
+
+    def selectTelluricScienceWorkflowStates(oids: NonEmptyList[Observation.Id]): AppliedFragment =
+      void"""
+        SELECT t.c_observation_id, sci_obscalc.c_workflow_state
+        FROM t_observation t
+        JOIN t_observation sci
+          ON sci.c_group_id = t.c_group_id
+         AND sci.c_calibration_role IS NULL
+        JOIN t_obscalc sci_obscalc
+          ON sci_obscalc.c_observation_id = sci.c_observation_id
+        WHERE t.c_calibration_role = 'telluric'
+          AND t.c_observation_id IN (
+      """ |+| oids.map(sql"$observation_id").intercalate(void", ") |+| void")"
 
 trait SpecPhotoCalibrations extends CalibrationTargetLocator {
   def idealLocation(site: Site, referenceInstant: Instant): Coordinates = {

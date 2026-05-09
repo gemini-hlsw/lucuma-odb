@@ -243,7 +243,7 @@ object PerScienceObservationCalibrationsService:
         T.span("sync-telluric", Attribute.from(ProgramIdKey, pid), Attribute.from(GroupIdKey, gid)).surround:
           for {
             existing           <- findAllTelluricObservations(gid)
-            deletable          <- excludeFromDeletion(existing, identity)
+            deletable          <- excludeTelluricsFromDeletion(existing, identity)
             duration           <- obsDuration(obs.id)
             requiredCount      = duration match
                                   case Some(d) if d > MultiTelluricThreshold => 2
@@ -416,7 +416,7 @@ object PerScienceObservationCalibrationsService:
           telluricOidsInGroup <- S.session
                                    .prepareR(Statements.selectTelluricObservations)
                                    .use(_.stream((gid, CalibrationRole.Telluric), 1024).compile.toList)
-          deletable           <- excludeFromDeletion(telluricOidsInGroup, identity)
+          deletable           <- excludeTelluricsFromDeletion(telluricOidsInGroup, identity)
           deleted             <- NonEmptyList.fromList(deletable) match
                                    case Some(nel) => observationService.deleteCalibrationObservations(nel).as(deletable)
                                    case None      => List.empty.pure[F]
@@ -455,11 +455,11 @@ object PerScienceObservationCalibrationsService:
                                       gidOpt  <- findTelluricGroupForObservation(oid)
                                       result  <- gidOpt match
                                                   case Some(gid) =>
-                                                    info"Observation $oid no longer active, cleaning up telluric group $gid" *>
+                                                    info"Observation $oid no longer active or ongoing, cleaning up telluric group $gid" *>
                                                       cleanupOrphanedTelluricGroup(pid, gid, oid)
                                                   case None =>
                                                     debug"Observation $oid has no telluric group, skipping" *>
-                                                      (List.empty[Observation.Id], List.empty[Observation.Id]).pure[F]
+                                                      (List.empty[Observation.Id], List.empty[Observation.Id]).pure
                                     } yield result
           } yield result
 
