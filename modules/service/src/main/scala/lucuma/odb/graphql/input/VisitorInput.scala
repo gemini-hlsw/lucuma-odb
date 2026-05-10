@@ -21,11 +21,11 @@ object VisitorInput:
   case class Edit(
     mode: Option[VisitorObservingModeType],
     centralWavelength: Option[Wavelength],
-    guideStarMinSep: Option[Angle] 
+    scienceFov: Option[Angle]
   ):
     def toCreate: Result[Create] =
       Result.fromOption(
-        (mode, centralWavelength, guideStarMinSep).mapN(Create.apply),
+        (mode, centralWavelength, scienceFov).mapN(Create.apply),
         "Cannot turn edit into create; all fields must be defined."
       )
 
@@ -34,15 +34,15 @@ object VisitorInput:
       case List(
         VisitorObservingModeTypeBinding("mode", rMode),
         WavelengthInput.Binding("centralWavelength", rWavelength),
-        AngleInput.Binding("guideStarMinSep", rGuideStarMinSep)
+        AngleInput.Binding("scienceFov", rScienceFov)
       ) =>
-        (rMode, rWavelength, rGuideStarMinSep).mapN(Create.apply)
+        (rMode, rWavelength, rScienceFov).mapN(Create.apply)
 
   val EditBinding: Matcher[Edit] =
     ObjectFieldsBinding.rmap:
       case List(
         VisitorObservingModeTypeBinding.Option("mode", rMode),
         WavelengthInput.Binding.Option("centralWavelength", rWavelength),
-        AngleInput.Binding.Option("guideStarMinSep", rGuideStarMinSep)
+        AngleInput.Binding.Option("scienceFov", rScienceFov)
       ) =>
-        (rMode, rWavelength, rGuideStarMinSep).mapN(Edit.apply)
+        (rMode, rWavelength, rScienceFov).mapN(Edit.apply)

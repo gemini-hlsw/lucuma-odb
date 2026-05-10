@@ -11,11 +11,11 @@ import table.VisitorTable
 
 trait VisitorMapping[F[_]] extends VisitorTable[F]:
   this: SkunkMapping[F] =>
-  
+
   lazy val VisitorMapping =
     ObjectMapping(VisitorType)(
       SqlField("observationId", VisitorTable.ObservationId, key = true, hidden = true),
       SqlField("mode", VisitorTable.ObservingModeType),
       SqlObject("centralWavelength"),
-      SqlObject("guideStarMinSep"),
+      SqlObject("scienceFov"),
     )

@@ -75,9 +75,9 @@ trait AngleMapping[F[_]] extends ObservationView[F]
       angleMappingAtPath(ImagingScienceRequirementsType / "minimumFov", Imaging.MinimumFovAngle.Value, Imaging.MinimumFovAngle.SyntheticId),
       angleMappingAtPath(RandomTelescopeConfigGeneratorType / "size", TelescopeConfigGeneratorView.Size, TelescopeConfigGeneratorView.Random.ObservationId, TelescopeConfigGeneratorView.Random.Role),
       angleMappingAtPath(SpiralTelescopeConfigGeneratorType / "size", TelescopeConfigGeneratorView.Size, TelescopeConfigGeneratorView.Spiral.ObservationId, TelescopeConfigGeneratorView.Spiral.Role),
-      angleMappingAtPath(VisitorType / "guideStarMinSep", VisitorTable.GuideStarMinSep, VisitorTable.ObservationId),
+      angleMappingAtPath(VisitorType / "scienceFov", VisitorTable.ScienceFov, VisitorTable.ObservationId),
       angleMappingAtPath(ConfigurationRequestType / "configuration" / "observingMode" / "visitor" / "radius", ConfigurationRequestView.Visitor.Radius, ConfigurationRequestView.Visitor.Id),
-      angleMappingAtPath(ObservationType / "configuration" / "observingMode" / "visitor" / "radius", VisitorTable.GuideStarMinSep, VisitorTable.ObservationId),
+      angleMappingAtPath(ObservationType / "configuration" / "observingMode" / "visitor" / "radius", VisitorTable.ScienceFov, VisitorTable.ObservationId),
     )
 
 }

@@ -13,5 +13,4 @@ trait VisitorTable[F[_]] extends BaseMapping[F]:
     val ObservationId     = col("c_observation_id", observation_id)
     val ObservingModeType = col("c_observing_mode_type", visitor_observing_mode_type)
     val CentralWavelength = col("c_central_wavelength", wavelength_pm)
-    val GuideStarMinSep   = col("c_guide_star_min_sep", angle_µas)
-
+    val ScienceFov        = col("c_science_fov", angle_µas)
