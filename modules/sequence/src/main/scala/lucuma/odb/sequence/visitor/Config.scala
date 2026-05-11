@@ -11,6 +11,7 @@ import lucuma.odb.sequence.util.HashBytes
 final case class Config(
   mode: VisitorObservingModeType,
   centralWavelength: Wavelength,
+  // Science field of view, understood as the diameter of a circular area.
   scienceFov: Angle
 )
 
