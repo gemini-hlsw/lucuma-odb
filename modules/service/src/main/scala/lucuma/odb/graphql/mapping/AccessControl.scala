@@ -78,6 +78,7 @@ import skunk.AppliedFragment
 import skunk.Encoder
 import skunk.Transaction
 import skunk.syntax.stringcontext.*
+import lucuma.core.enums.ObservingModeType
 
 object AccessControl:
 
@@ -713,16 +714,17 @@ trait AccessControl[F[_]] extends Predicates[F] {
       .value
 
 
-  def selectForUpdate(input: SetObservationWorkflowStateInput)(using Services[F], NoTransaction[F]): F[Result[CheckedWithId[(ObservationWorkflow, ObservationWorkflowState), Observation.Id]]] =
+  def selectForUpdate(input: SetObservationWorkflowStateInput)(using Services[F], NoTransaction[F]): F[Result[CheckedWithId[(Option[ObservingModeType], ObservationWorkflow, ObservationWorkflowState), Observation.Id]]] =
     verifyWritable(input.observationId) >>
     Services.asSuperUser:
-      observationWorkflowService.getWorkflows(List(input.observationId))
+      observationWorkflowService.getWorkflowsAndModes(List(input.observationId))
         .map: res =>
-          res.map(_(input.observationId)).flatMap: w =>
-            if w.state === input.state || w.validTransitions.contains(input.state)
-            then Result(AccessControl.unchecked((w, input.state), input.observationId, observation_id))
-            else Result.failure(OdbError.InvalidWorkflowTransition(w.state, input.state).asProblem)
-
+          res.map(_(input.observationId)).flatMap: 
+            case (w, om) =>
+              if w.state === input.state || w.validTransitions.contains(input.state)
+              then 
+                Result(AccessControl.unchecked((om, w, input.state), input.observationId, observation_id))
+              else Result.failure(OdbError.InvalidWorkflowTransition(w.state, input.state).asProblem)
 
   def selectForUpdate[D](
     input: ReplaceSequenceInput[D]

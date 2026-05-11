@@ -8,9 +8,12 @@ import cats.effect.Async
 import cats.implicits.*
 import grackle.Result
 import grackle.ResultT
+import lucuma.core.model.Access
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.ConfigurationRequestStatus
 import lucuma.core.enums.ExecutionState as CoreExecutionState
+import lucuma.core.enums.DeclaredExecutionState
+import lucuma.core.enums.DeclaredExecutionState.given
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObservationValidationCode
 import lucuma.core.enums.ObservationWorkflowState
@@ -59,6 +62,10 @@ import Services.Syntax.*
 
 sealed trait ObservationWorkflowService[F[_]] {
 
+  def getWorkflowsAndModes(
+    oids: List[Observation.Id]
+  )(using NoTransaction[F], SuperUserAccess): F[Result[Map[Observation.Id, (ObservationWorkflow, Option[ObservingModeType])]]]
+
   def getWorkflows(
     oids: List[Observation.Id]
   )(using NoTransaction[F], SuperUserAccess): F[Result[Map[Observation.Id, ObservationWorkflow]]]
@@ -85,7 +92,7 @@ sealed trait ObservationWorkflowService[F[_]] {
   )(using Transaction[F]): F[Result[ObservationWorkflow]]
 
   def setWorkflowState(
-    input: AccessControl.CheckedWithId[(ObservationWorkflow, ObservationWorkflowState), Observation.Id]
+    input: AccessControl.CheckedWithId[(Option[ObservingModeType], ObservationWorkflow, ObservationWorkflowState), Observation.Id]
   )(using NoTransaction[F]): F[Result[ObservationWorkflow]]
 
   def filterState(
@@ -115,7 +122,7 @@ case class ObservationValidationInfo(
   explicitBase:       Option[Coordinates],
   role:               Option[CalibrationRole],
   userState:          Option[ObservationWorkflowService.UserState],
-  declaredComplete:   Boolean,
+  declaredExecutionState: Option[DeclaredExecutionState],
   proposalStatus:     Tag,
   cfpid:              Option[CallForProposals.Id],
   scienceBand:        Option[ScienceBand],
@@ -125,6 +132,12 @@ case class ObservationValidationInfo(
   cfpInfo:            Option[CfpInfo] = None,
   programAllocations: Option[NonEmptyList[ScienceBand]] = None,
 ) {
+
+  def isDeclaredOngoing: Boolean =
+    declaredExecutionState === Some(CoreExecutionState.DeclaredOngoing)
+
+  def isDeclaredComplete: Boolean =
+    declaredExecutionState === Some(CoreExecutionState.DeclaredComplete)
 
   def instrument: Option[Instrument] =
     observingMode.map(_.instrument)
@@ -212,6 +225,7 @@ object ObservationWorkflowService {
       case CoreExecutionState.Completed        => Completed.some
       case CoreExecutionState.DeclaredComplete => Completed.some
       case CoreExecutionState.Ongoing          => Ongoing.some
+      case CoreExecutionState.DeclaredOngoing  => Ongoing.some
       case _                                   => none
 
   extension [A,B,C](m: Map[A, Either[B, C]]) def separateValues: (Map[A, B], Map[A, C]) =
@@ -234,6 +248,11 @@ object ObservationWorkflowService {
 
       // Make the enums available in a stable and implicit way
       given Enums = enums
+
+      // private def lookupObsDefinition(
+      //   oid: Observation.Id
+      // )(using Transaction[F]): F[Option[ObservationValidationInfo]] =
+      //   lookupObsDefinitions(List(oid)).map(_.get(oid))
 
       private def lookupObsDefinitions(
         oids: List[Observation.Id]
@@ -412,15 +431,22 @@ object ObservationWorkflowService {
                   case Unapproved => None
                   case Defined    => Some(Ready)
 
+          // println("")
+          // println(s"****** my executionState is $executionState")
+          // println(s"****** my validationStatus is $validationStatus")        
+          // println(s"****** my userStatus is ${userStatus(validationStatus)}")
+
           // Our final state is the execution state (if any), else the user state (if any), else the validation state,
           // with the one exception that user state Inactive overrides execution state Ongoing
           val state: ObservationWorkflowState =
-            if info.isVisitor then userStatus(validationStatus).getOrElse(validationStatus)
-            else (executionState, userStatus(validationStatus)) match
+            (executionState, userStatus(validationStatus)) match
               case (None, None)     => validationStatus
               case (None, Some(us)) => us
               case (Some(Ongoing), Some(Inactive)) => Inactive
               case (Some(es), _)    => es
+
+          val canUpdateExecutionState: Boolean =
+            info.isVisitor && user.role.access >= Access.Staff
 
           val allowedTransitions: List[ObservationWorkflowState] =
             if (info.role === Some(CalibrationRole.Telluric) && state <= Ready) then Nil
@@ -429,9 +455,9 @@ object ObservationWorkflowService {
               case Undefined  => List(Inactive)
               case Unapproved => List(Inactive)
               case Defined    => List(Inactive) ++ Option.when((!info.isOpportunity) && (isAccepted || info.tpe =!= ProgramType.Science))(Ready)
-              case Ready      => List(Inactive, validationStatus)
-              case Ongoing    => List(Inactive, Completed)
-              case Completed  => if info.declaredComplete then List(Ongoing) else Nil
+              case Ready      => List(Inactive, validationStatus) ++ Option.when(canUpdateExecutionState)(Ongoing)
+              case Ongoing    => List(Inactive, Completed) ++ Option.when(canUpdateExecutionState)(Ready)
+              case Completed  => if info.isDeclaredComplete then List(Ongoing) else Nil
 
           (state, allowedTransitions)
 
@@ -545,6 +571,14 @@ object ObservationWorkflowService {
       override def getWorkflows(
         oids: List[Observation.Id]
       )(using NoTransaction[F], SuperUserAccess): F[Result[Map[Observation.Id, ObservationWorkflow]]] =
+        ResultT(getWorkflowsAndModes(oids))
+          .map: m =>
+            m.view.mapValues(p => p._1).toMap
+          .value
+
+      override def getWorkflowsAndModes(
+        oids: List[Observation.Id]
+      )(using NoTransaction[F], SuperUserAccess): F[Result[Map[Observation.Id, (ObservationWorkflow, Option[ObservingModeType])]]] =
 
         // Data obtained from the database, requiring a transaction.
         val select: F[Result[(
@@ -566,7 +600,11 @@ object ObservationWorkflowService {
           errorFree              = infos.view.filterKeys(oid => errs.get(oid).forall(_.isEmpty)).toMap
           execs                  = executionStates(errorFree)
           workflows             <- ResultT.fromResult(computeWorkflows(infos, errs, execs))
-        yield workflows).value
+          withModes = 
+            workflows.map:
+              case (oid, wf) =>
+                oid -> (wf, infos.get(oid).flatMap(_.observingMode))
+        yield withModes).value
 
       override def getWorkflow(
         oid: Observation.Id
@@ -580,11 +618,14 @@ object ObservationWorkflowService {
       override def getCalculatedWorkflow(
         oid:  Observation.Id,
         itc:  Option[Itc],
-        exec: Option[CoreExecutionState]
+        exec0: Option[CoreExecutionState]
       )(using Transaction[F]): F[Result[ObservationWorkflow]] =
         (for
           infos <- ResultT.liftF(lookupObsDefinitions(List(oid)))
           errs  <- validateObsDefinition(infos, _ => itc.isDefined)
+          exec = exec0.filter:
+            case a: DeclaredExecutionState => true // always ok
+            case _ => !infos.get(oid).exists(_.isVisitor) // otherwise discard the state if it's a visitor
           wfExec = exec.flatMap[ExecutionState](ces => ces.workflowExecutionState)
           execs  = wfExec.fold[Map[Observation.Id, ExecutionState]](Map.empty)(es => Map(oid -> es))
           wfs   <- ResultT.fromResult(computeWorkflows(infos, errs, execs))
@@ -600,31 +641,66 @@ object ObservationWorkflowService {
               pq.stream(pid, 1024).compile.toList
           .flatMap(getWorkflows)
 
+      extension (self: ObservingModeType) def isVisitorMode: Boolean =
+        self match
+          case _: VisitorObservingModeType => true
+          case _ => false
+
       override def setWorkflowState(
-        input: AccessControl.CheckedWithId[(ObservationWorkflow, ObservationWorkflowState), Observation.Id]
+        input: AccessControl.CheckedWithId[(Option[ObservingModeType], ObservationWorkflow, ObservationWorkflowState), Observation.Id]
       )(using NoTransaction[F]): F[Result[ObservationWorkflow]] =
         input.foldWithId(OdbError.InvalidArgument().asFailureF):
-          case ((w, state), oid) =>
+          case ((mode, w, state), oid) =>
             (
               if w.state === state then ResultT.success(w)
               else ResultT:
-                // If we're transitioning to or from a UserState, just update that column
-                if w.state.isUserState || state.isUserState then
-                  services.transactionally:
+                services.transactionally:
+
+                  def updateUserState(oid: Observation.Id, state: Option[UserState]): F[Unit] =
                     session.prepareR(Statements.UpdateUserState).use: pc =>
-                      pc.execute(state.asUserState, oid)
-                        .as(Result(w.copy(state = state)))
-                else // we must be declaring completion (or revoking that declaration)
-                  import ObservationWorkflowState.*
+                      pc.execute(state, oid).void
+
+                  def updateDeclaredState(oid: Observation.Id, state: Option[ExecutionState]): F[Unit] =
+                    session.prepareR(Statements.UpdateDeclaredState).use: pc =>
+                      val es: Option[DeclaredExecutionState] = state.map:
+                        case Ongoing   => CoreExecutionState.DeclaredOngoing
+                        case Completed => CoreExecutionState.DeclaredComplete
+                      pc.execute(es, oid).void
+
                   (w.state, state) match
-                    case (Ongoing, Completed) | (Completed, Ongoing) =>
-                      services.transactionally:
-                        session.prepareR(Statements.UpdateDeclaredCompletion).use: pc =>
-                          pc.execute(state === Completed, oid)
-                            .as(Result(w.copy(state = state)))
+
+                    // Only for visitors
+                    case (Ready, Ongoing) =>
+                      updateUserState(oid, None) >>
+                      updateDeclaredState(oid, Some(Ongoing))
+                        .as(Result(w.copy(state = state)))
+
+                    // Only for visitors
+                    case (Ongoing, Ready)     =>
+                      updateUserState(oid, Some(Ready)) >>
+                      updateDeclaredState(oid, None)
+                        .as(Result(w.copy(state = state)))
+
+                    // Everyone, but logic differs for visitors
+                    case (Completed, Ongoing) =>
+                      val ds: Option[ExecutionState] = 
+                        if mode.exists(_.isVisitorMode) then Some(Ongoing) else None
+                      updateDeclaredState(oid, ds)
+                        .as(Result(w.copy(state = state)))
+
+                    // Same for everyone
+                    case (Ongoing, Completed) =>
+                      updateDeclaredState(oid, Some(Completed))
+                        .as(Result(w.copy(state = state)))
+
+                    // Same for everyone; note that this needs to be the last case
+                    case (a, b) if a.isUserState || b.isUserState => 
+                      updateUserState(oid, b.asUserState)
+                        .as(Result(w.copy(state = state)))
+
                     case _ =>
-                      // This should never happen but I want to check for it anyway.
                       Result.internalError(s"Transition from ${w.state} to $state was not expected.").pure[F]
+
             ).value
 
       extension (wf: ObservationWorkflow) def isCompatibleWith(states: Set[ObservationWorkflowState]): Boolean =
@@ -703,7 +779,7 @@ object ObservationWorkflowService {
           o.c_explicit_dec,
           o.c_calibration_role,
           o.c_workflow_user_state,
-          o.c_declared_complete,
+          o.c_declared_state,
           p.c_proposal_status,
           x.c_cfp_id,
           o.c_science_band,
@@ -718,10 +794,10 @@ object ObservationWorkflowService {
           AND o.c_group_id = s.c_group_id
         WHERE o.c_observation_id IN ($enc)
       """
-      .query(program_id *: program_type *: observation_id *: observing_mode_type.opt *: right_ascension.opt *: declination.opt *: calibration_role.opt *: user_state.opt *: bool *: tag *: cfp_id.opt *: science_band.opt *: user_state.opt)
+      .query(program_id *: program_type *: observation_id *: observing_mode_type.opt *: right_ascension.opt *: declination.opt *: calibration_role.opt *: user_state.opt *: declared_execution_state.opt *: tag *: cfp_id.opt *: science_band.opt *: user_state.opt)
       .map:
-        case (pid, tpe, oid, mode, ra, dec, cal, state, dc, tag, cfp, sci, state2) =>
-          ObservationValidationInfo(pid, tpe, oid, mode, None, (ra, dec).mapN(Coordinates.apply), cal, state, dc, tag, cfp, sci, Nil, state2)
+        case (pid, tpe, oid, mode, ra, dec, cal, state, ds, tag, cfp, sci, state2) =>
+          ObservationValidationInfo(pid, tpe, oid, mode, None, (ra, dec).mapN(Coordinates.apply), cal, state, ds, tag, cfp, sci, Nil, state2) 
 
     def ProgramAllocations[A <: NonEmptyList[Program.Id]](enc: Encoder[A]): Query[A, (Program.Id, ScienceBand)] =
       sql"""
@@ -765,10 +841,17 @@ object ObservationWorkflowService {
         WHERE c_observation_id = $observation_id
       """.command
 
-    val UpdateDeclaredCompletion: Command[(Boolean, Observation.Id)] =
+    val UpdateDeclaredState: Command[(Option[DeclaredExecutionState], Observation.Id)] =
       sql"""
         UPDATE t_observation
-        SET c_declared_complete = $bool
+        SET c_declared_state = ${declared_execution_state.opt}
+        WHERE c_observation_id = $observation_id
+      """.command
+
+    val UpdateDeclaredOngoing: Command[(Boolean, Observation.Id)] =
+      sql"""
+        UPDATE t_observation
+        SET c_declared_ongoing = $bool
         WHERE c_observation_id = $observation_id
       """.command
 

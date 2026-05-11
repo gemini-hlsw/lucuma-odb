@@ -232,7 +232,14 @@ object Generator:
               ??? // TODO Implement Gnirs observing mode service
             case ObservingModeType.Igrins2LongSlit    =>
               EitherT(streaming.selectOrGenerateIgrins2LongSlit(ctx)).flatMap(digest(_, calculator.igrins2LongSlitSetup))
-            case _: VisitorObservingModeType => done
+            case _: VisitorObservingModeType =>
+              EitherT.pure[F, OdbError]:
+                ExecutionDigest(
+                  SetupTime.Zero,
+                  NonNegInt.MinValue,
+                  SequenceDigest.Zero.copy(executionState = ExecutionState.Completed),
+                  SequenceDigest.Zero.copy(executionState = ExecutionState.Completed)
+                )
 
       private def calculateScienceAtomDigests(
         ctx: GeneratorContext
