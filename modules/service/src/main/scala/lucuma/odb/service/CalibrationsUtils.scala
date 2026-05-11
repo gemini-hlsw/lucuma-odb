@@ -9,6 +9,7 @@ import cats.effect.Concurrent
 import cats.syntax.all.*
 import grackle.Result
 import lucuma.core.enums.CalibrationRole
+import lucuma.core.enums.ExecutionState
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.Site
@@ -119,24 +120,26 @@ trait WorkflowStateQueries[F[_]: {Concurrent, Services, Tracer as T}] {
       haveVisits(filtered.map(oid)).map: visited =>
         filtered.filterNot(a => visited.contains(oid(a)))
 
-  // Like `excludeFromDeletion`, but also checks tellurics parent workflow state
+  // Like `excludeFromDeletion`, but also checks tellurics parent execution state
   def excludeTelluricsFromDeletion[A](obs: List[A], oid: A => Observation.Id): F[List[A]] =
     excludeFromDeletion(obs, oid).flatMap: base =>
-      telluricScienceStates(base.map(oid)).map: parents =>
+      telluricScienceExecutionStates(base.map(oid)).map: parents =>
         base.filterNot: a =>
           parents.get(oid(a)).exists: s =>
-            // if the science obs is ongoing or completed, the telluric should not be deleted.
-            s === ObservationWorkflowState.Ongoing || s === ObservationWorkflowState.Completed
+            // if the science obs has started or finished executing, the telluric should not be deleted.
+            s === ExecutionState.Ongoing ||
+              s === ExecutionState.Completed ||
+              s === ExecutionState.DeclaredComplete
 
-  private def telluricScienceStates(
+  private def telluricScienceExecutionStates(
     oids: List[Observation.Id]
-  ): F[Map[Observation.Id, ObservationWorkflowState]] =
+  ): F[Map[Observation.Id, ExecutionState]] =
     NonEmptyList.fromList(oids) match
       case None       => Map.empty.pure
       case Some(nel)  =>
-        val af = Statements.selectTelluricScienceWorkflowStates(nel)
+        val af = Statements.selectTelluricScienceExecutionStates(nel)
         session
-          .prepareR(af.fragment.query(observation_id *: observation_workflow_state))
+          .prepareR(af.fragment.query(observation_id *: execution_state))
           .use(_.stream(af.argument, 1024).compile.toList)
           .map(_.toMap)
 
@@ -198,15 +201,15 @@ object WorkflowStateQueries:
         oids.map(sql"$observation_id").intercalate(void", ")                          |+|
         void")"
 
-    def selectTelluricScienceWorkflowStates(oids: NonEmptyList[Observation.Id]): AppliedFragment =
+    def selectTelluricScienceExecutionStates(oids: NonEmptyList[Observation.Id]): AppliedFragment =
       void"""
-        SELECT t.c_observation_id, sci_obscalc.c_workflow_state
+        SELECT t.c_observation_id, sci_gp.c_execution_state
         FROM t_observation t
         JOIN t_observation sci
           ON sci.c_group_id = t.c_group_id
          AND sci.c_calibration_role IS NULL
-        JOIN t_obscalc sci_obscalc
-          ON sci_obscalc.c_observation_id = sci.c_observation_id
+        JOIN v_generator_params sci_gp
+          ON sci_gp.c_observation_id = sci.c_observation_id
         WHERE t.c_calibration_role = 'telluric'
           AND t.c_observation_id IN (
       """ |+| oids.map(sql"$observation_id").intercalate(void", ") |+| void")"

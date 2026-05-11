@@ -5,7 +5,7 @@ package lucuma.odb.graphql.issue.shortcut
 
 import cats.syntax.all.*
 import lucuma.core.enums.CalibrationRole
-import lucuma.core.enums.ObservationWorkflowState
+import lucuma.core.enums.SequenceCommand
 import lucuma.odb.graphql.feature.TelluricCalibrationsTestSupport
 import lucuma.odb.graphql.query.ExecutionTestSupportForFlamingos2
 
@@ -27,7 +27,7 @@ class ShortCut_8614
   private val when =
     LocalDateTime.of(2024, 1, 1, 12, 0, 0).toInstant(ZoneOffset.UTC)
 
-  test("tellurics survive when science observation transitions to Ongoing"):
+  test("tellurics survive when science observation has started executing"):
     for {
       pid                <- createProgramAs(pi)
       tid                <- createTargetWithProfileAs(pi, pid)
@@ -39,8 +39,8 @@ class ShortCut_8614
       groupId             = obsBefore.groupId.get
       obsInGroup1        <- queryObservationsInGroup(groupId)
       telluricOids        = obsInGroup1.filter(_.calibrationRole.contains(CalibrationRole.Telluric)).map(_.id)
-      // Force the science observation's workflow state to ongoing.
-      _                  <- setCalculatedWorkflowState(oid, ObservationWorkflowState.Ongoing)
+      vid                <- recordVisitAs(serviceUser, oid)
+      _                  <- addSequenceEventAs(serviceUser, vid, SequenceCommand.Start)
       (added2, removed2) <- recalculateCalibrations(pid, when, oid)
       groupExists        <- queryGroupExists(groupId)
       tellExists         <- telluricOids.traverse(queryObservationExists)
@@ -50,7 +50,7 @@ class ShortCut_8614
       assertEquals(added1.size, 2)
       assertEquals(removed1.size, 0)
       assert(groupExists)
-      // tellurics are not revomed
+      // tellurics are not removed
       assert(tellExists.forall(identity))
       assertEquals(obsInGroup2.size, 3) // 2 tellurics + 1 science
       assertEquals(removed2.size, 0)

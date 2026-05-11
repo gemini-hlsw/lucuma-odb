@@ -18,6 +18,7 @@ import lucuma.core.enums.Band
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.Flamingos2Fpu
 import lucuma.core.enums.ObservationWorkflowState
+import lucuma.core.enums.SequenceCommand
 import lucuma.core.enums.TelluricCalibrationOrder
 import lucuma.core.math.BrightnessUnits.BrightnessMeasure
 import lucuma.core.math.BrightnessUnits.Integrated
@@ -1575,8 +1576,8 @@ class perScienceObservationCalibrations
       groupId            =  obsBefore.groupId.get
       obsInGroup1        <- queryObservationsInGroup(groupId)
       telluricOid        =  obsInGroup1.find(_.calibrationRole.contains(CalibrationRole.Telluric)).get.id
-      // Set science observation to Ongoing
-      _                  <- setCalculatedWorkflowState(oid, ObservationWorkflowState.Ongoing)
+      vid                <- recordVisitAs(serviceUser, oid)
+      _                  <- addSequenceEventAs(serviceUser, vid, SequenceCommand.Start)
       (added2, removed2) <- recalculateCalibrations(pid, when, oid)
       groupExists        <- queryGroupExists(groupId)
       tellExists         <- queryObservationExists(telluricOid)
@@ -1605,8 +1606,8 @@ class perScienceObservationCalibrations
       groupId            =  obsBefore.groupId.get
       obsInGroup1        <- queryObservationsInGroup(groupId)
       telluricOid        =  obsInGroup1.find(_.calibrationRole.contains(CalibrationRole.Telluric)).get.id
-      // Set science observation to Complete
-      _                  <- setCalculatedWorkflowState(oid, ObservationWorkflowState.Completed)
+      vid                <- recordVisitAs(serviceUser, oid)
+      _                  <- addSequenceEventAs(serviceUser, vid, SequenceCommand.Start)
       (added2, removed2) <- recalculateCalibrations(pid, when, oid)
       groupExists        <- queryGroupExists(groupId)
       tellExists         <- queryObservationExists(telluricOid)
