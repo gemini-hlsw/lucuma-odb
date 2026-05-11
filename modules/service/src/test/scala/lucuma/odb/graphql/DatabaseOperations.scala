@@ -1146,13 +1146,13 @@ trait DatabaseOperations { this: OdbSuite =>
             }
           }
         }"""
-          
+
       case v: VisitorObservingModeType =>
         s"""{
           visitor: {
             mode: ${v.tag.toScreamingSnakeCase}
             centralWavelength: { nanometers: 2200 }
-            guideStarMinSep: { degrees: 1 }
+            scienceFov: { degrees: 1 }
           }
         }"""
 
@@ -1209,12 +1209,12 @@ trait DatabaseOperations { this: OdbSuite =>
             $offsetsField
           }
         }"""
-      case v: VisitorObservingModeType => 
+      case v: VisitorObservingModeType =>
         s"""{
           visitor: {
             mode: ${v.tag.toScreamingSnakeCase}
             centralWavelength: { nanometers: 2200 }
-            guideStarMinSep: { degrees: 1 }
+            scienceFov: { degrees: 1 }
           }
         }"""
       case _ => ???
