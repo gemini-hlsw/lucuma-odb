@@ -86,6 +86,7 @@ import skunk.data.Type
 import spire.math.interval.Closed
 import spire.math.interval.Open
 import spire.math.interval.ValueBound
+
 import scala.collection.immutable.SortedSet
 import scala.util.control.Exception
 import scala.util.matching.Regex

@@ -7,14 +7,14 @@ package data
 import cats.Eq
 import cats.syntax.either.*
 import lucuma.core.enums.CalibrationRole
-import lucuma.core.enums.ExecutionState
+import lucuma.core.enums.DeclaredExecutionState
 import lucuma.core.enums.DeclaredExecutionState.given
+import lucuma.core.enums.ExecutionState
 import lucuma.core.enums.ScienceBand
 import lucuma.odb.sequence.ObservingMode
 import lucuma.odb.sequence.ObservingMode.Instances.given
 import lucuma.odb.sequence.syntax.all.*
 import lucuma.odb.sequence.util.HashBytes
-import lucuma.core.enums.DeclaredExecutionState
 
 case class GeneratorParams(
   itcInput:         Either[MissingParamSet, ItcInput],

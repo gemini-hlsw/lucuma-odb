@@ -8,12 +8,11 @@ import cats.effect.Async
 import cats.implicits.*
 import grackle.Result
 import grackle.ResultT
-import lucuma.core.model.Access
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.ConfigurationRequestStatus
-import lucuma.core.enums.ExecutionState as CoreExecutionState
 import lucuma.core.enums.DeclaredExecutionState
 import lucuma.core.enums.DeclaredExecutionState.given
+import lucuma.core.enums.ExecutionState as CoreExecutionState
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObservationValidationCode
 import lucuma.core.enums.ObservationWorkflowState
@@ -25,6 +24,7 @@ import lucuma.core.enums.VisitorObservingModeType
 import lucuma.core.math.Coordinates
 import lucuma.core.math.Declination
 import lucuma.core.math.RightAscension
+import lucuma.core.model.Access
 import lucuma.core.model.CallCoordinatesLimits
 import lucuma.core.model.CallForProposals
 import lucuma.core.model.Observation

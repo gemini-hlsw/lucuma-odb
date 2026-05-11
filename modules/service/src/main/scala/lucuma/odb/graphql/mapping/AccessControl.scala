@@ -16,6 +16,7 @@ import grackle.Result
 import grackle.ResultT
 import grackle.Type
 import lucuma.core.enums.ObservationWorkflowState
+import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.SequenceType
 import lucuma.core.model.Access
 import lucuma.core.model.Observation
@@ -78,7 +79,6 @@ import skunk.AppliedFragment
 import skunk.Encoder
 import skunk.Transaction
 import skunk.syntax.stringcontext.*
-import lucuma.core.enums.ObservingModeType
 
 object AccessControl:
 

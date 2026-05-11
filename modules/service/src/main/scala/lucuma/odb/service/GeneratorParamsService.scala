@@ -21,8 +21,8 @@ import cats.syntax.functorFilter.*
 import cats.syntax.option.*
 import cats.syntax.traverse.*
 import lucuma.core.enums.CalibrationRole
-import lucuma.core.enums.ExecutionState
 import lucuma.core.enums.DeclaredExecutionState
+import lucuma.core.enums.ExecutionState
 import lucuma.core.enums.Flamingos2ReadMode
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.ScienceBand
