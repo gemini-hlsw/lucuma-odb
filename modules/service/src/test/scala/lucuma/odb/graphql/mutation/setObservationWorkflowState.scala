@@ -90,7 +90,7 @@ class setObservationWorkflowState
 
   import ObservationWorkflowState.*
 
-  test("              Undefined  <-> Inactive".ignore):
+  test("              Undefined  <-> Inactive"):
     for {
       pid <- createProgramAs(pi)
       oid <- createObservationAs(pi, pid)
@@ -99,7 +99,7 @@ class setObservationWorkflowState
       _   <- testTransitions(pid, oid, Undefined, Inactive)
     } yield ()
 
-  testWithTargetTypes("Unapproved <-> Inactive".ignore): (_, mkTarget) =>
+  testWithTargetTypes("Unapproved <-> Inactive"): (_, mkTarget) =>
     for {
       cfp <- createCallForProposalsAs(staff)
       pid <- createProgramWithNonPartnerPi(pi, "Foo")
@@ -114,7 +114,7 @@ class setObservationWorkflowState
       _   <- testTransitions(pid, oid, Unapproved, Inactive)
     } yield ()
 
-  testWithTargetTypes("Defined    <-> Inactive        (proposal not yet accepted)".ignore): (_, mkTarget) =>
+  testWithTargetTypes("Defined    <-> Inactive        (proposal not yet accepted)"): (_, mkTarget) =>
     for {
       cfp <- createCallForProposalsAs(staff)
       pid <- createProgramAs(pi, "Foo")
@@ -128,7 +128,7 @@ class setObservationWorkflowState
     } yield ()
 
 
-  test("[Sidereal]    Defined    <-> Inactive, Ready (proposal accepted)".ignore):
+  test("[Sidereal]    Defined    <-> Inactive, Ready (proposal accepted)"):
     for {
       cfp <- createCallForProposalsAs(staff)
       pid <- createProgramWithNonPartnerPi(pi, "Foo")
@@ -144,7 +144,7 @@ class setObservationWorkflowState
       _   <- testTransitions(pid, oid, Defined, Inactive, Ready)
     } yield ()
 
-  test("[Opportunity] Defined    <-> Inactive        (proposal accepted)".ignore):
+  test("[Opportunity] Defined    <-> Inactive        (proposal accepted)"):
     for {
       cfp <- createCallForProposalsAs(staff)
       pid <- createProgramWithNonPartnerPi(pi, "Foo")
@@ -161,7 +161,7 @@ class setObservationWorkflowState
     } yield ()
 
   // (see executionState.scala)
-  test("[Sidereal]    Ongoing    <-> Inactive, Completed".ignore):
+  test("[Sidereal]    Ongoing    <-> Inactive, Completed"):
     for
       p  <- createProgram
       t  <- createTargetWithProfileAs(pi, p)
@@ -177,7 +177,7 @@ class setObservationWorkflowState
     yield ()
 
 // (see executionState.scala)
-  test("[Sidereal]    Completed  <-> <none> if naturally complete".ignore):
+  test("[Sidereal]    Completed  <-> <none> if naturally complete"):
     for
       p <- createProgram
       t <- createTargetWithProfileAs(pi, p)
@@ -190,7 +190,7 @@ class setObservationWorkflowState
       _ <- testTransitions(p, o, Completed)
     yield ()
 
-  test("[Sidereal]    Completed  <-> Ongoing, if explicitly declared complete".ignore):
+  test("[Sidereal]    Completed  <-> Ongoing, if explicitly declared complete"):
     for
       p <- createProgram
       t <- createTargetWithProfileAs(pi, p)
@@ -206,7 +206,7 @@ class setObservationWorkflowState
       _ <- testTransitions(p, o, Completed, Ongoing)
     yield ()
 
-  test("[Eng]         Defined    <-> Inactive, Ready".ignore):
+  test("[Eng]         Defined    <-> Inactive, Ready"):
     for {
       pid <- createProgramAs(pi)
         _ <- setProgramReference(staff, pid, """engineering: { semester: "2025B", instrument: GMOS_SOUTH }""")
@@ -216,7 +216,7 @@ class setObservationWorkflowState
       _   <- testTransitions(pid, oid, Defined, Inactive, Ready)
     } yield ()
 
-  test("[Eng]         Ongoing    <-> Inactive, Completed".ignore):
+  test("[Eng]         Ongoing    <-> Inactive, Completed"):
     for
       p <- createProgram
       _ <- setProgramReference(staff, p, """engineering: { semester: "2025B", instrument: GMOS_SOUTH }""")
@@ -230,7 +230,7 @@ class setObservationWorkflowState
       _ <- testTransitions(p, o, Ongoing, Inactive, Completed)
     yield ()
 
-  test("[Eng]         Completed  <->".ignore):
+  test("[Eng]         Completed  <->"):
     for
       p <- createProgram
       _ <- setProgramReference(staff, p, """engineering: { semester: "2025B", instrument: GMOS_SOUTH }""")
@@ -311,7 +311,26 @@ class setObservationWorkflowState
               case OdbError.InvalidWorkflowTransition(Ready, Ongoing, _) => () // expected
     yield ()
 
-  test("[Visitor]      Ready -> Ongoing -> Ready (allowed for Staff)"):
+  test("[Visitor]      Ready -> Ongoing (allowed for Staff)"):
+    for
+      cfp <- createCallForProposalsAs(staff)
+      pid <- createProgramWithNonPartnerPi(pi)
+      _   <- addProposal(pi, pid, Some(cfp), None)
+      _   <- addPartnerSplits(pi, pid)
+      _   <- addCoisAs(pi, pid)
+      _   <- setProposalStatus(staff, pid, "ACCEPTED")
+      tid <- createTargetWithProfileAs(pi, pid)
+      oid <- createObservationWithModeAs(pi, pid, List(tid), visitorMode)
+      _   <- createConfigurationRequestAs(pi, oid).flatMap(approveConfigurationRequest)
+      _   <- setObservationWorkflowState(pi, oid, Ready)
+      _   <- runObscalcUpdateAs(serviceUser, pid, oid)
+      _   <- assertIO(queryObservationWorkflowState(oid), Ready)
+      _   <- setObservationWorkflowState(staff, oid, Ongoing)
+      _   <- runObscalcUpdateAs(serviceUser, pid, oid)
+      _   <- assertIO(queryObservationWorkflowState(oid), Ongoing)
+    yield ()
+
+  test("[Visitor]      Ongoing -> Ready (allowed for staff)"):
     for
       cfp <- createCallForProposalsAs(staff)
       pid <- createProgramWithNonPartnerPi(pi)
@@ -332,5 +351,4 @@ class setObservationWorkflowState
       _   <- runObscalcUpdateAs(serviceUser, pid, oid)
       _   <- assertIO(queryObservationWorkflowState(oid), Ready)
     yield ()
-
 }

@@ -380,14 +380,16 @@ object ObservationWorkflowService {
 
       private def executionStates(
         infos: Map[Observation.Id, ObservationValidationInfo]
-      )(using NoTransaction[F], SuperUserAccess): Map[Observation.Id, ExecutionState] =
+      )(using NoTransaction[F], SuperUserAccess): Map[Observation.Id, ExecutionState] =        
         infos
           .view
           .mapValues[Option[ExecutionState]]: info =>
-            info
+            val a: Option[ExecutionState] = info.declaredExecutionState.flatMap(_.workflowExecutionState)
+            val b: Option[ExecutionState] = info
               .generatorParams
               .flatMap(_.toOption)
               .flatMap(_.executionState.workflowExecutionState)
+            a.orElse(b)
           .collect[(Observation.Id, ExecutionState)]:
             case (oid, Some(es)) => oid -> es
           .toMap
@@ -430,11 +432,6 @@ object ObservationWorkflowService {
                   case Undefined  => None
                   case Unapproved => None
                   case Defined    => Some(Ready)
-
-          // println("")
-          // println(s"****** my executionState is $executionState")
-          // println(s"****** my validationStatus is $validationStatus")        
-          // println(s"****** my userStatus is ${userStatus(validationStatus)}")
 
           // Our final state is the execution state (if any), else the user state (if any), else the validation state,
           // with the one exception that user state Inactive overrides execution state Ongoing

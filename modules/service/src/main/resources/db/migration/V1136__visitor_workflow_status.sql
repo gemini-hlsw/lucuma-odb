@@ -72,6 +72,7 @@ SELECT
   o.c_observing_mode_type,
   o.c_science_band,
   o.c_declared_complete,
+  o.c_declared_state,
   CASE
     -- The observation is explicitly marked complete -> completed.
     WHEN o.c_declared_complete
