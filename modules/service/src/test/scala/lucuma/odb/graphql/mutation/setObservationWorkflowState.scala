@@ -351,4 +351,26 @@ class setObservationWorkflowState
       _   <- runObscalcUpdateAs(serviceUser, pid, oid)
       _   <- assertIO(queryObservationWorkflowState(oid), Ready)
     yield ()
+    
+  test("[Visitor]      Ongoing -> Ready (disallowed for staff)"):
+    for
+      cfp <- createCallForProposalsAs(staff)
+      pid <- createProgramWithNonPartnerPi(pi)
+      _   <- addProposal(pi, pid, Some(cfp), None)
+      _   <- addPartnerSplits(pi, pid)
+      _   <- addCoisAs(pi, pid)
+      _   <- setProposalStatus(staff, pid, "ACCEPTED")
+      tid <- createTargetWithProfileAs(pi, pid)
+      oid <- createObservationWithModeAs(pi, pid, List(tid), visitorMode)
+      _   <- createConfigurationRequestAs(pi, oid).flatMap(approveConfigurationRequest)
+      _   <- setObservationWorkflowState(pi, oid, Ready)
+      _   <- runObscalcUpdateAs(serviceUser, pid, oid)
+      _   <- assertIO(queryObservationWorkflowState(oid), Ready)
+      _   <- setObservationWorkflowState(staff, oid, Ongoing)
+      _   <- runObscalcUpdateAs(serviceUser, pid, oid)
+      _   <- assertIO(queryObservationWorkflowState(oid), Ongoing)
+      _   <- interceptOdbError(setObservationWorkflowState(pi, oid, Ready)):
+              case OdbError.InvalidWorkflowTransition(Ongoing, Ready, _) => () // expected
+    yield ()
+
 }
