@@ -133,9 +133,6 @@ case class ObservationValidationInfo(
   programAllocations: Option[NonEmptyList[ScienceBand]] = None,
 ) {
 
-  def isDeclaredOngoing: Boolean =
-    declaredExecutionState === Some(CoreExecutionState.DeclaredOngoing)
-
   def isDeclaredComplete: Boolean =
     declaredExecutionState === Some(CoreExecutionState.DeclaredComplete)
 
@@ -248,11 +245,6 @@ object ObservationWorkflowService {
 
       // Make the enums available in a stable and implicit way
       given Enums = enums
-
-      // private def lookupObsDefinition(
-      //   oid: Observation.Id
-      // )(using Transaction[F]): F[Option[ObservationValidationInfo]] =
-      //   lookupObsDefinitions(List(oid)).map(_.get(oid))
 
       private def lookupObsDefinitions(
         oids: List[Observation.Id]
@@ -380,7 +372,7 @@ object ObservationWorkflowService {
 
       private def executionStates(
         infos: Map[Observation.Id, ObservationValidationInfo]
-      )(using NoTransaction[F], SuperUserAccess): Map[Observation.Id, ExecutionState] =        
+      )(using NoTransaction[F], SuperUserAccess): Map[Observation.Id, ExecutionState] =
         infos
           .view
           .mapValues[Option[ExecutionState]]: info =>
