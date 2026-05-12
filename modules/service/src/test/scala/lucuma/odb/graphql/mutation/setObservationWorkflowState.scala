@@ -251,7 +251,7 @@ class setObservationWorkflowState
         centralWavelength: {
           picometers: 123
         }
-        guideStarMinSep: {
+        scienceFov: {
           arcminutes: 1.23
         }
       }

@@ -12089,6 +12089,7 @@ enum ExecutionState {
 
   "User marked the observation complete regardless of any remaining steps."
   DECLARED_COMPLETE
+
 }
 
 "A configuration target will define either coordinates or a region."

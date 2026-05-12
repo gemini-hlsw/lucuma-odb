@@ -1,7 +1,6 @@
-
 -- Update `t_observation` to store `c_declared_state` as an execution state rather than
--- the boolean `c_declared_complete`, but compute it to limit the extent of the change.
--- This is a multi-step process that requires re-creating two views.
+-- the boolean `c_declared_complete`. This is a multi-step process that requires re-creating
+-- two views and multiple migration files because commits are necessary.
 
 -- Continued from previous migration
 
