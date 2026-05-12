@@ -1151,11 +1151,17 @@ trait DatabaseOperations { this: OdbSuite =>
         }"""
 
       case v: VisitorObservingModeType =>
+        val extras = v match
+          case VisitorObservingModeType.VisitorNorth | VisitorObservingModeType.VisitorSouth =>
+            """
+            name: "test visitor"
+            totalRequestTime: { hours: 1 }"""
+          case _ => ""
         s"""{
           visitor: {
             mode: ${v.tag.toScreamingSnakeCase}
             centralWavelength: { nanometers: 2200 }
-            scienceFov: { degrees: 1 }
+            scienceFov: { degrees: 1 }$extras
           }
         }"""
 
@@ -1237,12 +1243,18 @@ trait DatabaseOperations { this: OdbSuite =>
             }
           }
         }"""
-      case v: VisitorObservingModeType => 
+      case v: VisitorObservingModeType =>
+        val extras = v match
+          case VisitorObservingModeType.VisitorNorth | VisitorObservingModeType.VisitorSouth =>
+            """
+            name: "test visitor"
+            totalRequestTime: { hours: 1 }"""
+          case _ => ""
         s"""{
           visitor: {
             mode: ${v.tag.toScreamingSnakeCase}
             centralWavelength: { nanometers: 2200 }
-            scienceFov: { degrees: 1 }
+            scienceFov: { degrees: 1 }$extras
           }
         }"""
       case _ => ???

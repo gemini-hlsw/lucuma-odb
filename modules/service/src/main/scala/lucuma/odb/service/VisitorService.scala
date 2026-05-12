@@ -7,7 +7,10 @@ import cats.data.NonEmptyList
 import cats.effect.Concurrent
 import cats.implicits.*
 import grackle.Result
+import lucuma.core.enums.VisitorObservingModeType
 import lucuma.core.model.Observation
+import lucuma.odb.data.OdbError
+import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.input.VisitorInput
 import lucuma.odb.sequence.visitor.Config
 import lucuma.odb.service.Services.Syntax.session
@@ -62,13 +65,16 @@ object VisitorService:
         input: VisitorInput.Create,
         which: List[Observation.Id]
       )(using Transaction[F]): F[Result[Unit]] =
-        session.prepareR(Statements.Insert).use: ps =>
-          which
-            .traverse: oid =>
-              ps.execute(oid, input).map:
-                case Completion.Insert(1) => Result.unit
-                case other => Result.failure(s"Expected single insert, got $other.")
-            .map(_.sequenceVoid)
+        validateRequiredFields(input.mode, input.name.isDefined, input.totalRequestTime.isDefined) match
+          case Left(err) => err.asFailure.pure
+          case Right(_)  =>
+            session.prepareR(Statements.Insert).use: ps =>
+              which
+                .traverse: oid =>
+                  ps.execute(oid, input).map:
+                    case Completion.Insert(1) => Result.unit
+                    case other => Result.failure(s"Expected single insert, got $other.")
+                .map(_.sequenceVoid)
 
       override def delete(
         which: List[Observation.Id]
@@ -90,7 +96,9 @@ object VisitorService:
               List(
                 SET.centralWavelength.foldMap(sql"centralWavelength = $wavelength_pm"),
                 SET.mode.foldMap(sql"mode = $visitor_observing_mode_type"),
-                SET.scienceFov.foldMap(sql"c_science_fov = $angle_µas")
+                SET.scienceFov.foldMap(sql"c_science_fov = $angle_µas"),
+                SET.name.foldMap(sql"c_name = $text_nonempty"),
+                SET.totalRequestTime.foldMap(sql"c_total_request_time = $time_span")
               )
             .map(_.foldSmash(void"UPDATE t_visitor SET ", void",", void" "))
 
@@ -121,6 +129,20 @@ object VisitorService:
                 case Left(Right(ps)) => Concurrent[F].raiseError(new RuntimeException(s"Clone: insert failed: ${ps.toList.mkString(", ")}"))
                 case Right(a)        => a.pure
 
+  // Visitor require both a name and a total request time.
+  private def validateRequiredFields(
+    mode:             VisitorObservingModeType,
+    nameDefined:      Boolean,
+    totalTimeDefined: Boolean
+  ): Either[OdbError, Unit] =
+    mode match
+      case VisitorObservingModeType.VisitorNorth | VisitorObservingModeType.VisitorSouth
+        if !nameDefined || !totalTimeDefined =>
+        Left(OdbError.InvalidArgument(
+          s"Visitor mode $mode requires both `name` and `totalRequestTime` to be provided.".some
+        ))
+      case _ => Right(())
+
   private object Statements:
 
     def select[A <: NonEmptyList[Observation.Id]](a: A): Query[a.type, (Observation.Id, Config)] =
@@ -129,14 +151,16 @@ object VisitorService:
           c_observation_id,
           c_observing_mode_type,
           c_central_wavelength,
-          c_science_fov
+          c_science_fov,
+          c_name,
+          c_total_request_time
         FROM
           t_visitor
         WHERE
            c_observation_id IN (${observation_id.nel(a)})
-      """.query(observation_id *: visitor_observing_mode_type *: wavelength_pm *: angle_µas)
+      """.query(observation_id *: visitor_observing_mode_type *: wavelength_pm *: angle_µas *: text_nonempty.opt *: time_span.opt)
         .map:
-          case (oid, mode, wavelength, sep) => (oid, Config(mode, wavelength, sep))
+          case (oid, mode, wavelength, sep, name, trt) => (oid, Config(mode, wavelength, sep, name, trt))
 
     val Insert: Command[(Observation.Id, VisitorInput.Create)] =
       sql"""
@@ -144,16 +168,21 @@ object VisitorService:
           c_observation_id,
           c_observing_mode_type,
           c_central_wavelength,
-          c_science_fov
+          c_science_fov,
+          c_name,
+          c_total_request_time
         ) VALUES (
           $observation_id,
           $visitor_observing_mode_type,
           $wavelength_pm,
-          $angle_µas
+          $angle_µas,
+          ${text_nonempty.opt},
+          ${time_span.opt}
         )
       """.command
         .contramap:
-          case (oid, VisitorInput.Create(mode, wavelength, angle)) => (oid, mode, wavelength, angle)
+          case (oid, VisitorInput.Create(mode, wavelength, angle, name, trt)) =>
+            (oid, mode, wavelength, angle, name, trt)
 
     def delete[A <: NonEmptyList[Observation.Id]](a: A): Command[a.type] =
       sql"""

@@ -300,7 +300,7 @@ object GuideService {
           (Site.GS, ObservingModeType.GmosSouthLongSlit, mode.centralWavelength)
         case _: igrins2.longslit.Config =>
           (Site.GN, ObservingModeType.Igrins2LongSlit, Igrins2CentralWavelength)
-        case visitor.Config(mode, wavelength, _) =>
+        case visitor.Config(mode, wavelength, _, _, _) =>
           (mode.instrument.site, mode, wavelength)
 
     def agsParamsFor(trackType: TrackType): Option[AgsParams] =

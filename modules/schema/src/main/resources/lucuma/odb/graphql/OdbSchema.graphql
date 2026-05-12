@@ -4810,6 +4810,16 @@ input VisitorInput {
   Science field of view, understood as the diameter of a circular area.
   """
   scienceFov: AngleInput
+
+  """
+  Optional descriptive name for this visitor mode selection.
+  """
+  name: String
+
+  """
+  Optional total requested observing time.
+  """
+  totalRequestTime: TimeSpanInput
 }
 
 type Visitor {
@@ -4820,6 +4830,16 @@ type Visitor {
   Science field of view, understood as the diameter of a circular area.
   """
   scienceFov: Angle!
+
+  """
+  Optional descriptive name for this visitor mode selection.
+  """
+  name: String
+
+  """
+  Optional total requested observing time.
+  """
+  totalRequestTime: TimeSpan
 }
 
 """
