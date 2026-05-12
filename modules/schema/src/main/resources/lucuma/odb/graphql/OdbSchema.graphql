@@ -4814,7 +4814,7 @@ input VisitorInput {
   """
   Optional descriptive name for this visitor mode selection.
   """
-  name: String
+  name: NonEmptyString
 
   """
   Optional total requested observing time.
@@ -4834,7 +4834,7 @@ type Visitor {
   """
   Optional descriptive name for this visitor mode selection.
   """
-  name: String
+  name: NonEmptyString
 
   """
   Optional total requested observing time.

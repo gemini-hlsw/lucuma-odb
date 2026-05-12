@@ -27,6 +27,7 @@ import lucuma.core.model.TelluricType
 import lucuma.core.model.User
 import lucuma.core.syntax.string.*
 import lucuma.core.syntax.timespan.*
+import lucuma.odb.data.OdbError
 import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.graphql.input.AllocationInput
 import lucuma.odb.json.tellurictype.query.given
@@ -2972,5 +2973,88 @@ class createObservation extends OdbSuite with TelluricTypeGraphQLFormat {
       }
     }
   }
+
+  private def visitorInputFragment(mode: String, extras: String): String =
+    s"""
+      visitor: {
+        mode: $mode
+        centralWavelength: { nanometers: 2200 }
+        scienceFov: { arcseconds: 1 }
+        $extras
+      }
+    """
+
+  private def createVisitorQuery(pid: String, tid: String, mode: String, extras: String): String =
+    s"""
+      mutation {
+        createObservation(input: {
+          programId: "$pid"
+          SET: {
+            targetEnvironment: { asterism: [ "$tid" ] }
+            observingMode: { ${visitorInputFragment(mode, extras)} }
+          }
+        }) {
+          observation {
+            observingMode {
+              visitor {
+                mode
+                name
+                totalRequestTime { hours }
+              }
+            }
+          }
+        }
+      }
+    """
+
+  test("[visitor] VISITOR_NORTH with name and totalRequestTime succeeds"):
+    createProgramAs(pi).flatMap: pid =>
+      createTargetAs(pi, pid).flatMap: tid =>
+        expect(
+          user  = pi,
+          query = createVisitorQuery(
+            pid.toString, tid.toString, "VISITOR_NORTH",
+            """name: "north run", totalRequestTime: { hours: 2 }"""
+          ),
+          expected = json"""
+            {
+              "createObservation": {
+                "observation": {
+                  "observingMode": {
+                    "visitor": {
+                      "mode": "VISITOR_NORTH",
+                      "name": "north run",
+                      "totalRequestTime": { "hours": 2.000000 }
+                    }
+                  }
+                }
+              }
+            }
+          """.asRight
+        )
+
+  test("[visitor] VISITOR_SOUTH missing name is rejected"):
+    createProgramAs(pi).flatMap: pid =>
+      createTargetAs(pi, pid).flatMap: tid =>
+        expectOdbError(
+          user  = pi,
+          query = createVisitorQuery(
+            pid.toString, tid.toString, "VISITOR_SOUTH",
+            """totalRequestTime: { hours: 2 }"""
+          ),
+          expected = { case OdbError.InvalidArgument(Some(msg)) if msg.contains("requires both `name` and `totalRequestTime`") => () }
+        )
+
+  test("[visitor] VISITOR_NORTH missing totalRequestTime"):
+    createProgramAs(pi).flatMap: pid =>
+      createTargetAs(pi, pid).flatMap: tid =>
+        expectOdbError(
+          user  = pi,
+          query = createVisitorQuery(
+            pid.toString, tid.toString, "VISITOR_NORTH",
+            """name: "no time""""
+          ),
+          expected = { case OdbError.InvalidArgument(Some(msg)) if msg.contains("requires both `name` and `totalRequestTime`") => () }
+        )
 
 }

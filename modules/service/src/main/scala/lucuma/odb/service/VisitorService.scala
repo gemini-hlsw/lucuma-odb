@@ -65,7 +65,7 @@ object VisitorService:
         input: VisitorInput.Create,
         which: List[Observation.Id]
       )(using Transaction[F]): F[Result[Unit]] =
-        validateRequiredFields(input.mode, input.name.isDefined, input.totalRequestTime.isDefined) match
+        validateFields(input.mode, input.name, input.totalRequestTime) match
           case Left(err) => err.asFailure.pure
           case Right(_)  =>
             session.prepareR(Statements.Insert).use: ps =>
@@ -129,19 +129,18 @@ object VisitorService:
                 case Left(Right(ps)) => Concurrent[F].raiseError(new RuntimeException(s"Clone: insert failed: ${ps.toList.mkString(", ")}"))
                 case Right(a)        => a.pure
 
-  // Visitor require both a name and a total request time.
-  private def validateRequiredFields(
-    mode:             VisitorObservingModeType,
-    nameDefined:      Boolean,
-    totalTimeDefined: Boolean
+  // Alien visitor require both a name and a total request time.
+  private def validateFields[A, B](
+    mode:      VisitorObservingModeType,
+    name:      Option[A],
+    totalTime: Option[B]
   ): Either[OdbError, Unit] =
     mode match
-      case VisitorObservingModeType.VisitorNorth | VisitorObservingModeType.VisitorSouth
-        if !nameDefined || !totalTimeDefined =>
-        Left(OdbError.InvalidArgument(
+      case VisitorObservingModeType.VisitorNorth | VisitorObservingModeType.VisitorSouth if !name.isDefined || !totalTime.isDefined =>
+        OdbError.InvalidArgument(
           s"Visitor mode $mode requires both `name` and `totalRequestTime` to be provided.".some
-        ))
-      case _ => Right(())
+        ).asLeft
+      case _ => ().asRight
 
   private object Statements:
 

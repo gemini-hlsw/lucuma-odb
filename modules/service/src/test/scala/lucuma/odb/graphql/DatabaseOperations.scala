@@ -1161,7 +1161,7 @@ trait DatabaseOperations { this: OdbSuite =>
           visitor: {
             mode: ${v.tag.toScreamingSnakeCase}
             centralWavelength: { nanometers: 2200 }
-            scienceFov: { degrees: 1 }$extras
+            scienceFov: { arcseconds: 1 }$extras
           }
         }"""
 
@@ -1254,7 +1254,7 @@ trait DatabaseOperations { this: OdbSuite =>
           visitor: {
             mode: ${v.tag.toScreamingSnakeCase}
             centralWavelength: { nanometers: 2200 }
-            scienceFov: { degrees: 1 }$extras
+            scienceFov: { arcseconds: 1 }$extras
           }
         }"""
       case _ => ???
