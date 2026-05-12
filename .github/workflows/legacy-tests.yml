@@ -22,6 +22,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: nschloe/action-cached-lfs-checkout@v1
+        with:
+          fetch-depth: 1
 
       - name: Setup sbt
         uses: sbt/setup-sbt@v1
