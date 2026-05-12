@@ -334,6 +334,8 @@ object GuideService {
             AgsParams.Igrins2LongSlit(PortDisposition.Bottom).withPWFS2.some
           case (_: igrins2.longslit.Config, GuideProbe.PWFS1) =>
             AgsParams.Igrins2LongSlit(PortDisposition.Bottom).withPWFS1.some
+          case (_: ghost.ifu.Config, GuideProbe.PWFS2) =>
+            AgsParams.GhostIfu(PortDisposition.Bottom).withPWFS2.some
           // case (c: visitor.Config, GuideProbe.PWFS2) =>
           //   AgsParams.Visitor(PortDisposition.Side, c.guideStarMinSep).withPWFS2.some
           case _ =>
