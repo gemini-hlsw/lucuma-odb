@@ -213,7 +213,7 @@ object Generator:
               SequenceDigest.Zero.copy(executionState = ExecutionState.DeclaredComplete)
             )
 
-        if ctx.params.declaredComplete then done          
+        if ctx.params.declaredState == Some(ExecutionState.DeclaredComplete) then done          
         else
           ctx.params.observingMode.modeType match
             case ObservingModeType.Flamingos2LongSlit =>
@@ -232,7 +232,15 @@ object Generator:
               ??? // TODO Implement Gnirs observing mode service
             case ObservingModeType.Igrins2LongSlit    =>
               EitherT(streaming.selectOrGenerateIgrins2LongSlit(ctx)).flatMap(digest(_, calculator.igrins2LongSlitSetup))
-            case _: VisitorObservingModeType => done
+            case _: VisitorObservingModeType =>
+              val state = ctx.params.declaredState.getOrElse(ExecutionState.Completed)
+              EitherT.pure[F, OdbError]:
+                ExecutionDigest(
+                  SetupTime.Zero,
+                  NonNegInt.MinValue,
+                  SequenceDigest.Zero.copy(executionState = state),
+                  SequenceDigest.Zero.copy(executionState = state)
+                )
 
       private def calculateScienceAtomDigests(
         ctx: GeneratorContext

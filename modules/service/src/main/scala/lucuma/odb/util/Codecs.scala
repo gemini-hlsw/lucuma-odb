@@ -4,12 +4,7 @@
 package lucuma.odb.util
 
 import cats.data.NonEmptyList
-import cats.syntax.apply.*
-import cats.syntax.either.*
-import cats.syntax.eq.*
-import cats.syntax.foldable.*
-import cats.syntax.option.*
-import cats.syntax.traverse.*
+import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.NonNegBigDecimal
 import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.numeric.NonNegLong
@@ -300,6 +295,14 @@ trait Codecs {
 
   val execution_state: Codec[ExecutionState] =
     enumerated(Type("e_execution_state"))
+
+  val declared_execution_state: Codec[DeclaredExecutionState] =
+    execution_state.eimap {
+        case a: DeclaredExecutionState => a.asRight
+        case other => s"Invalid DeclaredExecutionState: $other".asLeft
+      } {
+        a => a
+      }
 
   val existence: Codec[Existence] =
     enumerated(Type("e_existence"))

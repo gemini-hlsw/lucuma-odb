@@ -7,6 +7,8 @@ package arb
 
 import cats.syntax.either.*
 import lucuma.core.enums.CalibrationRole
+import lucuma.core.enums.DeclaredExecutionState
+import lucuma.core.enums.DeclaredExecutionState.given
 import lucuma.core.enums.ExecutionState
 import lucuma.core.enums.ScienceBand
 import lucuma.core.util.arb.ArbEnumerated
@@ -39,7 +41,7 @@ trait ArbGeneratorParams:
       bnd <- arbitrary[Option[ScienceBand]]
       cfg <- arbitrary[Config.GmosNorth]
       rol <- arbitrary[Option[CalibrationRole]]
-      dc  <- arbitrary[Boolean]
+      dc  <- arbitrary[Option[DeclaredExecutionState]]
       es  <- arbitrary[ExecutionState]
       sc  <- arbitrary[Long]
     yield GeneratorParams(Either.right(itc), bnd, cfg, rol, dc, es, sc)
@@ -51,7 +53,7 @@ trait ArbGeneratorParams:
       bnd <- arbitrary[Option[ScienceBand]]
       cfg <- arbitrary[Config.GmosSouth]
       rol <- arbitrary[Option[CalibrationRole]]
-      dc  <- arbitrary[Boolean]
+      dc  <- arbitrary[Option[DeclaredExecutionState]]
       es  <- arbitrary[ExecutionState]
       sc  <- arbitrary[Long]
     yield GeneratorParams(Either.right(itc), bnd, cfg, rol, dc, es, sc)

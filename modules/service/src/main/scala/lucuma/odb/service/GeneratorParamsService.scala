@@ -21,6 +21,7 @@ import cats.syntax.functorFilter.*
 import cats.syntax.option.*
 import cats.syntax.traverse.*
 import lucuma.core.enums.CalibrationRole
+import lucuma.core.enums.DeclaredExecutionState
 import lucuma.core.enums.ExecutionState
 import lucuma.core.enums.Flamingos2ReadMode
 import lucuma.core.enums.ObservingModeType
@@ -55,7 +56,6 @@ import lucuma.odb.sequence.visitor
 import lucuma.odb.util.Codecs.*
 import skunk.*
 import skunk.circe.codec.json.*
-import skunk.codec.boolean.bool
 import skunk.codec.numeric.int8
 import skunk.implicits.*
 
@@ -274,7 +274,7 @@ object GeneratorParamsService {
             .leftMap(MissingParamSet.fromParams)
             .toEither
 
-          GeneratorParams(itcInput, obsParams.scienceBand, obsMode, obsParams.calibrationRole, obsParams.declaredComplete, obsParams.executionState, obsParams.stepCount)
+          GeneratorParams(itcInput, obsParams.scienceBand, obsMode, obsParams.calibrationRole, obsParams.declaredState, obsParams.executionState, obsParams.stepCount)
 
         observingMode(obsParams.targets, config).flatMap:
 
@@ -301,7 +301,7 @@ object GeneratorParamsService {
                   .leftMap(MissingParamSet.fromParams)
                   .toEither
 
-              GeneratorParams(itcInput, obsParams.scienceBand, gh, obsParams.calibrationRole, obsParams.declaredComplete, obsParams.executionState, obsParams.stepCount)
+              GeneratorParams(itcInput, obsParams.scienceBand, gh, obsParams.calibrationRole, obsParams.declaredState, obsParams.executionState, obsParams.stepCount)
 
           case gn @ gmos.longslit.Config.GmosNorth(g, f, u, c, a) =>
             val sciMode = InstrumentMode.GmosNorthSpectroscopy(
@@ -374,7 +374,7 @@ object GeneratorParamsService {
                 .leftMap(MissingParamSet.fromParams)
                 .toEither
 
-            GeneratorParams(itcInput, obsParams.scienceBand, ig, obsParams.calibrationRole, obsParams.declaredComplete, obsParams.executionState, obsParams.stepCount).asRight
+            GeneratorParams(itcInput, obsParams.scienceBand, ig, obsParams.calibrationRole, obsParams.declaredState, obsParams.executionState, obsParams.stepCount).asRight
 
           case gn @ gmos.imaging.Config.GmosNorth(_, fs, _) =>
             // An input per filter.
@@ -392,7 +392,7 @@ object GeneratorParamsService {
                 .leftMap(MissingParamSet.fromParams)
                 .toEither
 
-            GeneratorParams(itcInput, obsParams.scienceBand, gn, obsParams.calibrationRole, obsParams.declaredComplete, obsParams.executionState, obsParams.stepCount).asRight
+            GeneratorParams(itcInput, obsParams.scienceBand, gn, obsParams.calibrationRole, obsParams.declaredState, obsParams.executionState, obsParams.stepCount).asRight
 
           case gs @ gmos.imaging.Config.GmosSouth(_, fs, _) =>
             // An input per filter.
@@ -410,7 +410,7 @@ object GeneratorParamsService {
                 .leftMap(MissingParamSet.fromParams)
                 .toEither
 
-            GeneratorParams(itcInput, obsParams.scienceBand, gs, obsParams.calibrationRole, obsParams.declaredComplete, obsParams.executionState, obsParams.stepCount).asRight
+            GeneratorParams(itcInput, obsParams.scienceBand, gs, obsParams.calibrationRole, obsParams.declaredState, obsParams.executionState, obsParams.stepCount).asRight
 
           // Visitor Modes 
           case vis: visitor.Config =>
@@ -419,7 +419,7 @@ object GeneratorParamsService {
               obsParams.scienceBand,
               vis,
               obsParams.calibrationRole,
-              obsParams.declaredComplete,
+              obsParams.declaredState,
               obsParams.executionState,
               obsParams.stepCount
             ).asRight
@@ -473,7 +473,7 @@ object GeneratorParamsService {
     targetId:            Option[Target.Id],
     radialVelocity:      Option[RadialVelocity],
     sourceProfile:       Option[SourceProfile],
-    declaredComplete:    Boolean,
+    declaredState:       Option[DeclaredExecutionState],
     executionState:      ExecutionState,
     stepCount:           Long,
     customSedTimestamp:  Option[Timestamp] = none
@@ -495,7 +495,7 @@ object GeneratorParamsService {
     scienceBand:       Option[ScienceBand],
     blindOffset:       Option[TargetParams],
     targets:           NonEmptyList[TargetParams],
-    declaredComplete:  Boolean,
+    declaredState:     Option[DeclaredExecutionState],
     executionState:    ExecutionState,
     stepCount:         Long
   )
@@ -513,7 +513,7 @@ object GeneratorParamsService {
           oParams.head.blindTargetId.map(btid => TargetParams(btid.some, oParams.head.blindRadialVelocity, oParams.head.blindSourceProfile, None)),
           oParams.map: r =>
             TargetParams(r.targetId, r.radialVelocity, r.sourceProfile, r.customSedTimestamp),
-          oParams.head.declaredComplete,
+          oParams.head.declaredState,
           oParams.head.executionState,
           oParams.head.stepCount
         )
@@ -554,7 +554,7 @@ object GeneratorParamsService {
        target_id.opt           *:
        radial_velocity.opt     *:
        source_profile.opt      *:
-       bool                    *:
+       declared_execution_state.opt *:
        execution_state         *:
        int8
       ).map( (oid, role, cs, etm, om, sb, btid, brv, bsp, tid, rv, sp, dc, es, sc) =>
@@ -585,7 +585,7 @@ object GeneratorParamsService {
         $tab.c_target_id,
         $tab.c_sid_rv,
         $tab.c_source_profile,
-        $tab.c_declared_complete,
+        $tab.c_declared_state,
         $tab.c_execution_state,
         $tab.c_step_count
       """

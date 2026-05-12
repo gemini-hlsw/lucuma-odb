@@ -28,7 +28,6 @@ trait ObservationView[F[_]] extends BaseMapping[F] {
       val CalibrationRole: ColumnRef     = col("c_calibration_role",       calibration_role.opt)
       val ObserverNotes: ColumnRef       = col("c_observer_notes",         text_nonempty.opt)
       val ReferenceTime: ColumnRef       = col("c_reference_time",         core_timestamp.opt)
-      val DeclaredComplete: ColumnRef    = col("c_declared_complete",      bool)
       val UseBlindOffset: ColumnRef      = col("c_use_blind_offset",       bool)
       val BlindOffsetTargetId: ColumnRef = col("c_blind_offset_target_id", target_id.opt)
       val BlindOffsetType: ColumnRef     = col("c_blind_offset_type",      blind_offset_type)
