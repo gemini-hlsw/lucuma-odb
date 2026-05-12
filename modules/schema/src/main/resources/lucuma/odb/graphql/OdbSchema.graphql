@@ -12090,6 +12090,9 @@ enum ExecutionState {
   "User marked the observation complete regardless of any remaining steps."
   DECLARED_COMPLETE
 
+  "Staff marked the observation as ongoing (visitor modes only)."
+  DECLARED_ONGOING
+
 }
 
 "A configuration target will define either coordinates or a region."
