@@ -20,7 +20,7 @@ import skunk.data.Completion
 import skunk.syntax.all.*
 
 trait VisitorService[F[_]]:
-  
+
   def select(
     which: List[Observation.Id]
   ): F[Map[Observation.Id, Config]]
@@ -40,7 +40,7 @@ trait VisitorService[F[_]]:
   )(using Transaction[F]): F[Unit]
 
   def clone(
-    originalId: Observation.Id, 
+    originalId: Observation.Id,
     newId: Observation.Id
   )(using Transaction[F]): F[Unit]
 
@@ -68,7 +68,7 @@ object VisitorService:
               ps.execute(oid, input).map:
                 case Completion.Insert(1) => Result.unit
                 case other => Result.failure(s"Expected single insert, got $other.")
-            .map(_.sequenceVoid)            
+            .map(_.sequenceVoid)
 
       override def delete(
         which: List[Observation.Id]
@@ -90,7 +90,7 @@ object VisitorService:
               List(
                 SET.centralWavelength.foldMap(sql"centralWavelength = $wavelength_pm"),
                 SET.mode.foldMap(sql"mode = $visitor_observing_mode_type"),
-                SET.guideStarMinSep.foldMap(sql"guideStarMinSep = $angle_µas")
+                SET.scienceFov.foldMap(sql"c_science_fov = $angle_µas")
               )
             .map(_.foldSmash(void"UPDATE t_visitor SET ", void",", void" "))
 
@@ -108,28 +108,28 @@ object VisitorService:
       }
 
       override def clone(
-        originalId: Observation.Id, 
+        originalId: Observation.Id,
         newId: Observation.Id
       )(using Transaction[F]): F[Unit] =
         select(List(originalId)).map(_.get(originalId)).flatMap:
-          case None         => 
+          case None         =>
             Concurrent[F].raiseError(new RuntimeException(s"Clone: original observation $originalId has no visitor config."))
-          case Some(config) => 
+          case Some(config) =>
             insert(config, List(newId)).flatMap: res =>
               res.toEither match
                 case Left(Left(t))   => Concurrent[F].raiseError(t)
                 case Left(Right(ps)) => Concurrent[F].raiseError(new RuntimeException(s"Clone: insert failed: ${ps.toList.mkString(", ")}"))
                 case Right(a)        => a.pure
-                            
+
   private object Statements:
 
-    def select[A <: NonEmptyList[Observation.Id]](a: A): Query[a.type, (Observation.Id, Config)] =      
+    def select[A <: NonEmptyList[Observation.Id]](a: A): Query[a.type, (Observation.Id, Config)] =
       sql"""
-        SELECT 
-          c_observation_id,      
-          c_observing_mode_type, 
-          c_central_wavelength,  
-          c_guide_star_min_sep
+        SELECT
+          c_observation_id,
+          c_observing_mode_type,
+          c_central_wavelength,
+          c_science_fov
         FROM
           t_visitor
         WHERE
@@ -141,10 +141,10 @@ object VisitorService:
     val Insert: Command[(Observation.Id, VisitorInput.Create)] =
       sql"""
         INSERT INTO t_visitor (
-          c_observation_id,      
-          c_observing_mode_type, 
-          c_central_wavelength,  
-          c_guide_star_min_sep
+          c_observation_id,
+          c_observing_mode_type,
+          c_central_wavelength,
+          c_science_fov
         ) VALUES (
           $observation_id,
           $visitor_observing_mode_type,
@@ -155,7 +155,7 @@ object VisitorService:
         .contramap:
           case (oid, VisitorInput.Create(mode, wavelength, angle)) => (oid, mode, wavelength, angle)
 
-    def delete[A <: NonEmptyList[Observation.Id]](a: A): Command[a.type] =      
+    def delete[A <: NonEmptyList[Observation.Id]](a: A): Command[a.type] =
       sql"""
         DELETE FROM t_visitor
         WHERE c_observation_id IN (${observation_id.nel(a)})

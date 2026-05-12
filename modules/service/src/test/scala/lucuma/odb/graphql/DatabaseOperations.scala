@@ -813,6 +813,9 @@ trait DatabaseOperations { this: OdbSuite =>
   def createIgrins2LongSlitObservationAs(user: User, pid: Program.Id, offsets: Option[String], tids: Target.Id*): IO[Observation.Id] =
     createObservationWithSpatialOffsets(user, pid, ObservingModeType.Igrins2LongSlit, ImageQuality.Preset.PointEight, offsets, tids*)
 
+  def createGhostIfuObservationAs(user: User, pid: Program.Id, offsets: Option[String], tids: Target.Id*): IO[Observation.Id] =
+    createObservationWithSpatialOffsets(user, pid, ObservingModeType.GhostIfu, ImageQuality.Preset.PointEight, offsets, tids*)
+
   def createVisitorModeObservationAs(user: User, pid: Program.Id, mode: VisitorObservingModeType, tids: Target.Id*): IO[Observation.Id] =
     createObservationWithSpatialOffsets(user, pid, mode, ImageQuality.Preset.PointEight, None, tids*)
 
@@ -1146,13 +1149,13 @@ trait DatabaseOperations { this: OdbSuite =>
             }
           }
         }"""
-          
+
       case v: VisitorObservingModeType =>
         s"""{
           visitor: {
             mode: ${v.tag.toScreamingSnakeCase}
             centralWavelength: { nanometers: 2200 }
-            guideStarMinSep: { degrees: 1 }
+            scienceFov: { degrees: 1 }
           }
         }"""
 
@@ -1209,12 +1212,37 @@ trait DatabaseOperations { this: OdbSuite =>
             $offsetsField
           }
         }"""
+      case ObservingModeType.GhostIfu =>
+        s"""{
+          ghostIfu: {
+            resolutionMode: STANDARD
+            stepCount: 3
+            red: {
+              exposureTimeMode: {
+                timeAndCount: {
+                  time: { seconds: 1.0 }
+                  count: 1
+                  at: { nanometers: 500 }
+                }
+              }
+            }
+            blue: {
+              exposureTimeMode: {
+                timeAndCount: {
+                  time: { seconds: 2.0 }
+                  count: 2
+                  at: { nanometers: 500 }
+                }
+              }
+            }
+          }
+        }"""
       case v: VisitorObservingModeType => 
         s"""{
           visitor: {
             mode: ${v.tag.toScreamingSnakeCase}
             centralWavelength: { nanometers: 2200 }
-            guideStarMinSep: { degrees: 1 }
+            scienceFov: { degrees: 1 }
           }
         }"""
       case _ => ???
@@ -2712,7 +2740,8 @@ trait DatabaseOperations { this: OdbSuite =>
   def setCalculatedWorkflowState(oid: Observation.Id, state: ObservationWorkflowState): IO[Unit] =
     session.use(_.execute(sql"""
       UPDATE t_obscalc
-      SET c_workflow_state = ${observation_workflow_state}
+      SET c_workflow_state = ${observation_workflow_state},
+          c_obscalc_state = 'ready'
       WHERE c_observation_id = ${observation_id}
     """.command)(state, oid)).void
 

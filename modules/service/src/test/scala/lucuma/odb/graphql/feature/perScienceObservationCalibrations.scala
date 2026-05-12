@@ -18,6 +18,7 @@ import lucuma.core.enums.Band
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.Flamingos2Fpu
 import lucuma.core.enums.ObservationWorkflowState
+import lucuma.core.enums.SequenceCommand
 import lucuma.core.enums.TelluricCalibrationOrder
 import lucuma.core.math.BrightnessUnits.BrightnessMeasure
 import lucuma.core.math.BrightnessUnits.Integrated
@@ -61,6 +62,7 @@ class perScienceObservationCalibrations
   with ExecutionTestSupportForFlamingos2
   with ExecutionTestSupportForIgrins2
   with ObservingModeSetupOperations
+  with TelluricCalibrationsTestSupport
   with TelluricTargetsServiceSuiteSupport:
 
   val DefaultSnAt: Wavelength = Wavelength.fromIntNanometers(510).get
@@ -163,13 +165,6 @@ class perScienceObservationCalibrations
     calibrationRoles: List[CalibrationRole],
     parentId:         Option[Group.Id],
     parentIndex:      Int
-  ) derives Decoder
-
-  case class ObsInfo(
-    id:              Observation.Id,
-    groupId:         Option[Group.Id],
-    groupIndex:      Option[Int],
-    calibrationRole: Option[CalibrationRole]
   ) derives Decoder
 
   case class ObsWithTarget(
@@ -279,33 +274,6 @@ class perScienceObservationCalibrations
       AllEtmInfo(parseEtm(reqEtm), parseEtm(acqEtm), parseEtm(sciEtm))
     }
 
-  private def queryObservationsInGroup(gid: Group.Id): IO[List[ObsInfo]] =
-    query(
-      serviceUser,
-      s"""query {
-            group(groupId: "$gid") {
-              elements {
-                observation {
-                  id
-                  groupId
-                  groupIndex
-                  calibrationRole
-                }
-              }
-            }
-          }"""
-    ).flatMap { c =>
-      val elements = c.hcursor
-        .downField("group")
-        .downField("elements")
-        .values
-        .toList
-        .flatten
-        .flatMap(_.hcursor.downField("observation").as[Option[ObsInfo]].toOption)
-        .flatten
-      elements.pure[IO]
-    }
-
   private def selectTelluricObservationFor(oid: Observation.Id): IO[Option[Observation.Id]] =
     queryObservation(oid).flatMap: obs =>
       obs.groupId.flatTraverse: gid =>
@@ -348,18 +316,6 @@ class perScienceObservationCalibrations
       yield ObsWithTarget(id, targetId, targetName, targetRa, targetDec)
 
       result.leftMap(f => new RuntimeException(f.message)).liftTo[IO]
-    }
-
-  private def queryObservationExists(oid: Observation.Id): IO[Boolean] =
-    query(
-      serviceUser,
-      s"""query {
-            observation(observationId: "$oid") {
-              id
-            }
-          }"""
-    ).map { c =>
-      c.hcursor.downField("observation").as[ObsInfo].isRight
     }
 
   private def queryTargetExists(tid: lucuma.core.model.Target.Id): IO[Boolean] =
@@ -422,36 +378,6 @@ class perScienceObservationCalibrations
       c.hcursor.downField("group").as[GroupInfo]
         .leftMap(f => new RuntimeException(f.message))
         .liftTo[IO]
-    }
-
-  private def queryObservation(oid: Observation.Id): IO[ObsInfo] =
-    query(
-      serviceUser,
-      s"""query {
-            observation(observationId: "$oid") {
-              id
-              groupId
-              groupIndex
-              calibrationRole
-            }
-          }"""
-    ).flatMap { c =>
-      c.hcursor.downField("observation").as[ObsInfo]
-        .leftMap(f => new RuntimeException(f.message))
-        .liftTo[IO]
-    }
-
-  private def queryGroupExists(gid: Group.Id): IO[Boolean] =
-    query(
-      serviceUser,
-      s"""query {
-            group(groupId: "$gid") {
-              id
-            }
-          }"""
-    ).map { c =>
-      val groupJson = c.hcursor.downField("group").focus
-      groupJson.exists(!_.isNull)
     }
 
   private def updateFlamingos2Fpu(oid: Observation.Id, fpu: Flamingos2Fpu): IO[Unit] =
@@ -1550,32 +1476,6 @@ class perScienceObservationCalibrations
       assert(meta2.exists(_.resolvedTargetId.isDefined))
     }
 
-  private def setExposureTime(oid: Observation.Id, totalMinutes: Int): IO[Unit] =
-    val perExposureMinutes = totalMinutes / 6
-    query(
-      pi,
-      s"""mutation {
-        updateObservations(input: {
-          WHERE: { id: { EQ: "$oid" } }
-          SET: {
-            observingMode: {
-              flamingos2LongSlit: {
-                exposureTimeMode: {
-                  timeAndCount: {
-                    time: { minutes: $perExposureMinutes },
-                    count: 6,
-                    at: { nanometers: 1390 }
-                  }
-                }
-              }
-            }
-          }
-        }) {
-          observations { id }
-        }
-      }"""
-    ).void
-
   private def queryObservationDuration(oid: Observation.Id): IO[Option[TimeSpan]] =
     withServicesForObscalc(serviceUser): services =>
       services.transactionally:
@@ -1676,8 +1576,8 @@ class perScienceObservationCalibrations
       groupId            =  obsBefore.groupId.get
       obsInGroup1        <- queryObservationsInGroup(groupId)
       telluricOid        =  obsInGroup1.find(_.calibrationRole.contains(CalibrationRole.Telluric)).get.id
-      // Set science observation to Ongoing
-      _                  <- setCalculatedWorkflowState(oid, ObservationWorkflowState.Ongoing)
+      vid                <- recordVisitAs(serviceUser, oid)
+      _                  <- addSequenceEventAs(serviceUser, vid, SequenceCommand.Start)
       (added2, removed2) <- recalculateCalibrations(pid, when, oid)
       groupExists        <- queryGroupExists(groupId)
       tellExists         <- queryObservationExists(telluricOid)
@@ -1706,8 +1606,8 @@ class perScienceObservationCalibrations
       groupId            =  obsBefore.groupId.get
       obsInGroup1        <- queryObservationsInGroup(groupId)
       telluricOid        =  obsInGroup1.find(_.calibrationRole.contains(CalibrationRole.Telluric)).get.id
-      // Set science observation to Complete
-      _                  <- setCalculatedWorkflowState(oid, ObservationWorkflowState.Completed)
+      vid                <- recordVisitAs(serviceUser, oid)
+      _                  <- addSequenceEventAs(serviceUser, vid, SequenceCommand.Start)
       (added2, removed2) <- recalculateCalibrations(pid, when, oid)
       groupExists        <- queryGroupExists(groupId)
       tellExists         <- queryObservationExists(telluricOid)

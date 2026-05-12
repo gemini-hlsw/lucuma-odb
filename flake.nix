@@ -31,7 +31,7 @@
         devShell = pkgs.devshell.mkShell {
           imports = [ typelevel-nix.typelevelShell ];
           packages = [
-            pkgs.nodePackages.graphqurl
+            pkgs.graphqurl
             pkgs.docker
             pkgs.docker-compose
             pkgs.postgresql_15
@@ -43,7 +43,7 @@
           typelevelShell = {
             nodejs.enable = true;
             nodejs.package = pkgs.nodejs_22;
-            jdk.package = pkgs.jdk17;
+            jdk.package = pkgs.jdk25;
           };
           env = [
             {

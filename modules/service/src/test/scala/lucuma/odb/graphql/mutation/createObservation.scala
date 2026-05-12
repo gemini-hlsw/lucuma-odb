@@ -1907,6 +1907,16 @@ class createObservation extends OdbSuite with TelluricTypeGraphQLFormat {
     testObservingModeExplicitParams(Site.GS, "B1200_G5321")
   }
 
+  test("[gmos] rejects non-longslit FPU at GN"):
+    createProgramAs(pi).flatMap: pid =>
+      interceptGraphQL("Argument 'input.SET.observingMode.gmosNorthLongSlit' is invalid: 'fpu' must be one of: LONG_SLIT_0_25, LONG_SLIT_0_50, LONG_SLIT_0_75, LONG_SLIT_1_00, LONG_SLIT_1_50, LONG_SLIT_2_00, LONG_SLIT_5_00"):
+        query(pi, createObsWithGmosObservingMode(pid, Site.GN, "B1200_G5301", fpu = "IFU2_SLITS"))
+
+  test("[general] rejects non-longslit FPU at GS"):
+    createProgramAs(pi).flatMap: pid =>
+      interceptGraphQL("Argument 'input.SET.observingMode.gmosSouthLongSlit' is invalid: 'fpu' must be one of: LONG_SLIT_0_25, LONG_SLIT_0_50, LONG_SLIT_0_75, LONG_SLIT_1_00, LONG_SLIT_1_50, LONG_SLIT_2_00, LONG_SLIT_5_00"):
+        query(pi, createObsWithGmosObservingMode(pid, Site.GS, "B1200_G5321", fpu = "NS1"))
+
   test("[general] can't create an observation with two observing modes") {
     createProgramAs(pi).flatMap { pid =>
       interceptGraphQL("Exactly one key must be specified for oneOf input object ObservingModeInput in field 'createObservation' of type 'Mutation', but found 'gmosNorthLongSlit', 'gmosSouthLongSlit'") {
