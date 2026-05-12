@@ -3,8 +3,7 @@
 -- the boolean `c_declared_complete`, but compute it to limit the extent of the change.
 -- This is a multi-step process that requires re-creating two views.
 
--- Add the new enum value.
-ALTER TYPE e_execution_state ADD VALUE 'declared_ongoing';
+-- Continued from previous migration
 
 -- Add `c_declared_state`.
 ALTER TABLE t_observation
