@@ -49,7 +49,7 @@ val refinedVersion               = "0.11.3"
 val skunkVersion                 = "0.6.5"
 val sqlFormatterVersion          = "2.0.5"
 val spireVersion                 = "0.18.0"
-val slf4jVersion                 = "2.0.17"
+val slf4jVersion                 = "2.0.18"
 val testcontainersScalaVersion   = "0.44.1" // check test output if you attempt to update this
 val weaverVersion                = "0.8.4"
 
