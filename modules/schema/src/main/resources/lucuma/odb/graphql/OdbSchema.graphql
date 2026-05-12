@@ -4805,13 +4805,21 @@ input ObservingModeInput @oneOf {
 input VisitorInput {
   mode: VisitorObservingModeType
   centralWavelength: WavelengthInput
-  guideStarMinSep: AngleInput
+
+  """
+  Science field of view, understood as the diameter of a circular area.
+  """
+  scienceFov: AngleInput
 }
 
 type Visitor {
   mode: VisitorObservingModeType!
   centralWavelength: Wavelength!
-  guideStarMinSep: Angle!
+
+  """
+  Science field of view, understood as the diameter of a circular area.
+  """
+  scienceFov: Angle!
 }
 
 """
@@ -5138,7 +5146,7 @@ input SpectroscopyScienceRequirementsInput {
   """
   The capabilities field may be unset by assigning a null value, or ignored by skipping it altogether
   """
-  capability: SpectroscopyCapabilities
+  capability: SpectroscopyCapability
 }
 
 """
@@ -8775,6 +8783,14 @@ input GhostIfuInput {
   blue: GhostDetectorConfigInput
 
   """
+  Coordinates for taking sky images.  When specified, the observation is
+  considered to be a Target + Sky and is validated to ensure that only a single
+  target exists in its asterism.  If not specified, this will remain null.  May
+  be unset with a null value.
+  """
+  skyPosition: CoordinatesInput
+
+  """
   Slit viewing camera exposure time.  If not specified, this will remain null.
   May be unset with a null value.
   """
@@ -8860,6 +8876,11 @@ type GhostIfu {
   Blue detector config.
   """
   blue: GhostDetectorConfig!
+
+  """
+  Sky position, if any.
+  """
+  skyPosition: Coordinates
 
   """
   Slit viewing camera exposure time (if specified).
@@ -11318,7 +11339,7 @@ type SpectroscopyConfigOption {
   adaptiveOptics: Boolean!
 
   "A special capability (if any) that the configuration may have."
-  capability: SpectroscopyCapabilities
+  capability: SpectroscopyCapability
 
   site: Site!
 
@@ -11516,6 +11537,9 @@ type ImagingConfigOption {
   filterLabel: NonEmptyString! # e.g., 'JH'
 
   adaptiveOptics: Boolean!
+
+  "A special capability (if any) that the configuration may have."
+  capability: ImagingCapability
 
   site: Site!
 
@@ -13834,21 +13858,36 @@ type SpectralDefinitionSurface {
 }
 
 """
+Imaging capabilities (e.g., Speckle).
+"""
+enum ImagingCapability {
+  """
+  ImagingCapability Speckle
+  """
+  SPECKLE
+
+  """
+  ImagingCapability WideField
+  """
+  WIDE_FIELD
+}
+
+"""
 Spectroscopy capabilities Nod&Shuffle/Polarimetry/Corongraphy
 """
-enum SpectroscopyCapabilities {
+enum SpectroscopyCapability {
   """
-  SpectroscopyCapabilities NodAndShuffle
+  SpectroscopyCapability NodAndShuffle
   """
   NOD_AND_SHUFFLE
 
   """
-  SpectroscopyCapabilities Polarimetry
+  SpectroscopyCapability Polarimetry
   """
   POLARIMETRY
 
   """
-  SpectroscopyCapabilities Coronagraphy
+  SpectroscopyCapability Coronagraphy
   """
   CORONAGRAPHY
 }
@@ -13882,7 +13921,7 @@ type SpectroscopyScienceRequirements {
   """
   Spectroscopy Capabilities
   """
-  capability: SpectroscopyCapabilities
+  capability: SpectroscopyCapability
 }
 
 """
@@ -17127,10 +17166,42 @@ input WhereEqScienceSubtype {
 }
 
 """
-Filters on equality (or not) of the SpectroscopyCapabilities property. All
+Filters on equality (or not) of the ImagingCapability property. All
 supplied criteria must match, but usually only one is selected.
 """
-input WhereOptionEqSpectroscopyCapabilities {
+input WhereOptionEqImagingCapability {
+  """
+  When `true`, matches if the imaging capability value is not defined.
+  """
+  IS_NULL: Boolean
+
+  """
+  Matches if the imaging capability is the supplied value.
+  """
+  EQ: ImagingCapability
+
+  """
+  Matches if the imaging capability is anything other than the supplied
+  value.
+  """
+  NEQ: ImagingCapability
+
+  """
+  Matches if the imaging capability is any one of the supplied values.
+  """
+  IN: [ImagingCapability!]
+
+  """
+  Matches if the imaging capability is not any one of the supplied values.
+  """
+  NIN: [ImagingCapability!]
+}
+
+"""
+Filters on equality (or not) of the SpectroscopyCapability property. All
+supplied criteria must match, but usually only one is selected.
+"""
+input WhereOptionEqSpectroscopyCapability {
   """
   When `true`, matches if the spectroscopy capability value is not defined.
   """
@@ -17139,23 +17210,23 @@ input WhereOptionEqSpectroscopyCapabilities {
   """
   Matches if the spectroscopy capability is the supplied value.
   """
-  EQ: SpectroscopyCapabilities
+  EQ: SpectroscopyCapability
 
   """
   Matches if the spectroscopy capability is anything other than the supplied
   value.
   """
-  NEQ: SpectroscopyCapabilities
+  NEQ: SpectroscopyCapability
 
   """
   Matches if the spectroscopy capability is any one of the supplied values.
   """
-  IN: [SpectroscopyCapabilities!]
+  IN: [SpectroscopyCapability!]
 
   """
   Matches if the spectroscopy capability is not any one of the supplied values.
   """
-  NIN: [SpectroscopyCapabilities!]
+  NIN: [SpectroscopyCapability!]
 }
 
 """
@@ -18769,7 +18840,7 @@ input WhereSpectroscopyConfigOption {
 
   adaptiveOptics: WhereBoolean
 
-  capability: WhereOptionEqSpectroscopyCapabilities
+  capability: WhereOptionEqSpectroscopyCapability
 
   focalPlane: WhereEqFocalPlane
 
@@ -18814,6 +18885,8 @@ input WhereImagingConfigOption {
   fov: WhereAngle
 
   site: WhereEqSite
+
+  capability: WhereOptionEqImagingCapability
 }
 
 """

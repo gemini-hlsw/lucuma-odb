@@ -1149,13 +1149,13 @@ trait DatabaseOperations { this: OdbSuite =>
             }
           }
         }"""
-          
+
       case v: VisitorObservingModeType =>
         s"""{
           visitor: {
             mode: ${v.tag.toScreamingSnakeCase}
             centralWavelength: { nanometers: 2200 }
-            guideStarMinSep: { degrees: 1 }
+            scienceFov: { degrees: 1 }
           }
         }"""
 
@@ -1242,7 +1242,7 @@ trait DatabaseOperations { this: OdbSuite =>
           visitor: {
             mode: ${v.tag.toScreamingSnakeCase}
             centralWavelength: { nanometers: 2200 }
-            guideStarMinSep: { degrees: 1 }
+            scienceFov: { degrees: 1 }
           }
         }"""
       case _ => ???
@@ -2740,7 +2740,8 @@ trait DatabaseOperations { this: OdbSuite =>
   def setCalculatedWorkflowState(oid: Observation.Id, state: ObservationWorkflowState): IO[Unit] =
     session.use(_.execute(sql"""
       UPDATE t_obscalc
-      SET c_workflow_state = ${observation_workflow_state}
+      SET c_workflow_state = ${observation_workflow_state},
+          c_obscalc_state = 'ready'
       WHERE c_observation_id = ${observation_id}
     """.command)(state, oid)).void
 

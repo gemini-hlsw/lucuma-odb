@@ -21,7 +21,7 @@ import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.SkyBackground
-import lucuma.core.enums.SpectroscopyCapabilities
+import lucuma.core.enums.SpectroscopyCapability
 import lucuma.core.enums.WaterVapor
 import lucuma.core.math.Angle
 import lucuma.core.math.Coordinates
@@ -157,6 +157,12 @@ object ObservationService {
       "explicitBase requires both ra and dec"
     )
 
+  val BothGhostIfuskyPositionConstraint: DatabaseConstraint =
+    DatabaseConstraint(
+      "ghost_ifu_sky_position_neither_or_both",
+      "skyPosition requires both ra and dec"
+    )
+
   def GenericConstraintViolationMessage(m: String): String =
     s"Database constraint violation produced by input: $m"
 
@@ -165,7 +171,8 @@ object ObservationService {
       MissingAirMassConstraint,
       MissingHourAngleConstraint,
       MissingScienceBandConstraint,
-      BothExplicitCoordinatesConstraint
+      BothExplicitCoordinatesConstraint,
+      BothGhostIfuskyPositionConstraint
     )
 
   def constraintViolationMessage(ex: PostgresErrorException): String =
@@ -748,7 +755,7 @@ object ObservationService {
       Option[Wavelength]               ,
       Option[FocalPlane]               ,
       Option[Angle]                    ,
-      Option[SpectroscopyCapabilities] ,
+      Option[SpectroscopyCapability] ,
       Option[Angle]                    ,
       Option[Boolean]                  ,
       Option[Boolean]                  ,
@@ -821,7 +828,7 @@ object ObservationService {
           ${wavelength_pm.opt},
           ${focal_plane.opt},
           ${angle_µas.opt},
-          ${spectroscopy_capabilities.opt},
+          ${spectroscopy_capability.opt},
           ${angle_µas.opt},
           ${bool.opt},
           ${bool.opt},
@@ -919,7 +926,7 @@ object ObservationService {
       val upWavelengthCoverage = sql"c_spec_wavelength_coverage = ${wavelength_pm.opt}"
       val upFocalPlane         = sql"c_spec_focal_plane = ${focal_plane.opt}"
       val upFocalPlaneAngle    = sql"c_spec_focal_plane_angle = ${angle_µas.opt}"
-      val upCapability         = sql"c_spec_capability = ${spectroscopy_capabilities.opt}"
+      val upCapability         = sql"c_spec_capability = ${spectroscopy_capability.opt}"
 
 
       List(

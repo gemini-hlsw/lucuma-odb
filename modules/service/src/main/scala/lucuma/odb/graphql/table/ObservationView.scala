@@ -101,7 +101,7 @@ trait ObservationView[F[_]] extends BaseMapping[F] {
 
           val Resolution: ColumnRef    = col("c_spec_resolution",          int4_pos.opt)
           val FocalPlane: ColumnRef    = col("c_spec_focal_plane",         focal_plane.opt)
-          val Capability: ColumnRef    = col("c_spec_capability",          spectroscopy_capabilities.opt)
+          val Capability: ColumnRef    = col("c_spec_capability",          spectroscopy_capability.opt)
 
         object Imaging:
           val SyntheticId: ColumnRef = col("c_imaging_mode_id", observation_id.embedded)

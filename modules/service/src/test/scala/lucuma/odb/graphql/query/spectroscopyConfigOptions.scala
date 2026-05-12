@@ -15,7 +15,7 @@ import io.circe.literal.*
 import lucuma.core.enums.FocalPlane
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.Site
-import lucuma.core.enums.SpectroscopyCapabilities
+import lucuma.core.enums.SpectroscopyCapability
 import lucuma.core.math.Angle
 import lucuma.core.math.Wavelength
 import skunk.Session
@@ -55,7 +55,7 @@ class spectroscopyConfigOptions extends OdbSuite {
     wavelengthCoverage: Wavelength,
     resolution:         Int,
     ao:                 Boolean,
-    capability:         Option[SpectroscopyCapabilities],
+    capability:         Option[SpectroscopyCapability],
     site:               Site
   )
 
@@ -81,7 +81,7 @@ class spectroscopyConfigOptions extends OdbSuite {
           waveCov  <- c.downField("wavelengthCoverage").as[Wavelength]
           res      <- c.downField("resolution").as[Int]
           ao       <- c.downField("adaptiveOptics").as[Boolean]
-          cap      <- c.downField("capability").as[Option[SpectroscopyCapabilities]]
+          cap      <- c.downField("capability").as[Option[SpectroscopyCapability]]
           site     <- c.downField("site").as[Site]
         } yield ConfigOption(
           name,

@@ -260,21 +260,24 @@ object Phase0Table {
         "c_fov",
         "c_filter_label",
         "c_ao",
+        "c_capability",
         "c_site"
       )
 
     override def encoder: Encoder[ImagingRow] =
       (
-        instrument    *:
-        angle_µas     *:
-        text          *:
-        bool          *:
+        instrument              *:
+        angle_µas               *:
+        text                    *:
+        bool                    *:
+        imaging_capability.opt  *:
         site
       ).contramap[ImagingRow] { row => (
         row.instrument,
         row.fov,
         row.filter,
         row.ao,
+        row.capability,
         row.site
       )}
 

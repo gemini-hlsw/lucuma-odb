@@ -30,7 +30,7 @@ jobs:
       matrix:
         os: [ubuntu-22.04]
         scala: [3]
-        java: [temurin@17]
+        java: [temurin@25]
         shard: [0, 1, 2, 3, 4, 5, 6, 7]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
@@ -43,17 +43,17 @@ jobs:
       - name: Setup sbt
         uses: sbt/setup-sbt@v1
 
-      - name: Setup Java (temurin@17)
-        id: setup-java-temurin-17
-        if: matrix.java == 'temurin@17'
+      - name: Setup Java (temurin@25)
+        id: setup-java-temurin-25
+        if: matrix.java == 'temurin@25'
         uses: actions/setup-java@v5
         with:
           distribution: temurin
-          java-version: 17
+          java-version: 25
           cache: sbt
 
       - name: sbt update
-        if: matrix.java == 'temurin@17' && steps.setup-java-temurin-17.outputs.cache-hit == 'false'
+        if: matrix.java == 'temurin@25' && steps.setup-java-temurin-25.outputs.cache-hit == 'false'
         run: sbt -v -J-Xmx6g +update
 
       - name: Set up cert permissions (1)
@@ -85,11 +85,11 @@ jobs:
         run: sbt -v -J-Xmx6g githubWorkflowCheck
 
       - name: Check headers and formatting
-        if: matrix.java == 'temurin@17' && matrix.os == 'ubuntu-22.04' && matrix.shard == '0'
+        if: matrix.java == 'temurin@25' && matrix.os == 'ubuntu-22.04' && matrix.shard == '0'
         run: sbt -v -J-Xmx6g '++ ${{ matrix.scala }}' headerCheckAll scalafmtCheckAll 'project /' scalafmtSbtCheck lucumaScalafmtCheck lucumaScalafixCheck
 
       - name: Check scalafix lints
-        if: matrix.java == 'temurin@17' && matrix.os == 'ubuntu-22.04' && matrix.shard == '0'
+        if: matrix.java == 'temurin@25' && matrix.os == 'ubuntu-22.04' && matrix.shard == '0'
         run: sbt -v -J-Xmx6g '++ ${{ matrix.scala }}' 'scalafixAll --check'
 
       - name: Test
@@ -99,18 +99,18 @@ jobs:
         run: sbt -v -J-Xmx6g '++ ${{ matrix.scala }}' test
 
       - name: Check binary compatibility
-        if: matrix.java == 'temurin@17' && matrix.os == 'ubuntu-22.04' && matrix.shard == '0'
+        if: matrix.java == 'temurin@25' && matrix.os == 'ubuntu-22.04' && matrix.shard == '0'
         run: sbt -v -J-Xmx6g '++ ${{ matrix.scala }}' mimaReportBinaryIssues
 
       - name: Generate API documentation
-        if: matrix.java == 'temurin@17' && matrix.os == 'ubuntu-22.04' && matrix.shard == '0'
+        if: matrix.java == 'temurin@25' && matrix.os == 'ubuntu-22.04' && matrix.shard == '0'
         run: sbt -v -J-Xmx6g '++ ${{ matrix.scala }}' doc
 
       - name: Aggregate coverage reports
         run: sbt -v -J-Xmx6g '++ ${{ matrix.scala }}' coverageReport coverageAggregate
 
       - name: Upload code coverage data
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v6
 
       - name: Docker compose down
         run: docker compose down
@@ -122,7 +122,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-22.04]
-        java: [temurin@17]
+        java: [temurin@25]
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout current branch
@@ -133,17 +133,17 @@ jobs:
       - name: Setup sbt
         uses: sbt/setup-sbt@v1
 
-      - name: Setup Java (temurin@17)
-        id: setup-java-temurin-17
-        if: matrix.java == 'temurin@17'
+      - name: Setup Java (temurin@25)
+        id: setup-java-temurin-25
+        if: matrix.java == 'temurin@25'
         uses: actions/setup-java@v5
         with:
           distribution: temurin
-          java-version: 17
+          java-version: 25
           cache: sbt
 
       - name: sbt update
-        if: matrix.java == 'temurin@17' && steps.setup-java-temurin-17.outputs.cache-hit == 'false'
+        if: matrix.java == 'temurin@25' && steps.setup-java-temurin-25.outputs.cache-hit == 'false'
         run: sbt -v -J-Xmx6g +update
 
       - name: Import signing key
@@ -177,7 +177,7 @@ jobs:
       matrix:
         os: [ubuntu-22.04]
         scala: [3.8.3]
-        java: [temurin@17]
+        java: [temurin@25]
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout current branch
@@ -188,17 +188,17 @@ jobs:
       - name: Setup sbt
         uses: sbt/setup-sbt@v1
 
-      - name: Setup Java (temurin@17)
-        id: setup-java-temurin-17
-        if: matrix.java == 'temurin@17'
+      - name: Setup Java (temurin@25)
+        id: setup-java-temurin-25
+        if: matrix.java == 'temurin@25'
         uses: actions/setup-java@v5
         with:
           distribution: temurin
-          java-version: 17
+          java-version: 25
           cache: sbt
 
       - name: sbt update
-        if: matrix.java == 'temurin@17' && steps.setup-java-temurin-17.outputs.cache-hit == 'false'
+        if: matrix.java == 'temurin@25' && steps.setup-java-temurin-25.outputs.cache-hit == 'false'
         run: sbt -v -J-Xmx6g +update
 
       - name: Build Docker images

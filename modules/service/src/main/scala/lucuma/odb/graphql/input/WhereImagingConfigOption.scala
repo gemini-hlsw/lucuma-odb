@@ -7,17 +7,22 @@ import cats.syntax.parallel.*
 import grackle.Path
 import grackle.Predicate
 import grackle.Predicate.*
+import lucuma.core.enums.ImagingCapability
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.Site
 import lucuma.odb.graphql.binding.*
 
 object WhereImagingConfigOption {
 
+  private val ImagingCapabilityBinding: Matcher[ImagingCapability] =
+    enumeratedBinding
+
   def binding(path: Path): Matcher[Predicate] = {
     val WhereAdaptiveOpt  = WhereBoolean.binding(path / "adaptiveOptics", BooleanBinding)
     val WhereInstrument   = WhereEq.binding[Instrument](path / "instrument", InstrumentBinding)
     val WhereSite         = WhereEq.binding[Site](path / "site", SiteBinding)
     val WhereFov          = WhereAngle.binding(path / "fov")
+    val WhereCapability   = WhereOptionEq.binding[ImagingCapability](path / "capability", ImagingCapabilityBinding)
 
     lazy val WhereConfigBinding = binding(path)
 
@@ -31,10 +36,11 @@ object WhereImagingConfigOption {
         WhereInstrument.Option("instrument", rIns),
         WhereFov.Option("fov", rFov),
         WhereSite.Option("site", rSte),
+        WhereCapability.Option("capability", rCap),
 
       ) =>
-        (rAND, rOR, rNOT, rAdp, rIns, rFov, rSte).parMapN {
-          (AND, OR, NOT, adp, ins, fov, ste) =>
+        (rAND, rOR, rNOT, rAdp, rIns, rFov, rSte, rCap).parMapN {
+          (AND, OR, NOT, adp, ins, fov, ste, cap) =>
             and(List(
               AND.map(and),
               OR.map(or),
@@ -42,7 +48,8 @@ object WhereImagingConfigOption {
               adp,
               ins,
               fov,
-              ste
+              ste,
+              cap
             ).flatten)
         }
     }

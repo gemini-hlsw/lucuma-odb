@@ -6,11 +6,13 @@ package ifu
 
 import cats.Eq
 import cats.derived.*
+import cats.syntax.functor.*
 import eu.timepit.refined.cats.*
 import eu.timepit.refined.types.numeric.PosInt
 import lucuma.core.enums.GhostIfu1FiberAgitator
 import lucuma.core.enums.GhostIfu2FiberAgitator
 import lucuma.core.enums.GhostResolutionMode
+import lucuma.core.math.Coordinates
 import lucuma.core.util.TimeSpan
 
 import java.io.ByteArrayOutputStream
@@ -23,6 +25,7 @@ case class Config(
   resolutionMode:         GhostResolutionMode,
   red:                    DetectorConfig.Red,
   blue:                   DetectorConfig.Blue,
+  skyPosition:            Option[Coordinates],
   slitCameraExposureTime: Option[TimeSpan],
   explicitIfu1Agitator:   Option[GhostIfu1FiberAgitator],
   explicitIfu2Agitator:   Option[GhostIfu2FiberAgitator]
@@ -48,6 +51,11 @@ case class Config(
     out.writeChars(resolutionMode.tag)
     out.write(red.value.hashBytes)
     out.write(blue.value.hashBytes)
+    out.writeInt(skyPosition.as(1).getOrElse(0))
+    skyPosition.foreach: c =>
+      out.writeLong(c.ra.toAngle.toMicroarcseconds)
+      out.writeLong(c.dec.toAngle.toMicroarcseconds)
+    out.writeInt(slitCameraExposureTime.as(1).getOrElse(0))
     slitCameraExposureTime.foreach: t =>
       out.writeLong(t.toMicroseconds)
     out.writeChars(ifu1Agitator.tag)

@@ -12,14 +12,14 @@ import grackle.Predicate.*
 import lucuma.core.enums.FocalPlane
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.Site
-import lucuma.core.enums.SpectroscopyCapabilities
+import lucuma.core.enums.SpectroscopyCapability
 import lucuma.odb.graphql.binding.*
 
 object WhereSpectroscopyConfigOption {
 
   def binding(path: Path): Matcher[Predicate] = {
     val WhereAdaptiveOpt  = WhereBoolean.binding(path / "adaptiveOptics", BooleanBinding)
-    val WhereCapabilities = WhereOptionEq.binding[SpectroscopyCapabilities](path / "capability", SpectroscopyCapabilitiesBinding)
+    val WhereCapabilities = WhereOptionEq.binding[SpectroscopyCapability](path / "capability", SpectroscopyCapabilityBinding)
     val WhereFocalPlane   = WhereEq.binding[FocalPlane](path / "focalPlane", FocalPlaneBinding)
     val WhereInstrument   = WhereEq.binding[Instrument](path / "instrument", InstrumentBinding)
     val WhereResolution   = WhereOrder.binding[PosInt](path / "resolution", PosIntBinding)

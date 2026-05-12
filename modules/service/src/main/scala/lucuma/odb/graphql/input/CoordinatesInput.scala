@@ -4,7 +4,7 @@
 package lucuma.odb.graphql
 package input
 
-import cats.syntax.parallel.*
+import cats.syntax.apply.*
 import lucuma.core.math.Coordinates
 import lucuma.core.math.Declination
 import lucuma.core.math.RightAscension
@@ -23,14 +23,17 @@ object CoordinatesInput {
   final case class Edit(
     ra:  Option[RightAscension],
     dec: Option[Declination]
-  )
+  ):
+    def toCoordinates: Option[Coordinates] =
+      (ra, dec).mapN(Coordinates(_, _))
+
   object Edit:
     val Binding: Matcher[Edit] =
       ObjectFieldsBinding.rmap {
         case List(
           RightAscensionInput.Binding.Option("ra", rRa),
           DeclinationInput.Binding.Option("dec", rDec)
-        ) => (rRa, rDec).parMapN(Edit(_, _))
+        ) => (rRa, rDec).mapN(Edit(_, _))
       }
 
 }
