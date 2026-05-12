@@ -63,6 +63,15 @@ ThisBuild / Test / parallelExecution := false
 
 ThisBuild / Test / testOptions += Tests.Argument(TestFrameworks.MUnit, "--log=debug")
 
+// Disable plugin-injected CI steps, they will be run in a the dedicated `checks` job
+// instead of being repeated for each shard
+ThisBuild / lucumaCoverage           := false
+ThisBuild / tlCiHeaderCheck          := false
+ThisBuild / tlCiScalafmtCheck        := false
+ThisBuild / tlCiScalafixCheck        := false
+ThisBuild / tlCiMimaBinaryIssueCheck := false
+ThisBuild / tlCiDocCheck             := false
+
 ThisBuild / watchOnTermination := { (action, cmd, times, state) =>
   val projNames = cmd
     .split(";")
@@ -101,44 +110,49 @@ ThisBuild / githubWorkflowBuildPreamble ~= { steps =>
 //    cond = Some("github.event_name == 'pull_request'  && matrix.shard == '1'")
 //  )
 
-ThisBuild / githubWorkflowBuildPreamble +=
-  WorkflowStep.Use(
-    UseRef.Public("kamilkisiela", "graphql-inspector", "master"),
-    name = Some("Validate ODB GraphQL schema changes"),
-    params =
-      Map(
-        "name"          -> "Validate ODB Public API",
-        "schema"        -> "main:modules/schema/src/main/resources/lucuma/odb/graphql/OdbSchema.graphql",
-        "approve-label" -> "expected-breaking-change"
-      ),
-    cond = Some("github.event_name == 'pull_request' && matrix.shard == '1'")
-  )
-
-ThisBuild / githubWorkflowBuildPreamble +=
-  WorkflowStep.Use(
-    UseRef.Public("kamilkisiela", "graphql-inspector", "master"),
-    name = Some("Validate ITC GraphQL schema changes"),
-    params =
-      Map(
-        "name"          -> "Validate ITC Public API",
-        "schema"        -> "main:itc/service/src/main/resources/graphql/itc.graphql",
-        "approve-label" -> "expected-breaking-change"
-      ),
-    cond = Some("github.event_name == 'pull_request' && matrix.shard == '2'")
-  )
-
 val nTestJobShards = 8
 
 ThisBuild / githubWorkflowBuildMatrixAdditions += (
   "shard" -> ((0 to (nTestJobShards - 1)).map(_.toString).toList)
 )
-ThisBuild / githubWorkflowBuild ~= (_.map(step =>
-  if (step.name.contains("Test"))
+ThisBuild / githubWorkflowBuild ~= (_.map {
+  case step if step.name.contains("Test") =>
     step.withEnv(
-      Map("TEST_SHARD_COUNT" -> nTestJobShards.toString(), "TEST_SHARD" -> "${{ matrix.shard }}")
+      Map(
+        "TEST_SHARD_COUNT" -> nTestJobShards.toString(),
+        "TEST_SHARD"       -> "${{ matrix.shard }}"
+      )
     )
-  else step
-))
+  case step => step
+})
+
+// Swap the test-shard checkout for a shallow no-LFS variant
+ThisBuild / githubWorkflowGeneratedCI ~= { jobs =>
+  jobs.map { job =>
+    if (job.id == "build")
+      job.withSteps(job.steps.map {
+        case s if s.name.contains("Checkout current branch") => CheckoutShallow
+        case s                                               => s
+      })
+    else job
+  }
+}
+
+// Shollow checkout and no lfs, used for test shards
+lazy val CheckoutShallow: WorkflowStep =
+  WorkflowStep.Use(
+    UseRef.Public("actions", "checkout", "v5"),
+    name = Some("Checkout current branch"),
+    params = Map("fetch-depth" -> "1")
+  )
+
+// checkout without lfs but full history
+lazy val CheckoutFull: WorkflowStep =
+  WorkflowStep.Use(
+    UseRef.Public("actions", "checkout", "v5"),
+    name = Some("Checkout current branch"),
+    params = Map("fetch-depth" -> "0")
+  )
 
 lazy val CheckoutFullWithLfs: WorkflowStep =
   WorkflowStep.Use(
@@ -148,7 +162,15 @@ lazy val CheckoutFullWithLfs: WorkflowStep =
   )
 
 ThisBuild / githubWorkflowJobSetup := {
-  List(CheckoutFullWithLfs) :::
+  List(CheckoutFull) :::
+    WorkflowStep.SetupSbt ::
+    WorkflowStep.SetupJava(githubWorkflowJavaVersions.value.toList) :::
+    githubWorkflowGeneratedCacheSteps.value.toList
+}
+
+// allow customizing the checkout style.
+def setupWith(checkout: WorkflowStep): Def.Initialize[List[WorkflowStep]] = Def.setting {
+  checkout ::
     WorkflowStep.SetupSbt ::
     WorkflowStep.SetupJava(githubWorkflowJavaVersions.value.toList) :::
     githubWorkflowGeneratedCacheSteps.value.toList
@@ -253,11 +275,65 @@ val mainCond                 = "github.ref == 'refs/heads/main'"
 val geminiRepoCond           = "startsWith(github.repository, 'gemini')"
 def allConds(conds: String*) = conds.mkString("(", " && ", ")")
 
+lazy val sbtStaticChecks =
+  WorkflowStep.Sbt(
+    List(
+      "headerCheckAll",
+      "scalafmtCheckAll",
+      "project /",
+      "scalafmtSbtCheck",
+      "lucumaScalafmtCheck",
+      "lucumaScalafixCheck",
+      "scalafixAll --check",
+      "mimaReportBinaryIssues",
+      "doc"
+    ),
+    name = Some("Static checks")
+  )
+
+lazy val graphqlInspectorOdb =
+  WorkflowStep.Use(
+    UseRef.Public("kamilkisiela", "graphql-inspector", "master"),
+    name = Some("Validate ODB GraphQL schema changes"),
+    params =
+      Map(
+        "name"          -> "Validate ODB Public API",
+        "schema"        -> "main:modules/schema/src/main/resources/lucuma/odb/graphql/OdbSchema.graphql",
+        "approve-label" -> "expected-breaking-change"
+      ),
+    cond = Some("github.event_name == 'pull_request'")
+  )
+
+lazy val graphqlInspectorItc =
+  WorkflowStep.Use(
+    UseRef.Public("kamilkisiela", "graphql-inspector", "master"),
+    name = Some("Validate ITC GraphQL schema changes"),
+    params =
+      Map(
+        "name"          -> "Validate ITC Public API",
+        "schema"        -> "main:itc/service/src/main/resources/graphql/itc.graphql",
+        "approve-label" -> "expected-breaking-change"
+      ),
+    cond = Some("github.event_name == 'pull_request'")
+  )
+
+// Don't do static checks repeatedly on each shard, instead create a separate task only for checks.
 ThisBuild / githubWorkflowAddedJobs ++= Seq(
+  WorkflowJob(
+    "checks",
+    "Static checks and schema validation",
+    githubWorkflowJobSetup.value.toList :::
+      sbtStaticChecks ::
+      graphqlInspectorOdb ::
+      graphqlInspectorItc ::
+      Nil,
+    scalas = List(scalaVersion.value),
+    javas = githubWorkflowJavaVersions.value.toList.take(1)
+  ),
   WorkflowJob(
     "deploy",
     "Build and publish Docker images / Deploy to Heroku",
-    githubWorkflowJobSetup.value.toList :::
+    setupWith(CheckoutFullWithLfs).value :::
       sbtDockerPublishLocal ::
       herokuPush ::
       herokuRelease ::

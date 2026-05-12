@@ -36,9 +36,9 @@ jobs:
     timeout-minutes: 60
     steps:
       - name: Checkout current branch
-        uses: nschloe/action-cached-lfs-checkout@v1
+        uses: actions/checkout@v5
         with:
-          fetch-depth: 0
+          fetch-depth: 1
 
       - name: Setup sbt
         uses: sbt/setup-sbt@v1
@@ -65,32 +65,8 @@ jobs:
       - name: Docker compose up
         run: docker compose up -d
 
-      - name: Validate ODB GraphQL schema changes
-        if: github.event_name == 'pull_request' && matrix.shard == '1'
-        uses: kamilkisiela/graphql-inspector@master
-        with:
-          name: Validate ODB Public API
-          schema: 'main:modules/schema/src/main/resources/lucuma/odb/graphql/OdbSchema.graphql'
-          approve-label: expected-breaking-change
-
-      - name: Validate ITC GraphQL schema changes
-        if: github.event_name == 'pull_request' && matrix.shard == '2'
-        uses: kamilkisiela/graphql-inspector@master
-        with:
-          name: Validate ITC Public API
-          schema: 'main:itc/service/src/main/resources/graphql/itc.graphql'
-          approve-label: expected-breaking-change
-
       - name: Check that workflows are up to date
         run: sbt -v -J-Xmx6g githubWorkflowCheck
-
-      - name: Check headers and formatting
-        if: matrix.java == 'temurin@25' && matrix.os == 'ubuntu-22.04' && matrix.shard == '0'
-        run: sbt -v -J-Xmx6g '++ ${{ matrix.scala }}' headerCheckAll scalafmtCheckAll 'project /' scalafmtSbtCheck lucumaScalafmtCheck lucumaScalafixCheck
-
-      - name: Check scalafix lints
-        if: matrix.java == 'temurin@25' && matrix.os == 'ubuntu-22.04' && matrix.shard == '0'
-        run: sbt -v -J-Xmx6g '++ ${{ matrix.scala }}' 'scalafixAll --check'
 
       - name: Test
         env:
@@ -98,22 +74,23 @@ jobs:
           TEST_SHARD: ${{ matrix.shard }}
         run: sbt -v -J-Xmx6g '++ ${{ matrix.scala }}' test
 
-      - name: Check binary compatibility
-        if: matrix.java == 'temurin@25' && matrix.os == 'ubuntu-22.04' && matrix.shard == '0'
-        run: sbt -v -J-Xmx6g '++ ${{ matrix.scala }}' mimaReportBinaryIssues
-
-      - name: Generate API documentation
-        if: matrix.java == 'temurin@25' && matrix.os == 'ubuntu-22.04' && matrix.shard == '0'
-        run: sbt -v -J-Xmx6g '++ ${{ matrix.scala }}' doc
-
-      - name: Aggregate coverage reports
-        run: sbt -v -J-Xmx6g '++ ${{ matrix.scala }}' coverageReport coverageAggregate
-
-      - name: Upload code coverage data
-        uses: codecov/codecov-action@v6
-
       - name: Docker compose down
         run: docker compose down
+
+      - name: Make target directories
+        if: github.event_name != 'pull_request' && (startsWith(github.ref, 'refs/tags/v'))
+        run: mkdir -p itc/testkit/.jvm/target itc/service/target modules/binding/target itc/model/.jvm/target modules/otel/target modules/sso-frontend-client/.jvm/target itc/testkit/.js/target itc/model/.js/target itc/client/jvm/target modules/schema/.js/target target itc/client/js/target modules/schema/.jvm/target modules/sso-frontend-client/.js/target modules/sso-backend-client/target project/target
+
+      - name: Compress target directories
+        if: github.event_name != 'pull_request' && (startsWith(github.ref, 'refs/tags/v'))
+        run: tar cf targets.tar itc/testkit/.jvm/target itc/service/target modules/binding/target itc/model/.jvm/target modules/otel/target modules/sso-frontend-client/.jvm/target itc/testkit/.js/target itc/model/.js/target itc/client/jvm/target modules/schema/.js/target target itc/client/js/target modules/schema/.jvm/target modules/sso-frontend-client/.js/target modules/sso-backend-client/target project/target
+
+      - name: Upload target directories
+        if: github.event_name != 'pull_request' && (startsWith(github.ref, 'refs/tags/v'))
+        uses: actions/upload-artifact@v5
+        with:
+          name: target-${{ matrix.os }}-${{ matrix.java }}-${{ matrix.scala }}-${{ matrix.shard }}
+          path: targets.tar
 
   publish:
     name: Publish Artifacts
@@ -126,7 +103,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout current branch
-        uses: nschloe/action-cached-lfs-checkout@v1
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
@@ -145,6 +122,16 @@ jobs:
       - name: sbt update
         if: matrix.java == 'temurin@25' && steps.setup-java-temurin-25.outputs.cache-hit == 'false'
         run: sbt -v -J-Xmx6g +update
+
+      - name: Download target directories (3, 0)
+        uses: actions/download-artifact@v6
+        with:
+          name: target-${{ matrix.os }}-${{ matrix.java }}-3-0
+
+      - name: Inflate target directories (3, 0)
+        run: |
+          tar xf targets.tar
+          rm targets.tar
 
       - name: Import signing key
         if: env.PGP_SECRET != '' && env.PGP_PASSPHRASE == ''
@@ -169,6 +156,55 @@ jobs:
           SONATYPE_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}
           SONATYPE_CREDENTIAL_HOST: ${{ secrets.SONATYPE_CREDENTIAL_HOST }}
         run: sbt -v -J-Xmx6g tlCiRelease
+
+  checks:
+    name: Static checks and schema validation
+    strategy:
+      matrix:
+        os: [ubuntu-22.04]
+        scala: [3.8.3]
+        java: [temurin@25]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout current branch
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Setup sbt
+        uses: sbt/setup-sbt@v1
+
+      - name: Setup Java (temurin@25)
+        id: setup-java-temurin-25
+        if: matrix.java == 'temurin@25'
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 25
+          cache: sbt
+
+      - name: sbt update
+        if: matrix.java == 'temurin@25' && steps.setup-java-temurin-25.outputs.cache-hit == 'false'
+        run: sbt -v -J-Xmx6g +update
+
+      - name: Static checks
+        run: sbt -v -J-Xmx6g '++ ${{ matrix.scala }}' headerCheckAll scalafmtCheckAll 'project /' scalafmtSbtCheck lucumaScalafmtCheck lucumaScalafixCheck 'scalafixAll --check' mimaReportBinaryIssues doc
+
+      - name: Validate ODB GraphQL schema changes
+        if: github.event_name == 'pull_request'
+        uses: kamilkisiela/graphql-inspector@master
+        with:
+          name: Validate ODB Public API
+          schema: 'main:modules/schema/src/main/resources/lucuma/odb/graphql/OdbSchema.graphql'
+          approve-label: expected-breaking-change
+
+      - name: Validate ITC GraphQL schema changes
+        if: github.event_name == 'pull_request'
+        uses: kamilkisiela/graphql-inspector@master
+        with:
+          name: Validate ITC Public API
+          schema: 'main:itc/service/src/main/resources/graphql/itc.graphql'
+          approve-label: expected-breaking-change
 
   deploy:
     name: Build and publish Docker images / Deploy to Heroku
