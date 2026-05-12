@@ -74,9 +74,8 @@ SELECT
   o.c_declared_complete,
   o.c_declared_state,
   CASE
-    -- The observation is explicitly marked complete -> completed.
-    WHEN o.c_declared_complete
-      THEN 'completed'::e_execution_state
+    -- The observation has a declared state.
+    WHEN o.c_declared_state IS NOT NULL THEN o.c_declared_state
 
     -- No events have been fired at all -> not_started (just slewing to the
     -- target doesn't count as execution).
