@@ -101,44 +101,70 @@ ThisBuild / githubWorkflowBuildPreamble ~= { steps =>
 //    cond = Some("github.event_name == 'pull_request'  && matrix.shard == '1'")
 //  )
 
-ThisBuild / githubWorkflowBuildPreamble +=
-  WorkflowStep.Use(
-    UseRef.Public("kamilkisiela", "graphql-inspector", "master"),
-    name = Some("Validate ODB GraphQL schema changes"),
-    params =
-      Map(
-        "name"          -> "Validate ODB Public API",
-        "schema"        -> "main:modules/schema/src/main/resources/lucuma/odb/graphql/OdbSchema.graphql",
-        "approve-label" -> "expected-breaking-change"
-      ),
-    cond = Some("github.event_name == 'pull_request' && matrix.shard == '1'")
-  )
-
-ThisBuild / githubWorkflowBuildPreamble +=
-  WorkflowStep.Use(
-    UseRef.Public("kamilkisiela", "graphql-inspector", "master"),
-    name = Some("Validate ITC GraphQL schema changes"),
-    params =
-      Map(
-        "name"          -> "Validate ITC Public API",
-        "schema"        -> "main:itc/service/src/main/resources/graphql/itc.graphql",
-        "approve-label" -> "expected-breaking-change"
-      ),
-    cond = Some("github.event_name == 'pull_request' && matrix.shard == '2'")
-  )
-
 val nTestJobShards = 8
 
 ThisBuild / githubWorkflowBuildMatrixAdditions += (
   "shard" -> ((0 to (nTestJobShards - 1)).map(_.toString).toList)
 )
-ThisBuild / githubWorkflowBuild ~= (_.map(step =>
-  if (step.name.contains("Test"))
-    step.withEnv(
-      Map("TEST_SHARD_COUNT" -> nTestJobShards.toString(), "TEST_SHARD" -> "${{ matrix.shard }}")
-    )
-  else step
-))
+
+// Test shards run only tests; all other checks/coverage are moved to a separate `checks` job.
+val nonTestStepNames = Set(
+  "Check that workflows are up to date",
+  "Check headers and formatting",
+  "Check scalafix lints",
+  "Check binary compatibility",
+  "Generate API documentation",
+  "Aggregate coverage reports",
+  "Upload code coverage data"
+)
+
+def dropNonTestSteps(steps: Seq[WorkflowStep]): Seq[WorkflowStep] =
+  steps.flatMap { step =>
+    step.name match {
+      case Some(n) if nonTestStepNames.contains(n) => None
+      case Some("Test")                            =>
+        Some(step.withEnv(
+          Map(
+            "TEST_SHARD_COUNT" -> nTestJobShards.toString(),
+            "TEST_SHARD"       -> "${{ matrix.shard }}"
+          )
+        ))
+      case _                                       => Some(step)
+    }
+  }
+
+ThisBuild / githubWorkflowBuild         ~= dropNonTestSteps
+ThisBuild / githubWorkflowBuildPostamble ~= dropNonTestSteps
+
+// Test shards swap to a shallow no-LFS checkout: they don't need history and the
+// ITC LFS jars (legacy-tests.yml owns those) cause minute-scale variance when 8
+// shards race for the same LFS objects.
+ThisBuild / githubWorkflowGeneratedCI ~= { jobs =>
+  jobs.map { job =>
+    if (job.id == "build")
+      job.withSteps(job.steps.map {
+        case s if s.name.contains("Checkout current branch") => CheckoutShallow
+        case s                                               => s
+      })
+    else job
+  }
+}
+
+// Shollow checkout and no lfs, used for test shards
+lazy val CheckoutShallow: WorkflowStep =
+  WorkflowStep.Use(
+    UseRef.Public("actions", "checkout", "v5"),
+    name = Some("Checkout current branch"),
+    params = Map("fetch-depth" -> "1")
+  )
+
+// checkout without lfs but full history
+lazy val CheckoutFull: WorkflowStep =
+  WorkflowStep.Use(
+    UseRef.Public("actions", "checkout", "v5"),
+    name = Some("Checkout current branch"),
+    params = Map("fetch-depth" -> "0")
+  )
 
 lazy val CheckoutFullWithLfs: WorkflowStep =
   WorkflowStep.Use(
@@ -148,7 +174,14 @@ lazy val CheckoutFullWithLfs: WorkflowStep =
   )
 
 ThisBuild / githubWorkflowJobSetup := {
-  List(CheckoutFullWithLfs) :::
+  List(CheckoutFull) :::
+    WorkflowStep.SetupSbt ::
+    WorkflowStep.SetupJava(githubWorkflowJavaVersions.value.toList) :::
+    githubWorkflowGeneratedCacheSteps.value.toList
+}
+
+def setupWith(checkout: WorkflowStep): Def.Initialize[List[WorkflowStep]] = Def.setting {
+  checkout ::
     WorkflowStep.SetupSbt ::
     WorkflowStep.SetupJava(githubWorkflowJavaVersions.value.toList) :::
     githubWorkflowGeneratedCacheSteps.value.toList
@@ -253,11 +286,64 @@ val mainCond                 = "github.ref == 'refs/heads/main'"
 val geminiRepoCond           = "startsWith(github.repository, 'gemini')"
 def allConds(conds: String*) = conds.mkString("(", " && ", ")")
 
+lazy val sbtStaticChecks =
+  WorkflowStep.Sbt(
+    List(
+      "headerCheckAll",
+      "scalafmtCheckAll",
+      "project /",
+      "scalafmtSbtCheck",
+      "lucumaScalafmtCheck",
+      "lucumaScalafixCheck",
+      "scalafixAll --check",
+      "mimaReportBinaryIssues",
+      "doc"
+    ),
+    name = Some("Static checks")
+  )
+
+lazy val graphqlInspectorOdb =
+  WorkflowStep.Use(
+    UseRef.Public("kamilkisiela", "graphql-inspector", "master"),
+    name = Some("Validate ODB GraphQL schema changes"),
+    params =
+      Map(
+        "name"          -> "Validate ODB Public API",
+        "schema"        -> "main:modules/schema/src/main/resources/lucuma/odb/graphql/OdbSchema.graphql",
+        "approve-label" -> "expected-breaking-change"
+      ),
+    cond = Some("github.event_name == 'pull_request'")
+  )
+
+lazy val graphqlInspectorItc =
+  WorkflowStep.Use(
+    UseRef.Public("kamilkisiela", "graphql-inspector", "master"),
+    name = Some("Validate ITC GraphQL schema changes"),
+    params =
+      Map(
+        "name"          -> "Validate ITC Public API",
+        "schema"        -> "main:itc/service/src/main/resources/graphql/itc.graphql",
+        "approve-label" -> "expected-breaking-change"
+      ),
+    cond = Some("github.event_name == 'pull_request'")
+  )
+
 ThisBuild / githubWorkflowAddedJobs ++= Seq(
+  WorkflowJob(
+    "checks",
+    "Static checks and schema validation",
+    githubWorkflowJobSetup.value.toList :::
+      sbtStaticChecks ::
+      graphqlInspectorOdb ::
+      graphqlInspectorItc ::
+      Nil,
+    scalas = List(scalaVersion.value),
+    javas = githubWorkflowJavaVersions.value.toList.take(1)
+  ),
   WorkflowJob(
     "deploy",
     "Build and publish Docker images / Deploy to Heroku",
-    githubWorkflowJobSetup.value.toList :::
+    setupWith(CheckoutFullWithLfs).value :::
       sbtDockerPublishLocal ::
       herokuPush ::
       herokuRelease ::
@@ -266,6 +352,7 @@ ThisBuild / githubWorkflowAddedJobs ++= Seq(
       Nil,
     scalas = List(scalaVersion.value),
     javas = githubWorkflowJavaVersions.value.toList.take(1),
+    needs = List("build", "checks"),
     cond = Some(allConds(mainCond, geminiRepoCond))
   )
 )
