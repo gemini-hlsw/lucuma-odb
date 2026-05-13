@@ -3,7 +3,7 @@
 
 package lucuma.odb.graphql.binding
 
-import lucuma.core.enums.Igrins2OffsetMode
+import lucuma.core.enums.SlitOffsetMode
 
-val Igrins2OffsetModeBinding: Matcher[Igrins2OffsetMode] =
+val SlitOffsetModeBinding: Matcher[SlitOffsetMode] =
   enumeratedBinding

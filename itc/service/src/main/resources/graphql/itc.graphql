@@ -3716,7 +3716,7 @@ type Igrins2Static {
   saveSVCImages: Boolean!
 
   """Offset mode."""
-  offsetMode: Igrins2OffsetMode!
+  offsetMode: SlitOffsetMode!
 }
 
 """IGRINS-2 dynamic step configuration"""
@@ -4273,12 +4273,12 @@ type GhostExecutionConfig {
   science: GhostExecutionSequence
 }
 
-"""IGRINS-2 Offset Mode"""
-enum Igrins2OffsetMode {
-  """Igrins2OffsetMode NodAlongSlit"""
+"""Slit Offset Mode"""
+enum SlitOffsetMode {
+  """SlitOffsetMode NodAlongSlit"""
   NOD_ALONG_SLIT
 
-  """Igrins2OffsetMode NodToSky"""
+  """SlitOffsetMode NodToSky"""
   NOD_TO_SKY
 }
 
@@ -4291,15 +4291,15 @@ type Igrins2LongSlit {
   The offset mode is either explicitly specified in explicitOffsetMode or else
   taken from defaultOffsetMode
   """
-  offsetMode: Igrins2OffsetMode!
+  offsetMode: SlitOffsetMode!
 
   """Default offset mode"""
-  defaultOffsetMode: Igrins2OffsetMode!
+  defaultOffsetMode: SlitOffsetMode!
 
   """
   Optional explicitly specified offset mode. If set it overrides the default.
   """
-  explicitOffsetMode: Igrins2OffsetMode
+  explicitOffsetMode: SlitOffsetMode
 
   """
   Whether to save SVC images, either explicitly specified in

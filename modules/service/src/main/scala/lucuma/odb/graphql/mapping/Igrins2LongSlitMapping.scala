@@ -13,7 +13,7 @@ import grackle.TypeRef
 import grackle.skunk.SkunkMapping
 import io.circe.Json
 import io.circe.syntax.*
-import lucuma.core.enums.Igrins2OffsetMode
+import lucuma.core.enums.SlitOffsetMode
 import lucuma.core.math.Offset
 import lucuma.odb.data.ExposureTimeModeRole
 import lucuma.odb.format.spatialOffsets.*
@@ -30,7 +30,7 @@ trait Igrins2LongSlitMapping[F[_]]
   private def decodeIgrins2Offsets(s: String): Json =
     OffsetsFormat.getOption(s).map(_.asJson).getOrElse(List.empty[Offset].asJson)
 
-  val defaultOffsetMode: FieldMapping = CursorField[Igrins2OffsetMode]("defaultOffsetMode", _ => Result(Igrins2OffsetMode.NodAlongSlit))
+  val defaultOffsetMode: FieldMapping = CursorField[SlitOffsetMode]("defaultOffsetMode", _ => Result(SlitOffsetMode.NodAlongSlit))
 
   val defaultSaveSVCImages: FieldMapping = CursorField[Boolean]("defaultSaveSVCImages", _ => Result(false))
 
@@ -41,7 +41,7 @@ trait Igrins2LongSlitMapping[F[_]]
 
       SqlObject("exposureTimeMode", Join(Igrins2LongSlitView.ObservationId, ExposureTimeModeView.ObservationId)),
 
-      explicitOrElseDefault[Igrins2OffsetMode]("offsetMode", "explicitOffsetMode", "defaultOffsetMode"),
+      explicitOrElseDefault[SlitOffsetMode]("offsetMode", "explicitOffsetMode", "defaultOffsetMode"),
       SqlField("explicitOffsetMode", Igrins2LongSlitView.OffsetMode),
       defaultOffsetMode,
 

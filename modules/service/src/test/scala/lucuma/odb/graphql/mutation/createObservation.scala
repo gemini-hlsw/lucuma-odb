@@ -2670,9 +2670,9 @@ class createObservation extends OdbSuite with TelluricTypeGraphQLFormat {
           "createObservation", "observation", "observingMode", "igrins2LongSlit"
         )
         assertIO(
-          (ls.downIO[Igrins2OffsetMode]("offsetMode"),
-           ls.downIO[Igrins2OffsetMode]("defaultOffsetMode"),
-           ls.downIO[Option[Igrins2OffsetMode]]("explicitOffsetMode"),
+          (ls.downIO[SlitOffsetMode]("offsetMode"),
+           ls.downIO[SlitOffsetMode]("defaultOffsetMode"),
+           ls.downIO[Option[SlitOffsetMode]]("explicitOffsetMode"),
            ls.downIO[Boolean]("saveSVCImages"),
            ls.downIO[Boolean]("defaultSaveSVCImages"),
            ls.downIO[Option[Boolean]]("explicitSaveSVCImages"),
@@ -2680,8 +2680,8 @@ class createObservation extends OdbSuite with TelluricTypeGraphQLFormat {
            ls.downIO[Double]("exposureTimeMode", "signalToNoise", "at", "nanometers"),
            ls.downIO[TelluricType]("telluricType")
           ).tupled,
-          (Igrins2OffsetMode.NodAlongSlit,
-           Igrins2OffsetMode.NodAlongSlit,
+          (SlitOffsetMode.NodAlongSlit,
+           SlitOffsetMode.NodAlongSlit,
            None,
            false,
            false,
@@ -2703,13 +2703,13 @@ class createObservation extends OdbSuite with TelluricTypeGraphQLFormat {
           "createObservation", "observation", "observingMode", "igrins2LongSlit"
         )
         assertIO(
-          (ls.downIO[Igrins2OffsetMode]("offsetMode"),
-           ls.downIO[Option[Igrins2OffsetMode]]("explicitOffsetMode"),
+          (ls.downIO[SlitOffsetMode]("offsetMode"),
+           ls.downIO[Option[SlitOffsetMode]]("explicitOffsetMode"),
            ls.downIO[Boolean]("saveSVCImages"),
            ls.downIO[Option[Boolean]]("explicitSaveSVCImages")
           ).tupled,
-          (Igrins2OffsetMode.NodToSky,
-           Some(Igrins2OffsetMode.NodToSky),
+          (SlitOffsetMode.NodToSky,
+           Some(SlitOffsetMode.NodToSky),
            true,
            Some(true)
           )
@@ -2848,7 +2848,7 @@ class createObservation extends OdbSuite with TelluricTypeGraphQLFormat {
 
   private def createObsWithIgrins2ObservingModeAllParams(
     pid:                    Program.Id,
-    explicitOffsetMode:     Option[Igrins2OffsetMode],
+    explicitOffsetMode:     Option[SlitOffsetMode],
     explicitSaveSVCImages:  Option[Boolean],
     telluricType:           TelluricType
   ): String =
@@ -2905,21 +2905,21 @@ class createObservation extends OdbSuite with TelluricTypeGraphQLFormat {
       query(pi,
         createObsWithIgrins2ObservingModeAllParams(
           pid,
-          explicitOffsetMode = Some(Igrins2OffsetMode.NodToSky),
+          explicitOffsetMode = Some(SlitOffsetMode.NodToSky),
           explicitSaveSVCImages = Some(true),
           telluricType = TelluricType.Solar
         )).flatMap { js =>
           val longSlit = js.hcursor.downPath("createObservation", "observation", "observingMode", "igrins2LongSlit")
 
           assertIO((
-            longSlit.downIO[Igrins2OffsetMode]("offsetMode"),
-            longSlit.downIO[Option[Igrins2OffsetMode]]("explicitOffsetMode"),
+            longSlit.downIO[SlitOffsetMode]("offsetMode"),
+            longSlit.downIO[Option[SlitOffsetMode]]("explicitOffsetMode"),
             longSlit.downIO[Boolean]("saveSVCImages"),
             longSlit.downIO[Option[Boolean]]("explicitSaveSVCImages"),
             longSlit.downIO[TelluricType]("telluricType")
           ).tupled, (
-            Igrins2OffsetMode.NodToSky,
-            Some(Igrins2OffsetMode.NodToSky),
+            SlitOffsetMode.NodToSky,
+            Some(SlitOffsetMode.NodToSky),
             true,
             Some(true),
             TelluricType.Solar
@@ -2941,11 +2941,11 @@ class createObservation extends OdbSuite with TelluricTypeGraphQLFormat {
           val longSlit = js.hcursor.downPath("createObservation", "observation", "observingMode", "igrins2LongSlit")
 
           assertIO((
-            longSlit.downIO[Igrins2OffsetMode]("offsetMode"),
-            longSlit.downIO[Option[Igrins2OffsetMode]]("explicitOffsetMode"),
+            longSlit.downIO[SlitOffsetMode]("offsetMode"),
+            longSlit.downIO[Option[SlitOffsetMode]]("explicitOffsetMode"),
             longSlit.downIO[TelluricType]("telluricType")
           ).tupled, (
-            Igrins2OffsetMode.NodAlongSlit,
+            SlitOffsetMode.NodAlongSlit,
             None,
             TelluricType.A0V
           )

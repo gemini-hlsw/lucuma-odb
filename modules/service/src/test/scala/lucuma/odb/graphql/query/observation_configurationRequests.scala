@@ -15,8 +15,8 @@ import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosNorthGrating
 import lucuma.core.enums.GmosSouthFilter
 import lucuma.core.enums.GmosSouthGrating
-import lucuma.core.enums.Igrins2OffsetMode
 import lucuma.core.enums.ObservingModeType
+import lucuma.core.enums.SlitOffsetMode
 import lucuma.core.enums.VisitorObservingModeType
 import lucuma.core.model.CloudExtinction
 import lucuma.core.model.ConfigurationRequest
@@ -106,7 +106,7 @@ class observation_configurationRequests
           }
         """
 
-    def forIgrins2LongSlit(user: User, oid: Observation.Id, offsetMode: Igrins2OffsetMode): IO[Unit] =
+    def forIgrins2LongSlit(user: User, oid: Observation.Id, offsetMode: SlitOffsetMode): IO[Unit] =
       updateObservationAs(user, oid):
         s"""
           observingMode: {
@@ -127,7 +127,7 @@ class observation_configurationRequests
       case ObservingModeType.GmosSouthLongSlit  => Mutation.forGmosSouthLongSlit(user, oid, GmosSouthGrating.B480_G5327)
       case ObservingModeType.GmosSouthImaging   => Mutation.forGmosSouthImaging(user, oid, List(GmosSouthFilter.CaT, GmosSouthFilter.GG455))
       case ObservingModeType.GnirsLongSlit      => IO.unit // TODO implement Gnirs
-      case ObservingModeType.Igrins2LongSlit    => Mutation.forIgrins2LongSlit(user, oid, Igrins2OffsetMode.NodAlongSlit)
+      case ObservingModeType.Igrins2LongSlit    => Mutation.forIgrins2LongSlit(user, oid, SlitOffsetMode.NodAlongSlit)
       case _: VisitorObservingModeType          => IO.unit
 
   def compatibleMutation(user: User, oid: Observation.Id, mode: ObservingModeType): IO[Unit] =
@@ -152,7 +152,7 @@ class observation_configurationRequests
       case ObservingModeType.GmosSouthLongSlit  => Some(Mutation.forGmosSouthLongSlit(user, oid, GmosSouthGrating.R600_G5324))
       case ObservingModeType.GmosSouthImaging   => None // Mutation.forGmosSouthImaging(user, oid, List(GmosSouthFilter.GG455, GmosSouthFilter.GPrime_GG455))
       case ObservingModeType.GnirsLongSlit      => Some(IO.unit) // TODO implement Gnirs
-      case ObservingModeType.Igrins2LongSlit    => None // Mutation.forIgrins2LongSlit(user, oid, Igrins2OffsetMode.NodToSky)
+      case ObservingModeType.Igrins2LongSlit    => None // Mutation.forIgrins2LongSlit(user, oid, SlitOffsetMode.NodToSky)
 
   private def updateObservationAs(user: User, oid: Observation.Id)(update: String): IO[Unit] =
     updateObservation(user, oid, update,

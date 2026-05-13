@@ -7,7 +7,7 @@ import cats.effect.IO
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
-import lucuma.core.enums.Igrins2OffsetMode
+import lucuma.core.enums.SlitOffsetMode
 import lucuma.core.enums.StepGuideState
 import lucuma.core.math.Offset
 import lucuma.core.model.Observation
@@ -18,7 +18,7 @@ import lucuma.core.util.TimeSpan
 
 trait ExecutionTestSupportForIgrins2 extends ExecutionTestSupport:
 
-  def setOffsets(oid: Observation.Id, mode: Igrins2OffsetMode, offsets: String): IO[Unit] =
+  def setOffsets(oid: Observation.Id, mode: SlitOffsetMode, offsets: String): IO[Unit] =
     query(
       pi,
       s"""

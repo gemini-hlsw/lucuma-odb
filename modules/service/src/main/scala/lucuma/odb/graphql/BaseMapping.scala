@@ -236,7 +236,7 @@ trait BaseMapping[F[_]]
   lazy val HmsStringType                           = schema.ref("HmsString")
   lazy val HourAngleRangeType                      = schema.ref("HourAngleRange")
   lazy val Igrins2LongSlitType                     = schema.ref("Igrins2LongSlit")
-  lazy val Igrins2OffsetModeType                   = schema.ref("Igrins2OffsetMode")
+  lazy val SlitOffsetModeType                   = schema.ref("SlitOffsetMode")
   lazy val Igrins2StaticType                       = schema.ref("Igrins2Static")
   lazy val IdempotencyKeyType                      = schema.ref("IdempotencyKey")
   lazy val IgnoreType                              = schema.ref("Ignore")

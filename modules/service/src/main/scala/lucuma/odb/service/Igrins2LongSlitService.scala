@@ -8,7 +8,7 @@ import cats.effect.Concurrent
 import cats.syntax.all.*
 import grackle.Result
 import grackle.ResultT
-import lucuma.core.enums.Igrins2OffsetMode
+import lucuma.core.enums.SlitOffsetMode
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.Observation
 import lucuma.core.model.TelluricType
@@ -64,7 +64,7 @@ object Igrins2LongSlitService:
           .map: offsets =>
             Config(
               sci,
-              offsetMode.getOrElse(Igrins2OffsetMode.NodAlongSlit),
+              offsetMode.getOrElse(SlitOffsetMode.NodAlongSlit),
               saveSVC.getOrElse(false),
               offsets,
               telluricType
@@ -154,7 +154,7 @@ object Igrins2LongSlitService:
 
     val InsertIgrins2LongSlit: Fragment[(
       Observation.Id,
-      Option[Igrins2OffsetMode],
+      Option[SlitOffsetMode],
       Option[Boolean],
       Option[String],
       TelluricType

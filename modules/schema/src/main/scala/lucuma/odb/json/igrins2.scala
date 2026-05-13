@@ -7,7 +7,7 @@ import io.circe.Decoder
 import io.circe.Encoder
 import io.circe.Json
 import io.circe.syntax.*
-import lucuma.core.enums.Igrins2OffsetMode
+import lucuma.core.enums.SlitOffsetMode
 import lucuma.core.model.sequence.igrins2.Igrins2DynamicConfig
 import lucuma.core.model.sequence.igrins2.Igrins2SVCImages
 import lucuma.core.model.sequence.igrins2.Igrins2StaticConfig
@@ -21,7 +21,7 @@ trait Igrins2Codec:
     Decoder.instance: c =>
       for
         s <- c.downField("saveSVCImages").as[Boolean]
-        o <- c.downField("offsetMode").as[Igrins2OffsetMode]
+        o <- c.downField("offsetMode").as[SlitOffsetMode]
       yield Igrins2StaticConfig(Igrins2SVCImages(s), o)
 
   given Encoder[Igrins2StaticConfig] =

@@ -6,7 +6,7 @@ package lucuma.odb.sequence.igrins2.longslit
 import cats.Eq
 import cats.derived.*
 import cats.syntax.all.*
-import lucuma.core.enums.Igrins2OffsetMode
+import lucuma.core.enums.SlitOffsetMode
 import lucuma.core.math.Offset
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.TelluricType
@@ -18,7 +18,7 @@ import java.io.DataOutputStream
 
 case class Config(
   scienceExposureTimeMode: ExposureTimeMode,
-  offsetMode: Igrins2OffsetMode,
+  offsetMode: SlitOffsetMode,
   saveSVCImages: Boolean,
   explicitSpatialOffsets: Option[List[Offset]],
   telluricType: TelluricType
