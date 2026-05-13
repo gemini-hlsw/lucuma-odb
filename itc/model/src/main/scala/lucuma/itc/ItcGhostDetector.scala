@@ -3,6 +3,7 @@
 
 package lucuma.itc
 
+import eu.timepit.refined.types.numeric.PosInt
 import lucuma.core.enums.GhostBinning
 import lucuma.core.enums.GhostReadMode
 import lucuma.core.model.ExposureTimeMode
@@ -11,4 +12,9 @@ case class ItcGhostDetector(
   timeAndCount: ExposureTimeMode.TimeAndCountMode, // ITC currently only supports TimeAndCountMode
   readMode:     GhostReadMode,
   binning:      GhostBinning
-)
+):
+  def multiplyCount(mul: PosInt): ItcGhostDetector =
+    copy(timeAndCount =
+      ExposureTimeMode.TimeAndCountMode.count
+        .modify(c => PosInt.unsafeFrom(c.value * mul.value))(timeAndCount)
+    )

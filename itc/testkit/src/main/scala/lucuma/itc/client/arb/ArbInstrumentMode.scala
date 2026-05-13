@@ -4,6 +4,8 @@
 package lucuma.itc.client
 package arb
 
+import eu.timepit.refined.scalacheck.all.given
+import eu.timepit.refined.types.numeric.PosInt
 import lucuma.core.enums.Flamingos2Disperser
 import lucuma.core.enums.Flamingos2Filter
 import lucuma.core.enums.Flamingos2Fpu
@@ -194,10 +196,11 @@ trait ArbInstrumentMode {
   given Arbitrary[GhostSpectroscopy] =
     Arbitrary {
       for {
+        sc <- arbitrary[PosInt]
         re <- arbitrary[GhostResolutionMode]
         r  <- arbitrary[ItcGhostDetector]
         b  <- arbitrary[ItcGhostDetector]
-      } yield GhostSpectroscopy(re, r, b)
+      } yield GhostSpectroscopy(sc, re, r, b)
     }
 
   given Cogen[GhostSpectroscopy] =

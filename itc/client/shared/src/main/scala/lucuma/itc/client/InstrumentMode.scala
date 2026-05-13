@@ -6,8 +6,11 @@ package lucuma.itc.client
 import cats.Eq
 import cats.derived.*
 import cats.syntax.functor.*
+import eu.timepit.refined.cats.*
+import eu.timepit.refined.types.numeric.PosInt
 import io.circe.Encoder
 import io.circe.Json
+import io.circe.refined.*
 import io.circe.syntax.*
 import lucuma.core.enums.Flamingos2Disperser
 import lucuma.core.enums.Flamingos2Filter
@@ -148,6 +151,7 @@ object InstrumentMode {
       )
 
   case class GhostSpectroscopy(
+    stepCount:      PosInt,
     resolutionMode: GhostResolutionMode,
     redDetector:    ItcGhostDetector,
     blueDetector:   ItcGhostDetector
@@ -169,6 +173,7 @@ object InstrumentMode {
     given Encoder[GhostSpectroscopy] = a =>
       Json.fromFields(
         List(
+          "stepCount"      -> a.stepCount.asJson,
           "resolutionMode" -> a.resolutionMode.asScreamingJson,
           "redDetector"    -> a.redDetector.asJson,
           "blueDetector"   -> a.blueDetector.asJson
@@ -307,7 +312,7 @@ object InstrumentMode {
         Json.obj("flamingos2Imaging" -> a.asJson)
       case a @ Igrins2Spectroscopy(_, _)                       =>
         Json.obj("igrins2Spectroscopy" -> a.asJson)
-      case a @ GhostSpectroscopy(_, _, _)                      =>
+      case a @ GhostSpectroscopy(_, _, _, _)                   =>
         Json.obj("ghostSpectroscopy" -> a.asJson)
       case a @ GnirsSpectroscopy(_, _, _, _, _, _, _, _, _, _) =>
         Json.obj("gnirsSpectroscopy" -> a.asJson)

@@ -442,7 +442,7 @@ object ItcService {
             imaging(im)
           case sp @ ItcInput.Spectroscopy(_, _, _, _) =>
             spectroscopy(sp)
-          case sp @ ItcInput.ScienceOnlySpectroscopy(SpectroscopyParameters(_, gh @ InstrumentMode.GhostSpectroscopy(_, _, _)), targets) =>
+          case sp @ ItcInput.ScienceOnlySpectroscopy(SpectroscopyParameters(_, gh @ InstrumentMode.GhostSpectroscopy(_, _, _, _)), targets) =>
             ghost(gh, targets)
           case sp @ ItcInput.ScienceOnlySpectroscopy(SpectroscopyParameters(_, InstrumentMode.Igrins2Spectroscopy(_, _)), _) =>
             igrins2Spectroscopy(sp)

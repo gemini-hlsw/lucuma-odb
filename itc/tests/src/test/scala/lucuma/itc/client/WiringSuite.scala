@@ -672,6 +672,7 @@ object WiringSuite:
           elevationRange = ElevationRange.ByAirMass.Default
         ),
         InstrumentMode.GhostSpectroscopy(
+          5.refined,
           GhostResolutionMode.Standard,
           ItcGhostDetector(
             defaultTimeAndCount,
