@@ -4,6 +4,7 @@
 package lucuma.itc.input
 
 import cats.syntax.parallel.*
+import eu.timepit.refined.types.numeric.PosInt
 import grackle.Result
 import lucuma.core.enums.GhostResolutionMode
 import lucuma.core.enums.PortDisposition
@@ -13,6 +14,7 @@ import lucuma.odb.graphql.binding.*
 
 case class GhostSpectroscopyInput(
   numSkyMicrolens: Int,
+  stepCount:       PosInt,
   resolutionMode:  GhostResolutionMode,
   redDetector:     ItcGhostDetector,
   blueDetector:    ItcGhostDetector
@@ -49,12 +51,13 @@ object GhostSpectroscopyInput:
     ObjectFieldsBinding.rmap {
       case List(
             IntBinding.Option("numSkyMicrolens", oNumSkyMicrolens),
+            PosIntBinding("stepCount", stepCount),
             GhostResolutionModeBinding("resolutionMode", resolutionMode),
             ItcGhostDetectorInput.Binding("redDetector", redDetector),
             ItcGhostDetectorInput.Binding("blueDetector", blueDetector)
           ) =>
-        (oNumSkyMicrolens, resolutionMode, redDetector, blueDetector).parTupled
-          .flatMap: (oNumSky, rm, rd, bd) =>
+        (oNumSkyMicrolens, stepCount, resolutionMode, redDetector, blueDetector).parTupled
+          .flatMap: (oNumSky, sc, rm, rd, bd) =>
             validateNumSkyMicrolens(oNumSky, rm)
-              .map(numSky => GhostSpectroscopyInput(numSky, rm, rd, bd))
+              .map(numSky => GhostSpectroscopyInput(numSky, sc, rm, rd, bd))
     }

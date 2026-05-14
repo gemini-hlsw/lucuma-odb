@@ -181,6 +181,12 @@ input GhostSpectroscopyInput {
   """
   numSkyMicrolens: Int
 
+  """
+  Number of steps for ghost spectroscopy mode.
+  When sending to the OCS, the count for each detector will be multiplied by this value.
+  """
+  stepCount: PosInt!
+
   """Resolution mode for ghost spectroscopy mode"""
   resolutionMode: GhostResolutionMode!
 

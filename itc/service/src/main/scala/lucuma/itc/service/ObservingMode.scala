@@ -6,6 +6,7 @@ package lucuma.itc.service
 import cats.Hash
 import cats.derived.*
 import cats.syntax.all.*
+import eu.timepit.refined.types.numeric.PosInt
 import lucuma.core.enums.*
 import lucuma.core.math.Wavelength
 import lucuma.core.model.sequence.gmos.GmosCcdMode
@@ -136,6 +137,7 @@ object ObservingMode {
 
     case class Ghost(
       numSkyMicrolens: Int,
+      stepCount:       PosInt,
       resolutionMode:  GhostResolutionMode,
       redDetector:     ItcGhostDetector,
       blueDetector:    ItcGhostDetector

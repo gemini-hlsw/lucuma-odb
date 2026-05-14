@@ -245,11 +245,13 @@ private[legacy] object codecs:
         "calculationMethod" -> d.timeAndCount.spectroscopyCalculationMethod.asJson
       )
 
+    // The legacy ITC doesn't know about step count, so we "include" it by multiplying the
+    // time and count for each detector by the step count.
     Json.obj(
       "nSkyMicrolens" -> a.numSkyMicrolens.asJson,
       "resolution"    -> a.resolutionMode.ocs2Tag.asJson,
-      "blueCamera"    -> a.blueDetector.asJson,
-      "redCamera"     -> a.redDetector.asJson
+      "blueCamera"    -> a.blueDetector.multiplyCount(a.stepCount).asJson,
+      "redCamera"     -> a.redDetector.multiplyCount(a.stepCount).asJson
     )
 
   private val encodeGnirsLongSlitSpectroscopy

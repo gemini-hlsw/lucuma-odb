@@ -25,7 +25,7 @@ class LegacyITCGhostSpecExpTimeSuite extends CommonITCLegacySuite:
   val timeAndCount =
     ExposureTimeMode.TimeAndCountMode(
       TimeSpan.fromSeconds(60).get,
-      PosInt.unsafeFrom(10),
+      PosInt.unsafeFrom(1),
       wavelengthAt
     )
 
@@ -44,6 +44,7 @@ class LegacyITCGhostSpecExpTimeSuite extends CommonITCLegacySuite:
   override def instrument = ItcInstrumentDetails(
     ObservingMode.SpectroscopyMode.Ghost(
       numSkyMicrolens = 7,
+      stepCount = PosInt.unsafeFrom(10),
       resolutionMode = GhostResolutionMode.High,
       redDetector = ItcGhostDetector(
         timeAndCount = timeAndCount,

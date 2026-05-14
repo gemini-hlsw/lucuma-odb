@@ -2138,7 +2138,9 @@ type SmartGcal implements StepConfig {
 type Visitor {
   mode: VisitorObservingModeType!
   centralWavelength: Wavelength!
-  guideStarMinSep: Angle!
+
+  """Science field of view, understood as the diameter of a circular area."""
+  scienceFov: Angle!
 }
 
 type SetAllocationsResult {
@@ -5976,6 +5978,9 @@ type ImagingConfigOption {
   instrument: Instrument!
   filterLabel: NonEmptyString!
   adaptiveOptics: Boolean!
+
+  """A special capability (if any) that the configuration may have."""
+  capability: ImagingCapability
   site: Site!
   fov: Angle!
 
@@ -6342,6 +6347,9 @@ enum ExecutionState {
   User marked the observation complete regardless of any remaining steps.
   """
   DECLARED_COMPLETE
+
+  """Staff marked the observation as ongoing (visitor modes only)."""
+  DECLARED_ONGOING
 }
 
 """A configuration target will define either coordinates or a region."""
@@ -7315,6 +7323,15 @@ type SpectralDefinitionSurface {
 
   """Emission lines spectral definition"""
   emissionLines: EmissionLinesSurface
+}
+
+"""Imaging capabilities (e.g., Speckle)."""
+enum ImagingCapability {
+  """ImagingCapability Speckle"""
+  SPECKLE
+
+  """ImagingCapability WideField"""
+  WIDE_FIELD
 }
 
 """Spectroscopy capabilities Nod&Shuffle/Polarimetry/Corongraphy"""
@@ -9116,6 +9133,12 @@ input GhostSpectroscopyInput {
   If omitted, defaults to 3 for Standard resolution and 7 for High resolution.
   """
   numSkyMicrolens: Int
+
+  """
+  Number of steps for ghost spectroscopy mode.
+  When sending to the OCS, the count for each detector will be multiplied by this value.
+  """
+  stepCount: PosInt!
 
   """Resolution mode for ghost spectroscopy mode"""
   resolutionMode: GhostResolutionMode!

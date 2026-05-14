@@ -354,12 +354,13 @@ class spectroscopyGraphSuite extends GraphQLSuite {
             mode: {
               ghostSpectroscopy: {
                 resolutionMode: HIGH,
+                stepCount: 3,
                 redDetector: {
                   timeAndCount: {
                     time: {
                       seconds: 2
                     },
-                    count: 3,
+                    count: 1,
                     at: {
                       nanometers: 1600
                     }
@@ -371,7 +372,7 @@ class spectroscopyGraphSuite extends GraphQLSuite {
                   timeAndCount: {
                     time: {
                       seconds: 2                    },
-                    count: 3,
+                    count: 1,
                     at: {
                       nanometers: 1600
                     }

@@ -1795,6 +1795,7 @@ class spectroscopyTimeAndCountSuite extends GraphQLSuite:
             mode: {
               ghostSpectroscopy: {
                 resolutionMode: HIGH,
+                stepCount: 3,
                 redDetector: {
                   timeAndCount: {
                     time: {

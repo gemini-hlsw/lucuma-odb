@@ -278,7 +278,7 @@ object GeneratorParamsService {
 
         observingMode(obsParams.targets, config).flatMap:
 
-          case gh @ ghost.ifu.Config(_, resolutionMode, red, blue, _, _, _, _) =>
+          case gh @ ghost.ifu.Config(stepCnt, resolutionMode, red, blue, _, _, _, _) =>
             (
               ExposureTimeMode.timeAndCount.getOption(red.value.exposureTimeMode),
               ExposureTimeMode.timeAndCount.getOption(blue.value.exposureTimeMode)
@@ -287,6 +287,7 @@ object GeneratorParamsService {
             .toRight(Error.MisconfiguredObservation(obsParams.observationId, "GHOST requires TimeAndCount exposure time modes"))
             .map: (redEtm, blueEtm) =>
               val sciMode = InstrumentMode.GhostSpectroscopy(
+                stepCnt,
                 resolutionMode,
                 ItcGhostDetector(redEtm, red.value.readMode, red.value.binning),
                 ItcGhostDetector(blueEtm, blue.value.readMode, blue.value.binning)
