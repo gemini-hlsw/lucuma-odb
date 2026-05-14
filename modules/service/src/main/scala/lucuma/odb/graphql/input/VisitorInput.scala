@@ -34,7 +34,8 @@ object VisitorInput:
           Create(m, w, f, name, totalRequestTime)
         ),
         "Cannot turn edit into create; all required fields must be defined."
-      )
+      ).flatMap: c =>
+        c.validate.fold(Result.failure, _ => Result.success(c))
 
   val CreateBinding: Matcher[Create] =
     ObjectFieldsBinding.rmap:

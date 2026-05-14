@@ -17,7 +17,13 @@ final case class Config(
   scienceFov: Angle,
   name: Option[NonEmptyString],
   totalRequestTime: Option[TimeSpan]
-)
+):
+  def validate: Either[String, Unit] =
+    mode match
+      case VisitorObservingModeType.VisitorNorth | VisitorObservingModeType.VisitorSouth
+        if name.isEmpty || totalRequestTime.isEmpty =>
+        Left(s"Visitor mode $mode requires both `name` and `totalRequestTime` to be provided.")
+      case _ => Right(())
 
 object Config:
 
