@@ -14,9 +14,9 @@ import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.string.NonEmptyString
 import fs2.Pure
 import fs2.Stream
-import lucuma.core.enums.Igrins2OffsetMode
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SequenceType
+import lucuma.core.enums.SlitOffsetMode
 import lucuma.core.enums.StepGuideState.Disabled
 import lucuma.core.enums.StepGuideState.Enabled
 import lucuma.core.math.Angle
@@ -48,22 +48,22 @@ object Science:
   val SlitLength: Angle =
     Angle.fromBigDecimalArcseconds(5.0)
 
-  private def isOnTarget(mode: Igrins2OffsetMode, o: Offset): Boolean =
+  private def isOnTarget(mode: SlitOffsetMode, o: Offset): Boolean =
     mode match
-      case Igrins2OffsetMode.NodAlongSlit => isOnSlit(SlitLength, o)
-      case Igrins2OffsetMode.NodToSky     => o.p.toAngle.toMicroarcseconds === 0L
+      case SlitOffsetMode.NodAlongSlit => isOnSlit(SlitLength, o)
+      case SlitOffsetMode.NodToSky     => o.p.toAngle.toMicroarcseconds === 0L
 
   object Igrins2SequenceState extends SequenceState[Igrins2DynamicConfig]:
     override val initialDynamicConfig: Igrins2DynamicConfig =
       Igrins2DynamicConfig(TimeSpan.Min)
 
-    def igrins2ScienceStep(mode: Igrins2OffsetMode)(o: Offset): State[Igrins2DynamicConfig, ProtoStep[Igrins2DynamicConfig]] =
+    def igrins2ScienceStep(mode: SlitOffsetMode)(o: Offset): State[Igrins2DynamicConfig, ProtoStep[Igrins2DynamicConfig]] =
       val guideState = if isOnTarget(mode, o) then Enabled else Disabled
       scienceStep(TelescopeConfig(o, guideState), ObserveClass.Science)
 
   case class StepDefinition(
     scienceSteps: NonEmptyList[ProtoStep[Igrins2DynamicConfig]],
-    offsetMode:   Igrins2OffsetMode
+    offsetMode:   SlitOffsetMode
   ):
     def cycleCount(t: IntegrationTime): Either[String, NonNegInt] =
       calculateCycleCount[Igrins2DynamicConfig](isOnTarget(offsetMode, _), scienceSteps.toList, t)

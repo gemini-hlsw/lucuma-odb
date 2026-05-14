@@ -7804,7 +7804,7 @@ input Igrins2StaticInput {
   """
   Offset mode (defaults to NOD_ALONG_SLIT)
   """
-  offsetMode: Igrins2OffsetMode
+  offsetMode: SlitOffsetMode
 
 }
 
@@ -8000,7 +8000,7 @@ type Igrins2Static {
   """
   Offset mode.
   """
-  offsetMode: Igrins2OffsetMode!
+  offsetMode: SlitOffsetMode!
 }
 
 """
@@ -9053,16 +9053,16 @@ type GhostExecutionConfig {
 }
 
 """
-IGRINS-2 Offset Mode
+Slit Offset Mode
 """
-enum Igrins2OffsetMode {
+enum SlitOffsetMode {
   """
-  Igrins2OffsetMode NodAlongSlit
+  SlitOffsetMode NodAlongSlit
   """
   NOD_ALONG_SLIT
 
   """
-  Igrins2OffsetMode NodToSky
+  SlitOffsetMode NodToSky
   """
   NOD_TO_SKY
 }
@@ -9081,17 +9081,17 @@ type Igrins2LongSlit {
   The offset mode is either explicitly specified in explicitOffsetMode or else
   taken from defaultOffsetMode
   """
-  offsetMode: Igrins2OffsetMode!
+  offsetMode: SlitOffsetMode!
 
   """
   Default offset mode
   """
-  defaultOffsetMode: Igrins2OffsetMode!
+  defaultOffsetMode: SlitOffsetMode!
 
   """
   Optional explicitly specified offset mode. If set it overrides the default.
   """
-  explicitOffsetMode: Igrins2OffsetMode
+  explicitOffsetMode: SlitOffsetMode
 
   """
   Whether to save SVC images, either explicitly specified in
@@ -9150,7 +9150,7 @@ input Igrins2LongSlitInput {
   The offset mode field may be unset by assigning a null value, or ignored by
   skipping it altogether
   """
-  explicitOffsetMode: Igrins2OffsetMode
+  explicitOffsetMode: SlitOffsetMode
 
   """
   The save SVC images field may be unset by assigning a null value, or ignored

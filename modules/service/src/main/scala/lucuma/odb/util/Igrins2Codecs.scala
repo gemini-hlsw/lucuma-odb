@@ -3,7 +3,7 @@
 
 package lucuma.odb.util
 
-import lucuma.core.enums.Igrins2OffsetMode
+import lucuma.core.enums.SlitOffsetMode
 import lucuma.core.model.sequence.igrins2.Igrins2DynamicConfig
 import lucuma.core.model.sequence.igrins2.Igrins2SVCImages
 import lucuma.core.model.sequence.igrins2.Igrins2StaticConfig
@@ -16,7 +16,7 @@ trait Igrins2Codecs:
   import Codecs.enumerated
   import Codecs.time_span
 
-  val igrins_2_offset_mode: Codec[Igrins2OffsetMode] =
+  val igrins_2_offset_mode: Codec[SlitOffsetMode] =
     enumerated(Type.varchar)
 
   val igrins_2_dynamic: Codec[Igrins2DynamicConfig] =

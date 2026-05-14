@@ -76,3 +76,12 @@ itc-performance-results*.csv
 itc/service/src/main/resources/graphql/ObservationDB.graphql
 .env
 .config/
+
+# Claude plans
+PLAN.md
+PLAN_*.md
+*_PLAN.md
+TODO.md
+TASK.md
+TASK_*.md
+*_TASK.md

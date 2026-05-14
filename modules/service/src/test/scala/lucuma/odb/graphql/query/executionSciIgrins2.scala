@@ -7,7 +7,7 @@ import cats.effect.IO
 import cats.syntax.either.*
 import io.circe.Json
 import io.circe.syntax.*
-import lucuma.core.enums.Igrins2OffsetMode
+import lucuma.core.enums.SlitOffsetMode
 import lucuma.core.enums.StepGuideState.Disabled
 import lucuma.core.enums.StepGuideState.Enabled
 import lucuma.core.model.Observation
@@ -86,7 +86,7 @@ class executionSciIgrins2 extends ExecutionTestSupportForIgrins2:
         p <- createProgram
         t <- createTargetWithProfileAs(pi, p)
         o <- createIgrins2LongSlitObservationAs(pi, p, t)
-        _ <- setOffsets(o, Igrins2OffsetMode.NodToSky,
+        _ <- setOffsets(o, SlitOffsetMode.NodToSky,
                """[
                  { p: { arcseconds:  0 }, q: { arcseconds:  0 } },
                  { p: { arcseconds: 10 }, q: { arcseconds: 10 } },
@@ -125,7 +125,7 @@ class executionSciIgrins2 extends ExecutionTestSupportForIgrins2:
         p <- createProgram
         t <- createTargetWithProfileAs(pi, p)
         o <- createIgrins2LongSlitObservationAs(pi, p, t)
-        _ <- setOffsets(o, Igrins2OffsetMode.NodToSky,
+        _ <- setOffsets(o, SlitOffsetMode.NodToSky,
                """[
                  { p: { arcseconds: 10 }, q: { arcseconds: 0 } },
                  { p: { arcseconds: 20 }, q: { arcseconds: 0 } },
