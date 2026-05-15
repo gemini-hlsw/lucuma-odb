@@ -38,6 +38,7 @@ object SsoSimulator {
       pool    <- FMain.databasePoolResource[F](config.database)
       chans   <- SsoMapping.Channels(pool)
       dbPool   = pool.map(Database.fromSession(_))
+      schema  <- Resource.eval(SsoMapping.loadSchema[F])
     } yield (dbPool, sim, Routes[F](
         dbPool    = dbPool,
         orcid     = OrcidService(OrcidConfig.orcidHost(Environment.Production), "unused", "unused", sim.client),
@@ -50,7 +51,8 @@ object SsoSimulator {
         pool,
         chans,
         SkunkMonitor.noopMonitor[F],
-        null // !!!
+        null, // !!!
+        schema
       ), config.ssoJwtReader, config.ssoJwtWriter)
 
   /** An Http client that hits an SSO server backed by a simulated ORCID server. */
@@ -71,4 +73,3 @@ object SsoSimulator {
   }
 
 }
-

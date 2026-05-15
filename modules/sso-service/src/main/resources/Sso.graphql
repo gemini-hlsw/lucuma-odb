@@ -1,3 +1,4 @@
+#import UserId, Partner, UserProfile from "lucuma/odb/graphql/OdbSchema.graphql"
 
 type Query {
   user: User!
@@ -32,13 +33,6 @@ type User {
   apiKeys:  [ApiKey!]!
 }
 
-type UserProfile {
-  givenName:  String
-  familyName: String
-  creditName: String
-  email:      String
-}
-
 type Role {
   id:      RoleId!
   type:    RoleType!
@@ -52,11 +46,8 @@ type ApiKey {
   role: Role!
 }
 
-scalar UserId
 scalar OrcidId
 scalar RoleId
 scalar ApiKeyId
 
 enum RoleType { PI NGO STAFF ADMIN }
-enum Partner { AR BR CA CL KR UH US }
-
