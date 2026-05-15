@@ -34,18 +34,6 @@ class guideEnvironmentGMOS extends ExecutionTestSupportForGmos with GuideEnviron
   val invalidTargetName: String =
     GuideStarName.gaiaSourceId.reverseGet(invalidTargetId).value.value
 
-  val emptyGuideEnvironmentResults =
-    json"""
-    {
-      "observation": {
-        "title": "V1647 Orionis",
-        "targetEnvironment": {
-          "guideEnvironments": null
-        }
-      }
-    }
-    """.asRight
-
   val otherGuideEnvironmentResults =
     json"""
     {

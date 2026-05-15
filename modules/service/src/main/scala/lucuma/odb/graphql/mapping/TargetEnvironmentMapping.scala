@@ -75,7 +75,6 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
       blindOffsetTargetObject("blindOffsetTarget"),
       SqlField("blindOffsetType", ObservationView.BlindOffsetType),
       EffectField("basePosition", basePositionQueryHandler, List("id", "programId")),
-      EffectField("guideEnvironments", guideEnvironmentsQueryHandler, List("id", "programId")),
       EffectField("guideEnvironment", guideEnvironmentQueryHandler, List("id", "programId")),
       EffectField("guideAvailability", guideAvailabilityQueryHandler, List("id", "programId")),
       EffectField("guideTargetName", guideTargetNameQueryHandler, List("id", "programId"))
@@ -117,13 +116,6 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
         }
       }
 
-    case (TargetEnvironmentType, "guideEnvironments", List(
-      TimestampBinding(ObsTimeParam, rObsTime)
-    )) =>
-      Elab.liftR(rObsTime).flatMap { obsTime =>
-        Elab.env(ObsTimeParam -> obsTime)
-      }
-
     case (TargetEnvironmentType, "guideAvailability", List(
       TimestampBinding(AvailabilityStartParam, rStart),
       TimestampBinding(AvailabilityEndParam, rEnd)
@@ -151,20 +143,6 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
               .getCoordinatesSnapshotOrRegion(oid, obsTime, false)
               .map: res =>
                 res.map(_.left.toOption.map(_.base)) // treat region as None
-        }
-
-    effectHandler(readEnv, calculate)
-  }
-
-  def guideEnvironmentsQueryHandler: EffectHandler[F] = {
-    val readEnv: Env => Result[Timestamp] = _.getR[Timestamp](ObsTimeParam)
-
-    val calculate: (Program.Id, Observation.Id, Timestamp) => F[Result[List[GuideService.GuideEnvironment]]] =
-      (pid, oid, obsTime) =>
-        services.use { implicit s =>
-          Services.asSuperUser:
-            s.guideService
-              .getGuideEnvironments(pid, oid, obsTime)
         }
 
     effectHandler(readEnv, calculate)

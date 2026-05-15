@@ -99,10 +99,6 @@ trait GuideService[F[_]] {
   import GuideService.AvailabilityPeriod
   import GuideService.GuideEnvironment
 
-  def getGuideEnvironments(pid: Program.Id, oid: Observation.Id, obsTime: Timestamp)(using
-    NoTransaction[F], SuperUserAccess
-  ): F[Result[List[GuideEnvironment]]]
-
   def getGuideEnvironment(pid: Program.Id, oid: Observation.Id)(using
     NoTransaction[F], SuperUserAccess
   ): F[Result[GuideEnvironment]]
@@ -615,11 +611,6 @@ object GuideService {
           }
         }
 
-      // TODO: Can go away after `guideEnvironments` is removed
-      extension (usables: List[AgsAnalysis.Usable])
-        def toGuideEnvironments(originals: Map[Long, Target.Sidereal]): List[GuideEnvironment] =
-          usables.map(_.toGuideEnvironment(originals)).flattenOption
-
       extension (usable: AgsAnalysis.Usable)
         def toGuideEnvironment(originals: Map[Long, Target.Sidereal]): Option[GuideEnvironment] =
           originals.get(usable.target.id).map: target =>
@@ -634,34 +625,6 @@ object GuideService {
             .map:
               case Right((d, p, h)) => GeneratorInfo(d, p, h).success
               case Left(ge)         => generatorError(ge).asFailure
-
-      // TODO: Can go away after `guideEnvironments` is removed
-      def processCandidates(
-        obsInfo:       ObservationInfo,
-        wavelength:    Wavelength,
-        genInfo:       GeneratorInfo,
-        baseCoords:    Coordinates,
-        scienceCoords: List[Coordinates],
-        blindOffset:   Option[Coordinates],
-        angles:        NonEmptyList[Angle],
-        candidates:    List[GuideStarCandidate],
-        trackType:     TrackType
-      ): List[AgsAnalysis.Usable] =
-        genInfo.agsParamsFor(trackType).foldMap: params =>
-          Ags
-            .agsAnalysis(obsInfo.constraints,
-                        wavelength,
-                        baseCoords,
-                        scienceCoords,
-                        blindOffset,
-                        angles,
-                        genInfo.acqOffsets,
-                        genInfo.sciOffsets,
-                        params,
-                        candidates
-            )
-            ._1
-            .sortUsablePositions
 
       def chooseBestGuideStar(
         obsInfo:       ObservationInfo,
@@ -987,55 +950,6 @@ object GuideService {
                           }
                         )
         } yield oGSName.map(_.toNonEmptyString)).value
-
-      // deprecated - use getGuideEnvironment istead
-      override def getGuideEnvironments(pid: Program.Id, oid: Observation.Id, obsTime: Timestamp)(
-        using NoTransaction[F], SuperUserAccess
-      ): F[Result[List[GuideEnvironment]]] =
-        (for {
-          obsInfo       <- ResultT(getObservationInfo(oid))
-          genInfo       <- ResultT(getGeneratorInfo(oid))
-
-          tracking      <- ResultT(trackingService.getTrackingSnapshot(oid, TimestampInterval.empty(obsTime), false))
-          baseTracking     = tracking.base // use explicit base if defined
-          asterismTracking = tracking.asterism.map(_._2) // discard the target ids
-
-          visitEnd      <- ResultT.fromResult(
-                             obsTime
-                               .plusMicrosOption(genInfo.timeEstimate.toMicroseconds)
-                               .toResult(generalError("Visit end time out of range").asProblem)
-                           )
-          trackType = CompositeTracking(asterismTracking).trackType
-          agsParams     <- ResultT.fromResult(
-                             genInfo.agsParamsFor(trackType)
-                               .toResult(generalError("No guide probe available for this observing mode.").asProblem)
-                           )
-          original <- ResultT(getAllCandidates(oid, obsTime, visitEnd, baseTracking, genInfo.agsWavelength, agsParams.probe, obsInfo.constraints))
-          originals      = original.map(c => c._2.id -> c._1).toMap
-          candidates     = original.map(_._2.at(obsTime.toInstant))
-          baseCoords    <- ResultT.fromResult(
-                             baseTracking.at(obsTime.toInstant)
-                               .toResult(
-                                 generalError(s"Unable to get coordinates for asterism in observation $oid").asProblem
-                               )
-                           )
-          scienceCoords <- ResultT.fromResult(
-                            asterismTracking
-                              .toList
-                              .traverse(_.at(obsTime.toInstant))
-                              .toResult(
-                                generalError(s"Unable to get coordinates for science targets in observation $oid").asProblem
-                              )
-                           )
-          angles        <- ResultT.fromResult(
-                            obsInfo
-                              .posAngleConstraint
-                              .anglesToTestAt(genInfo.site, baseTracking, obsTime.toInstant, genInfo.timeEstimate.toDuration)
-                              .toResult(generalError(s"No angles to test for guide target candidates for observation $oid.").asProblem)
-                           )
-          blindOffsetOpt <- ResultT.liftF(getBlindOffsetCoordinates(oid, obsTime.toInstant))
-          usable         = processCandidates(obsInfo, genInfo.agsWavelength, genInfo, baseCoords, scienceCoords, blindOffsetOpt, angles, candidates, trackType)
-        } yield usable.toGuideEnvironments(originals).toList).value
 
       override def getGuideAvailability(pid: Program.Id, oid: Observation.Id, period: TimestampInterval)(
         using NoTransaction[F], SuperUserAccess
