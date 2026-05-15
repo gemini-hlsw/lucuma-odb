@@ -144,3 +144,37 @@ class Phase0LoaderSuite extends CatsEffectSuite:
       .toList
       .map: rows =>
         assertEquals(rows.length, 22)
+
+  test("load alopeke configurations"):
+    val rdr = FileReader[IO](imgFileName)
+    val inputStream = getClass.getResourceAsStream(imgFileName)
+    val stream =
+      fs2.io.readInputStream(
+        IO(inputStream),
+        chunkSize = 4096,
+        closeAfterUse = true
+      )
+
+    stream
+      .through(rdr.alopekeImaging)
+      .compile
+      .toList
+      .map: rows =>
+        assertEquals(rows.length, 2)
+
+  test("load zorro configurations"):
+    val rdr = FileReader[IO](imgFileName)
+    val inputStream = getClass.getResourceAsStream(imgFileName)
+    val stream =
+      fs2.io.readInputStream(
+        IO(inputStream),
+        chunkSize = 4096,
+        closeAfterUse = true
+      )
+
+    stream
+      .through(rdr.zorroImaging)
+      .compile
+      .toList
+      .map: rows =>
+        assertEquals(rows.length, 2)

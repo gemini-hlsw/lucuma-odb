@@ -196,4 +196,19 @@ object ImagingRow extends RowParsers {
     }
   }
 
+  /**
+   * A single line in the .tsv file becomes exactly one row.
+   * Used for instruments that can't (yet) store details like filters (Alopeke, Zorro)
+   */
+  val singleRow: Parser[List[ImagingRow]] = (
+    (instrument        <* htab) ~
+    (arcsec            <* htab) ~
+    (string            <* htab) ~ // hold all filters
+    (ao                <* htab) ~
+    (imagingCapability <* htab) ~
+    site
+  ).map { case (((((inst, fov), filter), ao), capability), site) =>
+    List(ImagingRow(inst, fov, filter, ao, capability, site))
+  }
+
 }
