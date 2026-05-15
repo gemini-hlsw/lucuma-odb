@@ -104,6 +104,7 @@ extension[F[_], A](r: F[Result[A]])
     }
 
 trait WorkflowStateQueries[F[_]: {Concurrent, Services, Tracer as T}] {
+  import WorkflowStateQueries.ProtectedExecutionStates
   import WorkflowStateQueries.Statements
 
   def filterWorkflowStateNotIn[A](obs: List[A], oid: A => Observation.Id, states: List[ObservationWorkflowState]) =
@@ -113,35 +114,38 @@ trait WorkflowStateQueries[F[_]: {Concurrent, Services, Tracer as T}] {
     filterWorkflow(obs, oid, states, identity, ready)
 
   def excludeOngoingAndCompleted[A](obs: List[A], oid: A => Observation.Id): F[List[A]] =
-    filterWorkflowStateNotIn(obs, oid, List(ObservationWorkflowState.Ongoing, ObservationWorkflowState.Completed))
+    T.span("exclude-ongoing-and-completed").surround:
+      executionStates(obs.map(oid), Statements.selectExecutionStates).map: stateMap =>
+        obs.filterNot: o =>
+          // if the obs has started or finished executing, it should not be deleted.
+          stateMap.get(oid(o)).exists(ProtectedExecutionStates.contains_)
 
-  def excludeFromDeletion[A](obs: List[A], oid: A => Observation.Id): F[List[A]] =
+  private def executionStates(
+    oids:  List[Observation.Id],
+    query: NonEmptyList[Observation.Id] => AppliedFragment
+  ): F[Map[Observation.Id, ExecutionState]] =
+    NonEmptyList.fromList(oids) match
+      case None      => Map.empty.pure
+      case Some(nel) =>
+        val af = query(nel)
+        session
+          .prepareR(af.fragment.query(observation_id *: execution_state))
+          .use(_.stream(af.argument, 1024).compile.toList)
+          .map(_.toMap)
+
+  private def excludeFromDeletion[A](obs: List[A], oid: A => Observation.Id): F[List[A]] =
     excludeOngoingAndCompleted(obs, oid).flatMap: filtered =>
       haveVisits(filtered.map(oid)).map: visited =>
         filtered.filterNot(a => visited.contains(oid(a)))
 
   // Like `excludeFromDeletion`, but also checks tellurics parent execution state
   def excludeTelluricsFromDeletion[A](obs: List[A], oid: A => Observation.Id): F[List[A]] =
-    excludeFromDeletion(obs, oid).flatMap: base =>
-      telluricScienceExecutionStates(base.map(oid)).map: parents =>
-        base.filterNot: a =>
-          parents.get(oid(a)).exists: s =>
+    T.span("exclude-tellurics-from-deletion").surround:
+      excludeFromDeletion(obs, oid).flatMap: base =>
+        executionStates(base.map(oid), Statements.selectTelluricScienceExecutionStates).map: parents =>
+          base.filterNot: a =>
             // if the science obs has started or finished executing, the telluric should not be deleted.
-            s === ExecutionState.Ongoing ||
-              s === ExecutionState.Completed ||
-              s === ExecutionState.DeclaredComplete
-
-  private def telluricScienceExecutionStates(
-    oids: List[Observation.Id]
-  ): F[Map[Observation.Id, ExecutionState]] =
-    NonEmptyList.fromList(oids) match
-      case None       => Map.empty.pure
-      case Some(nel)  =>
-        val af = Statements.selectTelluricScienceExecutionStates(nel)
-        session
-          .prepareR(af.fragment.query(observation_id *: execution_state))
-          .use(_.stream(af.argument, 1024).compile.toList)
-          .map(_.toMap)
+            parents.get(oid(a)).exists(ProtectedExecutionStates.contains_)
 
   def onlyDefinedAndReady[A](obs: List[A], oid: A => Observation.Id): F[List[A]] =
     filterWorkflowStateIn(obs, oid, List(ObservationWorkflowState.Defined, ObservationWorkflowState.Ready), true)
@@ -188,6 +192,14 @@ trait WorkflowStateQueries[F[_]: {Concurrent, Services, Tracer as T}] {
 }
 
 object WorkflowStateQueries:
+  // Science obs states that don't allow calibrations to be deleted.
+  val ProtectedExecutionStates: NonEmptyList[ExecutionState] =
+    NonEmptyList.of(
+      ExecutionState.Ongoing,
+      ExecutionState.Completed,
+      ExecutionState.DeclaredComplete
+    )
+
   object Statements:
     def selectWorkflowStates(oids: NonEmptyList[Observation.Id], onlyReady: Boolean): AppliedFragment =
       val includeReady = if (onlyReady) void" AND c_obscalc_state = 'ready'" else void""
@@ -199,6 +211,11 @@ object WorkflowStateQueries:
     def selectVisitedObservations(oids: NonEmptyList[Observation.Id]): AppliedFragment =
       void"SELECT DISTINCT c_observation_id FROM t_visit WHERE c_observation_id IN (" |+|
         oids.map(sql"$observation_id").intercalate(void", ")                          |+|
+        void")"
+
+    def selectExecutionStates(oids: NonEmptyList[Observation.Id]): AppliedFragment =
+      void"SELECT c_observation_id, c_execution_state FROM v_generator_params WHERE c_observation_id IN (" |+|
+        oids.map(sql"$observation_id").intercalate(void", ")                                               |+|
         void")"
 
     def selectTelluricScienceExecutionStates(oids: NonEmptyList[Observation.Id]): AppliedFragment =

@@ -1557,26 +1557,26 @@ class perProgramPerConfigCalibrations
       }
 
   test("don't delete ongoing and completed calibrations"):
-    List(ObservationWorkflowState.Ongoing, ObservationWorkflowState.Completed).traverse_ : state =>
-      for {
-        pid        <- createProgramAs(pi)
-        tid        <- createTargetAs(pi, pid, "Target")
-        oid        <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid)
-        _          <- prepareObservation(pi, pid, oid, tid)
-        (added, _) <- recalculateCalibrations(pid, when, oid)
-        // Run obscalc on newly created calibrations so they're 'ready' before we set workflow state
-        _          <- added.traverse_(cid => runObscalcUpdate(pid, cid))
-        ob1        <- queryObservations(pid)
-        calibIds   = ob1.callibrationIds
-        _          <- setCalculatedWorkflowState(calibIds.head, state)
-        _          <- updateCentralWavelength(oid, Wavelength.fromIntNanometers(600).get)
-        _          <- runObscalcUpdate(pid, oid)
-        _          <- recalculateCalibrations(pid, when, oid)
-        ob2        <- queryObservations(pid)
-      } yield {
-        // Calibration preserved + 2 new calibrations
-        assertEquals(ob2.countCalibrations, 3)
-        assert(ob2.callibrationIds.contains(calibIds.head))
-      }
+    val setupEvent = ExecutionQuerySetupOperations.Setup(100, 1, 1, 1)
+
+    for {
+      pid        <- createProgramAs(pi)
+      tid        <- createTargetAs(pi, pid, "Target")
+      oid        <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid)
+      _          <- prepareObservation(pi, pid, oid, tid)
+      (added, _) <- recalculateCalibrations(pid, when, oid)
+      _          <- added.traverse_(cid => runObscalcUpdate(pid, cid))
+      ob1        <- queryObservations(pid)
+      calibIds   = ob1.callibrationIds
+      _          <- recordVisit(setupEvent, service, calibIds.head)
+      _          <- updateCentralWavelength(oid, Wavelength.fromIntNanometers(600).get)
+      _          <- runObscalcUpdate(pid, oid)
+      _          <- recalculateCalibrations(pid, when, oid)
+      ob2        <- queryObservations(pid)
+    } yield {
+      // Calibration preserved + 2 new calibrations
+      assertEquals(ob2.countCalibrations, 3)
+      assert(ob2.callibrationIds.contains(calibIds.head))
+    }
 
 }
