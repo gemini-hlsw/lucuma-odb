@@ -79,10 +79,10 @@ class FileReader[F[_]](fileName: String)(using ApplicativeError[F, Throwable]):
     read(Instrument.GmosSouth, GmosImagingRow.gmosSouth)
 
   val alopekeImaging: Pipe[F, Byte, (ImagingRow, PosInt)] =
-    read(Instrument.Alopeke, ImagingRow.rows)
+    read(Instrument.Alopeke, ImagingRow.singleRow)
 
   val zorroImaging: Pipe[F, Byte, (ImagingRow, PosInt)] =
-    read(Instrument.Zorro, ImagingRow.rows)
+    read(Instrument.Zorro, ImagingRow.singleRow)
 
   val gmosSouthSpectroscopy: Pipe[F, Byte, (GmosSpectroscopyRow.GmosSouth, PosInt)] =
     read(Instrument.GmosSouth, GmosSpectroscopyRow.gmosSouth)
