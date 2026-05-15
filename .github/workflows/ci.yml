@@ -238,7 +238,7 @@ jobs:
         run: sbt -v -J-Xmx6g +update
 
       - name: Build Docker images
-        run: 'sbt -v -J-Xmx6g ''++ ${{ matrix.scala }}'' clean ssoService/docker:publishLocal itcService/docker:publishLocal service/docker:publishLocal obscalc/docker:publishLocal calibrations/docker:publishLocal'
+        run: 'sbt -v -J-Xmx6g ''++ ${{ matrix.scala }}'' clean ssoService/docker:publishLocal itcService/docker:publishLocal service/docker:publishLocal obscalc/docker:publishLocal calibrations/docker:publishLocal resourceService/docker:publishLocal'
 
       - name: Push Docker images to Heroku
         run: |
@@ -284,12 +284,21 @@ jobs:
           docker push registry.heroku.com/${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb' }}-production/calibration:${{ github.sha }}
           docker tag noirlab/calibrations-service registry.heroku.com/${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb' }}-dev/calibration
           docker push registry.heroku.com/${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb' }}-dev/calibration
+          docker tag noirlab/lucuma-resource-service registry.heroku.com/${{ vars.HEROKU_RESOURCE_APP_NAME || 'lucuma-resource' }}-dev/web:${{ github.sha }}
+          docker push registry.heroku.com/${{ vars.HEROKU_RESOURCE_APP_NAME || 'lucuma-resource' }}-dev/web:${{ github.sha }}
+          docker tag noirlab/lucuma-resource-service registry.heroku.com/${{ vars.HEROKU_RESOURCE_APP_NAME || 'lucuma-resource' }}-staging/web:${{ github.sha }}
+          docker push registry.heroku.com/${{ vars.HEROKU_RESOURCE_APP_NAME || 'lucuma-resource' }}-staging/web:${{ github.sha }}
+          docker tag noirlab/lucuma-resource-service registry.heroku.com/${{ vars.HEROKU_RESOURCE_APP_NAME || 'lucuma-resource' }}-production/web:${{ github.sha }}
+          docker push registry.heroku.com/${{ vars.HEROKU_RESOURCE_APP_NAME || 'lucuma-resource' }}-production/web:${{ github.sha }}
+          docker tag noirlab/lucuma-resource-service registry.heroku.com/${{ vars.HEROKU_RESOURCE_APP_NAME || 'lucuma-resource' }}-dev/web
+          docker push registry.heroku.com/${{ vars.HEROKU_RESOURCE_APP_NAME || 'lucuma-resource' }}-dev/web
 
       - name: Release dev app in Heroku
         run: |
           heroku container:release web -a ${{ vars.HEROKU_SSO_APP_NAME || 'lucuma-sso' }}-dev -v
           heroku container:release web -a ${{ vars.HEROKU_ITC_APP_NAME || 'itc' }}-dev -v
           heroku container:release web obscalc calibration -a ${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb' }}-dev -v
+          heroku container:release web -a ${{ vars.HEROKU_RESOURCE_APP_NAME || 'lucuma-resource' }}-dev -v
 
       - name: Get Docker image SHA
         run: |
@@ -298,6 +307,7 @@ jobs:
           echo "DOCKER_IMAGE_SHA_ODB_WEB=$(docker inspect registry.heroku.com/${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb' }}-dev/web:${{ github.sha }} --format={{.Id}})" >> $GITHUB_ENV
           echo "DOCKER_IMAGE_SHA_ODB_OBSCALC=$(docker inspect registry.heroku.com/${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb' }}-dev/obscalc:${{ github.sha }} --format={{.Id}})" >> $GITHUB_ENV
           echo "DOCKER_IMAGE_SHA_ODB_CALIBRATION=$(docker inspect registry.heroku.com/${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb' }}-dev/calibration:${{ github.sha }} --format={{.Id}})" >> $GITHUB_ENV
+          echo "DOCKER_IMAGE_SHA_RESOURCE_WEB=$(docker inspect registry.heroku.com/${{ vars.HEROKU_RESOURCE_APP_NAME || 'lucuma-resource' }}-dev/web:${{ github.sha }} --format={{.Id}})" >> $GITHUB_ENV
 
       - name: Record deployment in GHA
         run: |
@@ -307,3 +317,5 @@ jobs:
           curl -s -X POST https://api.github.com/repos/${{ github.repository }}/deployments -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" -H "Accept: application/vnd.github+json" -d '{ "ref": "${{ github.sha }}", "environment": "development", "description": "ITC deployment to dev", "auto_merge": false, "required_contexts": [], "task": "deploy:ITC", "payload": { "docker_image_shas": { "web": "${{ env.DOCKER_IMAGE_SHA_ITC_WEB }}" } } }' 
           echo "Recording deployment ${{ github.sha }} for ODB to ${{ github.repository }}"
           curl -s -X POST https://api.github.com/repos/${{ github.repository }}/deployments -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" -H "Accept: application/vnd.github+json" -d '{ "ref": "${{ github.sha }}", "environment": "development", "description": "ODB deployment to dev", "auto_merge": false, "required_contexts": [], "task": "deploy:ODB", "payload": { "docker_image_shas": { "web": "${{ env.DOCKER_IMAGE_SHA_ODB_WEB }}", "obscalc": "${{ env.DOCKER_IMAGE_SHA_ODB_OBSCALC }}", "calibration": "${{ env.DOCKER_IMAGE_SHA_ODB_CALIBRATION }}" } } }' 
+          echo "Recording deployment ${{ github.sha }} for RESOURCE to ${{ github.repository }}"
+          curl -s -X POST https://api.github.com/repos/${{ github.repository }}/deployments -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" -H "Accept: application/vnd.github+json" -d '{ "ref": "${{ github.sha }}", "environment": "development", "description": "RESOURCE deployment to dev", "auto_merge": false, "required_contexts": [], "task": "deploy:RESOURCE", "payload": { "docker_image_shas": { "web": "${{ env.DOCKER_IMAGE_SHA_RESOURCE_WEB }}" } } }' 
