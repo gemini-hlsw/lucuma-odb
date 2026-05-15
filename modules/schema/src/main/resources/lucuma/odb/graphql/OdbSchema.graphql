@@ -15365,16 +15365,6 @@ type TargetEnvironment {
   ): Coordinates
 
   """
-  The guide star(s) and related information
-  """
-  guideEnvironments(
-    """
-    The time used for the guide star calculations.
-    """
-    observationTime: Timestamp!
-  ): [GuideEnvironment!]! @deprecated(reason: "use guideEnvironment instead")
-
-  """
   The guide target(s) and related information.
   If a guide target has been set via `guideTargetName`, that target will be
   returned. If it not found or not usable, an error will be returned.
