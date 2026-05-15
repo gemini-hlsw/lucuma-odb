@@ -1,4 +1,4 @@
-import NativePackagerHelper._
+import NativePackagerHelper.*
 
 // Please keep in alphabetical order
 val awsJavaSdkVersion            = "1.12.797"
@@ -184,28 +184,32 @@ lazy val sbtDockerPublishLocal =
       "itcService/docker:publishLocal",
       "service/docker:publishLocal",
       "obscalc/docker:publishLocal",
-      "calibrations/docker:publishLocal"
+      "calibrations/docker:publishLocal",
+      "resourceService/docker:publishLocal"
     ),
     name = Some("Build Docker images")
   )
 
-lazy val systems: List[String] = List("sso", "itc", "odb")
+lazy val systems: List[String] = List("sso", "itc", "odb", "resource")
 lazy val appNames: Map[String, String] = Map(
-  "sso" -> "${{ vars.HEROKU_SSO_APP_NAME || 'lucuma-sso' }}",
-  "itc" -> "${{ vars.HEROKU_ITC_APP_NAME || 'itc' }}",
-  "odb" -> "${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb' }}"
+  "sso"      -> "${{ vars.HEROKU_SSO_APP_NAME || 'lucuma-sso' }}",
+  "itc"      -> "${{ vars.HEROKU_ITC_APP_NAME || 'itc' }}",
+  "odb"      -> "${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb' }}",
+  "resource" -> "${{ vars.HEROKU_RESOURCE_APP_NAME || 'lucuma-resource' }}"
 )
 lazy val procTypes: Map[String, List[String]] = Map(
-  "sso" -> List("web"),
-  "itc" -> List("web"),
-  "odb" -> List("web", "obscalc", "calibration")
+  "sso"      -> List("web"),
+  "itc"      -> List("web"),
+  "odb"      -> List("web", "obscalc", "calibration"),
+  "resource" -> List("web")
 )
 lazy val procTypeImageNames: Map[(String, String), String] = Map(
-  ("sso", "web")           -> "lucuma-sso-service",
-  ("itc", "web")           -> "lucuma-itc-service",
-  ("odb", "web")           -> "lucuma-odb-service",
-  ("odb", "obscalc")       -> "obscalc-service",
-  ("odb", "calibration")   -> "calibrations-service"
+  ("sso", "web")         -> "lucuma-sso-service",
+  ("itc", "web")         -> "lucuma-itc-service",
+  ("odb", "web")         -> "lucuma-odb-service",
+  ("odb", "obscalc")     -> "obscalc-service",
+  ("odb", "calibration") -> "calibrations-service",
+  ("resource", "web")    -> "lucuma-resource-service"
 )
 lazy val environments: List[String] = List("dev", "staging", "production")
 lazy val systemProcTypes: List[(String, String, String)] =
@@ -317,6 +321,19 @@ lazy val graphqlInspectorItc =
     cond = Some("github.event_name == 'pull_request'")
   )
 
+lazy val graphqlInspectorResource =
+  WorkflowStep.Use(
+    UseRef.Public("kamilkisiela", "graphql-inspector", "master"),
+    name = Some("Validate Resource GraphQL schema changes"),
+    params =
+      Map(
+        "name"          -> "Validate Resource Public API",
+        "schema"        -> "main:resource/service/src/main/resources/graphql/resource.graphql",
+        "approve-label" -> "expected-breaking-change"
+      ),
+    cond = Some("github.event_name == 'pull_request'")
+  )
+
 // Don't do static checks repeatedly on each shard, instead create a separate task only for checks.
 ThisBuild / githubWorkflowAddedJobs ++= Seq(
   WorkflowJob(
@@ -326,6 +343,7 @@ ThisBuild / githubWorkflowAddedJobs ++= Seq(
       sbtStaticChecks ::
       graphqlInspectorOdb ::
       graphqlInspectorItc ::
+      // graphqlInspectorResource ::
       Nil,
     scalas = List(scalaVersion.value),
     javas = githubWorkflowJavaVersions.value.toList.take(1)
@@ -738,9 +756,12 @@ lazy val binding = project
     name := "lucuma-odb-binding",
     tlVersionIntroduced := Map("3" -> "0.19.3"),
     libraryDependencies ++= Seq(
+      "co.fs2"        %% "fs2-core"           % fs2Version,
+      "co.fs2"        %% "fs2-io"             % fs2Version,
       "edu.gemini"    %% "lucuma-core"        % lucumaCoreVersion,
       "org.typelevel" %% "grackle-core"       % grackleVersion,
       "org.scalameta" %% "munit"              % munitVersion           % Test,
+      "org.typelevel" %% "munit-cats-effect"  % munitCatsEffectVersion % Test
     )
   )
 
@@ -891,3 +912,69 @@ lazy val phase0 = project
 // Command aliases for starting/stopping all services
 addCommandAlias("allStart", ";service/reStart;obscalc/reStart;calibrations/reStart")
 addCommandAlias("allStop", ";service/reStop;obscalc/reStop;calibrations/reStop")
+
+// START RESOURCE
+
+lazy val resourceModel =
+  project
+    .in(file("resource/model"))
+    .enablePlugins(NoPublishPlugin)
+    .dependsOn(schema.jvm, otel)
+    .settings(resourceCommonSettings)
+    .settings(
+      name := "lucuma-resource-model",
+      libraryDependencies ++= Seq(
+        "edu.gemini"    %% "lucuma-core"  % lucumaCoreVersion,
+        "io.circe"      %% "circe-core"   % circeVersion,
+        "is.cir"        %% "ciris-http4s" % cirisVersion,
+        "is.cir"        %% "ciris"        % cirisVersion,
+        "org.http4s"    %% "http4s-core"  % http4sVersion,
+        "org.typelevel" %% "cats-core"    % catsVersion
+      )
+    )
+
+lazy val resourceService = project
+  .in(file("resource/service"))
+  .dependsOn(resourceModel, binding, otel, schema.jvm)
+  .enablePlugins(NoPublishPlugin, LucumaDockerPlugin, JavaAppPackaging, BuildInfoPlugin)
+  .settings(resourceCommonSettings, buildInfoSettings)
+  .settings(
+    name                        := "lucuma-resource-service",
+    description                 := "Lucuma Resource Service",
+    projectDependencyArtifacts  := (Compile / dependencyClasspathAsJars).value,
+    libraryDependencies ++= Seq(
+      "ch.qos.logback" % "logback-classic"                       % logbackVersion,
+      "co.fs2"        %% "fs2-core"                              % fs2Version,
+      "co.fs2"        %% "fs2-io"                                % fs2Version,
+      "edu.gemini"    %% "lucuma-graphql-routes"                 % lucumaGraphQLRoutesVersion,
+      "is.cir"        %% "ciris-http4s"                          % cirisVersion,
+      "is.cir"        %% "ciris"                                 % cirisVersion,
+      "org.flywaydb"   % "flyway-core"                           % flywayVersion,
+      "org.http4s"    %% "http4s-circe"                          % http4sVersion,
+      "org.http4s"    %% "http4s-dsl"                            % http4sVersion,
+      "org.http4s"    %% "http4s-ember-server"                   % http4sVersion,
+      "org.http4s"    %% "http4s-otel4s-middleware-metrics"      % http4sOtel4sVersion,
+      "org.http4s"    %% "http4s-otel4s-middleware-trace-server" % http4sOtel4sVersion,
+      "org.postgresql" % "postgresql"                            % postgresVersion,
+      "org.tpolecat"  %% "skunk-circe"                           % skunkVersion,
+      "org.tpolecat"  %% "skunk-core"                            % skunkVersion,
+      "org.typelevel" %% "cats-effect"                           % catsEffectVersion,
+      "org.typelevel" %% "grackle-skunk"                         % grackleVersion,
+      "org.typelevel" %% "log4cats-slf4j"                        % log4catsVersion,
+      "com.dimafeng"  %% "testcontainers-scala-munit"            % testcontainersScalaVersion   % Test,
+      "com.dimafeng"  %% "testcontainers-scala-postgresql"       % testcontainersScalaVersion   % Test,
+      "edu.gemini"    %% "lucuma-core-testkit"                   % lucumaCoreVersion            % Test,
+      "org.scalameta" %% "munit-scalacheck"                      % munitScalacheckVersion       % Test,
+      "org.scalameta" %% "munit"                                 % munitVersion                 % Test,
+      "org.typelevel" %% "munit-cats-effect"                     % munitCatsEffectVersion       % Test,
+      "org.typelevel" %% "scalacheck-effect-munit"               % scalacheckEffectMunitVersion % Test,
+      "org.http4s"    %% "http4s-jdk-http-client"                % http4sJdkHttpClientVersion   % Test,
+      "edu.gemini"    %% "clue-http4s"                           % clueVersion                  % Test
+    ),
+    reStart / envVars += "PORT" -> "8484",
+    executableScriptName        := "resource-service",
+    dockerExposedPorts ++= Seq(8484)
+  )
+
+lazy val resourceCommonSettings = lucumaGlobalSettings ++ Seq(
+)
