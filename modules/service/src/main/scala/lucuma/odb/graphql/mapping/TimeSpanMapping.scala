@@ -24,6 +24,7 @@ import lucuma.odb.graphql.table.TimeChargeCorrectionTable
 import lucuma.odb.graphql.table.TimeChargeDiscountTable
 import lucuma.odb.graphql.table.TimingWindowView
 import lucuma.odb.graphql.table.VisitTable
+import lucuma.odb.graphql.table.VisitorTable
 
 trait TimeSpanMapping[F[_]] extends AllocationTable[F]
                                with ExposureTimeModeView[F]
@@ -42,6 +43,7 @@ trait TimeSpanMapping[F[_]] extends AllocationTable[F]
                                with TimeChargeDiscountTable[F]
                                with TimingWindowView[F]
                                with VisitTable[F]
+                               with VisitorTable[F]
                                with ChronConditionsEntryView[F] {
 
   import ExposureTimeModeView.TimeAndCount
@@ -75,7 +77,8 @@ trait TimeSpanMapping[F[_]] extends AllocationTable[F]
       timeSpanMappingAtPath(TimeChargeInvoiceType / "finalCharge" / "program", VisitTable.Final.ProgramTime)(VisitTable.Id),
       timeSpanMappingAtPath(TimingWindowEndAfterType / "after", TimingWindowView.End.After)(TimingWindowView.End.SyntheticId),
       timeSpanMappingAtPath(TimingWindowRepeatType / "period", TimingWindowView.End.Repeat.Period)(TimingWindowView.End.SyntheticId),
-      timeSpanMappingAtPath(ObservationType / "observationDuration", ObservationView.ObservationDuration.ObservationDuration)(ObservationView.ObservationDuration.SyntheticId)
+      timeSpanMappingAtPath(ObservationType / "observationDuration", ObservationView.ObservationDuration.ObservationDuration)(ObservationView.ObservationDuration.SyntheticId),
+      timeSpanMappingAtPath(VisitorType / "totalRequestTime", VisitorTable.TotalRequestTime)(VisitorTable.TotalRequestTimeId)
     )
 
   private def valueAs[A: io.circe.Encoder](name: String)(f: Format[A, TimeSpan]): CursorField[A] =

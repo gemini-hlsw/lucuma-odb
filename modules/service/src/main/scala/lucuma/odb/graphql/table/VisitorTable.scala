@@ -9,8 +9,11 @@ import lucuma.odb.util.Codecs.*
 
 trait VisitorTable[F[_]] extends BaseMapping[F]:
 
-  object VisitorTable extends TableDef("t_visitor"):
-    val ObservationId     = col("c_observation_id", observation_id)
-    val ObservingModeType = col("c_observing_mode_type", visitor_observing_mode_type)
-    val CentralWavelength = col("c_central_wavelength", wavelength_pm)
-    val ScienceFov        = col("c_science_fov", angle_µas)
+  object VisitorTable extends TableDef("v_visitor"):
+    val ObservationId       = col("c_observation_id", observation_id)
+    val ObservingModeType   = col("c_observing_mode_type", visitor_observing_mode_type)
+    val CentralWavelength   = col("c_central_wavelength", wavelength_pm)
+    val ScienceFov          = col("c_science_fov", angle_µas)
+    val Name                = col("c_name", text_nonempty.opt)
+    val TotalRequestTime    = col("c_total_request_time", time_span.embedded)
+    val TotalRequestTimeId  = col("c_total_request_time_id", observation_id.embedded)

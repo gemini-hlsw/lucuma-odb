@@ -4,11 +4,14 @@
 package lucuma.odb.graphql.input
 
 import cats.syntax.all.*
+import eu.timepit.refined.types.string.NonEmptyString
 import grackle.Result
 import lucuma.core.enums.VisitorObservingModeType
 import lucuma.core.math.Angle
 import lucuma.core.math.Wavelength
+import lucuma.core.util.TimeSpan
 import lucuma.odb.graphql.binding.Matcher
+import lucuma.odb.graphql.binding.NonEmptyStringBinding
 import lucuma.odb.graphql.binding.ObjectFieldsBinding
 import lucuma.odb.graphql.binding.VisitorObservingModeTypeBinding
 import lucuma.odb.sequence.visitor.Config
@@ -21,28 +24,37 @@ object VisitorInput:
   case class Edit(
     mode: Option[VisitorObservingModeType],
     centralWavelength: Option[Wavelength],
-    scienceFov: Option[Angle]
+    scienceFov: Option[Angle],
+    name: Option[NonEmptyString],
+    totalRequestTime: Option[TimeSpan]
   ):
     def toCreate: Result[Create] =
       Result.fromOption(
-        (mode, centralWavelength, scienceFov).mapN(Create.apply),
-        "Cannot turn edit into create; all fields must be defined."
-      )
+        (mode, centralWavelength, scienceFov).mapN((m, w, f) =>
+          Create(m, w, f, name, totalRequestTime)
+        ),
+        "Cannot turn edit into create; all required fields must be defined."
+      ).flatMap: c =>
+        c.validate.fold(Result.failure, _ => Result.success(c))
 
   val CreateBinding: Matcher[Create] =
     ObjectFieldsBinding.rmap:
       case List(
         VisitorObservingModeTypeBinding("mode", rMode),
         WavelengthInput.Binding("centralWavelength", rWavelength),
-        AngleInput.Binding("scienceFov", rScienceFov)
+        AngleInput.Binding("scienceFov", rScienceFov),
+        NonEmptyStringBinding.Option("name", rName),
+        TimeSpanInput.Binding.Option("totalRequestTime", rTotalRequestTime)
       ) =>
-        (rMode, rWavelength, rScienceFov).mapN(Create.apply)
+        (rMode, rWavelength, rScienceFov, rName, rTotalRequestTime).mapN(Create.apply)
 
   val EditBinding: Matcher[Edit] =
     ObjectFieldsBinding.rmap:
       case List(
         VisitorObservingModeTypeBinding.Option("mode", rMode),
         WavelengthInput.Binding.Option("centralWavelength", rWavelength),
-        AngleInput.Binding.Option("scienceFov", rScienceFov)
+        AngleInput.Binding.Option("scienceFov", rScienceFov),
+        NonEmptyStringBinding.Option("name", rName),
+        TimeSpanInput.Binding.Option("totalRequestTime", rTotalRequestTime)
       ) =>
-        (rMode, rWavelength, rScienceFov).mapN(Edit.apply)
+        (rMode, rWavelength, rScienceFov, rName, rTotalRequestTime).mapN(Edit.apply)

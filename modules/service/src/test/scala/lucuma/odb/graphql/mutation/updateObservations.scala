@@ -4779,3 +4779,64 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
         (update1, query, expected1)  // switcth to igrins 2
       )
     )
+
+  private val AlienVisitorQuery: String =
+    """
+      observations {
+        observingMode {
+          visitor {
+            mode
+            name
+            totalRequestTime { hours }
+          }
+        }
+      }
+    """
+
+  test("observing mode: visitor update to VISITOR_NORTH without name and totalRequestTime is rejected"):
+    val update = """
+      observingMode: {
+        visitor: {
+          mode: VISITOR_NORTH
+          centralWavelength: { nanometers: 2200 }
+          scienceFov: { degrees: 1 }
+        }
+      }
+    """
+    oneUpdateTest(
+      user     = pi,
+      update   = update,
+      query    = AlienVisitorQuery,
+      expected = "Visitor mode VisitorNorth requires both `name` and `totalRequestTime` to be provided.".asLeft
+    )
+
+  test("observing mode: visitor update to VISITOR_NORTH with name and totalRequestTime succeeds"):
+    val update = """
+      observingMode: {
+        visitor: {
+          mode: VISITOR_NORTH
+          centralWavelength: { nanometers: 2200 }
+          scienceFov: { degrees: 1 }
+          name: "north run"
+          totalRequestTime: { hours: 3 }
+        }
+      }
+    """
+    val expected = json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "observingMode": {
+                "visitor": {
+                  "mode": "VISITOR_NORTH",
+                  "name": "north run",
+                  "totalRequestTime": { "hours": 3.000000 }
+                }
+              }
+            }
+          ]
+        }
+      }
+    """.asRight
+    oneUpdateTest(pi, update, AlienVisitorQuery, expected)

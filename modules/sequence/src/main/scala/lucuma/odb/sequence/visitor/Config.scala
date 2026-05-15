@@ -3,17 +3,27 @@
 
 package lucuma.odb.sequence.visitor
 
+import eu.timepit.refined.types.string.NonEmptyString
 import lucuma.core.enums.VisitorObservingModeType
 import lucuma.core.math.Angle
 import lucuma.core.math.Wavelength
+import lucuma.core.util.TimeSpan
 import lucuma.odb.sequence.util.HashBytes
 
 final case class Config(
   mode: VisitorObservingModeType,
   centralWavelength: Wavelength,
   // Science field of view, understood as the diameter of a circular area.
-  scienceFov: Angle
-)
+  scienceFov: Angle,
+  name: Option[NonEmptyString],
+  totalRequestTime: Option[TimeSpan]
+):
+  def validate: Either[String, Unit] =
+    mode match
+      case VisitorObservingModeType.VisitorNorth | VisitorObservingModeType.VisitorSouth
+        if name.isEmpty || totalRequestTime.isEmpty =>
+        Left(s"Visitor mode $mode requires both `name` and `totalRequestTime` to be provided.")
+      case _ => Right(())
 
 object Config:
 
@@ -23,4 +33,6 @@ object Config:
         HashBytes[VisitorObservingModeType].hashBytes(c.mode),
         HashBytes[Wavelength].hashBytes(c.centralWavelength),
         HashBytes[Angle].hashBytes(c.scienceFov),
+        c.name.fold(Array.emptyByteArray)(n => HashBytes[String].hashBytes(n.value)),
+        c.totalRequestTime.fold(Array.emptyByteArray)(HashBytes[TimeSpan].hashBytes)
       )
