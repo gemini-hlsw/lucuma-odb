@@ -206,6 +206,14 @@ jobs:
           schema: 'main:itc/service/src/main/resources/graphql/itc.graphql'
           approve-label: expected-breaking-change
 
+      - name: Validate Resource GraphQL schema changes
+        if: github.event_name == 'pull_request'
+        uses: kamilkisiela/graphql-inspector@master
+        with:
+          name: Validate Resource Public API
+          schema: 'main:resource/service/src/main/resources/graphql/resource.graphql'
+          approve-label: expected-breaking-change
+
   deploy:
     name: Build and publish Docker images / Deploy to Heroku
     if: (github.ref == 'refs/heads/main' && startsWith(github.repository, 'gemini'))

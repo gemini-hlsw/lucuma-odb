@@ -343,7 +343,7 @@ ThisBuild / githubWorkflowAddedJobs ++= Seq(
       sbtStaticChecks ::
       graphqlInspectorOdb ::
       graphqlInspectorItc ::
-      // graphqlInspectorResource ::
+      graphqlInspectorResource ::
       Nil,
     scalas = List(scalaVersion.value),
     javas = githubWorkflowJavaVersions.value.toList.take(1)
