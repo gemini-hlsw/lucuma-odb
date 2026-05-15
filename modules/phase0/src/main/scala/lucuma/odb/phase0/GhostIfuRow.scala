@@ -8,7 +8,6 @@ import cats.syntax.all.*
 import lucuma.core.enums.GhostBinning
 import lucuma.core.enums.GhostResolutionMode
 import lucuma.core.enums.Instrument
-import lucuma.core.util.Enumerated
 
 case class GhostIfuRow(
   spec:           SpectroscopyRow,
@@ -29,15 +28,8 @@ object GhostIfuRow:
       .get(r.fpu)
       .toRight(s"Cannot find GHOST resolution mode ${r.fpu}")
 
-  private def binning(r: SpectroscopyRow): Either[String, GhostBinning] =
-    r.description
-     .split(' ')
-     .drop(1)
-     .headOption
-     .flatMap: binString =>
-       Enumerated[GhostBinning].all.find(binString === _.name)
-     .toRight(s"GHOST binning not recognized in row description: ${r.description}")
-
+  // Binning used to be included in the phase 0 table, but it was removed in favor of always being 1x1.
+  // However, I'm keeping the assignment here so that no other code needs to know about decisions such as this.
   def ghost: Parser[List[GhostIfuRow]] =
     SpectroscopyRow.rows.flatMap: rs =>
       rs.traverse: r =>
@@ -45,6 +37,5 @@ object GhostIfuRow:
           for
             _ <- Either.raiseWhen(r.instrument =!= Instrument.Ghost)(s"Cannot parse a ${r.instrument.tag} as GHOST")
             m <- resolutionMode(r)
-            b <- binning(r)
-          yield GhostIfuRow(r, m, b)
+          yield GhostIfuRow(r, m, GhostBinning.OneByOne)
         row.fold(Parser.failWith, Parser.pure)
