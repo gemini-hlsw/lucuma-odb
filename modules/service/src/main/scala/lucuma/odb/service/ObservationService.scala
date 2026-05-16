@@ -29,6 +29,7 @@ import lucuma.core.math.Declination
 import lucuma.core.math.RightAscension
 import lucuma.core.math.SignalToNoise
 import lucuma.core.math.Wavelength
+import lucuma.core.model.Access
 import lucuma.core.model.CloudExtinction
 import lucuma.core.model.ConstraintSet
 import lucuma.core.model.ElevationRange
@@ -449,6 +450,27 @@ object ObservationService {
                   Services.asSuperUser:
                     allocationService.validateBand(band, pids)
 
+            // Observations in system groups (telluric, etc.) cannot be moved
+            // by non-service callers.
+            // doing so may introduce orphan groups, at least for tellurics.
+            val forbidSystemGroupMove: ResultT[F, Unit] =
+              val movingGroup = SET.group != Nullable.Absent || SET.groupIndex.isDefined
+
+              if !movingGroup || user.role.access == Access.Service then
+                ResultT.unit
+              else
+                val af = Statements.selectObservationsInSystemGroup(which)
+                ResultT:
+                  session.prepareR(af.fragment.query(observation_id))
+                    .use(_.stream(af.argument, 1024).compile.toList)
+                    .map:
+                      case Nil =>
+                        Result.unit
+                      case ids =>
+                        OdbError.InvalidArgument(
+                          s"Observations ${ids.map(_.show).mkString(", ")} cannot be moved out of their system group; move the group instead.".some
+                        ).asFailure
+
             val updates: ResultT[F, Map[Program.Id, List[Observation.Id]]] =
               for {
                 r <- ResultT(Statements.updateObservations(SET, which).traverse { af =>
@@ -481,17 +503,17 @@ object ObservationService {
                     }.map(_.sequence)))
             } yield g
 
-            for {
-              _ <- session.execute(sql"set constraints all deferred".command)
-              _ <- moveObservations(SET.group, SET.groupIndex, which)
-              r <- updates.value.recoverWith {
-                    case SqlState.CheckViolation(ex) =>
-                      OdbError.InvalidArgument(Some(constraintViolationMessage(ex))).asFailureF
-                    case SqlState.RaiseException(ex) =>
-                      OdbError.UpdateFailed(ex.message.some).asFailureF
-                  }
-              _ <- transaction.rollback.unlessA(r.hasValue) // rollback if something failed
-            } yield r
+            (for {
+              _ <- forbidSystemGroupMove
+              _ <- ResultT.liftF(session.execute(sql"set constraints all deferred".command))
+              _ <- ResultT.liftF(moveObservations(SET.group, SET.groupIndex, which))
+              r <- ResultT(updates.value.recoverWith {
+                     case SqlState.CheckViolation(ex) =>
+                       OdbError.InvalidArgument(Some(constraintViolationMessage(ex))).asFailureF
+                     case SqlState.RaiseException(ex) =>
+                       OdbError.UpdateFailed(ex.message.some).asFailureF
+                   })
+            } yield r).value.flatTap(r => transaction.rollback.unlessA(r.hasValue))
         }
 
       override def updateObservationsTimes(
@@ -1164,6 +1186,14 @@ object ObservationService {
         FROM t_observation
         WHERE c_observation_id IN (
       """.apply(gid, index) |+| which |+| void")"
+
+    def selectObservationsInSystemGroup(which: AppliedFragment): AppliedFragment =
+      void"""
+        SELECT o.c_observation_id
+        FROM   t_observation o
+        JOIN   t_group       g ON o.c_group_id = g.c_group_id
+        WHERE  g.c_system = true
+          AND  o.c_observation_id IN (""" |+| which |+| void")"
 
     // Brute force statements to delete a calibration observations
     def linkedTargets(oids: NonEmptyList[Observation.Id]): Query[List[Observation.Id], Target.Id] =
