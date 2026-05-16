@@ -129,6 +129,10 @@ object OdbSuite:
 abstract class OdbSuite extends CatsEffectSuite with DatabaseOperations with ServiceOperations with TestSsoClient with ChronicleOperations {
   override implicit def munitIoRuntime: IORuntime = OdbSuite.runtime
 
+  // Under parallelExecution suites share one IORuntime, so heavier tests can be
+  // starved past MUnit's 30s default. Give them more headroom.
+  override def munitIOTimeout: scala.concurrent.duration.Duration = 2.minutes
+
   /** Ensure that exactly the specified errors are reported, in order. */
   def interceptGraphQL(messages: String*)(fa: IO[Any])(using Location): IO[Unit] =
     fa.attempt.flatMap {

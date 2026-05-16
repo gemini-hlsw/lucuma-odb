@@ -855,7 +855,10 @@ lazy val service = project
     bashScriptExtraDefines += """set -- -Dfile.encoding=UTF-8 serve""",
     // Name of the launch script
     executableScriptName            := "lucuma-odb-service",
-    dockerExposedPorts ++= Seq(8082)
+    dockerExposedPorts ++= Seq(8082),
+    // Each suite gets its own DB cloned from a shared template container
+    // (see SharedOdbContainer), so suites are safe to run concurrently.
+    Test / parallelExecution := true
   )
 
 lazy val obscalc = project

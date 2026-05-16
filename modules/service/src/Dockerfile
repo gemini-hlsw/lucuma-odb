@@ -21,4 +21,7 @@ RUN sed -i 's/exec "$@"/echo "skipping..."/' /usr/local/bin/docker-entrypoint.sh
   # Run the init scripts
   /usr/local/bin/docker-entrypoint.sh postgres && \
   # Put everything back again
-  sed -i 's/echo "skipping..."/exec "$@"/' /usr/local/bin/docker-entrypoint.sh
+  sed -i 's/echo "skipping..."/exec "$@"/' /usr/local/bin/docker-entrypoint.sh && \
+  # Raise max_connections so parallel test suites (each with ~30 pool connections)
+  # don't saturate the default cap of 100.
+  echo "max_connections = 400" >> "$PGDATA/postgresql.conf"
