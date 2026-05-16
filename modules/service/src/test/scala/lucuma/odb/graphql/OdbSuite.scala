@@ -22,9 +22,7 @@ import clue.http4s.Http4sWebSocketBackend
 import clue.http4s.Http4sWebSocketClient
 import clue.model.GraphQLErrors
 import clue.websocket.WebSocketClient
-import com.dimafeng.testcontainers.GenericContainer
 import com.dimafeng.testcontainers.PostgreSQLContainer
-import com.dimafeng.testcontainers.munit.TestContainerForAll
 import eu.timepit.refined.types.numeric.PosInt
 import fs2.Stream
 import fs2.io.net.tls.TLSContext
@@ -84,7 +82,6 @@ import lucuma.refined.*
 import munit.AnyFixture
 import munit.CatsEffectSuite
 import munit.Location
-import munit.diff.console.AnsiColors
 import natchez.Trace
 import org.http4s.blaze.server.BlazeServerBuilder
 import org.http4s.client.Client
@@ -96,10 +93,6 @@ import org.http4s.server.Server
 import org.http4s.server.websocket.WebSocketBuilder2
 import org.http4s.syntax.literals.*
 import org.http4s.{Uri as Http4sUri, *}
-import org.slf4j
-import org.testcontainers.containers.PostgreSQLContainer.POSTGRESQL_PORT
-import org.testcontainers.containers.wait.strategy.Wait
-import org.testcontainers.images.builder.ImageFromDockerfile
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.LoggerFactory
 import org.typelevel.log4cats.slf4j.Slf4jFactory
@@ -112,9 +105,7 @@ import software.amazon.awssdk.services.s3.model.S3Exception
 import software.amazon.awssdk.services.s3.presigner.S3Presigner
 
 import java.net.SocketException
-import java.nio.file.Paths
 import scala.concurrent.duration.*
-import scala.jdk.CollectionConverters.*
 
 object OdbSuite:
   def reportFailure: Throwable => Unit =
@@ -135,7 +126,7 @@ object OdbSuite:
  * Mixin that allows execution of GraphQL operations on a per-suite instance of the Odb, shared
  * among all tests.
  */
-abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with TestContainerForAll with DatabaseOperations with ServiceOperations with TestSsoClient with ChronicleOperations {
+abstract class OdbSuite extends CatsEffectSuite with DatabaseOperations with ServiceOperations with TestSsoClient with ChronicleOperations {
   override implicit def munitIoRuntime: IORuntime = OdbSuite.runtime
 
   /** Ensure that exactly the specified errors are reported, in order. */
@@ -164,56 +155,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
   /** Generate a new id, impurely. */
   def nextId: Long = it.next().toLong
 
-  val jlogger: slf4j.Logger =
-    slf4j.LoggerFactory.getLogger("lucuma-odb-test-container")
-
-  var container: Containers = null
-
-  override def afterContainersStart(c: GenericContainer): Unit =
-    container = c
-
-    /**
-     * Build a single PostgreSQL container for test suites. Runs all migrations and database initialization in the image build.
-     *
-     * The image is built for the first suite, and the Docker cache will be used for subsequent suites. Skipping the long db initialization.
-     */
-  override val containerDef: GenericContainer.Def[GenericContainer] =
-    val env = Map(
-      "POSTGRES_USER"     -> PostgreSQLContainer.defaultUsername,
-      "POSTGRES_PASSWORD" -> PostgreSQLContainer.defaultPassword,
-      "POSTGRES_DB"       -> PostgreSQLContainer.defaultDatabaseName
-    )
-
-    // in CI, while running tests from sbt cli, or using vscode test explorer with bloop, the tests
-    // start in the root directory of the project. In that case, the dockerfile is in the
-    // modules/service/src directory.
-    // However, using vscode test explorer with sbt, the tests start in 'modulues/service'.
-    // We'll handle both cases here.
-    val dockerPrefix = Paths.get("modules", "service")
-    val dockerSuffix = Paths.get("src", "Dockerfile")
-    val dockerPath = if (Paths.get(".").toAbsolutePath.normalize.endsWith(dockerPrefix))
-      dockerSuffix
-    else
-      dockerPrefix.resolve(dockerSuffix)
-
-    val image = new ImageFromDockerfile("lucuma-odb-test-db")
-      .withDockerfile(dockerPath)
-      .withBuildArgs(env.asJava)
-
-    val dbContainer = GenericContainer(
-      image,
-      env = env,
-      exposedPorts = Seq(POSTGRESQL_PORT),
-      waitStrategy = Wait
-        .forLogMessage(".*database system is ready to accept connections.*", 1)
-        .withStartupTimeout(java.time.Duration.ofSeconds(15))
-    )
-    if (debug) {
-      dbContainer.container.withLogConsumer { f =>
-        jlogger.debug(s"${AnsiColors.CYAN}${f.getUtf8String().trim()}${AnsiColors.Reset}")
-      }: Unit
-    }
-    new GenericContainer.Def(dbContainer) {}
+  private var dbName: String = null
 
   given LoggerFactory[IO] =
     Slf4jFactory.create[IO]
@@ -347,11 +289,11 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       maxConnections = 10,
       maxCalibrationConnections = 10,
       maxObscalcConnections = 10,
-      host     = container.containerIpAddress,
-      port     = container.mappedPort(POSTGRESQL_PORT),
+      host     = SharedOdbContainer.host,
+      port     = SharedOdbContainer.port,
       user     = PostgreSQLContainer.defaultUsername,
       password = PostgreSQLContainer.defaultPassword,
-      database = PostgreSQLContainer.defaultDatabaseName,
+      database = dbName,
     )
 
   // overriden in OdbSuiteWithS3 for tests that need it.
@@ -522,6 +464,8 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
   override def beforeAll(): Unit = {
     super.beforeAll()
 
+    dbName = SharedOdbContainer.createFreshDb()
+
     dbInitialization.foreach { init =>
       import Trace.Implicits.noop
       FMain
@@ -537,6 +481,10 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
   override def afterAll(): Unit = {
     super.afterAll()
     stopS3
+    if (dbName != null) {
+      SharedOdbContainer.dropDb(dbName)
+      dbName = null
+    }
   }
 
   /**
