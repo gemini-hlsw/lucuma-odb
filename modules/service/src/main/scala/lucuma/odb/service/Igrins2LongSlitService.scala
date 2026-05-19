@@ -18,7 +18,6 @@ import lucuma.odb.format.spatialOffsets.*
 import lucuma.odb.graphql.input.Igrins2LongSlitInput
 import lucuma.odb.sequence.igrins2.longslit.Config
 import lucuma.odb.util.Codecs.*
-import lucuma.odb.util.Igrins2Codecs.*
 import skunk.*
 import skunk.codec.boolean.bool
 import skunk.codec.text.text
@@ -53,10 +52,10 @@ object Igrins2LongSlitService:
     new Igrins2LongSlitService[F] {
 
       val igrins2LS: Decoder[Config] =
-        (exposure_time_mode       *:
-         igrins_2_offset_mode.opt *:
-         bool.opt                 *:
-         text.opt                 *:
+        (exposure_time_mode   *:
+         slit_offset_mode.opt *:
+         bool.opt             *:
+         text.opt             *:
          telluric_type
         ).emap { case (sci, offsetMode, saveSVC, offsetsText, telluricType) =>
           offsetsText.traverse: so =>
@@ -169,11 +168,11 @@ object Igrins2LongSlitService:
           c_telluric_type
         )
         SELECT
-          $observation_id            ,
-          c_program_id               ,
-          ${igrins_2_offset_mode.opt},
-          ${bool.opt}                ,
-          ${text.opt}                ,
+          $observation_id        ,
+          c_program_id           ,
+          ${slit_offset_mode.opt},
+          ${bool.opt}            ,
+          ${text.opt}            ,
           $telluric_type
         FROM t_observation
         WHERE c_observation_id = $observation_id
@@ -199,7 +198,7 @@ object Igrins2LongSlitService:
 
     private def igrins2Updates(input: Igrins2LongSlitInput.Edit): Option[NonEmptyList[AppliedFragment]] = {
 
-      val upOffsetMode    = sql"c_offset_mode     = ${igrins_2_offset_mode.opt}"
+      val upOffsetMode    = sql"c_offset_mode     = ${slit_offset_mode.opt}"
       val upSaveSVCImages = sql"c_save_svc_images = ${bool.opt}"
       val upOffsets       = sql"c_spatial_offsets = ${text.opt}"
       val upTelluricType  = sql"c_telluric_type   = ${telluric_type.opt}"
