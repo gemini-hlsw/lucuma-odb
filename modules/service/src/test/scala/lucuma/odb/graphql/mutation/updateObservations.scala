@@ -4840,3 +4840,90 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
       }
     """.asRight
     oneUpdateTest(pi, update, AlienVisitorQuery, expected)
+
+  private val AlienVisQuery: String =
+    """
+      observations {
+        observingMode {
+          visitor {
+            mode
+            scienceFov { arcseconds }
+            name
+            totalRequestTime { hours }
+          }
+        }
+      }
+    """
+
+  test("observing mode: edit existing visitor mode"):
+    def expected(mode: String, fovArcsec: Int, hours: Int): Either[String, Json] =
+      json"""
+        {
+          "updateObservations": {
+            "observations": [
+              {
+                "observingMode": {
+                  "visitor": {
+                    "mode": $mode,
+                    "scienceFov": { "arcseconds": $fovArcsec },
+                    "name": "IQUEYE",
+                    "totalRequestTime": { "hours": ${BigDecimal(hours).setScale(6)} }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      """.asRight
+
+    val create = """
+      observingMode: {
+        visitor: {
+          mode: VISITOR_NORTH
+          centralWavelength: { nanometers: 2200 }
+          scienceFov: { arcseconds: 5 }
+          name: "IQUEYE"
+          totalRequestTime: { hours: 3 }
+        }
+      }
+    """
+
+    val editTotalRequestTime = """
+      observingMode: {
+        visitor: {
+          mode: VISITOR_NORTH
+          name: "IQUEYE"
+          totalRequestTime: { hours: 4 }
+        }
+      }
+    """
+
+    val editScienceFov = """
+      observingMode: {
+        visitor: {
+          mode: VISITOR_NORTH
+          scienceFov: { arcseconds: 10 }
+        }
+      }
+    """
+
+    val switchToSouth = """
+      observingMode: {
+        visitor: {
+          mode: VISITOR_SOUTH
+          centralWavelength: { nanometers: 2200 }
+          scienceFov: { arcseconds: 5 }
+          name: "IQUEYE"
+          totalRequestTime: { hours: 3 }
+        }
+      }
+    """
+
+    multiUpdateTest(pi,
+      List(
+        (create,               AlienVisQuery, expected("VISITOR_NORTH",  5, 3)),
+        (editTotalRequestTime, AlienVisQuery, expected("VISITOR_NORTH",  5, 4)),
+        (editScienceFov,       AlienVisQuery, expected("VISITOR_NORTH", 10, 4)),
+        (switchToSouth,        AlienVisQuery, expected("VISITOR_SOUTH",  5, 3))
+      )
+    )

@@ -94,13 +94,13 @@ object VisitorService:
           NonEmptyList
             .fromList:
               List(
-                SET.centralWavelength.foldMap(sql"centralWavelength = $wavelength_pm"),
-                SET.mode.foldMap(sql"mode = $visitor_observing_mode_type"),
-                SET.scienceFov.foldMap(sql"c_science_fov = $angle_µas"),
-                SET.name.foldMap(sql"c_name = $text_nonempty"),
-                SET.totalRequestTime.foldMap(sql"c_total_request_time = $time_span")
-              )
-            .map(_.foldSmash(void"UPDATE t_visitor SET ", void",", void" "))
+                SET.centralWavelength.map(sql"c_central_wavelength = $wavelength_pm"),
+                SET.mode.map(sql"c_observing_mode_type = $visitor_observing_mode_type"),
+                SET.scienceFov.map(sql"c_science_fov = $angle_µas"),
+                SET.name.map(sql"c_name = $text_nonempty"),
+                SET.totalRequestTime.map(sql"c_total_request_time = $time_span")
+              ).flatten
+            .map(_.foldSmash(void"UPDATE t_visitor SET ", void", ", void" "))
 
         val where: Option[AppliedFragment] =
           NonEmptyList.fromList(which).map: oids =>
