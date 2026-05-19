@@ -46,6 +46,10 @@ trait Flamingos2LongSlitService[F[_]]:
 
   def clone(originalId: Observation.Id, newId: Observation.Id): F[Unit]
 
+  /** Reset the configuration of `oid` to telluric `defaults.
+    */
+  def resetTelluricConfig(oid: Observation.Id): F[Unit]
+
 object Flamingos2LongSlitService:
 
   def instantiate[F[_]: {Concurrent as F, Services}]: Flamingos2LongSlitService[F] =
@@ -141,6 +145,9 @@ object Flamingos2LongSlitService:
 
       def clone(originalId: Observation.Id, newId: Observation.Id): F[Unit] =
         session.exec(Statements.cloneF2(originalId, newId))
+
+      override def resetTelluricConfig(oid: Observation.Id): F[Unit] =
+        session.exec(Statements.applyF2TelluricDefaults(oid))
     }
 
   object Statements {
@@ -333,4 +340,15 @@ object Flamingos2LongSlitService:
       FROM t_flamingos_2_long_slit
       WHERE c_observation_id = $observation_id
       """.apply(newId, newId, originalId)
+
+    // Tellurics need a fixed set of offsets
+    def applyF2TelluricDefaults(oid: Observation.Id): AppliedFragment =
+      sql"""
+        UPDATE t_flamingos_2_long_slit
+        SET c_offsets = $text
+        WHERE c_observation_id = $observation_id
+      """.apply(
+        OffsetsFormat.reverseGet(Config.DefaultSpatialOffsets),
+        oid
+      )
   }

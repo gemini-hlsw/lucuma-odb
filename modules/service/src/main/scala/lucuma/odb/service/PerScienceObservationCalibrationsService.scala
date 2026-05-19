@@ -365,6 +365,17 @@ object PerScienceObservationCalibrationsService:
         def cloneSourceMode(sm: Option[ObservingModeType]): F[Unit] =
           sm.traverse(mode => obsModeService.clone(mode, sourceOid, targetOid)).void
 
+        // Reset any mode-specific telluric overrides on the cloned obs.
+        // At the moment only offsets but eventually other properties may need a reset,
+        def resetTelluricConfig(sm: Option[ObservingModeType]): F[Unit] =
+          sm match
+            case Some(ObservingModeType.Igrins2LongSlit) =>
+              S.igrins2LongSlitService.resetTelluricConfig(targetOid)
+            case Some(ObservingModeType.Flamingos2LongSlit) =>
+              S.flamingos2LongSlitService.resetTelluricConfig(targetOid)
+            case _ =>
+              F.unit
+
         for {
           modes    <- readObservingModes
           (sm, tm) <- extractModes(modes)
@@ -373,6 +384,7 @@ object PerScienceObservationCalibrationsService:
           _        <- deleteAllExposureTimeModes(sm)
           _        <- updateTargetModeType(sm)
           _        <- cloneSourceMode(sm)
+          _        <- resetTelluricConfig(sm)
           _        <- createTelluricExposureTimeMode(sourceOid, targetOid)
         } yield ()
 

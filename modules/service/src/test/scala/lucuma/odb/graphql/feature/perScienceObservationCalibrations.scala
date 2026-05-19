@@ -25,6 +25,7 @@ import lucuma.core.math.BrightnessUnits.Integrated
 import lucuma.core.math.BrightnessValue
 import lucuma.core.math.Coordinates
 import lucuma.core.math.Declination
+import lucuma.core.math.Offset
 import lucuma.core.math.RightAscension
 import lucuma.core.math.SignalToNoise
 import lucuma.core.math.Wavelength
@@ -37,6 +38,7 @@ import lucuma.core.model.SourceProfile
 import lucuma.core.model.SpectralDefinition
 import lucuma.core.model.Target
 import lucuma.core.model.TelluricType
+import lucuma.core.model.sequence.igrins2.NodAlongSlitDefaultOffsets
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
@@ -47,8 +49,10 @@ import lucuma.odb.graphql.query.ExecutionTestSupportForFlamingos2
 import lucuma.odb.graphql.query.ExecutionTestSupportForIgrins2
 import lucuma.odb.graphql.query.ObservingModeSetupOperations
 import lucuma.odb.graphql.subscription.SubscriptionUtils
+import lucuma.odb.json.offset.decoder.given
 import lucuma.odb.json.time.transport.given
 import lucuma.odb.json.wavelength.decoder.given
+import lucuma.odb.sequence.flamingos2.longslit.Config as F2Config
 import lucuma.odb.service.TelluricTargetsServiceSuiteSupport
 import lucuma.refined.*
 
@@ -1943,4 +1947,131 @@ class perScienceObservationCalibrations
     } yield {
       assert(obsBefore.groupId.isDefined)
       assert(!groupExists)
+    }
+
+  private val CustomScienceOffsets = """[
+    { p: { arcseconds: 0 }, q: { arcseconds: -2.0 } },
+    { p: { arcseconds: 0 }, q: { arcseconds:  2.0 } },
+    { p: { arcseconds: 0 }, q: { arcseconds:  2.0 } },
+    { p: { arcseconds: 0 }, q: { arcseconds: -2.0 } }
+  ]"""
+
+  private def queryIgrins2OffsetSettings(oid: Observation.Id): IO[(String, List[Offset])] =
+    query(
+      serviceUser,
+      s"""query {
+            observation(observationId: "$oid") {
+              observingMode {
+                igrins2LongSlit {
+                  offsetMode
+                  explicitOffsets { p { microarcseconds } q { microarcseconds } }
+                }
+              }
+            }
+          }"""
+    ).map: c =>
+      val ls = c.hcursor.downField("observation").downField("observingMode").downField("igrins2LongSlit")
+      val mode = ls.downField("offsetMode").as[String].toOption.get
+      val offs = ls.downField("explicitOffsets").as[Option[List[Offset]]].toOption.flatten.orEmpty
+      (mode, offs)
+
+  test("igrins2 telluric overrides custom science offsets with the NodAlongSlit defaults"):
+    val customScience = List(-2.0, 2.0, 2.0, -2.0).map: q =>
+      Offset.Zero.copy(q = Offset.Q.signedDecimalArcseconds.reverseGet(BigDecimal(q)))
+    for {
+      pid     <- createProgramAs(pi)
+      tid     <- createTargetWithProfileAs(pi, pid)
+      // Science has some custom offsets
+      oid     <- createIgrins2LongSlitObservationAs(pi, pid, Some(CustomScienceOffsets), tid)
+      _       <- runObscalcUpdate(pid, oid)
+      _       <- recalculateCalibrations(pid, when, oid)
+      sciSet  <- queryIgrins2OffsetSettings(oid)
+      toidOpt <- selectTelluricObservationFor(oid)
+      toid    = toidOpt.get
+      telSet  <- queryIgrins2OffsetSettings(toid)
+    } yield {
+      // Science keeps its custom offsets
+      assertEquals(sciSet._1, "NOD_ALONG_SLIT")
+      assertEquals(sciSet._2, customScience)
+      // Telluric gets the default to NodAlongSlit offsets.
+      assertEquals(telSet._1, "NOD_ALONG_SLIT")
+      assertEquals(telSet._2, NodAlongSlitDefaultOffsets)
+    }
+
+  private def updateIgrins2ScienceOffsets(oid: Observation.Id): IO[Unit] =
+    query(
+      pi,
+      s"""mutation {
+        updateObservations(input: {
+          WHERE: { id: { EQ: "$oid" } }
+          SET: {
+            observingMode: {
+              igrins2LongSlit: {
+                explicitOffsets: [
+                  { p: { arcseconds: 0 }, q: { arcseconds: -1.0 } },
+                  { p: { arcseconds: 0 }, q: { arcseconds:  1.0 } },
+                  { p: { arcseconds: 0 }, q: { arcseconds:  1.0 } },
+                  { p: { arcseconds: 0 }, q: { arcseconds: -1.0 } }
+                ]
+              }
+            }
+          }
+        }) {
+          observations { id }
+        }
+      }"""
+    ).void
+
+  test("igrins2 telluric offsets stay at defaults on sync"):
+    for {
+      pid     <- createProgramAs(pi)
+      tid     <- createTargetWithProfileAs(pi, pid)
+      oid     <- createIgrins2LongSlitObservationAs(pi, pid, Some(CustomScienceOffsets), tid)
+      _       <- runObscalcUpdate(pid, oid)
+      _       <- recalculateCalibrations(pid, when, oid)
+      toid    <- selectTelluricObservationFor(oid).map(_.get)
+      tel1    <- queryIgrins2OffsetSettings(toid)
+      // Change the science offsets.
+      _       <- updateIgrins2ScienceOffsets(oid)
+      _       <- runObscalcUpdate(pid, oid)
+      // This re-syncs the changes to science but offsets are ignored.
+      _       <- recalculateCalibrations(pid, when, oid)
+      tel2    <- queryIgrins2OffsetSettings(toid)
+    } yield {
+      assertEquals(tel2._1, "NOD_ALONG_SLIT")
+      assertEquals(tel2._2, NodAlongSlitDefaultOffsets)
+    }
+
+  private def queryF2ExplicitOffsets(oid: Observation.Id): IO[List[Offset]] =
+    query(
+      serviceUser,
+      s"""query {
+            observation(observationId: "$oid") {
+              observingMode {
+                flamingos2LongSlit {
+                  explicitOffsets { p { microarcseconds } q { microarcseconds } }
+                }
+              }
+            }
+          }"""
+    ).map: c =>
+      c.hcursor.downField("observation").downField("observingMode").downField("flamingos2LongSlit")
+        .downField("explicitOffsets").as[Option[List[Offset]]].toOption.flatten.orEmpty
+
+  test("f2 telluric is created with explicit default offsets"):
+    for {
+      pid     <- createProgramAs(pi)
+      tid     <- createTargetWithProfileAs(pi, pid)
+      oid     <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+      _       <- runObscalcUpdate(pid, oid)
+      _       <- recalculateCalibrations(pid, when, oid)
+      sciOffs <- queryF2ExplicitOffsets(oid)
+      toidOpt <- selectTelluricObservationFor(oid)
+      toid    = toidOpt.get
+      telOffs <- queryF2ExplicitOffsets(toid)
+    } yield {
+      // Science has no explicit offsets
+      assertEquals(sciOffs, List.empty)
+      // Telluric has explicit defaults
+      assertEquals(telOffs, F2Config.DefaultSpatialOffsets)
     }
