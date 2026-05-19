@@ -543,63 +543,80 @@ object ObservationService {
 
           case (pid, observingMode, gid, gix) =>
 
-            // Desired group index is gix + 1
-            val destGroupIndex = NonNegShort.unsafeFrom((gix.value + 1).toShort)
+            // If the source observation is inside a system group, the clone cannot remain inside
+            // Place the clone in the parent instead.
+            val destLocation: F[(Option[Group.Id], NonNegShort)] =
+              gid.fold((none, NonNegShort.unsafeFrom((gix.value + 1).toShort)).pure[F]): groupId =>
+                val query = sql"""
+                  SELECT c_system, c_parent_id, c_parent_index
+                  FROM   t_group
+                  WHERE  c_group_id = $group_id
+                """.query(bool *: group_id.opt *: int2_nonneg)
+                session.prepareR(query).use(_.unique(groupId)).map:
+                  case (true, parentGid, parentGix) =>
+                    // For a system group put the clone in the parent
+                    (parentGid, NonNegShort.unsafeFrom((parentGix.value + 1).toShort))
+                  case _ =>
+                    // For regular groups copy next to it.
+                    (gid, NonNegShort.unsafeFrom((gix.value + 1).toShort))
 
-            // Ok the obs exists, so let's clone its main row in t_observation. If this returns
-            // None then it means the user doesn't have permission to see the obs.
-            val cObsStmt = Statements.cloneObservation(observationId, destGroupIndex)
-            val cloneObs = session.prepareR(cObsStmt.fragment.query(observation_id)).use(_.option(cObsStmt.argument))
+            destLocation.flatMap { (destGid, destGroupIndex) =>
 
-            // Action to open a hole in the destination program/group after the observation we're cloning
-            val openHole: F[NonNegShort] =
-              session.execute(sql"set constraints all deferred".command) >>
-              session.prepareR(sql"select group_open_hole($program_id, ${group_id.opt}, ${int2_nonneg.opt})".query(int2_nonneg)).use { pq =>
-                pq.unique(pid, gid, destGroupIndex.some)
-              }
+              // Ok the obs exists, so let's clone its main row in t_observation. If this returns
+              // None then it means the user doesn't have permission to see the obs.
+              val cObsStmt = Statements.cloneObservation(observationId, destGid, destGroupIndex)
+              val cloneObs = session.prepareR(cObsStmt.fragment.query(observation_id)).use(_.option(cObsStmt.argument))
 
-            // Ok let's do the clone.
-            (openHole >> cloneObs).flatMap {
+              // Action to open a hole in the destination program/group after the observation we're cloning
+              val openHole: F[NonNegShort] =
+                session.execute(sql"set constraints all deferred".command) >>
+                session.prepareR(sql"select group_open_hole($program_id, ${group_id.opt}, ${int2_nonneg.opt})".query(int2_nonneg)).use { pq =>
+                  pq.unique(pid, destGid, destGroupIndex.some)
+                }
 
-              case None =>
-                // User doesn't have permission to see the obs
-                Result.failure(s"No such observation: $observationId").pure[F]
+              // Ok let's do the clone.
+              (openHole >> cloneObs).flatMap {
 
-              case Some(oid2) =>
+                case None =>
+                  // User doesn't have permission to see the obs
+                  Result.failure(s"No such observation: $observationId").pure[F]
 
-                val cloneRelatedItems =
-                  Services.asSuperUser:
-                    asterismService.cloneAsterism(observationId, oid2) >>
-                    observingMode.traverse(observingModeServices.clone(_, observationId, oid2)) >>
-                    timingWindowService.cloneTimingWindows(observationId, oid2) >>
-                    obsAttachmentAssignmentService.cloneAssignments(observationId, oid2)
+                case Some(oid2) =>
 
-                val cloneBlindOffset = // only clone if it won't be overwritten by the updateObservations
-                  if SET.flatMap(_.targetEnvironment).fold(true)(_.blindOffsetTarget.isAbsent) then
-                    blindOffsetsService.cloneBlindOffset(pid, observationId, oid2)
-                  else Result.unit.pure
+                  val cloneRelatedItems =
+                    Services.asSuperUser:
+                      asterismService.cloneAsterism(observationId, oid2) >>
+                      observingMode.traverse(observingModeServices.clone(_, observationId, oid2)) >>
+                      timingWindowService.cloneTimingWindows(observationId, oid2) >>
+                      obsAttachmentAssignmentService.cloneAssignments(observationId, oid2)
 
-                val doUpdate =
-                  SET match
-                    case None    => Result((pid, oid2)).pure[F] // nothing to do
-                    case Some(s) =>
-                      updateObservations(Services.asSuperUser(AccessControl.unchecked(s, List(oid2), observation_id))).map { r =>
-                          // We probably don't need to check this return value, but I feel bad not doing it.
-                          r.map(_.toList).flatMap {
-                            case List((`pid`, List(`oid2`))) => Result((pid, oid2))
-                            case other                       => Result.failure(s"Observation update: expected ($pid, [$oid2]), found ${other.mkString("[", ",", "]")}")
+                  val cloneBlindOffset = // only clone if it won't be overwritten by the updateObservations
+                    if SET.flatMap(_.targetEnvironment).fold(true)(_.blindOffsetTarget.isAbsent) then
+                      blindOffsetsService.cloneBlindOffset(pid, observationId, oid2)
+                    else Result.unit.pure
+
+                  val doUpdate =
+                    SET match
+                      case None    => Result((pid, oid2)).pure[F] // nothing to do
+                      case Some(s) =>
+                        updateObservations(Services.asSuperUser(AccessControl.unchecked(s, List(oid2), observation_id))).map { r =>
+                            // We probably don't need to check this return value, but I feel bad not doing it.
+                            r.map(_.toList).flatMap {
+                              case List((`pid`, List(`oid2`))) => Result((pid, oid2))
+                              case other                       => Result.failure(s"Observation update: expected ($pid, [$oid2]), found ${other.mkString("[", ",", "]")}")
+                            }
                           }
-                        }
-                        .flatTap {
-                          r => transaction.rollback.unlessA(r.hasValue)
-                        }
-                (
-                  for
-                    _ <- ResultT.liftF(cloneRelatedItems)
-                    _ <- ResultT(cloneBlindOffset)
-                    r <- ResultT(doUpdate)
-                  yield r
-                ).value
+                          .flatTap {
+                            r => transaction.rollback.unlessA(r.hasValue)
+                          }
+                  (
+                    for
+                      _ <- ResultT.liftF(cloneRelatedItems)
+                      _ <- ResultT(cloneBlindOffset)
+                      r <- ResultT(doUpdate)
+                    yield r
+                  ).value
+              }
             }
         }
       }
@@ -777,7 +794,7 @@ object ObservationService {
       Option[Wavelength]               ,
       Option[FocalPlane]               ,
       Option[Angle]                    ,
-      Option[SpectroscopyCapability] ,
+      Option[SpectroscopyCapability]   ,
       Option[Angle]                    ,
       Option[Boolean]                  ,
       Option[Boolean]                  ,
@@ -1102,7 +1119,7 @@ object ObservationService {
      * Clone the base slice (just t_observation) and return the new obs id, or none if the original
      * doesn't exist or isn't accessible.
      */
-    def cloneObservation(oid: Observation.Id, gix: NonNegShort): AppliedFragment =
+    def cloneObservation(oid: Observation.Id, destGid: Option[Group.Id], gix: NonNegShort): AppliedFragment =
       sql"""
         INSERT INTO t_observation (
           c_program_id,
@@ -1142,7 +1159,7 @@ object ObservationService {
         )
         SELECT
           c_program_id,
-          c_group_id,
+          ${group_id.opt},
           $int2_nonneg,
           c_title,
           c_subtitle,
@@ -1178,7 +1195,7 @@ object ObservationService {
       FROM t_observation
       WHERE c_observation_id = $observation_id
       RETURNING c_observation_id
-      """.apply(gix, oid)
+      """.apply(destGid, gix, oid)
 
     def moveObservations(gid: Option[Group.Id], index: Option[NonNegShort], which: AppliedFragment): AppliedFragment =
       sql"""
