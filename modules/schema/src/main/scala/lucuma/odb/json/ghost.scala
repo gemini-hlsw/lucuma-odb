@@ -3,6 +3,7 @@
 
 package lucuma.odb.json
 
+import cats.syntax.either.*
 import eu.timepit.refined.types.numeric.PosInt
 import io.circe.Decoder
 import io.circe.Encoder
@@ -12,70 +13,187 @@ import io.circe.syntax.*
 import lucuma.core.enums.GhostBinning
 import lucuma.core.enums.GhostIfu1FiberAgitator
 import lucuma.core.enums.GhostIfu2FiberAgitator
+import lucuma.core.enums.GhostIfuMappingType
 import lucuma.core.enums.GhostReadMode
 import lucuma.core.enums.GhostResolutionMode
+import lucuma.core.math.Coordinates
+import lucuma.core.model.SiderealTracking
 import lucuma.core.model.sequence.ghost.GhostDetector
 import lucuma.core.model.sequence.ghost.GhostDynamicConfig
+import lucuma.core.model.sequence.ghost.GhostIfuMapping
+import lucuma.core.model.sequence.ghost.GhostIfuMapping.*
 import lucuma.core.model.sequence.ghost.GhostStaticConfig
 import lucuma.core.util.TimeSpan
 
 trait GhostCodec:
 
-  import time.decoder.given
+  trait DecoderGhost:
+    import target.decoder.given
+    import time.decoder.given
 
-  given Decoder[GhostStaticConfig] =
-    Decoder.instance: c =>
-      for
-        r <- c.downField("resolutionMode").as[GhostResolutionMode]
-        s <- c.downField("slitViewingCameraExposureTime").as[Option[TimeSpan]]
-      yield GhostStaticConfig(r, s)
+    given Decoder[SingleTarget] =
+      Decoder.instance: c =>
+        c.downField("ifu1").as[SiderealTracking].map(SingleTarget.apply)
 
-  given (using Encoder[TimeSpan]): Encoder[GhostStaticConfig] =
-    Encoder.instance: a =>
-      Json.obj(
-        "resolutionMode"                -> a.resolutionMode.asJson,
-        "slitViewingCameraExposureTime" -> a.slitViewingCameraExposureTime.asJson
-      )
+    given Decoder[TargetPlusSky] =
+      Decoder.instance: c =>
+        for
+          t <- c.downField("ifu1").as[SiderealTracking]
+          r <- c.downField("ifu2").as[Coordinates]
+        yield TargetPlusSky(t, r)
 
-  given Decoder[GhostDetector] =
-    Decoder.instance: c =>
-      for
-        t <- c.downField("exposureTime").as[TimeSpan]
-        n <- c.downField("exposureCount").as[PosInt]
-        b <- c.downField("binning").as[GhostBinning]
-        r <- c.downField("readMode").as[GhostReadMode]
-      yield GhostDetector(t, n, b, r)
+    given Decoder[SkyPlusTarget] =
+      Decoder.instance: c =>
+        for
+          r <- c.downField("ifu1").as[Coordinates]
+          t <- c.downField("ifu2").as[SiderealTracking]
+        yield SkyPlusTarget(r, t)
 
-  given (using Encoder[TimeSpan]): Encoder[GhostDetector] =
-    Encoder.instance: a =>
-      Json.obj(
-        "exposureTime"  -> a.exposureTime.asJson,
-        "exposureCount" -> a.exposureCount.asJson,
-        "binning"       -> a.binning.asJson,
-        "readMode"      -> a.readMode.asJson
-      )
+    given Decoder[DualTarget] =
+      Decoder.instance: c =>
+        for
+          t1 <- c.downField("ifu1").as[SiderealTracking]
+          t2 <- c.downField("ifu2").as[SiderealTracking]
+        yield DualTarget(t1, t2)
 
-  given Decoder[GhostDynamicConfig] =
-    Decoder.instance: c =>
-      for
-        r  <- c.downField("red").as[GhostDetector]
-        b  <- c.downField("blue").as[GhostDetector]
-        u1 <- c.downField("ifu1FiberAgitator").as[GhostIfu1FiberAgitator]
-        u2 <- c.downField("ifu2FiberAgitator").as[GhostIfu2FiberAgitator]
-      yield GhostDynamicConfig(
-        GhostDetector.Red(r),
-        GhostDetector.Blue(b),
-        u1,
-        u2
-      )
+    given Decoder[GhostIfuMapping] =
+      Decoder.instance: c =>
+        for
+          t <- c.downField("mappingType").as[GhostIfuMappingType]
+          m <- t match
+            case GhostIfuMappingType.Nonsidereal   => Nonsidereal.asRight
+            case GhostIfuMappingType.SingleTarget  => c.as[SingleTarget]
+            case GhostIfuMappingType.TargetPlusSky => c.as[TargetPlusSky]
+            case GhostIfuMappingType.SkyPlusTarget => c.as[SkyPlusTarget]
+            case GhostIfuMappingType.DualTarget    => c.as[DualTarget]
+        yield m
 
-  given (using Encoder[TimeSpan]): Encoder[GhostDynamicConfig] =
-    Encoder.instance: a =>
-      Json.obj(
-        "red"               -> a.red.asJson,
-        "blue"              -> a.blue.asJson,
-        "ifu1FiberAgitator" -> a.ifu1FiberAgitator.asJson,
-        "ifu2FiberAgitator" -> a.ifu2FiberAgitator.asJson
-      )
+    given Decoder[GhostStaticConfig] =
+      Decoder.instance: c =>
+        for
+          r <- c.downField("resolutionMode").as[GhostResolutionMode]
+          f <- c.downField("ifuMapping").as[GhostIfuMapping]
+          s <- c.downField("slitViewingCameraExposureTime").as[Option[TimeSpan]]
+        yield GhostStaticConfig(r, f, s)
+
+    given Decoder[GhostDetector] =
+      Decoder.instance: c =>
+        for
+          t <- c.downField("exposureTime").as[TimeSpan]
+          n <- c.downField("exposureCount").as[PosInt]
+          b <- c.downField("binning").as[GhostBinning]
+          r <- c.downField("readMode").as[GhostReadMode]
+        yield GhostDetector(t, n, b, r)
+
+    given Decoder[GhostDynamicConfig] =
+      Decoder.instance: c =>
+        for
+          r  <- c.downField("red").as[GhostDetector]
+          b  <- c.downField("blue").as[GhostDetector]
+          u1 <- c.downField("ifu1FiberAgitator").as[GhostIfu1FiberAgitator]
+          u2 <- c.downField("ifu2FiberAgitator").as[GhostIfu2FiberAgitator]
+        yield GhostDynamicConfig(
+          GhostDetector.Red(r),
+          GhostDetector.Blue(b),
+          u1,
+          u2
+        )
+
+  object decoder extends DecoderGhost
+
+  trait InternalCodec extends DecoderGhost:
+    protected def coordinatesEncoder: Encoder[Coordinates]
+    protected def siderealTrackingEncoder: Encoder[SiderealTracking]
+
+    given Encoder[Nonsidereal.type] =
+      Encoder.instance: a =>
+        Json.obj(
+          "mappingType" -> a.mappingType.asJson
+        )
+
+    given Encoder[SingleTarget] =
+      Encoder.instance: a =>
+        Json.obj(
+          "mappingType" -> a.mappingType.asJson,
+          "ifu1"        -> a.ifu1.asJson(using siderealTrackingEncoder)
+        )
+
+    given Encoder[TargetPlusSky] =
+      Encoder.instance: a =>
+        Json.obj(
+          "mappingType" -> a.mappingType.asJson,
+          "ifu1"        -> a.ifu1.asJson(using siderealTrackingEncoder),
+          "ifu2"        -> a.ifu2.asJson(using coordinatesEncoder)
+        )
+
+    given Encoder[SkyPlusTarget] =
+      Encoder.instance: a =>
+        Json.obj(
+          "mappingType" -> a.mappingType.asJson,
+          "ifu1"        -> a.ifu1.asJson(using coordinatesEncoder),
+          "ifu2"        -> a.ifu2.asJson(using siderealTrackingEncoder)
+        )
+
+    given Encoder[DualTarget] =
+      Encoder.instance: a =>
+        Json.obj(
+          "mappingType" -> a.mappingType.asJson,
+          "ifu1"        -> a.ifu1.asJson(using siderealTrackingEncoder),
+          "ifu2"        -> a.ifu2.asJson(using siderealTrackingEncoder)
+        )
+
+    given Encoder[GhostIfuMapping] =
+      Encoder.instance: a =>
+        a match
+          case Nonsidereal             => Nonsidereal.asJson
+          case m @ SingleTarget(_)     => m.asJson
+          case m @ TargetPlusSky(_, _) => m.asJson
+          case m @ SkyPlusTarget(_, _) => m.asJson
+          case m @ DualTarget(_, _)    => m.asJson
+
+    given (using Encoder[TimeSpan]): Encoder[GhostStaticConfig] =
+      Encoder.instance: a =>
+        Json.obj(
+          "resolutionMode"                -> a.resolutionMode.asJson,
+          "ifuMapping"                    -> a.ifuMapping.asJson,
+          "slitViewingCameraExposureTime" -> a.slitViewingCameraExposureTime.asJson
+        )
+
+    given (using Encoder[TimeSpan]): Encoder[GhostDetector] =
+      Encoder.instance: a =>
+        Json.obj(
+          "exposureTime"  -> a.exposureTime.asJson,
+          "exposureCount" -> a.exposureCount.asJson,
+          "binning"       -> a.binning.asJson,
+          "readMode"      -> a.readMode.asJson
+        )
+
+    given (using Encoder[TimeSpan]): Encoder[GhostDynamicConfig] =
+      Encoder.instance: a =>
+        Json.obj(
+          "red"               -> a.red.asJson,
+          "blue"              -> a.blue.asJson,
+          "ifu1FiberAgitator" -> a.ifu1FiberAgitator.asJson,
+          "ifu2FiberAgitator" -> a.ifu2FiberAgitator.asJson
+        )
+
+
+  trait QueryCodec extends InternalCodec:
+    override protected val coordinatesEncoder: Encoder[Coordinates] =
+      coordinates.query.Encoder_Coordinates
+
+    override protected val siderealTrackingEncoder: Encoder[SiderealTracking] =
+      target.query.siderealTrackingEncoder
+
+  object query extends QueryCodec
+
+  trait TransportCodec extends InternalCodec:
+    override protected val coordinatesEncoder: Encoder[Coordinates] =
+      coordinates.transport.Encoder_Coordinates
+
+    override protected val siderealTrackingEncoder: Encoder[SiderealTracking] =
+      target.transport.siderealTrackingEncoder
+
+  object transport extends TransportCodec
 
 object ghost extends GhostCodec

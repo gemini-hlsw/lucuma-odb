@@ -226,7 +226,7 @@ object GeneratorStreaming:
       )(using Transaction[F]): F[Either[OdbError, StreamingExecutionConfig[F, GhostStatic, GhostDynamic]]] =
         (for
           cfg <- extractMode(ObservingMode.GhostIfuName, context)(_.asGhostIfu)
-          stc  = GhostStatic(cfg.resolutionMode, cfg.slitCameraExposureTime)
+          stc <- EitherT(sequenceService.selectOrComputeGhostStatic(context.oid))
           res <- EitherT:
                    selectOrGenerate(
                      stc,
@@ -241,7 +241,7 @@ object GeneratorStreaming:
         import lucuma.odb.sequence.ghost.ifu.Ifu
         (for
           cfg <- extractMode(ObservingMode.GhostIfuName, context)(_.asGhostIfu)
-          stc  = GhostStatic(cfg.resolutionMode, cfg.slitCameraExposureTime)
+          stc <- EitherT(ghostIfuService.computeStatic(context.oid))
           itc  = requireGhostItc(context.oid, context.itcRes)
           gen <- EitherT(Ifu.instantiate(calculator.ghostStep, stc, context.namespace, exp.ghost, cfg, itc))
         yield gen.covary[F]).value

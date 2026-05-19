@@ -11,6 +11,7 @@ import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.util.Enumerated
 import lucuma.odb.service.ObservationWorkflowService
 import lucuma.odb.util.Codecs.*
+import lucuma.odb.util.GhostCodecs.ghost_ifu_mapping_type
 import lucuma.odb.util.GmosCodecs.*
 import lucuma.odb.util.GnirsCodecs.*
 import org.tpolecat.typename.TypeName
@@ -68,6 +69,7 @@ object StartupDiagnostics:
           checkPostgresEnum(exposure_time_mode_type),
           checkPostgresEnum(gcal_baseline),
           checkPostgresEnum(gcal_lamp_type),
+          checkPostgresEnum(ghost_ifu_mapping_type),
           checkPostgresEnum(gnirs_acquisition_type),
           checkPostgresEnum(gnirs_decker),
           checkPostgresEnum(gnirs_well_depth),

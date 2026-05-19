@@ -172,7 +172,7 @@ trait SequenceCodec {
     }
 
   import lucuma.odb.json.flamingos2.given
-  import lucuma.odb.json.ghost.given
+  import lucuma.odb.json.ghost.query.given
   import lucuma.odb.json.gmos.given
   import lucuma.odb.json.gnirs.given
   import lucuma.odb.json.igrins2.given

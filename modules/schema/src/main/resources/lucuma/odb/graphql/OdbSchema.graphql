@@ -9207,11 +9207,55 @@ type GhostIfu {
 
 }
 
+enum GhostIfuMappingType {
+  NONSIDEREAL
+
+  SINGLE_TARGET
+
+  TARGET_PLUS_SKY
+
+  SKY_PLUS_TARGET
+
+  DUAL_TARGET
+}
+
+interface GhostIfuMapping {
+  mappingType: GhostIfuMappingType!
+}
+
+type GhostNonsidereal implements GhostIfuMapping {
+  mappingType: GhostIfuMappingType!
+}
+
+type GhostSingleTarget implements GhostIfuMapping {
+  mappingType: GhostIfuMappingType!
+  ifu1:        Sidereal!
+}
+
+type GhostTargetPlusSky implements GhostIfuMapping {
+  mappingType: GhostIfuMappingType!
+  ifu1:        Sidereal!
+  ifu2:        Coordinates!
+}
+
+type GhostSkyPlusTarget implements GhostIfuMapping {
+  mappingType: GhostIfuMappingType!
+  ifu1:        Coordinates!
+  ifu2:        Sidereal!
+}
+
+type GhostDualTarget implements GhostIfuMapping {
+  mappingType: GhostIfuMappingType!
+  ifu1:        Sidereal!
+  ifu2:        Sidereal!
+}
+
 """
 GHOST configuration that applies across all steps.
 """
 type GhostStatic {
   resolutionMode: GhostResolutionMode!
+  ifuMapping: GhostIfuMapping!
   slitViewingCameraExposureTime: TimeSpan
 }
 

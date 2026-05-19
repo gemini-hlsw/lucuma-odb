@@ -3,6 +3,8 @@
 
 package lucuma.odb.data
 
+import lucuma.core.math.Angle
+import lucuma.core.model.PosAngleConstraint
 import lucuma.core.util.Enumerated
 
 // There is something similar in lucuma-core.  It needs to be updated and then
@@ -14,6 +16,14 @@ enum PosAngleConstraintMode(val dbTag: String):
   case AllowFlip           extends PosAngleConstraintMode("allow_flip")
   case AverageParallactic  extends PosAngleConstraintMode("average_parallactic")
   case ParallacticOverride extends PosAngleConstraintMode("parallactic_override")
+
+  def toPosAngleConstraint(a: Angle): PosAngleConstraint =
+    this match
+      case Unbounded           => PosAngleConstraint.Unbounded
+      case Fixed               => PosAngleConstraint.Fixed(a)
+      case AllowFlip           => PosAngleConstraint.AllowFlip(a)
+      case AverageParallactic  => PosAngleConstraint.AverageParallactic
+      case ParallacticOverride => PosAngleConstraint.ParallacticOverride(a)
 
 object PosAngleConstraintMode:
 
@@ -28,4 +38,3 @@ object PosAngleConstraintMode:
       AverageParallactic,
       ParallacticOverride
     ).withTag(_.dbTag)
-

@@ -102,6 +102,24 @@ object target {
 
   trait InternalCodec {
 
+    protected def siderealTrackingEncoderInternal(using
+      Encoder[RightAscension],
+      Encoder[Declination],
+      Encoder[Epoch],
+      Encoder[ProperMotion],
+      Encoder[RadialVelocity],
+      Encoder[Parallax]
+    ): Encoder[SiderealTracking] =
+      Encoder.instance: s =>
+        Json.obj(
+          "ra"             -> s.baseCoordinates.ra.asJson,
+          "dec"            -> s.baseCoordinates.dec.asJson,
+          "epoch"          -> s.epoch.asJson,
+          "properMotion"   -> s.properMotion.asJson,
+          "radialVelocity" -> s.radialVelocity.asJson,
+          "parallax"       -> s.parallax.asJson
+        )
+
     // This only encodes the part that goes under "sidereal" in the API
     protected def siderealDefinitionEncoderInternal(using
       Encoder[RightAscension],
@@ -112,17 +130,9 @@ object target {
       Encoder[Parallax],
       Encoder[CatalogInfo]
     ): Encoder[Target.Sidereal] =
-      Encoder.instance { s =>
-        Json.obj(
-          "ra"             -> s.tracking.baseCoordinates.ra.asJson,
-          "dec"            -> s.tracking.baseCoordinates.dec.asJson,
-          "epoch"          -> s.tracking.epoch.asJson,
-          "properMotion"   -> s.tracking.properMotion.asJson,
-          "radialVelocity" -> s.tracking.radialVelocity.asJson,
-          "parallax"       -> s.tracking.parallax.asJson,
-          "catalogInfo"    -> s.catalogInfo.asJson
-        )
-      }
+      Encoder.instance: s =>
+        siderealTrackingEncoderInternal(s.tracking).mapObject: obj =>
+          obj.add("catalogInfo", s.catalogInfo.asJson)
 
     // This only encodes the part that goes under "nonsidereal" in the API
     val nonsiderealDefinitionEncoder: Encoder[Target.Nonsidereal] =
@@ -180,6 +190,8 @@ object target {
   trait QueryCodec extends TargetDecoder with InternalCodec {
     import all.query.given
 
+    val siderealTrackingEncoder: Encoder[SiderealTracking] = siderealTrackingEncoderInternal
+
     // This only encodes the part that goes under "sidereal" in the API
     val siderealDefinitionEncoder: Encoder[Target.Sidereal] = siderealDefinitionEncoderInternal
 
@@ -196,6 +208,8 @@ object target {
 
   trait TransportCodec extends TargetDecoder with InternalCodec {
     import all.transport.given
+
+    val siderealTrackingEncoder: Encoder[SiderealTracking] = siderealTrackingEncoderInternal
 
     // This only encodes the part that goes under "sidereal" in the API
     val siderealDefinitionEncoder: Encoder[Target.Sidereal] = siderealDefinitionEncoderInternal

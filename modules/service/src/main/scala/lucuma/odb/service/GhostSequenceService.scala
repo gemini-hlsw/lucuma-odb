@@ -4,11 +4,8 @@
 package lucuma.odb.service
 
 import cats.effect.Concurrent
-import cats.syntax.applicative.*
-import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import cats.syntax.option.*
-import lucuma.core.enums.GhostResolutionMode
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.ghost.GhostDynamicConfig
@@ -37,10 +34,6 @@ trait GhostSequenceService[F[_]]:
     observationId: Observation.Id
   )(using Transaction[F]): F[Option[GhostStaticConfig]]
 
-  def selectStaticOrDefault(
-    observationId: Observation.Id
-  )(using Transaction[F]): F[Option[GhostStaticConfig]]
-
 object GhostSequenceService:
 
   def instantiate[F[_]: Concurrent](using Services[F]): GhostSequenceService[F] =
@@ -63,18 +56,6 @@ object GhostSequenceService:
         observationId: Observation.Id
       )(using Transaction[F]): F[Option[GhostStaticConfig]] =
         session.option(Statements.SelectStatic)(observationId)
-
-      private def defaultStatic: F[Option[GhostStaticConfig]] =
-        // Placeholder
-        GhostStaticConfig(GhostResolutionMode.Standard, none).some.pure[F]
-
-      override def selectStaticOrDefault(
-        observationId: Observation.Id
-      )(using Transaction[F]): F[Option[GhostStaticConfig]] =
-        for
-          s0 <- selectStatic(observationId)
-          s1 <- s0.fold(defaultStatic)(_.some.pure[F])
-        yield s1
 
   object Statements:
 
@@ -108,6 +89,21 @@ object GhostSequenceService:
         INSERT INTO t_ghost_static (
           c_observation_id,
           c_resolution_mode,
+          c_ifu_mapping,
+          c_ifu1_ra,
+          c_ifu1_dec,
+          c_ifu1_epoch,
+          c_ifu1_pm_ra,
+          c_ifu1_pm_dec,
+          c_ifu1_rv,
+          c_ifu1_parallax,
+          c_ifu2_ra,
+          c_ifu2_dec,
+          c_ifu2_epoch,
+          c_ifu2_pm_ra,
+          c_ifu2_pm_dec,
+          c_ifu2_rv,
+          c_ifu2_parallax,
           c_slit_viewing_camera_exposure_time
         )
         SELECT
@@ -121,6 +117,21 @@ object GhostSequenceService:
       sql"""
         SELECT
           c_resolution_mode,
+          c_ifu_mapping,
+          c_ifu1_ra,
+          c_ifu1_dec,
+          c_ifu1_epoch,
+          c_ifu1_pm_ra,
+          c_ifu1_pm_dec,
+          c_ifu1_rv,
+          c_ifu1_parallax,
+          c_ifu2_ra,
+          c_ifu2_dec,
+          c_ifu2_epoch,
+          c_ifu2_pm_ra,
+          c_ifu2_pm_dec,
+          c_ifu2_rv,
+          c_ifu2_parallax,
           c_slit_viewing_camera_exposure_time
         FROM t_ghost_static
         WHERE c_observation_id = $observation_id

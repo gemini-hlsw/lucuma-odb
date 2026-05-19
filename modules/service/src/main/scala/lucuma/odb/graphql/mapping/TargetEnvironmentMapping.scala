@@ -146,11 +146,11 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
     val readEnv: Env => Result[Unit] = _ => ().success
 
     val calculate: (Program.Id, Observation.Id, Unit) => F[Result[GuideService.GuideEnvironment]] =
-      (pid, oid, _) =>
+      (_, oid, _) =>
         services.use { implicit s =>
           Services.asSuperUser:
             s.guideService
-              .getGuideEnvironment(pid, oid)
+              .getGuideEnvironment(oid)
         }
 
     effectHandler(readEnv, calculate)

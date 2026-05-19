@@ -78,7 +78,6 @@ trait AsterismService[F[_]] {
   )(using Transaction[F], SuperUserAccess): F[Unit]
 
   def getAsterism(
-    programId: Program.Id,
     observationId: Observation.Id
   )(using SuperUserAccess): F[List[(Target.Id, Target)]]
 
@@ -188,10 +187,9 @@ object AsterismService {
         }
 
       override def getAsterism(
-        programId: Program.Id,
         observationId: Observation.Id
       )(using SuperUserAccess): F[List[(Target.Id, Target)]] =
-        val af = Statements.getAsterism(programId, observationId)
+        val af = Statements.getAsterism(observationId)
         session.prepareR(af.fragment.query(Decoders.targetDecoder)).use { ps =>
           ps.stream(af.argument, chunkSize = 1024).compile.toList
         }
@@ -301,7 +299,7 @@ object AsterismService {
         AND t_target.c_existence = 'present' -- don't clone references to deleted targets
       """.apply(newOid, originalOid)
 
-    def getAsterism(pid: Program.Id, oid: Observation.Id): AppliedFragment =
+    def getAsterism(oid: Observation.Id): AppliedFragment =
       sql"""
         select
           t.c_target_id,
@@ -327,11 +325,10 @@ object AsterismService {
           c_source_profile
         from t_target t
         inner join t_asterism_target a
-        on t.c_target_id = a.c_target_id
-          and a.c_program_id = $program_id
-          and a.c_observation_id = $observation_id
+                on t.c_target_id      = a.c_target_id
+               and a.c_observation_id = $observation_id
         where t.c_existence = 'present'
-      """.apply(pid, oid)
+      """.apply(oid)
 
     def getAsterisms[A <: NonEmptyList[Observation.Id]](enc: Encoder[A]): Query[A, (Observation.Id, (Target.Id, Target))] =
       sql"""

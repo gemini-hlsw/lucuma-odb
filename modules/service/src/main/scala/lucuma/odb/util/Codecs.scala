@@ -543,7 +543,7 @@ trait Codecs {
     )
 
   val coordinates: Codec[Coordinates] =
-    (right_ascension *: declination).imap(Coordinates.apply)(c => (c.ra, c.dec))
+    (right_ascension *: declination).to[Coordinates]
 
   val siderealTrackingDecoder: Decoder[SiderealTracking] =
     (right_ascension *: declination *: epoch *: proper_motion_ra.opt *: proper_motion_dec.opt *: radial_velocity.opt *: parallax.opt).emap {
@@ -825,6 +825,32 @@ trait Codecs {
         case PartnerLinkType.HasUnspecifiedPartner => PartnerLink.HasUnspecifiedPartner.asRight
       }
     } { pl => (pl.linkType, pl.partnerOption) }
+
+  val pos_angle_constraint: Codec[PosAngleConstraint] =
+    (pac_mode *: angle_µas).imap { (m, a) =>
+      m.toPosAngleConstraint(a)
+    } {
+      case PosAngleConstraint.Unbounded              => (PosAngleConstraintMode.Unbounded,           Angle.Angle0)
+      case PosAngleConstraint.Fixed(a)               => (PosAngleConstraintMode.Fixed,               a)
+      case PosAngleConstraint.AllowFlip(a)           => (PosAngleConstraintMode.AllowFlip,           a)
+      case PosAngleConstraint.AverageParallactic     => (PosAngleConstraintMode.AverageParallactic,  Angle.Angle0)
+      case PosAngleConstraint.ParallacticOverride(a) => (PosAngleConstraintMode.ParallacticOverride, a)
+    }
+
+  val proper_motion: Codec[ProperMotion] =
+    (
+      proper_motion_ra *:
+      proper_motion_dec
+    ).to[ProperMotion]
+
+  val sidereal_tracking: Codec[SiderealTracking] =
+    (
+      coordinates         *:
+      epoch               *:
+      proper_motion.opt   *:
+      radial_velocity.opt *:
+      parallax.opt
+    ).to[SiderealTracking]
 
   val step_config_gcal: Codec[StepConfig.Gcal] =
     (gcal_continuum.opt *:

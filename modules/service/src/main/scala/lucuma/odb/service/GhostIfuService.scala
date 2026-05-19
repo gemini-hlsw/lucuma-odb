@@ -7,6 +7,7 @@ import cats.Order.catsKernelOrderingForOrder
 import cats.data.NonEmptyList
 import cats.effect.Concurrent
 import cats.syntax.applicative.*
+import cats.syntax.either.*
 import cats.syntax.eq.*
 import cats.syntax.flatMap.*
 import cats.syntax.foldable.*
@@ -17,19 +18,23 @@ import grackle.ResultT
 import lucuma.core.enums.GhostBinning
 import lucuma.core.enums.GhostReadMode
 import lucuma.core.enums.GhostResolutionMode
-import lucuma.core.math.Coordinates
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.Observation
+import lucuma.core.model.sequence.ghost.GhostStaticConfig
+import lucuma.core.util.Timestamp
 import lucuma.odb.data.ExposureTimeModeId
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.input.GhostIfuInput
 import lucuma.odb.sequence.ghost.DetectorConfig
 import lucuma.odb.sequence.ghost.ifu.Config
+import lucuma.odb.sequence.ghost.ifu.StaticContext
+import lucuma.odb.sequence.ghost.ifu.GhostStaticConfigSyntax.*
 import lucuma.odb.syntax.exposureTimeMode.*
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.GhostCodecs.*
 import skunk.*
+import skunk.codec.temporal.timestamptz
 import skunk.data.Completion
 import skunk.implicits.*
 
@@ -60,6 +65,10 @@ trait GhostIfuService[F[_]]:
     newId:      Observation.Id,
     etms:       List[(ExposureTimeModeId, ExposureTimeModeId)]
   )(using Transaction[F]): F[Unit]
+
+  def computeStatic(
+    observationId: Observation.Id
+  ): F[Either[OdbError, GhostStaticConfig]]
 
 object GhostIfuService:
   enum Channel:
@@ -201,6 +210,20 @@ object GhostIfuService:
             case _                    =>
               Concurrent[F].raiseError(new RuntimeException(s"Could not clone Ghost IFU observing mode $originalId, $newId"))
 
+      override def computeStatic(
+        observationId: Observation.Id
+      ): F[Either[OdbError, GhostStaticConfig]] =
+        for
+          c <- session.option(Statements.SelectStaticContext)(observationId)
+          a <- Services.asSuperUser(asterismService.getAsterism(observationId))
+        yield
+          Either
+            .fromOption(c, OdbError.InvalidArgument(s"Observation '$observationId' not found, or not a GHOST observation.".some))
+            .flatMap: ctx =>
+              GhostStaticConfig
+                .derive(ctx, a.map(_._2))
+                .leftMap(s => OdbError.InvalidArgument(s"Could not compute GHOST IFU mapping: $s".some))
+
   object Statements:
 
     val ghost_detector: Decoder[DetectorConfig] =
@@ -230,7 +253,7 @@ object GhostIfuService:
         ghost_resolution_mode         *:
         ghost_detector_red            *:
         ghost_detector_blue           *:
-        (right_ascension *: declination).to[Coordinates].opt *:
+        coordinates.opt               *:
         time_span.opt                 *:
         ghost_ifu1_fiber_agitator.opt *:
         ghost_ifu2_fiber_agitator.opt
@@ -484,3 +507,35 @@ object GhostIfuService:
         void"UPDATE t_ghost_ifu " |+|
           void"SET " |+| us.intercalate(void", ") |+| void" " |+|
           void"WHERE " |+| observationIdIn(os)
+
+    val SelectStaticContext: Query[Observation.Id, StaticContext] =
+      sql"""
+        SELECT
+          g.c_resolution_mode,
+          g.c_sky_ra,
+          g.c_sky_dec,
+          g.c_slit_viewing_camera_exposure_time,
+          CURRENT_TIMESTAMP(6),
+          o.c_observation_time,
+          o.c_pac_mode,
+          o.c_pac_angle,
+          o.c_explicit_ra,
+          o.c_explicit_dec
+        FROM
+          t_ghost_ifu g
+        INNER JOIN
+          t_observation o ON o.c_observation_id = g.c_observation_id
+        WHERE
+          g.c_observation_id = $observation_id
+      """
+        .query(
+          ghost_resolution_mode *:
+          coordinates.opt       *:
+          time_span.opt         *:
+          timestamptz(6)        *:
+          core_timestamp.opt    *:
+          pos_angle_constraint  *:
+          coordinates.opt
+        ).map: (resMode, sky, svcExpTime, now, obsTime, pac, explicitBase) =>
+          val nowTimestamp = Timestamp.unsafeFromInstantTruncated(now.toInstant)
+          StaticContext(resMode, sky, nowTimestamp, obsTime, pac, explicitBase, svcExpTime)
