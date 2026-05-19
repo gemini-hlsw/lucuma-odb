@@ -1,10 +1,9 @@
 // Copyright (c) 2016-2025 Association of Universities for Research in Astronomy, Inc. (AURA)
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
-package lucuma.itc.binding
+package lucuma.odb.graphql.binding
 
-import lucuma.core.enums.GnirsGrating
-import lucuma.odb.graphql.binding.*
+import lucuma.core.enums.GnirsFilter
 
-val GnirsGratingBinding: Matcher[GnirsGrating] =
+val GnirsFilterBinding: Matcher[GnirsFilter] =
   enumeratedBinding

@@ -14,6 +14,7 @@ import lucuma.odb.graphql.table.GhostDynamicTable
 import lucuma.odb.graphql.table.GhostIfuView
 import lucuma.odb.graphql.table.GhostStaticView
 import lucuma.odb.graphql.table.GmosDynamicTables
+import lucuma.odb.graphql.table.GnirsLongSlitView
 import lucuma.odb.graphql.table.GroupView
 import lucuma.odb.graphql.table.Igrins2DynamicTable
 import lucuma.odb.graphql.table.ObservationView
@@ -30,6 +31,7 @@ trait TimeSpanMapping[F[_]] extends AllocationTable[F]
                                with ExposureTimeModeView[F]
                                with Flamingos2DynamicView[F]
                                with GhostDynamicTable[F]
+                               with GnirsLongSlitView[F]
                                with GhostIfuView[F]
                                with GhostStaticView[F]
                                with GmosDynamicTables[F]
@@ -63,6 +65,7 @@ trait TimeSpanMapping[F[_]] extends AllocationTable[F]
       timeSpanMappingAtPath(StepRecordType / "ghost" / "blue" / "exposureTime", GhostDynamicTable.Blue.ExposureTime)(GhostDynamicTable.Id),
       timeSpanMappingAtPath(StepRecordType / "gmosNorth" / "exposure", GmosNorthDynamicTable.ExposureTime)(GmosNorthDynamicTable.Id),
       timeSpanMappingAtPath(StepRecordType / "gmosSouth" / "exposure", GmosSouthDynamicTable.ExposureTime)(GmosSouthDynamicTable.Id),
+      timeSpanMappingAtPath(GnirsLongSlitAcquisitionType / "exposureTime", GnirsLongSlitView.AcqExpTime)(GnirsLongSlitView.ObservationId),
       timeSpanMappingAtPath(StepRecordType / "igrins2" / "exposure", Igrins2DynamicTable.ExposureTime)(Igrins2DynamicTable.Id),
       timeSpanMappingAtPath(TimeAndCountExposureTimeModeType / "time", TimeAndCount.Time)(TimeAndCount.SyntheticId),
       timeSpanMappingAtPath(TimeChargeCorrectionType / "amount", TimeChargeCorrectionTable.Amount)(TimeChargeCorrectionTable.Id),

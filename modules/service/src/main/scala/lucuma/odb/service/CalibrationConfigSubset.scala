@@ -37,6 +37,7 @@ import lucuma.odb.sequence.flamingos2.longslit.Config as Flamingos2Config
 import lucuma.odb.sequence.ghost.ifu.Config as GhostConfig
 import lucuma.odb.sequence.gmos.imaging.Config as ImagingConfig
 import lucuma.odb.sequence.gmos.longslit.Config
+import lucuma.odb.sequence.gnirs.longslit.Config as GnirsLongSlitConfig
 import lucuma.odb.sequence.igrins2.longslit.Config as Igrins2Config
 import lucuma.odb.sequence.visitor.Config as VisitorConfig
 
@@ -51,6 +52,10 @@ object CalibrationConfigSubset:
   // TODO: What do we need here?
   case object GhostConfigs extends CalibrationConfigSubset derives Eq:
     def modeType: ObservingModeType = ObservingModeType.GhostIfu
+
+  // TODO: What do we need here?
+  case object GnirsLongSlitConfigs extends CalibrationConfigSubset derives Eq:
+    def modeType: ObservingModeType = ObservingModeType.GnirsLongSlit
 
   sealed trait Gmos[G, L, U] extends CalibrationConfigSubset:
     def grating:           G
@@ -102,6 +107,7 @@ object CalibrationConfigSubset:
         none,
         none,
         none,
+        none,
         none
       )
 
@@ -127,6 +133,7 @@ object CalibrationConfigSubset:
         none,
         none,
         GmosLongSlitInput.Create.South(grating, filter, fpu, longSlitCommonInput, none).some,
+        none,
         none,
         none
       )
@@ -168,6 +175,7 @@ object CalibrationConfigSubset:
         none,
         none,
         none,
+        none,
         none
       )
 
@@ -199,6 +207,7 @@ object CalibrationConfigSubset:
         ).some,
         none,
         none,
+        none,
         none
       )
 
@@ -219,6 +228,7 @@ object CalibrationConfigSubset:
         none,
         none,
         none,
+        none,
         none
       )
 
@@ -228,12 +238,14 @@ object CalibrationConfigSubset:
   extension (mode: ObservingMode)
     def toConfigSubset: CalibrationConfigSubset =
       mode match
-
         case v: VisitorConfig =>
           VisitorConfigSubset(v)
 
         case _: GhostConfig =>
           GhostConfigs
+
+        case _: GnirsLongSlitConfig =>
+          GnirsLongSlitConfigs
 
         case gn: Config.GmosNorth =>
           GmosNConfigs(

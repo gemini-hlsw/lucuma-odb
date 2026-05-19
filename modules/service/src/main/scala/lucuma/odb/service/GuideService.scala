@@ -72,6 +72,7 @@ import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.sequence.flamingos2
 import lucuma.odb.sequence.ghost
 import lucuma.odb.sequence.gmos
+import lucuma.odb.sequence.gnirs
 import lucuma.odb.sequence.igrins2
 import lucuma.odb.sequence.syntax.hash.*
 import lucuma.odb.sequence.util.HashBytes
@@ -294,6 +295,8 @@ object GuideService {
           (Site.GS, ObservingModeType.GmosSouthImaging, filters.map(_.filter.wavelength).maximum)
         case mode: gmos.longslit.Config.GmosSouth =>
           (Site.GS, ObservingModeType.GmosSouthLongSlit, mode.centralWavelength)
+        case mode: gnirs.longslit.Config =>
+          (Site.GN, ObservingModeType.GnirsLongSlit, mode.centralWavelength)
         case _: igrins2.longslit.Config =>
           (Site.GN, ObservingModeType.Igrins2LongSlit, Igrins2CentralWavelength)
         case visitor.Config(mode, wavelength, _, _, _) =>
