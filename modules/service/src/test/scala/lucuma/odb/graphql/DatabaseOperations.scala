@@ -807,6 +807,9 @@ trait DatabaseOperations { this: OdbSuite =>
     ): IO[Observation.Id] =
     createObservationWithSpatialOffsets(user, pid, ObservingModeType.Flamingos2LongSlit, iq, offsets, tids*)
 
+  def createGnirsLongSlitObservationAs(user: User, pid: Program.Id, tids: Target.Id*): IO[Observation.Id] =
+    createObservationWithSpatialOffsets(user, pid, ObservingModeType.GnirsLongSlit, ImageQuality.Preset.PointEight, None, tids*)
+
   def createIgrins2LongSlitObservationAs(user: User, pid: Program.Id, tids: Target.Id*): IO[Observation.Id] =
     createObservationWithSpatialOffsets(user, pid, ObservingModeType.Igrins2LongSlit, ImageQuality.Preset.PointEight, None, tids*)
 
@@ -1035,7 +1038,15 @@ trait DatabaseOperations { this: OdbSuite =>
             }
           }"""
       case ObservingModeType.GnirsLongSlit =>
-        ??? // TODO implement Gnirs
+        """{
+          spectroscopy: {
+            wavelength: { nanometers: 2200 }
+            resolution: 1000
+            wavelengthCoverage: { nanometers: 200 }
+            focalPlane: SINGLE_SLIT
+            focalPlaneAngle: { microarcseconds: 0 }
+          }
+        }"""
       case ObservingModeType.Igrins2LongSlit =>
         """{
           spectroscopy: {
@@ -1113,7 +1124,23 @@ trait DatabaseOperations { this: OdbSuite =>
           }
         }"""
       case ObservingModeType.GnirsLongSlit =>
-        ??? // TODO implement Gnirs
+        """{
+          gnirsLongSlit: {
+            grating: D111
+            prism: MIRROR
+            camera: SHORT_BLUE
+            fpu: LONG_SLIT_0_30
+            centralWavelength: { nanometers: 2200 }
+            filter: K
+            exposureTimeMode: {
+              timeAndCount: {
+                time: { seconds: 30.0 }
+                count: 3
+                at: { nanometers: 2200 }
+              }
+            }
+          }
+        }"""
       case ObservingModeType.Igrins2LongSlit =>
         """{
           igrins2LongSlit: {
@@ -1239,6 +1266,24 @@ trait DatabaseOperations { this: OdbSuite =>
                   count: 2
                   at: { nanometers: 500 }
                 }
+              }
+            }
+          }
+        }"""
+      case ObservingModeType.GnirsLongSlit =>
+        """{
+          gnirsLongSlit: {
+            grating: D111
+            prism: MIRROR
+            camera: SHORT_BLUE
+            fpu: LONG_SLIT_0_30
+            centralWavelength: { nanometers: 2200 }
+            filter: ORDER3
+            exposureTimeMode: {
+              timeAndCount: {
+                time: { seconds: 30.0 }
+                count: 3
+                at: { nanometers: 2200 }
               }
             }
           }

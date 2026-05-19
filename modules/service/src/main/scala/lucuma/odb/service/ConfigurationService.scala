@@ -39,6 +39,7 @@ import lucuma.odb.json.configurationrequest.query.given
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.Flamingos2Codecs.*
 import lucuma.odb.util.GmosCodecs.*
+import lucuma.odb.util.GnirsCodecs.*
 import skunk.AppliedFragment
 import skunk.Query
 import skunk.Transaction
@@ -344,6 +345,11 @@ object ConfigurationService {
                     flamingos2LongSlit {
                       disperser
                     }
+                    gnirsLongSlit {
+                      grating
+                      camera
+                      prism
+                    }
                     visitor {
                       mode
                       radius {
@@ -410,6 +416,10 @@ object ConfigurationService {
                         }
                         flamingos2LongSlit {
                           disperser
+                        }
+                        gnirsLongSlit {
+                          camera
+                          prism
                         }
                         visitor {
                           mode
@@ -511,6 +521,10 @@ object ConfigurationService {
                   flamingos2LongSlit {
                     disperser
                   }
+                  gnirsLongSlit {
+                    camera
+                    prism
+                  }
                   visitor {
                     mode
                     radius {
@@ -579,6 +593,11 @@ object ConfigurationService {
                       }
                       flamingos2LongSlit {
                         disperser
+                      }
+                      gnirsLongSlit {
+                        grating
+                        camera
+                        prism
                       }
                       visitor {
                         mode
@@ -677,6 +696,11 @@ object ConfigurationService {
                     flamingos2LongSlit {
                       disperser
                     }
+                    gnirsLongSlit {
+                      grating
+                      camera
+                      prism
+                    }
                     visitor {
                       mode
                       radius {
@@ -723,6 +747,10 @@ object ConfigurationService {
                           }
                           flamingos2LongSlit {
                             disperser
+                          }
+                          gnirsLongSlit {
+                            camera
+                            prism
                           }
                           visitor {
                             mode
@@ -795,6 +823,11 @@ object ConfigurationService {
                     flamingos2LongSlit {
                       disperser
                     }
+                    gnirsLongSlit {
+                      grating
+                      camera
+                      prism
+                    }
                     visitor {
                       mode
                       radius {
@@ -838,6 +871,9 @@ object ConfigurationService {
           c_gmos_south_imaging_filters,
           c_gmos_north_longslit_grating,
           c_gmos_south_longslit_grating,
+          c_gnirs_longslit_grating,
+          c_gnirs_longslit_camera,
+          c_gnirs_longslit_prism,
           c_visitor_radius
         FROM v_configuration_request
         WHERE (
@@ -860,6 +896,9 @@ object ConfigurationService {
           COALESCE(c_gmos_south_imaging_filters, '{}'::_d_tag) @> COALESCE(${_gmos_south_filter.opt}, '{}'::_d_tag) AND
           c_gmos_north_longslit_grating is not distinct from ${gmos_north_grating.opt} AND
           c_gmos_south_longslit_grating is not distinct from ${gmos_south_grating.opt} AND
+          c_gnirs_longslit_grating is not distinct from ${gnirs_grating.opt} AND
+          c_gnirs_longslit_camera is not distinct from ${gnirs_camera.opt} AND
+          c_gnirs_longslit_prism  is not distinct from ${gnirs_prism.opt} AND
           c_visitor_radius is not distinct from ${angle_µas.opt}
         )
       """.query(
@@ -885,6 +924,9 @@ object ConfigurationService {
           _gmos_south_filter.opt       *:
           gmos_north_grating.opt       *:
           gmos_south_grating.opt       *:
+          gnirs_grating.opt            *:
+          gnirs_camera.opt             *:
+          gnirs_prism.opt              *:
           angle_µas.opt
         ).emap:
           { case
@@ -909,34 +951,40 @@ object ConfigurationService {
             gmosSouthImagingFilters  *:
             gmosNorthLongSlitGrating *:
             gmosSouthLongSlitGrating *:
+            gnirsLongSlitGrating     *:
+            gnirsLongSlitCamera      *:
+            gnirsLongSlitPrism       *:
             visitorRadius            *:
             EmptyTuple =>
 
               val mode: Either[String, Configuration.ObservingMode] =
-                (observingModeType, flamingos2Disperser, gmosNorthImagingFilters, gmosSouthImagingFilters, gmosNorthLongSlitGrating, gmosSouthLongSlitGrating, visitorRadius) match
+                (observingModeType, flamingos2Disperser, gmosNorthImagingFilters, gmosSouthImagingFilters, gmosNorthLongSlitGrating, gmosSouthLongSlitGrating, gnirsLongSlitGrating, gnirsLongSlitCamera, gnirsLongSlitPrism, visitorRadius) match
 
-                  case (ObservingModeType.Flamingos2LongSlit, Some(d), _, _, _, _, _) =>
+                  case (ObservingModeType.Flamingos2LongSlit, Some(d), _, _, _, _, _, _, _, _) =>
                     Right(Configuration.ObservingMode.Flamingos2LongSlit(d))
 
-                  case (ObservingModeType.GmosNorthImaging, _, Some(fs), _, _, _, _) =>
+                  case (ObservingModeType.GmosNorthImaging, _, Some(fs), _, _, _, _, _, _, _) =>
                     Right(Configuration.ObservingMode.GmosNorthImaging(fs.toList))
 
-                  case (ObservingModeType.GmosSouthImaging, _, _, Some(fs), _, _, _) =>
+                  case (ObservingModeType.GmosSouthImaging, _, _, Some(fs), _, _, _, _, _, _) =>
                     Right(Configuration.ObservingMode.GmosSouthImaging(fs.toList))
 
-                  case (ObservingModeType.GmosNorthLongSlit, _, _, _, Some(g), _, _) =>
+                  case (ObservingModeType.GmosNorthLongSlit, _, _, _, Some(g), _, _, _, _, _) =>
                     Right(Configuration.ObservingMode.GmosNorthLongSlit(g))
 
-                  case (ObservingModeType.GmosSouthLongSlit, _, _, _, _, Some(g), _) =>
+                  case (ObservingModeType.GmosSouthLongSlit, _, _, _, _, Some(g), _, _, _, _) =>
                     Right(Configuration.ObservingMode.GmosSouthLongSlit(g))
 
-                  case (ObservingModeType.Igrins2LongSlit, _, _, _, _, _, _) =>
+                  case (ObservingModeType.Igrins2LongSlit, _, _, _, _, _, _, _, _, _) =>
                     Right(Configuration.ObservingMode.Igrins2LongSlit)
 
-                  case (ObservingModeType.GhostIfu, _, _, _, _, _, _) =>
+                  case (ObservingModeType.GhostIfu, _, _, _, _, _, _, _, _, _) =>
                     Right(Configuration.ObservingMode.GhostIfu)
 
-                  case (m: VisitorObservingModeType, _, _, _, _, _, Some(radius)) =>
+                  case (ObservingModeType.GnirsLongSlit, _, _, _, _, _, Some(grating), Some(cam), Some(prism), _) =>
+                    Right(Configuration.ObservingMode.GnirsLongSlit(grating, cam, prism))
+
+                  case (m: VisitorObservingModeType, _, _, _, _, _, _, _, _, Some(radius)) =>
                     Right(Configuration.ObservingMode.Visitor(m, radius))
 
                   case _ => Left(s"Malformed observing mode for configuration request $configuration_request_id")
@@ -1012,6 +1060,9 @@ object ConfigurationService {
         cfg.observingMode.gmosSouthImaging.map(_.filters).map(Arr.fromFoldable) *:
         cfg.observingMode.gmosNorthLongSlit.map(_.grating)        *:
         cfg.observingMode.gmosSouthLongSlit.map(_.grating)        *:
+        cfg.observingMode.gnirsLongSlit.map(_.grating)            *:
+        cfg.observingMode.gnirsLongSlit.map(_.camera)             *:
+        cfg.observingMode.gnirsLongSlit.map(_.prism)              *:
         cfg.observingMode.visitor.map(_.radius)                   *:
         EmptyTuple
       }
@@ -1040,6 +1091,9 @@ object ConfigurationService {
           c_gmos_south_imaging_filters,
           c_gmos_north_longslit_grating,
           c_gmos_south_longslit_grating,
+          c_gnirs_longslit_grating,
+          c_gnirs_longslit_camera,
+          c_gnirs_longslit_prism,
           c_visitor_radius
         ) VALUES (
           (select c_program_id from t_observation where c_observation_id = $observation_id),
@@ -1062,6 +1116,9 @@ object ConfigurationService {
           ${_gmos_south_filter.opt},
           ${gmos_north_grating.opt},
           ${gmos_south_grating.opt},
+          ${gnirs_grating.opt},
+          ${gnirs_camera.opt},
+          ${gnirs_prism.opt},
           ${angle_µas.opt}
         )
         ON CONFLICT DO NOTHING
@@ -1087,6 +1144,9 @@ object ConfigurationService {
           c_gmos_south_imaging_filters,
           c_gmos_north_longslit_grating,
           c_gmos_south_longslit_grating,
+          c_gnirs_longslit_grating,
+          c_gnirs_longslit_camera,
+          c_gnirs_longslit_prism,
           c_visitor_radius
       """.query(
         (
@@ -1111,6 +1171,9 @@ object ConfigurationService {
           _gmos_south_filter.opt       *:
           gmos_north_grating.opt       *:
           gmos_south_grating.opt       *:
+          gnirs_grating.opt            *:
+          gnirs_camera.opt             *:
+          gnirs_prism.opt              *:
           angle_µas.opt
         ).emap:
           { case
@@ -1135,34 +1198,40 @@ object ConfigurationService {
             gmosSouthFilters         *:
             gmosNorthLongSlitGrating *:
             gmosSouthLongSlitGrating *:
+            gnirsLongSlitGrating     *:
+            gnirsLongSlitCamera      *:
+            gnirsLongSlitPrism       *:
             visitorRadius            *:
             EmptyTuple =>
 
               val mode: Either[String, Configuration.ObservingMode] =
-                (observingModeType, flamingos2LongSlitDisperser, gmosNorthFilters, gmosSouthFilters, gmosNorthLongSlitGrating, gmosSouthLongSlitGrating, visitorRadius) match
+                (observingModeType, flamingos2LongSlitDisperser, gmosNorthFilters, gmosSouthFilters, gmosNorthLongSlitGrating, gmosSouthLongSlitGrating, gnirsLongSlitGrating, gnirsLongSlitCamera, gnirsLongSlitPrism, visitorRadius) match
 
-                  case (ObservingModeType.Flamingos2LongSlit, Some(d), _, _, _, _, _) =>
+                  case (ObservingModeType.Flamingos2LongSlit, Some(d), _, _, _, _, _, _, _, _) =>
                     Right(Configuration.ObservingMode.Flamingos2LongSlit(d))
 
-                  case (ObservingModeType.GmosNorthImaging, _, Some(fs), _, _, _, _) =>
+                  case (ObservingModeType.GmosNorthImaging, _, Some(fs), _, _, _, _, _, _, _) =>
                     Right(Configuration.ObservingMode.GmosNorthImaging(fs.toList))
 
-                  case (ObservingModeType.GmosSouthImaging, _, _, Some(fs), _, _, _) =>
+                  case (ObservingModeType.GmosSouthImaging, _, _, Some(fs), _, _, _, _, _, _) =>
                     Right(Configuration.ObservingMode.GmosSouthImaging(fs.toList))
 
-                  case (ObservingModeType.GmosNorthLongSlit, _, _, _, Some(g), _, _) =>
+                  case (ObservingModeType.GmosNorthLongSlit, _, _, _, Some(g), _, _, _, _, _) =>
                     Right(Configuration.ObservingMode.GmosNorthLongSlit(g))
 
-                  case (ObservingModeType.GmosSouthLongSlit, _, _, _, _, Some(g), _) =>
+                  case (ObservingModeType.GmosSouthLongSlit, _, _, _, _, Some(g), _, _, _, _) =>
                     Right(Configuration.ObservingMode.GmosSouthLongSlit(g))
 
-                  case (ObservingModeType.GhostIfu, _, _, _, _, _, _) =>
+                  case (ObservingModeType.GhostIfu, _, _, _, _, _, _, _, _, _) =>
                     Right(Configuration.ObservingMode.GhostIfu)
 
-                  case (ObservingModeType.Igrins2LongSlit, _, _, _, _, _, _) =>
+                  case (ObservingModeType.Igrins2LongSlit, _, _, _, _, _, _, _, _, _) =>
                     Right(Configuration.ObservingMode.Igrins2LongSlit)
 
-                  case (m: VisitorObservingModeType, _, _, _, _, _, Some(radius)) =>
+                  case (ObservingModeType.GnirsLongSlit, _, _, _, _, _, Some(grating), Some(cam), Some(prism), _) =>
+                    Right(Configuration.ObservingMode.GnirsLongSlit(grating, cam, prism))
+
+                  case (m: VisitorObservingModeType, _, _, _, _, _, _, _, _, Some(radius)) =>
                     Right(Configuration.ObservingMode.Visitor(m, radius))
 
                   case _ => Left(s"Malformed observing mode for configuration request $configuration_request_id")
@@ -1239,6 +1308,9 @@ object ConfigurationService {
         cfg.observingMode.gmosSouthImaging.map(_.filters).map(Arr.fromFoldable) *:
         cfg.observingMode.gmosNorthLongSlit.map(_.grating)        *:
         cfg.observingMode.gmosSouthLongSlit.map(_.grating)        *:
+        cfg.observingMode.gnirsLongSlit.map(_.grating)            *:
+        cfg.observingMode.gnirsLongSlit.map(_.camera)             *:
+        cfg.observingMode.gnirsLongSlit.map(_.prism)              *:
         cfg.observingMode.visitor.map(_.radius)                   *:
         EmptyTuple
       }

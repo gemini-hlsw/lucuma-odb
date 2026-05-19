@@ -14,6 +14,7 @@ import lucuma.odb.sequence.gmos.imaging.Config.GmosNorth as GmosNorthImaging
 import lucuma.odb.sequence.gmos.imaging.Config.GmosSouth as GmosSouthImaging
 import lucuma.odb.sequence.gmos.longslit.Config.GmosNorth as GmosNorthLongSlit
 import lucuma.odb.sequence.gmos.longslit.Config.GmosSouth as GmosSouthLongSlit
+import lucuma.odb.sequence.gnirs.longslit.Config as GnirsLongSlit
 import lucuma.odb.sequence.igrins2.longslit.Config as Igrins2LongSlit
 import lucuma.odb.sequence.syntax.all.hashBytes
 import lucuma.odb.sequence.util.HashBytes
@@ -29,6 +30,7 @@ type ObservingMode =
   GmosNorthLongSlit  |
   GmosSouthImaging   |
   GmosSouthLongSlit  |
+  GnirsLongSlit      |
   Igrins2LongSlit    |
   Visitor
 
@@ -40,6 +42,7 @@ object ObservingMode:
   val GmosNorthLongSlitName: String  = "GMOS North Long Slit"
   val GmosSouthImagingName: String   = "GMOS South Imaging"
   val GmosSouthLongSlitName: String  = "GMOS South Long Slit"
+  val GnirsLongSlitName: String      = "GNIRS Long Slit"
   val Igrins2LongSlitName: String    = "IGRINS-2 Long Slit"
 
   object Instances:
@@ -51,6 +54,7 @@ object ObservingMode:
         case (a: GmosSouthLongSlit,  b: GmosSouthLongSlit)  => a === b
         case (a: GmosNorthImaging,   b: GmosNorthImaging)   => a === b
         case (a: GmosSouthImaging,   b: GmosSouthImaging)   => a === b
+        case (a: GnirsLongSlit,      b: GnirsLongSlit)      => a === b
         case (a: Igrins2LongSlit,    b: Igrins2LongSlit)    => a === b
         case _                                               => false
 
@@ -61,6 +65,7 @@ object ObservingMode:
       case gsl: GmosSouthLongSlit  => gsl.hashBytes
       case gni: GmosNorthImaging   => gni.hashBytes
       case gsi: GmosSouthImaging   => gsi.hashBytes
+      case gns: GnirsLongSlit      => gns.hashBytes
       case ig2: Igrins2LongSlit    => ig2.hashBytes
       case vis: Visitor            => vis.hashBytes
 
@@ -74,6 +79,7 @@ object ObservingMode:
           case _: GmosNorthLongSlit  => Instrument.GmosNorth
           case _: GmosSouthImaging   => Instrument.GmosSouth
           case _: GmosSouthLongSlit  => Instrument.GmosSouth
+          case _: GnirsLongSlit      => Instrument.Gnirs
           case _: Igrins2LongSlit    => Instrument.Igrins2
           case v: Visitor            => v.mode.instrument
 
@@ -85,6 +91,7 @@ object ObservingMode:
           case _: GmosNorthLongSlit  => GmosNorthLongSlitName
           case _: GmosSouthImaging   => GmosSouthImagingName
           case _: GmosSouthLongSlit  => GmosSouthLongSlitName
+          case _: GnirsLongSlit      => GnirsLongSlitName
           case _: Igrins2LongSlit    => Igrins2LongSlitName
           case v: Visitor            => v.mode.tag // TODO?
 
@@ -96,6 +103,7 @@ object ObservingMode:
           case _: GmosNorthLongSlit  => ObservingModeType.GmosNorthLongSlit
           case _: GmosSouthImaging   => ObservingModeType.GmosSouthImaging
           case _: GmosSouthLongSlit  => ObservingModeType.GmosSouthLongSlit
+          case _: GnirsLongSlit      => ObservingModeType.GnirsLongSlit
           case _: Igrins2LongSlit    => ObservingModeType.Igrins2LongSlit
           case v: Visitor            => v.mode
 
@@ -128,6 +136,11 @@ object ObservingMode:
         m match
           case a: GmosSouthLongSlit => a.some
           case _                    => none
+
+      def asGnirsLongSlit: Option[GnirsLongSlit] =
+        m match
+          case a: GnirsLongSlit => a.some
+          case _                => none
 
       def asIgrins2LongSlit: Option[Igrins2LongSlit] =
         m match

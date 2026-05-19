@@ -4,10 +4,14 @@
 package lucuma.odb.util
 
 import lucuma.core.enums.GnirsCamera
+import lucuma.core.enums.GnirsDecker
 import lucuma.core.enums.GnirsFilter
 import lucuma.core.enums.GnirsFpuSlit
 import lucuma.core.enums.GnirsGrating
 import lucuma.core.enums.GnirsPrism
+import lucuma.core.enums.GnirsReadMode
+import lucuma.core.enums.GnirsWellDepth
+import lucuma.core.enums.SlitOffsetMode
 import skunk.Codec
 import skunk.data.Type
 
@@ -16,6 +20,9 @@ trait GnirsCodecs:
   import Codecs.enumerated
 
   val gnirs_camera: Codec[GnirsCamera] =
+    enumerated(Type.varchar)
+
+  val gnirs_decker: Codec[GnirsDecker] =
     enumerated(Type.varchar)
 
   val gnirs_filter: Codec[GnirsFilter] =
@@ -28,6 +35,15 @@ trait GnirsCodecs:
     enumerated(Type.varchar)
 
   val gnirs_prism: Codec[GnirsPrism] =
+    enumerated(Type.varchar)
+
+  val gnirs_read_mode: Codec[GnirsReadMode] =
+    enumerated(Type.varchar)
+
+  val gnirs_slit_offset_mode: Codec[SlitOffsetMode] =
+    enumerated(Type.varchar)
+
+  val gnirs_well_depth: Codec[GnirsWellDepth] =
     enumerated(Type.varchar)
 
 object GnirsCodecs extends GnirsCodecs
