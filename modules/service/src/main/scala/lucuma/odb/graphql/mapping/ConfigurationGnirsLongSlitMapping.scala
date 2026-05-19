@@ -19,15 +19,17 @@ trait ConfigurationGnirsLongSlitMappings[F[_]]
   private lazy val ConfigurationGnirsLongSlitMapping: ObjectMapping =
     ObjectMapping(ObservationType / "configuration" / "observingMode" / "gnirsLongSlit")(
       SqlField("observationId", GnirsLongSlitView.ObservationId, key = true, hidden = true),
-      SqlField("camera", GnirsLongSlitView.Camera),
-      SqlField("prism",  GnirsLongSlitView.PrismEffective),
+      SqlField("grating", GnirsLongSlitView.GratingEffective),
+      SqlField("camera",  GnirsLongSlitView.Camera),
+      SqlField("prism",   GnirsLongSlitView.PrismEffective),
     )
 
   private lazy val ConfigurationRequestGnirsLongSlitMapping: ObjectMapping =
     ObjectMapping(ConfigurationRequestType / "configuration" / "observingMode" / "gnirsLongSlit")(
-      SqlField("id",     ConfigurationRequestView.GnirsLongSlit.Id, key = true, hidden = true),
-      SqlField("camera", ConfigurationRequestView.GnirsLongSlit.Camera),
-      SqlField("prism",  ConfigurationRequestView.GnirsLongSlit.Prism),
+      SqlField("id",      ConfigurationRequestView.GnirsLongSlit.Id, key = true, hidden = true),
+      SqlField("grating", ConfigurationRequestView.GnirsLongSlit.Grating),
+      SqlField("camera",  ConfigurationRequestView.GnirsLongSlit.Camera),
+      SqlField("prism",   ConfigurationRequestView.GnirsLongSlit.Prism),
     )
 
 }

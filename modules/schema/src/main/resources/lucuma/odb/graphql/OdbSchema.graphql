@@ -4796,6 +4796,11 @@ input ObservingModeInput @oneOf {
   igrins2LongSlit: Igrins2LongSlitInput
 
   """
+  The gnirsLongSlit field must be either specified or skipped altogether.  It cannot be unset with a null value.
+  """
+  gnirsLongSlit: GnirsLongSlitInput
+
+  """
   A visiting instrument mode. It cannot be unset with a null value.
   """
   visitor: VisitorInput
@@ -6870,6 +6875,11 @@ enum ObservingModeType {
   ObservingModeType GmosSouthLongSlit
   """
   GMOS_SOUTH_LONG_SLIT
+
+  """
+  ObservingModeType GnirsLongSlit
+  """
+  GNIRS_LONG_SLIT
 
   """
   ObservingModeType Igrins2LongSlit
@@ -9192,6 +9202,140 @@ input Igrins2LongSlitInput {
 
 }
 
+type GnirsLongSlitAcquisition {
+  readMode: GnirsReadMode!
+  coadds: PosInt!
+  filter: GnirsFilter!
+  offset: Offset
+  exposureTime: TimeSpan!
+  exposureCount: PosInt!
+  exposureAt: Wavelength!
+}
+
+"""
+GNIRS Long Slit mode
+"""
+type GnirsLongSlit {
+
+  exposureTimeMode: ExposureTimeMode!
+
+  grating: GnirsGrating!
+  explicitGrating: GnirsGrating
+  initialGrating: GnirsGrating!
+
+  prism: GnirsPrism!
+  explicitPrism: GnirsPrism
+  initialPrism: GnirsPrism!
+
+  gratingWavelength: Wavelength!
+  explicitGratingWavelength: Wavelength
+  defaultGratingWavelength: Wavelength!
+
+  camera: GnirsCamera!
+  initialCamera: GnirsCamera!
+
+  fpu: GnirsFpuSlit!
+  initialFpu: GnirsFpuSlit!
+
+  filter: GnirsFilter!
+  initialFilter: GnirsFilter!
+
+  centralWavelength: Wavelength!
+  coadds: PosInt!
+
+  decker: GnirsDecker!
+  explicitDecker: GnirsDecker
+  defaultDecker: GnirsDecker!
+
+  readMode: GnirsReadMode!
+  explicitReadMode: GnirsReadMode
+  defaultReadMode: GnirsReadMode!
+
+  wellDepth: GnirsWellDepth!
+  explicitWellDepth: GnirsWellDepth
+  defaultWellDepth: GnirsWellDepth!
+
+  explicitFocusMotorSteps: Int
+
+  acquisitionMirrorOut: Boolean!
+  defaultAcquisitionMirrorOut: Boolean!
+  explicitAcquisitionMirrorOut: Boolean
+
+  offsetMode: SlitOffsetMode!
+  defaultOffsetMode: SlitOffsetMode!
+  explicitOffsetMode: SlitOffsetMode
+
+  telescopeConfigs: [TelescopeConfig!]!
+  defaultTelescopeConfigs: [TelescopeConfig!]!
+  explicitTelescopeConfigs: [TelescopeConfig!]
+
+  acquisition: GnirsLongSlitAcquisition!
+
+}
+
+input GnirsLongSlitAcquisitionInput {
+  filter: GnirsFilter
+  readMode: GnirsReadMode
+  coadds: PosInt
+  offset: OffsetInput
+  exposureTimeMode: TimeAndCountExposureTimeModeInput
+}
+
+input GnirsAcquisitionMirrorInput {
+  grating: GnirsGrating!
+  prism: GnirsPrism!
+  gratingWavelength: WavelengthInput
+}
+
+input TelescopeConfigAlongSlitInput {
+  q: OffsetComponentInput!
+  guiding: GuideState!
+}
+
+input SlitTelescopeConfigsInput {
+  alongSlit: [TelescopeConfigAlongSlitInput!]
+  onSky: [TelescopeConfigInput!]
+}
+
+"""
+Edit or create GNIRS Long Slit configuration
+"""
+input GnirsLongSlitInput {
+
+  exposureTimeMode: ExposureTimeModeInput
+
+  coadds: PosInt
+
+  centralWavelength: WavelengthInput
+
+  filter: GnirsFilter
+
+  fpu: GnirsFpuSlit
+
+  camera: GnirsCamera
+
+  grating: GnirsGrating
+
+  prism: GnirsPrism
+
+  explicitDecker: GnirsDecker
+
+  explicitGratingWavelength: WavelengthInput
+
+  explicitAcquisitionMirror: GnirsAcquisitionMirrorInput
+
+  explicitFocus: Int
+
+  explicitReadMode: GnirsReadMode
+
+  explicitWellDepth: GnirsWellDepth
+
+  telescopeConfigs: SlitTelescopeConfigsInput
+
+  acquisition: GnirsLongSlitAcquisitionInput
+
+}
+
 """
 Metadata for `enum FilterType`
 """
@@ -11482,6 +11626,15 @@ enum GnirsWellDepth {
   DEEP
 }
 
+enum GnirsDecker {
+  ACQUISITION
+  PUPIL_VIEWER
+  SHORT_CAM_CROSS_DISPERSED
+  LONG_CAM_LONG_SLIT
+  SHORT_CAM_LONG_SLIT
+  LONG_CAM_CROSS_DISPERSED
+}
+
 """
 Edit or create imaging science requirements
 """
@@ -12142,6 +12295,7 @@ type ConfigurationObservingMode {
   gmosNorthImaging: ConfigurationGmosNorthImaging
   gmosSouthImaging: ConfigurationGmosSouthImaging
   flamingos2LongSlit: ConfigurationFlamingos2LongSlit
+  gnirsLongSlit: ConfigurationGnirsLongSlit
   igrins2LongSlit: ConfigurationIgrins2LongSlit
   visitor: ConfigurationVisitor
 }
@@ -12169,6 +12323,12 @@ type ConfigurationGmosSouthImaging {
 
 type ConfigurationFlamingos2LongSlit {
   disperser: Flamingos2Disperser!
+}
+
+type ConfigurationGnirsLongSlit {
+  grating: GnirsGrating!
+  camera: GnirsCamera!
+  prism: GnirsPrism!
 }
 
 type ConfigurationIgrins2LongSlit {
@@ -13408,6 +13568,11 @@ type ObservingMode {
   IGRINS-2 Long Slit mode
   """
   igrins2LongSlit: Igrins2LongSlit
+
+  """
+  GNIRS Long Slit mode
+  """
+  gnirsLongSlit: GnirsLongSlit
 
   visitor: Visitor
 

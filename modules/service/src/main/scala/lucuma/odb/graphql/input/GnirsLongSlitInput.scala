@@ -1,0 +1,207 @@
+// Copyright (c) 2016-2025 Association of Universities for Research in Astronomy, Inc. (AURA)
+// For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
+
+package lucuma.odb.graphql
+package input
+
+import cats.data.NonEmptyList
+import cats.syntax.apply.*
+import cats.syntax.parallel.*
+import eu.timepit.refined.types.numeric.PosInt
+import grackle.Result
+import lucuma.core.enums.GnirsCamera
+import lucuma.core.enums.GnirsDecker
+import lucuma.core.enums.GnirsFilter
+import lucuma.core.enums.GnirsFpuSlit
+import lucuma.core.enums.GnirsGrating
+import lucuma.core.enums.GnirsPrism
+import lucuma.core.enums.GnirsReadMode
+import lucuma.core.enums.GnirsWellDepth
+import lucuma.core.enums.ObservingModeType
+import lucuma.core.enums.StepGuideState
+import lucuma.core.math.Offset
+import lucuma.core.math.Wavelength
+import lucuma.core.model.ExposureTimeMode
+import lucuma.core.model.ExposureTimeMode.TimeAndCountMode
+import lucuma.core.model.SlitTelescopeConfigs
+import lucuma.core.model.sequence.TelescopeConfigAlongSlit
+import lucuma.odb.data.Nullable
+import lucuma.odb.graphql.binding.*
+
+object GnirsLongSlitInput:
+
+  object TelescopeConfigAlongSlitInput:
+    val Binding: Matcher[TelescopeConfigAlongSlit] =
+      ObjectFieldsBinding.rmap:
+        case List(
+          OffsetComponentInput.BindingQ("q", rQ),
+          StepGuideStateBinding("guiding", rGuiding)
+        ) =>
+          (rQ, rGuiding).parMapN(TelescopeConfigAlongSlit.apply)
+
+  object SlitTelescopeConfigsInput:
+    val Binding: Matcher[SlitTelescopeConfigs] =
+      ObjectFieldsBinding.rmap:
+        case List(
+          TelescopeConfigAlongSlitInput.Binding.List.Option("alongSlit", rAlongSlit),
+          TelescopeConfigInput.Binding.List.Option("onSky", rOnSky)
+        ) =>
+          (rAlongSlit, rOnSky).tupled.flatMap:
+            case (Some(cs), None) =>
+              NonEmptyList.fromList(cs).fold(
+                Matcher.validationFailure("alongSlit must not be empty")
+              )(nel => Result(SlitTelescopeConfigs.AlongSlit(nel)))
+            case (None, Some(cs)) =>
+              NonEmptyList.fromList(cs).fold(
+                Matcher.validationFailure("onSky must not be empty")
+              )(nel => Result(SlitTelescopeConfigs.ToSky(nel)))
+            case _ =>
+              Matcher.validationFailure("Exactly one of alongSlit or onSky must be provided")
+
+  object GnirsAcquisitionMirrorInput:
+    val Binding: Matcher[(GnirsGrating, GnirsPrism, Option[Wavelength])] =
+      ObjectFieldsBinding.rmap:
+        case List(
+          GnirsGratingBinding("grating", rGrating),
+          GnirsPrismBinding("prism", rPrism),
+          WavelengthInput.Binding.Option("gratingWavelength", rWavelength)
+        ) =>
+          (rGrating, rPrism, rWavelength).parTupled
+
+  case class AcquisitionInput(
+    filter:           Option[GnirsFilter],
+    readMode:         Option[GnirsReadMode],
+    coadds:           Option[PosInt],
+    offset:           Option[Offset],
+    exposureTimeMode: Option[TimeAndCountMode]
+  )
+
+  object AcquisitionInput:
+    val Binding: Matcher[AcquisitionInput] =
+      ObjectFieldsBinding.rmap:
+        case List(
+          GnirsFilterBinding.Option("filter", rFilter),
+          GnirsReadModeBinding.Option("readMode", rReadMode),
+          PosIntBinding.Option("coadds", rCoadds),
+          OffsetInput.Binding.Option("offset", rOffset),
+          ExposureTimeModeInput.TimeAndCount.Binding.Option("exposureTimeMode", rEtm)
+        ) =>
+          (rFilter, rReadMode, rCoadds, rOffset, rEtm).parMapN(AcquisitionInput.apply)
+
+  val defaultCentralWavelength: Wavelength =
+    Wavelength.unsafeFromIntPicometers(1_650_000)
+
+  def centralWavelengthFromFilter(filter: GnirsFilter): Wavelength =
+    filter.optimalWavelength.getOrElse(defaultCentralWavelength)
+
+  case class Create(
+    exposureTimeMode: Option[ExposureTimeMode],
+    coadds:           Option[PosInt],
+    centralWavelength: Option[Wavelength],
+    filter:           GnirsFilter,
+    fpu:              GnirsFpuSlit,
+    camera:           GnirsCamera,
+    grating:          GnirsGrating,
+    prism:            GnirsPrism,
+    explicitDecker:   Option[GnirsDecker]           = None,
+    explicitGratingWavelength: Option[Wavelength]   = None,
+    explicitAcqMirror: Option[(GnirsGrating, GnirsPrism, Option[Wavelength])] = None,
+    explicitFocusMotorSteps: Option[Int]            = None,
+    explicitReadMode: Option[GnirsReadMode]         = None,
+    explicitWellDepth: Option[GnirsWellDepth]       = None,
+    telescopeConfigs: Option[SlitTelescopeConfigs]  = None,
+    acquisition:      Option[AcquisitionInput]      = None
+  ):
+    def observingModeType: ObservingModeType = ObservingModeType.GnirsLongSlit
+
+  object Create:
+    val Binding: Matcher[Create] =
+      ObjectFieldsBinding.rmap:
+        case List(
+          ExposureTimeModeInput.Binding.Option("exposureTimeMode", rEtm),
+          PosIntBinding.Option("coadds", rCoadds),
+          WavelengthInput.Binding.Option("centralWavelength", rWavelength),
+          GnirsFilterBinding("filter", rFilter),
+          GnirsFpuSlitBinding("fpu", rFpu),
+          GnirsCameraBinding("camera", rCamera),
+          GnirsGratingBinding("grating", rGrating),
+          GnirsPrismBinding("prism", rPrism),
+          GnirsDeckerBinding.Option("explicitDecker", rDecker),
+          WavelengthInput.Binding.Option("explicitGratingWavelength", rGratingWavelength),
+          GnirsAcquisitionMirrorInput.Binding.Option("explicitAcquisitionMirror", rAcqMirror),
+          IntBinding.Option("explicitFocus", rFocus),
+          GnirsReadModeBinding.Option("explicitReadMode", rReadMode),
+          GnirsWellDepthBinding.Option("explicitWellDepth", rWellDepth),
+          SlitTelescopeConfigsInput.Binding.Option("telescopeConfigs", rTelescope),
+          AcquisitionInput.Binding.Option("acquisition", rAcq)
+        ) =>
+          (rEtm, rCoadds, rWavelength, rFilter, rFpu, rCamera, rGrating, rPrism,
+           rDecker, rGratingWavelength, rAcqMirror, rFocus, rReadMode, rWellDepth,
+           rTelescope, rAcq).parMapN:
+            (etm, coadds, wavelength, filter, fpu, camera, grating, prism,
+             decker, gratingWavelength, acqMirror, focus, readMode, wellDepth,
+             telescope, acq) =>
+              Create(etm, coadds, wavelength, filter, fpu, camera, grating, prism,
+                     decker, gratingWavelength, acqMirror, focus, readMode, wellDepth,
+                     telescope, acq)
+
+  case class Edit(
+    exposureTimeMode:  Option[ExposureTimeMode],
+    coadds:            Nullable[PosInt],
+    centralWavelength: Option[Wavelength],
+    filter:            Option[GnirsFilter],
+    fpu:               Option[GnirsFpuSlit],
+    camera:            Option[GnirsCamera],
+    grating:           Nullable[GnirsGrating],
+    prism:             Nullable[GnirsPrism],
+    explicitDecker:    Nullable[GnirsDecker],
+    explicitGratingWavelength: Nullable[Wavelength],
+    explicitAcqMirror: Nullable[(GnirsGrating, GnirsPrism, Option[Wavelength])],
+    explicitFocusMotorSteps: Nullable[Int],
+    explicitReadMode:  Nullable[GnirsReadMode],
+    explicitWellDepth: Nullable[GnirsWellDepth],
+    telescopeConfigs:  Option[SlitTelescopeConfigs],
+    acquisition:       Option[AcquisitionInput]
+  ):
+    def observingModeType: ObservingModeType = ObservingModeType.GnirsLongSlit
+    def updatesAcquisition: Boolean = acquisition.isDefined
+    def limitToPreExecution(access: lucuma.core.model.Access): Boolean = false
+    def toCreate: Result[Create] =
+      def required[A](oa: Option[A], name: String): Result[A] =
+        Result.fromOption(oa, Matcher.validationProblem(s"A $name is required to create a GNIRS Long Slit observing mode."))
+      for
+        f <- required(filter, "filter")
+        u <- required(fpu, "fpu")
+        c <- required(camera, "camera")
+        g <- required(grating.toOption, "grating")
+        p <- required(prism.toOption, "prism")
+      yield Create(exposureTimeMode, coadds.toOption, centralWavelength, f, u, c, g, p,
+                   explicitDecker.toOption, explicitGratingWavelength.toOption,
+                   explicitAcqMirror.toOption, explicitFocusMotorSteps.toOption,
+                   explicitReadMode.toOption, explicitWellDepth.toOption,
+                   telescopeConfigs, acquisition)
+
+  object Edit:
+    val Binding: Matcher[Edit] =
+      ObjectFieldsBinding.rmap:
+        case List(
+          ExposureTimeModeInput.Binding.Option("exposureTimeMode", rEtm),
+          PosIntBinding.Nullable("coadds", rCoadds),
+          WavelengthInput.Binding.Option("centralWavelength", rWavelength),
+          GnirsFilterBinding.Option("filter", rFilter),
+          GnirsFpuSlitBinding.Option("fpu", rFpu),
+          GnirsCameraBinding.Option("camera", rCamera),
+          GnirsGratingBinding.Nullable("grating", rGrating),
+          GnirsPrismBinding.Nullable("prism", rPrism),
+          GnirsDeckerBinding.Nullable("explicitDecker", rDecker),
+          WavelengthInput.Binding.Nullable("explicitGratingWavelength", rGratingWavelength),
+          GnirsAcquisitionMirrorInput.Binding.Nullable("explicitAcquisitionMirror", rAcqMirror),
+          IntBinding.Nullable("explicitFocus", rFocus),
+          GnirsReadModeBinding.Nullable("explicitReadMode", rReadMode),
+          GnirsWellDepthBinding.Nullable("explicitWellDepth", rWellDepth),
+          SlitTelescopeConfigsInput.Binding.Option("telescopeConfigs", rTelescope),
+          AcquisitionInput.Binding.Option("acquisition", rAcq)
+        ) =>
+          (rEtm, rCoadds, rWavelength, rFilter, rFpu, rCamera, rGrating, rPrism,
+           rDecker, rGratingWavelength, rAcqMirror, rFocus, rReadMode, rWellDepth,
+           rTelescope, rAcq).parMapN(Edit.apply)
