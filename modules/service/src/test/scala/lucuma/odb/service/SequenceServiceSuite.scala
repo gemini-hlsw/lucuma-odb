@@ -192,8 +192,8 @@ class SequenceServiceSuite extends ExecutionTestSupportForGmos:
       StepEstimate.fromMax(
         Nil,
         List(
-          estimate("Red",  red10.value, 28364.millisecondTimeSpan),
-          estimate("Blue", blue5.value,  3722.millisecondTimeSpan)
+          estimate("Red",  red10.value, 28363.millisecondTimeSpan),
+          estimate("Blue", blue5.value,  3724.millisecondTimeSpan)
         )
       )
     )
@@ -212,8 +212,8 @@ class SequenceServiceSuite extends ExecutionTestSupportForGmos:
       StepEstimate.fromMax(
         Nil,
         List(
-          estimate("Red",  red20.value, 23520.millisecondTimeSpan),
-          estimate("Blue", blue6.value, 23808.millisecondTimeSpan)
+          estimate("Red",  red20.value, 23514.millisecondTimeSpan),
+          estimate("Blue", blue6.value, 23804.millisecondTimeSpan)
         )
       )
     )
