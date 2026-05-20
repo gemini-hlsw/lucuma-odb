@@ -366,7 +366,7 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                       "prism": "MIRROR",
                       "camera": "SHORT_BLUE",
                       "fpu": "LONG_SLIT_0_30",
-                      "filter": "K",
+                      "filter": "ORDER3",
                       "centralWavelength": { "nanometers": 2200.000 }
                     }
                   }
@@ -378,7 +378,7 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                       "prism": "MIRROR",
                       "camera": "SHORT_BLUE",
                       "fpu": "LONG_SLIT_0_30",
-                      "filter": "K",
+                      "filter": "ORDER3",
                       "centralWavelength": { "nanometers": 2200.000 }
                     }
                   }
