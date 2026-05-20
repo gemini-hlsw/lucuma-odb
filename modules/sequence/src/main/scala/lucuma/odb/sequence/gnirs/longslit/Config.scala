@@ -77,7 +77,6 @@ case class Config(
 
     out.write(scienceExposureTimeMode.hashBytes)
 
-    // Acquisition mirror mode hash
     acquisitionMirrorMode match
       case GnirsAcquisitionMirrorMode.In =>
         out.writeChars("In")

@@ -14,10 +14,10 @@ trait GnirsLongSlitView[F[_]] extends BaseMapping[F]:
 
     val ObservationId: ColumnRef    = col("c_observation_id", observation_id)
 
-    // Acquisition mirror out: explicit (nullable), default (true), effective (COALESCE)
-    val AcqMirrorOut: ColumnRef         = col("c_acq_mirror_out", bool.opt)
-    val AcqMirrorOutDefault: ColumnRef  = col("c_acq_mirror_out_default", bool)
-    val AcqMirrorOutEffective: ColumnRef = col("c_acq_mirror_out_effective", bool)
+    // Acquisition mirror out: explicit (nullable), default ('Out'), effective (COALESCE)
+    val AcqMirrorOut: ColumnRef          = col("c_acq_mirror_out", gnirs_acquisition_mirror.opt)
+    val AcqMirrorOutDefault: ColumnRef   = col("c_acq_mirror_out_default", gnirs_acquisition_mirror)
+    val AcqMirrorOutEffective: ColumnRef = col("c_acq_mirror_out_effective", gnirs_acquisition_mirror)
     val Grating: ColumnRef           = col("c_grating", gnirs_grating.opt)
     val Prism: ColumnRef             = col("c_prism", gnirs_prism.opt)
     val GratingWavelength: ColumnRef = col("c_grating_wavelength", wavelength_pm.opt)

@@ -153,6 +153,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[GmosSouthStageMode](GmosSouthStageModeType),
       LeafMapping[GmosRoi](GmosRoiType),
       LeafMapping[GmosBinning](GmosBinningType),
+      LeafMapping[GnirsAcquisitionMirror](GnirsAcquisitionMirrorType),
       LeafMapping[GnirsDecker](GnirsDeckerType),
       LeafMapping[GnirsFilter](GnirsFilterType),
       LeafMapping[GnirsGrating](GnirsGratingType),

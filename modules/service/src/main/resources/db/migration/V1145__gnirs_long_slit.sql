@@ -1,6 +1,15 @@
 -- GNIRS Long Slit observing mode: lookup tables, main table, view, mode registration,
 -- configuration request columns, and ETM trigger update.
 
+-- Lookup table for GnirsAcquisitionMirror
+CREATE TABLE t_gnirs_acquisition_mirror (
+  c_tag        d_tag   NOT NULL PRIMARY KEY,
+  c_short_name varchar NOT NULL,
+  c_long_name  varchar NOT NULL
+);
+INSERT INTO t_gnirs_acquisition_mirror VALUES ('In',  'In',  'In');
+INSERT INTO t_gnirs_acquisition_mirror VALUES ('Out', 'Out', 'Out');
+
 -- Lookup table for GnirsDecker
 CREATE TABLE t_gnirs_decker (
   c_tag        d_tag   NOT NULL PRIMARY KEY,
@@ -40,16 +49,15 @@ CREATE TABLE t_gnirs_long_slit (
   c_observing_mode_type e_observing_mode_type NOT NULL DEFAULT 'gnirs_long_slit',
   CHECK (c_observing_mode_type = 'gnirs_long_slit'),
 
-  -- Explicit acquisition mirror overrides (all NULL = no override; default is mirror OUT = true).
-  -- c_acq_mirror_out: true = explicitly OUT, false = explicitly IN, NULL = use default (OUT).
-  -- Individual fields can be overridden independently when c_acq_mirror_out is not false.
-  -- When c_acq_mirror_out = false (mirror IN), grating/prism/wavelength must be NULL.
-  c_acq_mirror_out     boolean         NULL,
+  -- Explicit acquisition mirror overrides (NULL = no override; default is 'Out').
+  -- Individual fields can be overridden independently when c_acq_mirror_out is not 'In'.
+  -- When c_acq_mirror_out = 'In', grating/prism/wavelength must be NULL.
+  c_acq_mirror_out     d_tag           NULL REFERENCES t_gnirs_acquisition_mirror(c_tag),
   c_grating            d_tag           NULL REFERENCES t_gnirs_grating(c_tag),
   c_prism              d_tag           NULL REFERENCES t_gnirs_prism(c_tag),
   c_grating_wavelength d_wavelength_pm NULL,
   CHECK (
-    c_acq_mirror_out IS DISTINCT FROM false
+    c_acq_mirror_out IS DISTINCT FROM 'In'
     OR (c_grating IS NULL AND c_prism IS NULL AND c_grating_wavelength IS NULL)
   ),
 
@@ -111,9 +119,9 @@ CREATE TABLE t_gnirs_long_slit (
 CREATE VIEW v_gnirs_long_slit AS
   SELECT
     ls.*,
-    -- acq mirror out default/effective (default = true = mirror OUT)
-    true AS c_acq_mirror_out_default,
-    COALESCE(ls.c_acq_mirror_out, true) AS c_acq_mirror_out_effective,
+    -- acq mirror out default/effective (default = 'Out')
+    d.c_acq_mirror_out_default,
+    COALESCE(ls.c_acq_mirror_out, d.c_acq_mirror_out_default) AS c_acq_mirror_out_effective,
     -- decker pure default: mirrors GnirsDecker.forCameraAndReadMode(camera, effectivePrism)
     -- ATTENTION: This logic is duplicated from lucuma-core GnirsDecker. Modify in sync.
     CASE
@@ -157,6 +165,8 @@ CREATE VIEW v_gnirs_long_slit AS
    AND etm.c_role = 'science'
   CROSS JOIN LATERAL (
     SELECT
+      -- acquisition mirror default (always Out)
+      'Out'::varchar AS c_acq_mirror_out_default,
       -- slit offset mode default (always nod_along_slit for GNIRS)
       'nod_along_slit'::varchar AS c_slit_offset_mode_default,
       -- grating wavelength default: filter.optimalWavelength in pm

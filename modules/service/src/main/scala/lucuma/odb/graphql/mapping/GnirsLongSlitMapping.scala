@@ -124,9 +124,9 @@ trait GnirsLongSlitMapping[F[_]]
       SqlField("explicitFocusMotorSteps", GnirsLongSlitView.FocusMotorSteps),
 
       // Acquisition mirror out: effective, default, explicit
-      SqlField("acquisitionMirrorOut",        GnirsLongSlitView.AcqMirrorOutEffective),
-      SqlField("defaultAcquisitionMirrorOut", GnirsLongSlitView.AcqMirrorOutDefault),
-      SqlField("explicitAcquisitionMirrorOut", GnirsLongSlitView.AcqMirrorOut),
+      SqlField("acquisitionMirror",        GnirsLongSlitView.AcqMirrorOutEffective),
+      SqlField("defaultAcquisitionMirror", GnirsLongSlitView.AcqMirrorOutDefault),
+      SqlField("explicitAcquisitionMirror", GnirsLongSlitView.AcqMirrorOut),
 
       // Telescope configs raw columns (hidden, used for cursor fields)
       SqlField("slitOffsetModeEffRaw",  GnirsLongSlitView.SlitOffsetModeEffective,  hidden = true),

@@ -10,6 +10,7 @@ import coulomb.syntax.*
 import eu.timepit.refined.types.numeric.PosInt
 import grackle.Result
 import grackle.ResultT
+import lucuma.core.enums.GnirsAcquisitionMirror
 import lucuma.core.enums.GnirsReadMode
 import lucuma.core.enums.SlitOffsetMode
 import lucuma.core.math.Angle
@@ -23,7 +24,6 @@ import lucuma.core.model.sequence.gnirs.GnirsFocusMotorStep
 import lucuma.core.model.sequence.gnirs.GnirsFocusMotorStepsValue
 import lucuma.core.model.sequence.gnirs.GnirsGratingWavelength
 import lucuma.odb.data.ExposureTimeModeRole
-import lucuma.odb.data.Nullable
 import lucuma.odb.format.telescopeConfigs.*
 import lucuma.odb.graphql.input.GnirsLongSlitInput
 import lucuma.odb.sequence.gnirs.longslit.AcquisitionConfig
@@ -62,24 +62,23 @@ object GnirsLongSlitService:
 
     new GnirsLongSlitService[F]:
 
-      // Decodes GnirsAcquisitionMirrorMode from the effective acq_mirror_out value.
-      // acqMirrorOutEff = true → mirror OUT; false → mirror IN.
       private def decodeAcqMirror(
-        acqMirrorOutEff: Boolean,
+        acqMirror: GnirsAcquisitionMirror,
         grating: lucuma.core.enums.GnirsGrating,
         prism: lucuma.core.enums.GnirsPrism,
         wavelength: Wavelength
       ): GnirsAcquisitionMirrorMode =
-        if acqMirrorOutEff then
-          GnirsAcquisitionMirrorMode.Out(prism, grating, GnirsGratingWavelength(wavelength))
-        else
-          GnirsAcquisitionMirrorMode.In
+        acqMirror match
+          case GnirsAcquisitionMirror.Out =>
+            GnirsAcquisitionMirrorMode.Out(prism, grating, GnirsGratingWavelength(wavelength))
+          case GnirsAcquisitionMirror.In =>
+            GnirsAcquisitionMirrorMode.In
 
       val gnirsLS: Decoder[Config] = (
         // Science ETM (joined from t_exposure_time_mode)
         exposure_time_mode               *:
-        // Acq mirror: acq_mirror_out_effective (non-null), grating_eff, prism_eff, grating_wavelength_default
-        bool                             *:
+        // Acq mirror: effective enum, effective grating, effective prism, default grating wavelength
+        gnirs_acquisition_mirror         *: // c_acq_mirror_out_effective
         gnirs_grating                    *: // c_grating_effective
         gnirs_prism                      *: // c_prism_effective
         wavelength_pm                    *: // c_grating_wavelength_default
@@ -119,7 +118,7 @@ object GnirsLongSlitService:
         int4                             *: // c_acq_exp_count
         wavelength_pm                       // c_acq_exp_at
       ).emap:
-        case (sciEtm *: acqMirrorOutEff *: gratingEff *: prismEff *: gratingWavDef *:
+        case (sciEtm *: acqMirror *: gratingEff *: prismEff *: gratingWavDef *:
               camera *: fpu *: filter *: centralWavelength *: coadds *:
               deckerDef *: deckerExp *:
               readModeDef *: readModeExp *:
@@ -144,7 +143,7 @@ object GnirsLongSlitService:
                         PosInt.from(acqExpCount)
                           .leftMap(e => s"Invalid acq exp count $acqExpCount: $e")
                           .map: acqExpCountP =>
-                            val acqMirror = decodeAcqMirror(acqMirrorOutEff, gratingEff, prismEff, gratingWavDef)
+                            val acqMirrorMode = decodeAcqMirror(acqMirror, gratingEff, prismEff, gratingWavDef)
                             val acq = AcquisitionConfig(
                               acqReadMode, acqCoaddsP, acqFilter,
                               acqOffP.map(a => Offset.P(a)),
@@ -154,7 +153,7 @@ object GnirsLongSlitService:
                             val focus = focusMotorSteps.fold(GnirsFocus.Best): n =>
                               GnirsFocus.Custom(GnirsFocusMotorStepsValue.unsafeFrom(n).withUnit[GnirsFocusMotorStep])
                             Config(
-                              sciEtm, acqMirror, camera, fpu, filter, centralWavelength,
+                              sciEtm, acqMirrorMode, camera, fpu, filter, centralWavelength,
                               coaddsP,
                               deckerExp.getOrElse(deckerDef),
                               readModeExp.getOrElse(readModeDef),
@@ -303,7 +302,7 @@ object GnirsLongSlitService:
       // explicit overrides (all nullable)
       Option[lucuma.core.enums.GnirsDecker],
       Option[Wavelength],
-      Option[Boolean],     // acq_mirror_out
+      Option[GnirsAcquisitionMirror], // acq_mirror_out
       Option[lucuma.core.enums.GnirsGrating],  // explicit grating
       Option[lucuma.core.enums.GnirsPrism],    // explicit prism
       Option[Int],         // focus_motor_steps
@@ -372,7 +371,7 @@ object GnirsLongSlitService:
           $int4,
           ${gnirs_decker.opt},
           ${wavelength_pm.opt},
-          ${bool.opt},
+          ${gnirs_acquisition_mirror.opt},
           ${gnirs_grating.opt},
           ${gnirs_prism.opt},
           ${int4.opt},
@@ -410,13 +409,6 @@ object GnirsLongSlitService:
       val explicitTC = input.telescopeConfigs.map(SlitTelescopeConfigsFormat.reverseGet)
       val acqOffP = input.acquisition.flatMap(_.offset).map(o => Angle.microarcseconds.get(o.p.toAngle))
       val acqOffQ = input.acquisition.flatMap(_.offset).map(o => Angle.microarcseconds.get(o.q.toAngle))
-      // Explicit acquisition mirror from either structured input or flat fields
-      val (acqMirrorOut, explGrating, explPrism) =
-        input.explicitAcqMirror match
-          case Some((g, p, _)) => (Some(true), Some(g), Some(p))
-          case None            => (None, None, None)
-      val explGratingWav = input.explicitAcqMirror.flatMap(_._3)
-        .orElse(input.explicitGratingWavelength)
       InsertGnirsLongSlit.apply(
         observationId,
         input.grating,
@@ -427,10 +419,10 @@ object GnirsLongSlitService:
         input.filter,
         input.coadds.map(_.value).getOrElse(1),
         input.explicitDecker,
-        explGratingWav,
-        acqMirrorOut,
-        explGrating,
-        explPrism,
+        input.explicitGratingWavelength,
+        input.explicitAcquisitionMirror,
+        input.explicitGrating,
+        input.explicitPrism,
         input.explicitFocusMotorSteps,
         input.explicitReadMode,
         input.explicitWellDepth,
@@ -462,55 +454,16 @@ object GnirsLongSlitService:
       val upFocus        = sql"c_focus_motor_steps  = ${int4.opt}"
       val upReadMode     = sql"c_read_mode          = ${gnirs_read_mode.opt}"
       val upWellDepth    = sql"c_well_depth         = ${gnirs_well_depth.opt}"
-      val upAcqMirrorOut = sql"c_acq_mirror_out = ${bool.opt}"
+      val upAcqMirrorOut = sql"c_acq_mirror_out     = ${gnirs_acquisition_mirror.opt}"
       val upGrating      = sql"c_grating            = ${gnirs_grating.opt}"
       val upPrism        = sql"c_prism              = ${gnirs_prism.opt}"
       val upSlitMode     = sql"c_slit_offset_mode   = ${slit_offset_mode.opt}"
       val upOffsets      = sql"c_telescope_configs  = ${text.opt}"
 
-      // Telescope configs update
       val upTelescope: Option[List[AppliedFragment]] =
         SET.telescopeConfigs.map: tc =>
           val (mode, off) = SlitTelescopeConfigsFormat.reverseGet(tc)
           List(upSlitMode(Some(mode)), upOffsets(Some(off)))
-
-      // Explicit acq mirror: structured input or flat grating/prism
-      val (mirrorOutUpdate, gratingUpdate, prismUpdate): (Option[AppliedFragment], Option[AppliedFragment], Option[AppliedFragment]) =
-        SET.explicitAcqMirror match
-          case Nullable.Null =>
-            (Some(upAcqMirrorOut(None)), Some(upGrating(None)), Some(upPrism(None)))
-          case Nullable.NonNull((g, p, _)) =>
-            (Some(upAcqMirrorOut(Some(true))), Some(upGrating(Some(g))), Some(upPrism(Some(p))))
-          case Nullable.Absent =>
-            (None, None, None)
-
-      val gratingWavUpdate =
-        SET.explicitAcqMirror match
-          case Nullable.NonNull((_, _, Some(w))) => Some(upGratingWav(Some(w)))
-          case Nullable.NonNull((_, _, None))    => None
-          case Nullable.Null                     => Some(upGratingWav(None))
-          case Nullable.Absent                   =>
-            SET.explicitGratingWavelength match
-              case Nullable.NonNull(w) => Some(upGratingWav(Some(w)))
-              case Nullable.Null       => Some(upGratingWav(None))
-              case Nullable.Absent     => None
-
-      // Handle flat grating/prism updates (when explicitAcqMirror is Absent)
-      val flatMirrorUpdates: List[AppliedFragment] =
-        if SET.explicitAcqMirror.isAbsent then
-          (SET.grating, SET.prism) match
-            case (Nullable.Null, _) | (_, Nullable.Null) =>
-              // Clear the entire explicit acquisition mirror
-              List(upAcqMirrorOut(None), upGrating(None), upPrism(None))
-            case (Nullable.NonNull(g), Nullable.NonNull(p)) =>
-              List(upAcqMirrorOut(Some(true)), upGrating(Some(g)), upPrism(Some(p)))
-            case (Nullable.NonNull(g), _) =>
-              List(upAcqMirrorOut(Some(true)), upGrating(Some(g)))
-            case (_, Nullable.NonNull(p)) =>
-              List(upAcqMirrorOut(Some(true)), upPrism(Some(p)))
-            case _ => Nil
-        else
-          (mirrorOutUpdate.toList ++ gratingUpdate.toList ++ prismUpdate.toList)
 
       val ups: List[AppliedFragment] = List(
         SET.coadds.toOptionOption.map(upCoadds),
@@ -519,11 +472,14 @@ object GnirsLongSlitService:
         SET.fpu.map(f => upFpu(Some(f))),
         SET.camera.map(c => upCamera(Some(c))),
         SET.explicitDecker.toOptionOption.map(upDecker),
-        gratingWavUpdate,
+        SET.explicitGratingWavelength.toOptionOption.map(upGratingWav),
         SET.explicitFocusMotorSteps.toOptionOption.map(upFocus),
         SET.explicitReadMode.toOptionOption.map(upReadMode),
-        SET.explicitWellDepth.toOptionOption.map(upWellDepth)
-      ).flatten ++ flatMirrorUpdates ++ upTelescope.toList.flatten
+        SET.explicitWellDepth.toOptionOption.map(upWellDepth),
+        SET.explicitAcquisitionMirror.toOptionOption.map(upAcqMirrorOut),
+        SET.explicitGrating.toOptionOption.map(upGrating),
+        SET.explicitPrism.toOptionOption.map(upPrism)
+      ).flatten ++ upTelescope.toList.flatten
 
       NonEmptyList.fromList(ups)
 

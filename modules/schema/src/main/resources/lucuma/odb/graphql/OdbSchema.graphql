@@ -9257,9 +9257,9 @@ type GnirsLongSlit {
 
   explicitFocusMotorSteps: Int
 
-  acquisitionMirrorOut: Boolean!
-  defaultAcquisitionMirrorOut: Boolean!
-  explicitAcquisitionMirrorOut: Boolean
+  acquisitionMirror: GnirsAcquisitionMirror!
+  defaultAcquisitionMirror: GnirsAcquisitionMirror!
+  explicitAcquisitionMirror: GnirsAcquisitionMirror
 
   offsetMode: SlitOffsetMode!
   defaultOffsetMode: SlitOffsetMode!
@@ -9279,12 +9279,6 @@ input GnirsLongSlitAcquisitionInput {
   coadds: PosInt
   offset: OffsetInput
   exposureTimeMode: TimeAndCountExposureTimeModeInput
-}
-
-input GnirsAcquisitionMirrorInput {
-  grating: GnirsGrating!
-  prism: GnirsPrism!
-  gratingWavelength: WavelengthInput
 }
 
 input TelescopeConfigAlongSlitInput {
@@ -9322,7 +9316,11 @@ input GnirsLongSlitInput {
 
   explicitGratingWavelength: WavelengthInput
 
-  explicitAcquisitionMirror: GnirsAcquisitionMirrorInput
+  explicitAcquisitionMirror: GnirsAcquisitionMirror
+
+  explicitGrating: GnirsGrating
+
+  explicitPrism: GnirsPrism
 
   explicitFocus: Int
 
@@ -11566,6 +11564,11 @@ type SpectroscopyConfigOptionGnirs {
   fpu: GnirsFpuSlit!
   prism: GnirsPrism!
   camera: GnirsCamera!
+}
+
+enum GnirsAcquisitionMirror {
+  IN
+  OUT
 }
 
 enum GnirsPrism {
