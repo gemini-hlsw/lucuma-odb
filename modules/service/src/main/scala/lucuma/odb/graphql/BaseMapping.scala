@@ -369,7 +369,6 @@ trait BaseMapping[F[_]]
   lazy val SpectroscopyConfigOptionGmosSouthType   = schema.ref("SpectroscopyConfigOptionGmosSouth")
   lazy val SpectroscopyConfigOptionGnirsType       = schema.ref("SpectroscopyConfigOptionGnirs")
   lazy val SpectroscopyConfigOptionType            = schema.ref("SpectroscopyConfigOption")
-  lazy val GnirsAcquisitionMirrorType              = schema.ref("GnirsAcquisitionMirror")
   lazy val GnirsDeckerType                         = schema.ref("GnirsDecker")
   lazy val GnirsFilterType                         = schema.ref("GnirsFilter")
   lazy val GnirsGratingType                        = schema.ref("GnirsGrating")

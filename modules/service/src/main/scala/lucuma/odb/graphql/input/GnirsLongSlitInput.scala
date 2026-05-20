@@ -9,7 +9,6 @@ import cats.syntax.apply.*
 import cats.syntax.parallel.*
 import eu.timepit.refined.types.numeric.PosInt
 import grackle.Result
-import lucuma.core.enums.GnirsAcquisitionMirror
 import lucuma.core.enums.GnirsCamera
 import lucuma.core.enums.GnirsDecker
 import lucuma.core.enums.GnirsFilter
@@ -59,15 +58,6 @@ object GnirsLongSlitInput:
             case _ =>
               Matcher.validationFailure("Exactly one of alongSlit or onSky must be provided")
 
-  private def mirrorInConflict(
-    mirror: Option[GnirsAcquisitionMirror],
-    explicitGrating: Option[GnirsGrating],
-    explicitPrism: Option[GnirsPrism],
-    explicitGratingWavelength: Option[Wavelength]
-  ): Boolean =
-    mirror.contains(GnirsAcquisitionMirror.In) &&
-      (explicitGrating.isDefined || explicitPrism.isDefined || explicitGratingWavelength.isDefined)
-
   case class AcquisitionInput(
     filter:           Option[GnirsFilter],
     readMode:         Option[GnirsReadMode],
@@ -105,7 +95,6 @@ object GnirsLongSlitInput:
     prism:            GnirsPrism,
     explicitDecker:               Option[GnirsDecker]              = None,
     explicitGratingWavelength:    Option[Wavelength]               = None,
-    explicitAcquisitionMirror:    Option[GnirsAcquisitionMirror]   = None,
     explicitGrating:              Option[GnirsGrating]             = None,
     explicitPrism:                Option[GnirsPrism]               = None,
     explicitFocusMotorSteps:      Option[Int]                      = None,
@@ -130,7 +119,6 @@ object GnirsLongSlitInput:
           GnirsPrismBinding("prism", rPrism),
           GnirsDeckerBinding.Option("explicitDecker", rDecker),
           WavelengthInput.Binding.Option("explicitGratingWavelength", rGratingWavelength),
-          GnirsAcquisitionMirrorBinding.Option("explicitAcquisitionMirror", rAcqMirror),
           GnirsGratingBinding.Option("explicitGrating", rExplGrating),
           GnirsPrismBinding.Option("explicitPrism", rExplPrism),
           IntBinding.Option("explicitFocus", rFocus),
@@ -140,18 +128,14 @@ object GnirsLongSlitInput:
           AcquisitionInput.Binding.Option("acquisition", rAcq)
         ) =>
           (rEtm, rCoadds, rWavelength, rFilter, rFpu, rCamera, rGrating, rPrism,
-           rDecker, rGratingWavelength, rAcqMirror, rExplGrating, rExplPrism,
+           rDecker, rGratingWavelength, rExplGrating, rExplPrism,
            rFocus, rReadMode, rWellDepth, rTelescope, rAcq).parMapN:
             (etm, coadds, wavelength, filter, fpu, camera, grating, prism,
-             decker, gratingWavelength, acqMirror, explGrating, explPrism,
+             decker, gratingWavelength, explGrating, explPrism,
              focus, readMode, wellDepth, telescope, acq) =>
               Create(etm, coadds, wavelength, filter, fpu, camera, grating, prism,
-                     decker, gratingWavelength, acqMirror, explGrating, explPrism,
+                     decker, gratingWavelength, explGrating, explPrism,
                      focus, readMode, wellDepth, telescope, acq)
-          .flatMap: create =>
-            if mirrorInConflict(create.explicitAcquisitionMirror, create.explicitGrating, create.explicitPrism, create.explicitGratingWavelength) then
-              Matcher.validationFailure("Cannot set explicit grating, prism, or grating wavelength when acquisition mirror is In")
-            else Result(create)
 
   case class Edit(
     exposureTimeMode:          Option[ExposureTimeMode],
@@ -164,7 +148,6 @@ object GnirsLongSlitInput:
     prism:                     Nullable[GnirsPrism],
     explicitDecker:            Nullable[GnirsDecker],
     explicitGratingWavelength: Nullable[Wavelength],
-    explicitAcquisitionMirror: Nullable[GnirsAcquisitionMirror],
     explicitGrating:           Nullable[GnirsGrating],
     explicitPrism:             Nullable[GnirsPrism],
     explicitFocusMotorSteps:   Nullable[Int],
@@ -187,7 +170,7 @@ object GnirsLongSlitInput:
         p  <- required(prism.toOption, "prism")
       yield Create(exposureTimeMode, coadds.toOption, centralWavelength, f, u, c, g, p,
                    explicitDecker.toOption, explicitGratingWavelength.toOption,
-                   explicitAcquisitionMirror.toOption, explicitGrating.toOption, explicitPrism.toOption,
+                   explicitGrating.toOption, explicitPrism.toOption,
                    explicitFocusMotorSteps.toOption, explicitReadMode.toOption, explicitWellDepth.toOption,
                    telescopeConfigs, acquisition)
 
@@ -205,7 +188,6 @@ object GnirsLongSlitInput:
           GnirsPrismBinding.Nullable("prism", rPrism),
           GnirsDeckerBinding.Nullable("explicitDecker", rDecker),
           WavelengthInput.Binding.Nullable("explicitGratingWavelength", rGratingWavelength),
-          GnirsAcquisitionMirrorBinding.Nullable("explicitAcquisitionMirror", rAcqMirror),
           GnirsGratingBinding.Nullable("explicitGrating", rExplGrating),
           GnirsPrismBinding.Nullable("explicitPrism", rExplPrism),
           IntBinding.Nullable("explicitFocus", rFocus),
@@ -215,11 +197,5 @@ object GnirsLongSlitInput:
           AcquisitionInput.Binding.Option("acquisition", rAcq)
         ) =>
           (rEtm, rCoadds, rWavelength, rFilter, rFpu, rCamera, rGrating, rPrism,
-           rDecker, rGratingWavelength, rAcqMirror, rExplGrating, rExplPrism,
+           rDecker, rGratingWavelength, rExplGrating, rExplPrism,
            rFocus, rReadMode, rWellDepth, rTelescope, rAcq).parMapN(Edit.apply)
-          .flatMap: edit =>
-            if mirrorInConflict(edit.explicitAcquisitionMirror.toOption,
-                                edit.explicitGrating.toOption, edit.explicitPrism.toOption,
-                                edit.explicitGratingWavelength.toOption) then
-              Matcher.validationFailure("Cannot set explicit grating, prism, or grating wavelength when acquisition mirror is In")
-            else Result(edit)

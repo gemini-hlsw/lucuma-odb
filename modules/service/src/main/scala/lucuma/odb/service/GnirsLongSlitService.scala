@@ -10,7 +10,6 @@ import coulomb.syntax.*
 import eu.timepit.refined.types.numeric.PosInt
 import grackle.Result
 import grackle.ResultT
-import lucuma.core.enums.GnirsAcquisitionMirror
 import lucuma.core.enums.GnirsReadMode
 import lucuma.core.enums.SlitOffsetMode
 import lucuma.core.math.Angle
@@ -18,11 +17,9 @@ import lucuma.core.math.Offset
 import lucuma.core.math.Wavelength
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.Observation
-import lucuma.core.model.sequence.gnirs.GnirsAcquisitionMirrorMode
 import lucuma.core.model.sequence.gnirs.GnirsFocus
 import lucuma.core.model.sequence.gnirs.GnirsFocusMotorStep
 import lucuma.core.model.sequence.gnirs.GnirsFocusMotorStepsValue
-import lucuma.core.model.sequence.gnirs.GnirsGratingWavelength
 import lucuma.odb.data.ExposureTimeModeRole
 import lucuma.odb.format.telescopeConfigs.*
 import lucuma.odb.graphql.input.GnirsLongSlitInput
@@ -62,26 +59,13 @@ object GnirsLongSlitService:
 
     new GnirsLongSlitService[F]:
 
-      private def decodeAcqMirror(
-        acqMirror: GnirsAcquisitionMirror,
-        grating: lucuma.core.enums.GnirsGrating,
-        prism: lucuma.core.enums.GnirsPrism,
-        wavelength: Wavelength
-      ): GnirsAcquisitionMirrorMode =
-        acqMirror match
-          case GnirsAcquisitionMirror.Out =>
-            GnirsAcquisitionMirrorMode.Out(prism, grating, GnirsGratingWavelength(wavelength))
-          case GnirsAcquisitionMirror.In =>
-            GnirsAcquisitionMirrorMode.In
-
       val gnirsLS: Decoder[Config] = (
         // Science ETM (joined from t_exposure_time_mode)
         exposure_time_mode               *:
-        // Acq mirror: effective enum, effective grating, effective prism, default grating wavelength
-        gnirs_acquisition_mirror         *: // c_acq_mirror_out_effective
+        // Effective grating/prism/wavelength for the acquisition configuration
         gnirs_grating                    *: // c_grating_effective
         gnirs_prism                      *: // c_prism_effective
-        wavelength_pm                    *: // c_grating_wavelength_default
+        wavelength_pm                    *: // c_grating_wavelength_effective
         // Camera
         gnirs_camera                     *:
         // FPU
@@ -118,7 +102,7 @@ object GnirsLongSlitService:
         int4                             *: // c_acq_exp_count
         wavelength_pm                       // c_acq_exp_at
       ).emap:
-        case (sciEtm *: acqMirror *: gratingEff *: prismEff *: gratingWavDef *:
+        case (sciEtm *: gratingEff *: prismEff *: gratingWavEff *:
               camera *: fpu *: filter *: centralWavelength *: coadds *:
               deckerDef *: deckerExp *:
               readModeDef *: readModeExp *:
@@ -143,7 +127,6 @@ object GnirsLongSlitService:
                         PosInt.from(acqExpCount)
                           .leftMap(e => s"Invalid acq exp count $acqExpCount: $e")
                           .map: acqExpCountP =>
-                            val acqMirrorMode = decodeAcqMirror(acqMirror, gratingEff, prismEff, gratingWavDef)
                             val acq = AcquisitionConfig(
                               acqReadMode, acqCoaddsP, acqFilter,
                               acqOffP.map(a => Offset.P(a)),
@@ -153,7 +136,7 @@ object GnirsLongSlitService:
                             val focus = focusMotorSteps.fold(GnirsFocus.Best): n =>
                               GnirsFocus.Custom(GnirsFocusMotorStepsValue.unsafeFrom(n).withUnit[GnirsFocusMotorStep])
                             Config(
-                              sciEtm, acqMirrorMode, camera, fpu, filter, centralWavelength,
+                              sciEtm, gratingEff, prismEff, gratingWavEff, camera, fpu, filter, centralWavelength,
                               coaddsP,
                               deckerExp.getOrElse(deckerDef),
                               readModeExp.getOrElse(readModeDef),
@@ -229,10 +212,9 @@ object GnirsLongSlitService:
           sci.c_signal_to_noise,
           sci.c_exposure_time,
           sci.c_exposure_count,
-          ls.c_acq_mirror_out_effective,
           ls.c_grating_effective,
           ls.c_prism_effective,
-          ls.c_grating_wavelength_default,
+          ls.c_grating_wavelength_effective,
           ls.c_camera,
           ls.c_fpu,
           ls.c_filter,
@@ -302,7 +284,6 @@ object GnirsLongSlitService:
       // explicit overrides (all nullable)
       Option[lucuma.core.enums.GnirsDecker],
       Option[Wavelength],
-      Option[GnirsAcquisitionMirror], // acq_mirror_out
       Option[lucuma.core.enums.GnirsGrating],  // explicit grating
       Option[lucuma.core.enums.GnirsPrism],    // explicit prism
       Option[Int],         // focus_motor_steps
@@ -338,7 +319,6 @@ object GnirsLongSlitService:
           c_coadds,
           c_decker,
           c_grating_wavelength,
-          c_acq_mirror_out,
           c_grating,
           c_prism,
           c_focus_motor_steps,
@@ -371,7 +351,6 @@ object GnirsLongSlitService:
           $int4,
           ${gnirs_decker.opt},
           ${wavelength_pm.opt},
-          ${gnirs_acquisition_mirror.opt},
           ${gnirs_grating.opt},
           ${gnirs_prism.opt},
           ${int4.opt},
@@ -391,11 +370,11 @@ object GnirsLongSlitService:
         WHERE c_observation_id = $observation_id
       """.contramap {
         (oid, initGrating, initPrism, camera, fpu, wavelength, filter, coadds,
-         decker, gratingWav, acqMirrorOut, explGrating, explPrism, focus,
+         decker, gratingWav, explGrating, explPrism, focus,
          readMode, wellDepth, slitMode, offsets,
          acqRM, acqCoadds, acqFilter, acqOffP, acqOffQ, acqExpTime, acqExpCount, acqExpAt) =>
           (oid, initGrating, initPrism, camera, camera, fpu, fpu, wavelength, wavelength,
-           filter, filter, coadds, decker, gratingWav, acqMirrorOut,
+           filter, filter, coadds, decker, gratingWav,
            explGrating, explPrism, focus, readMode, wellDepth,
            slitMode, offsets,
            acqRM, acqCoadds, acqFilter, acqOffP, acqOffQ,
@@ -420,7 +399,6 @@ object GnirsLongSlitService:
         input.coadds.map(_.value).getOrElse(1),
         input.explicitDecker,
         input.explicitGratingWavelength,
-        input.explicitAcquisitionMirror,
         input.explicitGrating,
         input.explicitPrism,
         input.explicitFocusMotorSteps,
@@ -454,7 +432,6 @@ object GnirsLongSlitService:
       val upFocus        = sql"c_focus_motor_steps  = ${int4.opt}"
       val upReadMode     = sql"c_read_mode          = ${gnirs_read_mode.opt}"
       val upWellDepth    = sql"c_well_depth         = ${gnirs_well_depth.opt}"
-      val upAcqMirrorOut = sql"c_acq_mirror_out     = ${gnirs_acquisition_mirror.opt}"
       val upGrating      = sql"c_grating            = ${gnirs_grating.opt}"
       val upPrism        = sql"c_prism              = ${gnirs_prism.opt}"
       val upSlitMode     = sql"c_slit_offset_mode   = ${slit_offset_mode.opt}"
@@ -476,7 +453,6 @@ object GnirsLongSlitService:
         SET.explicitFocusMotorSteps.toOptionOption.map(upFocus),
         SET.explicitReadMode.toOptionOption.map(upReadMode),
         SET.explicitWellDepth.toOptionOption.map(upWellDepth),
-        SET.explicitAcquisitionMirror.toOptionOption.map(upAcqMirrorOut),
         SET.explicitGrating.toOptionOption.map(upGrating),
         SET.explicitPrism.toOptionOption.map(upPrism)
       ).flatten ++ upTelescope.toList.flatten
@@ -499,7 +475,7 @@ object GnirsLongSlitService:
       sql"""
         INSERT INTO t_gnirs_long_slit (
           c_observation_id, c_program_id, c_observing_mode_type,
-          c_acq_mirror_out, c_grating, c_prism, c_grating_wavelength,
+          c_grating, c_prism, c_grating_wavelength,
           c_initial_grating, c_initial_prism,
           c_camera, c_initial_camera,
           c_fpu, c_central_wavelength, c_initial_fpu, c_initial_central_wavelength,
@@ -514,7 +490,7 @@ object GnirsLongSlitService:
           $observation_id,
           (SELECT c_program_id FROM t_observation WHERE c_observation_id = $observation_id),
           c_observing_mode_type,
-          c_acq_mirror_out, c_grating, c_prism, c_grating_wavelength,
+          c_grating, c_prism, c_grating_wavelength,
           c_initial_grating, c_initial_prism,
           c_camera, c_initial_camera,
           c_fpu, c_central_wavelength, c_initial_fpu, c_initial_central_wavelength,

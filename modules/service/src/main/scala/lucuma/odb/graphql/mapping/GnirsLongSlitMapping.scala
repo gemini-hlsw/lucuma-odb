@@ -123,11 +123,6 @@ trait GnirsLongSlitMapping[F[_]]
       // Focus motor steps (null = best)
       SqlField("explicitFocusMotorSteps", GnirsLongSlitView.FocusMotorSteps),
 
-      // Acquisition mirror out: effective, default, explicit
-      SqlField("acquisitionMirror",        GnirsLongSlitView.AcqMirrorOutEffective),
-      SqlField("defaultAcquisitionMirror", GnirsLongSlitView.AcqMirrorOutDefault),
-      SqlField("explicitAcquisitionMirror", GnirsLongSlitView.AcqMirrorOut),
-
       // Telescope configs raw columns (hidden, used for cursor fields)
       SqlField("slitOffsetModeEffRaw",  GnirsLongSlitView.SlitOffsetModeEffective,  hidden = true),
       SqlField("tcEffRaw",              GnirsLongSlitView.TelescopeConfigsEffective, hidden = true),

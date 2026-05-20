@@ -11,13 +11,14 @@ import lucuma.core.enums.GnirsCamera
 import lucuma.core.enums.GnirsDecker
 import lucuma.core.enums.GnirsFilter
 import lucuma.core.enums.GnirsFpuSlit
+import lucuma.core.enums.GnirsGrating
+import lucuma.core.enums.GnirsPrism
 import lucuma.core.enums.GnirsReadMode
 import lucuma.core.enums.GnirsWellDepth
 import lucuma.core.math.Offset
 import lucuma.core.math.Wavelength
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.SlitTelescopeConfigs
-import lucuma.core.model.sequence.gnirs.GnirsAcquisitionMirrorMode
 import lucuma.core.model.sequence.gnirs.GnirsFocus
 import lucuma.core.util.TimeSpan
 import lucuma.odb.sequence.syntax.all.*
@@ -57,7 +58,9 @@ object AcquisitionConfig:
 
 case class Config(
   scienceExposureTimeMode: ExposureTimeMode,
-  acquisitionMirrorMode:   GnirsAcquisitionMirrorMode,
+  grating:                 GnirsGrating,
+  prism:                   GnirsPrism,
+  gratingWavelength:       Wavelength,
   camera:                  GnirsCamera,
   fpu:                     GnirsFpuSlit,
   filter:                  GnirsFilter,
@@ -76,16 +79,9 @@ case class Config(
     val out = new DataOutputStream(bao)
 
     out.write(scienceExposureTimeMode.hashBytes)
-
-    acquisitionMirrorMode match
-      case GnirsAcquisitionMirrorMode.In =>
-        out.writeChars("In")
-      case GnirsAcquisitionMirrorMode.Out(prism, grating, wavelength) =>
-        out.writeChars("Out")
-        out.writeChars(prism.tag)
-        out.writeChars(grating.tag)
-        out.write(wavelength.value.hashBytes)
-
+    out.writeChars(grating.tag)
+    out.writeChars(prism.tag)
+    out.write(gratingWavelength.hashBytes)
     out.writeChars(camera.tag)
     out.writeChars(fpu.tag)
     out.writeChars(filter.tag)
@@ -100,7 +96,6 @@ case class Config(
         out.writeByte(1)
         out.writeInt(qty.value.value.value)
 
-    // Telescope configs hash
     telescopeConfigs.telescopeConfigs.toList.foreach: tc =>
       out.write(tc.hashBytes)
 

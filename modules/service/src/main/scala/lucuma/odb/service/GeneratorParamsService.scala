@@ -35,7 +35,6 @@ import lucuma.core.model.SourceProfile
 import lucuma.core.model.Target
 import lucuma.core.model.UnnormalizedSED
 import lucuma.core.model.User
-import lucuma.core.model.sequence.gnirs.GnirsAcquisitionMirrorMode
 import lucuma.core.util.Timestamp
 import lucuma.itc.ItcGhostDetector
 import lucuma.itc.client.GmosFpu
@@ -418,32 +417,27 @@ object GeneratorParamsService {
           case gn: gnirs.longslit.Config =>
             ExposureTimeMode.timeAndCount.getOption(gn.scienceExposureTimeMode)
               .toRight(Error.MisconfiguredObservation(obsParams.observationId, "GNIRS requires a TimeAndCount exposure time mode"))
-              .flatMap: etm =>
-                gn.acquisitionMirrorMode match
-                  case GnirsAcquisitionMirrorMode.Out(prism, grating, _) =>
-                    val sciMode = InstrumentMode.GnirsSpectroscopy(
-                      exposureTimeMode  = etm,
-                      centralWavelength = gn.centralWavelength,
-                      filter            = gn.filter,
-                      slitWidth         = gn.fpu,
-                      prism             = prism,
-                      grating           = grating,
-                      camera            = gn.camera,
-                      readMode          = gn.readMode,
-                      wellDepth         = gn.wellDepth
-                    )
-                    val consInput = obsParams.constraints.toInput
-                    val science   = SpectroscopyParameters(consInput, sciMode)
-                    val itcInput  =
-                      obsParams.targets
-                        .traverse(itcTargetParams)
-                        .map(ItcInput.ScienceOnlySpectroscopy(science, _))
-                        .leftMap(MissingParamSet.fromParams)
-                        .toEither
-                    GeneratorParams(itcInput, obsParams.scienceBand, gn, obsParams.calibrationRole, obsParams.declaredState, obsParams.executionState, obsParams.stepCount).asRight
-
-                  case GnirsAcquisitionMirrorMode.In =>
-                    Error.MisconfiguredObservation(obsParams.observationId, "GNIRS science mode cannot have acquisition mirror in the beam").asLeft
+              .map: etm =>
+                val sciMode = InstrumentMode.GnirsSpectroscopy(
+                  exposureTimeMode  = etm,
+                  centralWavelength = gn.centralWavelength,
+                  filter            = gn.filter,
+                  slitWidth         = gn.fpu,
+                  prism             = gn.prism,
+                  grating           = gn.grating,
+                  camera            = gn.camera,
+                  readMode          = gn.readMode,
+                  wellDepth         = gn.wellDepth
+                )
+                val consInput = obsParams.constraints.toInput
+                val science   = SpectroscopyParameters(consInput, sciMode)
+                val itcInput  =
+                  obsParams.targets
+                    .traverse(itcTargetParams)
+                    .map(ItcInput.ScienceOnlySpectroscopy(science, _))
+                    .leftMap(MissingParamSet.fromParams)
+                    .toEither
+                GeneratorParams(itcInput, obsParams.scienceBand, gn, obsParams.calibrationRole, obsParams.declaredState, obsParams.executionState, obsParams.stepCount)
 
           // Visitor Modes
           case vis: visitor.Config =>

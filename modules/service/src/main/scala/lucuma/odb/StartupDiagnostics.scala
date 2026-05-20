@@ -148,7 +148,6 @@ object StartupDiagnostics:
           checkPostgresLookupTable(gmos_south_fpu, "t_gmos_south_fpu"),
           checkPostgresLookupTable(gmos_south_grating, "t_gmos_south_disperser"),
           checkPostgresLookupTable(gmos_south_stage_mode, "t_gmos_south_stage_mode"),
-          checkPostgresLookupTable(gnirs_acquisition_mirror, "t_gnirs_acquisition_mirror"),
           checkPostgresLookupTable(gnirs_camera, "t_gnirs_camera"),
           checkPostgresLookupTable(gnirs_decker, "t_gnirs_decker"),
           checkPostgresLookupTable(gnirs_filter, "t_gnirs_filter"),

@@ -3,7 +3,6 @@
 
 package lucuma.odb.util
 
-import lucuma.core.enums.GnirsAcquisitionMirror
 import lucuma.core.enums.GnirsCamera
 import lucuma.core.enums.GnirsDecker
 import lucuma.core.enums.GnirsFilter
@@ -18,9 +17,6 @@ import skunk.data.Type
 trait GnirsCodecs:
 
   import Codecs.enumerated
-
-  val gnirs_acquisition_mirror: Codec[GnirsAcquisitionMirror] =
-    enumerated(Type.varchar)
 
   val gnirs_camera: Codec[GnirsCamera] =
     enumerated(Type.varchar)
