@@ -15333,6 +15333,56 @@ type Region {
   declinationArc: DeclinationArc!
 }
 
+"""
+Discriminator for `BasePosition`.
+`SINGLE_TARGET` indicates the asterism has exactly one target (sideral/non-sidereal/too) with no explicit base override
+`ASTERISM` indicates a multi-target asterism whose base is the calculated center position at observation time;
+`EXPLICIT_BASE` indicates the base position has been explicitly overridden on the target environment.
+"""
+enum BasePositionType {
+  SINGLE_TARGET
+  ASTERISM
+  EXPLICIT_BASE
+}
+
+"""
+The base position used by navigate to slew and track the target.
+The display name can be the original name or a composite.
+`type` indicates which of the tracking types are returned.
+At most one of `sidereal` / `nonsidereal` / `coordinates` is non-null.
+"""
+type BasePosition {
+  """
+  Source of this base position: a single science target, the center
+  position of a multi-target asterism, or an explicit base override.
+  """
+  type: BasePositionType!
+
+  """
+  For single-target bases this is the target's name. For
+  multi-target asterisms this is a truncated comma-separated list of target names.
+  """
+  name: NonEmptyString!
+
+  """
+  Sidereal tracking record.
+  Populated only when the base is a single sidereal target with no explicit base override.
+  """
+  sidereal: Sidereal
+
+  """
+  Nonsidereal tracking record.
+  Populated only when the base is a single nonsidereal target with no explicit base override.
+  """
+  nonsidereal: Nonsidereal
+
+  """
+  Fixed base coordinates at observation time. Populated for multi-target
+  asterisms and for explicit base overrides.
+  """
+  coordinates: Coordinates
+}
+
 type TargetEnvironment {
   """
   All the observation's science targets, if any
@@ -15355,14 +15405,12 @@ type TargetEnvironment {
   ): Target
 
   """
-  Explicit (if defined) or computed base position at the specified time, if known.
+  The base position used by navigate to slew and track the target.
+  Uses the observation's stored observation time.
+  Returns a GraphQL error when the observation time is required
+  to compute the base but is not set on the observation.
   """
-  basePosition(
-    """
-    The time used for the base position calculations.
-    """
-    observationTime: Timestamp!
-  ): Coordinates
+  basePosition: BasePosition
 
   """
   The guide target(s) and related information.

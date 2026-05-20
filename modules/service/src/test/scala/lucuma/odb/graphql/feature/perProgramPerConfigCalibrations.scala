@@ -113,8 +113,6 @@ class perProgramPerConfigCalibrations
       _ <- runObscalcUpdate(pid, oid)
     } yield ()
 
-
-
   val when = LocalDateTime.of(2024, 1, 1, 12, 0, 0).toInstant(ZoneOffset.UTC)
 
   // Utility classes used to decode group queries

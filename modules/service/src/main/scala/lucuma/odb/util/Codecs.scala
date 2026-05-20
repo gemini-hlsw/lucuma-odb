@@ -533,6 +533,9 @@ trait Codecs {
       RightAscension.fromAngleExact.reverseGet
     )
 
+  val coordinates: Codec[Coordinates] =
+    (right_ascension *: declination).imap(Coordinates.apply)(c => (c.ra, c.dec))
+
   val siderealTrackingDecoder: Decoder[SiderealTracking] =
     (right_ascension *: declination *: epoch *: proper_motion_ra.opt *: proper_motion_dec.opt *: radial_velocity.opt *: parallax.opt).emap {
       case (ra, dec, ep, pmRa, pmDec, rv, par) =>
