@@ -562,6 +562,41 @@ trait ExecutionTestSupportForGmos extends ExecutionTestSupport:
         .getOrElse(sys.error("Could not create observation"))
     }
 
+  def stepInput(filter: GmosNorthFilter): String =
+    s"""
+          {
+            instrumentConfig: {
+              exposure: {
+                seconds: 20
+              }
+              readout: {
+                xBin: ONE
+                yBin: ONE
+                ampCount: TWELVE
+                ampGain: LOW
+                ampReadMode: SLOW
+              }
+              dtax: ZERO
+              roi: FULL_FRAME
+              gratingConfig: {
+                grating: R831_G5302
+                order: ZERO
+                wavelength: {
+                  nanometers: 500.0
+                }
+              }
+              filter: ${filter.tag.toScreamingSnakeCase}
+              fpu: {
+                builtin: LONG_SLIT_0_50
+              }
+            }
+            stepConfig: {
+              science: true
+            }
+            observeClass: SCIENCE
+          }
+    """
+
   val createOngoingGmosNorthObservation: IO[Observation.Id] =
     for
       p <- createProgramAs(pi)
