@@ -19,15 +19,15 @@ import grackle.skunk.SkunkMapping
 import grackle.syntax.*
 import io.circe.refined.given
 import lucuma.catalog.clients.GaiaClient
-import lucuma.core.math.Coordinates
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
 import lucuma.itc.client.ItcClient
+import lucuma.odb.data.BasePosition
 import lucuma.odb.graphql.predicate.Predicates
-import lucuma.odb.json.coordinates.query.given
+import lucuma.odb.json.basePosition.given
 import lucuma.odb.service.GuideService
 import lucuma.odb.service.Services
 import org.http4s.client.Client
@@ -47,7 +47,6 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
   def gaiaClient: GaiaClient[F]
   def services: Resource[F, Services[F]]
 
-  private val ObsTimeParam           = "observationTime"
   private val AvailabilityStartParam = "start"
   private val AvailabilityEndParam   = "end"
 
@@ -132,18 +131,13 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
   }
 
   def basePositionQueryHandler: EffectHandler[F] = {
-    val readEnv: Env => Result[Timestamp] = _.getR[Timestamp](ObsTimeParam)
+    val readEnv: Env => Result[Unit] = _ => ().success
 
-    val calculate: (Program.Id, Observation.Id, Timestamp) => F[Result[Option[Coordinates]]] =
-      (_, oid, obsTime) =>
-        services.use { implicit services =>
+    val calculate: (Program.Id, Observation.Id, Unit) => F[Result[Option[BasePosition]]] =
+      (_, oid, _) =>
+        services.use: s =>
           Services.asSuperUser:
-            services
-              .trackingService
-              .getCoordinatesSnapshotOrRegion(oid, obsTime, false)
-              .map: res =>
-                res.map(_.left.toOption.map(_.base)) // treat region as None
-        }
+            s.trackingService.getBasePosition(oid)
 
     effectHandler(readEnv, calculate)
   }

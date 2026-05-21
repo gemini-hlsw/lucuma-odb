@@ -37,6 +37,8 @@ import lucuma.core.model.Tracking
 import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
 import lucuma.horizons.HorizonsClient
+import lucuma.odb.data.BasePosition
+import lucuma.odb.data.BasePositionType
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.service.Services.SuperUserAccess
@@ -132,6 +134,13 @@ trait TrackingService[F[_]]:
   def deleteUserSuppliedEphemeris(
     key: Ephemeris.Key.UserSupplied
   )(using SuperUserAccess): F[Result[Unit]]
+
+  /**
+   * Compute the base position used by navigate for slewing.
+   */
+  def getBasePosition(
+    oid: Observation.Id
+  )(using SuperUserAccess): F[Result[Option[BasePosition]]]
 
 object TrackingService:
 
@@ -336,6 +345,69 @@ object TrackingService:
       )(using SuperUserAccess): F[Result[Unit]] =
         deleteEphemeris(key).value
 
+      def getBasePosition(
+        oid: Observation.Id
+      )(using SuperUserAccess): F[Result[Option[BasePosition]]] = {
+
+        def singleTargetResult(t: Target): Result[Option[BasePosition]] =
+          val name = BasePosition.truncate(t.name)
+          t match
+            case s: Sidereal    => Result.success(BasePosition(BasePositionType.SingleTarget, name, Some(s), None,    None).some)
+            case n: Nonsidereal => Result.success(BasePosition(BasePositionType.SingleTarget, name, None,    Some(n), None).some)
+            case _: Opportunity => Result.success(None)
+
+        def explicitBaseResult(
+          targets: NonEmptyList[Target],
+          coords:  Coordinates
+        ): Result[Option[BasePosition]] =
+          // for asterisms we return the composite name
+          val name =
+            if targets.size === 1 then BasePosition.truncate(targets.head.name)
+            else BasePosition.composeName(targets)
+
+          Result.success(BasePosition(BasePositionType.ExplicitBase, name, None, None, Some(coords)).some)
+
+        def asterismResult(
+          oid:     Observation.Id,
+          targets: NonEmptyList[Target],
+          obsTime: Option[Timestamp]
+        )(using SuperUserAccess): F[Result[Option[BasePosition]]] =
+          if targets.exists { case _: Opportunity => true; case _ => false } then
+            Result.success(Option.empty[BasePosition]).pure[F]
+          else obsTime match
+            case None    =>
+              OdbError.InvalidObservation(
+                oid,
+                Some(s"Observation time is required to compute the asterism base position in observation $oid.")
+              ).asFailure.pure
+            case Some(t) =>
+              getCoordinatesSnapshotOrRegion(oid, t, false).map: res =>
+                res.flatMap:
+                  case Left(snap) =>
+                    Result.success(BasePosition(BasePositionType.Asterism, BasePosition.composeName(targets), None, None, Some(snap.base)).some)
+                  case Right(_)   =>
+                    OdbError.InvalidObservation(
+                      oid, 
+                      Some(s"Unexpected opportunity target in asterism for $oid.")
+                    ).asFailure
+
+        for {
+          obsInfo            <- session.prepareR(Statements.SelectObsTimeExplicitBase).use(_.option(oid))
+          asterismMap        <- asterismService.getAsterisms(List(oid))
+          (obsTime, expBase)  = obsInfo.getOrElse((Option.empty[Timestamp], Option.empty[Coordinates]))
+          result             <- NonEmptyList.fromList(asterismMap.getOrElse(oid, Nil).map(_._2)) match
+                                  case None          =>
+                                    OdbError.InvalidObservation(oid, Some(s"No targets are defined for $oid.")).asFailure.pure
+                                  case Some(targets) =>
+                                    expBase match
+                                      case Some(coords) =>
+                                        explicitBaseResult(targets, coords).pure
+                                      case _            =>
+                                        if targets.size === 1 then singleTargetResult(targets.head).pure[F]
+                                        else asterismResult(oid, targets, obsTime)
+        } yield result
+      }
+
       private def getSiteAndExplicitBaseCoordinates(oids: List[Observation.Id], when: TimestampInterval): F[(Map[Observation.Id, Coordinates], Map[Observation.Id, Site])] =
         NonEmptyList.fromList(oids.distinct) match
           case None => (Map.empty, Map.empty).pure[F]
@@ -491,15 +563,22 @@ object TrackingService:
                       )
           .combineAll
 
+    val SelectObsTimeExplicitBase: Query[Observation.Id, (Option[Timestamp], Option[Coordinates])] =
+      sql"""
+        SELECT c_observation_time, c_explicit_ra, c_explicit_dec
+        FROM   t_observation
+        WHERE  c_observation_id = $observation_id
+      """.query(core_timestamp.opt *: coordinates.opt)
+
     def selectSiteAndExplicitBaseCoordinates(oids: NonEmptyList[Observation.Id], when: TimestampInterval, metadata: Metadata): Query[oids.type, (Observation.Id, Option[Site], Option[Coordinates])] =
       sql"""
         SELECT c_observation_id, c_instrument, c_explicit_ra, c_explicit_dec
         FROM t_observation
         WHERE c_observation_id IN (${observation_id.nel(oids)})
       """
-        .query(observation_id *: instrument.opt *: right_ascension.opt *: declination.opt)
+        .query(observation_id *: instrument.opt *: coordinates.opt)
         .map:
-          case (oid, oinst, ora, odec) =>
+          case (oid, oinst, ocoords) =>
 
             val osite: Option[Site] =
               oinst.flatMap: inst =>
@@ -507,7 +586,7 @@ object TrackingService:
                   .availability(inst)
                   .siteForRange(cats.collections.Range(when.start.toInstant, when.end.toInstant))
 
-            (oid, osite, (ora, odec).mapN(Coordinates.apply))
+            (oid, osite, ocoords)
 
     def storeEphemeris[A <: NonEmptyList[StorableEphemerisElement]](entries: A): Command[entries.type] = {
 
