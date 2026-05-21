@@ -418,6 +418,7 @@ object ConfigurationService {
                           disperser
                         }
                         gnirsLongSlit {
+                          grating
                           camera
                           prism
                         }
@@ -522,6 +523,7 @@ object ConfigurationService {
                     disperser
                   }
                   gnirsLongSlit {
+                    grating
                     camera
                     prism
                   }
@@ -749,6 +751,7 @@ object ConfigurationService {
                             disperser
                           }
                           gnirsLongSlit {
+                            grating
                             camera
                             prism
                           }
