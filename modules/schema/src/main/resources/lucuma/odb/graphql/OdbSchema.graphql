@@ -9283,12 +9283,12 @@ type TelescopeConfigAlongSlit {
 
 """
 A list of telescope configurations associated with a slit. The discriminant
-`offsetMode` selects which of `alongSlit` or `onSky` is populated.
+`offsetMode` selects which of `alongSlit` or `toSky` is populated.
 """
 type SlitTelescopeConfigs {
   offsetMode: SlitOffsetMode!
   alongSlit: [TelescopeConfigAlongSlit!]
-  onSky: [TelescopeConfig!]
+  toSky: [TelescopeConfig!]
 }
 
 input TelescopeConfigAlongSlitInput {
@@ -9298,7 +9298,7 @@ input TelescopeConfigAlongSlitInput {
 
 input SlitTelescopeConfigsInput {
   alongSlit: [TelescopeConfigAlongSlitInput!]
-  onSky: [TelescopeConfigInput!]
+  toSky: [TelescopeConfigInput!]
 }
 
 """

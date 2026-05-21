@@ -44,21 +44,21 @@ trait GnirsLongSlitMapping[F[_]]
     )
 
   // Encodes a SlitTelescopeConfigs as the JSON shape expected for the GraphQL
-  // SlitTelescopeConfigs type: { offsetMode, alongSlit, onSky } where exactly
-  // one of alongSlit / onSky is non-null depending on the discriminant.
+  // SlitTelescopeConfigs type: { offsetMode, alongSlit, toSky } where exactly
+  // one of alongSlit / toSky is non-null depending on the discriminant.
   private def slitTelescopeConfigsJson(mode: SlitOffsetMode, json: String): Json =
     SlitTelescopeConfigsFormat.getOption((mode, json)).fold(Json.Null):
       case lucuma.core.model.SlitTelescopeConfigs.AlongSlit(nel) =>
         Json.obj(
           "offsetMode" -> mode.asJson,
           "alongSlit"  -> nel.toList.map(c => telescopeConfigAlongSlitJson(c.offset, c.guiding)).asJson,
-          "onSky"      -> Json.Null
+          "toSky"      -> Json.Null
         )
       case lucuma.core.model.SlitTelescopeConfigs.ToSky(nel) =>
         Json.obj(
           "offsetMode" -> mode.asJson,
           "alongSlit"  -> Json.Null,
-          "onSky"      -> nel.toList.map(tc => telescopeConfigJson(tc.offset, tc.guiding)).asJson
+          "toSky"      -> nel.toList.map(tc => telescopeConfigJson(tc.offset, tc.guiding)).asJson
         )
 
   lazy val GnirsLongSlitAcquisitionMapping: ObjectMapping =

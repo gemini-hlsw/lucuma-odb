@@ -44,7 +44,7 @@ object GnirsLongSlitInput:
       ObjectFieldsBinding.rmap:
         case List(
           TelescopeConfigAlongSlitInput.Binding.List.Option("alongSlit", rAlongSlit),
-          TelescopeConfigInput.Binding.List.Option("onSky", rOnSky)
+          TelescopeConfigInput.Binding.List.Option("toSky", rOnSky)
         ) =>
           (rAlongSlit, rOnSky).tupled.flatMap:
             case (Some(cs), None) =>
@@ -53,10 +53,10 @@ object GnirsLongSlitInput:
               )(nel => Result(SlitTelescopeConfigs.AlongSlit(nel)))
             case (None, Some(cs)) =>
               NonEmptyList.fromList(cs).fold(
-                Matcher.validationFailure("onSky must not be empty")
+                Matcher.validationFailure("toSky must not be empty")
               )(nel => Result(SlitTelescopeConfigs.ToSky(nel)))
             case _ =>
-              Matcher.validationFailure("Exactly one of alongSlit or onSky must be provided")
+              Matcher.validationFailure("Exactly one of alongSlit or toSky must be provided")
 
   case class AcquisitionInput(
     filter:           Option[GnirsFilter],

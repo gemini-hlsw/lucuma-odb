@@ -85,7 +85,7 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                         telescopeConfigs {
                           offsetMode
                           alongSlit { q { arcseconds } guiding }
-                          onSky { offset { p { arcseconds } q { arcseconds } } guiding }
+                          toSky { offset { p { arcseconds } q { arcseconds } } guiding }
                         }
                         exposureTimeMode {
                           timeAndCount { time { seconds } count at { nanometers } }
@@ -146,7 +146,7 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                           { "q": { "arcseconds": -4.000000 }, "guiding": "ENABLED" },
                           { "q": { "arcseconds": 2.000000 },  "guiding": "ENABLED" }
                         ],
-                        "onSky": null
+                        "toSky": null
                       },
                       "exposureTimeMode": {
                         "timeAndCount": {
