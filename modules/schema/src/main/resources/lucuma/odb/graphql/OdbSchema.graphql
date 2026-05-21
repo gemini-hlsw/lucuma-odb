@@ -9336,7 +9336,7 @@ input GnirsLongSlitInput {
 
   explicitWellDepth: GnirsWellDepth
 
-  telescopeConfigs: SlitTelescopeConfigsInput
+  explicitTelescopeConfigs: SlitTelescopeConfigsInput
 
   acquisition: GnirsLongSlitAcquisitionInput
 

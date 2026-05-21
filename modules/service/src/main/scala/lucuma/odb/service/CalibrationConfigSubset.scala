@@ -53,7 +53,6 @@ object CalibrationConfigSubset:
   case object GhostConfigs extends CalibrationConfigSubset derives Eq:
     def modeType: ObservingModeType = ObservingModeType.GhostIfu
 
-  // TODO: What do we need here?
   case object GnirsLongSlitConfigs extends CalibrationConfigSubset derives Eq:
     def modeType: ObservingModeType = ObservingModeType.GnirsLongSlit
 

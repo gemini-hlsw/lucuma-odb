@@ -27,6 +27,7 @@ import lucuma.core.model.Observation
 import lucuma.core.model.sequence.gnirs.GnirsFocus
 import lucuma.core.model.sequence.gnirs.GnirsFocusMotorStep
 import lucuma.core.model.sequence.gnirs.GnirsFocusMotorStepsValue
+import lucuma.core.util.TimeSpan
 import lucuma.odb.data.ExposureTimeModeRole
 import lucuma.odb.format.telescopeConfigs.*
 import lucuma.odb.graphql.input.GnirsLongSlitInput
@@ -95,10 +96,10 @@ object GnirsLongSlitService:
         // Focus motor steps (nullable = Best)
         int4.opt                         *:
         // Telescope configs: explicit (both nullable) + default
-        slit_offset_mode.opt   *: // c_slit_offset_mode (explicit)
-        text.opt                     *: // c_telescope_configs (explicit)
-        slit_offset_mode       *: // c_slit_offset_mode_default
-        text                         *: // c_telescope_configs_default
+        slit_offset_mode.opt             *: // c_slit_offset_mode (explicit)
+        text.opt                         *: // c_telescope_configs (explicit)
+        slit_offset_mode                 *: // c_slit_offset_mode_default
+        text                             *: // c_telescope_configs_default
         // Acquisition inline fields
         gnirs_obs_read_mode              *: // c_acq_read_mode
         int4                             *: // c_acq_coadds
@@ -264,9 +265,9 @@ object GnirsLongSlitService:
     private def defaultAcqFilter(input: GnirsLongSlitInput.Create): GnirsFilter =
       input.acquisition.flatMap(_.filter).getOrElse(input.filter)
 
-    private def defaultAcqExpTime(input: GnirsLongSlitInput.Create): lucuma.core.util.TimeSpan =
+    private def defaultAcqExpTime(input: GnirsLongSlitInput.Create): TimeSpan =
       input.acquisition.flatMap(_.exposureTimeMode).map(_.time)
-        .getOrElse(lucuma.core.util.TimeSpan.fromSeconds(1).get)
+        .getOrElse(TimeSpan.fromSeconds(1).get)
 
     private def defaultAcqExpCount(input: GnirsLongSlitInput.Create): PosInt =
       input.acquisition.flatMap(_.exposureTimeMode).map(_.count)
@@ -305,7 +306,7 @@ object GnirsLongSlitService:
       GnirsFilter,
       Option[Long],           // acq_offset_p in µas
       Option[Long],           // acq_offset_q in µas
-      lucuma.core.util.TimeSpan,
+      TimeSpan,
       Int,
       Wavelength
     )] =
@@ -392,7 +393,7 @@ object GnirsLongSlitService:
       observationId: Observation.Id,
       input: GnirsLongSlitInput.Create
     ): AppliedFragment =
-      val explicitTC = input.telescopeConfigs.map(SlitTelescopeConfigsFormat.reverseGet)
+      val explicitTC = input.explicitTelescopeConfigs.map(SlitTelescopeConfigsFormat.reverseGet)
       val acqOffP = input.acquisition.flatMap(_.offset).map(o => Angle.microarcseconds.get(o.p.toAngle))
       val acqOffQ = input.acquisition.flatMap(_.offset).map(o => Angle.microarcseconds.get(o.q.toAngle))
       InsertGnirsLongSlit.apply(
@@ -455,7 +456,7 @@ object GnirsLongSlitService:
       val upAcqExpAt     = sql"c_acq_exp_at    = $wavelength_pm"
 
       val upTelescope: Option[List[AppliedFragment]] =
-        SET.telescopeConfigs.toOptionOption.map:
+        SET.explicitTelescopeConfigs.toOptionOption.map:
           case Some(tc) =>
             val (mode, off) = SlitTelescopeConfigsFormat.reverseGet(tc)
             List(upSlitMode(Some(mode)), upOffsets(Some(off)))

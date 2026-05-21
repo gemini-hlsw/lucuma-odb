@@ -18,7 +18,9 @@ import lucuma.core.enums.GnirsObsReadMode
 import lucuma.core.enums.GnirsWellDepth
 import lucuma.core.enums.SlitOffsetMode
 import lucuma.core.enums.StepGuideState
+import lucuma.core.math.Angle
 import lucuma.core.math.Offset
+import lucuma.core.model.SlitTelescopeConfigs
 import lucuma.odb.data.ExposureTimeModeRole
 import lucuma.odb.format.telescopeConfigs.*
 import lucuma.odb.graphql.predicate.Predicates
@@ -48,13 +50,13 @@ trait GnirsLongSlitMapping[F[_]]
   // one of alongSlit / toSky is non-null depending on the discriminant.
   private def slitTelescopeConfigsJson(mode: SlitOffsetMode, json: String): Json =
     SlitTelescopeConfigsFormat.getOption((mode, json)).fold(Json.Null):
-      case lucuma.core.model.SlitTelescopeConfigs.AlongSlit(nel) =>
+      case SlitTelescopeConfigs.AlongSlit(nel) =>
         Json.obj(
           "offsetMode" -> mode.asJson,
           "alongSlit"  -> nel.toList.map(c => telescopeConfigAlongSlitJson(c.offset, c.guiding)).asJson,
           "toSky"      -> Json.Null
         )
-      case lucuma.core.model.SlitTelescopeConfigs.ToSky(nel) =>
+      case SlitTelescopeConfigs.ToSky(nel) =>
         Json.obj(
           "offsetMode" -> mode.asJson,
           "alongSlit"  -> Json.Null,
@@ -76,8 +78,8 @@ trait GnirsLongSlitMapping[F[_]]
       CursorFieldJson("offset",
         cursor =>
           for
-            p <- cursor.field("acqOffPRaw", None).flatMap(_.as[Option[lucuma.core.math.Angle]])
-            q <- cursor.field("acqOffQRaw", None).flatMap(_.as[Option[lucuma.core.math.Angle]])
+            p <- cursor.field("acqOffPRaw", None).flatMap(_.as[Option[Angle]])
+            q <- cursor.field("acqOffQRaw", None).flatMap(_.as[Option[Angle]])
           yield (p, q) match
             case (Some(pa), Some(qa)) =>
               Offset(Offset.P(pa), Offset.Q(qa)).asJson

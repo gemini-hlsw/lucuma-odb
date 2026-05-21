@@ -21,6 +21,7 @@ import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.StepGuideState
 import lucuma.core.math.Offset
 import lucuma.core.math.Wavelength
+import lucuma.core.model.Access
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.ExposureTimeMode.TimeAndCountMode
 import lucuma.core.model.SlitTelescopeConfigs
@@ -100,7 +101,7 @@ object GnirsLongSlitInput:
     explicitFocusMotorSteps:      Option[Int]                      = None,
     explicitReadMode:             Option[GnirsObsReadMode]         = None,
     explicitWellDepth:            Option[GnirsWellDepth]           = None,
-    telescopeConfigs:             Option[SlitTelescopeConfigs]     = None,
+    explicitTelescopeConfigs:     Option[SlitTelescopeConfigs]     = None,
     acquisition:                  Option[AcquisitionInput]         = None
   ):
     def observingModeType: ObservingModeType = ObservingModeType.GnirsLongSlit
@@ -124,18 +125,18 @@ object GnirsLongSlitInput:
           IntBinding.Option("explicitFocus", rFocus),
           GnirsObsReadModeBinding.Option("explicitReadMode", rReadMode),
           GnirsWellDepthBinding.Option("explicitWellDepth", rWellDepth),
-          SlitTelescopeConfigsInput.Binding.Option("telescopeConfigs", rTelescope),
+          SlitTelescopeConfigsInput.Binding.Option("explicitTelescopeConfigs", rExplTelescope),
           AcquisitionInput.Binding.Option("acquisition", rAcq)
         ) =>
           (rEtm, rCoadds, rWavelength, rFilter, rFpu, rCamera, rGrating, rPrism,
            rDecker, rGratingWavelength, rExplGrating, rExplPrism,
-           rFocus, rReadMode, rWellDepth, rTelescope, rAcq).parMapN:
+           rFocus, rReadMode, rWellDepth, rExplTelescope, rAcq).parMapN:
             (etm, coadds, wavelength, filter, fpu, camera, grating, prism,
              decker, gratingWavelength, explGrating, explPrism,
-             focus, readMode, wellDepth, telescope, acq) =>
+             focus, readMode, wellDepth, explTelescope, acq) =>
               Create(etm, coadds, wavelength, filter, fpu, camera, grating, prism,
                      decker, gratingWavelength, explGrating, explPrism,
-                     focus, readMode, wellDepth, telescope, acq)
+                     focus, readMode, wellDepth, explTelescope, acq)
 
   case class Edit(
     exposureTimeMode:          Option[ExposureTimeMode],
@@ -153,12 +154,12 @@ object GnirsLongSlitInput:
     explicitFocusMotorSteps:   Nullable[Int],
     explicitReadMode:          Nullable[GnirsObsReadMode],
     explicitWellDepth:         Nullable[GnirsWellDepth],
-    telescopeConfigs:          Nullable[SlitTelescopeConfigs], // Nullable to allow clearing to default
+    explicitTelescopeConfigs:  Nullable[SlitTelescopeConfigs], // Nullable to allow clearing to default
     acquisition:               Option[AcquisitionInput]
   ):
     def observingModeType: ObservingModeType = ObservingModeType.GnirsLongSlit
     def updatesAcquisition: Boolean = acquisition.isDefined
-    def limitToPreExecution(access: lucuma.core.model.Access): Boolean = false
+    def limitToPreExecution(access: Access): Boolean = false
     def toCreate: Result[Create] =
       def required[A](oa: Option[A], name: String): Result[A] =
         Result.fromOption(oa, Matcher.validationProblem(s"A $name is required to create a GNIRS Long Slit observing mode."))
@@ -172,7 +173,7 @@ object GnirsLongSlitInput:
                    explicitDecker.toOption, explicitGratingWavelength.toOption,
                    explicitGrating.toOption, explicitPrism.toOption,
                    explicitFocusMotorSteps.toOption, explicitReadMode.toOption, explicitWellDepth.toOption,
-                   telescopeConfigs.toOption, acquisition)
+                   explicitTelescopeConfigs.toOption, acquisition)
 
   object Edit:
     val Binding: Matcher[Edit] =
@@ -193,9 +194,9 @@ object GnirsLongSlitInput:
           IntBinding.Nullable("explicitFocus", rFocus),
           GnirsObsReadModeBinding.Nullable("explicitReadMode", rReadMode),
           GnirsWellDepthBinding.Nullable("explicitWellDepth", rWellDepth),
-          SlitTelescopeConfigsInput.Binding.Nullable("telescopeConfigs", rTelescope),
+          SlitTelescopeConfigsInput.Binding.Nullable("explicitTelescopeConfigs", rExplTelescope),
           AcquisitionInput.Binding.Option("acquisition", rAcq)
         ) =>
           (rEtm, rCoadds, rWavelength, rFilter, rFpu, rCamera, rGrating, rPrism,
            rDecker, rGratingWavelength, rExplGrating, rExplPrism,
-           rFocus, rReadMode, rWellDepth, rTelescope, rAcq).parMapN(Edit.apply)
+           rFocus, rReadMode, rWellDepth, rExplTelescope, rAcq).parMapN(Edit.apply)

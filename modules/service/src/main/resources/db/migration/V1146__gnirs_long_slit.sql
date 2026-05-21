@@ -169,64 +169,29 @@ CREATE VIEW v_gnirs_long_slit AS
       END AS c_telescope_configs_default
   ) d;
 
--- Update v_observing_mode_group to include GNIRS LongSlit
+-- Extend v_all_modes with GNIRS LongSlit and refresh v_observing_mode_group (same
+-- pattern as V1119__ghost.sql).
+CREATE OR REPLACE VIEW v_all_modes AS
+  SELECT c_mode_key, c_observation_id FROM t_flamingos_2_long_slit
+  UNION ALL
+  SELECT c_mode_key, c_observation_id FROM t_ghost_ifu
+  UNION ALL
+  SELECT c_mode_key, c_observation_id FROM t_gmos_north_long_slit
+  UNION ALL
+  SELECT c_mode_key, c_observation_id FROM t_gmos_south_long_slit
+  UNION ALL
+  SELECT c_mode_key, c_observation_id FROM t_igrins_2_long_slit
+  UNION ALL
+  SELECT c_mode_key, c_observation_id FROM t_gnirs_long_slit;
+
 CREATE OR REPLACE VIEW v_observing_mode_group AS
--- GMOS-N LongSlit
   SELECT
     m.c_mode_key,
     o.c_program_id,
     max(m.c_observation_id) as c_observation_id
   FROM
-    t_gmos_north_long_slit m
-  JOIN t_observation o ON m.c_observation_id = o.c_observation_id
-  GROUP BY
-    m.c_mode_key,
-    o.c_program_id
--- GMOS-S LongSlit
-UNION ALL
-  SELECT
-    m.c_mode_key,
-    o.c_program_id,
-    max(m.c_observation_id) as c_observation_id
-  FROM
-    t_gmos_south_long_slit m
-  JOIN t_observation o ON m.c_observation_id = o.c_observation_id
-  GROUP BY
-    m.c_mode_key,
-    o.c_program_id
--- F2 LongSlit
-UNION ALL
-  SELECT
-    m.c_mode_key,
-    o.c_program_id,
-    max(m.c_observation_id) as c_observation_id
-  FROM
-    t_flamingos_2_long_slit m
-  JOIN t_observation o ON m.c_observation_id = o.c_observation_id
-  GROUP BY
-    m.c_mode_key,
-    o.c_program_id
--- IGRINS-2 LongSlit
-UNION ALL
-  SELECT
-    m.c_mode_key,
-    o.c_program_id,
-    max(m.c_observation_id) as c_observation_id
-  FROM
-    t_igrins_2_long_slit m
-  JOIN t_observation o ON m.c_observation_id = o.c_observation_id
-  GROUP BY
-    m.c_mode_key,
-    o.c_program_id
--- GNIRS LongSlit
-UNION ALL
-  SELECT
-    m.c_mode_key,
-    o.c_program_id,
-    max(m.c_observation_id) as c_observation_id
-  FROM
-    t_gnirs_long_slit m
-  JOIN t_observation o ON m.c_observation_id = o.c_observation_id
+    v_all_modes m
+  JOIN t_observation o USING (c_observation_id)
   GROUP BY
     m.c_mode_key,
     o.c_program_id;
