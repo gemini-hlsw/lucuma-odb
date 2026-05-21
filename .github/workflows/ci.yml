@@ -190,21 +190,21 @@ jobs:
       - name: Static checks
         run: sbt -v -J-Xmx6g '++ ${{ matrix.scala }}' headerCheckAll scalafmtCheckAll 'project /' scalafmtSbtCheck lucumaScalafmtCheck lucumaScalafixCheck 'scalafixAll --check' mimaReportBinaryIssues doc
 
+      - name: Install npm dependencies
+        if: github.event_name == 'pull_request'
+        run: npm ci
+
       - name: Validate ODB GraphQL schema changes
         if: github.event_name == 'pull_request'
-        uses: kamilkisiela/graphql-inspector@master
-        with:
-          name: Validate ODB Public API
-          schema: 'main:modules/schema/src/main/resources/lucuma/odb/graphql/OdbSchema.graphql'
-          approve-label: expected-breaking-change
+        run: node .github/validate-schema.mjs modules/schema/src/main/resources/lucuma/odb/graphql/OdbSchema.graphql
 
       - name: Validate ITC GraphQL schema changes
         if: github.event_name == 'pull_request'
-        uses: kamilkisiela/graphql-inspector@master
-        with:
-          name: Validate ITC Public API
-          schema: 'main:itc/service/src/main/resources/graphql/itc.graphql'
-          approve-label: expected-breaking-change
+        run: node .github/validate-schema.mjs itc/service/src/main/resources/graphql/itc.graphql
+
+      - name: Validate Resource GraphQL schema changes
+        if: github.event_name == 'pull_request'
+        run: node .github/validate-schema.mjs resource/service/src/main/resources/graphql/resource.graphql
 
   deploy:
     name: Build and publish Docker images / Deploy to Heroku
