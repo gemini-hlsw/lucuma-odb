@@ -77,15 +77,16 @@ CREATE TABLE t_gnirs_long_slit (
   c_slit_offset_mode d_tag NULL REFERENCES t_slit_offset_mode(c_tag),
   c_telescope_configs text  NULL,
 
-  -- Acquisition configuration (TimeAndCount ETM stored inline)
+  -- Acquisition configuration (ETM stored in t_exposure_time_mode, referenced via FK)
   c_acq_read_mode d_tag           NOT NULL REFERENCES t_gnirs_obs_read_mode(c_tag),
   c_acq_coadds    int4            NOT NULL DEFAULT 1 CHECK (c_acq_coadds > 0),
   c_acq_filter    d_tag           NOT NULL REFERENCES t_gnirs_filter(c_tag),
   c_acq_offset_p  d_angle_µas NULL,
   c_acq_offset_q  d_angle_µas NULL,
-  c_acq_exp_time  interval        NOT NULL CHECK (c_acq_exp_time >= '0'),
-  c_acq_exp_count int4            NOT NULL CHECK (c_acq_exp_count > 0),
-  c_acq_exp_at    d_wavelength_pm NOT NULL,
+
+  -- Exposure time mode FKs (rows in t_exposure_time_mode are tagged with role)
+  c_science_exposure_time_mode_id     integer NOT NULL REFERENCES t_exposure_time_mode(c_exposure_time_mode_id),
+  c_acquisition_exposure_time_mode_id integer NOT NULL REFERENCES t_exposure_time_mode(c_exposure_time_mode_id),
 
   -- Mode key for config grouping (initial grating/prism/fpu)
   c_mode_key text GENERATED ALWAYS AS (
@@ -169,6 +170,24 @@ CREATE VIEW v_gnirs_long_slit AS
       END AS c_telescope_configs_default
   ) d;
 
+-- Dedicated views joining t_exposure_time_mode with t_gnirs_long_slit by FK.
+-- Same pattern as V1120__ghost.sql; these support per-role Grackle mappings.
+CREATE VIEW v_gnirs_science_exposure_time_mode AS
+  SELECT
+    e.*,
+    CASE WHEN e.c_exposure_time_mode = 'signal_to_noise' THEN e.c_exposure_time_mode_id END AS c_signal_to_noise_id,
+    CASE WHEN e.c_exposure_time_mode = 'time_and_count'  THEN e.c_exposure_time_mode_id END AS c_time_and_count_id
+  FROM t_exposure_time_mode e
+  INNER JOIN t_gnirs_long_slit g ON g.c_science_exposure_time_mode_id = e.c_exposure_time_mode_id;
+
+CREATE VIEW v_gnirs_acquisition_exposure_time_mode AS
+  SELECT
+    e.*,
+    CASE WHEN e.c_exposure_time_mode = 'signal_to_noise' THEN e.c_exposure_time_mode_id END AS c_signal_to_noise_id,
+    CASE WHEN e.c_exposure_time_mode = 'time_and_count'  THEN e.c_exposure_time_mode_id END AS c_time_and_count_id
+  FROM t_exposure_time_mode e
+  INNER JOIN t_gnirs_long_slit g ON g.c_acquisition_exposure_time_mode_id = e.c_exposure_time_mode_id;
+
 -- Extend v_all_modes with GNIRS LongSlit and refresh v_observing_mode_group (same
 -- pattern as V1119__ghost.sql).
 CREATE OR REPLACE VIEW v_all_modes AS
@@ -200,7 +219,7 @@ CREATE OR REPLACE VIEW v_observing_mode_group AS
 SELECT register_observing_mode('gnirs_long_slit', 't_gnirs_long_slit');
 
 -- Update check_etm_consistent to handle gnirs_long_slit:
--- acquisition ETM is stored inline in t_gnirs_long_slit; only one science ETM in t_exposure_time_mode
+-- both acquisition and science ETMs live in t_exposure_time_mode (referenced via FK from t_gnirs_long_slit)
 CREATE OR REPLACE FUNCTION check_etm_consistent()
 RETURNS TRIGGER AS $$
 DECLARE
@@ -232,7 +251,7 @@ BEGIN
   ELSE
 
     CASE
-      WHEN obs_mode IN ('flamingos_2_long_slit', 'gmos_north_long_slit', 'gmos_south_long_slit') THEN
+      WHEN obs_mode IN ('flamingos_2_long_slit', 'gmos_north_long_slit', 'gmos_south_long_slit', 'gnirs_long_slit') THEN
         IF acq_count <> 1 THEN
           RAISE EXCEPTION 'Observation % with mode % must have an acquisition exposure time mode', obs_id, obs_mode;
         END IF;
@@ -246,7 +265,7 @@ BEGIN
           RAISE EXCEPTION 'Observation % with mode % must have two science exposure time modes (red and blue camera)', obs_id, obs_mode;
         END IF;
 
-      WHEN obs_mode IN ('igrins_2_long_slit', 'gnirs_long_slit') THEN
+      WHEN obs_mode = 'igrins_2_long_slit' THEN
         IF sci_count <> 1 THEN
           RAISE EXCEPTION 'Observation % with mode % must have exactly one science exposure time mode', obs_id, obs_mode;
         END IF;

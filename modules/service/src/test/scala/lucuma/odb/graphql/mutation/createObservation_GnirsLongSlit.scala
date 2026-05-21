@@ -95,9 +95,10 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                           coadds
                           filter
                           offset { p { arcseconds } q { arcseconds } }
-                          exposureTime { seconds }
-                          exposureCount
-                          exposureAt { nanometers }
+                          exposureTimeMode {
+                            signalToNoise { value at { nanometers } }
+                            timeAndCount { time { seconds } count at { nanometers } }
+                          }
                         }
                       }
                     }
@@ -160,9 +161,13 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                         "coadds": 1,
                         "filter": "ORDER3",
                         "offset": null,
-                        "exposureTime": { "seconds": 1.000000 },
-                        "exposureCount": 1,
-                        "exposureAt": { "nanometers": 2200.000 }
+                        "exposureTimeMode": {
+                          "signalToNoise": {
+                            "value": 10.000,
+                            "at": { "nanometers": 2200.000 }
+                          },
+                          "timeAndCount": null
+                        }
                       }
                     }
                   }

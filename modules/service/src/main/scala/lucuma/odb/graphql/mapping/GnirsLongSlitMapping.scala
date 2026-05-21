@@ -87,9 +87,7 @@ trait GnirsLongSlitMapping[F[_]]
         List("acqOffPRaw", "acqOffQRaw")
       ),
 
-      SqlObject("exposureTime"),
-      SqlField("exposureCount", GnirsLongSlitView.AcqExpCount),
-      SqlObject("exposureAt"),
+      SqlObject("exposureTimeMode", Join(GnirsLongSlitView.ObservationId, GnirsAcqExposureTimeModeView.ObservationId)),
     )
 
   lazy val GnirsLongSlitMapping: ObjectMapping =
@@ -97,7 +95,7 @@ trait GnirsLongSlitMapping[F[_]]
 
       SqlField("observationId", GnirsLongSlitView.ObservationId, key = true, hidden = true),
 
-      SqlObject("exposureTimeMode", Join(GnirsLongSlitView.ObservationId, ExposureTimeModeView.ObservationId)),
+      SqlObject("exposureTimeMode", Join(GnirsLongSlitView.ObservationId, GnirsSciExposureTimeModeView.ObservationId)),
 
       // Grating: effective = COALESCE(explicit, initial)
       SqlField("grating",        GnirsLongSlitView.GratingEffective),
@@ -193,6 +191,15 @@ trait GnirsLongSlitMapping[F[_]]
         Unique(
           Filter(
             Predicates.exposureTimeMode.role.eql(ExposureTimeModeRole.Science),
+            child
+          )
+        )
+
+    case (GnirsLongSlitAcquisitionType, "exposureTimeMode", Nil) =>
+      Elab.transformChild: child =>
+        Unique(
+          Filter(
+            Predicates.exposureTimeMode.role.eql(ExposureTimeModeRole.Acquisition),
             child
           )
         )

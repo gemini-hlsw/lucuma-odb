@@ -65,7 +65,6 @@ trait TimeSpanMapping[F[_]] extends AllocationTable[F]
       timeSpanMappingAtPath(StepRecordType / "ghost" / "blue" / "exposureTime", GhostDynamicTable.Blue.ExposureTime)(GhostDynamicTable.Id),
       timeSpanMappingAtPath(StepRecordType / "gmosNorth" / "exposure", GmosNorthDynamicTable.ExposureTime)(GmosNorthDynamicTable.Id),
       timeSpanMappingAtPath(StepRecordType / "gmosSouth" / "exposure", GmosSouthDynamicTable.ExposureTime)(GmosSouthDynamicTable.Id),
-      timeSpanMappingAtPath(GnirsLongSlitAcquisitionType / "exposureTime", GnirsLongSlitView.AcqExpTime)(GnirsLongSlitView.ObservationId),
       timeSpanMappingAtPath(StepRecordType / "igrins2" / "exposure", Igrins2DynamicTable.ExposureTime)(Igrins2DynamicTable.Id),
       timeSpanMappingAtPath(TimeAndCountExposureTimeModeType / "time", TimeAndCount.Time)(TimeAndCount.SyntheticId),
       timeSpanMappingAtPath(TimeChargeCorrectionType / "amount", TimeChargeCorrectionTable.Amount)(TimeChargeCorrectionTable.Id),

@@ -55,15 +55,12 @@ trait GnirsLongSlitView[F[_]] extends BaseMapping[F]:
     val SlitOffsetModeEffective: ColumnRef   = col("c_slit_offset_mode_effective", slit_offset_mode)
     val TelescopeConfigsEffective: ColumnRef = col("c_telescope_configs_effective", text)
 
-    // Acquisition inline config
+    // Acquisition config (ETM stored in t_exposure_time_mode via FK)
     val AcqReadMode: ColumnRef      = col("c_acq_read_mode", gnirs_obs_read_mode)
     val AcqCoadds: ColumnRef        = col("c_acq_coadds", int4_pos)
     val AcqFilter: ColumnRef        = col("c_acq_filter", gnirs_filter)
     val AcqOffsetP: ColumnRef       = col("c_acq_offset_p", angle_µas.opt)
     val AcqOffsetQ: ColumnRef       = col("c_acq_offset_q", angle_µas.opt)
-    val AcqExpTime: ColumnRef       = col("c_acq_exp_time", time_span)
-    val AcqExpCount: ColumnRef      = col("c_acq_exp_count", int4_pos)
-    val AcqExpAt: ColumnRef         = col("c_acq_exp_at", wavelength_pm)
 
     // View-computed defaults
     val DefaultDecker: ColumnRef    = col("c_decker_default", gnirs_decker)

@@ -79,5 +79,4 @@ trait WavelengthMapping[F[_]]
       wavelengthMappingAtPath(GnirsLongSlitType / "gratingWavelength",         GnirsLongSlitView.GratingWavelengthEffective, GnirsLongSlitView.ObservationId),
       wavelengthMappingAtPath(GnirsLongSlitType / "explicitGratingWavelength", GnirsLongSlitView.GratingWavelengthValue, GnirsLongSlitView.GratingWavelength),
       wavelengthMappingAtPath(GnirsLongSlitType / "defaultGratingWavelength",  GnirsLongSlitView.DefaultGratingWavelength,   GnirsLongSlitView.ObservationId),
-      wavelengthMappingAtPath(GnirsLongSlitAcquisitionType / "exposureAt",     GnirsLongSlitView.AcqExpAt,                       GnirsLongSlitView.ObservationId),
     )

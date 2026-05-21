@@ -27,7 +27,7 @@ import lucuma.core.model.Observation
 import lucuma.core.model.sequence.gnirs.GnirsFocus
 import lucuma.core.model.sequence.gnirs.GnirsFocusMotorStep
 import lucuma.core.model.sequence.gnirs.GnirsFocusMotorStepsValue
-import lucuma.core.util.TimeSpan
+import lucuma.odb.data.ExposureTimeModeId
 import lucuma.odb.data.ExposureTimeModeRole
 import lucuma.odb.format.telescopeConfigs.*
 import lucuma.odb.graphql.input.GnirsLongSlitInput
@@ -59,7 +59,11 @@ trait GnirsLongSlitService[F[_]]:
     which: List[Observation.Id]
   )(using Transaction[F]): F[Unit]
 
-  def clone(originalId: Observation.Id, newId: Observation.Id)(using Transaction[F]): F[Unit]
+  def clone(
+    originalId: Observation.Id,
+    newId:      Observation.Id,
+    etms:       List[(ExposureTimeModeId, ExposureTimeModeId)]
+  )(using Transaction[F]): F[Unit]
 
 object GnirsLongSlitService:
 
@@ -68,7 +72,7 @@ object GnirsLongSlitService:
     new GnirsLongSlitService[F]:
 
       val gnirsLS: Decoder[Config] = (
-        // Science ETM (joined from t_exposure_time_mode)
+        // Science ETM (joined from t_exposure_time_mode via FK)
         exposure_time_mode               *:
         // Effective grating/prism/wavelength for the acquisition configuration
         gnirs_grating                    *: // c_grating_effective
@@ -100,15 +104,13 @@ object GnirsLongSlitService:
         text.opt                         *: // c_telescope_configs (explicit)
         slit_offset_mode                 *: // c_slit_offset_mode_default
         text                             *: // c_telescope_configs_default
-        // Acquisition inline fields
+        // Acquisition fields (inline cols + acq ETM joined from t_exposure_time_mode via FK)
         gnirs_obs_read_mode              *: // c_acq_read_mode
         int4                             *: // c_acq_coadds
         gnirs_filter                     *: // c_acq_filter
         angle_µas.opt                    *: // c_acq_offset_p
         angle_µas.opt                    *: // c_acq_offset_q
-        time_span                        *: // c_acq_exp_time
-        int4                             *: // c_acq_exp_count
-        wavelength_pm                       // c_acq_exp_at
+        exposure_time_mode                  // acquisition ETM
       ).emap:
         case (sciEtm *: gratingEff *: prismEff *: gratingWavEff *:
               camera *: fpu *: filter *: centralWavelength *: coadds *:
@@ -118,7 +120,7 @@ object GnirsLongSlitService:
               focusMotorSteps *:
               slitOffsetModeExp *: tcExp *: slitOffsetModeDef *: tcDef *:
               acqReadMode *: acqCoadds *: acqFilter *: acqOffP *: acqOffQ *:
-              acqExpTime *: acqExpCount *: acqExpAt *: EmptyTuple) =>
+              acqEtm *: EmptyTuple) =>
           SlitTelescopeConfigsFormat.getOption((slitOffsetModeDef, tcDef))
             .toRight(s"Could not parse default telescope configs from '$tcDef'")
             .flatMap: defaultTC =>
@@ -131,28 +133,25 @@ object GnirsLongSlitService:
                   .flatMap: coaddsP =>
                     PosInt.from(acqCoadds)
                       .leftMap(e => s"Invalid acq coadds $acqCoadds: $e")
-                      .flatMap: acqCoaddsP =>
-                        PosInt.from(acqExpCount)
-                          .leftMap(e => s"Invalid acq exp count $acqExpCount: $e")
-                          .map: acqExpCountP =>
-                            val acq = AcquisitionConfig(
-                              acqReadMode, acqCoaddsP, acqFilter,
-                              acqOffP.map(a => Offset.P(a)),
-                              acqOffQ.map(a => Offset.Q(a)),
-                              acqExpTime, acqExpCountP, acqExpAt
-                            )
-                            val focus = focusMotorSteps.fold(GnirsFocus.Best): n =>
-                              GnirsFocus.Custom(GnirsFocusMotorStepsValue.unsafeFrom(n).withUnit[GnirsFocusMotorStep])
-                            Config(
-                              sciEtm, gratingEff, prismEff, gratingWavEff, camera, fpu, filter, centralWavelength,
-                              coaddsP,
-                              deckerExp.getOrElse(deckerDef),
-                              readModeExp.getOrElse(readModeDef),
-                              wellDepthExp.getOrElse(wellDepthDef),
-                              focus,
-                              explicitTCOpt.getOrElse(defaultTC),
-                              acq
-                            )
+                      .map: acqCoaddsP =>
+                        val acq = AcquisitionConfig(
+                          acqReadMode, acqCoaddsP, acqFilter,
+                          acqOffP.map(a => Offset.P(a)),
+                          acqOffQ.map(a => Offset.Q(a)),
+                          acqEtm
+                        )
+                        val focus = focusMotorSteps.fold(GnirsFocus.Best): n =>
+                          GnirsFocus.Custom(GnirsFocusMotorStepsValue.unsafeFrom(n).withUnit[GnirsFocusMotorStep])
+                        Config(
+                          sciEtm, gratingEff, prismEff, gratingWavEff, camera, fpu, filter, centralWavelength,
+                          coaddsP,
+                          deckerExp.getOrElse(deckerDef),
+                          readModeExp.getOrElse(readModeDef),
+                          wellDepthExp.getOrElse(wellDepthDef),
+                          focus,
+                          explicitTCOpt.getOrElse(defaultTC),
+                          acq
+                        )
               }
 
       override def select(
@@ -165,14 +164,14 @@ object GnirsLongSlitService:
             session.prepareR(af.fragment.query(observation_id *: gnirsLS)).use: pq =>
               pq.stream(af.argument, chunkSize = 1024).compile.toList.map(_.toMap)
 
-      private def insertScienceEtm(
+      private def insertExposureTimeModes(
         input: GnirsLongSlitInput.Create,
-        req: Option[ExposureTimeMode],
+        req:   Option[ExposureTimeMode],
         which: List[Observation.Id]
-      )(using Transaction[F]): F[Result[Unit]] =
+      )(using Transaction[F]): F[Result[Map[Observation.Id, (ExposureTimeModeId, ExposureTimeModeId)]]] =
+        val acqEtm: Option[ExposureTimeMode] = input.acquisition.flatMap(_.exposureTimeMode)
         exposureTimeModeService
-          .insertScienceOnlyWithDefaults("GNIRS Long Slit", input.exposureTimeMode, req, which)
-          .map(_.void)
+          .insertOneWithDefaults("GNIRS Long Slit", acqEtm, input.exposureTimeMode, req, which)
 
       override def insert(
         input:  GnirsLongSlitInput.Create,
@@ -180,34 +179,44 @@ object GnirsLongSlitService:
         which:  List[Observation.Id]
       )(using Transaction[F]): F[Result[Unit]] =
         (for
-          _ <- ResultT(insertScienceEtm(input, req, which))
-          _ <- ResultT.liftF:
+          ids <- ResultT(insertExposureTimeModes(input, req, which))
+          _   <- ResultT.liftF:
             which.traverse: oid =>
-              session.exec(Statements.insertGnirsLongSlit(oid, input))
+              val (acqId, sciId) = ids(oid)
+              session.exec(Statements.insertGnirsLongSlit(oid, acqId, sciId, input))
             .void
         yield ()).value
 
       override def delete(which: List[Observation.Id])(using Transaction[F]): F[Unit] =
         Statements.deleteGnirs(which).fold(F.unit)(session.exec)
 
-      private def updateScienceEtm(
+      private def updateExposureTimeModes(
         input: GnirsLongSlitInput.Edit,
         which: List[Observation.Id]
       )(using Transaction[F]): F[Unit] =
-        input.exposureTimeMode.fold(().pure[F]): e =>
-          services.exposureTimeModeService.updateMany(which, ExposureTimeModeRole.Science, e)
+        def update(etm: Option[ExposureTimeMode], role: ExposureTimeModeRole): F[Unit] =
+          etm.fold(().pure[F]): e =>
+            services.exposureTimeModeService.updateMany(which, role, e)
+        for
+          _ <- update(input.acquisition.flatMap(_.exposureTimeMode), ExposureTimeModeRole.Acquisition)
+          _ <- update(input.exposureTimeMode, ExposureTimeModeRole.Science)
+        yield ()
 
       override def update(
         SET:   GnirsLongSlitInput.Edit,
         which: List[Observation.Id]
       )(using Transaction[F]): F[Unit] =
         for
-          _ <- updateScienceEtm(SET, which)
+          _ <- updateExposureTimeModes(SET, which)
           _ <- Statements.updateGnirsLongSlit(SET, which).fold(F.unit)(session.exec)
         yield ()
 
-      override def clone(originalId: Observation.Id, newId: Observation.Id)(using Transaction[F]): F[Unit] =
-        session.exec(Statements.cloneGnirs(originalId, newId))
+      override def clone(
+        originalId: Observation.Id,
+        newId:      Observation.Id,
+        etms:       List[(ExposureTimeModeId, ExposureTimeModeId)]
+      )(using Transaction[F]): F[Unit] =
+        session.exec(Statements.cloneGnirs(originalId, newId, etms))
 
   object Statements:
 
@@ -244,13 +253,16 @@ object GnirsLongSlitService:
           ls.c_acq_filter,
           ls.c_acq_offset_p,
           ls.c_acq_offset_q,
-          ls.c_acq_exp_time,
-          ls.c_acq_exp_count,
-          ls.c_acq_exp_at
+          acq.c_exposure_time_mode,
+          acq.c_signal_to_noise_at,
+          acq.c_signal_to_noise,
+          acq.c_exposure_time,
+          acq.c_exposure_count
         FROM v_gnirs_long_slit ls
-        LEFT JOIN t_exposure_time_mode sci
-           ON sci.c_observation_id = ls.c_observation_id
-          AND sci.c_role = 'science'
+        INNER JOIN t_exposure_time_mode sci
+           ON sci.c_exposure_time_mode_id = ls.c_science_exposure_time_mode_id
+        INNER JOIN t_exposure_time_mode acq
+           ON acq.c_exposure_time_mode_id = ls.c_acquisition_exposure_time_mode_id
       """(Void) |+|
       void"WHERE ls.c_observation_id IN (" |+|
         observationIds.map(sql"$observation_id").intercalate(void",") |+|
@@ -264,18 +276,6 @@ object GnirsLongSlitService:
 
     private def defaultAcqFilter(input: GnirsLongSlitInput.Create): GnirsFilter =
       input.acquisition.flatMap(_.filter).getOrElse(input.filter)
-
-    private def defaultAcqExpTime(input: GnirsLongSlitInput.Create): TimeSpan =
-      input.acquisition.flatMap(_.exposureTimeMode).map(_.time)
-        .getOrElse(TimeSpan.fromSeconds(1).get)
-
-    private def defaultAcqExpCount(input: GnirsLongSlitInput.Create): PosInt =
-      input.acquisition.flatMap(_.exposureTimeMode).map(_.count)
-        .getOrElse(PosInt.unsafeFrom(1))
-
-    private def defaultAcqExpAt(input: GnirsLongSlitInput.Create): Wavelength =
-      input.acquisition.flatMap(_.exposureTimeMode).map(_.at)
-        .getOrElse(effectiveCentralWavelength(input))
 
     val InsertGnirsLongSlit: Fragment[(
       Observation.Id,
@@ -300,15 +300,15 @@ object GnirsLongSlitService:
       // telescope configs (nullable = use default)
       Option[SlitOffsetMode],
       Option[String],
-      // acquisition
+      // acquisition inline columns
       GnirsObsReadMode,
       Int,
       GnirsFilter,
       Option[Long],           // acq_offset_p in µas
       Option[Long],           // acq_offset_q in µas
-      TimeSpan,
-      Int,
-      Wavelength
+      // exposure time mode FKs
+      ExposureTimeModeId,     // science
+      ExposureTimeModeId      // acquisition
     )] =
       sql"""
         INSERT INTO t_gnirs_long_slit (
@@ -339,9 +339,8 @@ object GnirsLongSlitService:
           c_acq_filter,
           c_acq_offset_p,
           c_acq_offset_q,
-          c_acq_exp_time,
-          c_acq_exp_count,
-          c_acq_exp_at
+          c_science_exposure_time_mode_id,
+          c_acquisition_exposure_time_mode_id
         )
         SELECT
           $observation_id,
@@ -371,27 +370,29 @@ object GnirsLongSlitService:
           $gnirs_filter,
           ${int8.opt},
           ${int8.opt},
-          $time_span,
-          $int4,
-          $wavelength_pm
+          $exposure_time_mode_id,
+          $exposure_time_mode_id
         FROM t_observation
         WHERE c_observation_id = $observation_id
       """.contramap {
         (oid, initGrating, initPrism, camera, fpu, wavelength, filter, coadds,
          decker, gratingWav, explGrating, explPrism, focus,
          readMode, wellDepth, slitMode, offsets,
-         acqRM, acqCoadds, acqFilter, acqOffP, acqOffQ, acqExpTime, acqExpCount, acqExpAt) =>
+         acqRM, acqCoadds, acqFilter, acqOffP, acqOffQ,
+         sciEtmId, acqEtmId) =>
           (oid, initGrating, initPrism, camera, camera, fpu, fpu, wavelength, wavelength,
            filter, filter, coadds, decker, gratingWav,
            explGrating, explPrism, focus, readMode, wellDepth,
            slitMode, offsets,
            acqRM, acqCoadds, acqFilter, acqOffP, acqOffQ,
-           acqExpTime, acqExpCount, acqExpAt, oid)
+           sciEtmId, acqEtmId, oid)
       }
 
     def insertGnirsLongSlit(
       observationId: Observation.Id,
-      input: GnirsLongSlitInput.Create
+      acqEtmId:      ExposureTimeModeId,
+      sciEtmId:      ExposureTimeModeId,
+      input:         GnirsLongSlitInput.Create
     ): AppliedFragment =
       val explicitTC = input.explicitTelescopeConfigs.map(SlitTelescopeConfigsFormat.reverseGet)
       val acqOffP = input.acquisition.flatMap(_.offset).map(o => Angle.microarcseconds.get(o.p.toAngle))
@@ -419,9 +420,8 @@ object GnirsLongSlitService:
         defaultAcqFilter(input),
         acqOffP,
         acqOffQ,
-        defaultAcqExpTime(input),
-        defaultAcqExpCount(input).value,
-        defaultAcqExpAt(input)
+        sciEtmId,
+        acqEtmId
       )
 
     def deleteGnirs(which: List[Observation.Id]): Option[AppliedFragment] =
@@ -445,15 +445,12 @@ object GnirsLongSlitService:
       val upSlitMode     = sql"c_slit_offset_mode   = ${slit_offset_mode.opt}"
       val upOffsets      = sql"c_telescope_configs  = ${text.opt}"
 
-      // Acquisition inline column updates
+      // Acquisition inline (non-ETM) column updates
       val upAcqReadMode  = sql"c_acq_read_mode = $gnirs_obs_read_mode"
       val upAcqCoadds    = sql"c_acq_coadds    = $int4_pos"
       val upAcqFilter    = sql"c_acq_filter    = $gnirs_filter"
       val upAcqOffsetP   = sql"c_acq_offset_p  = ${int8.opt}"
       val upAcqOffsetQ   = sql"c_acq_offset_q  = ${int8.opt}"
-      val upAcqExpTime   = sql"c_acq_exp_time  = $time_span"
-      val upAcqExpCount  = sql"c_acq_exp_count = $int4_pos"
-      val upAcqExpAt     = sql"c_acq_exp_at    = $wavelength_pm"
 
       val upTelescope: Option[List[AppliedFragment]] =
         SET.explicitTelescopeConfigs.toOptionOption.map:
@@ -463,7 +460,8 @@ object GnirsLongSlitService:
           case None =>
             List(upSlitMode(None), upOffsets(None))
 
-      // Acquisition sub-field updates (each sub-field is independently optional)
+      // Acquisition sub-field updates (each sub-field is independently optional;
+      // exposureTimeMode is handled separately via updateExposureTimeModes).
       val acqUpdates: List[AppliedFragment] =
         SET.acquisition.toList.flatMap: acq =>
           val offUpdates: List[AppliedFragment] =
@@ -472,14 +470,11 @@ object GnirsLongSlitService:
                 upAcqOffsetP(Some(Angle.microarcseconds.get(o.p.toAngle))),
                 upAcqOffsetQ(Some(Angle.microarcseconds.get(o.q.toAngle)))
               )
-          val etmUpdates: List[AppliedFragment] =
-            acq.exposureTimeMode.toList.flatMap: etm =>
-              List(upAcqExpTime(etm.time), upAcqExpCount(etm.count), upAcqExpAt(etm.at))
           List(
             acq.readMode.map(upAcqReadMode),
             acq.coadds.map(upAcqCoadds),
             acq.filter.map(upAcqFilter)
-          ).flatten ++ offUpdates ++ etmUpdates
+          ).flatten ++ offUpdates
 
       val ups: List[AppliedFragment] = List(
         SET.coadds.map(c => upCoadds(Some(c))),
@@ -510,7 +505,17 @@ object GnirsLongSlitService:
           void"SET " |+| us.intercalate(void", ") |+| void" " |+|
           void"WHERE " |+| observationIdIn(oids)
 
-    def cloneGnirs(originalId: Observation.Id, newId: Observation.Id): AppliedFragment =
+    def cloneGnirs(
+      originalId: Observation.Id,
+      newId:      Observation.Id,
+      etms:       List[(ExposureTimeModeId, ExposureTimeModeId)]
+    ): AppliedFragment =
+      val mappingValues: AppliedFragment =
+        etms
+          .map: (oldEtm, newEtm) =>
+            sql"($exposure_time_mode_id, $exposure_time_mode_id)"(oldEtm, newEtm)
+          .intercalate(void", ")
+
       sql"""
         INSERT INTO t_gnirs_long_slit (
           c_observation_id, c_program_id, c_observing_mode_type,
@@ -523,22 +528,27 @@ object GnirsLongSlitService:
           c_slit_offset_mode, c_telescope_configs,
           c_acq_read_mode, c_acq_coadds, c_acq_filter,
           c_acq_offset_p, c_acq_offset_q,
-          c_acq_exp_time, c_acq_exp_count, c_acq_exp_at
+          c_science_exposure_time_mode_id,
+          c_acquisition_exposure_time_mode_id
         )
         SELECT
           $observation_id,
           (SELECT c_program_id FROM t_observation WHERE c_observation_id = $observation_id),
-          c_observing_mode_type,
-          c_grating, c_prism, c_grating_wavelength,
-          c_initial_grating, c_initial_prism,
-          c_camera, c_initial_camera,
-          c_fpu, c_central_wavelength, c_initial_fpu, c_initial_central_wavelength,
-          c_filter, c_initial_filter,
-          c_coadds, c_decker, c_focus_motor_steps, c_read_mode, c_well_depth,
-          c_slit_offset_mode, c_telescope_configs,
-          c_acq_read_mode, c_acq_coadds, c_acq_filter,
-          c_acq_offset_p, c_acq_offset_q,
-          c_acq_exp_time, c_acq_exp_count, c_acq_exp_at
-        FROM t_gnirs_long_slit
-        WHERE c_observation_id = $observation_id
-      """.apply(newId, newId, originalId)
+          src.c_observing_mode_type,
+          src.c_grating, src.c_prism, src.c_grating_wavelength,
+          src.c_initial_grating, src.c_initial_prism,
+          src.c_camera, src.c_initial_camera,
+          src.c_fpu, src.c_central_wavelength, src.c_initial_fpu, src.c_initial_central_wavelength,
+          src.c_filter, src.c_initial_filter,
+          src.c_coadds, src.c_decker, src.c_focus_motor_steps, src.c_read_mode, src.c_well_depth,
+          src.c_slit_offset_mode, src.c_telescope_configs,
+          src.c_acq_read_mode, src.c_acq_coadds, src.c_acq_filter,
+          src.c_acq_offset_p, src.c_acq_offset_q,
+          sci_map.new_id,
+          acq_map.new_id
+        FROM t_gnirs_long_slit src
+        JOIN (VALUES"""(newId, newId) |+| mappingValues |+| void""") AS sci_map(old_id, new_id)
+          ON sci_map.old_id = src.c_science_exposure_time_mode_id
+        JOIN (VALUES""" |+| mappingValues |+| sql""") AS acq_map(old_id, new_id)
+          ON acq_map.old_id = src.c_acquisition_exposure_time_mode_id
+        WHERE src.c_observation_id = $observation_id"""(originalId)

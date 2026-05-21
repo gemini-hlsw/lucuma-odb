@@ -415,7 +415,7 @@ object GeneratorParamsService {
             GeneratorParams(itcInput, obsParams.scienceBand, gs, obsParams.calibrationRole, obsParams.declaredState, obsParams.executionState, obsParams.stepCount).asRight
 
           case gn: gnirs.longslit.Config =>
-            ExposureTimeMode.timeAndCount.getOption(gn.scienceExposureTimeMode)
+            ExposureTimeMode.timeAndCount.getOption(gn.exposureTimeMode)
               .toRight(Error.MisconfiguredObservation(obsParams.observationId, "GNIRS requires a TimeAndCount exposure time mode"))
               .map: etm =>
                 val sciMode = InstrumentMode.GnirsSpectroscopy(

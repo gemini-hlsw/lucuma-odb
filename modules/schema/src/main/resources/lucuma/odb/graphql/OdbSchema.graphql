@@ -9207,9 +9207,7 @@ type GnirsLongSlitAcquisition {
   coadds: PosInt!
   filter: GnirsFilter!
   offset: Offset
-  exposureTime: TimeSpan!
-  exposureCount: PosInt!
-  exposureAt: Wavelength!
+  exposureTimeMode: ExposureTimeMode!
 }
 
 """
