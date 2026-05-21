@@ -95,33 +95,8 @@ The script will:
 
 ## Schema stitching
 
-The itc schema uses many types defined on the odb schema. The `schemastitcher.js` script can be used
-to generate a single schema file that includes all the types needed by the itc schema. It uses as a
-base `itc_base.graphql` and stitches it with the ODB schema fetched from a locally running server.
+The itc schema uses many types defined on the odb schema. Types are imported using standard GraphQL `#import` statements and stitched together by a SchemaStitcher class.
 
-It starts with the queries defined on `itc_base.graphql` and prunes the unused types, as itc doesn't
-need most of the ODB schema types.
-
-### ITC schema generation
-
-Run `itc/stitchSchema.sh` with some of the environments as argument (local/dev/staging/production)
-
-For `local`, start the ODB server first:
-
-```bash
-sbt service/reStart
-```
-
-The script fetches the ODB schema via GraphQL introspection, stitches it with `itc_base.graphql`,
-and writes the result to `itc/service/src/main/resources/graphql/itc.graphql`.
-
-You can also stitch manually:
-```bash
-node itc/schemastitcher.mjs \
-  <path-to-odb-schema> \
-  itc/service/src/main/resources/graphql/itc_base.graphql \
-  itc/service/src/main/resources/graphql/itc.graphql
-```
 ## Benchmarking
 
 ### Simple Performance Test
