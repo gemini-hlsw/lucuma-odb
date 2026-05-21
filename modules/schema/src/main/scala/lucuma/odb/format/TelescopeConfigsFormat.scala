@@ -13,8 +13,8 @@ import lucuma.core.optics.Format
 
 /**
  * Serialization layer between `SlitTelescopeConfigs` (the lucuma-core domain type) and the two
- * columns used to persist it in the DB: a discriminant tag (`c_slit_offset_mode`) and a JSON
- * blob (`c_spatial_offsets`).
+ * columns used to persist it in the DB: a discriminant tag (e.g. `c_slit_offset_mode`) and a
+ * JSON blob (column name varies by instrument, e.g. `c_telescope_configs` for GNIRS).
  */
 trait TelescopeConfigsFormat:
   import lucuma.odb.json.offset.transport.given

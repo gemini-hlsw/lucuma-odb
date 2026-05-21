@@ -14,16 +14,19 @@ INSERT INTO t_gnirs_decker VALUES ('LongCamLongSlit',        'Long camera slit',
 INSERT INTO t_gnirs_decker VALUES ('ShortCamLongSlit',       'Short camera slit', 'Short camera long slit');
 INSERT INTO t_gnirs_decker VALUES ('LongCamCrossDispersed',  'Long camera XD',    'Long camera cross dispersed');
 
--- Lookup tables for GnirsReadMode and GnirsWellDepth
-CREATE TABLE t_gnirs_read_mode (
+-- Lookup table for GnirsObsReadMode (used for both science and acquisition read mode columns).
+-- 'Automatic' is the GnirsObsReadMode discriminant for per-step resolution;
+-- the other four are the underlying GnirsReadMode values.
+CREATE TABLE t_gnirs_obs_read_mode (
   c_tag        d_tag   NOT NULL PRIMARY KEY,
   c_short_name varchar NOT NULL,
   c_long_name  varchar NOT NULL
 );
-INSERT INTO t_gnirs_read_mode VALUES ('VeryBright', 'Very bright', 'Very Bright Acquisition or High Background');
-INSERT INTO t_gnirs_read_mode VALUES ('Bright',     'Bright',      'Bright objects');
-INSERT INTO t_gnirs_read_mode VALUES ('Faint',      'Faint',       'Faint objects');
-INSERT INTO t_gnirs_read_mode VALUES ('VeryFaint',  'Very faint',  'Very faint objects');
+INSERT INTO t_gnirs_obs_read_mode VALUES ('Automatic',  'Automatic',   'Automatic in each step');
+INSERT INTO t_gnirs_obs_read_mode VALUES ('VeryBright', 'Very bright', 'Very Bright Acquisition or High Background');
+INSERT INTO t_gnirs_obs_read_mode VALUES ('Bright',     'Bright',      'Bright objects');
+INSERT INTO t_gnirs_obs_read_mode VALUES ('Faint',      'Faint',       'Faint objects');
+INSERT INTO t_gnirs_obs_read_mode VALUES ('VeryFaint',  'Very faint',  'Very faint objects');
 
 CREATE TABLE t_gnirs_well_depth (
   c_tag        d_tag   NOT NULL PRIMARY KEY,
@@ -67,7 +70,7 @@ CREATE TABLE t_gnirs_long_slit (
   -- Explicit overrides (NULL = use computed default)
   c_decker            d_tag    NULL REFERENCES t_gnirs_decker(c_tag),
   c_focus_motor_steps integer  NULL CHECK (c_focus_motor_steps BETWEEN -179999 AND 180000),
-  c_read_mode         d_tag    NULL REFERENCES t_gnirs_read_mode(c_tag),
+  c_read_mode         d_tag    NULL REFERENCES t_gnirs_obs_read_mode(c_tag),
   c_well_depth        d_tag    NULL REFERENCES t_gnirs_well_depth(c_tag),
 
   -- SlitTelescopeConfigs: discriminant + serialized JSON config list (NULL = use computed default)
@@ -75,7 +78,7 @@ CREATE TABLE t_gnirs_long_slit (
   c_telescope_configs text  NULL,
 
   -- Acquisition configuration (TimeAndCount ETM stored inline)
-  c_acq_read_mode d_tag           NOT NULL REFERENCES t_gnirs_read_mode(c_tag),
+  c_acq_read_mode d_tag           NOT NULL REFERENCES t_gnirs_obs_read_mode(c_tag),
   c_acq_coadds    int4            NOT NULL DEFAULT 1 CHECK (c_acq_coadds > 0),
   c_acq_filter    d_tag           NOT NULL REFERENCES t_gnirs_filter(c_tag),
   c_acq_offset_p  d_angle_µas NULL,
@@ -117,13 +120,8 @@ CREATE VIEW v_gnirs_long_slit AS
     -- grating wavelength default (computed once in lateral, referenced here and in effective)
     d.c_grating_wavelength_default,
     COALESCE(ls.c_grating_wavelength, d.c_grating_wavelength_default) AS c_grating_wavelength_effective,
-    -- read mode pure default: mirrors GnirsReadMode.forExposureTime
-    CASE
-      WHEN etm.c_exposure_time <  interval '0.6 seconds' THEN 'VeryBright'::varchar
-      WHEN etm.c_exposure_time <= interval '20 seconds'  THEN 'Bright'::varchar
-      WHEN etm.c_exposure_time <= interval '60 seconds'  THEN 'Faint'::varchar
-      ELSE 'VeryFaint'::varchar
-    END AS c_read_mode_default,
+    -- read mode default: Automatic (resolved per-step at sequence generation time)
+    'Automatic'::varchar AS c_read_mode_default,
     -- well depth pure default: mirrors GnirsWellDepth.forCamera
     CASE
       WHEN ls.c_camera IN ('ShortBlue', 'LongBlue') THEN 'Shallow'::varchar
@@ -140,9 +138,6 @@ CREATE VIEW v_gnirs_long_slit AS
     COALESCE(ls.c_slit_offset_mode, d.c_slit_offset_mode_default) AS c_slit_offset_mode_effective,
     COALESCE(ls.c_telescope_configs, d.c_telescope_configs_default) AS c_telescope_configs_effective
   FROM t_gnirs_long_slit ls
-  LEFT JOIN t_exposure_time_mode etm
-    ON etm.c_observation_id = ls.c_observation_id
-   AND etm.c_role = 'science'
   CROSS JOIN LATERAL (
     SELECT
       -- slit offset mode default (always nod_along_slit for GNIRS)

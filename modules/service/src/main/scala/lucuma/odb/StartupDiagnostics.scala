@@ -154,7 +154,7 @@ object StartupDiagnostics:
           checkPostgresLookupTable(gnirs_fpu_slit, "t_gnirs_fpu_slit"),
           checkPostgresLookupTable(gnirs_grating, "t_gnirs_grating"),
           checkPostgresLookupTable(gnirs_prism, "t_gnirs_prism"),
-          checkPostgresLookupTable(gnirs_read_mode, "t_gnirs_read_mode"),
+          checkPostgresLookupTable(gnirs_obs_read_mode, "t_gnirs_obs_read_mode"),
           checkPostgresLookupTable(slit_offset_mode, "t_slit_offset_mode"),
           checkPostgresLookupTable(gnirs_well_depth, "t_gnirs_well_depth"),
           checkPostgresLookupTable(image_quality_preset, "t_image_quality"),

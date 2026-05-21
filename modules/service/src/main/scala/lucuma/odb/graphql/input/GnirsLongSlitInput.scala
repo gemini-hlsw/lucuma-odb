@@ -14,8 +14,8 @@ import lucuma.core.enums.GnirsDecker
 import lucuma.core.enums.GnirsFilter
 import lucuma.core.enums.GnirsFpuSlit
 import lucuma.core.enums.GnirsGrating
+import lucuma.core.enums.GnirsObsReadMode
 import lucuma.core.enums.GnirsPrism
-import lucuma.core.enums.GnirsReadMode
 import lucuma.core.enums.GnirsWellDepth
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.StepGuideState
@@ -60,7 +60,7 @@ object GnirsLongSlitInput:
 
   case class AcquisitionInput(
     filter:           Option[GnirsFilter],
-    readMode:         Option[GnirsReadMode],
+    readMode:         Option[GnirsObsReadMode],
     coadds:           Option[PosInt],
     offset:           Option[Offset],
     exposureTimeMode: Option[TimeAndCountMode]
@@ -71,7 +71,7 @@ object GnirsLongSlitInput:
       ObjectFieldsBinding.rmap:
         case List(
           GnirsFilterBinding.Option("filter", rFilter),
-          GnirsReadModeBinding.Option("readMode", rReadMode),
+          GnirsObsReadModeBinding.Option("readMode", rReadMode),
           PosIntBinding.Option("coadds", rCoadds),
           OffsetInput.Binding.Option("offset", rOffset),
           ExposureTimeModeInput.TimeAndCount.Binding.Option("exposureTimeMode", rEtm)
@@ -98,7 +98,7 @@ object GnirsLongSlitInput:
     explicitGrating:              Option[GnirsGrating]             = None,
     explicitPrism:                Option[GnirsPrism]               = None,
     explicitFocusMotorSteps:      Option[Int]                      = None,
-    explicitReadMode:             Option[GnirsReadMode]            = None,
+    explicitReadMode:             Option[GnirsObsReadMode]         = None,
     explicitWellDepth:            Option[GnirsWellDepth]           = None,
     telescopeConfigs:             Option[SlitTelescopeConfigs]     = None,
     acquisition:                  Option[AcquisitionInput]         = None
@@ -122,7 +122,7 @@ object GnirsLongSlitInput:
           GnirsGratingBinding.Option("explicitGrating", rExplGrating),
           GnirsPrismBinding.Option("explicitPrism", rExplPrism),
           IntBinding.Option("explicitFocus", rFocus),
-          GnirsReadModeBinding.Option("explicitReadMode", rReadMode),
+          GnirsObsReadModeBinding.Option("explicitReadMode", rReadMode),
           GnirsWellDepthBinding.Option("explicitWellDepth", rWellDepth),
           SlitTelescopeConfigsInput.Binding.Option("telescopeConfigs", rTelescope),
           AcquisitionInput.Binding.Option("acquisition", rAcq)
@@ -139,7 +139,7 @@ object GnirsLongSlitInput:
 
   case class Edit(
     exposureTimeMode:          Option[ExposureTimeMode],
-    coadds:                    Nullable[PosInt],
+    coadds:                    Option[PosInt],          // Option, not Nullable — coadds is NOT NULL
     centralWavelength:         Option[Wavelength],
     filter:                    Option[GnirsFilter],
     fpu:                       Option[GnirsFpuSlit],
@@ -151,9 +151,9 @@ object GnirsLongSlitInput:
     explicitGrating:           Nullable[GnirsGrating],
     explicitPrism:             Nullable[GnirsPrism],
     explicitFocusMotorSteps:   Nullable[Int],
-    explicitReadMode:          Nullable[GnirsReadMode],
+    explicitReadMode:          Nullable[GnirsObsReadMode],
     explicitWellDepth:         Nullable[GnirsWellDepth],
-    telescopeConfigs:          Option[SlitTelescopeConfigs],
+    telescopeConfigs:          Nullable[SlitTelescopeConfigs], // Nullable to allow clearing to default
     acquisition:               Option[AcquisitionInput]
   ):
     def observingModeType: ObservingModeType = ObservingModeType.GnirsLongSlit
@@ -168,18 +168,18 @@ object GnirsLongSlitInput:
         c  <- required(camera, "camera")
         g  <- required(grating.toOption, "grating")
         p  <- required(prism.toOption, "prism")
-      yield Create(exposureTimeMode, coadds.toOption, centralWavelength, f, u, c, g, p,
+      yield Create(exposureTimeMode, coadds, centralWavelength, f, u, c, g, p,
                    explicitDecker.toOption, explicitGratingWavelength.toOption,
                    explicitGrating.toOption, explicitPrism.toOption,
                    explicitFocusMotorSteps.toOption, explicitReadMode.toOption, explicitWellDepth.toOption,
-                   telescopeConfigs, acquisition)
+                   telescopeConfigs.toOption, acquisition)
 
   object Edit:
     val Binding: Matcher[Edit] =
       ObjectFieldsBinding.rmap:
         case List(
           ExposureTimeModeInput.Binding.Option("exposureTimeMode", rEtm),
-          PosIntBinding.Nullable("coadds", rCoadds),
+          PosIntBinding.Option("coadds", rCoadds),
           WavelengthInput.Binding.Option("centralWavelength", rWavelength),
           GnirsFilterBinding.Option("filter", rFilter),
           GnirsFpuSlitBinding.Option("fpu", rFpu),
@@ -191,9 +191,9 @@ object GnirsLongSlitInput:
           GnirsGratingBinding.Nullable("explicitGrating", rExplGrating),
           GnirsPrismBinding.Nullable("explicitPrism", rExplPrism),
           IntBinding.Nullable("explicitFocus", rFocus),
-          GnirsReadModeBinding.Nullable("explicitReadMode", rReadMode),
+          GnirsObsReadModeBinding.Nullable("explicitReadMode", rReadMode),
           GnirsWellDepthBinding.Nullable("explicitWellDepth", rWellDepth),
-          SlitTelescopeConfigsInput.Binding.Option("telescopeConfigs", rTelescope),
+          SlitTelescopeConfigsInput.Binding.Nullable("telescopeConfigs", rTelescope),
           AcquisitionInput.Binding.Option("acquisition", rAcq)
         ) =>
           (rEtm, rCoadds, rWavelength, rFilter, rFpu, rCamera, rGrating, rPrism,

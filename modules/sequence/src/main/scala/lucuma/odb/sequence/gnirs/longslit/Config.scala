@@ -12,8 +12,8 @@ import lucuma.core.enums.GnirsDecker
 import lucuma.core.enums.GnirsFilter
 import lucuma.core.enums.GnirsFpuSlit
 import lucuma.core.enums.GnirsGrating
+import lucuma.core.enums.GnirsObsReadMode
 import lucuma.core.enums.GnirsPrism
-import lucuma.core.enums.GnirsReadMode
 import lucuma.core.enums.GnirsWellDepth
 import lucuma.core.math.Offset
 import lucuma.core.math.Wavelength
@@ -27,7 +27,7 @@ import java.io.ByteArrayOutputStream
 import java.io.DataOutputStream
 
 case class AcquisitionConfig(
-  readMode:      GnirsReadMode,
+  readMode:      GnirsObsReadMode,
   coadds:        PosInt,
   filter:        GnirsFilter,
   offsetP:       Option[Offset.P],
@@ -67,7 +67,7 @@ case class Config(
   centralWavelength:       Wavelength,
   coadds:                  PosInt,
   decker:                  GnirsDecker,
-  readMode:                GnirsReadMode,
+  readMode:                GnirsObsReadMode,
   wellDepth:               GnirsWellDepth,
   focus:                   GnirsFocus,
   telescopeConfigs:        SlitTelescopeConfigs,

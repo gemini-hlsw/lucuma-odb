@@ -10,7 +10,14 @@ import coulomb.syntax.*
 import eu.timepit.refined.types.numeric.PosInt
 import grackle.Result
 import grackle.ResultT
-import lucuma.core.enums.GnirsReadMode
+import lucuma.core.enums.GnirsCamera
+import lucuma.core.enums.GnirsDecker
+import lucuma.core.enums.GnirsFilter
+import lucuma.core.enums.GnirsFpuSlit
+import lucuma.core.enums.GnirsGrating
+import lucuma.core.enums.GnirsObsReadMode
+import lucuma.core.enums.GnirsPrism
+import lucuma.core.enums.GnirsWellDepth
 import lucuma.core.enums.SlitOffsetMode
 import lucuma.core.math.Angle
 import lucuma.core.math.Offset
@@ -80,8 +87,8 @@ object GnirsLongSlitService:
         gnirs_decker                     *: // c_decker_default
         gnirs_decker.opt                 *: // c_decker (explicit)
         // Read mode default + explicit
-        gnirs_read_mode                  *: // c_read_mode_default
-        gnirs_read_mode.opt              *: // c_read_mode (explicit)
+        gnirs_obs_read_mode              *: // c_read_mode_default
+        gnirs_obs_read_mode.opt          *: // c_read_mode (explicit)
         // Well depth default + explicit
         gnirs_well_depth                 *: // c_well_depth_default
         gnirs_well_depth.opt             *: // c_well_depth (explicit)
@@ -93,7 +100,7 @@ object GnirsLongSlitService:
         slit_offset_mode       *: // c_slit_offset_mode_default
         text                         *: // c_telescope_configs_default
         // Acquisition inline fields
-        gnirs_read_mode                  *: // c_acq_read_mode
+        gnirs_obs_read_mode              *: // c_acq_read_mode
         int4                             *: // c_acq_coadds
         gnirs_filter                     *: // c_acq_filter
         angle_µas.opt                    *: // c_acq_offset_p
@@ -248,13 +255,13 @@ object GnirsLongSlitService:
         observationIds.map(sql"$observation_id").intercalate(void",") |+|
       void")"
 
-    private def defaultAcqReadMode(input: GnirsLongSlitInput.Create): GnirsReadMode =
-      input.acquisition.flatMap(_.readMode).getOrElse(GnirsReadMode.VeryBright)
+    private def defaultAcqReadMode(input: GnirsLongSlitInput.Create): GnirsObsReadMode =
+      input.acquisition.flatMap(_.readMode).getOrElse(GnirsObsReadMode.AutomaticInEachStep)
 
     private def effectiveCentralWavelength(input: GnirsLongSlitInput.Create): Wavelength =
       input.centralWavelength.getOrElse(GnirsLongSlitInput.centralWavelengthFromFilter(input.filter))
 
-    private def defaultAcqFilter(input: GnirsLongSlitInput.Create): lucuma.core.enums.GnirsFilter =
+    private def defaultAcqFilter(input: GnirsLongSlitInput.Create): GnirsFilter =
       input.acquisition.flatMap(_.filter).getOrElse(input.filter)
 
     private def defaultAcqExpTime(input: GnirsLongSlitInput.Create): lucuma.core.util.TimeSpan =
@@ -272,32 +279,32 @@ object GnirsLongSlitService:
     val InsertGnirsLongSlit: Fragment[(
       Observation.Id,
       // initial mirror
-      lucuma.core.enums.GnirsGrating,
-      lucuma.core.enums.GnirsPrism,
+      GnirsGrating,
+      GnirsPrism,
       // camera/fpu/wavelength/filter
-      lucuma.core.enums.GnirsCamera,
-      lucuma.core.enums.GnirsFpuSlit,
+      GnirsCamera,
+      GnirsFpuSlit,
       Wavelength,
-      lucuma.core.enums.GnirsFilter,
+      GnirsFilter,
       // coadds
       Int,
       // explicit overrides (all nullable)
-      Option[lucuma.core.enums.GnirsDecker],
+      Option[GnirsDecker],
       Option[Wavelength],
-      Option[lucuma.core.enums.GnirsGrating],  // explicit grating
-      Option[lucuma.core.enums.GnirsPrism],    // explicit prism
-      Option[Int],         // focus_motor_steps
-      Option[lucuma.core.enums.GnirsReadMode],
-      Option[lucuma.core.enums.GnirsWellDepth],
+      Option[GnirsGrating],   // explicit grating
+      Option[GnirsPrism],     // explicit prism
+      Option[Int],            // focus_motor_steps
+      Option[GnirsObsReadMode],
+      Option[GnirsWellDepth],
       // telescope configs (nullable = use default)
       Option[SlitOffsetMode],
       Option[String],
       // acquisition
-      lucuma.core.enums.GnirsReadMode,
+      GnirsObsReadMode,
       Int,
-      lucuma.core.enums.GnirsFilter,
-      Option[Long],        // acq_offset_p in µas
-      Option[Long],        // acq_offset_q in µas
+      GnirsFilter,
+      Option[Long],           // acq_offset_p in µas
+      Option[Long],           // acq_offset_q in µas
       lucuma.core.util.TimeSpan,
       Int,
       Wavelength
@@ -354,11 +361,11 @@ object GnirsLongSlitService:
           ${gnirs_grating.opt},
           ${gnirs_prism.opt},
           ${int4.opt},
-          ${gnirs_read_mode.opt},
+          ${gnirs_obs_read_mode.opt},
           ${gnirs_well_depth.opt},
           ${slit_offset_mode.opt},
           ${text.opt},
-          $gnirs_read_mode,
+          $gnirs_obs_read_mode,
           $int4,
           $gnirs_filter,
           ${int8.opt},
@@ -430,20 +437,51 @@ object GnirsLongSlitService:
       val upDecker       = sql"c_decker             = ${gnirs_decker.opt}"
       val upGratingWav   = sql"c_grating_wavelength = ${wavelength_pm.opt}"
       val upFocus        = sql"c_focus_motor_steps  = ${int4.opt}"
-      val upReadMode     = sql"c_read_mode          = ${gnirs_read_mode.opt}"
+      val upReadMode     = sql"c_read_mode          = ${gnirs_obs_read_mode.opt}"
       val upWellDepth    = sql"c_well_depth         = ${gnirs_well_depth.opt}"
       val upGrating      = sql"c_grating            = ${gnirs_grating.opt}"
       val upPrism        = sql"c_prism              = ${gnirs_prism.opt}"
       val upSlitMode     = sql"c_slit_offset_mode   = ${slit_offset_mode.opt}"
       val upOffsets      = sql"c_telescope_configs  = ${text.opt}"
 
+      // Acquisition inline column updates
+      val upAcqReadMode  = sql"c_acq_read_mode = $gnirs_obs_read_mode"
+      val upAcqCoadds    = sql"c_acq_coadds    = $int4_pos"
+      val upAcqFilter    = sql"c_acq_filter    = $gnirs_filter"
+      val upAcqOffsetP   = sql"c_acq_offset_p  = ${int8.opt}"
+      val upAcqOffsetQ   = sql"c_acq_offset_q  = ${int8.opt}"
+      val upAcqExpTime   = sql"c_acq_exp_time  = $time_span"
+      val upAcqExpCount  = sql"c_acq_exp_count = $int4_pos"
+      val upAcqExpAt     = sql"c_acq_exp_at    = $wavelength_pm"
+
       val upTelescope: Option[List[AppliedFragment]] =
-        SET.telescopeConfigs.map: tc =>
-          val (mode, off) = SlitTelescopeConfigsFormat.reverseGet(tc)
-          List(upSlitMode(Some(mode)), upOffsets(Some(off)))
+        SET.telescopeConfigs.toOptionOption.map:
+          case Some(tc) =>
+            val (mode, off) = SlitTelescopeConfigsFormat.reverseGet(tc)
+            List(upSlitMode(Some(mode)), upOffsets(Some(off)))
+          case None =>
+            List(upSlitMode(None), upOffsets(None))
+
+      // Acquisition sub-field updates (each sub-field is independently optional)
+      val acqUpdates: List[AppliedFragment] =
+        SET.acquisition.toList.flatMap: acq =>
+          val offUpdates: List[AppliedFragment] =
+            acq.offset.toList.flatMap: o =>
+              List(
+                upAcqOffsetP(Some(Angle.microarcseconds.get(o.p.toAngle))),
+                upAcqOffsetQ(Some(Angle.microarcseconds.get(o.q.toAngle)))
+              )
+          val etmUpdates: List[AppliedFragment] =
+            acq.exposureTimeMode.toList.flatMap: etm =>
+              List(upAcqExpTime(etm.time), upAcqExpCount(etm.count), upAcqExpAt(etm.at))
+          List(
+            acq.readMode.map(upAcqReadMode),
+            acq.coadds.map(upAcqCoadds),
+            acq.filter.map(upAcqFilter)
+          ).flatten ++ offUpdates ++ etmUpdates
 
       val ups: List[AppliedFragment] = List(
-        SET.coadds.toOptionOption.map(upCoadds),
+        SET.coadds.map(c => upCoadds(Some(c))),
         SET.centralWavelength.map(w => upWavelength(Some(w))),
         SET.filter.map(f => upFilter(Some(f))),
         SET.fpu.map(f => upFpu(Some(f))),
@@ -455,7 +493,7 @@ object GnirsLongSlitService:
         SET.explicitWellDepth.toOptionOption.map(upWellDepth),
         SET.explicitGrating.toOptionOption.map(upGrating),
         SET.explicitPrism.toOptionOption.map(upPrism)
-      ).flatten ++ upTelescope.toList.flatten
+      ).flatten ++ upTelescope.toList.flatten ++ acqUpdates
 
       NonEmptyList.fromList(ups)
 

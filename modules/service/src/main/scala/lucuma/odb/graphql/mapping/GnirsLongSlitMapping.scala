@@ -14,7 +14,7 @@ import grackle.skunk.SkunkMapping
 import io.circe.Json
 import io.circe.syntax.*
 import lucuma.core.enums.GnirsDecker
-import lucuma.core.enums.GnirsReadMode
+import lucuma.core.enums.GnirsObsReadMode
 import lucuma.core.enums.GnirsWellDepth
 import lucuma.core.enums.SlitOffsetMode
 import lucuma.core.enums.StepGuideState
@@ -37,12 +37,29 @@ trait GnirsLongSlitMapping[F[_]]
       "guiding" -> guiding.asJson
     )
 
-  private def slitConfigToOffsets(mode: SlitOffsetMode, json: String): Json =
-    SlitTelescopeConfigsFormat.getOption((mode, json)).fold(Json.arr()):
+  private def telescopeConfigAlongSlitJson(q: Offset.Q, guiding: StepGuideState): Json =
+    Json.obj(
+      "q"       -> q.asJson,
+      "guiding" -> guiding.asJson
+    )
+
+  // Encodes a SlitTelescopeConfigs as the JSON shape expected for the GraphQL
+  // SlitTelescopeConfigs type: { offsetMode, alongSlit, onSky } where exactly
+  // one of alongSlit / onSky is non-null depending on the discriminant.
+  private def slitTelescopeConfigsJson(mode: SlitOffsetMode, json: String): Json =
+    SlitTelescopeConfigsFormat.getOption((mode, json)).fold(Json.Null):
       case lucuma.core.model.SlitTelescopeConfigs.AlongSlit(nel) =>
-        nel.toList.map(c => telescopeConfigJson(Offset(Offset.P.Zero, c.offset), c.guiding)).asJson
+        Json.obj(
+          "offsetMode" -> mode.asJson,
+          "alongSlit"  -> nel.toList.map(c => telescopeConfigAlongSlitJson(c.offset, c.guiding)).asJson,
+          "onSky"      -> Json.Null
+        )
       case lucuma.core.model.SlitTelescopeConfigs.ToSky(nel) =>
-        nel.toList.map(tc => telescopeConfigJson(tc.offset, tc.guiding)).asJson
+        Json.obj(
+          "offsetMode" -> mode.asJson,
+          "alongSlit"  -> Json.Null,
+          "onSky"      -> nel.toList.map(tc => telescopeConfigJson(tc.offset, tc.guiding)).asJson
+        )
 
   lazy val GnirsLongSlitAcquisitionMapping: ObjectMapping =
     ObjectMapping(GnirsLongSlitAcquisitionType)(
@@ -111,7 +128,7 @@ trait GnirsLongSlitMapping[F[_]]
       SqlField("defaultDecker",  GnirsLongSlitView.DefaultDecker),
 
       // Read mode: explicit + default + effective
-      explicitOrElseDefault[GnirsReadMode]("readMode", "explicitReadMode", "defaultReadMode"),
+      explicitOrElseDefault[GnirsObsReadMode]("readMode", "explicitReadMode", "defaultReadMode"),
       SqlField("explicitReadMode", GnirsLongSlitView.ExplicitReadMode),
       SqlField("defaultReadMode",  GnirsLongSlitView.DefaultReadMode),
 
@@ -131,51 +148,35 @@ trait GnirsLongSlitMapping[F[_]]
       SqlField("slitOffsetModeExpRaw",  GnirsLongSlitView.ExplicitSlitOffsetMode,    hidden = true),
       SqlField("tcExpRaw",              GnirsLongSlitView.ExplicitTelescopeConfigs,  hidden = true),
 
-      // offsetMode: effective
-      CursorField[SlitOffsetMode]("offsetMode",
-        cursor => cursor.field("slitOffsetModeEffRaw", None).flatMap(_.as[SlitOffsetMode]),
-        List("slitOffsetModeEffRaw")
-      ),
-
-      // defaultOffsetMode / explicitOffsetMode
-      CursorField[SlitOffsetMode]("defaultOffsetMode",
-        cursor => cursor.field("slitOffsetModeDefRaw", None).flatMap(_.as[SlitOffsetMode]),
-        List("slitOffsetModeDefRaw")
-      ),
-      CursorField[Option[SlitOffsetMode]]("explicitOffsetMode",
-        cursor => cursor.field("slitOffsetModeExpRaw", None).flatMap(_.as[Option[SlitOffsetMode]]),
-        List("slitOffsetModeExpRaw")
-      ),
-
-      // telescopeConfigs: effective = explicit coalesce default (computed in Scala)
+      // telescopeConfigs: effective SlitTelescopeConfigs = explicit coalesce default
       CursorFieldJson("telescopeConfigs",
         cursor =>
           for
-            modeExp  <- cursor.field("slitOffsetModeExpRaw", None).flatMap(_.as[Option[SlitOffsetMode]])
-            tcExp    <- cursor.field("tcExpRaw", None).flatMap(_.as[Option[String]])
-            modeDef  <- cursor.field("slitOffsetModeDefRaw", None).flatMap(_.as[SlitOffsetMode])
-            tcDef    <- cursor.field("tcDefRaw", None).flatMap(_.as[String])
-          yield slitConfigToOffsets(modeExp.getOrElse(modeDef), tcExp.getOrElse(tcDef)),
+            modeExp <- cursor.field("slitOffsetModeExpRaw", None).flatMap(_.as[Option[SlitOffsetMode]])
+            tcExp   <- cursor.field("tcExpRaw", None).flatMap(_.as[Option[String]])
+            modeDef <- cursor.field("slitOffsetModeDefRaw", None).flatMap(_.as[SlitOffsetMode])
+            tcDef   <- cursor.field("tcDefRaw", None).flatMap(_.as[String])
+          yield slitTelescopeConfigsJson(modeExp.getOrElse(modeDef), tcExp.getOrElse(tcDef)),
         List("slitOffsetModeExpRaw", "tcExpRaw", "slitOffsetModeDefRaw", "tcDefRaw")
       ),
 
-      // defaultTelescopeConfigs
+      // defaultTelescopeConfigs: the pure default
       CursorFieldJson("defaultTelescopeConfigs",
         cursor =>
           for
             mode <- cursor.field("slitOffsetModeDefRaw", None).flatMap(_.as[SlitOffsetMode])
             json <- cursor.field("tcDefRaw", None).flatMap(_.as[String])
-          yield slitConfigToOffsets(mode, json),
+          yield slitTelescopeConfigsJson(mode, json),
         List("slitOffsetModeDefRaw", "tcDefRaw")
       ),
 
-      // explicitTelescopeConfigs (nullable)
+      // explicitTelescopeConfigs (nullable): present only when an explicit override is set
       CursorFieldJson("explicitTelescopeConfigs",
         cursor =>
           for
             modeOpt <- cursor.field("slitOffsetModeExpRaw", None).flatMap(_.as[Option[SlitOffsetMode]])
             jsonOpt <- cursor.field("tcExpRaw", None).flatMap(_.as[Option[String]])
-          yield (modeOpt, jsonOpt).mapN(slitConfigToOffsets).getOrElse(Json.Null),
+          yield (modeOpt, jsonOpt).mapN(slitTelescopeConfigsJson).getOrElse(Json.Null),
         List("slitOffsetModeExpRaw", "tcExpRaw")
       ),
 

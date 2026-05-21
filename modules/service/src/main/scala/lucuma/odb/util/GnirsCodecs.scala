@@ -8,8 +8,8 @@ import lucuma.core.enums.GnirsDecker
 import lucuma.core.enums.GnirsFilter
 import lucuma.core.enums.GnirsFpuSlit
 import lucuma.core.enums.GnirsGrating
+import lucuma.core.enums.GnirsObsReadMode
 import lucuma.core.enums.GnirsPrism
-import lucuma.core.enums.GnirsReadMode
 import lucuma.core.enums.GnirsWellDepth
 import skunk.Codec
 import skunk.data.Type
@@ -36,7 +36,7 @@ trait GnirsCodecs:
   val gnirs_prism: Codec[GnirsPrism] =
     enumerated(Type.varchar)
 
-  val gnirs_read_mode: Codec[GnirsReadMode] =
+  val gnirs_obs_read_mode: Codec[GnirsObsReadMode] =
     enumerated(Type.varchar)
 
   val gnirs_well_depth: Codec[GnirsWellDepth] =

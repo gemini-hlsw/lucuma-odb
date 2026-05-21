@@ -9203,7 +9203,7 @@ input Igrins2LongSlitInput {
 }
 
 type GnirsLongSlitAcquisition {
-  readMode: GnirsReadMode!
+  readMode: GnirsObsReadMode!
   coadds: PosInt!
   filter: GnirsFilter!
   offset: Offset
@@ -9247,9 +9247,9 @@ type GnirsLongSlit {
   explicitDecker: GnirsDecker
   defaultDecker: GnirsDecker!
 
-  readMode: GnirsReadMode!
-  explicitReadMode: GnirsReadMode
-  defaultReadMode: GnirsReadMode!
+  readMode: GnirsObsReadMode!
+  explicitReadMode: GnirsObsReadMode
+  defaultReadMode: GnirsObsReadMode!
 
   wellDepth: GnirsWellDepth!
   explicitWellDepth: GnirsWellDepth
@@ -9257,13 +9257,9 @@ type GnirsLongSlit {
 
   explicitFocusMotorSteps: Int
 
-  offsetMode: SlitOffsetMode!
-  defaultOffsetMode: SlitOffsetMode!
-  explicitOffsetMode: SlitOffsetMode
-
-  telescopeConfigs: [TelescopeConfig!]!
-  defaultTelescopeConfigs: [TelescopeConfig!]!
-  explicitTelescopeConfigs: [TelescopeConfig!]
+  telescopeConfigs: SlitTelescopeConfigs!
+  defaultTelescopeConfigs: SlitTelescopeConfigs!
+  explicitTelescopeConfigs: SlitTelescopeConfigs
 
   acquisition: GnirsLongSlitAcquisition!
 
@@ -9271,10 +9267,28 @@ type GnirsLongSlit {
 
 input GnirsLongSlitAcquisitionInput {
   filter: GnirsFilter
-  readMode: GnirsReadMode
+  readMode: GnirsObsReadMode
   coadds: PosInt
   offset: OffsetInput
   exposureTimeMode: TimeAndCountExposureTimeModeInput
+}
+
+"""
+Telescope configuration along the slit: a single `q` offset plus guide state.
+"""
+type TelescopeConfigAlongSlit {
+  q: OffsetQ!
+  guiding: GuideState!
+}
+
+"""
+A list of telescope configurations associated with a slit. The discriminant
+`offsetMode` selects which of `alongSlit` or `onSky` is populated.
+"""
+type SlitTelescopeConfigs {
+  offsetMode: SlitOffsetMode!
+  alongSlit: [TelescopeConfigAlongSlit!]
+  onSky: [TelescopeConfig!]
 }
 
 input TelescopeConfigAlongSlitInput {
@@ -9318,7 +9332,7 @@ input GnirsLongSlitInput {
 
   explicitFocus: Int
 
-  explicitReadMode: GnirsReadMode
+  explicitReadMode: GnirsObsReadMode
 
   explicitWellDepth: GnirsWellDepth
 
@@ -11607,6 +11621,19 @@ enum GnirsFpuSlit {
 }
 
 enum GnirsReadMode {
+  VERY_BRIGHT
+  BRIGHT
+  FAINT
+  VERY_FAINT
+}
+
+"""
+GNIRS observation-level read mode. Use `AUTOMATIC` to let the read mode be
+resolved per step from the step exposure time; otherwise fix the read mode
+for all steps.
+"""
+enum GnirsObsReadMode {
+  AUTOMATIC
   VERY_BRIGHT
   BRIGHT
   FAINT

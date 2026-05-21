@@ -426,7 +426,7 @@ object GeneratorParamsService {
                   prism             = gn.prism,
                   grating           = gn.grating,
                   camera            = gn.camera,
-                  readMode          = gn.readMode,
+                  readMode          = gn.readMode.resolveForStepExposureTime(etm.time),
                   wellDepth         = gn.wellDepth
                 )
                 val consInput = obsParams.constraints.toInput

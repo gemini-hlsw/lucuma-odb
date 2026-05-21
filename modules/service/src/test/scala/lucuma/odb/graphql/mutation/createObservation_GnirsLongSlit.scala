@@ -82,8 +82,11 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                         defaultWellDepth
                         explicitWellDepth
                         explicitFocusMotorSteps
-                        offsetMode
-                        telescopeConfigs { offset { p { arcseconds } q { arcseconds } } guiding }
+                        telescopeConfigs {
+                          offsetMode
+                          alongSlit { q { arcseconds } guiding }
+                          onSky { offset { p { arcseconds } q { arcseconds } } guiding }
+                        }
                         exposureTimeMode {
                           timeAndCount { time { seconds } count at { nanometers } }
                         }
@@ -128,20 +131,23 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                       "gratingWavelength": { "nanometers": 2200.000 },
                       "defaultGratingWavelength": { "nanometers": 2200.000 },
                       "explicitGratingWavelength": null,
-                      "readMode": "FAINT",
-                      "defaultReadMode": "FAINT",
+                      "readMode": "AUTOMATIC",
+                      "defaultReadMode": "AUTOMATIC",
                       "explicitReadMode": null,
                       "wellDepth": "SHALLOW",
                       "defaultWellDepth": "SHALLOW",
                       "explicitWellDepth": null,
                       "explicitFocusMotorSteps": null,
-                      "offsetMode": "NOD_ALONG_SLIT",
-                      "telescopeConfigs": [
-                        { "offset": { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 2.000000 } }, "guiding": "ENABLED" },
-                        { "offset": { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -4.000000 } }, "guiding": "ENABLED" },
-                        { "offset": { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -4.000000 } }, "guiding": "ENABLED" },
-                        { "offset": { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 2.000000 } }, "guiding": "ENABLED" }
-                      ],
+                      "telescopeConfigs": {
+                        "offsetMode": "NOD_ALONG_SLIT",
+                        "alongSlit": [
+                          { "q": { "arcseconds": 2.000000 },  "guiding": "ENABLED" },
+                          { "q": { "arcseconds": -4.000000 }, "guiding": "ENABLED" },
+                          { "q": { "arcseconds": -4.000000 }, "guiding": "ENABLED" },
+                          { "q": { "arcseconds": 2.000000 },  "guiding": "ENABLED" }
+                        ],
+                        "onSky": null
+                      },
                       "exposureTimeMode": {
                         "timeAndCount": {
                           "time": { "seconds": 30.000000 },
@@ -150,7 +156,7 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                         }
                       },
                       "acquisition": {
-                        "readMode": "VERY_BRIGHT",
+                        "readMode": "AUTOMATIC",
                         "coadds": 1,
                         "filter": "ORDER3",
                         "offset": null,
@@ -259,7 +265,7 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                       "defaultGratingWavelength": { "nanometers": 2200.000 },
                       "explicitGratingWavelength": { "nanometers": 2100.000 },
                       "readMode": "BRIGHT",
-                      "defaultReadMode": "BRIGHT",
+                      "defaultReadMode": "AUTOMATIC",
                       "explicitReadMode": "BRIGHT",
                       "wellDepth": "SHALLOW",
                       "defaultWellDepth": "DEEP",
@@ -273,7 +279,7 @@ class createObservation_GnirsLongSlit extends OdbSuite:
           """)
         )
 
-  test("update GNIRS Long Slit — clear explicit overrides"):
+  test("update GNIRS Long Slit — set explicit overrides"):
     createProgramAs(pi).flatMap: pid =>
       createTargetAs(pi, pid).flatMap: tid =>
         for
