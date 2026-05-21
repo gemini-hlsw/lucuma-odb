@@ -10,6 +10,15 @@
   },
   "license": "BSD-3-Clause",
   "devDependencies": {
+    "@actions/core": "^3.0.1",
+    "@actions/github": "^9.1.1",
+    "@graphql-inspector/action": "^5.0.20",
+    "@graphql-inspector/git-loader": "^5.0.1",
+    "@graphql-tools/graphql-file-loader": "^8.1.14",
+    "@graphql-tools/import": "^7.1.14",
+    "@graphql-tools/load": "^8.1.10",
+    "@whatwg-node/fetch": "^0.10.13",
+    "glob": "^13.0.6",
     "graphql": "^16.11.0"
   },
   "repository": {

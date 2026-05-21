@@ -295,44 +295,32 @@ lazy val sbtStaticChecks =
     name = Some("Static checks")
   )
 
-lazy val graphqlInspectorOdb =
-  WorkflowStep.Use(
-    UseRef.Public("kamilkisiela", "graphql-inspector", "master"),
-    name = Some("Validate ODB GraphQL schema changes"),
-    params =
-      Map(
-        "name"          -> "Validate ODB Public API",
-        "schema"        -> "main:modules/schema/src/main/resources/lucuma/odb/graphql/OdbSchema.graphql",
-        "approve-label" -> "expected-breaking-change"
-      ),
-    cond = Some("github.event_name == 'pull_request'")
-  )
+lazy val npmCi = WorkflowStep.Run(
+  List("npm ci"),
+  name = Some("Install npm dependencies"),
+  cond = Some("github.event_name == 'pull_request'")
+)
 
-lazy val graphqlInspectorItc =
-  WorkflowStep.Use(
-    UseRef.Public("kamilkisiela", "graphql-inspector", "master"),
-    name = Some("Validate ITC GraphQL schema changes"),
-    params =
-      Map(
-        "name"          -> "Validate ITC Public API",
-        "schema"        -> "main:itc/service/src/main/resources/graphql/itc.graphql",
-        "approve-label" -> "expected-breaking-change"
-      ),
-    cond = Some("github.event_name == 'pull_request'")
-  )
+def validateSchemaStep(schema: String, name: String): WorkflowStep = WorkflowStep.Run(
+  List(s"node .github/validate-schema.mjs ${schema}"),
+  name = Some(name),
+  cond = Some("github.event_name == 'pull_request'")
+)
 
-lazy val graphqlInspectorResource =
-  WorkflowStep.Use(
-    UseRef.Public("kamilkisiela", "graphql-inspector", "master"),
-    name = Some("Validate Resource GraphQL schema changes"),
-    params =
-      Map(
-        "name"          -> "Validate Resource Public API",
-        "schema"        -> "main:resource/service/src/main/resources/graphql/resource.graphql",
-        "approve-label" -> "expected-breaking-change"
-      ),
-    cond = Some("github.event_name == 'pull_request'")
-  )
+lazy val graphqlInspectorOdb = validateSchemaStep(
+  "modules/schema/src/main/resources/lucuma/odb/graphql/OdbSchema.graphql",
+  name = "Validate ODB GraphQL schema changes",
+)
+
+lazy val graphqlInspectorItc = validateSchemaStep(
+  "itc/service/src/main/resources/graphql/itc.graphql",
+  name = "Validate ITC GraphQL schema changes",
+)
+
+lazy val graphqlInspectorResource = validateSchemaStep(
+  "resource/service/src/main/resources/graphql/resource.graphql",
+  name = "Validate Resource GraphQL schema changes",
+)
 
 // Don't do static checks repeatedly on each shard, instead create a separate task only for checks.
 ThisBuild / githubWorkflowAddedJobs ++= Seq(
@@ -341,9 +329,10 @@ ThisBuild / githubWorkflowAddedJobs ++= Seq(
     "Static checks and schema validation",
     githubWorkflowJobSetup.value.toList :::
       sbtStaticChecks ::
+      npmCi ::
       graphqlInspectorOdb ::
       graphqlInspectorItc ::
-      // graphqlInspectorResource ::
+      graphqlInspectorResource ::
       Nil,
     scalas = List(scalaVersion.value),
     javas = githubWorkflowJavaVersions.value.toList.take(1)
