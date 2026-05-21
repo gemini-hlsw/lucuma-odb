@@ -20,13 +20,11 @@ import io.laserdisc.pure.s3.tagless.S3AsyncClientOp
 import lucuma.catalog.clients.GaiaClient
 import lucuma.catalog.telluric.TelluricTargetsClient
 import lucuma.core.model.User
-import lucuma.graphql.routes.GraphQLService
 import lucuma.horizons.HorizonsClient
 import lucuma.itc.client.ItcClient
 import lucuma.odb.graphql.AttachmentRoutes
 import lucuma.odb.graphql.EmailWebhookRoutes
 import lucuma.odb.graphql.GraphQLRoutes
-import lucuma.odb.graphql.OdbMapping
 import lucuma.odb.graphql.SchedulerRoutes
 import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
@@ -259,8 +257,7 @@ object FMain extends MainParams {
       middleware        <- ServerMiddleware(corsOverHttps, domain, ssoClient, userSvc)
       enums             <- Resource.eval(pool.use(Enums.load))
       ptc               <- Resource.eval(pool.use(TimeEstimateCalculatorImplementation.fromSession(_, enums)))
-      metadataService    = GraphQLService(OdbMapping.forMetadata(pool, SkunkMonitor.noopMonitor[F], enums))
-      graphQLRoutes     <- GraphQLRoutes(gaiaClient, itcClient, commitHash, goaUsers, ssoClient, pool, SkunkMonitor.noopMonitor[F], GraphQLServiceTTL, userSvc, enums, ptc, httpClient, horizonsClient, emailConfig, metadataService)
+      graphQLRoutes     <- GraphQLRoutes(gaiaClient, itcClient, commitHash, goaUsers, ssoClient, pool, SkunkMonitor.noopMonitor[F], GraphQLServiceTTL, userSvc, enums, ptc, httpClient, horizonsClient, emailConfig)
       s3ClientOps       <- s3OpsResource
       s3Presigner       <- s3PresignerResource
       s3FileService      = S3FileService.fromS3ConfigAndClient(awsConfig, s3ClientOps, s3Presigner)
@@ -268,9 +265,8 @@ object FMain extends MainParams {
     } yield { wsb =>
       val attachmentRoutes   = AttachmentRoutes.apply[F](pool, s3FileService, ssoClient, enums, awsConfig.fileUploadMaxMb, emailConfig, commitHash, ptc, httpClient, itcClient, gaiaClient, horizonsClient)
       val schedulerRoutes    = SchedulerRoutes.apply[F](pool, ssoClient, enums, emailConfig, commitHash, ptc, httpClient, itcClient, gaiaClient, horizonsClient)
-      val metadataRoutes     = GraphQLRoutes.enumMetadata(metadataService)
       val emailWebhookRoutes = EmailWebhookRoutes(webhookService, emailConfig)
-      middleware(graphQLRoutes(wsb) <+> attachmentRoutes <+>  metadataRoutes <+> emailWebhookRoutes <+> schedulerRoutes)
+      middleware(graphQLRoutes(wsb) <+> attachmentRoutes <+> emailWebhookRoutes <+> schedulerRoutes)
     }
 
   /** A startup action that runs database migrations using Flyway. */

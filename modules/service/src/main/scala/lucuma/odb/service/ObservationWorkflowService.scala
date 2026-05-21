@@ -18,6 +18,7 @@ import lucuma.core.enums.ObservationValidationCode
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.ProgramType
+import lucuma.core.enums.ProposalStatus
 import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.Site
 import lucuma.core.enums.VisitorObservingModeType
@@ -36,14 +37,11 @@ import lucuma.core.model.StandardRole.*
 import lucuma.core.model.Target
 import lucuma.core.syntax.string.*
 import lucuma.core.util.DateInterval
-import lucuma.core.util.Enumerated
 import lucuma.core.util.Timestamp
 import lucuma.odb.data.Itc
 import lucuma.odb.data.ObservationValidationMap
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
-import lucuma.odb.data.Tag
-import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.graphql.mapping.AccessControl
 import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.sequence.data.MissingParamSet
@@ -123,7 +121,7 @@ case class ObservationValidationInfo(
   role:               Option[CalibrationRole],
   userState:          Option[ObservationWorkflowService.UserState],
   declaredExecutionState: Option[DeclaredExecutionState],
-  proposalStatus:     Tag,
+  proposalStatus:     ProposalStatus,
   cfpid:              Option[CallForProposals.Id],
   scienceBand:        Option[ScienceBand],
   asterism:           List[Target],
@@ -144,11 +142,8 @@ case class ObservationValidationInfo(
     else userState
 
   /* Has the proposal been accepted? */
-  def isAccepted(using enums: Enums): Result[Boolean] =
-    Result.fromOption(
-      Enumerated[enums.ProposalStatus].fromTag(proposalStatus.value).map(_ === enums.ProposalStatus.Accepted),
-      s"Unexpected enum value for ProposalStatus: ${proposalStatus.value}"
-    )
+  def isAccepted:Boolean =
+    proposalStatus === ProposalStatus.Accepted
 
   def site: Option[Site] =
     instrument.map(_.site)
@@ -242,9 +237,6 @@ object ObservationWorkflowService {
   /* Construct an instance. */
   def instantiate[F[_]: Async](using Services[F]): ObservationWorkflowService[F] =
     new ObservationWorkflowService[F] {
-
-      // Make the enums available in a stable and implicit way
-      given Enums = enums
 
       private def lookupObsDefinitions(
         oids: List[Observation.Id]
@@ -391,66 +383,62 @@ object ObservationWorkflowService {
         info:           ObservationValidationInfo,
         executionState: Option[ExecutionState],
         codes:          List[ObservationValidationCode]
-      )(using Enums): Result[(ObservationWorkflowState, List[ObservationWorkflowState])] =
-        info.isAccepted.map { isAccepted =>
+      ): (ObservationWorkflowState, List[ObservationWorkflowState]) =
+        // A special ordering where codes are ordered as they would occur in a typical lifecycle.
+        given Ordering[ObservationValidationCode] =
+          Ordering.by:
+            case ObservationValidationCode.CallForProposalsError => 1
+            case ObservationValidationCode.ConfigurationError => 2
+            case ObservationValidationCode.ItcError => 3
+            case ObservationValidationCode.ConfigurationRequestUnavailable => 4
+            case ObservationValidationCode.ConfigurationRequestNotRequested => 5
+            case ObservationValidationCode.ConfigurationRequestDenied => 6
+            case ObservationValidationCode.ConfigurationRequestPending => 7
 
-          // A special ordering where codes are ordered as they would occur in a typical lifecycle.
-          given Ordering[ObservationValidationCode] =
-            Ordering.by:
-              case ObservationValidationCode.CallForProposalsError => 1
-              case ObservationValidationCode.ConfigurationError => 2
-              case ObservationValidationCode.ItcError => 3
-              case ObservationValidationCode.ConfigurationRequestUnavailable => 4
-              case ObservationValidationCode.ConfigurationRequestNotRequested => 5
-              case ObservationValidationCode.ConfigurationRequestDenied => 6
-              case ObservationValidationCode.ConfigurationRequestPending => 7
+        val validationStatus: ValidationState =
+          if info.role.isDefined then Defined // Calibrations are immediately Defined
+          else codes.minOption.fold(Defined):
+            case ObservationValidationCode.CallForProposalsError            |
+                  ObservationValidationCode.ConfigurationError               |
+                  ObservationValidationCode.ItcError                         => Undefined
+            case ObservationValidationCode.ConfigurationRequestUnavailable  |
+                  ObservationValidationCode.ConfigurationRequestNotRequested |
+                  ObservationValidationCode.ConfigurationRequestDenied       |
+                  ObservationValidationCode.ConfigurationRequestPending      => Unapproved
 
-          val validationStatus: ValidationState =
-            if info.role.isDefined then Defined // Calibrations are immediately Defined
-            else codes.minOption.fold(Defined):
-              case ObservationValidationCode.CallForProposalsError            |
-                   ObservationValidationCode.ConfigurationError               |
-                   ObservationValidationCode.ItcError                         => Undefined
-              case ObservationValidationCode.ConfigurationRequestUnavailable  |
-                   ObservationValidationCode.ConfigurationRequestNotRequested |
-                   ObservationValidationCode.ConfigurationRequestDenied       |
-                   ObservationValidationCode.ConfigurationRequestPending      => Unapproved
+        def userStatus(validationStatus: ValidationState): Option[UserState] =
+          info.effectiveUserState.flatMap:
+            case Inactive => Some(Inactive)       // Inactive overrides validation errors
+            case Ready    =>
+              validationStatus match              // Validation errors override Ready
+                case Undefined  => None
+                case Unapproved => None
+                case Defined    => Some(Ready)
 
-          def userStatus(validationStatus: ValidationState): Option[UserState] =
-            info.effectiveUserState.flatMap:
-              case Inactive => Some(Inactive)       // Inactive overrides validation errors
-              case Ready    =>
-                validationStatus match              // Validation errors override Ready
-                  case Undefined  => None
-                  case Unapproved => None
-                  case Defined    => Some(Ready)
+        // Our final state is the execution state (if any), else the user state (if any), else the validation state,
+        // with the one exception that user state Inactive overrides execution state Ongoing
+        val state: ObservationWorkflowState =
+          (executionState, userStatus(validationStatus)) match
+            case (None, None)     => validationStatus
+            case (None, Some(us)) => us
+            case (Some(Ongoing), Some(Inactive)) => Inactive
+            case (Some(es), _)    => es
 
-          // Our final state is the execution state (if any), else the user state (if any), else the validation state,
-          // with the one exception that user state Inactive overrides execution state Ongoing
-          val state: ObservationWorkflowState =
-            (executionState, userStatus(validationStatus)) match
-              case (None, None)     => validationStatus
-              case (None, Some(us)) => us
-              case (Some(Ongoing), Some(Inactive)) => Inactive
-              case (Some(es), _)    => es
+        val canUpdateExecutionState: Boolean =
+          info.isVisitor && user.role.access >= Access.Staff
 
-          val canUpdateExecutionState: Boolean =
-            info.isVisitor && user.role.access >= Access.Staff
+        val allowedTransitions: List[ObservationWorkflowState] =
+          if (info.role === Some(CalibrationRole.Telluric) && state <= Ready) then Nil
+          else state match
+            case Inactive   => List(executionState.getOrElse(validationStatus))
+            case Undefined  => List(Inactive)
+            case Unapproved => List(Inactive)
+            case Defined    => List(Inactive) ++ Option.when((!info.isOpportunity) && (info.isAccepted || info.tpe =!= ProgramType.Science))(Ready)
+            case Ready      => List(Inactive, validationStatus) ++ Option.when(canUpdateExecutionState)(Ongoing)
+            case Ongoing    => List(Inactive, Completed) ++ Option.when(canUpdateExecutionState)(Ready)
+            case Completed  => if info.isDeclaredComplete then List(Ongoing) else Nil
 
-          val allowedTransitions: List[ObservationWorkflowState] =
-            if (info.role === Some(CalibrationRole.Telluric) && state <= Ready) then Nil
-            else state match
-              case Inactive   => List(executionState.getOrElse(validationStatus))
-              case Undefined  => List(Inactive)
-              case Unapproved => List(Inactive)
-              case Defined    => List(Inactive) ++ Option.when((!info.isOpportunity) && (isAccepted || info.tpe =!= ProgramType.Science))(Ready)
-              case Ready      => List(Inactive, validationStatus) ++ Option.when(canUpdateExecutionState)(Ongoing)
-              case Ongoing    => List(Inactive, Completed) ++ Option.when(canUpdateExecutionState)(Ready)
-              case Completed  => if info.isDeclaredComplete then List(Ongoing) else Nil
-
-          (state, allowedTransitions)
-
-        }
+        (state, allowedTransitions)
 
       private def validateObsDefinition(
         infos:  Map[Observation.Id, ObservationValidationInfo],
@@ -532,7 +520,7 @@ object ObservationWorkflowService {
 
         val toCheck: List[ObservationValidationInfo] =
           science.values.toList.filter: info =>
-            info.isAccepted.toOption.forall(_ === true) && prelimV.get(info.oid).forall(_.isEmpty)
+            info.isAccepted && prelimV.get(info.oid).forall(_.isEmpty)
 
         val configValidations: ResultT[F, Map[Observation.Id, ObservationValidationMap]] =
           NonEmptyList
@@ -547,15 +535,15 @@ object ObservationWorkflowService {
         infos: Map[Observation.Id, ObservationValidationInfo],
         errs:  Map[Observation.Id, ObservationValidationMap],
         execs: Map[Observation.Id, ExecutionState]
-      ): Result[Map[Observation.Id, ObservationWorkflow]] =
+      ): Map[Observation.Id, ObservationWorkflow] =
         infos
           .toList
-          .traverse: (oid, info) =>
+          .map: (oid, info) =>
             val obsErrors = errs.get(oid).toList.flatMap(_.toList)
-            workflowStateAndTransitions(info, execs.get(oid), obsErrors.map(_.code))
-              .map: (s, ss) =>
-                 oid -> ObservationWorkflow(s, ss, obsErrors)
-          .map(_.toMap)
+            val (s, ss) =workflowStateAndTransitions(info, execs.get(oid), obsErrors.map(_.code))
+              // .map: (s, ss) =>
+            oid -> ObservationWorkflow(s, ss, obsErrors)
+          .toMap
 
       override def getWorkflows(
         oids: List[Observation.Id]
@@ -588,7 +576,7 @@ object ObservationWorkflowService {
           (infos, errs, itcRes) <- ResultT(select)
           errorFree              = infos.view.filterKeys(oid => errs.get(oid).forall(_.isEmpty)).toMap
           execs                  = executionStates(errorFree)
-          workflows             <- ResultT.fromResult(computeWorkflows(infos, errs, execs))
+          workflows              = computeWorkflows(infos, errs, execs)
           withModes = 
             workflows.map:
               case (oid, wf) =>
@@ -617,7 +605,7 @@ object ObservationWorkflowService {
             case _ => !infos.get(oid).exists(_.isVisitor) // otherwise discard the state if it's a visitor
           wfExec = exec.flatMap[ExecutionState](ces => ces.workflowExecutionState)
           execs  = wfExec.fold[Map[Observation.Id, ExecutionState]](Map.empty)(es => Map(oid -> es))
-          wfs   <- ResultT.fromResult(computeWorkflows(infos, errs, execs))
+          wfs    = computeWorkflows(infos, errs, execs)
           res   <- ResultT.fromResult(Result.fromOption(wfs.get(oid), s"Invalid observation: $oid"))
         yield res).value
 
@@ -783,10 +771,10 @@ object ObservationWorkflowService {
           AND o.c_group_id = s.c_group_id
         WHERE o.c_observation_id IN ($enc)
       """
-      .query(program_id *: program_type *: observation_id *: observing_mode_type.opt *: right_ascension.opt *: declination.opt *: calibration_role.opt *: user_state.opt *: declared_execution_state.opt *: tag *: cfp_id.opt *: science_band.opt *: user_state.opt)
+      .query(program_id *: program_type *: observation_id *: observing_mode_type.opt *: right_ascension.opt *: declination.opt *: calibration_role.opt *: user_state.opt *: declared_execution_state.opt *: proposal_status *: cfp_id.opt *: science_band.opt *: user_state.opt)
       .map:
-        case (pid, tpe, oid, mode, ra, dec, cal, state, ds, tag, cfp, sci, state2) =>
-          ObservationValidationInfo(pid, tpe, oid, mode, None, (ra, dec).mapN(Coordinates.apply), cal, state, ds, tag, cfp, sci, Nil, state2) 
+        case (pid, tpe, oid, mode, ra, dec, cal, state, ds, ps, cfp, sci, state2) =>
+          ObservationValidationInfo(pid, tpe, oid, mode, None, (ra, dec).mapN(Coordinates.apply), cal, state, ds, ps, cfp, sci, Nil, state2) 
 
     def ProgramAllocations[A <: NonEmptyList[Program.Id]](enc: Encoder[A]): Query[A, (Program.Id, ScienceBand)] =
       sql"""

@@ -16,6 +16,7 @@ import lucuma.core.enums.CallForProposalsType
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.Partner
 import lucuma.core.enums.ProgramType
+import lucuma.core.enums.ProposalStatus
 import lucuma.core.model.PartnerLink
 import lucuma.core.model.Program
 import lucuma.core.model.Semester
@@ -23,7 +24,6 @@ import lucuma.core.model.User
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.odb.data.OdbError
-import lucuma.odb.data.Tag
 import lucuma.odb.graphql.query.ObservingModeSetupOperations
 import lucuma.odb.service.ProposalService.error
 
@@ -277,7 +277,7 @@ class setProposalStatus extends OdbSuite
           }
         """,
         expected =
-          Left(List(error.notAuthorizedNew(pid, pi, Tag("accepted")).message))
+          Left(List(error.notAuthorizedNew(pid, pi, ProposalStatus.Accepted).message))
       )
     }
   }
@@ -526,7 +526,7 @@ class setProposalStatus extends OdbSuite
           }
         """,
         expected =
-          List(error.notAuthorizedOld(pid, pi, Tag("accepted")).message).asLeft
+          List(error.notAuthorizedOld(pid, pi, ProposalStatus.Accepted).message).asLeft
       )
 
     for {

@@ -188,7 +188,6 @@ object OdbMapping {
           with Igrins2LongSlitMapping[F]
           with GnirsLongSlitMapping[F]
           with Igrins2StaticMapping[F]
-          with FilterTypeMetaMapping[F]
           with GhostDynamicMapping[F]
           with GhostIfuMapping[F]
           with GhostStaticMapping[F]
@@ -241,7 +240,6 @@ object OdbMapping {
           with ProperMotionRaMapping[F]
           with ProposalMapping[F]
           with ProposalReferenceMapping[F]
-          with ProposalStatusMetaMapping[F]
           with ProposalTypeMapping[F]
           with QueryMapping[F]
           with RadialVelocityMapping[F]
@@ -423,7 +421,6 @@ object OdbMapping {
                 ExecutionEventMapping,
                 ExecutionMapping,
                 FastTurnaroundMapping,
-                FilterTypeMetaMapping,
                 Flamingos2DynamicMapping,
                 Flamingos2LongSlitAcquisitionMapping,
                 Igrins2DynamicMapping,
@@ -482,7 +479,6 @@ object OdbMapping {
                 ProperMotionRaMapping,
                 ProposalMapping,
                 ProposalReferenceMapping,
-                ProposalStatusMetaMapping,
                 ProposalTypeMapping,
                 QueryMapping,
                 QueueMapping,
@@ -707,48 +703,6 @@ object OdbMapping {
                   case _ => delegate.sqlTypeName(codec)
 
         }
-
-  /**
-   * A minimal read-only mapping that only knows how to return enum metadata. Other queries will
-   * fail with errors.
-   */
-  def forMetadata[F[_]: Async](
-    database: Resource[F, Session[F]],
-    monitor:  SkunkMonitor[F],
-    enums:    Enums,
-  ): Mapping[F] =
-    new SkunkMapping[F](database, monitor)
-      with BaseMapping[F]
-      with FilterTypeMetaMapping[F]
-      with LeafMappings[F]
-      with ProposalStatusMetaMapping[F]
-      with QueryMapping[F]
-    {
-
-      // These are unused for enum metadata queries.
-      def user = sys.error("OdbMapping.forMetadata: no user available")
-      def services = sys.error("OdbMapping.forMetadata: no services available")
-      def itcClient = sys.error("OdbMapping.forMetadata: no itcClient available")
-      def goaUsers = sys.error("OdbMapping.forMetadata: no goaUsers available")
-
-      // Our schema
-      val schema: Schema =
-        unsafeLoadSchema("OdbSchema.graphql") |+| enums.schema
-
-      // Our combined type mappings
-      override val typeMappings: TypeMappings =
-        TypeMappings.unchecked(
-          List(
-            FilterTypeMetaMapping,
-            ProposalStatusMetaMapping,
-            QueryMapping,
-          ) ++ LeafMappings
-        )
-
-      override val selectElaborator: SelectElaborator =
-        SelectElaborator(QueryElaborator)
-
-    }
 
   /**
    * A reduced mapping for use with the Obscalc service.  Obscalc computes the

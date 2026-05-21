@@ -17,7 +17,6 @@ import io.circe.Json
 import lucuma.catalog.clients.GaiaClient
 import lucuma.core.model.User
 import lucuma.graphql.routes.GraphQLService
-import lucuma.graphql.routes.HttpRouteHandler
 import lucuma.graphql.routes.Routes as LucumaGraphQLRoutes
 import lucuma.horizons.HorizonsClient
 import lucuma.itc.client.ItcClient
@@ -32,12 +31,8 @@ import lucuma.odb.util.Cache
 import lucuma.sso.client.SsoClient
 import org.http4s.Header
 import org.http4s.HttpRoutes
-import org.http4s.MediaType
-import org.http4s.Response
 import org.http4s.client.Client
-import org.http4s.dsl.Http4sDsl
 import org.http4s.headers.Authorization
-import org.http4s.headers.`Content-Type`
 import org.http4s.server.websocket.WebSocketBuilder2
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.LoggerFactory
@@ -73,8 +68,7 @@ object GraphQLRoutes {
     ptc:             TimeEstimateCalculatorImplementation.ForInstrumentMode,
     httpClient:      Client[F],
     horizonsClient:  HorizonsClient[F],
-    emailConfig:     Config.Email,
-    metadataService: GraphQLService[F]
+    emailConfig:     Config.Email
   ): Resource[F, WebSocketBuilder2[F] => HttpRoutes[F]] =
     OdbMapping.Topics(pool).flatMap { topics =>
 
@@ -98,7 +92,7 @@ object GraphQLRoutes {
       Cache.timed[F, Authorization, Option[GraphQLService[F]]](ttl).map { cache => wsb =>
         LucumaGraphQLRoutes.forService[F](
           {
-            case None    => metadataService.some.pure  // No auth, use metadata service for introspection
+            case None    => none.pure[F]  // No auth, no service (for now)
             case Some(a) =>
               cache.get(a).flatMap {
                 case Some(opt) =>
@@ -160,48 +154,5 @@ object GraphQLRoutes {
         )
       }
     }
-
-  /**
-   * An endpoint that listens on `/export/<name>` and returns an application/javascript response
-   * of the form `export const <name> = '<query result>'`.
-   */
-  def exportConst[F[_]: Temporal: Tracer](
-    service: GraphQLService[F],
-    name:    String,
-    query:   String,
-  ): HttpRoutes[F] = {
-    val dsl = new Http4sDsl[F]{}; import dsl._
-    // borrow HttpRouteHandler from lucuma-graphql-routes but hack it to return js
-    val h = new HttpRouteHandler(service) {
-      override def toResponse(result: Result[Json]): F[Response[F]] =
-        result.toEither match {
-          case Left(err)   => super.toResponse(result)
-          case Right(json) =>
-            Ok(s"export const $name ='${json.noSpaces}'")
-            .map(_.withContentType(`Content-Type`(MediaType.application.javascript)))
-        }
-    }
-    HttpRoutes.of[F] {
-      case req @ GET -> Root / "export" / `name` =>
-        h.oneOffGet(query, None, None)
-    }
-  }
-
-  def enumMetadata[F[_]: Temporal: Tracer](
-    service: GraphQLService[F]
-  ): HttpRoutes[F] =
-    exportConst(service, "enumMetadata", """
-      query {
-        filterTypeMeta {
-          tag
-          shortName
-          longName
-        }
-        proposalStatusMeta {
-          tag
-          name
-        }
-      }
-    """)
 
 }

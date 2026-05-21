@@ -15,7 +15,9 @@ import grackle.syntax.*
 import lucuma.core.data.EmailAddress
 import lucuma.core.enums.ConsiderForBand3
 import lucuma.core.enums.ObservationWorkflowState
+import lucuma.core.enums.Partner
 import lucuma.core.enums.ProgramType
+import lucuma.core.enums.ProposalStatus
 import lucuma.core.enums.ScienceSubtype
 import lucuma.core.enums.ToOActivation
 import lucuma.core.model.Access
@@ -24,7 +26,6 @@ import lucuma.core.model.Program
 import lucuma.core.model.ProposalReference
 import lucuma.core.model.Semester
 import lucuma.core.model.User
-import lucuma.core.util.Enumerated
 import lucuma.core.util.Timestamp
 import lucuma.itc.client.ItcClient
 import lucuma.odb.Config
@@ -126,8 +127,8 @@ object ProposalService {
     def missingOrInvalidSplits(pid: Program.Id, subtype: ScienceSubtype): OdbError =
       s"Submitted proposal $pid of type ${subtype.title} must specify partner time percentages which sum to 100%.".invalidArg
 
-    def missingPartners(pid: Program.Id, partners: Set[Tag] = Set.empty): OdbError =
-      partners.toList.map(_.value.toUpperCase).sorted match
+    def missingPartners(pid: Program.Id, partners: Set[Partner] = Set.empty): OdbError =
+      partners.toList.map(_.abbreviation).sorted match
         case Nil     =>
           s"Program $pid requests time from partners not represented by any investigator.".invalidArg
         case List(p) =>
@@ -151,11 +152,11 @@ object ProposalService {
     def cannotEditSubmittedProposal(pid: Program.Id, user: User): OdbError =
       s"User ${user.id} cannot edit this proposal $pid because it has been submitted.".noAuth(user.id)
 
-    def notAuthorizedNew(pid: Program.Id, user: User, ps: Tag): OdbError =
-      s"User ${user.id} not authorized to set proposal status to ${ps.value.toUpperCase} in program $pid.".noAuth(user.id)
+    def notAuthorizedNew(pid: Program.Id, user: User, ps: ProposalStatus): OdbError =
+      s"User ${user.id} not authorized to set proposal status to ${ps.tag.toUpperCase} in program $pid.".noAuth(user.id)
 
-    def notAuthorizedOld(pid: Program.Id, user: User, ps: Tag): OdbError =
-      s"User ${user.id} not authorized to change proposal status from ${ps.value.toUpperCase} in program $pid.".noAuth(user.id)
+    def notAuthorizedOld(pid: Program.Id, user: User, ps: ProposalStatus): OdbError =
+      s"User ${user.id} not authorized to change proposal status from ${ps.tag.toUpperCase} in program $pid.".noAuth(user.id)
 
     def undefinedObservations(pid: Program.Id): OdbError =
       s"Submitted proposal $pid contains undefined observations.".invalidArg
@@ -177,22 +178,13 @@ object ProposalService {
 
       import error.*
 
-      // A stable identifier (ie. a `val`) is needed for the enums.
-      val enumsVal = enums
-
-      extension (tag: Tag)
-        def toProposalStatus: Result[enumsVal.ProposalStatus] =
-          Enumerated[enumsVal.ProposalStatus]
-            .fromTag(tag.value)
-            .fold(invalidProposalStatus(tag).asFailure)(Result.apply)
-
-      extension (ps: enumsVal.ProposalStatus)
+      extension (ps: ProposalStatus)
         def userCanChangeStatus: Boolean =
-          ps <= enumsVal.ProposalStatus.Submitted ||
+          ps <= ProposalStatus.Submitted ||
           user.role.access >= Access.Ngo
 
         def userCanEditProposal: Boolean =
-          ps < enumsVal.ProposalStatus.Submitted ||
+          ps < ProposalStatus.Submitted ||
           user.role.access >= Access.Ngo
 
       def lookupProperties(cid: CallForProposals.Id)(using Transaction[F]): F[Result[CfpProperties]] =
@@ -201,7 +193,7 @@ object ProposalService {
           .map(o => Result.fromOption(o, cfpNotFound(cid).asProblem))
 
       case class ProposalContext(
-        statusTag:         Tag,
+        status:            ProposalStatus,
         hasProposal:       Boolean,
         piEmailStr:        Option[NonEmptyString],
         title:             Option[NonEmptyString],
@@ -209,8 +201,8 @@ object ProposalService {
         semester:          Option[Semester],
         scienceSubtype:    Option[ScienceSubtype],
         splitsSum:         Long,
-        availablePartners: Set[Tag],
-        requestedPartners: Set[Tag],
+        availablePartners: Set[Partner],
+        requestedPartners: Set[Partner],
         proprietary:       NonNegInt,
         currentTime:       Timestamp,
         deadline:          Option[Timestamp],
@@ -218,9 +210,6 @@ object ProposalService {
         cfp:               Option[CfpProperties],
         considerForBand3:  Option[ConsiderForBand3]
       ) {
-        val status: Result[enumsVal.ProposalStatus] =
-          statusTag.toProposalStatus
-
         val isPastDeadline: Option[Boolean] =
           deadline.map(_ < currentTime)
 
@@ -236,7 +225,7 @@ object ProposalService {
 
         def validateSubmission(
           pid: Program.Id,
-          newStatus: enumsVal.ProposalStatus
+          newStatus: ProposalStatus
         ): Result[Unit] =
           val unmatchedPartners = requestedPartners -- availablePartners
           (
@@ -257,18 +246,18 @@ object ProposalService {
             ),
             missingPartners(pid, unmatchedPartners).asFailure.unlessA(unmatchedPartners.isEmpty),
             validatePiEmailAddress(pid)
-          ).tupled.unlessA(newStatus === enumsVal.ProposalStatus.NotSubmitted)
+          ).tupled.unlessA(newStatus === ProposalStatus.NotSubmitted)
 
         def validateDeadline(
           pid: Program.Id,
-          newStatus: enumsVal.ProposalStatus
+          newStatus: ProposalStatus
         ): Result[Unit] =
           (
             for
               _ <- missingDeadline(pid).asFailure.unlessA(deadline.isDefined)
               _ <- pastDeadline(pid).asFailure.whenA(isPastDeadline.exists(identity))
             yield ()
-          ).whenA(newStatus === enumsVal.ProposalStatus.Submitted)
+          ).whenA(newStatus === ProposalStatus.Submitted)
 
         def updateProgram(
           pid:            Program.Id,
@@ -383,23 +372,23 @@ object ProposalService {
 
         def sendEmail(
           pid: Program.Id,
-          newStatus: enumsVal.ProposalStatus
+          newStatus: ProposalStatus
          )(using Transaction[F]): F[Result[Unit]] =
           // There might be other emails in the future
-          if newStatus === enumsVal.ProposalStatus.Submitted then sendSubmissionEmail(pid)
+          if newStatus === ProposalStatus.Submitted then sendSubmissionEmail(pid)
           else Result.unit.pure
 
       }
 
       object ProposalContext {
-        val parts: Decoder[Set[Tag]] =
-          _tag.map(_.toList.toSet)
+        val parts: Decoder[Set[Partner]] =
+          _partner.map(_.toList.toSet)
 
         val coNames: Decoder[List[Option[NonEmptyString]]] =
           _text.map(_.toList.map(n => NonEmptyString.from(n).toOption))
 
         val codec: Decoder[ProposalContext] =
-          (tag *: bool *: varchar_nonempty.opt *: text_nonempty.opt *: proposal_reference.opt *: semester.opt *: science_subtype.opt *: int8 *: parts *: parts *: int4_nonneg *: core_timestamp *: core_timestamp.opt *: text_nonempty.opt *: CallForProposalsService.Statements.cfp_properties.opt *: consider_for_band_3.opt).to[ProposalContext]
+          (proposal_status *: bool *: varchar_nonempty.opt *: text_nonempty.opt *: proposal_reference.opt *: semester.opt *: science_subtype.opt *: int8 *: parts *: parts *: int4_nonneg *: core_timestamp *: core_timestamp.opt *: text_nonempty.opt *: CallForProposalsService.Statements.cfp_properties.opt *: consider_for_band_3.opt).to[ProposalContext]
 
         def lookup(pid: Program.Id): F[Result[ProposalContext]] =
           val af = Statements.selectProposalContext(user, pid)
@@ -473,9 +462,7 @@ object ProposalService {
 
         def checkUserAccess(pid: Program.Id, p: ProposalContext): ResultT[F, Unit] =
           ResultT.fromResult(
-            p.status.flatMap { s =>
-              cannotEditSubmittedProposal(pid, user).asFailure.unlessA(s.userCanEditProposal)
-            }
+            cannotEditSubmittedProposal(pid, user).asFailure.unlessA(p.status.userCanEditProposal)
           )
 
         // Update the program's science subtype and/or semester to match inputs.
@@ -516,7 +503,7 @@ object ProposalService {
           after  <- ResultT(before.edit(input.SET))
           _      <- checkCfpCompatibility(after)
           _      <- checkUserAccess(pid, after)
-          _      <- ResultT.fromResult(after.status.flatMap(s => after.validateSubmission(pid, s)))
+          _      <- ResultT.fromResult(after.validateSubmission(pid, after.status))
           _      <- ResultT.liftF(deferConstraints)
           set     = handleTypeChange(before)
           _      <- updateProposal(pid, set)
@@ -550,19 +537,19 @@ object ProposalService {
           pid: Program.Id,
           ctx: ProposalContext,
           states: Set[ObservationWorkflowState],
-          oldStatus: enumsVal.ProposalStatus,
-          newStatus: enumsVal.ProposalStatus
+          oldStatus: ProposalStatus,
+          newStatus: ProposalStatus
         ): Result[Unit] =
           for {
             _ <- undefinedObservations(pid).asFailure.whenA(states.contains(ObservationWorkflowState.Undefined))
-            _ <- notAuthorizedNew(pid, user, Tag(newStatus.tag)).asFailure.unlessA(newStatus.userCanChangeStatus)
-            _ <- notAuthorizedOld(pid, user, ctx.statusTag).asFailure.unlessA(oldStatus.userCanChangeStatus)
+            _ <- notAuthorizedNew(pid, user, newStatus).asFailure.unlessA(newStatus.userCanChangeStatus)
+            _ <- notAuthorizedOld(pid, user, ctx.status).asFailure.unlessA(oldStatus.userCanChangeStatus)
             _ <- ctx.validateSubmission(pid, newStatus)
             _ <- ctx.validateDeadline(pid, newStatus)
           } yield ()
 
-        def update(pid: Program.Id, tag: Tag): F[Unit] =
-          val af = Statements.updateProposalStatus(user, pid, tag)
+        def update(pid: Program.Id, ps: ProposalStatus): F[Unit] =
+          val af = Statements.updateProposalStatus(user, pid, ps)
           session.prepareR(af.fragment.command).use(_.execute(af.argument)).void
 
         ResultT(programService.resolvePid(input.programId, input.proposalReference, input.programReference))
@@ -574,12 +561,12 @@ object ProposalService {
                   val go2 =
                     for
                       info      <- ResultT(ProposalContext.lookup(pid))
-                      oldStatus <- ResultT.fromResult(info.status) // This 'should' be succesful, since it is from the DB
-                      newStatus <- ResultT.fromResult(input.status.toProposalStatus)
+                      oldStatus  = info.status
+                      newStatus  = input.status
                       _         <- ResultT.fromResult(validate(pid, info, states, oldStatus, newStatus))
                       _         <- ResultT.liftF(update(pid, input.status))
-                      _         <- ResultT(configurationService.canonicalizeAll(pid)).whenA(oldStatus === enumsVal.ProposalStatus.NotSubmitted && newStatus === enumsVal.ProposalStatus.Submitted)
-                      _         <- ResultT(configurationService.deleteAll(pid)).whenA(oldStatus === enumsVal.ProposalStatus.Submitted && newStatus === enumsVal.ProposalStatus.NotSubmitted)
+                      _         <- ResultT(configurationService.canonicalizeAll(pid)).whenA(oldStatus === ProposalStatus.NotSubmitted && newStatus === ProposalStatus.Submitted)
+                      _         <- ResultT(configurationService.deleteAll(pid)).whenA(oldStatus === ProposalStatus.Submitted && newStatus === ProposalStatus.NotSubmitted)
                       _         <- ResultT(info.sendEmail(pid, newStatus))
                     yield pid
                   go2.value
@@ -767,10 +754,10 @@ object ProposalService {
       """.apply(pid) |+|
       ProgramUserService.Statements.andWhereUserReadAccess(user, pid)
 
-    def updateProposalStatus(user: User, pid: Program.Id, status: Tag): AppliedFragment =
+    def updateProposalStatus(user: User, pid: Program.Id, status: ProposalStatus): AppliedFragment =
       sql"""
         UPDATE t_program
-        SET c_proposal_status = $tag
+        SET c_proposal_status = $proposal_status
         WHERE c_program_id = $program_id
       """.apply(status, pid) |+|
       ProgramUserService.Statements.andWhereUserWriteAccess(user, pid)
