@@ -8,7 +8,6 @@ import cats.data.StateT
 import cats.effect.Concurrent
 import cats.syntax.all.*
 import lucuma.core.enums.ChargeClass
-import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.Site
 import lucuma.core.enums.TwilightType
@@ -148,17 +147,13 @@ object TimeAccountingService {
           } yield s
 
         private val daylightDiscounts: StateT[F, TimeAccountingState, List[TimeCharge.DiscountEntry]] =
-          StateT { tas =>
-            session.unique(SelectObservingNight)(visitId).map { optionNight =>
-              optionNight.fold((tas, List.empty[TimeCharge.DiscountEntry])) { night =>
-                val interval  = night.nauticalTwilight
-                val preDusk   = toDiscount(tas.until(interval.start), TimeAccounting.comment.PreDusk)
-                val postDawn  = toDiscount(tas.from(interval.end),    TimeAccounting.comment.PostDawn)
-                val discounts = preDusk.toList ++ postDawn.toList
-                (tas.between(interval), discounts.map(TimeCharge.DiscountEntry.Daylight(_, night.site)))
-              }
-            }
-          }
+          StateT: tas =>
+            session.unique(SelectObservingNight)(visitId).map: night =>
+              val interval  = night.nauticalTwilight
+              val preDusk   = toDiscount(tas.until(interval.start), TimeAccounting.comment.PreDusk)
+              val postDawn  = toDiscount(tas.from(interval.end),    TimeAccounting.comment.PostDawn)
+              val discounts = preDusk.toList ++ postDawn.toList
+              (tas.between(interval), discounts.map(TimeCharge.DiscountEntry.Daylight(_, night.site)))
 
         private val noDataDiscount: StateT[F, TimeAccountingState, List[TimeCharge.DiscountEntry]] =
           StateT { tas =>
@@ -349,21 +344,18 @@ object TimeAccountingService {
           c_visit_id = $visit_id
       """.query(observation_id)
 
-    val SelectObservingNight: Query[Visit.Id, Option[ObservingNight]] =
+    val SelectObservingNight: Query[Visit.Id, ObservingNight] =
       sql"""
         SELECT
-          c_instrument,
+          c_site,
           c_created
         FROM
           t_visit
         WHERE
           c_visit_id = $visit_id
-      """.query(instrument *: core_timestamp)
-         .map {
-            case (Instrument.GmosNorth, ts) => ObservingNight.fromSiteAndInstant(Site.GN, ts.toInstant).some
-            case (Instrument.GmosSouth, ts) => ObservingNight.fromSiteAndInstant(Site.GS, ts.toInstant).some
-            case _                          => none
-         }
+      """.query(site *: core_timestamp)
+         .map: (site, ts) =>
+            ObservingNight.fromSiteAndInstant(site, ts.toInstant)
 
     val SelectObserveClass: Query[Observation.Id, ObserveClass] =
       sql"""
