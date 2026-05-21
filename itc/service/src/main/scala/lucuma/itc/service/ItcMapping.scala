@@ -10,6 +10,7 @@ import cats.effect.*
 import cats.syntax.all.*
 import eu.timepit.refined.*
 import eu.timepit.refined.types.numeric.NonNegInt
+import fs2.io.file.Path
 import grackle.*
 import grackle.circe.CirceMapping
 import io.circe.syntax.*
@@ -22,28 +23,34 @@ import lucuma.itc.service.config.*
 import lucuma.itc.service.encoders.given
 import lucuma.itc.service.requests.*
 import lucuma.itc.service.syntax.all.*
+import lucuma.odb.graphql.schema.SchemaSource
+import lucuma.odb.graphql.schema.SchemaStitcher
 import org.typelevel.log4cats.Logger
 import org.typelevel.otel4s.trace.Tracer
-
-import scala.io.Source
-import scala.util.Using
 
 import QueryCompiler.*
 
 object ItcMapping extends ItcCacheOrRemote with Version {
 
-  // In principle this is a pure operation because resources are constant values, but the potential
-  // for error in dev is high and it's nice to handle failures in `F`.
-  def loadSchema[F[_]: Sync]: F[Schema] =
-    Sync[F]
-      .blocking:
-        Using(Source.fromResource("graphql/itc.graphql", getClass().getClassLoader())): src =>
-          Schema(src.mkString).toEither
-            .fold(
-              x => sys.error(s"Invalid schema: ${x.toList.mkString(", ")}"),
-              identity
+  def loadSchema[F[_]: Sync: Logger]: F[Schema] =
+    SchemaStitcher[F](Path("graphql/itc.graphql"), SchemaSource.fromResource).build
+      .flatMap {
+        case Result.Success(schema)           => Logger[F].info("Loaded GraphQL schema").as(schema)
+        case Result.Warning(problems, schema) =>
+          Logger[F]
+            .warn(s"Loaded schema with problems: ${problems.map(_.message).toList.mkString(",")}")
+            .as(schema)
+        case Result.Failure(problems)         =>
+          Sync[F].raiseError[Schema](
+            new Throwable(
+              s"Unable to load schema because: ${problems.map(_.message).toList.mkString(",")}"
             )
-      .flatMap(_.liftTo[F])
+          )
+        case Result.InternalError(error)      =>
+          Sync[F].raiseError[Schema](
+            new Throwable(s"Unable to load schema because: ${error.getMessage}")
+          )
+      }
 
   def versions[F[_]: Applicative](
     environment: ExecutionEnvironment

@@ -7,6 +7,7 @@ package graphql
 import cats.data.OptionT
 import cats.effect.*
 import cats.implicits.*
+import grackle.Schema
 import grackle.skunk.SkunkMonitor
 import lucuma.core.model.StandardUser
 import lucuma.graphql.routes.GraphQLService
@@ -27,18 +28,17 @@ object GraphQLRoutes {
     channels: SsoMapping.Channels[F],
     monitor:  SkunkMonitor[F],
     wsb:      WebSocketBuilder2[F],
+    schema: Schema,
   ): HttpRoutes[F] =
     LucumaGraphQLRoutes.forService[F](
       oa => {
         for {
           auth <- OptionT.fromOption[F](oa)
           user <- OptionT(client.get(auth))
-          map  <- OptionT.liftF(SsoMapping(channels, pool, monitor).map(_(user)))
+          map  = SsoMapping(channels, pool, monitor, schema)(user)
         } yield new GraphQLService(map)
       } .widen.value,
       wsb
     )
 
 }
-
-

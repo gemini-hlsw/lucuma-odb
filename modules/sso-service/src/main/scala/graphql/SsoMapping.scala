@@ -10,6 +10,7 @@ import cats.effect.{Unique as _, *}
 import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.PosLong
 import fs2.Stream
+import fs2.io.file.Path
 import grackle.*
 import grackle.Predicate.*
 import grackle.Query.*
@@ -28,13 +29,13 @@ import lucuma.core.model.OrcidId
 import lucuma.core.model.StandardRole
 import lucuma.core.model.StandardUser
 import lucuma.core.model.User
+import lucuma.odb.graphql.schema.SchemaSource
+import lucuma.odb.graphql.schema.SchemaStitcher
 import lucuma.sso.service.database.Database
 import lucuma.sso.service.database.RoleRequest
 import lucuma.sso.service.database.RoleType
 import natchez.Trace
-
-import scala.io.Source
-import scala.util.Using
+import org.typelevel.log4cats.Logger
 
 object SsoMapping {
 
@@ -51,22 +52,33 @@ object SsoMapping {
       }
   }
 
-  // In principle this is a pure operation because resources are constant values, but the potential
-  // for error in dev is high and it's nice to handle failures in `F`.
-  def loadSchema[F[_]: Sync]: F[Schema] =
-    Sync[F].defer {
-      Using(Source.fromResource("Sso.graphql", getClass().getClassLoader())) { src =>
-        Schema(src.mkString).toOption.get // TODO
-      } .liftTo[F]
-    }
+  def loadSchema[F[_]: Sync: Logger]: F[Schema] =
+    SchemaStitcher[F](Path("Sso.graphql"), SchemaSource.fromResource).build
+      .flatMap {
+        case Result.Success(schema)           => Logger[F].info("Loaded GraphQL schema").as(schema)
+        case Result.Warning(problems, schema) =>
+          Logger[F]
+            .warn(s"Loaded schema with problems: ${problems.map(_.message).toList.mkString(",")}")
+            .as(schema)
+        case Result.Failure(problems)         =>
+          Sync[F].raiseError[Schema](
+            new Throwable(
+              s"Unable to load schema because: ${problems.map(_.message).toList.mkString(",")}"
+            )
+          )
+        case Result.InternalError(error)      =>
+          Sync[F].raiseError[Schema](
+            new Throwable(s"Unable to load schema because: ${error.getMessage}")
+          )
+      }
 
   def apply[F[_]: Async: Trace](
     channels: Channels[F],
     pool:     Resource[F, Session[F]],
     monitor:  SkunkMonitor[F],
-  ): F[StandardUser => Mapping[F]] =
-    loadSchema[F].map { loadedSchema => user =>
-
+    loadedSchema: Schema
+  ): StandardUser => Mapping[F] =
+    (user: StandardUser) => {
       // Directly-computed result for `createApiKey` mutation.
       def createApiKey(env: Env): F[Result[String]] =
         env
