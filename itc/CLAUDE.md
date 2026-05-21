@@ -73,31 +73,6 @@ JMH benchmark class:
 sbt "itcBenchmark/Jmh/run lucuma.itc.benchmarks.ItcCoreBenchmark"
 ```
 
-## Schema Stitching Workflow
-
-Scripts:
-
-- `itc/stitchSchema.sh`
-- `itc/fetchODBSchema.mjs`
-- `itc/schemastitcher.mjs`
-
-Generate stitched ITC schema:
-
-```bash
-./itc/stitchSchema.sh local
-```
-
-Supported environments: `local`, `dev`, `staging`, `production`.
-
-Output schema path:
-
-- `itc/service/src/main/resources/graphql/itc.graphql`
-
-Notes:
-
-- `stitchSchema.sh` runs `npm ci` and requires Node/npm.
-- `local` mode expects ODB at `http://localhost:8082/odb`.
-
 ## Legacy OCS JAR Refresh
 
 Use when upstream OCS ITC bundle changes.
