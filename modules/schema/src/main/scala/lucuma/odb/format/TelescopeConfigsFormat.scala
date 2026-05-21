@@ -4,6 +4,7 @@
 package lucuma.odb.format
 
 import cats.data.NonEmptyList
+import io.circe.parser.decode
 import io.circe.syntax.*
 import lucuma.core.enums.SlitOffsetMode
 import lucuma.core.model.SlitTelescopeConfigs
@@ -23,13 +24,13 @@ trait TelescopeConfigsFormat:
 
   val AlongSlitFormat: Format[String, NonEmptyList[TelescopeConfigAlongSlit]] =
     Format(
-      s => io.circe.parser.decode[List[TelescopeConfigAlongSlit]](s).toOption.flatMap(NonEmptyList.fromList),
+      s => decode[List[TelescopeConfigAlongSlit]](s).toOption.flatMap(NonEmptyList.fromList),
       cs => cs.toList.asJson.noSpaces
     )
 
   val ToSkyFormat: Format[String, NonEmptyList[TelescopeConfig]] =
     Format(
-      s => io.circe.parser.decode[List[TelescopeConfig]](s).toOption.flatMap(NonEmptyList.fromList),
+      s => decode[List[TelescopeConfig]](s).toOption.flatMap(NonEmptyList.fromList),
       cs => cs.toList.asJson.noSpaces
     )
 
