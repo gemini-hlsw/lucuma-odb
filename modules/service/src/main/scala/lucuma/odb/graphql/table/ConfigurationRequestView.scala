@@ -7,6 +7,7 @@ package table
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.Flamingos2Codecs.*
 import lucuma.odb.util.GmosCodecs.*
+import lucuma.odb.util.GnirsCodecs.*
 
 trait ConfigurationRequestView[F[_]] extends BaseMapping[F]:
 
@@ -64,6 +65,12 @@ trait ConfigurationRequestView[F[_]] extends BaseMapping[F]:
     object GmosSouthImaging:
       val Id = col("c_gmos_south_imaging_id", configuration_request_id.embedded)
       val Filters = col("c_gmos_south_imaging_filters", _gmos_south_filter.embedded)
+
+    object GnirsLongSlit:
+      val Id      = col("c_gnirs_longslit_id", configuration_request_id.embedded)
+      val Grating = col("c_gnirs_longslit_grating", gnirs_grating.embedded)
+      val Camera  = col("c_gnirs_longslit_camera", gnirs_camera.embedded)
+      val Prism   = col("c_gnirs_longslit_prism", gnirs_prism.embedded)
 
     object Igrins2LongSlit:
       val Id = col("c_igrins_2_longslit_id", configuration_request_id.embedded)

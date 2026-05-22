@@ -3,11 +3,11 @@ name: Legacy ITC Tests
 on:
   pull_request:
     paths:
-      - 'itc/service/ocslib/**'
-      - 'itc/legacy-tests/**'
-      - 'itc/service/src/main/scala/lucuma/itc/legacy/**'
+      - "itc/service/ocslib/**"
+      - "itc/legacy-tests/**"
+      - "itc/service/src/main/scala/lucuma/itc/legacy/**"
   schedule:
-    - cron: '0 2 * * *'  # Daily at 2 AM UTC
+    - cron: "0 2 * * *" # Daily at 2 AM UTC
   workflow_dispatch:
 
 jobs:
@@ -17,8 +17,8 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        java: ['17']
-        scala: ['3.7.3']
+        java: ["17"]
+        scala: ["3.7.3"]
     steps:
       - name: Checkout code
         uses: nschloe/action-cached-lfs-checkout@v1
@@ -28,13 +28,13 @@ jobs:
       - name: Setup sbt
         uses: sbt/setup-sbt@v1
 
-      - name: Setup Java (temurin@17)
-        id: setup-java-temurin-17
-        if: matrix.java == 'temurin@17'
+      - name: Setup Java (temurin@25)
+        id: setup-java-temurin-25
+        if: matrix.java == 'temurin@25'
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 17
+          java-version: 25
           cache: sbt
 
       - name: Run Legacy ITC Tests

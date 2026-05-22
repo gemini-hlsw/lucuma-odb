@@ -575,6 +575,9 @@ trait Codecs {
   val sky_background: Codec[SkyBackground] =
     enumerated[SkyBackground](Type.varchar)
 
+  val slit_offset_mode: Codec[SlitOffsetMode] =
+    enumerated[SlitOffsetMode](Type.varchar)
+
   val slew_stage: Codec[SlewStage] =
     enumerated(Type("e_slew_stage"))
 

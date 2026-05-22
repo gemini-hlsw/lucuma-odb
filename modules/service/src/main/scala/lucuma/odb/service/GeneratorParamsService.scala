@@ -51,6 +51,7 @@ import lucuma.odb.sequence.data.MissingParam
 import lucuma.odb.sequence.data.MissingParamSet
 import lucuma.odb.sequence.flamingos2
 import lucuma.odb.sequence.ghost
+import lucuma.odb.sequence.gnirs
 import lucuma.odb.sequence.igrins2
 import lucuma.odb.sequence.visitor
 import lucuma.odb.util.Codecs.*
@@ -413,7 +414,32 @@ object GeneratorParamsService {
 
             GeneratorParams(itcInput, obsParams.scienceBand, gs, obsParams.calibrationRole, obsParams.declaredState, obsParams.executionState, obsParams.stepCount).asRight
 
-          // Visitor Modes 
+          case gn: gnirs.longslit.Config =>
+            ExposureTimeMode.timeAndCount.getOption(gn.exposureTimeMode)
+              .toRight(Error.MisconfiguredObservation(obsParams.observationId, "GNIRS requires a TimeAndCount exposure time mode"))
+              .map: etm =>
+                val sciMode = InstrumentMode.GnirsSpectroscopy(
+                  exposureTimeMode  = etm,
+                  centralWavelength = gn.filter.centralWavelength,
+                  filter            = gn.filter,
+                  slitWidth         = gn.fpu,
+                  prism             = gn.prism,
+                  grating           = gn.grating,
+                  camera            = gn.camera,
+                  readMode          = gn.readMode.resolveForStepExposureTime(etm.time),
+                  wellDepth         = gn.wellDepth
+                )
+                val consInput = obsParams.constraints.toInput
+                val science   = SpectroscopyParameters(consInput, sciMode)
+                val itcInput  =
+                  obsParams.targets
+                    .traverse(itcTargetParams)
+                    .map(ItcInput.ScienceOnlySpectroscopy(science, _))
+                    .leftMap(MissingParamSet.fromParams)
+                    .toEither
+                GeneratorParams(itcInput, obsParams.scienceBand, gn, obsParams.calibrationRole, obsParams.declaredState, obsParams.executionState, obsParams.stepCount)
+
+          // Visitor Modes
           case vis: visitor.Config =>
             GeneratorParams(              
               MissingParamSet.fromParams(NonEmptyList.one(MissingParam.forObservation("(visitor mode)"))).asLeft,

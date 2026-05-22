@@ -164,6 +164,9 @@ trait Services[F[_]]:
   /** The `Igrins2LongSlitService`. */
   def igrins2LongSlitService: Igrins2LongSlitService[F]
 
+  /** The `GnirsLongSlitService`. */
+  def gnirsLongSlitService: GnirsLongSlitService[F]
+
   /** The `Igrins2SequenceService` */
   def igrins2SequenceService: Igrins2SequenceService[F]
 
@@ -348,6 +351,7 @@ object Services:
       lazy val gmosImagingService = GmosImagingService.instantiate
       lazy val gmosSequenceService = GmosSequenceService.instantiate
       lazy val igrins2LongSlitService = Igrins2LongSlitService.instantiate
+      lazy val gnirsLongSlitService = GnirsLongSlitService.instantiate
       lazy val igrins2SequenceService = Igrins2SequenceService.instantiate
       lazy val obsAttachmentAssignmentService = ObsAttachmentAssignmentService.instantiate
       lazy val observationService = ObservationService.instantiate
@@ -416,6 +420,7 @@ object Services:
     def gmosSequenceService[F[_]](using Services[F]): GmosSequenceService[F] = summon[Services[F]].gmosSequenceService
     def groupService[F[_]](using Services[F]): GroupService[F] = summon[Services[F]].groupService
     def igrins2LongSlitService[F[_]](using Services[F]): Igrins2LongSlitService[F] = summon[Services[F]].igrins2LongSlitService
+    def gnirsLongSlitService[F[_]](using Services[F]): GnirsLongSlitService[F] = summon[Services[F]].gnirsLongSlitService
     def igrins2SequenceService[F[_]](using Services[F]): Igrins2SequenceService[F] = summon[Services[F]].igrins2SequenceService
     def obsAttachmentAssignmentService[F[_]](using Services[F]): ObsAttachmentAssignmentService[F] = summon[Services[F]].obsAttachmentAssignmentService
     def observationService[F[_]](using Services[F]): ObservationService[F] = summon[Services[F]].observationService

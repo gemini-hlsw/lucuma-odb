@@ -68,6 +68,9 @@ object StartupDiagnostics:
           checkPostgresEnum(exposure_time_mode_type),
           checkPostgresEnum(gcal_baseline),
           checkPostgresEnum(gcal_lamp_type),
+          checkPostgresEnum(gnirs_decker),
+          checkPostgresEnum(gnirs_obs_read_mode),
+          checkPostgresEnum(gnirs_well_depth),
           {
             // We'll skip this one.  There is a postgres enum, but it is tied
             // to a scala NewBoolean type.  There is no Enumerated instance.
@@ -153,6 +156,7 @@ object StartupDiagnostics:
           checkPostgresLookupTable(gnirs_fpu_slit, "t_gnirs_fpu_slit"),
           checkPostgresLookupTable(gnirs_grating, "t_gnirs_grating"),
           checkPostgresLookupTable(gnirs_prism, "t_gnirs_prism"),
+          checkPostgresLookupTable(slit_offset_mode, "t_slit_offset_mode"),
           checkPostgresLookupTable(image_quality_preset, "t_image_quality"),
           checkPostgresLookupTable(imaging_capability, "t_imaging_capability"),
           checkPostgresLookupTable(instrument, "t_instrument"),

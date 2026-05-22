@@ -5,7 +5,6 @@ package lucuma.odb.graphql
 package table
 
 import lucuma.odb.util.Codecs.*
-import lucuma.odb.util.Igrins2Codecs.*
 import skunk.circe.codec.json.*
 import skunk.codec.all.*
 
@@ -15,7 +14,7 @@ trait Igrins2LongSlitView[F[_]] extends BaseMapping[F]:
 
     val ObservationId: ColumnRef         = col("c_observation_id", observation_id)
 
-    val OffsetMode: ColumnRef            = col("c_offset_mode", igrins_2_offset_mode.opt)
+    val OffsetMode: ColumnRef            = col("c_offset_mode", slit_offset_mode.opt)
 
     val SaveSVCImages: ColumnRef         = col("c_save_svc_images", bool.opt)
 

@@ -46,6 +46,7 @@ out/
 .metals/
 .vscode/
 metals.sbt
+sbt-launch.jar
 
 # Transient workspace
 *.worksheet.sc
@@ -85,3 +86,6 @@ TODO.md
 TASK.md
 TASK_*.md
 *_TASK.md
+.claude/
+
+*.bkp

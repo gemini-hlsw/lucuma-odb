@@ -177,6 +177,7 @@ object OdbMapping {
           with ExecutionEventSelectResultMapping[F]
           with ExposureTimeModeMapping[F]
           with ConfigurationFlamingos2LongSlitMappings[F]
+          with ConfigurationGnirsLongSlitMappings[F]
           with ConfigurationIgrins2LongSlitMappings[F]
           with Flamingos2CustomMaskMapping[F]
           with Flamingos2DynamicMapping[F]
@@ -185,6 +186,7 @@ object OdbMapping {
           with Flamingos2StaticMapping[F]
           with Igrins2DynamicMapping[F]
           with Igrins2LongSlitMapping[F]
+          with GnirsLongSlitMapping[F]
           with Igrins2StaticMapping[F]
           with FilterTypeMetaMapping[F]
           with GhostDynamicMapping[F]
@@ -442,6 +444,8 @@ object OdbMapping {
                 GroupElementMapping,
                 Igrins2LongSlitMapping,
                 Igrins2StaticMapping,
+                GnirsLongSlitAcquisitionMapping,
+                GnirsLongSlitMapping,
                 ImagingConfigOptionMapping,
                 ImagingConfigOptionGmosNorthMapping,
                 ImagingConfigOptionGmosSouthMapping,
@@ -564,6 +568,7 @@ object OdbMapping {
                 ConfigurationMappings,
                 ConfigurationConditionsMappings,
                 ConfigurationFlamingos2LongSlitMappings,
+                ConfigurationGnirsLongSlitMappings,
                 ConfigurationIgrins2LongSlitMappings,
                 ConfigurationGmosNorthImagingMappings,
                 ConfigurationGmosSouthImagingMappings,
@@ -620,6 +625,7 @@ object OdbMapping {
                 ExecutionElaborator,
                 Flamingos2LongSlitElaborator,
                 Igrins2LongSlitElaborator,
+                GnirsLongSlitElaborator,
                 GhostIfuElaborator,
                 GmosNorthImagingElaborator,
                 GmosNorthLongSlitElaborator,
