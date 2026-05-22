@@ -342,4 +342,52 @@ class executionTwilight extends ExecutionTestSupportForGmos {
       cSpecPhot   <- obsTimeEstimate(c.specPhot)
     yield (t0.programTime +| cSpecPhot.programTime) === t1.programTime)
 
+  test("twilight calibration role uses DayCal"):
+    val setupObs: IO[Observation.Id] =
+      for
+        p   <- createProgram
+        t   <- createTargetWithProfileAs(pi, p)
+        oid <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+        _   <- setObservationCalibrationRole(List(oid), CalibrationRole.Twilight)
+      yield oid
+
+    setupObs.flatMap: oid =>
+      expect(
+        user  = pi,
+        query =
+          s"""
+            query {
+              executionConfig(observationId: "$oid") {
+                gmosNorth {
+                  science {
+                    nextAtom {
+                      observeClass
+                      steps {
+                        observeClass
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          """,
+        expected =
+          json"""
+            {
+              "executionConfig": {
+                "gmosNorth": {
+                  "science": {
+                    "nextAtom": {
+                      "observeClass": "DAY_CAL",
+                      "steps": [
+                        { "observeClass": "DAY_CAL" }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          """.asRight
+      )
+
 }
