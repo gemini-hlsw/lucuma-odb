@@ -4,17 +4,17 @@
 package lucuma.odb.graphql.input
 
 import cats.syntax.all.*
+import lucuma.core.enums.ProposalStatus
 import lucuma.core.model.Program
 import lucuma.core.model.ProgramReference
 import lucuma.core.model.ProposalReference
-import lucuma.odb.data.Tag
 import lucuma.odb.graphql.binding.*
 
 final case class SetProposalStatusInput(
   programId: Option[Program.Id],
   proposalReference: Option[ProposalReference],
-  programReference: Option[ProgramReference],
-  status:           Tag
+  programReference:  Option[ProgramReference],
+  status:            ProposalStatus
 )
 
 object SetProposalStatusInput {
@@ -24,7 +24,7 @@ object SetProposalStatusInput {
         ProgramIdBinding.Option("programId", rPid),
         ProposalReferenceBinding.Option("proposalReference", rProp),
         ProgramReferenceBinding.Option("programReference", rProg),
-        TagBinding("status", rPs)
+        ProposalStatusBinding("status", rPs)
       ) => (rPid, rProp, rProg, rPs).parMapN(apply)
     }
 }

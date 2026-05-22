@@ -42,7 +42,6 @@ import lucuma.core.model.sequence.DatasetReference
 import lucuma.itc.client.ItcClient
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
-import lucuma.odb.data.Tag
 import lucuma.odb.graphql.binding.*
 import lucuma.odb.graphql.input.WhereCallForProposals
 import lucuma.odb.graphql.input.WhereConfigurationRequest
@@ -95,7 +94,6 @@ trait QueryMapping[F[_]] extends Predicates[F] {
       SqlObject("datasetChronicleEntries"),
       SqlObject("events"),
       RootEffect.computeJson("executionConfig")(executionConfig),
-      SqlObject("filterTypeMeta"),
       RootEffect.computeJson("goaDataDownloadAccess")(goaDataDownloadAccess),
       SqlObject("group"),
       SqlObject("observation"),
@@ -106,7 +104,6 @@ trait QueryMapping[F[_]] extends Predicates[F] {
       SqlObject("programNote"),
       SqlObject("programNotes"),
       SqlObject("programUsers"),
-      SqlObject("proposalStatusMeta"),
       SqlObject("spectroscopyConfigOptions"),
       SqlObject("imagingConfigOptions"),
       SqlObject("target"),
@@ -126,7 +123,6 @@ trait QueryMapping[F[_]] extends Predicates[F] {
       DatasetChronicleEntries,
       Events,
       ExecutionConfig,
-      FilterTypeMeta,
       GoaDataDownloadAccess,
       Group,
       ImagingConfigOptions,
@@ -138,7 +134,6 @@ trait QueryMapping[F[_]] extends Predicates[F] {
       ProgramNote,
       ProgramNotes,
       ProgramUsers,
-      ProposalStatusMeta,
       SpectroscopyConfigOptions,
       Target,
       TargetGroup,
@@ -302,12 +297,6 @@ trait QueryMapping[F[_]] extends Predicates[F] {
           }
         }
     }
-
-  private lazy val ProposalStatusMeta: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
-    case (QueryType, "proposalStatusMeta", Nil) =>
-      Elab.transformChild { child =>
-        OrderBy(OrderSelections(List(OrderSelection[Short](ProposalStatusMetaType / "ordinal"))), child)
-      }
 
   private def datasetPredicate(
     rDid: Result[Option[model.sequence.Dataset.Id]],
@@ -489,12 +478,6 @@ trait QueryMapping[F[_]] extends Predicates[F] {
           FutureLimitParam    -> limit
         )
   }
-
-  private lazy val FilterTypeMeta: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
-    case (QueryType, "filterTypeMeta", Nil) =>
-      Elab.transformChild { child =>
-        OrderBy(OrderSelections(List(OrderSelection[Tag](FilterTypeMetaType / "tag"))), child)
-      }
 
   private lazy val GoaDataDownloadAccess: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
     case (QueryType, "goaDataDownloadAccess", List(

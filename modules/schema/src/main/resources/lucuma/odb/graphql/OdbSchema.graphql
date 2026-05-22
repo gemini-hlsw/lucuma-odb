@@ -10,12 +10,6 @@ enum SeeingTrend {
 enum ConditionsExpectationType {
   DUMMY
 }
-enum FilterType {
-  DUMMY
-}
-enum ProposalStatus {
-  DUMMY
-}
 
 """
 Email address, matching ^\w+@[a-zA-Z_]+?\.[a-zA-Z]{2,3}$
@@ -9338,15 +9332,6 @@ input GnirsLongSlitInput {
 }
 
 """
-Metadata for `enum FilterType`
-"""
-type FilterTypeMeta {
-  tag: FilterType!
-  shortName: String!
-  longName: String!
-}
-
-"""
 Time and Count exposure time mode.
 """
 type TimeAndCountExposureTimeMode {
@@ -12892,6 +12877,13 @@ enum ProgramType {
   SYSTEM
 }
 
+enum ProposalStatus {
+  NOT_SUBMITTED
+  SUBMITTED
+  ACCEPTED
+  NOT_ACCEPTED
+}
+
 """
 The matching program user results, limited to a maximum of 1000 entries.
 """
@@ -12979,14 +12971,6 @@ Proposal reference for science programs, formatted as G-YYYY[AB]-NNNN+. For
 example, G-2024B-1234 where 2024B refers to the associated semester.
 """
 scalar ProposalReferenceLabel
-
-"""
-Metadata for `enum ProposalStatus`
-"""
-type ProposalStatusMeta {
-  tag: ProposalStatus!
-  name: String!
-}
 
 """
 Quasar spectrum
@@ -13198,11 +13182,6 @@ type Query {
   ): ExecutionConfig
 
   """
-  Metadata for `enum FilterType`
-  """
-  filterTypeMeta: [FilterTypeMeta!]!
-
-  """
   Obtains a list of program references for which the user with ORCiD `orcidId`
   has GOA data-download access privileges.  These will be those for which the
   user is a ProgramUser of any role with the `hasDataAccess` flag set.
@@ -13392,11 +13371,6 @@ type Query {
     """
     includeDeleted: Boolean! = false
   ): ProgramUserSelectResult!
-
-  """
-  Metadata for `enum ProposalStatus
-  """
-  proposalStatusMeta: [ProposalStatusMeta!]!
 
   # Observations grouped by commonly held science requirements
   # scienceRequirementsGroup(

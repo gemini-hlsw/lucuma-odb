@@ -316,6 +316,9 @@ trait Codecs {
   val exposure_time_mode_type: Codec[ExposureTimeModeType] =
     enumerated(Type("e_exp_time_mode"))
 
+  val filterType: Codec[FilterType] =
+    enumerated(Type.varchar)
+
   val focal_plane: Codec[FocalPlane] =
     enumerated[FocalPlane](Type.varchar)
 
@@ -458,6 +461,9 @@ trait Codecs {
   val partner: Codec[Partner] =
     enumerated(Type.varchar)
 
+  val _partner: Codec[Arr[Partner]] =
+    Codec.array(_.tag, s => Enumerated[Partner].fromTag(s).toRight(s"Invalid Partner tag: $s"), Type("_d_tag", List(Type("d_tag"))))
+
   val numeric_nonneg: Codec[NonNegBigDecimal] =
     numeric.eimap(NonNegBigDecimal.from)(_.value)
 
@@ -505,6 +511,9 @@ trait Codecs {
       s => ProposalReference.fromString.getOption(s).toRight(s"Invalid proposal reference: $s"))(
       ProposalReference.fromString.reverseGet
     )
+
+  val proposal_status: Codec[ProposalStatus] =
+    enumerated(Type.varchar)
 
   val program_reference: Codec[ProgramReference] =
     text.eimap(
