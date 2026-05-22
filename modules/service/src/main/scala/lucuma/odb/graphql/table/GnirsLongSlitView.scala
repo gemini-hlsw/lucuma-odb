@@ -27,9 +27,8 @@ trait GnirsLongSlitView[F[_]] extends BaseMapping[F]:
     val Camera: ColumnRef           = col("c_camera", gnirs_camera)
     val InitialCamera: ColumnRef    = col("c_initial_camera", gnirs_camera)
 
-    // FPU and central wavelength
+    // FPU
     val Fpu: ColumnRef              = col("c_fpu", gnirs_fpu_slit)
-    val CentralWavelength: ColumnRef = col("c_central_wavelength", wavelength_pm)
     val InitialFpu: ColumnRef       = col("c_initial_fpu", gnirs_fpu_slit)
 
     // Filter

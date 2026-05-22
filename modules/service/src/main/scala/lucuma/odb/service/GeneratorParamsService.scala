@@ -420,7 +420,7 @@ object GeneratorParamsService {
               .map: etm =>
                 val sciMode = InstrumentMode.GnirsSpectroscopy(
                   exposureTimeMode  = etm,
-                  centralWavelength = gn.centralWavelength,
+                  centralWavelength = gn.filter.centralWavelength,
                   filter            = gn.filter,
                   slitWidth         = gn.fpu,
                   prism             = gn.prism,

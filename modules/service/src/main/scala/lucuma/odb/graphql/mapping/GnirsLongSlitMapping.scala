@@ -119,7 +119,6 @@ trait GnirsLongSlitMapping[F[_]]
       SqlField("initialFpu",    GnirsLongSlitView.InitialFpu),
       SqlField("filter",        GnirsLongSlitView.Filter),
       SqlField("initialFilter", GnirsLongSlitView.InitialFilter),
-      SqlObject("centralWavelength"),
       SqlField("coadds",        GnirsLongSlitView.Coadds),
 
       // Decker: explicit override + computed default + effective

@@ -1130,7 +1130,6 @@ trait DatabaseOperations { this: OdbSuite =>
             prism: MIRROR
             camera: SHORT_BLUE
             fpu: LONG_SLIT_0_30
-            centralWavelength: { nanometers: 2200 }
             filter: ORDER3
             exposureTimeMode: {
               timeAndCount: {
@@ -1277,7 +1276,6 @@ trait DatabaseOperations { this: OdbSuite =>
             prism: MIRROR
             camera: SHORT_BLUE
             fpu: LONG_SLIT_0_30
-            centralWavelength: { nanometers: 2200 }
             filter: ORDER3
             exposureTimeMode: {
               timeAndCount: {

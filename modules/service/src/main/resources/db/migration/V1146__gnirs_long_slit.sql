@@ -36,10 +36,8 @@ CREATE TABLE t_gnirs_long_slit (
   c_camera         d_tag NOT NULL REFERENCES t_gnirs_camera(c_tag),
   c_initial_camera d_tag NOT NULL REFERENCES t_gnirs_camera(c_tag),
 
-  c_fpu                        d_tag           NOT NULL REFERENCES t_gnirs_fpu_slit(c_tag),
-  c_central_wavelength         d_wavelength_pm NOT NULL,
-  c_initial_fpu                d_tag           NOT NULL REFERENCES t_gnirs_fpu_slit(c_tag),
-  c_initial_central_wavelength d_wavelength_pm NOT NULL,
+  c_fpu             d_tag NOT NULL REFERENCES t_gnirs_fpu_slit(c_tag),
+  c_initial_fpu     d_tag NOT NULL REFERENCES t_gnirs_fpu_slit(c_tag),
 
   -- filter: single required value; initial tracked separately
   c_filter         d_tag NOT NULL REFERENCES t_gnirs_filter(c_tag),

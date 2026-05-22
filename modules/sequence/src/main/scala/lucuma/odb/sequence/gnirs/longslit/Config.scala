@@ -52,19 +52,18 @@ object AcquisitionConfig:
       (a.readMode, a.coadds.value, a.filter, a.offsetP.map(_.toAngle), a.offsetQ.map(_.toAngle), a.exposureTimeMode)
 
 case class Config(
-  exposureTimeMode:        ExposureTimeMode,
-  grating:                 GnirsGrating,
+  filter:                  GnirsFilter,
+  decker:                  GnirsDecker,
+  fpu:                     GnirsFpuSlit,
   prism:                   GnirsPrism,
+  grating:                 GnirsGrating,
   gratingWavelength:       Wavelength,
   camera:                  GnirsCamera,
-  fpu:                     GnirsFpuSlit,
-  filter:                  GnirsFilter,
-  centralWavelength:       Wavelength,
-  coadds:                  PosInt,
-  decker:                  GnirsDecker,
+  focus:                   GnirsFocus,
   readMode:                GnirsObsReadMode,
   wellDepth:               GnirsWellDepth,
-  focus:                   GnirsFocus,
+  exposureTimeMode:        ExposureTimeMode,
+  coadds:                  PosInt,
   telescopeConfigs:        SlitTelescopeConfigs,
   acquisition:             AcquisitionConfig
 ) derives Eq:
@@ -73,23 +72,22 @@ case class Config(
     val bao = new ByteArrayOutputStream(512)
     val out = new DataOutputStream(bao)
 
-    out.write(exposureTimeMode.hashBytes)
-    out.writeChars(grating.tag)
+    out.writeChars(filter.tag)
+    out.writeChars(decker.tag)
+    out.writeChars(fpu.tag)
     out.writeChars(prism.tag)
+    out.writeChars(grating.tag)
     out.write(gratingWavelength.hashBytes)
     out.writeChars(camera.tag)
-    out.writeChars(fpu.tag)
-    out.writeChars(filter.tag)
-    out.write(centralWavelength.hashBytes)
-    out.write(coadds.value.hashBytes)
-    out.writeChars(decker.tag)
-    out.writeChars(readMode.tag)
-    out.writeChars(wellDepth.tag)
     focus match
       case GnirsFocus.Best          => out.writeByte(0)
       case GnirsFocus.Custom(qty)   =>
         out.writeByte(1)
         out.writeInt(qty.value.value.value)
+    out.writeChars(readMode.tag)
+    out.writeChars(wellDepth.tag)
+    out.write(exposureTimeMode.hashBytes)
+    out.write(coadds.value.hashBytes)
 
     telescopeConfigs.telescopeConfigs.toList.foreach: tc =>
       out.write(tc.hashBytes)

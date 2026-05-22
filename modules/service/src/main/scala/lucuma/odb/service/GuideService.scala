@@ -296,7 +296,7 @@ object GuideService {
         case mode: gmos.longslit.Config.GmosSouth =>
           (Site.GS, ObservingModeType.GmosSouthLongSlit, mode.centralWavelength)
         case mode: gnirs.longslit.Config =>
-          (Site.GN, ObservingModeType.GnirsLongSlit, mode.centralWavelength)
+          (Site.GN, ObservingModeType.GnirsLongSlit, mode.filter.centralWavelength)
         case _: igrins2.longslit.Config =>
           (Site.GN, ObservingModeType.Igrins2LongSlit, Igrins2CentralWavelength)
         case visitor.Config(mode, wavelength, _, _, _) =>

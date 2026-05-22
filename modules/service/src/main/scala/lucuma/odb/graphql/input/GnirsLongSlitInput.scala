@@ -23,7 +23,6 @@ import lucuma.core.math.Offset
 import lucuma.core.math.Wavelength
 import lucuma.core.model.Access
 import lucuma.core.model.ExposureTimeMode
-import lucuma.core.model.ExposureTimeMode.TimeAndCountMode
 import lucuma.core.model.SlitTelescopeConfigs
 import lucuma.core.model.sequence.TelescopeConfigAlongSlit
 import lucuma.odb.data.Nullable
@@ -64,7 +63,7 @@ object GnirsLongSlitInput:
     readMode:         Option[GnirsObsReadMode],
     coadds:           Option[PosInt],
     offset:           Option[Offset],
-    exposureTimeMode: Option[TimeAndCountMode]
+    exposureTimeMode: Option[ExposureTimeMode]
   )
 
   object AcquisitionInput:
@@ -75,20 +74,13 @@ object GnirsLongSlitInput:
           GnirsObsReadModeBinding.Option("readMode", rReadMode),
           PosIntBinding.Option("coadds", rCoadds),
           OffsetInput.Binding.Option("offset", rOffset),
-          ExposureTimeModeInput.TimeAndCount.Binding.Option("exposureTimeMode", rEtm)
+          ExposureTimeModeInput.Binding.Option("exposureTimeMode", rEtm)
         ) =>
           (rFilter, rReadMode, rCoadds, rOffset, rEtm).parMapN(AcquisitionInput.apply)
-
-  val defaultCentralWavelength: Wavelength =
-    Wavelength.unsafeFromIntPicometers(1_650_000)
-
-  def centralWavelengthFromFilter(filter: GnirsFilter): Wavelength =
-    filter.optimalWavelength.getOrElse(defaultCentralWavelength)
 
   case class Create(
     exposureTimeMode: Option[ExposureTimeMode],
     coadds:           Option[PosInt],
-    centralWavelength: Option[Wavelength],
     filter:           GnirsFilter,
     fpu:              GnirsFpuSlit,
     camera:           GnirsCamera,
@@ -112,7 +104,6 @@ object GnirsLongSlitInput:
         case List(
           ExposureTimeModeInput.Binding.Option("exposureTimeMode", rEtm),
           PosIntBinding.Option("coadds", rCoadds),
-          WavelengthInput.Binding.Option("centralWavelength", rWavelength),
           GnirsFilterBinding("filter", rFilter),
           GnirsFpuSlitBinding("fpu", rFpu),
           GnirsCameraBinding("camera", rCamera),
@@ -128,20 +119,19 @@ object GnirsLongSlitInput:
           SlitTelescopeConfigsInput.Binding.Option("explicitTelescopeConfigs", rExplTelescope),
           AcquisitionInput.Binding.Option("acquisition", rAcq)
         ) =>
-          (rEtm, rCoadds, rWavelength, rFilter, rFpu, rCamera, rGrating, rPrism,
+          (rEtm, rCoadds, rFilter, rFpu, rCamera, rGrating, rPrism,
            rDecker, rGratingWavelength, rExplGrating, rExplPrism,
            rFocus, rReadMode, rWellDepth, rExplTelescope, rAcq).parMapN:
-            (etm, coadds, wavelength, filter, fpu, camera, grating, prism,
+            (etm, coadds, filter, fpu, camera, grating, prism,
              decker, gratingWavelength, explGrating, explPrism,
              focus, readMode, wellDepth, explTelescope, acq) =>
-              Create(etm, coadds, wavelength, filter, fpu, camera, grating, prism,
+              Create(etm, coadds, filter, fpu, camera, grating, prism,
                      decker, gratingWavelength, explGrating, explPrism,
                      focus, readMode, wellDepth, explTelescope, acq)
 
   case class Edit(
     exposureTimeMode:          Option[ExposureTimeMode],
     coadds:                    Option[PosInt],          // Option, not Nullable — coadds is NOT NULL
-    centralWavelength:         Option[Wavelength],
     filter:                    Option[GnirsFilter],
     fpu:                       Option[GnirsFpuSlit],
     camera:                    Option[GnirsCamera],
@@ -169,7 +159,7 @@ object GnirsLongSlitInput:
         c  <- required(camera, "camera")
         g  <- required(grating.toOption, "grating")
         p  <- required(prism.toOption, "prism")
-      yield Create(exposureTimeMode, coadds, centralWavelength, f, u, c, g, p,
+      yield Create(exposureTimeMode, coadds, f, u, c, g, p,
                    explicitDecker.toOption, explicitGratingWavelength.toOption,
                    explicitGrating.toOption, explicitPrism.toOption,
                    explicitFocusMotorSteps.toOption, explicitReadMode.toOption, explicitWellDepth.toOption,
@@ -181,7 +171,6 @@ object GnirsLongSlitInput:
         case List(
           ExposureTimeModeInput.Binding.Option("exposureTimeMode", rEtm),
           PosIntBinding.Option("coadds", rCoadds),
-          WavelengthInput.Binding.Option("centralWavelength", rWavelength),
           GnirsFilterBinding.Option("filter", rFilter),
           GnirsFpuSlitBinding.Option("fpu", rFpu),
           GnirsCameraBinding.Option("camera", rCamera),
@@ -197,6 +186,6 @@ object GnirsLongSlitInput:
           SlitTelescopeConfigsInput.Binding.Nullable("explicitTelescopeConfigs", rExplTelescope),
           AcquisitionInput.Binding.Option("acquisition", rAcq)
         ) =>
-          (rEtm, rCoadds, rWavelength, rFilter, rFpu, rCamera, rGrating, rPrism,
+          (rEtm, rCoadds, rFilter, rFpu, rCamera, rGrating, rPrism,
            rDecker, rGratingWavelength, rExplGrating, rExplPrism,
            rFocus, rReadMode, rWellDepth, rExplTelescope, rAcq).parMapN(Edit.apply)

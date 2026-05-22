@@ -75,7 +75,6 @@ trait WavelengthMapping[F[_]]
       wavelengthMappingAtPath(StepRecordType / "gmosSouth" / "gratingConfig" / "wavelength", GmosSouthDynamicTable.Grating.Wavelength, GmosSouthDynamicTable.Id),
       wavelengthMappingAtPath(TimeAndCountExposureTimeModeType / "at", ExposureTimeModeView.TimeAndCount.At, ExposureTimeModeView.TimeAndCount.SyntheticId),
       wavelengthMappingAtPath(VisitorType / "centralWavelength", VisitorTable.CentralWavelength, VisitorTable.ObservationId),
-      wavelengthMappingAtPath(GnirsLongSlitType / "centralWavelength",         GnirsLongSlitView.CentralWavelength,              GnirsLongSlitView.ObservationId),
       wavelengthMappingAtPath(GnirsLongSlitType / "gratingWavelength",         GnirsLongSlitView.GratingWavelengthEffective, GnirsLongSlitView.ObservationId),
       wavelengthMappingAtPath(GnirsLongSlitType / "explicitGratingWavelength", GnirsLongSlitView.GratingWavelengthValue, GnirsLongSlitView.GratingWavelength),
       wavelengthMappingAtPath(GnirsLongSlitType / "defaultGratingWavelength",  GnirsLongSlitView.DefaultGratingWavelength,   GnirsLongSlitView.ObservationId),

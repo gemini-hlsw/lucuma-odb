@@ -84,8 +84,6 @@ object GnirsLongSlitService:
         gnirs_fpu_slit                   *:
         // Filter
         gnirs_filter                     *:
-        // Wavelength
-        wavelength_pm                    *:
         // Coadds
         int4                             *:
         // Decker default + explicit
@@ -113,7 +111,7 @@ object GnirsLongSlitService:
         exposure_time_mode                  // acquisition ETM
       ).emap:
         case (sciEtm *: gratingEff *: prismEff *: gratingWavEff *:
-              camera *: fpu *: filter *: centralWavelength *: coadds *:
+              camera *: fpu *: filter *: coadds *:
               deckerDef *: deckerExp *:
               readModeDef *: readModeExp *:
               wellDepthDef *: wellDepthExp *:
@@ -143,12 +141,18 @@ object GnirsLongSlitService:
                         val focus = focusMotorSteps.fold(GnirsFocus.Best): n =>
                           GnirsFocus.Custom(GnirsFocusMotorStepsValue.unsafeFrom(n).withUnit[GnirsFocusMotorStep])
                         Config(
-                          sciEtm, gratingEff, prismEff, gratingWavEff, camera, fpu, filter, centralWavelength,
-                          coaddsP,
+                          filter,
                           deckerExp.getOrElse(deckerDef),
+                          fpu,
+                          prismEff,
+                          gratingEff,
+                          gratingWavEff,
+                          camera,
+                          focus,
                           readModeExp.getOrElse(readModeDef),
                           wellDepthExp.getOrElse(wellDepthDef),
-                          focus,
+                          sciEtm,
+                          coaddsP,
                           explicitTCOpt.getOrElse(defaultTC),
                           acq
                         )
@@ -235,7 +239,6 @@ object GnirsLongSlitService:
           ls.c_camera,
           ls.c_fpu,
           ls.c_filter,
-          ls.c_central_wavelength,
           ls.c_coadds,
           ls.c_decker_default,
           ls.c_decker,
@@ -271,9 +274,6 @@ object GnirsLongSlitService:
     private def defaultAcqReadMode(input: GnirsLongSlitInput.Create): GnirsObsReadMode =
       input.acquisition.flatMap(_.readMode).getOrElse(GnirsObsReadMode.AutomaticInEachStep)
 
-    private def effectiveCentralWavelength(input: GnirsLongSlitInput.Create): Wavelength =
-      input.centralWavelength.getOrElse(GnirsLongSlitInput.centralWavelengthFromFilter(input.filter))
-
     private def defaultAcqFilter(input: GnirsLongSlitInput.Create): GnirsFilter =
       input.acquisition.flatMap(_.filter).getOrElse(input.filter)
 
@@ -282,10 +282,9 @@ object GnirsLongSlitService:
       // initial mirror
       GnirsGrating,
       GnirsPrism,
-      // camera/fpu/wavelength/filter
+      // camera/fpu/filter
       GnirsCamera,
       GnirsFpuSlit,
-      Wavelength,
       GnirsFilter,
       // coadds
       Int,
@@ -320,8 +319,6 @@ object GnirsLongSlitService:
           c_initial_camera,
           c_fpu,
           c_initial_fpu,
-          c_central_wavelength,
-          c_initial_central_wavelength,
           c_filter,
           c_initial_filter,
           c_coadds,
@@ -351,8 +348,6 @@ object GnirsLongSlitService:
           $gnirs_camera,
           $gnirs_fpu_slit,
           $gnirs_fpu_slit,
-          $wavelength_pm,
-          $wavelength_pm,
           $gnirs_filter,
           $gnirs_filter,
           $int4,
@@ -375,12 +370,12 @@ object GnirsLongSlitService:
         FROM t_observation
         WHERE c_observation_id = $observation_id
       """.contramap {
-        (oid, initGrating, initPrism, camera, fpu, wavelength, filter, coadds,
+        (oid, initGrating, initPrism, camera, fpu, filter, coadds,
          decker, gratingWav, explGrating, explPrism, focus,
          readMode, wellDepth, slitMode, offsets,
          acqRM, acqCoadds, acqFilter, acqOffP, acqOffQ,
          sciEtmId, acqEtmId) =>
-          (oid, initGrating, initPrism, camera, camera, fpu, fpu, wavelength, wavelength,
+          (oid, initGrating, initPrism, camera, camera, fpu, fpu,
            filter, filter, coadds, decker, gratingWav,
            explGrating, explPrism, focus, readMode, wellDepth,
            slitMode, offsets,
@@ -403,7 +398,6 @@ object GnirsLongSlitService:
         input.prism,
         input.camera,
         input.fpu,
-        effectiveCentralWavelength(input),
         input.filter,
         input.coadds.map(_.value).getOrElse(1),
         input.explicitDecker,
@@ -431,7 +425,6 @@ object GnirsLongSlitService:
 
     private def gnirsUpdates(SET: GnirsLongSlitInput.Edit): Option[NonEmptyList[AppliedFragment]] =
       val upCoadds       = sql"c_coadds             = ${int4_pos.opt}"
-      val upWavelength   = sql"c_central_wavelength = ${wavelength_pm.opt}"
       val upFilter       = sql"c_filter             = ${gnirs_filter.opt}"
       val upFpu          = sql"c_fpu                = ${gnirs_fpu_slit.opt}"
       val upCamera       = sql"c_camera             = ${gnirs_camera.opt}"
@@ -478,7 +471,6 @@ object GnirsLongSlitService:
 
       val ups: List[AppliedFragment] = List(
         SET.coadds.map(c => upCoadds(Some(c))),
-        SET.centralWavelength.map(w => upWavelength(Some(w))),
         SET.filter.map(f => upFilter(Some(f))),
         SET.fpu.map(f => upFpu(Some(f))),
         SET.camera.map(c => upCamera(Some(c))),
@@ -522,7 +514,7 @@ object GnirsLongSlitService:
           c_grating, c_prism, c_grating_wavelength,
           c_initial_grating, c_initial_prism,
           c_camera, c_initial_camera,
-          c_fpu, c_central_wavelength, c_initial_fpu, c_initial_central_wavelength,
+          c_fpu, c_initial_fpu,
           c_filter, c_initial_filter,
           c_coadds, c_decker, c_focus_motor_steps, c_read_mode, c_well_depth,
           c_slit_offset_mode, c_telescope_configs,
@@ -538,7 +530,7 @@ object GnirsLongSlitService:
           src.c_grating, src.c_prism, src.c_grating_wavelength,
           src.c_initial_grating, src.c_initial_prism,
           src.c_camera, src.c_initial_camera,
-          src.c_fpu, src.c_central_wavelength, src.c_initial_fpu, src.c_initial_central_wavelength,
+          src.c_fpu, src.c_initial_fpu,
           src.c_filter, src.c_initial_filter,
           src.c_coadds, src.c_decker, src.c_focus_motor_steps, src.c_read_mode, src.c_well_depth,
           src.c_slit_offset_mode, src.c_telescope_configs,

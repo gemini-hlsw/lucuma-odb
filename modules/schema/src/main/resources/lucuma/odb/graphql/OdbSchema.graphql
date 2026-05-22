@@ -9238,7 +9238,6 @@ type GnirsLongSlit {
   filter: GnirsFilter!
   initialFilter: GnirsFilter!
 
-  centralWavelength: Wavelength!
   coadds: PosInt!
 
   decker: GnirsDecker!
@@ -9268,7 +9267,7 @@ input GnirsLongSlitAcquisitionInput {
   readMode: GnirsObsReadMode
   coadds: PosInt
   offset: OffsetInput
-  exposureTimeMode: TimeAndCountExposureTimeModeInput
+  exposureTimeMode: ExposureTimeModeInput
 }
 
 """
@@ -9307,8 +9306,6 @@ input GnirsLongSlitInput {
   exposureTimeMode: ExposureTimeModeInput
 
   coadds: PosInt
-
-  centralWavelength: WavelengthInput
 
   filter: GnirsFilter
 
