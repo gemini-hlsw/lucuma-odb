@@ -7,6 +7,8 @@ import cats.effect.IO
 import cats.syntax.either.*
 import io.circe.Json
 import io.circe.syntax.*
+import lucuma.core.enums.CalibrationRole
+import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SlitOffsetMode
 import lucuma.core.enums.StepGuideState.Disabled
 import lucuma.core.enums.StepGuideState.Enabled
@@ -179,6 +181,37 @@ class executionSciIgrins2 extends ExecutionTestSupportForIgrins2:
                       (0, -1, Enabled), (0, 1, Enabled), (0, 10, Disabled), (0, -1, Enabled)
                     )
                   ).asJson,
+                  "hasMore" -> false.asJson
+                )
+              )
+            )
+          ).asRight
+      )
+
+  test("[igrins2] telluric calibration have Night Cal observe class"):
+    val setup: IO[Observation.Id] =
+      for {
+        p <- createProgram
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createIgrins2LongSlitObservationAs(pi, p, t)
+        // Directly set the calibration role
+        _ <- setObservationCalibrationRole(List(o), CalibrationRole.Telluric)
+      } yield o
+
+    // Verify the steps are created with class night cal
+    setup.flatMap: oid =>
+      expect(
+        user     = pi,
+        query    = igrins2ScienceQuery(oid),
+        expected =
+          Json.obj(
+            "executionConfig" -> Json.obj(
+              "igrins2" -> Json.obj(
+                "science" -> Json.obj(
+                  "nextAtom" -> igrins2ExpectedScienceAtomAs(ObserveClass.NightCal, ExposureTime,
+                    (0, qA, Enabled), (0, qB, Enabled), (0, qB, Enabled), (0, qA, Enabled)
+                  ),
+                  "possibleFuture" -> List.empty[Json].asJson,
                   "hasMore" -> false.asJson
                 )
               )

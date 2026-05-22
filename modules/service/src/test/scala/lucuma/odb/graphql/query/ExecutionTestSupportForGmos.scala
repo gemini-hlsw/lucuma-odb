@@ -33,6 +33,7 @@ import lucuma.core.enums.GmosSouthFpu
 import lucuma.core.enums.GmosSouthGrating
 import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
+import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.StepGuideState
 import lucuma.core.math.BoundedInterval
 import lucuma.core.math.Wavelength
@@ -418,12 +419,15 @@ trait ExecutionTestSupportForGmos extends ExecutionTestSupport:
     """
 
   protected def gmosNorthExpectedScience(ditherNm: Int, p: Int, q: Int): Json =
+    gmosNorthExpectedScienceAs(ditherNm, p, q, ObserveClass.Science)
+
+  protected def gmosNorthExpectedScienceAs(ditherNm: Int, p: Int, q: Int, obsClass: ObserveClass): Json =
     json"""
       {
         "instrumentConfig" : ${gmosNorthExpectedInstrumentConfig(gmosNorthScience(ditherNm))},
         "stepConfig" : { "stepType": "SCIENCE" },
         "telescopeConfig": ${expectedTelescopeConfig(p, q, StepGuideState.Enabled)},
-        "observeClass" : "SCIENCE",
+        "observeClass" : ${obsClass.tag.toScreamingSnakeCase.asJson},
         "breakpoint": "DISABLED"
       }
     """
@@ -445,17 +449,23 @@ trait ExecutionTestSupportForGmos extends ExecutionTestSupport:
     """
 
   protected def gmosNorthExpectedScienceAtom(ditherNm: Int, steps: List[Json]): Json =
+    gmosNorthExpectedScienceAtomAs(ditherNm, ObserveClass.Science, steps)
+
+  protected def gmosNorthExpectedScienceAtomAs(ditherNm: Int, obsClass: ObserveClass, steps: List[Json]): Json =
     Json.obj(
-      "description" -> s"$ditherNm.000 nm".asJson,
-      "observeClass" -> "SCIENCE".asJson,
-      "steps" -> steps.asJson
+      "description"  -> s"$ditherNm.000 nm".asJson,
+      "observeClass" -> obsClass.tag.toScreamingSnakeCase.asJson,
+      "steps"        -> steps.asJson
     )
 
   protected def gmosNorthExpectedScienceAtom(ditherNm: Int, q0: Int, qs: Int*): Json =
+    gmosNorthExpectedScienceAtomAs(ditherNm, ObserveClass.Science, q0, qs*)
+
+  protected def gmosNorthExpectedScienceAtomAs(ditherNm: Int, obsClass: ObserveClass, q0: Int, qs: Int*): Json =
     val steps = List(
       gmosNorthExpectedArc(ditherNm, 0, q0), gmosNorthExpectedFlat(ditherNm, 0, q0)
-    ) ++ (q0 :: qs.toList).map(q => gmosNorthExpectedScience(ditherNm, 0, q))
-    gmosNorthExpectedScienceAtom(ditherNm, steps)
+    ) ++ (q0 :: qs.toList).map(q => gmosNorthExpectedScienceAs(ditherNm, 0, q, obsClass))
+    gmosNorthExpectedScienceAtomAs(ditherNm, obsClass, steps)
 
   // This is a bit hackish, we are passing an RV of 999 to identify which one is BlindOffset
   def createObservationWithBlindOffset(

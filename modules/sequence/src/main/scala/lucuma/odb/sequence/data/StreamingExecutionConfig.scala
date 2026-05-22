@@ -6,6 +6,8 @@ package lucuma.odb.sequence.data
 import fs2.Pure
 import fs2.Stream
 import lucuma.core.model.sequence.Atom
+import monocle.Focus
+import monocle.Lens
 
 /**
  * A precursor to a lucuma.core.model.sequence.ExecutionConfig, which contains
@@ -24,6 +26,12 @@ case class StreamingExecutionConfig[F[_], S, D](
 )
 
 object StreamingExecutionConfig:
+
+  def acquisition[F[_], S, D]: Lens[StreamingExecutionConfig[F, S, D], Stream[F, Atom[D]]] =
+    Focus[StreamingExecutionConfig[F, S, D]](_.acquisition)
+
+  def science[F[_], S, D]: Lens[StreamingExecutionConfig[F, S, D], Stream[F, Atom[D]]] =
+    Focus[StreamingExecutionConfig[F, S, D]](_.science)
 
   extension [S, D](self: StreamingExecutionConfig[Pure, S, D])
     def covary[F[_]]: StreamingExecutionConfig[F, S, D] =
