@@ -53,7 +53,7 @@ val slf4jVersion                 = "2.0.18"
 val testcontainersScalaVersion   = "0.44.1" // check test output if you attempt to update this
 val weaverVersion                = "0.8.4"
 
-ThisBuild / tlBaseVersion      := "0.73"
+ThisBuild / tlBaseVersion      := "0.74"
 ThisBuild / scalaVersion       := "3.8.3"
 ThisBuild / crossScalaVersions := Seq("3.8.3")
 ThisBuild / scalacOptions     ++= Seq("-Xmax-inlines", "50") // Hash derivation fails with default of 32
@@ -749,6 +749,7 @@ lazy val binding = project
       "co.fs2"        %% "fs2-io"             % fs2Version,
       "edu.gemini"    %% "lucuma-core"        % lucumaCoreVersion,
       "org.typelevel" %% "grackle-core"       % grackleVersion,
+      "org.typelevel" %% "log4cats-core"      % log4catsVersion,
       "org.scalameta" %% "munit"              % munitVersion           % Test,
       "org.typelevel" %% "munit-cats-effect"  % munitCatsEffectVersion % Test
     )

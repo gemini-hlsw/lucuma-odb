@@ -6,11 +6,11 @@ package lucuma.sso.service.graphql
 import _root_.skunk.Channel
 import _root_.skunk.Session
 import _root_.skunk.implicits.*
+import cats.ApplicativeThrow
 import cats.effect.{Unique as _, *}
 import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.PosLong
 import fs2.Stream
-import fs2.io.file.Path
 import grackle.*
 import grackle.Predicate.*
 import grackle.Query.*
@@ -29,7 +29,6 @@ import lucuma.core.model.OrcidId
 import lucuma.core.model.StandardRole
 import lucuma.core.model.StandardUser
 import lucuma.core.model.User
-import lucuma.odb.graphql.schema.SchemaSource
 import lucuma.odb.graphql.schema.SchemaStitcher
 import lucuma.sso.service.database.Database
 import lucuma.sso.service.database.RoleRequest
@@ -52,25 +51,8 @@ object SsoMapping {
       }
   }
 
-  def loadSchema[F[_]: Sync: Logger]: F[Schema] =
-    SchemaStitcher[F](Path("Sso.graphql"), SchemaSource.fromResource).build
-      .flatMap {
-        case Result.Success(schema)           => Logger[F].info("Loaded GraphQL schema").as(schema)
-        case Result.Warning(problems, schema) =>
-          Logger[F]
-            .warn(s"Loaded schema with problems: ${problems.map(_.message).toList.mkString(",")}")
-            .as(schema)
-        case Result.Failure(problems)         =>
-          Sync[F].raiseError[Schema](
-            new Throwable(
-              s"Unable to load schema because: ${problems.map(_.message).toList.mkString(",")}"
-            )
-          )
-        case Result.InternalError(error)      =>
-          Sync[F].raiseError[Schema](
-            new Throwable(s"Unable to load schema because: ${error.getMessage}")
-          )
-      }
+  def loadSchema[F[_]: ApplicativeThrow: Logger]: F[Schema] =
+    SchemaStitcher.load("Sso.graphql")
 
   def apply[F[_]: Async: Trace](
     channels: Channels[F],
