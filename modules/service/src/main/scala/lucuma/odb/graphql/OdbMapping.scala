@@ -705,6 +705,43 @@ object OdbMapping {
         }
 
   /**
+    * A minimal read-only mapping that only knows how to return introspection metadata. Other queries will
+    * fail with errors.
+    */
+  def forIntrospection[F[_]: Async](
+    database: Resource[F, Session[F]],
+    monitor:  SkunkMonitor[F],
+    enums:    Enums,
+  ): Mapping[F] =
+    new SkunkMapping[F](database, monitor)
+      with LeafMappings[F]
+      with QueryMapping[F]
+    {
+
+      // These are unused for introspection metadata queries.
+      def user = sys.error("OdbMapping.forIntrospection: no user available")
+      def services = sys.error("OdbMapping.forIntrospection: no services available")
+      def itcClient = sys.error("OdbMapping.forIntrospection: no itcClient available")
+      def goaUsers = sys.error("OdbMapping.forIntrospection: no goaUsers available")
+
+      // Our schema
+      val schema: Schema =
+        unsafeLoadSchema("OdbSchema.graphql") |+| enums.schema
+
+      // Our combined type mappings
+      override val typeMappings: TypeMappings =
+        TypeMappings.unchecked(
+          List(
+            QueryMapping,
+          ) ++ LeafMappings
+        )
+
+      override val selectElaborator: SelectElaborator =
+        SelectElaborator(QueryElaborator)
+
+    }
+
+  /**
    * A reduced mapping for use with the Obscalc service.  Obscalc computes the
    * observation workflow, which makes a GraphQL call which in turn requires
    * a `Services` instance that has a mapping.  This mapping ignores

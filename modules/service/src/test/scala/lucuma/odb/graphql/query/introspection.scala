@@ -134,3 +134,18 @@ class introspection extends OdbSuite:
     ).onError { case t =>
       fail("\n🐞🐞🐞\n🐞🐞🐞 Schema introspection failed!\n🐞🐞🐞\n", t)
     }
+
+  test("introspection query works without authentication"):
+    unauthenticatedQuery(
+      query = """
+        query IntrospectionQuery {
+          __schema {
+            queryType {
+              name
+            }
+          }
+        }
+      """
+    ).onError { case t =>
+      fail("Unauthenticated schema introspection failed!", t)
+    }

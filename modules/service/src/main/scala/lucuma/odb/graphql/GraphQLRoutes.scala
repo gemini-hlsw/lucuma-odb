@@ -55,20 +55,21 @@ object GraphQLRoutes {
    * based on the `Authorization` header and discarded when `ttl` expires.
    */
   def apply[F[_]: {Async, Parallel, Tracer as T, Logger as L, LoggerFactory, SecureRandom}](
-    gaiaClient:      GaiaClient[F],
-    itcClient:       ItcClient[F],
-    commitHash:      CommitHash,
-    goaUsers:        Set[User.Id],
-    ssoClient:       SsoClient[F, User],
-    pool:            Resource[F, Session[F]],
-    monitor:         SkunkMonitor[F],
-    ttl:             FiniteDuration,
-    userSvc:         UserService[F],
-    enums:           Enums,
-    ptc:             TimeEstimateCalculatorImplementation.ForInstrumentMode,
-    httpClient:      Client[F],
-    horizonsClient:  HorizonsClient[F],
-    emailConfig:     Config.Email
+    gaiaClient:           GaiaClient[F],
+    itcClient:            ItcClient[F],
+    commitHash:           CommitHash,
+    goaUsers:             Set[User.Id],
+    ssoClient:            SsoClient[F, User],
+    pool:                 Resource[F, Session[F]],
+    monitor:              SkunkMonitor[F],
+    ttl:                  FiniteDuration,
+    userSvc:              UserService[F],
+    enums:                Enums,
+    ptc:                  TimeEstimateCalculatorImplementation.ForInstrumentMode,
+    httpClient:           Client[F],
+    horizonsClient:       HorizonsClient[F],
+    emailConfig:          Config.Email,
+    introspectionService: GraphQLService[F]
   ): Resource[F, WebSocketBuilder2[F] => HttpRoutes[F]] =
     OdbMapping.Topics(pool).flatMap { topics =>
 
@@ -92,7 +93,7 @@ object GraphQLRoutes {
       Cache.timed[F, Authorization, Option[GraphQLService[F]]](ttl).map { cache => wsb =>
         LucumaGraphQLRoutes.forService[F](
           {
-            case None    => none.pure[F]  // No auth, no service (for now)
+            case None    => introspectionService.some.pure[F] // only allow introspection
             case Some(a) =>
               cache.get(a).flatMap {
                 case Some(opt) =>
