@@ -197,6 +197,23 @@ CREATE OR REPLACE VIEW v_observing_mode_group AS
 -- Register mode for observing mode consistency trigger
 SELECT register_observing_mode('gnirs_long_slit', 't_gnirs_long_slit');
 
+-- Propagate c_mode_key changes from the GNIRS table to t_observation (used for grouping).
+CREATE TRIGGER observing_mode_key_trigger
+AFTER INSERT OR DELETE OR UPDATE OF c_mode_key ON t_gnirs_long_slit
+FOR EACH ROW
+EXECUTE FUNCTION trigger_set_observation_mode_key();
+
+-- Send an observation update event when any GNIRS long slit row changes.
+CREATE TRIGGER ch_observation_edit_gnirs_long_slit_trigger
+AFTER INSERT OR UPDATE OR DELETE ON t_gnirs_long_slit
+FOR EACH ROW
+EXECUTE FUNCTION ch_observation_edit_associated_table_update();
+
+-- Invalidate obscalc on config changes.
+CREATE TRIGGER gnirs_long_slit_invalidate_trigger
+AFTER INSERT OR UPDATE OR DELETE ON t_gnirs_long_slit
+FOR EACH ROW EXECUTE FUNCTION obsid_obscalc_invalidate();
+
 -- Update check_etm_consistent to handle gnirs_long_slit:
 -- both acquisition and science ETMs live in t_exposure_time_mode (referenced via FK from t_gnirs_long_slit)
 CREATE OR REPLACE FUNCTION check_etm_consistent()

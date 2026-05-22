@@ -15,6 +15,7 @@ import io.circe.syntax.*
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.Flamingos2Disperser
 import lucuma.core.enums.GmosNorthGrating
+import lucuma.core.enums.GnirsGrating
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.math.Epoch
 import lucuma.core.model.Observation
@@ -788,6 +789,79 @@ class observationEdit extends OdbSuite with SubscriptionUtils {
         query     = gmosConfigSubscription,
         mutations = Right(updateGmosNorthGrating(pi, oid, GmosNorthGrating.B1200_G5301)),
         expected  = List(gmosGratingObservationEdit(GmosNorthGrating.B1200_G5301))
+      )
+    } yield ()
+
+  val gnirsConfigSubscription: String =
+    s"""
+      subscription {
+        observationEdit {
+          editType
+          value {
+            observingMode {
+              gnirsLongSlit {
+                grating
+                filter
+                fpu
+              }
+            }
+          }
+        }
+      }
+    """
+
+  def gnirsGratingObservationEdit(grating: GnirsGrating): Json =
+    json"""
+      {
+        "observationEdit": {
+          "editType": "UPDATED",
+          "value": {
+            "observingMode": {
+              "gnirsLongSlit": {
+                "grating": ${grating.tag},
+                "filter": "ORDER3",
+                "fpu": "LONG_SLIT_0_30"
+              }
+            }
+          }
+        }
+      }
+    """
+
+  def updateGnirsExplicitGrating(user: User, oid: Observation.Id, grating: GnirsGrating): IO[Unit] =
+    query(
+      user = user,
+      query = s"""
+        mutation {
+          updateObservations(input: {
+            SET: {
+              observingMode: {
+                gnirsLongSlit: {
+                  explicitGrating: ${grating.tag}
+                }
+              }
+            },
+            WHERE: { id: { EQ: "$oid" } }
+          }) {
+            observations {
+              id
+            }
+          }
+        }
+      """
+    ).void
+
+  test("triggers for changing gnirs long slit configuration"):
+    import Group1.pi
+    for {
+      pid <- createProgram(pi, "name")
+      tid <- createTargetAs(pi, pid)
+      oid <- createGnirsLongSlitObservationAs(pi, pid, tid)
+      _   <- subscriptionExpect(
+        user      = pi,
+        query     = gnirsConfigSubscription,
+        mutations = Right(updateGnirsExplicitGrating(pi, oid, GnirsGrating.D32)),
+        expected  = List(gnirsGratingObservationEdit(GnirsGrating.D32))
       )
     } yield ()
 
