@@ -46,6 +46,7 @@ out/
 .metals/
 .vscode/
 metals.sbt
+sbt-launch.jar
 
 # Transient workspace
 *.worksheet.sc

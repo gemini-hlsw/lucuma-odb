@@ -63,10 +63,6 @@ CREATE TABLE t_gnirs_long_slit (
   c_acq_offset_p  d_angle_µas NULL,
   c_acq_offset_q  d_angle_µas NULL,
 
-  -- Exposure time mode FKs (rows in t_exposure_time_mode are tagged with role)
-  c_science_exposure_time_mode_id     integer NOT NULL REFERENCES t_exposure_time_mode(c_exposure_time_mode_id),
-  c_acquisition_exposure_time_mode_id integer NOT NULL REFERENCES t_exposure_time_mode(c_exposure_time_mode_id),
-
   -- Mode key for config grouping (initial grating/prism/fpu)
   c_mode_key text GENERATED ALWAYS AS (
     c_initial_grating || '/' || c_initial_prism || '/' || c_fpu
@@ -148,24 +144,6 @@ CREATE VIEW v_gnirs_long_slit AS
           '[{"q":{"microarcseconds":-1000000},"guiding":"ENABLED"},{"q":{"microarcseconds":5000000},"guiding":"ENABLED"},{"q":{"microarcseconds":5000000},"guiding":"ENABLED"},{"q":{"microarcseconds":-1000000},"guiding":"ENABLED"}]'
       END AS c_telescope_configs_default
   ) d;
-
--- Dedicated views joining t_exposure_time_mode with t_gnirs_long_slit by FK.
--- Same pattern as V1120__ghost.sql; these support per-role Grackle mappings.
-CREATE VIEW v_gnirs_science_exposure_time_mode AS
-  SELECT
-    e.*,
-    CASE WHEN e.c_exposure_time_mode = 'signal_to_noise' THEN e.c_exposure_time_mode_id END AS c_signal_to_noise_id,
-    CASE WHEN e.c_exposure_time_mode = 'time_and_count'  THEN e.c_exposure_time_mode_id END AS c_time_and_count_id
-  FROM t_exposure_time_mode e
-  INNER JOIN t_gnirs_long_slit g ON g.c_science_exposure_time_mode_id = e.c_exposure_time_mode_id;
-
-CREATE VIEW v_gnirs_acquisition_exposure_time_mode AS
-  SELECT
-    e.*,
-    CASE WHEN e.c_exposure_time_mode = 'signal_to_noise' THEN e.c_exposure_time_mode_id END AS c_signal_to_noise_id,
-    CASE WHEN e.c_exposure_time_mode = 'time_and_count'  THEN e.c_exposure_time_mode_id END AS c_time_and_count_id
-  FROM t_exposure_time_mode e
-  INNER JOIN t_gnirs_long_slit g ON g.c_acquisition_exposure_time_mode_id = e.c_exposure_time_mode_id;
 
 -- Extend v_all_modes with GNIRS LongSlit and refresh v_observing_mode_group (same
 -- pattern as V1119__ghost.sql).

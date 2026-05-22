@@ -87,7 +87,7 @@ trait GnirsLongSlitMapping[F[_]]
         List("acqOffPRaw", "acqOffQRaw")
       ),
 
-      SqlObject("exposureTimeMode", Join(GnirsLongSlitView.ObservationId, GnirsAcqExposureTimeModeView.ObservationId)),
+      SqlObject("exposureTimeMode", Join(GnirsLongSlitView.ObservationId, ExposureTimeModeView.ObservationId)),
     )
 
   lazy val GnirsLongSlitMapping: ObjectMapping =
@@ -95,7 +95,7 @@ trait GnirsLongSlitMapping[F[_]]
 
       SqlField("observationId", GnirsLongSlitView.ObservationId, key = true, hidden = true),
 
-      SqlObject("exposureTimeMode", Join(GnirsLongSlitView.ObservationId, GnirsSciExposureTimeModeView.ObservationId)),
+      SqlObject("exposureTimeMode", Join(GnirsLongSlitView.ObservationId, ExposureTimeModeView.ObservationId)),
 
       // Grating: effective = COALESCE(explicit, initial)
       SqlField("grating",        GnirsLongSlitView.GratingEffective),

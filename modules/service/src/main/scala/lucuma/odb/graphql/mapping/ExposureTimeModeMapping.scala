@@ -68,8 +68,8 @@ trait ExposureTimeModeMapping[F[_]] extends ExposureTimeModeView[F]:
       etmMappings(GmosSouthLongSlitAcquisitionType, ExposureTimeModeView),
 
       // GNIRS
-      etmMappings(GnirsLongSlitType,            GnirsSciExposureTimeModeView),
-      etmMappings(GnirsLongSlitAcquisitionType, GnirsAcqExposureTimeModeView),
+      etmMappings(GnirsLongSlitType,            ExposureTimeModeView),
+      etmMappings(GnirsLongSlitAcquisitionType, ExposureTimeModeView),
 
       // IGRINS2
       etmMappings(Igrins2LongSlitType, ExposureTimeModeView),

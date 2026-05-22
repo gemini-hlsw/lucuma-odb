@@ -27,8 +27,6 @@ trait ExposureTimeModeView[F[_]] extends BaseMapping[F]:
       val Count: ColumnRef       = col("c_exposure_count",     int4_pos.embedded)
       val At: ColumnRef          = col("c_signal_to_noise_at", wavelength_pm.embedded)
 
-  object ExposureTimeModeView                extends BaseExposureTimeModeView("v_exposure_time_mode")
-  object GhostBlueExposureTimeModeView       extends BaseExposureTimeModeView("v_ghost_blue_exposure_time_mode")
-  object GhostRedExposureTimeModeView        extends BaseExposureTimeModeView("v_ghost_red_exposure_time_mode")
-  object GnirsSciExposureTimeModeView        extends BaseExposureTimeModeView("v_gnirs_science_exposure_time_mode")
-  object GnirsAcqExposureTimeModeView        extends BaseExposureTimeModeView("v_gnirs_acquisition_exposure_time_mode")
+  object ExposureTimeModeView          extends BaseExposureTimeModeView("v_exposure_time_mode")
+  object GhostBlueExposureTimeModeView extends BaseExposureTimeModeView("v_ghost_blue_exposure_time_mode")
+  object GhostRedExposureTimeModeView  extends BaseExposureTimeModeView("v_ghost_red_exposure_time_mode")
