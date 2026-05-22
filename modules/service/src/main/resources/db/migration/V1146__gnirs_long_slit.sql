@@ -1,40 +1,21 @@
--- GNIRS Long Slit observing mode: lookup tables, main table, view, mode registration,
+-- GNIRS Long Slit observing mode: enum types, main table, view, mode registration,
 -- configuration request columns, and ETM trigger update.
 
--- Lookup table for GnirsDecker
-CREATE TABLE t_gnirs_decker (
-  c_tag        d_tag   NOT NULL PRIMARY KEY,
-  c_short_name varchar NOT NULL,
-  c_long_name  varchar NOT NULL
+-- New GNIRS enum types (decker, observation-level read mode, well depth)
+CREATE TYPE e_gnirs_decker AS ENUM (
+  'Acquisition',
+  'PupilViewer',
+  'ShortCamCrossDispersed',
+  'LongCamLongSlit',
+  'ShortCamLongSlit',
+  'LongCamCrossDispersed'
 );
-INSERT INTO t_gnirs_decker VALUES ('Acquisition',            'Acquisition',       'Acquisition');
-INSERT INTO t_gnirs_decker VALUES ('PupilViewer',            'Pupil',             'Pupil viewer');
-INSERT INTO t_gnirs_decker VALUES ('ShortCamCrossDispersed', 'Short camera XD',   'Short camera cross dispersed');
-INSERT INTO t_gnirs_decker VALUES ('LongCamLongSlit',        'Long camera slit',  'Long camera long slit');
-INSERT INTO t_gnirs_decker VALUES ('ShortCamLongSlit',       'Short camera slit', 'Short camera long slit');
-INSERT INTO t_gnirs_decker VALUES ('LongCamCrossDispersed',  'Long camera XD',    'Long camera cross dispersed');
 
--- Lookup table for GnirsObsReadMode (used for both science and acquisition read mode columns).
 -- 'Automatic' is the GnirsObsReadMode discriminant for per-step resolution;
 -- the other four are the underlying GnirsReadMode values.
-CREATE TABLE t_gnirs_obs_read_mode (
-  c_tag        d_tag   NOT NULL PRIMARY KEY,
-  c_short_name varchar NOT NULL,
-  c_long_name  varchar NOT NULL
-);
-INSERT INTO t_gnirs_obs_read_mode VALUES ('Automatic',  'Automatic',   'Automatic in each step');
-INSERT INTO t_gnirs_obs_read_mode VALUES ('VeryBright', 'Very bright', 'Very Bright Acquisition or High Background');
-INSERT INTO t_gnirs_obs_read_mode VALUES ('Bright',     'Bright',      'Bright objects');
-INSERT INTO t_gnirs_obs_read_mode VALUES ('Faint',      'Faint',       'Faint objects');
-INSERT INTO t_gnirs_obs_read_mode VALUES ('VeryFaint',  'Very faint',  'Very faint objects');
+CREATE TYPE e_gnirs_obs_read_mode AS ENUM ('Automatic', 'VeryBright', 'Bright', 'Faint', 'VeryFaint');
 
-CREATE TABLE t_gnirs_well_depth (
-  c_tag        d_tag   NOT NULL PRIMARY KEY,
-  c_short_name varchar NOT NULL,
-  c_long_name  varchar NOT NULL
-);
-INSERT INTO t_gnirs_well_depth VALUES ('Shallow', 'Shallow', 'Shallow well');
-INSERT INTO t_gnirs_well_depth VALUES ('Deep',    'Deep',    'Deep well');
+CREATE TYPE e_gnirs_well_depth AS ENUM ('Shallow', 'Deep');
 
 -- Main GNIRS long slit table
 CREATE TABLE t_gnirs_long_slit (
@@ -68,18 +49,18 @@ CREATE TABLE t_gnirs_long_slit (
   c_coadds int4 NOT NULL DEFAULT 1 CHECK (c_coadds > 0),
 
   -- Explicit overrides (NULL = use computed default)
-  c_decker            d_tag    NULL REFERENCES t_gnirs_decker(c_tag),
-  c_focus_motor_steps integer  NULL CHECK (c_focus_motor_steps BETWEEN -179999 AND 180000),
-  c_read_mode         d_tag    NULL REFERENCES t_gnirs_obs_read_mode(c_tag),
-  c_well_depth        d_tag    NULL REFERENCES t_gnirs_well_depth(c_tag),
+  c_decker            e_gnirs_decker        NULL,
+  c_focus_motor_steps integer               NULL CHECK (c_focus_motor_steps BETWEEN -179999 AND 180000),
+  c_read_mode         e_gnirs_obs_read_mode NULL,
+  c_well_depth        e_gnirs_well_depth    NULL,
 
   -- SlitTelescopeConfigs: discriminant + serialized JSON config list (NULL = use computed default)
   c_slit_offset_mode d_tag NULL REFERENCES t_slit_offset_mode(c_tag),
   c_telescope_configs text  NULL,
 
   -- Acquisition configuration (ETM stored in t_exposure_time_mode, referenced via FK)
-  c_acq_read_mode d_tag           NOT NULL REFERENCES t_gnirs_obs_read_mode(c_tag),
-  c_acq_coadds    int4            NOT NULL DEFAULT 1 CHECK (c_acq_coadds > 0),
+  c_acq_read_mode e_gnirs_obs_read_mode NOT NULL,
+  c_acq_coadds    int4                  NOT NULL DEFAULT 1 CHECK (c_acq_coadds > 0),
   c_acq_filter    d_tag           NOT NULL REFERENCES t_gnirs_filter(c_tag),
   c_acq_offset_p  d_angle_µas NULL,
   c_acq_offset_q  d_angle_µas NULL,
@@ -108,26 +89,26 @@ CREATE VIEW v_gnirs_long_slit AS
     ls.*,
     -- decker pure default: mirrors GnirsDecker.forCameraAndReadMode(camera, effectivePrism)
     -- ATTENTION: This logic is duplicated from lucuma-core GnirsDecker. Modify in sync.
-    CASE
+    (CASE
       WHEN COALESCE(ls.c_prism, ls.c_initial_prism) = 'Mirror' THEN
-        CASE WHEN ls.c_camera IN ('ShortRed', 'ShortBlue') THEN 'ShortCamLongSlit'::varchar
-             ELSE 'LongCamLongSlit'::varchar
+        CASE WHEN ls.c_camera IN ('ShortRed', 'ShortBlue') THEN 'ShortCamLongSlit'
+             ELSE 'LongCamLongSlit'
         END
       ELSE -- Sxd or Lxd
-        CASE WHEN ls.c_camera IN ('ShortRed', 'ShortBlue') THEN 'ShortCamCrossDispersed'::varchar
-             ELSE 'LongCamCrossDispersed'::varchar
+        CASE WHEN ls.c_camera IN ('ShortRed', 'ShortBlue') THEN 'ShortCamCrossDispersed'
+             ELSE 'LongCamCrossDispersed'
         END
-    END AS c_decker_default,
+    END)::e_gnirs_decker AS c_decker_default,
     -- grating wavelength default (computed once in lateral, referenced here and in effective)
     d.c_grating_wavelength_default,
     COALESCE(ls.c_grating_wavelength, d.c_grating_wavelength_default) AS c_grating_wavelength_effective,
     -- read mode default: Automatic (resolved per-step at sequence generation time)
-    'Automatic'::varchar AS c_read_mode_default,
+    'Automatic'::e_gnirs_obs_read_mode AS c_read_mode_default,
     -- well depth pure default: mirrors GnirsWellDepth.forCamera
-    CASE
-      WHEN ls.c_camera IN ('ShortBlue', 'LongBlue') THEN 'Shallow'::varchar
-      WHEN ls.c_camera IN ('ShortRed',  'LongRed')  THEN 'Deep'::varchar
-    END AS c_well_depth_default,
+    (CASE
+      WHEN ls.c_camera IN ('ShortBlue', 'LongBlue') THEN 'Shallow'
+      WHEN ls.c_camera IN ('ShortRed',  'LongRed')  THEN 'Deep'
+    END)::e_gnirs_well_depth AS c_well_depth_default,
     -- effective grating/prism: COALESCE(explicit, initial)
     COALESCE(ls.c_grating, ls.c_initial_grating) AS c_grating_effective,
     COALESCE(ls.c_prism,   ls.c_initial_prism)   AS c_prism_effective,

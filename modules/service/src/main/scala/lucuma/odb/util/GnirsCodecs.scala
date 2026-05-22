@@ -22,7 +22,7 @@ trait GnirsCodecs:
     enumerated(Type.varchar)
 
   val gnirs_decker: Codec[GnirsDecker] =
-    enumerated(Type.varchar)
+    enumerated(Type("e_gnirs_decker"))
 
   val gnirs_filter: Codec[GnirsFilter] =
     enumerated(Type.varchar)
@@ -37,9 +37,9 @@ trait GnirsCodecs:
     enumerated(Type.varchar)
 
   val gnirs_obs_read_mode: Codec[GnirsObsReadMode] =
-    enumerated(Type.varchar)
+    enumerated(Type("e_gnirs_obs_read_mode"))
 
   val gnirs_well_depth: Codec[GnirsWellDepth] =
-    enumerated(Type.varchar)
+    enumerated(Type("e_gnirs_well_depth"))
 
 object GnirsCodecs extends GnirsCodecs
