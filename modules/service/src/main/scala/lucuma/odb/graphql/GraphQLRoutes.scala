@@ -168,5 +168,5 @@ object GraphQLRoutes {
     HttpRoutes.of[F]:
       case GET -> Root / "export" / "enumMetadata" =>
         Ok(dummyEnumMetadata)
-          .map(_.withContentType(`Content-Type`(MediaType.application.json)))
+          .map(_.withContentType(`Content-Type`(MediaType.application.javascript)))
 }
