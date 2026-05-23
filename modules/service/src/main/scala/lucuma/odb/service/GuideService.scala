@@ -32,6 +32,7 @@ import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.PortDisposition
 import lucuma.core.enums.Site
 import lucuma.core.enums.TrackType
+import lucuma.core.enums.VisitorObservingModeType
 import lucuma.core.geom.jts.interpreter.given
 import lucuma.core.math.Angle
 import lucuma.core.math.Coordinates
@@ -335,6 +336,10 @@ object GuideService {
             AgsParams.Igrins2LongSlit(PortDisposition.Bottom).withPWFS1.some
           case (_: ghost.ifu.Config, GuideProbe.PWFS2) =>
             AgsParams.GhostIfu(PortDisposition.Bottom).withPWFS2.some
+          case (c: visitor.Config, GuideProbe.PWFS2) if c.mode === VisitorObservingModeType.MaroonX =>
+            AgsParams.MaroonX(PortDisposition.Bottom).withPWFS2.some
+          case (c: visitor.Config, GuideProbe.PWFS1) if c.mode === VisitorObservingModeType.MaroonX =>
+            AgsParams.MaroonX(PortDisposition.Bottom).withPWFS1.some
           case (c: visitor.Config, GuideProbe.PWFS2) =>
             AgsParams.Visitor(c.scienceFov, PortDisposition.Bottom).withPWFS2.some
           case _ =>
