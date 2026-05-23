@@ -31,8 +31,11 @@ import lucuma.odb.util.Cache
 import lucuma.sso.client.SsoClient
 import org.http4s.Header
 import org.http4s.HttpRoutes
+import org.http4s.MediaType
 import org.http4s.client.Client
+import org.http4s.dsl.Http4sDsl
 import org.http4s.headers.Authorization
+import org.http4s.headers.`Content-Type`
 import org.http4s.server.websocket.WebSocketBuilder2
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.LoggerFactory
@@ -156,4 +159,14 @@ object GraphQLRoutes {
       }
     }
 
+  // The metadata service is gone and new versions of explore don't need it, however
+  // in order for the service workers in old versions of explore to keep working until
+  // the point where they can update themselves, we need to provide this endpoint...
+  def dummyMetadata[F[_]: Temporal]: HttpRoutes[F] =
+    val dummyEnumMetadata: String = """export const enumMetadata ='{"filterTypeMeta":[{"tag":"BROAD_BAND","shortName":"Broad-Band","longName":"Broad-Band Filter"},{"tag":"COMBINATION","shortName":"Combination","longName":"Combination Filter"},{"tag":"ENGINEERING","shortName":"Engineering","longName":"Engineering Filter"},{"tag":"NARROW_BAND","shortName":"Narrow-Band","longName":"Narrow-Band Filter"},{"tag":"SPECTROSCOPIC","shortName":"Spectroscopic","longName":"Spectroscopic Filter"}],"proposalStatusMeta":[{"tag":"NOT_SUBMITTED","name":"Not Submitted"},{"tag":"SUBMITTED","name":"Submitted"},{"tag":"ACCEPTED","name":"Accepted"},{"tag":"NOT_ACCEPTED","name":"Not Accepted"}]}'"""
+    val dsl = new Http4sDsl[F]{}; import dsl._
+    HttpRoutes.of[F]:
+      case GET -> Root / "export" / "enumMetadata" =>
+        Ok(dummyEnumMetadata)
+          .map(_.withContentType(`Content-Type`(MediaType.application.json)))
 }
