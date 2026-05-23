@@ -269,7 +269,7 @@ object FMain extends MainParams {
       val attachmentRoutes   = AttachmentRoutes.apply[F](pool, s3FileService, ssoClient, enums, awsConfig.fileUploadMaxMb, emailConfig, commitHash, ptc, httpClient, itcClient, gaiaClient, horizonsClient)
       val schedulerRoutes    = SchedulerRoutes.apply[F](pool, ssoClient, enums, emailConfig, commitHash, ptc, httpClient, itcClient, gaiaClient, horizonsClient)
       val emailWebhookRoutes = EmailWebhookRoutes(webhookService, emailConfig)
-      middleware(graphQLRoutes(wsb) <+> attachmentRoutes <+> emailWebhookRoutes <+> schedulerRoutes)
+      middleware(graphQLRoutes(wsb) <+> attachmentRoutes <+> GraphQLRoutes.dummyMetadata <+> emailWebhookRoutes <+> schedulerRoutes)
     }
 
   /** A startup action that runs database migrations using Flyway. */
