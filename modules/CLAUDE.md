@@ -130,7 +130,7 @@ When adding an instrument mode (e.g., `gnirs_long_slit`), changes are needed in 
 - `StartupDiagnostics.scala` — Add a diagnostic check for the new mode table if applicable.
 
 **Additional mapping registrations (easy to miss):**
-- `graphql/mapping/ExposureTimeModeMapping.scala` — Add `etmMappings(FooLongSlitType, ExposureTimeModeView)` to `ExposureTimeModeMappings`. Modes that store acquisition ETM inline (like GNIRS) only need the science type, not an acquisition type.
+- `graphql/mapping/ExposureTimeModeMapping.scala` — Add `etmMappings(FooLongSlitType, ExposureTimeModeView)` for the science type, and `etmMappings(FooLongSlitAcquisitionType, ExposureTimeModeView)` if the mode has an acquisition ETM row. GNIRS has both. IGRINS-2 (no acquisition) has only the science entry.
 - `graphql/mapping/TimeSpanMapping.scala` — Add `timeSpanMappingAtPath(FooLongSlitAcquisitionType / "exposureTime", ...)` for any inline acquisition `TimeSpan` field. Also extend the trait with the mode's view trait.
 - `graphql/mapping/WavelengthMapping.scala` — Add `wavelengthMappingAtPath(...)` for every `Wavelength` output field (both non-null and nullable). Extend the trait with the mode's view trait. For **nullable** `Wavelength` fields (e.g. `explicitGratingWavelength`): use the **nullable column** (`wavelength_pm.opt`) as the key (so null DB value → null GraphQL object) and a **non-nullable alias** of the same column (`wavelength_pm`) as the value column.
 - `graphql/mapping/LeafMappings.scala` — Add `LeafMapping[FooEnum](FooEnumType)` for every new enum exposed in the schema. Also add the corresponding `lazy val FooEnumType = schema.ref("FooEnum")` in `graphql/BaseMapping.scala`.
@@ -245,11 +245,14 @@ When writing a `Fragment` / `encoder` for an INSERT that maps to a table with `c
 
 ## ETM (ExposureTimeMode) Convention
 
-| Mode | Acquisition ETM | Science ETM |
-|---|---|---|
-| GMOS North/South LongSlit, Flamingos-2 LongSlit | `t_exposure_time_mode` (role=acquisition) | `t_exposure_time_mode` (role=science) |
-| GNIRS LongSlit, IGRINS-2 LongSlit | Inline columns in mode table | `t_exposure_time_mode` (role=science) |
-| GHOST IFU | — | Two rows (red + blue) in `t_exposure_time_mode` |
+"Acquisition config" means the non-ETM acquisition fields (filter, read mode, coadds, P/Q offsets). "Acquisition ETM" is the exposure time + count row in `t_exposure_time_mode`. The two are independent: a mode can store acquisition config inline in its own table and still keep the acquisition ETM in `t_exposure_time_mode`.
+
+| Mode | Acquisition config | Acquisition ETM | Science ETM |
+|---|---|---|---|
+| GMOS North/South LongSlit, Flamingos-2 LongSlit | (none inline; comes from observation/defaults) | `t_exposure_time_mode` (role=acquisition) | `t_exposure_time_mode` (role=science) |
+| GNIRS LongSlit | Inline columns in `t_gnirs_long_slit`: `c_acq_read_mode`, `c_acq_coadds`, `c_acq_filter`, `c_acq_offset_p`, `c_acq_offset_q` | `t_exposure_time_mode` (role=acquisition) | `t_exposure_time_mode` (role=science) |
+| IGRINS-2 LongSlit | (no acquisition sequence) | — | `t_exposure_time_mode` (role=science) |
+| GHOST IFU | — | — | Two rows (red + blue) in `t_exposure_time_mode` |
 
 The `check_etm_consistent` trigger function must be updated for each new mode.
 

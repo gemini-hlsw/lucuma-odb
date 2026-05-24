@@ -218,7 +218,7 @@ trait SequenceCodec {
   given (using Encoder[Offset], Encoder[TimeSpan], Encoder[Wavelength]): Encoder[InstrumentExecutionConfig.GmosSouth] =
     rootEncoder(_.executionConfig)
 
-  given (using Encoder[Offset], Encoder[TimeSpan]): Encoder[InstrumentExecutionConfig.Gnirs] =
+  given (using Encoder[Offset], Encoder[TimeSpan], Encoder[Wavelength]): Encoder[InstrumentExecutionConfig.Gnirs] =
     rootEncoder(_.executionConfig)
 
   given (using Encoder[Offset], Encoder[TimeSpan]): Encoder[InstrumentExecutionConfig.Igrins2] =

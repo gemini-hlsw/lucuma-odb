@@ -91,6 +91,10 @@ trait ItcCodec:
   given Decoder[Itc.GmosSouthImaging] =
     imagingScienceNemDecoder[GmosSouthFilter]("gmosSouthImagingScience").map(Itc.GmosSouthImaging.apply)
 
+  given Decoder[Itc.GnirsSpectroscopy] =
+    Decoder.instance:
+      _.downField("spectroscopyScience").as[Zipper[Itc.Result]].map(Itc.GnirsSpectroscopy.apply)
+
   given Decoder[Itc.Igrins2Spectroscopy] =
     Decoder.instance:
       _.downField("spectroscopyScience").as[Zipper[Itc.Result]].map(Itc.Igrins2Spectroscopy.apply)
@@ -135,6 +139,13 @@ trait ItcCodec:
         "gmosSouthImagingScience" -> a.science.asJson(using imagingScienceNemEncoder[GmosSouthFilter])
       )
 
+  given (using Encoder[TimeSpan], Encoder[Wavelength]): Encoder[Itc.GnirsSpectroscopy] =
+    Encoder.instance: a =>
+      Json.obj(
+        "itcType"             -> Itc.Type.GnirsSpectroscopy.asJson,
+        "spectroscopyScience" -> a.science.asJson
+      )
+
   given (using Encoder[TimeSpan], Encoder[Wavelength]): Encoder[Itc.Igrins2Spectroscopy] =
     Encoder.instance: a =>
       Json.obj(
@@ -158,6 +169,7 @@ trait ItcCodec:
          case Itc.Type.GhostIfu            => Decoder[Itc.GhostIfu].apply(c)
          case Itc.Type.GmosNorthImaging    => Decoder[Itc.GmosNorthImaging].apply(c)
          case Itc.Type.GmosSouthImaging    => Decoder[Itc.GmosSouthImaging].apply(c)
+         case Itc.Type.GnirsSpectroscopy   => Decoder[Itc.GnirsSpectroscopy].apply(c)
          case Itc.Type.Igrins2Spectroscopy => Decoder[Itc.Igrins2Spectroscopy].apply(c)
          case Itc.Type.Spectroscopy        => Decoder[Itc.Spectroscopy].apply(c)
 
@@ -166,6 +178,7 @@ trait ItcCodec:
       case a @ Itc.GhostIfu(_, _)         => Encoder[Itc.GhostIfu].apply(a)
       case a @ Itc.GmosNorthImaging(_)    => Encoder[Itc.GmosNorthImaging].apply(a)
       case a @ Itc.GmosSouthImaging(_)    => Encoder[Itc.GmosSouthImaging].apply(a)
+      case a @ Itc.GnirsSpectroscopy(_)   => Encoder[Itc.GnirsSpectroscopy].apply(a)
       case a @ Itc.Igrins2Spectroscopy(_) => Encoder[Itc.Igrins2Spectroscopy].apply(a)
       case a @ Itc.Spectroscopy(_, _)     => Encoder[Itc.Spectroscopy].apply(a)
 
