@@ -5,10 +5,7 @@ package lucuma.odb.graphql
 package query
 
 import cats.effect.IO
-import cats.effect.Resource
 import cats.syntax.all.*
-import fs2.Stream
-import fs2.text.utf8
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
@@ -17,19 +14,14 @@ import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.core.util.TimeSpan
-import org.http4s.Request
-import org.http4s.Response
 
 class guideEnvironmentGhost extends ExecutionTestSupportForGhost
                                     with GuideEnvironmentSuite:
   override val fullTimeEstimate: TimeSpan = TimeSpan.fromMinutes(40).get
 
-  override protected def httpRequestHandler: Request[IO] => Resource[IO, Response[IO]] =
-    _ => Resource.eval(IO.pure(Response(body = Stream(gaiaResponseString).through(utf8.encode))))
-
   override def createObservationAs(user: User, pid: Program.Id, tids: List[Target.Id]): IO[Observation.Id] =
-    createGhostIfuObservationAs(user, pid, None, tids*) 
-  
+    createGhostIfuObservationAs(user, pid, None, tids*)
+
   def setObservationPAC(
     user: User,
     oid:  Observation.Id,
@@ -181,4 +173,3 @@ class guideEnvironmentGhost extends ExecutionTestSupportForGhost
 
     setup.flatMap: oid =>
       expect(pi, guideEnvironmentQuery(oid), expected = ghostPwfs2Result("Nonsidereal Target", BigDecimal("0.000000")))
-

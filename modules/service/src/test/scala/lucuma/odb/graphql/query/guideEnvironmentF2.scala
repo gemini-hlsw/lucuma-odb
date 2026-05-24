@@ -5,26 +5,18 @@ package lucuma.odb.graphql
 package query
 
 import cats.effect.IO
-import cats.effect.kernel.Resource
 import cats.syntax.all.*
-import fs2.Stream
-import fs2.text.utf8
 import io.circe.literal.*
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.core.util.TimeSpan
-import org.http4s.Request
-import org.http4s.Response
 
 class guideEnvironmentF2 extends ExecutionTestSupportForFlamingos2
                               with GuideEnvironmentSuite:
 
   override val fullTimeEstimate: TimeSpan = TimeSpan.fromMinutes(40).get
-
-  override def httpRequestHandler: Request[IO] => Resource[IO, Response[IO]] =
-    _ => Resource.eval(IO.pure(Response(body = Stream(gaiaResponseString).through(utf8.encode))))
 
   override def createObservationAs(user: User, pid: Program.Id, tids: List[Target.Id]): IO[Observation.Id] =
     createFlamingos2LongSlitObservationAs(user, pid, tids)

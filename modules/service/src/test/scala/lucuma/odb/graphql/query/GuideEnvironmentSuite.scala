@@ -5,7 +5,10 @@ package lucuma.odb.graphql
 package query
 
 import cats.effect.IO
+import cats.effect.Resource
 import cats.syntax.all.*
+import fs2.Stream
+import fs2.text.utf8
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
@@ -22,10 +25,15 @@ import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
+import org.http4s.Request
+import org.http4s.Response
 
 import java.time.Instant
 
 trait GuideEnvironmentSuite extends ExecutionTestSupport:
+
+  override protected def httpRequestHandler: Request[IO] => Resource[IO, Response[IO]] =
+    _ => Resource.eval(IO.pure(Response(body = Stream(gaiaResponseString).through(utf8.encode))))
 
   val gaiaSuccess: Timestamp = Timestamp.FromString.getOption("2023-08-30T00:00:00Z").get
 
