@@ -47,7 +47,9 @@ object ObservationPropertiesInput {
     group:               Option[Group.Id],
     groupIndex:          Option[NonNegShort],
     observerNotes:       Option[NonEmptyString]
-  ) extends AsterismInput
+  ) extends AsterismInput:
+    def needsStaffAccess: Boolean =
+      observingMode.exists(_.needsStaffAccess)
 
   object Create {
 
@@ -123,6 +125,9 @@ object ObservationPropertiesInput {
   ) extends AsterismInput:
     def updatesAcquisition: Boolean =
       observingMode.toOption.exists(_.updatesAcquisition)
+
+    def needsStaffAccess: Boolean =
+      observingMode.toOption.exists(_.needsStaffAccess)
 
   object Edit {
 

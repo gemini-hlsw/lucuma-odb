@@ -41,6 +41,9 @@ object ObservingModeInput:
         .orElse(igrins2LongSlit.map(_.observingModeType))
         .orElse(visitor.map(_.mode))
 
+    def needsStaffAccess: Boolean =
+      gnirsLongSlit.exists(_.needsStaffAccess)
+
   object Create:
 
     val Binding: Matcher[Create] =
@@ -106,6 +109,9 @@ object ObservingModeInput:
         gmosSouthLongSlit.exists(_.limitToPreExecution(access))  ||
         gnirsLongSlit.isDefined                                  ||
         igrins2LongSlit.isDefined
+
+    def needsStaffAccess: Boolean =
+      gnirsLongSlit.exists(_.needsStaffAccess)
 
     def observingModeType: Option[ObservingModeType] =
       flamingos2LongSlit.map(_.observingModeType)

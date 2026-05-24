@@ -339,7 +339,9 @@ trait AccessControl[F[_]] extends Predicates[F] {
   )(using Services[F],
           NoTransaction[F]
   ): F[Result[AccessControl.CheckedWithIds[ObservationPropertiesInput.Edit, Observation.Id]]] =
-    {
+    if input.SET.needsStaffAccess && user.role.access < Access.Staff then
+      OdbError.NotAuthorized(user.id).asFailureF
+    else {
 
       // Which workflow states would permit the proposed update (also taking user into account)?
       val allowedStates: Set[ObservationWorkflowState] =
@@ -459,7 +461,10 @@ trait AccessControl[F[_]] extends Predicates[F] {
 
   def selectForUpdate(
     input: CreateObservationInput,
-  )(using Services[F]): F[Result[AccessControl.CheckedWithId[ObservationPropertiesInput.Create, Program.Id]]] = {
+  )(using Services[F]): F[Result[AccessControl.CheckedWithId[ObservationPropertiesInput.Create, Program.Id]]] =
+    if input.SET.exists(_.needsStaffAccess) && user.role.access < Access.Staff then
+      OdbError.NotAuthorized(user.id).asFailureF
+    else {
 
     // Compute our ObservationPropertiesInput.Create and set/verify the science band
     def props(pid: Program.Id): F[Result[ObservationPropertiesInput.Create]] =
@@ -504,7 +509,10 @@ trait AccessControl[F[_]] extends Predicates[F] {
 
   def selectForClone(
     input: CloneObservationInput
-  )(using Services[F]): F[Result[AccessControl.CheckedWithId[Option[ObservationPropertiesInput.Edit], Observation.Id]]] = {
+  )(using Services[F]): F[Result[AccessControl.CheckedWithId[Option[ObservationPropertiesInput.Edit], Observation.Id]]] =
+    if input.SET.exists(_.needsStaffAccess) && user.role.access < Access.Staff then
+      OdbError.NotAuthorized(user.id).asFailureF
+    else {
 
     val ensureWritable: F[Result[Option[Observation.Id]]] =
       Services.asSuperUser:

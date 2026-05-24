@@ -98,6 +98,9 @@ object GnirsLongSlitInput:
   ):
     def observingModeType: ObservingModeType = ObservingModeType.GnirsLongSlit
 
+    /** True if the input modifies fields that only Staff (or higher) may set. */
+    def needsStaffAccess: Boolean = explicitFocusMotorSteps.isDefined
+
   object Create:
     val Binding: Matcher[Create] =
       ObjectFieldsBinding.rmap:
@@ -150,6 +153,9 @@ object GnirsLongSlitInput:
     def observingModeType: ObservingModeType = ObservingModeType.GnirsLongSlit
     def updatesAcquisition: Boolean = acquisition.isDefined
     def limitToPreExecution(access: Access): Boolean = false
+
+    /** True if the input modifies fields that only Staff (or higher) may set. */
+    def needsStaffAccess: Boolean = explicitFocusMotorSteps.isDefined
     def toCreate: Result[Create] =
       def required[A](oa: Option[A], name: String): Result[A] =
         Result.fromOption(oa, Matcher.validationProblem(s"A $name is required to create a GNIRS Long Slit observing mode."))
