@@ -1,6 +1,20 @@
 -- GNIRS time estimates.
--- Values ported from the OCS legacy code (ocs/bundle/edu.gemini.pot,
--- InstGNIRS.java and SPInstObsComp.java).
+--
+-- Sourced from the OCS legacy code (ocs/bundle/edu.gemini.pot,
+-- InstGNIRS.java + SPInstObsComp.java + GnirsReadoutTime.java).
+--
+-- Per-step overhead structure for GNIRS in OCS (InstGNIRS.calc):
+--   * READOUT     — per-coadd × coadds; encoded in lucuma-core's
+--                   `GnirsReadMode.readoutTimePerCoadd` (no DB entry needed).
+--   * DHS_WRITE   — 8500 ms; `gnirs_write` below.
+--   * Offset / Gcal — added by the generic CommonStepCalculator (handled by
+--                     the lucuma-odb `ConfigChangeEstimator` base trait).
+--
+-- Notably, GNIRS in OCS does NOT declare any mechanism-change overheads
+-- (no Filter/FPU/Disperser/Camera/Decker/Prism CONFIG_CHANGE entries),
+-- unlike GMOS, Flamingos-2, NIRI, GSAOI, GPI, and NICI. That's why
+-- `ConfigChangeEstimator.gnirs.instrumentChecks` returns Nil and there are
+-- no `gnirs_<mechanism>` rows here.
 
 -- InstGNIRS.SETUP_TIME = 15 minutes (LongSlit non-LGS, non-IFU).
 INSERT INTO t_time_estimate VALUES(
@@ -39,3 +53,8 @@ INSERT INTO t_time_estimate VALUES(
   'Gnirs',
   '2 hours'
 );
+
+-- Setup variants from OCS (InstGNIRS.SETUP_TIME_LGS = 25 min,
+-- InstGNIRS.SETUP_TIME_IFU = 20 min) are intentionally NOT inserted here:
+-- those modes (LGS, IFU) are not yet implemented in lucuma-odb.  Add them
+-- alongside the corresponding observing-mode work.
