@@ -4,13 +4,16 @@
 package lucuma.odb.graphql
 package mutation
 
+import cats.syntax.eq.*
 import io.circe.literal.*
 import lucuma.core.model.User
+import lucuma.odb.data.OdbError
 
 class createObservation_GnirsLongSlit extends OdbSuite:
 
-  val pi: User = TestUsers.Standard.pi(nextId, nextId)
-  override lazy val validUsers: List[User] = List(pi)
+  val pi:    User = TestUsers.Standard.pi(nextId, nextId)
+  val staff: User = TestUsers.Standard.staff(nextId, nextId)
+  override lazy val validUsers: List[User] = List(pi, staff)
 
   test("create GNIRS Long Slit with required fields — defaults computed"):
     createProgramAs(pi).flatMap: pid =>
@@ -175,10 +178,10 @@ class createObservation_GnirsLongSlit extends OdbSuite:
         )
 
   test("create GNIRS Long Slit with explicit overrides"):
-    createProgramAs(pi).flatMap: pid =>
-      createTargetAs(pi, pid).flatMap: tid =>
+    createProgramAs(staff).flatMap: pid =>
+      createTargetAs(staff, pid).flatMap: tid =>
         expect(
-          user  = pi,
+          user  = staff,
           query =
             s"""
               mutation {
@@ -325,6 +328,221 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                           "explicitReadMode": "VERY_FAINT",
                           "explicitWellDepth": "DEEP"
                         }
+                      }
+                    }
+                  ]
+                }
+              }
+            """)
+          )
+        yield ()
+
+  test("PI cannot set explicitFocus on create — NotAuthorized"):
+    interceptOdbError {
+      createProgramAs(pi).flatMap: pid =>
+        createTargetAs(pi, pid).flatMap: tid =>
+          query(
+            user  = pi,
+            query =
+              s"""
+                mutation {
+                  createObservation(input: {
+                    programId: "$pid"
+                    SET: {
+                      targetEnvironment: { asterism: [ "$tid" ] }
+                      scienceRequirements: {
+                        spectroscopy: {
+                          wavelength: { nanometers: 2200 }
+                          resolution: 1000
+                          wavelengthCoverage: { nanometers: 200 }
+                          focalPlane: SINGLE_SLIT
+                          focalPlaneAngle: { microarcseconds: 0 }
+                        }
+                      }
+                      observingMode: {
+                        gnirsLongSlit: {
+                          grating: D111
+                          prism: MIRROR
+                          camera: SHORT_BLUE
+                          fpu: LONG_SLIT_0_30
+                          filter: ORDER3
+                          explicitFocus: 500
+                          exposureTimeMode: {
+                            timeAndCount: {
+                              time: { seconds: 30.0 }
+                              count: 3
+                              at: { nanometers: 2200 }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }) { observation { id } }
+                }
+              """
+          )
+    } {
+      case OdbError.NotAuthorized(uid, _) if uid === pi.id => // expected
+    }
+
+  test("Staff can set explicitFocus on create"):
+    createProgramAs(staff).flatMap: pid =>
+      createTargetAs(staff, pid).flatMap: tid =>
+        expect(
+          user  = staff,
+          query =
+            s"""
+              mutation {
+                createObservation(input: {
+                  programId: "$pid"
+                  SET: {
+                    targetEnvironment: { asterism: [ "$tid" ] }
+                    scienceRequirements: {
+                      spectroscopy: {
+                        wavelength: { nanometers: 2200 }
+                        resolution: 1000
+                        wavelengthCoverage: { nanometers: 200 }
+                        focalPlane: SINGLE_SLIT
+                        focalPlaneAngle: { microarcseconds: 0 }
+                      }
+                    }
+                    observingMode: {
+                      gnirsLongSlit: {
+                        grating: D111
+                        prism: MIRROR
+                        camera: SHORT_BLUE
+                        fpu: LONG_SLIT_0_30
+                        filter: ORDER3
+                        explicitFocus: 500
+                        exposureTimeMode: {
+                          timeAndCount: {
+                            time: { seconds: 30.0 }
+                            count: 3
+                            at: { nanometers: 2200 }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }) {
+                  observation {
+                    observingMode {
+                      gnirsLongSlit { explicitFocusMotorSteps }
+                    }
+                  }
+                }
+              }
+            """,
+          expected = Right(json"""
+            {
+              "createObservation": {
+                "observation": {
+                  "observingMode": {
+                    "gnirsLongSlit": { "explicitFocusMotorSteps": 500 }
+                  }
+                }
+              }
+            }
+          """)
+        )
+
+  test("PI cannot set explicitFocus on update — NotAuthorized"):
+    interceptOdbError {
+      createProgramAs(pi).flatMap: pid =>
+        createTargetAs(pi, pid).flatMap: tid =>
+          for
+            oid <- createGnirsLongSlitObservationAs(pi, pid, tid)
+            _   <- query(
+              user  = pi,
+              query =
+                s"""
+                  mutation {
+                    updateObservations(input: {
+                      SET: {
+                        observingMode: {
+                          gnirsLongSlit: { explicitFocus: 500 }
+                        }
+                      }
+                      WHERE: { id: { EQ: "$oid" } }
+                    }) { observations { id } }
+                  }
+                """
+            )
+          yield ()
+    } {
+      case OdbError.NotAuthorized(uid, _) if uid === pi.id => // expected
+    }
+
+  test("PI cannot clear explicitFocus on update — NotAuthorized"):
+    // First, staff creates and sets explicit focus; then PI tries to clear it.
+    interceptOdbError {
+      for
+        pid <- createProgramAs(staff)
+        tid <- createTargetAs(staff, pid)
+        oid <- createGnirsLongSlitObservationAs(staff, pid, tid)
+        // Staff sets explicit focus
+        _   <- query(
+          user  = staff,
+          query =
+            s"""
+              mutation {
+                updateObservations(input: {
+                  SET: { observingMode: { gnirsLongSlit: { explicitFocus: 500 } } }
+                  WHERE: { id: { EQ: "$oid" } }
+                }) { observations { id } }
+              }
+            """
+        )
+        _   <- query(
+          user  = pi,
+          query =
+            s"""
+              mutation {
+                updateObservations(input: {
+                  SET: { observingMode: { gnirsLongSlit: { explicitFocus: null } } }
+                  WHERE: { id: { EQ: "$oid" } }
+                }) { observations { id } }
+              }
+            """
+        )
+      yield ()
+    } {
+      case OdbError.NotAuthorized(uid, _) if uid === pi.id => // expected
+    }
+
+  test("Staff can set explicitFocus on update"):
+    createProgramAs(staff).flatMap: pid =>
+      createTargetAs(staff, pid).flatMap: tid =>
+        for
+          oid <- createGnirsLongSlitObservationAs(staff, pid, tid)
+          _   <- expect(
+            user  = staff,
+            query =
+              s"""
+                mutation {
+                  updateObservations(input: {
+                    SET: {
+                      observingMode: {
+                        gnirsLongSlit: { explicitFocus: 500 }
+                      }
+                    }
+                    WHERE: { id: { EQ: "$oid" } }
+                  }) {
+                    observations {
+                      observingMode {
+                        gnirsLongSlit { explicitFocusMotorSteps }
+                      }
+                    }
+                  }
+                }
+              """,
+            expected = Right(json"""
+              {
+                "updateObservations": {
+                  "observations": [
+                    {
+                      "observingMode": {
+                        "gnirsLongSlit": { "explicitFocusMotorSteps": 500 }
                       }
                     }
                   ]
