@@ -452,7 +452,7 @@ object ItcService {
             ghost(gh, targets)
           case sp @ ItcInput.ScienceOnlySpectroscopy(SpectroscopyParameters(_, InstrumentMode.Igrins2Spectroscopy(_, _)), _) =>
             igrins2Spectroscopy(sp)
-          case sp @ ItcInput.ScienceOnlySpectroscopy(SpectroscopyParameters(_, gn: InstrumentMode.GnirsSpectroscopy), _) =>
+          case sp @ ItcInput.ScienceOnlySpectroscopy(SpectroscopyParameters(_, _: InstrumentMode.GnirsSpectroscopy), _) =>
             gnirsSpectroscopy(sp)
           case _ =>
             EitherT.leftT(OdbError.InvalidObservation(oid, s"Unrecognized ItcInput: $input".some))
