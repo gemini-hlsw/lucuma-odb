@@ -8173,7 +8173,7 @@ Exposes every field needed to reconstruct a
 Exactly one of `fpuSlit` / `fpuOther` is non-null per step. The
 `acquisitionMirrorOut` field is non-null when the acquisition mirror is "out"
 (spectroscopy mode) — its absence indicates the mirror is "in" (imaging /
-acquisition mode). The `focus` field is null when focus is "Best" (instrument-
+acquisition mode). The `focusMotorSteps` field is null when focus is "Best" (instrument-
 chosen); otherwise it carries the motor-step value.
 """
 type GnirsDynamic {
