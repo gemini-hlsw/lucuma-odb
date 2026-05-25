@@ -33,6 +33,7 @@ import lucuma.odb.graphql.mapping.AccessControl
 import lucuma.odb.otel.*
 import lucuma.odb.otel.given
 import lucuma.odb.service.Services.SuperUserAccess
+import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.syntax.exposureTimeMode.*
 import lucuma.odb.util.Codecs.*
 import org.typelevel.log4cats.Logger
@@ -56,12 +57,6 @@ trait PerScienceObservationCalibrationsService[F[_]]:
 object PerScienceObservationCalibrationsService:
   def instantiate[F[_]: {Concurrent as F, Tracer as T, Logger, Services as S}]: PerScienceObservationCalibrationsService[F] =
     new PerScienceObservationCalibrationsService[F] with CalibrationObservations with WorkflowStateQueries[F]:
-
-      val groupService  = S.groupService
-      val observationService = S.observationService
-      val obsModeService = S.observingModeServices
-      val telluricTargets = S.telluricTargetsService
-      val obscalcService = S.obscalcService
 
       private val MultiTelluricThreshold: TimeSpan = TimeSpan.fromHours(1.5).get
 
@@ -118,7 +113,7 @@ object PerScienceObservationCalibrationsService:
         ).orError
 
       private def findAllTelluricObservations(gid: Group.Id): F[List[Observation.Id]] =
-        S.session
+        session
           .prepareR(Statements.selectTelluricObservations)
           .use(_.stream((gid, CalibrationRole.Telluric), 10).compile.toList)
 
@@ -177,7 +172,7 @@ object PerScienceObservationCalibrationsService:
       )(using Transaction[F], SuperUserAccess): F[Observation.Id] =
         for {
           telluricId <- insertTelluricObservation(pid, telluricGroupId, telluricIndex)
-          _          <- telluricTargets.requestTelluricTarget(pid, telluricId, scienceOid, duration, order)
+          _          <- telluricTargetsService.requestTelluricTarget(pid, telluricId, scienceOid, duration, order)
           _          <- syncConfiguration(scienceOid, telluricId)
         } yield telluricId
 
@@ -187,7 +182,7 @@ object PerScienceObservationCalibrationsService:
         telluricGroupId: Group.Id
       )(using Transaction[F], SuperUserAccess): F[List[Observation.Id]] =
         def obsGroupIndex(scienceOid: Observation.Id): F[NonNegShort] =
-          S.session
+          session
             .prepareR(Statements.selectScienceObservationIndex)
             .use(_.unique(scienceOid))
 
@@ -298,13 +293,13 @@ object PerScienceObservationCalibrationsService:
           newEtm:  ExposureTimeMode,
           current: Option[ExposureTimeMode]
         ): F[Unit] =
-          (S.exposureTimeModeService.deleteMany(List(telluricOid), role) *>
-            S.exposureTimeModeService.insertOne(telluricOid, role, newEtm))
+          (exposureTimeModeService.deleteMany(List(telluricOid), role) *>
+            exposureTimeModeService.insertOne(telluricOid, role, newEtm))
               .unlessA(current.contains(newEtm))
               .void
 
         for {
-          allEtm     <- S.exposureTimeModeService
+          allEtm     <- exposureTimeModeService
                            .select(List(scienceOid, telluricOid), ExposureTimeModeRole.Science, ExposureTimeModeRole.Acquisition)
           allSciEtm   = allEtm.collect:
                           case (oid, roles) if roles.contains(ExposureTimeModeRole.Science) =>
@@ -347,7 +342,7 @@ object PerScienceObservationCalibrationsService:
           S.session.executeCommand(Statements.syncObservationConfiguration(sourceOid, targetOid)).void
 
         def deleteOldTargetMode(tm: Option[ObservingModeType]): F[Unit] =
-          tm.traverse(mode => obsModeService.delete(mode, List(targetOid))).void
+          tm.traverse(mode => observingModeServices.delete(mode, List(targetOid))).void
 
         def deleteAllExposureTimeModes(sm: Option[ObservingModeType]): F[Unit] =
           sm.traverse(_ => S.exposureTimeModeService.deleteMany(
@@ -363,7 +358,18 @@ object PerScienceObservationCalibrationsService:
           ).void
 
         def cloneSourceMode(sm: Option[ObservingModeType]): F[Unit] =
-          sm.traverse(mode => obsModeService.clone(mode, sourceOid, targetOid)).void
+          sm.traverse(mode => observingModeServices.clone(mode, sourceOid, targetOid)).void
+
+        // Reset any mode-specific telluric overrides on the cloned obs.
+        // At the moment only offsets but eventually other properties may need a reset,
+        def resetTelluricConfig(sm: Option[ObservingModeType]): F[Unit] =
+          sm match
+            case Some(ObservingModeType.Igrins2LongSlit) =>
+              igrins2LongSlitService.resetTelluricConfig(targetOid)
+            case Some(ObservingModeType.Flamingos2LongSlit) =>
+              flamingos2LongSlitService.resetTelluricConfig(targetOid)
+            case _ =>
+              F.unit
 
         for {
           modes    <- readObservingModes
@@ -373,6 +379,7 @@ object PerScienceObservationCalibrationsService:
           _        <- deleteAllExposureTimeModes(sm)
           _        <- updateTargetModeType(sm)
           _        <- cloneSourceMode(sm)
+          _        <- resetTelluricConfig(sm)
           _        <- createTelluricExposureTimeMode(sourceOid, targetOid)
         } yield ()
 

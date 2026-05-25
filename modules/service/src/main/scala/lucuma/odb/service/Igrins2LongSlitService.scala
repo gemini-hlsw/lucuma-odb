@@ -12,6 +12,7 @@ import lucuma.core.enums.SlitOffsetMode
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.Observation
 import lucuma.core.model.TelluricType
+import lucuma.core.model.sequence.igrins2.NodAlongSlitDefaultOffsets
 import lucuma.odb.data.ExposureTimeModeRole
 import lucuma.odb.data.Nullable
 import lucuma.odb.format.spatialOffsets.*
@@ -44,6 +45,10 @@ trait Igrins2LongSlitService[F[_]]:
   )(using Transaction[F]): F[Unit]
 
   def clone(originalId: Observation.Id, newId: Observation.Id): F[Unit]
+
+  /** Reset the configuration of `oid` to telluric `defaults.
+    */
+  def resetTelluricConfig(oid: Observation.Id): F[Unit]
 
 object Igrins2LongSlitService:
 
@@ -122,6 +127,9 @@ object Igrins2LongSlitService:
 
       def clone(originalId: Observation.Id, newId: Observation.Id): F[Unit] =
         session.exec(Statements.cloneIgrins2(originalId, newId))
+
+      override def resetTelluricConfig(oid: Observation.Id): F[Unit] =
+        session.exec(Statements.applyIgrins2TelluricDefaults(oid))
     }
 
   object Statements {
@@ -234,6 +242,20 @@ object Igrins2LongSlitService:
         void"UPDATE t_igrins_2_long_slit " |+|
           void"SET " |+| us.intercalate(void", ") |+| void" " |+|
           void"WHERE " |+| observationIdIn(oids)
+
+    // Tellurcis need a fixed set of offsets
+    def applyIgrins2TelluricDefaults(oid: Observation.Id): AppliedFragment =
+      sql"""
+        UPDATE t_igrins_2_long_slit
+        SET
+          c_offset_mode     = $slit_offset_mode,
+          c_spatial_offsets = $text
+        WHERE c_observation_id = $observation_id
+      """.apply(
+        SlitOffsetMode.NodAlongSlit,
+        OffsetsFormat.reverseGet(NodAlongSlitDefaultOffsets),
+        oid
+      )
 
     def cloneIgrins2(originalId: Observation.Id, newId: Observation.Id): AppliedFragment =
       sql"""
