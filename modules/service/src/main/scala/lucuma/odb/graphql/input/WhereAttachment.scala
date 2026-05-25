@@ -19,7 +19,7 @@ object WhereAttachment {
     val WhereOrderAttachmentId = WhereOrder.binding[Attachment.Id](path / "id", AttachmentIdBinding)
     val WhereFileNameBinding   = WhereString.binding(path / "fileName")
     val WhereDescriptionBinding   = WhereOptionString.binding(path / "description")
-    val WhereAttachmentTypeBinding = WhereUnorderedTag.binding(path / "attachmentType", enumeratedBinding[AttachmentType])
+    val WhereAttachmentTypeBinding = WhereEq.binding(path / "attachmentType", enumeratedBinding[AttachmentType])
     val WhereProgramBinding = WhereProgram.binding(path / "program")
 
     lazy val WhereAttachmentBinding = binding(path)

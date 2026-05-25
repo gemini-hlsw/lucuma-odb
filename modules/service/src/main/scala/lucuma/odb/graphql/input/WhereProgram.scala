@@ -24,7 +24,7 @@ object WhereProgram {
     val WhereTypeBinding             = WhereEq.binding[ProgramType](path / "type", ProgramTypeBinding)
     val WhereProgramReferenceBinding = WhereProgramReference.binding(path / "reference")
     val WherePiBinding               = WhereProgramUser.binding(path / "pi", ProgramUserRole.Pi.some)
-    val WhereEqProposalStatus        = WhereUnorderedTag.binding(path / "proposalStatus", TagBinding)
+    val WhereEqProposalStatus        = WhereEq.binding(path / "proposalStatus", ProposalStatusBinding)
     val WhereProposalBinding         = WhereProposal.binding(path / "proposal")
     val WhereCalibrationRoleBinding  = WhereOptionEq.binding[CalibrationRole](path / "calibrationRole", enumeratedBinding[CalibrationRole])
     val WhereStartBinding            = WhereOrder.binding(path / "active" / "start", DateBinding)

@@ -364,4 +364,31 @@ class programs extends OdbSuite {
               )
     yield ()
 
+  test("[sc-8783] program selection via proposalStatus") {
+    // This query produced a class cast exception in sc-8783
+    createProgramAs(pi).flatMap { pid =>
+      expect(
+        user = pi,
+        query = s"""
+          query {
+            programs(
+              WHERE: {
+                id: { EQ: "$pid" }
+                proposalStatus: { EQ: NOT_SUBMITTED }
+              }
+            ) {
+              matches { id }
+            }
+          }
+        """,
+        expected =
+          Json.obj(
+            "programs" -> Json.obj(
+              "matches" -> Json.arr(Json.obj("id" -> pid.asJson))
+            )
+          ).asRight
+      )
+    }
+  }
+
 }
