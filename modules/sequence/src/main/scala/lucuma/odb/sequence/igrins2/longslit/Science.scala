@@ -14,6 +14,7 @@ import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.string.NonEmptyString
 import fs2.Pure
 import fs2.Stream
+import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SequenceType
 import lucuma.core.enums.SlitOffsetMode
@@ -57,9 +58,9 @@ object Science:
     override val initialDynamicConfig: Igrins2DynamicConfig =
       Igrins2DynamicConfig(TimeSpan.Min)
 
-    def igrins2ScienceStep(mode: SlitOffsetMode)(o: Offset): State[Igrins2DynamicConfig, ProtoStep[Igrins2DynamicConfig]] =
+    def igrins2ScienceStep(mode: SlitOffsetMode, obsClass: ObserveClass)(o: Offset): State[Igrins2DynamicConfig, ProtoStep[Igrins2DynamicConfig]] =
       val guideState = if isOnTarget(mode, o) then Enabled else Disabled
-      scienceStep(TelescopeConfig(o, guideState), ObserveClass.Science)
+      scienceStep(TelescopeConfig(o, guideState), obsClass)
 
   case class StepDefinition(
     scienceSteps: NonEmptyList[ProtoStep[Igrins2DynamicConfig]],
@@ -71,17 +72,19 @@ object Science:
   object StepDefinition:
 
     def compute(
-      config: Config,
-      time:   IntegrationTime
+      config:  Config,
+      time:    IntegrationTime,
+      calRole: Option[CalibrationRole]
     ): Either[String, StepDefinition] =
-      val offsets = config.offsets
+      val offsets  = config.offsets
+      val sciClass = calRole.sciClass
       NonEmptyList.fromList(offsets)
         .toRight("At least one offset position is required for IGRINS-2 Long Slit.")
         .map: nel =>
           val sciSteps = Igrins2SequenceState.eval:
             for
               _  <- State.modify[Igrins2DynamicConfig](_.copy(exposure = time.exposureTime))
-              ss <- nel.traverse(Igrins2SequenceState.igrins2ScienceStep(config.offsetMode))
+              ss <- nel.traverse(Igrins2SequenceState.igrins2ScienceStep(config.offsetMode, sciClass))
             yield ss
           StepDefinition(sciSteps, config.offsetMode)
 
@@ -112,7 +115,8 @@ object Science:
     static:        Igrins2StaticConfig,
     namespace:     UUID,
     config:        Config,
-    time:          Either[OdbError, IntegrationTime]
+    time:          Either[OdbError, IntegrationTime],
+    calRole:       Option[CalibrationRole]
   ): Either[OdbError, SequenceGenerator[Igrins2DynamicConfig]] =
     val posTime: Either[OdbError, IntegrationTime] =
       time.filterOrElse(
@@ -122,7 +126,7 @@ object Science:
 
     for {
       t <- posTime
-      s <- StepDefinition.compute(config, t)
+      s <- StepDefinition.compute(config, t, calRole)
              .leftMap(m => definitionError(observationId, m))
       c <- s.cycleCount(t)
              .leftMap(m => definitionError(observationId, m))

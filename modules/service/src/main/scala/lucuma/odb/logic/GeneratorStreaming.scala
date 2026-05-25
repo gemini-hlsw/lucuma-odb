@@ -4,7 +4,6 @@
 package lucuma.odb.logic
 
 import cats.data.EitherT
-import cats.data.Nested
 import cats.effect.Async
 import cats.syntax.applicative.*
 import cats.syntax.either.*
@@ -12,12 +11,9 @@ import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import cats.syntax.option.*
 import fs2.Stream
-import lucuma.core.enums.CalibrationRole
-import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SequenceType
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.Atom
-import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig as Flamingos2Dynamic
 import lucuma.core.model.sequence.flamingos2.Flamingos2StaticConfig as Flamingos2Static
 import lucuma.core.model.sequence.ghost.GhostDynamicConfig as GhostDynamic
@@ -177,28 +173,6 @@ object GeneratorStreaming:
 
       private val exp = SmartGcalImplementation.fromService(smartGcalService)
 
-      // Spec-photo and telluric standards are night calibrations rather than science
-      private def updateObsClass[S, D](
-        exec:    StreamingExecutionConfig[F, S, D],
-        calRole: Option[CalibrationRole]
-      ): StreamingExecutionConfig[F, S, D] =
-        val isNightCal = calRole.exists:
-          case CalibrationRole.Telluric | CalibrationRole.SpectroPhotometric => true
-          case _                                                             => false
-
-        if isNightCal then
-          val updateClass = Step.observeClass[D].modify:
-            case ObserveClass.Science => ObserveClass.NightCal
-            case oc                   => oc
-          StreamingExecutionConfig.science[F, S, D].modify(_.map(Atom.steps[D].modify(_.map(updateClass))))(exec)
-        else exec
-
-      // Post processing stage to update the generated steps
-      // It update obs class but could be extended for other cross cutting concerns.
-      extension [S, D](self: F[Either[OdbError, StreamingExecutionConfig[F, S, D]]])
-        def adjustObsClass(context: GeneratorContext): F[Either[OdbError, StreamingExecutionConfig[F, S, D]]] =
-          Nested(self).map(updateObsClass(_, context.params.calibrationRole)).value
-
       private def extractMode[A](
         expected: String,
         context:  GeneratorContext
@@ -243,8 +217,9 @@ object GeneratorStreaming:
         (for
           cfg <- extractMode(ObservingMode.Flamingos2LongSlitName, context)(_.asFlamingos2LongSlit)
           itc  = requireSpectroscopyItc(context.oid, context.itcRes)
-          gen <- EitherT(LongSlit.instantiate(context.oid, calculator.flamingos2Step, context.namespace, exp.flamingos2, cfg, itc))
-        yield gen.covary[F]).value.adjustObsClass(context)
+          rol  = context.params.calibrationRole
+          gen <- EitherT(LongSlit.instantiate(context.oid, calculator.flamingos2Step, context.namespace, exp.flamingos2, cfg, itc, rol))
+        yield gen.covary[F]).value
 
       override def selectOrGenerateGhost(
         context: GeneratorContext
@@ -269,7 +244,7 @@ object GeneratorStreaming:
           stc  = GhostStatic(cfg.resolutionMode, cfg.slitCameraExposureTime)
           itc  = requireGhostItc(context.oid, context.itcRes)
           gen <- EitherT(Ifu.instantiate(calculator.ghostStep, stc, context.namespace, exp.ghost, cfg, itc))
-        yield gen.covary[F]).value.adjustObsClass(context)
+        yield gen.covary[F]).value
 
       override def selectOrGenerateIgrins2LongSlit(
         context: GeneratorContext
@@ -291,8 +266,9 @@ object GeneratorStreaming:
         (for
           cfg <- extractMode(ObservingMode.Igrins2LongSlitName, context)(_.asIgrins2LongSlit)
           itc  = requireIgrins2SpectroscopyItc(context.oid, context.itcRes)
-          gen <- EitherT.fromEither(LongSlit.instantiate(context.oid, calculator.igrins2Step, context.namespace, cfg, itc))
-        yield gen.covary[F]).value.adjustObsClass(context)
+          rol  = context.params.calibrationRole
+          gen <- EitherT.fromEither(LongSlit.instantiate(context.oid, calculator.igrins2Step, context.namespace, cfg, itc, rol))
+        yield gen.covary[F]).value
 
       override def selectOrGenerateGnirsLongSlit(
         context: GeneratorContext
@@ -332,7 +308,7 @@ object GeneratorStreaming:
           cfg <- extractMode(ObservingMode.GmosNorthImagingName, context)(_.asGmosNorthImaging)
           itc  = requireImagingItc(ObservingMode.GmosNorthImagingName, context.oid, context.itcRes, Itc.gmosNorthImaging.getOption)
           gen <- EitherT(Imaging.gmosNorth(calculator.gmosNorthStep, context.namespace, cfg, itc))
-        yield gen.covary[F]).value.adjustObsClass(context)
+        yield gen.covary[F]).value
 
       override def selectOrGenerateGmosNorthLongSlit(
         context: GeneratorContext
@@ -352,7 +328,7 @@ object GeneratorStreaming:
           itc  = requireSpectroscopyItc(context.oid, context.itcRes)
           rol  = context.params.calibrationRole
           gen <- EitherT(LongSlit.gmosNorth(context.oid, calculator.gmosNorthStep, context.namespace, exp.gmosNorth, cfg, itc, rol))
-        yield gen.covary[F]).value.adjustObsClass(context)
+        yield gen.covary[F]).value
 
 
       override def selectOrGenerateGmosSouthImaging(
@@ -375,7 +351,7 @@ object GeneratorStreaming:
           cfg <- extractMode(ObservingMode.GmosSouthImagingName, context)(_.asGmosSouthImaging)
           itc  = requireImagingItc(ObservingMode.GmosSouthImagingName, context.oid, context.itcRes, Itc.gmosSouthImaging.getOption)
           gen <- EitherT(Imaging.gmosSouth(calculator.gmosSouthStep, context.namespace, cfg, itc))
-        yield gen.covary[F]).value.adjustObsClass(context)
+        yield gen.covary[F]).value
 
 
       override def selectOrGenerateGmosSouthLongSlit(
@@ -396,4 +372,4 @@ object GeneratorStreaming:
           itc  = requireSpectroscopyItc(context.oid, context.itcRes)
           rol  = context.params.calibrationRole
           gen <- EitherT(LongSlit.gmosSouth(context.oid, calculator.gmosSouthStep, context.namespace, exp.gmosSouth, cfg, itc, rol))
-        yield gen.covary[F]).value.adjustObsClass(context)
+        yield gen.covary[F]).value
