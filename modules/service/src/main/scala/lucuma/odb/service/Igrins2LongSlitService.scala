@@ -248,7 +248,7 @@ object Igrins2LongSlitService:
       sql"""
         UPDATE t_igrins_2_long_slit
         SET
-          c_offset_mode     = $igrins_2_offset_mode,
+          c_offset_mode     = $slit_offset_mode,
           c_spatial_offsets = $text
         WHERE c_observation_id = $observation_id
       """.apply(
