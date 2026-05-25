@@ -9411,7 +9411,7 @@ input Igrins2LongSlitInput {
 }
 
 type GnirsLongSlitAcquisition {
-  acqType: GnirsAcquisitionType!
+  acquisitionType: GnirsAcquisitionType!
   coadds: PosInt!
   filter: GnirsFilter!
   offset: Offset
@@ -9472,7 +9472,7 @@ type GnirsLongSlit {
 
 input GnirsLongSlitAcquisitionInput {
   filter: GnirsFilter
-  acqType: GnirsAcquisitionType
+  acquisitionType: GnirsAcquisitionType
   coadds: PosInt
   offset: OffsetInput
   exposureTimeMode: ExposureTimeModeInput

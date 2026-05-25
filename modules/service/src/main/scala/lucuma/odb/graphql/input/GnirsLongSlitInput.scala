@@ -72,7 +72,7 @@ object GnirsLongSlitInput:
       ObjectFieldsBinding.rmap:
         case List(
           GnirsFilterBinding.Option("filter", rFilter),
-          GnirsAcquisitionTypeBinding.Option("acqType", rAcqType),
+          GnirsAcquisitionTypeBinding.Option("acquisitionType", rAcqType),
           PosIntBinding.Option("coadds", rCoadds),
           OffsetInput.Binding.Option("offset", rOffset),
           ExposureTimeModeInput.Binding.Option("exposureTimeMode", rEtm)
