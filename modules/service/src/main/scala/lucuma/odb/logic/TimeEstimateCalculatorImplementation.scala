@@ -5,7 +5,9 @@ package lucuma.odb.logic
 
 import cats.MonadError
 import cats.syntax.functor.*
+import cats.syntax.option.*
 import eu.timepit.refined.types.numeric.NonNegInt
+import lucuma.core.enums.VisitorObservingModeType
 import lucuma.core.model.sequence.SetupTime
 import lucuma.core.model.sequence.StepEstimate
 import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig
@@ -24,6 +26,7 @@ import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.sequence.SetupTimeEstimateCalculator
 import lucuma.odb.sequence.StepTimeEstimateCalculator
 import lucuma.odb.sequence.data.ProtoStep
+import lucuma.odb.sequence.visitor.VisitorTimeCalculator
 import skunk.Session
 
 object TimeEstimateCalculatorImplementation:
@@ -153,3 +156,21 @@ object TimeEstimateCalculatorImplementation:
 
     lazy val gnirsStep: StepTimeEstimateCalculator[GnirsStaticConfig, GnirsDynamicConfig] =
       stepCalculatorfromEstimators(cce.gnirs, de.gnirs)
+
+    def visitorOverheads(mode: VisitorObservingModeType): Option[VisitorTimeCalculator.Overheads] =
+      import VisitorObservingModeType.*
+      val te = ctx.enums.TimeEstimate
+
+      mode match
+        case AlopekeSpeckle              =>
+          VisitorTimeCalculator.Overheads(te.AlopekeSpeckleSetup.time,   te.AlopekeSpeckleReadout.time).some
+        case AlopekeWideField            =>
+          VisitorTimeCalculator.Overheads(te.AlopekeWideFieldSetup.time, te.AlopekeWideFieldReadout.time).some
+        case ZorroSpeckle                =>
+          VisitorTimeCalculator.Overheads(te.ZorroSpeckleSetup.time,     te.ZorroSpeckleReadout.time).some
+        case ZorroWideField              =>
+          VisitorTimeCalculator.Overheads(te.ZorroWideFieldSetup.time,   te.ZorroWideFieldReadout.time).some
+        case MaroonX                     =>
+          VisitorTimeCalculator.Overheads(te.MaroonXSetup.time,          te.MaroonXReadout.time).some
+        case VisitorNorth | VisitorSouth =>
+          none

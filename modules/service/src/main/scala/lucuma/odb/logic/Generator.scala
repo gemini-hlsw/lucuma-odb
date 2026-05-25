@@ -7,6 +7,7 @@ import cats.data.EitherT
 import cats.effect.Async
 import cats.syntax.applicative.*
 import cats.syntax.apply.*
+import cats.syntax.compose.*
 import cats.syntax.either.*
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
@@ -36,6 +37,7 @@ import lucuma.odb.sequence.SetupTimeEstimateCalculator
 import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.sequence.data.StreamingExecutionConfig
 import lucuma.odb.sequence.util.CommitHash
+import lucuma.odb.sequence.visitor.VisitorTimeCalculator
 import lucuma.odb.service.NoTransaction
 import lucuma.odb.service.Services
 import lucuma.odb.service.Services.Syntax.*
@@ -213,7 +215,7 @@ object Generator:
               SequenceDigest.Zero.copy(executionState = ExecutionState.DeclaredComplete)
             )
 
-        if ctx.params.declaredState == Some(ExecutionState.DeclaredComplete) then done          
+        if ctx.params.declaredState == Some(ExecutionState.DeclaredComplete) then done
         else
           ctx.params.observingMode.modeType match
             case ObservingModeType.Flamingos2LongSlit =>
@@ -232,15 +234,22 @@ object Generator:
               EitherT(streaming.selectOrGenerateGnirsLongSlit(ctx)).flatMap(digest(_, calculator.gnirsLongSlitSetup))
             case ObservingModeType.Igrins2LongSlit    =>
               EitherT(streaming.selectOrGenerateIgrins2LongSlit(ctx)).flatMap(digest(_, calculator.igrins2LongSlitSetup))
-            case _: VisitorObservingModeType =>
+            case vis: VisitorObservingModeType =>
+              // There is no sequence for visitors we calculate the digest directly
               val state = ctx.params.declaredState.getOrElse(ExecutionState.Completed)
-              EitherT.pure[F, OdbError]:
-                ExecutionDigest(
-                  SetupTime.Zero,
-                  NonNegInt.MinValue,
-                  SequenceDigest.Zero.copy(executionState = state),
-                  SequenceDigest.Zero.copy(executionState = state)
-                )
+              calculator.visitorOverheads(vis) match
+                case Some(over) =>
+                  EitherT.liftF:
+                    exposureTimeModeService
+                      .selectRequirement(List(ctx.oid))
+                      .map: etms =>
+                        VisitorTimeCalculator.digest(over, etms.get(ctx.oid), state)
+                case None =>
+                  // TODO: Implement alien visitors.
+                  val updateExecutionState =
+                    ExecutionDigest.acquisition.andThen(SequenceDigest.executionState).replace(state) >>>
+                      ExecutionDigest.science.andThen(SequenceDigest.executionState).replace(state)
+                  EitherT.pure[F, OdbError](updateExecutionState(ExecutionDigest.Zero))
 
       private def calculateScienceAtomDigests(
         ctx: GeneratorContext
@@ -268,7 +277,7 @@ object Generator:
           case ObservingModeType.GmosSouthLongSlit  => EitherT(streaming.selectOrGenerateGmosSouthLongSlit(ctx))
           case ObservingModeType.GnirsLongSlit      => EitherT(streaming.selectOrGenerateGnirsLongSlit(ctx))
           case ObservingModeType.Igrins2LongSlit    => EitherT(streaming.selectOrGenerateIgrins2LongSlit(ctx))
-          case _: VisitorObservingModeType          => 
+          case _: VisitorObservingModeType          =>
             EitherT.rightT[F, OdbError]:
               StreamingExecutionConfig[F, Unit, Nothing]((), Stream.empty, Stream.empty)
 
@@ -454,7 +463,7 @@ object Generator:
 
             case _: VisitorObservingModeType =>
               EitherT.pure(())
-              
+
         transactionallyWithContext(oid, commitHash): ctx =>
           materializeExecutionConfig(ctx) *> EitherT(f)
 
