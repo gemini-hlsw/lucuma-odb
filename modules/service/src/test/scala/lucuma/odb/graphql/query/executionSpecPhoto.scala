@@ -14,7 +14,7 @@ import lucuma.core.model.Observation
 import lucuma.core.syntax.timespan.*
 import lucuma.itc.IntegrationTime
 
-class executionSpecPhot extends ExecutionTestSupportForGmos {
+class executionSpecPhoto extends ExecutionTestSupportForGmos {
 
   override def fakeItcSpectroscopyResult: IntegrationTime =
     IntegrationTime(
@@ -22,7 +22,7 @@ class executionSpecPhot extends ExecutionTestSupportForGmos {
       PosInt.unsafeFrom(10)
     )
 
-  test("spec phot") {
+  test("spec photo") {
     val setup: IO[Observation.Id] =
       for {
         p <- createProgram
@@ -99,7 +99,7 @@ class executionSpecPhot extends ExecutionTestSupportForGmos {
                 "gmosNorth": {
                   "science": {
                     "nextAtom": {
-                      "observeClass": "SCIENCE",
+                      "observeClass": "NIGHT_CAL",
                       "steps": [
                         {
                           "observeClass": "NIGHT_CAL",
@@ -141,7 +141,7 @@ class executionSpecPhot extends ExecutionTestSupportForGmos {
                           }
                         },
                         {
-                          "observeClass": "SCIENCE",
+                          "observeClass": "NIGHT_CAL",
                           "instrumentConfig": {
                             "exposure": {
                               "seconds": 1200.000000
@@ -191,7 +191,7 @@ class executionSpecPhot extends ExecutionTestSupportForGmos {
     }
   }
 
-  test("spec phot, small custom wavelength dither") {
+  test("spec photo, small custom wavelength dither") {
     // simultaneous coverage 235 nm, so dither up to 23.5 nm is ignored
     val setup: IO[Observation.Id] =
       for {
@@ -282,7 +282,7 @@ class executionSpecPhot extends ExecutionTestSupportForGmos {
                           }
                         },
                         {
-                          "observeClass": "SCIENCE",
+                          "observeClass": "NIGHT_CAL",
                           "instrumentConfig": {
                             "gratingConfig": {
                               "wavelength": {
@@ -303,7 +303,7 @@ class executionSpecPhot extends ExecutionTestSupportForGmos {
     }
   }
 
-  test("spec phot, large custom wavelength dither") {
+  test("spec photo, large custom wavelength dither") {
     // simultaneous coverage 235 nm, so dither over 23.5 nm is tracked
     val setup: IO[Observation.Id] =
       for {
@@ -391,7 +391,7 @@ class executionSpecPhot extends ExecutionTestSupportForGmos {
                           }
                         },
                         {
-                          "observeClass": "SCIENCE",
+                          "observeClass": "NIGHT_CAL",
                           "instrumentConfig": {
                             "gratingConfig": {
                               "wavelength": {
@@ -416,7 +416,7 @@ class executionSpecPhot extends ExecutionTestSupportForGmos {
                             }
                           },
                           {
-                            "observeClass": "SCIENCE",
+                            "observeClass": "NIGHT_CAL",
                             "instrumentConfig": {
                               "gratingConfig": {
                                 "wavelength": {

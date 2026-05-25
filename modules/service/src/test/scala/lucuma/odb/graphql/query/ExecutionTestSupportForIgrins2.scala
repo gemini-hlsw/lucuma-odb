@@ -7,6 +7,7 @@ import cats.effect.IO
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
+import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SlitOffsetMode
 import lucuma.core.enums.StepGuideState
 import lucuma.core.math.Offset
@@ -67,7 +68,13 @@ trait ExecutionTestSupportForIgrins2 extends ExecutionTestSupport:
   def igrins2ScienceQuery(oid: Observation.Id, futureLimit: Option[Int] = None): String =
     executionConfigQuery(oid, "igrins2", "science", Igrins2AtomQuery, futureLimit)
 
-  protected def igrins2ExpectedScience(exposureTime: TimeSpan, p: BigDecimal, q: BigDecimal, g: StepGuideState): Json =
+  private def igrins2ExpectedScience(
+    exposureTime: TimeSpan,
+    p:            BigDecimal,
+    q:            BigDecimal,
+    g:            StepGuideState,
+    obsClass:     ObserveClass
+  ): Json =
     val tc = TelescopeConfig(
       Offset(
         Offset.P.signedDecimalArcseconds.reverseGet(p),
@@ -83,19 +90,26 @@ trait ExecutionTestSupportForIgrins2 extends ExecutionTestSupport:
         },
         "stepConfig": { "stepType": "SCIENCE" },
         "telescopeConfig": ${expectedTelescopeConfig(tc)},
-        "observeClass": "SCIENCE",
+        "observeClass": ${obsClass.tag.toScreamingSnakeCase.asJson},
         "breakpoint": "DISABLED"
       }
     """
 
   protected def igrins2ExpectedScienceAtom(
     exposureTime: TimeSpan,
-    offsets: (BigDecimal, BigDecimal, StepGuideState)*
+    offsets:      (BigDecimal, BigDecimal, StepGuideState)*
   ): Json =
-    val sciSteps = offsets.toList.map((p, q, g) => igrins2ExpectedScience(exposureTime, p, q, g))
+    igrins2ExpectedScienceAtomAs(ObserveClass.Science, exposureTime, offsets*)
+
+  protected def igrins2ExpectedScienceAtomAs(
+    obsClass:     ObserveClass,
+    exposureTime: TimeSpan,
+    offsets:      (BigDecimal, BigDecimal, StepGuideState)*
+  ): Json =
+    val sciSteps = offsets.toList.map((p, q, g) => igrins2ExpectedScience(exposureTime, p, q, g, obsClass))
 
     Json.obj(
-      "description" -> "ABBA Cycle".asJson,
-      "observeClass" -> "SCIENCE".asJson,
-      "steps" -> sciSteps.asJson
+      "description"  -> "ABBA Cycle".asJson,
+      "observeClass" -> obsClass.tag.toScreamingSnakeCase.asJson,
+      "steps"        -> sciSteps.asJson
     )

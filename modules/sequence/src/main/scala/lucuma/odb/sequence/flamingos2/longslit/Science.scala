@@ -18,6 +18,7 @@ import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.string.NonEmptyString
 import fs2.Pure
 import fs2.Stream
+import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.Flamingos2LyotWheel
 import lucuma.core.enums.Flamingos2ReadMode
 import lucuma.core.enums.ObserveClass
@@ -39,6 +40,7 @@ import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.itc.IntegrationTime
 import lucuma.odb.data.OdbError
+import lucuma.odb.sequence.*
 import lucuma.odb.sequence.data.ProtoAtom
 import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.sequence.isOnSlit
@@ -112,9 +114,9 @@ object Science:
 
   object StepDefinition extends SequenceState[F2] with Flamingos2InitialDynamicConfig:
 
-    def f2ScienceStep(o: Offset): State[F2, ProtoStep[F2]] =
+    def f2ScienceStep(o: Offset, obsClass: ObserveClass): State[F2, ProtoStep[F2]] =
       val guideState = if isOnSlit(SlitLength, o) then Enabled else Disabled
-      scienceStep(TelescopeConfig(o, guideState), ObserveClass.Science)
+      scienceStep(TelescopeConfig(o, guideState), obsClass)
 
     // PreDef is a StepDefinition before SmartGcal expansion.
     case class PreDef(
@@ -143,12 +145,13 @@ object Science:
     object PreDef:
 
       def apply(
-         config: Config,
-         time:   IntegrationTime,
-         a0Off:  Offset,
-         b0Off:  Offset,
-         b1Off:  Offset,
-         a1Off:  Offset
+         config:  Config,
+         time:    IntegrationTime,
+         a0Off:   Offset,
+         b0Off:   Offset,
+         b1Off:   Offset,
+         a1Off:   Offset,
+         calRole: Option[CalibrationRole]
       ): PreDef =
 
         val readMode =
@@ -156,6 +159,8 @@ object Science:
             .explicitReadMode
             .getOrElse:
               Flamingos2ReadMode.forExposureTime(time.exposureTime)
+
+        val sciClass = calRole.sciClass
 
         eval:
           for
@@ -168,10 +173,10 @@ object Science:
             _  <- F2.decker      := config.decker
             _  <- F2.readoutMode := config.readoutMode
             _  <- F2.reads       := config.explicitReads.getOrElse(readMode.readCount)
-            a0 <- f2ScienceStep(a0Off)
-            b0 <- f2ScienceStep(b0Off)
-            b1 <- f2ScienceStep(b1Off)
-            a1 <- f2ScienceStep(a1Off)
+            a0 <- f2ScienceStep(a0Off, sciClass)
+            b0 <- f2ScienceStep(b0Off, sciClass)
+            b1 <- f2ScienceStep(b1Off, sciClass)
+            a1 <- f2ScienceStep(a1Off, sciClass)
             f  <- flatStep(a1.telescopeConfig.copy(guiding = Disabled), ObserveClass.NightCal)
             r  <- arcStep(a1.telescopeConfig.copy(guiding = Disabled), ObserveClass.NightCal)
           yield PreDef(a0, b0, b1, a1, f, r)
@@ -180,12 +185,13 @@ object Science:
       config:    Config,
       time:      IntegrationTime,
       static:    Flamingos2StaticConfig,
-      expander:  SmartGcalExpander[F, Flamingos2StaticConfig, F2]
+      expander:  SmartGcalExpander[F, Flamingos2StaticConfig, F2],
+      calRole:   Option[CalibrationRole]
     ): EitherT[F, String, StepDefinition] =
       for
         p <- EitherT.fromEither:
                config.offsets match
-                 case List(a0, b0, b1, a1) => PreDef(config, time, a0, b0, b1, a1).asRight
+                 case List(a0, b0, b1, a1) => PreDef(config, time, a0, b0, b1, a1, calRole).asRight
                  // This case should be caught when validating arguments to the mode
                  // construction / update.  Nevertheless, we'll guarantee it here.
                  case _                    => s"Exactly 4 offset positions are needed for Flamingos 2 Long Slit (${config.offsets.size} provided).".asLeft
@@ -286,7 +292,8 @@ object Science:
     namespace:     UUID,
     expander:      SmartGcalExpander[F, Flamingos2StaticConfig, F2],
     config:        Config,
-    time:          Either[OdbError, IntegrationTime]
+    time:          Either[OdbError, IntegrationTime],
+    calRole:       Option[CalibrationRole]
   ): F[Either[OdbError, SequenceGenerator[F2]]] =
 
     val posTime: EitherT[F, OdbError, IntegrationTime] =
@@ -300,7 +307,7 @@ object Science:
 
     val gen = for
       t <- posTime
-      s <- StepDefinition.compute(config, t, static, expander).leftMap(m => definitionError(observationId, m))
+      s <- StepDefinition.compute(config, t, static, expander, calRole).leftMap(m => definitionError(observationId, m))
       e <- cycleEstimate(s)
       c <- EitherT.fromEither(s.cycleCount(t).leftMap(m => definitionError(observationId, m)))
     yield Generator(

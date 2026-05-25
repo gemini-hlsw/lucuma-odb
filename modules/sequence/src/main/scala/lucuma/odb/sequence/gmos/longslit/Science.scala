@@ -30,7 +30,6 @@ import lucuma.core.enums.GmosNorthGrating
 import lucuma.core.enums.GmosSouthFilter
 import lucuma.core.enums.GmosSouthFpu
 import lucuma.core.enums.GmosSouthGrating
-import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SequenceType
 import lucuma.core.enums.StepGuideState
 import lucuma.core.math.Offset
@@ -281,6 +280,8 @@ object Science:
         val includeFlats = !isTwilight
         val includeArcs  = calRole.isEmpty
         val goals        = Goal.compute(config.wavelengthDithers, config.spatialOffsets, expTimeμs, expCount)
+        val gcalClass    = calRole.gcalClass
+        val sciClass     = calRole.sciClass
 
         def define(g: Goal): EitherT[F, OdbError, StepDefinition[D]] =
           val (smartArc, smartFlat, science) =
@@ -288,9 +289,9 @@ object Science:
               for
                 _ <- setup(config, TimeSpan.unsafeFromMicroseconds(expTimeμs.value))
                 _ <- optics.wavelength := λ.offset(g.Δλ).getOrElse(λ)
-                a <- arcStep(TelescopeConfig(Offset.Zero, StepGuideState.Disabled), if isTwilight then ObserveClass.DayCal else ObserveClass.NightCal)
-                f <- flatStep(TelescopeConfig(Offset.Zero, StepGuideState.Disabled), if isTwilight then ObserveClass.DayCal else ObserveClass.NightCal)
-                s <- scienceStep(TelescopeConfig(Offset.Zero, StepGuideState.Enabled), if isTwilight then ObserveClass.DayCal else ObserveClass.Science)
+                a <- arcStep(TelescopeConfig(Offset.Zero, StepGuideState.Disabled), gcalClass)
+                f <- flatStep(TelescopeConfig(Offset.Zero, StepGuideState.Disabled), gcalClass)
+                s <- scienceStep(TelescopeConfig(Offset.Zero, StepGuideState.Enabled), sciClass)
               yield (a, f, s)
 
           val defn = for
