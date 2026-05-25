@@ -437,6 +437,12 @@ object ItcService {
             sci <- EitherT.fromEither(toTargetResults(sp.targets, NonEmptyList.one(cr)).map(_.head))
           yield Itc.Igrins2Spectroscopy(sci)
 
+        def gnirsSpectroscopy(sp: ItcInput.ScienceOnlySpectroscopy): EitherT[F, OdbError, Itc] =
+          for
+            cr  <- callSpectroscopy(sp.scienceInput)
+            sci <- EitherT.fromEither(toTargetResults(sp.targets, NonEmptyList.one(cr)).map(_.head))
+          yield Itc.GnirsSpectroscopy(sci)
+
         (input match
           case im @ ItcInput.Imaging(_, _) =>
             imaging(im)
@@ -446,6 +452,8 @@ object ItcService {
             ghost(gh, targets)
           case sp @ ItcInput.ScienceOnlySpectroscopy(SpectroscopyParameters(_, InstrumentMode.Igrins2Spectroscopy(_, _)), _) =>
             igrins2Spectroscopy(sp)
+          case sp @ ItcInput.ScienceOnlySpectroscopy(SpectroscopyParameters(_, _: InstrumentMode.GnirsSpectroscopy), _) =>
+            gnirsSpectroscopy(sp)
           case _ =>
             EitherT.leftT(OdbError.InvalidObservation(oid, s"Unrecognized ItcInput: $input".some))
         ).value

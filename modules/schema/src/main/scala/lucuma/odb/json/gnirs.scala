@@ -32,7 +32,7 @@ import lucuma.core.model.sequence.gnirs.GnirsStaticConfig
 import lucuma.core.util.TimeSpan
 
 import time.decoder.given
-import wavelength.transport.given
+import wavelength.decoder.given
 
 trait GnirsCodec:
 
@@ -56,7 +56,7 @@ trait GnirsCodec:
         wavelength <- c.downField("wavelength").as[GnirsGratingWavelength]
       yield GnirsAcquisitionMirrorMode.Out(prism, grating, wavelength)
 
-  given Encoder[GnirsAcquisitionMirrorMode.Out] =
+  given (using Encoder[Wavelength]): Encoder[GnirsAcquisitionMirrorMode.Out] =
     Encoder.instance: a =>
       Json.obj(
         "prism" -> a.prism.asJson,
@@ -68,7 +68,7 @@ trait GnirsCodec:
     Decoder.instance: c =>
       c.as[Option[GnirsAcquisitionMirrorMode.Out]].map(_.getOrElse(GnirsAcquisitionMirrorMode.In))
 
-  given Encoder[GnirsAcquisitionMirrorMode] =
+  given (using Encoder[Wavelength]): Encoder[GnirsAcquisitionMirrorMode] =
     Encoder.instance: a =>
       GnirsAcquisitionMirrorMode.out.getOption(a).fold(Json.Null)(_.asJson)
 
@@ -101,7 +101,7 @@ trait GnirsCodec:
                              c.downField("fpuOther").as[GnirsFpuOther].map(_.asRight[GnirsFpuSlit])
         acqMirror         <- c.downField("acquisitionMirrorOut").as[GnirsAcquisitionMirrorMode]
         camera            <- c.downField("camera").as[GnirsCamera]
-        focus             <- c.downField("focusCustom").as[GnirsFocus]
+        focus             <- c.downField("focusMotorSteps").as[GnirsFocus]
         readMode          <- c.downField("readMode").as[GnirsReadMode]
       yield GnirsDynamicConfig(
         exposure,
@@ -116,7 +116,7 @@ trait GnirsCodec:
         readMode
       )
 
-  given (using Encoder[TimeSpan]): Encoder[GnirsDynamicConfig] =
+  given (using Encoder[TimeSpan], Encoder[Wavelength]): Encoder[GnirsDynamicConfig] =
     Encoder.instance: a =>
       Json.obj(
         "exposure"             -> a.exposure.asJson,
@@ -128,7 +128,7 @@ trait GnirsCodec:
         "fpuOther"             -> a.fpu.toOption.fold(Json.Null)(_.asJson),
         "acquisitionMirrorOut" -> a.acquisitionMirror.asJson,
         "camera"               -> a.camera.asJson,
-        "focus"                -> a.focus.asJson,
+        "focusMotorSteps"      -> a.focus.asJson,
         "readMode"             -> a.readMode.asJson
       )
 

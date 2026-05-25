@@ -18,6 +18,8 @@ import lucuma.core.model.sequence.ghost.GhostDynamicConfig
 import lucuma.core.model.sequence.ghost.GhostStaticConfig
 import lucuma.core.model.sequence.gmos.DynamicConfig
 import lucuma.core.model.sequence.gmos.StaticConfig
+import lucuma.core.model.sequence.gnirs.GnirsDynamicConfig
+import lucuma.core.model.sequence.gnirs.GnirsStaticConfig
 import lucuma.core.model.sequence.igrins2.Igrins2DynamicConfig
 import lucuma.core.model.sequence.igrins2.Igrins2StaticConfig
 import lucuma.core.util.TimeSpan
@@ -110,6 +112,17 @@ object DetectorEstimator {
         )
     }
 
+    extension (gn: GnirsDynamicConfig) {
+      def datasetEstimate: DatasetEstimate =
+        // Readout time per step = read mode's per-coadd readout × coadds.
+        val readout = gn.readMode.readoutTimePerCoadd *| gn.coadds.value
+        DatasetEstimate(
+          gn.exposure,
+          readout,
+          ctx.enums.TimeEstimate.GnirsWrite.time
+        )
+    }
+
     lazy val flamingos2: DetectorEstimator[Flamingos2StaticConfig, Flamingos2DynamicConfig] =
       (_: Flamingos2StaticConfig, step: ProtoStep[Flamingos2DynamicConfig]) => List(
         DetectorEstimate(
@@ -166,6 +179,16 @@ object DetectorEstimator {
         DetectorEstimate(
           "Igrins2",
           "IGRINS-2 Detector Array",
+          step.value.datasetEstimate,
+          1.refined
+        )
+      )
+
+    lazy val gnirs: DetectorEstimator[GnirsStaticConfig, GnirsDynamicConfig] =
+      (_: GnirsStaticConfig, step: ProtoStep[GnirsDynamicConfig]) => List(
+        DetectorEstimate(
+          "Gnirs",
+          "GNIRS Detector Array",
           step.value.datasetEstimate,
           1.refined
         )

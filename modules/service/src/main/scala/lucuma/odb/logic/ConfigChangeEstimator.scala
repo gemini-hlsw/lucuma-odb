@@ -13,6 +13,7 @@ import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig
 import lucuma.core.model.sequence.ghost.GhostDynamicConfig
 import lucuma.core.model.sequence.gmos.DynamicConfig
+import lucuma.core.model.sequence.gnirs.GnirsDynamicConfig
 import lucuma.core.model.sequence.igrins2.Igrins2DynamicConfig
 import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.sequence.StepTimeEstimateCalculator
@@ -90,6 +91,19 @@ object ConfigChangeEstimator:
           present: ProtoStep[Igrins2DynamicConfig]
         ): List[Option[ConfigChangeEstimate]] =
           // IGRINS-2 has no configurable mechanisms
+          Nil
+
+    lazy val gnirs: ConfigChangeEstimator[GnirsDynamicConfig] =
+      new ForInstrument[GnirsDynamicConfig]:
+        override def instrumentChecks(
+          past: StepTimeEstimateCalculator.Last[GnirsDynamicConfig],
+          present: ProtoStep[GnirsDynamicConfig]
+        ): List[Option[ConfigChangeEstimate]] =
+          // GNIRS in OCS does not declare any mechanism-change overheads (no
+          // CONFIG_CHANGE entries in InstGNIRS.calc, unlike GMOS / Flamingos-2
+          // / NIRI / GSAOI / GPI / NICI).  We match that here.  If a future
+          // requirement adds GNIRS mechanism costs, add them per-mechanism —
+          // the base trait still applies the generic offset + gcal overheads.
           Nil
 
     private def gcal[D](past: StepTimeEstimateCalculator.Last[D], present: ProtoStep[D]): List[ConfigChangeEstimate] =

@@ -370,6 +370,7 @@ trait BaseMapping[F[_]]
   lazy val GnirsFilterType                         = schema.ref("GnirsFilter")
   lazy val GnirsGratingType                        = schema.ref("GnirsGrating")
   lazy val GnirsFpuSlitType                        = schema.ref("GnirsFpuSlit")
+  lazy val GnirsFpuOtherType                       = schema.ref("GnirsFpuOther")
   lazy val GnirsPrismType                          = schema.ref("GnirsPrism")
   lazy val GnirsCameraType                         = schema.ref("GnirsCamera")
   lazy val GnirsObsReadModeType                    = schema.ref("GnirsObsReadMode")

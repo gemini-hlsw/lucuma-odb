@@ -14,6 +14,8 @@ import lucuma.core.model.sequence.ghost.GhostDynamicConfig
 import lucuma.core.model.sequence.ghost.GhostStaticConfig
 import lucuma.core.model.sequence.gmos.DynamicConfig
 import lucuma.core.model.sequence.gmos.StaticConfig
+import lucuma.core.model.sequence.gnirs.GnirsDynamicConfig
+import lucuma.core.model.sequence.gnirs.GnirsStaticConfig
 import lucuma.core.model.sequence.igrins2.Igrins2DynamicConfig
 import lucuma.core.model.sequence.igrins2.Igrins2StaticConfig
 import lucuma.core.refined.numeric.NonZeroInt
@@ -124,6 +126,15 @@ object TimeEstimateCalculatorImplementation:
         ctx.enums.TimeEstimate.Igrins2LongslitMaxVisit.time
       )
 
+    lazy val gnirsLongSlitSetup: SetupTimeEstimateCalculator =
+      setupCalculatorfromEstimation(
+        SetupTime(
+          ctx.enums.TimeEstimate.GnirsLongslitSetup.time,
+          ctx.enums.TimeEstimate.GnirsReacquisition.time
+        ),
+        ctx.enums.TimeEstimate.GnirsLongslitMaxVisit.time
+      )
+
 
     lazy val flamingos2Step: StepTimeEstimateCalculator[Flamingos2StaticConfig, Flamingos2DynamicConfig] =
       stepCalculatorfromEstimators(cce.flamingos2, de.flamingos2)
@@ -139,3 +150,6 @@ object TimeEstimateCalculatorImplementation:
 
     lazy val igrins2Step: StepTimeEstimateCalculator[Igrins2StaticConfig, Igrins2DynamicConfig] =
       stepCalculatorfromEstimators(cce.igrins2, de.igrins2)
+
+    lazy val gnirsStep: StepTimeEstimateCalculator[GnirsStaticConfig, GnirsDynamicConfig] =
+      stepCalculatorfromEstimators(cce.gnirs, de.gnirs)

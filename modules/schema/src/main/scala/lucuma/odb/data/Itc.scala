@@ -59,6 +59,7 @@ object Itc:
     case GhostIfu            extends Type("ghost_ifu")
     case GmosNorthImaging    extends Type("gmos_north_imaging")
     case GmosSouthImaging    extends Type("gmos_south_imaging")
+    case GnirsSpectroscopy   extends Type("gnirs_spectroscopy")
     case Igrins2Spectroscopy extends Type("igrins_2_spectroscopy")
     case Spectroscopy        extends Type("spectroscopy")
 
@@ -172,11 +173,33 @@ object Itc:
   val igrins2Spectroscopy: Prism[Itc, Igrins2Spectroscopy] =
     GenPrism[Itc, Igrins2Spectroscopy]
 
+  /**
+   * Spectroscopy science results for GNIRS. Acquisition is configured inline
+   * in the observing mode but the acquisition ITC call is not yet performed.
+   */
+  case class GnirsSpectroscopy(
+    science: Zipper[Result]
+  ) extends Itc:
+
+    override def dataType: Type =
+      Type.GnirsSpectroscopy
+
+    override def scienceExposureCount: PosInt =
+      science.focus.value.exposureCount
+
+  object GnirsSpectroscopy:
+    given Eq[GnirsSpectroscopy] =
+      Eq.by(_.science)
+
+  val gnirsSpectroscopy: Prism[Itc, GnirsSpectroscopy] =
+    GenPrism[Itc, GnirsSpectroscopy]
+
   given Eq[Itc] =
     Eq.instance:
       case (a: GhostIfu,            b: GhostIfu)            => a === b
       case (a: GmosNorthImaging,    b: GmosNorthImaging)    => a === b
       case (a: GmosSouthImaging,    b: GmosSouthImaging)    => a === b
+      case (a: GnirsSpectroscopy,   b: GnirsSpectroscopy)   => a === b
       case (a: Igrins2Spectroscopy, b: Igrins2Spectroscopy) => a === b
       case (a: Spectroscopy,        b: Spectroscopy)        => a === b
       case _                                                => false
