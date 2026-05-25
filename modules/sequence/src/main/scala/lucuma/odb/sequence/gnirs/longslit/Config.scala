@@ -7,9 +7,9 @@ import cats.Eq
 import cats.derived.*
 import eu.timepit.refined.cats.*
 import eu.timepit.refined.types.numeric.PosInt
+import lucuma.core.enums.GnirsAcquisitionType
 import lucuma.core.enums.GnirsCamera
 import lucuma.core.enums.GnirsDecker
-import lucuma.core.enums.GnirsAcquisitionType
 import lucuma.core.enums.GnirsFilter
 import lucuma.core.enums.GnirsFpuSlit
 import lucuma.core.enums.GnirsGrating
