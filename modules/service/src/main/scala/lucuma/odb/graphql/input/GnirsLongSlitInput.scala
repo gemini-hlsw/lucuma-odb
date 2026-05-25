@@ -9,6 +9,7 @@ import cats.syntax.apply.*
 import cats.syntax.parallel.*
 import eu.timepit.refined.types.numeric.PosInt
 import grackle.Result
+import lucuma.core.enums.GnirsAcquisitionType
 import lucuma.core.enums.GnirsCamera
 import lucuma.core.enums.GnirsDecker
 import lucuma.core.enums.GnirsFilter
@@ -60,7 +61,7 @@ object GnirsLongSlitInput:
 
   case class AcquisitionInput(
     filter:           Option[GnirsFilter],
-    readMode:         Option[GnirsObsReadMode],
+    acqType:          Option[GnirsAcquisitionType],
     coadds:           Option[PosInt],
     offset:           Option[Offset],
     exposureTimeMode: Option[ExposureTimeMode]
@@ -71,12 +72,12 @@ object GnirsLongSlitInput:
       ObjectFieldsBinding.rmap:
         case List(
           GnirsFilterBinding.Option("filter", rFilter),
-          GnirsObsReadModeBinding.Option("readMode", rReadMode),
+          GnirsAcquisitionTypeBinding.Option("acqType", rAcqType),
           PosIntBinding.Option("coadds", rCoadds),
           OffsetInput.Binding.Option("offset", rOffset),
           ExposureTimeModeInput.Binding.Option("exposureTimeMode", rEtm)
         ) =>
-          (rFilter, rReadMode, rCoadds, rOffset, rEtm).parMapN(AcquisitionInput.apply)
+          (rFilter, rAcqType, rCoadds, rOffset, rEtm).parMapN(AcquisitionInput.apply)
 
   case class Create(
     exposureTimeMode: Option[ExposureTimeMode],

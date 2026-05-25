@@ -55,7 +55,7 @@ trait GnirsLongSlitView[F[_]] extends BaseMapping[F]:
     val TelescopeConfigsEffective: ColumnRef = col("c_telescope_configs_effective", text)
 
     // Acquisition config (ETM stored in t_exposure_time_mode via FK)
-    val AcqReadMode: ColumnRef      = col("c_acq_read_mode", gnirs_obs_read_mode)
+    val AcqType: ColumnRef          = col("c_acq_type", gnirs_acquisition_type)
     val AcqCoadds: ColumnRef        = col("c_acq_coadds", int4_pos)
     val AcqFilter: ColumnRef        = col("c_acq_filter", gnirs_filter)
     val AcqOffsetP: ColumnRef       = col("c_acq_offset_p", angle_µas.opt)

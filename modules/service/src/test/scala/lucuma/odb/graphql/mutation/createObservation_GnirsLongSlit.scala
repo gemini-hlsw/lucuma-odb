@@ -92,7 +92,7 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                           timeAndCount { time { seconds } count at { nanometers } }
                         }
                         acquisition {
-                          readMode
+                          acqType
                           coadds
                           filter
                           offset { p { arcseconds } q { arcseconds } }
@@ -157,7 +157,7 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                         }
                       },
                       "acquisition": {
-                        "readMode": "AUTOMATIC",
+                        "acqType": "FAINT",
                         "coadds": 1,
                         "filter": "ORDER3",
                         "offset": null,

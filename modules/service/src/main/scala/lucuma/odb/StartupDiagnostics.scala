@@ -68,6 +68,7 @@ object StartupDiagnostics:
           checkPostgresEnum(exposure_time_mode_type),
           checkPostgresEnum(gcal_baseline),
           checkPostgresEnum(gcal_lamp_type),
+          checkPostgresEnum(gnirs_acquisition_type),
           checkPostgresEnum(gnirs_decker),
           checkPostgresEnum(gnirs_obs_read_mode),
           checkPostgresEnum(gnirs_well_depth),

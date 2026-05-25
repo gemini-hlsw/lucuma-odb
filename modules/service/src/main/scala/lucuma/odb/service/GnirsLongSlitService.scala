@@ -10,6 +10,7 @@ import coulomb.syntax.*
 import eu.timepit.refined.types.numeric.PosInt
 import grackle.Result
 import grackle.ResultT
+import lucuma.core.enums.GnirsAcquisitionType
 import lucuma.core.enums.GnirsCamera
 import lucuma.core.enums.GnirsDecker
 import lucuma.core.enums.GnirsFilter
@@ -98,7 +99,7 @@ object GnirsLongSlitService:
         slit_offset_mode                 *: // c_slit_offset_mode_default
         text                             *: // c_telescope_configs_default
         // Acquisition fields (inline cols + acq ETM joined from t_exposure_time_mode via FK)
-        gnirs_obs_read_mode              *: // c_acq_read_mode
+        gnirs_acquisition_type           *: // c_acq_type
         int4                             *: // c_acq_coadds
         gnirs_filter                     *: // c_acq_filter
         angle_µas.opt                    *: // c_acq_offset_p
@@ -112,7 +113,7 @@ object GnirsLongSlitService:
               wellDepthDef *: wellDepthExp *:
               focusMotorSteps *:
               slitOffsetModeExp *: tcExp *: slitOffsetModeDef *: tcDef *:
-              acqReadMode *: acqCoadds *: acqFilter *: acqOffP *: acqOffQ *:
+              acqType *: acqCoadds *: acqFilter *: acqOffP *: acqOffQ *:
               acqEtm *: EmptyTuple) =>
           SlitTelescopeConfigsFormat.getOption((slitOffsetModeDef, tcDef))
             .toRight(s"Could not parse default telescope configs from '$tcDef'")
@@ -128,7 +129,7 @@ object GnirsLongSlitService:
                       .leftMap(e => s"Invalid acq coadds $acqCoadds: $e")
                       .map: acqCoaddsP =>
                         val acq = AcquisitionConfig(
-                          acqReadMode, acqCoaddsP, acqFilter,
+                          acqType, acqCoaddsP, acqFilter,
                           acqOffP.map(a => Offset.P(a)),
                           acqOffQ.map(a => Offset.Q(a)),
                           acqEtm
@@ -242,7 +243,7 @@ object GnirsLongSlitService:
           ls.c_telescope_configs,
           ls.c_slit_offset_mode_default,
           ls.c_telescope_configs_default,
-          ls.c_acq_read_mode,
+          ls.c_acq_type,
           ls.c_acq_coadds,
           ls.c_acq_filter,
           ls.c_acq_offset_p,
@@ -264,8 +265,8 @@ object GnirsLongSlitService:
         observationIds.map(sql"$observation_id").intercalate(void",") |+|
       void")"
 
-    private def defaultAcqReadMode(input: GnirsLongSlitInput.Create): GnirsObsReadMode =
-      input.acquisition.flatMap(_.readMode).getOrElse(GnirsObsReadMode.AutomaticInEachStep)
+    private def defaultAcqType(input: GnirsLongSlitInput.Create): GnirsAcquisitionType =
+      input.acquisition.flatMap(_.acqType).getOrElse(GnirsAcquisitionType.Faint)
 
     private def defaultAcqFilter(input: GnirsLongSlitInput.Create): GnirsFilter =
       input.acquisition.flatMap(_.filter).getOrElse(input.filter)
@@ -293,7 +294,7 @@ object GnirsLongSlitService:
       Option[SlitOffsetMode],
       Option[String],
       // acquisition inline columns
-      GnirsObsReadMode,
+      GnirsAcquisitionType,
       Int,
       GnirsFilter,
       Option[Long],           // acq_offset_p in µas
@@ -321,7 +322,7 @@ object GnirsLongSlitService:
           c_well_depth,
           c_slit_offset_mode,
           c_telescope_configs,
-          c_acq_read_mode,
+          c_acq_type,
           c_acq_coadds,
           c_acq_filter,
           c_acq_offset_p,
@@ -348,7 +349,7 @@ object GnirsLongSlitService:
           ${gnirs_well_depth.opt},
           ${slit_offset_mode.opt},
           ${text.opt},
-          $gnirs_obs_read_mode,
+          $gnirs_acquisition_type,
           $int4,
           $gnirs_filter,
           ${int8.opt},
@@ -359,12 +360,12 @@ object GnirsLongSlitService:
         (oid, initGrating, initPrism, camera, fpu, filter, coadds,
          decker, gratingWav, explGrating, explPrism, focus,
          readMode, wellDepth, slitMode, offsets,
-         acqRM, acqCoadds, acqFilter, acqOffP, acqOffQ) =>
+         acqType, acqCoadds, acqFilter, acqOffP, acqOffQ) =>
           (oid, initGrating, initPrism, camera, camera, fpu, fpu,
            filter, filter, coadds, decker, gratingWav,
            explGrating, explPrism, focus, readMode, wellDepth,
            slitMode, offsets,
-           acqRM, acqCoadds, acqFilter, acqOffP, acqOffQ, oid)
+           acqType, acqCoadds, acqFilter, acqOffP, acqOffQ, oid)
       }
 
     def insertGnirsLongSlit(
@@ -391,7 +392,7 @@ object GnirsLongSlitService:
         input.explicitWellDepth,
         explicitTC.map(_._1),
         explicitTC.map(_._2),
-        defaultAcqReadMode(input),
+        defaultAcqType(input),
         input.acquisition.flatMap(_.coadds).map(_.value).getOrElse(1),
         defaultAcqFilter(input),
         acqOffP,
@@ -419,7 +420,7 @@ object GnirsLongSlitService:
       val upOffsets      = sql"c_telescope_configs  = ${text.opt}"
 
       // Acquisition inline (non-ETM) column updates
-      val upAcqReadMode  = sql"c_acq_read_mode = $gnirs_obs_read_mode"
+      val upAcqType      = sql"c_acq_type = $gnirs_acquisition_type"
       val upAcqCoadds    = sql"c_acq_coadds    = $int4_pos"
       val upAcqFilter    = sql"c_acq_filter    = $gnirs_filter"
       val upAcqOffsetP   = sql"c_acq_offset_p  = ${int8.opt}"
@@ -444,7 +445,7 @@ object GnirsLongSlitService:
                 upAcqOffsetQ(Some(Angle.microarcseconds.get(o.q.toAngle)))
               )
           List(
-            acq.readMode.map(upAcqReadMode),
+            acq.acqType.map(upAcqType),
             acq.coadds.map(upAcqCoadds),
             acq.filter.map(upAcqFilter)
           ).flatten ++ offUpdates
@@ -488,7 +489,7 @@ object GnirsLongSlitService:
           c_filter, c_initial_filter,
           c_coadds, c_decker, c_focus_motor_steps, c_read_mode, c_well_depth,
           c_slit_offset_mode, c_telescope_configs,
-          c_acq_read_mode, c_acq_coadds, c_acq_filter,
+          c_acq_type, c_acq_coadds, c_acq_filter,
           c_acq_offset_p, c_acq_offset_q
         )
         SELECT
@@ -502,7 +503,7 @@ object GnirsLongSlitService:
           c_filter, c_initial_filter,
           c_coadds, c_decker, c_focus_motor_steps, c_read_mode, c_well_depth,
           c_slit_offset_mode, c_telescope_configs,
-          c_acq_read_mode, c_acq_coadds, c_acq_filter,
+          c_acq_type, c_acq_coadds, c_acq_filter,
           c_acq_offset_p, c_acq_offset_q
         FROM t_gnirs_long_slit
         WHERE c_observation_id = $observation_id
