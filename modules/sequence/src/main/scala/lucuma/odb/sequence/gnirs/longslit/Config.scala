@@ -7,6 +7,7 @@ import cats.Eq
 import cats.derived.*
 import eu.timepit.refined.cats.*
 import eu.timepit.refined.types.numeric.PosInt
+import lucuma.core.enums.GnirsAcquisitionType
 import lucuma.core.enums.GnirsCamera
 import lucuma.core.enums.GnirsDecker
 import lucuma.core.enums.GnirsFilter
@@ -26,7 +27,7 @@ import java.io.ByteArrayOutputStream
 import java.io.DataOutputStream
 
 case class AcquisitionConfig(
-  readMode:         GnirsObsReadMode,
+  acqType:          GnirsAcquisitionType,
   coadds:           PosInt,
   filter:           GnirsFilter,
   offsetP:          Option[Offset.P],
@@ -37,7 +38,7 @@ case class AcquisitionConfig(
   def hashBytes: Array[Byte] =
     val bao = new ByteArrayOutputStream(128)
     val out = new DataOutputStream(bao)
-    out.writeChars(readMode.tag)
+    out.writeChars(acqType.tag)
     out.write(coadds.value.hashBytes)
     out.writeChars(filter.tag)
     out.write(offsetP.map(_.hashBytes).getOrElse(Array.emptyByteArray))
@@ -49,7 +50,7 @@ case class AcquisitionConfig(
 object AcquisitionConfig:
   given Eq[AcquisitionConfig] =
     Eq.by: a =>
-      (a.readMode, a.coadds.value, a.filter, a.offsetP.map(_.toAngle), a.offsetQ.map(_.toAngle), a.exposureTimeMode)
+      (a.acqType, a.coadds.value, a.filter, a.offsetP.map(_.toAngle), a.offsetQ.map(_.toAngle), a.exposureTimeMode)
 
 case class Config(
   filter:                  GnirsFilter,
