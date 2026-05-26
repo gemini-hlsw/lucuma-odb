@@ -1057,6 +1057,42 @@ trait DatabaseOperations { this: OdbSuite =>
             focalPlaneAngle: { microarcseconds: 0 }
           }
         }"""
+      case VisitorObservingModeType.AlopekeSpeckle    |
+           VisitorObservingModeType.AlopekeWideField  |
+           VisitorObservingModeType.ZorroSpeckle      |
+           VisitorObservingModeType.ZorroWideField    =>
+        """{
+          exposureTimeMode: {
+            timeAndCount: {
+              time: { seconds: 30.0 }
+              count: 4
+              at: { nanometers: 700 }
+            }
+          }
+          imaging: {
+            minimumFov: { arcseconds: 1 }
+            narrowFilters: false
+            broadFilters: false
+            combinedFilters: true
+          }
+        }"""
+      case VisitorObservingModeType.MaroonX =>
+        """{
+          exposureTimeMode: {
+            timeAndCount: {
+              time: { seconds: 30.0 }
+              count: 4
+              at: { nanometers: 700 }
+            }
+          }
+          spectroscopy: {
+            wavelength: { nanometers: 700 }
+            resolution: 80000
+            wavelengthCoverage: { nanometers: 200 }
+            focalPlane: SINGLE_SLIT
+            focalPlaneAngle: { microarcseconds: 0 }
+          }
+        }"""
       case _ => // TODO: FIX THIS!!!
         """{
           spectroscopy: {
