@@ -116,7 +116,7 @@ object GnirsLongSlitInput:
           WavelengthInput.Binding.Option("explicitGratingWavelength", rGratingWavelength),
           GnirsGratingBinding.Option("explicitGrating", rExplGrating),
           GnirsPrismBinding.Option("explicitPrism", rExplPrism),
-          IntBinding.Option("explicitFocus", rFocus),
+          IntBinding.Option("explicitFocusMotorSteps", rFocus),
           GnirsObsReadModeBinding.Option("explicitReadMode", rReadMode),
           GnirsWellDepthBinding.Option("explicitWellDepth", rWellDepth),
           SlitTelescopeConfigsInput.Binding.Option("explicitTelescopeConfigs", rExplTelescope),
@@ -154,8 +154,12 @@ object GnirsLongSlitInput:
     def updatesAcquisition: Boolean = acquisition.isDefined
     def limitToPreExecution(access: Access): Boolean = false
 
-    /** True if the input modifies fields that only Staff (or higher) may set. */
-    def needsStaffAccess: Boolean = explicitFocusMotorSteps.isDefined
+    /**
+     * True if the input modifies fields that only Staff (or higher) may set.
+     * Setting `explicitFocusMotorSteps` to a value requires Staff; clearing it
+     * to null is allowed for anyone.
+     */
+    def needsStaffAccess: Boolean = explicitFocusMotorSteps.isPresent
     def toCreate: Result[Create] =
       def required[A](oa: Option[A], name: String): Result[A] =
         Result.fromOption(oa, Matcher.validationProblem(s"A $name is required to create a GNIRS Long Slit observing mode."))
@@ -186,7 +190,7 @@ object GnirsLongSlitInput:
           WavelengthInput.Binding.Nullable("explicitGratingWavelength", rGratingWavelength),
           GnirsGratingBinding.Nullable("explicitGrating", rExplGrating),
           GnirsPrismBinding.Nullable("explicitPrism", rExplPrism),
-          IntBinding.Nullable("explicitFocus", rFocus),
+          IntBinding.Nullable("explicitFocusMotorSteps", rFocus),
           GnirsObsReadModeBinding.Nullable("explicitReadMode", rReadMode),
           GnirsWellDepthBinding.Nullable("explicitWellDepth", rWellDepth),
           SlitTelescopeConfigsInput.Binding.Nullable("explicitTelescopeConfigs", rExplTelescope),

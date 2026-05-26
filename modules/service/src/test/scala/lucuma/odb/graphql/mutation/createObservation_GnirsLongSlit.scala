@@ -210,7 +210,7 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                         explicitReadMode: BRIGHT
                         explicitWellDepth: SHALLOW
                         explicitGratingWavelength: { nanometers: 2100 }
-                        explicitFocus: 500
+                        explicitFocusMotorSteps: 500
                         exposureTimeMode: {
                           timeAndCount: {
                             time: { seconds: 10.0 }
@@ -337,7 +337,7 @@ class createObservation_GnirsLongSlit extends OdbSuite:
           )
         yield ()
 
-  test("PI cannot set explicitFocus on create — NotAuthorized"):
+  test("PI cannot set explicitFocusMotorSteps on create — NotAuthorized"):
     interceptOdbError {
       createProgramAs(pi).flatMap: pid =>
         createTargetAs(pi, pid).flatMap: tid =>
@@ -366,7 +366,7 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                           camera: SHORT_BLUE
                           fpu: LONG_SLIT_0_30
                           filter: ORDER3
-                          explicitFocus: 500
+                          explicitFocusMotorSteps: 500
                           exposureTimeMode: {
                             timeAndCount: {
                               time: { seconds: 30.0 }
@@ -385,7 +385,7 @@ class createObservation_GnirsLongSlit extends OdbSuite:
       case OdbError.NotAuthorized(uid, _) if uid === pi.id => // expected
     }
 
-  test("Staff can set explicitFocus on create"):
+  test("Staff can set explicitFocusMotorSteps on create"):
     createProgramAs(staff).flatMap: pid =>
       createTargetAs(staff, pid).flatMap: tid =>
         expect(
@@ -413,7 +413,7 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                         camera: SHORT_BLUE
                         fpu: LONG_SLIT_0_30
                         filter: ORDER3
-                        explicitFocus: 500
+                        explicitFocusMotorSteps: 500
                         exposureTimeMode: {
                           timeAndCount: {
                             time: { seconds: 30.0 }
@@ -446,7 +446,7 @@ class createObservation_GnirsLongSlit extends OdbSuite:
           """)
         )
 
-  test("PI cannot set explicitFocus on update — NotAuthorized"):
+  test("PI cannot set explicitFocusMotorSteps on update — NotAuthorized"):
     interceptOdbError {
       createProgramAs(pi).flatMap: pid =>
         createTargetAs(pi, pid).flatMap: tid =>
@@ -460,7 +460,7 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                     updateObservations(input: {
                       SET: {
                         observingMode: {
-                          gnirsLongSlit: { explicitFocus: 500 }
+                          gnirsLongSlit: { explicitFocusMotorSteps: 500 }
                         }
                       }
                       WHERE: { id: { EQ: "$oid" } }
@@ -473,44 +473,59 @@ class createObservation_GnirsLongSlit extends OdbSuite:
       case OdbError.NotAuthorized(uid, _) if uid === pi.id => // expected
     }
 
-  test("PI cannot clear explicitFocus on update — NotAuthorized"):
-    // First, staff creates and sets explicit focus; then PI tries to clear it.
-    interceptOdbError {
-      for
-        pid <- createProgramAs(staff)
-        tid <- createTargetAs(staff, pid)
-        oid <- createGnirsLongSlitObservationAs(staff, pid, tid)
-        // Staff sets explicit focus
-        _   <- query(
-          user  = staff,
-          query =
-            s"""
-              mutation {
-                updateObservations(input: {
-                  SET: { observingMode: { gnirsLongSlit: { explicitFocus: 500 } } }
-                  WHERE: { id: { EQ: "$oid" } }
-                }) { observations { id } }
+  test("PI can clear explicitFocusMotorSteps on update"):
+    // PI owns the program; staff sets explicit focus; then PI clears it to null.
+    for
+      pid <- createProgramAs(pi)
+      tid <- createTargetAs(pi, pid)
+      oid <- createGnirsLongSlitObservationAs(pi, pid, tid)
+      // Staff sets explicit focus
+      _   <- query(
+        user  = staff,
+        query =
+          s"""
+            mutation {
+              updateObservations(input: {
+                SET: { observingMode: { gnirsLongSlit: { explicitFocusMotorSteps: 500 } } }
+                WHERE: { id: { EQ: "$oid" } }
+              }) { observations { id } }
+            }
+          """
+      )
+      _   <- expect(
+        user  = pi,
+        query =
+          s"""
+            mutation {
+              updateObservations(input: {
+                SET: { observingMode: { gnirsLongSlit: { explicitFocusMotorSteps: null } } }
+                WHERE: { id: { EQ: "$oid" } }
+              }) {
+                observations {
+                  observingMode {
+                    gnirsLongSlit { explicitFocusMotorSteps }
+                  }
+                }
               }
-            """
-        )
-        _   <- query(
-          user  = pi,
-          query =
-            s"""
-              mutation {
-                updateObservations(input: {
-                  SET: { observingMode: { gnirsLongSlit: { explicitFocus: null } } }
-                  WHERE: { id: { EQ: "$oid" } }
-                }) { observations { id } }
-              }
-            """
-        )
-      yield ()
-    } {
-      case OdbError.NotAuthorized(uid, _) if uid === pi.id => // expected
-    }
+            }
+          """,
+        expected = Right(json"""
+          {
+            "updateObservations": {
+              "observations": [
+                {
+                  "observingMode": {
+                    "gnirsLongSlit": { "explicitFocusMotorSteps": null }
+                  }
+                }
+              ]
+            }
+          }
+        """)
+      )
+    yield ()
 
-  test("Staff can set explicitFocus on update"):
+  test("Staff can set explicitFocusMotorSteps on update"):
     createProgramAs(staff).flatMap: pid =>
       createTargetAs(staff, pid).flatMap: tid =>
         for
@@ -523,7 +538,7 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                   updateObservations(input: {
                     SET: {
                       observingMode: {
-                        gnirsLongSlit: { explicitFocus: 500 }
+                        gnirsLongSlit: { explicitFocusMotorSteps: 500 }
                       }
                     }
                     WHERE: { id: { EQ: "$oid" } }

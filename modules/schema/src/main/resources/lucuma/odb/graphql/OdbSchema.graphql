@@ -9533,7 +9533,7 @@ input GnirsLongSlitInput {
 
   explicitPrism: GnirsPrism
 
-  explicitFocus: Int
+  explicitFocusMotorSteps: Int
 
   explicitReadMode: GnirsObsReadMode
 
