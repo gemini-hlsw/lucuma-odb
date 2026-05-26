@@ -109,6 +109,18 @@ final class Enums(
     case OffsetDistance             extends TimeEstimate("offset_distance")
     case ScienceFold                extends TimeEstimate("science_fold")
 
+    // For resident visitors
+    case AlopekeSpeckleSetup        extends TimeEstimate("alopeke_speckle_setup")
+    case AlopekeSpeckleReadout      extends TimeEstimate("alopeke_speckle_readout")
+    case AlopekeWideFieldSetup      extends TimeEstimate("alopeke_wide_field_setup")
+    case AlopekeWideFieldReadout    extends TimeEstimate("alopeke_wide_field_readout")
+    case ZorroSpeckleSetup          extends TimeEstimate("zorro_speckle_setup")
+    case ZorroSpeckleReadout        extends TimeEstimate("zorro_speckle_readout")
+    case ZorroWideFieldSetup        extends TimeEstimate("zorro_wide_field_setup")
+    case ZorroWideFieldReadout      extends TimeEstimate("zorro_wide_field_readout")
+    case MaroonXSetup               extends TimeEstimate("maroon_x_setup")
+    case MaroonXReadout             extends TimeEstimate("maroon_x_readout")
+
     // Used to test that undefined values in the database produce immediate failure on startup.
     // case FooBar              extends TimeEstimate("foo_bar")
   }
