@@ -7,14 +7,26 @@ import cats.syntax.eq.*
 import fs2.io.file.Path
 
 import java.lang.System.lineSeparator
+import java.nio.file.Files
 import scala.io.Source
+import scala.util.Using
+import scala.util.control.NonFatal
 
 trait SchemaSource:
   def resolve(name: Path): List[String]
 
+  def orElse(other: SchemaSource): SchemaSource = (name: Path) =>
+    try resolve(name)
+    catch case NonFatal(_) => other.resolve(name)
+
 object SchemaSource:
   def fromResource(classloader: ClassLoader): SchemaSource = (name: Path) =>
-    Source.fromResource(name.toString, classloader).getLines().toList
+    Using.resource(Source.fromResource(name.toString, classloader))(_.getLines().toList)
+
+  def fromFileSystem(root: Path): SchemaSource = (name: Path) =>
+    val file = root.toNioPath.resolve(name.toString).normalize
+    if Files.exists(file) then Using.resource(Source.fromFile(file.toFile))(_.getLines().toList)
+    else throw new RuntimeException(s"Unknown source $file")
 
   def fromString(name: Path, content: String): SchemaSource = (n: Path) =>
     if (n === name) content.split(lineSeparator).toList
