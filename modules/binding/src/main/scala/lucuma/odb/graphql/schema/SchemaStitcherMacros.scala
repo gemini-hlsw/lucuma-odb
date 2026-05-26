@@ -8,7 +8,9 @@ import fs2.io.file.Path
 import grackle.*
 import org.tpolecat.sourcepos.SourcePos
 
+import java.io.File.separator
 import java.lang.System.lineSeparator
+import java.nio.file.Files
 
 private object SchemaStitcherMacros:
   import scala.quoted.*
@@ -25,14 +27,32 @@ private object SchemaStitcherMacros:
    *     doesn't have to be loaded at runtime
    */
   def fromResourcesImpl(x: Expr[String])(using Quotes): Expr[SchemaStitcher] =
-    import quotes.reflect.report
+    import quotes.reflect.{asTerm, report}
 
     val location = x.valueOrAbort
-    val cl       = this.getClass().getClassLoader()
+    val cl       = Thread.currentThread().getContextClassLoader()
+
+    val sourceFile = Path.fromNioPath(x.asTerm.pos.sourceFile.getJPath.get)
+    val sourceStr  = sourceFile.toString
+
+    val mainPrefix = s"${separator}src${separator}main${separator}scala${separator}"
+
+    val idx          = sourceStr.indexOf(mainPrefix)
+    val resourceRoot = Path(
+      sourceStr.substring(0, idx) + s"${separator}src${separator}main${separator}resources"
+    )
+
+    // Try to load the schema from disk, otherwise from classpath resources
+    val resourceSchemaSource = SchemaSource.fromResource(cl)
+    val schemaSource         = Option
+      .when(Files.exists(resourceRoot.resolve(location).normalize.toNioPath))(
+        SchemaSource.fromFileSystem(resourceRoot)
+      )
+      .fold(resourceSchemaSource)(_.orElse(resourceSchemaSource))
 
     SchemaStitcher(
       Path(location),
-      SchemaSource.fromResource(cl)
+      schemaSource
     ).build match
       case Result.Success(schema) =>
         val strSchema = Expr(schema.toString)

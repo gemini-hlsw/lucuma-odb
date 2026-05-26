@@ -31,7 +31,12 @@ object SchemaStitcher:
     SchemaStitcherImpl(root, source)
 
   /**
-   * Load a schema from the given resource path, log any results, and raise the `Result` to `F[_]`
+   * Load a schema from the given resource path, log any results, and raise the `Result` to `F[_]`.
+   * 
+   * Sbt projects should have this setting to prevent issues with loading resources during the compilation stage
+   * ```scala
+   * (Compile / compile) := ((Compile / compile) dependsOn (Compile / copyResources)).value
+   * ```
    */
   inline def load[F[_]: ApplicativeThrow: Logger](location: String)(using SourcePos): F[Schema] =
     SchemaStitcherMacros.fromResources(location).build match
