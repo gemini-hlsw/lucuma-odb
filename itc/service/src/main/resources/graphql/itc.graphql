@@ -293,7 +293,7 @@ input GnirsSpectroscopyInput {
   """
   Exposure time mode.
   """
-  timeAndCount: TimeAndCountExposureTimeModeInput!
+  exposureTimeMode: ExposureTimeModeInput!
 
   """
   Central wavelength

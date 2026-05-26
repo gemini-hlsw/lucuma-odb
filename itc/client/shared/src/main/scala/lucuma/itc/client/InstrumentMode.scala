@@ -181,7 +181,7 @@ object InstrumentMode {
       )
 
   case class GnirsSpectroscopy(
-    exposureTimeMode:  ExposureTimeMode.TimeAndCountMode,
+    exposureTimeMode:  ExposureTimeMode,
     centralWavelength: Wavelength,
     filter:            GnirsFilter,
     slitWidth:         GnirsFpuSlit,
@@ -198,7 +198,7 @@ object InstrumentMode {
   object GnirsSpectroscopy:
     given Encoder[GnirsSpectroscopy] = a =>
       Json.obj(
-        "timeAndCount"      -> a.exposureTimeMode.asJson,
+        "exposureTimeMode"  -> a.exposureTimeMode.asJson,
         "centralWavelength" -> a.centralWavelength.asJson,
         "filter"            -> a.filter.asScreamingJson,
         "slitWidth"         -> a.slitWidth.asScreamingJson,

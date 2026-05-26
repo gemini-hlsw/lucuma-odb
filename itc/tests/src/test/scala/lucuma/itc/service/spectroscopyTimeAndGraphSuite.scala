@@ -369,7 +369,7 @@ class spectroscopyTimeAndGraphSuite extends GraphQLSuite {
             },
             mode: {
               gnirsSpectroscopy: {
-                timeAndCount: { time: { seconds: 120 }, count: 30, at: { nanometers: 2200 } },
+                exposureTimeMode: { timeAndCount: { time: { seconds: 120 }, count: 30, at: { nanometers: 2200 } } },
                 centralWavelength: { nanometers: 2200 },
                 filter: ORDER3,
                 slitWidth: LONG_SLIT_0_30,

@@ -19,7 +19,7 @@ import lucuma.odb.graphql.binding.*
 import lucuma.odb.graphql.input.*
 
 final case class GnirsSpectroscopyInput(
-  exposureTimeMode:  ExposureTimeMode.TimeAndCountMode,
+  exposureTimeMode:  ExposureTimeMode,
   centralWavelength: Wavelength,
   filter:            GnirsFilter,
   slitWidth:         GnirsFpuSlit,
@@ -36,7 +36,7 @@ object GnirsSpectroscopyInput:
   def binding: Matcher[GnirsSpectroscopyInput] =
     ObjectFieldsBinding.rmap:
       case List(
-            ExposureTimeModeInput.TimeAndCount.Binding("timeAndCount", exposureTimeMode),
+            ExposureTimeModeInput.Binding("exposureTimeMode", exposureTimeMode),
             WavelengthInput.Binding("centralWavelength", centralWavelength),
             GnirsFilterBinding("filter", filter),
             GnirsFpuSlitBinding("slitWidth", slitWidth),

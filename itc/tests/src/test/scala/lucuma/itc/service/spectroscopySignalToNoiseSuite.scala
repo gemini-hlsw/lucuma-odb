@@ -1363,3 +1363,111 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
       """
     )
   }
+
+  test("gnirs case") {
+    query(
+      """
+      query {
+        spectroscopy(input: {
+          asterism: [
+            {
+              sourceProfile: {
+                point: {
+                  bandNormalized: {
+                    sed: {
+                      stellarLibrary: O5_V
+                    }
+                    brightnesses: [ {
+                      band: J
+                      value: 12
+                      units: AB_MAGNITUDE
+                    }]
+                  }
+                }
+              },
+              radialVelocity: {
+                kilometersPerSecond: 0
+              }
+            }
+          ],
+          constraints: {
+            imageQuality: {
+              preset: POINT_THREE
+            },
+            cloudExtinction: {
+              preset: POINT_FIVE
+            },
+            skyBackground: DARK,
+            waterVapor: DRY,
+            elevationRange: {
+              airMass: {
+                min: 1,
+                max: 2
+              }
+            }
+          },
+          mode: {
+            gnirsSpectroscopy: {
+              exposureTimeMode: { signalToNoise: { value: 100, at: { nanometers: 2200 } } },
+              centralWavelength: { nanometers: 2200 },
+              filter: ORDER3,
+              slitWidth: LONG_SLIT_0_30,
+              prism: MIRROR,
+              grating: D32,
+              camera: SHORT_BLUE,
+              readMode: BRIGHT,
+              wellDepth: SHALLOW
+            }
+          }
+        }) {
+            targetTimes {
+              ... on TargetIntegrationTime {
+                signalToNoiseAt {
+                  single
+                  total
+                  wavelength {
+                    nanometers
+                  }
+                }
+              }
+            }
+            brightest {
+              selected {
+                exposureCount
+                exposureTime {
+                  seconds
+                }
+              }
+            }
+        }
+      }
+      """,
+      json"""
+      {
+        "data": {
+          "spectroscopy" : {
+              "targetTimes": [
+                {
+                  "signalToNoiseAt": {
+                    "single": 101.000000,
+                    "total": 102.000000,
+                    "wavelength": {
+                      "nanometers": 2200.000
+                    }
+                  }
+                }
+              ],
+              "brightest": {
+                "selected" : {
+                  "exposureCount" : 10,
+                  "exposureTime" : {
+                    "seconds" : 1.000000
+                  }
+                }
+              }
+            }
+        }
+      }
+      """
+    )
+  }
