@@ -26,7 +26,7 @@ import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.sequence.SetupTimeEstimateCalculator
 import lucuma.odb.sequence.StepTimeEstimateCalculator
 import lucuma.odb.sequence.data.ProtoStep
-import lucuma.odb.sequence.visitor.VisitorTimeCalculator
+import lucuma.odb.sequence.visitor.VisitorExecutionDigestCalculator
 import skunk.Session
 
 object TimeEstimateCalculatorImplementation:
@@ -157,20 +157,20 @@ object TimeEstimateCalculatorImplementation:
     lazy val gnirsStep: StepTimeEstimateCalculator[GnirsStaticConfig, GnirsDynamicConfig] =
       stepCalculatorfromEstimators(cce.gnirs, de.gnirs)
 
-    def visitorOverheads(mode: VisitorObservingModeType): Option[VisitorTimeCalculator.Overheads] =
+    def visitorOverheads(mode: VisitorObservingModeType): Option[VisitorExecutionDigestCalculator.Overheads] =
       import VisitorObservingModeType.*
       val te = ctx.enums.TimeEstimate
 
       mode match
         case AlopekeSpeckle              =>
-          VisitorTimeCalculator.Overheads(te.AlopekeSpeckleSetup.time,   te.AlopekeSpeckleReadout.time).some
+          VisitorExecutionDigestCalculator.Overheads(te.AlopekeSpeckleSetup.time,   te.AlopekeSpeckleReadout.time).some
         case AlopekeWideField            =>
-          VisitorTimeCalculator.Overheads(te.AlopekeWideFieldSetup.time, te.AlopekeWideFieldReadout.time).some
+          VisitorExecutionDigestCalculator.Overheads(te.AlopekeWideFieldSetup.time, te.AlopekeWideFieldReadout.time).some
         case ZorroSpeckle                =>
-          VisitorTimeCalculator.Overheads(te.ZorroSpeckleSetup.time,     te.ZorroSpeckleReadout.time).some
+          VisitorExecutionDigestCalculator.Overheads(te.ZorroSpeckleSetup.time,     te.ZorroSpeckleReadout.time).some
         case ZorroWideField              =>
-          VisitorTimeCalculator.Overheads(te.ZorroWideFieldSetup.time,   te.ZorroWideFieldReadout.time).some
+          VisitorExecutionDigestCalculator.Overheads(te.ZorroWideFieldSetup.time,   te.ZorroWideFieldReadout.time).some
         case MaroonX                     =>
-          VisitorTimeCalculator.Overheads(te.MaroonXSetup.time,          te.MaroonXReadout.time).some
+          VisitorExecutionDigestCalculator.Overheads(te.MaroonXSetup.time,          te.MaroonXReadout.time).some
         case VisitorNorth | VisitorSouth =>
           none

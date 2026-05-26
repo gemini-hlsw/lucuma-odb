@@ -25,7 +25,7 @@ import scala.collection.immutable.SortedSet
  *
  * Acquisition and reacquisition times are zero for resident visitors.
  */
-object VisitorTimeCalculator:
+object VisitorExecutionDigestCalculator:
 
   case class Overheads(setup: TimeSpan, readout: TimeSpan)
 

@@ -37,7 +37,7 @@ import lucuma.odb.sequence.SetupTimeEstimateCalculator
 import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.sequence.data.StreamingExecutionConfig
 import lucuma.odb.sequence.util.CommitHash
-import lucuma.odb.sequence.visitor.VisitorTimeCalculator
+import lucuma.odb.sequence.visitor.VisitorExecutionDigestCalculator
 import lucuma.odb.service.NoTransaction
 import lucuma.odb.service.Services
 import lucuma.odb.service.Services.Syntax.*
@@ -243,7 +243,7 @@ object Generator:
                     exposureTimeModeService
                       .selectRequirement(List(ctx.oid))
                       .map: etms =>
-                        VisitorTimeCalculator.digest(over, etms.get(ctx.oid), state)
+                        VisitorExecutionDigestCalculator.digest(over, etms.get(ctx.oid), state)
                 case None =>
                   // TODO: Implement alien visitors.
                   val updateExecutionState =
