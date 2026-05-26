@@ -3,6 +3,7 @@
 
 package lucuma.odb.util
 
+import lucuma.core.enums.GnirsAcquisitionType
 import lucuma.core.enums.GnirsCamera
 import lucuma.core.enums.GnirsDecker
 import lucuma.core.enums.GnirsFilter
@@ -35,6 +36,9 @@ trait GnirsCodecs:
 
   val gnirs_prism: Codec[GnirsPrism] =
     enumerated(Type.varchar)
+
+  val gnirs_acquisition_type: Codec[GnirsAcquisitionType] =
+    enumerated(Type("e_gnirs_acquisition_type"))
 
   val gnirs_obs_read_mode: Codec[GnirsObsReadMode] =
     enumerated(Type("e_gnirs_obs_read_mode"))
