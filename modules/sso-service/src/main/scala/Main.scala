@@ -42,6 +42,8 @@ import org.http4s.server.*
 import org.http4s.server.websocket.WebSocketBuilder2
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
+import org.typelevel.otel4s.metrics.Meter
+import org.typelevel.otel4s.metrics.Meter.Implicits.noop
 import org.typelevel.otel4s.trace.Tracer
 import org.typelevel.otel4s.trace.Tracer.Implicits.noop
 import skunk.{Command as _, *}
@@ -143,21 +145,11 @@ object FMain extends AnsiColor {
   val ServiceName = "lucuma-sso"
 
   /** A resource that yields a Skunk session pool. */
-  def databasePoolResource[F[_]: Temporal: Trace: Network: Console](
+  def databasePoolResource[F[_]: Temporal: Tracer: Meter: Network: Console](
     config: DatabaseConfig
   ): Resource[F, Resource[F, Session[F]]] =
-    Session.pooled(
-      host     = config.host,
-      port     = config.port,
-      user     = config.user,
-      password = config.password,
-      database = config.database,
-      ssl      = SSL.Trusted.withFallback(true),
-      max      = MaxConnections,
-      strategy = Strategy.SearchPath,
-      // debug    = true,
-    )
-
+    dbSessionBuilder(config)
+      .pooled(MaxConnections)
 
   /** A resource that yields a running HTTP server. */
   def serverResource[F[_]: Async](
@@ -217,7 +209,7 @@ object FMain extends AnsiColor {
     }
 
   /** A resource that yields our HttpRoutes, wrapped in accessory middleware. */
-  def routesResource[F[_]: Async: Trace: Tracer: Logger: Network: Console](config: Config): Resource[F, WebSocketBuilder2[F] => HttpRoutes[F]] =
+  def routesResource[F[_]: Async: Trace: Tracer: Meter: Logger: Network: Console](config: Config): Resource[F, WebSocketBuilder2[F] => HttpRoutes[F]] =
     for {
       pool     <- databasePoolResource[F](config.database)
       schema <- SsoMapping.loadSchema[F].toResource
@@ -269,20 +261,26 @@ object FMain extends AnsiColor {
   implicit def kleisliLogger[F[_]: Logger, A]: Logger[Kleisli[F, A, *]] =
     Logger[F].mapK(Kleisli.liftK)
 
-  def singleSession[F[_]: Async: Console: Network](
+  private def dbSessionBuilder[F[_]: Temporal: Console: Network: Meter](
+    config: DatabaseConfig,
+    database: Option[String] = None
+  ) =
+    Session.Builder[F]
+      .withHost(config.host)
+      .withPort(config.port)
+      .withUserAndPassword(config.user, config.password.getOrElse(""))
+      .withDatabase(database.getOrElse(config.database))
+      .withSSL(SSL.Trusted.withFallback(true))
+      .withTypingStrategy(TypingStrategy.SearchPath)
+      // .withDebug(true)
+
+  def singleSession[F[_]: Temporal: Console: Network](
     config:   DatabaseConfig,
     database: Option[String] = None
   ): Resource[F, Session[F]] =
-    import natchez.Trace.Implicits.noop
-    Session.single[F](
-      host     = config.host,
-      port     = config.port,
-      user     = config.user,
-      database = database.getOrElse(config.database),
-      password = config.password,
-      ssl      = SSL.Trusted.withFallback(true),
-      strategy = Strategy.SearchPath
-    )
+    import Tracer.Implicits.noop
+    import Meter.Implicits.noop
+    dbSessionBuilder(config, database).single
 
   def resetDatabase[F[_]: Async : Console : Network](config: DatabaseConfig): F[Unit] =
     import skunk.*
@@ -326,6 +324,8 @@ object FMain extends AnsiColor {
   def standaloneDatabase[F[_]: Temporal: Network: Console](
     config: DatabaseConfig
   ): Resource[F, Database[F]] = {
+    import Tracer.Implicits.noop
+    import Meter.Implicits.noop
     import Trace.Implicits.noop
     databasePoolResource(config).flatten.map(Database.fromSession(_))
   }

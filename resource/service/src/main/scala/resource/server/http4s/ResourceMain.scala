@@ -24,6 +24,7 @@ import org.http4s.server.*
 import org.http4s.server.websocket.WebSocketBuilder2
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
+import org.typelevel.otel4s.metrics.Meter
 import org.typelevel.otel4s.metrics.MeterProvider
 import org.typelevel.otel4s.trace.Tracer
 import org.typelevel.otel4s.trace.TracerProvider
@@ -50,6 +51,7 @@ object ResourceMain extends IOApp.Simple {
                                 )
       given Trace[F]          = otel.trace
       given Tracer[F]         = otel.tracer
+      given Meter[F]          = otel.meter
       given TracerProvider[F] = otel.tracerProvider
       given MeterProvider[F]  = otel.meterProvider
       r                      <- routesResource[F](conf.database)
@@ -66,7 +68,7 @@ object ResourceMain extends IOApp.Simple {
   )
 
   def routesResource[
-    F[_]: {Async, Trace, Tracer, TracerProvider, MeterProvider, Logger, Console, Network, Files,
+    F[_]: {Async, Tracer, TracerProvider, Meter, MeterProvider, Logger, Console, Network, Files,
       Compression}
   ](
     databaseConfig: DatabaseConfiguration
@@ -88,35 +90,36 @@ object ResourceMain extends IOApp.Simple {
     .withHttpWebSocketApp(wsb => app(wsb).orNotFound)
     .build
 
-  def databasePool[F[_]: {Temporal, Trace, Console, Network}](
+  def databasePool[F[_]: {Temporal, Tracer, Meter, Console, Network}](
     config: DatabaseConfiguration
   ): Resource[F, Resource[F, Session[F]]] =
-    Session.pooled[F](
-      host = config.host.renderString,
-      port = config.port.value,
-      user = config.user,
-      password = config.password.some,
-      database = config.database,
-      ssl = SSL.Trusted.withFallback(true),
-      strategy = Strategy.SearchPath,
-      max = config.maxConnections
-    )
+    Session
+      .Builder[F]
+      .withHost(config.host.renderString)
+      .withPort(config.port)
+      .withUserAndPassword(config.user, config.password)
+      .withDatabase(config.database)
+      .withSSL(SSL.Trusted.withFallback(true))
+      .withTypingStrategy(TypingStrategy.SearchPath)
+      // .withDebug(true)
+      .pooled(config.maxConnections)
 
   def singleSession[F[_]: {Temporal, Console, Network}](
     config:   DatabaseConfiguration,
     database: Option[String] = None
   ): Resource[F, Session[F]] =
-    import natchez.Trace.Implicits.noop
-
-    Session.single[F](
-      host = config.host.renderString,
-      port = config.port.value,
-      user = config.user,
-      password = config.password.some,
-      database = database.getOrElse(config.database),
-      ssl = SSL.Trusted.withFallback(true),
-      strategy = Strategy.SearchPath
-    )
+    import Meter.Implicits.noop
+    import Tracer.Implicits.noop
+    Session
+      .Builder[F]
+      .withHost(config.host.renderString)
+      .withPort(config.port)
+      .withUserAndPassword(config.user, config.password)
+      .withDatabase(database.getOrElse(config.database))
+      .withSSL(SSL.Trusted.withFallback(true))
+      .withTypingStrategy(TypingStrategy.SearchPath)
+      // .withDebug(true)
+      .single
 
   private def printBanner[F[_]: {Logger as L}](conf: ResourceConfiguration): F[Unit] = {
     val runtime    = Runtime.getRuntime

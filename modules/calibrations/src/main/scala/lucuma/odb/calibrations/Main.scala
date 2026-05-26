@@ -52,6 +52,7 @@ import org.typelevel.log4cats.LoggerFactory
 import org.typelevel.log4cats.slf4j.Slf4jFactory
 import org.typelevel.log4cats.syntax.*
 import org.typelevel.otel4s.Attribute
+import org.typelevel.otel4s.metrics.Meter
 import org.typelevel.otel4s.trace.Tracer
 import org.typelevel.otel4s.trace.TracerProvider
 import skunk.*
@@ -114,21 +115,18 @@ object CMain extends MainParams {
     banner.linesIterator.toList.traverse_(Logger[F].info(_))
 
   /** A resource that yields a Skunk session pool. */
-  def databasePoolResource[F[_]: Temporal: Trace: Network: Console](
+  def databasePoolResource[F[_]: Temporal: Tracer: Meter: Network: Console](
     config: Config.Database
-  ): Resource[F, Resource[F, Session[F]]] = {
-    Session.pooled(
-      host     = config.host,
-      port     = config.port,
-      user     = config.user,
-      password = Some(config.password),
-      database = config.database,
-      ssl      = SSL.Trusted.withFallback(true),
-      max      = config.maxCalibrationConnections,
-      strategy = Strategy.SearchPath,
-      // debug    = true,
-    )
-  }
+  ): Resource[F, Resource[F, Session[F]]] =
+    Session.Builder[F]
+      .withHost(config.host)
+      .withPort(config.port)
+      .withUserAndPassword(config.user, config.password)
+      .withDatabase(config.database)
+      .withSSL(SSL.Trusted.withFallback(true))
+      .withTypingStrategy(TypingStrategy.SearchPath)
+      // .withDebug(true)
+      .pooled(max = config.maxCalibrationConnections)
 
   def serviceUser[F[_]: Async: Trace: Network: Logger](c: Config): F[Option[User]] =
     c.ssoClient.use: sso =>
@@ -253,7 +251,7 @@ object CMain extends MainParams {
    * Our main server, as a resource that starts up our server on acquire and shuts it all down
    * in cleanup, yielding an `ExitCode`. Users will `use` this resource and hold it forever.
    */
-  def server[F[_]: Async: Compression: Parallel: Logger: LoggerFactory: Trace: Tracer: TracerProvider: Console: Network: SecureRandom]: Resource[F, ExitCode] =
+  def server[F[_]: Async: Compression: Parallel: Logger: LoggerFactory: Trace: Tracer: TracerProvider: Meter: Console: Network: SecureRandom]: Resource[F, ExitCode] =
     for {
       c                  <- Resource.eval(Config.fromCiris.load[F])
       _                  <- Resource.eval(banner[F](c))
@@ -284,6 +282,7 @@ object CMain extends MainParams {
       otel                     <- OdbTelemetry.otel(ServiceName, c)
       given Tracer[IO]         = otel.tracer
       given Trace[IO]          = otel.trace
+      given Meter[IO]          = otel.meter
       given TracerProvider[IO] = otel.tracerProvider
       _                        <- server[IO]
     yield ExitCode.Success).useForever

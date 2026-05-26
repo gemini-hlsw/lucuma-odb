@@ -17,6 +17,7 @@ import org.http4s.ember.server.EmberServerBuilder
 import org.http4s.server.Server
 import org.testcontainers.containers.PostgreSQLContainer.POSTGRESQL_PORT
 import org.testcontainers.utility.DockerImageName
+import org.typelevel.otel4s.metrics.Meter
 import org.typelevel.otel4s.metrics.MeterProvider
 import org.typelevel.otel4s.trace.Tracer
 import org.typelevel.otel4s.trace.TracerProvider
@@ -31,6 +32,7 @@ trait ServerFixtures extends munit.CatsEffectSuite with ResourceBaseSuite with T
   given TracerProvider[IO] = TracerProvider.noop
   given Tracer[IO]         = Tracer.Implicits.noop
   given MeterProvider[IO]  = MeterProvider.noop
+  given Meter[IO]          = Meter.Implicits.noop
 
   override def munitFixtures = super.munitFixtures ++ List(serverFixture)
 

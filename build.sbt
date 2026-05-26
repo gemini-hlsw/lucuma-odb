@@ -1,5 +1,7 @@
 import NativePackagerHelper.*
 
+ThisBuild / resolvers += Resolver.sonatypeCentralSnapshots
+
 // Please keep in alphabetical order
 val awsJavaSdkVersion            = "1.12.797"
 val boopickleVersion             = "1.5.0"
@@ -17,7 +19,7 @@ val declineVersion               = "2.6.2"
 val flywayVersion                = "12.8.1"
 val fs2AwsVersion                = "6.2.0"
 val fs2Version                   = "3.13.0"
-val grackleVersion               = "0.26.0"
+val grackleVersion               = "0.27.1"
 val http4sVersion                = "0.23.34"
 val http4sBlazeVersion           = "0.23.17"
 val http4sJdkHttpClientVersion   = "0.10.0"
@@ -29,7 +31,7 @@ val kittensVersion               = "3.5.0"
 val logbackVersion               = "1.5.34"
 val log4catsVersion              = "2.8.0"
 val lucumaCoreVersion            = "0.210.1"
-val lucumaGraphQLRoutesVersion   = "0.13.5"
+val lucumaGraphQLRoutesVersion   = "0.13.6"
 val monocleVersion               = "3.3.0"
 val munitVersion                 = "1.3.2"
 val munitCatsEffectVersion       = "2.2.0"   // check test output if you attempt to update this
@@ -46,7 +48,7 @@ val postgresVersion              = "42.7.11"
 val pprintVersion                = "0.9.6"
 val redis4CatsVersion            = "2.0.3"
 val refinedVersion               = "0.11.3"
-val skunkVersion                 = "0.6.5"
+val skunkVersion                 = "1.1-c0fa0b0-SNAPSHOT"
 val sqlFormatterVersion          = "2.0.5"
 val spireVersion                 = "0.18.0"
 val slf4jVersion                 = "2.0.18"

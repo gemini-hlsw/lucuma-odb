@@ -10,6 +10,7 @@ import io.opentelemetry.instrumentation.runtimetelemetry.RuntimeTelemetry
 import natchez.Trace
 import org.typelevel.otel4s.context.LocalProvider
 import org.typelevel.otel4s.instrumentation.ce.IORuntimeMetrics
+import org.typelevel.otel4s.metrics.Meter
 import org.typelevel.otel4s.metrics.MeterProvider
 import org.typelevel.otel4s.oteljava.OtelJava
 import org.typelevel.otel4s.oteljava.context.Context
@@ -20,6 +21,7 @@ import scala.jdk.CollectionConverters.*
 
 case class OtelServices[F[_]](
   trace:          Trace[F],
+  meter:          Meter[F],
   tracer:         Tracer[F],
   meterProvider:  MeterProvider[F],
   tracerProvider: TracerProvider[F]
@@ -56,10 +58,11 @@ object OtelSetup:
           given MeterProvider[F] = otel.meterProvider
           IORuntimeMetrics.register[F](IORuntime.global.metrics, IORuntimeMetrics.Config.default)
         .evalMap: otel =>
-          otel.tracerProvider.get(serviceName).map: tracer =>
+          (otel.tracerProvider.get(serviceName), otel.meterProvider.get(serviceName)).mapN: (tracer, meter) =>
             OtelServices(
               trace = Otel4sTrace.fromTracer(tracer),
               tracer = tracer,
+              meter = meter,
               meterProvider = otel.meterProvider,
               tracerProvider = otel.tracerProvider
             )
@@ -67,6 +70,7 @@ object OtelSetup:
         Resource.pure(OtelServices(
           trace = Trace.Implicits.noop,
           tracer = Tracer.noop,
+          meter = Meter.noop,
           meterProvider = MeterProvider.noop,
           tracerProvider = TracerProvider.noop
         ))

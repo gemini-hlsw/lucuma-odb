@@ -220,7 +220,7 @@ object StartupDiagnostics:
        * its database tag.
        */
       def databaseTag[A](codec: Codec[A])(tag: String)(using e: Enumerated[A]): String =
-        e.fromTag(tag).flatMap(codec.encode(_).headOption.flatten).getOrElse(tag)
+        e.fromTag(tag).flatMap(codec.encode(_).headOption.flatten).fold(tag)(_.value)
 
       def align[A](codec: Codec[A], where: String)(found: List[String])(using e: Enumerated[A], tn: TypeName[A]): List[String] =
         val expected = e.all.map(e.tag).map(databaseTag(codec)).toSet
