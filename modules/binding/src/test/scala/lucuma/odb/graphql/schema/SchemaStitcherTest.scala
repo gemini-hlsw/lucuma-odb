@@ -3,46 +3,41 @@
 
 package lucuma.odb.graphql.schema
 
-import cats.effect.IO
 import fs2.io.file.Path
 import grackle.Result
 import grackle.Result.Success
 import grackle.Schema
-import munit.CatsEffectSuite
+import munit.FunSuite
 
-class SchemaStitcherTest extends CatsEffectSuite {
+class SchemaStitcherTest extends FunSuite {
 
   import SchemaStitcherTest.*
 
   test("SchemaStitcher should parse import statements") {
-    schemaResolver
+    val elements = schemaResolver
       .resolve(Path("baseSchema.graphql"))
       .map(SchemaStitcher.importLineParser.parse)
       .collect { case Right((_, (els, path))) =>
         (els, path)
       }
-      .compile
-      .toList
-      .map: a =>
-        assertEquals(a.length, 2)
-        a(0) match {
-          case (SchemaStitcher.AllElements, path) => assertEquals(path, Path("schema1.graphql"))
-          case other                              => fail(s"Unexpected parse result: $other")
-        }
-        a(1) match {
-          case (SchemaStitcher.ElementList(els), path) =>
-            assertEquals(els.toNonEmptyList.toList.map(_.value), List("TypeA", "TypeX"))
-            assertEquals(path, Path("schema2.graphql"))
-          case other                                   => fail(s"Unexpected parse result: $other")
-        }
+    assertEquals(elements.length, 2)
+    elements(0) match {
+      case (SchemaStitcher.AllElements, path) => assertEquals(path, Path("schema1.graphql"))
+      case other                              => fail(s"Unexpected parse result: $other")
+    }
+    elements(1) match {
+      case (SchemaStitcher.ElementList(els), path) =>
+        assertEquals(els.toNonEmptyList.toList.map(_.value), List("TypeA", "TypeX"))
+        assertEquals(path, Path("schema2.graphql"))
+      case other                                   => fail(s"Unexpected parse result: $other")
+    }
   }
 
   test("SchemaStitcher should compose schema") {
-    SchemaStitcher[IO](Path("baseSchema.graphql"), schemaResolver).build.map { x =>
-      (x, expectedSchema) match {
-        case (Success(a), Success(b)) => assertEquals(a.toString, b.toString)
-        case _                        => fail("Error creating schema")
-      }
+    val result = SchemaStitcher(Path("baseSchema.graphql"), schemaResolver).build
+    (result, expectedSchema) match {
+      case (Success(a), Success(b)) => assertEquals(a.toString, b.toString)
+      case _                        => fail("Error creating schema")
     }
   }
 
@@ -120,7 +115,7 @@ object SchemaStitcherTest {
     |}
     |""".stripMargin)
 
-  val schemaResolver: SchemaSource[IO] = SchemaSource.fromStringMap(
+  val schemaResolver: SchemaSource = SchemaSource.fromStringMap(
     Map(
       Path("baseSchema.graphql") -> baseSchema,
       Path("schema1.graphql")    -> schema1,
