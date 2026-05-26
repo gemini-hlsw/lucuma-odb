@@ -437,7 +437,9 @@ lazy val ssoService = project
     executableScriptName            := "lucuma-sso-service",
     dockerExposedPorts ++= Seq(8082),
     // Truncate DYNO on first dot. For web dyno, execute "serve", otherwise execute whatever the dyno type is (eg: "create-service-user" or "create-jwt").
-    bashScriptExtraDefines += """DYNO_TYPE=${DYNO%%.*}; if [[ "$DYNO_TYPE" == "web" ]]; then set -- serve; else set; set -- $DYNO_TYPE $1 $2; fi"""
+    bashScriptExtraDefines += """DYNO_TYPE=${DYNO%%.*}; if [[ "$DYNO_TYPE" == "web" ]]; then set -- serve; else set; set -- $DYNO_TYPE $1 $2; fi""",
+    // Load resources during compile so they are available for GraphQL schema macros
+    (Compile / compile) := ((Compile / compile) dependsOn (Compile / copyResources)).value
   )
 
 lazy val ssoBackendExample = project
@@ -596,7 +598,9 @@ lazy val itcService = project
     // The heap needs to be a lot smaller than the dyno size. This may be
     // because the JVM tricks to load the 367M of old itc jar files increases the
     // `metaspace` size by that amount. It's a nice theory, at least.
-    lucumaDockerHeapSubtract := 400
+    lucumaDockerHeapSubtract := 400,
+    // Load resources during compile so they are available for GraphQL schema macros
+    (Compile / compile) := ((Compile / compile) dependsOn (Compile / copyResources)).value
   )
 
 lazy val itcClient = crossProject(JVMPlatform, JSPlatform)
@@ -963,7 +967,9 @@ lazy val resourceService = project
     ),
     reStart / envVars += "PORT" -> "8484",
     executableScriptName        := "resource-service",
-    dockerExposedPorts ++= Seq(8484)
+    dockerExposedPorts ++= Seq(8484),
+    // Load resources during compile so they are available for GraphQL schema macros
+    (Compile / compile) := ((Compile / compile) dependsOn (Compile / copyResources)).value
   )
 
 lazy val resourceCommonSettings = lucumaGlobalSettings ++ Seq(
