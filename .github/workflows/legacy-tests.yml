@@ -17,8 +17,8 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        java: ["17"]
-        scala: ["3.7.3"]
+        java: [temurin@25]
+        scala: [3]
     steps:
       - name: Checkout code
         uses: nschloe/action-cached-lfs-checkout@v1

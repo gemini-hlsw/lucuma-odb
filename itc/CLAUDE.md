@@ -28,6 +28,37 @@ Project IDs are taken from `build.sbt` and should be used in sbt commands.
 - `itcTests` and `itcLegacyTests` depend on `itcService`, `itcClient.jvm`, and `itcTestkit.jvm`.
 - `itcBenchmark` depends on `itcService`.
 
+## How Computations Are Performed (Legacy OCS Bridge)
+
+ITC numbers are **not** computed in this codebase. The actual calculations are done by
+legacy OCS ITC code shipped as JARs in `itc/service/ocslib/` (e.g. the GNIRS recipe
+`edu.gemini.itc.gnirs.GnirsRecipe`). The OCS source is in the separate `ocs` repository
+(`bundle/edu.gemini.itc` and `bundle/edu.gemini.itc.shared`); if you have it checked out
+locally it may sit alongside this repo (e.g. `../ocs`), but don't assume that path.
+
+Those JARs are compiled against Scala 2.11, which is binary-incompatible with this
+service's Scala 3 runtime. To run both in the same JVM, the legacy classes are loaded
+through a custom **`ReverseClassLoader`** (defined in `Main.scala`) that prefers classes
+from `ocslib/` over the parent classloader, isolating the conflicting Scala stdlib.
+Because the legacy classes can't be referenced directly, they are invoked via **Java
+reflection** in `legacy/LocalItc.scala` (the static entry points
+`edu.gemini.itc.web.servlets.ItcCalculation.calculateExposureTime` /
+`calculateCharts`). Parameters and results cross this boundary as **JSON strings** —
+never as shared typed objects.
+
+Request/response flow (Scala 3 side):
+- `legacy/package.scala` (`toItcParameters`, `getCalculationMethod`) converts model types
+  into OCS-compatible `ItcParameters`, mapping `ExposureTimeMode.SignalToNoiseMode` to the
+  OCS `SpectroscopyIntegrationTime` method and `TimeAndCountMode` to `SpectroscopyS2N`.
+- `legacy/codecs.scala` encodes those parameters (including per-instrument blocks) to JSON;
+  `legacy/syntax/` maps lucuma enums to OCS2 string tags.
+- `legacy/ItcImpl.scala` invokes `LocalItc` and converts the JSON result back into
+  `TargetIntegrationTime` / `TargetTimeAndGraphs`.
+
+Practical implication: adding support for a mode/instrument is usually a matter of whether
+the OCS recipe already implements it. If it does, the Scala 3 path is generic and only the
+GraphQL input/client/schema type restrictions need lifting — no `ocslib` change required.
+
 ## Important Directories
 
 - `itc/service/src/main/scala/lucuma/itc/service/Main.scala`: service entrypoint and middleware wiring.
