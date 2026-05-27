@@ -51,10 +51,10 @@ object ResourceMain extends IOApp.Simple {
     yield s
 
   def routes[F[_]: {Async, Files, Tracer}](
-    pool:    Resource[F, Session[F]],
-    monitor: SkunkMonitor[F],
-    schema:  Schema
-  )(wsb: WebSocketBuilder2[F]): HttpRoutes[F]         = Router[F](
+    pool:            Resource[F, Session[F]],
+    monitor:         SkunkMonitor[F],
+    schema:          Schema
+  )(wsb: WebSocketBuilder2[F]): HttpRoutes[F] = Router[F](
     "/"         -> new StaticRoutes().service,
     "/resource" -> new GraphQlRoutes().service(wsb, pool, monitor, schema)
   )

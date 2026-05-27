@@ -16,20 +16,20 @@ import lucuma.core.util.TimeSpan
 
 import scala.collection.immutable.SortedSet
 
-/**
- * Computes the time estimate for a resident visitors (Alopeke, Zorro, maroon-x).
- * There is no sequence for these modes. We get the teotal time as:
- *
- * total time is `setup + count * (exposureTime + readout)` derived
- * from the single science ExposureTimeMode row.
- *
- * Acquisition and reacquisition times are zero for resident visitors.
- */
 object VisitorExecutionDigestCalculator:
 
   case class Overheads(setup: TimeSpan, readout: TimeSpan)
 
-  def digest(
+ /**
+  * Computes the time estimate for a resident visitors (Alopeke, Zorro, maroon-x).
+  * There is no sequence for these modes. We get the teotal time as:
+  *
+  * total time is `setup + count * (exposureTime + readout)` derived
+  * from the single science ExposureTimeMode row.
+  *
+  * Acquisition and reacquisition times are zero for resident visitors.
+  */
+  def residentDigest(
     overheads: Overheads,
     science:   Option[ExposureTimeMode],
     state:     ExecutionState
@@ -54,6 +54,31 @@ object VisitorExecutionDigestCalculator:
     ExecutionDigest(
       SetupTime(overheads.setup, TimeSpan.Zero),
       NonNegInt.unsafeFrom(if count > 0 then 1 else 0),
+      SequenceDigest.Zero.copy(executionState = state),
+      scienceDigest
+    )
+
+ /**
+  * The time estimate for alien visitors cannot be calculated, we return the
+  * total requested time instead
+  */
+  def alienDigest(
+    totalRequestTime: Option[TimeSpan],
+    state:            ExecutionState
+  ): ExecutionDigest =
+    val total = totalRequestTime.getOrElse(TimeSpan.Zero)
+    val scienceDigest =
+      SequenceDigest(
+        ObserveClass.Science,
+        CategorizedTime(ChargeClass.Program -> total),
+        SortedSet.empty,
+        NonNegInt.unsafeFrom(0),
+        state
+      )
+
+    ExecutionDigest(
+      SetupTime.Zero, // no info about setup time
+      NonNegInt.unsafeFrom(0),
       SequenceDigest.Zero.copy(executionState = state),
       scienceDigest
     )
