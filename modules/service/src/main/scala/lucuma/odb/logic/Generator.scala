@@ -7,7 +7,6 @@ import cats.data.EitherT
 import cats.effect.Async
 import cats.syntax.applicative.*
 import cats.syntax.apply.*
-import cats.syntax.compose.*
 import cats.syntax.either.*
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
@@ -37,6 +36,7 @@ import lucuma.odb.sequence.SetupTimeEstimateCalculator
 import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.sequence.data.StreamingExecutionConfig
 import lucuma.odb.sequence.util.CommitHash
+import lucuma.odb.sequence.visitor.Config as VisitorConfig
 import lucuma.odb.sequence.visitor.VisitorExecutionDigestCalculator
 import lucuma.odb.service.NoTransaction
 import lucuma.odb.service.Services
@@ -243,13 +243,13 @@ object Generator:
                     exposureTimeModeService
                       .selectRequirement(List(ctx.oid))
                       .map: etms =>
-                        VisitorExecutionDigestCalculator.digest(over, etms.get(ctx.oid), state)
+                        VisitorExecutionDigestCalculator.residentDigest(over, etms.get(ctx.oid), state)
                 case None =>
-                  // TODO: Implement alien visitors.
-                  val updateExecutionState =
-                    ExecutionDigest.acquisition.andThen(SequenceDigest.executionState).replace(state) >>>
-                      ExecutionDigest.science.andThen(SequenceDigest.executionState).replace(state)
-                  EitherT.pure[F, OdbError](updateExecutionState(ExecutionDigest.Zero))
+                  val totalRequestTime = ctx.params.observingMode match
+                    case VisitorConfig(totalRequestTime = t) => t
+                    case _                                   => none
+                  EitherT.pure[F, OdbError]:
+                    VisitorExecutionDigestCalculator.alienDigest(totalRequestTime, state)
 
       private def calculateScienceAtomDigests(
         ctx: GeneratorContext
