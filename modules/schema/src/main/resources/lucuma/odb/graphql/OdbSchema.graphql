@@ -9219,35 +9219,45 @@ enum GhostIfuMappingType {
   DUAL_TARGET
 }
 
-interface GhostIfuMapping {
-  mappingType: GhostIfuMappingType!
+type GhostIfuMapping {
+  mappingType:   GhostIfuMappingType!
+  singleTarget:  GhostSingleTarget
+  targetPlusSky: GhostTargetPlusSky
+  skyPlusTarget: GhostSkyPlusTarget
+  dualTarget:    GhostDualTarget
 }
 
-type GhostNonsidereal implements GhostIfuMapping {
-  mappingType: GhostIfuMappingType!
+"""
+In the GhostSingleTarget mapping, IFU1 is assigned the target.
+"""
+type GhostSingleTarget {
+  ifu1: Sidereal!
 }
 
-type GhostSingleTarget implements GhostIfuMapping {
-  mappingType: GhostIfuMappingType!
-  ifu1:        Sidereal!
+"""
+In the GhostTargetPlusSky mapping, IFU1 is assigned the target and IFU2 the sky
+position.
+"""
+type GhostTargetPlusSky {
+  ifu1: Sidereal!
+  ifu2: Coordinates!
 }
 
-type GhostTargetPlusSky implements GhostIfuMapping {
-  mappingType: GhostIfuMappingType!
-  ifu1:        Sidereal!
-  ifu2:        Coordinates!
+"""
+In the GhostSkyPlusTarget mapping, IFU1 is assigned the sky position and IFU2
+the target.
+"""
+type GhostSkyPlusTarget {
+  ifu1: Coordinates!
+  ifu2: Sidereal!
 }
 
-type GhostSkyPlusTarget implements GhostIfuMapping {
-  mappingType: GhostIfuMappingType!
-  ifu1:        Coordinates!
-  ifu2:        Sidereal!
-}
-
-type GhostDualTarget implements GhostIfuMapping {
-  mappingType: GhostIfuMappingType!
-  ifu1:        Sidereal!
-  ifu2:        Sidereal!
+"""
+In the GhostDualTarget mapping, IFU1 is assigned target1 and IFU2 target2.
+"""
+type GhostDualTarget {
+  ifu1: Sidereal!
+  ifu2: Sidereal!
 }
 
 """

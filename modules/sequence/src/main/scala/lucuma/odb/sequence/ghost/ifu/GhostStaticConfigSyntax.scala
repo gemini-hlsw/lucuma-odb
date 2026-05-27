@@ -37,15 +37,8 @@ object GhostStaticConfigSyntax:
     val pos1 = base.diff(c1).offset
     val pos2 = c2.map(base.diff(_).offset)
 
-    println(s"pos1   = $pos1")
-    println(s"pos2   = $pos2")
-    println(s"shape1.contains(pos1)        = ${shape1.contains(pos1)}")
-    println(s"pos2.forall(shape2.contains) = ${pos2.forall(shape2.contains)}")
-    println(s"pos2.forall(shape1.contains) = ${pos2.forall(shape1.contains)}")
-    println(s"shape2.contains(pos")
-
     if shape1.contains(pos1) && pos2.forall(shape2.contains)      then -1
-    else if pos2.forall(shape1.contains) && shape2.contains(pos1) then 1
+    else if pos2.forall(shape1.contains) && shape2.contains(pos1) then  1
     else 0
 
   private def deriveOneTarget(
@@ -60,14 +53,14 @@ object GhostStaticConfigSyntax:
               ifuAssignment(ctx.explicitBase.getOrElse(c), c, ctx.sky, ctx.angle) match
                 case -1 => ctx.sky.fold(GhostIfuMapping.SingleTarget(track).asRight)(s => GhostIfuMapping.TargetPlusSky(track, s).asRight)
                 case  1 => ctx.sky.fold("The target does not fall in range of GHOST IFU1 probe.".asLeft)(s => GhostIfuMapping.SkyPlusTarget(s, track).asRight)
-                case  _ => "The target does not fall in range of the GHOST IFU probes.".asLeft
+                case  _ => "The target and sky positions are too far apart.".asLeft
 
           case Target.Nonsidereal(_, _, _)     =>
             ctx.sky.fold(GhostIfuMapping.Nonsidereal.asRight): _ =>
               "GHOST does not support sky positions for nonsidereal targets.".asLeft
 
           case Target.Opportunity(_, _, _)     =>
-            "A GHOST IFU mapping can only be determined after the science target is indentified".asLeft
+            "A GHOST IFU mapping can only be determined after the science target is identified.".asLeft
 
       case GhostResolutionMode.High =>
         target match
@@ -83,7 +76,7 @@ object GhostStaticConfigSyntax:
               "GHOST does not support sky positions for nonsidereal targets.".asLeft
 
           case Target.Opportunity(_, _, _)     =>
-            "A GHOST IFU mapping can only be determined after the science target is indentified".asLeft
+            "A GHOST IFU mapping can only be determined after the science target is identified.".asLeft
 
   private def deriveDualTarget(
     ctx:     StaticContext,
@@ -109,7 +102,7 @@ object GhostStaticConfigSyntax:
         "A sky position should not be defined for Dual Target mode.".asLeft
 
       case (GhostResolutionMode.High, _)           =>
-        "Dual Target mode is only available in Standard Resolution".asLeft
+        "Dual Target mode is only available in Standard Resolution.".asLeft
 
 
   extension (g: GhostStaticConfig.type)

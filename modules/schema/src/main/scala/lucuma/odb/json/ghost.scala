@@ -4,6 +4,7 @@
 package lucuma.odb.json
 
 import cats.syntax.either.*
+import cats.syntax.option.*
 import eu.timepit.refined.types.numeric.PosInt
 import io.circe.Decoder
 import io.circe.Encoder
@@ -61,11 +62,11 @@ trait GhostCodec:
         for
           t <- c.downField("mappingType").as[GhostIfuMappingType]
           m <- t match
-            case GhostIfuMappingType.Nonsidereal   => Nonsidereal.asRight
-            case GhostIfuMappingType.SingleTarget  => c.as[SingleTarget]
-            case GhostIfuMappingType.TargetPlusSky => c.as[TargetPlusSky]
-            case GhostIfuMappingType.SkyPlusTarget => c.as[SkyPlusTarget]
-            case GhostIfuMappingType.DualTarget    => c.as[DualTarget]
+                 case GhostIfuMappingType.Nonsidereal   => Nonsidereal.asRight
+                 case GhostIfuMappingType.SingleTarget  => c.downField("singleTarget").as[SingleTarget]
+                 case GhostIfuMappingType.TargetPlusSky => c.downField("targetPlusSky").as[TargetPlusSky]
+                 case GhostIfuMappingType.SkyPlusTarget => c.downField("skyPlusTarget").as[SkyPlusTarget]
+                 case GhostIfuMappingType.DualTarget    => c.downField("dualTarget").as[DualTarget]
         yield m
 
     given Decoder[GhostStaticConfig] =
@@ -105,51 +106,53 @@ trait GhostCodec:
     protected def coordinatesEncoder: Encoder[Coordinates]
     protected def siderealTrackingEncoder: Encoder[SiderealTracking]
 
-    given Encoder[Nonsidereal.type] =
-      Encoder.instance: a =>
-        Json.obj(
-          "mappingType" -> a.mappingType.asJson
-        )
-
     given Encoder[SingleTarget] =
       Encoder.instance: a =>
         Json.obj(
-          "mappingType" -> a.mappingType.asJson,
-          "ifu1"        -> a.ifu1.asJson(using siderealTrackingEncoder)
+          "ifu1" -> a.ifu1.asJson(using siderealTrackingEncoder)
         )
 
     given Encoder[TargetPlusSky] =
       Encoder.instance: a =>
         Json.obj(
-          "mappingType" -> a.mappingType.asJson,
-          "ifu1"        -> a.ifu1.asJson(using siderealTrackingEncoder),
-          "ifu2"        -> a.ifu2.asJson(using coordinatesEncoder)
+          "ifu1" -> a.ifu1.asJson(using siderealTrackingEncoder),
+          "ifu2" -> a.ifu2.asJson(using coordinatesEncoder)
         )
 
     given Encoder[SkyPlusTarget] =
       Encoder.instance: a =>
         Json.obj(
-          "mappingType" -> a.mappingType.asJson,
-          "ifu1"        -> a.ifu1.asJson(using coordinatesEncoder),
-          "ifu2"        -> a.ifu2.asJson(using siderealTrackingEncoder)
+          "ifu1" -> a.ifu1.asJson(using coordinatesEncoder),
+          "ifu2" -> a.ifu2.asJson(using siderealTrackingEncoder)
         )
 
     given Encoder[DualTarget] =
       Encoder.instance: a =>
         Json.obj(
-          "mappingType" -> a.mappingType.asJson,
-          "ifu1"        -> a.ifu1.asJson(using siderealTrackingEncoder),
-          "ifu2"        -> a.ifu2.asJson(using siderealTrackingEncoder)
+          "ifu1" -> a.ifu1.asJson(using siderealTrackingEncoder),
+          "ifu2" -> a.ifu2.asJson(using siderealTrackingEncoder)
         )
 
     given Encoder[GhostIfuMapping] =
+      def subtypeSlice(m: GhostIfuMapping): Option[(String, Json)] =
+        m match
+          case Nonsidereal             => none
+          case m @ SingleTarget(_)     => ("singleTarget",  m.asJson).some
+          case m @ TargetPlusSky(_, _) => ("targetPlusSky", m.asJson).some
+          case m @ SkyPlusTarget(_, _) => ("skyPlusTarget", m.asJson).some
+          case m @ DualTarget(_, _)    => ("dualTarget",    m.asJson).some
+
       Encoder.instance: a =>
-        a match
-          case Nonsidereal             => Nonsidereal.asJson
-          case m @ SingleTarget(_)     => m.asJson
-          case m @ TargetPlusSky(_, _) => m.asJson
-          case m @ SkyPlusTarget(_, _) => m.asJson
-          case m @ DualTarget(_, _)    => m.asJson
+        Json.fromFields(
+          List(
+            ("mappingType",   a.mappingType.asJson).some,
+            ("singleTarget",  Json.Null).some,
+            ("targetPlusSky", Json.Null).some,
+            ("skyPlusTarget", Json.Null).some,
+            ("dualTarget",    Json.Null).some,
+            subtypeSlice(a)
+          ).flatten
+        )
 
     given (using Encoder[TimeSpan]): Encoder[GhostStaticConfig] =
       Encoder.instance: a =>
