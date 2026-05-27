@@ -273,10 +273,15 @@ object GeneratorStreaming:
       override def selectOrGenerateGnirsLongSlit(
         context: GeneratorContext
       )(using Transaction[F]): F[Either[OdbError, StreamingExecutionConfig[F, GnirsStatic, GnirsDynamic]]] =
-        // GNIRS does not yet have DB-materialized sequences (no
-        // selectGnirsSequence on SequenceService).  Until that lands, we always
-        // generate from scratch — equivalent to "select returns None, generate".
-        generateGnirsLongSlit(context)
+        import lucuma.odb.sequence.gnirs.longslit.LongSlit
+        (for
+          cfg <- extractMode(ObservingMode.GnirsLongSlitName, context)(_.asGnirsLongSlit)
+          res <- EitherT(selectOrGenerate(
+                   LongSlit.staticFrom(cfg),
+                   sequenceService.selectGnirsSequence(context.oid, _, _),
+                   generateGnirsLongSlit(context)
+                 ))
+        yield res).value
 
       override def generateGnirsLongSlit(
         context: GeneratorContext

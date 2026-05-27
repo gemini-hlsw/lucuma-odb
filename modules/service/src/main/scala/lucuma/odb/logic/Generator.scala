@@ -452,10 +452,8 @@ object Generator:
                 .flatMap(s => EitherT.liftF(sequenceService.materializeGmosSouthExecutionConfig(oid, s)))
 
             case ObservingModeType.GnirsLongSlit      =>
-              // GNIRS sequences are not persisted to the DB yet (no
-              // sequenceService.materializeGnirsExecutionConfig).  Skip
-              // materialization; sequences are regenerated on each request.
-              EitherT.pure(())
+              EitherT(streaming.generateGnirsLongSlit(ctx))
+                .flatMap(s => EitherT.liftF(sequenceService.materializeGnirsExecutionConfig(oid, s)))
 
             case ObservingModeType.Igrins2LongSlit    =>
               EitherT(streaming.generateIgrins2LongSlit(ctx))

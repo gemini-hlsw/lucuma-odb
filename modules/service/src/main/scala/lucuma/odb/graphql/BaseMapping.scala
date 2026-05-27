@@ -240,6 +240,7 @@ trait BaseMapping[F[_]]
   lazy val SlitOffsetModeType                   = schema.ref("SlitOffsetMode")
   lazy val GnirsLongSlitType                       = schema.ref("GnirsLongSlit")
   lazy val GnirsLongSlitAcquisitionType            = schema.ref("GnirsLongSlitAcquisition")
+  lazy val GnirsStaticType                         = schema.ref("GnirsStatic")
   lazy val Igrins2StaticType                       = schema.ref("Igrins2Static")
   lazy val IdempotencyKeyType                      = schema.ref("IdempotencyKey")
   lazy val IgnoreType                              = schema.ref("Ignore")

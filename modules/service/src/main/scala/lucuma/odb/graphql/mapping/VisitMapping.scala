@@ -25,6 +25,7 @@ import table.AtomRecordView
 import table.ExecutionEventTable
 import table.Flamingos2StaticTable
 import table.GmosStaticTables
+import table.GnirsStaticTable
 import table.Igrins2StaticTable
 import table.ObservationView
 import table.VisitTable
@@ -35,6 +36,7 @@ trait VisitMapping[F[_]] extends VisitTable[F]
                             with ExecutionEventTable[F]
                             with Flamingos2StaticTable[F]
                             with GmosStaticTables[F]
+                            with GnirsStaticTable[F]
                             with Igrins2StaticTable[F]
                             with ObservationView[F]
                             with Predicates[F]
@@ -59,7 +61,8 @@ trait VisitMapping[F[_]] extends VisitTable[F]
       SqlObject("flamingos2", Join(VisitTable.ObservationId, Flamingos2StaticTable.ObservationId)),
       SqlObject("gmosNorth",  Join(VisitTable.ObservationId, GmosNorthStaticTable.ObservationId)),
       SqlObject("gmosSouth",  Join(VisitTable.ObservationId, GmosSouthStaticTable.ObservationId)),
-      SqlObject("igrins2",    Join(VisitTable.ObservationId, Igrins2StaticTable.ObservationId))
+      SqlObject("igrins2",    Join(VisitTable.ObservationId, Igrins2StaticTable.ObservationId)),
+      SqlObject("gnirs",      Join(VisitTable.ObservationId, GnirsStaticTable.ObservationId))
     )
 
   lazy val VisitElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] = {

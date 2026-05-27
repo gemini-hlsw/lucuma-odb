@@ -41,6 +41,8 @@ import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosSouth
 import lucuma.core.model.sequence.gmos.StaticConfig.GmosNorth as GmosNorthStatic
 import lucuma.core.model.sequence.gmos.StaticConfig.GmosSouth as GmosSouthStatic
+import lucuma.core.model.sequence.gnirs.GnirsDynamicConfig
+import lucuma.core.model.sequence.gnirs.GnirsStaticConfig
 import lucuma.core.model.sequence.igrins2.Igrins2DynamicConfig
 import lucuma.core.model.sequence.igrins2.Igrins2StaticConfig
 import lucuma.core.util.TimeSpan
@@ -58,6 +60,7 @@ import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.Flamingos2Codecs.*
 import lucuma.odb.util.GhostCodecs.*
 import lucuma.odb.util.GmosCodecs.*
+import lucuma.odb.util.GnirsCodecs.*
 import lucuma.odb.util.Igrins2Codecs.*
 import skunk.*
 import skunk.codec.boolean.bool
@@ -241,6 +244,34 @@ trait SequenceService[F[_]]:
     staticConfig:  Igrins2StaticConfig
   )(using Transaction[F]): F[Option[Stream[F, Atom[Igrins2DynamicConfig]]]]
 
+  def replaceGnirsSequence(
+    observationId:  Observation.Id,
+    sequenceType:   SequenceType,
+    sequence:       List[ProtoAtom[ProtoStep[GnirsDynamicConfig]]],
+    namespace:      Option[UUID] = None
+  )(using Transaction[F]): F[Result[Stream[Pure, Atom[GnirsDynamicConfig]]]]
+
+  def replaceGnirsSequence(
+    checked: CheckedWithId[(SequenceType, List[ProtoAtom[ProtoStep[GnirsDynamicConfig]]]), Observation.Id]
+  )(using Transaction[F]): F[Result[Stream[Pure, Atom[GnirsDynamicConfig]]]]
+
+  def insertGnirsSequence(
+    observationId: Observation.Id,
+    sequenceType:  SequenceType,
+    sequence:      Stream[F, Atom[GnirsDynamicConfig]]
+  )(using Transaction[F], Services.ServiceAccess): F[Unit]
+
+  def materializeGnirsExecutionConfig(
+    observationId: Observation.Id,
+    stream:        StreamingExecutionConfig[F, GnirsStaticConfig, GnirsDynamicConfig]
+  )(using Transaction[F], Services.ServiceAccess): F[Unit]
+
+  def selectGnirsSequence(
+    observationId: Observation.Id,
+    sequenceType:  SequenceType,
+    staticConfig:  GnirsStaticConfig
+  )(using Transaction[F]): F[Option[Stream[F, Atom[GnirsDynamicConfig]]]]
+
 object SequenceService:
 
   def instantiate[F[_]: Concurrent: UUIDGen](
@@ -346,6 +377,19 @@ object SequenceService:
           sequenceType,
           sequence,
           Igrins2SequenceService.Statements.InsertDynamic
+        )
+
+      override def insertGnirsSequence(
+        observationId:  Observation.Id,
+        sequenceType:   SequenceType,
+        sequence:       Stream[F, Atom[GnirsDynamicConfig]]
+      )(using Transaction[F], Services.ServiceAccess): F[Unit] =
+        insertSequence(
+          Instrument.Gnirs,
+          observationId,
+          sequenceType,
+          sequence,
+          GnirsSequenceService.Statements.InsertDynamic
         )
 
       private def insertSequence[D](
@@ -661,6 +705,36 @@ object SequenceService:
           )
         }
 
+      override def replaceGnirsSequence(
+        observationId: Observation.Id,
+        sequenceType:  SequenceType,
+        sequence:      List[ProtoAtom[ProtoStep[GnirsDynamicConfig]]],
+        namespace:     Option[UUID] = None
+      )(using Transaction[F]): F[Result[Stream[Pure, Atom[GnirsDynamicConfig]]]] =
+        (for
+          s <- selectStatic(observationId, "GNIRS", gnirsSequenceService.selectStaticOrDefault)
+          b <- ResultT.liftF(atomBuilder(sequenceType, s, namespace, estimator.gnirsStep))
+          r <- replaceSequence(
+                 Instrument.Gnirs,
+                 observationId,
+                 sequenceType,
+                 sequence,
+                 GnirsSequenceService.Statements.InsertDynamic,
+                 b
+               )
+        yield r).value
+
+      override def replaceGnirsSequence(
+        checked: CheckedWithId[(SequenceType, List[ProtoAtom[ProtoStep[GnirsDynamicConfig]]]), Observation.Id]
+      )(using Transaction[F]): F[Result[Stream[Pure, Atom[GnirsDynamicConfig]]]] =
+        checked.foldWithId(OdbError.InvalidArgument().asFailureF[F, Stream[Pure, Atom[GnirsDynamicConfig]]]) { case ((sequenceType, sequence), oid) =>
+          replaceGnirsSequence(
+            oid,
+            sequenceType,
+            sequence
+          )
+        }
+
       private def resetAcquisition[D](
         observationId: Observation.Id,
         stream:        Stream[F, Atom[D]]
@@ -743,6 +817,12 @@ object SequenceService:
         stream:        StreamingExecutionConfig[F, Igrins2StaticConfig, Igrins2DynamicConfig]
       )(using Transaction[F], Services.ServiceAccess): F[Unit] =
         materializeExecutionConfig(observationId, stream, igrins2SequenceService.insertStatic)(insertIgrins2Sequence)
+
+      override def materializeGnirsExecutionConfig(
+        observationId: Observation.Id,
+        stream:        StreamingExecutionConfig[F, GnirsStaticConfig, GnirsDynamicConfig]
+      )(using Transaction[F], Services.ServiceAccess): F[Unit] =
+        materializeExecutionConfig(observationId, stream, gnirsSequenceService.insertStatic)(insertGnirsSequence)
 
       private def selectSequence[S, D](
         instrument:    Instrument,
@@ -828,6 +908,20 @@ object SequenceService:
           Statements.SelectIgrins2Sequence,
           staticConfig,
           estimator.igrins2Step
+        )
+
+      override def selectGnirsSequence(
+        observationId: Observation.Id,
+        sequenceType:  SequenceType,
+        staticConfig:  GnirsStaticConfig
+      )(using Transaction[F]): F[Option[Stream[F, Atom[GnirsDynamicConfig]]]] =
+        selectSequence(
+          Instrument.Gnirs,
+          observationId,
+          sequenceType,
+          Statements.SelectGnirsSequence,
+          staticConfig,
+          estimator.gnirsStep
         )
 
   object Statements:
@@ -1121,6 +1215,13 @@ object SequenceService:
         "t_igrins_2_dynamic",
         Igrins2SequenceService.Statements.Igrins2DynamicColumns,
         igrins_2_dynamic
+      )
+
+    val SelectGnirsSequence: Query[(Instrument, Observation.Id, SequenceType), (Atom.Id, Option[String], Step.Id, ProtoStep[GnirsDynamicConfig])] =
+      selectSequence(
+        "t_gnirs_dynamic",
+        GnirsSequenceService.Statements.GnirsDynamicColumns,
+        gnirs_dynamic
       )
 
     val IsMaterialized: Query[(Observation.Id, SequenceType), Boolean] =

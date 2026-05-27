@@ -9,6 +9,7 @@ import grackle.syntax.*
 import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosSouth
+import lucuma.core.model.sequence.gnirs.GnirsDynamicConfig
 import lucuma.core.model.sequence.igrins2.Igrins2DynamicConfig
 import lucuma.odb.graphql.binding.*
 import lucuma.odb.sequence.data.ProtoAtom
@@ -40,3 +41,6 @@ object AtomInput:
 
   val Igrins2Binding: Matcher[ProtoAtom[ProtoStep[Igrins2DynamicConfig]]] =
     binding(StepInput.Igrins2Binding)
+
+  val GnirsBinding: Matcher[ProtoAtom[ProtoStep[GnirsDynamicConfig]]] =
+    binding(StepInput.GnirsBinding)

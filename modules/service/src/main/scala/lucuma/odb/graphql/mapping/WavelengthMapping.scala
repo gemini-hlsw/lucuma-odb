@@ -12,6 +12,7 @@ import lucuma.odb.graphql.table.ExposureTimeModeView
 import lucuma.odb.graphql.table.Flamingos2DynamicView
 import lucuma.odb.graphql.table.GmosDynamicTables
 import lucuma.odb.graphql.table.GmosLongSlitView
+import lucuma.odb.graphql.table.GnirsDynamicView
 import lucuma.odb.graphql.table.GnirsLongSlitView
 import lucuma.odb.graphql.table.ObservationView
 import lucuma.odb.graphql.table.SpectroscopyConfigOptionTable
@@ -23,6 +24,7 @@ trait WavelengthMapping[F[_]]
      with ExposureTimeModeView[F]
      with Flamingos2DynamicView[F]
      with GmosDynamicTables[F]
+     with GnirsDynamicView[F]
      with GnirsLongSlitView[F]
      with ObservationView[F]
      with SpectroscopyConfigOptionTable[F]
@@ -69,6 +71,8 @@ trait WavelengthMapping[F[_]]
       wavelengthMappingAtPath(SpectroscopyScienceRequirementsType / "wavelength", Spectroscopy.Wavelength.Value, Spectroscopy.Wavelength.SyntheticId),
       wavelengthMappingAtPath(SpectroscopyScienceRequirementsType / "wavelengthCoverage", Spectroscopy.WavelengthCoverage.Value, Spectroscopy.WavelengthCoverage.SyntheticId),
       wavelengthMappingAtPath(StepRecordType / "flamingos2" / "centralWavelength", Flamingos2DynamicView.CentralWavelength, Flamingos2DynamicView.Id),
+      wavelengthMappingAtPath(StepRecordType / "gnirs" / "centralWavelength", GnirsDynamicView.CentralWavelength, GnirsDynamicView.Id),
+      wavelengthMappingAtPath(StepRecordType / "gnirs" / "acquisitionMirrorOut" / "wavelength", GnirsDynamicView.AcquisitionMirrorOut.Wavelength, GnirsDynamicView.AcquisitionMirrorOut.SyntheticId),
       wavelengthMappingAtPath(StepRecordType / "gmosNorth" / "centralWavelength", GmosNorthDynamicTable.CentralWavelength.Value, GmosNorthDynamicTable.CentralWavelength.SyntheticId),
       wavelengthMappingAtPath(StepRecordType / "gmosSouth" / "centralWavelength", GmosSouthDynamicTable.CentralWavelength.Value, GmosSouthDynamicTable.CentralWavelength.SyntheticId),
       wavelengthMappingAtPath(StepRecordType / "gmosNorth" / "gratingConfig" / "wavelength", GmosNorthDynamicTable.Grating.Wavelength, GmosNorthDynamicTable.Id),

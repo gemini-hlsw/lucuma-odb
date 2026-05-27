@@ -104,6 +104,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
       ReplaceGmosNorthSequence,
       ReplaceGmosSouthSequence,
       ReplaceIgrins2Sequence,
+      ReplaceGnirsSequence,
       ResetAcquisition,
       RevokeUserInvitation,
       SetAllocations,
@@ -515,6 +516,18 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
             services.useTransactionally:
               sequenceService
                 .replaceIgrins2Sequence(checked)
+                .nestMap: s =>
+                  Json.obj("sequence" -> s.compile.toList.asJson)
+
+  private lazy val ReplaceGnirsSequence =
+    MutationField.json("replaceGnirsSequence", ReplaceSequenceInput.ReplaceGnirsBinding): input =>
+      services
+        .useNonTransactionally(selectForUpdate(input))
+        .flatMap: res =>
+          res.flatTraverse: checked =>
+            services.useTransactionally:
+              sequenceService
+                .replaceGnirsSequence(checked)
                 .nestMap: s =>
                   Json.obj("sequence" -> s.compile.toList.asJson)
 
