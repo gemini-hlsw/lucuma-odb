@@ -10,7 +10,10 @@
 import * as core from '@actions/core';
 import * as github from '@actions/github';
 import { diff } from '@graphql-inspector/action/action/helpers/diff';
-import { CheckConclusion } from '@graphql-inspector/action/action/helpers/types';
+import {
+  AnnotationLevel,
+  CheckConclusion,
+} from '@graphql-inspector/action/action/helpers/types';
 import { createSummary } from '@graphql-inspector/action/action/helpers/utils';
 import {
   getAssociatedPullRequest,
@@ -26,8 +29,7 @@ import { parseGraphQLSDL } from '@graphql-tools/utils';
 import fs from 'fs';
 import { readFile } from 'fs/promises';
 import { glob } from 'glob';
-import { printSchema, Source } from 'graphql';
-
+import { Source } from 'graphql';
 const APPROVE_LABEL = 'expected-breaking-change';
 
 const schemaPath = process.argv[2];
@@ -43,12 +45,17 @@ if (!fs.existsSync(schemaPath)) {
 // Map of resource path to content, used for handling #import statements in .graphql files
 const resourceLocations = await glob('**/src/main/resources/**/*.graphql');
 const resourceMapping = Object.fromEntries(
-  await Promise.all(
-    resourceLocations.map(async (l) => [
-      l.split('src/main/resources/')[1],
-      await readFile(l, 'utf-8'),
-    ]),
-  ),
+  (
+    await Promise.all(
+      resourceLocations.map(async (l) => {
+        const content = await readFile(l, 'utf-8');
+        return [
+          [l.split('src/main/resources/')[1], content],
+          [l, content],
+        ];
+      }),
+    )
+  ).flat(),
 );
 
 const gitResourceMapping = Object.fromEntries(
@@ -116,13 +123,10 @@ class LucumaResourceGitLoader extends GitLoader {
     // @ts-ignore
     const su = await super.handleSingularPointerAsync(pointer, options);
     if (su) {
-      return su.map(({ location }) => {
-        const r = processImport(location, options.cwd, gitResourceMapping);
-        return {
-          location,
-          document: r,
-        };
-      });
+      return su.map(({ location }) => ({
+        location,
+        document: processImport(location, options.cwd, gitResourceMapping),
+      }));
     }
     return su;
   }
@@ -132,10 +136,8 @@ const schemaLoaderOptions = {
   loaders: [new LucumaResourceLoader(), new LucumaResourceGitLoader()],
 };
 const newSchema = await loadSchema(schemaPath, schemaLoaderOptions);
-const oldSchema = await loadSchema(
-  `git:origin/main:${schemaPath}`,
-  schemaLoaderOptions,
-);
+const oldSchemaPath = `git:origin/main:${schemaPath}`;
+const oldSchema = await loadSchema(oldSchemaPath, schemaLoaderOptions);
 
 const action = await diff({
   path: schemaPath,
@@ -144,8 +146,8 @@ const action = await diff({
     new: newSchema,
   },
   sources: {
-    old: new Source(printSchema(oldSchema), `main:${schemaPath}`),
-    new: new Source(printSchema(newSchema), schemaPath),
+    old: new Source(gitResourceMapping[oldSchemaPath], `main:${schemaPath}`),
+    new: new Source(resourceMapping[schemaPath], schemaPath),
   },
 });
 
@@ -174,7 +176,10 @@ async function reportToGithub() {
 
   let conclusion = action.conclusion;
   const changes = action.changes ?? [];
-  const annotations = action.annotations || [];
+  const annotations =
+    action.annotations?.filter(
+      (c) => c.annotation_level !== AnnotationLevel.Notice,
+    ) ?? [];
 
   const hasApprovedBreakingChangeLabel = pullRequest?.labels?.some(
     (label) => label.name === APPROVE_LABEL,
@@ -251,7 +256,13 @@ if (process.env.GITHUB_ACTIONS) {
 } else if (action.conclusion === CheckConclusion.Failure) {
   console.error(
     'Schema validation failed:\n' +
-      action.changes?.map((c) => `${c.path}: ${c.message}`).join('\n'),
+      action.annotations
+        ?.filter((c) => c.annotation_level !== AnnotationLevel.Notice)
+        .map(
+          (c) =>
+            `${c.path}:${c.start_line}${c.start_column ? ':' + c.start_column : ''}: ${c.message}`,
+        )
+        .join('\n'),
   );
   process.exit(1);
 }
