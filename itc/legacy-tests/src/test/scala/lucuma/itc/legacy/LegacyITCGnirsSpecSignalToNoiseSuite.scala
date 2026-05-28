@@ -55,6 +55,16 @@ class LegacyITCGnirsSpecSignalToNoiseSuite extends CommonITCLegacySuite:
 
   override def instrument = ItcInstrumentDetails(gnirs)
 
+  // Strict regression test for the GNIRS S/N wavelength-unit bug. The OCS GnirsRecipe
+  // multiplies SpectroscopyIntegrationTime.wavelengthAt by 1000 (it expects microns),
+  // but the JSON path sends nm. Before the OCS-side fix (adding paramsInMicrons for
+  // GnirsParameters in ItcServiceImpl) this call returned "Wavelength = ... nm is out
+  // of range". Unlike the per-parameter tests below this asserts containsValidResults
+  // directly — no allowedErrors fallback (which would silently absorb the bug).
+  test("gnirs signal-to-noise base config yields valid results".tag(LegacyITCTest)):
+    val result = localItc.calculate(baseParams.asJson.noSpaces)
+    assertIOBoolean(result.map(_.fold(_ => false, containsValidResults)))
+
   test("gnirs grating".tag(LegacyITCTest)):
     Enumerated[GnirsGrating].all.foreach: g =>
       val result = localItc.calculate:

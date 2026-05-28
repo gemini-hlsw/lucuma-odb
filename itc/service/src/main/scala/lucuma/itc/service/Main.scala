@@ -82,6 +82,7 @@ object Main extends IOApp with ItcCacheOrRemote {
             | / / /_/ / /__/ /_/ / / / / / / /_/ /_____/ / /_/ /__
             |/_/\\__,_/\\___/\\__,_/_/ /_/ /_/\\__,_/     /_/\\__/\\___/
             |
+            | environment          : ${cfg.environment}
             | redis                : $redis
             | port                 : ${cfg.port}
             | data checksum        : ${BuildInfo.ocslibHash}
