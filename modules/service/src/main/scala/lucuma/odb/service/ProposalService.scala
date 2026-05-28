@@ -240,10 +240,8 @@ object ProposalService {
                  (s === ScienceSubtype.Queue))
               )
             },
-            missingConsiderForBand3(pid).asFailure.whenA(
-              (scienceSubtype.contains(ScienceSubtype.Queue) || scienceSubtype.contains(ScienceSubtype.Classical))
-              && considerForBand3.contains(ConsiderForBand3.Unset)
-            ),
+            missingConsiderForBand3(pid).asFailure
+              .whenA(scienceSubtype.contains(ScienceSubtype.Queue) && considerForBand3.contains(ConsiderForBand3.Unset)),
             missingPartners(pid, unmatchedPartners).asFailure.unlessA(unmatchedPartners.isEmpty),
             validatePiEmailAddress(pid)
           ).tupled.unlessA(newStatus === ProposalStatus.NotSubmitted)

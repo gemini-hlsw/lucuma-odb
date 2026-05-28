@@ -148,9 +148,8 @@ object ProposalTypeInput {
           PartnerSplitsInput.Option("partnerSplits", rSplits),
           BooleanBinding.Option("aeonMultiFacility", rAeon),
           BooleanBinding.Option("jwstSynergy", rJwst),
-          BooleanBinding.Option("usLongTerm", rUsLong),
-          ConsiderForBand3Binding.Option("considerForBand3", rBand3)
-        ) => (rMin, rSplits, rAeon, rJwst, rUsLong, rBand3).parMapN { (min, splits, aeon, jwst, usLong, band3) =>
+          BooleanBinding.Option("usLongTerm", rUsLong)
+        ) => (rMin, rSplits, rAeon, rJwst, rUsLong).parMapN { (min, splits, aeon, jwst, usLong) =>
           Create(ScienceSubtype.Classical).update(
             for {
               _ <- minPercentTime     := min
@@ -158,7 +157,6 @@ object ProposalTypeInput {
               _ <- aeonMultiFacility  := aeon
               _ <- jwstSynergy        := jwst
               _ <- usLongTerm         := usLong
-              _ <- considerForBand3   := band3
             } yield ()
           )
         }
@@ -311,10 +309,9 @@ object ProposalTypeInput {
           PartnerSplitsInput.Nullable("partnerSplits", rSplits),
           BooleanBinding.Option("aeonMultiFacility", rAeon),
           BooleanBinding.Option("jwstSynergy", rJwst),
-          BooleanBinding.Option("usLongTerm", rUsLong),
-          ConsiderForBand3Binding.Option("considerForBand3", rBand3)
-        ) => (rMin, rSplits, rAeon, rJwst, rUsLong, rBand3).parMapN { (min, splits, aeon, jwst, usLong, band3) =>
-          Edit(ScienceSubtype.Classical, minPercentTime = min, partnerSplits = splits, aeonMultiFacility = aeon, jwstSynergy = jwst, usLongTerm = usLong, considerForBand3 = band3)
+          BooleanBinding.Option("usLongTerm", rUsLong)
+        ) => (rMin, rSplits, rAeon, rJwst, rUsLong).parMapN { (min, splits, aeon, jwst, usLong) =>
+          Edit(ScienceSubtype.Classical, minPercentTime = min, partnerSplits = splits, aeonMultiFacility = aeon, jwstSynergy = jwst, usLongTerm = usLong)
         }
       }
 

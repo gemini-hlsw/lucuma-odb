@@ -961,12 +961,12 @@ class setProposalStatus extends OdbSuite
             )
     yield ()
 
-  test("⨯ classical submission requires band 3 flag"):
+  test("✓ classical submission does not take a band 3 flag"):
     for
       cid <- createCallForProposalsAs(staff, CallForProposalsType.RegularSemester)
       pid <- createProgramWithNonPartnerPi(pi)
       _   <- addProposal(pi, pid, cid.some, "classical: { minPercentTime: 0 }".some)
-      _   <- addPartnerSplits(pi, pid)
+      _   <- addPartnerSplits(pi, pid, "classical")
       _   <- addCoisAs(pi, pid)
       _   <- expect(
               user = pi,
@@ -978,13 +978,19 @@ class setProposalStatus extends OdbSuite
                       status: SUBMITTED
                     }
                   ) {
-                    program { proposal { reference { label } } }
+                    program { proposalStatus }
                   }
                 }
               """,
-              expected = List(
-                s"Proposal $pid must specify whether it should be considered for Band 3 before it can be submitted."
-              ).asLeft
+              expected = json"""
+                {
+                  "setProposalStatus": {
+                    "program": {
+                      "proposalStatus": "SUBMITTED"
+                    }
+                  }
+                }
+              """.asRight
             )
     yield ()
 
