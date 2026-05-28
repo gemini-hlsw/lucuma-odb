@@ -76,8 +76,6 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                         gratingWavelength { nanometers }
                         defaultGratingWavelength { nanometers }
                         explicitGratingWavelength { nanometers }
-                        readMode
-                        defaultReadMode
                         explicitReadMode
                         wellDepth
                         defaultWellDepth
@@ -132,8 +130,6 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                       "gratingWavelength": { "nanometers": 2200.000 },
                       "defaultGratingWavelength": { "nanometers": 2200.000 },
                       "explicitGratingWavelength": null,
-                      "readMode": "AUTOMATIC",
-                      "defaultReadMode": "AUTOMATIC",
                       "explicitReadMode": null,
                       "wellDepth": "SHALLOW",
                       "defaultWellDepth": "SHALLOW",
@@ -237,8 +233,6 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                         gratingWavelength { nanometers }
                         defaultGratingWavelength { nanometers }
                         explicitGratingWavelength { nanometers }
-                        readMode
-                        defaultReadMode
                         explicitReadMode
                         wellDepth
                         defaultWellDepth
@@ -268,8 +262,6 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                       "gratingWavelength": { "nanometers": 2100.000 },
                       "defaultGratingWavelength": { "nanometers": 2200.000 },
                       "explicitGratingWavelength": { "nanometers": 2100.000 },
-                      "readMode": "BRIGHT",
-                      "defaultReadMode": "AUTOMATIC",
                       "explicitReadMode": "BRIGHT",
                       "wellDepth": "SHALLOW",
                       "defaultWellDepth": "DEEP",

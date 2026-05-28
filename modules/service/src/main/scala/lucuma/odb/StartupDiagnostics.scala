@@ -70,7 +70,6 @@ object StartupDiagnostics:
           checkPostgresEnum(gcal_lamp_type),
           checkPostgresEnum(gnirs_acquisition_type),
           checkPostgresEnum(gnirs_decker),
-          checkPostgresEnum(gnirs_obs_read_mode),
           checkPostgresEnum(gnirs_well_depth),
           {
             // We'll skip this one.  There is a postgres enum, but it is tied

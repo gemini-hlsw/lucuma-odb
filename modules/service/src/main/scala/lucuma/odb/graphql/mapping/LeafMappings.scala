@@ -160,7 +160,6 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[GnirsFpuOther](GnirsFpuOtherType),
       LeafMapping[GnirsPrism](GnirsPrismType),
       LeafMapping[GnirsCamera](GnirsCameraType),
-      LeafMapping[GnirsObsReadMode](GnirsObsReadModeType),
       LeafMapping[GnirsReadMode](GnirsReadModeType),
       LeafMapping[GnirsWellDepth](GnirsWellDepthType),
       LeafMapping[Group.Id](GroupIdType),

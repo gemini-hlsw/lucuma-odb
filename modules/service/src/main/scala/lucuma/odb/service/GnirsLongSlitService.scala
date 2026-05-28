@@ -16,8 +16,8 @@ import lucuma.core.enums.GnirsDecker
 import lucuma.core.enums.GnirsFilter
 import lucuma.core.enums.GnirsFpuSlit
 import lucuma.core.enums.GnirsGrating
-import lucuma.core.enums.GnirsObsReadMode
 import lucuma.core.enums.GnirsPrism
+import lucuma.core.enums.GnirsReadMode
 import lucuma.core.enums.GnirsWellDepth
 import lucuma.core.enums.SlitOffsetMode
 import lucuma.core.math.Angle
@@ -85,9 +85,8 @@ object GnirsLongSlitService:
         // Decker default + explicit
         gnirs_decker                     *: // c_decker_default
         gnirs_decker.opt                 *: // c_decker (explicit)
-        // Read mode default + explicit
-        gnirs_obs_read_mode              *: // c_read_mode_default
-        gnirs_obs_read_mode.opt          *: // c_read_mode (explicit)
+        // Read mode explicit override (None => compute from exposure time)
+        gnirs_read_mode.opt              *: // c_read_mode (explicit)
         // Well depth default + explicit
         gnirs_well_depth                 *: // c_well_depth_default
         gnirs_well_depth.opt             *: // c_well_depth (explicit)
@@ -109,7 +108,7 @@ object GnirsLongSlitService:
         case (sciEtm *: gratingEff *: prismEff *: gratingWavEff *:
               camera *: fpu *: filter *: coadds *:
               deckerDef *: deckerExp *:
-              readModeDef *: readModeExp *:
+              readModeExp *:
               wellDepthDef *: wellDepthExp *:
               focusMotorSteps *:
               slitOffsetModeExp *: tcExp *: slitOffsetModeDef *: tcDef *:
@@ -145,7 +144,7 @@ object GnirsLongSlitService:
                           gratingWavEff,
                           camera,
                           focus,
-                          readModeExp.getOrElse(readModeDef),
+                          readModeExp,
                           wellDepthExp.getOrElse(wellDepthDef),
                           sciEtm,
                           coaddsP,
@@ -234,7 +233,6 @@ object GnirsLongSlitService:
           ls.c_coadds,
           ls.c_decker_default,
           ls.c_decker,
-          ls.c_read_mode_default,
           ls.c_read_mode,
           ls.c_well_depth_default,
           ls.c_well_depth,
@@ -288,7 +286,7 @@ object GnirsLongSlitService:
       Option[GnirsGrating],   // explicit grating
       Option[GnirsPrism],     // explicit prism
       Option[Int],            // focus_motor_steps
-      Option[GnirsObsReadMode],
+      Option[GnirsReadMode],
       Option[GnirsWellDepth],
       // telescope configs (nullable = use default)
       Option[SlitOffsetMode],
@@ -345,7 +343,7 @@ object GnirsLongSlitService:
           ${gnirs_grating.opt},
           ${gnirs_prism.opt},
           ${int4.opt},
-          ${gnirs_obs_read_mode.opt},
+          ${gnirs_read_mode.opt},
           ${gnirs_well_depth.opt},
           ${slit_offset_mode.opt},
           ${text.opt},
@@ -412,7 +410,7 @@ object GnirsLongSlitService:
       val upDecker       = sql"c_decker             = ${gnirs_decker.opt}"
       val upGratingWav   = sql"c_grating_wavelength = ${wavelength_pm.opt}"
       val upFocus        = sql"c_focus_motor_steps  = ${int4.opt}"
-      val upReadMode     = sql"c_read_mode          = ${gnirs_obs_read_mode.opt}"
+      val upReadMode     = sql"c_read_mode          = ${gnirs_read_mode.opt}"
       val upWellDepth    = sql"c_well_depth         = ${gnirs_well_depth.opt}"
       val upGrating      = sql"c_grating            = ${gnirs_grating.opt}"
       val upPrism        = sql"c_prism              = ${gnirs_prism.opt}"

@@ -13,8 +13,8 @@ import lucuma.core.enums.GnirsDecker
 import lucuma.core.enums.GnirsFilter
 import lucuma.core.enums.GnirsFpuSlit
 import lucuma.core.enums.GnirsGrating
-import lucuma.core.enums.GnirsObsReadMode
 import lucuma.core.enums.GnirsPrism
+import lucuma.core.enums.GnirsReadMode
 import lucuma.core.enums.GnirsWellDepth
 import lucuma.core.math.Offset
 import lucuma.core.math.Wavelength
@@ -61,7 +61,7 @@ case class Config(
   gratingWavelength:       Wavelength,
   camera:                  GnirsCamera,
   focus:                   GnirsFocus,
-  readMode:                GnirsObsReadMode,
+  explicitReadMode:        Option[GnirsReadMode],
   wellDepth:               GnirsWellDepth,
   exposureTimeMode:        ExposureTimeMode,
   coadds:                  PosInt,
@@ -85,7 +85,7 @@ case class Config(
       case GnirsFocus.Custom(qty)   =>
         out.writeByte(1)
         out.writeInt(qty.value.value.value)
-    out.writeChars(readMode.tag)
+    out.writeChars(explicitReadMode.fold("")(_.tag))
     out.writeChars(wellDepth.tag)
     out.write(exposureTimeMode.hashBytes)
     out.write(coadds.value.hashBytes)

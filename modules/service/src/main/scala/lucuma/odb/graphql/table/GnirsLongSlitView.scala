@@ -41,7 +41,7 @@ trait GnirsLongSlitView[F[_]] extends BaseMapping[F]:
     // Explicit overrides (nullable)
     val ExplicitDecker: ColumnRef   = col("c_decker", gnirs_decker.opt)
     val FocusMotorSteps: ColumnRef  = col("c_focus_motor_steps", int4.opt)
-    val ExplicitReadMode: ColumnRef = col("c_read_mode", gnirs_obs_read_mode.opt)
+    val ExplicitReadMode: ColumnRef = col("c_read_mode", gnirs_read_mode.opt)
     val ExplicitWellDepth: ColumnRef = col("c_well_depth", gnirs_well_depth.opt)
 
     // Slit telescope configs: explicit overrides (both nullable)
@@ -65,7 +65,6 @@ trait GnirsLongSlitView[F[_]] extends BaseMapping[F]:
     val DefaultDecker: ColumnRef    = col("c_decker_default", gnirs_decker)
     val DefaultGratingWavelength: ColumnRef    = col("c_grating_wavelength_default", wavelength_pm)
     val GratingWavelengthEffective: ColumnRef  = col("c_grating_wavelength_effective", wavelength_pm)
-    val DefaultReadMode: ColumnRef  = col("c_read_mode_default", gnirs_obs_read_mode)
     val DefaultWellDepth: ColumnRef = col("c_well_depth_default", gnirs_well_depth)
 
     // Effective grating/prism: COALESCE(explicit, initial)

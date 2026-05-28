@@ -24,6 +24,7 @@ import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.DeclaredExecutionState
 import lucuma.core.enums.ExecutionState
 import lucuma.core.enums.Flamingos2ReadMode
+import lucuma.core.enums.GnirsReadMode
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.ScienceBand
 import lucuma.core.math.RadialVelocity
@@ -426,7 +427,7 @@ object GeneratorParamsService {
                   prism             = gn.prism,
                   grating           = gn.grating,
                   camera            = gn.camera,
-                  readMode          = gn.readMode.resolveForStepExposureTime(etm.time),
+                  readMode          = gn.explicitReadMode.getOrElse(GnirsReadMode.forExposureTime(etm.time)),
                   wellDepth         = gn.wellDepth
                 )
                 val consInput = obsParams.constraints.toInput
