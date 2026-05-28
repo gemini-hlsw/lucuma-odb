@@ -22,7 +22,8 @@ case class ProgramUserPropertiesInput(
   thesis:            Nullable[Boolean],
   gender:            Nullable[Gender],
   affiliation:       Nullable[NonEmptyString],
-  hasDataAccess:     Option[Boolean]
+  hasDataAccess:     Option[Boolean],
+  classicalObserver: Option[Boolean]
 )
 
 object ProgramUserPropertiesInput:
@@ -35,6 +36,7 @@ object ProgramUserPropertiesInput:
       Nullable.Absent,
       Nullable.Absent,
       Nullable.Absent,
+      none,
       none
     )
 
@@ -50,5 +52,6 @@ object ProgramUserPropertiesInput:
         BooleanBinding.Nullable("thesis", rThesis),
         GenderBinding.Nullable("gender", rGender),
         NonEmptyStringBinding.Nullable("affiliation", rAffiliation),
-        BooleanBinding.Option("hasDataAccess", rDataAccess)
-      ) => (rPartnerLink, rPreferredProfile, rEducationalStatus, rThesis, rGender, rAffiliation, rDataAccess).parMapN(ProgramUserPropertiesInput.apply)
+        BooleanBinding.Option("hasDataAccess", rDataAccess),
+        BooleanBinding.Option("classicalObserver", rClassicalObserver)
+      ) => (rPartnerLink, rPreferredProfile, rEducationalStatus, rThesis, rGender, rAffiliation, rDataAccess, rClassicalObserver).parMapN(ProgramUserPropertiesInput.apply)

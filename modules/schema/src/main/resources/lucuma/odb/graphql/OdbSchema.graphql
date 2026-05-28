@@ -4014,7 +4014,7 @@ input ProgramUserPropertiesInput {
   hasDataAccess: Boolean
 
   """
-  Whether this investigator will visit Gemini to carry out the observations.
+  Whether this investigator will visit to carry out the observations.
   This property is only meaningful for classical proposals.
   """
   classicalObserver: Boolean
@@ -4085,7 +4085,7 @@ type ProgramUser {
   hasDataAccess: Boolean!
 
   """
-  Whether this investigator will visit Gemini to carry out the observations.
+  Whether this investigator will visit to carry out the observations.
   This property is only meaningful for classical proposals.
   """
   classicalObserver: Boolean!
