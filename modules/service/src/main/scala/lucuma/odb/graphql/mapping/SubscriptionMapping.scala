@@ -320,7 +320,7 @@ trait SubscriptionMapping[F[_]] extends Predicates[F] {
 
           Result(
             Environment(
-              Env("editType" -> e.editType, "programId" -> e.programId),
+              Env("editType" -> e.editType, "programId" -> e.programId, "groupId" -> e.groupId),
               Unique(
                 Filter(
                   Predicates.groupEdit.program.id.eql(e.programId),

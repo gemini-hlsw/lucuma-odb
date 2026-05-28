@@ -5,6 +5,7 @@ package lucuma.odb.graphql
 package mapping
 
 
+import lucuma.core.model.Group
 import lucuma.odb.data.EditType
 import lucuma.odb.graphql.table.GroupView
 import lucuma.odb.graphql.table.ProgramTable
@@ -17,6 +18,7 @@ trait GroupEditMapping[F[_]] extends GroupView[F] with ProgramTable[F] {
     ObjectMapping(GroupEditType)(
       SqlField("synthetic-id", ProgramTable.Id, key = true, hidden = true),
       CursorField("editType", _.envR[EditType]("editType"), List("synthetic-id")),
+      CursorField("groupId", _.envR[Option[Group.Id]]("groupId"), List("synthetic-id")),
       SqlObject("program"),
       SqlObject("value", Join(ProgramTable.Id, GroupView.ProgramId))
     )
