@@ -445,6 +445,45 @@ class recordVisit extends OdbSuite with query.GenerationTestSupport with Executi
       """.asRight
     )
 
+  test("recordVisit - GNIRS"):
+
+    recordVisitTest(
+      ObservingModeType.GnirsLongSlit,
+      service,
+      oid => s"""
+        mutation {
+          recordVisit(input: {
+            observationId: "$oid",
+          }) {
+            visit {
+              gnirs {
+                wellDepth
+              }
+              igrins2 {
+                saveSVCImages
+              }
+              gmosNorth {
+                stageMode
+              }
+            }
+          }
+        }
+      """,
+      json"""
+      {
+        "recordVisit": {
+          "visit": {
+            "gnirs": {
+              "wellDepth": "SHALLOW"
+            },
+            "igrins2": null,
+            "gmosNorth": null
+          }
+        }
+      }
+      """.asRight
+    )
+
   test("recordVisit - abandon steps"):
     assertIOBoolean:
       for
