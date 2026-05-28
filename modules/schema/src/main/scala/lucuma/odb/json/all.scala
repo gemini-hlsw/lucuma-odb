@@ -12,6 +12,7 @@ object all:
        with Flamingos2Codec
        with GhostCodec
        with GmosCodec
+       with GnirsCodec
        with Igrins2Codec
        with ItcCodec
        with NumericCodec

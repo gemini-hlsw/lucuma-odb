@@ -11,6 +11,7 @@ import lucuma.core.model.ObservationReference
 import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosSouth
+import lucuma.core.model.sequence.gnirs.GnirsDynamicConfig
 import lucuma.core.model.sequence.igrins2.Igrins2DynamicConfig
 import lucuma.odb.graphql.binding.*
 import lucuma.odb.sequence.data.ProtoAtom
@@ -49,3 +50,6 @@ object ReplaceSequenceInput:
 
   val ReplaceIgrins2Binding: Matcher[ReplaceSequenceInput[Igrins2DynamicConfig]] =
     binding(AtomInput.Igrins2Binding)
+
+  val ReplaceGnirsBinding: Matcher[ReplaceSequenceInput[GnirsDynamicConfig]] =
+    binding(AtomInput.GnirsBinding)

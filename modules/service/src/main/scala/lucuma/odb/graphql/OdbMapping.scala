@@ -187,6 +187,9 @@ object OdbMapping {
           with Igrins2DynamicMapping[F]
           with Igrins2LongSlitMapping[F]
           with GnirsLongSlitMapping[F]
+          with GnirsDynamicMapping[F]
+          with GnirsAcquisitionMirrorOutMapping[F]
+          with GnirsStaticMapping[F]
           with Igrins2StaticMapping[F]
           with GhostDynamicMapping[F]
           with GhostIfuMapping[F]
@@ -443,6 +446,8 @@ object OdbMapping {
                 Igrins2StaticMapping,
                 GnirsLongSlitAcquisitionMapping,
                 GnirsLongSlitMapping,
+                GnirsDynamicMapping,
+                GnirsStaticMapping,
                 ImagingConfigOptionMapping,
                 ImagingConfigOptionGmosNorthMapping,
                 ImagingConfigOptionGmosSouthMapping,
@@ -582,6 +587,7 @@ object OdbMapping {
                 ExposureTimeModeMappings,
                 Flamingos2CustomMaskMappings,
                 Flamingos2FpuMaskMappings,
+                GnirsAcquisitionMirrorOutMappings,
                 GhostDynamicMappings,
                 GhostIfuMappings,
                 GmosCcdModeMappings,

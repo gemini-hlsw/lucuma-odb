@@ -76,6 +76,36 @@ class executionSciGnirsLongSlit extends ExecutionTestSupportForGnirs:
           ).asRight
       )
 
+  test("[gnirs] materialized sequence round-trips through t_gnirs_dynamic"):
+    // Recording a visit materializes the science sequence into the DB.  The
+    // subsequent query must then read it back (via SelectGnirsSequence) and
+    // produce exactly the same dynamic config as the freshly generated one.
+    val setup: IO[Observation.Id] =
+      for
+        oid <- gnirsObs
+        _   <- recordVisitAs(serviceUser, oid)
+      yield oid
+
+    setup.flatMap: oid =>
+      expect(
+        user     = pi,
+        query    = gnirsScienceQuery(oid),
+        expected =
+          Json.obj(
+            "executionConfig" -> Json.obj(
+              "gnirs" -> Json.obj(
+                "science" -> Json.obj(
+                  "nextAtom" -> gnirsExpectedScienceAtom(DynamicSnapshot,
+                    (0, 2, Enabled), (0, -4, Enabled), (0, -4, Enabled), (0, 2, Enabled)
+                  ),
+                  "possibleFuture" -> List.empty[Json].asJson,
+                  "hasMore"        -> false.asJson
+                )
+              )
+            )
+          ).asRight
+      )
+
   test("[gnirs] exposureCount=8 with 4 offsets -> 2 identical cycles"):
     val setup: IO[Observation.Id] =
       for
