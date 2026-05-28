@@ -17,6 +17,7 @@ import lucuma.core.enums.GhostIfu1FiberAgitator
 import lucuma.core.enums.GhostIfu2FiberAgitator
 import lucuma.core.enums.GhostReadMode
 import lucuma.core.enums.GhostResolutionMode
+import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.math.Angle
 import lucuma.core.math.Coordinates
 import lucuma.core.math.Declination
@@ -993,3 +994,52 @@ class executionSciGhostIfu extends ExecutionTestSupportForGhost:
               List("Could not compute GHOST IFU mapping: Dual Target mode is only available in Standard Resolution.").asLeft
             )
     yield ()
+
+  test("IFU Mapping FAIL - validation"):
+    val workflow = for
+      p  <- createProgram
+      t0 <- createTargetWithProfileAs(pi, p)
+      t1 <- createTargetWithProfileAs(pi, p)
+      o  <- createObservationWithModeAs(pi, p, List(t0, t1), mode(resolutionMode = GhostResolutionMode.High))
+      _  <- runObscalcUpdate(p, o)
+      w  <- queryObservationWorkflowState(pi, o)
+      _  <- expect(
+        user  = pi,
+        query = s"""
+          query {
+            observation(observationId: "$o") {
+              workflow {
+                value {
+                  state
+                  validationErrors {
+                    code
+                    messages
+                  }
+                }
+              }
+            }
+          }
+        """,
+        expected = json"""
+          {
+            "observation": {
+              "workflow": {
+                "value": {
+                  "state": "UNDEFINED",
+                  "validationErrors": [
+                    {
+                      "code": "CONFIGURATION_ERROR",
+                      "messages": [
+                        "Dual Target mode is only available in Standard Resolution."
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        """.asRight
+      )
+    yield w
+
+    assertIO(workflow, ObservationWorkflowState.Undefined)

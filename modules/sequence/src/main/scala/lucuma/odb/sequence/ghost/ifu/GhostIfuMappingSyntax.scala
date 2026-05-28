@@ -15,10 +15,9 @@ import lucuma.core.math.Coordinates
 import lucuma.core.math.Offset
 import lucuma.core.model.Target
 import lucuma.core.model.sequence.ghost.GhostIfuMapping
-import lucuma.core.model.sequence.ghost.GhostStaticConfig
 import lucuma.core.util.Timestamp
 
-object GhostStaticConfigSyntax:
+object GhostIfuMappingSyntax:
 
   private def ifuAssignment(
     base:          Coordinates,
@@ -42,7 +41,7 @@ object GhostStaticConfigSyntax:
     else 0
 
   private def deriveOneTarget(
-    ctx:    StaticContext,
+    ctx:    IfuMappingContext,
     target: Target
   ): Either[String, GhostIfuMapping] =
     ctx.resolutionMode match
@@ -79,7 +78,7 @@ object GhostStaticConfigSyntax:
             "A GHOST IFU mapping can only be determined after the science target is identified.".asLeft
 
   private def deriveDualTarget(
-    ctx:     StaticContext,
+    ctx:     IfuMappingContext,
     targetA: Target,
     targetB: Target
   ): Either[String, GhostIfuMapping] =
@@ -105,20 +104,19 @@ object GhostStaticConfigSyntax:
         "Dual Target mode is only available in Standard Resolution.".asLeft
 
 
-  extension (g: GhostStaticConfig.type)
+  extension (g: GhostIfuMapping.type)
     def derive(
-      ctx:     StaticContext,
+      ctx:     IfuMappingContext,
       targets: List[Target]
-    ): Either[String, GhostStaticConfig] =
-      val mapping = targets match
+    ): Either[String, GhostIfuMapping] =
+      targets match
         case Nil          => "Cannot derive a GHOST IFU mapping until targets are defined.".asLeft
         case List(t)      => deriveOneTarget(ctx, t)
         case List(t1, t2) => deriveDualTarget(ctx, t1, t2)
         case _            => "Cannot derive a GHOST IFU mapping with more than two targets.".asLeft
 
-      mapping.map: m =>
-        GhostStaticConfig(
-          ctx.resolutionMode,
-          m,
-          ctx.svcExposureTime
-        )
+    def validate(
+      ctx:     IfuMappingContext,
+      targets: List[Target]
+    ): Option[String] =
+      derive(ctx, targets).swap.toOption

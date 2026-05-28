@@ -12,6 +12,7 @@ import cats.syntax.eq.*
 import cats.syntax.flatMap.*
 import cats.syntax.foldable.*
 import cats.syntax.functor.*
+import cats.syntax.functorFilter.*
 import cats.syntax.option.*
 import grackle.Result
 import grackle.ResultT
@@ -20,7 +21,9 @@ import lucuma.core.enums.GhostReadMode
 import lucuma.core.enums.GhostResolutionMode
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.Observation
+import lucuma.core.model.sequence.ghost.GhostIfuMapping
 import lucuma.core.model.sequence.ghost.GhostStaticConfig
+import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.odb.data.ExposureTimeModeId
 import lucuma.odb.data.OdbError
@@ -28,8 +31,8 @@ import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.input.GhostIfuInput
 import lucuma.odb.sequence.ghost.DetectorConfig
 import lucuma.odb.sequence.ghost.ifu.Config
-import lucuma.odb.sequence.ghost.ifu.StaticContext
-import lucuma.odb.sequence.ghost.ifu.GhostStaticConfigSyntax.*
+import lucuma.odb.sequence.ghost.ifu.GhostIfuMappingSyntax.*
+import lucuma.odb.sequence.ghost.ifu.IfuMappingContext
 import lucuma.odb.syntax.exposureTimeMode.*
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.GhostCodecs.*
@@ -69,6 +72,15 @@ trait GhostIfuService[F[_]]:
   def computeStatic(
     observationId: Observation.Id
   ): F[Either[OdbError, GhostStaticConfig]]
+
+  /**
+   * Returns a map of the observations for which we can derive a valid
+   * IFU mapping.  If an observation is not found or has no problems, then
+   * it is not included in the results.
+   */
+  def validationErrors(
+    observationIds: List[Observation.Id]
+  ): F[Map[Observation.Id, String]]
 
 object GhostIfuService:
   enum Channel:
@@ -210,19 +222,49 @@ object GhostIfuService:
             case _                    =>
               Concurrent[F].raiseError(new RuntimeException(s"Could not clone Ghost IFU observing mode $originalId, $newId"))
 
+      private def selectStaticContext(
+        oids: List[Observation.Id]
+      ): F[Map[Observation.Id, (IfuMappingContext, Option[TimeSpan])]] =
+        val af = Statements.selectStaticContext(oids)
+        session.prepareR(af.fragment.query(observation_id *: Statements.mapping_context *: time_span.opt)).use: pq =>
+          pq.stream(af.argument, chunkSize = 1024)
+            .compile
+            .toList
+            .map: lst =>
+              lst
+                .map: (oid, ctx, svcExposureTime) =>
+                  oid -> (ctx, svcExposureTime)
+                .toMap
+
       override def computeStatic(
         observationId: Observation.Id
       ): F[Either[OdbError, GhostStaticConfig]] =
         for
-          c <- session.option(Statements.SelectStaticContext)(observationId)
+          c <- selectStaticContext(List(observationId))
           a <- Services.asSuperUser(asterismService.getAsterism(observationId))
         yield
           Either
-            .fromOption(c, OdbError.InvalidArgument(s"Observation '$observationId' not found, or not a GHOST observation.".some))
-            .flatMap: ctx =>
-              GhostStaticConfig
-                .derive(ctx, a.map(_._2))
+            .fromOption(c.get(observationId), OdbError.InvalidArgument(s"Observation '$observationId' not found, or not a GHOST observation.".some))
+            .flatMap: (mappingCtx, svcTime) =>
+              GhostIfuMapping
+                .derive(mappingCtx, a.map(_._2))
                 .leftMap(s => OdbError.InvalidArgument(s"Could not compute GHOST IFU mapping: $s".some))
+                .map: mapping =>
+                  GhostStaticConfig(mappingCtx.resolutionMode, mapping, svcTime)
+
+      override def validationErrors(
+        observationIds: List[Observation.Id]
+      ): F[Map[Observation.Id, String]] =
+        for
+          c <- selectStaticContext(observationIds)
+          a <- Services.asSuperUser(asterismService.getAsterisms(observationIds))
+        yield
+          c.toList
+           .mapFilter { case (oid, (mappingCtx, _)) =>
+             val targets = a.getOrElse(oid, Nil).map(_._2)
+             GhostIfuMapping.validate(mappingCtx, targets).map(error => oid -> error)
+           }
+           .toMap
 
   object Statements:
 
@@ -508,34 +550,38 @@ object GhostIfuService:
           void"SET " |+| us.intercalate(void", ") |+| void" " |+|
           void"WHERE " |+| observationIdIn(os)
 
-    val SelectStaticContext: Query[Observation.Id, StaticContext] =
+    val mapping_context: Decoder[IfuMappingContext] =
+      (
+        ghost_resolution_mode *:
+        coordinates.opt       *:
+        timestamptz(6)        *:
+        core_timestamp.opt    *:
+        pos_angle_constraint  *:
+        coordinates.opt
+      ).map: (resMode, sky, now, obsTime, pac, explicitBase) =>
+        val t = obsTime.getOrElse(Timestamp.unsafeFromInstantTruncated(now.toInstant))
+        IfuMappingContext(resMode, sky, pac, explicitBase, t)
+
+    def selectStaticContext(
+      oids: List[Observation.Id]
+    ): AppliedFragment =
       sql"""
         SELECT
+          o.c_observation_id,
           g.c_resolution_mode,
           g.c_sky_ra,
           g.c_sky_dec,
-          g.c_slit_viewing_camera_exposure_time,
           CURRENT_TIMESTAMP(6),
           o.c_observation_time,
           o.c_pac_mode,
           o.c_pac_angle,
           o.c_explicit_ra,
-          o.c_explicit_dec
+          o.c_explicit_dec,
+          g.c_slit_viewing_camera_exposure_time
         FROM
           t_ghost_ifu g
         INNER JOIN
           t_observation o ON o.c_observation_id = g.c_observation_id
         WHERE
-          g.c_observation_id = $observation_id
-      """
-        .query(
-          ghost_resolution_mode *:
-          coordinates.opt       *:
-          time_span.opt         *:
-          timestamptz(6)        *:
-          core_timestamp.opt    *:
-          pos_angle_constraint  *:
-          coordinates.opt
-        ).map: (resMode, sky, svcExpTime, now, obsTime, pac, explicitBase) =>
-          val nowTimestamp = Timestamp.unsafeFromInstantTruncated(now.toInstant)
-          StaticContext(resMode, sky, nowTimestamp, obsTime, pac, explicitBase, svcExpTime)
+          g.c_observation_id IN ${observation_id.list(oids.length).values}
+      """.apply(oids.toList)
