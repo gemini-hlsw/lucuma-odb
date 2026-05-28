@@ -14,7 +14,6 @@ import grackle.skunk.SkunkMapping
 import io.circe.Json
 import io.circe.syntax.*
 import lucuma.core.enums.GnirsDecker
-import lucuma.core.enums.GnirsObsReadMode
 import lucuma.core.enums.GnirsWellDepth
 import lucuma.core.enums.SlitOffsetMode
 import lucuma.core.enums.StepGuideState
@@ -126,10 +125,9 @@ trait GnirsLongSlitMapping[F[_]]
       SqlField("explicitDecker", GnirsLongSlitView.ExplicitDecker),
       SqlField("defaultDecker",  GnirsLongSlitView.DefaultDecker),
 
-      // Read mode: explicit + default + effective
-      explicitOrElseDefault[GnirsObsReadMode]("readMode", "explicitReadMode", "defaultReadMode"),
+      // Read mode: explicit override only; when null the read mode is computed
+      // from the exposure time at sequence-generation time (mirrors Flamingos2).
       SqlField("explicitReadMode", GnirsLongSlitView.ExplicitReadMode),
-      SqlField("defaultReadMode",  GnirsLongSlitView.DefaultReadMode),
 
       // Well depth: explicit + default + effective
       explicitOrElseDefault[GnirsWellDepth]("wellDepth", "explicitWellDepth", "defaultWellDepth"),

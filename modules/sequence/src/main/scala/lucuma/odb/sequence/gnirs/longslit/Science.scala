@@ -12,6 +12,7 @@ import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.string.NonEmptyString
 import fs2.Pure
 import fs2.Stream
+import lucuma.core.enums.GnirsReadMode
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SequenceType
 import lucuma.core.model.Observation
@@ -58,7 +59,7 @@ object Science:
       // Configure the dynamic config for a science step, then traverse the
       // telescope configs from the observing mode in order, producing one
       // science ProtoStep per offset.
-      val resolvedReadMode = config.readMode.resolveForStepExposureTime(time.exposureTime)
+      val resolvedReadMode = config.explicitReadMode.getOrElse(GnirsReadMode.forExposureTime(time.exposureTime))
       val acqMirror        = GnirsAcquisitionMirrorMode.Out(
         config.prism,
         config.grating,

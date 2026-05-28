@@ -9496,9 +9496,7 @@ type GnirsLongSlit {
   explicitDecker: GnirsDecker
   defaultDecker: GnirsDecker!
 
-  readMode: GnirsObsReadMode!
-  explicitReadMode: GnirsObsReadMode
-  defaultReadMode: GnirsObsReadMode!
+  explicitReadMode: GnirsReadMode
 
   wellDepth: GnirsWellDepth!
   explicitWellDepth: GnirsWellDepth
@@ -9579,7 +9577,7 @@ input GnirsLongSlitInput {
 
   explicitFocusMotorSteps: Int
 
-  explicitReadMode: GnirsObsReadMode
+  explicitReadMode: GnirsReadMode
 
   explicitWellDepth: GnirsWellDepth
 
@@ -11869,19 +11867,6 @@ enum GnirsFpuOther {
 }
 
 enum GnirsReadMode {
-  VERY_BRIGHT
-  BRIGHT
-  FAINT
-  VERY_FAINT
-}
-
-"""
-GNIRS observation-level read mode. Use `AUTOMATIC` to let the read mode be
-resolved per step from the step exposure time; otherwise fix the read mode
-for all steps.
-"""
-enum GnirsObsReadMode {
-  AUTOMATIC
   VERY_BRIGHT
   BRIGHT
   FAINT

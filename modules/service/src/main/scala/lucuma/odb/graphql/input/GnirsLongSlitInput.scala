@@ -15,8 +15,8 @@ import lucuma.core.enums.GnirsDecker
 import lucuma.core.enums.GnirsFilter
 import lucuma.core.enums.GnirsFpuSlit
 import lucuma.core.enums.GnirsGrating
-import lucuma.core.enums.GnirsObsReadMode
 import lucuma.core.enums.GnirsPrism
+import lucuma.core.enums.GnirsReadMode
 import lucuma.core.enums.GnirsWellDepth
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.StepGuideState
@@ -92,7 +92,7 @@ object GnirsLongSlitInput:
     explicitGrating:              Option[GnirsGrating]             = None,
     explicitPrism:                Option[GnirsPrism]               = None,
     explicitFocusMotorSteps:      Option[Int]                      = None,
-    explicitReadMode:             Option[GnirsObsReadMode]         = None,
+    explicitReadMode:             Option[GnirsReadMode]            = None,
     explicitWellDepth:            Option[GnirsWellDepth]           = None,
     explicitTelescopeConfigs:     Option[SlitTelescopeConfigs]     = None,
     acquisition:                  Option[AcquisitionInput]         = None
@@ -118,7 +118,7 @@ object GnirsLongSlitInput:
           GnirsGratingBinding.Option("explicitGrating", rExplGrating),
           GnirsPrismBinding.Option("explicitPrism", rExplPrism),
           IntBinding.Option("explicitFocusMotorSteps", rFocus),
-          GnirsObsReadModeBinding.Option("explicitReadMode", rReadMode),
+          GnirsReadModeBinding.Option("explicitReadMode", rReadMode),
           GnirsWellDepthBinding.Option("explicitWellDepth", rWellDepth),
           SlitTelescopeConfigsInput.Binding.Option("explicitTelescopeConfigs", rExplTelescope),
           AcquisitionInput.Binding.Option("acquisition", rAcq)
@@ -146,7 +146,7 @@ object GnirsLongSlitInput:
     explicitGrating:           Nullable[GnirsGrating],
     explicitPrism:             Nullable[GnirsPrism],
     explicitFocusMotorSteps:   Nullable[Int],
-    explicitReadMode:          Nullable[GnirsObsReadMode],
+    explicitReadMode:          Nullable[GnirsReadMode],
     explicitWellDepth:         Nullable[GnirsWellDepth],
     explicitTelescopeConfigs:  Nullable[SlitTelescopeConfigs], // Nullable to allow clearing to default
     acquisition:               Option[AcquisitionInput]
@@ -192,7 +192,7 @@ object GnirsLongSlitInput:
           GnirsGratingBinding.Nullable("explicitGrating", rExplGrating),
           GnirsPrismBinding.Nullable("explicitPrism", rExplPrism),
           IntBinding.Nullable("explicitFocusMotorSteps", rFocus),
-          GnirsObsReadModeBinding.Nullable("explicitReadMode", rReadMode),
+          GnirsReadModeBinding.Nullable("explicitReadMode", rReadMode),
           GnirsWellDepthBinding.Nullable("explicitWellDepth", rWellDepth),
           SlitTelescopeConfigsInput.Binding.Nullable("explicitTelescopeConfigs", rExplTelescope),
           AcquisitionInput.Binding.Option("acquisition", rAcq)
