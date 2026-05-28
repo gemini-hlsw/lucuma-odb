@@ -127,6 +127,7 @@ class ShortCut_7118 extends OdbSuite with DatabaseOperations:
           subscription {
             groupEdit {
               editType
+              groupId
             }
           }
         """,
@@ -140,26 +141,31 @@ class ShortCut_7118 extends OdbSuite with DatabaseOperations:
               _   <- deleteSystemGroup(pid, gid)
             yield (),
         expectedF =
-          d.get.map: (_, _) =>
+          // Check groupId is present on HARD_DELETE.
+          d.get.map: (_, gid) =>
             List(
               json"""{
                 "groupEdit" : {
-                  "editType" : "CREATED"
+                  "editType" : "CREATED",
+                  "groupId" : $gid
                 }
               }""",
               json"""{
                 "groupEdit" : {
-                  "editType" : "UPDATED"
+                  "editType" : "UPDATED",
+                  "groupId" : $gid
                 }
               }""",
               json"""{
                 "groupEdit" : {
-                  "editType" : "UPDATED"
+                  "editType" : "UPDATED",
+                  "groupId" : $gid
                 }
               }""",
               json"""{
                 "groupEdit" : {
-                  "editType" : "HARD_DELETE"
+                  "editType" : "HARD_DELETE",
+                  "groupId" : $gid
                 }
               }"""
           )

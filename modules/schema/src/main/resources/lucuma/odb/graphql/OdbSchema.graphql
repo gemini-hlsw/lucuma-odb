@@ -5636,6 +5636,12 @@ type GroupEdit {
   program: Program!
 
   """
+  The groupId of the edited group, or null if it's the top-level group.
+  it is present even when the group has been deleted.
+  """
+  groupId: GroupId
+
+  """
   Edited group, or null if it's the top-level group.
   """
   value: Group
