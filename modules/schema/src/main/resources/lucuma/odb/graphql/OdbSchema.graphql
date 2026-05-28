@@ -6841,6 +6841,16 @@ ObservingMode
 """
 enum ObservingModeType {
   """
+  ObservingModeType AlopekeSpeckle
+  """
+  ALOPEKE_SPECKLE
+
+  """
+  ObservingModeType AlopekeWideField
+  """
+  ALOPEKE_WIDE_FIELD
+
+  """
   ObservingModeType Flamingos2LongSlit
   """
   FLAMINGOS_2_LONG_SLIT
@@ -6879,6 +6889,31 @@ enum ObservingModeType {
   ObservingModeType Igrins2LongSlit
   """
   IGRINS_2_LONG_SLIT
+
+  """
+  ObservingModeType MaroonX
+  """
+  MAROON_X
+
+  """
+  ObservingModeType VisitorNorth
+  """
+  VISITOR_NORTH
+
+  """
+  ObservingModeType VisitorSouth
+  """
+  VISITOR_SOUTH
+
+  """
+  ObservingModeType ZorroSpeckle
+  """
+  ZORRO_SPECKLE
+
+  """
+  ObservingModeType ZorroWideField
+  """
+  ZORRO_WIDE_FIELD
 }
 
 """
