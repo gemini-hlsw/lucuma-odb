@@ -128,10 +128,10 @@ object GnirsLongSlitService:
                       .leftMap(e => s"Invalid acq coadds $acqCoadds: $e")
                       .map: acqCoaddsP =>
                         val acq = AcquisitionConfig(
-                          acqType, acqCoaddsP, acqFilter,
+                          acqType, acqFilter,
                           acqOffP.map(a => Offset.P(a)),
                           acqOffQ.map(a => Offset.Q(a)),
-                          acqEtm
+                          acqEtm, acqCoaddsP
                         )
                         val focus = focusMotorSteps.fold(GnirsFocus.Best): n =>
                           GnirsFocus.Custom(GnirsFocusMotorStepsValue.unsafeFrom(n).withUnit[GnirsFocusMotorStep])

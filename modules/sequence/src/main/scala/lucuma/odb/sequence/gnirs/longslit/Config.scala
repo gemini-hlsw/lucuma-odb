@@ -28,11 +28,11 @@ import java.io.DataOutputStream
 
 case class AcquisitionConfig(
   acqType:          GnirsAcquisitionType,
-  coadds:           PosInt,
   filter:           GnirsFilter,
   offsetP:          Option[Offset.P],
   offsetQ:          Option[Offset.Q],
-  exposureTimeMode: ExposureTimeMode
+  exposureTimeMode: ExposureTimeMode,
+  coadds:           PosInt,
 ):
 
   def hashBytes: Array[Byte] =
