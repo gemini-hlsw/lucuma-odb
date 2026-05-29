@@ -27,7 +27,7 @@ import java.io.ByteArrayOutputStream
 import java.io.DataOutputStream
 
 case class AcquisitionConfig(
-  acqType:          GnirsAcquisitionType,
+  explicitAcqType:  Option[GnirsAcquisitionType],
   filter:           GnirsFilter,
   skyOffset:        Option[Offset],
   exposureTimeMode: ExposureTimeMode,
@@ -37,7 +37,7 @@ case class AcquisitionConfig(
   def hashBytes: Array[Byte] =
     val bao = new ByteArrayOutputStream(128)
     val out = new DataOutputStream(bao)
-    out.writeChars(acqType.tag)
+    out.writeChars(explicitAcqType.fold("")(_.tag))
     out.write(coadds.value.hashBytes)
     out.writeChars(filter.tag)
     out.write(skyOffset.map(_.hashBytes).getOrElse(Array.emptyByteArray))
@@ -48,7 +48,7 @@ case class AcquisitionConfig(
 object AcquisitionConfig:
   given Eq[AcquisitionConfig] =
     Eq.by: a =>
-      (a.acqType, a.coadds.value, a.filter, a.skyOffset, a.exposureTimeMode)
+      (a.explicitAcqType, a.coadds.value, a.filter, a.skyOffset, a.exposureTimeMode)
 
 case class Config(
   filter:                  GnirsFilter,

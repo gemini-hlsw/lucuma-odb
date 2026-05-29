@@ -61,7 +61,7 @@ object GnirsLongSlitInput:
 
   case class AcquisitionInput(
     filter:           Option[GnirsFilter],
-    acqType:          Option[GnirsAcquisitionType],
+    explicitAcqType:  Nullable[GnirsAcquisitionType], // Nullable to allow clearing to automatic
     coadds:           Option[PosInt],
     skyOffset:        Option[Offset],
     exposureTimeMode: Option[ExposureTimeMode]
@@ -72,7 +72,7 @@ object GnirsLongSlitInput:
       ObjectFieldsBinding.rmap:
         case List(
           GnirsFilterBinding.Option("filter", rFilter),
-          GnirsAcquisitionTypeBinding.Option("acquisitionType", rAcqType),
+          GnirsAcquisitionTypeBinding.Nullable("explicitAcquisitionType", rAcqType),
           PosIntBinding.Option("coadds", rCoadds),
           OffsetInput.Binding.Option("skyOffset", rSkyOffset),
           ExposureTimeModeInput.Binding.Option("exposureTimeMode", rEtm)

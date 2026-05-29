@@ -98,7 +98,7 @@ object GnirsLongSlitService:
         slit_offset_mode                 *: // c_slit_offset_mode_default
         text                             *: // c_telescope_configs_default
         // Acquisition fields (inline cols + acq ETM joined from t_exposure_time_mode via FK)
-        gnirs_acquisition_type           *: // c_acq_type
+        gnirs_acquisition_type.opt       *: // c_acq_type (None => compute from exposure time)
         int4                             *: // c_acq_coadds
         gnirs_filter                     *: // c_acq_filter
         angle_µas.opt                    *: // c_acq_sky_offset_p
@@ -262,8 +262,10 @@ object GnirsLongSlitService:
         observationIds.map(sql"$observation_id").intercalate(void",") |+|
       void")"
 
-    private def defaultAcqType(input: GnirsLongSlitInput.Create): GnirsAcquisitionType =
-      input.acquisition.flatMap(_.acqType).getOrElse(GnirsAcquisitionType.Faint)
+    // None => no explicit acquisition type; resolved from the exposure time at
+    // sequence-generation time (mirrors read mode handling).
+    private def explicitAcqType(input: GnirsLongSlitInput.Create): Option[GnirsAcquisitionType] =
+      input.acquisition.flatMap(_.explicitAcqType.toOption)
 
     private def defaultAcqFilter(input: GnirsLongSlitInput.Create): GnirsFilter =
       input.acquisition.flatMap(_.filter).getOrElse(input.filter)
@@ -291,7 +293,7 @@ object GnirsLongSlitService:
       Option[SlitOffsetMode],
       Option[String],
       // acquisition inline columns
-      GnirsAcquisitionType,
+      Option[GnirsAcquisitionType], // None => automatic
       Int,
       GnirsFilter,
       Option[Long],           // acq_sky_offset_p in µas
@@ -346,7 +348,7 @@ object GnirsLongSlitService:
           ${gnirs_well_depth.opt},
           ${slit_offset_mode.opt},
           ${text.opt},
-          $gnirs_acquisition_type,
+          ${gnirs_acquisition_type.opt},
           $int4,
           $gnirs_filter,
           ${int8.opt},
@@ -389,7 +391,7 @@ object GnirsLongSlitService:
         input.explicitWellDepth,
         explicitTC.map(_._1),
         explicitTC.map(_._2),
-        defaultAcqType(input),
+        explicitAcqType(input),
         input.acquisition.flatMap(_.coadds).map(_.value).getOrElse(1),
         defaultAcqFilter(input),
         acqSkyOffP,
@@ -417,7 +419,7 @@ object GnirsLongSlitService:
       val upOffsets      = sql"c_telescope_configs  = ${text.opt}"
 
       // Acquisition inline (non-ETM) column updates
-      val upAcqType      = sql"c_acq_type = $gnirs_acquisition_type"
+      val upAcqType      = sql"c_acq_type = ${gnirs_acquisition_type.opt}"
       val upAcqCoadds    = sql"c_acq_coadds    = $int4_pos"
       val upAcqFilter    = sql"c_acq_filter    = $gnirs_filter"
       val upAcqSkyOffP   = sql"c_acq_sky_offset_p  = ${int8.opt}"
@@ -442,7 +444,7 @@ object GnirsLongSlitService:
                 upAcqSkyOffQ(Some(Angle.microarcseconds.get(o.q.toAngle)))
               )
           List(
-            acq.acqType.map(upAcqType),
+            acq.explicitAcqType.toOptionOption.map(upAcqType),
             acq.coadds.map(upAcqCoadds),
             acq.filter.map(upAcqFilter)
           ).flatten ++ offUpdates
