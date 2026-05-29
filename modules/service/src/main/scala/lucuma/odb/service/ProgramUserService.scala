@@ -639,7 +639,7 @@ object ProgramUserService:
       val upGender            = sql"c_gender               = ${gender.opt}"
       val upAffiliation       = sql"c_affiliation          = ${varchar_nonempty.opt}"
       val upDataAccess        = sql"c_has_data_access      = $bool"
-      val upClassicalObserver = sql"c_classical_observer   = $bool"
+      val upClassicalVisitor  = sql"c_classical_visitor    = $bool"
 
       val ups: Option[NonEmptyList[AppliedFragment]] = NonEmptyList.fromList(
         List(
@@ -652,7 +652,7 @@ object ProgramUserService:
           SET.gender.foldPresent(upGender),
           SET.affiliation.foldPresent(upAffiliation),
           SET.hasDataAccess.map(upDataAccess),
-          SET.classicalObserver.map(upClassicalObserver)
+          SET.classicalVisitor.map(upClassicalVisitor)
         ).flattenOption :::
         SET.partnerLink.toList.flatMap { pl => List(
           sql"c_partner_link = $partner_link_type"(pl.linkType),

@@ -17,13 +17,13 @@ import monocle.Lens
 
 case class ProgramUserPropertiesInput(
   partnerLink:       Option[PartnerLink],
-  preferredProfile:   Nullable[UserProfileInput],
+  preferredProfile:  Nullable[UserProfileInput],
   educationalStatus: Nullable[EducationalStatus],
   thesis:            Nullable[Boolean],
   gender:            Nullable[Gender],
   affiliation:       Nullable[NonEmptyString],
   hasDataAccess:     Option[Boolean],
-  classicalObserver: Option[Boolean]
+  classicalVisitor:  Option[Boolean]
 )
 
 object ProgramUserPropertiesInput:
@@ -53,5 +53,5 @@ object ProgramUserPropertiesInput:
         GenderBinding.Nullable("gender", rGender),
         NonEmptyStringBinding.Nullable("affiliation", rAffiliation),
         BooleanBinding.Option("hasDataAccess", rDataAccess),
-        BooleanBinding.Option("classicalObserver", rClassicalObserver)
-      ) => (rPartnerLink, rPreferredProfile, rEducationalStatus, rThesis, rGender, rAffiliation, rDataAccess, rClassicalObserver).parMapN(ProgramUserPropertiesInput.apply)
+        BooleanBinding.Option("classicalVisitor", rClassicalVisitor)
+      ) => (rPartnerLink, rPreferredProfile, rEducationalStatus, rThesis, rGender, rAffiliation, rDataAccess, rClassicalVisitor).parMapN(ProgramUserPropertiesInput.apply)

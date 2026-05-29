@@ -1,6 +1,6 @@
--- Add a flag to users marking an investigator as classical
+-- Add a flag to users marking an investigator as a classical visitor
 ALTER TABLE t_program_user
-  ADD COLUMN c_classical_observer boolean NOT NULL DEFAULT false;
+  ADD COLUMN c_classical_visitor boolean NOT NULL DEFAULT false;
 
 DROP VIEW v_program_user;
 

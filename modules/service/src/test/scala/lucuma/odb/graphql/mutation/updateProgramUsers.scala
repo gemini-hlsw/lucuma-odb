@@ -134,13 +134,13 @@ class updateProgramUsers extends OdbSuite:
       }
     """
 
-  def updateUserClassicalObserver(p: Program.Id, u: User, classicalObserver: Boolean): String =
+  def updateUserClassicalVisitor(p: Program.Id, u: User, classicalVisitor: Boolean): String =
     s"""
       mutation {
         updateProgramUsers(
           input: {
             SET: {
-              classicalObserver: $classicalObserver
+              classicalVisitor: $classicalVisitor
             }
             WHERE: {
               user: {
@@ -155,7 +155,7 @@ class updateProgramUsers extends OdbSuite:
           programUsers {
             program { id }
             user { id }
-            classicalObserver
+            classicalVisitor
           }
         }
       }
@@ -376,14 +376,14 @@ class updateProgramUsers extends OdbSuite:
       )
     )
 
-  def expectedClassicalObserver(ts: (Program.Id, User, Boolean)*): Json =
+  def expectedClassicalVisitor(ts: (Program.Id, User, Boolean)*): Json =
     Json.obj(
       "updateProgramUsers" -> Json.obj(
         "programUsers" -> ts.toList.map { case (pid, user, co) =>
           Json.obj(
             "program"           -> Json.obj("id" -> pid.asJson),
             "user"              -> Json.obj("id" -> user.id.asJson),
-            "classicalObserver" -> co.asJson
+            "classicalVisitor" -> co.asJson
           )
         }.asJson
       )
@@ -518,14 +518,14 @@ class updateProgramUsers extends OdbSuite:
           expected = expectedThesis((pid, pi3, true)).asRight
         )
 
-  test("update coi classicalObserver flag"):
+  test("update coi classicalVisitor flag"):
     createProgramAs(pi3) >> createProgramAs(pi).flatMap: pid =>
       addProgramUserAs(pi, pid, partnerLink = PartnerLink.HasUnspecifiedPartner).flatMap: mid =>
         linkUserAs(pi, mid, pi3.id) >>
         expect(
           user     = pi,
-          query    = updateUserClassicalObserver(pid, pi3, true),
-          expected = expectedClassicalObserver((pid, pi3, true)).asRight
+          query    = updateUserClassicalVisitor(pid, pi3, true),
+          expected = expectedClassicalVisitor((pid, pi3, true)).asRight
         )
 
   test("update coi affiliation"):

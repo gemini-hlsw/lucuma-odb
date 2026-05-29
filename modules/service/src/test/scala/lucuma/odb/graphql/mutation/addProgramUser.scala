@@ -79,7 +79,7 @@ class addProgramUser extends OdbSuite:
                 thesis
                 gender
                 hasDataAccess
-                classicalObserver
+                classicalVisitor
               }
             }
           }
@@ -103,7 +103,7 @@ class addProgramUser extends OdbSuite:
                 "thesis": false,
                 "gender": "MALE",
                 "hasDataAccess": true,
-                "classicalObserver": false
+                "classicalVisitor": false
               }
             }
           }
@@ -318,7 +318,7 @@ class addProgramUser extends OdbSuite:
       case OdbError.InvalidArgument(Some("Argument 'input' is invalid: PIs are added at program creation time.")) => // ok
     }
 
-  test("check classicalObserver field"):
+  test("check classicalVisitor field"):
     createProgramAs(pi1).flatMap: pid =>
       expect(
         user     = pi1,
@@ -330,12 +330,12 @@ class addProgramUser extends OdbSuite:
                 role: COI
                 SET: {
                   partnerLink: { partner: CA }
-                  classicalObserver: true
+                  classicalVisitor: true
                 }
               }
             ) {
               programUser {
-                classicalObserver
+                classicalVisitor
               }
             }
           }
@@ -344,7 +344,7 @@ class addProgramUser extends OdbSuite:
           {
             "addProgramUser": {
               "programUser": {
-                "classicalObserver": true
+                "classicalVisitor": true
               }
             }
           }
