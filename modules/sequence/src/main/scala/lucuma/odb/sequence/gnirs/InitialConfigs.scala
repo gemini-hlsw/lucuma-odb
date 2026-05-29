@@ -8,7 +8,6 @@ import lucuma.core.enums.GnirsCamera
 import lucuma.core.enums.GnirsDecker
 import lucuma.core.enums.GnirsFilter
 import lucuma.core.enums.GnirsReadMode
-import lucuma.core.math.Wavelength
 import lucuma.core.model.sequence.gnirs.GnirsAcquisitionMirrorMode
 import lucuma.core.model.sequence.gnirs.GnirsDynamicConfig
 import lucuma.core.model.sequence.gnirs.GnirsFocus
@@ -26,7 +25,6 @@ object InitialConfigs:
     GnirsDynamicConfig(
       exposure          = TimeSpan.Min,
       coadds            = PosInt.MinValue,
-      centralWavelength = Wavelength.Min,
       filter            = GnirsFilter.Y,
       decker            = GnirsDecker.Acquisition,
       fpu               = Left(lucuma.core.enums.GnirsFpuSlit.LongSlit_0_10),

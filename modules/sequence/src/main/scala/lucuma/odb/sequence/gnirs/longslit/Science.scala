@@ -72,7 +72,6 @@ object Science:
                   dyn.copy(
                     exposure          = time.exposureTime,
                     coadds            = config.coadds,
-                    centralWavelength = config.gratingWavelength,
                     filter            = config.filter,
                     decker            = config.decker,
                     fpu               = Left(config.fpu),
