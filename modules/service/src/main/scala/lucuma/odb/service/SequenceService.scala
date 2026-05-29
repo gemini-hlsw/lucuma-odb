@@ -951,50 +951,20 @@ object SequenceService:
           estimator.gnirsStep
         )
 
-      extension (self: Instrument)
-        private def staticConfigTableName: Option[String] =
-          self match
-            case Instrument.AcqCamNorth => none
-            case Instrument.AcqCamSouth => none
-            case Instrument.Alopeke => none
-            case Instrument.Flamingos2 => "t_flamingos2_static".some
-            case Instrument.Ghost => "t_ghost_static".some
-            case lucuma.core.enums.Instrument.GmosNorth => "t_gmos_north_static".some
-            case lucuma.core.enums.Instrument.GmosSouth => "t_gmos_south_static".some
-            case Instrument.Gnirs => "t_gnirs_static".some
-            case Instrument.Gpi => none
-            case Instrument.Gsaoi => none
-            case Instrument.Igrins2 => "t_igrins2_static".some
-            case Instrument.MaroonX => none
-            case Instrument.Niri => none
-            case Instrument.Scorpio => none
-            case Instrument.VisitorNorth => none
-            case Instrument.VisitorSouth => none
-            case Instrument.Zorro => none
-
-      private def deleteMaterializedSequence(observationId: Observation.Id, sequenceType: SequenceType): F[Boolean] = 
-        deleteMaterialized(observationId, sequenceType).flatTap( wasMaterialized =>
-           if wasMaterialized then abandonAndDeleteUnexecuted(observationId, sequenceType)
-           else Applicative[F].unit
+      private def deleteMaterializedSequence(observationId: Observation.Id, sequenceType: SequenceType): F[Unit] = 
+        deleteMaterialized(observationId, sequenceType).ifM(
+          abandonAndDeleteUnexecuted(observationId, sequenceType),
+          Applicative[F].unit
         )
 
       override def deleteSequence(
         observationId: Observation.Id
       )(using Transaction[F]): F[Unit] = 
-        // if there is no instrument, can't have a sequence...
-        observationService.selectInstrument(observationId)
-          // And, if the instrument has no static config table, can't have a materialized sequence...
-          .map(_.flatMap(instrument => instrument.staticConfigTableName))
-          .flatMap {
-            case Some(staticConfigTableName) =>
-              for {
-                wasAcq <- deleteMaterializedSequence(observationId, SequenceType.Acquisition)
-                wasSci <- deleteMaterializedSequence(observationId, SequenceType.Science)
-                _ <- if wasAcq || wasSci then session.execute(Statements.deleteStaticConfigIfUnexecuted(staticConfigTableName))(observationId).void
-                     else Applicative[F].unit
-              } yield ()
-            case None => Applicative[F].unit
-          }
+        // access control limits this to pre-execution, so we don't need to worry about static config, etc.
+        for {
+          _ <- deleteMaterializedSequence(observationId, SequenceType.Acquisition)
+          _ <- deleteMaterializedSequence(observationId, SequenceType.Science)
+        } yield ()
 
   object Statements:
 
@@ -1076,18 +1046,6 @@ object SequenceService:
           #${encodeColumns(none, columns)}
         )
       """
-
-    def deleteStaticConfigIfUnexecuted(tableName: String): Command[Observation.Id] =
-      sql"""
-        DELETE FROM #$tableName s
-        WHERE c_observation_id = $observation_id
-          AND NOT EXISTS (
-            SELECT 1
-            FROM v_generator_params g
-            WHERE g.c_observation_id = s.c_observation_id
-              AND g.c_execution_state >= 'ongoing'::e_execution_state
-          )
-      """.command
 
     private val StepConfigGcalColumns: List[String] =
       List(

@@ -761,10 +761,6 @@ trait AccessControl[F[_]] extends Predicates[F] {
   def selectForUpdate(
     input: DeleteSequenceInput
   )(using Services[F], NoTransaction[F]): F[Result[AccessControl.CheckedWithId[Unit, Observation.Id]]] =
-    val allowedStates: Set[ObservationWorkflowState] =
-      if user.role.access <= Access.Pi then ObservationWorkflowState.preExecutionSet // ok prior to execution
-      else ObservationWorkflowState.allButComplete
-
     Services.asSuperUser:
       (for
         o  <- ResultT(observationService.resolveOid(input.observationId, input.observationRef))
@@ -772,7 +768,7 @@ trait AccessControl[F[_]] extends Predicates[F] {
                 includeDeleted      = None,
                 oids                = List(o),
                 includeCalibrations = true,
-                allowedStates       = allowedStates
+                allowedStates       = ObservationWorkflowState.preExecutionSet
               ))
         c  <- ResultT.fromResult:
                 os match
