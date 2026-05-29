@@ -169,6 +169,7 @@ object OdbMapping {
           with DatasetSelectResultMapping[F]
           with DateIntervalMapping[F]
           with DeclinationMapping[F]
+          with DeleteSequenceResultMapping[F]
           with ElevationRangeMapping[F]
           with EmailMapping[F]
           with ExecutionMapping[F]
@@ -414,6 +415,7 @@ object OdbMapping {
                 DatasetEventMapping,
                 DatasetMapping,
                 DatasetReferenceMapping,
+                DeleteSequenceResultMapping,
                 DemoScienceMapping,
                 DirectorsTimeMapping,
                 EmailMapping,

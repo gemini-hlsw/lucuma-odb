@@ -3138,6 +3138,11 @@ type Mutation {
   deleteProposal(input: DeleteProposalInput!): DeleteProposalResult!
 
   """
+  Deletes a materialized sequence, if any.
+  """
+  deleteSequence(input: DeleteSequenceInput!): DeleteSequenceResult!
+
+  """
   Ties a specific user to an existing ProgramUser, which must not already be
   associated with any user.
   """
@@ -4483,6 +4488,25 @@ input LargeProgramInput {
 
   "Whether this proposal has JWST synergy."
   jwstSynergy: Boolean
+}
+
+"""
+Input parameters for deleting a materialized sequence.
+Select one of `observationId` or `observationReference`.
+"""
+input DeleteSequenceInput {
+  observationId: ObservationId
+  observationReference: ObservationReferenceLabel
+}
+
+"""
+The result of deleting a materialized sequence.
+"""
+type DeleteSequenceResult {
+  """
+  The observation whose sequence was deleted.
+  """
+  observation: Observation!
 }
 
 """
@@ -7623,6 +7647,18 @@ type Execution {
 
   "Time accounting calculation for this observation."
   timeCharge: CategorizedTime!
+
+  """
+  Whether the science sequence has been materialized.
+  This will happen when the sequence is executed or if it is manually edited.
+  """
+  scienceSequenceIsMaterialized: Boolean!
+
+  """
+  Whether the acquisition sequence has been materialized.
+  This will happen when the sequence is executed or if it is manually edited.
+  """
+  acquisitionSequenceIsMaterialized: Boolean!
 }
 
 """

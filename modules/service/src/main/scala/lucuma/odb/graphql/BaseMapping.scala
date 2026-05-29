@@ -118,6 +118,7 @@ trait BaseMapping[F[_]]
   lazy val DeclinationArcType                      = schema.ref("DeclinationArc")
   lazy val DeleteProgramUserResultType             = schema.ref("DeleteProgramUserResult")
   lazy val DeleteProposalResultType                = schema.ref("DeleteProposalResult")
+  lazy val DeleteSequenceResultType                = schema.ref("DeleteSequenceResult")
   lazy val DemoScienceType                         = schema.ref("DemoScience")
   lazy val DirectorsTimeType                       = schema.ref("DirectorsTime")
   lazy val DmsStringType                           = schema.ref("DmsString")

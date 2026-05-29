@@ -66,7 +66,9 @@ trait ExecutionMapping[F[_]] extends ObservationEffectHandler[F]
       SqlObject("datasets"),
       SqlObject("events"),
       SqlObject("visits"),
-      EffectField("timeCharge", timeChargeHandler, List("id", "programId"))
+      EffectField("timeCharge", timeChargeHandler, List("id", "programId")),
+      SqlField("scienceSequenceIsMaterialized", ObservationView.ScienceSequenceIsMaterialized),
+      SqlField("acquisitionSequenceIsMaterialized", ObservationView.AcquisitionSequenceIsMaterialized)
     )
 
   lazy val ExecutionElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] = {
