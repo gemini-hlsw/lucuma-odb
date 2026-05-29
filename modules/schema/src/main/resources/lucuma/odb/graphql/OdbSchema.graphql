@@ -9464,7 +9464,7 @@ type GnirsLongSlitAcquisition {
   acquisitionType: GnirsAcquisitionType!
   coadds: PosInt!
   filter: GnirsFilter!
-  offset: Offset
+  skyOffset: Offset
   exposureTimeMode: ExposureTimeMode!
 }
 
@@ -9522,7 +9522,7 @@ input GnirsLongSlitAcquisitionInput {
   filter: GnirsFilter
   acquisitionType: GnirsAcquisitionType
   coadds: PosInt
-  offset: OffsetInput
+  skyOffset: OffsetInput
   exposureTimeMode: ExposureTimeModeInput
 }
 

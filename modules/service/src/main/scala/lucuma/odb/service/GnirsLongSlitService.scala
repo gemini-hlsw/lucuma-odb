@@ -101,8 +101,8 @@ object GnirsLongSlitService:
         gnirs_acquisition_type           *: // c_acq_type
         int4                             *: // c_acq_coadds
         gnirs_filter                     *: // c_acq_filter
-        angle_µas.opt                    *: // c_acq_offset_p
-        angle_µas.opt                    *: // c_acq_offset_q
+        angle_µas.opt                    *: // c_acq_sky_offset_p
+        angle_µas.opt                    *: // c_acq_sky_offset_q
         exposure_time_mode                  // acquisition ETM
       ).emap:
         case (sciEtm *: gratingEff *: prismEff *: gratingWavEff *:
@@ -112,7 +112,7 @@ object GnirsLongSlitService:
               wellDepthDef *: wellDepthExp *:
               focusMotorSteps *:
               slitOffsetModeExp *: tcExp *: slitOffsetModeDef *: tcDef *:
-              acqType *: acqCoadds *: acqFilter *: acqOffP *: acqOffQ *:
+              acqType *: acqCoadds *: acqFilter *: acqSkyOffP *: acqSkyOffQ *:
               acqEtm *: EmptyTuple) =>
           SlitTelescopeConfigsFormat.getOption((slitOffsetModeDef, tcDef))
             .toRight(s"Could not parse default telescope configs from '$tcDef'")
@@ -128,10 +128,9 @@ object GnirsLongSlitService:
                       .leftMap(e => s"Invalid acq coadds $acqCoadds: $e")
                       .map: acqCoaddsP =>
                         val acq = AcquisitionConfig(
-                          acqType, acqCoaddsP, acqFilter,
-                          acqOffP.map(a => Offset.P(a)),
-                          acqOffQ.map(a => Offset.Q(a)),
-                          acqEtm
+                          acqType, acqFilter,
+                          (acqSkyOffP, acqSkyOffQ).mapN((p, q) => Offset(Offset.P(p), Offset.Q(q))),
+                          acqEtm, acqCoaddsP
                         )
                         val focus = focusMotorSteps.fold(GnirsFocus.Best): n =>
                           GnirsFocus.Custom(GnirsFocusMotorStepsValue.unsafeFrom(n).withUnit[GnirsFocusMotorStep])
@@ -244,8 +243,8 @@ object GnirsLongSlitService:
           ls.c_acq_type,
           ls.c_acq_coadds,
           ls.c_acq_filter,
-          ls.c_acq_offset_p,
-          ls.c_acq_offset_q,
+          ls.c_acq_sky_offset_p,
+          ls.c_acq_sky_offset_q,
           acq.c_exposure_time_mode,
           acq.c_signal_to_noise_at,
           acq.c_signal_to_noise,
@@ -295,8 +294,8 @@ object GnirsLongSlitService:
       GnirsAcquisitionType,
       Int,
       GnirsFilter,
-      Option[Long],           // acq_offset_p in µas
-      Option[Long]            // acq_offset_q in µas
+      Option[Long],           // acq_sky_offset_p in µas
+      Option[Long]            // acq_sky_offset_q in µas
     )] =
       sql"""
         INSERT INTO t_gnirs_long_slit (
@@ -323,8 +322,8 @@ object GnirsLongSlitService:
           c_acq_type,
           c_acq_coadds,
           c_acq_filter,
-          c_acq_offset_p,
-          c_acq_offset_q
+          c_acq_sky_offset_p,
+          c_acq_sky_offset_q
         )
         SELECT
           $observation_id,
@@ -358,12 +357,12 @@ object GnirsLongSlitService:
         (oid, initGrating, initPrism, camera, fpu, filter, coadds,
          decker, gratingWav, explGrating, explPrism, focus,
          readMode, wellDepth, slitMode, offsets,
-         acqType, acqCoadds, acqFilter, acqOffP, acqOffQ) =>
+         acqType, acqCoadds, acqFilter, acqSkyOffP, acqSkyOffQ) =>
           (oid, initGrating, initPrism, camera, camera, fpu, fpu,
            filter, filter, coadds, decker, gratingWav,
            explGrating, explPrism, focus, readMode, wellDepth,
            slitMode, offsets,
-           acqType, acqCoadds, acqFilter, acqOffP, acqOffQ, oid)
+           acqType, acqCoadds, acqFilter, acqSkyOffP, acqSkyOffQ, oid)
       }
 
     def insertGnirsLongSlit(
@@ -371,8 +370,8 @@ object GnirsLongSlitService:
       input:         GnirsLongSlitInput.Create
     ): AppliedFragment =
       val explicitTC = input.explicitTelescopeConfigs.map(SlitTelescopeConfigsFormat.reverseGet)
-      val acqOffP = input.acquisition.flatMap(_.offset).map(o => Angle.microarcseconds.get(o.p.toAngle))
-      val acqOffQ = input.acquisition.flatMap(_.offset).map(o => Angle.microarcseconds.get(o.q.toAngle))
+      val acqSkyOffP = input.acquisition.flatMap(_.skyOffset).map(o => Angle.microarcseconds.get(o.p.toAngle))
+      val acqSkyOffQ = input.acquisition.flatMap(_.skyOffset).map(o => Angle.microarcseconds.get(o.q.toAngle))
       InsertGnirsLongSlit.apply(
         observationId,
         input.grating,
@@ -393,8 +392,8 @@ object GnirsLongSlitService:
         defaultAcqType(input),
         input.acquisition.flatMap(_.coadds).map(_.value).getOrElse(1),
         defaultAcqFilter(input),
-        acqOffP,
-        acqOffQ
+        acqSkyOffP,
+        acqSkyOffQ
       )
 
     def deleteGnirs(which: List[Observation.Id]): Option[AppliedFragment] =
@@ -421,8 +420,8 @@ object GnirsLongSlitService:
       val upAcqType      = sql"c_acq_type = $gnirs_acquisition_type"
       val upAcqCoadds    = sql"c_acq_coadds    = $int4_pos"
       val upAcqFilter    = sql"c_acq_filter    = $gnirs_filter"
-      val upAcqOffsetP   = sql"c_acq_offset_p  = ${int8.opt}"
-      val upAcqOffsetQ   = sql"c_acq_offset_q  = ${int8.opt}"
+      val upAcqSkyOffP   = sql"c_acq_sky_offset_p  = ${int8.opt}"
+      val upAcqSkyOffQ   = sql"c_acq_sky_offset_q  = ${int8.opt}"
 
       val upTelescope: Option[List[AppliedFragment]] =
         SET.explicitTelescopeConfigs.toOptionOption.map:
@@ -437,10 +436,10 @@ object GnirsLongSlitService:
       val acqUpdates: List[AppliedFragment] =
         SET.acquisition.toList.flatMap: acq =>
           val offUpdates: List[AppliedFragment] =
-            acq.offset.toList.flatMap: o =>
+            acq.skyOffset.toList.flatMap: o =>
               List(
-                upAcqOffsetP(Some(Angle.microarcseconds.get(o.p.toAngle))),
-                upAcqOffsetQ(Some(Angle.microarcseconds.get(o.q.toAngle)))
+                upAcqSkyOffP(Some(Angle.microarcseconds.get(o.p.toAngle))),
+                upAcqSkyOffQ(Some(Angle.microarcseconds.get(o.q.toAngle)))
               )
           List(
             acq.acqType.map(upAcqType),
@@ -488,7 +487,7 @@ object GnirsLongSlitService:
           c_coadds, c_decker, c_focus_motor_steps, c_read_mode, c_well_depth,
           c_slit_offset_mode, c_telescope_configs,
           c_acq_type, c_acq_coadds, c_acq_filter,
-          c_acq_offset_p, c_acq_offset_q
+          c_acq_sky_offset_p, c_acq_sky_offset_q
         )
         SELECT
           $observation_id,
@@ -502,7 +501,7 @@ object GnirsLongSlitService:
           c_coadds, c_decker, c_focus_motor_steps, c_read_mode, c_well_depth,
           c_slit_offset_mode, c_telescope_configs,
           c_acq_type, c_acq_coadds, c_acq_filter,
-          c_acq_offset_p, c_acq_offset_q
+          c_acq_sky_offset_p, c_acq_sky_offset_q
         FROM t_gnirs_long_slit
         WHERE c_observation_id = $observation_id
       """.apply(newId, newId, originalId)

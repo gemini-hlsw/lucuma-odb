@@ -71,19 +71,19 @@ trait GnirsLongSlitMapping[F[_]]
       SqlField("coadds",    GnirsLongSlitView.AcqCoadds),
       SqlField("filter",    GnirsLongSlitView.AcqFilter),
 
-      SqlField("acqOffPRaw", GnirsLongSlitView.AcqOffsetP, hidden = true),
-      SqlField("acqOffQRaw", GnirsLongSlitView.AcqOffsetQ, hidden = true),
+      SqlField("acqSkyOffPRaw", GnirsLongSlitView.AcqSkyOffsetP, hidden = true),
+      SqlField("acqSkyOffQRaw", GnirsLongSlitView.AcqSkyOffsetQ, hidden = true),
 
-      CursorFieldJson("offset",
+      CursorFieldJson("skyOffset",
         cursor =>
           for
-            p <- cursor.field("acqOffPRaw", None).flatMap(_.as[Option[Angle]])
-            q <- cursor.field("acqOffQRaw", None).flatMap(_.as[Option[Angle]])
+            p <- cursor.field("acqSkyOffPRaw", None).flatMap(_.as[Option[Angle]])
+            q <- cursor.field("acqSkyOffQRaw", None).flatMap(_.as[Option[Angle]])
           yield (p, q) match
             case (Some(pa), Some(qa)) =>
               Offset(Offset.P(pa), Offset.Q(qa)).asJson
             case _ => Json.Null,
-        List("acqOffPRaw", "acqOffQRaw")
+        List("acqSkyOffPRaw", "acqSkyOffQRaw")
       ),
 
       SqlObject("exposureTimeMode", Join(GnirsLongSlitView.ObservationId, ExposureTimeModeView.ObservationId)),

@@ -58,8 +58,8 @@ trait GnirsLongSlitView[F[_]] extends BaseMapping[F]:
     val AcqType: ColumnRef          = col("c_acq_type", gnirs_acquisition_type)
     val AcqCoadds: ColumnRef        = col("c_acq_coadds", int4_pos)
     val AcqFilter: ColumnRef        = col("c_acq_filter", gnirs_filter)
-    val AcqOffsetP: ColumnRef       = col("c_acq_offset_p", angle_µas.opt)
-    val AcqOffsetQ: ColumnRef       = col("c_acq_offset_q", angle_µas.opt)
+    val AcqSkyOffsetP: ColumnRef    = col("c_acq_sky_offset_p", angle_µas.opt)
+    val AcqSkyOffsetQ: ColumnRef    = col("c_acq_sky_offset_q", angle_µas.opt)
 
     // View-computed defaults
     val DefaultDecker: ColumnRef    = col("c_decker_default", gnirs_decker)
