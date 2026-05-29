@@ -3,6 +3,7 @@
 
 package lucuma.odb.service
 
+import cats.data.NonEmptyChain
 import cats.data.NonEmptyList
 import cats.effect.Async
 import cats.implicits.*
@@ -129,6 +130,7 @@ case class ObservationValidationInfo(
   generatorParams:    Option[Either[GeneratorParamsService.Error, GeneratorParams]] = None,
   cfpInfo:            Option[CfpInfo] = None,
   programAllocations: Option[NonEmptyList[ScienceBand]] = None,
+  otherConfigErrors:  List[String] = Nil
 ) {
 
   def isDeclaredComplete: Boolean =
@@ -322,6 +324,39 @@ object ObservationWorkflowService {
                           accum2.updatedWith(oid): op =>
                             op.map(_.copy(coordinates = Some(coords)))
 
+        // Configuration errors that don't fit elsewhere.
+        def addOtherConfigErrors(input: Map[Observation.Id, ObservationValidationInfo]): F[Map[Observation.Id, ObservationValidationInfo]] =
+          import lucuma.odb.sequence.ghost.ifu.Config as GhostIfu
+
+          extension (e: CoreExecutionState)
+            def shouldCheck: Boolean =
+              e match
+                case CoreExecutionState.NotDefined |
+                     CoreExecutionState.NotStarted => true
+                case _                             => false
+
+          // Get a list of GHOST observations that need to be checked.
+          val ghostObsList: List[Observation.Id] =
+            input
+              .toList
+              .mapFilter: (oid, info) =>
+                info
+                  .generatorParams
+                  .flatMap(_.toOption)
+                  .flatMap: params =>
+                    params.observingMode match
+                      case GhostIfu(_, _, _, _, _, _, _, _) if params.executionState.shouldCheck => oid.some
+                      case _                                                                     => none
+
+          // Validate each one to ensure it has an IFU mapping.
+          ghostIfuService
+            .validationErrors(ghostObsList)
+            .map: errors =>
+              errors.toList.foldLeft(input) { case (m, (oid, msg)) =>
+                m.updatedWith(oid): info =>
+                  info.map(in => in.copy(otherConfigErrors = msg :: in.otherConfigErrors))
+              }
+
         NonEmptyList.fromList(oids) match
           case None      =>
             Map.empty.pure
@@ -332,6 +367,7 @@ object ObservationWorkflowService {
               .flatMap(addCfpInfos)
               .flatMap(addProgramAllocations)
               .flatMap(addCoordinates)
+              .flatMap(addOtherConfigErrors)
       }
 
       private def lookupCachedItcResults(
@@ -483,6 +519,11 @@ object ObservationWorkflowService {
           if hasItc(info.oid) || info.isVisitor then ObservationValidationMap.empty
           else ObservationValidationMap.singleton(ObservationValidation.itc("ITC results are not present."))
 
+        val otherConfigErrors: Validator = info =>
+          NonEmptyChain.fromSeq(info.otherConfigErrors) match
+            case None       => ObservationValidationMap.empty
+            case Some(errs) => ObservationValidationMap.singleton(ObservationValidation(ObservationValidationCode.ConfigurationError, errs))
+
         // Here are our composed validators
 
         val calibrationValidator, engValidator: Validator = _ =>
@@ -492,7 +533,8 @@ object ObservationWorkflowService {
           generatorValidator     |+|
           cfpInstrumentValidator |+|
           cfpRaDecValidator      |+|
-          bandValidator
+          bandValidator          |+|
+          otherConfigErrors
 
         val scienceValidator2: Validator =
           itcValidator

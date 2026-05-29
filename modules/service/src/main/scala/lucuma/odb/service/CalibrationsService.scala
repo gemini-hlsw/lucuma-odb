@@ -173,7 +173,7 @@ object CalibrationsService extends CalibrationObservations {
           o    <- session.execute(Statements.selectCalibrationTimeAndConf)(oid).map(_.headOption)
           // Find the original target
           otgs <- o.map(_._1).map { oid =>
-                    asterismService.getAsterism(pid, oid).map(_.map(_._1))
+                    asterismService.getAsterism(oid).map(_.map(_._1))
                   }.getOrElse(List.empty.pure[F])
           // Select a new target
           tgts <- o match {

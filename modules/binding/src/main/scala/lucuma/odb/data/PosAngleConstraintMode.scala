@@ -5,9 +5,6 @@ package lucuma.odb.data
 
 import lucuma.core.util.Enumerated
 
-// There is something similar in lucuma-core.  It needs to be updated and then
-// we can switch to that.
-
 enum PosAngleConstraintMode(val dbTag: String):
   case Unbounded           extends PosAngleConstraintMode("unbounded")
   case Fixed               extends PosAngleConstraintMode("fixed")
@@ -28,4 +25,3 @@ object PosAngleConstraintMode:
       AverageParallactic,
       ParallacticOverride
     ).withTag(_.dbTag)
-

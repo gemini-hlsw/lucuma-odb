@@ -13,21 +13,43 @@ import lucuma.core.math.RightAscension
 
 object coordinates:
 
-  trait QueryCodec:
-    import rightascension.query.given
-    import declination.query.given
+  trait DecoderCoordinates:
+    import rightascension.decoder.given
+    import declination.decoder.given
 
-    given Encoder_Coordinates: Encoder[Coordinates] = cs =>
-      Json.obj(
-        "ra"  -> cs.ra.asJson,
-        "dec" -> cs.dec.asJson
-      )
-
-    given Decoder_Coordinates: Decoder[Coordinates] = hc =>
-      for 
+    given Decoder[Coordinates] = hc =>
+      for
         r <- hc.downField("ra").as[RightAscension]
         d <- hc.downField("dec").as[Declination]
       yield Coordinates(r, d)
 
+  object decoder extends DecoderCoordinates
+
+  trait InternalCodec extends DecoderCoordinates:
+
+    protected def rightAscensionEncoder: Encoder[RightAscension]
+    protected def declinationEncoder:    Encoder[Declination]
+
+    given Encoder_Coordinates: Encoder[Coordinates] = cs =>
+      Json.obj(
+        "ra"  -> cs.ra.asJson(using rightAscensionEncoder),
+        "dec" -> cs.dec.asJson(using declinationEncoder)
+      )
+
+  trait QueryCodec extends InternalCodec:
+    override protected val rightAscensionEncoder: Encoder[RightAscension] =
+      rightascension.query.Encoder_Right_Ascension
+
+    override protected val declinationEncoder: Encoder[Declination] =
+      declination.query.Encoder_Declination
+
   object query extends QueryCodec
 
+  trait TransportCodec extends InternalCodec:
+    override protected val rightAscensionEncoder: Encoder[RightAscension] =
+      rightascension.transport.Encoder_Right_Ascension
+
+    override protected val declinationEncoder: Encoder[Declination] =
+      declination.transport.Encoder_Declination
+
+  object transport extends TransportCodec

@@ -100,6 +100,10 @@ trait SequenceService[F[_]]:
     checked: CheckedWithId[(SequenceType, List[ProtoAtom[ProtoStep[Flamingos2DynamicConfig]]]), Observation.Id]
   )(using Transaction[F]): F[Result[Stream[Pure, Atom[Flamingos2DynamicConfig]]]]
 
+  def selectOrComputeGhostStatic(
+    observationId: Observation.Id
+  )(using Transaction[F]): F[Either[OdbError, GhostStaticConfig]]
+
   def replaceGhostSequence(
     observationId:  Observation.Id,
     sequenceType:   SequenceType,
@@ -584,6 +588,14 @@ object SequenceService:
           )
         }
 
+      override def selectOrComputeGhostStatic(
+        observationId: Observation.Id
+      )(using Transaction[F]): F[Either[OdbError, GhostStaticConfig]] =
+        for
+          s0 <- ghostSequenceService.selectStatic(observationId)
+          s  <- s0.fold(ghostIfuService.computeStatic(observationId))(_.asRight[OdbError].pure[F])
+        yield s
+
       override def replaceGhostSequence(
         observationId:  Observation.Id,
         sequenceType:   SequenceType,
@@ -591,7 +603,7 @@ object SequenceService:
         namespace:      Option[UUID] = None
       )(using Transaction[F]): F[Result[Stream[Pure, Atom[GhostDynamicConfig]]]] =
         (for
-          s <- selectStatic(observationId, "GHOST", ghostSequenceService.selectStaticOrDefault)
+          s <- ResultT(selectOrComputeGhostStatic(observationId).map(e => Result.fromEither(e.leftMap(_.asProblem))))
           b <- ResultT.liftF(atomBuilder(sequenceType, s, namespace, estimator.ghostStep))
           r <- replaceSequence(
                  Instrument.Ghost,

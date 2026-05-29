@@ -101,7 +101,7 @@ trait GuideService[F[_]] {
   import GuideService.AvailabilityPeriod
   import GuideService.GuideEnvironment
 
-  def getGuideEnvironment(pid: Program.Id, oid: Observation.Id)(using
+  def getGuideEnvironment(oid: Observation.Id)(using
     NoTransaction[F], SuperUserAccess
   ): F[Result[GuideEnvironment]]
 
@@ -361,11 +361,11 @@ object GuideService {
   ): GuideService[F] =
     new GuideService[F] {
 
-      def getAsterism(pid: Program.Id, oid: Observation.Id)(using
+      def getAsterism(oid: Observation.Id)(using
         NoTransaction[F], SuperUserAccess
       ): F[Result[NonEmptyList[Target]]] =
         asterismService
-          .getAsterism(pid, oid)
+          .getAsterism(oid)
           .map(l =>
             NonEmptyList
               .fromList(
@@ -930,7 +930,7 @@ object GuideService {
                            )
         } yield env).value
 
-      override def getGuideEnvironment(pid: Program.Id, oid: Observation.Id)(
+      override def getGuideEnvironment(oid: Observation.Id)(
         using NoTransaction[F], SuperUserAccess
       ): F[Result[GuideEnvironment]] =
         T.span("getGuideEnvironment").surround:
@@ -938,7 +938,7 @@ object GuideService {
             obsInfo         <- ResultT(getObservationInfo(oid))
             obsTime         <- ResultT.fromResult(obsInfo.obsTime)
             obsDuration     <- ResultT.fromResult(obsInfo.obsDuration)
-            asterism        <- ResultT(getAsterism(pid, oid))
+            asterism        <- ResultT(getAsterism(oid))
             genInfo         <- ResultT(getGeneratorInfo(oid))
             scienceDuration <- ResultT.fromResult(genInfo.getScienceDuration(obsDuration, oid))
             scienceStart     = genInfo.getScienceStartTime(obsTime)
