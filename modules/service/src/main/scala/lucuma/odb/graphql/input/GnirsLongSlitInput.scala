@@ -6,9 +6,13 @@ package input
 
 import cats.data.NonEmptyList
 import cats.syntax.apply.*
+import cats.syntax.foldable.*
+import cats.syntax.option.*
 import cats.syntax.parallel.*
+import cats.syntax.traverse.*
 import eu.timepit.refined.types.numeric.PosInt
 import grackle.Result
+import grackle.syntax.*
 import lucuma.core.enums.GnirsAcquisitionType
 import lucuma.core.enums.GnirsCamera
 import lucuma.core.enums.GnirsDecker
@@ -26,7 +30,10 @@ import lucuma.core.model.Access
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.SlitTelescopeConfigs
 import lucuma.core.model.sequence.TelescopeConfigAlongSlit
+import lucuma.core.syntax.string.*
 import lucuma.odb.data.Nullable
+import lucuma.odb.data.OdbError
+import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.binding.*
 
 object GnirsLongSlitInput:
@@ -59,8 +66,14 @@ object GnirsLongSlitInput:
             case _ =>
               Matcher.validationFailure("Exactly one of alongSlit or toSky must be provided")
 
+  // GNIRS acquisition (keyhole imaging) filters: H (Order4), H2, J, K, PAH.
+  // Mirrors c_is_acquisition_filter in t_gnirs_filter. GnirsFilter has no
+  // built-in `acquisition` helper (unlike Flamingos2Filter), so it is defined here.
+  val AcquisitionFilters: List[GnirsFilter] =
+    List(GnirsFilter.Order4, GnirsFilter.H2, GnirsFilter.J, GnirsFilter.K, GnirsFilter.PAH)
+
   case class AcquisitionInput(
-    filter:           Option[GnirsFilter],
+    explicitFilter:   Nullable[GnirsFilter], // Nullable to allow clearing to the computed default
     explicitAcqType:  Nullable[GnirsAcquisitionType], // Nullable to allow clearing to automatic
     coadds:           Option[PosInt],
     skyOffset:        Option[Offset],
@@ -71,13 +84,20 @@ object GnirsLongSlitInput:
     val Binding: Matcher[AcquisitionInput] =
       ObjectFieldsBinding.rmap:
         case List(
-          GnirsFilterBinding.Option("filter", rFilter),
+          GnirsFilterBinding.Nullable("explicitFilter", rFilter),
           GnirsAcquisitionTypeBinding.Nullable("explicitAcquisitionType", rAcqType),
           PosIntBinding.Option("coadds", rCoadds),
           OffsetInput.Binding.Option("skyOffset", rSkyOffset),
           ExposureTimeModeInput.Binding.Option("exposureTimeMode", rEtm)
         ) =>
-          (rFilter, rAcqType, rCoadds, rSkyOffset, rEtm).parMapN(AcquisitionInput.apply)
+          (
+            rFilter.flatMap: n =>
+              n.traverse: f =>
+                if AcquisitionFilters.contains(f) then f.success
+                else OdbError.InvalidArgument(s"'explicitFilter' must contain one of: ${AcquisitionFilters.map(_.tag.toScreamingSnakeCase).mkString_(", ")}".some).asFailure
+            ,
+            rAcqType, rCoadds, rSkyOffset, rEtm
+          ).parMapN(AcquisitionInput.apply)
 
   case class Create(
     exposureTimeMode: Option[ExposureTimeMode],

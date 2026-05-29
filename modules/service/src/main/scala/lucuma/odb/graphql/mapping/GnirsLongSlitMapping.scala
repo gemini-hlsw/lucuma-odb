@@ -13,8 +13,6 @@ import grackle.TypeRef
 import grackle.skunk.SkunkMapping
 import io.circe.Json
 import io.circe.syntax.*
-import lucuma.core.enums.GnirsDecker
-import lucuma.core.enums.GnirsWellDepth
 import lucuma.core.enums.SlitOffsetMode
 import lucuma.core.enums.StepGuideState
 import lucuma.core.math.Angle
@@ -69,7 +67,11 @@ trait GnirsLongSlitMapping[F[_]]
 
       SqlField("explicitAcquisitionType", GnirsLongSlitView.AcqType),
       SqlField("coadds",    GnirsLongSlitView.AcqCoadds),
-      SqlField("filter",    GnirsLongSlitView.AcqFilter),
+
+      // Acquisition filter: effective (DB-computed COALESCE), default, explicit
+      SqlField("filter",         GnirsLongSlitView.AcqFilterEffective),
+      SqlField("defaultFilter",  GnirsLongSlitView.AcqFilterDefault),
+      SqlField("explicitFilter", GnirsLongSlitView.AcqFilter),
 
       SqlField("acqSkyOffPRaw", GnirsLongSlitView.AcqSkyOffsetP, hidden = true),
       SqlField("acqSkyOffQRaw", GnirsLongSlitView.AcqSkyOffsetQ, hidden = true),
@@ -120,19 +122,19 @@ trait GnirsLongSlitMapping[F[_]]
       SqlField("initialFilter", GnirsLongSlitView.InitialFilter),
       SqlField("coadds",        GnirsLongSlitView.Coadds),
 
-      // Decker: explicit override + computed default + effective
-      explicitOrElseDefault[GnirsDecker]("decker", "explicitDecker", "defaultDecker"),
-      SqlField("explicitDecker", GnirsLongSlitView.ExplicitDecker),
+      // Decker: effective (DB-computed COALESCE), default, explicit
+      SqlField("decker",         GnirsLongSlitView.DeckerEffective),
       SqlField("defaultDecker",  GnirsLongSlitView.DefaultDecker),
+      SqlField("explicitDecker", GnirsLongSlitView.ExplicitDecker),
 
       // Read mode: explicit override only; when null the read mode is computed
       // from the exposure time at sequence-generation time (mirrors Flamingos2).
       SqlField("explicitReadMode", GnirsLongSlitView.ExplicitReadMode),
 
-      // Well depth: explicit + default + effective
-      explicitOrElseDefault[GnirsWellDepth]("wellDepth", "explicitWellDepth", "defaultWellDepth"),
-      SqlField("explicitWellDepth", GnirsLongSlitView.ExplicitWellDepth),
+      // Well depth: effective (DB-computed COALESCE), default, explicit
+      SqlField("wellDepth",         GnirsLongSlitView.WellDepthEffective),
       SqlField("defaultWellDepth",  GnirsLongSlitView.DefaultWellDepth),
+      SqlField("explicitWellDepth", GnirsLongSlitView.ExplicitWellDepth),
 
       // Focus motor steps (null = best)
       SqlField("explicitFocusMotorSteps", GnirsLongSlitView.FocusMotorSteps),

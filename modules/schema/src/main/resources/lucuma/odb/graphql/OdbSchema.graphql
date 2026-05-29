@@ -9523,7 +9523,16 @@ input Igrins2LongSlitInput {
 type GnirsLongSlitAcquisition {
   explicitAcquisitionType: GnirsAcquisitionType
   coadds: PosInt!
+
+  "The acquisition filter that will be used: the explicitFilter if specified, otherwise the defaultFilter."
   filter: GnirsFilter!
+
+  "The acquisition filter used by default (closest acquisition filter to the science wavelength) when no explicit filter is specified."
+  defaultFilter: GnirsFilter!
+
+  "An explicitly specified acquisition filter to use instead of the default (if any)."
+  explicitFilter: GnirsFilter
+
   skyOffset: Offset
   exposureTimeMode: ExposureTimeMode!
 }
@@ -9579,7 +9588,7 @@ type GnirsLongSlit {
 }
 
 input GnirsLongSlitAcquisitionInput {
-  filter: GnirsFilter
+  explicitFilter: GnirsFilter
   explicitAcquisitionType: GnirsAcquisitionType
   coadds: PosInt
   skyOffset: OffsetInput
