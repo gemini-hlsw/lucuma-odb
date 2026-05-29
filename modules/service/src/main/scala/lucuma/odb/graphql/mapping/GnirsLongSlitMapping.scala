@@ -67,7 +67,7 @@ trait GnirsLongSlitMapping[F[_]]
 
       SqlField("observationId", GnirsLongSlitView.ObservationId, key = true, hidden = true),
 
-      SqlField("acquisitionType", GnirsLongSlitView.AcqType),
+      SqlField("explicitAcquisitionType", GnirsLongSlitView.AcqType),
       SqlField("coadds",    GnirsLongSlitView.AcqCoadds),
       SqlField("filter",    GnirsLongSlitView.AcqFilter),
 

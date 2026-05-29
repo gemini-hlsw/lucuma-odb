@@ -90,7 +90,7 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                           timeAndCount { time { seconds } count at { nanometers } }
                         }
                         acquisition {
-                          acquisitionType
+                          explicitAcquisitionType
                           coadds
                           filter
                           skyOffset { p { arcseconds } q { arcseconds } }
@@ -153,7 +153,7 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                         }
                       },
                       "acquisition": {
-                        "acquisitionType": "FAINT",
+                        "explicitAcquisitionType": null,
                         "coadds": 1,
                         "filter": "ORDER3",
                         "skyOffset": null,
