@@ -94,7 +94,6 @@ trait GnirsCodec:
       for
         exposure          <- c.downField("exposure").as[TimeSpan]
         coadds            <- c.downField("coadds").as[PosInt]
-        centralWavelength <- c.downField("centralWavelength").as[Wavelength]
         filter            <- c.downField("filter").as[GnirsFilter]
         decker            <- c.downField("decker").as[GnirsDecker]
         fpu               <- c.downField("fpuSlit").as[GnirsFpuSlit].map(_.asLeft[GnirsFpuOther]) orElse
@@ -106,7 +105,6 @@ trait GnirsCodec:
       yield GnirsDynamicConfig(
         exposure,
         coadds,
-        centralWavelength,
         filter,
         decker,
         fpu,

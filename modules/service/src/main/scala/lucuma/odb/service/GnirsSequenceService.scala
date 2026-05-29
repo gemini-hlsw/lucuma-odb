@@ -67,7 +67,6 @@ object GnirsSequenceService:
       List(
         "c_exposure_time",
         "c_coadds",
-        "c_central_wavelength",
         "c_filter",
         "c_decker",
         "c_fpu_slit",

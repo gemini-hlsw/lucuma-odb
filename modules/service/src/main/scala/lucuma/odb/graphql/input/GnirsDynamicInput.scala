@@ -36,7 +36,6 @@ object GnirsDynamicInput:
       case List(
         TimeSpanInput.Binding("exposure", rExposure),
         PosIntBinding("coadds", rCoadds),
-        WavelengthInput.Binding("centralWavelength", rCentralWavelength),
         GnirsFilterBinding("filter", rFilter),
         GnirsDeckerBinding("decker", rDecker),
         GnirsFpuSlitBinding.Option("fpuSlit", rFpuSlit),
@@ -45,8 +44,8 @@ object GnirsDynamicInput:
         GnirsCameraBinding("camera", rCamera),
         IntBinding.Option("focusMotorSteps", rFocusMotorSteps),
         GnirsReadModeBinding("readMode", rReadMode)
-      ) => (rExposure, rCoadds, rCentralWavelength, rFilter, rDecker, rFpuSlit, rFpuOther, rAcqMirror, rCamera, rFocusMotorSteps, rReadMode).parTupled.flatMap {
-        case (exposure, coadds, centralWavelength, filter, decker, fpuSlit, fpuOther, acqMirror, camera, focusMotorSteps, readMode) =>
+      ) => (rExposure, rCoadds, rFilter, rDecker, rFpuSlit, rFpuOther, rAcqMirror, rCamera, rFocusMotorSteps, rReadMode).parTupled.flatMap {
+        case (exposure, coadds, filter, decker, fpuSlit, fpuOther, acqMirror, camera, focusMotorSteps, readMode) =>
 
           val rFpu: Result[Either[GnirsFpuSlit, GnirsFpuOther]] =
             (fpuSlit, fpuOther) match
@@ -67,7 +66,6 @@ object GnirsDynamicInput:
             GnirsDynamicConfig(
               exposure,
               coadds,
-              centralWavelength,
               filter,
               decker,
               fpu,

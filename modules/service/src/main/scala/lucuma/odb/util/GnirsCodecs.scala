@@ -108,7 +108,6 @@ trait GnirsCodecs:
     (
       time_span                     *:
       int4_pos                      *:
-      wavelength_pm                 *:
       gnirs_filter                  *:
       gnirs_decker                  *:
       gnirs_fpu                     *:

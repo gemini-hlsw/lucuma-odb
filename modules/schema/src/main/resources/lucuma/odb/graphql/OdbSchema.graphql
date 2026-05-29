@@ -19721,7 +19721,6 @@ is "Best" (instrument-chosen).
 input GnirsDynamicInput {
   exposure: TimeSpanInput!
   coadds: PosInt!
-  centralWavelength: WavelengthInput!
   filter: GnirsFilter!
   decker: GnirsDecker!
   fpuSlit: GnirsFpuSlit

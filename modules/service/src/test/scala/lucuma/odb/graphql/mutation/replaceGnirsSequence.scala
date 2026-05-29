@@ -19,7 +19,6 @@ class replaceGnirsSequence extends query.ExecutionTestSupportForGnirs with Repla
             instrumentConfig: {
               exposure: { seconds: $exposureSeconds }
               coadds: 2
-              centralWavelength: { nanometers: 2200 }
               filter: H2
               decker: LONG_CAM_LONG_SLIT
               fpuSlit: LONG_SLIT_0_10
