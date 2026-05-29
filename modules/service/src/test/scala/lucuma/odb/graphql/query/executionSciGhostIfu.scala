@@ -995,6 +995,71 @@ class executionSciGhostIfu extends ExecutionTestSupportForGhost:
             )
     yield ()
 
+  test("IFU Mapping FAIL - target an sky are too close"):
+    val sky = TargetCoordinates.get.shift(HourAngle.fromMicroseconds(-6790000L), Angle.Angle0)
+    for
+      p <- createProgram
+      t <- createTargetWithProfileAs(pi, p)
+      o <- createObservationWithModeAs(pi, p, List(t), mode(skyPosition = sky.some))
+      _ <- expect(
+            pi,
+            staticConfigQuery(o),
+            List("Could not compute GHOST IFU mapping: The target and sky positions are too close (minimum separation is 102 arcseconds).").asLeft
+          )
+    yield ()
+
+  test("IFU Mapping FAIL - dual targets are too close"):
+    for
+      p  <- createProgram
+      t1 <- createTargetWithProfileAs(pi, p)
+      t2 <- query(
+              user  = pi,
+              query =
+              s"""
+                mutation {
+                  createTarget(input: {
+                    programId: "$p",
+                    SET: {
+                      name: "V1647 Orionis 2"
+                      sidereal: {
+                        ra: { hms: "05:46:10.137" },
+                        dec: { dms: "-00:06:04.89" },
+                        epoch: "J2000.0",
+                        properMotion: {
+                          ra: {
+                            milliarcsecondsPerYear: 0.918
+                          },
+                          dec: {
+                            milliarcsecondsPerYear: -1.057
+                          },
+                        },
+                        radialVelocity: {
+                          kilometersPerSecond: 27.58
+                        },
+                        parallax: {
+                          milliarcseconds: 2.422
+                        }
+                      },
+                      $PointBandNormalizedProfile
+                    }
+                  }) {
+                    target {
+                      id
+                    }
+                  }
+                }
+              """
+            ).map(
+              _.hcursor.downFields("createTarget", "target", "id").require[Target.Id]
+            )
+      o  <- createObservationWithModeAs(pi, p, List(t1, t2), standardResolutionNoSky)
+      _  <- expect(
+              pi,
+              staticConfigQuery(o),
+              List("Could not compute GHOST IFU mapping: The dual targets are too close (minimum separation is 102 arcseconds).").asLeft
+            )
+    yield ()
+
   test("IFU Mapping FAIL - validation"):
     val workflow = for
       p  <- createProgram

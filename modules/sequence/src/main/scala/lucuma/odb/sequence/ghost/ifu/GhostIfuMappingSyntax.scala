@@ -25,12 +25,20 @@ import lucuma.core.util.Timestamp
  */
 object GhostIfuMappingSyntax:
 
+  private enum AssignmentResult:
+    case TargetAtIfu1 extends AssignmentResult
+    case TargetAtIfu2 extends AssignmentResult
+    case OutOfRange   extends AssignmentResult
+    case TooClose     extends AssignmentResult
+
+  import AssignmentResult.*
+
   private def ifuAssignment(
     base:          Coordinates,
-    c1:            Coordinates,
-    c2:            Option[Coordinates],
+    target:        Coordinates,
+    skyOrTarget:   Option[Coordinates],
     positionAngle: Option[Angle]
-  ): Int =
+  ): AssignmentResult =
     val angle  = positionAngle.getOrElse(Angle.Angle0)
 
     val field1 = GhostIfuPatrolField.ifu1PatrolFieldAt(angle, Offset.Zero)
@@ -39,12 +47,30 @@ object GhostIfuMappingSyntax:
     val shape1 = field1.eval
     val shape2 = field2.eval
 
-    val pos1 = base.diff(c1).offset
-    val pos2 = c2.map(base.diff(_).offset)
+    val pos1 = base.diff(target).offset
+    val pos2 = skyOrTarget.map(base.diff(_).offset)
 
-    if shape1.contains(pos1) && pos2.forall(shape2.contains)      then -1
-    else if pos2.forall(shape1.contains) && shape2.contains(pos1) then  1
-    else 0
+    val preliminaryResult =
+      if shape1.contains(pos1) && pos2.forall(shape2.contains)      then TargetAtIfu1
+      else if pos2.forall(shape1.contains) && shape2.contains(pos1) then TargetAtIfu2
+      else OutOfRange
+
+    extension (a: Angle)
+      def µas: Long =
+        Angle.signedMicroarcseconds.get(a).abs
+
+    // Check whether the positions are too close.
+    pos2.fold(preliminaryResult): p =>
+      if pos1.distance(p).µas >= MinimumIfuArmSeparation.µas then preliminaryResult
+      else TooClose
+
+  private val MinimumArmSeparationString: String =
+    Angle
+      .signedDecimalArcseconds
+      .get(MinimumIfuArmSeparation)
+      .underlying
+      .stripTrailingZeros
+      .toPlainString
 
   private def deriveOneTarget(
     ctx:    IfuMappingContext,
@@ -56,9 +82,10 @@ object GhostIfuMappingSyntax:
           case Target.Sidereal(_, track, _, _) =>
             track.at(ctx.when.toInstant).fold("Cannot determine the target coordinates.".asLeft): c =>
               ifuAssignment(ctx.explicitBase.getOrElse(c), c, ctx.sky, ctx.angle) match
-                case -1 => ctx.sky.fold(GhostIfuMapping.SingleTarget(track).asRight)(s => GhostIfuMapping.TargetPlusSky(track, s).asRight)
-                case  1 => ctx.sky.fold("The target does not fall in range of GHOST IFU1 probe.".asLeft)(s => GhostIfuMapping.SkyPlusTarget(s, track).asRight)
-                case  _ => "The target and sky positions are too far apart.".asLeft
+                case TargetAtIfu1 => ctx.sky.fold(GhostIfuMapping.SingleTarget(track).asRight)(s => GhostIfuMapping.TargetPlusSky(track, s).asRight)
+                case TargetAtIfu2 => ctx.sky.fold("The target does not fall in range of GHOST IFU1 probe.".asLeft)(s => GhostIfuMapping.SkyPlusTarget(s, track).asRight)
+                case OutOfRange   => "The target and sky positions are too far apart.".asLeft
+                case TooClose     => s"The target and sky positions are too close (minimum separation is $MinimumArmSeparationString arcseconds).".asLeft
 
           case Target.Nonsidereal(_, _, _)     =>
             ctx.sky.fold(GhostIfuMapping.Nonsidereal.asRight): _ =>
@@ -73,8 +100,9 @@ object GhostIfuMappingSyntax:
             track.at(ctx.when.toInstant).fold("Cannot determine the target coordinates.".asLeft): c =>
               ctx.sky.fold("GHOST High Resolution mode requires a sky position.".asLeft): s =>
                 ifuAssignment(ctx.explicitBase.getOrElse(c), c, s.some, ctx.angle) match
-                  case -1 => GhostIfuMapping.TargetPlusSky(track, s).asRight
-                  case  _ => "The target and/or sky position is not reachable by the GHOST IFU probes.".asLeft
+                  case TargetAtIfu1 => GhostIfuMapping.TargetPlusSky(track, s).asRight
+                  case TooClose     => s"The target and sky positions are too close (minimum separation is $MinimumArmSeparationString arcseconds).".asLeft
+                  case _            => "The target and/or sky position is not reachable by the GHOST IFU probes.".asLeft
 
           case Target.Nonsidereal(_, _, _)     =>
             ctx.sky.fold(GhostIfuMapping.Nonsidereal.asRight): _ =>
@@ -97,9 +125,10 @@ object GhostIfuMappingSyntax:
               .fold("Cannot determine the target coordinates.".asLeft): (c1, c2) =>
                 val base = ctx.explicitBase.getOrElse(Coordinates.centerOf(NonEmptyList.of(c1, c2)))
                 ifuAssignment(base, c1, c2.some, ctx.angle) match
-                  case -1 => GhostIfuMapping.DualTarget(track1, track2).asRight
-                  case  1 => GhostIfuMapping.DualTarget(track2, track1).asRight
-                  case  _ => "The targets do not fall in range of the GHOST IFU probes.".asLeft
+                  case TargetAtIfu1 => GhostIfuMapping.DualTarget(track1, track2).asRight
+                  case TargetAtIfu2 => GhostIfuMapping.DualTarget(track2, track1).asRight
+                  case OutOfRange   => "The targets do not fall in range of the GHOST IFU probes.".asLeft
+                  case TooClose     => s"The dual targets are too close (minimum separation is $MinimumArmSeparationString arcseconds).".asLeft
           case _                                                                    =>
             "GHOST Dual Target mode is available for sidereal targets only.".asLeft
 
