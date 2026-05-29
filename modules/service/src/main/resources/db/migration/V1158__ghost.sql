@@ -2,7 +2,7 @@ DROP VIEW v_ghost_static;
 
 ALTER TABLE t_ghost_static
   DROP COLUMN c_visit_id,
-  ADD COLUMN  c_ifu_mapping    e_ghost_ifu_mapping NULL,  -- To be made NOT NULL
+  ADD COLUMN  c_ifu_mapping    e_ghost_ifu_mapping NOT NULL,
 
   ADD COLUMN  c_ifu1_ra        d_angle_µas         NULL,
   ADD COLUMN  c_ifu1_dec       d_angle_µas         NULL,
@@ -22,8 +22,7 @@ ALTER TABLE t_ghost_static
 
   ADD CONSTRAINT t_ghost_static_consistent_ifu_mapping CHECK (
     CASE
-      WHEN (c_ifu_mapping IS NULL        ) OR
-           (c_ifu_mapping = 'nonsidereal')   THEN
+      WHEN c_ifu_mapping = 'nonsidereal'     THEN
         num_nulls(
           c_ifu1_ra, c_ifu1_dec, c_ifu1_epoch, c_ifu1_pm_ra, c_ifu1_pm_dec, c_ifu1_rv, c_ifu1_parallax,
           c_ifu2_ra, c_ifu2_dec, c_ifu2_epoch, c_ifu2_pm_ra, c_ifu2_pm_dec, c_ifu2_rv, c_ifu2_parallax
