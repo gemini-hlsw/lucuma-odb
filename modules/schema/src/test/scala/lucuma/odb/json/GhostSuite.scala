@@ -18,7 +18,7 @@ class GhostSuite extends DisciplineSuite with ArbitraryInstances:
   import ArbGhostDetector.given
   import ArbGhostDynamicConfig.given
   import ArbGhostStaticConfig.given
-  import ghost.given
+  import ghost.query.given
   import time.query.given
 
   checkAll("GhostCodec StaticConfig",       CodecTests[GhostStaticConfig].codec)

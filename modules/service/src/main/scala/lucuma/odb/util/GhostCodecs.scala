@@ -6,9 +6,9 @@ package lucuma.odb.util
 import cats.syntax.either.*
 import cats.syntax.option.*
 import lucuma.core.enums.GhostBinning
-import lucuma.core.enums.GhostIfuMappingType
 import lucuma.core.enums.GhostIfu1FiberAgitator
 import lucuma.core.enums.GhostIfu2FiberAgitator
+import lucuma.core.enums.GhostIfuMappingType
 import lucuma.core.enums.GhostReadMode
 import lucuma.core.enums.GhostResolutionMode
 import lucuma.core.math.Coordinates
