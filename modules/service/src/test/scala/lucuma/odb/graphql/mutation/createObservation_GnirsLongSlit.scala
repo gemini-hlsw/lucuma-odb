@@ -93,6 +93,8 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                           explicitAcquisitionType
                           coadds
                           filter
+                          defaultFilter
+                          explicitFilter
                           skyOffset { p { arcseconds } q { arcseconds } }
                           exposureTimeMode {
                             signalToNoise { value at { nanometers } }
@@ -155,7 +157,9 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                       "acquisition": {
                         "explicitAcquisitionType": null,
                         "coadds": 1,
-                        "filter": "ORDER3",
+                        "filter": "K",
+                        "defaultFilter": "K",
+                        "explicitFilter": null,
                         "skyOffset": null,
                         "exposureTimeMode": {
                           "signalToNoise": {
@@ -753,3 +757,123 @@ class createObservation_GnirsLongSlit extends OdbSuite:
             """)
           )
         yield ()
+
+  test("create GNIRS Long Slit with explicit acquisition filter"):
+    createProgramAs(pi).flatMap: pid =>
+      createTargetAs(pi, pid).flatMap: tid =>
+        expect(
+          user  = pi,
+          query =
+            s"""
+              mutation {
+                createObservation(input: {
+                  programId: "$pid"
+                  SET: {
+                    targetEnvironment: { asterism: [ "$tid" ] }
+                    scienceRequirements: {
+                      spectroscopy: {
+                        wavelength: { nanometers: 2200 }
+                        resolution: 1000
+                        wavelengthCoverage: { nanometers: 200 }
+                        focalPlane: SINGLE_SLIT
+                        focalPlaneAngle: { microarcseconds: 0 }
+                      }
+                    }
+                    observingMode: {
+                      gnirsLongSlit: {
+                        grating: D111
+                        prism: MIRROR
+                        camera: SHORT_BLUE
+                        fpu: LONG_SLIT_0_30
+                        filter: ORDER3
+                        exposureTimeMode: {
+                          timeAndCount: {
+                            time: { seconds: 30.0 }
+                            count: 3
+                            at: { nanometers: 2200 }
+                          }
+                        }
+                        acquisition: {
+                          explicitFilter: H2
+                        }
+                      }
+                    }
+                  }
+                }) {
+                  observation {
+                    observingMode {
+                      gnirsLongSlit {
+                        acquisition { filter defaultFilter explicitFilter }
+                      }
+                    }
+                  }
+                }
+              }
+            """,
+          expected = Right(json"""
+            {
+              "createObservation": {
+                "observation": {
+                  "observingMode": {
+                    "gnirsLongSlit": {
+                      "acquisition": {
+                        "filter": "H2",
+                        "defaultFilter": "K",
+                        "explicitFilter": "H2"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          """)
+        )
+
+  test("create GNIRS Long Slit rejects a non-acquisition explicit filter"):
+    createProgramAs(pi).flatMap: pid =>
+      createTargetAs(pi, pid).flatMap: tid =>
+        expect(
+          user  = pi,
+          query =
+            s"""
+              mutation {
+                createObservation(input: {
+                  programId: "$pid"
+                  SET: {
+                    targetEnvironment: { asterism: [ "$tid" ] }
+                    scienceRequirements: {
+                      spectroscopy: {
+                        wavelength: { nanometers: 2200 }
+                        resolution: 1000
+                        wavelengthCoverage: { nanometers: 200 }
+                        focalPlane: SINGLE_SLIT
+                        focalPlaneAngle: { microarcseconds: 0 }
+                      }
+                    }
+                    observingMode: {
+                      gnirsLongSlit: {
+                        grating: D111
+                        prism: MIRROR
+                        camera: SHORT_BLUE
+                        fpu: LONG_SLIT_0_30
+                        filter: ORDER3
+                        exposureTimeMode: {
+                          timeAndCount: {
+                            time: { seconds: 30.0 }
+                            count: 3
+                            at: { nanometers: 2200 }
+                          }
+                        }
+                        acquisition: {
+                          explicitFilter: ORDER5
+                        }
+                      }
+                    }
+                  }
+                }) { observation { id } }
+              }
+            """,
+          expected = Left(List(
+            "Argument 'input.SET.observingMode.gnirsLongSlit.acquisition' is invalid: 'explicitFilter' must contain one of: ORDER4, H2, J, K, PAH"
+          ))
+        )

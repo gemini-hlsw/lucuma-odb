@@ -82,14 +82,12 @@ object GnirsLongSlitService:
         gnirs_filter                     *:
         // Coadds
         int4                             *:
-        // Decker default + explicit
-        gnirs_decker                     *: // c_decker_default
-        gnirs_decker.opt                 *: // c_decker (explicit)
+        // Decker effective (DB-computed COALESCE)
+        gnirs_decker                     *: // c_decker_effective
         // Read mode explicit override (None => compute from exposure time)
         gnirs_read_mode.opt              *: // c_read_mode (explicit)
-        // Well depth default + explicit
-        gnirs_well_depth                 *: // c_well_depth_default
-        gnirs_well_depth.opt             *: // c_well_depth (explicit)
+        // Well depth effective (DB-computed COALESCE)
+        gnirs_well_depth                 *: // c_well_depth_effective
         // Focus motor steps (nullable = Best)
         int4.opt                         *:
         // Telescope configs: explicit (both nullable) + default
@@ -100,19 +98,19 @@ object GnirsLongSlitService:
         // Acquisition fields (inline cols + acq ETM joined from t_exposure_time_mode via FK)
         gnirs_acquisition_type.opt       *: // c_acq_type (None => compute from exposure time)
         int4                             *: // c_acq_coadds
-        gnirs_filter                     *: // c_acq_filter
+        gnirs_filter                     *: // c_acq_filter_effective (DB-computed COALESCE)
         angle_µas.opt                    *: // c_acq_sky_offset_p
         angle_µas.opt                    *: // c_acq_sky_offset_q
         exposure_time_mode                  // acquisition ETM
       ).emap:
         case (sciEtm *: gratingEff *: prismEff *: gratingWavEff *:
               camera *: fpu *: filter *: coadds *:
-              deckerDef *: deckerExp *:
+              deckerEff *:
               readModeExp *:
-              wellDepthDef *: wellDepthExp *:
+              wellDepthEff *:
               focusMotorSteps *:
               slitOffsetModeExp *: tcExp *: slitOffsetModeDef *: tcDef *:
-              acqType *: acqCoadds *: acqFilter *: acqSkyOffP *: acqSkyOffQ *:
+              acqType *: acqCoadds *: acqFilterEff *: acqSkyOffP *: acqSkyOffQ *:
               acqEtm *: EmptyTuple) =>
           SlitTelescopeConfigsFormat.getOption((slitOffsetModeDef, tcDef))
             .toRight(s"Could not parse default telescope configs from '$tcDef'")
@@ -128,7 +126,7 @@ object GnirsLongSlitService:
                       .leftMap(e => s"Invalid acq coadds $acqCoadds: $e")
                       .map: acqCoaddsP =>
                         val acq = AcquisitionConfig(
-                          acqType, acqFilter,
+                          acqType, acqFilterEff,
                           (acqSkyOffP, acqSkyOffQ).mapN((p, q) => Offset(Offset.P(p), Offset.Q(q))),
                           acqEtm, acqCoaddsP
                         )
@@ -136,7 +134,7 @@ object GnirsLongSlitService:
                           GnirsFocus.Custom(GnirsFocusMotorStepsValue.unsafeFrom(n).withUnit[GnirsFocusMotorStep])
                         Config(
                           filter,
-                          deckerExp.getOrElse(deckerDef),
+                          deckerEff,
                           fpu,
                           prismEff,
                           gratingEff,
@@ -144,7 +142,7 @@ object GnirsLongSlitService:
                           camera,
                           focus,
                           readModeExp,
-                          wellDepthExp.getOrElse(wellDepthDef),
+                          wellDepthEff,
                           sciEtm,
                           coaddsP,
                           explicitTCOpt.getOrElse(defaultTC),
@@ -230,11 +228,9 @@ object GnirsLongSlitService:
           ls.c_fpu,
           ls.c_filter,
           ls.c_coadds,
-          ls.c_decker_default,
-          ls.c_decker,
+          ls.c_decker_effective,
           ls.c_read_mode,
-          ls.c_well_depth_default,
-          ls.c_well_depth,
+          ls.c_well_depth_effective,
           ls.c_focus_motor_steps,
           ls.c_slit_offset_mode,
           ls.c_telescope_configs,
@@ -242,7 +238,7 @@ object GnirsLongSlitService:
           ls.c_telescope_configs_default,
           ls.c_acq_type,
           ls.c_acq_coadds,
-          ls.c_acq_filter,
+          ls.c_acq_filter_effective,
           ls.c_acq_sky_offset_p,
           ls.c_acq_sky_offset_q,
           acq.c_exposure_time_mode,
@@ -266,9 +262,6 @@ object GnirsLongSlitService:
     // sequence-generation time (mirrors read mode handling).
     private def explicitAcqType(input: GnirsLongSlitInput.Create): Option[GnirsAcquisitionType] =
       input.acquisition.flatMap(_.explicitAcqType.toOption)
-
-    private def defaultAcqFilter(input: GnirsLongSlitInput.Create): GnirsFilter =
-      input.acquisition.flatMap(_.filter).getOrElse(input.filter)
 
     val InsertGnirsLongSlit: Fragment[(
       Observation.Id,
@@ -295,7 +288,7 @@ object GnirsLongSlitService:
       // acquisition inline columns
       Option[GnirsAcquisitionType], // None => automatic
       Int,
-      GnirsFilter,
+      Option[GnirsFilter],    // explicit acq filter (None => computed default)
       Option[Long],           // acq_sky_offset_p in µas
       Option[Long]            // acq_sky_offset_q in µas
     )] =
@@ -350,7 +343,7 @@ object GnirsLongSlitService:
           ${text.opt},
           ${gnirs_acquisition_type.opt},
           $int4,
-          $gnirs_filter,
+          ${gnirs_filter.opt},
           ${int8.opt},
           ${int8.opt}
         FROM t_observation
@@ -393,7 +386,7 @@ object GnirsLongSlitService:
         explicitTC.map(_._2),
         explicitAcqType(input),
         input.acquisition.flatMap(_.coadds).map(_.value).getOrElse(1),
-        defaultAcqFilter(input),
+        input.acquisition.flatMap(_.explicitFilter.toOption),
         acqSkyOffP,
         acqSkyOffQ
       )
@@ -421,7 +414,7 @@ object GnirsLongSlitService:
       // Acquisition inline (non-ETM) column updates
       val upAcqType      = sql"c_acq_type = ${gnirs_acquisition_type.opt}"
       val upAcqCoadds    = sql"c_acq_coadds    = $int4_pos"
-      val upAcqFilter    = sql"c_acq_filter    = $gnirs_filter"
+      val upAcqFilter    = sql"c_acq_filter    = ${gnirs_filter.opt}"
       val upAcqSkyOffP   = sql"c_acq_sky_offset_p  = ${int8.opt}"
       val upAcqSkyOffQ   = sql"c_acq_sky_offset_q  = ${int8.opt}"
 
@@ -446,7 +439,7 @@ object GnirsLongSlitService:
           List(
             acq.explicitAcqType.toOptionOption.map(upAcqType),
             acq.coadds.map(upAcqCoadds),
-            acq.filter.map(upAcqFilter)
+            acq.explicitFilter.toOptionOption.map(upAcqFilter)
           ).flatten ++ offUpdates
 
       val ups: List[AppliedFragment] = List(
