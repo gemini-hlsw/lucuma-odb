@@ -9,6 +9,10 @@ import lucuma.core.math.Coordinates
 import lucuma.core.model.PosAngleConstraint
 import lucuma.core.util.Timestamp
 
+/**
+ * The mapping contgext is a collection of data required to derive the
+ * GhostIfuMapping or validate that a GHOST observation has a mapping.
+ */
 case class IfuMappingContext(
   resolutionMode:     GhostResolutionMode,
   sky:                Option[Coordinates],

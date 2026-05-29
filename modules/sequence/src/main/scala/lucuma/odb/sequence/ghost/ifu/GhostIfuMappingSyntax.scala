@@ -17,6 +17,12 @@ import lucuma.core.model.Target
 import lucuma.core.model.sequence.ghost.GhostIfuMapping
 import lucuma.core.util.Timestamp
 
+/**
+ * Syntax for the GhostIfuMapping companion that adds derivation and validation
+ * from observation information.  Particularly, the resolution mode, the
+ * (possible) sky position, the position angle, the observation time, and the
+ * targets.
+ */
 object GhostIfuMappingSyntax:
 
   private def ifuAssignment(

@@ -828,7 +828,12 @@ trait Codecs {
 
   val pos_angle_constraint: Codec[PosAngleConstraint] =
     (pac_mode *: angle_µas).imap { (m, a) =>
-      m.toPosAngleConstraint(a)
+      m match
+        case PosAngleConstraintMode.Unbounded           => PosAngleConstraint.Unbounded
+        case PosAngleConstraintMode.Fixed               => PosAngleConstraint.Fixed(a)
+        case PosAngleConstraintMode.AllowFlip           => PosAngleConstraint.AllowFlip(a)
+        case PosAngleConstraintMode.AverageParallactic  => PosAngleConstraint.AverageParallactic
+        case PosAngleConstraintMode.ParallacticOverride => PosAngleConstraint.ParallacticOverride(a)
     } {
       case PosAngleConstraint.Unbounded              => (PosAngleConstraintMode.Unbounded,           Angle.Angle0)
       case PosAngleConstraint.Fixed(a)               => (PosAngleConstraintMode.Fixed,               a)

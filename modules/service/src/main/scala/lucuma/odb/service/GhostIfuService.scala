@@ -74,7 +74,7 @@ trait GhostIfuService[F[_]]:
   ): F[Either[OdbError, GhostStaticConfig]]
 
   /**
-   * Returns a map of the observations for which we can derive a valid
+   * Returns a map of the observations for which we cannot derive a valid
    * IFU mapping.  If an observation is not found or has no problems, then
    * it is not included in the results.
    */

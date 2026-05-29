@@ -9219,6 +9219,12 @@ enum GhostIfuMappingType {
   DUAL_TARGET
 }
 
+"""
+Describes how the target(s) and sky position (if any) are mapped to the GHOST
+IFUs.  If the `mappingType` is `NONSIDEREAL` then all other fields will be
+`null`.  Otherwise, there will be a single non-null field that corresponds to
+the `mappingType`.
+"""
 type GhostIfuMapping {
   mappingType:   GhostIfuMappingType!
   singleTarget:  GhostSingleTarget
