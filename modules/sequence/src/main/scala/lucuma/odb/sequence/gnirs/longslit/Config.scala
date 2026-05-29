@@ -29,8 +29,7 @@ import java.io.DataOutputStream
 case class AcquisitionConfig(
   acqType:          GnirsAcquisitionType,
   filter:           GnirsFilter,
-  offsetP:          Option[Offset.P],
-  offsetQ:          Option[Offset.Q],
+  skyOffset:        Option[Offset],
   exposureTimeMode: ExposureTimeMode,
   coadds:           PosInt,
 ):
@@ -41,8 +40,7 @@ case class AcquisitionConfig(
     out.writeChars(acqType.tag)
     out.write(coadds.value.hashBytes)
     out.writeChars(filter.tag)
-    out.write(offsetP.map(_.hashBytes).getOrElse(Array.emptyByteArray))
-    out.write(offsetQ.map(_.hashBytes).getOrElse(Array.emptyByteArray))
+    out.write(skyOffset.map(_.hashBytes).getOrElse(Array.emptyByteArray))
     out.write(exposureTimeMode.hashBytes)
     out.close()
     bao.toByteArray
@@ -50,7 +48,7 @@ case class AcquisitionConfig(
 object AcquisitionConfig:
   given Eq[AcquisitionConfig] =
     Eq.by: a =>
-      (a.acqType, a.coadds.value, a.filter, a.offsetP.map(_.toAngle), a.offsetQ.map(_.toAngle), a.exposureTimeMode)
+      (a.acqType, a.coadds.value, a.filter, a.skyOffset, a.exposureTimeMode)
 
 case class Config(
   filter:                  GnirsFilter,

@@ -93,7 +93,7 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                           acquisitionType
                           coadds
                           filter
-                          offset { p { arcseconds } q { arcseconds } }
+                          skyOffset { p { arcseconds } q { arcseconds } }
                           exposureTimeMode {
                             signalToNoise { value at { nanometers } }
                             timeAndCount { time { seconds } count at { nanometers } }
@@ -156,7 +156,7 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                         "acquisitionType": "FAINT",
                         "coadds": 1,
                         "filter": "ORDER3",
-                        "offset": null,
+                        "skyOffset": null,
                         "exposureTimeMode": {
                           "signalToNoise": {
                             "value": 10.000,
@@ -172,6 +172,143 @@ class createObservation_GnirsLongSlit extends OdbSuite:
             }
           """)
         )
+
+  test("create GNIRS Long Slit with acquisition skyOffset — round-trips"):
+    createProgramAs(pi).flatMap: pid =>
+      createTargetAs(pi, pid).flatMap: tid =>
+        expect(
+          user  = pi,
+          query =
+            s"""
+              mutation {
+                createObservation(input: {
+                  programId: "$pid"
+                  SET: {
+                    targetEnvironment: { asterism: [ "$tid" ] }
+                    scienceRequirements: {
+                      spectroscopy: {
+                        wavelength: { nanometers: 2200 }
+                        resolution: 1000
+                        wavelengthCoverage: { nanometers: 200 }
+                        focalPlane: SINGLE_SLIT
+                        focalPlaneAngle: { microarcseconds: 0 }
+                      }
+                    }
+                    observingMode: {
+                      gnirsLongSlit: {
+                        grating: D111
+                        prism: MIRROR
+                        camera: SHORT_BLUE
+                        fpu: LONG_SLIT_0_30
+                        filter: ORDER3
+                        exposureTimeMode: {
+                          timeAndCount: {
+                            time: { seconds: 30.0 }
+                            count: 3
+                            at: { nanometers: 2200 }
+                          }
+                        }
+                        acquisition: {
+                          skyOffset: {
+                            p: { arcseconds: 1.5 }
+                            q: { arcseconds: -2.5 }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }) {
+                  observation {
+                    observingMode {
+                      gnirsLongSlit {
+                        acquisition {
+                          skyOffset { p { arcseconds } q { arcseconds } }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            """,
+          expected = Right(json"""
+            {
+              "createObservation": {
+                "observation": {
+                  "observingMode": {
+                    "gnirsLongSlit": {
+                      "acquisition": {
+                        "skyOffset": {
+                          "p": { "arcseconds": 1.500000 },
+                          "q": { "arcseconds": -2.500000 }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          """)
+        )
+
+  test("update GNIRS Long Slit — set acquisition skyOffset"):
+    createProgramAs(pi).flatMap: pid =>
+      createTargetAs(pi, pid).flatMap: tid =>
+        for
+          oid <- createGnirsLongSlitObservationAs(pi, pid, tid)
+          _   <- expect(
+            user  = pi,
+            query =
+              s"""
+                mutation {
+                  updateObservations(input: {
+                    SET: {
+                      observingMode: {
+                        gnirsLongSlit: {
+                          acquisition: {
+                            skyOffset: {
+                              p: { arcseconds: 3.0 }
+                              q: { arcseconds: 4.0 }
+                            }
+                          }
+                        }
+                      }
+                    }
+                    WHERE: { id: { EQ: "$oid" } }
+                  }) {
+                    observations {
+                      observingMode {
+                        gnirsLongSlit {
+                          acquisition {
+                            skyOffset { p { arcseconds } q { arcseconds } }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              """,
+            expected = Right(json"""
+              {
+                "updateObservations": {
+                  "observations": [
+                    {
+                      "observingMode": {
+                        "gnirsLongSlit": {
+                          "acquisition": {
+                            "skyOffset": {
+                              "p": { "arcseconds": 3.000000 },
+                              "q": { "arcseconds": 4.000000 }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            """)
+          )
+        yield ()
 
   test("create GNIRS Long Slit with explicit overrides"):
     createProgramAs(staff).flatMap: pid =>

@@ -245,12 +245,12 @@ When writing a `Fragment` / `encoder` for an INSERT that maps to a table with `c
 
 ## ETM (ExposureTimeMode) Convention
 
-"Acquisition config" means the non-ETM acquisition fields (filter, read mode, coadds, P/Q offsets). "Acquisition ETM" is the exposure time + count row in `t_exposure_time_mode`. The two are independent: a mode can store acquisition config inline in its own table and still keep the acquisition ETM in `t_exposure_time_mode`.
+"Acquisition config" means the non-ETM acquisition fields (filter, read mode, coadds, sky offset). "Acquisition ETM" is the exposure time + count row in `t_exposure_time_mode`. The two are independent: a mode can store acquisition config inline in its own table and still keep the acquisition ETM in `t_exposure_time_mode`.
 
 | Mode | Acquisition config | Acquisition ETM | Science ETM |
 |---|---|---|---|
 | GMOS North/South LongSlit, Flamingos-2 LongSlit | (none inline; comes from observation/defaults) | `t_exposure_time_mode` (role=acquisition) | `t_exposure_time_mode` (role=science) |
-| GNIRS LongSlit | Inline columns in `t_gnirs_long_slit`: `c_acq_type`, `c_acq_coadds`, `c_acq_filter`, `c_acq_offset_p`, `c_acq_offset_q` | `t_exposure_time_mode` (role=acquisition) | `t_exposure_time_mode` (role=science) |
+| GNIRS LongSlit | Inline columns in `t_gnirs_long_slit`: `c_acq_type`, `c_acq_coadds`, `c_acq_filter`, `c_acq_sky_offset_p`, `c_acq_sky_offset_q` (the two components together form a single `Option[Offset]` sky offset, enforced by a both-or-neither CHECK) | `t_exposure_time_mode` (role=acquisition) | `t_exposure_time_mode` (role=science) |
 | IGRINS-2 LongSlit | (no acquisition sequence) | — | `t_exposure_time_mode` (role=science) |
 | GHOST IFU | — | — | Two rows (red + blue) in `t_exposure_time_mode` |
 

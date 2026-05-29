@@ -63,7 +63,7 @@ object GnirsLongSlitInput:
     filter:           Option[GnirsFilter],
     acqType:          Option[GnirsAcquisitionType],
     coadds:           Option[PosInt],
-    offset:           Option[Offset],
+    skyOffset:        Option[Offset],
     exposureTimeMode: Option[ExposureTimeMode]
   )
 
@@ -74,10 +74,10 @@ object GnirsLongSlitInput:
           GnirsFilterBinding.Option("filter", rFilter),
           GnirsAcquisitionTypeBinding.Option("acquisitionType", rAcqType),
           PosIntBinding.Option("coadds", rCoadds),
-          OffsetInput.Binding.Option("offset", rOffset),
+          OffsetInput.Binding.Option("skyOffset", rSkyOffset),
           ExposureTimeModeInput.Binding.Option("exposureTimeMode", rEtm)
         ) =>
-          (rFilter, rAcqType, rCoadds, rOffset, rEtm).parMapN(AcquisitionInput.apply)
+          (rFilter, rAcqType, rCoadds, rSkyOffset, rEtm).parMapN(AcquisitionInput.apply)
 
   case class Create(
     exposureTimeMode: Option[ExposureTimeMode],
