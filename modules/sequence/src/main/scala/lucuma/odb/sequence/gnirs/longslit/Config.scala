@@ -28,7 +28,6 @@ import java.io.DataOutputStream
 
 case class AcquisitionConfig(
   explicitAcqType:  Option[GnirsAcquisitionType],
-  coadds:           PosInt,
   filter:           GnirsFilter,
   skyOffset:        Option[Offset],
   exposureTimeMode: ExposureTimeMode,
