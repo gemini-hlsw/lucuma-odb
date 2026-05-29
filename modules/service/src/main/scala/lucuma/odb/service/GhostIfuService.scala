@@ -223,7 +223,7 @@ object GhostIfuService:
               Concurrent[F].raiseError(new RuntimeException(s"Could not clone Ghost IFU observing mode $originalId, $newId"))
 
       private def selectStaticContext(
-        oids: List[Observation.Id]
+        oids: NonEmptyList[Observation.Id]
       ): F[Map[Observation.Id, (IfuMappingContext, Option[TimeSpan])]] =
         val af = Statements.selectStaticContext(oids)
         session.prepareR(af.fragment.query(observation_id *: Statements.mapping_context *: time_span.opt)).use: pq =>
@@ -240,7 +240,7 @@ object GhostIfuService:
         observationId: Observation.Id
       ): F[Either[OdbError, GhostStaticConfig]] =
         for
-          c <- selectStaticContext(List(observationId))
+          c <- selectStaticContext(NonEmptyList.one(observationId))
           a <- Services.asSuperUser(asterismService.getAsterism(observationId))
         yield
           Either
@@ -255,16 +255,19 @@ object GhostIfuService:
       override def validationErrors(
         observationIds: List[Observation.Id]
       ): F[Map[Observation.Id, String]] =
-        for
-          c <- selectStaticContext(observationIds)
-          a <- Services.asSuperUser(asterismService.getAsterisms(observationIds))
-        yield
-          c.toList
-           .mapFilter { case (oid, (mappingCtx, _)) =>
-             val targets = a.getOrElse(oid, Nil).map(_._2)
-             GhostIfuMapping.validate(mappingCtx, targets).map(error => oid -> error)
-           }
-           .toMap
+        NonEmptyList
+          .fromList(observationIds)
+          .fold(Map.empty.pure[F]): nel =>
+            for
+              c <- selectStaticContext(nel)
+              a <- Services.asSuperUser(asterismService.getAsterisms(observationIds))
+            yield
+              c.toList
+               .mapFilter { case (oid, (mappingCtx, _)) =>
+                 val targets = a.getOrElse(oid, Nil).map(_._2)
+                 GhostIfuMapping.validate(mappingCtx, targets).map(error => oid -> error)
+               }
+               .toMap
 
   object Statements:
 
@@ -563,7 +566,7 @@ object GhostIfuService:
         IfuMappingContext(resMode, sky, pac, explicitBase, t)
 
     def selectStaticContext(
-      oids: List[Observation.Id]
+      oids: NonEmptyList[Observation.Id]
     ): AppliedFragment =
       sql"""
         SELECT
