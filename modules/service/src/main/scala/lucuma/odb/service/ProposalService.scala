@@ -594,6 +594,13 @@ object ProposalService {
 
       val callUpdates: List[AppliedFragment] =
         SET.typeʹ.toList.flatMap { call =>
+          // reset consider_for_band_3 for classical proposals.
+          val considerForBand3Update =
+            if call.scienceSubtype === ScienceSubtype.Classical then
+              sql"c_consider_for_band_3 = ${consider_for_band_3}"(ConsiderForBand3.Unset).some
+            else
+              call.considerForBand3.map(sql"c_consider_for_band_3 = ${consider_for_band_3}")
+
           sql"c_science_subtype = $science_subtype"(call.scienceSubtype) ::
           List(
             call.tooActivation.map(sql"c_too_activation = ${too_activation}"),
@@ -605,7 +612,7 @@ object ProposalService {
             call.aeonMultiFacility.map(sql"c_aeon_multi_facility = ${bool}"),
             call.jwstSynergy.map(sql"c_jwst_synergy = ${bool}"),
             call.usLongTerm.map(sql"c_us_long_term = ${bool}"),
-            call.considerForBand3.map(sql"c_consider_for_band_3 = ${consider_for_band_3}")
+            considerForBand3Update
           ).flatten
         }
 

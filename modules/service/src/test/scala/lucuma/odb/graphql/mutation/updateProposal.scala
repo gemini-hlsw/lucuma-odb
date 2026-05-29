@@ -1378,4 +1378,58 @@ class updateProposal extends OdbSuite with DatabaseOperations {
         """.asRight
       )
 
+  test("✓ converting queue to classical resets considerForBand3"):
+    createProgramAs(pi).flatMap: pid =>
+      addProposal(pi, pid, callProps = "queue: { considerForBand3: CONSIDER }".some) *>
+      // Convert it to classical
+      query(pi, s"""
+        mutation {
+          updateProposal(
+            input: {
+              programId: "$pid"
+              SET: { type: { classical: { minPercentTime: 50 } } }
+            }
+          ) { proposal { type { scienceSubtype } } }
+        }
+      """) *>
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            updateProposal(
+              input: {
+                programId: "$pid"
+                SET: {
+                  type: {
+                    queue: {
+                      partnerSplits: [{ partner: US, percent: 100 }]
+                    }
+                  }
+                }
+              }
+            ) {
+              proposal {
+                type {
+                  ... on Queue {
+                    considerForBand3
+                  }
+                }
+              }
+            }
+          }
+        """,
+        // considerForBand3 gets reset on conversion to classical
+        expected = json"""
+          {
+            "updateProposal": {
+              "proposal": {
+                "type": {
+                  "considerForBand3": "UNSET"
+                }
+              }
+            }
+          }
+        """.asRight
+      )
+
 }
