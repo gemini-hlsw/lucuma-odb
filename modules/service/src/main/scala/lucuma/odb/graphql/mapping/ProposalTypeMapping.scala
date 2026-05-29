@@ -79,7 +79,6 @@ trait ProposalTypeMapping[F[_]] extends BaseMapping[F]
       SqlField("aeonMultiFacility",  ProposalView.Classical.AeonMultiFacility),
       SqlField("jwstSynergy",        ProposalView.Classical.JwstSynergy),
       SqlField("usLongTerm",         ProposalView.Classical.UsLongTerm),
-      SqlField("considerForBand3",   ProposalView.Classical.ConsiderForBand3),
       SqlObject("partnerSplits",     Join(ProposalView.Classical.Id, PartnerSplitTable.ProgramId))
     )
 

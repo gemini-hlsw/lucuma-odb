@@ -79,6 +79,7 @@ class addProgramUser extends OdbSuite:
                 thesis
                 gender
                 hasDataAccess
+                classicalVisitor
               }
             }
           }
@@ -101,7 +102,8 @@ class addProgramUser extends OdbSuite:
                 "educationalStatus": "GRAD_STUDENT",
                 "thesis": false,
                 "gender": "MALE",
-                "hasDataAccess": true
+                "hasDataAccess": true,
+                "classicalVisitor": false
               }
             }
           }
@@ -315,3 +317,37 @@ class addProgramUser extends OdbSuite:
     } {
       case OdbError.InvalidArgument(Some("Argument 'input' is invalid: PIs are added at program creation time.")) => // ok
     }
+
+  test("check classicalVisitor field"):
+    createProgramAs(pi1).flatMap: pid =>
+      expect(
+        user     = pi1,
+        query    = s"""
+          mutation {
+            addProgramUser(
+              input: {
+                programId: "$pid"
+                role: COI
+                SET: {
+                  partnerLink: { partner: CA }
+                  classicalVisitor: true
+                }
+              }
+            ) {
+              programUser {
+                classicalVisitor
+              }
+            }
+          }
+        """,
+        expected = json"""
+          {
+            "addProgramUser": {
+              "programUser": {
+                "classicalVisitor": true
+              }
+            }
+          }
+        """.asRight
+      )
+

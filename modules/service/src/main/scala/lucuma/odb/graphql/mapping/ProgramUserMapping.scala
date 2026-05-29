@@ -41,6 +41,7 @@ trait ProgramUserMapping[F[_]]
       SqlField("gender", ProgramUserView.Gender),
       SqlField("affiliation", ProgramUserView.Affiliation),
       SqlField("hasDataAccess", ProgramUserView.HasDataAccess),
+      SqlField("classicalVisitor", ProgramUserView.ClassicalVisitor),
       SqlField("displayName", ProgramUserView.DisplayName),
       SqlField("email", ProgramUserView.Email),
       CursorFieldJson("partnerLink", c =>
