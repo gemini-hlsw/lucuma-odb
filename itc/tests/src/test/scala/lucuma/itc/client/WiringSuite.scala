@@ -30,6 +30,10 @@ import lucuma.core.enums.GmosNorthGrating
 import lucuma.core.enums.GmosRoi
 import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
+import lucuma.core.enums.GnirsCamera
+import lucuma.core.enums.GnirsFilter
+import lucuma.core.enums.GnirsReadMode
+import lucuma.core.enums.GnirsWellDepth
 import lucuma.core.enums.PortDisposition
 import lucuma.core.enums.SkyBackground
 import lucuma.core.enums.WaterVapor
@@ -230,7 +234,57 @@ class WiringSuite extends ClientSuite:
     )
 
   test("ItcClient imaging f2 basic wiring and sanity check for txc"):
-    val toITC = WiringSuite.flaminos2ImagingInput(
+    val toITC = WiringSuite.flamingos2ImagingInput(
+      ExposureTimeMode.TimeAndCountMode(TimeSpan.fromSeconds(1).get, 10.refined, atWavelength)
+    )
+
+    imaging(
+      toITC,
+      ClientCalculationResult(
+        ItcVersions(
+          versionDateTimeFormatter.format(Instant.ofEpochMilli(buildinfo.BuildInfo.buildDateTime)),
+          BuildInfo.ocslibHash.some
+        ),
+        AsterismIntegrationTimeOutcomes:
+          NonEmptyChain:
+            TargetIntegrationTimeOutcome:
+              TargetIntegrationTime(
+                Zipper.fromNel(NonEmptyList.one(selected)),
+                Band.R.asLeft,
+                SignalToNoiseAt(atWavelength,
+                                SingleSN(SignalToNoise.unsafeFromBigDecimalExact(101.0)),
+                                TotalSN(SignalToNoise.unsafeFromBigDecimalExact(102.0))
+                ).some,
+                List.empty
+              ).asRight
+      ).asRight
+    )
+
+  test("ItcClient imaging gnirs basic wiring and sanity check for s/n"):
+    imaging(
+      WiringSuite.GnirsImagingInputData,
+      ClientCalculationResult(
+        ItcVersions(
+          versionDateTimeFormatter.format(Instant.ofEpochMilli(buildinfo.BuildInfo.buildDateTime)),
+          BuildInfo.ocslibHash.some
+        ),
+        AsterismIntegrationTimeOutcomes:
+          NonEmptyChain:
+            TargetIntegrationTimeOutcome:
+              TargetIntegrationTime(
+                Zipper.fromNel(NonEmptyList.one(selected)),
+                Band.R.asLeft,
+                SignalToNoiseAt(atWavelength,
+                                SingleSN(SignalToNoise.unsafeFromBigDecimalExact(101.0)),
+                                TotalSN(SignalToNoise.unsafeFromBigDecimalExact(102.0))
+                ).some,
+                List.empty
+              ).asRight
+      ).asRight
+    )
+
+  test("ItcClient imaging gnirs basic wiring and sanity check for txc"):
+    val toITC = WiringSuite.gnirsImagingInput(
       ExposureTimeMode.TimeAndCountMode(TimeSpan.fromSeconds(1).get, 10.refined, atWavelength)
     )
 
@@ -706,9 +760,9 @@ object WiringSuite:
     )
 
   val Flamingos2ImagingInputData: ImagingInput =
-    flaminos2ImagingInput(defaultEtm)
+    flamingos2ImagingInput(defaultEtm)
 
-  def flaminos2ImagingInput(etm: ExposureTimeMode): ImagingInput =
+  def flamingos2ImagingInput(etm: ExposureTimeMode): ImagingInput =
     ImagingInput(
       ImagingParameters(
         ItcConstraintsInput(
@@ -722,6 +776,46 @@ object WiringSuite:
                                          Flamingos2Filter.J,
                                          Flamingos2ReadMode.Bright,
                                          PortDisposition.Side
+        )
+      ),
+      NonEmptyList.of(
+        TargetInput(
+          SourceProfile.Point(
+            BandNormalized[Integrated](
+              Galaxy(Spiral).some,
+              SortedMap(
+                Band.R ->
+                  Measure(
+                    BrightnessValue.unsafeFrom(BigDecimal(10.0)),
+                    TaggedUnit[VegaMagnitude, Brightness[Integrated]].unit
+                  ).tag
+              )
+            )
+          ),
+          RadialVelocity.fromMetersPerSecond.getOption(1.0).get
+        )
+      )
+    )
+
+  val GnirsImagingInputData: ImagingInput =
+    gnirsImagingInput(defaultEtm)
+
+  def gnirsImagingInput(etm: ExposureTimeMode): ImagingInput =
+    ImagingInput(
+      ImagingParameters(
+        ItcConstraintsInput(
+          ImageQualityInput.preset(ImageQuality.Preset.PointOne),
+          CloudExtinctionInput.preset(CloudExtinction.Preset.PointOne),
+          skyBackground = SkyBackground.Darkest,
+          waterVapor = WaterVapor.VeryDry,
+          elevationRange = ElevationRange.ByAirMass.Default
+        ),
+        InstrumentMode.GnirsImaging(etm,
+                                    GnirsFilter.H2,
+                                    GnirsCamera.ShortBlue,
+                                    GnirsReadMode.Bright,
+                                    GnirsWellDepth.Shallow,
+                                    PortDisposition.Side
         )
       ),
       NonEmptyList.of(

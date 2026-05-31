@@ -269,6 +269,20 @@ private[legacy] object codecs:
       "altair"            -> Json.Null
     )
 
+  private val encodeGnirsImaging: Encoder[ObservingMode.ImagingMode.Gnirs] = a =>
+    Json.obj(
+      "pixelScale"        -> Json.fromString(a.camera.pixelScale.ocs2Tag),
+      "filter"            -> Json.fromString(a.filter.ocs2Tag),
+      "grating"           -> Json.Null,
+      "readMode"          -> Json.fromString(a.readMode.ocs2Tag),
+      "crossDispersed"    -> Json.fromString("NO"),
+      "centralWavelength" -> a.centralWavelength.asJson,
+      "slitWidth"         -> Json.fromString("ACQUISITION"),
+      "camera"            -> Json.fromString(a.camera.ocs2Tag),
+      "wellDepth"         -> Json.fromString(a.wellDepth.ocs2Tag),
+      "altair"            -> Json.Null
+    )
+
   private given Encoder[ItcInstrumentDetails] = (a: ItcInstrumentDetails) =>
     a.mode match
       // Spectroscopy
@@ -291,6 +305,8 @@ private[legacy] object codecs:
         Json.obj("GmosParameters" -> encodeGmosNorthImaging(a))
       case a: ObservingMode.ImagingMode.GmosSouth          =>
         Json.obj("GmosParameters" -> encodeGmosSouthImaging(a))
+      case a: ObservingMode.ImagingMode.Gnirs              =>
+        Json.obj("GnirsParameters" -> encodeGnirsImaging(a))
 
   private given Encoder[ItcWavefrontSensor] = Encoder[String].contramap(_.ocs2Tag)
 

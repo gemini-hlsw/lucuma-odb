@@ -59,6 +59,9 @@ object AsterismImagingTimeRequest:
         case Flamingos2ImagingInput(_, filter, readMode, port) =>
           Result.success:
             ObservingMode.ImagingMode.Flamingos2(filter, readMode, port)
+        case GnirsImagingInput(_, filter, camera, readMode, wellDepth, port) =>
+          Result.success:
+            ObservingMode.ImagingMode.Gnirs(filter, camera, readMode, wellDepth, port)
         case _                                                 =>
           Result.failure("Invalid imaging mode")
 

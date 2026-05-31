@@ -237,5 +237,26 @@ object ObservingMode {
       val description: String =
         s"${instrument.shortName} Imaging"
     }
+
+    final case class Gnirs(
+      filter:          GnirsFilter,
+      camera:          GnirsCamera,
+      readMode:        GnirsReadMode,
+      wellDepth:       GnirsWellDepth,
+      portDisposition: PortDisposition
+    ) extends ImagingMode derives Hash {
+      val instrument: Instrument = Instrument.Gnirs
+
+      // Central wavelength is ignored for imaging; report the filter's.
+      val centralWavelength: Wavelength = filter.centralWavelength
+
+      def analysisMethod: ItcObservationDetails.AnalysisMethod =
+        ItcObservationDetails.AnalysisMethod.Aperture.Auto(
+          skyAperture = 1.0
+        )
+
+      val description: String =
+        s"${instrument.shortName} Imaging"
+    }
   }
 }
