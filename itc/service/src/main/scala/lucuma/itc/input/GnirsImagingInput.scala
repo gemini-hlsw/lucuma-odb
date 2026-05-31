@@ -35,10 +35,4 @@ object GnirsImagingInput:
             GnirsWellDepthBinding("wellDepth", wellDepth),
             PortDispositionBinding("port", portDisposition)
           ) =>
-        (exposureTimeMode,
-         filter,
-         camera,
-         readMode,
-         wellDepth,
-         portDisposition
-        ).parMapN(apply)
+        (exposureTimeMode, filter, camera, readMode, wellDepth, portDisposition).parMapN(apply)
