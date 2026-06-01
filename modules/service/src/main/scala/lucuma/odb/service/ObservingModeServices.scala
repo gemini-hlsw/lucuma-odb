@@ -10,6 +10,7 @@ import cats.syntax.functor.*
 import cats.syntax.functorFilter.*
 import cats.syntax.option.*
 import cats.syntax.traverse.*
+import cats.syntax.applicative.*
 import grackle.Result
 import grackle.syntax.*
 import lucuma.core.enums.ObservingModeType
@@ -88,6 +89,9 @@ object ObservingModeServices:
             flamingos2LongSlitService
               .select(oids)
               .map(_.widen[ObservingMode])
+
+          case (Flamingos2Imaging, _) =>
+            Map.empty[Observation.Id, ObservingMode].pure
 
           case (GhostIfu, oids) =>
             ghostIfuService
@@ -172,6 +176,7 @@ object ObservingModeServices:
 
         val deleteObservingMode: F[Unit] =
           mode match
+            case ObservingModeType.Flamingos2Imaging  => MonadCancelThrow[F].raiseError(new RuntimeException("Flamingos2 deletion is not yet implemented."))
             case ObservingModeType.Flamingos2LongSlit => flamingos2LongSlitService.delete(which)
             case ObservingModeType.GhostIfu           => ghostIfuService.delete(which)
             case ObservingModeType.GmosNorthImaging   => gmosImagingService.deleteNorth(which)
@@ -218,6 +223,7 @@ object ObservingModeServices:
 
         def cloneObservingMode(etms: List[(ExposureTimeModeId, ExposureTimeModeId)]): F[Unit] =
           mode match
+            case ObservingModeType.Flamingos2Imaging  => MonadCancelThrow[F].raiseError(new RuntimeException("Flamingos2 clonning is not yet implemented."))
             case ObservingModeType.Flamingos2LongSlit => flamingos2LongSlitService.clone(origOid, newOid)
             case ObservingModeType.GhostIfu           => ghostIfuService.clone(origOid, newOid, etms)
             case ObservingModeType.GmosNorthLongSlit  => gmosLongSlitService.cloneNorth(origOid, newOid)
