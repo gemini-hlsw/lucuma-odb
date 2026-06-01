@@ -15,8 +15,6 @@ CREATE TABLE t_flamingos_2_imaging (
   c_decker_default        d_tag                 NOT NULL DEFAULT 'Imaging' REFERENCES t_f2_decker(c_tag),
   c_readout_mode          d_tag                 NULL DEFAULT NULL REFERENCES t_f2_readout_mode(c_tag),
   c_readout_mode_default  d_tag                 NOT NULL DEFAULT 'Science' REFERENCES t_f2_readout_mode(c_tag),
-
-  -- Serialized spatial (dither) offsets list (NULL = use computed default)
   c_offsets               text                  NULL DEFAULT NULL,
 
   PRIMARY KEY (c_observation_id, c_instrument, c_observing_mode_type),
@@ -28,8 +26,7 @@ CREATE TABLE t_flamingos_2_imaging (
 
 COMMENT ON TABLE t_flamingos_2_imaging IS 'Flamingos2 Imaging mode configuration';
 
--- Keep c_reads_default in sync with the effective read mode, mirroring the
--- Flamingos2 long slit behavior (reuses the existing update_f2_reads function).
+-- Keep c_reads_default in sync with the read mode
 CREATE TRIGGER maintain_f2_imaging_reads_default
 BEFORE INSERT OR UPDATE OF c_read_mode, c_read_mode_default
 ON t_flamingos_2_imaging

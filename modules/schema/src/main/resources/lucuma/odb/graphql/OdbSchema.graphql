@@ -9057,9 +9057,7 @@ input Flamingos2LongSlitInput {
 }
 
 """
-Defines a Flamingos2 imaging filter to use along with its exposure time mode.  If
-the exposure time mode is not specified, it is taken from the observation's
-requirements.
+Imaging filters combine an actual filter with an exposure time mode.
 """
 type Flamingos2ImagingFilter {
 
@@ -9070,14 +9068,19 @@ type Flamingos2ImagingFilter {
 }
 
 """
-Defines a Flamingos2 imaging filter to use along with its exposure time mode.  If
-the exposure time mode is not specified, it is taken from the observation's
-requirements.
+Defines a Flamingos2 imaging filter to use along with its exposure time mode.
 """
 input Flamingos2ImagingFilterInput {
 
+  """
+  The filter to use for this imaging configuration.
+  """
   filter: Flamingos2Filter!
 
+  """
+  Exposure time mode for this filter.
+  If not specified, it is taken from the observation's requirements.
+  """
   exposureTimeMode: ExposureTimeModeInput
 
 }

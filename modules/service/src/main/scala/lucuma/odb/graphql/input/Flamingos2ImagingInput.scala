@@ -74,16 +74,15 @@ object Flamingos2ImagingInput extends ImagingFilterCheck:
       explicitOffsets.map(OffsetsFormat.reverseGet)
 
     def toCreate: Result[Create] =
-      for
-        fs <- Result.fromOption(filters, atLeastOne.asProblem)
-      yield Create(
-        fs,
-        explicitReadMode.toOption,
-        explicitReads.toOption,
-        explicitDecker.toOption,
-        explicitReadoutMode.toOption,
-        explicitOffsets.toOption
-      )
+      Result.fromOption(filters, atLeastOne.asProblem).map: fs =>
+        Create(
+          fs,
+          explicitReadMode.toOption,
+          explicitReads.toOption,
+          explicitDecker.toOption,
+          explicitReadoutMode.toOption,
+          explicitOffsets.toOption
+        )
 
   object Edit:
 
