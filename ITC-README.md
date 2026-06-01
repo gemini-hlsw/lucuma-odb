@@ -1,6 +1,5 @@
 # lucuma-itc
 
-
 This is a graphql server acting as a proxy for the old ocs2-based itc server
 
 # Run
@@ -8,19 +7,18 @@ This is a graphql server acting as a proxy for the old ocs2-based itc server
 It is possible to run locally using sbt
 
 ```
-   sbt ~service/reStart
+   sbt ~itcService/reStart
 ```
 
 When using sbtn there is no output (see https://github.com/spray/sbt-revolver/issues/99).
 
 Note, it is important to have [`git lfs`](https://git-lfs.com) installed in
-order to obtain the necessary classes for running the ITC.  See (`git lfs` and
+order to obtain the necessary classes for running the ITC. See (`git lfs` and
 Legacy ITC Code below).
 
 You can then open the playground to work with the API by pointing your browser to
 
 http://localhost:6060/playground.html
-
 
 ## Env
 
@@ -40,9 +38,9 @@ The keys are stored as `itc:prefix:hash` where hash is just the hash of the para
 
 A few diferent encodings were tested to reduce size. Here are some measurement
 
-* Plain json: 1441864
-* Compressed json: 589896
-* Boopickle: 262216
+- Plain json: 1441864
+- Compressed json: 589896
+- Boopickle: 262216
 
 Make sure Redis is configured to use the `volatile-lru` eviction policy. This allows us to use it as a cache
 for keys stored with a TTL, which is what we do here, while keeping a permanent entry for the version key.
@@ -61,15 +59,15 @@ The only reason for the remote values to be stale is if the old ITC changes (hap
 ## `git lfs` and Legacy ITC Code
 
 The itc calculations are mostly done in java and scala using legacy technologies,
-in particular libraries like scala 2.11, scalaz, argonaut.  We were wrapping this
+in particular libraries like scala 2.11, scalaz, argonaut. We were wrapping this
 code in an http server but that incurred considerable overhead especially when
-the graph data was needed.  As an alternative we can now directly call the java
+the graph data was needed. As an alternative we can now directly call the java
 code but given the use of legacy libraries this requires the jar files to be
 loaded dynamically by the application and be called via reflection with a custom
 classloader
 
 In case the code in ocs2 changes we need to update the jar files using the
-`itc/update_itc_jars.sh` script.  The jar files are fairly large (they contain the data files
+`itc/update_itc_jars.sh` script. The jar files are fairly large (they contain the data files
 used to calculate the itc results). Given github limitations these need to be
 stored in `git lfs`.
 
@@ -82,11 +80,13 @@ When the OCS ITC code changes, update the JAR files by running:
 ```
 
 For example:
+
 ```bash
 ./itc/update_itc_jars.sh ../ocs/app/itc/target/itc/2026A-test.1.1.1/Test/itc/bundle
 ```
 
 The script will:
+
 - Find the OCS git repository from the bundle directory
 - Capture git metadata (commit hash, branch, etc.)
   - ocs git repo bust be clean
@@ -100,11 +100,13 @@ The itc schema uses many types defined on the odb schema. Types are imported usi
 ## Benchmarking
 
 ### Simple Performance Test
+
 ```
 sbt "benchmark/runMain lucuma.itc.benchmarks.ItcPerformanceHarness"
 ```
 
 ### Using jmh
+
 ```
 benchmark/Jmh/run lucuma.itc.benchmarks.ItcCoreBenchmark
 ```

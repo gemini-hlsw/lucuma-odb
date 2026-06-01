@@ -130,8 +130,116 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
       }
     """
 
+  def gnirsAcquisitionQuery(oid: Observation.Id, futureLimit: Option[Int] = None): String =
+    executionConfigQuery(oid, "gnirs", "acquisition", GnirsAtomQuery, futureLimit)
+
   def gnirsScienceQuery(oid: Observation.Id, futureLimit: Option[Int] = None): String =
     executionConfigQuery(oid, "gnirs", "science", GnirsAtomQuery, futureLimit)
+
+  /** Set the acquisition T+C ETM on a GNIRS LongSlit observation. */
+  def setAcquisitionTimeAndCount(oid: Observation.Id, seconds: BigDecimal, count: Int, atNm: BigDecimal): IO[Unit] =
+    query(
+      pi,
+      s"""
+        mutation {
+          updateObservations(input: {
+            SET: {
+              observingMode: {
+                gnirsLongSlit: {
+                  acquisition: {
+                    exposureTimeMode: {
+                      timeAndCount: {
+                        time:  { seconds: $seconds }
+                        count: $count
+                        at:    { nanometers: $atNm }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+            WHERE: { id: { EQ: "$oid" } }
+          }) {
+            observations { id }
+          }
+        }
+      """
+    ).void
+
+  /** Set the explicit acquisition type on a GNIRS LongSlit observation. */
+  def setAcquisitionType(oid: Observation.Id, acqType: String): IO[Unit] =
+    query(
+      pi,
+      s"""
+        mutation {
+          updateObservations(input: {
+            SET: {
+              observingMode: {
+                gnirsLongSlit: {
+                  acquisition: {
+                    explicitAcquisitionType: $acqType
+                  }
+                }
+              }
+            }
+            WHERE: { id: { EQ: "$oid" } }
+          }) {
+            observations { id }
+          }
+        }
+      """
+    ).void
+
+  /** Set the acquisition sky offset on a GNIRS LongSlit observation. */
+  def setAcquisitionSkyOffset(oid: Observation.Id, pArcsec: BigDecimal, qArcsec: BigDecimal): IO[Unit] =
+    query(
+      pi,
+      s"""
+        mutation {
+          updateObservations(input: {
+            SET: {
+              observingMode: {
+                gnirsLongSlit: {
+                  acquisition: {
+                    skyOffset: {
+                      p: { arcseconds: $pArcsec }
+                      q: { arcseconds: $qArcsec }
+                    }
+                  }
+                }
+              }
+            }
+            WHERE: { id: { EQ: "$oid" } }
+          }) {
+            observations { id }
+          }
+        }
+      """
+    ).void
+
+  /** Set the explicit acquisition filter on a GNIRS LongSlit observation. */
+  def setAcquisitionFilter(oid: Observation.Id, filter: String): IO[Unit] =
+    query(
+      pi,
+      s"""
+        mutation {
+          updateObservations(input: {
+            SET: {
+              observingMode: {
+                gnirsLongSlit: {
+                  acquisition: {
+                    explicitFilter: $filter
+                  }
+                }
+              }
+            }
+            WHERE: { id: { EQ: "$oid" } }
+          }) {
+            observations { id }
+          }
+        }
+      """
+    ).void
 
   /**
    * Description of a single GNIRS dynamic config worth of fields, shared by
