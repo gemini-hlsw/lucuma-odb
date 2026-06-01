@@ -173,7 +173,9 @@ class ShortCut_7591 extends ExecutionTestSupportForGmos:
         },
         "readout" : {
           "xBin" : "TWO",
-          "yBin" : "TWO"
+          "yBin" : "TWO",
+          "ampReadMode": "SLOW",
+          "ampGain": "LOW"
         },
         "roi" : "FULL_FRAME",
         "gratingConfig" : {
