@@ -183,6 +183,7 @@ object OdbMapping {
           with Flamingos2CustomMaskMapping[F]
           with Flamingos2DynamicMapping[F]
           with Flamingos2FpuMaskMapping[F]
+          with Flamingos2ImagingMapping[F]
           with Flamingos2LongSlitMapping[F]
           with Flamingos2StaticMapping[F]
           with Igrins2DynamicMapping[F]
@@ -589,6 +590,7 @@ object OdbMapping {
                 ExposureTimeModeMappings,
                 Flamingos2CustomMaskMappings,
                 Flamingos2FpuMaskMappings,
+                Flamingos2ImagingMappings,
                 GnirsAcquisitionMirrorOutMappings,
                 GhostDynamicMappings,
                 GhostIfuMappings,
@@ -627,6 +629,7 @@ object OdbMapping {
                 DatasetElaborator,
                 EnumeratedOffsetElaborator,
                 ExecutionElaborator,
+                Flamingos2ImagingElaborator,
                 Flamingos2LongSlitElaborator,
                 Igrins2LongSlitElaborator,
                 GnirsLongSlitElaborator,

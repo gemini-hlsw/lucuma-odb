@@ -15,10 +15,6 @@ class createObservation_Flamingos2Imaging extends OdbSuite:
 
   override lazy val validUsers: List[User] = List(pi)
 
-  // Insert-only: a successful createObservation proves the row was inserted,
-  // because the observing-mode consistency trigger (DEFERRABLE INITIALLY
-  // DEFERRED) requires a t_flamingos_2_imaging row at commit.  We can only read
-  // back `mode` until the Grackle output mapping is added.
   test("create Flamingos2 imaging"):
     createProgramAs(pi).flatMap: pid =>
       createTargetAs(pi, pid).flatMap: tid =>
@@ -55,6 +51,17 @@ class createObservation_Flamingos2Imaging extends OdbSuite:
                 instrument
                 observingMode {
                   mode
+                  flamingos2Imaging {
+                    filters { filter }
+                    initialFilters { filter }
+                    explicitReadMode
+                    decker
+                    defaultDecker
+                    explicitDecker
+                    readoutMode
+                    defaultReadoutMode
+                    explicitReadoutMode
+                  }
                 }
               }
             }
@@ -66,7 +73,24 @@ class createObservation_Flamingos2Imaging extends OdbSuite:
               "observation": {
                 "instrument": "FLAMINGOS2",
                 "observingMode": {
-                  "mode": "FLAMINGOS_2_IMAGING"
+                  "mode": "FLAMINGOS_2_IMAGING",
+                  "flamingos2Imaging": {
+                    "filters": [
+                      { "filter": "Y" },
+                      { "filter": "J" }
+                    ],
+                    "initialFilters": [
+                      { "filter": "Y" },
+                      { "filter": "J" }
+                    ],
+                    "explicitReadMode": "BRIGHT",
+                    "decker": "IMAGING",
+                    "defaultDecker": "IMAGING",
+                    "explicitDecker": "IMAGING",
+                    "readoutMode": "SCIENCE",
+                    "defaultReadoutMode": "SCIENCE",
+                    "explicitReadoutMode": "SCIENCE"
+                  }
                 }
               }
             }

@@ -42,6 +42,17 @@ class updateObservations_Flamingos2Imaging extends OdbSuite with UpdateObservati
         instrument
         observingMode {
           mode
+          flamingos2Imaging {
+            filters { filter }
+            initialFilters { filter }
+            explicitReadMode
+            decker
+            defaultDecker
+            explicitDecker
+            readoutMode
+            defaultReadoutMode
+            explicitReadoutMode
+          }
         }
       }
     """
@@ -53,7 +64,24 @@ class updateObservations_Flamingos2Imaging extends OdbSuite with UpdateObservati
             {
               "instrument": "FLAMINGOS2",
               "observingMode": {
-                "mode": "FLAMINGOS_2_IMAGING"
+                "mode": "FLAMINGOS_2_IMAGING",
+                "flamingos2Imaging": {
+                  "filters": [
+                    { "filter": "Y" },
+                    { "filter": "J" }
+                  ],
+                  "initialFilters": [
+                    { "filter": "Y" },
+                    { "filter": "J" }
+                  ],
+                  "explicitReadMode": "BRIGHT",
+                  "decker": "IMAGING",
+                  "defaultDecker": "IMAGING",
+                  "explicitDecker": "IMAGING",
+                  "readoutMode": "SCIENCE",
+                  "defaultReadoutMode": "SCIENCE",
+                  "explicitReadoutMode": "SCIENCE"
+                }
               }
             }
           ]

@@ -9061,11 +9061,99 @@ Defines a Flamingos2 imaging filter to use along with its exposure time mode.  I
 the exposure time mode is not specified, it is taken from the observation's
 requirements.
 """
+type Flamingos2ImagingFilter {
+
+  filter: Flamingos2Filter!
+
+  exposureTimeMode: ExposureTimeMode!
+
+}
+
+"""
+Defines a Flamingos2 imaging filter to use along with its exposure time mode.  If
+the exposure time mode is not specified, it is taken from the observation's
+requirements.
+"""
 input Flamingos2ImagingFilterInput {
 
   filter: Flamingos2Filter!
 
   exposureTimeMode: ExposureTimeModeInput
+
+}
+
+"""
+Flamingos2 Imaging mode
+"""
+type Flamingos2Imaging {
+
+  """
+  The filters (at least one is required) to be used for data collection.
+  """
+  filters: [Flamingos2ImagingFilter!]!
+
+  """
+  Filters as initially selected when creating the imaging mode.
+  """
+  initialFilters: [Flamingos2ImagingFilter!]!
+
+  """
+  Optional explicitly specified F2 ReadMode. If set it overrides the default.
+  """
+  explicitReadMode: Flamingos2ReadMode
+
+  """
+  Optional explicitly specified F2 Reads. If set it overrides the default.
+  """
+  explicitReads: Flamingos2Reads
+
+  """
+  The decker field is either explicitly specified in explicitDecker or else taken
+  from defaultDecker.
+  """
+  decker: Flamingos2Decker!
+
+  """
+  Default decker.
+  """
+  defaultDecker: Flamingos2Decker!
+
+  """
+  Optional explicitly specified F2 Decker. If set it overrides the default.
+  """
+  explicitDecker: Flamingos2Decker
+
+  """
+  The readoutMode field is either explicitly specified in explicitReadoutMode or
+  else taken from defaultReadoutMode.
+  """
+  readoutMode: Flamingos2ReadoutMode!
+
+  """
+  Default readout mode.
+  """
+  defaultReadoutMode: Flamingos2ReadoutMode!
+
+  """
+  Optional explicitly specified F2 Readout mode. If set it overrides the default.
+  """
+  explicitReadoutMode: Flamingos2ReadoutMode
+
+  """
+  Spatial offsets, either explicitly specified in explicitSpatialOffsets or else
+  taken from defaultSpatialOffsets.
+  """
+  spatialOffsets: [Offset!]!
+
+  """
+  Default spatial offsets.
+  """
+  defaultSpatialOffsets: [Offset!]!
+
+  """
+  Optional explicitly specified spatial offsets. If set it overrides the default.
+  """
+  explicitSpatialOffsets: [Offset!]
 
 }
 
@@ -13957,6 +14045,11 @@ type ObservingMode {
   Mode type
   """
   mode: ObservingModeType!
+
+  """
+  Flamingos 2 Imaging mode
+  """
+  flamingos2Imaging: Flamingos2Imaging
 
   """
   Flamingos 2 Long Slit mode

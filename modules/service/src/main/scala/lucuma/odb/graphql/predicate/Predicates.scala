@@ -36,6 +36,7 @@ trait Predicates[F[_]] extends BaseMapping[F] {
     val executionEventAdded           = ExecutionEventAddedPredicates(Path.from(ExecutionEventAddedType))
     val exposureTimeMode              = ExposureTimeModePredicates(Path.from(ExposureTimeModeType))
     val flamingos2Step                = StepPredicates(Path.from(Flamingos2StepType))
+    val flamingos2ImagingFilter       = GmosImagingFilterPredicates(Path.from(Flamingos2ImagingFilterType))
     val gmosNorthImagingFilter        = GmosImagingFilterPredicates(Path.from(GmosNorthImagingFilterType))
     val gmosNorthStep                 = StepPredicates(Path.from(GmosNorthStepType))
     val gmosSouthImagingFilter        = GmosImagingFilterPredicates(Path.from(GmosSouthImagingFilterType))
