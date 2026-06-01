@@ -269,6 +269,29 @@ object InstrumentMode {
         )
       )
 
+  case class GnirsImaging(
+    exposureTimeMode: ExposureTimeMode,
+    filter:           GnirsFilter,
+    camera:           GnirsCamera,
+    readMode:         GnirsReadMode,
+    wellDepth:        GnirsWellDepth,
+    port:             PortDisposition = PortDisposition.Side
+  ) extends InstrumentMode derives Eq:
+    override def displayName: String =
+      "GNIRS Imaging"
+
+  object GnirsImaging:
+
+    given Encoder[GnirsImaging] = a =>
+      Json.obj(
+        "exposureTimeMode" -> a.exposureTimeMode.asJson,
+        "filter"           -> a.filter.asScreamingJson,
+        "camera"           -> a.camera.asScreamingJson,
+        "readMode"         -> a.readMode.asScreamingJson,
+        "wellDepth"        -> a.wellDepth.asScreamingJson,
+        "port"             -> a.port.asScreamingJson
+      )
+
   val gmosNorthSpectroscopy: Prism[InstrumentMode, GmosNorthSpectroscopy] =
     GenPrism[InstrumentMode, GmosNorthSpectroscopy]
 
@@ -296,6 +319,9 @@ object InstrumentMode {
   val flamingos2Imaging: Prism[InstrumentMode, Flamingos2Imaging] =
     GenPrism[InstrumentMode, Flamingos2Imaging]
 
+  val gnirsImaging: Prism[InstrumentMode, GnirsImaging] =
+    GenPrism[InstrumentMode, GnirsImaging]
+
   given Encoder[InstrumentMode] = a =>
     a match
       case a @ GmosNorthSpectroscopy(_, _, _, _, _, _, _, _)   =>
@@ -316,4 +342,6 @@ object InstrumentMode {
         Json.obj("ghostSpectroscopy" -> a.asJson)
       case a @ GnirsSpectroscopy(_, _, _, _, _, _, _, _, _, _) =>
         Json.obj("gnirsSpectroscopy" -> a.asJson)
+      case a @ GnirsImaging(_, _, _, _, _, _)                  =>
+        Json.obj("gnirsImaging" -> a.asJson)
 }

@@ -341,6 +341,38 @@ input GnirsSpectroscopyInput {
   port: PortDisposition = SIDE
 }
 
+input GnirsImagingInput {
+  """
+  Exposure time mode.
+  """
+  exposureTimeMode: ExposureTimeModeInput!
+
+  """
+  GNIRS imaging filter
+  """
+  filter: GnirsFilter!
+
+  """
+  GNIRS camera (determines pixel scale)
+  """
+  camera: GnirsCamera!
+
+  """
+  GNIRS read mode
+  """
+  readMode: GnirsReadMode!
+
+  """
+  GNIRS well depth
+  """
+  wellDepth: GnirsWellDepth!
+
+  """
+  Instrument port disposition
+  """
+  port: PortDisposition = SIDE
+}
+
 """
 Params for instrument modes
 """
@@ -389,6 +421,11 @@ input InstrumentModesInput @oneOf {
   Gnirs Longslit Spectroscopy
   """
   gnirsSpectroscopy: GnirsSpectroscopyInput
+
+  """
+  Gnirs Imaging (acquisition)
+  """
+  gnirsImaging: GnirsImagingInput
 }
 
 """
