@@ -172,7 +172,9 @@ class executionSciGmosNorthImaging extends ExecutionTestSupportForGmos:
             "exposure" : { "seconds" : ${Json.fromBigDecimal(time.exposureTime.toSeconds)} },
             "readout" : {
               "xBin" : "TWO",
-              "yBin" : "TWO"
+              "yBin" : "TWO",
+              "ampReadMode": "SLOW",
+              "ampGain": "LOW"
             },
             "roi" : "FULL_FRAME",
             "gratingConfig" : null,
