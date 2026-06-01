@@ -5,7 +5,6 @@ package lucuma.odb.sequence
 package gnirs.longslit
 
 import fs2.Pure
-import fs2.Stream
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.gnirs.GnirsDynamicConfig
 import lucuma.core.model.sequence.gnirs.GnirsStaticConfig
@@ -26,10 +25,16 @@ object LongSlit:
     estimator:     StepTimeEstimateCalculator[GnirsStaticConfig, GnirsDynamicConfig],
     namespace:     UUID,
     config:        Config,
-    itc:           Either[OdbError, Itc.GnirsSpectroscopy]
+    itc:           Either[OdbError, Itc.Spectroscopy]
   ): Either[OdbError, StreamingExecutionConfig[Pure, GnirsStaticConfig, GnirsDynamicConfig]] =
     val static = staticFrom(config)
-    Science.instantiate(
-      observationId, estimator, static, namespace, config,
-      itc.map(_.science.focus.value)
-    ).map(s => StreamingExecutionConfig(static, Stream.empty, s.generate))
+    for
+      a <- Acquisition.instantiate(
+             observationId, estimator, static, namespace, config,
+             itc.map(_.acquisition.focus.value)
+           )
+      s <- Science.instantiate(
+             observationId, estimator, static, namespace, config,
+             itc.map(_.science.focus.value)
+           )
+    yield StreamingExecutionConfig(static, a.generate, s.generate)

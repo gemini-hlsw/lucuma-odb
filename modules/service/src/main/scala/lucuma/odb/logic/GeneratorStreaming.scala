@@ -134,14 +134,6 @@ object GeneratorStreaming:
       Itc.igrins2Spectroscopy.getOption(i).toRight:
         OdbError.InvalidObservation(oid, s"Expecting an IGRINS-2 spectroscopy ITC result for this observation".some)
 
-  def requireGnirsSpectroscopyItc(
-    oid: Observation.Id,
-    itc: Either[OdbError, Itc]
-  ): Either[OdbError, Itc.GnirsSpectroscopy] =
-    itc.flatMap: i =>
-      Itc.gnirsSpectroscopy.getOption(i).toRight:
-        OdbError.InvalidObservation(oid, s"Expecting a GNIRS spectroscopy ITC result for this observation".some)
-
   def requireImagingItc[A](
     name: String,
     oid:  Observation.Id,
@@ -289,7 +281,7 @@ object GeneratorStreaming:
         import lucuma.odb.sequence.gnirs.longslit.LongSlit
         (for
           cfg <- extractMode(ObservingMode.GnirsLongSlitName, context)(_.asGnirsLongSlit)
-          itc  = requireGnirsSpectroscopyItc(context.oid, context.itcRes)
+          itc  = requireSpectroscopyItc(context.oid, context.itcRes)
           gen <- EitherT.fromEither(LongSlit.instantiate(context.oid, calculator.gnirsStep, context.namespace, cfg, itc))
         yield gen.covary[F]).value
 

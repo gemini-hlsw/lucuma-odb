@@ -430,15 +430,17 @@ object GeneratorParamsService {
                   readMode          = gn.explicitReadMode.getOrElse(GnirsReadMode.forExposureTime(etm.time)),
                   wellDepth         = gn.wellDepth
                 )
-                val consInput = obsParams.constraints.toInput
-                val science   = SpectroscopyParameters(consInput, sciMode)
-                val itcInput  =
-                  obsParams.targets
-                    .traverse(itcTargetParams)
-                    .map(ItcInput.ScienceOnlySpectroscopy(science, _))
-                    .leftMap(MissingParamSet.fromParams)
-                    .toEither
-                GeneratorParams(itcInput, obsParams.scienceBand, gn, obsParams.calibrationRole, obsParams.declaredState, obsParams.executionState, obsParams.stepCount)
+                spectroscopyGeneratorParams(
+                  obsMode = gn,
+                  acqMode = InstrumentMode.GnirsImaging(
+                    exposureTimeMode = gn.acquisition.exposureTimeMode,
+                    filter           = gn.acquisition.filter,
+                    camera           = gn.camera,
+                    readMode         = GnirsReadMode.Bright,
+                    wellDepth        = gn.wellDepth
+                  ),
+                  sciMode = sciMode
+                )
 
           // Visitor Modes
           case vis: visitor.Config =>

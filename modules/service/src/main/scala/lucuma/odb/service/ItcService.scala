@@ -294,6 +294,9 @@ object ItcService {
           case InstrumentMode.Flamingos2Imaging(_, _, _, _) =>
             go(lucuma.odb.sequence.flamingos2.MinAcquisitionExposureTime,
                lucuma.odb.sequence.flamingos2.MaxAcquisitionExposureTime)
+          case InstrumentMode.GnirsImaging(_, _, _, _, _, _) =>
+            go(lucuma.odb.sequence.gnirs.MinAcquisitionExposureTime,
+               lucuma.odb.sequence.gnirs.MaxAcquisitionExposureTime)
           case m                                                      =>
             EitherT.leftT:
               OdbError.InvalidObservation(oid, s"Acquisition is not supported for ${m.displayName}".some)
@@ -437,12 +440,6 @@ object ItcService {
             sci <- EitherT.fromEither(toTargetResults(sp.targets, NonEmptyList.one(cr)).map(_.head))
           yield Itc.Igrins2Spectroscopy(sci)
 
-        def gnirsSpectroscopy(sp: ItcInput.ScienceOnlySpectroscopy): EitherT[F, OdbError, Itc] =
-          for
-            cr  <- callSpectroscopy(sp.scienceInput)
-            sci <- EitherT.fromEither(toTargetResults(sp.targets, NonEmptyList.one(cr)).map(_.head))
-          yield Itc.GnirsSpectroscopy(sci)
-
         (input match
           case im @ ItcInput.Imaging(_, _) =>
             imaging(im)
@@ -452,8 +449,6 @@ object ItcService {
             ghost(gh, targets)
           case sp @ ItcInput.ScienceOnlySpectroscopy(SpectroscopyParameters(_, InstrumentMode.Igrins2Spectroscopy(_, _)), _) =>
             igrins2Spectroscopy(sp)
-          case sp @ ItcInput.ScienceOnlySpectroscopy(SpectroscopyParameters(_, _: InstrumentMode.GnirsSpectroscopy), _) =>
-            gnirsSpectroscopy(sp)
           case _ =>
             EitherT.leftT(OdbError.InvalidObservation(oid, s"Unrecognized ItcInput: $input".some))
         ).value
