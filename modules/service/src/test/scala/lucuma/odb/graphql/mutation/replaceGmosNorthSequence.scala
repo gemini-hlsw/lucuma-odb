@@ -13,69 +13,8 @@ import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.SequenceType
 import lucuma.core.model.Observation
-import lucuma.core.syntax.string.*
 
-class replaceGmosNorthSequence extends query.ExecutionTestSupportForGmos with ReplaceSequenceOps:
-
-  def stepInput(filter: GmosNorthFilter): String =
-    s"""
-          {
-            instrumentConfig: {
-              exposure: {
-                seconds: 20
-              }
-              readout: {
-                xBin: ONE
-                yBin: ONE
-                ampCount: TWELVE
-                ampGain: LOW
-                ampReadMode: SLOW
-              }
-              dtax: ZERO
-              roi: FULL_FRAME
-              gratingConfig: {
-                grating: R831_G5302
-                order: ZERO
-                wavelength: {
-                  nanometers: 500.0
-                }
-              }
-              filter: ${filter.tag.toScreamingSnakeCase}
-              fpu: {
-                builtin: LONG_SLIT_0_50
-              }
-            }
-            stepConfig: {
-              science: true
-            }
-            observeClass: SCIENCE
-          }
-    """
-
-  def imagingStepInput(filter: GmosNorthFilter): String =
-    s"""
-          {
-            instrumentConfig: {
-              exposure: {
-                seconds: 20
-              }
-              readout: {
-                xBin: ONE
-                yBin: ONE
-                ampCount: TWELVE
-                ampGain: LOW
-                ampReadMode: SLOW
-              }
-              dtax: ZERO
-              roi: FULL_FRAME
-              filter: ${filter.tag.toScreamingSnakeCase}
-            }
-            stepConfig: {
-              science: true
-            }
-            observeClass: SCIENCE
-          }
-    """
+class replaceGmosNorthSequence extends query.ExecutionTestSupportForGmos with ReplaceGmosNorthSequenceOps:
 
   test("Simple one atom, one step"):
     val setup: IO[Observation.Id] =
