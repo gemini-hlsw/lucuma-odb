@@ -484,8 +484,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
                 services.useTransactionally:
                   sequenceService
                     .deleteSequence(oid)
-                    .map(_ => oid.success)
-                    .nestMap: oid =>
+                    .nestMap: _ =>
                       Filter(Predicates.deleteSequenceResult.observation.id.eql(oid), child)
 
   private lazy val ReplaceFlamingos2Sequence =

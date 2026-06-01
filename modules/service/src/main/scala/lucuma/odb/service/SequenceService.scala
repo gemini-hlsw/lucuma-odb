@@ -278,7 +278,7 @@ trait SequenceService[F[_]]:
 
   def deleteSequence(
     observationId: Observation.Id
-  )(using Transaction[F]): F[Unit]
+  )(using Transaction[F]): F[Result[Unit]]
 
 object SequenceService:
 
@@ -959,12 +959,18 @@ object SequenceService:
 
       override def deleteSequence(
         observationId: Observation.Id
-      )(using Transaction[F]): F[Unit] = 
-        // access control limits this to pre-execution, so we don't need to worry about static config, etc.
-        for {
+      )(using Transaction[F]): F[Result[Unit]] =
+        def doDelete: F[Unit] = for {
           _ <- deleteMaterializedSequence(observationId, SequenceType.Acquisition)
           _ <- deleteMaterializedSequence(observationId, SequenceType.Science)
         } yield ()
+        // AccessControl limits this to pre-execution, but we could still have visits. If there
+        // are visits, it brings up questions about the static configs and whether we should delete those too.
+        // For now, we'll just disallow deleting sequences with visits.
+        visitService.hasVisits(observationId).ifM(
+          OdbError.InvalidArgument(s"Cannot delete sequence for observation $observationId because it has visits.".some).asFailureF,
+          doDelete.map(Result.success)
+        ) 
 
   object Statements:
 

@@ -772,7 +772,7 @@ trait AccessControl[F[_]] extends Predicates[F] {
               ))
         c  <- ResultT.fromResult:
                 os match
-                  case Nil     => Result.failure(OdbError.NotAuthorized(user.id, s"User cannot replace the sequence in the current observation workflow state.".some).asProblem)
+                  case Nil     => Result.failure(OdbError.NotAuthorized(user.id, s"User cannot delete the sequence in the current observation workflow state.".some).asProblem)
                   case List(o) => Result(AccessControl.unchecked((), o, observation_id))
                   case o       => Result.internalError(s"Checked one id '$o', but got a list of ids back: $os")
       yield c).value
