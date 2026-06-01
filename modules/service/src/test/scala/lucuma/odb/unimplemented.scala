@@ -5,7 +5,8 @@ package lucuma.odb
 
 import lucuma.core.enums.ObservingModeType
 
-val UnImplementedModes: Set[ObservingModeType] = Set(ObservingModeType.GnirsLongSlit)
+val UnImplementedModes: Set[ObservingModeType] =
+  Set(ObservingModeType.Flamingos2Imaging, ObservingModeType.GnirsLongSlit)
 
 extension (mode: ObservingModeType)
   def isImplemented: Boolean =

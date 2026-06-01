@@ -120,6 +120,7 @@ class observation_configurationRequests
 
   def baseMutation(user: User, oid: Observation.Id, mode: ObservingModeType): IO[Unit] =
     mode match
+      case ObservingModeType.Flamingos2Imaging  => IO.unit
       case ObservingModeType.Flamingos2LongSlit => Mutation.forFlamingos2LongSlit(user, oid, Flamingos2Disperser.R1200HK)
       case ObservingModeType.GhostIfu           => Mutation.forGhostIfu(user, oid, GhostResolutionMode.Standard)
       case ObservingModeType.GmosNorthLongSlit  => Mutation.forGmosNorthLongSlit(user, oid, GmosNorthGrating.B480_G5309)
@@ -132,6 +133,7 @@ class observation_configurationRequests
 
   def compatibleMutation(user: User, oid: Observation.Id, mode: ObservingModeType): IO[Unit] =
     mode match
+      case ObservingModeType.Flamingos2Imaging  => IO.unit
       case ObservingModeType.Flamingos2LongSlit => IO.unit // no changes are compatible
       case ObservingModeType.GhostIfu           => IO.unit
       case _: VisitorObservingModeType          => IO.unit
@@ -144,6 +146,7 @@ class observation_configurationRequests
 
   def incompatibleMutation(user: User, oid: Observation.Id, mode: ObservingModeType): Option[IO[Unit]] =
     mode match
+      case ObservingModeType.Flamingos2Imaging  => None
       case ObservingModeType.Flamingos2LongSlit => Some(Mutation.forFlamingos2LongSlit(user, oid, Flamingos2Disperser.R1200JH))
       case ObservingModeType.GhostIfu           => None
       case _: VisitorObservingModeType          => None
@@ -223,6 +226,7 @@ class observation_configurationRequests
       tid   <- if !too then createTargetWithProfileAs(pi, pid) else createOpportunityTargetAs(pi, pid)
       oid   <-
         mode match
+          case ObservingModeType.Flamingos2Imaging  => IO.raiseError(new RuntimeException("Flamingos2 imaging not supported yet"))
           case ObservingModeType.Flamingos2LongSlit => createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
           case ObservingModeType.GhostIfu           => createGhostIfuObservationAs(pi, pid, List(tid))
           case ObservingModeType.GmosNorthLongSlit  => createGmosNorthLongSlitObservationAs(pi, pid, List(tid))

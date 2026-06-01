@@ -6866,6 +6866,11 @@ enum ObservingModeType {
   ALOPEKE_WIDE_FIELD
 
   """
+  ObservingModeType Flamingos2Imaging
+  """
+  FLAMINGOS_2_IMAGING
+
+  """
   ObservingModeType Flamingos2LongSlit
   """
   FLAMINGOS_2_LONG_SLIT
