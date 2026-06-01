@@ -96,3 +96,73 @@ class createObservation_Flamingos2Imaging extends OdbSuite:
             }
           }
         """.asRight)
+
+  test("create Flamingos2 imaging with arbitrary offsets"):
+    createProgramAs(pi).flatMap: pid =>
+      createTargetAs(pi, pid).flatMap: tid =>
+        expect(pi, s"""
+          mutation {
+            createObservation(input: {
+              programId: ${pid.asJson}
+              SET: {
+                targetEnvironment: {
+                  asterism: [${tid.asJson}]
+                }
+                scienceRequirements: {
+                  exposureTimeMode: {
+                    signalToNoise: {
+                      value: 100.0
+                      at: { nanometers: 500.0 }
+                    }
+                  }
+                }
+                observingMode: {
+                  flamingos2Imaging: {
+                    filters: [
+                      { filter: Y }
+                    ]
+                    explicitSpatialOffsets: [
+                      { p: { microarcseconds:  10000000 }, q: { microarcseconds:         0 } },
+                      { p: { microarcseconds:         0 }, q: { microarcseconds: -10000000 } }
+                    ]
+                  }
+                }
+              }
+            }) {
+              observation {
+                observingMode {
+                  flamingos2Imaging {
+                    spatialOffsets {
+                      p { microarcseconds }
+                      q { microarcseconds }
+                    }
+                    explicitSpatialOffsets {
+                      p { microarcseconds }
+                      q { microarcseconds }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        """,
+        json"""
+          {
+            "createObservation": {
+              "observation": {
+                "observingMode": {
+                  "flamingos2Imaging": {
+                    "spatialOffsets": [
+                      { "p": { "microarcseconds": 10000000 }, "q": { "microarcseconds": 0 } },
+                      { "p": { "microarcseconds": 0 }, "q": { "microarcseconds": -10000000 } }
+                    ],
+                    "explicitSpatialOffsets": [
+                      { "p": { "microarcseconds": 10000000 }, "q": { "microarcseconds": 0 } },
+                      { "p": { "microarcseconds": 0 }, "q": { "microarcseconds": -10000000 } }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        """.asRight)
