@@ -18,9 +18,11 @@ import lucuma.core.enums.Flamingos2Reads
 import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig
 import lucuma.core.model.sequence.flamingos2.Flamingos2FpuMask
 import lucuma.core.model.sequence.flamingos2.Flamingos2StaticConfig
+import lucuma.core.util.Enumerated
 import skunk.*
 import skunk.codec.boolean.bool
 import skunk.codec.text.varchar
+import skunk.data.Arr
 import skunk.data.Type
 
 trait Flamingos2Codecs:
@@ -39,6 +41,9 @@ trait Flamingos2Codecs:
 
   val flamingos_2_filter: Codec[Flamingos2Filter] =
     enumerated(Type.varchar)
+
+  val _flamingos_2_filter: Codec[Arr[Flamingos2Filter]] =
+    Codec.array(_.tag, s => Enumerated[Flamingos2Filter].fromTag(s).toRight(s"Invalid Flamingos2 filter tag: $s"), Type("_d_tag", List(Type("d_tag"))))
 
   val flamingos_2_fpu: Codec[Flamingos2Fpu] =
     enumerated(Type.varchar)

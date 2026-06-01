@@ -120,7 +120,7 @@ class observation_configurationRequests
 
   def baseMutation(user: User, oid: Observation.Id, mode: ObservingModeType): IO[Unit] =
     mode match
-      case ObservingModeType.Flamingos2Imaging  => IO.unit
+      case ObservingModeType.Flamingos2Imaging  => IO.unit // TODO implement Flamingos2 imaging
       case ObservingModeType.Flamingos2LongSlit => Mutation.forFlamingos2LongSlit(user, oid, Flamingos2Disperser.R1200HK)
       case ObservingModeType.GhostIfu           => Mutation.forGhostIfu(user, oid, GhostResolutionMode.Standard)
       case ObservingModeType.GmosNorthLongSlit  => Mutation.forGmosNorthLongSlit(user, oid, GmosNorthGrating.B480_G5309)
@@ -133,7 +133,7 @@ class observation_configurationRequests
 
   def compatibleMutation(user: User, oid: Observation.Id, mode: ObservingModeType): IO[Unit] =
     mode match
-      case ObservingModeType.Flamingos2Imaging  => IO.unit
+      case ObservingModeType.Flamingos2Imaging  => IO.unit // TODO implement Flamingos2 imaging
       case ObservingModeType.Flamingos2LongSlit => IO.unit // no changes are compatible
       case ObservingModeType.GhostIfu           => IO.unit
       case _: VisitorObservingModeType          => IO.unit
@@ -146,7 +146,7 @@ class observation_configurationRequests
 
   def incompatibleMutation(user: User, oid: Observation.Id, mode: ObservingModeType): Option[IO[Unit]] =
     mode match
-      case ObservingModeType.Flamingos2Imaging  => None
+      case ObservingModeType.Flamingos2Imaging  => None // TODO implement Flamingos2 imaging
       case ObservingModeType.Flamingos2LongSlit => Some(Mutation.forFlamingos2LongSlit(user, oid, Flamingos2Disperser.R1200JH))
       case ObservingModeType.GhostIfu           => None
       case _: VisitorObservingModeType          => None

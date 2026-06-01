@@ -4788,6 +4788,11 @@ Edit or create an observation's observing mode
 """
 input ObservingModeInput @oneOf {
   """
+  The flamingos2Imaging field must be either specified or skipped altogether.  It cannot be unset with a null value.
+  """
+  flamingos2Imaging: Flamingos2ImagingInput
+
+  """
   The flamingos2LongSlit field must be either specified or skipped altogether.  It cannot be unset with a null value.
   """
   flamingos2LongSlit: Flamingos2LongSlitInput
@@ -9049,6 +9054,57 @@ input Flamingos2LongSlitInput {
   Acquisition properties that, when set, override default values.
   """
   acquisition: Flamingos2LongSlitAcquisitionInput
+}
+
+"""
+Defines a Flamingos2 imaging filter to use along with its exposure time mode.  If
+the exposure time mode is not specified, it is taken from the observation's
+requirements.
+"""
+input Flamingos2ImagingFilterInput {
+
+  filter: Flamingos2Filter!
+
+  exposureTimeMode: ExposureTimeModeInput
+
+}
+
+"""
+Flamingos2 Imaging creation and edit input parameters.
+"""
+input Flamingos2ImagingInput {
+
+  """
+  The filters field must be specified with at least one filter. It cannot be
+  unset with a null value.
+  """
+  filters: [Flamingos2ImagingFilterInput!]
+
+  """
+  The explicitReadMode field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  explicitReadMode: Flamingos2ReadMode
+
+  """
+  The explicitReads field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  explicitReads: Flamingos2Reads
+
+  """
+  The explicitDecker field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  explicitDecker: Flamingos2Decker
+
+  """
+  The explicitReadoutMode field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  explicitReadoutMode: Flamingos2ReadoutMode
+
+  """
+  The explicitSpatialOffsets field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  explicitSpatialOffsets: [OffsetInput!]
+
 }
 
 enum GhostIfu1FiberAgitator {

@@ -1108,7 +1108,14 @@ trait DatabaseOperations { this: OdbSuite =>
   private def observingModeObject(observingMode: ObservingModeType): String =
     observingMode match
       case ObservingModeType.Flamingos2Imaging =>
-        sys.error("Flamingos2 imaging observing mode is not yet implemented")
+        """{
+          flamingos2Imaging: {
+            filters: [
+              { filter: Y },
+              { filter: J }
+            ]
+          }
+        }"""
       case ObservingModeType.Flamingos2LongSlit =>
         """{
           flamingos2LongSlit: {
