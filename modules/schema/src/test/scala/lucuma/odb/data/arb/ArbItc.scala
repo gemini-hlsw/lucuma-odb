@@ -126,33 +126,24 @@ trait ArbItc:
   given Cogen[Itc.Igrins2Spectroscopy] =
     Cogen[Zipper[Itc.Result]].contramap(_.science)
 
-  given Arbitrary[Itc.GnirsSpectroscopy] =
-    Arbitrary:
-      arbitrary[Zipper[Itc.Result]].map(Itc.GnirsSpectroscopy.apply)
-
-  given Cogen[Itc.GnirsSpectroscopy] =
-    Cogen[Zipper[Itc.Result]].contramap(_.science)
-
   given Arbitrary[Itc] =
     Arbitrary:
       Gen.oneOf(
         arbitrary[Itc.GhostIfu],
         arbitrary[Itc.GmosNorthImaging],
         arbitrary[Itc.GmosSouthImaging],
-        arbitrary[Itc.GnirsSpectroscopy],
         arbitrary[Itc.Igrins2Spectroscopy],
         arbitrary[Itc.Spectroscopy]
       )
 
   given Cogen[Itc] =
     Cogen[
-      Either[Itc.Spectroscopy, Either[Itc.GmosNorthImaging, Either[Itc.GmosSouthImaging, Either[Itc.GnirsSpectroscopy, Either[Itc.Igrins2Spectroscopy, Itc.GhostIfu]]]]]
+      Either[Itc.Spectroscopy, Either[Itc.GmosNorthImaging, Either[Itc.GmosSouthImaging, Either[Itc.Igrins2Spectroscopy, Itc.GhostIfu]]]]
     ].contramap:
       case a: Itc.Spectroscopy        => Left(a)
       case a: Itc.GmosNorthImaging    => Right(Left(a))
       case a: Itc.GmosSouthImaging    => Right(Right(Left(a)))
-      case a: Itc.GnirsSpectroscopy   => Right(Right(Right(Left(a))))
-      case a: Itc.Igrins2Spectroscopy => Right(Right(Right(Right(Left(a)))))
-      case a: Itc.GhostIfu            => Right(Right(Right(Right(Right(a)))))
+      case a: Itc.Igrins2Spectroscopy => Right(Right(Right(Left(a))))
+      case a: Itc.GhostIfu            => Right(Right(Right(Right(a))))
 
 object ArbItc extends ArbItc
