@@ -454,6 +454,7 @@ object OdbMapping {
                 ImagingConfigOptionMapping,
                 ImagingConfigOptionGmosNorthMapping,
                 ImagingConfigOptionGmosSouthMapping,
+                ImagingConfigOptionFlamingos2Mapping,
                 ImagingScienceRequirementsMapping,
                 HourAngleRangeMapping,
                 LargeProgramMapping,

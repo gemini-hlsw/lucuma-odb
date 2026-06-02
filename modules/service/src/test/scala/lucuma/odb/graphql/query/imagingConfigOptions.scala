@@ -30,9 +30,13 @@ class imagingConfigOptions extends OdbSuite {
       s.execute(sql"insert into t_imaging_config_option (c_instrument, c_index, c_fov, c_filter_label, c_ao, c_site) values('GmosNorth', 2, 350000000, 'OVI', false, 'gn')".command) *>
       s.execute(sql"insert into t_imaging_config_option (c_instrument, c_index, c_fov, c_filter_label, c_ao, c_site) values('GmosSouth', 3, 150000000, 'OVIC', false, 'gs')".command) *>
       s.execute(sql"insert into t_imaging_config_option (c_instrument, c_index, c_fov, c_filter_label, c_ao, c_capability, c_site) values('Alopeke', 4, 3000000, 'EO466', false, 'speckle', 'gn')".command) *>
+      s.execute(sql"insert into t_imaging_config_option (c_instrument, c_index, c_fov, c_filter_label, c_ao, c_site) values('Flamingos2', 5, 366000000, 'Y', false, 'gs')".command) *>
+      s.execute(sql"insert into t_imaging_config_option (c_instrument, c_index, c_fov, c_filter_label, c_ao, c_site) values('Flamingos2', 6, 366000000, 'K-short', false, 'gs')".command) *>
       s.execute(sql"insert into t_imaging_config_option_gmos_north values('GmosNorth', 1, 'ZPrime_CaT')".command) *>
       s.execute(sql"insert into t_imaging_config_option_gmos_north values('GmosNorth', 2, 'OVI')".command) *>
-      s.execute(sql"insert into t_imaging_config_option_gmos_south values('GmosSouth', 3, 'OVIC')".command)).void
+      s.execute(sql"insert into t_imaging_config_option_gmos_south values('GmosSouth', 3, 'OVIC')".command) *>
+      s.execute(sql"insert into t_imaging_config_option_flamingos_2 values('Flamingos2', 5, 'Y')".command) *>
+      s.execute(sql"insert into t_imaging_config_option_flamingos_2 values('Flamingos2', 6, 'KShort')".command)).void
   }
 
   case class ConfigOption(
@@ -142,7 +146,7 @@ class imagingConfigOptions extends OdbSuite {
   }
 
   test("AND") {
-    val expect = allOptions.map(_.filter(o => (o.fov.toMicroarcseconds / 1e6) > 3000 && o.site === Site.GS))
+    val expect = allOptions.map(_.filter(o => (o.fov.toMicroarcseconds / 1e6) > 300 && o.site === Site.GS))
     val actual = optionsWhere(s"""AND: [ { site: { EQ: GS } }, { fov: { arcseconds: { GT: 300 } } }]""")
     for {
       es <- expect
@@ -299,6 +303,41 @@ class imagingConfigOptions extends OdbSuite {
             {
               "gmosSouth": {
                 "filter": "OVIC"
+              }
+            }
+          ]
+        }
+      """.asRight
+    )
+  }
+
+  test("Flamingos2") {
+    expect(
+      user = pi,
+      query = s"""
+        query {
+          imagingConfigOptions(
+            WHERE: {
+              instrument: { EQ: FLAMINGOS2 }
+            }
+          ) {
+            flamingos2 {
+              filter
+            }
+          }
+        }
+      """,
+      expected = json"""
+        {
+          "imagingConfigOptions": [
+            {
+              "flamingos2": {
+                "filter": "K_SHORT"
+              }
+            },
+            {
+              "flamingos2": {
+                "filter": "Y"
               }
             }
           ]

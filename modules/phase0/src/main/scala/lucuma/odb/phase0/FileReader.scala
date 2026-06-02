@@ -78,6 +78,9 @@ class FileReader[F[_]](fileName: String)(using ApplicativeError[F, Throwable]):
   val gmosSouthImaging: Pipe[F, Byte, (GmosImagingRow.GmosSouth, PosInt)] =
     read(Instrument.GmosSouth, GmosImagingRow.gmosSouth)
 
+  val flamingos2Imaging: Pipe[F, Byte, (Flamingos2ImagingRow, PosInt)] =
+    read(Instrument.Flamingos2, Flamingos2ImagingRow.flamingos2)
+
   val alopekeImaging: Pipe[F, Byte, (ImagingRow, PosInt)] =
     read(Instrument.Alopeke, ImagingRow.singleRow)
 
