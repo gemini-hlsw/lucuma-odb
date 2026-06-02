@@ -152,6 +152,7 @@ object ObservingModeServices:
         which: List[Observation.Id]
       )(using Transaction[F], SuperUserAccess): F[Result[Unit]] =
         List(
+          input.flamingos2Imaging.map(m =>  flamingos2ImagingService.insert(m, etm, which)),
           input.flamingos2LongSlit.map(m => flamingos2LongSlitService.insert(m, etm, which)),
           input.ghostIfu.map(m =>           ghostIfuService.insert(m, etm, which)),
           input.gmosNorthImaging.map(m =>   gmosImagingService.insertNorth(m, etm, which)),
@@ -176,8 +177,8 @@ object ObservingModeServices:
 
         val deleteObservingMode: F[Unit] =
           mode match
-            case ObservingModeType.Flamingos2Imaging  => MonadCancelThrow[F].raiseError(new RuntimeException("Flamingos2 deletion is not yet implemented."))
             case ObservingModeType.Flamingos2LongSlit => flamingos2LongSlitService.delete(which)
+            case ObservingModeType.Flamingos2Imaging  => MonadCancelThrow[F].raiseError(new RuntimeException("Flamingos2 imaging deletion is not yet implemented."))
             case ObservingModeType.GhostIfu           => ghostIfuService.delete(which)
             case ObservingModeType.GmosNorthImaging   => gmosImagingService.deleteNorth(which)
             case ObservingModeType.GmosNorthLongSlit  => gmosLongSlitService.deleteNorth(which)
@@ -223,8 +224,8 @@ object ObservingModeServices:
 
         def cloneObservingMode(etms: List[(ExposureTimeModeId, ExposureTimeModeId)]): F[Unit] =
           mode match
-            case ObservingModeType.Flamingos2Imaging  => MonadCancelThrow[F].raiseError(new RuntimeException("Flamingos2 clonning is not yet implemented."))
             case ObservingModeType.Flamingos2LongSlit => flamingos2LongSlitService.clone(origOid, newOid)
+            case ObservingModeType.Flamingos2Imaging  => MonadCancelThrow[F].raiseError(new RuntimeException("Flamingos2 imaging cloning is not yet implemented."))
             case ObservingModeType.GhostIfu           => ghostIfuService.clone(origOid, newOid, etms)
             case ObservingModeType.GmosNorthLongSlit  => gmosLongSlitService.cloneNorth(origOid, newOid)
             case ObservingModeType.GmosNorthImaging   => gmosImagingService.cloneNorth(origOid, newOid, etms)

@@ -13,18 +13,7 @@ import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.binding.*
 
-object GmosImagingInput:
-
-  private object FilterCheck:
-    val AtLeastOne: OdbError =
-      OdbError.InvalidArgument("At least one filter must be specified for GMOS imaging observations.".some)
-
-    def notEmpty[L](filters: Result[List[L]]): Result[NonEmptyList[L]] =
-      filters.flatMap: fs =>
-        Result.fromOption(NonEmptyList.fromList(fs), AtLeastOne.asProblem)
-
-    def notEmptyIfPresent[L](filters: Result[Option[List[L]]]): Result[Option[NonEmptyList[L]]] =
-      filters.flatMap(_.traverse(fs => Result.fromOption(NonEmptyList.fromList(fs), AtLeastOne.asProblem)))
+object GmosImagingInput extends ImagingFilterCheck:
 
   // Create ---------------------------------------------------------------------
 
@@ -59,7 +48,7 @@ object GmosImagingInput:
           GmosRoiBinding.Option("explicitRoi", rExplicitRoi),
         ) => (
           rVariant,
-          FilterCheck.notEmpty(rFilters),
+          notEmpty("GMOS", rFilters),
           rExplicitBin,
           rExplicitAmpReadMode,
           rExplicitAmpGain,
@@ -86,7 +75,7 @@ object GmosImagingInput:
     def toCreate: Result[Create[L]] =
       for
         v  <- Result.fromOption(variant, OdbError.InvalidArgument("An imaging variant must be suplied for GMOS imaging observations".some).asProblem)
-        fs <- Result.fromOption(filters, OdbError.InvalidArgument("At least one filter must be specified for GMOS imaging observations".some).asProblem)
+        fs <- Result.fromOption(filters, atLeastOne("GMOS").asProblem)
       yield Create(v, fs, common.toCreate)
 
   object Edit:
@@ -121,7 +110,7 @@ object GmosImagingInput:
           GmosRoiBinding.Nullable("explicitRoi", rExplicitRoi)
         ) => (
           rVariant,
-          FilterCheck.notEmptyIfPresent(rFilters),
+          notEmptyIfPresent("GMOS", rFilters),
           rExplicitBin,
           rExplicitAmpReadMode,
           rExplicitAmpGain,

@@ -4788,6 +4788,11 @@ Edit or create an observation's observing mode
 """
 input ObservingModeInput @oneOf {
   """
+  The flamingos2Imaging field must be either specified or skipped altogether.  It cannot be unset with a null value.
+  """
+  flamingos2Imaging: Flamingos2ImagingInput
+
+  """
   The flamingos2LongSlit field must be either specified or skipped altogether.  It cannot be unset with a null value.
   """
   flamingos2LongSlit: Flamingos2LongSlitInput
@@ -9049,6 +9054,165 @@ input Flamingos2LongSlitInput {
   Acquisition properties that, when set, override default values.
   """
   acquisition: Flamingos2LongSlitAcquisitionInput
+}
+
+"""
+Imaging filters combine an actual filter with an exposure time mode.
+"""
+type Flamingos2ImagingFilter {
+
+  """
+  The filter to use for this imaging configuration.
+  """
+  filter: Flamingos2Filter!
+
+  """
+  Exposure time mode for this filter.
+  If not specified, it is taken from the observation's requirements.
+  """
+  exposureTimeMode: ExposureTimeMode!
+
+}
+
+"""
+Defines a Flamingos2 imaging filter to use along with its exposure time mode.
+"""
+input Flamingos2ImagingFilterInput {
+
+  """
+  The filter to use for this imaging configuration.
+  """
+  filter: Flamingos2Filter!
+
+  """
+  Exposure time mode for this filter.
+  If not specified, it is taken from the observation's requirements.
+  """
+  exposureTimeMode: ExposureTimeModeInput
+
+}
+
+"""
+Flamingos2 Imaging mode
+"""
+type Flamingos2Imaging {
+
+  """
+  The filters (at least one is required) to be used for data collection.
+  """
+  filters: [Flamingos2ImagingFilter!]!
+
+  """
+  Filters as initially selected when creating the imaging mode.
+  """
+  initialFilters: [Flamingos2ImagingFilter!]!
+
+  """
+  Default read mode.
+  """
+  defaultReadMode: Flamingos2ReadMode!
+
+  """
+  Optional explicitly specified F2 ReadMode. If set it overrides the default.
+  """
+  explicitReadMode: Flamingos2ReadMode
+
+  """
+  Default reads.
+  """
+  defaultReads: Flamingos2Reads!
+
+  """
+  Optional explicitly specified F2 Reads. If set it overrides the default.
+  """
+  explicitReads: Flamingos2Reads
+
+  """
+  The decker field is either explicitly specified in explicitDecker or else taken
+  from defaultDecker.
+  """
+  decker: Flamingos2Decker!
+
+  """
+  Default decker.
+  """
+  defaultDecker: Flamingos2Decker!
+
+  """
+  Optional explicitly specified F2 Decker. If set it overrides the default.
+  """
+  explicitDecker: Flamingos2Decker
+
+  """
+  The readoutMode field is either explicitly specified in explicitReadoutMode or
+  else taken from defaultReadoutMode.
+  """
+  readoutMode: Flamingos2ReadoutMode!
+
+  """
+  Default readout mode.
+  """
+  defaultReadoutMode: Flamingos2ReadoutMode!
+
+  """
+  Optional explicitly specified F2 Readout mode. If set it overrides the default.
+  """
+  explicitReadoutMode: Flamingos2ReadoutMode
+
+  """
+  Spatial offsets, either explicitly specified in explicitSpatialOffsets or else
+  taken from defaultSpatialOffsets.
+  """
+  spatialOffsets: [Offset!]!
+
+  """
+  Default spatial offsets.
+  """
+  defaultSpatialOffsets: [Offset!]!
+
+  """
+  Optional explicitly specified spatial offsets. If set it overrides the default.
+  """
+  explicitSpatialOffsets: [Offset!]
+
+}
+
+"""
+Flamingos2 Imaging creation and edit input parameters.
+"""
+input Flamingos2ImagingInput {
+
+  """
+  The filters field must be specified with at least one filter. It cannot be
+  unset with a null value.
+  """
+  filters: [Flamingos2ImagingFilterInput!]
+
+  """
+  The explicitReadMode field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  explicitReadMode: Flamingos2ReadMode
+
+  """
+  The explicitReads field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  explicitReads: Flamingos2Reads
+
+  """
+  The explicitDecker field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  explicitDecker: Flamingos2Decker
+
+  """
+  The explicitReadoutMode field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  explicitReadoutMode: Flamingos2ReadoutMode
+
+  """
+  The explicitSpatialOffsets field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  explicitSpatialOffsets: [OffsetInput!]
+
 }
 
 enum GhostIfu1FiberAgitator {
@@ -13901,6 +14065,11 @@ type ObservingMode {
   Mode type
   """
   mode: ObservingModeType!
+
+  """
+  Flamingos 2 Imaging mode
+  """
+  flamingos2Imaging: Flamingos2Imaging
 
   """
   Flamingos 2 Long Slit mode

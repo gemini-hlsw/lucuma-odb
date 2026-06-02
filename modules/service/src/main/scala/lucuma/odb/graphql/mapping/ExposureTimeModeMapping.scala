@@ -50,6 +50,7 @@ trait ExposureTimeModeMapping[F[_]] extends ExposureTimeModeView[F]:
   lazy val ExposureTimeModeMappings: List[ObjectMapping] =
     List(
       // Flamingos 2
+      etmMappings(Flamingos2ImagingFilterType,       ExposureTimeModeView),
       etmMappings(Flamingos2LongSlitType,            ExposureTimeModeView),
       etmMappings(Flamingos2LongSlitAcquisitionType, ExposureTimeModeView),
 
