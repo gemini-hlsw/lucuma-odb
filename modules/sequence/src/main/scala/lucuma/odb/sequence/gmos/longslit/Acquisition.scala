@@ -109,10 +109,12 @@ object Acquisition:
           _  <- optics.fpu           := GmosFpuMask.Builtin(fpu).some
           _  <- optics.xBin          := GmosXBinning.One
           _  <- optics.yBin          := GmosYBinning.One
+          _  <- optics.ampReadMode   := GmosAmpReadMode.Fast
           _  <- optics.roi           := acqConfig.roi.slitRoi
           s1 <- scienceStep(10.arcsec, 0.arcsec, ObserveClass.Acquisition)
 
           _  <- optics.exposure      := lastExpTime(exposureTime)
+          _  <- optics.ampReadMode   := readMode
           s2 <- scienceStep(0.arcsec, 0.arcsec, ObserveClass.Acquisition)
         yield Acquisition.Steps(s0, s1, s2)
 

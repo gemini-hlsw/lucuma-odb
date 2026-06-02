@@ -78,7 +78,7 @@ class executionAcqGmosNorth_slow extends ExecutionTestSupportForGmos with mutati
                         "instrumentConfig": {
                           "exposure": { "seconds": 20.000000 },
                           "readout": {
-                            "ampReadMode": "SLOW",
+                            "ampReadMode": "FAST",
                             "ampGain": "LOW"
                           }
                         }
