@@ -92,6 +92,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
       CreateUserInvitation,
       DeleteProgramUser,
       DeleteProposal,
+      DeleteSequence,
       LinkUser,
       RecordDataset,
       RecordFlamingos2Visit,
@@ -470,6 +471,21 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
         requireStaffAccess:
           proposalService.deleteProposal(input).nestMap: b =>
             Json.obj("result" -> b.asJson)
+
+  private lazy val DeleteSequence =
+    MutationField("deleteSequence", DeleteSequenceInput.Binding): (input, child) =>
+      services.useNonTransactionally(selectForUpdate(input))
+        .flatMap: res =>
+          res.flatTraverse: checked =>
+            if checked.isEmpty then
+              OdbError.NotAuthorized(user.id).asFailureF
+            else
+              checked.foldWithId(OdbError.InvalidArgument().asFailureF): (_, oid) =>
+                services.useTransactionally:
+                  sequenceService
+                    .deleteSequence(oid)
+                    .nestMap: _ =>
+                      Filter(Predicates.deleteSequenceResult.observation.id.eql(oid), child)
 
   private lazy val ReplaceFlamingos2Sequence =
     MutationField.json("replaceFlamingos2Sequence", ReplaceSequenceInput.ReplaceFlamingos2Binding): input =>

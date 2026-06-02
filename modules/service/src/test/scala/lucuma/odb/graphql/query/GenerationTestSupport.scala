@@ -28,8 +28,6 @@ trait GenerationTestSupport extends OdbSuite:
    * Generates the sequence for the given observation.
    *
    * @param limit the future limit, which must be in the range [0, 100]
-   * @param when the timestamp to pass the generator. in other words generate as
-   *             if asked at this time
    */
   def generateAs(
     user:  User,
@@ -54,8 +52,6 @@ trait GenerationTestSupport extends OdbSuite:
    * Generates the sequence but fails if it produces an error.
    *
    * @param limit the future limit, which must be in the range [0, 100]
-   * @param when the timestamp to pass the generator. in other words generate as
-   *             if asked at this time
    */
   def generateOrFailAs(
     user:  User,

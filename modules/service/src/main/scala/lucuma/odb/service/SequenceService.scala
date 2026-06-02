@@ -276,6 +276,10 @@ trait SequenceService[F[_]]:
     staticConfig:  GnirsStaticConfig
   )(using Transaction[F]): F[Option[Stream[F, Atom[GnirsDynamicConfig]]]]
 
+  def deleteSequence(
+    observationId: Observation.Id
+  )(using Transaction[F]): F[Result[Unit]]
+
 object SequenceService:
 
   def instantiate[F[_]: Concurrent: UUIDGen](
@@ -503,6 +507,17 @@ object SequenceService:
         sequenceType:  SequenceType
       ): F[Boolean] =
         session.unique(Statements.MarkMaterializedOrUpdate)(observationId, sequenceType)
+
+      /**
+       * Deletes the row in the t_squence_materialized table if it exists.
+       *
+       * @return `true` if a row was deleted, `false` otherwise.
+       */
+      private def deleteMaterialized(
+        observationId: Observation.Id,
+        sequenceType:  SequenceType
+      ): F[Boolean] =
+        session.unique(Statements.DeleteMaterialized)(observationId, sequenceType)
 
       private def atomBuilder[S, D](
         sequenceType: SequenceType,
@@ -936,6 +951,27 @@ object SequenceService:
           estimator.gnirsStep
         )
 
+      private def deleteMaterializedSequence(observationId: Observation.Id, sequenceType: SequenceType): F[Unit] = 
+        deleteMaterialized(observationId, sequenceType).ifM(
+          abandonAndDeleteUnexecuted(observationId, sequenceType),
+          Applicative[F].unit
+        )
+
+      override def deleteSequence(
+        observationId: Observation.Id
+      )(using Transaction[F]): F[Result[Unit]] =
+        def doDelete: F[Unit] = for {
+          _ <- deleteMaterializedSequence(observationId, SequenceType.Acquisition)
+          _ <- deleteMaterializedSequence(observationId, SequenceType.Science)
+        } yield ()
+        // AccessControl limits this to pre-execution, but we could still have visits. If there
+        // are visits, it brings up questions about the static configs and whether we should delete those too.
+        // For now, we'll just disallow deleting sequences with visits.
+        visitService.hasVisits(observationId).ifM(
+          OdbError.InvalidArgument(s"Cannot delete sequence for observation $observationId because it has visits.".some).asFailureF,
+          doDelete.map(Result.success)
+        ) 
+
   object Statements:
 
     val AbandonAndDeleteUnexecuted: Command[(Observation.Id, SequenceType)] =
@@ -1275,3 +1311,16 @@ object SequenceService:
         DO UPDATE SET c_updated = now()
         RETURNING (xmax = 0) AS inserted
       """.query(bool)
+
+    val DeleteMaterialized: Query[(Observation.Id, SequenceType), Boolean] =
+      sql"""
+        WITH deleted_rows AS (
+           DELETE FROM t_sequence_materialization
+           WHERE c_observation_id = $observation_id
+             AND c_sequence_type  = $sequence_type
+           RETURNING 1
+        )
+        SELECT EXISTS (SELECT 1 FROM deleted_rows) AS deleted
+      """.query(bool)
+
+    

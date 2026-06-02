@@ -31,6 +31,10 @@ trait ObservationView[F[_]] extends BaseMapping[F] {
       val UseBlindOffset: ColumnRef      = col("c_use_blind_offset",       bool)
       val BlindOffsetTargetId: ColumnRef = col("c_blind_offset_target_id", target_id.opt)
       val BlindOffsetType: ColumnRef     = col("c_blind_offset_type",      blind_offset_type)
+      val AcquisitionSequenceIsMaterialized: ColumnRef =
+        col("c_acquisition_sequence_is_materialized", bool)
+      val ScienceSequenceIsMaterialized: ColumnRef =
+        col("c_science_sequence_is_materialized", bool)
 
       object PosAngleConstraint {
         val Mode: ColumnRef  = col("c_pac_mode",  pac_mode.embedded)

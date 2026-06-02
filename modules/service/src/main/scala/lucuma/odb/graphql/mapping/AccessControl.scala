@@ -41,6 +41,7 @@ import lucuma.odb.graphql.input.CreateObservationInput
 import lucuma.odb.graphql.input.CreateProgramInput
 import lucuma.odb.graphql.input.CreateProgramNoteInput
 import lucuma.odb.graphql.input.CreateTargetInput
+import lucuma.odb.graphql.input.DeleteSequenceInput
 import lucuma.odb.graphql.input.EditAsterismsPatchInput
 import lucuma.odb.graphql.input.ObservationPropertiesInput
 import lucuma.odb.graphql.input.ObservationTimesInput
@@ -754,6 +755,25 @@ trait AccessControl[F[_]] extends Predicates[F] {
                 os match
                   case Nil     => Result.failure(OdbError.NotAuthorized(user.id, s"User cannot replace the sequence in the current observation workflow state.".some).asProblem)
                   case List(o) => Result(AccessControl.unchecked(input.sequenceType -> input.sequence, o, observation_id))
+                  case o       => Result.internalError(s"Checked one id '$o', but got a list of ids back: $os")
+      yield c).value
+
+  def selectForUpdate(
+    input: DeleteSequenceInput
+  )(using Services[F], NoTransaction[F]): F[Result[AccessControl.CheckedWithId[Unit, Observation.Id]]] =
+    Services.asSuperUser:
+      (for
+        o  <- ResultT(observationService.resolveOid(input.observationId, input.observationRef))
+        os <- ResultT(selectForObservationUpdateImpl(
+                includeDeleted      = None,
+                oids                = List(o),
+                includeCalibrations = true,
+                allowedStates       = ObservationWorkflowState.preExecutionSet
+              ))
+        c  <- ResultT.fromResult:
+                os match
+                  case Nil     => Result.failure(OdbError.NotAuthorized(user.id, s"User cannot delete the sequence in the current observation workflow state.".some).asProblem)
+                  case List(o) => Result(AccessControl.unchecked((), o, observation_id))
                   case o       => Result.internalError(s"Checked one id '$o', but got a list of ids back: $os")
       yield c).value
 
