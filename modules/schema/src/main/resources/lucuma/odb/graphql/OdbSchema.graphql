@@ -9061,8 +9061,15 @@ Imaging filters combine an actual filter with an exposure time mode.
 """
 type Flamingos2ImagingFilter {
 
+  """
+  The filter to use for this imaging configuration.
+  """
   filter: Flamingos2Filter!
 
+  """
+  Exposure time mode for this filter.
+  If not specified, it is taken from the observation's requirements.
+  """
   exposureTimeMode: ExposureTimeMode!
 
 }

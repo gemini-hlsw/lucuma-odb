@@ -13,6 +13,7 @@ import grackle.QueryCompiler.Elab
 import grackle.Result
 import grackle.TypeRef
 import grackle.skunk.SkunkMapping
+import io.circe.Json
 import io.circe.syntax.*
 import lucuma.core.enums.Flamingos2Decker
 import lucuma.core.enums.Flamingos2Filter
@@ -31,10 +32,10 @@ trait Flamingos2ImagingMapping[F[_]]
      with OptionalFieldMapping[F]
      with Predicates[F] { this: SkunkMapping[F] =>
 
-  private def decodeOffsets(s: String): io.circe.Json =
+  private def decodeOffsets(s: String): Json =
     OffsetsFormat.getOption(s).map(_.asJson).getOrElse(List.empty[Offset].asJson)
 
-  private val defaultOffsetsJson: io.circe.Json =
+  private val defaultOffsetsJson: Json =
     List.empty[Offset].asJson
 
   lazy val Flamingos2ImagingFilterMapping: ObjectMapping =
@@ -86,11 +87,7 @@ trait Flamingos2ImagingMapping[F[_]]
     )
 
   // Order filters predictably and limit to either "current" or "initial".
-  private def filterElaborator(
-    t: TypeRef,
-    p: LeafPredicates[ObservingModeRowVersion],
-    v: ObservingModeRowVersion
-  ): Elab[Unit] =
+  private def filterElaborator(t: TypeRef, p: LeafPredicates[ObservingModeRowVersion], v: ObservingModeRowVersion): Elab[Unit] =
     Elab.transformChild: child =>
       OrderBy(
         OrderSelections(List(OrderSelection[Flamingos2Filter](t / "filter"))),

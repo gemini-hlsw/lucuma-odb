@@ -66,15 +66,14 @@ object Flamingos2ImagingService:
             for
               _   <- ResultT.liftF(session.exec(Statements.insert(input, oids)))
 
-              // Resolve the exposure time modes for acquisition and science
+              // Resolve the etms for acquisition and science
               r   <- ResultT(services.exposureTimeModeService.resolve("Flamingos2 Imaging", none, input.filters.map(f => (f.filter, f.exposureTimeMode)), reqEtm, which))
 
-              // Insert the acquisition and science filters (initial / immutable version)
               ids <- ResultT.liftF(services.exposureTimeModeService.insertResolvedAcquisitionAndScience(r))
               ini  = stripAcquisition(ids)
               _   <- ResultT.liftF(insertFilters(ini, ObservingModeRowVersion.Initial))
 
-              // Insert the science filters (current / mutable version)
+              // Insert the science filters
               cur <- ResultT.liftF(services.exposureTimeModeService.insertResolvedScienceOnly(stripAcquisition(r)))
               _   <- ResultT.liftF(insertFilters(cur, ObservingModeRowVersion.Current))
             yield ()

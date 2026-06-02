@@ -10,14 +10,13 @@ import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 
 trait ImagingFilterCheck:
-  val instrumentName: String
 
-  lazy val atLeastOne: OdbError =
+  def atLeastOne(instrumentName: String): OdbError =
     OdbError.InvalidArgument(s"At least one filter must be specified for $instrumentName imaging observations.".some)
 
-  def notEmpty[L](filters: Result[List[L]]): Result[NonEmptyList[L]] =
+  def notEmpty[L](instrumentName: String, filters: Result[List[L]]): Result[NonEmptyList[L]] =
     filters.flatMap: fs =>
-      Result.fromOption(NonEmptyList.fromList(fs), atLeastOne.asProblem)
+      Result.fromOption(NonEmptyList.fromList(fs), atLeastOne(instrumentName).asProblem)
 
-  def notEmptyIfPresent[L](filters: Result[Option[List[L]]]): Result[Option[NonEmptyList[L]]] =
-    filters.flatMap(_.traverse(fs => Result.fromOption(NonEmptyList.fromList(fs), atLeastOne.asProblem)))
+  def notEmptyIfPresent[L](instrumentName: String, filters: Result[Option[List[L]]]): Result[Option[NonEmptyList[L]]] =
+    filters.flatMap(_.traverse(fs => Result.fromOption(NonEmptyList.fromList(fs), atLeastOne(instrumentName).asProblem)))

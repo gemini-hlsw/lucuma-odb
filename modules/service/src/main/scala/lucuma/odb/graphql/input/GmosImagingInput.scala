@@ -14,7 +14,6 @@ import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.binding.*
 
 object GmosImagingInput extends ImagingFilterCheck:
-  override val instrumentName: String = "GMOS"
 
   // Create ---------------------------------------------------------------------
 
@@ -49,7 +48,7 @@ object GmosImagingInput extends ImagingFilterCheck:
           GmosRoiBinding.Option("explicitRoi", rExplicitRoi),
         ) => (
           rVariant,
-          notEmpty(rFilters),
+          notEmpty("GMOS", rFilters),
           rExplicitBin,
           rExplicitAmpReadMode,
           rExplicitAmpGain,
@@ -76,7 +75,7 @@ object GmosImagingInput extends ImagingFilterCheck:
     def toCreate: Result[Create[L]] =
       for
         v  <- Result.fromOption(variant, OdbError.InvalidArgument("An imaging variant must be suplied for GMOS imaging observations".some).asProblem)
-        fs <- Result.fromOption(filters, atLeastOne.asProblem)
+        fs <- Result.fromOption(filters, atLeastOne("GMOS").asProblem)
       yield Create(v, fs, common.toCreate)
 
   object Edit:
@@ -111,7 +110,7 @@ object GmosImagingInput extends ImagingFilterCheck:
           GmosRoiBinding.Nullable("explicitRoi", rExplicitRoi)
         ) => (
           rVariant,
-          notEmptyIfPresent(rFilters),
+          notEmptyIfPresent("GMOS", rFilters),
           rExplicitBin,
           rExplicitAmpReadMode,
           rExplicitAmpGain,

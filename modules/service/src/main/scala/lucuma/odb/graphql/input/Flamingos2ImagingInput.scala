@@ -19,7 +19,6 @@ import lucuma.odb.format.spatialOffsets.*
 import lucuma.odb.graphql.binding.*
 
 object Flamingos2ImagingInput extends ImagingFilterCheck:
-  override val instrumentName: String = "Flamingos2"
 
   case class Create(
     filters:             NonEmptyList[Flamingos2ImagingFilterInput],
@@ -48,7 +47,7 @@ object Flamingos2ImagingInput extends ImagingFilterCheck:
           OffsetInput.Binding.List.Option("explicitSpatialOffsets", rOffsets)
         ) =>
           (
-            notEmpty(rFilters),
+            notEmpty("Flamingos2", rFilters),
             rReadMode,
             rReads,
             rDecker,
@@ -74,7 +73,7 @@ object Flamingos2ImagingInput extends ImagingFilterCheck:
       explicitOffsets.map(OffsetsFormat.reverseGet)
 
     def toCreate: Result[Create] =
-      Result.fromOption(filters, atLeastOne.asProblem).map: fs =>
+      Result.fromOption(filters, atLeastOne("Flamingos2").asProblem).map: fs =>
         Create(
           fs,
           explicitReadMode.toOption,
@@ -97,7 +96,7 @@ object Flamingos2ImagingInput extends ImagingFilterCheck:
           OffsetInput.Binding.List.Nullable("explicitSpatialOffsets", rOffsets)
         ) =>
           (
-            notEmptyIfPresent(rFilters),
+            notEmptyIfPresent("Flamingos2", rFilters),
             rReadMode,
             rReads,
             rDecker,
