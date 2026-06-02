@@ -12,12 +12,17 @@ import io.circe.syntax.*
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.SequenceType
 import lucuma.core.model.Observation
+import lucuma.odb.util.Codecs.*
+import munit.Location
+import skunk.*
+import skunk.codec.numeric.int8
+import skunk.implicits.*
 
 // There is nothing instrument or mode specific about the delete sequence mutation (at least for now), so
 // we'll just use GmosNorth for testing it.
 class deleteSequence extends query.ExecutionTestSupportForGmos with ReplaceGmosNorthSequenceOps:
 
-  def expectMaterializedSequences(o: Observation.Id, acquistion: Boolean, science: Boolean): IO[Unit] =
+  def expectMaterializedSequences(o: Observation.Id, acquistion: Boolean, science: Boolean)(using Location): IO[Unit] =
     expect(
       pi,
       s"""
@@ -56,7 +61,10 @@ class deleteSequence extends query.ExecutionTestSupportForGmos with ReplaceGmosN
       }
     """
 
-  def deleteSequence(oid: Observation.Id, expected: Either[List[String], Json] = expectedSuccessResponse.asRight): IO[Unit] =
+  def deleteSequence(
+    oid: Observation.Id,
+    expected: Either[List[String], Json] = expectedSuccessResponse.asRight
+  )(using Location): IO[Unit] =
     expect(
       pi,
       s"""
@@ -74,7 +82,7 @@ class deleteSequence extends query.ExecutionTestSupportForGmos with ReplaceGmosN
       expected
     )
 
-  def replaceSequence(oid: Observation.Id, sequenceType: SequenceType): IO[Unit] =
+  def replaceSequence(oid: Observation.Id, sequenceType: SequenceType)(using Location): IO[Unit] =
     val inputString = input(oid, sequenceType, atomInput("Foo", stepInput(GmosNorthFilter.GPrime)))
     expect(
       pi,
@@ -110,55 +118,71 @@ class deleteSequence extends query.ExecutionTestSupportForGmos with ReplaceGmosN
       """.asRight
     )
 
-  val setup: IO[Observation.Id] =
+  def expectAtomCount(oid: Observation.Id, expected: Long)(using Location): IO[Unit] =
+    withSession: session =>
+      val query = sql"""
+        SELECT COUNT(*)
+        FROM t_atom
+        WHERE c_observation_id = $observation_id
+      """.query(int8)
+      session.unique(query)(oid)
+    .map: count =>
+      assertEquals(count, expected)
+
+  def setup(using Location): IO[Observation.Id] =
     for
       p <- createProgramAs(pi)
       t <- createTargetWithProfileAs(pi, p)
       o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+      _ <- expectMaterializedSequences(o, acquistion = false, science = false)
+      _ <- expectAtomCount(o, 0)
     yield o
 
   test("delete unmaterialized sequence is a no-op"):
     for 
       oid <- setup
-      _   <- expectMaterializedSequences(oid, acquistion = false, science = false)
       _   <- deleteSequence(oid)
+      _   <- expectMaterializedSequences(oid, acquistion = false, science = false)
+      _   <- expectAtomCount(oid, 0)
     yield ()
 
   test("delete with modified acquisition sequence is succesful"):
     for
       oid <- setup
-      _   <- expectMaterializedSequences(oid, acquistion = false, science = false)
       _   <- replaceSequence(oid, SequenceType.Acquisition)
       _   <- expectMaterializedSequences(oid, acquistion = true, science = false)
+      _   <- expectAtomCount(oid, 1)
       _   <- deleteSequence(oid)
       _   <- expectMaterializedSequences(oid, acquistion = false, science = false)
-    yield ()
-
-  test("delete with both modified acquisition and science sequences is succesful"):
-    for
-      oid <- setup
-      _   <- expectMaterializedSequences(oid, acquistion = false, science = false)
-      _   <- replaceSequence(oid, SequenceType.Acquisition)
-      _   <- replaceSequence(oid, SequenceType.Science)
-      _   <- expectMaterializedSequences(oid, acquistion = true, science = true)
-      _   <- deleteSequence(oid)
-      _   <- expectMaterializedSequences(oid, acquistion = false, science = false)
+      _   <- expectAtomCount(oid, 0)
     yield ()
 
   test("delete with modified science sequence is succesful"):
     for
       oid <- setup
-      _   <- expectMaterializedSequences(oid, acquistion = false, science = false)
       _   <- replaceSequence(oid, SequenceType.Science)
       _   <- expectMaterializedSequences(oid, acquistion = false, science = true)
+      _   <- expectAtomCount(oid, 1)
       _   <- deleteSequence(oid)
       _   <- expectMaterializedSequences(oid, acquistion = false, science = false)
+      _   <- expectAtomCount(oid, 0)
+    yield ()
+
+  test("delete with both modified acquisition and science sequences is succesful"):
+    for
+      oid <- setup
+      _   <- replaceSequence(oid, SequenceType.Acquisition)
+      _   <- replaceSequence(oid, SequenceType.Science)
+      _   <- expectMaterializedSequences(oid, acquistion = true, science = true)
+      _   <- expectAtomCount(oid, 2)
+      _   <- deleteSequence(oid)
+      _   <- expectMaterializedSequences(oid, acquistion = false, science = false)
+      _   <- expectAtomCount(oid, 0)
     yield ()
 
   test("attempting to delete with a visit is an error"):
     for
       oid <- setup
-      _   <- expectMaterializedSequences(oid, acquistion = false, science = false)
       _   <- recordVisitAs(serviceUser, oid)
       _   <- expectMaterializedSequences(oid, acquistion = true, science = true)
       _   <- deleteSequence(oid, List(s"Cannot delete sequence for observation $oid because it has visits.").asLeft)
