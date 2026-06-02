@@ -9108,9 +9108,19 @@ type Flamingos2Imaging {
   initialFilters: [Flamingos2ImagingFilter!]!
 
   """
+  Default read mode.
+  """
+  defaultReadMode: Flamingos2ReadMode!
+
+  """
   Optional explicitly specified F2 ReadMode. If set it overrides the default.
   """
   explicitReadMode: Flamingos2ReadMode
+
+  """
+  Default reads.
+  """
+  defaultReads: Flamingos2Reads!
 
   """
   Optional explicitly specified F2 Reads. If set it overrides the default.

@@ -53,7 +53,10 @@ trait Flamingos2ImagingMapping[F[_]]
       SqlObject("filters",        Join(Flamingos2ImagingView.ObservationId, Flamingos2ImagingFilterTable.ObservationId)),
       SqlObject("initialFilters", Join(Flamingos2ImagingView.ObservationId, Flamingos2ImagingFilterTable.ObservationId)),
 
+      SqlField("defaultReadMode",  Flamingos2ImagingView.ReadModeDefault),
       SqlField("explicitReadMode", Flamingos2ImagingView.ReadMode),
+
+      SqlField("defaultReads",     Flamingos2ImagingView.ReadsDefault),
       SqlField("explicitReads",    Flamingos2ImagingView.Reads),
 
       explicitOrElseDefault[Flamingos2Decker]("decker", "explicitDecker", "defaultDecker"),

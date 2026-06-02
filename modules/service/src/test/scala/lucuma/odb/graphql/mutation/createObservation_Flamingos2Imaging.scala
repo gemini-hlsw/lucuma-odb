@@ -54,7 +54,10 @@ class createObservation_Flamingos2Imaging extends OdbSuite:
                   flamingos2Imaging {
                     filters { filter }
                     initialFilters { filter }
+                    defaultReadMode
                     explicitReadMode
+                    defaultReads
+                    explicitReads
                     decker
                     defaultDecker
                     explicitDecker
@@ -83,7 +86,10 @@ class createObservation_Flamingos2Imaging extends OdbSuite:
                       { "filter": "Y" },
                       { "filter": "J" }
                     ],
+                    "defaultReadMode": "FAINT",
                     "explicitReadMode": "BRIGHT",
+                    "defaultReads": "READS_1",
+                    "explicitReads": null,
                     "decker": "IMAGING",
                     "defaultDecker": "IMAGING",
                     "explicitDecker": "IMAGING",
