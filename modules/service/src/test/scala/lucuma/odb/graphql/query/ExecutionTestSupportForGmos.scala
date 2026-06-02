@@ -236,6 +236,8 @@ trait ExecutionTestSupportForGmos extends ExecutionTestSupport:
           readout {
             xBin
             yBin
+            ampReadMode
+            ampGain
           }
           roi
           gratingConfig {
@@ -361,7 +363,9 @@ trait ExecutionTestSupportForGmos extends ExecutionTestSupport:
         "exposure": { "seconds": ${gn.exposure.toSeconds} },
         "readout": {
           "xBin": ${gn.readout.xBin},
-          "yBin": ${gn.readout.yBin}
+          "yBin": ${gn.readout.yBin},
+          "ampReadMode": ${gn.readout.ampReadMode},
+          "ampGain": ${gn.readout.ampGain}
         },
         "roi": ${gn.roi},
         "gratingConfig": ${gn.gratingConfig.fold(Json.Null) { gc =>

@@ -16,6 +16,7 @@ import eu.timepit.refined.types.string.NonEmptyString
 import fs2.Pure
 import fs2.Stream
 import lucuma.core.enums.CalibrationRole
+import lucuma.core.enums.GmosAmpReadMode
 import lucuma.core.enums.GmosGratingOrder
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosNorthFpu
@@ -50,6 +51,7 @@ object Acquisition:
   val AcquisitionSN: SignalToNoise =
     SignalToNoise.FromBigDecimalExact.getOption(10).get
 
+  val FastReadModeLimit  = 60.secTimeSpan
   val MaxExpTimeLastStep = 360.secondTimeSpan
 
   val RepeatingAtomCount: Int = 10
@@ -89,6 +91,8 @@ object Acquisition:
         Acquisition.MaxExpTimeLastStep min
           TimeSpan.unsafeFromMicroseconds(exposureTime.toMicroseconds * 3)
 
+      val readMode = if exposureTime <= FastReadModeLimit then GmosAmpReadMode.Fast else GmosAmpReadMode.Slow
+
       eval:
         for
           _  <- optics.exposure      := exposureTime
@@ -97,6 +101,7 @@ object Acquisition:
           _  <- optics.grating       := none[(G, GmosGratingOrder, Wavelength)]
           _  <- optics.xBin          := GmosXBinning.Two
           _  <- optics.yBin          := GmosYBinning.Two
+          _  <- optics.ampReadMode   := readMode
           _  <- optics.roi           := acqConfig.roi.imagingRoi
           s0 <- scienceStep(0.arcsec, 0.arcsec, ObserveClass.Acquisition)
 
@@ -104,10 +109,12 @@ object Acquisition:
           _  <- optics.fpu           := GmosFpuMask.Builtin(fpu).some
           _  <- optics.xBin          := GmosXBinning.One
           _  <- optics.yBin          := GmosYBinning.One
+          _  <- optics.ampReadMode   := GmosAmpReadMode.Fast
           _  <- optics.roi           := acqConfig.roi.slitRoi
           s1 <- scienceStep(10.arcsec, 0.arcsec, ObserveClass.Acquisition)
 
           _  <- optics.exposure      := lastExpTime(exposureTime)
+          _  <- optics.ampReadMode   := readMode
           s2 <- scienceStep(0.arcsec, 0.arcsec, ObserveClass.Acquisition)
         yield Acquisition.Steps(s0, s1, s2)
 
