@@ -5,6 +5,7 @@ package lucuma.odb.graphql
 package table
 
 import lucuma.odb.util.Codecs.*
+import lucuma.odb.util.Flamingos2Codecs.*
 import lucuma.odb.util.GmosCodecs.*
 import skunk.codec.boolean.bool
 
@@ -37,6 +38,13 @@ trait ImagingConfigOptionTable[F[_]] extends BaseMapping[F] {
     val Index      = col("c_index",       int4_pos)
 
     val Filter     = col("c_filter",      gmos_south_filter)
+  }
+
+  object ImagingConfigOptionFlamingos2Table extends TableDef("t_imaging_config_option_flamingos_2") {
+    val Instrument = col("c_instrument",  instrument)
+    val Index      = col("c_index",       int4_pos)
+
+    val Filter     = col("c_filter",      flamingos_2_filter)
   }
 
 }

@@ -31,6 +31,11 @@ trait ImagingConfigOptionMapping[F[_]] extends ImagingConfigOptionTable[F] {
         ImagingConfigOptionTable.Index      -> ImagingConfigOptionGmosSouthTable.Index
       ))),
 
+      SqlObject("flamingos2", Join(List(
+        ImagingConfigOptionTable.Instrument -> ImagingConfigOptionFlamingos2Table.Instrument,
+        ImagingConfigOptionTable.Index      -> ImagingConfigOptionFlamingos2Table.Index
+      ))),
+
     )
 
   lazy val ImagingConfigOptionGmosNorthMapping: ObjectMapping =
@@ -50,6 +55,16 @@ trait ImagingConfigOptionMapping[F[_]] extends ImagingConfigOptionTable[F] {
       SqlField("index",      ImagingConfigOptionGmosSouthTable.Index, key = true, hidden = true),
 
       SqlField("filter",     ImagingConfigOptionGmosSouthTable.Filter)
+
+    )
+
+  lazy val ImagingConfigOptionFlamingos2Mapping: ObjectMapping =
+    ObjectMapping(ImagingConfigOptionFlamingos2Type)(
+
+      SqlField("instrument", ImagingConfigOptionFlamingos2Table.Instrument, key = true, hidden = true),
+      SqlField("index",      ImagingConfigOptionFlamingos2Table.Index, key = true, hidden = true),
+
+      SqlField("filter",     ImagingConfigOptionFlamingos2Table.Filter)
 
     )
 

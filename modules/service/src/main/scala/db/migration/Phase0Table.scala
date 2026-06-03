@@ -12,6 +12,7 @@ import lucuma.core.enums.GmosSouthFilter
 import lucuma.core.enums.GmosSouthFpu
 import lucuma.core.enums.GmosSouthGrating
 import lucuma.core.enums.Instrument
+import lucuma.odb.phase0.Flamingos2ImagingRow
 import lucuma.odb.phase0.Flamingos2SpectroscopyRow
 import lucuma.odb.phase0.GhostIfuRow
 import lucuma.odb.phase0.GmosImagingRow
@@ -314,6 +315,27 @@ object Phase0Table {
         instrument       *:
         gmos_south_filter
       ).contramap[GmosImagingRow.GmosSouth]{ row => (
+        row.img.instrument,
+        row.filter,
+      )}
+
+    override def columns: List[String] =
+      List(
+        "c_instrument",
+        "c_filter",
+      )
+  }
+
+  val ImagingFlamingos2 = new Phase0Table[Flamingos2ImagingRow] {
+
+    override def name: String =
+      s"${Imaging.name}_flamingos_2"
+
+    override def encoder: Encoder[Flamingos2ImagingRow] =
+      (
+        instrument         *:
+        flamingos_2_filter
+      ).contramap[Flamingos2ImagingRow]{ row => (
         row.img.instrument,
         row.filter,
       )}

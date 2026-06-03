@@ -12272,6 +12272,12 @@ type ImagingConfigOption {
   """
   gmosSouth: ImagingConfigOptionGmosSouth
 
+  """
+  For Flamingos2 options, the Flamingos2 configuration.  Null for other
+  instruments.
+  """
+  flamingos2: ImagingConfigOptionFlamingos2
+
 }
 
 type ImagingConfigOptionGmosNorth {
@@ -12280,6 +12286,10 @@ type ImagingConfigOptionGmosNorth {
 
 type ImagingConfigOptionGmosSouth {
   filter: GmosSouthFilter!
+}
+
+type ImagingConfigOptionFlamingos2 {
+  filter: Flamingos2Filter!
 }
 
 """
