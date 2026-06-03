@@ -131,6 +131,7 @@ class programPlannedTime extends ExecutionTestSupportForGmos:
       """
     ).void
 
+
   test("program level range.: single complete observation"):
     val setup: IO[Program.Id] =
       for
@@ -1248,3 +1249,72 @@ class programPlannedTime extends ExecutionTestSupportForGmos:
           """
         )
       )
+
+  test("sc-8836"):
+    val setup: IO[Group.Id] =
+      for
+        p <- createProgram
+        t <- createTargetWithProfileAs(user, p)
+        o <- createGmosNorthLongSlitObservationAs(user, p, List(t))
+
+        g0      <- createGroupAs(user, p, minRequired = none)
+        oShort0 <- createGmosNorthLongSlitObservationAs(user, p, List(t))
+        oLong0  <- createLongerGmosNorthLongSlitObservationAs(user, p, t)
+        _       <- moveObsToGroup(g0, oShort0, oLong0)
+
+        g1      <- createGroupAs(user, p, minRequired = none)
+        oShort1 <- createGmosNorthLongSlitObservationAs(user, p, List(t))
+        oLong1  <- createLongerGmosNorthLongSlitObservationAs(user, p, t)
+        _       <- moveObsToGroup(g1, oShort1, oLong1)
+
+        g2      <- createGroupAs(user, p, minRequired = none)
+
+        gTop <- createGroupAs(user, p, minRequired = NonNegShort.unsafeFrom(1).some)
+        _    <- moveObsToGroup(gTop, o)
+        _    <- query(
+          user = user,
+          query = s"""
+            mutation {
+              updateGroups(
+                input: {
+                  SET: {
+                    parentGroup: "$gTop"
+                  }
+                  WHERE: {
+                    id: { IN: ${List(g0, g1, g2).asJson.spaces2} }
+                  }
+                }
+              ) {
+                groups { id }
+              }
+            }
+          """
+        ).void
+
+        _ <- runObscalcUpdate(p, o)
+        _ <- runObscalcUpdate(p, oShort0)
+        _ <- runObscalcUpdate(p, oLong0)
+        _ <- runObscalcUpdate(p, oShort1)
+        _ <- runObscalcUpdate(p, oLong1)
+        _ <- deleteGroup(user, g2)
+      yield gTop
+
+    val seconds = setup.flatMap: gid =>
+      query(
+        user  = user,
+        query =
+          s"""
+             query {
+               group(groupId: "$gid") {
+                 timeEstimateRange {
+                   value {
+                     minimum { total { seconds } }
+                   }
+                 }
+               }
+             }
+           """
+      ).map: json =>
+        json.hcursor.downFields("group", "timeEstimateRange", "value", "minimum", "total", "seconds").require[BigDecimal]
+
+    assertIOBoolean(seconds.map(_ > 0.0))

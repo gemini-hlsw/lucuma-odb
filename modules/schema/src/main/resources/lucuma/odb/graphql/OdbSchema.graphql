@@ -6025,6 +6025,11 @@ input UpdateGroupsInput {
   Caps the number of results returned to the given value (if additional datasets match the WHERE clause they will be updated but not returned).
   """
   LIMIT: NonNegInt
+
+  """
+  Set to `true` to include deleted groups.
+  """
+  includeDeleted: Boolean = false
 }
 
 type UpdateGroupsResult {

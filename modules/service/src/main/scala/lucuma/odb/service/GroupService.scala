@@ -42,7 +42,7 @@ trait GroupService[F[_]] {
   def updateGroups(SET: GroupPropertiesInput.Edit, which: AppliedFragment)(using Transaction[F]): F[Result[List[Group.Id]]]
   def selectGroups(
     programId: Program.Id,
-    groupFilter: AppliedFragment = void"",
+    groupFilter: AppliedFragment = sql"c_existence = $existence"(Existence.Present),
     obsFilter: AppliedFragment = sql"c_existence = $existence"(Existence.Present)
   )(using Transaction[F]): F[GroupTree]
   def selectPid(groupId: Group.Id)(using Transaction[F]): F[Option[Program.Id]]
@@ -243,7 +243,7 @@ object GroupService {
 
       def selectGroups(
         programId: Program.Id,
-        groupFilter: AppliedFragment = void"",
+        groupFilter: AppliedFragment = sql"c_existence = $existence"(Existence.Present),
         obsFilter: AppliedFragment = sql"c_existence = $existence"(Existence.Present)
       )(using Transaction[F]): F[GroupTree] = {
 

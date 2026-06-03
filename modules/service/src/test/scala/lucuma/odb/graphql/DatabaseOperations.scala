@@ -2062,6 +2062,58 @@ trait DatabaseOperations { this: OdbSuite =>
         }
       )
 
+  def setGroupExistence(
+    user:      User,
+    gid:       Group.Id,
+    existence: Existence
+  ): IO[Unit] =
+    expect(
+      user = user,
+      query = s"""
+        mutation {
+          updateGroups(
+            input: {
+              WHERE: {
+                id: {
+                  EQ: ${gid.asJson}
+                }
+              }
+              SET: {
+                existence: ${existence.tag.toUpperCase}
+              }
+              includeDeleted: true
+            }
+          ) {
+            groups {
+              id
+              existence
+            }
+          }
+        }
+      """,
+      expected = json"""
+        {
+          "updateGroups": {
+            "groups": [
+              { "id": $gid, "existence": ${existence.tag.toScreamingSnakeCase} }
+            ]
+          }
+        }
+      """.asRight
+    )
+
+  def deleteGroup(
+    user: User,
+    gid:  Group.Id
+  ): IO[Unit] =
+    setGroupExistence(user, gid, Existence.Deleted)
+
+  def restoreGroup(
+    user: User,
+    gid:  Group.Id
+  ): IO[Unit] =
+    setGroupExistence(user, gid, Existence.Present)
+
   protected def dynamicConfigGmos(instrument: Instrument): String =
     s"""
       ${instrument.fieldName}: {
