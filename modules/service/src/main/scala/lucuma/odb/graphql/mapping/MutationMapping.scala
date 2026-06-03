@@ -954,8 +954,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
             GroupType,
             and(List(
               // TODO: Predicates.group.program.isWritableBy(user),
-              input.WHERE.getOrElse(True),
-              input.includeDeleted.map(Predicates.group.existence.includeDeleted).getOrElse(True)
+              input.WHERE.getOrElse(True)
             ))
           ).flatTraverse: which =>
             groupService.updateGroups(input.SET, which).map: r =>

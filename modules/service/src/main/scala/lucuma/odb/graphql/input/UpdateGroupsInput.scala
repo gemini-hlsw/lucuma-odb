@@ -12,10 +12,9 @@ import grackle.Predicate
 import lucuma.odb.graphql.binding.*
 
 final case class UpdateGroupsInput(
-  SET:            GroupPropertiesInput.Edit,
-  WHERE:          Option[Predicate],
-  LIMIT:          Option[NonNegInt],
-  includeDeleted: Option[Boolean]
+  SET:   GroupPropertiesInput.Edit,
+  WHERE: Option[Predicate],
+  LIMIT: Option[NonNegInt],
 )
 
 object UpdateGroupsInput {
@@ -27,9 +26,8 @@ object UpdateGroupsInput {
         GroupPropertiesInput.EditBinding("SET", rSET),
         WhereGroupBinding.Option("WHERE", rWHERE),
         NonNegIntBinding.Option("LIMIT", rLIMIT),
-        BooleanBinding.Option("includeDeleted", rIncludeDeleted)
       ) =>
-        (rSET, rWHERE, rLIMIT, rIncludeDeleted).parMapN(apply)
+        (rSET, rWHERE, rLIMIT).parMapN(apply)
     }
   }
 

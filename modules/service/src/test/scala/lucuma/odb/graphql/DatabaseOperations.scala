@@ -2081,7 +2081,6 @@ trait DatabaseOperations { this: OdbSuite =>
               SET: {
                 existence: ${existence.tag.toUpperCase}
               }
-              includeDeleted: true
             }
           ) {
             groups {
