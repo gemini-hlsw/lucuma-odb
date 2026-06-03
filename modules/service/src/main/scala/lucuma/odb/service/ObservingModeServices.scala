@@ -178,7 +178,7 @@ object ObservingModeServices:
         val deleteObservingMode: F[Unit] =
           mode match
             case ObservingModeType.Flamingos2LongSlit => flamingos2LongSlitService.delete(which)
-            case ObservingModeType.Flamingos2Imaging  => MonadCancelThrow[F].raiseError(new RuntimeException("Flamingos2 imaging deletion is not yet implemented."))
+            case ObservingModeType.Flamingos2Imaging  => flamingos2ImagingService.delete(which)
             case ObservingModeType.GhostIfu           => ghostIfuService.delete(which)
             case ObservingModeType.GmosNorthImaging   => gmosImagingService.deleteNorth(which)
             case ObservingModeType.GmosNorthLongSlit  => gmosLongSlitService.deleteNorth(which)
