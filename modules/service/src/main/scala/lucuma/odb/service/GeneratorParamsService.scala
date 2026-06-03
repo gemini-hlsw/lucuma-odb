@@ -24,6 +24,7 @@ import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.DeclaredExecutionState
 import lucuma.core.enums.ExecutionState
 import lucuma.core.enums.Flamingos2ReadMode
+import lucuma.core.enums.GnirsFilter
 import lucuma.core.enums.GnirsReadMode
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.ScienceBand
@@ -416,31 +417,37 @@ object GeneratorParamsService {
             GeneratorParams(itcInput, obsParams.scienceBand, gs, obsParams.calibrationRole, obsParams.declaredState, obsParams.executionState, obsParams.stepCount).asRight
 
           case gn: gnirs.longslit.Config =>
-            ExposureTimeMode.timeAndCount.getOption(gn.exposureTimeMode)
-              .toRight(Error.MisconfiguredObservation(obsParams.observationId, "GNIRS requires a TimeAndCount exposure time mode"))
-              .map: etm =>
-                val sciMode = InstrumentMode.GnirsSpectroscopy(
-                  exposureTimeMode  = etm,
-                  centralWavelength = gn.filter.centralWavelength,
-                  filter            = gn.filter,
-                  slitWidth         = gn.fpu,
-                  prism             = gn.prism,
-                  grating           = gn.grating,
-                  camera            = gn.camera,
-                  readMode          = gn.explicitReadMode.getOrElse(GnirsReadMode.forExposureTime(etm.time)),
-                  wellDepth         = gn.wellDepth
-                )
-                spectroscopyGeneratorParams(
-                  obsMode = gn,
-                  acqMode = InstrumentMode.GnirsImaging(
-                    exposureTimeMode = gn.acquisition.exposureTimeMode,
-                    filter           = gn.acquisition.filter,
-                    camera           = gn.camera,
-                    readMode         = GnirsReadMode.Bright,
-                    wellDepth        = gn.wellDepth
-                  ),
-                  sciMode = sciMode
-                )
+            for
+              etm       <- ExposureTimeMode.timeAndCount.getOption(gn.exposureTimeMode)
+                             .toRight(Error.MisconfiguredObservation(obsParams.observationId, "GNIRS requires a TimeAndCount exposure time mode"))
+              // Acquisition (imaging) filter for the ITC: the explicit acquisition
+              // filter if set, otherwise the default for the spectroscopy wavelength.
+              acqFilter <- gn.acquisition.explicitFilter
+                             .fold(GnirsFilter.fromSpectroscopyWavelength(gn.gratingWavelength))(_.asRight[String])
+                             .leftMap(msg => Error.MisconfiguredObservation(obsParams.observationId, msg))
+            yield
+              val sciMode = InstrumentMode.GnirsSpectroscopy(
+                exposureTimeMode  = etm,
+                centralWavelength = gn.filter.centralWavelength,
+                filter            = gn.filter,
+                slitWidth         = gn.fpu,
+                prism             = gn.prism,
+                grating           = gn.grating,
+                camera            = gn.camera,
+                readMode          = gn.explicitReadMode.getOrElse(GnirsReadMode.forExposureTime(etm.time)),
+                wellDepth         = gn.wellDepth
+              )
+              spectroscopyGeneratorParams(
+                obsMode = gn,
+                acqMode = InstrumentMode.GnirsImaging(
+                  exposureTimeMode = gn.acquisition.exposureTimeMode,
+                  filter           = acqFilter,
+                  camera           = gn.camera,
+                  readMode         = GnirsReadMode.Bright,
+                  wellDepth        = gn.wellDepth
+                ),
+                sciMode = sciMode
+              )
 
           // Visitor Modes
           case vis: visitor.Config =>

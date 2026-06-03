@@ -25,6 +25,7 @@ import lucuma.core.math.Offset
 import lucuma.core.math.Wavelength
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.Observation
+import lucuma.core.model.sequence.gnirs.GnirsAcquisitionMode
 import lucuma.core.model.sequence.gnirs.GnirsFocus
 import lucuma.core.model.sequence.gnirs.GnirsFocusMotorStep
 import lucuma.core.model.sequence.gnirs.GnirsFocusMotorStepsValue
@@ -96,9 +97,9 @@ object GnirsLongSlitService:
         slit_offset_mode                 *: // c_slit_offset_mode_default
         text                             *: // c_telescope_configs_default
         // Acquisition fields (inline cols + acq ETM joined from t_exposure_time_mode via FK)
-        gnirs_acquisition_type.opt       *: // c_acq_type (None => compute from exposure time)
+        gnirs_acquisition_type.opt       *: // c_acq_type (None => AUTO mode)
         int4                             *: // c_acq_coadds
-        gnirs_filter                     *: // c_acq_filter_effective (DB-computed COALESCE)
+        gnirs_filter.opt                 *: // c_acq_filter (explicit override; None => mode default)
         angle_µas.opt                    *: // c_acq_sky_offset_p
         angle_µas.opt                    *: // c_acq_sky_offset_q
         exposure_time_mode                  // acquisition ETM
@@ -110,7 +111,7 @@ object GnirsLongSlitService:
               wellDepthEff *:
               focusMotorSteps *:
               slitOffsetModeExp *: tcExp *: slitOffsetModeDef *: tcDef *:
-              acqType *: acqCoadds *: acqFilterEff *: acqSkyOffP *: acqSkyOffQ *:
+              acqType *: acqCoadds *: acqFilterExp *: acqSkyOffP *: acqSkyOffQ *:
               acqEtm *: EmptyTuple) =>
           SlitTelescopeConfigsFormat.getOption((slitOffsetModeDef, tcDef))
             .toRight(s"Could not parse default telescope configs from '$tcDef'")
@@ -125,11 +126,14 @@ object GnirsLongSlitService:
                     PosInt.from(acqCoadds)
                       .leftMap(e => s"Invalid acq coadds $acqCoadds: $e")
                       .map: acqCoaddsP =>
-                        val acq = AcquisitionConfig(
-                          acqType, acqFilterEff,
-                          (acqSkyOffP, acqSkyOffQ).mapN((p, q) => Offset(Offset.P(p), Offset.Q(q))),
-                          acqEtm, acqCoaddsP
-                        )
+                        // Explicit acquisition mode (None => AUTO); the sky offset is
+                        // present only for an explicit FAINT type (DB CHECK enforced) and
+                        // is carried inside the Faint mode. The filter override is separate.
+                        val acqSkyOffset: Option[Offset] =
+                          (acqSkyOffP, acqSkyOffQ).mapN((p, q) => Offset(Offset.P(p), Offset.Q(q)))
+                        val explicitAcqMode: Option[GnirsAcquisitionMode] =
+                          acqType.map(GnirsAcquisitionMode.forTypeAndOffset(_, acqSkyOffset))
+                        val acq = AcquisitionConfig(explicitAcqMode, acqFilterExp, acqEtm, acqCoaddsP)
                         val focus = focusMotorSteps.fold(GnirsFocus.Best): n =>
                           GnirsFocus.Custom(GnirsFocusMotorStepsValue.unsafeFrom(n).withUnit[GnirsFocusMotorStep])
                         Config(
@@ -147,7 +151,7 @@ object GnirsLongSlitService:
                           coaddsP,
                           explicitTCOpt.getOrElse(defaultTC),
                           acq
-                        )
+                          )
               }
 
       override def select(
@@ -238,7 +242,7 @@ object GnirsLongSlitService:
           ls.c_telescope_configs_default,
           ls.c_acq_type,
           ls.c_acq_coadds,
-          ls.c_acq_filter_effective,
+          ls.c_acq_filter,
           ls.c_acq_sky_offset_p,
           ls.c_acq_sky_offset_q,
           acq.c_exposure_time_mode,
@@ -426,21 +430,28 @@ object GnirsLongSlitService:
           case None =>
             List(upSlitMode(None), upOffsets(None))
 
-      // Acquisition sub-field updates (each sub-field is independently optional;
-      // exposureTimeMode is handled separately via updateExposureTimeModes).
+      // Acquisition sub-field updates (exposureTimeMode is handled separately via
+      // updateExposureTimeModes). The acquisition type and sky offset are coupled:
+      // input validation guarantees a sky offset is present iff the explicit type is
+      // FAINT, so whenever the type is (re)set we rewrite the offset columns too —
+      // the provided offset for FAINT, NULL otherwise. When the type is left
+      // unchanged we touch neither (and no orphan offset can be supplied).
       val acqUpdates: List[AppliedFragment] =
         SET.acquisition.toList.flatMap: acq =>
-          val offUpdates: List[AppliedFragment] =
-            acq.skyOffset.toList.flatMap: o =>
-              List(
-                upAcqSkyOffP(Some(Angle.microarcseconds.get(o.p.toAngle))),
-                upAcqSkyOffQ(Some(Angle.microarcseconds.get(o.q.toAngle)))
-              )
+          val typeAndOffset: List[AppliedFragment] =
+            acq.explicitAcqType.toOptionOption match
+              case Some(tOpt) =>
+                List(
+                  upAcqType(tOpt),
+                  upAcqSkyOffP(acq.skyOffset.map(o => Angle.microarcseconds.get(o.p.toAngle))),
+                  upAcqSkyOffQ(acq.skyOffset.map(o => Angle.microarcseconds.get(o.q.toAngle)))
+                )
+              case None       =>
+                Nil
           List(
-            acq.explicitAcqType.toOptionOption.map(upAcqType),
             acq.coadds.map(upAcqCoadds),
             acq.explicitFilter.toOptionOption.map(upAcqFilter)
-          ).flatten ++ offUpdates
+          ).flatten ++ typeAndOffset
 
       val ups: List[AppliedFragment] = List(
         SET.coadds.map(c => upCoadds(Some(c))),

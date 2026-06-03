@@ -217,6 +217,35 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
       """
     ).void
 
+  /**
+   * Set the explicit FAINT acquisition type together with its required sky offset
+   * (the two must be set in the same input — FAINT requires a sky offset, and a sky
+   * offset is only valid with FAINT).
+   */
+  def setAcquisitionFaint(oid: Observation.Id, pArcsec: BigDecimal, qArcsec: BigDecimal): IO[Unit] =
+    query(
+      pi,
+      s"""
+        mutation {
+          updateObservations(input: {
+            SET: {
+              observingMode: {
+                gnirsLongSlit: {
+                  acquisition: {
+                    explicitAcquisitionType: FAINT
+                    skyOffset: { p: { arcseconds: $pArcsec }, q: { arcseconds: $qArcsec } }
+                  }
+                }
+              }
+            }
+            WHERE: { id: { EQ: "$oid" } }
+          }) {
+            observations { id }
+          }
+        }
+      """
+    ).void
+
   /** Set the explicit acquisition filter on a GNIRS LongSlit observation. */
   def setAcquisitionFilter(oid: Observation.Id, filter: String): IO[Unit] =
     query(

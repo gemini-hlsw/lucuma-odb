@@ -177,7 +177,7 @@ object StartupDiagnostics:
 
         )
 
-      def runAllDiagnostics(fatal: Boolean): F[Unit] =
+      def runAllDiagnostics(fatal: Boolean): F[Unit] = 
         Logger[F].info("Running startup diagnostics.") >>
           allDiagnostics.sequence.runS(DiagState(Nil, Nil)).map(_.errors).flatMap: errors =>
           errors.traverse_(Logger[F].error(_)) >>
