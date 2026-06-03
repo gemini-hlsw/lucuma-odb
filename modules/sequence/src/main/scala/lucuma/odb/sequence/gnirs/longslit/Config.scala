@@ -7,7 +7,6 @@ import cats.Eq
 import cats.derived.*
 import eu.timepit.refined.cats.*
 import eu.timepit.refined.types.numeric.PosInt
-import lucuma.core.enums.GnirsAcquisitionType
 import lucuma.core.enums.GnirsCamera
 import lucuma.core.enums.GnirsDecker
 import lucuma.core.enums.GnirsFilter
@@ -16,31 +15,55 @@ import lucuma.core.enums.GnirsGrating
 import lucuma.core.enums.GnirsPrism
 import lucuma.core.enums.GnirsReadMode
 import lucuma.core.enums.GnirsWellDepth
-import lucuma.core.math.Offset
 import lucuma.core.math.Wavelength
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.SlitTelescopeConfigs
+import lucuma.core.model.sequence.gnirs.GnirsAcquisitionMode
 import lucuma.core.model.sequence.gnirs.GnirsFocus
+import lucuma.core.util.TimeSpan
 import lucuma.odb.sequence.syntax.all.*
 
 import java.io.ByteArrayOutputStream
 import java.io.DataOutputStream
 
 case class AcquisitionConfig(
-  explicitAcqType:  Option[GnirsAcquisitionType],
-  filter:           GnirsFilter,
-  skyOffset:        Option[Offset],
+  explicitAcqMode:  Option[GnirsAcquisitionMode], // None => AUTO (from integration time); Faint carries its sky offset
+  explicitFilter:   Option[GnirsFilter],          // None => AUTO (H2 for VeryBright, from wavelength for Bright/Faint)
   exposureTimeMode: ExposureTimeMode,
   coadds:           PosInt,
 ):
 
+  /** The acquisition mode: the explicit choice if set, else the default for the integration time. */
+  def resolvedMode(acqExposureTime: TimeSpan): GnirsAcquisitionMode =
+    explicitAcqMode.getOrElse(GnirsAcquisitionMode.defaultFor(acqExposureTime, coadds))
+
+  /**
+   * The selected acquisition filter: the explicit filter if set, otherwise the
+   * automatic choice — H2 for VeryBright (low transmission), or the filter for the
+   * spectroscopy wavelength for Bright/Faint. This is the filter used for all
+   * acquisition steps except the VeryBright FPU image, which always uses H (Order4).
+   */
+  def selectedFilter(mode: GnirsAcquisitionMode, wavelength: Wavelength): Either[String, GnirsFilter] =
+    explicitFilter match
+      case Some(f) => Right(f)
+      case None    =>
+        mode match
+          case GnirsAcquisitionMode.VeryBright => Right(GnirsFilter.H2)
+          case _                               => GnirsFilter.fromSpectroscopyWavelength(wavelength)
+
   def hashBytes: Array[Byte] =
     val bao = new ByteArrayOutputStream(128)
     val out = new DataOutputStream(bao)
-    out.writeChars(explicitAcqType.fold("")(_.tag))
+    // explicit acquisition mode (None => AUTO): tag byte + offset (Faint only)
+    explicitAcqMode match
+      case None                                  => out.writeByte(0)
+      case Some(GnirsAcquisitionMode.VeryBright) => out.writeByte(1)
+      case Some(GnirsAcquisitionMode.Bright)     => out.writeByte(2)
+      case Some(GnirsAcquisitionMode.Faint(o))   =>
+        out.writeByte(3)
+        out.write(o.hashBytes)
+    out.writeChars(explicitFilter.fold("")(_.tag))
     out.write(coadds.value.hashBytes)
-    out.writeChars(filter.tag)
-    out.write(skyOffset.map(_.hashBytes).getOrElse(Array.emptyByteArray))
     out.write(exposureTimeMode.hashBytes)
     out.close()
     bao.toByteArray
@@ -48,7 +71,7 @@ case class AcquisitionConfig(
 object AcquisitionConfig:
   given Eq[AcquisitionConfig] =
     Eq.by: a =>
-      (a.explicitAcqType, a.coadds.value, a.filter, a.skyOffset, a.exposureTimeMode)
+      (a.explicitAcqMode, a.explicitFilter, a.coadds.value, a.exposureTimeMode)
 
 case class Config(
   filter:                  GnirsFilter,

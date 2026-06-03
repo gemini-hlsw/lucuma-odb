@@ -92,8 +92,6 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                         acquisition {
                           explicitAcquisitionType
                           coadds
-                          filter
-                          defaultFilter
                           explicitFilter
                           skyOffset { p { arcseconds } q { arcseconds } }
                           exposureTimeMode {
@@ -157,8 +155,6 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                       "acquisition": {
                         "explicitAcquisitionType": null,
                         "coadds": 1,
-                        "filter": "K",
-                        "defaultFilter": "K",
                         "explicitFilter": null,
                         "skyOffset": null,
                         "exposureTimeMode": {
@@ -213,6 +209,7 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                           }
                         }
                         acquisition: {
+                          explicitAcquisitionType: FAINT
                           skyOffset: {
                             p: { arcseconds: 1.5 }
                             q: { arcseconds: -2.5 }
@@ -226,6 +223,7 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                     observingMode {
                       gnirsLongSlit {
                         acquisition {
+                          explicitAcquisitionType
                           skyOffset { p { arcseconds } q { arcseconds } }
                         }
                       }
@@ -241,6 +239,7 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                   "observingMode": {
                     "gnirsLongSlit": {
                       "acquisition": {
+                        "explicitAcquisitionType": "FAINT",
                         "skyOffset": {
                           "p": { "arcseconds": 1.500000 },
                           "q": { "arcseconds": -2.500000 }
@@ -269,6 +268,7 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                       observingMode: {
                         gnirsLongSlit: {
                           acquisition: {
+                            explicitAcquisitionType: FAINT
                             skyOffset: {
                               p: { arcseconds: 3.0 }
                               q: { arcseconds: 4.0 }
@@ -283,6 +283,7 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                       observingMode {
                         gnirsLongSlit {
                           acquisition {
+                            explicitAcquisitionType
                             skyOffset { p { arcseconds } q { arcseconds } }
                           }
                         }
@@ -299,6 +300,7 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                       "observingMode": {
                         "gnirsLongSlit": {
                           "acquisition": {
+                            "explicitAcquisitionType": "FAINT",
                             "skyOffset": {
                               "p": { "arcseconds": 3.000000 },
                               "q": { "arcseconds": 4.000000 }
@@ -803,7 +805,7 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                   observation {
                     observingMode {
                       gnirsLongSlit {
-                        acquisition { filter defaultFilter explicitFilter }
+                        acquisition { explicitFilter }
                       }
                     }
                   }
@@ -817,8 +819,6 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                   "observingMode": {
                     "gnirsLongSlit": {
                       "acquisition": {
-                        "filter": "H2",
-                        "defaultFilter": "K",
                         "explicitFilter": "H2"
                       }
                     }
@@ -874,6 +874,164 @@ class createObservation_GnirsLongSlit extends OdbSuite:
               }
             """,
           expected = Left(List(
-            "Argument 'input.SET.observingMode.gnirsLongSlit.acquisition' is invalid: 'explicitFilter' must contain one of: ORDER4, H2, J, K, PAH"
+            "Argument 'input.SET.observingMode.gnirsLongSlit.acquisition' is invalid: 'explicitFilter' must contain one of: J, ORDER4, H2, K, PAH"
           ))
+        )
+
+  test("create GNIRS Long Slit rejects a sky offset without FAINT acquisition type"):
+    createProgramAs(pi).flatMap: pid =>
+      createTargetAs(pi, pid).flatMap: tid =>
+        expect(
+          user  = pi,
+          query =
+            s"""
+              mutation {
+                createObservation(input: {
+                  programId: "$pid"
+                  SET: {
+                    targetEnvironment: { asterism: [ "$tid" ] }
+                    scienceRequirements: {
+                      spectroscopy: {
+                        wavelength: { nanometers: 2200 }
+                        resolution: 1000
+                        wavelengthCoverage: { nanometers: 200 }
+                        focalPlane: SINGLE_SLIT
+                        focalPlaneAngle: { microarcseconds: 0 }
+                      }
+                    }
+                    observingMode: {
+                      gnirsLongSlit: {
+                        grating: D111
+                        prism: MIRROR
+                        camera: SHORT_BLUE
+                        fpu: LONG_SLIT_0_30
+                        filter: ORDER3
+                        acquisition: {
+                          explicitAcquisitionType: BRIGHT
+                          skyOffset: { p: { arcseconds: 1.5 }, q: { arcseconds: -2.5 } }
+                        }
+                      }
+                    }
+                  }
+                }) { observation { id } }
+              }
+            """,
+          expected = Left(List(
+            "Argument 'input.SET.observingMode.gnirsLongSlit.acquisition' is invalid: 'skyOffset' is only valid when 'explicitAcquisitionType' is FAINT."
+          ))
+        )
+
+  test("create GNIRS Long Slit rejects FAINT acquisition type without a sky offset"):
+    createProgramAs(pi).flatMap: pid =>
+      createTargetAs(pi, pid).flatMap: tid =>
+        expect(
+          user  = pi,
+          query =
+            s"""
+              mutation {
+                createObservation(input: {
+                  programId: "$pid"
+                  SET: {
+                    targetEnvironment: { asterism: [ "$tid" ] }
+                    scienceRequirements: {
+                      spectroscopy: {
+                        wavelength: { nanometers: 2200 }
+                        resolution: 1000
+                        wavelengthCoverage: { nanometers: 200 }
+                        focalPlane: SINGLE_SLIT
+                        focalPlaneAngle: { microarcseconds: 0 }
+                      }
+                    }
+                    observingMode: {
+                      gnirsLongSlit: {
+                        grating: D111
+                        prism: MIRROR
+                        camera: SHORT_BLUE
+                        fpu: LONG_SLIT_0_30
+                        filter: ORDER3
+                        acquisition: {
+                          explicitAcquisitionType: FAINT
+                        }
+                      }
+                    }
+                  }
+                }) { observation { id } }
+              }
+            """,
+          expected = Left(List(
+            "Argument 'input.SET.observingMode.gnirsLongSlit.acquisition' is invalid: 'explicitAcquisitionType' FAINT requires a 'skyOffset'."
+          ))
+        )
+
+  test("create GNIRS Long Slit with explicit BRIGHT acquisition type and no sky offset"):
+    createProgramAs(pi).flatMap: pid =>
+      createTargetAs(pi, pid).flatMap: tid =>
+        expect(
+          user  = pi,
+          query =
+            s"""
+              mutation {
+                createObservation(input: {
+                  programId: "$pid"
+                  SET: {
+                    targetEnvironment: { asterism: [ "$tid" ] }
+                    scienceRequirements: {
+                      spectroscopy: {
+                        wavelength: { nanometers: 2200 }
+                        resolution: 1000
+                        wavelengthCoverage: { nanometers: 200 }
+                        focalPlane: SINGLE_SLIT
+                        focalPlaneAngle: { microarcseconds: 0 }
+                      }
+                    }
+                    observingMode: {
+                      gnirsLongSlit: {
+                        grating: D111
+                        prism: MIRROR
+                        camera: SHORT_BLUE
+                        fpu: LONG_SLIT_0_30
+                        filter: ORDER3
+                        exposureTimeMode: {
+                          timeAndCount: {
+                            time: { seconds: 30.0 }
+                            count: 3
+                            at: { nanometers: 2200 }
+                          }
+                        }
+                        acquisition: {
+                          explicitAcquisitionType: BRIGHT
+                        }
+                      }
+                    }
+                  }
+                }) {
+                  observation {
+                    observingMode {
+                      gnirsLongSlit {
+                        acquisition {
+                          explicitAcquisitionType
+                          skyOffset { p { arcseconds } q { arcseconds } }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            """,
+          expected = Right(json"""
+            {
+              "createObservation": {
+                "observation": {
+                  "observingMode": {
+                    "gnirsLongSlit": {
+                      "acquisition": {
+                        "explicitAcquisitionType": "BRIGHT",
+                        "skyOffset": null
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          """)
         )

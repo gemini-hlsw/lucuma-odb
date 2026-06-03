@@ -58,7 +58,6 @@ trait GnirsLongSlitView[F[_]] extends BaseMapping[F]:
     val AcqType: ColumnRef          = col("c_acq_type", gnirs_acquisition_type.opt)
     val AcqCoadds: ColumnRef        = col("c_acq_coadds", int4_pos)
     val AcqFilter: ColumnRef        = col("c_acq_filter", gnirs_filter.opt)
-    val AcqFilterDefault: ColumnRef = col("c_acq_filter_default", gnirs_filter)
     val AcqSkyOffsetP: ColumnRef    = col("c_acq_sky_offset_p", angle_µas.opt)
     val AcqSkyOffsetQ: ColumnRef    = col("c_acq_sky_offset_q", angle_µas.opt)
 
@@ -69,7 +68,6 @@ trait GnirsLongSlitView[F[_]] extends BaseMapping[F]:
     val GratingWavelengthEffective: ColumnRef  = col("c_grating_wavelength_effective", wavelength_pm)
     val DefaultWellDepth: ColumnRef        = col("c_well_depth_default", gnirs_well_depth)
     val WellDepthEffective: ColumnRef      = col("c_well_depth_effective", gnirs_well_depth)
-    val AcqFilterEffective: ColumnRef      = col("c_acq_filter_effective", gnirs_filter)
 
     // Effective grating/prism: COALESCE(explicit, initial)
     val GratingEffective: ColumnRef = col("c_grating_effective", gnirs_grating)

@@ -7,14 +7,14 @@ package longslit
 
 import cats.data.NonEmptyList
 import cats.data.State
-import cats.syntax.eq.*
+import cats.syntax.either.*
 import cats.syntax.option.*
 import cats.syntax.traverse.*
 import eu.timepit.refined.types.string.NonEmptyString
 import fs2.Pure
 import fs2.Stream
-import lucuma.core.enums.GnirsAcquisitionType
 import lucuma.core.enums.GnirsDecker
+import lucuma.core.enums.GnirsFilter
 import lucuma.core.enums.GnirsFpuOther
 import lucuma.core.enums.GnirsPrism
 import lucuma.core.enums.GnirsReadMode
@@ -28,6 +28,7 @@ import lucuma.core.model.Observation
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.model.sequence.gnirs.GnirsAcquisitionMirrorMode
+import lucuma.core.model.sequence.gnirs.GnirsAcquisitionMode
 import lucuma.core.model.sequence.gnirs.GnirsDynamicConfig
 import lucuma.core.model.sequence.gnirs.GnirsStaticConfig
 import lucuma.itc.IntegrationTime
@@ -70,13 +71,19 @@ object Acquisition:
 
   private object StepComputer extends GnirsSequenceState:
 
-    def compute(config: Config, time: IntegrationTime): Steps =
+    def compute(config: Config, mode: GnirsAcquisitionMode, selectedFilter: GnirsFilter, time: IntegrationTime): Steps =
       val acqExposureTime = time.exposureTime
       val readMode        = GnirsReadMode.forExposureTime(acqExposureTime)
-      val acqType         = config.acquisition.explicitAcqType.getOrElse:
-        GnirsAcquisitionType.forAcquisitionExposureTime(acqExposureTime)
       val slitDecker      = GnirsDecker.forCameraAndReadMode(config.camera, GnirsPrism.Mirror)
-      val applySky        = acqType === GnirsAcquisitionType.Faint
+
+      // The FPU image (first step) always uses H (Order4) for VeryBright; for Bright
+      // and Faint it uses the selected filter. All other steps use the selected
+      // filter. Sky frames are generated only for Faint, at its sky offset.
+      val fpuStepFilter: GnirsFilter =
+        mode match
+          case GnirsAcquisitionMode.VeryBright => GnirsFilter.Order4
+          case _                               => selectedFilter
+      val skyOffsetOpt: Option[Offset] = GnirsAcquisitionMode.skyOffset.getOption(mode)
 
       eval:
         for
@@ -84,7 +91,7 @@ object Acquisition:
                  dyn.copy(
                    exposure          = acqExposureTime,
                    coadds            = config.acquisition.coadds,
-                   filter            = config.acquisition.filter,
+                   filter            = fpuStepFilter,
                    acquisitionMirror = GnirsAcquisitionMirrorMode.In,
                    camera            = config.camera,
                    focus             = config.focus,
@@ -99,22 +106,24 @@ object Acquisition:
                               ),
                               ObserveClass.Acquisition
                             )
+          // Subsequent steps switch to the acquisition decker/FPU and the selected filter.
           _              <- State.modify[GnirsDynamicConfig]:
-                              _.copy(decker = GnirsDecker.Acquisition, fpu = Right(GnirsFpuOther.Acquisition))
-          fieldSkyOpt    <- config.acquisition.skyOffset.traverse: sky =>
+                              _.copy(decker = GnirsDecker.Acquisition, fpu = Right(GnirsFpuOther.Acquisition), filter = selectedFilter)
+          fieldSkyOpt    <- skyOffsetOpt.traverse: sky =>
                               scienceStep(TelescopeConfig(sky, Enabled), ObserveClass.Acquisition)
           field          <- scienceStep(0.arcsec, 0.arcsec, ObserveClass.Acquisition)
+          // Back to the selected slit (decker/FPU) for the through-slit steps.
           _              <- State.modify[GnirsDynamicConfig]:
                               _.copy(decker = slitDecker, fpu = Left(config.fpu))
-          tSlitSkyOpt    <- config.acquisition.skyOffset.traverse: sky =>
+          tSlitSkyOpt    <- skyOffsetOpt.traverse: sky =>
                               scienceStep(TelescopeConfig(sky, Enabled), ObserveClass.Acquisition)
           throughSlit    <- scienceStep(0.arcsec, 0.arcsec, ObserveClass.Acquisition)
         yield Steps(
           slitImage      = slitImage,
           field          = field,
-          fieldSky       = if applySky then fieldSkyOpt else none,
+          fieldSky       = fieldSkyOpt,
           throughSlit    = throughSlit,
-          throughSlitSky = if applySky then tSlitSkyOpt else none
+          throughSlitSky = tSlitSkyOpt
         )
 
   private class Generator(
@@ -137,16 +146,26 @@ object Acquisition:
     config:        Config,
     time:          Either[OdbError, IntegrationTime]
   ): Either[OdbError, SequenceGenerator[GnirsDynamicConfig]] =
-    time
-      .filterOrElse(
-        _.exposureTime.toNonNegMicroseconds.value > 0,
-        OdbError.SequenceUnavailable(
-          observationId,
-          s"Could not generate a sequence for $observationId: GNIRS Long Slit requires a positive acquisition exposure time.".some
-        )
+    for
+      t <- time.filterOrElse(
+             _.exposureTime.toNonNegMicroseconds.value > 0,
+             OdbError.SequenceUnavailable(
+               observationId,
+               s"Could not generate a sequence for $observationId: GNIRS Long Slit requires a positive acquisition exposure time.".some
+             )
+           )
+      // Resolve the acquisition mode (explicit or auto) and the selected filter
+      // (explicit, or auto from the mode + spectroscopy wavelength).
+      mode       = config.acquisition.resolvedMode(t.exposureTime)
+      selFilter <- config.acquisition
+                     .selectedFilter(mode, config.gratingWavelength)
+                     .leftMap: msg =>
+                       OdbError.SequenceUnavailable(
+                         observationId,
+                         s"Could not generate a sequence for $observationId: $msg".some
+                       )
+    yield
+      new Generator(
+        AtomBuilder.instantiate(estimator, static, namespace, SequenceType.Acquisition),
+        StepComputer.compute(config, mode, selFilter, t)
       )
-      .map: t =>
-        new Generator(
-          AtomBuilder.instantiate(estimator, static, namespace, SequenceType.Acquisition),
-          StepComputer.compute(config, t)
-        )

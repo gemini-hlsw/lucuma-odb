@@ -66,11 +66,9 @@ object GnirsLongSlitInput:
             case _ =>
               Matcher.validationFailure("Exactly one of alongSlit or toSky must be provided")
 
-  // GNIRS acquisition (keyhole imaging) filters: H (Order4), H2, J, K, PAH.
-  // Mirrors c_is_acquisition_filter in t_gnirs_filter. GnirsFilter has no
-  // built-in `acquisition` helper (unlike Flamingos2Filter), so it is defined here.
+  // GNIRS acquisition (keyhole imaging) filters, from lucuma-core: J, Order4 (H), H2, K, PAH.
   val AcquisitionFilters: List[GnirsFilter] =
-    List(GnirsFilter.Order4, GnirsFilter.H2, GnirsFilter.J, GnirsFilter.K, GnirsFilter.PAH)
+    GnirsFilter.acquisition.toList
 
   case class AcquisitionInput(
     explicitFilter:   Nullable[GnirsFilter], // Nullable to allow clearing to the computed default
@@ -81,6 +79,22 @@ object GnirsLongSlitInput:
   )
 
   object AcquisitionInput:
+
+    // A sky offset is valid exactly when the explicit acquisition type is FAINT:
+    // FAINT requires one, and any other explicit type (or clearing to AUTO) forbids
+    // it. This must hold within a single input; the DB also enforces it on the row.
+    private def validateSkyOffset(a: AcquisitionInput): Result[AcquisitionInput] =
+      val explicitlyFaint = a.explicitAcqType match
+        case Nullable.NonNull(GnirsAcquisitionType.Faint) => true
+        case _                                            => false
+      (a.skyOffset.isDefined, explicitlyFaint) match
+        case (true, false) =>
+          OdbError.InvalidArgument("'skyOffset' is only valid when 'explicitAcquisitionType' is FAINT.".some).asFailure
+        case (false, true) =>
+          OdbError.InvalidArgument("'explicitAcquisitionType' FAINT requires a 'skyOffset'.".some).asFailure
+        case _             =>
+          Result(a)
+
     val Binding: Matcher[AcquisitionInput] =
       ObjectFieldsBinding.rmap:
         case List(
@@ -97,7 +111,7 @@ object GnirsLongSlitInput:
                 else OdbError.InvalidArgument(s"'explicitFilter' must contain one of: ${AcquisitionFilters.map(_.tag.toScreamingSnakeCase).mkString_(", ")}".some).asFailure
             ,
             rAcqType, rCoadds, rSkyOffset, rEtm
-          ).parMapN(AcquisitionInput.apply)
+          ).parMapN(AcquisitionInput.apply).flatMap(validateSkyOffset)
 
   case class Create(
     exposureTimeMode: Option[ExposureTimeMode],

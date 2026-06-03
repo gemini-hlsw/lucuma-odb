@@ -166,7 +166,7 @@ class executionAcqGnirs extends ExecutionTestSupportForGnirs:
         o <- createGnirsLongSlitObservationAs(pi, p, t)
         _ <- setAcquisitionTimeAndCount(o, 30.0, 1, 1645)
         _ <- setAcquisitionFilter(o, "ORDER4")
-        _ <- setAcquisitionSkyOffset(o, 0, 10)
+        _ <- setAcquisitionFaint(o, 0, 10)
       yield o
 
     setup.flatMap: oid =>
@@ -211,55 +211,6 @@ class executionAcqGnirs extends ExecutionTestSupportForGnirs:
       """
     .asJson
 
-  test("Faint type explicit but no sky offset — falls back to 3-step structure"):
-    val setup: IO[Observation.Id] =
-      for
-        p <- createProgram
-        t <- createTargetWithProfileAs(pi, p)
-        o <- createGnirsLongSlitObservationAs(pi, p, t)
-        _ <- setAcquisitionTimeAndCount(o, 5.0, 1, 1645)
-        _ <- setAcquisitionFilter(o, "ORDER4")
-        _ <- setAcquisitionType(o, "FAINT")   // Faint type but no sky offset
-      yield o
-
-    setup.flatMap: oid =>
-      expect(
-        user     = pi,
-        query    = s"""
-          query {
-            executionConfig(observationId: "$oid") {
-              gnirs {
-                acquisition {
-                  nextAtom {
-                    steps {
-                      telescopeConfig { guiding }
-                      breakpoint
-                    }
-                  }
-                }
-              }
-            }
-          }
-        """,
-        expected = json"""
-          {
-            "executionConfig": {
-              "gnirs": {
-                "acquisition": {
-                  "nextAtom": {
-                    "steps": [
-                      { "telescopeConfig": { "guiding": "DISABLED" }, "breakpoint": "DISABLED" },
-                      { "telescopeConfig": { "guiding": "ENABLED"  }, "breakpoint": "DISABLED" },
-                      { "telescopeConfig": { "guiding": "ENABLED"  }, "breakpoint": "ENABLED" }
-                    ]
-                  }
-                }
-              }
-            }
-          }
-        """.asRight
-      )
-
   // 500_000 µs = 0.5 s → VeryBright (< 1s), readMode=VERY_BRIGHT
   val VeryBrightUs: Long = 500_000L
 
@@ -300,7 +251,7 @@ class executionAcqGnirs extends ExecutionTestSupportForGnirs:
                   "nextAtom": {
                     "steps": [
                       {
-                        "instrumentConfig": { "exposure": { "microseconds": $VeryBrightUs }, "readMode": "VERY_BRIGHT", "filter": "H2" },
+                        "instrumentConfig": { "exposure": { "microseconds": $VeryBrightUs }, "readMode": "VERY_BRIGHT", "filter": "ORDER4" },
                         "telescopeConfig": { "offset": { "p": { "arcseconds": 10.000000 }, "q": { "arcseconds": 0.000000 } }, "guiding": "DISABLED" }
                       },
                       {
@@ -347,6 +298,9 @@ class executionAcqGnirs extends ExecutionTestSupportForGnirs:
              ).void
       yield o
 
+    // 5s exposure × 7 coadds = 35s integration ≥ 10s ⇒ AUTO resolves to FAINT
+    // (a sky frame is added, so 5 steps); every step takes its coadds from the
+    // acquisition config (7), not from the ITC.
     setup.flatMap: oid =>
       expect(
         user     = pi,
@@ -372,6 +326,8 @@ class executionAcqGnirs extends ExecutionTestSupportForGnirs:
                 "acquisition": {
                   "nextAtom": {
                     "steps": [
+                      { "instrumentConfig": { "coadds": 7 } },
+                      { "instrumentConfig": { "coadds": 7 } },
                       { "instrumentConfig": { "coadds": 7 } },
                       { "instrumentConfig": { "coadds": 7 } },
                       { "instrumentConfig": { "coadds": 7 } }

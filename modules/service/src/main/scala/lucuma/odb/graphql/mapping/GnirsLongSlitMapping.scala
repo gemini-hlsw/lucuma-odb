@@ -68,9 +68,8 @@ trait GnirsLongSlitMapping[F[_]]
       SqlField("explicitAcquisitionType", GnirsLongSlitView.AcqType),
       SqlField("coadds",    GnirsLongSlitView.AcqCoadds),
 
-      // Acquisition filter: effective (DB-computed COALESCE), default, explicit
-      SqlField("filter",         GnirsLongSlitView.AcqFilterEffective),
-      SqlField("defaultFilter",  GnirsLongSlitView.AcqFilterDefault),
+      // Acquisition filter: explicit override only. The effective/default filter is
+      // determined in code (GnirsAcquisitionMode) at sequence-generation time.
       SqlField("explicitFilter", GnirsLongSlitView.AcqFilter),
 
       SqlField("acqSkyOffPRaw", GnirsLongSlitView.AcqSkyOffsetP, hidden = true),
