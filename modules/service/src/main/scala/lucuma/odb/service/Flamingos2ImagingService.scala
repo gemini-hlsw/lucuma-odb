@@ -30,6 +30,10 @@ sealed trait Flamingos2ImagingService[F[_]]:
     which:  List[Observation.Id]
   )(using Transaction[F]): F[Result[Unit]]
 
+  def delete(
+    which: List[Observation.Id]
+  )(using Transaction[F]): F[Unit]
+
 object Flamingos2ImagingService:
 
   private val ModeTableName   = "t_flamingos_2_imaging"
@@ -79,6 +83,11 @@ object Flamingos2ImagingService:
             yield ()
           .value
 
+      override def delete(
+        which: List[Observation.Id]
+      )(using Transaction[F]): F[Unit] =
+        session.exec(Statements.delete(which))
+
   object Statements:
 
     def insert(
@@ -116,6 +125,15 @@ object Flamingos2ImagingService:
           c_offsets
         ) VALUES
       """(Void) |+| modeEntries.intercalate(void", ")
+
+    def delete(
+      which: List[Observation.Id]
+    ): AppliedFragment =
+      sql"""
+        DELETE FROM #${Flamingos2ImagingService.ModeTableName}
+        WHERE c_observation_id IN (
+      """(Void) |+| which.map(sql"$observation_id").intercalate(void",") |+|
+      void""")"""
 
     def insertFilters(
       rows:    NonEmptyList[(Observation.Id, Flamingos2Filter, ExposureTimeModeId)],

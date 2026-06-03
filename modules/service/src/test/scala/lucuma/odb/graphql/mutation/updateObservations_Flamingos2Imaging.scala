@@ -96,3 +96,83 @@ class updateObservations_Flamingos2Imaging extends OdbSuite with UpdateObservati
     """.asRight
 
     oneUpdateTest(pi, update, query, expected)
+
+  test("observing mode: delete Flamingos2 imaging"):
+
+    val update0 = """
+      scienceRequirements: {
+        exposureTimeMode: {
+          signalToNoise: {
+            value: 100.0
+            at: { nanometers: 500.0 }
+          }
+        }
+      }
+      observingMode: {
+        flamingos2Imaging: {
+          filters: [
+            { filter: Y },
+            { filter: J }
+          ]
+        }
+      }
+    """
+
+    val query = """
+      observations {
+        instrument
+        observingMode {
+          mode
+          flamingos2Imaging {
+            filters { filter }
+          }
+        }
+      }
+    """
+
+    val expected0 =
+      json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "instrument": "FLAMINGOS2",
+              "observingMode": {
+                "mode": "FLAMINGOS_2_IMAGING",
+                "flamingos2Imaging": {
+                  "filters": [
+                    { "filter": "Y" },
+                    { "filter": "J" }
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      }
+    """.asRight
+
+    val update1 = """
+      observingMode: null
+    """
+
+    val expected1 =
+      json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "instrument": null,
+              "observingMode": null
+            }
+          ]
+        }
+      }
+    """.asRight
+
+    multiUpdateTest(pi,
+      List(
+        (update0, query, expected0),
+        (update1, query, expected1)
+      )
+    )
