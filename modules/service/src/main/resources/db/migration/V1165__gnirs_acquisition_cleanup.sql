@@ -12,6 +12,27 @@
 -- c_acq_sky_offset_both_or_neither check (V1154) already keeps p and q in lockstep;
 -- `IS NOT DISTINCT FROM` treats a NULL c_acq_type as "not Faint", so AUTO rows must
 -- have no offset.
+
+-- Backfill existing rows to satisfy the new invariant before adding the constraint:
+--   - Faint rows with no offset get the default (0, -2"), matching
+--     GnirsAcquisitionMode.Faint.DefaultSkyOffset.
+--   - Non-Faint rows (NULL/Bright/VeryBright) drop any offset, which is no longer valid.
+UPDATE t_gnirs_long_slit
+  SET c_acq_sky_offset_p = 0,
+      c_acq_sky_offset_q = -2000000
+  WHERE c_acq_type IS NOT DISTINCT FROM 'Faint'
+    AND c_acq_sky_offset_p IS NULL;
+
+UPDATE t_gnirs_long_slit
+  SET c_acq_sky_offset_p = NULL,
+      c_acq_sky_offset_q = NULL
+  WHERE c_acq_type IS DISTINCT FROM 'Faint'
+    AND c_acq_sky_offset_p IS NOT NULL;
+
+-- Flush any deferred trigger events queued by the backfill so the ADD CONSTRAINT
+-- below doesn't fail with "pending trigger events".
+SET CONSTRAINTS ALL IMMEDIATE;
+
 ALTER TABLE t_gnirs_long_slit
   ADD CONSTRAINT c_acq_sky_offset_faint_only
   CHECK ((c_acq_sky_offset_p IS NOT NULL) = (c_acq_type IS NOT DISTINCT FROM 'Faint'));
