@@ -41,6 +41,12 @@ sealed trait Flamingos2ImagingService[F[_]]:
     which: List[Observation.Id]
   )(using Transaction[F]): F[Unit]
 
+  def clone(
+    observationId:    Observation.Id,
+    newObservationId: Observation.Id,
+    etms:             List[(ExposureTimeModeId, ExposureTimeModeId)]
+  )(using Transaction[F]): F[Unit]
+
 object Flamingos2ImagingService:
 
   private val ModeTableName   = "t_flamingos_2_imaging"
@@ -107,6 +113,14 @@ object Flamingos2ImagingService:
         which: List[Observation.Id]
       )(using Transaction[F]): F[Unit] =
         session.exec(Statements.delete(which))
+
+      override def clone(
+        observationId:    Observation.Id,
+        newObservationId: Observation.Id,
+        etms:             List[(ExposureTimeModeId, ExposureTimeModeId)]
+      )(using Transaction[F]): F[Unit] =
+        session.exec(Statements.clone(observationId, newObservationId))                       *>
+        session.exec(Statements.cloneFiltersAndEtms(observationId, newObservationId, etms))
 
   object Statements:
 
@@ -176,6 +190,66 @@ object Flamingos2ImagingService:
         WHERE c_observation_id IN (
       """(Void) |+| which.map(sql"$observation_id").intercalate(void",") |+|
       void""")"""
+
+    def clone(
+      originalId: Observation.Id,
+      newId:      Observation.Id
+    ): AppliedFragment =
+      sql"""
+        INSERT INTO #${Flamingos2ImagingService.ModeTableName} (
+          c_observation_id,
+          c_program_id,
+          c_read_mode,
+          c_reads,
+          c_decker,
+          c_readout_mode,
+          c_offsets
+        )
+        SELECT
+          $observation_id,
+          (SELECT c_program_id FROM t_observation WHERE c_observation_id = $observation_id),
+          c_read_mode,
+          c_reads,
+          c_decker,
+          c_readout_mode,
+          c_offsets
+        FROM #${Flamingos2ImagingService.ModeTableName}
+        WHERE c_observation_id = $observation_id
+      """.apply(newId, newId, originalId)
+
+    def cloneFiltersAndEtms(
+      originalId: Observation.Id,
+      newId:      Observation.Id,
+      etms:       List[(ExposureTimeModeId, ExposureTimeModeId)]
+    ): AppliedFragment =
+      sql"""
+        WITH etm_map AS (
+          SELECT
+            old_exposure_time_mode_id,
+            new_exposure_time_mode_id
+          FROM
+            unnest(
+              ARRAY[${exposure_time_mode_id.list(etms.length)}],
+              ARRAY[${exposure_time_mode_id.list(etms.length)}]
+            ) AS map(old_exposure_time_mode_id, new_exposure_time_mode_id)
+        )
+        INSERT INTO #${Flamingos2ImagingService.FilterTableName} (
+          c_observation_id,
+          c_exposure_time_mode_id,
+          c_filter,
+          c_version,
+          c_role
+        )
+        SELECT
+          $observation_id,
+          e.new_exposure_time_mode_id,
+          f.c_filter,
+          f.c_version,
+          f.c_role
+        FROM #${Flamingos2ImagingService.FilterTableName} f
+        JOIN etm_map e ON f.c_exposure_time_mode_id = e.old_exposure_time_mode_id
+        WHERE f.c_observation_id = $observation_id
+      """.apply(etms.map(_._1), etms.map(_._2), newId, originalId)
 
     def insertFilters(
       rows:    NonEmptyList[(Observation.Id, Flamingos2Filter, ExposureTimeModeId)],
