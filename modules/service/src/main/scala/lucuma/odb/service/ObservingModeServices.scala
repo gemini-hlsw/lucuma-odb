@@ -226,7 +226,7 @@ object ObservingModeServices:
         def cloneObservingMode(etms: List[(ExposureTimeModeId, ExposureTimeModeId)]): F[Unit] =
           mode match
             case ObservingModeType.Flamingos2LongSlit => flamingos2LongSlitService.clone(origOid, newOid)
-            case ObservingModeType.Flamingos2Imaging  => MonadCancelThrow[F].raiseError(new RuntimeException("Flamingos2 imaging cloning is not yet implemented."))
+            case ObservingModeType.Flamingos2Imaging  => flamingos2ImagingService.clone(origOid, newOid, etms)
             case ObservingModeType.GhostIfu           => ghostIfuService.clone(origOid, newOid, etms)
             case ObservingModeType.GmosNorthLongSlit  => gmosLongSlitService.cloneNorth(origOid, newOid)
             case ObservingModeType.GmosNorthImaging   => gmosImagingService.cloneNorth(origOid, newOid, etms)

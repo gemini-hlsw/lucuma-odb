@@ -808,6 +808,9 @@ trait DatabaseOperations { this: OdbSuite =>
     ): IO[Observation.Id] =
     createObservationWithSpatialOffsets(user, pid, ObservingModeType.Flamingos2LongSlit, iq, offsets, tids*)
 
+  def createFlamingos2ImagingObservationAs(user: User, pid: Program.Id, tids: Target.Id*): IO[Observation.Id] =
+    createObservationWithSpatialOffsets(user, pid, ObservingModeType.Flamingos2Imaging, ImageQuality.Preset.PointEight, None, tids*)
+
   def createGnirsLongSlitObservationAs(user: User, pid: Program.Id, tids: Target.Id*): IO[Observation.Id] =
     createObservationWithSpatialOffsets(user, pid, ObservingModeType.GnirsLongSlit, ImageQuality.Preset.PointEight, None, tids*)
 
@@ -1282,6 +1285,30 @@ trait DatabaseOperations { this: OdbSuite =>
               { filter: R_PRIME },
               { filter: G_PRIME }
             ]
+          }
+        }"""
+      case ObservingModeType.Flamingos2Imaging =>
+        s"""{
+          flamingos2Imaging: {
+            filters: [
+              { filter: Y },
+              { filter: J }
+            ]
+            explicitReadMode: BRIGHT
+            explicitDecker: IMAGING
+            explicitReadoutMode: SCIENCE
+            variant: {
+              grouped: {
+                offsets: {
+                  enumerated: {
+                    values: [
+                      { offset: { p: { microarcseconds: 10000000 }, q: { microarcseconds:         0 } } },
+                      { offset: { p: { microarcseconds:        0 }, q: { microarcseconds: -10000000 } } }
+                    ]
+                  }
+                }
+              }
+            }
           }
         }"""
       case ObservingModeType.Flamingos2LongSlit =>
