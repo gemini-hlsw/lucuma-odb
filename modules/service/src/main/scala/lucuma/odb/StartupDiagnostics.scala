@@ -177,13 +177,13 @@ object StartupDiagnostics:
 
         )
 
-      def runAllDiagnostics(fatal: Boolean): F[Unit] = // TODO REENABLE!!!!!
-        Logger[F].info("Running startup diagnostics.") //>>
-          // allDiagnostics.sequence.runS(DiagState(Nil, Nil)).map(_.errors).flatMap: errors =>
-          // errors.traverse_(Logger[F].error(_)) >>
-          //   Logger[F].info("Startup diagnostics passed.").whenA(errors.isEmpty) >>
-          //   Logger[F].error("Startup diagnostics failed.").whenA(errors.nonEmpty) >>
-          //   Concurrent[F].raiseError(new Error(s"Startup diagnostics failed. Exiting.")).whenA(fatal && errors.nonEmpty)
+      def runAllDiagnostics(fatal: Boolean): F[Unit] = 
+        Logger[F].info("Running startup diagnostics.") >>
+          allDiagnostics.sequence.runS(DiagState(Nil, Nil)).map(_.errors).flatMap: errors =>
+          errors.traverse_(Logger[F].error(_)) >>
+            Logger[F].info("Startup diagnostics passed.").whenA(errors.isEmpty) >>
+            Logger[F].error("Startup diagnostics failed.").whenA(errors.nonEmpty) >>
+            Concurrent[F].raiseError(new Error(s"Startup diagnostics failed. Exiting.")).whenA(fatal && errors.nonEmpty)
 
       def assertUnusedPostgresEnum(tpe: Type): StateT[F, DiagState, Unit] =
         StateT.modify(_.updated(tpe))
