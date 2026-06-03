@@ -74,38 +74,38 @@ object GhostIfuMappingSyntax:
 
   private def deriveOneTarget(
     ctx:    IfuMappingContext,
-    target: Target
+    target: (Target.Id, Target)
   ): Either[String, GhostIfuMapping] =
     ctx.resolutionMode match
       case GhostResolutionMode.Standard =>
-        target match
+        target._2 match
           case Target.Sidereal(_, track, _, _) =>
             track.at(ctx.when.toInstant).fold("Cannot determine the target coordinates.".asLeft): c =>
               ifuAssignment(ctx.explicitBase.getOrElse(c), c, ctx.sky, ctx.angle) match
-                case TargetAtIfu1 => ctx.sky.fold(GhostIfuMapping.SingleTarget(track).asRight)(s => GhostIfuMapping.TargetPlusSky(track, s).asRight)
-                case TargetAtIfu2 => ctx.sky.fold("The target does not fall in range of GHOST IFU1 probe.".asLeft)(s => GhostIfuMapping.SkyPlusTarget(s, track).asRight)
+                case TargetAtIfu1 => ctx.sky.fold(GhostIfuMapping.SingleTarget(target._1).asRight)(s => GhostIfuMapping.TargetPlusSky(target._1, s).asRight)
+                case TargetAtIfu2 => ctx.sky.fold("The target does not fall in range of GHOST IFU1 probe.".asLeft)(s => GhostIfuMapping.SkyPlusTarget(s, target._1).asRight)
                 case OutOfRange   => "The target and sky positions are too far apart.".asLeft
                 case TooClose     => s"The target and sky positions are too close (minimum separation is $MinimumArmSeparationString arcseconds).".asLeft
 
           case Target.Nonsidereal(_, _, _)     =>
-            ctx.sky.fold(GhostIfuMapping.Nonsidereal.asRight): _ =>
+            ctx.sky.fold(GhostIfuMapping.SingleTarget(target._1).asRight): _ =>
               "GHOST does not support sky positions for nonsidereal targets.".asLeft
 
           case Target.Opportunity(_, _, _)     =>
             "A GHOST IFU mapping can only be determined after the science target is identified.".asLeft
 
       case GhostResolutionMode.High =>
-        target match
+        target._2 match
           case Target.Sidereal(_, track, _, _) =>
             track.at(ctx.when.toInstant).fold("Cannot determine the target coordinates.".asLeft): c =>
               ctx.sky.fold("GHOST High Resolution mode requires a sky position.".asLeft): s =>
                 ifuAssignment(ctx.explicitBase.getOrElse(c), c, s.some, ctx.angle) match
-                  case TargetAtIfu1 => GhostIfuMapping.TargetPlusSky(track, s).asRight
+                  case TargetAtIfu1 => GhostIfuMapping.TargetPlusSky(target._1, s).asRight
                   case TooClose     => s"The target and sky positions are too close (minimum separation is $MinimumArmSeparationString arcseconds).".asLeft
                   case _            => "The target and/or sky position is not reachable by the GHOST IFU probes.".asLeft
 
           case Target.Nonsidereal(_, _, _)     =>
-            ctx.sky.fold(GhostIfuMapping.Nonsidereal.asRight): _ =>
+            ctx.sky.fold(GhostIfuMapping.SingleTarget(target._1).asRight): _ =>
               "GHOST does not support sky positions for nonsidereal targets.".asLeft
 
           case Target.Opportunity(_, _, _)     =>
@@ -113,20 +113,20 @@ object GhostIfuMappingSyntax:
 
   private def deriveDualTarget(
     ctx:     IfuMappingContext,
-    targetA: Target,
-    targetB: Target
+    targetA: (Target.Id, Target),
+    targetB: (Target.Id, Target)
   ): Either[String, GhostIfuMapping] =
     (ctx.resolutionMode, ctx.sky) match
       case (GhostResolutionMode.Standard, None)    =>
-        (targetA, targetB) match
+        (targetA._2, targetB._2) match
           case (Target.Sidereal(_, track1, _, _), Target.Sidereal(_, track2, _, _)) =>
             (track1.at(ctx.when.toInstant), track2.at(ctx.when.toInstant))
               .tupled
               .fold("Cannot determine the target coordinates.".asLeft): (c1, c2) =>
                 val base = ctx.explicitBase.getOrElse(Coordinates.centerOf(NonEmptyList.of(c1, c2)))
                 ifuAssignment(base, c1, c2.some, ctx.angle) match
-                  case TargetAtIfu1 => GhostIfuMapping.DualTarget(track1, track2).asRight
-                  case TargetAtIfu2 => GhostIfuMapping.DualTarget(track2, track1).asRight
+                  case TargetAtIfu1 => GhostIfuMapping.DualTarget(targetA._1, targetB._1).asRight
+                  case TargetAtIfu2 => GhostIfuMapping.DualTarget(targetB._1, targetA._1).asRight
                   case OutOfRange   => "The targets do not fall in range of the GHOST IFU probes.".asLeft
                   case TooClose     => s"The dual targets are too close (minimum separation is $MinimumArmSeparationString arcseconds).".asLeft
           case _                                                                    =>
@@ -142,7 +142,7 @@ object GhostIfuMappingSyntax:
   extension (g: GhostIfuMapping.type)
     def derive(
       ctx:     IfuMappingContext,
-      targets: List[Target]
+      targets: List[(Target.Id, Target)]
     ): Either[String, GhostIfuMapping] =
       targets match
         case Nil          => "Cannot derive a GHOST IFU mapping until targets are defined.".asLeft
@@ -152,6 +152,6 @@ object GhostIfuMappingSyntax:
 
     def validate(
       ctx:     IfuMappingContext,
-      targets: List[Target]
+      targets: List[(Target.Id, Target)]
     ): Option[String] =
       derive(ctx, targets).swap.toOption

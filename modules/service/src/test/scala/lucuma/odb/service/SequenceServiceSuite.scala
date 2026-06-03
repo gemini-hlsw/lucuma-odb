@@ -19,6 +19,7 @@ import lucuma.core.enums.GhostResolutionMode.Standard
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.SequenceType
 import lucuma.core.model.Observation
+import lucuma.core.model.Target
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.DatasetEstimate
 import lucuma.core.model.sequence.DetectorEstimate
@@ -114,13 +115,14 @@ class SequenceServiceSuite extends ExecutionTestSupportForGmos:
       s.execute(up)(i, o).void
 
   private def readGhostSequence(
-    o: Observation.Id
+    o: Observation.Id,
+    t: Target.Id
   ): IO[List[Atom[GhostDynamicConfig]]] =
     withServices(serviceUser): services =>
       services
         .transactionally:
           sequenceService
-            .selectGhostSequence(o, SequenceType.Science, GhostStaticConfig(Standard, GhostIfuMapping.Nonsidereal, none))
+            .selectGhostSequence(o, SequenceType.Science, GhostStaticConfig(Standard, GhostIfuMapping.SingleTarget(t), none))
             .flatMap(_.toList.flatTraverse(_.compile.toList))
 
   private def writeGhostSequence(
@@ -232,17 +234,18 @@ class SequenceServiceSuite extends ExecutionTestSupportForGmos:
       NonEmptyList.one(s1)
     )
 
-    val config = StreamingExecutionConfig[IO, GhostStaticConfig, GhostDynamicConfig](
-      GhostStaticConfig(Standard, GhostIfuMapping.Nonsidereal, none),
+    def config(t: Target.Id) = StreamingExecutionConfig[IO, GhostStaticConfig, GhostDynamicConfig](
+      GhostStaticConfig(Standard, GhostIfuMapping.SingleTarget(t), none),
       Stream.empty.covary[IO],
       Stream.emits(List(a0, a1)).covary[IO]
     )
 
     for
       p <- createProgram
-      o <- createObservationAs(pi, p)
+      t <- createTargetWithProfileAs(pi, p)
+      o <- createObservationAs(pi, p, t)
       _ <- setInstrument(Instrument.Ghost, o)
-      _ <- writeGhostSequence(o, config)
-      r <- readGhostSequence(o)
+      _ <- writeGhostSequence(o, config(t))
+      r <- readGhostSequence(o, t)
     yield assertEquals(r, List(a0, a1))
 

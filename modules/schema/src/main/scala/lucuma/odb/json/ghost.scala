@@ -3,7 +3,6 @@
 
 package lucuma.odb.json
 
-import cats.syntax.either.*
 import cats.syntax.option.*
 import eu.timepit.refined.types.numeric.PosInt
 import io.circe.Decoder
@@ -18,7 +17,7 @@ import lucuma.core.enums.GhostIfuMappingType
 import lucuma.core.enums.GhostReadMode
 import lucuma.core.enums.GhostResolutionMode
 import lucuma.core.math.Coordinates
-import lucuma.core.model.SiderealTracking
+import lucuma.core.model.Target
 import lucuma.core.model.sequence.ghost.GhostDetector
 import lucuma.core.model.sequence.ghost.GhostDynamicConfig
 import lucuma.core.model.sequence.ghost.GhostIfuMapping
@@ -34,12 +33,12 @@ trait GhostCodec:
 
     given Decoder[SingleTarget] =
       Decoder.instance: c =>
-        c.downField("ifu1").as[SiderealTracking].map(SingleTarget.apply)
+        c.downField("ifu1").as[Target.Id].map(SingleTarget.apply)
 
     given Decoder[TargetPlusSky] =
       Decoder.instance: c =>
         for
-          t <- c.downField("ifu1").as[SiderealTracking]
+          t <- c.downField("ifu1").as[Target.Id]
           r <- c.downField("ifu2").as[Coordinates]
         yield TargetPlusSky(t, r)
 
@@ -47,14 +46,14 @@ trait GhostCodec:
       Decoder.instance: c =>
         for
           r <- c.downField("ifu1").as[Coordinates]
-          t <- c.downField("ifu2").as[SiderealTracking]
+          t <- c.downField("ifu2").as[Target.Id]
         yield SkyPlusTarget(r, t)
 
     given Decoder[DualTarget] =
       Decoder.instance: c =>
         for
-          t1 <- c.downField("ifu1").as[SiderealTracking]
-          t2 <- c.downField("ifu2").as[SiderealTracking]
+          t1 <- c.downField("ifu1").as[Target.Id]
+          t2 <- c.downField("ifu2").as[Target.Id]
         yield DualTarget(t1, t2)
 
     given Decoder[GhostIfuMapping] =
@@ -62,7 +61,6 @@ trait GhostCodec:
         for
           t <- c.downField("mappingType").as[GhostIfuMappingType]
           m <- t match
-                 case GhostIfuMappingType.Nonsidereal   => Nonsidereal.asRight
                  case GhostIfuMappingType.SingleTarget  => c.downField("singleTarget").as[SingleTarget]
                  case GhostIfuMappingType.TargetPlusSky => c.downField("targetPlusSky").as[TargetPlusSky]
                  case GhostIfuMappingType.SkyPlusTarget => c.downField("skyPlusTarget").as[SkyPlusTarget]
@@ -104,18 +102,17 @@ trait GhostCodec:
 
   trait InternalCodec extends DecoderGhost:
     protected def coordinatesEncoder: Encoder[Coordinates]
-    protected def siderealTrackingEncoder: Encoder[SiderealTracking]
 
     given Encoder[SingleTarget] =
       Encoder.instance: a =>
         Json.obj(
-          "ifu1" -> a.ifu1.asJson(using siderealTrackingEncoder)
+          "ifu1" -> a.ifu1.asJson
         )
 
     given Encoder[TargetPlusSky] =
       Encoder.instance: a =>
         Json.obj(
-          "ifu1" -> a.ifu1.asJson(using siderealTrackingEncoder),
+          "ifu1" -> a.ifu1.asJson,
           "ifu2" -> a.ifu2.asJson(using coordinatesEncoder)
         )
 
@@ -123,20 +120,19 @@ trait GhostCodec:
       Encoder.instance: a =>
         Json.obj(
           "ifu1" -> a.ifu1.asJson(using coordinatesEncoder),
-          "ifu2" -> a.ifu2.asJson(using siderealTrackingEncoder)
+          "ifu2" -> a.ifu2.asJson
         )
 
     given Encoder[DualTarget] =
       Encoder.instance: a =>
         Json.obj(
-          "ifu1" -> a.ifu1.asJson(using siderealTrackingEncoder),
-          "ifu2" -> a.ifu2.asJson(using siderealTrackingEncoder)
+          "ifu1" -> a.ifu1.asJson,
+          "ifu2" -> a.ifu2.asJson
         )
 
     given Encoder[GhostIfuMapping] =
       def subtypeSlice(m: GhostIfuMapping): Option[(String, Json)] =
         m match
-          case Nonsidereal             => none
           case m @ SingleTarget(_)     => ("singleTarget",  m.asJson).some
           case m @ TargetPlusSky(_, _) => ("targetPlusSky", m.asJson).some
           case m @ SkyPlusTarget(_, _) => ("skyPlusTarget", m.asJson).some
@@ -185,17 +181,11 @@ trait GhostCodec:
     override protected val coordinatesEncoder: Encoder[Coordinates] =
       coordinates.query.Encoder_Coordinates
 
-    override protected val siderealTrackingEncoder: Encoder[SiderealTracking] =
-      target.query.siderealTrackingEncoder
-
   object query extends QueryCodec
 
   trait TransportCodec extends InternalCodec:
     override protected val coordinatesEncoder: Encoder[Coordinates] =
       coordinates.transport.Encoder_Coordinates
-
-    override protected val siderealTrackingEncoder: Encoder[SiderealTracking] =
-      target.transport.siderealTrackingEncoder
 
   object transport extends TransportCodec
 

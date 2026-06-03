@@ -87,31 +87,28 @@ object GhostSequenceService:
     val InsertStatic: Query[(Observation.Id, GhostStaticConfig), Long] =
       sql"""
         INSERT INTO t_ghost_static (
+          c_program_id,
           c_observation_id,
           c_resolution_mode,
           c_ifu_mapping,
           c_ifu1_ra,
           c_ifu1_dec,
-          c_ifu1_epoch,
-          c_ifu1_pm_ra,
-          c_ifu1_pm_dec,
-          c_ifu1_rv,
-          c_ifu1_parallax,
+          c_ifu1_target_id,
           c_ifu2_ra,
           c_ifu2_dec,
-          c_ifu2_epoch,
-          c_ifu2_pm_ra,
-          c_ifu2_pm_dec,
-          c_ifu2_rv,
-          c_ifu2_parallax,
+          c_ifu2_target_id,
           c_slit_viewing_camera_exposure_time
         )
         SELECT
+          o.c_program_id,
           $observation_id,
           $ghost_static
+        FROM t_observation o
+        WHERE o.c_observation_id = $observation_id
         ON CONFLICT DO NOTHING
         RETURNING c_static_id
       """.query(int8)
+         .contramap { (o, g) => (o, g, o) }
 
     val SelectStatic: Query[Observation.Id, GhostStaticConfig] =
       sql"""
@@ -120,18 +117,10 @@ object GhostSequenceService:
           c_ifu_mapping,
           c_ifu1_ra,
           c_ifu1_dec,
-          c_ifu1_epoch,
-          c_ifu1_pm_ra,
-          c_ifu1_pm_dec,
-          c_ifu1_rv,
-          c_ifu1_parallax,
+          c_ifu1_target_id,
           c_ifu2_ra,
           c_ifu2_dec,
-          c_ifu2_epoch,
-          c_ifu2_pm_ra,
-          c_ifu2_pm_dec,
-          c_ifu2_rv,
-          c_ifu2_parallax,
+          c_ifu2_target_id,
           c_slit_viewing_camera_exposure_time
         FROM t_ghost_static
         WHERE c_observation_id = $observation_id
