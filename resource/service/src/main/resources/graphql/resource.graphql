@@ -1,4 +1,4 @@
-#import Timestamp, TimestampInterval, Site, Date from "lucuma/odb/graphql/OdbSchema.graphql"
+#import Timestamp, TimestampInterval, Site, Date, ProgramReferenceLabel from "lucuma/odb/graphql/OdbSchema.graphql"
 
 enum TelescopeAvailability {
   OPEN
@@ -23,7 +23,7 @@ enum TelescopeModeType {
 
 type TelescopeMode {
   type: TelescopeModeType!
-  programReference: String
+  programReference: ProgramReferenceLabel
 }
 
 type TelescopeAvailabilityStatus {

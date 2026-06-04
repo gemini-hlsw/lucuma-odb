@@ -3,10 +3,7 @@
 
 package resource.server.graphql
 
-import grackle.TypeRef
-
 trait SubscriptionMapping[F[_]] extends BaseMapping[F] {
-  val SubscriptionType: TypeRef = schema.ref("Subscription")
 
   lazy val SubscriptionMapping =
     ObjectMapping(SubscriptionType)(

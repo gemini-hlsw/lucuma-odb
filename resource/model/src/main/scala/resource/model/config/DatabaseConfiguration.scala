@@ -18,7 +18,9 @@ case class DatabaseConfiguration(
   port:           Port,
   database:       String,
   user:           String,
-  password:       String
+  password:       String,
+  resetDatabase:  Boolean,
+  skipMigration:  Boolean
 ) derives Eq:
   // We use Flyway (which uses JDBC) to perform schema migrations. Savor the irony.
   def jdbcUrl: String = s"jdbc:postgresql://${host}:${port}/${database}?sslmode=require"
@@ -29,7 +31,9 @@ object DatabaseConfiguration:
 
   def fromDatabaseUrl(
     maxConnections: Int,
-    uri:            Uri
+    uri:            Uri,
+    resetDatabase:  Boolean,
+    skipMigration:  Boolean
   ): Option[DatabaseConfiguration] =
     for
       userInfo <- uri.userInfo
@@ -44,13 +48,17 @@ object DatabaseConfiguration:
       port = port,
       database = database,
       user = user,
-      password = password
+      password = password,
+      resetDatabase = resetDatabase,
+      skipMigration = skipMigration
     )
 
   lazy val fromCiris: ConfigValue[Effect, DatabaseConfiguration] = (
-    env("MAX_CONNECTIONS").as[Int].default(Default.MaxConnections),
-    env("DATABASE_URL").as[Uri].redacted // passed by Heroku
+    envOrProp("MAX_CONNECTIONS").as[Int].default(Default.MaxConnections),
+    envOrProp("DATABASE_URL").as[Uri].redacted, // passed by Heroku
+    envOrProp("RESET_DATABASE").as[Boolean].default(false),
+    envOrProp("SKIP_MIGRATION").as[Boolean].default(false)
   ).parTupled.as[DatabaseConfiguration]
 
-  private given ConfigDecoder[(Int, Uri), DatabaseConfiguration] =
-    ConfigDecoder[(Int, Uri)].mapOption("DatabaseConfiguration")(fromDatabaseUrl)
+  private given ConfigDecoder[(Int, Uri, Boolean, Boolean), DatabaseConfiguration] =
+    ConfigDecoder[(Int, Uri, Boolean, Boolean)].mapOption("DatabaseConfiguration")(fromDatabaseUrl)
