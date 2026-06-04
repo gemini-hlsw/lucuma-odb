@@ -354,7 +354,7 @@ trait AccessControl[F[_]] extends Predicates[F] {
           SET.scienceBand.isDefined         ||
           SET.targetEnvironment.exists(_.limitToPreExecution(access)) ||
           SET.constraintSet.isDefined       ||
-          SET.timingWindows.isDefined       ||
+          SET.scheduling.isDefined          ||
           SET.attachments.isDefined         ||
           SET.scienceRequirements.isDefined ||
           SET.observingMode.exists(_.limitToPreExecution(access)) ||
