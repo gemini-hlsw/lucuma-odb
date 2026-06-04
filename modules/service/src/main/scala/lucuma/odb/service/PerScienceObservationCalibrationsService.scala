@@ -147,7 +147,7 @@ object PerScienceObservationCalibrationsService:
           ).some,
           targetEnvironment = targetEnvironment.some,
           constraintSet = none,
-          timingWindows = none,
+          scheduling = none,
           attachments = none,
           scienceRequirements = none,
           observingMode = none,

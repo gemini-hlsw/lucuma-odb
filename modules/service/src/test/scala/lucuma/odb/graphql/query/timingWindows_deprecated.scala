@@ -13,7 +13,7 @@ import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.User
 
-class timingWindows extends OdbSuite {
+class timingWindows_deprecated extends OdbSuite {
   val pi       = TestUsers.Standard.pi(1, 30)
   val validUsers = List(pi)
 
@@ -29,9 +29,7 @@ class timingWindows extends OdbSuite {
         twisOpt.map(twis => 
           s""",
               SET: {
-                scheduling: {
-                  timingWindows: $twis
-                }
+                timingWindows: $twis
               }
           """
         ).orEmpty +
@@ -43,8 +41,9 @@ class timingWindows extends OdbSuite {
             }
           }
         """
-    ).map: json =>
+    ).map { json => 
       json.hcursor.downFields("createObservation", "observation", "id").require[Observation.Id]
+    }
 
   def updateObservation(user: User,  oid: Observation.Id, twisOpt: Option[String]): IO[Json] =
     query(
@@ -61,7 +60,7 @@ class timingWindows extends OdbSuite {
               SET: {
         """ + 
         twisOpt.map(twis => 
-          s"scheduling: { timingWindows: $twis }"
+          s"timingWindows: $twis"
         ).orEmpty +
         s"""
               }
@@ -73,8 +72,9 @@ class timingWindows extends OdbSuite {
           }
         """
 
-    ).map: json =>
+    ).map { json => 
       json.hcursor.downFields("updateObservations").require[Json]
+    }
 
   test("null timing windows should result in an empty set") {
     List(pi).traverse { user =>
@@ -293,42 +293,6 @@ class timingWindows extends OdbSuite {
     }
   }
 
-  test("scheduling edit to null"):
-    createProgramAs(pi).flatMap: pid =>
-      createObservation(pi, pid, TimingWindowsInput.some).flatMap: oid =>
-        expect(
-          user  = pi,
-          query = s"""
-            mutation {
-              updateObservations(input: {
-                WHERE: {
-                  id: {
-                    EQ: "$oid"
-                  }
-                }
-                SET: {
-                  scheduling: null
-                }
-              }) {
-                observations {
-                  $TimingWindowsGraph
-                }
-              }
-            }
-          """,
-          expected = json"""
-            {
-              "updateObservations": {
-                "observations": [
-                  {
-                    "timingWindows": []
-                  }
-                ]
-              }
-            }
-          """.asRight
-        )
-
   test("timing windows edit omit value") {
     List(pi).traverse { user =>
       createProgramAs(user).flatMap { pid =>
@@ -389,4 +353,58 @@ class timingWindows extends OdbSuite {
       }
     }
   }
+
+  test("create fail when both timingWindows and scheduling are present"):
+    createProgramAs(pi).flatMap: p =>
+      expect(
+        user  = pi,
+        query = s"""
+          mutation {
+            createObservation(input: {
+              programId: "$p"
+              SET: {
+                timingWindows: $TimingWindowsInput
+                scheduling: {
+                  timingWindows: $TimingWindowsInput
+                }
+              }
+            }) {
+              observation {
+                id
+              }
+            }
+          }
+        """,
+        expected = List("Argument 'input.SET' is invalid: Set timing windows via the 'scheduling' properties field.").asLeft
+      )
+
+  test("update fail when both timingWindows and scheduling are present"):
+    createProgramAs(pi).flatMap: p =>
+      createObservation(pi, p, TimingWindowsInput.some).flatMap: o =>
+        expect(
+          user  = pi,
+          query = s"""
+            mutation {
+              updateObservations(input: {
+                WHERE: {
+                  id: {
+                    EQ: "$o"
+                  }
+                },
+                SET: {
+                  timingWindows: $TimingWindowsInput
+                  scheduling: {
+                    timingWindows: $TimingWindowsInput
+                  }
+                }
+              }) {
+                observations {
+                  $TimingWindowsGraph
+                }
+              }
+            }
+          """,
+          expected = List("Argument 'input.SET' is invalid: Set timing windows via the 'scheduling' properties field.").asLeft
+        )
+
 }

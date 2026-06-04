@@ -273,7 +273,7 @@ object ObservationService {
 
               .flatTap: rOid =>
                 rOid.flatTraverse: oid =>
-                  Services.asSuperUser(setTimingWindows(List(oid), SET.timingWindows))
+                  Services.asSuperUser(setTimingWindows(List(oid), SET.scheduling.flatMap(_.timingWindows.toOption)))
 
               .flatMap: rOid =>
                 SET.attachments.fold(rOid.pure[F]): aids =>
@@ -494,7 +494,7 @@ object ObservationService {
 
                 _ <- validateBand(g.keys.toList)
                 _ <- ResultT(u.map(u => Services.asSuperUser(updateObservingModes(SET.observingMode, u, e.toOption))).getOrElse(Result.unit.pure[F]))
-                _ <- ResultT(Services.asSuperUser(setTimingWindows(u.foldMap(_.toList), SET.timingWindows.foldPresent(_.orEmpty))))
+                _ <- ResultT(Services.asSuperUser(setTimingWindows(u.foldMap(_.toList), SET.scheduling.flatMap(_.timingWindows).foldPresent(_.orEmpty))))
                 _ <- ResultT(g.toList.traverse { case (pid, oids) =>
                       obsAttachmentAssignmentService.setAssignments(pid, oids, SET.attachments)
                     }.map(_.sequence))
