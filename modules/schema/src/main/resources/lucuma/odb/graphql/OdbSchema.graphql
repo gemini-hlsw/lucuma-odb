@@ -9413,8 +9413,6 @@ type GhostIfu {
 }
 
 enum GhostIfuMappingType {
-  NONSIDEREAL
-
   SINGLE_TARGET
 
   TARGET_PLUS_SKY
@@ -9442,7 +9440,7 @@ type GhostIfuMapping {
 In the GhostSingleTarget mapping, IFU1 is assigned the target.
 """
 type GhostSingleTarget {
-  ifu1: Sidereal!
+  ifu1: TargetId!
 }
 
 """
@@ -9450,7 +9448,7 @@ In the GhostTargetPlusSky mapping, IFU1 is assigned the target and IFU2 the sky
 position.
 """
 type GhostTargetPlusSky {
-  ifu1: Sidereal!
+  ifu1: TargetId!
   ifu2: Coordinates!
 }
 
@@ -9460,15 +9458,15 @@ the target.
 """
 type GhostSkyPlusTarget {
   ifu1: Coordinates!
-  ifu2: Sidereal!
+  ifu2: TargetId!
 }
 
 """
 In the GhostDualTarget mapping, IFU1 is assigned target1 and IFU2 target2.
 """
 type GhostDualTarget {
-  ifu1: Sidereal!
-  ifu2: Sidereal!
+  ifu1: TargetId!
+  ifu2: TargetId!
 }
 
 """

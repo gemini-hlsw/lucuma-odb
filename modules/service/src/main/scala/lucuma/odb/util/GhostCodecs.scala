@@ -4,7 +4,6 @@
 package lucuma.odb.util
 
 import cats.syntax.either.*
-import cats.syntax.option.*
 import lucuma.core.enums.GhostBinning
 import lucuma.core.enums.GhostIfu1FiberAgitator
 import lucuma.core.enums.GhostIfu2FiberAgitator
@@ -12,7 +11,6 @@ import lucuma.core.enums.GhostIfuMappingType
 import lucuma.core.enums.GhostReadMode
 import lucuma.core.enums.GhostResolutionMode
 import lucuma.core.math.Coordinates
-import lucuma.core.model.SiderealTracking
 import lucuma.core.model.sequence.ghost.GhostDetector
 import lucuma.core.model.sequence.ghost.GhostDynamicConfig
 import lucuma.core.model.sequence.ghost.GhostIfuMapping
@@ -24,11 +22,8 @@ trait GhostCodecs:
 
   import Codecs.coordinates
   import Codecs.enumerated
-  import Codecs.epoch
   import Codecs.int4_pos
-  import Codecs.parallax
-  import Codecs.proper_motion
-  import Codecs.radial_velocity
+  import Codecs.target_id
   import Codecs.time_span
 
   val ghost_binning: Codec[GhostBinning] =
@@ -72,24 +67,21 @@ trait GhostCodecs:
   private enum IfuSlot:
     case Empty
     case Sky(coordinates: Coordinates)
-    case Target(tracking: SiderealTracking)
+    case Target(id: lucuma.core.model.Target.Id)
 
   private val ifu_slot: Codec[IfuSlot] =
     (
       coordinates.opt     *:
-      epoch.opt           *:
-      proper_motion.opt   *:
-      radial_velocity.opt *:
-      parallax.opt
+      target_id.opt
     ).eimap {
-      case (None, None, None, None, None)         => IfuSlot.Empty.asRight
-      case (Some(coords), None, None, None, None) => IfuSlot.Sky(coords).asRight
-      case (Some(base), Some(ep), pm, rv, px)     => IfuSlot.Target(SiderealTracking(base, ep, pm, rv, px)).asRight
-      case other                                  => s"Inconsistent GHOST IFU mapping: $other".asLeft
+      case (None, None)         => IfuSlot.Empty.asRight
+      case (Some(coords), None) => IfuSlot.Sky(coords).asRight
+      case (None, Some(id))     => IfuSlot.Target(id).asRight
+      case other                => s"Inconsistent GHOST IFU mapping: $other".asLeft
     }{
-      case IfuSlot.Empty     => (None, None, None, None, None)
-      case IfuSlot.Sky(c)    => (Some(c), None, None, None, None)
-      case IfuSlot.Target(t) => (t.baseCoordinates.some, t.epoch.some, t.properMotion, t.radialVelocity, t.parallax)
+      case IfuSlot.Empty     => (None, None)
+      case IfuSlot.Sky(c)    => (Some(c), None)
+      case IfuSlot.Target(t) => (None, Some(t))
     }
 
   val ghost_ifu_mapping: Codec[GhostIfuMapping] =
@@ -98,8 +90,6 @@ trait GhostCodecs:
       ifu_slot               *:
       ifu_slot
     ).eimap {
-      case (GhostIfuMappingType.Nonsidereal, IfuSlot.Empty, IfuSlot.Empty)              =>
-        GhostIfuMapping.Nonsidereal.asRight
       case (GhostIfuMappingType.SingleTarget, IfuSlot.Target(ifu1), IfuSlot.Empty)      =>
         GhostIfuMapping.SingleTarget(ifu1).asRight
       case (GhostIfuMappingType.TargetPlusSky, IfuSlot.Target(ifu1), IfuSlot.Sky(ifu2)) =>
@@ -111,8 +101,6 @@ trait GhostCodecs:
       case (mappingType, slot1, slot2)                                                  =>
         s"Inconsistent GHOST IFU mapping: $mappingType, $slot1, $slot2".asLeft
     } {
-      case GhostIfuMapping.Nonsidereal               =>
-        (GhostIfuMappingType.Nonsidereal, IfuSlot.Empty, IfuSlot.Empty)
       case GhostIfuMapping.SingleTarget(ifu1)        =>
         (GhostIfuMappingType.SingleTarget, IfuSlot.Target(ifu1), IfuSlot.Empty)
       case GhostIfuMapping.TargetPlusSky(ifu1, ifu2) =>

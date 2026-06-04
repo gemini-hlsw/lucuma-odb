@@ -21,11 +21,7 @@ import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.math.Angle
 import lucuma.core.math.Coordinates
 import lucuma.core.math.Declination
-import lucuma.core.math.Epoch
 import lucuma.core.math.HourAngle
-import lucuma.core.math.Parallax
-import lucuma.core.math.ProperMotion
-import lucuma.core.math.RadialVelocity
 import lucuma.core.math.RightAscension
 import lucuma.core.model.Observation
 import lucuma.core.model.Target
@@ -34,11 +30,8 @@ import lucuma.core.model.sequence.ghost.GhostDynamicConfig
 import lucuma.core.syntax.string.*
 import lucuma.core.syntax.timespan.*
 import lucuma.odb.util.Codecs.coordinates
-import lucuma.odb.util.Codecs.epoch
 import lucuma.odb.util.Codecs.observation_id
-import lucuma.odb.util.Codecs.parallax
-import lucuma.odb.util.Codecs.proper_motion
-import lucuma.odb.util.Codecs.radial_velocity
+import lucuma.odb.util.Codecs.target_id
 import lucuma.odb.util.GhostCodecs.ghost_ifu_mapping_type
 import skunk.*
 import skunk.implicits.*
@@ -235,15 +228,9 @@ class executionSciGhostIfu extends ExecutionTestSupportForGhost:
   ): IO[(
     GhostIfuMappingType,
     Option[Coordinates],
-    Option[Epoch],
-    Option[ProperMotion],
-    Option[RadialVelocity],
-    Option[Parallax],
+    Option[Target.Id],
     Option[Coordinates],
-    Option[Epoch],
-    Option[ProperMotion],
-    Option[RadialVelocity],
-    Option[Parallax]
+    Option[Target.Id]
   )] =
     withSession: session =>
       session.unique(
@@ -252,32 +239,18 @@ class executionSciGhostIfu extends ExecutionTestSupportForGhost:
             c_ifu_mapping,
             c_ifu1_ra,
             c_ifu1_dec,
-            c_ifu1_epoch,
-            c_ifu1_pm_ra,
-            c_ifu1_pm_dec,
-            c_ifu1_rv,
-            c_ifu1_parallax,
+            c_ifu1_target_id,
             c_ifu2_ra,
             c_ifu2_dec,
-            c_ifu2_epoch,
-            c_ifu2_pm_ra,
-            c_ifu2_pm_dec,
-            c_ifu2_rv,
-            c_ifu2_parallax
+            c_ifu2_target_id
           FROM t_ghost_static
           WHERE c_observation_id = $observation_id
         """.query(
           ghost_ifu_mapping_type *:
           coordinates.opt        *:
-          epoch.opt              *:
-          proper_motion.opt      *:
-          radial_velocity.opt    *:
-          parallax.opt           *:
+          target_id.opt          *:
           coordinates.opt        *:
-          epoch.opt              *:
-          proper_motion.opt      *:
-          radial_velocity.opt    *:
-          parallax.opt
+          target_id.opt
         )
       )(oid)
 
@@ -286,31 +259,12 @@ class executionSciGhostIfu extends ExecutionTestSupportForGhost:
     row: (
       GhostIfuMappingType,
       Option[Coordinates],
-      Option[Epoch],
-      Option[ProperMotion],
-      Option[RadialVelocity],
-      Option[Parallax],
+      Option[Target.Id],
       Option[Coordinates],
-      Option[Epoch],
-      Option[ProperMotion],
-      Option[RadialVelocity],
-      Option[Parallax]
+      Option[Target.Id]
     )
   ): IO[Unit] =
     assertIO(readIfuMappingRow(oid), row)
-
-  val siderealQuery: String =
-    """
-                    ra { hms }
-                    dec { dms }
-                    epoch
-                    properMotion {
-                      ra { microarcsecondsPerYear }
-                      dec { microarcsecondsPerYear }
-                    }
-                    radialVelocity { centimetersPerSecond }
-                    parallax { microarcseconds }
-    """
 
   val skyQuery: String =
     """
@@ -328,19 +282,19 @@ class executionSciGhostIfu extends ExecutionTestSupportForGhost:
               ifuMapping {
                 mappingType
                 singleTarget {
-                  ifu1 { $siderealQuery }
+                  ifu1
                 }
                 targetPlusSky {
-                  ifu1 { $siderealQuery }
+                  ifu1
                   ifu2 { $skyQuery }
                 }
                 skyPlusTarget {
                   ifu1 { $skyQuery }
-                  ifu2 { $siderealQuery }
+                  ifu2
                 }
                 dualTarget {
-                  ifu1 { $siderealQuery }
-                  ifu2 { $siderealQuery }
+                  ifu1
+                  ifu2
                 }
               }
               slitViewingCameraExposureTime { seconds }
@@ -350,86 +304,7 @@ class executionSciGhostIfu extends ExecutionTestSupportForGhost:
       }
     """
 
-  val NonsiderealResult: Json =
-    json"""
-      {
-        "executionConfig": {
-          "ghost": {
-            "static": {
-              "resolutionMode": "STANDARD",
-              "ifuMapping": {
-                "mappingType": "NONSIDEREAL",
-                "singleTarget": null,
-                "targetPlusSky": null,
-                "skyPlusTarget": null,
-                "dualTarget": null
-              },
-              "slitViewingCameraExposureTime": {
-                "seconds": 5.000000
-              }
-            }
-          }
-        }
-      }
-    """
-
-  test("IFU Mapping Nonsidereal"):
-    for
-      p <- createProgram
-      t <- createNonsiderealTargetAs(pi, p)
-      o <- createObservationWithModeAs(pi, p, List(t), standardResolutionNoSky)
-      _ <- expect(
-            pi,
-            staticConfigQuery(o),
-            NonsiderealResult.asRight
-          )
-    yield ()
-
-  test("IFU Mapping Nonsidereal - stored"):
-    for
-      p <- createProgram
-      t <- createNonsiderealTargetAs(pi, p)
-      o <- createObservationWithModeAs(pi, p, List(t), standardResolutionNoSky)
-      _ <- recordVisitAs(serviceUser, o)
-      r <- assertIfuMappingRow(
-        o,
-        (
-          GhostIfuMappingType.Nonsidereal,
-          None,
-          None,
-          None,
-          None,
-          None,
-          None,
-          None,
-          None,
-          None,
-          None
-        )
-      )
-      _ <- expect(
-            pi,
-            staticConfigQuery(o),
-            NonsiderealResult.asRight
-          )
-    yield ()
-
-  val TargetJson: Json =
-    json"""
-      {
-        "ra" : { "hms" : "05:46:13.137000" },
-        "dec" : { "dms" : "-00:06:04.890000" },
-        "epoch" : "J2000.000",
-        "properMotion" : {
-          "ra" : { "microarcsecondsPerYear" : 918 },
-          "dec" : { "microarcsecondsPerYear" : -1057 }
-        },
-        "radialVelocity" : { "centimetersPerSecond" : 2758000 },
-        "parallax" : { "microarcseconds" : 2422 }
-      }
-    """
-
-  val SingleTargetResult: Json =
+  def singleTargetResult(t: Target.Id): Json =
     json"""
       {
         "executionConfig": {
@@ -439,12 +314,11 @@ class executionSciGhostIfu extends ExecutionTestSupportForGhost:
               "ifuMapping": {
                 "mappingType": "SINGLE_TARGET",
                 "singleTarget": {
-                  "ifu1": $TargetJson
+                  "ifu1": ${t.asJson}
                 },
                 "targetPlusSky": null,
                 "skyPlusTarget": null,
                 "dualTarget": null
-
               },
               "slitViewingCameraExposureTime": {
                 "seconds": 5.000000
@@ -455,7 +329,42 @@ class executionSciGhostIfu extends ExecutionTestSupportForGhost:
       }
     """
 
-  test("IFU Mapping SingleTarget"):
+  test("IFU Mapping SingleTarget (Nonsidereal)"):
+    for
+      p <- createProgram
+      t <- createNonsiderealTargetAs(pi, p)
+      o <- createObservationWithModeAs(pi, p, List(t), standardResolutionNoSky)
+      _ <- expect(
+            pi,
+            staticConfigQuery(o),
+            singleTargetResult(t).asRight
+          )
+    yield ()
+
+  test("IFU Mapping SingleTarget (Nonsidereal) - stored"):
+    for
+      p <- createProgram
+      t <- createNonsiderealTargetAs(pi, p)
+      o <- createObservationWithModeAs(pi, p, List(t), standardResolutionNoSky)
+      _ <- recordVisitAs(serviceUser, o)
+      r <- assertIfuMappingRow(
+        o,
+        (
+          GhostIfuMappingType.SingleTarget,
+          None,
+          Some(t),
+          None,
+          None
+        )
+      )
+      _ <- expect(
+            pi,
+            staticConfigQuery(o),
+            singleTargetResult(t).asRight
+          )
+    yield ()
+
+  test("IFU Mapping SingleTarget (Sidereal)"):
     for
       p <- createProgram
       t <- createTargetWithProfileAs(pi, p)
@@ -463,7 +372,7 @@ class executionSciGhostIfu extends ExecutionTestSupportForGhost:
       _ <- expect(
             pi,
             staticConfigQuery(o),
-            SingleTargetResult.asRight
+            singleTargetResult(t).asRight
           )
     yield ()
 
@@ -473,22 +382,7 @@ class executionSciGhostIfu extends ExecutionTestSupportForGhost:
       Declination.lenientFromStringDMS.unsafeGet("-00:06:04.89")
     ).some
 
-  val TargetEpoch: Option[Epoch] =
-    Epoch.fromString.getOption("J2000.0")
-
-  val TargetProperMotion: Option[ProperMotion] =
-    ProperMotion(
-      ProperMotion.RA.microarcsecondsPerYear.get(918L),
-      ProperMotion.Dec.microarcsecondsPerYear.get(-1057L)
-    ).some
-
-  val TargetRadialVelocity: Option[RadialVelocity] =
-    RadialVelocity.fromMetersPerSecond.getOption(27580)
-
-  val TargetParallax: Option[Parallax] =
-    Parallax.fromMicroarcseconds(2422).some
-
-  test("IFU Mapping SingleTarget - stored"):
+  test("IFU Mapping SingleTarget (Sidereal) - stored"):
     for
       p <- createProgram
       t <- createTargetWithProfileAs(pi, p)
@@ -498,14 +392,8 @@ class executionSciGhostIfu extends ExecutionTestSupportForGhost:
         o,
         (
           GhostIfuMappingType.SingleTarget,
-          TargetCoordinates,
-          TargetEpoch,
-          TargetProperMotion,
-          TargetRadialVelocity,
-          TargetParallax,
           None,
-          None,
-          None,
+          Some(t),
           None,
           None
         )
@@ -513,11 +401,11 @@ class executionSciGhostIfu extends ExecutionTestSupportForGhost:
       _ <- expect(
             pi,
             staticConfigQuery(o),
-            SingleTargetResult.asRight
+            singleTargetResult(t).asRight
           )
     yield ()
 
-  val TargetPlusSkyResult: Json =
+  def targetPlusSkyResult(t: Target.Id): Json =
     json"""
       {
         "executionConfig": {
@@ -528,7 +416,7 @@ class executionSciGhostIfu extends ExecutionTestSupportForGhost:
                 "mappingType": "TARGET_PLUS_SKY",
                 "singleTarget": null,
                 "targetPlusSky": {
-                  "ifu1": $TargetJson,
+                  "ifu1": ${t.asJson},
                   "ifu2": {
                     "ra": { "hms":  "05:46:03.137000" },
                     "dec": { "dms":  "-00:06:04.890000" }
@@ -555,7 +443,7 @@ class executionSciGhostIfu extends ExecutionTestSupportForGhost:
       _ <- expect(
             pi,
             staticConfigQuery(o),
-            TargetPlusSkyResult.asRight
+            targetPlusSkyResult(t).asRight
           )
     yield ()
 
@@ -570,29 +458,23 @@ class executionSciGhostIfu extends ExecutionTestSupportForGhost:
         o,
         (
           GhostIfuMappingType.TargetPlusSky,
-          TargetCoordinates,
-          TargetEpoch,
-          TargetProperMotion,
-          TargetRadialVelocity,
-          TargetParallax,
+          None,
+          Some(t),
           Coordinates(
             RightAscension.lenientFromStringHMS.unsafeGet("05:46:03.137"),
             Declination.lenientFromStringDMS.unsafeGet("-00:06:04.89")
           ).some,
-          None,
-          None,
-          None,
           None
         )
       )
       _ <- expect(
             pi,
             staticConfigQuery(o),
-            TargetPlusSkyResult.asRight
+            targetPlusSkyResult(t).asRight
           )
     yield ()
 
-  val SkyPlusTargetResult: Json =
+  def skyPlusTargetResult(t: Target.Id): Json =
     json"""
       {
         "executionConfig": {
@@ -608,7 +490,7 @@ class executionSciGhostIfu extends ExecutionTestSupportForGhost:
                     "ra": { "hms":  "05:46:23.137000" },
                     "dec": { "dms":  "-00:06:04.890000" }
                   },
-                  "ifu2": $TargetJson
+                  "ifu2": ${t.asJson}
                 },
                 "dualTarget": null
               },
@@ -630,7 +512,7 @@ class executionSciGhostIfu extends ExecutionTestSupportForGhost:
       _ <- expect(
             pi,
             staticConfigQuery(o),
-            SkyPlusTargetResult.asRight
+            skyPlusTargetResult(t).asRight
           )
     yield ()
 
@@ -651,38 +533,20 @@ class executionSciGhostIfu extends ExecutionTestSupportForGhost:
           ).some,
           None,
           None,
-          None,
-          None,
-          TargetCoordinates,
-          TargetEpoch,
-          TargetProperMotion,
-          TargetRadialVelocity,
-          TargetParallax,
+          Some(t)
         )
       )
       _ <- expect(
             pi,
             staticConfigQuery(o),
-            SkyPlusTargetResult.asRight
+            skyPlusTargetResult(t).asRight
           )
     yield ()
 
-  val TargetJson2: Json =
-    json"""
-      {
-        "ra" : { "hms" : "05:46:03.137000" },
-        "dec" : { "dms" : "-00:06:04.890000" },
-        "epoch" : "J2000.000",
-        "properMotion" : {
-          "ra" : { "microarcsecondsPerYear" : 918 },
-          "dec" : { "microarcsecondsPerYear" : -1057 }
-        },
-        "radialVelocity" : { "centimetersPerSecond" : 2758000 },
-        "parallax" : { "microarcseconds" : 2422 }
-      }
-    """
-
-  val DualTargetResult: Json =
+  def dualTargetResult(
+    target1: Target.Id,
+    target2: Target.Id
+  ): Json =
     json"""
       {
         "executionConfig": {
@@ -695,8 +559,8 @@ class executionSciGhostIfu extends ExecutionTestSupportForGhost:
                 "targetPlusSky": null,
                 "skyPlusTarget": null,
                 "dualTarget": {
-                  "ifu1": $TargetJson,
-                  "ifu2": $TargetJson2
+                  "ifu1": ${target1.asJson},
+                  "ifu2": ${target2.asJson}
                 }
               },
               "slitViewingCameraExposureTime": {
@@ -736,7 +600,7 @@ class executionSciGhostIfu extends ExecutionTestSupportForGhost:
       _  <- expect(
             pi,
             staticConfigQuery(o),
-            DualTargetResult.asRight
+            dualTargetResult(t1, t2).asRight
           )
     yield ()
 
@@ -791,30 +655,7 @@ class executionSciGhostIfu extends ExecutionTestSupportForGhost:
       _  <- expect(
             pi,
             staticConfigQuery(o),
-            json"""
-              {
-                "executionConfig": {
-                  "ghost": {
-                    "static": {
-                      "resolutionMode": "STANDARD",
-                      "ifuMapping": {
-                        "mappingType": "DUAL_TARGET",
-                        "singleTarget": null,
-                        "targetPlusSky": null,
-                        "skyPlusTarget": null,
-                        "dualTarget": {
-                          "ifu1": $TargetJson2,
-                          "ifu2": $TargetJson
-                        }
-                      },
-                      "slitViewingCameraExposureTime": {
-                        "seconds": 5.000000
-                      }
-                    }
-                  }
-                }
-              }
-            """.asRight
+            dualTargetResult(t2, t1).asRight
           )
     yield ()
 

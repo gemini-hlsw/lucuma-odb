@@ -247,7 +247,7 @@ object GhostIfuService:
             .fromOption(c.get(observationId), OdbError.InvalidArgument(s"Observation '$observationId' not found, or not a GHOST observation.".some))
             .flatMap: (mappingCtx, svcTime) =>
               GhostIfuMapping
-                .derive(mappingCtx, a.map(_._2))
+                .derive(mappingCtx, a)
                 .leftMap(s => OdbError.InvalidArgument(s"Could not compute GHOST IFU mapping: $s".some))
                 .map: mapping =>
                   GhostStaticConfig(mappingCtx.resolutionMode, mapping, svcTime)
@@ -264,7 +264,7 @@ object GhostIfuService:
             yield
               c.toList
                .mapFilter { case (oid, (mappingCtx, _)) =>
-                 val targets = a.getOrElse(oid, Nil).map(_._2)
+                 val targets = a.getOrElse(oid, Nil)
                  GhostIfuMapping.validate(mappingCtx, targets).map(error => oid -> error)
                }
                .toMap
