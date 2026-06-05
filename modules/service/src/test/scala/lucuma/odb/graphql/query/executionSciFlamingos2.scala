@@ -178,3 +178,23 @@ class executionSciFlamingos2 extends ExecutionTestSupportForFlamingos2:
             s"Could not generate a sequence for $oid: At least one exposure must be taken on slit."
           ).asLeft
       )
+
+  test("simple generation - unsplittable"):
+    val setup: IO[Observation.Id] =
+      for
+        p <- createProgram
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createFlamingos2LongSlitObservationAs(pi, p, List(t))
+        _ <- setIsSplittableAs(pi, o, isSplittable = false)
+      yield o
+
+    setup.flatMap: oid =>
+      expect(
+        user     = pi,
+        query    = flamingos2ScienceQuery(oid, 1.some),
+        expected = expectedUnsplittableExecutionConfig(
+          "flamingos2",
+          flamingos2ExpectedScienceAtom(ExposureTime, (0, 15, Enabled), (0, -15, Enabled), (0, -15, Enabled), (0, 15, Enabled)),
+          flamingos2ExpectedGcals((0, 15))
+        ).asRight
+      )

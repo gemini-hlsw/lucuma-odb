@@ -755,3 +755,25 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos:
       yield Set(x0, x1, x2, x3, x4, x5)
 
     assertIO(execSci.map(_.size), 1)
+
+  test("simple generation - unsplittable"):
+    val setup: IO[Observation.Id] =
+      for
+        p <- createProgram
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+        _ <- setIsSplittableAs(pi, o, isSplittable = false)
+      yield o
+
+    setup.flatMap: oid =>
+      expect(
+        user     = pi,
+        query    = gmosNorthScienceQuery(oid),
+        expected = expectedUnsplittableExecutionConfig(
+          "gmosNorth",
+          gmosNorthExpectedScienceAtom(ditherNm =  0, 0, 15, -15),
+          gmosNorthExpectedScienceAtom(ditherNm =  5, 0, 15, -15),
+          gmosNorthExpectedScienceAtom(ditherNm = -5, 0, 15, -15),
+          gmosNorthExpectedScienceAtom(ditherNm =  0, 0)
+        ).asRight
+      )

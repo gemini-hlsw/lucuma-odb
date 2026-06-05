@@ -59,6 +59,7 @@ import lucuma.odb.sequence.visitor
 import lucuma.odb.util.Codecs.*
 import skunk.*
 import skunk.circe.codec.json.*
+import skunk.codec.boolean.bool
 import skunk.codec.numeric.int8
 import skunk.implicits.*
 
@@ -174,7 +175,7 @@ object GeneratorParamsService {
       )(using Transaction[F]): F[Map[Observation.Id, Either[Error, GeneratorParams]]] =
         for
           paramsRows <- params
-          oms         = paramsRows.collect { case ParamsRow(oid, _, _, _, Some(om), _, _, _, _, _, _, _, _, _, _, _) => (oid, om) }.distinct
+          oms         = paramsRows.collect { case ParamsRow(oid, _, _, _, Some(om), _, _, _, _, _, _, _, _, _, _, _, _) => (oid, om) }.distinct
           m          <- Services.asSuperUser(observingModeServices.selectObservingMode(oms))
         yield
           NonEmptyList.fromList(paramsRows).fold(Map.empty): paramsRowsNel =>
@@ -277,7 +278,7 @@ object GeneratorParamsService {
             .leftMap(MissingParamSet.fromParams)
             .toEither
 
-          GeneratorParams(itcInput, obsParams.scienceBand, obsMode, obsParams.calibrationRole, obsParams.declaredState, obsParams.executionState, obsParams.stepCount)
+          GeneratorParams(itcInput, obsParams.scienceBand, obsMode, obsParams.calibrationRole, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.isSplittable)
 
         observingMode(obsParams.targets, config).flatMap:
 
@@ -305,7 +306,7 @@ object GeneratorParamsService {
                   .leftMap(MissingParamSet.fromParams)
                   .toEither
 
-              GeneratorParams(itcInput, obsParams.scienceBand, gh, obsParams.calibrationRole, obsParams.declaredState, obsParams.executionState, obsParams.stepCount)
+              GeneratorParams(itcInput, obsParams.scienceBand, gh, obsParams.calibrationRole, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.isSplittable)
 
           case gn @ gmos.longslit.Config.GmosNorth(g, f, u, c, a) =>
             val sciMode = InstrumentMode.GmosNorthSpectroscopy(
@@ -378,7 +379,7 @@ object GeneratorParamsService {
                 .leftMap(MissingParamSet.fromParams)
                 .toEither
 
-            GeneratorParams(itcInput, obsParams.scienceBand, ig, obsParams.calibrationRole, obsParams.declaredState, obsParams.executionState, obsParams.stepCount).asRight
+            GeneratorParams(itcInput, obsParams.scienceBand, ig, obsParams.calibrationRole, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.isSplittable).asRight
 
           case gn @ gmos.imaging.Config.GmosNorth(_, fs, _) =>
             // An input per filter.
@@ -396,7 +397,7 @@ object GeneratorParamsService {
                 .leftMap(MissingParamSet.fromParams)
                 .toEither
 
-            GeneratorParams(itcInput, obsParams.scienceBand, gn, obsParams.calibrationRole, obsParams.declaredState, obsParams.executionState, obsParams.stepCount).asRight
+            GeneratorParams(itcInput, obsParams.scienceBand, gn, obsParams.calibrationRole, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.isSplittable).asRight
 
           case gs @ gmos.imaging.Config.GmosSouth(_, fs, _) =>
             // An input per filter.
@@ -414,7 +415,7 @@ object GeneratorParamsService {
                 .leftMap(MissingParamSet.fromParams)
                 .toEither
 
-            GeneratorParams(itcInput, obsParams.scienceBand, gs, obsParams.calibrationRole, obsParams.declaredState, obsParams.executionState, obsParams.stepCount).asRight
+            GeneratorParams(itcInput, obsParams.scienceBand, gs, obsParams.calibrationRole, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.isSplittable).asRight
 
           case gn: gnirs.longslit.Config =>
             for
@@ -462,7 +463,8 @@ object GeneratorParamsService {
               obsParams.calibrationRole,
               obsParams.declaredState,
               obsParams.executionState,
-              obsParams.stepCount
+              obsParams.stepCount,
+              obsParams.isSplittable
             ).asRight
           
 
@@ -517,6 +519,7 @@ object GeneratorParamsService {
     declaredState:       Option[DeclaredExecutionState],
     executionState:      ExecutionState,
     stepCount:           Long,
+    isSplittable:        Boolean,
     customSedTimestamp:  Option[Timestamp] = none
   )
 
@@ -538,7 +541,8 @@ object GeneratorParamsService {
     targets:           NonEmptyList[TargetParams],
     declaredState:     Option[DeclaredExecutionState],
     executionState:    ExecutionState,
-    stepCount:         Long
+    stepCount:         Long,
+    isSplittable:      Boolean
   )
 
   object ObsParams {
@@ -556,7 +560,8 @@ object GeneratorParamsService {
             TargetParams(r.targetId, r.radialVelocity, r.sourceProfile, r.customSedTimestamp),
           oParams.head.declaredState,
           oParams.head.executionState,
-          oParams.head.stepCount
+          oParams.head.stepCount,
+          oParams.head.isSplittable
         )
       .toMap
   }
@@ -597,9 +602,10 @@ object GeneratorParamsService {
        source_profile.opt      *:
        declared_execution_state.opt *:
        execution_state         *:
-       int8
-      ).map( (oid, role, cs, etm, om, sb, btid, brv, bsp, tid, rv, sp, dc, es, sc) =>
-        ParamsRow(oid, role, cs, etm, om, sb, btid, brv, bsp, tid, rv, sp, dc, es, sc, None))
+       int8                    *:
+       bool
+      ).map( (oid, role, cs, etm, om, sb, btid, brv, bsp, tid, rv, sp, dc, es, sc, split) =>
+        ParamsRow(oid, role, cs, etm, om, sb, btid, brv, bsp, tid, rv, sp, dc, es, sc, split, None))
 
     private def ParamColumns(tab: String): String =
       s"""
@@ -628,7 +634,8 @@ object GeneratorParamsService {
         $tab.c_source_profile,
         $tab.c_declared_state,
         $tab.c_execution_state,
-        $tab.c_step_count
+        $tab.c_step_count,
+        $tab.c_is_splittable
       """
 
     def selectManyParams(

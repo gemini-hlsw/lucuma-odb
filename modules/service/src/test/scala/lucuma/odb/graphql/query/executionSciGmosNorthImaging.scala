@@ -259,6 +259,44 @@ class executionSciGmosNorthImaging extends ExecutionTestSupportForGmos:
         expected = expectedResult(json).asRight
       )
 
+  test("grouped, no offsets, no sky (INCREASING), Unsplittable"):
+    val setup: IO[Observation.Id] =
+      for
+        p <- createProgram
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createObservation(p, t, Site.GN):
+          s"""{
+            gmosNorthImaging: {
+              variant: {
+                grouped: { skyCount: 0 }
+              }
+              filters: [
+                { filter: G_PRIME },
+                { filter: I_PRIME },
+                { filter: Y       }
+              ]
+            }
+          }"""
+        _ <- setIsSplittableAs(pi, o, isSplittable = false)
+      yield o
+
+    val json: List[Json] = List(
+      List.fill( 6)(gnAtom(Step(GmosNorthFilter.GPrime, Time120x06))) ++
+      List.fill(12)(gnAtom(Step(GmosNorthFilter.IPrime, Time060x12))) ++
+      List.fill(30)(gnAtom(Step(GmosNorthFilter.Y,      Time030x30)))
+    ).flatten
+
+    setup.flatMap: oid =>
+      expect(
+        user     = pi,
+        query    = gmosNorthScienceQuery(oid, 100.some),
+        expected = expectedUnsplittableExecutionConfig(
+          "gmosNorth",
+          json.head,
+          json.tail*
+        ).asRight
+      )
+
   test("grouped, no offsets, no sky (DECREASING)"):
     val setup: IO[Observation.Id] =
       for

@@ -56,6 +56,31 @@ class executionSciIgrins2 extends ExecutionTestSupportForIgrins2:
           ).asRight
       )
 
+  test("[igrins2] mode nod along slit (4 offsets, 1 atom), unsplittable"):
+    val setup: IO[Observation.Id] =
+      for {
+        p <- createProgram
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createIgrins2LongSlitObservationAs(pi, p, t)
+        _ <- setIsSplittableAs(pi, o, isSplittable = false)
+      } yield o
+
+    setup.flatMap: oid =>
+      expect(
+        user     = pi,
+        query    = igrins2ScienceQuery(oid),
+        expected = expectedUnsplittableExecutionConfig(
+          "igrins2",
+          igrins2ExpectedScienceAtom(
+            ExposureTime,
+            (0, qA, Enabled),
+            (0, qB, Enabled),
+            (0, qB, Enabled),
+            (0, qA, Enabled)
+          )
+        ).asRight
+      )
+
   test("[igrins2] mode nod along slit, all offsets off slit"):
     val setup: IO[Observation.Id] =
       for {

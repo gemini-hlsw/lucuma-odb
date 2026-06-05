@@ -9,9 +9,11 @@ import cats.effect.IO
 import cats.syntax.all.*
 import io.circe.Json
 import io.circe.literal.*
+import io.circe.syntax.*
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.DatasetQaState
 import lucuma.core.enums.DatasetStage
+import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.StepGuideState
 import lucuma.core.math.Angle
 import lucuma.core.math.Offset
@@ -29,6 +31,7 @@ import lucuma.core.syntax.string.*
 import lucuma.core.util.Timestamp
 import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
+import lucuma.odb.sequence.data.UnsplittableAtom
 import lucuma.odb.service.Services
 import lucuma.odb.service.UserService
 import lucuma.odb.util.Codecs.*
@@ -289,4 +292,41 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations wi
                      Services.asSuperUser(services.telluricTargetsService.resolveTargets(p))
       yield ()
     }
+
+  def expectedUnsplittableExecutionConfig(
+    instrument:       String,
+    expectedAtomHead: Json,
+    expectedAtomTail: Json*
+  ): Json =
+    Json.obj(
+      "executionConfig" -> Json.obj(
+        instrument -> Json.obj(
+          "science" -> Json.obj(
+            "nextAtom" ->
+              expectedUnsplittableAtom(
+                expectedAtomHead,
+                expectedAtomTail*
+              ),
+            "possibleFuture" -> List.empty[Json].asJson,
+            "hasMore" -> false.asJson
+          )
+        )
+      )
+    )
+
+  def expectedUnsplittableAtom(
+    expectedAtomHead: Json,
+    expectedAtomTail: Json*
+  ): Json =
+    val steps: List[Json] =
+      (expectedAtomHead +: expectedAtomTail.toVector)
+        .flatMap: atom =>
+          atom.asObject.get.toMap.get("steps").get.asArray.toVector.flatten
+        .toList
+
+    Json.obj(
+      "description"  -> UnsplittableAtom.Descripton.value.asJson,
+      "observeClass" -> ObserveClass.Science.tag.toScreamingSnakeCase.asJson,
+      "steps"        -> steps.asJson
+    )
 }
