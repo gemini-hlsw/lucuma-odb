@@ -3553,6 +3553,29 @@ input SchedulingPropertiesInput {
 }
 
 """
+Configuration that controls how and when the Scheduler may plan execution of an
+observation, including whether it can be split across multiple visits and any
+timing constraints.
+"""
+type SchedulingProperties {
+
+  """
+  Controls whether the observation may be split across multiple visits. When
+  true, the scheduler may divide the science sequence into discrete segments
+  (i.e. "atoms") scheduled in order across separate visits. When false, the
+  entire science sequence must complete within a single uninterrupted visit.
+  """
+  isSplittable: Boolean!
+
+  """
+  One or more windows during which the observation is permitted to execute.  If
+  empty, there are no timing constraints for the observation.
+  """
+  timingWindows: [TimingWindow!]!
+
+}
+
+"""
 Observation properties
 """
 input ObservationPropertiesInput {
@@ -12754,6 +12777,11 @@ type Observation {
   Observation timing windows
   """
   timingWindows: [TimingWindow!]!
+
+  """
+  Observation scheduling constraints.
+  """
+  scheduling: SchedulingProperties!
 
   """
   attachments

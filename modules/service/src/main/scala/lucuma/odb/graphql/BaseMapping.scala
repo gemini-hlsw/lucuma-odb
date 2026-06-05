@@ -345,6 +345,7 @@ trait BaseMapping[F[_]]
   lazy val ScienceRequirementsType                 = schema.ref("ScienceRequirements")
   lazy val ScienceSubtypeType                      = schema.ref("ScienceSubtype")
   lazy val ScienceType                             = schema.ref("Science")
+  lazy val SchedulingPropertiesType                = schema.ref("SchedulingProperties")
   lazy val SeeingTrendType                         = schema.ref("SeeingTrend")
   lazy val SemesterType                            = schema.ref("Semester")
   lazy val SequenceCommandType                     = schema.ref("SequenceCommand")
