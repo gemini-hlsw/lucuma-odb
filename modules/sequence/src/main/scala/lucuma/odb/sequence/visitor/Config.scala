@@ -13,8 +13,8 @@ import lucuma.odb.sequence.util.HashBytes
 final case class Config(
   mode: VisitorObservingModeType,
   centralWavelength: Wavelength,
-  // Science field of view, understood as the diameter of a circular area.
-  scienceFov: Angle,
+  // AGS field of view, understood as the diameter of a circular area.
+  agsDiameter: Angle,
   name: Option[NonEmptyString],
   totalRequestTime: Option[TimeSpan]
 ):
@@ -32,7 +32,7 @@ object Config:
       Array.concat(
         HashBytes[VisitorObservingModeType].hashBytes(c.mode),
         HashBytes[Wavelength].hashBytes(c.centralWavelength),
-        HashBytes[Angle].hashBytes(c.scienceFov),
+        HashBytes[Angle].hashBytes(c.agsDiameter),
         c.name.fold(Array.emptyByteArray)(n => HashBytes[String].hashBytes(n.value)),
         c.totalRequestTime.fold(Array.emptyByteArray)(HashBytes[TimeSpan].hashBytes)
       )

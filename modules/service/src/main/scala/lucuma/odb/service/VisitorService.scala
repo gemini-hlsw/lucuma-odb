@@ -96,7 +96,7 @@ object VisitorService:
               List(
                 SET.centralWavelength.map(sql"c_central_wavelength = $wavelength_pm"),
                 SET.mode.map(sql"c_observing_mode_type = $visitor_observing_mode_type"),
-                SET.scienceFov.map(sql"c_science_fov = $angle_µas"),
+                SET.agsDiameter.map(sql"c_ags_diameter = $angle_µas"),
                 SET.name.map(sql"c_name = $text_nonempty"),
                 SET.totalRequestTime.map(sql"c_total_request_time = $time_span")
               ).flatten
@@ -150,7 +150,7 @@ object VisitorService:
           c_observation_id,
           c_observing_mode_type,
           c_central_wavelength,
-          c_science_fov,
+          c_ags_diameter,
           c_name,
           c_total_request_time
         FROM
@@ -167,7 +167,7 @@ object VisitorService:
           c_observation_id,
           c_observing_mode_type,
           c_central_wavelength,
-          c_science_fov,
+          c_ags_diameter,
           c_name,
           c_total_request_time
         ) VALUES (
