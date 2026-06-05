@@ -334,7 +334,11 @@ object GuideService {
             AgsParams.Igrins2LongSlit(PortDisposition.Bottom).withPWFS2.some
           case (_: igrins2.longslit.Config, GuideProbe.PWFS1)                                               =>
             AgsParams.Igrins2LongSlit(PortDisposition.Bottom).withPWFS1.some
-          case (_: ghost.ifu.Config, GuideProbe.PWFS2)                                                      =>
+          case (gnirs.longslit.Config(fpu = fpu, prism = prism, camera = camera), GuideProbe.PWFS2) =>
+            AgsParams.GnirsLongSlit(fpu, camera, prism, PortDisposition.Bottom).withPWFS2.some
+          case (gnirs.longslit.Config(fpu = fpu, prism = prism, camera = camera), GuideProbe.PWFS1) =>
+            AgsParams.GnirsLongSlit(fpu, camera, prism, PortDisposition.Bottom).withPWFS1.some
+          case (_: ghost.ifu.Config, GuideProbe.PWFS2) =>
             AgsParams.GhostIfu(PortDisposition.Bottom).withPWFS2.some
           case (c: visitor.Config, GuideProbe.PWFS2) if c.mode === VisitorObservingModeType.MaroonX         =>
             AgsParams.MaroonX(PortDisposition.Bottom).withPWFS2.some
