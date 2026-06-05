@@ -17,7 +17,7 @@ trait VisitorMapping[F[_]] extends VisitorTable[F]:
       SqlField("observationId", VisitorTable.ObservationId, key = true, hidden = true),
       SqlField("mode", VisitorTable.ObservingModeType),
       SqlObject("centralWavelength"),
-      SqlObject("scienceFov"),
+      SqlObject("agsDiameter"),
       SqlField("name", VisitorTable.Name),
       SqlObject("totalRequestTime"),
     )

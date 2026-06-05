@@ -251,7 +251,7 @@ class setObservationWorkflowState
         centralWavelength: {
           picometers: 123
         }
-        scienceFov: {
+        agsDiameter: {
           arcminutes: 1.23
         }
       }

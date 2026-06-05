@@ -1232,7 +1232,7 @@ trait DatabaseOperations { this: OdbSuite =>
           visitor: {
             mode: ${v.tag.toScreamingSnakeCase}
             centralWavelength: { nanometers: 2200 }
-            scienceFov: { arcseconds: 1 }$extras
+            agsDiameter: { arcseconds: 1 }$extras
           }
         }"""
 
@@ -1342,7 +1342,7 @@ trait DatabaseOperations { this: OdbSuite =>
           visitor: {
             mode: ${v.tag.toScreamingSnakeCase}
             centralWavelength: { nanometers: 2200 }
-            scienceFov: { arcseconds: 1 }$extras
+            agsDiameter: { arcseconds: 1 }$extras
           }
         }"""
       case _ => ???

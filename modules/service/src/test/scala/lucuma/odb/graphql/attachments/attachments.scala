@@ -48,7 +48,7 @@ class attachments extends AttachmentsSuite {
     user:        User,
     WHERE:       String,
     SET:         String,
-    expectedTas: (Attachment.Id, TestAttachment)*
+    expected: Either[List[String], Json]
   ): IO[Unit] =
     expect(
       user = user,
@@ -64,11 +64,22 @@ class attachments extends AttachmentsSuite {
           }
         }
       """,
-      expected = Right(
-        Json.obj(
-          "updateAttachments" -> expectedAttachments(expectedTas.toList)
-        )
-      )
+      expected = expected
+    )
+
+  def updateAttachmentsGql(
+    user:        User,
+    WHERE:       String,
+    SET:         String,
+    expectedTas: (Attachment.Id, TestAttachment)*
+  ): IO[Unit] =
+    updateAttachmentsGql(
+      user,
+      WHERE,
+      SET,
+      Right(Json.obj(
+        "updateAttachments" -> expectedAttachments(expectedTas.toList)
+      ))
     )
 
   def getRemotePathFromDb(aid: Attachment.Id): IO[NonEmptyString] = {
@@ -450,10 +461,11 @@ class attachments extends AttachmentsSuite {
       aid1 <- insertAttachment(pi, pid1, preImaging).toAttachmentId
       pid2 <- createProgramAs(pi)
       aid2 <- insertAttachment(pi, pid2, preImaging).toAttachmentId
-      ta3c  = preImaging.copy(checked = true)
+      desc  = "New description"
+      ta3c  = preImaging.copy(description = desc.some)
       _    <- updateAttachmentsGql(pi,
                                    WHERE = s"""{ id: { IN: [ "$aid1", "$aid2" ] } }""",
-                                   SET = s"""{ checked: true }""",
+                                   SET = s"""{ description: "$desc" }""",
                                    (aid1, ta3c), (aid2, ta3c)
               )
     } yield ()
@@ -675,7 +687,7 @@ class attachments extends AttachmentsSuite {
     } yield ()
   }
 
-  test("update single attachment metadata: checked") {
+  test("pi cannot update single attachment metadata: checked") {
     for {
       pid  <- createProgramAs(pi)
       aid  <- insertAttachment(pi, pid, mosMask1A).toAttachmentId
@@ -683,7 +695,36 @@ class attachments extends AttachmentsSuite {
       _    <- updateAttachmentsGql(pi,
                                    WHERE = s"""{ id: { EQ: "$aid"}}""",
                                    SET = """{ checked: true }""",
+                                   List("User cannot set the `checked` property of the attachment.").asLeft
+              )
+    } yield ()
+  }
+
+  test("staff can update single attachment metadata: checked") {
+    for {
+      pid  <- createProgramAs(pi)
+      aid  <- insertAttachment(pi, pid, mosMask1A).toAttachmentId
+      newTa = mosMask1A.copy(checked = true)
+      _    <- updateAttachmentsGql(staff,
+                                   WHERE = s"""{ id: { EQ: "$aid"}}""",
+                                   SET = """{ checked: true }""",
                                    (aid, newTa)
+              )
+    } yield ()
+  }
+
+  test("staff can update checked for all attachments in a program") {
+    for {
+      pid  <- createProgramAs(pi)
+      aid1 <- insertAttachment(pi, pid, mosMask1A).toAttachmentId
+      aid2 <- insertAttachment(pi, pid, mosMask2).toAttachmentId
+      newTa1 = mosMask1A.copy(checked = true)
+      newTa2 = mosMask2.copy(checked = true)
+      _    <- updateAttachmentsGql(staff,
+                                   WHERE = s"""{ program: { id: { EQ: "$pid"} }}""",
+                                   SET = """{ checked: true }""",
+                                   (aid1, newTa1),
+                                   (aid2, newTa2)
               )
     } yield ()
   }
@@ -695,11 +736,11 @@ class attachments extends AttachmentsSuite {
       aid2   <- insertAttachment(pi, pid, mosMask2).toAttachmentId
       aid3   <- insertAttachment(pi, pid, finderPNG).toAttachmentId
       newDesc = "updated"
-      newTa1  = mosMask1A.copy(description = newDesc.some, checked = true)
-      newTa2  = mosMask2.copy(description = newDesc.some, checked = true)
+      newTa1  = mosMask1A.copy(description = newDesc.some)
+      newTa2  = mosMask2.copy(description = newDesc.some)
       _      <- updateAttachmentsGql(pi,
                                      WHERE = s"""{ fileName: { LIKE: "file%"}, program: { id: { EQ: "$pid" } } }""",
-                                     SET = s"""{ checked: true, description: "$newDesc" }""",
+                                     SET = s"""{ description: "$newDesc" }""",
                                      (aid1, newTa1),
                                      (aid2, newTa2)
                 )
@@ -712,11 +753,11 @@ class attachments extends AttachmentsSuite {
       aid1  <- insertAttachment(pi, pid, mosMask1A).toAttachmentId
       aid2  <- insertAttachment(pi, pid, mosMask2).toAttachmentId
       aid3  <- insertAttachment(pi, pid, finderPNG).toAttachmentId
-      newTa1 = mosMask1A.copy(description = none, checked = true)
-      newTa3 = finderPNG.copy(description = none, checked = true)
+      newTa1 = mosMask1A.copy(description = none)
+      newTa3 = finderPNG.copy(description = none)
       _     <- updateAttachmentsGql(pi,
                                     WHERE = s"""{ id: { IN: ["$aid1", "$aid3"]}}""",
-                                    SET = """{ checked: true, description: null }""",
+                                    SET = """{ description: null }""",
                                     (aid1, newTa1),
                                     (aid3, newTa3)
                )
@@ -730,7 +771,7 @@ class attachments extends AttachmentsSuite {
       aid2  <- insertAttachment(pi, pid, mosMask2).toAttachmentId
       aid3  <- insertAttachment(pi, pid, finderPNG).toAttachmentId
       ta3c   = finderPNG.copy(checked = true)
-      _     <- updateAttachmentsGql(pi,
+      _     <- updateAttachmentsGql(staff,
                                     WHERE = s"""{ id: { EQ: "$aid3"}}""",
                                     SET = s"""{ checked: true }""",
                                     (aid3, ta3c)

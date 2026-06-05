@@ -2979,7 +2979,7 @@ class createObservation extends OdbSuite with TelluricTypeGraphQLFormat {
       visitor: {
         mode: $mode
         centralWavelength: { nanometers: 2200 }
-        scienceFov: { arcseconds: 1 }
+        agsDiameter: { arcseconds: 1 }
         $extras
       }
     """

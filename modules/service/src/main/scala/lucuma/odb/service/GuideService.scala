@@ -284,65 +284,65 @@ object GuideService {
 
     val (site, observingModeType, agsWavelength): (Site, ObservingModeType, Wavelength) =
       params.observingMode match
-        case mode: flamingos2.longslit.Config =>
+        case mode: flamingos2.longslit.Config                 =>
           (Site.GS, ObservingModeType.Flamingos2LongSlit, mode.filter.wavelength)
-        case mode: ghost.ifu.Config =>
+        case mode: ghost.ifu.Config                           =>
           (Site.GS, ObservingModeType.GhostIfu, GhostCentralWavelength)
         case gmos.imaging.Config.GmosNorth(filters = filters) =>
           (Site.GN, ObservingModeType.GmosNorthImaging, filters.map(_.filter.wavelength).maximum)
-        case mode: gmos.longslit.Config.GmosNorth =>
+        case mode: gmos.longslit.Config.GmosNorth             =>
           (Site.GN, ObservingModeType.GmosNorthLongSlit, mode.centralWavelength)
         case gmos.imaging.Config.GmosSouth(filters = filters) =>
           (Site.GS, ObservingModeType.GmosSouthImaging, filters.map(_.filter.wavelength).maximum)
-        case mode: gmos.longslit.Config.GmosSouth =>
+        case mode: gmos.longslit.Config.GmosSouth             =>
           (Site.GS, ObservingModeType.GmosSouthLongSlit, mode.centralWavelength)
-        case mode: gnirs.longslit.Config =>
+        case mode: gnirs.longslit.Config                      =>
           (Site.GN, ObservingModeType.GnirsLongSlit, mode.filter.centralWavelength)
-        case _: igrins2.longslit.Config =>
+        case _: igrins2.longslit.Config                       =>
           (Site.GN, ObservingModeType.Igrins2LongSlit, Igrins2CentralWavelength)
-        case visitor.Config(mode, wavelength, _, _, _) =>
+        case visitor.Config(mode, wavelength, _, _, _)        =>
           (mode.instrument.site, mode, wavelength)
 
     def agsParamsFor(trackType: TrackType): Option[AgsParams] =
       probes.guideProbe(observingModeType, trackType).flatMap: probe =>
         (params.observingMode, probe) match
-          case (gmos.longslit.Config.GmosNorth(fpu = fpu), GuideProbe.GmosOIWFS) =>
+          case (gmos.longslit.Config.GmosNorth(fpu = fpu), GuideProbe.GmosOIWFS)                            =>
             AgsParams.GmosLongSlit(fpu.asLeft, PortDisposition.Side).some
-          case (gmos.longslit.Config.GmosNorth(fpu = fpu), GuideProbe.PWFS1) =>
+          case (gmos.longslit.Config.GmosNorth(fpu = fpu), GuideProbe.PWFS1)                                =>
             AgsParams.GmosLongSlit(fpu.asLeft, PortDisposition.Side).withPWFS1.some
-          case (gmos.longslit.Config.GmosNorth(fpu = fpu), GuideProbe.PWFS2) =>
+          case (gmos.longslit.Config.GmosNorth(fpu = fpu), GuideProbe.PWFS2)                                =>
             AgsParams.GmosLongSlit(fpu.asLeft, PortDisposition.Side).withPWFS2.some
-          case (gmos.longslit.Config.GmosSouth(fpu = fpu), GuideProbe.GmosOIWFS) =>
+          case (gmos.longslit.Config.GmosSouth(fpu = fpu), GuideProbe.GmosOIWFS)                            =>
             AgsParams.GmosLongSlit(fpu.asRight, PortDisposition.Side).some
-          case (gmos.longslit.Config.GmosSouth(fpu = fpu), GuideProbe.PWFS1) =>
+          case (gmos.longslit.Config.GmosSouth(fpu = fpu), GuideProbe.PWFS1)                                =>
             AgsParams.GmosLongSlit(fpu.asRight, PortDisposition.Side).withPWFS1.some
-          case (gmos.longslit.Config.GmosSouth(fpu = fpu), GuideProbe.PWFS2) =>
+          case (gmos.longslit.Config.GmosSouth(fpu = fpu), GuideProbe.PWFS2)                                =>
             AgsParams.GmosLongSlit(fpu.asRight, PortDisposition.Side).withPWFS2.some
-          case (flamingos2.longslit.Config(fpu = fpu), GuideProbe.Flamingos2OIWFS) =>
+          case (flamingos2.longslit.Config(fpu = fpu), GuideProbe.Flamingos2OIWFS)                          =>
             AgsParams.Flamingos2LongSlit(Flamingos2LyotWheel.F16, Flamingos2FpuMask.Builtin(fpu), PortDisposition.Side).some
-          case (flamingos2.longslit.Config(fpu = fpu), GuideProbe.PWFS1) =>
+          case (flamingos2.longslit.Config(fpu = fpu), GuideProbe.PWFS1)                                    =>
             AgsParams.Flamingos2LongSlit(Flamingos2LyotWheel.F16, Flamingos2FpuMask.Builtin(fpu), PortDisposition.Side).withPWFS1.some
-          case (flamingos2.longslit.Config(fpu = fpu), GuideProbe.PWFS2) =>
+          case (flamingos2.longslit.Config(fpu = fpu), GuideProbe.PWFS2)                                    =>
             AgsParams.Flamingos2LongSlit(Flamingos2LyotWheel.F16, Flamingos2FpuMask.Builtin(fpu), PortDisposition.Side).withPWFS2.some
-          case (_: gmos.imaging.Config.GmosNorth | _: gmos.imaging.Config.GmosSouth, GuideProbe.GmosOIWFS) =>
+          case (_: gmos.imaging.Config.GmosNorth | _: gmos.imaging.Config.GmosSouth, GuideProbe.GmosOIWFS)  =>
             AgsParams.GmosImaging(PortDisposition.Side).some
-          case (_: gmos.imaging.Config.GmosNorth | _: gmos.imaging.Config.GmosSouth, GuideProbe.PWFS1) =>
+          case (_: gmos.imaging.Config.GmosNorth | _: gmos.imaging.Config.GmosSouth, GuideProbe.PWFS1)      =>
             AgsParams.GmosImaging(PortDisposition.Side).withPWFS1.some
-          case (_: gmos.imaging.Config.GmosNorth | _: gmos.imaging.Config.GmosSouth, GuideProbe.PWFS2) =>
+          case (_: gmos.imaging.Config.GmosNorth | _: gmos.imaging.Config.GmosSouth, GuideProbe.PWFS2)      =>
             AgsParams.GmosImaging(PortDisposition.Side).withPWFS2.some
-          case (_: igrins2.longslit.Config, GuideProbe.PWFS2) =>
+          case (_: igrins2.longslit.Config, GuideProbe.PWFS2)                                               =>
             AgsParams.Igrins2LongSlit(PortDisposition.Bottom).withPWFS2.some
-          case (_: igrins2.longslit.Config, GuideProbe.PWFS1) =>
+          case (_: igrins2.longslit.Config, GuideProbe.PWFS1)                                               =>
             AgsParams.Igrins2LongSlit(PortDisposition.Bottom).withPWFS1.some
-          case (_: ghost.ifu.Config, GuideProbe.PWFS2) =>
+          case (_: ghost.ifu.Config, GuideProbe.PWFS2)                                                      =>
             AgsParams.GhostIfu(PortDisposition.Bottom).withPWFS2.some
-          case (c: visitor.Config, GuideProbe.PWFS2) if c.mode === VisitorObservingModeType.MaroonX =>
+          case (c: visitor.Config, GuideProbe.PWFS2) if c.mode === VisitorObservingModeType.MaroonX         =>
             AgsParams.MaroonX(PortDisposition.Bottom).withPWFS2.some
-          case (c: visitor.Config, GuideProbe.PWFS1) if c.mode === VisitorObservingModeType.MaroonX =>
+          case (c: visitor.Config, GuideProbe.PWFS1) if c.mode === VisitorObservingModeType.MaroonX         =>
             AgsParams.MaroonX(PortDisposition.Bottom).withPWFS1.some
-          case (c: visitor.Config, GuideProbe.PWFS2) =>
-            AgsParams.Visitor(c.scienceFov, PortDisposition.Bottom).withPWFS2.some
-          case _ =>
+          case (c: visitor.Config, GuideProbe.PWFS2)                                                        =>
+            AgsParams.Visitor(c.agsDiameter, PortDisposition.Bottom).withPWFS2.some
+          case _                                                                                            =>
             none
 
     def getScienceStartTime(obsTime: Timestamp): Timestamp = obsTime +| setupTime

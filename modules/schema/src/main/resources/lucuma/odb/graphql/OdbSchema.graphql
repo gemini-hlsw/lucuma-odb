@@ -4883,9 +4883,9 @@ input VisitorInput {
   centralWavelength: WavelengthInput
 
   """
-  Science field of view, understood as the diameter of a circular area.
+  AGS field of view, understood as the diameter of a circular area.
   """
-  scienceFov: AngleInput
+  agsDiameter: AngleInput
 
   """
   Optional descriptive name for this visitor mode selection.
@@ -4903,9 +4903,9 @@ type Visitor {
   centralWavelength: Wavelength!
 
   """
-  Science field of view, understood as the diameter of a circular area.
+  AGS field of view, understood as the diameter of a circular area.
   """
-  scienceFov: Angle!
+  agsDiameter: Angle!
 
   """
   Optional descriptive name for this visitor mode selection.

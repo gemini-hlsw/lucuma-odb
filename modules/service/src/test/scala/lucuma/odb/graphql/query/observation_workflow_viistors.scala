@@ -83,7 +83,7 @@ class observation_workflow_visitors extends OdbSuite with ObservingModeSetupOper
         centralWavelength: {
           picometers: 123
         }
-        scienceFov: {
+        agsDiameter: {
           arcminutes: 1.23
         }
       }
