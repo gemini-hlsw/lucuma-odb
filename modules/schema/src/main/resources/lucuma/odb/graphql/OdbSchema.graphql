@@ -3606,14 +3606,15 @@ input ObservationPropertiesInput {
   constraintSet: ConstraintSetInput
 
   """
-  Deprecated in favor of the scheduling field — use that instead. If both this
-  field and scheduling are specified in the same mutation, the mutation will be
-  rejected with a validation error. One or more timing windows during which the
-  observation may execute. Defaults to empty (unconstrained) if omitted. To
-  modify, supply the complete desired array — it replaces the previous value
-  entirely.
+  Deprecated in favor of the `schedulingConstraints` field — use that instead.
+  If both this field and `schedulingConstraints` are specified in the same
+  mutation, the mutation will be rejected with a validation error.
+
+  Specifies one or more timing windows during which the observation may execute.
+  Defaults to empty (unconstrained) if omitted. To modify, supply the complete
+  desired array — it replaces the previous value entirely.
   """
-  timingWindows: [TimingWindowInput!] @deprecated(reason: "Use `scheduling` instead. (Deprecated June 4, 2026).")
+  timingWindows: [TimingWindowInput!] @deprecated(reason: "Use `schedulingConstraints` instead. (Deprecated June 4, 2026)")
 
   """
   Scheduling configuration for this observation, controlling visit splitting and
@@ -12774,9 +12775,10 @@ type Observation {
   constraintSet: ConstraintSet!
 
   """
-  Observation timing windows
+  Deprecated (using `schedulingConstraints` instead).  Observation timing
+  windows.
   """
-  timingWindows: [TimingWindow!]!
+  timingWindows: [TimingWindow!]! @deprecated(reason: "Use `schedulingConstraints` instead. (Deprecated June 5, 2026)")
 
   """
   Observation scheduling constraints.

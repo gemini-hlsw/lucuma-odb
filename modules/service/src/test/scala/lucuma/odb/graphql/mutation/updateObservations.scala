@@ -4927,3 +4927,39 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
         (switchToSouth,        AlienVisQuery, expected("VISITOR_SOUTH",  5, 3))
       )
     )
+
+  test("scheduling: update isSplittable"):
+
+    val update = """
+      schedulingConstraints: {
+        isSplittable: false
+      }
+    """
+
+    val query = """
+      observations {
+        schedulingConstraints {
+          isSplittable
+        }
+      }
+    """
+
+    val expected = json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "schedulingConstraints": {
+                "isSplittable": false
+              }
+            }
+          ]
+        }
+      }
+    """.asRight
+
+    for
+      pid <- createProgramAs(pi)
+      oid <- createObservationAs(pi, pid)
+      _   <- updateObservation(pi, oid, update, query, expected)
+    yield ()

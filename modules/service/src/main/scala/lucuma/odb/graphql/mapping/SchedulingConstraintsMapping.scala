@@ -4,11 +4,11 @@
 package lucuma.odb.graphql
 package mapping
 
-import grackle.TypeRef
 import grackle.Query.Binding
 import grackle.Query.FilterOrderByOffsetLimit
 import grackle.Query.OrderSelection
 import grackle.QueryCompiler.Elab
+import grackle.TypeRef
 import lucuma.odb.graphql.table.ObservationView
 import lucuma.odb.graphql.table.TimingWindowView
 

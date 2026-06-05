@@ -67,7 +67,9 @@ class timingWindows extends OdbSuite {
               }
             }) {
               observations {
-                $TimingWindowsGraph
+                schedulingConstraints {
+                  $TimingWindowsGraph
+                }
               }
             }
           }
@@ -86,7 +88,9 @@ class timingWindows extends OdbSuite {
               s"""
                 query {
                   observation(observationId: "$obsId") {
-                    $TimingWindowsGraph
+                    schedulingConstraints {
+                      $TimingWindowsGraph
+                    }
                   }
                 }
               """,
@@ -94,8 +98,9 @@ class timingWindows extends OdbSuite {
               json"""
                 {
                   "observation" : {
-                    "timingWindows" : [
-                    ]
+                    "schedulingConstraints": {
+                      "timingWindows" : []
+                    }
                   }
                 }
               """
@@ -116,7 +121,9 @@ class timingWindows extends OdbSuite {
               s"""
                 query {
                   observation(observationId: "$obsId") {
-                    $TimingWindowsGraph
+                    schedulingConstraints {
+                      $TimingWindowsGraph
+                    }
                   }
                 }
               """, 
@@ -124,8 +131,9 @@ class timingWindows extends OdbSuite {
               json"""
                 {
                   "observation" : {
-                    "timingWindows" : [
-                    ]
+                    "schedulingConstraints": {
+                      "timingWindows" : []
+                    }
                   }
                 }
               """
@@ -170,35 +178,37 @@ class timingWindows extends OdbSuite {
     json"""
       {
         "observation" : {
-          "timingWindows" : [
-            {
-              "inclusion": "INCLUDE",
-              "startUtc": "2023-04-01T00:00:00Z",
-              "end": null
-            },
-            {
-              "inclusion": "INCLUDE",
-              "startUtc": "2023-05-01T00:00:00Z",
-              "end": {
-                "atUtc": "2023-05-02T00:00:00Z"
-              }
-            },
-            {
-              "inclusion": "EXCLUDE",
-              "startUtc": "2023-04-15T00:00:00Z",
-              "end": {
-                "after": {
-                  "hours": 2.000000
-                },
-                "repeat": {
-                  "period": {
-                    "hours": 4.000000
+          "schedulingConstraints": {
+            "timingWindows" : [
+              {
+                "inclusion": "INCLUDE",
+                "startUtc": "2023-04-01T00:00:00Z",
+                "end": null
+              },
+              {
+                "inclusion": "INCLUDE",
+                "startUtc": "2023-05-01T00:00:00Z",
+                "end": {
+                  "atUtc": "2023-05-02T00:00:00Z"
+                }
+              },
+              {
+                "inclusion": "EXCLUDE",
+                "startUtc": "2023-04-15T00:00:00Z",
+                "end": {
+                  "after": {
+                    "hours": 2.000000
                   },
-                  "times": 50
+                  "repeat": {
+                    "period": {
+                      "hours": 4.000000
+                    },
+                    "times": 50
+                  }
                 }
               }
-            }
-          ]
+            ]
+          }
         }
       }
     """
@@ -213,7 +223,9 @@ class timingWindows extends OdbSuite {
               s"""
                 query {
                   observation(observationId: "$obsId") {
-                    $TimingWindowsGraph
+                    schedulingConstraints {
+                      $TimingWindowsGraph
+                    }
                   }
                 }
               """,
@@ -249,25 +261,27 @@ class timingWindows extends OdbSuite {
       {
         "observations" : [
           {
-            "timingWindows" : [
-              {
-                "inclusion": "EXCLUDE",
-                "startUtc": "2023-04-01T00:00:00Z",
-                "end": {
-                  "after": {
-                    "hours": 48.000000
-                  },
-                  "repeat": null
+            "schedulingConstraints": {
+              "timingWindows" : [
+                {
+                  "inclusion": "EXCLUDE",
+                  "startUtc": "2023-04-01T00:00:00Z",
+                  "end": {
+                    "after": {
+                      "hours": 48.000000
+                    },
+                    "repeat": null
+                  }
+                },
+                {
+                  "inclusion": "INCLUDE",
+                  "startUtc": "2023-04-04T00:00:00Z",
+                  "end": {
+                    "atUtc": "2023-04-08T00:00:00Z"
+                  }
                 }
-              },
-              {
-                "inclusion": "INCLUDE",
-                "startUtc": "2023-04-04T00:00:00Z",
-                "end": {
-                  "atUtc": "2023-04-08T00:00:00Z"
-                }
-              }
-            ]
+              ]
+            }
           }
         ]
       }
@@ -287,7 +301,7 @@ class timingWindows extends OdbSuite {
     List(pi).traverse { user =>
       createProgramAs(user).flatMap { pid =>
         createObservation(user, pid, TimingWindowsInput.some).flatMap{ obsId =>
-          updateObservation(user, obsId, "null".some).assertEquals(json"""{ "observations": [{ "timingWindows": [] }]}""")
+          updateObservation(user, obsId, "null".some).assertEquals(json"""{ "observations": [{ "schedulingConstraints": { "timingWindows": [] }}]}""")
         }
       }
     }
@@ -311,7 +325,9 @@ class timingWindows extends OdbSuite {
                 }
               }) {
                 observations {
-                  $TimingWindowsGraph
+                  schedulingConstraints {
+                    $TimingWindowsGraph
+                  }
                 }
               }
             }
@@ -321,7 +337,9 @@ class timingWindows extends OdbSuite {
               "updateObservations": {
                 "observations": [
                   {
-                    "timingWindows": []
+                    "schedulingConstraints": {
+                      "timingWindows": []
+                    }
                   }
                 ]
               }
@@ -362,12 +380,14 @@ class timingWindows extends OdbSuite {
                         }
                       }
                     }
-                    timingWindows {
-                      end {
-                        ... on TimingWindowEndAfter {
-                          after {
-                            milliseconds
-                          }         
+                    schedulingConstraints {
+                      timingWindows {
+                        end {
+                          ... on TimingWindowEndAfter {
+                            after {
+                              milliseconds
+                            }
+                          }
                         }
                       }
                     }

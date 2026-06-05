@@ -39,6 +39,10 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
         imageQuality
         skyBackground
       }
+      schedulingConstraints {
+        isSplittable
+        $TimingWindowsGraph
+      }
       scienceRequirements {
         mode
         exposureTimeMode {
@@ -284,7 +288,6 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
         }
         blindOffsetType
       }
-      $TimingWindowsGraph
     }
     """
 
