@@ -612,15 +612,18 @@ trait AccessControl[F[_]] extends Predicates[F] {
   def selectForUpdate(
     input: UpdateAttachmentsInput
   )(using Services[F]): F[Result[AccessControl.Checked[AttachmentPropertiesInput.Edit]]] =
-    idSelectFromPredicate(
-      AttachmentType,
-      and(List(
-        Predicates.attachment.program.isWritableBy(user),
-        input.WHERE.getOrElse(True)
-      ))
-    ).traverse: af =>
-      Services.asSuperUser:
-        AccessControl.unchecked(input.SET, af).pure[F]
+    if input.SET.checked.isDefined && user.role.access < Access.Staff then
+      Result.failure(OdbError.NotAuthorized(user.id, "User cannot set the `checked` property of the attachment.".some).asProblem).pure[F]
+    else
+      idSelectFromPredicate(
+        AttachmentType,
+        and(List(
+          Predicates.attachment.program.isWritableBy(user),
+          input.WHERE.getOrElse(True)
+        ))
+      ).traverse: af =>
+        Services.asSuperUser:
+          AccessControl.unchecked(input.SET, af).pure[F]
 
   def selectForUpdate(
     input: CreateCallForProposalsInput
