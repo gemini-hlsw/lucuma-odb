@@ -58,11 +58,12 @@ abstract class AttachmentsSuite extends OdbSuiteWithS3 {
         } yield nes
       }
 
-  val pi: User      = TestUsers.Standard.pi(1, 30)
-  val pi2: User     = TestUsers.Standard.pi(2, 30)
-  val service: User = TestUsers.service(3)
+  val pi: User      = TestUsers.Standard.pi(1, 101)
+  val pi2: User     = TestUsers.Standard.pi(2, 102)
+  val staff: User     = TestUsers.Standard.staff(3, 103)
+  val service: User = TestUsers.service(4)
 
-  val validUsers: List[User] = List(pi, pi2, service)
+  val validUsers: List[User] = List(pi, pi2, staff, service)
 
   case class TestAttachment(
     fileName:       String,
