@@ -4799,7 +4799,7 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
         visitor: {
           mode: VISITOR_NORTH
           centralWavelength: { nanometers: 2200 }
-          scienceFov: { degrees: 1 }
+          agsDiameter: { degrees: 1 }
         }
       }
     """
@@ -4816,7 +4816,7 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
         visitor: {
           mode: VISITOR_NORTH
           centralWavelength: { nanometers: 2200 }
-          scienceFov: { degrees: 1 }
+          agsDiameter: { degrees: 1 }
           name: "north run"
           totalRequestTime: { hours: 3 }
         }
@@ -4847,7 +4847,7 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
         observingMode {
           visitor {
             mode
-            scienceFov { arcseconds }
+            agsDiameter { arcseconds }
             name
             totalRequestTime { hours }
           }
@@ -4865,7 +4865,7 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
                 "observingMode": {
                   "visitor": {
                     "mode": $mode,
-                    "scienceFov": { "arcseconds": $fovArcsec },
+                    "agsDiameter": { "arcseconds": $fovArcsec },
                     "name": "IQUEYE",
                     "totalRequestTime": { "hours": ${BigDecimal(hours).setScale(6)} }
                   }
@@ -4881,7 +4881,7 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
         visitor: {
           mode: VISITOR_NORTH
           centralWavelength: { nanometers: 2200 }
-          scienceFov: { arcseconds: 5 }
+          agsDiameter: { arcseconds: 5 }
           name: "IQUEYE"
           totalRequestTime: { hours: 3 }
         }
@@ -4898,11 +4898,11 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
       }
     """
 
-    val editScienceFov = """
+    val editAgsDiameter = """
       observingMode: {
         visitor: {
           mode: VISITOR_NORTH
-          scienceFov: { arcseconds: 10 }
+          agsDiameter: { arcseconds: 10 }
         }
       }
     """
@@ -4912,7 +4912,7 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
         visitor: {
           mode: VISITOR_SOUTH
           centralWavelength: { nanometers: 2200 }
-          scienceFov: { arcseconds: 5 }
+          agsDiameter: { arcseconds: 5 }
           name: "IQUEYE"
           totalRequestTime: { hours: 3 }
         }
@@ -4923,7 +4923,7 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
       List(
         (create,               AlienVisQuery, expected("VISITOR_NORTH",  5, 3)),
         (editTotalRequestTime, AlienVisQuery, expected("VISITOR_NORTH",  5, 4)),
-        (editScienceFov,       AlienVisQuery, expected("VISITOR_NORTH", 10, 4)),
+        (editAgsDiameter,       AlienVisQuery, expected("VISITOR_NORTH", 10, 4)),
         (switchToSouth,        AlienVisQuery, expected("VISITOR_SOUTH",  5, 3))
       )
     )

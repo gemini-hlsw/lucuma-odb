@@ -341,7 +341,7 @@ object GuideService {
           case (c: visitor.Config, GuideProbe.PWFS1) if c.mode === VisitorObservingModeType.MaroonX =>
             AgsParams.MaroonX(PortDisposition.Bottom).withPWFS1.some
           case (c: visitor.Config, GuideProbe.PWFS2) =>
-            AgsParams.Visitor(c.scienceFov, PortDisposition.Bottom).withPWFS2.some
+            AgsParams.Visitor(c.agsDiameter, PortDisposition.Bottom).withPWFS2.some
           case _ =>
             none
 

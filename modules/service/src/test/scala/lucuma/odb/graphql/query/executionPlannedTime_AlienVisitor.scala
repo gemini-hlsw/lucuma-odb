@@ -31,7 +31,7 @@ class executionPlannedTime_AlienVisitor extends ExecutionTestSupport:
                 visitor: {
                   mode: ${mode.tag.toScreamingSnakeCase}
                   centralWavelength: { nanometers: 2200 }
-                  scienceFov: { arcseconds: 1 }
+                  agsDiameter: { arcseconds: 1 }
                   name: "test visitor"
                   totalRequestTime: { milliseconds: ${time.toMilliseconds} }
                 }

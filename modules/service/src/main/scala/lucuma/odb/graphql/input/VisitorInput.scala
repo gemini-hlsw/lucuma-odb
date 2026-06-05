@@ -24,13 +24,13 @@ object VisitorInput:
   case class Edit(
     mode: Option[VisitorObservingModeType],
     centralWavelength: Option[Wavelength],
-    scienceFov: Option[Angle],
+    agsDiameter: Option[Angle],
     name: Option[NonEmptyString],
     totalRequestTime: Option[TimeSpan]
   ):
     def toCreate: Result[Create] =
       Result.fromOption(
-        (mode, centralWavelength, scienceFov).mapN((m, w, f) =>
+        (mode, centralWavelength, agsDiameter).mapN((m, w, f) =>
           Create(m, w, f, name, totalRequestTime)
         ),
         "Cannot turn edit into create; all required fields must be defined."
@@ -42,19 +42,19 @@ object VisitorInput:
       case List(
         VisitorObservingModeTypeBinding("mode", rMode),
         WavelengthInput.Binding("centralWavelength", rWavelength),
-        AngleInput.Binding("scienceFov", rScienceFov),
+        AngleInput.Binding("agsDiameter", rAgsDiameter),
         NonEmptyStringBinding.Option("name", rName),
         TimeSpanInput.Binding.Option("totalRequestTime", rTotalRequestTime)
       ) =>
-        (rMode, rWavelength, rScienceFov, rName, rTotalRequestTime).mapN(Create.apply)
+        (rMode, rWavelength, rAgsDiameter, rName, rTotalRequestTime).mapN(Create.apply)
 
   val EditBinding: Matcher[Edit] =
     ObjectFieldsBinding.rmap:
       case List(
         VisitorObservingModeTypeBinding.Option("mode", rMode),
         WavelengthInput.Binding.Option("centralWavelength", rWavelength),
-        AngleInput.Binding.Option("scienceFov", rScienceFov),
+        AngleInput.Binding.Option("agsDiameter", rAgsDiameter),
         NonEmptyStringBinding.Option("name", rName),
         TimeSpanInput.Binding.Option("totalRequestTime", rTotalRequestTime)
       ) =>
-        (rMode, rWavelength, rScienceFov, rName, rTotalRequestTime).mapN(Edit.apply)
+        (rMode, rWavelength, rAgsDiameter, rName, rTotalRequestTime).mapN(Edit.apply)
