@@ -255,7 +255,7 @@ object OdbMapping {
           with ResetAcquisitionResultMapping[F]
           with RevokeUserInvitationResultMapping[F]
           with RightAscensionMapping[F]
-          with SchedulingPropertiesMapping[F]
+          with SchedulingConstraintsMapping[F]
           with ScienceRequirementsMapping[F]
           with SetAllocationsResultMapping[F]
           with SetGuideTargetNameResultMapping[F]
@@ -502,7 +502,7 @@ object OdbMapping {
                 RedeemUserInvitationResultMapping,
                 ResetAcquisitionResultMapping,
                 RevokeUserInvitationResultMapping,
-                SchedulingPropertiesMapping,
+                SchedulingConstraintsMapping,
                 ScienceProgramReferenceMapping,
                 ScienceRequirementsMapping,
                 SequenceEventMapping,
@@ -648,7 +648,7 @@ object OdbMapping {
                 ProgramElaborator,
                 ProgramUserElaborator,
                 ProposalTypeElaborator,
-                SchedulingPropertiesElaborator,
+                SchedulingConstraintsElaborator,
                 ScienceRequirementsElaborator,
                 StepRecordElaborator,
                 SubscriptionElaborator,

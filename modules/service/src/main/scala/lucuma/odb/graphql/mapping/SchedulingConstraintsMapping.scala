@@ -12,20 +12,20 @@ import grackle.QueryCompiler.Elab
 import lucuma.odb.graphql.table.ObservationView
 import lucuma.odb.graphql.table.TimingWindowView
 
-trait SchedulingPropertiesMapping[F[_]]
+trait SchedulingConstraintsMapping[F[_]]
   extends ObservationView[F]
     with TimingWindowView[F]:
 
-  lazy val SchedulingPropertiesMapping: ObjectMapping =
-    ObjectMapping(SchedulingPropertiesType)(
+  lazy val SchedulingConstraintsMapping: ObjectMapping =
+    ObjectMapping(SchedulingConstraintsType)(
       SqlField("id", ObservationView.Id, key = true, hidden = true),
       SqlField("isSplittable", ObservationView.IsSplittable),
       SqlObject("timingWindows", Join(ObservationView.Id, TimingWindowView.ObservationId))
     )
 
-  lazy val SchedulingPropertiesElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] = {
+  lazy val SchedulingConstraintsElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] = {
 
-    case (SchedulingPropertiesType, "timingWindows", Nil) =>
+    case (SchedulingConstraintsType, "timingWindows", Nil) =>
         Elab.transformChild: child =>
           FilterOrderByOffsetLimit(
             pred = None,

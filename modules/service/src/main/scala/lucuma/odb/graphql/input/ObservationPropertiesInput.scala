@@ -26,7 +26,7 @@ import monocle.Lens
 object ObservationPropertiesInput {
 
   private val PleaseUseSchedulingField: Result[Nothing] =
-    OdbError.InvalidArgument("Set timing windows via the 'scheduling' properties field.".some).asFailure
+    OdbError.InvalidArgument("Set timing windows via the 'schedulingConstraints' field.".some).asFailure
 
   trait AsterismInput {
     def targetEnvironment: Option[TargetEnvironmentInput]
@@ -46,7 +46,7 @@ object ObservationPropertiesInput {
     posAngleConstraint:  Option[PosAngleConstraintInput],
     targetEnvironment:   Option[TargetEnvironmentInput.Create],
     constraintSet:       Option[ConstraintSetInput],
-    scheduling:          Option[SchedulingPropertiesInput],
+    scheduling:          Option[SchedulingConstraintsInput],
     attachments:         Option[List[Attachment.Id]],
     scienceRequirements: Option[ScienceRequirementsInput],
     observingMode:       Option[ObservingModeInput.Create],
@@ -89,7 +89,7 @@ object ObservationPropertiesInput {
           TargetEnvironmentInput.Create.Binding.Option("targetEnvironment", rTargetEnvironment),
           ConstraintSetInput.Binding.Option("constraintSet", rConstraintSet),
           TimingWindowInput.Binding.List.Option("timingWindows", rTimingWindows),
-          SchedulingPropertiesInput.Binding.Option("scheduling", rScheduling),
+          SchedulingConstraintsInput.Binding.Option("schedulingConstraints", rScheduling),
           AttachmentIdBinding.List.Option("attachments", rAttachments),
           ScienceRequirementsInput.Binding.Option("scienceRequirements", rScienceRequirements),
           ObservingModeInput.Create.Binding.Option("observingMode", rObservingMode),
@@ -105,7 +105,7 @@ object ObservationPropertiesInput {
             rConstraintSet,
             (rTimingWindows, rScheduling).parFlatMapN {
               case (Some(_), Some(_)) => PleaseUseSchedulingField
-              case (Some(t), None)    => SchedulingPropertiesInput(None, Nullable.NonNull(t)).some.success
+              case (Some(t), None)    => SchedulingConstraintsInput(None, Nullable.NonNull(t)).some.success
               case (None,    s)       => s.success
             },
             rAttachments,
@@ -126,7 +126,7 @@ object ObservationPropertiesInput {
     posAngleConstraint:  Option[PosAngleConstraintInput],
     targetEnvironment:   Option[TargetEnvironmentInput.Edit],
     constraintSet:       Option[ConstraintSetInput],
-    scheduling:          Nullable[SchedulingPropertiesInput],
+    scheduling:          Nullable[SchedulingConstraintsInput],
     attachments:         Nullable[List[Attachment.Id]],
     scienceRequirements: Option[ScienceRequirementsInput],
     observingMode:       Nullable[ObservingModeInput.Edit],
@@ -169,7 +169,7 @@ object ObservationPropertiesInput {
           TargetEnvironmentInput.Edit.Binding.Option("targetEnvironment", rTargetEnvironment),
           ConstraintSetInput.Binding.Option("constraintSet", rConstraintSet),
           TimingWindowInput.Binding.List.Nullable("timingWindows", rTimingWindows),
-          SchedulingPropertiesInput.Binding.Nullable("scheduling", rScheduling),
+          SchedulingConstraintsInput.Binding.Nullable("schedulingConstraints", rScheduling),
           AttachmentIdBinding.List.Nullable("attachments", rAttachments),
           ScienceRequirementsInput.Binding.Option("scienceRequirements", rScienceRequirements),
           ObservingModeInput.Edit.Binding.Nullable("observingMode", rObservingMode),
@@ -184,10 +184,10 @@ object ObservationPropertiesInput {
             rTargetEnvironment,
             rConstraintSet,
             (rTimingWindows, rScheduling).parFlatMapN {
-              case (Nullable.Null,       Nullable.Absent)     => Nullable.NonNull(SchedulingPropertiesInput(None, Nullable.Null)).success
+              case (Nullable.Null,       Nullable.Absent)     => Nullable.NonNull(SchedulingConstraintsInput(None, Nullable.Null)).success
               case (Nullable.Null,       Nullable.Null)       => Nullable.Null.success
               case (Nullable.Absent,     s)                   => s.success
-              case (Nullable.NonNull(t), Nullable.Absent)     => Nullable.NonNull(SchedulingPropertiesInput(None, Nullable.NonNull(t))).success
+              case (Nullable.NonNull(t), Nullable.Absent)     => Nullable.NonNull(SchedulingConstraintsInput(None, Nullable.NonNull(t))).success
               case _                                          => PleaseUseSchedulingField
             },
             rAttachments,

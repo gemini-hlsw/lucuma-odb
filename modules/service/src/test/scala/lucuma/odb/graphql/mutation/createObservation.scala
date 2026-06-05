@@ -3066,13 +3066,13 @@ class createObservation extends OdbSuite with TelluricTypeGraphQLFormat {
               createObservation(input: {
                 programId: ${pid.asJson}
                 SET: {
-                  scheduling: {
+                  schedulingConstraints: {
                     isSplittable: false
                   }
                 }
               }) {
                 observation {
-                  scheduling {
+                  schedulingConstraints {
                     isSplittable
                   }
                 }
@@ -3081,7 +3081,7 @@ class createObservation extends OdbSuite with TelluricTypeGraphQLFormat {
           """
         ).map: js =>
           !js.hcursor
-             .downFields("createObservation", "observation", "scheduling", "isSplittable")
+             .downFields("createObservation", "observation", "schedulingConstraints", "isSplittable")
              .require[Boolean]
 
   test("[general] created observation should have default splittable property"):
@@ -3094,7 +3094,7 @@ class createObservation extends OdbSuite with TelluricTypeGraphQLFormat {
                 programId: ${pid.asJson}
               }) {
                 observation {
-                  scheduling {
+                  schedulingConstraints {
                     isSplittable
                   }
                 }
@@ -3103,7 +3103,7 @@ class createObservation extends OdbSuite with TelluricTypeGraphQLFormat {
           """
         ).map: js =>
           js.hcursor
-            .downFields("createObservation", "observation", "scheduling", "isSplittable")
+            .downFields("createObservation", "observation", "schedulingConstraints", "isSplittable")
             .require[Boolean]
 
 }

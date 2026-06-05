@@ -3531,7 +3531,7 @@ Configuration that controls how and when the Scheduler may plan execution of an
 observation, including whether it can be split across multiple visits and any
 timing constraints.
 """
-input SchedulingPropertiesInput {
+input SchedulingConstraintsInput {
 
   """
   Controls whether the observation may be split across multiple visits. When
@@ -3557,7 +3557,7 @@ Configuration that controls how and when the Scheduler may plan execution of an
 observation, including whether it can be split across multiple visits and any
 timing constraints.
 """
-type SchedulingProperties {
+type SchedulingConstraints {
 
   """
   Controls whether the observation may be split across multiple visits. When
@@ -3621,7 +3621,7 @@ input ObservationPropertiesInput {
   splittable, no timing windows). Set to `null` to reset any existing scheduling
   configuration to those defaults.
   """
-  scheduling: SchedulingPropertiesInput
+  schedulingConstraints: SchedulingConstraintsInput
 
   """
   The attachments defaults to empty if not specified on creation, and may be edited by specifying a new whole array
@@ -12781,7 +12781,7 @@ type Observation {
   """
   Observation scheduling constraints.
   """
-  scheduling: SchedulingProperties!
+  schedulingConstraints: SchedulingConstraints!
 
   """
   attachments

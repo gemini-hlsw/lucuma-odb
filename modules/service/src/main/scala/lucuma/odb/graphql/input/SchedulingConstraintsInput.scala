@@ -8,16 +8,16 @@ import grackle.Result
 import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.binding.*
 
-case class SchedulingPropertiesInput(
+case class SchedulingConstraintsInput(
   isSplittable:  Option[Boolean],
   timingWindows: Nullable[List[TimingWindowInput]]
 )
 
-object SchedulingPropertiesInput:
+object SchedulingConstraintsInput:
 
-  val Binding: Matcher[SchedulingPropertiesInput] =
+  val Binding: Matcher[SchedulingConstraintsInput] =
     ObjectFieldsBinding.rmap:
       case List(
         BooleanBinding.Option("isSplittable", rSplit),
         TimingWindowInput.Binding.List.Nullable("timingWindows", rTiming)
-      ) => (rSplit, rTiming).parMapN(SchedulingPropertiesInput(_, _))
+      ) => (rSplit, rTiming).parMapN(SchedulingConstraintsInput(_, _))

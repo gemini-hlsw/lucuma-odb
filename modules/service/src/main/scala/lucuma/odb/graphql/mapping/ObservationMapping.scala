@@ -70,7 +70,7 @@ trait ObservationMapping[F[_]]
       SqlObject("targetEnvironment"),
       SqlObject("constraintSet"),
       SqlObject("timingWindows", Join(ObservationView.Id, TimingWindowView.ObservationId)),
-      SqlObject("scheduling"),
+      SqlObject("schedulingConstraints"),
       SqlObject("attachments",
         Join(ObservationView.Id, ObsAttachmentAssignmentTable.ObservationId),
         Join(ObsAttachmentAssignmentTable.AttachmentId, AttachmentTable.Id)),

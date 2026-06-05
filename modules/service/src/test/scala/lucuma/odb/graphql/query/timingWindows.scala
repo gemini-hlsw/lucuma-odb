@@ -29,7 +29,7 @@ class timingWindows extends OdbSuite {
         twisOpt.map(twis => 
           s""",
               SET: {
-                scheduling: {
+                schedulingConstraints: {
                   timingWindows: $twis
                 }
               }
@@ -61,7 +61,7 @@ class timingWindows extends OdbSuite {
               SET: {
         """ + 
         twisOpt.map(twis => 
-          s"scheduling: { timingWindows: $twis }"
+          s"schedulingConstraints: { timingWindows: $twis }"
         ).orEmpty +
         s"""
               }
@@ -307,7 +307,7 @@ class timingWindows extends OdbSuite {
                   }
                 }
                 SET: {
-                  scheduling: null
+                  schedulingConstraints: null
                 }
               }) {
                 observations {
