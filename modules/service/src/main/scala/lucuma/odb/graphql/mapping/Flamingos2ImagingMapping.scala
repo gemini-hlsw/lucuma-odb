@@ -10,33 +10,22 @@ import grackle.Query.OrderBy
 import grackle.Query.OrderSelection
 import grackle.Query.OrderSelections
 import grackle.QueryCompiler.Elab
-import grackle.Result
 import grackle.TypeRef
 import grackle.skunk.SkunkMapping
-import io.circe.Json
-import io.circe.syntax.*
 import lucuma.core.enums.Flamingos2Decker
 import lucuma.core.enums.Flamingos2Filter
 import lucuma.core.enums.Flamingos2ReadoutMode
-import lucuma.core.math.Offset
 import lucuma.odb.data.ObservingModeRowVersion
-import lucuma.odb.format.spatialOffsets.*
 import lucuma.odb.graphql.predicate.LeafPredicates
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.graphql.table.*
-import lucuma.odb.json.offset.query.given
 
 trait Flamingos2ImagingMapping[F[_]]
   extends Flamingos2ImagingView[F]
      with ExposureTimeModeMapping[F]
+     with TelescopeConfigGeneratorView[F]
      with OptionalFieldMapping[F]
      with Predicates[F] { this: SkunkMapping[F] =>
-
-  private def decodeOffsets(s: String): Json =
-    OffsetsFormat.getOption(s).map(_.asJson).getOrElse(List.empty[Offset].asJson)
-
-  private val defaultOffsetsJson: Json =
-    List.empty[Offset].asJson
 
   lazy val Flamingos2ImagingFilterMapping: ObjectMapping =
     ObjectMapping(Flamingos2ImagingFilterType)(
@@ -46,9 +35,46 @@ trait Flamingos2ImagingMapping[F[_]]
       SqlObject("exposureTimeMode", Join(Flamingos2ImagingFilterTable.ExposureTimeModeId, ExposureTimeModeView.Id))
     )
 
+  lazy val Flamingos2GroupedImagingMapping: ObjectMapping =
+    ObjectMapping(Flamingos2ImagingType / "variant" / "grouped")(
+      SqlField("observationId", Flamingos2ImagingView.Grouped.ObservationId, key = true, hidden = true),
+      SqlField("order",         Flamingos2ImagingView.Grouped.WavelengthOrder),
+      SqlField("skyCount",      Flamingos2ImagingView.Sky.Count),
+      SqlObject("offsets",      Join(Flamingos2ImagingView.ObservationId, TelescopeConfigGeneratorView.ObjectObservationId)),
+      SqlObject("skyOffsets",   Join(Flamingos2ImagingView.ObservationId, TelescopeConfigGeneratorView.SkyObservationId)),
+    )
+
+  lazy val Flamingos2InterleavedImagingMapping: ObjectMapping =
+    ObjectMapping(Flamingos2ImagingType / "variant" / "interleaved")(
+      SqlField("observationId", Flamingos2ImagingView.Interleaved.ObservationId, key = true, hidden = true),
+      SqlField("skyCount",      Flamingos2ImagingView.Sky.Count),
+      SqlObject("offsets",      Join(Flamingos2ImagingView.ObservationId, TelescopeConfigGeneratorView.ObjectObservationId)),
+      SqlObject("skyOffsets",   Join(Flamingos2ImagingView.ObservationId, TelescopeConfigGeneratorView.SkyObservationId)),
+    )
+
+  lazy val Flamingos2PreImagingMapping: ObjectMapping =
+    ObjectMapping(Flamingos2ImagingType / "variant" / "preImaging")(
+      SqlField("observationId", Flamingos2ImagingView.PreImaging.ObservationId, key = true, hidden = true),
+      SqlObject("offset1"),
+      SqlObject("offset2"),
+      SqlObject("offset3"),
+      SqlObject("offset4")
+    )
+
+  lazy val Flamingos2ImagingVariantMapping: ObjectMapping =
+    ObjectMapping(Flamingos2ImagingType / "variant")(
+      SqlField("observationId", Flamingos2ImagingView.ObservationId, key = true, hidden = true),
+      SqlField("variantType",   Flamingos2ImagingView.Variant),
+      SqlObject("grouped"),
+      SqlObject("interleaved"),
+      SqlObject("preImaging")
+    )
+
   lazy val Flamingos2ImagingMapping: ObjectMapping =
     ObjectMapping(Flamingos2ImagingType)(
       SqlField("observationId", Flamingos2ImagingView.ObservationId, key = true, hidden = true),
+
+      SqlObject("variant"),
 
       SqlObject("filters",        Join(Flamingos2ImagingView.ObservationId, Flamingos2ImagingFilterTable.ObservationId)),
       SqlObject("initialFilters", Join(Flamingos2ImagingView.ObservationId, Flamingos2ImagingFilterTable.ObservationId)),
@@ -65,28 +91,7 @@ trait Flamingos2ImagingMapping[F[_]]
 
       explicitOrElseDefault[Flamingos2ReadoutMode]("readoutMode", "explicitReadoutMode", "defaultReadoutMode"),
       SqlField("defaultReadoutMode",  Flamingos2ImagingView.ReadoutModeDefault),
-      SqlField("explicitReadoutMode", Flamingos2ImagingView.ReadoutMode),
-
-      SqlField("offsetsString", Flamingos2ImagingView.Offsets, hidden = true),
-
-      CursorFieldJson("spatialOffsets",
-        cursor =>
-          cursor
-            .field("offsetsString", None)
-            .flatMap(_.as[Option[String]].map(_.map(decodeOffsets)))
-            .map(_.getOrElse(defaultOffsetsJson)),
-        List("explicitSpatialOffsets", "defaultSpatialOffsets")
-      ),
-
-      CursorFieldJson("explicitSpatialOffsets",
-        cursor =>
-          cursor
-            .field("offsetsString", None)
-            .flatMap(_.as[Option[String]].map(_.map(decodeOffsets).asJson)),
-        List("offsetsString")
-      ),
-
-      CursorFieldJson("defaultSpatialOffsets", _ => Result(defaultOffsetsJson), Nil)
+      SqlField("explicitReadoutMode", Flamingos2ImagingView.ReadoutMode)
     )
 
   // Order filters predictably and limit to either "current" or "initial".
@@ -115,6 +120,10 @@ trait Flamingos2ImagingMapping[F[_]]
   lazy val Flamingos2ImagingMappings: List[TypeMapping] =
     List(
       Flamingos2ImagingFilterMapping,
+      Flamingos2GroupedImagingMapping,
+      Flamingos2InterleavedImagingMapping,
+      Flamingos2PreImagingMapping,
+      Flamingos2ImagingVariantMapping,
       Flamingos2ImagingMapping
     )
 }

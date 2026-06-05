@@ -9161,6 +9161,11 @@ Flamingos2 Imaging mode
 type Flamingos2Imaging {
 
   """
+  Details specific to the type of imaging being performed.
+  """
+  variant: ImagingVariant!
+
+  """
   The filters (at least one is required) to be used for data collection.
   """
   filters: [Flamingos2ImagingFilter!]!
@@ -9222,28 +9227,19 @@ type Flamingos2Imaging {
   """
   explicitReadoutMode: Flamingos2ReadoutMode
 
-  """
-  Spatial offsets, either explicitly specified in explicitSpatialOffsets or else
-  taken from defaultSpatialOffsets.
-  """
-  spatialOffsets: [Offset!]!
-
-  """
-  Default spatial offsets.
-  """
-  defaultSpatialOffsets: [Offset!]!
-
-  """
-  Optional explicitly specified spatial offsets. If set it overrides the default.
-  """
-  explicitSpatialOffsets: [Offset!]
-
 }
 
 """
 Flamingos2 Imaging creation and edit input parameters.
 """
 input Flamingos2ImagingInput {
+
+  """
+  Details specific to the type of imaging being performed.  On creation, if not
+  specified, defaults to a grouped variant with an increasing-wavelength,
+  30 arcsec spiral offset generator.
+  """
+  variant: ImagingVariantInput
 
   """
   The filters field must be specified with at least one filter. It cannot be
@@ -9270,11 +9266,6 @@ input Flamingos2ImagingInput {
   The explicitReadoutMode field may be unset by assigning a null value, or ignored by skipping it altogether
   """
   explicitReadoutMode: Flamingos2ReadoutMode
-
-  """
-  The explicitSpatialOffsets field may be unset by assigning a null value, or ignored by skipping it altogether
-  """
-  explicitSpatialOffsets: [OffsetInput!]
 
 }
 
