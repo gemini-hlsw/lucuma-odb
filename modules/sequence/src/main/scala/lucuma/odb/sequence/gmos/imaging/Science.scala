@@ -48,6 +48,7 @@ import lucuma.odb.data.OdbError
 import lucuma.odb.sequence.data.ProtoAtom
 import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.sequence.data.TelescopeConfigGenerator
+import lucuma.odb.sequence.imaging.Variant
 import lucuma.odb.sequence.util.AtomBuilder
 
 import java.util.UUID

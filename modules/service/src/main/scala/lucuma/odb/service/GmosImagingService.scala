@@ -11,7 +11,6 @@ import eu.timepit.refined.types.numeric.NonNegInt
 import grackle.Result
 import grackle.ResultT
 import grackle.syntax.*
-import lucuma.core.enums.GmosImagingVariantType
 import lucuma.core.enums.Site
 import lucuma.core.enums.WavelengthOrder
 import lucuma.core.math.Offset
@@ -19,17 +18,18 @@ import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.Observation
 import lucuma.odb.data.ExposureTimeModeId
 import lucuma.odb.data.ExposureTimeModeRole
+import lucuma.odb.data.ImagingVariantType
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.ObservingModeRowVersion
 import lucuma.odb.data.TelescopeConfigGeneratorRole
 import lucuma.odb.graphql.input.GmosImagingFilterInput
 import lucuma.odb.graphql.input.GmosImagingInput
-import lucuma.odb.graphql.input.GmosImagingVariantInput
+import lucuma.odb.graphql.input.ImagingVariantInput
 import lucuma.odb.graphql.input.TelescopeConfigGeneratorInput
 import lucuma.odb.sequence.data.TelescopeConfigGenerator
 import lucuma.odb.sequence.gmos.imaging.Config
 import lucuma.odb.sequence.gmos.imaging.Filter
-import lucuma.odb.sequence.gmos.imaging.Variant
+import lucuma.odb.sequence.imaging.Variant
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.GmosCodecs.*
 import monocle.Optional
@@ -179,12 +179,12 @@ object GmosImagingService:
         val modeName = s"GMOS ${siteName(site).capitalize} Imaging"
 
         def offsetInput(
-          in: Optional[GmosImagingVariantInput, Nullable[TelescopeConfigGeneratorInput]]
+          in: Optional[ImagingVariantInput, Nullable[TelescopeConfigGeneratorInput]]
         ): TelescopeConfigGeneratorInput =
           in.getOption(input.variant).flatMap(_.toOption).getOrElse(TelescopeConfigGeneratorInput.NoGeneratorInput)
 
-        val offsets    = offsetInput(GmosImagingVariantInput.offsets)
-        val skyOffsets = offsetInput(GmosImagingVariantInput.skyOffsets)
+        val offsets    = offsetInput(ImagingVariantInput.offsets)
+        val skyOffsets = offsetInput(ImagingVariantInput.skyOffsets)
 
         NonEmptyList
           .fromList(which)
@@ -304,7 +304,7 @@ object GmosImagingService:
 
           def updateOffsetForRole(
             input:   Nullable[TelescopeConfigGeneratorInput],
-            variant: GmosImagingVariantType,
+            variant: ImagingVariantType,
             role:    TelescopeConfigGeneratorRole
           ): F[Unit] =
             input.toOptionOption.fold(
@@ -324,8 +324,8 @@ object GmosImagingService:
           val offsetUpdates =
             edit.variant.fold(().pure[F]): v =>
               val (o, s) = v match
-                case GmosImagingVariantInput.Grouped(_, offsets, _, skyOffsets)  => (offsets, skyOffsets)
-                case GmosImagingVariantInput.Interleaved(offsets, _, skyOffsets) => (offsets, skyOffsets)
+                case ImagingVariantInput.Grouped(_, offsets, _, skyOffsets)  => (offsets, skyOffsets)
+                case ImagingVariantInput.Interleaved(offsets, _, skyOffsets) => (offsets, skyOffsets)
                 case _                                                           => (Nullable.Null, Nullable.Null)
 
               updateOffsetForRole(o, v.variantType, TelescopeConfigGeneratorRole.Object) *>
@@ -407,7 +407,7 @@ object GmosImagingService:
         .eimap(arr => NonEmptyList.fromList(arr.toList).toRight("At least one filter entry expected"))(Arr.fromFoldable)
 
     val variant_fields: Decoder[Variant.Fields] =
-      (gmos_imaging_variant *:
+      (imaging_variant *:
        wavelength_order     *:
        int4_nonneg          *:
        offset               *:
@@ -493,7 +493,7 @@ object GmosImagingService:
             ${gmos_amp_read_mode.opt},
             ${gmos_amp_gain.opt},
             ${gmos_roi.opt},
-            $gmos_imaging_variant,
+            $imaging_variant,
             $wavelength_order,
             $int4_nonneg,
             $offset,
@@ -507,12 +507,12 @@ object GmosImagingService:
             input.common.explicitAmpGain,
             input.common.explicitRoi,
             input.variant.variantType,
-            GmosImagingVariantInput.order.getOption(input.variant).flatten.getOrElse(Variant.Grouped.Default.order),
-            GmosImagingVariantInput.skyCount.getOption(input.variant).flatten.getOrElse(NonNegInt.MinValue),
-            GmosImagingVariantInput.preImaging.getOption(input.variant).flatMap(_.offset1).getOrElse(Offset.Zero),
-            GmosImagingVariantInput.preImaging.getOption(input.variant).flatMap(_.offset2).getOrElse(Offset.Zero),
-            GmosImagingVariantInput.preImaging.getOption(input.variant).flatMap(_.offset3).getOrElse(Offset.Zero),
-            GmosImagingVariantInput.preImaging.getOption(input.variant).flatMap(_.offset4).getOrElse(Offset.Zero)
+            ImagingVariantInput.order.getOption(input.variant).flatten.getOrElse(Variant.Grouped.Default.order),
+            ImagingVariantInput.skyCount.getOption(input.variant).flatten.getOrElse(NonNegInt.MinValue),
+            ImagingVariantInput.preImaging.getOption(input.variant).flatMap(_.offset1).getOrElse(Offset.Zero),
+            ImagingVariantInput.preImaging.getOption(input.variant).flatMap(_.offset2).getOrElse(Offset.Zero),
+            ImagingVariantInput.preImaging.getOption(input.variant).flatMap(_.offset3).getOrElse(Offset.Zero),
+            ImagingVariantInput.preImaging.getOption(input.variant).flatMap(_.offset4).getOrElse(Offset.Zero)
           )
 
       sql"""
@@ -641,24 +641,24 @@ object GmosImagingService:
       ).flatten
 
     def variantUpdates(
-      input: GmosImagingVariantInput
+      input: ImagingVariantInput
     ): List[AppliedFragment] =
-      val upVariant  = sql"c_variant   = $gmos_imaging_variant"
+      val upVariant  = sql"c_variant   = $imaging_variant"
 
       // Sky count requires special handling because it is used by two different
       // modes.  If we are simply updating an existing mode, then we don't
       // change the sky count value unless it is explicitly set.  If we are
       // switching modes, then we reset the value if it is not explicitly set.
-      def upSkyCount(variant: GmosImagingVariantType, skyCount: Option[NonNegInt]): AppliedFragment =
+      def upSkyCount(variant: ImagingVariantType, skyCount: Option[NonNegInt]): AppliedFragment =
         (variant, skyCount) match
-          case (GmosImagingVariantType.PreImaging, _) =>
+          case (ImagingVariantType.PreImaging, _) =>
             sql"c_sky_count = $int4_nonneg"(NonNegInt.MinValue)
 
           case (v, None)                   =>
             sql"""
               c_sky_count =
                 CASE
-                  WHEN c_variant = $gmos_imaging_variant THEN c_sky_count
+                  WHEN c_variant = $imaging_variant THEN c_sky_count
                   ELSE $int4_nonneg
                 END
             """.apply(v, NonNegInt.MinValue)
@@ -670,20 +670,20 @@ object GmosImagingService:
         val upOrder = sql"c_wavelength_order = ${wavelength_order}"
 
         input match
-          case GmosImagingVariantInput.Grouped(order, _, skyCount, _) =>
+          case ImagingVariantInput.Grouped(order, _, skyCount, _) =>
             List(
-              upVariant(GmosImagingVariantType.Grouped),
-              upSkyCount(GmosImagingVariantType.Grouped, skyCount)
+              upVariant(ImagingVariantType.Grouped),
+              upSkyCount(ImagingVariantType.Grouped, skyCount)
             ) ++ order.map(upOrder).toList
           case _                                                         =>
             List(upOrder(Variant.Grouped.Default.order))
 
       def interleaved: List[AppliedFragment] =
         input match
-          case GmosImagingVariantInput.Interleaved(_, skyCount, _) =>
+          case ImagingVariantInput.Interleaved(_, skyCount, _) =>
             List(
-              upVariant(GmosImagingVariantType.Interleaved),
-              upSkyCount(GmosImagingVariantType.Interleaved, skyCount)
+              upVariant(ImagingVariantType.Interleaved),
+              upSkyCount(ImagingVariantType.Interleaved, skyCount)
             )
           case _                                      =>
             Nil
@@ -699,9 +699,9 @@ object GmosImagingService:
         val upPre4q = sql"c_pre_imaging_off4_q = ${angle_µas}"
 
         input match
-          case GmosImagingVariantInput.PreImaging(o1, o2, o3, o4) =>
-            upSkyCount(GmosImagingVariantType.PreImaging, None) :: List(
-              upVariant(GmosImagingVariantType.PreImaging).some,
+          case ImagingVariantInput.PreImaging(o1, o2, o3, o4) =>
+            upSkyCount(ImagingVariantType.PreImaging, None) :: List(
+              upVariant(ImagingVariantType.PreImaging).some,
               o1.map(o => upPre1p(o.p.toAngle)),
               o1.map(o => upPre1q(o.q.toAngle)),
               o2.map(o => upPre2p(o.p.toAngle)),

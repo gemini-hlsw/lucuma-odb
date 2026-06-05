@@ -14,45 +14,45 @@ import lucuma.odb.data.arb.ArbNullable
 import org.scalacheck.*
 import org.scalacheck.Arbitrary.arbitrary
 
-trait ArbGmosImagingVariantInput:
+trait ArbImagingVariantInput:
 
   import ArbEnumerated.given
   import ArbNullable.given
   import ArbOffset.given
   import ArbTelescopeConfigGeneratorInput.given
 
-  given arbVariantInputGrouped: Arbitrary[GmosImagingVariantInput.Grouped] =
+  given arbVariantInputGrouped: Arbitrary[ImagingVariantInput.Grouped] =
     Arbitrary:
       for
         wo <- arbitrary[Option[WavelengthOrder]]
         of <- arbitrary[Nullable[TelescopeConfigGeneratorInput]]
         sc <- Gen.option(Gen.choose(0, 100).map(NonNegInt.unsafeFrom))
         so <- arbitrary[Nullable[TelescopeConfigGeneratorInput]]
-      yield GmosImagingVariantInput.Grouped(wo, of, sc, so)
+      yield ImagingVariantInput.Grouped(wo, of, sc, so)
 
-  given arbVariantInputInterleaved: Arbitrary[GmosImagingVariantInput.Interleaved] =
+  given arbVariantInputInterleaved: Arbitrary[ImagingVariantInput.Interleaved] =
     Arbitrary:
       for
         of <- arbitrary[Nullable[TelescopeConfigGeneratorInput]]
         sc <- Gen.option(Gen.choose(0, 100).map(NonNegInt.unsafeFrom))
         so <- arbitrary[Nullable[TelescopeConfigGeneratorInput]]
-      yield GmosImagingVariantInput.Interleaved(of, sc, so)
+      yield ImagingVariantInput.Interleaved(of, sc, so)
 
-  given arbVariantInputPreImaging: Arbitrary[GmosImagingVariantInput.PreImaging] =
+  given arbVariantInputPreImaging: Arbitrary[ImagingVariantInput.PreImaging] =
     Arbitrary:
       for
         o1 <- arbitrary[Option[Offset]]
         o2 <- arbitrary[Option[Offset]]
         o3 <- arbitrary[Option[Offset]]
         o4 <- arbitrary[Option[Offset]]
-      yield GmosImagingVariantInput.PreImaging(o1, o2, o3, o4)
+      yield ImagingVariantInput.PreImaging(o1, o2, o3, o4)
 
-  given Arbitrary[GmosImagingVariantInput] =
+  given Arbitrary[ImagingVariantInput] =
     Arbitrary:
       Gen.oneOf(
-        arbitrary[GmosImagingVariantInput.Grouped](using arbVariantInputGrouped),
-        arbitrary[GmosImagingVariantInput.Interleaved](using arbVariantInputInterleaved),
-        arbitrary[GmosImagingVariantInput.PreImaging](using arbVariantInputPreImaging)
+        arbitrary[ImagingVariantInput.Grouped](using arbVariantInputGrouped),
+        arbitrary[ImagingVariantInput.Interleaved](using arbVariantInputInterleaved),
+        arbitrary[ImagingVariantInput.PreImaging](using arbVariantInputPreImaging)
       )
 
-object ArbGmosImagingVariantInput extends ArbGmosImagingVariantInput
+object ArbImagingVariantInput extends ArbImagingVariantInput

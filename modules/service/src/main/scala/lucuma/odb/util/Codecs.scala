@@ -63,6 +63,7 @@ import lucuma.odb.data.ExposureTimeModeId
 import lucuma.odb.data.ExposureTimeModeRole
 import lucuma.odb.data.ExposureTimeModeType
 import lucuma.odb.data.Extinction
+import lucuma.odb.data.ImagingVariantType
 import lucuma.odb.data.Md5Hash
 import lucuma.odb.data.ObservingModeRowVersion
 import lucuma.odb.data.OdbError
@@ -749,6 +750,9 @@ trait Codecs {
 
   val wavelength_order: Codec[WavelengthOrder] =
     enumerated[WavelengthOrder](Type("e_wavelength_order"))
+
+  val imaging_variant: Codec[ImagingVariantType] =
+    enumerated[ImagingVariantType](Type("e_imaging_variant"))
 
   val wavelength_pm: Codec[Wavelength] =
     int4.eimap(

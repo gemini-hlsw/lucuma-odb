@@ -12,6 +12,7 @@ import lucuma.core.math.Wavelength
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.SpectralDefinition.BandNormalized
 import lucuma.core.util.TimeSpan
+import lucuma.odb.sequence.imaging.Variant
 import munit.FunSuite
 
 import scala.collection.immutable.SortedMap

@@ -24,7 +24,7 @@ trait ArbGmosImagingInput:
 
   import ArbEnumerated.given
   import ArbExposureTimeMode.given
-  import ArbGmosImagingVariantInput.given
+  import ArbImagingVariantInput.given
 
   given [L: Arbitrary]: Arbitrary[GmosImagingFilterInput[L]] =
     Arbitrary:
@@ -51,7 +51,7 @@ trait ArbGmosImagingInput:
   given Arbitrary[GmosImagingInput.Create.North] =
     Arbitrary:
       for
-        v <- arbitrary[GmosImagingVariantInput]
+        v <- arbitrary[ImagingVariantInput]
         f <- genFilterList[GmosImagingFilterInput[GmosNorthFilter], GmosNorthFilter](_.filter)
         c <- arbitrary[GmosImagingInput.Create.Common]
       yield GmosImagingInput.Create(v, f, c)
@@ -59,7 +59,7 @@ trait ArbGmosImagingInput:
   given Arbitrary[GmosImagingInput.Create.South] =
     Arbitrary:
       for
-        v <- arbitrary[GmosImagingVariantInput]
+        v <- arbitrary[ImagingVariantInput]
         f <- genFilterList[GmosImagingFilterInput[GmosSouthFilter], GmosSouthFilter](_.filter)
         c <- arbitrary[GmosImagingInput.Create.Common]
       yield GmosImagingInput.Create(v, f, c)
@@ -76,7 +76,7 @@ trait ArbGmosImagingInput:
   given arbEditCommonN: Arbitrary[GmosImagingInput.Edit.North] =
     Arbitrary:
       for
-        v <- arbitrary[Option[GmosImagingVariantInput]]
+        v <- arbitrary[Option[ImagingVariantInput]]
         f <- Gen.option(genFilterList[GmosImagingFilterInput[GmosNorthFilter], GmosNorthFilter](_.filter))
         c <- arbitrary[GmosImagingInput.Edit.Common]
       yield GmosImagingInput.Edit(v, f, c)
@@ -84,7 +84,7 @@ trait ArbGmosImagingInput:
   given arbEditCommonS: Arbitrary[GmosImagingInput.Edit.South] =
     Arbitrary:
       for
-        v <- arbitrary[Option[GmosImagingVariantInput]]
+        v <- arbitrary[Option[ImagingVariantInput]]
         f <- Gen.option(genFilterList[GmosImagingFilterInput[GmosSouthFilter], GmosSouthFilter](_.filter))
         c <- arbitrary[GmosImagingInput.Edit.Common]
       yield GmosImagingInput.Edit(v, f, c)

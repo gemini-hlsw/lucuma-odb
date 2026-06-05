@@ -18,7 +18,7 @@ object GmosImagingInput extends ImagingFilterCheck:
   // Create ---------------------------------------------------------------------
 
   case class Create[L](
-    variant: GmosImagingVariantInput,
+    variant: ImagingVariantInput,
     filters: NonEmptyList[L],
     common:  Create.Common
   )
@@ -40,7 +40,7 @@ object GmosImagingInput extends ImagingFilterCheck:
     ): Matcher[Create[L]] =
       ObjectFieldsBinding.rmap:
         case List(
-          GmosImagingVariantInput.Binding("variant", rVariant),
+          ImagingVariantInput.Binding("variant", rVariant),
           FilterBinding.List("filters", rFilters),
           GmosBinningBinding.Option("explicitBin", rExplicitBin),
           GmosAmpReadModeBinding.Option("explicitAmpReadMode", rExplicitAmpReadMode),
@@ -68,7 +68,7 @@ object GmosImagingInput extends ImagingFilterCheck:
   // Edit ---------------------------------------------------------------------
 
   case class Edit[L](
-    variant: Option[GmosImagingVariantInput],
+    variant: Option[ImagingVariantInput],
     filters: Option[NonEmptyList[L]],
     common:  Edit.Common
   ):
@@ -102,7 +102,7 @@ object GmosImagingInput extends ImagingFilterCheck:
     ): Matcher[Edit[GmosImagingFilterInput[L]]] =
       ObjectFieldsBinding.rmap:
         case List(
-          GmosImagingVariantInput.Binding.Option("variant", rVariant),
+          ImagingVariantInput.Binding.Option("variant", rVariant),
           FilterBinding.List.Option("filters", rFilters),
           GmosBinningBinding.Nullable("explicitBin", rExplicitBin),
           GmosAmpReadModeBinding.Nullable("explicitAmpReadMode", rExplicitAmpReadMode),
