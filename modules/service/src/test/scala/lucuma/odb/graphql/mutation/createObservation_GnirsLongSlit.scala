@@ -874,7 +874,7 @@ class createObservation_GnirsLongSlit extends OdbSuite:
               }
             """,
           expected = Left(List(
-            "Argument 'input.SET.observingMode.gnirsLongSlit.acquisition' is invalid: 'explicitFilter' must contain one of: J, ORDER4, H2, K, PAH"
+            "Argument 'input.SET.observingMode.gnirsLongSlit.acquisition' is invalid: 'explicitFilter' must contain one of: ORDER6, J, ORDER4, H2, K, PAH"
           ))
         )
 
