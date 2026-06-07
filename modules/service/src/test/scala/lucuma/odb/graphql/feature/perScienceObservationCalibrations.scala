@@ -46,6 +46,7 @@ import lucuma.itc.IntegrationTime
 import lucuma.itc.client.SpectroscopyInput
 import lucuma.odb.data.OdbError
 import lucuma.odb.graphql.query.ExecutionTestSupportForFlamingos2
+import lucuma.odb.graphql.query.ExecutionTestSupportForGnirs
 import lucuma.odb.graphql.query.ExecutionTestSupportForIgrins2
 import lucuma.odb.graphql.query.ObservingModeSetupOperations
 import lucuma.odb.graphql.subscription.SubscriptionUtils
@@ -64,6 +65,7 @@ class perScienceObservationCalibrations
   extends OdbSuite
   with SubscriptionUtils
   with ExecutionTestSupportForFlamingos2
+  with ExecutionTestSupportForGnirs
   with ExecutionTestSupportForIgrins2
   with ObservingModeSetupOperations
   with TelluricCalibrationsTestSupport
@@ -2074,4 +2076,77 @@ class perScienceObservationCalibrations
       assertEquals(sciOffs, List.empty)
       // Telluric has explicit defaults
       assertEquals(telOffs, F2Config.DefaultSpatialOffsets)
+    }
+
+  // GNIRS along-slit q offsets (arcseconds) for the effective telescope configs.
+  private def queryGnirsAlongSlitOffsets(oid: Observation.Id): IO[List[BigDecimal]] =
+    query(
+      user  = pi,
+      query = s"""
+        query {
+          observation(observationId: "$oid") {
+            observingMode {
+              gnirsLongSlit {
+                telescopeConfigs {
+                  alongSlit { q { arcseconds } }
+                }
+              }
+            }
+          }
+        }"""
+    ).map: c =>
+      c.hcursor
+        .downField("observation").downField("observingMode").downField("gnirsLongSlit")
+        .downField("telescopeConfigs").downField("alongSlit").as[List[Json]].toOption.orEmpty
+        .flatMap(_.hcursor.downField("q").downField("arcseconds").as[BigDecimal].toOption)
+
+  test("gnirs observation is placed in a telluric system group"):
+    for {
+      pid  <- createProgramAs(pi)
+      tid  <- createTargetWithProfileAs(pi, pid)
+      oid  <- createGnirsLongSlitObservationAs(pi, pid, tid)
+      _    <- runObscalcUpdate(pid, oid)
+      _    <- recalculateCalibrations(pid, when, oid)
+      obs  <- queryObservation(oid)
+      grp  <- obs.groupId.traverse(queryGroup)
+    } yield {
+      assert(obs.groupId.isDefined)
+      assert(grp.exists(_.system))
+      assert(grp.exists(_.calibrationRoles.contains(CalibrationRole.Telluric)))
+    }
+
+  test("gnirs telluric observation is created and gets a real target"):
+    for {
+      pid     <- createProgramAs(pi)
+      tid     <- createTargetWithProfileAs(pi, pid)
+      oid     <- createGnirsLongSlitObservationAs(pi, pid, tid)
+      _       <- runObscalcUpdate(pid, oid)
+      _       <- recalculateCalibrations(pid, when, oid)
+      toidOpt <- selectTelluricObservationFor(oid)
+      toid    =  toidOpt.get
+      _       <- runObscalcUpdate(pid, toid)
+      _       <- sleep >> resolveTelluricTargets
+      twt     <- queryObservationWithTarget(toid)
+    } yield {
+      assert(twt.targetId.isDefined)
+      assert(twt.targetName.isDefined)
+    }
+
+  test("gnirs telluric is created with config-dependent telluric offsets"):
+    for {
+      pid     <- createProgramAs(pi)
+      tid     <- createTargetWithProfileAs(pi, pid)
+      // Short camera (SHORT_BLUE), long slit (MIRROR), ORDER3 (< 2.5 µm).
+      oid     <- createGnirsLongSlitObservationAs(pi, pid, tid)
+      _       <- runObscalcUpdate(pid, oid)
+      _       <- recalculateCalibrations(pid, when, oid)
+      sciOffs <- queryGnirsAlongSlitOffsets(oid)
+      toidOpt <- selectTelluricObservationFor(oid)
+      toid    =  toidOpt.get
+      telOffs <- queryGnirsAlongSlitOffsets(toid)
+    } yield {
+      // Science uses the standard short-camera offsets...
+      assertEquals(sciOffs, List[BigDecimal](2, -4, -4, 2))
+      // ...and the telluric uses the corresponding telluric offsets.
+      assertEquals(telOffs, List[BigDecimal](-2, 4, 4, -2))
     }

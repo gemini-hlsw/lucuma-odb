@@ -418,8 +418,6 @@ object GeneratorParamsService {
 
           case gn: gnirs.longslit.Config =>
             for
-              etm       <- ExposureTimeMode.timeAndCount.getOption(gn.exposureTimeMode)
-                             .toRight(Error.MisconfiguredObservation(obsParams.observationId, "GNIRS requires a TimeAndCount exposure time mode"))
               // Acquisition (imaging) filter for the ITC: the explicit acquisition
               // filter if set, otherwise the default for the spectroscopy wavelength.
               acqFilter <- gn.acquisition.explicitFilter
@@ -433,7 +431,7 @@ object GeneratorParamsService {
                                     gn.explicitReadMode.getOrElse(GnirsReadMode.forExposureTime(time))
 
               val sciMode = InstrumentMode.GnirsSpectroscopy(
-                exposureTimeMode  = etm,
+                exposureTimeMode  = gn.exposureTimeMode,
                 centralWavelength = gn.filter.centralWavelength,
                 filter            = gn.filter,
                 slitWidth         = gn.fpu,

@@ -181,6 +181,9 @@ trait GnirsLongSlitMapping[F[_]]
       // Acquisition sub-object
       SqlObject("acquisition"),
 
+      // Telluric type (stored as jsonb)
+      SqlJson("telluricType", GnirsLongSlitView.TelluricType),
+
     )
 
   lazy val GnirsLongSlitElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =

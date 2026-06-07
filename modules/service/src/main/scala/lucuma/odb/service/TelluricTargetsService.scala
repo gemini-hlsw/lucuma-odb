@@ -94,6 +94,7 @@ trait TelluricTargetsService[F[_]]:
 enum HminBrightnessKey:
   case F2(disperser: Flamingos2Disperser, filter: Flamingos2Filter, fpu: Flamingos2Fpu)
   case Igrins2
+  case Gnirs
 
 object HminBrightnessCache extends NewType[Map[HminBrightnessKey, (Option[BigDecimal], Option[BigDecimal])]]:
   val Empty: HminBrightnessCache = HminBrightnessCache(Map.empty)
@@ -119,6 +120,10 @@ object HminBrightnessCache extends NewType[Map[HminBrightnessKey, (Option[BigDec
     def lookupIgrins2(telluricType: TelluricType): BigDecimal =
       m.value.get(HminBrightnessKey.Igrins2).flatMap(entry(_, telluricType))
         .getOrElse(HminBrightnessCache.DefaultHmin)
+
+    def lookupGnirs(telluricType: TelluricType): BigDecimal =
+      m.value.get(HminBrightnessKey.Gnirs).flatMap(entry(_, telluricType))
+        .getOrElse(HminBrightnessCache.DefaultHmin)
 end HminBrightnessCache
 
 type HminBrightnessCache = HminBrightnessCache.Type
@@ -142,15 +147,17 @@ object TelluricTargetsService:
 
   def loadBrightnessCache[F[_]: Monad](session: Session[F]): F[HminBrightnessCache] =
     for
-      f2Rows  <- session.execute(Statements.SelectAllHmin)
-      ig2Opt  <- session.execute(Statements.SelectIgrins2Hmin).map(_.headOption)
+      f2Rows    <- session.execute(Statements.SelectAllHmin)
+      ig2Opt    <- session.execute(Statements.SelectIgrins2Hmin).map(_.headOption)
+      gnirsOpt  <- session.execute(Statements.SelectGnirsHmin).map(_.headOption)
     yield
       val f2Entries: Map[HminBrightnessKey, (Option[BigDecimal], Option[BigDecimal])] =
         f2Rows.map { case (disperser, filter, fpu, hminHot, hminSolar) =>
           HminBrightnessKey.F2(disperser, filter, fpu) -> (hminHot, hminSolar)
         }.toMap
-      val ig2Entry = ig2Opt.tupleLeft(HminBrightnessKey.Igrins2)
-      HminBrightnessCache(f2Entries ++ ig2Entry)
+      val ig2Entry   = ig2Opt.tupleLeft(HminBrightnessKey.Igrins2)
+      val gnirsEntry = gnirsOpt.tupleLeft(HminBrightnessKey.Gnirs)
+      HminBrightnessCache(f2Entries ++ ig2Entry ++ gnirsEntry)
 
   def instantiate[F[_]: {Temporal, LoggerFactory as LF, Services as S}](
     telluricClient: TelluricTargetsClient[F],
@@ -178,12 +185,17 @@ object TelluricTargetsService:
                               .map(_.get(scienceObsId))
               ig2Config  <- igrins2LongSlitService.select(List(scienceObsId))
                               .map(_.get(scienceObsId))
+              gnirsConfig <- gnirsLongSlitService.select(List(scienceObsId))
+                              .map(_.get(scienceObsId))
             yield coordsOpt.flatMap: coords =>
               f2Config.map: f2 =>
                 TelluricSearchParams(coords, f2.telluricType, hminCache.lookupF2(f2))
               .orElse:
                 ig2Config.map: ig2 =>
                   TelluricSearchParams(coords, ig2.telluricType, hminCache.lookupIgrins2(ig2.telluricType))
+              .orElse:
+                gnirsConfig.map: gnirs =>
+                  TelluricSearchParams(coords, gnirs.telluricType, hminCache.lookupGnirs(gnirs.telluricType))
 
       // Exponential backoff calculation
       // Should this be configurable?
@@ -574,5 +586,13 @@ object TelluricTargetsService:
         SELECT c_hmin_hot, c_hmin_solar
         FROM   t_spectroscopy_config_option
         WHERE  c_instrument = 'Igrins2'
+        LIMIT  1
+      """.query(numeric.opt *: numeric.opt)
+
+    val SelectGnirsHmin: Query[Void, (Option[BigDecimal], Option[BigDecimal])] =
+      sql"""
+        SELECT c_hmin_hot, c_hmin_solar
+        FROM   t_spectroscopy_config_option
+        WHERE  c_instrument = 'Gnirs'
         LIMIT  1
       """.query(numeric.opt *: numeric.opt)

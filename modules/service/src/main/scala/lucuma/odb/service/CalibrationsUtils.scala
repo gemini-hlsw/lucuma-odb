@@ -41,6 +41,7 @@ import lucuma.odb.sequence.data.ItcInput
 import lucuma.odb.sequence.flamingos2.longslit.Config as Flamingos2Config
 import lucuma.odb.sequence.gmos.longslit.Config.GmosNorth as GmosNorthLongSlit
 import lucuma.odb.sequence.gmos.longslit.Config.GmosSouth as GmosSouthLongSlit
+import lucuma.odb.sequence.gnirs.longslit.Config as GnirsLongSlitConfig
 import lucuma.odb.sequence.igrins2.longslit.Config as Igrins2Config
 import lucuma.odb.service.CalibrationConfigSubset.*
 import lucuma.odb.service.Services.Syntax.*
@@ -69,8 +70,9 @@ object ObsExtract:
   val PerProgramPerConfigCalibrationTypes = List(CalibrationRole.SpectroPhotometric, CalibrationRole.Twilight)
 
   def perObsFilter: PartialFunction[ObsExtract[ObservingMode], ObsExtract[ObservingMode]] =
-    case d @ ObsExtract(data = _: Flamingos2Config) => d
-    case d @ ObsExtract(data = _: Igrins2Config)    => d
+    case d @ ObsExtract(data = _: Flamingos2Config)    => d
+    case d @ ObsExtract(data = _: Igrins2Config)       => d
+    case d @ ObsExtract(data = _: GnirsLongSlitConfig) => d
 
   def perProgramFilter: PartialFunction[ObsExtract[ObservingMode], ObsExtract[ObservingMode]] =
     case d @ ObsExtract(data = _: GmosNorthLongSlit) => d
