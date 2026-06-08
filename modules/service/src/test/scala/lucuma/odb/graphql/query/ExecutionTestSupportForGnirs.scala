@@ -246,6 +246,28 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
       """
     ).void
 
+  /** Set the camera on a GNIRS LongSlit observation. */
+  def setCamera(oid: Observation.Id, camera: String): IO[Unit] =
+    query(
+      pi,
+      s"""
+        mutation {
+          updateObservations(input: {
+            SET: {
+              observingMode: {
+                gnirsLongSlit: {
+                  camera: $camera
+                }
+              }
+            }
+            WHERE: { id: { EQ: "$oid" } }
+          }) {
+            observations { id }
+          }
+        }
+      """
+    ).void
+
   /** Set the explicit acquisition filter on a GNIRS LongSlit observation. */
   def setAcquisitionFilter(oid: Observation.Id, filter: String): IO[Unit] =
     query(
