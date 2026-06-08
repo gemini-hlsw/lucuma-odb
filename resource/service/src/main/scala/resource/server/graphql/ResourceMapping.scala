@@ -17,7 +17,9 @@ class ResourceMapping[F[_]: Async](
 )(override val schema: Schema)
     extends SkunkMapping[F](pool, monitor)
     with BaseMapping[F]
-    with QueryMapping[F]:
+    with QueryMapping[F]
+    with LeafMappings[F]
+    with TelescopeNightTimelineMapping[F]:
   // with SubscriptionMapping[F]
   // with MutationMapping[F]:
 
@@ -25,8 +27,9 @@ class ResourceMapping[F[_]: Async](
     List(
       // MutationMapping,
       QueryMapping
-      // SubscriptionMapping
-    )
+      // SubscriptionMapping,
+
+    ) ++ TelescopeNightTimelineMappings ++ LeafMappings
   )
 
   override val selectElaborator: SelectElaborator =

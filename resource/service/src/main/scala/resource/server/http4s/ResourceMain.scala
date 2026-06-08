@@ -7,6 +7,7 @@ import buildinfo.BuildInfo
 import cats.effect.*
 import cats.effect.std.Console
 import cats.effect.syntax.all.*
+import cats.syntax.all.*
 import com.comcast.ip4s.*
 import fs2.*
 import fs2.compression.Compression
@@ -16,6 +17,7 @@ import grackle.Schema
 import grackle.skunk.SkunkMonitor
 import lucuma.otel.OtelSetup
 import natchez.Trace
+import org.flywaydb.core.Flyway
 import org.http4s.*
 import org.http4s.ember.server.EmberServerBuilder
 import org.http4s.server.*
@@ -34,9 +36,13 @@ object ResourceMain extends IOApp.Simple {
 
   def webServer[F[_]: {Async, LiftIO, Compression, Console, Files, Network}]: Resource[F, Server] =
     for
-      given Logger[F]         = Slf4jLogger.getLoggerFromName[F]("resource")
-      conf                   <- ResourceConfiguration.fromCiris.load[F].toResource
-      _                      <- printBanner(conf).toResource
+      given Logger[F] = Slf4jLogger.getLoggerFromName[F]("resource")
+      conf           <- ResourceConfiguration.fromCiris.load[F].toResource
+      _              <- printBanner(conf).toResource
+
+      _ <- resetDatabase(conf.database).toResource
+      _ <- migrateDatabase(conf.database.jdbcUrl, conf.database).toResource
+
       otel                   <- OtelSetup.resource(
                                   "lucuma-resource",
                                   BuildInfo.gitHeadCommit.getOrElse("000000"),
@@ -89,10 +95,27 @@ object ResourceMain extends IOApp.Simple {
       host = config.host.renderString,
       port = config.port.value,
       user = config.user,
-      password = Some(config.password),
+      password = config.password.some,
       database = config.database,
       ssl = SSL.Trusted.withFallback(true),
+      strategy = Strategy.SearchPath,
       max = config.maxConnections
+    )
+
+  def singleSession[F[_]: {Temporal, Console, Network}](
+    config:   DatabaseConfiguration,
+    database: Option[String] = None
+  ): Resource[F, Session[F]] =
+    import natchez.Trace.Implicits.noop
+
+    Session.single[F](
+      host = config.host.renderString,
+      port = config.port.value,
+      user = config.user,
+      password = config.password.some,
+      database = database.getOrElse(config.database),
+      ssl = SSL.Trusted.withFallback(true),
+      strategy = Strategy.SearchPath
     )
 
   private def printBanner[F[_]: {Logger as L}](conf: ResourceConfiguration): F[Unit] = {
@@ -129,5 +152,45 @@ object ResourceMain extends IOApp.Simple {
 
     L.info(banner + msg)
   }
+
+  /**
+   * Drop and recreate the database.
+   */
+  def resetDatabase[F[_]: {Temporal, Console, Network, Logger}](
+    config: DatabaseConfiguration
+  ): F[Unit] =
+    import skunk.*
+    import skunk.implicits.*
+
+    val drop   = sql"""DROP DATABASE IF EXISTS "#${config.database}"""".command
+    val create = sql"""CREATE DATABASE "#${config.database}"""".command
+
+    (Logger[F].warn(s"Resetting database '${config.database}'") *>
+      singleSession(config, "postgres".some).use: s =>
+        s.execute(drop) *>
+          s.execute(create).void).whenA(config.resetDatabase)
+
+  /**
+   * A startup action that runs database migrations using Flyway.
+   */
+  def migrateDatabase[F[_]: {Sync, Logger}](
+    jdbcUrl: String,
+    config:  DatabaseConfiguration
+  ): F[Unit] =
+    Sync[F]
+      .delay {
+        Flyway
+          .configure()
+          .loggers("slf4j")
+          .dataSource(jdbcUrl, config.user, config.password)
+          .baselineOnMigrate(true)
+          .load()
+          .migrate()
+      }
+      .flatMap: result =>
+        Logger[F].info(
+          s"Database migration completed with ${result.migrationsExecuted} migrations applied"
+        )
+      .unlessA(config.skipMigration)
 
 }
