@@ -350,7 +350,7 @@ object GeneratorParamsService {
           case f2 @ flamingos2.longslit.Config(disperser, filter, fpu, sci, acq, _, _, _, _, _, _, _, _) =>
             val sciReadMode  = f2.exposureTimeMode match
                                  case ExposureTimeMode.SignalToNoiseMode(_, _) =>
-                                   Flamingos2ReadMode.Bright // In practice thil will be ignored by the ITC
+                                   Flamingos2ReadMode.Bright // In practice this will be ignored by the ITC
                                  case ExposureTimeMode.TimeAndCountMode(time = time) =>
                                    f2.explicitReadMode.getOrElse(Flamingos2ReadMode.forExposureTime(time))
 
@@ -426,6 +426,12 @@ object GeneratorParamsService {
                              .fold(GnirsFilter.fromSpectroscopyWavelength(gn.gratingWavelength))(_.asRight[String])
                              .leftMap(msg => Error.MisconfiguredObservation(obsParams.observationId, msg))
             yield
+              val sciReadMode = gn.exposureTimeMode match
+                                  case ExposureTimeMode.SignalToNoiseMode(_, _) =>
+                                    GnirsReadMode.Bright // In practice this will be ignored by the ITC, which derives the read mode itself in S/N mode
+                                  case ExposureTimeMode.TimeAndCountMode(time = time) =>
+                                    gn.explicitReadMode.getOrElse(GnirsReadMode.forExposureTime(time))
+
               val sciMode = InstrumentMode.GnirsSpectroscopy(
                 exposureTimeMode  = etm,
                 centralWavelength = gn.filter.centralWavelength,
@@ -434,7 +440,7 @@ object GeneratorParamsService {
                 prism             = gn.prism,
                 grating           = gn.grating,
                 camera            = gn.camera,
-                readMode          = gn.explicitReadMode.getOrElse(GnirsReadMode.forExposureTime(etm.time)),
+                readMode          = sciReadMode,
                 wellDepth         = gn.wellDepth
               )
               spectroscopyGeneratorParams(
