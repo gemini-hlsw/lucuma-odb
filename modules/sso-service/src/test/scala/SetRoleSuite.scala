@@ -33,13 +33,7 @@ object SetRoleSuite extends SsoSuite with Fixture with FlakyTests {
         tok2   <- sso.get(setRole(rid))(CookieReader[IO].getSessionToken)
         user2  <- db.use(_.getStandardUserFromToken(tok2))
 
-      } yield expect(
-        user1.role.access === Access.Pi &&
-        user2.role.access === Access.Admin &&
-        user1.id === user2.id &&
-        user2.role.id === rid &&
-        user2.otherRoles.contains(user1.role)
-      )
+      } yield expect.eql(Access.Pi, user1.role.access).and(expect.eql(Access.Admin, user2.role.access)).and(expect.eql(user1.id, user2.id)).and(expect.eql(user2.role.id, rid)).and(expect(user2.otherRoles.contains(user1.role)))
     }
   }
 

@@ -109,7 +109,7 @@ object GraphQLSuite extends SsoSuite with Fixture with FlakyTests with OrcidIdGe
       queryAs(person, query, withRole, withOrcidId).map: result =>
         if result != expected then
           println(s"Result: $result\n\nExpected: $expected")
-        expect(result == expected)
+        expect.same(expected, result)
 
     def queryIds: IO[(User.Id, OrcidId)] =
       query("query { role { user { id orcidId }}}")

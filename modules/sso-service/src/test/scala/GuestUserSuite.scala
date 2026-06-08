@@ -33,9 +33,9 @@ object GuestUserSuite extends SsoSuite with Fixture with FlakyTests {
               tok   <- CookieReader[IO].getSessionToken(res)  // get the new session token
               userʹ <- db.getGuestUserFromToken(tok)          // redeem it to get the same user
             } yield
-              expect(res.status == Status.Created) &&
-              expect(user.role  == GuestRole) &&
-              expect(user.id == userʹ.id)
+              expect.same(Status.Created, res.status) &&
+              expect.same(GuestRole, user.role) &&
+              expect.same(`userʹ`.id, user.id)
           }
         }
     )
@@ -76,7 +76,7 @@ object GuestUserSuite extends SsoSuite with Fixture with FlakyTests {
             loginAsBob.flatMap { case (bobId, bobToken) =>
               db.findUserFromToken(guestToken).map { op =>
                 expect(op.isEmpty)             && // old token should no longer work
-                expect(guestId == bobId)       && // bob and guest have the same id
+                expect.same(guestId, bobId)       && // bob and guest have the same id
                 expect(guestToken != bobToken)    // and different tokens
               }
             }
@@ -114,7 +114,7 @@ object GuestUserSuite extends SsoSuite with Fixture with FlakyTests {
           // Ensure the guest token doesn't work anymore
           op     <- db.use(_.findUserFromToken(gtok))
 
-        } yield expect(user1 == user2) && // same user
+        } yield expect.same(user1, user2) && // same user
                 expect(op.isEmpty)        // guest user session is invalid
       }
     )
