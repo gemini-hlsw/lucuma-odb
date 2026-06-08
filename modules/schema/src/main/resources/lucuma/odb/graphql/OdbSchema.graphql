@@ -3531,7 +3531,7 @@ Configuration that controls how and when the Scheduler may plan execution of an
 observation, including whether it can be split across multiple visits and any
 timing constraints.
 """
-input SchedulingPropertiesInput {
+input SchedulingConstraintsInput {
 
   """
   Controls whether the observation may be split across multiple visits. When
@@ -3549,6 +3549,29 @@ input SchedulingPropertiesInput {
   value clears all existing timing windows.
   """
   timingWindows: [TimingWindowInput!]
+
+}
+
+"""
+Configuration that controls how and when the Scheduler may plan execution of an
+observation, including whether it can be split across multiple visits and any
+timing constraints.
+"""
+type SchedulingConstraints {
+
+  """
+  Controls whether the observation may be split across multiple visits. When
+  true, the scheduler may divide the science sequence into discrete segments
+  (i.e. "atoms") scheduled in order across separate visits. When false, the
+  entire science sequence must complete within a single uninterrupted visit.
+  """
+  isSplittable: Boolean!
+
+  """
+  One or more windows during which the observation is permitted to execute.  If
+  empty, there are no timing constraints for the observation.
+  """
+  timingWindows: [TimingWindow!]!
 
 }
 
@@ -3583,14 +3606,15 @@ input ObservationPropertiesInput {
   constraintSet: ConstraintSetInput
 
   """
-  Deprecated in favor of the scheduling field — use that instead. If both this
-  field and scheduling are specified in the same mutation, the mutation will be
-  rejected with a validation error. One or more timing windows during which the
-  observation may execute. Defaults to empty (unconstrained) if omitted. To
-  modify, supply the complete desired array — it replaces the previous value
-  entirely.
+  Deprecated in favor of the `schedulingConstraints` field — use that instead.
+  If both this field and `schedulingConstraints` are specified in the same
+  mutation, the mutation will be rejected with a validation error.
+
+  Specifies one or more timing windows during which the observation may execute.
+  Defaults to empty (unconstrained) if omitted. To modify, supply the complete
+  desired array — it replaces the previous value entirely.
   """
-  timingWindows: [TimingWindowInput!] @deprecated(reason: "Use `scheduling` instead. (Deprecated June 4, 2026).")
+  timingWindows: [TimingWindowInput!] @deprecated(reason: "Use `schedulingConstraints` instead. (Deprecated June 4, 2026)")
 
   """
   Scheduling configuration for this observation, controlling visit splitting and
@@ -3598,7 +3622,7 @@ input ObservationPropertiesInput {
   splittable, no timing windows). Set to `null` to reset any existing scheduling
   configuration to those defaults.
   """
-  scheduling: SchedulingPropertiesInput
+  schedulingConstraints: SchedulingConstraintsInput
 
   """
   The attachments defaults to empty if not specified on creation, and may be edited by specifying a new whole array
@@ -12751,9 +12775,15 @@ type Observation {
   constraintSet: ConstraintSet!
 
   """
-  Observation timing windows
+  Deprecated (using `schedulingConstraints` instead).  Observation timing
+  windows.
   """
-  timingWindows: [TimingWindow!]!
+  timingWindows: [TimingWindow!]! @deprecated(reason: "Use `schedulingConstraints` instead. (Deprecated June 5, 2026)")
+
+  """
+  Observation scheduling constraints.
+  """
+  schedulingConstraints: SchedulingConstraints!
 
   """
   attachments
