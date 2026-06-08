@@ -8,7 +8,7 @@ package imaging
 import cats.data.EitherT
 import cats.effect.Sync
 import fs2.Pure
-import lucuma.core.enums.GmosImagingVariantType.PreImaging
+import lucuma.core.enums.ImagingVariantType.PreImaging
 import lucuma.core.enums.MosPreImaging
 import lucuma.core.model.sequence.gmos.DynamicConfig
 import lucuma.core.model.sequence.gmos.StaticConfig

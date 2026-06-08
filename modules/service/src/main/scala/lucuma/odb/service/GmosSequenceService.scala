@@ -12,7 +12,7 @@ import cats.syntax.eq.*
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import cats.syntax.option.*
-import lucuma.core.enums.GmosImagingVariantType
+import lucuma.core.enums.ImagingVariantType
 import lucuma.core.enums.MosPreImaging
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.model.Observation
@@ -83,8 +83,8 @@ trait GmosSequenceService[F[_]]:
 object GmosSequenceService:
 
   // Extract the mos-preimaging setting from the imaging variant
-  private def mosPreImaging(v: Option[GmosImagingVariantType]): MosPreImaging =
-    v.filter(_ === GmosImagingVariantType.PreImaging)
+  private def mosPreImaging(v: Option[ImagingVariantType]): MosPreImaging =
+    v.filter(_ === ImagingVariantType.PreImaging)
      .as(MosPreImaging.IsMosPreImaging)
      .getOrElse(MosPreImaging.IsNotMosPreImaging)
 
@@ -106,7 +106,7 @@ object GmosSequenceService:
       private def defaultGmosNorthStatic(
         observationId: Observation.Id
       ): F[Option[StaticConfig.GmosNorth]] =
-        def toStatic(mode: ObservingModeType, variant: Option[GmosImagingVariantType]): Option[StaticConfig.GmosNorth] =
+        def toStatic(mode: ObservingModeType, variant: Option[ImagingVariantType]): Option[StaticConfig.GmosNorth] =
           mode match
             case ObservingModeType.GmosNorthLongSlit =>
               InitialConfigs.GmosNorthStatic.some
@@ -152,7 +152,7 @@ object GmosSequenceService:
       private def defaultGmosSouthStatic(
         observationId: Observation.Id
       ): F[Option[StaticConfig.GmosSouth]] =
-        def toStatic(mode: ObservingModeType, variant: Option[GmosImagingVariantType]): Option[StaticConfig.GmosSouth] =
+        def toStatic(mode: ObservingModeType, variant: Option[ImagingVariantType]): Option[StaticConfig.GmosSouth] =
           mode match
             case ObservingModeType.GmosSouthLongSlit =>
               InitialConfigs.GmosSouthStatic.some
@@ -254,14 +254,14 @@ object GmosSequenceService:
     val SelectGmosSouthStatic: Query[Observation.Id, StaticConfig.GmosSouth] =
       selectStatic("south", gmos_south_static)
 
-    def selectStaticParams(site: String): Query[Observation.Id, (ObservingModeType, Option[GmosImagingVariantType])] =
+    def selectStaticParams(site: String): Query[Observation.Id, (ObservingModeType, Option[ImagingVariantType])] =
       sql"""
         SELECT o.c_observing_mode_type,
                i.c_variant
           FROM t_observation o
           LEFT JOIN t_gmos_#${site}_imaging i ON i.c_observation_id = o.c_observation_id
          WHERE o.c_observation_id = $observation_id
-      """.query(observing_mode_type *: gmos_imaging_variant.opt)
+      """.query(observing_mode_type *: imaging_variant.opt)
 
     def insertStatic[A](site: String, encoderA: Encoder[A]): Query[(Observation.Id, A), Long] =
       sql"""

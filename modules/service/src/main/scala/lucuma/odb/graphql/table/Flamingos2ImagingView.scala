@@ -6,7 +6,6 @@ package table
 
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.Flamingos2Codecs.*
-import skunk.codec.all.*
 
 trait Flamingos2ImagingView[F[_]] extends BaseMapping[F]:
 
@@ -20,6 +19,7 @@ trait Flamingos2ImagingView[F[_]] extends BaseMapping[F]:
   object Flamingos2ImagingView extends TableDef("v_flamingos_2_imaging"):
 
     val ObservationId: ColumnRef      = col("c_observation_id", observation_id)
+    val Variant: ColumnRef            = col("c_variant", imaging_variant)
 
     val Filters: ColumnRef            = col("c_filters", _flamingos_2_filter)
 
@@ -35,4 +35,23 @@ trait Flamingos2ImagingView[F[_]] extends BaseMapping[F]:
     val ReadoutMode: ColumnRef        = col("c_readout_mode", flamingos_2_readout_mode.opt)
     val ReadoutModeDefault: ColumnRef = col("c_readout_mode_default", flamingos_2_readout_mode)
 
-    val Offsets: ColumnRef            = col("c_offsets", text.opt)
+    object Sky:
+      val Count: ColumnRef = col("c_sky_count", int4_nonneg)
+
+    object Grouped:
+      val ObservationId: ColumnRef   = col("c_grouped_observation_id", observation_id.embedded)
+      val WavelengthOrder: ColumnRef = col("c_wavelength_order", wavelength_order)
+
+    object Interleaved:
+      val ObservationId: ColumnRef = col("c_interleaved_observation_id", observation_id.embedded)
+
+    object PreImaging:
+      val ObservationId: ColumnRef = col("c_pre_imaging_observation_id", observation_id.embedded)
+      val Offset1P: ColumnRef      = col("c_pre_imaging_off1_p", angle_µas)
+      val Offset1Q: ColumnRef      = col("c_pre_imaging_off1_q", angle_µas)
+      val Offset2P: ColumnRef      = col("c_pre_imaging_off2_p", angle_µas)
+      val Offset2Q: ColumnRef      = col("c_pre_imaging_off2_q", angle_µas)
+      val Offset3P: ColumnRef      = col("c_pre_imaging_off3_p", angle_µas)
+      val Offset3Q: ColumnRef      = col("c_pre_imaging_off3_q", angle_µas)
+      val Offset4P: ColumnRef      = col("c_pre_imaging_off4_p", angle_µas)
+      val Offset4Q: ColumnRef      = col("c_pre_imaging_off4_q", angle_µas)
