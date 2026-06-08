@@ -18,6 +18,7 @@ import lucuma.core.enums.GnirsWellDepth
 import lucuma.core.math.Wavelength
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.SlitTelescopeConfigs
+import lucuma.core.model.TelluricType
 import lucuma.core.model.sequence.gnirs.GnirsAcquisitionMode
 import lucuma.core.model.sequence.gnirs.GnirsFocus
 import lucuma.core.util.TimeSpan
@@ -87,7 +88,8 @@ case class Config(
   exposureTimeMode:        ExposureTimeMode,
   coadds:                  PosInt,
   telescopeConfigs:        SlitTelescopeConfigs,
-  acquisition:             AcquisitionConfig
+  acquisition:             AcquisitionConfig,
+  telluricType:            TelluricType
 ) derives Eq:
 
   def hashBytes: Array[Byte] =
@@ -115,6 +117,7 @@ case class Config(
       out.write(tc.hashBytes)
 
     out.write(acquisition.hashBytes)
+    out.write(telluricType.hashBytes)
 
     out.close()
     bao.toByteArray

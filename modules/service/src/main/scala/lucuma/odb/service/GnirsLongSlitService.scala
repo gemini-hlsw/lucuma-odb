@@ -25,6 +25,7 @@ import lucuma.core.math.Offset
 import lucuma.core.math.Wavelength
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.Observation
+import lucuma.core.model.TelluricType
 import lucuma.core.model.sequence.gnirs.GnirsAcquisitionMode
 import lucuma.core.model.sequence.gnirs.GnirsFocus
 import lucuma.core.model.sequence.gnirs.GnirsFocusMotorStep
@@ -61,6 +62,9 @@ trait GnirsLongSlitService[F[_]]:
   )(using Transaction[F]): F[Unit]
 
   def clone(originalId: Observation.Id, newId: Observation.Id)(using Transaction[F]): F[Unit]
+
+  /** Reset `oid`'s configuration to telluric defaults (config-dependent slit offsets). */
+  def resetTelluricConfig(oid: Observation.Id)(using Transaction[F]): F[Unit]
 
 object GnirsLongSlitService:
 
@@ -102,7 +106,8 @@ object GnirsLongSlitService:
         gnirs_filter.opt                 *: // c_acq_filter (explicit override; None => mode default)
         angle_µas.opt                    *: // c_acq_sky_offset_p
         angle_µas.opt                    *: // c_acq_sky_offset_q
-        exposure_time_mode                  // acquisition ETM
+        exposure_time_mode               *: // acquisition ETM
+        telluric_type                       // c_telluric_type
       ).emap:
         case (sciEtm *: gratingEff *: prismEff *: gratingWavEff *:
               camera *: fpu *: filter *: coadds *:
@@ -112,7 +117,7 @@ object GnirsLongSlitService:
               focusMotorSteps *:
               slitOffsetModeExp *: tcExp *: slitOffsetModeDef *: tcDef *:
               acqType *: acqCoadds *: acqFilterExp *: acqSkyOffP *: acqSkyOffQ *:
-              acqEtm *: EmptyTuple) =>
+              acqEtm *: telluricType *: EmptyTuple) =>
           SlitTelescopeConfigsFormat.getOption((slitOffsetModeDef, tcDef))
             .toRight(s"Could not parse default telescope configs from '$tcDef'")
             .flatMap: defaultTC =>
@@ -150,7 +155,8 @@ object GnirsLongSlitService:
                           sciEtm,
                           coaddsP,
                           explicitTCOpt.getOrElse(defaultTC),
-                          acq
+                          acq,
+                          telluricType
                           )
               }
 
@@ -214,6 +220,9 @@ object GnirsLongSlitService:
       override def clone(originalId: Observation.Id, newId: Observation.Id)(using Transaction[F]): F[Unit] =
         session.exec(Statements.cloneGnirs(originalId, newId))
 
+      override def resetTelluricConfig(oid: Observation.Id)(using Transaction[F]): F[Unit] =
+        session.exec(Statements.applyGnirsTelluricDefaults(oid))
+
   object Statements:
 
     def selectGnirsLongSlit(observationIds: NonEmptyList[Observation.Id]): AppliedFragment =
@@ -249,7 +258,8 @@ object GnirsLongSlitService:
           acq.c_signal_to_noise_at,
           acq.c_signal_to_noise,
           acq.c_exposure_time,
-          acq.c_exposure_count
+          acq.c_exposure_count,
+          ls.c_telluric_type
         FROM v_gnirs_long_slit ls
         LEFT JOIN t_exposure_time_mode sci
            ON sci.c_observation_id = ls.c_observation_id
@@ -294,7 +304,8 @@ object GnirsLongSlitService:
       Int,
       Option[GnirsFilter],    // explicit acq filter (None => computed default)
       Option[Long],           // acq_sky_offset_p in µas
-      Option[Long]            // acq_sky_offset_q in µas
+      Option[Long],           // acq_sky_offset_q in µas
+      TelluricType            // telluric type
     )] =
       sql"""
         INSERT INTO t_gnirs_long_slit (
@@ -322,7 +333,8 @@ object GnirsLongSlitService:
           c_acq_coadds,
           c_acq_filter,
           c_acq_sky_offset_p,
-          c_acq_sky_offset_q
+          c_acq_sky_offset_q,
+          c_telluric_type
         )
         SELECT
           $observation_id,
@@ -349,19 +361,20 @@ object GnirsLongSlitService:
           $int4,
           ${gnirs_filter.opt},
           ${int8.opt},
-          ${int8.opt}
+          ${int8.opt},
+          $telluric_type
         FROM t_observation
         WHERE c_observation_id = $observation_id
       """.contramap {
         (oid, initGrating, initPrism, camera, fpu, filter, coadds,
          decker, gratingWav, explGrating, explPrism, focus,
          readMode, wellDepth, slitMode, offsets,
-         acqType, acqCoadds, acqFilter, acqSkyOffP, acqSkyOffQ) =>
+         acqType, acqCoadds, acqFilter, acqSkyOffP, acqSkyOffQ, telluricType) =>
           (oid, initGrating, initPrism, camera, camera, fpu, fpu,
            filter, filter, coadds, decker, gratingWav,
            explGrating, explPrism, focus, readMode, wellDepth,
            slitMode, offsets,
-           acqType, acqCoadds, acqFilter, acqSkyOffP, acqSkyOffQ, oid)
+           acqType, acqCoadds, acqFilter, acqSkyOffP, acqSkyOffQ, telluricType, oid)
       }
 
     def insertGnirsLongSlit(
@@ -392,7 +405,8 @@ object GnirsLongSlitService:
         input.acquisition.flatMap(_.coadds).map(_.value).getOrElse(1),
         input.acquisition.flatMap(_.explicitFilter.toOption),
         acqSkyOffP,
-        acqSkyOffQ
+        acqSkyOffQ,
+        input.telluricType
       )
 
     def deleteGnirs(which: List[Observation.Id]): Option[AppliedFragment] =
@@ -414,6 +428,7 @@ object GnirsLongSlitService:
       val upPrism        = sql"c_prism              = ${gnirs_prism.opt}"
       val upSlitMode     = sql"c_slit_offset_mode   = ${slit_offset_mode.opt}"
       val upOffsets      = sql"c_telescope_configs  = ${text.opt}"
+      val upTelluricType = sql"c_telluric_type      = $telluric_type"
 
       // Acquisition inline (non-ETM) column updates
       val upAcqType      = sql"c_acq_type = ${gnirs_acquisition_type.opt}"
@@ -464,7 +479,8 @@ object GnirsLongSlitService:
         SET.explicitReadMode.toOptionOption.map(upReadMode),
         SET.explicitWellDepth.toOptionOption.map(upWellDepth),
         SET.explicitGrating.toOptionOption.map(upGrating),
-        SET.explicitPrism.toOptionOption.map(upPrism)
+        SET.explicitPrism.toOptionOption.map(upPrism),
+        SET.telluricType.map(upTelluricType)
       ).flatten ++ upTelescope.toList.flatten ++ acqUpdates
 
       NonEmptyList.fromList(ups)
@@ -481,6 +497,32 @@ object GnirsLongSlitService:
           void"SET " |+| us.intercalate(void", ") |+| void" " |+|
           void"WHERE " |+| observationIdIn(oids)
 
+    // Reset `oid` to telluric slit-offset defaults. The telluric offsets parallel the
+    // science offsets computed by v_gnirs_long_slit (V1165/V1169), per the GNIRS
+    // configuration (cross-dispersed / short camera / long camera) and grating
+    // wavelength regime (filters Order2/Order1/PAH are >= 2.5 µm):
+    //   Cross-dispersed prisms        → [+1", -2", -2", +1"]
+    //   Short camera long slit        → [-2", +4", +4", -2"]
+    //   Long camera, filter >= 2.5 µm → [-3", +3", +3", -3"]
+    //   Long camera, filter < 2.5 µm  → [+1", -5", -5", +1"]
+    def applyGnirsTelluricDefaults(oid: Observation.Id): AppliedFragment =
+      sql"""
+        UPDATE t_gnirs_long_slit
+        SET
+          c_slit_offset_mode  = 'nod_along_slit',
+          c_telescope_configs = CASE
+            WHEN COALESCE(c_prism, c_initial_prism) IN ('Sxd', 'Lxd') THEN
+              '[{"q":{"microarcseconds":1000000},"guiding":"ENABLED"},{"q":{"microarcseconds":-2000000},"guiding":"ENABLED"},{"q":{"microarcseconds":-2000000},"guiding":"ENABLED"},{"q":{"microarcseconds":1000000},"guiding":"ENABLED"}]'
+            WHEN c_camera IN ('ShortBlue', 'ShortRed') THEN
+              '[{"q":{"microarcseconds":-2000000},"guiding":"ENABLED"},{"q":{"microarcseconds":4000000},"guiding":"ENABLED"},{"q":{"microarcseconds":4000000},"guiding":"ENABLED"},{"q":{"microarcseconds":-2000000},"guiding":"ENABLED"}]'
+            WHEN c_filter IN ('Order2', 'Order1', 'PAH') THEN
+              '[{"q":{"microarcseconds":-3000000},"guiding":"ENABLED"},{"q":{"microarcseconds":3000000},"guiding":"ENABLED"},{"q":{"microarcseconds":3000000},"guiding":"ENABLED"},{"q":{"microarcseconds":-3000000},"guiding":"ENABLED"}]'
+            ELSE
+              '[{"q":{"microarcseconds":1000000},"guiding":"ENABLED"},{"q":{"microarcseconds":-5000000},"guiding":"ENABLED"},{"q":{"microarcseconds":-5000000},"guiding":"ENABLED"},{"q":{"microarcseconds":1000000},"guiding":"ENABLED"}]'
+          END
+        WHERE c_observation_id = $observation_id
+      """.apply(oid)
+
     def cloneGnirs(originalId: Observation.Id, newId: Observation.Id): AppliedFragment =
       sql"""
         INSERT INTO t_gnirs_long_slit (
@@ -493,7 +535,8 @@ object GnirsLongSlitService:
           c_coadds, c_decker, c_focus_motor_steps, c_read_mode, c_well_depth,
           c_slit_offset_mode, c_telescope_configs,
           c_acq_type, c_acq_coadds, c_acq_filter,
-          c_acq_sky_offset_p, c_acq_sky_offset_q
+          c_acq_sky_offset_p, c_acq_sky_offset_q,
+          c_telluric_type
         )
         SELECT
           $observation_id,
@@ -507,7 +550,8 @@ object GnirsLongSlitService:
           c_coadds, c_decker, c_focus_motor_steps, c_read_mode, c_well_depth,
           c_slit_offset_mode, c_telescope_configs,
           c_acq_type, c_acq_coadds, c_acq_filter,
-          c_acq_sky_offset_p, c_acq_sky_offset_q
+          c_acq_sky_offset_p, c_acq_sky_offset_q,
+          c_telluric_type
         FROM t_gnirs_long_slit
         WHERE c_observation_id = $observation_id
       """.apply(newId, newId, originalId)

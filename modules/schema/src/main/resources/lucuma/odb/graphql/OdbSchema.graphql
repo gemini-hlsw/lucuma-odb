@@ -9847,6 +9847,11 @@ type GnirsLongSlit {
 
   acquisition: GnirsLongSlitAcquisition!
 
+  """
+  Telluric type configuration for this observation.
+  """
+  telluricType: TelluricType!
+
 }
 
 input GnirsLongSlitAcquisitionInput {
@@ -9921,6 +9926,12 @@ input GnirsLongSlitInput {
   explicitTelescopeConfigs: SlitTelescopeConfigsInput
 
   acquisition: GnirsLongSlitAcquisitionInput
+
+  """
+  The telluricType field must be either specified or skipped altogether. It cannot be unset with a null value.
+  On create the default is HOT.
+  """
+  telluricType: TelluricTypeInput
 
 }
 
