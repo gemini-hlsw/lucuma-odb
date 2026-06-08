@@ -40,7 +40,7 @@ object HerokuConfigSuite extends IOSuite {
         _ <- putSystemProperty("HEROKU_APP_NAME", "chickenpants")
         _ <- putSystemProperty("HEROKU_BRANCH", "fix the thing")
         _ <- HerokuConfig.review.load[IO]
-      } yield expect(true)
+      } yield success
     }
   }
 
@@ -56,7 +56,7 @@ object HerokuConfigSuite extends IOSuite {
         _ <- putSystemProperty("DYNO", "...")
         _ <- putSystemProperty("HEROKU_SLUG_DESCRIPTION", "...")
         _ <- HerokuConfig.default.load[IO]
-      } yield expect(true)
+      } yield success
     }
   }
 
@@ -67,7 +67,7 @@ object HerokuConfigSuite extends IOSuite {
         _ <- putSystemProperty("HEROKU_APP_NAME", "chickenpants")
         _ <- putSystemProperty("HEROKU_BRANCH", "fix the thing")
         _ <- HerokuConfig.config.load[IO]
-      } yield expect(true)
+      } yield success
     }
   }
 
@@ -83,7 +83,7 @@ object HerokuConfigSuite extends IOSuite {
         _ <- putSystemProperty("DYNO", "...")
         _ <- putSystemProperty("HEROKU_SLUG_DESCRIPTION", "...")
         _ <- HerokuConfig.config.load[IO]
-      } yield expect(true)
+      } yield success
     }
   }
 

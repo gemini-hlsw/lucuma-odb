@@ -426,8 +426,8 @@ lazy val ssoService = project
       "org.tpolecat"        %% "natchez-log"                % natchezVersion,
       "edu.gemini"          %% "lucuma-graphql-routes"      % lucumaGraphQLRoutesVersion,
       "io.circe"            %% "circe-literal"              % circeVersion  % Test,
-      "org.typelevel" %% "weaver-cats"                      % weaverVersion % Test,
-      "org.typelevel" %% "weaver-scalacheck"                % weaverVersion % Test
+      "org.typelevel"       %% "weaver-cats"                % weaverVersion % Test,
+      "org.typelevel"       %% "weaver-scalacheck"          % weaverVersion % Test
     ),
     testFrameworks += new TestFramework("weaver.framework.CatsEffect"),
     reStart / envVars += "PORT" -> "8082",

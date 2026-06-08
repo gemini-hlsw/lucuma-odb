@@ -30,7 +30,7 @@ object ExistingUserSuite extends SsoSuite with Fixture with FlakyTests {
           user2  <- db.use(_.getStandardUserFromToken(tok2))
 
         } yield expect(tok != tok2)    && // different tokens
-                expect(user2 == user1)    // for the same user
+                expect.same(user2, user1)    // for the same user
       }
     )
   }
