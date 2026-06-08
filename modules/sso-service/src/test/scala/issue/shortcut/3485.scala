@@ -24,7 +24,7 @@ import lucuma.sso.service.util.JwtEncoder
 import monocle.Prism
 import org.http4s.*
 import org.http4s.headers.Location
-import weaver.SimpleMutableIOSuite
+import weaver.SimpleIOSuite
 
 import scala.concurrent.duration.*
 
@@ -66,7 +66,7 @@ object Shortcut_3485 extends SsoSuite with Fixture with OrcidIdGenerator[IO]:
       orcidId <- randomOrcidId
       jwt     <- jwtWriter.newJwt(user(orcidId))
       decoded <- jwtReader.decodeStandardUser(jwt)
-    yield expect(decoded.profile.email == Some(email))
+    yield expect.same(Some(email), decoded.profile.email)
 
 
   test("ensure generated JWT for existing user includes email."):
@@ -85,10 +85,10 @@ object Shortcut_3485 extends SsoSuite with Fixture with OrcidIdGenerator[IO]:
 
         for
           res    <- sso.get(stage1)(_.pure[IO])
-          _      <- expect(res.status == Status.Found).failFast
+          _      <- expect.same(Status.Found, res.status).failFast
           loc     = res.headers.get[Location].map(_.uri)
           _      <- expect(loc.isDefined).failFast
           stage2 <- sim.authenticate(loc.get, Bob, None)
           _      <- sso.get(stage2)(CookieReader[IO].getSessionToken)
           bob    <- sso.fetchAs[StandardUser](Request[IO](Method.POST, SsoRoot / "api" / "v1" / "refresh-token"))
-        yield expect(bob.profile.email.get === Bob.primaryEmail.get.email)
+        yield expect.eql(Bob.primaryEmail.get.email, bob.profile.email.get)

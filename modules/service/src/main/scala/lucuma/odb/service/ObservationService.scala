@@ -693,7 +693,8 @@ object ObservationService {
           SET.observerNotes,
           SET.targetEnvironment.flatMap(_.useBlindOffset).getOrElse(false),
           SET.targetEnvironment.map(_.blindOffsetType).getOrElse(BlindOffsetType.Manual),
-          calibrationRole
+          calibrationRole,
+          SET.scheduling.flatMap(_.isSplittable).getOrElse(true)
         )
       }
 
@@ -714,7 +715,8 @@ object ObservationService {
       observerNotes:       Option[NonEmptyString],
       useBlindOffset:      Boolean,
       blindOffsetType:     BlindOffsetType,
-      calibrationRole:     Option[CalibrationRole]
+      calibrationRole:     Option[CalibrationRole],
+      isSplittable:        Boolean
     ): AppliedFragment = {
 
       val insert: AppliedFragment = {
@@ -759,6 +761,7 @@ object ObservationService {
            useBlindOffset                                                                                                         ,
            blindOffsetType                                                                                                        ,
            calibrationRole                                                                                                        ,
+           isSplittable
         )
       }
 
@@ -805,6 +808,7 @@ object ObservationService {
       Boolean                          ,
       BlindOffsetType                  ,
       Option[CalibrationRole]          ,
+      Boolean
     )] =
       sql"""
         INSERT INTO t_observation (
@@ -841,7 +845,8 @@ object ObservationService {
           c_observer_notes,
           c_use_blind_offset,
           c_blind_offset_type,
-          c_calibration_role
+          c_calibration_role,
+          c_is_splittable
         )
         SELECT
           $program_id,
@@ -877,7 +882,8 @@ object ObservationService {
           ${text_nonempty.opt},
           $bool,
           $blind_offset_type,
-          ${calibration_role.opt}
+          ${calibration_role.opt},
+          $bool
       """
 
     def selectObservingModes(
@@ -1027,6 +1033,7 @@ object ObservationService {
       val upScienceBand       = sql"c_science_band = ${science_band.opt}"
       val upObserverNotes     = sql"c_observer_notes = ${text_nonempty.opt}"
       val upUseBlindOffset    = sql"c_use_blind_offset = $bool"
+      val upIsSplittable      = sql"c_is_splittable = $bool"
 
       val ups: List[AppliedFragment] =
         List(
@@ -1034,7 +1041,8 @@ object ObservationService {
           SET.subtitle.foldPresent(upSubtitle),
           SET.scienceBand.foldPresent(upScienceBand),
           SET.observerNotes.foldPresent(upObserverNotes),
-          SET.targetEnvironment.flatMap(_.useBlindOffset).map(upUseBlindOffset)
+          SET.targetEnvironment.flatMap(_.useBlindOffset).map(upUseBlindOffset),
+          SET.scheduling.fold(true.some, none, _.isSplittable).map(upIsSplittable)
         ).flatten
 
       val posAngleConstraint: List[AppliedFragment] =
@@ -1155,7 +1163,8 @@ object ObservationService {
           c_img_combined_filters,
           c_observer_notes,
           c_use_blind_offset,
-          c_blind_offset_type
+          c_blind_offset_type,
+          c_is_splittable
         )
         SELECT
           c_program_id,
@@ -1191,7 +1200,8 @@ object ObservationService {
           c_img_combined_filters,
           c_observer_notes,
           c_use_blind_offset,
-          c_blind_offset_type
+          c_blind_offset_type,
+          c_is_splittable
       FROM t_observation
       WHERE c_observation_id = $observation_id
       RETURNING c_observation_id

@@ -14,7 +14,7 @@ val circeRefinedVersion          = "0.15.1"
 val cirisVersion                 = "3.15.0"
 val clueVersion                  = "0.53.2"
 val declineVersion               = "2.6.2"
-val flywayVersion                = "9.22.3"
+val flywayVersion                = "12.8.1"
 val fs2AwsVersion                = "6.2.0"
 val fs2Version                   = "3.13.0"
 val grackleVersion               = "0.26.0"
@@ -51,7 +51,7 @@ val sqlFormatterVersion          = "2.0.5"
 val spireVersion                 = "0.18.0"
 val slf4jVersion                 = "2.0.18"
 val testcontainersScalaVersion   = "0.44.1" // check test output if you attempt to update this
-val weaverVersion                = "0.8.4"
+val weaverVersion                = "0.13.0"
 
 ThisBuild / tlBaseVersion      := "0.78"
 ThisBuild / scalaVersion       := "3.8.3"
@@ -407,27 +407,27 @@ lazy val ssoService = project
   .settings(
     name := "lucuma-sso-service",
     libraryDependencies ++= Seq(
-      "org.typelevel"       %% "grackle-skunk"           % grackleVersion,
-      "org.tpolecat"        %% "skunk-core"              % skunkVersion,
-      "org.tpolecat"        %% "skunk-circe"             % skunkVersion,
-      "org.flywaydb"         % "flyway-core"             % flywayVersion,
-      "org.postgresql"       % "postgresql"              % postgresVersion,
-      "org.http4s"          %% "http4s-blaze-server"     % http4sBlazeVersion,
-      "org.http4s"          %% "http4s-ember-client"     % http4sVersion,
-      "org.http4s"          %% "http4s-circe"            % http4sVersion,
-      "org.http4s"          %% "http4s-dsl"              % http4sVersion,
-      "is.cir"              %% "ciris"                   % cirisVersion,
-      "com.monovore"        %% "decline-effect"          % declineVersion,
-      "org.typelevel"       %% "log4cats-slf4j"          % log4catsVersion,
-      "ch.qos.logback"       % "logback-classic"         % logbackVersion,
-      "io.circe"            %% "circe-generic"           % circeVersion,
-      "org.tpolecat"        %% "natchez-honeycomb"       % natchezVersion,
-      "org.tpolecat"        %% "natchez-http4s"          % natchezHttp4sVersion,
-      "org.tpolecat"        %% "natchez-log"             % natchezVersion,
-      "edu.gemini"          %% "lucuma-graphql-routes"   % lucumaGraphQLRoutesVersion,
-      "io.circe"            %% "circe-literal"           % circeVersion  % Test,
-      "com.disneystreaming" %% "weaver-cats"             % weaverVersion % Test,
-      "com.disneystreaming" %% "weaver-scalacheck"       % weaverVersion % Test
+      "org.typelevel"       %% "grackle-skunk"              % grackleVersion,
+      "org.tpolecat"        %% "skunk-core"                 % skunkVersion,
+      "org.tpolecat"        %% "skunk-circe"                % skunkVersion,
+      "org.flywaydb"         % "flyway-database-postgresql" % flywayVersion,
+      "org.postgresql"       % "postgresql"                 % postgresVersion,
+      "org.http4s"          %% "http4s-blaze-server"        % http4sBlazeVersion,
+      "org.http4s"          %% "http4s-ember-client"        % http4sVersion,
+      "org.http4s"          %% "http4s-circe"               % http4sVersion,
+      "org.http4s"          %% "http4s-dsl"                 % http4sVersion,
+      "is.cir"              %% "ciris"                      % cirisVersion,
+      "com.monovore"        %% "decline-effect"             % declineVersion,
+      "org.typelevel"       %% "log4cats-slf4j"             % log4catsVersion,
+      "ch.qos.logback"       % "logback-classic"            % logbackVersion,
+      "io.circe"            %% "circe-generic"              % circeVersion,
+      "org.tpolecat"        %% "natchez-honeycomb"          % natchezVersion,
+      "org.tpolecat"        %% "natchez-http4s"             % natchezHttp4sVersion,
+      "org.tpolecat"        %% "natchez-log"                % natchezVersion,
+      "edu.gemini"          %% "lucuma-graphql-routes"      % lucumaGraphQLRoutesVersion,
+      "io.circe"            %% "circe-literal"              % circeVersion  % Test,
+      "org.typelevel"       %% "weaver-cats"                % weaverVersion % Test,
+      "org.typelevel"       %% "weaver-scalacheck"          % weaverVersion % Test
     ),
     testFrameworks += new TestFramework("weaver.framework.CatsEffect"),
     reStart / envVars += "PORT" -> "8082",
@@ -809,7 +809,7 @@ lazy val service = project
       "edu.gemini"                       %% "lucuma-graphql-routes"                      % lucumaGraphQLRoutesVersion,
       "is.cir"                           %% "ciris"                                      % cirisVersion,
       "is.cir"                           %% "ciris-refined"                              % cirisVersion,
-      "org.flywaydb"                      % "flyway-core"                                % flywayVersion,
+      "org.flywaydb"                      % "flyway-database-postgresql"                 % flywayVersion,
       "org.http4s"                       %% "http4s-blaze-server"                        % http4sBlazeVersion,
       "org.http4s"                       %% "http4s-ember-client"                        % http4sVersion,
       "org.postgresql"                    % "postgresql"                                 % postgresVersion,
@@ -943,7 +943,7 @@ lazy val resourceService = project
       "edu.gemini"    %% "lucuma-graphql-routes"                 % lucumaGraphQLRoutesVersion,
       "is.cir"        %% "ciris-http4s"                          % cirisVersion,
       "is.cir"        %% "ciris"                                 % cirisVersion,
-      "org.flywaydb"   % "flyway-core"                           % flywayVersion,
+      "org.flywaydb"   % "flyway-database-postgresql"            % flywayVersion,
       "org.http4s"    %% "http4s-circe"                          % http4sVersion,
       "org.http4s"    %% "http4s-dsl"                            % http4sVersion,
       "org.http4s"    %% "http4s-ember-server"                   % http4sVersion,

@@ -3057,4 +3057,53 @@ class createObservation extends OdbSuite with TelluricTypeGraphQLFormat {
           expected = { case OdbError.InvalidArgument(Some(msg)) if msg.contains("requires both `name` and `totalRequestTime`") => () }
         )
 
+  test("[general] created observation should have specified splittable property"):
+    assertIOBoolean:
+      createProgramAs(pi).flatMap: pid =>
+        query(pi,
+          s"""
+            mutation {
+              createObservation(input: {
+                programId: ${pid.asJson}
+                SET: {
+                  schedulingConstraints: {
+                    isSplittable: false
+                  }
+                }
+              }) {
+                observation {
+                  schedulingConstraints {
+                    isSplittable
+                  }
+                }
+              }
+            }
+          """
+        ).map: js =>
+          !js.hcursor
+             .downFields("createObservation", "observation", "schedulingConstraints", "isSplittable")
+             .require[Boolean]
+
+  test("[general] created observation should have default splittable property"):
+    assertIOBoolean:
+      createProgramAs(pi).flatMap: pid =>
+        query(pi,
+          s"""
+            mutation {
+              createObservation(input: {
+                programId: ${pid.asJson}
+              }) {
+                observation {
+                  schedulingConstraints {
+                    isSplittable
+                  }
+                }
+              }
+            }
+          """
+        ).map: js =>
+          js.hcursor
+            .downFields("createObservation", "observation", "schedulingConstraints", "isSplittable")
+            .require[Boolean]
+
 }

@@ -354,7 +354,7 @@ class timingWindows_deprecated extends OdbSuite {
     }
   }
 
-  test("create fail when both timingWindows and scheduling are present"):
+  test("create fail when both timingWindows and schedulingConstraints are present"):
     createProgramAs(pi).flatMap: p =>
       expect(
         user  = pi,
@@ -364,7 +364,7 @@ class timingWindows_deprecated extends OdbSuite {
               programId: "$p"
               SET: {
                 timingWindows: $TimingWindowsInput
-                scheduling: {
+                schedulingConstraints: {
                   timingWindows: $TimingWindowsInput
                 }
               }
@@ -375,10 +375,10 @@ class timingWindows_deprecated extends OdbSuite {
             }
           }
         """,
-        expected = List("Argument 'input.SET' is invalid: Set timing windows via the 'scheduling' properties field.").asLeft
+        expected = List("Argument 'input.SET' is invalid: Set timing windows via the 'schedulingConstraints' field.").asLeft
       )
 
-  test("update fail when both timingWindows and scheduling are present"):
+  test("update fail when both timingWindows and schedulingConstraints are present"):
     createProgramAs(pi).flatMap: p =>
       createObservation(pi, p, TimingWindowsInput.some).flatMap: o =>
         expect(
@@ -393,7 +393,7 @@ class timingWindows_deprecated extends OdbSuite {
                 },
                 SET: {
                   timingWindows: $TimingWindowsInput
-                  scheduling: {
+                  schedulingConstraints: {
                     timingWindows: $TimingWindowsInput
                   }
                 }
@@ -404,7 +404,7 @@ class timingWindows_deprecated extends OdbSuite {
               }
             }
           """,
-          expected = List("Argument 'input.SET' is invalid: Set timing windows via the 'scheduling' properties field.").asLeft
+          expected = List("Argument 'input.SET' is invalid: Set timing windows via the 'schedulingConstraints' field.").asLeft
         )
 
 }

@@ -69,7 +69,7 @@ object SsoClientSuite extends SsoSuite with Fixture with FlakyTests {
                       )
                     )
 
-        } yield expect(name == "Bob Dobbs")
+        } yield expect.same("Bob Dobbs", name)
       }
     )
   }
@@ -107,7 +107,7 @@ object SsoClientSuite extends SsoSuite with Fixture with FlakyTests {
                       )
                     )
 
-        } yield expect(name == "Bob Dobbs")
+        } yield expect.same("Bob Dobbs", name)
       }
     )
   }
@@ -142,7 +142,7 @@ object SsoClientSuite extends SsoSuite with Fixture with FlakyTests {
                       )
                     )
 
-        } yield expect(status == Status.Forbidden)
+        } yield expect.same(Status.Forbidden, status)
       }
     )
   }
