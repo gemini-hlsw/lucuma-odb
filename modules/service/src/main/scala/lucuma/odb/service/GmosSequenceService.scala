@@ -12,13 +12,13 @@ import cats.syntax.eq.*
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import cats.syntax.option.*
+import lucuma.core.enums.ImagingVariantType
 import lucuma.core.enums.MosPreImaging
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.gmos.DynamicConfig
 import lucuma.core.model.sequence.gmos.StaticConfig
-import lucuma.odb.data.ImagingVariantType
 import lucuma.odb.sequence.gmos.InitialConfigs
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.GmosCodecs.*

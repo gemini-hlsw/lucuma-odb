@@ -10,6 +10,7 @@ import cats.syntax.either.*
 import cats.syntax.flatMap.*
 import cats.syntax.foldable.*
 import cats.syntax.functor.*
+import lucuma.core.enums.ImagingVariantType
 import lucuma.core.enums.Site
 import lucuma.core.enums.StepGuideState
 import lucuma.core.enums.TelescopeConfigGeneratorType
@@ -18,7 +19,6 @@ import lucuma.core.math.Angle
 import lucuma.core.math.Offset
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.TelescopeConfig
-import lucuma.odb.data.ImagingVariantType
 import lucuma.odb.data.TelescopeConfigGeneratorRole
 import lucuma.odb.graphql.input.TelescopeConfigGeneratorInput
 import lucuma.odb.sequence.data.TelescopeConfigGenerator

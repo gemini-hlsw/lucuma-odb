@@ -11,6 +11,7 @@ import eu.timepit.refined.types.numeric.NonNegInt
 import grackle.Result
 import grackle.ResultT
 import grackle.syntax.*
+import lucuma.core.enums.ImagingVariantType
 import lucuma.core.enums.Site
 import lucuma.core.enums.WavelengthOrder
 import lucuma.core.math.Offset
@@ -18,7 +19,6 @@ import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.Observation
 import lucuma.odb.data.ExposureTimeModeId
 import lucuma.odb.data.ExposureTimeModeRole
-import lucuma.odb.data.ImagingVariantType
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.ObservingModeRowVersion
 import lucuma.odb.data.TelescopeConfigGeneratorRole

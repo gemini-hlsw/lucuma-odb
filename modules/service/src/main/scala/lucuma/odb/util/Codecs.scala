@@ -19,6 +19,7 @@ import lucuma.ags.GuideStarName
 import lucuma.core.data.EmailAddress
 import lucuma.core.enums.*
 import lucuma.core.enums.ImagingCapability
+import lucuma.core.enums.ImagingVariantType
 import lucuma.core.math.Angle
 import lucuma.core.math.BoundedInterval
 import lucuma.core.math.Coordinates
@@ -63,7 +64,6 @@ import lucuma.odb.data.ExposureTimeModeId
 import lucuma.odb.data.ExposureTimeModeRole
 import lucuma.odb.data.ExposureTimeModeType
 import lucuma.odb.data.Extinction
-import lucuma.odb.data.ImagingVariantType
 import lucuma.odb.data.Md5Hash
 import lucuma.odb.data.ObservingModeRowVersion
 import lucuma.odb.data.OdbError

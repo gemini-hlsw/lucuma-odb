@@ -18,6 +18,7 @@ import lucuma.core.data.EmailAddress
 import lucuma.core.enums.*
 import lucuma.core.enums.ConsiderForBand3
 import lucuma.core.enums.ImagingCapability
+import lucuma.core.enums.ImagingVariantType
 import lucuma.core.math.Epoch
 import lucuma.core.math.SignalToNoise
 import lucuma.core.model.Attachment
@@ -55,7 +56,6 @@ import lucuma.odb.data.EditType
 import lucuma.odb.data.ExecutionEventType
 import lucuma.odb.data.Existence
 import lucuma.odb.data.Extinction
-import lucuma.odb.data.ImagingVariantType
 import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.data.StepExecutionState
 import lucuma.odb.data.Tag
